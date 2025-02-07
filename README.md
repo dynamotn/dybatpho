@@ -6,7 +6,7 @@ dybatpho is a portmanteau of `đi bát phố`. `đi` is related to my nickname (
 
 ## Usage
 1. Add dybatpho into your project in the way that best fits your workflow
-The only requirement is that you *pin the version of dybatpho* that you use. This is important so that changes to dybatpho do not have the power to break all projects that use dybatpho. Your project can then test updates to dybatpho and roll forward periodically.
+The only requirement is that you **pin the version of dybatpho** that you use. This is important so that changes to dybatpho do not have the power to break all projects that use dybatpho. Your project can then test updates to dybatpho and roll forward periodically.
 - Add as a submodule: it's an easy way to integrate dybatpho and automatically use a single SHA until manually updated. Submodules add a pointer from a mount point in your repo to the external repo (dybatpho), and require workflow changes to ensure that pointer is referenced during clone, checkout and some other operations.
 ```sh
 git submodule add --depth 1 https://github.com/dynamotn/dybatpho.git <path>

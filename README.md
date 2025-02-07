@@ -6,6 +6,7 @@ The place to store functions that are used in pipelines, scripts for multiple re
 
 ## Usage
 1. Add `dybatpho` into your project in the way that best fits your workflow
+
 The only requirement is that you **pin the version of `dybatpho`** that you use. This is important so that changes to `dybatpho` do not have the power to break all projects that use `dybatpho`. Your project can then test updates to `dybatpho` and roll forward periodically.
 - Add as a submodule: it's an easy way to integrate `dybatpho` and automatically use a single SHA until manually updated. Submodules add a pointer from a mount point in your repo to the external repo (`dybatpho`), and require workflow changes to ensure that pointer is referenced during clone, checkout and some other operations.
 ```sh
@@ -24,6 +25,7 @@ git subtree pull --prefix <path> https://github.com/dynamotn/dybatpho.git main -
 
 - Clone `dybatpho` in your deployment process, `dybatpho` doesn't have to be within your repo, just needs to be somewhere where your scripts can source [init.sh](init.sh). This is where it's most important that you implement a mechanism to always use the same SHA, as a clone will track main branch by default, which is not an allowed use of `dybatpho`.
 2. Source logics
+
 Once you have `dybatpho` cloned in your project, you source by two ways:
 
 - Source `dybatpho/init.sh`: This ensures submodules are initialized. This makes it easy to source libraries from other scripts.

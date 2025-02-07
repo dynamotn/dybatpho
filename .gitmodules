@@ -1,0 +1,4 @@
+[submodule "test/lib/bats"]
+        path = test/lib/core
+        url = https://github.com/bats-core/bats-core
+        shallow = true

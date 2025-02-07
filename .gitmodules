@@ -1,4 +1,13 @@
+# vim:expandtab:shiftwidth=8:tabstop=8:softtabstop=8:ft=gitconfig
 [submodule "test/lib/bats"]
         path = test/lib/core
         url = https://github.com/bats-core/bats-core
+        shallow = true
+[submodule "test/lib/support"]
+        path = test/lib/support
+        url = https://github.com/bats-core/bats-support
+        shallow = true
+[submodule "test/lib/assert"]
+        path = test/lib/assert
+        url = https://github.com/bats-core/bats-assert
         shallow = true

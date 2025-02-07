@@ -34,6 +34,17 @@ Once you have `dybatpho` cloned in your project, you source by two ways:
 ## Structure
 
 ```
+ .
+├──  init.sh # initial script, source it first
+├──  src
+│   ├──  *.sh # module
+├──  test # unit test folder
+│   ├──  lib # library from bats
+│   │   ├──  assert
+│   │   ├──  core
+│   │   └──  support
+│   ├──  *.bats # unit test for each module
+└──  test.sh # unit test script
 ```
 ## Contents
 |Library|Description|Functions|

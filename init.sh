@@ -23,5 +23,5 @@ export DYBATPHO_DIR
 # Load modules
 for module in string logging helpers; do
   # shellcheck disable=SC1090
-  source "${DYBATPHO_DIR}/src/${module}.sh"
+  . "${DYBATPHO_DIR}/src/${module}.sh"
 done

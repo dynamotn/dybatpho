@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-source "$SCRIPT_DIR/../init.sh" # correct path of dybatpho at here
+. "$SCRIPT_DIR/../init.sh" # correct path of dybatpho at here
 
 tmpfile="$(mktemp -t myprogram-XXXXXX)"
-trap _clean_up EXIT
+trap __clean_up EXIT
 
-_clean_up() {
+function __clean_up {
   rm -f "$tmpfile"
 }
 
-_main() {
-  _require "chezmoi"
-  _info "This is example script that used dybatpho"
-  _start_trace
+function __main {
+  dybatpho::require "chezmoi"
+  dybatpho::info "This is example script that used dybatpho"
+  dybatpho::start_trace
   whoami
-  _end_trace
-  _success "Finish all logics of this script"
+  dybatpho::end_trace
+  dybatpho::success "Finish all logics of this script"
 }
 
 # shellcheck disable=SC2034
 LOG_LEVEL=trace
-_main
+__main

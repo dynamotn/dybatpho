@@ -8,20 +8,20 @@ This module contains functions to log messages to stdout/stderr.
 
 ## Index
 
-* [_verify_log_level](#verifyloglevel)
-* [_log](#log)
-* [_debug](#debug)
-* [_info](#info)
-* [_progress](#progress)
-* [_notice](#notice)
-* [_success](#success)
-* [_warning](#warning)
-* [_error](#error)
-* [_fatal](#fatal)
-* [_start_trace](#starttrace)
-* [_end_trace](#endtrace)
+* [__verify_log_level](#verifyloglevel)
+* [__log](#log)
+* [dybatpho::debug](#dybatphodebug)
+* [dybatpho::info](#dybatphoinfo)
+* [dybatpho::progress](#dybatphoprogress)
+* [dybatpho::notice](#dybatphonotice)
+* [dybatpho::success](#dybatphosuccess)
+* [dybatpho::warning](#dybatphowarning)
+* [dybatpho::error](#dybatphoerror)
+* [dybatpho::fatal](#dybatphofatal)
+* [dybatpho::start_trace](#dybatphostarttrace)
+* [dybatpho::end_trace](#dybatphoendtrace)
 
-### _verify_log_level
+### __verify_log_level
 
 Verify log level from input.
 
@@ -34,7 +34,7 @@ Verify log level from input.
 * **0**: If is valid log level
 * **1**: If invalid
 
-### _log
+### __log
 
 Log a message to stdout/stderr with color and caution.
 
@@ -58,7 +58,7 @@ Log a message to stdout/stderr with color and caution.
 
 * Show message if log level of message is less than runtime log level and $3 is `stderr`
 
-### _debug
+### dybatpho::debug
 
 Show debug message.
 
@@ -70,7 +70,7 @@ Show debug message.
 
 * Show message if log level of message is less than debug level
 
-### _info
+### dybatpho::info
 
 Show info message.
 
@@ -82,7 +82,7 @@ Show info message.
 
 * Show message if log level of message is less than info level
 
-### _progress
+### dybatpho::progress
 
 Show in progress message.
 
@@ -94,7 +94,7 @@ Show in progress message.
 
 * Show message if log level of message is less than info level
 
-### _notice
+### dybatpho::notice
 
 Show notice message with banner.
 
@@ -106,7 +106,7 @@ Show notice message with banner.
 
 * Show message if log level of message is less than info level
 
-### _success
+### dybatpho::success
 
 Show success message.
 
@@ -118,7 +118,7 @@ Show success message.
 
 * Show message if log level of message is less than info level
 
-### _warning
+### dybatpho::warning
 
 Show warning message.
 
@@ -130,7 +130,7 @@ Show warning message.
 
 * Show message if log level of message is less than warning level
 
-### _error
+### dybatpho::error
 
 Show error message.
 
@@ -142,7 +142,7 @@ Show error message.
 
 * Show message if log level of message is less than error level
 
-### _fatal
+### dybatpho::fatal
 
 Show fatal message and exit process.
 
@@ -159,13 +159,13 @@ Show fatal message and exit process.
 
 * Show message if log level of message is less than fatal level
 
-### _start_trace
+### dybatpho::start_trace
 
 Start tracing script.
 
 _Function has no arguments._
 
-### _end_trace
+### dybatpho::end_trace
 
 End tracing script.
 

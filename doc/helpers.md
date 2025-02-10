@@ -8,9 +8,9 @@ This module contains functions to write efficient script.
 
 ## Index
 
-* [_require](#require)
+* [dybatpho::require](#dybatphorequire)
 
-### _require
+### dybatpho::require
 
 Check command dependency is installed.
 

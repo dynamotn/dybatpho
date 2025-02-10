@@ -8,15 +8,15 @@ This module contains functions to manipulate, convert, etc with string.
 
 ## Index
 
-* [_trim](#trim)
-* [_split](#split)
-* [_url_encode](#urlencode)
-* [_url_decode](#urldecode)
-* [_lower](#lower)
-* [_upper](#upper)
-* [_reverse](#reverse)
+* [dybatpho::trim](#dybatphotrim)
+* [dybatpho::split](#dybatphosplit)
+* [dybatpho::url_encode](#dybatphourlencode)
+* [dybatpho::url_decode](#dybatphourldecode)
+* [dybatpho::lower](#dybatpholower)
+* [dybatpho::upper](#dybatphoupper)
+* [dybatpho::reverse](#dybatphoreverse)
 
-### _trim
+### dybatpho::trim
 
 Trim leading and trailing white-space from string.
 
@@ -28,7 +28,7 @@ Trim leading and trailing white-space from string.
 
 * Trimmed string
 
-### _split
+### dybatpho::split
 
 Split a string on a delimiter.
 
@@ -41,7 +41,7 @@ Split a string on a delimiter.
 
 * Show each part of splited string
 
-### _url_encode
+### dybatpho::url_encode
 
 URL-encode a string.
 
@@ -53,7 +53,7 @@ URL-encode a string.
 
 * Encoded string
 
-### _url_decode
+### dybatpho::url_decode
 
 URL-decode a string.
 
@@ -65,7 +65,7 @@ URL-decode a string.
 
 * Decoded string
 
-### _lower
+### dybatpho::lower
 
 Convert a string to lowercase.
 
@@ -77,7 +77,7 @@ Convert a string to lowercase.
 
 * Converted string
 
-### _upper
+### dybatpho::upper
 
 Convert a string to uppercase.
 
@@ -89,7 +89,7 @@ Convert a string to uppercase.
 
 * Converted string
 
-### _reverse
+### dybatpho::reverse
 
 Reverse a string case.
 

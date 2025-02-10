@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-source init.sh
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+source "$SCRIPT_DIR/../init.sh" # correct path of dybatpho at here
 
 tmpfile="$(mktemp -t myprogram-XXXXXX)"
 trap _clean_up EXIT

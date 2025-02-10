@@ -7,7 +7,7 @@
 
 # Require bash >= v4
 if ((BASH_VERSINFO[0] < 4)); then
-  echo "Bash-Lib requires bash v4 or greater"
+  echo "dybatpho requires bash v4 or greater"
   echo "Current Bash Version: ${BASH_VERSION}"
   exit 1
 fi

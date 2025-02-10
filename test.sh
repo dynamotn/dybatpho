@@ -5,6 +5,6 @@ export DYBATPHO_DIR
 # CMD to run bats
 BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 
-for module in string logging; do
+for module in string logging helpers; do
   "$BATS_CMD" "test/${module}.bats"
 done

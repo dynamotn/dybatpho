@@ -4,10 +4,6 @@ setup() {
   source "${DYBATPHO_DIR}/init.sh"
 }
 
-teardown() {
-  export LOG_LEVEL=info
-}
-
 @test "_lower output string" {
   run _lower "dYbaTPHO"
   assert_success

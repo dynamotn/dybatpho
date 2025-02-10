@@ -36,6 +36,7 @@ Once you have `dybatpho` cloned in your project, you source by two ways:
 ```
  .
 ├──  init.sh # initial script, source it first
+├──  example.sh # example script for user can use as a reference
 ├──  src
 │   ├──  *.sh # module
 ├──  test # unit test folder

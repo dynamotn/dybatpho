@@ -61,7 +61,7 @@ _log() {
 #######################################
 # Show debug message.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _debug() {
   _log debug "DEBUG: ${*}" stderr
@@ -70,7 +70,7 @@ _debug() {
 #######################################
 # Show info message.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _info() {
   _log info "INFO: ${*}" stderr
@@ -79,7 +79,7 @@ _info() {
 #######################################
 # Show in progress message.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _progress() {
   _log info "${*}..." stdout "0;36"
@@ -88,7 +88,7 @@ _progress() {
 #######################################
 # Show notice message with banner.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _notice() {
   local color="1;30;44"
@@ -104,38 +104,40 @@ _notice() {
 #######################################
 # Show success message.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _success() {
-  _log info "DONE: ${*}" stdout "1;32;40"
+  _log info "DONE: ${1}" stdout "1;32;40"
 }
 
 #######################################
 # Show warning message.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _warning() {
-  _log warning "WARNING: ${*}" stderr
+  _log warning "WARNING: ${1}" stderr
 }
 
 #######################################
 # Show error message.
 # Arguments:
-#   Message
+#   1: Message
 #######################################
 _error() {
-  _log error "ERROR: ${*}" stderr
+  _log error "ERROR: ${1}" stderr
 }
 
 #######################################
 # Show fatal message and exit process.
 # Arguments:
-#   Message
+#   1: Message
+#   2: Exit code
 #######################################
 _fatal() {
-  _log fatal "FATAL: ${*}" stderr
-  exit 1
+  local exit_code=${2:-1}
+  _log fatal "FATAL: ${1}" stderr
+  exit "$exit_code"
 }
 
 #######################################

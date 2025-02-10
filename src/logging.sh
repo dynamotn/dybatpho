@@ -5,7 +5,7 @@
 #   This module contains functions to log messages to stdout/stderr.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-LOG_LEVEL=$(_lower "${LOG_LEVEL:-info}")
+LOG_LEVEL=$(dybatpho::lower "${LOG_LEVEL:-info}")
 export LOG_LEVEL
 
 #######################################
@@ -14,9 +14,9 @@ export LOG_LEVEL
 # @exitcode 0 If is valid log level
 # @exitcode 1 If invalid
 #######################################
-_verify_log_level() {
+function __verify_log_level {
   local level="${1}"
-  level=$(_lower "$level")
+  level=$(dybatpho::lower "$level")
   if [[ ${level} =~ trace|debug|info|warn|error|fatal ]]; then
     return 0
   else
@@ -36,7 +36,7 @@ _verify_log_level() {
 # @stdout Show message if log level of message is less than runtime log level and $3 is not `stderr`
 # @stderr Show message if log level of message is less than runtime log level and $3 is `stderr`
 #######################################
-_log() {
+function __log {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
   declare -A log_colors=([trace]="1;30;47" [debug]="0;37;40" [info]="0;40" [warn]="0;33;40" [error]="1;31;40" [fatal]="1;37;41")
   local show_log_level="${1}"
@@ -44,8 +44,8 @@ _log() {
   local out="${3:-stdout}"
   local color=${4:-${log_colors[${show_log_level}]}}
 
-  _verify_log_level "$LOG_LEVEL"
-  _verify_log_level "$show_log_level"
+  __verify_log_level "$LOG_LEVEL"
+  __verify_log_level "$show_log_level"
 
   local runtime_level_num="${log_levels[${LOG_LEVEL}]}"
   local write_level_num="${log_levels[${show_log_level}]}"
@@ -64,8 +64,8 @@ _log() {
 # @arg $1 string Message
 # @stderr Show message if log level of message is less than debug level
 #######################################
-_debug() {
-  _log debug "DEBUG: ${*}" stderr
+function dybatpho::debug {
+  __log debug "DEBUG: ${*}" stderr
 }
 
 #######################################
@@ -73,8 +73,8 @@ _debug() {
 # @arg $1 string Message
 # @stderr Show message if log level of message is less than info level
 #######################################
-_info() {
-  _log info "INFO: ${*}" stderr
+function dybatpho::info {
+  __log info "INFO: ${*}" stderr
 }
 
 #######################################
@@ -82,8 +82,8 @@ _info() {
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level
 #######################################
-_progress() {
-  _log info "${*}..." stdout "0;36"
+function dybatpho::progress {
+  __log info "${*}..." stdout "0;36"
 }
 
 #######################################
@@ -91,13 +91,13 @@ _progress() {
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level
 #######################################
-_notice() {
+function dybatpho::notice {
   local color="1;30;44"
-  _log info \
+  __log info \
     "================================================================================" \
     stdout "$color"
-  _log info "${*}" stdout "$color"
-  _log info \
+  __log info "${*}" stdout "$color"
+  __log info \
     "================================================================================" \
     stdout "$color"
 }
@@ -107,8 +107,8 @@ _notice() {
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level
 #######################################
-_success() {
-  _log info "DONE: ${1}" stdout "1;32;40"
+function dybatpho::success {
+  __log info "DONE: ${1}" stdout "1;32;40"
 }
 
 #######################################
@@ -116,8 +116,8 @@ _success() {
 # @arg $1 string Message
 # @stderr Show message if log level of message is less than warning level
 #######################################
-_warning() {
-  _log warning "WARNING: ${1}" stderr
+function dybatpho::warning {
+  __log warning "WARNING: ${1}" stderr
 }
 
 #######################################
@@ -125,8 +125,8 @@ _warning() {
 # @arg $1 string Message
 # @stderr Show message if log level of message is less than error level
 #######################################
-_error() {
-  _log error "ERROR: ${1}" stderr
+function dybatpho::error {
+  __log error "ERROR: ${1}" stderr
 }
 
 #######################################
@@ -136,9 +136,9 @@ _error() {
 # @stderr Show message if log level of message is less than fatal level
 # @exitcode $2 Stop to process anything else
 #######################################
-_fatal() {
+function dybatpho::fatal {
   local exit_code=${2:-1}
-  _log fatal "FATAL: ${1}" stderr
+  __log fatal "FATAL: ${1}" stderr
   exit "$exit_code"
 }
 
@@ -146,8 +146,8 @@ _fatal() {
 # @description Start tracing script.
 # @noargs
 #######################################
-_start_trace() {
-  _log trace "START TRACE" stderr
+function dybatpho::start_trace {
+  __log trace "START TRACE" stderr
   [ "$LOG_LEVEL" = "trace" ] && set -x
 }
 
@@ -155,7 +155,7 @@ _start_trace() {
 # @description End tracing script.
 # @noargs
 #######################################
-_end_trace() {
+function dybatpho::end_trace {
   set +x
-  _log trace "END TRACE" stderr
+  __log trace "END TRACE" stderr
 }

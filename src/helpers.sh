@@ -11,6 +11,6 @@
 # @exitcode 127 Stop script if command isn't installed
 # @exitcode 0 Otherwise run seamlessly
 #######################################
-_require() {
-  hash "$1" || _fatal "$1 isn't installed" 127
+function dybatpho::require {
+  hash "$1" || dybatpho::fatal "$1 isn't installed" 127
 }

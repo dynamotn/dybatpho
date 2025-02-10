@@ -11,7 +11,7 @@
 # @stdout Trimmed string
 #######################################
 # shellcheck disable=SC2317
-_trim() {
+function dybatpho::trim {
   : "${1#"${1%%[![:space:]]*}"}"
   : "${_%"${_##*[![:space:]]}"}"
   printf '%s\n' "$_"
@@ -23,7 +23,7 @@ _trim() {
 # @arg $2 string Delimiter
 # @stdout Show each part of splited string
 #######################################
-_split() {
+function dybatpho::split {
   IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}"
   printf '%s\n' "${arr[@]}"
 }
@@ -33,7 +33,7 @@ _split() {
 # @arg $1 string String to encode
 # @stdout Encoded string
 #######################################
-_url_encode() {
+function dybatpho::url_encode {
   local LC_ALL=C
   for (( i = 0; i < ${#1}; i++ )); do
     : "${1:i:1}"
@@ -55,7 +55,7 @@ _url_encode() {
 # @arg $1 string String to decode
 # @stdout Decoded string
 #######################################
-_url_decode() {
+function dybatpho::url_decode {
   : "${1//+/ }"
   printf '%b\n' "${_//%/\\x}"
 }
@@ -65,7 +65,7 @@ _url_decode() {
 # @arg $1 string String to convert
 # @stdout Converted string
 #######################################
-_lower() {
+function dybatpho::lower {
   printf '%s\n' "${1,,}"
 }
 
@@ -74,7 +74,7 @@ _lower() {
 # @arg $1 string String to convert
 # @stdout Converted string
 #######################################
-_upper() {
+function dybatpho::upper {
   printf '%s\n' "${1^^}"
 }
 
@@ -83,6 +83,6 @@ _upper() {
 # @arg $1 string String to convert
 # @stdout Converted string
 #######################################
-_reverse() {
+function dybatpho::reverse {
   printf '%s\n' "${1~~}"
 }

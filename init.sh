@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# This script should be sourced before any of
+# @file init.sh
+# @brief Initial script
+# @description This script should be sourced before any of
 # the other scripts in this repo. Other scripts
 # make use of ${DYBATPHO_DIR} to find each other.
 

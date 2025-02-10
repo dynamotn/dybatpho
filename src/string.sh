@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
+# @file string.sh
+# @brief Utilities for working with string
+# @description
+#   This module contains functions to manipulate, convert, etc with string.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# Trim leading and trailing white-space from string.
-# Arguments:
-#   1: string to change
-# Outputs:
-#   Trimmed string
+# @description Trim leading and trailing white-space from string.
+# @arg $1 string String to change
+# @stdout Trimmed string
 #######################################
 # shellcheck disable=SC2317
 _trim() {
@@ -16,12 +18,10 @@ _trim() {
 }
 
 #######################################
-# Split a string on a delimiter.
-# Arguments:
-#   1: string to split
-#   2: delimiter
-# Outputs:
-#   Show each part of splited string
+# @description Split a string on a delimiter.
+# @arg $1 string String to split
+# @arg $2 string Delimiter
+# @stdout Show each part of splited string
 #######################################
 _split() {
   IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}"
@@ -29,11 +29,9 @@ _split() {
 }
 
 #######################################
-# URL-encode a string.
-# Arguments:
-#   1: string to encode
-# Outputs:
-#   Encoded string
+# @description URL-encode a string.
+# @arg $1 string String to encode
+# @stdout Encoded string
 #######################################
 _url_encode() {
   local LC_ALL=C
@@ -53,11 +51,9 @@ _url_encode() {
 }
 
 #######################################
-# URL-decode a string.
-# Arguments:
-#   1: string to decode
-# Outputs:
-#   Decoded string
+# @description URL-decode a string.
+# @arg $1 string String to decode
+# @stdout Decoded string
 #######################################
 _url_decode() {
   : "${1//+/ }"
@@ -65,33 +61,27 @@ _url_decode() {
 }
 
 #######################################
-# Convert a string to lowercase.
-# Arguments:
-#   1: string to change
-# Outputs:
-#   Converted string
+# @description Convert a string to lowercase.
+# @arg $1 string String to convert
+# @stdout Converted string
 #######################################
 _lower() {
   printf '%s\n' "${1,,}"
 }
 
 #######################################
-# Convert a string to uppercase.
-# Arguments:
-#   1: string to change
-# Outputs:
-#   Converted string
+# @description Convert a string to uppercase.
+# @arg $1 string String to convert
+# @stdout Converted string
 #######################################
 _upper() {
   printf '%s\n' "${1^^}"
 }
 
 #######################################
-# Reverse a string case.
-# Arguments:
-#   1: string to convert
-# Outputs:
-#   Converted string
+# @description Reverse a string case.
+# @arg $1 string String to convert
+# @stdout Converted string
 #######################################
 _reverse() {
   printf '%s\n' "${1~~}"

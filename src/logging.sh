@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
+# @file logging.sh
+# @brief Utilities for logging to stdout/stderr
+# @description
+#   This module contains functions to log messages to stdout/stderr.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 LOG_LEVEL=$(_lower "${LOG_LEVEL:-info}")
 export LOG_LEVEL
 
 #######################################
-# Verify log level from input.
-# Arguments:
-#   1: string of log level
-# Returns:
-#   0 if is valid log level, 1 if invalid
+# @description Verify log level from input.
+# @arg $1 string String of log level
+# @exitcode 0 If is valid log level
+# @exitcode 1 If invalid
 #######################################
 _verify_log_level() {
   local level="${1}"
@@ -23,17 +26,15 @@ _verify_log_level() {
 }
 
 #######################################
-# Log a message to stdout/stderr with color and caution.
-# Globals:
-#   LOG_LEVEL
-# Arguments:
-#   1: Log level of message
-#   2: Message
-#   3: `stdout`/`stderr`
-#   4: ANSI escape color code
-#   5: Command to run after log
-# Outputs:
-#   Write to stdout/stderr message if log level of message is less than runtime log level
+# @description Log a message to stdout/stderr with color and caution.
+# @set LOG_LEVEL string Log level of script
+# @arg $1 string Log level of message
+# @arg $2 string Message
+# @arg $3 string `stderr` to output to stderr, otherwise then to stdout
+# @arg $4 string ANSI escape color code
+# @arg $5 string Command to run after log
+# @stdout Show message if log level of message is less than runtime log level and $3 is not `stderr`
+# @stderr Show message if log level of message is less than runtime log level and $3 is `stderr`
 #######################################
 _log() {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
@@ -59,36 +60,36 @@ _log() {
 }
 
 #######################################
-# Show debug message.
-# Arguments:
-#   1: Message
+# @description Show debug message.
+# @arg $1 string Message
+# @stderr Show message if log level of message is less than debug level
 #######################################
 _debug() {
   _log debug "DEBUG: ${*}" stderr
 }
 
 #######################################
-# Show info message.
-# Arguments:
-#   1: Message
+# @description Show info message.
+# @arg $1 string Message
+# @stderr Show message if log level of message is less than info level
 #######################################
 _info() {
   _log info "INFO: ${*}" stderr
 }
 
 #######################################
-# Show in progress message.
-# Arguments:
-#   1: Message
+# @description Show in progress message.
+# @arg $1 string Message
+# @stdout Show message if log level of message is less than info level
 #######################################
 _progress() {
   _log info "${*}..." stdout "0;36"
 }
 
 #######################################
-# Show notice message with banner.
-# Arguments:
-#   1: Message
+# @description Show notice message with banner.
+# @arg $1 string Message
+# @stdout Show message if log level of message is less than info level
 #######################################
 _notice() {
   local color="1;30;44"
@@ -102,37 +103,38 @@ _notice() {
 }
 
 #######################################
-# Show success message.
-# Arguments:
-#   1: Message
+# @description Show success message.
+# @arg $1 string Message
+# @stdout Show message if log level of message is less than info level
 #######################################
 _success() {
   _log info "DONE: ${1}" stdout "1;32;40"
 }
 
 #######################################
-# Show warning message.
-# Arguments:
-#   1: Message
+# @description Show warning message.
+# @arg $1 string Message
+# @stderr Show message if log level of message is less than warning level
 #######################################
 _warning() {
   _log warning "WARNING: ${1}" stderr
 }
 
 #######################################
-# Show error message.
-# Arguments:
-#   1: Message
+# @description Show error message.
+# @arg $1 string Message
+# @stderr Show message if log level of message is less than error level
 #######################################
 _error() {
   _log error "ERROR: ${1}" stderr
 }
 
 #######################################
-# Show fatal message and exit process.
-# Arguments:
-#   1: Message
-#   2: Exit code
+# @description Show fatal message and exit process.
+# @arg $1 string Message
+# @arg $2 number Exit code
+# @stderr Show message if log level of message is less than fatal level
+# @exitcode $2 Stop to process anything else
 #######################################
 _fatal() {
   local exit_code=${2:-1}
@@ -141,7 +143,8 @@ _fatal() {
 }
 
 #######################################
-# Start tracing script.
+# @description Start tracing script.
+# @noargs
 #######################################
 _start_trace() {
   _log trace "START TRACE" stderr
@@ -149,7 +152,8 @@ _start_trace() {
 }
 
 #######################################
-# End tracing script.
+# @description End tracing script.
+# @noargs
 #######################################
 _end_trace() {
   set +x

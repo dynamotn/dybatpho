@@ -132,7 +132,7 @@ function dybatpho::error {
 #######################################
 # @description Show fatal message and exit process.
 # @arg $1 string Message
-# @arg $2 number Exit code
+# @arg $2 number Exit code, default is 1
 # @stderr Show message if log level of message is less than fatal level
 # @exitcode $2 Stop to process anything else
 #######################################

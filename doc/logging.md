@@ -149,7 +149,7 @@ Show fatal message and exit process.
 #### Arguments
 
 * **$1** (string): Message
-* **$2** (number): Exit code
+* **$2** (number): Exit code, default is 1
 
 #### Exit codes
 

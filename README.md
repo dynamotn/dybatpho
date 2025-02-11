@@ -56,3 +56,4 @@ You can see `doc/example.sh` for example usages.
 - [string.sh](doc/string.md)
 - [logging.sh](doc/logging.md)
 - [helpers.sh](doc/helpers.md)
+- [process.sh](doc/process.md)

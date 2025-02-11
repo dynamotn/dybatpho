@@ -13,7 +13,7 @@ if ((BASH_VERSINFO[0] < 4)); then
 fi
 
 # Default shell options
-set -Eeuo pipefail         # Strict mode
+set -euo pipefail          # Strict mode
 shopt -s nullglob globstar # Safer and better globbing
 shopt -s extglob           # Extended globbing
 

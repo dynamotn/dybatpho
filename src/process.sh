@@ -7,7 +7,6 @@
 
 #######################################
 # @description Stop script/process.
-# @set SELF_PID number Top level PID
 # @arg $1 string Message
 # @arg $2 number Exit code, default is 1
 # @exitcode $2 Stop to process anything else
@@ -16,4 +15,28 @@ function dybatpho::die {
   local exit_code=${2:-1}
   dybatpho::fatal "${1}" "${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"
   exit "$exit_code"
+}
+
+#######################################
+# @description Register error handling.
+# @noargs
+#######################################
+function dybatpho::register_err_handler {
+  set -E
+  trap 'dybatpho::run_err_handler ${?}' ERR
+}
+
+#######################################
+# @description Run error handling.
+# @arg $1 number Exit code
+#######################################
+function dybatpho::run_err_handler {
+  trap - ERR
+  i=0
+  printf -- '%s\n' "Aborting on error ${1}:" \
+    "--------------------" >&2
+  while caller "$i"; do
+    ((i++))
+  done
+  exit "${1}"
 }

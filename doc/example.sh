@@ -4,6 +4,7 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 tmpfile="$(mktemp -t myprogram-XXXXXX)"
 trap __clean_up EXIT
+dybatpho::register_err_handler
 
 function __clean_up {
   rm -f "$tmpfile"

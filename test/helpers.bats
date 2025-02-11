@@ -1,7 +1,5 @@
 setup() {
-  . "${DYBATPHO_DIR}/test/lib/support/load.bash"
-  . "${DYBATPHO_DIR}/test/lib/assert/load.bash"
-  . "${DYBATPHO_DIR}/init.sh"
+  load test_helper
 }
 
 @test "dybatpho::require installed tool" {

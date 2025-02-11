@@ -15,7 +15,7 @@ This module contains functions to log messages to stdout/stderr.
 * [dybatpho::progress](#dybatphoprogress)
 * [dybatpho::notice](#dybatphonotice)
 * [dybatpho::success](#dybatphosuccess)
-* [dybatpho::warning](#dybatphowarning)
+* [dybatpho::warn](#dybatphowarn)
 * [dybatpho::error](#dybatphoerror)
 * [dybatpho::fatal](#dybatphofatal)
 * [dybatpho::start_trace](#dybatphostarttrace)
@@ -120,13 +120,14 @@ Show success message.
 
 * Show message if log level of message is less than info level
 
-### dybatpho::warning
+### dybatpho::warn
 
 Show warning message.
 
 #### Arguments
 
 * **$1** (string): Message
+* **$2** (string): Indicator of message, default is `<invoke file>:<line number of invoke file>`
 
 #### Output on stderr
 
@@ -139,6 +140,7 @@ Show error message.
 #### Arguments
 
 * **$1** (string): Message
+* **$2** (string): Indicator of message, default is `<invoke file>:<line number of invoke file>`
 
 #### Output on stderr
 
@@ -151,11 +153,7 @@ Show fatal message and exit process.
 #### Arguments
 
 * **$1** (string): Message
-* **$2** (number): Exit code, default is 1
-
-#### Exit codes
-
-* $**2**: Stop to process anything else
+* **$2** (string): Indicator of message, default is `<invoke file>:<line number of invoke file>`
 
 #### Output on stderr
 

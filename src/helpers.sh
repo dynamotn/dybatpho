@@ -3,7 +3,7 @@
 # @brief Utilities for writing efficient script
 # @description
 #   This module contains functions to write efficient script.
-: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 #######################################
 # @description Check command dependency is installed.

@@ -3,7 +3,7 @@
 # @brief Utilities for logging to stdout/stderr
 # @description
 #   This module contains functions to log messages to stdout/stderr.
-: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 LOG_LEVEL=$(dybatpho::lower "${LOG_LEVEL:-info}")
 export LOG_LEVEL

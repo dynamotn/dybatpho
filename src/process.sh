@@ -3,7 +3,7 @@
 # @brief Utilities for process handling
 # @description
 #   This module contains functions to error handling, fork process...
-: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 #######################################
 # @description Stop script/process.

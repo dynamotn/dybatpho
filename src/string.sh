@@ -3,7 +3,7 @@
 # @brief Utilities for working with string
 # @description
 #   This module contains functions to manipulate, convert, etc with string.
-: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 #######################################
 # @description Trim leading and trailing white-space from string.

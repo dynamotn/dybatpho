@@ -3,7 +3,7 @@
 # @brief Test all modules of dybatpho
 # Get path to root of repository and export to subshell
 DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
-. "$DYBATPHO_DIR/init.sh"
+. "$DYBATPHO_DIR/init"
 # CMD to run bats
 BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 dybatpho::require "kcov"

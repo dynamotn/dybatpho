@@ -23,12 +23,12 @@ git subtree add --prefix <path> https://github.com/dynamotn/dybatpho.git main --
 git subtree pull --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
 ```
 
-- Clone `dybatpho` in your deployment process, `dybatpho` doesn't have to be within your repo, just needs to be somewhere where your scripts can source [init.sh](init.sh). This is where it's most important that you implement a mechanism to always use the same SHA, as a clone will track main branch by default, which is not an allowed use of `dybatpho`.
+- Clone `dybatpho` in your deployment process, `dybatpho` doesn't have to be within your repo, just needs to be somewhere where your scripts can source [init](init). This is where it's most important that you implement a mechanism to always use the same SHA, as a clone will track main branch by default, which is not an allowed use of `dybatpho`.
 2. Source logics
 
 Once you have `dybatpho` cloned in your project, you source by two ways:
 
-- Source `dybatpho/init.sh`: This ensures submodules are initialized. This makes it easy to source libraries from other scripts.
+- Source `dybatpho/init`: This ensures submodules are initialized. This makes it easy to source libraries from other scripts.
 - Source `dybatpho/src/<library name>.sh` for any libraries you are interested in.
 
 You can see `doc/example.sh` for example usages.
@@ -37,7 +37,7 @@ You can see `doc/example.sh` for example usages.
 
 ```
  .
-├──  init.sh # initial script, source it first
+├──  init # initial script, source it first
 ├──  doc # documentation of modules
 │   ├──  *.md # module
 │   └──  example.sh # example script for user can use as a reference

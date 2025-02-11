@@ -2,7 +2,7 @@
 # @file doc.sh
 # @brief Generate documentation of dybatpho
 DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
-. "$DYBATPHO_DIR/init.sh"
+. "$DYBATPHO_DIR/init"
 dybatpho::require "shdoc"
 dybatpho::require "gawk"
 

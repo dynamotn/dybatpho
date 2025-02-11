@@ -31,7 +31,7 @@ Once you have `dybatpho` cloned in your project, you source by two ways:
 - Source `dybatpho/init`: This ensures submodules are initialized. This makes it easy to source libraries from other scripts.
 - Source `dybatpho/src/<library name>.sh` for any libraries you are interested in.
 
-You can see `doc/example.sh` for example usages.
+You can see [example.sh](doc/example.sh) for example usages.
 
 ## Structure
 

@@ -15,6 +15,7 @@ fi
 # Default shell options
 set -Eeuo pipefail         # Strict mode
 shopt -s nullglob globstar # Safer and better globbing
+shopt -s extglob           # Extended globbing
 
 # Get path to root of repository and export to subshell
 DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -25,3 +26,6 @@ for module in string logging helpers; do
   # shellcheck disable=SC1090
   . "${DYBATPHO_DIR}/src/${module}.sh"
 done
+
+# Filter functions and re-export only dybatpho functions to subshells
+eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"

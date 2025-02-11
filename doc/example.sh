@@ -18,6 +18,7 @@ function __main {
   dybatpho::pause_trace
   dybatpho::end_trace
   dybatpho::success "Finish all logics of this script"
+  dybatpho::die "Test" 1
 }
 
 # shellcheck disable=SC2034

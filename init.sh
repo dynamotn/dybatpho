@@ -22,7 +22,7 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
 export DYBATPHO_DIR
 
 # Load modules
-for module in string logging helpers; do
+for module in string logging helpers process; do
   # shellcheck disable=SC1090
   . "${DYBATPHO_DIR}/src/${module}.sh"
 done

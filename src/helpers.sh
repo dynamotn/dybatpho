@@ -12,5 +12,5 @@
 # @exitcode 0 Otherwise run seamlessly
 #######################################
 function dybatpho::require {
-  hash "$1" || dybatpho::fatal "$1 isn't installed" 127
+  hash "$1" || dybatpho::die "$1 isn't installed" 127
 }

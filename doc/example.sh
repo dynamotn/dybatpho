@@ -13,7 +13,9 @@ function __main {
   dybatpho::require "chezmoi"
   dybatpho::info "This is example script that used dybatpho"
   dybatpho::start_trace
+  dybatpho::breakpoint
   whoami
+  dybatpho::pause_trace
   dybatpho::end_trace
   dybatpho::success "Finish all logics of this script"
 }

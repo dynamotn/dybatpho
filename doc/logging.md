@@ -19,6 +19,8 @@ This module contains functions to log messages to stdout/stderr.
 * [dybatpho::error](#dybatphoerror)
 * [dybatpho::fatal](#dybatphofatal)
 * [dybatpho::start_trace](#dybatphostarttrace)
+* [dybatpho::pause_trace](#dybatphopausetrace)
+* [dybatpho::breakpoint](#dybatphobreakpoint)
 * [dybatpho::end_trace](#dybatphoendtrace)
 
 ### __verify_log_level
@@ -162,6 +164,18 @@ Show fatal message and exit process.
 ### dybatpho::start_trace
 
 Start tracing script.
+
+_Function has no arguments._
+
+### dybatpho::pause_trace
+
+Pause when tracing script.
+
+_Function has no arguments._
+
+### dybatpho::breakpoint
+
+Hit breakpoint when tracing script.
 
 _Function has no arguments._
 

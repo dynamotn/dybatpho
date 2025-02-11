@@ -147,8 +147,42 @@ function dybatpho::fatal {
 # @noargs
 #######################################
 function dybatpho::start_trace {
+  [ "$LOG_LEVEL" != "trace" ] && return
   __log trace "START TRACE" stderr
-  [ "$LOG_LEVEL" = "trace" ] && set -x
+  export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+  trap 'set +x' EXIT
+  set -xv
+}
+
+#######################################
+# @description Pause when tracing script.
+# @noargs
+#######################################
+function dybatpho::pause_trace {
+  [ "$LOG_LEVEL" != "trace" ] && return
+  read -n 1 -s -r -p "Press any key to continue"
+}
+
+#######################################
+# @description Hit breakpoint when tracing script.
+# @noargs
+#######################################
+function dybatpho::breakpoint {
+  [ "$LOG_LEVEL" != "trace" ] && return
+  local REPLY
+  local help='Breakpoint hit. [hopaAq]\nh: display help\no: list options\np: list parameters\na: list array\nA: list associative array\nq: quit'
+  echo -e "$help"
+  while read -r -N1; do case $REPLY in
+    h) echo -e "$help" ;;
+    o)
+      shopt -s
+      set -o
+      ;;
+    p) declare -p | less ;;
+    a) declare -a ;;
+    A) declare -A ;;
+    q) return ;;
+  esac done
 }
 
 #######################################
@@ -156,6 +190,6 @@ function dybatpho::start_trace {
 # @noargs
 #######################################
 function dybatpho::end_trace {
-  set +x
-  __log trace "END TRACE" stderr
+  set +xv
+  [ "$LOG_LEVEL" = "trace" ] && __log trace "END TRACE" stderr
 }

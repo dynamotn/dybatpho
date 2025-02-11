@@ -11,9 +11,14 @@ function __clean_up {
 }
 
 function __main {
-  dybatpho::require "chezmoi"
+  if ! dybatpho::is "command" "chezmoi"; then
+    dybatpho::require "chezmoi"
+  else
+    dybatpho::debug "chezmoi is installed"
+  fi
   dybatpho::info "This is example script that used dybatpho"
   dybatpho::start_trace
+  dybatpho::is "set" "dyfoooo"
   dybatpho::breakpoint
   whoami
   dybatpho::pause_trace

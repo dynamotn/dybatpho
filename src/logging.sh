@@ -149,7 +149,7 @@ function dybatpho::fatal {
 # @noargs
 #######################################
 function dybatpho::start_trace {
-  [ "$LOG_LEVEL" != "trace" ] && return 1
+  [ "$LOG_LEVEL" != "trace" ] && return
   __log trace "START TRACE" stderr
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
   trap 'set +xv' EXIT && set -xv
@@ -160,7 +160,7 @@ function dybatpho::start_trace {
 # @noargs
 #######################################
 function dybatpho::pause_trace {
-  [ "$LOG_LEVEL" != "trace" ] && return 1
+  [ "$LOG_LEVEL" != "trace" ] && return
   read -n1 -s -r -p "Press any key to continue"
 }
 
@@ -169,7 +169,7 @@ function dybatpho::pause_trace {
 # @noargs
 #######################################
 function dybatpho::breakpoint {
-  [ "$LOG_LEVEL" != "trace" ] && return 1
+  [ "$LOG_LEVEL" != "trace" ] && return
   local key_pressed
   local help='Breakpoint hit.'$'\no: list options'$'\np: list parameters'$'\na: list indexed array'$'\nA: list associative array'$'\nq: quit'
   while read -n1 -s -r -p $"$help" key_pressed; do case $key_pressed in
@@ -190,7 +190,7 @@ function dybatpho::breakpoint {
 # @noargs
 #######################################
 function dybatpho::end_trace {
-  set +xv \
-    && [ "$LOG_LEVEL" = "trace" ] \
-    && __log trace "END TRACE" stderr
+  set +xv
+  [ "$LOG_LEVEL" != "trace" ] && return
+  __log trace "END TRACE" stderr
 }

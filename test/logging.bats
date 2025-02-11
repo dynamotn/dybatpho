@@ -107,7 +107,7 @@ teardown() {
 
 @test "dybatpho::start_trace doesn't output anything when using default log level" {
   run dybatpho::start_trace
-  assert_failure
+  assert_success
   refute_output "START TRACE"
 }
 
@@ -122,7 +122,7 @@ teardown() {
 
 @test "dybatpho::pause_trace doesn't output anything when using default log level" {
   run dybatpho::pause_trace
-  assert_failure
+  assert_success
 }
 
 @test "dybatpho::pause_trace wait for output" {
@@ -133,7 +133,7 @@ teardown() {
 
 @test "dybatpho::breakpoint doesn't output anything when using default log level" {
   run dybatpho::breakpoint
-  assert_failure
+  assert_success
 }
 
 @test "dybatpho::breakpoint wait for output" {
@@ -144,7 +144,7 @@ teardown() {
 
 @test "dybatpho::end_trace doesn't output anything when using default log level" {
   run dybatpho::end_trace
-  assert_failure
+  assert_success
   refute_output "END TRACE"
 }
 

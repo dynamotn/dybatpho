@@ -27,7 +27,7 @@ function dybatpho::register_err_handler {
 }
 
 #######################################
-# @description Run error handling.
+# @description Run error handling. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
 # @arg $1 number Exit code
 #######################################
 function dybatpho::run_err_handler {

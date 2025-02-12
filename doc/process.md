@@ -33,7 +33,7 @@ _Function has no arguments._
 
 ### dybatpho::run_err_handler
 
-Run error handling.
+Run error handling. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
 
 #### Arguments
 

@@ -14,6 +14,37 @@ setup() {
   assert_output --partial "dyfoooo isn't installed"
 }
 
+@test "dybatpho::expect_args have right spec" {
+  test_function() {
+    local arg1 arg2
+    dybatpho::expect_args arg1 arg2 -- "$@"
+    assert_equal "$arg1" "this is first arg"
+    assert_equal "$arg2" "this is second arg"
+  }
+  run test_function "this is first arg" "this is second arg"
+  assert_success
+}
+
+@test "dybatpho::expect_args not have right spec" {
+  test_function() {
+    local arg1 arg2
+    dybatpho::expect_args arg1 arg2 "$@"
+  }
+  run test_function "this is first arg" "this is second arg"
+  assert_failure
+}
+
+@test "dybatpho::expect_args not have enough args" {
+  test_function() {
+    local arg1 arg2
+    dybatpho::expect_args arg1 arg2 -- "$@"
+  }
+  run test_function
+  assert_failure
+  run test_function "1"
+  assert_failure
+}
+
 @test "dybatpho::is with empty" {
   run dybatpho::is
   assert_failure

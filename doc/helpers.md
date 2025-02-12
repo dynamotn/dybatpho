@@ -8,8 +8,23 @@ This module contains functions to write efficient script.
 
 ## Index
 
+* [dybatpho::expect_args](#dybatphoexpectargs)
 * [dybatpho::require](#dybatphorequire)
 * [dybatpho::is](#dybatphois)
+
+### dybatpho::expect_args
+
+Validate argument when invoke function. It adds a small performance penalty but is a sane option.
+
+#### Example
+
+```bash
+  local arg1 arg2 .. argN
+  dybatpho::expect_args arg1 arg2 .. argN -- "$@"
+@exitcode 1 Stop script if not correct spec: enough variable names to get, `--`, and list of arguments to pass `$@`
+            or not have enough arguments that follow by spec
+@exitcode 0 Otherwise run seamlessly, pass value of argument to variable name
+```
 
 ### dybatpho::require
 

@@ -6,6 +6,41 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 #######################################
+# @description Validate argument when invoke function. It adds a small performance penalty but is a sane option.
+# @example
+#   local arg1 arg2 .. argN
+#   dybatpho::expect_args arg1 arg2 .. argN -- "$@"
+# @exitcode 1 Stop script if not correct spec: enough variable names to get, `--`, and list of arguments to pass `$@`
+#             or not have enough arguments that follow by spec
+# @exitcode 0 Otherwise run seamlessly, pass value of argument to variable name
+#######################################
+function dybatpho::expect_args {
+  local variable_names=()
+  local is_error=1
+
+  while (($#)); do
+    if [ "$1" = -- ]; then
+      is_error=0
+      shift
+      break
+    fi
+    variable_names+=("$1")
+    shift
+  done
+
+  ((${is_error})) && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"'
+
+  local variable_name
+  for variable_name in "${variable_names[@]}"; do
+    if ! (($#)); then
+      dybatpho::die "${FUNCNAME[1]:--}: Expected args: ${variable_names[*]:-}"
+    fi
+    eval "${variable_name}=\$1"
+    shift
+  done
+}
+
+#######################################
 # @description Check command dependency is installed.
 # @arg $1 string Command need to be installed
 # @exitcode 127 Stop script if command isn't installed

@@ -11,12 +11,14 @@ function __clean_up {
 }
 
 function __main {
+  local message
+  dybatpho::expect_args message -- "$@"
   if ! dybatpho::is "command" "chezmoi"; then
     dybatpho::require "chezmoi"
   else
     dybatpho::debug "chezmoi is installed"
   fi
-  dybatpho::info "This is example script that used dybatpho"
+  dybatpho::info "$message"
   dybatpho::start_trace
   dybatpho::is "set" "dyfoooo"
   dybatpho::breakpoint
@@ -29,4 +31,4 @@ function __main {
 
 # shellcheck disable=SC2034
 LOG_LEVEL=trace
-__main
+__main "This is example script that used dybatpho"

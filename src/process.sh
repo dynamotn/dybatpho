@@ -12,8 +12,10 @@
 # @exitcode $2 Stop to process anything else
 #######################################
 function dybatpho::die {
-  local exit_code=${2:-1}
-  dybatpho::fatal "${1}" "${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"
+  local message exit_code
+  dybatpho::expect_args message -- "$@"
+  exit_code=${2:-1}
+  dybatpho::fatal "$message" "${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"
   exit "$exit_code"
 }
 
@@ -32,11 +34,13 @@ function dybatpho::register_err_handler {
 #######################################
 function dybatpho::run_err_handler {
   trap - ERR
-  i=0
-  printf -- '%s\n' "Aborting on error ${1}:" \
+  local exit_code
+  dybatpho::expect_args exit_code -- "$@"
+  local i=0
+  printf -- '%s\n' "Aborting on error ${exit_code}:" \
     "--------------------" >&2
   while caller "$i"; do
     ((i++))
   done
-  exit "${1}"
+  exit "$exit_code"
 }

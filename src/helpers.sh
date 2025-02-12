@@ -59,8 +59,8 @@ function dybatpho::require {
 # @exitcode 1 If not matched
 #######################################
 function dybatpho::is {
-  local condition="${1}"
-  local input="${2}"
+  local condition input
+  dybatpho::expect_args condition input -- "$@"
   case "$condition" in
     command)
       command -v "$input"

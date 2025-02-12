@@ -28,7 +28,7 @@ function __verify_log_level {
 #######################################
 # @description Log a message to stdout/stderr with color and caution.
 # @set LOG_LEVEL string Log level of script
-# @arg $1 string Log level of message
+# @arg $1 string Log level of message (trace|debug|info|warn|error|fatal). Default is `info`
 # @arg $2 string Message
 # @arg $3 string `stderr` to output to stderr, otherwise then to stdout
 # @arg $4 string ANSI escape color code

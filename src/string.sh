@@ -35,6 +35,7 @@ function dybatpho::split {
 #######################################
 function dybatpho::url_encode {
   local LC_ALL=C
+  local i
   for (( i = 0; i < ${#1}; i++ )); do
     : "${1:i:1}"
     case "$_" in

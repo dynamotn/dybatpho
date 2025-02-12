@@ -10,6 +10,7 @@
 # @example
 #   local arg1 arg2 .. argN
 #   dybatpho::expect_args arg1 arg2 .. argN -- "$@"
+#
 # @exitcode 1 Stop script if not correct spec: enough variable names to get, `--`, and list of arguments to pass `$@`
 #             or not have enough arguments that follow by spec
 # @exitcode 0 Otherwise run seamlessly, pass value of argument to variable name

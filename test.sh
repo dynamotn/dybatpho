@@ -8,7 +8,7 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
 BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 dybatpho::require "kcov"
 
-for module in string logging helpers process; do
+for module in string logging helpers process network; do
   kcov --include-pattern=.sh \
     --exclude-path="$DYBATPHO_DIR"/test \
     "$DYBATPHO_DIR"/coverage \

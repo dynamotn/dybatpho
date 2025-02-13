@@ -3,6 +3,8 @@
 # @brief Utilities for logging to stdout/stderr
 # @description
 #   This module contains functions to log messages to stdout/stderr.
+#
+# **LOG_LEVEL** (string): Run time log level of all messages (trace|debug|info|warn|error|fatal). Default is `info`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 LOG_LEVEL=$(dybatpho::lower "${LOG_LEVEL:-info}")
@@ -28,7 +30,7 @@ function __verify_log_level {
 #######################################
 # @description Log a message to stdout/stderr with color and caution.
 # @set LOG_LEVEL string Log level of script
-# @arg $1 string Log level of message (trace|debug|info|warn|error|fatal). Default is `info`
+# @arg $1 string Log level of message
 # @arg $2 string Message
 # @arg $3 string `stderr` to output to stderr, otherwise then to stdout
 # @arg $4 string ANSI escape color code

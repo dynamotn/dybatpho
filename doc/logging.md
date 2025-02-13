@@ -6,6 +6,8 @@ Utilities for logging to stdout/stderr
 
 This module contains functions to log messages to stdout/stderr.
 
+**LOG_LEVEL** (string): Run time log level of all messages (trace|debug|info|warn|error|fatal). Default is `info`
+
 ## Index
 
 * [__verify_log_level](#verifyloglevel)
@@ -42,7 +44,7 @@ Log a message to stdout/stderr with color and caution.
 
 #### Arguments
 
-* **$1** (string): Log level of message (trace|debug|info|warn|error|fatal). Default is `info`
+* **$1** (string): Log level of message
 * **$2** (string): Message
 * **$3** (string): `stderr` to output to stderr, otherwise then to stdout
 * **$4** (string): ANSI escape color code

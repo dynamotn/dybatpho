@@ -1,0 +1,2 @@
+[env]
+COVERALL_TOKEN = { value = "", redact = true }

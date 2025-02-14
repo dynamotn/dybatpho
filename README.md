@@ -1,4 +1,6 @@
 # dybatpho
+[![Coverage Status](https://coveralls.io/repos/github/dynamotn/dybatpho/badge.svg)](https://coveralls.io/github/dynamotn/dybatpho)
+
 The place to store functions that are used in pipelines, scripts for multiple repositories.
 
 ## What does `dybatpho` mean?

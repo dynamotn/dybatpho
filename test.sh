@@ -9,7 +9,9 @@ BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 dybatpho::require "kcov"
 
 for module in string logging helpers process network; do
-  kcov --include-pattern=.sh \
+  kcov \
+    --coveralls-id="$COVERALL_TOKEN" \
+    --include-pattern=.sh \
     --exclude-path="$DYBATPHO_DIR"/test \
     --exclude-line="# kcov(skip)" \
     --exclude-region="# kcov(disabled):# kcov(enabled)" \

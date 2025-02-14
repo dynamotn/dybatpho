@@ -1,0 +1,27 @@
+name: CI
+
+permissions:
+  contents: read
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: kcov/kcov
+    steps:
+      - name: "Install git"
+        run: apt-get update && apt-get install -y --fix-missing git
+
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: "Test"
+        run: bash test.sh
+
+      - name: "Coveralls"
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

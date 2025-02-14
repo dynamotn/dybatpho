@@ -7,6 +7,8 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # CMD to run bats
 BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 dybatpho::require "kcov"
+dybatpho::require "parallel"
+dybatpho::require "nproc"
 
 kcov \
   --clean \
@@ -18,4 +20,5 @@ kcov \
   --configure=coveralls-service-name=github-actions \
   "$DYBATPHO_DIR"/coverage \
   "$BATS_CMD" \
+  -j "$(nproc)" \
   "${DYBATPHO_DIR}/test"

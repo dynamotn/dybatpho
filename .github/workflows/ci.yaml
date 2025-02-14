@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     container: kcov/kcov
     steps:
-      - name: "Install git"
+      - name: "Install dependencies"
         run: |
           apt-get update && apt-get install -y --fix-missing git parallel curl
           useradd test
@@ -26,5 +26,5 @@ jobs:
         uses: coverallsapp/github-action@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          format: "coveralls"
-          file: "coverage/bats.*/coveralls.out"
+          format: "cobertura"
+          files: "coverage/bats/cobertura.xml"

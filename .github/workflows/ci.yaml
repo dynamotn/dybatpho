@@ -8,7 +8,7 @@ jobs:
     container: kcov/kcov
     steps:
       - name: "Install git"
-        run: apt-get update && apt-get install -y --fix-missing git
+        run: apt-get update && apt-get install -y --fix-missing git parallel
 
       - name: "Checkout"
         uses: actions/checkout@v4

@@ -8,8 +8,6 @@ This module contains functions to work with network connection.
 
 **DYBATPHO_CURL_MAX_RETRIES** (number): Max number of retries when using `curl` failed
 
-**DYBATPHO_CURL_DISABLED_RETRY** (string): Flag to disable retrying after using `curl` failed
-
 ## Index
 
 * [__get_http_code](#gethttpcode)

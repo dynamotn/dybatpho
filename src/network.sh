@@ -5,11 +5,9 @@
 #   This module contains functions to work with network connection.
 #
 # **DYBATPHO_CURL_MAX_RETRIES** (number): Max number of retries when using `curl` failed
-#
-# **DYBATPHO_CURL_DISABLED_RETRY** (string): Flag to disable retrying after using `curl` failed
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
+
 DYBATPHO_CURL_MAX_RETRIES=${DYBATPHO_CURL_MAX_RETRIES:-5}
-DYBATPHO_CURL_DISABLED_RETRY=${DYBATPHO_CURL_DISABLED_RETRY:-"false"}
 
 #######################################
 # @description Get description of HTTP status code
@@ -112,6 +110,7 @@ function dybatpho::curl_do {
   retries="$DYBATPHO_CURL_MAX_RETRIES"
   code=
   while ((retries)); do
+    # kcov(disabled)
     code=$(
       curl -fsSL "$url" \
         -w '%{http_code}' \
@@ -119,15 +118,13 @@ function dybatpho::curl_do {
         "$@" \
         2> /dev/null
     ) || true
+    # kcov(enabled)
 
     local code_description
     code_description=$(__get_http_code "$code")
     dybatpho::debug "Received HTTP status: $code_description"
 
-    if [[ "$code" =~ '2'.* ]]; then
-      break
-    fi
-    if [[ "$code" =~ '4'.* ]] && dybatpho::is true "$DYBATPHO_CURL_DISABLED_RETRY"; then
+    if [[ "$code" =~ '2'.* ]] || [[ "$code" =~ '4'.* ]]; then
       break
     fi
 

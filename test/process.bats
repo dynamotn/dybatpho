@@ -3,7 +3,6 @@ setup() {
 }
 
 @test 'dybatpho::die output' {
-  bats_require_minimum_version 1.5.0
   local exit_code=7
   run -"$exit_code" dybatpho::die loioday "$exit_code"
   assert_failure
@@ -16,7 +15,6 @@ setup() {
 }
 
 @test 'dybatpho::run_err_handler output' {
-  bats_require_minimum_version 1.5.0
   local exit_code=7
   run -"$exit_code" dybatpho::run_err_handler "$exit_code"
   assert_failure

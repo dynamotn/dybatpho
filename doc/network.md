@@ -14,6 +14,7 @@ This module contains functions to work with network connection.
 
 * [__get_http_code](#gethttpcode)
 * [dybatpho::curl_do](#dybatphocurldo)
+* [dybatpho::curl_download](#dybatphocurldownload)
 
 ### __get_http_code
 
@@ -51,4 +52,21 @@ dybatpho::curl_do <url> --output /tmp/1
 * **4**: First digit of HTTP error code 4xx
 * **5**: First digit of HTTP error code 5xx
 * **127**: Curl isn't installed
+
+### dybatpho::curl_download
+
+Download file
+
+#### Arguments
+
+* $1 URL
+* **$2** (Destination): of file to download
+
+#### Exit codes
+
+* **2**: Can't create folder of destination file
+
+#### See also
+
+* [dybatpho::curl_do](#dybatphocurldo)
 

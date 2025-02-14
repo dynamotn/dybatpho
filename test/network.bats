@@ -34,3 +34,17 @@ teardown() {
   assert_success
   assert_file_not_empty "${TEST_TEMP_DIR}/curl_do"
 }
+
+@test "dybatpho::curl_download not have right spec" {
+  run dybatpho::curl_download
+  assert_failure
+  run dybatpho::curl_download https://github.com
+  assert_failure
+}
+
+@test "dybatpho::curl_download with output" {
+  local temp_file=$TEST_TEMP_DIR/test/curl_download
+  run dybatpho::curl_download https://github.com "$temp_file"
+  assert_success
+  assert_file_not_empty "${TEST_TEMP_DIR}/test/curl_download"
+}

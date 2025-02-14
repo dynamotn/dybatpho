@@ -108,15 +108,15 @@ function dybatpho::curl_do {
   while ((retries)); do
     code=$(
       /usr/bin/curl -fsSL "$url" \
-        --write-out '%{http_code}' \
-        --output "$output" \
+        -w '%{http_code}' \
+        -o "$output" \
         "$@" \
         2> /dev/null
     ) || true
 
     local code_description
     code_description=$(__get_http_code "$code")
-    dybatpho::debug "$code_description"
+    dybatpho::debug "Received HTTP status: $code_description"
 
     if [[ "$code" =~ '2'.* ]]; then
       break
@@ -145,4 +145,24 @@ function dybatpho::curl_do {
     '5'*) return 5 ;;
     *) return 1 ;;
   esac
+}
+
+#######################################
+# @description Download file
+# @arg $1 URL
+# @arg $2 Destination of file to download
+# @see dybatpho::curl_do
+# @exitcode 2 Can't create folder of destination file
+#######################################
+function dybatpho::curl_download {
+  local url dst_file
+  dybatpho::expect_args url dst_file -- "$@"
+  dybatpho::progress "Downloading ${url}"
+
+  # Create destination folder
+  local dst_dir
+  dst_dir=$(dirname "$dst_file") || return 2
+  mkdir -p "$dst_dir" || return 2
+
+  dybatpho::curl_do "$url" "$dst_file" || return
 }

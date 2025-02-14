@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: "Install git"
         run: |
-          apt-get update && apt-get install -y --fix-missing git parallel
+          apt-get update && apt-get install -y --fix-missing git parallel curl
           useradd test
 
       - name: "Checkout"
@@ -23,6 +23,8 @@ jobs:
           su - test bash -c $(pwd)/test.sh
 
       - name: "Coveralls"
-        uses: coverallsapp/github-action@master
+        uses: coverallsapp/github-action@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          format: "coveralls"
+          file: "coverage/bats.*/coveralls.out"

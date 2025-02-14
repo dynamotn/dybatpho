@@ -7,9 +7,11 @@
 
 # Require bash >= v4
 if ((BASH_VERSINFO[0] < 4)); then
+  # kcov(disabled)
   echo "dybatpho requires bash v4 or greater"
   echo "Current Bash Version: ${BASH_VERSION}"
   exit 1
+  # kcov(enabled)
 fi
 
 # Default shell options

@@ -13,11 +13,10 @@ dybatpho::require "nproc"
 kcov \
   --clean \
   --dump-summary \
-  --include-pattern=.sh \
+  --include-path="$DYBATPHO_DIR" \
   --exclude-path="$DYBATPHO_DIR"/test \
   --exclude-line="# kcov(skip)" \
   --exclude-region="# kcov(disabled):# kcov(enabled)" \
-  --configure=coveralls-service-name=github-actions \
   "$DYBATPHO_DIR"/coverage \
   "$BATS_CMD" \
   -j "$(nproc)" \

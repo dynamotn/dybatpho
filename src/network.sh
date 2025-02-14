@@ -138,7 +138,7 @@ function dybatpho::curl_do {
       retry=$((DYBATPHO_CURL_MAX_RETRIES - retries))
       delay=$((2 ** retry))
 
-      dybatpho::progress "Retrying in ${delay} seconds (${retry}/${max_retries})..."
+      dybatpho::progress "Retrying in ${delay} seconds (${retry}/${DYBATPHO_CURL_MAX_RETRIES})..."
       sleep "$delay" || true
     fi
   done

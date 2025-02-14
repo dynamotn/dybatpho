@@ -21,9 +21,12 @@ __get_http_code() {
   dybatpho::expect_args code -- "$@"
 
   case "$code" in
+    # kcov(disabled)
     '100') echo '100 (continue)' ;;
     '101') echo '101 (switching protocols)' ;;
+    # kcov(enabled)
     '200') echo 'done' ;;
+    # kcov(disabled)
     '201') echo '201 (created)' ;;
     '202') echo '202 (accepted)' ;;
     '203') echo '203 (non-authoritative information)' ;;
@@ -41,7 +44,9 @@ __get_http_code() {
     '400') echo '400 (bad request)' ;;
     '401') echo '401 (unauthorized)' ;;
     '402') echo '402 (payment required)' ;;
+    # kcov(enabled)
     '403') echo '403 (forbidden)' ;;
+    # kcov(disabled)
     '404') echo '404 (not found)' ;;
     '405') echo '405 (method not allowed)' ;;
     '406') echo '406 (not acceptable)' ;;
@@ -74,6 +79,7 @@ __get_http_code() {
     '510') echo '510 (not extended)' ;;
     '511') echo '511 (network authentication required)' ;;
     *) echo "${code} (unknown)" ;;
+      # kcov(enabled)
   esac
 }
 

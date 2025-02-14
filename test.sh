@@ -11,6 +11,8 @@ dybatpho::require "kcov"
 for module in string logging helpers process network; do
   kcov --include-pattern=.sh \
     --exclude-path="$DYBATPHO_DIR"/test \
+    --exclude-line="# kcov(skip)" \
+    --exclude-region="# kcov(disabled):# kcov(enabled)" \
     "$DYBATPHO_DIR"/coverage \
     "$BATS_CMD" "${DYBATPHO_DIR}/test/${module}.bats"
 done

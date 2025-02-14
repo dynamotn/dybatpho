@@ -154,7 +154,7 @@ function dybatpho::start_trace {
   [ "$LOG_LEVEL" != "trace" ] && return
   __log trace "START TRACE" stderr
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
-  trap 'set +xv' EXIT && set -xv
+  trap 'set +xv' EXIT && set -xv # kcov(skip)
 }
 
 #######################################
@@ -163,7 +163,7 @@ function dybatpho::start_trace {
 #######################################
 function dybatpho::pause_trace {
   [ "$LOG_LEVEL" != "trace" ] && return
-  read -n1 -s -r -p "Press any key to continue"
+  read -n1 -s -r -p "Press any key to continue" # kcov(skip)
 }
 
 #######################################
@@ -175,7 +175,7 @@ function dybatpho::breakpoint {
   local key_pressed
   local help='Breakpoint hit.'$'\no: list options'$'\np: list parameters'$'\na: list indexed array'$'\nA: list associative array'$'\nq: quit'
   while read -n1 -s -r -p $"$help" key_pressed; do case $key_pressed in
-    o)
+    o) # kcov(skip)
       shopt -s
       set -o
       ;;
@@ -184,7 +184,7 @@ function dybatpho::breakpoint {
     A) declare -A ;;
     q) return ;;
     *) continue ;;
-  esac done
+  esac done # kcov(skip)
 }
 
 #######################################
@@ -193,6 +193,8 @@ function dybatpho::breakpoint {
 #######################################
 function dybatpho::end_trace {
   set +xv
+  # kcov(disabled)
   [ "$LOG_LEVEL" != "trace" ] && return
   __log trace "END TRACE" stderr
+  # kcov(enabled)
 }

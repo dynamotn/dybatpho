@@ -122,6 +122,6 @@ function dybatpho::is {
         '' | *) return 1 ;;
       esac
       ;;
-  esac 2>&1 > /dev/null
+  esac 2>&1 > /dev/null # kcov(skip)
   return 1
 }

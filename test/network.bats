@@ -1,7 +1,10 @@
 setup() {
   load test_helper
-  DYBATPHO_TEMP_FILE=$(mktemp)
-  trap "rm -f $DYBATPHO_TEMP_FILE" EXIT
+  TEST_TEMP_DIR=$(temp_make)
+}
+
+teardown() {
+  temp_del "$TEST_TEMP_DIR"
 }
 
 @test "__get_http_code no arg" {
@@ -26,7 +29,8 @@ setup() {
 }
 
 @test "dybatpho::curl_do with output" {
-  run dybatpho::curl_do https://github.com "$DYBATPHO_TEMP_FILE"
+  local temp_file="$TEST_TEMP_DIR/curl_do"
+  run dybatpho::curl_do https://github.com "$temp_file"
   assert_success
-  ! dybatpho::is empty "$(cat "$DYBATPHO_TEMP_FILE")"
+  assert_file_not_empty "${TEST_TEMP_DIR}/curl_do"
 }

@@ -11,3 +11,7 @@
         path = test/lib/assert
         url = https://github.com/bats-core/bats-assert
         shallow = true
+[submodule "test/lib/file"]
+        path = test/lib/file
+        url = https://github.com/bats-core/bats-file.git
+        shallow = true

@@ -113,7 +113,7 @@ function dybatpho::curl_do {
   code=
   while ((retries)); do
     code=$(
-      /usr/bin/curl -fsSL "$url" \
+      curl -fsSL "$url" \
         -w '%{http_code}' \
         -o "$output" \
         "$@" \

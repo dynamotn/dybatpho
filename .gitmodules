@@ -15,3 +15,7 @@
         path = test/lib/file
         url = https://github.com/bats-core/bats-file.git
         shallow = true
+[submodule "test/lib/mock"]
+        path = test/lib/mock
+        url = https://github.com/dynamotn/bats-mock.git
+        shallow = true

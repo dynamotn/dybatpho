@@ -8,7 +8,9 @@ jobs:
     container: kcov/kcov
     steps:
       - name: "Install git"
-        run: apt-get update && apt-get install -y --fix-missing git parallel
+        run: |
+          apt-get update && apt-get install -y --fix-missing git parallel
+          useradd test
 
       - name: "Checkout"
         uses: actions/checkout@v4
@@ -16,7 +18,9 @@ jobs:
           submodules: recursive
 
       - name: "Test"
-        run: bash test.sh
+        run: |
+          chown -R test $(pwd)
+          su - test bash -c $(pwd)/test.sh
 
       - name: "Coveralls"
         uses: coverallsapp/github-action@master

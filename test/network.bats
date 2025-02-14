@@ -1,10 +1,5 @@
 setup() {
   load test_helper
-  TEST_TEMP_DIR=$(temp_make)
-}
-
-teardown() {
-  temp_del "$TEST_TEMP_DIR"
 }
 
 @test "__get_http_code no arg" {
@@ -24,15 +19,19 @@ teardown() {
 }
 
 @test "dybatpho::curl_do only url" {
-  run dybatpho::curl_do https://github.com
+  stub curl ": echo '200'"
+  run dybatpho::curl_do https://this
+  unstub curl
   assert_success
 }
 
 @test "dybatpho::curl_do with output" {
-  local temp_file="$TEST_TEMP_DIR/curl_do"
-  run dybatpho::curl_do https://github.com "$temp_file"
+  local temp_file="$BATS_TEST_TMPDIR/curl_do"
+  stub curl ": echo '200'; echo 'hahaa' > $temp_file"
+  run dybatpho::curl_do https://this "$temp_file"
   assert_success
-  assert_file_not_empty "${TEST_TEMP_DIR}/curl_do"
+  assert_file_not_empty "${BATS_TEST_TMPDIR}/curl_do"
+  unstub curl
 }
 
 @test "dybatpho::curl_download not have right spec" {
@@ -43,8 +42,10 @@ teardown() {
 }
 
 @test "dybatpho::curl_download with output" {
-  local temp_file=$TEST_TEMP_DIR/test/curl_download
+  local temp_file=$BATS_TEST_TMPDIR/test/curl_download
+  stub curl ": echo '200'; echo 'hahaa' > $temp_file"
   run dybatpho::curl_download https://github.com "$temp_file"
   assert_success
-  assert_file_not_empty "${TEST_TEMP_DIR}/test/curl_download"
+  assert_file_not_empty "${BATS_TEST_TMPDIR}/test/curl_download"
+  unstub curl
 }

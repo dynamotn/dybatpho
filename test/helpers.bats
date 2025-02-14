@@ -77,8 +77,7 @@ setup() {
 }
 
 @test "dybatpho::is link" {
-  local temp=$(mktemp)
-  trap "rm -f $temp" EXIT
+  local temp="${BATS_TEST_TMPDIR}/link"
   ln -sf "${BASH_SOURCE[0]}" "$temp"
   run dybatpho::is "link" "$temp"
   assert_success
@@ -98,28 +97,37 @@ setup() {
 }
 
 @test "dybatpho::is readable" {
-  run dybatpho::is "readable" "$(dirname "${BASH_SOURCE[0]}")"
+  local temp="$(mktemp -p "$BATS_TEST_TMPDIR")"
+  chmod +r "$temp"
+  run dybatpho::is "readable" "$temp"
   assert_success
   refute_output
-  run dybatpho::is "readable" "/root"
+  chmod -r "$temp"
+  run dybatpho::is "readable" "$temp"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is writeable" {
-  run dybatpho::is "writeable" "$(dirname "${BASH_SOURCE[0]}")"
+  local temp="$(mktemp -p "$BATS_TEST_TMPDIR")"
+  chmod +w "$temp"
+  run dybatpho::is "writeable" "$temp"
   assert_success
   refute_output
-  run dybatpho::is "writeable" "/root"
+  chmod -w "$temp"
+  run dybatpho::is "writeable" "$temp"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is executable" {
-  run dybatpho::is "executable" "${DYBATPHO_DIR}/test.sh"
+  local temp="$(mktemp -p "$BATS_TEST_TMPDIR")"
+  chmod +x "$temp"
+  run dybatpho::is "executable" "$temp"
   assert_success
   refute_output
-  run dybatpho::is "executable" "/root"
+  chmod -x "$temp"
+  run dybatpho::is "executable" "$temp"
   assert_failure
   refute_output
 }

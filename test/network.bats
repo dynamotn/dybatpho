@@ -61,11 +61,11 @@ setup() {
     ": echo '300'" \
     ": echo '500'" \
     ": echo '101'"
-  run dybatpho::curl_do https://this "$temp_file"
+  run -3 dybatpho::curl_do https://this "$temp_file"
   assert_failure
-  run dybatpho::curl_do https://this "$temp_file"
+  run -5 dybatpho::curl_do https://this "$temp_file"
   assert_failure
-  run dybatpho::curl_do https://this "$temp_file"
+  run -1 dybatpho::curl_do https://this "$temp_file"
   assert_failure
   unstub curl
 }

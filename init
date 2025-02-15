@@ -24,10 +24,10 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
 export DYBATPHO_DIR
 
 # Load modules
-for module in string logging helpers process network; do
+while read module; do
   # shellcheck disable=SC1090
   . "${DYBATPHO_DIR}/src/${module}.sh"
-done
+done < "$DYBATPHO_DIR"/modules # kcov(skip)
 
 # Filter functions and re-export only dybatpho functions to subshells
 eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"

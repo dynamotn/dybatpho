@@ -6,6 +6,6 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
 dybatpho::require "shdoc"
 dybatpho::require "gawk"
 
-for module in string logging helpers process network; do
+while read module; do
   shdoc < "$DYBATPHO_DIR/src/$module.sh" > doc/"$module".md || true
-done
+done < "$DYBATPHO_DIR"/modules

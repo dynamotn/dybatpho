@@ -23,7 +23,6 @@ function __main {
   dybatpho::is "set" "dyfoooo"
   dybatpho::breakpoint
   whoami
-  dybatpho::pause_trace
   dybatpho::end_trace
   dybatpho::success "Finish all logics of this script"
   dybatpho::die "Test" 1

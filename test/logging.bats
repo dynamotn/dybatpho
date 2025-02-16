@@ -120,24 +120,7 @@ teardown() {
   assert_output --partial "$(echo -e "\e[0m")"
 }
 
-@test "dybatpho::pause_trace doesn't output anything when using default log level" {
-  run dybatpho::pause_trace
-  assert_success
-}
-
-@test "dybatpho::pause_trace wait for output" {
-  export LOG_LEVEL=trace
-  run dybatpho::breakpoint 2>&1 <<< "q"
-  assert_success
-}
-
-@test "dybatpho::breakpoint doesn't output anything when using default log level" {
-  run dybatpho::breakpoint
-  assert_success
-}
-
 @test "dybatpho::breakpoint wait for output" {
-  export LOG_LEVEL=trace
   run dybatpho::breakpoint 2>&1 <<< "hoaApq"
   assert_success
 }

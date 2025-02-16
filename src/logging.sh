@@ -158,36 +158,6 @@ function dybatpho::start_trace {
 }
 
 #######################################
-# @description Pause when tracing script.
-# @noargs
-#######################################
-function dybatpho::pause_trace {
-  [ "$LOG_LEVEL" != "trace" ] && return
-  read -n1 -s -r -p "Press any key to continue" # kcov(skip)
-}
-
-#######################################
-# @description Hit breakpoint when tracing script.
-# @noargs
-#######################################
-function dybatpho::breakpoint {
-  [ "$LOG_LEVEL" != "trace" ] && return
-  local key_pressed
-  local help='Breakpoint hit.'$'\no: list options'$'\np: list parameters'$'\na: list indexed array'$'\nA: list associative array'$'\nq: quit'
-  while read -n1 -s -r -p $"$help" key_pressed; do case $key_pressed in
-    o) # kcov(skip)
-      shopt -s
-      set -o
-      ;;
-    p) declare -p ;;
-    a) declare -a ;;
-    A) declare -A ;;
-    q) return ;;
-    *) continue ;;
-  esac done # kcov(skip)
-}
-
-#######################################
 # @description End tracing script.
 # @noargs
 #######################################
@@ -197,4 +167,33 @@ function dybatpho::end_trace {
   [ "$LOG_LEVEL" != "trace" ] && return
   __log trace "END TRACE" stderr
   # kcov(enabled)
+}
+
+#######################################
+# @description Hit breakpoint to debug script.
+# @noargs
+#######################################
+function dybatpho::breakpoint {
+  local key_pressed
+  local help='Breakpoint hit.'$'\nd: run debugger'$'\no: list options'$'\np: list parameters'$'\na: list indexed array'$'\nA: list associative array'$'\nq: quit'
+  while read -n1 -s -r -p $"$help" key_pressed; do case $key_pressed in
+    o) # kcov(skip)
+      shopt -s
+      set -o
+      ;;
+    p) declare -p ;;
+    a) declare -a ;;
+    A) declare -A ;;
+    q) return ;;
+    # kcov(disabled)
+    d)
+      set +xv # Disable tracing for better verbose output
+      while read -p "Debugger (Ctrl-d to exit)> " REPL; do
+        eval "$REPL"
+      done
+      [ "$LOG_LEVEL" == "trace" ] && set -xv # Re-enable tracing if needed
+      ;;
+    # kcov(enabled)
+    *) continue ;;
+  esac done # kcov(skip)
 }

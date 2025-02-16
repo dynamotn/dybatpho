@@ -89,6 +89,22 @@ function dybatpho::progress {
 }
 
 #######################################
+# @description Show progress bar.
+# @arg $1 number Elapsed percentage
+# @arg $2 number Total length of progress bar in chars. Default is 50
+# @stdout Show progress bar and it's disappeared after done
+#######################################
+function dybatpho::progress_bar {
+  local percentage="${1}"
+  local length="${2:-50}"
+  local elapsed=$(($percentage * $length / 100))
+
+  printf -v prog "%${elapsed}s"
+  printf -v total "%$(($length - elapsed))s"
+  printf '%s\r' "[${prog// /#}${total}]"
+}
+
+#######################################
 # @description Show notice message with banner.
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level

@@ -15,6 +15,7 @@ This module contains functions to log messages to stdout/stderr.
 * [dybatpho::debug](#dybatphodebug)
 * [dybatpho::info](#dybatphoinfo)
 * [dybatpho::progress](#dybatphoprogress)
+* [dybatpho::progress_bar](#dybatphoprogressbar)
 * [dybatpho::notice](#dybatphonotice)
 * [dybatpho::success](#dybatphosuccess)
 * [dybatpho::warn](#dybatphowarn)
@@ -95,6 +96,19 @@ Show in progress message.
 #### Output on stdout
 
 * Show message if log level of message is less than info level
+
+### dybatpho::progress_bar
+
+Show progress bar.
+
+#### Arguments
+
+* **$1** (number): Elapsed percentage
+* **$2** (number): Total length of progress bar in chars. Default is 50
+
+#### Output on stdout
+
+* Show progress bar and it's disappeared after done
 
 ### dybatpho::notice
 

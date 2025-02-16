@@ -58,6 +58,21 @@ teardown() {
   assert_output --partial "$(echo -e "\e[0m")"
 }
 
+@test "dybatpho::progress_bar output" {
+  run dybatpho::progress_bar 3
+  assert_success
+  assert_output --partial "[#                                                 ]"
+  run dybatpho::progress_bar 0 20
+  assert_success
+  assert_output --partial "[                    ]"
+  run dybatpho::progress_bar 10 20
+  assert_success
+  assert_output --partial "[##                  ]"
+  run dybatpho::progress_bar 100 20
+  assert_success
+  assert_output --partial "[####################]"
+}
+
 @test "dybatpho::notice output" {
   run dybatpho::notice daylathongtin
   assert_success

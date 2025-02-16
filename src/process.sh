@@ -3,7 +3,11 @@
 # @brief Utilities for process handling
 # @description
 #   This module contains functions to error handling, fork process...
+#
+# DYBATPHO_USED_ERR_HANDLING bool Flag that script used dybatpho::register_err_handler
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
+
+DYBATPHO_USED_ERR_HANDLER=false
 
 #######################################
 # @description Stop script/process.
@@ -21,10 +25,12 @@ function dybatpho::die {
 
 #######################################
 # @description Register error handling.
+# @set DYBATPHO_USED_ERR_HANDLING
 # @noargs
 #######################################
 function dybatpho::register_err_handler {
   set -E
+  DYBATPHO_USED_ERR_HANDLER=true
   trap 'dybatpho::run_err_handler ${?}' ERR
 }
 

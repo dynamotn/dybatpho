@@ -174,9 +174,19 @@ function dybatpho::end_trace {
 # @noargs
 #######################################
 function dybatpho::breakpoint {
-  local key_pressed
-  local help='Breakpoint hit.'$'\nd: run debugger'$'\no: list options'$'\np: list parameters'$'\na: list indexed array'$'\nA: list associative array'$'\nq: quit'
-  while read -n1 -s -r -p $"$help" key_pressed; do case $key_pressed in
+  local dybatpho_key_pressed
+  local dybatpho_section="--------------------------------------------------------------------------------"
+  local dybatpho_help="$dybatpho_section
+    d: run debugger
+    c: display source file
+    o: list options
+    p: list parameters
+    a: list indexed array
+    A: list associative array
+    q: quit
+"
+  __log fatal "Breakpoint hit. Current line: ${BASH_SOURCE[-1]}:${BASH_LINENO[0]}" stderr "1;36"
+  while read -n1 -s -r -p $"$dybatpho_help" dybatpho_key_pressed; do case $dybatpho_key_pressed in
     o) # kcov(skip)
       shopt -s
       set -o
@@ -184,14 +194,29 @@ function dybatpho::breakpoint {
     p) declare -p ;;
     a) declare -a ;;
     A) declare -A ;;
-    q) return ;;
+    q) # kcov(skip)
+      echo "$dybatpho_section"
+      return
+      ;;
     # kcov(disabled)
     d)
-      set +xv # Disable tracing for better verbose output
+      set +xv              # Disable tracing for better verbose output
+      set +eou pipefail    # Disable strict mode
+      set +E && trap - ERR # Disable exit and error handling
       while read -p "Debugger (Ctrl-d to exit)> " REPL; do
         eval "$REPL"
       done
+      echo
+      set -eou pipefail # Enable strict mode
+      dybatpho::is true "$DYBATPHO_USED_ERR_HANDLER" \
+        && dybatpho::register_err_handler    # Rerun register_err_handler
       [ "$LOG_LEVEL" == "trace" ] && set -xv # Re-enable tracing if needed
+      ;;
+    c)
+      echo "$dybatpho_section"
+      dybatpho::is command "bat" \
+        && bat "${BASH_SOURCE[-1]}" \
+        || cat -n "${BASH_SOURCE[-1]}"
       ;;
     # kcov(enabled)
     *) continue ;;

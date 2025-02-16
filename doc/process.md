@@ -6,6 +6,8 @@ Utilities for process handling
 
 This module contains functions to error handling, fork process...
 
+DYBATPHO_USED_ERR_HANDLING bool Flag that script used dybatpho::register_err_handler
+
 ## Index
 
 * [dybatpho::die](#dybatphodie)
@@ -30,6 +32,10 @@ Stop script/process.
 Register error handling.
 
 _Function has no arguments._
+
+#### Variables set
+
+* DYBATPHO_USED_ERR_HANDLING
 
 ### dybatpho::run_err_handler
 

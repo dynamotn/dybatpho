@@ -14,7 +14,7 @@ DYBATPHO_CURL_MAX_RETRIES=${DYBATPHO_CURL_MAX_RETRIES:-5}
 # @arg $1 string Status code
 # @stdout Description of status code
 #######################################
-__get_http_code() {
+function __get_http_code {
   local code
   dybatpho::expect_args code -- "$@"
 
@@ -106,10 +106,8 @@ function dybatpho::curl_do {
     shift
   fi
 
-  local retries code
-  retries="$DYBATPHO_CURL_MAX_RETRIES"
-  code=
-  while ((retries)); do
+  local code
+  _request() {
     # kcov(disabled)
     code=$(
       curl -fsSL "$url" \
@@ -125,20 +123,13 @@ function dybatpho::curl_do {
     dybatpho::debug "Received HTTP status: $code_description"
 
     if [[ "$code" =~ '2'.* ]] || [[ "$code" =~ '4'.* ]]; then
-      break
+      return 0
+    else
+      return 1
     fi
+  }
 
-    # Delay for next retry
-    retries=$((retries - 1))
-    if ((retries)); then
-      local retry delay
-      retry=$((DYBATPHO_CURL_MAX_RETRIES - retries))
-      delay=$((2 ** retry))
-
-      dybatpho::progress "Retrying in ${delay} seconds (${retry}/${DYBATPHO_CURL_MAX_RETRIES})..."
-      sleep "$delay" || true
-    fi
-  done
+  dybatpho::retry "$DYBATPHO_CURL_MAX_RETRIES" _request
 
   # Return exit code based on HTTP status code
   case "$code" in

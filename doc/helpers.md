@@ -11,6 +11,7 @@ This module contains functions to write efficient script.
 * [dybatpho::expect_args](#dybatphoexpectargs)
 * [dybatpho::require](#dybatphorequire)
 * [dybatpho::is](#dybatphois)
+* [dybatpho::retry](#dybatphoretry)
 
 ### dybatpho::expect_args
 
@@ -54,4 +55,19 @@ Check input is matching with a condition
 
 * **0**: If matched
 * **1**: If not matched
+
+### dybatpho::retry
+
+Retry a command multiple times until it succeeds,
+with escalating delay between attempts.
+
+#### Arguments
+
+* **$1** (number): Number of retries
+* **$2** (string): Command to run
+
+#### Exit codes
+
+* **0**: Run command successfully
+* **1**: Out of retries
 

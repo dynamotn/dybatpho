@@ -18,6 +18,7 @@ function __main {
   else
     dybatpho::debug "chezmoi is installed"
   fi
+  dybatpho::curl_do https://github.com/dynamotn/dybatpho
   dybatpho::info "$message"
   dybatpho::start_trace
   dybatpho::is "set" "dyfoooo"

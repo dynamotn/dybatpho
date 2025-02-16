@@ -125,3 +125,32 @@ function dybatpho::is {
   esac 2>&1 > /dev/null # kcov(skip)
   return 1
 }
+
+#######################################
+# @description Retry a command multiple times until it succeeds,
+# with escalating delay between attempts.
+# @arg $1 number Number of retries
+# @arg $2 string Command to run
+# @exitcode 0 Run command successfully
+# @exitcode 1 Out of retries
+#######################################
+function dybatpho::retry {
+  local dybatpho_retries dybatpho_command
+  dybatpho::expect_args dybatpho_retries dybatpho_command -- "$@"
+  local dybatpho_exit_code dybatpho_count dybatpho_delay
+
+  dybatpho_count=0
+  until eval "$dybatpho_command"; do
+    dybatpho_exit_code=$?
+    dybatpho_count=$((dybatpho_count + 1))
+    if [ "$dybatpho_count" -le "$dybatpho_retries" ]; then
+      dybatpho_delay=$((2 * dybatpho_count))
+      dybatpho::progress "Retrying in ${dybatpho_delay} seconds (${dybatpho_count}/${dybatpho_retries})..."
+      sleep "$dybatpho_delay" || true
+    else
+      # Out of retries :(
+      dybatpho::warn "No more retries left to run ${dybatpho_command}."
+      return "$dybatpho_exit_code"
+    fi
+  done
+}

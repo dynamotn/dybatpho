@@ -218,3 +218,34 @@ setup() {
   assert_failure
   refute_output
 }
+
+_test_retry() {
+  count=$((count + 1))
+  if [ "$count" -lt 3 ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+@test "dybatpho::retry out of retries" {
+  count=0
+  run dybatpho::retry 1 _test_retry
+  assert_failure
+  assert_output --partial "No more retries left to run _test"
+}
+
+@test "dybatpho::retry success in max retries" {
+  count=0
+  run dybatpho::retry 2 _test_retry
+  assert_success
+  assert_output --partial "Retrying in 4 seconds (2/2)"
+}
+
+@test "dybatpho::retry success before max retries" {
+  count=0
+  run dybatpho::retry 3 _test_retry
+  assert_success
+  assert_output --partial "Retrying in 4 seconds (2/3)"
+  refute_output --partial "Retrying in 8 seconds (3/3)"
+}

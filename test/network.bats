@@ -59,7 +59,10 @@ setup() {
   DYBATPHO_CURL_MAX_RETRIES=1
   stub curl \
     ": echo '300'" \
+    ": echo '300'" \
     ": echo '500'" \
+    ": echo '500'" \
+    ": echo '101'" \
     ": echo '101'"
   run -3 dybatpho::curl_do https://this "$temp_file"
   assert_failure

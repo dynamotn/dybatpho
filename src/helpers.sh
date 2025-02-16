@@ -181,7 +181,7 @@ function dybatpho::breakpoint {
     a) declare -a ;;
     A) declare -A ;;
     q) # kcov(skip)
-      echo "$dybatpho_section"
+      echo "$dybatpho_section" 1>&2
       return
       ;;
     # kcov(disabled)
@@ -199,10 +199,10 @@ function dybatpho::breakpoint {
       [ "$LOG_LEVEL" == "trace" ] && set -xv # Re-enable tracing if needed
       ;;
     c)
-      echo "$dybatpho_section"
+      echo "$dybatpho_section" 1>&2
       dybatpho::is command "bat" \
-        && bat "${BASH_SOURCE[-1]}" \
-        || cat -n "${BASH_SOURCE[-1]}"
+        && bat "${BASH_SOURCE[-1]}" 1>&2 \
+        || cat -n "${BASH_SOURCE[-1]}" 1>&2
       ;;
     # kcov(enabled)
     *) continue ;;

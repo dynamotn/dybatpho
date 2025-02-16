@@ -7,31 +7,52 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 #######################################
+# @description Print an array
+# @arg $1 string Name of array
+# @stdout Print array with each element separated by newline
+#######################################
+function dybatpho::array_print {
+  local -n input_arr="$1"
+  printf '%s\n' "${input_arr[@]}"
+}
+
+#######################################
 # @description Reverse an array
-# @arg $@ array
-# @stdout Reversed array with each element separated by newline
+# @arg $1 string Name of array
+# @arg $2 string Set `--` to print to stdout
+# @stdout Print array if $2 is `--`
 #######################################
 function dybatpho::array_reverse {
-  local input_arr=("$@")
-  local length=${#input_arr[@]}
+  local -n input_arr="$1"
+  local result_arr=()
+  [ "${#input_arr[@]}" -eq 0 ] && return
 
-  if ((length > 0)); then
-    printf '%s\n' "${input_arr[-1]}"
-    dybatpho::array_reverse "${input_arr[@]::length-1}"
+  for ((i = 1; i <= "${#input_arr[@]}"; i++)); do
+    result_arr+=("${input_arr[$((-i))]}")
+  done
+
+  input_arr=("${result_arr[@]}")
+  if [[ "${2-""}" == "--" ]]; then
+    dybatpho::array_print "$1"
   fi
 }
 
 #######################################
 # @description Remove duplicate elements in array
-# @arg $@ array
-# @stdout Result array with each element separated by newline
+# @arg $1 string Name of array
+# @arg $2 string Set `--` to print to stdout
+# @stdout Print array if $2 is `--`
 #######################################
 function dybatpho::array_unique {
-  local result_arr=()
+  local -n input_arr="$1"
+  declare -A result_arr
 
-  for i in "$@"; do
+  for i in "${input_arr[@]}"; do
     [[ $i ]] && IFS=" " result_arr["${i:- }"]=1
   done
 
-  printf '%s\n' "${!result_arr[@]}"
+  input_arr=("${!result_arr[@]}")
+  if [[ "${2-""}" == "--" ]]; then
+    dybatpho::array_print "$1"
+  fi
 }

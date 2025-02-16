@@ -2,28 +2,45 @@ setup() {
   load test_helper
 }
 
+@test "dybatpho::array_print output" {
+  arr=(2 33 55 "b c" 11)
+  run dybatpho::array_print "arr"
+  assert_line --index 0 2
+  assert_line --index 1 33
+  assert_line --index 2 55
+  assert_line --index 3 "b c"
+  assert_line --index 4 11
+}
+
 @test "dybatpho::array_reverse output" {
-  run dybatpho::array_reverse
+  arr=()
+  run dybatpho::array_reverse "arr"
   assert_success
   refute_output
-  run dybatpho::array_reverse 1 2 3 4 5
+  run dybatpho::array_reverse "arr" "--"
+  assert_success
+  refute_output
+  export arr=(1 2 "b c" 4 5)
+  run dybatpho::array_reverse "arr" "--"
   assert_success
   assert_line --index 0 5
   assert_line --index 1 4
-  assert_line --index 2 3
+  assert_line --index 2 "b c"
   assert_line --index 3 2
   assert_line --index 4 1
 }
 
 @test "dybatpho::array_unique output" {
-  run dybatpho::array_unique
+  arr=()
+  run dybatpho::array_unique "arr" "--"
   assert_success
   refute_output
-  run dybatpho::array_unique 1 1 2 2 3 3 3 3 3 4 4 4 4 4 5 5 5 5 5 5
+  arr=(1 1 2 2 3 3 3 3 3 4 4 4 4 4 5 5 5 5 5 5)
+  run dybatpho::array_unique "arr" "--"
   assert_success
-  assert_line --index 0 1
-  assert_line --index 1 2
-  assert_line --index 2 3
-  assert_line --index 3 4
-  assert_line --index 4 5
+  assert_output "5
+4
+3
+2
+1"
 }

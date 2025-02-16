@@ -22,7 +22,6 @@ This module contains functions to log messages to stdout/stderr.
 * [dybatpho::fatal](#dybatphofatal)
 * [dybatpho::start_trace](#dybatphostarttrace)
 * [dybatpho::end_trace](#dybatphoendtrace)
-* [dybatpho::breakpoint](#dybatphobreakpoint)
 
 ### __verify_log_level
 
@@ -169,12 +168,6 @@ _Function has no arguments._
 ### dybatpho::end_trace
 
 End tracing script.
-
-_Function has no arguments._
-
-### dybatpho::breakpoint
-
-Hit breakpoint to debug script.
 
 _Function has no arguments._
 

@@ -249,3 +249,8 @@ _test_retry() {
   assert_output --partial "Retrying in 4 seconds (2/3)"
   refute_output --partial "Retrying in 8 seconds (3/3)"
 }
+
+@test "dybatpho::breakpoint wait for output" {
+  run dybatpho::breakpoint 2>&1 <<< "hoaApq"
+  assert_success
+}

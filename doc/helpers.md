@@ -12,6 +12,7 @@ This module contains functions to write efficient script.
 * [dybatpho::require](#dybatphorequire)
 * [dybatpho::is](#dybatphois)
 * [dybatpho::retry](#dybatphoretry)
+* [dybatpho::breakpoint](#dybatphobreakpoint)
 
 ### dybatpho::expect_args
 
@@ -70,4 +71,10 @@ with escalating delay between attempts.
 
 * **0**: Run command successfully
 * **1**: Out of retries
+
+### dybatpho::breakpoint
+
+Hit breakpoint to debug script.
+
+_Function has no arguments._
 

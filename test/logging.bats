@@ -120,11 +120,6 @@ teardown() {
   assert_output --partial "$(echo -e "\e[0m")"
 }
 
-@test "dybatpho::breakpoint wait for output" {
-  run dybatpho::breakpoint 2>&1 <<< "hoaApq"
-  assert_success
-}
-
 @test "dybatpho::end_trace doesn't output anything when using default log level" {
   run dybatpho::end_trace
   assert_success

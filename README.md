@@ -42,12 +42,9 @@ You can see [example.sh](doc/example.sh) for example usages.
 
 ```
  .
-├──  init # initial script, source it first
 ├──  doc # documentation of modules
 │   ├──  *.md # module
 │   └──  example.sh # example script for user can use as a reference
-├──  doc.sh # generation documentation script
-├──  modules # list of modules
 ├──  src # source code of modules
 │   └──  *.sh # module
 ├──  test # unit test folder
@@ -56,6 +53,9 @@ You can see [example.sh](doc/example.sh) for example usages.
 │   │   ├──  core
 │   │   └──  support
 │   └──  *.bats # unit test for each module
+├──  init # initial script, source it first
+├──  doc.sh # generation documentation script
+├──  modules # list of modules
 └──  test.sh # unit test script
 ```
 ## Contents

@@ -4,7 +4,7 @@
 [![CI](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml/badge.svg)](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml)
 [![Latest release](https://img.shields.io/github/release/dynamotn/dybatpho.svg)](https://github.com/dynamotn/dybatpho/releases/latest)
 
-The place to store functions that are used in pipelines, scripts for multiple repositories.
+The place to store **frequently used functions** that are used in pipelines, scripts for multiple repositories and help you to **write efficient Bash script**.
 
 ## What does `dybatpho` mean?
 `dybatpho` is a portmanteau of `đi bát phố`. `đi` is related to my nickname (Dynamo). `đi bát phố` means wandering on the street, an idiom in Vietnamese with `bát` with almost similar pronunciation with `bash`, `phố` is `street` that have many stores. I want this library will be used as a street on the Internet, which have some special stores to give you some surprise presents in your codes.

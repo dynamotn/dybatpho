@@ -34,6 +34,7 @@ teardown() {
 }
 
 @test "dybatpho::debug output when using debug level" {
+  # shellcheck disable=SC2030
   export LOG_LEVEL=debug
   run dybatpho::debug foo
   assert_success
@@ -127,6 +128,7 @@ teardown() {
 }
 
 @test "dybatpho::start_trace output when using trace level" {
+  # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
   run dybatpho::start_trace
   assert_success
@@ -142,6 +144,7 @@ teardown() {
 }
 
 @test "dybatpho::end_trace output when using trace level" {
+  # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
   run dybatpho::end_trace
   assert_success

@@ -24,10 +24,11 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")"
 export DYBATPHO_DIR
 
 # Load modules
+# shellcheck disable=SC2162
 while read module; do
   # shellcheck disable=SC1090
   . "${DYBATPHO_DIR}/src/${module}.sh"
-done < "$DYBATPHO_DIR"/modules # kcov(skip)
+done <"$DYBATPHO_DIR"/modules # kcov(skip)
 
 # Filter functions and re-export only dybatpho functions to subshells
 eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"

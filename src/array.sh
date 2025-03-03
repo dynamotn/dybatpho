@@ -28,6 +28,7 @@ function dybatpho::array_reverse {
   [ "${#input_arr[@]}" -eq 0 ] && return
 
   for ((i = 1; i <= "${#input_arr[@]}"; i++)); do
+    # shellcheck disable=SC2190
     result_arr+=("${input_arr[$((-i))]}")
   done
 
@@ -44,6 +45,7 @@ function dybatpho::array_reverse {
 # @stdout Print array if $2 is `--`
 #######################################
 function dybatpho::array_unique {
+  # shellcheck disable=SC2178
   local -n input_arr="$1"
   declare -A result_arr
 

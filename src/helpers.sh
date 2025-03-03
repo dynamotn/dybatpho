@@ -29,7 +29,7 @@ function dybatpho::expect_args {
     shift
   done
 
-  ((${is_error})) && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"'
+  ((is_error)) && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"'
 
   local variable_name
   for variable_name in "${variable_names[@]}"; do
@@ -62,67 +62,67 @@ function dybatpho::is {
   local condition input
   dybatpho::expect_args condition input -- "$@"
   case "$condition" in
-    command)
-      command -v "$input"
-      return "${?}"
-      ;;
-    file)
-      [ -f "$input" ]
-      return "${?}"
-      ;;
-    dir)
-      [ -d "$input" ]
-      return "${?}"
-      ;;
-    link)
-      [ -L "$input" ]
-      return "${?}"
-      ;;
-    exist)
-      [ -e "$input" ]
-      return "${?}"
-      ;;
-    readable)
-      [ -r "$input" ]
-      return "${?}"
-      ;;
-    writeable)
-      [ -w "$input" ]
-      return "${?}"
-      ;;
-    executable)
-      [ -x "$input" ]
-      return "${?}"
-      ;;
-    set)
-      [ "${input+x}" = "x" ] && [ "${#input}" -gt "0" ]
-      return "${?}"
-      ;;
-    empty)
-      [ "${input+x}" = "x" ] && [ "${#input}" -eq "0" ]
-      return "${?}"
-      ;;
-    number)
-      printf -- '%f' "${input:-null}" > /dev/null 2>&1
-      return "${?}"
-      ;;
-    int)
-      printf -- '%d' "${input:-null}" > /dev/null 2>&1
-      return "${?}"
-      ;;
-    true)
-      case "$input" in
-        0 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
-        '' | *) return 1 ;;
-      esac
-      ;;
-    false)
-      case "$input" in
-        1 | [fF][aA][lL][sS][eE] | [nN][oO] | [oO][fF][fF]) return 0 ;;
-        '' | *) return 1 ;;
-      esac
-      ;;
-  esac 2>&1 > /dev/null # kcov(skip)
+  command)
+    command -v "$input"
+    return "${?}"
+    ;;
+  file)
+    [ -f "$input" ]
+    return "${?}"
+    ;;
+  dir)
+    [ -d "$input" ]
+    return "${?}"
+    ;;
+  link)
+    [ -L "$input" ]
+    return "${?}"
+    ;;
+  exist)
+    [ -e "$input" ]
+    return "${?}"
+    ;;
+  readable)
+    [ -r "$input" ]
+    return "${?}"
+    ;;
+  writeable)
+    [ -w "$input" ]
+    return "${?}"
+    ;;
+  executable)
+    [ -x "$input" ]
+    return "${?}"
+    ;;
+  set)
+    [ "${input+x}" = "x" ] && [ "${#input}" -gt "0" ]
+    return "${?}"
+    ;;
+  empty)
+    [ "${input+x}" = "x" ] && [ "${#input}" -eq "0" ]
+    return "${?}"
+    ;;
+  number)
+    printf -- '%f' "${input:-null}" >/dev/null 2>&1
+    return "${?}"
+    ;;
+  int)
+    printf -- '%d' "${input:-null}" >/dev/null 2>&1
+    return "${?}"
+    ;;
+  true)
+    case "$input" in
+    0 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
+    '' | *) return 1 ;;
+    esac
+    ;;
+  false)
+    case "$input" in
+    1 | [fF][aA][lL][sS][eE] | [nN][oO] | [oO][fF][fF]) return 0 ;;
+    '' | *) return 1 ;;
+    esac
+    ;;
+  esac >/dev/null 2>&1 # kcov(skip)
   return 1
 }
 
@@ -189,22 +189,24 @@ function dybatpho::breakpoint {
       set +xv              # Disable tracing for better verbose output
       set +eou pipefail    # Disable strict mode
       set +E && trap - ERR # Disable exit and error handling
+      # shellcheck disable=SC2162
       while read -p "Debugger (Ctrl-d to exit)> " REPL; do
         eval "$REPL"
       done
       echo
       set -eou pipefail # Enable strict mode
-      dybatpho::is true "$DYBATPHO_USED_ERR_HANDLER" \
-        && dybatpho::register_err_handler    # Rerun register_err_handler
+      dybatpho::is true "$DYBATPHO_USED_ERR_HANDLER" &&
+        dybatpho::register_err_handler       # Rerun register_err_handler
       [ "$LOG_LEVEL" == "trace" ] && set -xv # Re-enable tracing if needed
       ;;
     c)
       echo "$dybatpho_section" 1>&2
-      dybatpho::is command "bat" \
-        && bat "${BASH_SOURCE[-1]}" 1>&2 \
-        || cat -n "${BASH_SOURCE[-1]}" 1>&2
+      # shellcheck disable=SC2015
+      dybatpho::is command "bat" &&
+        bat "${BASH_SOURCE[-1]}" 1>&2 ||
+        cat -n "${BASH_SOURCE[-1]}" 1>&2
       ;;
     # kcov(enabled)
     *) continue ;;
-  esac done # kcov(skip)
+    esac done # kcov(skip)
 }

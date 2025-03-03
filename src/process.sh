@@ -30,6 +30,7 @@ function dybatpho::die {
 #######################################
 function dybatpho::register_err_handler {
   set -E
+  # shellcheck disable=SC2034
   DYBATPHO_USED_ERR_HANDLER=true
   trap 'dybatpho::run_err_handler ${?}' ERR
 }

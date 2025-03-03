@@ -14,6 +14,7 @@ setup() {
 }
 
 @test "dybatpho::expect_args have right spec" {
+  # shellcheck disable=SC2317
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 -- "$@"
@@ -25,6 +26,7 @@ setup() {
 }
 
 @test "dybatpho::expect_args not have right spec" {
+  # shellcheck disable=SC2317
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 "$@"
@@ -102,7 +104,7 @@ setup() {
   run dybatpho::is "readable" "$temp"
   assert_success
   refute_output
-  chmod -r "$temp"
+  chmod a-r "$temp"
   run dybatpho::is "readable" "$temp"
   assert_failure
   refute_output
@@ -251,6 +253,6 @@ _test_retry() {
 }
 
 @test "dybatpho::breakpoint wait for output" {
-  run dybatpho::breakpoint 2>&1 <<< "hoaApq"
+  run dybatpho::breakpoint 2>&1 <<<"hoaApq"
   assert_success
 }

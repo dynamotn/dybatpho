@@ -6,13 +6,15 @@ Utilities for process handling
 
 This module contains functions to error handling, fork process...
 
-DYBATPHO_USED_ERR_HANDLING bool Flag that script used dybatpho::register_err_handler
+DYBATPHO_USED_ERR_HANDLER bool Flag that script used dybatpho::register_err_handler
 
 ## Index
 
 * [dybatpho::die](#dybatphodie)
 * [dybatpho::register_err_handler](#dybatphoregistererrhandler)
 * [dybatpho::run_err_handler](#dybatphorunerrhandler)
+* [dybatpho::trap](#dybatphotrap)
+* [dybatpho::gen_temp_file](#dybatphogentempfile)
 
 ### dybatpho::die
 
@@ -44,4 +46,22 @@ Run error handling. If you activate by `dybatpho::register_err_handler`, you don
 #### Arguments
 
 * **$1** (number): Exit code
+
+### dybatpho::trap
+
+Trap multiple signals
+
+#### Arguments
+
+* **$1** (string): Command run when trapped
+* **$2** (string_list): Signals to trap
+
+### dybatpho::gen_temp_file
+
+Generate temporary file
+
+#### Arguments
+
+* **$1** (string): Name of file in /tmp/dybatpho
+* **$2** (bool): Flag to delete temporary file when exit. Default is true
 

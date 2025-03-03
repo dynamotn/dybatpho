@@ -4,7 +4,7 @@
 # @description
 #   This module contains functions to error handling, fork process...
 #
-# DYBATPHO_USED_ERR_HANDLING bool Flag that script used dybatpho::register_err_handler
+# DYBATPHO_USED_ERR_HANDLER bool Flag that script used dybatpho::register_err_handler
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
 
 DYBATPHO_USED_ERR_HANDLER=false
@@ -50,4 +50,36 @@ function dybatpho::run_err_handler {
     ((i++))
   done
   exit "$exit_code"
+}
+
+#######################################
+# @description Trap multiple signals
+# @arg $1 string Command run when trapped
+# @arg $2 string_list Signals to trap
+#######################################
+function dybatpho::trap {
+  local command signal
+  dybatpho::expect_args command signal -- "$@"
+  shift
+  for signal in "$@"; do
+    # shellcheck disable=SC2064
+    trap "$command" "$signal"
+  done
+}
+
+#######################################
+# @description Generate temporary file
+# @arg $1 string Name of file in /tmp/dybatpho
+# @arg $2 bool Flag to delete temporary file when exit. Default is true
+#######################################
+function dybatpho::gen_temp_file {
+  dybatpho::require 'mktemp'
+  local filename
+  dybatpho::expect_args filename -- "$@"
+  local filepath=$(mktemp -t "${filename}-XXXXXX")
+
+  if dybatpho::is true "${2:-true}"; then
+    dybatpho::trap "rm -f $filepath" EXIT HUP INT TERM
+  fi
+  echo "$filepath"
 }

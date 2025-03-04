@@ -69,17 +69,35 @@ function dybatpho::trap {
 
 #######################################
 # @description Generate temporary file
-# @arg $1 string Name of file in /tmp/dybatpho
-# @arg $2 bool Flag to delete temporary file when exit. Default is true
+# @arg $1 string Name of file in TMPDIR
+# @arg $2 string TMPDIR, default is /tmp
+# @arg $3 bool Flag to delete temporary file when exit, default is true
 #######################################
 function dybatpho::gen_temp_file {
   dybatpho::require 'mktemp'
   local filename
   dybatpho::expect_args filename -- "$@"
-  local filepath=$(mktemp -t "${filename}-XXXXXX")
+  local filepath=$(mktemp -t "${filename}-XXXXXX" -p "${2:-/tmp}")
 
-  if dybatpho::is true "${2:-true}"; then
+  if dybatpho::is true "${3:-true}"; then
     dybatpho::trap "rm -f $filepath" EXIT HUP INT TERM
   fi
   echo "$filepath"
+}
+
+#######################################
+# @description Generate temporary directory
+# @arg $1 string Name of directory in /tmp
+# @arg $2 bool Flag to delete temporary directory when exit. Default is true
+#######################################
+function dybatpho::gen_temp_dir {
+  local dir
+  dybatpho::expect_args dir -- "$@"
+  local dirpath="/tmp/${dir}"
+  mkdir -p "$dirpath"
+
+  if dybatpho::is true "${2:-true}"; then
+    dybatpho::trap "rm -rf $dirpath" EXIT HUP INT TERM
+  fi
+  echo "$dirpath"
 }

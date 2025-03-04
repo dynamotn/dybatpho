@@ -109,6 +109,7 @@ function dybatpho::curl_do {
   local code
   # shellcheck disable=SC2317
   _request() {
+    dybatpho::require curl
     # kcov(disabled)
     code=$(
       curl -fsSL "$url" \

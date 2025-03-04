@@ -3,8 +3,9 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck disable=1091
 . "$SCRIPT_DIR/../init" # correct path of dybatpho at here
 
+TEMP_FILE=$(mktemp)
 dybatpho::register_err_handler
-dybatpho::gen_temp_file myprogram
+dybatpho::cleanup_file_on_exit "$TEMP_FILE"
 
 function __main {
   local message

@@ -27,28 +27,9 @@ setup() {
   assert_line --index 1 3
 }
 
-@test 'dybatpho::gen_temp_file show path of generated file' {
-  run dybatpho::gen_temp_file program
+@test 'dybatpho::cleanup_file_on_exit action' {
+  local filepath=$(mktemp)
+  run dybatpho::cleanup_file_on_exit "$filepath"
   assert_success
-  assert_output --partial program-
-}
-
-@test 'dybatpho::gen_temp_file create file' {
-  stub mktemp ": touch ${BATS_TEST_TMPDIR}/program"
-  run dybatpho::gen_temp_file program /tmp false
-  assert_success
-  assert_file_exist "${BATS_TEST_TMPDIR}/program"
-  unstub mktemp
-}
-
-@test 'dybatpho::gen_temp_dir show path of generated dir' {
-  run dybatpho::gen_temp_dir program
-  assert_success
-  assert_output --partial /tmp/program
-}
-
-@test 'dybatpho::gen_temp_dir create dir' {
-  run dybatpho::gen_temp_dir program false
-  assert_success
-  [[ -d /tmp/program ]] && rm -r /tmp/program
+  assert_file_not_exist "$filepath"
 }

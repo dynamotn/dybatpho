@@ -97,10 +97,10 @@ function dybatpho::progress {
 function dybatpho::progress_bar {
   local percentage="${1}"
   local length="${2:-50}"
-  local elapsed=$(($percentage * $length / 100))
+  local elapsed=$((percentage * length / 100))
 
   printf -v prog "%${elapsed}s"
-  printf -v total "%$(($length - elapsed))s"
+  printf -v total "%$((length - elapsed))s"
   printf '%s\r' "[${prog// /#}${total}]"
 }
 
@@ -170,7 +170,7 @@ function dybatpho::start_trace {
   [ "$LOG_LEVEL" != "trace" ] && return
   __log trace "START TRACE" stderr
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
-  trap 'set +xv' EXIT && set -xv # kcov(skip)
+  trap -p EXIT || (trap 'set +xv' EXIT && set -xv) # kcov(skip)
 }
 
 #######################################

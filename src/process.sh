@@ -40,7 +40,6 @@ function dybatpho::register_err_handler {
 # @arg $1 number Exit code
 #######################################
 function dybatpho::run_err_handler {
-  trap - ERR
   local exit_code
   dybatpho::expect_args exit_code -- "$@"
   local i=0
@@ -61,43 +60,42 @@ function dybatpho::trap {
   local command signal
   dybatpho::expect_args command signal -- "$@"
   shift
+  # shellcheck disable=SC2317
+  _gen_finalize_command() {
+    # shellcheck disable=SC2086
+    local cmds=$(trap -p $1)
+    cmds="${cmds#*\'}"
+    cmds="${cmds%\'*}"
+    echo "$cmds"
+  }
+
+  local finalize_command
   for signal in "$@"; do
-    # shellcheck disable=SC2064
-    trap "$command" "$signal"
+    finalize_command=$(_gen_finalize_command "$signal")
+    finalize_command="$finalize_command${finalize_command:+; }$command"
+    # shellcheck disable=SC2064,SC2086
+    trap "$command" $signal
   done
 }
 
 #######################################
-# @description Generate temporary file
-# @arg $1 string Name of file in TMPDIR
-# @arg $2 string TMPDIR, default is /tmp
-# @arg $3 bool Flag to delete temporary file when exit, default is true
+# @description Clean up file on exit
+# @arg $1 string File path
 #######################################
-function dybatpho::gen_temp_file {
-  dybatpho::require 'mktemp'
-  local filename
-  dybatpho::expect_args filename -- "$@"
-  local filepath=$(mktemp -t "${filename}-XXXXXX" -p "${2:-/tmp}")
+function dybatpho::cleanup_file_on_exit {
+  local filepath
+  dybatpho::expect_args filepath -- "$@"
 
-  if dybatpho::is true "${3:-true}"; then
-    dybatpho::trap "rm -f $filepath" EXIT HUP INT TERM
-  fi
-  echo "$filepath"
-}
-
-#######################################
-# @description Generate temporary directory
-# @arg $1 string Name of directory in /tmp
-# @arg $2 bool Flag to delete temporary directory when exit. Default is true
-#######################################
-function dybatpho::gen_temp_dir {
-  local dir
-  dybatpho::expect_args dir -- "$@"
-  local dirpath="/tmp/${dir}"
-  mkdir -p "$dirpath"
-
-  if dybatpho::is true "${2:-true}"; then
-    dybatpho::trap "rm -rf $dirpath" EXIT HUP INT TERM
-  fi
-  echo "$dirpath"
+  local pid="$$"
+  local cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh"
+  touch $cleanup_file
+  (
+    grep -vF $cleanup_file $cleanup_file ||
+      (
+        echo "/bin/rm -rf '$filepath'"
+        echo "/bin/rm -rf $cleanup_file"
+      )
+  ) >$cleanup_file.new
+  mv -f $cleanup_file.new $cleanup_file
+  dybatpho::trap "bash $cleanup_file" EXIT HUP INT TERM
 }

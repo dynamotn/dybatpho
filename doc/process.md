@@ -14,8 +14,7 @@ DYBATPHO_USED_ERR_HANDLER bool Flag that script used dybatpho::register_err_hand
 * [dybatpho::register_err_handler](#dybatphoregistererrhandler)
 * [dybatpho::run_err_handler](#dybatphorunerrhandler)
 * [dybatpho::trap](#dybatphotrap)
-* [dybatpho::gen_temp_file](#dybatphogentempfile)
-* [dybatpho::gen_temp_dir](#dybatphogentempdir)
+* [dybatpho::cleanup_file_on_exit](#dybatphocleanupfileonexit)
 
 ### dybatpho::die
 
@@ -57,22 +56,11 @@ Trap multiple signals
 * **$1** (string): Command run when trapped
 * **$2** (string_list): Signals to trap
 
-### dybatpho::gen_temp_file
+### dybatpho::cleanup_file_on_exit
 
-Generate temporary file
-
-#### Arguments
-
-* **$1** (string): Name of file in TMPDIR
-* **$2** (string): TMPDIR, default is /tmp
-* **$3** (bool): Flag to delete temporary file when exit, default is true
-
-### dybatpho::gen_temp_dir
-
-Generate temporary directory
+Clean up file on exit
 
 #### Arguments
 
-* **$1** (string): Name of directory in /tmp
-* **$2** (bool): Flag to delete temporary directory when exit. Default is true
+* **$1** (string): File path
 

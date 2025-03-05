@@ -34,9 +34,11 @@ git subtree pull --prefix <path> https://github.com/dynamotn/dybatpho.git main -
 Once you have `dybatpho` cloned in your project, you source by two ways:
 
 - Source `dybatpho/init`: This ensures submodules are initialized. This makes it easy to source libraries from other scripts.
-- Source `dybatpho/src/<library name>.sh` for any libraries you are interested in.
+- Source `dybatpho/src/<library name>.sh` for any libraries you are interested in. But you need to check it carefully because some scripts are depended on another script.
 
-You can see [example.sh](doc/example.sh) for example usages.
+> [!NOTE]
+> You can see [example.sh](doc/example.sh) for example usages.
+> Or you can see implementation in my [dotfiles](https://github.com/dynamotn/dotfiles) or my [custom font](https://github.com/dynamotn/Iosevka-Dynamo)
 
 ## Structure
 

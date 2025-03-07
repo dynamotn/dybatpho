@@ -5,7 +5,7 @@
 #   This module contains functions to error handling, fork process...
 #
 # DYBATPHO_USED_ERR_HANDLER bool Flag that script used dybatpho::register_err_handler
-: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
+: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 DYBATPHO_USED_ERR_HANDLER=false
 
@@ -63,7 +63,7 @@ function dybatpho::trap {
   # shellcheck disable=SC2317
   _gen_finalize_command() {
     # shellcheck disable=SC2086
-    local cmds=$(trap -p $1)
+    local cmds=$(trap -p "$1")
     cmds="${cmds#*\'}"
     cmds="${cmds%\'*}"
     echo "$cmds"
@@ -74,7 +74,7 @@ function dybatpho::trap {
     finalize_command=$(_gen_finalize_command "$signal")
     finalize_command="$finalize_command${finalize_command:+; }$command"
     # shellcheck disable=SC2064,SC2086
-    trap "$command" $signal
+    trap "$command" "$signal"
   done
 }
 
@@ -88,14 +88,14 @@ function dybatpho::cleanup_file_on_exit {
 
   local pid="$$"
   local cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh"
-  touch $cleanup_file
-  (
-    grep -vF $cleanup_file $cleanup_file ||
-      (
+  touch "$cleanup_file"
+  ( # kcov(skip)
+    grep -vF "$cleanup_file" "$cleanup_file" \
+      || (
         echo "/bin/rm -rf '$filepath'"
         echo "/bin/rm -rf $cleanup_file"
-      )
-  ) >$cleanup_file.new
-  mv -f $cleanup_file.new $cleanup_file
+      )                     # kcov(skip)
+  ) > "${cleanup_file}.new" # kcov(skip)
+  mv -f "${cleanup_file}.new" "$cleanup_file"
   dybatpho::trap "bash $cleanup_file" EXIT HUP INT TERM
 }

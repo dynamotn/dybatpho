@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @file init
+# @file init.sh
 # @brief Initial script
 # @description This script should be sourced before any of
 # the other scripts in this repo. Other scripts

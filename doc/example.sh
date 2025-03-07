@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck disable=1091
-. "$SCRIPT_DIR/../init" # correct path of dybatpho at here
+. "$SCRIPT_DIR/../init.sh" # correct path of dybatpho at here
 
 TEMP_FILE=$(mktemp)
 dybatpho::register_err_handler

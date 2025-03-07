@@ -3,7 +3,7 @@
 # @brief Utilities for writing efficient script
 # @description
 #   This module contains functions to write efficient script.
-: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init before other scripts from dybatpho.}"
+: "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
 # @description Validate argument when invoke function. It adds a small performance penalty but is a sane option.
@@ -62,67 +62,67 @@ function dybatpho::is {
   local condition input
   dybatpho::expect_args condition input -- "$@"
   case "$condition" in
-  command)
-    command -v "$input"
-    return "${?}"
-    ;;
-  file)
-    [ -f "$input" ]
-    return "${?}"
-    ;;
-  dir)
-    [ -d "$input" ]
-    return "${?}"
-    ;;
-  link)
-    [ -L "$input" ]
-    return "${?}"
-    ;;
-  exist)
-    [ -e "$input" ]
-    return "${?}"
-    ;;
-  readable)
-    [ -r "$input" ]
-    return "${?}"
-    ;;
-  writeable)
-    [ -w "$input" ]
-    return "${?}"
-    ;;
-  executable)
-    [ -x "$input" ]
-    return "${?}"
-    ;;
-  set)
-    [ "${input+x}" = "x" ] && [ "${#input}" -gt "0" ]
-    return "${?}"
-    ;;
-  empty)
-    [ "${input+x}" = "x" ] && [ "${#input}" -eq "0" ]
-    return "${?}"
-    ;;
-  number)
-    printf -- '%f' "${input:-null}" >/dev/null 2>&1
-    return "${?}"
-    ;;
-  int)
-    printf -- '%d' "${input:-null}" >/dev/null 2>&1
-    return "${?}"
-    ;;
-  true)
-    case "$input" in
-    0 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
-    '' | *) return 1 ;;
-    esac
-    ;;
-  false)
-    case "$input" in
-    1 | [fF][aA][lL][sS][eE] | [nN][oO] | [oO][fF][fF]) return 0 ;;
-    '' | *) return 1 ;;
-    esac
-    ;;
-  esac >/dev/null 2>&1 # kcov(skip)
+    command)
+      command -v "$input"
+      return "${?}"
+      ;;
+    file)
+      [ -f "$input" ]
+      return "${?}"
+      ;;
+    dir)
+      [ -d "$input" ]
+      return "${?}"
+      ;;
+    link)
+      [ -L "$input" ]
+      return "${?}"
+      ;;
+    exist)
+      [ -e "$input" ]
+      return "${?}"
+      ;;
+    readable)
+      [ -r "$input" ]
+      return "${?}"
+      ;;
+    writeable)
+      [ -w "$input" ]
+      return "${?}"
+      ;;
+    executable)
+      [ -x "$input" ]
+      return "${?}"
+      ;;
+    set)
+      [ "${input+x}" = "x" ] && [ "${#input}" -gt "0" ]
+      return "${?}"
+      ;;
+    empty)
+      [ "${input+x}" = "x" ] && [ "${#input}" -eq "0" ]
+      return "${?}"
+      ;;
+    number)
+      printf -- '%f' "${input:-null}" > /dev/null 2>&1
+      return "${?}"
+      ;;
+    int)
+      printf -- '%d' "${input:-null}" > /dev/null 2>&1
+      return "${?}"
+      ;;
+    true)
+      case "$input" in
+        0 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
+        '' | *) return 1 ;;
+      esac
+      ;;
+    false)
+      case "$input" in
+        1 | [fF][aA][lL][sS][eE] | [nN][oO] | [oO][fF][fF]) return 0 ;;
+        '' | *) return 1 ;;
+      esac
+      ;;
+  esac > /dev/null 2>&1 # kcov(skip)
   return 1
 }
 
@@ -195,18 +195,18 @@ function dybatpho::breakpoint {
       done
       echo
       set -eou pipefail # Enable strict mode
-      dybatpho::is true "$DYBATPHO_USED_ERR_HANDLER" &&
-        dybatpho::register_err_handler       # Rerun register_err_handler
+      dybatpho::is true "$DYBATPHO_USED_ERR_HANDLER" \
+        && dybatpho::register_err_handler    # Rerun register_err_handler
       [ "$LOG_LEVEL" == "trace" ] && set -xv # Re-enable tracing if needed
       ;;
     c)
       echo "$dybatpho_section" 1>&2
       # shellcheck disable=SC2015
-      dybatpho::is command "bat" &&
-        bat "${BASH_SOURCE[-1]}" 1>&2 ||
-        cat -n "${BASH_SOURCE[-1]}" 1>&2
+      dybatpho::is command "bat" \
+        && bat "${BASH_SOURCE[-1]}" 1>&2 \
+        || cat -n "${BASH_SOURCE[-1]}" 1>&2
       ;;
     # kcov(enabled)
     *) continue ;;
-    esac done # kcov(skip)
+  esac done # kcov(skip)
 }

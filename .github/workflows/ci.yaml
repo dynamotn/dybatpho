@@ -20,7 +20,7 @@ jobs:
       - name: "Test"
         run: |
           chown -R test $(pwd)
-          su - test bash -c $(pwd)/test.sh
+          su - test bash -c $(pwd)/scripts/test.sh
 
       - name: "Coveralls"
         uses: coverallsapp/github-action@main

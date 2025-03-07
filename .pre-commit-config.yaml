@@ -3,15 +3,17 @@ repos:
     hooks:
       - id: test
         name: Test all test cases
-        entry: bash test.sh
+        entry: bash scripts/test.sh
         language: system
-        types: [file]
+        types:
+          - file
         files: \.(sh|bats)$
         pass_filenames: false
       - id: gen-doc
         name: Generate documentation
-        entry: bash doc.sh
+        entry: bash scripts/doc.sh
         language: system
-        types: [file]
+        types:
+          - file
         files: \.(sh|bats)$
         pass_filenames: false

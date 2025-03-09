@@ -50,7 +50,7 @@ function dybatpho::array_unique {
   declare -A result_arr
 
   for i in "${input_arr[@]}"; do
-    [[ $i ]] && IFS=" " result_arr["${i:- }"]=1
+    [[ ${i} ]] && IFS=" " result_arr["${i:- }"]=1
   done
 
   input_arr=("${!result_arr[@]}")

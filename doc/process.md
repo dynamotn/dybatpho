@@ -45,7 +45,7 @@ Run error handling. If you activate by `dybatpho::register_err_handler`, you don
 
 #### Arguments
 
-* **$1** (number): Exit code
+* **$1** (number): Exit code of last command
 
 ### dybatpho::trap
 

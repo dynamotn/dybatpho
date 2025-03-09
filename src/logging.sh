@@ -17,9 +17,9 @@ export LOG_LEVEL
 # @exitcode 1 If invalid
 #######################################
 function __verify_log_level {
-  local level="${1}"
-  level=$(dybatpho::lower "$level")
-  if [[ ${level} =~ trace|debug|info|warn|error|fatal ]]; then
+  local level="$1"
+  level=$(dybatpho::lower "${level}")
+  if [[ "${level}" =~ trace|debug|info|warn|error|fatal ]]; then
     return 0
   else
     echo "${level} is not a valid LOG_LEVEL, it should be trace|debug|info|warn|error|fatal"
@@ -41,20 +41,20 @@ function __verify_log_level {
 function __log {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
   declare -A log_colors=([trace]="1;30;47" [debug]="0;37;40" [info]="0;40" [warn]="0;33;40" [error]="1;31;40" [fatal]="1;37;41")
-  local show_log_level="${1}"
-  local msg="${2}"
+  local show_log_level="$1"
+  local msg="$2"
   local out="${3:-stdout}"
-  local color=${4:-${log_colors[${show_log_level}]}}
+  local color="${4:-${log_colors[${show_log_level}]}}"
 
-  __verify_log_level "$LOG_LEVEL"
-  __verify_log_level "$show_log_level"
+  __verify_log_level "${LOG_LEVEL}"
+  __verify_log_level "${show_log_level}"
 
   local runtime_level_num="${log_levels[${LOG_LEVEL}]}"
   local write_level_num="${log_levels[${show_log_level}]}"
 
-  [ "$write_level_num" -le "$runtime_level_num" ] || return 0
+  [ "${write_level_num}" -le "${runtime_level_num}" ] || return 0
 
-  if [[ "$out" == "stderr" ]]; then
+  if [[ "${out}" == "stderr" ]]; then
     echo -e "\e[${color}m${msg}\e[0m" 1>&2
   else
     echo -e "\e[${color}m${msg}\e[0m"
@@ -67,7 +67,7 @@ function __log {
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug {
-  __log debug "DEBUG: ${*}" stderr
+  __log debug "DEBUG: $*" stderr
 }
 
 #######################################
@@ -76,7 +76,7 @@ function dybatpho::debug {
 # @stderr Show message if log level of message is less than info level
 #######################################
 function dybatpho::info {
-  __log info "INFO: ${*}" stderr
+  __log info "INFO: $*" stderr
 }
 
 #######################################
@@ -85,7 +85,7 @@ function dybatpho::info {
 # @stdout Show message if log level of message is less than info level
 #######################################
 function dybatpho::progress {
-  __log info "${*}..." stdout "0;36"
+  __log info "$*..." stdout "0;36"
 }
 
 #######################################
@@ -95,7 +95,7 @@ function dybatpho::progress {
 # @stdout Show progress bar and it's disappeared after done
 #######################################
 function dybatpho::progress_bar {
-  local percentage="${1}"
+  local percentage="$1"
   local length="${2:-50}"
   local elapsed=$((percentage * length / 100))
 
@@ -113,11 +113,11 @@ function dybatpho::notice {
   local color="1;30;44"
   __log info \
     "================================================================================" \
-    stdout "$color"
-  __log info "${*}" stdout "$color"
+    stdout "${color}"
+  __log info "$*" stdout "${color}"
   __log info \
     "================================================================================" \
-    stdout "$color"
+    stdout "${color}"
 }
 
 #######################################
@@ -126,7 +126,7 @@ function dybatpho::notice {
 # @stdout Show message if log level of message is less than info level
 #######################################
 function dybatpho::success {
-  __log info "DONE: ${1}" stdout "1;32;40"
+  __log info "DONE: $1" stdout "1;32;40"
 }
 
 #######################################
@@ -136,7 +136,7 @@ function dybatpho::success {
 # @stderr Show message if log level of message is less than warning level
 #######################################
 function dybatpho::warn {
-  local indicator=${2:-"${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"}
+  local indicator="${2:-"${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"}"
   __log warn "$(date +"%FT%T") ${indicator} [WARNING]: ${1}" stderr
 }
 
@@ -147,7 +147,7 @@ function dybatpho::warn {
 # @stderr Show message if log level of message is less than error level
 #######################################
 function dybatpho::error {
-  local indicator=${2:-"${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"}
+  local indicator="${2:-"${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"}"
   __log error "$(date +"%FT%T") ${indicator} [ERROR]: ${1}" stderr
 }
 
@@ -158,7 +158,7 @@ function dybatpho::error {
 # @stderr Show message if log level of message is less than fatal level
 #######################################
 function dybatpho::fatal {
-  local indicator=${2:-"${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"}
+  local indicator="${2:-"${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"}"
   __log fatal "$(date +"%FT%T") ${indicator} [FATAL]: ${1}" stderr
 }
 
@@ -167,7 +167,7 @@ function dybatpho::fatal {
 # @noargs
 #######################################
 function dybatpho::start_trace {
-  [ "$LOG_LEVEL" != "trace" ] && return
+  [ "${LOG_LEVEL}" != "trace" ] && return
   __log trace "START TRACE" stderr
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
   trap -p EXIT || (trap 'set +xv' EXIT && set -xv) # kcov(skip)
@@ -180,7 +180,7 @@ function dybatpho::start_trace {
 function dybatpho::end_trace {
   set +xv
   # kcov(disabled)
-  [ "$LOG_LEVEL" != "trace" ] && return
+  [ "${LOG_LEVEL}" != "trace" ] && return
   __log trace "END TRACE" stderr
   # kcov(enabled)
 }

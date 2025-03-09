@@ -19,8 +19,8 @@ function dybatpho::die {
   local message exit_code
   dybatpho::expect_args message -- "$@"
   exit_code=${2:-1}
-  dybatpho::fatal "$message" "${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"
-  exit "$exit_code"
+  dybatpho::fatal "${message}" "${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"
+  exit "${exit_code}"
 }
 
 #######################################
@@ -32,12 +32,12 @@ function dybatpho::register_err_handler {
   set -E
   # shellcheck disable=SC2034
   DYBATPHO_USED_ERR_HANDLER=true
-  trap 'dybatpho::run_err_handler ${?}' ERR
+  trap 'dybatpho::run_err_handler $?' ERR
 }
 
 #######################################
 # @description Run error handling. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
-# @arg $1 number Exit code
+# @arg $1 number Exit code of last command
 #######################################
 function dybatpho::run_err_handler {
   local exit_code
@@ -45,10 +45,10 @@ function dybatpho::run_err_handler {
   local i=0
   printf -- '%s\n' "Aborting on error ${exit_code}:" \
     "--------------------" >&2
-  while caller "$i"; do
+  while caller "${i}"; do
     ((i++))
   done
-  exit "$exit_code"
+  exit "${exit_code}"
 }
 
 #######################################
@@ -66,15 +66,15 @@ function dybatpho::trap {
     local cmds=$(trap -p "$1")
     cmds="${cmds#*\'}"
     cmds="${cmds%\'*}"
-    echo "$cmds"
+    echo "${cmds}"
   }
 
   local finalize_command
   for signal in "$@"; do
-    finalize_command=$(_gen_finalize_command "$signal")
-    finalize_command="$finalize_command${finalize_command:+; }$command"
+    finalize_command=$(_gen_finalize_command "${signal}")
+    finalize_command="${finalize_command}${finalize_command:+; }${command}"
     # shellcheck disable=SC2064,SC2086
-    trap "$command" "$signal"
+    trap "${command}" "${signal}"
   done
 }
 
@@ -88,14 +88,14 @@ function dybatpho::cleanup_file_on_exit {
 
   local pid="$$"
   local cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh"
-  touch "$cleanup_file"
+  touch "${cleanup_file}"
   ( # kcov(skip)
-    grep -vF "$cleanup_file" "$cleanup_file" \
+    grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
-        echo "/bin/rm -rf '$filepath'"
-        echo "/bin/rm -rf $cleanup_file"
+        echo "/bin/rm -rf '${filepath}'"
+        echo "/bin/rm -rf ${cleanup_file}"
       )                     # kcov(skip)
   ) > "${cleanup_file}.new" # kcov(skip)
-  mv -f "${cleanup_file}.new" "$cleanup_file"
-  dybatpho::trap "bash $cleanup_file" EXIT HUP INT TERM
+  mv -f "${cleanup_file}.new" "${cleanup_file}"
+  dybatpho::trap "bash ${cleanup_file}" EXIT HUP INT TERM
 }

@@ -61,63 +61,63 @@ function dybatpho::require {
 function dybatpho::is {
   local condition input
   dybatpho::expect_args condition input -- "$@"
-  case "$condition" in
+  case "${condition}" in
     command)
-      command -v "$input"
-      return "${?}"
+      command -v "${input}"
+      return "$?"
       ;;
     file)
-      [ -f "$input" ]
-      return "${?}"
+      [ -f "${input}" ]
+      return "$?"
       ;;
     dir)
-      [ -d "$input" ]
-      return "${?}"
+      [ -d "${input}" ]
+      return "$?"
       ;;
     link)
-      [ -L "$input" ]
-      return "${?}"
+      [ -L "${input}" ]
+      return "$?"
       ;;
     exist)
-      [ -e "$input" ]
-      return "${?}"
+      [ -e "${input}" ]
+      return "$?"
       ;;
     readable)
-      [ -r "$input" ]
-      return "${?}"
+      [ -r "${input}" ]
+      return "$?"
       ;;
     writeable)
-      [ -w "$input" ]
-      return "${?}"
+      [ -w "${input}" ]
+      return "$?"
       ;;
     executable)
-      [ -x "$input" ]
-      return "${?}"
+      [ -x "${input}" ]
+      return "$?"
       ;;
     set)
       [ "${input+x}" = "x" ] && [ "${#input}" -gt "0" ]
-      return "${?}"
+      return "$?"
       ;;
     empty)
       [ "${input+x}" = "x" ] && [ "${#input}" -eq "0" ]
-      return "${?}"
+      return "$?"
       ;;
     number)
       printf -- '%f' "${input:-null}" > /dev/null 2>&1
-      return "${?}"
+      return "$?"
       ;;
     int)
       printf -- '%d' "${input:-null}" > /dev/null 2>&1
-      return "${?}"
+      return "$?"
       ;;
     true)
-      case "$input" in
+      case "${input}" in
         0 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
         '' | *) return 1 ;;
       esac
       ;;
     false)
-      case "$input" in
+      case "${input}" in
         1 | [fF][aA][lL][sS][eE] | [nN][oO] | [oO][fF][fF]) return 0 ;;
         '' | *) return 1 ;;
       esac
@@ -140,17 +140,17 @@ function dybatpho::retry {
   local dybatpho_exit_code dybatpho_count dybatpho_delay
 
   dybatpho_count=0
-  until eval "$dybatpho_command"; do
-    dybatpho_exit_code=$?
-    dybatpho_count=$((dybatpho_count + 1))
-    if [ "$dybatpho_count" -le "$dybatpho_retries" ]; then
-      dybatpho_delay=$((2 * dybatpho_count))
+  until eval "${dybatpho_command}"; do
+    dybatpho_exit_code="$?"
+    dybatpho_count="$((dybatpho_count + 1))"
+    if [ "${dybatpho_count}" -le "${dybatpho_retries}" ]; then
+      dybatpho_delay="$((2 * dybatpho_count))"
       dybatpho::progress "Retrying in ${dybatpho_delay} seconds (${dybatpho_count}/${dybatpho_retries})..."
-      sleep "$dybatpho_delay" || true
+      sleep "${dybatpho_delay}" || true
     else
       # Out of retries :(
       dybatpho::warn "No more retries left to run ${dybatpho_command}."
-      return "$dybatpho_exit_code"
+      return "${dybatpho_exit_code}"
     fi
   done
 }
@@ -162,7 +162,7 @@ function dybatpho::retry {
 function dybatpho::breakpoint {
   local dybatpho_key_pressed
   local dybatpho_section="--------------------------------------------------------------------------------"
-  local dybatpho_help="$dybatpho_section
+  local dybatpho_help="${dybatpho_section}
     d: run debugger
     c: display source file
     o: list options
@@ -172,41 +172,43 @@ function dybatpho::breakpoint {
     q: quit
 "
   __log fatal "Breakpoint hit. Current line: ${BASH_SOURCE[-1]}:${BASH_LINENO[0]}" stderr "1;36"
-  while read -n1 -s -r -p $"$dybatpho_help" dybatpho_key_pressed; do case $dybatpho_key_pressed in
-    o) # kcov(skip)
-      shopt -s
-      set -o
-      ;;
-    p) declare -p ;;
-    a) declare -a ;;
-    A) declare -A ;;
-    q) # kcov(skip)
-      echo "$dybatpho_section" 1>&2
-      return
-      ;;
-    # kcov(disabled)
-    d)
-      set +xv              # Disable tracing for better verbose output
-      set +eou pipefail    # Disable strict mode
-      set +E && trap - ERR # Disable exit and error handling
-      # shellcheck disable=SC2162
-      while read -p "Debugger (Ctrl-d to exit)> " REPL; do
-        eval "$REPL"
-      done
-      echo
-      set -eou pipefail # Enable strict mode
-      dybatpho::is true "$DYBATPHO_USED_ERR_HANDLER" \
-        && dybatpho::register_err_handler    # Rerun register_err_handler
-      [ "$LOG_LEVEL" == "trace" ] && set -xv # Re-enable tracing if needed
-      ;;
-    c)
-      echo "$dybatpho_section" 1>&2
-      # shellcheck disable=SC2015
-      dybatpho::is command "bat" \
-        && bat "${BASH_SOURCE[-1]}" 1>&2 \
-        || cat -n "${BASH_SOURCE[-1]}" 1>&2
-      ;;
-    # kcov(enabled)
-    *) continue ;;
-  esac done # kcov(skip)
+  while read -n1 -s -r -p $"${dybatpho_help}" dybatpho_key_pressed; do
+    case "${dybatpho_key_pressed}" in
+      o) # kcov(skip)
+        shopt -s
+        set -o
+        ;;
+      p) declare -p ;;
+      a) declare -a ;;
+      A) declare -A ;;
+      q) # kcov(skip)
+        echo "${dybatpho_section}" 1>&2
+        return
+        ;;
+      # kcov(disabled)
+      d)
+        set +xv              # Disable tracing for better verbose output
+        set +eou pipefail    # Disable strict mode
+        set +E && trap - ERR # Disable exit and error handling
+        # shellcheck disable=SC2162
+        while read -p "Debugger (Ctrl-d to exit)> " REPL; do
+          eval "${REPL}"
+        done
+        echo
+        set -eou pipefail # Enable strict mode
+        dybatpho::is true "${DYBATPHO_USED_ERR_HANDLER}" \
+          && dybatpho::register_err_handler      # Rerun register_err_handler
+        [ "${LOG_LEVEL}" == "trace" ] && set -xv # Re-enable tracing if needed
+        ;;
+      c)
+        echo "${dybatpho_section}" 1>&2
+        # shellcheck disable=SC2015
+        dybatpho::is command "bat" \
+          && bat "${BASH_SOURCE[-1]}" 1>&2 \
+          || cat -n "${BASH_SOURCE[-1]}" 1>&2
+        ;;
+      # kcov(enabled)
+      *) continue ;;
+    esac
+  done # kcov(skip)
 }

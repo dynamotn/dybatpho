@@ -253,6 +253,6 @@ _test_retry() {
 }
 
 @test "dybatpho::breakpoint wait for output" {
-  run dybatpho::breakpoint 2>&1 <<<"hoaApq"
+  run dybatpho::breakpoint 2>&1 <<< "hoaApq"
   assert_success
 }

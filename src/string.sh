@@ -14,7 +14,7 @@
 function dybatpho::trim {
   : "${1#"${1%%[![:space:]]*}"}"
   : "${_%"${_##*[![:space:]]}"}"
-  printf '%s\n' "$_"
+  printf '%s\n' "${_}"
 }
 
 #######################################
@@ -38,13 +38,13 @@ function dybatpho::url_encode {
   local i
   for (( i = 0; i < ${#1}; i++ )); do
     : "${1:i:1}"
-    case "$_" in
+    case "${_}" in
       [a-zA-Z0-9.~_-])
-        printf '%s' "$_"
+        printf '%s' "${_}"
         ;;
 
       *)
-        printf '%%%02X' "'$_"
+        printf '%%%02X' "'${_}"
         ;;
     esac
   done

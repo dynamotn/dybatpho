@@ -11,7 +11,7 @@ setup() {
 @test "dybatpho::split output string" {
   run dybatpho::split "apples,oranges,pears,grapes" ","
   assert_success
-  assert_output <<EOF
+  assert_output << EOF
 apples
 oranges
 pears
@@ -19,7 +19,7 @@ grapes
 EOF
   run dybatpho::split "hello---world---my---name---is---dynamo" ","
   assert_success
-  assert_output <<EOF
+  assert_output << EOF
 hello
 world
 my

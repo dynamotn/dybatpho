@@ -18,7 +18,7 @@ function __get_http_code {
   local code
   dybatpho::expect_args code -- "$@"
 
-  case "$code" in
+  case "${code}" in
     # kcov(disabled)
     '100') echo '100 (continue)' ;;
     '101') echo '101 (switching protocols)' ;;
@@ -102,7 +102,7 @@ function dybatpho::curl_do {
   shift
   local output="/dev/null"
   if [ $# -ne 0 ]; then
-    output="${1}"
+    output="$1"
     shift
   fi
 
@@ -112,29 +112,29 @@ function dybatpho::curl_do {
     dybatpho::require curl
     # kcov(disabled)
     code=$(
-      curl -fsSL "$url" \
+      curl -fsSL "${url}" \
         -w '%{http_code}' \
-        -o "$output" \
+        -o "${output}" \
         "$@" \
         2> /dev/null
     ) || true
     # kcov(enabled)
 
     local code_description
-    code_description=$(__get_http_code "$code")
-    dybatpho::debug "Received HTTP status: $code_description"
+    code_description=$(__get_http_code "${code}")
+    dybatpho::debug "Received HTTP status: ${code_description}"
 
-    if [[ "$code" =~ '2'.* ]] || [[ "$code" =~ '4'.* ]]; then
+    if [[ "${code}" =~ '2'.* ]] || [[ "${code}" =~ '4'.* ]]; then
       return 0
     else
       return 1
     fi
   }
 
-  dybatpho::retry "$DYBATPHO_CURL_MAX_RETRIES" _request
+  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" _request
 
   # Return exit code based on HTTP status code
-  case "$code" in
+  case "${code}" in
     '2'*) return 0 ;;
     '3'*) return 3 ;;
     '4'*) return 4 ;;
@@ -157,8 +157,8 @@ function dybatpho::curl_download {
 
   # Create destination folder
   local dst_dir
-  dst_dir=$(dirname "$dst_file") || return 2
-  mkdir -p "$dst_dir" || return 2
+  dst_dir=$(dirname "${dst_file}") || return 2
+  mkdir -p "${dst_dir}" || return 2
 
-  dybatpho::curl_do "$url" "$dst_file" || return
+  dybatpho::curl_do "${url}" "${dst_file}" || return
 }

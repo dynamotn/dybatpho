@@ -18,8 +18,8 @@ setup() {
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 -- "$@"
-    assert_equal "$arg1" "this is first arg"
-    assert_equal "$arg2" "this is second arg"
+    assert_equal "${arg1}" "this is first arg"
+    assert_equal "${arg2}" "this is second arg"
   }
   run test_function "this is first arg" "this is second arg"
   assert_success
@@ -80,8 +80,8 @@ setup() {
 
 @test "dybatpho::is link" {
   local temp="${BATS_TEST_TMPDIR}/link"
-  ln -sf "${BASH_SOURCE[0]}" "$temp"
-  run dybatpho::is "link" "$temp"
+  ln -sf "${BASH_SOURCE[0]}" "${temp}"
+  run dybatpho::is "link" "${temp}"
   assert_success
   refute_output
   run dybatpho::is "link" "dyfoooo"
@@ -99,55 +99,55 @@ setup() {
 }
 
 @test "dybatpho::is readable" {
-  local temp="$(mktemp -p "$BATS_TEST_TMPDIR")"
-  chmod +r "$temp"
-  run dybatpho::is "readable" "$temp"
+  local temp="$(mktemp -p "${BATS_TEST_TMPDIR}")"
+  chmod +r "${temp}"
+  run dybatpho::is "readable" "${temp}"
   assert_success
   refute_output
-  chmod a-r "$temp"
-  run dybatpho::is "readable" "$temp"
+  chmod a-r "${temp}"
+  run dybatpho::is "readable" "${temp}"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is writeable" {
-  local temp="$(mktemp -p "$BATS_TEST_TMPDIR")"
-  chmod +w "$temp"
-  run dybatpho::is "writeable" "$temp"
+  local temp="$(mktemp -p "${BATS_TEST_TMPDIR}")"
+  chmod +w "${temp}"
+  run dybatpho::is "writeable" "${temp}"
   assert_success
   refute_output
-  chmod -w "$temp"
-  run dybatpho::is "writeable" "$temp"
+  chmod -w "${temp}"
+  run dybatpho::is "writeable" "${temp}"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is executable" {
-  local temp="$(mktemp -p "$BATS_TEST_TMPDIR")"
-  chmod +x "$temp"
-  run dybatpho::is "executable" "$temp"
+  local temp="$(mktemp -p "${BATS_TEST_TMPDIR}")"
+  chmod +x "${temp}"
+  run dybatpho::is "executable" "${temp}"
   assert_success
   refute_output
-  chmod -x "$temp"
-  run dybatpho::is "executable" "$temp"
+  chmod -x "${temp}"
+  run dybatpho::is "executable" "${temp}"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is set" {
   local dyfoooo=""
-  run dybatpho::is "set" "$dyfoooo"
+  run dybatpho::is "set" "${dyfoooo}"
   assert_failure
   refute_output
   dyfoooo="v"
-  run dybatpho::is "set" "$dyfoooo"
+  run dybatpho::is "set" "${dyfoooo}"
   assert_success
   refute_output
 }
 
 @test "dybatpho::is empty" {
   local dyfoooo=""
-  run dybatpho::is "empty" "$dyfoooo"
+  run dybatpho::is "empty" "${dyfoooo}"
   assert_success
   refute_output
 }
@@ -223,7 +223,7 @@ setup() {
 
 _test_retry() {
   count=$((count + 1))
-  if [ "$count" -lt 3 ]; then
+  if [ "${count}" -lt 3 ]; then
     return 1
   else
     return 0

@@ -108,7 +108,7 @@ function dybatpho::curl_do {
 
   local code
   # shellcheck disable=SC2317
-  _request() {
+  __request() {
     dybatpho::require curl
     # kcov(disabled)
     code=$(
@@ -131,7 +131,7 @@ function dybatpho::curl_do {
     fi
   }
 
-  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" _request
+  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" __request
 
   # Return exit code based on HTTP status code
   case "${code}" in

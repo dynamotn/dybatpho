@@ -5,9 +5,9 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 TEMP_FILE=$(mktemp)
 dybatpho::register_err_handler
-dybatpho::cleanup_file_on_exit "$TEMP_FILE"
+dybatpho::cleanup_file_on_exit "${TEMP_FILE}"
 
-function __main {
+function _main {
   local message
   dybatpho::expect_args message -- "$@"
   if ! dybatpho::is "command" "chezmoi"; then
@@ -16,7 +16,7 @@ function __main {
     dybatpho::debug "chezmoi is installed"
   fi
   dybatpho::curl_do https://github.com/dynamotn/dybatpho
-  dybatpho::info "$message"
+  dybatpho::info "${message}"
   dybatpho::start_trace
   dybatpho::is "set" "dyfoooo"
   dybatpho::breakpoint
@@ -28,4 +28,4 @@ function __main {
 
 # shellcheck disable=SC2034
 LOG_LEVEL=trace
-__main "This is example script that used dybatpho"
+_main "This is example script that used dybatpho"

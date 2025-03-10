@@ -14,6 +14,7 @@ This module contains functions to log messages to stdout/stderr.
 * [__log](#log)
 * [dybatpho::debug](#dybatphodebug)
 * [dybatpho::info](#dybatphoinfo)
+* [dybatpho::print](#dybatphoprint)
 * [dybatpho::progress](#dybatphoprogress)
 * [dybatpho::progress_bar](#dybatphoprogressbar)
 * [dybatpho::notice](#dybatphonotice)
@@ -82,6 +83,18 @@ Show info message.
 * **$1** (string): Message
 
 #### Output on stderr
+
+* Show message if log level of message is less than info level
+
+### dybatpho::print
+
+Show normal message.
+
+#### Arguments
+
+* **$1** (string): Message
+
+#### Output on stdout
 
 * Show message if log level of message is less than info level
 

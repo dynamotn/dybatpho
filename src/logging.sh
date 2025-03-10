@@ -80,6 +80,15 @@ function dybatpho::info {
 }
 
 #######################################
+# @description Show normal message.
+# @arg $1 string Message
+# @stdout Show message if log level of message is less than info level
+#######################################
+function dybatpho::print {
+  __log info "$*" stdout "0;0"
+}
+
+#######################################
 # @description Show in progress message.
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level

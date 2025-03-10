@@ -4,7 +4,7 @@ setup() {
 
 @test 'dybatpho::die output' {
   local exit_code=7
-  run -"$exit_code" dybatpho::die loioday "$exit_code"
+  run -"${exit_code}" dybatpho::die loioday "${exit_code}"
   assert_failure
   assert_output --partial "loioday"
 }
@@ -16,7 +16,7 @@ setup() {
 
 @test 'dybatpho::run_err_handler output' {
   local exit_code=7
-  run -"$exit_code" dybatpho::run_err_handler "$exit_code"
+  run -"${exit_code}" dybatpho::run_err_handler "${exit_code}"
   assert_failure
 }
 
@@ -29,7 +29,7 @@ setup() {
 
 @test 'dybatpho::cleanup_file_on_exit action' {
   local filepath=$(mktemp)
-  run dybatpho::cleanup_file_on_exit "$filepath"
+  run dybatpho::cleanup_file_on_exit "${filepath}"
   assert_success
-  assert_file_not_exist "$filepath"
+  assert_file_not_exist "${filepath}"
 }

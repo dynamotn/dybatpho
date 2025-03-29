@@ -42,6 +42,22 @@ function dybatpho::expect_args {
 }
 
 #######################################
+# @description Check that function still has next argument after shift.
+# This function is useful to check argument of function that you don't now
+# count of arguments when triggered, and you just only need to process next
+# argument
+# @example
+#   while dybatpho::still_has_args "$@" && shift; do
+#     echo "Function has next argument is $1"
+#   done
+# @exitcode 0 Still has an argument
+# @exitcode 1 Not has any arguments
+#######################################
+function dybatpho::still_has_args {
+  [ $# -gt 1 ]
+}
+
+#######################################
 # @description Check command dependency is installed.
 # @arg $1 string Command need to be installed
 # @exitcode 127 Stop script if command isn't installed

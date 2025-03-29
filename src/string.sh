@@ -21,7 +21,7 @@ function dybatpho::trim {
 # @description Split a string on a delimiter.
 # @arg $1 string String to split
 # @arg $2 string Delimiter
-# @stdout Show each part of splited string
+# @stdout Show each part of split string
 #######################################
 function dybatpho::split {
   IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}"

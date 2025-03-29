@@ -39,7 +39,7 @@ Split a string on a delimiter.
 
 #### Output on stdout
 
-* Show each part of splited string
+* Show each part of split string
 
 ### dybatpho::url_encode
 

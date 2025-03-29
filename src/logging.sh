@@ -7,7 +7,7 @@
 # **LOG_LEVEL** (string): Run time log level of all messages (trace|debug|info|warn|error|fatal). Default is `info`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-LOG_LEVEL=$(dybatpho::lower "${LOG_LEVEL:-info}")
+LOG_LEVEL="${LOG_LEVEL:-info}"
 export LOG_LEVEL
 
 #######################################

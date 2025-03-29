@@ -5,3 +5,7 @@ run = "{{ config_root }}/scripts/doc.sh"
 [tasks.test]
 description = "Unit test"
 run = "{{ config_root }}/scripts/test.sh"
+
+[tasks.demo]
+description = "Run demo script"
+run = "{{ config_root }}/doc/example.sh --help"

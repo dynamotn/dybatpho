@@ -82,14 +82,14 @@ function __get_http_code {
 }
 
 #######################################
-# @description Transfering data with URL by curl
+# @description Transferring data with URL by curl
 # @example
 #   dybatpho::curl_do <url> --output /tmp/1
 #
 # @arg $1 string URL
 # @arg $2 string Location of curl output, default is `/dev/null`
 # @arg $3 string Other options/arguments for curl
-# @exitcode 0 Transfered data
+# @exitcode 0 Transferred data
 # @exitcode 1 Unknown error
 # @exitcode 3 First digit of HTTP error code 3xx
 # @exitcode 4 First digit of HTTP error code 4xx

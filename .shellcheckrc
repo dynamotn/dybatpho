@@ -1,2 +1,3 @@
 disable=SC2155,SC2148
 enable=require-variable-braces
+external-sources=true

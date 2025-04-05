@@ -3,7 +3,11 @@
 # @brief Utilities for writing efficient script
 # @description
 #   This module contains functions to write efficient script.
+#
+# DYBATPHO_REPL_HISTORY_FILE string Path of REPL history file for dybatpho, used in dybatpho::breakpoint
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+
+DYBATPHO_REPL_HISTORY_FILE="${HOME}/.cache/dybatpho_repl.history"
 
 #######################################
 # @description Validate argument when invoke function. It adds a small performance penalty but is a sane option.
@@ -39,6 +43,22 @@ function dybatpho::expect_args {
     eval "${variable_name}=\$1"
     shift
   done
+}
+
+#######################################
+# @description Check that function still has next argument after shift.
+# This function is useful to check argument of function that you don't now
+# count of arguments when triggered, and you just only need to process next
+# argument
+# @example
+#   while dybatpho::still_has_args "$@" && shift; do
+#     echo "Function has next argument is $1"
+#   done
+# @exitcode 0 Still has an argument
+# @exitcode 1 Not has any arguments
+#######################################
+function dybatpho::still_has_args {
+  [ $# -gt 1 ]
 }
 
 #######################################
@@ -169,18 +189,19 @@ function dybatpho::breakpoint {
     p: list parameters
     a: list indexed array
     A: list associative array
-    q: quit
-"
+    q: quit"
   __log fatal "Breakpoint hit. Current line: ${BASH_SOURCE[-1]}:${BASH_LINENO[0]}" stderr "1;36"
-  while read -n1 -s -r -p $"${dybatpho_help}" dybatpho_key_pressed; do
+  while true; do
+    printf "%s\n" "${dybatpho_help}" 1>&2
+    read -n1 -s -r dybatpho_key_pressed
     case "${dybatpho_key_pressed}" in
       o) # kcov(skip)
-        shopt -s
-        set -o
+        shopt -s 1>&2
+        set -o 1>&2
         ;;
-      p) declare -p ;;
-      a) declare -a ;;
-      A) declare -A ;;
+      p) declare -p 1>&2 ;;
+      a) declare -a 1>&2 ;;
+      A) declare -A 1>&2 ;;
       q) # kcov(skip)
         echo "${dybatpho_section}" 1>&2
         return
@@ -190,11 +211,21 @@ function dybatpho::breakpoint {
         set +xv              # Disable tracing for better verbose output
         set +eou pipefail    # Disable strict mode
         set +E && trap - ERR # Disable exit and error handling
+        if [[ -f ${DYBATPHO_REPL_HISTORY_FILE} ]]; then
+          history -r "${DYBATPHO_REPL_HISTORY_FILE}"
+        fi
         # shellcheck disable=SC2162
-        while read -p "Debugger (Ctrl-d to exit)> " REPL; do
-          eval "${REPL}"
+        while read -e -p "Debugger (Ctrl-d to exit)> " line; do
+          [[ "${line}" == "exit" ]] && break
+          if [[ "${line}" =~ ^rm ]] || [[ "${line}" =~ ^dd ]]; then
+            dybatpho::error "Ignore dangerous command."
+            continue
+          fi
+          echo "${line}" >> "${DYBATPHO_REPL_HISTORY_FILE}"
+          history -s "${line}"
+          eval "${line} >&2"
         done
-        echo
+        echo 1>&2
         set -eou pipefail # Enable strict mode
         dybatpho::is true "${DYBATPHO_USED_ERR_HANDLER}" \
           && dybatpho::register_err_handler      # Rerun register_err_handler

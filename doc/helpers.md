@@ -6,9 +6,12 @@ Utilities for writing efficient script
 
 This module contains functions to write efficient script.
 
+DYBATPHO_REPL_HISTORY_FILE string Path of REPL history file for dybatpho, used in dybatpho::breakpoint
+
 ## Index
 
 * [dybatpho::expect_args](#dybatphoexpectargs)
+* [dybatpho::still_has_args](#dybatphostillhasargs)
 * [dybatpho::require](#dybatphorequire)
 * [dybatpho::is](#dybatphois)
 * [dybatpho::retry](#dybatphoretry)
@@ -29,6 +32,23 @@ dybatpho::expect_args arg1 arg2 .. argN -- "$@"
 
 * **1**: Stop script if not correct spec: enough variable names to get, `--`, and list of arguments to pass `$@`
 * **0**: Otherwise run seamlessly, pass value of argument to variable name
+
+### dybatpho::still_has_args
+
+Check that function still has next argument after shift.
+This function is useful to check argument of function that you don't now
+count of arguments when triggered, and you just only need to process next
+argument
+
+#### Example
+
+```bash
+  while dybatpho::still_has_args "$@" && shift; do
+    echo "Function has next argument is $1"
+  done
+@exitcode 0 Still has an argument
+@exitcode 1 Not has any arguments
+```
 
 ### dybatpho::require
 

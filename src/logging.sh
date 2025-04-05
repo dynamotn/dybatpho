@@ -7,7 +7,7 @@
 # **LOG_LEVEL** (string): Run time log level of all messages (trace|debug|info|warn|error|fatal). Default is `info`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-LOG_LEVEL=$(dybatpho::lower "${LOG_LEVEL:-info}")
+LOG_LEVEL="${LOG_LEVEL:-info}"
 export LOG_LEVEL
 
 #######################################
@@ -179,7 +179,7 @@ function dybatpho::start_trace {
   [ "${LOG_LEVEL}" != "trace" ] && return
   __log trace "START TRACE" stderr
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
-  trap -p EXIT || (trap 'set +xv' EXIT && set -xv) # kcov(skip)
+  dybatpho::trap 'set +xv' EXIT && set -xv
 }
 
 #######################################

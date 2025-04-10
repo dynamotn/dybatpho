@@ -51,10 +51,13 @@ Run error handling. If you activate by `dybatpho::register_err_handler`, you don
 
 Trap multiple signals
 
+#### Options
+
+* $* string Signals to trap
+
 #### Arguments
 
 * **$1** (string): Command run when trapped
-* **$2** (string_list): Signals to trap
 
 ### dybatpho::cleanup_file_on_exit
 

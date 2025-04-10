@@ -1,0 +1,15 @@
+{
+  "neoconf": {
+    "plugins": {
+      "bashls": {
+        "enabled": true
+      }
+    }
+  },
+  "lspconfig": {
+    "bashls": {
+      "bashIde.includeAllWorkspaceSymbols": true,
+      "bashIde.enableSourceErrorDiagnostics": true
+    }
+  }
+}

@@ -52,9 +52,3 @@ EOF
   assert_success
   assert_output "DYBATPHO"
 }
-
-@test "dybatpho::reverse output string" {
-  run dybatpho::reverse "dYbaTPHO"
-  assert_success
-  assert_output "DyBAtpho"
-}

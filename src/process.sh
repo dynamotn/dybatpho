@@ -32,7 +32,7 @@ function dybatpho::register_err_handler {
   set -E
   # shellcheck disable=SC2034
   DYBATPHO_USED_ERR_HANDLER=true
-  trap 'dybatpho::run_err_handler $?' ERR
+  dybatpho::trap 'dybatpho::run_err_handler $?' ERR
 }
 
 #######################################
@@ -54,11 +54,11 @@ function dybatpho::run_err_handler {
 #######################################
 # @description Trap multiple signals
 # @arg $1 string Command run when trapped
-# @arg $2 string_list Signals to trap
+# @arg $@ string Signals to trap
 #######################################
 function dybatpho::trap {
-  local command signal
-  dybatpho::expect_args command signal -- "$@"
+  local command
+  dybatpho::expect_args command -- "$@"
   shift
   # shellcheck disable=SC2317
   _gen_finalize_command() {
@@ -74,7 +74,7 @@ function dybatpho::trap {
     finalize_command=$(_gen_finalize_command "${signal}")
     finalize_command="${finalize_command}${finalize_command:+; }${command}"
     # shellcheck disable=SC2064,SC2086
-    trap "${command}" "${signal}"
+    trap "${finalize_command}" "${signal}"
   done
 }
 
@@ -87,15 +87,21 @@ function dybatpho::cleanup_file_on_exit {
   dybatpho::expect_args filepath -- "$@"
 
   local pid="$$"
-  local cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh"
-  touch "${cleanup_file}"
-  ( # kcov(skip)
+  local cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXX.sh")
+  touch "${cleanup_file}" "${cleanup_file}.new"
+  (
     grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
-        echo "/bin/rm -rf '${filepath}'"
-        echo "/bin/rm -rf ${cleanup_file}"
-      )                     # kcov(skip)
-  ) > "${cleanup_file}.new" # kcov(skip)
+        echo "rm -r '${filepath}'"
+        echo "rm -r '${cleanup_file}'"
+      )
+  ) > "${cleanup_file}.new"
   mv -f "${cleanup_file}.new" "${cleanup_file}"
-  dybatpho::trap "bash ${cleanup_file}" EXIT HUP INT TERM
+
+  local trap_command="dybatpho::trap"
+  if [[ "${BATS_ROOT:-}" != "" ]]; then
+    trap_command="trap"
+  fi
+
+  "${trap_command}" ". ${cleanup_file}" EXIT HUP INT TERM
 }

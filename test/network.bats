@@ -3,7 +3,7 @@ setup() {
 }
 
 @test "__get_http_code no arg" {
-  run _get_http_code
+  run __get_http_code
   assert_failure
 }
 

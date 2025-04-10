@@ -54,7 +54,7 @@ Trap multiple signals
 #### Arguments
 
 * **$1** (string): Command run when trapped
-* **$2** (string_list): Signals to trap
+* **...** (string): Signals to trap
 
 ### dybatpho::cleanup_file_on_exit
 

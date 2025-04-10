@@ -28,7 +28,7 @@ setup() {
 }
 
 @test 'dybatpho::cleanup_file_on_exit action' {
-  local filepath=$(mktemp)
+  local filepath="$(mktemp -p "${BATS_TEST_TMPDIR}")"
   run dybatpho::cleanup_file_on_exit "${filepath}"
   assert_success
   assert_file_not_exist "${filepath}"

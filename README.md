@@ -59,7 +59,6 @@ Once you have `dybatpho` cloned in your project, you source by two ways:
 │   │   └──  support
 │   └──  *.bats # unit test for each module
 ├──  init.sh # initial script, source it first
-├──  modules # list of modules
 ```
 ## Contents
 - [string.sh](doc/string.md)

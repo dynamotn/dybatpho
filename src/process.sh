@@ -89,19 +89,20 @@ function dybatpho::cleanup_file_on_exit {
   local pid="$$"
   local cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXX.sh")
   touch "${cleanup_file}" "${cleanup_file}.new"
-  (
+  ( # kcov(skip)
     grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
         echo "rm -r '${filepath}'"
         echo "rm -r '${cleanup_file}'"
-      )
-  ) > "${cleanup_file}.new"
+      )                     # kcov(skip)
+  ) > "${cleanup_file}.new" # kcov(skip)
   mv -f "${cleanup_file}.new" "${cleanup_file}"
 
+  # kcov(disabled)
   local trap_command="dybatpho::trap"
   if [[ "${BATS_ROOT:-}" != "" ]]; then
     trap_command="trap"
   fi
-
   "${trap_command}" ". ${cleanup_file}" EXIT HUP INT TERM
+  # kcov(enabled)
 }

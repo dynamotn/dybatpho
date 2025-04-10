@@ -21,7 +21,7 @@ function dybatpho::trim {
 # @description Split a string on a delimiter.
 # @arg $1 string String to split
 # @arg $2 string Delimiter
-# @stdout Show each part of splited string
+# @stdout Show each part of split string
 #######################################
 function dybatpho::split {
   IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}"
@@ -36,7 +36,7 @@ function dybatpho::split {
 function dybatpho::url_encode {
   local LC_ALL=C
   local i
-  for (( i = 0; i < ${#1}; i++ )); do
+  for ((i = 0; i < ${#1}; i++)); do
     : "${1:i:1}"
     case "${_}" in
       [a-zA-Z0-9.~_-])
@@ -77,13 +77,4 @@ function dybatpho::lower {
 #######################################
 function dybatpho::upper {
   printf '%s\n' "${1^^}"
-}
-
-#######################################
-# @description Reverse a string case.
-# @arg $1 string String to convert
-# @stdout Converted string
-#######################################
-function dybatpho::reverse {
-  printf '%s\n' "${1~~}"
 }

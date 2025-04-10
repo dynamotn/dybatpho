@@ -14,7 +14,6 @@ This module contains functions to manipulate, convert, etc with string.
 * [dybatpho::url_decode](#dybatphourldecode)
 * [dybatpho::lower](#dybatpholower)
 * [dybatpho::upper](#dybatphoupper)
-* [dybatpho::reverse](#dybatphoreverse)
 
 ### dybatpho::trim
 
@@ -39,7 +38,7 @@ Split a string on a delimiter.
 
 #### Output on stdout
 
-* Show each part of splited string
+* Show each part of split string
 
 ### dybatpho::url_encode
 
@@ -80,18 +79,6 @@ Convert a string to lowercase.
 ### dybatpho::upper
 
 Convert a string to uppercase.
-
-#### Arguments
-
-* **$1** (string): String to convert
-
-#### Output on stdout
-
-* Converted string
-
-### dybatpho::reverse
-
-Reverse a string case.
 
 #### Arguments
 

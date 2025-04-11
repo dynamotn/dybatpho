@@ -2,6 +2,15 @@ setup() {
   load test_helper
 }
 
+@test "dybatpho::still_has_args logic" {
+  declare -a opts=('opt1' 'opt2' '--opt3')
+  run dybatpho::still_has_args "${opts[@]}"
+  assert_success
+  opts=()
+  run dybatpho::still_has_args "${opts[@]}"
+  assert_failure
+}
+
 @test "dybatpho::require installed tool" {
   run dybatpho::require "bash"
   assert_success
@@ -255,4 +264,14 @@ _test_retry() {
 @test "dybatpho::breakpoint wait for output" {
   run dybatpho::breakpoint 2>&1 <<< "hoaApq"
   assert_success
+}
+
+@test "dybatpho::show_file cat content file" {
+  local temp_file="${BATS_TEST_TMPDIR}/file_has_content"
+  local content="Toi la ai day la dau"
+  echo "${content}" >> "${temp_file}"
+  alias bat="cat -n"
+  run dybatpho::show_file "${temp_file}"
+  assert_success
+  assert_output --partial "${content}"
 }

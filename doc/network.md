@@ -28,7 +28,7 @@ Get description of HTTP status code
 
 ### dybatpho::curl_do
 
-Transfering data with URL by curl
+Transferring data with URL by curl
 
 #### Example
 
@@ -44,7 +44,7 @@ dybatpho::curl_do <url> --output /tmp/1
 
 #### Exit codes
 
-* **0**: Transfered data
+* **0**: Transferred data
 * **1**: Unknown error
 * **3**: First digit of HTTP error code 3xx
 * **4**: First digit of HTTP error code 4xx

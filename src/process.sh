@@ -4,7 +4,7 @@
 # @description
 #   This module contains functions to error handling, fork process...
 #
-# DYBATPHO_USED_ERR_HANDLER bool Flag that script used dybatpho::register_err_handler
+# **DYBATPHO_USED_ERR_HANDLER** (bool): Flag that script used dybatpho::register_err_handler
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 DYBATPHO_USED_ERR_HANDLER=false
@@ -45,7 +45,7 @@ function dybatpho::run_err_handler {
   local i=0
   printf -- '%s\n' "Aborting on error ${exit_code}:" \
     "--------------------" >&2
-  while caller "${i}"; do
+  while caller "${i}" >&2; do
     ((i++))
   done
   exit "${exit_code}"
@@ -87,7 +87,12 @@ function dybatpho::cleanup_file_on_exit {
   dybatpho::expect_args filepath -- "$@"
 
   local pid="$$"
-  local cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXX.sh")
+  local cleanup_file
+  if hash "mktemp" > /dev/null 2>&1; then
+    cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXXXXX.sh")
+  else
+    cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh"
+  fi
   touch "${cleanup_file}" "${cleanup_file}.new"
   ( # kcov(skip)
     grep -vF "${cleanup_file}" "${cleanup_file}" \

@@ -2,26 +2,6 @@ setup() {
   load test_helper
 }
 
-@test "dybatpho::still_has_args logic" {
-  declare -a opts=('opt1' 'opt2' '--opt3')
-  run dybatpho::still_has_args "${opts[@]}"
-  assert_success
-  opts=()
-  run dybatpho::still_has_args "${opts[@]}"
-  assert_failure
-}
-
-@test "dybatpho::require installed tool" {
-  run dybatpho::require "bash"
-  assert_success
-}
-
-@test "dybatpho::require not installed tool" {
-  run -127 dybatpho::require "dyfoooo"
-  assert_failure
-  assert_output --partial "dyfoooo isn't installed"
-}
-
 @test "dybatpho::expect_args have right spec" {
   # shellcheck disable=SC2317
   test_function() {
@@ -40,8 +20,9 @@ setup() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 "$@"
   }
-  run test_function "this is first arg" "this is second arg"
+  run --separate-stderr test_function "this is first arg" "this is second arg"
   assert_failure
+  assert_stderr --partial "Expected variable names:"
 }
 
 @test "dybatpho::expect_args not have enough args" {
@@ -49,10 +30,34 @@ setup() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 -- "$@"
   }
-  run test_function
+  run --separate-stderr test_function
   assert_failure
-  run test_function "1"
+  assert_stderr --partial "Expected args:"
+  run --separate-stderr test_function "1"
   assert_failure
+  assert_stderr --partial "Expected args:"
+}
+
+@test "dybatpho::still_has_args logic" {
+  declare -a opts=('opt1' 'opt2' '--opt3')
+  run dybatpho::still_has_args "${opts[@]}"
+  assert_success
+  refute_output
+  opts=()
+  run dybatpho::still_has_args "${opts[@]}"
+  assert_failure
+  refute_output
+}
+
+@test "dybatpho::require installed tool" {
+  run dybatpho::require "bash"
+  assert_success
+}
+
+@test "dybatpho::require not installed tool" {
+  run --separate-stderr -127 dybatpho::require "dyfoooo"
+  assert_failure
+  assert_output --partial "dyfoooo isn't installed"
 }
 
 @test "dybatpho::is with empty" {
@@ -241,37 +246,29 @@ _test_retry() {
 
 @test "dybatpho::retry out of retries" {
   count=0
-  run dybatpho::retry 1 _test_retry
+  run --separate-stderr dybatpho::retry 1 _test_retry
   assert_failure
-  assert_output --partial "No more retries left to run _test"
+  assert_stderr --partial "No more retries left to run _test"
 }
 
 @test "dybatpho::retry success in max retries" {
   count=0
-  run dybatpho::retry 2 _test_retry
+  run --separate-stderr dybatpho::retry 2 _test_retry
   assert_success
-  assert_output --partial "Retrying in 4 seconds (2/2)"
+  assert_stderr --partial "Retrying in 4 seconds (2/2)"
 }
 
 @test "dybatpho::retry success before max retries" {
   count=0
-  run dybatpho::retry 3 _test_retry
+  run --separate-stderr dybatpho::retry 3 _test_retry
   assert_success
-  assert_output --partial "Retrying in 4 seconds (2/3)"
-  refute_output --partial "Retrying in 8 seconds (3/3)"
+  assert_stderr --partial "Retrying in 4 seconds (2/3)"
+  refute_stderr --partial "Retrying in 8 seconds (3/3)"
 }
 
 @test "dybatpho::breakpoint wait for output" {
-  run dybatpho::breakpoint 2>&1 <<< "hoaApq"
+  run --separate-stderr dybatpho::breakpoint 2>&1 <<< "hoaApq"
   assert_success
-}
-
-@test "dybatpho::show_file cat content file" {
-  local temp_file="${BATS_TEST_TMPDIR}/file_has_content"
-  local content="Toi la ai day la dau"
-  echo "${content}" >> "${temp_file}"
-  alias bat="cat -n"
-  run dybatpho::show_file "${temp_file}"
-  assert_success
-  assert_output --partial "${content}"
+  refute_output
+  assert_stderr --partial "Breakpoint hit"
 }

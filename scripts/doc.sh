@@ -7,6 +7,6 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 dybatpho::require "shdoc"
 dybatpho::require "gawk"
 
-for module in string array opts logging helpers process network; do
+for module in string array logging helpers process network file cli; do
   shdoc < "${DYBATPHO_DIR}/src/${module}.sh" > doc/"${module}".md || true
 done

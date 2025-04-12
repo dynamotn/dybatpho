@@ -1,42 +1,47 @@
 #!/usr/bin/env bash
 #
-# @file opts.sh
-# @brief Utilities for getting options when calling command in script or from CLI
+# @file cli.sh
+# @brief Utilities for getting options when calling command from CLI or in script with CLI-like format
 # @description
 #   This module contains functions to define, get options (flags, parameters...) for command or subcommand
 #   when calling it from CLI or in shell script.
+#
+# Theses are type of function arguments that defined in this file
+#
+# |Type|Description|
+# |----|-----------|
+# |`switch`|A type as a string with format `-?`, `--*`, `--no-*`, `--with-*`, `--without-*`, `--{no-}*` (expand to use both `--flag` and `--no-flag`), `--with{out}-*` (expand to `--with-flag` and `--without-flag`)|
+# |`key:value`|`key1:value1` style arguments, if `:value` is omitted, it is the same as `key:key`|
+#
+# ### Key-value type
+# |Format|Description|
+# |------|-----------|
+# |`action:<code>`|List of multiple statements, split by `;` as `key:value`, eg `"action:foo; bar"`|
+# |`init:<method>`|Method to initial value of variable from spec by variable name with key 'init:', used for `dybatpho::opts::flag` and `dybatpho::opts::param`, see `Initial variable kind` below|
+# |`on:<string>`|The positive value whether option is switch as `--flag`, `--with-flag`, default is `"true"`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+# |`off:<string>`|The negative value whether option is not presence, or as `--no-flag`, `--without-flag`, default is empty `''`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+# |`export:<bool>`|Export variable in spec command or not, default is true, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+# |`optional:<bool>`|Used for `dybatpho::opts::param` whether option is optional, default is false (restrict)|
+# |`validate:<code>`|Validate statements for options, eg: '_function1 \$OPTARG' (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+# |`error:<code>`|Custom error messages function for options, eg: '_show_error1',  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+#
+# ### Initial variable kind
+# |Format|Description|
+# |------|-----------|
+# |`init:@empty`|Initial value as empty. It's default behavior|
+# |`init:@on`|Initial value with same as `on` key|
+# |`init:@off`|Initial value with same as `off` key|
+# |`init:@unset`|Unset the variable|
+# |`init:@keep`|Do not initialization (Use the current value as it is)|
+# |`init:action:<code>`|Initialize by run statement(s) and not assigned to variable|
+# |`init:=<code>`| Initialize by plain code and assigned to variable|
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @section Theses are type of functions' arguments that defined in this file
-# - `switch`: A type as a string with format `-?`, `--*`, `--no-*`,
-#             `--with-*`, `--without-*`,
-#             `--{no-}*` (expand to use both `--flag` and `--no-flag`),
-#             `--with{out}-*` (expand to `--with-flag` and `--without-flag`)
-# - `key:value`: `key1:value1` style arguments,
-#                if `:value` is omitted, it is the same as `key:key`
-#   - `action:<statement>`: A function name with arguments as `key:value`,
-#                           eg `action:foo` or `"action:foo 1 2 3"`
-#   - `action:<code>`: List of multiple statements, split by `;` as `key:value`,
-#                      eg `"action:foo; bar"`
-#   - `init:<method>`: Method to initial value of variable from spec by
-#                      variable name with key 'init:', include:
-#     - `init:@empty`: Initial value as empty. It's default behavior
-#     - `init:@on`: Initial value with same as `on` key,
-#     - `init:@off`: Initial value with same as `off` key
-#     - `init:@unset`: Unset the variable
-#     - `init:@keep`: Do not initialization (Use the current value as it is)
-#     - `init:action:<statement|code>`: Initialize by run statement(s)
-#   - `export:<bool>`: Export variable in spec command or not, default is true
-#   - `on:<string>`: The positive value whether option is switch as
-#                    `--flag`, `--with-flag`, default is `"true"`
-#   - `off:<string>`: The negative value whether option is not presence,
-#                     or as `--no-flag`, `--without-flag`, default is empty `''`
-# - `switch_or_key:value`: Any values that match `switch` or `key:value` type
-
 # @section Functions are triggered by `dybatpho::generate_from_spec`
+
 #######################################
 # @description Parse options with a spec from `dybatpho::opts::flag`,
-# `dybatpho::opts::param`
+#              `dybatpho::opts::param`
 # @arg $1 bool Flag that defined option that take argument in spec
 # @arg $@ string Passed arguments from `dybatpho::opts::(flag|param)`
 # @exitcode 0
@@ -79,8 +84,8 @@ function __parse_opt {
 
 #######################################
 # @description Write script with indentation to stdout
-# @arg $1 Number of indentation level
-# @arg $@ Line of code to generate
+# @arg $1 number Number of indentation level
+# @arg $@ string Line of code to generate
 # @exitcode 0
 #######################################
 function __print_indent {
@@ -94,8 +99,8 @@ function __print_indent {
 
 #######################################
 # @description Assign the quoted string to a variable
-# @arg $1 Variable name to be assigned
-# @arg $2 Input string to be quoted
+# @arg $1 string Variable name to be assigned
+# @arg $2 string Input string to be quoted
 # @exitcode 0
 #######################################
 function __assign_quoted {
@@ -109,7 +114,7 @@ function __assign_quoted {
 
 #######################################
 # @description Prepend export of before string of command,
-#              based on <export:bool> switch
+#              based on `export:<bool>` switch
 # @arg $1 string String of command
 #######################################
 function __prepend_export {
@@ -159,8 +164,9 @@ function __parse_key_value() {
 
 # shellcheck disable=2016
 #######################################
-# @description Generate logic from spec of script/function
+# @description Generate logic from spec of script/function to get options
 # @arg $1 string Name of function that has spec of parent function or script
+# @arg $2 string Command of spec (`-` for root command trigger from CLI, otherwise is sub-command)
 # @stdout Generated logic
 #######################################
 function __generate_logic {
@@ -195,7 +201,7 @@ function __generate_logic {
     __print_indent 4 ";;"
   }
 
-  # HACK: For initial all variables before get value of variables
+  # Initial all variables before get value of options
   local __done_initial
   __done_initial=false && "${spec}" "$*"
   __print_indent 0 "dybatpho::opts::parse::${spec}() {"
@@ -226,6 +232,8 @@ function __generate_logic {
     __print_indent 4 ';;'
   }
   __print_indent 2 "esac"
+
+  # Get value of options
   __print_indent 2 'case $1 in'
   __done_initial=true && "${spec}" "$*"
   __print_indent 3 "--)"
@@ -253,6 +261,8 @@ function __generate_logic {
   __print_indent 2 "esac"
   __print_indent 2 "shift"
   __print_indent 1 "done"
+
+  # Show error messages if invalid, otherwise run action command
   __print_indent 1 '[ $# -eq 0 ] && {'
   __print_indent 2 'OPTIND=1; unset OPTARG'
   __print_indent 2 "${__setup_action}"
@@ -269,10 +279,12 @@ function __generate_logic {
   __print_indent 1 'dybatpho::die "$1" 1'
   __print_indent 0 "} # End of dybatpho::opts::parse::${spec}"
 
+  # Generate sub-command logics
   for sub_spec in "${__sub_specs[@]}"; do
     __generate_logic "${sub_spec%%:*}" "${sub_spec#*:}" "$@"
   done
 
+  # Trigger root spec
   if [[ "${command}" == "-" ]]; then
     local trigger="dybatpho::opts::parse::${spec}"
     for param in "$@"; do
@@ -283,6 +295,10 @@ function __generate_logic {
 
 }
 
+#######################################
+# @description Add to switches list if flag/param has multiple switches
+# @arg $1 switch Switch
+#######################################
 function __add_switch {
   __switch="${__switch}${__switch:+|}$1"
 }
@@ -294,7 +310,8 @@ function __print_validate {
 }
 
 # @section Functions work in spec of script or function via
-#          `dybatpho::generate_from_spec`.
+# `dybatpho::generate_from_spec`.
+
 #######################################
 # @description Setup global settings for getting options (mandatory) in spec
 # of script or function
@@ -435,8 +452,11 @@ function dybatpho::generate_from_spec {
 # @arg $@ string Arguments pass from `dybatpho::opts::(flag|param)`
 # @exitcode 0 exit code
 #######################################
-function _help_opt {
-  :
+function __generate_help {
+  eval "
+    dybatpho::print 'Usage: ${0##*/} [options...] [arguments...]'
+    dybatpho::print 'Options:'
+  "
 }
 
 #######################################
@@ -445,8 +465,14 @@ function _help_opt {
 # @stdout Help description
 #######################################
 function dybatpho::generate_help {
-  eval "
-    dybatpho::print 'Usage: ${0##*/} [options...] [arguments...]'
-    dybatpho::print 'Options:'
-  "
+  local spec
+  dybatpho::expect_args spec -- "$@"
+
+  local gen_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_genhelp-${pid}-XXXXX.sh")
+  __generate_logic "${spec}" - "$@" >> "${gen_file}"
+  dybatpho::cleanup_file_on_exit "${gen_file}"
+  dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
+  # shellcheck disable=1090
+  . "${gen_file}"
+  __generate_help "${spec}"
 }

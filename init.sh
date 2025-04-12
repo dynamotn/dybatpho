@@ -43,10 +43,12 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/helpers.sh"
 # shellcheck source=src/process.sh
 . "${DYBATPHO_DIR}/src/process.sh"
-# shellcheck source=src/opts.sh
-. "${DYBATPHO_DIR}/src/opts.sh"
 # shellcheck source=src/network.sh
 . "${DYBATPHO_DIR}/src/network.sh"
+# shellcheck source=src/file.sh
+. "${DYBATPHO_DIR}/src/file.sh"
+# shellcheck source=src/cli.sh
+. "${DYBATPHO_DIR}/src/cli.sh"
 
 # Filter functions and re-export only dybatpho functions to subshells
 eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"

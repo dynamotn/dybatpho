@@ -16,7 +16,6 @@ This module contains functions to write efficient script.
 * [dybatpho::is](#dybatphois)
 * [dybatpho::retry](#dybatphoretry)
 * [dybatpho::breakpoint](#dybatphobreakpoint)
-* [dybatpho::show_file](#dybatphoshowfile)
 
 ### dybatpho::expect_args
 
@@ -99,12 +98,4 @@ with escalating delay between attempts.
 Hit breakpoint to debug script.
 
 _Function has no arguments._
-
-### dybatpho::show_file
-
-Show content of file
-
-#### Arguments
-
-* **$1** (string): File path
 

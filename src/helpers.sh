@@ -242,18 +242,3 @@ function dybatpho::breakpoint {
     esac
   done # kcov(skip)
 }
-
-#######################################
-# @description Show content of file
-# @arg $1 string File path
-#######################################
-function dybatpho::show_file {
-  local file_path
-  dybatpho::expect_args file_path -- "$@"
-
-  if dybatpho::is command "bat"; then
-    bat "${file_path}" >&2
-  else
-    cat -n "${file_path}" >&2 # kcov(skip)
-  fi
-}

@@ -91,7 +91,7 @@ function dybatpho::cleanup_file_on_exit {
   if hash "mktemp" > /dev/null 2>&1; then
     cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXXXXX.sh")
   else
-    cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh"
+    cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh" # kcov(skip)
   fi
   touch "${cleanup_file}" "${cleanup_file}.new"
   ( # kcov(skip)

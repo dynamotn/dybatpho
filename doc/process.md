@@ -6,7 +6,7 @@ Utilities for process handling
 
 This module contains functions to error handling, fork process...
 
-DYBATPHO_USED_ERR_HANDLER bool Flag that script used dybatpho::register_err_handler
+**DYBATPHO_USED_ERR_HANDLER** (bool): Flag that script used dybatpho::register_err_handler
 
 ## Index
 

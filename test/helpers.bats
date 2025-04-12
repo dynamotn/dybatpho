@@ -22,7 +22,7 @@ setup() {
   }
   run --separate-stderr test_function "this is first arg" "this is second arg"
   assert_failure
-  assert_stderr --partial "Expected variable names:"
+  assert_stderr --partial "Expected variable names,"
 }
 
 @test "dybatpho::expect_args not have enough args" {
@@ -57,7 +57,7 @@ setup() {
 @test "dybatpho::require not installed tool" {
   run --separate-stderr -127 dybatpho::require "dyfoooo"
   assert_failure
-  assert_output --partial "dyfoooo isn't installed"
+  assert_stderr --partial "dyfoooo isn't installed"
 }
 
 @test "dybatpho::is with empty" {
@@ -246,24 +246,24 @@ _test_retry() {
 
 @test "dybatpho::retry out of retries" {
   count=0
-  run --separate-stderr dybatpho::retry 1 _test_retry
+  run dybatpho::retry 1 _test_retry
   assert_failure
-  assert_stderr --partial "No more retries left to run _test"
+  assert_output --partial "No more retries left to run _test"
 }
 
 @test "dybatpho::retry success in max retries" {
   count=0
-  run --separate-stderr dybatpho::retry 2 _test_retry
+  run dybatpho::retry 2 _test_retry
   assert_success
-  assert_stderr --partial "Retrying in 4 seconds (2/2)"
+  assert_output --partial "Retrying in 4 seconds (2/2)"
 }
 
 @test "dybatpho::retry success before max retries" {
   count=0
-  run --separate-stderr dybatpho::retry 3 _test_retry
+  run dybatpho::retry 3 _test_retry
   assert_success
-  assert_stderr --partial "Retrying in 4 seconds (2/3)"
-  refute_stderr --partial "Retrying in 8 seconds (3/3)"
+  assert_output --partial "Retrying in 4 seconds (2/3)"
+  refute_output --partial "Retrying in 8 seconds (3/3)"
 }
 
 @test "dybatpho::breakpoint wait for output" {

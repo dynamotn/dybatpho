@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 #
+# @file [TODO:description]
+# @brief [TODO:description]
+# @description [TODO:description]
+
+#!/usr/bin/env bash
 # @file cli.sh
 # @brief Utilities for getting options when calling command from CLI or in script with CLI-like format
 # @description
@@ -86,6 +91,7 @@ function __parse_opt {
 # @description Write script with indentation to stdout
 # @arg $1 number Number of indentation level
 # @arg $@ string Line of code to generate
+# @stdout Generated code
 # @exitcode 0
 #######################################
 function __print_indent {
@@ -194,7 +200,7 @@ function __generate_logic {
 
   __print_rest() {
     __print_indent 4 'while [ $# -gt 0 ]; do'
-    __print_indent 5 "eval \"${__rest}=\\\"\${${__rest}} \\\${\$((OPTIND-\$#))}\\\"\""
+    __print_indent 5 "${__rest}=\"\${${__rest}} \$1\""
     __print_indent 5 "shift"
     __print_indent 4 "done"
     __print_indent 4 "break"
@@ -206,7 +212,6 @@ function __generate_logic {
   __done_initial=false && "${spec}" "$*"
   __print_indent 0 "dybatpho::opts::parse::${spec}() {"
   # shellcheck disable=2016
-  __print_indent 1 'OPTIND=$(($# + 1))'
   __print_indent 1 \
     "while OPTARG= && [ \"\${${__rest}}\" != end ] && [ \$# -gt 0 ]; do"
   __print_indent 2 "case \$1 in"
@@ -237,12 +242,11 @@ function __generate_logic {
   __print_indent 2 'case $1 in'
   __done_initial=true && "${spec}" "$*"
   __print_indent 3 "--)"
-  dybatpho::is false "${__has_sub_cmd}" && __print_indent 4 "shift"
+  __print_indent 4 "shift"
   __print_rest
   __print_indent 3 "*)"
   if dybatpho::is false "${__has_sub_cmd}"; then
-    __print_indent 4 "eval \"${__rest}=\\\"\${${__rest}} \\\${\$((OPTIND-\$#))}\\\"\""
-    __print_indent 4 ";;"
+    __print_rest
   else
     __print_indent 4 "case \$1 in"
     for sub_spec in "${__sub_specs[@]}"; do
@@ -264,7 +268,7 @@ function __generate_logic {
 
   # Show error messages if invalid, otherwise run action command
   __print_indent 1 '[ $# -eq 0 ] && {'
-  __print_indent 2 'OPTIND=1; unset OPTARG'
+  __print_indent 2 'unset OPTARG'
   __print_indent 2 "${__setup_action}"
   __print_indent 2 'return 0'
   __print_indent 1 '}'
@@ -288,7 +292,7 @@ function __generate_logic {
   if [[ "${command}" == "-" ]]; then
     local trigger="dybatpho::opts::parse::${spec}"
     for param in "$@"; do
-      trigger+=" '${param}'"
+      trigger+=" \"${param//\"/\\\"}\""
     done
     __print_indent 0 "${trigger}"
   fi
@@ -434,10 +438,9 @@ function dybatpho::generate_from_spec {
   dybatpho::expect_args spec -- "$@"
   shift
 
-  local pid="$$"
-  local gen_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_genopts-${pid}-XXXXX.sh")
+  local gen_file
+  dybatpho::create_temp gen_file ".sh" "genopts"
   __generate_logic "${spec}" - "$@" >> "${gen_file}"
-  dybatpho::cleanup_file_on_exit "${gen_file}"
   dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
   # shellcheck disable=1090
   . "${gen_file}"
@@ -466,7 +469,8 @@ function dybatpho::generate_help {
   local spec
   dybatpho::expect_args spec -- "$@"
 
-  local gen_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_genhelp-${pid}-XXXXX.sh")
+  local gen_file
+  dybatpho::create_temp gen_file ".sh" "genhelp"
   __generate_logic "${spec}" - "$@" >> "${gen_file}"
   dybatpho::cleanup_file_on_exit "${gen_file}"
   dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"

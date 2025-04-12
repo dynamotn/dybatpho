@@ -12,7 +12,7 @@ VERSION="v1.0.0"
 MESSAGE=""
 
 function _main {
-  dybatpho::progress "Running main function"
+  dybatpho::progress "Running main function with params ${MAIN_ARGS} ${BREAK}"
 
   dybatpho::info "This is sample progress bar"
   for i in {0..100}; do
@@ -82,4 +82,5 @@ function _spec_main {
   dybatpho::opts::cmd cheatsheet _spec_cheatsheet
 }
 
+LOG_LEVEL=debug
 dybatpho::generate_from_spec _spec_main "$@"

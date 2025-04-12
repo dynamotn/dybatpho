@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-#
-# @file [TODO:description]
-# @brief [TODO:description]
-# @description [TODO:description]
-
-#!/usr/bin/env bash
 # @file cli.sh
 # @brief Utilities for getting options when calling command from CLI or in script with CLI-like format
 # @description
@@ -42,7 +36,8 @@
 # |`init:=<code>`| Initialize by plain code and assigned to variable|
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @section Functions are triggered by `dybatpho::generate_from_spec`
+# @section Internal functions
+# @description Functions are triggered by `dybatpho::generate_from_spec`
 
 #######################################
 # @description Parse options with a spec from `dybatpho::opts::flag`,
@@ -300,6 +295,17 @@ function __generate_logic {
 }
 
 #######################################
+# @description Get help description for options from spec
+# @exitcode 0 exit code
+#######################################
+function __generate_help {
+  eval "
+    dybatpho::print 'Usage: ${0##*/} [options...] [arguments...]'
+    dybatpho::print 'Options:'
+  "
+}
+
+#######################################
 # @description Add to switches list if flag/param has multiple switches
 # @arg $1 switch Switch
 #######################################
@@ -313,7 +319,8 @@ function __print_validate {
   __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
 }
 
-# @section Functions work in spec of script or function via `dybatpho::generate_from_spec`.
+# @section Spec functions
+# @description Functions work in spec of script or function via `dybatpho::generate_from_spec`.
 
 #######################################
 # @description Setup global settings for getting options (mandatory) in spec
@@ -341,7 +348,7 @@ function dybatpho::opts::setup {
 # @description Define an option that take no argument
 # @arg $1 string Description of option to display
 # @arg $2 string Variable name for getting option. `-` if want to omit
-# @arg $@ switch_or_key:value Other switches and settings `key:value` of this option
+# @arg $@ switch|key:value Other switches and settings `key:value` of this option
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::flag {
@@ -365,7 +372,7 @@ function dybatpho::opts::flag {
 # @description Define an option that take an argument
 # @arg $1 string Description of option to display
 # @arg $2 string Variable name for getting option. `-` if want to omit
-# @arg $@ switch_or_key:value Other switches and settings `key:value` of this option
+# @arg $@ switch|key:value Other switches and settings `key:value` of this option
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::param {
@@ -396,7 +403,7 @@ function dybatpho::opts::param {
 #######################################
 # @description Define an option that display only
 # @arg $1 string Description of option to display
-# @arg $@ switch_or_key:value Other switches and settings `key:value` of this option
+# @arg $@ switch|key:value Other switches and settings `key:value` of this option
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::disp {
@@ -426,7 +433,8 @@ function dybatpho::opts::cmd {
   fi
 }
 
-# @section Functions to parse spec and put value of options to variable with corresponding name
+# @section Parse functions
+# @description Functions to parse spec and put value of options to variable with corresponding name
 
 #######################################
 # @description Define spec of parent function or script, spec contains below commands
@@ -444,20 +452,6 @@ function dybatpho::generate_from_spec {
   dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
   # shellcheck disable=1090
   . "${gen_file}"
-}
-
-#######################################
-# @description Get help description for option with a spec from
-# `dybatpho::opts::flag`, `dybatpho::opts::param`
-# @arg $1 bool Flag that defined option that take argument in spec
-# @arg $@ string Arguments pass from `dybatpho::opts::(flag|param)`
-# @exitcode 0 exit code
-#######################################
-function __generate_help {
-  eval "
-    dybatpho::print 'Usage: ${0##*/} [options...] [arguments...]'
-    dybatpho::print 'Options:'
-  "
 }
 
 #######################################

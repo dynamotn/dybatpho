@@ -18,13 +18,13 @@ Theses are type of function arguments that defined in this file
 |Format|Description|
 |------|-----------|
 |`action:<code>`|List of multiple statements, split by `;` as `key:value`, eg `"action:foo; bar"`|
-|`init:<method>`|Method to initial value of variable from spec by variable name with key 'init:', used for `dybatpho::opts::flag` and `dybatpho::opts::param`, see `Initial variable kind` below|
+|`init:<method>`|Method to initial value of variable from spec by variable name with key `init:`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`, see `Initial variable kind` below|
 |`on:<string>`|The positive value whether option is switch as `--flag`, `--with-flag`, default is `"true"`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`off:<string>`|The negative value whether option is not presence, or as `--no-flag`, `--without-flag`, default is empty `''`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`export:<bool>`|Export variable in spec command or not, default is true, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`optional:<bool>`|Used for `dybatpho::opts::param` whether option is optional, default is false (restrict)|
-|`validate:<code>`|Validate statements for options, eg: '_function1 \$OPTARG' (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
-|`error:<code>`|Custom error messages function for options, eg: '_show_error1',  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+|`validate:<code>`|Validate statements for options, eg: `"_function1 \$OPTARG"` (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+|`error:<code>`|Custom error messages function for options, eg: `"_show_error1"`,  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 
 ### Initial variable kind
 |Format|Description|
@@ -72,13 +72,13 @@ Theses are type of function arguments that defined in this file
 |Format|Description|
 |------|-----------|
 |`action:<code>`|List of multiple statements, split by `;` as `key:value`, eg `"action:foo; bar"`|
-|`init:<method>`|Method to initial value of variable from spec by variable name with key 'init:', used for `dybatpho::opts::flag` and `dybatpho::opts::param`, see `Initial variable kind` below|
+|`init:<method>`|Method to initial value of variable from spec by variable name with key `init:`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`, see `Initial variable kind` below|
 |`on:<string>`|The positive value whether option is switch as `--flag`, `--with-flag`, default is `"true"`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`off:<string>`|The negative value whether option is not presence, or as `--no-flag`, `--without-flag`, default is empty `''`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`export:<bool>`|Export variable in spec command or not, default is true, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`optional:<bool>`|Used for `dybatpho::opts::param` whether option is optional, default is false (restrict)|
-|`validate:<code>`|Validate statements for options, eg: '_function1 \$OPTARG' (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
-|`error:<code>`|Custom error messages function for options, eg: '_show_error1',  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+|`validate:<code>`|Validate statements for options, eg: `"_function1 \$OPTARG"` (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
+|`error:<code>`|Custom error messages function for options, eg: `"_show_error1"`,  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 
 ### Initial variable kind
 |Format|Description|
@@ -180,7 +180,7 @@ Add to switches list if flag/param has multiple switches
 
 * **$1** (switch): Switch
 
-## Functions work in spec of script or function via
+## Functions work in spec of script or function via `dybatpho::generate_from_spec`.
 
 Setup global settings for getting options (mandatory) in spec
 of script or function
@@ -248,7 +248,7 @@ Define a sub-command in spec
 
 * **$1** (string): Name of function that has spec of sub-command
 
-## Functions to parse spec and put value of options to variable with
+## Functions to parse spec and put value of options to variable with corresponding name
 
 Define spec of parent function or script, spec contains below commands
 

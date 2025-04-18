@@ -49,6 +49,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/file.sh"
 # shellcheck source=src/cli.sh
 . "${DYBATPHO_DIR}/src/cli.sh"
+# shellcheck source=src/os.sh
+. "${DYBATPHO_DIR}/src/os.sh"
 
 # Filter functions and re-export only dybatpho functions to subshells
 eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"

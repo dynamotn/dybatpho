@@ -65,5 +65,5 @@ function dybatpho::create_temp {
     fi
     # kcov(enabled)
   fi
-  # dybatpho::cleanup_file_on_exit "${temp_path}"
+  dybatpho::cleanup_file_on_exit "${temp_path}"
 }

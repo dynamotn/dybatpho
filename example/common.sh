@@ -74,6 +74,7 @@ function _spec_main {
   dybatpho::opts::setup "This is example script for dybatpho" MAIN_ARGS action:"_main"
   dybatpho::opts::flag "Breakpoint" BREAK -b --break --no-break-point
   dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info" validate:"dybatpho::validate_log_level \$OPTARG"
+  dybatpho::opts::flag "Dry run" DRY_RUN --dry-run -D on:true off:false init:="false"
   dybatpho::opts::param "Message show in command" MESSAGE --message -m optional:true init:="Example script"
   dybatpho::opts::param "Program to check prerequisite" PROGRAM --program -p init:="cat"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_main"

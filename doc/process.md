@@ -15,6 +15,7 @@ This module contains functions to error handling, fork process...
 * [dybatpho::run_err_handler](#dybatphorunerrhandler)
 * [dybatpho::trap](#dybatphotrap)
 * [dybatpho::cleanup_file_on_exit](#dybatphocleanupfileonexit)
+* [dybatpho::dry_run](#dybatphodryrun)
 
 ### dybatpho::die
 
@@ -63,4 +64,16 @@ Clean up file on exit
 #### Arguments
 
 * **$1** (string): File path
+
+### dybatpho::dry_run
+
+Show dry run message or run command.
+
+#### Arguments
+
+* **...** (string): Command to run
+
+#### Output on stdout
+
+* Show details of command if DRY_RUN is set to true
 

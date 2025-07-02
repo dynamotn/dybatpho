@@ -8,5 +8,5 @@ dybatpho::require "shdoc"
 dybatpho::require "gawk"
 
 for module in string array logging helpers process network file cli os; do
-  shdoc < "${DYBATPHO_DIR}/src/${module}.sh" > doc/"${module}".md || true
+  shdoc < "${DYBATPHO_DIR}/src/${module}.sh" > "${DYBATPHO_DIR}/doc/${module}.md" || true
 done

@@ -41,3 +41,33 @@ setup() {
   refute_stderr
   assert_file_not_exist "${filepath}"
 }
+
+@test "dybatpho::dry_run with DRY_RUN=true should print dry run message and not execute command" {
+  DRY_RUN="true"
+  local test_file="dry_run_test_file.tmp"
+  rm -f "${test_file}"
+  run dybatpho::dry_run touch "${test_file}"
+  assert_output "DRY RUN: touch ${test_file}"
+  assert_file_not_exist "${test_file}"
+  unset DRY_RUN
+}
+
+@test "dybatpho::dry_run with DRY_RUN=false should execute command and produce no dry run output" {
+  DRY_RUN="false"
+  local test_file="actual_run_test_file.tmp"
+  rm -f "${test_file}"
+  run dybatpho::dry_run touch "${test_file}"
+  assert_output ""
+  refute_output --regexp "DRY RUN:"
+  assert_file_exist "${test_file}"
+  rm -f "${test_file}"
+  unset DRY_RUN
+}
+
+@test "dybatpho::dry_run with DRY_RUN unset should error" {
+  unset DRY_RUN
+  local test_file="unset_dry_run_test_file.tmp"
+  rm -f "${test_file}"
+  run dybatpho::dry_run touch "${test_file}"
+  assert_failure
+}

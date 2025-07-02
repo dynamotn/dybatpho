@@ -8,6 +8,8 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 DYBATPHO_USED_ERR_HANDLER=false
+DRY_RUN="${DRY_RUN:-}"
+export DRY_RUN
 
 #######################################
 # @description Stop script/process.
@@ -110,4 +112,17 @@ function dybatpho::cleanup_file_on_exit {
   fi
   "${trap_command}" ". ${cleanup_file}" EXIT HUP INT TERM
   # kcov(enabled)
+}
+
+#######################################
+# @description Show dry run message or run command.
+# @arg $@ string Command to run
+# @stdout Show details of command if DRY_RUN is set to true
+#######################################
+function dybatpho::dry_run {
+  if dybatpho::is true "${DRY_RUN}"; then
+    echo "DRY RUN: $@"
+  else
+    "$@"
+  fi
 }

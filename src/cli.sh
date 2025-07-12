@@ -249,7 +249,7 @@ function __generate_logic {
     for sub_spec in "${__sub_specs[@]}"; do
       __print_indent 5 "${sub_spec#*:})"
       __print_indent 6 "shift"
-      __print_indent 6 "dybatpho::opts::parse::${sub_spec%%:*} \$@"
+      __print_indent 6 "dybatpho::opts::parse::${sub_spec%%:*} \"\$@\""
       __print_indent 6 ";;"
     done
     __print_indent 5 "*)"

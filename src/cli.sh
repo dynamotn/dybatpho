@@ -36,6 +36,8 @@
 # |`init:=<code>`| Initialize by plain code and assigned to variable|
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
+DYBATPHO_CLI_DEBUG="${DYBATPHO_CLI_DEBUG:-false}"
+
 # @section Internal functions
 # @description Functions are triggered by `dybatpho::generate_from_spec`
 
@@ -449,7 +451,9 @@ function dybatpho::generate_from_spec {
   local gen_file
   dybatpho::create_temp gen_file ".sh" "genopts"
   __generate_logic "${spec}" - "$@" >> "${gen_file}"
-  dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
+  if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
+    dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
+  fi
   # shellcheck disable=1090
   . "${gen_file}"
 }
@@ -467,7 +471,9 @@ function dybatpho::generate_help {
   dybatpho::create_temp gen_file ".sh" "genhelp"
   __generate_logic "${spec}" - "$@" >> "${gen_file}"
   dybatpho::cleanup_file_on_exit "${gen_file}"
-  dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
+  if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
+    dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
+  fi
   # shellcheck disable=1090
   . "${gen_file}"
   __generate_help "${spec}"

@@ -23,6 +23,7 @@ setup() {
 
   # shellcheck disable=2030
   export LOG_LEVEL=debug
+  export DYBATPHO_CLI_DEBUG=true
   run --separate-stderr dybatpho::generate_from_spec _spec 1 2 "3\""
   assert_success
   assert_stderr --partial "dybatpho::opts::parse::_spec \"1\" \"2\" \"3\\\""

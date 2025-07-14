@@ -5,75 +5,100 @@
 [![CI](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml/badge.svg)](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml)
 [![Latest release](https://img.shields.io/github/release/dynamotn/dybatpho.svg)](https://github.com/dynamotn/dybatpho/releases/latest)
 
-The place to store **frequently used functions** that are used in pipelines, scripts for multiple repositories and help you to **write efficient Bash script**.
+> **dybatpho** – A powerful collection of bash functions to help you build scripts efficiently, quickly, and maintainably!
 
-## What does `dybatpho` mean?
+---
 
-`dybatpho` is a portmanteau of `đi bát phố`. `đi` is related to my nickname (Dynamo). `đi bát phố` means wandering on the street, an idiom in Vietnamese with `bát` with almost similar pronunciation with `bash`, `phố` is `street` that have many stores. I want this library will be used as a street on the Internet, which have some special stores to give you some surprise presents in your codes.
+## 🚀 Why choose **dybatpho**?
 
-## Usage
+- **Save time:** A curated set of the most popular & useful functions for working with Bash scripts.
+- **Easy integration:** Flexibly use as a submodule, subtree, or manual clone.
+- **Battle-tested:** Used in many projects, personal dotfiles, and in real CI/CD workflows.
+- **Extensible:** Easily add your own modules or customize to fit your needs.
+- **Community-driven:** Always open to feedback, suggestions, and PRs from everyone.
 
-1. Add `dybatpho` into your project in the way that best fits your workflow
+## 📖 What is `dybatpho`?
 
-The only requirement is that you **pin the version of `dybatpho`** that you use. This is important so that changes to `dybatpho` do not have the power to break all projects that use `dybatpho`. Your project can then test updates to `dybatpho` and roll forward periodically.
+`dybatpho` is a portmanteau of `đi bát phố` - meaning "to wander and explore", just like this repo helps you discover and use handy bash functions freely and flexibly.
 
-- Add as a submodule: it's an easy way to integrate `dybatpho` and automatically use a single SHA until manually updated. Submodules add a pointer from a mount point in your repo to the external repo (`dybatpho`), and require workflow changes to ensure that pointer is referenced during clone, checkout and some other operations.
+# ⚡️ Quick Start
+
+1. **Add `dybatpho` to your project** (pin the version if needed):
+
+   - **Submodule:**
+
+     ```sh
+     git submodule add --depth 1 https://github.com/dynamotn/dybatpho.git <path>
+     git submodule update <path> --remote
+     ```
+
+   - **Subtree:**
+
+     ```sh
+     git subtree add --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
+     git subtree pull --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
+     ```
+
+   - **Manual clone** (for CI/CD, etc.):
+
+     ```sh
+     git clone https://github.com/dynamotn/dybatpho.git
+     ```
+
+2. **Source the logic you need:**
+
+   ```sh
+   # Source the initialization script
+   . <path-to-dybatpho>/init.sh
+   ```
+
+   > See more [example scripts](example/) or real-world usage in [my dotfiles](https://github.com/dynamotn/dotfiles).
+
+## 🗂 Directory Structure
+
+```
+.
+├── doc/            # Module documentation
+├── example/        # Example scripts for users
+├── scripts/        # Helper scripts (test, doc generation, etc.)
+├── src/            # Source code of modules
+├── test/           # Unit tests
+└── init.sh         # Initialization script, **must be sourced first**
+```
+
+## 📚 Contents & Featured Modules
+
+- [array.sh](doc/array.md) – Array manipulation
+- [string.sh](doc/string.md) – String operations
+- [logging.sh](doc/logging.md) – Easy logging
+- [helpers.sh](doc/helpers.md) – Miscellaneous utilities
+- [process.sh](doc/process.md) – Process management
+- [network.sh](doc/network.md) – Network utilities
+- [file.sh](doc/file.md) – File operations
+- [cli.sh](doc/cli.md) – CLI building support
+
+## 🎯 Usage Example
 
 ```sh
-git submodule add --depth 1 https://github.com/dynamotn/dybatpho.git <path>
-
-# To update
-git submodule update <path> --remote
+# Using the log function
+. dybatpho/init.sh
+dybatpho::register_err_handler
+dybatpho::info "Greetings from dybatpho!"
 ```
 
-- Add as a subtree: subtrees copy an external repo into a subdirectory of the host repo, no workflow changes are required. Subtrees naturally keep a single version of `dybatpho` until explicitly updated. Note that subtree merge commits do not rebase well ⚠️, so best to keep subtree updates in separate PRs from normal commits.
+See more at [example/](example/).
 
-```sh
-git subtree add --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
+## 💬 Contribution & Support
 
-# To update
-git subtree pull --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
-```
+- Open an Issue or Pull Request if you'd like to suggest ideas, fix bugs, or contribute new modules!
+- All feedback and contributions are welcome.
 
-- Clone `dybatpho` in your deployment process, `dybatpho` doesn't have to be within your repo, just needs to be somewhere where your scripts can source [init.sh](init.sh). This is where it's most important that you implement a mechanism to always use the same SHA, as a clone will track main branch by default, which is not an allowed use of `dybatpho`.
+---
 
-2. Source logics
+**Get started with dybatpho now to optimize your workflow and save time with your Bash scripts!**
 
-Once you have `dybatpho` cloned in your project, you can source `dybatpho/init.sh`. This ensures submodules are initialized and makes it easy to source libraries from other scripts.
-
-> [!NOTE]
-> You can see [example scripts](example/) for example usages.
-> Or you can see implementation in my [dotfiles](https://github.com/dynamotn/dotfiles) or my [custom font](https://github.com/dynamotn/Iosevka-Dynamo) repositories.
-
-## Structure
-
-```
- .
-├──  doc # documentation of modules
-│   ├──  *.md # module
-├──  example # example scripts for user can use as a reference
-│   └──  *.sh # example script
-├──  scripts # helper scripts folder
-│   ├──  doc.sh # generation documentation script
-│   └──  test.sh # unit test script
-├──  src # source code of modules
-│   └──  *.sh # module
-├──  test # unit test folder
-│   ├──  lib # library from bats
-│   │   ├──  assert
-│   │   ├──  core
-│   │   └──  support
-│   └──  *.bats # unit test for each module
-└──  init.sh # initial script, **SOURCE IT FIRST**
-```
-
-## Contents
-
-- [array.sh](doc/array.md)
-- [string.sh](doc/string.md)
-- [logging.sh](doc/logging.md)
-- [helpers.sh](doc/helpers.md)
-- [process.sh](doc/process.md)
-- [network.sh](doc/network.md)
-- [file.sh](doc/file.md)
-- [cli.sh](doc/cli.md)
+<p align="center">
+  <a href="https://github.com/dynamotn/dybatpho/stargazers">
+    <img src="https://img.shields.io/github/stars/dynamotn/dybatpho?style=social" alt="Star dybatpho" />
+  </a>
+</p>

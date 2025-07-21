@@ -83,7 +83,7 @@ function __log_inspect {
   local message="${3:-}"
   local indicator="${4:-${BASH_SOURCE[-1]}:${BASH_LINENO[1]}}"
   local color="${5:-}"
-  __log "${log_level}" "$(date --rfc-3339="seconds") ‖ ${log_level_text} ‖ ${indicator}:${message}" stderr "${color}"
+  __log "${log_level}" "$(date --rfc-3339="seconds") ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
 }
 
 #######################################

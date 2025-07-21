@@ -216,7 +216,7 @@ Show error message.
 
 ### dybatpho::fatal
 
-Show fatal message and exit process.
+Show fatal message.
 
 #### Arguments
 

@@ -211,7 +211,7 @@ function dybatpho::error {
 }
 
 #######################################
-# @description Show fatal message and exit process.
+# @description Show fatal message.
 # @arg $1 string Message
 # @arg $2 string Indicator of message, default is `<invoke file>:<line number of invoke file>`
 # @stderr Show message if log level of message is less than fatal level

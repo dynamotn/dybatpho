@@ -99,8 +99,8 @@ function dybatpho::cleanup_file_on_exit {
   ( # kcov(skip)
     grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
-        echo "rm -r '${filepath}' 2>&1 > /dev/null || :"
-        echo "rm -r '${cleanup_file}' 2>&1 > /dev/null || :"
+        echo "rm -r '${filepath}' 2>/dev/null || :"
+        echo "rm -r '${cleanup_file}' 2>/dev/null || :"
       )                     # kcov(skip)
   ) > "${cleanup_file}.new" # kcov(skip)
   mv -f "${cleanup_file}.new" "${cleanup_file}"

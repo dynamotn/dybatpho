@@ -25,6 +25,15 @@ setup() {
   assert_success
 }
 
+@test "dybatpho::curl_do with more than 2 parameters" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_do"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  run dybatpho::curl_do https://this "${temp_file}" --header "X-Test: 1"
+  assert_success
+  grep "header X-Test: 1" "${temp_file}"
+  unstub curl
+}
+
 @test "dybatpho::curl_do with status code 200" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl ": echo '200'; echo 'hahaa' > ${temp_file}"

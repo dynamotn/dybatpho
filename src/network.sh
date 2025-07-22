@@ -131,7 +131,7 @@ function dybatpho::curl_do {
     fi
   }
 
-  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" __request "curl ${url}"
+  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" "__request ${*}" "curl ${url}"
 
   # Return exit code based on HTTP status code
   case "${code}" in

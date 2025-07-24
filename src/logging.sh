@@ -81,7 +81,12 @@ function __log_inspect {
   local log_level=$1
   local log_level_text=$2
   local message="${3:-}"
-  local indicator="${4:-${BASH_SOURCE[-1]}:${BASH_LINENO[1]}}"
+  local indicator
+  if [ -n "${BASH_SOURCE[0]:-}" ]; then
+    indicator="${4:-${BASH_SOURCE[-1]}:${BASH_LINENO[1]}}"
+  else
+    indicator="${4:-<unknown>:<unknown>}"
+  fi
   local color="${5:-}"
   __log "${log_level}" "$(date --rfc-3339="seconds") ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
 }

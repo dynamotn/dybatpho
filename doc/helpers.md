@@ -69,7 +69,7 @@ Check input is matching with a condition
 
 #### Arguments
 
-* **$1** (string): Condition (command|file|dir|link|exist|readable|writing|executable|set|empty|number|int|true|false)
+* **$1** (string): Condition (command|function|file|dir|link|exist|readable|writable|executable
 * **$2** (string): Input need to check
 
 #### Exit codes

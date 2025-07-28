@@ -73,7 +73,8 @@ function dybatpho::require {
 
 #######################################
 # @description Check input is matching with a condition
-# @arg $1 string Condition (command|file|dir|link|exist|readable|writing|executable|set|empty|number|int|true|false)
+# @arg $1 string Condition (command|function|file|dir|link|exist|readable|writable|executable
+# |set|empty|number|int|true|false)
 # @arg $2 string Input need to check
 # @exitcode 0 If matched
 # @exitcode 1 If not matched
@@ -84,6 +85,10 @@ function dybatpho::is {
   case "${condition}" in
     command)
       command -v "${input}"
+      return "$?"
+      ;;
+    function)
+      declare -F "${input}"
       return "$?"
       ;;
     file)
@@ -123,11 +128,11 @@ function dybatpho::is {
       return "$?"
       ;;
     number)
-      printf -- '%f' "${input:-null}" > /dev/null 2>&1
+      printf -- '%f' "${input:-null}"
       return "$?"
       ;;
     int)
-      printf -- '%d' "${input:-null}" > /dev/null 2>&1
+      printf -- '%d' "${input:-null}"
       return "$?"
       ;;
     true)

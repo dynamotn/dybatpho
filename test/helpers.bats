@@ -74,6 +74,18 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::is command" {
+  dyfoo() {
+    :
+  }
+  run dybatpho::is "function" "dyfoo"
+  assert_success
+  refute_output
+  run dybatpho::is "function" "dyfoooo"
+  assert_failure
+  refute_output
+}
+
 @test "dybatpho::is file" {
   run dybatpho::is "file" "${BASH_SOURCE[0]}"
   assert_success

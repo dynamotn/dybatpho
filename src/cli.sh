@@ -186,7 +186,6 @@ function __generate_logic {
   local __export="true"                   # For handle export variable of `dybatpho::opts::*` commands via name
   local __optional="true"                 # For set flag is optional or required
   local __action="" __setup_action=""     # For get action after parse all options and action of each options in spec
-  local __description=""                  # For get description of command/option via `dybatpho::opts::*` command
   local __switch=""                       # For get switch of options
   local __has_sub_cmd="false"
   declare -a __sub_specs=()
@@ -332,10 +331,13 @@ function __print_validate {
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::setup {
-  dybatpho::expect_args __description __rest -- "$@"
+  local description
+  dybatpho::expect_args description -- "$@"
   shift
 
-  [ "${__rest#-}" ] || __rest="__rest"
+  # HACK: __rest is defined in __generate_logic, so we need to define it here
+  [ "${1#-}" ] && __rest="$1" || __rest="__rest"
+
   if dybatpho::is false "${__done_initial}"; then
     while dybatpho::still_has_args "$@" && shift; do
       __parse_key_value "$1" "__"
@@ -354,8 +356,8 @@ function dybatpho::opts::setup {
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::flag {
-  local var
-  dybatpho::expect_args __description var -- "$@"
+  local description var
+  dybatpho::expect_args description var -- "$@"
 
   __parse_opt false "$@"
   if dybatpho::is false "${__done_initial}"; then
@@ -378,8 +380,8 @@ function dybatpho::opts::flag {
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::param {
-  local var
-  dybatpho::expect_args __description var -- "$@"
+  local description var
+  dybatpho::expect_args description var -- "$@"
 
   __parse_opt true "$@"
   if dybatpho::is false "${__done_initial}"; then
@@ -409,7 +411,8 @@ function dybatpho::opts::param {
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::disp {
-  dybatpho::expect_args __description -- "$@"
+  local description
+  dybatpho::expect_args description -- "$@"
 
   __parse_opt false "$@"
   if ! dybatpho::is false "${__done_initial}"; then

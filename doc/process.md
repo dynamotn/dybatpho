@@ -7,12 +7,16 @@ Utilities for process handling
 This module contains functions to error handling, fork process...
 
 **DYBATPHO_USED_ERR_HANDLER** (bool): Flag that script used dybatpho::register_err_handler
+**DYBATPHO_USED_KILLED_HANDLER** (bool): Flag that script used dybatpho::register_killed_handler
 
 ## Index
 
 * [dybatpho::die](#dybatphodie)
 * [dybatpho::register_err_handler](#dybatphoregistererrhandler)
+* [dybatpho::register_killed_handler](#dybatphoregisterkilledhandler)
+* [dybatpho::register_common_handlers](#dybatphoregistercommonhandlers)
 * [dybatpho::run_err_handler](#dybatphorunerrhandler)
+* [dybatpho::killed_process_handler](#dybatphokilledprocesshandler)
 * [dybatpho::trap](#dybatphotrap)
 * [dybatpho::cleanup_file_on_exit](#dybatphocleanupfileonexit)
 * [dybatpho::dry_run](#dybatphodryrun)
@@ -32,7 +36,7 @@ Stop script/process.
 
 ### dybatpho::register_err_handler
 
-Register error handling.
+Register error handler.
 
 _Function has no arguments._
 
@@ -40,13 +44,37 @@ _Function has no arguments._
 
 * DYBATPHO_USED_ERR_HANDLING
 
+### dybatpho::register_killed_handler
+
+Register killed process handler.
+
+_Function has no arguments._
+
+#### Variables set
+
+* DYBATPHO_USED_ERR_HANDLING
+
+### dybatpho::register_common_handlers
+
+Register all handlers
+
+_Function has no arguments._
+
 ### dybatpho::run_err_handler
 
-Run error handling. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
+Handle error when running process. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
 
 #### Arguments
 
 * **$1** (number): Exit code of last command
+
+### dybatpho::killed_process_handler
+
+Handle killed process. If you activate by `dybatpho::register_killed_handler`, you don't need to invoke this function.
+
+#### Arguments
+
+* **$1** (string): Signal
 
 ### dybatpho::trap
 

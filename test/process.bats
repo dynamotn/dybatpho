@@ -17,9 +17,35 @@ setup() {
   refute_stderr
 }
 
+@test 'dybatpho::register_killed_handler output' {
+  run --separate-stderr dybatpho::register_killed_handler
+  assert_success
+  refute_output
+  refute_stderr
+}
+
+@test 'dybatpho::register_common_handlers output' {
+  run --separate-stderr dybatpho::register_common_handlers
+  assert_success
+  refute_output
+  refute_stderr
+}
+
 @test 'dybatpho::run_err_handler output' {
   local exit_code=7
   run --separate-stderr -"${exit_code}" dybatpho::run_err_handler "${exit_code}"
+  assert_failure
+  refute_output
+  assert_stderr
+}
+
+@test 'dybatpho::killed_process_handler output' {
+  run --separate-stderr dybatpho::run_err_handler SIGTERM
+  assert_failure
+  refute_output
+  assert_stderr
+
+  run --separate-stderr dybatpho::run_err_handler SIGINT
   assert_failure
   refute_output
   assert_stderr

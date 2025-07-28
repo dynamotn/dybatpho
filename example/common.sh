@@ -6,7 +6,7 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" # correct path of dybatpho at here
 
-dybatpho::register_err_handler
+dybatpho::register_common_handlers
 dybatpho::create_temp TEMP_FILE ".txt"
 VERSION="v1.0.0"
 MESSAGE=""
@@ -15,7 +15,7 @@ function _main {
   dybatpho::progress "Running main function with params ${MAIN_ARGS} ${BREAK}"
 
   dybatpho::info "This is sample progress bar"
-  for i in {0..100}; do
+  for i in {0..10000}; do
     dybatpho::progress_bar "${i}"
     sleep 0.005
   done

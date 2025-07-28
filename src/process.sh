@@ -5,9 +5,11 @@
 #   This module contains functions to error handling, fork process...
 #
 # **DYBATPHO_USED_ERR_HANDLER** (bool): Flag that script used dybatpho::register_err_handler
+# **DYBATPHO_USED_KILLED_HANDLER** (bool): Flag that script used dybatpho::register_killed_handler
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 DYBATPHO_USED_ERR_HANDLER=false
+DYBATPHO_USED_KILLED_HANDLER=false
 DRY_RUN="${DRY_RUN:-}"
 export DRY_RUN
 
@@ -26,7 +28,7 @@ function dybatpho::die {
 }
 
 #######################################
-# @description Register error handling.
+# @description Register error handler.
 # @set DYBATPHO_USED_ERR_HANDLING
 # @noargs
 #######################################
@@ -38,7 +40,28 @@ function dybatpho::register_err_handler {
 }
 
 #######################################
-# @description Run error handling. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
+# @description Register killed process handler.
+# @set DYBATPHO_USED_ERR_HANDLING
+# @noargs
+#######################################
+function dybatpho::register_killed_handler {
+  # shellcheck disable=SC2034
+  DYBATPHO_USED_KILLED_HANDLER=true
+  dybatpho::trap 'dybatpho::killed_process_handler SIGINT' SIGINT
+  dybatpho::trap 'dybatpho::killed_process_handler SIGTERM' SIGTERM
+}
+
+#######################################
+# @description Register all handlers
+# @noargs
+#######################################
+function dybatpho::register_common_handlers {
+  dybatpho::register_err_handler
+  dybatpho::register_killed_handler
+}
+
+#######################################
+# @description Handle error when running process. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
 # @arg $1 number Exit code of last command
 #######################################
 function dybatpho::run_err_handler {
@@ -51,6 +74,25 @@ function dybatpho::run_err_handler {
     ((i++))
   done
   exit "${exit_code}"
+}
+
+#######################################
+# @description Handle killed process. If you activate by `dybatpho::register_killed_handler`, you don't need to invoke this function.
+# @arg $1 string Signal
+#######################################
+function dybatpho::killed_process_handler {
+  local signal
+  dybatpho::expect_args signal -- "$@"
+
+  case ${signal} in
+    SIGINT)
+      dybatpho::error 'Interrupt by CTRL+C'
+      ;;
+    SIGTERM)
+      dybatpho::error 'Terminated'
+      ;;
+  esac
+  trap - SIGTERM && kill -- -$$
 }
 
 #######################################

@@ -49,6 +49,28 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::expect_envs have right envs" {
+  export DYBATPHO_TEST_ENV1="test1"
+  export DYBATPHO_TEST_ENV2="test2"
+  run dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
+  assert_success
+}
+
+@test "dybatpho::expect_envs not have right envs" {
+  run --separate-stderr dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
+  assert_failure
+  assert_stderr --partial "Environment variable \`DYBATPHO_TEST_ENV1\` isn't set"
+  export DYBATPHO_TEST_ENV1="test1"
+  run --separate-stderr dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
+  assert_failure
+  assert_stderr --partial "Environment variable \`DYBATPHO_TEST_ENV2\` isn't set"
+}
+
+@test "dybatpho::expect_envs not have enough envs" {
+  run dybatpho::expect_envs
+  assert_success
+}
+
 @test "dybatpho::require installed tool" {
   run dybatpho::require "bash"
   assert_success

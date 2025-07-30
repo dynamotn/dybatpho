@@ -62,6 +62,21 @@ function dybatpho::still_has_args {
 }
 
 #######################################
+# @description Check that environment variables are set
+# @example
+#   dybatpho::expect_envs ENV_VAR1 ENV_VAR2
+# @arg $@ string Environment variables to check
+# @exitcode 1 Stop script if not set
+#######################################
+function dybatpho::expect_envs {
+  for arg in "$@"; do
+    if [ -z "${!arg:-}" ]; then
+      dybatpho::die "Environment variable \`${arg}\` isn't set."
+    fi
+  done
+}
+
+#######################################
 # @description Check command dependency is installed.
 # @arg $1 string Command need to be installed
 # @exitcode 127 Stop script if command isn't installed

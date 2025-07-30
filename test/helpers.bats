@@ -74,7 +74,7 @@ setup() {
   refute_output
 }
 
-@test "dybatpho::is command" {
+@test "dybatpho::is function" {
   dyfoo() {
     :
   }

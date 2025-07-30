@@ -70,7 +70,7 @@ teardown() {
   run --separate-stderr dybatpho::info daylathongtin
   assert_success
   refute_output
-  assert_stderr --partial "$(echo -e "\e[0;32m")"
+  assert_stderr --partial "$(echo -e "\e[0;34m")"
   assert_stderr --partial daylathongtin
   assert_stderr --partial "‖ INFO"
   assert_stderr --partial "$(echo -e "\e[0m")"
@@ -113,13 +113,14 @@ teardown() {
   assert_output --partial "[####################]"
 }
 
-@test "dybatpho::notice output" {
-  run --separate-stderr dybatpho::notice daylathongtin
+@test "dybatpho::header output" {
+  run --separate-stderr dybatpho::header daylathongtin
   assert_success
   refute_stderr
-  assert_output --partial "$(echo -e "\e[1;5;44m")"
-  assert_output --partial "================================================================================"
+  assert_output --partial "$(echo -e "\e[1;5;30;47m")"
+  assert_output --partial "╔══════════════════════════════════════════════════════════════════════════════╗"
   assert_output --partial daylathongtin
+  assert_output --partial "╚══════════════════════════════════════════════════════════════════════════════╝"
   assert_output --partial "$(echo -e "\e[0m")"
 }
 
@@ -127,9 +128,11 @@ teardown() {
   run --separate-stderr dybatpho::success daylathongtin
   assert_success
   refute_stderr
-  assert_output --partial "$(echo -e "\e[1;4;32;40m")"
+  assert_output --partial "$(echo -e "\e[1;3;32m")"
+  assert_output --partial "╭──────────────────────────────────────────────────────────────────────────────╮"
   assert_output --partial "DONE:"
   assert_output --partial daylathongtin
+  assert_output --partial "╰──────────────────────────────────────────────────────────────────────────────╯"
   assert_output --partial "$(echo -e "\e[0m")"
 }
 

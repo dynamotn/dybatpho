@@ -25,7 +25,7 @@ export NO_COLOR
 # @stderr Show message if log level of message is less than runtime log level and $3 is `stderr`
 #######################################
 function __log {
-  declare -A log_colors=([trace]="0;36" [debug]="0;35" [info]="0;32" [warn]="0;33" [error]="1;31" [fatal]="0;31")
+  declare -A log_colors=([trace]="0;36" [debug]="0;35" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
   local show_log_level="$1"
   local msg="$2"
   local out="${3:-stdout}"
@@ -125,7 +125,7 @@ function dybatpho::debug {
 #######################################
 function dybatpho::debug_command {
   if dybatpho::compare_log_level debug; then
-    __log_inspect debug "DEBUG COMMAND" "$1\n$(eval "$2")"
+    __log_inspect debug "COMMAND 💻    " "$1\n$(eval "$2")"
   fi
 }
 
@@ -135,7 +135,7 @@ function dybatpho::debug_command {
 # @stderr Show message if log level of message is less than info level
 #######################################
 function dybatpho::info {
-  __log_inspect info "INFO         " "$1"
+  __log_inspect info "INFO 💡       " "$1"
 }
 
 #######################################
@@ -153,7 +153,10 @@ function dybatpho::print {
 # @stdout Show message if log level of message is less than info level
 #######################################
 function dybatpho::progress {
-  __log info "$*..." stdout "0;3;34"
+  local color="0;3;34"
+  __log info "╭──────────────────────────────────────────────────────────────────────────────╮" stdout "${color}"
+  __log info "│  🚀 $*..." stdout "${color}"
+  __log info "╰──────────────────────────────────────────────────────────────────────────────╯" stdout "${color}"
 }
 
 #######################################
@@ -173,19 +176,15 @@ function dybatpho::progress_bar {
 }
 
 #######################################
-# @description Show notice message with banner.
+# @description Show header message with banner.
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level
 #######################################
-function dybatpho::notice {
-  local color="1;5;44"
-  __log info \
-    "================================================================================" \
-    stdout "${color}"
-  __log info "$*" stdout "${color}"
-  __log info \
-    "================================================================================" \
-    stdout "${color}"
+function dybatpho::header {
+  local color="1;5;30;47"
+  __log info "╔══════════════════════════════════════════════════════════════════════════════╗" stdout "${color}"
+  __log info "║ $*" stdout "${color}"
+  __log info "╚══════════════════════════════════════════════════════════════════════════════╝" stdout "${color}"
 }
 
 #######################################
@@ -194,7 +193,10 @@ function dybatpho::notice {
 # @stdout Show message if log level of message is less than info level
 #######################################
 function dybatpho::success {
-  __log info "DONE: $1" stdout "1;4;32;40"
+  local color="1;3;32"
+  __log info "╭──────────────────────────────────────────────────────────────────────────────╮" stdout "${color}"
+  __log info "│  ✅ DONE: $1" stdout "${color}"
+  __log info "╰──────────────────────────────────────────────────────────────────────────────╯" stdout "${color}"
 }
 
 #######################################
@@ -203,7 +205,7 @@ function dybatpho::success {
 # @stderr Show message if log level of message is less than warn level
 #######################################
 function dybatpho::warn {
-  __log_inspect warn "WARN         " "$1"
+  __log_inspect warn "WARN ⚠️       " "$1"
 }
 
 #######################################
@@ -212,7 +214,7 @@ function dybatpho::warn {
 # @stderr Show message if log level of message is less than error level
 #######################################
 function dybatpho::error {
-  __log_inspect error "ERROR        " "$1"
+  __log_inspect error "ERROR ❌      " "$1"
 }
 
 #######################################
@@ -222,7 +224,7 @@ function dybatpho::error {
 # @stderr Show message if log level of message is less than fatal level
 #######################################
 function dybatpho::fatal {
-  __log_inspect fatal "FATAL        " "$1" "${2:-}"
+  __log_inspect fatal "FATAL 🛑      " "$1" "${2:-}"
 }
 
 #######################################
@@ -231,7 +233,7 @@ function dybatpho::fatal {
 #######################################
 function dybatpho::start_trace {
   dybatpho::compare_log_level trace || return 0
-  __log_inspect trace "TRACE        " "Start tracing"
+  __log_inspect trace "TRACE ⚡       " "Start tracing"
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
   # kcov(disabled)
@@ -251,6 +253,6 @@ function dybatpho::end_trace {
   set +xv
   # kcov(disabled)
   dybatpho::compare_log_level trace || return 0
-  __log_inspect trace "TRACE        " "End tracing"
+  __log_inspect trace "TRACE ⚡      " "End tracing"
   # kcov(enabled)
 }

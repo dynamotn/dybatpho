@@ -9,6 +9,10 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 dybatpho::register_common_handlers
 
 function _main {
+  dybatpho::header "THIS IS A BASIC EXAMPLE SCRIPT"
   dybatpho::info "This is simple script using dybatpho library"
+  dybatpho::progress "Running the script"
+  dybatpho::success "Script completed successfully"
+  dybatpho::die "safksajf"
 }
 _main "$@"

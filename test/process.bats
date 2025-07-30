@@ -73,7 +73,7 @@ setup() {
   local test_file="dry_run_test_file.tmp"
   rm -f "${test_file}"
   run dybatpho::dry_run touch "${test_file}"
-  assert_output "DRY RUN: touch ${test_file}"
+  assert_output --partial "DRY RUN: touch ${test_file}"
   assert_file_not_exist "${test_file}"
   unset DRY_RUN
 }

@@ -163,7 +163,7 @@ function dybatpho::cleanup_file_on_exit {
 #######################################
 function dybatpho::dry_run {
   if dybatpho::is true "${DRY_RUN}"; then
-    echo "DRY RUN: $@"
+    echo "🧪 DRY RUN: $*"
   else
     "$@"
   fi

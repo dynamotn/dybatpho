@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# @file example.sh
-# @brief An example script to show how to use `dybatpho` library
+# @file common.sh
+# @brief An example script to show how to use `dybatpho` library with real case
 # @description An example script to show how to use most of useful `dybatpho` commands
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh

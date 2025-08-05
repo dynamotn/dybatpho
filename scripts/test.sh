@@ -14,11 +14,13 @@ dybatpho::require "nproc"
 kcov \
   --clean \
   --dump-summary \
-  --include-path="${DYBATPHO_DIR}" \
-  --exclude-path="${DYBATPHO_DIR}"/test \
+  --include-path="${DYBATPHO_DIR}/init.sh" \
+  --include-path="${DYBATPHO_DIR}/src" \
   --exclude-line="# kcov(skip)" \
   --exclude-region="# kcov(disabled):# kcov(enabled)" \
   "${DYBATPHO_DIR}"/coverage \
   "${BATS_CMD}" \
+  --print-output-on-failure \
+  --verbose-run \
   -j "$(nproc)" \
   "${DYBATPHO_DIR}/test"

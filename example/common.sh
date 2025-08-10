@@ -15,7 +15,7 @@ function _main {
   dybatpho::progress "Running main function with params ${MAIN_ARGS} ${BREAK}"
 
   dybatpho::info "This is sample progress bar"
-  for i in {0..10000}; do
+  for i in {0..100}; do
     dybatpho::progress_bar "${i}"
     sleep 0.005
   done

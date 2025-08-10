@@ -104,9 +104,7 @@ function dybatpho::trap {
   local command
   dybatpho::expect_args command -- "$@"
   shift
-  # shellcheck disable=SC2317
   _gen_finalize_command() {
-    # shellcheck disable=SC2086
     local cmds=$(trap -p "$1")
     cmds="${cmds#*\'}"
     cmds="${cmds%\'*}"
@@ -130,7 +128,7 @@ function dybatpho::cleanup_file_on_exit {
   local filepath
   dybatpho::expect_args filepath -- "$@"
 
-  local pid="$$"
+  local pid="${BASHPID}"
   local cleanup_file
   if hash "mktemp" > /dev/null 2>&1; then
     cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXXXXX.sh")
@@ -141,8 +139,12 @@ function dybatpho::cleanup_file_on_exit {
   ( # kcov(skip)
     grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
-        echo "rm -r '${filepath}' 2>/dev/null || :"
-        echo "rm -r '${cleanup_file}' 2>/dev/null || :"
+        echo ". ${DYBATPHO_DIR}/init.sh"
+        echo "if [[ \"\$BASHPID\" == ${pid} ]]; then"
+        echo "  dybatpho::debug 'Delete ${cleanup_file} and ${filepath} of PID ${pid}'"
+        echo "  rm -rf '${filepath}' 2>&1 > /dev/null"
+        echo "  rm -rf '${cleanup_file}' 2>&1 > /dev/null"
+        echo "fi"
       )                     # kcov(skip)
   ) > "${cleanup_file}.new" # kcov(skip)
   mv -f "${cleanup_file}.new" "${cleanup_file}"

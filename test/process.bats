@@ -40,12 +40,12 @@ setup() {
 }
 
 @test 'dybatpho::killed_process_handler output' {
-  run --separate-stderr dybatpho::run_err_handler SIGTERM
+  run --separate-stderr dybatpho::killed_process_handler SIGTERM
   assert_failure
   refute_output
   assert_stderr
 
-  run --separate-stderr dybatpho::run_err_handler SIGINT
+  run --separate-stderr dybatpho::killed_process_handler SIGINT
   assert_failure
   refute_output
   assert_stderr

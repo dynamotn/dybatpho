@@ -85,7 +85,7 @@ function __log_inspect {
   if [ -n "${BASH_SOURCE[0]:-}" ]; then
     indicator="${4:-${BASH_SOURCE[-1]}:${BASH_LINENO[1]}}"
   else
-    indicator="${4:-<unknown>:<unknown>}"
+    indicator="${4:-<unknown>:<unknown>}" # kcov(skip)
   fi
   local color="${5:-}"
   __log "${log_level}" "$(date --rfc-3339="seconds") ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
@@ -124,9 +124,7 @@ function dybatpho::debug {
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug_command {
-  if dybatpho::compare_log_level debug; then
-    __log_inspect debug "COMMAND 💻    " "$1\n$(eval "$2")"
-  fi
+  __log_inspect debug "COMMAND 💻    " "$1\n$(eval "$2")"
 }
 
 #######################################
@@ -232,7 +230,6 @@ function dybatpho::fatal {
 # @noargs
 #######################################
 function dybatpho::start_trace {
-  dybatpho::compare_log_level trace || return 0
   __log_inspect trace "TRACE ⚡       " "Start tracing"
   export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
@@ -252,7 +249,6 @@ function dybatpho::start_trace {
 function dybatpho::end_trace {
   set +xv
   # kcov(disabled)
-  dybatpho::compare_log_level trace || return 0
   __log_inspect trace "TRACE ⚡      " "End tracing"
   # kcov(enabled)
 }

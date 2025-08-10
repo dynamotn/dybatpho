@@ -44,7 +44,7 @@ function dybatpho::create_temp {
   fi
 
   extension=${extension%%/} # Remove '/' and after in extension, for security
-  local pid="$$"
+  local pid="${BASHPID}"
   local -n temp_path="${path_var}"
   local prefix="${1:-temp}"
   local filename_format="dybatpho_${prefix}_${pid}"

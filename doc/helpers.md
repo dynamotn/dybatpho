@@ -12,6 +12,7 @@ This module contains functions to write efficient script.
 
 * [dybatpho::expect_args](#dybatphoexpectargs)
 * [dybatpho::still_has_args](#dybatphostillhasargs)
+* [dybatpho::expect_envs](#dybatphoexpectenvs)
 * [dybatpho::require](#dybatphorequire)
 * [dybatpho::is](#dybatphois)
 * [dybatpho::retry](#dybatphoretry)
@@ -48,6 +49,18 @@ argument
   done
 @exitcode 0 Still has an argument
 @exitcode 1 Not has any arguments
+```
+
+### dybatpho::expect_envs
+
+Check that environment variables are set
+
+#### Example
+
+```bash
+  dybatpho::expect_envs ENV_VAR1 ENV_VAR2
+@arg $@ string Environment variables to check
+@exitcode 1 Stop script if not set
 ```
 
 ### dybatpho::require

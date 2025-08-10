@@ -21,7 +21,7 @@ This module contains functions to log messages to stdout/stderr.
 * [dybatpho::print](#dybatphoprint)
 * [dybatpho::progress](#dybatphoprogress)
 * [dybatpho::progress_bar](#dybatphoprogressbar)
-* [dybatpho::notice](#dybatphonotice)
+* [dybatpho::header](#dybatphoheader)
 * [dybatpho::success](#dybatphosuccess)
 * [dybatpho::warn](#dybatphowarn)
 * [dybatpho::error](#dybatphoerror)
@@ -166,9 +166,9 @@ Show progress bar.
 
 * Show progress bar and it's disappeared after done
 
-### dybatpho::notice
+### dybatpho::header
 
-Show notice message with banner.
+Show header message with banner.
 
 #### Arguments
 

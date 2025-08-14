@@ -23,7 +23,7 @@ function dybatpho::die {
   local message exit_code
   dybatpho::expect_args message -- "$@"
   exit_code=${2:-1}
-  dybatpho::fatal "${message}" "${BASH_SOURCE[-1]}:${BASH_LINENO[0]}"
+  dybatpho::fatal "${message}" 1
   exit "${exit_code}"
 }
 

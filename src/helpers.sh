@@ -212,7 +212,8 @@ function dybatpho::breakpoint {
     a: list indexed array
     A: list associative array
     q: quit"
-  __log fatal "Breakpoint hit. Current line: ${BASH_SOURCE[-1]}:${BASH_LINENO[0]}" stderr "1;36"
+  local source_file="${BASH_SOURCE[1]:-bash}"
+  __log fatal "Breakpoint hit. Current line: ${source_file}:${BASH_LINENO[0]}" stderr "1;36"
   while true; do
     printf "%s\n" "${dybatpho_help}" >&2
     read -n1 -s -r dybatpho_key_pressed
@@ -254,8 +255,10 @@ function dybatpho::breakpoint {
         [ "${LOG_LEVEL}" == "trace" ] && set -xv # Re-enable tracing if needed
         ;;
       c)
-        echo "${dybatpho_section}" >&2
-        dybatpho::show_file "${BASH_SOURCE[-1]}"
+        if [ "${source_file}" != "bash" ]; then
+          echo "${dybatpho_section}" >&2
+          dybatpho::show_file "${BASH_SOURCE[1]}"
+        fi
         ;;
       # kcov(enabled)
       *) continue ;;

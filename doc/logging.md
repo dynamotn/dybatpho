@@ -76,7 +76,7 @@ to recognize on tty
 * **$1** (string): String of log level
 * **$2** (string): Text of log level
 * **$3** (string): Message
-* **$4** (string): Indicator of message, default is `<invoke file>:<line number of invoke file>`
+* **$4** (number): Number of call stack to get source file and line number when logging
 * **$5** (string): ANSI escape color code
 
 ### dybatpho::validate_log_level
@@ -221,7 +221,7 @@ Show fatal message.
 #### Arguments
 
 * **$1** (string): Message
-* **$2** (string): Indicator of message, default is `<invoke file>:<line number of invoke file>`
+* **$2** (number): Number of call stack to get source file and line number when logging
 
 #### Output on stderr
 

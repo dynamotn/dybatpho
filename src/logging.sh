@@ -74,18 +74,23 @@ function dybatpho::compare_log_level {
 # @arg $1 string String of log level
 # @arg $2 string Text of log level
 # @arg $3 string Message
-# @arg $4 string Indicator of message, default is `<invoke file>:<line number of invoke file>`
+# @arg $4 number Number of call stack to get source file and line number when logging
 # @arg $5 string ANSI escape color code
 #######################################
 function __log_inspect {
   local log_level=$1
   local log_level_text=$2
   local message="${3:-}"
-  local indicator
-  if [ -n "${BASH_SOURCE[0]:-}" ]; then
-    indicator="${4:-${BASH_SOURCE[-1]}:${BASH_LINENO[1]}}"
+  local indicator="${4:-0}"
+  # 2 is total stacks from dybatpho::(info|fatal|...) to this function
+  local MAGIC_NUMBER=2
+  local stack_total=$((indicator + MAGIC_NUMBER))
+
+  if [ "${#BASH_SOURCE[@]}" -gt "${stack_total}" ]; then
+    indicator="${BASH_SOURCE[${stack_total}]}:${BASH_LINENO[$((stack_total - 1))]}"
   else
-    indicator="${4:-<unknown>:<unknown>}" # kcov(skip)
+    # This case for calling inline from `bash -c`
+    indicator="bash:${BASH_LINENO[1]}" # kcov(skip)
   fi
   local color="${5:-}"
   __log "${log_level}" "$(date --rfc-3339="seconds") ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
@@ -218,11 +223,11 @@ function dybatpho::error {
 #######################################
 # @description Show fatal message.
 # @arg $1 string Message
-# @arg $2 string Indicator of message, default is `<invoke file>:<line number of invoke file>`
+# @arg $2 number Number of call stack to get source file and line number when logging
 # @stderr Show message if log level of message is less than fatal level
 #######################################
 function dybatpho::fatal {
-  __log_inspect fatal "FATAL 🛑      " "$1" "${2:-}"
+  __log_inspect fatal "FATAL 🛑      " "$1" "${2:-0}"
 }
 
 #######################################

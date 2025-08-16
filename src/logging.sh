@@ -25,7 +25,7 @@ export NO_COLOR
 # @stderr Show message if log level of message is less than runtime log level and $3 is `stderr`
 #######################################
 function __log {
-  declare -A log_colors=([trace]="0;36" [debug]="0;35" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
+  declare -A log_colors=([trace]="0;37" [debug]="0;36" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
   local show_log_level="$1"
   local msg="$2"
   local out="${3:-stdout}"
@@ -119,7 +119,7 @@ function dybatpho::validate_log_level {
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug {
-  __log_inspect debug "DEBUG        " "$1"
+  __log_inspect debug "DEBUG 🐞      " "$1"
 }
 
 #######################################
@@ -208,7 +208,7 @@ function dybatpho::success {
 # @stderr Show message if log level of message is less than warn level
 #######################################
 function dybatpho::warn {
-  __log_inspect warn "WARN ⚠️       " "$1"
+  __log_inspect warn "WARN 🚧       " "$1"
 }
 
 #######################################

@@ -70,11 +70,13 @@ Check command dependency is installed.
 #### Arguments
 
 * **$1** (string): Command need to be installed
+* **$2** (number): Exit code if not installed (default 127)
 
 #### Exit codes
 
 * **127**: Stop script if command isn't installed
 * **0**: Otherwise run seamlessly
+* other Exit code if command isn't installed and second argument is set
 
 ### dybatpho::is
 

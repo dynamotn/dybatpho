@@ -80,6 +80,9 @@ setup() {
   run --separate-stderr -127 dybatpho::require "dyfoooo"
   assert_failure
   assert_stderr --partial "dyfoooo isn't installed"
+  run --separate-stderr -200 dybatpho::require "dyfoooo" 200
+  assert_failure
+  assert_stderr --partial "dyfoooo isn't installed"
 }
 
 @test "dybatpho::is with empty" {

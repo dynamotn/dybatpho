@@ -79,11 +79,13 @@ function dybatpho::expect_envs {
 #######################################
 # @description Check command dependency is installed.
 # @arg $1 string Command need to be installed
+# @arg $2 number Exit code if not installed (default 127)
 # @exitcode 127 Stop script if command isn't installed
 # @exitcode 0 Otherwise run seamlessly
+# @exitcode other Exit code if command isn't installed and second argument is set
 #######################################
 function dybatpho::require {
-  hash "$1" > /dev/null 2>&1 || dybatpho::die "$1 isn't installed" 127
+  hash "$1" > /dev/null 2>&1 || dybatpho::die "$1 isn't installed" "${2:-127}"
 }
 
 #######################################

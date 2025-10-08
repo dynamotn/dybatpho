@@ -97,3 +97,12 @@ setup() {
   assert_file_not_empty "${BATS_TEST_TMPDIR}/test/curl_download"
   unstub curl
 }
+
+@test "dybatpho::curl_download with more than 2 parameters" {
+  local temp_file="${BATS_TEST_TMPDIR}/test/curl_download"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  run dybatpho::curl_download https://this "${temp_file}" --header "X-Test: 1"
+  assert_success
+  grep "header X-Test: 1" "${temp_file}"
+  unstub curl
+}

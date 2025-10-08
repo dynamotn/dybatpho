@@ -33,7 +33,8 @@ Transferring data with URL by curl
 #### Example
 
 ```bash
-dybatpho::curl_do <url> --output /tmp/1
+dybatpho::curl_do https://example.com /tmp/1
+dybatpho::curl_do https://example.com /tmp/1 --compressed
 ```
 
 #### Arguments
@@ -57,8 +58,9 @@ Download file
 
 #### Arguments
 
-* $1 URL
-* **$2** (Destination): of file to download
+* **$1** (string): URL
+* **$2** (string): Destination of file to download
+* **...** (string): Other options/arguments for curl
 
 #### Exit codes
 

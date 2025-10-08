@@ -84,7 +84,8 @@ function __get_http_code {
 #######################################
 # @description Transferring data with URL by curl
 # @example
-#   dybatpho::curl_do <url> --output /tmp/1
+#   dybatpho::curl_do https://example.com /tmp/1
+#   dybatpho::curl_do https://example.com /tmp/1 --compressed
 #
 # @arg $1 string URL
 # @arg $2 string Location of curl output, default is `/dev/null`
@@ -145,14 +146,16 @@ function dybatpho::curl_do {
 
 #######################################
 # @description Download file
-# @arg $1 URL
-# @arg $2 Destination of file to download
+# @arg $1 string URL
+# @arg $2 string Destination of file to download
+# @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
 # @exitcode 2 Can't create folder of destination file
 #######################################
 function dybatpho::curl_download {
   local url dst_file
   dybatpho::expect_args url dst_file -- "$@"
+  shift 2
   dybatpho::progress "Downloading ${url}"
 
   # Create destination folder
@@ -160,5 +163,5 @@ function dybatpho::curl_download {
   dst_dir=$(dirname "${dst_file}") || return 2
   mkdir -p "${dst_dir}" || return 2
 
-  dybatpho::curl_do "${url}" "${dst_file}" || return
+  dybatpho::curl_do "${url}" "${dst_file}" "$@" || return
 }

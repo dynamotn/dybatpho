@@ -83,10 +83,12 @@ function __log_inspect {
   local message="${3:-}"
   local indicator="${4:-0}"
   # 2 is total stacks from dybatpho::(info|fatal|...) to this function
-  local MAGIC_NUMBER=2
-  local stack_total=$((indicator + MAGIC_NUMBER))
+  local magic_number=2
+  local stack_total=$((indicator + magic_number))
 
-  if [ "${#BASH_SOURCE[@]}" -gt "${stack_total}" ]; then
+  if [ -z "${BASH_SOURCE+x}" ]; then
+    indicator="bash:0" # kcov(skip)
+  elif [ "${#BASH_SOURCE[@]}" -gt "${stack_total}" ]; then
     indicator="${BASH_SOURCE[${stack_total}]}:${BASH_LINENO[$((stack_total - 1))]}"
   else
     # This case for calling inline from `bash -c`
@@ -236,7 +238,12 @@ function dybatpho::fatal {
 #######################################
 function dybatpho::start_trace {
   __log_inspect trace "TRACE ⚡       " "Start tracing"
-  export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+  if [ -z "${BASH_SOURCE+x}" ]; then
+    PS4='+(bash:0)'
+  else
+    PS4='+(${BASH_SOURCE}:${LINENO})'
+  fi
+  export PS4="${PS4}"': ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
   # kcov(disabled)
   local trap_command="dybatpho::trap"

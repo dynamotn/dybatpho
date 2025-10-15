@@ -86,7 +86,7 @@ function __log_inspect {
   local magic_number=2
   local stack_total=$((indicator + magic_number))
 
-  if [ -z "${BASH_SOURCE+x}" ]; then
+  if [ "${BASH_SOURCE:-}" = "" ]; then
     indicator="bash:0" # kcov(skip)
   elif [ "${#BASH_SOURCE[@]}" -gt "${stack_total}" ]; then
     indicator="${BASH_SOURCE[${stack_total}]}:${BASH_LINENO[$((stack_total - 1))]}"
@@ -238,7 +238,7 @@ function dybatpho::fatal {
 #######################################
 function dybatpho::start_trace {
   __log_inspect trace "TRACE ⚡       " "Start tracing"
-  if [ -z "${BASH_SOURCE+x}" ]; then
+  if [ "${BASH_SOURCE:-}" = "" ]; then
     PS4='+(bash:0)'
   else
     PS4='+(${BASH_SOURCE}:${LINENO})'

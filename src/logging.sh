@@ -95,7 +95,13 @@ function __log_inspect {
     indicator="bash:${BASH_LINENO[1]}" # kcov(skip)
   fi
   local color="${5:-}"
-  __log "${log_level}" "$(date --rfc-3339="seconds") ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
+  local date
+  if hash "busybox" 2> /dev/null; then
+    date=$(busybox date +%Y-%m-%dT%H:%M:%S%:z)
+  else
+    date=$(date --rfc-3339="seconds")
+  fi
+  __log "${log_level}" "${date} ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
 }
 
 #######################################

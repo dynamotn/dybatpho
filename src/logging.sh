@@ -244,12 +244,8 @@ function dybatpho::fatal {
 #######################################
 function dybatpho::start_trace {
   __log_inspect trace "TRACE ⚡       " "Start tracing"
-  if [ "${BASH_SOURCE:-}" = "" ]; then
-    PS4='+(bash:0)'
-  else
-    PS4='+(${BASH_SOURCE}:${LINENO})'
-  fi
-  export PS4="${PS4}"': ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+  PS4='+(${BASH_SOURCE:-no_source}:${LINENO:-no_line})'
+  export PS4="${PS4}"': ${FUNCNAME[0]-no_func:+${FUNCNAME[0]-no_func}(): }'
 
   # kcov(disabled)
   local trap_command="dybatpho::trap"

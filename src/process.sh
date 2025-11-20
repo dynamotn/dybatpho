@@ -154,7 +154,7 @@ function dybatpho::cleanup_file_on_exit {
   if [[ "${BATS_ROOT:-}" != "" ]]; then
     trap_command="trap"
   fi
-  "${trap_command}" ". ${cleanup_file}" EXIT HUP INT TERM
+  "${trap_command}" "bash ${cleanup_file}" EXIT HUP INT TERM
   # kcov(enabled)
 }
 

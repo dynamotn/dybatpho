@@ -113,11 +113,10 @@ function dybatpho::curl_do {
     dybatpho::require curl
     # kcov(disabled)
     code=$(
-      curl -fsSL "${url}" \
+      command curl -fsSL "${url}" \
         -w '%{http_code}' \
         -o "${output}" \
-        "$@" \
-        2> /dev/null
+        "$@"
     ) || true
     # kcov(enabled)
 
@@ -163,5 +162,5 @@ function dybatpho::curl_download {
   dst_dir=$(dirname "${dst_file}") || return 2
   mkdir -p "${dst_dir}" || return 2
 
-  dybatpho::curl_do "${url}" "${dst_file}" "$@" || return
+  dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent "$@" || return
 }

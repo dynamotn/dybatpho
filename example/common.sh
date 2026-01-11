@@ -45,8 +45,8 @@ function _get_weather {
   dybatpho::expect_args location -- "$@"
 
   dybatpho::progress "Querying weather"
-  dybatpho::curl_do https://wttr.in/"${location}" "${TEMP_FILE}"
-  cat "${TEMP_FILE}"
+  dybatpho::dry_run "dybatpho::curl_do 'https://wttr.in/${location}' '${TEMP_FILE}'"
+  dybatpho::dry_run "dybatpho::show_file '${TEMP_FILE}'"
   dybatpho::success "Finished getting weather of ${location}" && exit 0
 }
 
@@ -55,8 +55,8 @@ function _get_cheatsheet {
   dybatpho::expect_args keyword -- "$@"
 
   dybatpho::progress "Querying cheatsheet"
-  dybatpho::curl_do https://cht.sh/"${keyword}" "${TEMP_FILE}"
-  cat "${TEMP_FILE}"
+  dybatpho::dry_run "dybatpho::curl_do 'https://cht.sh/${keyword}' '${TEMP_FILE}'"
+  dybatpho::dry_run "dybatpho::show_file '${TEMP_FILE}'"
   dybatpho::success "Finished getting cheatsheet of ${keyword}" && exit 0
 }
 

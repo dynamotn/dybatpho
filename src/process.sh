@@ -167,6 +167,6 @@ function dybatpho::dry_run {
   if dybatpho::is true "${DRY_RUN}"; then
     echo "🧪 DRY RUN: $*"
   else
-    "$@"
+    eval "$@"
   fi
 }

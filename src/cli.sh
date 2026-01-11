@@ -207,6 +207,12 @@ function __generate_logic {
   local __done_initial
   __done_initial=false && "${spec}" "$*"
   __print_indent 0 "dybatpho::opts::parse::${spec}() {"
+  # Store command path without quotes for help display
+  local cmd_path_clean="${command#\'}"
+  cmd_path_clean="${cmd_path_clean%\'}"
+  cmd_path_clean="${cmd_path_clean// \'/}"
+  cmd_path_clean="${cmd_path_clean//\' /}"
+  [ "${cmd_path_clean}" != "-" ] && __print_indent 1 "local __cmd_path='${cmd_path_clean}'"
   # shellcheck disable=2016
   __print_indent 1 \
     "while OPTARG= && [ \"\${${__rest}}\" != end ] && [ \$# -gt 0 ]; do"
@@ -246,6 +252,8 @@ function __generate_logic {
   else
     __print_indent 4 "case \$1 in"
     for sub_spec in "${__sub_specs[@]}"; do
+      local cmd_name="${sub_spec#*:}"
+      cmd_name="${cmd_name//\'/}"
       __print_indent 5 "${sub_spec#*:})"
       __print_indent 6 "shift"
       __print_indent 6 "dybatpho::opts::parse::${sub_spec%%:*} \"\$@\""
@@ -297,13 +305,78 @@ function __generate_logic {
 
 #######################################
 # @description Get help description for options from spec
+# @arg $1 string Name of function that has spec of parent function or script
+# @arg $2 string Command path (optional)
 # @exitcode 0 exit code
 #######################################
 function __generate_help {
-  eval "
-    dybatpho::print 'Usage: ${0##*/} [options...] [arguments...]'
-    dybatpho::print 'Options:'
-  "
+  local spec=$1
+  local command_path=${2:-}
+  [ "$(type -t "${spec}")" != 'function' ] && return
+
+  local __description="" __rest="" __flags="" __params=""
+  local __on="true" __off="" __init="@empty" __export="true" __optional="false"
+  local __action="" __setup_action="" __validate="" __error="" __switch=""
+  local __has_sub_cmd="false"
+  declare -a __sub_specs=()
+  declare -a __help_items=()
+
+  # First pass: get setup information (silently)
+  local __done_initial=false
+  "${spec}" "${command_path}" > /dev/null 2>&1
+
+  # Second pass: collect help information for each option
+  __done_initial=true
+  __collect_help_mode=true
+  "${spec}" "${command_path}"
+
+  # Display usage and description
+  local usage_cmd="${command_path:+ ${command_path}}"
+  dybatpho::print "Usage: ${0##*/}${usage_cmd} [options...] [arguments...]"
+  [ "${__description}" ] && dybatpho::print "" && dybatpho::print "${__description}"
+
+  # Display options
+  if [ ${#__help_items[@]} -gt 0 ]; then
+    dybatpho::print "" && dybatpho::print "Options:"
+    for item in "${__help_items[@]}"; do
+      local switches="${item%%|*}"
+      local desc="${item#*|}"
+      dybatpho::print "  ${switches}"
+      dybatpho::print "      ${desc}"
+    done
+  fi
+
+  # Display sub-commands
+  if dybatpho::is true "${__has_sub_cmd}"; then
+    dybatpho::print "" && dybatpho::print "Commands:"
+    for sub_spec in "${__sub_specs[@]}"; do
+      local cmd_name="${sub_spec#*:}"
+      cmd_name="${cmd_name//\'/}"
+      local spec_name="${sub_spec%%:*}"
+
+      # Get description from subcommand spec
+      local sub_description=""
+      if [ "$(type -t "${spec_name}")" = 'function' ]; then
+        local __description="" __rest="" __flags="" __params=""
+        local __on="true" __off="" __init="@empty" __export="true" __optional="false"
+        local __action="" __setup_action="" __validate="" __error="" __switch=""
+        local __has_sub_cmd="false" __command_name=""
+        declare -a __help_items=()
+        local __done_initial=false
+        "${spec_name}" "" > /dev/null 2>&1
+        __done_initial=true
+        __collect_help_mode=true
+        "${spec_name}" ""
+        sub_description="${__description}"
+      fi
+
+      if [ -n "${sub_description}" ]; then
+        dybatpho::print "  ${cmd_name}    ${sub_description}"
+      else
+        dybatpho::print "  ${cmd_name}"
+      fi
+    done
+  fi
 }
 
 #######################################
@@ -344,6 +417,8 @@ function dybatpho::opts::setup {
     done
     __define_var "${__rest}"
     __setup_action="${__action}"
+  elif [ "${__collect_help_mode:-false}" = "true" ]; then
+    __description="${description}"
   fi
 }
 
@@ -362,6 +437,13 @@ function dybatpho::opts::flag {
   __parse_opt false "$@"
   if dybatpho::is false "${__done_initial}"; then
     __define_var "${var}"
+  elif [ "${__collect_help_mode:-false}" = "true" ]; then
+    # Convert __switch format to human-readable
+    local switches="${__switch}"
+    switches="${switches//\'|\'/,}" # Replace '|' with ,
+    switches="${switches//\'/}"     # Remove quotes
+    switches="${switches//|/, }"    # Replace | with ,
+    __help_items+=("${switches}|${description}")
   else
     __print_indent 3 "${__switch})"
     __print_indent 4 '[ "${OPTARG:-}" ] && OPTARG=${OPTARG#*\=} && set "noarg" "$1" && break'
@@ -386,6 +468,13 @@ function dybatpho::opts::param {
   __parse_opt true "$@"
   if dybatpho::is false "${__done_initial}"; then
     __define_var "${var}"
+  elif [ "${__collect_help_mode:-false}" = "true" ]; then
+    # Convert __switch format to human-readable
+    local switches="${__switch}"
+    switches="${switches//\'|\'/,}" # Replace '|' with ,
+    switches="${switches//\'/}"     # Remove quotes
+    switches="${switches//|/, }"    # Replace | with ,
+    __help_items+=("${switches}|${description}")
   else
     __print_indent 3 "${__switch})"
     if dybatpho::is false "${__optional}"; then
@@ -415,7 +504,14 @@ function dybatpho::opts::disp {
   dybatpho::expect_args description -- "$@"
 
   __parse_opt false "$@"
-  if ! dybatpho::is false "${__done_initial}"; then
+  if [ "${__collect_help_mode:-false}" = "true" ]; then
+    # Convert __switch format to human-readable
+    local switches="${__switch}"
+    switches="${switches//\'|\'/,}" # Replace '|' with ,
+    switches="${switches//\'/}"     # Remove quotes
+    switches="${switches//|/, }"    # Replace | with ,
+    __help_items+=("${switches}|${description}")
+  elif ! dybatpho::is false "${__done_initial}"; then
     __print_indent 3 "${__switch})"
     [ "${__action}" ] && __print_indent 4 "${__action}"
     __print_indent 4 "exit 0"
@@ -435,6 +531,12 @@ function dybatpho::opts::cmd {
     __has_sub_cmd="true"
     # shellcheck disable=2190
     __sub_specs+=("${sub_spec}:'${sub_cmd}'")
+  fi
+
+  # In help mode, collect command for building command path
+  if [ "${__collect_help_mode:-false}" = "true" ]; then
+    # Store the last command in path for this spec
+    : # Command is already passed to spec function via $1
   fi
 }
 
@@ -464,20 +566,14 @@ function dybatpho::generate_from_spec {
 #######################################
 # @description Show help description of root command/sub-command
 # @arg $1 string Name of function that has spec of parent function or script
+# @arg $2 string Command path (optional, auto-detect from __cmd_path if available)
 # @stdout Help description
 #######################################
 function dybatpho::generate_help {
   local spec
   dybatpho::expect_args spec -- "$@"
+  shift
 
-  local gen_file
-  dybatpho::create_temp gen_file ".sh" "genhelp"
-  __generate_logic "${spec}" - "$@" >> "${gen_file}"
-  dybatpho::cleanup_file_on_exit "${gen_file}"
-  if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
-    dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
-  fi
-  # shellcheck disable=1090
-  . "${gen_file}"
-  __generate_help "${spec}"
+  local command_path="${1:-${__cmd_path:-}}"
+  __generate_help "${spec}" "${command_path}"
 }

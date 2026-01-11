@@ -60,27 +60,66 @@ function _get_cheatsheet {
   dybatpho::success "Finished getting cheatsheet of ${keyword}" && exit 0
 }
 
+function _get_internet_ip {
+  dybatpho::progress "Querying IP"
+  dybatpho::dry_run "dybatpho::curl_do 'https://ipinfo.io' '${TEMP_FILE}'"
+  dybatpho::dry_run "dybatpho::show_file '${TEMP_FILE}'"
+  exit 0
+}
+
+function _get_local_ip {
+  dybatpho::dry_run "ip addr"
+  exit 0
+}
+
 function _spec_weather {
+  _spec_global
   dybatpho::opts::setup "Get weather of your location" WEATHER_ARGS action:"_get_weather \$WEATHER_ARGS"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_weather"
 }
 
 function _spec_cheatsheet {
+  _spec_global
   dybatpho::opts::setup "Get cheatsheet of your keyword" CHTST_ARGS action:"_get_cheatsheet \$CHTST_ARGS"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_cheatsheet"
 }
 
-function _spec_main {
-  dybatpho::opts::setup "This is example script for dybatpho" MAIN_ARGS action:"_main"
+function _spec_ip {
+  _spec_global
+  dybatpho::opts::setup "Get your IP" IP_ARGS action:"dybatpho::warn 'Need to have sub-command' && exit 0"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_ip"
+  dybatpho::opts::cmd internet _spec_internet_ip
+  dybatpho::opts::cmd local _spec_local_ip
+}
+
+function _spec_internet_ip {
+  _spec_global
+  dybatpho::opts::setup "Get your Internet IP" INTERNET_IP_ARGS action:"_get_internet_ip \$INTERNET_IP_ARGS"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_internet_ip"
+}
+
+function _spec_local_ip {
+  _spec_global
+  dybatpho::opts::setup "Get your local IP" LOCAL_IP_ARGS action:"_get_local_ip \$LOCAL_IP_ARGS"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_local_ip"
+}
+
+function _spec_global {
   dybatpho::opts::flag "Breakpoint" BREAK -b --break --no-break-point
   dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info" validate:"dybatpho::validate_log_level \$OPTARG"
   dybatpho::opts::flag "Dry run" DRY_RUN --dry-run -D on:true off:false init:="false"
+}
+
+function _spec_main {
+  _spec_global
+  dybatpho::opts::setup "This is example script for dybatpho" MAIN_ARGS action:"_main"
   dybatpho::opts::param "Message show in command" MESSAGE --message -m optional:true init:="Example script"
   dybatpho::opts::param "Program to check prerequisite" PROGRAM --program -p init:="cat"
-  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_main"
   dybatpho::opts::disp "Show version" --version action:"echo ${VERSION}"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_main"
   dybatpho::opts::cmd weather _spec_weather
   dybatpho::opts::cmd cheatsheet _spec_cheatsheet
+  dybatpho::opts::cmd ip _spec_ip
 }
 
 LOG_LEVEL=debug

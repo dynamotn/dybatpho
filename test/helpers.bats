@@ -3,7 +3,7 @@ setup() {
 }
 
 @test "dybatpho::expect_args have right spec" {
-  # shellcheck disable=SC2317
+  # shellcheck disable=2329
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 -- "$@"
@@ -15,7 +15,7 @@ setup() {
 }
 
 @test "dybatpho::expect_args not have right spec" {
-  # shellcheck disable=SC2317
+  # shellcheck disable=2329
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 "$@"
@@ -49,7 +49,14 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::still_has_args with single arg" {
+  run dybatpho::still_has_args "single"
+  assert_failure
+  refute_output
+}
+
 @test "dybatpho::expect_envs have right envs" {
+  # shellcheck disable=2030
   export DYBATPHO_TEST_ENV1="test1"
   export DYBATPHO_TEST_ENV2="test2"
   run dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
@@ -60,6 +67,7 @@ setup() {
   run --separate-stderr dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
   assert_failure
   assert_stderr --partial "Environment variable \`DYBATPHO_TEST_ENV1\` isn't set"
+  # shellcheck disable=2031
   export DYBATPHO_TEST_ENV1="test1"
   run --separate-stderr dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
   assert_failure
@@ -69,6 +77,13 @@ setup() {
 @test "dybatpho::expect_envs not have enough envs" {
   run dybatpho::expect_envs
   assert_success
+}
+
+@test "dybatpho::expect_envs with empty env value" {
+  export EMPTY_ENV=""
+  run --separate-stderr dybatpho::expect_envs EMPTY_ENV
+  assert_failure
+  assert_stderr --partial "Environment variable \`EMPTY_ENV\` isn't set"
 }
 
 @test "dybatpho::require installed tool" {
@@ -83,6 +98,12 @@ setup() {
   run --separate-stderr -200 dybatpho::require "dyfoooo" 200
   assert_failure
   assert_stderr --partial "dyfoooo isn't installed"
+}
+
+@test "dybatpho::require with custom exit code" {
+  run --separate-stderr -99 dybatpho::require "nonexistent_command_xyz" 99
+  assert_failure
+  assert_stderr --partial "nonexistent_command_xyz isn't installed"
 }
 
 @test "dybatpho::is with empty" {
@@ -196,6 +217,12 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::is with unset variable" {
+  local unset_var
+  run dybatpho::is "set" "${unset_var:-}"
+  assert_failure
+}
+
 @test "dybatpho::is empty" {
   local dyfoooo=""
   run dybatpho::is "empty" "${dyfoooo}"
@@ -212,6 +239,12 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::is number with negative number" {
+  run dybatpho::is "number" "-123.45"
+  assert_success
+  refute_output
+}
+
 @test "dybatpho::is int" {
   run dybatpho::is "int" "11"
   assert_success
@@ -221,6 +254,12 @@ setup() {
   refute_output
   run dybatpho::is "int" "1a"
   assert_failure
+  refute_output
+}
+
+@test "dybatpho::is int with negative int" {
+  run dybatpho::is "int" "-456"
+  assert_success
   refute_output
 }
 
@@ -272,6 +311,7 @@ setup() {
   refute_output
 }
 
+# shellcheck disable=2329
 _test_retry() {
   count=$((count + 1))
   if [ "${count}" -lt 3 ]; then
@@ -301,6 +341,16 @@ _test_retry() {
   assert_success
   assert_output --partial "Retrying in 4 seconds (2/3)"
   refute_output --partial "Retrying in 8 seconds (3/3)"
+}
+
+@test "dybatpho::retry with immediate success" {
+  count=0
+  _test_retry() {
+    return 0
+  }
+  run dybatpho::retry 3 _test_retry
+  assert_success
+  refute_output --partial "Retrying"
 }
 
 @test "dybatpho::breakpoint wait for output" {

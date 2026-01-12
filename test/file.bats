@@ -13,6 +13,11 @@ setup() {
   assert_output --partial "${content}"
 }
 
+@test "dybatpho::show_file with non-existent file" {
+  run --separate-stderr dybatpho::show_file "/non/existent/file.txt"
+  assert_failure
+}
+
 @test "dybatpho::create_temp with empty variable name" {
   run dybatpho::create_temp "" ".txt"
   assert_failure
@@ -26,7 +31,7 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp file" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt"
@@ -39,7 +44,7 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp folder" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _create() {
     local temp_folder
     dybatpho::create_temp temp_folder "${1:-}"
@@ -56,7 +61,7 @@ setup() {
 }
 
 @test "dybatpho::create_temp create file with prefix" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".sh" "prefix1"
@@ -69,7 +74,7 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp file in not existed folder" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt" "" "/not-existed-folder"
@@ -83,12 +88,25 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp file in existed folder, different with TMPDIR" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt" "" "${BATS_TEST_TMPDIR}"
     # shellcheck disable=2031
     [[ -f ${temp_file} ]] && [[ -n "${temp_file}" ]]
+  }
+  run _create
+  assert_success
+  refute_output
+}
+
+@test "dybatpho::create_temp with different extensions" {
+  _create() {
+    local temp_file1 temp_file2
+    dybatpho::create_temp temp_file1 ".json"
+    dybatpho::create_temp temp_file2 ".yaml"
+    [[ -f ${temp_file1} ]] && [[ ${temp_file1} =~ .*\.json$ ]] \
+      && [[ -f ${temp_file2} ]] && [[ ${temp_file2} =~ .*\.yaml$ ]]
   }
   run _create
   assert_success

@@ -24,6 +24,41 @@ teardown() {
   refute_output --partial "$(echo -e "\e[0;32m")"
 }
 
+@test "dybatpho::compare_log_level with same level" {
+  # shellcheck disable=2030,2031
+  export LOG_LEVEL=info
+  run dybatpho::compare_log_level "info"
+  assert_success
+}
+
+@test "dybatpho::compare_log_level with lower level" {
+  # shellcheck disable=2030,2031
+  export LOG_LEVEL=info
+  run dybatpho::compare_log_level "error"
+  assert_success
+}
+
+@test "dybatpho::compare_log_level with higher level" {
+  # shellcheck disable=2030,2031
+  export LOG_LEVEL=error
+  run dybatpho::compare_log_level "debug"
+  assert_failure
+}
+
+@test "dybatpho::compare_log_level with trace and fatal" {
+  # shellcheck disable=2030,2031
+  export LOG_LEVEL=trace
+  run dybatpho::compare_log_level "fatal"
+  assert_success
+}
+
+@test "dybatpho::compare_log_level case insensitive" {
+  # shellcheck disable=2030,2031
+  export LOG_LEVEL=INFO
+  run dybatpho::compare_log_level "info"
+  assert_success
+}
+
 @test "dybatpho::validate_log_level succeeds with valid level" {
   run --separate-stderr dybatpho::validate_log_level error
   assert_success
@@ -46,19 +81,19 @@ teardown() {
 }
 
 @test "dybatpho::debug output when using debug level" {
-  # shellcheck disable=SC2030
+  # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
   run --separate-stderr dybatpho::debug foo
   assert_success
   refute_output
-  assert_stderr --partial "$(echo -e "\e[0;35m")"
+  assert_stderr --partial "$(echo -e "\e[0;36m")"
   assert_stderr --partial "foo"
   assert_stderr --partial "‖ DEBUG"
   assert_stderr --partial "$(echo -e "\e[0m")"
 }
 
 @test "dybatpho::debug_command output" {
-  # shellcheck disable=SC2030
+  # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
   run --separate-stderr dybatpho::debug_command "Who am I" "whoami"
   assert_success
@@ -180,7 +215,7 @@ teardown() {
   run --separate-stderr dybatpho::start_trace
   assert_success
   refute_output
-  assert_stderr --partial "$(echo -e "\e[0;36m")"
+  assert_stderr --partial "$(echo -e "\e[0;37m")"
   assert_stderr --partial "‖ TRACE"
   assert_stderr --partial "Start tracing"
   assert_stderr --partial "$(echo -e "\e[0m")"
@@ -199,7 +234,7 @@ teardown() {
   run --separate-stderr dybatpho::end_trace
   assert_success
   refute_output
-  assert_stderr --partial "$(echo -e "\e[0;36m")"
+  assert_stderr --partial "$(echo -e "\e[0;37m")"
   assert_stderr --partial "‖ TRACE"
   assert_stderr --partial "End tracing"
   assert_stderr --partial "$(echo -e "\e[0m")"

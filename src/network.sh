@@ -101,6 +101,11 @@ function dybatpho::curl_do {
   local url
   dybatpho::expect_args url -- "$@"
   shift
+
+  if dybatpho::is empty "${url}"; then
+    return 1
+  fi
+
   local output="/dev/null"
   if [ $# -ne 0 ]; then
     output="$1"
@@ -108,16 +113,19 @@ function dybatpho::curl_do {
   fi
 
   local code
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2329
   __request() {
     dybatpho::require curl
     # kcov(disabled)
     code=$(
-      command curl -fsSL "${url}" \
+      if command curl -fsSL "${url}" \
         -w '%{http_code}' \
         -o "${output}" \
-        "$@"
-    ) || true
+        "$@"; then
+        dybatpho::fatal "Error when access ${url}"
+        return 1
+      fi
+    )
     # kcov(enabled)
 
     local code_description
@@ -149,7 +157,7 @@ function dybatpho::curl_do {
 # @arg $2 string Destination of file to download
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
-# @exitcode 2 Can't create folder of destination file
+# @exitcode 6 Can't create folder of destination file
 #######################################
 function dybatpho::curl_download {
   local url dst_file
@@ -159,8 +167,8 @@ function dybatpho::curl_download {
 
   # Create destination folder
   local dst_dir
-  dst_dir=$(dirname "${dst_file}") || return 2
-  mkdir -p "${dst_dir}" || return 2
+  dst_dir=$(dirname "${dst_file}") || return 6
+  mkdir -p "${dst_dir}" || return 6
 
-  dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent "$@" || return
+  dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent "$@"
 }

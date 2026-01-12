@@ -167,6 +167,7 @@ function dybatpho::dry_run {
   if dybatpho::is true "${DRY_RUN}"; then
     echo "🧪 DRY RUN: $*"
   else
+    # shellcheck disable=2294
     eval "$@"
   fi
 }

@@ -13,8 +13,19 @@ setup() {
   assert_output "403 (forbidden)"
 }
 
+@test "__get_http_code with unknown code" {
+  run __get_http_code 999
+  assert_success
+  assert_output "999 (unknown)"
+}
+
 @test "dybatpho::curl_do no arg" {
   run dybatpho::curl_do
+  assert_failure
+}
+
+@test "dybatpho::curl_do with empty url" {
+  run --separate-stderr dybatpho::curl_do ""
   assert_failure
 }
 
@@ -65,7 +76,7 @@ setup() {
 
 @test "dybatpho::curl_do with retries failed" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
-  DYBATPHO_CURL_MAX_RETRIES=1
+  export DYBATPHO_CURL_MAX_RETRIES=1
   stub curl \
     ": echo '300'" \
     ": echo '300'" \
@@ -105,4 +116,9 @@ setup() {
   assert_success
   grep "header X-Test: 1" "${temp_file}"
   unstub curl
+}
+
+@test "dybatpho::curl_download to readonly directory" {
+  run --separate-stderr -6 dybatpho::curl_download https://example.com /root/readonly/file.txt
+  assert_failure
 }

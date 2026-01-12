@@ -3,7 +3,7 @@ setup() {
 }
 
 @test "dybatpho::generate_from_spec simple" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     echo "called" >&2
@@ -16,7 +16,7 @@ setup() {
 }
 
 @test "dybatpho::generate_from_spec send arguments to dybatpho::opts::parse" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
   }
@@ -30,7 +30,7 @@ setup() {
 }
 
 @test "dybatpho::generate_from_spec handling rest arguments" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" ARGS action:"echo \$ARGS"
   }
@@ -41,7 +41,7 @@ setup() {
 }
 
 @test "dybatpho::generate_from_spec handling arguments with doesn't have sub commands" {
-  # shellcheck disable=2317
+  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" ARGS action:"echo -e \"\$ARGS\n\$FLAG_A\""
     dybatpho::opts::flag "" FLAG_A -a

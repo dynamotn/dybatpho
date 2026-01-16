@@ -62,6 +62,15 @@ setup() {
   unstub curl
 }
 
+@test "dybatpho::curl_do without stub" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_do"
+  echo -e "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n" | nc -l 8080 &
+  sleep 1
+  run dybatpho::curl_do http://localhost:8080 "${temp_file}"
+  assert_success
+  refute_output
+}
+
 @test "dybatpho::curl_do with retries success" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl \

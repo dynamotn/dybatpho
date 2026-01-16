@@ -118,7 +118,7 @@ function dybatpho::curl_do {
     dybatpho::require curl
     # kcov(disabled)
     code=$(
-      if command curl -fsSL "${url}" \
+      if ! command curl -fsSL "${url}" \
         -w '%{http_code}' \
         -o "${output}" \
         "$@"; then

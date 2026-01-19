@@ -58,3 +58,23 @@ function dybatpho::array_unique {
     dybatpho::array_print "$1"
   fi
 }
+
+#######################################
+# @description Join array with given separator into a string
+# @arg $1 string Name of array
+# @arg $2 string Separator
+# @stdout Print outputted string
+#######################################
+function dybatpho::array_join {
+  # shellcheck disable=SC2178
+  local -n input_arr="$1"
+  local separator="$2"
+
+  if [[ ${#input_arr[@]} -eq 0 ]]; then
+    return
+  fi
+  printf -- "%s" "${input_arr[0]}"
+  if [[ ${#input_arr[@]} -gt 1 ]]; then
+    printf -- "${separator}%s" "${input_arr[@]:1}"
+  fi
+}

@@ -1,7 +1,7 @@
 # dybatpho
 
 ![Bash Script](https://img.shields.io/badge/bash_script-%23121011.svg?style=for-the-badge&logo=gnu-bash&logoColor=white)
-[![Coverage Status](https://coveralls.io/repos/github/dynamotn/dybatpho/badge.svg)](https://coveralls.io/github/dynamotn/dybatpho)
+[![Coverage Status](https://coveralls.io/repos/github/dynamotn/dybatpho/badge.svg?branch=main)](https://coveralls.io/github/dynamotn/dybatpho?branch=main)
 [![CI](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml/badge.svg)](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml)
 [![Latest release](https://img.shields.io/github/release/dynamotn/dybatpho.svg)](https://github.com/dynamotn/dybatpho/releases/latest)
 
@@ -35,8 +35,8 @@
    - **Subtree:**
 
      ```sh
-     git subtree add --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
-     git subtree pull --prefix <path> https://github.com/dynamotn/dybatpho.git main --squash
+     git subtree add --prefix main --squash < path > https://github.com/dynamotn/dybatpho.git
+     git subtree pull --prefix main --squash < path > https://github.com/dynamotn/dybatpho.git
      ```
 
    - **Manual clone** (for CI/CD, etc.):
@@ -49,7 +49,7 @@
 
    ```sh
    # Source the initialization script
-   . <path-to-dybatpho>/init.sh
+   . < path-to-dybatpho > /init.sh
    ```
 
    > See more [example scripts](example/) or real-world usage in [my dotfiles](https://github.com/dynamotn/dotfiles).

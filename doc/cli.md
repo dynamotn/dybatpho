@@ -102,7 +102,8 @@ Parse options with a spec from `dybatpho::opts::flag`,
 #### Arguments
 
 * **$1** (bool): Flag that defined option that take argument in spec
-* **...** (string): Passed arguments from `dybatpho::opts::(flag|param)`
+* **$2** (number): Count of non-option metadata args to skip after the mode flags
+* **...** (string): Passed arguments from `dybatpho::opts::(flag|param|disp)`
 
 #### Exit codes
 

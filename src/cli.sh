@@ -45,14 +45,19 @@ DYBATPHO_CLI_DEBUG="${DYBATPHO_CLI_DEBUG:-false}"
 # @description Parse options with a spec from `dybatpho::opts::flag`,
 #              `dybatpho::opts::param`
 # @arg $1 bool Flag that defined option that take argument in spec
-# @arg $@ string Passed arguments from `dybatpho::opts::(flag|param)`
+# @arg $2 number Count of non-option metadata args to skip after the mode flags
+# @arg $@ string Passed arguments from `dybatpho::opts::(flag|param|disp)`
 # @exitcode 0
 #######################################
 function __parse_opt {
+  local need_argument=$1
+  local skip_meta=$2
+  shift 2
+
   if dybatpho::is false "${__done_initial}"; then
-    local need_argument=$1 && shift
     __on="true" __off="" __init="@empty" __export="true"
-    while dybatpho::still_has_args "$@" && shift; do
+    shift "${skip_meta}"
+    while (($#)); do
       case $1 in
         [!-]*) __parse_key_value "$1" "__" ;;
         -?)
@@ -61,11 +66,12 @@ function __parse_opt {
             || __flags="${__flags}${1#-}"
           ;;
       esac
+      shift
     done
   else
     __validate="" __on="true" __off="" __export="true" __optional="false" __switch=""
-    shift # ignore flag $1
-    while dybatpho::still_has_args "$@" && shift; do
+    shift "${skip_meta}"
+    while (($#)); do
       case $1 in
         --\{no-\}*)
           i=${1#--?no-?}
@@ -78,6 +84,7 @@ function __parse_opt {
         -? | --*) __add_switch "'$1'" ;;
         *) __parse_key_value "$1" "__" ;;
       esac
+      shift
     done
     __assign_quoted __on "${__on}"
     __assign_quoted __off "${__off}"
@@ -100,6 +107,13 @@ function __print_indent {
   echo "$@"
 }
 
+function __require_shell_name {
+  local name="${1:-}"
+  [[ "${name}" == "-" ]] && return 0
+  [[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+    || dybatpho::die "Invalid shell variable name: ${name}"
+}
+
 #######################################
 # @description Assign the quoted string to a variable
 # @arg $1 string Variable name to be assigned
@@ -107,12 +121,13 @@ function __print_indent {
 # @exitcode 0
 #######################################
 function __assign_quoted {
+  __require_shell_name "$1"
   local quote="$2'" result=""
   while [ "${quote}" ]; do
     result="${result}${quote%%\'*}'\''" && quote=${quote#*\'}
   done
   quote="'${result%????}'" && quote=${quote#\'\'} && quote=${quote%\'\'}
-  eval "$1=\${quote:-\"''\"}"
+  printf -v "$1" '%s' "${quote:-"''"}"
 }
 
 #######################################
@@ -130,6 +145,8 @@ function __prepend_export {
 # @arg $1 string Name of variable to be defined
 #######################################
 function __define_var {
+  [ "$1" = "-" ] && return 0
+  __require_shell_name "$1"
   case ${__init} in
     @keep) : ;;
     @empty) __print_indent 0 "$(__prepend_export "$1=''")" ;;
@@ -162,7 +179,9 @@ function __define_var {
 # @arg $2 string Prefix of key to assign as variable
 #######################################
 function __parse_key_value() {
-  eval "${2-}${1%%:*}=\${1#*:}"
+  local target="${2-}${1%%:*}"
+  __require_shell_name "${target}"
+  printf -v "${target}" '%s' "${1#*:}"
 }
 
 # shellcheck disable=2016
@@ -338,9 +357,10 @@ function __generate_help {
 # @arg $3 number Minimum length
 #######################################
 function __help_pad {
+  __require_shell_name "$1"
   local __p=$2
   while [ "${#__p}" -lt "$3" ]; do __p="${__p} "; done
-  eval "$1=\${__p}"
+  printf -v "$1" '%s' "${__p}"
 }
 
 #######################################
@@ -421,7 +441,7 @@ function __add_switch {
 function __print_validate {
   set -- "${__validate}" "$1"
   [ "$1" ] && __print_indent 4 "$1 || { set -- ${1%% *}:\$? \"\$1\" $1; break; }"
-  __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
+  [ "$2" = "-" ] || __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
 }
 
 # @section Spec functions
@@ -452,7 +472,12 @@ function dybatpho::opts::setup {
   fi
 
   # HACK: __rest is defined in __generate_logic, so we need to define it here
-  [ "${1#-}" ] && __rest="$1" || __rest="__rest"
+  if [ "${1#-}" ]; then
+    __require_shell_name "$1"
+    __rest="$1"
+  else
+    __rest="__rest"
+  fi
 
   if dybatpho::is false "${__done_initial}"; then
     __init="@empty"
@@ -475,6 +500,7 @@ function dybatpho::opts::setup {
 function dybatpho::opts::flag {
   local description var
   dybatpho::expect_args description var -- "$@"
+  __require_shell_name "${var}"
 
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
@@ -485,7 +511,7 @@ function dybatpho::opts::flag {
     return 0
   fi
 
-  __parse_opt false "$@"
+  __parse_opt false 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
     __define_var "${var}"
   else
@@ -508,6 +534,7 @@ function dybatpho::opts::flag {
 function dybatpho::opts::param {
   local description var
   dybatpho::expect_args description var -- "$@"
+  __require_shell_name "${var}"
 
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
@@ -518,7 +545,7 @@ function dybatpho::opts::param {
     return 0
   fi
 
-  __parse_opt true "$@"
+  __parse_opt true 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
     __define_var "${var}"
   else
@@ -564,7 +591,7 @@ function dybatpho::opts::disp {
     return 0
   fi
 
-  __parse_opt false "$@"
+  __parse_opt false 1 "$@"
   if ! dybatpho::is false "${__done_initial}"; then
     __print_indent 3 "${__switch})"
     [ "${__action}" ] && __print_indent 4 "${__action}"

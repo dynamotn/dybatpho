@@ -38,6 +38,15 @@ setup() {
   assert_stderr --partial "Expected args:"
 }
 
+@test "dybatpho::expect_args with invalid variable name" {
+  test_function() {
+    dybatpho::expect_args bad-name -- "$@"
+  }
+  run --separate-stderr test_function "value"
+  assert_failure
+  assert_stderr --partial "Invalid variable name: bad-name"
+}
+
 @test "dybatpho::still_has_args logic" {
   declare -a opts=('opt1' 'opt2' '--opt3')
   run dybatpho::still_has_args "${opts[@]}"

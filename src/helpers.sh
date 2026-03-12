@@ -37,10 +37,12 @@ function dybatpho::expect_args {
 
   local variable_name
   for variable_name in "${variable_names[@]}"; do
+    [[ "${variable_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+      || dybatpho::die "${FUNCNAME[1]:--}: Invalid variable name: ${variable_name}"
     if ! (($#)); then
       dybatpho::die "${FUNCNAME[1]:--}: Expected args: ${variable_names[*]:-}"
     fi
-    eval "${variable_name}=\$1"
+    printf -v "${variable_name}" '%s' "$1"
     shift
   done
 }
@@ -242,7 +244,7 @@ function dybatpho::breakpoint {
         # shellcheck disable=SC2162
         while read -e -p "Debugger (Ctrl-d to exit)> " line; do
           [[ "${line}" == "exit" ]] && break
-          if [[ "${line}" =~ ^rm ]] || [[ "${line}" =~ ^dd ]]; then
+          if [[ "${line}" =~ ^[[:space:]]*(rm|dd)([[:space:]]|$) ]]; then
             dybatpho::error "Ignore dangerous command."
             continue
           fi

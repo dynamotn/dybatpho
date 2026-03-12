@@ -351,6 +351,29 @@ setup() {
   assert_output --partial "hello"
 }
 
+@test "dybatpho::opts::setup rejects invalid rest variable name" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" bad-name action:"echo nope"
+  }
+
+  run --separate-stderr dybatpho::generate_from_spec _spec
+  assert_failure
+  assert_stderr --partial "Invalid shell variable name: bad-name"
+}
+
+@test "dybatpho::opts::flag omits variable assignment with dash" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" REST action:"echo ${REST:-EMPTY}"
+    dybatpho::opts::flag "Verbose" - --verbose
+  }
+
+  run dybatpho::generate_from_spec _spec --verbose
+  assert_success
+  assert_output "EMPTY"
+}
+
 # =============================================================================
 # dybatpho::opts::disp
 # =============================================================================

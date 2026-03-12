@@ -455,6 +455,7 @@ function dybatpho::opts::setup {
   [ "${1#-}" ] && __rest="$1" || __rest="__rest"
 
   if dybatpho::is false "${__done_initial}"; then
+    __init="@empty"
     while dybatpho::still_has_args "$@" && shift; do
       __parse_key_value "$1" "__"
     done

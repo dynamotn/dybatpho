@@ -64,7 +64,7 @@ Download file
 
 #### Exit codes
 
-* **2**: Can't create folder of destination file
+* **6**: Can't create folder of destination file
 
 #### See also
 

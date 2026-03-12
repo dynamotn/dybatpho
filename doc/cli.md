@@ -47,6 +47,9 @@ Theses are type of function arguments that defined in this file
 * [__parse_key_value](#parsekeyvalue)
 * [__generate_logic](#generatelogic)
 * [__generate_help](#generatehelp)
+* [__help_pad](#helppad)
+* [__help_sw](#helpsw)
+* [__help_row](#helprow)
 * [__add_switch](#addswitch)
 * [dybatpho::opts::setup](#dybatphooptssetup)
 * [dybatpho::opts::flag](#dybatphooptsflag)
@@ -178,11 +181,58 @@ Generate logic from spec of script/function to get options
 
 ### __generate_help
 
-Get help description for options from spec
+Get help description for options from spec.
+Sets __help_mode=true so dybatpho::opts::* collect help data
+via dynamic scoping into dybatpho::generate_help's locals,
+then prints the buffered sections in the correct order.
+
+#### Arguments
+
+* **$1** (string): Name of function that has spec of parent function or script
 
 #### Exit codes
 
 * **0**: exit code
+
+#### Output on stdout
+
+* Help description
+
+### __help_pad
+
+Pad string $2 to at least length $3 and store result in variable $1
+
+#### Arguments
+
+* **$1** (string): Variable name to store result
+* **$2** (string): String to pad
+* **$3** (number): Minimum length
+
+### __help_sw
+
+Append a formatted switch to caller-local variable `sw`.
+Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so
+that short+long pairs align as "-s, --long".
+
+#### Arguments
+
+* **$1** (number): Minimum pad width before appending $2
+* **$2** (string): Switch string to append
+
+### __help_row
+
+Format one help row and print to stdout
+
+#### Arguments
+
+* **$1** (string): Type: flag | param | disp | cmd
+* **$2** (string): Variable name (or command name for cmd type)
+* **$3** (string): Description
+* **...** (switch|key:value): Switches and settings of this option
+
+#### Output on stdout
+
+* Formatted help row
 
 ### __add_switch
 
@@ -277,7 +327,9 @@ Define spec of parent function or script, spec contains below commands
 
 ### dybatpho::generate_help
 
-Show help description of root command/sub-command
+Show help description of root command/sub-command.
+Declares help state as locals so dybatpho::opts::* in the call
+chain can read/write them via bash dynamic scoping.
 
 #### Arguments
 

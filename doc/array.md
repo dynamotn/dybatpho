@@ -11,6 +11,7 @@ This module contains functions to work with array.
 * [dybatpho::array_print](#dybatphoarrayprint)
 * [dybatpho::array_reverse](#dybatphoarrayreverse)
 * [dybatpho::array_unique](#dybatphoarrayunique)
+* [dybatpho::array_join](#dybatphoarrayjoin)
 
 ### dybatpho::array_print
 
@@ -49,4 +50,17 @@ Remove duplicate elements in array
 #### Output on stdout
 
 * Print array if $2 is `--`
+
+### dybatpho::array_join
+
+Join array with given separator into a string
+
+#### Arguments
+
+* **$1** (string): Name of array
+* **$2** (string): Separator
+
+#### Output on stdout
+
+* Print outputted string
 

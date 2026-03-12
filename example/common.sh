@@ -44,7 +44,7 @@ function _get_weather {
   local location
   dybatpho::expect_args location -- "$@"
 
-  dybatpho::progress "Querying weather"
+  dybatpho::progress "Querying weather of ${location}"
   dybatpho::dry_run "dybatpho::curl_do 'https://wttr.in/${location}' '${TEMP_FILE}'"
   dybatpho::dry_run "dybatpho::show_file '${TEMP_FILE}'"
   dybatpho::success "Finished getting weather of ${location}" && exit 0
@@ -113,7 +113,7 @@ function _spec_global {
 function _spec_main {
   _spec_global
   dybatpho::opts::setup "This is example script for dybatpho" MAIN_ARGS action:"_main"
-  dybatpho::opts::param "Message show in command" MESSAGE --message -m optional:true init:="Example script"
+  dybatpho::opts::param "Message show in command" MESSAGE --message -m optional:true init:="'Example script'"
   dybatpho::opts::param "Program to check prerequisite" PROGRAM --program -p init:="cat"
   dybatpho::opts::disp "Show version" --version action:"echo ${VERSION}"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_main"

@@ -246,7 +246,10 @@ function __generate_logic {
   else
     __print_indent 4 "case \$1 in"
     for sub_spec in "${__sub_specs[@]}"; do
+      local _cmd_name="${sub_spec#*:}"
+      _cmd_name="${_cmd_name#\'}" && _cmd_name="${_cmd_name%\'}"
       __print_indent 5 "${sub_spec#*:})"
+      __print_indent 6 "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${_cmd_name}\""
       __print_indent 6 "shift"
       __print_indent 6 "dybatpho::opts::parse::${sub_spec%%:*} \"\$@\""
       __print_indent 6 ";;"
@@ -296,14 +299,115 @@ function __generate_logic {
 }
 
 #######################################
-# @description Get help description for options from spec
+# @description Get help description for options from spec.
+#              Sets __help_mode=true so dybatpho::opts::* collect help data
+#              via dynamic scoping into dybatpho::generate_help's locals,
+#              then prints the buffered sections in the correct order.
+# @arg $1 string Name of function that has spec of parent function or script
+# @stdout Help description
 # @exitcode 0 exit code
 #######################################
 function __generate_help {
-  eval "
-    dybatpho::print 'Usage: ${0##*/} [options...] [arguments...]'
-    dybatpho::print 'Options:'
-  "
+  local spec
+  dybatpho::expect_args spec -- "$@"
+  [ "$(type -t "${spec}")" != 'function' ] && return
+
+  __help_mode=true
+  "${spec}"
+  __help_mode=false
+
+  dybatpho::print "${__help_usage}"
+  if [ -n "${__help_description}" ]; then
+    dybatpho::print ""
+    dybatpho::print "${__help_description}"
+  fi
+  dybatpho::print ""
+  dybatpho::print "Options:"
+  printf "%s" "${__help_opts_output}"
+  if [ -n "${__help_cmds_output}" ]; then
+    dybatpho::print ""
+    dybatpho::print "Commands:"
+    printf "%s" "${__help_cmds_output}"
+  fi
+}
+
+#######################################
+# @description Pad string $2 to at least length $3 and store result in variable $1
+# @arg $1 string Variable name to store result
+# @arg $2 string String to pad
+# @arg $3 number Minimum length
+#######################################
+function __help_pad {
+  local __p=$2
+  while [ "${#__p}" -lt "$3" ]; do __p="${__p} "; done
+  eval "$1=\${__p}"
+}
+
+#######################################
+# @description Append a formatted switch to caller-local variable `sw`.
+# Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so
+# that short+long pairs align as "-s, --long".
+# @arg $1 number Minimum pad width before appending $2
+# @arg $2 string Switch string to append
+#######################################
+function __help_sw {
+  __help_pad sw "${sw}${sw:+, }" "$1"
+  sw="${sw}$2"
+}
+
+#######################################
+# @description Format one help row and print to stdout
+# @arg $1 string Type: flag | param | disp | cmd
+# @arg $2 string Variable name (or command name for cmd type)
+# @arg $3 string Description
+# @arg $@ switch|key:value Switches and settings of this option
+# @stdout Formatted help row
+#######################################
+function __help_row {
+  local _type=$1 _var=$2 _desc=$3
+  shift 3
+  local sw="" label="" hidden=""
+  while [ $# -gt 0 ]; do
+    local _i=$1 && shift
+    case $_i in
+      --\{no-\}*)
+        local _name="${_i#--?no-?}"
+        __help_sw 4 "--${_name}"
+        __help_sw 4 "--no-${_name}"
+        ;;
+      --with\{out\}-*)
+        local _name="${_i#--*-}"
+        __help_sw 4 "--with-${_name}"
+        __help_sw 4 "--without-${_name}"
+        ;;
+      --*) __help_sw 4 "$_i" ;;
+      -?) __help_sw 0 "$_i" ;;
+      hidden:*) hidden="${_i#hidden:}" ;;
+      label:*) label="${_i#label:}" ;;
+      *) : ;;
+    esac
+  done
+
+  [ "${hidden}" ] && return 0
+
+  local len=${__help_width%,*}
+  [ "${label}" ] || case $_type in
+    flag | disp) label="${sw} " ;;
+    param) label="${sw} <${_var}> " ;;
+    cmd) label="${_var} " len=${__help_width#*,} ;;
+  esac
+
+  __help_pad label "${label:+${__help_leading}}${label}" "${len}"
+  if [ "${#label}" -le "${len}" ]; then
+    printf "%s\n" "${label}${_desc}"
+  else
+    printf "%s\n" "${label}"
+    if [ -n "${_desc}" ]; then
+      local _pad
+      __help_pad _pad "" "${len}"
+      printf "%s\n" "${_pad}${_desc}"
+    fi
+  fi
 }
 
 #######################################
@@ -333,7 +437,19 @@ function __print_validate {
 function dybatpho::opts::setup {
   local description
   dybatpho::expect_args description -- "$@"
+
+  if dybatpho::is true "${__cmd_desc_mode:-false}"; then
+    __cmd_desc="${description}"
+    return 0
+  fi
+
   shift
+
+  if dybatpho::is true "${__help_mode:-false}"; then
+    __help_usage="Usage: ${0##*/}${__help_subcmd:+ ${__help_subcmd}} [options...] [arguments...]"
+    __help_description="${description}"
+    return 0
+  fi
 
   # HACK: __rest is defined in __generate_logic, so we need to define it here
   [ "${1#-}" ] && __rest="$1" || __rest="__rest"
@@ -359,6 +475,15 @@ function dybatpho::opts::flag {
   local description var
   dybatpho::expect_args description var -- "$@"
 
+  dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
+
+  if dybatpho::is true "${__help_mode:-false}"; then
+    local _line
+    _line=$(__help_row flag "${var}" "${description}" "${@:3}")
+    __help_opts_output="${__help_opts_output}${_line}"$'\n'
+    return 0
+  fi
+
   __parse_opt false "$@"
   if dybatpho::is false "${__done_initial}"; then
     __define_var "${var}"
@@ -382,6 +507,15 @@ function dybatpho::opts::flag {
 function dybatpho::opts::param {
   local description var
   dybatpho::expect_args description var -- "$@"
+
+  dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
+
+  if dybatpho::is true "${__help_mode:-false}"; then
+    local _line
+    _line=$(__help_row param "${var}" "${description}" "${@:3}")
+    __help_opts_output="${__help_opts_output}${_line}"$'\n'
+    return 0
+  fi
 
   __parse_opt true "$@"
   if dybatpho::is false "${__done_initial}"; then
@@ -414,6 +548,15 @@ function dybatpho::opts::disp {
   local description
   dybatpho::expect_args description -- "$@"
 
+  dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
+
+  if dybatpho::is true "${__help_mode:-false}"; then
+    local _line
+    _line=$(__help_row disp "-" "${description}" "${@:2}")
+    __help_opts_output="${__help_opts_output}${_line}"$'\n'
+    return 0
+  fi
+
   __parse_opt false "$@"
   if ! dybatpho::is false "${__done_initial}"; then
     __print_indent 3 "${__switch})"
@@ -430,6 +573,17 @@ function dybatpho::opts::disp {
 function dybatpho::opts::cmd {
   local sub_cmd sub_spec
   dybatpho::expect_args sub_cmd sub_spec -- "$@"
+
+  dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
+
+  if dybatpho::is true "${__help_mode:-false}"; then
+    local __cmd_desc="" __cmd_desc_mode=true
+    "${sub_spec}"
+    local _line
+    _line=$(__help_row cmd "${sub_cmd}" "${__cmd_desc}")
+    __help_cmds_output="${__help_cmds_output}${_line}"$'\n'
+    return 0
+  fi
 
   if dybatpho::is true "${__done_initial}"; then
     __has_sub_cmd="true"
@@ -451,6 +605,7 @@ function dybatpho::generate_from_spec {
   dybatpho::expect_args spec -- "$@"
   shift
 
+  __current_cmd_path=""
   local gen_file
   dybatpho::create_temp gen_file ".sh" "genopts"
   __generate_logic "${spec}" - "$@" >> "${gen_file}"
@@ -462,7 +617,9 @@ function dybatpho::generate_from_spec {
 }
 
 #######################################
-# @description Show help description of root command/sub-command
+# @description Show help description of root command/sub-command.
+#              Declares help state as locals so dybatpho::opts::* in the call
+#              chain can read/write them via bash dynamic scoping.
 # @arg $1 string Name of function that has spec of parent function or script
 # @stdout Help description
 #######################################
@@ -470,14 +627,17 @@ function dybatpho::generate_help {
   local spec
   dybatpho::expect_args spec -- "$@"
 
-  local gen_file
-  dybatpho::create_temp gen_file ".sh" "genhelp"
-  __generate_logic "${spec}" - "$@" >> "${gen_file}"
-  dybatpho::cleanup_file_on_exit "${gen_file}"
-  if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
-    dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
-  fi
-  # shellcheck disable=1090
-  . "${gen_file}"
+  # Help generation state — local here, visible to the whole call chain via
+  # bash dynamic scoping (dybatpho::opts::* write, __generate_help reads)
+  local __help_mode=false
+  local __cmd_desc_mode=false
+  local __help_width="30,16"
+  local __help_leading="  "
+  local __help_subcmd="${__current_cmd_path:-}"
+  local __help_usage=""
+  local __help_description=""
+  local __help_opts_output=""
+  local __help_cmds_output=""
+
   __generate_help "${spec}"
 }

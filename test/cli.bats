@@ -313,7 +313,7 @@ setup() {
 }
 
 @test "dybatpho::opts::param validate passes for valid input" {
-  _validate_positive() { [[ "$1" -gt 0 ]] 2>/dev/null; }
+  _validate_positive() { [[ "$1" -gt 0 ]] 2> /dev/null; }
   # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PCOUNT"
@@ -325,7 +325,7 @@ setup() {
 }
 
 @test "dybatpho::opts::param validate fails for invalid input" {
-  _validate_positive2() { [[ "$1" -gt 0 ]] 2>/dev/null; }
+  _validate_positive2() { [[ "$1" -gt 0 ]] 2> /dev/null; }
   # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PCOUNT2"

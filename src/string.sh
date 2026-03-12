@@ -24,7 +24,7 @@ function dybatpho::trim {
 # @stdout Show each part of split string
 #######################################
 function dybatpho::split {
-  IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}"
+  IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}" || true
   printf '%s\n' "${arr[@]}"
 }
 

@@ -53,6 +53,16 @@ EOF
   assert_output ""
 }
 
+@test "dybatpho::split with multi-character delimiter" {
+  run dybatpho::split "hello---world---dybatpho" "---"
+  assert_success
+  assert_output << EOF
+hello
+world
+dybatpho
+EOF
+}
+
 @test "dybatpho::url_encode output string" {
   run dybatpho::url_encode "https://github.com/dynamotn/dybatpho/?f=This is sample string"
   assert_success
@@ -65,6 +75,12 @@ EOF
   assert_output "hello%20world%21%40%23%24%25%5E%26%2A%28%29"
 }
 
+@test "dybatpho::url_encode keeps unreserved characters" {
+  run dybatpho::url_encode "AZaz09.~_-"
+  assert_success
+  assert_output "AZaz09.~_-"
+}
+
 @test "dybatpho::url_decode output string" {
   run dybatpho::url_decode "https%3A%2F%2Fgithub.com%2Fdynamotn%2Fdybatpho%2F%3Ff%3DThis%20is%20sample%20string"
   assert_success
@@ -75,6 +91,12 @@ EOF
   run dybatpho::url_decode "hello+world"
   assert_success
   assert_output "hello world"
+}
+
+@test "dybatpho::url_decode mixes encoded plus and spaces" {
+  run dybatpho::url_decode "a%2Bb+c"
+  assert_success
+  assert_output "a+b c"
 }
 
 @test "dybatpho::lower output string" {

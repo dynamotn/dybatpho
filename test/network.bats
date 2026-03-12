@@ -102,6 +102,16 @@ setup() {
   unstub curl
 }
 
+@test "dybatpho::curl_do with curl command failure" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_do"
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub curl ": return 1"
+  run --separate-stderr -1 dybatpho::curl_do https://this "${temp_file}"
+  unstub curl
+  assert_failure
+  assert_stderr --partial "Error when access https://this"
+}
+
 @test "dybatpho::curl_download not have right spec" {
   run dybatpho::curl_download
   assert_failure
@@ -124,6 +134,16 @@ setup() {
   run dybatpho::curl_download https://this "${temp_file}" --header "X-Test: 1"
   assert_success
   grep "header X-Test: 1" "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_download adds progress flags" {
+  local temp_file="${BATS_TEST_TMPDIR}/test/curl_download_flags"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  run dybatpho::curl_download https://this "${temp_file}"
+  assert_success
+  grep -- "-#" "${temp_file}"
+  grep -- "--no-silent" "${temp_file}"
   unstub curl
 }
 

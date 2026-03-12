@@ -59,6 +59,18 @@ setup() {
   refute_stderr
 }
 
+@test 'dybatpho::trap preserves existing trap handlers' {
+  # shellcheck disable=2329
+  _trap_chain() {
+    trap 'echo first' EXIT
+    dybatpho::trap 'echo second' EXIT
+  }
+  run _trap_chain
+  assert_success
+  assert_line --index 0 first
+  assert_line --index 1 second
+}
+
 @test 'dybatpho::cleanup_file_on_exit action' {
   # Just test that function runs without error and registers trap
   local filepath="$(mktemp -p "${BATS_TEST_TMPDIR}")"
@@ -71,6 +83,21 @@ setup() {
   # Verify cleanup script was created
   local cleanup_scripts=$(ls /tmp/dybatpho_cleanup-*.sh 2> /dev/null | wc -l)
   [[ "${cleanup_scripts}" -gt 0 ]]
+}
+
+@test 'dybatpho::cleanup_file_on_exit removes file on shell exit' {
+  local filepath="${BATS_TEST_TMPDIR}/cleanup-me"
+  # shellcheck disable=2329
+  _register_cleanup() {
+    local file="$1"
+    touch "${file}"
+    dybatpho::cleanup_file_on_exit "${file}"
+    echo "${file}"
+  }
+  run _register_cleanup "${filepath}"
+  assert_success
+  assert_output "${filepath}"
+  assert_file_not_exist "${filepath}"
 }
 
 @test "dybatpho::dry_run with DRY_RUN=true should print dry run message and not execute command" {

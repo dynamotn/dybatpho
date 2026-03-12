@@ -353,6 +353,28 @@ _test_retry() {
   refute_output --partial "Retrying"
 }
 
+@test "dybatpho::retry sleeps between attempts" {
+  local sleep_args_file="${BATS_TEST_TMPDIR}/sleep-args"
+  count=0
+  stub sleep ": echo \"\$*\" >> ${sleep_args_file}"
+  run dybatpho::retry 2 _test_retry retry-target
+  unstub sleep
+  assert_success
+  assert_output --partial "Retrying in 4 seconds (2/2)"
+  run cat "${sleep_args_file}"
+  assert_success
+  assert_output '4'
+}
+
+@test "dybatpho::retry uses provided description in warning" {
+  _always_fail() {
+    return 7
+  }
+  run dybatpho::retry 0 _always_fail custom-description
+  assert_failure
+  assert_output --partial "No more retries left to run custom-description."
+}
+
 @test "dybatpho::breakpoint wait for output" {
   run --separate-stderr dybatpho::breakpoint 2>&1 <<< "hoaApq"
   assert_success

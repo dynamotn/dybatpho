@@ -100,6 +100,33 @@ setup() {
   assert_file_not_exist "${filepath}"
 }
 
+@test 'dybatpho::cleanup_file_on_exit removes directory on shell exit' {
+  local dirpath="${BATS_TEST_TMPDIR}/cleanup-dir"
+  _register_cleanup_dir() {
+    local dir="$1"
+    mkdir -p "${dir}"
+    dybatpho::cleanup_file_on_exit "${dir}"
+    echo "${dir}"
+  }
+  run _register_cleanup_dir "${dirpath}"
+  assert_success
+  assert_output "${dirpath}"
+  [[ ! -e "${dirpath}" ]]
+}
+
+@test 'dybatpho::cleanup_file_on_exit generates quoted cleanup commands' {
+  local target="${BATS_TEST_TMPDIR}/dir with space"
+  dybatpho::cleanup_file_on_exit "${target}"
+  local cleanup_script
+  cleanup_script=$(ls -t /tmp/dybatpho_cleanup-*.sh | head -n 1)
+  run grep -F "> /dev/null 2>&1" "${cleanup_script}"
+  assert_success
+  local quoted_target
+  quoted_target=$(printf '%q' "${target}")
+  run grep -F "[ -e ${quoted_target} ] && rm -rf ${quoted_target} > /dev/null 2>&1" "${cleanup_script}"
+  assert_success
+}
+
 @test "dybatpho::dry_run with DRY_RUN=true should print dry run message and not execute command" {
   # shellcheck disable=2030
   export DRY_RUN="true"

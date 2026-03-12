@@ -128,20 +128,23 @@ function dybatpho::cleanup_file_on_exit {
   dybatpho::expect_args filepath -- "$@"
 
   local pid="${BASHPID}"
-  local cleanup_file
+  local cleanup_file quoted_filepath quoted_cleanup_file quoted_init
   if hash "mktemp" > /dev/null 2>&1; then
     cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXXXXX.sh")
   else
     cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh" # kcov(skip)
   fi
-  touch "${cleanup_file}" "${cleanup_file}.new"
+  touch "${cleanup_file}" "${cleanup_file}.new" || return 1
+  printf -v quoted_filepath '%q' "${filepath}"
+  printf -v quoted_cleanup_file '%q' "${cleanup_file}"
+  printf -v quoted_init '%q' "${DYBATPHO_DIR}/init.sh"
   ( # kcov(skip)
     grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
-        echo ". ${DYBATPHO_DIR}/init.sh"
+        echo ". ${quoted_init}"
         echo "dybatpho::debug 'Delete ${cleanup_file} and ${filepath} of PID ${pid}'"
-        echo "[ -f ${filepath} ] && rm -rf '${filepath}' 2>&1 > /dev/null"
-        echo "[ -f ${cleanup_file} ] && rm -rf '${cleanup_file}' 2>&1 > /dev/null"
+        echo "[ -e ${quoted_filepath} ] && rm -rf ${quoted_filepath} > /dev/null 2>&1"
+        echo "[ -e ${quoted_cleanup_file} ] && rm -rf ${quoted_cleanup_file} > /dev/null 2>&1"
       )                     # kcov(skip)
   ) > "${cleanup_file}.new" # kcov(skip)
   mv -f "${cleanup_file}.new" "${cleanup_file}"

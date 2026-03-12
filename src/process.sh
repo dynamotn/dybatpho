@@ -140,11 +140,9 @@ function dybatpho::cleanup_file_on_exit {
     grep -vF "${cleanup_file}" "${cleanup_file}" \
       || (
         echo ". ${DYBATPHO_DIR}/init.sh"
-        echo "if [[ \"\$BASHPID\" == ${pid} ]]; then"
-        echo "  dybatpho::debug 'Delete ${cleanup_file} and ${filepath} of PID ${pid}'"
-        echo "  rm -rf '${filepath}' 2>&1 > /dev/null"
-        echo "  rm -rf '${cleanup_file}' 2>&1 > /dev/null"
-        echo "fi"
+        echo "dybatpho::debug 'Delete ${cleanup_file} and ${filepath} of PID ${pid}'"
+        echo "[ -f ${filepath} ] && rm -rf '${filepath}' 2>&1 > /dev/null"
+        echo "[ -f ${cleanup_file} ] && rm -rf '${cleanup_file}' 2>&1 > /dev/null"
       )                     # kcov(skip)
   ) > "${cleanup_file}.new" # kcov(skip)
   mv -f "${cleanup_file}.new" "${cleanup_file}"
@@ -154,7 +152,7 @@ function dybatpho::cleanup_file_on_exit {
   if [[ "${BATS_ROOT:-}" != "" ]]; then
     trap_command="trap"
   fi
-  "${trap_command}" "bash ${cleanup_file}" EXIT HUP INT TERM
+  "${trap_command}" "[[ \"\${BASHPID}\" == ${pid} ]] && bash ${cleanup_file}" EXIT HUP INT TERM
   # kcov(enabled)
 }
 

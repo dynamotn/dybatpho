@@ -26,10 +26,10 @@ function dybatpho::array_reverse {
   local -n input_arr="$1"
   local result_arr=()
   [ "${#input_arr[@]}" -eq 0 ] && return
+  local -a indices=("${!input_arr[@]}")
 
-  for ((i = 1; i <= "${#input_arr[@]}"; i++)); do
-    # shellcheck disable=SC2190
-    result_arr+=("${input_arr[$((-i))]}")
+  for ((i = ${#indices[@]} - 1; i >= 0; i--)); do
+    result_arr+=("${input_arr[${indices[${i}]}]}")
   done
 
   input_arr=("${result_arr[@]}")
@@ -69,12 +69,13 @@ function dybatpho::array_join {
   # shellcheck disable=SC2178
   local -n input_arr="$1"
   local separator="$2"
+  local i
 
   if [[ ${#input_arr[@]} -eq 0 ]]; then
     return
   fi
   printf -- "%s" "${input_arr[0]}"
-  if [[ ${#input_arr[@]} -gt 1 ]]; then
-    printf -- "${separator}%s" "${input_arr[@]:1}"
-  fi
+  for ((i = 1; i < ${#input_arr[@]}; i++)); do
+    printf -- "%s%s" "${separator}" "${input_arr[${i}]}"
+  done
 }

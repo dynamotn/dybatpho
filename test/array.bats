@@ -38,6 +38,14 @@ setup() {
   assert_line --index 4 1
 }
 
+@test "dybatpho::array_reverse with sparse array" {
+  arr=([5]="hello" [3]="world")
+  run dybatpho::array_reverse "arr" "--"
+  assert_success
+  assert_line --index 0 "hello"
+  assert_line --index 1 "world"
+}
+
 @test "dybatpho::array_unique output" {
   arr=()
   run dybatpho::array_unique "arr" "--"
@@ -108,10 +116,16 @@ setup() {
   arr=("start" "middle" "end")
   run dybatpho::array_join "arr" "%%"
   assert_success
+  assert_output "start%%middle%%end"
+  run dybatpho::array_join "arr" "%"
+  assert_success
   assert_output "start%middle%end"
   run dybatpho::array_join "arr" "-"
   assert_success
   assert_output "start-middle-end"
+  run dybatpho::array_join "arr" "%q"
+  assert_success
+  assert_output "start%qmiddle%qend"
 }
 
 @test "dybatpho::array_join with spaces in elements" {

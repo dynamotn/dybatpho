@@ -33,6 +33,7 @@ function dybatpho::goos {
 #######################################
 function dybatpho::goarch {
   local arch="$(uname -m)"
+  local goarch
   case "${arch}" in
     aarch64) goarch="arm64" ;;
     armv*) goarch="arm" ;;

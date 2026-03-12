@@ -113,3 +113,11 @@ setup() {
   assert_output "mips64"
   unstub uname
 }
+
+@test "dybatpho::goarch unknown arch falls back to uname" {
+  stub uname ": echo 'riscv64'"
+  run dybatpho::goarch
+  assert_success
+  assert_output "riscv64"
+  unstub uname
+}

@@ -59,6 +59,13 @@ teardown() {
   assert_success
 }
 
+@test "dybatpho::compare_log_level does not mutate LOG_LEVEL" {
+  export LOG_LEVEL=INFO
+  run dybatpho::compare_log_level "warn"
+  assert_success
+  [ "${LOG_LEVEL}" = "INFO" ]
+}
+
 @test "dybatpho::validate_log_level succeeds with valid level" {
   run --separate-stderr dybatpho::validate_log_level error
   assert_success

@@ -59,10 +59,11 @@ function __log {
 function dybatpho::compare_log_level {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
   local level="$1"
+  local runtime_level
   level=$(dybatpho::lower "${level}")
-  LOG_LEVEL=$(dybatpho::lower "${LOG_LEVEL}")
+  runtime_level=$(dybatpho::lower "${LOG_LEVEL}")
 
-  local runtime_level_num="${log_levels[${LOG_LEVEL}]}"
+  local runtime_level_num="${log_levels[${runtime_level}]}"
   local write_level_num="${log_levels[${level}]}"
 
   [ "${write_level_num}" -le "${runtime_level_num}" ]

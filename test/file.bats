@@ -100,6 +100,19 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::create_temp uses TMPDIR by default" {
+  # shellcheck disable=2329
+  _create() {
+    local temp_file
+    export TMPDIR="${BATS_TEST_TMPDIR}"
+    dybatpho::create_temp temp_file ".txt"
+    [[ -f ${temp_file} ]] && [[ ${temp_file} == "${BATS_TEST_TMPDIR}"/* ]]
+  }
+  run _create
+  assert_success
+  refute_output
+}
+
 @test "dybatpho::create_temp with different extensions" {
   _create() {
     local temp_file1 temp_file2
@@ -107,6 +120,18 @@ setup() {
     dybatpho::create_temp temp_file2 ".yaml"
     [[ -f ${temp_file1} ]] && [[ ${temp_file1} =~ .*\.json$ ]] \
       && [[ -f ${temp_file2} ]] && [[ ${temp_file2} =~ .*\.yaml$ ]]
+  }
+  run _create
+  assert_success
+  refute_output
+}
+
+@test "dybatpho::create_temp sanitizes extension suffix" {
+  # shellcheck disable=2329
+  _create() {
+    local temp_file
+    dybatpho::create_temp temp_file ".txt/../../ignored"
+    [[ -f ${temp_file} ]] && [[ ${temp_file} =~ \.txt$ ]] && [[ ${temp_file} != *ignored* ]]
   }
   run _create
   assert_success

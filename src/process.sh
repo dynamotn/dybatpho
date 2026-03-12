@@ -68,8 +68,7 @@ function dybatpho::run_err_handler {
   local exit_code
   dybatpho::expect_args exit_code -- "$@"
   local i=0
-  printf -- '%s\n' "Aborting on error ${exit_code}:" \
-    "--------------------" >&2
+  printf -- '%s\n' "Aborting on error ${exit_code}:" "--------------------" >&2
   while caller "${i}" >&2; do
     ((i++))
   done

@@ -233,6 +233,17 @@ setup() {
   assert_success && assert_output "world"
 }
 
+@test "dybatpho::opts::param short switch with attached value" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - action:"echo \$PVALATTACHED"
+    dybatpho::opts::param "Value" PVALATTACHED -v
+  }
+
+  run dybatpho::generate_from_spec _spec -vworld
+  assert_success && assert_output "world"
+}
+
 @test "dybatpho::opts::param multiple switches" {
   # shellcheck disable=2329
   _spec() {
@@ -288,6 +299,17 @@ setup() {
 
   run dybatpho::generate_from_spec _spec
   assert_output ""
+}
+
+@test "dybatpho::opts::param optional:true with separated value" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" PREST action:"printf '%s|%s\n' \"\$POPT3\" \"\$PREST\""
+    dybatpho::opts::param "Optional" POPT3 --opt3 optional:true
+  }
+
+  run dybatpho::generate_from_spec _spec --opt3 value
+  assert_success && assert_output "value|"
 }
 
 @test "dybatpho::opts::param validate passes for valid input" {

@@ -530,7 +530,13 @@ function dybatpho::opts::param {
       __print_indent 4 'set -- "$1" "$@"'
       __print_indent 4 '[ ${OPTARG+x} ] && {'
       __print_indent 5 'case $1 in --no-*|--without-*) set "noarg" "${1%%\=*}"; break; esac'
-      __print_indent 5 '[ "${OPTARG:-}" ] && { shift; OPTARG=$2; } ||' "OPTARG=${__on}"
+      __print_indent 5 '[ "${OPTARG:-}" ] && { shift; OPTARG=$2; } || {'
+      __print_indent 6 'case ${3:-} in'
+      __print_indent 7 '"") OPTARG='"${__on}"' ;;'
+      __print_indent 7 '-*) OPTARG='"${__on}"' ;;'
+      __print_indent 7 '*) shift; OPTARG=$2 ;;'
+      __print_indent 6 'esac'
+      __print_indent 5 '}'
       __print_indent 4 "} || OPTARG=${__off}"
     fi
     __print_validate "${var}" '$OPTARG'

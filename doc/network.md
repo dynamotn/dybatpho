@@ -6,6 +6,7 @@ Utilities for network
 >
 > Jump to: [Overview](#overview) · [Tips](#tips) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains functions to work with network connection.
@@ -23,6 +24,7 @@ This module contains functions to work with network connection.
 - [`__request`](#__request) — Execute one curl request attempt and capture its HTTP status code.
 - [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
 
+<a id="tips"></a>
 ## 💡 Tips
 
 ### `dybatpho::curl_do`
@@ -33,6 +35,7 @@ This module contains functions to work with network connection.
 
 - The destination directory is created automatically before downloading
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `__get_http_code`

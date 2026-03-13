@@ -6,6 +6,7 @@ Utilities for logging to stdout/stderr
 >
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains functions to log messages to stdout/stderr.
@@ -38,10 +39,12 @@ This module contains functions to log messages to stdout/stderr.
 - [`dybatpho::start_trace`](#dybatphostart_trace) — Enable Bash tracing with dybatpho formatting.
 - [`dybatpho::end_trace`](#dybatphoend_trace) — Disable Bash tracing started by `dybatpho::start_trace`.
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/logging_demo.sh](../example/logging_demo.sh)
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `__log`

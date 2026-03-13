@@ -6,6 +6,7 @@ Utilities for working with string
 >
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains helpers for trimming, splitting, encoding, decoding,
@@ -20,10 +21,12 @@ and case-converting shell strings.
 - [`dybatpho::lower`](#dybatpholower) — Convert a string to lowercase.
 - [`dybatpho::upper`](#dybatphoupper) — Convert a string to uppercase.
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/string_ops.sh](../example/string_ops.sh)
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `dybatpho::trim`

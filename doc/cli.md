@@ -8,6 +8,7 @@ Utilities for building CLI parsers from shell specs.
 >
 > Reference sections: [Internal functions](#internal-functions) · [Spec functions](#spec-functions) · [Parse functions](#parse-functions)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 `src/cli.sh` lets you describe a command with shell functions, then generate:
@@ -57,6 +58,7 @@ Utilities for building CLI parsers from shell specs.
 - [`dybatpho::generate_from_spec`](#dybatphogenerate_from_spec) — Functions to parse spec and put value of options to variable with corresponding name Define spec of parent function or script, spec contains below commands
 - [`dybatpho::generate_help`](#dybatphogenerate_help) — Show help description of root command/sub-command. Declares help state as locals so dybatpho::opts::* in the call chain can read/write them via bash dynamic scoping.
 
+<a id="usage"></a>
 ## 🚀 Usage
 
 ### Basic workflow
@@ -357,11 +359,13 @@ This is useful when debugging:
 
 
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/cli_basic.sh](../example/cli_basic.sh)
 - [example/cli_advanced.sh](../example/cli_advanced.sh)
 
+<a id="tips"></a>
 ## 💡 Tips
 
 - Set `DYBATPHO_CLI_DEBUG=true` while developing a spec to inspect the generated parser and help logic.
@@ -377,8 +381,10 @@ This is useful when debugging:
 
 - The current subcommand path is tracked automatically during parser dispatch
 
+<a id="reference"></a>
 ## 📚 Reference
 
+<a id="internal-functions"></a>
 ### 🧩 Internal functions
 
 #### `__parse_opt`
@@ -778,6 +784,7 @@ Emit generated code that validates the positional argument count configured by `
 - `0`: Rule accepted and code emitted
 
 
+<a id="spec-functions"></a>
 ### 🧩 Spec functions
 
 #### `dybatpho::opts::setup`
@@ -886,6 +893,7 @@ Define a sub-command in spec
 | `$@` | key:value | Optional metadata such as `alias:<name>` or `aliases:<a,b>` |
 
 
+<a id="parse-functions"></a>
 ### 🧩 Parse functions
 
 #### `dybatpho::generate_from_spec`

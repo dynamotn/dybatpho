@@ -6,6 +6,7 @@ Utilities for common shell-script helper patterns.
 >
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 `src/helpers.sh` groups together the small building blocks that many other
@@ -34,6 +35,7 @@ modules rely on:
 - [`dybatpho::retry`](#dybatphoretry) — Retry a shell command with escalating delays until it succeeds or retries are exhausted.
 - [`dybatpho::breakpoint`](#dybatphobreakpoint) — Open an interactive breakpoint for debugging a running script.
 
+<a id="usage"></a>
 ## 🚀 Usage
 
 ### When to use this module
@@ -97,10 +99,12 @@ dybatpho::retry 4 "curl -fsSL '${health_url}'" "service health check"
 dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 ```
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/process_ops.sh](../example/process_ops.sh)
 
+<a id="tips"></a>
 ## 💡 Tips
 
 - Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on missing configuration or dependencies.
@@ -126,6 +130,7 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 
 - This helper is intended for interactive local debugging, not unattended CI or production runs
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `dybatpho::expect_args`

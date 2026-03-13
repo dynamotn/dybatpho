@@ -6,6 +6,7 @@ Utilities for working with array
 >
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains helpers for printing, reversing, deduplicating, and
@@ -18,10 +19,12 @@ joining Bash arrays by name.
 - [`dybatpho::array_unique`](#dybatphoarray_unique) — Remove duplicate elements from an array in place.
 - [`dybatpho::array_join`](#dybatphoarray_join) — Join array elements with a separator into one string.
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/array_ops.sh](../example/array_ops.sh)
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `dybatpho::array_print`

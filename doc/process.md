@@ -6,6 +6,7 @@ Utilities for process handling
 >
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains helpers for script termination, signal handling, trap
@@ -34,10 +35,12 @@ composition, deferred cleanup, and dry-run execution.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/process_ops.sh](../example/process_ops.sh)
 
+<a id="tips"></a>
 ## 💡 Tips
 
 ### `dybatpho::register_common_handlers`
@@ -52,6 +55,7 @@ composition, deferred cleanup, and dry-run execution.
 
 - Pass a single shell command string because this helper executes the command with `eval`
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `dybatpho::die`

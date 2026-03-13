@@ -6,6 +6,7 @@ Utilities for working with OS/distro package manager or getting information of O
 >
 > Jump to: [Overview](#overview) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains functions to get information of OS/distro or work with package manager
@@ -15,6 +16,7 @@ This module contains functions to get information of OS/distro or work with pack
 - [`dybatpho::goos`](#dybatphogoos) — Get $GOOS compilation environment
 - [`dybatpho::goarch`](#dybatphogoarch) — Get $GOARCH compilation environment
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `dybatpho::goos`

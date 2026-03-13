@@ -9,6 +9,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `project.md` describes the full Bash utility library as a product.
 - Each `src/*.sh` module has a matching spec file.
 - `init.md` describes repository bootstrap and module loading behavior.
+- Recent helper additions are folded into the existing module specs here rather than tracked in a separate spec tree.
 
 ## Spec Files
 
@@ -41,3 +42,4 @@ The goal is to capture the current product behavior of the library in a form tha
 
 - These specs describe the current observable behavior of the existing codebase, not a proposed rewrite.
 - They intentionally stay focused on user-visible outcomes and contracts rather than line-by-line implementation details.
+- `doc/spec/` is the canonical spec location for the repository.

@@ -204,6 +204,14 @@ function append_nav_link(nav, label, anchor)
 	return nav (nav == "" ? "" : " · ") "[" label "](#" github_anchor(anchor) ")"
 }
 
+function print_anchor(id)
+{
+	if (id == "") {
+		return
+	}
+	print "<a id=\"" id "\"></a>"
+}
+
 function print_option_item(text, m, term, desc)
 {
 	if (match(text, /^(((-[[:alnum:]]([[:blank:]]*<[^>]+>)?|--[[:alnum:]][[:alnum:]-]*((=|[[:blank:]]+)<[^>]+>)?)([[:blank:]]*\|?[[:blank:]]+))+)([^[:blank:]|<-].*)?$/, m)) {
@@ -824,6 +832,7 @@ function print_function(idx, fn_desc_key, fn_heading_level, starts_new_section)
 		print ""
 	}
 	if (fn_section[idx] != "" && fn_section[idx] != last_printed_section) {
+		print_anchor(github_anchor(fn_section[idx]))
 		print "### 🧩 " fn_section[idx]
 		print ""
 		last_printed_section = fn_section[idx]
@@ -966,6 +975,7 @@ function print_tips_section(i, j, has_tips)
 	if (! has_tips) {
 		return
 	}
+	print_anchor("tips")
 	print "## 💡 Tips"
 	print ""
 	if (counts["module_tip", 0] > 0) {
@@ -1062,6 +1072,7 @@ function render_module(i, desc, intro, usage, rest, n, j, line, in_rest)
 		}
 		print ""
 	}
+	print_anchor("overview")
 	print "## ✨ Overview"
 	print ""
 	desc = texts["module_desc", 0]
@@ -1115,12 +1126,14 @@ function render_module(i, desc, intro, usage, rest, n, j, line, in_rest)
 	}
 	usage = texts["module_usage", 0]
 	if (usage != "") {
+		print_anchor("usage")
 		print "## 🚀 Usage"
 		print ""
 		print_multiline(dedent(usage))
 		print ""
 	}
 	if (counts["module_see", 0] > 0) {
+		print_anchor("see-also")
 		print "## 🔗 See also"
 		print ""
 		for (i = 1; i <= counts["module_see", 0]; i++) {
@@ -1131,6 +1144,7 @@ function render_module(i, desc, intro, usage, rest, n, j, line, in_rest)
 	}
 	print_tips_section()
 	if (fn_count > 0) {
+		print_anchor("reference")
 		print "## 📚 Reference"
 		print ""
 		for (i = 1; i <= fn_count; i++) {

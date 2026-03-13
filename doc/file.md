@@ -6,6 +6,7 @@ Utilities for file handling
 >
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
+<a id="overview"></a>
 ## ✨ Overview
 
 This module contains helpers for previewing files and creating temporary
@@ -16,10 +17,12 @@ files or directories that are cleaned up automatically on shell exit.
 - [`dybatpho::show_file`](#dybatphoshow_file) — Show the contents of a file with line numbers.
 - [`dybatpho::create_temp`](#dybatphocreate_temp) — Create a temporary file or directory and register it for cleanup on shell exit.
 
+<a id="see-also"></a>
 ## 🔗 See also
 
 - [example/file_ops.sh](../example/file_ops.sh)
 
+<a id="tips"></a>
 ## 💡 Tips
 
 ### `dybatpho::show_file`
@@ -31,6 +34,7 @@ files or directories that are cleaned up automatically on shell exit.
 - Pass `/` or an empty extension to create a directory instead of a file
 - The created path is automatically registered for cleanup on script exit
 
+<a id="reference"></a>
 ## 📚 Reference
 
 ### `dybatpho::show_file`

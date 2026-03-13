@@ -14,7 +14,7 @@ dybatpho::register_common_handlers
 # ===========================================================================
 
 function _spec_global {
-  dybatpho::opts::flag "Enable verbose output" VERBOSE -v --verbose
+  dybatpho::opts::flag "Enable verbose output" VERBOSE --verbose alias:-v
   dybatpho::opts::flag "Print commands without executing" DRY_RUN --dry-run -n on:true off:false init:="false"
   dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info"
 }
@@ -143,7 +143,7 @@ function _spec_root {
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_root"
   dybatpho::opts::cmd deploy _spec_deploy
   dybatpho::opts::cmd db _spec_db
-  dybatpho::opts::cmd config _spec_config
+  dybatpho::opts::cmd config _spec_config alias:cfg
 }
 
 dybatpho::generate_from_spec _spec_root "$@"

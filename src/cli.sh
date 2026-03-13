@@ -60,6 +60,8 @@
 #   | --------- | ---------- | ----------- |
 #   | `action:<code>` | `setup`, `disp` | Code to run when parsing finishes or a display option is used |
 #   | `args:<rule>` | `setup` | Positional argument rule: `none`, `exact:N`, `min:N`, `max:N`, or `range:M:N` |
+#   | `alias:<name>` | `flag`, `param`, `disp`, `cmd` | Add one alias switch or command name |
+#   | `aliases:<a,b>` | `flag`, `param`, `disp`, `cmd` | Add multiple aliases separated by commas |
 #   | `init:<value>` | `flag`, `param` | Initial variable value |
 #   | `on:<string>` | `flag`, `param` | Positive value when the option is enabled |
 #   | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
@@ -152,6 +154,13 @@
 #   }
 #   ```
 #
+#   #### Aliases
+#
+#   ```bash
+#   dybatpho::opts::flag "Verbose output" VERBOSE --verbose alias:-v
+#   dybatpho::opts::cmd config _spec_config alias:cfg aliases:conf,settings
+#   ```
+#
 #   #### Boolean toggle
 #
 #   ```bash
@@ -240,6 +249,48 @@ function __parse_opt {
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
+        alias:*)
+          case ${1#alias:} in
+            --*)
+              if [ -z "${__label}" ] || [ "${__label#--}" = "${__label}" ]; then
+                __label="${1#alias:}"
+              fi
+              ;;
+            -?)
+              [ -n "${__label}" ] || __label="${1#alias:}"
+              local __alias_switch="${1#alias:}"
+              dybatpho::is true "${need_argument}" \
+                && __params="${__params}${__alias_switch#-}" \
+                || __flags="${__flags}${__alias_switch#-}"
+              ;;
+            *)
+              dybatpho::die "Invalid switch alias: ${1#alias:}"
+              ;;
+          esac
+          ;;
+        aliases:*)
+          local -a __opt_aliases=()
+          local __opt_alias
+          __parse_alias_list __opt_aliases "${1#aliases:}"
+          for __opt_alias in "${__opt_aliases[@]}"; do
+            case ${__opt_alias} in
+              --*)
+                if [ -z "${__label}" ] || [ "${__label#--}" = "${__label}" ]; then
+                  __label="${__opt_alias}"
+                fi
+                ;;
+              -?)
+                [ -n "${__label}" ] || __label="${__opt_alias}"
+                dybatpho::is true "${need_argument}" \
+                  && __params="${__params}${__opt_alias#-}" \
+                  || __flags="${__flags}${__opt_alias#-}"
+                ;;
+              *)
+                dybatpho::die "Invalid switch alias: ${__opt_alias}"
+                ;;
+            esac
+          done
+          ;;
         [!-]*) __parse_key_value "$1" "__" ;;
         --*)
           if [ -z "${__label}" ] || [ "${__label#--}" = "${__label}" ]; then
@@ -260,6 +311,39 @@ function __parse_opt {
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
+        alias:*)
+          case ${1#alias:} in
+            --\{no-\}*)
+              i=${1#alias:--?no-?}
+              __add_switch "'--${i}'|'--no-${i}'"
+              ;;
+            --with\{out\}-*)
+              i=${1#alias:--*-}
+              __add_switch "'--with-${i}'|'--without-${i}'"
+              ;;
+            -? | --*) __add_switch "'${1#alias:}'" ;;
+            *) dybatpho::die "Invalid switch alias: ${1#alias:}" ;;
+          esac
+          ;;
+        aliases:*)
+          local -a __opt_aliases=()
+          local __opt_alias
+          __parse_alias_list __opt_aliases "${1#aliases:}"
+          for __opt_alias in "${__opt_aliases[@]}"; do
+            case ${__opt_alias} in
+              --\{no-\}*)
+                i=${__opt_alias#--?no-?}
+                __add_switch "'--${i}'|'--no-${i}'"
+                ;;
+              --with\{out\}-*)
+                i=${__opt_alias#--*-}
+                __add_switch "'--with-${i}'|'--without-${i}'"
+                ;;
+              -? | --*) __add_switch "'${__opt_alias}'" ;;
+              *) dybatpho::die "Invalid switch alias: ${__opt_alias}" ;;
+            esac
+          done
+          ;;
         --\{no-\}*)
           i=${1#--?no-?}
           __add_switch "'--${i}'|'--no-${i}'"
@@ -471,12 +555,12 @@ function __generate_logic {
   else
     __print_indent 4 "case \$1 in"
     for sub_spec in "${__sub_specs[@]}"; do
-      local _cmd_name="${sub_spec#*:}"
-      _cmd_name="${_cmd_name#\'}" && _cmd_name="${_cmd_name%\'}"
-      __print_indent 5 "${sub_spec#*:})"
+      local _sub_spec _cmd_match _cmd_name
+      IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name <<< "${sub_spec}"
+      __print_indent 5 "${_cmd_match})"
       __print_indent 6 "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${_cmd_name}\""
       __print_indent 6 "shift"
-      __print_indent 6 "dybatpho::opts::parse::${sub_spec%%:*} \"\$@\""
+      __print_indent 6 "dybatpho::opts::parse::${_sub_spec} \"\$@\""
       __print_indent 6 ";;"
     done
     __print_indent 5 "*)"
@@ -519,7 +603,10 @@ function __generate_logic {
 
   # Generate sub-command logics
   for sub_spec in "${__sub_specs[@]}"; do
-    __generate_logic "${sub_spec%%:*}" "${sub_spec#*:}" "$@"
+    local _sub_spec _cmd_match _cmd_name
+    IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name <<< "${sub_spec}"
+    [ "${_cmd_match}" = "${_cmd_name}" ] || continue
+    __generate_logic "${_sub_spec}" "${_cmd_name}" "$@"
   done
 
   # Trigger root spec
@@ -606,6 +693,45 @@ function __help_row {
   while [ $# -gt 0 ]; do
     local _i=$1 && shift
     case ${_i} in
+      alias:*)
+        case ${_i#alias:} in
+          --\{no-\}*)
+            local _name="${_i#alias:--?no-?}"
+            __help_sw 4 "--${_name}"
+            __help_sw 4 "--no-${_name}"
+            ;;
+          --with\{out\}-*)
+            local _name="${_i#alias:--*-}"
+            __help_sw 4 "--with-${_name}"
+            __help_sw 4 "--without-${_name}"
+            ;;
+          --*) __help_sw 4 "${_i#alias:}" ;;
+          -?) __help_sw 0 "${_i#alias:}" ;;
+          *) : ;;
+        esac
+        ;;
+      aliases:*)
+        local -a _aliases=()
+        local _alias_item
+        __parse_alias_list _aliases "${_i#aliases:}"
+        for _alias_item in "${_aliases[@]}"; do
+          case ${_alias_item} in
+            --\{no-\}*)
+              local _name="${_alias_item#--?no-?}"
+              __help_sw 4 "--${_name}"
+              __help_sw 4 "--no-${_name}"
+              ;;
+            --with\{out\}-*)
+              local _name="${_alias_item#--*-}"
+              __help_sw 4 "--with-${_name}"
+              __help_sw 4 "--without-${_name}"
+              ;;
+            --*) __help_sw 4 "${_alias_item}" ;;
+            -?) __help_sw 0 "${_alias_item}" ;;
+            *) : ;;
+          esac
+        done
+        ;;
       --\{no-\}*)
         local _name="${_i#--?no-?}"
         __help_sw 4 "--${_name}"
@@ -668,6 +794,22 @@ function __print_validate {
   set -- "${__validate}" "$1"
   [ "$1" ] && __print_indent 4 "$1 || { set -- ${1%% *}:\$? \"\$1\" $1; break; }"
   [ "$2" = "-" ] || __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
+}
+
+#######################################
+# @description Split a comma-separated alias list into a caller-provided array.
+# @arg $1 string Name of destination array variable
+# @arg $2 string Comma-separated aliases
+# @exitcode 0 Aliases appended to destination array
+#######################################
+function __parse_alias_list {
+  __require_shell_name "$1"
+  local -n __alias_out="$1"
+  local __alias_raw="${2:-}" __alias_item
+  IFS=',' read -r -a __alias_items <<< "${__alias_raw}"
+  for __alias_item in "${__alias_items[@]}"; do
+    [ -n "${__alias_item}" ] && __alias_out+=("${__alias_item}")
+  done
 }
 
 #######################################
@@ -780,7 +922,7 @@ function dybatpho::opts::setup {
 # @description Define an option that take no argument
 # @arg $1 string Description of option to display
 # @arg $2 string Variable name for getting option. `-` if want to omit
-# @arg $@ switch|key:value Other switches and settings `key:value` of this option
+# @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::flag {
@@ -814,7 +956,7 @@ function dybatpho::opts::flag {
 # @description Define an option that take an argument
 # @arg $1 string Description of option to display
 # @arg $2 string Variable name for getting option. `-` if want to omit
-# @arg $@ switch|key:value Other switches and settings `key:value` of this option
+# @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
 # @tip Use `required:true` when the option itself must be present
 # @tip Use `optional:true` when the option may appear without an explicit value
 # @tip `optional:true` controls whether a value is required after the switch appears, while `required:true` controls whether the switch itself must appear at all
@@ -880,7 +1022,7 @@ function dybatpho::opts::param {
 #######################################
 # @description Define an option that display only
 # @arg $1 string Description of option to display
-# @arg $@ switch|key:value Other switches and settings `key:value` of this option
+# @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::disp {
@@ -907,27 +1049,46 @@ function dybatpho::opts::disp {
 
 #######################################
 # @description Define a sub-command in spec
-# @arg $1 string Name of function that has spec of sub-command
+# @arg $1 string Command name
+# @arg $2 string Name of function that has spec of sub-command
+# @arg $@ key:value Optional metadata such as `alias:<name>` or `aliases:<a,b>`
 #######################################
 function dybatpho::opts::cmd {
   local sub_cmd sub_spec
   dybatpho::expect_args sub_cmd sub_spec -- "$@"
+  shift 2
+
+  local -a __cmd_aliases=()
+  local __cmd_alias
+  while [ $# -gt 0 ]; do
+    case $1 in
+      alias:*) __cmd_aliases+=("${1#alias:}") ;;
+      aliases:*) __parse_alias_list __cmd_aliases "${1#aliases:}" ;;
+    esac
+    shift
+  done
 
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local __cmd_desc="" __cmd_desc_mode=true
     "${sub_spec}"
+    local __cmd_label="${sub_cmd}"
+    for __cmd_alias in "${__cmd_aliases[@]}"; do
+      __cmd_label="${__cmd_label}, ${__cmd_alias}"
+    done
     local _line
-    _line=$(__help_row cmd "${sub_cmd}" "${__cmd_desc}")
+    _line=$(__help_row cmd "${__cmd_label}" "${__cmd_desc}")
     __help_cmds_output="${__help_cmds_output}${_line}"$'\n'
     return 0
   fi
 
   if dybatpho::is true "${__done_initial}"; then
     __has_sub_cmd="true"
-    # shellcheck disable=2190
-    __sub_specs+=("${sub_spec}:'${sub_cmd}'")
+    __sub_specs+=("${sub_spec}"$'\t'"${sub_cmd}"$'\t'"${sub_cmd}")
+    for __cmd_alias in "${__cmd_aliases[@]}"; do
+      __sub_specs+=("${sub_spec}"$'\t'"${__cmd_alias}"$'\t'"${sub_cmd}")
+    done
   fi
 }
 

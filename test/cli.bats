@@ -479,6 +479,22 @@ setup() {
   assert_output "EMPTY"
 }
 
+@test "dybatpho::opts::flag alias metadata adds alternate switches" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - action:"echo \$VERBOSE_ALIAS"
+    dybatpho::opts::flag "Verbose" VERBOSE_ALIAS --verbose alias:-v aliases:--chatty
+  }
+
+  run dybatpho::generate_from_spec _spec -v
+  assert_success
+  assert_output "true"
+
+  run dybatpho::generate_from_spec _spec --chatty
+  assert_success
+  assert_output "true"
+}
+
 # =============================================================================
 # dybatpho::opts::disp
 # =============================================================================
@@ -610,6 +626,26 @@ setup() {
 
   run dybatpho::generate_from_spec _spec_multi_parent cmdb
   assert_output "cmd-b"
+}
+
+@test "dybatpho::opts::cmd alias metadata dispatches to subcommand" {
+  # shellcheck disable=2329
+  _spec_alias_child() {
+    dybatpho::opts::setup "" CHILD_ARGS action:"echo alias:\$CHILD_ARGS"
+  }
+  # shellcheck disable=2329
+  _spec_alias_parent() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::cmd config _spec_alias_child alias:cfg aliases:conf,settings
+  }
+
+  run dybatpho::generate_from_spec _spec_alias_parent cfg hello
+  assert_success
+  assert_output "alias: hello"
+
+  run dybatpho::generate_from_spec _spec_alias_parent settings world
+  assert_success
+  assert_output "alias: world"
 }
 
 # =============================================================================
@@ -791,6 +827,38 @@ setup() {
   assert_output --partial "First sub command"
   assert_output --partial "sub2"
   assert_output --partial "Second sub command"
+}
+
+@test "dybatpho::generate_help shows command aliases" {
+  # shellcheck disable=2329
+  _spec_hc_alias_sub() {
+    dybatpho::opts::setup "Config command" -
+  }
+  # shellcheck disable=2329
+  _spec_hc_alias() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::cmd config _spec_hc_alias_sub alias:cfg aliases:conf
+  }
+
+  __current_cmd_path=""
+  run dybatpho::generate_help _spec_hc_alias
+  assert_success
+  assert_output --partial "config, cfg, conf"
+}
+
+@test "dybatpho::generate_help shows switch aliases from metadata" {
+  # shellcheck disable=2329
+  _spec_halias() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::flag "Verbose output" HALIAS --verbose alias:-v aliases:--chatty
+  }
+
+  __current_cmd_path=""
+  run dybatpho::generate_help _spec_halias
+  assert_success
+  assert_output --partial "--verbose"
+  assert_output --partial "-v"
+  assert_output --partial "--chatty"
 }
 
 @test "dybatpho::generate_help no Commands section when no subcommands" {

@@ -42,6 +42,7 @@ Utilities for building CLI parsers from shell specs.
 - [`__help_row`](#__help_row) — Format one help row and print to stdout
 - [`__add_switch`](#__add_switch) — Add to switches list if flag/param has multiple switches
 - [`__print_validate`](#__print_validate) — Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
+- [`__parse_alias_list`](#__parse_alias_list) — Split a comma-separated alias list into a caller-provided array.
 - [`__print_args_check`](#__print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
 - [`dybatpho::opts::flag`](#dybatphooptsflag) — Define an option that take no argument
@@ -117,6 +118,8 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | --------- | ---------- | ----------- |
 | `action:<code>` | `setup`, `disp` | Code to run when parsing finishes or a display option is used |
 | `args:<rule>` | `setup` | Positional argument rule: `none`, `exact:N`, `min:N`, `max:N`, or `range:M:N` |
+| `alias:<name>` | `flag`, `param`, `disp`, `cmd` | Add one alias switch or command name |
+| `aliases:<a,b>` | `flag`, `param`, `disp`, `cmd` | Add multiple aliases separated by commas |
 | `init:<value>` | `flag`, `param` | Initial variable value |
 | `on:<string>` | `flag`, `param` | Positive value when the option is enabled |
 | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
@@ -227,6 +230,15 @@ function _spec {
 function _spec_sum {
   dybatpho::opts::setup "Add two numbers" SUM_ARGS args:exact:2 action:"_run_sum"
 }
+```
+
+
+#### Aliases
+
+
+```bash
+dybatpho::opts::flag "Verbose output" VERBOSE --verbose alias:-v
+dybatpho::opts::cmd config _spec_config alias:cfg aliases:conf,settings
 ```
 
 
@@ -607,6 +619,24 @@ Emit generated code that validates the current `OPTARG` and assigns it to the de
 
 ---
 
+### `__parse_alias_list`
+
+Split a comma-separated alias list into a caller-provided array.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of destination array variable |
+| `$2` | string | Comma-separated aliases |
+
+**🚦 Exit codes**
+
+- `0`: Aliases appended to destination array
+
+
+---
+
 ### `__print_args_check`
 
 Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
@@ -662,7 +692,7 @@ Define an option that take no argument
 | --- | --- | --- |
 | `$1` | string | Description of option to display |
 | `$2` | string | Variable name for getting option. `-` if want to omit |
-| `$@` | switch\|key:value | Other switches and settings `key:value` of this option |
+| `$@` | switch\|key:value | Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>` |
 
 **🚦 Exit codes**
 
@@ -681,7 +711,7 @@ Define an option that take an argument
 | --- | --- | --- |
 | `$1` | string | Description of option to display |
 | `$2` | string | Variable name for getting option. `-` if want to omit |
-| `$@` | switch\|key:value | Other switches and settings `key:value` of this option |
+| `$@` | switch\|key:value | Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>` |
 
 **🚦 Exit codes**
 
@@ -699,7 +729,7 @@ Define an option that display only
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Description of option to display |
-| `$@` | switch\|key:value | Other switches and settings `key:value` of this option |
+| `$@` | switch\|key:value | Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>` |
 
 **🚦 Exit codes**
 
@@ -716,7 +746,9 @@ Define a sub-command in spec
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$1` | string | Name of function that has spec of sub-command |
+| `$1` | string | Command name |
+| `$2` | string | Name of function that has spec of sub-command |
+| `$@` | key:value | Optional metadata such as `alias:<name>` or `aliases:<a,b>` |
 
 
 ### 🧩 Parse functions

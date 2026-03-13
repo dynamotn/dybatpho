@@ -320,6 +320,91 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::coalesce returns first non-empty value" {
+  run dybatpho::coalesce "" "" "fallback" "other"
+  assert_success
+  assert_output "fallback"
+
+  run dybatpho::coalesce "" "0" "later"
+  assert_success
+  assert_output "0"
+}
+
+@test "dybatpho::coalesce fails when all values are empty or missing" {
+  run dybatpho::coalesce "" ""
+  assert_failure
+  refute_output
+
+  run --separate-stderr dybatpho::coalesce
+  assert_failure
+  assert_stderr --partial "Expected at least one value"
+}
+
+@test "dybatpho::command_exists_all verifies every command" {
+  run dybatpho::command_exists_all bash cat
+  assert_success
+
+  run dybatpho::command_exists_all bash definitely_missing_command_xyz
+  assert_failure
+}
+
+@test "dybatpho::coalesce_cmd prints first available command" {
+  run dybatpho::coalesce_cmd definitely_missing_command_xyz bash cat
+  assert_success
+  assert_output "bash"
+
+  run dybatpho::coalesce_cmd definitely_missing_command_xyz another_missing_command_xyz
+  assert_failure
+}
+
+@test "dybatpho::default_env assigns and preserves environment values" {
+  _default_env_assigns() {
+    unset DYBATPHO_SAMPLE_ENV
+    dybatpho::default_env DYBATPHO_SAMPLE_ENV "fallback"
+    printf '%s\n' "${DYBATPHO_SAMPLE_ENV}"
+  }
+  run _default_env_assigns
+  assert_success
+  assert_output << EOF
+fallback
+fallback
+EOF
+
+  _default_env_preserves() {
+    export DYBATPHO_SAMPLE_ENV="custom"
+    dybatpho::default_env DYBATPHO_SAMPLE_ENV "fallback"
+    printf '%s\n' "${DYBATPHO_SAMPLE_ENV}"
+  }
+  run _default_env_preserves
+  assert_success
+  assert_output << EOF
+custom
+custom
+EOF
+}
+
+@test "dybatpho::require_envs_any accepts any configured environment variable" {
+  export DYBATPHO_ENV_ONE=""
+  export DYBATPHO_ENV_TWO="configured"
+  run dybatpho::require_envs_any DYBATPHO_ENV_ONE DYBATPHO_ENV_TWO
+  assert_success
+
+  export DYBATPHO_ENV_ONE=""
+  export DYBATPHO_ENV_TWO=""
+  run --separate-stderr dybatpho::require_envs_any DYBATPHO_ENV_ONE DYBATPHO_ENV_TWO
+  assert_failure
+  assert_stderr --partial "Expected at least one environment variable"
+}
+
+@test "dybatpho::assert succeeds and fails with clear messages" {
+  run dybatpho::assert '[[ 1 -eq 1 ]]'
+  assert_success
+
+  run --separate-stderr dybatpho::assert '[[ 1 -eq 2 ]]' "numbers mismatch"
+  assert_failure
+  assert_stderr --partial "numbers mismatch"
+}
+
 # shellcheck disable=2329
 _test_retry() {
   count=$((count + 1))
@@ -382,6 +467,37 @@ _test_retry() {
   run dybatpho::retry 0 _always_fail custom-description
   assert_failure
   assert_output --partial "No more retries left to run custom-description."
+}
+
+@test "dybatpho::retry_until retries with a fixed delay" {
+  local sleep_args_file="${BATS_TEST_TMPDIR}/retry-until-sleep-args"
+  _retry_until_flaky() {
+    count=$((count + 1))
+    [[ "${count}" -ge 3 ]]
+  }
+  count=0
+  stub sleep ": echo \"\$*\" >> ${sleep_args_file}"
+  run dybatpho::retry_until 3 1 _retry_until_flaky retry-until-target
+  unstub sleep
+  assert_success
+  assert_output --partial "Retrying in 1 seconds (2/3)"
+  run cat "${sleep_args_file}"
+  assert_success
+  assert_output << EOF
+1
+1
+EOF
+}
+
+@test "dybatpho::retry_until returns the final failure code" {
+  _retry_until_fail() {
+    return 9
+  }
+  stub sleep ":"
+  run dybatpho::retry_until 1 1 _retry_until_fail fixed-delay-target
+  unstub sleep
+  assert_failure 9
+  assert_output --partial "No more retries left to run fixed-delay-target."
 }
 
 @test "dybatpho::breakpoint wait for output" {

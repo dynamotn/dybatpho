@@ -8,6 +8,9 @@
 #   - validating function arguments
 #   - checking environment and tool dependencies
 #   - testing common conditions
+#   - checking several commands or env vars at once
+#   - choosing the first usable value from fallbacks
+#   - assigning default env values
 #   - retrying flaky commands
 #   - opening an interactive breakpoint
 # @usage
@@ -17,6 +20,9 @@
 #
 #   - make shell functions fail fast on bad input
 #   - avoid repeating `command -v`, `[[ -f ... ]]`, `[[ -d ... ]]`, and similar checks
+#   - validate that any or all required commands and env vars are present
+#   - choose the first non-empty value from environment, defaults, or arguments
+#   - assign fallback defaults into environment variables
 #   - retry transient commands without rewriting loop logic
 #   - inspect runtime state interactively while debugging a script
 #
@@ -51,6 +57,18 @@
 #
 #   ```bash
 #   dybatpho::retry 4 "curl -fsSL '${health_url}'" "service health check"
+#   ```
+#
+#   #### Pick the first configured value
+#
+#   ```bash
+#   api_host="$(dybatpho::coalesce "${API_HOST:-}" "${FALLBACK_HOST:-}" "http://localhost:8080")"
+#   ```
+#
+#   #### Pick the first available command
+#
+#   ```bash
+#   json_tool="$(dybatpho::coalesce_cmd jq yq python3)"
 #   ```
 #
 #   #### Add an optional breakpoint
@@ -147,6 +165,21 @@ function dybatpho::require {
 }
 
 #######################################
+# @description Return success when all listed commands are available.
+# @arg $@ string Commands to check
+# @exitcode 0 Every command exists
+# @exitcode 1 At least one command is missing
+#######################################
+function dybatpho::command_exists_all {
+  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one command"
+  local command_name
+  for command_name in "$@"; do
+    dybatpho::is command "${command_name}" || return 1
+  done
+  return 0
+}
+
+#######################################
 # @description Check whether a value matches a supported shell-oriented condition.
 # @arg $1 string Condition (command|function|file|dir|link|exist|readable|writeable|executable|set|empty|number|int|true|false)
 # @arg $2 string Value to test
@@ -227,6 +260,94 @@ function dybatpho::is {
 }
 
 #######################################
+# @description Print the first non-empty value from a list of fallbacks.
+# @arg $@ string Candidate values in priority order
+# @stdout First non-empty value
+# @exitcode 0 A non-empty value is found
+# @exitcode 1 No values are provided or all values are empty
+#######################################
+function dybatpho::coalesce {
+  if [[ $# -eq 0 ]]; then
+    dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
+  fi
+
+  local value
+  for value in "$@"; do
+    if [[ -n "${value}" ]]; then
+      printf '%s\n' "${value}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+#######################################
+# @description Print the first available command from a list of candidates.
+# @arg $@ string Candidate command names in priority order
+# @stdout First available command name
+# @exitcode 0 An available command is found
+# @exitcode 1 No commands are available
+#######################################
+function dybatpho::coalesce_cmd {
+  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one command"
+  local command_name
+  for command_name in "$@"; do
+    if dybatpho::is command "${command_name}"; then
+      printf '%s\n' "${command_name}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+#######################################
+# @description Assign and export a default value for an environment variable when it is empty.
+# @arg $1 string Environment variable name
+# @arg $2 string Default value
+# @stdout Effective value after applying the default
+#######################################
+function dybatpho::default_env {
+  local env_name default_value
+  dybatpho::expect_args env_name default_value -- "$@"
+  [[ "${env_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || dybatpho::die "Invalid environment variable name: ${env_name}"
+  if [[ -z "${!env_name:-}" ]]; then
+    printf -v "${env_name}" '%s' "${default_value}"
+    export "${env_name}"
+  fi
+  printf '%s\n' "${!env_name}"
+}
+
+#######################################
+# @description Ensure that at least one of the listed environment variables is set.
+# @arg $@ string Environment variables to check
+# @exitcode 0 At least one environment variable is set
+# @exitcode 1 None of the environment variables are set
+#######################################
+function dybatpho::require_envs_any {
+  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one environment variable"
+  local env_name
+  for env_name in "$@"; do
+    [[ -n "${!env_name:-}" ]] && return 0
+  done
+  dybatpho::die "Expected at least one environment variable to be set: $*"
+}
+
+#######################################
+# @description Evaluate a shell condition string and stop with a message when it fails.
+# @arg $1 string Shell condition or command string to evaluate
+# @arg $2 string Optional failure message
+# @exitcode 0 The assertion condition succeeds
+# @exitcode 1 The assertion condition fails
+# @tip The assertion command is executed with `eval`
+#######################################
+function dybatpho::assert {
+  local condition
+  dybatpho::expect_args condition -- "$@"
+  local message="${2:-Assertion failed: ${condition}}"
+  eval "${condition}" || dybatpho::die "${message}"
+}
+
+#######################################
 # @description Retry a shell command with escalating delays until it succeeds or retries are exhausted.
 # @example
 #   dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
@@ -258,6 +379,33 @@ function dybatpho::retry {
       dybatpho::warn "No more retries left to run ${1:-${command}}."
       return "${exit_code}"
     fi
+  done
+}
+
+#######################################
+# @description Retry a shell command until it succeeds or the retry budget is exhausted, using a fixed delay.
+# @arg $1 number Number of retries
+# @arg $2 number Delay in seconds between attempts
+# @arg $3 string Shell command string to run
+# @arg $4 string Optional short description for retry logs
+# @exitcode 0 The command eventually succeeds
+# @exitcode 1 The command never succeeds and returns its final exit code
+# @tip The command is executed with `eval`, so pass it as one shell command string
+#######################################
+function dybatpho::retry_until {
+  local retries delay_seconds command
+  dybatpho::expect_args retries delay_seconds command -- "$@"
+  shift 3
+  local exit_code=0 count=0
+  until eval "${command}"; do
+    exit_code=$?
+    count=$((count + 1))
+    if ((count > retries)); then
+      dybatpho::warn "No more retries left to run ${1:-${command}}."
+      return "${exit_code}"
+    fi
+    dybatpho::progress "Retrying in ${delay_seconds} seconds (${count}/${retries})..."
+    sleep "${delay_seconds}" || true
   done
 }
 

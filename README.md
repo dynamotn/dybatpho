@@ -72,6 +72,7 @@
 
 - [array.sh](doc/array.md) – Array manipulation
 - [string.sh](doc/string.md) – String operations
+- [text.sh](doc/text.md) – Multi-line text formatting
 - [logging.sh](doc/logging.md) – Easy logging
 - [helpers.sh](doc/helpers.md) – Miscellaneous utilities
 - [process.sh](doc/process.md) – Process management
@@ -79,6 +80,7 @@
 - [date.sh](doc/date.md) – Date and timestamp helpers
 - [json.sh](doc/json.md) – JSON and YAML helpers
 - [file.sh](doc/file.md) – File operations
+- [table.sh](doc/table.md) – Plain-text and Markdown table rendering
 - [cli.sh](doc/cli.md) – CLI building support
 
 ## 🎯 Usage Example

@@ -37,6 +37,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/string.sh"
 # shellcheck source=src/array.sh
 . "${DYBATPHO_DIR}/src/array.sh"
+# shellcheck source=src/text.sh
+. "${DYBATPHO_DIR}/src/text.sh"
 # shellcheck source=src/logging.sh
 . "${DYBATPHO_DIR}/src/logging.sh"
 # shellcheck source=src/helpers.sh
@@ -51,6 +53,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/json.sh"
 # shellcheck source=src/file.sh
 . "${DYBATPHO_DIR}/src/file.sh"
+# shellcheck source=src/table.sh
+. "${DYBATPHO_DIR}/src/table.sh"
 # shellcheck source=src/cli.sh
 . "${DYBATPHO_DIR}/src/cli.sh"
 # shellcheck source=src/os.sh

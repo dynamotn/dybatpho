@@ -30,7 +30,7 @@ composition, deferred cleanup, and dry-run execution.
 - [`dybatpho::run_err_handler`](#dybatphorun_err_handler) — Handle a command failure captured by `dybatpho::register_err_handler`.
 - [`dybatpho::killed_process_handler`](#dybatphokilled_process_handler) — Handle SIGINT or SIGTERM received by the current process.
 - [`dybatpho::trap`](#dybatphotrap) — Append a command to one or more trap handlers without discarding existing traps.
-- [`_gen_finalize_command`](#_gen_finalize_command) — 
+- [`_gen_finalize_command`](#_gen_finalize_command) — Read the current trap command registered for a signal.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
 
@@ -70,6 +70,8 @@ Log a fatal message and stop the current script or process.
 - `$2`: Exit the current shell with the requested code
 
 
+---
+
 ### `dybatpho::register_err_handler`
 
 Register the ERR trap handler used by dybatpho scripts.
@@ -80,6 +82,8 @@ _Function has no arguments._
 
 - DYBATPHO_USED_ERR_HANDLER
 
+
+---
 
 ### `dybatpho::register_killed_handler`
 
@@ -92,12 +96,16 @@ _Function has no arguments._
 - DYBATPHO_USED_KILLED_HANDLER
 
 
+---
+
 ### `dybatpho::register_common_handlers`
 
 Register both error and signal handlers.
 
 _Function has no arguments._
 
+
+---
 
 ### `dybatpho::run_err_handler`
 
@@ -110,6 +118,8 @@ Handle a command failure captured by `dybatpho::register_err_handler`.
 | `$1` | number | Exit code of last command |
 
 
+---
+
 ### `dybatpho::killed_process_handler`
 
 Handle SIGINT or SIGTERM received by the current process.
@@ -120,6 +130,8 @@ Handle SIGINT or SIGTERM received by the current process.
 | --- | --- | --- |
 | `$1` | string | Signal |
 
+
+---
 
 ### `dybatpho::trap`
 
@@ -133,9 +145,24 @@ Append a command to one or more trap handlers without discarding existing traps.
 | `$@` | string | Signals to trap |
 
 
+---
+
 ### `_gen_finalize_command`
 
+Read the current trap command registered for a signal.
 
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Signal name |
+
+**📤 Output on stdout**
+
+- Existing trap command, or an empty string when none is registered
+
+
+---
 
 ### `dybatpho::cleanup_file_on_exit`
 
@@ -147,6 +174,8 @@ Register a file or directory to be removed when the current shell exits.
 | --- | --- | --- |
 | `$1` | string | File or directory path |
 
+
+---
 
 ### `dybatpho::dry_run`
 

@@ -116,6 +116,13 @@ function dybatpho::curl_do {
 
   local code
   # shellcheck disable=SC2329
+  #######################################
+  # @description Execute one curl request attempt and capture its HTTP status code.
+  # @arg $@ string Extra curl arguments forwarded from `dybatpho::curl_do`
+  # @set code string HTTP status code returned by curl
+  # @exitcode 0 Request completed with an accepted HTTP status (`2xx` or `4xx`)
+  # @exitcode 1 Curl failed or the response should be retried/treated as an error
+  #######################################
   __request() {
     dybatpho::require curl
     # kcov(disabled)

@@ -48,6 +48,8 @@ Show the contents of a file with line numbers.
 - File contents
 
 
+---
+
 ### `dybatpho::create_temp`
 
 Create a temporary file or directory and register it for cleanup on shell exit.

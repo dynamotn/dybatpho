@@ -146,6 +146,8 @@ dybatpho::expect_args arg1 arg2 .. argN -- "$@"
 - `0`: Assign arguments to the requested variable names and return successfully
 
 
+---
+
 ### `dybatpho::still_has_args`
 
 Check whether at least one more positional argument remains after the current one.
@@ -164,6 +166,8 @@ done
 - `0`: Still has an argument
 - `1`: No additional arguments remain
 
+
+---
 
 ### `dybatpho::expect_envs`
 
@@ -186,6 +190,8 @@ dybatpho::expect_envs ENV_VAR1 ENV_VAR2
 - `1`: Stop the script if any variable is unset or empty
 
 
+---
+
 ### `dybatpho::require`
 
 Ensure that a required command is installed.
@@ -204,6 +210,8 @@ Ensure that a required command is installed.
 - `other`: Exit code if command isn't installed and second argument is set
 
 
+---
+
 ### `dybatpho::is`
 
 Check whether a value matches a supported shell-oriented condition.
@@ -220,6 +228,8 @@ Check whether a value matches a supported shell-oriented condition.
 - `0`: If matched
 - `1`: If not matched
 
+
+---
 
 ### `dybatpho::retry`
 
@@ -245,6 +255,8 @@ dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
 - `0`: The command eventually succeeds
 - `1`: The command never succeeds and returns 1 on the final attempt
 
+
+---
 
 ### `dybatpho::breakpoint`
 

@@ -20,7 +20,7 @@ This module contains functions to log messages to stdout/stderr.
 ### 🚀 Highlights
 
 - [`__log`](#__log) — Log a message to stdout or stderr, optionally with ANSI color.
-- [`__check_color`](#__check_color) — 
+- [`__check_color`](#__check_color) — Render the current log message with ANSI color unless `NO_COLOR` is set.
 - [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown for the current `LOG_LEVEL`.
 - [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information.
 - [`dybatpho::validate_log_level`](#dybatphovalidate_log_level) — Validate a candidate log level value.
@@ -59,7 +59,7 @@ Log a message to stdout or stderr, optionally with ANSI color.
 
 **🧩 Variable sets**
 
-- LOG_LEVEL string Runtime log level of the current script
+- **`LOG_LEVEL`**: string Runtime log level of the current script
 
 **📤 Output on stdout**
 
@@ -70,9 +70,20 @@ Log a message to stdout or stderr, optionally with ANSI color.
 - Show the formatted message when the level passes filtering and $3 is `stderr`
 
 
+---
+
 ### `__check_color`
 
+Render the current log message with ANSI color unless `NO_COLOR` is set.
 
+_Function has no arguments._
+
+**📤 Output on stdout**
+
+- Message text for the active log call
+
+
+---
 
 ### `dybatpho::compare_log_level`
 
@@ -96,6 +107,8 @@ Return success when a message level should be shown for the current `LOG_LEVEL`.
 - `1`: The message level is filtered out
 
 
+---
+
 ### `__log_inspect`
 
 Log a structured diagnostic message with timestamp and call-site information.
@@ -110,6 +123,8 @@ Log a structured diagnostic message with timestamp and call-site information.
 | `$4` | number | Additional stack frames to skip when resolving the source location |
 | `$5` | string | ANSI escape color code |
 
+
+---
 
 ### `dybatpho::validate_log_level`
 
@@ -127,6 +142,8 @@ Validate a candidate log level value.
 - `1`: The input is invalid
 
 
+---
+
 ### `dybatpho::debug`
 
 Show debug message.
@@ -141,6 +158,8 @@ Show debug message.
 
 - Show message if log level of message is less than debug level
 
+
+---
 
 ### `dybatpho::debug_command`
 
@@ -164,6 +183,8 @@ Log a debug message together with the output of a shell command.
 - Show message if log level of message is less than debug level
 
 
+---
+
 ### `dybatpho::info`
 
 Show info message.
@@ -178,6 +199,8 @@ Show info message.
 
 - Show message if log level of message is less than info level
 
+
+---
 
 ### `dybatpho::print`
 
@@ -194,6 +217,8 @@ Show normal message.
 - Show message if log level of message is less than info level
 
 
+---
+
 ### `dybatpho::progress`
 
 Show a highlighted in-progress banner.
@@ -208,6 +233,8 @@ Show a highlighted in-progress banner.
 
 - Show message if log level of message is less than info level
 
+
+---
 
 ### `dybatpho::progress_bar`
 
@@ -225,6 +252,8 @@ Render a percentage-based progress bar on the current output line.
 - Show the progress bar; print a newline in the caller when the task is done
 
 
+---
+
 ### `dybatpho::header`
 
 Show a section header banner.
@@ -239,6 +268,8 @@ Show a section header banner.
 
 - Show message if log level of message is less than info level
 
+
+---
 
 ### `dybatpho::success`
 
@@ -255,6 +286,8 @@ Show success message.
 - Show message if log level of message is less than info level
 
 
+---
+
 ### `dybatpho::warn`
 
 Show warning message.
@@ -270,6 +303,8 @@ Show warning message.
 - Show message if log level of message is less than warn level
 
 
+---
+
 ### `dybatpho::error`
 
 Show error message.
@@ -284,6 +319,8 @@ Show error message.
 
 - Show message if log level of message is less than error level
 
+
+---
 
 ### `dybatpho::fatal`
 
@@ -301,6 +338,8 @@ Show fatal message.
 - Show message if log level of message is less than fatal level
 
 
+---
+
 ### `dybatpho::start_trace`
 
 Enable Bash tracing with dybatpho formatting.
@@ -313,6 +352,8 @@ _Function has no arguments._
 | --- | --- | --- |
 | **`LOG_LEVEL`** | string | Set to `trace` to emit the trace start/end messages |
 
+
+---
 
 ### `dybatpho::end_trace`
 

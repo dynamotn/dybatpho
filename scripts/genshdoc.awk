@@ -816,8 +816,13 @@ function print_bullet_list(kind, idx, formatter, i, key, text, m)
 	}
 }
 
-function print_function(idx, fn_desc_key, fn_heading_level)
+function print_function(idx, fn_desc_key, fn_heading_level, starts_new_section)
 {
+	starts_new_section = (fn_section[idx] != "" && fn_section[idx] != last_printed_section)
+	if (printed_reference_count > 0 && !starts_new_section) {
+		print "---"
+		print ""
+	}
 	if (fn_section[idx] != "" && fn_section[idx] != last_printed_section) {
 		print "### 🧩 " fn_section[idx]
 		print ""
@@ -867,6 +872,7 @@ function print_function(idx, fn_desc_key, fn_heading_level)
 	print_list("fn_stderr", idx, "Output on stderr", "bullet")
 	print_list("fn_exitcode", idx, "Exit codes", "exit")
 	print_list("fn_see", idx, "See also", "see")
+	printed_reference_count++
 }
 
 function print_list(kind, idx, title, formatter, i, key, text)
@@ -882,6 +888,8 @@ function print_list(kind, idx, title, formatter, i, key, text)
 		print_option_table(kind, idx)
 	} else if (formatter == "env") {
 		print_env_table(kind, idx)
+	} else if (formatter == "set") {
+		print_bullet_list(kind, idx, "set")
 	} else if (formatter == "see") {
 		print_bullet_list(kind, idx, "see")
 	} else if (formatter == "exit") {
@@ -1038,6 +1046,7 @@ function push_item(kind, idx, value, key)
 function render_module(i, desc, intro, usage, rest, n, j, line, in_rest)
 {
 	last_printed_section = ""
+	printed_reference_count = 0
 	print "# " module_file
 	print ""
 	if (module_brief != "") {

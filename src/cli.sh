@@ -270,6 +270,11 @@ function __print_indent {
   echo "$@"
 }
 
+#######################################
+# @description Validate a shell variable name used by generated parser code.
+# @arg $1 string Variable name, or `-` to intentionally skip assignment
+# @exitcode 0 The name is valid, or the sentinel `-` was used
+#######################################
 function __require_shell_name {
   local name="${1:-}"
   [[ "${name}" == "-" ]] && return 0
@@ -373,10 +378,20 @@ function __generate_logic {
   local __has_sub_cmd="false"
   declare -a __sub_specs=()
 
+  #######################################
+  # @description Emit generated code that rebuilds positional parameters from a serialized argument list.
+  # @arg $1 string Shell expression that expands to serialized arguments
+  # @stdout Generated parser code
+  #######################################
   __print_get_arg() {
     __print_indent 4 "eval 'set -- $1' \${1+'\"\$@\"'}"
   }
 
+  #######################################
+  # @description Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
+  # @noargs
+  # @stdout Generated parser code
+  #######################################
   __print_rest() {
     __print_indent 4 'while [ $# -gt 0 ]; do'
     __print_indent 5 "${__rest}=\"\${${__rest}} \$1\""
@@ -614,6 +629,12 @@ function __add_switch {
   __switch="${__switch}${__switch:+|}$1"
 }
 
+#######################################
+# @description Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
+# @arg $1 string Destination variable name, or `-` to skip assignment
+# @stdout Generated parser code
+# @note Uses caller-local `__validate` when a custom validator was configured for the current option
+#######################################
 function __print_validate {
   set -- "${__validate}" "$1"
   [ "$1" ] && __print_indent 4 "$1 || { set -- ${1%% *}:\$? \"\$1\" $1; break; }"

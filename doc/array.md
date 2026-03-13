@@ -39,6 +39,8 @@ Print each element of an array on its own line.
 - Print array with each element separated by newline
 
 
+---
+
 ### `dybatpho::array_reverse`
 
 Reverse an array in place.
@@ -55,6 +57,8 @@ Reverse an array in place.
 - Print the reversed array if $2 is `--`
 
 
+---
+
 ### `dybatpho::array_unique`
 
 Remove duplicate elements from an array in place.
@@ -70,6 +74,8 @@ Remove duplicate elements from an array in place.
 
 - Print the deduplicated array if $2 is `--`
 
+
+---
 
 ### `dybatpho::array_join`
 

@@ -28,20 +28,20 @@ Utilities for building CLI parsers from shell specs.
 
 - [`__parse_opt`](#__parse_opt) — Functions are triggered by `dybatpho::generate_from_spec` Parse options with a spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
 - [`__print_indent`](#__print_indent) — Write script with indentation to stdout
-- [`__require_shell_name`](#__require_shell_name) — 
+- [`__require_shell_name`](#__require_shell_name) — Validate a shell variable name used by generated parser code.
 - [`__assign_quoted`](#__assign_quoted) — Assign the quoted string to a variable
 - [`__prepend_export`](#__prepend_export) — Prepend export of before string of command, based on `export:<bool>` switch
 - [`__define_var`](#__define_var) — Define variable from spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
 - [`__parse_key_value`](#__parse_key_value) — Extract key value from spec with format `x:y`, to get settings of option
 - [`__generate_logic`](#__generate_logic) — Generate logic from spec of script/function to get options
-- [`__print_get_arg`](#__print_get_arg) — 
-- [`__print_rest`](#__print_rest) — 
+- [`__print_get_arg`](#__print_get_arg) — Emit generated code that rebuilds positional parameters from a serialized argument list.
+- [`__print_rest`](#__print_rest) — Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
 - [`__generate_help`](#__generate_help) — Get help description for options from spec. Sets __help_mode=true so dybatpho::opts::* collect help data via dynamic scoping into dybatpho::generate_help's locals, then prints the buffered sections in the correct order.
 - [`__help_pad`](#__help_pad) — Pad string $2 to at least length $3 and store result in variable $1
 - [`__help_sw`](#__help_sw) — Append a formatted switch to caller-local variable `sw`. Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so that short+long pairs align as "-s, --long".
 - [`__help_row`](#__help_row) — Format one help row and print to stdout
 - [`__add_switch`](#__add_switch) — Add to switches list if flag/param has multiple switches
-- [`__print_validate`](#__print_validate) — 
+- [`__print_validate`](#__print_validate) — Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
 - [`dybatpho::opts::flag`](#dybatphooptsflag) — Define an option that take no argument
 - [`dybatpho::opts::param`](#dybatphooptsparam) — Define an option that take an argument
@@ -318,6 +318,8 @@ Parse options with a spec from `dybatpho::opts::flag`,
 - 0
 
 
+---
+
 ### `__print_indent`
 
 Write script with indentation to stdout
@@ -338,9 +340,24 @@ Write script with indentation to stdout
 - 0
 
 
+---
+
 ### `__require_shell_name`
 
+Validate a shell variable name used by generated parser code.
 
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Variable name, or `-` to intentionally skip assignment |
+
+**🚦 Exit codes**
+
+- `0`: The name is valid, or the sentinel `-` was used
+
+
+---
 
 ### `__assign_quoted`
 
@@ -358,6 +375,8 @@ Assign the quoted string to a variable
 - 0
 
 
+---
+
 ### `__prepend_export`
 
 Prepend export of before string of command,
@@ -369,6 +388,8 @@ Prepend export of before string of command,
 | --- | --- | --- |
 | `$1` | string | String of command |
 
+
+---
 
 ### `__define_var`
 
@@ -382,6 +403,8 @@ Define variable from spec from `dybatpho::opts::flag`,
 | `$1` | string | Name of variable to be defined |
 
 
+---
+
 ### `__parse_key_value`
 
 Extract key value from spec with format `x:y`,
@@ -394,6 +417,8 @@ Extract key value from spec with format `x:y`,
 | `$1` | key:value | Key-value string to extract |
 | `$2` | string | Prefix of key to assign as variable |
 
+
+---
 
 ### `__generate_logic`
 
@@ -411,13 +436,37 @@ Generate logic from spec of script/function to get options
 - Generated logic
 
 
+---
+
 ### `__print_get_arg`
 
+Emit generated code that rebuilds positional parameters from a serialized argument list.
 
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Shell expression that expands to serialized arguments |
+
+**📤 Output on stdout**
+
+- Generated parser code
+
+
+---
 
 ### `__print_rest`
 
+Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
 
+_Function has no arguments._
+
+**📤 Output on stdout**
+
+- Generated parser code
+
+
+---
 
 ### `__generate_help`
 
@@ -441,6 +490,8 @@ Get help description for options from spec.
 - `0`: exit code
 
 
+---
+
 ### `__help_pad`
 
 Pad string $2 to at least length $3 and store result in variable $1
@@ -453,6 +504,8 @@ Pad string $2 to at least length $3 and store result in variable $1
 | `$2` | string | String to pad |
 | `$3` | number | Minimum length |
 
+
+---
 
 ### `__help_sw`
 
@@ -467,6 +520,8 @@ that short+long pairs align as "-s, --long".
 | `$1` | number | Minimum pad width before appending $2 |
 | `$2` | string | Switch string to append |
 
+
+---
 
 ### `__help_row`
 
@@ -486,6 +541,8 @@ Format one help row and print to stdout
 - Formatted help row
 
 
+---
+
 ### `__add_switch`
 
 Add to switches list if flag/param has multiple switches
@@ -497,8 +554,25 @@ Add to switches list if flag/param has multiple switches
 | `$1` | switch | Switch |
 
 
+---
+
 ### `__print_validate`
 
+Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Destination variable name, or `-` to skip assignment |
+
+**📝 Notes**
+
+- Uses caller-local `__validate` when a custom validator was configured for the current option
+
+**📤 Output on stdout**
+
+- Generated parser code
 
 
 ### 🧩 Spec functions
@@ -521,6 +595,8 @@ of script or function
 - `0`: exit code
 
 
+---
+
 ### `dybatpho::opts::flag`
 
 Define an option that take no argument
@@ -537,6 +613,8 @@ Define an option that take no argument
 
 - `0`: exit code
 
+
+---
 
 ### `dybatpho::opts::param`
 
@@ -555,6 +633,8 @@ Define an option that take an argument
 - `0`: exit code
 
 
+---
+
 ### `dybatpho::opts::disp`
 
 Define an option that display only
@@ -570,6 +650,8 @@ Define an option that display only
 
 - `0`: exit code
 
+
+---
 
 ### `dybatpho::opts::cmd`
 
@@ -599,6 +681,8 @@ Define spec of parent function or script, spec contains below commands
 
 - `0`: exit code
 
+
+---
 
 ### `dybatpho::generate_help`
 

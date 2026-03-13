@@ -20,7 +20,7 @@ This module contains functions to work with network connection.
 
 - [`__get_http_code`](#__get_http_code) — Get description of HTTP status code
 - [`dybatpho::curl_do`](#dybatphocurl_do) — Transferring data with URL by curl
-- [`__request`](#__request) — 
+- [`__request`](#__request) — Execute one curl request attempt and capture its HTTP status code.
 - [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
 
 ## 💡 Tips
@@ -49,6 +49,8 @@ Get description of HTTP status code
 
 - Description of status code
 
+
+---
 
 ### `dybatpho::curl_do`
 
@@ -90,9 +92,29 @@ dybatpho::curl_do https://example.com /tmp/1 --compressed
 - `127`: Curl isn't installed
 
 
+---
+
 ### `__request`
 
+Execute one curl request attempt and capture its HTTP status code.
 
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$@` | string | Extra curl arguments forwarded from `dybatpho::curl_do` |
+
+**🧩 Variable sets**
+
+- **`code`**: string HTTP status code returned by curl
+
+**🚦 Exit codes**
+
+- `0`: Request completed with an accepted HTTP status (`2xx` or `4xx`)
+- `1`: Curl failed or the response should be retried/treated as an error
+
+
+---
 
 ### `dybatpho::curl_download`
 

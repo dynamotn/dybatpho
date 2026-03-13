@@ -26,6 +26,8 @@ Get $GOOS compilation environment
 - Return $GOOS value https://go.dev/doc/install/source#environment
 
 
+---
+
 ### `dybatpho::goarch`
 
 Get $GOARCH compilation environment

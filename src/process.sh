@@ -108,6 +108,11 @@ function dybatpho::trap {
   local command
   dybatpho::expect_args command -- "$@"
   shift
+  #######################################
+  # @description Read the current trap command registered for a signal.
+  # @arg $1 string Signal name
+  # @stdout Existing trap command, or an empty string when none is registered
+  #######################################
   _gen_finalize_command() {
     local cmds=$(trap -p "$1")
     cmds="${cmds#*\'}"

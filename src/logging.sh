@@ -36,6 +36,11 @@ function __log {
 
   dybatpho::compare_log_level "${show_log_level}" || return 0
 
+  #######################################
+  # @description Render the current log message with ANSI color unless `NO_COLOR` is set.
+  # @noargs
+  # @stdout Message text for the active log call
+  #######################################
   __check_color() {
     if [[ "${NO_COLOR}" != "" ]]; then
       echo -e "${msg}"

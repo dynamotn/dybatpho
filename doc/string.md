@@ -41,6 +41,8 @@ Trim leading and trailing whitespace from a string.
 - Trimmed string
 
 
+---
+
 ### `dybatpho::split`
 
 Split a string on an exact delimiter.
@@ -57,6 +59,8 @@ Split a string on an exact delimiter.
 - Print each split part on its own line
 
 
+---
+
 ### `dybatpho::url_encode`
 
 URL-encode a string.
@@ -71,6 +75,8 @@ URL-encode a string.
 
 - Encoded string
 
+
+---
 
 ### `dybatpho::url_decode`
 
@@ -87,6 +93,8 @@ URL-decode a string.
 - Decoded string
 
 
+---
+
 ### `dybatpho::lower`
 
 Convert a string to lowercase.
@@ -101,6 +109,8 @@ Convert a string to lowercase.
 
 - Converted string
 
+
+---
 
 ### `dybatpho::upper`
 

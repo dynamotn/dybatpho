@@ -111,6 +111,215 @@ function __log_inspect {
 }
 
 #######################################
+# @description Return the effective terminal width used by boxed logging helpers.
+# @stdout Terminal width, falling back to 80 columns
+#######################################
+function __get_terminal_width {
+  local width="${COLUMNS:-}"
+  if ! [[ "${width}" =~ ^[0-9]+$ ]] || ((width <= 0)); then
+    if dybatpho::is command tput && [[ -t 1 || -t 2 ]]; then
+      width="$(tput cols 2> /dev/null || true)"
+    fi
+  fi
+  if ! [[ "${width}" =~ ^[0-9]+$ ]] || ((width <= 0)); then
+    width=80
+  fi
+  printf '%s\n' "${width}"
+}
+
+#######################################
+# @description Return the display width of a string, accounting for wide Unicode glyphs when possible.
+# @arg $1 string Input text
+# @stdout Display width of the input
+#######################################
+function __string_display_width {
+  local text="${1:-}"
+
+  if dybatpho::is command python3; then
+    TEXT="${text}" python3 - <<'PY'
+import os
+import unicodedata
+
+text = os.environ.get("TEXT", "")
+width = 0
+for char in text:
+    if unicodedata.combining(char):
+        continue
+    width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+print(width)
+PY
+    return 0
+  fi
+
+  printf '%s\n' "${#text}"
+}
+
+#######################################
+# @description Wrap one text line to the requested width using word boundaries when possible.
+# @arg $1 string Input line
+# @arg $2 number Maximum width
+# @stdout Wrapped lines
+#######################################
+function __wrap_line {
+  local line max_width
+  dybatpho::expect_args line max_width -- "$@"
+  if ((max_width <= 0)); then
+    printf '%s\n' "${line}"
+    return 0
+  fi
+  if [[ -z "${line}" ]]; then
+    printf '\n'
+    return 0
+  fi
+
+  if dybatpho::is command python3; then
+    LINE="${line}" MAX_WIDTH="${max_width}" python3 - <<'PY'
+import os
+import unicodedata
+
+line = os.environ.get("LINE", "")
+max_width = int(os.environ["MAX_WIDTH"])
+
+def char_width(char):
+    if unicodedata.combining(char):
+        return 0
+    return 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+
+def text_width(text):
+    return sum(char_width(char) for char in text)
+
+def wrap_text(text, limit):
+    if text == "":
+        return [""]
+
+    result = []
+    remaining = text
+    while text_width(remaining) > limit:
+        width = 0
+        break_at = None
+        last_space = None
+        for index, char in enumerate(remaining):
+            width += char_width(char)
+            if char == " ":
+                last_space = index
+            if width > limit:
+                break_at = last_space if last_space is not None else index
+                break
+
+        if break_at is None:
+            break
+
+        if last_space is not None and break_at == last_space:
+            result.append(remaining[:break_at])
+            remaining = remaining[break_at + 1 :].lstrip(" ")
+        else:
+            result.append(remaining[:break_at])
+            remaining = remaining[break_at:]
+
+    result.append(remaining)
+    return result
+
+for part in wrap_text(line, max_width):
+    print(part)
+PY
+    return 0
+  fi
+
+  while ((${#line} > max_width)); do
+    local break_at=-1 i
+    for ((i = max_width; i >= 1; i--)); do
+      if [[ "${line:i-1:1}" == " " ]]; then
+        break_at=${i}
+        break
+      fi
+    done
+    if ((break_at == -1)); then
+      printf '%s\n' "${line:0:max_width}"
+      line="${line:max_width}"
+    else
+      printf '%s\n' "${line:0:break_at-1}"
+      line="${line:break_at}"
+      while [[ "${line}" == " "* ]]; do
+        line="${line# }"
+      done
+    fi
+  done
+  printf '%s\n' "${line}"
+}
+
+#######################################
+# @description Render a boxed message sized to its content while respecting terminal width.
+# @arg $1 string Top-left border character
+# @arg $2 string Horizontal border character
+# @arg $3 string Top-right border character
+# @arg $4 string Left border character
+# @arg $5 string Right border character
+# @arg $6 string Bottom-left border character
+# @arg $7 string Bottom-right border character
+# @arg $8 string Message body
+# @arg $9 string Output stream (`stdout` or `stderr`)
+# @arg $10 string ANSI color code
+#######################################
+function __log_box {
+  local top_left="$1"
+  local horizontal="$2"
+  local top_right="$3"
+  local left_border="$4"
+  local right_border="$5"
+  local bottom_left="$6"
+  local bottom_right="$7"
+  local message="$8"
+  local out="${9:-stdout}"
+  local color="${10:-0}"
+  local terminal_width inner_limit line content_width=0
+  local -a input_lines=() wrapped_lines=()
+
+  terminal_width=$(__get_terminal_width)
+  inner_limit=$((terminal_width - 4))
+  if ((inner_limit < 1)); then
+    inner_limit=1
+  fi
+
+  mapfile -t input_lines <<< "${message}"
+  if ((${#input_lines[@]} == 0)); then
+    input_lines=("")
+  fi
+
+  local input_line wrapped_line
+  for input_line in "${input_lines[@]}"; do
+    while IFS= read -r wrapped_line; do
+      wrapped_lines+=("${wrapped_line}")
+      local wrapped_width
+      wrapped_width=$(__string_display_width "${wrapped_line}")
+      if ((wrapped_width > content_width)); then
+        content_width=${wrapped_width}
+      fi
+    done < <(__wrap_line "${input_line}" "${inner_limit}")
+  done
+
+  if ((${#wrapped_lines[@]} == 0)); then
+    wrapped_lines=("")
+  fi
+
+  local border_count=$((content_width + 2))
+  local horizontal_line
+  horizontal_line="$(dybatpho::string_repeat "${horizontal}" "${border_count}")"
+
+  __log info "${top_left}${horizontal_line}${top_right}" "${out}" "${color}"
+  for line in "${wrapped_lines[@]}"; do
+    local line_width padding_size
+    line_width=$(__string_display_width "${line}")
+    padding_size=$((content_width - line_width))
+    local padding=""
+    if ((padding_size > 0)); then
+      padding="$(dybatpho::string_repeat " " "${padding_size}")"
+    fi
+    __log info "${left_border} ${line}${padding} ${right_border}" "${out}" "${color}"
+  done
+  __log info "${bottom_left}${horizontal_line}${bottom_right}" "${out}" "${color}"
+}
+
+#######################################
 # @description Validate a candidate log level value.
 # @arg $1 string Log level to validate
 # @exitcode 0 The input is a supported log level
@@ -172,9 +381,7 @@ function dybatpho::print {
 #######################################
 function dybatpho::progress {
   local color="0;3;34"
-  __log info "╭──────────────────────────────────────────────────────────────────────────────╮" stdout "${color}"
-  __log info "│  🚀 $*..." stdout "${color}"
-  __log info "╰──────────────────────────────────────────────────────────────────────────────╯" stdout "${color}"
+  __log_box "╭" "─" "╮" "│" "│" "╰" "╯" "🚀 $*..." stdout "${color}"
 }
 
 #######################################
@@ -200,9 +407,7 @@ function dybatpho::progress_bar {
 #######################################
 function dybatpho::header {
   local color="1;5;30;47"
-  __log info "╔══════════════════════════════════════════════════════════════════════════════╗" stdout "${color}"
-  __log info "║ $*" stdout "${color}"
-  __log info "╚══════════════════════════════════════════════════════════════════════════════╝" stdout "${color}"
+  __log_box "╔" "═" "╗" "║" "║" "╚" "╝" "$*" stdout "${color}"
 }
 
 #######################################
@@ -212,9 +417,7 @@ function dybatpho::header {
 #######################################
 function dybatpho::success {
   local color="1;3;32"
-  __log info "╭──────────────────────────────────────────────────────────────────────────────╮" stdout "${color}"
-  __log info "│  ✅ DONE: $1" stdout "${color}"
-  __log info "╰──────────────────────────────────────────────────────────────────────────────╯" stdout "${color}"
+  __log_box "╭" "─" "╮" "│" "│" "╰" "╯" "✅ DONE: $1" stdout "${color}"
 }
 
 #######################################

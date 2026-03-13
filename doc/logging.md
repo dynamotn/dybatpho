@@ -24,6 +24,10 @@ This module contains functions to log messages to stdout/stderr.
 - [`__check_color`](#__check_color) — Render the current log message with ANSI color unless `NO_COLOR` is set.
 - [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown for the current `LOG_LEVEL`.
 - [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information.
+- [`__get_terminal_width`](#__get_terminal_width) — Return the effective terminal width used by boxed logging helpers.
+- [`__string_display_width`](#__string_display_width) — Return the display width of a string, accounting for wide Unicode glyphs when possible.
+- [`__wrap_line`](#__wrap_line) — Wrap one text line to the requested width using word boundaries when possible.
+- [`__log_box`](#__log_box) — Render a boxed message sized to its content while respecting terminal width.
 - [`dybatpho::validate_log_level`](#dybatphovalidate_log_level) — Validate a candidate log level value.
 - [`dybatpho::debug`](#dybatphodebug) — Show debug message.
 - [`dybatpho::debug_command`](#dybatphodebug_command) — Log a debug message together with the output of a shell command.
@@ -125,6 +129,74 @@ Log a structured diagnostic message with timestamp and call-site information.
 | `$3` | string | Message |
 | `$4` | number | Additional stack frames to skip when resolving the source location |
 | `$5` | string | ANSI escape color code |
+
+
+---
+
+### `__get_terminal_width`
+
+Return the effective terminal width used by boxed logging helpers.
+
+**📤 Output on stdout**
+
+- Terminal width, falling back to 80 columns
+
+
+---
+
+### `__string_display_width`
+
+Return the display width of a string, accounting for wide Unicode glyphs when possible.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Input text |
+
+**📤 Output on stdout**
+
+- Display width of the input
+
+
+---
+
+### `__wrap_line`
+
+Wrap one text line to the requested width using word boundaries when possible.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Input line |
+| `$2` | number | Maximum width |
+
+**📤 Output on stdout**
+
+- Wrapped lines
+
+
+---
+
+### `__log_box`
+
+Render a boxed message sized to its content while respecting terminal width.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Top-left border character |
+| `$2` | string | Horizontal border character |
+| `$3` | string | Top-right border character |
+| `$4` | string | Left border character |
+| `$5` | string | Right border character |
+| `$6` | string | Bottom-left border character |
+| `$7` | string | Bottom-right border character |
+| `$8` | string | Message body |
+| `$9` | string | Output stream (`stdout` or `stderr`) |
+| `$10` | string | ANSI color code |
 
 
 ---

@@ -4,6 +4,7 @@ setup() {
 
 teardown() {
   export LOG_LEVEL=info
+  unset COLUMNS
 }
 
 @test "__log output message" {
@@ -132,7 +133,9 @@ teardown() {
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[0;3;34m")"
-  assert_output --partial "daylathongtin..."
+  assert_output --partial "╭"
+  assert_output --partial "│ 🚀 daylathongtin... │"
+  assert_output --partial "╰"
   assert_output --partial "$(echo -e "\e[0m")"
 }
 
@@ -160,9 +163,9 @@ teardown() {
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[1;5;30;47m")"
-  assert_output --partial "╔══════════════════════════════════════════════════════════════════════════════╗"
-  assert_output --partial daylathongtin
-  assert_output --partial "╚══════════════════════════════════════════════════════════════════════════════╝"
+  assert_output --partial "╔"
+  assert_output --partial "║ daylathongtin ║"
+  assert_output --partial "╝"
   assert_output --partial "$(echo -e "\e[0m")"
 }
 
@@ -171,11 +174,94 @@ teardown() {
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[1;3;32m")"
-  assert_output --partial "╭──────────────────────────────────────────────────────────────────────────────╮"
+  assert_output --partial "╭"
   assert_output --partial "DONE:"
-  assert_output --partial daylathongtin
-  assert_output --partial "╰──────────────────────────────────────────────────────────────────────────────╯"
+  assert_output --partial "│ ✅ DONE: daylathongtin │"
+  assert_output --partial "╯"
   assert_output --partial "$(echo -e "\e[0m")"
+}
+
+@test "boxed logging helpers wrap to terminal width and keep minimal box size" {
+  export COLUMNS=20
+  export NO_COLOR=true
+
+  run --separate-stderr dybatpho::header "alpha beta gamma"
+  assert_success
+  refute_stderr
+  assert_output << EOF
+╔══════════════╗
+║ alpha beta   ║
+║ gamma        ║
+╚══════════════╝
+EOF
+
+  run --separate-stderr dybatpho::success "deploy finished cleanly"
+  assert_success
+  refute_stderr
+  assert_output << EOF
+╭────────────────╮
+│ ✅ DONE: deploy │
+│ finished       │
+│ cleanly        │
+╰────────────────╯
+EOF
+}
+
+@test "boxed logging helpers keep visual border width aligned for wide glyphs" {
+  command -v python3 > /dev/null || skip "python3 required"
+  export NO_COLOR=true
+
+  run --separate-stderr dybatpho::success "daylathongtin"
+  assert_success
+  refute_stderr
+  OUTPUT="${output}" python3 - <<'PY'
+import os
+import sys
+import unicodedata
+
+def display_width(text):
+    width = 0
+    for char in text:
+        if unicodedata.combining(char):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+    return width
+
+lines = os.environ["OUTPUT"].splitlines()
+if len(lines) != 3:
+    raise SystemExit(f"expected 3 lines, got {len(lines)}")
+
+widths = [display_width(line) for line in lines]
+if len(set(widths)) != 1:
+    raise SystemExit(f"misaligned box widths: {widths}")
+PY
+  assert_success
+
+  run --separate-stderr dybatpho::progress "daylathongtin"
+  assert_success
+  refute_stderr
+  OUTPUT="${output}" python3 - <<'PY'
+import os
+import sys
+import unicodedata
+
+def display_width(text):
+    width = 0
+    for char in text:
+        if unicodedata.combining(char):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+    return width
+
+lines = os.environ["OUTPUT"].splitlines()
+if len(lines) != 3:
+    raise SystemExit(f"expected 3 lines, got {len(lines)}")
+
+widths = [display_width(line) for line in lines]
+if len(set(widths)) != 1:
+    raise SystemExit(f"misaligned box widths: {widths}")
+PY
+  assert_success
 }
 
 @test "dybatpho::warn output" {

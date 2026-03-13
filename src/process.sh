@@ -139,34 +139,26 @@ function dybatpho::cleanup_file_on_exit {
   dybatpho::expect_args filepath -- "$@"
 
   local pid="${BASHPID}"
-  local cleanup_file quoted_filepath quoted_cleanup_file quoted_init
-  if hash "mktemp" > /dev/null 2>&1; then
-    cleanup_file=$(mktemp --tmpdir="${TMPDIR:-/tmp}" "dybatpho_cleanup-${pid}-XXXXXXXX.sh")
-  else
-    cleanup_file="/tmp/dybatpho_cleanup-${pid}.sh" # kcov(skip)
-  fi
-  touch "${cleanup_file}" "${cleanup_file}.new" || return 1
+  local quoted_filepath
+  local running_under_bats_test=false source_file
   printf -v quoted_filepath '%q' "${filepath}"
-  printf -v quoted_cleanup_file '%q' "${cleanup_file}"
-  printf -v quoted_init '%q' "${DYBATPHO_DIR}/init.sh"
-  ( # kcov(skip)
-    grep -vF "${cleanup_file}" "${cleanup_file}" \
-      || (
-        echo ". ${quoted_init}"
-        echo "dybatpho::debug 'Delete ${cleanup_file} and ${filepath} of PID ${pid}'"
-        echo "[ -e ${quoted_filepath} ] && rm -rf ${quoted_filepath} > /dev/null 2>&1"
-        echo "[ -e ${quoted_cleanup_file} ] && rm -rf ${quoted_cleanup_file} > /dev/null 2>&1"
-      )                     # kcov(skip)
-  ) > "${cleanup_file}.new" # kcov(skip)
-  mv -f "${cleanup_file}.new" "${cleanup_file}"
 
-  # kcov(disabled)
-  local trap_command="dybatpho::trap"
-  if [[ "${BATS_ROOT:-}" != "" ]]; then
-    trap_command="trap"
+  local cleanup_command
+  cleanup_command="[[ \"\${BASHPID}\" == ${pid} ]] && [[ -e ${quoted_filepath} ]] && rm -rf ${quoted_filepath} > /dev/null 2>&1"
+
+  for source_file in "${BASH_SOURCE[@]}"; do
+    if [[ "${source_file}" == *.bats ]] || [[ "${source_file}" == */bats-core/* ]]; then
+      running_under_bats_test=true
+      break
+    fi
+  done
+
+  # Bats manages its own EXIT trap in the test shell, so keep the single-trap behavior there.
+  if [[ "${running_under_bats_test}" == true ]]; then
+    trap "${cleanup_command}" EXIT HUP INT TERM
+  else
+    dybatpho::trap "${cleanup_command}" EXIT HUP INT TERM
   fi
-  "${trap_command}" "[[ \"\${BASHPID}\" == ${pid} ]] && bash ${cleanup_file}" EXIT HUP INT TERM
-  # kcov(enabled)
 }
 
 #######################################

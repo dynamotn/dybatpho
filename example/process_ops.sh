@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # @file process_ops.sh
 # @brief Example showing process control utilities
-# @description Demonstrates dybatpho::retry, dry_run, breakpoint, expect_args,
-#              expect_envs, require, is, and error/signal handlers
+# @description Demonstrates dybatpho::retry, retry_until, dry_run, breakpoint,
+#              expect_args, expect_envs, require, command_exists_all, is,
+#              coalesce, coalesce_cmd, default_env, require_envs_any, assert,
+#              and error/signal handlers
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"
@@ -83,6 +85,12 @@ function _demo_require {
   dybatpho::info "(Requiring a missing command would call dybatpho::die)"
 }
 
+function _demo_command_checks {
+  dybatpho::header "COMMAND CHECKS"
+  dybatpho::info "bash + cat available? $(dybatpho::command_exists_all bash cat && echo yes || echo no)"
+  dybatpho::info "Preferred JSON tool  : $(dybatpho::coalesce_cmd jq python3 bash)"
+}
+
 # --- is -------------------------------------------------------------------
 
 function _demo_is {
@@ -103,6 +111,41 @@ function _demo_is {
   dybatpho::is "int" "abc" || dybatpho::warn "'abc' is not an integer (expected)"
 }
 
+# --- coalesce -------------------------------------------------------------
+
+function _demo_coalesce {
+  dybatpho::header "COALESCE"
+  local primary_host=""
+  local fallback_host="https://backup.example.com"
+  dybatpho::info "Selected host: $(dybatpho::coalesce "${primary_host}" "${fallback_host}" "http://localhost:8080")"
+}
+
+function _demo_env_defaults {
+  dybatpho::header "DEFAULT ENV / REQUIRE ANY ENV"
+  unset APP_ENDPOINT
+  dybatpho::info "Defaulted endpoint: $(dybatpho::default_env APP_ENDPOINT "http://localhost:8080")"
+  export APP_BACKUP_TOKEN="configured"
+  dybatpho::require_envs_any APP_TOKEN APP_BACKUP_TOKEN
+  dybatpho::success "At least one application token is configured"
+}
+
+function _demo_assert {
+  dybatpho::header "ASSERT"
+  dybatpho::assert '[[ 2 -gt 1 ]]' "math should still work"
+  dybatpho::success "Assertion passed"
+}
+
+function _demo_retry_until {
+  dybatpho::header "RETRY UNTIL"
+  local fixed_attempts=0
+  _fixed_delay_flaky() {
+    fixed_attempts=$((fixed_attempts + 1))
+    [[ "${fixed_attempts}" -ge 2 ]]
+  }
+  dybatpho::retry_until 2 1 _fixed_delay_flaky fixed-delay-demo
+  dybatpho::success "Fixed-delay retry succeeded"
+}
+
 # --- main -----------------------------------------------------------------
 
 function _main {
@@ -111,7 +154,12 @@ function _main {
   _demo_expect_args
   _demo_expect_envs
   _demo_require
+  _demo_command_checks
   _demo_is
+  _demo_coalesce
+  _demo_env_defaults
+  _demo_assert
+  _demo_retry_until
   dybatpho::success "Process operations demo complete"
 }
 

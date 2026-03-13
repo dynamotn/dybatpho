@@ -117,14 +117,12 @@ setup() {
 @test 'dybatpho::cleanup_file_on_exit generates quoted cleanup commands' {
   local target="${BATS_TEST_TMPDIR}/dir with space"
   dybatpho::cleanup_file_on_exit "${target}"
-  local cleanup_script
-  cleanup_script=$(ls -t /tmp/dybatpho_cleanup-*.sh | head -n 1)
-  run grep -F "> /dev/null 2>&1" "${cleanup_script}"
+  run trap -p EXIT
   assert_success
   local quoted_target
   quoted_target=$(printf '%q' "${target}")
-  run grep -F "[ -e ${quoted_target} ] && rm -rf ${quoted_target} > /dev/null 2>&1" "${cleanup_script}"
-  assert_success
+  assert_output --partial "> /dev/null 2>&1"
+  assert_output --partial "[[ -e ${quoted_target} ]] && rm -rf ${quoted_target} > /dev/null 2>&1"
 }
 
 @test "dybatpho::dry_run with DRY_RUN=true should print dry run message and not execute command" {

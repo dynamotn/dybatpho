@@ -77,6 +77,7 @@
 - [process.sh](doc/process.md) – Process management
 - [network.sh](doc/network.md) – Network utilities
 - [date.sh](doc/date.md) – Date and timestamp helpers
+- [json.sh](doc/json.md) – JSON and YAML helpers
 - [file.sh](doc/file.md) – File operations
 - [cli.sh](doc/cli.md) – CLI building support
 

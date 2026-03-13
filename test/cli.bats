@@ -622,6 +622,43 @@ setup() {
   assert_output "true"
 }
 
+@test "dybatpho::opts::setup prerun/postrun wrap action" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - prerun:"echo pre" action:"echo main" postrun:"echo post"
+  }
+
+  run dybatpho::generate_from_spec _spec
+  assert_success
+  assert_line --index 0 "pre"
+  assert_line --index 1 "main"
+  assert_line --index 2 "post"
+}
+
+@test "dybatpho::opts::setup prerun/postrun are scoped to active subcommand" {
+  # shellcheck disable=2329
+  _spec_hook_child() {
+    dybatpho::opts::setup "" - prerun:"echo child-pre" action:"echo child-main" postrun:"echo child-post"
+  }
+  # shellcheck disable=2329
+  _spec_hook_parent() {
+    dybatpho::opts::setup "" - prerun:"echo parent-pre" action:"echo parent-main" postrun:"echo parent-post"
+    dybatpho::opts::cmd child _spec_hook_child
+  }
+
+  run dybatpho::generate_from_spec _spec_hook_parent
+  assert_success
+  assert_line --index 0 "parent-pre"
+  assert_line --index 1 "parent-main"
+  assert_line --index 2 "parent-post"
+
+  run dybatpho::generate_from_spec _spec_hook_parent child
+  assert_success
+  assert_line --index 0 "child-pre"
+  assert_line --index 1 "child-main"
+  assert_line --index 2 "child-post"
+}
+
 @test "dybatpho::opts::cmd multiple subcommands dispatch correctly" {
   # shellcheck disable=2329
   _spec_cmd_a() {

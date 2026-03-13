@@ -122,6 +122,8 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | Attribute | Applies to | Description |
 | --------- | ---------- | ----------- |
 | `action:<code>` | `setup`, `disp` | Code to run when parsing finishes or a display option is used |
+| `prerun:<code>` | `setup` | Code to run after validation and before `action:<code>` |
+| `postrun:<code>` | `setup` | Code to run after `action:<code>` |
 | `args:<rule>` | `setup` | Positional argument rule: `none`, `exact:N`, `min:N`, `max:N`, or `range:M:N` |
 | `alias:<name>` | `flag`, `param`, `disp`, `cmd` | Add one alias switch or command name |
 | `aliases:<a,b>` | `flag`, `param`, `disp`, `cmd` | Add multiple aliases separated by commas |
@@ -267,6 +269,16 @@ function _spec_root {
 ```bash
 dybatpho::opts::flag "Legacy flag" LEGACY --legacy hidden:true
 dybatpho::opts::cmd old-run _spec_old deprecated:"Use 'run' instead"
+```
+
+
+#### PreRun / PostRun hooks
+
+
+```bash
+function _spec_run {
+  dybatpho::opts::setup "Run command" - prerun:"echo pre" action:"echo main" postrun:"echo post"
+}
 ```
 
 
@@ -779,11 +791,12 @@ of script or function
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Description of sub-command/root command |
-| `$@` | key:value | Settings `key:value` for sub-command/root command such as `action:<code>` and `args:<rule>` |
+| `$@` | key:value | Settings `key:value` for sub-command/root command such as `action:<code>`, `prerun:<code>`, `postrun:<code>`, and `args:<rule>` |
 
 **📝 Notes**
 
-- `args:<rule>` supports `none`, `exact:N`, `min:N`, `max:N`, and `range:M:N`
+- `args:<rule>` supports raw rules plus Cobra-like names such as `NoArgs`, `ExactArgs:N`, and `RangeArgs:M:N`
+- `prerun:<code>` runs before `action:<code>`, and `postrun:<code>` runs after it
 
 **🚦 Exit codes**
 

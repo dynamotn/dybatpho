@@ -34,7 +34,9 @@ function _run_deploy {
 }
 
 function _spec_deploy {
-  dybatpho::opts::setup "Deploy application to an environment" DEPLOY_ARGS args:none action:"_run_deploy"
+  dybatpho::opts::setup "Deploy application to an environment" DEPLOY_ARGS args:none action:"_run_deploy" \
+    prerun:"dybatpho::progress 'Preparing deploy...'" \
+    postrun:"dybatpho::success 'Deploy hook finished'"
   dybatpho::opts::param "Target environment" ENV -e --env init:="staging"
   dybatpho::opts::flag "Force deploy even if checks fail" FORCE -f --force
   dybatpho::opts::flag "Build before deploying" BUILD -b --build

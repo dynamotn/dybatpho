@@ -59,6 +59,8 @@
 #   | Attribute | Applies to | Description |
 #   | --------- | ---------- | ----------- |
 #   | `action:<code>` | `setup`, `disp` | Code to run when parsing finishes or a display option is used |
+#   | `prerun:<code>` | `setup` | Code to run after validation and before `action:<code>` |
+#   | `postrun:<code>` | `setup` | Code to run after `action:<code>` |
 #   | `args:<rule>` | `setup` | Positional argument rule: `none`, `exact:N`, `min:N`, `max:N`, or `range:M:N` |
 #   | `alias:<name>` | `flag`, `param`, `disp`, `cmd` | Add one alias switch or command name |
 #   | `aliases:<a,b>` | `flag`, `param`, `disp`, `cmd` | Add multiple aliases separated by commas |
@@ -178,6 +180,14 @@
 #   ```bash
 #   dybatpho::opts::flag "Legacy flag" LEGACY --legacy hidden:true
 #   dybatpho::opts::cmd old-run _spec_old deprecated:"Use 'run' instead"
+#   ```
+#
+#   #### PreRun / PostRun hooks
+#
+#   ```bash
+#   function _spec_run {
+#     dybatpho::opts::setup "Run command" - prerun:"echo pre" action:"echo main" postrun:"echo post"
+#   }
 #   ```
 #
 #   #### Boolean toggle
@@ -499,7 +509,7 @@ function __generate_logic {
   local __on="1" __off="" __init="@empty"                                                                     # For handle argument of param, effective for rest arguments and options
   local __export="true"                                                                                       # For handle export variable of `dybatpho::opts::*` commands via name
   local __optional="true" __required="false" __persistent="false" __hidden="false" __deprecated="" __label="" # Param value optionality, option presence, persistence, visibility, deprecation, preferred switch label
-  local __action="" __setup_action=""                                                                         # For get action after parse all options and action of each options in spec
+  local __action="" __setup_action="" __prerun="" __setup_prerun="" __postrun="" __setup_postrun=""          # For get action and setup hooks in spec
   local __args="any"                                                                                          # For validate positional argument count from opts::setup
   local __switch=""                                                                                           # For get switch of options
   declare -a __required_checks=()
@@ -609,7 +619,9 @@ function __generate_logic {
   done
   __print_args_check "${__args}"
   __print_indent 2 '[ $# -eq 0 ] && {'
-  __print_indent 3 "${__setup_action}"
+  [ "${__setup_prerun}" ] && __print_indent 3 "${__setup_prerun}"
+  [ "${__setup_action}" ] && __print_indent 3 "${__setup_action}"
+  [ "${__setup_postrun}" ] && __print_indent 3 "${__setup_postrun}"
   __print_indent 3 'return 0'
   __print_indent 2 '}'
   __print_indent 1 '}'
@@ -988,8 +1000,9 @@ function __print_args_check {
 # @description Setup global settings for getting options (mandatory) in spec
 # of script or function
 # @arg $1 string Description of sub-command/root command
-# @arg $@ key:value Settings `key:value` for sub-command/root command such as `action:<code>` and `args:<rule>`
-# @note `args:<rule>` supports `none`, `exact:N`, `min:N`, `max:N`, and `range:M:N`
+# @arg $@ key:value Settings `key:value` for sub-command/root command such as `action:<code>`, `prerun:<code>`, `postrun:<code>`, and `args:<rule>`
+# @note `args:<rule>` supports raw rules plus Cobra-like names such as `NoArgs`, `ExactArgs:N`, and `RangeArgs:M:N`
+# @note `prerun:<code>` runs before `action:<code>`, and `postrun:<code>` runs after it
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::setup {
@@ -1023,7 +1036,9 @@ function dybatpho::opts::setup {
       __parse_key_value "$1" "__"
     done
     __define_var "${__rest}"
+    __setup_prerun="${__prerun}"
     __setup_action="${__action}"
+    __setup_postrun="${__postrun}"
   fi
 }
 

@@ -605,6 +605,23 @@ setup() {
   assert_success && assert_output "true:true"
 }
 
+@test "dybatpho::opts::flag persistent:true works after subcommand dispatch" {
+  # shellcheck disable=2329
+  _spec_persist_child() {
+    dybatpho::opts::setup "" - action:"echo \$PERSIST_FLAG"
+  }
+  # shellcheck disable=2329
+  _spec_persist_parent() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::flag "Persistent flag" PERSIST_FLAG --persist persistent:true
+    dybatpho::opts::cmd child _spec_persist_child
+  }
+
+  run dybatpho::generate_from_spec _spec_persist_parent child --persist
+  assert_success
+  assert_output "true"
+}
+
 @test "dybatpho::opts::cmd multiple subcommands dispatch correctly" {
   # shellcheck disable=2329
   _spec_cmd_a() {
@@ -827,6 +844,25 @@ setup() {
   assert_output --partial "First sub command"
   assert_output --partial "sub2"
   assert_output --partial "Second sub command"
+}
+
+@test "dybatpho::generate_help includes persistent parent options in child help" {
+  # shellcheck disable=2329
+  _spec_hpersist_child() {
+    dybatpho::opts::setup "Child help" -
+    dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_hpersist_child"
+  }
+  # shellcheck disable=2329
+  _spec_hpersist_parent() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::flag "Persistent flag" HPERSIST --persist persistent:true
+    dybatpho::opts::cmd child _spec_hpersist_child
+  }
+
+  run dybatpho::generate_from_spec _spec_hpersist_parent child --help
+  assert_success
+  assert_output --partial "--persist"
+  assert_output --partial "Persistent flag"
 }
 
 @test "dybatpho::generate_help shows command aliases" {

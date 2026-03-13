@@ -65,6 +65,7 @@
 #   | `init:<value>` | `flag`, `param` | Initial variable value |
 #   | `on:<string>` | `flag`, `param` | Positive value when the option is enabled |
 #   | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
+#   | `persistent:<bool>` | `flag`, `param`, `disp` | Make the option available in descendant subcommands |
 #   | `export:<bool>` | `flag`, `param` | Export the variable |
 #   | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 #   | `required:<bool>` | `param` | Whether the option itself must appear |
@@ -161,6 +162,16 @@
 #   dybatpho::opts::cmd config _spec_config alias:cfg aliases:conf,settings
 #   ```
 #
+#   #### Persistent parent options
+#
+#   ```bash
+#   function _spec_root {
+#     dybatpho::opts::setup "Root command" -
+#     dybatpho::opts::flag "Verbose output" VERBOSE --verbose persistent:true
+#     dybatpho::opts::cmd deploy _spec_deploy
+#   }
+#   ```
+#
 #   #### Boolean toggle
 #
 #   ```bash
@@ -245,7 +256,7 @@ function __parse_opt {
   shift 2
 
   if dybatpho::is false "${__done_initial}"; then
-    __on="true" __off="" __init="@empty" __export="true" __required="false" __label=""
+    __on="true" __off="" __init="@empty" __export="true" __required="false" __persistent="false" __label=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -307,7 +318,7 @@ function __parse_opt {
       shift
     done
   else
-    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __switch=""
+    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __persistent="false" __switch=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -479,11 +490,12 @@ function __generate_logic {
   local __flags="" __params=""                          # For get all flags and params of command
   local __on="1" __off="" __init="@empty"               # For handle argument of param, effective for rest arguments and options
   local __export="true"                                 # For handle export variable of `dybatpho::opts::*` commands via name
-  local __optional="true" __required="false" __label="" # Param value optionality, option presence, preferred switch label
+  local __optional="true" __required="false" __persistent="false" __label="" # Param value optionality, option presence, persistence, preferred switch label
   local __action="" __setup_action=""                   # For get action after parse all options and action of each options in spec
   local __args="any"                                    # For validate positional argument count from opts::setup
   local __switch=""                                     # For get switch of options
   declare -a __required_checks=()
+  declare -a __persistent_defs=()
   local __has_sub_cmd="false"
   declare -a __sub_specs=()
 
@@ -512,10 +524,12 @@ function __generate_logic {
   }
 
   # Initial all variables before get value of options
-  local __done_initial
-  __done_initial=false && "${spec}" "$*"
+  local __done_initial=false
+  __replay_persistent_defs
+  "${spec}" "$*"
   __print_indent 0 "dybatpho::opts::parse::${spec}() {"
   __print_indent 1 'local __rest_argc=0'
+  __print_persistent_help_defs
   # shellcheck disable=2016
   __print_indent 1 \
     "while OPTARG= && [ \"\${${__rest}}\" != end ] && [ \$# -gt 0 ]; do"
@@ -545,7 +559,9 @@ function __generate_logic {
 
   # Get value of options
   __print_indent 2 'case $1 in'
-  __done_initial=true && "${spec}" "$*"
+  __done_initial=true
+  __replay_persistent_defs
+  "${spec}" "$*"
   __print_indent 3 "--)"
   __print_indent 4 "shift"
   __print_rest
@@ -606,7 +622,7 @@ function __generate_logic {
     local _sub_spec _cmd_match _cmd_name
     IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name <<< "${sub_spec}"
     [ "${_cmd_match}" = "${_cmd_name}" ] || continue
-    __generate_logic "${_sub_spec}" "${_cmd_name}" "$@"
+    __generate_child_logic "${_sub_spec}" "${_cmd_name}" "$@"
   done
 
   # Trigger root spec
@@ -635,6 +651,12 @@ function __generate_help {
   [ "$(type -t "${spec}")" != 'function' ] && return
 
   __help_mode=true
+  __replay_persistent_defs
+  local __persistent_def
+  local __persistent_replay=true
+  for __persistent_def in "${__persistent_help_defs[@]}"; do
+    eval "${__persistent_def}"
+  done
   "${spec}"
   __help_mode=false
 
@@ -813,6 +835,67 @@ function __parse_alias_list {
 }
 
 #######################################
+# @description Serialize an option definition so it can be replayed for persistent descendant commands.
+# @arg $1 string Option type (`flag`, `param`, or `disp`)
+# @arg $@ string Original arguments passed to the option helper
+# @exitcode 0 Definition stored for later replay
+#######################################
+function __record_persistent_def {
+  local __kind="$1" __serialized="dybatpho::opts::${1}" __part
+  shift
+  for __part in "$@"; do
+    printf -v __part '%q' "${__part}"
+    __serialized+=" ${__part}"
+  done
+  __persistent_defs+=("${__serialized}")
+}
+
+#######################################
+# @description Replay inherited persistent option definitions inside the current parser/help generation context.
+# @noargs
+# @exitcode 0 All inherited persistent definitions were replayed
+#######################################
+function __replay_persistent_defs {
+  local __persistent_def
+  local __persistent_replay=true
+  for __persistent_def in "${__persistent_inherited_defs[@]}"; do
+    eval "${__persistent_def}"
+  done
+}
+
+#######################################
+# @description Emit generated code that seeds persistent option definitions for nested help output.
+# @noargs
+# @stdout Generated parser code
+#######################################
+function __print_persistent_help_defs {
+  local __persistent_def __quoted_def __has_defs=false
+  for __persistent_def in "${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}"; do
+    [ -n "${__persistent_def}" ] || continue
+    if dybatpho::is false "${__has_defs}"; then
+      __print_indent 1 'local -a __persistent_help_defs=()'
+      __has_defs=true
+    fi
+    __assign_quoted __quoted_def "${__persistent_def}"
+    __print_indent 1 "__persistent_help_defs+=( ${__quoted_def} )"
+  done
+}
+
+#######################################
+# @description Generate parser logic for a child command with inherited persistent option definitions.
+# @arg $1 string Child spec function
+# @arg $2 string Child command name
+# @arg $@ string Original CLI arguments
+# @stdout Generated parser code
+#######################################
+function __generate_child_logic {
+  local __child_spec="$1" __child_command="$2"
+  shift 2
+  local -a __persistent_inherited_defs=("${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}")
+  __generate_logic "${__child_spec}" "${__child_command}" "$@"
+}
+
+#######################################
 # @description Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
 # @arg $1 string Argument count rule (`none`, `exact:N`, `min:N`, `max:N`, `range:M:N`, `any`)
 # @stdout Generated parser code
@@ -923,6 +1006,7 @@ function dybatpho::opts::setup {
 # @arg $1 string Description of option to display
 # @arg $2 string Variable name for getting option. `-` if want to omit
 # @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
+# @note Use `persistent:true` to make the flag available to descendant subcommands
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::flag {
@@ -941,6 +1025,9 @@ function dybatpho::opts::flag {
 
   __parse_opt false 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
+    if dybatpho::is true "${__persistent}" && dybatpho::is false "${__persistent_replay:-false}"; then
+      __record_persistent_def flag "$@"
+    fi
     __define_var "${var}"
   else
     __print_indent 3 "${__switch})"
@@ -961,6 +1048,7 @@ function dybatpho::opts::flag {
 # @tip Use `optional:true` when the option may appear without an explicit value
 # @tip `optional:true` controls whether a value is required after the switch appears, while `required:true` controls whether the switch itself must appear at all
 # @tip Keep conditional requirements such as "required unless `--list` is set" in your action or validation logic
+# @note Use `persistent:true` to make the param available to descendant subcommands
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::param {
@@ -979,6 +1067,9 @@ function dybatpho::opts::param {
 
   __parse_opt true 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
+    if dybatpho::is true "${__persistent}" && dybatpho::is false "${__persistent_replay:-false}"; then
+      __record_persistent_def param "$@"
+    fi
     __define_var "${var}"
     if dybatpho::is true "${__required}"; then
       local __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
@@ -1023,6 +1114,7 @@ function dybatpho::opts::param {
 # @description Define an option that display only
 # @arg $1 string Description of option to display
 # @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
+# @note Use `persistent:true` to make the display option available to descendant subcommands
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::disp {
@@ -1044,6 +1136,8 @@ function dybatpho::opts::disp {
     [ "${__action}" ] && __print_indent 4 "${__action}"
     __print_indent 4 "exit 0"
     __print_indent 4 ";;"
+  elif dybatpho::is true "${__persistent}" && dybatpho::is false "${__persistent_replay:-false}"; then
+    __record_persistent_def disp "$@"
   fi
 }
 

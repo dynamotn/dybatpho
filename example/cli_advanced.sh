@@ -14,9 +14,9 @@ dybatpho::register_common_handlers
 # ===========================================================================
 
 function _spec_global {
-  dybatpho::opts::flag "Enable verbose output" VERBOSE --verbose alias:-v
-  dybatpho::opts::flag "Print commands without executing" DRY_RUN --dry-run -n on:true off:false init:="false"
-  dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info"
+  dybatpho::opts::flag "Enable verbose output" VERBOSE --verbose alias:-v persistent:true
+  dybatpho::opts::flag "Print commands without executing" DRY_RUN --dry-run -n on:true off:false init:="false" persistent:true
+  dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info" persistent:true
 }
 
 # ===========================================================================
@@ -34,7 +34,6 @@ function _run_deploy {
 }
 
 function _spec_deploy {
-  _spec_global
   dybatpho::opts::setup "Deploy application to an environment" DEPLOY_ARGS args:none action:"_run_deploy"
   dybatpho::opts::param "Target environment" ENV -e --env init:="staging"
   dybatpho::opts::flag "Force deploy even if checks fail" FORCE -f --force
@@ -53,7 +52,6 @@ function _run_db_migrate {
 }
 
 function _spec_db_migrate {
-  _spec_global
   dybatpho::opts::setup "Run pending database migrations" MIGRATE_ARGS args:none action:"_run_db_migrate"
   dybatpho::opts::param "Number of migrations to run" STEPS -s --steps init:="all"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_migrate"
@@ -66,7 +64,6 @@ function _run_db_seed {
 }
 
 function _spec_db_seed {
-  _spec_global
   dybatpho::opts::setup "Populate database with seed data" SEED_ARGS args:none action:"_run_db_seed"
   dybatpho::opts::param "Seed fixture file" FIXTURE -f --fixture required:true
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_seed"
@@ -84,14 +81,12 @@ function _run_db_reset {
 }
 
 function _spec_db_reset {
-  _spec_global
   dybatpho::opts::setup "Drop and recreate the database" RESET_ARGS args:none action:"_run_db_reset"
   dybatpho::opts::flag "Skip confirmation prompt" YES -y --yes
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_reset"
 }
 
 function _spec_db {
-  _spec_global
   dybatpho::opts::setup "Database management commands" DB_ARGS action:"dybatpho::generate_help _spec_db"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db"
   dybatpho::opts::cmd migrate _spec_db_migrate
@@ -124,7 +119,6 @@ function _run_config {
 }
 
 function _spec_config {
-  _spec_global
   dybatpho::opts::setup "Show or update configuration" CONFIG_ARGS args:none action:"_run_config"
   dybatpho::opts::param "Config key to read or write" KEY -k --key
   dybatpho::opts::param "Value to set (omit to read)" VALUE -V --value

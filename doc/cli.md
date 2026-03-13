@@ -43,6 +43,10 @@ Utilities for building CLI parsers from shell specs.
 - [`__add_switch`](#__add_switch) — Add to switches list if flag/param has multiple switches
 - [`__print_validate`](#__print_validate) — Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
 - [`__parse_alias_list`](#__parse_alias_list) — Split a comma-separated alias list into a caller-provided array.
+- [`__record_persistent_def`](#__record_persistent_def) — Serialize an option definition so it can be replayed for persistent descendant commands.
+- [`__replay_persistent_defs`](#__replay_persistent_defs) — Replay inherited persistent option definitions inside the current parser/help generation context.
+- [`__print_persistent_help_defs`](#__print_persistent_help_defs) — Emit generated code that seeds persistent option definitions for nested help output.
+- [`__generate_child_logic`](#__generate_child_logic) — Generate parser logic for a child command with inherited persistent option definitions.
 - [`__print_args_check`](#__print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
 - [`dybatpho::opts::flag`](#dybatphooptsflag) — Define an option that take no argument
@@ -123,6 +127,7 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | `init:<value>` | `flag`, `param` | Initial variable value |
 | `on:<string>` | `flag`, `param` | Positive value when the option is enabled |
 | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
+| `persistent:<bool>` | `flag`, `param`, `disp` | Make the option available in descendant subcommands |
 | `export:<bool>` | `flag`, `param` | Export the variable |
 | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 | `required:<bool>` | `param` | Whether the option itself must appear |
@@ -239,6 +244,18 @@ function _spec_sum {
 ```bash
 dybatpho::opts::flag "Verbose output" VERBOSE --verbose alias:-v
 dybatpho::opts::cmd config _spec_config alias:cfg aliases:conf,settings
+```
+
+
+#### Persistent parent options
+
+
+```bash
+function _spec_root {
+  dybatpho::opts::setup "Root command" -
+  dybatpho::opts::flag "Verbose output" VERBOSE --verbose persistent:true
+  dybatpho::opts::cmd deploy _spec_deploy
+}
 ```
 
 
@@ -637,6 +654,69 @@ Split a comma-separated alias list into a caller-provided array.
 
 ---
 
+### `__record_persistent_def`
+
+Serialize an option definition so it can be replayed for persistent descendant commands.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Option type (`flag`, `param`, or `disp`) |
+| `$@` | string | Original arguments passed to the option helper |
+
+**🚦 Exit codes**
+
+- `0`: Definition stored for later replay
+
+
+---
+
+### `__replay_persistent_defs`
+
+Replay inherited persistent option definitions inside the current parser/help generation context.
+
+_Function has no arguments._
+
+**🚦 Exit codes**
+
+- `0`: All inherited persistent definitions were replayed
+
+
+---
+
+### `__print_persistent_help_defs`
+
+Emit generated code that seeds persistent option definitions for nested help output.
+
+_Function has no arguments._
+
+**📤 Output on stdout**
+
+- Generated parser code
+
+
+---
+
+### `__generate_child_logic`
+
+Generate parser logic for a child command with inherited persistent option definitions.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Child spec function |
+| `$2` | string | Child command name |
+| `$@` | string | Original CLI arguments |
+
+**📤 Output on stdout**
+
+- Generated parser code
+
+
+---
+
 ### `__print_args_check`
 
 Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
@@ -694,6 +774,10 @@ Define an option that take no argument
 | `$2` | string | Variable name for getting option. `-` if want to omit |
 | `$@` | switch\|key:value | Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>` |
 
+**📝 Notes**
+
+- Use `persistent:true` to make the flag available to descendant subcommands
+
 **🚦 Exit codes**
 
 - `0`: exit code
@@ -713,6 +797,10 @@ Define an option that take an argument
 | `$2` | string | Variable name for getting option. `-` if want to omit |
 | `$@` | switch\|key:value | Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>` |
 
+**📝 Notes**
+
+- Use `persistent:true` to make the param available to descendant subcommands
+
 **🚦 Exit codes**
 
 - `0`: exit code
@@ -730,6 +818,10 @@ Define an option that display only
 | --- | --- | --- |
 | `$1` | string | Description of option to display |
 | `$@` | switch\|key:value | Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>` |
+
+**📝 Notes**
+
+- Use `persistent:true` to make the display option available to descendant subcommands
 
 **🚦 Exit codes**
 

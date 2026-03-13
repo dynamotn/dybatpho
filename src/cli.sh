@@ -20,7 +20,8 @@
 # |`on:<string>`|The positive value whether option is switch as `--flag`, `--with-flag`, default is `"true"`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 # |`off:<string>`|The negative value whether option is not presence, or as `--no-flag`, `--without-flag`, default is empty `''`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 # |`export:<bool>`|Export variable in spec command or not, default is true, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
-# |`optional:<bool>`|Used for `dybatpho::opts::param` whether option is optional, default is false (restrict)|
+# |`optional:<bool>`|Used for `dybatpho::opts::param` whether option value is optional when the switch appears, default is false|
+# |`required:<bool>`|Used for `dybatpho::opts::param` whether the option itself must appear, default is false|
 # |`validate:<code>`|Validate statements for options, eg: `"_function1 \$OPTARG"` (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 # |`error:<code>`|Custom error messages function for options, eg: `"_show_error1"`,  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 #
@@ -55,12 +56,18 @@ function __parse_opt {
   shift 2
 
   if dybatpho::is false "${__done_initial}"; then
-    __on="true" __off="" __init="@empty" __export="true"
+    __on="true" __off="" __init="@empty" __export="true" __required="false" __label=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
         [!-]*) __parse_key_value "$1" "__" ;;
+        --*)
+          if [ -z "${__label}" ] || [ "${__label#--}" = "${__label}" ]; then
+            __label="$1"
+          fi
+          ;;
         -?)
+          [ -n "${__label}" ] || __label="$1"
           dybatpho::is true "${need_argument}" \
             && __params="${__params}${1#-}" \
             || __flags="${__flags}${1#-}"
@@ -69,7 +76,7 @@ function __parse_opt {
       shift
     done
   else
-    __validate="" __on="true" __off="" __export="true" __optional="false" __switch=""
+    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __switch=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -203,9 +210,10 @@ function __generate_logic {
   local __flags="" __params=""            # For get all flags and params of command
   local __on="1" __off="" __init="@empty" # For handle argument of param, effective for rest arguments and options
   local __export="true"                   # For handle export variable of `dybatpho::opts::*` commands via name
-  local __optional="true"                 # For set flag is optional or required
+  local __optional="true" __required="false" __label="" # Param value optionality, option presence, preferred switch label
   local __action="" __setup_action=""     # For get action after parse all options and action of each options in spec
   local __switch=""                       # For get switch of options
+  declare -a __required_checks=()
   local __has_sub_cmd="false"
   declare -a __sub_specs=()
 
@@ -287,13 +295,21 @@ function __generate_logic {
   # Show error messages if invalid, otherwise run action command
   __print_indent 1 '[ $# -eq 0 ] && {'
   __print_indent 2 'unset OPTARG'
-  __print_indent 2 "${__setup_action}"
-  __print_indent 2 'return 0'
+  for __required_check in "${__required_checks[@]}"; do
+    __print_indent 2 '[ $# -eq 0 ] && {'
+    __print_indent 3 "${__required_check}"
+    __print_indent 2 '}'
+  done
+  __print_indent 2 '[ $# -eq 0 ] && {'
+  __print_indent 3 "${__setup_action}"
+  __print_indent 3 'return 0'
+  __print_indent 2 '}'
   __print_indent 1 '}'
   __print_indent 1 'case $1 in'
   __print_indent 2 'unknown) set "Unrecognized option: $2" "$@" ;;'
   __print_indent 2 'noarg) set "Does not allow an argument: $2" "$@" ;;'
   __print_indent 2 'needarg) set "Requires an argument: $2" "$@" ;;'
+  __print_indent 2 'missingopt) set "Missing required option: $2" "$@" ;;'
   __print_indent 2 'notcmd) set "Invalid command: $2" "$@" ;;'
   __print_indent 2 '*) set "Validation error ($1): $2" "$@"'
   __print_indent 1 "esac"
@@ -386,7 +402,7 @@ function __help_sw {
 function __help_row {
   local _type=$1 _var=$2 _desc=$3
   shift 3
-  local sw="" label="" hidden=""
+  local sw="" label="" hidden="" required="false"
   while [ $# -gt 0 ]; do
     local _i=$1 && shift
     case $_i in
@@ -404,11 +420,15 @@ function __help_row {
       -?) __help_sw 0 "$_i" ;;
       hidden:*) hidden="${_i#hidden:}" ;;
       label:*) label="${_i#label:}" ;;
+      required:*) required="${_i#required:}" ;;
       *) : ;;
     esac
   done
 
   [ "${hidden}" ] && return 0
+  if [ "${_type}" = "param" ] && dybatpho::is true "${required}"; then
+    _desc="${_desc:+${_desc} }(required)"
+  fi
 
   local len=${__help_width%,*}
   [ "${label}" ] || case $_type in
@@ -548,7 +568,21 @@ function dybatpho::opts::param {
   __parse_opt true 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
     __define_var "${var}"
+    if dybatpho::is true "${__required}"; then
+      local __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
+      local __saved_init="${__init}" __saved_export="${__export}"
+      __init="@empty"
+      __export="false"
+      __define_var "${__required_marker}"
+      __init="${__saved_init}"
+      __export="${__saved_export}"
+      __required_checks+=("[ \"\${${__required_marker}}\" ] || set \"missingopt\" \"${__label:-$var}\"")
+    fi
   else
+    local __required_marker=""
+    if dybatpho::is true "${__required}"; then
+      __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
+    fi
     __print_indent 3 "${__switch})"
     if dybatpho::is false "${__optional}"; then
       __print_indent 4 '[ $# -le 1 ] && set "needarg" "$1" && break'
@@ -567,6 +601,7 @@ function dybatpho::opts::param {
       __print_indent 4 "} || OPTARG=${__off}"
     fi
     __print_validate "${var}" '$OPTARG'
+    [ "${__required_marker}" ] && __print_indent 4 "${__required_marker}=true"
     __print_indent 4 "shift"
     __print_indent 4 ";;"
   fi

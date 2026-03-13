@@ -22,7 +22,8 @@ Theses are type of function arguments that defined in this file
 |`on:<string>`|The positive value whether option is switch as `--flag`, `--with-flag`, default is `"true"`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`off:<string>`|The negative value whether option is not presence, or as `--no-flag`, `--without-flag`, default is empty `''`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`export:<bool>`|Export variable in spec command or not, default is true, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
-|`optional:<bool>`|Used for `dybatpho::opts::param` whether option is optional, default is false (restrict)|
+|`optional:<bool>`|Used for `dybatpho::opts::param` whether option value is optional when the switch appears, default is false|
+|`required:<bool>`|Used for `dybatpho::opts::param` whether the option itself must appear, default is false|
 |`validate:<code>`|Validate statements for options, eg: `"_function1 \$OPTARG"` (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`error:<code>`|Custom error messages function for options, eg: `"_show_error1"`,  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 
@@ -79,7 +80,8 @@ Theses are type of function arguments that defined in this file
 |`on:<string>`|The positive value whether option is switch as `--flag`, `--with-flag`, default is `"true"`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`off:<string>`|The negative value whether option is not presence, or as `--no-flag`, `--without-flag`, default is empty `''`, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`export:<bool>`|Export variable in spec command or not, default is true, used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
-|`optional:<bool>`|Used for `dybatpho::opts::param` whether option is optional, default is false (restrict)|
+|`optional:<bool>`|Used for `dybatpho::opts::param` whether option value is optional when the switch appears, default is false|
+|`required:<bool>`|Used for `dybatpho::opts::param` whether the option itself must appear, default is false|
 |`validate:<code>`|Validate statements for options, eg: `"_function1 \$OPTARG"` (must have `\$OPTARG` to pass param value of option), used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 |`error:<code>`|Custom error messages function for options, eg: `"_show_error1"`,  used for `dybatpho::opts::flag` and `dybatpho::opts::param`|
 

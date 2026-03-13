@@ -351,6 +351,30 @@ setup() {
   assert_output --partial "hello"
 }
 
+@test "dybatpho::opts::param required:true fails when option is missing" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - action:"echo \$REQNAME"
+    dybatpho::opts::param "Name" REQNAME -n --name required:true
+  }
+
+  run --separate-stderr dybatpho::generate_from_spec _spec
+  assert_failure
+  assert_stderr --partial "Missing required option: --name"
+}
+
+@test "dybatpho::opts::param required:true succeeds when option is present" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - action:"echo \$REQNAME2"
+    dybatpho::opts::param "Name" REQNAME2 -n --name required:true
+  }
+
+  run dybatpho::generate_from_spec _spec --name dynamo
+  assert_success
+  assert_output "dynamo"
+}
+
 @test "dybatpho::opts::setup rejects invalid rest variable name" {
   # shellcheck disable=2329
   _spec() {
@@ -634,6 +658,19 @@ setup() {
   __current_cmd_path=""
   run dybatpho::generate_help _spec_hpv
   assert_output --partial "<HPVAL>"
+}
+
+@test "dybatpho::generate_help marks required:true params automatically" {
+  # shellcheck disable=2329
+  _spec_hreq() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::param "Set name" HREQ --name required:true
+  }
+
+  __current_cmd_path=""
+  run dybatpho::generate_help _spec_hreq
+  assert_output --partial "--name"
+  assert_output --partial "Set name (required)"
 }
 
 @test "dybatpho::generate_help disp shows without <VAR>" {

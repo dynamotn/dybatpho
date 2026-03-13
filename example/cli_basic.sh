@@ -44,7 +44,7 @@ function _run {
 function _spec {
   dybatpho::opts::setup "A minimal greeter CLI" ARGS action:"_run"
 
-  dybatpho::opts::param "Your name" NAME -n --name
+  dybatpho::opts::param "Your name" NAME -n --name required:true
   dybatpho::opts::param "Custom greeting word" GREETING -g --greeting init:="Hello"
   dybatpho::opts::param "How many times to greet" COUNT -c --count init:="1"
   dybatpho::opts::flag "Print the message in UPPERCASE" SHOUT -s --shout

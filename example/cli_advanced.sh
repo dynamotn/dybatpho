@@ -60,15 +60,15 @@ function _spec_db_migrate {
 }
 
 function _run_db_seed {
-  dybatpho::header "DB SEED (fixture: ${FIXTURE:-seeds/default.sql})"
-  dybatpho::dry_run "echo 'Seeding from ${FIXTURE:-seeds/default.sql}...'"
+  dybatpho::header "DB SEED (fixture: ${FIXTURE})"
+  dybatpho::dry_run "echo 'Seeding from ${FIXTURE}...'"
   dybatpho::success "Seeding complete" && exit 0
 }
 
 function _spec_db_seed {
   _spec_global
   dybatpho::opts::setup "Populate database with seed data" SEED_ARGS action:"_run_db_seed"
-  dybatpho::opts::param "Seed fixture file" FIXTURE -f --fixture init:="seeds/default.sql"
+  dybatpho::opts::param "Seed fixture file" FIXTURE -f --fixture required:true
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_seed"
 }
 

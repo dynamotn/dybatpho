@@ -59,6 +59,7 @@
 #   | Attribute | Applies to | Description |
 #   | --------- | ---------- | ----------- |
 #   | `action:<code>` | `setup`, `disp` | Code to run when parsing finishes or a display option is used |
+#   | `args:<rule>` | `setup` | Positional argument rule: `none`, `exact:N`, `min:N`, `max:N`, or `range:M:N` |
 #   | `init:<value>` | `flag`, `param` | Initial variable value |
 #   | `on:<string>` | `flag`, `param` | Positive value when the option is enabled |
 #   | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
@@ -82,12 +83,26 @@
 #   | `init:action:<code>` | Run code without assignment |
 #   | `init:=<code>` | Assign the raw shell expression |
 #
+#   ### Positional argument rules
+#
+#   Use `args:<rule>` in `dybatpho::opts::setup` to validate positional arguments
+#   the same way Cobra-style commands often do.
+#
+#   | Rule | Meaning |
+#   | ---- | ------- |
+#   | `args:none` | Reject all positional arguments |
+#   | `args:exact:2` | Require exactly 2 positional arguments |
+#   | `args:min:1` | Require at least 1 positional argument |
+#   | `args:max:3` | Allow at most 3 positional arguments |
+#   | `args:range:1:2` | Require between 1 and 2 positional arguments |
+#
 #   ### Parsing and dispatch
 #
 #   `dybatpho::generate_from_spec` generates and runs parser logic from a spec. It:
 #
 #   - initializes variables from the spec
 #   - parses switches and arguments
+#   - counts positional arguments for `args:` rules
 #   - validates input
 #   - dispatches subcommands
 #   - runs the `action:` from `dybatpho::opts::setup`
@@ -126,6 +141,14 @@
 #     dybatpho::opts::setup "Greeter" -
 #     dybatpho::opts::param "Your name" NAME --name required:true
 #     dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
+#   }
+#   ```
+#
+#   #### Exact positional args
+#
+#   ```bash
+#   function _spec_sum {
+#     dybatpho::opts::setup "Add two numbers" SUM_ARGS args:exact:2 action:"_run_sum"
 #   }
 #   ```
 #
@@ -168,6 +191,7 @@
 #   - `Does not allow an argument: ...`
 #   - `Requires an argument: ...`
 #   - `Missing required option: ...`
+#   - `Expected ... arguments, got ...`
 #   - `Invalid command: ...`
 #   - `Validation error (...): ...`
 #
@@ -373,6 +397,7 @@ function __generate_logic {
   local __export="true"                                 # For handle export variable of `dybatpho::opts::*` commands via name
   local __optional="true" __required="false" __label="" # Param value optionality, option presence, preferred switch label
   local __action="" __setup_action=""                   # For get action after parse all options and action of each options in spec
+  local __args="any"                                    # For validate positional argument count from opts::setup
   local __switch=""                                     # For get switch of options
   declare -a __required_checks=()
   local __has_sub_cmd="false"
@@ -395,6 +420,7 @@ function __generate_logic {
   __print_rest() {
     __print_indent 4 'while [ $# -gt 0 ]; do'
     __print_indent 5 "${__rest}=\"\${${__rest}} \$1\""
+    __print_indent 5 '__rest_argc=$((__rest_argc + 1))'
     __print_indent 5 "shift"
     __print_indent 4 "done"
     __print_indent 4 "break"
@@ -405,6 +431,7 @@ function __generate_logic {
   local __done_initial
   __done_initial=false && "${spec}" "$*"
   __print_indent 0 "dybatpho::opts::parse::${spec}() {"
+  __print_indent 1 'local __rest_argc=0'
   # shellcheck disable=2016
   __print_indent 1 \
     "while OPTARG= && [ \"\${${__rest}}\" != end ] && [ \$# -gt 0 ]; do"
@@ -471,6 +498,7 @@ function __generate_logic {
     __print_indent 3 "${__required_check}"
     __print_indent 2 '}'
   done
+  __print_args_check "${__args}"
   __print_indent 2 '[ $# -eq 0 ] && {'
   __print_indent 3 "${__setup_action}"
   __print_indent 3 'return 0'
@@ -481,6 +509,7 @@ function __generate_logic {
   __print_indent 2 'noarg) set "Does not allow an argument: $2" "$@" ;;'
   __print_indent 2 'needarg) set "Requires an argument: $2" "$@" ;;'
   __print_indent 2 'missingopt) set "Missing required option: $2" "$@" ;;'
+  __print_indent 2 'argcount) set "$2" "$@" ;;'
   __print_indent 2 'notcmd) set "Invalid command: $2" "$@" ;;'
   __print_indent 2 '*) set "Validation error ($1): $2" "$@"'
   __print_indent 1 "esac"
@@ -641,6 +670,65 @@ function __print_validate {
   [ "$2" = "-" ] || __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
 }
 
+#######################################
+# @description Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
+# @arg $1 string Argument count rule (`none`, `exact:N`, `min:N`, `max:N`, `range:M:N`, `any`)
+# @stdout Generated parser code
+# @exitcode 0 Rule accepted and code emitted
+#######################################
+function __print_args_check {
+  local rule="${1:-any}"
+  local expected min max noun
+
+  case "${rule}" in
+    "" | any | arbitrary) return 0 ;;
+    none | noargs)
+      __print_indent 2 '[ $# -eq 0 ] && {'
+      __print_indent 3 '[ "${__rest_argc}" -eq 0 ] || set "argcount" "Expected no arguments, got ${__rest_argc}"'
+      __print_indent 2 '}'
+      ;;
+    exact:*)
+      expected="${rule#exact:}"
+      [[ "${expected}" =~ ^[0-9]+$ ]] || dybatpho::die "Invalid args rule: ${rule}"
+      noun="arguments"
+      [ "${expected}" -eq 1 ] && noun="argument"
+      __print_indent 2 '[ $# -eq 0 ] && {'
+      __print_indent 3 "[ \"\${__rest_argc}\" -eq ${expected} ] || set \"argcount\" \"Expected exactly ${expected} ${noun}, got \${__rest_argc}\""
+      __print_indent 2 '}'
+      ;;
+    min:*)
+      min="${rule#min:}"
+      [[ "${min}" =~ ^[0-9]+$ ]] || dybatpho::die "Invalid args rule: ${rule}"
+      noun="arguments"
+      [ "${min}" -eq 1 ] && noun="argument"
+      __print_indent 2 '[ $# -eq 0 ] && {'
+      __print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] || set \"argcount\" \"Expected at least ${min} ${noun}, got \${__rest_argc}\""
+      __print_indent 2 '}'
+      ;;
+    max:*)
+      max="${rule#max:}"
+      [[ "${max}" =~ ^[0-9]+$ ]] || dybatpho::die "Invalid args rule: ${rule}"
+      noun="arguments"
+      [ "${max}" -eq 1 ] && noun="argument"
+      __print_indent 2 '[ $# -eq 0 ] && {'
+      __print_indent 3 "[ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"Expected at most ${max} ${noun}, got \${__rest_argc}\""
+      __print_indent 2 '}'
+      ;;
+    range:*)
+      min="${rule#range:}"
+      max="${min#*:}"
+      min="${min%%:*}"
+      [[ "${min}" =~ ^[0-9]+$ && "${max}" =~ ^[0-9]+$ && "${min}" -le "${max}" ]] || dybatpho::die "Invalid args rule: ${rule}"
+      __print_indent 2 '[ $# -eq 0 ] && {'
+      __print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] && [ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"Expected between ${min} and ${max} arguments, got \${__rest_argc}\""
+      __print_indent 2 '}'
+      ;;
+    *)
+      dybatpho::die "Invalid args rule: ${rule}"
+      ;;
+  esac
+}
+
 # @section Spec functions
 # @description Functions work in spec of script or function via `dybatpho::generate_from_spec`.
 
@@ -648,7 +736,8 @@ function __print_validate {
 # @description Setup global settings for getting options (mandatory) in spec
 # of script or function
 # @arg $1 string Description of sub-command/root command
-# @arg $@ key:value Settings `key:value` for sub-command/root command
+# @arg $@ key:value Settings `key:value` for sub-command/root command such as `action:<code>` and `args:<rule>`
+# @note `args:<rule>` supports `none`, `exact:N`, `min:N`, `max:N`, and `range:M:N`
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::setup {

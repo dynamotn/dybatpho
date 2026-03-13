@@ -386,6 +386,87 @@ setup() {
   assert_stderr --partial "Invalid shell variable name: bad-name"
 }
 
+@test "dybatpho::opts::setup args:none rejects positional args" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - args:none action:"echo ok"
+  }
+
+  run dybatpho::generate_from_spec _spec
+  assert_success
+  assert_output "ok"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec extra
+  assert_failure
+  assert_stderr --partial "Expected no arguments, got 1"
+}
+
+@test "dybatpho::opts::setup args:exact:N validates positional args" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" REST args:exact:2 action:"printf '[%s]\n' \"\$REST\""
+  }
+
+  run dybatpho::generate_from_spec _spec one two
+  assert_success
+  assert_output "[ one two]"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec one
+  assert_failure
+  assert_stderr --partial "Expected exactly 2 arguments, got 1"
+}
+
+@test "dybatpho::opts::setup args:min/max validate positional args" {
+  # shellcheck disable=2329
+  _spec_min() {
+    dybatpho::opts::setup "" REST args:min:1 action:"printf '[%s]\n' \"\$REST\""
+  }
+  # shellcheck disable=2329
+  _spec_max() {
+    dybatpho::opts::setup "" REST args:max:1 action:"printf '[%s]\n' \"\$REST\""
+  }
+
+  run dybatpho::generate_from_spec _spec_min one
+  assert_success
+  assert_output "[ one]"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_min
+  assert_failure
+  assert_stderr --partial "Expected at least 1 argument, got 0"
+
+  run dybatpho::generate_from_spec _spec_max one
+  assert_success
+  assert_output "[ one]"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_max one two
+  assert_failure
+  assert_stderr --partial "Expected at most 1 argument, got 2"
+}
+
+@test "dybatpho::opts::setup args:range validates subcommand positional args" {
+  # shellcheck disable=2329
+  _spec_leaf() {
+    dybatpho::opts::setup "" LEAF_ARGS args:range:1:2 action:"printf '[%s]\n' \"\$LEAF_ARGS\""
+  }
+  # shellcheck disable=2329
+  _spec_root() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::cmd leaf _spec_leaf
+  }
+
+  run dybatpho::generate_from_spec _spec_root leaf one two
+  assert_success
+  assert_output "[ one two]"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_root leaf
+  assert_failure
+  assert_stderr --partial "Expected between 1 and 2 arguments, got 0"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_root leaf one two three
+  assert_failure
+  assert_stderr --partial "Expected between 1 and 2 arguments, got 3"
+}
+
 @test "dybatpho::opts::flag omits variable assignment with dash" {
   # shellcheck disable=2329
   _spec() {

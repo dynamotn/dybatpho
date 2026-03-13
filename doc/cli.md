@@ -42,6 +42,7 @@ Utilities for building CLI parsers from shell specs.
 - [`__help_row`](#__help_row) — Format one help row and print to stdout
 - [`__add_switch`](#__add_switch) — Add to switches list if flag/param has multiple switches
 - [`__print_validate`](#__print_validate) — Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
+- [`__print_args_check`](#__print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
 - [`dybatpho::opts::flag`](#dybatphooptsflag) — Define an option that take no argument
 - [`dybatpho::opts::param`](#dybatphooptsparam) — Define an option that take an argument
@@ -115,6 +116,7 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | Attribute | Applies to | Description |
 | --------- | ---------- | ----------- |
 | `action:<code>` | `setup`, `disp` | Code to run when parsing finishes or a display option is used |
+| `args:<rule>` | `setup` | Positional argument rule: `none`, `exact:N`, `min:N`, `max:N`, or `range:M:N` |
 | `init:<value>` | `flag`, `param` | Initial variable value |
 | `on:<string>` | `flag`, `param` | Positive value when the option is enabled |
 | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
@@ -141,6 +143,22 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | `init:=<code>` | Assign the raw shell expression |
 
 
+### Positional argument rules
+
+
+Use `args:<rule>` in `dybatpho::opts::setup` to validate positional arguments
+the same way Cobra-style commands often do.
+
+
+| Rule | Meaning |
+| ---- | ------- |
+| `args:none` | Reject all positional arguments |
+| `args:exact:2` | Require exactly 2 positional arguments |
+| `args:min:1` | Require at least 1 positional argument |
+| `args:max:3` | Allow at most 3 positional arguments |
+| `args:range:1:2` | Require between 1 and 2 positional arguments |
+
+
 ### Parsing and dispatch
 
 
@@ -149,6 +167,7 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 
 - initializes variables from the spec
 - parses switches and arguments
+- counts positional arguments for `args:` rules
 - validates input
 - dispatches subcommands
 - runs the `action:` from `dybatpho::opts::setup`
@@ -197,6 +216,16 @@ function _spec {
   dybatpho::opts::setup "Greeter" -
   dybatpho::opts::param "Your name" NAME --name required:true
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
+}
+```
+
+
+#### Exact positional args
+
+
+```bash
+function _spec_sum {
+  dybatpho::opts::setup "Add two numbers" SUM_ARGS args:exact:2 action:"_run_sum"
 }
 ```
 
@@ -250,6 +279,7 @@ The parser reports these standard errors:
 - `Does not allow an argument: ...`
 - `Requires an argument: ...`
 - `Missing required option: ...`
+- `Expected ... arguments, got ...`
 - `Invalid command: ...`
 - `Validation error (...): ...`
 
@@ -575,6 +605,27 @@ Emit generated code that validates the current `OPTARG` and assigns it to the de
 - Generated parser code
 
 
+---
+
+### `__print_args_check`
+
+Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Argument count rule (`none`, `exact:N`, `min:N`, `max:N`, `range:M:N`, `any`) |
+
+**📤 Output on stdout**
+
+- Generated parser code
+
+**🚦 Exit codes**
+
+- `0`: Rule accepted and code emitted
+
+
 ### 🧩 Spec functions
 
 #### `dybatpho::opts::setup`
@@ -588,7 +639,11 @@ of script or function
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Description of sub-command/root command |
-| `$@` | key:value | Settings `key:value` for sub-command/root command |
+| `$@` | key:value | Settings `key:value` for sub-command/root command such as `action:<code>` and `args:<rule>` |
+
+**📝 Notes**
+
+- `args:<rule>` supports `none`, `exact:N`, `min:N`, `max:N`, and `range:M:N`
 
 **🚦 Exit codes**
 

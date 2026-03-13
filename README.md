@@ -59,6 +59,8 @@
 ```
 .
 ├── doc/            # Module documentation
+│   ├── *.md        # Usage guides & Reference for each module
+│   └── spec/       # Module specifications and design docs
 ├── example/        # Example scripts for users
 ├── scripts/        # Helper scripts (test, doc generation, etc.)
 ├── src/            # Source code of modules

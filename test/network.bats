@@ -151,3 +151,24 @@ setup() {
   run --separate-stderr -6 dybatpho::curl_download https://example.com /root/readonly/file.txt
   assert_failure
 }
+
+@test "dybatpho::curl_json adds JSON headers" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_json"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  run dybatpho::curl_json https://this "${temp_file}" --request POST
+  assert_success
+  grep -- '--header Accept: application/json' "${temp_file}"
+  grep -- '--header Content-Type: application/json' "${temp_file}"
+  grep -- '--request POST' "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_head adds HEAD mode" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_head"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  run dybatpho::curl_head https://this "${temp_file}" --header "X-Test: 1"
+  assert_success
+  grep -- '-I' "${temp_file}"
+  grep -- '--header X-Test: 1' "${temp_file}"
+  unstub curl
+}

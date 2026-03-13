@@ -7,13 +7,14 @@
 
 ## Problem Statement *(mandatory)*
 
-Shell scripts frequently need resilient HTTP access and file downloads, but raw curl usage alone does not provide consistent retry behavior, status interpretation, or user-facing progress semantics.
+Shell scripts frequently need resilient HTTP access, file downloads, JSON-friendly requests, and lightweight HEAD requests, but raw curl usage alone does not provide consistent retry behavior, status interpretation, or user-facing progress semantics.
 
 ## Business Value *(mandatory)*
 
 - Standardize HTTP request handling around curl.
 - Give scripts a consistent retry and status-code contract for remote calls.
 - Simplify file downloads by managing destination preparation automatically.
+- Provide higher-level entry points for common JSON and metadata request patterns.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -52,6 +53,7 @@ As an operator, I want downloads to create their destination directories automat
 - Curl is not installed.
 - The request returns a 3xx, 4xx, or 5xx status.
 - The caller omits an output file and expects a safe default destination.
+- The caller wants JSON headers or HEAD-only metadata without rebuilding curl flags manually.
 
 ## Requirements *(mandatory)*
 
@@ -63,6 +65,8 @@ As an operator, I want downloads to create their destination directories automat
 - **FR-004**: The request helper MUST write the response body to the caller-specified destination or a safe default sink.
 - **FR-005**: The module MUST expose a download helper that creates the destination directory automatically.
 - **FR-006**: The module MUST expose an HTTP status-description helper suitable for diagnostics.
+- **FR-007**: The module MUST expose a JSON-oriented curl helper that adds standard JSON headers.
+- **FR-008**: The module MUST expose a HEAD-oriented curl helper that retrieves response headers without downloading a body.
 
 ### Key Entities *(include if feature involves data)*
 

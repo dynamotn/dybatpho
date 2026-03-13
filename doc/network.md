@@ -9,7 +9,8 @@ Utilities for network
 <a id="overview"></a>
 ## ✨ Overview
 
-This module contains functions to work with network connection.
+This module contains functions to work with network connection, downloads,
+JSON-oriented requests, and HEAD requests.
 
 ### 🌍 Environment
 
@@ -23,6 +24,8 @@ This module contains functions to work with network connection.
 - [`dybatpho::curl_do`](#dybatphocurl_do) — Transferring data with URL by curl
 - [`__request`](#__request) — Execute one curl request attempt and capture its HTTP status code.
 - [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
+- [`dybatpho::curl_json`](#dybatphocurl_json) — Transfer JSON data with URL by curl.
+- [`dybatpho::curl_head`](#dybatphocurl_head) — Fetch only HTTP headers for a URL by curl.
 
 <a id="tips"></a>
 ## 💡 Tips
@@ -134,6 +137,52 @@ Download file
 **🚦 Exit codes**
 
 - `6`: Can't create folder of destination file
+
+**🔗 See also**
+
+- [dybatpho::curl_do](#dybatphocurl_do)
+
+
+---
+
+### `dybatpho::curl_json`
+
+Transfer JSON data with URL by curl.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | URL |
+| `$2` | string | Location of curl output, default is `/dev/null` |
+| `$@` | string | Other options/arguments for curl |
+
+**🚦 Exit codes**
+
+- `0`: Transferred data
+
+**🔗 See also**
+
+- [dybatpho::curl_do](#dybatphocurl_do)
+
+
+---
+
+### `dybatpho::curl_head`
+
+Fetch only HTTP headers for a URL by curl.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | URL |
+| `$2` | string | Location of curl output, default is `/dev/null` |
+| `$@` | string | Other options/arguments for curl |
+
+**🚦 Exit codes**
+
+- `0`: Transferred headers
 
 **🔗 See also**
 

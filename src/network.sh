@@ -2,7 +2,8 @@
 # @file network.sh
 # @brief Utilities for network
 # @description
-#   This module contains functions to work with network connection.
+#   This module contains functions to work with network connection, downloads,
+#   JSON-oriented requests, and HEAD requests.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_CURL_MAX_RETRIES number Max number of retry attempts when `dybatpho::curl_do` retries a request
@@ -181,4 +182,47 @@ function dybatpho::curl_download {
   mkdir -p "${dst_dir}" || return 6
 
   dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent "$@"
+}
+
+#######################################
+# @description Transfer JSON data with URL by curl.
+# @arg $1 string URL
+# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $@ string Other options/arguments for curl
+# @see dybatpho::curl_do
+# @exitcode 0 Transferred data
+#######################################
+function dybatpho::curl_json {
+  local url
+  dybatpho::expect_args url -- "$@"
+  local output="/dev/null"
+  shift
+  if (($# > 0)); then
+    output="$1"
+    shift
+  fi
+  dybatpho::curl_do "${url}" "${output}" \
+    --header "Accept: application/json" \
+    --header "Content-Type: application/json" \
+    "$@"
+}
+
+#######################################
+# @description Fetch only HTTP headers for a URL by curl.
+# @arg $1 string URL
+# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $@ string Other options/arguments for curl
+# @see dybatpho::curl_do
+# @exitcode 0 Transferred headers
+#######################################
+function dybatpho::curl_head {
+  local url
+  dybatpho::expect_args url -- "$@"
+  local output="/dev/null"
+  shift
+  if (($# > 0)); then
+    output="$1"
+    shift
+  fi
+  dybatpho::curl_do "${url}" "${output}" -I "$@"
 }

@@ -2,12 +2,15 @@
 # @file string.sh
 # @brief Utilities for working with string
 # @description
-#   This module contains functions to manipulate, convert, etc with string.
+#   This module contains helpers for trimming, splitting, encoding, decoding,
+#   and case-converting shell strings.
+# @see
+#   - `example/string_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# @description Trim leading and trailing white-space from string.
-# @arg $1 string String to change
+# @description Trim leading and trailing whitespace from a string.
+# @arg $1 string String to trim
 # @stdout Trimmed string
 #######################################
 # shellcheck disable=SC2317
@@ -18,10 +21,10 @@ function dybatpho::trim {
 }
 
 #######################################
-# @description Split a string on a delimiter.
+# @description Split a string on an exact delimiter.
 # @arg $1 string String to split
-# @arg $2 string Delimiter
-# @stdout Show each part of split string
+# @arg $2 string Delimiter string
+# @stdout Print each split part on its own line
 #######################################
 function dybatpho::split {
   IFS=$'\n' read -d "" -ra arr <<< "${1//$2/$'\n'}" || true

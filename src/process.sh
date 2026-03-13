@@ -2,22 +2,26 @@
 # @file process.sh
 # @brief Utilities for process handling
 # @description
-#   This module contains functions to error handling, fork process...
+#   This module contains helpers for script termination, signal handling, trap
+#   composition, deferred cleanup, and dry-run execution.
 #
-# **DYBATPHO_USED_ERR_HANDLER** (bool): Flag that script used dybatpho::register_err_handler
-# **DYBATPHO_USED_KILLED_HANDLER** (bool): Flag that script used dybatpho::register_killed_handler
+# @see
+#   - `example/process_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
+# @env DYBATPHO_USED_ERR_HANDLER bool Internal flag set after `dybatpho::register_err_handler`
 DYBATPHO_USED_ERR_HANDLER=false
+# @env DYBATPHO_USED_KILLED_HANDLER bool Internal flag set after `dybatpho::register_killed_handler`
 DYBATPHO_USED_KILLED_HANDLER=false
+# @env DRY_RUN string When true-like, `dybatpho::dry_run` prints commands instead of executing them
 DRY_RUN="${DRY_RUN:-}"
 export DRY_RUN
 
 #######################################
-# @description Stop script/process.
+# @description Log a fatal message and stop the current script or process.
 # @arg $1 string Message
 # @arg $2 number Exit code, default is 1
-# @exitcode $2 Stop to process anything else
+# @exitcode $2 Exit the current shell with the requested code
 #######################################
 function dybatpho::die {
   local message exit_code
@@ -28,8 +32,8 @@ function dybatpho::die {
 }
 
 #######################################
-# @description Register error handler.
-# @set DYBATPHO_USED_ERR_HANDLING
+# @description Register the ERR trap handler used by dybatpho scripts.
+# @set DYBATPHO_USED_ERR_HANDLER
 # @noargs
 #######################################
 function dybatpho::register_err_handler {
@@ -40,8 +44,8 @@ function dybatpho::register_err_handler {
 }
 
 #######################################
-# @description Register killed process handler.
-# @set DYBATPHO_USED_ERR_HANDLING
+# @description Register handlers for SIGINT and SIGTERM.
+# @set DYBATPHO_USED_KILLED_HANDLER
 # @noargs
 #######################################
 function dybatpho::register_killed_handler {
@@ -52,8 +56,9 @@ function dybatpho::register_killed_handler {
 }
 
 #######################################
-# @description Register all handlers
+# @description Register both error and signal handlers.
 # @noargs
+# @tip This is the usual one-line setup at the top of scripts that want both error and signal handling
 #######################################
 function dybatpho::register_common_handlers {
   dybatpho::register_err_handler
@@ -61,7 +66,7 @@ function dybatpho::register_common_handlers {
 }
 
 #######################################
-# @description Handle error when running process. If you activate by `dybatpho::register_err_handler`, you don't need to invoke this function.
+# @description Handle a command failure captured by `dybatpho::register_err_handler`.
 # @arg $1 number Exit code of last command
 #######################################
 function dybatpho::run_err_handler {
@@ -76,7 +81,7 @@ function dybatpho::run_err_handler {
 }
 
 #######################################
-# @description Handle killed process. If you activate by `dybatpho::register_killed_handler`, you don't need to invoke this function.
+# @description Handle SIGINT or SIGTERM received by the current process.
 # @arg $1 string Signal
 #######################################
 function dybatpho::killed_process_handler {
@@ -95,8 +100,8 @@ function dybatpho::killed_process_handler {
 }
 
 #######################################
-# @description Trap multiple signals
-# @arg $1 string Command run when trapped
+# @description Append a command to one or more trap handlers without discarding existing traps.
+# @arg $1 string Command to run when the signal is trapped
 # @arg $@ string Signals to trap
 #######################################
 function dybatpho::trap {
@@ -120,8 +125,9 @@ function dybatpho::trap {
 }
 
 #######################################
-# @description Clean up file on exit
-# @arg $1 string File path
+# @description Register a file or directory to be removed when the current shell exits.
+# @arg $1 string File or directory path
+# @tip `dybatpho::create_temp` already uses this internally, so call it directly only for custom temporary paths
 #######################################
 function dybatpho::cleanup_file_on_exit {
   local filepath
@@ -159,9 +165,18 @@ function dybatpho::cleanup_file_on_exit {
 }
 
 #######################################
-# @description Show dry run message or run command.
-# @arg $@ string Command to run
-# @stdout Show details of command if DRY_RUN is set to true
+# @description Print a shell command instead of executing it when `DRY_RUN` is enabled.
+# @example
+#   DRY_RUN=true
+#   dybatpho::dry_run "rm -rf ./build"
+#
+# @example
+#   dybatpho::dry_run "ssh ${host} 'systemctl restart app'"
+#
+# @arg $@ string Shell command string to run
+# @env DRY_RUN string Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them
+# @stdout Show the command instead of executing it when `DRY_RUN` is true
+# @tip Pass a single shell command string because this helper executes the command with `eval`
 #######################################
 function dybatpho::dry_run {
   if dybatpho::is true "${DRY_RUN}"; then

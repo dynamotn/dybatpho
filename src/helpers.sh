@@ -1,23 +1,80 @@
 #!/usr/bin/env bash
 # @file helpers.sh
-# @brief Utilities for writing efficient script
+# @brief Utilities for common shell-script helper patterns.
 # @description
-#   This module contains functions to write efficient script.
+#   `src/helpers.sh` groups together the small building blocks that many other
+#   modules rely on:
 #
-# **DYBATPHO_REPL_HISTORY_FILE** (string): Path of REPL history file for dybatpho, used in `dybatpho::breakpoint`
+#   - validating function arguments
+#   - checking environment and tool dependencies
+#   - testing common conditions
+#   - retrying flaky commands
+#   - opening an interactive breakpoint
+# @usage
+#   ### When to use this module
+#
+#   Use `helpers.sh` when you want to:
+#
+#   - make shell functions fail fast on bad input
+#   - avoid repeating `command -v`, `[[ -f ... ]]`, `[[ -d ... ]]`, and similar checks
+#   - retry transient commands without rewriting loop logic
+#   - inspect runtime state interactively while debugging a script
+#
+#   ### Common patterns
+#
+#   #### Validate function input
+#
+#   ```bash
+#   function copy_file() {
+#     local src dst
+#     dybatpho::expect_args src dst -- "$@"
+#     cp "${src}" "${dst}"
+#   }
+#   ```
+#
+#   #### Require environment + binary before running
+#
+#   ```bash
+#   dybatpho::expect_envs API_TOKEN
+#   dybatpho::require curl
+#   ```
+#
+#   #### Guard conditions
+#
+#   ```bash
+#   if ! dybatpho::is file "${config_path}"; then
+#     dybatpho::die "Config file not found: ${config_path}"
+#   fi
+#   ```
+#
+#   #### Retry transient network operations
+#
+#   ```bash
+#   dybatpho::retry 4 "curl -fsSL '${health_url}'" "service health check"
+#   ```
+#
+#   #### Add an optional breakpoint
+#
+#   ```bash
+#   dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
+#   ```
+# @see
+#   - `example/process_ops.sh`
+# @tip Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on missing configuration or dependencies.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
+# @env DYBATPHO_REPL_HISTORY_FILE string History file used by `dybatpho::breakpoint`
 DYBATPHO_REPL_HISTORY_FILE="${HOME}/.cache/dybatpho_repl.history"
 
 #######################################
-# @description Validate argument when invoke function. It adds a small performance penalty but is a sane option.
+# @description Validate function arguments and assign them into named local variables.
 # @example
 #   local arg1 arg2 .. argN
 #   dybatpho::expect_args arg1 arg2 .. argN -- "$@"
 #
-# @exitcode 1 Stop script if not correct spec: enough variable names to get, `--`, and list of arguments to pass `$@`
-#             or not have enough arguments that follow by spec
-# @exitcode 0 Otherwise run seamlessly, pass value of argument to variable name
+# @tip Prefer calling this at the top of reusable functions instead of manually unpacking `$@`
+# @exitcode 1 Stop the script if the specification is invalid or required arguments are missing
+# @exitcode 0 Assign arguments to the requested variable names and return successfully
 #######################################
 function dybatpho::expect_args {
   local variable_names=()
@@ -48,27 +105,25 @@ function dybatpho::expect_args {
 }
 
 #######################################
-# @description Check that function still has next argument after shift.
-# This function is useful to check argument of function that you don't now
-# count of arguments when triggered, and you just only need to process next
-# argument
+# @description Check whether at least one more positional argument remains after the current one.
+# This helper is useful while manually parsing a shifting argument list.
 # @example
 #   while dybatpho::still_has_args "$@" && shift; do
 #     echo "Function has next argument is $1"
 #   done
 # @exitcode 0 Still has an argument
-# @exitcode 1 Not has any arguments
+# @exitcode 1 No additional arguments remain
 #######################################
 function dybatpho::still_has_args {
   [ $# -gt 1 ]
 }
 
 #######################################
-# @description Check that environment variables are set
+# @description Ensure that required environment variables are set.
 # @example
 #   dybatpho::expect_envs ENV_VAR1 ENV_VAR2
 # @arg $@ string Environment variables to check
-# @exitcode 1 Stop script if not set
+# @exitcode 1 Stop the script if any variable is unset or empty
 #######################################
 function dybatpho::expect_envs {
   for arg in "$@"; do
@@ -79,11 +134,12 @@ function dybatpho::expect_envs {
 }
 
 #######################################
-# @description Check command dependency is installed.
-# @arg $1 string Command need to be installed
+# @description Ensure that a required command is installed.
+# @arg $1 string Command that must be available
 # @arg $2 number Exit code if not installed (default 127)
+# @tip Prefer this over repeating inline `command -v ... || exit` checks throughout a script
 # @exitcode 127 Stop script if command isn't installed
-# @exitcode 0 Otherwise run seamlessly
+# @exitcode 0 The command is available
 # @exitcode other Exit code if command isn't installed and second argument is set
 #######################################
 function dybatpho::require {
@@ -91,10 +147,10 @@ function dybatpho::require {
 }
 
 #######################################
-# @description Check input is matching with a condition
-# @arg $1 string Condition (command|function|file|dir|link|exist|readable|writable|executable
-# |set|empty|number|int|true|false)
-# @arg $2 string Input need to check
+# @description Check whether a value matches a supported shell-oriented condition.
+# @arg $1 string Condition (command|function|file|dir|link|exist|readable|writeable|executable|set|empty|number|int|true|false)
+# @arg $2 string Value to test
+# @tip Use this helper to keep calling code readable instead of scattering shell test syntax across the script
 # @exitcode 0 If matched
 # @exitcode 1 If not matched
 #######################################
@@ -171,13 +227,17 @@ function dybatpho::is {
 }
 
 #######################################
-# @description Retry a command multiple times until it succeeds,
-# with escalating delay between attempts.
+# @description Retry a shell command with escalating delays until it succeeds or retries are exhausted.
+# @example
+#   dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
+#
 # @arg $1 number Number of retries
-# @arg $2 string Command to run
-# @arg $3 string Description of command
-# @exitcode 0 Run command successfully
-# @exitcode 1 Out of retries
+# @arg $2 string Shell command string to run
+# @arg $3 string Optional short description for retry logs
+# @exitcode 0 The command eventually succeeds
+# @exitcode 1 The command never succeeds and returns 1 on the final attempt
+# @tip The command is executed with `eval`, so pass it as one shell command string
+# @tip Pass a short description when the raw command is noisy so retry logs stay readable
 #######################################
 function dybatpho::retry {
   local retries command
@@ -202,8 +262,10 @@ function dybatpho::retry {
 }
 
 #######################################
-# @description Hit breakpoint to debug script.
+# @description Open an interactive breakpoint for debugging a running script.
 # @noargs
+# @env DYBATPHO_REPL_HISTORY_FILE string Override where REPL history is persisted between breakpoint sessions
+# @tip This helper is intended for interactive local debugging, not unattended CI or production runs
 #######################################
 function dybatpho::breakpoint {
   local dybatpho_key_pressed

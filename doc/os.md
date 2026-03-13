@@ -2,28 +2,35 @@
 
 Utilities for working with OS/distro package manager or getting information of OS/distro
 
-## Overview
+> 🧭 Source: [src/os.sh](../src/os.sh)
+>
+> Jump to: [Overview](#overview) · [Reference](#reference)
+
+## ✨ Overview
 
 This module contains functions to get information of OS/distro or work with package manager
 
-## Index
+### 🚀 Highlights
 
-* [dybatpho::goos](#dybatphogoos)
-* [dybatpho::goarch](#dybatphogoarch)
+- [`dybatpho::goos`](#dybatphogoos) — Get $GOOS compilation environment
+- [`dybatpho::goarch`](#dybatphogoarch) — Get $GOARCH compilation environment
 
-### dybatpho::goos
+## 📚 Reference
+
+### `dybatpho::goos`
 
 Get $GOOS compilation environment
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Return $GOOS value https://go.dev/doc/install/source#environment
+- Return $GOOS value https://go.dev/doc/install/source#environment
 
-### dybatpho::goarch
+
+### `dybatpho::goarch`
 
 Get $GOARCH compilation environment
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Return $GOOS value https://go.dev/doc/install/source#environment
+- Return $GOOS value https://go.dev/doc/install/source#environment
 

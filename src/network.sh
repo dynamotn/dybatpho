@@ -3,10 +3,9 @@
 # @brief Utilities for network
 # @description
 #   This module contains functions to work with network connection.
-#
-# **DYBATPHO_CURL_MAX_RETRIES** (number): Max number of retries when using `curl` failed
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
+# @env DYBATPHO_CURL_MAX_RETRIES number Max number of retry attempts when `dybatpho::curl_do` retries a request
 DYBATPHO_CURL_MAX_RETRIES=${DYBATPHO_CURL_MAX_RETRIES:-5}
 
 #######################################
@@ -90,12 +89,15 @@ function __get_http_code {
 # @arg $1 string URL
 # @arg $2 string Location of curl output, default is `/dev/null`
 # @arg $3 string Other options/arguments for curl
+# @env DYBATPHO_CURL_MAX_RETRIES number Override the retry budget used around curl requests
 # @exitcode 0 Transferred data
 # @exitcode 1 Unknown error
 # @exitcode 3 First digit of HTTP error code 3xx
 # @exitcode 4 First digit of HTTP error code 4xx
 # @exitcode 5 First digit of HTTP error code 5xx
 # @exitcode 127 Curl isn't installed
+# @tip The request body is written to the provided output file, or `/dev/null` when omitted
+# @note HTTP 4xx responses are treated as completed requests and returned to the caller as exit code `4`
 #######################################
 function dybatpho::curl_do {
   local url
@@ -158,6 +160,7 @@ function dybatpho::curl_do {
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
 # @exitcode 6 Can't create folder of destination file
+# @tip The destination directory is created automatically before downloading
 #######################################
 function dybatpho::curl_download {
   local url dst_file

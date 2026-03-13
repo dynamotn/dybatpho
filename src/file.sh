@@ -2,13 +2,17 @@
 # @file file.sh
 # @brief Utilities for file handling
 # @description
-#   This module containss functions to file handling
+#   This module contains helpers for previewing files and creating temporary
+#   files or directories that are cleaned up automatically on shell exit.
+# @see
+#   - `example/file_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# @description Show content of file
+# @description Show the contents of a file with line numbers.
 # @arg $1 string File path
-# @stderr Content of file
+# @stderr File contents
+# @tip Uses `bat` when available for richer output, otherwise falls back to `cat -n`
 #######################################
 function dybatpho::show_file {
   local file_path
@@ -22,11 +26,23 @@ function dybatpho::show_file {
 }
 
 #######################################
-# @description Create temporary file or folder and cleanup it on exit
-# @arg $1 string Variable name to get file/folder path
-# @arg $2 string Extension of file name, use `/` or empty for folder
-# @arg $3 string Prefix of file/folder name, default is `temp`
-# @arg $4 string Parent folder for file/folder, default is `$TMPDIR`
+# @description Create a temporary file or directory and register it for cleanup on shell exit.
+# @example
+#   local TMPFILE
+#   dybatpho::create_temp TMPFILE ".txt"
+#   echo "hello" > "${TMPFILE}"
+#
+# @example
+#   local TMPDIR_VAR
+#   dybatpho::create_temp TMPDIR_VAR "/"
+#   mkdir -p "${TMPDIR_VAR}/subdir"
+#
+# @arg $1 string Variable name that receives the created path
+# @arg $2 string File extension to append, or `/`/empty to create a directory
+# @arg $3 string Name prefix, default is `temp`
+# @arg $4 string Parent directory, default is `${TMPDIR:-/tmp}`
+# @tip Pass `/` or an empty extension to create a directory instead of a file
+# @tip The created path is automatically registered for cleanup on script exit
 #######################################
 function dybatpho::create_temp {
   local path_var extension

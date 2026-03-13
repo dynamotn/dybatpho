@@ -2,65 +2,87 @@
 
 Utilities for working with array
 
-## Overview
+> 🧭 Source: [src/array.sh](../src/array.sh)
+>
+> Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
-This module contains functions to work with array.
+## ✨ Overview
 
-## Index
+This module contains helpers for printing, reversing, deduplicating, and
+joining Bash arrays by name.
 
-* [dybatpho::array_print](#dybatphoarrayprint)
-* [dybatpho::array_reverse](#dybatphoarrayreverse)
-* [dybatpho::array_unique](#dybatphoarrayunique)
-* [dybatpho::array_join](#dybatphoarrayjoin)
+### 🚀 Highlights
 
-### dybatpho::array_print
+- [`dybatpho::array_print`](#dybatphoarray_print) — Print each element of an array on its own line.
+- [`dybatpho::array_reverse`](#dybatphoarray_reverse) — Reverse an array in place.
+- [`dybatpho::array_unique`](#dybatphoarray_unique) — Remove duplicate elements from an array in place.
+- [`dybatpho::array_join`](#dybatphoarray_join) — Join array elements with a separator into one string.
 
-Print an array
+## 🔗 See also
 
-#### Arguments
+- [example/array_ops.sh](../example/array_ops.sh)
 
-* **$1** (string): Name of array
+## 📚 Reference
 
-#### Output on stdout
+### `dybatpho::array_print`
 
-* Print array with each element separated by newline
+Print each element of an array on its own line.
 
-### dybatpho::array_reverse
+**🧾 Arguments**
 
-Reverse an array
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of array |
 
-#### Arguments
+**📤 Output on stdout**
 
-* **$1** (string): Name of array
-* **$2** (string): Set `--` to print to stdout
+- Print array with each element separated by newline
 
-#### Output on stdout
 
-* Print array if $2 is `--`
+### `dybatpho::array_reverse`
 
-### dybatpho::array_unique
+Reverse an array in place.
 
-Remove duplicate elements in array
+**🧾 Arguments**
 
-#### Arguments
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of array |
+| `$2` | string | Set `--` to print to stdout |
 
-* **$1** (string): Name of array
-* **$2** (string): Set `--` to print to stdout
+**📤 Output on stdout**
 
-#### Output on stdout
+- Print the reversed array if $2 is `--`
 
-* Print array if $2 is `--`
 
-### dybatpho::array_join
+### `dybatpho::array_unique`
 
-Join array with given separator into a string
+Remove duplicate elements from an array in place.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Name of array
-* **$2** (string): Separator
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of array |
+| `$2` | string | Set `--` to print to stdout |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Print outputted string
+- Print the deduplicated array if $2 is `--`
+
+
+### `dybatpho::array_join`
+
+Join array elements with a separator into one string.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of array |
+| `$2` | string | Separator |
+
+**📤 Output on stdout**
+
+- Print outputted string
 

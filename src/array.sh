@@ -2,12 +2,14 @@
 # @file array.sh
 # @brief Utilities for working with array
 # @description
-#   This module contains functions to work with array.
-#
+#   This module contains helpers for printing, reversing, deduplicating, and
+#   joining Bash arrays by name.
+# @see
+#   - `example/array_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# @description Print an array
+# @description Print each element of an array on its own line.
 # @arg $1 string Name of array
 # @stdout Print array with each element separated by newline
 #######################################
@@ -17,10 +19,10 @@ function dybatpho::array_print {
 }
 
 #######################################
-# @description Reverse an array
+# @description Reverse an array in place.
 # @arg $1 string Name of array
 # @arg $2 string Set `--` to print to stdout
-# @stdout Print array if $2 is `--`
+# @stdout Print the reversed array if $2 is `--`
 #######################################
 function dybatpho::array_reverse {
   local -n input_arr="$1"
@@ -39,10 +41,10 @@ function dybatpho::array_reverse {
 }
 
 #######################################
-# @description Remove duplicate elements in array
+# @description Remove duplicate elements from an array in place.
 # @arg $1 string Name of array
 # @arg $2 string Set `--` to print to stdout
-# @stdout Print array if $2 is `--`
+# @stdout Print the deduplicated array if $2 is `--`
 #######################################
 function dybatpho::array_unique {
   # shellcheck disable=SC2178
@@ -60,7 +62,7 @@ function dybatpho::array_unique {
 }
 
 #######################################
-# @description Join array with given separator into a string
+# @description Join array elements with a separator into one string.
 # @arg $1 string Name of array
 # @arg $2 string Separator
 # @stdout Print outputted string

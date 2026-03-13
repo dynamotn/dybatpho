@@ -2,89 +2,117 @@
 
 Utilities for working with string
 
-## Overview
+> 🧭 Source: [src/string.sh](../src/string.sh)
+>
+> Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
-This module contains functions to manipulate, convert, etc with string.
+## ✨ Overview
 
-## Index
+This module contains helpers for trimming, splitting, encoding, decoding,
+and case-converting shell strings.
 
-* [dybatpho::trim](#dybatphotrim)
-* [dybatpho::split](#dybatphosplit)
-* [dybatpho::url_encode](#dybatphourlencode)
-* [dybatpho::url_decode](#dybatphourldecode)
-* [dybatpho::lower](#dybatpholower)
-* [dybatpho::upper](#dybatphoupper)
+### 🚀 Highlights
 
-### dybatpho::trim
+- [`dybatpho::trim`](#dybatphotrim) — Trim leading and trailing whitespace from a string.
+- [`dybatpho::split`](#dybatphosplit) — Split a string on an exact delimiter.
+- [`dybatpho::url_encode`](#dybatphourl_encode) — URL-encode a string.
+- [`dybatpho::url_decode`](#dybatphourl_decode) — URL-decode a string.
+- [`dybatpho::lower`](#dybatpholower) — Convert a string to lowercase.
+- [`dybatpho::upper`](#dybatphoupper) — Convert a string to uppercase.
 
-Trim leading and trailing white-space from string.
+## 🔗 See also
 
-#### Arguments
+- [example/string_ops.sh](../example/string_ops.sh)
 
-* **$1** (string): String to change
+## 📚 Reference
 
-#### Output on stdout
+### `dybatpho::trim`
 
-* Trimmed string
+Trim leading and trailing whitespace from a string.
 
-### dybatpho::split
+**🧾 Arguments**
 
-Split a string on a delimiter.
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | String to trim |
 
-#### Arguments
+**📤 Output on stdout**
 
-* **$1** (string): String to split
-* **$2** (string): Delimiter
+- Trimmed string
 
-#### Output on stdout
 
-* Show each part of split string
+### `dybatpho::split`
 
-### dybatpho::url_encode
+Split a string on an exact delimiter.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | String to split |
+| `$2` | string | Delimiter string |
+
+**📤 Output on stdout**
+
+- Print each split part on its own line
+
+
+### `dybatpho::url_encode`
 
 URL-encode a string.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): String to encode
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | String to encode |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Encoded string
+- Encoded string
 
-### dybatpho::url_decode
+
+### `dybatpho::url_decode`
 
 URL-decode a string.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): String to decode
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | String to decode |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Decoded string
+- Decoded string
 
-### dybatpho::lower
+
+### `dybatpho::lower`
 
 Convert a string to lowercase.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): String to convert
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | String to convert |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Converted string
+- Converted string
 
-### dybatpho::upper
+
+### `dybatpho::upper`
 
 Convert a string to uppercase.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): String to convert
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | String to convert |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Converted string
+- Converted string
 

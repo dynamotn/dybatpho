@@ -39,10 +39,12 @@ function _demo_progress {
 function _demo_progress_bar {
   dybatpho::header "PROGRESS BAR"
   dybatpho::info "Simulating a 10-step task..."
-  local total=10
-  local i
-  for i in $(seq 1 ${total}); do
-    dybatpho::progress_bar "${i}" "${total}"
+  local total_steps=10
+  local bar_width=30
+  local i percentage
+  for i in $(seq 1 ${total_steps}); do
+    percentage=$((i * 100 / total_steps))
+    dybatpho::progress_bar "${percentage}" "${bar_width}"
     sleep 0.1
   done
   printf '\n' >&2
@@ -52,7 +54,9 @@ function _demo_progress_bar {
 function _demo_debug_command {
   dybatpho::header "DEBUG COMMAND"
   dybatpho::info "Capturing output of 'ls example/' as debug:"
-  dybatpho::debug_command ls "$(dirname "${BASH_SOURCE[0]}")"
+  dybatpho::debug_command \
+    "Listing example directory" \
+    "ls '$(dirname "${BASH_SOURCE[0]}")'"
 }
 
 function _demo_trace {

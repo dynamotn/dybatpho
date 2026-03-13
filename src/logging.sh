@@ -3,26 +3,26 @@
 # @brief Utilities for logging to stdout/stderr
 # @description
 #   This module contains functions to log messages to stdout/stderr.
-#
-# **LOG_LEVEL** (string): Run time log level of all messages (trace|debug|info|warn|error|fatal). Default is `info`
-# **NO_COLOR** (string): Prevents the addition of ANSI color to the output when present and not an empty string. Default is ``
+# @see
+#   - `example/logging_demo.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
+# @env LOG_LEVEL string Runtime log level for all messages (`trace|debug|info|warn|error|fatal`). Default is `info`
 LOG_LEVEL="${LOG_LEVEL:-info}"
 export LOG_LEVEL
+# @env NO_COLOR string Disable ANSI colors when set to a non-empty value
 NO_COLOR="${NO_COLOR:-}"
 export NO_COLOR
 
 #######################################
-# @description Log a message to stdout/stderr with color and caution
-# @set LOG_LEVEL string Log level of script
+# @description Log a message to stdout or stderr, optionally with ANSI color.
+# @set LOG_LEVEL string Runtime log level of the current script
 # @arg $1 string Log level of message
 # @arg $2 string Message
-# @arg $3 string `stderr` to output to stderr, otherwise then to stdout
+# @arg $3 string `stderr` to write to stderr, otherwise stdout
 # @arg $4 string ANSI escape color code
-# @arg $5 string Command to run after log
-# @stdout Show message if log level of message is less than runtime log level and $3 is not `stderr`
-# @stderr Show message if log level of message is less than runtime log level and $3 is `stderr`
+# @stdout Show the formatted message when the level passes filtering and $3 is not `stderr`
+# @stderr Show the formatted message when the level passes filtering and $3 is `stderr`
 #######################################
 function __log {
   declare -A log_colors=([trace]="0;37" [debug]="0;36" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
@@ -51,10 +51,11 @@ function __log {
 }
 
 #######################################
-# @description Verify input log level is less than runtime log level
+# @description Return success when a message level should be shown for the current `LOG_LEVEL`.
 # @arg $1 string Input log level
-# @exitcode 0 If less than
-# @exitcode 1 Otherwise
+# @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted
+# @exitcode 0 The message level should be emitted
+# @exitcode 1 The message level is filtered out
 #######################################
 function dybatpho::compare_log_level {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
@@ -70,12 +71,11 @@ function dybatpho::compare_log_level {
 }
 
 #######################################
-# @description Log a message with date time and invoke file indicator for easier
-#              to recognize on tty
-# @arg $1 string String of log level
-# @arg $2 string Text of log level
+# @description Log a structured diagnostic message with timestamp and call-site information.
+# @arg $1 string Log level
+# @arg $2 string Rendered label for the log level
 # @arg $3 string Message
-# @arg $4 number Number of call stack to get source file and line number when logging
+# @arg $4 number Additional stack frames to skip when resolving the source location
 # @arg $5 string ANSI escape color code
 #######################################
 function __log_inspect {
@@ -106,10 +106,10 @@ function __log_inspect {
 }
 
 #######################################
-# @description Validate log level from input.
-# @arg $1 string String of log level
-# @exitcode 0 If is valid log level
-# @exitcode 1 If invalid
+# @description Validate a candidate log level value.
+# @arg $1 string Log level to validate
+# @exitcode 0 The input is a supported log level
+# @exitcode 1 The input is invalid
 #######################################
 function dybatpho::validate_log_level {
   local level="$1"
@@ -132,9 +132,10 @@ function dybatpho::debug {
 }
 
 #######################################
-# @description Show debug result of a command.
-# @arg $1 string Message
-# @arg $2 string Command
+# @description Log a debug message together with the output of a shell command.
+# @arg $1 string Introductory message
+# @arg $2 string Shell command string to evaluate
+# @env LOG_LEVEL string Set to `debug` or `trace` to see this output
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug_command {
@@ -160,7 +161,7 @@ function dybatpho::print {
 }
 
 #######################################
-# @description Show in progress message.
+# @description Show a highlighted in-progress banner.
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level
 #######################################
@@ -172,10 +173,10 @@ function dybatpho::progress {
 }
 
 #######################################
-# @description Show progress bar.
-# @arg $1 number Elapsed percentage
-# @arg $2 number Total length of progress bar in chars. Default is 50
-# @stdout Show progress bar and it's disappeared after done
+# @description Render a percentage-based progress bar on the current output line.
+# @arg $1 number Progress percentage from 0 to 100
+# @arg $2 number Width of the progress bar in characters. Default is 50
+# @stdout Show the progress bar; print a newline in the caller when the task is done
 #######################################
 function dybatpho::progress_bar {
   local percentage="$1"
@@ -188,7 +189,7 @@ function dybatpho::progress_bar {
 }
 
 #######################################
-# @description Show header message with banner.
+# @description Show a section header banner.
 # @arg $1 string Message
 # @stdout Show message if log level of message is less than info level
 #######################################
@@ -240,8 +241,9 @@ function dybatpho::fatal {
 }
 
 #######################################
-# @description Start tracing script.
+# @description Enable Bash tracing with dybatpho formatting.
 # @noargs
+# @env LOG_LEVEL string Set to `trace` to emit the trace start/end messages
 #######################################
 function dybatpho::start_trace {
   __log_inspect trace "TRACE ⚡       " "Start tracing"
@@ -258,7 +260,7 @@ function dybatpho::start_trace {
 }
 
 #######################################
-# @description End tracing script.
+# @description Disable Bash tracing started by `dybatpho::start_trace`.
 # @noargs
 #######################################
 function dybatpho::end_trace {

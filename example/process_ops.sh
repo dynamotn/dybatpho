@@ -97,10 +97,10 @@ function _demo_is {
   dybatpho::is "file" "${TMPFILE_IS}" && dybatpho::info "Temp file exists"
 
   dybatpho::create_temp TMPDIR_IS "/"
-  dybatpho::is "directory" "${TMPDIR_IS}" && dybatpho::info "Temp dir exists"
+  dybatpho::is "dir" "${TMPDIR_IS}" && dybatpho::info "Temp dir exists"
 
-  dybatpho::is "integer" "42" && dybatpho::info "42 is an integer"
-  dybatpho::is "integer" "abc" || dybatpho::warn "'abc' is not an integer (expected)"
+  dybatpho::is "int" "42" && dybatpho::info "42 is an integer"
+  dybatpho::is "int" "abc" || dybatpho::warn "'abc' is not an integer (expected)"
 }
 
 # --- main -----------------------------------------------------------------

@@ -2,240 +2,321 @@
 
 Utilities for logging to stdout/stderr
 
-## Overview
+> 🧭 Source: [src/logging.sh](../src/logging.sh)
+>
+> Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
+
+## ✨ Overview
 
 This module contains functions to log messages to stdout/stderr.
 
-**LOG_LEVEL** (string): Run time log level of all messages (trace|debug|info|warn|error|fatal). Default is `info`
-**NO_COLOR** (string): Prevents the addition of ANSI color to the output when present and not an empty string. Default is ``
+### 🌍 Environment
 
-## Index
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`LOG_LEVEL`** | string | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`). Default is `info` |
+| **`NO_COLOR`** | string | Disable ANSI colors when set to a non-empty value |
 
-* [__log](#log)
-* [dybatpho::compare_log_level](#dybatphocompareloglevel)
-* [__log_inspect](#loginspect)
-* [dybatpho::validate_log_level](#dybatphovalidateloglevel)
-* [dybatpho::debug](#dybatphodebug)
-* [dybatpho::debug_command](#dybatphodebugcommand)
-* [dybatpho::info](#dybatphoinfo)
-* [dybatpho::print](#dybatphoprint)
-* [dybatpho::progress](#dybatphoprogress)
-* [dybatpho::progress_bar](#dybatphoprogressbar)
-* [dybatpho::header](#dybatphoheader)
-* [dybatpho::success](#dybatphosuccess)
-* [dybatpho::warn](#dybatphowarn)
-* [dybatpho::error](#dybatphoerror)
-* [dybatpho::fatal](#dybatphofatal)
-* [dybatpho::start_trace](#dybatphostarttrace)
-* [dybatpho::end_trace](#dybatphoendtrace)
+### 🚀 Highlights
 
-### __log
+- [`__log`](#__log) — Log a message to stdout or stderr, optionally with ANSI color.
+- [`__check_color`](#__check_color) — 
+- [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown for the current `LOG_LEVEL`.
+- [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information.
+- [`dybatpho::validate_log_level`](#dybatphovalidate_log_level) — Validate a candidate log level value.
+- [`dybatpho::debug`](#dybatphodebug) — Show debug message.
+- [`dybatpho::debug_command`](#dybatphodebug_command) — Log a debug message together with the output of a shell command.
+- [`dybatpho::info`](#dybatphoinfo) — Show info message.
+- [`dybatpho::print`](#dybatphoprint) — Show normal message.
+- [`dybatpho::progress`](#dybatphoprogress) — Show a highlighted in-progress banner.
+- [`dybatpho::progress_bar`](#dybatphoprogress_bar) — Render a percentage-based progress bar on the current output line.
+- [`dybatpho::header`](#dybatphoheader) — Show a section header banner.
+- [`dybatpho::success`](#dybatphosuccess) — Show success message.
+- [`dybatpho::warn`](#dybatphowarn) — Show warning message.
+- [`dybatpho::error`](#dybatphoerror) — Show error message.
+- [`dybatpho::fatal`](#dybatphofatal) — Show fatal message.
+- [`dybatpho::start_trace`](#dybatphostart_trace) — Enable Bash tracing with dybatpho formatting.
+- [`dybatpho::end_trace`](#dybatphoend_trace) — Disable Bash tracing started by `dybatpho::start_trace`.
 
-Log a message to stdout/stderr with color and caution
+## 🔗 See also
 
-#### Arguments
+- [example/logging_demo.sh](../example/logging_demo.sh)
 
-* **$1** (string): Log level of message
-* **$2** (string): Message
-* **$3** (string): `stderr` to output to stderr, otherwise then to stdout
-* **$4** (string): ANSI escape color code
-* **$5** (string): Command to run after log
+## 📚 Reference
 
-#### Variables set
+### `__log`
 
-* **LOG_LEVEL** (string): Log level of script
+Log a message to stdout or stderr, optionally with ANSI color.
 
-#### Output on stdout
+**🧾 Arguments**
 
-* Show message if log level of message is less than runtime log level and $3 is not `stderr`
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Log level of message |
+| `$2` | string | Message |
+| `$3` | string | `stderr` to write to stderr, otherwise stdout |
+| `$4` | string | ANSI escape color code |
 
-#### Output on stderr
+**🧩 Variable sets**
 
-* Show message if log level of message is less than runtime log level and $3 is `stderr`
+- LOG_LEVEL string Runtime log level of the current script
 
-### dybatpho::compare_log_level
+**📤 Output on stdout**
 
-Verify input log level is less than runtime log level
+- Show the formatted message when the level passes filtering and $3 is not `stderr`
 
-#### Arguments
+**📤 Output on stderr**
 
-* **$1** (string): Input log level
+- Show the formatted message when the level passes filtering and $3 is `stderr`
 
-#### Exit codes
 
-* **0**: If less than
-* **1**: Otherwise
+### `__check_color`
 
-### __log_inspect
 
-Log a message with date time and invoke file indicator for easier
-to recognize on tty
 
-#### Arguments
+### `dybatpho::compare_log_level`
 
-* **$1** (string): String of log level
-* **$2** (string): Text of log level
-* **$3** (string): Message
-* **$4** (number): Number of call stack to get source file and line number when logging
-* **$5** (string): ANSI escape color code
+Return success when a message level should be shown for the current `LOG_LEVEL`.
 
-### dybatpho::validate_log_level
+**🧾 Arguments**
 
-Validate log level from input.
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Input log level |
 
-#### Arguments
+**🌍 Environment variables**
 
-* **$1** (string): String of log level
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`LOG_LEVEL`** | string | Runtime threshold used to decide whether the message is emitted |
 
-#### Exit codes
+**🚦 Exit codes**
 
-* **0**: If is valid log level
-* **1**: If invalid
+- `0`: The message level should be emitted
+- `1`: The message level is filtered out
 
-### dybatpho::debug
+
+### `__log_inspect`
+
+Log a structured diagnostic message with timestamp and call-site information.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Log level |
+| `$2` | string | Rendered label for the log level |
+| `$3` | string | Message |
+| `$4` | number | Additional stack frames to skip when resolving the source location |
+| `$5` | string | ANSI escape color code |
+
+
+### `dybatpho::validate_log_level`
+
+Validate a candidate log level value.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Log level to validate |
+
+**🚦 Exit codes**
+
+- `0`: The input is a supported log level
+- `1`: The input is invalid
+
+
+### `dybatpho::debug`
 
 Show debug message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-#### Output on stderr
+**📤 Output on stderr**
 
-* Show message if log level of message is less than debug level
+- Show message if log level of message is less than debug level
 
-### dybatpho::debug_command
 
-Show debug result of a command.
+### `dybatpho::debug_command`
 
-#### Arguments
+Log a debug message together with the output of a shell command.
 
-* **$1** (string): Message
-* **$2** (string): Command
+**🧾 Arguments**
 
-#### Output on stderr
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Introductory message |
+| `$2` | string | Shell command string to evaluate |
 
-* Show message if log level of message is less than debug level
+**🌍 Environment variables**
 
-### dybatpho::info
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`LOG_LEVEL`** | string | Set to `debug` or `trace` to see this output |
+
+**📤 Output on stderr**
+
+- Show message if log level of message is less than debug level
+
+
+### `dybatpho::info`
 
 Show info message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-#### Output on stderr
+**📤 Output on stderr**
 
-* Show message if log level of message is less than info level
+- Show message if log level of message is less than info level
 
-### dybatpho::print
+
+### `dybatpho::print`
 
 Show normal message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Show message if log level of message is less than info level
+- Show message if log level of message is less than info level
 
-### dybatpho::progress
 
-Show in progress message.
+### `dybatpho::progress`
 
-#### Arguments
+Show a highlighted in-progress banner.
 
-* **$1** (string): Message
+**🧾 Arguments**
 
-#### Output on stdout
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-* Show message if log level of message is less than info level
+**📤 Output on stdout**
 
-### dybatpho::progress_bar
+- Show message if log level of message is less than info level
 
-Show progress bar.
 
-#### Arguments
+### `dybatpho::progress_bar`
 
-* **$1** (number): Elapsed percentage
-* **$2** (number): Total length of progress bar in chars. Default is 50
+Render a percentage-based progress bar on the current output line.
 
-#### Output on stdout
+**🧾 Arguments**
 
-* Show progress bar and it's disappeared after done
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Progress percentage from 0 to 100 |
+| `$2` | number | Width of the progress bar in characters. Default is 50 |
 
-### dybatpho::header
+**📤 Output on stdout**
 
-Show header message with banner.
+- Show the progress bar; print a newline in the caller when the task is done
 
-#### Arguments
 
-* **$1** (string): Message
+### `dybatpho::header`
 
-#### Output on stdout
+Show a section header banner.
 
-* Show message if log level of message is less than info level
+**🧾 Arguments**
 
-### dybatpho::success
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
+
+**📤 Output on stdout**
+
+- Show message if log level of message is less than info level
+
+
+### `dybatpho::success`
 
 Show success message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Show message if log level of message is less than info level
+- Show message if log level of message is less than info level
 
-### dybatpho::warn
+
+### `dybatpho::warn`
 
 Show warning message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-#### Output on stderr
+**📤 Output on stderr**
 
-* Show message if log level of message is less than warn level
+- Show message if log level of message is less than warn level
 
-### dybatpho::error
+
+### `dybatpho::error`
 
 Show error message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
 
-#### Output on stderr
+**📤 Output on stderr**
 
-* Show message if log level of message is less than error level
+- Show message if log level of message is less than error level
 
-### dybatpho::fatal
+
+### `dybatpho::fatal`
 
 Show fatal message.
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Message
-* **$2** (number): Number of call stack to get source file and line number when logging
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message |
+| `$2` | number | Number of call stack to get source file and line number when logging |
 
-#### Output on stderr
+**📤 Output on stderr**
 
-* Show message if log level of message is less than fatal level
+- Show message if log level of message is less than fatal level
 
-### dybatpho::start_trace
 
-Start tracing script.
+### `dybatpho::start_trace`
+
+Enable Bash tracing with dybatpho formatting.
 
 _Function has no arguments._
 
-### dybatpho::end_trace
+**🌍 Environment variables**
 
-End tracing script.
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`LOG_LEVEL`** | string | Set to `trace` to emit the trace start/end messages |
+
+
+### `dybatpho::end_trace`
+
+Disable Bash tracing started by `dybatpho::start_trace`.
 
 _Function has no arguments._
 

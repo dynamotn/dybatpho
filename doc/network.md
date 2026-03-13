@@ -2,71 +2,115 @@
 
 Utilities for network
 
-## Overview
+> 🧭 Source: [src/network.sh](../src/network.sh)
+>
+> Jump to: [Overview](#overview) · [Tips](#tips) · [Reference](#reference)
+
+## ✨ Overview
 
 This module contains functions to work with network connection.
 
-**DYBATPHO_CURL_MAX_RETRIES** (number): Max number of retries when using `curl` failed
+### 🌍 Environment
 
-## Index
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_CURL_MAX_RETRIES`** | number | Max number of retry attempts when `dybatpho::curl_do` retries a request |
 
-* [__get_http_code](#gethttpcode)
-* [dybatpho::curl_do](#dybatphocurldo)
-* [dybatpho::curl_download](#dybatphocurldownload)
+### 🚀 Highlights
 
-### __get_http_code
+- [`__get_http_code`](#__get_http_code) — Get description of HTTP status code
+- [`dybatpho::curl_do`](#dybatphocurl_do) — Transferring data with URL by curl
+- [`__request`](#__request) — 
+- [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
+
+## 💡 Tips
+
+### `dybatpho::curl_do`
+
+- The request body is written to the provided output file, or `/dev/null` when omitted
+
+### `dybatpho::curl_download`
+
+- The destination directory is created automatically before downloading
+
+## 📚 Reference
+
+### `__get_http_code`
 
 Get description of HTTP status code
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): Status code
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Status code |
 
-#### Output on stdout
+**📤 Output on stdout**
 
-* Description of status code
+- Description of status code
 
-### dybatpho::curl_do
+
+### `dybatpho::curl_do`
 
 Transferring data with URL by curl
 
-#### Example
+**🧪 Example**
 
 ```bash
 dybatpho::curl_do https://example.com /tmp/1
 dybatpho::curl_do https://example.com /tmp/1 --compressed
+
 ```
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): URL
-* **$2** (string): Location of curl output, default is `/dev/null`
-* **$3** (string): Other options/arguments for curl
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | URL |
+| `$2` | string | Location of curl output, default is `/dev/null` |
+| `$3` | string | Other options/arguments for curl |
 
-#### Exit codes
+**🌍 Environment variables**
 
-* **0**: Transferred data
-* **1**: Unknown error
-* **3**: First digit of HTTP error code 3xx
-* **4**: First digit of HTTP error code 4xx
-* **5**: First digit of HTTP error code 5xx
-* **127**: Curl isn't installed
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_CURL_MAX_RETRIES`** | number | Override the retry budget used around curl requests |
 
-### dybatpho::curl_download
+**📝 Notes**
+
+- HTTP 4xx responses are treated as completed requests and returned to the caller as exit code `4`
+
+**🚦 Exit codes**
+
+- `0`: Transferred data
+- `1`: Unknown error
+- `3`: First digit of HTTP error code 3xx
+- `4`: First digit of HTTP error code 4xx
+- `5`: First digit of HTTP error code 5xx
+- `127`: Curl isn't installed
+
+
+### `__request`
+
+
+
+### `dybatpho::curl_download`
 
 Download file
 
-#### Arguments
+**🧾 Arguments**
 
-* **$1** (string): URL
-* **$2** (string): Destination of file to download
-* **...** (string): Other options/arguments for curl
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | URL |
+| `$2` | string | Destination of file to download |
+| `$@` | string | Other options/arguments for curl |
 
-#### Exit codes
+**🚦 Exit codes**
 
-* **6**: Can't create folder of destination file
+- `6`: Can't create folder of destination file
 
-#### See also
+**🔗 See also**
 
-* [dybatpho::curl_do](#dybatphocurldo)
+- [dybatpho::curl_do](#dybatphocurl_do)
 

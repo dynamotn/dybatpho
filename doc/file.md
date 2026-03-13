@@ -2,35 +2,78 @@
 
 Utilities for file handling
 
-## Overview
+> 🧭 Source: [src/file.sh](../src/file.sh)
+>
+> Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
-This module containss functions to file handling
+## ✨ Overview
 
-## Index
+This module contains helpers for previewing files and creating temporary
+files or directories that are cleaned up automatically on shell exit.
 
-* [dybatpho::show_file](#dybatphoshowfile)
-* [dybatpho::create_temp](#dybatphocreatetemp)
+### 🚀 Highlights
 
-### dybatpho::show_file
+- [`dybatpho::show_file`](#dybatphoshow_file) — Show the contents of a file with line numbers.
+- [`dybatpho::create_temp`](#dybatphocreate_temp) — Create a temporary file or directory and register it for cleanup on shell exit.
 
-Show content of file
+## 🔗 See also
 
-#### Arguments
+- [example/file_ops.sh](../example/file_ops.sh)
 
-* **$1** (string): File path
+## 💡 Tips
 
-#### Output on stderr
+### `dybatpho::show_file`
 
-* Content of file
+- Uses `bat` when available for richer output, otherwise falls back to `cat -n`
 
-### dybatpho::create_temp
+### `dybatpho::create_temp`
 
-Create temporary file or folder and cleanup it on exit
+- Pass `/` or an empty extension to create a directory instead of a file
+- The created path is automatically registered for cleanup on script exit
 
-#### Arguments
+## 📚 Reference
 
-* **$1** (string): Variable name to get file/folder path
-* **$2** (string): Extension of file name, use `/` or empty for folder
-* **$3** (string): Prefix of file/folder name, default is `temp`
-* **$4** (string): Parent folder for file/folder, default is `$TMPDIR`
+### `dybatpho::show_file`
+
+Show the contents of a file with line numbers.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | File path |
+
+**📤 Output on stderr**
+
+- File contents
+
+
+### `dybatpho::create_temp`
+
+Create a temporary file or directory and register it for cleanup on shell exit.
+
+**🧪 Examples**
+
+```bash
+local TMPFILE
+dybatpho::create_temp TMPFILE ".txt"
+echo "hello" > "${TMPFILE}"
+
+```
+
+```bash
+local TMPDIR_VAR
+dybatpho::create_temp TMPDIR_VAR "/"
+mkdir -p "${TMPDIR_VAR}/subdir"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Variable name that receives the created path |
+| `$2` | string | File extension to append, or `/`/empty to create a directory |
+| `$3` | string | Name prefix, default is `temp` |
+| `$4` | string | Parent directory, default is `${TMPDIR:-/tmp}` |
 

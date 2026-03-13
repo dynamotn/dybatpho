@@ -70,6 +70,7 @@
 #   | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 #   | `required:<bool>` | `param` | Whether the option itself must appear |
 #   | `validate:<code>` | `flag`, `param` | Validation logic using `\$OPTARG` |
+#   | `deprecated:<text>` | `flag`, `param`, `disp`, `cmd` | Warn when the item is used and annotate it in help |
 #   | `error:<code>` | `flag`, `param`, `setup` | Custom error handler |
 #   | `hidden:<bool>` | help output | Hide the row from generated help |
 #   | `label:<string>` | help output | Override the label shown in generated help |
@@ -172,6 +173,13 @@
 #   }
 #   ```
 #
+#   #### Hidden and deprecated items
+#
+#   ```bash
+#   dybatpho::opts::flag "Legacy flag" LEGACY --legacy hidden:true
+#   dybatpho::opts::cmd old-run _spec_old deprecated:"Use 'run' instead"
+#   ```
+#
 #   #### Boolean toggle
 #
 #   ```bash
@@ -256,7 +264,7 @@ function __parse_opt {
   shift 2
 
   if dybatpho::is false "${__done_initial}"; then
-    __on="true" __off="" __init="@empty" __export="true" __required="false" __persistent="false" __label=""
+    __on="true" __off="" __init="@empty" __export="true" __required="false" __persistent="false" __hidden="false" __deprecated="" __label=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -318,7 +326,7 @@ function __parse_opt {
       shift
     done
   else
-    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __persistent="false" __switch=""
+    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __persistent="false" __hidden="false" __deprecated="" __switch=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -484,16 +492,16 @@ function __generate_logic {
   [ "$(type -t "${spec}")" != 'function' ] && return
   shift 2
 
-  local IFS=" "                                         # For get list of options, separated by space
-  local __rest=""                                       # For get all rest arguments
-  local __error="" __validate=""                        # For get function name of custom error handler, validation and
-  local __flags="" __params=""                          # For get all flags and params of command
-  local __on="1" __off="" __init="@empty"               # For handle argument of param, effective for rest arguments and options
-  local __export="true"                                 # For handle export variable of `dybatpho::opts::*` commands via name
-  local __optional="true" __required="false" __persistent="false" __label="" # Param value optionality, option presence, persistence, preferred switch label
-  local __action="" __setup_action=""                   # For get action after parse all options and action of each options in spec
-  local __args="any"                                    # For validate positional argument count from opts::setup
-  local __switch=""                                     # For get switch of options
+  local IFS=" "                                                                                               # For get list of options, separated by space
+  local __rest=""                                                                                             # For get all rest arguments
+  local __error="" __validate=""                                                                              # For get function name of custom error handler, validation and
+  local __flags="" __params=""                                                                                # For get all flags and params of command
+  local __on="1" __off="" __init="@empty"                                                                     # For handle argument of param, effective for rest arguments and options
+  local __export="true"                                                                                       # For handle export variable of `dybatpho::opts::*` commands via name
+  local __optional="true" __required="false" __persistent="false" __hidden="false" __deprecated="" __label="" # Param value optionality, option presence, persistence, visibility, deprecation, preferred switch label
+  local __action="" __setup_action=""                                                                         # For get action after parse all options and action of each options in spec
+  local __args="any"                                                                                          # For validate positional argument count from opts::setup
+  local __switch=""                                                                                           # For get switch of options
   declare -a __required_checks=()
   declare -a __persistent_defs=()
   local __has_sub_cmd="false"
@@ -571,9 +579,10 @@ function __generate_logic {
   else
     __print_indent 4 "case \$1 in"
     for sub_spec in "${__sub_specs[@]}"; do
-      local _sub_spec _cmd_match _cmd_name
-      IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name <<< "${sub_spec}"
+      local _sub_spec _cmd_match _cmd_name _cmd_deprecated
+      IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
       __print_indent 5 "${_cmd_match})"
+      [ "${_cmd_deprecated}" ] && __print_deprecated_warning "command" "${_cmd_name}" "${_cmd_deprecated}"
       __print_indent 6 "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${_cmd_name}\""
       __print_indent 6 "shift"
       __print_indent 6 "dybatpho::opts::parse::${_sub_spec} \"\$@\""
@@ -619,8 +628,8 @@ function __generate_logic {
 
   # Generate sub-command logics
   for sub_spec in "${__sub_specs[@]}"; do
-    local _sub_spec _cmd_match _cmd_name
-    IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name <<< "${sub_spec}"
+    local _sub_spec _cmd_match _cmd_name _cmd_deprecated
+    IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
     [ "${_cmd_match}" = "${_cmd_name}" ] || continue
     __generate_child_logic "${_sub_spec}" "${_cmd_name}" "$@"
   done
@@ -711,7 +720,7 @@ function __help_sw {
 function __help_row {
   local _type=$1 _var=$2 _desc=$3
   shift 3
-  local sw="" label="" hidden="" required="false"
+  local sw="" label="" hidden="" required="false" deprecated=""
   while [ $# -gt 0 ]; do
     local _i=$1 && shift
     case ${_i} in
@@ -769,13 +778,17 @@ function __help_row {
       hidden:*) hidden="${_i#hidden:}" ;;
       label:*) label="${_i#label:}" ;;
       required:*) required="${_i#required:}" ;;
+      deprecated:*) deprecated="${_i#deprecated:}" ;;
       *) : ;;
     esac
   done
 
-  [ "${hidden}" ] && return 0
+  dybatpho::is true "${hidden}" && return 0
   if [ "${_type}" = "param" ] && dybatpho::is true "${required}"; then
     _desc="${_desc:+${_desc} }(required)"
+  fi
+  if [ -n "${deprecated}" ]; then
+    _desc="${_desc:+${_desc} }(deprecated: ${deprecated})"
   fi
 
   local len=${__help_width%,*}
@@ -879,6 +892,20 @@ function __print_persistent_help_defs {
     __assign_quoted __quoted_def "${__persistent_def}"
     __print_indent 1 "__persistent_help_defs+=( ${__quoted_def} )"
   done
+}
+
+#######################################
+# @description Emit generated code that warns when a deprecated CLI item is used.
+# @arg $1 string Item type label (`option` or `command`)
+# @arg $2 string Item label shown in the warning
+# @arg $3 string Deprecation message
+# @stdout Generated parser code
+#######################################
+function __print_deprecated_warning {
+  local __item_type="$1" __item_label="$2" __message="$3"
+  local __warning
+  __assign_quoted __warning "Deprecated ${__item_type}: ${__item_label}. ${__message}"
+  __print_indent 4 "dybatpho::warn ${__warning}"
 }
 
 #######################################
@@ -1031,6 +1058,7 @@ function dybatpho::opts::flag {
     __define_var "${var}"
   else
     __print_indent 3 "${__switch})"
+    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-$var}" "${__deprecated}"
     __print_indent 4 '[ "${OPTARG:-}" ] && OPTARG=${OPTARG#*\=} && set "noarg" "$1" && break'
     __print_indent 4 "eval '[ \${OPTARG+x} ] &&:' && OPTARG=${__on} || OPTARG=${__off}"
     __print_validate "${var}" '$OPTARG'
@@ -1087,6 +1115,7 @@ function dybatpho::opts::param {
       __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
     fi
     __print_indent 3 "${__switch})"
+    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-$var}" "${__deprecated}"
     if dybatpho::is false "${__optional}"; then
       __print_indent 4 '[ $# -le 1 ] && set "needarg" "$1" && break'
       __print_indent 4 'OPTARG=$2'
@@ -1133,6 +1162,7 @@ function dybatpho::opts::disp {
   __parse_opt false 1 "$@"
   if ! dybatpho::is false "${__done_initial}"; then
     __print_indent 3 "${__switch})"
+    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-${description}}" "${__deprecated}"
     [ "${__action}" ] && __print_indent 4 "${__action}"
     __print_indent 4 "exit 0"
     __print_indent 4 ";;"
@@ -1153,11 +1183,13 @@ function dybatpho::opts::cmd {
   shift 2
 
   local -a __cmd_aliases=()
-  local __cmd_alias
+  local __cmd_alias __cmd_hidden="false" __cmd_deprecated=""
   while [ $# -gt 0 ]; do
     case $1 in
       alias:*) __cmd_aliases+=("${1#alias:}") ;;
       aliases:*) __parse_alias_list __cmd_aliases "${1#aliases:}" ;;
+      hidden:*) __cmd_hidden="${1#hidden:}" ;;
+      deprecated:*) __cmd_deprecated="${1#deprecated:}" ;;
     esac
     shift
   done
@@ -1172,16 +1204,16 @@ function dybatpho::opts::cmd {
       __cmd_label="${__cmd_label}, ${__cmd_alias}"
     done
     local _line
-    _line=$(__help_row cmd "${__cmd_label}" "${__cmd_desc}")
+    _line=$(__help_row cmd "${__cmd_label}" "${__cmd_desc}" "hidden:${__cmd_hidden}" "deprecated:${__cmd_deprecated}")
     __help_cmds_output="${__help_cmds_output}${_line}"$'\n'
     return 0
   fi
 
   if dybatpho::is true "${__done_initial}"; then
     __has_sub_cmd="true"
-    __sub_specs+=("${sub_spec}"$'\t'"${sub_cmd}"$'\t'"${sub_cmd}")
+    __sub_specs+=("${sub_spec}"$'\t'"${sub_cmd}"$'\t'"${sub_cmd}"$'\t'"${__cmd_deprecated}")
     for __cmd_alias in "${__cmd_aliases[@]}"; do
-      __sub_specs+=("${sub_spec}"$'\t'"${__cmd_alias}"$'\t'"${sub_cmd}")
+      __sub_specs+=("${sub_spec}"$'\t'"${__cmd_alias}"$'\t'"${sub_cmd}"$'\t'"${__cmd_deprecated}")
     done
   fi
 }

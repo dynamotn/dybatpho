@@ -46,6 +46,7 @@ Utilities for building CLI parsers from shell specs.
 - [`__record_persistent_def`](#__record_persistent_def) — Serialize an option definition so it can be replayed for persistent descendant commands.
 - [`__replay_persistent_defs`](#__replay_persistent_defs) — Replay inherited persistent option definitions inside the current parser/help generation context.
 - [`__print_persistent_help_defs`](#__print_persistent_help_defs) — Emit generated code that seeds persistent option definitions for nested help output.
+- [`__print_deprecated_warning`](#__print_deprecated_warning) — Emit generated code that warns when a deprecated CLI item is used.
 - [`__generate_child_logic`](#__generate_child_logic) — Generate parser logic for a child command with inherited persistent option definitions.
 - [`__print_args_check`](#__print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
@@ -132,6 +133,7 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 | `required:<bool>` | `param` | Whether the option itself must appear |
 | `validate:<code>` | `flag`, `param` | Validation logic using `\$OPTARG` |
+| `deprecated:<text>` | `flag`, `param`, `disp`, `cmd` | Warn when the item is used and annotate it in help |
 | `error:<code>` | `flag`, `param`, `setup` | Custom error handler |
 | `hidden:<bool>` | help output | Hide the row from generated help |
 | `label:<string>` | help output | Override the label shown in generated help |
@@ -256,6 +258,15 @@ function _spec_root {
   dybatpho::opts::flag "Verbose output" VERBOSE --verbose persistent:true
   dybatpho::opts::cmd deploy _spec_deploy
 }
+```
+
+
+#### Hidden and deprecated items
+
+
+```bash
+dybatpho::opts::flag "Legacy flag" LEGACY --legacy hidden:true
+dybatpho::opts::cmd old-run _spec_old deprecated:"Use 'run' instead"
 ```
 
 
@@ -690,6 +701,25 @@ _Function has no arguments._
 Emit generated code that seeds persistent option definitions for nested help output.
 
 _Function has no arguments._
+
+**📤 Output on stdout**
+
+- Generated parser code
+
+
+---
+
+### `__print_deprecated_warning`
+
+Emit generated code that warns when a deprecated CLI item is used.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Item type label (`option` or `command`) |
+| `$2` | string | Item label shown in the warning |
+| `$3` | string | Deprecation message |
 
 **📤 Output on stdout**
 

@@ -123,6 +123,7 @@ function _spec_config {
   dybatpho::opts::param "Config key to read or write" KEY -k --key
   dybatpho::opts::param "Value to set (omit to read)" VALUE -V --value
   dybatpho::opts::flag "List all config keys" LIST -l --list
+  dybatpho::opts::flag "Legacy output format" LEGACY_OUTPUT --legacy-output hidden:true
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_config"
 }
 
@@ -138,6 +139,7 @@ function _spec_root {
   dybatpho::opts::cmd deploy _spec_deploy
   dybatpho::opts::cmd db _spec_db
   dybatpho::opts::cmd config _spec_config alias:cfg
+  dybatpho::opts::cmd old-config _spec_config deprecated:"Use 'config' instead"
 }
 
 dybatpho::generate_from_spec _spec_root "$@"

@@ -737,6 +737,36 @@ setup() {
   assert_stderr --partial "Validation error"
 }
 
+@test "deprecated flag warns but still works" {
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" - action:"echo \$OLD_FLAG"
+    dybatpho::opts::flag "Old flag" OLD_FLAG --old deprecated:"Use --new instead"
+  }
+
+  run --separate-stderr dybatpho::generate_from_spec _spec --old
+  assert_success
+  assert_output "true"
+  assert_stderr --partial "Deprecated option: --old. Use --new instead"
+}
+
+@test "deprecated command warns but still dispatches" {
+  # shellcheck disable=2329
+  _spec_old_cmd() {
+    dybatpho::opts::setup "" - action:"echo old-cmd"
+  }
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::cmd old _spec_old_cmd deprecated:"Use 'new' instead"
+  }
+
+  run --separate-stderr dybatpho::generate_from_spec _spec old
+  assert_success
+  assert_output "old-cmd"
+  assert_stderr --partial "Deprecated command: old. Use 'new' instead"
+}
+
 # =============================================================================
 # dybatpho::generate_help
 # =============================================================================
@@ -780,6 +810,21 @@ setup() {
   assert_output --partial "Enable verbose"
   assert_output --partial "--name"
   assert_output --partial "Set name"
+}
+
+@test "dybatpho::generate_help hides hidden flags" {
+  # shellcheck disable=2329
+  _spec_hidden_flag() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::flag "Visible flag" HVISIBLE --visible
+    dybatpho::opts::flag "Hidden flag" HHIDDEN --hidden hidden:true
+  }
+
+  __current_cmd_path=""
+  run dybatpho::generate_help _spec_hidden_flag
+  assert_success
+  assert_output --partial "--visible"
+  refute_output --partial "--hidden"
 }
 
 @test "dybatpho::generate_help param shows <VAR> in label" {
@@ -844,6 +889,44 @@ setup() {
   assert_output --partial "First sub command"
   assert_output --partial "sub2"
   assert_output --partial "Second sub command"
+}
+
+@test "dybatpho::generate_help hides hidden commands" {
+  # shellcheck disable=2329
+  _spec_hc_hidden_sub() {
+    dybatpho::opts::setup "Hidden sub" -
+  }
+  # shellcheck disable=2329
+  _spec_hc_hidden_parent() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::cmd visible _spec_hc_hidden_sub
+    dybatpho::opts::cmd secret _spec_hc_hidden_sub hidden:true
+  }
+
+  __current_cmd_path=""
+  run dybatpho::generate_help _spec_hc_hidden_parent
+  assert_success
+  assert_output --partial "visible"
+  refute_output --partial "secret"
+}
+
+@test "dybatpho::generate_help annotates deprecated items" {
+  # shellcheck disable=2329
+  _spec_hdeprecated_sub() {
+    dybatpho::opts::setup "Deprecated sub" -
+  }
+  # shellcheck disable=2329
+  _spec_hdeprecated() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::flag "Legacy flag" HLEGACY --legacy deprecated:"Use --modern instead"
+    dybatpho::opts::cmd old _spec_hdeprecated_sub deprecated:"Use 'new' instead"
+  }
+
+  __current_cmd_path=""
+  run dybatpho::generate_help _spec_hdeprecated
+  assert_success
+  assert_output --partial "deprecated: Use --modern instead"
+  assert_output --partial "deprecated: Use 'new' instead"
 }
 
 @test "dybatpho::generate_help includes persistent parent options in child help" {

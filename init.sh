@@ -45,6 +45,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/process.sh"
 # shellcheck source=src/network.sh
 . "${DYBATPHO_DIR}/src/network.sh"
+# shellcheck source=src/date.sh
+. "${DYBATPHO_DIR}/src/date.sh"
 # shellcheck source=src/file.sh
 . "${DYBATPHO_DIR}/src/file.sh"
 # shellcheck source=src/cli.sh

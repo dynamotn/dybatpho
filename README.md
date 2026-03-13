@@ -76,6 +76,7 @@
 - [helpers.sh](doc/helpers.md) – Miscellaneous utilities
 - [process.sh](doc/process.md) – Process management
 - [network.sh](doc/network.md) – Network utilities
+- [date.sh](doc/date.md) – Date and timestamp helpers
 - [file.sh](doc/file.md) – File operations
 - [cli.sh](doc/cli.md) – CLI building support
 

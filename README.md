@@ -80,6 +80,7 @@
 - [date.sh](doc/date.md) – Date and timestamp helpers
 - [json.sh](doc/json.md) – JSON and YAML helpers
 - [file.sh](doc/file.md) – File operations
+- [archive.sh](doc/archive.md) – Archive create/extract/list helpers
 - [table.sh](doc/table.md) – Plain-text and Markdown table rendering
 - [cli.sh](doc/cli.md) – CLI building support
 

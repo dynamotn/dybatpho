@@ -62,6 +62,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/json.sh"
 # shellcheck source=src/file.sh
 . "${DYBATPHO_DIR}/src/file.sh"
+# shellcheck source=src/archive.sh
+. "${DYBATPHO_DIR}/src/archive.sh"
 # shellcheck source=src/table.sh
 . "${DYBATPHO_DIR}/src/table.sh"
 # shellcheck source=src/cli.sh

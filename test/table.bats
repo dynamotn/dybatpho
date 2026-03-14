@@ -37,7 +37,7 @@ EOF
 }
 
 @test "dybatpho::table_print reads from stdin when input is -" {
-  run bash -lc 'source "'"${DYBATPHO_DIR}"'/init.sh" && printf "Name|Role\nAlice|Dev\nBob|Ops\n" | dybatpho::table_print -'
+  run dybatpho::table_print - <<< $'Name|Role\nAlice|Dev\nBob|Ops\n'
   assert_success
   assert_output << EOF
 Name   Role

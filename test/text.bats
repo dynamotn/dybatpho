@@ -12,7 +12,7 @@ EOF
 }
 
 @test "dybatpho::text_indent reads from stdin when input is -" {
-  run bash -lc 'source "'"${DYBATPHO_DIR}"'/init.sh" && printf "alpha\nbeta\n" | dybatpho::text_indent - "-- "'
+  run dybatpho::text_indent - "-- " <<< $'alpha\nbeta\n'
   assert_success
   assert_output << EOF
 -- alpha

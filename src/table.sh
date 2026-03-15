@@ -223,7 +223,7 @@ function dybatpho::table_align {
   local row index line gap_text=""
 
   [[ "${gap}" =~ ^[0-9]+$ ]] || dybatpho::die "Gap width must be a non-negative integer: ${gap}"
-  __dybatpho_text_read_lines "${input}" rows
+  __text_read_lines "${input}" rows
   __table_measure_widths rows "${delimiter}" widths
   __table_parse_alignments "${align_spec}" widths alignments
   gap_text="$(dybatpho::string_repeat " " "${gap}")"
@@ -254,7 +254,7 @@ function dybatpho::table_box {
   local -a rows=() widths=() cells=()
   local row row_index index line
 
-  __dybatpho_text_read_lines "${input}" rows
+  __text_read_lines "${input}" rows
   __table_measure_widths rows "${delimiter}" widths
 
   _table_rule "┌" "┬" "┐" widths
@@ -286,7 +286,7 @@ function dybatpho::table_markdown {
   local -a rows=() widths=() cells=()
   local row row_index index line separator segment width
 
-  __dybatpho_text_read_lines "${input}" rows
+  __text_read_lines "${input}" rows
   __table_measure_widths rows "${delimiter}" widths
 
   for row_index in "${!rows[@]}"; do

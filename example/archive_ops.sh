@@ -10,7 +10,7 @@ dybatpho::register_common_handlers
 
 function _demo_archives {
   local workspace bundle_dir archive_path extract_dir
-  dybatpho::create_temp workspace
+  dybatpho::create_temp workspace "/"
   bundle_dir="${workspace}/bundle"
   archive_path="${workspace}/bundle.tar.gz"
   extract_dir="${workspace}/extracted"
@@ -33,7 +33,7 @@ function _demo_archives {
 
 function _demo_single_file_formats {
   local workspace source_file archive_path extract_dir
-  dybatpho::create_temp workspace
+  dybatpho::create_temp workspace "/"
   source_file="${workspace}/hello.txt"
   archive_path="${workspace}/hello.txt.xz"
   extract_dir="${workspace}/single-out"

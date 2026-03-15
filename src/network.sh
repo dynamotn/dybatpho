@@ -202,8 +202,8 @@ function dybatpho::curl_json {
     shift
   fi
   dybatpho::curl_do "${url}" "${output}" \
-    --header "Accept: application/json" \
-    --header "Content-Type: application/json" \
+    --header "'Accept: application/json'" \
+    --header "'Content-Type: application/json'" \
     "$@"
 }
 

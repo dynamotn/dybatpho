@@ -53,4 +53,8 @@ function _spec {
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
 }
 
+if (($# == 0)); then
+  set -- --help
+fi
+
 dybatpho::generate_from_spec _spec "$@"

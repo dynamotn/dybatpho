@@ -173,8 +173,7 @@ function dybatpho::path_normalize {
   local is_absolute=false
   [[ "${path}" == /* ]] && is_absolute=true
 
-  while [[ "${path}" == *'//'*
-  ]]; do
+  while [[ "${path}" == *'//'* ]]; do
     path="${path//\/\//\/}"
   done
 
@@ -204,7 +203,10 @@ function dybatpho::path_normalize {
   done
 
   local normalized_path
-  normalized_path=$(IFS=/; printf '%s' "${normalized_parts[*]}")
+  normalized_path=$(
+    IFS=/
+    printf '%s' "${normalized_parts[*]}"
+  )
   if [[ "${is_absolute}" == true ]]; then
     printf '%s\n' "/${normalized_path}"
   elif [[ -n "${normalized_path}" ]]; then
@@ -299,7 +301,7 @@ function dybatpho::path_relative {
 
   while ((common < ${#target_parts[@]} && common < ${#base_parts[@]})); do
     [[ "${target_parts[${common}]}" == "${base_parts[${common}]}" ]] || break
-    ((common++))
+    common=$((common + 1))
   done
 
   for ((i = common; i < ${#base_parts[@]}; i++)); do
@@ -312,7 +314,10 @@ function dybatpho::path_relative {
   if ((${#relative_parts[@]} == 0)); then
     printf '.\n'
   else
-    printf '%s\n' "$(IFS=/; printf '%s' "${relative_parts[*]}")"
+    printf '%s\n' "$(
+      IFS=/
+      printf '%s' "${relative_parts[*]}"
+    )"
   fi
 }
 

@@ -115,6 +115,11 @@ function dybatpho::curl_do {
     shift
   fi
 
+  if dybatpho::is true "${DRY_RUN}"; then
+    dybatpho::dry_run curl -fsSL "${url}" -o "${output}" "$@"
+    return 0
+  fi
+
   local code
   # shellcheck disable=SC2329
   #######################################

@@ -154,7 +154,11 @@ function dybatpho::curl_do {
     fi
   }
 
-  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" "__request ${*}" "curl ${url}"
+  local _quoted_args=""
+  if (($# > 0)); then
+    printf -v _quoted_args '%q ' "$@"
+  fi
+  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" "__request ${_quoted_args}" "curl ${url}"
 
   # Return exit code based on HTTP status code
   case "${code}" in
@@ -207,8 +211,8 @@ function dybatpho::curl_json {
     shift
   fi
   dybatpho::curl_do "${url}" "${output}" \
-    --header "'Accept: application/json'" \
-    --header "'Content-Type: application/json'" \
+    --header "Accept: application/json" \
+    --header "Content-Type: application/json" \
     "$@"
 }
 

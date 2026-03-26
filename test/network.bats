@@ -45,6 +45,17 @@ setup() {
   unstub curl
 }
 
+@test "dybatpho::curl_do header with space in value is passed as single argument" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_do_header"
+  # Write each curl argument on its own line so we can verify quoting
+  stub curl ": printf '%s\n' \"\$@\" > ${temp_file}; echo '200'"
+  run dybatpho::curl_do https://this "${temp_file}" -H "Authorization: Bearer mytoken"
+  assert_success
+  # The full header value must appear on one line, not split
+  grep "^Authorization: Bearer mytoken$" "${temp_file}"
+  unstub curl
+}
+
 @test "dybatpho::curl_do with status code 200" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl ": echo '200'; echo 'hahaa' > ${temp_file}"

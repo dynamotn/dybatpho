@@ -177,9 +177,15 @@ function dybatpho::cleanup_file_on_exit {
 #######################################
 function dybatpho::dry_run {
   if dybatpho::is true "${DRY_RUN}"; then
-    echo "🧪 DRY RUN: $*"
+    printf '🧪 DRY RUN:'
+    printf ' %q' "$@"
+    printf '\n'
   else
     # shellcheck disable=2294
-    eval "$@"
+    if (($# == 1)); then
+      eval "$1"
+    else
+      "$@"
+    fi
   fi
 }

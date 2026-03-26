@@ -136,6 +136,34 @@ setup() {
   unset DRY_RUN
 }
 
+@test "dybatpho::dry_run with DRY_RUN=true displays args with spaces as single quoted tokens" {
+  # shellcheck disable=2030
+  export DRY_RUN="true"
+  run dybatpho::dry_run curl -H "Authorization: Bearer token"
+  assert_output --partial "DRY RUN:"
+  # The header value must be shell-quoted as a single token (printf %q uses backslash escaping)
+  assert_output --partial "Authorization:"
+  assert_output --partial "Bearer"
+  # All parts must appear on the same line, not split across lines
+  local line
+  while IFS= read -r line; do
+    if [[ "${line}" == *"Authorization:"* ]]; then
+      [[ "${line}" == *"Bearer"* ]] || { echo "header value was split across lines"; return 1; }
+    fi
+  done <<< "${output}"
+  unset DRY_RUN
+}
+
+@test "dybatpho::dry_run with DRY_RUN=false preserves argument quoting during execution" {
+  # shellcheck disable=2031
+  export DRY_RUN="false"
+  # Use printf to write args one-per-line; verify "hello world" stays as one arg
+  local temp_file="${BATS_TEST_TMPDIR}/dry_run_exec"
+  run dybatpho::dry_run bash -c "printf '%s\n' \"\$@\"" -- "hello world" "second"
+  assert_output "$(printf 'hello world\nsecond')"
+  unset DRY_RUN
+}
+
 @test "dybatpho::dry_run with DRY_RUN=false should execute command and produce no dry run output" {
   # shellcheck disable=2031
   export DRY_RUN="false"

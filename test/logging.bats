@@ -207,6 +207,28 @@ EOF
 EOF
 }
 
+@test "boxed logging helpers do not split words or links mid-token" {
+  command -v python3 > /dev/null || skip "python3 required"
+  export NO_COLOR=true
+
+  # A URL that would overflow inner_limit=36 (COLUMNS=40) must not be split mid-link
+  export COLUMNS=40
+  run --separate-stderr dybatpho::header "Visit https://example.com/very/long/path/to/resource please"
+  assert_success
+  refute_stderr
+  assert_output --partial "https://example.com/very/long/path/to/resource"
+  refute_output --partial "https://example.com/very/long/path/to/resource/" # would be cut
+  # Ensure the URL appears on one unbroken line
+  while IFS= read -r line; do
+    if [[ "${line}" == *"https://"* ]]; then
+      [[ "${line}" == *"https://example.com/very/long/path/to/resource"* ]] || {
+        echo "URL was split: ${line}"
+        return 1
+      }
+    fi
+  done <<< "${output}"
+}
+
 @test "boxed logging helpers keep visual border width aligned for wide glyphs" {
   command -v python3 > /dev/null || skip "python3 required"
   export NO_COLOR=true

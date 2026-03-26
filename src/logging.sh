@@ -209,12 +209,18 @@ def wrap_text(text, limit):
         if break_at is None:
             break
 
-        if last_space is not None and break_at == last_space:
+        if last_space is not None:
             result.append(remaining[:break_at])
             remaining = remaining[break_at + 1 :].lstrip(" ")
         else:
-            result.append(remaining[:break_at])
-            remaining = remaining[break_at:]
+            # No space before limit; scan forward to keep the word/link whole
+            next_space = remaining.find(" ", index)
+            if next_space != -1:
+                result.append(remaining[:next_space])
+                remaining = remaining[next_space + 1 :].lstrip(" ")
+            else:
+                result.append(remaining[:break_at])
+                remaining = remaining[break_at:]
 
     result.append(remaining)
     return result
@@ -233,6 +239,15 @@ PY
         break
       fi
     done
+    if ((break_at == -1)); then
+      # No space before limit; scan forward to keep the word/link whole
+      for ((i = max_width + 1; i <= ${#line}; i++)); do
+        if [[ "${line:i-1:1}" == " " ]]; then
+          break_at=${i}
+          break
+        fi
+      done
+    fi
     if ((break_at == -1)); then
       printf '%s\n' "${line:0:max_width}"
       line="${line:max_width}"

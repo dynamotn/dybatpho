@@ -74,6 +74,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/os.sh"
 # shellcheck source=src/notification.sh
 . "${DYBATPHO_DIR}/src/notification.sh"
+# shellcheck source=src/semver.sh
+. "${DYBATPHO_DIR}/src/semver.sh"
 
 # Filter functions and re-export only dybatpho functions to subshells
 eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"

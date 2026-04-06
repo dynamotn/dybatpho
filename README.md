@@ -84,6 +84,7 @@
 - [table.sh](doc/table.md) – Plain-text and Markdown table rendering
 - [cli.sh](doc/cli.md) – CLI building support
 - [notification.sh](doc/notification.md) – Notification utilities
+- [semver.sh](doc/semver.md) – Semantic versioning utilities
 
 ## 🎯 Usage Example
 

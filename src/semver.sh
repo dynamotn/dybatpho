@@ -13,11 +13,11 @@
 
 # Prevent multiple sourcing
 [[ -n "${DYBATPHO_SEMVER_LOADED:-}" ]] && return 0
-declare -r DYBATPHO_SEMVER_LOADED=true
+export DYBATPHO_SEMVER_LOADED=true
 
 # Regex for a valid semver string (with optional leading v)
 # Groups: 1=major 2=minor 3=patch 4=pre-release 5=build-metadata
-declare -r DYBATPHO_SEMVER_REGEX='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z0-9._-]+))?(\+([a-zA-Z0-9._-]+))?$'
+export DYBATPHO_SEMVER_REGEX='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z0-9._-]+))?(\+([a-zA-Z0-9._-]+))?$'
 
 #######################################
 # @description Return success when the string is a valid semver (with optional leading v).

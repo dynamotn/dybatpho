@@ -88,15 +88,20 @@ function dybatpho::killed_process_handler {
   local signal
   dybatpho::expect_args signal -- "$@"
 
+  trap - SIGINT SIGTERM EXIT
   case ${signal} in
     SIGINT)
       dybatpho::error 'Interrupt by CTRL+C'
+      exit 130
       ;;
     SIGTERM)
       dybatpho::error 'Terminated'
+      exit 143
+      ;;
+    *)
+      exit 1
       ;;
   esac
-  trap - SIGTERM && kill -- -$$
 }
 
 #######################################

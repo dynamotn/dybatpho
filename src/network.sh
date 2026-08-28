@@ -7,7 +7,17 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_CURL_MAX_RETRIES number Max number of retry attempts when `dybatpho::curl_do` retries a request
+# @env DYBATPHO_CURL_RETRY_BASE_DELAY number Initial retry delay in seconds (default `2`)
+# @env DYBATPHO_CURL_RETRY_MAX_DELAY number Maximum retry delay in seconds (default `30`)
+# @env DYBATPHO_CURL_RETRY_JITTER bool Add up to one base delay of random jitter
+# @env DYBATPHO_CURL_CONNECT_TIMEOUT number Optional curl connection timeout in seconds
+# @env DYBATPHO_CURL_TIMEOUT number Optional curl total timeout in seconds
 DYBATPHO_CURL_MAX_RETRIES=${DYBATPHO_CURL_MAX_RETRIES:-5}
+DYBATPHO_CURL_RETRY_BASE_DELAY=${DYBATPHO_CURL_RETRY_BASE_DELAY:-2}
+DYBATPHO_CURL_RETRY_MAX_DELAY=${DYBATPHO_CURL_RETRY_MAX_DELAY:-30}
+DYBATPHO_CURL_RETRY_JITTER=${DYBATPHO_CURL_RETRY_JITTER:-false}
+DYBATPHO_CURL_CONNECT_TIMEOUT=${DYBATPHO_CURL_CONNECT_TIMEOUT:-}
+DYBATPHO_CURL_TIMEOUT=${DYBATPHO_CURL_TIMEOUT:-}
 
 #######################################
 # @description Get description of HTTP status code
@@ -120,45 +130,66 @@ function dybatpho::curl_do {
     return 0
   fi
 
-  local code
-  # shellcheck disable=SC2329
-  #######################################
-  # @description Execute one curl request attempt and capture its HTTP status code.
-  # @arg $@ string Extra curl arguments forwarded from `dybatpho::curl_do`
-  # @set code string HTTP status code returned by curl
-  # @exitcode 0 Request completed with an accepted HTTP status (`2xx` or `4xx`)
-  # @exitcode 1 Curl failed or the response should be retried/treated as an error
-  #######################################
-  __request() {
-    dybatpho::require curl
-    # kcov(disabled)
-    code=$(
-      if ! command curl -fsSL "${url}" \
-        -w '%{http_code}' \
-        -o "${output}" \
-        "$@"; then
-        dybatpho::fatal "Error when access ${url}"
-        return 1
-      fi
-    )
-    # kcov(enabled)
+  dybatpho::require curl
+  [[ "${DYBATPHO_CURL_MAX_RETRIES}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "DYBATPHO_CURL_MAX_RETRIES must be a non-negative integer"
+  [[ "${DYBATPHO_CURL_RETRY_BASE_DELAY}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "DYBATPHO_CURL_RETRY_BASE_DELAY must be a non-negative integer"
+  [[ "${DYBATPHO_CURL_RETRY_MAX_DELAY}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "DYBATPHO_CURL_RETRY_MAX_DELAY must be a non-negative integer"
+
+  local code="" retry_after delay attempt=0
+  local header_file
+  header_file=$(mktemp) || dybatpho::die "Unable to create temporary HTTP header file"
+  # Keep the body path owned by the caller; only response headers are temporary.
+  while :; do
+    local curl_args=(-fsSL -D "${header_file}" -w '%{http_code}' -o "${output}")
+    [[ -n "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ]] && curl_args+=(--connect-timeout "${DYBATPHO_CURL_CONNECT_TIMEOUT}")
+    [[ -n "${DYBATPHO_CURL_TIMEOUT}" ]] && curl_args+=(--max-time "${DYBATPHO_CURL_TIMEOUT}")
+    curl_args+=("$@")
+
+    : > "${header_file}"
+    if code=$(command curl "${curl_args[@]}" "${url}"); then
+      :
+    else
+      code="000"
+      dybatpho::error "Error when access ${url}"
+    fi
 
     local code_description
     code_description=$(__get_http_code "${code}")
     dybatpho::debug "Received HTTP status: ${code_description}"
-
-    if [[ "${code}" =~ '2'.* ]] || [[ "${code}" =~ '4'.* ]]; then
-      return 0
-    else
-      return 1
+    if [[ "${code}" =~ ^2[0-9][0-9]$ ]]; then
+      rm -f "${header_file}"
+      break
+    elif [[ "${code}" =~ ^4[0-9][0-9]$ ]]; then
+      case "${code}" in
+        408|425|429) ;;
+        *)
+          rm -f "${header_file}"
+          break
+          ;;
+      esac
     fi
-  }
+    if ((attempt >= DYBATPHO_CURL_MAX_RETRIES)); then
+      dybatpho::warn "No more retries left to run curl ${url}."
+      rm -f "${header_file}"
+      break
+    fi
 
-  local _quoted_args=""
-  if (($# > 0)); then
-    printf -v _quoted_args '%q ' "$@"
-  fi
-  dybatpho::retry "${DYBATPHO_CURL_MAX_RETRIES}" "__request ${_quoted_args}" "curl ${url}"
+    attempt=$((attempt + 1))
+    delay=$((DYBATPHO_CURL_RETRY_BASE_DELAY * (2 ** (attempt - 1))))
+    ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
+    retry_after=$(awk 'tolower($1) == "retry-after:" { gsub("\r", "", $2); if ($2 ~ /^[0-9]+$/) print $2; exit }' "${header_file}")
+    [[ -n "${retry_after}" ]] && delay="${retry_after}"
+    ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
+    if dybatpho::is true "${DYBATPHO_CURL_RETRY_JITTER}"; then
+      ((delay += RANDOM % (DYBATPHO_CURL_RETRY_BASE_DELAY + 1)))
+      ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
+    fi
+    dybatpho::progress "Retrying in ${delay} seconds (${attempt}/${DYBATPHO_CURL_MAX_RETRIES})..."
+    sleep "${delay}" || true
+  done
 
   # Return exit code based on HTTP status code
   case "${code}" in

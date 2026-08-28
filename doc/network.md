@@ -17,12 +17,16 @@ JSON-oriented requests, and HEAD requests.
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_CURL_MAX_RETRIES`** | number | Max number of retry attempts when `dybatpho::curl_do` retries a request |
+| **`DYBATPHO_CURL_RETRY_BASE_DELAY`** | number | Initial retry delay in seconds (default `2`) |
+| **`DYBATPHO_CURL_RETRY_MAX_DELAY`** | number | Maximum retry delay in seconds (default `30`) |
+| **`DYBATPHO_CURL_RETRY_JITTER`** | bool | Add up to one base delay of random jitter |
+| **`DYBATPHO_CURL_CONNECT_TIMEOUT`** | number | Optional curl connection timeout in seconds |
+| **`DYBATPHO_CURL_TIMEOUT`** | number | Optional curl total timeout in seconds |
 
 ### 🚀 Highlights
 
 - [`__get_http_code`](#__get_http_code) — Get description of HTTP status code
 - [`dybatpho::curl_do`](#dybatphocurl_do) — Transferring data with URL by curl
-- [`__request`](#__request) — Execute one curl request attempt and capture its HTTP status code.
 - [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
 - [`dybatpho::curl_json`](#dybatphocurl_json) — Transfer JSON data with URL by curl.
 - [`dybatpho::curl_head`](#dybatphocurl_head) — Fetch only HTTP headers for a URL by curl.
@@ -96,28 +100,6 @@ dybatpho::curl_do https://example.com /tmp/1 --compressed
 - `4`: First digit of HTTP error code 4xx
 - `5`: First digit of HTTP error code 5xx
 - `127`: Curl isn't installed
-
-
----
-
-### `__request`
-
-Execute one curl request attempt and capture its HTTP status code.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$@` | string | Extra curl arguments forwarded from `dybatpho::curl_do` |
-
-**🧩 Variable sets**
-
-- **`code`**: string HTTP status code returned by curl
-
-**🚦 Exit codes**
-
-- `0`: Request completed with an accepted HTTP status (`2xx` or `4xx`)
-- `1`: Curl failed or the response should be retried/treated as an error
 
 
 ---

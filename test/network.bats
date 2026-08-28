@@ -94,6 +94,23 @@ setup() {
   unstub curl
 }
 
+@test "dybatpho::curl_do uses capped exponential backoff" {
+  local sleep_file="${BATS_TEST_TMPDIR}/retry-delays"
+  export DYBATPHO_CURL_MAX_RETRIES=2
+  export DYBATPHO_CURL_RETRY_BASE_DELAY=1
+  export DYBATPHO_CURL_RETRY_MAX_DELAY=3
+  stub curl ": echo '500'" ": echo '500'" ": echo '200'"
+  stub sleep \
+    ": echo \"\$1\" >> ${sleep_file}" \
+    ": echo \"\$1\" >> ${sleep_file}"
+  run dybatpho::curl_do https://this
+  assert_success
+  assert_equal "$(cat "${sleep_file}")" $'1\n2'
+  unstub sleep
+  unstub curl
+  unset DYBATPHO_CURL_MAX_RETRIES DYBATPHO_CURL_RETRY_BASE_DELAY DYBATPHO_CURL_RETRY_MAX_DELAY
+}
+
 @test "dybatpho::curl_do with retries failed" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   export DYBATPHO_CURL_MAX_RETRIES=1

@@ -24,6 +24,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `file.md`
 - `cli.md`
 - `os.md`
+- `config.md`
 
 ## Source Mapping
 
@@ -37,6 +38,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/file.sh` -> `file.md`
 - `src/cli.sh` -> `cli.md`
 - `src/os.sh` -> `os.md`
+- `src/config.sh` -> `config.md`
 
 ## Notes
 

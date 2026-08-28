@@ -85,6 +85,7 @@
 - [cli.sh](doc/cli.md) – CLI building support
 - [notification.sh](doc/notification.md) – Notification utilities
 - [semver.sh](doc/semver.md) – Semantic versioning utilities
+- [config.sh](doc/config.md) – Configuration loading and precedence
 
 ## 🎯 Usage Example
 

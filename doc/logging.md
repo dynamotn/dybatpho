@@ -16,12 +16,16 @@ This module contains functions to log messages to stdout/stderr.
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`LOG_LEVEL`** | string | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`). Default is `info` |
+| **`LOG_FORMAT`** | string | Log output format (`text\|json`). Default is `text` |
 | **`NO_COLOR`** | string | Disable ANSI colors when set to a non-empty value |
 
 ### 🚀 Highlights
 
 - [`__log`](#__log) — Log a message to stdout or stderr, optionally with ANSI color.
 - [`__check_color`](#__check_color) — Render the current log message with ANSI color unless `NO_COLOR` is set.
+- [`__log_json_escape`](#__log_json_escape) — Escape a string for use as a JSON string value.
+- [`__log_timestamp`](#__log_timestamp) — Return an RFC 3339 timestamp for a log event.
+- [`__log_structured`](#__log_structured) — Log a diagnostic event as JSON when `LOG_FORMAT=json`.
 - [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown for the current `LOG_LEVEL`.
 - [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information.
 - [`__get_terminal_width`](#__get_terminal_width) — Return the effective terminal width used by boxed logging helpers.
@@ -88,6 +92,50 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - Message text for the active log call
+
+
+---
+
+### `__log_json_escape`
+
+Escape a string for use as a JSON string value.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Input text |
+
+**📤 Output on stdout**
+
+- JSON-escaped text without surrounding quotes
+
+
+---
+
+### `__log_timestamp`
+
+Return an RFC 3339 timestamp for a log event.
+
+**📤 Output on stdout**
+
+- Current timestamp
+
+
+---
+
+### `__log_structured`
+
+Log a diagnostic event as JSON when `LOG_FORMAT=json`.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Log level |
+| `$2` | string | Source location |
+| `$3` | string | Message |
+| `$4` | string | ANSI escape color code |
 
 
 ---

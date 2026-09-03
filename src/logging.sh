@@ -10,6 +10,9 @@
 # @env LOG_LEVEL string Runtime log level for all messages (`trace|debug|info|warn|error|fatal`). Default is `info`
 LOG_LEVEL="${LOG_LEVEL:-info}"
 export LOG_LEVEL
+# @env LOG_FORMAT string Log output format (`text|json`). Default is `text`
+LOG_FORMAT="${LOG_FORMAT:-text}"
+export LOG_FORMAT
 # @env NO_COLOR string Disable ANSI colors when set to a non-empty value
 NO_COLOR="${NO_COLOR:-}"
 export NO_COLOR
@@ -31,8 +34,8 @@ function __log {
   local out="${3:-stdout}"
   local color="${4:-${log_colors[${show_log_level}]}}"
 
-  dybatpho::validate_log_level "${LOG_LEVEL}"
-  dybatpho::validate_log_level "${show_log_level}"
+  dybatpho::validate_log_level "${LOG_LEVEL}" || return 1
+  dybatpho::validate_log_level "${show_log_level}" || return 1
 
   dybatpho::compare_log_level "${show_log_level}" || return 0
 
@@ -48,10 +51,67 @@ function __log {
       echo -e "\e[${color}m${msg}\e[0m"
     fi
   }
+
   if [[ "${out}" == "stderr" ]]; then
     __check_color >&2
   else
     __check_color
+  fi
+}
+
+#######################################
+# @description Escape a string for use as a JSON string value.
+# @arg $1 string Input text
+# @stdout JSON-escaped text without surrounding quotes
+#######################################
+function __log_json_escape {
+  local value="${1:-}"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "${value}"
+}
+
+#######################################
+# @description Return an RFC 3339 timestamp for a log event.
+# @stdout Current timestamp
+#######################################
+function __log_timestamp {
+  if hash "busybox" 2> /dev/null; then
+      busybox date +%Y-%m-%dT%H:%M:%S%:z
+  elif date --version > /dev/null 2>&1; then
+      date --rfc-3339="seconds"
+  else
+      date +%Y-%m-%dT%H:%M:%S%z
+  fi
+}
+
+#######################################
+# @description Log a diagnostic event as JSON when `LOG_FORMAT=json`.
+# @arg $1 string Log level
+# @arg $2 string Source location
+# @arg $3 string Message
+# @arg $4 string ANSI escape color code
+#######################################
+function __log_structured {
+  local log_level="$1"
+  local source="$2"
+  local message="$3"
+  local color="${4:-}"
+  local timestamp
+  dybatpho::compare_log_level "${log_level}" || return 0
+  timestamp=$(__log_timestamp)
+
+  if [[ "${LOG_FORMAT}" == "json" ]]; then
+    printf '{"timestamp":"%s","level":"%s","source":"%s","message":"%s"}\n' \
+      "$(__log_json_escape "${timestamp}")" \
+      "$(__log_json_escape "${log_level}")" \
+      "$(__log_json_escape "${source}")" \
+      "$(__log_json_escape "${message}")" >&2
+  else
+    __log "${log_level}" "${timestamp} ‖ ${source}: ${message}" stderr "${color}"
   fi
 }
 
@@ -69,6 +129,8 @@ function dybatpho::compare_log_level {
   level=$(dybatpho::lower "${level}")
   runtime_level=$(dybatpho::lower "${LOG_LEVEL}")
 
+  dybatpho::validate_log_level "${runtime_level}" || return 1
+  dybatpho::validate_log_level "${level}" || return 1
   local runtime_level_num="${log_levels[${runtime_level}]}"
   local write_level_num="${log_levels[${level}]}"
 
@@ -101,17 +163,11 @@ function __log_inspect {
     indicator="bash:${BASH_LINENO[1]}" # kcov(skip)
   fi
   local color="${5:-}"
-  local date
-  if hash "busybox" 2> /dev/null; then
-    date=$(busybox date +%Y-%m-%dT%H:%M:%S%:z)
+  if [[ "${LOG_FORMAT}" == "json" ]]; then
+    __log_structured "${log_level}" "${indicator}" "${message}" "${color}"
   else
-    if date --version > /dev/null 2>&1; then
-      date=$(date --rfc-3339="seconds")
-    else
-      date=$(date +%Y-%m-%dT%H:%M:%S%z)
-    fi
+    __log "${log_level}" "$(__log_timestamp) ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
   fi
-  __log "${log_level}" "${date} ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
 }
 
 #######################################
@@ -347,10 +403,10 @@ function __log_box {
 function dybatpho::validate_log_level {
   local level="$1"
   level=$(dybatpho::lower "${level}")
-  if [[ "${level}" =~ trace|debug|info|warn|error|fatal ]]; then
+  if [[ "${level}" =~ ^(trace|debug|info|warn|error|fatal)$ ]]; then
     return 0
   else
-    echo "${level} is not a valid LOG_LEVEL, it should be trace|debug|info|warn|error|fatal"
+    printf '%s is not a valid LOG_LEVEL, it should be trace|debug|info|warn|error|fatal\n' "${level}" >&2
     return 1
   fi
 }

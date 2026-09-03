@@ -4,6 +4,7 @@ setup() {
 
 teardown() {
   export LOG_LEVEL=info
+  export LOG_FORMAT=text
   unset COLUMNS
 }
 
@@ -107,6 +108,18 @@ teardown() {
   assert_success
   refute_output
   assert_stderr --partial "${USER}"
+}
+
+@test "structured logging emits valid JSON" {
+  export LOG_FORMAT=json
+  export NO_COLOR=true
+  run --separate-stderr dybatpho::error 'message with "quotes" and
+a newline'
+  assert_success
+  refute_output
+  assert_stderr --partial '"level":"error"'
+  assert_stderr --partial '"message":"message with'
+  printf '%s\n' "${stderr}" | python3 -c 'import json, sys; event=json.load(sys.stdin); assert event["level"] == "error"; assert event["message"].startswith("message with")'
 }
 
 @test "dybatpho::info output" {

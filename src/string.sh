@@ -43,7 +43,7 @@ function dybatpho::split {
 function dybatpho::string_starts_with {
   local input="${1-}"
   local prefix="${2-}"
-  [[ -z "${prefix}" || "${input#"$prefix"}" != "${input}" ]]
+  [[ -z "${prefix}" || "${input#"${prefix}"}" != "${input}" ]]
 }
 
 #######################################
@@ -56,7 +56,7 @@ function dybatpho::string_starts_with {
 function dybatpho::string_ends_with {
   local input="${1-}"
   local suffix="${2-}"
-  [[ -z "${suffix}" || "${input%"$suffix"}" != "${input}" ]]
+  [[ -z "${suffix}" || "${input%"${suffix}"}" != "${input}" ]]
 }
 
 #######################################
@@ -69,7 +69,7 @@ function dybatpho::string_ends_with {
 function dybatpho::string_contains {
   local input="${1-}"
   local needle="${2-}"
-  [[ -z "${needle}" || "${input#*"$needle"}" != "${input}" ]]
+  [[ -z "${needle}" || "${input#*"${needle}"}" != "${input}" ]]
 }
 
 #######################################
@@ -87,7 +87,7 @@ function dybatpho::string_replace {
     printf '%s\n' "${input}"
     return 0
   fi
-  printf '%s\n' "${input//"$needle"/"$replacement"}"
+  printf '%s\n' "${input//"${needle}"/"${replacement}"}"
 }
 
 #######################################
@@ -100,7 +100,7 @@ function dybatpho::string_trim_prefix {
   local input prefix
   dybatpho::expect_args input prefix -- "$@"
   if dybatpho::string_starts_with "${input}" "${prefix}"; then
-    printf '%s\n' "${input#"$prefix"}"
+    printf '%s\n' "${input#"${prefix}"}"
   else
     printf '%s\n' "${input}"
   fi
@@ -116,7 +116,7 @@ function dybatpho::string_trim_suffix {
   local input suffix
   dybatpho::expect_args input suffix -- "$@"
   if dybatpho::string_ends_with "${input}" "${suffix}"; then
-    printf '%s\n' "${input%"$suffix"}"
+    printf '%s\n' "${input%"${suffix}"}"
   else
     printf '%s\n' "${input}"
   fi

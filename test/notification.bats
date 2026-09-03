@@ -328,3 +328,31 @@ setup() {
   assert_success
   grep -- '--header Authorization: Bearer SECRET' "${args_file}"
 }
+
+@test "notification helpers return HTTP client status codes" {
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub curl ": printf '404'"
+  run dybatpho::notify_slack "not found"
+  assert_failure 4
+  unstub curl
+
+  stub curl ": printf '503'"
+  run dybatpho::notify_slack "unavailable"
+  assert_failure 5
+  unstub curl
+}
+
+@test "notification helpers escape all JSON control characters" {
+  local args_file="${BATS_TEST_TMPDIR}/notification-escape-args"
+  export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/TEST"
+  stub curl ": echo \"\$*\" > ${args_file}; printf '200'"
+  run dybatpho::notify_google_chat $'slash\\quote"\nreturn\rtab\t'
+  assert_success
+  unstub curl
+  run cat "${args_file}"
+  assert_success
+  assert_output --partial 'slash\\quote\"'
+  assert_output --partial '\nreturn'
+  assert_output --partial '\rtab\t'
+}

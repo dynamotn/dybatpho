@@ -25,7 +25,7 @@ function __dybatpho_date_parse {
   fi
   local input_format
   for input_format in "%Y-%m-%d %H:%M:%S" "%Y-%m-%d" "%Y-%m-%dT%H:%M:%S%z"; do
-    if TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "${input_format}" "${input}" +%s 2>/dev/null; then
+    if TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "${input_format}" "${input}" +%s 2> /dev/null; then
       return 0
     fi
   done

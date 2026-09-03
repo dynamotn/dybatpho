@@ -14,7 +14,7 @@ function dybatpho::goos {
   case "${os}" in
     cygwin_nt*) goos="windows" ;;
     linux)
-      local variant="$(dybatpho::lower "$(uname -o 2>/dev/null || true)")"
+      local variant="$(dybatpho::lower "$(uname -o 2> /dev/null || true)")"
       case "${variant}" in
         android) goos="android" ;;
         *) goos="linux" ;;
@@ -59,7 +59,7 @@ function dybatpho::command_path {
   (($# > 0)) || return 1
   local command_name path
   for command_name in "$@"; do
-    path="$(command -v "${command_name}" 2>/dev/null || true)"
+    path="$(command -v "${command_name}" 2> /dev/null || true)"
     if [[ -n "${path}" ]]; then
       printf '%s\n' "${path}"
       return 0

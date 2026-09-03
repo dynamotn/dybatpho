@@ -76,15 +76,18 @@ function dybatpho::git_default_branch {
     return 0
   fi
   if git -C "${repo_path}" show-ref --verify --quiet refs/heads/main; then
-    printf 'main\n'; return 0
+    printf 'main\n'
+    return 0
   fi
   if git -C "${repo_path}" show-ref --verify --quiet refs/heads/master; then
-    printf 'master\n'; return 0
+    printf 'master\n'
+    return 0
   fi
   local configured_default
   configured_default="$(git -C "${repo_path}" config --get init.defaultBranch 2> /dev/null || true)"
   if [[ -n "${configured_default}" ]]; then
-    printf '%s\n' "${configured_default}"; return 0
+    printf '%s\n' "${configured_default}"
+    return 0
   fi
   dybatpho::git_branch "${repo_path}"
 }

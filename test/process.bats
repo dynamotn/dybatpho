@@ -148,7 +148,10 @@ setup() {
   local line
   while IFS= read -r line; do
     if [[ "${line}" == *"Authorization:"* ]]; then
-      [[ "${line}" == *"Bearer"* ]] || { echo "header value was split across lines"; return 1; }
+      [[ "${line}" == *"Bearer"* ]] || {
+        echo "header value was split across lines"
+        return 1
+      }
     fi
   done <<< "${output}"
   unset DRY_RUN

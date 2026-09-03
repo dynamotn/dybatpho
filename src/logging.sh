@@ -80,11 +80,11 @@ function __log_json_escape {
 #######################################
 function __log_timestamp {
   if hash "busybox" 2> /dev/null; then
-      busybox date +%Y-%m-%dT%H:%M:%S%:z
+    busybox date +%Y-%m-%dT%H:%M:%S%:z
   elif date --version > /dev/null 2>&1; then
-      date --rfc-3339="seconds"
+    date --rfc-3339="seconds"
   else
-      date +%Y-%m-%dT%H:%M:%S%z
+    date +%Y-%m-%dT%H:%M:%S%z
   fi
 }
 
@@ -196,7 +196,7 @@ function __string_display_width {
   local text="${1:-}"
 
   if dybatpho::is command python3; then
-    TEXT="${text}" python3 - <<'PY'
+    TEXT="${text}" python3 - << 'PY'
 import os
 import unicodedata
 
@@ -233,7 +233,7 @@ function __wrap_line {
   fi
 
   if dybatpho::is command python3; then
-    LINE="${line}" MAX_WIDTH="${max_width}" python3 - <<'PY'
+    LINE="${line}" MAX_WIDTH="${max_width}" python3 - << 'PY'
 import os
 import unicodedata
 
@@ -428,6 +428,7 @@ function dybatpho::debug {
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug_command {
+  dybatpho::compare_log_level debug || return 0
   __log_inspect debug "COMMAND 💻    " "$1\n$(eval "$2")"
 }
 

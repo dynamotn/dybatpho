@@ -7,8 +7,14 @@ setup() {
 # ---------------------------------------------------------------------------
 
 function _safe_git_test_root {
-  [[ -n "${BATS_TEST_TMPDIR:-}" ]] || { printf '%s\n' "BATS_TEST_TMPDIR is not set" >&2; return 1; }
-  [[ -d "${BATS_TEST_TMPDIR}" ]] || { printf '%s\n' "BATS_TEST_TMPDIR does not exist: ${BATS_TEST_TMPDIR}" >&2; return 1; }
+  [[ -n "${BATS_TEST_TMPDIR:-}" ]] || {
+    printf '%s\n' "BATS_TEST_TMPDIR is not set" >&2
+    return 1
+  }
+  [[ -d "${BATS_TEST_TMPDIR}" ]] || {
+    printf '%s\n' "BATS_TEST_TMPDIR does not exist: ${BATS_TEST_TMPDIR}" >&2
+    return 1
+  }
   printf '%s\n' "${BATS_TEST_TMPDIR}"
 }
 
@@ -22,10 +28,22 @@ function _require_safe_git_test_path {
   local repo_path test_root
   dybatpho::expect_args repo_path -- "$@"
   test_root="$(_safe_git_test_root)" || return $?
-  [[ -n "${repo_path}" ]] || { printf '%s\n' "Refusing to use an empty repository path" >&2; return 1; }
-  [[ "${repo_path}" == "${test_root}"/* ]] || { printf '%s\n' "Refusing to touch non-test path: ${repo_path}" >&2; return 1; }
-  [[ "${repo_path}" != "${DYBATPHO_DIR}" ]] || { printf '%s\n' "Refusing to touch the real dybatpho repository" >&2; return 1; }
-  [[ "${repo_path}" != "${DYBATPHO_DIR}"/* ]] || { printf '%s\n' "Refusing to touch paths inside the real dybatpho repository" >&2; return 1; }
+  [[ -n "${repo_path}" ]] || {
+    printf '%s\n' "Refusing to use an empty repository path" >&2
+    return 1
+  }
+  [[ "${repo_path}" == "${test_root}"/* ]] || {
+    printf '%s\n' "Refusing to touch non-test path: ${repo_path}" >&2
+    return 1
+  }
+  [[ "${repo_path}" != "${DYBATPHO_DIR}" ]] || {
+    printf '%s\n' "Refusing to touch the real dybatpho repository" >&2
+    return 1
+  }
+  [[ "${repo_path}" != "${DYBATPHO_DIR}"/* ]] || {
+    printf '%s\n' "Refusing to touch paths inside the real dybatpho repository" >&2
+    return 1
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -90,7 +108,10 @@ function _append_git_commit {
   local repo_path
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  (unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" checkout -qb feature/test)
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" checkout -qb feature/test
+  )
 
   run dybatpho::git_branch "${repo_path}"
   assert_success
@@ -102,8 +123,14 @@ function _append_git_commit {
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
   local short_sha
-  short_sha="$(unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" rev-parse --short HEAD)"
-  (unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" checkout -q --detach)
+  short_sha="$(
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" rev-parse --short HEAD
+  )"
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" checkout -q --detach
+  )
 
   run dybatpho::git_branch "${repo_path}"
   assert_success
@@ -140,8 +167,14 @@ function _append_git_commit {
   local repo_path commit_sha short_sha
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  commit_sha="$(unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" rev-parse HEAD)"
-  short_sha="$(unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" rev-parse --short=7 HEAD)"
+  commit_sha="$(
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" rev-parse HEAD
+  )"
+  short_sha="$(
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" rev-parse --short=7 HEAD
+  )"
 
   run dybatpho::git_commit_hash "${repo_path}"
   assert_success
@@ -171,7 +204,10 @@ function _append_git_commit {
   local repo_path commit_sha
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  commit_sha="$(unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" rev-parse HEAD)"
+  commit_sha="$(
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" rev-parse HEAD
+  )"
 
   run dybatpho::git_has_commit "${repo_path}" "${commit_sha}"
   assert_success
@@ -184,11 +220,20 @@ function _append_git_commit {
   local repo_path second_commit third_commit
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  (unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" update-ref refs/tags/v1.0.0 "$(git -C "${repo_path}" rev-parse HEAD)")
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" update-ref refs/tags/v1.0.0 "$(git -C "${repo_path}" rev-parse HEAD)"
+  )
   _append_git_commit "${repo_path}" "Add feature"
-  second_commit="$(unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" rev-parse HEAD)"
+  second_commit="$(
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" rev-parse HEAD
+  )"
   _append_git_commit "${repo_path}" "Ship release"
-  third_commit="$(unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" rev-parse HEAD)"
+  third_commit="$(
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" rev-parse HEAD
+  )"
 
   run dybatpho::git_commits_between "${repo_path}" v1.0.0 HEAD
   assert_success
@@ -216,7 +261,10 @@ function _append_git_commit {
   local repo_path
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  (unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" remote add origin https://example.com/repo.git)
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" remote add origin https://example.com/repo.git
+  )
 
   run dybatpho::git_remote_url origin "${repo_path}"
   assert_success
@@ -227,7 +275,10 @@ function _append_git_commit {
   local repo_path
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  (unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" remote add origin https://example.com/repo.git)
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" remote add origin https://example.com/repo.git
+  )
 
   run dybatpho::git_has_remote origin "${repo_path}"
   assert_success
@@ -252,7 +303,10 @@ function _append_git_commit {
   local repo_path
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  (unset GIT_DIR GIT_WORK_TREE; git -C "${repo_path}" update-ref refs/tags/v1.0.0 "$(git -C "${repo_path}" rev-parse HEAD)")
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" update-ref refs/tags/v1.0.0 "$(git -C "${repo_path}" rev-parse HEAD)"
+  )
 
   run dybatpho::git_tags_containing "${repo_path}"
   assert_success
@@ -283,4 +337,67 @@ function _append_git_commit {
   run _create_git_repo "${DYBATPHO_DIR}/unsafe-repo" main
   assert_failure
   assert_output --partial 'Refusing to touch'
+}
+
+@test "dybatpho::git_default_branch uses local main before configured defaults" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" config init.defaultBranch configured
+  )
+
+  run dybatpho::git_default_branch "${repo_path}"
+  assert_success
+  assert_output 'main'
+}
+
+@test "dybatpho::git_default_branch uses configured and current branch fallbacks" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" develop
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" config init.defaultBranch configured
+  )
+
+  run dybatpho::git_default_branch "${repo_path}"
+  assert_success
+  assert_output 'configured'
+
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" config --local init.defaultBranch ""
+  )
+  run dybatpho::git_default_branch "${repo_path}"
+  assert_success
+  assert_output 'develop'
+}
+
+@test "Git range helpers reject unknown base and head commits" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+
+  run dybatpho::git_commits_between "${repo_path}" missing-base
+  assert_failure
+  assert_output --partial "Unknown git commit: missing-base"
+
+  run dybatpho::git_commit_count "${repo_path}" HEAD missing-head
+  assert_failure
+  assert_output --partial "Unknown git commit: missing-head"
+}
+
+@test "dybatpho::git_remote_url and git_tags_containing report missing refs" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+
+  run dybatpho::git_remote_url upstream "${repo_path}"
+  assert_failure
+
+  run dybatpho::git_tags_containing "${repo_path}" missing-commit
+  assert_failure
+  assert_output --partial "Unknown git commit: missing-commit"
 }

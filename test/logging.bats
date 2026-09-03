@@ -122,6 +122,13 @@ a newline'
   printf '%s\n' "${stderr}" | python3 -c 'import json, sys; event=json.load(sys.stdin); assert event["level"] == "error"; assert event["message"].startswith("message with")'
 }
 
+@test "filtered debug command does not execute its command" {
+  local marker="${BATS_TEST_TMPDIR}/debug-command-marker"
+  run --separate-stderr dybatpho::debug_command "hidden" "touch '${marker}'"
+  assert_success
+  [ ! -e "${marker}" ]
+}
+
 @test "dybatpho::info output" {
   run --separate-stderr dybatpho::info daylathongtin
   assert_success
@@ -249,7 +256,7 @@ EOF
   run --separate-stderr dybatpho::success "daylathongtin"
   assert_success
   refute_stderr
-  OUTPUT="${output}" python3 - <<'PY'
+  OUTPUT="${output}" python3 - << 'PY'
 import os
 import sys
 import unicodedata
@@ -275,7 +282,7 @@ PY
   run --separate-stderr dybatpho::progress "daylathongtin"
   assert_success
   refute_stderr
-  OUTPUT="${output}" python3 - <<'PY'
+  OUTPUT="${output}" python3 - << 'PY'
 import os
 import sys
 import unicodedata

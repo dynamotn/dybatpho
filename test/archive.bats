@@ -112,6 +112,19 @@ setup() {
   unstub zip
 }
 
+@test "dybatpho::archive_create resolves relative zip output paths" {
+  local source_dir="${BATS_TEST_TMPDIR}/bundle"
+  local args_file="${BATS_TEST_TMPDIR}/zip-relative-args"
+  mkdir -p "${source_dir}"
+  stub zip ": echo \"\$*\" > ${args_file}"
+  run dybatpho::archive_create "${source_dir}" "bundle.zip"
+  assert_success
+  run cat "${args_file}"
+  assert_success
+  assert_output "-rq $(pwd)/bundle.zip bundle"
+  unstub zip
+}
+
 @test "dybatpho::archive_extract extracts tar.gz archives into the destination" {
   local archive_path="${BATS_TEST_TMPDIR}/bundle.tar.gz"
   local destination="${BATS_TEST_TMPDIR}/out"
@@ -270,4 +283,117 @@ setup() {
   run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.rar"
   assert_failure
   assert_output --partial "Unsupported archive format"
+}
+
+@test "__dybatpho_archive_format recognizes every supported suffix and aliases" {
+  local suffix expected
+  for suffix in tar.gz tgz tar.xz tar.bz2 tbz2 tbz tar.zst tar xz gz bz2 zst zip; do
+    case "${suffix}" in
+      tgz) expected=tar.gz ;;
+      tbz2 | tbz) expected=tar.bz2 ;;
+      *) expected="${suffix}" ;;
+    esac
+    run __dybatpho_archive_format "archive.${suffix}"
+    assert_success
+    assert_output "${expected}"
+  done
+
+  run __dybatpho_archive_format "archive.rar"
+  assert_failure
+  assert_output --partial "Unsupported archive format"
+}
+
+@test "__dybatpho_archive_output_name strips single-file compression suffixes" {
+  run __dybatpho_archive_output_name "/var/lib/archive.txt.xz"
+  assert_success
+  assert_output "archive.txt"
+
+  run __dybatpho_archive_output_name "/var/lib/archive.txt.gz"
+  assert_success
+  assert_output "archive.txt"
+
+  run __dybatpho_archive_output_name "/var/lib/archive.txt.bz2"
+  assert_success
+  assert_output "archive.txt"
+
+  run __dybatpho_archive_output_name "/var/lib/archive.txt.zst"
+  assert_success
+  assert_output "archive.txt"
+
+  run __dybatpho_archive_output_name "/var/lib/archive.tar"
+  assert_success
+  assert_output "archive.tar"
+}
+
+@test "dybatpho::archive_create supports plain tar and tar.bz2" {
+  local source_dir="${BATS_TEST_TMPDIR}/bundle"
+  local args_file="${BATS_TEST_TMPDIR}/tar-other-args"
+  mkdir -p "${source_dir}"
+  stub tar \
+    ": echo \"\$*\" > ${args_file}" \
+    ": echo \"\$*\" > ${args_file}"
+
+  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar"
+  assert_success
+  run cat "${args_file}"
+  assert_output "-C ${BATS_TEST_TMPDIR} -cf ${BATS_TEST_TMPDIR}/bundle.tar bundle"
+
+  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tbz"
+  assert_success
+  run cat "${args_file}"
+  assert_output "-C ${BATS_TEST_TMPDIR} -cjf ${BATS_TEST_TMPDIR}/bundle.tbz bundle"
+  unstub tar
+}
+
+@test "dybatpho::archive_create rejects directories for single-file formats" {
+  local source_dir="${BATS_TEST_TMPDIR}/bundle"
+  mkdir -p "${source_dir}"
+  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.gz"
+  assert_failure
+  assert_output --partial "Single-file archive formats require a file source"
+}
+
+@test "dybatpho::archive_extract and archive_list cover tar.bz2 and plain tar" {
+  local destination="${BATS_TEST_TMPDIR}/out"
+  local tar_archive="${BATS_TEST_TMPDIR}/bundle.tbz2"
+  local plain_archive="${BATS_TEST_TMPDIR}/bundle.tar"
+  local args_file="${BATS_TEST_TMPDIR}/tar-more-args"
+  : > "${tar_archive}"
+  : > "${plain_archive}"
+  stub tar \
+    ": echo \"\$*\" > ${args_file}; printf 'bundle/file\n'" \
+    ": echo \"\$*\" > ${args_file}; printf 'bundle/file\n'" \
+    ": echo \"\$*\" > ${args_file}; printf 'bundle/file\n'"
+
+  run dybatpho::archive_extract "${tar_archive}" "${destination}"
+  assert_success
+  run cat "${args_file}"
+  assert_output "-xjf ${tar_archive} -C ${destination}"
+
+  run dybatpho::archive_extract "${plain_archive}" "${destination}" 2
+  assert_success
+  run cat "${args_file}"
+  assert_output "-xf ${plain_archive} -C ${destination} --strip-components 2"
+
+  run dybatpho::archive_list "${plain_archive}"
+  assert_success
+  assert_output "bundle/file"
+  unstub tar
+}
+
+@test "dybatpho::archive_extract rejects malformed strip-components and supports zst" {
+  local archive_path="${BATS_TEST_TMPDIR}/bundle.tar.zst"
+  local args_file="${BATS_TEST_TMPDIR}/zst-extract-args"
+  : > "${archive_path}"
+
+  run dybatpho::archive_extract "${archive_path}" "${BATS_TEST_TMPDIR}/out" nope
+  assert_failure
+  assert_output --partial "strip-components must be a non-negative integer"
+
+  stub tar ": echo \"\$*\" > ${args_file}"
+  run dybatpho::archive_extract "${archive_path}" "${BATS_TEST_TMPDIR}/out"
+  assert_success
+  run cat "${args_file}"
+  assert_output "--zstd -xf ${archive_path} -C ${BATS_TEST_TMPDIR}/out"
+  unstub tar
 }

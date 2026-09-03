@@ -164,7 +164,7 @@ function dybatpho::curl_do {
       break
     elif [[ "${code}" =~ ^4[0-9][0-9]$ ]]; then
       case "${code}" in
-        408|425|429) ;;
+        408 | 425 | 429) ;;
         *)
           rm -f "${header_file}"
           break

@@ -344,3 +344,41 @@ setup() {
   run dybatpho::semver_bump "1.2.3" "build"
   assert_failure
 }
+
+@test "dybatpho::semver_compare covers reverse short and numeric pre-release ordering" {
+  run dybatpho::semver_compare "1.0.0-alpha.1" "1.0.0-alpha"
+  assert_success
+  assert_output "1"
+
+  run dybatpho::semver_compare "1.0.0-beta.11" "1.0.0-beta.2"
+  assert_success
+  assert_output "1"
+}
+
+@test "dybatpho::semver_compare compares alphanumeric identifiers in both directions" {
+  run dybatpho::semver_compare "1.0.0-beta" "1.0.0-alpha"
+  assert_success
+  assert_output "1"
+
+  run dybatpho::semver_compare "1.0.0-alpha" "1.0.0-alpha"
+  assert_success
+  assert_output "0"
+
+  run dybatpho::semver_compare "1.0.0-alpha" "1.0.0-1"
+  assert_success
+  assert_output "1"
+}
+
+@test "dybatpho::semver_release_type detects removed prerelease and build metadata" {
+  run dybatpho::semver_release_type "1.2.3-rc.1" "1.2.3"
+  assert_success
+  assert_output "pre-release"
+
+  run dybatpho::semver_release_type "1.2.3" "1.2.3+build.1"
+  assert_success
+  assert_output "build"
+
+  run dybatpho::semver_release_type "1.2.3+build.1" "1.2.3"
+  assert_success
+  assert_output "build"
+}

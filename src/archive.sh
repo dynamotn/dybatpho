@@ -178,7 +178,7 @@ function dybatpho::archive_create {
         output_abs="$(dybatpho::path_join "$(pwd)" "${output_path}")"
       fi
       (
-        cd "${source_dir}"
+        cd "${source_dir}" || exit
         zip -rq "${output_abs}" "${source_name}"
       )
       ;;

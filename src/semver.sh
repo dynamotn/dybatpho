@@ -102,8 +102,8 @@ function dybatpho::semver_compare {
 
   # Both have pre-release — compare identifier by identifier
   local -a ids1 ids2
-  IFS='.' read -r -a ids1 <<<"${pre1}"
-  IFS='.' read -r -a ids2 <<<"${pre2}"
+  IFS='.' read -r -a ids1 <<< "${pre1}"
+  IFS='.' read -r -a ids2 <<< "${pre2}"
 
   local max_len="${#ids1[@]}"
   ((${#ids2[@]} > max_len)) && max_len="${#ids2[@]}"
@@ -182,21 +182,21 @@ function dybatpho::semver_bump {
   local major="${parts[0]}" minor="${parts[1]}" patch="${parts[2]}"
 
   case "${part}" in
-  major)
-    major=$((10#${major} + 1))
-    minor=0
-    patch=0
-    ;;
-  minor)
-    minor=$((10#${minor} + 1))
-    patch=0
-    ;;
-  patch)
-    patch=$((10#${patch} + 1))
-    ;;
-  *)
-    dybatpho::die "semver_bump: unknown part '${part}'. Must be one of: major, minor, patch"
-    ;;
+    major)
+      major=$((10#${major} + 1))
+      minor=0
+      patch=0
+      ;;
+    minor)
+      minor=$((10#${minor} + 1))
+      patch=0
+      ;;
+    patch)
+      patch=$((10#${patch} + 1))
+      ;;
+    *)
+      dybatpho::die "semver_bump: unknown part '${part}'. Must be one of: major, minor, patch"
+      ;;
   esac
 
   local result="${major}.${minor}.${patch}"

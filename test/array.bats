@@ -361,3 +361,72 @@ EOF
   assert_success
   assert_output "item1|42|item3|test"
 }
+
+@test "dybatpho::array_unique skips empty elements and preserves output-free mode" {
+  arr=("" "one" "" "one" "two")
+  run dybatpho::array_unique "arr"
+  assert_success
+  refute_output
+  run dybatpho::array_unique "arr" "--"
+  assert_success
+  assert_line "one"
+  assert_line "two"
+  refute_line ""
+}
+
+@test "dybatpho::array_filter, array_map, and array_reject support output-free mode" {
+  _is_even_word() { [[ "$1" == even-* ]]; }
+  _prefix_word() { printf 'mapped-%s\n' "$1"; }
+
+  arr=("even-one" "odd" "even-two")
+  run dybatpho::array_filter "arr" "_is_even_word"
+  assert_success
+  refute_output
+
+  arr=("one" "two")
+  run dybatpho::array_map "arr" "_prefix_word"
+  assert_success
+  refute_output
+
+  arr=("even-one" "odd")
+  run dybatpho::array_reject "arr" "_is_even_word"
+  assert_success
+  refute_output
+}
+
+@test "dybatpho::array_every and array_some handle empty arrays" {
+  _always_true() { return 0; }
+  arr=()
+
+  run dybatpho::array_every "arr" "_always_true"
+  assert_success
+
+  run dybatpho::array_some "arr" "_always_true"
+  assert_failure
+}
+
+@test "dybatpho predicate array helpers reject invalid functions" {
+  arr=("one")
+  run --separate-stderr dybatpho::array_every "arr" "missing_predicate"
+  assert_failure
+  assert_stderr --partial "Invalid predicate function"
+
+  run --separate-stderr dybatpho::array_some "arr" "missing_predicate"
+  assert_failure
+  assert_stderr --partial "Invalid predicate function"
+
+  run --separate-stderr dybatpho::array_reject "arr" "missing_predicate"
+  assert_failure
+  assert_stderr --partial "Invalid predicate function"
+}
+
+@test "dybatpho::array_first and array_last handle sparse arrays" {
+  arr=([4]="first" [9]="last")
+  run dybatpho::array_first "arr"
+  assert_success
+  assert_output "first"
+
+  run dybatpho::array_last "arr"
+  assert_success
+  assert_output "last"
+}

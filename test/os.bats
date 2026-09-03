@@ -50,6 +50,20 @@ setup() {
   unstub uname
 }
 
+@test "dybatpho::platform aliases normalized operating system" {
+  stub uname ": echo 'Darwin'"
+  run dybatpho::platform
+  assert_success
+  assert_output "darwin"
+  unstub uname
+}
+
+@test "dybatpho::command_path returns the first available command" {
+  run dybatpho::command_path command-that-does-not-exist sh
+  assert_success
+  assert_output "$(command -v sh)"
+}
+
 @test "dybatpho::goarch arm64" {
   stub uname ": echo 'aarch64'"
   run dybatpho::goarch

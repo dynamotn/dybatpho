@@ -14,7 +14,7 @@ function dybatpho::goos {
   case "${os}" in
     cygwin_nt*) goos="windows" ;;
     linux)
-      local variant="$(dybatpho::lower "$(uname -o)")"
+      local variant="$(dybatpho::lower "$(uname -o 2>/dev/null || true)")"
       case "${variant}" in
         android) goos="android" ;;
         *) goos="linux" ;;
@@ -25,6 +25,47 @@ function dybatpho::goos {
     *) goos="${os}" ;;
   esac
   printf '%s' "${goos}"
+}
+
+#######################################
+# @description Return the normalized host operating system name.
+# @stdout `linux`, `darwin`, `windows`, `android`, or the normalized uname name
+#######################################
+function dybatpho::platform {
+  dybatpho::goos
+}
+
+#######################################
+# @description Return success when running on macOS.
+#######################################
+function dybatpho::is_macos {
+  [[ "$(dybatpho::platform)" == "darwin" ]]
+}
+
+#######################################
+# @description Return success when running on Linux.
+#######################################
+function dybatpho::is_linux {
+  [[ "$(dybatpho::platform)" == "linux" ]]
+}
+
+#######################################
+# @description Return the path of the first installed command.
+# @arg $@ string Commands to check
+# @stdout Path of the first available command
+# @exitcode 1 None of the commands is installed
+#######################################
+function dybatpho::command_path {
+  (($# > 0)) || return 1
+  local command_name path
+  for command_name in "$@"; do
+    path="$(command -v "${command_name}" 2>/dev/null || true)"
+    if [[ -n "${path}" ]]; then
+      printf '%s\n' "${path}"
+      return 0
+    fi
+  done
+  return 1
 }
 
 #######################################

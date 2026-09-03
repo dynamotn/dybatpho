@@ -21,6 +21,8 @@ offsets, and calculating day differences.
 
 ### 🚀 Highlights
 
+- [`__dybatpho_date_is_gnu`](#__dybatpho_date_is_gnu) — 
+- [`__dybatpho_date_parse`](#__dybatpho_date_parse) — 
 - [`dybatpho::date_now`](#dybatphodate_now) — Print the current time using a `date` format string.
 - [`dybatpho::date_today`](#dybatphodate_today) — Print today's date using a `date` format string.
 - [`dybatpho::date_is_valid`](#dybatphodate_is_valid) — Return success when a date string can be parsed by `date`.
@@ -36,6 +38,18 @@ offsets, and calculating day differences.
 
 <a id="reference"></a>
 ## 📚 Reference
+
+### `__dybatpho_date_is_gnu`
+
+
+
+---
+
+### `__dybatpho_date_parse`
+
+
+
+---
 
 ### `dybatpho::date_now`
 

@@ -61,6 +61,8 @@ As a maintainer, I want architecture normalization so that downloads and packagi
 - **FR-002**: The OS helper MUST distinguish Android from generic Linux when the runtime exposes that variant.
 - **FR-003**: The module MUST normalize common CPU architectures into target values suitable for cross-platform artifact selection.
 - **FR-004**: Unknown architecture strings MUST remain available to callers instead of being silently discarded.
+- **FR-005**: The module MUST expose normalized platform predicates for common host systems.
+- **FR-006**: The module MUST provide command capability lookup without requiring platform-specific paths.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -80,6 +82,8 @@ As a maintainer, I want architecture normalization so that downloads and packagi
 - **IT-001**: Stub Linux, Android, and Windows-like `uname` outputs and verify normalized OS values.
 - **IT-002**: Stub amd64, 386, arm, and arm64 architectures and verify normalized architecture values.
 - **IT-003**: Pass through an unknown architecture string and verify the helper preserves it.
+- **IT-004**: Verify `platform`, `is_macos`, and `is_linux` use the normalized OS value.
+- **IT-005**: Verify command lookup returns the first available command.
 
 ## Acceptance Criteria *(mandatory)*
 

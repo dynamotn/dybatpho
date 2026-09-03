@@ -28,3 +28,19 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           format: "cobertura"
           files: "coverage/bats/cobertura.xml"
+
+  portable:
+    name: "Portable smoke tests (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: "Run portable module tests"
+        run: |
+          test/lib/core/bin/bats test/os.bats test/date.bats test/file.bats

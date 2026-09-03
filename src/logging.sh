@@ -105,7 +105,11 @@ function __log_inspect {
   if hash "busybox" 2> /dev/null; then
     date=$(busybox date +%Y-%m-%dT%H:%M:%S%:z)
   else
-    date=$(date --rfc-3339="seconds")
+    if date --version > /dev/null 2>&1; then
+      date=$(date --rfc-3339="seconds")
+    else
+      date=$(date +%Y-%m-%dT%H:%M:%S%z)
+    fi
   fi
   __log "${log_level}" "${date} ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
 }

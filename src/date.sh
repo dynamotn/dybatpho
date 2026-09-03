@@ -12,6 +12,26 @@
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used by date helpers, default is `UTC`
 DYBATPHO_DATE_TIMEZONE="${DYBATPHO_DATE_TIMEZONE:-UTC}"
 
+function __dybatpho_date_is_gnu {
+  date --version > /dev/null 2>&1
+}
+
+function __dybatpho_date_parse {
+  local input
+  dybatpho::expect_args input -- "$@"
+  if __dybatpho_date_is_gnu; then
+    TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s
+    return
+  fi
+  local input_format
+  for input_format in "%Y-%m-%d %H:%M:%S" "%Y-%m-%d" "%Y-%m-%dT%H:%M:%S%z"; do
+    if TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "${input_format}" "${input}" +%s 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 #######################################
 # @description Print the current time using a `date` format string.
 # @arg $1 string Optional output format, default is `%s`
@@ -44,7 +64,7 @@ function dybatpho::date_today {
 function dybatpho::date_is_valid {
   local input
   dybatpho::expect_args input -- "$@"
-  TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s > /dev/null 2>&1
+  __dybatpho_date_parse "${input}" > /dev/null 2>&1
 }
 
 #######################################
@@ -58,7 +78,7 @@ function dybatpho::date_is_valid {
 function dybatpho::date_parse {
   local input
   dybatpho::expect_args input -- "$@"
-  TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s
+  __dybatpho_date_parse "${input}"
 }
 
 #######################################
@@ -72,7 +92,11 @@ function dybatpho::date_format {
   local timestamp
   dybatpho::expect_args timestamp -- "$@"
   local format="${2:-%F %T}"
-  TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "@${timestamp}" +"${format}"
+  if __dybatpho_date_is_gnu; then
+    TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "@${timestamp}" +"${format}"
+  else
+    TZ="${DYBATPHO_DATE_TIMEZONE}" date -r "${timestamp}" +"${format}"
+  fi
 }
 
 #######################################
@@ -87,7 +111,13 @@ function dybatpho::date_add_days {
   local input days
   dybatpho::expect_args input days -- "$@"
   local format="${3:-%F}"
-  TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input} ${days} days" +"${format}"
+  if __dybatpho_date_is_gnu; then
+    TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input} ${days} days" +"${format}"
+  else
+    local timestamp
+    timestamp=$(__dybatpho_date_parse "${input}") || return $?
+    TZ="${DYBATPHO_DATE_TIMEZONE}" date -r "$((timestamp + days * 86400))" +"${format}"
+  fi
 }
 
 #######################################

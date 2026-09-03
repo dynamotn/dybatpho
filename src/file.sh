@@ -361,10 +361,14 @@ function dybatpho::create_temp {
   local prefix="${1:-temp}"
   local filename_format="dybatpho_${prefix}_${pid}"
   if hash "mktemp" > /dev/null 2>&1; then
+    local temp_template="${parent_folder%/}/${filename_format}_XXXXXXXX"
     if dybatpho::is empty "${extension}"; then
-      temp_path=$(mktemp --tmpdir="${parent_folder}" -d "${filename_format}_XXXXXXXX")
+      temp_path=$(mktemp -d "${temp_template}")
     else
-      temp_path=$(mktemp --tmpdir="${parent_folder}" "${filename_format}_XXXXXXXX${extension}")
+      temp_path=$(mktemp "${temp_template}")
+      local extended_temp_path="${temp_path}${extension}"
+      mv "${temp_path}" "${extended_temp_path}"
+      temp_path="${extended_temp_path}"
     fi
   else
     # kcov(disabled)

@@ -86,6 +86,9 @@
 - [notification.sh](doc/notification.md) – Notification utilities
 - [semver.sh](doc/semver.md) – Semantic versioning utilities
 - [config.sh](doc/config.md) – Configuration loading and precedence
+- Cross-platform helpers automatically handle GNU/BSD `date`, portable temporary
+  files, and normalized platform detection on Linux, macOS, BSD, and Windows
+  compatibility shells.
 
 ## 🎯 Usage Example
 

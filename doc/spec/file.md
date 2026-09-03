@@ -112,7 +112,7 @@ As a script author, I want a helper that cleans repeated separators plus `.` and
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - The target variable name is empty or invalid.
 - The caller requests a custom parent directory that does not exist.

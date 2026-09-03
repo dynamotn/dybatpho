@@ -62,7 +62,7 @@ As a maintainer, I want conversion helpers between JSON and YAML so that scripts
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - `yq` or `jq` is not installed.
 - The input document path is `-` for stdin.

@@ -30,6 +30,9 @@ As a script author, I want to source one initialization file and immediately use
 
 1. **Given** a Bash v4+ shell is in a project using dybatpho, **When** the script sources `init.sh`, **Then** the shared environment and module functions become available for use
 2. **Given** a script uses child shell execution after sourcing dybatpho, **When** a child shell is started, **Then** named `dybatpho::` functions remain available where the library promises export support
+3. **Given** a consumer needs archive, Git, notification, or SemVer behavior,
+   **When** the bootstrap completes, **Then** those modules are available through
+   the same entrypoint
 
 ---
 
@@ -63,22 +66,29 @@ As a CLI author, I want to declare command specs in shell functions so that I ca
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - Sourcing is attempted from a shell that is not Bash v4 or newer.
 - A consumer executes `init.sh` directly instead of sourcing it.
 - Multiple modules are used in subshells, traps, or strict-mode scripts where environment and export behavior must remain predictable.
+- Optional external tools such as `curl`, `jq`, `yq`, archivers, or `python3`
+  are unavailable.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: The library MUST provide a single bootstrap file that validates the runtime shell and loads all shipped modules in a stable order.
-- **FR-002**: The library MUST expose reusable shell functions for strings, arrays, logging, helpers, process handling, networking, file operations, CLI generation, and OS normalization.
+- **FR-002**: The library MUST expose reusable shell functions for strings,
+  arrays, text, tables, logging, helpers, process handling, networking, date
+  and structured data, configuration, file and archive operations, Git,
+  notifications, SemVer, CLI generation, and OS normalization.
 - **FR-003**: The library MUST support strict-mode-friendly usage in scripts that run with fail-fast shell settings.
 - **FR-004**: The library MUST ship examples and generated documentation that map to the available modules and primary workflows.
 - **FR-005**: The library MUST keep user-visible behavior covered by the existing automated test suite.
 - **FR-006**: The library MUST support composition across modules without requiring consumers to manage hidden cross-module dependencies manually.
+- **FR-007**: The library MUST document optional external-command dependencies
+  and the failure behavior when they are unavailable.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -91,13 +101,17 @@ As a CLI author, I want to declare command specs in shell functions so that I ca
 ### Measurable Outcomes
 
 - **SC-001**: A new consumer can source one file and access the full library without additional bootstrap steps.
-- **SC-002**: Every top-level module in `src/` has a corresponding documented behavioral contract in `doc/spec/` and generated docs under `doc/`.
+- **SC-002**: Every top-level module in `src/` has a corresponding documented
+  behavioral contract in `doc/spec/` and generated docs under `doc/`, including
+  `archive`, `notification`, and `semver`.
 - **SC-003**: Core workflows remain verifiable through the project test suite without ad hoc manual setup.
 - **SC-004**: Scripts using multiple dybatpho modules can complete common automation tasks with consistent logging, validation, and cleanup behavior.
 
 ## Integration Tests *(mandatory)*
 
-- **IT-001**: End-to-end bootstrap: source `init.sh` in a Bash v4+ shell and verify representative functions from all modules are available.
+- **IT-001**: End-to-end bootstrap: source `init.sh` in a Bash v4+ shell and
+  verify representative functions from all modules are available, including
+  archive, Git, notification, and SemVer.
 - **IT-002**: Composite automation: validate inputs, create temp files, perform a network request, log progress, and clean up on shell exit using dybatpho utilities.
 - **IT-003**: CLI generation: define a nested spec and verify parsing, help, aliases, hooks, and standardized failures without separate parser code.
 

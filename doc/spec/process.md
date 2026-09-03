@@ -28,7 +28,9 @@ As a script author, I want one-line registration of common handlers so that erro
 **Acceptance Scenarios**:
 
 1. **Given** a script opts into the common handlers, **When** a command fails under the ERR trap, **Then** the error handler reports the failure and exits non-zero
-2. **Given** a script receives SIGINT or SIGTERM, **When** the signal handler runs, **Then** the script reports the interruption and terminates the process group as intended
+2. **Given** a script receives SIGINT or SIGTERM, **When** the signal handler
+   runs, **Then** the script reports the interruption and exits with the
+   signal-specific status
 
 ---
 
@@ -47,11 +49,14 @@ As an operator, I want files and directories removed on shell exit so that tempo
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - A script already has an EXIT or signal trap when dybatpho trap composition is requested.
 - `DRY_RUN` is unset, true-like, or false-like.
+- A dry-run command is supplied as one shell string (evaluated) or multiple
+  arguments (executed directly).
 - Cleanup registration runs under normal scripts and Bats test environments.
+- An existing trap must be preserved when cleanup or another handler is added.
 
 ## Requirements *(mandatory)*
 
@@ -63,11 +68,20 @@ As an operator, I want files and directories removed on shell exit so that tempo
 - **FR-004**: The module MUST provide deferred cleanup registration for files and directories on shell exit.
 - **FR-005**: The module MUST provide a dry-run helper that prints commands instead of executing them when dry-run mode is enabled.
 - **FR-006**: Cleanup registration MUST be suitable for temporary resources created during script execution.
+- **FR-007**: `DRY_RUN` MUST treat `0`, `true`, `yes`, and `on` as enabled
+  values and execute commands otherwise.
+- **FR-008**: `dry_run` MUST evaluate a single command string and execute
+  multiple arguments directly when dry-run mode is disabled.
+- **FR-009**: Signal handlers MUST return 130 for SIGINT and 143 for SIGTERM.
+- **FR-010**: Cleanup registration MUST append to existing traps and remove
+  registered files or directories on EXIT, HUP, INT, or TERM.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Registered Trap Action**: A command appended to one or more shell trap handlers.
 - **Deferred Cleanup Target**: A file or directory scheduled for removal when the owning shell exits.
+- **Dry-Run Command**: A command represented as a shell string or argument
+  vector and optionally printed instead of run.
 
 ## Success Criteria *(mandatory)*
 
@@ -76,12 +90,16 @@ As an operator, I want files and directories removed on shell exit so that tempo
 - **SC-001**: Scripts can opt into consistent lifecycle handling with one or two helper calls.
 - **SC-002**: Temporary resources do not leak after scripts exit under normal conditions.
 - **SC-003**: Operators can preview command execution safely when dry-run mode is enabled.
+- **SC-004**: Existing trap behavior is retained when dybatpho handlers and
+  cleanup actions are registered.
 
 ## Integration Tests *(mandatory)*
 
 - **IT-001**: Register common handlers and verify command failures trigger the shared error path.
 - **IT-002**: Register cleanup for a file and directory, exit the shell, and verify both are removed.
 - **IT-003**: Set `DRY_RUN=true` and verify the dry-run helper prints the command without executing it.
+- **IT-004**: Verify false-like dry-run execution, signal-specific statuses,
+  and trap composition with pre-existing handlers.
 
 ## Acceptance Criteria *(mandatory)*
 

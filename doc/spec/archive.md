@@ -57,6 +57,17 @@ As a script author, I want to list archive contents before extraction so that va
 2. **Given** a `.zip` archive, **When** the list helper runs, **Then** it prints the output from `unzip -Z1`
 3. **Given** a single-file compressed archive, **When** the list helper runs, **Then** it prints the decompressed output file name inferred from the archive name
 
+## Edge Cases
+
+- The source path does not exist or a single-file compressor receives a
+  directory.
+- The output or input extension is unsupported.
+- The extraction destination does not exist.
+- A non-negative strip-components count is supplied for tar or zip content.
+- A non-zero strip-components count is supplied for a single-file compressed
+  archive, which is rejected.
+- An archive contains entries that become empty after path stripping.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements

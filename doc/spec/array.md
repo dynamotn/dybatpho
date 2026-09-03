@@ -49,6 +49,8 @@ As a maintainer, I want reverse and unique operations to modify arrays by name s
 
 1. **Given** an array has ordered values, **When** the reverse helper runs, **Then** the target array order is inverted
 2. **Given** an array contains duplicate values, **When** the unique helper runs, **Then** duplicate entries are removed from the target array
+3. **Given** an array contains empty-string values, **When** the unique helper
+   runs, **Then** those empty values are omitted along with duplicates
 
 ---
 
@@ -112,11 +114,13 @@ As a script author, I want a helper that returns the first array value accepted 
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - The input array is empty.
 - The array contains sparse indexes.
 - Elements contain spaces or repeated values.
+- Unique operation does not promise the original order because it rebuilds the
+  result through an associative array.
 - The array contains empty-string placeholder elements that should be removed during compaction.
 - The predicate function is missing or rejects all elements.
 - The mapper function is missing or fails for one of the values.
@@ -129,7 +133,9 @@ As a script author, I want a helper that returns the first array value accepted 
 
 - **FR-001**: The module MUST print array elements by array name.
 - **FR-002**: The module MUST support in-place reversal of a named array.
-- **FR-003**: The module MUST support in-place duplicate removal of a named array.
+- **FR-003**: The module MUST support in-place duplicate removal of a named
+  array; the helper MUST remove empty-string values and does not
+  guarantee the original ordering of retained values.
 - **FR-004**: The module MUST provide a membership helper that returns success when an element exists in the named array.
 - **FR-005**: The module MUST provide an index lookup helper that prints the first exact-match index.
 - **FR-006**: The module MUST provide a compaction helper that removes empty-string elements in place.
@@ -144,6 +150,8 @@ As a script author, I want a helper that returns the first array value accepted 
 - **FR-015**: The module MUST provide helpers that return success when every or at least one element satisfies a predicate function.
 - **FR-016**: The module MUST provide a reject helper that removes elements accepted by a predicate function.
 - **FR-017**: The module MUST provide helpers that print the first and last array elements and fail for empty arrays.
+- **FR-018**: Predicate helpers MUST treat an empty array as matching `every`
+  and not matching `some` or `find`.
 
 ### Key Entities *(include if feature involves data)*
 

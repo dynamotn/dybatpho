@@ -65,6 +65,14 @@ As a script author, I want per-column alignment rules and a CSV convenience wrap
 1. **Given** an alignment specification, **When** the aligned-table helper runs, **Then** each column uses the requested alignment
 2. **Given** comma-delimited row data, **When** the CSV helper runs, **Then** it dispatches to the requested renderer using `,` as the delimiter
 
+## Edge Cases
+
+- Empty input or input supplied through stdin with `-`.
+- Rows contain uneven numbers of cells or leading/trailing whitespace.
+- A custom delimiter is multi-character.
+- A table has only a header row or no meaningful rows.
+- An invalid alignment name or negative/non-numeric gap is supplied.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements

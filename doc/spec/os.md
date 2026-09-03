@@ -47,7 +47,7 @@ As a maintainer, I want architecture normalization so that downloads and packagi
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - Linux reports the Android userspace variant.
 - The architecture is unknown and must pass through unchanged.

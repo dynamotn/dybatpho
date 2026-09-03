@@ -88,6 +88,10 @@ artifacts expose the declared options and commands.
 4. **Given** a CLI spec contains options and subcommands, **When** completion is
    generated for Bash, Zsh, or Fish, **Then** the output contains the visible
    switches and command names for that shell
+5. **Given** an application needs a standalone prompt or selection list,
+   **When** `dybatpho::prompt` or `dybatpho::select` runs, **Then** it reads
+   interactive input and returns the selected value according to its choices
+   and default behavior
 
 ---
 
@@ -121,7 +125,7 @@ roff man-page output.
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - A user passes an unrecognized option, a forbidden argument, or an invalid subcommand.
 - A parameter is required but omitted.
@@ -134,6 +138,7 @@ roff man-page output.
 - An environment variable is configured with an invalid shell identifier.
 - Completion generation is requested for an unsupported shell.
 - Schema or man-page metadata contains quotes, backslashes, or newlines.
+- A standalone prompt or selection helper receives EOF or an invalid choice.
 
 ## Requirements *(mandatory)*
 
@@ -148,7 +153,9 @@ roff man-page output.
 - **FR-007**: The module MUST emit standardized error messages for invalid command-line input.
 - **FR-008**: The module MUST allow debug inspection of generated parser output through the documented debug toggle.
 - **FR-009**: The module MUST support interactive prompts for missing parameter values, including optional defaults.
-- **FR-010**: The module MUST support constrained choices and multi-value selection for parameters.
+- **FR-010**: The module MUST support constrained choices and multi-value
+  selection for parameters and provide standalone prompt and choice-selection
+  helpers, including validation of named or numbered choices.
 - **FR-011**: The module MUST generate completion scripts for Bash, Zsh, and Fish from the CLI spec.
 - **FR-012**: The module MUST allow options to declare an environment variable fallback using `env:NAME`.
 - **FR-013**: Explicit command-line values MUST take precedence over environment-variable fallbacks.
@@ -156,6 +163,11 @@ roff man-page output.
 - **FR-015**: The module MUST generate a roff man page from the same CLI spec.
 - **FR-016**: Generated schema and man-page output MUST preserve relevant option and command metadata, including descriptions, aliases, visibility, required state, choices, prompts, and environment names.
 - **FR-017**: The CLI spec documentation MUST describe the `env:`, `prompt:`, `choices:`, and `multiple:` option attributes and their supported scope.
+- **FR-018**: The option DSL MUST support setup, flag, parameter, display, and
+  child-command declarations through `dybatpho::opts::*`.
+- **FR-019**: `opts::validate_choice` MUST accept only declared choice names
+  and reject values outside the declared set; `select` MUST additionally
+  support numeric selections and ascending ranges in multi-select mode.
 
 ### Key Entities *(include if feature involves data)*
 

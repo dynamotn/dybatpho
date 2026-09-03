@@ -66,6 +66,14 @@ As a script author, I want helpers for bullet lists and lightweight aligned colu
 1. **Given** a multi-line list, **When** the bullet helper runs, **Then** every non-empty line is prefixed with the chosen bullet marker
 2. **Given** delimited text rows, **When** the column helper runs, **Then** cells are padded into aligned plain columns with the requested gap
 
+## Edge Cases
+
+- Empty input, blank lines, or input supplied through stdin with `-`.
+- Lines have different indentation depths.
+- ANSI sequences occur alongside ordinary text.
+- A bullet marker, delimiter, or gap is omitted or empty.
+- The table dependency required by `text_columns` is unavailable.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements

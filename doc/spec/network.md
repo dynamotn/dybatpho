@@ -48,12 +48,15 @@ As an operator, I want downloads to create their destination directories automat
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - Curl is not installed.
 - The request returns a 3xx, 4xx, or 5xx status.
-- The caller omits an output file and expects a safe default destination.
+- The request output is omitted, in which case it is discarded to `/dev/null`.
 - The caller wants JSON headers or HEAD-only metadata without rebuilding curl flags manually.
+- Retry configuration is overridden through base/max delay, jitter, connect
+  timeout, or total timeout environment variables.
+- A response includes a numeric `Retry-After` header.
 
 ## Requirements *(mandatory)*
 
@@ -67,11 +70,21 @@ As an operator, I want downloads to create their destination directories automat
 - **FR-006**: The module MUST expose an HTTP status-description helper suitable for diagnostics.
 - **FR-007**: The module MUST expose a JSON-oriented curl helper that adds standard JSON headers.
 - **FR-008**: The module MUST expose a HEAD-oriented curl helper that retrieves response headers without downloading a body.
+- **FR-009**: Requests MUST retry server errors, transport failures, and
+  transient 408/425/429 responses, while completing non-transient 4xx
+  responses without retrying.
+- **FR-010**: Retry delays MUST support configurable base and maximum values,
+  optional jitter, and numeric `Retry-After` response headers.
+- **FR-011**: Requests MUST honor optional connect and total curl timeouts.
+- **FR-012**: Dry-run mode MUST print the planned curl command without making a
+  network request.
 
 ### Key Entities *(include if feature involves data)*
 
 - **HTTP Attempt**: One curl execution performed within a request workflow.
 - **Download Target**: The destination file path prepared and populated by the download helper.
+- **Retry Policy**: Retry budget, exponential delay bounds, optional jitter,
+  and server-provided retry delay.
 
 ## Success Criteria *(mandatory)*
 
@@ -80,12 +93,18 @@ As an operator, I want downloads to create their destination directories automat
 - **SC-001**: Callers can perform remote requests without hand-writing curl retry loops.
 - **SC-002**: Download workflows succeed with minimal setup code when the destination path is valid.
 - **SC-003**: Remote failures can be distinguished by status class through the helper return code contract.
+- **SC-004**: Transient failures recover according to bounded, configurable
+  retry behavior without retrying ordinary client errors.
 
 ## Integration Tests *(mandatory)*
 
 - **IT-001**: Run a successful request and verify the body is written and exit status is zero.
 - **IT-002**: Run a request that returns a 4xx response and verify the helper returns the mapped client-error code after request completion.
 - **IT-003**: Run a download to a nested path and verify directory creation plus fetched file content.
+- **IT-004**: Verify transient status retries, `Retry-After`, jitter/timeout
+  settings, and final status mapping.
+- **IT-005**: Verify JSON and HEAD wrappers add their documented curl options,
+  and dry-run avoids network access.
 
 ## Acceptance Criteria *(mandatory)*
 

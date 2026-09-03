@@ -111,7 +111,7 @@ As a maintainer, I want URL encode/decode helpers so that scripts can safely pas
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - The input string is empty.
 - The delimiter used for splitting is multi-character or empty.

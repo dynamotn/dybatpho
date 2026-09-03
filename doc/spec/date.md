@@ -77,7 +77,7 @@ As a script author, I want a helper that prints the signed difference in days be
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - A date string cannot be parsed by the underlying `date` command.
 - A timestamp is formatted with a custom output format.

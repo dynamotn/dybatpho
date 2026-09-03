@@ -29,6 +29,9 @@ As a script author, I want one bootstrap file so that I can enable the entire li
 
 1. **Given** a Bash v4+ shell is running, **When** the script sources `init.sh`, **Then** the bootstrap exports the project root and loads all modules in order
 2. **Given** the consumer expects child shells to reuse dybatpho functions, **When** a child shell inherits the environment, **Then** exported `dybatpho::` functions remain callable
+3. **Given** the repository ships utility, notification, and SemVer modules,
+   **When** the bootstrap completes, **Then** those modules are available along
+   with the core helpers
 
 ---
 
@@ -47,11 +50,12 @@ As a maintainer, I want invalid startup modes rejected so that downstream behavi
 
 ---
 
-### Edge Cases
+## Edge Cases
 
 - The current shell is not Bash v4+.
 - The consumer runs the file directly instead of sourcing it.
 - Bootstrap runs under strict mode and must still load all modules safely.
+- A module is sourced more than once in the same shell.
 
 ## Requirements *(mandatory)*
 
@@ -61,8 +65,12 @@ As a maintainer, I want invalid startup modes rejected so that downstream behavi
 - **FR-002**: The bootstrap MUST refuse direct execution and require sourcing.
 - **FR-003**: The bootstrap MUST enable the default strict and globbing shell options expected by the library.
 - **FR-004**: The bootstrap MUST set and export `DYBATPHO_DIR` to the repository root path.
-- **FR-005**: The bootstrap MUST source all shipped modules in a deterministic order.
+- **FR-005**: The bootstrap MUST source all shipped modules in a deterministic
+  order, including text, date, JSON, configuration, archive, Git, table, CLI,
+  OS, notification, and SemVer modules.
 - **FR-006**: The bootstrap MUST re-export the public `dybatpho::` functions for downstream shells.
+- **FR-007**: Re-sourcing a module with a load guard MUST not duplicate its
+  initialization or change its public behavior.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -75,11 +83,13 @@ As a maintainer, I want invalid startup modes rejected so that downstream behavi
 
 - **SC-001**: Consumers can enable the full toolkit with one source statement.
 - **SC-002**: Unsupported execution modes fail before any partial initialization leaks into the session.
-- **SC-003**: All public modules are available immediately after bootstrap.
+- **SC-003**: All public modules, including archive, Git, notification, and
+  SemVer helpers, are available immediately after bootstrap.
 
 ## Integration Tests *(mandatory)*
 
-- **IT-001**: Source `init.sh` and call one representative function from each module.
+- **IT-001**: Source `init.sh` and call one representative function from each
+  shipped module, including archive, Git, notification, and SemVer helpers.
 - **IT-002**: Execute `init.sh` directly and verify the session is rejected.
 - **IT-003**: Run under Bash v4+ strict mode and verify bootstrap completes without manual overrides.
 

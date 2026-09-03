@@ -1,5 +1,6 @@
 setup() {
   load test_helper
+  unset CLI_NAME API_TOKEN
 }
 
 # =============================================================================
@@ -17,6 +18,157 @@ setup() {
   assert_success
   assert_stderr_line --index 0 "called"
   assert_stderr_line --index 1 "called"
+}
+
+@test "commands get automatic help when no help option is declared" {
+  _spec_auto_help() { dybatpho::opts::setup "Automatic help command" -; }
+  run dybatpho::generate_from_spec _spec_auto_help --help
+  assert_success
+  assert_line --index 0 --partial "Usage:"
+  assert_output --partial "Automatic help command"
+  run dybatpho::generate_from_spec _spec_auto_help -h
+  assert_success
+  assert_line --index 0 --partial "Usage:"
+}
+
+@test "explicit help option overrides automatic help" {
+  _spec_custom_help() {
+    dybatpho::opts::setup "Custom help command" -
+    dybatpho::opts::disp "Custom help" --help action:"echo custom-help"
+  }
+  run dybatpho::generate_from_spec _spec_custom_help --help
+  assert_success
+  assert_output "custom-help"
+}
+
+@test "dybatpho::prompt uses entered value and default" {
+  local entered
+  entered="$(printf 'Alice\n' | dybatpho::prompt 'Name')"
+  assert_equal "Alice" "${entered}"
+  entered="$(printf '\n' | dybatpho::prompt 'Name' 'Guest')"
+  assert_equal "Guest" "${entered}"
+}
+
+@test "dybatpho::select supports numeric multiple selections" {
+  local selected
+  selected="$(printf '1,3\n' | dybatpho::select 'Choose colors' 'red,green,blue' true)"
+  assert_equal "red blue" "${selected}"
+}
+
+@test "dybatpho::select supports numeric ranges for multiple selections" {
+  local selected
+  selected="$(printf '1-3\n' | dybatpho::select 'Choose colors' 'red,green,blue,yellow' true)"
+  assert_equal "red green blue" "${selected}"
+}
+
+@test "dybatpho::select rejects descending or out-of-range selections" {
+  local selected
+  selected="$(printf '4-2\n1-2\n' | dybatpho::select 'Choose colors' 'red,green,blue' true)"
+  assert_equal "red green" "${selected}"
+}
+
+@test "options use environment values and explicit arguments take precedence" {
+  _spec_env_option() {
+    dybatpho::opts::setup "" - action:'printf "%s" "$NAME"'
+    dybatpho::opts::param "Name" NAME --name env:CLI_NAME
+  }
+
+  export CLI_NAME=from-env
+  run dybatpho::generate_from_spec _spec_env_option
+  assert_success
+  assert_output "from-env"
+
+  run dybatpho::generate_from_spec _spec_env_option --name from-cli
+  assert_success
+  assert_output "from-cli"
+}
+
+@test "options validate choices and collect multiple values" {
+  _spec_choices() {
+    dybatpho::opts::setup "" - action:'printf "%s" "$COLORS"'
+    dybatpho::opts::param "Color" COLORS --color choices:red,blue multiple:true
+  }
+
+  run dybatpho::generate_from_spec _spec_choices --color red --color blue
+  assert_success
+  assert_output "red blue"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_choices --color green
+  assert_failure
+  assert_stderr --partial "Validation error"
+}
+
+@test "completion generation supports Bash Zsh and Fish" {
+  _spec_completion() {
+    dybatpho::opts::setup "Completion demo" -
+    dybatpho::opts::flag "Verbose" VERBOSE --verbose alias:-v
+    dybatpho::opts::cmd deploy _spec_completion_deploy
+  }
+  _spec_completion_deploy() { dybatpho::opts::setup "Deploy command" -; }
+
+  run dybatpho::generate_completion _spec_completion bash demo
+  assert_success
+  assert_output --partial "complete -F"
+  assert_output --partial "--verbose"
+  assert_output --partial "deploy"
+
+  run dybatpho::generate_completion _spec_completion zsh demo
+  assert_success
+  assert_output --partial "compdef"
+  assert_output --partial "--verbose"
+
+  run dybatpho::generate_completion _spec_completion fish demo
+  assert_success
+  assert_output --partial "complete -c demo -l verbose"
+  assert_output --partial "complete -c demo -f -a deploy"
+}
+
+@test "schema and man generation preserve CLI metadata" {
+  _spec_artifacts() {
+    dybatpho::opts::setup "Artifact demo" -
+    dybatpho::opts::param "API token" TOKEN --token env:API_TOKEN required:true choices:a,b prompt:"Choose token"
+    dybatpho::opts::cmd deploy _spec_artifacts_deploy
+  }
+  _spec_artifacts_deploy() { dybatpho::opts::setup "Deploy command" -; }
+
+  run dybatpho::generate_schema _spec_artifacts demo
+  assert_success
+  SCHEMA="${output}" python3 -c 'import json, os; data=json.loads(os.environ["SCHEMA"]); option=data["options"][0]; assert data["description"] == "Artifact demo"; assert option["env"] == "API_TOKEN"; assert option["required"] is True; assert option["choices"] == "a,b"; assert data["commands"][0]["name"] == "deploy"'
+
+  run dybatpho::generate_man _spec_artifacts demo
+  assert_success
+  assert_output --partial ".TH"
+  assert_output --partial "Artifact demo"
+  assert_output --partial "--token <TOKEN>"
+  assert_output --partial "[env: API_TOKEN]"
+  assert_output --partial "deploy"
+}
+
+@test "subcommand artifacts include child options and aliases" {
+  _spec_artifact_child() {
+    dybatpho::opts::setup "Child command" -
+    dybatpho::opts::flag "Child flag" CHILD_FLAG --child-flag
+  }
+  _spec_artifact_root() {
+    dybatpho::opts::setup "Root command" -
+    dybatpho::opts::cmd child _spec_artifact_child aliases:c
+  }
+
+  run dybatpho::generate_completion _spec_artifact_root bash tool
+  assert_success
+  assert_output --partial "--child-flag"
+  assert_output --partial "child"
+  assert_output --partial "c"
+
+  run dybatpho::generate_schema _spec_artifact_root tool
+  assert_success
+  SCHEMA="${output}" python3 -c 'import json, os; child=json.loads(os.environ["SCHEMA"])["commands"][0]; assert child["aliases"] == ["c"]; assert child["options"][0]["switches"] == ["--child-flag"]'
+
+  run dybatpho::generate_man _spec_artifact_root tool
+  assert_success
+  [ "$(printf "%s\n" "${output}" | grep -c '^\.TH')" -eq 1 ]
+  assert_output --partial "--child-flag"
+  assert_output --partial "Child command"
 }
 
 @test "dybatpho::generate_from_spec send arguments to dybatpho::opts::parse" {

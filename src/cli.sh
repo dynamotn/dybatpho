@@ -8,6 +8,7 @@
 #   - subcommand dispatch
 #   - help output
 #   - validation and error handling
+#   - automatic `--help` / `-h` for commands that do not define their own help option
 # @usage
 #   ### Basic workflow
 #
@@ -69,8 +70,12 @@
 #   | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
 #   | `persistent:<bool>` | `flag`, `param`, `disp` | Make the option available in descendant subcommands |
 #   | `export:<bool>` | `flag`, `param` | Export the variable |
+#   | `env:<NAME>` | `flag`, `param` | Use environment variable `NAME` as the option's initial value |
 #   | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 #   | `required:<bool>` | `param` | Whether the option itself must appear |
+#   | `prompt:<text>` | `param` | Prompt for a missing value with the supplied text |
+#   | `choices:<a,b>` | `param` | Restrict values to a comma-separated list of choices |
+#   | `multiple:<bool>` | `param` | Append repeated or multi-selected values instead of replacing the value; interactive selection accepts comma-separated values and ranges such as `1-3` |
 #   | `validate:<code>` | `flag`, `param` | Validation logic using `\$OPTARG` |
 #   | `deprecated:<text>` | `flag`, `param`, `disp`, `cmd` | Warn when the item is used and annotate it in help |
 #   | `error:<code>` | `flag`, `param`, `setup` | Custom error handler |
@@ -132,6 +137,10 @@
 #   - `cmd` rows show the command name
 #
 #   You can override the rendered label with `label:<string>`.
+#
+#   Commands automatically accept `--help` and `-h` unless the spec defines a
+#   help display option itself. Define a custom display option when the command
+#   needs a different help action or aliases.
 #
 #   ### Common patterns
 #
@@ -257,6 +266,99 @@
 # @env DYBATPHO_CLI_DEBUG bool Set to `true` to dump generated parser details while developing specs
 DYBATPHO_CLI_DEBUG="${DYBATPHO_CLI_DEBUG:-false}"
 
+#######################################
+# @description Read a line from the terminal (or stdin) with an optional default.
+# @arg $1 string Prompt text
+# @arg $2 string Optional default value
+# @stdout Entered value
+# @exitcode 0
+#######################################
+function dybatpho::prompt {
+  local prompt="${1:-}" default="${2:-}" value
+  printf "%s" "${prompt}" >&2
+  [ -n "${default}" ] && printf " [%s]" "${default}" >&2
+  printf ": " >&2
+  IFS= read -r value || return 1
+  [ -n "${value}" ] || value="${default}"
+  printf "%s" "${value}"
+}
+
+#######################################
+# @description Prompt for one or more values from a comma-separated list or numeric range.
+# @arg $1 string Prompt text
+# @arg $2 string Comma-separated choices
+# @arg $3 bool Allow multiple selections
+# @stdout Selected value(s), separated by spaces
+# @exitcode 0
+#######################################
+function dybatpho::select {
+  local prompt="${1:-}" choices="${2:-}" multiple="${3:-false}"
+  local -a items=() selected=()
+  local item answer index
+  IFS=',' read -r -a items <<< "${choices}"
+  printf "%s\n" "${prompt}" >&2
+  for index in "${!items[@]}"; do
+    printf "  %d) %s\n" "$((index + 1))" "${items[index]}" >&2
+  done
+  while :; do
+    local selection_prompt="Select"
+    dybatpho::is true "${multiple}" && selection_prompt+=" (comma-separated or ranges, e.g. 1-3)"
+    answer="$(dybatpho::prompt "${selection_prompt}")" || return 1
+    selected=()
+    local -a answers=()
+    IFS=',' read -r -a answers <<< "${answer}"
+    local token range_start range_end range_index
+    for token in "${answers[@]}"; do
+      if [[ "${token}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+        range_start="${BASH_REMATCH[1]}"
+        range_end="${BASH_REMATCH[2]}"
+        if dybatpho::is false "${multiple}"; then
+          continue
+        fi
+        if ((range_start < 1 || range_end > ${#items[@]} || range_start > range_end)); then
+          continue
+        fi
+        for ((range_index = range_start; range_index <= range_end; range_index++)); do
+          selected+=("${items[$((range_index - 1))]}")
+        done
+      elif [[ "${token}" =~ ^[0-9]+$ ]] && [ "${token}" -ge 1 ] && [ "${token}" -le "${#items[@]}" ]; then
+        selected+=("${items[$((token - 1))]}")
+      else
+        for item in "${items[@]}"; do
+          [ "${token}" = "${item}" ] && selected+=("${item}") && break
+        done
+      fi
+    done
+    [ "${#selected[@]}" -gt 0 ] || {
+      dybatpho::warn "Choose a valid selection."
+      continue
+    }
+    if dybatpho::is false "${multiple}"; then
+      [ "${#selected[@]}" -eq 1 ] || {
+        dybatpho::warn "Choose one selection."
+        continue
+      }
+    fi
+    printf "%s" "${selected[*]}"
+    return 0
+  done
+}
+
+#######################################
+# @description Check that a value belongs to a comma-separated choice list.
+# @arg $1 string Value
+# @arg $2 string Comma-separated choices
+# @exitcode 0 Value is allowed
+#######################################
+function dybatpho::opts::validate_choice {
+  local value="${1-}" choices="${2-}" choice
+  IFS=',' read -r -a __choice_items <<< "${choices}"
+  for choice in "${__choice_items[@]}"; do
+    [ "${value}" = "${choice}" ] && return 0
+  done
+  return 1
+}
+
 # @section Internal functions
 # @description Functions are triggered by `dybatpho::generate_from_spec`
 
@@ -274,7 +376,7 @@ function __parse_opt {
   shift 2
 
   if dybatpho::is false "${__done_initial}"; then
-    __on="true" __off="" __init="@empty" __export="true" __required="false" __persistent="false" __hidden="false" __deprecated="" __label=""
+    __on="true" __off="" __init="@empty" __export="true" __required="false" __persistent="false" __hidden="false" __deprecated="" __label="" __env="" __multiple="false" __prompt="" __choices=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -336,7 +438,7 @@ function __parse_opt {
       shift
     done
   else
-    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __persistent="false" __hidden="false" __deprecated="" __switch=""
+    __validate="" __on="true" __off="" __export="true" __optional="false" __required="false" __persistent="false" __hidden="false" __deprecated="" __switch="" __env="" __multiple="false" __prompt="" __choices=""
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
@@ -452,6 +554,23 @@ function __prepend_export {
 function __define_var {
   [ "$1" = "-" ] && return 0
   __require_shell_name "$1"
+  local __env_name="${__env:-}"
+  if [ "${__env_name}" = "true" ]; then __env_name="$1"; fi
+  [ "${__env_name}" = "false" ] && __env_name=""
+  [ -z "${__env_name}" ] || __require_shell_name "${__env_name}"
+  if [ -n "${__env_name}" ] && [ "${__init}" != "@unset" ]; then
+    __print_indent 0 "if [ \"\${${__env_name}+x}\" ]; then"
+    __print_indent 1 "$(__prepend_export "$1=\${${__env_name}}")"
+    __print_indent 0 "else"
+    local __saved_env="${__env}"
+    local __fallback
+    __env=""
+    __fallback="$(__define_var "$1")"
+    __env="${__saved_env}"
+    __print_indent 1 "${__fallback}"
+    __print_indent 0 "fi"
+    return 0
+  fi
   case ${__init} in
     @keep) : ;;
     @empty) __print_indent 0 "$(__prepend_export "$1=''")" ;;
@@ -509,13 +628,15 @@ function __generate_logic {
   local __on="1" __off="" __init="@empty"                                                                     # For handle argument of param, effective for rest arguments and options
   local __export="true"                                                                                       # For handle export variable of `dybatpho::opts::*` commands via name
   local __optional="true" __required="false" __persistent="false" __hidden="false" __deprecated="" __label="" # Param value optionality, option presence, persistence, visibility, deprecation, preferred switch label
-  local __action="" __setup_action="" __prerun="" __setup_prerun="" __postrun="" __setup_postrun=""          # For get action and setup hooks in spec
+  local __action="" __setup_action="" __prerun="" __setup_prerun="" __postrun="" __setup_postrun=""           # For get action and setup hooks in spec
   local __args="any"                                                                                          # For validate positional argument count from opts::setup
   local __switch=""                                                                                           # For get switch of options
   declare -a __required_checks=()
   declare -a __persistent_defs=()
   local __has_sub_cmd="false"
+  local __has_help="false"
   declare -a __sub_specs=()
+  declare -a __prompt_defs=()
 
   #######################################
   # @description Emit generated code that rebuilds positional parameters from a serialized argument list.
@@ -579,6 +700,12 @@ function __generate_logic {
   __print_indent 2 'case $1 in'
   __done_initial=true
   __replay_persistent_defs
+  if dybatpho::is false "${__has_help}"; then
+    __print_indent 3 "--help|-h)"
+    __print_indent 4 "dybatpho::generate_help ${spec}"
+    __print_indent 4 "exit 0"
+    __print_indent 4 ";;"
+  fi
   "${spec}" "$*"
   __print_indent 3 "--)"
   __print_indent 4 "shift"
@@ -618,6 +745,23 @@ function __generate_logic {
     __print_indent 2 '}'
   done
   __print_args_check "${__args}"
+  local __prompt_def __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export
+  for __prompt_def in "${__prompt_defs[@]}"; do
+    IFS=$'\t' read -r __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export <<< "${__prompt_def}"
+    __assign_quoted __prompt_text "${__prompt_text}"
+    __assign_quoted __prompt_choices "${__prompt_choices}"
+    if [ -n "${__prompt_choices}" ]; then
+      __print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
+      __print_indent 3 "${__prompt_var}=\$(dybatpho::select ${__prompt_text} ${__prompt_choices} ${__prompt_multiple})"
+      [ "${__prompt_export}" = "true" ] && __print_indent 3 "export ${__prompt_var}"
+      __print_indent 2 "fi"
+    else
+      __print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
+      __print_indent 3 "${__prompt_var}=\$(dybatpho::prompt ${__prompt_text})"
+      [ "${__prompt_export}" = "true" ] && __print_indent 3 "export ${__prompt_var}"
+      __print_indent 2 "fi"
+    fi
+  done
   __print_indent 2 '[ $# -eq 0 ] && {'
   [ "${__setup_prerun}" ] && __print_indent 3 "${__setup_prerun}"
   [ "${__setup_action}" ] && __print_indent 3 "${__setup_action}"
@@ -694,6 +838,200 @@ function __generate_help {
     dybatpho::print "Commands:"
     printf "%s" "${__help_cmds_output}"
   fi
+}
+
+#######################################
+# @description Generate a JSON CLI schema from the same option spec used by parsing.
+# @arg $1 string Spec function
+# @arg $2 string Optional command name
+# @stdout JSON schema
+#######################################
+function dybatpho::generate_schema {
+  local spec name="${2:-${0##*/}}"
+  dybatpho::expect_args spec -- "$@"
+  __generate_schema_command "${spec}" "${name}"
+}
+
+function __generate_schema_command {
+  local spec="$1" name="$2" command_aliases="${3:-}" description
+  local -a options=() commands=()
+  __collect_spec_metadata "${spec}" options commands description
+  local q_name q_description item first=true aliases="${command_aliases}"
+  __json_quote q_name "${name}"
+  __json_quote q_description "${description}"
+  local alias alias_first=true
+  printf '{"name":%s,"description":%s,"aliases":[' "${q_name}" "${q_description}"
+  for alias in ${aliases:-}; do
+    __json_quote alias "${alias}"
+    [ "${alias_first}" = true ] || printf ","
+    alias_first=false
+    printf "%s" "${alias}"
+  done
+  printf '],"options":['
+  for item in "${options[@]}"; do
+    local type var desc switches env multiple choices prompt hidden required deprecated label
+    IFS=$'\t' read -r type var desc switches env multiple choices prompt hidden required deprecated label <<< "${item}"
+    [ "${env}" = "@none" ] && env=""
+    [ "${choices}" = "@none" ] && choices=""
+    [ "${prompt}" = "@none" ] && prompt=""
+    [ "${deprecated}" = "@none" ] && deprecated=""
+    [ "${label}" = "@none" ] && label=""
+    local q_type q_var q_desc q_env q_choices q_prompt q_deprecated q_label
+    __json_quote q_type "${type}"
+    __json_quote q_var "${var}"
+    __json_quote q_desc "${desc}"
+    __json_quote q_env "${env}"
+    __json_quote q_choices "${choices}"
+    __json_quote q_prompt "${prompt}"
+    __json_quote q_deprecated "${deprecated}"
+    __json_quote q_label "${label}"
+    [ "${first}" = true ] || printf ","
+    first=false
+    printf '{"type":%s,"name":%s,"description":%s,"switches":[' "${q_type}" "${q_var}" "${q_desc}"
+    local switch switch_first=true
+    for switch in ${switches}; do
+      __json_quote switch "${switch}"
+      [ "${switch_first}" = true ] || printf ","
+      switch_first=false
+      printf "%s" "${switch}"
+    done
+    printf '],"env":%s,"multiple":%s,"choices":%s,"prompt":%s,"hidden":%s,"required":%s,"deprecated":%s,"label":%s}' \
+      "${q_env}" "${multiple:-false}" "${q_choices}" "${q_prompt}" "${hidden:-false}" "${required:-false}" "${q_deprecated}" "${q_label}"
+  done
+  printf '],"commands":['
+  first=true
+  for item in "${commands[@]}"; do
+    local cmd child aliases child_hidden child_deprecated
+    IFS=$'\t' read -r cmd child aliases child_hidden child_deprecated <<< "${item}"
+    [ "${first}" = true ] || printf ","
+    first=false
+    __generate_schema_command "${child}" "${cmd}" "${aliases}"
+  done
+  printf "]}"
+}
+
+#######################################
+# @description Generate a roff man page from a CLI option spec.
+# @arg $1 string Spec function
+# @arg $2 string Optional command name
+# @stdout Man page
+#######################################
+function dybatpho::generate_man {
+  local spec name="${2:-${0##*/}}"
+  dybatpho::expect_args spec -- "$@"
+  __generate_man_command "${spec}" "${name}" 1
+}
+
+function __generate_man_command {
+  local spec="$1" name="$2" section="${3:-1}" nested="${4:-false}" description
+  local -a options=() commands=()
+  __collect_spec_metadata "${spec}" options commands description
+  local escaped
+  escaped="${name//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  if [ "${nested}" = false ]; then
+    printf '.TH "%s" "%s" "" "" "dybatpho"\n' "${escaped}" "${section}"
+    printf '.SH NAME\n%s \\- %s\n' "${escaped}" "${description}"
+    printf '.SH SYNOPSIS\n.B %s\n' "${escaped}"
+    printf '.SH OPTIONS\n'
+  else
+    printf '.SS %s\n%s\n' "${escaped}" "${description}"
+  fi
+  for item in "${options[@]}"; do
+    local type var desc switches env multiple choices prompt hidden required deprecated label
+    IFS=$'\t' read -r type var desc switches env multiple choices prompt hidden required deprecated label <<< "${item}"
+    [ "${env}" = "@none" ] && env=""
+    [ "${deprecated}" = "@none" ] && deprecated=""
+    [ "${label}" = "@none" ] && label=""
+    [ "${hidden:-false}" = true ] && continue
+    local option_label="${switches// /, }"
+    [ "${type}" = param ] && option_label="${option_label} <${var}>"
+    printf '.TP\n.B %s\n%s' "${option_label}" "${desc}"
+    [ "${required:-false}" = true ] && printf ' (required)'
+    [ -n "${env}" ] && printf ' [env: %s]' "${env}"
+    printf '\n'
+  done
+  if [ "${#commands[@]}" -gt 0 ]; then
+    printf '.SH COMMANDS\n'
+    for item in "${commands[@]}"; do
+      local cmd child aliases child_hidden child_deprecated
+      IFS=$'\t' read -r cmd child aliases child_hidden child_deprecated <<< "${item}"
+      [ "${child_hidden:-false}" = true ] && continue
+      printf '.TP\n.B %s\n' "${cmd}"
+      __generate_man_command "${child}" "${cmd}" "${section}" true
+    done
+  fi
+}
+
+#######################################
+# @description Generate Bash, Zsh, or Fish completion from a CLI option spec.
+# @arg $1 string Spec function
+# @arg $2 string Shell (`bash`, `zsh`, or `fish`)
+# @arg $3 string Optional command name
+# @stdout Completion script
+#######################################
+function dybatpho::generate_completion {
+  local spec shell name="${3:-${0##*/}}"
+  dybatpho::expect_args spec shell -- "$@"
+  case "${shell}" in
+    bash | zsh | fish) ;;
+    *) dybatpho::die "Unsupported completion shell: ${shell}" 1 ;;
+  esac
+  __generate_completion_command "${spec}" "${shell}" "${name}" "${name}"
+}
+
+function __completion_words {
+  local -n __completion_out="$1"
+  local -a options=("${@:2}") item switches switch
+  for item in "${options[@]}"; do
+    IFS=$'\t' read -r _ _ _ switches _ _ _ _ hidden _ _ _ <<< "${item}"
+    [ "${hidden:-false}" = true ] && continue
+    for switch in ${switches}; do __completion_out+=("${switch}"); done
+  done
+}
+
+function __generate_completion_command {
+  local spec="$1" shell="$2" name="$3" root="$4" description
+  local -a options=() commands=() words=()
+  __collect_spec_metadata "${spec}" options commands description
+  __completion_words words "${options[@]}"
+  local word_list="${words[*]}" cmd_list="" item cmd child aliases hidden deprecated
+  for item in "${commands[@]}"; do
+    IFS=$'\t' read -r cmd child aliases hidden deprecated <<< "${item}"
+    if [ "${hidden:-false}" != true ]; then
+      cmd_list+=" ${cmd} ${aliases}"
+      local -a child_options=() child_commands=()
+      local child_description
+      __collect_spec_metadata "${child}" child_options child_commands child_description
+      __completion_words words "${child_options[@]}"
+    fi
+  done
+  word_list="${words[*]}"
+  case "${shell}" in
+    bash)
+      printf '_%s_completion() {\n  local cur="${COMP_WORDS[COMP_CWORD]}"\n  COMPREPLY=( $(compgen -W %q -- "${cur}") )\n}\ncomplete -F _%s_completion %s\n' \
+        "${name//[^a-zA-Z0-9_]/_}" "${word_list} ${cmd_list} --help -h" \
+        "${name//[^a-zA-Z0-9_]/_}" "${name}"
+      ;;
+    zsh)
+      printf '_%s_completion() {\n  _arguments "*: :((%s))"\n}\ncompdef _%s_completion %s\n' \
+        "${name//[^a-zA-Z0-9_]/_}" "${word_list} ${cmd_list} --help -h" \
+        "${name//[^a-zA-Z0-9_]/_}" "${name}"
+      ;;
+    fish)
+      local switch
+      for switch in "${words[@]}"; do
+        case "${switch}" in
+          --*) printf "complete -c %s -l %s\n" "${name}" "${switch#--}" ;;
+          -?) printf "complete -c %s -s %s\n" "${name}" "${switch#-}" ;;
+        esac
+      done
+      for item in "${commands[@]}"; do
+        IFS=$'\t' read -r cmd child aliases hidden deprecated <<< "${item}"
+        [ "${hidden:-false}" = true ] || printf "complete -c %s -f -a %q\n" "${name}" "${cmd}"
+      done
+      ;;
+  esac
 }
 
 #######################################
@@ -839,8 +1177,20 @@ function __add_switch {
 #######################################
 function __print_validate {
   set -- "${__validate}" "$1"
+  if [ -n "${__choices:-}" ]; then
+    local __choices_quoted
+    __assign_quoted __choices_quoted "${__choices}"
+    __print_indent 4 "dybatpho::opts::validate_choice \"\$OPTARG\" ${__choices_quoted} || { set \"choice\" \"\$OPTARG\"; break; }"
+  fi
   [ "$1" ] && __print_indent 4 "$1 || { set -- ${1%% *}:\$? \"\$1\" $1; break; }"
-  [ "$2" = "-" ] || __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
+  if [ "$2" != "-" ]; then
+    if dybatpho::is true "${__multiple:-false}"; then
+      __print_indent 4 "[ -n \"\${$2:-}\" ] && $2=\"\${$2} \$OPTARG\" || $2=\"\$OPTARG\""
+      [ "${__export}" = "true" ] && __print_indent 4 "export $2"
+    else
+      __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
+    fi
+  fi
 }
 
 #######################################
@@ -993,6 +1343,81 @@ function __print_args_check {
   esac
 }
 
+#######################################
+# @description Expand option switches and aliases into a caller-provided array.
+# @arg $1 string Name of destination array
+# @arg $@ switch|key:value Option metadata
+#######################################
+function __collect_switches {
+  __require_shell_name "$1"
+  local -n __switch_out="$1"
+  shift
+  local __item __alias
+  for __item in "$@"; do
+    case "${__item}" in
+      alias:*) __alias="${__item#alias:}" ;;
+      aliases:*)
+        local -a __aliases=()
+        __parse_alias_list __aliases "${__item#aliases:}"
+        for __alias in "${__aliases[@]}"; do
+          case "${__alias}" in
+            --\{no-\}*) __switch_out+=("--${__alias#--\{no-\}}" "--no-${__alias#--\{no-\}}") ;;
+            --with\{out\}-*) __switch_out+=("--with-${__alias#--with\{out\}-}" "--without-${__alias#--with\{out\}-}") ;;
+            -? | --*) __switch_out+=("${__alias}") ;;
+          esac
+        done
+        continue
+        ;;
+      --\{no-\}*)
+        __switch_out+=("--${__item#--\{no-\}}" "--no-${__item#--\{no-\}}")
+        continue
+        ;;
+      --with\{out\}-*)
+        __switch_out+=("--with-${__item#--with\{out\}-}" "--without-${__item#--with\{out\}-}")
+        continue
+        ;;
+      -? | --*)
+        __switch_out+=("${__item}")
+        continue
+        ;;
+      *) continue ;;
+    esac
+    case "${__alias}" in
+      --\{no-\}*) __switch_out+=("--${__alias#--\{no-\}}" "--no-${__alias#--\{no-\}}") ;;
+      --with\{out\}-*) __switch_out+=("--with-${__alias#--with\{out\}-}" "--without-${__alias#--with\{out\}-}") ;;
+      -? | --*) __switch_out+=("${__alias}") ;;
+    esac
+  done
+}
+
+#######################################
+# @description Escape a value for JSON and store it in a caller variable.
+#######################################
+function __json_quote {
+  __require_shell_name "$1"
+  local __value="${2-}"
+  __value="${__value//\\/\\\\}"
+  __value="${__value//\"/\\\"}"
+  __value="${__value//$'\n'/\\n}"
+  __value="${__value//$'\r'/\\r}"
+  __value="${__value//$'\t'/\\t}"
+  printf -v "$1" '%s' "\"${__value}\""
+}
+
+#######################################
+# @description Collect option and command metadata from a CLI spec.
+#######################################
+function __collect_spec_metadata {
+  local __meta_spec="$1"
+  local -n __meta_options_out="$2" __meta_commands_out="$3" __meta_description_out="$4"
+  local __meta_mode=true __meta_description="" __meta_options=() __meta_commands=()
+  local __done_initial=false __flags="" __params=""
+  "${__meta_spec}"
+  __meta_options_out=("${__meta_options[@]}")
+  __meta_commands_out=("${__meta_commands[@]}")
+  __meta_description_out="${__meta_description}"
+}
+
 # @section Spec functions
 # @description Functions work in spec of script or function via `dybatpho::generate_from_spec`.
 
@@ -1008,6 +1433,11 @@ function __print_args_check {
 function dybatpho::opts::setup {
   local description
   dybatpho::expect_args description -- "$@"
+
+  if dybatpho::is true "${__meta_mode:-false}"; then
+    __meta_description="${description}"
+    return 0
+  fi
 
   if dybatpho::is true "${__cmd_desc_mode:-false}"; then
     __cmd_desc="${description}"
@@ -1056,6 +1486,14 @@ function dybatpho::opts::flag {
   dybatpho::expect_args description var -- "$@"
   __require_shell_name "${var}"
 
+  if dybatpho::is true "${__meta_mode:-false}"; then
+    __parse_opt false 2 "$@"
+    local -a __meta_switches=()
+    __collect_switches __meta_switches "${@:3}"
+    __meta_options+=("flag"$'\t'"${var}"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t'"${__env:-@none}"$'\t'"${__multiple:-false}"$'\t'"${__choices:-@none}"$'\t'"${__prompt:-@none}"$'\t'"${__hidden:-false}"$'\t'"${__required:-false}"$'\t'"${__deprecated:-@none}"$'\t'"${__label:-@none}")
+    return 0
+  fi
+
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
   if dybatpho::is true "${__help_mode:-false}"; then
@@ -1073,7 +1511,7 @@ function dybatpho::opts::flag {
     __define_var "${var}"
   else
     __print_indent 3 "${__switch})"
-    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-$var}" "${__deprecated}"
+    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
     __print_indent 4 '[ "${OPTARG:-}" ] && OPTARG=${OPTARG#*\=} && set "noarg" "$1" && break'
     __print_indent 4 "eval '[ \${OPTARG+x} ] &&:' && OPTARG=${__on} || OPTARG=${__off}"
     __print_validate "${var}" '$OPTARG'
@@ -1099,6 +1537,14 @@ function dybatpho::opts::param {
   dybatpho::expect_args description var -- "$@"
   __require_shell_name "${var}"
 
+  if dybatpho::is true "${__meta_mode:-false}"; then
+    __parse_opt true 2 "$@"
+    local -a __meta_switches=()
+    __collect_switches __meta_switches "${@:3}"
+    __meta_options+=("param"$'\t'"${var}"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t'"${__env:-@none}"$'\t'"${__multiple:-false}"$'\t'"${__choices:-@none}"$'\t'"${__prompt:-@none}"$'\t'"${__hidden:-false}"$'\t'"${__required:-false}"$'\t'"${__deprecated:-@none}"$'\t'"${__label:-@none}")
+    return 0
+  fi
+
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
   if dybatpho::is true "${__help_mode:-false}"; then
@@ -1114,6 +1560,9 @@ function dybatpho::opts::param {
       __record_persistent_def param "$@"
     fi
     __define_var "${var}"
+    if [ -n "${__prompt}" ]; then
+      __prompt_defs+=("${var}"$'\t'"${__prompt}"$'\t'"${__choices}"$'\t'"${__multiple}"$'\t'"${__export}")
+    fi
     if dybatpho::is true "${__required}"; then
       local __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
       local __saved_init="${__init}" __saved_export="${__export}"
@@ -1130,7 +1579,7 @@ function dybatpho::opts::param {
       __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
     fi
     __print_indent 3 "${__switch})"
-    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-$var}" "${__deprecated}"
+    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
     if dybatpho::is false "${__optional}"; then
       __print_indent 4 '[ $# -le 1 ] && set "needarg" "$1" && break'
       __print_indent 4 'OPTARG=$2'
@@ -1166,6 +1615,26 @@ function dybatpho::opts::disp {
   dybatpho::expect_args description -- "$@"
 
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
+
+  if dybatpho::is true "${__meta_mode:-false}"; then
+    __parse_opt false 1 "$@"
+    local -a __meta_switches=()
+    __collect_switches __meta_switches "${@:2}"
+    __meta_options+=("disp"$'\t'"-"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t@none\tfalse\t@none\t@none\t'"${__hidden:-false}"$'\tfalse\t'"${__deprecated:-@none}"$'\t'"${__label:-@none}")
+    return 0
+  fi
+
+  if dybatpho::is false "${__done_initial:-false}"; then
+    local __help_arg
+    for __help_arg in "${@:2}"; do
+      case "${__help_arg}" in
+        --help | -h | alias:--help | alias:-h | aliases:--help,* | aliases:*,-h | aliases:--help,-h)
+          __has_help=true
+          break
+          ;;
+      esac
+    done
+  fi
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
@@ -1208,6 +1677,11 @@ function dybatpho::opts::cmd {
     esac
     shift
   done
+
+  if dybatpho::is true "${__meta_mode:-false}"; then
+    __meta_commands+=("${sub_cmd}"$'\t'"${sub_spec}"$'\t'"${__cmd_aliases[*]:-@none}"$'\t'"${__cmd_hidden:-false}"$'\t'"${__cmd_deprecated:-@none}")
+    return 0
+  fi
 
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 

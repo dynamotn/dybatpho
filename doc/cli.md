@@ -18,6 +18,7 @@ Utilities for building CLI parsers from shell specs.
 - subcommand dispatch
 - help output
 - validation and error handling
+- automatic `--help` / `-h` for commands that do not define their own help option
 
 ### 🌍 Environment
 
@@ -27,6 +28,9 @@ Utilities for building CLI parsers from shell specs.
 
 ### 🚀 Highlights
 
+- [`dybatpho::prompt`](#dybatphoprompt) — Read a line from the terminal (or stdin) with an optional default.
+- [`dybatpho::select`](#dybatphoselect) — Prompt for one or more values from a comma-separated list or numeric range.
+- [`dybatpho::opts::validate_choice`](#dybatphooptsvalidate_choice) — Check that a value belongs to a comma-separated choice list.
 - [`__parse_opt`](#__parse_opt) — Functions are triggered by `dybatpho::generate_from_spec` Parse options with a spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
 - [`__print_indent`](#__print_indent) — Write script with indentation to stdout
 - [`__require_shell_name`](#__require_shell_name) — Validate a shell variable name used by generated parser code.
@@ -38,6 +42,13 @@ Utilities for building CLI parsers from shell specs.
 - [`__print_get_arg`](#__print_get_arg) — Emit generated code that rebuilds positional parameters from a serialized argument list.
 - [`__print_rest`](#__print_rest) — Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
 - [`__generate_help`](#__generate_help) — Get help description for options from spec. Sets __help_mode=true so dybatpho::opts::* collect help data via dynamic scoping into dybatpho::generate_help's locals, then prints the buffered sections in the correct order.
+- [`dybatpho::generate_schema`](#dybatphogenerate_schema) — Generate a JSON CLI schema from the same option spec used by parsing.
+- [`__generate_schema_command`](#__generate_schema_command) — 
+- [`dybatpho::generate_man`](#dybatphogenerate_man) — Generate a roff man page from a CLI option spec.
+- [`__generate_man_command`](#__generate_man_command) — 
+- [`dybatpho::generate_completion`](#dybatphogenerate_completion) — Generate Bash, Zsh, or Fish completion from a CLI option spec.
+- [`__completion_words`](#__completion_words) — 
+- [`__generate_completion_command`](#__generate_completion_command) — 
 - [`__help_pad`](#__help_pad) — Pad string $2 to at least length $3 and store result in variable $1
 - [`__help_sw`](#__help_sw) — Append a formatted switch to caller-local variable `sw`. Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so that short+long pairs align as "-s, --long".
 - [`__help_row`](#__help_row) — Format one help row and print to stdout
@@ -50,6 +61,9 @@ Utilities for building CLI parsers from shell specs.
 - [`__print_deprecated_warning`](#__print_deprecated_warning) — Emit generated code that warns when a deprecated CLI item is used.
 - [`__generate_child_logic`](#__generate_child_logic) — Generate parser logic for a child command with inherited persistent option definitions.
 - [`__print_args_check`](#__print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
+- [`__collect_switches`](#__collect_switches) — Expand option switches and aliases into a caller-provided array.
+- [`__json_quote`](#__json_quote) — Escape a value for JSON and store it in a caller variable.
+- [`__collect_spec_metadata`](#__collect_spec_metadata) — Collect option and command metadata from a CLI spec.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
 - [`dybatpho::opts::flag`](#dybatphooptsflag) — Define an option that take no argument
 - [`dybatpho::opts::param`](#dybatphooptsparam) — Define an option that take an argument
@@ -134,8 +148,12 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | `off:<string>` | `flag`, `param` | Negative value when the option is disabled or absent |
 | `persistent:<bool>` | `flag`, `param`, `disp` | Make the option available in descendant subcommands |
 | `export:<bool>` | `flag`, `param` | Export the variable |
+| `env:<NAME>` | `flag`, `param` | Use environment variable `NAME` as the option's initial value |
 | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 | `required:<bool>` | `param` | Whether the option itself must appear |
+| `prompt:<text>` | `param` | Prompt for a missing value with the supplied text |
+| `choices:<a,b>` | `param` | Restrict values to a comma-separated list of choices |
+| `multiple:<bool>` | `param` | Append repeated or multi-selected values instead of replacing the value; interactive selection accepts comma-separated values and ranges such as `1-3` |
 | `validate:<code>` | `flag`, `param` | Validation logic using `\$OPTARG` |
 | `deprecated:<text>` | `flag`, `param`, `disp`, `cmd` | Warn when the item is used and annotate it in help |
 | `error:<code>` | `flag`, `param`, `setup` | Custom error handler |
@@ -211,6 +229,11 @@ By default:
 
 
 You can override the rendered label with `label:<string>`.
+
+
+Commands automatically accept `--help` and `-h` unless the spec defines a
+help display option itself. Define a custom display option when the command
+needs a different help action or aliases.
 
 
 ### Common patterns
@@ -383,6 +406,67 @@ This is useful when debugging:
 
 <a id="reference"></a>
 ## 📚 Reference
+
+### `dybatpho::prompt`
+
+Read a line from the terminal (or stdin) with an optional default.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Prompt text |
+| `$2` | string | Optional default value |
+
+**📤 Output on stdout**
+
+- Entered value
+
+**🚦 Exit codes**
+
+- 0
+
+
+---
+
+### `dybatpho::select`
+
+Prompt for one or more values from a comma-separated list or numeric range.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Prompt text |
+| `$2` | string | Comma-separated choices |
+| `$3` | bool | Allow multiple selections |
+
+**📤 Output on stdout**
+
+- Selected value(s), separated by spaces
+
+**🚦 Exit codes**
+
+- 0
+
+
+---
+
+### `dybatpho::opts::validate_choice`
+
+Check that a value belongs to a comma-separated choice list.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Value |
+| `$2` | string | Comma-separated choices |
+
+**🚦 Exit codes**
+
+- `0`: Value is allowed
+
 
 <a id="internal-functions"></a>
 ### 🧩 Internal functions
@@ -576,6 +660,85 @@ Get help description for options from spec.
 **🚦 Exit codes**
 
 - `0`: exit code
+
+
+---
+
+### `dybatpho::generate_schema`
+
+Generate a JSON CLI schema from the same option spec used by parsing.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Optional command name |
+
+**📤 Output on stdout**
+
+- JSON schema
+
+
+---
+
+### `__generate_schema_command`
+
+
+
+---
+
+### `dybatpho::generate_man`
+
+Generate a roff man page from a CLI option spec.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Optional command name |
+
+**📤 Output on stdout**
+
+- Man page
+
+
+---
+
+### `__generate_man_command`
+
+
+
+---
+
+### `dybatpho::generate_completion`
+
+Generate Bash, Zsh, or Fish completion from a CLI option spec.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Shell (`bash`, `zsh`, or `fish`) |
+| `$3` | string | Optional command name |
+
+**📤 Output on stdout**
+
+- Completion script
+
+
+---
+
+### `__completion_words`
+
+
+
+---
+
+### `__generate_completion_command`
+
 
 
 ---
@@ -782,6 +945,34 @@ Emit generated code that validates the positional argument count configured by `
 **🚦 Exit codes**
 
 - `0`: Rule accepted and code emitted
+
+
+---
+
+### `__collect_switches`
+
+Expand option switches and aliases into a caller-provided array.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of destination array |
+| `$@` | switch\|key:value | Option metadata |
+
+
+---
+
+### `__json_quote`
+
+Escape a value for JSON and store it in a caller variable.
+
+
+---
+
+### `__collect_spec_metadata`
+
+Collect option and command metadata from a CLI spec.
 
 
 <a id="spec-functions"></a>

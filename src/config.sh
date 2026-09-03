@@ -72,9 +72,9 @@ function dybatpho::config_load {
     dybatpho::is file "${file}" || dybatpho::die "Configuration file not found: ${file}"
     extension="${file##*.}"
     case "${extension,,}" in
-      env|dotenv) __dybatpho_config_load_dotenv "${file}" ;;
+      env | dotenv) __dybatpho_config_load_dotenv "${file}" ;;
       json) __dybatpho_config_load_structured json "${file}" ;;
-      yaml|yml) __dybatpho_config_load_structured yaml "${file}" ;;
+      yaml | yml) __dybatpho_config_load_structured yaml "${file}" ;;
       *) dybatpho::die "Unsupported configuration format: ${file}" ;;
     esac
   done

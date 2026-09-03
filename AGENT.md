@@ -13,7 +13,7 @@ This document describes the repository workflow and conventions to preserve.
 - `src/` — Bash modules, each covering one functional area.
 - `init.sh` — required entrypoint; source it before using the library.
 - `test/` — Bats tests for each module, such as `test/cli.bats`.
-- `example/` — runnable usage examples.
+- `example/` — complete, runnable usage examples for every public module.
 - `doc/` — API documentation generated from source comments.
 - `doc/spec/` — Spec Kit-style feature specifications.
 - `scripts/test.sh` — full test and coverage runner.
@@ -22,8 +22,29 @@ This document describes the repository workflow and conventions to preserve.
 ## Module scope
 
 Every module in `src/` must have a clear responsibility and expose public
-functions under the `dybatpho::` namespace. When changing a module, read its
-source, tests, API documentation, and matching specification before editing.
+functions under the `dybatpho::` namespace. Every public module must have a
+corresponding complete example in `example/` (normally
+`example/<module>_ops.sh`). When changing a module, read its source, tests, API
+documentation, matching specification, and example before editing.
+
+### Complete example requirements
+
+A complete example is a user-facing, executable workflow rather than a list of
+isolated function calls. It must:
+
+- source `init.sh` and run successfully with `bash example/<name>.sh`;
+- demonstrate the module's primary public APIs, including newly added options
+  or behavior;
+- show realistic input, expected output, and relevant success/failure paths;
+- run non-interactively without credentials, network access, or machine-local
+  assumptions; use temporary fixtures, dry-run mode, or command mocks where
+  needed;
+- clean up temporary files and avoid modifying the repository or user data.
+
+When adding or changing a public API, update the corresponding example in the
+same change. If a module has no example, add one before considering the work
+complete. Validate every example with `bash -n example/*.sh` and execute new or
+changed examples.
 
 | Module | Primary responsibility | Tests / documentation |
 | --- | --- | --- |
@@ -202,7 +223,8 @@ When adding CLI behavior, update these together:
 3. Add API comments for new public functions so `scripts/doc.sh` can generate
    the reference documentation.
 4. Update `doc/spec/<module>.md` for contract or capability changes.
-5. Update `example/` when the behavior needs a user-facing workflow example.
+5. Add or update the module's complete example in `example/`; do not defer
+   examples for public behavior.
 6. Run `bash -n` on the source, the module test, and tests for affected
    dependencies.
 
@@ -229,5 +251,7 @@ to the module convention.
 2. Read related source, tests, documentation, and specification.
 3. Make a focused, backward-compatible change unless the contract requires otherwise.
 4. Add regression tests for new or fixed behavior.
-5. Run targeted tests, syntax checks, and `git diff --check`.
-6. Review the final diff and remove temporary artifacts.
+5. Add or update a complete example for every changed public module.
+6. Run targeted tests, `bash -n example/*.sh`, changed examples, and
+   `git diff --check`.
+7. Review the final diff and remove temporary artifacts.

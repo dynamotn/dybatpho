@@ -86,6 +86,7 @@
 - [notification.sh](doc/notification.md) – Notification utilities
 - [semver.sh](doc/semver.md) – Semantic versioning utilities
 - [config.sh](doc/config.md) – Configuration loading and precedence
+- [os.sh](doc/os.md) – Platform and command capability detection
 
 ## 🎯 Usage Example
 
@@ -97,6 +98,9 @@ dybatpho::info "Greetings from dybatpho!"
 ```
 
 See more at [example/](example/).
+
+The examples cover every shipped module, including configuration schemas,
+platform detection, and general helpers.
 
 ## 💬 Contribution & Support
 

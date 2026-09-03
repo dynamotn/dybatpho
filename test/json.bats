@@ -169,7 +169,7 @@ EOF
   local empty_path="${BATS_TEST_TMPDIR}/empty-bin"
   mkdir -p "${empty_path}"
   run -127 bash -c \
-    'source "$1/init.sh"; PATH="$2:/usr/bin:/bin"; dybatpho::json_query data.json "."' \
+    'source "$1/init.sh"; PATH="$2"; dybatpho::json_query data.json "."' \
     _ "${DYBATPHO_DIR}" "${empty_path}"
   assert_failure 127
   assert_output --partial "Neither yq nor jq is installed"

@@ -8,6 +8,7 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 declare -gA DYBATPHO_CONFIG=()
+declare -gA DYBATPHO_CONFIG_SCHEMA=()
 
 function __dybatpho_config_set {
   local key value
@@ -91,6 +92,7 @@ function dybatpho::config_env {
     [[ -n "${prefix}" && "${variable}" != "${prefix}"* ]] && continue
     key="${variable#"${prefix}"}"
     [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+    [[ -v "${variable}" ]] || continue
     __dybatpho_config_set "${key}" "${!variable}"
   done < <(compgen -v)
 }
@@ -145,5 +147,101 @@ function dybatpho::config_export {
     [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
       || dybatpho::die "Cannot export configuration key as variable: ${key}"
     export "${prefix}${key}=${DYBATPHO_CONFIG[${key}]}"
+  done
+}
+
+#######################################
+# @description Declare validation rules for a configuration key.
+# @arg $1 string Configuration key
+# @arg $2 string Type: string, int, bool, url, or enum
+# @arg $@ string Rules: required:true, default:value, min:number, max:number, choices:a,b
+# @tip Call `dybatpho::config_validate` after all files and environment overlays are loaded.
+#######################################
+function dybatpho::config_schema {
+  local key type rule name value
+  dybatpho::expect_args key type -- "$@"
+  [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
+    || dybatpho::die "Invalid configuration key: ${key}"
+  case "${type}" in
+    string|int|bool|url|enum) ;;
+    *) dybatpho::die "Unsupported configuration type: ${type}" ;;
+  esac
+  DYBATPHO_CONFIG_SCHEMA["${key}.type"]="${type}"
+  shift 2
+  for rule in "$@"; do
+    [[ "${rule}" == *:* ]] || dybatpho::die "Invalid configuration schema rule: ${rule}"
+    name="${rule%%:*}"
+    value="${rule#*:}"
+    case "${name}" in
+      required|default|min|max|choices) ;;
+      *) dybatpho::die "Unsupported configuration schema rule: ${name}" ;;
+    esac
+    DYBATPHO_CONFIG_SCHEMA["${key}.${name}"]="${value}"
+  done
+}
+
+function __dybatpho_config_schema_error {
+  local key reason
+  dybatpho::expect_args key reason -- "$@"
+  dybatpho::die "Invalid configuration \`${key}\`: ${reason}"
+}
+
+#######################################
+# @description Validate configured values against all declared schemas.
+# @exitcode 1 A required key is missing or a value violates its schema
+#######################################
+function dybatpho::config_validate {
+  local schema_key key type value required min max choices choice choice_value
+  for schema_key in "${!DYBATPHO_CONFIG_SCHEMA[@]}"; do
+    [[ "${schema_key}" == *.type ]] || continue
+    key="${schema_key%.type}"
+    type="${DYBATPHO_CONFIG_SCHEMA[${schema_key}]}"
+    if [[ ! -v "DYBATPHO_CONFIG[${key}]" ]]; then
+      required="${DYBATPHO_CONFIG_SCHEMA[${key}.required]-false}"
+      if dybatpho::is true "${required}"; then
+        __dybatpho_config_schema_error "${key}" "required value is missing"
+      elif [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]]; then
+        DYBATPHO_CONFIG["${key}"]="${DYBATPHO_CONFIG_SCHEMA[${key}.default]}"
+      else
+        continue
+      fi
+    fi
+    value="${DYBATPHO_CONFIG[${key}]}"
+    case "${type}" in
+      int)
+        [[ "${value}" =~ ^-?[0-9]+$ ]] || __dybatpho_config_schema_error "${key}" "expected an integer"
+        ;;
+      bool)
+        [[ "${value,,}" =~ ^(true|false|yes|no|1|0)$ ]] \
+          || __dybatpho_config_schema_error "${key}" "expected a boolean"
+        ;;
+      url)
+        [[ "${value}" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]+$ ]] \
+          || __dybatpho_config_schema_error "${key}" "expected a URL"
+        ;;
+      enum)
+        choices="${DYBATPHO_CONFIG_SCHEMA[${key}.choices]-}"
+        choice=false
+        IFS=',' read -r -a __dybatpho_config_choices <<< "${choices}"
+        for choice_value in "${__dybatpho_config_choices[@]}"; do
+          [[ "${value}" == "${choice_value}" ]] && choice=true && break
+        done
+        [[ "${choice}" == true ]] \
+          || __dybatpho_config_schema_error "${key}" "expected one of: ${choices}"
+        ;;
+    esac
+    min="${DYBATPHO_CONFIG_SCHEMA[${key}.min]-}"
+    max="${DYBATPHO_CONFIG_SCHEMA[${key}.max]-}"
+    if [[ -n "${min}" || -n "${max}" ]]; then
+      [[ -z "${min}" || "${min}" =~ ^-?[0-9]+$ ]] \
+        || __dybatpho_config_schema_error "${key}" "minimum must be an integer"
+      [[ -z "${max}" || "${max}" =~ ^-?[0-9]+$ ]] \
+        || __dybatpho_config_schema_error "${key}" "maximum must be an integer"
+      [[ "${value}" =~ ^-?[0-9]+$ ]] || __dybatpho_config_schema_error "${key}" "range requires an integer"
+      [[ -z "${min}" || "${value}" -ge "${min}" ]] \
+        || __dybatpho_config_schema_error "${key}" "must be at least ${min}"
+      [[ -z "${max}" || "${value}" -le "${max}" ]] \
+        || __dybatpho_config_schema_error "${key}" "must be at most ${max}"
+    fi
   done
 }

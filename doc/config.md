@@ -23,6 +23,9 @@ override earlier files. Environment variables loaded with
 - [`dybatpho::config_get`](#dybatphoconfig_get) — Print a configuration value.
 - [`dybatpho::config_require`](#dybatphoconfig_require) — Require configuration keys to be present.
 - [`dybatpho::config_export`](#dybatphoconfig_export) — Export loaded values as shell variables.
+- [`dybatpho::config_schema`](#dybatphoconfig_schema) — Declare validation rules for a configuration key.
+- [`__dybatpho_config_schema_error`](#__dybatpho_config_schema_error) — 
+- [`dybatpho::config_validate`](#dybatphoconfig_validate) — Validate configured values against all declared schemas.
 
 <a id="tips"></a>
 ## 💡 Tips
@@ -30,6 +33,10 @@ override earlier files. Environment variables loaded with
 ### `dybatpho::config_env`
 
 - Environment variables override values loaded from configuration files.
+
+### `dybatpho::config_schema`
+
+- Call `dybatpho::config_validate` after all files and environment overlays are loaded.
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -134,4 +141,36 @@ Export loaded values as shell variables.
 **🚦 Exit codes**
 
 - `1`: A key cannot be represented as a shell variable
+
+
+---
+
+### `dybatpho::config_schema`
+
+Declare validation rules for a configuration key.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Configuration key |
+| `$2` | string | Type: string, int, bool, url, or enum |
+| `$@` | string | Rules: required:true, default:value, min:number, max:number, choices:a,b |
+
+
+---
+
+### `__dybatpho_config_schema_error`
+
+
+
+---
+
+### `dybatpho::config_validate`
+
+Validate configured values against all declared schemas.
+
+**🚦 Exit codes**
+
+- `1`: A required key is missing or a value violates its schema
 

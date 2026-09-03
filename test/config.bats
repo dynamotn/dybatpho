@@ -178,3 +178,52 @@ setup() {
   assert_failure
   assert_stderr --partial "Cannot export configuration key as variable"
 }
+
+@test "config_validate applies defaults and validates types, ranges, URLs, and enums" {
+  DYBATPHO_CONFIG=()
+  DYBATPHO_CONFIG_SCHEMA=()
+  dybatpho::config_schema HOST url required:true
+  dybatpho::config_schema PORT int default:8080 min:1 max:65535
+  dybatpho::config_schema MODE enum choices:dev,prod
+  dybatpho::config_schema DEBUG bool
+  __dybatpho_config_set HOST "https://example.test"
+  __dybatpho_config_set MODE prod
+  __dybatpho_config_set DEBUG true
+  dybatpho::config_validate
+  run dybatpho::config_get PORT
+  assert_output "8080"
+}
+
+@test "config_validate rejects missing required and invalid values" {
+  DYBATPHO_CONFIG=()
+  DYBATPHO_CONFIG_SCHEMA=()
+  dybatpho::config_schema REQUIRED string required:true
+  run --separate-stderr dybatpho::config_validate
+  assert_failure
+  assert_stderr --partial "required value is missing"
+
+  DYBATPHO_CONFIG=()
+  DYBATPHO_CONFIG_SCHEMA=()
+  dybatpho::config_schema PORT int min:1 max:10
+  __dybatpho_config_set PORT 99
+  run --separate-stderr dybatpho::config_validate
+  assert_failure
+  assert_stderr --partial "must be at most 10"
+
+  DYBATPHO_CONFIG=()
+  DYBATPHO_CONFIG_SCHEMA=()
+  dybatpho::config_schema MODE enum choices:dev,prod
+  __dybatpho_config_set MODE test
+  run --separate-stderr dybatpho::config_validate
+  assert_failure
+  assert_stderr --partial "expected one of"
+}
+
+@test "config_schema rejects invalid types and rules" {
+  run --separate-stderr dybatpho::config_schema VALUE float
+  assert_failure
+  assert_stderr --partial "Unsupported configuration type"
+  run --separate-stderr dybatpho::config_schema VALUE string unknown:value
+  assert_failure
+  assert_stderr --partial "Unsupported configuration schema rule"
+}

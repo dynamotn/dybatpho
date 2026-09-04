@@ -5,61 +5,144 @@
 [![CI](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml/badge.svg)](https://github.com/dynamotn/dybatpho/actions/workflows/ci.yaml)
 [![Latest release](https://img.shields.io/github/release/dynamotn/dybatpho.svg)](https://github.com/dynamotn/dybatpho/releases/latest)
 
-> **dybatpho** – A powerful collection of bash functions to help you build scripts efficiently, quickly, and maintainably!
+> **dybatpho** – The standard library your Bash scripts never had.
+> Logging, CLI parsing, config, secrets, JSON, HTTP, Git and more — in one `source` line.
 
 ---
 
-## 🚀 Why choose **dybatpho**?
+## ✨ From 200 lines of boilerplate to this
 
-- **Save time:** A curated set of the most popular & useful functions for working with Bash scripts.
-- **Easy integration:** Flexibly use as a submodule, subtree, or manual clone.
-- **Battle-tested:** Used in many projects, personal dotfiles, and in real CI/CD workflows.
-- **Extensible:** Easily add your own modules or customize to fit your needs.
-- **Community-driven:** Always open to feedback, suggestions, and PRs from everyone.
+```sh
+. dybatpho/init.sh
+dybatpho::register_common_handlers   # strict mode, error trap, signal cleanup
 
-## 📖 What is `dybatpho`?
+dybatpho::git_is_clean "." || dybatpho::die "Commit your changes first"
 
-`dybatpho` is a portmanteau of `đi bát phố` - meaning "to wander and explore", just like this repo helps you discover and use handy bash functions freely and flexibly.
+next=$(dybatpho::semver_bump "$(git describe --tags --abbrev=0)" minor)
+dybatpho::info "Preparing release v${next}"
 
-# ⚡️ Quick Start
+dybatpho::git_commits_between "." "v1.0.0" HEAD | while read -r sha; do
+  dybatpho::print "- $(dybatpho::git_commit_subject "." "${sha}")"
+done
 
-1. **Add `dybatpho` to your project** (pin the version if needed):
+dybatpho::success "Release notes ready"
+```
 
-   - **Submodule:**
+No dependency manager, no runtime, no build step — just Bash ≥ 4 and the files in this repo.
 
-     ```sh
-     git submodule add --depth 1 https://github.com/dynamotn/dybatpho.git <path>
-     git submodule update <path> --remote
-     ```
+## 🚀 Why dybatpho?
 
-   - **Subtree:**
+- **Batteries included** — 19 modules covering the things every script ends up rewriting: logs, arguments, retries, temp files, traps.
+- **Safe by default** — strict mode, error handlers, signal cleanup and secret masking are wired in from `init.sh`.
+- **Portable** — works on GNU/Linux and macOS/BSD, with the flag differences handled for you.
+- **Tested** — full unit-test suite with coverage tracking on every commit.
+- **Drop-in** — submodule, subtree or plain clone; pin a tag and forget about it.
+- **Yours to extend** — plain Bash files, no magic, easy to fork a module and adapt it.
 
-     ```sh
-     git subtree add --prefix main --squash < path > https://github.com/dynamotn/dybatpho.git
-     git subtree pull --prefix main --squash < path > https://github.com/dynamotn/dybatpho.git
-     ```
+## 📖 What does the name mean?
 
-   - **Manual clone** (for CI/CD, etc.):
+`dybatpho` is a portmanteau of `đi bát phố` — "to wander and explore", just like this repo helps you discover
+and use handy Bash functions freely and flexibly.
 
-     ```sh
-     git clone https://github.com/dynamotn/dybatpho.git
-     ```
+## ⚡️ Quick Start
 
-2. **Source the logic you need:**
+**1. Add `dybatpho` to your project** (pin the version if needed):
 
-   ```sh
-   # Source the initialization script
-   . < path-to-dybatpho > /init.sh
-   ```
+- **Submodule:**
 
-   > See more [example scripts](example/) or real-world usage in [my dotfiles](https://github.com/dynamotn/dotfiles).
+  ```sh
+  git submodule add --depth 1 https://github.com/dynamotn/dybatpho.git <path>
+  git submodule update <path> --remote
+  ```
+
+- **Subtree:**
+
+  ```sh
+  git subtree add --prefix main --squash < path > https://github.com/dynamotn/dybatpho.git
+  git subtree pull --prefix main --squash < path > https://github.com/dynamotn/dybatpho.git
+  ```
+
+- **Manual clone** (for CI/CD, etc.):
+
+  ```sh
+  git clone https://github.com/dynamotn/dybatpho.git
+  ```
+
+**2. Source it before anything else:**
+
+```sh
+# Loads every module and enables strict mode
+. < path-to-dybatpho > /init.sh
+dybatpho::register_err_handler
+dybatpho::info "Greetings from dybatpho!"
+```
+
+> Requires **Bash ≥ 4**. `init.sh` must be *sourced*, not executed.
+> See the [example scripts](example/) — one per module — or real-world usage in
+> [my dotfiles](https://github.com/dynamotn/dotfiles).
+
+## 📚 Modules
+
+### 🧱 Core scripting
+
+| Module                            | What you get                                                       |
+| --------------------------------- | ------------------------------------------------------------------ |
+| [helpers.sh](doc/helpers.md)      | Argument expectation, dry-run, retries and other everyday patterns  |
+| [logging.sh](doc/logging.md)      | Levelled logs, boxed output, structured JSON logging                |
+| [process.sh](doc/process.md)      | Process management, traps, signal-safe cleanup                      |
+
+### 🔤 Data & text
+
+| Module                        | What you get                                       |
+| ----------------------------- | -------------------------------------------------- |
+| [array.sh](doc/array.md)      | Array manipulation                                  |
+| [string.sh](doc/string.md)    | String operations                                   |
+| [text.sh](doc/text.md)        | Multi-line text blocks and formatting               |
+| [json.sh](doc/json.md)        | JSON and YAML reading/writing                       |
+| [table.sh](doc/table.md)      | Aligned plain-text and Markdown tables              |
+| [date.sh](doc/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
+
+### 🖥️ CLI building
+
+| Module               | What you get                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [cli.sh](doc/cli.md) | Declarative option parser, prompts for missing values, env fallbacks, automatic `--help`, and generated JSON schema / shell completion / man pages |
+
+### 📁 Files & system
+
+| Module                          | What you get                                     |
+| ------------------------------- | ------------------------------------------------ |
+| [file.sh](doc/file.md)          | File handling, temp files, safe writes            |
+| [archive.sh](doc/archive.md)    | Create, extract and list archives                 |
+| [os.sh](doc/os.md)              | Platform/distro detection, package managers       |
+
+### 🌐 Network & notifications
+
+| Module                                    | What you get                                                    |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| [network.sh](doc/network.md)              | `curl` wrapper with retry, dry-run and header handling            |
+| [notification.sh](doc/notification.md)    | Slack, Telegram, Teams, Google Chat, Discord, generic webhooks     |
+
+### 🔐 Configuration & secrets
+
+| Module                          | What you get                                                     |
+| ------------------------------- | ----------------------------------------------------------------- |
+| [config.sh](doc/config.md)      | Config files + env vars with precedence and schema validation      |
+| [secret.sh](doc/secret.md)      | Read secrets safely, mask them in output, shred and wipe them      |
+
+### 🛠 Dev workflow
+
+| Module                        | What you get                                            |
+| ----------------------------- | -------------------------------------------------------- |
+| [git.sh](doc/git.md)          | Repo metadata, branches, tags, commits, remotes           |
+| [semver.sh](doc/semver.md)    | Parse, validate, compare and bump semantic versions       |
 
 ## 🗂 Directory Structure
 
 ```
 .
 ├── doc/            # Module documentation
-│   ├── *.md        # Usage guides & Reference for each module
+│   ├── *.md        # Usage guides & reference for each module
 │   └── spec/       # Module specifications and design docs
 ├── example/        # Example scripts for users
 ├── scripts/        # Helper scripts (test, doc generation, etc.)
@@ -67,41 +150,6 @@
 ├── test/           # Unit tests
 └── init.sh         # Initialization script, **must be sourced first**
 ```
-
-## 📚 Contents & Featured Modules
-
-- [array.sh](doc/array.md) – Array manipulation
-- [string.sh](doc/string.md) – String operations
-- [text.sh](doc/text.md) – Multi-line text formatting
-- [logging.sh](doc/logging.md) – Easy logging
-- [helpers.sh](doc/helpers.md) – Miscellaneous utilities
-- [process.sh](doc/process.md) – Process management
-- [network.sh](doc/network.md) – Network utilities
-- [date.sh](doc/date.md) – Date and timestamp helpers
-- [json.sh](doc/json.md) – JSON and YAML helpers
-- [file.sh](doc/file.md) – File operations
-- [archive.sh](doc/archive.md) – Archive create/extract/list helpers
-- [table.sh](doc/table.md) – Plain-text and Markdown table rendering
-- [cli.sh](doc/cli.md) – CLI building support
-- [notification.sh](doc/notification.md) – Notification utilities
-- [semver.sh](doc/semver.md) – Semantic versioning utilities
-- [config.sh](doc/config.md) – Configuration loading and precedence
-- [os.sh](doc/os.md) – Platform and command capability detection
-- [secret.sh](doc/secret.md) – Safe secret reading, masking, and storage
-
-## 🎯 Usage Example
-
-```sh
-# Using the log function
-. dybatpho/init.sh
-dybatpho::register_err_handler
-dybatpho::info "Greetings from dybatpho!"
-```
-
-See more at [example/](example/).
-
-The examples cover every shipped module, including configuration schemas,
-platform detection, and general helpers.
 
 ## 💬 Contribution & Support
 

@@ -45,11 +45,23 @@ setup() {
 
 @test "date helpers fall back to BSD date flags" {
   # BSD date has no --version and no -d; it parses with -j -f and formats with -r.
-  stub_repeated date ": case \"\$1\" in --version) exit 1 ;; -j) [[ \$3 == '%Y-%m-%d %H:%M:%S' ]] && echo '1709210096' || exit 1 ;; -r) echo '2024-02-29' ;; *) exit 1 ;; esac"
+  stub_repeated date ": case \"\$1\" in --version) exit 1 ;; -j) [[ \$3 == '%Y-%m-%d %H:%M:%S' ]] && echo '1709210096' || exit 1 ;; -r) [[ \$3 == '+%Y-%m-%d %H:%M:%S' ]] && echo '2024-02-29 12:34:56' || echo '2024-02-29' ;; *) exit 1 ;; esac"
 
   assert_equal "$(dybatpho::date_parse "2024-02-29 12:34:56")" "1709210096"
   assert_equal "$(dybatpho::date_format "1709210096" "%F")" "2024-02-29"
   assert_equal "$(dybatpho::date_add_days "2024-02-29 12:34:56" 1)" "2024-02-29"
+}
+
+@test "BSD date parsing rejects dates that roll over" {
+  # BSD `date -j -f` accepts 2024-02-30 and answers with 2024-03-01, which must
+  # not be reported as a valid date.
+  stub_repeated date ": case \"\$1\" in --version) exit 1 ;; -j) [[ \$3 == '%Y-%m-%d' ]] && echo '1709251200' || exit 1 ;; -r) echo '2024-03-01' ;; *) exit 1 ;; esac"
+
+  run dybatpho::date_is_valid "2024-02-30"
+  assert_failure
+
+  run dybatpho::date_parse "2024-02-30"
+  assert_failure
 }
 
 @test "date parsing fails when no BSD input format matches" {

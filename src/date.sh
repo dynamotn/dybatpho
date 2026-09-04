@@ -23,13 +23,19 @@ function __dybatpho_date_parse {
     TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s
     return
   fi
-  local input_format
-  for input_format in "%Y-%m-%d %H:%M:%S" "%Y-%m-%d" "%Y-%m-%dT%H:%M:%S%z"; do
-    if TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "${input_format}" "${input}" +%s 2> /dev/null; then
+  # BSD `date -j -f` silently rolls invalid dates over (`2024-02-30` becomes
+  # `2024-03-01`), so the parsed timestamp is formatted back and compared with
+  # the input before it is accepted.
+  local input_format timestamp
+  for input_format in "%Y-%m-%d %H:%M:%S" "%Y-%m-%d"; do
+    timestamp=$(TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "${input_format}" "${input}" +%s 2> /dev/null) || continue
+    if [[ "$(TZ="${DYBATPHO_DATE_TIMEZONE}" date -r "${timestamp}" +"${input_format}" 2> /dev/null)" == "${input}" ]]; then
+      printf '%s\n' "${timestamp}"
       return 0
     fi
   done
-  return 1
+  # Offset-aware timestamps cannot round-trip literally, so a plain parse wins.
+  TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "%Y-%m-%dT%H:%M:%S%z" "${input}" +%s 2> /dev/null
 }
 
 #######################################

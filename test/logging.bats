@@ -6,6 +6,7 @@ teardown() {
   export LOG_LEVEL=info
   export LOG_FORMAT=text
   unset COLUMNS
+  unset LOG_FILE LOG_FILE_LEVEL LOG_FILE_MAX_BYTES LOG_FILE_MAX_BACKUPS LOG_REQUEST_ID
 }
 
 # The logging helpers are exercised directly here so their behavior is checked
@@ -496,4 +497,174 @@ PY
   assert_stderr --partial "‖ TRACE"
   assert_stderr --partial "End tracing"
   assert_stderr --partial "$(echo -e "\e[0m")"
+}
+
+@test "structured JSON events include request_id, hostname, pid, and duration_ms" {
+  export LOG_FORMAT=json
+  export NO_COLOR=true
+  export LOG_REQUEST_ID="req-fixed-123"
+  run --separate-stderr dybatpho::error "enriched event"
+  assert_success
+  refute_output
+  assert_stderr --partial '"request_id":"req-fixed-123"'
+  assert_stderr --partial "\"pid\":$$"
+  printf '%s\n' "${stderr}" | python3 -c '
+import json, sys
+event = json.load(sys.stdin)
+assert event["request_id"] == "req-fixed-123"
+assert event["hostname"]
+assert event["pid"] == '"$$"'
+assert isinstance(event["duration_ms"], int)
+assert event["duration_ms"] >= 0
+'
+}
+
+@test "LOG_REQUEST_ID is generated once and reused across calls when unset" {
+  export LOG_FORMAT=json
+  export NO_COLOR=true
+  unset LOG_REQUEST_ID
+  local out="${BATS_TEST_TMPDIR}/request-id-out"
+  { dybatpho::error "first"; dybatpho::error "second"; } 2> "${out}"
+  local first_id second_id
+  first_id=$(sed -n '1p' "${out}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["request_id"])')
+  second_id=$(sed -n '2p' "${out}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["request_id"])')
+  assert_equal "${first_id}" "${second_id}"
+  [[ -n "${first_id}" ]]
+}
+
+@test "dybatpho::compare_log_level supports an explicit threshold override" {
+  export LOG_LEVEL=error
+  dybatpho::compare_log_level debug debug
+  run dybatpho::compare_log_level debug warn
+  assert_failure
+}
+
+@test "LOG_FILE receives structured JSON events independent of LOG_FORMAT" {
+  local log_file="${BATS_TEST_TMPDIR}/app.log"
+  export LOG_FILE="${log_file}"
+  export LOG_FORMAT=text
+  export LOG_LEVEL=info
+  dybatpho::info "file logged event"
+  assert_file_exist "${log_file}"
+  grep -q '"message":"file logged event"' "${log_file}"
+  grep -q '"level":"info"' "${log_file}"
+}
+
+@test "LOG_FILE_LEVEL captures more verbose events than stdout LOG_LEVEL" {
+  local log_file="${BATS_TEST_TMPDIR}/verbose.log"
+  export LOG_FILE="${log_file}"
+  export LOG_LEVEL=info
+  export LOG_FILE_LEVEL=debug
+  run --separate-stderr dybatpho::debug "hidden from stdout, visible in file"
+  assert_success
+  refute_stderr "hidden from stdout"
+  grep -q '"message":"hidden from stdout, visible in file"' "${log_file}"
+}
+
+@test "LOG_FILE_LEVEL can suppress events that still appear on stdout" {
+  local log_file="${BATS_TEST_TMPDIR}/quiet.log"
+  export LOG_FILE="${log_file}"
+  export LOG_LEVEL=debug
+  export LOG_FILE_LEVEL=error
+  run --separate-stderr dybatpho::debug "stdout only"
+  assert_success
+  assert_stderr --partial "stdout only"
+  [ ! -s "${log_file}" ]
+}
+
+@test "LOG_FILE creates missing parent directories" {
+  local log_file="${BATS_TEST_TMPDIR}/nested/dir/app.log"
+  export LOG_FILE="${log_file}"
+  dybatpho::info "creates parent dirs"
+  assert_file_exist "${log_file}"
+}
+
+@test "LOG_FILE rotates once the size threshold is reached" {
+  local log_file="${BATS_TEST_TMPDIR}/rotate.log"
+  export LOG_FILE="${log_file}"
+  export LOG_FILE_MAX_BYTES=1
+  export LOG_FILE_MAX_BACKUPS=2
+  dybatpho::info "first entry"
+  dybatpho::info "second entry"
+  dybatpho::info "third entry"
+  assert_file_exist "${log_file}"
+  assert_file_exist "${log_file}.1"
+  grep -q '"message":"third entry"' "${log_file}"
+  grep -q '"message":"second entry"' "${log_file}.1"
+}
+
+@test "LOG_FILE rotation caps the number of retained backups" {
+  local log_file="${BATS_TEST_TMPDIR}/rotate_cap.log"
+  export LOG_FILE="${log_file}"
+  export LOG_FILE_MAX_BYTES=1
+  export LOG_FILE_MAX_BACKUPS=1
+  dybatpho::info "one"
+  dybatpho::info "two"
+  dybatpho::info "three"
+  assert_file_exist "${log_file}.1"
+  [ ! -e "${log_file}.2" ]
+}
+
+@test "LOG_FILE_MAX_BYTES=0 disables rotation" {
+  local log_file="${BATS_TEST_TMPDIR}/no_rotate.log"
+  export LOG_FILE="${log_file}"
+  export LOG_FILE_MAX_BYTES=0
+  dybatpho::info "one"
+  dybatpho::info "two"
+  [ ! -e "${log_file}.1" ]
+  grep -q '"message":"one"' "${log_file}"
+  grep -q '"message":"two"' "${log_file}"
+}
+
+@test "LOG_FILE is a no-op when unset" {
+  unset LOG_FILE
+  run --separate-stderr dybatpho::info "no file configured"
+  assert_success
+  assert_stderr --partial "no file configured"
+}
+
+@test "LOG_FILE redacts registered secrets" {
+  local log_file="${BATS_TEST_TMPDIR}/masked.log"
+  export LOG_FILE="${log_file}"
+  dybatpho::secret_register "file-secret-value"
+  dybatpho::info "token file-secret-value"
+  dybatpho::secret_forget
+  grep -q '\*\*\*' "${log_file}"
+  ! grep -q "file-secret-value" "${log_file}"
+}
+
+@test "__log_now_ms returns an increasing integer" {
+  local first second
+  first=$(__log_now_ms)
+  sleep 0.01
+  second=$(__log_now_ms)
+  [[ "${first}" =~ ^[0-9]+$ ]]
+  [[ "${second}" =~ ^[0-9]+$ ]]
+  ((second >= first))
+}
+
+@test "__log_now_ms falls back to SECONDS when date lacks nanosecond support" {
+  local saved_epochrealtime="${EPOCHREALTIME:-}"
+  # shellcheck disable=SC2030
+  unset EPOCHREALTIME 2> /dev/null || true
+  stub_repeated date ": echo 1700000000N"
+  local value
+  value=$(__log_now_ms)
+  [[ "${value}" =~ ^[0-9]+$ ]]
+  unstub date
+}
+
+@test "__log_hostname returns a non-empty value" {
+  [[ -n "$(__log_hostname)" ]]
+}
+
+@test "__log_rotate_file is a no-op for a missing file or disabled rotation" {
+  local missing_file="${BATS_TEST_TMPDIR}/missing.log"
+  __log_rotate_file "${missing_file}" 100 3
+  [ ! -e "${missing_file}" ]
+
+  local existing_file="${BATS_TEST_TMPDIR}/existing.log"
+  echo "some content" > "${existing_file}"
+  __log_rotate_file "${existing_file}" 0 3
+  [ ! -e "${existing_file}.1" ]
 }

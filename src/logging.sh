@@ -2,7 +2,10 @@
 # @file logging.sh
 # @brief Utilities for logging to stdout/stderr
 # @description
-#   This module contains functions to log messages to stdout/stderr.
+#   This module contains functions to log messages to stdout/stderr. Every
+#   structured (JSON) log event is enriched with a request ID, hostname, PID,
+#   and duration since the process started. Structured events can also be
+#   appended to a rotating log file at an independent verbosity level.
 # @see
 #   - `example/logging_demo.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -16,6 +19,21 @@ export LOG_FORMAT
 # @env NO_COLOR string Disable ANSI colors when set to a non-empty value
 NO_COLOR="${NO_COLOR:-}"
 export NO_COLOR
+# @env LOG_REQUEST_ID string Correlation ID attached to every structured log event. Generated automatically when empty
+LOG_REQUEST_ID="${LOG_REQUEST_ID:-}"
+export LOG_REQUEST_ID
+# @env LOG_FILE string Optional path to append structured JSON log lines to, independent of `LOG_FORMAT`
+LOG_FILE="${LOG_FILE:-}"
+export LOG_FILE
+# @env LOG_FILE_LEVEL string Verbosity threshold applied only to `LOG_FILE` output. Default is `LOG_LEVEL`
+LOG_FILE_LEVEL="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
+export LOG_FILE_LEVEL
+# @env LOG_FILE_MAX_BYTES number Rotate `LOG_FILE` once it reaches this size in bytes. `0` disables rotation. Default `10485760` (10 MiB)
+LOG_FILE_MAX_BYTES="${LOG_FILE_MAX_BYTES:-10485760}"
+export LOG_FILE_MAX_BYTES
+# @env LOG_FILE_MAX_BACKUPS number Number of rotated `LOG_FILE` backups to keep. Default `5`
+LOG_FILE_MAX_BACKUPS="${LOG_FILE_MAX_BACKUPS:-5}"
+export LOG_FILE_MAX_BACKUPS
 
 #######################################
 # @description Log a message to stdout or stderr, optionally with ANSI color.
@@ -94,6 +112,153 @@ function __log_timestamp {
 }
 
 #######################################
+# @description Return the current time in milliseconds since the epoch, using the most precise portable source available.
+# @stdout Current time in milliseconds
+#######################################
+function __log_now_ms {
+  if [[ -n "${EPOCHREALTIME:-}" ]]; then
+    local whole="${EPOCHREALTIME%%.*}" frac="${EPOCHREALTIME#*.}"
+    printf '%s' $((whole * 1000 + 10#${frac:0:3}))
+    return 0
+  fi
+  local nanoseconds
+  if nanoseconds=$(date +%s%N 2> /dev/null) && [[ "${nanoseconds}" =~ ^[0-9]+$ ]]; then
+    printf '%s' $((nanoseconds / 1000000))
+    return 0
+  fi
+  # kcov(disabled) - only reachable without EPOCHREALTIME or GNU/busybox date
+  printf '%s' $((SECONDS * 1000))
+  # kcov(enabled)
+}
+
+# Captured once per process so structured log events can report elapsed duration.
+DYBATPHO_LOG_START_MS="$(__log_now_ms)"
+
+#######################################
+# @description Return the elapsed time since the process started, for structured log events.
+# @stdout Elapsed time in milliseconds
+#######################################
+function __log_duration_ms {
+  printf '%s' "$(($(__log_now_ms) - DYBATPHO_LOG_START_MS))"
+}
+
+#######################################
+# @description Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
+# @set LOG_REQUEST_ID string Generated correlation ID, when it was previously empty
+# @stdout Correlation ID
+#######################################
+function __log_request_id {
+  if [[ -z "${LOG_REQUEST_ID:-}" ]]; then
+    if dybatpho::is command uuidgen; then
+      LOG_REQUEST_ID="$(uuidgen)" # kcov(skip)
+    else
+      LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "$(__log_now_ms)" "${RANDOM}${RANDOM}")"
+    fi
+    export LOG_REQUEST_ID
+  fi
+  printf '%s' "${LOG_REQUEST_ID}"
+}
+
+#######################################
+# @description Return the current hostname attached to every structured log event, caching the result for the process lifetime.
+# @stdout Hostname
+#######################################
+function __log_hostname {
+  if [[ -z "${DYBATPHO_LOG_HOSTNAME:-}" ]]; then
+    if dybatpho::is command hostname; then
+      DYBATPHO_LOG_HOSTNAME=$(hostname 2> /dev/null) || true
+    fi
+    if [[ -z "${DYBATPHO_LOG_HOSTNAME:-}" && -r /proc/sys/kernel/hostname ]]; then
+      DYBATPHO_LOG_HOSTNAME=$(cat /proc/sys/kernel/hostname 2> /dev/null) || true # kcov(skip)
+    fi
+    [[ -z "${DYBATPHO_LOG_HOSTNAME:-}" ]] && DYBATPHO_LOG_HOSTNAME="${HOSTNAME:-unknown}" # kcov(skip)
+  fi
+  printf '%s' "${DYBATPHO_LOG_HOSTNAME}"
+}
+
+#######################################
+# @description Build one structured JSON log event enriched with request ID, hostname, PID, and duration.
+# @arg $1 string RFC 3339 timestamp
+# @arg $2 string Log level
+# @arg $3 string Source location
+# @arg $4 string Message
+# @arg $5 number Duration in milliseconds since the process started
+# @stdout One JSON object followed by a newline
+#######################################
+function __log_json_event {
+  local timestamp="$1" level="$2" source="$3" message="$4" duration_ms="$5"
+  # Call these directly (not inside `$(...)`) so the caches they populate
+  # persist in the current shell instead of being lost with a subshell.
+  __log_request_id > /dev/null
+  __log_hostname > /dev/null
+  printf '{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s","hostname":"%s","pid":%s,"duration_ms":%s}\n' \
+    "$(__log_json_escape "${timestamp}")" \
+    "$(__log_json_escape "${level}")" \
+    "$(__log_json_escape "${source}")" \
+    "$(__log_json_escape "${message}")" \
+    "$(__log_json_escape "${LOG_REQUEST_ID}")" \
+    "$(__log_json_escape "${DYBATPHO_LOG_HOSTNAME}")" \
+    "$$" \
+    "${duration_ms}"
+}
+
+#######################################
+# @description Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
+# @arg $1 string Log file path
+# @arg $2 number Maximum size in bytes before rotating, `0` disables rotation
+# @arg $3 number Number of rotated backups to keep
+#######################################
+function __log_rotate_file {
+  local file="$1" max_bytes="$2" max_backups="$3"
+  [[ -f "${file}" ]] || return 0
+  ((max_bytes > 0)) || return 0
+
+  local size
+  size=$(wc -c < "${file}" 2> /dev/null || echo 0)
+  ((size >= max_bytes)) || return 0
+
+  if ((max_backups <= 0)); then
+    : > "${file}"
+    return 0
+  fi
+
+  local i
+  for ((i = max_backups - 1; i >= 1; i--)); do
+    [[ -f "${file}.${i}" ]] && mv -f "${file}.${i}" "${file}.$((i + 1))"
+  done
+  mv -f "${file}" "${file}.1"
+}
+
+#######################################
+# @description Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
+# @arg $1 string Log level
+# @arg $2 string Source location
+# @arg $3 string Message
+# @env LOG_FILE string Destination file; no-op when empty
+# @env LOG_FILE_LEVEL string Verbosity threshold applied independently of `LOG_LEVEL`
+# @env LOG_FILE_MAX_BYTES number Rotation size threshold
+# @env LOG_FILE_MAX_BACKUPS number Number of rotated backups to keep
+#######################################
+function __log_write_file {
+  local log_level="$1"
+  local source="$2"
+  local message="$3"
+  [[ -n "${LOG_FILE:-}" ]] || return 0
+  dybatpho::compare_log_level "${log_level}" "${LOG_FILE_LEVEL:-${LOG_LEVEL}}" || return 0
+
+  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
+    __dybatpho_secret_mask_var message
+  fi
+
+  local log_dir
+  log_dir=$(dirname "${LOG_FILE}")
+  [[ -d "${log_dir}" ]] || mkdir -p "${log_dir}" 2> /dev/null || return 0
+
+  __log_rotate_file "${LOG_FILE}" "${LOG_FILE_MAX_BYTES}" "${LOG_FILE_MAX_BACKUPS}"
+  __log_json_event "$(__log_timestamp)" "${log_level}" "${source}" "${message}" "$(__log_duration_ms)" >> "${LOG_FILE}"
+}
+
+#######################################
 # @description Log a diagnostic event as JSON when `LOG_FORMAT=json`.
 # @arg $1 string Log level
 # @arg $2 string Source location
@@ -114,29 +279,26 @@ function __log_structured {
   fi
 
   if [[ "${LOG_FORMAT}" == "json" ]]; then
-    printf '{"timestamp":"%s","level":"%s","source":"%s","message":"%s"}\n' \
-      "$(__log_json_escape "${timestamp}")" \
-      "$(__log_json_escape "${log_level}")" \
-      "$(__log_json_escape "${source}")" \
-      "$(__log_json_escape "${message}")" >&2
+    __log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" "$(__log_duration_ms)" >&2
   else
     __log "${log_level}" "${timestamp} ‖ ${source}: ${message}" stderr "${color}"
   fi
 }
 
 #######################################
-# @description Return success when a message level should be shown for the current `LOG_LEVEL`.
+# @description Return success when a message level should be shown against a threshold.
 # @arg $1 string Input log level
-# @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted
+# @arg $2 string Threshold level to compare against, default is `LOG_LEVEL`
+# @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted, when no explicit threshold is given
 # @exitcode 0 The message level should be emitted
 # @exitcode 1 The message level is filtered out
 #######################################
 function dybatpho::compare_log_level {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
   local level="$1"
-  local runtime_level
+  local runtime_level="${2:-${LOG_LEVEL}}"
   level=$(dybatpho::lower "${level}")
-  runtime_level=$(dybatpho::lower "${LOG_LEVEL}")
+  runtime_level=$(dybatpho::lower "${runtime_level}")
 
   dybatpho::validate_log_level "${runtime_level}" || return 1
   dybatpho::validate_log_level "${level}" || return 1
@@ -147,12 +309,13 @@ function dybatpho::compare_log_level {
 }
 
 #######################################
-# @description Log a structured diagnostic message with timestamp and call-site information.
+# @description Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
 # @arg $1 string Log level
 # @arg $2 string Rendered label for the log level
 # @arg $3 string Message
 # @arg $4 number Additional stack frames to skip when resolving the source location
 # @arg $5 string ANSI escape color code
+# @env LOG_FILE string Optional file that receives a structured JSON event regardless of `LOG_FORMAT`
 #######################################
 function __log_inspect {
   local log_level=$1
@@ -172,6 +335,7 @@ function __log_inspect {
     indicator="bash:${BASH_LINENO[1]}" # kcov(skip)
   fi
   local color="${5:-}"
+  __log_write_file "${log_level}" "${indicator}" "${message}"
   if [[ "${LOG_FORMAT}" == "json" ]]; then
     __log_structured "${log_level}" "${indicator}" "${message}" "${color}"
   else

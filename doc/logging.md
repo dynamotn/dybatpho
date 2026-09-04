@@ -9,7 +9,10 @@ Utilities for logging to stdout/stderr
 <a id="overview"></a>
 ## ✨ Overview
 
-This module contains functions to log messages to stdout/stderr.
+This module contains functions to log messages to stdout/stderr. Every
+structured (JSON) log event is enriched with a request ID, hostname, PID,
+and duration since the process started. Structured events can also be
+appended to a rotating log file at an independent verbosity level.
 
 ### 🌍 Environment
 
@@ -18,6 +21,11 @@ This module contains functions to log messages to stdout/stderr.
 | **`LOG_LEVEL`** | string | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`). Default is `info` |
 | **`LOG_FORMAT`** | string | Log output format (`text\|json`). Default is `text` |
 | **`NO_COLOR`** | string | Disable ANSI colors when set to a non-empty value |
+| **`LOG_REQUEST_ID`** | string | Correlation ID attached to every structured log event. Generated automatically when empty |
+| **`LOG_FILE`** | string | Optional path to append structured JSON log lines to, independent of `LOG_FORMAT` |
+| **`LOG_FILE_LEVEL`** | string | Verbosity threshold applied only to `LOG_FILE` output. Default is `LOG_LEVEL` |
+| **`LOG_FILE_MAX_BYTES`** | number | Rotate `LOG_FILE` once it reaches this size in bytes. `0` disables rotation. Default `10485760` (10 MiB) |
+| **`LOG_FILE_MAX_BACKUPS`** | number | Number of rotated `LOG_FILE` backups to keep. Default `5` |
 
 ### 🚀 Highlights
 
@@ -25,9 +33,16 @@ This module contains functions to log messages to stdout/stderr.
 - [`__check_color`](#__check_color) — Render the current log message with ANSI color unless `NO_COLOR` is set.
 - [`__log_json_escape`](#__log_json_escape) — Escape a string for use as a JSON string value.
 - [`__log_timestamp`](#__log_timestamp) — Return an RFC 3339 timestamp for a log event.
+- [`__log_now_ms`](#__log_now_ms) — Return the current time in milliseconds since the epoch, using the most precise portable source available.
+- [`__log_duration_ms`](#__log_duration_ms) — Return the elapsed time since the process started, for structured log events.
+- [`__log_request_id`](#__log_request_id) — Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
+- [`__log_hostname`](#__log_hostname) — Return the current hostname attached to every structured log event, caching the result for the process lifetime.
+- [`__log_json_event`](#__log_json_event) — Build one structured JSON log event enriched with request ID, hostname, PID, and duration.
+- [`__log_rotate_file`](#__log_rotate_file) — Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
+- [`__log_write_file`](#__log_write_file) — Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
 - [`__log_structured`](#__log_structured) — Log a diagnostic event as JSON when `LOG_FORMAT=json`.
-- [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown for the current `LOG_LEVEL`.
-- [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information.
+- [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown against a threshold.
+- [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
 - [`__get_terminal_width`](#__get_terminal_width) — Return the effective terminal width used by boxed logging helpers.
 - [`__string_display_width`](#__string_display_width) — Return the display width of a string, accounting for wide Unicode glyphs when possible.
 - [`__wrap_line`](#__wrap_line) — Wrap one text line to the requested width using word boundaries when possible.
@@ -124,6 +139,114 @@ Return an RFC 3339 timestamp for a log event.
 
 ---
 
+### `__log_now_ms`
+
+Return the current time in milliseconds since the epoch, using the most precise portable source available.
+
+**📤 Output on stdout**
+
+- Current time in milliseconds
+
+
+---
+
+### `__log_duration_ms`
+
+Return the elapsed time since the process started, for structured log events.
+
+**📤 Output on stdout**
+
+- Elapsed time in milliseconds
+
+
+---
+
+### `__log_request_id`
+
+Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
+
+**🧩 Variable sets**
+
+- **`LOG_REQUEST_ID`**: string Generated correlation ID, when it was previously empty
+
+**📤 Output on stdout**
+
+- Correlation ID
+
+
+---
+
+### `__log_hostname`
+
+Return the current hostname attached to every structured log event, caching the result for the process lifetime.
+
+**📤 Output on stdout**
+
+- Hostname
+
+
+---
+
+### `__log_json_event`
+
+Build one structured JSON log event enriched with request ID, hostname, PID, and duration.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | RFC 3339 timestamp |
+| `$2` | string | Log level |
+| `$3` | string | Source location |
+| `$4` | string | Message |
+| `$5` | number | Duration in milliseconds since the process started |
+
+**📤 Output on stdout**
+
+- One JSON object followed by a newline
+
+
+---
+
+### `__log_rotate_file`
+
+Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Log file path |
+| `$2` | number | Maximum size in bytes before rotating, `0` disables rotation |
+| `$3` | number | Number of rotated backups to keep |
+
+
+---
+
+### `__log_write_file`
+
+Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Log level |
+| `$2` | string | Source location |
+| `$3` | string | Message |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`LOG_FILE`** | string | Destination file; no-op when empty |
+| **`LOG_FILE_LEVEL`** | string | Verbosity threshold applied independently of `LOG_LEVEL` |
+| **`LOG_FILE_MAX_BYTES`** | number | Rotation size threshold |
+| **`LOG_FILE_MAX_BACKUPS`** | number | Number of rotated backups to keep |
+
+
+---
+
 ### `__log_structured`
 
 Log a diagnostic event as JSON when `LOG_FORMAT=json`.
@@ -142,19 +265,20 @@ Log a diagnostic event as JSON when `LOG_FORMAT=json`.
 
 ### `dybatpho::compare_log_level`
 
-Return success when a message level should be shown for the current `LOG_LEVEL`.
+Return success when a message level should be shown against a threshold.
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Input log level |
+| `$2` | string | Threshold level to compare against, default is `LOG_LEVEL` |
 
 **🌍 Environment variables**
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`LOG_LEVEL`** | string | Runtime threshold used to decide whether the message is emitted |
+| **`LOG_LEVEL`** | string | Runtime threshold used to decide whether the message is emitted, when no explicit threshold is given |
 
 **🚦 Exit codes**
 
@@ -166,7 +290,7 @@ Return success when a message level should be shown for the current `LOG_LEVEL`.
 
 ### `__log_inspect`
 
-Log a structured diagnostic message with timestamp and call-site information.
+Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
 
 **🧾 Arguments**
 
@@ -177,6 +301,12 @@ Log a structured diagnostic message with timestamp and call-site information.
 | `$3` | string | Message |
 | `$4` | number | Additional stack frames to skip when resolving the source location |
 | `$5` | string | ANSI escape color code |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`LOG_FILE`** | string | Optional file that receives a structured JSON event regardless of `LOG_FORMAT` |
 
 
 ---

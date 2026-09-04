@@ -257,9 +257,29 @@
 #   - switch matching
 #   - help generation
 #
+#   ### Advanced UX example
+#
+#   `example/cli_ux.sh` is a complete spec-driven CLI example:
+#
+#   - `_spec_root` declares the root command plus `deploy`, `completion`, `schema`, and `man` subcommands.
+#   - `_spec_deploy` demonstrates `env:`, `choices:`, `prompt:`, `multiple:`, and boolean toggles.
+#   - `_spec_completion`, `_spec_schema`, and `_spec_man` define the artifact subcommands.
+#   - `_run_root`, `_run_completion`, `_run_schema`, and `_run_man` implement their actions.
+#   - `_run_deploy` consumes the parsed values and performs the deploy action.
+#
+#   Run it with:
+#
+#   ```bash
+#   bash example/cli_ux.sh deploy
+#   bash example/cli_ux.sh completion --shell bash
+#   bash example/cli_ux.sh schema
+#   bash example/cli_ux.sh man
+#   ```
+#
 # @see
 #   - `example/cli_basic.sh`
 #   - `example/cli_advanced.sh`
+#   - `example/cli_ux.sh`
 # @tip Set `DYBATPHO_CLI_DEBUG=true` while developing a spec to inspect the generated parser and help logic.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
@@ -270,6 +290,7 @@ DYBATPHO_CLI_DEBUG="${DYBATPHO_CLI_DEBUG:-false}"
 # @description Read a line from the terminal (or stdin) with an optional default.
 # @arg $1 string Prompt text
 # @arg $2 string Optional default value
+# @tip The prompt is written to stderr so the returned value remains clean on stdout.
 # @stdout Entered value
 # @exitcode 0
 #######################################
@@ -288,6 +309,8 @@ function dybatpho::prompt {
 # @arg $1 string Prompt text
 # @arg $2 string Comma-separated choices
 # @arg $3 bool Allow multiple selections
+# @tip Pass `true` for the third argument to accept comma-separated values and numeric ranges such as `1-3`.
+# @tip Invalid or out-of-range selections are rejected and prompt again.
 # @stdout Selected value(s), separated by spaces
 # @exitcode 0
 #######################################
@@ -845,6 +868,7 @@ function __generate_help {
 # @description Generate a JSON CLI schema from the same option spec used by parsing.
 # @arg $1 string Spec function
 # @arg $2 string Optional command name
+# @tip Use the schema to drive external validation, form generation, tooling, or documentation from the same source of truth.
 # @stdout JSON schema
 #######################################
 function dybatpho::generate_schema {
@@ -915,6 +939,7 @@ function __generate_schema_command {
 # @description Generate a roff man page from a CLI option spec.
 # @arg $1 string Spec function
 # @arg $2 string Optional command name
+# @tip Generate the page from the root spec to include the complete nested command tree.
 # @stdout Man page
 #######################################
 function dybatpho::generate_man {
@@ -969,6 +994,8 @@ function __generate_man_command {
 # @arg $1 string Spec function
 # @arg $2 string Shell (`bash`, `zsh`, or `fish`)
 # @arg $3 string Optional command name
+# @tip Keep completion generation in a display option declared inside the spec when the CLI should complete itself.
+# @tip Generate completion from the root spec so subcommand options and aliases are included.
 # @stdout Completion script
 #######################################
 function dybatpho::generate_completion {
@@ -1427,6 +1454,8 @@ function __collect_spec_metadata {
 # of script or function
 # @arg $1 string Description of sub-command/root command
 # @arg $@ key:value Settings `key:value` for sub-command/root command such as `action:<code>`, `prerun:<code>`, `postrun:<code>`, and `args:<rule>`
+# @tip Call `setup` before declaring any flags, params, display options, or subcommands.
+# @tip Keep the action focused on command behavior; validation and lifecycle hooks are applied by the generated parser.
 # @note `args:<rule>` supports raw rules plus Cobra-like names such as `NoArgs`, `ExactArgs:N`, and `RangeArgs:M:N`
 # @note `prerun:<code>` runs before `action:<code>`, and `postrun:<code>` runs after it
 # @exitcode 0 exit code
@@ -1479,6 +1508,8 @@ function dybatpho::opts::setup {
 # @arg $1 string Description of option to display
 # @arg $2 string Variable name for getting option. `-` if want to omit
 # @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
+# @tip Use `on:` and `off:` with a paired `--{no-}name` switch to model boolean toggles.
+# @tip Use `persistent:true` for options that must be accepted by every descendant command.
 # @note Use `persistent:true` to make the flag available to descendant subcommands
 # @exitcode 0 exit code
 #######################################
@@ -1531,6 +1562,8 @@ function dybatpho::opts::flag {
 # @tip `optional:true` controls whether a value is required after the switch appears, while `required:true` controls whether the switch itself must appear at all
 # @tip Keep conditional requirements such as "required unless `--list` is set" in your action or validation logic
 # @note Use `persistent:true` to make the param available to descendant subcommands
+# @tip Use `env:NAME` for an environment fallback; an explicit command-line value always takes precedence.
+# @tip Combine `prompt:` with `choices:` to interactively request a missing value from a constrained set.
 # @exitcode 0 exit code
 #######################################
 function dybatpho::opts::param {
@@ -1609,6 +1642,8 @@ function dybatpho::opts::param {
 # @description Define an option that display only
 # @arg $1 string Description of option to display
 # @arg $@ switch|key:value Other switches and settings `key:value` of this option, including `alias:<switch>` / `aliases:<a,b>`
+# @tip Use a display option for help, schema, man-page, completion, or other actions that should exit after running.
+# @tip Define a custom help display option only when the default `--help` / `-h` behavior is not sufficient.
 # @note Use `persistent:true` to make the display option available to descendant subcommands
 # @exitcode 0 exit code
 #######################################
@@ -1662,6 +1697,8 @@ function dybatpho::opts::disp {
 # @arg $1 string Command name
 # @arg $2 string Name of function that has spec of sub-command
 # @arg $@ key:value Optional metadata such as `alias:<name>` or `aliases:<a,b>`
+# @tip Declare each subcommand with its own spec function so help, completion, schema, and man output stay consistent.
+# @tip Aliases are accepted during dispatch and are included in generated help and schema metadata.
 #######################################
 function dybatpho::opts::cmd {
   local sub_cmd sub_spec
@@ -1711,6 +1748,8 @@ function dybatpho::opts::cmd {
 
 # @section Parse functions
 # @description Functions to parse spec and put value of options to variable with corresponding name
+# @tip Generate the parser once at the end of the script after defining the complete spec tree.
+# @tip The generated parser preserves the original command-line arguments while dispatching nested subcommands.
 
 #######################################
 # @description Define spec of parent function or script, spec contains below commands
@@ -1740,6 +1779,7 @@ function dybatpho::generate_from_spec {
 # @arg $1 string Name of function that has spec of parent function or script
 # @stdout Help description
 # @tip The current subcommand path is tracked automatically during parser dispatch
+# @tip A command receives automatic `--help` and `-h` unless the spec declares its own help display option.
 #######################################
 function dybatpho::generate_help {
   local spec

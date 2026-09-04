@@ -9,11 +9,11 @@
 #   DEPLOY_ENV=production bash example/cli_ux.sh deploy --tag api --tag worker
 #
 # Generate shell integrations and reference artifacts:
-#   bash example/cli_ux.sh --completion bash > cli_ux.bash
-#   bash example/cli_ux.sh --completion zsh > _cli_ux
-#   bash example/cli_ux.sh --completion fish > cli_ux.fish
-#   bash example/cli_ux.sh --schema > cli_ux.json
-#   bash example/cli_ux.sh --man > cli_ux.1
+#   bash example/cli_ux.sh completion --shell bash > cli_ux.bash
+#   bash example/cli_ux.sh completion --shell zsh > _cli_ux
+#   bash example/cli_ux.sh completion --shell fish > cli_ux.fish
+#   bash example/cli_ux.sh schema > cli_ux.json
+#   bash example/cli_ux.sh man > cli_ux.1
 #   bash example/cli_ux.sh --help
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
@@ -30,11 +30,22 @@ function _run_deploy {
 }
 
 function _run_root {
-  if [[ -n "${COMPLETION_SHELL:-}" ]]; then
-    dybatpho::generate_completion _spec_root "${COMPLETION_SHELL}" cli_ux.sh
-  else
-    dybatpho::generate_help _spec_root
-  fi
+  dybatpho::generate_help _spec_root
+}
+
+function _run_completion {
+  dybatpho::generate_completion _spec_root "${COMPLETION_SHELL}" cli_ux.sh
+  exit 0
+}
+
+function _run_schema {
+  dybatpho::generate_schema _spec_root cli_ux.sh
+  exit 0
+}
+
+function _run_man {
+  dybatpho::generate_man _spec_root cli_ux.sh
+  exit 0
 }
 
 function _spec_deploy {
@@ -46,15 +57,26 @@ function _spec_deploy {
   dybatpho::opts::flag "Preview without applying changes" DRY_RUN --dry-run on:true off:false init:="false"
 }
 
+function _spec_completion {
+  dybatpho::opts::setup "Generate shell completion" COMPLETION_ARGS args:none action:"_run_completion"
+  dybatpho::opts::param "Completion shell (bash, zsh, or fish)" COMPLETION_SHELL \
+    --shell choices:bash,zsh,fish required:true
+}
+
+function _spec_schema {
+  dybatpho::opts::setup "Generate JSON CLI schema" SCHEMA_ARGS args:none action:"_run_schema"
+}
+
+function _spec_man {
+  dybatpho::opts::setup "Generate roff man page" MAN_ARGS args:none action:"_run_man"
+}
+
 function _spec_root {
   dybatpho::opts::setup "CLI UX demonstration" ROOT_ARGS action:"_run_root"
   dybatpho::opts::cmd deploy _spec_deploy
-  dybatpho::opts::param "Completion shell (bash, zsh, or fish)" COMPLETION_SHELL --completion \
-    choices:bash,zsh,fish
-  dybatpho::opts::disp "Generate JSON schema" --schema \
-    action:'dybatpho::generate_schema _spec_root cli_ux.sh'
-  dybatpho::opts::disp "Generate roff man page" --man \
-    action:'dybatpho::generate_man _spec_root cli_ux.sh'
+  dybatpho::opts::cmd completion _spec_completion
+  dybatpho::opts::cmd schema _spec_schema
+  dybatpho::opts::cmd man _spec_man
 }
 
 dybatpho::generate_from_spec _spec_root "$@"

@@ -381,17 +381,74 @@ This is useful when debugging:
 - help generation
 
 
+### Advanced UX example
+
+
+`example/cli_ux.sh` is a complete spec-driven CLI example:
+
+
+- `_spec_root` declares the root command plus `deploy`, `completion`, `schema`, and `man` subcommands.
+- `_spec_deploy` demonstrates `env:`, `choices:`, `prompt:`, `multiple:`, and boolean toggles.
+- `_spec_completion`, `_spec_schema`, and `_spec_man` define the artifact subcommands.
+- `_run_root`, `_run_completion`, `_run_schema`, and `_run_man` implement their actions.
+- `_run_deploy` consumes the parsed values and performs the deploy action.
+
+
+Run it with:
+
+
+```bash
+bash example/cli_ux.sh deploy
+bash example/cli_ux.sh completion --shell bash
+bash example/cli_ux.sh schema
+bash example/cli_ux.sh man
+```
+
+
 
 <a id="see-also"></a>
 ## 🔗 See also
 
 - [example/cli_basic.sh](../example/cli_basic.sh)
 - [example/cli_advanced.sh](../example/cli_advanced.sh)
+- [example/cli_ux.sh](../example/cli_ux.sh)
 
 <a id="tips"></a>
 ## 💡 Tips
 
 - Set `DYBATPHO_CLI_DEBUG=true` while developing a spec to inspect the generated parser and help logic.
+
+### `dybatpho::prompt`
+
+- The prompt is written to stderr so the returned value remains clean on stdout.
+
+### `dybatpho::select`
+
+- Pass `true` for the third argument to accept comma-separated values and numeric ranges such as `1-3`.
+- Invalid or out-of-range selections are rejected and prompt again.
+
+### `dybatpho::generate_schema`
+
+- Use the schema to drive external validation, form generation, tooling, or documentation from the same source of truth.
+
+### `dybatpho::generate_man`
+
+- Generate the page from the root spec to include the complete nested command tree.
+
+### `dybatpho::generate_completion`
+
+- Keep completion generation in a display option declared inside the spec when the CLI should complete itself.
+- Generate completion from the root spec so subcommand options and aliases are included.
+
+### `dybatpho::opts::setup`
+
+- Call `setup` before declaring any flags, params, display options, or subcommands.
+- Keep the action focused on command behavior; validation and lifecycle hooks are applied by the generated parser.
+
+### `dybatpho::opts::flag`
+
+- Use `on:` and `off:` with a paired `--{no-}name` switch to model boolean toggles.
+- Use `persistent:true` for options that must be accepted by every descendant command.
 
 ### `dybatpho::opts::param`
 
@@ -399,10 +456,28 @@ This is useful when debugging:
 - Use `optional:true` when the option may appear without an explicit value
 - `optional:true` controls whether a value is required after the switch appears, while `required:true` controls whether the switch itself must appear at all
 - Keep conditional requirements such as "required unless `--list` is set" in your action or validation logic
+- Use `env:NAME` for an environment fallback; an explicit command-line value always takes precedence.
+- Combine `prompt:` with `choices:` to interactively request a missing value from a constrained set.
+
+### `dybatpho::opts::disp`
+
+- Use a display option for help, schema, man-page, completion, or other actions that should exit after running.
+- Define a custom help display option only when the default `--help` / `-h` behavior is not sufficient.
+
+### `dybatpho::opts::cmd`
+
+- Declare each subcommand with its own spec function so help, completion, schema, and man output stay consistent.
+- Aliases are accepted during dispatch and are included in generated help and schema metadata.
+
+### `dybatpho::generate_from_spec`
+
+- Generate the parser once at the end of the script after defining the complete spec tree.
+- The generated parser preserves the original command-line arguments while dispatching nested subcommands.
 
 ### `dybatpho::generate_help`
 
 - The current subcommand path is tracked automatically during parser dispatch
+- A command receives automatic `--help` and `-h` unless the spec declares its own help display option.
 
 <a id="reference"></a>
 ## 📚 Reference

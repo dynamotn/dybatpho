@@ -24,11 +24,13 @@ export DRY_RUN
 # @exitcode $2 Exit the current shell with the requested code
 #######################################
 function dybatpho::die {
+  # kcov(disabled) - always terminates the shell, so it only runs in subshells
   local message exit_code
   dybatpho::expect_args message -- "$@"
   exit_code=${2:-1}
   dybatpho::fatal "${message}" 1
   exit "${exit_code}"
+  # kcov(enabled)
 }
 
 #######################################
@@ -70,6 +72,7 @@ function dybatpho::register_common_handlers {
 # @arg $1 number Exit code of last command
 #######################################
 function dybatpho::run_err_handler {
+  # kcov(disabled) - always terminates the shell, so it only runs in subshells
   local exit_code
   dybatpho::expect_args exit_code -- "$@"
   local i=0
@@ -78,6 +81,7 @@ function dybatpho::run_err_handler {
     ((i++))
   done
   exit "${exit_code}"
+  # kcov(enabled)
 }
 
 #######################################
@@ -85,6 +89,7 @@ function dybatpho::run_err_handler {
 # @arg $1 string Signal
 #######################################
 function dybatpho::killed_process_handler {
+  # kcov(disabled) - always terminates the shell, so it only runs in subshells
   local signal
   dybatpho::expect_args signal -- "$@"
 
@@ -102,6 +107,7 @@ function dybatpho::killed_process_handler {
       exit 1
       ;;
   esac
+  # kcov(enabled)
 }
 
 #######################################
@@ -162,7 +168,7 @@ function dybatpho::cleanup_file_on_exit {
   if [[ "${running_under_bats_test}" == true ]]; then
     trap "${cleanup_command}" EXIT HUP INT TERM
   else
-    dybatpho::trap "${cleanup_command}" EXIT HUP INT TERM
+    dybatpho::trap "${cleanup_command}" EXIT HUP INT TERM # kcov(skip) - tests always run under bats
   fi
 }
 

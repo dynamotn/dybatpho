@@ -138,14 +138,9 @@ function dybatpho::notify_telegram {
   if [[ -n "${parse_mode}" ]]; then
     local escaped_parse_mode
     escaped_parse_mode=$(__notification_json_escape "${parse_mode}")
-    payload=$(printf '{"chat_id":"%s","text":"%s","parse_mode":"%s"}' \
-      "${escaped_chat_id}" \
-      "${escaped_message}" \
-      "${escaped_parse_mode}")
+    printf -v payload '{"chat_id":"%s","text":"%s","parse_mode":"%s"}' "${escaped_chat_id}" "${escaped_message}" "${escaped_parse_mode}"
   else
-    payload=$(printf '{"chat_id":"%s","text":"%s"}' \
-      "${escaped_chat_id}" \
-      "${escaped_message}")
+    printf -v payload '{"chat_id":"%s","text":"%s"}' "${escaped_chat_id}" "${escaped_message}"
   fi
 
   dybatpho::debug "Sending Telegram notification"
@@ -184,18 +179,14 @@ function dybatpho::notify_teams {
   if [[ -n "${title}" ]]; then
     local escaped_title
     escaped_title=$(__notification_json_escape "${title}")
-    body_blocks=$(printf '[{"type":"TextBlock","text":"%s","weight":"bolder","size":"medium"},{"type":"TextBlock","text":"%s","wrap":true}]' \
-      "${escaped_title}" \
-      "${escaped_message}")
+    printf -v body_blocks '[{"type":"TextBlock","text":"%s","weight":"bolder","size":"medium"},{"type":"TextBlock","text":"%s","wrap":true}]' "${escaped_title}" "${escaped_message}"
   else
-    body_blocks=$(printf '[{"type":"TextBlock","text":"%s","wrap":true}]' \
-      "${escaped_message}")
+    printf -v body_blocks '[{"type":"TextBlock","text":"%s","wrap":true}]' "${escaped_message}"
   fi
 
   local payload
   # shellcheck disable=SC2016
-  payload=$(printf '{"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","content":{"$schema":"http://adaptivecards.io/schemas/adaptive-card.json","type":"AdaptiveCard","version":"1.2","body":%s}}]}' \
-    "${body_blocks}")
+  printf -v payload '{"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","content":{"$schema":"http://adaptivecards.io/schemas/adaptive-card.json","type":"AdaptiveCard","version":"1.2","body":%s}}]}' "${body_blocks}"
 
   dybatpho::debug "Sending Teams notification"
   dybatpho::curl_json "${DYBATPHO_TEAMS_WEBHOOK_URL}" /dev/null \
@@ -260,11 +251,9 @@ function dybatpho::notify_discord {
   if [[ -n "${username}" ]]; then
     local escaped_username
     escaped_username=$(__notification_json_escape "${username}")
-    payload=$(printf '{"content":"%s","username":"%s"}' \
-      "${escaped_message}" \
-      "${escaped_username}")
+    printf -v payload '{"content":"%s","username":"%s"}' "${escaped_message}" "${escaped_username}"
   else
-    payload=$(printf '{"content":"%s"}' "${escaped_message}")
+    printf -v payload '{"content":"%s"}' "${escaped_message}"
   fi
 
   dybatpho::debug "Sending Discord notification"

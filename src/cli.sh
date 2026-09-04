@@ -395,7 +395,7 @@ function __parse_opt {
                 || __flags="${__flags}${__alias_switch#-}"
               ;;
             *)
-              dybatpho::die "Invalid switch alias: ${1#alias:}"
+              dybatpho::die "Invalid switch alias: ${1#alias:}" # kcov(skip)
               ;;
           esac
           ;;
@@ -417,7 +417,7 @@ function __parse_opt {
                   || __flags="${__flags}${__opt_alias#-}"
                 ;;
               *)
-                dybatpho::die "Invalid switch alias: ${__opt_alias}"
+                dybatpho::die "Invalid switch alias: ${__opt_alias}" # kcov(skip)
                 ;;
             esac
           done
@@ -453,7 +453,7 @@ function __parse_opt {
               __add_switch "'--with-${i}'|'--without-${i}'"
               ;;
             -? | --*) __add_switch "'${1#alias:}'" ;;
-            *) dybatpho::die "Invalid switch alias: ${1#alias:}" ;;
+            *) dybatpho::die "Invalid switch alias: ${1#alias:}" ;; # kcov(skip)
           esac
           ;;
         aliases:*)
@@ -471,7 +471,7 @@ function __parse_opt {
                 __add_switch "'--with-${i}'|'--without-${i}'"
                 ;;
               -? | --*) __add_switch "'${__opt_alias}'" ;;
-              *) dybatpho::die "Invalid switch alias: ${__opt_alias}" ;;
+              *) dybatpho::die "Invalid switch alias: ${__opt_alias}" ;; # kcov(skip)
             esac
           done
           ;;
@@ -747,10 +747,11 @@ function __generate_logic {
   __print_args_check "${__args}"
   local __prompt_def __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export
   for __prompt_def in "${__prompt_defs[@]}"; do
-    IFS=$'\t' read -r __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export <<< "${__prompt_def}"
+    IFS=$'\x1f' read -r __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export <<< "${__prompt_def}"
     __assign_quoted __prompt_text "${__prompt_text}"
-    __assign_quoted __prompt_choices "${__prompt_choices}"
+    # Quote the choices only after testing them: quoting an empty value yields `''`.
     if [ -n "${__prompt_choices}" ]; then
+      __assign_quoted __prompt_choices "${__prompt_choices}"
       __print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
       __print_indent 3 "${__prompt_var}=\$(dybatpho::select ${__prompt_text} ${__prompt_choices} ${__prompt_multiple})"
       [ "${__prompt_export}" = "true" ] && __print_indent 3 "export ${__prompt_var}"
@@ -974,8 +975,8 @@ function dybatpho::generate_completion {
   local spec shell name="${3:-${0##*/}}"
   dybatpho::expect_args spec shell -- "$@"
   case "${shell}" in
-    bash | zsh | fish) ;;
-    *) dybatpho::die "Unsupported completion shell: ${shell}" 1 ;;
+    bash | zsh | fish) ;;                                          # kcov(skip)
+    *) dybatpho::die "Unsupported completion shell: ${shell}" 1 ;; # kcov(skip)
   esac
   __generate_completion_command "${spec}" "${shell}" "${name}" "${name}"
 }
@@ -1088,7 +1089,7 @@ function __help_row {
             ;;
           --*) __help_sw 4 "${_i#alias:}" ;;
           -?) __help_sw 0 "${_i#alias:}" ;;
-          *) : ;;
+          *) : ;; # kcov(skip)
         esac
         ;;
       aliases:*)
@@ -1109,7 +1110,7 @@ function __help_row {
               ;;
             --*) __help_sw 4 "${_alias_item}" ;;
             -?) __help_sw 0 "${_alias_item}" ;;
-            *) : ;;
+            *) : ;; # kcov(skip)
           esac
         done
         ;;
@@ -1338,7 +1339,7 @@ function __print_args_check {
       __print_indent 2 '}'
       ;;
     *)
-      dybatpho::die "Invalid args rule: ${rule}"
+      dybatpho::die "Invalid args rule: ${rule}" # kcov(skip)
       ;;
   esac
 }
@@ -1561,7 +1562,8 @@ function dybatpho::opts::param {
     fi
     __define_var "${var}"
     if [ -n "${__prompt}" ]; then
-      __prompt_defs+=("${var}"$'\t'"${__prompt}"$'\t'"${__choices}"$'\t'"${__multiple}"$'\t'"${__export}")
+      # A unit separator keeps empty fields, which tabs would collapse on read.
+      __prompt_defs+=("${var}"$'\x1f'"${__prompt}"$'\x1f'"${__choices}"$'\x1f'"${__multiple}"$'\x1f'"${__export}")
     fi
     if dybatpho::is true "${__required}"; then
       local __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"

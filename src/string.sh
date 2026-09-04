@@ -17,9 +17,10 @@
 #######################################
 # shellcheck disable=SC2317
 function dybatpho::trim {
-  : "${1#"${1%%[![:space:]]*}"}"
-  : "${_%"${_##*[![:space:]]}"}"
-  printf '%s\n' "${_}"
+  local value="${1-}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s\n' "${value}"
 }
 
 #######################################
@@ -310,9 +311,6 @@ function dybatpho::string_pad {
     printf '%s\n' "${padded}"
     return 0
   fi
-  if [[ -z "${pad_token}" ]]; then
-    pad_token=' '
-  fi
   while [ "${#padded}" -lt "${width}" ]; do
     padded="${padded}${pad_token}"
   done
@@ -326,16 +324,16 @@ function dybatpho::string_pad {
 #######################################
 function dybatpho::url_encode {
   local LC_ALL=C
-  local i
+  local i character
   for ((i = 0; i < ${#1}; i++)); do
-    : "${1:i:1}"
-    case "${_}" in
+    character="${1:i:1}"
+    case "${character}" in
       [a-zA-Z0-9.~_-])
-        printf '%s' "${_}"
+        printf '%s' "${character}"
         ;;
 
       *)
-        printf '%%%02X' "'${_}"
+        printf '%%%02X' "'${character}"
         ;;
     esac
   done
@@ -348,8 +346,8 @@ function dybatpho::url_encode {
 # @stdout Decoded string
 #######################################
 function dybatpho::url_decode {
-  : "${1//+/ }"
-  printf '%b\n' "${_//%/\\x}"
+  local value="${1//+/ }"
+  printf '%b\n' "${value//%/\\x}"
 }
 
 #######################################

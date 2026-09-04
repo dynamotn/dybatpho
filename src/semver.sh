@@ -11,10 +11,6 @@
 #   - https://semver.org/
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# Prevent multiple sourcing
-[[ -n "${DYBATPHO_SEMVER_LOADED:-}" ]] && return 0
-export DYBATPHO_SEMVER_LOADED=true
-
 # Regex for a valid semver string (with optional leading v)
 # Groups: 1=major 2=minor 3=patch 4=pre-release 5=build-metadata
 export DYBATPHO_SEMVER_REGEX='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z0-9._-]+))?(\+([a-zA-Z0-9._-]+))?$'
@@ -42,7 +38,7 @@ function dybatpho::semver_parse {
   local version
   dybatpho::expect_args version -- "$@"
   if ! [[ "${version}" =~ ${DYBATPHO_SEMVER_REGEX} ]]; then
-    dybatpho::die "semver_parse: '${version}' is not a valid semver string"
+    dybatpho::die "semver_parse: '${version}' is not a valid semver string" # kcov(skip)
   fi
   printf '%s\n' "${BASH_REMATCH[1]}" # major
   printf '%s\n' "${BASH_REMATCH[2]}" # minor

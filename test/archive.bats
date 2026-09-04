@@ -9,11 +9,8 @@ setup() {
   mkdir -p "${source_dir}"
 
   stub tar ": echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_create "${source_dir}" "${archive_path}"
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "-C ${BATS_TEST_TMPDIR} -czf ${archive_path} bundle"
+  dybatpho::archive_create "${source_dir}" "${archive_path}"
+  assert_equal "$(cat "${args_file}")" "-C ${BATS_TEST_TMPDIR} -czf ${archive_path} bundle"
   unstub tar
 }
 
@@ -26,17 +23,11 @@ setup() {
     ": echo \"\$*\" > ${args_file}" \
     ": echo \"\$*\" > ${args_file}"
 
-  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar.xz"
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "-C ${BATS_TEST_TMPDIR} -cJf ${BATS_TEST_TMPDIR}/bundle.tar.xz bundle"
+  dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar.xz"
+  assert_equal "$(cat "${args_file}")" "-C ${BATS_TEST_TMPDIR} -cJf ${BATS_TEST_TMPDIR}/bundle.tar.xz bundle"
 
-  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar.zst"
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "--zstd -C ${BATS_TEST_TMPDIR} -cf ${BATS_TEST_TMPDIR}/bundle.tar.zst bundle"
+  dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar.zst"
+  assert_equal "$(cat "${args_file}")" "--zstd -C ${BATS_TEST_TMPDIR} -cf ${BATS_TEST_TMPDIR}/bundle.tar.zst bundle"
   unstub tar
 }
 
@@ -49,47 +40,27 @@ setup() {
   local zst_args="${BATS_TEST_TMPDIR}/zst-args"
 
   stub xz ": echo \"\$*\" > ${xz_args}; printf 'xz-data'"
-  run dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.xz"
-  assert_success
-  run cat "${BATS_TEST_TMPDIR}/bundle.txt.xz"
-  assert_success
-  assert_output "xz-data"
-  run cat "${xz_args}"
-  assert_success
-  assert_output "-c ${source_file}"
+  dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.xz"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.xz")" "xz-data"
+  assert_equal "$(cat "${xz_args}")" "-c ${source_file}"
   unstub xz
 
   stub gzip ": echo \"\$*\" > ${gz_args}; printf 'gz-data'"
-  run dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.gz"
-  assert_success
-  run cat "${BATS_TEST_TMPDIR}/bundle.txt.gz"
-  assert_success
-  assert_output "gz-data"
-  run cat "${gz_args}"
-  assert_success
-  assert_output "-c ${source_file}"
+  dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.gz"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.gz")" "gz-data"
+  assert_equal "$(cat "${gz_args}")" "-c ${source_file}"
   unstub gzip
 
   stub bzip2 ": echo \"\$*\" > ${bz2_args}; printf 'bz2-data'"
-  run dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.bz2"
-  assert_success
-  run cat "${BATS_TEST_TMPDIR}/bundle.txt.bz2"
-  assert_success
-  assert_output "bz2-data"
-  run cat "${bz2_args}"
-  assert_success
-  assert_output "-c ${source_file}"
+  dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.bz2"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.bz2")" "bz2-data"
+  assert_equal "$(cat "${bz2_args}")" "-c ${source_file}"
   unstub bzip2
 
   stub zstd ": echo \"\$*\" > ${zst_args}; printf 'zst-data'"
-  run dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.zst"
-  assert_success
-  run cat "${BATS_TEST_TMPDIR}/bundle.txt.zst"
-  assert_success
-  assert_output "zst-data"
-  run cat "${zst_args}"
-  assert_success
-  assert_output "-q -c ${source_file}"
+  dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.zst"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.zst")" "zst-data"
+  assert_equal "$(cat "${zst_args}")" "-q -c ${source_file}"
   unstub zstd
 }
 
@@ -101,14 +72,9 @@ setup() {
   mkdir -p "${source_dir}"
 
   stub zip ": pwd > ${pwd_file}; echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_create "${source_dir}" "${archive_path}"
-  assert_success
-  run cat "${pwd_file}"
-  assert_success
-  assert_output "${BATS_TEST_TMPDIR}"
-  run cat "${args_file}"
-  assert_success
-  assert_output "-rq ${archive_path} bundle"
+  dybatpho::archive_create "${source_dir}" "${archive_path}"
+  assert_equal "$(cat "${pwd_file}")" "${BATS_TEST_TMPDIR}"
+  assert_equal "$(cat "${args_file}")" "-rq ${archive_path} bundle"
   unstub zip
 }
 
@@ -117,11 +83,8 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/zip-relative-args"
   mkdir -p "${source_dir}"
   stub zip ": echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_create "${source_dir}" "bundle.zip"
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "-rq $(pwd)/bundle.zip bundle"
+  dybatpho::archive_create "${source_dir}" "bundle.zip"
+  assert_equal "$(cat "${args_file}")" "-rq $(pwd)/bundle.zip bundle"
   unstub zip
 }
 
@@ -132,12 +95,9 @@ setup() {
   : > "${archive_path}"
 
   stub tar ": echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_extract "${archive_path}" "${destination}"
-  assert_success
+  dybatpho::archive_extract "${archive_path}" "${destination}"
   [ -d "${destination}" ]
-  run cat "${args_file}"
-  assert_success
-  assert_output "-xzf ${archive_path} -C ${destination}"
+  assert_equal "$(cat "${args_file}")" "-xzf ${archive_path} -C ${destination}"
   unstub tar
 }
 
@@ -148,11 +108,8 @@ setup() {
   : > "${archive_path}"
 
   stub tar ": echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_extract "${archive_path}" "${destination}" 1
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "-xJf ${archive_path} -C ${destination} --strip-components 1"
+  dybatpho::archive_extract "${archive_path}" "${destination}" 1
+  assert_equal "$(cat "${args_file}")" "-xJf ${archive_path} -C ${destination} --strip-components 1"
   unstub tar
 }
 
@@ -163,12 +120,9 @@ setup() {
   : > "${archive_path}"
 
   stub unzip ": echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_extract "${archive_path}" "${destination}"
-  assert_success
+  dybatpho::archive_extract "${archive_path}" "${destination}"
   [ -d "${destination}" ]
-  run cat "${args_file}"
-  assert_success
-  assert_output "-q ${archive_path} -d ${destination}"
+  assert_equal "$(cat "${args_file}")" "-q ${archive_path} -d ${destination}"
   unstub unzip
 }
 
@@ -178,12 +132,9 @@ setup() {
   : > "${archive_path}"
 
   stub unzip ": mkdir -p \"\$4/bundle/nested\"; printf 'hello\n' > \"\$4/bundle/nested/file.txt\""
-  run dybatpho::archive_extract "${archive_path}" "${destination}" 1
-  assert_success
+  dybatpho::archive_extract "${archive_path}" "${destination}" 1
   [ -f "${destination}/nested/file.txt" ]
-  run cat "${destination}/nested/file.txt"
-  assert_success
-  assert_output "hello"
+  assert_equal "$(cat "${destination}/nested/file.txt")" "hello"
   unstub unzip
 }
 
@@ -197,27 +148,18 @@ setup() {
   : > "${bz2_archive}"
 
   stub xz ": printf 'hello-xz\n'"
-  run dybatpho::archive_extract "${xz_archive}" "${destination}"
-  assert_success
-  run cat "${destination}/bundle.txt"
-  assert_success
-  assert_output "hello-xz"
+  dybatpho::archive_extract "${xz_archive}" "${destination}"
+  assert_equal "$(cat "${destination}/bundle.txt")" "hello-xz"
   unstub xz
 
   stub gzip ": printf 'hello-gz\n'"
-  run dybatpho::archive_extract "${gz_archive}" "${destination}"
-  assert_success
-  run cat "${destination}/bundle.txt"
-  assert_success
-  assert_output "hello-gz"
+  dybatpho::archive_extract "${gz_archive}" "${destination}"
+  assert_equal "$(cat "${destination}/bundle.txt")" "hello-gz"
   unstub gzip
 
   stub bzip2 ": printf 'hello-bz2\n'"
-  run dybatpho::archive_extract "${bz2_archive}" "${destination}"
-  assert_success
-  run cat "${destination}/bundle.txt"
-  assert_success
-  assert_output "hello-bz2"
+  dybatpho::archive_extract "${bz2_archive}" "${destination}"
+  assert_equal "$(cat "${destination}/bundle.txt")" "hello-bz2"
   unstub bzip2
 }
 
@@ -234,37 +176,21 @@ setup() {
   stub tar \
     ": echo \"\$*\" > ${tar_args_file}; printf 'bundle/file.txt\n'" \
     ": echo \"\$*\" > ${tar_args_file}; printf 'bundle/file.txt\n'"
-  run dybatpho::archive_list "${tar_archive}"
-  assert_success
-  assert_output "bundle/file.txt"
-  run cat "${tar_args_file}"
-  assert_success
-  assert_output "-tf ${tar_archive}"
+  assert_equal "$(dybatpho::archive_list "${tar_archive}")" "bundle/file.txt"
+  assert_equal "$(cat "${tar_args_file}")" "-tf ${tar_archive}"
 
-  run dybatpho::archive_list "${tar_zst_archive}"
-  assert_success
-  assert_output "bundle/file.txt"
-  run cat "${tar_args_file}"
-  assert_success
-  assert_output "--zstd -tf ${tar_zst_archive}"
+  assert_equal "$(dybatpho::archive_list "${tar_zst_archive}")" "bundle/file.txt"
+  assert_equal "$(cat "${tar_args_file}")" "--zstd -tf ${tar_zst_archive}"
   unstub tar
 
   stub unzip ": echo \"\$*\" > ${unzip_args_file}; printf 'bundle/file.txt\n'"
-  run dybatpho::archive_list "${zip_archive}"
-  assert_success
-  assert_output "bundle/file.txt"
-  run cat "${unzip_args_file}"
-  assert_success
-  assert_output "-Z1 ${zip_archive}"
+  assert_equal "$(dybatpho::archive_list "${zip_archive}")" "bundle/file.txt"
+  assert_equal "$(cat "${unzip_args_file}")" "-Z1 ${zip_archive}"
   unstub unzip
 
-  run dybatpho::archive_list "${BATS_TEST_TMPDIR}/bundle.txt.xz"
-  assert_success
-  assert_output "bundle.txt"
+  assert_equal "$(dybatpho::archive_list "${BATS_TEST_TMPDIR}/bundle.txt.xz")" "bundle.txt"
 
-  run dybatpho::archive_list "${BATS_TEST_TMPDIR}/bundle.txt.gz"
-  assert_success
-  assert_output "bundle.txt"
+  assert_equal "$(dybatpho::archive_list "${BATS_TEST_TMPDIR}/bundle.txt.gz")" "bundle.txt"
 }
 
 @test "dybatpho::archive_extract rejects strip-components for single-file archives" {
@@ -293,9 +219,7 @@ setup() {
       tbz2 | tbz) expected=tar.bz2 ;;
       *) expected="${suffix}" ;;
     esac
-    run __dybatpho_archive_format "archive.${suffix}"
-    assert_success
-    assert_output "${expected}"
+    assert_equal "$(__dybatpho_archive_format "archive.${suffix}")" "${expected}"
   done
 
   run __dybatpho_archive_format "archive.rar"
@@ -304,25 +228,15 @@ setup() {
 }
 
 @test "__dybatpho_archive_output_name strips single-file compression suffixes" {
-  run __dybatpho_archive_output_name "/var/lib/archive.txt.xz"
-  assert_success
-  assert_output "archive.txt"
+  assert_equal "$(__dybatpho_archive_output_name "/var/lib/archive.txt.xz")" "archive.txt"
 
-  run __dybatpho_archive_output_name "/var/lib/archive.txt.gz"
-  assert_success
-  assert_output "archive.txt"
+  assert_equal "$(__dybatpho_archive_output_name "/var/lib/archive.txt.gz")" "archive.txt"
 
-  run __dybatpho_archive_output_name "/var/lib/archive.txt.bz2"
-  assert_success
-  assert_output "archive.txt"
+  assert_equal "$(__dybatpho_archive_output_name "/var/lib/archive.txt.bz2")" "archive.txt"
 
-  run __dybatpho_archive_output_name "/var/lib/archive.txt.zst"
-  assert_success
-  assert_output "archive.txt"
+  assert_equal "$(__dybatpho_archive_output_name "/var/lib/archive.txt.zst")" "archive.txt"
 
-  run __dybatpho_archive_output_name "/var/lib/archive.tar"
-  assert_success
-  assert_output "archive.tar"
+  assert_equal "$(__dybatpho_archive_output_name "/var/lib/archive.tar")" "archive.tar"
 }
 
 @test "dybatpho::archive_create supports plain tar and tar.bz2" {
@@ -333,15 +247,11 @@ setup() {
     ": echo \"\$*\" > ${args_file}" \
     ": echo \"\$*\" > ${args_file}"
 
-  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar"
-  assert_success
-  run cat "${args_file}"
-  assert_output "-C ${BATS_TEST_TMPDIR} -cf ${BATS_TEST_TMPDIR}/bundle.tar bundle"
+  dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tar"
+  assert_equal "$(cat "${args_file}")" "-C ${BATS_TEST_TMPDIR} -cf ${BATS_TEST_TMPDIR}/bundle.tar bundle"
 
-  run dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tbz"
-  assert_success
-  run cat "${args_file}"
-  assert_output "-C ${BATS_TEST_TMPDIR} -cjf ${BATS_TEST_TMPDIR}/bundle.tbz bundle"
+  dybatpho::archive_create "${source_dir}" "${BATS_TEST_TMPDIR}/bundle.tbz"
+  assert_equal "$(cat "${args_file}")" "-C ${BATS_TEST_TMPDIR} -cjf ${BATS_TEST_TMPDIR}/bundle.tbz bundle"
   unstub tar
 }
 
@@ -365,19 +275,13 @@ setup() {
     ": echo \"\$*\" > ${args_file}; printf 'bundle/file\n'" \
     ": echo \"\$*\" > ${args_file}; printf 'bundle/file\n'"
 
-  run dybatpho::archive_extract "${tar_archive}" "${destination}"
-  assert_success
-  run cat "${args_file}"
-  assert_output "-xjf ${tar_archive} -C ${destination}"
+  dybatpho::archive_extract "${tar_archive}" "${destination}"
+  assert_equal "$(cat "${args_file}")" "-xjf ${tar_archive} -C ${destination}"
 
-  run dybatpho::archive_extract "${plain_archive}" "${destination}" 2
-  assert_success
-  run cat "${args_file}"
-  assert_output "-xf ${plain_archive} -C ${destination} --strip-components 2"
+  dybatpho::archive_extract "${plain_archive}" "${destination}" 2
+  assert_equal "$(cat "${args_file}")" "-xf ${plain_archive} -C ${destination} --strip-components 2"
 
-  run dybatpho::archive_list "${plain_archive}"
-  assert_success
-  assert_output "bundle/file"
+  assert_equal "$(dybatpho::archive_list "${plain_archive}")" "bundle/file"
   unstub tar
 }
 
@@ -391,9 +295,50 @@ setup() {
   assert_output --partial "strip-components must be a non-negative integer"
 
   stub tar ": echo \"\$*\" > ${args_file}"
-  run dybatpho::archive_extract "${archive_path}" "${BATS_TEST_TMPDIR}/out"
-  assert_success
-  run cat "${args_file}"
-  assert_output "--zstd -xf ${archive_path} -C ${BATS_TEST_TMPDIR}/out"
+  dybatpho::archive_extract "${archive_path}" "${BATS_TEST_TMPDIR}/out"
+  assert_equal "$(cat "${args_file}")" "--zstd -xf ${archive_path} -C ${BATS_TEST_TMPDIR}/out"
   unstub tar
+}
+
+@test "dybatpho::archive_list supports compressed tar variants" {
+  local args_file="${BATS_TEST_TMPDIR}/tar-variant-args"
+  local gz_archive="${BATS_TEST_TMPDIR}/bundle.tar.gz"
+  local xz_archive="${BATS_TEST_TMPDIR}/bundle.tar.xz"
+  local bz2_archive="${BATS_TEST_TMPDIR}/bundle.tar.bz2"
+  : > "${gz_archive}"
+  : > "${xz_archive}"
+  : > "${bz2_archive}"
+
+  stub_repeated tar ": echo \"\$*\" > ${args_file}; printf 'bundle/file.txt\n'"
+
+  assert_equal "$(dybatpho::archive_list "${gz_archive}")" "bundle/file.txt"
+  assert_equal "$(cat "${args_file}")" "-tzf ${gz_archive}"
+
+  assert_equal "$(dybatpho::archive_list "${xz_archive}")" "bundle/file.txt"
+  assert_equal "$(cat "${args_file}")" "-tJf ${xz_archive}"
+
+  assert_equal "$(dybatpho::archive_list "${bz2_archive}")" "bundle/file.txt"
+  assert_equal "$(cat "${args_file}")" "-tjf ${bz2_archive}"
+}
+
+@test "dybatpho::archive_extract supports tar.zst and zst archives" {
+  local tar_args="${BATS_TEST_TMPDIR}/tar-zst-extract-args"
+  local zstd_args="${BATS_TEST_TMPDIR}/zstd-extract-args"
+  local destination="${BATS_TEST_TMPDIR}/out"
+  local tar_zst_archive="${BATS_TEST_TMPDIR}/bundle.tar.zst"
+  local zst_archive="${BATS_TEST_TMPDIR}/bundle.txt.zst"
+  mkdir -p "${destination}"
+  : > "${tar_zst_archive}"
+  : > "${zst_archive}"
+
+  stub tar ": echo \"\$*\" > ${tar_args}"
+  dybatpho::archive_extract "${tar_zst_archive}" "${destination}"
+  assert_equal "$(cat "${tar_args}")" "--zstd -xf ${tar_zst_archive} -C ${destination}"
+  unstub tar
+
+  stub zstd ": echo \"\$*\" > ${zstd_args}; printf 'plain-data'"
+  dybatpho::archive_extract "${zst_archive}" "${destination}"
+  assert_equal "$(cat "${zstd_args}")" "-d -q -c ${zst_archive}"
+  assert_equal "$(cat "${destination}/bundle.txt")" "plain-data"
+  unstub zstd
 }

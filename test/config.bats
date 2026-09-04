@@ -9,26 +9,20 @@ setup() {
   printf 'PORT=443\nMESSAGE="hello world"\n' > "${local_config}"
 
   dybatpho::config_load "${base}" "${local_config}"
-  run dybatpho::config_get HOST
-  assert_output "example.test"
-  run dybatpho::config_get PORT
-  assert_output "443"
-  run dybatpho::config_get MESSAGE
-  assert_output "hello world"
+  assert_equal "$(dybatpho::config_get HOST)" "example.test"
+  assert_equal "$(dybatpho::config_get PORT)" "443"
+  assert_equal "$(dybatpho::config_get MESSAGE)" "hello world"
 }
 
 @test "config_env applies prefixed environment variables" {
   export APP_HOST="env.test"
   dybatpho::config_env APP_
-  run dybatpho::config_get HOST
-  assert_output "env.test"
+  assert_equal "$(dybatpho::config_get HOST)" "env.test"
   unset APP_HOST
 }
 
 @test "config_get supports defaults and config_export exports values" {
-  run dybatpho::config_get MISSING fallback
-  assert_success
-  assert_output "fallback"
+  assert_equal "$(dybatpho::config_get MISSING fallback)" "fallback"
 
   __dybatpho_config_set EXPORTED "value"
   dybatpho::config_export
@@ -58,14 +52,10 @@ setup() {
 
   DYBATPHO_CONFIG=()
   dybatpho::config_load "${config}"
-  run dybatpho::config_get PLAIN
-  assert_output "value"
-  run dybatpho::config_get DOUBLE
-  assert_output $'line\nvalue'
-  run dybatpho::config_get SINGLE
-  assert_output 'literal # value'
-  run dybatpho::config_get SPACED
-  assert_output "trimmed"
+  assert_equal "$(dybatpho::config_get PLAIN)" "value"
+  assert_equal "$(dybatpho::config_get DOUBLE)" $'line\nvalue'
+  assert_equal "$(dybatpho::config_get SINGLE)" 'literal # value'
+  assert_equal "$(dybatpho::config_get SPACED)" "trimmed"
 }
 
 @test "config_load supports JSON and YAML files with precedence" {
@@ -78,12 +68,9 @@ setup() {
 
   DYBATPHO_CONFIG=()
   dybatpho::config_load "${json_file}" "${yaml_file}"
-  run dybatpho::config_get PORT
-  assert_output "8080"
-  run dybatpho::config_get SHARED
-  assert_output "from-yaml"
-  run dybatpho::config_get HOST
-  assert_output "localhost"
+  assert_equal "$(dybatpho::config_get PORT)" "8080"
+  assert_equal "$(dybatpho::config_get SHARED)" "from-yaml"
+  assert_equal "$(dybatpho::config_get HOST)" "localhost"
   unstub jq
   unstub yq
 }
@@ -114,8 +101,9 @@ setup() {
 
 @test "config_get and config_require validate keys and missing values" {
   DYBATPHO_CONFIG=()
-  run dybatpho::config_get MISSING
-  assert_failure
+  run ! dybatpho::config_get MISSING
+  __dybatpho_config_set PRESENT "yes"
+  dybatpho::config_require PRESENT
 
   run --separate-stderr dybatpho::config_get "bad key"
   assert_failure
@@ -123,13 +111,10 @@ setup() {
 
   run dybatpho::config_require
   assert_failure
+
   run --separate-stderr dybatpho::config_require MISSING
   assert_failure
   assert_stderr --partial "Required configuration is missing"
-
-  __dybatpho_config_set PRESENT "yes"
-  run dybatpho::config_require PRESENT
-  assert_success
 }
 
 @test "config_env applies only matching prefixed variables" {
@@ -137,9 +122,7 @@ setup() {
   export UNRELATED_CONFIG_ENV_TEST="ignored"
   DYBATPHO_CONFIG=()
   dybatpho::config_env DYBATPHO_CONFIG_
-  run dybatpho::config_get ENV_TEST
-  assert_success
-  assert_output "loaded"
+  assert_equal "$(dybatpho::config_get ENV_TEST)" "loaded"
   run dybatpho::config_get UNRELATED_CONFIG_ENV_TEST
   assert_failure
   unset DYBATPHO_CONFIG_ENV_TEST UNRELATED_CONFIG_ENV_TEST
@@ -151,9 +134,7 @@ setup() {
   set +u
   dybatpho::config_env
   set -u
-  run dybatpho::config_get DYBATPHO_CONFIG_UNPREFIXED
-  assert_success
-  assert_output "loaded"
+  assert_equal "$(dybatpho::config_get DYBATPHO_CONFIG_UNPREFIXED)" "loaded"
   unset DYBATPHO_CONFIG_UNPREFIXED
 }
 
@@ -189,9 +170,11 @@ setup() {
   __dybatpho_config_set HOST "https://example.test"
   __dybatpho_config_set MODE prod
   __dybatpho_config_set DEBUG true
+  # An optional key without a default is skipped instead of failing.
+  dybatpho::config_schema REGION string
   dybatpho::config_validate
-  run dybatpho::config_get PORT
-  assert_output "8080"
+  assert_equal "$(dybatpho::config_get PORT)" "8080"
+  run ! dybatpho::config_get REGION
 }
 
 @test "config_validate rejects missing required and invalid values" {

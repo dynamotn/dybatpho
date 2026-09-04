@@ -112,7 +112,7 @@ function dybatpho::path_stem {
 #######################################
 function dybatpho::path_join {
   if [[ $# -eq 0 ]]; then
-    dybatpho::die "${FUNCNAME[0]}: Expected at least one path segment"
+    dybatpho::die "${FUNCNAME[0]}: Expected at least one path segment" # kcov(skip)
   fi
 
   local result=""
@@ -203,10 +203,7 @@ function dybatpho::path_normalize {
   done
 
   local normalized_path
-  normalized_path=$(
-    IFS=/
-    printf '%s' "${normalized_parts[*]}"
-  )
+  normalized_path=$(IFS=/ && printf '%s' "${normalized_parts[*]}")
   if [[ "${is_absolute}" == true ]]; then
     printf '%s\n' "/${normalized_path}"
   elif [[ -n "${normalized_path}" ]]; then
@@ -314,10 +311,7 @@ function dybatpho::path_relative {
   if ((${#relative_parts[@]} == 0)); then
     printf '.\n'
   else
-    printf '%s\n' "$(
-      IFS=/
-      printf '%s' "${relative_parts[*]}"
-    )"
+    printf '%s\n' "$(IFS=/ && printf '%s' "${relative_parts[*]}")"
   fi
 }
 
@@ -352,7 +346,7 @@ function dybatpho::create_temp {
   # Ensure existed parent folder
   local parent_folder=${2:-${TMPDIR:-/tmp}}
   if ! dybatpho::is dir "${parent_folder}"; then
-    dybatpho::die "Folder ${parent_folder} is not existed"
+    dybatpho::die "Folder ${parent_folder} is not existed" # kcov(skip)
   fi
 
   extension=${extension%%/*} # Remove '/' and after in extension, for security

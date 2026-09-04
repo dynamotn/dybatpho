@@ -12,39 +12,27 @@ setup() {
 }
 
 @test "__notification_json_escape plain string" {
-  run __notification_json_escape "hello world"
-  assert_success
-  assert_output "hello world"
+  assert_equal "$(__notification_json_escape "hello world")" "hello world"
 }
 
 @test "__notification_json_escape escapes double quotes" {
-  run __notification_json_escape 'say "hi"'
-  assert_success
-  assert_output 'say \"hi\"'
+  assert_equal "$(__notification_json_escape 'say "hi"')" 'say \"hi\"'
 }
 
 @test "__notification_json_escape escapes backslash" {
-  run __notification_json_escape 'C:\path'
-  assert_success
-  assert_output 'C:\\path'
+  assert_equal "$(__notification_json_escape 'C:\path')" 'C:\\path'
 }
 
 @test "__notification_json_escape escapes newline" {
-  run __notification_json_escape $'line1\nline2'
-  assert_success
-  assert_output 'line1\nline2'
+  assert_equal "$(__notification_json_escape $'line1\nline2')" 'line1\nline2'
 }
 
 @test "__notification_json_escape escapes tab" {
-  run __notification_json_escape $'col1\tcol2'
-  assert_success
-  assert_output 'col1\tcol2'
+  assert_equal "$(__notification_json_escape $'col1\tcol2')" 'col1\tcol2'
 }
 
 @test "__notification_json_escape escapes carriage return" {
-  run __notification_json_escape $'text\rmore'
-  assert_success
-  assert_output 'text\rmore'
+  assert_equal "$(__notification_json_escape $'text\rmore')" 'text\rmore'
 }
 
 # ---------------------------------------------------------------------------
@@ -67,7 +55,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/slack-curl-args"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_slack "hello slack"
+  run_traced dybatpho::notify_slack "hello slack"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
@@ -79,7 +67,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/slack-escape-args"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_slack 'say "hi"'
+  run_traced dybatpho::notify_slack 'say "hi"'
   unstub curl
   assert_success
   grep -- '--data {"text":"say \\\"hi\\\""}' "${args_file}"
@@ -89,7 +77,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/slack-url-args"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/MYTOKEN"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_slack "test"
+  run_traced dybatpho::notify_slack "test"
   unstub curl
   assert_success
   grep "https://hooks.slack.com/services/MYTOKEN" "${args_file}"
@@ -116,7 +104,7 @@ setup() {
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_telegram "build done"
+  run_traced dybatpho::notify_telegram "build done"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
@@ -129,7 +117,7 @@ setup() {
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_telegram "test"
+  run_traced dybatpho::notify_telegram "test"
   unstub curl
   assert_success
   grep "api.telegram.org/bot123:TOKEN/sendMessage" "${args_file}"
@@ -140,7 +128,7 @@ setup() {
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_telegram "**bold**" "Markdown"
+  run_traced dybatpho::notify_telegram "**bold**" "Markdown"
   unstub curl
   assert_success
   grep -- '"parse_mode":"Markdown"' "${args_file}"
@@ -151,7 +139,7 @@ setup() {
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_telegram "plain text"
+  run_traced dybatpho::notify_telegram "plain text"
   unstub curl
   assert_success
   run grep "parse_mode" "${args_file}"
@@ -178,7 +166,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/teams-curl-args"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_teams "deploy done"
+  run_traced dybatpho::notify_teams "deploy done"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
@@ -190,7 +178,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/teams-title-args"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_teams "all checks passed" "Deploy v2.0"
+  run_traced dybatpho::notify_teams "all checks passed" "Deploy v2.0"
   unstub curl
   assert_success
   grep -- '"text":"Deploy v2.0"' "${args_file}"
@@ -202,7 +190,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/teams-notitle-args"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_teams "simple message"
+  run_traced dybatpho::notify_teams "simple message"
   unstub curl
   assert_success
   run grep '"weight":"bolder"' "${args_file}"
@@ -229,7 +217,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/gchat-curl-args"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_google_chat "release live"
+  run_traced dybatpho::notify_google_chat "release live"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
@@ -240,7 +228,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/gchat-url-args"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/MYSPACE"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_google_chat "test"
+  run_traced dybatpho::notify_google_chat "test"
   unstub curl
   assert_success
   grep "https://chat.googleapis.com/v1/spaces/MYSPACE" "${args_file}"
@@ -266,7 +254,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/discord-curl-args"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_discord "build passed"
+  run_traced dybatpho::notify_discord "build passed"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
@@ -277,7 +265,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/discord-user-args"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_discord "deploy done" "CI Bot"
+  run_traced dybatpho::notify_discord "deploy done" "CI Bot"
   unstub curl
   assert_success
   grep -- '"username":"CI Bot"' "${args_file}"
@@ -287,7 +275,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/discord-nouser-args"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_discord "simple"
+  run_traced dybatpho::notify_discord "simple"
   unstub curl
   assert_success
   run grep '"username"' "${args_file}"
@@ -311,7 +299,7 @@ setup() {
 @test "dybatpho::notify_webhook sends POST to given URL with payload" {
   local args_file="${BATS_TEST_TMPDIR}/webhook-curl-args"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy"}'
+  run_traced dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy"}'
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
@@ -347,10 +335,9 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/notification-escape-args"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/TEST"
   stub curl ": echo \"\$*\" > ${args_file}; printf '200'"
-  run dybatpho::notify_google_chat $'slash\\quote"\nreturn\rtab\t'
-  assert_success
+  dybatpho::notify_google_chat $'slash\\quote"\nreturn\rtab\t'
   unstub curl
-  run cat "${args_file}"
+  run_traced cat "${args_file}"
   assert_success
   assert_output --partial 'slash\\quote\"'
   assert_output --partial '\nreturn'

@@ -337,7 +337,7 @@ function dybatpho::secret_from_env {
   [[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Invalid environment variable name: ${name}"
   case "${mode}" in
-    keep | unset) ;; # kcov(skip)
+    keep | unset) ;;                                                                   # kcov(skip)
     *) dybatpho::die "${FUNCNAME[0]}: Expected \`keep\` or \`unset\`, got: ${mode}" ;; # kcov(skip)
   esac
 

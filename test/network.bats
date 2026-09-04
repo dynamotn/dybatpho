@@ -8,15 +8,11 @@ setup() {
 }
 
 @test "__get_http_code output" {
-  run __get_http_code 403
-  assert_success
-  assert_output "403 (forbidden)"
+  assert_equal "$(__get_http_code 403)" "403 (forbidden)"
 }
 
 @test "__get_http_code with unknown code" {
-  run __get_http_code 999
-  assert_success
-  assert_output "999 (unknown)"
+  assert_equal "$(__get_http_code 999)" "999 (unknown)"
 }
 
 @test "dybatpho::curl_do no arg" {
@@ -31,7 +27,7 @@ setup() {
 
 @test "dybatpho::curl_do only url" {
   stub curl ": echo '200'"
-  run dybatpho::curl_do https://this
+  run_traced dybatpho::curl_do https://this
   unstub curl
   assert_success
 }
@@ -39,8 +35,7 @@ setup() {
 @test "dybatpho::curl_do with more than 2 parameters" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
-  run dybatpho::curl_do https://this "${temp_file}" --header "X-Test: 1"
-  assert_success
+  dybatpho::curl_do https://this "${temp_file}" --header "X-Test: 1"
   grep "header X-Test: 1" "${temp_file}"
   unstub curl
 }
@@ -49,8 +44,7 @@ setup() {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do_header"
   # Write each curl argument on its own line so we can verify quoting
   stub curl ": printf '%s\n' \"\$@\" > ${temp_file}; echo '200'"
-  run dybatpho::curl_do https://this "${temp_file}" -H "Authorization: Bearer mytoken"
-  assert_success
+  dybatpho::curl_do https://this "${temp_file}" -H "Authorization: Bearer mytoken"
   # The full header value must appear on one line, not split
   grep "^Authorization: Bearer mytoken$" "${temp_file}"
   unstub curl
@@ -77,7 +71,7 @@ setup() {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   echo -e "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n" | nc -l 8080 &
   sleep 1
-  run dybatpho::curl_do http://localhost:8080 "${temp_file}"
+  run_traced dybatpho::curl_do http://localhost:8080 "${temp_file}"
   assert_success
   refute_output
 }
@@ -159,8 +153,7 @@ setup() {
 @test "dybatpho::curl_download with more than 2 parameters" {
   local temp_file="${BATS_TEST_TMPDIR}/test/curl_download"
   stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
-  run dybatpho::curl_download https://this "${temp_file}" --header "X-Test: 1"
-  assert_success
+  dybatpho::curl_download https://this "${temp_file}" --header "X-Test: 1"
   grep "header X-Test: 1" "${temp_file}"
   unstub curl
 }
@@ -168,8 +161,7 @@ setup() {
 @test "dybatpho::curl_download adds progress flags" {
   local temp_file="${BATS_TEST_TMPDIR}/test/curl_download_flags"
   stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
-  run dybatpho::curl_download https://this "${temp_file}"
-  assert_success
+  dybatpho::curl_download https://this "${temp_file}"
   grep -- "-#" "${temp_file}"
   grep -- "--no-silent" "${temp_file}"
   unstub curl
@@ -183,8 +175,7 @@ setup() {
 @test "dybatpho::curl_json adds JSON headers" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_json"
   stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
-  run dybatpho::curl_json https://this "${temp_file}" --request POST
-  assert_success
+  dybatpho::curl_json https://this "${temp_file}" --request POST
   grep -- '--header Accept: application/json' "${temp_file}"
   grep -- '--header Content-Type: application/json' "${temp_file}"
   grep -- '--request POST' "${temp_file}"
@@ -194,9 +185,63 @@ setup() {
 @test "dybatpho::curl_head adds HEAD mode" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_head"
   stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
-  run dybatpho::curl_head https://this "${temp_file}" --header "X-Test: 1"
-  assert_success
+  dybatpho::curl_head https://this "${temp_file}" --header "X-Test: 1"
   grep -- '-I' "${temp_file}"
   grep -- '--header X-Test: 1' "${temp_file}"
   unstub curl
+}
+
+@test "dybatpho::curl_do rejects an empty URL" {
+  run ! dybatpho::curl_do ""
+}
+
+@test "dybatpho::curl_do only prints the request when DRY_RUN is enabled" {
+  DRY_RUN=true
+  run_traced dybatpho::curl_do https://example.com /dev/null --header "X-Test: 1"
+  DRY_RUN=""
+  assert_success
+  assert_output --partial "DRY RUN"
+  assert_output --partial "https://example.com"
+}
+
+@test "dybatpho::curl_do maps a failed curl invocation to status 000" {
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub_repeated curl ": exit 1"
+  local status=0
+  dybatpho::curl_do https://example.com || status=$?
+  assert_equal "${status}" "1"
+  unset DYBATPHO_CURL_MAX_RETRIES
+}
+
+@test "dybatpho::curl_do retries throttled responses and caps Retry-After" {
+  local sleep_file="${BATS_TEST_TMPDIR}/throttle-delays"
+  export DYBATPHO_CURL_MAX_RETRIES=1
+  export DYBATPHO_CURL_RETRY_BASE_DELAY=1
+  export DYBATPHO_CURL_RETRY_MAX_DELAY=3
+  stub curl \
+    ": while ((\$#)); do if [[ \$1 == -D ]]; then printf 'Retry-After: 99\r\n' > \$2; fi; shift; done; echo '429'" \
+    ": echo '200'"
+  stub sleep ": echo \"\$1\" >> ${sleep_file}"
+  dybatpho::curl_do https://example.com
+  assert_equal "$(< "${sleep_file}")" "3"
+  unstub sleep
+  unstub curl
+  unset DYBATPHO_CURL_MAX_RETRIES DYBATPHO_CURL_RETRY_BASE_DELAY DYBATPHO_CURL_RETRY_MAX_DELAY
+}
+
+@test "dybatpho::curl_do adds jitter to the retry delay when enabled" {
+  local sleep_file="${BATS_TEST_TMPDIR}/jitter-delays"
+  export DYBATPHO_CURL_MAX_RETRIES=1
+  export DYBATPHO_CURL_RETRY_BASE_DELAY=2
+  export DYBATPHO_CURL_RETRY_MAX_DELAY=2
+  export DYBATPHO_CURL_RETRY_JITTER=true
+  stub curl ": echo '500'" ": echo '200'"
+  stub sleep ": echo \"\$1\" >> ${sleep_file}"
+  dybatpho::curl_do https://example.com
+  # Jitter can only raise the delay, and the cap keeps it at the maximum.
+  assert_equal "$(< "${sleep_file}")" "2"
+  unstub sleep
+  unstub curl
+  unset DYBATPHO_CURL_MAX_RETRIES DYBATPHO_CURL_RETRY_BASE_DELAY
+  unset DYBATPHO_CURL_RETRY_MAX_DELAY DYBATPHO_CURL_RETRY_JITTER
 }

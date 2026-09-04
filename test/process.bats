@@ -31,6 +31,26 @@ setup() {
   refute_stderr
 }
 
+@test 'dybatpho::register_common_handlers installs traps in the current shell' {
+  dybatpho::register_common_handlers
+  local err_trap sigint_trap sigterm_trap
+  err_trap="$(trap -p ERR)"
+  sigint_trap="$(trap -p SIGINT)"
+  sigterm_trap="$(trap -p SIGTERM)"
+  # Restore the default traps before asserting so a failure can't loop back in.
+  trap - ERR SIGINT SIGTERM
+  set +E
+
+  assert_equal "${DYBATPHO_USED_ERR_HANDLER}" "true"
+  assert_equal "${DYBATPHO_USED_KILLED_HANDLER}" "true"
+  assert_regex "${err_trap}" "run_err_handler"
+  # A signal inherited as ignored (bats --jobs does this) can't be trapped again.
+  if [[ "${sigint_trap}" != *"-- ''"* ]]; then
+    assert_regex "${sigint_trap}" "killed_process_handler SIGINT"
+    assert_regex "${sigterm_trap}" "killed_process_handler SIGTERM"
+  fi
+}
+
 @test 'dybatpho::run_err_handler output' {
   local exit_code=7
   run --separate-stderr -"${exit_code}" dybatpho::run_err_handler "${exit_code}"
@@ -65,6 +85,7 @@ setup() {
     trap 'echo first' EXIT
     dybatpho::trap 'echo second' EXIT
   }
+  # The chained EXIT trap must fire in a subshell, so keep the isolating `run`.
   run _trap_chain
   assert_success
   assert_line --index 0 first
@@ -108,9 +129,7 @@ setup() {
     dybatpho::cleanup_file_on_exit "${dir}"
     echo "${dir}"
   }
-  run _register_cleanup_dir "${dirpath}"
-  assert_success
-  assert_output "${dirpath}"
+  assert_equal "$(_register_cleanup_dir "${dirpath}")" "${dirpath}"
   [[ ! -e "${dirpath}" ]]
 }
 
@@ -139,7 +158,7 @@ setup() {
 @test "dybatpho::dry_run with DRY_RUN=true displays args with spaces as single quoted tokens" {
   # shellcheck disable=2030
   export DRY_RUN="true"
-  run dybatpho::dry_run curl -H "Authorization: Bearer token"
+  run_traced dybatpho::dry_run curl -H "Authorization: Bearer token"
   assert_output --partial "DRY RUN:"
   # The header value must be shell-quoted as a single token (printf %q uses backslash escaping)
   assert_output --partial "Authorization:"
@@ -162,8 +181,10 @@ setup() {
   export DRY_RUN="false"
   # Use printf to write args one-per-line; verify "hello world" stays as one arg
   local temp_file="${BATS_TEST_TMPDIR}/dry_run_exec"
-  run dybatpho::dry_run bash -c "printf '%s\n' \"\$@\"" -- "hello world" "second"
-  assert_output "$(printf 'hello world\nsecond')"
+  assert_equal "$(dybatpho::dry_run bash -c "printf '%s\n' \"\$@\"" -- "hello world" "second")" "$(printf 'hello world\nsecond')"
+
+  # A single argument is evaluated as a shell command string.
+  assert_equal "$(dybatpho::dry_run "printf 'evaluated\n'")" "evaluated"
   unset DRY_RUN
 }
 

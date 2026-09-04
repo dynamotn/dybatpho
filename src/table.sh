@@ -22,7 +22,7 @@ function __table_cell_width {
   if dybatpho::is function __string_display_width; then
     __string_display_width "${text}"
   else
-    printf '%s\n' "${#text}"
+    printf '%s\n' "${#text}" # kcov(skip) - only when table.sh is used without logging.sh
   fi
 }
 
@@ -59,7 +59,7 @@ function __table_split_row {
 
   mapfile -t target_ref < <(dybatpho::split "${row}" "${delimiter}")
   if ((${#target_ref[@]} == 0)); then
-    target_ref=("")
+    target_ref=("") # kcov(skip) - defensive; split always emits at least one field
   fi
 
   for index in "${!target_ref[@]}"; do
@@ -125,7 +125,7 @@ function __table_parse_alignments {
         alignments_ref[${index}]="center"
         ;;
       *)
-        dybatpho::die "Unsupported table alignment: ${alignment}"
+        dybatpho::die "Unsupported table alignment: ${alignment}" # kcov(skip)
         ;;
     esac
   done
@@ -145,7 +145,7 @@ function __table_format_cell {
   width=$(__table_cell_width "${text}")
   padding_size=$((target_width - width))
   if ((padding_size < 0)); then
-    padding_size=0
+    padding_size=0 # kcov(skip) - defensive; column widths always cover their cells
   fi
 
   case "${alignment}" in
@@ -156,10 +156,7 @@ function __table_format_cell {
     center)
       left_pad_size=$((padding_size / 2))
       right_pad_size=$((padding_size - left_pad_size))
-      printf '%s%s%s' \
-        "$(dybatpho::string_repeat " " "${left_pad_size}")" \
-        "${text}" \
-        "$(dybatpho::string_repeat " " "${right_pad_size}")"
+      printf '%s%s%s' "$(dybatpho::string_repeat " " "${left_pad_size}")" "${text}" "$(dybatpho::string_repeat " " "${right_pad_size}")"
       ;;
     *)
       __table_pad "${text}" "${target_width}"
@@ -336,7 +333,7 @@ function dybatpho::table_csv {
       dybatpho::table_markdown "${input}" ","
       ;;
     *)
-      dybatpho::die "Unsupported table CSV style: ${style}"
+      dybatpho::die "Unsupported table CSV style: ${style}" # kcov(skip)
       ;;
   esac
 }

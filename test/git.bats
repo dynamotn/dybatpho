@@ -99,9 +99,7 @@ function _append_git_commit {
   mkdir -p "${repo_path}/nested/path"
   _create_git_repo "${repo_path}" main
 
-  run dybatpho::git_root "${repo_path}/nested/path"
-  assert_success
-  assert_output "${repo_path}"
+  assert_equal "$(dybatpho::git_root "${repo_path}/nested/path")" "${repo_path}"
 }
 
 @test "dybatpho::git_branch returns the current branch name" {
@@ -113,9 +111,7 @@ function _append_git_commit {
     git -C "${repo_path}" checkout -qb feature/test
   )
 
-  run dybatpho::git_branch "${repo_path}"
-  assert_success
-  assert_output 'feature/test'
+  assert_equal "$(dybatpho::git_branch "${repo_path}")" 'feature/test'
 }
 
 @test "dybatpho::git_branch falls back to a short SHA in detached HEAD state" {
@@ -132,9 +128,7 @@ function _append_git_commit {
     git -C "${repo_path}" checkout -q --detach
   )
 
-  run dybatpho::git_branch "${repo_path}"
-  assert_success
-  assert_output "${short_sha}"
+  assert_equal "$(dybatpho::git_branch "${repo_path}")" "${short_sha}"
 }
 
 @test "dybatpho::git_default_branch prefers origin HEAD when available" {
@@ -148,9 +142,7 @@ function _append_git_commit {
     git -C "${repo_path}" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
   )
 
-  run dybatpho::git_default_branch "${repo_path}"
-  assert_success
-  assert_output 'main'
+  assert_equal "$(dybatpho::git_default_branch "${repo_path}")" 'main'
 }
 
 @test "dybatpho::git_default_branch falls back to local master when origin HEAD is absent" {
@@ -158,9 +150,7 @@ function _append_git_commit {
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" master
 
-  run dybatpho::git_default_branch "${repo_path}"
-  assert_success
-  assert_output 'master'
+  assert_equal "$(dybatpho::git_default_branch "${repo_path}")" 'master'
 }
 
 @test "dybatpho::git_commit_hash and dybatpho::git_commit_short_hash resolve commit SHAs" {
@@ -176,13 +166,9 @@ function _append_git_commit {
     git -C "${repo_path}" rev-parse --short=7 HEAD
   )"
 
-  run dybatpho::git_commit_hash "${repo_path}"
-  assert_success
-  assert_output "${commit_sha}"
+  assert_equal "$(dybatpho::git_commit_hash "${repo_path}")" "${commit_sha}"
 
-  run dybatpho::git_commit_short_hash "${repo_path}"
-  assert_success
-  assert_output "${short_sha}"
+  assert_equal "$(dybatpho::git_commit_short_hash "${repo_path}")" "${short_sha}"
 }
 
 @test "dybatpho::git_commit_subject and dybatpho::git_commit_author inspect commit metadata" {
@@ -191,13 +177,9 @@ function _append_git_commit {
   _create_git_repo "${repo_path}" main
   _append_git_commit "${repo_path}" "Add feature" "release-bot" "release@example.com"
 
-  run dybatpho::git_commit_subject "${repo_path}"
-  assert_success
-  assert_output 'Add feature'
+  assert_equal "$(dybatpho::git_commit_subject "${repo_path}")" 'Add feature'
 
-  run dybatpho::git_commit_author "${repo_path}"
-  assert_success
-  assert_output 'release-bot'
+  assert_equal "$(dybatpho::git_commit_author "${repo_path}")" 'release-bot'
 }
 
 @test "dybatpho::git_has_commit checks whether a commit exists" {
@@ -209,8 +191,7 @@ function _append_git_commit {
     git -C "${repo_path}" rev-parse HEAD
   )"
 
-  run dybatpho::git_has_commit "${repo_path}" "${commit_sha}"
-  assert_success
+  dybatpho::git_has_commit "${repo_path}" "${commit_sha}"
 
   run dybatpho::git_has_commit "${repo_path}" deadbeef
   assert_failure
@@ -235,13 +216,9 @@ function _append_git_commit {
     git -C "${repo_path}" rev-parse HEAD
   )"
 
-  run dybatpho::git_commits_between "${repo_path}" v1.0.0 HEAD
-  assert_success
-  assert_output "${second_commit}"$'\n'"${third_commit}"
+  assert_equal "$(dybatpho::git_commits_between "${repo_path}" v1.0.0 HEAD)" "${second_commit}"$'\n'"${third_commit}"
 
-  run dybatpho::git_commit_count "${repo_path}" v1.0.0 HEAD
-  assert_success
-  assert_output '2'
+  assert_equal "$(dybatpho::git_commit_count "${repo_path}" v1.0.0 HEAD)" '2'
 }
 
 @test "dybatpho::git_is_clean reflects repository changes" {
@@ -249,8 +226,7 @@ function _append_git_commit {
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
 
-  run dybatpho::git_is_clean "${repo_path}"
-  assert_success
+  dybatpho::git_is_clean "${repo_path}"
 
   printf 'dirty\n' >> "${repo_path}/README.md"
   run dybatpho::git_is_clean "${repo_path}"
@@ -266,9 +242,7 @@ function _append_git_commit {
     git -C "${repo_path}" remote add origin https://example.com/repo.git
   )
 
-  run dybatpho::git_remote_url origin "${repo_path}"
-  assert_success
-  assert_output 'https://example.com/repo.git'
+  assert_equal "$(dybatpho::git_remote_url origin "${repo_path}")" 'https://example.com/repo.git'
 }
 
 @test "dybatpho::git_has_remote checks whether a remote exists" {
@@ -280,8 +254,7 @@ function _append_git_commit {
     git -C "${repo_path}" remote add origin https://example.com/repo.git
   )
 
-  run dybatpho::git_has_remote origin "${repo_path}"
-  assert_success
+  dybatpho::git_has_remote origin "${repo_path}"
 
   run dybatpho::git_has_remote upstream "${repo_path}"
   assert_failure
@@ -294,9 +267,7 @@ function _append_git_commit {
   printf 'dirty\n' >> "${repo_path}/README.md"
   printf 'new\n' > "${repo_path}/notes.txt"
 
-  run dybatpho::git_changed_files "${repo_path}"
-  assert_success
-  assert_output $'README.md\nnotes.txt'
+  assert_equal "$(dybatpho::git_changed_files "${repo_path}")" $'README.md\nnotes.txt'
 }
 
 @test "dybatpho::git_tags_containing lists tags containing a commit" {
@@ -308,9 +279,7 @@ function _append_git_commit {
     git -C "${repo_path}" update-ref refs/tags/v1.0.0 "$(git -C "${repo_path}" rev-parse HEAD)"
   )
 
-  run dybatpho::git_tags_containing "${repo_path}"
-  assert_success
-  assert_output 'v1.0.0'
+  assert_equal "$(dybatpho::git_tags_containing "${repo_path}")" 'v1.0.0'
 }
 
 @test "Commit-resolving Git helpers fail clearly for an unknown commit" {
@@ -348,9 +317,7 @@ function _append_git_commit {
     git -C "${repo_path}" config init.defaultBranch configured
   )
 
-  run dybatpho::git_default_branch "${repo_path}"
-  assert_success
-  assert_output 'main'
+  assert_equal "$(dybatpho::git_default_branch "${repo_path}")" 'main'
 }
 
 @test "dybatpho::git_default_branch uses configured and current branch fallbacks" {
@@ -362,17 +329,13 @@ function _append_git_commit {
     git -C "${repo_path}" config init.defaultBranch configured
   )
 
-  run dybatpho::git_default_branch "${repo_path}"
-  assert_success
-  assert_output 'configured'
+  assert_equal "$(dybatpho::git_default_branch "${repo_path}")" 'configured'
 
   (
     unset GIT_DIR GIT_WORK_TREE
     git -C "${repo_path}" config --local init.defaultBranch ""
   )
-  run dybatpho::git_default_branch "${repo_path}"
-  assert_success
-  assert_output 'develop'
+  assert_equal "$(dybatpho::git_default_branch "${repo_path}")" 'develop'
 }
 
 @test "Git range helpers reject unknown base and head commits" {

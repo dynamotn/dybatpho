@@ -73,11 +73,9 @@ function dybatpho::text_dedent {
       continue
     fi
 
-    if [[ "${line}" =~ ^([[:space:]]*)[^[:space:]] ]]; then
-      indent_length=${#BASH_REMATCH[1]}
-    else
-      indent_length=0
-    fi
+    # Blank lines are skipped above, so every remaining line has this shape.
+    [[ "${line}" =~ ^([[:space:]]*)[^[:space:]] ]]
+    indent_length=${#BASH_REMATCH[1]}
 
     if ((min_indent == -1 || indent_length < min_indent)); then
       min_indent=${indent_length}

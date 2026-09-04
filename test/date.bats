@@ -4,60 +4,60 @@ setup() {
 
 @test "dybatpho::date_now defaults to unix timestamp format" {
   stub date ": echo '1709210096'"
-  run dybatpho::date_now
-  assert_success
-  assert_output "1709210096"
+  assert_equal "$(dybatpho::date_now)" "1709210096"
   unstub date
 }
 
 @test "dybatpho::date_today uses custom format" {
   stub date ": echo '2024-02-29'"
-  run dybatpho::date_today "%F"
-  assert_success
-  assert_output "2024-02-29"
+  assert_equal "$(dybatpho::date_today "%F")" "2024-02-29"
   unstub date
 }
 
 @test "dybatpho::date_is_valid accepts valid dates and rejects invalid ones" {
-  run dybatpho::date_is_valid "2024-02-29"
-  assert_success
+  dybatpho::date_is_valid "2024-02-29"
 
   run dybatpho::date_is_valid "2024-02-30"
   assert_failure
 }
 
 @test "dybatpho::date_parse converts a date string to unix timestamp" {
-  run dybatpho::date_parse "2024-02-29 12:34:56"
-  assert_success
-  assert_output "1709210096"
+  assert_equal "$(dybatpho::date_parse "2024-02-29 12:34:56")" "1709210096"
 }
 
 @test "dybatpho::date_format formats a unix timestamp" {
-  run dybatpho::date_format "1709210096"
-  assert_success
-  assert_output "2024-02-29 12:34:56"
+  assert_equal "$(dybatpho::date_format "1709210096")" "2024-02-29 12:34:56"
 
-  run dybatpho::date_format "1709210096" "%Y-%m-%d"
-  assert_success
-  assert_output "2024-02-29"
+  assert_equal "$(dybatpho::date_format "1709210096" "%Y-%m-%d")" "2024-02-29"
 }
 
 @test "dybatpho::date_add_days shifts a date forward and backward" {
-  run dybatpho::date_add_days "2024-03-01" 10
-  assert_success
-  assert_output "2024-03-11"
+  assert_equal "$(dybatpho::date_add_days "2024-03-01" 10)" "2024-03-11"
 
-  run dybatpho::date_add_days "2024-03-01" -1
-  assert_success
-  assert_output "2024-02-29"
+  assert_equal "$(dybatpho::date_add_days "2024-03-01" -1)" "2024-02-29"
 }
 
 @test "dybatpho::date_diff_days prints signed day difference" {
-  run dybatpho::date_diff_days "2024-03-01" "2024-03-11"
-  assert_success
-  assert_output "10"
+  assert_equal "$(dybatpho::date_diff_days "2024-03-01" "2024-03-11")" "10"
 
-  run dybatpho::date_diff_days "2024-03-11" "2024-03-01"
-  assert_success
-  assert_output "-10"
+  assert_equal "$(dybatpho::date_diff_days "2024-03-11" "2024-03-01")" "-10"
+}
+
+@test "date helpers fall back to BSD date flags" {
+  # BSD date has no --version and no -d; it parses with -j -f and formats with -r.
+  stub_repeated date ": case \"\$1\" in --version) exit 1 ;; -j) [[ \$3 == '%Y-%m-%d %H:%M:%S' ]] && echo '1709210096' || exit 1 ;; -r) echo '2024-02-29' ;; *) exit 1 ;; esac"
+
+  assert_equal "$(dybatpho::date_parse "2024-02-29 12:34:56")" "1709210096"
+  assert_equal "$(dybatpho::date_format "1709210096" "%F")" "2024-02-29"
+  assert_equal "$(dybatpho::date_add_days "2024-02-29 12:34:56" 1)" "2024-02-29"
+}
+
+@test "date parsing fails when no BSD input format matches" {
+  stub_repeated date ": exit 1"
+
+  # Called directly so the failing branch is exercised in this shell.
+  run ! __dybatpho_date_parse "not a date"
+
+  run dybatpho::date_parse "not a date"
+  assert_failure
 }

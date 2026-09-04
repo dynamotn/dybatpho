@@ -187,7 +187,7 @@ function __get_terminal_width {
   local width="${COLUMNS:-}"
   if ! [[ "${width}" =~ ^[0-9]+$ ]] || ((width <= 0)); then
     if dybatpho::is command tput && [[ -t 1 || -t 2 ]]; then
-      width="$(tput cols 2> /dev/null || true)"
+      width="$(tput cols 2> /dev/null || true)" # kcov(skip) - needs a terminal
     fi
   fi
   if ! [[ "${width}" =~ ^[0-9]+$ ]] || ((width <= 0)); then
@@ -366,7 +366,7 @@ function __log_box {
 
   mapfile -t input_lines <<< "${message}"
   if ((${#input_lines[@]} == 0)); then
-    input_lines=("")
+    input_lines=("") # kcov(skip) - defensive; a here-string always yields one line
   fi
 
   local input_line wrapped_line
@@ -378,11 +378,11 @@ function __log_box {
       if ((wrapped_width > content_width)); then
         content_width=${wrapped_width}
       fi
-    done < <(__wrap_line "${input_line}" "${inner_limit}")
+    done < <(__wrap_line "${input_line}" "${inner_limit}") # kcov(skip)
   done
 
   if ((${#wrapped_lines[@]} == 0)); then
-    wrapped_lines=("")
+    wrapped_lines=("") # kcov(skip) - defensive; wrapping always yields one line
   fi
 
   local border_count=$((content_width + 2))
@@ -539,11 +539,11 @@ function dybatpho::fatal {
 # @env LOG_LEVEL string Set to `trace` to emit the trace start/end messages
 #######################################
 function dybatpho::start_trace {
+  # kcov(disabled) - replacing PS4 stops the coverage tracer
   __log_inspect trace "TRACE ⚡       " "Start tracing"
   PS4='+(${BASH_SOURCE:-no_source}:${LINENO:-no_line})'
   export PS4="${PS4}"': ${FUNCNAME[0]-no_func:+${FUNCNAME[0]-no_func}(): }'
 
-  # kcov(disabled)
   local trap_command="dybatpho::trap"
   if [[ "${BATS_ROOT:-}" != "" ]]; then
     trap_command="trap"
@@ -557,8 +557,8 @@ function dybatpho::start_trace {
 # @noargs
 #######################################
 function dybatpho::end_trace {
+  # kcov(disabled) - disabling xtrace stops the coverage tracer
   set +xv
-  # kcov(disabled)
   __log_inspect trace "TRACE ⚡      " "End tracing"
   # kcov(enabled)
 }

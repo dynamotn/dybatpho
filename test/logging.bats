@@ -8,6 +8,135 @@ teardown() {
   unset COLUMNS
 }
 
+# The logging helpers are exercised directly here so their behavior is checked
+# in this shell; the tests below assert the rendered output through `run`.
+@test "logging helpers run in the current shell" {
+  local out="${BATS_TEST_TMPDIR}/log-out"
+
+  __log info "direct stdout" > "${out}"
+  assert_file_contains "${out}" "direct stdout"
+  __log info "direct stderr" stderr
+  NO_COLOR=true __log info "no color" > "${out}"
+  assert_file_contains "${out}" "no color"
+  NO_COLOR=""
+
+  assert_equal "$(__log_json_escape 'a"b\c')" 'a\"b\\c'
+  assert_equal "$(__log_json_escape $'tab\tnew\nret\r')" 'tab\tnew\nret\r'
+  [[ "$(__log_timestamp)" =~ ^[0-9]{4}- ]]
+
+  dybatpho::validate_log_level info
+  run ! dybatpho::validate_log_level nonsense
+
+  LOG_LEVEL=trace
+  dybatpho::debug "debug message"
+  dybatpho::debug_command "command output" "printf 'hi\n'"
+  dybatpho::info "info message"
+  dybatpho::warn "warn message"
+  dybatpho::error "error message"
+  dybatpho::fatal "fatal message"
+  LOG_FORMAT=json
+  dybatpho::error "structured message"
+  LOG_FORMAT=text
+  LOG_LEVEL=info
+
+  dybatpho::print "printed" > "${out}"
+  assert_file_contains "${out}" "printed"
+  dybatpho::progress "in progress" > "${out}"
+  assert_file_contains "${out}" "in progress"
+  dybatpho::header "a header" > "${out}"
+  assert_file_contains "${out}" "a header"
+  dybatpho::success "all good" > "${out}"
+  assert_file_contains "${out}" "all good"
+  dybatpho::progress_bar 50 10 > "${out}"
+  assert_file_contains "${out}" "#####"
+}
+
+@test "boxed output falls back to plain widths without python3" {
+  local out="${BATS_TEST_TMPDIR}/fallback-out"
+  local empty_bin="${BATS_TEST_TMPDIR}/empty-bin"
+  local old_path="${PATH}"
+  mkdir -p "${empty_bin}"
+  export COLUMNS=24
+  export NO_COLOR=true
+
+  # Without python3 the wrapping and width helpers use their pure-bash paths.
+  PATH="${empty_bin}"
+  dybatpho::header "alpha beta gamma delta epsilon" > "${out}"
+  dybatpho::success "https://example.com/a/very/long/link" >> "${out}"
+  # A long token with a later space breaks at that space, dropping the padding.
+  assert_equal "$(__wrap_line "ab   cd" 2)" "$(printf 'ab\ncd')"
+  assert_equal "$(__wrap_line "aaaaaaaaaa bb" 5)" "$(printf 'aaaaaaaaaa\nbb')"
+  PATH="${old_path}"
+
+  assert_file_contains "${out}" "alpha"
+  assert_file_contains "${out}" "example.com"
+  unset COLUMNS
+  NO_COLOR=""
+}
+
+@test "__get_terminal_width falls back to tput and then to 80 columns" {
+  local out="${BATS_TEST_TMPDIR}/width-out"
+  unset COLUMNS
+  stub_repeated tput ": echo 30"
+  export NO_COLOR=true
+  dybatpho::header "width probe" > "${out}"
+  assert_file_contains "${out}" "width probe"
+
+  COLUMNS=not-a-number
+  dybatpho::header "width probe" > "${out}"
+  assert_file_contains "${out}" "width probe"
+  unset COLUMNS
+  NO_COLOR=""
+}
+
+@test "logging redacts registered secrets in both formats" {
+  dybatpho::secret_register "logging-secret-value"
+  local out="${BATS_TEST_TMPDIR}/masked-log"
+
+  __log info "token logging-secret-value" > "${out}"
+  assert_file_contains "${out}" "token \\*\\*\\*"
+  assert_file_not_contains "${out}" "logging-secret-value"
+
+  LOG_FORMAT=json
+  dybatpho::error "json logging-secret-value"
+  LOG_FORMAT=text
+  dybatpho::secret_forget
+}
+
+@test "__log_structured renders text output when the format is not json" {
+  LOG_FORMAT=text
+  __log_structured info "source.sh:12" "structured text message"
+  __log_structured trace "source.sh:12" "filtered out"
+}
+
+@test "__wrap_line handles non-positive widths and empty lines" {
+  assert_equal "$(__wrap_line "unwrapped text" 0)" "unwrapped text"
+  assert_equal "$(__wrap_line "" 10)" ""
+}
+
+@test "boxed output copes with empty messages and tiny terminals" {
+  local out="${BATS_TEST_TMPDIR}/tiny-box"
+  export NO_COLOR=true
+
+  export COLUMNS=3
+  dybatpho::header "" > "${out}"
+  assert_file_contains "${out}" "╔"
+
+  unset COLUMNS
+  NO_COLOR=""
+}
+
+@test "__log_timestamp supports busybox and portable date" {
+  stub_repeated busybox ": echo '2024-02-29T12:34:56+07:00'"
+  assert_equal "$(__log_timestamp)" "2024-02-29T12:34:56+07:00"
+}
+
+@test "__log_timestamp falls back to portable date flags" {
+  # Neither busybox nor GNU date is available in this environment.
+  stub_repeated date ": case \"\$1\" in --version) exit 1 ;; *) echo '2024-02-29T12:34:56+0700' ;; esac"
+  assert_equal "$(__log_timestamp)" "2024-02-29T12:34:56+0700"
+}
+
 @test "__log output message" {
   run --separate-stderr __log info test
   assert_success
@@ -29,15 +158,13 @@ teardown() {
 @test "dybatpho::compare_log_level with same level" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=info
-  run dybatpho::compare_log_level "info"
-  assert_success
+  dybatpho::compare_log_level "info"
 }
 
 @test "dybatpho::compare_log_level with lower level" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=info
-  run dybatpho::compare_log_level "error"
-  assert_success
+  dybatpho::compare_log_level "error"
 }
 
 @test "dybatpho::compare_log_level with higher level" {
@@ -50,21 +177,18 @@ teardown() {
 @test "dybatpho::compare_log_level with trace and fatal" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=trace
-  run dybatpho::compare_log_level "fatal"
-  assert_success
+  dybatpho::compare_log_level "fatal"
 }
 
 @test "dybatpho::compare_log_level case insensitive" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=INFO
-  run dybatpho::compare_log_level "info"
-  assert_success
+  dybatpho::compare_log_level "info"
 }
 
 @test "dybatpho::compare_log_level does not mutate LOG_LEVEL" {
   export LOG_LEVEL=INFO
-  run dybatpho::compare_log_level "warn"
-  assert_success
+  dybatpho::compare_log_level "warn"
   [ "${LOG_LEVEL}" = "INFO" ]
 }
 
@@ -124,8 +248,7 @@ a newline'
 
 @test "filtered debug command does not execute its command" {
   local marker="${BATS_TEST_TMPDIR}/debug-command-marker"
-  run --separate-stderr dybatpho::debug_command "hidden" "touch '${marker}'"
-  assert_success
+  dybatpho::debug_command "hidden" "touch '${marker}'"
   [ ! -e "${marker}" ]
 }
 

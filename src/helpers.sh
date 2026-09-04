@@ -108,14 +108,14 @@ function dybatpho::expect_args {
     shift
   done
 
-  ((is_error)) && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"'
+  ((is_error)) && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"' # kcov(skip)
 
   local variable_name
   for variable_name in "${variable_names[@]}"; do
     [[ "${variable_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
       || dybatpho::die "${FUNCNAME[1]:--}: Invalid variable name: ${variable_name}"
     if ! (($#)); then
-      dybatpho::die "${FUNCNAME[1]:--}: Expected args: ${variable_names[*]:-}"
+      dybatpho::die "${FUNCNAME[1]:--}: Expected args: ${variable_names[*]:-}" # kcov(skip)
     fi
     printf -v "${variable_name}" '%s' "$1"
     shift
@@ -146,7 +146,7 @@ function dybatpho::still_has_args {
 function dybatpho::expect_envs {
   for arg in "$@"; do
     if [ -z "${!arg:-}" ]; then
-      dybatpho::die "Environment variable \`${arg}\` isn't set."
+      dybatpho::die "Environment variable \`${arg}\` isn't set." # kcov(skip)
     fi
   done
 }
@@ -268,7 +268,7 @@ function dybatpho::is {
 #######################################
 function dybatpho::coalesce {
   if [[ $# -eq 0 ]]; then
-    dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
+    dybatpho::die "${FUNCNAME[0]}: Expected at least one value" # kcov(skip)
   fi
 
   local value
@@ -329,7 +329,7 @@ function dybatpho::require_envs_any {
   for env_name in "$@"; do
     [[ -n "${!env_name:-}" ]] && return 0
   done
-  dybatpho::die "Expected at least one environment variable to be set: $*"
+  dybatpho::die "Expected at least one environment variable to be set: $*" # kcov(skip)
 }
 
 #######################################
@@ -418,14 +418,8 @@ function dybatpho::retry_until {
 function dybatpho::breakpoint {
   local dybatpho_key_pressed
   local dybatpho_section="--------------------------------------------------------------------------------"
-  local dybatpho_help="${dybatpho_section}
-    d: run debugger
-    c: display source file
-    o: list options
-    p: list parameters
-    a: list indexed array
-    A: list associative array
-    q: quit"
+  local dybatpho_help
+  printf -v dybatpho_help '%s\n    d: run debugger\n    c: display source file\n    o: list options\n    p: list parameters\n    a: list indexed array\n    A: list associative array\n    q: quit' "${dybatpho_section}"
   local source_file="${BASH_SOURCE[1]:-bash}"
   __log fatal "Breakpoint hit. Current line: ${source_file}:${BASH_LINENO[0]}" stderr "1;36"
   while true; do

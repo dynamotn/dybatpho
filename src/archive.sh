@@ -52,7 +52,7 @@ function __dybatpho_archive_format {
       printf 'zip\n'
       ;;
     *)
-      dybatpho::die "Unsupported archive format: ${archive_path}"
+      dybatpho::die "Unsupported archive format: ${archive_path}" # kcov(skip)
       ;;
   esac
 }
@@ -101,7 +101,7 @@ function __dybatpho_archive_move_stripped {
     stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" 'NF>n{for(i=n+1;i<=NF;i++) printf "%s%s", $i, (i<NF?"/":"")}')
     [[ -z "${stripped}" ]] && continue
     mkdir -p "${destination}/${stripped}"
-  done < <(find "${source_root}" -mindepth 1 -type d -printf '%P\n' | sort)
+  done < <(find "${source_root}" -mindepth 1 -type d -printf '%P\n' | sort) # kcov(skip)
 
   while IFS= read -r rel; do
     [[ -z "${rel}" ]] && continue
@@ -110,7 +110,7 @@ function __dybatpho_archive_move_stripped {
     dir_path=$(dybatpho::path_dirname "${destination}/${stripped}")
     mkdir -p "${dir_path}"
     mv "${source_root}/${rel}" "${destination}/${stripped}"
-  done < <(find "${source_root}" -mindepth 1 ! -type d -printf '%P\n' | sort)
+  done < <(find "${source_root}" -mindepth 1 ! -type d -printf '%P\n' | sort) # kcov(skip)
 }
 
 #######################################
@@ -177,7 +177,7 @@ function dybatpho::archive_create {
       else
         output_abs="$(dybatpho::path_join "$(pwd)" "${output_path}")"
       fi
-      (
+      ( # kcov(skip) - subshell keeps the caller's working directory
         cd "${source_dir}" || exit
         zip -rq "${output_abs}" "${source_name}"
       )

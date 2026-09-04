@@ -182,16 +182,14 @@ teardown() {
 @test "secret_register masks each line of a multiline secret" {
   dybatpho::secret_register "$(printf 'first-line-secret\nsecond-line-secret')"
 
-  run dybatpho::secret_mask "leaked second-line-secret here"
-  assert_output "leaked *** here"
+  assert_equal "$(dybatpho::secret_mask "leaked second-line-secret here")" "leaked *** here"
 }
 
 @test "secret_forget stops masking" {
   dybatpho::secret_register "forgettable-secret"
   dybatpho::secret_forget
   assert_equal "${DYBATPHO_SECRET_COUNT}" "0"
-  run dybatpho::secret_mask "forgettable-secret"
-  assert_output "forgettable-secret"
+  assert_equal "$(dybatpho::secret_mask "forgettable-secret")" "forgettable-secret"
 }
 
 @test "secret_mask_run masks command output and preserves the exit code" {

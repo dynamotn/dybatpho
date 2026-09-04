@@ -5,23 +5,16 @@ setup() {
 @test "dybatpho::json_query prefers yq for JSON queries" {
   local args_file="${BATS_TEST_TMPDIR}/yq-json-args"
   stub yq ": echo \"\$*\" > ${args_file}; echo '\"1.0.0\"'"
-  run dybatpho::json_query "package.json" ".version"
-  assert_success
-  assert_output '"1.0.0"'
-  run cat "${args_file}"
-  assert_success
-  assert_output "eval -o=json .version package.json"
+  assert_equal "$(dybatpho::json_query "package.json" ".version")" '"1.0.0"'
+  assert_equal "$(cat "${args_file}")" "eval -o=json .version package.json"
   unstub yq
 }
 
 @test "dybatpho::json_has prefers yq -e semantics" {
   local args_file="${BATS_TEST_TMPDIR}/yq-json-has-args"
   stub yq ": echo \"\$*\" > ${args_file}; exit 0"
-  run dybatpho::json_has "package.json" ".name"
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "eval -e .name package.json"
+  dybatpho::json_has "package.json" ".name"
+  assert_equal "$(cat "${args_file}")" "eval -e .name package.json"
   unstub yq
 
   stub yq ": exit 1"
@@ -35,7 +28,7 @@ setup() {
   stub yq \
     ": printf '{\n  \"name\": \"dybatpho\"\n}\n'" \
     ": printf '{\n  \"name\": \"dybatpho\"\n}\n'"
-  run dybatpho::json_pretty "package.json"
+  run_traced dybatpho::json_pretty "package.json"
   assert_success
   assert_output << EOF
 {
@@ -43,9 +36,8 @@ setup() {
 }
 EOF
 
-  run dybatpho::json_pretty "package.json" "${output_file}"
-  assert_success
-  run cat "${output_file}"
+  dybatpho::json_pretty "package.json" "${output_file}"
+  run_traced cat "${output_file}"
   assert_success
   assert_output << EOF
 {
@@ -61,41 +53,27 @@ EOF
   stub yq \
     ": echo \"\$*\" > ${args_file}; printf 'name: dybatpho\n'" \
     ": echo \"\$*\" > ${args_file}; printf 'name: dybatpho\n'"
-  run dybatpho::json_to_yaml "package.json"
-  assert_success
-  assert_output "name: dybatpho"
-  run cat "${args_file}"
-  assert_success
-  assert_output "eval -P . package.json"
+  assert_equal "$(dybatpho::json_to_yaml "package.json")" "name: dybatpho"
+  assert_equal "$(cat "${args_file}")" "eval -P . package.json"
 
-  run dybatpho::json_to_yaml "package.json" "${output_file}"
-  assert_success
-  run cat "${output_file}"
-  assert_success
-  assert_output "name: dybatpho"
+  dybatpho::json_to_yaml "package.json" "${output_file}"
+  assert_equal "$(cat "${output_file}")" "name: dybatpho"
   unstub yq
 }
 
 @test "dybatpho::yaml_query delegates to yq eval" {
   local args_file="${BATS_TEST_TMPDIR}/yq-args"
   stub yq ": echo \"\$*\" > ${args_file}; echo 'dybatpho'"
-  run dybatpho::yaml_query "compose.yaml" ".services.app.image"
-  assert_success
-  assert_output "dybatpho"
-  run cat "${args_file}"
-  assert_success
-  assert_output "eval .services.app.image compose.yaml"
+  assert_equal "$(dybatpho::yaml_query "compose.yaml" ".services.app.image")" "dybatpho"
+  assert_equal "$(cat "${args_file}")" "eval .services.app.image compose.yaml"
   unstub yq
 }
 
 @test "dybatpho::yaml_has uses yq eval -e semantics" {
   local args_file="${BATS_TEST_TMPDIR}/yq-has-args"
   stub yq ": echo \"\$*\" > ${args_file}; exit 0"
-  run dybatpho::yaml_has "compose.yaml" ".services.app"
-  assert_success
-  run cat "${args_file}"
-  assert_success
-  assert_output "eval -e .services.app compose.yaml"
+  dybatpho::yaml_has "compose.yaml" ".services.app"
+  assert_equal "$(cat "${args_file}")" "eval -e .services.app compose.yaml"
   unstub yq
 
   stub yq ": exit 1"
@@ -109,16 +87,15 @@ EOF
   stub yq \
     ": printf 'name: dybatpho\nenabled: true\n'" \
     ": printf 'name: dybatpho\nenabled: true\n'"
-  run dybatpho::yaml_pretty "compose.yaml"
+  run_traced dybatpho::yaml_pretty "compose.yaml"
   assert_success
   assert_output << EOF
 name: dybatpho
 enabled: true
 EOF
 
-  run dybatpho::yaml_pretty "compose.yaml" "${output_file}"
-  assert_success
-  run cat "${output_file}"
+  dybatpho::yaml_pretty "compose.yaml" "${output_file}"
+  run_traced cat "${output_file}"
   assert_success
   assert_output << EOF
 name: dybatpho
@@ -133,18 +110,11 @@ EOF
   stub yq \
     ": echo \"\$*\" > ${args_file}; printf '{\"name\":\"dybatpho\"}\n'" \
     ": echo \"\$*\" > ${args_file}; printf '{\"name\":\"dybatpho\"}\n'"
-  run dybatpho::yaml_to_json "compose.yaml"
-  assert_success
-  assert_output '{"name":"dybatpho"}'
-  run cat "${args_file}"
-  assert_success
-  assert_output "eval -o=json . compose.yaml"
+  assert_equal "$(dybatpho::yaml_to_json "compose.yaml")" '{"name":"dybatpho"}'
+  assert_equal "$(cat "${args_file}")" "eval -o=json . compose.yaml"
 
-  run dybatpho::yaml_to_json "compose.yaml" "${output_file}"
-  assert_success
-  run cat "${output_file}"
-  assert_success
-  assert_output '{"name":"dybatpho"}'
+  dybatpho::yaml_to_json "compose.yaml" "${output_file}"
+  assert_equal "$(cat "${output_file}")" '{"name":"dybatpho"}'
   unstub yq
 }
 
@@ -154,12 +124,8 @@ EOF
   stub jq ": echo \"\$*\" > ${args_file}; printf '42\n'"
   PATH="${BATS_MOCK_BINDIR}:/usr/bin:/bin"
 
-  run dybatpho::json_query "data.json" ".answer" --arg name value
-  assert_success
-  assert_output "42"
-  run cat "${args_file}"
-  assert_success
-  assert_output '.answer data.json --arg name value'
+  assert_equal "$(dybatpho::json_query "data.json" ".answer" --arg name value)" "42"
+  assert_equal "$(cat "${args_file}")" '.answer data.json --arg name value'
 
   unstub jq
   PATH="${old_path}"
@@ -194,18 +160,12 @@ EOF
     ": printf '{\"ok\":true}\n'"
   PATH="${BATS_MOCK_BINDIR}:/usr/bin:/bin"
 
-  run dybatpho::json_has "data.json" ".ok"
-  assert_success
+  dybatpho::json_has "data.json" ".ok"
 
-  run dybatpho::json_pretty "data.json"
-  assert_success
-  assert_output '{"ok":true}'
+  assert_equal "$(dybatpho::json_pretty "data.json")" '{"ok":true}'
 
-  run dybatpho::json_pretty "data.json" "${output_file}"
-  assert_success
-  run cat "${output_file}"
-  assert_success
-  assert_output '{"ok":true}'
+  dybatpho::json_pretty "data.json" "${output_file}"
+  assert_equal "$(cat "${output_file}")" '{"ok":true}'
 
   unstub jq
   PATH="${old_path}"

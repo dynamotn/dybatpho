@@ -22,6 +22,7 @@ setup() {
 
 @test "commands get automatic help when no help option is declared" {
   _spec_auto_help() { dybatpho::opts::setup "Automatic help command" -; }
+  # Display actions exit the shell, so these need the isolating form of `run`.
   run dybatpho::generate_from_spec _spec_auto_help --help
   assert_success
   assert_line --index 0 --partial "Usage:"
@@ -36,9 +37,7 @@ setup() {
     dybatpho::opts::setup "Custom help command" -
     dybatpho::opts::disp "Custom help" --help action:"echo custom-help"
   }
-  run dybatpho::generate_from_spec _spec_custom_help --help
-  assert_success
-  assert_output "custom-help"
+  assert_equal "$(dybatpho::generate_from_spec _spec_custom_help --help)" "custom-help"
 }
 
 @test "dybatpho::prompt uses entered value and default" {
@@ -74,13 +73,9 @@ setup() {
   }
 
   export CLI_NAME=from-env
-  run dybatpho::generate_from_spec _spec_env_option
-  assert_success
-  assert_output "from-env"
+  assert_equal "$(dybatpho::generate_from_spec _spec_env_option)" "from-env"
 
-  run dybatpho::generate_from_spec _spec_env_option --name from-cli
-  assert_success
-  assert_output "from-cli"
+  assert_equal "$(dybatpho::generate_from_spec _spec_env_option --name from-cli)" "from-cli"
 }
 
 @test "options validate choices and collect multiple values" {
@@ -89,9 +84,7 @@ setup() {
     dybatpho::opts::param "Color" COLORS --color choices:red,blue multiple:true
   }
 
-  run dybatpho::generate_from_spec _spec_choices --color red --color blue
-  assert_success
-  assert_output "red blue"
+  assert_equal "$(dybatpho::generate_from_spec _spec_choices --color red --color blue)" "red blue"
 
   run --separate-stderr dybatpho::generate_from_spec _spec_choices --color green
   assert_failure
@@ -106,18 +99,18 @@ setup() {
   }
   _spec_completion_deploy() { dybatpho::opts::setup "Deploy command" -; }
 
-  run dybatpho::generate_completion _spec_completion bash demo
+  run_traced dybatpho::generate_completion _spec_completion bash demo
   assert_success
   assert_output --partial "complete -F"
   assert_output --partial "--verbose"
   assert_output --partial "deploy"
 
-  run dybatpho::generate_completion _spec_completion zsh demo
+  run_traced dybatpho::generate_completion _spec_completion zsh demo
   assert_success
   assert_output --partial "compdef"
   assert_output --partial "--verbose"
 
-  run dybatpho::generate_completion _spec_completion fish demo
+  run_traced dybatpho::generate_completion _spec_completion fish demo
   assert_success
   assert_output --partial "complete -c demo -l verbose"
   assert_output --partial "complete -c demo -f -a deploy"
@@ -131,11 +124,11 @@ setup() {
   }
   _spec_artifacts_deploy() { dybatpho::opts::setup "Deploy command" -; }
 
-  run dybatpho::generate_schema _spec_artifacts demo
+  run_traced dybatpho::generate_schema _spec_artifacts demo
   assert_success
   SCHEMA="${output}" python3 -c 'import json, os; data=json.loads(os.environ["SCHEMA"]); option=data["options"][0]; assert data["description"] == "Artifact demo"; assert option["env"] == "API_TOKEN"; assert option["required"] is True; assert option["choices"] == "a,b"; assert data["commands"][0]["name"] == "deploy"'
 
-  run dybatpho::generate_man _spec_artifacts demo
+  run_traced dybatpho::generate_man _spec_artifacts demo
   assert_success
   assert_output --partial ".TH"
   assert_output --partial "Artifact demo"
@@ -154,17 +147,17 @@ setup() {
     dybatpho::opts::cmd child _spec_artifact_child aliases:c
   }
 
-  run dybatpho::generate_completion _spec_artifact_root bash tool
+  run_traced dybatpho::generate_completion _spec_artifact_root bash tool
   assert_success
   assert_output --partial "--child-flag"
   assert_output --partial "child"
   assert_output --partial "c"
 
-  run dybatpho::generate_schema _spec_artifact_root tool
+  run_traced dybatpho::generate_schema _spec_artifact_root tool
   assert_success
   SCHEMA="${output}" python3 -c 'import json, os; child=json.loads(os.environ["SCHEMA"])["commands"][0]; assert child["aliases"] == ["c"]; assert child["options"][0]["switches"] == ["--child-flag"]'
 
-  run dybatpho::generate_man _spec_artifact_root tool
+  run_traced dybatpho::generate_man _spec_artifact_root tool
   assert_success
   [ "$(printf "%s\n" "${output}" | grep -c '^\.TH')" -eq 1 ]
   assert_output --partial "--child-flag"
@@ -191,9 +184,7 @@ setup() {
     dybatpho::opts::setup "" ARGS action:"echo \$ARGS"
   }
 
-  run dybatpho::generate_from_spec _spec -a 1 -a 2 -a "3\"" -- -a
-  assert_success
-  assert_output "-a 1 -a 2 -a 3\" -- -a"
+  assert_equal "$(dybatpho::generate_from_spec _spec -a 1 -a 2 -a "3\"" -- -a)" "-a 1 -a 2 -a 3\" -- -a"
 }
 
 @test "dybatpho::generate_from_spec handling arguments with doesn't have sub commands" {
@@ -203,12 +194,12 @@ setup() {
     dybatpho::opts::flag "" FLAG_A -a
   }
 
-  run dybatpho::generate_from_spec _spec -a 1 -a 2 -a "3\"" -- -a
+  run_traced dybatpho::generate_from_spec _spec -a 1 -a 2 -a "3\"" -- -a
   assert_success
   assert_line --index 0 " 1 -a 2 -a 3\" -- -a"
   assert_line --index 1 "true"
 
-  run dybatpho::generate_from_spec _spec -a -- -a
+  run_traced dybatpho::generate_from_spec _spec -a -- -a
   assert_success
   assert_line --index 0 " -a"
   assert_line --index 1 "true"
@@ -225,11 +216,9 @@ setup() {
     dybatpho::opts::flag "Verbose" VERBOSE --verbose
   }
 
-  run dybatpho::generate_from_spec _spec --verbose
-  assert_success && assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --verbose)" "true"
 
-  run dybatpho::generate_from_spec _spec
-  assert_success && assert_output ""
+  dybatpho::generate_from_spec _spec
 }
 
 @test "dybatpho::opts::flag basic short switch" {
@@ -239,8 +228,7 @@ setup() {
     dybatpho::opts::flag "Debug" DEBUGF -d
   }
 
-  run dybatpho::generate_from_spec _spec -d
-  assert_success && assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec -d)" "true"
 }
 
 @test "dybatpho::opts::flag multiple switches" {
@@ -250,14 +238,11 @@ setup() {
     dybatpho::opts::flag "Multi" MFLAG -m --multi --multiple
   }
 
-  run dybatpho::generate_from_spec _spec -m
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec -m)" "true"
 
-  run dybatpho::generate_from_spec _spec --multi
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --multi)" "true"
 
-  run dybatpho::generate_from_spec _spec --multiple
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --multiple)" "true"
 }
 
 @test "dybatpho::opts::flag custom on/off values" {
@@ -267,11 +252,9 @@ setup() {
     dybatpho::opts::flag "Feature" FEAT --feature on:yes off:no init:="no"
   }
 
-  run dybatpho::generate_from_spec _spec --feature
-  assert_output "yes"
+  assert_equal "$(dybatpho::generate_from_spec _spec --feature)" "yes"
 
-  run dybatpho::generate_from_spec _spec
-  assert_output "no"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "no"
 }
 
 @test "dybatpho::opts::flag init:@on" {
@@ -281,8 +264,7 @@ setup() {
     dybatpho::opts::flag "Flag" FFLAG --flag init:@on
   }
 
-  run dybatpho::generate_from_spec _spec
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "true"
 }
 
 @test "dybatpho::opts::flag init:@off" {
@@ -292,8 +274,7 @@ setup() {
     dybatpho::opts::flag "Flag" OFFLAG --flag on:yes off:no init:@off
   }
 
-  run dybatpho::generate_from_spec _spec
-  assert_output "no"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "no"
 }
 
 @test "dybatpho::opts::flag init:@keep preserves existing value" {
@@ -304,8 +285,7 @@ setup() {
   }
 
   export KFLAG=existing
-  run dybatpho::generate_from_spec _spec
-  assert_output "existing"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "existing"
 }
 
 @test "dybatpho::opts::flag init:@unset unsets variable" {
@@ -316,8 +296,7 @@ setup() {
   }
 
   export UFLAG=something
-  run dybatpho::generate_from_spec _spec
-  assert_output "UNSET"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "UNSET"
 }
 
 @test "dybatpho::opts::flag --{no-} expand" {
@@ -327,11 +306,9 @@ setup() {
     dybatpho::opts::flag "Feature" NOFEAT --{no-}feature
   }
 
-  run dybatpho::generate_from_spec _spec --feature
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --feature)" "true"
 
-  run dybatpho::generate_from_spec _spec --no-feature
-  assert_output ""
+  assert_equal "$(dybatpho::generate_from_spec _spec --no-feature)" ""
 }
 
 @test "dybatpho::opts::flag --with{out}- expand" {
@@ -341,11 +318,9 @@ setup() {
     dybatpho::opts::flag "Feature" WFEAT --with{out}-wfeat
   }
 
-  run dybatpho::generate_from_spec _spec --with-wfeat
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --with-wfeat)" "true"
 
-  run dybatpho::generate_from_spec _spec --without-wfeat
-  assert_output ""
+  assert_equal "$(dybatpho::generate_from_spec _spec --without-wfeat)" ""
 }
 
 @test "dybatpho::opts::flag export:false" {
@@ -355,8 +330,7 @@ setup() {
     dybatpho::opts::flag "Private" PRIVFLAG --flag export:false
   }
 
-  run dybatpho::generate_from_spec _spec --flag
-  assert_success && assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --flag)" "true"
 }
 
 # =============================================================================
@@ -370,8 +344,7 @@ setup() {
     dybatpho::opts::param "Name" PNAME --name
   }
 
-  run dybatpho::generate_from_spec _spec --name hello
-  assert_success && assert_output "hello"
+  assert_equal "$(dybatpho::generate_from_spec _spec --name hello)" "hello"
 }
 
 @test "dybatpho::opts::param basic short switch" {
@@ -381,8 +354,7 @@ setup() {
     dybatpho::opts::param "Value" PVAL -v
   }
 
-  run dybatpho::generate_from_spec _spec -v world
-  assert_success && assert_output "world"
+  assert_equal "$(dybatpho::generate_from_spec _spec -v world)" "world"
 }
 
 @test "dybatpho::opts::param short switch with attached value" {
@@ -392,8 +364,7 @@ setup() {
     dybatpho::opts::param "Value" PVALATTACHED -v
   }
 
-  run dybatpho::generate_from_spec _spec -vworld
-  assert_success && assert_output "world"
+  assert_equal "$(dybatpho::generate_from_spec _spec -vworld)" "world"
 }
 
 @test "dybatpho::opts::param multiple switches" {
@@ -403,14 +374,11 @@ setup() {
     dybatpho::opts::param "Multi" PMSW -p --param --parameter
   }
 
-  run dybatpho::generate_from_spec _spec -p val1
-  assert_output "val1"
+  assert_equal "$(dybatpho::generate_from_spec _spec -p val1)" "val1"
 
-  run dybatpho::generate_from_spec _spec --param val2
-  assert_output "val2"
+  assert_equal "$(dybatpho::generate_from_spec _spec --param val2)" "val2"
 
-  run dybatpho::generate_from_spec _spec --parameter val3
-  assert_output "val3"
+  assert_equal "$(dybatpho::generate_from_spec _spec --parameter val3)" "val3"
 }
 
 @test "dybatpho::opts::param init:=" {
@@ -420,11 +388,9 @@ setup() {
     dybatpho::opts::param "Default" PDEF --default init:="default-value"
   }
 
-  run dybatpho::generate_from_spec _spec
-  assert_output "default-value"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "default-value"
 
-  run dybatpho::generate_from_spec _spec --default override
-  assert_output "override"
+  assert_equal "$(dybatpho::generate_from_spec _spec --default override)" "override"
 }
 
 @test "dybatpho::opts::param optional:true with = value" {
@@ -435,8 +401,7 @@ setup() {
   }
 
   # With = syntax, value is passed directly
-  run dybatpho::generate_from_spec _spec --opt=value
-  assert_output "value"
+  assert_equal "$(dybatpho::generate_from_spec _spec --opt=value)" "value"
 }
 
 @test "dybatpho::opts::param optional:true without value" {
@@ -446,11 +411,9 @@ setup() {
     dybatpho::opts::param "Optional" POPT2 --opt2 optional:true
   }
 
-  run dybatpho::generate_from_spec _spec --opt2
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --opt2)" "true"
 
-  run dybatpho::generate_from_spec _spec
-  assert_output ""
+  assert_equal "$(dybatpho::generate_from_spec _spec)" ""
 }
 
 @test "dybatpho::opts::param optional:true with separated value" {
@@ -460,8 +423,7 @@ setup() {
     dybatpho::opts::param "Optional" POPT3 --opt3 optional:true
   }
 
-  run dybatpho::generate_from_spec _spec --opt3 value
-  assert_success && assert_output "value|"
+  assert_equal "$(dybatpho::generate_from_spec _spec --opt3 value)" "value|"
 }
 
 @test "dybatpho::opts::param validate passes for valid input" {
@@ -472,8 +434,7 @@ setup() {
     dybatpho::opts::param "Count" PCOUNT --count validate:"_validate_positive \$OPTARG"
   }
 
-  run dybatpho::generate_from_spec _spec --count 5
-  assert_success && assert_output "5"
+  assert_equal "$(dybatpho::generate_from_spec _spec --count 5)" "5"
 }
 
 @test "dybatpho::opts::param validate fails for invalid input" {
@@ -497,7 +458,7 @@ setup() {
     dybatpho::opts::flag "Dry" PDRY --dry-run on:true off:false init:="false"
   }
 
-  run dybatpho::generate_from_spec _spec hello
+  run_traced dybatpho::generate_from_spec _spec hello
   assert_success
   refute_output --partial "false"
   assert_output --partial "hello"
@@ -522,9 +483,7 @@ setup() {
     dybatpho::opts::param "Name" REQNAME2 -n --name required:true
   }
 
-  run dybatpho::generate_from_spec _spec --name dynamo
-  assert_success
-  assert_output "dynamo"
+  assert_equal "$(dybatpho::generate_from_spec _spec --name dynamo)" "dynamo"
 }
 
 @test "dybatpho::opts::setup rejects invalid rest variable name" {
@@ -544,9 +503,7 @@ setup() {
     dybatpho::opts::setup "" - args:none action:"echo ok"
   }
 
-  run dybatpho::generate_from_spec _spec
-  assert_success
-  assert_output "ok"
+  assert_equal "$(dybatpho::generate_from_spec _spec)" "ok"
 
   run --separate-stderr dybatpho::generate_from_spec _spec extra
   assert_failure
@@ -559,9 +516,7 @@ setup() {
     dybatpho::opts::setup "" REST args:exact:2 action:"printf '[%s]\n' \"\$REST\""
   }
 
-  run dybatpho::generate_from_spec _spec one two
-  assert_success
-  assert_output "[ one two]"
+  assert_equal "$(dybatpho::generate_from_spec _spec one two)" "[ one two]"
 
   run --separate-stderr dybatpho::generate_from_spec _spec one
   assert_failure
@@ -578,17 +533,13 @@ setup() {
     dybatpho::opts::setup "" REST args:max:1 action:"printf '[%s]\n' \"\$REST\""
   }
 
-  run dybatpho::generate_from_spec _spec_min one
-  assert_success
-  assert_output "[ one]"
+  assert_equal "$(dybatpho::generate_from_spec _spec_min one)" "[ one]"
 
   run --separate-stderr dybatpho::generate_from_spec _spec_min
   assert_failure
   assert_stderr --partial "Expected at least 1 argument, got 0"
 
-  run dybatpho::generate_from_spec _spec_max one
-  assert_success
-  assert_output "[ one]"
+  assert_equal "$(dybatpho::generate_from_spec _spec_max one)" "[ one]"
 
   run --separate-stderr dybatpho::generate_from_spec _spec_max one two
   assert_failure
@@ -606,9 +557,7 @@ setup() {
     dybatpho::opts::cmd leaf _spec_leaf
   }
 
-  run dybatpho::generate_from_spec _spec_root leaf one two
-  assert_success
-  assert_output "[ one two]"
+  assert_equal "$(dybatpho::generate_from_spec _spec_root leaf one two)" "[ one two]"
 
   run --separate-stderr dybatpho::generate_from_spec _spec_root leaf
   assert_failure
@@ -626,9 +575,7 @@ setup() {
     dybatpho::opts::flag "Verbose" - --verbose
   }
 
-  run dybatpho::generate_from_spec _spec --verbose
-  assert_success
-  assert_output "EMPTY"
+  assert_equal "$(dybatpho::generate_from_spec _spec --verbose)" "EMPTY"
 }
 
 @test "dybatpho::opts::flag alias metadata adds alternate switches" {
@@ -638,13 +585,9 @@ setup() {
     dybatpho::opts::flag "Verbose" VERBOSE_ALIAS --verbose alias:-v aliases:--chatty
   }
 
-  run dybatpho::generate_from_spec _spec -v
-  assert_success
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec -v)" "true"
 
-  run dybatpho::generate_from_spec _spec --chatty
-  assert_success
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec --chatty)" "true"
 }
 
 # =============================================================================
@@ -658,8 +601,7 @@ setup() {
     dybatpho::opts::disp "Show version" --version action:"echo v1.0"
   }
 
-  run dybatpho::generate_from_spec _spec --version
-  assert_success && assert_output "v1.0"
+  assert_equal "$(dybatpho::generate_from_spec _spec --version)" "v1.0"
 }
 
 @test "dybatpho::opts::disp short switch" {
@@ -669,8 +611,7 @@ setup() {
     dybatpho::opts::disp "Show help" -h action:"echo help-text"
   }
 
-  run dybatpho::generate_from_spec _spec -h
-  assert_success && assert_output "help-text"
+  assert_equal "$(dybatpho::generate_from_spec _spec -h)" "help-text"
 }
 
 @test "dybatpho::opts::disp exits before action runs" {
@@ -680,6 +621,7 @@ setup() {
     dybatpho::opts::disp "Version" --version action:"echo v2.0"
   }
 
+  # The display action exits the shell, so `run` must isolate it.
   run dybatpho::generate_from_spec _spec --version
   assert_output "v2.0"
   refute_output --partial "main"
@@ -700,8 +642,7 @@ setup() {
     dybatpho::opts::cmd child _spec_child
   }
 
-  run dybatpho::generate_from_spec _spec_parent child hello
-  assert_success && assert_output "hello"
+  assert_equal "$(dybatpho::generate_from_spec _spec_parent child hello)" "hello"
 }
 
 @test "dybatpho::opts::cmd passes flags to subcommand" {
@@ -716,8 +657,7 @@ setup() {
     dybatpho::opts::cmd child _spec_flag_child
   }
 
-  run dybatpho::generate_from_spec _spec_flag_parent child --cflag
-  assert_success && assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec_flag_parent child --cflag)" "true"
 }
 
 @test "dybatpho::opts::cmd nested subcommand dispatch" {
@@ -736,8 +676,7 @@ setup() {
     dybatpho::opts::cmd mid _spec_mid
   }
 
-  run dybatpho::generate_from_spec _spec_root mid leaf world
-  assert_success && assert_output "leaf: world"
+  assert_equal "$(dybatpho::generate_from_spec _spec_root mid leaf world)" "leaf: world"
 }
 
 @test "dybatpho::opts::cmd global options before subcommand" {
@@ -753,8 +692,7 @@ setup() {
     dybatpho::opts::cmd child _spec_gc_child
   }
 
-  run dybatpho::generate_from_spec _spec_gc_parent --gflag child --cflag2
-  assert_success && assert_output "true:true"
+  assert_equal "$(dybatpho::generate_from_spec _spec_gc_parent --gflag child --cflag2)" "true:true"
 }
 
 @test "dybatpho::opts::flag persistent:true works after subcommand dispatch" {
@@ -769,9 +707,7 @@ setup() {
     dybatpho::opts::cmd child _spec_persist_child
   }
 
-  run dybatpho::generate_from_spec _spec_persist_parent child --persist
-  assert_success
-  assert_output "true"
+  assert_equal "$(dybatpho::generate_from_spec _spec_persist_parent child --persist)" "true"
 }
 
 @test "dybatpho::opts::setup prerun/postrun wrap action" {
@@ -780,7 +716,7 @@ setup() {
     dybatpho::opts::setup "" - prerun:"echo pre" action:"echo main" postrun:"echo post"
   }
 
-  run dybatpho::generate_from_spec _spec
+  run_traced dybatpho::generate_from_spec _spec
   assert_success
   assert_line --index 0 "pre"
   assert_line --index 1 "main"
@@ -798,13 +734,13 @@ setup() {
     dybatpho::opts::cmd child _spec_hook_child
   }
 
-  run dybatpho::generate_from_spec _spec_hook_parent
+  run_traced dybatpho::generate_from_spec _spec_hook_parent
   assert_success
   assert_line --index 0 "parent-pre"
   assert_line --index 1 "parent-main"
   assert_line --index 2 "parent-post"
 
-  run dybatpho::generate_from_spec _spec_hook_parent child
+  run_traced dybatpho::generate_from_spec _spec_hook_parent child
   assert_success
   assert_line --index 0 "child-pre"
   assert_line --index 1 "child-main"
@@ -827,11 +763,9 @@ setup() {
     dybatpho::opts::cmd cmdb _spec_cmd_b
   }
 
-  run dybatpho::generate_from_spec _spec_multi_parent cmda
-  assert_output "cmd-a"
+  assert_equal "$(dybatpho::generate_from_spec _spec_multi_parent cmda)" "cmd-a"
 
-  run dybatpho::generate_from_spec _spec_multi_parent cmdb
-  assert_output "cmd-b"
+  assert_equal "$(dybatpho::generate_from_spec _spec_multi_parent cmdb)" "cmd-b"
 }
 
 @test "dybatpho::opts::cmd alias metadata dispatches to subcommand" {
@@ -845,13 +779,9 @@ setup() {
     dybatpho::opts::cmd config _spec_alias_child alias:cfg aliases:conf,settings
   }
 
-  run dybatpho::generate_from_spec _spec_alias_parent cfg hello
-  assert_success
-  assert_output "alias: hello"
+  assert_equal "$(dybatpho::generate_from_spec _spec_alias_parent cfg hello)" "alias: hello"
 
-  run dybatpho::generate_from_spec _spec_alias_parent settings world
-  assert_success
-  assert_output "alias: world"
+  assert_equal "$(dybatpho::generate_from_spec _spec_alias_parent settings world)" "alias: world"
 }
 
 # =============================================================================
@@ -967,7 +897,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hu
+  run_traced dybatpho::generate_help _spec_hu
   assert_success
   assert_line --index 0 --partial "Usage:"
   assert_line --index 0 --partial "[options...]"
@@ -980,7 +910,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hd
+  run_traced dybatpho::generate_help _spec_hd
   assert_output --partial "My tool description"
 }
 
@@ -993,7 +923,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_ho
+  run_traced dybatpho::generate_help _spec_ho
   assert_output --partial "Options:"
   assert_output --partial "--verbose"
   assert_output --partial "Enable verbose"
@@ -1010,7 +940,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hidden_flag
+  run_traced dybatpho::generate_help _spec_hidden_flag
   assert_success
   assert_output --partial "--visible"
   refute_output --partial "--hidden"
@@ -1024,7 +954,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hpv
+  run_traced dybatpho::generate_help _spec_hpv
   assert_output --partial "<HPVAL>"
 }
 
@@ -1036,7 +966,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hreq
+  run_traced dybatpho::generate_help _spec_hreq
   assert_output --partial "--name"
   assert_output --partial "Set name (required)"
 }
@@ -1049,7 +979,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hdisp
+  run_traced dybatpho::generate_help _spec_hdisp
   assert_output --partial "--version"
   assert_output --partial "Show version"
   refute_output --partial "<"
@@ -1072,7 +1002,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hc
+  run_traced dybatpho::generate_help _spec_hc
   assert_output --partial "Commands:"
   assert_output --partial "sub1"
   assert_output --partial "First sub command"
@@ -1093,7 +1023,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hc_hidden_parent
+  run_traced dybatpho::generate_help _spec_hc_hidden_parent
   assert_success
   assert_output --partial "visible"
   refute_output --partial "secret"
@@ -1112,7 +1042,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hdeprecated
+  run_traced dybatpho::generate_help _spec_hdeprecated
   assert_success
   assert_output --partial "deprecated: Use --modern instead"
   assert_output --partial "deprecated: Use 'new' instead"
@@ -1131,6 +1061,7 @@ setup() {
     dybatpho::opts::cmd child _spec_hpersist_child
   }
 
+  # The help action exits the shell, so `run` must isolate it.
   run dybatpho::generate_from_spec _spec_hpersist_parent child --help
   assert_success
   assert_output --partial "--persist"
@@ -1149,7 +1080,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hc_alias
+  run_traced dybatpho::generate_help _spec_hc_alias
   assert_success
   assert_output --partial "config, cfg, conf"
 }
@@ -1162,7 +1093,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_halias
+  run_traced dybatpho::generate_help _spec_halias
   assert_success
   assert_output --partial "--verbose"
   assert_output --partial "-v"
@@ -1176,7 +1107,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hnc
+  run_traced dybatpho::generate_help _spec_hnc
   refute_output --partial "Commands:"
 }
 
@@ -1187,7 +1118,7 @@ setup() {
   }
 
   __current_cmd_path="weather"
-  run dybatpho::generate_help _spec_hsp
+  run_traced dybatpho::generate_help _spec_hsp
   assert_line --index 0 --partial "weather"
 }
 
@@ -1198,7 +1129,7 @@ setup() {
   }
 
   __current_cmd_path="ip internet"
-  run dybatpho::generate_help _spec_hnsp
+  run_traced dybatpho::generate_help _spec_hnsp
   assert_line --index 0 --partial "ip internet"
 }
 
@@ -1211,7 +1142,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hh
+  run_traced dybatpho::generate_help _spec_hh
   assert_output --partial "--visible"
   refute_output --partial "--hidden"
 }
@@ -1224,7 +1155,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hlbl
+  run_traced dybatpho::generate_help _spec_hlbl
   assert_output --partial "[--custom]"
 }
 
@@ -1236,7 +1167,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hno
+  run_traced dybatpho::generate_help _spec_hno
   assert_output --partial "--toggle"
   assert_output --partial "--no-toggle"
 }
@@ -1249,7 +1180,7 @@ setup() {
   }
 
   __current_cmd_path=""
-  run dybatpho::generate_help _spec_hwith
+  run_traced dybatpho::generate_help _spec_hwith
   assert_output --partial "--with-feature"
   assert_output --partial "--without-feature"
 }
@@ -1266,7 +1197,180 @@ setup() {
     dybatpho::opts::cmd mysub _spec_dp_sub
   }
 
+  # The dispatched action exits, so it needs the isolating form of `run`.
   run dybatpho::generate_from_spec _spec_dp_root mysub --help
   assert_success
   assert_line --index 0 --partial "mysub"
+}
+
+@test "switch metadata expands bracketed aliases in help and schema" {
+  # shellcheck disable=2329
+  _spec_alias_forms() {
+    dybatpho::opts::setup "Alias forms" -
+    dybatpho::opts::flag "Colored output" COLORED --color alias:--{no-}colour
+    dybatpho::opts::flag "Cache toggle" CACHE --cache alias:--with{out}-cache
+    dybatpho::opts::flag "Quiet mode" QUIET --quiet alias:-q
+    dybatpho::opts::flag "Tracing" TRACING --trace aliases:--{no-}tracing,--with{out}-timing,-t
+  }
+
+  __current_cmd_path=""
+  run_traced dybatpho::generate_help _spec_alias_forms
+  assert_success
+  assert_output --partial "--colour"
+  assert_output --partial "--no-colour"
+  assert_output --partial "--with-cache"
+  assert_output --partial "--without-cache"
+  assert_output --partial "-q"
+  assert_output --partial "--no-tracing"
+  assert_output --partial "--without-timing"
+  assert_output --partial "-t"
+}
+
+@test "bracketed aliases parse into the same destination variable" {
+  # shellcheck disable=2329
+  _spec_alias_parse() {
+    dybatpho::opts::setup "" - action:'printf "%s|%s" "${COLORED:-}" "${CACHE:-}"'
+    dybatpho::opts::flag "Colored output" COLORED --color alias:--{no-}colour
+    dybatpho::opts::flag "Cache toggle" CACHE --cache alias:--with{out}-cache
+  }
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_alias_parse --colour --with-cache)" "true|true"
+  # The negative variants are accepted as switches and leave the flag unset.
+  assert_equal "$(dybatpho::generate_from_spec _spec_alias_parse --no-colour --without-cache)" "|"
+}
+
+@test "generated parsers prompt for missing values" {
+  # shellcheck disable=2329
+  _spec_prompts() {
+    dybatpho::opts::setup "" - action:'printf "%s|%s" "${NAME}" "${COLOR}"'
+    dybatpho::opts::param "Name" NAME --name prompt:"Your name"
+    dybatpho::opts::param "Color" COLOR --color choices:red,green prompt:"Pick a color"
+  }
+
+  local result
+  result="$(printf 'Alice\n2\n' | dybatpho::generate_from_spec _spec_prompts 2> /dev/null)"
+  assert_equal "${result}" "Alice|green"
+}
+
+@test "persistent params and display options are inherited by subcommands" {
+  # shellcheck disable=2329
+  _spec_persistent_sub() {
+    dybatpho::opts::setup "Child" - action:'printf "%s" "${TOKEN}"'
+  }
+  # shellcheck disable=2329
+  _spec_persistent_root() {
+    dybatpho::opts::setup "Root" -
+    dybatpho::opts::param "Token" TOKEN --token persistent:true
+    dybatpho::opts::disp "Version" --version persistent:true action:'printf "1.0.0"'
+    dybatpho::opts::cmd child _spec_persistent_sub
+  }
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_persistent_root child --token abc)" "abc"
+  assert_equal "$(dybatpho::generate_from_spec _spec_persistent_root child --version)" "1.0.0"
+}
+
+@test "init:action: runs a shell action while initializing an option" {
+  # shellcheck disable=2329
+  _spec_init_action() {
+    dybatpho::opts::setup "" - action:'printf "%s" "${STAMP}"'
+    dybatpho::opts::param "Stamp" STAMP --stamp init:action:'STAMP=generated'
+  }
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_init_action)" "generated"
+}
+
+@test "generated artifacts expand bracketed aliases for every shell" {
+  # shellcheck disable=2329
+  _spec_alias_artifacts() {
+    dybatpho::opts::setup "Alias artifacts" -
+    dybatpho::opts::flag "Colored output" COLORED --color alias:--{no-}colour
+    dybatpho::opts::flag "Cache toggle" CACHE --cache aliases:--with{out}-cache,-k
+    dybatpho::opts::param "Name" NAME --name alias:-n
+    dybatpho::opts::flag "Timing" TIMING --timing alias:--with{out}-timing
+    dybatpho::opts::cmd deploy _spec_alias_artifacts_child
+  }
+  # shellcheck disable=2329
+  _spec_alias_artifacts_child() {
+    dybatpho::opts::setup "Child" -
+  }
+
+  run_traced dybatpho::generate_schema _spec_alias_artifacts tool
+  assert_success
+  assert_output --partial '"--no-colour"'
+  assert_output --partial '"--without-cache"'
+  assert_output --partial '"-k"'
+  assert_output --partial '"--without-timing"'
+
+  # Fish prints switch names without their leading dashes.
+  local shell
+  for shell in bash zsh fish; do
+    run_traced dybatpho::generate_completion _spec_alias_artifacts "${shell}" tool
+    assert_success
+    assert_output --partial "no-colour"
+    assert_output --partial "without-cache"
+  done
+
+  run_traced dybatpho::generate_man _spec_alias_artifacts tool
+  assert_success
+  assert_output --partial "--without-cache"
+}
+
+@test "short aliases stay usable while long aliases set the help label" {
+  # shellcheck disable=2329
+  _spec_alias_short() {
+    dybatpho::opts::setup "" - action:'printf "%s|%s" "${QUIET:-}" "${NAME:-}"'
+    dybatpho::opts::flag "Quiet" QUIET --quiet aliases:-q,--silent
+    dybatpho::opts::param "Name" NAME --name aliases:-n
+  }
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_alias_short -q -n dybatpho)" "true|dybatpho"
+  assert_equal "$(dybatpho::generate_from_spec _spec_alias_short --silent)" "true|"
+
+  __current_cmd_path=""
+  run_traced dybatpho::generate_help _spec_alias_short
+  assert_output --partial "-q"
+  assert_output --partial "--silent"
+  assert_output --partial "-n"
+}
+
+@test "dybatpho::select rejects ranges and multiple answers in single mode" {
+  local selected
+  # A range and a second answer are both refused before a plain name is accepted.
+  selected="$(printf '1-2\n1,2\ngreen\n' | dybatpho::select 'Choose one color' 'red,green,blue' 2> /dev/null)"
+  assert_equal "green" "${selected}"
+}
+
+@test "primary bracketed switches and short primaries flow through every artifact" {
+  # shellcheck disable=2329
+  _spec_primary_forms() {
+    dybatpho::opts::setup "Primary forms" - action:'printf "%s|%s|%s" "${TOGGLE:-}" "${FEATURE:-}" "${QUIET:-}"'
+    dybatpho::opts::flag "Toggle" TOGGLE --{no-}toggle
+    dybatpho::opts::flag "Feature" FEATURE --with{out}-feature
+    dybatpho::opts::flag "Quiet" QUIET -q alias:--quiet-mode
+    dybatpho::opts::flag "Silent" SILENT -s aliases:-z,--silent-mode
+    dybatpho::opts::flag "Extra" EXTRA --extra aliases:--{no-}extended,--with{out}-extras
+    dybatpho::opts::disp "Version" --version action:'printf "2.0.0"'
+  }
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_primary_forms --toggle --with-feature -q)" "true|true|true"
+  assert_equal "$(dybatpho::generate_from_spec _spec_primary_forms --quiet-mode)" "||true"
+  assert_equal "$(dybatpho::generate_from_spec _spec_primary_forms --version)" "2.0.0"
+
+  __current_cmd_path=""
+  run_traced dybatpho::generate_help _spec_primary_forms
+  assert_success
+  assert_output --partial "--no-toggle"
+  assert_output --partial "--without-feature"
+  assert_output --partial "-q"
+  assert_output --partial "--quiet-mode"
+  assert_output --partial "--no-extended"
+  assert_output --partial "-z"
+  assert_output --partial "--silent-mode"
+  assert_output --partial "--version"
+
+  run_traced dybatpho::generate_schema _spec_primary_forms tool
+  assert_success
+  assert_output --partial '"--no-toggle"'
+  assert_output --partial '"--without-extras"'
+  assert_output --partial '"--version"'
 }

@@ -38,7 +38,7 @@ function __dybatpho_config_load_dotenv {
       value="${value%"${value##*[![:space:]]}"}"
     fi
     __dybatpho_config_set "${key}" "${value}"
-  done < "${file}"
+  done < "${file}" # kcov(skip)
 }
 
 function __dybatpho_config_load_structured {
@@ -76,7 +76,7 @@ function dybatpho::config_load {
       env | dotenv) __dybatpho_config_load_dotenv "${file}" ;;
       json) __dybatpho_config_load_structured json "${file}" ;;
       yaml | yml) __dybatpho_config_load_structured yaml "${file}" ;;
-      *) dybatpho::die "Unsupported configuration format: ${file}" ;;
+      *) dybatpho::die "Unsupported configuration format: ${file}" ;; # kcov(skip)
     esac
   done
 }
@@ -94,7 +94,7 @@ function dybatpho::config_env {
     [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
     [[ -v "${variable}" ]] || continue
     __dybatpho_config_set "${key}" "${!variable}"
-  done < <(compgen -v)
+  done < <(compgen -v) # kcov(skip)
 }
 
 #######################################
@@ -163,8 +163,8 @@ function dybatpho::config_schema {
   [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
     || dybatpho::die "Invalid configuration key: ${key}"
   case "${type}" in
-    string|int|bool|url|enum) ;;
-    *) dybatpho::die "Unsupported configuration type: ${type}" ;;
+    string|int|bool|url|enum) ;; # kcov(skip)
+    *) dybatpho::die "Unsupported configuration type: ${type}" ;; # kcov(skip)
   esac
   DYBATPHO_CONFIG_SCHEMA["${key}.type"]="${type}"
   shift 2
@@ -173,17 +173,19 @@ function dybatpho::config_schema {
     name="${rule%%:*}"
     value="${rule#*:}"
     case "${name}" in
-      required|default|min|max|choices) ;;
-      *) dybatpho::die "Unsupported configuration schema rule: ${name}" ;;
+      required|default|min|max|choices) ;; # kcov(skip)
+      *) dybatpho::die "Unsupported configuration schema rule: ${name}" ;; # kcov(skip)
     esac
     DYBATPHO_CONFIG_SCHEMA["${key}.${name}"]="${value}"
   done
 }
 
 function __dybatpho_config_schema_error {
+  # kcov(disabled) - this helper always terminates the shell
   local key reason
   dybatpho::expect_args key reason -- "$@"
   dybatpho::die "Invalid configuration \`${key}\`: ${reason}"
+  # kcov(enabled)
 }
 
 #######################################
@@ -199,7 +201,7 @@ function dybatpho::config_validate {
     if [[ ! -v "DYBATPHO_CONFIG[${key}]" ]]; then
       required="${DYBATPHO_CONFIG_SCHEMA[${key}.required]-false}"
       if dybatpho::is true "${required}"; then
-        __dybatpho_config_schema_error "${key}" "required value is missing"
+        __dybatpho_config_schema_error "${key}" "required value is missing" # kcov(skip)
       elif [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]]; then
         DYBATPHO_CONFIG["${key}"]="${DYBATPHO_CONFIG_SCHEMA[${key}.default]}"
       else

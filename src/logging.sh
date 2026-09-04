@@ -34,6 +34,11 @@ function __log {
   local out="${3:-stdout}"
   local color="${4:-${log_colors[${show_log_level}]}}"
 
+  # Redact registered secrets before anything reaches stdout or stderr.
+  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
+    __dybatpho_secret_mask_var msg
+  fi
+
   dybatpho::validate_log_level "${LOG_LEVEL}" || return 1
   dybatpho::validate_log_level "${show_log_level}" || return 1
 
@@ -103,6 +108,10 @@ function __log_structured {
   local timestamp
   dybatpho::compare_log_level "${log_level}" || return 0
   timestamp=$(__log_timestamp)
+
+  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
+    __dybatpho_secret_mask_var message
+  fi
 
   if [[ "${LOG_FORMAT}" == "json" ]]; then
     printf '{"timestamp":"%s","level":"%s","source":"%s","message":"%s"}\n' \

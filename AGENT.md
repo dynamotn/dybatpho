@@ -62,6 +62,7 @@ changed examples.
 | `notification.sh` | Webhook notifications and JSON payloads | `test/notification.bats`, `doc/notification.md`, `doc/spec/notification.md` |
 | `os.sh` | OS, architecture, and environment detection | `test/os.bats`, `doc/os.md`, `doc/spec/os.md` |
 | `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `doc/process.md`, `doc/spec/process.md` |
+| `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `doc/secret.md`, `doc/spec/secret.md` |
 | `semver.sh` | Semantic version parsing, comparison, and validation | `test/semver.bats`, `doc/semver.md`, `doc/spec/semver.md` |
 | `string.sh` | Case conversion, matching, splitting, trimming, and predicates | `test/string.bats`, `doc/string.md`, `doc/spec/string.md` |
 | `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `doc/table.md`, `doc/spec/table.md` |
@@ -78,6 +79,8 @@ documents the dependency and isolated tests provide the required setup.
   predictable and free of unexpected file writes or logging.
 - **System primitives** (`date`, `file`, `os`, `process`, `helpers`): prioritize
   GNU/BSD/BusyBox portability and return clear errors for invalid input.
+- **Security primitives** (`secret`): never log or export secret values, keep
+  the masking registry process-local, and validate file permissions before use.
 - **Integration modules** (`git`, `network`, `notification`, `archive`, `config`,
   `json`): validate dependencies, quote paths/URLs/payloads, and do not hide
   external command failures.

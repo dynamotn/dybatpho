@@ -99,6 +99,9 @@ quotes and newlines, and parse the resulting JSON record.
   wide Unicode glyphs when `python3` is available.
 - **FR-010**: The module MUST provide a percentage progress-bar helper with a
   configurable width.
+- **FR-011**: Text and JSON log output MUST redact values registered with
+  `src/secret.sh` whenever the masking registry is non-empty, without depending
+  on that module being loaded.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -107,6 +110,8 @@ quotes and newlines, and parse the resulting JSON record.
 - **Log Format**: `text` human-readable output or `json` structured diagnostic
   output.
 - **Progress Bar**: A carriage-return-updated percentage indicator.
+- **Masking Registry**: The optional process-local secret registry consulted
+  before a log line is written.
 
 ## Success Criteria *(mandatory)*
 

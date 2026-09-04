@@ -64,6 +64,8 @@ export DYBATPHO_DIR
 . "${DYBATPHO_DIR}/src/config.sh"
 # shellcheck source=src/file.sh
 . "${DYBATPHO_DIR}/src/file.sh"
+# shellcheck source=src/secret.sh
+. "${DYBATPHO_DIR}/src/secret.sh"
 # shellcheck source=src/archive.sh
 . "${DYBATPHO_DIR}/src/archive.sh"
 # shellcheck source=src/git.sh

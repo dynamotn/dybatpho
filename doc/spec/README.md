@@ -39,6 +39,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `date.md`
 - `semver.md`
 - `notification.md`
+- `secret.md`
 
 ## Source Mapping
 
@@ -61,6 +62,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/date.sh` -> `date.md`
 - `src/semver.sh` -> `semver.md`
 - `src/notification.sh` -> `notification.md`
+- `src/secret.sh` -> `secret.md`
 
 ## Notes
 

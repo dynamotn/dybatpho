@@ -82,7 +82,8 @@ As a CLI author, I want to declare command specs in shell functions so that I ca
 - **FR-002**: The library MUST expose reusable shell functions for strings,
   arrays, text, tables, logging, helpers, process handling, networking, date
   and structured data, configuration, file and archive operations, Git,
-  notifications, SemVer, CLI generation, and OS normalization.
+  notifications, secret handling, SemVer, CLI generation, and OS
+  normalization.
 - **FR-003**: The library MUST support strict-mode-friendly usage in scripts that run with fail-fast shell settings.
 - **FR-004**: The library MUST ship examples and generated documentation that map to the available modules and primary workflows.
 - **FR-005**: The library MUST keep user-visible behavior covered by the existing automated test suite.
@@ -103,7 +104,7 @@ As a CLI author, I want to declare command specs in shell functions so that I ca
 - **SC-001**: A new consumer can source one file and access the full library without additional bootstrap steps.
 - **SC-002**: Every top-level module in `src/` has a corresponding documented
   behavioral contract in `doc/spec/` and generated docs under `doc/`, including
-  `archive`, `notification`, and `semver`.
+  `archive`, `notification`, `secret`, and `semver`.
 - **SC-003**: Core workflows remain verifiable through the project test suite without ad hoc manual setup.
 - **SC-004**: Scripts using multiple dybatpho modules can complete common automation tasks with consistent logging, validation, and cleanup behavior.
 

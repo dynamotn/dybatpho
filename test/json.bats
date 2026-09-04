@@ -167,10 +167,11 @@ EOF
 
 @test "JSON helpers fail clearly when neither backend is installed" {
   local empty_path="${BATS_TEST_TMPDIR}/empty-bin"
+  local old_path="${PATH}"
   mkdir -p "${empty_path}"
-  run -127 bash -c \
-    'source "$1/init.sh"; PATH="$2"; dybatpho::json_query data.json "."' \
-    _ "${DYBATPHO_DIR}" "${empty_path}"
+  PATH="${empty_path}"
+  run -127 dybatpho::json_query "data.json" "."
+  PATH="${old_path}"
   assert_failure 127
   assert_output --partial "Neither yq nor jq is installed"
 }

@@ -87,6 +87,7 @@
 - [semver.sh](doc/semver.md) – Semantic versioning utilities
 - [config.sh](doc/config.md) – Configuration loading and precedence
 - [os.sh](doc/os.md) – Platform and command capability detection
+- [secret.sh](doc/secret.md) – Safe secret reading, masking, and storage
 
 ## 🎯 Usage Example
 

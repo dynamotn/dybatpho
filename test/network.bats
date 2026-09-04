@@ -245,3 +245,202 @@ setup() {
   unset DYBATPHO_CURL_MAX_RETRIES DYBATPHO_CURL_RETRY_BASE_DELAY
   unset DYBATPHO_CURL_RETRY_MAX_DELAY DYBATPHO_CURL_RETRY_JITTER
 }
+
+@test "dybatpho::curl_upload builds -F flags for value and file fields" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_upload"
+  local upload_file="${BATS_TEST_TMPDIR}/report.csv"
+  echo "data" > "${upload_file}"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  dybatpho::curl_upload https://this "${temp_file}" note="nightly run" "report=@${upload_file}"
+  grep -- "--request POST" "${temp_file}"
+  grep -- "F note=nightly run" "${temp_file}"
+  grep -- "F report=@${upload_file}" "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_upload allows overriding the request method" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_upload_override"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  dybatpho::curl_upload https://this "${temp_file}" note=1 --request PUT
+  grep -- "--request PUT" "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_upload fails when referenced file is missing" {
+  run --separate-stderr -2 dybatpho::curl_upload https://this /dev/null "report=@${BATS_TEST_TMPDIR}/missing.csv"
+  assert_failure
+}
+
+@test "dybatpho::verify_checksum succeeds on matching sha256" {
+  local file="${BATS_TEST_TMPDIR}/checksum_ok"
+  echo -n "hello" > "${file}"
+  local digest
+  digest=$(sha256sum "${file}" | awk '{print $1}')
+  run dybatpho::verify_checksum "${file}" "sha256:${digest}"
+  assert_success
+}
+
+@test "dybatpho::verify_checksum fails on mismatch" {
+  local file="${BATS_TEST_TMPDIR}/checksum_bad"
+  echo -n "hello" > "${file}"
+  run -7 dybatpho::verify_checksum "${file}" "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  assert_failure
+}
+
+@test "dybatpho::verify_checksum rejects invalid spec" {
+  local file="${BATS_TEST_TMPDIR}/checksum_invalid"
+  echo -n "hello" > "${file}"
+  run -8 dybatpho::verify_checksum "${file}" "invalid-spec"
+  assert_failure
+}
+
+@test "dybatpho::curl_resume_download adds resume flag" {
+  local temp_file="${BATS_TEST_TMPDIR}/test/resume_download"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  dybatpho::curl_resume_download https://this "${temp_file}"
+  grep -- "-C -" "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_resume_download verifies checksum on success" {
+  local temp_file="${BATS_TEST_TMPDIR}/test/resume_checksum"
+  local digest
+  digest=$(echo -n "hahaa" | sha256sum | awk '{print $1}')
+  stub curl ": echo '200'; echo -n 'hahaa' > ${temp_file}"
+  run dybatpho::curl_resume_download https://this "${temp_file}" "sha256:${digest}"
+  assert_success
+  unstub curl
+}
+
+@test "dybatpho::curl_resume_download fails on checksum mismatch" {
+  local temp_file="${BATS_TEST_TMPDIR}/test/resume_checksum_bad"
+  stub curl ": echo '200'; echo -n 'hahaa' > ${temp_file}"
+  run -7 dybatpho::curl_resume_download https://this "${temp_file}" "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  assert_failure
+  unstub curl
+}
+
+@test "dybatpho::curl_parse_response extracts status, headers, and body" {
+  local header_file="${BATS_TEST_TMPDIR}/headers.txt"
+  printf 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Request-Id: abc\r\n\r\n' > "${header_file}"
+  dybatpho::curl_parse_response "${header_file}" "/tmp/body.json"
+  assert_equal "${DYBATPHO_HTTP_STATUS}" "200"
+  assert_equal "${DYBATPHO_HTTP_HEADERS[content-type]}" "application/json"
+  assert_equal "${DYBATPHO_HTTP_HEADERS[x-request-id]}" "abc"
+  assert_equal "${DYBATPHO_HTTP_BODY_FILE}" "/tmp/body.json"
+}
+
+@test "dybatpho::curl_parse_response uses only the last block after a redirect" {
+  local header_file="${BATS_TEST_TMPDIR}/headers_redirect.txt"
+  printf 'HTTP/1.1 301 Moved Permanently\r\nLocation: https://new\r\n\r\nHTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n' > "${header_file}"
+  dybatpho::curl_parse_response "${header_file}"
+  assert_equal "${DYBATPHO_HTTP_STATUS}" "200"
+  assert_equal "${DYBATPHO_HTTP_HEADERS[content-type]}" "text/plain"
+  [[ -z "${DYBATPHO_HTTP_HEADERS[location]:-}" ]]
+}
+
+@test "dybatpho::curl_parse_response fails without a status line" {
+  local header_file="${BATS_TEST_TMPDIR}/headers_empty.txt"
+  : > "${header_file}"
+  run -1 dybatpho::curl_parse_response "${header_file}"
+  assert_failure
+}
+
+@test "dybatpho::curl_response_header returns value or default" {
+  local header_file="${BATS_TEST_TMPDIR}/headers_get.txt"
+  printf 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n' > "${header_file}"
+  dybatpho::curl_parse_response "${header_file}"
+  assert_equal "$(dybatpho::curl_response_header Content-Type)" "application/json"
+  assert_equal "$(dybatpho::curl_response_header X-Missing default-value)" "default-value"
+  run dybatpho::curl_response_header X-Missing
+  assert_failure
+}
+
+@test "dybatpho::curl_request populates normalized response state" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_request"
+  stub curl \
+    ": while ((\$#)); do if [[ \$1 == -D ]]; then printf 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n' > \$2; fi; shift; done; echo 'body' > ${temp_file}; echo '200'"
+  dybatpho::curl_request https://this "${temp_file}"
+  assert_equal "${DYBATPHO_HTTP_STATUS}" "200"
+  assert_equal "${DYBATPHO_HTTP_HEADERS[content-type]}" "application/json"
+  assert_equal "${DYBATPHO_HTTP_BODY_FILE}" "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_request skips response parsing during dry run" {
+  DRY_RUN=true
+  DYBATPHO_HTTP_STATUS=""
+  run_traced dybatpho::curl_request https://example.com /dev/null
+  DRY_RUN=""
+  assert_success
+  assert_equal "${DYBATPHO_HTTP_STATUS}" ""
+}
+
+@test "dybatpho::curl_timeout applies scoped connect/total timeout overrides" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_timeout"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  dybatpho::curl_timeout https://this "${temp_file}" 2 10
+  grep -- "--connect-timeout 2" "${temp_file}"
+  grep -- "--max-time 10" "${temp_file}"
+  unstub curl
+  # Global defaults must remain untouched after the scoped call.
+  assert_equal "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ""
+  assert_equal "${DYBATPHO_CURL_TIMEOUT}" ""
+}
+
+@test "dybatpho::curl_timeout allows overriding only the total timeout" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_timeout_total_only"
+  stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
+  dybatpho::curl_timeout https://this "${temp_file}" "" 5
+  grep -- "--max-time 5" "${temp_file}"
+  ! grep -- "--connect-timeout" "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_timeout rejects non-numeric overrides" {
+  run --separate-stderr dybatpho::curl_timeout https://this /dev/null abc
+  assert_failure
+}
+
+@test "dybatpho::circuit_breaker stays closed while under threshold" {
+  export DYBATPHO_CIRCUIT_THRESHOLD=3
+  dybatpho::circuit_reset test-service
+  run dybatpho::circuit_breaker test-service "false"
+  assert_failure
+  assert_equal "$(dybatpho::circuit_state test-service)" "closed"
+  unset DYBATPHO_CIRCUIT_THRESHOLD
+}
+
+@test "dybatpho::circuit_breaker opens after reaching the failure threshold" {
+  export DYBATPHO_CIRCUIT_THRESHOLD=2
+  export DYBATPHO_CIRCUIT_COOLDOWN=60
+  dybatpho::circuit_reset flaky-service
+  local status=0
+  dybatpho::circuit_breaker flaky-service "false" || true
+  dybatpho::circuit_breaker flaky-service "false" || status=$?
+  assert_equal "${status}" "1"
+  assert_equal "$(dybatpho::circuit_state flaky-service)" "open"
+  unset DYBATPHO_CIRCUIT_THRESHOLD DYBATPHO_CIRCUIT_COOLDOWN
+}
+
+@test "dybatpho::circuit_breaker short-circuits calls while open" {
+  export DYBATPHO_CIRCUIT_THRESHOLD=1
+  export DYBATPHO_CIRCUIT_COOLDOWN=60
+  dybatpho::circuit_reset blocked-service
+  dybatpho::circuit_breaker blocked-service "false" || true
+  run -9 dybatpho::circuit_breaker blocked-service "true"
+  assert_failure
+  unset DYBATPHO_CIRCUIT_THRESHOLD DYBATPHO_CIRCUIT_COOLDOWN
+}
+
+@test "dybatpho::circuit_breaker closes again after a successful call" {
+  export DYBATPHO_CIRCUIT_THRESHOLD=1
+  dybatpho::circuit_reset recovering-service
+  dybatpho::circuit_breaker recovering-service "false" || true
+  assert_equal "$(dybatpho::circuit_state recovering-service)" "open"
+  dybatpho::circuit_reset recovering-service
+  run dybatpho::circuit_breaker recovering-service "true"
+  assert_success
+  assert_equal "$(dybatpho::circuit_state recovering-service)" "closed"
+  unset DYBATPHO_CIRCUIT_THRESHOLD
+}

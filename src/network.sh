@@ -3,7 +3,10 @@
 # @brief Utilities for network
 # @description
 #   This module contains functions to work with network connection, downloads,
-#   JSON-oriented requests, and HEAD requests.
+#   JSON-oriented requests, and HEAD requests. It also provides multipart
+#   uploads, resumable downloads with checksum verification, normalized
+#   response parsing (status/headers/body), per-request timeouts, and an
+#   in-memory circuit breaker.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_CURL_MAX_RETRIES number Max number of retry attempts when `dybatpho::curl_do` retries a request
@@ -12,12 +15,25 @@
 # @env DYBATPHO_CURL_RETRY_JITTER bool Add up to one base delay of random jitter
 # @env DYBATPHO_CURL_CONNECT_TIMEOUT number Optional curl connection timeout in seconds
 # @env DYBATPHO_CURL_TIMEOUT number Optional curl total timeout in seconds
+# @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before `dybatpho::circuit_breaker` opens a circuit (default `5`)
+# @env DYBATPHO_CIRCUIT_COOLDOWN number Seconds an open circuit waits before allowing a trial request (default `30`)
 DYBATPHO_CURL_MAX_RETRIES=${DYBATPHO_CURL_MAX_RETRIES:-5}
 DYBATPHO_CURL_RETRY_BASE_DELAY=${DYBATPHO_CURL_RETRY_BASE_DELAY:-2}
 DYBATPHO_CURL_RETRY_MAX_DELAY=${DYBATPHO_CURL_RETRY_MAX_DELAY:-30}
 DYBATPHO_CURL_RETRY_JITTER=${DYBATPHO_CURL_RETRY_JITTER:-false}
 DYBATPHO_CURL_CONNECT_TIMEOUT=${DYBATPHO_CURL_CONNECT_TIMEOUT:-}
 DYBATPHO_CURL_TIMEOUT=${DYBATPHO_CURL_TIMEOUT:-}
+DYBATPHO_CIRCUIT_THRESHOLD=${DYBATPHO_CIRCUIT_THRESHOLD:-5}
+DYBATPHO_CIRCUIT_COOLDOWN=${DYBATPHO_CIRCUIT_COOLDOWN:-30}
+
+# Normalized state populated by `dybatpho::curl_parse_response`/`dybatpho::curl_request`.
+declare -gA DYBATPHO_HTTP_HEADERS=()
+DYBATPHO_HTTP_STATUS=""
+DYBATPHO_HTTP_BODY_FILE=""
+
+# Per-key in-memory state used by `dybatpho::circuit_breaker`.
+declare -gA DYBATPHO_CIRCUIT_FAILURES=()
+declare -gA DYBATPHO_CIRCUIT_OPENED_AT=()
 
 #######################################
 # @description Get description of HTTP status code
@@ -265,4 +281,345 @@ function dybatpho::curl_head {
     shift
   fi
   dybatpho::curl_do "${url}" "${output}" -I "$@"
+}
+
+#######################################
+# @description Upload fields and files with curl using multipart/form-data.
+# @example
+#   dybatpho::curl_upload https://example.com/upload /tmp/resp.json note="nightly run" report=@/tmp/report.csv
+#   dybatpho::curl_upload https://example.com/upload /tmp/resp.json report=@/tmp/report.csv --request PUT
+#
+# @arg $1 string URL
+# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $@ string Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments
+# @see dybatpho::curl_do
+# @exitcode 2 A `name=@path` field references a file that does not exist
+# @tip The request method defaults to `POST`; pass `--request PUT` (or similar) afterwards to override it
+#######################################
+function dybatpho::curl_upload {
+  local url
+  dybatpho::expect_args url -- "$@"
+  shift
+  local output="/dev/null"
+  if (($# > 0)); then
+    output="$1"
+    shift
+  fi
+
+  local curl_args=() field path
+  while (($#)); do
+    field="$1"
+    shift
+    if [[ "${field}" =~ ^[^=]+=@(.+)$ ]]; then
+      path="${BASH_REMATCH[1]}"
+      dybatpho::is file "${path}" || dybatpho::die "Upload file not found: ${path}" 2
+      curl_args+=(-F "${field}")
+    elif [[ "${field}" == *=* ]]; then
+      curl_args+=(-F "${field}")
+    else
+      curl_args+=("${field}")
+    fi
+  done
+
+  dybatpho::curl_do "${url}" "${output}" --request POST "${curl_args[@]}"
+}
+
+#######################################
+# @description Verify a downloaded file against an expected checksum.
+# @arg $1 string File to verify
+# @arg $2 string Expected checksum as `algorithm:hexdigest`, algorithm is one of `sha256`, `sha1`, or `md5`
+# @exitcode 7 Checksum mismatch
+# @exitcode 8 Unsupported algorithm, invalid spec, or the checksum tool isn't installed
+#######################################
+function dybatpho::verify_checksum {
+  local file checksum
+  dybatpho::expect_args file checksum -- "$@"
+
+  [[ "${checksum}" =~ ^(sha256|sha1|md5):([0-9a-fA-F]+)$ ]] \
+    || dybatpho::die "Invalid checksum spec: ${checksum}" 8
+  local algorithm="${BASH_REMATCH[1]}" expected="${BASH_REMATCH[2],,}"
+  local tool
+  case "${algorithm}" in
+    sha256) tool="sha256sum" ;;
+    sha1) tool="sha1sum" ;;
+    md5) tool="md5sum" ;;
+  esac
+  dybatpho::is command "${tool}" || dybatpho::die "${tool} isn't installed" 8
+
+  local actual
+  actual=$("${tool}" "${file}" | awk '{print $1}') || dybatpho::die "Unable to compute ${algorithm} checksum for ${file}" 8
+  if [[ "${actual,,}" != "${expected}" ]]; then
+    dybatpho::error "Checksum mismatch for ${file}: expected ${expected}, got ${actual}"
+    return 7
+  fi
+  dybatpho::debug "Checksum verified for ${file} (${algorithm})"
+}
+
+#######################################
+# @description Download a file with resume support and optional checksum verification.
+# @example
+#   dybatpho::curl_resume_download https://example.com/big.iso /tmp/big.iso
+#   dybatpho::curl_resume_download https://example.com/big.iso /tmp/big.iso sha256:3a7bd3e2360a3d...
+#
+# @arg $1 string URL
+# @arg $2 string Destination of file to download
+# @arg $3 string Optional checksum as `algorithm:hexdigest` (sha256, sha1, or md5)
+# @arg $@ string Other options/arguments for curl
+# @see dybatpho::curl_download
+# @see dybatpho::verify_checksum
+# @exitcode 6 Can't create folder of destination file
+# @exitcode 7 Checksum verification failed
+# @exitcode 8 Unsupported checksum algorithm or missing checksum tool
+# @tip A partially downloaded destination file is resumed instead of restarted
+#######################################
+function dybatpho::curl_resume_download {
+  local url dst_file
+  dybatpho::expect_args url dst_file -- "$@"
+  shift 2
+
+  local checksum=""
+  if (($# > 0)) && [[ "$1" =~ ^(sha256|sha1|md5):[0-9a-fA-F]+$ ]]; then
+    checksum="$1"
+    shift
+  fi
+
+  local dst_dir
+  dst_dir=$(dirname "${dst_file}") || return 6
+  mkdir -p "${dst_dir}" || return 6
+
+  dybatpho::progress "Downloading ${url} (resume enabled)"
+  dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent -C - "$@" || return $?
+
+  if [[ -n "${checksum}" ]]; then
+    dybatpho::verify_checksum "${dst_file}" "${checksum}" || return $?
+  fi
+}
+
+#######################################
+# @description Parse a raw curl header dump (and optional body file) into normalized response state.
+# @arg $1 string Path to a header file captured via `curl -D` (may contain multiple header blocks from redirects; the last block wins)
+# @arg $2 string Optional path to the response body file to record
+# @set DYBATPHO_HTTP_STATUS number Status code of the last received response block
+# @set DYBATPHO_HTTP_HEADERS map Lower-cased header name to value, from the last response block
+# @set DYBATPHO_HTTP_BODY_FILE string Path to the response body, or empty when omitted
+# @exitcode 1 No status line was found in the header file
+#######################################
+function dybatpho::curl_parse_response {
+  local header_file
+  dybatpho::expect_args header_file -- "$@"
+  shift
+  local body_file="${1:-}"
+  (($# > 0)) && shift
+
+  dybatpho::is file "${header_file}" || dybatpho::die "Header file not found: ${header_file}"
+
+  DYBATPHO_HTTP_STATUS=""
+  DYBATPHO_HTTP_HEADERS=()
+  DYBATPHO_HTTP_BODY_FILE="${body_file}"
+
+  local line key value
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line%$'\r'}"
+    if [[ "${line}" =~ ^HTTP/[0-9.]+[[:space:]]+([0-9]{3}) ]]; then
+      DYBATPHO_HTTP_STATUS="${BASH_REMATCH[1]}"
+      DYBATPHO_HTTP_HEADERS=() # A new status line starts a new block, e.g. after a redirect.
+      continue
+    fi
+    [[ -z "${line}" ]] && continue
+    if [[ "${line}" =~ ^([^:]+):[[:space:]]?(.*)$ ]]; then
+      key="${BASH_REMATCH[1],,}"
+      value="${BASH_REMATCH[2]}"
+      DYBATPHO_HTTP_HEADERS["${key}"]="${value}"
+    fi
+  done < "${header_file}"
+
+  [[ -n "${DYBATPHO_HTTP_STATUS}" ]]
+}
+
+#######################################
+# @description Print a normalized response header captured by `dybatpho::curl_parse_response`.
+# @arg $1 string Header name, matched case-insensitively
+# @arg $2 string Optional default value
+# @stdout Header value
+# @exitcode 1 Header is missing and no default was supplied
+#######################################
+function dybatpho::curl_response_header {
+  local name
+  dybatpho::expect_args name -- "$@"
+  local name_lower="${name,,}"
+  if [[ -v "DYBATPHO_HTTP_HEADERS[${name_lower}]" ]]; then
+    printf '%s\n' "${DYBATPHO_HTTP_HEADERS[${name_lower}]}"
+  elif (($# > 1)); then
+    printf '%s\n' "$2"
+  else
+    return 1
+  fi
+}
+
+#######################################
+# @description Perform a request via `dybatpho::curl_do` and parse its response into normalized status/header/body state.
+# @example
+#   dybatpho::curl_request https://example.com/api /tmp/resp.json
+#   echo "${DYBATPHO_HTTP_STATUS}"
+#   dybatpho::curl_response_header content-type
+#
+# @arg $1 string URL
+# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $@ string Other options/arguments for curl
+# @see dybatpho::curl_do
+# @see dybatpho::curl_parse_response
+# @set DYBATPHO_HTTP_STATUS number Status code of the last received response block
+# @set DYBATPHO_HTTP_HEADERS map Lower-cased header name to value, from the last response block
+# @set DYBATPHO_HTTP_BODY_FILE string Path holding the response body
+# @tip Response headers aren't captured while `DRY_RUN` is enabled
+#######################################
+function dybatpho::curl_request {
+  local url
+  dybatpho::expect_args url -- "$@"
+  shift
+  local output="/dev/null"
+  if (($# > 0)); then
+    output="$1"
+    shift
+  fi
+
+  local header_file
+  dybatpho::create_temp header_file ".headers"
+  local exit_code=0
+  dybatpho::curl_do "${url}" "${output}" "$@" -D "${header_file}" || exit_code=$?
+
+  if ! dybatpho::is true "${DRY_RUN}"; then
+    dybatpho::curl_parse_response "${header_file}" "${output}"
+  fi
+  return "${exit_code}"
+}
+
+#######################################
+# @description Perform a request via `dybatpho::curl_do` with connect/total timeouts scoped to this call only.
+# @example
+#   dybatpho::curl_timeout https://example.com /tmp/out 2 10
+#   dybatpho::curl_timeout https://example.com /tmp/out "" 5 --header "X-Test: 1"
+#
+# @arg $1 string URL
+# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $3 number Connect timeout in seconds for this request, empty keeps the global default
+# @arg $4 number Total timeout in seconds for this request, empty keeps the global default
+# @arg $@ string Other options/arguments for curl
+# @see dybatpho::curl_do
+# @tip Overrides apply only for the duration of this call; global `DYBATPHO_CURL_*` timeouts are unaffected
+#######################################
+function dybatpho::curl_timeout {
+  local url
+  dybatpho::expect_args url -- "$@"
+  shift
+  local output="/dev/null"
+  if (($# > 0)); then
+    output="$1"
+    shift
+  fi
+
+  local connect_timeout="" total_timeout=""
+  if (($# > 0)); then
+    connect_timeout="$1"
+    shift
+  fi
+  if (($# > 0)); then
+    total_timeout="$1"
+    shift
+  fi
+  [[ -z "${connect_timeout}" || "${connect_timeout}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "Connect timeout must be a non-negative integer"
+  [[ -z "${total_timeout}" || "${total_timeout}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "Total timeout must be a non-negative integer"
+
+  (
+    [[ -n "${connect_timeout}" ]] && DYBATPHO_CURL_CONNECT_TIMEOUT="${connect_timeout}"
+    [[ -n "${total_timeout}" ]] && DYBATPHO_CURL_TIMEOUT="${total_timeout}"
+    dybatpho::curl_do "${url}" "${output}" "$@"
+  )
+}
+
+#######################################
+# @description Report whether a circuit breaker key is currently open, half-open, or closed.
+# @arg $1 string Circuit key
+# @stdout `open`, `half-open`, or `closed`
+#######################################
+function dybatpho::circuit_state {
+  local key
+  dybatpho::expect_args key -- "$@"
+  local opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${key}]:-0}"
+  if ((opened_at == 0)); then
+    echo closed
+    return 0
+  fi
+  local now elapsed
+  now=$(date +%s)
+  elapsed=$((now - opened_at))
+  if ((elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
+    echo open
+  else
+    echo half-open
+  fi
+}
+
+#######################################
+# @description Reset a circuit breaker key back to the closed state.
+# @arg $1 string Circuit key
+#######################################
+function dybatpho::circuit_reset {
+  local key
+  dybatpho::expect_args key -- "$@"
+  DYBATPHO_CIRCUIT_FAILURES["${key}"]=0
+  DYBATPHO_CIRCUIT_OPENED_AT["${key}"]=0
+}
+
+#######################################
+# @description Run a shell command guarded by a circuit breaker keyed by name.
+# @example
+#   dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example.com/health"
+#
+# @arg $1 string Circuit key, typically a host or service name
+# @arg $2 string Shell command string to run
+# @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before the circuit opens (default `5`)
+# @env DYBATPHO_CIRCUIT_COOLDOWN number Seconds the circuit stays open before a trial request is allowed (default `30`)
+# @exitcode 0 The command succeeded, or a trial request succeeded and closed the circuit
+# @exitcode 9 The circuit is open; the command was not attempted
+# @exitcode other The command's own exit code, while the circuit is closed or half-open
+# @tip The command is executed with `eval`, so pass it as one shell command string
+# @note Circuit breaker state is in-memory and process-local; it does not persist across script invocations
+#######################################
+function dybatpho::circuit_breaker {
+  local key command
+  dybatpho::expect_args key command -- "$@"
+  shift 2
+
+  local failures="${DYBATPHO_CIRCUIT_FAILURES[${key}]:-0}"
+  local opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${key}]:-0}"
+  local now
+  now=$(date +%s)
+
+  if ((opened_at > 0)); then
+    local elapsed=$((now - opened_at))
+    if ((elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
+      dybatpho::warn "Circuit '${key}' is open; skipping request (retry in $((DYBATPHO_CIRCUIT_COOLDOWN - elapsed))s)"
+      return 9
+    fi
+    dybatpho::debug "Circuit '${key}' cooldown elapsed; allowing a trial request"
+  fi
+
+  local exit_code=0
+  eval "${command}" || exit_code=$?
+
+  if ((exit_code == 0)); then
+    DYBATPHO_CIRCUIT_FAILURES["${key}"]=0
+    DYBATPHO_CIRCUIT_OPENED_AT["${key}"]=0
+  else
+    failures=$((failures + 1))
+    DYBATPHO_CIRCUIT_FAILURES["${key}"]="${failures}"
+    if ((failures >= DYBATPHO_CIRCUIT_THRESHOLD)); then
+      DYBATPHO_CIRCUIT_OPENED_AT["${key}"]="${now}"
+      dybatpho::warn "Circuit '${key}' opened after ${failures} consecutive failures"
+    fi
+  fi
+  return "${exit_code}"
 }

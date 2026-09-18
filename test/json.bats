@@ -151,6 +151,112 @@ EOF
   unstub yq
 }
 
+# ---------------------------------------------------------------------------
+# In-memory document helpers
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::json_string no arg" {
+  run dybatpho::json_string
+  assert_failure
+}
+
+@test "dybatpho::json_string quotes and escapes a value" {
+  assert_equal "$(dybatpho::json_string 'plain')" '"plain"'
+  assert_equal "$(dybatpho::json_string 'he said "hi"')" '"he said \"hi\""'
+  assert_equal "$(dybatpho::json_string 'back\slash')" '"back\\slash"'
+  assert_equal "$(dybatpho::json_string "$(printf 'l1\nl2')")" '"l1\nl2"'
+}
+
+@test "dybatpho::json_string encodes an empty value" {
+  assert_equal "$(dybatpho::json_string '')" '""'
+}
+
+@test "dybatpho::json_object rejects an odd number of arguments" {
+  run --separate-stderr dybatpho::json_object name
+  assert_failure
+  assert_stderr --partial "even number of arguments"
+}
+
+@test "dybatpho::json_object builds an empty object with no arguments" {
+  assert_equal "$(dybatpho::json_object)" "{}"
+}
+
+@test "dybatpho::json_object escapes every value" {
+  local document
+  document=$(dybatpho::json_object status ok message 'it "worked"')
+  assert_equal "$(dybatpho::json_get "${document}" '.status')" "ok"
+  assert_equal "$(dybatpho::json_get "${document}" '.message')" 'it "worked"'
+}
+
+@test "dybatpho::json_object keeps a value that looks like YAML as a string" {
+  local document
+  document=$(dybatpho::json_object note 'key: value' flag 'true')
+  assert_equal "$(dybatpho::json_get "${document}" '.note')" "key: value"
+  assert_equal "$(dybatpho::json_eval "${document}" '.flag')" '"true"'
+}
+
+@test "dybatpho::json_object nests an already encoded document" {
+  local document
+  document=$(dybatpho::json_object name api ports:json '[80,443]' meta:json '{"tier":1}')
+  assert_equal "$(dybatpho::json_get "${document}" '.ports[1]')" "443"
+  assert_equal "$(dybatpho::json_get "${document}" '.meta.tier')" "1"
+}
+
+@test "dybatpho::json_object accepts a name containing spaces" {
+  local document
+  document=$(dybatpho::json_object 'two words' value)
+  # Bracket syntax is the form both backends accept for an awkward key.
+  assert_equal "$(dybatpho::json_get "${document}" '.["two words"]')" "value"
+}
+
+@test "dybatpho::json_eval no arg" {
+  run dybatpho::json_eval
+  assert_failure
+}
+
+@test "dybatpho::json_eval returns compact JSON" {
+  assert_equal "$(dybatpho::json_eval '{"a":[1,2]}' '.a')" "[1,2]"
+  assert_equal "$(dybatpho::json_eval '[]' '. + [{"a":1}]')" '[{"a":1}]'
+}
+
+@test "dybatpho::json_get no arg" {
+  run dybatpho::json_get
+  assert_failure
+}
+
+@test "dybatpho::json_get returns a bare scalar" {
+  assert_equal "$(dybatpho::json_get '{"a":"x y"}' '.a')" "x y"
+  assert_equal "$(dybatpho::json_get '{"a":"x: y"}' '.a')" "x: y"
+  assert_equal "$(dybatpho::json_get '{"a":2}' '.a')" "2"
+}
+
+@test "dybatpho::json_get falls back through the alternative operator" {
+  assert_equal "$(dybatpho::json_get '{}' '.missing // "none"')" "none"
+}
+
+@test "dybatpho::json_valid no arg" {
+  run dybatpho::json_valid
+  assert_failure
+}
+
+@test "dybatpho::json_valid separates documents from prose" {
+  run dybatpho::json_valid '{"a":1}'
+  assert_success
+  run dybatpho::json_valid '[1,2]'
+  assert_success
+  run dybatpho::json_valid 'definitely not json'
+  assert_failure
+  run dybatpho::json_valid '{"a":'
+  assert_failure
+}
+
+@test "the in-memory helpers round-trip a document through both directions" {
+  local document
+  document=$(dybatpho::json_object text "$(printf 'quote " and\nnewline')")
+  dybatpho::json_valid "${document}"
+  assert_equal "$(dybatpho::json_get "${document}" '.text')" "$(printf 'quote " and\nnewline')"
+}
+
 @test "JSON has and pretty helpers also fall back to jq" {
   local output_file="${BATS_TEST_TMPDIR}/jq-pretty.json"
   local old_path="${PATH}"

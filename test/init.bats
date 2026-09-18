@@ -110,6 +110,12 @@ loaded_line() {
 
   run -0 init_sh "--modules testing" "$(loaded_line)"
   assert_output "string logging helpers process file secret json network table text testing "
+
+  run -0 init_sh "--modules ai" "$(loaded_line)"
+  assert_output "string logging helpers process file secret network json ai "
+
+  run -0 init_sh "--modules agent" "$(loaded_line)"
+  assert_output "string logging helpers process file secret cli archive safety json agent "
 }
 
 @test "a dependency cycle loads every module once and terminates" {

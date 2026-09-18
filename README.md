@@ -32,7 +32,7 @@ No dependency manager, no runtime, no build step — just Bash ≥ 4 and the fil
 
 ## 🚀 Why dybatpho?
 
-- **Batteries included** — modules covering the things every script ends up rewriting: logs, arguments, retries, temp files, traps.
+- **Batteries included** — modules covering the things every script ends up rewriting: logs, arguments, retries, temp files, traps — and now talking to language models.
 - **Load what you need** — the core modules by default, anything else by name, with dependencies resolved for you.
 - **Safe by default** — strict mode, error handlers, signal cleanup and secret masking are wired in from `init.sh`.
 - **Portable** — works on GNU/Linux and macOS/BSD, with the flag differences handled for you.
@@ -156,6 +156,13 @@ with a missing function. See [init.sh reference](doc/init.md) and
 | [config.sh](doc/config.md)      | Config files + env vars with precedence and schema validation      |
 | [secret.sh](doc/secret.md)      | Read secrets safely, mask them in output, shred and wipe them      |
 | [safety.sh](doc/safety.md)      | Confirm-or-refuse guards for rm, overwrite, extract, system changes |
+
+### 🤖 AI
+
+| Module                      | What you get                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| [ai.sh](doc/ai.md)          | Call Claude, OpenAI-compatible APIs, Ollama or a local CLI — conversations, JSON output, streaming, tool use, budgets |
+| [agent.sh](doc/agent.md)    | Make your script agent-safe — JSON results, tool/MCP definitions generated from your CLI spec, an allowlist gate, an audit log |
 
 ### 🛠 Dev workflow
 

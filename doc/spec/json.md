@@ -31,6 +31,32 @@ As a script author, I want helpers that wrap `yq` for common JSON queries and ch
 
 ---
 
+### User Story 1b - Assemble a JSON document safely (Priority: P1)
+
+As a script author, I want to build a JSON document from shell values without
+thinking about escaping, so that a quotation mark in a log line or a newline in
+a commit message cannot corrupt the payload I am about to send.
+
+**Why this priority**: hand-built JSON is the most common way a shell script
+silently produces invalid output.
+
+**Independent Test**: Build an object from values containing quotes,
+backslashes, and newlines, then read each value back and compare it with the
+original.
+
+**Acceptance Scenarios**:
+
+1. **Given** values containing JSON-sensitive characters, **When** an object is
+   built, **Then** every value round-trips unchanged
+2. **Given** a name carrying the `:json` suffix, **When** an object is built,
+   **Then** the value is nested as a document rather than quoted as a string
+3. **Given** a document held in a variable, **When** a filter is evaluated,
+   **Then** the result is available either as compact JSON or as a bare scalar
+4. **Given** either backend, **When** the same helpers run, **Then** they
+   produce the same result
+
+---
+
 ### User Story 2 - Query YAML data cleanly (Priority: P1)
 
 As a script author, I want helpers that wrap `yq` for YAML queries and checks so that configuration-file lookups stay readable in shell scripts.
@@ -96,12 +122,27 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
 - **FR-007**: The module MUST provide a YAML pretty-print helper.
 - **FR-008**: The module MUST provide a YAML-to-JSON conversion helper.
 - **FR-009**: The output-oriented helpers MUST support stdout output and optional destination files where applicable.
+- **FR-010**: The module MUST provide a helper that encodes an arbitrary string
+  as a JSON string value, escaping quotes, backslashes, and control characters.
+- **FR-011**: The module MUST provide a helper that builds a JSON object from
+  name and value pairs, escaping every value, and MUST insert a value as-is when
+  its name carries the `:json` suffix.
+- **FR-012**: The object helper MUST reject an odd number of arguments.
+- **FR-013**: The module MUST provide helpers that evaluate a filter against a
+  document held in a shell variable, one returning compact JSON and one
+  returning a bare scalar.
+- **FR-014**: The module MUST provide a predicate that reports whether a string
+  held in a shell variable is valid JSON.
+- **FR-015**: The in-memory helpers MUST behave identically on both backends,
+  which means filters written for them stay inside the subset the two share.
 
 ### Key Entities *(include if feature involves data)*
 
 - **JSON Filter**: A caller-provided expression used to query or validate JSON input.
 - **YAML Expression**: A caller-provided `yq` expression used to query or validate YAML input.
 - **Structured Document**: An input JSON or YAML file path, or `-` for stdin.
+- **In-Memory Document**: A JSON string a script is still assembling, held in a
+  shell variable rather than written to a file.
 
 ## Success Criteria *(mandatory)*
 
@@ -110,6 +151,8 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
 - **SC-001**: Scripts can express common JSON and YAML queries without repeating raw `yq` and `jq` command lines.
 - **SC-002**: Predicate-style helpers are easy to use in shell control flow.
 - **SC-003**: Conversion between JSON and YAML is available through a small reusable API.
+- **SC-004**: A script can assemble a JSON document containing arbitrary text
+  without thinking about escaping, and without depending on one specific backend.
 
 ## Integration Tests *(mandatory)*
 
@@ -118,6 +161,16 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
 - **IT-003**: Query a YAML document and verify the expected value is printed.
 - **IT-004**: Check YAML existence semantics and verify success/failure behavior.
 - **IT-005**: Convert JSON to YAML and YAML to JSON with both stdout and output-file workflows.
+- **IT-006**: Encode strings containing quotes, backslashes, newlines, and
+  nothing at all, and verify the result is a valid JSON string value.
+- **IT-007**: Build objects with escaped values, nested `:json` documents, and
+  awkward names, and verify an odd argument count is rejected.
+- **IT-008**: Evaluate filters against in-memory documents and verify compact
+  JSON, bare scalars, and the alternative operator.
+- **IT-009**: Verify the JSON predicate separates documents from prose and from
+  truncated input.
+- **IT-010**: Verify the in-memory helpers produce the same results under both
+  the `yq` and the `jq` backend.
 
 ## Acceptance Criteria *(mandatory)*
 

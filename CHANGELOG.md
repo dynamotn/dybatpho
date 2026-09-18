@@ -28,6 +28,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::metrics_time backup_duration_seconds target=db -- pg_dump -Fc mydb -f /backup/db.dump
   dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
   ```
+- **`ai` module.** Call a language model from a script the way you call any
+  other command: prompt in, text on stdout, a documented exit code. One API
+  covers four backends — the Claude Messages API, any OpenAI-compatible
+  `/v1/chat/completions` endpoint, a local Ollama daemon, and an installed
+  `claude`, `llm` or `ollama` client — so the choice of provider is
+  configuration, not a rewrite.
+
+  ```sh
+  . dybatpho/init.sh --modules ai
+  dybatpho::ai_ask "Summarize this deploy log in three bullets"
+  ```
+
+  Around the call it provides what a script actually needs: conversations kept
+  in a file (`ai_conversation_new`, `ai_chat`), answers validated against a
+  JSON schema (`ai_json`), token streaming (`ai_stream`), a tool-use loop that
+  runs your shell functions (`ai_tool_register`, `ai_run`), response caching,
+  and usage accounting. Secrets registered with `dybatpho::secret_register` are
+  masked before any request is built, `dybatpho::ai_budget` caps how many calls
+  a run may make, and `DRY_RUN` exercises the whole path without sending
+  anything. Needs `yq` or `jq`, like the rest of the library.
+
+- **`agent` module.** Make a script safe for an AI agent to drive.
+  `agent_result` and `agent_error` print readable text for a person and JSON
+  for an agent from the same call site; `agent_confirm` replaces an
+  unanswerable prompt with an explicit `DYBATPHO_AGENT_ALLOW` allowlist and
+  records every decision through `agent_audit`; `agent_context` tells a model
+  what it is working with before it acts.
+
+  ```sh
+  . dybatpho/init.sh --modules agent
+  dybatpho::agent_tools _spec_root mytool anthropic # Claude tool definitions
+  dybatpho::agent_mcp _spec_root mytool             # MCP tools/list payload
+  ```
+
+  Tool definitions are generated from the same `cli.sh` option spec that drives
+  the parser, in Anthropic, OpenAI, or MCP shape, so a schema cannot describe an
+  option the CLI does not have. Needs `yq` or `jq`, like the rest of the library.
+
+- **JSON documents you are still assembling.** `json.sh` gains five helpers for
+  documents held in a shell variable rather than a file, so building JSON no
+  longer means quoting by hand:
+
+  ```sh
+  dybatpho::json_object status ok message 'it "worked"' ports:json '[80,443]'
+  # {"status":"ok","message":"it \"worked\"","ports":[80,443]}
+  ```
+
+  `json_string` encodes one value, `json_object` builds an object from name and
+  value pairs (a name ending in `:json` nests an already-encoded document),
+  `json_eval` and `json_get` run a filter against a document in a variable
+  returning compact JSON or a bare scalar, and `json_valid` reports whether a
+  string parses. All five prefer `yq` and fall back to `jq`, like the rest of
+  the module, and the `ai` and `agent` modules are built on them.
+
+- `example/ai_ops.sh` and `example/agent_ops.sh`, both runnable with no API key.
 
 ## [2.0.0] - 2026-09-17
 

@@ -70,10 +70,45 @@ EOF
   done
 }
 
+function _demo_in_memory {
+  dybatpho::header "DOCUMENTS IN A VARIABLE"
+
+  dybatpho::info "Encoding one value:"
+  dybatpho::print "  $(dybatpho::json_string 'he said "hi"')"
+
+  local document
+  document=$(dybatpho::json_object \
+    service api \
+    note 'operator said "restart at 02:00"' \
+    ports:json '[80,443]')
+  dybatpho::info "Building an object, escaping included:"
+  dybatpho::print "  ${document}"
+
+  dybatpho::info "Reading it back:"
+  dybatpho::print "  service: $(dybatpho::json_get "${document}" '.service')"
+  dybatpho::print "  ports:   $(dybatpho::json_eval "${document}" '.ports')"
+
+  dybatpho::info "Appending to an array:"
+  local list='[]'
+  list=$(dybatpho::json_eval "${list}" \
+    ". + [$(dybatpho::json_object name web)]")
+  list=$(dybatpho::json_eval "${list}" \
+    ". + [$(dybatpho::json_object name worker)]")
+  dybatpho::print "  ${list}"
+
+  if dybatpho::json_valid "${document}"; then
+    dybatpho::info "The document parses"
+  fi
+  if ! dybatpho::json_valid 'not a document'; then
+    dybatpho::info "Prose does not, so a script can tell the difference"
+  fi
+}
+
 function _main {
   _demo_json_helpers
   _demo_yaml_helpers
   _demo_conversion
+  _demo_in_memory
   dybatpho::success "JSON operations demo complete"
 }
 

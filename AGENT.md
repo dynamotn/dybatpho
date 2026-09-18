@@ -100,6 +100,8 @@ changed examples.
 
 | Module | Primary responsibility | Tests / documentation |
 | --- | --- | --- |
+| `agent.sh` | Agent detection, structured results and errors, allowlist gate, audit log, and tool/MCP definitions generated from a CLI spec | `test/agent.bats`, `doc/agent.md`, `doc/spec/agent.md` |
+| `ai.sh` | Language model calls across Claude, OpenAI-compatible, Ollama, and CLI backends, with conversations, JSON output, streaming, tool use, caching, and budgets | `test/ai.bats`, `doc/ai.md`, `doc/spec/ai.md` |
 | `array.sh` | Create, read, join, filter, and manipulate Bash arrays | `test/array.bats`, `doc/array.md`, `doc/spec/array.md` |
 | `archive.sh` | Create, extract, and inspect archives | `test/archive.bats`, `doc/archive.md`, `doc/spec/archive.md` |
 | `cli.sh` | Declarative parser, help, subcommands, completions, and CLI artifacts | `test/cli.bats`, `doc/cli.md`, `doc/spec/cli.md` |

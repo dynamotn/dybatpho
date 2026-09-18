@@ -16,7 +16,7 @@
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 string Name of the array variable to fill
 #######################################
-function __text_read_lines {
+function __dybatpho_text_read_lines {
   local input target_var
   dybatpho::expect_args input target_var -- "$@"
   local -n target_ref="${target_var}"
@@ -49,7 +49,7 @@ function dybatpho::text_indent {
   local -a lines=()
   local line
 
-  __text_read_lines "${input}" lines
+  __dybatpho_text_read_lines "${input}" lines
   for line in "${lines[@]}"; do
     printf '%s%s\n' "${prefix}" "${line}"
   done
@@ -66,7 +66,7 @@ function dybatpho::text_dedent {
   local -a lines=()
   local line indent_length min_indent=-1
 
-  __text_read_lines "${input}" lines
+  __dybatpho_text_read_lines "${input}" lines
 
   for line in "${lines[@]}"; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
@@ -106,7 +106,7 @@ function dybatpho::text_strip_ansi {
   local -a lines=()
   local line
 
-  __text_read_lines "${input}" lines
+  __dybatpho_text_read_lines "${input}" lines
   for line in "${lines[@]}"; do
     printf '%s\n' "$(printf '%s' "${line}" | sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g')"
   done
@@ -125,7 +125,7 @@ function dybatpho::text_bullet_list {
   local -a lines=()
   local line
 
-  __text_read_lines "${input}" lines
+  __dybatpho_text_read_lines "${input}" lines
   for line in "${lines[@]}"; do
     if dybatpho::string_is_blank "${line}"; then
       printf '\n'

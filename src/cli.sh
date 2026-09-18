@@ -393,7 +393,7 @@ function dybatpho::opts::validate_choice {
 # @arg $@ string Passed arguments from `dybatpho::opts::(flag|param|disp)`
 # @exitcode 0
 #######################################
-function __parse_opt {
+function __dybatpho_cli_parse_opt {
   local need_argument=$1
   local skip_meta=$2
   shift 2
@@ -425,7 +425,7 @@ function __parse_opt {
         aliases:*)
           local -a __opt_aliases=()
           local __opt_alias
-          __parse_alias_list __opt_aliases "${1#aliases:}"
+          __dybatpho_cli_parse_alias_list __opt_aliases "${1#aliases:}"
           for __opt_alias in "${__opt_aliases[@]}"; do
             case ${__opt_alias} in
               --*)
@@ -445,7 +445,7 @@ function __parse_opt {
             esac
           done
           ;;
-        [!-]*) __parse_key_value "$1" "__" ;;
+        [!-]*) __dybatpho_cli_parse_key_value "$1" "__" ;;
         --*)
           if [ -z "${__label}" ] || [ "${__label#--}" = "${__label}" ]; then
             __label="$1"
@@ -469,50 +469,50 @@ function __parse_opt {
           case ${1#alias:} in
             --\{no-\}*)
               i=${1#alias:--?no-?}
-              __add_switch "'--${i}'|'--no-${i}'"
+              __dybatpho_cli_add_switch "'--${i}'|'--no-${i}'"
               ;;
             --with\{out\}-*)
               i=${1#alias:--*-}
-              __add_switch "'--with-${i}'|'--without-${i}'"
+              __dybatpho_cli_add_switch "'--with-${i}'|'--without-${i}'"
               ;;
-            -? | --*) __add_switch "'${1#alias:}'" ;;
+            -? | --*) __dybatpho_cli_add_switch "'${1#alias:}'" ;;
             *) dybatpho::die "Invalid switch alias: ${1#alias:}" ;; # kcov(skip)
           esac
           ;;
         aliases:*)
           local -a __opt_aliases=()
           local __opt_alias
-          __parse_alias_list __opt_aliases "${1#aliases:}"
+          __dybatpho_cli_parse_alias_list __opt_aliases "${1#aliases:}"
           for __opt_alias in "${__opt_aliases[@]}"; do
             case ${__opt_alias} in
               --\{no-\}*)
                 i=${__opt_alias#--?no-?}
-                __add_switch "'--${i}'|'--no-${i}'"
+                __dybatpho_cli_add_switch "'--${i}'|'--no-${i}'"
                 ;;
               --with\{out\}-*)
                 i=${__opt_alias#--*-}
-                __add_switch "'--with-${i}'|'--without-${i}'"
+                __dybatpho_cli_add_switch "'--with-${i}'|'--without-${i}'"
                 ;;
-              -? | --*) __add_switch "'${__opt_alias}'" ;;
+              -? | --*) __dybatpho_cli_add_switch "'${__opt_alias}'" ;;
               *) dybatpho::die "Invalid switch alias: ${__opt_alias}" ;; # kcov(skip)
             esac
           done
           ;;
         --\{no-\}*)
           i=${1#--?no-?}
-          __add_switch "'--${i}'|'--no-${i}'"
+          __dybatpho_cli_add_switch "'--${i}'|'--no-${i}'"
           ;;
         --with\{out\}-*)
           i=${1#--*-}
-          __add_switch "'--with-${i}'|'--without-${i}'"
+          __dybatpho_cli_add_switch "'--with-${i}'|'--without-${i}'"
           ;;
-        -? | --*) __add_switch "'$1'" ;;
-        *) __parse_key_value "$1" "__" ;;
+        -? | --*) __dybatpho_cli_add_switch "'$1'" ;;
+        *) __dybatpho_cli_parse_key_value "$1" "__" ;;
       esac
       shift
     done
-    __assign_quoted __on "${__on}"
-    __assign_quoted __off "${__off}"
+    __dybatpho_cli_assign_quoted __on "${__on}"
+    __dybatpho_cli_assign_quoted __off "${__off}"
   fi
 }
 
@@ -523,7 +523,7 @@ function __parse_opt {
 # @stdout Generated code
 # @exitcode 0
 #######################################
-function __print_indent {
+function __dybatpho_cli_print_indent {
   local indent=$1
   shift
   for ((i = indent; i > 0; i--)); do
@@ -537,7 +537,7 @@ function __print_indent {
 # @arg $1 string Variable name, or `-` to intentionally skip assignment
 # @exitcode 0 The name is valid, or the sentinel `-` was used
 #######################################
-function __require_shell_name {
+function __dybatpho_cli_require_shell_name {
   local name="${1:-}"
   [[ "${name}" == "-" ]] && return 0
   [[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
@@ -550,8 +550,8 @@ function __require_shell_name {
 # @arg $2 string Input string to be quoted
 # @exitcode 0
 #######################################
-function __assign_quoted {
-  __require_shell_name "$1"
+function __dybatpho_cli_assign_quoted {
+  __dybatpho_cli_require_shell_name "$1"
   local quote="$2'" result=""
   while [ "${quote}" ]; do
     result="${result}${quote%%\'*}'\''" && quote=${quote#*\'}
@@ -565,7 +565,7 @@ function __assign_quoted {
 #              based on `export:<bool>` switch
 # @arg $1 string String of command
 #######################################
-function __prepend_export {
+function __dybatpho_cli_prepend_export {
   echo "$(dybatpho::is true "${__export}" && echo "export ")$1"
 }
 
@@ -574,47 +574,47 @@ function __prepend_export {
 #              `dybatpho::opts::param`
 # @arg $1 string Name of variable to be defined
 #######################################
-function __define_var {
+function __dybatpho_cli_define_var {
   [ "$1" = "-" ] && return 0
-  __require_shell_name "$1"
+  __dybatpho_cli_require_shell_name "$1"
   local __env_name="${__env:-}"
   if [ "${__env_name}" = "true" ]; then __env_name="$1"; fi
   [ "${__env_name}" = "false" ] && __env_name=""
-  [ -z "${__env_name}" ] || __require_shell_name "${__env_name}"
+  [ -z "${__env_name}" ] || __dybatpho_cli_require_shell_name "${__env_name}"
   if [ -n "${__env_name}" ] && [ "${__init}" != "@unset" ]; then
-    __print_indent 0 "if [ \"\${${__env_name}+x}\" ]; then"
-    __print_indent 1 "$(__prepend_export "$1=\${${__env_name}}")"
-    __print_indent 0 "else"
+    __dybatpho_cli_print_indent 0 "if [ \"\${${__env_name}+x}\" ]; then"
+    __dybatpho_cli_print_indent 1 "$(__dybatpho_cli_prepend_export "$1=\${${__env_name}}")"
+    __dybatpho_cli_print_indent 0 "else"
     local __saved_env="${__env}"
     local __fallback
     __env=""
-    __fallback="$(__define_var "$1")"
+    __fallback="$(__dybatpho_cli_define_var "$1")"
     __env="${__saved_env}"
-    __print_indent 1 "${__fallback}"
-    __print_indent 0 "fi"
+    __dybatpho_cli_print_indent 1 "${__fallback}"
+    __dybatpho_cli_print_indent 0 "fi"
     return 0
   fi
   case ${__init} in
     @keep) : ;;
-    @empty) __print_indent 0 "$(__prepend_export "$1=''")" ;;
-    @unset) __print_indent 0 "unset $1 ||:" ;;
+    @empty) __dybatpho_cli_print_indent 0 "$(__dybatpho_cli_prepend_export "$1=''")" ;;
+    @unset) __dybatpho_cli_print_indent 0 "unset $1 ||:" ;;
     *)
       case ${__init} in @on) __init=${__on} ;; esac
       case ${__init} in @off) __init=${__off} ;; esac
       case ${__init} in =*)
-        __print_indent 0 "$(__prepend_export "$1${__init}")"
+        __dybatpho_cli_print_indent 0 "$(__dybatpho_cli_prepend_export "$1${__init}")"
         return 0
         ;;
       esac
       case ${__init} in action:*)
         local action=""
-        __parse_key_value "${__init#init:}"
-        __print_indent 0 "${action}"
+        __dybatpho_cli_parse_key_value "${__init#init:}"
+        __dybatpho_cli_print_indent 0 "${action}"
         return 0
         ;;
       esac
-      __assign_quoted __init "${__init#=}"
-      __print_indent 0 "$(__prepend_export "$1=${__init}")"
+      __dybatpho_cli_assign_quoted __init "${__init#=}"
+      __dybatpho_cli_print_indent 0 "$(__dybatpho_cli_prepend_export "$1=${__init}")"
       ;;
   esac
 }
@@ -625,9 +625,9 @@ function __define_var {
 # @arg $1 key:value Key-value string to extract
 # @arg $2 string Prefix of key to assign as variable
 #######################################
-function __parse_key_value() {
+function __dybatpho_cli_parse_key_value() {
   local target="${2-}${1%%:*}"
-  __require_shell_name "${target}"
+  __dybatpho_cli_require_shell_name "${target}"
   printf -v "${target}" '%s' "${1#*:}"
 }
 
@@ -638,7 +638,7 @@ function __parse_key_value() {
 # @arg $2 string Command of spec (`-` for root command trigger from CLI, otherwise is sub-command)
 # @stdout Generated logic
 #######################################
-function __generate_logic {
+function __dybatpho_cli_generate_logic {
   local spec command
   dybatpho::expect_args spec command -- "$@"
   [ "$(type -t "${spec}")" != 'function' ] && return
@@ -666,8 +666,8 @@ function __generate_logic {
   # @arg $1 string Shell expression that expands to serialized arguments
   # @stdout Generated parser code
   #######################################
-  __print_get_arg() {
-    __print_indent 4 "eval 'set -- $1' \${1+'\"\$@\"'}"
+  __dybatpho_cli_print_get_arg() {
+    __dybatpho_cli_print_indent 4 "eval 'set -- $1' \${1+'\"\$@\"'}"
   }
 
   #######################################
@@ -675,143 +675,143 @@ function __generate_logic {
   # @noargs
   # @stdout Generated parser code
   #######################################
-  __print_rest() {
-    __print_indent 4 'while [ $# -gt 0 ]; do'
-    __print_indent 5 "${__rest}=\"\${${__rest}} \$1\""
-    __print_indent 5 '__rest_argc=$((__rest_argc + 1))'
-    __print_indent 5 "shift"
-    __print_indent 4 "done"
-    __print_indent 4 "break"
-    __print_indent 4 ";;"
+  __dybatpho_cli_print_rest() {
+    __dybatpho_cli_print_indent 4 'while [ $# -gt 0 ]; do'
+    __dybatpho_cli_print_indent 5 "${__rest}=\"\${${__rest}} \$1\""
+    __dybatpho_cli_print_indent 5 '__rest_argc=$((__rest_argc + 1))'
+    __dybatpho_cli_print_indent 5 "shift"
+    __dybatpho_cli_print_indent 4 "done"
+    __dybatpho_cli_print_indent 4 "break"
+    __dybatpho_cli_print_indent 4 ";;"
   }
 
   # Initial all variables before get value of options
   local __done_initial=false
-  __replay_persistent_defs
+  __dybatpho_cli_replay_persistent_defs
   "${spec}" "$*"
-  __print_indent 0 "dybatpho::opts::parse::${spec}() {"
-  __print_indent 1 'local __rest_argc=0'
-  __print_persistent_help_defs
+  __dybatpho_cli_print_indent 0 "dybatpho::opts::parse::${spec}() {"
+  __dybatpho_cli_print_indent 1 'local __rest_argc=0'
+  __dybatpho_cli_print_persistent_help_defs
   # shellcheck disable=2016
-  __print_indent 1 \
+  __dybatpho_cli_print_indent 1 \
     "while OPTARG= && [ \"\${${__rest}}\" != end ] && [ \$# -gt 0 ]; do"
-  __print_indent 2 "case \$1 in"
-  __print_indent 3 "--?*=*)"
-  __print_indent 4 "OPTARG=\$1; shift"
-  __print_get_arg '"${OPTARG%%\=*}" "${OPTARG#*\=}"'
-  __print_indent 4 ";;"
-  __print_indent 3 "--no-*|--without-*)"
-  __print_indent 4 "unset OPTARG"
-  __print_indent 4 ";;"
+  __dybatpho_cli_print_indent 2 "case \$1 in"
+  __dybatpho_cli_print_indent 3 "--?*=*)"
+  __dybatpho_cli_print_indent 4 "OPTARG=\$1; shift"
+  __dybatpho_cli_print_get_arg '"${OPTARG%%\=*}" "${OPTARG#*\=}"'
+  __dybatpho_cli_print_indent 4 ";;"
+  __dybatpho_cli_print_indent 3 "--no-*|--without-*)"
+  __dybatpho_cli_print_indent 4 "unset OPTARG"
+  __dybatpho_cli_print_indent 4 ";;"
   [ "${__params}" ] && {
-    __print_indent 3 "-[${__params}]?*)"
-    __print_indent 4 "OPTARG=\$1; shift"
-    __print_get_arg '"${OPTARG%"${OPTARG#??}"}" "${OPTARG#??}"'
-    __print_indent 4 ";;"
+    __dybatpho_cli_print_indent 3 "-[${__params}]?*)"
+    __dybatpho_cli_print_indent 4 "OPTARG=\$1; shift"
+    __dybatpho_cli_print_get_arg '"${OPTARG%"${OPTARG#??}"}" "${OPTARG#??}"'
+    __dybatpho_cli_print_indent 4 ";;"
   }
   [ "${__flags}" ] && {
-    __print_indent 3 "-[${__flags}]?*) OPTARG=\$1; shift"
-    __print_get_arg '"${OPTARG%"${OPTARG#??}"}" -"${OPTARG#??}"'
-    __print_indent 4 \
+    __dybatpho_cli_print_indent 3 "-[${__flags}]?*) OPTARG=\$1; shift"
+    __dybatpho_cli_print_get_arg '"${OPTARG%"${OPTARG#??}"}" -"${OPTARG#??}"'
+    __dybatpho_cli_print_indent 4 \
       'case $2 in --*) set -- "$1" unknown "$2" && '"${__rest}"'=end; esac'
-    __print_indent 4 'OPTARG='
-    __print_indent 4 ';;'
+    __dybatpho_cli_print_indent 4 'OPTARG='
+    __dybatpho_cli_print_indent 4 ';;'
   }
-  __print_indent 2 "esac"
+  __dybatpho_cli_print_indent 2 "esac"
 
   # Get value of options
-  __print_indent 2 'case $1 in'
+  __dybatpho_cli_print_indent 2 'case $1 in'
   __done_initial=true
-  __replay_persistent_defs
+  __dybatpho_cli_replay_persistent_defs
   if dybatpho::is false "${__has_help}"; then
-    __print_indent 3 "--help|-h)"
-    __print_indent 4 "dybatpho::generate_help ${spec}"
-    __print_indent 4 "exit 0"
-    __print_indent 4 ";;"
+    __dybatpho_cli_print_indent 3 "--help|-h)"
+    __dybatpho_cli_print_indent 4 "dybatpho::generate_help ${spec}"
+    __dybatpho_cli_print_indent 4 "exit 0"
+    __dybatpho_cli_print_indent 4 ";;"
   fi
   "${spec}" "$*"
-  __print_indent 3 "--)"
-  __print_indent 4 "shift"
-  __print_rest
-  __print_indent 3 "*)"
+  __dybatpho_cli_print_indent 3 "--)"
+  __dybatpho_cli_print_indent 4 "shift"
+  __dybatpho_cli_print_rest
+  __dybatpho_cli_print_indent 3 "*)"
   if dybatpho::is false "${__has_sub_cmd}"; then
-    __print_rest
+    __dybatpho_cli_print_rest
   else
-    __print_indent 4 "case \$1 in"
+    __dybatpho_cli_print_indent 4 "case \$1 in"
     for sub_spec in "${__sub_specs[@]}"; do
       local _sub_spec _cmd_match _cmd_name _cmd_deprecated
       IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
-      __print_indent 5 "${_cmd_match})"
-      [ "${_cmd_deprecated}" ] && __print_deprecated_warning "command" "${_cmd_name}" "${_cmd_deprecated}"
-      __print_indent 6 "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${_cmd_name}\""
-      __print_indent 6 "shift"
-      __print_indent 6 "dybatpho::opts::parse::${_sub_spec} \"\$@\""
-      __print_indent 6 ";;"
+      __dybatpho_cli_print_indent 5 "${_cmd_match})"
+      [ "${_cmd_deprecated}" ] && __dybatpho_cli_print_deprecated_warning "command" "${_cmd_name}" "${_cmd_deprecated}"
+      __dybatpho_cli_print_indent 6 "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${_cmd_name}\""
+      __dybatpho_cli_print_indent 6 "shift"
+      __dybatpho_cli_print_indent 6 "dybatpho::opts::parse::${_sub_spec} \"\$@\""
+      __dybatpho_cli_print_indent 6 ";;"
     done
-    __print_indent 5 "*)"
-    __print_indent 6 'set "notcmd" "$1"'
-    __print_indent 6 "break"
-    __print_indent 6 ";;"
-    __print_indent 4 "esac"
-    __print_rest
+    __dybatpho_cli_print_indent 5 "*)"
+    __dybatpho_cli_print_indent 6 'set "notcmd" "$1"'
+    __dybatpho_cli_print_indent 6 "break"
+    __dybatpho_cli_print_indent 6 ";;"
+    __dybatpho_cli_print_indent 4 "esac"
+    __dybatpho_cli_print_rest
   fi
-  __print_indent 2 "esac"
-  __print_indent 2 "shift"
-  __print_indent 1 "done"
+  __dybatpho_cli_print_indent 2 "esac"
+  __dybatpho_cli_print_indent 2 "shift"
+  __dybatpho_cli_print_indent 1 "done"
 
   # Show error messages if invalid, otherwise run action command
-  __print_indent 1 '[ $# -eq 0 ] && {'
-  __print_indent 2 'unset OPTARG'
+  __dybatpho_cli_print_indent 1 '[ $# -eq 0 ] && {'
+  __dybatpho_cli_print_indent 2 'unset OPTARG'
   for __required_check in "${__required_checks[@]}"; do
-    __print_indent 2 '[ $# -eq 0 ] && {'
-    __print_indent 3 "${__required_check}"
-    __print_indent 2 '}'
+    __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+    __dybatpho_cli_print_indent 3 "${__required_check}"
+    __dybatpho_cli_print_indent 2 '}'
   done
-  __print_args_check "${__args}"
+  __dybatpho_cli_print_args_check "${__args}"
   local __prompt_def __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export
   for __prompt_def in "${__prompt_defs[@]}"; do
     IFS=$'\x1f' read -r __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export <<< "${__prompt_def}"
-    __assign_quoted __prompt_text "${__prompt_text}"
+    __dybatpho_cli_assign_quoted __prompt_text "${__prompt_text}"
     # Quote the choices only after testing them: quoting an empty value yields `''`.
     if [ -n "${__prompt_choices}" ]; then
-      __assign_quoted __prompt_choices "${__prompt_choices}"
-      __print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
-      __print_indent 3 "${__prompt_var}=\$(dybatpho::select ${__prompt_text} ${__prompt_choices} ${__prompt_multiple})"
-      [ "${__prompt_export}" = "true" ] && __print_indent 3 "export ${__prompt_var}"
-      __print_indent 2 "fi"
+      __dybatpho_cli_assign_quoted __prompt_choices "${__prompt_choices}"
+      __dybatpho_cli_print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
+      __dybatpho_cli_print_indent 3 "${__prompt_var}=\$(dybatpho::select ${__prompt_text} ${__prompt_choices} ${__prompt_multiple})"
+      [ "${__prompt_export}" = "true" ] && __dybatpho_cli_print_indent 3 "export ${__prompt_var}"
+      __dybatpho_cli_print_indent 2 "fi"
     else
-      __print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
-      __print_indent 3 "${__prompt_var}=\$(dybatpho::prompt ${__prompt_text})"
-      [ "${__prompt_export}" = "true" ] && __print_indent 3 "export ${__prompt_var}"
-      __print_indent 2 "fi"
+      __dybatpho_cli_print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
+      __dybatpho_cli_print_indent 3 "${__prompt_var}=\$(dybatpho::prompt ${__prompt_text})"
+      [ "${__prompt_export}" = "true" ] && __dybatpho_cli_print_indent 3 "export ${__prompt_var}"
+      __dybatpho_cli_print_indent 2 "fi"
     fi
   done
-  __print_indent 2 '[ $# -eq 0 ] && {'
-  [ "${__setup_prerun}" ] && __print_indent 3 "${__setup_prerun}"
-  [ "${__setup_action}" ] && __print_indent 3 "${__setup_action}"
-  [ "${__setup_postrun}" ] && __print_indent 3 "${__setup_postrun}"
-  __print_indent 3 'return 0'
-  __print_indent 2 '}'
-  __print_indent 1 '}'
-  __print_indent 1 'case $1 in'
-  __print_indent 2 'unknown) set "Unrecognized option: $2" "$@" ;;'
-  __print_indent 2 'noarg) set "Does not allow an argument: $2" "$@" ;;'
-  __print_indent 2 'needarg) set "Requires an argument: $2" "$@" ;;'
-  __print_indent 2 'missingopt) set "Missing required option: $2" "$@" ;;'
-  __print_indent 2 'argcount) set "$2" "$@" ;;'
-  __print_indent 2 'notcmd) set "Invalid command: $2" "$@" ;;'
-  __print_indent 2 '*) set "Validation error ($1): $2" "$@"'
-  __print_indent 1 "esac"
-  [ "${__error}" ] && __print_indent 1 "${__error}" '"$@" >&2 || exit $?'
-  __print_indent 1 'dybatpho::die "$1" 1'
-  __print_indent 0 "} # End of dybatpho::opts::parse::${spec}"
+  __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+  [ "${__setup_prerun}" ] && __dybatpho_cli_print_indent 3 "${__setup_prerun}"
+  [ "${__setup_action}" ] && __dybatpho_cli_print_indent 3 "${__setup_action}"
+  [ "${__setup_postrun}" ] && __dybatpho_cli_print_indent 3 "${__setup_postrun}"
+  __dybatpho_cli_print_indent 3 'return 0'
+  __dybatpho_cli_print_indent 2 '}'
+  __dybatpho_cli_print_indent 1 '}'
+  __dybatpho_cli_print_indent 1 'case $1 in'
+  __dybatpho_cli_print_indent 2 'unknown) set "Unrecognized option: $2" "$@" ;;'
+  __dybatpho_cli_print_indent 2 'noarg) set "Does not allow an argument: $2" "$@" ;;'
+  __dybatpho_cli_print_indent 2 'needarg) set "Requires an argument: $2" "$@" ;;'
+  __dybatpho_cli_print_indent 2 'missingopt) set "Missing required option: $2" "$@" ;;'
+  __dybatpho_cli_print_indent 2 'argcount) set "$2" "$@" ;;'
+  __dybatpho_cli_print_indent 2 'notcmd) set "Invalid command: $2" "$@" ;;'
+  __dybatpho_cli_print_indent 2 '*) set "Validation error ($1): $2" "$@"'
+  __dybatpho_cli_print_indent 1 "esac"
+  [ "${__error}" ] && __dybatpho_cli_print_indent 1 "${__error}" '"$@" >&2 || exit $?'
+  __dybatpho_cli_print_indent 1 'dybatpho::die "$1" 1'
+  __dybatpho_cli_print_indent 0 "} # End of dybatpho::opts::parse::${spec}"
 
   # Generate sub-command logics
   for sub_spec in "${__sub_specs[@]}"; do
     local _sub_spec _cmd_match _cmd_name _cmd_deprecated
     IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
     [ "${_cmd_match}" = "${_cmd_name}" ] || continue
-    __generate_child_logic "${_sub_spec}" "${_cmd_name}" "$@"
+    __dybatpho_cli_generate_child_logic "${_sub_spec}" "${_cmd_name}" "$@"
   done
 
   # Trigger root spec
@@ -820,7 +820,7 @@ function __generate_logic {
     for param in "$@"; do
       trigger+=" \"${param//\"/\\\"}\""
     done
-    __print_indent 0 "${trigger}"
+    __dybatpho_cli_print_indent 0 "${trigger}"
   fi
 
 }
@@ -834,13 +834,13 @@ function __generate_logic {
 # @stdout Help description
 # @exitcode 0 exit code
 #######################################
-function __generate_help {
+function __dybatpho_cli_generate_help {
   local spec
   dybatpho::expect_args spec -- "$@"
   [ "$(type -t "${spec}")" != 'function' ] && return
 
   __help_mode=true
-  __replay_persistent_defs
+  __dybatpho_cli_replay_persistent_defs
   local __persistent_def
   local __persistent_replay=true
   for __persistent_def in "${__persistent_help_defs[@]}"; do
@@ -874,20 +874,20 @@ function __generate_help {
 function dybatpho::generate_schema {
   local spec name="${2:-${0##*/}}"
   dybatpho::expect_args spec -- "$@"
-  __generate_schema_command "${spec}" "${name}"
+  __dybatpho_cli_generate_schema_command "${spec}" "${name}"
 }
 
-function __generate_schema_command {
+function __dybatpho_cli_generate_schema_command {
   local spec="$1" name="$2" command_aliases="${3:-}" description
   local -a options=() commands=()
-  __collect_spec_metadata "${spec}" options commands description
+  __dybatpho_cli_collect_spec_metadata "${spec}" options commands description
   local q_name q_description item first=true aliases="${command_aliases}"
-  __json_quote q_name "${name}"
-  __json_quote q_description "${description}"
+  __dybatpho_cli_json_quote q_name "${name}"
+  __dybatpho_cli_json_quote q_description "${description}"
   local alias alias_first=true
   printf '{"name":%s,"description":%s,"aliases":[' "${q_name}" "${q_description}"
   for alias in ${aliases:-}; do
-    __json_quote alias "${alias}"
+    __dybatpho_cli_json_quote alias "${alias}"
     [ "${alias_first}" = true ] || printf ","
     alias_first=false
     printf "%s" "${alias}"
@@ -902,20 +902,20 @@ function __generate_schema_command {
     [ "${deprecated}" = "@none" ] && deprecated=""
     [ "${label}" = "@none" ] && label=""
     local q_type q_var q_desc q_env q_choices q_prompt q_deprecated q_label
-    __json_quote q_type "${type}"
-    __json_quote q_var "${var}"
-    __json_quote q_desc "${desc}"
-    __json_quote q_env "${env}"
-    __json_quote q_choices "${choices}"
-    __json_quote q_prompt "${prompt}"
-    __json_quote q_deprecated "${deprecated}"
-    __json_quote q_label "${label}"
+    __dybatpho_cli_json_quote q_type "${type}"
+    __dybatpho_cli_json_quote q_var "${var}"
+    __dybatpho_cli_json_quote q_desc "${desc}"
+    __dybatpho_cli_json_quote q_env "${env}"
+    __dybatpho_cli_json_quote q_choices "${choices}"
+    __dybatpho_cli_json_quote q_prompt "${prompt}"
+    __dybatpho_cli_json_quote q_deprecated "${deprecated}"
+    __dybatpho_cli_json_quote q_label "${label}"
     [ "${first}" = true ] || printf ","
     first=false
     printf '{"type":%s,"name":%s,"description":%s,"switches":[' "${q_type}" "${q_var}" "${q_desc}"
     local switch switch_first=true
     for switch in ${switches}; do
-      __json_quote switch "${switch}"
+      __dybatpho_cli_json_quote switch "${switch}"
       [ "${switch_first}" = true ] || printf ","
       switch_first=false
       printf "%s" "${switch}"
@@ -930,7 +930,7 @@ function __generate_schema_command {
     IFS=$'\t' read -r cmd child aliases child_hidden child_deprecated <<< "${item}"
     [ "${first}" = true ] || printf ","
     first=false
-    __generate_schema_command "${child}" "${cmd}" "${aliases}"
+    __dybatpho_cli_generate_schema_command "${child}" "${cmd}" "${aliases}"
   done
   printf "]}"
 }
@@ -945,13 +945,13 @@ function __generate_schema_command {
 function dybatpho::generate_man {
   local spec name="${2:-${0##*/}}"
   dybatpho::expect_args spec -- "$@"
-  __generate_man_command "${spec}" "${name}" 1
+  __dybatpho_cli_generate_man_command "${spec}" "${name}" 1
 }
 
-function __generate_man_command {
+function __dybatpho_cli_generate_man_command {
   local spec="$1" name="$2" section="${3:-1}" nested="${4:-false}" description
   local -a options=() commands=()
-  __collect_spec_metadata "${spec}" options commands description
+  __dybatpho_cli_collect_spec_metadata "${spec}" options commands description
   local escaped
   escaped="${name//\\/\\\\}"
   escaped="${escaped//\"/\\\"}"
@@ -984,7 +984,7 @@ function __generate_man_command {
       IFS=$'\t' read -r cmd child aliases child_hidden child_deprecated <<< "${item}"
       [ "${child_hidden:-false}" = true ] && continue
       printf '.TP\n.B %s\n' "${cmd}"
-      __generate_man_command "${child}" "${cmd}" "${section}" true
+      __dybatpho_cli_generate_man_command "${child}" "${cmd}" "${section}" true
     done
   fi
 }
@@ -1005,10 +1005,10 @@ function dybatpho::generate_completion {
     bash | zsh | fish) ;;                                          # kcov(skip)
     *) dybatpho::die "Unsupported completion shell: ${shell}" 1 ;; # kcov(skip)
   esac
-  __generate_completion_command "${spec}" "${shell}" "${name}" "${name}"
+  __dybatpho_cli_generate_completion_command "${spec}" "${shell}" "${name}" "${name}"
 }
 
-function __completion_words {
+function __dybatpho_cli_completion_words {
   local -n __completion_out="$1"
   local -a options=("${@:2}") item switches switch
   for item in "${options[@]}"; do
@@ -1018,11 +1018,11 @@ function __completion_words {
   done
 }
 
-function __generate_completion_command {
+function __dybatpho_cli_generate_completion_command {
   local spec="$1" shell="$2" name="$3" root="$4" description
   local -a options=() commands=() words=()
-  __collect_spec_metadata "${spec}" options commands description
-  __completion_words words "${options[@]}"
+  __dybatpho_cli_collect_spec_metadata "${spec}" options commands description
+  __dybatpho_cli_completion_words words "${options[@]}"
   local word_list="${words[*]}" cmd_list="" item cmd child aliases hidden deprecated
   for item in "${commands[@]}"; do
     IFS=$'\t' read -r cmd child aliases hidden deprecated <<< "${item}"
@@ -1030,8 +1030,8 @@ function __generate_completion_command {
       cmd_list+=" ${cmd} ${aliases}"
       local -a child_options=() child_commands=()
       local child_description
-      __collect_spec_metadata "${child}" child_options child_commands child_description
-      __completion_words words "${child_options[@]}"
+      __dybatpho_cli_collect_spec_metadata "${child}" child_options child_commands child_description
+      __dybatpho_cli_completion_words words "${child_options[@]}"
     fi
   done
   word_list="${words[*]}"
@@ -1068,8 +1068,8 @@ function __generate_completion_command {
 # @arg $2 string String to pad
 # @arg $3 number Minimum length
 #######################################
-function __help_pad {
-  __require_shell_name "$1"
+function __dybatpho_cli_help_pad {
+  __dybatpho_cli_require_shell_name "$1"
   local __p=$2
   while [ "${#__p}" -lt "$3" ]; do __p="${__p} "; done
   printf -v "$1" '%s' "${__p}"
@@ -1082,8 +1082,8 @@ function __help_pad {
 # @arg $1 number Minimum pad width before appending $2
 # @arg $2 string Switch string to append
 #######################################
-function __help_sw {
-  __help_pad sw "${sw}${sw:+, }" "$1"
+function __dybatpho_cli_help_sw {
+  __dybatpho_cli_help_pad sw "${sw}${sw:+, }" "$1"
   sw="${sw}$2"
 }
 
@@ -1095,7 +1095,7 @@ function __help_sw {
 # @arg $@ switch|key:value Switches and settings of this option
 # @stdout Formatted help row
 #######################################
-function __help_row {
+function __dybatpho_cli_help_row {
   local _type=$1 _var=$2 _desc=$3
   shift 3
   local sw="" label="" hidden="" required="false" deprecated=""
@@ -1106,53 +1106,53 @@ function __help_row {
         case ${_i#alias:} in
           --\{no-\}*)
             local _name="${_i#alias:--?no-?}"
-            __help_sw 4 "--${_name}"
-            __help_sw 4 "--no-${_name}"
+            __dybatpho_cli_help_sw 4 "--${_name}"
+            __dybatpho_cli_help_sw 4 "--no-${_name}"
             ;;
           --with\{out\}-*)
             local _name="${_i#alias:--*-}"
-            __help_sw 4 "--with-${_name}"
-            __help_sw 4 "--without-${_name}"
+            __dybatpho_cli_help_sw 4 "--with-${_name}"
+            __dybatpho_cli_help_sw 4 "--without-${_name}"
             ;;
-          --*) __help_sw 4 "${_i#alias:}" ;;
-          -?) __help_sw 0 "${_i#alias:}" ;;
+          --*) __dybatpho_cli_help_sw 4 "${_i#alias:}" ;;
+          -?) __dybatpho_cli_help_sw 0 "${_i#alias:}" ;;
           *) : ;; # kcov(skip)
         esac
         ;;
       aliases:*)
         local -a _aliases=()
         local _alias_item
-        __parse_alias_list _aliases "${_i#aliases:}"
+        __dybatpho_cli_parse_alias_list _aliases "${_i#aliases:}"
         for _alias_item in "${_aliases[@]}"; do
           case ${_alias_item} in
             --\{no-\}*)
               local _name="${_alias_item#--?no-?}"
-              __help_sw 4 "--${_name}"
-              __help_sw 4 "--no-${_name}"
+              __dybatpho_cli_help_sw 4 "--${_name}"
+              __dybatpho_cli_help_sw 4 "--no-${_name}"
               ;;
             --with\{out\}-*)
               local _name="${_alias_item#--*-}"
-              __help_sw 4 "--with-${_name}"
-              __help_sw 4 "--without-${_name}"
+              __dybatpho_cli_help_sw 4 "--with-${_name}"
+              __dybatpho_cli_help_sw 4 "--without-${_name}"
               ;;
-            --*) __help_sw 4 "${_alias_item}" ;;
-            -?) __help_sw 0 "${_alias_item}" ;;
+            --*) __dybatpho_cli_help_sw 4 "${_alias_item}" ;;
+            -?) __dybatpho_cli_help_sw 0 "${_alias_item}" ;;
             *) : ;; # kcov(skip)
           esac
         done
         ;;
       --\{no-\}*)
         local _name="${_i#--?no-?}"
-        __help_sw 4 "--${_name}"
-        __help_sw 4 "--no-${_name}"
+        __dybatpho_cli_help_sw 4 "--${_name}"
+        __dybatpho_cli_help_sw 4 "--no-${_name}"
         ;;
       --with\{out\}-*)
         local _name="${_i#--*-}"
-        __help_sw 4 "--with-${_name}"
-        __help_sw 4 "--without-${_name}"
+        __dybatpho_cli_help_sw 4 "--with-${_name}"
+        __dybatpho_cli_help_sw 4 "--without-${_name}"
         ;;
-      --*) __help_sw 4 "${_i}" ;;
-      -?) __help_sw 0 "${_i}" ;;
+      --*) __dybatpho_cli_help_sw 4 "${_i}" ;;
+      -?) __dybatpho_cli_help_sw 0 "${_i}" ;;
       hidden:*) hidden="${_i#hidden:}" ;;
       label:*) label="${_i#label:}" ;;
       required:*) required="${_i#required:}" ;;
@@ -1176,14 +1176,14 @@ function __help_row {
     cmd) label="${_var} " len=${__help_width#*,} ;;
   esac
 
-  __help_pad label "${label:+${__help_leading}}${label}" "${len}"
+  __dybatpho_cli_help_pad label "${label:+${__help_leading}}${label}" "${len}"
   if [ "${#label}" -le "${len}" ]; then
     printf "%s\n" "${label}${_desc}"
   else
     printf "%s\n" "${label}"
     if [ -n "${_desc}" ]; then
       local _pad
-      __help_pad _pad "" "${len}"
+      __dybatpho_cli_help_pad _pad "" "${len}"
       printf "%s\n" "${_pad}${_desc}"
     fi
   fi
@@ -1193,7 +1193,7 @@ function __help_row {
 # @description Add to switches list if flag/param has multiple switches
 # @arg $1 switch Switch
 #######################################
-function __add_switch {
+function __dybatpho_cli_add_switch {
   __switch="${__switch}${__switch:+|}$1"
 }
 
@@ -1203,20 +1203,20 @@ function __add_switch {
 # @stdout Generated parser code
 # @note Uses caller-local `__validate` when a custom validator was configured for the current option
 #######################################
-function __print_validate {
+function __dybatpho_cli_print_validate {
   set -- "${__validate}" "$1"
   if [ -n "${__choices:-}" ]; then
     local __choices_quoted
-    __assign_quoted __choices_quoted "${__choices}"
-    __print_indent 4 "dybatpho::opts::validate_choice \"\$OPTARG\" ${__choices_quoted} || { set \"choice\" \"\$OPTARG\"; break; }"
+    __dybatpho_cli_assign_quoted __choices_quoted "${__choices}"
+    __dybatpho_cli_print_indent 4 "dybatpho::opts::validate_choice \"\$OPTARG\" ${__choices_quoted} || { set \"choice\" \"\$OPTARG\"; break; }"
   fi
-  [ "$1" ] && __print_indent 4 "$1 || { set -- ${1%% *}:\$? \"\$1\" $1; break; }"
+  [ "$1" ] && __dybatpho_cli_print_indent 4 "$1 || { set -- ${1%% *}:\$? \"\$1\" $1; break; }"
   if [ "$2" != "-" ]; then
     if dybatpho::is true "${__multiple:-false}"; then
-      __print_indent 4 "[ -n \"\${$2:-}\" ] && $2=\"\${$2} \$OPTARG\" || $2=\"\$OPTARG\""
-      [ "${__export}" = "true" ] && __print_indent 4 "export $2"
+      __dybatpho_cli_print_indent 4 "[ -n \"\${$2:-}\" ] && $2=\"\${$2} \$OPTARG\" || $2=\"\$OPTARG\""
+      [ "${__export}" = "true" ] && __dybatpho_cli_print_indent 4 "export $2"
     else
-      __print_indent 4 "$(__prepend_export "$2=\$OPTARG")"
+      __dybatpho_cli_print_indent 4 "$(__dybatpho_cli_prepend_export "$2=\$OPTARG")"
     fi
   fi
 }
@@ -1227,8 +1227,8 @@ function __print_validate {
 # @arg $2 string Comma-separated aliases
 # @exitcode 0 Aliases appended to destination array
 #######################################
-function __parse_alias_list {
-  __require_shell_name "$1"
+function __dybatpho_cli_parse_alias_list {
+  __dybatpho_cli_require_shell_name "$1"
   local -n __alias_out="$1"
   local __alias_raw="${2:-}" __alias_item
   IFS=',' read -r -a __alias_items <<< "${__alias_raw}"
@@ -1243,7 +1243,7 @@ function __parse_alias_list {
 # @arg $@ string Original arguments passed to the option helper
 # @exitcode 0 Definition stored for later replay
 #######################################
-function __record_persistent_def {
+function __dybatpho_cli_record_persistent_def {
   local __kind="$1" __serialized="dybatpho::opts::${1}" __part
   shift
   for __part in "$@"; do
@@ -1258,7 +1258,7 @@ function __record_persistent_def {
 # @noargs
 # @exitcode 0 All inherited persistent definitions were replayed
 #######################################
-function __replay_persistent_defs {
+function __dybatpho_cli_replay_persistent_defs {
   local __persistent_def
   local __persistent_replay=true
   for __persistent_def in "${__persistent_inherited_defs[@]}"; do
@@ -1271,16 +1271,16 @@ function __replay_persistent_defs {
 # @noargs
 # @stdout Generated parser code
 #######################################
-function __print_persistent_help_defs {
+function __dybatpho_cli_print_persistent_help_defs {
   local __persistent_def __quoted_def __has_defs=false
   for __persistent_def in "${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}"; do
     [ -n "${__persistent_def}" ] || continue
     if dybatpho::is false "${__has_defs}"; then
-      __print_indent 1 'local -a __persistent_help_defs=()'
+      __dybatpho_cli_print_indent 1 'local -a __persistent_help_defs=()'
       __has_defs=true
     fi
-    __assign_quoted __quoted_def "${__persistent_def}"
-    __print_indent 1 "__persistent_help_defs+=( ${__quoted_def} )"
+    __dybatpho_cli_assign_quoted __quoted_def "${__persistent_def}"
+    __dybatpho_cli_print_indent 1 "__persistent_help_defs+=( ${__quoted_def} )"
   done
 }
 
@@ -1291,11 +1291,11 @@ function __print_persistent_help_defs {
 # @arg $3 string Deprecation message
 # @stdout Generated parser code
 #######################################
-function __print_deprecated_warning {
+function __dybatpho_cli_print_deprecated_warning {
   local __item_type="$1" __item_label="$2" __message="$3"
   local __warning
-  __assign_quoted __warning "Deprecated ${__item_type}: ${__item_label}. ${__message}"
-  __print_indent 4 "dybatpho::warn ${__warning}"
+  __dybatpho_cli_assign_quoted __warning "Deprecated ${__item_type}: ${__item_label}. ${__message}"
+  __dybatpho_cli_print_indent 4 "dybatpho::warn ${__warning}"
 }
 
 #######################################
@@ -1305,11 +1305,11 @@ function __print_deprecated_warning {
 # @arg $@ string Original CLI arguments
 # @stdout Generated parser code
 #######################################
-function __generate_child_logic {
+function __dybatpho_cli_generate_child_logic {
   local __child_spec="$1" __child_command="$2"
   shift 2
   local -a __persistent_inherited_defs=("${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}")
-  __generate_logic "${__child_spec}" "${__child_command}" "$@"
+  __dybatpho_cli_generate_logic "${__child_spec}" "${__child_command}" "$@"
 }
 
 #######################################
@@ -1318,52 +1318,52 @@ function __generate_child_logic {
 # @stdout Generated parser code
 # @exitcode 0 Rule accepted and code emitted
 #######################################
-function __print_args_check {
+function __dybatpho_cli_print_args_check {
   local rule="${1:-any}"
   local expected min max noun
 
   case "${rule}" in
     "" | any | arbitrary) return 0 ;;
     none | noargs)
-      __print_indent 2 '[ $# -eq 0 ] && {'
-      __print_indent 3 '[ "${__rest_argc}" -eq 0 ] || set "argcount" "Expected no arguments, got ${__rest_argc}"'
-      __print_indent 2 '}'
+      __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+      __dybatpho_cli_print_indent 3 '[ "${__rest_argc}" -eq 0 ] || set "argcount" "Expected no arguments, got ${__rest_argc}"'
+      __dybatpho_cli_print_indent 2 '}'
       ;;
     exact:*)
       expected="${rule#exact:}"
       [[ "${expected}" =~ ^[0-9]+$ ]] || dybatpho::die "Invalid args rule: ${rule}"
       noun="arguments"
       [ "${expected}" -eq 1 ] && noun="argument"
-      __print_indent 2 '[ $# -eq 0 ] && {'
-      __print_indent 3 "[ \"\${__rest_argc}\" -eq ${expected} ] || set \"argcount\" \"Expected exactly ${expected} ${noun}, got \${__rest_argc}\""
-      __print_indent 2 '}'
+      __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+      __dybatpho_cli_print_indent 3 "[ \"\${__rest_argc}\" -eq ${expected} ] || set \"argcount\" \"Expected exactly ${expected} ${noun}, got \${__rest_argc}\""
+      __dybatpho_cli_print_indent 2 '}'
       ;;
     min:*)
       min="${rule#min:}"
       [[ "${min}" =~ ^[0-9]+$ ]] || dybatpho::die "Invalid args rule: ${rule}"
       noun="arguments"
       [ "${min}" -eq 1 ] && noun="argument"
-      __print_indent 2 '[ $# -eq 0 ] && {'
-      __print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] || set \"argcount\" \"Expected at least ${min} ${noun}, got \${__rest_argc}\""
-      __print_indent 2 '}'
+      __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+      __dybatpho_cli_print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] || set \"argcount\" \"Expected at least ${min} ${noun}, got \${__rest_argc}\""
+      __dybatpho_cli_print_indent 2 '}'
       ;;
     max:*)
       max="${rule#max:}"
       [[ "${max}" =~ ^[0-9]+$ ]] || dybatpho::die "Invalid args rule: ${rule}"
       noun="arguments"
       [ "${max}" -eq 1 ] && noun="argument"
-      __print_indent 2 '[ $# -eq 0 ] && {'
-      __print_indent 3 "[ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"Expected at most ${max} ${noun}, got \${__rest_argc}\""
-      __print_indent 2 '}'
+      __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+      __dybatpho_cli_print_indent 3 "[ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"Expected at most ${max} ${noun}, got \${__rest_argc}\""
+      __dybatpho_cli_print_indent 2 '}'
       ;;
     range:*)
       min="${rule#range:}"
       max="${min#*:}"
       min="${min%%:*}"
       [[ "${min}" =~ ^[0-9]+$ && "${max}" =~ ^[0-9]+$ && "${min}" -le "${max}" ]] || dybatpho::die "Invalid args rule: ${rule}"
-      __print_indent 2 '[ $# -eq 0 ] && {'
-      __print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] && [ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"Expected between ${min} and ${max} arguments, got \${__rest_argc}\""
-      __print_indent 2 '}'
+      __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
+      __dybatpho_cli_print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] && [ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"Expected between ${min} and ${max} arguments, got \${__rest_argc}\""
+      __dybatpho_cli_print_indent 2 '}'
       ;;
     *)
       dybatpho::die "Invalid args rule: ${rule}" # kcov(skip)
@@ -1376,8 +1376,8 @@ function __print_args_check {
 # @arg $1 string Name of destination array
 # @arg $@ switch|key:value Option metadata
 #######################################
-function __collect_switches {
-  __require_shell_name "$1"
+function __dybatpho_cli_collect_switches {
+  __dybatpho_cli_require_shell_name "$1"
   local -n __switch_out="$1"
   shift
   local __item __alias
@@ -1386,7 +1386,7 @@ function __collect_switches {
       alias:*) __alias="${__item#alias:}" ;;
       aliases:*)
         local -a __aliases=()
-        __parse_alias_list __aliases "${__item#aliases:}"
+        __dybatpho_cli_parse_alias_list __aliases "${__item#aliases:}"
         for __alias in "${__aliases[@]}"; do
           case "${__alias}" in
             --\{no-\}*) __switch_out+=("--${__alias#--\{no-\}}" "--no-${__alias#--\{no-\}}") ;;
@@ -1421,8 +1421,8 @@ function __collect_switches {
 #######################################
 # @description Escape a value for JSON and store it in a caller variable.
 #######################################
-function __json_quote {
-  __require_shell_name "$1"
+function __dybatpho_cli_json_quote {
+  __dybatpho_cli_require_shell_name "$1"
   local __value="${2-}"
   __value="${__value//\\/\\\\}"
   __value="${__value//\"/\\\"}"
@@ -1435,7 +1435,7 @@ function __json_quote {
 #######################################
 # @description Collect option and command metadata from a CLI spec.
 #######################################
-function __collect_spec_metadata {
+function __dybatpho_cli_collect_spec_metadata {
   local __meta_spec="$1"
   local -n __meta_options_out="$2" __meta_commands_out="$3" __meta_description_out="$4"
   local __meta_mode=true __meta_description="" __meta_options=() __meta_commands=()
@@ -1482,9 +1482,9 @@ function dybatpho::opts::setup {
     return 0
   fi
 
-  # HACK: __rest is defined in __generate_logic, so we need to define it here
+  # HACK: __rest is defined in __dybatpho_cli_generate_logic, so we need to define it here
   if [ "${1#-}" ]; then
-    __require_shell_name "$1"
+    __dybatpho_cli_require_shell_name "$1"
     __rest="$1"
   else
     __rest="__rest"
@@ -1493,9 +1493,9 @@ function dybatpho::opts::setup {
   if dybatpho::is false "${__done_initial}"; then
     __init="@empty"
     while dybatpho::still_has_args "$@" && shift; do
-      __parse_key_value "$1" "__"
+      __dybatpho_cli_parse_key_value "$1" "__"
     done
-    __define_var "${__rest}"
+    __dybatpho_cli_define_var "${__rest}"
     __setup_prerun="${__prerun}"
     __setup_action="${__action}"
     __setup_postrun="${__postrun}"
@@ -1516,12 +1516,12 @@ function dybatpho::opts::setup {
 function dybatpho::opts::flag {
   local description var
   dybatpho::expect_args description var -- "$@"
-  __require_shell_name "${var}"
+  __dybatpho_cli_require_shell_name "${var}"
 
   if dybatpho::is true "${__meta_mode:-false}"; then
-    __parse_opt false 2 "$@"
+    __dybatpho_cli_parse_opt false 2 "$@"
     local -a __meta_switches=()
-    __collect_switches __meta_switches "${@:3}"
+    __dybatpho_cli_collect_switches __meta_switches "${@:3}"
     __meta_options+=("flag"$'\t'"${var}"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t'"${__env:-@none}"$'\t'"${__multiple:-false}"$'\t'"${__choices:-@none}"$'\t'"${__prompt:-@none}"$'\t'"${__hidden:-false}"$'\t'"${__required:-false}"$'\t'"${__deprecated:-@none}"$'\t'"${__label:-@none}")
     return 0
   fi
@@ -1530,24 +1530,24 @@ function dybatpho::opts::flag {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
-    _line=$(__help_row flag "${var}" "${description}" "${@:3}")
+    _line=$(__dybatpho_cli_help_row flag "${var}" "${description}" "${@:3}")
     __help_opts_output="${__help_opts_output}${_line}"$'\n'
     return 0
   fi
 
-  __parse_opt false 2 "$@"
+  __dybatpho_cli_parse_opt false 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
     if dybatpho::is true "${__persistent}" && dybatpho::is false "${__persistent_replay:-false}"; then
-      __record_persistent_def flag "$@"
+      __dybatpho_cli_record_persistent_def flag "$@"
     fi
-    __define_var "${var}"
+    __dybatpho_cli_define_var "${var}"
   else
-    __print_indent 3 "${__switch})"
-    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
-    __print_indent 4 '[ "${OPTARG:-}" ] && OPTARG=${OPTARG#*\=} && set "noarg" "$1" && break'
-    __print_indent 4 "eval '[ \${OPTARG+x} ] &&:' && OPTARG=${__on} || OPTARG=${__off}"
-    __print_validate "${var}" '$OPTARG'
-    __print_indent 4 ";;"
+    __dybatpho_cli_print_indent 3 "${__switch})"
+    [ "${__deprecated}" ] && __dybatpho_cli_print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
+    __dybatpho_cli_print_indent 4 '[ "${OPTARG:-}" ] && OPTARG=${OPTARG#*\=} && set "noarg" "$1" && break'
+    __dybatpho_cli_print_indent 4 "eval '[ \${OPTARG+x} ] &&:' && OPTARG=${__on} || OPTARG=${__off}"
+    __dybatpho_cli_print_validate "${var}" '$OPTARG'
+    __dybatpho_cli_print_indent 4 ";;"
   fi
 }
 
@@ -1569,12 +1569,12 @@ function dybatpho::opts::flag {
 function dybatpho::opts::param {
   local description var
   dybatpho::expect_args description var -- "$@"
-  __require_shell_name "${var}"
+  __dybatpho_cli_require_shell_name "${var}"
 
   if dybatpho::is true "${__meta_mode:-false}"; then
-    __parse_opt true 2 "$@"
+    __dybatpho_cli_parse_opt true 2 "$@"
     local -a __meta_switches=()
-    __collect_switches __meta_switches "${@:3}"
+    __dybatpho_cli_collect_switches __meta_switches "${@:3}"
     __meta_options+=("param"$'\t'"${var}"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t'"${__env:-@none}"$'\t'"${__multiple:-false}"$'\t'"${__choices:-@none}"$'\t'"${__prompt:-@none}"$'\t'"${__hidden:-false}"$'\t'"${__required:-false}"$'\t'"${__deprecated:-@none}"$'\t'"${__label:-@none}")
     return 0
   fi
@@ -1583,17 +1583,17 @@ function dybatpho::opts::param {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
-    _line=$(__help_row param "${var}" "${description}" "${@:3}")
+    _line=$(__dybatpho_cli_help_row param "${var}" "${description}" "${@:3}")
     __help_opts_output="${__help_opts_output}${_line}"$'\n'
     return 0
   fi
 
-  __parse_opt true 2 "$@"
+  __dybatpho_cli_parse_opt true 2 "$@"
   if dybatpho::is false "${__done_initial}"; then
     if dybatpho::is true "${__persistent}" && dybatpho::is false "${__persistent_replay:-false}"; then
-      __record_persistent_def param "$@"
+      __dybatpho_cli_record_persistent_def param "$@"
     fi
-    __define_var "${var}"
+    __dybatpho_cli_define_var "${var}"
     if [ -n "${__prompt}" ]; then
       # A unit separator keeps empty fields, which tabs would collapse on read.
       __prompt_defs+=("${var}"$'\x1f'"${__prompt}"$'\x1f'"${__choices}"$'\x1f'"${__multiple}"$'\x1f'"${__export}")
@@ -1603,7 +1603,7 @@ function dybatpho::opts::param {
       local __saved_init="${__init}" __saved_export="${__export}"
       __init="@empty"
       __export="false"
-      __define_var "${__required_marker}"
+      __dybatpho_cli_define_var "${__required_marker}"
       __init="${__saved_init}"
       __export="${__saved_export}"
       __required_checks+=("[ \"\${${__required_marker}}\" ] || set \"missingopt\" \"${__label:-${var}}\"")
@@ -1613,28 +1613,28 @@ function dybatpho::opts::param {
     if dybatpho::is true "${__required}"; then
       __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
     fi
-    __print_indent 3 "${__switch})"
-    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
+    __dybatpho_cli_print_indent 3 "${__switch})"
+    [ "${__deprecated}" ] && __dybatpho_cli_print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
     if dybatpho::is false "${__optional}"; then
-      __print_indent 4 '[ $# -le 1 ] && set "needarg" "$1" && break'
-      __print_indent 4 'OPTARG=$2'
+      __dybatpho_cli_print_indent 4 '[ $# -le 1 ] && set "needarg" "$1" && break'
+      __dybatpho_cli_print_indent 4 'OPTARG=$2'
     else
-      __print_indent 4 'set -- "$1" "$@"'
-      __print_indent 4 '[ ${OPTARG+x} ] && {'
-      __print_indent 5 'case $1 in --no-*|--without-*) set "noarg" "${1%%\=*}"; break; esac'
-      __print_indent 5 '[ "${OPTARG:-}" ] && { shift; OPTARG=$2; } || {'
-      __print_indent 6 'case ${3:-} in'
-      __print_indent 7 '"") OPTARG='"${__on}"' ;;'
-      __print_indent 7 '-*) OPTARG='"${__on}"' ;;'
-      __print_indent 7 '*) shift; OPTARG=$2 ;;'
-      __print_indent 6 'esac'
-      __print_indent 5 '}'
-      __print_indent 4 "} || OPTARG=${__off}"
+      __dybatpho_cli_print_indent 4 'set -- "$1" "$@"'
+      __dybatpho_cli_print_indent 4 '[ ${OPTARG+x} ] && {'
+      __dybatpho_cli_print_indent 5 'case $1 in --no-*|--without-*) set "noarg" "${1%%\=*}"; break; esac'
+      __dybatpho_cli_print_indent 5 '[ "${OPTARG:-}" ] && { shift; OPTARG=$2; } || {'
+      __dybatpho_cli_print_indent 6 'case ${3:-} in'
+      __dybatpho_cli_print_indent 7 '"") OPTARG='"${__on}"' ;;'
+      __dybatpho_cli_print_indent 7 '-*) OPTARG='"${__on}"' ;;'
+      __dybatpho_cli_print_indent 7 '*) shift; OPTARG=$2 ;;'
+      __dybatpho_cli_print_indent 6 'esac'
+      __dybatpho_cli_print_indent 5 '}'
+      __dybatpho_cli_print_indent 4 "} || OPTARG=${__off}"
     fi
-    __print_validate "${var}" '$OPTARG'
-    [ "${__required_marker}" ] && __print_indent 4 "${__required_marker}=true"
-    __print_indent 4 "shift"
-    __print_indent 4 ";;"
+    __dybatpho_cli_print_validate "${var}" '$OPTARG'
+    [ "${__required_marker}" ] && __dybatpho_cli_print_indent 4 "${__required_marker}=true"
+    __dybatpho_cli_print_indent 4 "shift"
+    __dybatpho_cli_print_indent 4 ";;"
   fi
 }
 
@@ -1654,9 +1654,9 @@ function dybatpho::opts::disp {
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
   if dybatpho::is true "${__meta_mode:-false}"; then
-    __parse_opt false 1 "$@"
+    __dybatpho_cli_parse_opt false 1 "$@"
     local -a __meta_switches=()
-    __collect_switches __meta_switches "${@:2}"
+    __dybatpho_cli_collect_switches __meta_switches "${@:2}"
     __meta_options+=("disp"$'\t'"-"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t@none\tfalse\t@none\t@none\t'"${__hidden:-false}"$'\tfalse\t'"${__deprecated:-@none}"$'\t'"${__label:-@none}")
     return 0
   fi
@@ -1675,20 +1675,20 @@ function dybatpho::opts::disp {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
-    _line=$(__help_row disp "-" "${description}" "${@:2}")
+    _line=$(__dybatpho_cli_help_row disp "-" "${description}" "${@:2}")
     __help_opts_output="${__help_opts_output}${_line}"$'\n'
     return 0
   fi
 
-  __parse_opt false 1 "$@"
+  __dybatpho_cli_parse_opt false 1 "$@"
   if ! dybatpho::is false "${__done_initial}"; then
-    __print_indent 3 "${__switch})"
-    [ "${__deprecated}" ] && __print_deprecated_warning "option" "${__label:-${description}}" "${__deprecated}"
-    [ "${__action}" ] && __print_indent 4 "${__action}"
-    __print_indent 4 "exit 0"
-    __print_indent 4 ";;"
+    __dybatpho_cli_print_indent 3 "${__switch})"
+    [ "${__deprecated}" ] && __dybatpho_cli_print_deprecated_warning "option" "${__label:-${description}}" "${__deprecated}"
+    [ "${__action}" ] && __dybatpho_cli_print_indent 4 "${__action}"
+    __dybatpho_cli_print_indent 4 "exit 0"
+    __dybatpho_cli_print_indent 4 ";;"
   elif dybatpho::is true "${__persistent}" && dybatpho::is false "${__persistent_replay:-false}"; then
-    __record_persistent_def disp "$@"
+    __dybatpho_cli_record_persistent_def disp "$@"
   fi
 }
 
@@ -1710,7 +1710,7 @@ function dybatpho::opts::cmd {
   while [ $# -gt 0 ]; do
     case $1 in
       alias:*) __cmd_aliases+=("${1#alias:}") ;;
-      aliases:*) __parse_alias_list __cmd_aliases "${1#aliases:}" ;;
+      aliases:*) __dybatpho_cli_parse_alias_list __cmd_aliases "${1#aliases:}" ;;
       hidden:*) __cmd_hidden="${1#hidden:}" ;;
       deprecated:*) __cmd_deprecated="${1#deprecated:}" ;;
     esac
@@ -1732,7 +1732,7 @@ function dybatpho::opts::cmd {
       __cmd_label="${__cmd_label}, ${__cmd_alias}"
     done
     local _line
-    _line=$(__help_row cmd "${__cmd_label}" "${__cmd_desc}" "hidden:${__cmd_hidden}" "deprecated:${__cmd_deprecated}")
+    _line=$(__dybatpho_cli_help_row cmd "${__cmd_label}" "${__cmd_desc}" "hidden:${__cmd_hidden}" "deprecated:${__cmd_deprecated}")
     __help_cmds_output="${__help_cmds_output}${_line}"$'\n'
     return 0
   fi
@@ -1764,7 +1764,7 @@ function dybatpho::generate_from_spec {
   __current_cmd_path=""
   local gen_file
   dybatpho::create_temp gen_file ".sh" "genopts"
-  __generate_logic "${spec}" - "$@" >> "${gen_file}"
+  __dybatpho_cli_generate_logic "${spec}" - "$@" >> "${gen_file}"
   if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
     dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
   fi
@@ -1786,7 +1786,7 @@ function dybatpho::generate_help {
   dybatpho::expect_args spec -- "$@"
 
   # Help generation state — local here, visible to the whole call chain via
-  # bash dynamic scoping (dybatpho::opts::* write, __generate_help reads)
+  # bash dynamic scoping (dybatpho::opts::* write, __dybatpho_cli_generate_help reads)
   local __help_mode=false
   local __cmd_desc_mode=false
   local __help_width="30,16"
@@ -1797,5 +1797,5 @@ function dybatpho::generate_help {
   local __help_opts_output=""
   local __help_cmds_output=""
 
-  __generate_help "${spec}"
+  __dybatpho_cli_generate_help "${spec}"
 }

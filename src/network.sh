@@ -40,7 +40,7 @@ declare -gA DYBATPHO_CIRCUIT_OPENED_AT=()
 # @arg $1 string Status code
 # @stdout Description of status code
 #######################################
-function __get_http_code {
+function __dybatpho_network_get_http_code {
   local code
   dybatpho::expect_args code -- "$@"
 
@@ -173,7 +173,7 @@ function dybatpho::curl_do {
     fi
 
     local code_description
-    code_description=$(__get_http_code "${code}")
+    code_description=$(__dybatpho_network_get_http_code "${code}")
     dybatpho::debug "Received HTTP status: ${code_description}"
     if [[ "${code}" =~ ^2[0-9][0-9]$ ]]; then
       rm -f "${header_file}"

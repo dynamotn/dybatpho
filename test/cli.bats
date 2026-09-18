@@ -451,7 +451,7 @@ setup() {
 }
 
 @test "dybatpho::opts::param init not leaked from previous flag" {
-  # Regression: __init from flag's off:value must not leak into setup's __define_var
+  # Regression: __init from flag's off:value must not leak into setup's __dybatpho_cli_define_var
   # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" PREST action:"echo \$PREST"

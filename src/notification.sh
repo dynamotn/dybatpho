@@ -65,7 +65,7 @@
 # @arg $1 string Input string
 # @stdout JSON-safe escaped string (without surrounding quotes)
 #######################################
-function __notification_json_escape {
+function __dybatpho_notification_json_escape {
   local input
   dybatpho::expect_args input -- "$@"
   local output="${input}"
@@ -97,7 +97,7 @@ function dybatpho::notify_slack {
   dybatpho::expect_envs DYBATPHO_SLACK_WEBHOOK_URL
 
   local payload
-  payload=$(printf '{"text":"%s"}' "$(__notification_json_escape "${message}")")
+  payload=$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")
 
   dybatpho::debug "Sending Slack notification"
   dybatpho::curl_json "${DYBATPHO_SLACK_WEBHOOK_URL}" /dev/null \
@@ -131,13 +131,13 @@ function dybatpho::notify_telegram {
 
   local url="https://api.telegram.org/bot${DYBATPHO_TELEGRAM_BOT_TOKEN}/sendMessage"
   local escaped_message escaped_chat_id
-  escaped_message=$(__notification_json_escape "${message}")
-  escaped_chat_id=$(__notification_json_escape "${DYBATPHO_TELEGRAM_CHAT_ID}")
+  escaped_message=$(__dybatpho_notification_json_escape "${message}")
+  escaped_chat_id=$(__dybatpho_notification_json_escape "${DYBATPHO_TELEGRAM_CHAT_ID}")
 
   local payload
   if [[ -n "${parse_mode}" ]]; then
     local escaped_parse_mode
-    escaped_parse_mode=$(__notification_json_escape "${parse_mode}")
+    escaped_parse_mode=$(__dybatpho_notification_json_escape "${parse_mode}")
     printf -v payload '{"chat_id":"%s","text":"%s","parse_mode":"%s"}' "${escaped_chat_id}" "${escaped_message}" "${escaped_parse_mode}"
   else
     printf -v payload '{"chat_id":"%s","text":"%s"}' "${escaped_chat_id}" "${escaped_message}"
@@ -173,12 +173,12 @@ function dybatpho::notify_teams {
   dybatpho::expect_envs DYBATPHO_TEAMS_WEBHOOK_URL
 
   local escaped_message
-  escaped_message=$(__notification_json_escape "${message}")
+  escaped_message=$(__dybatpho_notification_json_escape "${message}")
 
   local body_blocks
   if [[ -n "${title}" ]]; then
     local escaped_title
-    escaped_title=$(__notification_json_escape "${title}")
+    escaped_title=$(__dybatpho_notification_json_escape "${title}")
     printf -v body_blocks '[{"type":"TextBlock","text":"%s","weight":"bolder","size":"medium"},{"type":"TextBlock","text":"%s","wrap":true}]' "${escaped_title}" "${escaped_message}"
   else
     printf -v body_blocks '[{"type":"TextBlock","text":"%s","wrap":true}]' "${escaped_message}"
@@ -214,7 +214,7 @@ function dybatpho::notify_google_chat {
   dybatpho::expect_envs DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL
 
   local payload
-  payload=$(printf '{"text":"%s"}' "$(__notification_json_escape "${message}")")
+  payload=$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")
 
   dybatpho::debug "Sending Google Chat notification"
   dybatpho::curl_json "${DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL}" /dev/null \
@@ -245,12 +245,12 @@ function dybatpho::notify_discord {
   dybatpho::expect_envs DYBATPHO_DISCORD_WEBHOOK_URL
 
   local escaped_message
-  escaped_message=$(__notification_json_escape "${message}")
+  escaped_message=$(__dybatpho_notification_json_escape "${message}")
 
   local payload
   if [[ -n "${username}" ]]; then
     local escaped_username
-    escaped_username=$(__notification_json_escape "${username}")
+    escaped_username=$(__dybatpho_notification_json_escape "${username}")
     printf -v payload '{"content":"%s","username":"%s"}' "${escaped_message}" "${escaped_username}"
   else
     printf -v payload '{"content":"%s"}' "${escaped_message}"

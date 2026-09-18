@@ -29,24 +29,24 @@ appended to a rotating log file at an independent verbosity level.
 
 ### 🚀 Highlights
 
-- [`__log`](#__log) — Log a message to stdout or stderr, optionally with ANSI color.
-- [`__check_color`](#__check_color) — Render the current log message with ANSI color unless `NO_COLOR` is set.
-- [`__log_json_escape`](#__log_json_escape) — Escape a string for use as a JSON string value.
-- [`__log_timestamp`](#__log_timestamp) — Return an RFC 3339 timestamp for a log event.
-- [`__log_now_ms`](#__log_now_ms) — Return the current time in milliseconds since the epoch, using the most precise portable source available.
-- [`__log_duration_ms`](#__log_duration_ms) — Return the elapsed time since the process started, for structured log events.
-- [`__log_request_id`](#__log_request_id) — Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
-- [`__log_hostname`](#__log_hostname) — Return the current hostname attached to every structured log event, caching the result for the process lifetime.
-- [`__log_json_event`](#__log_json_event) — Build one structured JSON log event enriched with request ID, hostname, PID, and duration.
-- [`__log_rotate_file`](#__log_rotate_file) — Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
-- [`__log_write_file`](#__log_write_file) — Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
-- [`__log_structured`](#__log_structured) — Log a diagnostic event as JSON when `LOG_FORMAT=json`.
+- [`__dybatpho_log`](#__dybatpho_log) — Log a message to stdout or stderr, optionally with ANSI color.
+- [`__dybatpho_log_check_color`](#__dybatpho_log_check_color) — Render the current log message with ANSI color unless `NO_COLOR` is set.
+- [`__dybatpho_log_json_escape`](#__dybatpho_log_json_escape) — Escape a string for use as a JSON string value.
+- [`__dybatpho_log_timestamp`](#__dybatpho_log_timestamp) — Return an RFC 3339 timestamp for a log event.
+- [`__dybatpho_log_now_ms`](#__dybatpho_log_now_ms) — Return the current time in milliseconds since the epoch, using the most precise portable source available.
+- [`__dybatpho_log_duration_ms`](#__dybatpho_log_duration_ms) — Return the elapsed time since the process started, for structured log events.
+- [`__dybatpho_log_request_id`](#__dybatpho_log_request_id) — Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
+- [`__dybatpho_log_hostname`](#__dybatpho_log_hostname) — Return the current hostname attached to every structured log event, caching the result for the process lifetime.
+- [`__dybatpho_log_json_event`](#__dybatpho_log_json_event) — Build one structured JSON log event enriched with request ID, hostname, PID, and duration.
+- [`__dybatpho_log_rotate_file`](#__dybatpho_log_rotate_file) — Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
+- [`__dybatpho_log_write_file`](#__dybatpho_log_write_file) — Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
+- [`__dybatpho_log_structured`](#__dybatpho_log_structured) — Log a diagnostic event as JSON when `LOG_FORMAT=json`.
 - [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown against a threshold.
-- [`__log_inspect`](#__log_inspect) — Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
-- [`__get_terminal_width`](#__get_terminal_width) — Return the effective terminal width used by boxed logging helpers.
-- [`__string_display_width`](#__string_display_width) — Return the display width of a string, accounting for wide Unicode glyphs when possible.
-- [`__wrap_line`](#__wrap_line) — Wrap one text line to the requested width using word boundaries when possible.
-- [`__log_box`](#__log_box) — Render a boxed message sized to its content while respecting terminal width.
+- [`__dybatpho_log_inspect`](#__dybatpho_log_inspect) — Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
+- [`__dybatpho_log_get_terminal_width`](#__dybatpho_log_get_terminal_width) — Return the effective terminal width used by boxed logging helpers.
+- [`__dybatpho_log_string_display_width`](#__dybatpho_log_string_display_width) — Return the display width of a string, accounting for wide Unicode glyphs when possible.
+- [`__dybatpho_log_wrap_line`](#__dybatpho_log_wrap_line) — Wrap one text line to the requested width using word boundaries when possible.
+- [`__dybatpho_log_box`](#__dybatpho_log_box) — Render a boxed message sized to its content while respecting terminal width.
 - [`dybatpho::validate_log_level`](#dybatphovalidate_log_level) — Validate a candidate log level value.
 - [`dybatpho::debug`](#dybatphodebug) — Show debug message.
 - [`dybatpho::debug_command`](#dybatphodebug_command) — Log a debug message together with the output of a shell command.
@@ -70,7 +70,7 @@ appended to a rotating log file at an independent verbosity level.
 <a id="reference"></a>
 ## 📚 Reference
 
-### `__log`
+### `__dybatpho_log`
 
 Log a message to stdout or stderr, optionally with ANSI color.
 
@@ -98,7 +98,7 @@ Log a message to stdout or stderr, optionally with ANSI color.
 
 ---
 
-### `__check_color`
+### `__dybatpho_log_check_color`
 
 Render the current log message with ANSI color unless `NO_COLOR` is set.
 
@@ -111,7 +111,7 @@ _Function has no arguments._
 
 ---
 
-### `__log_json_escape`
+### `__dybatpho_log_json_escape`
 
 Escape a string for use as a JSON string value.
 
@@ -128,7 +128,7 @@ Escape a string for use as a JSON string value.
 
 ---
 
-### `__log_timestamp`
+### `__dybatpho_log_timestamp`
 
 Return an RFC 3339 timestamp for a log event.
 
@@ -139,7 +139,7 @@ Return an RFC 3339 timestamp for a log event.
 
 ---
 
-### `__log_now_ms`
+### `__dybatpho_log_now_ms`
 
 Return the current time in milliseconds since the epoch, using the most precise portable source available.
 
@@ -150,7 +150,7 @@ Return the current time in milliseconds since the epoch, using the most precise 
 
 ---
 
-### `__log_duration_ms`
+### `__dybatpho_log_duration_ms`
 
 Return the elapsed time since the process started, for structured log events.
 
@@ -161,7 +161,7 @@ Return the elapsed time since the process started, for structured log events.
 
 ---
 
-### `__log_request_id`
+### `__dybatpho_log_request_id`
 
 Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
 
@@ -176,7 +176,7 @@ Return the correlation ID attached to every structured log event, generating and
 
 ---
 
-### `__log_hostname`
+### `__dybatpho_log_hostname`
 
 Return the current hostname attached to every structured log event, caching the result for the process lifetime.
 
@@ -187,7 +187,7 @@ Return the current hostname attached to every structured log event, caching the 
 
 ---
 
-### `__log_json_event`
+### `__dybatpho_log_json_event`
 
 Build one structured JSON log event enriched with request ID, hostname, PID, and duration.
 
@@ -208,7 +208,7 @@ Build one structured JSON log event enriched with request ID, hostname, PID, and
 
 ---
 
-### `__log_rotate_file`
+### `__dybatpho_log_rotate_file`
 
 Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
 
@@ -223,7 +223,7 @@ Rotate a log file in place once it reaches a size threshold, keeping a bounded n
 
 ---
 
-### `__log_write_file`
+### `__dybatpho_log_write_file`
 
 Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
 
@@ -247,7 +247,7 @@ Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL`
 
 ---
 
-### `__log_structured`
+### `__dybatpho_log_structured`
 
 Log a diagnostic event as JSON when `LOG_FORMAT=json`.
 
@@ -288,7 +288,7 @@ Return success when a message level should be shown against a threshold.
 
 ---
 
-### `__log_inspect`
+### `__dybatpho_log_inspect`
 
 Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
 
@@ -311,7 +311,7 @@ Log a structured diagnostic message with timestamp and call-site information. Al
 
 ---
 
-### `__get_terminal_width`
+### `__dybatpho_log_get_terminal_width`
 
 Return the effective terminal width used by boxed logging helpers.
 
@@ -322,7 +322,7 @@ Return the effective terminal width used by boxed logging helpers.
 
 ---
 
-### `__string_display_width`
+### `__dybatpho_log_string_display_width`
 
 Return the display width of a string, accounting for wide Unicode glyphs when possible.
 
@@ -339,7 +339,7 @@ Return the display width of a string, accounting for wide Unicode glyphs when po
 
 ---
 
-### `__wrap_line`
+### `__dybatpho_log_wrap_line`
 
 Wrap one text line to the requested width using word boundaries when possible.
 
@@ -357,7 +357,7 @@ Wrap one text line to the requested width using word boundaries when possible.
 
 ---
 
-### `__log_box`
+### `__dybatpho_log_box`
 
 Render a boxed message sized to its content while respecting terminal width.
 

@@ -430,7 +430,9 @@ EOF
 @test "dybatpho::file_age_seconds grows with the modification time" {
   local target="${BATS_TEST_TMPDIR}/aged"
   printf 'x' > "${target}"
-  assert_equal "$(dybatpho::file_age_seconds "${target}")" "0"
+  # A freshly written file is new, but asserting exactly 0 makes the test flaky:
+  # under a parallel run the clock can tick between the write and the read.
+  assert [ "$(dybatpho::file_age_seconds "${target}")" -lt 5 ]
   touch -t 200001010000 "${target}"
   assert [ "$(dybatpho::file_age_seconds "${target}")" -gt 100000 ]
   run ! dybatpho::file_age_seconds "${BATS_TEST_TMPDIR}/absent"

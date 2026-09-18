@@ -17,10 +17,10 @@
 # @arg $1 string Cell text
 # @stdout Cell width
 #######################################
-function __table_cell_width {
+function __dybatpho_table_cell_width {
   local text="${1-}"
-  if dybatpho::is function __string_display_width; then
-    __string_display_width "${text}"
+  if dybatpho::is function __dybatpho_log_string_display_width; then
+    __dybatpho_log_string_display_width "${text}"
   else
     printf '%s\n' "${#text}" # kcov(skip) - only when table.sh is used without logging.sh
   fi
@@ -32,11 +32,11 @@ function __table_cell_width {
 # @arg $2 number Target width
 # @stdout Right-padded cell text
 #######################################
-function __table_pad {
+function __dybatpho_table_pad {
   local text target_width
   dybatpho::expect_args text target_width -- "$@"
   local width padding_size=0 padding=""
-  width=$(__table_cell_width "${text}")
+  width=$(__dybatpho_table_cell_width "${text}")
   if ((target_width > width)); then
     padding_size=$((target_width - width))
     padding="$(dybatpho::string_repeat " " "${padding_size}")"
@@ -50,7 +50,7 @@ function __table_pad {
 # @arg $2 string Exact delimiter
 # @arg $3 string Name of the array variable to fill
 #######################################
-function __table_split_row {
+function __dybatpho_table_split_row {
   local row delimiter target_var
   dybatpho::expect_args row delimiter target_var -- "$@"
   local -n target_ref="${target_var}"
@@ -73,7 +73,7 @@ function __table_split_row {
 # @arg $2 string Exact delimiter
 # @arg $3 string Name of the width array variable to fill
 #######################################
-function __table_measure_widths {
+function __dybatpho_table_measure_widths {
   local rows_var delimiter widths_var
   dybatpho::expect_args rows_var delimiter widths_var -- "$@"
   local -n rows_ref="${rows_var}"
@@ -83,9 +83,9 @@ function __table_measure_widths {
   widths_ref=()
 
   for row in "${rows_ref[@]}"; do
-    __table_split_row "${row}" "${delimiter}" cells
+    __dybatpho_table_split_row "${row}" "${delimiter}" cells
     for index in "${!cells[@]}"; do
-      cell_width=$(__table_cell_width "${cells[${index}]}")
+      cell_width=$(__dybatpho_table_cell_width "${cells[${index}]}")
       if [[ -z "${widths_ref[${index}]+x}" ]] || ((cell_width > widths_ref[${index}])); then
         widths_ref[${index}]=${cell_width}
       fi
@@ -99,7 +99,7 @@ function __table_measure_widths {
 # @arg $2 string Name of the widths array variable
 # @arg $3 string Name of the alignments array variable to fill
 #######################################
-function __table_parse_alignments {
+function __dybatpho_table_parse_alignments {
   local spec widths_var alignments_var
   dybatpho::expect_args spec widths_var alignments_var -- "$@"
   local -n widths_ref="${widths_var}"
@@ -138,11 +138,11 @@ function __table_parse_alignments {
 # @arg $3 string Alignment (`left`, `right`, `center`)
 # @stdout Formatted cell text
 #######################################
-function __table_format_cell {
+function __dybatpho_table_format_cell {
   local text target_width alignment
   dybatpho::expect_args text target_width alignment -- "$@"
   local width padding_size left_pad_size right_pad_size padding=""
-  width=$(__table_cell_width "${text}")
+  width=$(__dybatpho_table_cell_width "${text}")
   padding_size=$((target_width - width))
   if ((padding_size < 0)); then
     padding_size=0 # kcov(skip) - defensive; column widths always cover their cells
@@ -159,7 +159,7 @@ function __table_format_cell {
       printf '%s%s%s' "$(dybatpho::string_repeat " " "${left_pad_size}")" "${text}" "$(dybatpho::string_repeat " " "${right_pad_size}")"
       ;;
     *)
-      __table_pad "${text}" "${target_width}"
+      __dybatpho_table_pad "${text}" "${target_width}"
       ;;
   esac
 }
@@ -172,7 +172,7 @@ function __table_format_cell {
 # @arg $4 string Name of the widths array variable
 # @stdout Rendered rule line
 #######################################
-function _table_rule {
+function __dybatpho_table_rule {
   local left join right widths_var
   dybatpho::expect_args left join right widths_var -- "$@"
   local -n widths_ref="${widths_var}"
@@ -220,16 +220,16 @@ function dybatpho::table_align {
   local row index line gap_text=""
 
   [[ "${gap}" =~ ^[0-9]+$ ]] || dybatpho::die "Gap width must be a non-negative integer: ${gap}"
-  __text_read_lines "${input}" rows
-  __table_measure_widths rows "${delimiter}" widths
-  __table_parse_alignments "${align_spec}" widths alignments
+  __dybatpho_text_read_lines "${input}" rows
+  __dybatpho_table_measure_widths rows "${delimiter}" widths
+  __dybatpho_table_parse_alignments "${align_spec}" widths alignments
   gap_text="$(dybatpho::string_repeat " " "${gap}")"
 
   for row in "${rows[@]}"; do
-    __table_split_row "${row}" "${delimiter}" cells
+    __dybatpho_table_split_row "${row}" "${delimiter}" cells
     line=""
     for ((index = 0; index < ${#widths[@]}; index++)); do
-      line+="$(__table_format_cell "${cells[${index}]-}" "${widths[${index}]}" "${alignments[${index}]}")"
+      line+="$(__dybatpho_table_format_cell "${cells[${index}]-}" "${widths[${index}]}" "${alignments[${index}]}")"
       if ((index < ${#widths[@]} - 1)); then
         line+="${gap_text}"
       fi
@@ -251,23 +251,23 @@ function dybatpho::table_box {
   local -a rows=() widths=() cells=()
   local row row_index index line
 
-  __text_read_lines "${input}" rows
-  __table_measure_widths rows "${delimiter}" widths
+  __dybatpho_text_read_lines "${input}" rows
+  __dybatpho_table_measure_widths rows "${delimiter}" widths
 
-  _table_rule "┌" "┬" "┐" widths
+  __dybatpho_table_rule "┌" "┬" "┐" widths
   for row_index in "${!rows[@]}"; do
     row="${rows[${row_index}]}"
-    __table_split_row "${row}" "${delimiter}" cells
+    __dybatpho_table_split_row "${row}" "${delimiter}" cells
     line="│"
     for ((index = 0; index < ${#widths[@]}; index++)); do
-      line+=" $(__table_pad "${cells[${index}]-}" "${widths[${index}]}") │"
+      line+=" $(__dybatpho_table_pad "${cells[${index}]-}" "${widths[${index}]}") │"
     done
     printf '%s\n' "${line}"
     if ((row_index == 0 && ${#rows[@]} > 1)); then
-      _table_rule "├" "┼" "┤" widths
+      __dybatpho_table_rule "├" "┼" "┤" widths
     fi
   done
-  _table_rule "└" "┴" "┘" widths
+  __dybatpho_table_rule "└" "┴" "┘" widths
 }
 
 #######################################
@@ -283,15 +283,15 @@ function dybatpho::table_markdown {
   local -a rows=() widths=() cells=()
   local row row_index index line separator segment width
 
-  __text_read_lines "${input}" rows
-  __table_measure_widths rows "${delimiter}" widths
+  __dybatpho_text_read_lines "${input}" rows
+  __dybatpho_table_measure_widths rows "${delimiter}" widths
 
   for row_index in "${!rows[@]}"; do
     row="${rows[${row_index}]}"
-    __table_split_row "${row}" "${delimiter}" cells
+    __dybatpho_table_split_row "${row}" "${delimiter}" cells
     line="|"
     for ((index = 0; index < ${#widths[@]}; index++)); do
-      line+=" $(__table_pad "${cells[${index}]-}" "${widths[${index}]}") |"
+      line+=" $(__dybatpho_table_pad "${cells[${index}]-}" "${widths[${index}]}") |"
     done
     printf '%s\n' "${line}"
 

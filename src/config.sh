@@ -447,7 +447,7 @@ function __dybatpho_config_doc_json_value {
     printf 'null'
     return 0
   fi
-  printf '"%s"' "$(__log_json_escape "${value}")"
+  printf '"%s"' "$(__dybatpho_log_json_escape "${value}")"
 }
 
 #######################################
@@ -508,7 +508,7 @@ function dybatpho::config_doc {
         [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]] && declared="declared" || true
         printf '%s{"key":"%s","type":"%s","required":%s,"default":%s,"constraints":%s,"description":%s}' \
           "${separator}" \
-          "$(__log_json_escape "${key}")" "${type}" "${required}" \
+          "$(__dybatpho_log_json_escape "${key}")" "${type}" "${required}" \
           "$(__dybatpho_config_doc_json_value "${default}" "${declared}")" \
           "$(__dybatpho_config_doc_json_value "${constraints}")" \
           "$(__dybatpho_config_doc_json_value "${description}")"

@@ -14,16 +14,16 @@ teardown() {
 @test "logging helpers run in the current shell" {
   local out="${BATS_TEST_TMPDIR}/log-out"
 
-  __log info "direct stdout" > "${out}"
+  __dybatpho_log info "direct stdout" > "${out}"
   assert_file_contains "${out}" "direct stdout"
-  __log info "direct stderr" stderr
-  NO_COLOR=true __log info "no color" > "${out}"
+  __dybatpho_log info "direct stderr" stderr
+  NO_COLOR=true __dybatpho_log info "no color" > "${out}"
   assert_file_contains "${out}" "no color"
   NO_COLOR=""
 
-  assert_equal "$(__log_json_escape 'a"b\c')" 'a\"b\\c'
-  assert_equal "$(__log_json_escape $'tab\tnew\nret\r')" 'tab\tnew\nret\r'
-  [[ "$(__log_timestamp)" =~ ^[0-9]{4}- ]]
+  assert_equal "$(__dybatpho_log_json_escape 'a"b\c')" 'a\"b\\c'
+  assert_equal "$(__dybatpho_log_json_escape $'tab\tnew\nret\r')" 'tab\tnew\nret\r'
+  [[ "$(__dybatpho_log_timestamp)" =~ ^[0-9]{4}- ]]
 
   dybatpho::validate_log_level info
   run ! dybatpho::validate_log_level nonsense
@@ -65,8 +65,8 @@ teardown() {
   dybatpho::header "alpha beta gamma delta epsilon" > "${out}"
   dybatpho::success "https://example.com/a/very/long/link" >> "${out}"
   # A long token with a later space breaks at that space, dropping the padding.
-  assert_equal "$(__wrap_line "ab   cd" 2)" "$(printf 'ab\ncd')"
-  assert_equal "$(__wrap_line "aaaaaaaaaa bb" 5)" "$(printf 'aaaaaaaaaa\nbb')"
+  assert_equal "$(__dybatpho_log_wrap_line "ab   cd" 2)" "$(printf 'ab\ncd')"
+  assert_equal "$(__dybatpho_log_wrap_line "aaaaaaaaaa bb" 5)" "$(printf 'aaaaaaaaaa\nbb')"
   PATH="${old_path}"
 
   assert_file_contains "${out}" "alpha"
@@ -75,7 +75,7 @@ teardown() {
   NO_COLOR=""
 }
 
-@test "__get_terminal_width falls back to tput and then to 80 columns" {
+@test "__dybatpho_log_get_terminal_width falls back to tput and then to 80 columns" {
   local out="${BATS_TEST_TMPDIR}/width-out"
   unset COLUMNS
   stub_repeated tput ": echo 30"
@@ -94,7 +94,7 @@ teardown() {
   dybatpho::secret_register "logging-secret-value"
   local out="${BATS_TEST_TMPDIR}/masked-log"
 
-  __log info "token logging-secret-value" > "${out}"
+  __dybatpho_log info "token logging-secret-value" > "${out}"
   assert_file_contains "${out}" "token \\*\\*\\*"
   assert_file_not_contains "${out}" "logging-secret-value"
 
@@ -104,15 +104,15 @@ teardown() {
   dybatpho::secret_forget
 }
 
-@test "__log_structured renders text output when the format is not json" {
+@test "__dybatpho_log_structured renders text output when the format is not json" {
   LOG_FORMAT=text
-  __log_structured info "source.sh:12" "structured text message"
-  __log_structured trace "source.sh:12" "filtered out"
+  __dybatpho_log_structured info "source.sh:12" "structured text message"
+  __dybatpho_log_structured trace "source.sh:12" "filtered out"
 }
 
-@test "__wrap_line handles non-positive widths and empty lines" {
-  assert_equal "$(__wrap_line "unwrapped text" 0)" "unwrapped text"
-  assert_equal "$(__wrap_line "" 10)" ""
+@test "__dybatpho_log_wrap_line handles non-positive widths and empty lines" {
+  assert_equal "$(__dybatpho_log_wrap_line "unwrapped text" 0)" "unwrapped text"
+  assert_equal "$(__dybatpho_log_wrap_line "" 10)" ""
 }
 
 @test "boxed output copes with empty messages and tiny terminals" {
@@ -127,31 +127,31 @@ teardown() {
   NO_COLOR=""
 }
 
-@test "__log_timestamp supports busybox and portable date" {
+@test "__dybatpho_log_timestamp supports busybox and portable date" {
   stub_repeated busybox ": echo '2024-02-29T12:34:56+07:00'"
-  assert_equal "$(__log_timestamp)" "2024-02-29T12:34:56+07:00"
+  assert_equal "$(__dybatpho_log_timestamp)" "2024-02-29T12:34:56+07:00"
 }
 
-@test "__log_timestamp falls back to portable date flags" {
+@test "__dybatpho_log_timestamp falls back to portable date flags" {
   # Neither busybox nor GNU date is available in this environment.
   stub_repeated date ": case \"\$1\" in --version) exit 1 ;; *) echo '2024-02-29T12:34:56+0700' ;; esac"
-  assert_equal "$(__log_timestamp)" "2024-02-29T12:34:56+0700"
+  assert_equal "$(__dybatpho_log_timestamp)" "2024-02-29T12:34:56+0700"
 }
 
-@test "__log output message" {
-  run --separate-stderr __log info test
+@test "__dybatpho_log output message" {
+  run --separate-stderr __dybatpho_log info test
   assert_success
   refute_stderr
   assert_output --partial test
-  run --separate-stderr __log info test stderr
+  run --separate-stderr __dybatpho_log info test stderr
   assert_success
   refute_output
   assert_stderr --partial test
 }
 
-@test "__log with NO_COLOR" {
+@test "__dybatpho_log with NO_COLOR" {
   export NO_COLOR="true"
-  run --separate-stderr __log info test
+  run --separate-stderr __dybatpho_log info test
   assert_success
   refute_output --partial "$(echo -e "\e[0;32m")"
 }
@@ -633,38 +633,38 @@ assert event["duration_ms"] >= 0
   ! grep -q "file-secret-value" "${log_file}"
 }
 
-@test "__log_now_ms returns an increasing integer" {
+@test "__dybatpho_log_now_ms returns an increasing integer" {
   local first second
-  first=$(__log_now_ms)
+  first=$(__dybatpho_log_now_ms)
   sleep 0.01
-  second=$(__log_now_ms)
+  second=$(__dybatpho_log_now_ms)
   [[ "${first}" =~ ^[0-9]+$ ]]
   [[ "${second}" =~ ^[0-9]+$ ]]
   ((second >= first))
 }
 
-@test "__log_now_ms falls back to SECONDS when date lacks nanosecond support" {
+@test "__dybatpho_log_now_ms falls back to SECONDS when date lacks nanosecond support" {
   local saved_epochrealtime="${EPOCHREALTIME:-}"
   # shellcheck disable=SC2030
   unset EPOCHREALTIME 2> /dev/null || true
   stub_repeated date ": echo 1700000000N"
   local value
-  value=$(__log_now_ms)
+  value=$(__dybatpho_log_now_ms)
   [[ "${value}" =~ ^[0-9]+$ ]]
   unstub date
 }
 
-@test "__log_hostname returns a non-empty value" {
-  [[ -n "$(__log_hostname)" ]]
+@test "__dybatpho_log_hostname returns a non-empty value" {
+  [[ -n "$(__dybatpho_log_hostname)" ]]
 }
 
-@test "__log_rotate_file is a no-op for a missing file or disabled rotation" {
+@test "__dybatpho_log_rotate_file is a no-op for a missing file or disabled rotation" {
   local missing_file="${BATS_TEST_TMPDIR}/missing.log"
-  __log_rotate_file "${missing_file}" 100 3
+  __dybatpho_log_rotate_file "${missing_file}" 100 3
   [ ! -e "${missing_file}" ]
 
   local existing_file="${BATS_TEST_TMPDIR}/existing.log"
   echo "some content" > "${existing_file}"
-  __log_rotate_file "${existing_file}" 0 3
+  __dybatpho_log_rotate_file "${existing_file}" 0 3
   [ ! -e "${existing_file}.1" ]
 }

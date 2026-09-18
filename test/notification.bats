@@ -3,36 +3,36 @@ setup() {
 }
 
 # ---------------------------------------------------------------------------
-# __notification_json_escape
+# __dybatpho_notification_json_escape
 # ---------------------------------------------------------------------------
 
-@test "__notification_json_escape no arg" {
-  run __notification_json_escape
+@test "__dybatpho_notification_json_escape no arg" {
+  run __dybatpho_notification_json_escape
   assert_failure
 }
 
-@test "__notification_json_escape plain string" {
-  assert_equal "$(__notification_json_escape "hello world")" "hello world"
+@test "__dybatpho_notification_json_escape plain string" {
+  assert_equal "$(__dybatpho_notification_json_escape "hello world")" "hello world"
 }
 
-@test "__notification_json_escape escapes double quotes" {
-  assert_equal "$(__notification_json_escape 'say "hi"')" 'say \"hi\"'
+@test "__dybatpho_notification_json_escape escapes double quotes" {
+  assert_equal "$(__dybatpho_notification_json_escape 'say "hi"')" 'say \"hi\"'
 }
 
-@test "__notification_json_escape escapes backslash" {
-  assert_equal "$(__notification_json_escape 'C:\path')" 'C:\\path'
+@test "__dybatpho_notification_json_escape escapes backslash" {
+  assert_equal "$(__dybatpho_notification_json_escape 'C:\path')" 'C:\\path'
 }
 
-@test "__notification_json_escape escapes newline" {
-  assert_equal "$(__notification_json_escape $'line1\nline2')" 'line1\nline2'
+@test "__dybatpho_notification_json_escape escapes newline" {
+  assert_equal "$(__dybatpho_notification_json_escape $'line1\nline2')" 'line1\nline2'
 }
 
-@test "__notification_json_escape escapes tab" {
-  assert_equal "$(__notification_json_escape $'col1\tcol2')" 'col1\tcol2'
+@test "__dybatpho_notification_json_escape escapes tab" {
+  assert_equal "$(__dybatpho_notification_json_escape $'col1\tcol2')" 'col1\tcol2'
 }
 
-@test "__notification_json_escape escapes carriage return" {
-  assert_equal "$(__notification_json_escape $'text\rmore')" 'text\rmore'
+@test "__dybatpho_notification_json_escape escapes carriage return" {
+  assert_equal "$(__dybatpho_notification_json_escape $'text\rmore')" 'text\rmore'
 }
 
 # ---------------------------------------------------------------------------

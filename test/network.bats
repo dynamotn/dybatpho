@@ -2,17 +2,17 @@ setup() {
   load test_helper
 }
 
-@test "__get_http_code no arg" {
-  run __get_http_code
+@test "__dybatpho_network_get_http_code no arg" {
+  run __dybatpho_network_get_http_code
   assert_failure
 }
 
-@test "__get_http_code output" {
-  assert_equal "$(__get_http_code 403)" "403 (forbidden)"
+@test "__dybatpho_network_get_http_code output" {
+  assert_equal "$(__dybatpho_network_get_http_code 403)" "403 (forbidden)"
 }
 
-@test "__get_http_code with unknown code" {
-  assert_equal "$(__get_http_code 999)" "999 (unknown)"
+@test "__dybatpho_network_get_http_code with unknown code" {
+  assert_equal "$(__dybatpho_network_get_http_code 999)" "999 (unknown)"
 }
 
 @test "dybatpho::curl_do no arg" {

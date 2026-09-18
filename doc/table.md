@@ -17,13 +17,13 @@ strict CSV parsing.
 
 ### 🚀 Highlights
 
-- [`__table_cell_width`](#__table_cell_width) — Return the display width of a table cell.
-- [`__table_pad`](#__table_pad) — Pad a cell to the requested display width.
-- [`__table_split_row`](#__table_split_row) — Split one delimited row into trimmed cells.
-- [`__table_measure_widths`](#__table_measure_widths) — Measure the widest cell in each column across all rows.
-- [`__table_parse_alignments`](#__table_parse_alignments) — Normalize a per-column alignment specification.
-- [`__table_format_cell`](#__table_format_cell) — Format a cell according to width and alignment.
-- [`_table_rule`](#_table_rule) — Print a Unicode rule line for a boxed table.
+- [`__dybatpho_table_cell_width`](#__dybatpho_table_cell_width) — Return the display width of a table cell.
+- [`__dybatpho_table_pad`](#__dybatpho_table_pad) — Pad a cell to the requested display width.
+- [`__dybatpho_table_split_row`](#__dybatpho_table_split_row) — Split one delimited row into trimmed cells.
+- [`__dybatpho_table_measure_widths`](#__dybatpho_table_measure_widths) — Measure the widest cell in each column across all rows.
+- [`__dybatpho_table_parse_alignments`](#__dybatpho_table_parse_alignments) — Normalize a per-column alignment specification.
+- [`__dybatpho_table_format_cell`](#__dybatpho_table_format_cell) — Format a cell according to width and alignment.
+- [`__dybatpho_table_rule`](#__dybatpho_table_rule) — Print a Unicode rule line for a boxed table.
 - [`dybatpho::table_print`](#dybatphotable_print) — Render aligned columns without borders from delimited rows.
 - [`dybatpho::table_align`](#dybatphotable_align) — Render aligned columns with optional per-column alignment rules.
 - [`dybatpho::table_box`](#dybatphotable_box) — Render a Unicode boxed table from delimited rows.
@@ -43,7 +43,7 @@ strict CSV parsing.
 <a id="reference"></a>
 ## 📚 Reference
 
-### `__table_cell_width`
+### `__dybatpho_table_cell_width`
 
 Return the display width of a table cell.
 
@@ -60,7 +60,7 @@ Return the display width of a table cell.
 
 ---
 
-### `__table_pad`
+### `__dybatpho_table_pad`
 
 Pad a cell to the requested display width.
 
@@ -78,7 +78,7 @@ Pad a cell to the requested display width.
 
 ---
 
-### `__table_split_row`
+### `__dybatpho_table_split_row`
 
 Split one delimited row into trimmed cells.
 
@@ -93,7 +93,7 @@ Split one delimited row into trimmed cells.
 
 ---
 
-### `__table_measure_widths`
+### `__dybatpho_table_measure_widths`
 
 Measure the widest cell in each column across all rows.
 
@@ -108,7 +108,7 @@ Measure the widest cell in each column across all rows.
 
 ---
 
-### `__table_parse_alignments`
+### `__dybatpho_table_parse_alignments`
 
 Normalize a per-column alignment specification.
 
@@ -123,7 +123,7 @@ Normalize a per-column alignment specification.
 
 ---
 
-### `__table_format_cell`
+### `__dybatpho_table_format_cell`
 
 Format a cell according to width and alignment.
 
@@ -142,7 +142,7 @@ Format a cell according to width and alignment.
 
 ---
 
-### `_table_rule`
+### `__dybatpho_table_rule`
 
 Print a Unicode rule line for a boxed table.
 

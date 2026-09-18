@@ -168,8 +168,8 @@ or a registered name with no file behind it.
 
 Verify the dependency table against the real call graph rather than by eye.
 **Match internal helpers too**: `table.sh` reaches `text.sh` only through
-`__text_read_lines`, and an edge found by reading `dybatpho::` calls alone would
-miss it.
+`__dybatpho_text_read_lines`, and an edge found by reading `dybatpho::` calls
+alone would miss it.
 
 ```bash
 declare -A OWNER
@@ -256,7 +256,10 @@ affect editor navigation.
 - Keep compatibility with strict mode: `set -euo pipefail`.
 - Use two-space indentation, LF line endings, and a final newline.
 - Put public functions under the `dybatpho::` namespace.
-- Use non-public names for internal functions, usually beginning with `__`.
+- Name every internal function `__dybatpho_<module>_<action>` (for example
+  `__dybatpho_log_write_file`). The `__dybatpho_` prefix is mandatory — a bare
+  `__` or `_` prefix risks colliding with helpers defined by the calling script.
+  Nested helpers declared inside a function follow the same rule.
 - Use `printf` instead of `echo` when output must be stable or contains user data.
 - Quote variables that may contain whitespace or special characters.
 - Do not silently swallow errors; return clear failures following repository

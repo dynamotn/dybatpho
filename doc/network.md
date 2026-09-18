@@ -30,7 +30,7 @@ in-memory circuit breaker.
 
 ### 🚀 Highlights
 
-- [`__get_http_code`](#__get_http_code) — Get description of HTTP status code
+- [`__dybatpho_network_get_http_code`](#__dybatpho_network_get_http_code) — Get description of HTTP status code
 - [`dybatpho::curl_do`](#dybatphocurl_do) — Transferring data with URL by curl
 - [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
 - [`dybatpho::curl_json`](#dybatphocurl_json) — Transfer JSON data with URL by curl.
@@ -80,7 +80,7 @@ in-memory circuit breaker.
 <a id="reference"></a>
 ## 📚 Reference
 
-### `__get_http_code`
+### `__dybatpho_network_get_http_code`
 
 Get description of HTTP status code
 

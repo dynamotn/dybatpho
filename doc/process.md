@@ -31,7 +31,7 @@ composition, deferred cleanup, and dry-run execution.
 - [`dybatpho::run_err_handler`](#dybatphorun_err_handler) — Handle a command failure captured by `dybatpho::register_err_handler`.
 - [`dybatpho::killed_process_handler`](#dybatphokilled_process_handler) — Handle SIGINT or SIGTERM received by the current process.
 - [`dybatpho::trap`](#dybatphotrap) — Append a command to one or more trap handlers without discarding existing traps.
-- [`_gen_finalize_command`](#_gen_finalize_command) — Read the current trap command registered for a signal.
+- [`__dybatpho_process_gen_finalize_command`](#__dybatpho_process_gen_finalize_command) — Read the current trap command registered for a signal.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
 
@@ -151,7 +151,7 @@ Append a command to one or more trap handlers without discarding existing traps.
 
 ---
 
-### `_gen_finalize_command`
+### `__dybatpho_process_gen_finalize_command`
 
 Read the current trap command registered for a signal.
 

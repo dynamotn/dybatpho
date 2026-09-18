@@ -24,7 +24,7 @@ notification platforms through their webhook or bot APIs:
 
 ### 🚀 Highlights
 
-- [`__notification_json_escape`](#__notification_json_escape) — Escape a string for safe embedding inside a JSON string value. Escapes: backslash, double-quote, newline, carriage-return, and tab.
+- [`__dybatpho_notification_json_escape`](#__dybatpho_notification_json_escape) — Escape a string for safe embedding inside a JSON string value. Escapes: backslash, double-quote, newline, carriage-return, and tab.
 - [`dybatpho::notify_slack`](#dybatphonotify_slack) — Send a message to a Slack channel via Incoming Webhook.
 - [`dybatpho::notify_telegram`](#dybatphonotify_telegram) — Send a message to a Telegram chat via Bot API.
 - [`dybatpho::notify_teams`](#dybatphonotify_teams) — Send a message to a Microsoft Teams channel via Incoming Webhook. Uses the Adaptive Card format required by the current Teams webhook API.
@@ -102,7 +102,7 @@ dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy","status":"
 <a id="reference"></a>
 ## 📚 Reference
 
-### `__notification_json_escape`
+### `__dybatpho_notification_json_escape`
 
 Escape a string for safe embedding inside a JSON string value.
 Escapes: backslash, double-quote, newline, carriage-return, and tab.

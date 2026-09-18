@@ -421,7 +421,7 @@ function dybatpho::breakpoint {
   local dybatpho_help
   printf -v dybatpho_help '%s\n    d: run debugger\n    c: display source file\n    o: list options\n    p: list parameters\n    a: list indexed array\n    A: list associative array\n    q: quit' "${dybatpho_section}"
   local source_file="${BASH_SOURCE[1]:-bash}"
-  __log fatal "Breakpoint hit. Current line: ${source_file}:${BASH_LINENO[0]}" stderr "1;36"
+  __dybatpho_log fatal "Breakpoint hit. Current line: ${source_file}:${BASH_LINENO[0]}" stderr "1;36"
   while true; do
     printf "%s\n" "${dybatpho_help}" >&2
     read -n1 -s -r dybatpho_key_pressed

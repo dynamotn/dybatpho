@@ -124,7 +124,7 @@ function dybatpho::trap {
   # @arg $1 string Signal name
   # @stdout Existing trap command, or an empty string when none is registered
   #######################################
-  _gen_finalize_command() {
+  __dybatpho_process_gen_finalize_command() {
     local cmds=$(trap -p "$1")
     cmds="${cmds#*\'}"
     cmds="${cmds%\'*}"
@@ -133,7 +133,7 @@ function dybatpho::trap {
 
   local finalize_command
   for signal in "$@"; do
-    finalize_command=$(_gen_finalize_command "${signal}")
+    finalize_command=$(__dybatpho_process_gen_finalize_command "${signal}")
     finalize_command="${finalize_command}${finalize_command:+; }${command}"
     # shellcheck disable=SC2064,SC2086
     trap "${finalize_command}" "${signal}"

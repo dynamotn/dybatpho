@@ -31,39 +31,39 @@ Utilities for building CLI parsers from shell specs.
 - [`dybatpho::prompt`](#dybatphoprompt) — Read a line from the terminal (or stdin) with an optional default.
 - [`dybatpho::select`](#dybatphoselect) — Prompt for one or more values from a comma-separated list or numeric range.
 - [`dybatpho::opts::validate_choice`](#dybatphooptsvalidate_choice) — Check that a value belongs to a comma-separated choice list.
-- [`__parse_opt`](#__parse_opt) — Functions are triggered by `dybatpho::generate_from_spec` Parse options with a spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
-- [`__print_indent`](#__print_indent) — Write script with indentation to stdout
-- [`__require_shell_name`](#__require_shell_name) — Validate a shell variable name used by generated parser code.
-- [`__assign_quoted`](#__assign_quoted) — Assign the quoted string to a variable
-- [`__prepend_export`](#__prepend_export) — Prepend export of before string of command, based on `export:<bool>` switch
-- [`__define_var`](#__define_var) — Define variable from spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
-- [`__parse_key_value`](#__parse_key_value) — Extract key value from spec with format `x:y`, to get settings of option
-- [`__generate_logic`](#__generate_logic) — Generate logic from spec of script/function to get options
-- [`__print_get_arg`](#__print_get_arg) — Emit generated code that rebuilds positional parameters from a serialized argument list.
-- [`__print_rest`](#__print_rest) — Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
-- [`__generate_help`](#__generate_help) — Get help description for options from spec. Sets __help_mode=true so dybatpho::opts::* collect help data via dynamic scoping into dybatpho::generate_help's locals, then prints the buffered sections in the correct order.
+- [`__dybatpho_cli_parse_opt`](#__dybatpho_cli_parse_opt) — Functions are triggered by `dybatpho::generate_from_spec` Parse options with a spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
+- [`__dybatpho_cli_print_indent`](#__dybatpho_cli_print_indent) — Write script with indentation to stdout
+- [`__dybatpho_cli_require_shell_name`](#__dybatpho_cli_require_shell_name) — Validate a shell variable name used by generated parser code.
+- [`__dybatpho_cli_assign_quoted`](#__dybatpho_cli_assign_quoted) — Assign the quoted string to a variable
+- [`__dybatpho_cli_prepend_export`](#__dybatpho_cli_prepend_export) — Prepend export of before string of command, based on `export:<bool>` switch
+- [`__dybatpho_cli_define_var`](#__dybatpho_cli_define_var) — Define variable from spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
+- [`__dybatpho_cli_parse_key_value`](#__dybatpho_cli_parse_key_value) — Extract key value from spec with format `x:y`, to get settings of option
+- [`__dybatpho_cli_generate_logic`](#__dybatpho_cli_generate_logic) — Generate logic from spec of script/function to get options
+- [`__dybatpho_cli_print_get_arg`](#__dybatpho_cli_print_get_arg) — Emit generated code that rebuilds positional parameters from a serialized argument list.
+- [`__dybatpho_cli_print_rest`](#__dybatpho_cli_print_rest) — Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
+- [`__dybatpho_cli_generate_help`](#__dybatpho_cli_generate_help) — Get help description for options from spec. Sets __help_mode=true so dybatpho::opts::* collect help data via dynamic scoping into dybatpho::generate_help's locals, then prints the buffered sections in the correct order.
 - [`dybatpho::generate_schema`](#dybatphogenerate_schema) — Generate a JSON CLI schema from the same option spec used by parsing.
-- [`__generate_schema_command`](#__generate_schema_command) — 
+- [`__dybatpho_cli_generate_schema_command`](#__dybatpho_cli_generate_schema_command) — 
 - [`dybatpho::generate_man`](#dybatphogenerate_man) — Generate a roff man page from a CLI option spec.
-- [`__generate_man_command`](#__generate_man_command) — 
+- [`__dybatpho_cli_generate_man_command`](#__dybatpho_cli_generate_man_command) — 
 - [`dybatpho::generate_completion`](#dybatphogenerate_completion) — Generate Bash, Zsh, or Fish completion from a CLI option spec.
-- [`__completion_words`](#__completion_words) — 
-- [`__generate_completion_command`](#__generate_completion_command) — 
-- [`__help_pad`](#__help_pad) — Pad string $2 to at least length $3 and store result in variable $1
-- [`__help_sw`](#__help_sw) — Append a formatted switch to caller-local variable `sw`. Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so that short+long pairs align as "-s, --long".
-- [`__help_row`](#__help_row) — Format one help row and print to stdout
-- [`__add_switch`](#__add_switch) — Add to switches list if flag/param has multiple switches
-- [`__print_validate`](#__print_validate) — Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
-- [`__parse_alias_list`](#__parse_alias_list) — Split a comma-separated alias list into a caller-provided array.
-- [`__record_persistent_def`](#__record_persistent_def) — Serialize an option definition so it can be replayed for persistent descendant commands.
-- [`__replay_persistent_defs`](#__replay_persistent_defs) — Replay inherited persistent option definitions inside the current parser/help generation context.
-- [`__print_persistent_help_defs`](#__print_persistent_help_defs) — Emit generated code that seeds persistent option definitions for nested help output.
-- [`__print_deprecated_warning`](#__print_deprecated_warning) — Emit generated code that warns when a deprecated CLI item is used.
-- [`__generate_child_logic`](#__generate_child_logic) — Generate parser logic for a child command with inherited persistent option definitions.
-- [`__print_args_check`](#__print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
-- [`__collect_switches`](#__collect_switches) — Expand option switches and aliases into a caller-provided array.
-- [`__json_quote`](#__json_quote) — Escape a value for JSON and store it in a caller variable.
-- [`__collect_spec_metadata`](#__collect_spec_metadata) — Collect option and command metadata from a CLI spec.
+- [`__dybatpho_cli_completion_words`](#__dybatpho_cli_completion_words) — 
+- [`__dybatpho_cli_generate_completion_command`](#__dybatpho_cli_generate_completion_command) — 
+- [`__dybatpho_cli_help_pad`](#__dybatpho_cli_help_pad) — Pad string $2 to at least length $3 and store result in variable $1
+- [`__dybatpho_cli_help_sw`](#__dybatpho_cli_help_sw) — Append a formatted switch to caller-local variable `sw`. Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so that short+long pairs align as "-s, --long".
+- [`__dybatpho_cli_help_row`](#__dybatpho_cli_help_row) — Format one help row and print to stdout
+- [`__dybatpho_cli_add_switch`](#__dybatpho_cli_add_switch) — Add to switches list if flag/param has multiple switches
+- [`__dybatpho_cli_print_validate`](#__dybatpho_cli_print_validate) — Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
+- [`__dybatpho_cli_parse_alias_list`](#__dybatpho_cli_parse_alias_list) — Split a comma-separated alias list into a caller-provided array.
+- [`__dybatpho_cli_record_persistent_def`](#__dybatpho_cli_record_persistent_def) — Serialize an option definition so it can be replayed for persistent descendant commands.
+- [`__dybatpho_cli_replay_persistent_defs`](#__dybatpho_cli_replay_persistent_defs) — Replay inherited persistent option definitions inside the current parser/help generation context.
+- [`__dybatpho_cli_print_persistent_help_defs`](#__dybatpho_cli_print_persistent_help_defs) — Emit generated code that seeds persistent option definitions for nested help output.
+- [`__dybatpho_cli_print_deprecated_warning`](#__dybatpho_cli_print_deprecated_warning) — Emit generated code that warns when a deprecated CLI item is used.
+- [`__dybatpho_cli_generate_child_logic`](#__dybatpho_cli_generate_child_logic) — Generate parser logic for a child command with inherited persistent option definitions.
+- [`__dybatpho_cli_print_args_check`](#__dybatpho_cli_print_args_check) — Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
+- [`__dybatpho_cli_collect_switches`](#__dybatpho_cli_collect_switches) — Expand option switches and aliases into a caller-provided array.
+- [`__dybatpho_cli_json_quote`](#__dybatpho_cli_json_quote) — Escape a value for JSON and store it in a caller variable.
+- [`__dybatpho_cli_collect_spec_metadata`](#__dybatpho_cli_collect_spec_metadata) — Collect option and command metadata from a CLI spec.
 - [`dybatpho::opts::setup`](#dybatphooptssetup) — Functions work in spec of script or function via `dybatpho::generate_from_spec`. Setup global settings for getting options (mandatory) in spec of script or function
 - [`dybatpho::opts::flag`](#dybatphooptsflag) — Define an option that take no argument
 - [`dybatpho::opts::param`](#dybatphooptsparam) — Define an option that take an argument
@@ -546,7 +546,7 @@ Check that a value belongs to a comma-separated choice list.
 <a id="internal-functions"></a>
 ### 🧩 Internal functions
 
-#### `__parse_opt`
+#### `__dybatpho_cli_parse_opt`
 
 Functions are triggered by `dybatpho::generate_from_spec`
 Parse options with a spec from `dybatpho::opts::flag`,
@@ -567,7 +567,7 @@ Parse options with a spec from `dybatpho::opts::flag`,
 
 ---
 
-### `__print_indent`
+### `__dybatpho_cli_print_indent`
 
 Write script with indentation to stdout
 
@@ -589,7 +589,7 @@ Write script with indentation to stdout
 
 ---
 
-### `__require_shell_name`
+### `__dybatpho_cli_require_shell_name`
 
 Validate a shell variable name used by generated parser code.
 
@@ -606,7 +606,7 @@ Validate a shell variable name used by generated parser code.
 
 ---
 
-### `__assign_quoted`
+### `__dybatpho_cli_assign_quoted`
 
 Assign the quoted string to a variable
 
@@ -624,7 +624,7 @@ Assign the quoted string to a variable
 
 ---
 
-### `__prepend_export`
+### `__dybatpho_cli_prepend_export`
 
 Prepend export of before string of command,
              based on `export:<bool>` switch
@@ -638,7 +638,7 @@ Prepend export of before string of command,
 
 ---
 
-### `__define_var`
+### `__dybatpho_cli_define_var`
 
 Define variable from spec from `dybatpho::opts::flag`,
              `dybatpho::opts::param`
@@ -652,7 +652,7 @@ Define variable from spec from `dybatpho::opts::flag`,
 
 ---
 
-### `__parse_key_value`
+### `__dybatpho_cli_parse_key_value`
 
 Extract key value from spec with format `x:y`,
              to get settings of option
@@ -667,7 +667,7 @@ Extract key value from spec with format `x:y`,
 
 ---
 
-### `__generate_logic`
+### `__dybatpho_cli_generate_logic`
 
 Generate logic from spec of script/function to get options
 
@@ -685,7 +685,7 @@ Generate logic from spec of script/function to get options
 
 ---
 
-### `__print_get_arg`
+### `__dybatpho_cli_print_get_arg`
 
 Emit generated code that rebuilds positional parameters from a serialized argument list.
 
@@ -702,7 +702,7 @@ Emit generated code that rebuilds positional parameters from a serialized argume
 
 ---
 
-### `__print_rest`
+### `__dybatpho_cli_print_rest`
 
 Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
 
@@ -715,7 +715,7 @@ _Function has no arguments._
 
 ---
 
-### `__generate_help`
+### `__dybatpho_cli_generate_help`
 
 Get help description for options from spec.
              Sets __help_mode=true so dybatpho::opts::* collect help data
@@ -757,7 +757,7 @@ Generate a JSON CLI schema from the same option spec used by parsing.
 
 ---
 
-### `__generate_schema_command`
+### `__dybatpho_cli_generate_schema_command`
 
 
 
@@ -781,7 +781,7 @@ Generate a roff man page from a CLI option spec.
 
 ---
 
-### `__generate_man_command`
+### `__dybatpho_cli_generate_man_command`
 
 
 
@@ -806,19 +806,19 @@ Generate Bash, Zsh, or Fish completion from a CLI option spec.
 
 ---
 
-### `__completion_words`
+### `__dybatpho_cli_completion_words`
 
 
 
 ---
 
-### `__generate_completion_command`
+### `__dybatpho_cli_generate_completion_command`
 
 
 
 ---
 
-### `__help_pad`
+### `__dybatpho_cli_help_pad`
 
 Pad string $2 to at least length $3 and store result in variable $1
 
@@ -833,7 +833,7 @@ Pad string $2 to at least length $3 and store result in variable $1
 
 ---
 
-### `__help_sw`
+### `__dybatpho_cli_help_sw`
 
 Append a formatted switch to caller-local variable `sw`.
 Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so
@@ -849,7 +849,7 @@ that short+long pairs align as "-s, --long".
 
 ---
 
-### `__help_row`
+### `__dybatpho_cli_help_row`
 
 Format one help row and print to stdout
 
@@ -869,7 +869,7 @@ Format one help row and print to stdout
 
 ---
 
-### `__add_switch`
+### `__dybatpho_cli_add_switch`
 
 Add to switches list if flag/param has multiple switches
 
@@ -882,7 +882,7 @@ Add to switches list if flag/param has multiple switches
 
 ---
 
-### `__print_validate`
+### `__dybatpho_cli_print_validate`
 
 Emit generated code that validates the current `OPTARG` and assigns it to the destination variable.
 
@@ -903,7 +903,7 @@ Emit generated code that validates the current `OPTARG` and assigns it to the de
 
 ---
 
-### `__parse_alias_list`
+### `__dybatpho_cli_parse_alias_list`
 
 Split a comma-separated alias list into a caller-provided array.
 
@@ -921,7 +921,7 @@ Split a comma-separated alias list into a caller-provided array.
 
 ---
 
-### `__record_persistent_def`
+### `__dybatpho_cli_record_persistent_def`
 
 Serialize an option definition so it can be replayed for persistent descendant commands.
 
@@ -939,7 +939,7 @@ Serialize an option definition so it can be replayed for persistent descendant c
 
 ---
 
-### `__replay_persistent_defs`
+### `__dybatpho_cli_replay_persistent_defs`
 
 Replay inherited persistent option definitions inside the current parser/help generation context.
 
@@ -952,7 +952,7 @@ _Function has no arguments._
 
 ---
 
-### `__print_persistent_help_defs`
+### `__dybatpho_cli_print_persistent_help_defs`
 
 Emit generated code that seeds persistent option definitions for nested help output.
 
@@ -965,7 +965,7 @@ _Function has no arguments._
 
 ---
 
-### `__print_deprecated_warning`
+### `__dybatpho_cli_print_deprecated_warning`
 
 Emit generated code that warns when a deprecated CLI item is used.
 
@@ -984,7 +984,7 @@ Emit generated code that warns when a deprecated CLI item is used.
 
 ---
 
-### `__generate_child_logic`
+### `__dybatpho_cli_generate_child_logic`
 
 Generate parser logic for a child command with inherited persistent option definitions.
 
@@ -1003,7 +1003,7 @@ Generate parser logic for a child command with inherited persistent option defin
 
 ---
 
-### `__print_args_check`
+### `__dybatpho_cli_print_args_check`
 
 Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
 
@@ -1024,7 +1024,7 @@ Emit generated code that validates the positional argument count configured by `
 
 ---
 
-### `__collect_switches`
+### `__dybatpho_cli_collect_switches`
 
 Expand option switches and aliases into a caller-provided array.
 
@@ -1038,14 +1038,14 @@ Expand option switches and aliases into a caller-provided array.
 
 ---
 
-### `__json_quote`
+### `__dybatpho_cli_json_quote`
 
 Escape a value for JSON and store it in a caller variable.
 
 
 ---
 
-### `__collect_spec_metadata`
+### `__dybatpho_cli_collect_spec_metadata`
 
 Collect option and command metadata from a CLI spec.
 

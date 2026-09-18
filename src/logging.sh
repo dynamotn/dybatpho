@@ -45,7 +45,7 @@ export LOG_FILE_MAX_BACKUPS
 # @stdout Show the formatted message when the level passes filtering and $3 is not `stderr`
 # @stderr Show the formatted message when the level passes filtering and $3 is `stderr`
 #######################################
-function __log {
+function __dybatpho_log {
   declare -A log_colors=([trace]="0;37" [debug]="0;36" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
   local show_log_level="$1"
   local msg="$2"
@@ -67,7 +67,7 @@ function __log {
   # @noargs
   # @stdout Message text for the active log call
   #######################################
-  __check_color() {
+  __dybatpho_log_check_color() {
     if [[ "${NO_COLOR}" != "" ]]; then
       echo -e "${msg}"
     else
@@ -76,9 +76,9 @@ function __log {
   }
 
   if [[ "${out}" == "stderr" ]]; then
-    __check_color >&2
+    __dybatpho_log_check_color >&2
   else
-    __check_color
+    __dybatpho_log_check_color
   fi
 }
 
@@ -87,7 +87,7 @@ function __log {
 # @arg $1 string Input text
 # @stdout JSON-escaped text without surrounding quotes
 #######################################
-function __log_json_escape {
+function __dybatpho_log_json_escape {
   local value="${1:-}"
   value="${value//\\/\\\\}"
   value="${value//\"/\\\"}"
@@ -101,7 +101,7 @@ function __log_json_escape {
 # @description Return an RFC 3339 timestamp for a log event.
 # @stdout Current timestamp
 #######################################
-function __log_timestamp {
+function __dybatpho_log_timestamp {
   if hash "busybox" 2> /dev/null; then
     busybox date +%Y-%m-%dT%H:%M:%S%:z
   elif date --version > /dev/null 2>&1; then
@@ -115,7 +115,7 @@ function __log_timestamp {
 # @description Return the current time in milliseconds since the epoch, using the most precise portable source available.
 # @stdout Current time in milliseconds
 #######################################
-function __log_now_ms {
+function __dybatpho_log_now_ms {
   if [[ -n "${EPOCHREALTIME:-}" ]]; then
     local whole="${EPOCHREALTIME%%.*}" frac="${EPOCHREALTIME#*.}"
     printf '%s' $((whole * 1000 + 10#${frac:0:3}))
@@ -132,14 +132,14 @@ function __log_now_ms {
 }
 
 # Captured once per process so structured log events can report elapsed duration.
-DYBATPHO_LOG_START_MS="$(__log_now_ms)"
+DYBATPHO_LOG_START_MS="$(__dybatpho_log_now_ms)"
 
 #######################################
 # @description Return the elapsed time since the process started, for structured log events.
 # @stdout Elapsed time in milliseconds
 #######################################
-function __log_duration_ms {
-  printf '%s' "$(($(__log_now_ms) - DYBATPHO_LOG_START_MS))"
+function __dybatpho_log_duration_ms {
+  printf '%s' "$(($(__dybatpho_log_now_ms) - DYBATPHO_LOG_START_MS))"
 }
 
 #######################################
@@ -147,12 +147,12 @@ function __log_duration_ms {
 # @set LOG_REQUEST_ID string Generated correlation ID, when it was previously empty
 # @stdout Correlation ID
 #######################################
-function __log_request_id {
+function __dybatpho_log_request_id {
   if [[ -z "${LOG_REQUEST_ID:-}" ]]; then
     if dybatpho::is command uuidgen; then
       LOG_REQUEST_ID="$(uuidgen)" # kcov(skip)
     else
-      LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "$(__log_now_ms)" "${RANDOM}${RANDOM}")"
+      LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "$(__dybatpho_log_now_ms)" "${RANDOM}${RANDOM}")"
     fi
     export LOG_REQUEST_ID
   fi
@@ -163,7 +163,7 @@ function __log_request_id {
 # @description Return the current hostname attached to every structured log event, caching the result for the process lifetime.
 # @stdout Hostname
 #######################################
-function __log_hostname {
+function __dybatpho_log_hostname {
   if [[ -z "${DYBATPHO_LOG_HOSTNAME:-}" ]]; then
     if dybatpho::is command hostname; then
       DYBATPHO_LOG_HOSTNAME=$(hostname 2> /dev/null) || true
@@ -185,19 +185,19 @@ function __log_hostname {
 # @arg $5 number Duration in milliseconds since the process started
 # @stdout One JSON object followed by a newline
 #######################################
-function __log_json_event {
+function __dybatpho_log_json_event {
   local timestamp="$1" level="$2" source="$3" message="$4" duration_ms="$5"
   # Call these directly (not inside `$(...)`) so the caches they populate
   # persist in the current shell instead of being lost with a subshell.
-  __log_request_id > /dev/null
-  __log_hostname > /dev/null
+  __dybatpho_log_request_id > /dev/null
+  __dybatpho_log_hostname > /dev/null
   printf '{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s","hostname":"%s","pid":%s,"duration_ms":%s}\n' \
-    "$(__log_json_escape "${timestamp}")" \
-    "$(__log_json_escape "${level}")" \
-    "$(__log_json_escape "${source}")" \
-    "$(__log_json_escape "${message}")" \
-    "$(__log_json_escape "${LOG_REQUEST_ID}")" \
-    "$(__log_json_escape "${DYBATPHO_LOG_HOSTNAME}")" \
+    "$(__dybatpho_log_json_escape "${timestamp}")" \
+    "$(__dybatpho_log_json_escape "${level}")" \
+    "$(__dybatpho_log_json_escape "${source}")" \
+    "$(__dybatpho_log_json_escape "${message}")" \
+    "$(__dybatpho_log_json_escape "${LOG_REQUEST_ID}")" \
+    "$(__dybatpho_log_json_escape "${DYBATPHO_LOG_HOSTNAME}")" \
     "$$" \
     "${duration_ms}"
 }
@@ -208,7 +208,7 @@ function __log_json_event {
 # @arg $2 number Maximum size in bytes before rotating, `0` disables rotation
 # @arg $3 number Number of rotated backups to keep
 #######################################
-function __log_rotate_file {
+function __dybatpho_log_rotate_file {
   local file="$1" max_bytes="$2" max_backups="$3"
   [[ -f "${file}" ]] || return 0
   ((max_bytes > 0)) || return 0
@@ -239,7 +239,7 @@ function __log_rotate_file {
 # @env LOG_FILE_MAX_BYTES number Rotation size threshold
 # @env LOG_FILE_MAX_BACKUPS number Number of rotated backups to keep
 #######################################
-function __log_write_file {
+function __dybatpho_log_write_file {
   local log_level="$1"
   local source="$2"
   local message="$3"
@@ -254,8 +254,8 @@ function __log_write_file {
   log_dir=$(dirname "${LOG_FILE}")
   [[ -d "${log_dir}" ]] || mkdir -p "${log_dir}" 2> /dev/null || return 0
 
-  __log_rotate_file "${LOG_FILE}" "${LOG_FILE_MAX_BYTES}" "${LOG_FILE_MAX_BACKUPS}"
-  __log_json_event "$(__log_timestamp)" "${log_level}" "${source}" "${message}" "$(__log_duration_ms)" >> "${LOG_FILE}"
+  __dybatpho_log_rotate_file "${LOG_FILE}" "${LOG_FILE_MAX_BYTES}" "${LOG_FILE_MAX_BACKUPS}"
+  __dybatpho_log_json_event "$(__dybatpho_log_timestamp)" "${log_level}" "${source}" "${message}" "$(__dybatpho_log_duration_ms)" >> "${LOG_FILE}"
 }
 
 #######################################
@@ -265,23 +265,23 @@ function __log_write_file {
 # @arg $3 string Message
 # @arg $4 string ANSI escape color code
 #######################################
-function __log_structured {
+function __dybatpho_log_structured {
   local log_level="$1"
   local source="$2"
   local message="$3"
   local color="${4:-}"
   local timestamp
   dybatpho::compare_log_level "${log_level}" || return 0
-  timestamp=$(__log_timestamp)
+  timestamp=$(__dybatpho_log_timestamp)
 
   if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
     __dybatpho_secret_mask_var message
   fi
 
   if [[ "${LOG_FORMAT}" == "json" ]]; then
-    __log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" "$(__log_duration_ms)" >&2
+    __dybatpho_log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" "$(__dybatpho_log_duration_ms)" >&2
   else
-    __log "${log_level}" "${timestamp} ‖ ${source}: ${message}" stderr "${color}"
+    __dybatpho_log "${log_level}" "${timestamp} ‖ ${source}: ${message}" stderr "${color}"
   fi
 }
 
@@ -317,7 +317,7 @@ function dybatpho::compare_log_level {
 # @arg $5 string ANSI escape color code
 # @env LOG_FILE string Optional file that receives a structured JSON event regardless of `LOG_FORMAT`
 #######################################
-function __log_inspect {
+function __dybatpho_log_inspect {
   local log_level=$1
   local log_level_text=$2
   local message="${3:-}"
@@ -335,11 +335,11 @@ function __log_inspect {
     indicator="bash:${BASH_LINENO[1]}" # kcov(skip)
   fi
   local color="${5:-}"
-  __log_write_file "${log_level}" "${indicator}" "${message}"
+  __dybatpho_log_write_file "${log_level}" "${indicator}" "${message}"
   if [[ "${LOG_FORMAT}" == "json" ]]; then
-    __log_structured "${log_level}" "${indicator}" "${message}" "${color}"
+    __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${color}"
   else
-    __log "${log_level}" "$(__log_timestamp) ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
+    __dybatpho_log "${log_level}" "$(__dybatpho_log_timestamp) ‖ ${log_level_text} ‖ ${indicator}: ${message}" stderr "${color}"
   fi
 }
 
@@ -347,7 +347,7 @@ function __log_inspect {
 # @description Return the effective terminal width used by boxed logging helpers.
 # @stdout Terminal width, falling back to 80 columns
 #######################################
-function __get_terminal_width {
+function __dybatpho_log_get_terminal_width {
   local width="${COLUMNS:-}"
   if ! [[ "${width}" =~ ^[0-9]+$ ]] || ((width <= 0)); then
     if dybatpho::is command tput && [[ -t 1 || -t 2 ]]; then
@@ -365,7 +365,7 @@ function __get_terminal_width {
 # @arg $1 string Input text
 # @stdout Display width of the input
 #######################################
-function __string_display_width {
+function __dybatpho_log_string_display_width {
   local text="${1:-}"
 
   if dybatpho::is command python3; then
@@ -393,7 +393,7 @@ PY
 # @arg $2 number Maximum width
 # @stdout Wrapped lines
 #######################################
-function __wrap_line {
+function __dybatpho_log_wrap_line {
   local line max_width
   dybatpho::expect_args line max_width -- "$@"
   if ((max_width <= 0)); then
@@ -508,7 +508,7 @@ PY
 # @arg $9 string Output stream (`stdout` or `stderr`)
 # @arg $10 string ANSI color code
 #######################################
-function __log_box {
+function __dybatpho_log_box {
   local top_left="$1"
   local horizontal="$2"
   local top_right="$3"
@@ -522,7 +522,7 @@ function __log_box {
   local terminal_width inner_limit line content_width=0
   local -a input_lines=() wrapped_lines=()
 
-  terminal_width=$(__get_terminal_width)
+  terminal_width=$(__dybatpho_log_get_terminal_width)
   inner_limit=$((terminal_width - 4))
   if ((inner_limit < 1)); then
     inner_limit=1
@@ -538,11 +538,11 @@ function __log_box {
     while IFS= read -r wrapped_line; do
       wrapped_lines+=("${wrapped_line}")
       local wrapped_width
-      wrapped_width=$(__string_display_width "${wrapped_line}")
+      wrapped_width=$(__dybatpho_log_string_display_width "${wrapped_line}")
       if ((wrapped_width > content_width)); then
         content_width=${wrapped_width}
       fi
-    done < <(__wrap_line "${input_line}" "${inner_limit}") # kcov(skip)
+    done < <(__dybatpho_log_wrap_line "${input_line}" "${inner_limit}") # kcov(skip)
   done
 
   if ((${#wrapped_lines[@]} == 0)); then
@@ -553,18 +553,18 @@ function __log_box {
   local horizontal_line
   horizontal_line="$(dybatpho::string_repeat "${horizontal}" "${border_count}")"
 
-  __log info "${top_left}${horizontal_line}${top_right}" "${out}" "${color}"
+  __dybatpho_log info "${top_left}${horizontal_line}${top_right}" "${out}" "${color}"
   for line in "${wrapped_lines[@]}"; do
     local line_width padding_size
-    line_width=$(__string_display_width "${line}")
+    line_width=$(__dybatpho_log_string_display_width "${line}")
     padding_size=$((content_width - line_width))
     local padding=""
     if ((padding_size > 0)); then
       padding="$(dybatpho::string_repeat " " "${padding_size}")"
     fi
-    __log info "${left_border} ${line}${padding} ${right_border}" "${out}" "${color}"
+    __dybatpho_log info "${left_border} ${line}${padding} ${right_border}" "${out}" "${color}"
   done
-  __log info "${bottom_left}${horizontal_line}${bottom_right}" "${out}" "${color}"
+  __dybatpho_log info "${bottom_left}${horizontal_line}${bottom_right}" "${out}" "${color}"
 }
 
 #######################################
@@ -590,7 +590,7 @@ function dybatpho::validate_log_level {
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug {
-  __log_inspect debug "DEBUG 🐞      " "$1"
+  __dybatpho_log_inspect debug "DEBUG 🐞      " "$1"
 }
 
 #######################################
@@ -602,7 +602,7 @@ function dybatpho::debug {
 #######################################
 function dybatpho::debug_command {
   dybatpho::compare_log_level debug || return 0
-  __log_inspect debug "COMMAND 💻    " "$1\n$(eval "$2")"
+  __dybatpho_log_inspect debug "COMMAND 💻    " "$1\n$(eval "$2")"
 }
 
 #######################################
@@ -611,7 +611,7 @@ function dybatpho::debug_command {
 # @stderr Show message if log level of message is less than info level
 #######################################
 function dybatpho::info {
-  __log_inspect info "INFO 💡       " "$1"
+  __dybatpho_log_inspect info "INFO 💡       " "$1"
 }
 
 #######################################
@@ -620,7 +620,7 @@ function dybatpho::info {
 # @stdout Show message if log level of message is less than info level
 #######################################
 function dybatpho::print {
-  __log info "$*" stdout "0"
+  __dybatpho_log info "$*" stdout "0"
 }
 
 #######################################
@@ -630,7 +630,7 @@ function dybatpho::print {
 #######################################
 function dybatpho::progress {
   local color="0;3;34"
-  __log_box "╭" "─" "╮" "│" "│" "╰" "╯" "🚀 $*..." stdout "${color}"
+  __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "🚀 $*..." stdout "${color}"
 }
 
 #######################################
@@ -656,7 +656,7 @@ function dybatpho::progress_bar {
 #######################################
 function dybatpho::header {
   local color="1;5;30;47"
-  __log_box "╔" "═" "╗" "║" "║" "╚" "╝" "$*" stdout "${color}"
+  __dybatpho_log_box "╔" "═" "╗" "║" "║" "╚" "╝" "$*" stdout "${color}"
 }
 
 #######################################
@@ -666,7 +666,7 @@ function dybatpho::header {
 #######################################
 function dybatpho::success {
   local color="1;3;32"
-  __log_box "╭" "─" "╮" "│" "│" "╰" "╯" "✅ DONE: $1" stdout "${color}"
+  __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "✅ DONE: $1" stdout "${color}"
 }
 
 #######################################
@@ -675,7 +675,7 @@ function dybatpho::success {
 # @stderr Show message if log level of message is less than warn level
 #######################################
 function dybatpho::warn {
-  __log_inspect warn "WARN 🚧       " "$1"
+  __dybatpho_log_inspect warn "WARN 🚧       " "$1"
 }
 
 #######################################
@@ -684,7 +684,7 @@ function dybatpho::warn {
 # @stderr Show message if log level of message is less than error level
 #######################################
 function dybatpho::error {
-  __log_inspect error "ERROR ❌      " "$1"
+  __dybatpho_log_inspect error "ERROR ❌      " "$1"
 }
 
 #######################################
@@ -694,7 +694,7 @@ function dybatpho::error {
 # @stderr Show message if log level of message is less than fatal level
 #######################################
 function dybatpho::fatal {
-  __log_inspect fatal "FATAL 🛑      " "$1" "${2:-0}"
+  __dybatpho_log_inspect fatal "FATAL 🛑      " "$1" "${2:-0}"
 }
 
 #######################################
@@ -704,7 +704,7 @@ function dybatpho::fatal {
 #######################################
 function dybatpho::start_trace {
   # kcov(disabled) - replacing PS4 stops the coverage tracer
-  __log_inspect trace "TRACE ⚡       " "Start tracing"
+  __dybatpho_log_inspect trace "TRACE ⚡       " "Start tracing"
   PS4='+(${BASH_SOURCE:-no_source}:${LINENO:-no_line})'
   export PS4="${PS4}"': ${FUNCNAME[0]-no_func:+${FUNCNAME[0]-no_func}(): }'
 
@@ -723,6 +723,6 @@ function dybatpho::start_trace {
 function dybatpho::end_trace {
   # kcov(disabled) - disabling xtrace stops the coverage tracer
   set +xv
-  __log_inspect trace "TRACE ⚡      " "End tracing"
+  __dybatpho_log_inspect trace "TRACE ⚡      " "End tracing"
   # kcov(enabled)
 }

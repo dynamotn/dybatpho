@@ -124,12 +124,6 @@ DYBATPHO_AI_OLLAMA_MODEL=${DYBATPHO_AI_OLLAMA_MODEL:-llama3.2}
 # @env DYBATPHO_AI_STATE_FILE string File the call and token counters are kept in
 DYBATPHO_AI_STATE_FILE=${DYBATPHO_AI_STATE_FILE:-${TMPDIR:-/tmp}/dybatpho_ai_state_$$}
 
-# Registered here, in the shell that sourced the module, rather than where the
-# file is first written: a model call happens inside a command substitution,
-# and a cleanup trap installed there would fire when that subshell exits and
-# delete the counters mid-run. The handler ignores a path that never appears.
-dybatpho::cleanup_file_on_exit "${DYBATPHO_AI_STATE_FILE}"
-
 # Tool registry used by `dybatpho::ai_run`, keyed by tool name.
 declare -gA DYBATPHO_AI_TOOL_DESCRIPTION=()
 declare -gA DYBATPHO_AI_TOOL_SCHEMA=()
@@ -161,6 +155,24 @@ function __ai_redact {
   else
     printf '%s\n' "${text}"
   fi
+}
+
+#######################################
+# @description Arrange for the counter file to be removed when the script ends.
+# Sourcing a module must not touch the host script's traps, so this runs on
+# first use rather than at load time. A command substitution gets its own
+# process, and a handler registered there would delete the counters the moment
+# that subshell returned, so only the top-level shell registers one.
+# @noargs
+# @exitcode 0 A handler is registered, or this is not the shell that should
+#   register one
+# @see dybatpho::cleanup_file_on_exit
+#######################################
+function __ai_state_cleanup_once {
+  [[ "${BASHPID}" == "$$" ]] || return 0
+  [[ -n "${__dybatpho_ai_state_cleanup-}" ]] && return 0
+  __dybatpho_ai_state_cleanup=1
+  dybatpho::cleanup_file_on_exit "${DYBATPHO_AI_STATE_FILE}"
 }
 
 #######################################
@@ -198,6 +210,9 @@ function __ai_state_write {
 #######################################
 function __ai_budget_check {
   local wanted="${1:-1}"
+  # Every public entry point passes through here, which makes it the place to
+  # arrange cleanup of the counter file in the caller's own shell.
+  __ai_state_cleanup_once
   ((DYBATPHO_AI_MAX_CALLS > 0)) || return 0
   local calls
   calls=$(dybatpho::json_get "$(__ai_state_read)" '.calls')
@@ -1476,6 +1491,7 @@ function dybatpho::ai_tokens_estimate {
 #######################################
 function dybatpho::ai_usage {
   local scope="${1:-last}"
+  __ai_state_cleanup_once
   local state
   state=$(__ai_state_read)
   case "${scope}" in
@@ -1510,6 +1526,7 @@ function dybatpho::ai_usage_field {
     calls | total_input | total_output | last_input | last_output | last_model | last_stop_reason) ;;
     *) dybatpho::die "dybatpho::ai_usage_field: Unknown field '${field}'" ;;
   esac
+  __ai_state_cleanup_once
   dybatpho::json_get "$(__ai_state_read)" ".${field}"
 }
 
@@ -1519,6 +1536,7 @@ function dybatpho::ai_usage_field {
 # @exitcode 0 The counters are back to zero
 #######################################
 function dybatpho::ai_usage_reset {
+  __ai_state_cleanup_once
   __ai_state_write '{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,"last_model":"","last_stop_reason":""}'
 }
 

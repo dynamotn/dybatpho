@@ -307,6 +307,22 @@ EOF
   assert_output ""
 }
 
+@test "the file writers accept a relative path that begins with a dash" {
+  # The writers carry the destination mode over with chmod and rewrite with
+  # sed. Neither accepts `--` on BSD, so the path is guarded instead; a name
+  # that reads as an option is what proves the guard works.
+  cd "${BATS_TEST_TMPDIR}"
+  printf 'old value\n' > ./-dashed.conf
+  chmod 640 ./-dashed.conf
+
+  printf 'keep me\n' | dybatpho::file_write_atomic -dashed.conf
+  assert_equal "$(cat ./-dashed.conf)" "keep me"
+  assert_equal "$(stat -c %a ./-dashed.conf 2> /dev/null || stat -f %Lp ./-dashed.conf)" "640"
+
+  dybatpho::file_replace -dashed.conf "keep" "kept"
+  assert_equal "$(cat ./-dashed.conf)" "kept me"
+}
+
 @test "dybatpho::file_write_atomic creates a new file and rejects a missing directory" {
   local target="${BATS_TEST_TMPDIR}/created.txt"
   printf 'fresh\n' | dybatpho::file_write_atomic "${target}"

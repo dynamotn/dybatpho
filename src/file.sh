@@ -481,6 +481,23 @@ function __dybatpho_file_discard {
 }
 
 #######################################
+# @description Render a path that is safe to pass to a command that does not
+#   understand `--`. The BSD versions of `chmod`, `chown`, and `sed` on macOS
+#   treat `--` as a file name rather than as the end of the options, so a path
+#   that could be read as an option is prefixed with `./` instead.
+# @arg $1 string Path
+# @stdout The path, prefixed with `./` when it starts with a dash
+#######################################
+function __dybatpho_file_operand {
+  local path
+  dybatpho::expect_args path -- "$@"
+  case "${path}" in
+    -*) printf '%s\n' "./${path}" ;;
+    *) printf '%s\n' "${path}" ;;
+  esac
+}
+
+#######################################
 # @description Move a staging file onto its destination, carrying the
 #   destination's mode and owner over first so that the rename does not change
 #   how the file is accessed.
@@ -489,15 +506,16 @@ function __dybatpho_file_discard {
 # @exitcode 1 The staging file cannot be moved into place
 #######################################
 function __dybatpho_file_commit {
-  local staging path mode owner
+  local staging path mode owner operand
   dybatpho::expect_args staging path -- "$@"
   if dybatpho::is file "${path}"; then
+    operand="$(__dybatpho_file_operand "${staging}")"
     mode="$(__dybatpho_file_stat mode "${path}" || true)"
-    [[ -n "${mode}" ]] && chmod "${mode}" -- "${staging}"
+    [[ -n "${mode}" ]] && chmod "${mode}" "${operand}"
     # Changing the owner needs privilege the caller usually does not have, so a
     # refusal here is expected rather than a failure.
     owner="$(__dybatpho_file_stat owner "${path}" || true)"
-    [[ -n "${owner}" ]] && chown "${owner}" -- "${staging}" 2> /dev/null || true
+    [[ -n "${owner}" ]] && chown "${owner}" "${operand}" 2> /dev/null || true
   fi
   if ! mv -f -- "${staging}" "${path}"; then
     __dybatpho_file_discard "${staging}"
@@ -602,7 +620,7 @@ function dybatpho::file_replace {
 
   staging="$(__dybatpho_file_staging "${path}")"
   if ! sed "s${delimiter}${pattern}${delimiter}${replacement}${delimiter}g" \
-    -- "${path}" > "${staging}"; then
+    "$(__dybatpho_file_operand "${path}")" > "${staging}"; then
     __dybatpho_file_discard "${staging}"
     dybatpho::die "${FUNCNAME[0]}: Cannot apply '${pattern}' to ${path}"
   fi
@@ -887,7 +905,7 @@ function dybatpho::ensure_dir {
 
   if dybatpho::is true "${DRY_RUN}"; then
     dybatpho::is dir "${path}" || dybatpho::dry_run mkdir -p -- "${path}"
-    [[ -n "${mode}" ]] && dybatpho::dry_run chmod "${mode}" -- "${path}"
+    [[ -n "${mode}" ]] && dybatpho::dry_run chmod "${mode}" "$(__dybatpho_file_operand "${path}")"
     printf '%s\n' "${path}"
     return 0
   fi
@@ -898,7 +916,7 @@ function dybatpho::ensure_dir {
     dybatpho::debug "Created directory ${path}"
   fi
   if [[ -n "${mode}" ]]; then
-    chmod "${mode}" -- "${path}" \
+    chmod "${mode}" "$(__dybatpho_file_operand "${path}")" \
       || dybatpho::die "${FUNCNAME[0]}: Cannot set mode ${mode} on ${path}" # kcov(skip)
   fi
   printf '%s\n' "${path}"

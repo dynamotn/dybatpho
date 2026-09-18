@@ -10,8 +10,18 @@ jobs:
     container: kcov/kcov
     steps:
       - name: "Install dependencies"
+        env:
+          # Pin the JSON backend: Debian's `yq` package is a different program
+          # with a different expression language, so the Go implementation the
+          # library is written against is fetched directly.
+          YQ_VERSION: v4.53.3
         run: |
-          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd
+          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq
+          curl -fsSL -o /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          chmod +x /usr/local/bin/yq
+          yq --version
+          jq --version
           useradd test
 
       - name: "Checkout"
@@ -21,8 +31,14 @@ jobs:
 
       - name: "Test"
         run: |
+          # `su -` resets the environment, so the worker count and the JSON
+          # backend are both checked from inside the test user's own shell.
+          su - test -c "command -v yq && command -v jq"
           chown -R test $(pwd)
-          su - test bash -c $(pwd)/scripts/test.sh
+          # One kcov-instrumented worker per core exhausts the runner's memory
+          # now that the library has grown; the OOM killer takes the whole run
+          # down with exit 137.
+          su - test -c "DYBATPHO_TEST_JOBS=2 bash $(pwd)/scripts/test.sh"
 
       - name: "Fix coverage paths"
         # kcov strips the longest common prefix from `filename` and records it in

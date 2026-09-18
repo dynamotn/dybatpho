@@ -160,7 +160,7 @@ function dybatpho::curl_do {
   # Keep the body path owned by the caller; only response headers are temporary.
   local __dybatpho_http_started=""
   if declare -F dybatpho::metrics_observe_ms > /dev/null; then
-    __dybatpho_http_started="$(__log_now_ms)"
+    __dybatpho_http_started="$(__dybatpho_log_now_ms)"
   fi
   while :; do
     local curl_args=(-fsSL -D "${header_file}" -w '%{http_code}' -o "${output}")
@@ -218,7 +218,7 @@ function dybatpho::curl_do {
   # reflects what the script actually waited for.
   if [[ -n "${__dybatpho_http_started}" ]]; then
     dybatpho::metrics_observe_ms dybatpho_http_request_duration_seconds \
-      "$(($(__log_now_ms) - __dybatpho_http_started))" "status=${code}"
+      "$(($(__dybatpho_log_now_ms) - __dybatpho_http_started))" "status=${code}"
     dybatpho::metrics_counter_inc dybatpho_http_requests_total 1 "status=${code}"
   fi
 

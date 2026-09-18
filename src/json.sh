@@ -237,38 +237,52 @@ function dybatpho::json_string {
 function dybatpho::json_object {
   (($# % 2 == 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected an even number of arguments, got $#"
+  if (($# == 0)); then
+    printf '%s\n' '{}'
+    return 0
+  fi
+
   local json_cmd
   json_cmd=$(__dybatpho_json_cmd)
 
-  local document='{}' name value raw
+  # Every pair is assigned in a single backend invocation. Building the object
+  # one key at a time would fork once per field, which is the difference
+  # between a handful of processes per request and several dozen.
+  local filter='{}' name value index=0
+  local -a environment=() arguments=()
   while (($# >= 2)); do
     name="$1"
     value="$2"
     shift 2
-    raw=false
+    local raw=false
     if [[ "${name}" == *:json ]]; then
       raw=true
       name="${name%:json}"
     fi
     if [[ "${json_cmd}" == "yq" ]]; then
+      environment+=("__dybatpho_json_n${index}=${name}" "__dybatpho_json_v${index}=${value}")
       if [[ "${raw}" == true ]]; then
-        document=$(__dybatpho_json_name="${name}" __dybatpho_json_value="${value}" \
-          yq -o=json -I=0 '.[strenv(__dybatpho_json_name)] = (strenv(__dybatpho_json_value) | from_json)' <<< "${document}")
+        filter+=" | .[strenv(__dybatpho_json_n${index})] = (strenv(__dybatpho_json_v${index}) | from_json)"
       else
-        document=$(__dybatpho_json_name="${name}" __dybatpho_json_value="${value}" \
-          yq -o=json -I=0 '.[strenv(__dybatpho_json_name)] = strenv(__dybatpho_json_value)' <<< "${document}")
+        filter+=" | .[strenv(__dybatpho_json_n${index})] = strenv(__dybatpho_json_v${index})"
       fi
     else
+      arguments+=(--arg "n${index}" "${name}")
       if [[ "${raw}" == true ]]; then
-        document=$(jq -c --arg name "${name}" --argjson value "${value}" \
-          '.[$name] = $value' <<< "${document}")
+        arguments+=(--argjson "v${index}" "${value}")
       else
-        document=$(jq -c --arg name "${name}" --arg value "${value}" \
-          '.[$name] = $value' <<< "${document}")
+        arguments+=(--arg "v${index}" "${value}")
       fi
+      filter+=" | .[\$n${index}] = \$v${index}"
     fi
+    index=$((index + 1))
   done
-  printf '%s\n' "${document}"
+
+  if [[ "${json_cmd}" == "yq" ]]; then
+    env "${environment[@]}" yq -n -o=json -I=0 "${filter}"
+  else
+    jq -n -c "${arguments[@]}" "${filter}"
+  fi
 }
 
 #######################################

@@ -11,6 +11,13 @@ dybatpho::require "kcov"
 dybatpho::require "parallel"
 dybatpho::require "nproc"
 
+# @env DYBATPHO_TEST_JOBS number Bats workers to run at once, one per core by
+#   default. kcov keeps its coverage state per worker, so a machine with less
+#   memory than cores needs this turned down; CI sets it explicitly.
+JOBS="${DYBATPHO_TEST_JOBS:-$(nproc)}"
+[[ "${JOBS}" =~ ^[1-9][0-9]*$ ]] \
+  || dybatpho::die "DYBATPHO_TEST_JOBS must be a positive integer, got '${JOBS}'"
+
 kcov \
   --clean \
   --dump-summary \
@@ -22,5 +29,5 @@ kcov \
   "${BATS_CMD}" \
   --print-output-on-failure \
   --verbose-run \
-  -j "$(nproc)" \
+  -j "${JOBS}" \
   "${DYBATPHO_DIR}/test"

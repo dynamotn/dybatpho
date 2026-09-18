@@ -84,6 +84,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `example/ai_ops.sh` and `example/agent_ops.sh`, both runnable with no API key.
 
+### Fixed
+
+- **File writers now work on macOS.** `chmod` and `sed` were given `--` to mark
+  the end of the options, which the BSD versions on macOS read as a file name
+  instead: `chmod: --: No such file or directory`. Every writer that carries a
+  destination mode over — `file_write_atomic`, `file_replace`,
+  `file_ensure_line`, `file_remove_line`, `ensure_dir` — failed there. The
+  paths are now guarded by prefixing `./` when a name could be read as an
+  option, which both platforms accept.
+- CI installs a JSON backend. The `kcov` container had neither `yq` nor `jq`,
+  so anything exercising `json.sh` for real died with `Neither yq nor jq is
+  installed`; the existing JSON tests passed only because they stub the
+  binaries.
+- `scripts/test.sh` takes the worker count from `DYBATPHO_TEST_JOBS`, still one
+  per core by default. A kcov-instrumented worker per core no longer fits in a
+  CI runner now that the library has grown — the OOM killer was taking the run
+  down mid-suite with exit 137 — so CI asks for two.
+
 ## [2.0.0] - 2026-09-17
 
 ### Added

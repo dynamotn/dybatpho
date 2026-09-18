@@ -45,6 +45,7 @@ the privilege to set it. These helpers honor `DRY_RUN`.
 - [`__dybatpho_file_resolve`](#__dybatpho_file_resolve) — Follow a symlink chain to the file it ends at. Committing a rewrite means renaming a staging file onto the destination, which would replace a symlink with a regular file and quietly detach it from whatever it pointed at. Resolving first writes through the link instead, so a dotfile symlinked into a repository keeps pointing there and the file in the repository is the one that changes.
 - [`__dybatpho_file_staging`](#__dybatpho_file_staging) — Print the path of a staging file next to a destination. The staging file has to share a directory with the destination, because `mv` is only atomic within one filesystem.
 - [`__dybatpho_file_discard`](#__dybatpho_file_discard) — Remove a staging file that will not be committed.
+- [`__dybatpho_file_operand`](#__dybatpho_file_operand) — Render a path that is safe to pass to a command that does not understand `--`. The BSD versions of `chmod`, `chown`, and `sed` on macOS treat `--` as a file name rather than as the end of the options, so a path that could be read as an option is prefixed with `./` instead.
 - [`__dybatpho_file_commit`](#__dybatpho_file_commit) — Move a staging file onto its destination, carrying the destination's mode and owner over first so that the rename does not change how the file is accessed.
 - [`dybatpho::file_write_atomic`](#dybatphofile_write_atomic) — Write standard input to a file through a staging file, so that readers see either the previous contents or the complete new contents.
 - [`__dybatpho_file_sed_delimiter`](#__dybatpho_file_sed_delimiter) — Pick a `sed` substitution delimiter that appears in neither the pattern nor the replacement, so that neither has to be escaped.
@@ -419,6 +420,26 @@ Remove a staging file that will not be committed.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Staging file path |
+
+
+---
+
+### `__dybatpho_file_operand`
+
+Render a path that is safe to pass to a command that does not
+  understand `--`. The BSD versions of `chmod`, `chown`, and `sed` on macOS
+  treat `--` as a file name rather than as the end of the options, so a path
+  that could be read as an option is prefixed with `./` instead.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Path |
+
+**📤 Output on stdout**
+
+- The path, prefixed with `./` when it starts with a dash
 
 
 ---

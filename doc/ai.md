@@ -58,6 +58,7 @@ anything is sent, and a call budget that stops a runaway loop.
 
 - [`__ai_require_json`](#__ai_require_json) — Fail loudly when no JSON backend is installed.
 - [`__ai_redact`](#__ai_redact) — Mask registered secrets in text before it leaves the machine.
+- [`__ai_state_cleanup_once`](#__ai_state_cleanup_once) — Arrange for the counter file to be removed when the script ends. Sourcing a module must not touch the host script's traps, so this runs on first use rather than at load time. A command substitution gets its own process, and a handler registered there would delete the counters the moment that subshell returned, so only the top-level shell registers one.
 - [`__ai_state_read`](#__ai_state_read) — Print the counter document, creating it on first use.
 - [`__ai_state_write`](#__ai_state_write) — Replace the counter document.
 - [`__ai_budget_check`](#__ai_budget_check) — Stop the script when the call budget is already used up. This is deliberately separate from counting: the count happens deep inside a command substitution, where an `exit` would only leave that subshell, so the refusal has to be raised by the public function the caller invoked.
@@ -245,6 +246,27 @@ Mask registered secrets in text before it leaves the machine.
 **🔗 See also**
 
 - [dybatpho::secret_mask](#dybatphosecret_mask)
+
+
+---
+
+### `__ai_state_cleanup_once`
+
+Arrange for the counter file to be removed when the script ends.
+Sourcing a module must not touch the host script's traps, so this runs on
+first use rather than at load time. A command substitution gets its own
+process, and a handler registered there would delete the counters the moment
+that subshell returned, so only the top-level shell registers one.
+
+_Function has no arguments._
+
+**🚦 Exit codes**
+
+- `0`: A handler is registered, or this is not the shell that should register one
+
+**🔗 See also**
+
+- [dybatpho::cleanup_file_on_exit](#dybatphocleanup_file_on_exit)
 
 
 ---

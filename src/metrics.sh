@@ -256,7 +256,7 @@ function dybatpho::metrics_observe_ms {
 function dybatpho::metrics_timer_start {
   local name
   dybatpho::expect_args name -- "$@"
-  __dybatpho_metrics_timer["${name}"]="$(__log_now_ms)"
+  __dybatpho_metrics_timer["${name}"]="$(__dybatpho_log_now_ms)"
 }
 
 #######################################
@@ -276,7 +276,7 @@ function dybatpho::metrics_timer_stop {
   started="${__dybatpho_metrics_timer[${name}]-}"
   [[ -n "${started}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Timer '${name}' was never started"
-  elapsed=$(($(__log_now_ms) - started))
+  elapsed=$(($(__dybatpho_log_now_ms) - started))
   ((elapsed < 0)) && elapsed=0
   unset "__dybatpho_metrics_timer[${name}]"
   dybatpho::metrics_observe_ms "${name}" "${elapsed}" "$@"
@@ -312,9 +312,9 @@ function dybatpho::metrics_time {
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command after '--'"
 
   local started elapsed status=0
-  started="$(__log_now_ms)"
+  started="$(__dybatpho_log_now_ms)"
   "$@" || status=$?
-  elapsed=$(($(__log_now_ms) - started))
+  elapsed=$(($(__dybatpho_log_now_ms) - started))
   ((elapsed < 0)) && elapsed=0
   dybatpho::metrics_observe_ms "${name}" "${elapsed}" ${labels[@]+"${labels[@]}"}
   DYBATPHO_METRICS_LAST_MS="${elapsed}"

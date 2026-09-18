@@ -140,7 +140,8 @@ with a missing function. See [init.sh reference](doc/init.md) and
 | ------------------------------- | ------------------------------------------------ |
 | [file.sh](doc/file.md)          | Paths, temp files, atomic rewrites, idempotent lines, checksums, upward search |
 | [archive.sh](doc/archive.md)    | Create, extract and list archives                 |
-| [os.sh](doc/os.md)              | Platform/distro detection, package managers       |
+| [os.sh](doc/os.md)              | Platform/distro and architecture detection        |
+| [pkg.sh](doc/pkg.md)            | Detect the package manager and install dependencies, with confirmation and dry-run |
 
 ### 🌐 Network & notifications
 

@@ -102,6 +102,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI runner now that the library has grown — the OOM killer was taking the run
   down mid-suite with exit 137 — so CI asks for two.
 
+- **`pkg` module** — detect the machine's package manager and install
+  dependencies through it. `dybatpho::pkg_manager` reports one of `apt`, `brew`,
+  `apk`, `dnf`, `pacman`, or `emerge`, preferring the distribution manager over
+  Homebrew on Linux, and `DYBATPHO_PKG_MANAGER` overrides the detection.
+  `dybatpho::pkg_installed` and `dybatpho::pkg_missing` answer what is already
+  there, `dybatpho::pkg_name` resolves `<manager>:<package>` overrides so one
+  script names a dependency once, and `dybatpho::pkg_install_command` prints the
+  exact command a run would execute.
+
+  `dybatpho::pkg_install`, `dybatpho::pkg_update`, `dybatpho::pkg_ensure`, and
+  `dybatpho::pkg_require` are the mutating half, and none of them changes the
+  system quietly: each asks for confirmation unless `--force` or
+  `DYBATPHO_FORCE` approves it, refuses rather than guessing in a
+  non-interactive shell, and prints the command instead of running it under
+  `--dry-run` or `DRY_RUN`. Elevation follows `DYBATPHO_PKG_SUDO` and is never
+  added for Homebrew, and `DYBATPHO_PKG_ASSUME_YES=false` drops the managers'
+  non-interactive flags.
+
+  ```sh
+  . dybatpho/init.sh --modules pkg
+  dybatpho::pkg_install --dry-run ripgrep      # preview the command
+  dybatpho::pkg_ensure --force --update curl jq
+  dybatpho::pkg_require --force fd apt:fd-find emerge:sys-apps/fd
+  ```
+
+### Fixed
+
+- `network` and `metrics` called `__log_now_ms`, which the internal-function
+  rename had turned into `__dybatpho_log_now_ms`. Every timed `curl` call and
+  every timer in the `metrics` module failed with `command not found` instead of
+  recording a duration.
+
 ## [2.0.0] - 2026-09-17
 
 ### Added

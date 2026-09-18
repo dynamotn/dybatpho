@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @file os.sh
-# @brief Utilities for working with OS/distro package manager or getting information of OS/distro
-# @description This module contains functions to get information of OS/distro or work with package manager
+# @brief Utilities for getting information of OS/distro
+# @description This module contains functions to get information of OS/distro, such as platform, distribution and architecture. Package manager detection and dependency installation live in `pkg.sh`.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################

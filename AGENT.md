@@ -118,6 +118,7 @@ changed examples.
 | `notification.sh` | Webhook notifications and JSON payloads | `test/notification.bats`, `doc/notification.md`, `doc/spec/notification.md` |
 | `os.sh` | OS, architecture, and environment detection | `test/os.bats`, `doc/os.md`, `doc/spec/os.md` |
 | `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `doc/process.md`, `doc/spec/process.md` |
+| `pkg.sh` | Package manager detection and guarded dependency installation | `test/pkg.bats`, `doc/pkg.md`, `doc/spec/pkg.md` |
 | `safety.sh` | Guards for destructive operations: removal, overwrite, extraction, and system changes | `test/safety.bats`, `doc/safety.md`, `doc/spec/safety.md` |
 | `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `doc/secret.md`, `doc/spec/secret.md` |
 | `semver.sh` | Semantic version parsing, comparison, and validation | `test/semver.bats`, `doc/semver.md`, `doc/spec/semver.md` |
@@ -242,6 +243,10 @@ affect editor navigation.
   predictable and free of unexpected file writes or logging.
 - **System primitives** (`date`, `file`, `os`, `process`, `helpers`): prioritize
   GNU/BSD/BusyBox portability and return clear errors for invalid input.
+- **Dependency modules** (`pkg`): detect before acting, resolve package names
+  per manager rather than assuming one distribution, and never change system
+  state without `--force`/`DYBATPHO_FORCE` or an answered confirmation; honor
+  `DRY_RUN`.
 - **Security primitives** (`secret`, `safety`): never log or export secret
   values, keep the masking registry process-local, and validate file
   permissions before use. Guarded operations must validate the target path

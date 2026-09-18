@@ -1,6 +1,6 @@
 # os.sh
 
-Utilities for working with OS/distro package manager or getting information of OS/distro
+Utilities for getting information of OS/distro
 
 > 🧭 Source: [src/os.sh](../src/os.sh)
 >
@@ -9,7 +9,7 @@ Utilities for working with OS/distro package manager or getting information of O
 <a id="overview"></a>
 ## ✨ Overview
 
-This module contains functions to get information of OS/distro or work with package manager
+This module contains functions to get information of OS/distro, such as platform, distribution and architecture. Package manager detection and dependency installation live in `pkg.sh`.
 
 ### 🚀 Highlights
 

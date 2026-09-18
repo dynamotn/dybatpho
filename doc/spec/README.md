@@ -46,6 +46,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `metrics.md`
 - `ai.md`
 - `agent.md`
+- `pkg.md`
 
 ## Source Mapping
 
@@ -75,6 +76,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/metrics.sh` -> `metrics.md`
 - `src/ai.sh` -> `ai.md`
 - `src/agent.sh` -> `agent.md`
+- `src/pkg.sh` -> `pkg.md`
 
 ## Notes
 

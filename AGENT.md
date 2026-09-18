@@ -18,7 +18,7 @@ This document describes the repository workflow and conventions to preserve.
   `doc/init.md` for the bootstrap's own public functions.
 - `doc/spec/` — Spec Kit-style feature specifications.
 - `CHANGELOG.md` — user-visible history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
-- `scripts/test.sh` — full test and coverage runner.
+- `scripts/test.sh` — test runner; `--coverage` adds the kcov report.
 - `.mise.toml` — standard tasks such as `mise run test` and `mise run doc`.
 
 ## Module scope
@@ -413,10 +413,12 @@ bash -n example/cli_ux.sh
 git diff --check
 ```
 
-Run the complete test and coverage workflow for broad changes:
+Run the whole suite for broad changes, and the coverage workflow before
+touching anything CI reports on:
 
 ```bash
 mise run test
+mise run coverage
 ```
 
 ## Example reference

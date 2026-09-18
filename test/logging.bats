@@ -644,12 +644,16 @@ assert event["duration_ms"] >= 0
 }
 
 @test "__dybatpho_log_now_ms falls back to SECONDS when date lacks nanosecond support" {
-  local saved_epochrealtime="${EPOCHREALTIME:-}"
-  # shellcheck disable=SC2030
-  unset EPOCHREALTIME 2> /dev/null || true
   stub_repeated date ": echo 1700000000N"
   local value
-  value=$(__dybatpho_log_now_ms)
+  # `EPOCHREALTIME` is unset inside the command substitution rather than in the
+  # test body: it is a bash dynamic variable, an `unset` in the test process is
+  # permanent, and Bats reads it for `--timing` right after the body returns —
+  # which silently drops this test from the run.
+  value=$(
+    unset EPOCHREALTIME
+    __dybatpho_log_now_ms
+  )
   [[ "${value}" =~ ^[0-9]+$ ]]
   unstub date
 }

@@ -35,10 +35,12 @@ jobs:
           # backend are both checked from inside the test user's own shell.
           su - test -c "command -v yq && command -v jq"
           chown -R test $(pwd)
-          # One kcov-instrumented worker per core exhausts the runner's memory
-          # now that the library has grown; the OOM killer takes the whole run
-          # down with exit 137.
-          su - test -c "DYBATPHO_TEST_JOBS=2 bash $(pwd)/scripts/test.sh"
+          # kcov never releases the trace state it accumulates, so a single
+          # invocation over the whole suite grows until the OOM killer takes the
+          # run down with exit 137. `--coverage` runs one invocation per chunk of
+          # test files, which keeps the peak at whatever the largest chunk needs,
+          # and two workers keep it there.
+          su - test -c "DYBATPHO_TEST_JOBS=2 DYBATPHO_TEST_CHUNK=5 bash $(pwd)/scripts/test.sh --coverage"
 
       - name: "Fix coverage paths"
         # kcov strips the longest common prefix from `filename` and records it in

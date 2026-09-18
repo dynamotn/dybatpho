@@ -195,15 +195,20 @@ setup() {
   # `run` disables errexit, so this has to be a real strict-mode shell: an
   # earlier version returned non-zero from the series lookup whenever the last
   # key did not match, which the ERR trap reported as a failure.
-  run -0 env -u DYBATPHO_MODULES bash -c '
-    . "${0}/init.sh" --modules metrics
-    dybatpho::register_common_handlers
-    dybatpho::metrics_counter_inc a_total
-    dybatpho::metrics_counter_inc b_total
-    dybatpho::metrics_observe_ms c_seconds 5
-    dybatpho::metrics_render > /dev/null
-    printf "rendered\n"
-  ' "${DYBATPHO_DIR}"
+  # A `bash -c` shell has an empty `BASH_SOURCE`, which the kcov hook expands on
+  # every command and `set -u` then turns into a failure that shows up only
+  # under `scripts/test.sh --coverage`. Spawn from a script file instead.
+  local script="${BATS_TEST_TMPDIR}/err_trap.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules metrics
+dybatpho::register_common_handlers
+dybatpho::metrics_counter_inc a_total
+dybatpho::metrics_counter_inc b_total
+dybatpho::metrics_observe_ms c_seconds 5
+dybatpho::metrics_render > /dev/null
+printf "rendered\n"
+SCRIPT
+  run -0 env -u DYBATPHO_MODULES bash "${script}" "${DYBATPHO_DIR}"
   assert_output "rendered"
   refute_output --partial "Aborting on error"
 }

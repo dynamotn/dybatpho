@@ -1,4 +1,15 @@
 DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Bats keeps a DEBUG trap and `set -T -E` armed so it can print a stack trace for
+# the failing line. That trap fires once per executed command, and sourcing the
+# bats libraries plus every dybatpho module runs tens of thousands of commands —
+# which costs ~800ms per test instead of ~150ms. None of that setup is code under
+# test, so the trap is parked for the duration of the sourcing and restored
+# afterwards; failures inside a test body still get their full trace.
+__dybatpho_helper_saved_trap="$(trap -p DEBUG)"
+trap - DEBUG
+set +T +E
+
 . "${DYBATPHO_DIR}/test/lib/support/load.bash"
 . "${DYBATPHO_DIR}/test/lib/assert/load.bash"
 . "${DYBATPHO_DIR}/test/lib/file/load.bash"
@@ -7,6 +18,10 @@ DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")/.."
 # module. A script under test that cares about a narrower module set sources
 # `init.sh` itself in a fresh shell, the way `test/init.bats` does.
 . "${DYBATPHO_DIR}/init.sh" --modules all
+
+set -T -E
+eval "${__dybatpho_helper_saved_trap}"
+unset -v __dybatpho_helper_saved_trap
 
 bats_require_minimum_version 1.5.0
 

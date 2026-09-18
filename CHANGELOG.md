@@ -84,6 +84,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `example/ai_ops.sh` and `example/agent_ops.sh`, both runnable with no API key.
 
+### Changed
+
+- **The test runner is roughly three times faster and reports one summary
+  instead of a TAP transcript.** `test/test_helper.bash` parks Bats' `DEBUG`
+  trap while it sources the bats libraries and every dybatpho module: that trap
+  fires once per executed command, and the setup a test does not care about was
+  costing ~800ms per test instead of ~150ms. `scripts/test.sh` now lets Bats
+  schedule at the test level so one heavy file no longer pins a single core, and
+  prints a per-file table plus one set of totals, with the failure detail
+  replayed once at the end. A full run went from ~6m to ~2m.
+- **`scripts/test.sh` follows the library's own CLI conventions.** Options are
+  declared through `dybatpho::opts::*` and parsed by
+  `dybatpho::generate_from_spec`, so `--help` is generated, values are
+  validated, and `--jobs`/`--chunk` read `DYBATPHO_TEST_JOBS`/
+  `DYBATPHO_TEST_CHUNK` as their initial values.
+- **Coverage is opt-in and chunked.** `scripts/test.sh` runs without kcov by
+  default, which is what makes it usable in an edit/test loop; `--coverage`
+  runs one kcov invocation per `--chunk` files and merges the parts into
+  `coverage/bats`. kcov never releases the trace state it accumulates, so a
+  single invocation over the whole suite grew until the OOM killer took the run
+  down.
+
 ### Fixed
 
 - **File writers now work on macOS.** `chmod` and `sed` were given `--` to mark
@@ -101,6 +123,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per core by default. A kcov-instrumented worker per core no longer fits in a
   CI runner now that the library has grown — the OOM killer was taking the run
   down mid-suite with exit 137 — so CI asks for two.
+- **Two tests were silently not running.** `test/logging.bats` unset
+  `EPOCHREALTIME` in the test body; it is a bash dynamic variable, so the unset
+  is permanent, and Bats reads it for `--timing` right after the body returns —
+  which dropped the test from the run with nothing but a warning line to say so.
+  `test/metrics.bats` spawned a child shell with `bash -c`, whose empty
+  `BASH_SOURCE` the kcov hook expands on every command until `set -u` fails the
+  test, so it failed under coverage only. `scripts/test.sh` now fails a run when
+  a file executes fewer tests than it declares, so a disappearing test cannot
+  pass unnoticed again.
 
 ## [2.0.0] - 2026-09-17
 

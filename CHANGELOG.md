@@ -377,6 +377,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `mktemp` is missing.** The fallback path hardcoded `/tmp`, ignoring both the
   explicit fourth argument and `TMPDIR`.
 
+- **`parallel`**: a job that called `exit` ended the worker before its exit code
+  was written, so the pool reported the job as never having run and the run as
+  successful even though the job had failed. Both `dybatpho::parallel_map` and
+  `dybatpho::parallel_run` now evaluate the job one subshell deeper, so `exit`
+  ends only the job.
 - **`cli`**: a persistent option declared on a command was listed twice in that
   command's own help, once replayed as an inherited definition and once from
   its own spec.

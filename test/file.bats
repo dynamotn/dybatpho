@@ -661,10 +661,17 @@ EOF
 
 @test "the XDG helpers follow the specification's defaults" {
   local home="${BATS_TEST_TMPDIR}/home"
+  # A `bash -c` shell has an empty `BASH_SOURCE`, which the kcov hook expands on
+  # every command and `set -u` then turns into a failure that shows up only
+  # under `scripts/test.sh --coverage`. Spawn from a script file instead.
+  local script="${BATS_TEST_TMPDIR}/xdg_defaults.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+printf "%s\n%s\n%s\n%s\n" "$(dybatpho::xdg_config_dir)" "$(dybatpho::xdg_cache_dir)" \
+  "$(dybatpho::xdg_data_dir)" "$(dybatpho::xdg_state_dir)"
+SCRIPT
   run -0 env -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME \
-    HOME="${home}" bash -c '. "${0}/init.sh"
-      printf "%s\n%s\n%s\n%s\n" "$(dybatpho::xdg_config_dir)" "$(dybatpho::xdg_cache_dir)" \
-        "$(dybatpho::xdg_data_dir)" "$(dybatpho::xdg_state_dir)"' "${DYBATPHO_DIR}"
+    HOME="${home}" bash "${script}" "${DYBATPHO_DIR}"
   assert_line --index 0 "${home}/.config"
   assert_line --index 1 "${home}/.cache"
   assert_line --index 2 "${home}/.local/share"
@@ -687,14 +694,22 @@ EOF
 
 @test "the XDG helpers ignore a relative value, as the specification requires" {
   local home="${BATS_TEST_TMPDIR}/home2"
-  run -0 env XDG_CACHE_HOME="relative/path" HOME="${home}" bash -c \
-    '. "${0}/init.sh"; dybatpho::xdg_cache_dir myapp' "${DYBATPHO_DIR}"
+  local script="${BATS_TEST_TMPDIR}/xdg_relative.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::xdg_cache_dir myapp
+SCRIPT
+  run -0 env XDG_CACHE_HOME="relative/path" HOME="${home}" bash "${script}" "${DYBATPHO_DIR}"
   assert_output "${home}/.cache/myapp"
 }
 
 @test "the XDG helpers report when there is no home to fall back to" {
-  run ! env -u XDG_CONFIG_HOME -u HOME bash -c \
-    '. "${0}/init.sh"; dybatpho::xdg_config_dir' "${DYBATPHO_DIR}"
+  local script="${BATS_TEST_TMPDIR}/xdg_no_home.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::xdg_config_dir
+SCRIPT
+  run ! env -u XDG_CONFIG_HOME -u HOME bash "${script}" "${DYBATPHO_DIR}"
 }
 
 @test "the XDG helpers only build a path, leaving creation to the caller" {
@@ -714,7 +729,12 @@ EOF
   local mtime
   mtime="$(dybatpho::file_mtime "${target}")"
   assert_equal "${mtime}" "$(date -r "${target}" +%s 2> /dev/null || stat -c %Y "${target}")"
-  assert [ "$(($(date +%s) - mtime))" -eq "$(dybatpho::file_age_seconds "${target}")" ]
+  # The two readings straddle the clock, so a tick between them is expected.
+  local age drift
+  age="$(dybatpho::file_age_seconds "${target}")"
+  drift="$(($(date +%s) - mtime - age))"
+  assert [ "${drift}" -ge 0 ]
+  assert [ "${drift}" -le 1 ]
   run ! dybatpho::file_mtime "${BATS_TEST_TMPDIR}/absent"
 }
 
@@ -776,8 +796,6 @@ EOF
   printf 'x\n' > "${workdir}/file"
   assert [ -f "${workdir}/file" ]
   # The name carries the requested prefix, which is what makes it findable.
-  assert_equal "$(dybatpho::path_basename "${workdir}")" \
-    "$(dybatpho::path_basename "${workdir}")"
   case "$(dybatpho::path_basename "${workdir}")" in
     *spec*) ;;
     *) fail "prefix missing from ${workdir}" ;;
@@ -795,9 +813,13 @@ EOF
 
 @test "the temporary directory of dybatpho::create_temp_dir is removed on exit" {
   local probe
-  probe="$(bash -c '. "${0}/init.sh"
-    dybatpho::create_temp_dir workdir "gone"
-    printf "%s\n" "${workdir}"' "${DYBATPHO_DIR}")"
+  local script="${BATS_TEST_TMPDIR}/temp_dir_exit.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::create_temp_dir workdir "gone"
+printf "%s\n" "${workdir}"
+SCRIPT
+  probe="$(bash "${script}" "${DYBATPHO_DIR}")"
   refute [ -d "${probe}" ]
 }
 

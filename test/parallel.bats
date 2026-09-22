@@ -203,3 +203,23 @@ _failing_job() {
   assert_equal "${captured}" "$(printf 'out p\nout q\nout r')"
   assert_equal "$(dybatpho::parallel_count)" "${before}"
 }
+
+@test "a job that calls exit is recorded, not lost" {
+  # `exit` inside a job used to end the worker before its exit code was
+  # written, which reported the job as never having run — visible only under
+  # coverage, where the traced worker dies with it.
+  ! dybatpho::parallel_run 2 "true" "exit 7" "true" > /dev/null
+  assert_equal "$(dybatpho::parallel_status 1)" "7"
+  assert_equal "$(dybatpho::parallel_failed)" "1"
+}
+
+@test "a mapped command that calls exit is recorded too" {
+  _exiting_job() {
+    [[ "$1" == "bad" ]] && exit 5
+    return 0
+  }
+  ! dybatpho::parallel_map 2 _exiting_job good bad > /dev/null
+  assert_equal "$(dybatpho::parallel_status 0)" "0"
+  assert_equal "$(dybatpho::parallel_status 1)" "5"
+  assert_equal "$(dybatpho::parallel_failed)" "1"
+}

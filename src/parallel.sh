@@ -264,7 +264,10 @@ function dybatpho::parallel_map {
   # shellcheck disable=SC2329 # run by the pool through its name
   __dybatpho_parallel_launch_item() {
     local index="$1" directory="$2" code=0
-    "${command}" "${__dybatpho_parallel_items[index]}" \
+    # The job runs one subshell deeper so that a command calling `exit` ends
+    # only itself. Without that, the exit would skip the line below and the job
+    # would be reported as never having run.
+    ("${command}" "${__dybatpho_parallel_items[index]}") \
       > "${directory}/${index}.out" 2> "${directory}/${index}.err" || code=$?
     printf '%s' "${code}" > "${directory}/${index}.status"
   }
@@ -322,7 +325,10 @@ function dybatpho::parallel_run {
   # shellcheck disable=SC2329 # run by the pool through its name
   __dybatpho_parallel_launch_command() {
     local index="$1" directory="$2" code=0
-    eval "${__dybatpho_parallel_commands[index]}" \
+    # `exit` is ordinary inside a command string, so the evaluation runs one
+    # subshell deeper: otherwise the exit would skip the line below and the job
+    # would be reported as never having run.
+    (eval "${__dybatpho_parallel_commands[index]}") \
       > "${directory}/${index}.out" 2> "${directory}/${index}.err" || code=$?
     printf '%s' "${code}" > "${directory}/${index}.status"
   }

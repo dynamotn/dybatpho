@@ -2,6 +2,19 @@ setup() {
   load test_helper
 }
 
+# @description Print a PATH that has the stubs and the few tools they need, but
+#   no real `yq`. Dropping to `/usr/bin:/bin` is not enough: a stock Ubuntu
+#   runner ships `yq` in `/usr/bin`.
+# @stdout PATH value
+__json_path_without_yq() {
+  local bin="${BATS_TEST_TMPDIR}/no-yq-bin" tool
+  mkdir -p "${bin}"
+  for tool in bash cat rm sed tr; do
+    ln -sf "$(command -v "${tool}")" "${bin}/${tool}"
+  done
+  printf '%s\n' "${BATS_MOCK_BINDIR}:${bin}"
+}
+
 @test "dybatpho::json_query prefers yq for JSON queries" {
   local args_file="${BATS_TEST_TMPDIR}/yq-json-args"
   stub yq ": echo \"\$*\" > ${args_file}; echo '\"1.0.0\"'"
@@ -122,7 +135,7 @@ EOF
   local args_file="${BATS_TEST_TMPDIR}/jq-json-args"
   local old_path="${PATH}"
   stub jq ": echo \"\$*\" > ${args_file}; printf '42\n'"
-  PATH="${BATS_MOCK_BINDIR}:/usr/bin:/bin"
+  PATH="$(__json_path_without_yq)"
 
   assert_equal "$(dybatpho::json_query "data.json" ".answer" --arg name value)" "42"
   assert_equal "$(cat "${args_file}")" '.answer data.json --arg name value'
@@ -264,7 +277,7 @@ EOF
     ": exit 0" \
     ": printf '{\"ok\":true}\n'" \
     ": printf '{\"ok\":true}\n'"
-  PATH="${BATS_MOCK_BINDIR}:/usr/bin:/bin"
+  PATH="$(__json_path_without_yq)"
 
   dybatpho::json_has "data.json" ".ok"
 

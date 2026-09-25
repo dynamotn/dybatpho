@@ -465,7 +465,12 @@ setup() {
 # ---------------------------------------------------------------------------
 
 @test "math loads on its own, without an optional module beside it" {
-  run bash -c ". '${DYBATPHO_DIR}/init.sh' --modules math; dybatpho::math_add 1 2"
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/math_alone.sh"
+  printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules math" \
+    "dybatpho::math_add 1 2" > "${script}"
+  run bash "${script}"
   assert_success
   assert_output "3"
 }

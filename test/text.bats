@@ -77,7 +77,7 @@ EOF
   assert_equal "$(dybatpho::text_dedent $' \n\t\nx')" $'\n\nx'
 
   # Every line is blank, so no shared indentation can be computed.
-  assert_equal "$(dybatpho::text_dedent $'  \n\t' | wc -l)" "2"
+  assert_equal "$(dybatpho::text_dedent $'  \n\t' | wc -l | tr -d ' ')" "2"
 
   # Empty stdin produces a single empty line rather than no output.
   assert_equal "$(dybatpho::text_indent - "> " < /dev/null)" "> "

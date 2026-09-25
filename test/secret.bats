@@ -235,7 +235,7 @@ teardown() {
   local RELOADED
   dybatpho::secret_from_file RELOADED "${file}"
   assert_equal "${RELOADED}" "written-secret-value"
-  assert_equal "$(stat -L -c '%a' "${file}")" "600"
+  assert_equal "$(stat -L -c '%a' "${file}" 2> /dev/null || stat -L -f '%Lp' "${file}")" "600"
 }
 
 @test "secret_write_file validates its destination and source variable" {

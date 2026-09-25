@@ -2055,7 +2055,7 @@ setup() {
   assert_success
   assert_output --partial "--color"
   local first="${output}"
-  assert_equal "$(find "${DYBATPHO_CLI_CACHE_DIR}" -type f | wc -l)" "1"
+  assert_equal "$(find "${DYBATPHO_CLI_CACHE_DIR}" -type f | wc -l | tr -d ' ')" "1"
 
   run_traced dybatpho::generate_completion _spec_cache bash cachetool
   assert_equal "${output}" "${first}"

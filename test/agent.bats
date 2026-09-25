@@ -243,7 +243,7 @@ _spec_test_deploy() {
   dybatpho::agent_confirm deploy "Ship it" || true
   dybatpho::agent_confirm wipe "Delete it" > /dev/null || true
   assert_file_exist "${DYBATPHO_AGENT_AUDIT_FILE}"
-  assert_equal "$(wc -l < "${DYBATPHO_AGENT_AUDIT_FILE}")" "2"
+  assert_equal "$(wc -l < "${DYBATPHO_AGENT_AUDIT_FILE}" | tr -d ' ')" "2"
   assert_equal "$(dybatpho::json_get "$(head -n 1 "${DYBATPHO_AGENT_AUDIT_FILE}")" '.detail')" "allowed: Ship it"
   assert_equal "$(dybatpho::json_get "$(tail -n 1 "${DYBATPHO_AGENT_AUDIT_FILE}")" '.detail')" "refused: not in DYBATPHO_AGENT_ALLOW"
 }
@@ -268,7 +268,7 @@ _spec_test_deploy() {
   dybatpho::agent_audit deploy "version 1.0"
   dybatpho::agent_audit rollback
   assert_file_exist "${DYBATPHO_AGENT_AUDIT_FILE}"
-  assert_equal "$(wc -l < "${DYBATPHO_AGENT_AUDIT_FILE}")" "2"
+  assert_equal "$(wc -l < "${DYBATPHO_AGENT_AUDIT_FILE}" | tr -d ' ')" "2"
   assert_equal "$(dybatpho::json_get "$(head -n 1 "${DYBATPHO_AGENT_AUDIT_FILE}")" '.action')" "deploy"
   assert_equal "$(dybatpho::json_get "$(head -n 1 "${DYBATPHO_AGENT_AUDIT_FILE}")" '.detail')" "version 1.0"
 }

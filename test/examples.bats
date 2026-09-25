@@ -24,7 +24,9 @@ run_example() {
 
   before="$(git -C "${REPO_ROOT}" status --porcelain)"
 
-  run --separate-stderr timeout 120 bash "${REPO_ROOT}/example/${name}"
+  # Not the `timeout` binary: a stock macOS has none, and the library's own
+  # helper falls back to a Bash watchdog there.
+  run --separate-stderr dybatpho::run_with_timeout 120 bash "${REPO_ROOT}/example/${name}"
   if [ "${status}" -ne 0 ]; then
     printf 'example/%s exited %s\n--- stdout ---\n%s\n--- stderr ---\n%s\n' \
       "${name}" "${status}" "${output}" "${stderr}" >&2

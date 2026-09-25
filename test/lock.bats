@@ -232,10 +232,14 @@ teardown() {
 @test "a second acquire is refused while the lock is held" {
   dybatpho::lock_acquire "exclusive"
   # A fresh shell, so it is a different process asking.
-  run bash -c "DYBATPHO_LOCK_DIR=$(printf '%q' "${DYBATPHO_LOCK_DIR}") \
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/second_acquire.sh"
+  printf '%s\n' "DYBATPHO_LOCK_DIR=$(printf '%q' "${DYBATPHO_LOCK_DIR}") \
     LOG_LEVEL=fatal \
     . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock \
-    && dybatpho::lock_acquire exclusive 0"
+    && dybatpho::lock_acquire exclusive 0" > "${script}"
+  run bash "${script}"
   assert_failure
   dybatpho::lock_release "exclusive"
 }
@@ -248,7 +252,8 @@ teardown() {
   # handled the same way and is not inherited ignored, so it is what this
   # asserts on. The probe is a shell function so it runs in that child and can
   # see its handlers; a command run as a program could not.
-  run bash -c "
+  local script="${BATS_TEST_TMPDIR}/trap_probe.sh"
+  printf '%s\n' "
     export DYBATPHO_LOCK_DIR=$(printf '%q' "${DYBATPHO_LOCK_DIR}")
     export LOG_LEVEL=fatal
     . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock
@@ -256,7 +261,8 @@ teardown() {
     printf 'before: %s\\n' \"\$(trap -p HUP)\"
     dybatpho::with_lock trap-probe 1 -- probe
     printf 'after: %s\\n' \"\$(trap -p HUP)\"
-  "
+  " > "${script}"
+  run bash "${script}"
   assert_success
 
   # Present while the command runs, so an interrupt during a long job releases.

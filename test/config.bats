@@ -406,9 +406,12 @@ require_tool() {
   local base="${BATS_TEST_TMPDIR}/config.env"
   printf 'HOST=localhost\n' > "${base}"
 
-  run --separate-stderr env -u DYBATPHO_CONFIG_PROFILE \
-    bash -c ". '${DYBATPHO_DIR}/init.sh' --modules config
-    dybatpho::config_profile '${base}'"
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/profile.sh"
+  printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules config" \
+    "dybatpho::config_profile '${base}'" > "${script}"
+  run --separate-stderr env -u DYBATPHO_CONFIG_PROFILE bash "${script}"
   assert_failure
   assert_stderr --partial "Expected a profile name or DYBATPHO_CONFIG_PROFILE"
 

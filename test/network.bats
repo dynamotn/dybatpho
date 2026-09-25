@@ -685,7 +685,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   run dybatpho::curl_paginate "https://api.example.test/items?page=1"
   DYBATPHO_PAGINATE_MAX_PAGES=100
   assert_success
-  assert_equal "$(dybatpho::mock_http_calls | wc -l)" "2"
+  assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "2"
   refute_output --partial "three"
 }
 
@@ -697,7 +697,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 
   run dybatpho::curl_paginate "https://api.example.test/items?page=1"
   assert_success
-  assert_equal "$(dybatpho::mock_http_calls | wc -l)" "2"
+  assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "2"
 }
 
 @test "dybatpho::curl_paginate reports the failing page instead of the pages before it" {

@@ -138,8 +138,12 @@ EOF
 @test "dybatpho::table_csv still reads stdin once and renders it" {
   # The check and the renderer both need the input, and standard input can only
   # be read once.
-  run_traced bash -c "printf 'web 1/1 Running\napi 1/1 Running\n' | tr -s ' ' ',' \
-    | { . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules table && dybatpho::table_csv - markdown; }"
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/csv_stdin.sh"
+  printf '%s\n' "printf 'web 1/1 Running\napi 1/1 Running\n' | tr -s ' ' ',' \
+    | { . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules table && dybatpho::table_csv - markdown; }" > "${script}"
+  run_traced bash "${script}"
   assert_success
   assert_output --partial "Running"
 }

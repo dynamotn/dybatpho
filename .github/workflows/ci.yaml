@@ -59,13 +59,16 @@ jobs:
           # library is written against is fetched directly.
           YQ_VERSION: v4.53.3
         run: |
-          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq
+          # gawk: `scripts/doc.sh`, which the conventions tests run, needs it.
+          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
           chmod +x /usr/local/bin/yq
           yq --version
           jq --version
-          useradd test
+          # With a home: the AI example keeps its counters under the XDG state
+          # home, and a user without one cannot create it.
+          useradd -m test
 
       - name: "Checkout"
         uses: actions/checkout@v4
@@ -174,6 +177,9 @@ jobs:
       - name: "Install GNU parallel so Bats can use more than one worker"
         if: runner.os == 'macOS'
         run: brew list parallel > /dev/null 2>&1 || brew install parallel
+      - name: "Install gawk, which the documentation check needs"
+        if: runner.os == 'macOS'
+        run: brew list gawk > /dev/null 2>&1 || brew install gawk
       - name: "Run the suite"
         # Three files used to run here, which left everything that touches
         # `stat`, `sed` or `find` unchecked on a BSD userland — `stat -c` in

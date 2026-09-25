@@ -186,7 +186,7 @@ dybatpho::module_loaded network || echo no'
 @test "dybatpho::module_list prints each selection" {
   assert_equal "$(dybatpho::module_list core | tr '\n' ' ')" "${DYBATPHO_CORE_MODULES} "
   assert_equal "$(dybatpho::module_list optional | tr '\n' ' ')" "${DYBATPHO_OPTIONAL_MODULES} "
-  assert_equal "$(dybatpho::module_list all | wc -l)" "$(ls "${DYBATPHO_DIR}"/src/*.sh | wc -l)"
+  assert_equal "$(dybatpho::module_list all | wc -l | tr -d ' ')" "$(ls "${DYBATPHO_DIR}"/src/*.sh | wc -l | tr -d ' ')"
   assert_equal "$(dybatpho::module_list | tr '\n' ' ')" "$(dybatpho::module_list loaded | tr '\n' ' ')"
 }
 

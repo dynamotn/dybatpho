@@ -1,6 +1,10 @@
 setup() {
   load test_helper
   REPO="${BATS_TEST_TMPDIR}/repo"
+  # A pre-commit hook runs this suite with `GIT_DIR` and `GIT_INDEX_FILE`
+  # pointing at the real repository, and they win over `git -C`: the commits
+  # below would land there, as `test/git.bats` already guards against.
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
   _require_throwaway_repo
   git init -q "${REPO}"
   git -C "${REPO}" config user.email "test@dybatpho.invalid"

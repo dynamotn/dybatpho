@@ -1653,8 +1653,15 @@ function dybatpho::ai_redact {
     text=$(cat)
   fi
   text=$(dybatpho::secret_mask "${text}")
+  # `\b` is a GNU extension that BSD sed rejects, so the word boundaries are
+  # spelled out and captured. A captured boundary is consumed, which would skip
+  # a match right after another one, so each rule loops until nothing changes.
   printf '%s\n' "${text}" | sed -E \
     -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/<email>/g' \
-    -e 's/\b([0-9]{1,3}\.){3}[0-9]{1,3}\b/<ip>/g' \
-    -e 's/\b[0-9]{9,}\b/<number>/g'
+    -e ':ip' \
+    -e 's/(^|[^[:alnum:]_])([0-9]{1,3}\.){3}[0-9]{1,3}($|[^[:alnum:]_])/\1<ip>\3/' \
+    -e 't ip' \
+    -e ':number' \
+    -e 's/(^|[^[:alnum:]_])[0-9]{9,}($|[^[:alnum:]_])/\1<number>\2/' \
+    -e 't number'
 }

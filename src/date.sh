@@ -93,6 +93,12 @@ function __dybatpho_date_parse_with {
     TZ="${DYBATPHO_DATE_TIMEZONE}" date -D "${input_format}" -d "${input}" +%s 2> /dev/null
     return
   fi
+  # BSD `date -j -f` fills every field the format leaves out from the current
+  # time, so a bare date would land at this moment's hour rather than midnight.
+  if [[ "${input_format}" != *%H* ]]; then
+    input_format+=" %H:%M:%S"
+    input+=" 00:00:00"
+  fi
   TZ="${DYBATPHO_DATE_TIMEZONE}" date -j -f "${input_format}" "${input}" +%s 2> /dev/null
 }
 

@@ -108,7 +108,9 @@ function dybatpho::text_strip_ansi {
 
   __dybatpho_text_read_lines "${input}" lines
   for line in "${lines[@]}"; do
-    printf '%s\n' "$(printf '%s' "${line}" | sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g')"
+    # The ranges are byte ranges, and BSD sed rejects `[ -/]` as an invalid
+    # range under a UTF-8 collation, so the match runs in the C locale.
+    printf '%s\n' "$(printf '%s' "${line}" | LC_ALL=C sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g')"
   done
 }
 

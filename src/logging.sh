@@ -479,6 +479,46 @@ function __dybatpho_log_is_plain_ascii {
   esac
 }
 
+#######################################
+# @description Read the character that starts at an index, as UTF-8.
+#   Outside a UTF-8 locale Bash indexes a string by byte, so a glyph such as
+#   `✅` would be measured as three one-column characters and the box drawn
+#   around it would come out too wide. The lead byte gives the length of the
+#   sequence, which keeps the measure the same under the C locale.
+# @arg $1 string Name of the variable receiving the character
+# @arg $2 string Text to read from
+# @arg $3 number Index of the character's first byte or character
+# @arg $4 bool `1` when Bash is indexing by byte
+# @set The named variable
+#######################################
+function __dybatpho_log_char_at_into {
+  local -n __dybatpho_char_out="$1"
+  local __dybatpho_char_text="$2" __dybatpho_char_index="$3"
+  local __dybatpho_char_lead __dybatpho_char_length=1
+
+  __dybatpho_char_out="${__dybatpho_char_text:__dybatpho_char_index:1}"
+  [[ "$4" == 1 ]] || return 0
+  printf -v __dybatpho_char_lead '%d' "'${__dybatpho_char_out}"
+  if ((__dybatpho_char_lead >= 240)); then
+    __dybatpho_char_length=4
+  elif ((__dybatpho_char_lead >= 224)); then
+    __dybatpho_char_length=3
+  elif ((__dybatpho_char_lead >= 192)); then
+    __dybatpho_char_length=2
+  fi
+  __dybatpho_char_out="${__dybatpho_char_text:__dybatpho_char_index:__dybatpho_char_length}"
+}
+
+#######################################
+# @description Report whether Bash indexes strings by byte in this locale.
+# @exitcode 0 Bash counts bytes, so multi-byte characters must be assembled
+# @exitcode 1 Bash counts characters
+#######################################
+function __dybatpho_log_indexes_bytes {
+  local probe=$'\303\251'
+  ((${#probe} != 1))
+}
+
 # Display width of each non-ASCII character seen so far, keyed by the character.
 # @env __dybatpho_log_char_width_cache
 declare -gA __dybatpho_log_char_width_cache=()
@@ -502,10 +542,11 @@ declare -gA __dybatpho_log_char_width_cache=()
 function __dybatpho_log_learn_widths {
   local text="${1-}"
   local -a unknown=()
-  local index character
+  local index character bytewise=0
+  __dybatpho_log_indexes_bytes && bytewise=1
 
-  for ((index = 0; index < ${#text}; index++)); do
-    character="${text:index:1}"
+  for ((index = 0; index < ${#text}; index += ${#character})); do
+    __dybatpho_log_char_at_into character "${text}" "${index}" "${bytewise}"
     __dybatpho_log_is_plain_ascii "${character}" && continue
     [[ -v "__dybatpho_log_char_width_cache[${character}]" ]] && continue
     __dybatpho_log_char_width_cache["${character}"]=1
@@ -557,10 +598,12 @@ function __dybatpho_log_width_into {
 
   __dybatpho_log_learn_widths "${__dybatpho_width_text}"
 
-  local __dybatpho_width_index __dybatpho_width_char
+  local __dybatpho_width_index __dybatpho_width_char __dybatpho_width_bytewise=0
+  __dybatpho_log_indexes_bytes && __dybatpho_width_bytewise=1
   __dybatpho_width_out=0
-  for ((__dybatpho_width_index = 0; __dybatpho_width_index < ${#__dybatpho_width_text}; __dybatpho_width_index++)); do
-    __dybatpho_width_char="${__dybatpho_width_text:__dybatpho_width_index:1}"
+  for ((__dybatpho_width_index = 0; __dybatpho_width_index < ${#__dybatpho_width_text}; __dybatpho_width_index += ${#__dybatpho_width_char})); do
+    __dybatpho_log_char_at_into __dybatpho_width_char "${__dybatpho_width_text}" \
+      "${__dybatpho_width_index}" "${__dybatpho_width_bytewise}"
     if __dybatpho_log_is_plain_ascii "${__dybatpho_width_char}"; then
       __dybatpho_width_out=$((__dybatpho_width_out + 1))
     else

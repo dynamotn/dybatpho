@@ -56,6 +56,8 @@ appended to a rotating log file at an independent verbosity level.
 - [`__dybatpho_log_inspect`](#__dybatpho_log_inspect) — Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
 - [`__dybatpho_log_get_terminal_width`](#__dybatpho_log_get_terminal_width) — Return the effective terminal width used by boxed logging helpers.
 - [`__dybatpho_log_is_plain_ascii`](#__dybatpho_log_is_plain_ascii) — Return success when a string holds nothing but printable ASCII, which is the case where one character is exactly one terminal column and Bash can measure it on its own. `LC_ALL=C` is local to this function so the bracket range means bytes 0x20..0x7E rather than whatever the caller's collation makes of it.
+- [`__dybatpho_log_char_at_into`](#__dybatpho_log_char_at_into) — Read the character that starts at an index, as UTF-8. Outside a UTF-8 locale Bash indexes a string by byte, so a glyph such as `✅` would be measured as three one-column characters and the box drawn around it would come out too wide. The lead byte gives the length of the sequence, which keeps the measure the same under the C locale.
+- [`__dybatpho_log_indexes_bytes`](#__dybatpho_log_indexes_bytes) — Report whether Bash indexes strings by byte in this locale.
 - [`__dybatpho_log_learn_widths`](#__dybatpho_log_learn_widths) — Fill the character-width cache for every non-ASCII character in a string that is not in it yet, in a single `python3` call. Width used to cost one process per measured string, so a twenty-row table paid eighty of them and a boxed `dybatpho::success` paid one per line. Caching per character rather than per string is what makes that cost amortize away: the library's own labels hold about ten distinct glyphs, and CJK text reuses its characters heavily, so a long run settles into no processes at all while still answering exactly what `python3` answers. Without `python3` every unknown character is recorded as one column, which is the answer the previous fallback gave.
 - [`__dybatpho_log_width_into`](#__dybatpho_log_width_into) — Return the display width of a string, accounting for wide Unicode glyphs when possible.
 - [`__dybatpho_log_repeat_into`](#__dybatpho_log_repeat_into) — Repeat a string, writing the result into a named variable. The renderers build padding one cell at a time, and reaching `dybatpho::string_repeat` through `$( )` forked once per cell.
@@ -469,6 +471,42 @@ Return success when a string holds nothing but printable ASCII,
 
 - `0`: The text is printable ASCII, optionally with tabs
 - `1`: The text holds a character that may not be one column wide
+
+
+---
+
+### `__dybatpho_log_char_at_into`
+
+Read the character that starts at an index, as UTF-8.
+  Outside a UTF-8 locale Bash indexes a string by byte, so a glyph such as
+  `✅` would be measured as three one-column characters and the box drawn
+  around it would come out too wide. The lead byte gives the length of the
+  sequence, which keeps the measure the same under the C locale.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the character |
+| `$2` | string | Text to read from |
+| `$3` | number | Index of the character's first byte or character |
+| `$4` | bool | `1` when Bash is indexing by byte |
+
+**🧩 Variable sets**
+
+- **`The`**: named variable
+
+
+---
+
+### `__dybatpho_log_indexes_bytes`
+
+Report whether Bash indexes strings by byte in this locale.
+
+**🚦 Exit codes**
+
+- `0`: Bash counts bytes, so multi-byte characters must be assembled
+- `1`: Bash counts characters
 
 
 ---

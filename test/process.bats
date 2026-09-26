@@ -330,6 +330,19 @@ SCRIPT
   assert_equal "${status}" 7
 }
 
+@test "dybatpho::run_with_timeout leaves a BusyBox timeout to the watchdog" {
+  # BusyBox `timeout` takes `-k` but reports a timeout as 143, so accepting it
+  # would break the 124 this helper promises.
+  local bin="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${bin}"
+  printf '#!/bin/sh\n[ "$1" = --version ] && exit 1\nexit 0\n' > "${bin}/timeout"
+  chmod +x "${bin}/timeout"
+
+  __dybatpho_process_timeout_probe=""
+  PATH="${bin}:${PATH}" run __dybatpho_process_has_timeout
+  assert_failure
+}
+
 @test "dybatpho::run_with_timeout does not mistake exit code 143 for a timeout" {
   # A command that chooses to exit 143 looks exactly like one killed by
   # SIGTERM, which is why the watchdog reports a timeout through a marker file

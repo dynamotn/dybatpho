@@ -43,7 +43,7 @@ writes PID files.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
 - [`__dybatpho_process_forget_cleanup`](#__dybatpho_process_forget_cleanup) — Drop a path from the deferred-cleanup registry. A temporary file that a function removes itself leaves its registration behind, and a script that times hundreds of commands would carry one dead entry per call to the end of the run.
-- [`__dybatpho_process_has_timeout`](#__dybatpho_process_has_timeout) — Report whether the system `timeout` understands `-k`. The probe runs once and its answer is cached, because the alternative is spawning a process to ask the same question on every timed command.
+- [`__dybatpho_process_has_timeout`](#__dybatpho_process_has_timeout) — Report whether the system `timeout` is a coreutils one. Only GNU and uutils coreutils are trusted: BusyBox `timeout` accepts `-k` but reports a timeout as 143 rather than 124, which would break the exit code this helper promises. The probe runs once and its answer is cached, because the alternative is spawning a process on every timed command.
 - [`__dybatpho_process_end_job`](#__dybatpho_process_end_job) — End a background job, and whatever it started, with SIGTERM and then SIGKILL. A job launched under job control leads its own process group, so the group is signalled first: ending the job alone would orphan its children, which is the usual way a "killed" build leaves a compiler running. The group kill is only attempted for a job that does lead its own group, never as a blind fallback, because a job that shares the caller's process group would take the calling script down with it.
 - [`__dybatpho_process_timeout_fallback`](#__dybatpho_process_timeout_fallback) — Run a command under a time limit without the `timeout` binary. The command runs under job control so it leads its own process group, and a watchdog subshell ends that group once the limit elapses. The watchdog records that it fired by creating a marker file, rather than leaving the answer to the exit status: a command killed by SIGTERM and a command that chose to exit 143 are indistinguishable otherwise, and only the first is a timeout.
 - [`dybatpho::run_with_timeout`](#dybatphorun_with_timeout) — Run a command and end it if it takes too long. The system `timeout` is used when it is available and usable, and a pure-Bash watchdog takes over when it is not, which is the common case on macOS, where coreutils is not installed by default. A shell function always takes the Bash path, because `timeout` executes a program and cannot see the caller's functions. The command is ended with SIGTERM first and SIGKILL afterwards, so a job that traps SIGTERM still gets to clean up before it is removed, and one that ignores it is still removed.
@@ -292,16 +292,18 @@ Drop a path from the deferred-cleanup registry.
 
 ### `__dybatpho_process_has_timeout`
 
-Report whether the system `timeout` understands `-k`.
-  The probe runs once and its answer is cached, because the alternative is
-  spawning a process to ask the same question on every timed command.
+Report whether the system `timeout` is a coreutils one.
+  Only GNU and uutils coreutils are trusted: BusyBox `timeout` accepts `-k`
+  but reports a timeout as 143 rather than 124, which would break the exit
+  code this helper promises. The probe runs once and its answer is cached,
+  because the alternative is spawning a process on every timed command.
 
 _Function has no arguments._
 
 **🚦 Exit codes**
 
-- `0`: `timeout -k` is usable
-- `1`: There is no `timeout`, or it rejects `-k`
+- `0`: A coreutils `timeout -k` is usable
+- `1`: There is no `timeout`, or it is not a coreutils one
 
 
 ---

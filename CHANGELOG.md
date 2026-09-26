@@ -467,6 +467,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A bare date parsed on macOS kept the current time of day.** BSD `date -j -f`
+  fills every field the format leaves out from the current time, so
+  `dybatpho::date_month_start 2024-02-17 '%F %T'` answered `2024-02-01 08:46:02`
+  rather than midnight, and `date_add_days` and every other helper built on the
+  parser drifted the same way. A date without a time now parses as midnight on
+  every `date` flavour.
+- **`dybatpho::text_strip_ansi` stripped nothing on macOS.** Under a UTF-8
+  locale BSD `sed` rejects the escape-sequence pattern as an invalid character
+  range, so the helper printed empty lines — and `dybatpho::assert_snapshot`,
+  which strips colours through it, recorded empty snapshots. The match now runs
+  in the C locale, where the ranges are the byte ranges they were meant to be.
+- **`dybatpho::ai_redact` let IP addresses and long numbers through on macOS.**
+  Their patterns relied on `\b`, a GNU `sed` extension that BSD `sed` does not
+  understand, so only email addresses were masked. The word boundaries are now
+  spelled out, and back-to-back matches such as `1.2.3.4 5.6.7.8` are both
+  masked.
+- **`dybatpho::run_with_timeout` reported a timeout as 143 on BusyBox.** BusyBox
+  `timeout` accepts `-k` but exits 143 rather than 124 when the limit elapses,
+  so a caller checking for 124 took the timeout for a failure. Only a coreutils
+  `timeout` (GNU or uutils) is used now; anything else goes through the Bash
+  watchdog, which reports 124.
+- **Boxed log messages came out too wide in the C locale.** Outside a UTF-8
+  locale Bash indexes a string by byte, so a glyph such as `✅` was measured as
+  three one-column characters and `dybatpho::success`, `dybatpho::progress` and
+  the tables drew their border past the text. Multi-byte characters are now
+  assembled from their bytes before they are measured.
 - **An HTTP error lost its body and its status.** `dybatpho::curl_do` passed
   `-f` to `curl`, which discards the response body on a 4xx or 5xx — it does not
   even create the `-o` file. The part of the answer that says *why* a request was

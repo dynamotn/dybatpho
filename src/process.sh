@@ -289,16 +289,19 @@ function __dybatpho_process_forget_cleanup {
 }
 
 #######################################
-# @description Report whether the system `timeout` understands `-k`.
-#   The probe runs once and its answer is cached, because the alternative is
-#   spawning a process to ask the same question on every timed command.
+# @description Report whether the system `timeout` is a coreutils one.
+#   Only GNU and uutils coreutils are trusted: BusyBox `timeout` accepts `-k`
+#   but reports a timeout as 143 rather than 124, which would break the exit
+#   code this helper promises. The probe runs once and its answer is cached,
+#   because the alternative is spawning a process on every timed command.
 # @noargs
-# @exitcode 0 `timeout -k` is usable
-# @exitcode 1 There is no `timeout`, or it rejects `-k`
+# @exitcode 0 A coreutils `timeout -k` is usable
+# @exitcode 1 There is no `timeout`, or it is not a coreutils one
 #######################################
 function __dybatpho_process_has_timeout {
   if [[ -z "${__dybatpho_process_timeout_probe}" ]]; then
     if command -v timeout > /dev/null 2>&1 \
+      && [[ "$(timeout --version 2> /dev/null)" == *coreutils* ]] \
       && timeout -k 1 1 true > /dev/null 2>&1; then
       __dybatpho_process_timeout_probe=yes
     else

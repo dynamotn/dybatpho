@@ -41,3 +41,31 @@ run_traced() {
   fi
   return 0
 }
+
+# Assert that a process is no longer running.
+#
+# `kill -0` alone is not enough: a process whose parent died with it is
+# reparented to PID 1, and the PID 1 of a container is usually a plain command
+# that never reaps. The killed process then lingers as a zombie, `kill -0`
+# keeps succeeding for it, and a test asserting "this got killed" fails on every
+# containerised CI job while passing on a host whose init reaps orphans. A
+# zombie has already been killed, so it counts as dead here.
+assert_process_dead() {
+  local pid="$1" state=""
+  kill -0 "${pid}" 2> /dev/null || return 0
+  if [[ -r "/proc/${pid}/stat" ]]; then
+    local stat
+    stat="$(< "/proc/${pid}/stat")" || return 0
+    # The command name is parenthesised and may itself hold spaces and
+    # parentheses, so the state is the first field after the last `)`.
+    stat="${stat##*) }"
+    state="${stat%% *}"
+  else
+    state="$(ps -o state= -p "${pid}" 2> /dev/null)"
+    state="${state#"${state%%[![:space:]]*}"}"
+  fi
+  case "${state}" in
+    Z*) return 0 ;;
+  esac
+  fail "process ${pid} is still running (state: ${state:-alive})"
+}

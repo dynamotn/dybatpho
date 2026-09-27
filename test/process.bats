@@ -93,17 +93,21 @@ setup() {
 }
 
 @test 'dybatpho::cleanup_file_on_exit action' {
-  # Just test that function runs without error and registers trap
-  local filepath="$(mktemp -p "${BATS_TEST_TMPDIR}")"
+  # The call itself must stay quiet, and it must remember the path.
+  local filepath
+  filepath="$(mktemp -p "${BATS_TEST_TMPDIR}")"
   run --separate-stderr dybatpho::cleanup_file_on_exit "${filepath}"
   assert_success
   refute_output
   refute_stderr
 
-  # Cleanup is triggered on EXIT, file may or may not be deleted immediately
-  # Verify cleanup script was created
-  local cleanup_scripts=$(ls /tmp/dybatpho_cleanup-*.sh 2> /dev/null | wc -l)
-  [[ "${cleanup_scripts}" -gt 0 ]]
+  # Registering happens in the calling shell, and `run` uses a subshell, so
+  # register once more here to inspect what the current shell kept: the path,
+  # tagged with this shell's pid. Removal on EXIT is covered by the next test.
+  dybatpho::cleanup_file_on_exit "${filepath}"
+  assert_equal \
+    "${DYBATPHO_CLEANUP_PATHS[$((${#DYBATPHO_CLEANUP_PATHS[@]} - 1))]}" \
+    "${BASHPID}:${filepath}"
 }
 
 @test 'dybatpho::cleanup_file_on_exit removes file on shell exit' {
@@ -371,8 +375,7 @@ SCRIPT
   grandchild="$(< "${pid_file}")"
   # The kill is asynchronous, so give it a moment before asking.
   sleep 1
-  run kill -0 "${grandchild}"
-  assert_failure
+  assert_process_dead "${grandchild}"
 }
 
 @test "dybatpho::run_with_timeout with a limit of 0 runs without a limit" {
@@ -480,8 +483,7 @@ SCRIPT
   assert_equal "${#DYBATPHO_BACKGROUND_NAMES[@]}" 0
   assert_equal "${#DYBATPHO_BACKGROUND_PIDS[@]}" 0
 
-  run kill -0 "${pid}"
-  assert_failure
+  assert_process_dead "${pid}"
 }
 
 @test "dybatpho::kill_children ends the processes a background job started" {
@@ -500,8 +502,7 @@ SCRIPT
 
   dybatpho::kill_children
   sleep 1
-  run kill -0 "$(< "${pid_file}")"
-  assert_failure
+  assert_process_dead "$(< "${pid_file}")"
 }
 
 @test "dybatpho::kill_children is safe to call when no job was ever started" {

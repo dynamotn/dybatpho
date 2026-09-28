@@ -724,6 +724,11 @@ function __dybatpho_tui_menu_fallback {
     break
   done
 
+  # The nameref is bound to an array for a multi-select and to a scalar for a
+  # single one, which is the contract of the two public functions. ShellCheck
+  # sees one variable assigned both ways and cannot know only one branch runs
+  # for any given caller.
+  # shellcheck disable=SC2178,SC2128
   if dybatpho::is true "${__dybatpho_tui_fb_multiple}"; then
     DYBATPHO_TUI_INDEXES="${__dybatpho_tui_fb_chosen[*]}"
     __dybatpho_tui_fb_out=()
@@ -897,6 +902,9 @@ function __dybatpho_tui_menu_interactive {
   fi
 
   local -a __dybatpho_tui_menu_selected=() __dybatpho_tui_menu_positions=()
+  # As in the fallback: one nameref, an array for a multi-select and a scalar
+  # for a single one, and only one of the branches ever runs for a caller.
+  # shellcheck disable=SC2178,SC2128,SC2034
   if dybatpho::is true "${__dybatpho_tui_menu_multiple}"; then
     for ((__dybatpho_tui_menu_index = 0; __dybatpho_tui_menu_index < __dybatpho_tui_menu_count; __dybatpho_tui_menu_index++)); do
       ((__dybatpho_tui_menu_checked[__dybatpho_tui_menu_index] == 1)) || continue

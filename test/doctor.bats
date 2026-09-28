@@ -48,6 +48,14 @@ fake_versioned_command() {
   assert_line --index 1 "git"
 }
 
+@test "dybatpho::doctor_requirements lists what the screen module needs" {
+  # Without `stty` there is no raw mode, so a keystroke only reaches a
+  # full-screen application once Return is pressed: the module cannot work at
+  # all rather than working partially.
+  run -0 dybatpho::doctor_requirements screen required
+  assert_output "stty"
+}
+
 @test "dybatpho::doctor_requirements lists optional dependencies" {
   run -0 dybatpho::doctor_requirements json optional
   assert_output "jq"

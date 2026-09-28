@@ -177,6 +177,7 @@ scripts/release.sh --version 3.0.0 --sign
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [cli.sh](doc/cli.md) | Declarative option parser with "did you mean" suggestions, generated `--no-` switches, counting `-vv` flags, options bound to config keys, prompts for missing values, env fallbacks, automatic `--help`, and generated JSON schema / shell completion / man pages |
 | [tui.sh](doc/tui.md) | Spinners, progress bars, arrow-key single and multi select menus, and confirmations — each one falling back to a numbered prompt or a log line when there is no terminal, so the same script runs unattended |
+| [screen.sh](doc/screen.md) | Full-screen applications: a constraint layout solver, blocks, lists, tables, gauges, tabs, scrollbars, sparklines, bar and Braille line charts, popups, and an event loop with keys, mouse and resize |
 
 ### 📁 Files & system
 

@@ -153,6 +153,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `doc/table.md`, `doc/spec/table.md` |
 | `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `doc/text.md`, `doc/spec/text.md` |
 | `tui.sh` | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `doc/tui.md`, `doc/spec/tui.md` |
+| `screen.sh` | Full-screen applications: alternate screen and raw mode, a constraint layout solver, a widget set, Unicode-correct column measurement, and an event loop over keys, mouse and resize | `test/screen.bats`, `doc/screen.md`, `doc/spec/screen.md` |
 | `testing.sh` | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `doc/testing.md`, `doc/spec/testing.md` |
 | `validate.sh` | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `doc/validate.md`, `doc/spec/validate.md` |
 

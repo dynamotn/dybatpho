@@ -65,6 +65,9 @@ declare -gA DYBATPHO_DOCTOR_REQUIRED=(
   # plain presence check would pass on a host where every YAML call then fails.
   [json]="yq>=4"
   [network]="curl"
+  # Raw mode is what makes a key reach the application before Return does, and
+  # there is no way to ask for it from Bash alone.
+  [screen]="stty"
 )
 # @env DYBATPHO_DOCTOR_OPTIONAL array Optional external commands per module
 declare -gA DYBATPHO_DOCTOR_OPTIONAL=(

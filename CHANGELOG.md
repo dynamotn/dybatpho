@@ -9,6 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`screen` — full-screen terminal applications: a layout solver, a widget
+  set, and an event loop.** `tui` draws beside a script's output; this takes
+  the whole terminal, which is what a process browser, a log viewer or a picker
+  with a preview pane needs. It is the `ratatui` shape in Bash.
+
+  ```sh
+  . dybatpho/init.sh --modules screen
+
+  dybatpho::screen_begin || dybatpho::die "No terminal"
+  while true; do
+    dybatpho::screen_clear
+    dybatpho::screen_layout rows vertical "${DYBATPHO_SCREEN_RECT}" length:1 fill:1
+    dybatpho::screen_tabs "${rows[0]}" tabs active:"${tab}"
+    dybatpho::screen_block "${rows[1]}" title:"Pods" border:rounded
+    dybatpho::screen_list "${DYBATPHO_SCREEN_INNER}" pods selected:"${cursor}"
+    dybatpho::screen_flush
+
+    dybatpho::screen_event key
+    case "${key}" in
+      char:q | escape) break ;;
+      down) cursor=$((cursor + 1)) ;;
+      resize) dybatpho::screen_size || true ;;
+    esac
+  done
+  dybatpho::screen_end
+  ```
+
+  `dybatpho::screen_layout` splits a rectangle with the constraints `length:`,
+  `percent:`, `ratio:`, `min:`, `max:` and `fill:`, always tiling it exactly.
+  The widgets are `dybatpho::screen_block`, `screen_text`, `screen_list`,
+  `screen_table`, `screen_gauge`, `screen_tabs`, `screen_scrollbar`,
+  `screen_sparkline`, `screen_barchart`, `screen_chart` — a Braille line chart
+  at two points across and four down per character — and `screen_popup`, which
+  erases what it covers. `dybatpho::screen_event` reports keys, arrows,
+  navigation keys, mouse buttons with a zero-based position, resizes and end of
+  input as names, so an input loop never parses an escape sequence.
+
+  `dybatpho::screen_begin` switches to the alternate screen, enters raw mode
+  and hides the cursor, and registers the restore on `EXIT`, `INT` and `TERM`,
+  so an application that crashes still gives the terminal back. It draws on
+  `/dev/tty` rather than stdout, so an application can still print a result
+  that a caller captures.
+
+  Widths come from embedded Unicode tables rather than from another program, so
+  CJK text and emoji stay on the column grid with no `python3` and no `wcwidth`
+  binary, in a UTF-8 locale or the C one.
+
+  The frame buffer holds rows rather than cells. `ratatui`'s per-cell model
+  measures at about 50 microseconds a cell in Bash — half a second for one
+  frame of a 200x50 terminal, and it is the per-cell loop that costs, so a
+  smarter diff does not rescue it. Rows, styles kept as runs, and a per-row
+  skip when nothing changed bring a realistic 80x24 frame to about 18
+  milliseconds and a 200x50 one to about 38, which is fast enough to repaint on
+  every keystroke.
+
+  Requires `stty`, now declared for the module in `dybatpho::doctor`.
+
 - **`validate` — one validator for the whole library.** Every module that took
   a value from outside wrote its own check: `config` matched an integer with
   one regular expression and a URL with another, `cli` matched a shell variable

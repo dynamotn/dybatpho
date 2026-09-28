@@ -119,6 +119,11 @@ loaded_line() {
 
   run -0 init_sh "--modules tui" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety tui "
+
+  # `screen` calls nothing outside the core modules, so it must load on its own
+  # rather than dragging the interactive helpers in behind it.
+  run -0 init_sh "--modules screen" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret screen "
 }
 
 @test "a dependency cycle loads every module once and terminates" {

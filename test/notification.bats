@@ -343,3 +343,16 @@ setup() {
   assert_output --partial '\nreturn'
   assert_output --partial '\rtab\t'
 }
+
+@test "__dybatpho_notification_json_escape spells out every control character" {
+  # A notification usually carries the output of the command that failed,
+  # colour codes and all. Left raw, a control character makes the payload
+  # something the webhook refuses, so the message never arrives.
+  local message
+  message="$(printf 'build \033[31mFAILED\033[0m\a on nhánh "main"')"
+  local payload
+  payload="$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")"
+  run jq -e . <<< "${payload}"
+  assert_success
+  assert_equal "$(jq -r '.text' <<< "${payload}")" "${message}"
+}

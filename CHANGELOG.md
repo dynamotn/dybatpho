@@ -841,6 +841,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anything else below `0x20`, plus `DEL`, goes out as `\u00XX`. UTF-8 is
   untouched.
 
+- **A notification carrying a control character was refused by the webhook.**
+  `notification` had its own copy of the same five-character escaper, so a
+  Slack, Telegram, Teams, Google Chat or Discord message quoting the output of
+  a failed command built a payload the API rejected — the message simply never
+  arrived. It now uses the `logging` escaper, which is core and always loaded,
+  rather than a second copy that can drift.
+
 - **`dybatpho::string_slugify` threw away every accented letter.** Anything
   outside `a-z0-9` counted as a separator, so `Thế Giới` slugged to `th-gi-i`
   and `Crème brûlée` to `cr-me-br-l-e` — slugs that name nothing, and that

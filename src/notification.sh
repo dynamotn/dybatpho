@@ -61,20 +61,18 @@
 
 #######################################
 # @description Escape a string for safe embedding inside a JSON string value.
-# Escapes: backslash, double-quote, newline, carriage-return, and tab.
+#   The rule is the same one the log events follow, and `logging` is a core
+#   module, so the escaping lives there rather than in a second copy that can
+#   drift. That matters here: a notification often carries the output of a
+#   command that failed, ANSI colour sequences and all, and a control character
+#   left raw makes the payload something the webhook refuses.
 # @arg $1 string Input string
 # @stdout JSON-safe escaped string (without surrounding quotes)
 #######################################
 function __dybatpho_notification_json_escape {
   local input
   dybatpho::expect_args input -- "$@"
-  local output="${input}"
-  output="${output//\\/\\\\}"
-  output="${output//\"/\\\"}"
-  output="${output//$'\n'/\\n}"
-  output="${output//$'\r'/\\r}"
-  output="${output//$'\t'/\\t}"
-  printf '%s' "${output}"
+  __dybatpho_log_json_escape "${input}"
 }
 
 #######################################

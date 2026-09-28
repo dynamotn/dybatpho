@@ -24,7 +24,7 @@ notification platforms through their webhook or bot APIs:
 
 ### 🚀 Highlights
 
-- [`__dybatpho_notification_json_escape`](#__dybatpho_notification_json_escape) — Escape a string for safe embedding inside a JSON string value. Escapes: backslash, double-quote, newline, carriage-return, and tab.
+- [`__dybatpho_notification_json_escape`](#__dybatpho_notification_json_escape) — Escape a string for safe embedding inside a JSON string value. The rule is the same one the log events follow, and `logging` is a core module, so the escaping lives there rather than in a second copy that can drift. That matters here: a notification often carries the output of a command that failed, ANSI colour sequences and all, and a control character left raw makes the payload something the webhook refuses.
 - [`dybatpho::notify_slack`](#dybatphonotify_slack) — Send a message to a Slack channel via Incoming Webhook.
 - [`dybatpho::notify_telegram`](#dybatphonotify_telegram) — Send a message to a Telegram chat via Bot API.
 - [`dybatpho::notify_teams`](#dybatphonotify_teams) — Send a message to a Microsoft Teams channel via Incoming Webhook. Uses the Adaptive Card format required by the current Teams webhook API.
@@ -105,7 +105,11 @@ dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy","status":"
 ### `__dybatpho_notification_json_escape`
 
 Escape a string for safe embedding inside a JSON string value.
-Escapes: backslash, double-quote, newline, carriage-return, and tab.
+  The rule is the same one the log events follow, and `logging` is a core
+  module, so the escaping lives there rather than in a second copy that can
+  drift. That matters here: a notification often carries the output of a
+  command that failed, ANSI colour sequences and all, and a control character
+  left raw makes the payload something the webhook refuses.
 
 **🧾 Arguments**
 

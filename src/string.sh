@@ -147,13 +147,73 @@ function dybatpho::string_trim_suffix {
   fi
 }
 
+# Latin letters carrying a diacritic, and the ASCII they stand in for. Slugs
+# are ASCII by definition, and dropping the letter outright turned `Thế Giới`
+# into `th-gi-i` -- a slug that names nothing. Only lowercase forms are listed,
+# because the slug is lowercased before the table is consulted.
+#
+# The empty targets are the combining marks: text that arrives decomposed is a
+# plain letter followed by one of them, so the mark is removed and the letter
+# it sits on is kept.
+declare -gA __DYBATPHO_STRING_ASCII=()
+
+#######################################
+# @description Fill the transliteration table, once, when the module loads.
+# @set __DYBATPHO_STRING_ASCII
+#######################################
+function __dybatpho_string_build_ascii {
+  local spec target chars index
+  for spec in \
+    "a:àáâãäåāăąạảấầẩẫậắằẳẵặ" \
+    "e:èéêëēĕėęěẹẻẽếềểễệ" \
+    "i:ìíîïĩīĭįıỉị" \
+    "o:òóôõöøōŏőơọỏốồổỗộớờởỡợ" \
+    "u:ùúûüũūŭůűųưụủứừửữự" \
+    "y:ýÿŷỳỷỹỵ" \
+    "d:đďð" \
+    "c:çćĉċč" \
+    "n:ñńņňŋ" \
+    "s:śŝşš" \
+    "z:źżž" \
+    "g:ĝğġģ" \
+    "l:ĺļľŀł" \
+    "r:ŕŗř" \
+    "t:ţťŧþ" \
+    "h:ĥħ" \
+    "j:ĵ" \
+    "k:ķ" \
+    "w:ŵ" \
+    "ae:æ" \
+    "oe:œ" \
+    "ss:ß" \
+    ":̧̨̣̀́̂̃̈̉̌̄̆̇̊̋"; do
+    target="${spec%%:*}"
+    chars="${spec#*:}"
+    for ((index = 0; index < ${#chars}; index++)); do
+      __DYBATPHO_STRING_ASCII["${chars:index:1}"]="${target}"
+    done
+  done
+}
+__dybatpho_string_build_ascii
+unset -f __dybatpho_string_build_ascii
+
 #######################################
 # @description Convert a string into a lowercase ASCII slug.
+#   A letter carrying a diacritic becomes the ASCII letter underneath it, so
+#   `Thế Giới` slugs to `the-gioi` rather than to `th-gi-i`. Anything else
+#   outside `a-z0-9` is a separator, and a run of separators collapses into a
+#   single `-`.
+# @example
+#   dybatpho::string_slugify "Thế Giới"   # the-gioi
+#   dybatpho::string_slugify "Crème brûlée 2024" # creme-brulee-2024
+#
 # @arg $1 string Input string
 # @stdout Slugified string
+# @note The input is walked character by character, so a locale that reports
+#   UTF-8 text as single bytes (`LC_ALL=C`) transliterates nothing
 #######################################
 function dybatpho::string_slugify {
-  local input slug char
+  local input slug char mapped
   dybatpho::expect_args input -- "$@"
   input=$(dybatpho::lower "${input}")
   slug=""
@@ -168,6 +228,15 @@ function dybatpho::string_slugify {
         last_was_separator=false
         ;;
       *)
+        if [[ -v "__DYBATPHO_STRING_ASCII[${char}]" ]]; then
+          mapped="${__DYBATPHO_STRING_ASCII[${char}]}"
+          # A combining mark maps to nothing: it leaves the letter before it
+          # alone rather than standing in for a separator.
+          [[ -z "${mapped}" ]] && continue
+          slug+="${mapped}"
+          last_was_separator=false
+          continue
+        fi
         if [[ "${last_was_separator}" == false && -n "${slug}" ]]; then
           slug+='-'
           last_was_separator=true

@@ -30,7 +30,8 @@ to be written into shell code that will be evaluated later.
 - [`dybatpho::string_replace`](#dybatphostring_replace) — Replace all exact substring matches in a string.
 - [`dybatpho::string_trim_prefix`](#dybatphostring_trim_prefix) — Remove an exact prefix from a string when it matches.
 - [`dybatpho::string_trim_suffix`](#dybatphostring_trim_suffix) — Remove an exact suffix from a string when it matches.
-- [`dybatpho::string_slugify`](#dybatphostring_slugify) — Convert a string into a lowercase ASCII slug.
+- [`__dybatpho_string_build_ascii`](#__dybatpho_string_build_ascii) — Fill the transliteration table, once, when the module loads.
+- [`dybatpho::string_slugify`](#dybatphostring_slugify) — Convert a string into a lowercase ASCII slug. A letter carrying a diacritic becomes the ASCII letter underneath it, so `Thế Giới` slugs to `the-gioi` rather than to `th-gi-i`. Anything else outside `a-z0-9` is a separator, and a run of separators collapses into a single `-`.
 - [`dybatpho::string_is_blank`](#dybatphostring_is_blank) — Return success when a string is empty or contains only whitespace.
 - [`dybatpho::string_trim_chars`](#dybatphostring_trim_chars) — Trim a set of exact characters from both ends of a string.
 - [`dybatpho::string_truncate`](#dybatphostring_truncate) — Truncate a string to a maximum width and append a suffix when needed.
@@ -213,15 +214,42 @@ Remove an exact suffix from a string when it matches.
 
 ---
 
+### `__dybatpho_string_build_ascii`
+
+Fill the transliteration table, once, when the module loads.
+
+**🧩 Variable sets**
+
+- __DYBATPHO_STRING_ASCII
+
+
+---
+
 ### `dybatpho::string_slugify`
 
 Convert a string into a lowercase ASCII slug.
+  A letter carrying a diacritic becomes the ASCII letter underneath it, so
+  `Thế Giới` slugs to `the-gioi` rather than to `th-gi-i`. Anything else
+  outside `a-z0-9` is a separator, and a run of separators collapses into a
+  single `-`.
+
+**🧪 Example**
+
+```bash
+dybatpho::string_slugify "Thế Giới"   # the-gioi
+dybatpho::string_slugify "Crème brûlée 2024" # creme-brulee-2024
+
+```
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Input string |
+
+**📝 Notes**
+
+- The input is walked character by character, so a locale that reports UTF-8 text as single bytes (`LC_ALL=C`) transliterates nothing
 
 **📤 Output on stdout**
 

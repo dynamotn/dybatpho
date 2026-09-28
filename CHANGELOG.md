@@ -749,6 +749,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   standard input, which has no name to quote and is the one spelling the GNU
   tools, `shasum`, `md5` and `openssl` all accept.
 
+- **`dybatpho::string_slugify` threw away every accented letter.** Anything
+  outside `a-z0-9` counted as a separator, so `Thế Giới` slugged to `th-gi-i`
+  and `Crème brûlée` to `cr-me-br-l-e` — slugs that name nothing, and that
+  collide between titles which have nothing in common. A letter carrying a
+  diacritic now becomes the ASCII letter underneath it (`the-gioi`,
+  `creme-brulee`), `ß`, `æ` and `œ` expand to the two letters they stand for,
+  and a combining mark in decomposed text comes off without splitting the word
+  in two.
+
 ### Security
 
 - **Credentials no longer reach `curl` as command-line arguments.** A process's

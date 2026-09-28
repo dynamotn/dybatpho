@@ -326,6 +326,30 @@ EOF
   assert_equal "$(dybatpho::string_to_pascal "  ")" ""
 }
 
+@test "dybatpho::string_slugify transliterates a letter carrying a diacritic" {
+  # Dropping the letter outright made the slug name nothing: `Thế Giới` came
+  # out as `th-gi-i`, and two different titles could collapse onto the same
+  # slug.
+  assert_equal "$(dybatpho::string_slugify "Thế Giới")" "the-gioi"
+  assert_equal "$(dybatpho::string_slugify "Đường Láng Hạ")" "duong-lang-ha"
+  assert_equal "$(dybatpho::string_slugify "ĐẤT NƯỚC")" "dat-nuoc"
+  assert_equal "$(dybatpho::string_slugify "Crème brûlée 2024")" "creme-brulee-2024"
+  assert_equal "$(dybatpho::string_slugify "Žluťoučký kůň")" "zlutoucky-kun"
+  assert_equal "$(dybatpho::string_slugify "Łódź")" "lodz"
+}
+
+@test "dybatpho::string_slugify expands the letters that stand for two" {
+  assert_equal "$(dybatpho::string_slugify "Straße")" "strasse"
+  assert_equal "$(dybatpho::string_slugify "Ærø & Œuvre")" "aero-oeuvre"
+}
+
+@test "dybatpho::string_slugify keeps the letter under a combining mark" {
+  # Decomposed text is a plain letter followed by its mark. The mark is not a
+  # word separator, so it comes off without splitting the word in two.
+  assert_equal "$(dybatpho::string_slugify "$(printf 'cafe\xcc\x81 au lait')")" \
+    "cafe-au-lait"
+}
+
 @test "dybatpho::string_to_kebab differs from slugify on word boundaries" {
   # Slugify is for prose and has no idea where the words are; this reads the
   # boundaries the naming convention implies.

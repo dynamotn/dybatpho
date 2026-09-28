@@ -741,6 +741,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   under `example/` and `scripts/` is run and must be executable, everything
   under `src/` and `init.sh` is sourced and must not be.
 
+- **`dybatpho::file_hash` returned a corrupt digest for some file names.** Given
+  a path holding a newline or a backslash, `sha256sum` and friends quote the
+  name: the whole line is prefixed with `\`, so taking the first field handed
+  back `\<digest>` and every comparison against it — `dybatpho::verify_checksum`
+  included — failed on a file that was perfectly fine. The file now goes in on
+  standard input, which has no name to quote and is the one spelling the GNU
+  tools, `shasum`, `md5` and `openssl` all accept.
+
 ### Security
 
 - **Credentials no longer reach `curl` as command-line arguments.** A process's
@@ -781,6 +789,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   query result — which is not public, and the `ai` module caches provider
   responses there. Entries are now written `0600` inside a `0700` directory,
   the same treatment `dybatpho::secret_write_file` already gave a secret.
+
+- **`dybatpho::create_temp` left a symlink attack open where `mktemp` is
+  missing.** On that fallback path the name was the prefix and the pid — fully
+  predictable — and the file was made with `touch`, which follows a symbolic
+  link someone else planted at that name and writes through to its target. The
+  name now carries 32 random bits, the file is opened under `set -C` so an
+  existing name (a link included) is refused rather than followed, and both the
+  file and the directory form are created under `umask 077`.
 
 ## [4.0.0] - 2026-09-23
 

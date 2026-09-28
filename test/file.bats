@@ -172,6 +172,44 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::create_temp stays safe on the path taken without mktemp" {
+  # Without `mktemp` the name used to be the prefix and the pid, and the file
+  # was created with `touch`. Both halves were wrong: the name is guessable,
+  # and `touch` follows a symbolic link someone else planted at it, so a write
+  # meant for a temporary file landed on the link's target instead.
+  local sandbox="${BATS_TEST_TMPDIR}/no-mktemp"
+  local tools="${sandbox}/bin"
+  mkdir -p "${tools}"
+  local tool source
+  for tool in cat chmod date find grep ln mkdir rm sed stat touch tr wc; do
+    source="$(command -v "${tool}" 2> /dev/null)" || continue
+    ln -s "${source}" "${tools}/${tool}"
+  done
+
+  local victim="${sandbox}/victim"
+  printf 'untouched\n' > "${victim}"
+  ln -s "${victim}" "${sandbox}/dybatpho_probe_${BASHPID}.txt"
+
+  local first second directory
+  local saved_path="${PATH}"
+  PATH="${tools}"
+  hash -r
+  dybatpho::create_temp first ".txt" probe "${sandbox}"
+  dybatpho::create_temp second ".txt" probe "${sandbox}"
+  dybatpho::create_temp directory "" probe "${sandbox}"
+  PATH="${saved_path}"
+  hash -r
+
+  assert_equal "$(cat "${victim}")" "untouched"
+  [[ -f "${first}" && ! -L "${first}" ]]
+  [[ -d "${directory}" ]]
+  # Two calls in the same process must not land on the same name.
+  refute_equal() { [[ "$1" != "$2" ]]; }
+  refute_equal "${first}" "${second}"
+  assert_equal "$(stat -c '%a' "${first}" 2> /dev/null \
+    || stat -f '%Lp' "${first}")" "600"
+}
+
 @test "dybatpho::create_temp create temp file in not existed folder" {
   # shellcheck disable=2329
   _create() {
@@ -432,6 +470,23 @@ EOF
   assert_equal "$(dybatpho::file_hash "${target}" MD5)" "b1946ac92492d2347c6235b4d2611184"
   run ! dybatpho::file_hash "${target}" crc32
   run ! dybatpho::file_hash "${BATS_TEST_TMPDIR}/absent"
+}
+
+@test "dybatpho::file_hash reads a name the checksum tools would quote" {
+  # `sha256sum -- <path>` quotes a name holding a newline or a backslash: the
+  # line comes back as `\\<digest>  <escaped name>`, so taking the first field
+  # yielded a digest with a `\\` glued to its front and every comparison
+  # against it failed. The file goes in on standard input instead.
+  local expected="5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+  local newline_name="${BATS_TEST_TMPDIR}/$(printf 'two\nlines')"
+  printf 'hello\n' > "${newline_name}"
+  assert_equal "$(dybatpho::file_hash "${newline_name}")" "${expected}"
+
+  local backslash_name="${BATS_TEST_TMPDIR}/back\\slash"
+  printf 'hello\n' > "${backslash_name}"
+  assert_equal "$(dybatpho::file_hash "${backslash_name}")" "${expected}"
+  assert_equal "$(dybatpho::file_hash "${backslash_name}" md5)" \
+    "b1946ac92492d2347c6235b4d2611184"
 }
 
 @test "dybatpho::file_size reports the byte count" {

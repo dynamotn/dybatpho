@@ -393,13 +393,35 @@ function dybatpho::create_temp {
     fi
   else
     # kcov(disabled)
-    if dybatpho::is empty "${extension}"; then
-      temp_path="${parent_folder%/}/${filename_format}"
-      mkdir "${temp_path}"
-    else
-      temp_path="${parent_folder%/}/${filename_format}${extension}"
-      touch "${temp_path}"
-    fi
+    # No `mktemp`. The name must still be unpredictable and the creation must
+    # still fail rather than follow something that is already there: a name
+    # made only of a prefix and a pid is guessable, and `touch` on a symbolic
+    # link planted at it writes through to whatever it points at.
+    #
+    # `mkdir` already fails on an existing name. For a file, `set -C` makes
+    # `>` refuse to open one that exists, symbolic link included, which is the
+    # `O_EXCL` this path would otherwise be missing.
+    local -i attempt
+    local suffix previous_umask
+    previous_umask="$(umask)"
+    umask 077
+    for ((attempt = 0; attempt < 10; attempt++)); do
+      printf -v suffix '%04x%04x' "${RANDOM}" "${RANDOM}"
+      if dybatpho::is empty "${extension}"; then
+        temp_path="${parent_folder%/}/${filename_format}_${suffix}"
+        mkdir "${temp_path}" 2> /dev/null && break
+      else
+        temp_path="${parent_folder%/}/${filename_format}_${suffix}${extension}"
+        (
+          set -C
+          : > "${temp_path}"
+        ) 2> /dev/null && break
+      fi
+      temp_path=""
+    done
+    umask "${previous_umask}"
+    [[ -n "${temp_path}" ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Unable to create a temporary path under ${parent_folder}"
     # kcov(enabled)
   fi
   dybatpho::cleanup_file_on_exit "${temp_path}"
@@ -754,20 +776,31 @@ function dybatpho::file_hash {
     *) dybatpho::die "${FUNCNAME[0]}: Unknown algorithm '${algorithm}', expected md5, sha1, sha256 or sha512" ;;
   esac
 
+  # The file goes in on standard input rather than as an argument. Given a
+  # name, the `*sum` tools quote one that holds a newline or a backslash: they
+  # print a `\` before the digest and escape the name, so `${checksum%% *}`
+  # came back as `\<digest>` and every comparison against it failed. Reading
+  # standard input has no name to quote, and it is the one spelling all four
+  # tools agree on.
   if dybatpho::is command "${algorithm}sum"; then
-    checksum="$("${algorithm}sum" -- "${path}")"
+    checksum="$("${algorithm}sum" < "${path}")"
   elif [[ "${algorithm}" == md5 ]] && dybatpho::is command md5; then
-    checksum="$(md5 -q -- "${path}")" # kcov(skip)
+    checksum="$(md5 -q < "${path}")" # kcov(skip)
   elif [[ "${algorithm}" != md5 ]] && dybatpho::is command shasum; then
-    checksum="$(shasum -a "${algorithm#sha}" -- "${path}")"
+    checksum="$(shasum -a "${algorithm#sha}" < "${path}")"
   elif dybatpho::is command openssl; then
-    checksum="$(openssl dgst "-${algorithm}" -- "${path}")"
+    checksum="$(openssl dgst "-${algorithm}" < "${path}")"
     checksum="${checksum##* }"
   else
     dybatpho::die "${FUNCNAME[0]}: No tool available to compute ${algorithm}" # kcov(skip)
   fi
-  # The `*sum` and `shasum` tools print `<checksum>  <path>`.
-  printf '%s\n' "${checksum%% *}"
+  # Reading standard input, the `*sum` and `shasum` tools print
+  # `<checksum>  -`. An unreadable file leaves nothing at all, and an empty
+  # answer must not be mistaken for a digest.
+  checksum="${checksum%% *}"
+  [[ -n "${checksum}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Unable to read ${path}"
+  printf '%s\n' "${checksum}"
 }
 
 #######################################

@@ -737,7 +737,12 @@ function __dybatpho_tui_menu_fallback {
     done
   else
     DYBATPHO_TUI_INDEX="${__dybatpho_tui_fb_chosen[0]}"
+    # shellcheck disable=SC2034 # output for the caller; nothing in this module reads it back
     DYBATPHO_TUI_INDEXES="${DYBATPHO_TUI_INDEX}"
+    # The output variable is an array when several entries are accepted and a
+    # scalar when one is. Both are the documented contract, but a nameref is
+    # one name to ShellCheck, so it reads the branch above as the type.
+    # shellcheck disable=SC2178 # nameref to the caller's variable, a scalar here
     __dybatpho_tui_fb_out="${__dybatpho_tui_fb_items[DYBATPHO_TUI_INDEX - 1]}"
   fi
   return 0
@@ -918,8 +923,13 @@ function __dybatpho_tui_menu_interactive {
       "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_selected[*]-}" >&2
   else
     DYBATPHO_TUI_INDEX=$((__dybatpho_tui_menu_cursor + 1))
+    # shellcheck disable=SC2034 # output for the caller; nothing in this module reads it back
     DYBATPHO_TUI_INDEXES="${DYBATPHO_TUI_INDEX}"
+    # Single-select hands back a scalar, multi-select an array. See the same
+    # note in `__dybatpho_tui_menu_fallback`.
+    # shellcheck disable=SC2178 # nameref to the caller's variable, a scalar here
     __dybatpho_tui_menu_out="${__dybatpho_tui_menu_items[__dybatpho_tui_menu_cursor]}"
+    # shellcheck disable=SC2128 # the same nameref, holding that scalar
     printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt}" \
       "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_out}" >&2
   fi

@@ -98,12 +98,28 @@ function dybatpho::validate_matches {
   local value pattern
   dybatpho::expect_args value pattern -- "$@"
   local status=0
-  # The group redirection hides Bash's own complaint about a broken pattern;
-  # the status it returns is what this function reports on.
-  { [[ "${value}" =~ ${pattern} ]]; } 2> /dev/null || status=$?
+  # The match is behind a function rather than written inline. `[[ =~ ]]`
+  # answers 2 for a pattern that will not compile, and that third answer is the
+  # whole point here -- but `$?` taken straight off a conditional is the one
+  # ShellCheck will not vouch for, since a conditional is not a command. A
+  # function call is, and the redirection still hides Bash's own complaint
+  # about the broken pattern.
+  __dybatpho_validate_match "${value}" "${pattern}" 2> /dev/null || status=$?
   ((status < 2)) || dybatpho::die \
     "${FUNCNAME[0]}: '${pattern}' is not a valid extended regular expression"
   return "${status}"
+}
+
+#######################################
+# @description Match a value against an extended regular expression.
+# @arg $1 string Value to test
+# @arg $2 string Extended regular expression
+# @exitcode 0 The value matches
+# @exitcode 1 The value does not match
+# @exitcode 2 The expression is not a valid ERE
+#######################################
+function __dybatpho_validate_match {
+  [[ "$1" =~ $2 ]]
 }
 
 #######################################
@@ -279,10 +295,14 @@ function dybatpho::validate_describe {
 # @exitcode 0 Always
 #######################################
 function dybatpho::validate_types {
-  local name
-  for name in "${!__DYBATPHO_VALIDATE_PREDICATES[@]}"; do
-    printf '%s\n' "${name}"
-  done | LC_ALL=C sort
+  # The names are collected before the pipeline, not inside it. A loop feeding
+  # `sort` runs in a subshell, and ShellCheck then treats `name` as a variable
+  # modified in a subshell -- for every function in this file, not just this
+  # one, because the check reasons about the name rather than the scope.
+  local -a names=()
+  names=(${__DYBATPHO_VALIDATE_PREDICATES[@]+"${!__DYBATPHO_VALIDATE_PREDICATES[@]}"})
+  ((${#names[@]})) || return 0
+  printf '%s\n' "${names[@]}" | LC_ALL=C sort
 }
 
 #######################################

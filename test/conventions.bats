@@ -107,11 +107,16 @@ fail_with() {
 }
 
 @test "every module is registered in init.sh" {
-  local registry violations="" module
-  registry="$(grep -E '^DYBATPHO_(CORE|OPTIONAL)_MODULES=' "${REPO_ROOT}/init.sh")"
+  # The registry is read as the shell sees it, not grepped out of the source.
+  # Matching the text meant the check answered to how the assignment happens to
+  # be laid out: splitting the list over `+=` continuations so no line runs past
+  # the length limit left the pattern matching only the first line, and every
+  # module after it was reported missing from a registry that in fact held it.
+  local violations="" module
+  local registry=" ${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES} "
   for source in "${REPO_ROOT}"/src/*.sh; do
     module="$(basename "${source}" .sh)"
-    [[ " ${registry} " == *" ${module} "* || " ${registry} " == *"\"${module} "* || " ${registry} " == *" ${module}\""* ]] ||
+    [[ "${registry}" == *" ${module} "* ]] ||
       violations+="${module}: not listed in DYBATPHO_CORE_MODULES or DYBATPHO_OPTIONAL_MODULES"$'\n'
   done
   [ -z "${violations}" ] ||

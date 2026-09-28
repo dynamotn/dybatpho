@@ -119,6 +119,9 @@ function _demo_config {
   # The broken file is loaded in a subshell: the values it carries must not
   # outlive the demonstration, and `config_validate` would end the script.
   (
+    # Emptying the store is what `config_load` reads back; the module owns the
+    # variable, so nothing in this file refers to it again.
+    # shellcheck disable=SC2034 # read by config.sh, not by this example
     DYBATPHO_CONFIG=()
     dybatpho::config_load "${WORKDIR}/broken.env"
     dybatpho::config_validate

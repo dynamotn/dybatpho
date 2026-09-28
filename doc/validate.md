@@ -54,6 +54,7 @@ everywhere a built-in type does, including in a `config` schema and in a
 ### 🚀 Highlights
 
 - [`dybatpho::validate_matches`](#dybatphovalidate_matches) — Match a value against an extended regular expression, without letting a malformed expression reach the caller as a shell diagnostic. Bash answers a broken pattern with exit status 2 and a message of its own, which reads as a validation failure at the call site; here it is turned into the library's own fatal error instead.
+- [`__dybatpho_validate_match`](#__dybatpho_validate_match) — Match a value against an extended regular expression.
 - [`__dybatpho_validate_canonical`](#__dybatpho_validate_canonical) — Resolve a type name, or an alias of one, to its canonical name. This never terminates the script: it is called from inside a command substitution, where `dybatpho::die` would only end the subshell and leave the caller reporting success on an empty value.
 - [`__dybatpho_validate_numeric_type`](#__dybatpho_validate_numeric_type) — Return success when a type's `min:` and `max:` bound the value itself rather than the number of characters in it.
 - [`__dybatpho_validate_number_cmp`](#__dybatpho_validate_number_cmp) — Compare two numbers written as decimal text, without arithmetic the shell would get wrong. `((08 > 1))` is an error, because a leading zero asks for base 8, and `((1.5 > 1))` is an error too, because Bash has no fractional arithmetic at all. Both forms reach here from a configuration file, so both have to compare rather than abort. Two plain integers are compared as integers, which is the case that matters for a port, a timeout, or a count and is the one that must not lose precision. Anything else — a fraction, an exponent — is scaled to a fixed six decimal places first, under `LC_ALL=C` so the radix character is a dot whatever the host's locale says.
@@ -142,6 +143,26 @@ dybatpho::validate_matches "v1.2.3" '^v[0-9]'      # succeeds
 - `0`: The value matches
 - `1`: The value does not match
 - `1`: Stop the script when the expression is not a valid ERE
+
+
+---
+
+### `__dybatpho_validate_match`
+
+Match a value against an extended regular expression.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Value to test |
+| `$2` | string | Extended regular expression |
+
+**🚦 Exit codes**
+
+- `0`: The value matches
+- `1`: The value does not match
+- `2`: The expression is not a valid ERE
 
 
 ---

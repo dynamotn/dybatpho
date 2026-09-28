@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG050,BSG043,BSG011,BSG033,BSG037,BSG053,BSG040
 # @file init.sh
 # @brief Initial script
+# @namespace dybatpho
 # @description This script should be sourced before any of
 # the other scripts in this repo. Other scripts
 # make use of ${DYBATPHO_DIR} to find each other.
@@ -35,6 +37,7 @@ if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3))); 
   # kcov(enabled)
 fi
 
+# dyshellint disable=BSG043
 if [[ -n "${__dybatpho_init_source}" && "${__dybatpho_init_source}" == "${0}" ]]; then
   # kcov(disabled)
   echo "dybatpho can't be executed directly. Please source dybatpho."
@@ -60,7 +63,9 @@ export DYBATPHO_DIR
 # @env DYBATPHO_CORE_MODULES string Modules that call each other and are always loaded
 DYBATPHO_CORE_MODULES="string os logging helpers process file secret"
 # @env DYBATPHO_OPTIONAL_MODULES string Modules that are only loaded when requested
-DYBATPHO_OPTIONAL_MODULES="array math text lock network date json validate config archive git table cli tui screen notification semver testing safety metrics ai agent pkg release parallel doctor i18n forge cache"
+DYBATPHO_OPTIONAL_MODULES="array math text lock network date json validate config archive"
+DYBATPHO_OPTIONAL_MODULES+=" git table cli tui screen notification semver testing safety"
+DYBATPHO_OPTIONAL_MODULES+=" metrics ai agent pkg release parallel doctor i18n forge cache"
 # The loaded set describes the current shell, so it is deliberately neither
 # exported nor seeded from the environment. A child shell that sources `init.sh`
 # again has to source the module files itself: only `dybatpho::` functions cross
@@ -190,6 +195,7 @@ function __dybatpho_export_functions {
 #
 # @env DYBATPHO_VERSION string Version to report, resolved on first call and cached; set it to override the resolution
 # @set DYBATPHO_VERSION
+# @noargs
 # @stdout The version, without a leading `v`, or `unknown` when it cannot be resolved
 # @exitcode 0 Always
 #######################################
@@ -282,7 +288,8 @@ function dybatpho::module_list {
     all) modules="${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES}" ;;
     core) modules="${DYBATPHO_CORE_MODULES}" ;;
     optional) modules="${DYBATPHO_OPTIONAL_MODULES}" ;;
-    *) dybatpho::die "dybatpho::module_list: Unknown selection '${selection}', expected loaded, all, core or optional" ;;
+    *) dybatpho::die \
+      "dybatpho::module_list: Unknown selection '${selection}', expected loaded, all, core or optional" ;;
   esac
   local module
   for module in ${modules}; do

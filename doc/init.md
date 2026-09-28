@@ -149,6 +149,8 @@ dybatpho::version   # 2.0.0+af745ff
 
 ```
 
+_Function has no arguments._
+
 **🌍 Environment variables**
 
 | Variable | Type | Description |

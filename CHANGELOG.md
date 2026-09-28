@@ -826,6 +826,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   responses there. Entries are now written `0600` inside a `0700` directory,
   the same treatment `dybatpho::secret_write_file` already gave a secret.
 
+- **A stale lock could be handed to two processes at once.** Reclaiming one was
+  a check followed by a delete. Two runs that both found the dead holder both
+  decided to reclaim: the first removed the lock and took it, and the second
+  then removed *that* — a live lock — and took it as well. Both believed they
+  held it, which is the one thing a lock exists to prevent, and it happened
+  exactly when a lock is reclaimed, after a crash.
+
+  Reclaiming is a rename now. `rename()` fails when the source is gone, so of
+  two processes racing to move the same lock aside exactly one succeeds and the
+  loser touches nothing. The identity recorded in the lock is re-read from the
+  moved-aside copy and compared with the one that was judged stale; they differ
+  only when the lock changed hands in between, and that lock is put back rather
+  than deleted.
+
 - **`dybatpho::create_temp` left a symlink attack open where `mktemp` is
   missing.** On that fallback path the name was the prefix and the pid — fully
   predictable — and the file was made with `touch`, which follows a symbolic

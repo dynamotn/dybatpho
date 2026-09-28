@@ -213,6 +213,39 @@ teardown() {
   dybatpho::lock_release "reclaim-live"
 }
 
+@test "dybatpho::lock_reclaim_stale doesn't hand the same lock to two processes" {
+  # Both processes read the same dead holder and both decided to reclaim. The
+  # first removed the lock and took it; the second then removed *that* one --
+  # a live lock -- and took it as well, so two processes held the lock at once.
+  #
+  # The second process is made slow on purpose: without a stall the window is
+  # a few microseconds wide and the race shows up once in a very long while,
+  # which is not a test.
+  local lock_path winners
+  lock_path="$(dybatpho::lock_path "reclaim-race")"
+  ln -s "999999:$(dybatpho::lock_hostname):2020-01-01T00:00:00Z" "${lock_path}"
+  winners="${BATS_TEST_TMPDIR}/race-winners"
+  mkdir -p "${winners}"
+
+  (
+    # `lock_hostname` is read while the lock is being judged, so stalling it
+    # holds the second process inside exactly the window that was unsafe.
+    eval "$(declare -f dybatpho::lock_hostname | sed '2a\  sleep 0.5')"
+    dybatpho::lock_acquire "reclaim-race" > /dev/null 2>&1 \
+      && : > "${winners}/slow"
+  ) &
+  local slow_pid=$!
+  sleep 0.1
+  dybatpho::lock_acquire "reclaim-race" > /dev/null 2>&1 && : > "${winners}/fast"
+  wait "${slow_pid}" || true
+
+  local -a held=("${winners}"/*)
+  assert_equal "${#held[@]}" "1"
+  assert_equal "$(basename "${held[0]}")" "fast"
+
+  dybatpho::lock_release "reclaim-race"
+}
+
 @test "a lock is claimed atomically, with its owner already in it" {
   local lock_path
   lock_path="$(dybatpho::lock_path "atomic-claim")"

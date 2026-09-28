@@ -202,18 +202,73 @@ function dybatpho::lock_info {
 }
 
 #######################################
-# @description Remove a lock directory left behind by a process that is no longer running.
+# @description Remove a lock left behind by a process that is no longer running.
+#   Deleting it in place was a way for two processes to end up holding the same
+#   lock. Both read the dead holder, both decided to reclaim, the first one
+#   removed it and took the lock, and the second one then removed *that* — a
+#   live lock — and took it as well.
+#
+#   Reclaiming is therefore a rename rather than a delete. `rename()` fails when
+#   the source is gone, so of two processes racing to reclaim the same lock
+#   exactly one moves it aside and the loser touches nothing. The identity
+#   recorded in the lock is re-read from the moved-aside copy and compared with
+#   the one that was judged stale: they differ only when the lock was replaced
+#   between the judgement and the move, and the fresh lock is put back rather
+#   than deleted.
 # @arg $1 string Lock directory path
 # @stderr Notice when a stale lock is reclaimed
 #######################################
 function dybatpho::lock_reclaim_stale {
   local lock_path
   dybatpho::expect_args lock_path -- "$@"
-  if __dybatpho_lock_exists "${lock_path}" && ! dybatpho::lock_is_alive "${lock_path}"; then
-    dybatpho::warn "Reclaiming stale lock ${lock_path} (pid $(dybatpho::lock_field "${lock_path}" pid) is no longer running)"
-    # `rm` on a symbolic link removes the link, never what it points at.
-    rm -rf -- "${lock_path}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" > /dev/null 2>&1 || true
+  __dybatpho_lock_exists "${lock_path}" || return 0
+
+  local holder pid
+  holder="$(__dybatpho_lock_identity "${lock_path}")"
+  dybatpho::lock_is_alive "${lock_path}" && return 0
+  pid="$(dybatpho::lock_field "${lock_path}" pid)"
+
+  # A name no other process can be moving a lock to: two reclaimers of the same
+  # lock must not collide on the destination, or the rename would succeed for
+  # both and the check below would lose its meaning.
+  local aside="${lock_path}.stale.$$.${RANDOM}"
+  mv -- "${lock_path}" "${aside}" 2> /dev/null || return 0
+
+  local moved
+  moved="$(__dybatpho_lock_identity "${aside}")"
+  if [[ -n "${holder}" && "${moved}" != "${holder}" ]]; then
+    # Someone reclaimed and re-took the lock while this call was deciding, so
+    # what was moved aside is a live lock. Put it back if the name is still
+    # free; `ln -s` refuses to replace an existing name, so a third holder is
+    # never overwritten.
+    if ln -s "${moved}" "${lock_path}" 2> /dev/null; then
+      rm -f -- "${aside}" > /dev/null 2>&1 || true
+    else
+      dybatpho::warn "Lock ${lock_path} changed hands while it was being reclaimed; the copy moved aside is at ${aside}"
+    fi
+    return 0
   fi
+
+  dybatpho::warn "Reclaiming stale lock ${lock_path} (pid ${pid} is no longer running)"
+  # `rm` on a symbolic link removes the link, never what it points at.
+  rm -rf -- "${aside}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" > /dev/null 2>&1 || true
+}
+
+#######################################
+# @description Print what identifies the holder of a lock, for comparing one
+#   observation of a lock with a later one. It is the link target for the
+#   atomic form, and the recorded pid for the directory form older copies of
+#   the library wrote.
+# @arg $1 string Lock path
+# @stdout The identity, or nothing when the lock is gone
+#######################################
+function __dybatpho_lock_identity {
+  local lock_path="${1-}"
+  if [[ -L "${lock_path}" ]]; then
+    readlink "${lock_path}" 2> /dev/null || true
+    return 0
+  fi
+  dybatpho::lock_field "${lock_path}" pid
 }
 
 #######################################

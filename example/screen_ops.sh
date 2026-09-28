@@ -19,6 +19,9 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# Every widget takes the *name* of an array and binds a nameref to it, so the
+# arrays below are read even though nothing in this function expands them.
+# shellcheck disable=SC2034
 function _main {
   # Size the buffer from these rather than from a terminal, which is what makes
   # the output below identical wherever it runs.

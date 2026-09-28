@@ -75,6 +75,11 @@ export DYBATPHO_SCREEN_STYLE_BORDER
 DYBATPHO_SCREEN_STYLE_TITLE="${DYBATPHO_SCREEN_STYLE_TITLE:-1}"
 export DYBATPHO_SCREEN_STYLE_TITLE
 
+# The state below is written for the application to read: the rectangle a block
+# left inside itself, the offset a list scrolled to, where a mouse event landed.
+# Nothing in this module reads them back, so they are exported rather than
+# merely assigned -- which is also what stops a static check reading a variable
+# only ever written as one that is never used.
 # @env DYBATPHO_SCREEN_WIDTH number Columns of the terminal the buffer is sized for
 DYBATPHO_SCREEN_WIDTH=0
 # @env DYBATPHO_SCREEN_HEIGHT number Rows of the terminal the buffer is sized for
@@ -91,6 +96,9 @@ DYBATPHO_SCREEN_MOUSE_ROW=0
 DYBATPHO_SCREEN_INNER="0 0 0 0"
 # @env DYBATPHO_SCREEN_OFFSET number Index of the first item the last list or table drew, after it scrolled to keep the selection visible
 DYBATPHO_SCREEN_OFFSET=0
+export DYBATPHO_SCREEN_WIDTH DYBATPHO_SCREEN_HEIGHT DYBATPHO_SCREEN_RECT
+export DYBATPHO_SCREEN_ACTIVE DYBATPHO_SCREEN_INNER DYBATPHO_SCREEN_OFFSET
+export DYBATPHO_SCREEN_MOUSE_COLUMN DYBATPHO_SCREEN_MOUSE_ROW
 
 # Plain text of each row, padded to exactly `DYBATPHO_SCREEN_WIDTH` columns.
 declare -ga __dybatpho_screen_text=()
@@ -782,7 +790,7 @@ function dybatpho::screen_flush {
   done
   [[ -n "${out}" ]] || return 0
   if [[ -n "${__dybatpho_screen_fd}" ]]; then
-    printf '%s' "${out}" >&"${__dybatpho_screen_fd}"
+    printf '%s' "${out}" 1>&"${__dybatpho_screen_fd}"
   else
     printf '%s' "${out}" >&2
   fi
@@ -1070,9 +1078,9 @@ function dybatpho::screen_begin {
   fi
 
   # Alternate screen, cursor hidden, and the cursor parked at the origin.
-  printf '\033[?1049h\033[?25l\033[H' >&"${__dybatpho_screen_fd}"
+  printf '\033[?1049h\033[?25l\033[H' 1>&"${__dybatpho_screen_fd}"
   if dybatpho::is true "${DYBATPHO_SCREEN_MOUSE}"; then
-    printf '\033[?1000h\033[?1006h' >&"${__dybatpho_screen_fd}"
+    printf '\033[?1000h\033[?1006h' 1>&"${__dybatpho_screen_fd}"
   fi
 
   DYBATPHO_SCREEN_ACTIVE=true
@@ -1095,7 +1103,7 @@ function dybatpho::screen_end {
   # kcov(disabled)
   DYBATPHO_SCREEN_ACTIVE=false
   if [[ -n "${__dybatpho_screen_fd}" ]]; then
-    printf '\033[?1006l\033[?1000l\033[?25h\033[?1049l' >&"${__dybatpho_screen_fd}" 2> /dev/null || true
+    printf '\033[?1006l\033[?1000l\033[?25h\033[?1049l' 1>&"${__dybatpho_screen_fd}" 2> /dev/null || true
     [[ -n "${__dybatpho_screen_saved_stty}" ]] \
       && stty "${__dybatpho_screen_saved_stty}" <&"${__dybatpho_screen_fd}" 2> /dev/null
     exec {__dybatpho_screen_fd}>&- 2> /dev/null || true
@@ -1148,6 +1156,9 @@ function dybatpho::screen_event {
 
   # kcov(disabled)
   local __dybatpho_screen_e_char __dybatpho_screen_e_rest="" __dybatpho_screen_e_status=0
+  # The flags are in an array because the timeout is optional; `-r` is always
+  # among them, which a static check cannot see through the expansion.
+  # shellcheck disable=SC2162
   if [[ -n "${__dybatpho_screen_fd}" ]]; then
     IFS= read "${__dybatpho_screen_e_read[@]}" __dybatpho_screen_e_char \
       <&"${__dybatpho_screen_fd}" || __dybatpho_screen_e_status=$?
@@ -1645,7 +1656,6 @@ function dybatpho::screen_table {
   local selected_style="${options[selected_style]:-${DYBATPHO_SCREEN_STYLE_SELECTED}}"
 
   local body_y="${y}" body_height="${height}"
-  local -a columns=()
   if [[ -n "${header}" ]]; then
     body_y=$((y + 1))
     body_height=$((height - 1))
@@ -2016,6 +2026,10 @@ function __dybatpho_screen_braille_table {
     format+="${piece}"
   done
   local all
+  # The format string is the point: it is 256 `\Uxxxxxxxx` escapes built above,
+  # and one `printf` expands all of them at once instead of calling out per
+  # character.
+  # shellcheck disable=SC2059
   printf -v all "${format}"
   __dybatpho_screen_chars_into __dybatpho_screen_braille "${all}"
   return 0

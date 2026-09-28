@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Requires `stty`, now declared for the module in `dybatpho::doctor`.
 
+  `example/screen_top.sh` is a working process viewer built on it — a sortable,
+  filterable, scrollable table of every process, with CPU and memory gauges,
+  history sparklines, a detail panel and a confirmation dialog before a signal
+  is sent. Run it with `bash example/screen_top.sh`; with no terminal it
+  renders one frame and exits, which is what `--once` forces.
+
 - **`validate` — one validator for the whole library.** Every module that took
   a value from outside wrote its own check: `config` matched an integer with
   one regular expression and a URL with another, `cli` matched a shell variable

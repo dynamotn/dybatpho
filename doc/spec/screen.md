@@ -304,6 +304,11 @@ dybatpho::screen_end
 - `example/screen_ops.sh` runs unattended, offline, and leaves the working tree
   untouched; it composes a frame and prints it rather than taking over the
   terminal, because an example cannot wait for a keystroke.
+- `example/screen_top.sh` is a working process viewer built on the module:
+  sorting, filtering, scrolling, a detail panel, and a signal dialog. It runs
+  interactively when it has a terminal and renders a single frame when it does
+  not, which is how it is both a real application and an example the suite can
+  run.
 - The module is registered in `init.sh`, and `stty` is declared in
   `src/doctor.sh`.
 - The drawn path is exercised against a real pseudo-terminal before the work is

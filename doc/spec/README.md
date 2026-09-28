@@ -34,6 +34,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `file.md`
 - `cli.md`
 - `os.md`
+- `validate.md`
 - `config.md`
 - `lock.md`
 - `cache.md`
@@ -71,6 +72,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/file.sh` -> `file.md`
 - `src/cli.sh` -> `cli.md`
 - `src/os.sh` -> `os.md`
+- `src/validate.sh` -> `validate.md`
 - `src/config.sh` -> `config.md`
 - `src/lock.sh` -> `lock.md`
 - `src/cache.sh` -> `cache.md`

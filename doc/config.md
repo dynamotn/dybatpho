@@ -30,7 +30,11 @@ rewritten through `jq` and `yq` so the rest of the document survives.
 Keys can also be given a typed schema with `dybatpho::config_schema`.
 `dybatpho::config_validate` then applies declared defaults, enforces
 required keys, types, ranges, and enum choices, and reports every
-violation together with the key that caused it. The same schema renders a
+violation together with the key that caused it. The types come from the
+`validate` module rather than from a list kept here, so a schema may
+declare `email`, `port`, `ipv4`, `semver`, `dir` or any type registered
+with `dybatpho::validate_register`, and the message a rejected value
+produces is worded the same way everywhere in the library. The same schema renders a
 configuration reference through `dybatpho::config_doc`, and tells
 `dybatpho::config_save` which values to write as numbers or booleans
 rather than as strings.
@@ -51,14 +55,14 @@ rather than as strings.
 - [`__dybatpho_config_save_dotenv`](#__dybatpho_config_save_dotenv) — Rewrite the named keys into a dotenv file. Every line that assigns one of the keys is replaced in place, so comments, blank lines, unrelated assignments, and the order of the file all survive. Keys the file does not mention are appended in the order they were given.
 - [`__dybatpho_config_save_structured`](#__dybatpho_config_save_structured) — Rewrite the named keys into a JSON, YAML, or TOML file. Each key is assigned on its own rather than merged from a second document, which is what keeps the file's own comments, indentation, and block style: a node imported from JSON carries its flow style with it and reflows everything around it. Values reach `jq` and `yq` through the environment, never through the command line, so a configured secret does not become world-readable in `/proc`. Only the declared schema makes a value a number or a boolean; without one it is written as a string.
 - [`dybatpho::config_save`](#dybatphoconfig_save) — Write configuration values back to a file, in the format that file already uses. The extension selects the format, the file is created when it does not exist, and the rewrite is atomic, so a reader sees either the previous file or the complete new one. A dotenv file keeps its comments, blank lines, and assignment order; JSON, YAML, and TOML are rewritten with `jq` and `yq`, which leaves the keys this call does not name untouched. A value is written as a number or a boolean only when `dybatpho::config_schema` declared it as `int` or `bool`; otherwise it is written as a string.
-- [`__dybatpho_config_schema_type`](#__dybatpho_config_schema_type) — Normalize a schema type name to its canonical form.
+- [`__dybatpho_config_schema_type`](#__dybatpho_config_schema_type) — Normalize a schema type name to its canonical form. Every type the `validate` module knows is a configuration type, so a schema can declare `email`, `port`, `semver`, `dir` or anything else registered there without `config` carrying a second copy of the check. `enum` is the one name `config` owns: it is not a type but a `choices` rule, which the validator receives as such.
 - [`__dybatpho_config_schema_clear`](#__dybatpho_config_schema_clear) — Drop every attribute previously declared for a key.
 - [`__dybatpho_config_schema_attr`](#__dybatpho_config_schema_attr) — Print a schema attribute, or a fallback when it is not declared.
 - [`__dybatpho_config_schema_constraints`](#__dybatpho_config_schema_constraints) — Describe the range and choice constraints declared for a key.
 - [`dybatpho::config_schema`](#dybatphoconfig_schema) — Declare validation rules for a configuration key.
 - [`dybatpho::config_schema_reset`](#dybatphoconfig_schema_reset) — Forget every declared configuration schema.
 - [`__dybatpho_config_schema_error`](#__dybatpho_config_schema_error) — Record a validation failure for a configuration key.
-- [`__dybatpho_config_schema_check`](#__dybatpho_config_schema_check) — Validate a single value against the type declared for its key.
+- [`__dybatpho_config_schema_check`](#__dybatpho_config_schema_check) — Validate a single value against the type declared for its key. The checking itself belongs to the `validate` module: this turns the declared attributes into its rules and gives each reason it reports the key that caused it.
 - [`dybatpho::config_validate`](#dybatphoconfig_validate) — Validate configured values against all declared schemas. Missing optional keys take their declared default, and every violation is reported with the key that caused it.
 - [`__dybatpho_config_doc_cell`](#__dybatpho_config_doc_cell) — Render one Markdown table cell, escaping pipes and marking empties.
 - [`__dybatpho_config_doc_json_value`](#__dybatpho_config_doc_json_value) — Render one JSON value, emitting `null` for an undeclared attribute.
@@ -414,6 +418,11 @@ dybatpho::config_save "${HOME}/.config/app.env"
 ### `__dybatpho_config_schema_type`
 
 Normalize a schema type name to its canonical form.
+  Every type the `validate` module knows is a configuration type, so a schema
+  can declare `email`, `port`, `semver`, `dir` or anything else registered
+  there without `config` carrying a second copy of the check. `enum` is the
+  one name `config` owns: it is not a type but a `choices` rule, which the
+  validator receives as such.
 
 **🧾 Arguments**
 
@@ -423,11 +432,15 @@ Normalize a schema type name to its canonical form.
 
 **📤 Output on stdout**
 
-- Canonical type: string, int, bool, url, or enum
+- Canonical type name, or `enum`
 
 **🚦 Exit codes**
 
 - `1`: The type is not supported
+
+**🔗 See also**
+
+- [- `dybatpho::validate_types](#dybatphovalidate_types)
 
 
 ---
@@ -490,7 +503,7 @@ Declare validation rules for a configuration key.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Configuration key |
-| `$2` | string | Type: `string`, `int` (`integer`), `bool` (`boolean`), `url`, or `enum` |
+| `$2` | string | Type: any name `dybatpho::validate_types` prints — `string`, `int`, `bool`, `url`, `email`, `port`, `semver`, `dir`, a type of your own — or `enum` |
 | `$@` | string | Rules: `required:true`, `default:value`, `min:number`, `max:number`, `choices:a,b`, `description:text` |
 
 **🧩 Variable sets**
@@ -540,6 +553,9 @@ Record a validation failure for a configuration key.
 ### `__dybatpho_config_schema_check`
 
 Validate a single value against the type declared for its key.
+  The checking itself belongs to the `validate` module: this turns the
+  declared attributes into its rules and gives each reason it reports the key
+  that caused it.
 
 **🧾 Arguments**
 

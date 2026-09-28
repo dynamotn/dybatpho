@@ -153,6 +153,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `doc/table.md`, `doc/spec/table.md` |
 | `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `doc/text.md`, `doc/spec/text.md` |
 | `testing.sh` | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `doc/testing.md`, `doc/spec/testing.md` |
+| `validate.sh` | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `doc/validate.md`, `doc/spec/validate.md` |
 
 ### Module registry
 
@@ -290,6 +291,13 @@ affect editor navigation.
 
 - **Data primitives** (`array`, `string`, `text`, `table`): keep functions
   predictable and free of unexpected file writes or logging.
+- **Validation primitive** (`validate`): the library's checks live here and
+  nowhere else, so a module that needs one calls it rather than writing a
+  regular expression of its own. It may depend on the core modules only —
+  `config` and `cli` load it unconditionally, and a heavier edge would reach
+  every script that parses an option. A rule it shares with a richer parser
+  elsewhere, such as `network`'s addresses or `semver`'s versions, is pinned
+  against that parser by a test rather than trusted to stay in step.
 - **System primitives** (`date`, `file`, `os`, `process`, `helpers`): prioritize
   GNU/BSD/BusyBox portability and return clear errors for invalid input. CI
   checks this rather than trusting it: the `portable` job runs the suite on

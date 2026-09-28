@@ -115,15 +115,27 @@ loaded_line() {
   assert_output "string os logging helpers process file secret json network cache ai "
 
   run -0 init_sh "--modules agent" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret config cli archive safety json agent "
+  assert_output "string os logging helpers process file secret validate config cli archive safety json agent "
 }
 
 @test "a dependency cycle loads every module once and terminates" {
   run -0 init_sh "--modules safety" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret archive config cli safety "
+  assert_output "string os logging helpers process file secret archive validate config cli safety "
 
   run -0 init_sh "--modules archive" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret config cli safety archive "
+  assert_output "string os logging helpers process file secret validate config cli safety archive "
+}
+
+@test "the shared validator is loaded ahead of the modules that check with it" {
+  # `config` and `cli` no longer carry their own type checks, so a script that
+  # asks for either of them has to end up with `validate` defined. The edge is
+  # pinned here because a missing one does not fail at load time: it fails
+  # later, on the first value anybody validates.
+  run -0 init_sh "--modules config" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret validate config "
+
+  run -0 init_sh "--modules cli" 'dybatpho::validate_is port 8080 && echo reachable'
+  assert_output "reachable"
 }
 
 @test "a dependency pulled in on demand stays usable" {

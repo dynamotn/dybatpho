@@ -9,6 +9,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`validate` — one validator for the whole library.** Every module that took
+  a value from outside wrote its own check: `config` matched an integer with
+  one regular expression and a URL with another, `cli` matched a shell variable
+  name with a third, and a script that wanted an email address, a port or an
+  existing directory wrote a fourth. The expressions drifted, the messages
+  drifted with them, and the set of checks stopped at whatever those two
+  modules happened to need.
+
+  ```sh
+  . dybatpho/init.sh --modules validate
+
+  dybatpho::validate_is email "${contact}" || dybatpho::die "Not an address"
+  dybatpho::validate_or_die "--release" "${version}" type:semver
+
+  if ! dybatpho::validate_value "${port}" type:int min:1 max:65535; then
+    dybatpho::error "$(dybatpho::validate_errors)"   # every violation, not the first
+  fi
+
+  function _is_service { [[ "$1" =~ ^[a-z]+-(api|worker)$ ]]; }
+  dybatpho::validate_register service _is_service "a service name"
+  ```
+
+  `dybatpho::validate_is` answers for a named type; `dybatpho::validate_types`
+  lists them. The built-ins cover `string`, `nonempty`, `int`, `uint`,
+  `number`, `bool`, `port`, `email`, `url`, `hostname`, `ipv4`, `ipv6`, `ip`,
+  `cidr`, `mac`, `semver`, `uuid`, `hex`, `alpha`, `alnum`, `slug`,
+  `identifier`, `date`, `time`, `duration`, and the path types `path`, `file`,
+  `dir`, `symlink`, `readable`, `writable`, `executable`, `abspath` and
+  `parent_dir`. `dybatpho::validate_value` applies `type:`, `pattern:`,
+  `choices:`, `min:`, `max:`, `minlen:` and `maxlen:` together and records
+  every violation, which `dybatpho::validate_errors` prints and
+  `dybatpho::validate_or_die` turns into a fatal `Invalid <label>: <reason>`.
+  `dybatpho::validate_matches` applies a regular expression and turns a
+  malformed one into the library's own error rather than a silent non-match.
+  `dybatpho::validate_register` adds a type of your own, with `numeric` to make
+  its bounds count the value rather than the characters, and
+  `dybatpho::validate_reset` puts the registry back.
+
+  The awkward cases are handled rather than avoided: a number with leading
+  zeros, a fraction or an exponent compares correctly although shell arithmetic
+  reads none of them, a date is checked against the length of its month, an
+  IPv4 octet with a leading zero is refused because `inet_aton` reads it as
+  octal, and `abspath` answers about a file that does not exist yet. `ipv4`,
+  `ipv6` and `semver` are pinned by tests against `dybatpho::is_ipv4`,
+  `dybatpho::is_ipv6` and `dybatpho::semver_valid` so the two cannot drift.
+
+- **`config` — a schema key can declare any validated type.** `string`, `int`,
+  `bool`, `url` and `enum` were the whole vocabulary. A key may now declare
+  anything `dybatpho::validate_types` prints, including a type registered by
+  the script, and a rejected value is described the same way it would be
+  anywhere else in the library.
+
+  ```sh
+  dybatpho::config_schema ADMIN_EMAIL email required:true
+  dybatpho::config_schema LISTEN_PORT port default:8080 min:1024 max:65535
+  dybatpho::config_schema WORKDIR dir required:true
+  # Invalid configuration `ADMIN_EMAIL`: expected an email address, got `ops@`
+  ```
+
+  `min:` and `max:` bound the value for every numeric type rather than only for
+  `int`, and the character count for everything else, as before.
+
+- **`cli` — `type:<name>` constrains an option to a validated type.** Checking
+  a value meant either a `pattern:` glob or a `validate:` function of your own.
+
+  ```sh
+  dybatpho::opts::param "Port" PORT --port type:port
+  dybatpho::opts::param "Contact" EMAIL --contact type:email
+  # --port 65536  ->  Expected a port number: 65536
+  ```
+
+  A spec naming a type nobody registered fails while the parser is generated
+  rather than when a user first types a value. The declared type is annotated
+  in `--help` and the man page as `[type: ...]` and carried into the generated
+  JSON schema as `valueType`.
+
 - **`process` — a general time limit, named background jobs, and PID files.**
   The library could bound a curl request and nothing else, so every script that
   needed a command not to hang reached for the `timeout` binary — which a stock

@@ -197,6 +197,7 @@ scripts/release.sh --version 3.0.0 --sign
 
 | Module                          | What you get                                                     |
 | ------------------------------- | ----------------------------------------------------------------- |
+| [validate.sh](doc/validate.md)  | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
 | [config.sh](doc/config.md)      | Config files + env vars with precedence and schema validation      |
 | [secret.sh](doc/secret.md)      | Read secrets safely, mask them in output, shred and wipe them      |
 | [safety.sh](doc/safety.md)      | Confirm-or-refuse guards for rm, overwrite, extract, system changes |

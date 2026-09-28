@@ -44,6 +44,7 @@ Utilities for building CLI parsers from shell specs.
 - [`__dybatpho_cli_collect_long_switches`](#__dybatpho_cli_collect_long_switches) — Collect every long switch a spec accepts, for abbreviation matching. The metadata walk is reused because it already expands `--{no-}x`, aliases, and negatable forms.
 - [`__dybatpho_cli_expand_abbr`](#__dybatpho_cli_expand_abbr) — Resolve an abbreviated long option against the switches a command accepts, the way `--vers` stands for `--version`. An exact match wins outright, so a switch that is also the prefix of a longer one stays reachable.
 - [`__dybatpho_cli_require_case_pattern`](#__dybatpho_cli_require_case_pattern) — Validate a `case` glob supplied by `pattern:<glob>`. Unlike every other spec value, a pattern cannot be quoted on its way into the generated script — quoting it would make `case` compare it literally and defeat the point. This restricts it to characters that cannot end the `case` branch or start a substitution, so a spec still cannot inject code into the parser it generates.
+- [`__dybatpho_cli_canonical_type`](#__dybatpho_cli_canonical_type) — Resolve the name given by `type:<name>` to the canonical type the generated parser will call. Kept separate from `__dybatpho_validate_canonical` only so the `cli` module has one place to name the validator it depends on.
 - [`__dybatpho_cli_assign_quoted`](#__dybatpho_cli_assign_quoted) — Assign the quoted string to a variable
 - [`__dybatpho_cli_prepend_export`](#__dybatpho_cli_prepend_export) — Prepend export of before string of command, based on `export:<bool>` switch
 - [`__dybatpho_cli_define_var`](#__dybatpho_cli_define_var) — Define variable from spec from `dybatpho::opts::flag`, `dybatpho::opts::param`
@@ -186,6 +187,7 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | `choices:<a,b>` | `param` | Restrict values to a comma-separated list of choices |
 | `multiple:<bool>` | `param` | Append repeated or multi-selected values instead of replacing the value; interactive selection accepts comma-separated values and ranges such as `1-3` |
 | `pattern:<glob>` | `flag`, `param` | Restrict values to a `case` glob such as `fast|slow` |
+| `type:<name>` | `flag`, `param` | Restrict values to a `validate` type such as `email`, `port`, or `file` |
 | `validate:<code>` | `flag`, `param` | Validation logic using `\$OPTARG` |
 | `deprecated:<text>` | `flag`, `param`, `disp`, `cmd` | Warn when the item is used and annotate it in help |
 | `error:<code>` | `flag`, `param`, `setup` | Custom error handler |
@@ -313,7 +315,7 @@ It automatically handles:
 - the `-h, --help` row every command gets for free
 - current subcommand path
 - automatic `(required)` suffix for `required:true` params
-- `[env: ...]`, `[config: ...]`, `[choices: ...]`, `[pattern: ...]`, `[default: ...]`,
+- `[env: ...]`, `[config: ...]`, `[choices: ...]`, `[pattern: ...]`, `[type: ...]`, `[default: ...]`,
   `[repeatable]`, and `[repeat to increase]` annotations, each on its own
   line under the description
 
@@ -536,6 +538,15 @@ reported as an unrecognized option, suggestion included.
 #### Restricting values to a pattern
 
 
+`type:` names a check the `validate` module already owns — `email`,
+`port`, `ipv4`, `semver`, `file`, or anything registered with
+`dybatpho::validate_register` — so the common cases need neither a glob nor
+a validator function, and a rejected value is described the same way it
+would be in a configuration file. A spec naming a type that does not exist
+fails when the parser is generated rather than when a user first types a
+value.
+
+
 `pattern:` takes a `case` glob, which covers the common checks without a
 helper function. `choices:` is still the better fit for a fixed list, since
 it also feeds completion and the `[choices: ...]` help annotation.
@@ -544,6 +555,8 @@ it also feeds completion and the `[choices: ...]` help annotation.
 ```bash
 dybatpho::opts::param "Mode" MODE --mode pattern:'fast|slow'
 dybatpho::opts::param "Port" PORT --port pattern:'[0-9]*'
+dybatpho::opts::param "Port" PORT --port type:port
+dybatpho::opts::param "Contact" EMAIL --email type:email
 ```
 
 
@@ -1118,6 +1131,30 @@ Validate a `case` glob supplied by `pattern:<glob>`. Unlike every
 **🚦 Exit codes**
 
 - `0`: The pattern is safe to interpolate
+
+
+---
+
+### `__dybatpho_cli_canonical_type`
+
+Resolve the name given by `type:<name>` to the canonical type
+             the generated parser will call. Kept separate from
+             `__dybatpho_validate_canonical` only so the `cli` module has one
+             place to name the validator it depends on.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Declared type name or alias |
+
+**📤 Output on stdout**
+
+- Canonical type name
+
+**🚦 Exit codes**
+
+- `1`: The type is not registered
 
 
 ---

@@ -20,7 +20,11 @@
 #   Keys can also be given a typed schema with `dybatpho::config_schema`.
 #   `dybatpho::config_validate` then applies declared defaults, enforces
 #   required keys, types, ranges, and enum choices, and reports every
-#   violation together with the key that caused it. The same schema renders a
+#   violation together with the key that caused it. The types come from the
+#   `validate` module rather than from a list kept here, so a schema may
+#   declare `email`, `port`, `ipv4`, `semver`, `dir` or any type registered
+#   with `dybatpho::validate_register`, and the message a rejected value
+#   produces is worded the same way everywhere in the library. The same schema renders a
 #   configuration reference through `dybatpho::config_doc`, and tells
 #   `dybatpho::config_save` which values to write as numbers or booleans
 #   rather than as strings.
@@ -369,7 +373,7 @@ function __dybatpho_config_save_structured {
     value="${DYBATPHO_CONFIG[${key}]}"
     type="$(__dybatpho_config_schema_attr "${key}" type string)"
     literal=""
-    if [[ "${type}" == int && "${value}" =~ ^-?[0-9]+$ ]]; then
+    if __dybatpho_validate_numeric_type "${type}" && [[ "${value}" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
       literal="${value}"
     elif [[ "${type}" == bool ]]; then
       # `dybatpho::is true` follows the shell's exit-code convention, where `0`
@@ -493,20 +497,24 @@ function dybatpho::config_save {
 
 #######################################
 # @description Normalize a schema type name to its canonical form.
+#   Every type the `validate` module knows is a configuration type, so a schema
+#   can declare `email`, `port`, `semver`, `dir` or anything else registered
+#   there without `config` carrying a second copy of the check. `enum` is the
+#   one name `config` owns: it is not a type but a `choices` rule, which the
+#   validator receives as such.
 # @arg $1 string Declared type
-# @stdout Canonical type: string, int, bool, url, or enum
+# @stdout Canonical type name, or `enum`
 # @exitcode 1 The type is not supported
+# @see
+#   - `dybatpho::validate_types`
 #######################################
 function __dybatpho_config_schema_type {
   local input="${1,,}"
-  case "${input}" in
-    string) printf 'string' ;;
-    int | integer) printf 'int' ;;
-    bool | boolean) printf 'bool' ;;
-    url) printf 'url' ;;
-    enum) printf 'enum' ;;
-    *) return 1 ;;
-  esac
+  [[ "${input}" == enum ]] && {
+    printf 'enum'
+    return 0
+  }
+  __dybatpho_validate_canonical "${input}"
 }
 
 #######################################
@@ -553,7 +561,7 @@ function __dybatpho_config_schema_constraints {
     printf 'one of: %s' "${choices//,/, }"
     return 0
   fi
-  if [[ "${type}" == int ]]; then
+  if __dybatpho_validate_numeric_type "${type}"; then
     unit=""
   else
     unit=" characters"
@@ -571,7 +579,7 @@ function __dybatpho_config_schema_constraints {
 #######################################
 # @description Declare validation rules for a configuration key.
 # @arg $1 string Configuration key
-# @arg $2 string Type: `string`, `int` (`integer`), `bool` (`boolean`), `url`, or `enum`
+# @arg $2 string Type: any name `dybatpho::validate_types` prints — `string`, `int`, `bool`, `url`, `email`, `port`, `semver`, `dir`, a type of your own — or `enum`
 # @arg $@ string Rules: `required:true`, `default:value`, `min:number`, `max:number`, `choices:a,b`, `description:text`
 # @set DYBATPHO_CONFIG_SCHEMA Declared attributes, keyed by `<key>.<attribute>`
 # @set DYBATPHO_CONFIG_SCHEMA_KEYS Declaration order used by validation and documentation
@@ -648,69 +656,34 @@ function __dybatpho_config_schema_error {
 
 #######################################
 # @description Validate a single value against the type declared for its key.
+#   The checking itself belongs to the `validate` module: this turns the
+#   declared attributes into its rules and gives each reason it reports the key
+#   that caused it.
 # @arg $1 string Configuration key
 # @arg $2 string Effective value
 # @set DYBATPHO_CONFIG_ERRORS Appends one message per violation
 #######################################
 function __dybatpho_config_schema_check {
-  local key value type choices matched choice min max length subject
+  local key value type min max reason
   dybatpho::expect_args key value -- "$@"
   type="$(__dybatpho_config_schema_attr "${key}" type string)"
-  case "${type}" in
-    int)
-      if [[ ! "${value}" =~ ^-?[0-9]+$ ]]; then
-        __dybatpho_config_schema_error "${key}" "expected an integer, got \`${value}\`"
-        return 0
-      fi
-      ;;
-    bool)
-      if [[ ! "${value,,}" =~ ^(true|false|yes|no|on|off|1|0)$ ]]; then
-        __dybatpho_config_schema_error "${key}" "expected a boolean, got \`${value}\`"
-        return 0
-      fi
-      ;;
-    url)
-      if [[ ! "${value}" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]+$ ]]; then
-        __dybatpho_config_schema_error "${key}" "expected a URL, got \`${value}\`"
-        return 0
-      fi
-      ;;
-    enum)
-      choices="$(__dybatpho_config_schema_attr "${key}" choices)"
-      matched=false
-      local -a choice_list=()
-      IFS=',' read -r -a choice_list <<< "${choices}"
-      for choice in ${choice_list[@]+"${choice_list[@]}"}; do
-        if [[ "${value}" == "${choice}" ]]; then
-          matched=true
-          break
-        fi
-      done
-      if [[ "${matched}" != true ]]; then
-        __dybatpho_config_schema_error "${key}" "expected one of: ${choices}, got \`${value}\`"
-        return 0
-      fi
-      ;;
-  esac
-
+  local -a rules=()
+  if [[ "${type}" == enum ]]; then
+    # An enum constrains the value to a list rather than to a shape, so it
+    # reaches the validator as a `choices` rule over a plain string.
+    rules+=("choices:$(__dybatpho_config_schema_attr "${key}" choices)")
+  else
+    rules+=("type:${type}")
+  fi
   min="$(__dybatpho_config_schema_attr "${key}" min)"
   max="$(__dybatpho_config_schema_attr "${key}" max)"
-  if [[ -z "${min}" && -z "${max}" ]]; then
-    return 0
-  fi
-  if [[ "${type}" == int ]]; then
-    length="${value}"
-    subject=""
-  else
-    length="${#value}"
-    subject=" characters"
-  fi
-  if [[ -n "${min}" ]] && ((length < min)); then
-    __dybatpho_config_schema_error "${key}" "must be at least ${min}${subject}"
-  fi
-  if [[ -n "${max}" ]] && ((length > max)); then
-    __dybatpho_config_schema_error "${key}" "must be at most ${max}${subject}"
-  fi
+  [[ -z "${min}" ]] || rules+=("min:${min}")
+  [[ -z "${max}" ]] || rules+=("max:${max}")
+
+  dybatpho::validate_value "${value}" "${rules[@]}" && return 0
+  for reason in "${DYBATPHO_VALIDATE_ERRORS[@]}"; do
+    __dybatpho_config_schema_error "${key}" "${reason}"
+  done
   return 0
 }
 

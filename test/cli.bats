@@ -1839,6 +1839,75 @@ setup() {
   assert_output --partial '"pattern":"fast|slow"'
 }
 
+@test "type: rejects a value that is not of the declared type" {
+  # The check itself belongs to the `validate` module; what is tested here is
+  # that a spec reaches it and that the rejection reads like the library's own.
+  # shellcheck disable=2329
+  _spec_type() {
+    dybatpho::opts::setup "Typed" TYPE_ARGS action:"echo \$TYPE_PORT"
+    dybatpho::opts::param "Port" TYPE_PORT --port type:port
+  }
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_type --port 8080)" "8080"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_type --port 65536
+  assert_failure
+  assert_stderr --partial "Expected a port number: 65536"
+}
+
+@test "type: accepts any registered type, including one of the caller's own" {
+  # shellcheck disable=2329
+  function _spec_type_custom() {
+    dybatpho::opts::setup "Typed" TYPEC_ARGS action:"echo \$TYPEC_SERVICE"
+    dybatpho::opts::param "Service" TYPEC_SERVICE --service type:service
+  }
+  # shellcheck disable=2329
+  function _test_is_service { [[ "$1" =~ ^[a-z]+-api$ ]]; }
+  dybatpho::validate_register service _test_is_service "a service name"
+
+  assert_equal "$(dybatpho::generate_from_spec _spec_type_custom --service billing-api)" "billing-api"
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_type_custom --service billing-db
+  assert_failure
+  assert_stderr --partial "Expected a service name: billing-db"
+
+  dybatpho::validate_reset
+}
+
+@test "type: naming a type nobody registered fails while the parser is built" {
+  # A typo in a spec should not wait for the first user to type a value.
+  # shellcheck disable=2329
+  _spec_type_unknown() {
+    dybatpho::opts::setup "Typed" TYPEU_ARGS action:"echo ran"
+    dybatpho::opts::param "Thing" TYPEU_THING --thing type:nosuchtype
+  }
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_type_unknown --thing x
+  assert_failure
+  assert_stderr --partial "Unknown type: nosuchtype"
+  refute_output --partial "ran"
+}
+
+@test "type: is annotated in help, the man page, and the schema" {
+  # shellcheck disable=2329
+  _spec_type_help() {
+    dybatpho::opts::setup "Typed" TYPEH_ARGS action:"echo ran"
+    dybatpho::opts::param "Contact" TYPEH_MAIL --contact type:email
+  }
+
+  run dybatpho::generate_help _spec_type_help
+  assert_success
+  assert_output --partial "[type: email]"
+
+  run dybatpho::generate_man _spec_type_help typedtool
+  assert_success
+  assert_output --partial "[type: email]"
+
+  run dybatpho::generate_schema _spec_type_help typedtool
+  assert_success
+  assert_output --partial '"valueType":"email"'
+}
+
 @test "dybatpho::opts::msg places free text in help without declaring an option" {
   # shellcheck disable=2329
   _spec_msg() {

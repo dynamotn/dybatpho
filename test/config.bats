@@ -213,6 +213,57 @@ setup() {
   assert_stderr --partial "Unsupported configuration schema rule"
 }
 
+@test "config_schema accepts every type the validator knows" {
+  # `config` no longer carries its own list of types: anything registered with
+  # the `validate` module is a configuration type, including a custom one.
+  DYBATPHO_CONFIG=()
+  dybatpho::config_schema_reset
+  # shellcheck disable=2329
+  function _test_is_region { [[ "$1" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]]; }
+  dybatpho::validate_register region _test_is_region "an AWS region"
+
+  dybatpho::config_schema ADMIN email required:true
+  dybatpho::config_schema LISTEN port default:8080
+  dybatpho::config_schema RELEASE semver required:true
+  dybatpho::config_schema REGION region required:true
+
+  __dybatpho_config_set ADMIN "ops@"
+  __dybatpho_config_set RELEASE "two"
+  __dybatpho_config_set REGION "somewhere"
+
+  run --separate-stderr dybatpho::config_validate
+  assert_failure
+  assert_stderr --partial "\`ADMIN\`: expected an email address"
+  assert_stderr --partial "\`RELEASE\`: expected a semantic version"
+  assert_stderr --partial "\`REGION\`: expected an AWS region"
+
+  dybatpho::validate_reset
+  dybatpho::config_schema_reset
+}
+
+@test "config_validate bounds a port by its value and a string by its length" {
+  # A numeric type is bounded by the number, anything else by the character
+  # count, and which is which comes from the validator rather than from a name
+  # `config` special-cases.
+  DYBATPHO_CONFIG=()
+  dybatpho::config_schema_reset
+  dybatpho::config_schema LISTEN port min:1024 max:65535
+  dybatpho::config_schema NAME string min:3 max:5
+
+  __dybatpho_config_set LISTEN 80
+  __dybatpho_config_set NAME "ab"
+  run --separate-stderr dybatpho::config_validate
+  assert_failure
+  assert_stderr --partial "\`LISTEN\`: must be at least 1024"
+  assert_stderr --partial "\`NAME\`: must be at least 3 characters"
+
+  DYBATPHO_CONFIG=()
+  __dybatpho_config_set LISTEN 8080
+  __dybatpho_config_set NAME "prod"
+  dybatpho::config_validate
+  dybatpho::config_schema_reset
+}
+
 @test "config_schema accepts long type aliases and replaces earlier declarations" {
   DYBATPHO_CONFIG=()
   dybatpho::config_schema_reset

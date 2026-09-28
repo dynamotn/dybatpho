@@ -93,3 +93,4 @@ run_example() {
 @test "example/table_ops.sh runs clean" { run_example "table_ops.sh"; }
 @test "example/testing_ops.sh runs clean" { run_example "testing_ops.sh"; }
 @test "example/text_ops.sh runs clean" { run_example "text_ops.sh"; }
+@test "example/validate_ops.sh runs clean" { run_example "validate_ops.sh"; }

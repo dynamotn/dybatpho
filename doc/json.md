@@ -18,6 +18,7 @@ fallback where practical.
 ### 🚀 Highlights
 
 - [`__dybatpho_json_cmd`](#__dybatpho_json_cmd) — Resolve the preferred command for JSON helpers.
+- [`__dybatpho_json_escape_into`](#__dybatpho_json_escape_into) — Quote text as a JSON string, into a named variable. Escaping a string is the one JSON operation that needs no parser, and forking `yq` or `jq` for it cost ~12ms a call -- enough to dominate any loop that builds a request body or a structured log line. The result carries its own surrounding quotes. Bytes below 0x20 that JSON has no short escape for go out as `\u00XX`, as does `DEL`, which is what `jq` emits for it. Everything else is passed through, which is what keeps UTF-8 text readable: JSON takes it verbatim and only `"` and `\` need escaping.
 - [`dybatpho::json_query`](#dybatphojson_query) — Query a JSON document with `yq`, or `jq` as a fallback.
 - [`dybatpho::json_has`](#dybatphojson_has) — Return success when a JSON document satisfies a filter.
 - [`dybatpho::json_pretty`](#dybatphojson_pretty) — Pretty-print a JSON document.
@@ -66,6 +67,34 @@ Resolve the preferred command for JSON helpers.
 
 - `0`: A supported JSON helper command exists
 - `127`: Neither `yq` nor `jq` is installed
+
+
+---
+
+### `__dybatpho_json_escape_into`
+
+Quote text as a JSON string, into a named variable.
+  Escaping a string is the one JSON operation that needs no parser, and
+  forking `yq` or `jq` for it cost ~12ms a call -- enough to dominate any
+  loop that builds a request body or a structured log line. The result
+  carries its own surrounding quotes.
+
+
+  Bytes below 0x20 that JSON has no short escape for go out as `\u00XX`, as
+  does `DEL`, which is what `jq` emits for it. Everything else is passed
+  through, which is what keeps UTF-8 text readable: JSON takes it verbatim
+  and only `"` and `\` need escaping.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the quoted string |
+| `$2` | string | Text to encode |
+
+**🧩 Variable sets**
+
+- **`The`**: named variable
 
 
 ---
@@ -270,6 +299,10 @@ dybatpho::json_string 'he said "hi"' # "he said \"hi\""
 | --- | --- | --- |
 | `$1` | string | Text to encode |
 
+**📝 Notes**
+
+- Quoting is done in the shell, so this is the one JSON helper that needs neither `yq` nor `jq`
+
 **📤 Output on stdout**
 
 - Quoted JSON string
@@ -278,7 +311,6 @@ dybatpho::json_string 'he said "hi"' # "he said \"hi\""
 
 - `0`: The value was encoded
 - `1`: Missing argument
-- `127`: Neither `yq` nor `jq` is installed
 
 
 ---

@@ -555,6 +555,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   order they arrived in, which is what lets a caller sort by one field without
   scrambling the rest.
 
+- **`dybatpho::json_string` quotes in the shell instead of forking a JSON
+  tool.** Escaping a string is the one JSON operation that needs no parser, yet
+  every call started `yq` or `jq` and waited ~12ms for it — enough to dominate
+  any loop building a request body or a structured log line. Quoting is now
+  done in Bash, which is roughly 80× faster and makes this the one JSON helper
+  that works on a host with neither tool installed.
+
+  The output is byte-for-byte what `jq -Rs .` produced, control characters and
+  `DEL` included. UTF-8 is passed through rather than escaped, so the result
+  stays readable; the walk is by character and the control-character test is by
+  code point, so a multi-byte character is never cut in half or mistaken for
+  one.
+
 ### Fixed
 
 - **A bare date parsed on macOS kept the current time of day.** BSD `date -j -f`

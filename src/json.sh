@@ -26,6 +26,64 @@ function __dybatpho_json_cmd {
 }
 
 #######################################
+# @description Quote text as a JSON string, into a named variable.
+#   Escaping a string is the one JSON operation that needs no parser, and
+#   forking `yq` or `jq` for it cost ~12ms a call -- enough to dominate any
+#   loop that builds a request body or a structured log line. The result
+#   carries its own surrounding quotes.
+#
+#   Bytes below 0x20 that JSON has no short escape for go out as `\u00XX`, as
+#   does `DEL`, which is what `jq` emits for it. Everything else is passed
+#   through, which is what keeps UTF-8 text readable: JSON takes it verbatim
+#   and only `"` and `\` need escaping.
+# @arg $1 string Name of the variable receiving the quoted string
+# @arg $2 string Text to encode
+# @set The named variable
+#######################################
+function __dybatpho_json_escape_into {
+  local -n __dybatpho_json_escape_out="$1"
+  local __dybatpho_json_escape_text="${2-}"
+  local __dybatpho_json_escape_result='"'
+  local __dybatpho_json_escape_char __dybatpho_json_escape_index __dybatpho_json_escape_code
+
+  # The cheap path: text with nothing to escape is the common case, and this
+  # avoids walking it character by character. `[[:cntrl:]]` rather than a
+  # `\x01`-`\x1f` range, because a bracket range is resolved by the locale's
+  # collation and a multi-byte character can fall inside one.
+  if [[ "${__dybatpho_json_escape_text}" != *[\\\"]* \
+    && "${__dybatpho_json_escape_text}" != *[[:cntrl:]]* ]]; then
+    __dybatpho_json_escape_out="\"${__dybatpho_json_escape_text}\""
+    return 0
+  fi
+
+  for ((__dybatpho_json_escape_index = 0; __dybatpho_json_escape_index < ${#__dybatpho_json_escape_text}; __dybatpho_json_escape_index++)); do
+    __dybatpho_json_escape_char="${__dybatpho_json_escape_text:__dybatpho_json_escape_index:1}"
+    case "${__dybatpho_json_escape_char}" in
+      '"') __dybatpho_json_escape_result+='\"' ;;
+      $'\\') __dybatpho_json_escape_result+=$'\\\\' ;;
+      $'\b') __dybatpho_json_escape_result+='\b' ;;
+      $'\f') __dybatpho_json_escape_result+='\f' ;;
+      $'\n') __dybatpho_json_escape_result+='\n' ;;
+      $'\r') __dybatpho_json_escape_result+='\r' ;;
+      $'\t') __dybatpho_json_escape_result+='\t' ;;
+      *)
+        # Anything else is passed through unless it is a control character
+        # JSON has no short escape for. The code point decides that, so a
+        # multi-byte character is never mistaken for one.
+        printf -v __dybatpho_json_escape_code '%d' "'${__dybatpho_json_escape_char}"
+        if ((__dybatpho_json_escape_code < 32 || __dybatpho_json_escape_code == 127)); then
+          printf -v __dybatpho_json_escape_result '%s\\u%04x' \
+            "${__dybatpho_json_escape_result}" "${__dybatpho_json_escape_code}"
+        else
+          __dybatpho_json_escape_result+="${__dybatpho_json_escape_char}"
+        fi
+        ;;
+    esac
+  done
+  __dybatpho_json_escape_out="${__dybatpho_json_escape_result}\""
+}
+
+#######################################
 # @description Query a JSON document with `yq`, or `jq` as a fallback.
 # @arg $1 string JSON file path or `-` for stdin
 # @arg $2 string Query filter
@@ -200,18 +258,15 @@ function dybatpho::yaml_to_json {
 # @stdout Quoted JSON string
 # @exitcode 0 The value was encoded
 # @exitcode 1 Missing argument
-# @exitcode 127 Neither `yq` nor `jq` is installed
+# @note Quoting is done in the shell, so this is the one JSON helper that needs
+#   neither `yq` nor `jq`
 #######################################
 function dybatpho::json_string {
   local text
   dybatpho::expect_args text -- "$@"
-  local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
-  if [[ "${json_cmd}" == "yq" ]]; then
-    __dybatpho_json_text="${text}" yq -n -o=json -I=0 'strenv(__dybatpho_json_text)'
-  else
-    printf '%s' "${text}" | jq -Rs .
-  fi
+  local quoted
+  __dybatpho_json_escape_into quoted "${text}"
+  printf '%s\n' "${quoted}"
 }
 
 #######################################

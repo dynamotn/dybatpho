@@ -184,6 +184,37 @@ EOF
   assert_equal "$(dybatpho::json_string '')" '""'
 }
 
+@test "dybatpho::json_string escapes every control character JSON requires" {
+  assert_equal "$(dybatpho::json_string "$(printf 'a\tb')")" '"a\tb"'
+  assert_equal "$(dybatpho::json_string "$(printf 'a\rb')")" '"a\rb"'
+  assert_equal "$(dybatpho::json_string "$(printf 'a\bb')")" '"a\bb"'
+  assert_equal "$(dybatpho::json_string "$(printf 'a\fb')")" '"a\fb"'
+  # No short escape exists for these, so they go out as \u00XX.
+  assert_equal "$(dybatpho::json_string "$(printf 'a\001\037b')")" '"a\u0001\u001fb"'
+  assert_equal "$(dybatpho::json_string "$(printf 'a\177b')")" '"a\u007fb"'
+}
+
+@test "dybatpho::json_string passes UTF-8 through instead of escaping it" {
+  # Quoting is done in the shell now, one character at a time. Walking bytes
+  # rather than characters would cut a multi-byte one in half, and treating a
+  # character as a control one by a locale-collated range would escape it.
+  assert_equal "$(dybatpho::json_string 'héllo 日本語 đường')" \
+    '"héllo 日本語 đường"'
+}
+
+@test "dybatpho::json_string needs neither yq nor jq" {
+  # It is the one JSON helper that is pure shell, so a script that only builds
+  # values keeps working on a host with no JSON tool installed.
+  local saved_path="${PATH}"
+  PATH="${BATS_TEST_TMPDIR}"
+  hash -r
+  run dybatpho::json_string 'still works'
+  PATH="${saved_path}"
+  hash -r
+  assert_success
+  assert_output '"still works"'
+}
+
 @test "dybatpho::json_object rejects an odd number of arguments" {
   run --separate-stderr dybatpho::json_object name
   assert_failure

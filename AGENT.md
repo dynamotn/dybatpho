@@ -14,15 +14,15 @@ This document describes the repository workflow and conventions to preserve.
 - `init.sh` — required entrypoint; source it before using the library.
 - `test/` — Bats tests for each module, such as `test/cli.bats`.
 - `example/` — complete, runnable usage examples for every public module.
-- `doc/` — API documentation generated from source comments, including
-  `doc/init.md` for the bootstrap's own public functions.
-- `doc/spec/` — Spec Kit-style feature specifications.
+- `docs/` — API documentation generated from source comments, including
+  `docs/init.md` for the bootstrap's own public functions.
+- `docs/spec/` — Spec Kit-style feature specifications.
 - `CHANGELOG.md` — user-visible history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 - `scripts/test.sh` — test runner; `--coverage` adds the kcov report.
 - `scripts/bundle.sh` — flatten a module selection into one vendorable file;
-  covered by `test/bundle.bats` and specified in `doc/spec/doctor.md`.
+  covered by `test/bundle.bats` and specified in `docs/spec/doctor.md`.
 - `scripts/release.sh` — cut a release: stamp `VERSION` and `CHANGELOG.md`,
-  regenerate `doc/`, commit, tag, and publish the GitHub release. Run it with
+  regenerate `docs/`, commit, tag, and publish the GitHub release. Run it with
   `--dry-run` first.
 - `VERSION` — the version this copy reports through `dybatpho::version`;
   `scripts/release.sh` stamps it in the same commit that tags the release.
@@ -33,21 +33,21 @@ This document describes the repository workflow and conventions to preserve.
 Every module in `src/` must have a clear responsibility and expose public
 functions under the `dybatpho::` namespace. Every public module must have a
 corresponding complete example in `example/` (normally
-`example/<module>_ops.sh`) **and a specification in `doc/spec/<module>.md`**.
+`example/<module>_ops.sh`) **and a specification in `docs/spec/<module>.md`**.
 When changing a module, read its source, tests, API documentation, matching
 specification, and example before editing.
 
 ### Specification requirements
 
-**Every module in `src/` MUST have `doc/spec/<module>.md`. A change that adds a
+**Every module in `src/` MUST have `docs/spec/<module>.md`. A change that adds a
 module or public behavior without its spec is incomplete and must not be
 reported as done.** This is not conditional on the size of the change.
 
 Generate or update the spec in the same change that touches the module:
 
-- **New module** — write `doc/spec/<module>.md` before the work is considered
+- **New module** — write `docs/spec/<module>.md` before the work is considered
   complete, and register it in both the Spec Files and Source Mapping lists of
-  `doc/spec/README.md`.
+  `docs/spec/README.md`.
 - **New or changed public function, argument, rule, output, or exit code** —
   add or update the matching user story, functional requirement (`FR-xxx`),
   edge case, and integration test (`IT-xxx`) entries.
@@ -84,8 +84,8 @@ scripts/test.sh test/conventions.bats
 `test/conventions.bats` enforces this rule and the rest of the repository
 contract as part of the normal suite, so a missing spec fails the tests rather
 than waiting for a reviewer. It checks that every `src/<module>.sh` has its
-`doc/`, `doc/spec/`, `test/` and `example/` counterpart, that the module is
-registered in `init.sh`, that the spec is listed in `doc/spec/README.md`, that
+`docs/`, `docs/spec/`, `test/` and `example/` counterpart, that the module is
+registered in `init.sh`, that the spec is listed in `docs/spec/README.md`, that
 every public function is named in both its module doc and its test file, and
 that no function escapes the `dybatpho::` / `__dybatpho_` namespaces.
 
@@ -122,40 +122,40 @@ module calls `command curl` on purpose, which bypasses functions.
 
 | Module | Primary responsibility | Tests / documentation |
 | --- | --- | --- |
-| `agent.sh` | Agent detection, structured results and errors, allowlist gate, audit log, and tool/MCP definitions generated from a CLI spec | `test/agent.bats`, `doc/agent.md`, `doc/spec/agent.md` |
-| `ai.sh` | Language model calls across Claude, OpenAI-compatible, Ollama, and CLI backends, with conversations, JSON output, streaming, tool use, caching, and budgets | `test/ai.bats`, `doc/ai.md`, `doc/spec/ai.md` |
-| `array.sh` | Create, read, join, filter, and manipulate Bash arrays | `test/array.bats`, `doc/array.md`, `doc/spec/array.md` |
-| `archive.sh` | Create, extract, and inspect archives | `test/archive.bats`, `doc/archive.md`, `doc/spec/archive.md` |
-| `cli.sh` | Declarative parser, help, subcommands, typo suggestions, config-bound options, completions, and CLI artifacts | `test/cli.bats`, `doc/cli.md`, `doc/spec/cli.md` |
-| `config.sh` | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `doc/config.md`, `doc/spec/config.md` |
-| `date.sh` | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `doc/date.md`, `doc/spec/date.md` |
-| `doctor.sh` | Environment report: Bash version, library version, and the external commands the loaded modules declare | `test/doctor.bats`, `doc/doctor.md`, `doc/spec/doctor.md` |
-| `file.sh` | Path and XDG helpers, upward search, directory creation, temporary files, atomic content rewrites, checksums, and metadata | `test/file.bats`, `doc/file.md`, `doc/spec/file.md` |
-| `forge.sh` | GitHub and GitLab detection from the remote, authenticated requests, issues, and releases | `test/forge.bats`, `doc/forge.md`, `doc/spec/forge.md` |
-| `git.sh` | Safe repository, branch, commit, reachability, and Git operations | `test/git.bats`, `doc/git.md`, `doc/spec/git.md` |
-| `helpers.sh` | Argument validation, command lookup, retry, and common helpers | `test/helpers.bats`, `doc/helpers.md`, `doc/spec/helpers.md` |
-| `i18n.sh` | Message catalogs, plural rules, and locale-aware numbers, money, sizes, dates, and text direction | `test/i18n.bats`, `doc/i18n.md`, `doc/spec/i18n.md` |
-| `json.sh` | Query, validate, pretty-print, and convert JSON/YAML | `test/json.bats`, `doc/json.md`, `doc/spec/json.md` |
-| `lock.sh` | Portable `mkdir`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `doc/lock.md`, `doc/spec/lock.md` |
-| `logging.sh` | Log levels, text/JSON logging, banners, and Bash tracing | `test/logging.bats`, `doc/logging.md`, `doc/spec/logging.md` |
-| `metrics.sh` | Timing, counters, and Prometheus text export, plus the retry/HTTP/error instrumentation | `test/metrics.bats`, `doc/metrics.md`, `doc/spec/metrics.md` |
-| `network.sh` | Curl wrappers, retries, JSON requests, and HTTP metadata | `test/network.bats`, `doc/network.md`, `doc/spec/network.md` |
-| `notification.sh` | Webhook notifications and JSON payloads | `test/notification.bats`, `doc/notification.md`, `doc/spec/notification.md` |
-| `os.sh` | OS, architecture, distribution, and host facts: name, user, processors, terminal size, root/container/WSL/CI detection | `test/os.bats`, `doc/os.md`, `doc/spec/os.md` |
-| `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `doc/process.md`, `doc/spec/process.md` |
-| `parallel.sh` | Bounded worker pool with ordered output and per-job exit codes | `test/parallel.bats`, `doc/parallel.md`, `doc/spec/parallel.md` |
-| `pkg.sh` | Package manager detection and guarded dependency installation | `test/pkg.bats`, `doc/pkg.md`, `doc/spec/pkg.md` |
-| `release.sh` | Version bumping from commits, changelog generation, per-platform packaging, checksums, and signing | `test/release.bats`, `doc/release.md`, `doc/spec/release.md` |
-| `safety.sh` | Guards for destructive operations: removal, overwrite, extraction, and system changes | `test/safety.bats`, `doc/safety.md`, `doc/spec/safety.md` |
-| `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `doc/secret.md`, `doc/spec/secret.md` |
-| `semver.sh` | Semantic version parsing, comparison, ranges, ordering, and validation | `test/semver.bats`, `doc/semver.md`, `doc/spec/semver.md` |
-| `string.sh` | Case conversion, matching, splitting, trimming, and predicates | `test/string.bats`, `doc/string.md`, `doc/spec/string.md` |
-| `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `doc/table.md`, `doc/spec/table.md` |
-| `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `doc/text.md`, `doc/spec/text.md` |
-| `tui.sh` | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `doc/tui.md`, `doc/spec/tui.md` |
-| `screen.sh` | Full-screen applications: alternate screen and raw mode, a constraint layout solver, a widget set, Unicode-correct column measurement, and an event loop over keys, mouse and resize | `test/screen.bats`, `doc/screen.md`, `doc/spec/screen.md` |
-| `testing.sh` | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `doc/testing.md`, `doc/spec/testing.md` |
-| `validate.sh` | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `doc/validate.md`, `doc/spec/validate.md` |
+| `agent.sh` | Agent detection, structured results and errors, allowlist gate, audit log, and tool/MCP definitions generated from a CLI spec | `test/agent.bats`, `docs/agent.md`, `docs/spec/agent.md` |
+| `ai.sh` | Language model calls across Claude, OpenAI-compatible, Ollama, and CLI backends, with conversations, JSON output, streaming, tool use, caching, and budgets | `test/ai.bats`, `docs/ai.md`, `docs/spec/ai.md` |
+| `array.sh` | Create, read, join, filter, and manipulate Bash arrays | `test/array.bats`, `docs/array.md`, `docs/spec/array.md` |
+| `archive.sh` | Create, extract, and inspect archives | `test/archive.bats`, `docs/archive.md`, `docs/spec/archive.md` |
+| `cli.sh` | Declarative parser, help, subcommands, typo suggestions, config-bound options, completions, and CLI artifacts | `test/cli.bats`, `docs/cli.md`, `docs/spec/cli.md` |
+| `config.sh` | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `docs/config.md`, `docs/spec/config.md` |
+| `date.sh` | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `docs/date.md`, `docs/spec/date.md` |
+| `doctor.sh` | Environment report: Bash version, library version, and the external commands the loaded modules declare | `test/doctor.bats`, `docs/doctor.md`, `docs/spec/doctor.md` |
+| `file.sh` | Path and XDG helpers, upward search, directory creation, temporary files, atomic content rewrites, checksums, and metadata | `test/file.bats`, `docs/file.md`, `docs/spec/file.md` |
+| `forge.sh` | GitHub and GitLab detection from the remote, authenticated requests, issues, and releases | `test/forge.bats`, `docs/forge.md`, `docs/spec/forge.md` |
+| `git.sh` | Safe repository, branch, commit, reachability, and Git operations | `test/git.bats`, `docs/git.md`, `docs/spec/git.md` |
+| `helpers.sh` | Argument validation, command lookup, retry, and common helpers | `test/helpers.bats`, `docs/helpers.md`, `docs/spec/helpers.md` |
+| `i18n.sh` | Message catalogs, plural rules, and locale-aware numbers, money, sizes, dates, and text direction | `test/i18n.bats`, `docs/i18n.md`, `docs/spec/i18n.md` |
+| `json.sh` | Query, validate, pretty-print, and convert JSON/YAML | `test/json.bats`, `docs/json.md`, `docs/spec/json.md` |
+| `lock.sh` | Portable `mkdir`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `docs/lock.md`, `docs/spec/lock.md` |
+| `logging.sh` | Log levels, text/JSON logging, banners, and Bash tracing | `test/logging.bats`, `docs/logging.md`, `docs/spec/logging.md` |
+| `metrics.sh` | Timing, counters, and Prometheus text export, plus the retry/HTTP/error instrumentation | `test/metrics.bats`, `docs/metrics.md`, `docs/spec/metrics.md` |
+| `network.sh` | Curl wrappers, retries, JSON requests, and HTTP metadata | `test/network.bats`, `docs/network.md`, `docs/spec/network.md` |
+| `notification.sh` | Webhook notifications and JSON payloads | `test/notification.bats`, `docs/notification.md`, `docs/spec/notification.md` |
+| `os.sh` | OS, architecture, distribution, and host facts: name, user, processors, terminal size, root/container/WSL/CI detection | `test/os.bats`, `docs/os.md`, `docs/spec/os.md` |
+| `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `docs/process.md`, `docs/spec/process.md` |
+| `parallel.sh` | Bounded worker pool with ordered output and per-job exit codes | `test/parallel.bats`, `docs/parallel.md`, `docs/spec/parallel.md` |
+| `pkg.sh` | Package manager detection and guarded dependency installation | `test/pkg.bats`, `docs/pkg.md`, `docs/spec/pkg.md` |
+| `release.sh` | Version bumping from commits, changelog generation, per-platform packaging, checksums, and signing | `test/release.bats`, `docs/release.md`, `docs/spec/release.md` |
+| `safety.sh` | Guards for destructive operations: removal, overwrite, extraction, and system changes | `test/safety.bats`, `docs/safety.md`, `docs/spec/safety.md` |
+| `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `docs/secret.md`, `docs/spec/secret.md` |
+| `semver.sh` | Semantic version parsing, comparison, ranges, ordering, and validation | `test/semver.bats`, `docs/semver.md`, `docs/spec/semver.md` |
+| `string.sh` | Case conversion, matching, splitting, trimming, and predicates | `test/string.bats`, `docs/string.md`, `docs/spec/string.md` |
+| `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `docs/table.md`, `docs/spec/table.md` |
+| `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `docs/text.md`, `docs/spec/text.md` |
+| `tui.sh` | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `docs/tui.md`, `docs/spec/tui.md` |
+| `screen.sh` | Full-screen applications: alternate screen and raw mode, a constraint layout solver, a widget set, Unicode-correct column measurement, and an event loop over keys, mouse and resize | `test/screen.bats`, `docs/screen.md`, `docs/spec/screen.md` |
+| `testing.sh` | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `docs/testing.md`, `docs/spec/testing.md` |
+| `validate.sh` | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `docs/validate.md`, `docs/spec/validate.md` |
 
 ### Module registry
 
@@ -396,10 +396,10 @@ changes public behavior.
 ## Releasing
 
 `scripts/release.sh` is the only supported way to cut a release, because the
-tag, `VERSION`, `CHANGELOG.md`, and `doc/` have to agree and doing that by hand
+tag, `VERSION`, `CHANGELOG.md`, and `docs/` have to agree and doing that by hand
 is where they drift apart. It stamps the version, promotes `## [Unreleased]` to
 `## [<version>] - <date>` with a fresh empty `Unreleased` above it, rewrites the
-comparison links, regenerates `doc/`, commits `chore(release): v<version>`, tags
+comparison links, regenerates `docs/`, commits `chore(release): v<version>`, tags
 it annotated with the changelog entry, builds the all-modules bundle and its
 checksum file, pushes, and creates the GitHub release with the same entry as the
 release notes.
@@ -563,17 +563,17 @@ When adding CLI behavior, update these together:
 1. `src/cli.sh` and embedded API/usage comments;
 2. `test/cli.bats`;
 3. `example/` when the behavior is useful to demonstrate;
-4. `doc/cli.md`;
-5. `doc/spec/cli.md` when the contract, acceptance scenario, or requirement changes.
+4. `docs/cli.md`;
+5. `docs/spec/cli.md` when the contract, acceptance scenario, or requirement changes.
 
 ## Workflow for other module changes
 
 1. Identify the module's public API, side effects, dependencies, and portable
    behavior.
 2. Find its tests in `test/<module>.bats`; extend tests near the changed behavior.
-3. Add API comments for new public functions so `scripts/doc.sh` can generate
+3. Add API comments for new public functions so `scripts/docs.sh` can generate
    the reference documentation.
-4. Create or update `doc/spec/<module>.md`. This step is mandatory for any
+4. Create or update `docs/spec/<module>.md`. This step is mandatory for any
    contract or capability change, and for every new module; do not defer it.
 5. Add or update the module's complete example in `example/`; do not defer
    examples for public behavior.
@@ -598,12 +598,12 @@ to the module convention.
 | Locking/coordination | Atomic acquire, stale reclaim, release on failure paths, and `DYBATPHO_LOCK_DIR` isolation in tests |
 | Destructive guards (`safety`) | Protected paths, `DYBATPHO_SAFE_ROOTS` confinement, declined and forced paths, `DRY_RUN`, short options, and `--` end-of-options |
 | Testing helpers | Passing and failing direction of every assertion, mock restore, snapshot create/match/diff, and fixture cleanup |
-| New module | `init.sh` registry entry and dependency edges, `doc/spec/<module>.md`, `doc/spec/README.md` entries, `test/<module>.bats`, and `example/<module>_ops.sh` |
+| New module | `init.sh` registry entry and dependency edges, `docs/spec/<module>.md`, `docs/spec/README.md` entries, `test/<module>.bats`, and `example/<module>_ops.sh` |
 | Bootstrap/module loading | `test/init.bats`, a fresh shell per assertion, dependency order, cycle termination, and unknown-module failure. Spawn child shells from a script **file**, never `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which the kcov hook expands on every command and `set -u` then turns into a failure that only appears under `scripts/test.sh` |
 | External tool used by a module | A declaration in `DYBATPHO_DOCTOR_REQUIRED` or `DYBATPHO_DOCTOR_OPTIONAL` in `src/doctor.sh`, on the module that runs the command, plus a case in `test/doctor.bats` |
 | Bootstrap function or generated artifact | `test/init.bats` or `test/bundle.bats`, and a regenerated bundle check: `scripts/bundle.sh --modules all -o /tmp/bundle.sh` |
 | Documentation/spec | Correct links/references, `git diff --check`, and `scripts/lint.sh --stage doc` after regenerating |
-| New public function | `test/conventions.bats` — it must appear in `doc/<module>.md` and be named directly in `test/<module>.bats` |
+| New public function | `test/conventions.bats` — it must appear in `docs/<module>.md` and be named directly in `test/<module>.bats` |
 | New or changed example | `test/examples.bats` — it must run non-interactively, offline, and leave the working tree untouched |
 | Any shell script | `scripts/lint.sh --stage shell` — ShellCheck and `bash -n` over every tracked script |
 | `CHANGELOG.md` | `scripts/lint.sh --stage changelog` — Keep a Changelog headings, dates, and well-formed link reference URLs |
@@ -616,7 +616,7 @@ to the module convention.
 3. Make a focused, backward-compatible change unless the contract requires otherwise.
 4. Add regression tests for new or fixed behavior.
 5. Add or update a complete example for every changed public module.
-6. Add or update `doc/spec/<module>.md` for every changed public module, and
+6. Add or update `docs/spec/<module>.md` for every changed public module, and
    confirm the missing-spec check above prints nothing.
 7. **Mandatory** — add an entry under `## [Unreleased]` in `CHANGELOG.md` for
    anything a consumer would notice, following the Changelog requirements

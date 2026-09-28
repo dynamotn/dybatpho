@@ -476,6 +476,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The generated documentation moved from `doc/` to `docs/`.** Every link into
+  it changes: `doc/logging.md` is now `docs/logging.md`, and the
+  specifications sit under `docs/spec/`. It is also the layout `sh-docs`
+  defaults to, so `scripts/docs.sh` no longer has to describe this repository
+  to it.
+
+- **The documentation generator is now the standalone `sh-docs` project.**
+  `scripts/genshdoc.awk` was a copy of it maintained inside this repository, so
+  every fix had to be made twice. It is gone; `scripts/sh-docs` is a submodule
+  of [sh-docs](https://gitlab.com/dynamo-tools/sh-docs) and `scripts/docs.sh`
+  drives it.
+
+  Clone with `--recurse-submodules`, or run
+  `git submodule update --init scripts/sh-docs` before `scripts/docs.sh`; it
+  says so itself when the submodule is missing.
+
+  Every file under `docs/` is regenerated: the stray double blank lines between
+  overview paragraphs are gone, an indented `@description` continuation is
+  dedented, and `@set` renders its type column like `@arg` and `@env` do.
+
 - **Drawing a table no longer costs a process per cell.** Every function in the
   library returns its answer on stdout, so every caller reads it with `$( )` —
   and `$( )` forks. The renderers were built entirely out of those: measuring a
@@ -1218,7 +1238,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A `lint` job in CI runs it, together with a `gitleaks` scan of the history.
   `mise run lint` and a `pre-commit` hook run it locally.
 
-- **`scripts/doc.sh --check`.** Generates into a temporary directory and
+- **`scripts/docs.sh --check`.** Generates into a temporary directory and
   compares instead of writing, so stale generated documentation fails a pull
   request. Previously the only signal was a dirty tree at commit time, which no
   reviewer ever saw.
@@ -1463,17 +1483,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to be present — a workstation passed, CI did not. The new test pins both
   variables instead of inheriting them.
 
-- **`scripts/doc.sh` read its arguments as a string, and the documentation
+- **`scripts/docs.sh` read its arguments as a string, and the documentation
   guard quietly stopped guarding.** `dybatpho::opts::setup` collects positional
   arguments into a Bash array, which the positional-argument rework made
   explicit. This script was not updated with it and still expanded the array as
   a scalar, which is wrong in both directions: with arguments, `"${DOC_ARGS}"`
-  is element zero, so `scripts/doc.sh src/a.sh src/b.sh` documented only
+  is element zero, so `scripts/docs.sh src/a.sh src/b.sh` documented only
   `src/a.sh`; with none, an empty array is unset, so `errexit` ended the source
   listing inside the process substitution that feeds the loop.
 
   The second case is the damaging one. The loop simply read nothing, so
-  `scripts/doc.sh --check` compared no documents and reported that everything
+  `scripts/docs.sh --check` compared no documents and reported that everything
   was up to date — which is what `scripts/lint.sh` and CI were relying on to
   catch documentation drift. It had been passing without checking anything.
 

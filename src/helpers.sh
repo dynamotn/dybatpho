@@ -16,7 +16,7 @@
 #   - asking the library about itself
 #
 #   That last one is `dybatpho::provides`, `dybatpho::describe` and
-#   `dybatpho::function_list`. The library documents itself in `doc/`, which
+#   `dybatpho::function_list`. The library documents itself in `docs/`, which
 #   answers the question while you are reading; these answer it from the
 #   running shell, where the question actually comes up. They ask Bash rather
 #   than the filesystem: `declare -F` under `extdebug` reports the file and line
@@ -759,11 +759,11 @@ function dybatpho::provides {
 
 #######################################
 # @description Print the documentation comment of a function.
-#   The library documents itself in `doc/`, which answers the question when you
+#   The library documents itself in `docs/`, which answers the question when you
 #   are reading it. At a prompt, mid-script, the question is what a function
 #   takes and what it returns, and the answer is in a browser tab. This reads it
 #   out of the source the shell actually loaded, so it describes the code that
-#   will run, and it is there whether or not `doc/` was ever generated.
+#   will run, and it is there whether or not `docs/` was ever generated.
 #
 #   The banner rules and any `shellcheck` directive between the comment and the
 #   function are dropped, one `#` and the space after it are taken off each

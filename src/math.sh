@@ -35,7 +35,7 @@
 #   money, sizes, counters, percentages — not for cryptographic bignums.
 # @see
 #   - `example/math_ops.sh`
-#   - `doc/spec/math.md`
+#   - `docs/spec/math.md`
 # @tip Reach for `dybatpho::i18n_number` when the number is about to be shown to
 #   a person, and for this module when it is about to be computed with
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"

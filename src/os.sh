@@ -135,7 +135,7 @@ function dybatpho::command_version {
 
 #######################################
 # @description Get $GOARCH compilation environment
-# @stdout Return $GOOS value https://go.dev/doc/install/source#environment
+# @stdout Return $GOOS value https://go.dev/docs/install/source#environment
 #######################################
 function dybatpho::goarch {
   local arch="$(uname -m)"

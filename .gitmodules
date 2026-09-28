@@ -19,3 +19,7 @@
         path = test/lib/mock
         url = https://github.com/dynamotn/bats-mock.git
         shallow = true
+[submodule "scripts/sh-docs"]
+	path = scripts/sh-docs
+	url = https://gitlab.com/dynamo-tools/sh-docs.git
+	shallow = true

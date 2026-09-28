@@ -146,11 +146,11 @@ function __dybatpho_lint_changelog {
 }
 
 # @description Verify the committed documentation still matches what
-#   `scripts/doc.sh` generates from the sources.
+#   `scripts/docs.sh` generates from the sources.
 # @exitcode 0 No drift
 # @exitcode 1 At least one generated document is stale
 function __dybatpho_lint_doc {
-  "${SCRIPT_DIR}/doc.sh" --check
+  "${SCRIPT_DIR}/docs.sh" --check
 }
 
 # @description Regenerate the single-file bundle and let its own smoke test run.

@@ -1,6 +1,6 @@
 [tasks.doc]
 description = "Generate documentation"
-run = "{{ config_root }}/scripts/doc.sh"
+run = "{{ config_root }}/scripts/docs.sh"
 
 [tasks.lint]
 description = "Check the repository: ShellCheck, changelog, doc drift, bundle"

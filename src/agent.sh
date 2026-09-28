@@ -59,7 +59,7 @@
 #
 # @see
 #   - `example/agent_ops.sh`
-#   - `doc/cli.md` for the option spec these tool definitions are generated from
+#   - `docs/cli.md` for the option spec these tool definitions are generated from
 # @tip Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE`
 # @note Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a second edit
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"

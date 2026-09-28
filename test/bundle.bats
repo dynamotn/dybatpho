@@ -124,7 +124,7 @@ bundle() {
   run -0 bundle --modules semver
 
   # The documentation travels with the code, so this is the part that still
-  # works when there is no `src/` and no `doc/` to read.
+  # works when there is no `src/` and no `docs/` to read.
   run -0 use_bundle 'dybatpho::describe semver_valid'
   assert_output --partial "Return success when the string is a valid semver"
   assert_output --partial '@arg $1 string Version string to validate'

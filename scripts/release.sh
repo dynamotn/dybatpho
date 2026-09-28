@@ -14,7 +14,7 @@
 #   3. Stamp `VERSION`, promote `## [Unreleased]` in `CHANGELOG.md` to the new
 #      version with today's date, open a fresh empty `Unreleased`, and rewrite
 #      the comparison links at the bottom of the file.
-#   4. Regenerate `doc/` so the published docs match the tagged source.
+#   4. Regenerate `docs/` so the published docs match the tagged source.
 #   5. Commit `chore(release): v<version>` and tag it, annotated with the
 #      changelog entry so `git show v<version>` carries the release notes.
 #   6. Build the artifacts from the tagged tree: the all-modules bundle, a
@@ -353,13 +353,13 @@ function __dybatpho_release_run {
   dybatpho::file_write_atomic "${CHANGELOG_FILE}" < "${_changelog}"
 
   if dybatpho::is true "${DOCS}"; then
-    dybatpho::progress "Regenerating doc/"
-    dybatpho::dry_run "${SCRIPT_DIR}/doc.sh"
+    dybatpho::progress "Regenerating docs/"
+    dybatpho::dry_run "${SCRIPT_DIR}/docs.sh"
   fi
 
   dybatpho::progress "Committing and tagging ${_tag}"
   dybatpho::dry_run git -C "${DYBATPHO_DIR}" add -A -- \
-    "${VERSION_FILE}" "${CHANGELOG_FILE}" "${DYBATPHO_DIR}/doc"
+    "${VERSION_FILE}" "${CHANGELOG_FILE}" "${DYBATPHO_DIR}/docs"
   dybatpho::dry_run git -C "${DYBATPHO_DIR}" commit -m "chore(release): ${_tag}"
   # The tag message leads with the version, so `git tag -n1` and every tool that
   # shows a tag's first line name the release rather than its first bullet.
@@ -427,7 +427,7 @@ function _spec {
   dybatpho::opts::flag "Create the GitHub release as a draft" DRAFT --draft \
     on:true off:false init:="false"
   # shellcheck disable=SC1083 # `--{no-}name` is dybatpho's toggle-switch syntax
-  dybatpho::opts::flag "Regenerate doc/ before committing" DOCS --{no-}docs \
+  dybatpho::opts::flag "Regenerate docs/ before committing" DOCS --{no-}docs \
     on:true off:false init:="true"
   # shellcheck disable=SC1083
   dybatpho::opts::flag "Build the bundle and checksum artifacts" BUNDLE --{no-}bundle \

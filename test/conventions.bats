@@ -27,7 +27,7 @@ fail_with() {
   return 1
 }
 
-# The documentation check is what keeps the committed `doc/` honest, and a
+# The documentation check is what keeps the committed `docs/` honest, and a
 # guard that stops guarding is worse than no guard: it reports success either
 # way. These two cover the ways it went quiet rather than the drift it reports,
 # which the guard itself already covers when it runs.
@@ -36,7 +36,7 @@ fail_with() {
   # The positional arguments arrive as a Bash array. Read as a string, an empty
   # one is unset, `errexit` ended the source listing inside a process
   # substitution, and the check then compared nothing and called it clean.
-  run "${REPO_ROOT}/scripts/doc.sh" --check
+  run "${REPO_ROOT}/scripts/docs.sh" --check
   refute_output --partial "unbound variable"
   refute_output --partial "DOC_ARGS"
 }
@@ -45,7 +45,7 @@ fail_with() {
   # Read as a string, the argument list was its own first element, so only the
   # first source was ever compared. A stale document anywhere after it passed.
   #
-  # The stale source is a copy in this test's own directory, whose `doc/` file
+  # The stale source is a copy in this test's own directory, whose `docs/` file
   # therefore does not exist. Making a committed document stale in place would
   # dirty the shared repository for as long as the check runs, and the suite
   # runs its files in parallel: `test/examples.bats` compares the working tree
@@ -54,21 +54,21 @@ fail_with() {
   local stale_source="${BATS_TEST_TMPDIR}/zzz_unpublished.sh"
   cp "${REPO_ROOT}/src/semver.sh" "${stale_source}"
 
-  run "${REPO_ROOT}/scripts/doc.sh" --check \
+  run "${REPO_ROOT}/scripts/docs.sh" --check \
     "${REPO_ROOT}/src/os.sh" "${stale_source}"
   assert_failure
   # Naming the second source proves the first did not end the listing.
-  assert_output --partial "doc/zzz_unpublished.md is stale"
+  assert_output --partial "docs/zzz_unpublished.md is stale"
 }
 
 @test "every module has a doc, a spec, a test file and an example" {
   local violations="" module
   for source in "${REPO_ROOT}"/src/*.sh; do
     module="$(basename "${source}" .sh)"
-    [ -f "${REPO_ROOT}/doc/${module}.md" ] ||
-      violations+="${module}: missing doc/${module}.md"$'\n'
-    [ -f "${REPO_ROOT}/doc/spec/${module}.md" ] ||
-      violations+="${module}: missing doc/spec/${module}.md"$'\n'
+    [ -f "${REPO_ROOT}/docs/${module}.md" ] ||
+      violations+="${module}: missing docs/${module}.md"$'\n'
+    [ -f "${REPO_ROOT}/docs/spec/${module}.md" ] ||
+      violations+="${module}: missing docs/spec/${module}.md"$'\n'
     [ -f "${REPO_ROOT}/test/${module}.bats" ] ||
       violations+="${module}: missing test/${module}.bats"$'\n'
     compgen -G "${REPO_ROOT}/example/${module}*.sh" > /dev/null ||
@@ -125,29 +125,29 @@ fail_with() {
 
 @test "every spec is listed in the spec index" {
   local index violations="" module
-  index="$(cat "${REPO_ROOT}/doc/spec/README.md")"
-  for spec in "${REPO_ROOT}"/doc/spec/*.md; do
+  index="$(cat "${REPO_ROOT}/docs/spec/README.md")"
+  for spec in "${REPO_ROOT}"/docs/spec/*.md; do
     module="$(basename "${spec}" .md)"
     [ "${module}" = "README" ] && continue
     [[ "${index}" == *"${module}.md"* ]] ||
-      violations+="${module}: doc/spec/${module}.md not listed in doc/spec/README.md"$'\n'
+      violations+="${module}: docs/spec/${module}.md not listed in docs/spec/README.md"$'\n'
   done
   [ -z "${violations}" ] ||
-    fail_with "Specs missing from the doc/spec/README.md index:" "${violations}"
+    fail_with "Specs missing from the docs/spec/README.md index:" "${violations}"
 }
 
 @test "every public function is documented in its module doc" {
   local violations="" module doc
   for source in "${REPO_ROOT}"/src/*.sh; do
     module="$(basename "${source}" .sh)"
-    doc="${REPO_ROOT}/doc/${module}.md"
+    doc="${REPO_ROOT}/docs/${module}.md"
     [ -f "${doc}" ] || continue
     while read -r fn; do
       [ -n "${fn}" ] || continue
       # Match the name followed by a non-name character so a shorter function
       # can't be satisfied by a longer one that merely starts with it.
       grep -qE "${fn}([^A-Za-z0-9_]|$)" "${doc}" ||
-        violations+="${module}: ${fn} is not documented in doc/${module}.md"$'\n'
+        violations+="${module}: ${fn} is not documented in docs/${module}.md"$'\n'
     done < <(public_functions "${source}")
   done
   [ -z "${violations}" ] ||

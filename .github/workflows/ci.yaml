@@ -59,7 +59,7 @@ jobs:
           # library is written against is fetched directly.
           YQ_VERSION: v4.53.3
         run: |
-          # gawk: `scripts/doc.sh`, which the conventions tests run, needs it.
+          # gawk: `scripts/docs.sh`, which the conventions tests run, needs it.
           apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"

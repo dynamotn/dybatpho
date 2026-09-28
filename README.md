@@ -104,7 +104,7 @@ dybatpho::module_list all    # core + optional module names
 ```
 
 An unknown module name stops the script at bootstrap instead of failing later
-with a missing function. See [init.sh reference](doc/init.md) and
+with a missing function. See [init.sh reference](docs/init.md) and
 [example/init_modules.sh](example/init_modules.sh).
 
 `dybatpho::version` reports which copy of the library is loaded, and the
@@ -136,7 +136,7 @@ bundled module and names the regeneration command for anything else.
 
 Maintainers cut a release with `scripts/release.sh`. It stamps `VERSION`,
 promotes the `Unreleased` section of `CHANGELOG.md` to the new version,
-regenerates `doc/`, commits, tags, builds the all-modules bundle with its
+regenerates `docs/`, commits, tags, builds the all-modules bundle with its
 checksum file, pushes, and publishes the GitHub release with the changelog entry
 as its notes:
 
@@ -152,82 +152,82 @@ scripts/release.sh --version 3.0.0 --sign
 
 | Module                            | What you get                                                       |
 | --------------------------------- | ------------------------------------------------------------------ |
-| [helpers.sh](doc/helpers.md)      | Argument expectation, dry-run, retries and other everyday patterns  |
-| [logging.sh](doc/logging.md)      | Levelled logs, boxed output, structured JSON logging                |
-| [process.sh](doc/process.md)      | Process management, traps, timeouts, background jobs, PID files     |
-| [lock.sh](doc/lock.md)            | Portable file locking to serialize concurrent script runs           |
-| [parallel.sh](doc/parallel.md)  | Bounded worker pool: ordered output, per-job exit codes, fail-fast |
+| [helpers.sh](docs/helpers.md)      | Argument expectation, dry-run, retries and other everyday patterns  |
+| [logging.sh](docs/logging.md)      | Levelled logs, boxed output, structured JSON logging                |
+| [process.sh](docs/process.md)      | Process management, traps, timeouts, background jobs, PID files     |
+| [lock.sh](docs/lock.md)            | Portable file locking to serialize concurrent script runs           |
+| [parallel.sh](docs/parallel.md)  | Bounded worker pool: ordered output, per-job exit codes, fail-fast |
 
 ### 🔤 Data & text
 
 | Module                        | What you get                                       |
 | ----------------------------- | -------------------------------------------------- |
-| [array.sh](doc/array.md)      | Array manipulation                                  |
-| [math.sh](doc/math.md)        | Exact decimal arithmetic, rounding, aggregates — no `bc`, no float drift |
-| [string.sh](doc/string.md)    | String operations                                   |
-| [text.sh](doc/text.md)        | Multi-line text blocks and formatting               |
-| [json.sh](doc/json.md)        | JSON and YAML reading/writing                       |
-| [table.sh](doc/table.md)      | Aligned plain-text and Markdown tables              |
-| [date.sh](doc/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
-| [i18n.sh](doc/i18n.md)        | Translations, plural rules, locale-aware numbers, money, sizes and dates |
+| [array.sh](docs/array.md)      | Array manipulation                                  |
+| [math.sh](docs/math.md)        | Exact decimal arithmetic, rounding, aggregates — no `bc`, no float drift |
+| [string.sh](docs/string.md)    | String operations                                   |
+| [text.sh](docs/text.md)        | Multi-line text blocks and formatting               |
+| [json.sh](docs/json.md)        | JSON and YAML reading/writing                       |
+| [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables              |
+| [date.sh](docs/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
+| [i18n.sh](docs/i18n.md)        | Translations, plural rules, locale-aware numbers, money, sizes and dates |
 
 ### 🖥️ CLI building
 
 | Module               | What you get                                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [cli.sh](doc/cli.md) | Declarative option parser with "did you mean" suggestions, generated `--no-` switches, counting `-vv` flags, options bound to config keys, prompts for missing values, env fallbacks, automatic `--help`, and generated JSON schema / shell completion / man pages |
-| [tui.sh](doc/tui.md) | Spinners, progress bars, arrow-key single and multi select menus, and confirmations — each one falling back to a numbered prompt or a log line when there is no terminal, so the same script runs unattended |
-| [screen.sh](doc/screen.md) | Full-screen applications: a constraint layout solver, blocks, lists, tables, gauges, tabs, scrollbars, sparklines, bar and Braille line charts, popups, and an event loop with keys, mouse and resize |
+| [cli.sh](docs/cli.md) | Declarative option parser with "did you mean" suggestions, generated `--no-` switches, counting `-vv` flags, options bound to config keys, prompts for missing values, env fallbacks, automatic `--help`, and generated JSON schema / shell completion / man pages |
+| [tui.sh](docs/tui.md) | Spinners, progress bars, arrow-key single and multi select menus, and confirmations — each one falling back to a numbered prompt or a log line when there is no terminal, so the same script runs unattended |
+| [screen.sh](docs/screen.md) | Full-screen applications: a constraint layout solver, blocks, lists, tables, gauges, tabs, scrollbars, sparklines, bar and Braille line charts, popups, and an event loop with keys, mouse and resize |
 
 ### 📁 Files & system
 
 | Module                          | What you get                                     |
 | ------------------------------- | ------------------------------------------------ |
-| [file.sh](doc/file.md)          | Paths, XDG dirs, temp files, atomic rewrites, idempotent lines, checksums, upward search |
-| [archive.sh](doc/archive.md)    | Create, extract and list archives                 |
-| [os.sh](doc/os.md)              | Platform/distro and architecture detection        |
-| [pkg.sh](doc/pkg.md)            | Detect the package manager and install dependencies, with confirmation and dry-run |
+| [file.sh](docs/file.md)          | Paths, XDG dirs, temp files, atomic rewrites, idempotent lines, checksums, upward search |
+| [archive.sh](docs/archive.md)    | Create, extract and list archives                 |
+| [os.sh](docs/os.md)              | Platform/distro and architecture detection        |
+| [pkg.sh](docs/pkg.md)            | Detect the package manager and install dependencies, with confirmation and dry-run |
 
 ### 🌐 Network & notifications
 
 | Module                                    | What you get                                                    |
 | ----------------------------------------- | ---------------------------------------------------------------- |
-| [network.sh](doc/network.md)              | `curl` wrapper with retry, rate limiting, pagination and auth     |
-| [notification.sh](doc/notification.md)    | Slack, Telegram, Teams, Google Chat, Discord, generic webhooks     |
+| [network.sh](docs/network.md)              | `curl` wrapper with retry, rate limiting, pagination and auth     |
+| [notification.sh](docs/notification.md)    | Slack, Telegram, Teams, Google Chat, Discord, generic webhooks     |
 
 ### 🔐 Configuration & secrets
 
 | Module                          | What you get                                                     |
 | ------------------------------- | ----------------------------------------------------------------- |
-| [validate.sh](doc/validate.md)  | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
-| [config.sh](doc/config.md)      | Config files + env vars with precedence and schema validation      |
-| [secret.sh](doc/secret.md)      | Read secrets safely, mask them in output, shred and wipe them      |
-| [safety.sh](doc/safety.md)      | Confirm-or-refuse guards for rm, overwrite, extract, system changes |
+| [validate.sh](docs/validate.md)  | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
+| [config.sh](docs/config.md)      | Config files + env vars with precedence and schema validation      |
+| [secret.sh](docs/secret.md)      | Read secrets safely, mask them in output, shred and wipe them      |
+| [safety.sh](docs/safety.md)      | Confirm-or-refuse guards for rm, overwrite, extract, system changes |
 
 ### 🤖 AI
 
 | Module                      | What you get                                                                           |
 | --------------------------- | ---------------------------------------------------------------------------------------- |
-| [ai.sh](doc/ai.md)          | Call Claude, OpenAI-compatible APIs, Ollama or a local CLI — conversations, JSON output, streaming, tool use, budgets |
-| [agent.sh](doc/agent.md)    | Make your script agent-safe — JSON results, tool/MCP definitions generated from your CLI spec, an allowlist gate, an audit log |
+| [ai.sh](docs/ai.md)          | Call Claude, OpenAI-compatible APIs, Ollama or a local CLI — conversations, JSON output, streaming, tool use, budgets |
+| [agent.sh](docs/agent.md)    | Make your script agent-safe — JSON results, tool/MCP definitions generated from your CLI spec, an allowlist gate, an audit log |
 
 ### 🛠 Dev workflow
 
 | Module                        | What you get                                            |
 | ----------------------------- | -------------------------------------------------------- |
-| [git.sh](doc/git.md)          | Repo metadata, branches, tags, commits, remotes, reachability |
-| [semver.sh](doc/semver.md)    | Parse, validate, compare, bump, sort and range-match semantic versions |
-| [release.sh](doc/release.md)  | Version from commits, changelog, per-platform artifacts, checksums, signing |
-| [forge.sh](doc/forge.md)      | Publish to GitHub or GitLab: releases, assets, and issues that comment instead of duplicating |
-| [testing.sh](doc/testing.md)  | File/JSON/YAML assertions, CLI snapshots, mocks, fixtures |
-| [metrics.sh](doc/metrics.md)  | Command timing, counters, retry/HTTP/error stats, Prometheus export |
-| [doctor.sh](doc/doctor.md)    | Report the Bash version, the library version and every external tool the loaded modules need |
+| [git.sh](docs/git.md)          | Repo metadata, branches, tags, commits, remotes, reachability |
+| [semver.sh](docs/semver.md)    | Parse, validate, compare, bump, sort and range-match semantic versions |
+| [release.sh](docs/release.md)  | Version from commits, changelog, per-platform artifacts, checksums, signing |
+| [forge.sh](docs/forge.md)      | Publish to GitHub or GitLab: releases, assets, and issues that comment instead of duplicating |
+| [testing.sh](docs/testing.md)  | File/JSON/YAML assertions, CLI snapshots, mocks, fixtures |
+| [metrics.sh](docs/metrics.md)  | Command timing, counters, retry/HTTP/error stats, Prometheus export |
+| [doctor.sh](docs/doctor.md)    | Report the Bash version, the library version and every external tool the loaded modules need |
 
 ## 🗂 Directory Structure
 
 ```
 .
-├── doc/            # Module documentation
+├── docs/           # Module documentation
 │   ├── *.md        # Usage guides & reference for each module
 │   └── spec/       # Module specifications and design docs
 ├── example/        # Example scripts for users

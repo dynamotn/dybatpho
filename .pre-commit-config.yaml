@@ -5,7 +5,7 @@ repos:
       # by the time `lint` compares it against the sources.
       - id: gen-doc
         name: Generate documentation
-        entry: bash scripts/doc.sh
+        entry: bash scripts/docs.sh
         language: system
         types:
           - file

@@ -39,7 +39,7 @@ appended to a rotating log file at an independent verbosity level.
 ### 🚀 Highlights
 
 - [`__dybatpho_log`](#__dybatpho_log) — Log a message to stdout or stderr, optionally with ANSI color.
-- [`__dybatpho_log_json_escape`](#__dybatpho_log_json_escape) — Escape a string for use as a JSON string value.
+- [`__dybatpho_log_json_escape`](#__dybatpho_log_json_escape) — Escape a string for use as a JSON string value. JSON forbids a raw control character inside a string, and only five of them have a short escape. Leaving the rest alone produced a line no parser would read: a message carrying an ANSI colour sequence -- which is what logging the output of any coloured command gives you -- made the whole event invalid, and a log shipper drops an invalid line without saying so. Anything with no short escape now goes out as `\u00XX`.
 - [`__dybatpho_log_timestamp`](#__dybatpho_log_timestamp) — Return an RFC 3339 timestamp for a log event.
 - [`__dybatpho_log_now_ms`](#__dybatpho_log_now_ms) — Return the current time in milliseconds since the epoch, using the most precise portable source available.
 - [`__dybatpho_log_duration_ms`](#__dybatpho_log_duration_ms) — Return the elapsed time since the process started, for structured log events.
@@ -155,6 +155,12 @@ Log a message to stdout or stderr, optionally with ANSI color.
 ### `__dybatpho_log_json_escape`
 
 Escape a string for use as a JSON string value.
+  JSON forbids a raw control character inside a string, and only five of them
+  have a short escape. Leaving the rest alone produced a line no parser would
+  read: a message carrying an ANSI colour sequence -- which is what logging
+  the output of any coloured command gives you -- made the whole event
+  invalid, and a log shipper drops an invalid line without saying so.
+  Anything with no short escape now goes out as `\u00XX`.
 
 **🧾 Arguments**
 

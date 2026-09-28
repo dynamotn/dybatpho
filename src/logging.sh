@@ -117,6 +117,12 @@ function __dybatpho_log {
 
 #######################################
 # @description Escape a string for use as a JSON string value.
+#   JSON forbids a raw control character inside a string, and only five of them
+#   have a short escape. Leaving the rest alone produced a line no parser would
+#   read: a message carrying an ANSI colour sequence -- which is what logging
+#   the output of any coloured command gives you -- made the whole event
+#   invalid, and a log shipper drops an invalid line without saying so.
+#   Anything with no short escape now goes out as `\u00XX`.
 # @arg $1 string Input text
 # @stdout JSON-escaped text without surrounding quotes
 #######################################
@@ -127,6 +133,25 @@ function __dybatpho_log_json_escape {
   value="${value//$'\n'/\\n}"
   value="${value//$'\r'/\\r}"
   value="${value//$'\t'/\\t}"
+  value="${value//$'\b'/\\b}"
+  value="${value//$'\f'/\\f}"
+  # The walk below costs a pass per character, so it runs only when something
+  # is left that the substitutions above could not spell.
+  if [[ "${value}" == *[[:cntrl:]]* ]]; then
+    local escaped="" index char code
+    for ((index = 0; index < ${#value}; index++)); do
+      char="${value:index:1}"
+      # The code point decides, not a bracket range: a range is resolved by the
+      # locale's collation and a multi-byte character can fall inside one.
+      printf -v code '%d' "'${char}"
+      if ((code < 32 || code == 127)); then
+        printf -v escaped '%s\\u%04x' "${escaped}" "${code}"
+      else
+        escaped+="${char}"
+      fi
+    done
+    value="${escaped}"
+  fi
   printf '%s' "${value}"
 }
 

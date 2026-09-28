@@ -38,6 +38,13 @@ teardown() {
 
   assert_equal "$(__dybatpho_log_json_escape 'a"b\c')" 'a\"b\\c'
   assert_equal "$(__dybatpho_log_json_escape $'tab\tnew\nret\r')" 'tab\tnew\nret\r'
+  assert_equal "$(__dybatpho_log_json_escape $'back\bfeed\f')" 'back\bfeed\f'
+  # A control character with no short escape has to be spelled out, or the
+  # event is not JSON at all.
+  assert_equal "$(__dybatpho_log_json_escape $'esc\033[31m')" 'esc\u001b[31m'
+  assert_equal "$(__dybatpho_log_json_escape $'a\001b\177c')" 'a\u0001b\u007fc'
+  # UTF-8 is not a control character and must survive intact.
+  assert_equal "$(__dybatpho_log_json_escape 'nhánh 日本')" 'nhánh 日本'
   [[ "$(__dybatpho_log_timestamp)" =~ ^[0-9]{4}- ]]
 
   dybatpho::validate_log_level info
@@ -954,4 +961,19 @@ assert event["duration_ms"] >= 0
   assert_success
   refute_stderr --partial "spinner-secret-value"
   assert_stderr --partial "***"
+}
+
+@test "a JSON log event stays parseable whatever the message carries" {
+  # Only backslash, quote, newline, carriage return and tab were escaped, so a
+  # message holding an ANSI colour sequence -- what you get logging the output
+  # of any coloured command -- left a raw control character in the string and
+  # made the whole line invalid JSON. A log shipper drops such a line silently.
+  local out="${BATS_TEST_TMPDIR}/events.json"
+  local message
+  message="$(printf 'build \033[31mFAILED\033[0m\a on "main"\ttab')"
+
+  LOG_FORMAT=json LOG_LEVEL=info dybatpho::info "${message}" 2> "${out}"
+  run jq -e . "${out}"
+  assert_success
+  assert_equal "$(jq -r '.message' "${out}")" "${message}"
 }

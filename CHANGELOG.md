@@ -832,6 +832,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   standard input, which has no name to quote and is the one spelling the GNU
   tools, `shasum`, `md5` and `openssl` all accept.
 
+- **`LOG_FORMAT=json` produced lines no JSON parser would read.** Only
+  backslash, quote, newline, carriage return and tab were escaped, and JSON
+  forbids every other raw control character inside a string. A message carrying
+  an ANSI colour sequence — which is what logging the output of any coloured
+  command gives you — made the whole event invalid, and a log shipper drops an
+  invalid line without saying so. `\b` and `\f` are now spelled out and
+  anything else below `0x20`, plus `DEL`, goes out as `\u00XX`. UTF-8 is
+  untouched.
+
 - **`dybatpho::string_slugify` threw away every accented letter.** Anything
   outside `a-z0-9` counted as a separator, so `Thế Giới` slugged to `th-gi-i`
   and `Crème brûlée` to `cr-me-br-l-e` — slugs that name nothing, and that

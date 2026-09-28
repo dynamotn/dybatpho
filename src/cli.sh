@@ -1195,6 +1195,11 @@ function __dybatpho_cli_parse_key_value() {
 # @stdout Generated logic
 #######################################
 function __dybatpho_cli_generate_logic {
+  # `command` is read by nobody here any more -- it used to pick out the root
+  # spec so the arguments could be appended to the generated file -- but it is
+  # still the second argument every caller passes and `expect_args` still has
+  # to account for it.
+  # shellcheck disable=SC2034 # kept for the argument contract
   local spec command
   dybatpho::expect_args spec command -- "$@"
   [ "$(type -t "${spec}")" != 'function' ] && return
@@ -1443,14 +1448,12 @@ function __dybatpho_cli_generate_logic {
     __dybatpho_cli_generate_child_logic "${_sub_spec}" "${_cmd_name}" "$@"
   done
 
-  # Trigger root spec
-  if [[ "${command}" == "-" ]]; then
-    local trigger="dybatpho::opts::parse::${spec}"
-    for param in "$@"; do
-      trigger+=" \"${param//\"/\\\"}\""
-    done
-    __dybatpho_cli_print_indent 0 "${trigger}"
-  fi
+  # The root spec is not triggered from inside the generated file. Writing the
+  # arguments into it as shell source and sourcing that put every value through
+  # a round of expansion: `--name '$(id)'` ran `id`, `--name '$VAR'` expanded
+  # it, and a value ending in a backslash escaped the closing quote and left
+  # the file unparseable. `dybatpho::generate_from_spec` calls the parser with
+  # the real argument vector instead, where a value is a value.
 
 }
 
@@ -3054,6 +3057,10 @@ function dybatpho::generate_from_spec {
   fi
   # shellcheck disable=1090
   . "${gen_file}"
+  # The generated file only defines parsers. Running one is done here, with the
+  # argument vector this function was given, so nothing a caller typed is ever
+  # read as shell source.
+  "dybatpho::opts::parse::${spec}" "$@"
 }
 
 #######################################

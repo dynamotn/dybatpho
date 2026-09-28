@@ -164,10 +164,14 @@ setup() {
   assert_output --partial "Child command"
 }
 
-@test "dybatpho::generate_from_spec send arguments to dybatpho::opts::parse" {
+@test "dybatpho::generate_from_spec keeps the arguments out of the generated file" {
+  # The arguments used to be written into the generated file as shell source
+  # and the file sourced, so every value went through a round of expansion.
+  # The file now only defines the parser; the arguments reach it as an
+  # argument vector.
   # shellcheck disable=2329
   _spec() {
-    dybatpho::opts::setup "" -
+    dybatpho::opts::setup "" ARGS action:"printf '%s\n' \"\${ARGS[@]}\""
   }
 
   # shellcheck disable=2030
@@ -175,7 +179,46 @@ setup() {
   export DYBATPHO_CLI_DEBUG=true
   run --separate-stderr dybatpho::generate_from_spec _spec 1 2 "3\""
   assert_success
-  assert_stderr --partial "dybatpho::opts::parse::_spec \"1\" \"2\" \"3\\\""
+  assert_stderr --partial "dybatpho::opts::parse::_spec() {"
+  refute_stderr --partial "dybatpho::opts::parse::_spec \"1\""
+  assert_line --index 0 "1"
+  assert_line --index 2 "3\""
+}
+
+@test "dybatpho::generate_from_spec treats an argument as data, never as shell" {
+  # `--name '$(touch ...)'` ran the command, `--name '$HOME'` expanded it, and
+  # a value ending in a backslash escaped the closing quote and left the
+  # generated file unparseable. Any script built on this parser therefore ran
+  # whatever an argument value asked it to.
+  # shellcheck disable=2329
+  _spec() {
+    dybatpho::opts::setup "" ARGS action:"printf '%s\n' \"\${NAME}\" \"\${ARGS[@]}\""
+    dybatpho::opts::param "name" NAME --name
+  }
+
+  local marker="${BATS_TEST_TMPDIR}/executed"
+  local payload="x\$(touch '${marker}')y"
+  run dybatpho::generate_from_spec _spec --name "${payload}"
+  assert_success
+  assert_line --index 0 "${payload}"
+  assert_file_not_exist "${marker}"
+
+  # A positional argument goes the same way.
+  run dybatpho::generate_from_spec _spec "${payload}"
+  assert_success
+  assert_output --partial "${payload}"
+  assert_file_not_exist "${marker}"
+
+  # Backticks, a bare variable reference, and a trailing backslash.
+  run dybatpho::generate_from_spec _spec --name '`id`'
+  assert_success
+  assert_line --index 0 '`id`'
+  run dybatpho::generate_from_spec _spec --name '$HOME'
+  assert_success
+  assert_line --index 0 '$HOME'
+  run dybatpho::generate_from_spec _spec --name 'trailing\'
+  assert_success
+  assert_line --index 0 'trailing\'
 }
 
 @test "dybatpho::generate_from_spec handling rest arguments" {

@@ -843,6 +843,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **A CLI built on `dybatpho::opts` ran whatever an argument value asked it
+  to.** `dybatpho::generate_from_spec` wrote the script's arguments into the
+  generated parser file as shell source and then sourced that file, quoting
+  only `"`. Inside double quotes `$`, a backtick and a backslash are still
+  live, so `--name '$(id)'` ran `id` before the parser had even looked at the
+  value, `--name '$HOME'` came out expanded, and a value ending in a backslash
+  escaped the closing quote and left the file unparseable — the CLI then died
+  with a bash syntax error. A positional argument went the same way.
+
+  Any script whose arguments are not entirely under the author's control was
+  therefore a way to run commands: a branch name, a ticket title or a file name
+  coming from CI was enough. The generated file now only defines parsers, and
+  `dybatpho::generate_from_spec` calls the one it needs with the real argument
+  vector, so nothing a caller typed is ever read as shell source.
+
 - **Credentials no longer reach `curl` as command-line arguments.** A process's
   arguments are readable by every account on the host through
   `/proc/<pid>/cmdline` — that is what `ps auxww` prints — so

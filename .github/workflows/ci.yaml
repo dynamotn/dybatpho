@@ -60,7 +60,11 @@ jobs:
           YQ_VERSION: v4.53.3
         run: |
           # gawk: `scripts/docs.sh`, which the conventions tests run, needs it.
-          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk
+          # locales: the base image carries no UTF-8 locale, and bash only
+          # walks a string character by character under one. Without it the
+          # screen widgets and `dybatpho::string_slugify` see raw bytes.
+          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk locales
+          locale -a | grep -qix 'C\.utf-\?8' || localedef -i C -f UTF-8 C.UTF-8
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
           chmod +x /usr/local/bin/yq
@@ -93,7 +97,7 @@ jobs:
           # runner has 4. `scripts/test.sh` balances the chunks by test count, so
           # 5 files per chunk is ~180 tests, or well under 3 GiB of the 16 GiB
           # the runner has.
-          su - test -c "DYBATPHO_TEST_JOBS=4 DYBATPHO_TEST_CHUNK=5 bash $(pwd)/scripts/test.sh --coverage"
+          su - test -c "LANG=C.UTF-8 LC_ALL=C.UTF-8 DYBATPHO_TEST_JOBS=4 DYBATPHO_TEST_CHUNK=5 bash $(pwd)/scripts/test.sh --coverage"
 
       - name: "Fix coverage paths"
         # kcov strips the longest common prefix from `filename` and records it in

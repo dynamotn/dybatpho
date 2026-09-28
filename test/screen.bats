@@ -229,7 +229,7 @@ screen_raw() {
   __dybatpho_screen_fd=""
   # Only the changed row travelled, not the whole screen.
   local sent
-  sent="$(LC_ALL=C grep -ao 'second' "${output_file}" | wc -l)"
+  sent="$(LC_ALL=C grep -ao 'second' "${output_file}" | wc -l | tr -d ' ')"
   assert_equal "${sent}" 1
 }
 

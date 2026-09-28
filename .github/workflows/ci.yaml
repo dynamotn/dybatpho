@@ -19,25 +19,53 @@ jobs:
       - name: "Install dependencies"
         env:
           YQ_VERSION: v4.53.3
-          # Pin ShellCheck: the runner image ships 0.9.0, whose SC2317, SC2119,
-          # and SC2015 findings on this code are false positives that later
-          # versions dropped. A pinned release also keeps a lint failure here
-          # reproducible on a developer machine.
-          SHELLCHECK_VERSION: v0.11.0
+          # The lint toolchain deliberately floats: `dyshellint` and the two
+          # tools it drives are always fetched at their latest release, so a
+          # rule or a formatting change reaches this job the day it ships
+          # rather than whenever someone remembers to bump a pin. The runner
+          # image's own ShellCheck is too old to use — 0.9.0 reports SC2317,
+          # SC2119 and SC2015 false positives on this code that later versions
+          # dropped — so it is replaced rather than relied on.
+          #
+          # The token is only to lift the unauthenticated API rate limit, which
+          # a shared runner IP exhausts quickly.
+          GH_TOKEN: ${{ github.token }}
         run: |
           sudo apt-get update
           sudo apt-get install -y --fix-missing gawk jq
+
+          latest_tag() {
+            curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+              "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
+          }
+
+          shellcheck_version="$(latest_tag koalaman/shellcheck)"
           curl -fsSL \
-            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar -xJf - -C /tmp "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
-          sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+            "https://github.com/koalaman/shellcheck/releases/download/${shellcheck_version}/shellcheck-${shellcheck_version}.linux.x86_64.tar.xz" \
+            | tar -xJf - -C /tmp "shellcheck-${shellcheck_version}/shellcheck"
+          sudo install -m 0755 "/tmp/shellcheck-${shellcheck_version}/shellcheck" /usr/local/bin/shellcheck
+
+          shfmt_version="$(latest_tag mvdan/sh)"
+          sudo curl -fsSL -o /usr/local/bin/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${shfmt_version}/shfmt_${shfmt_version}_linux_amd64"
+          sudo chmod +x /usr/local/bin/shfmt
+
+          # The asset name carries no version, so this one needs no lookup.
+          curl -fsSL \
+            "https://github.com/dynamotn/dyshellint/releases/latest/download/dyshellint_linux_amd64.tar.gz" \
+            | tar -xzf - -C /tmp dyshellint
+          sudo install -m 0755 /tmp/dyshellint /usr/local/bin/dyshellint
+
           sudo curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
           sudo chmod +x /usr/local/bin/yq
           shellcheck --version | head -n 2
+          shfmt --version
+          dyshellint -version | head -n 1
 
       - name: "Lint"
-        # ShellCheck over every tracked script, Keep a Changelog conformance,
+        # `dyshellint` over every tracked script — the Bash coding style guide's
+        # own rules plus ShellCheck and shfmt — Keep a Changelog conformance,
         # generated-documentation drift, and a bundle that still builds and loads.
         run: bash scripts/lint.sh
 

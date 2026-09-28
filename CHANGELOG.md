@@ -496,6 +496,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overview paragraphs are gone, an indented `@description` continuation is
   dedented, and `@set` renders its type column like `@arg` and `@env` do.
 
+- **`scripts/lint.sh` checks the code against the Bash coding style guide, not
+  only against ShellCheck.** The `shell` stage now runs
+  [`dyshellint`](https://github.com/dynamotn/dyshellint), which reports the
+  guide's own rules (`BSG###`), ShellCheck (`SC####`) and shfmt (`FMT001`) as a
+  single list, reading the same `.shellcheckrc` as before. The rules the guide
+  states — namespaced functions, `dybatpho::expect_args`, shdoc headers, line
+  length — were prose a reviewer had to remember; they are now checked.
+
+  ```sh
+  scripts/lint.sh --stage shell   # dyshellint and `bash -n`
+  ```
+
+  `dyshellint` is required for that stage, and the CI lint job installs it —
+  along with the ShellCheck and shfmt it drives — at their latest release, so
+  a new rule reaches the job as soon as it ships. The repository does not satisfy the
+  full rule set yet, so the stage reports a backlog that is being worked down;
+  `bash -n`, the changelog, documentation and bundle stages are unaffected.
+
 - **Drawing a table no longer costs a process per cell.** Every function in the
   library returns its answer on stdout, so every caller reads it with `$( )` —
   and `$( )` forks. The renderers were built entirely out of those: measuring a

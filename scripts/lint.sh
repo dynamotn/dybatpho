@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @file lint.sh
-# @brief Check the repository itself: shell syntax, ShellCheck, changelog format
+# @brief Check the repository itself: shell syntax, dyshellint, changelog format
 # @description
 #   `scripts/test.sh` answers whether the library behaves; this script answers
 #   whether the repository is in the shape `AGENT.md` says it must be. The rules
@@ -8,27 +8,35 @@
 #   `.shellcheckrc` ended up in the repository without a single automated
 #   ShellCheck run.
 #
+#   The style pass is `dyshellint`, the linter for the Bash coding style guide
+#   this library follows. It is one command for three checks — the guide's own
+#   rules (`BSG###`), ShellCheck (`SC####`) and shfmt (`FMT001`) — so a finding
+#   in any of them is reported in one list, with the `.shellcheckrc` of the
+#   repository still honoured. Calling ShellCheck directly here would leave the
+#   guide's own rules unchecked, which is what let them drift.
+#
 #   Scripts are discovered the way Git sees them, so nothing has to be
 #   registered by hand: every tracked file that either ends in `.sh` or opens
 #   with a Bash shebang is checked. Vendored code under `test/lib/` is a set of
 #   submodules, so `git ls-files` never descends into it and upstream's style is
 #   never this repository's problem.
 #
-#   `.bats` files are deliberately excluded from ShellCheck: `@test "name" {` is
-#   Bats syntax, not Bash, and ShellCheck has no dialect for it.
+#   `.bats` files are deliberately excluded: `@test "name" {` is Bats syntax,
+#   not Bash, and neither ShellCheck nor shfmt has a dialect for it.
 #
 #   Stages run in order and each reports everything it finds before the script
 #   moves on, so one run lists the whole backlog instead of one item at a time.
 #
 # @example
 #   scripts/lint.sh                # every stage
-#   scripts/lint.sh --stage shell  # ShellCheck and `bash -n` only
+#   scripts/lint.sh --stage shell  # dyshellint and `bash -n` only
 #   scripts/lint.sh --list         # print the discovered scripts and exit
 #
 # @see
 #   - `test/conventions.bats`
 #   - `.github/workflows/ci.yaml`
 #   - `.shellcheckrc`
+#   - https://github.com/dynamotn/dyshellint
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=init.sh
 . "${SCRIPT_DIR}/../init.sh" --modules cli
@@ -72,13 +80,16 @@ function __dybatpho_lint_syntax {
   dybatpho::success "Shell syntax is valid"
 }
 
-# @description Run ShellCheck over every discovered script.
-#   `-x` follows sourced files and `-P` tells ShellCheck where to find them, so
-#   a script that sources `../init.sh` resolves instead of reporting SC1091.
-# @exitcode 0 ShellCheck reports nothing
-# @exitcode 1 ShellCheck reports at least one finding
-function __dybatpho_lint_shellcheck {
-  dybatpho::require "shellcheck"
+# @description Run `dyshellint` over every discovered script: the rules of the
+#   Bash coding style guide, ShellCheck and shfmt in a single pass.
+#   The linter separates the two ways a run can end badly — `1` is the code
+#   having findings, `2` is the linter itself unable to run, usually a missing
+#   ShellCheck or shfmt — so a broken toolchain is not reported as a style
+#   backlog.
+# @exitcode 0 `dyshellint` reports nothing
+# @exitcode 1 `dyshellint` reports at least one finding, or could not run
+function __dybatpho_lint_dyshellint {
+  dybatpho::require "dyshellint"
 
   local -a scripts=()
   mapfile -t scripts < <(__dybatpho_lint_scripts)
@@ -87,11 +98,16 @@ function __dybatpho_lint_shellcheck {
     return 0
   fi
 
-  if (cd "${DYBATPHO_DIR}" && shellcheck -x -P . -P example -- "${scripts[@]}"); then
-    dybatpho::success "ShellCheck is clean over ${#scripts[@]} script(s)"
-    return 0
-  fi
-  dybatpho::error "ShellCheck reported findings"
+  local status=0
+  (cd "${DYBATPHO_DIR}" && dyshellint "${scripts[@]}") || status=$?
+  case "${status}" in
+    0)
+      dybatpho::success "dyshellint is clean over ${#scripts[@]} script(s)"
+      return 0
+      ;;
+    1) dybatpho::error "dyshellint reported findings" ;;
+    *) dybatpho::error "dyshellint could not run (exit ${status}); is shellcheck or shfmt missing?" ;;
+  esac
   return 1
 }
 
@@ -186,7 +202,7 @@ function __dybatpho_lint_run {
   case "${STAGE}" in
     all | shell)
       __dybatpho_lint_syntax || failures=$((failures + 1))
-      __dybatpho_lint_shellcheck || failures=$((failures + 1))
+      __dybatpho_lint_dyshellint || failures=$((failures + 1))
       ;;&
     all | changelog)
       __dybatpho_lint_changelog || failures=$((failures + 1))
@@ -206,7 +222,7 @@ function __dybatpho_lint_run {
 # @description CLI specification for this script.
 function _spec {
   dybatpho::opts::setup \
-    "Check the repository's own shape: syntax, ShellCheck, changelog, docs, bundle" \
+    "Check the repository's own shape: syntax, dyshellint, changelog, docs, bundle" \
     LINT_ARGS action:"__dybatpho_lint_run"
 
   dybatpho::opts::flag "Print the discovered scripts and exit" LIST --list \

@@ -605,7 +605,7 @@ to the module convention.
 | Documentation/spec | Correct links/references, `git diff --check`, and `scripts/lint.sh --stage doc` after regenerating |
 | New public function | `test/conventions.bats` — it must appear in `docs/<module>.md` and be named directly in `test/<module>.bats` |
 | New or changed example | `test/examples.bats` — it must run non-interactively, offline, and leave the working tree untouched |
-| Any shell script | `scripts/lint.sh --stage shell` — ShellCheck and `bash -n` over every tracked script |
+| Any shell script | `scripts/lint.sh --stage shell` — `dyshellint` (the style guide rules, ShellCheck and shfmt) and `bash -n` over every tracked script |
 | `CHANGELOG.md` | `scripts/lint.sh --stage changelog` — Keep a Changelog headings, dates, and well-formed link reference URLs |
 | Any public behavior | `CHANGELOG.md` entry under `## [Unreleased]`, in the same change |
 
@@ -623,6 +623,6 @@ to the module convention.
    above, and confirm `git diff --stat HEAD -- CHANGELOG.md` shows the file.
    A public-behavior change without its entry is not done.
 8. Run targeted tests, `scripts/lint.sh`, and `git diff --check`. `scripts/lint.sh`
-   covers ShellCheck, `bash -n`, the changelog format, documentation drift and
+   covers `dyshellint`, `bash -n`, the changelog format, documentation drift and
    the bundle; `test/examples.bats` covers the examples.
 9. Review the final diff and remove temporary artifacts.

@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::validate_or_die "--release" "${version}" type:semver
 
   if ! dybatpho::validate_value "${port}" type:int min:1 max:65535; then
-    dybatpho::error "$(dybatpho::validate_errors)"   # every violation, not the first
+    dybatpho::error "$(dybatpho::validate_errors)" # every violation, not the first
   fi
 
   function _is_service { [[ "$1" =~ ^[a-z]+-(api|worker)$ ]]; }
@@ -84,6 +84,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than when a user first types a value. The declared type is annotated
   in `--help` and the man page as `[type: ...]` and carried into the generated
   JSON schema as `valueType`.
+- **`tui` — spinners, progress bars, arrow-key menus and confirmations that
+  also work with no terminal.** `cli` covered everything up to the moment a
+  script starts talking to a person, and stopped there. Asking a question meant
+  hand-rolling ANSI escapes and raw key reading, plus a second code path for
+  the unattended case — which is where hand-rolled widgets fail: a menu hangs
+  in CI, a `\r` progress bar fills a log with part-drawn lines, and a widget
+  that prints to stdout corrupts the value the script was computing.
+
+  ```sh
+  . dybatpho/init.sh --modules tui
+
+  dybatpho::tui_menu environment "Deploy where?" dev staging prod \
+    || dybatpho::die "No environment chosen"
+  dybatpho::tui_multi_menu components "Which components?" api worker scheduler
+  dybatpho::tui_confirm "Deploy ${components[*]} to ${environment}?" \
+    || dybatpho::die "Cancelled"
+
+  dybatpho::tui_spinner_start "Resolving the release"
+  dybatpho::tui_spinner_message "Resolving api"
+  dybatpho::tui_spinner_stop "$?" "Resolved"
+
+  dybatpho::tui_progress_start "Uploading" "${#components[@]}"
+  for component in "${components[@]}"; do
+    _upload "${component}"
+    dybatpho::tui_progress_step 1 "Uploading ${component}"
+  done
+  dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
+  ```
+
+  Every widget has two renderings and the module picks between them, so the
+  same calls work in both places. On a terminal `dybatpho::tui_menu` and
+  `dybatpho::tui_multi_menu` draw a pointer, move on the arrow keys or `j`/`k`,
+  toggle on `space`, scroll once the list is longer than the window, and cancel
+  on `esc`; `dybatpho::tui_confirm` draws both answers with the default
+  highlighted. With the streams captured — CI, a pipe, a `$( )` — the menus
+  become numbered prompts read through `dybatpho::prompt`, and
+  `dybatpho::tui_confirm` is `dybatpho::confirm`, keeping its `DYBATPHO_FORCE`
+  override and its refusal to guess in an unattended shell.
+  `dybatpho::tui_supported` reports which rendering is in force, and
+  `DYBATPHO_TUI` overrides the detection in both directions.
+
+  Everything the module draws goes to stderr, including its closing banners, so
+  a value on stdout stays usable in a command substitution; the menus return
+  their answer through a named variable for the same reason, and a multi-select
+  returns an array so entries containing spaces survive. A menu that can
+  neither ask nor read `DYBATPHO_TUI_DEFAULT` fails rather than choosing an
+  entry silently.
+
+  `dybatpho::spinner` still wraps one command;
+  `dybatpho::tui_spinner_start`/`_message`/`_stop` bracket a region instead,
+  which is what a loop or a pipeline needs, and stopping returns the status it
+  was given so one call both reports and propagates an outcome. Progress is
+  driven with `dybatpho::tui_progress_start`, `_update`, `_step` and `_stop`;
+  off a terminal it logs on a percentage grid rather than once per update, so a
+  thousand-item loop leaves a bounded log. `dybatpho::tui_bar` renders a bar as
+  plain text on its own, for a script that already tracks its own progress.
 
 - **`process` — a general time limit, named background jobs, and PID files.**
   The library could bound a curl request and nothing else, so every script that

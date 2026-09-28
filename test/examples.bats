@@ -48,8 +48,8 @@ run_example() {
   local missing="" name
   for source in "${REPO_ROOT}"/example/*.sh; do
     name="$(basename "${source}")"
-    grep -qF "run_example \"${name}\"" "${BATS_TEST_FILENAME}" ||
-      missing+="example/${name} has no test in test/examples.bats"$'\n'
+    grep -qF "run_example \"${name}\"" "${BATS_TEST_FILENAME}" \
+      || missing+="example/${name} has no test in test/examples.bats"$'\n'
   done
   [ -z "${missing}" ] || {
     printf 'Examples that are never executed:\n\n%s\n' "${missing}" >&2
@@ -94,3 +94,4 @@ run_example() {
 @test "example/testing_ops.sh runs clean" { run_example "testing_ops.sh"; }
 @test "example/text_ops.sh runs clean" { run_example "text_ops.sh"; }
 @test "example/validate_ops.sh runs clean" { run_example "validate_ops.sh"; }
+@test "example/tui_ops.sh runs clean" { run_example "tui_ops.sh"; }

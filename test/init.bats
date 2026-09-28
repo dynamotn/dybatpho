@@ -116,6 +116,9 @@ loaded_line() {
 
   run -0 init_sh "--modules agent" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety json agent "
+
+  run -0 init_sh "--modules tui" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret validate config cli archive safety tui "
 }
 
 @test "a dependency cycle loads every module once and terminates" {

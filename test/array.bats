@@ -452,6 +452,44 @@ EOF
   assert_equal "${values[0]}" "a"
 }
 
+@test "dybatpho::array_sort agrees with sort(1) over random input" {
+  # The comparison is decided in one place, but the merge that drives it is
+  # not, and an off-by-one in a run boundary drops or duplicates elements at
+  # sizes the fixed examples above never reach. `sort` is the reference.
+  local -a values=() sorted=()
+  local index expected actual
+  for ((index = 0; index < 137; index++)); do
+    values+=("$((RANDOM % 90))")
+  done
+  expected="$(printf '%s\n' "${values[@]}" | LC_ALL=C sort -n | tr '\n' ' ')"
+  sorted=("${values[@]}")
+  dybatpho::array_sort sorted --numeric
+  actual="$(printf '%s ' "${sorted[@]}")"
+  assert_equal "${actual}" "${expected}"
+
+  expected="$(printf '%s\n' "${values[@]}" | LC_ALL=C sort -rn | tr '\n' ' ')"
+  sorted=("${values[@]}")
+  dybatpho::array_sort sorted --numeric --reverse
+  actual="$(printf '%s ' "${sorted[@]}")"
+  assert_equal "${actual}" "${expected}"
+
+  expected="$(printf '%s\n' "${values[@]}" | LC_ALL=C sort | tr '\n' ' ')"
+  sorted=("${values[@]}")
+  LC_ALL=C dybatpho::array_sort sorted
+  actual="$(printf '%s ' "${sorted[@]}")"
+  assert_equal "${actual}" "${expected}"
+}
+
+@test "dybatpho::array_sort keeps equal elements in the order they arrived" {
+  # The merge takes from the left run on a tie, which is what makes sorting by
+  # one field leave the rest of the order alone.
+  local values=(b1 a1 b2 a2 b3 a3)
+  # shellcheck disable=2329
+  __dybatpho_array_sorts_after() { [[ "${1:0:1}" > "${2:0:1}" ]]; }
+  dybatpho::array_sort values
+  assert_equal "${values[*]}" "a1 a2 a3 b1 b2 b3"
+}
+
 @test "dybatpho::array_sort prints with -- and rejects a bad option or value" {
   local fruit=(b a)
   run -0 dybatpho::array_sort fruit --

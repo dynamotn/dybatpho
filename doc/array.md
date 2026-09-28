@@ -39,7 +39,8 @@ Every helper takes an array by name and changes it in place, with a final
 - [`__dybatpho_array_copy`](#__dybatpho_array_copy) — Copy the values of one array into another. Bash 4.3 treats `"${empty[@]}"` as unset under `nounset`, so every copy in this module goes through the length check here rather than repeating it.
 - [`__dybatpho_array_index`](#__dybatpho_array_index) — Build a lookup of the values an array holds.
 - [`__dybatpho_array_sorts_after`](#__dybatpho_array_sorts_after) — Return success when one value must sort after another.
-- [`dybatpho::array_sort`](#dybatphoarray_sort) — Sort an array in place. Text is ordered by the current locale's collation, the same rule `sort` follows, so a script that needs one fixed order everywhere sets `LC_ALL` as it would for `sort`. `--numeric` compares values as numbers, which is the reason a shell script wants a sort at all: as text, `10` comes before `9`. It takes integers, negative ones included, and stops the script on anything else rather than quietly ordering it as text. The sort is an insertion sort rather than a pipe through `sort(1)`: it keeps an element containing a newline intact, needs no external command, and is quick at the sizes a shell array actually reaches.
+- [`__dybatpho_array_merge_sort`](#__dybatpho_array_merge_sort) — Sort an array of values in place, bottom-up and stable. Runs of length one are already sorted, so the passes start by merging pairs of them and double the run length until one run covers everything. That is `n log n` comparisons instead of the `n²` an insertion sort pays, and the comparison stays in `__dybatpho_array_sorts_after` so text, numeric and reversed order are all decided in one place. The merge takes the left run whenever the two compare equal, which is what makes the sort stable.
+- [`dybatpho::array_sort`](#dybatphoarray_sort) — Sort an array in place. Text is ordered by the current locale's collation, the same rule `sort` follows, so a script that needs one fixed order everywhere sets `LC_ALL` as it would for `sort`. `--numeric` compares values as numbers, which is the reason a shell script wants a sort at all: as text, `10` comes before `9`. It takes integers, negative ones included, and stops the script on anything else rather than quietly ordering it as text. The sort is a bottom-up merge sort rather than a pipe through `sort(1)`: it keeps an element containing a newline intact and needs no external command. It is also stable, so values that compare equal stay in the order they arrived in. The insertion sort it replaces cost a comparison per pair and took ~39s over 2000 elements, which is a size a list of files or packages reaches without trying.
 - [`dybatpho::array_slice`](#dybatphoarray_slice) — Keep a run of an array in place and drop the rest. A negative start counts back from the end, so `-2` takes the last two elements without the caller working out the length first. A start past either end leaves an empty array rather than failing: asking for elements that are not there is a shape the data can have, not a mistake in the call.
 - [`dybatpho::array_union`](#dybatphoarray_union) — Replace an array with the union of it and another, in place. The result is a set: every value appears once, in the order it was first seen, the first array's values ahead of the second's. A set operation that kept duplicates would not be one, so `dybatpho::array_unique` afterwards has nothing left to do.
 - [`dybatpho::array_intersect`](#dybatphoarray_intersect) — Keep only the values an array shares with another, in place. The result is a set, in the order the first array had them.
@@ -417,6 +418,34 @@ Return success when one value must sort after another.
 
 ---
 
+### `__dybatpho_array_merge_sort`
+
+Sort an array of values in place, bottom-up and stable.
+  Runs of length one are already sorted, so the passes start by merging pairs
+  of them and double the run length until one run covers everything. That is
+  `n log n` comparisons instead of the `n²` an insertion sort pays, and the
+  comparison stays in `__dybatpho_array_sorts_after` so text, numeric and
+  reversed order are all decided in one place.
+
+
+  The merge takes the left run whenever the two compare equal, which is what
+  makes the sort stable.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the array to sort in place |
+| `$2` | bool | Compare as numbers rather than as text |
+| `$3` | bool | Reverse the order |
+
+**🧩 Variable sets**
+
+- **`The`**: named array
+
+
+---
+
 ### `dybatpho::array_sort`
 
 Sort an array in place.
@@ -431,9 +460,12 @@ Sort an array in place.
   quietly ordering it as text.
 
 
-  The sort is an insertion sort rather than a pipe through `sort(1)`: it keeps
-  an element containing a newline intact, needs no external command, and is
-  quick at the sizes a shell array actually reaches.
+  The sort is a bottom-up merge sort rather than a pipe through `sort(1)`: it
+  keeps an element containing a newline intact and needs no external command.
+  It is also stable, so values that compare equal stay in the order they
+  arrived in. The insertion sort it replaces cost a comparison per pair and
+  took ~39s over 2000 elements, which is a size a list of files or packages
+  reaches without trying.
 
 **🧪 Examples**
 

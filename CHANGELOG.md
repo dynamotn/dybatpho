@@ -541,6 +541,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   baseline it touched, and a suite whose snapshots are all rewritten asserts
   nothing.
 
+- **`dybatpho::array_sort` no longer slows to a crawl on a real list.** It was
+  an insertion sort, which pays a comparison per pair: 2000 elements — a
+  directory listing, an installed-package list, a tag list — took 39 seconds,
+  and every element added cost more than the last. It is a bottom-up merge sort
+  now, so the same 2000 elements sort in about 1 second and 5000 in about 3,
+  where the old one would have spent minutes.
+
+  The comparison is unchanged and still lives in one place, so locale
+  collation, `--numeric` and `--reverse` decide the order exactly as before. An
+  element containing a newline still survives, since nothing is piped through
+  `sort(1)`. The new sort is also stable: values that compare equal keep the
+  order they arrived in, which is what lets a caller sort by one field without
+  scrambling the rest.
+
 ### Fixed
 
 - **A bare date parsed on macOS kept the current time of day.** BSD `date -j -f`

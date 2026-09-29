@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# keeps its declarations with the functions they describe.
+# dyshellint disable=BSG050,BSG033
 # @file validate_ops.sh
 # @brief Example showing the shared validator
 # @description
@@ -18,10 +22,14 @@ dybatpho::register_common_handlers
 
 dybatpho::create_temp WORKDIR "" "validate"
 
+# @description Run the `NAMED TYPES` section of this example.
+# @noargs
 function _demo_types {
   dybatpho::header "NAMED TYPES"
-  dybatpho::info "$(dybatpho::validate_types | wc -l | tr -d ' ') types are registered"
-  local pairs=(
+  local validate_types
+  validate_types=$(dybatpho::validate_types | wc -l | tr -d ' ')
+  dybatpho::info "${validate_types} types are registered"
+  local -a pairs=(
     "email    ops@example.com"
     "email    ops.example.com"
     "port     8080"
@@ -48,18 +56,31 @@ function _demo_types {
   done
 }
 
+# @description Run the `PATH TYPES` section of this example.
+# @noargs
 function _demo_paths {
   dybatpho::header "PATH TYPES"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   local report="${WORKDIR}/report.txt"
   printf 'deployed\n' > "${report}"
-  dybatpho::info "existing file      : $(dybatpho::validate_is file "${report}" && echo yes || echo no)"
-  dybatpho::info "existing directory : $(dybatpho::validate_is dir "${WORKDIR}" && echo yes || echo no)"
-  dybatpho::info "absent file        : $(dybatpho::validate_is file "${WORKDIR}/absent" && echo yes || echo no)"
+  local validate_is_4
+  validate_is_4=$(dybatpho::validate_is file "${report}" && echo yes || echo no)
+  dybatpho::info "existing file      : ${validate_is_4}"
+  local validate_is_3
+  validate_is_3=$(dybatpho::validate_is dir "${WORKDIR}" && echo yes || echo no)
+  dybatpho::info "existing directory : ${validate_is_3}"
+  local validate_is_2
+  validate_is_2=$(dybatpho::validate_is file "${WORKDIR}/absent" && echo yes || echo no)
+  dybatpho::info "absent file        : ${validate_is_2}"
   # The output file does not exist yet; what has to exist is the directory it
   # will land in.
-  dybatpho::info "writable target    : $(dybatpho::validate_is parent_dir "${WORKDIR}/new.log" && echo yes || echo no)"
+  local validate_is
+  validate_is=$(dybatpho::validate_is parent_dir "${WORKDIR}/new.log" && echo yes || echo no)
+  dybatpho::info "writable target    : ${validate_is}"
 }
 
+# @description Run the `RULES ON A RECORD` section of this example.
+# @noargs
 function _demo_rules {
   dybatpho::header "RULES ON A RECORD"
   local -a fields=(
@@ -79,25 +100,41 @@ function _demo_rules {
     if dybatpho::validate_value "${value}" ${rules}; then
       dybatpho::info "${name}=${value} accepted"
     else
-      dybatpho::warn "${name}=${value} rejected: $(dybatpho::validate_errors | tr '\n' ' ')"
+      local validate_errors
+      validate_errors=$(dybatpho::validate_errors | tr '\n' ' ')
+      dybatpho::warn "${name}=${value} rejected: ${validate_errors}"
     fi
   done
 
-  dybatpho::info "regex directly: $(dybatpho::validate_matches "release/2.0" '^release/' && echo matches || echo no)"
+  local validate_matches
+  validate_matches=$(dybatpho::validate_matches "release/2.0" '^release/' && echo matches || echo no)
+  dybatpho::info "regex directly: ${validate_matches}"
 }
 
+# @description Run the `A TYPE OF YOUR OWN` section of this example.
+# @noargs
 function _demo_custom_type {
   dybatpho::header "A TYPE OF YOUR OWN"
+  # @description A validator of its own: a service name is `<team>-api` or `<team>-worker`.
+  # @noargs
   function _is_service { [[ "$1" =~ ^[a-z]+-(api|worker)$ ]]; }
   dybatpho::validate_register service _is_service "a service name"
-  dybatpho::info "billing-api : $(dybatpho::validate_is service billing-api && echo ok || echo rejected)"
-  dybatpho::info "billing-db  : $(dybatpho::validate_is service billing-db && echo ok || echo rejected)"
+  local validate_is_2
+  validate_is_2=$(dybatpho::validate_is service billing-api && echo ok || echo rejected)
+  dybatpho::info "billing-api : ${validate_is_2}"
+  local validate_is
+  validate_is=$(dybatpho::validate_is service billing-db && echo ok || echo rejected)
+  dybatpho::info "billing-db  : ${validate_is}"
   dybatpho::validate_value "billing-db" type:service || true
-  dybatpho::warn "message: $(dybatpho::validate_errors)"
+  local validate_errors
+  validate_errors=$(dybatpho::validate_errors)
+  dybatpho::warn "message: ${validate_errors}"
   # Leave the registry the way it was found.
   dybatpho::validate_reset
 }
 
+# @description Run the `THE SAME TYPES IN A CONFIG SCHEMA` section of this example.
+# @noargs
 function _demo_config {
   dybatpho::header "THE SAME TYPES IN A CONFIG SCHEMA"
   dybatpho::config_schema ADMIN_EMAIL email required:true description:"Who to page"
@@ -110,9 +147,15 @@ function _demo_config {
   # `config_validate` applies the declared defaults and stops the script on a
   # violation, so this file is the one that passes.
   dybatpho::config_validate
-  dybatpho::info "ADMIN_EMAIL=$(dybatpho::config_get ADMIN_EMAIL)"
-  dybatpho::info "LISTEN_PORT defaulted to $(dybatpho::config_get LISTEN_PORT)"
-  dybatpho::print "$(dybatpho::config_doc markdown "Deployment settings")"
+  local config_get_2
+  config_get_2=$(dybatpho::config_get ADMIN_EMAIL)
+  dybatpho::info "ADMIN_EMAIL=${config_get_2}"
+  local config_get
+  config_get=$(dybatpho::config_get LISTEN_PORT)
+  dybatpho::info "LISTEN_PORT defaulted to ${config_get}"
+  local config_doc
+  config_doc=$(dybatpho::config_doc markdown "Deployment settings")
+  dybatpho::print "${config_doc}"
 
   printf 'ADMIN_EMAIL=ops@\nRELEASE=two\n' > "${WORKDIR}/broken.env"
   dybatpho::warn "a broken file reports every key at once:"
@@ -129,16 +172,27 @@ function _demo_config {
   dybatpho::config_schema_reset
 }
 
+# This section is not an option spec; it defines one and runs it, so the
+# `--help` the rule asks for belongs to `_deploy_spec` inside it.
+# dyshellint disable=BSG052
+# @description Run the `THE SAME TYPES ON A CLI OPTION` section of this example.
+# @noargs
 function _demo_cli {
   dybatpho::header "THE SAME TYPES ON A CLI OPTION"
+  # @description The action behind the spec: report what the validated options say.
+  # @noargs
   function _deploy_action {
+    # shellcheck disable=SC2154 # set by the option spec of this script
     dybatpho::info "deploying ${RELEASE} to port ${PORT}, paging ${CONTACT}"
   }
+  # @description An option spec whose options are validated by type rather than by hand.
+  # @noargs
   function _deploy_spec {
     dybatpho::opts::setup "Deploy a release" DEPLOY_ARGS action:"_deploy_action"
     dybatpho::opts::param "Version to deploy" RELEASE --release type:semver required:true
     dybatpho::opts::param "Port to bind" PORT --port type:port init:=8080
     dybatpho::opts::param "Who to page" CONTACT --contact type:email required:true
+    dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _deploy_spec"
   }
   dybatpho::generate_from_spec _deploy_spec \
     --release v2.1.0 --port 9090 --contact ops@example.com
@@ -148,6 +202,8 @@ function _demo_cli {
     | sed -n 's/.*Expected/  Expected/p' || true
 }
 
+# @description Run the `STOPPING ON A BAD VALUE` section of this example.
+# @noargs
 function _demo_or_die {
   dybatpho::header "STOPPING ON A BAD VALUE"
   dybatpho::validate_or_die "--port" "8080" type:port

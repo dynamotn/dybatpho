@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file release.sh
 # @brief Cut a release of dybatpho: stamp the tree, tag it, and publish it
 # @description
@@ -81,6 +84,7 @@ function __dybatpho_release_is_version {
 
 #######################################
 # @description Print the version currently stamped in `VERSION`.
+# @noargs
 # @stdout The stamped version, without a leading `v`, or empty when unreadable
 #######################################
 function __dybatpho_release_current_version {
@@ -103,9 +107,13 @@ function __dybatpho_release_repo_url {
   # `forge` already normalises `git@host:path`, `ssh://git@host/path` and
   # `https://host/path` to the same host and project, so this is the one place
   # that knowledge has to live.
+  local forge_repo
+  forge_repo=$(dybatpho::forge_repo "${_remote}" "${DYBATPHO_DIR}")
+  local forge_host
+  forge_host=$(dybatpho::forge_host "${_remote}" "${DYBATPHO_DIR}")
   printf 'https://%s/%s\n' \
-    "$(dybatpho::forge_host "${_remote}" "${DYBATPHO_DIR}")" \
-    "$(dybatpho::forge_repo "${_remote}" "${DYBATPHO_DIR}")"
+    "${forge_host}" \
+    "${forge_repo}"
 }
 
 #######################################
@@ -193,6 +201,7 @@ function __dybatpho_release_render_changelog {
 #   without a `!` or a `BREAKING CHANGE:` footer still describes a break once
 #   the entry for it says **BREAKING** — and publishing the smaller of the two
 #   answers is the one mistake a release cannot take back.
+# @noargs
 # @exitcode 0 The section marks a breaking change
 # @exitcode 1 Otherwise
 #######################################
@@ -254,6 +263,7 @@ function __dybatpho_release_resolve_version {
       || dybatpho::die "No commit since the last tag calls for a release; pass --version to release anyway"
     # The changelog overrules the commits when it is the stricter of the two:
     # an entry marked BREAKING is a major release whatever the subjects said.
+    # shellcheck disable=SC2310 # the changelog check answers yes or no
     if __dybatpho_release_changelog_breaking \
       && [[ -n "${_current}" ]] \
       && [[ "${_next%%.*}" == "${_current%%.*}" ]]; then
@@ -291,6 +301,7 @@ function __dybatpho_release_artifacts {
 
   # DRY_RUN leaves nothing on disk for the checksum step to read, and a checksum
   # over files that weren't built would be a lie rather than a rehearsal.
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
     printf '%s\n' "${_bundle}"
     return 0
@@ -314,24 +325,30 @@ function __dybatpho_release_run {
   local -a _artifacts=()
 
   dybatpho::require "git"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::is true "${DOCS}" && dybatpho::require "gawk"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${DRY_RUN}"; then
     # Resolved before any local step runs: a missing token should not be found
     # out after the tree is stamped, committed and tagged.
     dybatpho::require "curl"
     dybatpho::forge_token > /dev/null \
-      || dybatpho::die "No token to publish with. Set GITHUB_TOKEN, or export it from the CLI: GITHUB_TOKEN=\$(gh auth token)"
+      || dybatpho::die \
+        "No token to publish with. Set GITHUB_TOKEN, or export it from the CLI: GITHUB_TOKEN=\$(gh auth token)"
   fi
 
   local _current
   _current="$(__dybatpho_release_current_version)"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   _version="$(__dybatpho_release_resolve_version "${RELEASE_VERSION}" "${BUMP}" "${_current}")"
   _tag="v${_version}"
   __dybatpho_release_preflight "${_tag}"
 
+  # shellcheck disable=SC2154 # set by the option spec of this script
   _previous="$(dybatpho::git_latest_tag "${DYBATPHO_DIR}" "${DYBATPHO_RELEASE_TAG_PATTERN}" || true)"
   _previous="${_previous#v}"
   _date="$(dybatpho::date_today)"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   _url="$(__dybatpho_release_repo_url "${REMOTE}")"
 
   dybatpho::header "Releasing ${_tag}"
@@ -365,16 +382,24 @@ function __dybatpho_release_run {
   # shows a tag's first line name the release rather than its first bullet.
   local _message
   dybatpho::create_temp _message ".md" "release-tag"
-  { printf '%s\n\n' "${_tag}"; cat "${_notes}"; } > "${_message}"
+  {
+    printf '%s\n\n' "${_tag}"
+    cat "${_notes}"
+  } > "${_message}"
   dybatpho::dry_run git -C "${DYBATPHO_DIR}" tag -a "${_tag}" -F "${_message}"
 
+  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${BUNDLE}"; then
     local _artifact
-    while read -r _artifact; do
+    # shellcheck disable=SC2154 # set by the option spec of this script
+    local release_artifacts_output
+    release_artifacts_output=$(__dybatpho_release_artifacts "${_version}" "${SIGN}")
+    while read -r _artifact || [[ -n "${_artifact}" ]]; do
       [[ -n "${_artifact}" ]] && _artifacts+=("${_artifact}")
-    done < <(__dybatpho_release_artifacts "${_version}" "${SIGN}")
+    done < <(printf '%s' "${release_artifacts_output}")
   fi
 
+  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${PUSH}"; then
     dybatpho::progress "Pushing to ${REMOTE}"
     dybatpho::dry_run git -C "${DYBATPHO_DIR}" push "${REMOTE}" HEAD
@@ -387,19 +412,28 @@ function __dybatpho_release_run {
     if dybatpho::is false "${PUSH}"; then
       dybatpho::die "--publish needs the tag pushed; drop --no-push or pass --no-publish"
     fi
-    dybatpho::progress "Creating the $(dybatpho::forge_kind) release"
+    local forge_kind
+    forge_kind=$(dybatpho::forge_kind)
+    dybatpho::progress "Creating the ${forge_kind} release"
     if dybatpho::is true "${DRY_RUN}"; then
-      dybatpho::dry_run "forge_release_create ${_tag} with $(wc -l < "${_notes}") lines of notes"
+      local wc
+      wc=$(wc -l < "${_notes}")
+      dybatpho::dry_run "forge_release_create ${_tag} with ${wc} lines of notes"
       local _artifact
       for _artifact in ${_artifacts[@]+"${_artifacts[@]}"}; do
         dybatpho::dry_run "forge_release_upload ${_tag} ${_artifact}"
       done
     else
+      # shellcheck disable=SC2154 # set by the option spec of this script
       dybatpho::forge_release_create "${_tag}" "${_tag}" "$(< "${_notes}")" "${DRAFT}" > /dev/null
       local _artifact
       for _artifact in ${_artifacts[@]+"${_artifacts[@]}"}; do
-        dybatpho::progress "Attaching $(dybatpho::path_basename "${_artifact}")"
-        dybatpho::info "$(dybatpho::forge_release_upload "${_tag}" "${_artifact}")"
+        local path_basename
+        path_basename=$(dybatpho::path_basename "${_artifact}")
+        dybatpho::progress "Attaching ${path_basename}"
+        local forge_release_upload
+        forge_release_upload=$(dybatpho::forge_release_upload "${_tag}" "${_artifact}")
+        dybatpho::info "${forge_release_upload}"
       done
     fi
   fi
@@ -411,6 +445,10 @@ function __dybatpho_release_run {
   return 0
 }
 
+#######################################
+# @description CLI specification for this script.
+#######################################
+# @noargs
 function _spec {
   dybatpho::opts::setup "Cut a release of dybatpho: stamp, tag, and publish" RELEASE_ARGS \
     action:"__dybatpho_release_run"

@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # @file json_ops.sh
 # @brief Example showing JSON and YAML utilities
-# @description Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty, and yaml_to_json
+# @description
+#   Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty, and
+#   yaml_to_json
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules json
 
 dybatpho::register_common_handlers
 
+# @description Run the `JSON HELPERS` section of this example.
+# @noargs
 function _demo_json_helpers {
   dybatpho::header "JSON HELPERS"
   local json_file
@@ -15,15 +19,23 @@ function _demo_json_helpers {
   cat > "${json_file}" << 'EOF'
 {"name":"dybatpho","version":"1.0.0","features":["json","yaml"]}
 EOF
-  dybatpho::info "Version: $(dybatpho::json_query "${json_file}" ".version")"
-  dybatpho::info "Has features? $(dybatpho::json_has "${json_file}" ".features" && echo yes || echo no)"
+  local json_query
+  json_query=$(dybatpho::json_query "${json_file}" ".version")
+  dybatpho::info "Version: ${json_query}"
+  local json_has
+  json_has=$(dybatpho::json_has "${json_file}" ".features" && echo yes || echo no)
+  dybatpho::info "Has features? ${json_has}"
   dybatpho::info "Pretty JSON:"
-  dybatpho::json_pretty "${json_file}" | while IFS= read -r line; do
+  local json_pretty_output
+  json_pretty_output=$(dybatpho::json_pretty "${json_file}")
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
-  done
+  done < <(printf '%s' "${json_pretty_output}")
   dybatpho::info "JSON helpers prefer yq when it is available"
 }
 
+# @description Run the `YAML HELPERS` section of this example.
+# @noargs
 function _demo_yaml_helpers {
   dybatpho::header "YAML HELPERS"
   local yaml_file
@@ -33,14 +45,22 @@ service:
   name: dybatpho
   enabled: true
 EOF
-  dybatpho::info "Service name: $(dybatpho::yaml_query "${yaml_file}" ".service.name")"
-  dybatpho::info "Has service?  $(dybatpho::yaml_has "${yaml_file}" ".service" && echo yes || echo no)"
+  local yaml_query
+  yaml_query=$(dybatpho::yaml_query "${yaml_file}" ".service.name")
+  dybatpho::info "Service name: ${yaml_query}"
+  local yaml_has
+  yaml_has=$(dybatpho::yaml_has "${yaml_file}" ".service" && echo yes || echo no)
+  dybatpho::info "Has service?  ${yaml_has}"
   dybatpho::info "Pretty YAML:"
-  dybatpho::yaml_pretty "${yaml_file}" | while IFS= read -r line; do
+  local yaml_pretty_output
+  yaml_pretty_output=$(dybatpho::yaml_pretty "${yaml_file}")
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
-  done
+  done < <(printf '%s' "${yaml_pretty_output}")
 }
 
+# @description Run the `CONVERSION` section of this example.
+# @noargs
 function _demo_conversion {
   dybatpho::header "CONVERSION"
   if ! dybatpho::is command yq; then
@@ -60,21 +80,29 @@ kind: library
 EOF
 
   dybatpho::info "JSON -> YAML:"
-  dybatpho::json_to_yaml "${json_file}" | while IFS= read -r line; do
+  local json_to_yaml_output
+  json_to_yaml_output=$(dybatpho::json_to_yaml "${json_file}")
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
-  done
+  done < <(printf '%s' "${json_to_yaml_output}")
 
   dybatpho::info "YAML -> JSON:"
-  dybatpho::yaml_to_json "${yaml_file}" | while IFS= read -r line; do
+  local yaml_to_json_output
+  yaml_to_json_output=$(dybatpho::yaml_to_json "${yaml_file}")
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
-  done
+  done < <(printf '%s' "${yaml_to_json_output}")
 }
 
+# @description Run the `DOCUMENTS IN A VARIABLE` section of this example.
+# @noargs
 function _demo_in_memory {
   dybatpho::header "DOCUMENTS IN A VARIABLE"
 
   dybatpho::info "Encoding one value:"
-  dybatpho::print "  $(dybatpho::json_string 'he said "hi"')"
+  local json_string
+  json_string=$(dybatpho::json_string 'he said "hi"')
+  dybatpho::print "  ${json_string}"
 
   local document
   document=$(dybatpho::json_object \
@@ -85,15 +113,23 @@ function _demo_in_memory {
   dybatpho::print "  ${document}"
 
   dybatpho::info "Reading it back:"
-  dybatpho::print "  service: $(dybatpho::json_get "${document}" '.service')"
-  dybatpho::print "  ports:   $(dybatpho::json_eval "${document}" '.ports')"
+  local json_get
+  json_get=$(dybatpho::json_get "${document}" '.service')
+  dybatpho::print "  service: ${json_get}"
+  local json_eval
+  json_eval=$(dybatpho::json_eval "${document}" '.ports')
+  dybatpho::print "  ports:   ${json_eval}"
 
   dybatpho::info "Appending to an array:"
   local list='[]'
+  local json_object_2
+  json_object_2=$(dybatpho::json_object name web)
   list=$(dybatpho::json_eval "${list}" \
-    ". + [$(dybatpho::json_object name web)]")
+    ". + [${json_object_2}]")
+  local json_object
+  json_object=$(dybatpho::json_object name worker)
   list=$(dybatpho::json_eval "${list}" \
-    ". + [$(dybatpho::json_object name worker)]")
+    ". + [${json_object}]")
   dybatpho::print "  ${list}"
 
   if dybatpho::json_valid "${document}"; then
@@ -104,6 +140,8 @@ function _demo_in_memory {
   fi
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_json_helpers
   _demo_yaml_helpers

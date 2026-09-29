@@ -22,6 +22,8 @@ dybatpho::register_common_handlers
 # Every widget takes the *name* of an array and binds a nameref to it, so the
 # arrays below are read even though nothing in this function expands them.
 # shellcheck disable=SC2034
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   # Size the buffer from these rather than from a terminal, which is what makes
   # the output below identical wherever it runs.
@@ -38,6 +40,7 @@ function _main {
   local selected=1
 
   local -a frame=() columns=() detail=()
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::screen_layout frame vertical "${DYBATPHO_SCREEN_RECT}" \
     length:1 fill:1 length:3 length:1
 
@@ -48,10 +51,12 @@ function _main {
   dybatpho::screen_layout columns horizontal "${frame[1]}" percent:40 fill:1
 
   dybatpho::screen_block "${columns[0]}" title:"Pods" border:rounded
+  # shellcheck disable=SC2154 # set by the option spec of this script
   local list_area="${DYBATPHO_SCREEN_INNER}"
   local -a list_parts=()
   dybatpho::screen_layout list_parts horizontal "${list_area}" fill:1 length:1
   dybatpho::screen_list "${list_parts[0]}" pods selected:"${selected}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::screen_scrollbar "${list_parts[1]}" "${DYBATPHO_SCREEN_OFFSET}" "${#pods[@]}"
 
   dybatpho::screen_block "${columns[1]}" title:"Detail"
@@ -78,6 +83,7 @@ function _main {
 
   # Print the buffer instead of flushing it to a terminal.
   local row rendered
+  # shellcheck disable=SC2154 # set by the option spec of this script
   for ((row = 0; row < DYBATPHO_SCREEN_HEIGHT; row++)); do
     __dybatpho_screen_render_into rendered "${row}"
     printf '%s\n' "${rendered}"

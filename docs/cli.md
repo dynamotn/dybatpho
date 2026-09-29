@@ -54,13 +54,13 @@ Utilities for building CLI parsers from shell specs.
 - [`__dybatpho_cli_generate_help`](#__dybatpho_cli_generate_help) — Get help description for options from spec. Sets __help_mode=true so dybatpho::opts::* collect help data via dynamic scoping into dybatpho::generate_help's locals, then prints the buffered sections in the correct order.
 - [`__dybatpho_cli_help_usage`](#__dybatpho_cli_help_usage) — Build the usage line from what the command actually accepts, so it names a COMMAND only when there are subcommands and shows the declared positional arguments when there are any.
 - [`dybatpho::generate_schema`](#dybatphogenerate_schema) — Generate a JSON CLI schema from the same option spec used by parsing.
-- [`__dybatpho_cli_generate_schema_command`](#__dybatpho_cli_generate_schema_command) — 
+- [`__dybatpho_cli_generate_schema_command`](#__dybatpho_cli_generate_schema_command) — Write one command of a spec as a JSON object, and recurse into its subcommands. `dybatpho::generate_schema` is the entry point; this is the body it calls for the root and for every command under it.
 - [`dybatpho::generate_man`](#dybatphogenerate_man) — Generate a roff man page from a CLI option spec.
-- [`__dybatpho_cli_generate_man_command`](#__dybatpho_cli_generate_man_command) — 
+- [`__dybatpho_cli_generate_man_command`](#__dybatpho_cli_generate_man_command) — Write one command of a spec as a roff section, and recurse into its subcommands. The root becomes the page, and every command under it a subsection of the same page.
 - [`dybatpho::generate_completion`](#dybatphogenerate_completion) — Generate Bash, Zsh, or Fish completion from a CLI option spec.
 - [`__dybatpho_cli_cache_file`](#__dybatpho_cli_cache_file) — Resolve the cache file for a generated artifact, creating the cache directory when needed. The key hashes the script that declares the spec, so a spec change produces a new key instead of a stale hit; a spec declared from an unreadable source (a `bash -c` one-liner, for example) is simply not cached.
-- [`__dybatpho_cli_completion_words`](#__dybatpho_cli_completion_words) — 
-- [`__dybatpho_cli_generate_completion_command`](#__dybatpho_cli_generate_completion_command) — 
+- [`__dybatpho_cli_completion_words`](#__dybatpho_cli_completion_words) — Collect the switches a completion should offer, skipping the options the spec hides.
+- [`__dybatpho_cli_generate_completion_command`](#__dybatpho_cli_generate_completion_command) — Write the completion for one command in the requested shell, and recurse into its subcommands.
 - [`__dybatpho_cli_help_pad`](#__dybatpho_cli_help_pad) — Pad string $2 to at least length $3 and store result in variable $1
 - [`__dybatpho_cli_help_sw`](#__dybatpho_cli_help_sw) — Append a formatted switch to caller-local variable `sw`. Short flags (-?) use pad width 0; long flags (--*) use pad width 4 so that short+long pairs align as "-s, --long".
 - [`__dybatpho_cli_help_row`](#__dybatpho_cli_help_row) — Build one help row and print it as a record for later rendering. Rendering is deferred because the column width is only known once every row of every section has been collected.
@@ -164,14 +164,14 @@ These attributes are parsed by `dybatpho::opts::flag` and/or `dybatpho::opts::pa
 | `persistent:<bool>` | `flag`, `param`, `disp` | Make the option available in descendant subcommands |
 | `export:<bool>` | `flag`, `param` | Export the variable |
 | `env:<NAME>` | `flag`, `param` | Use environment variable `NAME` as the option's initial value |
-| `config:<key>` | `flag`, `param` | Use configuration key `key` as the option's initial value, below `env:` and above `init:` |
+| `config:<key>` | `flag`, `param` | Initial value from configuration key `key`, under `env:`, over `init:` |
 | `negatable:<bool>` | `flag` | Also accept a generated `--no-<name>` for every long switch |
 | `count:<bool>` | `flag` | Count repeats instead of storing a value, so `-vv` yields `2` |
 | `optional:<bool>` | `param` | Whether the option value is optional when the switch appears |
 | `required:<bool>` | `param` | Whether the option itself must appear |
 | `prompt:<text>` | `param` | Prompt for a missing value with the supplied text |
 | `choices:<a,b>` | `param` | Restrict values to a comma-separated list of choices |
-| `multiple:<bool>` | `param` | Append repeated or multi-selected values instead of replacing the value; interactive selection accepts comma-separated values and ranges such as `1-3` |
+| `multiple:<bool>` | `param` | Append repeats instead of replacing; selection takes lists and ranges (`1-3`) |
 | `pattern:<glob>` | `flag`, `param` | Restrict values to a `case` glob such as `fast|slow` |
 | `type:<name>` | `flag`, `param` | Restrict values to a `validate` type such as `email`, `port`, or `file` |
 | `validate:<code>` | `flag`, `param` | Validation logic using `\$OPTARG` |
@@ -569,8 +569,10 @@ This is useful when debugging:
 
 `example/cli_ux.sh` is a complete spec-driven CLI example:
 
-- `_spec_root` declares the root command, a persistent `count:true` verbosity flag, plus `deploy`, `completion`, `schema`, and `man` subcommands.
-- `_spec_deploy` demonstrates `arg`, `env:`, `config:`, `choices:`, `prompt:`, `multiple:`, `negatable:`, and boolean toggles.
+- `_spec_root` declares the root command, a persistent `count:true` verbosity
+  flag, plus `deploy`, `completion`, `schema`, and `man` subcommands.
+- `_spec_deploy` demonstrates `arg`, `env:`, `config:`, `choices:`,
+  `prompt:`, `multiple:`, `negatable:`, and boolean toggles.
 - `_spec_completion`, `_spec_schema`, and `_spec_man` define the artifact subcommands.
 - `_run_root`, `_run_completion`, `_run_schema`, and `_run_man` implement their actions.
 - `_run_deploy` consumes the parsed values and performs the deploy action.
@@ -1142,7 +1144,8 @@ Emit generated code that rebuilds positional parameters from a serialized argume
 
 ### `__dybatpho_cli_print_rest`
 
-Emit generated code that appends the remaining positional arguments to the configured rest variable and stops option parsing.
+Emit generated code that appends the remaining positional arguments to the configured rest variable and stops
+option parsing.
 
 _Function has no arguments._
 
@@ -1212,6 +1215,21 @@ Generate a JSON CLI schema from the same option spec used by parsing.
 
 ### `__dybatpho_cli_generate_schema_command`
 
+Write one command of a spec as a JSON object, and recurse into
+its subcommands. `dybatpho::generate_schema` is the entry point; this is
+the body it calls for the root and for every command under it.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Command name, as it appears in the schema |
+| `$3` | string | Optional aliases of the command, or `@none` |
+
+**📤 Output on stdout**
+
+- The command as a JSON object
 
 
 ---
@@ -1236,6 +1254,22 @@ Generate a roff man page from a CLI option spec.
 
 ### `__dybatpho_cli_generate_man_command`
 
+Write one command of a spec as a roff section, and recurse into
+its subcommands. The root becomes the page, and every command under it a
+subsection of the same page.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Command name |
+| `$3` | number | Manual section |
+| `$4` | bool | Whether this is a subcommand rather than the root |
+
+**📤 Output on stdout**
+
+- The command as roff
 
 
 ---
@@ -1288,12 +1322,40 @@ one-liner, for example) is simply not cached.
 
 ### `__dybatpho_cli_completion_words`
 
+Collect the switches a completion should offer, skipping the
+options the spec hides.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the array to fill |
+| `$@` | string | Option records, as `__dybatpho_cli_collect_spec_metadata` builds them |
+
+**🧩 Variable sets**
+
+- **`The`** (named): array, one switch per element
 
 
 ---
 
 ### `__dybatpho_cli_generate_completion_command`
 
+Write the completion for one command in the requested shell, and
+recurse into its subcommands.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Shell to generate for |
+| `$3` | string | Command name |
+| `$4` | string | Root command name, which the generated function is named after |
+
+**📤 Output on stdout**
+
+- The completion script for that command
 
 
 ---
@@ -1682,7 +1744,8 @@ holds keep their boundaries.
 
 ### `__dybatpho_cli_print_args_check`
 
-Emit generated code that validates the positional argument count configured by `args:<rule>` in `dybatpho::opts::setup`.
+Emit generated code that validates the positional argument count configured by `args:<rule>` in
+`dybatpho::opts::setup`.
 
 **🧾 Arguments**
 
@@ -1719,12 +1782,29 @@ Expand option switches and aliases into a caller-provided array.
 
 Escape a value for JSON and store it in a caller variable.
 
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable to write into |
+| `$2` | string | Value to quote |
+
 
 ---
 
 ### `__dybatpho_cli_collect_spec_metadata`
 
 Collect option and command metadata from a CLI spec.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec function |
+| `$2` | string | Name of the array to fill with the options |
+| `$3` | string | Name of the array to fill with the commands |
+| `$4` | string | Name of the variable to fill with the description |
+| `$5` | string | Optional name of the array to fill with the arguments |
 
 
 <a id="spec-functions"></a>

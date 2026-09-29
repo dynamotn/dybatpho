@@ -57,6 +57,8 @@ fallback where practical.
 
 Resolve the preferred command for JSON helpers.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - `yq` or `jq`

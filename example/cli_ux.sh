@@ -42,41 +42,62 @@ DYBATPHO_CONFIG["deploy.environment"]="staging"
 # shellcheck disable=SC2034 # read by the generated parser through config:<key>
 DYBATPHO_CONFIG["deploy.color"]="true"
 
+# @description Run the `DEPLOY ${DEPLOY_ENV}` section of this example.
+# @noargs
 function _run_deploy {
   # A counting flag carries how often `-v` was repeated, which maps onto the
   # log level: `-v` is debug and `-vv` is trace.
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::cli_apply_verbosity "${VERBOSITY}"
 
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::header "DEPLOY ${DEPLOY_ENV}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Service: ${SERVICE}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Selected components: ${COMPONENTS}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Colorized output: ${COLOR}"
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   dybatpho::info "Dry run: ${DRY_RUN}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Replicas: ${REPLICAS}"
+  # shellcheck disable=SC2154 # declared by `src/logging.sh`, a core module
   dybatpho::debug "Verbosity requested ${VERBOSITY} time(s), log level is ${LOG_LEVEL}"
   dybatpho::success "Deployment plan is ready"
   exit 0
 }
 
+# @description The action of the root command: print its own help.
+# @noargs
 function _run_root {
   dybatpho::generate_help _spec_root
 }
 
+# @description The action of `completion`: write the completion script for a shell.
+# @noargs
 function _run_completion {
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::generate_completion _spec_root "${COMPLETION_SHELL}" cli_ux.sh
   exit 0
 }
 
+# @description The action of `schema`: write the CLI as a JSON schema.
+# @noargs
 function _run_schema {
   dybatpho::generate_schema _spec_root cli_ux.sh
   exit 0
 }
 
+# @description The action of `man`: write the CLI as a roff man page.
+# @noargs
 function _run_man {
   dybatpho::generate_man _spec_root cli_ux.sh
   exit 0
 }
 
+# @description The option spec of `deploy`, which shows every option attribute at once.
+# @noargs
 function _spec_deploy {
   dybatpho::opts::setup "Deploy selected components" DEPLOY_ARGS action:"_run_deploy"
   dybatpho::opts::arg "Service to deploy" SERVICE
@@ -98,22 +119,34 @@ function _spec_deploy {
   dybatpho::opts::flag "Colorize the deployment report" COLOR --color \
     negatable:true config:deploy.color
   dybatpho::opts::flag "Preview without applying changes" DRY_RUN --dry-run on:true off:false init:="false"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_deploy"
 }
 
+# @description The option spec of `completion`.
+# @noargs
 function _spec_completion {
   dybatpho::opts::setup "Generate shell completion" COMPLETION_ARGS args:none action:"_run_completion"
   dybatpho::opts::param "Completion shell (bash, zsh, or fish)" COMPLETION_SHELL \
     --shell choices:bash,zsh,fish required:true
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_completion"
 }
 
+# @description The option spec of `schema`.
+# @noargs
 function _spec_schema {
   dybatpho::opts::setup "Generate JSON CLI schema" SCHEMA_ARGS args:none action:"_run_schema"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_schema"
 }
 
+# @description The option spec of `man`.
+# @noargs
 function _spec_man {
   dybatpho::opts::setup "Generate roff man page" MAN_ARGS args:none action:"_run_man"
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_man"
 }
 
+# @description The option spec of the root command, with the artifact subcommands.
+# @noargs
 function _spec_root {
   dybatpho::opts::setup "CLI UX demonstration" ROOT_ARGS action:"_run_root"
   # A persistent counting flag every subcommand inherits.
@@ -123,6 +156,7 @@ function _spec_root {
   dybatpho::opts::cmd completion _spec_completion
   dybatpho::opts::cmd schema _spec_schema
   dybatpho::opts::cmd man _spec_man
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_root"
 }
 
 dybatpho::generate_from_spec _spec_root "$@"

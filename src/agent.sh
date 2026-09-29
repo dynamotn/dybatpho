@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 # @file agent.sh
 # @brief Utilities for making a script usable by an AI agent
+# @namespace dybatpho
 # @description
 #   Where `ai.sh` lets a script call a model, this module points the other way:
 #   it makes a script something a model can drive safely. A tool that an agent
@@ -61,7 +62,8 @@
 #   - `example/agent_ops.sh`
 #   - `docs/cli.md` for the option spec these tool definitions are generated from
 # @tip Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE`
-# @note Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a second edit
+# @note Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a
+#   second edit
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_AGENT_MODE string `auto` (default), `on`, or `off`
@@ -75,7 +77,8 @@ DYBATPHO_AGENT_ENV=${DYBATPHO_AGENT_ENV:-}
 
 # Environment variables set by the agent runtimes this module recognises. Any
 # one of them being non-empty is taken as evidence that a model is driving.
-DYBATPHO_AGENT_MARKERS="CLAUDECODE CLAUDE_CODE CLAUDE_AGENT ANTHROPIC_AGENT AI_AGENT AIDER_ACTIVE CURSOR_AGENT OPENAI_AGENT MCP_SERVER"
+DYBATPHO_AGENT_MARKERS="CLAUDECODE CLAUDE_CODE CLAUDE_AGENT ANTHROPIC_AGENT AI_AGENT"
+DYBATPHO_AGENT_MARKERS+=" AIDER_ACTIVE CURSOR_AGENT OPENAI_AGENT MCP_SERVER"
 
 #######################################
 # @description Fail loudly when no JSON backend is installed.
@@ -147,7 +150,9 @@ function dybatpho::agent_mode {
 # @see dybatpho::agent_mode
 #######################################
 function dybatpho::agent_detect {
-  [[ "$(dybatpho::agent_mode)" == "on" ]]
+  local agent_mode
+  agent_mode=$(dybatpho::agent_mode)
+  [[ "${agent_mode}" == "on" ]]
 }
 
 #######################################
@@ -250,13 +255,20 @@ function dybatpho::agent_context {
   dybatpho::agent_detect && agent=true
 
   local modules git
+  # shellcheck disable=SC2154 # declared by `init.sh`
   modules=$(dybatpho::json_eval "$(dybatpho::json_string "${DYBATPHO_LOADED_MODULES}")" \
     'split(" ") | map(select(length > 0))')
   git=$(dybatpho::json_object repository:json "${repository}" branch "${branch}")
 
+  local uname
+  local uname_2
+  uname_2=$(uname -m)
+  uname=${uname_2}
+  local uname_3
+  uname_3=$(uname -s)
   dybatpho::json_object \
-    os "$(uname -s)" \
-    arch "$(uname -m)" \
+    os "${uname_3}" \
+    arch "${uname}" \
     bash "${BASH_VERSION}" \
     cwd "${PWD}" \
     git:json "${git}" \
@@ -345,10 +357,16 @@ function dybatpho::agent_audit {
   local directory
   directory=$(dirname "${DYBATPHO_AGENT_AUDIT_FILE}")
   mkdir -p "${directory}"
+  local agent_mode
+  local agent_mode_2
+  agent_mode_2=$(dybatpho::agent_mode)
+  agent_mode=${agent_mode_2}
+  local date
+  date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dybatpho::json_object \
-    timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    timestamp "${date}" \
     script "${0##*/}" \
-    mode "$(dybatpho::agent_mode)" \
+    mode "${agent_mode}" \
     action "${action}" \
     detail "${detail}" \
     >> "${DYBATPHO_AGENT_AUDIT_FILE}"
@@ -403,7 +421,9 @@ function __dybatpho_agent_flatten_command {
 
   local name path description options entry
   name=$(dybatpho::json_get "${node}" '.name')
-  path=$(dybatpho::json_eval "${parent}" ". + [$(dybatpho::json_string "${name}")]")
+  local json_string
+  json_string=$(dybatpho::json_string "${name}")
+  path=$(dybatpho::json_eval "${parent}" ". + [${json_string}]")
   description=$(dybatpho::json_get "${node}" '.description')
   options=$(dybatpho::json_eval "${node}" '[.options[]? | select(.hidden != true)]')
   entry=$(dybatpho::json_object \
@@ -413,8 +433,10 @@ function __dybatpho_agent_flatten_command {
   local total index=0
   total=$(dybatpho::json_get "${node}" '[.commands[]?] | length')
   while ((index < total)); do
+    local json_eval
+    json_eval=$(dybatpho::json_eval "${node}" ".commands[${index}]")
     flattened=$(__dybatpho_agent_flatten_command \
-      "$(dybatpho::json_eval "${node}" ".commands[${index}]")" \
+      "${json_eval}" \
       "${path}" "${flattened}")
     index=$((index + 1))
   done
@@ -450,8 +472,10 @@ function __dybatpho_agent_options_schema {
 
     local -a enum=()
     if dybatpho::is set "${choices}"; then
+      local json_string
+      json_string=$(dybatpho::json_string "${choices}")
       enum=(enum:json "$(dybatpho::json_eval \
-        "$(dybatpho::json_string "${choices}")" 'split(",")')")
+        "${json_string}" 'split(",")')")
     fi
 
     if [[ "${type}" == "flag" ]]; then
@@ -470,11 +494,17 @@ function __dybatpho_agent_options_schema {
         type string description "${description}" "${enum[@]}")
     fi
 
+    local json_object
+    json_object=$(dybatpho::json_object "${key}:json" "${property}")
     properties=$(dybatpho::json_eval "${properties}" \
-      ". + $(dybatpho::json_object "${key}:json" "${property}")")
-    if [[ "$(dybatpho::json_get "${option}" '.required')" == "true" ]]; then
+      ". + ${json_object}")
+    local json_get
+    json_get=$(dybatpho::json_get "${option}" '.required')
+    if [[ "${json_get}" == "true" ]]; then
+      local json_string_2
+      json_string_2=$(dybatpho::json_string "${key}")
       required=$(dybatpho::json_eval "${required}" \
-        ". + [$(dybatpho::json_string "${key}")]")
+        ". + [${json_string_2}]")
     fi
     index=$((index + 1))
   done
@@ -503,7 +533,8 @@ function __dybatpho_agent_options_schema {
 # @exitcode 0 The definitions were printed
 # @exitcode 1 Missing arguments or an unknown output shape
 # @see dybatpho::generate_schema
-# @tip Feed the result straight into the tool registry of the `ai` module, or into an API request; it needs no hand editing
+# @tip Feed the result straight into the tool registry of the `ai` module, or into an API request; it needs no hand
+#   editing
 #######################################
 function dybatpho::agent_tools {
   local spec name format
@@ -524,7 +555,9 @@ function dybatpho::agent_tools {
     entry=$(dybatpho::json_eval "${commands}" ".[${index}]")
     description=$(dybatpho::json_get "${entry}" '.description')
     tool_name=$(__dybatpho_agent_tool_name "${entry}")
-    input_schema=$(__dybatpho_agent_options_schema "$(dybatpho::json_eval "${entry}" '.options')")
+    local json_eval
+    json_eval=$(dybatpho::json_eval "${entry}" '.options')
+    input_schema=$(__dybatpho_agent_options_schema "${json_eval}")
     if [[ "${format}" == "anthropic" ]]; then
       definition=$(dybatpho::json_object \
         name "${tool_name}" description "${description}" input_schema:json "${input_schema}")
@@ -569,7 +602,8 @@ function __dybatpho_agent_tool_name {
 # @exitcode 0 The payload was printed
 # @exitcode 1 Missing arguments
 # @see dybatpho::agent_tools
-# @note This is the tool manifest, not a running server; point your MCP host at it and dispatch with the recorded command
+# @note This is the tool manifest, not a running server; point your MCP host at it and dispatch with the recorded
+#   command
 #######################################
 function dybatpho::agent_mcp {
   local spec name command
@@ -586,12 +620,16 @@ function dybatpho::agent_mcp {
     entry=$(dybatpho::json_eval "${commands}" ".[${index}]")
     description=$(dybatpho::json_get "${entry}" '.description')
     tool_name=$(__dybatpho_agent_tool_name "${entry}")
-    input_schema=$(__dybatpho_agent_options_schema "$(dybatpho::json_eval "${entry}" '.options')")
+    local json_eval
+    json_eval=$(dybatpho::json_eval "${entry}" '.options')
+    input_schema=$(__dybatpho_agent_options_schema "${json_eval}")
     # The first path element is the root name, which the command already names.
     # `.path | .[1:]` rather than `.path[1:]`: yq 4.52 applies the latter slice to
     # the enclosing object, not to `.path`.
+    local json_string
+    json_string=$(dybatpho::json_string "${command}")
     argv=$(dybatpho::json_eval "${entry}" \
-      "[$(dybatpho::json_string "${command}")] + (.path | .[1:])")
+      "[${json_string}] + (.path | .[1:])")
     definition=$(dybatpho::json_object \
       name "${tool_name}" \
       description "${description}" \

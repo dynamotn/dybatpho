@@ -140,7 +140,7 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 <a id="tips"></a>
 ## 💡 Tips
 
-- Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on missing configuration or dependencies.
+- Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on missing configuration or dependencies. The `dybatpho::is` family and the lookups below are questions, not work: a caller tests them, so `set -e` is not meant to reach inside.
 
 ### `dybatpho::expect_args`
 
@@ -186,6 +186,12 @@ local arg1 arg2 .. argN
 dybatpho::expect_args arg1 arg2 .. argN -- "$@"
 
 ```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$@` | string | Variable names, then `--`, then the arguments to bind |
 
 **🚦 Exit codes**
 
@@ -255,6 +261,8 @@ while dybatpho::still_has_args "$@" && shift; do
   echo "Function has next argument is $1"
 done
 ```
+
+_Function has no arguments._
 
 **🚦 Exit codes**
 

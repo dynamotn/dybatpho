@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # @file file_ops.sh
 # @brief Example showing file utilities
-# @description Demonstrates dybatpho::create_temp, show_file, path_basename, path_dirname, path_extname, path_stem, path_join, path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, xdg_config_dir, xdg_cache_dir, xdg_data_dir, xdg_state_dir, create_temp_dir, file_mtime, dir_size, file_is_binary, file_write_atomic, file_replace, file_ensure_line, file_remove_line, file_hash, file_size, file_age_seconds, file_backup, find_up, ensure_dir, and temp cleanup behavior
+# @description
+#   Demonstrates dybatpho::create_temp, show_file, path_basename, path_dirname, path_extname, path_stem, path_join,
+#   path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, xdg_config_dir, xdg_cache_dir,
+#   xdg_data_dir, xdg_state_dir, create_temp_dir, file_mtime, dir_size, file_is_binary, file_write_atomic, file_replace,
+#   file_ensure_line, file_remove_line, file_hash, file_size, file_age_seconds, file_backup, find_up, ensure_dir, and
+#   temp cleanup behavior
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"
 
 dybatpho::register_common_handlers
 
+# @description Run the `TEMPORARY FILE` section of this example.
+# @noargs
 function _demo_temp_file {
   dybatpho::header "TEMPORARY FILE"
 
@@ -28,6 +35,8 @@ EOF
   dybatpho::info "Temp file will be deleted automatically when script exits"
 }
 
+# @description Run the `TEMPORARY DIRECTORY` section of this example.
+# @noargs
 function _demo_temp_dir {
   dybatpho::header "TEMPORARY DIRECTORY"
 
@@ -45,14 +54,18 @@ function _demo_temp_dir {
   if command -v tree &> /dev/null; then
     tree "${TMPDIR_VAR}" >&2
   else
-    find "${TMPDIR_VAR}" -type f | sort | while IFS= read -r f; do
+    local find_output
+    find_output=$(find "${TMPDIR_VAR}" -type f | sort)
+    while IFS= read -r f || [[ -n "${f}" ]]; do
       dybatpho::print "  ${f}"
-    done
+    done < <(printf '%s' "${find_output}")
   fi
 
   dybatpho::info "Temp directory will be removed recursively on exit"
 }
 
+# @description Run the `SHOW FILE (source of this script)` section of this example.
+# @noargs
 function _demo_show_file {
   dybatpho::header "SHOW FILE (source of this script)"
   # Show the first 20 lines of this very script
@@ -62,38 +75,74 @@ function _demo_show_file {
   dybatpho::show_file "${TMPFILE}"
 }
 
+# @description Run the `PATH PARTS` section of this example.
+# @noargs
 function _demo_path_parts {
   dybatpho::header "PATH PARTS"
   local path="/tmp/dybatpho/demo/archive.tar.gz"
   dybatpho::info "Path     : ${path}"
-  dybatpho::info "Dirname  : $(dybatpho::path_dirname "${path}")"
-  dybatpho::info "Basename : $(dybatpho::path_basename "${path}")"
-  dybatpho::info "Extname  : $(dybatpho::path_extname "${path}")"
-  dybatpho::info "Stem     : $(dybatpho::path_basename "${path}" ".gz")"
-  dybatpho::info "Stem 2   : $(dybatpho::path_stem "${path}")"
+  local path_dirname
+  path_dirname=$(dybatpho::path_dirname "${path}")
+  dybatpho::info "Dirname  : ${path_dirname}"
+  local path_basename_2
+  path_basename_2=$(dybatpho::path_basename "${path}")
+  dybatpho::info "Basename : ${path_basename_2}"
+  local path_extname
+  path_extname=$(dybatpho::path_extname "${path}")
+  dybatpho::info "Extname  : ${path_extname}"
+  local path_basename
+  path_basename=$(dybatpho::path_basename "${path}" ".gz")
+  dybatpho::info "Stem     : ${path_basename}"
+  local path_stem
+  path_stem=$(dybatpho::path_stem "${path}")
+  dybatpho::info "Stem 2   : ${path_stem}"
 }
 
+# @description Run the `PATH JOIN` section of this example.
+# @noargs
 function _demo_path_join {
   dybatpho::header "PATH JOIN"
-  dybatpho::info "Joined absolute path: $(dybatpho::path_join "/tmp/" "/dybatpho/" "cache" "data.json")"
-  dybatpho::info "Joined relative path: $(dybatpho::path_join "var" "log" "dybatpho")"
+  local path_join_2
+  path_join_2=$(dybatpho::path_join "/tmp/" "/dybatpho/" "cache" "data.json")
+  dybatpho::info "Joined absolute path: ${path_join_2}"
+  local path_join
+  path_join=$(dybatpho::path_join "var" "log" "dybatpho")
+  dybatpho::info "Joined relative path: ${path_join}"
 }
 
+# @description Run the `PATH NORMALIZE` section of this example.
+# @noargs
 function _demo_path_normalize {
   dybatpho::header "PATH NORMALIZE"
-  dybatpho::info "Normalized absolute path: $(dybatpho::path_normalize "/tmp//dybatpho/./cache/../data.json")"
-  dybatpho::info "Normalized relative path: $(dybatpho::path_normalize "var//log/../tmp/./app/")"
+  local path_normalize_2
+  path_normalize_2=$(dybatpho::path_normalize "/tmp//dybatpho/./cache/../data.json")
+  dybatpho::info "Normalized absolute path: ${path_normalize_2}"
+  local path_normalize
+  path_normalize=$(dybatpho::path_normalize "var//log/../tmp/./app/")
+  dybatpho::info "Normalized relative path: ${path_normalize}"
 }
 
+# @description Run the `PATH CHECKS / REWRITE` section of this example.
+# @noargs
 function _demo_path_checks {
   dybatpho::header "PATH CHECKS / REWRITE"
   local path="/tmp/dybatpho/demo/archive.tar.gz"
-  dybatpho::info "Absolute?      : $(dybatpho::path_is_abs "${path}" && echo yes || echo no)"
-  dybatpho::info "Has .gz ext?   : $(dybatpho::path_has_ext "${path}" ".gz" && echo yes || echo no)"
-  dybatpho::info "Change ext     : $(dybatpho::path_change_ext "${path}" "zip")"
-  dybatpho::info "Relative to /tmp: $(dybatpho::path_relative "${path}" "/tmp")"
+  local path_is_abs
+  path_is_abs=$(dybatpho::path_is_abs "${path}" && echo yes || echo no)
+  dybatpho::info "Absolute?      : ${path_is_abs}"
+  local path_has_ext
+  path_has_ext=$(dybatpho::path_has_ext "${path}" ".gz" && echo yes || echo no)
+  dybatpho::info "Has .gz ext?   : ${path_has_ext}"
+  local path_change_ext
+  path_change_ext=$(dybatpho::path_change_ext "${path}" "zip")
+  dybatpho::info "Change ext     : ${path_change_ext}"
+  local path_relative
+  path_relative=$(dybatpho::path_relative "${path}" "/tmp")
+  dybatpho::info "Relative to /tmp: ${path_relative}"
 }
 
+# @description Run the `FILE CONTENTS` section of this example.
+# @noargs
 function _demo_file_contents {
   dybatpho::header "FILE CONTENTS"
   # A throwaway copy of a dotfile, so the demo never touches a real one.
@@ -114,16 +163,22 @@ EOF
   # Keep a copy before editing, and report where it went.
   local backup
   backup="$(dybatpho::file_backup "${config}")"
-  dybatpho::info "Backup kept at $(dybatpho::path_basename "${backup}")"
+  local path_basename
+  path_basename=$(dybatpho::path_basename "${backup}")
+  dybatpho::info "Backup kept at ${path_basename}"
 
   # A portable in-place edit: no `sed -i`, whose argument differs on BSD.
   dybatpho::file_replace "${config}" '^debug = true$' 'debug = false'
   dybatpho::info "After replace:"
   dybatpho::show_file "${config}"
 
-  dybatpho::info "Mode survived the rewrite: $(stat -c %a "${config}" 2> /dev/null || stat -f %Lp "${config}")"
+  local stat
+  stat=$(stat -c %a "${config}" 2> /dev/null || stat -f %Lp "${config}")
+  dybatpho::info "Mode survived the rewrite: ${stat}"
 }
 
+# @description Run the `IDEMPOTENT LINES` section of this example.
+# @noargs
 function _demo_file_lines {
   dybatpho::header "IDEMPOTENT LINES"
   local WORKDIR
@@ -136,7 +191,9 @@ function _demo_file_lines {
   # makes these usable in a dotfiles bootstrap.
   dybatpho::file_ensure_line "${rc}" 'export EDITOR=nvim'
   dybatpho::file_ensure_line "${rc}" 'export EDITOR=nvim'
-  dybatpho::info "EDITOR line count after two calls: $(grep -cxF 'export EDITOR=nvim' "${rc}")"
+  local grep
+  grep=$(grep -cxF 'export EDITOR=nvim' "${rc}")
+  dybatpho::info "EDITOR line count after two calls: ${grep}"
 
   dybatpho::file_remove_line "${rc}" 'export EDITOR=nvim'
   dybatpho::file_remove_line "${rc}" 'export EDITOR=nvim'
@@ -144,6 +201,8 @@ function _demo_file_lines {
   dybatpho::show_file "${rc}"
 }
 
+# @description Run the `FILE METADATA` section of this example.
+# @noargs
 function _demo_file_metadata {
   dybatpho::header "FILE METADATA"
   local WORKDIR
@@ -151,10 +210,18 @@ function _demo_file_metadata {
   local payload="${WORKDIR}/release.txt"
   printf 'dybatpho release payload\n' > "${payload}"
 
-  dybatpho::info "Size    : $(dybatpho::file_size "${payload}") bytes"
-  dybatpho::info "SHA-256 : $(dybatpho::file_hash "${payload}")"
-  dybatpho::info "MD5     : $(dybatpho::file_hash "${payload}" md5)"
-  dybatpho::info "Age     : $(dybatpho::file_age_seconds "${payload}")s since last modification"
+  local file_size
+  file_size=$(dybatpho::file_size "${payload}")
+  dybatpho::info "Size    : ${file_size} bytes"
+  local file_hash_2
+  file_hash_2=$(dybatpho::file_hash "${payload}")
+  dybatpho::info "SHA-256 : ${file_hash_2}"
+  local file_hash
+  file_hash=$(dybatpho::file_hash "${payload}" md5)
+  dybatpho::info "MD5     : ${file_hash}"
+  local file_age_seconds
+  file_age_seconds=$(dybatpho::file_age_seconds "${payload}")
+  dybatpho::info "Age     : ${file_age_seconds}s since last modification"
 
   local age
   age="$(dybatpho::file_age_seconds "${payload}")"
@@ -165,6 +232,8 @@ function _demo_file_metadata {
   fi
 }
 
+# @description Run the `DRY RUN` section of this example.
+# @noargs
 function _demo_dry_run {
   dybatpho::header "DRY RUN"
   local WORKDIR
@@ -175,9 +244,13 @@ function _demo_dry_run {
   # Every writer honors DRY_RUN, so a script can be rehearsed before it runs.
   DRY_RUN=true dybatpho::file_replace "${config}" 'keep' 'gone'
   DRY_RUN=true dybatpho::file_ensure_line "${config}" 'added'
-  dybatpho::info "File is untouched: $(cat "${config}")"
+  local cat
+  cat=$(cat "${config}")
+  dybatpho::info "File is untouched: ${cat}"
 }
 
+# @description Run the `FIND UP` section of this example.
+# @noargs
 function _demo_find_up {
   dybatpho::header "FIND UP"
   local WORKDIR
@@ -189,7 +262,9 @@ function _demo_find_up {
   local marker
   if marker="$(dybatpho::find_up ".projectrc" "${WORKDIR}/project/src/deep")"; then
     dybatpho::info "Marker : ${marker}"
-    dybatpho::info "Root   : $(dybatpho::path_dirname "${marker}")"
+    local path_dirname
+    path_dirname=$(dybatpho::path_dirname "${marker}")
+    dybatpho::info "Root   : ${path_dirname}"
   fi
 
   if dybatpho::find_up "definitely-not-here" "${WORKDIR}" > /dev/null; then
@@ -199,6 +274,8 @@ function _demo_find_up {
   fi
 }
 
+# @description Run the `ENSURE DIR` section of this example.
+# @noargs
 function _demo_ensure_dir {
   dybatpho::header "ENSURE DIR"
   local WORKDIR
@@ -208,14 +285,20 @@ function _demo_ensure_dir {
   local cache
   cache="$(dybatpho::ensure_dir "${WORKDIR}/cache/myapp" 700)"
   printf 'last run: ok\n' | dybatpho::file_write_atomic "${cache}/state"
-  dybatpho::info "Cache dir : ${cache} (mode $(stat -c %a "${cache}" 2> /dev/null || stat -f %Lp "${cache}"))"
-  dybatpho::info "State file: $(cat "${cache}/state")"
+  local stat
+  stat=$(stat -c %a "${cache}" 2> /dev/null || stat -f %Lp "${cache}")
+  dybatpho::info "Cache dir : ${cache} (mode ${stat})"
+  local cat
+  cat=$(cat "${cache}/state")
+  dybatpho::info "State file: ${cat}"
 
   # Calling it again is a no-op, so scripts can call it before every write.
   dybatpho::ensure_dir "${WORKDIR}/cache/myapp" 700 > /dev/null
   dybatpho::info "Second call changed nothing"
 }
 
+# @description Run the `SYMLINKED DOTFILE` section of this example.
+# @noargs
 function _demo_symlinked_dotfile {
   dybatpho::header "SYMLINKED DOTFILE"
   local WORKDIR
@@ -227,20 +310,36 @@ function _demo_symlinked_dotfile {
   # The writers follow the link, so editing the dotfile edits the file in the
   # repository it points at rather than detaching the link from it.
   dybatpho::file_replace "${WORKDIR}/.bashrc" 'EDITOR=vi' 'EDITOR=nvim'
+  local value
+  value=$([[ -L "${WORKDIR}/.bashrc" ]] && echo yes || echo no)
   # shellcheck disable=SC2088 # `~/.bashrc` is prose in a log line, not a path to expand
-  dybatpho::info "~/.bashrc is still a symlink: $([[ -L "${WORKDIR}/.bashrc" ]] && echo yes || echo no)"
-  dybatpho::info "Repository copy now holds  : $(cat "${WORKDIR}/dotfiles/bashrc")"
+  dybatpho::info "~/.bashrc is still a symlink: ${value}"
+  local cat
+  cat=$(cat "${WORKDIR}/dotfiles/bashrc")
+  dybatpho::info "Repository copy now holds  : ${cat}"
 }
 
+# @description Run the `XDG DIRECTORIES` section of this example.
+# @noargs
 function _demo_xdg {
   dybatpho::header "XDG DIRECTORIES"
   # These only build a path. Pairing them with `ensure_dir`, which prints the
   # directory it made, keeps the whole thing to one line.
-  dybatpho::info "config : $(dybatpho::xdg_config_dir myapp)"
-  dybatpho::info "cache  : $(dybatpho::xdg_cache_dir myapp)"
-  dybatpho::info "data   : $(dybatpho::xdg_data_dir myapp)"
-  dybatpho::info "state  : $(dybatpho::xdg_state_dir myapp)"
-  dybatpho::info "without an application name: $(dybatpho::xdg_config_dir)"
+  local xdg_config_dir_2
+  xdg_config_dir_2=$(dybatpho::xdg_config_dir myapp)
+  dybatpho::info "config : ${xdg_config_dir_2}"
+  local xdg_cache_dir
+  xdg_cache_dir=$(dybatpho::xdg_cache_dir myapp)
+  dybatpho::info "cache  : ${xdg_cache_dir}"
+  local xdg_data_dir
+  xdg_data_dir=$(dybatpho::xdg_data_dir myapp)
+  dybatpho::info "data   : ${xdg_data_dir}"
+  local xdg_state_dir
+  xdg_state_dir=$(dybatpho::xdg_state_dir myapp)
+  dybatpho::info "state  : ${xdg_state_dir}"
+  local xdg_config_dir
+  xdg_config_dir=$(dybatpho::xdg_config_dir)
+  dybatpho::info "without an application name: ${xdg_config_dir}"
 
   # A real script would write into the directory it just made; this one keeps
   # to a temporary root so it never touches the user's home.
@@ -249,10 +348,16 @@ function _demo_xdg {
   local state
   state="$(XDG_STATE_HOME="${WORKDIR}/state" dybatpho::xdg_state_dir myapp)"
   state="$(dybatpho::ensure_dir "${state}" 700)"
-  printf 'last-run=%s\n' "$(date +%s)" | dybatpho::file_write_atomic "${state}/run"
-  dybatpho::info "Wrote ${state#"${WORKDIR}"/}/run with mode $(stat -c %a "${state}" 2> /dev/null || stat -f %Lp "${state}")"
+  local date
+  date=$(date +%s)
+  printf 'last-run=%s\n' "${date}" | dybatpho::file_write_atomic "${state}/run"
+  local mode
+  mode=$(stat -c %a "${state}" 2> /dev/null || stat -f %Lp "${state}")
+  dybatpho::info "Wrote ${state#"${WORKDIR}"/}/run with mode ${mode}"
 }
 
+# @description Run the `INSPECTING FILES AND TREES` section of this example.
+# @noargs
 function _demo_inspect {
   dybatpho::header "INSPECTING FILES AND TREES"
   local WORKDIR
@@ -262,23 +367,37 @@ function _demo_inspect {
   printf 'some text\n' > "${WORKDIR}/tree/sub/notes.txt"
   printf 'binary\000payload' > "${WORKDIR}/tree/sub/blob"
 
-  dybatpho::info "Tree total: $(dybatpho::dir_size "${WORKDIR}/tree") bytes"
-  dybatpho::info "One file  : $(dybatpho::file_size "${WORKDIR}/tree/a.bin") bytes"
-  dybatpho::info "Modified  : $(dybatpho::file_mtime "${WORKDIR}/tree/sub/notes.txt") (epoch seconds)"
+  local dir_size
+  dir_size=$(dybatpho::dir_size "${WORKDIR}/tree")
+  dybatpho::info "Tree total: ${dir_size} bytes"
+  local file_size
+  file_size=$(dybatpho::file_size "${WORKDIR}/tree/a.bin")
+  dybatpho::info "One file  : ${file_size} bytes"
+  local file_mtime
+  file_mtime=$(dybatpho::file_mtime "${WORKDIR}/tree/sub/notes.txt")
+  dybatpho::info "Modified  : ${file_mtime} (epoch seconds)"
 
   # Checking before a text rewrite is the point of `file_is_binary`: the
   # substitution below would otherwise mangle the binary file.
   local candidate
   for candidate in "${WORKDIR}/tree/sub/notes.txt" "${WORKDIR}/tree/sub/blob"; do
     if dybatpho::file_is_binary "${candidate}"; then
-      dybatpho::warn "  $(dybatpho::path_basename "${candidate}") is binary, leaving it alone"
+      local path_basename
+      path_basename=$(dybatpho::path_basename "${candidate}")
+      dybatpho::warn "  ${path_basename} is binary, leaving it alone"
     else
       dybatpho::file_replace "${candidate}" 'some' 'edited'
-      dybatpho::print "  $(dybatpho::path_basename "${candidate}") rewritten: $(cat "${candidate}")"
+      local cat
+      cat=$(cat "${candidate}")
+      local path_basename_2
+      path_basename_2=$(dybatpho::path_basename "${candidate}")
+      dybatpho::print "  ${path_basename_2} rewritten: ${cat}"
     fi
   done
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_temp_file
   _demo_temp_dir

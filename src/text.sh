@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 # @file text.sh
 # @brief Utilities for working with multi-line text blocks
+# @namespace dybatpho
 # @description
 #   This module contains helpers for formatting larger text blocks: indenting
 #   each line, removing shared indentation, stripping ANSI escape sequences,
@@ -110,7 +111,9 @@ function dybatpho::text_strip_ansi {
   for line in "${lines[@]}"; do
     # The ranges are byte ranges, and BSD sed rejects `[ -/]` as an invalid
     # range under a UTF-8 collation, so the match runs in the C locale.
-    printf '%s\n' "$(printf '%s' "${line}" | LC_ALL=C sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g')"
+    local printf
+    printf=$(printf '%s' "${line}" | LC_ALL=C sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g')
+    printf '%s\n' "${printf}"
   done
 }
 
@@ -149,6 +152,7 @@ function dybatpho::text_columns {
   dybatpho::expect_args input -- "$@"
   local delimiter="${2:-|}"
   local gap="${3:-2}"
-  dybatpho::is function dybatpho::table_align || dybatpho::die "dybatpho::table_align is required for dybatpho::text_columns"
+  dybatpho::is function dybatpho::table_align || dybatpho::die \
+    "dybatpho::table_align is required for dybatpho::text_columns"
   dybatpho::table_align "${input}" "${delimiter}" "" "${gap}"
 }

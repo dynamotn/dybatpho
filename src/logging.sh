@@ -1,6 +1,13 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it keeps its declarations with the functions they
+# describe; it uses `eval`, which is how the spec engine builds a parser.
+# dyshellint disable=BSG050,BSG011,BSG033,BSG040
 # @file logging.sh
 # @brief Utilities for logging to stdout/stderr
+# @namespace dybatpho
 # @description
 #   This module contains functions to log messages to stdout/stderr. Every
 #   structured (JSON) log event is enriched with a request ID, hostname, PID,
@@ -28,13 +35,16 @@ export LOG_FILE
 # @env LOG_FILE_LEVEL string Verbosity threshold applied only to `LOG_FILE` output. Default is `LOG_LEVEL`
 LOG_FILE_LEVEL="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
 export LOG_FILE_LEVEL
-# @env LOG_FILE_MAX_BYTES number Rotate `LOG_FILE` once it reaches this size in bytes. `0` disables rotation. Default `10485760` (10 MiB)
+# @env LOG_FILE_MAX_BYTES number Rotate `LOG_FILE` once it reaches this size in bytes. `0` disables rotation. Default
+#   `10485760` (10 MiB)
 LOG_FILE_MAX_BYTES="${LOG_FILE_MAX_BYTES:-10485760}"
 export LOG_FILE_MAX_BYTES
 # @env LOG_FILE_MAX_BACKUPS number Number of rotated `LOG_FILE` backups to keep. Default `5`
 LOG_FILE_MAX_BACKUPS="${LOG_FILE_MAX_BACKUPS:-5}"
 export LOG_FILE_MAX_BACKUPS
-# @env DYBATPHO_SPINNER string When `dybatpho::spinner` animates (`auto|always|never`). `auto` animates only on a terminal. Default `auto`
+# @env DYBATPHO_SPINNER string When `dybatpho::spinner` animates (`auto|always|never`). `auto` animates only on a
+#   terminal.
+#   Default `auto`
 DYBATPHO_SPINNER="${DYBATPHO_SPINNER:-auto}"
 export DYBATPHO_SPINNER
 # @env DYBATPHO_SPINNER_INTERVAL string Seconds between spinner frames. Default `0.1`
@@ -157,6 +167,7 @@ function __dybatpho_log_json_escape {
 
 #######################################
 # @description Return an RFC 3339 timestamp for a log event.
+# @noargs
 # @stdout Current timestamp
 #######################################
 function __dybatpho_log_timestamp {
@@ -170,7 +181,9 @@ function __dybatpho_log_timestamp {
 }
 
 #######################################
-# @description Return the current time in milliseconds since the epoch, using the most precise portable source available.
+# @description
+#   Return the current time in milliseconds since the epoch, using the most precise portable source available.
+# @noargs
 # @stdout Current time in milliseconds
 #######################################
 function __dybatpho_log_now_ms {
@@ -194,14 +207,20 @@ DYBATPHO_LOG_START_MS="$(__dybatpho_log_now_ms)"
 
 #######################################
 # @description Return the elapsed time since the process started, for structured log events.
+# @noargs
 # @stdout Elapsed time in milliseconds
 #######################################
 function __dybatpho_log_duration_ms {
-  printf '%s' "$(($(__dybatpho_log_now_ms) - DYBATPHO_LOG_START_MS))"
+  local log_now_ms
+  log_now_ms=$(__dybatpho_log_now_ms)
+  printf '%s' "$((log_now_ms - DYBATPHO_LOG_START_MS))"
 }
 
 #######################################
-# @description Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
+# @description
+#   Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID`
+#   is empty.
+# @noargs
 # @set LOG_REQUEST_ID string Generated correlation ID, when it was previously empty
 # @stdout Correlation ID
 #######################################
@@ -210,7 +229,9 @@ function __dybatpho_log_request_id {
     if dybatpho::is command uuidgen; then
       LOG_REQUEST_ID="$(uuidgen)" # kcov(skip)
     else
-      LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "$(__dybatpho_log_now_ms)" "${RANDOM}${RANDOM}")"
+      local log_now_ms
+      log_now_ms=$(__dybatpho_log_now_ms)
+      LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "${log_now_ms}" "${RANDOM}${RANDOM}")"
     fi
     export LOG_REQUEST_ID
   fi
@@ -218,7 +239,9 @@ function __dybatpho_log_request_id {
 }
 
 #######################################
-# @description Return the current hostname attached to every structured log event, caching the result for the process lifetime.
+# @description
+#   Return the current hostname attached to every structured log event, caching the result for the process lifetime.
+# @noargs
 # @stdout Hostname
 # @env DYBATPHO_LOG_HOSTNAME string Hostname to log instead of the one `dybatpho::hostname` detects
 #######################################
@@ -230,7 +253,9 @@ function __dybatpho_log_hostname {
 }
 
 #######################################
-# @description Build one structured JSON log event enriched with request ID, hostname, PID, duration, and the fields registered with `dybatpho::log_context`.
+# @description
+#   Build one structured JSON log event enriched with request ID, hostname, PID, duration, and the fields registered
+#   with `dybatpho::log_context`.
 # @arg $1 string RFC 3339 timestamp
 # @arg $2 string Log level
 # @arg $3 string Source location
@@ -246,21 +271,40 @@ function __dybatpho_log_json_event {
   # persist in the current shell instead of being lost with a subshell.
   __dybatpho_log_request_id > /dev/null
   __dybatpho_log_hostname > /dev/null
-  printf '{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s","hostname":"%s","pid":%s,"duration_ms":%s%s%s}\n' \
-    "$(__dybatpho_log_json_escape "${timestamp}")" \
-    "$(__dybatpho_log_json_escape "${level}")" \
-    "$(__dybatpho_log_json_escape "${source}")" \
-    "$(__dybatpho_log_json_escape "${message}")" \
-    "$(__dybatpho_log_json_escape "${LOG_REQUEST_ID}")" \
-    "$(__dybatpho_log_json_escape "${DYBATPHO_LOG_HOSTNAME}")" \
+  local event_format='{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s",'
+  event_format+='"hostname":"%s","pid":%s,"duration_ms":%s%s%s}\n'
+  # shellcheck disable=SC2059 # the format is built above, not taken from input
+  local log_context_json
+  log_context_json=$(__dybatpho_log_context_json)
+  local log_json_escape
+  log_json_escape=$(__dybatpho_log_json_escape "${message}")
+  local log_json_escape_2
+  log_json_escape_2=$(__dybatpho_log_json_escape "${timestamp}")
+  local log_json_escape_3
+  log_json_escape_3=$(__dybatpho_log_json_escape "${DYBATPHO_LOG_HOSTNAME}")
+  local log_json_escape_4
+  log_json_escape_4=$(__dybatpho_log_json_escape "${source}")
+  local log_json_escape_5
+  log_json_escape_5=$(__dybatpho_log_json_escape "${LOG_REQUEST_ID}")
+  local log_json_escape_6
+  log_json_escape_6=$(__dybatpho_log_json_escape "${level}")
+  # shellcheck disable=SC2059 # the format is built above, not taken from input
+  printf "${event_format}" \
+    "${log_json_escape_2}" \
+    "${log_json_escape_6}" \
+    "${log_json_escape_4}" \
+    "${log_json_escape}" \
+    "${log_json_escape_5}" \
+    "${log_json_escape_3}" \
     "$$" \
     "${duration_ms}" \
-    "$(__dybatpho_log_context_json)" \
+    "${log_context_json}" \
     "${extra_fields}"
 }
 
 #######################################
-# @description Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
+# @description
+#   Rotate a log file in place once it reaches a size threshold, keeping a bounded number of numbered backups.
 # @arg $1 string Log file path
 # @arg $2 number Maximum size in bytes before rotating, `0` disables rotation
 # @arg $3 number Number of rotated backups to keep
@@ -287,7 +331,9 @@ function __dybatpho_log_rotate_file {
 }
 
 #######################################
-# @description Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
+# @description
+#   Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first
+#   when needed.
 # @arg $1 string Log level
 # @arg $2 string Source location
 # @arg $3 string Message
@@ -313,7 +359,10 @@ function __dybatpho_log_write_file {
   [[ -d "${log_dir}" ]] || mkdir -p "${log_dir}" 2> /dev/null || return 0
 
   __dybatpho_log_rotate_file "${LOG_FILE}" "${LOG_FILE_MAX_BYTES}" "${LOG_FILE_MAX_BACKUPS}"
-  __dybatpho_log_json_event "$(__dybatpho_log_timestamp)" "${log_level}" "${source}" "${message}" "$(__dybatpho_log_duration_ms)" "${extra_fields}" >> "${LOG_FILE}"
+  local log_duration_ms
+  log_duration_ms=$(__dybatpho_log_duration_ms)
+  __dybatpho_log_json_event "$(__dybatpho_log_timestamp)" "${log_level}" "${source}" \
+    "${message}" "${log_duration_ms}" "${extra_fields}" >> "${LOG_FILE}"
 }
 
 #######################################
@@ -339,9 +388,14 @@ function __dybatpho_log_structured {
   fi
 
   if [[ "${LOG_FORMAT}" == "json" ]]; then
-    __dybatpho_log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" "$(__dybatpho_log_duration_ms)" "${extra_fields}" >&2
+    local log_duration_ms
+    log_duration_ms=$(__dybatpho_log_duration_ms)
+    __dybatpho_log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" \
+      "${log_duration_ms}" "${extra_fields}" >&2
   else
-    __dybatpho_log "${log_level}" "${timestamp} ‖ ${source}: ${message}$(__dybatpho_log_context_text)" stderr "${color}"
+    local log_context_text
+    log_context_text=$(__dybatpho_log_context_text)
+    __dybatpho_log "${log_level}" "${timestamp} ‖ ${source}: ${message}${log_context_text}" stderr "${color}"
   fi
 }
 
@@ -349,7 +403,8 @@ function __dybatpho_log_structured {
 # @description Return success when a message level should be shown against a threshold.
 # @arg $1 string Input log level
 # @arg $2 string Threshold level to compare against, default is `LOG_LEVEL`
-# @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted, when no explicit threshold is given
+# @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted, when no explicit threshold is
+#   given
 # @exitcode 0 The message level should be emitted
 # @exitcode 1 The message level is filtered out
 #######################################
@@ -365,7 +420,7 @@ function dybatpho::compare_log_level {
   local runtime_level_num="${log_levels[${runtime_level}]}"
   local write_level_num="${log_levels[${level}]}"
 
-  [ "${write_level_num}" -le "${runtime_level_num}" ]
+  [[ "${write_level_num}" -le "${runtime_level_num}" ]]
 }
 
 #######################################
@@ -438,7 +493,9 @@ function __dybatpho_log_text_n {
 }
 
 #######################################
-# @description Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
+# @description
+#   Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to
+#   `LOG_FILE` when configured, independently of `LOG_FORMAT`.
 # @arg $1 string Log level
 # @arg $2 string Rendered label for the log level
 # @arg $3 string Message
@@ -457,9 +514,9 @@ function __dybatpho_log_inspect {
   local magic_number=2
   local stack_total=$((indicator + magic_number))
 
-  if [ "${BASH_SOURCE:-}" = "" ]; then
+  if [[ "${BASH_SOURCE:-}" = "" ]]; then
     indicator="bash:0" # kcov(skip)
-  elif [ "${#BASH_SOURCE[@]}" -gt "${stack_total}" ]; then
+  elif [[ "${#BASH_SOURCE[@]}" -gt "${stack_total}" ]]; then
     indicator="${BASH_SOURCE[${stack_total}]}:${BASH_LINENO[$((stack_total - 1))]}"
   else
     # This case for calling inline from `bash -c`
@@ -473,12 +530,19 @@ function __dybatpho_log_inspect {
   if [[ "${LOG_FORMAT}" == "json" ]]; then
     __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${color}" "${extra_fields}"
   else
-    __dybatpho_log "${log_level}" "$(__dybatpho_log_timestamp) ‖ ${log_level_text} ‖ ${indicator}: ${message}$(__dybatpho_log_context_text)" stderr "${color}"
+    local log_context_text
+    log_context_text=$(__dybatpho_log_context_text)
+    local log_timestamp
+    log_timestamp=$(__dybatpho_log_timestamp)
+    __dybatpho_log "${log_level}" \
+      "${log_timestamp} ‖ ${log_level_text} ‖ ${indicator}: ${message}${log_context_text}" \
+      stderr "${color}"
   fi
 }
 
 #######################################
 # @description Return the effective terminal width used by boxed logging helpers.
+# @noargs
 # @stdout Terminal width, falling back to 80 columns
 #######################################
 function __dybatpho_log_get_terminal_width {
@@ -536,6 +600,7 @@ function __dybatpho_log_char_at_into {
 
 #######################################
 # @description Report whether Bash indexes strings by byte in this locale.
+# @noargs
 # @exitcode 0 Bash counts bytes, so multi-byte characters must be assembled
 # @exitcode 1 Bash counts characters
 #######################################
@@ -585,7 +650,8 @@ function __dybatpho_log_learn_widths {
   printf -v joined '%s' "${unknown[@]}"
 
   local -a widths=()
-  mapfile -t widths < <(TEXT="${joined}" python3 - << 'PY'
+  mapfile -t widths < <(
+    TEXT="${joined}" python3 - << 'PY'
 import os
 import unicodedata
 
@@ -626,7 +692,9 @@ function __dybatpho_log_width_into {
   local __dybatpho_width_index __dybatpho_width_char __dybatpho_width_bytewise=0
   __dybatpho_log_indexes_bytes && __dybatpho_width_bytewise=1
   __dybatpho_width_out=0
-  for ((__dybatpho_width_index = 0; __dybatpho_width_index < ${#__dybatpho_width_text}; __dybatpho_width_index += ${#__dybatpho_width_char})); do
+  for ((__dybatpho_width_index = 0;  \
+  __dybatpho_width_index < ${#__dybatpho_width_text};  \
+  __dybatpho_width_index += ${#__dybatpho_width_char})); do
     __dybatpho_log_char_at_into __dybatpho_width_char "${__dybatpho_width_text}" \
       "${__dybatpho_width_index}" "${__dybatpho_width_bytewise}"
     if __dybatpho_log_is_plain_ascii "${__dybatpho_width_char}"; then
@@ -670,7 +738,6 @@ function __dybatpho_log_string_display_width {
   __dybatpho_log_width_into __dybatpho_display_width "${1:-}"
   printf '%s\n' "${__dybatpho_display_width}"
 }
-
 
 #######################################
 # @description Wrap one text line to the requested width using word boundaries when possible.
@@ -797,14 +864,16 @@ function __dybatpho_log_box {
 
   local input_line wrapped_line
   for input_line in "${input_lines[@]}"; do
-    while IFS= read -r wrapped_line; do
+    local log_wrap_line_output
+    log_wrap_line_output=$(__dybatpho_log_wrap_line "${input_line}" "${inner_limit}") # kcov(skip)
+    while IFS= read -r wrapped_line || [[ -n "${wrapped_line}" ]]; do
       wrapped_lines+=("${wrapped_line}")
       local wrapped_width
       __dybatpho_log_width_into wrapped_width "${wrapped_line}"
       if ((wrapped_width > content_width)); then
         content_width=${wrapped_width}
       fi
-    done < <(__dybatpho_log_wrap_line "${input_line}" "${inner_limit}") # kcov(skip)
+    done < <(printf '%s' "${log_wrap_line_output}")
   done
 
   if ((${#wrapped_lines[@]} == 0)); then
@@ -977,6 +1046,7 @@ function dybatpho::fatal {
 #
 #   Values are redacted here rather than when the field is registered, so a
 #   secret registered after the fact is still masked on the next event.
+# @noargs
 # @stdout `,"name":"value"` for every registered field, in registration order
 #######################################
 function __dybatpho_log_context_json {
@@ -987,14 +1057,19 @@ function __dybatpho_log_context_json {
     if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
       __dybatpho_secret_mask_var value
     fi
+    local log_json_escape
+    log_json_escape=$(__dybatpho_log_json_escape "${value}")
+    local log_json_escape_2
+    log_json_escape_2=$(__dybatpho_log_json_escape "${key}")
     printf ',"%s":"%s"' \
-      "$(__dybatpho_log_json_escape "${key}")" \
-      "$(__dybatpho_log_json_escape "${value}")"
+      "${log_json_escape_2}" \
+      "${log_json_escape}"
   done
 }
 
 #######################################
 # @description Render the registered context fields for a human-readable line.
+# @noargs
 # @stdout ` name=value` for every registered field, in registration order
 #######################################
 function __dybatpho_log_context_text {
@@ -1084,6 +1159,7 @@ function __dybatpho_log_parse_size {
     [Mm]) number=$((number * 1024 * 1024)) ;;
     [Gg]) number=$((number * 1024 * 1024 * 1024)) ;;
     [Tt]) number=$((number * 1024 * 1024 * 1024 * 1024)) ;;
+    *) ;;
   esac
   printf '%s' "${number}"
 }
@@ -1094,7 +1170,7 @@ function __dybatpho_log_parse_size {
 # @arg $1 string Seconds to wait
 #######################################
 function __dybatpho_log_sleep {
-  sleep "${1}" 2> /dev/null || sleep 1
+  sleep "$1" 2> /dev/null || sleep 1
 }
 
 #######################################
@@ -1220,7 +1296,8 @@ function dybatpho::log_to_file {
 # @exitcode 1 `get` was asked for a field that is not set
 # @set __dybatpho_log_context_values
 # @set __dybatpho_log_context_keys
-# @tip Fields are held in the current shell, so a child process starts with none of them; export `LOG_REQUEST_ID` to correlate across processes
+# @tip Fields are held in the current shell, so a child process starts with none of them; export `LOG_REQUEST_ID` to
+#   correlate across processes
 # @tip Registered secrets are redacted in field values the same way they are in messages
 #######################################
 function dybatpho::log_context {
@@ -1265,7 +1342,9 @@ function dybatpho::log_context {
 #
 # @arg $1 string Timer name
 # @set __dybatpho_log_timer
-# @tip This times a step so the log says how long it took; `dybatpho::metrics_timer_start` records the same measurement as a metric for a dashboard
+# @tip This times a step so the log says how long it took; `dybatpho::metrics_timer_start` records the same measurement
+#   as
+#   a metric for a dashboard
 #######################################
 function dybatpho::timer_start {
   local name
@@ -1283,7 +1362,8 @@ function dybatpho::timer_start {
 # @set __dybatpho_log_timer
 # @stderr The duration message, at the requested level
 # @exitcode 1 The requested level is not a valid log level
-# @tip The elapsed time is published in `DYBATPHO_TIMER_LAST_MS` rather than printed, because capturing output with `$(...)` would run the call in a subshell and throw the measurement away
+# @tip The elapsed time is published in `DYBATPHO_TIMER_LAST_MS` rather than printed, because capturing output with
+#   `$(...)` would run the call in a subshell and throw the measurement away
 #######################################
 function dybatpho::timer_end {
   local name
@@ -1295,7 +1375,8 @@ function dybatpho::timer_end {
   local started="${__dybatpho_log_timer[${name}]-}"
   [[ -n "${started}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Timer '${name}' was never started"
-  local elapsed=$(($(__dybatpho_log_now_ms) - started))
+  local elapsed
+  elapsed=$(($(__dybatpho_log_now_ms) - started))
   if ((elapsed < 0)); then
     elapsed=0
   fi
@@ -1304,8 +1385,10 @@ function dybatpho::timer_end {
   export DYBATPHO_TIMER_LAST_MS
 
   local extra_fields
+  local log_json_escape
+  log_json_escape=$(__dybatpho_log_json_escape "${name}")
   printf -v extra_fields ',"timer":"%s","elapsed_ms":%s' \
-    "$(__dybatpho_log_json_escape "${name}")" "${elapsed}"
+    "${log_json_escape}" "${elapsed}"
   local message
   message="$(__dybatpho_log_text logging.timer_end "${name} took ${elapsed}ms" \
     name="${name}" elapsed_ms="${elapsed}")"
@@ -1383,7 +1466,8 @@ function dybatpho::spinner {
     printf '\r\033[K' >&2
   fi
 
-  local elapsed=$(($(__dybatpho_log_now_ms) - started))
+  local elapsed
+  elapsed=$(($(__dybatpho_log_now_ms) - started))
   if ((elapsed < 0)); then
     elapsed=0
   fi
@@ -1410,6 +1494,7 @@ function dybatpho::start_trace {
   if [[ "${BATS_ROOT:-}" != "" ]]; then
     trap_command="trap"
   fi
+  # dyshellint disable=BSG034 # this is `dybatpho::start_trace`; it has no helper to defer to
   "${trap_command}" 'set +xv' EXIT && set -xv
   # kcov(enabled)
 }

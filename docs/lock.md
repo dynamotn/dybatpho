@@ -32,7 +32,7 @@ A lock is a directory containing metadata about the process holding it
 
 - [`__dybatpho_lock_exists`](#__dybatpho_lock_exists) — Return success when something holds this lock path, whichever form it is in: a symbolic link, which is what the atomic claim writes, or a directory, which is what versions before it wrote. `[[ -L ]]` is deliberately first and deliberately not `[[ -e ]]`: the link target is data rather than a path, so it never resolves, and `-e` reports a dangling link as absent.
 - [`__dybatpho_lock_target`](#__dybatpho_lock_target) — Print the link target that identifies the holder of a lock, as `pid:host:acquired_at`.
-- [`dybatpho::lock_hostname`](#dybatpholock_hostname) — 
+- [`dybatpho::lock_hostname`](#dybatpholock_hostname) — Print the host name a lock records as its owner. It is its own function so a test can replace it, which is how the stale-lock paths are exercised without a second machine.
 - [`dybatpho::lock_path`](#dybatpholock_path) — Resolve a lock name or path into an absolute lock directory path.
 - [`dybatpho::lock_field`](#dybatpholock_field) — Read a single metadata field recorded for a lock.
 - [`dybatpho::lock_is_alive`](#dybatpholock_is_alive) — Return success when the process that owns a lock is still alive on this host.
@@ -115,6 +115,8 @@ dangling link as absent.
 Print the link target that identifies the holder of a lock,
 as `pid:host:acquired_at`.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - The target
@@ -124,6 +126,15 @@ as `pid:host:acquired_at`.
 
 ### `dybatpho::lock_hostname`
 
+Print the host name a lock records as its owner. It is its own
+function so a test can replace it, which is how the stale-lock paths are
+exercised without a second machine.
+
+_Function has no arguments._
+
+**📤 Output on stdout**
+
+- The host name
 
 
 ---

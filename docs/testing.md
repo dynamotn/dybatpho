@@ -1033,6 +1033,8 @@ dybatpho::mock_http_payloads   # header = "Authorization: Bearer ..." {"title":.
 
 ```
 
+_Function has no arguments._
+
 **🌍 Environment variables**
 
 | Variable | Type | Description |

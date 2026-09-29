@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file ai_ops.sh
 # @brief Example showing the AI model utilities
 # @description Demonstrates dybatpho::ai_provider, ai_model, ai_check, ai_ask,
@@ -16,14 +19,22 @@ export DRY_RUN=true
 export DYBATPHO_AI_PROVIDER=anthropic
 export DYBATPHO_AI_API_KEY="example-key-not-used-in-dry-run"
 
+# @description Run the `BACKEND` section of this example.
+# @noargs
 function _demo_backend {
   dybatpho::header "BACKEND"
-  dybatpho::print "Provider: $(dybatpho::ai_provider)"
-  dybatpho::print "Model:    $(dybatpho::ai_model)"
+  local ai_provider
+  ai_provider=$(dybatpho::ai_provider)
+  dybatpho::print "Provider: ${ai_provider}"
+  local ai_model
+  ai_model=$(dybatpho::ai_model)
+  dybatpho::print "Model:    ${ai_model}"
   dybatpho::ai_check
   dybatpho::info "Backend is usable"
 }
 
+# @description Run the `ONE-SHOT QUESTION` section of this example.
+# @noargs
 function _demo_ask {
   dybatpho::header "ONE-SHOT QUESTION"
   dybatpho::ai_ask "Summarize this deploy log in one line"
@@ -31,6 +42,8 @@ function _demo_ask {
   dybatpho::info "Two questions answered"
 }
 
+# @description Run the `CONVERSATION` section of this example.
+# @noargs
 function _demo_conversation {
   dybatpho::header "CONVERSATION"
   local chat
@@ -42,14 +55,19 @@ function _demo_conversation {
   dybatpho::info "Conversation kept in ${chat}"
 }
 
+# @description Run the `STRUCTURED OUTPUT` section of this example.
+# @noargs
 function _demo_structured {
   dybatpho::header "STRUCTURED OUTPUT"
   local schema
-  schema='{"type":"object","properties":{"severity":{"type":"string","enum":["low","high"]}},"required":["severity"],"additionalProperties":false}'
+  schema='{"type":"object","properties":{"severity":{"type":"string","enum":["low","high"]}},'
+  schema+='"required":["severity"],"additionalProperties":false}'
   dybatpho::ai_json "Classify this alert: disk at 91 percent" "${schema}"
   dybatpho::info "Answer is valid JSON, so a script can branch on it"
 }
 
+# @description Run the `STREAMING` section of this example.
+# @noargs
 function _demo_stream {
   dybatpho::header "STREAMING"
   dybatpho::ai_stream "Explain this stack trace"
@@ -80,6 +98,8 @@ function _tool_path_exists {
   fi
 }
 
+# @description Run the `TOOL USE` section of this example.
+# @noargs
 function _demo_tools {
   dybatpho::header "TOOL USE"
   dybatpho::ai_tool_register disk_free \
@@ -97,17 +117,29 @@ function _demo_tools {
   dybatpho::info "Tool registry cleared"
 }
 
+# @description Run the `GUARDRAILS` section of this example.
+# @noargs
 function _demo_guardrails {
   dybatpho::header "GUARDRAILS"
-  dybatpho::print "Estimated tokens: $(dybatpho::ai_tokens_estimate 'a prompt of some length')"
-  dybatpho::print "Redacted: $(dybatpho::ai_redact 'ping ops@example.com from 10.1.2.3 ticket 998877665544')"
+  local ai_tokens_estimate
+  ai_tokens_estimate=$(dybatpho::ai_tokens_estimate 'a prompt of some length')
+  dybatpho::print "Estimated tokens: ${ai_tokens_estimate}"
+  local ai_redact_2
+  ai_redact_2=$(dybatpho::ai_redact 'ping ops@example.com from 10.1.2.3 ticket 998877665544')
+  dybatpho::print "Redacted: ${ai_redact_2}"
   dybatpho::secret_register "super-secret-token"
-  dybatpho::print "Masked secret: $(dybatpho::ai_redact 'token is super-secret-token')"
+  local ai_redact
+  ai_redact=$(dybatpho::ai_redact 'token is super-secret-token')
+  dybatpho::print "Masked secret: ${ai_redact}"
   dybatpho::ai_budget 100
-  dybatpho::print "Usage: $(dybatpho::ai_usage total)"
+  local ai_usage
+  ai_usage=$(dybatpho::ai_usage total)
+  dybatpho::print "Usage: ${ai_usage}"
   dybatpho::info "A budget stops a runaway loop before it bills"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_backend
   _demo_ask

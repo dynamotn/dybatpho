@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file forge.sh
 # @brief Utilities for talking to the forge a repository is hosted on
+# @namespace dybatpho
 # @description
 #   `git.sh` reads the repository on disk and `release.sh` builds, checksums and
 #   signs artifacts — and then stops. Nothing in the library publishes anything.
@@ -111,6 +115,7 @@ function __dybatpho_forge_normalize_url {
     ssh://*) url="${url#ssh://}" ;;
     https://*) url="${url#https://}" ;;
     http://*) url="${url#http://}" ;;
+    *) ;;
   esac
   # A URL may carry `user@host`; the credential is not part of the identity.
   url="${url#*@}"
@@ -229,6 +234,7 @@ function dybatpho::forge_api {
       fi
       ;;
     gitlab) printf 'https://%s/api/v4\n' "${host}" ;;
+    *) ;;
   esac
 }
 
@@ -266,11 +272,14 @@ function dybatpho::forge_token {
     case "${kind}" in
       github) token="${GITHUB_TOKEN:-${GH_TOKEN:-}}" ;;
       gitlab) token="${GITLAB_TOKEN:-${CI_JOB_TOKEN:-}}" ;;
+      *) ;;
     esac
   fi
 
+  local forge_token_vars
+  forge_token_vars=$(__dybatpho_forge_token_vars "${kind}")
   [[ -n "${token}" ]] || dybatpho::die \
-    "No ${kind} token. Set DYBATPHO_FORGE_TOKEN, or $(__dybatpho_forge_token_vars "${kind}")"
+    "No ${kind} token. Set DYBATPHO_FORGE_TOKEN, or ${forge_token_vars}"
 
   dybatpho::secret_register "${token}"
   printf '%s\n' "${token}"
@@ -287,6 +296,7 @@ function __dybatpho_forge_token_vars {
   case "${kind}" in
     github) printf 'GITHUB_TOKEN or GH_TOKEN\n' ;;
     gitlab) printf 'GITLAB_TOKEN or CI_JOB_TOKEN\n' ;;
+    *) ;;
   esac
 }
 
@@ -303,7 +313,12 @@ function __dybatpho_forge_project_path {
   dybatpho::expect_args kind repo -- "$@"
   case "${kind}" in
     github) printf 'repos/%s\n' "${repo}" ;;
-    gitlab) printf 'projects/%s\n' "$(dybatpho::url_encode "${repo}")" ;;
+    gitlab)
+      local encoded
+      encoded=$(dybatpho::url_encode "${repo}")
+      printf 'projects/%s\n' "${encoded}"
+      ;;
+    *) ;;
   esac
 }
 
@@ -319,12 +334,14 @@ function __dybatpho_forge_labels_json {
   dybatpho::expect_args labels -- "$@"
 
   local label separator="" array="["
-  while IFS= read -r label; do
+  local split_output
+  split_output=$(dybatpho::split "${labels}" ",")
+  while IFS= read -r label || [[ -n "${label}" ]]; do
     label="$(dybatpho::trim "${label}")"
     [[ -n "${label}" ]] || continue
     array+="${separator}$(dybatpho::json_string "${label}")"
     separator=","
-  done < <(dybatpho::split "${labels}" ",")
+  done < <(printf '%s' "${split_output}")
   printf '%s]\n' "${array}"
 }
 
@@ -340,6 +357,7 @@ function __dybatpho_forge_auth_header {
   case "${kind}" in
     github) printf 'Authorization: Bearer %s\n' "${token}" ;;
     gitlab) printf 'PRIVATE-TOKEN: %s\n' "${token}" ;;
+    *) ;;
   esac
 }
 
@@ -381,7 +399,11 @@ function dybatpho::forge_request {
   case "${path}" in
     http://* | https://*) url="${path}" ;;
     *)
-      url="$(dybatpho::forge_api)/$(__dybatpho_forge_project_path "${kind}" "$(dybatpho::forge_repo)")/${path#/}"
+      local forge_repo
+      forge_repo=$(dybatpho::forge_repo)
+      local forge_api
+      forge_api=$(dybatpho::forge_api)
+      url="${forge_api}/$(__dybatpho_forge_project_path "${kind}" "${forge_repo}")/${path#/}"
       ;;
   esac
 
@@ -447,7 +469,9 @@ function dybatpho::forge_error {
   if ! dybatpho::json_valid "${body}"; then
     # Not JSON: an HTML error page or a proxy's plain text. A little of it is
     # more use than none of it, and all of it is not worth a log line.
-    printf '%s: %s\n' "${status_text}" "$(dybatpho::string_truncate "${body//$'\n'/ }" 200)"
+    local string_truncate_2
+    string_truncate_2=$(dybatpho::string_truncate "${body//$'\n'/ }" 200)
+    printf '%s: %s\n' "${status_text}" "${string_truncate_2}"
     return 0
   fi
 
@@ -460,7 +484,9 @@ function dybatpho::forge_error {
     '[.errors[]? | [.field?, .code?] | map(select(. != null)) | join(" ")] | join(", ")' 2> /dev/null || true)"
 
   if [[ -z "${message}" && -z "${detail}" ]]; then
-    printf '%s: %s\n' "${status_text}" "$(dybatpho::string_truncate "${body//$'\n'/ }" 200)"
+    local string_truncate
+    string_truncate=$(dybatpho::string_truncate "${body//$'\n'/ }" 200)
+    printf '%s: %s\n' "${status_text}" "${string_truncate}"
     return 0
   fi
 
@@ -488,15 +514,22 @@ function dybatpho::forge_issue_find {
   case "${kind}" in
     github)
       dybatpho::forge_request GET "issues?state=open&per_page=100" "" "${body}" || return 1
+      local json_string_2
+      json_string_2=$(dybatpho::json_string "${title}")
       number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == $(dybatpho::json_string "${title}")) | .number" | head -n 1)"
+        ".[] | select(.title == ${json_string_2}) | .number" | head -n 1)"
       ;;
     gitlab)
+      local url_encode
+      url_encode=$(dybatpho::url_encode "${title}")
       dybatpho::forge_request GET \
-        "issues?state=opened&search=$(dybatpho::url_encode "${title}")&in=title" "" "${body}" || return 1
+        "issues?state=opened&search=${url_encode}&in=title" "" "${body}" || return 1
+      local json_string
+      json_string=$(dybatpho::json_string "${title}")
       number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == $(dybatpho::json_string "${title}")) | .iid" | head -n 1)"
+        ".[] | select(.title == ${json_string}) | .iid" | head -n 1)"
       ;;
+    *) ;;
   esac
 
   [[ -n "${number}" && "${number}" != "null" ]] || return 1
@@ -523,11 +556,17 @@ function dybatpho::forge_issue_create {
   case "${kind}" in
     github)
       payload="$(dybatpho::json_object title "${title}" body "${body}")"
+      local forge_labels_json
+      forge_labels_json=$(__dybatpho_forge_labels_json "${labels}")
       [[ -n "${labels}" ]] \
         && payload="$(dybatpho::json_eval "${payload}" \
-          ".labels = $(__dybatpho_forge_labels_json "${labels}")")"
+          ".labels = ${forge_labels_json}")"
       dybatpho::forge_request POST "issues" "${payload}" "${response}" \
-        || dybatpho::die "Could not create issue '${title}': $(dybatpho::forge_error "${response}")"
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die "Could not create issue '${title}': ${forge_error_detail}"
+        }
       number="$(dybatpho::json_get "$(< "${response}")" '.number')"
       ;;
     gitlab)
@@ -535,9 +574,14 @@ function dybatpho::forge_issue_create {
       [[ -n "${labels}" ]] \
         && payload="$(dybatpho::json_eval "${payload}" ".labels = $(dybatpho::json_string "${labels}")")"
       dybatpho::forge_request POST "issues" "${payload}" "${response}" \
-        || dybatpho::die "Could not create issue '${title}': $(dybatpho::forge_error "${response}")"
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die "Could not create issue '${title}': ${forge_error_detail}"
+        }
       number="$(dybatpho::json_get "$(< "${response}")" '.iid')"
       ;;
+    *) ;;
   esac
 
   printf '%s\n' "${number}"
@@ -559,12 +603,17 @@ function dybatpho::forge_issue_comment {
   case "${kind}" in
     github) path="issues/${number}/comments" ;;
     gitlab) path="issues/${number}/notes" ;;
+    *) ;;
   esac
 
   local response
   dybatpho::create_temp response ".json"
   dybatpho::forge_request POST "${path}" "${payload}" "${response}" \
-    || dybatpho::die "Could not comment on issue ${number}: $(dybatpho::forge_error "${response}")"
+    || {
+      local forge_error_detail
+      forge_error_detail=$(dybatpho::forge_error "${response}")
+      dybatpho::die "Could not comment on issue ${number}: ${forge_error_detail}"
+    }
 }
 
 #######################################
@@ -596,10 +645,12 @@ function dybatpho::forge_issue_report {
     action="created"
   fi
 
+  local forge_issue_url
+  forge_issue_url=$(dybatpho::forge_issue_url "${number}")
   dybatpho::json_object \
     action "${action}" \
     number "${number}" \
-    url "$(dybatpho::forge_issue_url "${number}")"
+    url "${forge_issue_url}"
 }
 
 #######################################
@@ -618,6 +669,7 @@ function dybatpho::forge_issue_url {
   case "${kind}" in
     github) printf 'https://%s/%s/issues/%s\n' "${host}" "${repo}" "${number}" ;;
     gitlab) printf 'https://%s/%s/-/issues/%s\n' "${host}" "${repo}" "${number}" ;;
+    *) ;;
   esac
 }
 
@@ -644,9 +696,12 @@ function dybatpho::forge_release_find {
       value="$(dybatpho::json_get "$(< "${body}")" '.id')"
       ;;
     gitlab)
-      dybatpho::forge_request GET "releases/$(dybatpho::url_encode "${tag}")" "" "${body}" || return 1
+      local url_encode
+      url_encode=$(dybatpho::url_encode "${tag}")
+      dybatpho::forge_request GET "releases/${url_encode}" "" "${body}" || return 1
       value="$(dybatpho::json_get "$(< "${body}")" '.tag_name')"
       ;;
+    *) ;;
   esac
 
   [[ -n "${value}" && "${value}" != "null" ]] || return 1
@@ -684,7 +739,11 @@ function dybatpho::forge_release_create {
       dybatpho::is true "${draft}" \
         && payload="$(dybatpho::json_eval "${payload}" '.draft = true')"
       dybatpho::forge_request POST "releases" "${payload}" "${response}" \
-        || dybatpho::die "Could not create release '${tag}': $(dybatpho::forge_error "${response}")"
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die "Could not create release '${tag}': ${forge_error_detail}"
+        }
       value="$(dybatpho::json_get "$(< "${response}")" '.id')"
       ;;
     gitlab)
@@ -692,9 +751,14 @@ function dybatpho::forge_release_create {
         && dybatpho::die "GitLab has no draft release; hold the tag back instead"
       payload="$(dybatpho::json_object tag_name "${tag}" name "${name}" description "${notes}")"
       dybatpho::forge_request POST "releases" "${payload}" "${response}" \
-        || dybatpho::die "Could not create release '${tag}': $(dybatpho::forge_error "${response}")"
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die "Could not create release '${tag}': ${forge_error_detail}"
+        }
       value="$(dybatpho::json_get "$(< "${response}")" '.tag_name')"
       ;;
+    *) ;;
   esac
 
   printf '%s\n' "${value}"
@@ -751,14 +815,24 @@ function dybatpho::forge_release_upload {
         --request POST \
         --header "Content-Type: application/octet-stream" \
         --data-binary "@${file}" \
-        || dybatpho::die "Could not upload ${name}: $(dybatpho::forge_error "${response}")"
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die "Could not upload ${name}: ${forge_error_detail}"
+        }
       dybatpho::json_get "$(< "${response}")" '.browser_download_url'
       ;;
     gitlab)
       local package_url
-      package_url="$(dybatpho::forge_api)/$(__dybatpho_forge_project_path gitlab "${repo}")"
-      package_url="${package_url}/packages/generic/$(dybatpho::url_encode "$(dybatpho::path_basename "${repo}")")"
-      package_url="${package_url}/$(dybatpho::url_encode "${tag}")/$(dybatpho::url_encode "${name}")"
+      local forge_api
+      forge_api=$(dybatpho::forge_api)
+      package_url="${forge_api}/$(__dybatpho_forge_project_path gitlab "${repo}")"
+      local path_basename
+      path_basename=$(dybatpho::path_basename "${repo}")
+      package_url="${package_url}/packages/generic/$(dybatpho::url_encode "${path_basename}")"
+      local url_encode
+      url_encode=$(dybatpho::url_encode "${tag}")
+      package_url="${package_url}/${url_encode}/$(dybatpho::url_encode "${name}")"
 
       # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
       # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
@@ -768,15 +842,27 @@ function dybatpho::forge_release_upload {
       dybatpho::curl_request "${package_url}" "${response}" \
         --request PUT \
         --upload-file "${file}" \
-        || dybatpho::die "Could not upload ${name}: $(dybatpho::forge_error "${response}")"
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die "Could not upload ${name}: ${forge_error_detail}"
+        }
 
       # A generic package is not visible from the release until it is linked.
       local link_payload
       link_payload="$(dybatpho::json_object name "${name}" url "${package_url}")"
+      local forge_error
+      local forge_error_2
+      forge_error_2=$(dybatpho::forge_error "${response}")
+      forge_error=${forge_error_2}
+      local url_encode_2
+      url_encode_2=$(dybatpho::url_encode "${tag}")
       dybatpho::forge_request POST \
-        "releases/$(dybatpho::url_encode "${tag}")/assets/links" "${link_payload}" "${response}" \
-        || dybatpho::die "Uploaded ${name} but could not link it to release '${tag}': $(dybatpho::forge_error "${response}")"
+        "releases/${url_encode_2}/assets/links" "${link_payload}" "${response}" \
+        || dybatpho::die \
+          "Uploaded ${name} but could not link it to release '${tag}': ${forge_error}"
       printf '%s\n' "${package_url}"
       ;;
+    *) ;;
   esac
 }

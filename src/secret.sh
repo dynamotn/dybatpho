@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file secret.sh
 # @brief Utilities for handling secrets safely
+# @namespace dybatpho
 # @description
 #   This module reads secrets from files, environment variables, or stdin,
 #   masks registered secrets in logs and error messages, and enforces safe
@@ -18,7 +22,8 @@ DYBATPHO_SECRET_PLACEHOLDER="${DYBATPHO_SECRET_PLACEHOLDER:-***}"
 DYBATPHO_SECRET_MIN_LENGTH="${DYBATPHO_SECRET_MIN_LENGTH:-4}"
 # @env DYBATPHO_SECRET_MAX_MODE string Most permissive octal mode allowed for a secret file. Default is `600`
 DYBATPHO_SECRET_MAX_MODE="${DYBATPHO_SECRET_MAX_MODE:-600}"
-# @env DYBATPHO_SECRET_STRICT_PERMS string When true-like, permission problems fail instead of warning. Default is `true`
+# @env DYBATPHO_SECRET_STRICT_PERMS string When true-like, permission problems fail instead of warning. Default is
+#   `true`
 DYBATPHO_SECRET_STRICT_PERMS="${DYBATPHO_SECRET_STRICT_PERMS:-true}"
 
 # Registered secret values, longest first so overlapping values mask completely.
@@ -150,13 +155,13 @@ function __dybatpho_secret_file_owner {
 #######################################
 function dybatpho::secret_register {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  local value line
-  for value in "$@"; do
-    __dybatpho_secret_register_one "${value}"
-    if [[ "${value}" == *$'\n'* ]]; then
+  local secret line
+  for secret in "$@"; do
+    __dybatpho_secret_register_one "${secret}"
+    if [[ "${secret}" == *$'\n'* ]]; then
       while IFS= read -r line; do
         [[ -n "${line}" ]] && __dybatpho_secret_register_one "${line}" true
-      done <<< "${value}"
+      done <<< "${secret}"
     fi
   done
 }
@@ -470,6 +475,7 @@ function dybatpho::secret_with_file {
     local previous_umask
     previous_umask="$(umask)"
     umask 077
+    # dyshellint disable=BSG046 # created under the umask set above, which `create_temp` does not take
     path="$(mktemp "${TMPDIR:-/tmp}/dybatpho_secret_${BASHPID}_XXXXXXXX")"
     umask "${previous_umask}"
     printf '%s\n' "${__dybatpho_secret_source}" > "${path}"

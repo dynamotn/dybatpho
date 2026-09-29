@@ -8,6 +8,8 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# @description Run the `PLAIN TABLE` section of this example.
+# @noargs
 function _main {
   local rows=$'Name|Role|State\nAlice|Dev|Active\nBob|Ops|Paused'
   local csv_rows=$'Name,Count\nApples,3\nPears,12'

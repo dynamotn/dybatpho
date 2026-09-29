@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file validate.sh
 # @brief One validator for the whole library: named value types and declarative rules
+# @namespace dybatpho
 # @description
 #   Before this module every caller wrote its own check. `config` matched an
 #   integer with one regex and a URL with another, `cli` matched a shell
@@ -61,7 +65,8 @@ __DYBATPHO_VALIDATE_RE_NUMBER='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]
 # part and a bracketed address literal are legal and effectively never typed
 # into a configuration file, and accepting them costs the rejection of the
 # typos that are.
-__DYBATPHO_VALIDATE_RE_EMAIL='^[A-Za-z0-9._%+-]+@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$'
+__DYBATPHO_VALIDATE_RE_EMAIL='^[A-Za-z0-9._%+-]+@[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?'
+__DYBATPHO_VALIDATE_RE_EMAIL+='(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$'
 # A scheme, `://`, and something that is not whitespace. Deliberately the same
 # expression `config` used before this module existed, so a schema that passed
 # then still passes now.
@@ -207,6 +212,7 @@ function __dybatpho_validate_plain_int {
       __int_text="${__int_text#-}"
       ;;
     +*) __int_text="${__int_text#+}" ;;
+    *) ;;
   esac
   __int_out=$((10#${__int_text:-0}))
   [[ "${__int_sign}" == "-" ]] && __int_out=$((-__int_out))
@@ -446,10 +452,10 @@ function dybatpho::validate_value {
 
   if [[ -n "${choices}" ]]; then
     local -a items=()
-    local item matched=false
+    local choice matched=false
     IFS=',' read -r -a items <<< "${choices}"
-    for item in ${items[@]+"${items[@]}"}; do
-      [[ "${value}" == "${item}" ]] && {
+    for choice in ${items[@]+"${items[@]}"}; do
+      [[ "${value}" == "${choice}" ]] && {
         matched=true
         break
       }
@@ -735,7 +741,7 @@ function __dybatpho_validate_is_ipv6 {
     part="${last##*:}"
     __dybatpho_validate_is_ipv4 "${part}" || return 1
     trailing_v4=2
-    if [[ "${tail}" ]]; then
+    if [[ -n "${tail}" ]]; then
       tail="${tail%"${part}"}"
       tail="${tail%:}"
     else
@@ -810,7 +816,7 @@ function __dybatpho_validate_is_cidr {
 function __dybatpho_validate_is_mac {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_MAC} ]] || return 1
   # One separator or the other, never both in the same address.
-  [[ "${1}" != *:*-* && "${1}" != *-*:* ]]
+  [[ "$1" != *:*-* && "$1" != *-*:* ]]
 }
 
 #######################################
@@ -944,7 +950,7 @@ function __dybatpho_validate_is_duration {
 # @exitcode 1 It does not
 #######################################
 function __dybatpho_validate_is_path {
-  [[ -n "${1-}" ]] && dybatpho::is exist "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is exist "$1"
 }
 
 #######################################
@@ -954,7 +960,7 @@ function __dybatpho_validate_is_path {
 # @exitcode 1 It does not
 #######################################
 function __dybatpho_validate_is_file {
-  [[ -n "${1-}" ]] && dybatpho::is file "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is file "$1"
 }
 
 #######################################
@@ -964,7 +970,7 @@ function __dybatpho_validate_is_file {
 # @exitcode 1 It does not
 #######################################
 function __dybatpho_validate_is_dir {
-  [[ -n "${1-}" ]] && dybatpho::is dir "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is dir "$1"
 }
 
 #######################################
@@ -974,7 +980,7 @@ function __dybatpho_validate_is_dir {
 # @exitcode 1 It does not
 #######################################
 function __dybatpho_validate_is_symlink {
-  [[ -n "${1-}" ]] && dybatpho::is link "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is link "$1"
 }
 
 #######################################
@@ -984,7 +990,7 @@ function __dybatpho_validate_is_symlink {
 # @exitcode 1 It is not
 #######################################
 function __dybatpho_validate_is_readable {
-  [[ -n "${1-}" ]] && dybatpho::is readable "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is readable "$1"
 }
 
 #######################################
@@ -994,7 +1000,7 @@ function __dybatpho_validate_is_readable {
 # @exitcode 1 It is not
 #######################################
 function __dybatpho_validate_is_writable {
-  [[ -n "${1-}" ]] && dybatpho::is writeable "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is writeable "$1"
 }
 
 #######################################
@@ -1004,7 +1010,7 @@ function __dybatpho_validate_is_writable {
 # @exitcode 1 It is not
 #######################################
 function __dybatpho_validate_is_executable {
-  [[ -n "${1-}" ]] && dybatpho::is executable "${1}"
+  [[ -n "${1-}" ]] && dybatpho::is executable "$1"
 }
 
 #######################################

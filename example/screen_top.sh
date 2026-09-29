@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file screen_top.sh
 # @brief A complete process viewer built on the screen module
 # @description
@@ -75,6 +78,7 @@ readonly HISTORY_LIMIT=240
 #   and prints no header; the second is the same without the `=` suffixes, for
 #   a `ps` that rejects them; the third rearranges `ps aux`, which is all a
 #   BusyBox `ps` may offer. An example runs in CI on more than one of these.
+# @noargs
 #######################################
 function _collect {
   local raw=""
@@ -107,7 +111,7 @@ function _collect {
   if [[ -n "${raw}" ]]; then
     # One `sort` per refresh rather than a comparison ladder in Bash: sorting
     # several hundred rows in the shell costs far more than the process does.
-    # shellcheck disable=SC2086
+    # shellcheck disable=SC2086,SC2248 # the sort flags are words on purpose
     sorted="$(printf '%s\n' "${raw}" | LC_ALL=C sort ${key} ${direction} 2> /dev/null)" \
       || sorted="${raw}"
   fi
@@ -126,6 +130,7 @@ function _collect {
 # @description Work out the CPU and memory pressure shown in the gauges, and
 #   append both to the history the sparklines draw.
 #######################################
+# @noargs
 function _measure_totals {
   local line pid ppid user cpu mem rss stat command
   local cpu_sum=0 mem_sum=0 cpu_whole mem_whole
@@ -152,6 +157,7 @@ function _measure_totals {
       case "${field}" in
         MemTotal:) total="${value}" ;;
         MemAvailable:) available="${value}" ;;
+        *) ;;
       esac
     done < /proc/meminfo
     if ((total > 0)); then
@@ -232,6 +238,7 @@ function _draw_header {
   dybatpho::screen_layout halves horizontal "$1" ratio:1/2 ratio:1/2
 
   dybatpho::screen_block "${halves[0]}" title:"CPU" border:rounded
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::screen_layout cpu_parts vertical "${DYBATPHO_SCREEN_INNER}" length:1 fill:1
   local cpu_style="1;32"
   ((CPU_PERCENT >= 75)) && cpu_style="1;31"
@@ -322,10 +329,12 @@ function _draw_help {
 #######################################
 # @description Draw the whole frame into the buffer.
 #######################################
+# @noargs
 function _draw {
   dybatpho::screen_clear
 
   local -a frame=()
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::screen_layout frame vertical "${DYBATPHO_SCREEN_RECT}" \
     length:1 length:4 fill:1 length:6 length:1
 
@@ -377,6 +386,7 @@ function _draw {
   # A lighter track than the default: the scrollbar sits directly against the
   # block's own border, and two solid verticals side by side read as a second
   # border rather than as a scrollbar.
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::screen_scrollbar "${scroll_rect}" "${DYBATPHO_SCREEN_OFFSET}" "${#VISIBLE[@]}" \
     track:"┊"
 
@@ -426,6 +436,7 @@ function _draw_status {
 # @arg $1 string Event name
 #######################################
 function _handle_list_key {
+  # shellcheck disable=SC2154 # set by the option spec of this script
   local page=$((DYBATPHO_SCREEN_HEIGHT - 12))
   ((page > 0)) || page=1
   local count=${#VISIBLE[@]}
@@ -478,6 +489,7 @@ function _handle_list_key {
       ;;
     resize) dybatpho::screen_size || true ;;
     eof) RUNNING=false ;;
+    *) ;;
   esac
   return 0
 }
@@ -502,6 +514,7 @@ function _handle_filter_key {
     char:*) FILTER_DRAFT+="${1#char:}" ;;
     resize) dybatpho::screen_size || true ;;
     eof) RUNNING=false ;;
+    *) ;;
   esac
   return 0
 }
@@ -538,6 +551,7 @@ function _handle_confirm_key {
 #   Both ends matter: keys come from stdin and the frame goes to the terminal,
 #   and a run with either redirected is a run that has to draw once and stop.
 #######################################
+# @noargs
 function _has_terminal {
   [[ -t 0 && -t 1 && -e /dev/tty ]]
 }
@@ -545,6 +559,7 @@ function _has_terminal {
 #######################################
 # @description Render one frame to stdout, for a run with no terminal.
 #######################################
+# @noargs
 function _render_once {
   export COLUMNS="${COLUMNS:-100}" LINES="${LINES:-30}"
   dybatpho::screen_size || true
@@ -559,6 +574,7 @@ function _render_once {
 #######################################
 # @description Take over the terminal and run until the user quits.
 #######################################
+# @noargs
 function _run_interactive {
   dybatpho::screen_begin || return 1
   local key
@@ -568,6 +584,7 @@ function _run_interactive {
     # The refresh is the read's deadline rather than a sleep, so the keyboard
     # stays live between refreshes instead of being ignored for a second at a
     # time.
+    # shellcheck disable=SC2154 # set by the option spec of this script
     if ! dybatpho::screen_event key "${INTERVAL}"; then
       _collect
       continue
@@ -582,6 +599,8 @@ function _run_interactive {
   return 0
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   CPU_COUNT="$(dybatpho::cpu_count)"
   ((CPU_COUNT > 0)) || CPU_COUNT=1
@@ -598,6 +617,8 @@ function _main {
   # No terminal, or asked for a single frame: draw once and leave. This is the
   # path the example suite takes, and it is why this file can be an example at
   # all rather than something that waits forever for a keystroke.
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  # shellcheck disable=SC2310 # both are questions about the terminal
   if dybatpho::is true "${ONCE}" || ! _has_terminal; then
     _render_once
     return 0
@@ -605,6 +626,8 @@ function _main {
   _run_interactive
 }
 
+# @description The option spec of the viewer: refresh interval and what to show.
+# @noargs
 function _spec {
   dybatpho::opts::setup "A process viewer drawn with the screen module" ARGS action:"_main"
 

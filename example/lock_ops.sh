@@ -15,18 +15,26 @@ LOCK_NAME="lock_ops_demo"
 
 # --- acquire / release ------------------------------------------------------
 
+# @description Run the `ACQUIRE / RELEASE` section of this example.
+# @noargs
 function _demo_acquire_release {
   dybatpho::header "ACQUIRE / RELEASE"
   if dybatpho::lock_acquire "${LOCK_NAME}"; then
     dybatpho::success "Lock acquired by pid $$"
   fi
-  dybatpho::info "Currently held? $(dybatpho::lock_is_held "${LOCK_NAME}" && echo yes || echo no)"
+  local lock_is_held_2
+  lock_is_held_2=$(dybatpho::lock_is_held "${LOCK_NAME}" && echo yes || echo no)
+  dybatpho::info "Currently held? ${lock_is_held_2}"
   dybatpho::lock_release "${LOCK_NAME}"
-  dybatpho::info "Released. Currently held? $(dybatpho::lock_is_held "${LOCK_NAME}" && echo yes || echo no)"
+  local lock_is_held
+  lock_is_held=$(dybatpho::lock_is_held "${LOCK_NAME}" && echo yes || echo no)
+  dybatpho::info "Released. Currently held? ${lock_is_held}"
 }
 
 # --- prevent a concurrent run ------------------------------------------------
 
+# @description Run the `PREVENT CONCURRENT RUN` section of this example.
+# @noargs
 function _demo_prevent_concurrent_run {
   dybatpho::header "PREVENT CONCURRENT RUN"
   dybatpho::lock_acquire "${LOCK_NAME}"
@@ -41,15 +49,21 @@ function _demo_prevent_concurrent_run {
 
 # --- inspect the holder ------------------------------------------------------
 
+# @description Run the `LOCK INFO` section of this example.
+# @noargs
 function _demo_lock_info {
   dybatpho::header "LOCK INFO"
   dybatpho::lock_acquire "${LOCK_NAME}"
-  dybatpho::info "Holder: $(dybatpho::lock_info "${LOCK_NAME}")"
+  local lock_info
+  lock_info=$(dybatpho::lock_info "${LOCK_NAME}")
+  dybatpho::info "Holder: ${lock_info}"
   dybatpho::lock_release "${LOCK_NAME}"
 }
 
 # --- wait with a timeout ------------------------------------------------------
 
+# @description Run the `WAIT WITH TIMEOUT` section of this example.
+# @noargs
 function _demo_wait_with_timeout {
   dybatpho::header "WAIT WITH TIMEOUT"
   dybatpho::lock_acquire "${LOCK_NAME}"
@@ -69,6 +83,8 @@ function _demo_wait_with_timeout {
 
 # --- with_lock convenience wrapper -------------------------------------------
 
+# @description Run the `WITH_LOCK` section of this example.
+# @noargs
 function _demo_with_lock {
   dybatpho::header "WITH_LOCK"
   dybatpho::with_lock "${LOCK_NAME}" 5 -- bash -c 'echo "running while holding the lock"'
@@ -77,6 +93,8 @@ function _demo_with_lock {
 
 # --- main -----------------------------------------------------------------
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_acquire_release
   _demo_prevent_concurrent_run

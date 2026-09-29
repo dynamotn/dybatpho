@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file parallel_ops.sh
 # @brief Example showing bounded concurrency with ordered output
 # @description Demonstrates dybatpho::parallel_map, parallel_run,
@@ -11,6 +14,8 @@ dybatpho::register_common_handlers
 
 HOSTS=(web-01 web-02 db-01 cache-01 worker-01 worker-02)
 
+# @description Pretend to check one host, slowly enough that the jobs really overlap.
+# @arg $1 string Host to check
 function _check_host {
   local host="$1"
   # Pretend work, long enough that the jobs really do overlap.
@@ -21,6 +26,8 @@ function _check_host {
   return 0
 }
 
+# @description Run the `ONE COMMAND OVER A LIST` section of this example.
+# @noargs
 function _demo_map {
   dybatpho::header "ONE COMMAND OVER A LIST"
   dybatpho::info "Checking ${#HOSTS[@]} hosts, 3 at a time"
@@ -29,17 +36,27 @@ function _demo_map {
   # are kept in this shell, and a subshell would take them with it.
   dybatpho::parallel_map 3 _check_host "${HOSTS[@]}" || true
 
-  dybatpho::info "Jobs: $(dybatpho::parallel_count), failed: $(dybatpho::parallel_failed)"
+  local parallel_failed
+  parallel_failed=$(dybatpho::parallel_failed)
+  local parallel_count
+  parallel_count=$(dybatpho::parallel_count)
+  dybatpho::info "Jobs: ${parallel_count}, failed: ${parallel_failed}"
   local index
   for ((index = 0; index < $(dybatpho::parallel_count); index++)); do
-    dybatpho::print "  $(printf '%-10s' "${HOSTS[index]}") exit $(dybatpho::parallel_status "${index}")"
+    local parallel_status
+    parallel_status=$(dybatpho::parallel_status "${index}")
+    dybatpho::print "  $(printf '%-10s' "${HOSTS[index]}") exit ${parallel_status}"
   done
 }
 
+# @description Run the `OUTPUT STAYS READABLE` section of this example.
+# @noargs
 function _demo_ordering {
   dybatpho::header "OUTPUT STAYS READABLE"
   dybatpho::info "Jobs overlap, but each one's lines are replayed together"
 
+  # @description A job that writes while it runs, to show how output is kept apart.
+  # @arg $1 string Name of the job
   function _noisy {
     printf '  [%s] starting\n' "$1"
     sleep "0.$((RANDOM % 3))"
@@ -48,6 +65,8 @@ function _demo_ordering {
   dybatpho::parallel_map 4 _noisy alpha bravo charlie delta
 }
 
+# @description Run the `DIFFERENT COMMANDS AT ONCE` section of this example.
+# @noargs
 function _demo_run {
   dybatpho::header "DIFFERENT COMMANDS AT ONCE"
   # `parallel_run` suits jobs that are not the same command over a list.
@@ -57,12 +76,16 @@ function _demo_run {
     "printf '  building...\n'; sleep 0.1; printf '  build done\n'"
 }
 
+# @description Run the `FAIL FAST` section of this example.
+# @noargs
 function _demo_failfast {
   dybatpho::header "FAIL FAST"
   dybatpho::info "With fail-fast on, the jobs after a failure are never started"
 
+  # @description One step of the pipeline; `step-2` fails, to show what a failure does.
+  # @arg $1 string Name of the step
   function _step {
-    dybatpho::print "  running ${1}"
+    dybatpho::print "  running $1"
     [[ "$1" == "step-2" ]] && return 1
     return 0
   }
@@ -70,19 +93,25 @@ function _demo_failfast {
   dybatpho::parallel_map 1 _step step-1 step-2 step-3 step-4 || true
   DYBATPHO_PARALLEL_FAILFAST=false
 
-  local index
-  for ((index = 0; index < $(dybatpho::parallel_count); index++)); do
-    dybatpho::print "  job ${index} -> $(dybatpho::parallel_status "${index}")"
+  local index parallel_count parallel_status
+  parallel_count=$(dybatpho::parallel_count)
+  for ((index = 0; index < parallel_count; index++)); do
+    parallel_status=$(dybatpho::parallel_status "${index}")
+    dybatpho::print "  job ${index} -> ${parallel_status}"
   done
   dybatpho::info "A skipped job never ran, so it counts as neither pass nor fail"
 }
 
+# @description Run the `DRY RUN` section of this example.
+# @noargs
 function _demo_dry_run {
   dybatpho::header "DRY RUN"
   DRY_RUN=true dybatpho::parallel_map 2 _check_host web-01 db-01
   dybatpho::info "Nothing was contacted"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_map
   _demo_ordering

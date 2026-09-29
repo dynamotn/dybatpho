@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# parses its own arguments, so the raw form is what the reader sees.
+# dyshellint disable=BSG050,BSG051
 # @file json.sh
 # @brief Utilities for working with JSON and YAML data
+# @namespace dybatpho
 # @description
 #   This module contains helpers for querying, validating, formatting, and
 #   converting JSON and YAML documents through `yq`, with `jq` kept as a JSON
@@ -15,6 +20,7 @@
 
 #######################################
 # @description Resolve the preferred command for JSON helpers.
+# @noargs
 # @stdout `yq` or `jq`
 # @exitcode 0 A supported JSON helper command exists
 # @exitcode 127 Neither `yq` nor `jq` is installed
@@ -50,13 +56,15 @@ function __dybatpho_json_escape_into {
   # avoids walking it character by character. `[[:cntrl:]]` rather than a
   # `\x01`-`\x1f` range, because a bracket range is resolved by the locale's
   # collation and a multi-byte character can fall inside one.
-  if [[ "${__dybatpho_json_escape_text}" != *[\\\"]* \
-    && "${__dybatpho_json_escape_text}" != *[[:cntrl:]]* ]]; then
+  if [[ "${__dybatpho_json_escape_text}" != *[\\\"]* &&
+    "${__dybatpho_json_escape_text}" != *[[:cntrl:]]* ]]; then
     __dybatpho_json_escape_out="\"${__dybatpho_json_escape_text}\""
     return 0
   fi
 
-  for ((__dybatpho_json_escape_index = 0; __dybatpho_json_escape_index < ${#__dybatpho_json_escape_text}; __dybatpho_json_escape_index++)); do
+  for ((__dybatpho_json_escape_index = 0;  \
+  __dybatpho_json_escape_index < ${#__dybatpho_json_escape_text};  \
+  __dybatpho_json_escape_index++)); do
     __dybatpho_json_escape_char="${__dybatpho_json_escape_text:__dybatpho_json_escape_index:1}"
     case "${__dybatpho_json_escape_char}" in
       '"') __dybatpho_json_escape_result+='\"' ;;

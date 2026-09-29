@@ -1,6 +1,13 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it parses its own arguments, so the raw form is
+# what the reader sees.
+# dyshellint disable=BSG050,BSG011,BSG051
 # @file ai.sh
 # @brief Utilities for calling large language models from shell scripts
+# @namespace dybatpho
 # @description
 #   This module turns an LLM into an ordinary shell dependency: one function
 #   call in, text on stdout, a non-zero exit code when something fails. It
@@ -68,9 +75,14 @@
 #
 # @see
 #   - `example/ai_ops.sh`
-# @tip Set `DYBATPHO_AI_PROVIDER` to pin a backend; the default `auto` picks the first one whose credentials or command are present
-# @tip Every prompt is passed through `dybatpho::secret_mask` first, so values registered with `dybatpho::secret_register` never reach the provider
-# @note Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library; building them by string concatenation is too escaping-sensitive to be safe
+# @tip Set `DYBATPHO_AI_PROVIDER` to pin a backend; the default `auto` picks the first one whose credentials or command
+#   are
+#   present
+# @tip Every prompt is passed through `dybatpho::secret_mask` first, so values registered with
+#   `dybatpho::secret_register`
+#   never reach the provider
+# @note Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library;
+#   building them by string concatenation is too escaping-sensitive to be safe
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_AI_PROVIDER string Backend to use: `auto` (default), `anthropic`, `openai`, `ollama`, or `cli`
@@ -181,7 +193,9 @@ function __dybatpho_ai_state_cleanup_once {
   [[ "${BASHPID}" == "$$" ]] || return 0
   [[ -n "${__dybatpho_ai_state_cleanup-}" ]] && return 0
   __dybatpho_ai_state_cleanup=1
-  dybatpho::cleanup_file_on_exit "$(__dybatpho_ai_state_path)"
+  local ai_state_path
+  ai_state_path=$(__dybatpho_ai_state_path)
+  dybatpho::cleanup_file_on_exit "${ai_state_path}"
 }
 
 #######################################
@@ -191,6 +205,7 @@ function __dybatpho_ai_state_cleanup_once {
 #   The directory is created 0700, so no other account can plant anything in it.
 #   Resolution is lazy because working it out needs `HOME`, and a module must
 #   not fail at source time on a host that has none.
+# @noargs
 # @env DYBATPHO_AI_STATE_FILE string Overrides the default when set
 # @set DYBATPHO_AI_STATE_FILE
 # @stdout Path of the counter file
@@ -212,6 +227,7 @@ function __dybatpho_ai_state_path {
 #   link. Writing the counters is a plain redirection, which follows a link and
 #   truncates whatever is on the other end, so a link here is either an attack
 #   or a mistake; either way it is not something to write through.
+# @noargs
 # @stdout Path of the counter file
 # @exitcode 0 The path is safe to write
 # @exitcode 1 Stop the script when the path is a symbolic link
@@ -226,6 +242,7 @@ function __dybatpho_ai_state_prepare {
 
 #######################################
 # @description Print the counter document, creating it on first use.
+# @noargs
 # @env DYBATPHO_AI_STATE_FILE string File the counters are kept in
 # @stdout Counter JSON
 #######################################
@@ -233,7 +250,9 @@ function __dybatpho_ai_state_read {
   local path
   path="$(__dybatpho_ai_state_prepare)" || return 1
   if [[ ! -f "${path}" ]]; then
-    printf '%s\n' '{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,"last_model":"","last_stop_reason":""}' \
+    local empty_usage='{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,'
+    empty_usage+='"last_model":"","last_stop_reason":""}'
+    printf '%s\n' "${empty_usage}" \
       > "${path}"
   fi
   cat "${path}"
@@ -267,7 +286,9 @@ function __dybatpho_ai_budget_check {
   __dybatpho_ai_state_cleanup_once
   ((DYBATPHO_AI_MAX_CALLS > 0)) || return 0
   local calls
-  calls=$(dybatpho::json_get "$(__dybatpho_ai_state_read)" '.calls')
+  local ai_state_read
+  ai_state_read=$(__dybatpho_ai_state_read)
+  calls=$(dybatpho::json_get "${ai_state_read}" '.calls')
   if ((calls + wanted > DYBATPHO_AI_MAX_CALLS)); then
     dybatpho::die "ai: call budget of ${DYBATPHO_AI_MAX_CALLS} calls is exhausted"
   fi
@@ -275,10 +296,15 @@ function __dybatpho_ai_budget_check {
 
 #######################################
 # @description Count one model call in the shared counter file.
+# @noargs
 # @exitcode 0 The counter was incremented
 #######################################
 function __dybatpho_ai_count_call {
-  __dybatpho_ai_state_write "$(dybatpho::json_eval "$(__dybatpho_ai_state_read)" '.calls += 1')"
+  local ai_state_read
+  ai_state_read=$(__dybatpho_ai_state_read)
+  local json_eval
+  json_eval=$(dybatpho::json_eval "${ai_state_read}" '.calls += 1')
+  __dybatpho_ai_state_write "${json_eval}"
 }
 
 #######################################
@@ -338,7 +364,8 @@ function dybatpho::ai_provider {
       ;;
     auto) ;;
     *)
-      dybatpho::die "dybatpho::ai_provider: Unknown provider '${DYBATPHO_AI_PROVIDER}', expected auto, anthropic, openai, ollama or cli"
+      dybatpho::die \
+        "${FUNCNAME[0]}: Unknown provider '${DYBATPHO_AI_PROVIDER}'; expected auto, anthropic, openai, ollama or cli"
       ;;
   esac
 
@@ -353,7 +380,8 @@ function dybatpho::ai_provider {
   elif dybatpho::coalesce_cmd claude llm ollama > /dev/null 2>&1; then
     printf 'cli\n'
   else
-    dybatpho::die "dybatpho::ai_provider: No AI backend configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, run ollama, or install a supported CLI"
+    dybatpho::die \
+      "dybatpho::ai_provider: No AI backend. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, run ollama, or install a CLI"
   fi
 }
 
@@ -456,12 +484,16 @@ function dybatpho::ai_check {
     cli)
       __dybatpho_ai_cli_command > /dev/null
       ;;
+    *) ;;
   esac
-  dybatpho::debug "ai: provider=${provider} model=$(dybatpho::ai_model "${provider}")"
+  local ai_model
+  ai_model=$(dybatpho::ai_model "${provider}")
+  dybatpho::debug "ai: provider=${provider} model=${ai_model}"
 }
 
 #######################################
 # @description Resolve the command used by the `cli` backend.
+# @noargs
 # @env DYBATPHO_AI_CLI string Pin a command instead of probing
 # @stdout `claude`, `llm`, or `ollama`
 # @exitcode 0 A supported client exists
@@ -583,8 +615,10 @@ function __dybatpho_ai_messages_with_system {
   system=$(dybatpho::json_get "${conversation}" '.system')
   messages=$(dybatpho::json_eval "${conversation}" '.messages')
   if dybatpho::is set "${system}"; then
+    local json_object
+    json_object=$(dybatpho::json_object role system content "${system}")
     messages=$(dybatpho::json_eval "${messages}" \
-      "[$(dybatpho::json_object role system content "${system}")] + .")
+      "[${json_object}] + .")
   fi
   printf '%s\n' "${messages}"
 }
@@ -698,6 +732,7 @@ function dybatpho::ai_cache_clear {
   __dybatpho_ai_cache dybatpho::cache_clear
   # Entries this module wrote before it used the `cache` module carry a `.json`
   # suffix, and nothing else would ever come back for them.
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   dybatpho::is true "${DRY_RUN}" \
     || find "${DYBATPHO_AI_CACHE_DIR}" -maxdepth 1 -name '*.json' -type f -delete
 }
@@ -725,30 +760,41 @@ function __dybatpho_ai_dry_run_body {
   model=$(dybatpho::ai_model "${provider}")
   case "${provider}" in
     anthropic)
+      local json_object_4
+      json_object_4=$(dybatpho::json_object input_tokens:json 0 output_tokens:json 0)
+      local json_object_5
+      json_object_5=$(dybatpho::json_object type text text "${text}")
       dybatpho::json_object \
         model "${model}" \
         stop_reason end_turn \
-        content:json "[$(dybatpho::json_object type text text "${text}")]" \
-        usage:json "$(dybatpho::json_object input_tokens:json 0 output_tokens:json 0)"
+        content:json "[${json_object_5}]" \
+        usage:json "${json_object_4}"
       ;;
     openai)
       local choice
+      local json_object_3
+      json_object_3=$(dybatpho::json_object role assistant content "${text}")
       choice=$(dybatpho::json_object \
         finish_reason stop \
-        message:json "$(dybatpho::json_object role assistant content "${text}")")
+        message:json "${json_object_3}")
+      local json_object_2
+      json_object_2=$(dybatpho::json_object prompt_tokens:json 0 completion_tokens:json 0)
       dybatpho::json_object \
         model "${model}" \
         choices:json "[${choice}]" \
-        usage:json "$(dybatpho::json_object prompt_tokens:json 0 completion_tokens:json 0)"
+        usage:json "${json_object_2}"
       ;;
     ollama)
+      local json_object
+      json_object=$(dybatpho::json_object role assistant content "${text}")
       dybatpho::json_object \
         model "${model}" \
         done_reason stop \
-        message:json "$(dybatpho::json_object role assistant content "${text}")" \
+        message:json "${json_object}" \
         prompt_eval_count:json 0 \
         eval_count:json 0
       ;;
+    *) ;;
   esac
 }
 
@@ -792,6 +838,7 @@ function __dybatpho_ai_http {
     ollama)
       url="${base}/api/chat"
       ;;
+    *) ;;
   esac
 
   if dybatpho::is true "${DRY_RUN-}"; then
@@ -863,6 +910,7 @@ function __dybatpho_ai_extract_text {
     ollama)
       dybatpho::json_get "${body}" '.message.content // ""'
       ;;
+    *) ;;
   esac
 }
 
@@ -893,6 +941,7 @@ function __dybatpho_ai_usage_from_response {
       output_tokens=$(dybatpho::json_get "${body}" '.eval_count // 0')
       stop_reason=$(dybatpho::json_get "${body}" '.done_reason // ""')
       ;;
+    *) ;;
   esac
   __dybatpho_ai_record_usage "${input_tokens}" "${output_tokens}" "${model}" "${stop_reason}"
 }
@@ -955,6 +1004,7 @@ function __dybatpho_ai_cli_complete {
         printf '%s\n' "${prompt}" | ollama run "${model}"
       fi
       ;;
+    *) ;;
   esac
 }
 
@@ -1061,7 +1111,9 @@ function dybatpho::ai_conversation_add {
   esac
   local turn updated
   turn=$(dybatpho::json_object role "${role}" content "${content}")
-  updated=$(dybatpho::json_eval "$(cat "${file}")" ".messages += [${turn}]")
+  local cat
+  cat=$(cat "${file}")
+  updated=$(dybatpho::json_eval "${cat}" ".messages += [${turn}]")
   printf '%s\n' "${updated}" > "${file}"
 }
 
@@ -1107,7 +1159,9 @@ function dybatpho::ai_chat {
   prompt=$(__dybatpho_ai_redact "${prompt}")
   dybatpho::ai_conversation_add "${file}" user "${prompt}"
   local answer
-  answer=$(__dybatpho_ai_complete "$(cat "${file}")")
+  local cat
+  cat=$(cat "${file}")
+  answer=$(__dybatpho_ai_complete "${cat}")
   dybatpho::ai_conversation_add "${file}" assistant "${answer}"
   printf '%s\n' "${answer}"
 }
@@ -1150,7 +1204,8 @@ function dybatpho::ai_json {
     native_schema=""
     effective_prompt="${prompt}
 
-Answer with a single JSON document and nothing else. No prose, no Markdown code fence. It must validate against this JSON schema:
+Answer with a single JSON document and nothing else. No prose, no Markdown
+code fence. It must validate against this JSON schema:
 ${schema}"
   fi
 
@@ -1162,7 +1217,8 @@ ${schema}"
     answer=$(__dybatpho_ai_complete "${conversation}" "${native_schema}")
     # Models sometimes wrap JSON in a fence even when told not to; strip it
     # before parsing rather than failing a well-formed answer on packaging.
-    candidate=$(printf '%s\n' "${answer}" | sed -e 's/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$//' -e 's/^[[:space:]]*```[[:space:]]*$//')
+    candidate=$(printf '%s\n' "${answer}" \
+      | sed -e 's/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$//' -e 's/^[[:space:]]*```[[:space:]]*$//')
     if dybatpho::json_valid "${candidate}"; then
       dybatpho::json_eval "${candidate}" '.'
       return 0
@@ -1184,7 +1240,8 @@ ${schema}"
 # @stdout Assistant answer, written incrementally
 # @exitcode 0 The stream completed
 # @exitcode 1 Missing arguments or a provider error
-# @note Usage counters are not updated for streamed Anthropic calls because the totals arrive in a trailing event this helper does not buffer
+# @note Usage counters are not updated for streamed Anthropic calls because the totals arrive in a trailing event this
+#   helper does not buffer
 #######################################
 function dybatpho::ai_stream {
   local prompt system
@@ -1231,6 +1288,7 @@ function dybatpho::ai_stream {
       url="${base}/api/chat"
       payload=$(dybatpho::json_eval "${payload}" '.stream = true')
       ;;
+    *) ;;
   esac
 
   if dybatpho::is true "${DRY_RUN-}"; then
@@ -1251,6 +1309,7 @@ function dybatpho::ai_stream {
     ollama)
       filter='.message.content // ""'
       ;;
+    *) ;;
   esac
 
   local stream_config=""
@@ -1262,22 +1321,23 @@ function dybatpho::ai_stream {
   # Server-sent events prefix every payload with `data: `; Ollama streams bare
   # JSON objects. Both are handled by stripping an optional prefix per line.
   # The payload arrives on stdin, so it is not an argument either.
-  curl --silent --no-buffer --show-error \
-    --request POST \
-    --max-time "${DYBATPHO_AI_TIMEOUT}" \
-    --header "Content-Type: application/json" \
-    --header "Accept: text/event-stream" \
-    ${headers[@]+"${headers[@]}"} \
-    ${stream_args[@]+"${stream_args[@]}"} \
-    --data-binary @- \
-    "${url}" <<< "${payload}" \
-    | while IFS= read -r line; do
-      [[ -z "${line}" ]] && continue
-      data="${line#data: }"
-      [[ "${data}" == "[DONE]" ]] && break
-      [[ "${data}" == event:* ]] && continue
-      __dybatpho_ai_stream_chunk "${data}" "${filter}"
-    done
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    data="${line#data: }"
+    [[ "${data}" == "[DONE]" ]] && break
+    [[ "${data}" == event:* ]] && continue
+    __dybatpho_ai_stream_chunk "${data}" "${filter}"
+  done < <(
+    curl --silent --no-buffer --show-error \
+      --request POST \
+      --max-time "${DYBATPHO_AI_TIMEOUT}" \
+      --header "Content-Type: application/json" \
+      --header "Accept: text/event-stream" \
+      ${headers[@]+"${headers[@]}"} \
+      ${stream_args[@]+"${stream_args[@]}"} \
+      --data-binary @- \
+      "${url}" <<< "${payload}"
+  )
   [[ -n "${stream_config}" ]] && rm -f "${stream_config}"
   printf '\n'
 }
@@ -1362,11 +1422,14 @@ function dybatpho::ai_tool_clear {
 
 #######################################
 # @description Render the tool registry as a provider-neutral tools array.
+# @noargs
 # @stdout JSON array, `[]` when nothing is registered
 #######################################
 function __dybatpho_ai_tools_json {
   local tools='[]' name definition
-  for name in $(dybatpho::ai_tool_list); do
+  local -a tool_names=()
+  readarray -t tool_names < <(dybatpho::ai_tool_list)
+  for name in ${tool_names[@]+"${tool_names[@]}"}; do
     definition=$(dybatpho::json_object \
       name "${name}" \
       description "${DYBATPHO_AI_TOOL_DESCRIPTION[${name}]}" \
@@ -1470,6 +1533,7 @@ function dybatpho::ai_run {
           '[.choices[0].message.tool_calls[]?
             | {"id": .id, "name": .function.name, "arguments": .function.arguments}]')
         ;;
+      *) ;;
     esac
 
     local total
@@ -1484,12 +1548,15 @@ function dybatpho::ai_run {
     local assistant
     case "${provider}" in
       anthropic)
+        local json_eval
+        json_eval=$(dybatpho::json_eval "${body}" '.content')
         assistant=$(dybatpho::json_object \
-          role assistant content:json "$(dybatpho::json_eval "${body}" '.content')")
+          role assistant content:json "${json_eval}")
         ;;
       openai)
         assistant=$(dybatpho::json_eval "${body}" '.choices[0].message')
         ;;
+      *) ;;
     esac
     messages=$(dybatpho::json_eval "${messages}" ". + [${assistant}]")
 
@@ -1511,13 +1578,16 @@ function dybatpho::ai_run {
             role tool tool_call_id "${call_id}" content "${result}")
           messages=$(dybatpho::json_eval "${messages}" ". + [${entry}]")
           ;;
+        *) ;;
       esac
       index=$((index + 1))
     done
 
     if [[ "${provider}" == "anthropic" ]]; then
+      local json_object
+      json_object=$(dybatpho::json_object role user content:json "${results}")
       messages=$(dybatpho::json_eval "${messages}" \
-        ". + [$(dybatpho::json_object role user content:json "${results}")]")
+        ". + [${json_object}]")
     fi
     step=$((step + 1))
   done
@@ -1569,8 +1639,9 @@ function dybatpho::ai_usage {
   state=$(__dybatpho_ai_state_read)
   case "${scope}" in
     last)
-      dybatpho::json_get "${state}" \
-        '"calls=\(.calls) input=\(.last_input) output=\(.last_output) model=\(.last_model) stop_reason=\(.last_stop_reason)"'
+      local last_filter='"calls=\(.calls) input=\(.last_input) output=\(.last_output) '
+      last_filter+='model=\(.last_model) stop_reason=\(.last_stop_reason)"'
+      dybatpho::json_get "${state}" "${last_filter}"
       ;;
     total)
       dybatpho::json_get "${state}" \
@@ -1587,7 +1658,8 @@ function dybatpho::ai_usage {
 #     dybatpho::warn "This run is getting expensive"
 #   fi
 #
-# @arg $1 string Field name: `calls`, `total_input`, `total_output`, `last_input`, `last_output`, `last_model`, or `last_stop_reason`
+# @arg $1 string Field name: `calls`, `total_input`, `total_output`, `last_input`, `last_output`, `last_model`, or
+#   `last_stop_reason`
 # @stdout The counter value
 # @exitcode 0 The value was printed
 # @exitcode 1 Missing argument or an unknown field
@@ -1600,7 +1672,9 @@ function dybatpho::ai_usage_field {
     *) dybatpho::die "dybatpho::ai_usage_field: Unknown field '${field}'" ;;
   esac
   __dybatpho_ai_state_cleanup_once
-  dybatpho::json_get "$(__dybatpho_ai_state_read)" ".${field}"
+  local ai_state_read
+  ai_state_read=$(__dybatpho_ai_state_read)
+  dybatpho::json_get "${ai_state_read}" ".${field}"
 }
 
 #######################################
@@ -1610,7 +1684,8 @@ function dybatpho::ai_usage_field {
 #######################################
 function dybatpho::ai_usage_reset {
   __dybatpho_ai_state_cleanup_once
-  __dybatpho_ai_state_write '{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,"last_model":"","last_stop_reason":""}'
+  __dybatpho_ai_state_write \
+    '{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,"last_model":"","last_stop_reason":""}'
 }
 
 #######################################
@@ -1641,7 +1716,9 @@ function dybatpho::ai_budget {
 # @arg $1 string Text to redact, stdin is read when omitted
 # @stdout Redacted text
 # @exitcode 0 The text was printed
-# @tip This is a coarse net, not a compliance control; do not send regulated data to a third party provider on the strength of it
+# @tip This is a coarse net, not a compliance control; do not send regulated data to a third party provider on the
+#   strength
+#   of it
 # @see dybatpho::secret_register
 #######################################
 # shellcheck disable=SC2120 # The argument is optional; stdin is used without it.

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file network_ops.sh
 # @brief Example showing network utilities
 # @description Demonstrates dybatpho::curl_do, curl_download, curl_json,
@@ -23,6 +26,7 @@ dybatpho::register_common_handlers
 #   The stub reproduces the three things the module asks curl for: the body at
 #   the path after `-o`, the response headers at the path after `-D`, and the
 #   status code on stdout via `-w '%{http_code}'`.
+# @noargs
 function _install_curl_stub {
   local stub_dir
   dybatpho::create_temp_dir stub_dir "curl-stub"
@@ -87,6 +91,8 @@ STUB
   export PATH="${stub_dir}:${PATH}"
 }
 
+# @description Run the `HEAD REQUEST` section of this example.
+# @noargs
 function _demo_head_request {
   dybatpho::header "HEAD REQUEST"
   local headers_file
@@ -99,6 +105,8 @@ function _demo_head_request {
   fi
 }
 
+# @description Run the `JSON REQUEST` section of this example.
+# @noargs
 function _demo_json_request {
   dybatpho::header "JSON REQUEST"
   local json_file
@@ -111,6 +119,8 @@ function _demo_json_request {
   fi
 }
 
+# @description Run the `MULTIPART UPLOAD` section of this example.
+# @noargs
 function _demo_upload {
   dybatpho::header "MULTIPART UPLOAD"
   local report_file response_file
@@ -125,6 +135,8 @@ function _demo_upload {
   fi
 }
 
+# @description Run the `RESUMABLE DOWNLOAD + CHECKSUM` section of this example.
+# @noargs
 function _demo_resume_download_with_checksum {
   dybatpho::header "RESUMABLE DOWNLOAD + CHECKSUM"
   local dst_file expected_checksum
@@ -138,18 +150,25 @@ function _demo_resume_download_with_checksum {
   fi
 }
 
+# @description Run the `NORMALIZED RESPONSE PARSING` section of this example.
+# @noargs
 function _demo_normalized_response {
   dybatpho::header "NORMALIZED RESPONSE PARSING"
   local body_file
   dybatpho::create_temp body_file ".json"
   if dybatpho::curl_request "https://api.github.com/repos/dynamotn/dybatpho" "${body_file}"; then
+    # shellcheck disable=SC2154 # set by the option spec of this script
     dybatpho::info "Status: ${DYBATPHO_HTTP_STATUS}"
-    dybatpho::info "Content-Type: $(dybatpho::curl_response_header content-type unknown)"
+    local curl_response_header
+    curl_response_header=$(dybatpho::curl_response_header content-type unknown)
+    dybatpho::info "Content-Type: ${curl_response_header}"
   else
     dybatpho::warn "Request failed with status: ${DYBATPHO_HTTP_STATUS}"
   fi
 }
 
+# @description Run the `PER-REQUEST TIMEOUT` section of this example.
+# @noargs
 function _demo_per_request_timeout {
   dybatpho::header "PER-REQUEST TIMEOUT"
   # Override connect/total timeouts for this single call only; global
@@ -161,6 +180,8 @@ function _demo_per_request_timeout {
   fi
 }
 
+# @description Run the `CIRCUIT BREAKER` section of this example.
+# @noargs
 function _demo_circuit_breaker {
   dybatpho::header "CIRCUIT BREAKER"
   export DYBATPHO_CIRCUIT_THRESHOLD=2
@@ -174,7 +195,9 @@ function _demo_circuit_breaker {
   if dybatpho::circuit_breaker "${service}" "true"; then
     dybatpho::info "Call succeeded"
   else
-    dybatpho::warn "Circuit '${service}' is $(dybatpho::circuit_state "${service}"); call was skipped"
+    local circuit_state
+    circuit_state=$(dybatpho::circuit_state "${service}")
+    dybatpho::warn "Circuit '${service}' is ${circuit_state}; call was skipped"
   fi
   unset DYBATPHO_CIRCUIT_THRESHOLD DYBATPHO_CIRCUIT_COOLDOWN
 }
@@ -182,14 +205,17 @@ function _demo_circuit_breaker {
 # @description Spend a call budget rather than a rate limit: ten calls a minute
 #   is what the API agreed to, and the limiter waits for the window to slide
 #   instead of letting the script find out through a `429`.
+# @noargs
 function _demo_rate_limit {
   dybatpho::header "RATE LIMIT"
-  local service="api.example.test" item
+  local service="api.example.test" resource
   dybatpho::rate_limit_reset "${service}"
-  for item in alpha beta gamma; do
-    dybatpho::rate_limit "${service}" 10/60 -- dybatpho::print "  fetched ${item}"
+  for resource in alpha beta gamma; do
+    dybatpho::rate_limit "${service}" 10/60 -- dybatpho::print "  fetched ${resource}"
   done
-  dybatpho::info "Calls left in this minute: $(dybatpho::rate_limit_remaining "${service}" 10/60)"
+  local rate_limit_remaining
+  rate_limit_remaining=$(dybatpho::rate_limit_remaining "${service}" 10/60)
+  dybatpho::info "Calls left in this minute: ${rate_limit_remaining}"
 
   # With waiting switched off the limiter refuses the call instead, which is
   # what a script wants when it would rather skip work than block.
@@ -206,13 +232,16 @@ function _demo_rate_limit {
 
 # @description Walk a paginated collection the way the server describes it,
 #   through the `Link` header, instead of rebuilding `?page=N` by hand.
+# @noargs
 function _demo_pagination {
   dybatpho::header "PAGINATION"
   local body_file
   dybatpho::create_temp body_file ".json"
   # One page on its own already says where the next one is.
   dybatpho::curl_request "https://api.example.test/items?page=1" "${body_file}"
-  dybatpho::info "The server's next page: $(dybatpho::curl_link next || echo '(none)')"
+  local curl_link
+  curl_link=$(dybatpho::curl_link next || echo '(none)')
+  dybatpho::info "The server's next page: ${curl_link}"
 
   # And this walks the whole collection, one body per page, until the server
   # stops offering a next one.
@@ -225,6 +254,7 @@ function _demo_pagination {
 
 # @description Send a token without putting it where `ps` can read it, and ask a
 #   GraphQL endpoint a question whose failures live in the body.
+# @noargs
 function _demo_authenticated_requests {
   dybatpho::header "AUTHENTICATED REQUESTS"
   local body_file
@@ -248,6 +278,7 @@ function _demo_authenticated_requests {
 
 # @description Take a URL apart before doing anything with it, which is what
 #   picking a host out of configuration usually turns into.
+# @noargs
 function _demo_url_parse {
   dybatpho::header "URL COMPONENTS"
   local url="postgres://app:secret@db.internal:5432/orders?sslmode=require"
@@ -255,26 +286,34 @@ function _demo_url_parse {
     || dybatpho::die "Could not read ${url}"
   local part
   for part in scheme user host port path query; do
-    dybatpho::print "  $(printf '%-9s' "${part}") $(dybatpho::url_part "${part}" '(none)')"
+    local url_part_2
+    url_part_2=$(dybatpho::url_part "${part}" '(none)')
+    dybatpho::print "  $(printf '%-9s' "${part}") ${url_part_2}"
   done
   # A component that was never there reads as the default rather than as an
   # error the caller has to handle.
-  dybatpho::print "  fragment  $(dybatpho::url_part fragment '(none)')"
+  local url_part
+  url_part=$(dybatpho::url_part fragment '(none)')
+  dybatpho::print "  fragment  ${url_part}"
 
   # An IPv6 literal keeps its colons inside the brackets, where they are not a
   # port separator.
   dybatpho::url_parse "http://[2001:db8::1]:8080/health"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::print "  IPv6 host ${DYBATPHO_URL[host]} on port ${DYBATPHO_URL[port]}"
 }
 
 # @description Decide whether an address is one, and whether it belongs to a
 #   network, without shelling out to anything.
+# @noargs
 function _demo_addresses {
   dybatpho::header "ADDRESSES AND NETWORKS"
   local candidate
   for candidate in 192.0.2.10 2001:db8::1 192.0.2.256 127.0.0.010 not-an-address; do
     if dybatpho::ip_version "${candidate}" > /dev/null; then
-      dybatpho::print "  $(printf '%-15s' "${candidate}") IPv$(dybatpho::ip_version "${candidate}")"
+      local ip_version
+      ip_version=$(dybatpho::ip_version "${candidate}")
+      dybatpho::print "  $(printf '%-15s' "${candidate}") IPv${ip_version}"
     else
       # `192.0.2.256` has an octet that does not exist, and `127.0.0.010` is
       # read as octal by the resolver, so it is not the host it looks like.
@@ -282,7 +321,9 @@ function _demo_addresses {
     fi
   done
 
-  dybatpho::print "  /24 is $(dybatpho::cidr_netmask 24)"
+  local cidr_netmask
+  cidr_netmask=$(dybatpho::cidr_netmask 24)
+  dybatpho::print "  /24 is ${cidr_netmask}"
   local block="10.0.0.0/8"
   for candidate in 10.1.2.3 11.1.2.3; do
     if dybatpho::cidr_contains "${block}" "${candidate}"; then
@@ -298,6 +339,7 @@ function _demo_addresses {
 
 # @description Wait for a service to start listening, which is the wait every
 #   `docker compose up` script ends up writing by hand.
+# @noargs
 function _demo_port_probe {
   dybatpho::header "PORT PROBE"
   # Port 1 is privileged and nothing listens on it here, so this is the shape of
@@ -314,6 +356,8 @@ function _demo_port_probe {
   fi
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_url_parse
   _demo_addresses

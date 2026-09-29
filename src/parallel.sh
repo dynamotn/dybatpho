@@ -1,6 +1,13 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it uses `eval`, which is how the spec engine builds
+# a parser.
+# dyshellint disable=BSG050,BSG011,BSG040
 # @file parallel.sh
 # @brief Utilities for running work concurrently with a bounded worker pool
+# @namespace dybatpho
 # @description
 #   This module runs a list of jobs several at a time and reports what each one
 #   did. It exists because the hand-written version of this loop gets three
@@ -146,6 +153,7 @@ function __dybatpho_parallel_pool {
   local __dybatpho_parallel_monitor="off"
   case "$-" in
     *m*) __dybatpho_parallel_monitor="on" ;;
+    *) ;;
   esac
   set -m
   for ((index = 0; index < total; index++)); do
@@ -248,10 +256,11 @@ function dybatpho::parallel_map {
   (($#)) || return 0
 
   local -a __dybatpho_parallel_items=("$@")
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
-    local item
-    for item in "${__dybatpho_parallel_items[@]}"; do
-      dybatpho::dry_run "${command}" "${item}"
+    local job
+    for job in "${__dybatpho_parallel_items[@]}"; do
+      dybatpho::dry_run "${command}" "${job}"
     done
     return 0
   fi
@@ -262,7 +271,7 @@ function dybatpho::parallel_map {
   # @arg $2 string Capture directory
   #######################################
   # shellcheck disable=SC2329 # run by the pool through its name
-  __dybatpho_parallel_launch_item() {
+  function __dybatpho_parallel_launch_item {
     local index="$1" directory="$2" code=0
     # The job runs one subshell deeper so that a command calling `exit` ends
     # only itself. Without that, the exit would skip the line below and the job
@@ -323,7 +332,7 @@ function dybatpho::parallel_run {
   # @arg $2 string Capture directory
   #######################################
   # shellcheck disable=SC2329 # run by the pool through its name
-  __dybatpho_parallel_launch_command() {
+  function __dybatpho_parallel_launch_command {
     local index="$1" directory="$2" code=0
     # `exit` is ordinary inside a command string, so the evaluation runs one
     # subshell deeper: otherwise the exit would skip the line below and the job

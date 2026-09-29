@@ -13,9 +13,12 @@ dybatpho::register_common_handlers
 # Global flags (shared across all commands)
 # ===========================================================================
 
+# @description The option spec every command inherits: the persistent flags of the root.
+# @noargs
 function _spec_global {
   dybatpho::opts::flag "Enable verbose output" VERBOSE --verbose alias:-v persistent:true
-  dybatpho::opts::flag "Print commands without executing" DRY_RUN --dry-run -n on:true off:false init:="false" persistent:true
+  dybatpho::opts::flag "Print commands without executing" DRY_RUN --dry-run -n \
+    on:true off:false init:="false" persistent:true
   dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info" persistent:true
 }
 
@@ -23,6 +26,8 @@ function _spec_global {
 # deploy subcommand
 # ===========================================================================
 
+# @description Run the `DEPLOY → ${_target}` section of this example.
+# @noargs
 function _run_deploy {
   local _target="${ENV:-staging}"
   dybatpho::header "DEPLOY → ${_target}"
@@ -33,6 +38,8 @@ function _run_deploy {
   dybatpho::success "Deploy to ${_target} complete" && exit 0
 }
 
+# @description The option spec of `deploy`, the command this example is built around.
+# @noargs
 function _spec_deploy {
   dybatpho::opts::setup "Deploy application to an environment" DEPLOY_ARGS args:none action:"_run_deploy" \
     prerun:"dybatpho::progress 'Preparing deploy...'" \
@@ -47,30 +54,41 @@ function _spec_deploy {
 # db subcommands
 # ===========================================================================
 
+# @description Run the `DB MIGRATE (steps: ${STEPS:-all})` section of this example.
+# @noargs
 function _run_db_migrate {
   dybatpho::header "DB MIGRATE (steps: ${STEPS:-all})"
   dybatpho::dry_run "echo 'Running ${STEPS:-all} migration(s)...'"
   dybatpho::success "Migrations complete" && exit 0
 }
 
+# @description The option spec of `db migrate`.
+# @noargs
 function _spec_db_migrate {
   dybatpho::opts::setup "Run pending database migrations" MIGRATE_ARGS args:none action:"_run_db_migrate"
   dybatpho::opts::param "Number of migrations to run" STEPS -s --steps init:="all"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_migrate"
 }
 
+# @description Run the `DB SEED (fixture: ${FIXTURE})` section of this example.
+# @noargs
 function _run_db_seed {
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::header "DB SEED (fixture: ${FIXTURE})"
   dybatpho::dry_run "echo 'Seeding from ${FIXTURE}...'"
   dybatpho::success "Seeding complete" && exit 0
 }
 
+# @description The option spec of `db seed`.
+# @noargs
 function _spec_db_seed {
   dybatpho::opts::setup "Populate database with seed data" SEED_ARGS args:none action:"_run_db_seed"
   dybatpho::opts::param "Seed fixture file" FIXTURE -f --fixture required:true
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_seed"
 }
 
+# @description Run the `DB RESET` section of this example.
+# @noargs
 function _run_db_reset {
   if [[ "${YES:-false}" != "true" ]]; then
     dybatpho::warn "This will DESTROY all data. Pass --yes to confirm."
@@ -82,12 +100,16 @@ function _run_db_reset {
   dybatpho::success "Database reset complete" && exit 0
 }
 
+# @description The option spec of `db reset`.
+# @noargs
 function _spec_db_reset {
   dybatpho::opts::setup "Drop and recreate the database" RESET_ARGS args:none action:"_run_db_reset"
   dybatpho::opts::flag "Skip confirmation prompt" YES -y --yes
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db_reset"
 }
 
+# @description The option spec of `db`, the parent of the database subcommands.
+# @noargs
 function _spec_db {
   dybatpho::opts::setup "Database management commands" DB_ARGS action:"dybatpho::generate_help _spec_db"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_db"
@@ -100,6 +122,8 @@ function _spec_db {
 # config subcommand
 # ===========================================================================
 
+# @description Run the `CONFIG` section of this example.
+# @noargs
 function _run_config {
   dybatpho::header "CONFIG"
   if [[ "${LIST:-false}" == "true" ]]; then
@@ -120,6 +144,8 @@ function _run_config {
   exit 0
 }
 
+# @description The option spec of `config`.
+# @noargs
 function _spec_config {
   dybatpho::opts::setup "Show or update configuration" CONFIG_ARGS args:none action:"_run_config"
   dybatpho::opts::param "Config key to read or write" KEY -k --key
@@ -133,6 +159,8 @@ function _spec_config {
 # Root spec + entry point
 # ===========================================================================
 
+# @description The option spec of the root command, which carries every subcommand.
+# @noargs
 function _spec_root {
   _spec_global
   dybatpho::opts::setup "A sample devops CLI built with dybatpho" ROOT_ARGS action:"dybatpho::generate_help _spec_root"

@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 # @file notification.sh
 # @brief Utilities for sending messages to chat and notification providers
+# @namespace dybatpho
 # @description
 #   This module contains functions to send messages to popular messaging and
 #   notification platforms through their webhook or bot APIs:
@@ -56,7 +57,9 @@
 #
 # @see
 #   - `example/notification_ops.sh`
-# @tip Most providers require a webhook URL or API token set via environment variables. The functions validate these before making requests.
+# @tip Most providers require a webhook URL or API token set via environment variables. The functions validate these
+#   before
+#   making requests.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
@@ -95,9 +98,12 @@ function dybatpho::notify_slack {
   dybatpho::expect_envs DYBATPHO_SLACK_WEBHOOK_URL
 
   local payload
-  payload=$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")
+  local notification_json_escape
+  notification_json_escape=$(__dybatpho_notification_json_escape "${message}")
+  payload=$(printf '{"text":"%s"}' "${notification_json_escape}")
 
   dybatpho::debug "Sending Slack notification"
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   dybatpho::curl_json "${DYBATPHO_SLACK_WEBHOOK_URL}" /dev/null \
     --request POST \
     --data "${payload}"
@@ -127,16 +133,19 @@ function dybatpho::notify_telegram {
   local parse_mode="${2:-}"
   dybatpho::expect_envs DYBATPHO_TELEGRAM_BOT_TOKEN DYBATPHO_TELEGRAM_CHAT_ID
 
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   local url="https://api.telegram.org/bot${DYBATPHO_TELEGRAM_BOT_TOKEN}/sendMessage"
   local escaped_message escaped_chat_id
   escaped_message=$(__dybatpho_notification_json_escape "${message}")
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   escaped_chat_id=$(__dybatpho_notification_json_escape "${DYBATPHO_TELEGRAM_CHAT_ID}")
 
   local payload
   if [[ -n "${parse_mode}" ]]; then
     local escaped_parse_mode
     escaped_parse_mode=$(__dybatpho_notification_json_escape "${parse_mode}")
-    printf -v payload '{"chat_id":"%s","text":"%s","parse_mode":"%s"}' "${escaped_chat_id}" "${escaped_message}" "${escaped_parse_mode}"
+    printf -v payload '{"chat_id":"%s","text":"%s","parse_mode":"%s"}' "${escaped_chat_id}" "${escaped_message}" \
+      "${escaped_parse_mode}"
   else
     printf -v payload '{"chat_id":"%s","text":"%s"}' "${escaped_chat_id}" "${escaped_message}"
   fi
@@ -177,16 +186,26 @@ function dybatpho::notify_teams {
   if [[ -n "${title}" ]]; then
     local escaped_title
     escaped_title=$(__dybatpho_notification_json_escape "${title}")
-    printf -v body_blocks '[{"type":"TextBlock","text":"%s","weight":"bolder","size":"medium"},{"type":"TextBlock","text":"%s","wrap":true}]' "${escaped_title}" "${escaped_message}"
+    local blocks_format='[{"type":"TextBlock","text":"%s","weight":"bolder","size":"medium"},'
+    blocks_format+='{"type":"TextBlock","text":"%s","wrap":true}]'
+    # shellcheck disable=SC2059 # the format is built above, not taken from input
+    printf -v body_blocks "${blocks_format}" "${escaped_title}" "${escaped_message}"
   else
     printf -v body_blocks '[{"type":"TextBlock","text":"%s","wrap":true}]' "${escaped_message}"
   fi
 
   local payload
   # shellcheck disable=SC2016
-  printf -v payload '{"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","content":{"$schema":"http://adaptivecards.io/schemas/adaptive-card.json","type":"AdaptiveCard","version":"1.2","body":%s}}]}' "${body_blocks}"
+  local payload_format='{"type":"message","attachments":[{"contentType":'
+  # shellcheck disable=SC2016 # `$schema` is a key of the card, not an expansion
+  payload_format+='"application/vnd.microsoft.card.adaptive","content":{"$schema":'
+  payload_format+='"http://adaptivecards.io/schemas/adaptive-card.json","type":"AdaptiveCard",'
+  payload_format+='"version":"1.2","body":%s}}]}'
+  # shellcheck disable=SC2059 # the format is built above, not taken from input
+  printf -v payload "${payload_format}" "${body_blocks}"
 
   dybatpho::debug "Sending Teams notification"
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   dybatpho::curl_json "${DYBATPHO_TEAMS_WEBHOOK_URL}" /dev/null \
     --request POST \
     --data "${payload}"
@@ -212,9 +231,12 @@ function dybatpho::notify_google_chat {
   dybatpho::expect_envs DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL
 
   local payload
-  payload=$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")
+  local notification_json_escape
+  notification_json_escape=$(__dybatpho_notification_json_escape "${message}")
+  payload=$(printf '{"text":"%s"}' "${notification_json_escape}")
 
   dybatpho::debug "Sending Google Chat notification"
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   dybatpho::curl_json "${DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL}" /dev/null \
     --request POST \
     --data "${payload}"
@@ -255,6 +277,7 @@ function dybatpho::notify_discord {
   fi
 
   dybatpho::debug "Sending Discord notification"
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   dybatpho::curl_json "${DYBATPHO_DISCORD_WEBHOOK_URL}" /dev/null \
     --request POST \
     --data "${payload}"

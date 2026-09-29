@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 # @file archive.sh
 # @brief Utilities for creating, extracting, and listing archives
+# @namespace dybatpho
 # @description
 #   This module contains helpers for common archive workflows in shell scripts:
 #   creating archives from files or directories, extracting them into a target
@@ -99,23 +100,33 @@ function __dybatpho_archive_move_stripped {
   # `find -printf '%P'` would say this in one flag, but it is GNU-only: neither
   # BusyBox nor BSD has it, and this is the zip path of an extractor the library
   # documents as portable. The prefix comes off here instead.
-  while IFS= read -r path; do
+  local find_dirs find_output                            # kcov(skip)
+  find_dirs=$(find "${source_root}" -mindepth 1 -type d) # kcov(skip)
+  find_output=$(printf '%s\n' "${find_dirs}" | sort)     # kcov(skip)
+  while IFS= read -r path || [[ -n "${path}" ]]; do
     rel="${path#"${source_root}/"}"
     [[ -z "${rel}" || "${rel}" == "${path}" ]] && continue
-    stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" 'NF>n{for(i=n+1;i<=NF;i++) printf "%s%s", $i, (i<NF?"/":"")}')
+    stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" '
+      NF > n { for (i = n + 1; i <= NF; i++) printf "%s%s", $i, (i < NF ? "/" : "") }
+    ')
     [[ -z "${stripped}" ]] && continue
     mkdir -p "${destination}/${stripped}"
-  done < <(find "${source_root}" -mindepth 1 -type d | sort) # kcov(skip)
+  done < <(printf '%s' "${find_output}")
 
-  while IFS= read -r path; do
+  local find_files                                          # kcov(skip)
+  find_files=$(find "${source_root}" -mindepth 1 ! -type d) # kcov(skip)
+  find_output=$(printf '%s\n' "${find_files}" | sort)       # kcov(skip)
+  while IFS= read -r path || [[ -n "${path}" ]]; do
     rel="${path#"${source_root}/"}"
     [[ -z "${rel}" || "${rel}" == "${path}" ]] && continue
-    stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" 'NF>n{for(i=n+1;i<=NF;i++) printf "%s%s", $i, (i<NF?"/":"")}')
+    stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" '
+      NF > n { for (i = n + 1; i <= NF; i++) printf "%s%s", $i, (i < NF ? "/" : "") }
+    ')
     [[ -z "${stripped}" ]] && continue
     dir_path=$(dybatpho::path_dirname "${destination}/${stripped}")
     mkdir -p "${dir_path}"
     mv "${source_root}/${rel}" "${destination}/${stripped}"
-  done < <(find "${source_root}" -mindepth 1 ! -type d | sort) # kcov(skip)
+  done < <(printf '%s' "${find_output}")
 }
 
 #######################################
@@ -157,22 +168,26 @@ function dybatpho::archive_create {
       ;;
     xz)
       dybatpho::require xz
-      dybatpho::is file "${source_path}" || dybatpho::die "Single-file archive formats require a file source: ${source_path}"
+      dybatpho::is file "${source_path}" || dybatpho::die \
+        "Single-file archive formats require a file source: ${source_path}"
       xz -c "${source_path}" > "${output_path}"
       ;;
     gz)
       dybatpho::require gzip
-      dybatpho::is file "${source_path}" || dybatpho::die "Single-file archive formats require a file source: ${source_path}"
+      dybatpho::is file "${source_path}" || dybatpho::die \
+        "Single-file archive formats require a file source: ${source_path}"
       gzip -c "${source_path}" > "${output_path}"
       ;;
     bz2)
       dybatpho::require bzip2
-      dybatpho::is file "${source_path}" || dybatpho::die "Single-file archive formats require a file source: ${source_path}"
+      dybatpho::is file "${source_path}" || dybatpho::die \
+        "Single-file archive formats require a file source: ${source_path}"
       bzip2 -c "${source_path}" > "${output_path}"
       ;;
     zst)
       dybatpho::require zstd
-      dybatpho::is file "${source_path}" || dybatpho::die "Single-file archive formats require a file source: ${source_path}"
+      dybatpho::is file "${source_path}" || dybatpho::die \
+        "Single-file archive formats require a file source: ${source_path}"
       zstd -q -c "${source_path}" > "${output_path}"
       ;;
     zip)
@@ -180,13 +195,16 @@ function dybatpho::archive_create {
       if dybatpho::path_is_abs "${output_path}"; then
         output_abs="${output_path}"
       else
-        output_abs="$(dybatpho::path_join "$(pwd)" "${output_path}")"
+        local pwd
+        pwd=$(pwd)
+        output_abs="$(dybatpho::path_join "${pwd}" "${output_path}")"
       fi
       ( # kcov(skip) - subshell keeps the caller's working directory
         cd "${source_dir}" || exit
         zip -rq "${output_abs}" "${source_name}"
       )
       ;;
+    *) ;;
   esac
 }
 
@@ -205,7 +223,8 @@ function dybatpho::archive_extract {
   local format
   local -a strip_args=()
   format=$(__dybatpho_archive_format "${archive_path}") || return $?
-  [[ "${strip_components}" =~ ^[0-9]+$ ]] || dybatpho::die "strip-components must be a non-negative integer: ${strip_components}"
+  [[ "${strip_components}" =~ ^[0-9]+$ ]] || dybatpho::die \
+    "strip-components must be a non-negative integer: ${strip_components}"
   if ((strip_components > 0)); then
     strip_args=(--strip-components "${strip_components}")
   fi
@@ -246,23 +265,36 @@ function dybatpho::archive_extract {
     xz)
       dybatpho::require xz
       ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      xz -dc "${archive_path}" > "$(dybatpho::path_join "${destination}" "$(__dybatpho_archive_output_name "${archive_path}")")"
+      local archive_output_name_4
+      archive_output_name_4=$(__dybatpho_archive_output_name "${archive_path}")
+      xz -dc "${archive_path}" \
+        > "$(dybatpho::path_join "${destination}" "${archive_output_name_4}")"
       ;;
     gz)
       dybatpho::require gzip
       ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      gzip -dc "${archive_path}" > "$(dybatpho::path_join "${destination}" "$(__dybatpho_archive_output_name "${archive_path}")")"
+      local archive_output_name_3
+      archive_output_name_3=$(__dybatpho_archive_output_name "${archive_path}")
+      gzip -dc "${archive_path}" \
+        > "$(dybatpho::path_join "${destination}" "${archive_output_name_3}")"
       ;;
     bz2)
       dybatpho::require bzip2
       ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      bzip2 -dc "${archive_path}" > "$(dybatpho::path_join "${destination}" "$(__dybatpho_archive_output_name "${archive_path}")")"
+      local archive_output_name_2
+      archive_output_name_2=$(__dybatpho_archive_output_name "${archive_path}")
+      bzip2 -dc "${archive_path}" \
+        > "$(dybatpho::path_join "${destination}" "${archive_output_name_2}")"
       ;;
     zst)
       dybatpho::require zstd
       ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      zstd -d -q -c "${archive_path}" > "$(dybatpho::path_join "${destination}" "$(__dybatpho_archive_output_name "${archive_path}")")"
+      local archive_output_name
+      archive_output_name=$(__dybatpho_archive_output_name "${archive_path}")
+      zstd -d -q -c "${archive_path}" \
+        > "$(dybatpho::path_join "${destination}" "${archive_output_name}")"
       ;;
+    *) ;;
   esac
 }
 
@@ -305,6 +337,7 @@ function dybatpho::archive_list {
       dybatpho::require unzip
       unzip -Z1 "${archive_path}"
       ;;
+    *) ;;
   esac
 }
 
@@ -323,6 +356,7 @@ function __dybatpho_archive_entry_is_safe {
   case "${normalized}" in
     /* | '~/'* | [a-zA-Z]:/*) return 1 ;;
     .. | ../* | */../* | */..) return 1 ;;
+    *) ;;
   esac
   return 0
 }
@@ -337,12 +371,14 @@ function dybatpho::archive_unsafe_entries {
   local archive_path
   dybatpho::expect_args archive_path -- "$@"
   local entry
-  while IFS= read -r entry; do
+  local archive_list_output
+  archive_list_output=$(dybatpho::archive_list "${archive_path}")
+  while IFS= read -r entry || [[ -n "${entry}" ]]; do
     [[ -n "${entry}" ]] || continue
     if ! __dybatpho_archive_entry_is_safe "${entry}"; then
       printf '%s\n' "${entry}"
     fi
-  done < <(dybatpho::archive_list "${archive_path}")
+  done < <(printf '%s' "${archive_list_output}")
 }
 
 #######################################

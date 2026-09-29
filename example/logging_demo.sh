@@ -14,6 +14,8 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# @description Run the `LOG LEVELS` section of this example.
+# @noargs
 function _demo_log_levels {
   dybatpho::header "LOG LEVELS"
   dybatpho::info "Set LOG_LEVEL=debug to see debug messages (current: ${LOG_LEVEL:-info})"
@@ -26,12 +28,16 @@ function _demo_log_levels {
   dybatpho::success "This operation completed successfully"
 }
 
+# @description Run the `PRINT vs INFO` section of this example.
+# @noargs
 function _demo_print {
   dybatpho::header "PRINT vs INFO"
   dybatpho::info "dybatpho::info goes to STDERR (always visible)"
   dybatpho::print "dybatpho::print goes to STDOUT (can be piped/captured)"
 }
 
+# @description Run the `PROGRESS INDICATOR` section of this example.
+# @noargs
 function _demo_progress {
   dybatpho::header "PROGRESS INDICATOR"
   dybatpho::progress "Doing something important..."
@@ -41,14 +47,16 @@ function _demo_progress {
   dybatpho::success "Done!"
 }
 
+# @description Run the `PROGRESS BAR` section of this example.
+# @noargs
 function _demo_progress_bar {
   dybatpho::header "PROGRESS BAR"
   dybatpho::info "Simulating a 10-step task..."
   local total_steps=10
   local bar_width=30
-  local i percentage
-  for i in $(seq 1 ${total_steps}); do
-    percentage=$((i * 100 / total_steps))
+  local step percentage
+  for ((step = 1; step <= total_steps; step++)); do
+    percentage=$((step * 100 / total_steps))
     dybatpho::progress_bar "${percentage}" "${bar_width}"
     sleep 0.1
   done
@@ -56,6 +64,8 @@ function _demo_progress_bar {
   dybatpho::success "Task complete!"
 }
 
+# @description Run the `DEBUG COMMAND` section of this example.
+# @noargs
 function _demo_debug_command {
   dybatpho::header "DEBUG COMMAND"
   dybatpho::info "Capturing output of 'ls example/' as debug:"
@@ -64,6 +74,8 @@ function _demo_debug_command {
     "ls '$(dirname "${BASH_SOURCE[0]}")'"
 }
 
+# @description Run the `TRACE (start/end)` section of this example.
+# @noargs
 function _demo_trace {
   dybatpho::header "TRACE (start/end)"
   dybatpho::info "Enabling trace for a small block..."
@@ -75,6 +87,8 @@ function _demo_trace {
   dybatpho::info "Trace disabled again"
 }
 
+# @description Run the `STRUCTURED JSON CONTEXT` section of this example.
+# @noargs
 function _demo_json_context {
   dybatpho::header "STRUCTURED JSON CONTEXT"
   dybatpho::info "Set LOG_FORMAT=json to emit machine-readable events enriched"
@@ -92,6 +106,8 @@ function _demo_json_context {
   )
 }
 
+# @description Run the `FILE LOGGING WITH ROTATION` section of this example.
+# @noargs
 function _demo_file_logging {
   dybatpho::header "FILE LOGGING WITH ROTATION"
   local demo_dir
@@ -109,19 +125,25 @@ function _demo_file_logging {
     dybatpho::warn "captured on disk and stdout"
   )
   dybatpho::info "Log file content:"
-  dybatpho::print "$(cat "${log_file}")"
+  local cat
+  cat=$(cat "${log_file}")
+  dybatpho::print "${cat}"
 
   dybatpho::info "Simulating rotation with a tiny LOG_FILE_MAX_BYTES..."
   (
     export LOG_FILE="${log_file}" LOG_FILE_MAX_BYTES=200 LOG_FILE_MAX_BACKUPS=2
-    for i in $(seq 1 5); do
-      dybatpho::info "padding event number ${i} to exceed the rotation threshold"
+    for ((event = 1; event <= 5; event++)); do
+      dybatpho::info "padding event number ${event} to exceed the rotation threshold"
     done
   )
   dybatpho::info "Files present after rotation:"
-  dybatpho::print "$(ls -1 "${demo_dir}")"
+  local ls
+  ls=$(ls -1 "${demo_dir}")
+  dybatpho::print "${ls}"
 }
 
+# @description Run the `CONFIGURING THE FILE SINK IN ONE CALL` section of this example.
+# @noargs
 function _demo_log_to_file {
   dybatpho::header "CONFIGURING THE FILE SINK IN ONE CALL"
   local demo_dir
@@ -138,9 +160,13 @@ function _demo_log_to_file {
     dybatpho::info "file logging is off again, so this event stays on stderr"
   )
   dybatpho::info "Log file content:"
-  dybatpho::print "$(cat "${log_file}")"
+  local cat
+  cat=$(cat "${log_file}")
+  dybatpho::print "${cat}"
 }
 
+# @description Run the `CONTEXT FIELDS` section of this example.
+# @noargs
 function _demo_log_context {
   dybatpho::header "CONTEXT FIELDS"
   dybatpho::info "Fields registered once ride along with every later event:"
@@ -156,14 +182,19 @@ function _demo_log_context {
   )
 }
 
+# @description Run the `TIMERS` section of this example.
+# @noargs
 function _demo_timers {
   dybatpho::header "TIMERS"
   dybatpho::timer_start demo_step
   sleep 0.2
   dybatpho::timer_end demo_step
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "The duration is also readable as ${DYBATPHO_TIMER_LAST_MS}ms"
 }
 
+# @description Run the `SPINNER` section of this example.
+# @noargs
 function _demo_spinner {
   dybatpho::header "SPINNER"
   dybatpho::info "On a terminal the message spins; elsewhere it is logged once."
@@ -173,6 +204,8 @@ function _demo_spinner {
   dybatpho::info "The spinner passed the command's exit code back: ${status}"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_log_levels
   _demo_print

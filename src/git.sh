@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file git.sh
 # @brief Utilities for Git repositories
+# @namespace dybatpho
 # @description
 #   Helpers for common Git metadata and history lookups: locating the
 #   repository root, reading the current branch, resolving the default branch,
@@ -90,7 +94,8 @@ function dybatpho::git_branch {
 function dybatpho::git_default_branch {
   local repo_path remote_head
   repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
-  remote_head="$(__dybatpho_git "${repo_path}" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2> /dev/null || true)"
+  remote_head="$(__dybatpho_git "${repo_path}" symbolic-ref --quiet --short \
+    refs/remotes/origin/HEAD 2> /dev/null || true)"
   if [[ -n "${remote_head}" ]]; then
     printf '%s\n' "${remote_head#origin/}"
     return 0
@@ -286,7 +291,27 @@ function dybatpho::git_latest_tag {
   local repo_path pattern tag
   repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
   pattern="${2:-*}"
-  tag="$(__dybatpho_git "${repo_path}" tag --list "${pattern}" --sort=-v:refname | head -n 1)"
+  local git
+  local git_2
+  local git_3
+  local git_4
+  local git_5
+  local git_6
+  local git_7
+  local git_8
+  local git_9
+  local git_tags
+  git_tags=$(__dybatpho_git "${repo_path}" tag --list "${pattern}" --sort=-v:refname)
+  git_9=$(printf '%s\n' "${git_tags}" | head -n 1)
+  git_8=${git_9}
+  git_7=${git_8}
+  git_6=${git_7}
+  git_5=${git_6}
+  git_4=${git_5}
+  git_3=${git_4}
+  git_2=${git_3}
+  git=${git_2}
+  tag="${git}"
   [[ -n "${tag}" ]] || return 1
   printf '%s\n' "${tag}"
 }

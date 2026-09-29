@@ -38,9 +38,9 @@ rather than as strings.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_config_set`](#__dybatpho_config_set) — 
-- [`__dybatpho_config_load_dotenv`](#__dybatpho_config_load_dotenv) — 
-- [`__dybatpho_config_load_structured`](#__dybatpho_config_load_structured) — 
+- [`__dybatpho_config_set`](#__dybatpho_config_set) — Store one configuration value, rejecting a key that is not a name: the key becomes part of a variable name and of the schema, so a stray character would land somewhere it cannot be looked up again.
+- [`__dybatpho_config_load_dotenv`](#__dybatpho_config_load_dotenv) — Read a dotenv file into the configuration: `KEY=value` a line, with `export` prefixes, quotes and trailing comments removed.
+- [`__dybatpho_config_load_structured`](#__dybatpho_config_load_structured) — Read a JSON, YAML or TOML file into the configuration, flattening it to the dotted keys the rest of the module uses.
 - [`dybatpho::config_load`](#dybatphoconfig_load) — Load one or more configuration files, merging them left to right.
 - [`dybatpho::config_profile`](#dybatphoconfig_profile) — Load a base configuration file and the profile overlay beside it. The overlay is the base name with the profile inserted before the extension, so `config.yaml` with profile `prod` reads `config.prod.yaml` after it. The base file is required; the overlay is not, which is what lets the same call work on a machine that has no profile-specific file.
 - [`dybatpho::config_env`](#dybatphoconfig_env) — Load environment variables after an optional prefix.
@@ -94,18 +94,65 @@ rather than as strings.
 
 ### `__dybatpho_config_set`
 
+Store one configuration value, rejecting a key that is not a
+name: the key becomes part of a variable name and of the schema, so a
+stray character would land somewhere it cannot be looked up again.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Configuration key |
+| `$2` | string | Value |
+
+**🧩 Variable sets**
+
+- DYBATPHO_CONFIG
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when the key is not a valid name
 
 
 ---
 
 ### `__dybatpho_config_load_dotenv`
 
+Read a dotenv file into the configuration: `KEY=value` a line,
+with `export` prefixes, quotes and trailing comments removed.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | path | File to read |
+
+**🧩 Variable sets**
+
+- DYBATPHO_CONFIG
 
 
 ---
 
 ### `__dybatpho_config_load_structured`
 
+Read a JSON, YAML or TOML file into the configuration, flattening
+it to the dotted keys the rest of the module uses.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Format: `json`, `yaml` or `toml` |
+| `$2` | path | File to read |
+
+**🧩 Variable sets**
+
+- DYBATPHO_CONFIG
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when the document's root is not a mapping
 
 
 ---

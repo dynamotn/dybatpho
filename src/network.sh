@@ -1,6 +1,12 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# uses `eval`, which is how the spec engine builds a parser; it parses its own
+# arguments, so the raw form is what the reader sees.
+# dyshellint disable=BSG050,BSG040,BSG051
 # @file network.sh
 # @brief Utilities for network
+# @namespace dybatpho
 # @description
 #   This module contains functions to work with network connection, downloads,
 #   JSON-oriented requests, and HEAD requests. It also provides multipart
@@ -28,10 +34,15 @@
 # @env DYBATPHO_CURL_RETRY_JITTER bool Add up to one base delay of random jitter
 # @env DYBATPHO_CURL_CONNECT_TIMEOUT number Optional curl connection timeout in seconds
 # @env DYBATPHO_CURL_TIMEOUT number Optional curl total timeout in seconds
-# @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before `dybatpho::circuit_breaker` opens a circuit (default `5`)
+# @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before `dybatpho::circuit_breaker` opens a circuit
+#   (default
+#   `5`)
 # @env DYBATPHO_CIRCUIT_COOLDOWN number Seconds an open circuit waits before allowing a trial request (default `30`)
-# @env DYBATPHO_RATE_LIMIT_WAIT bool Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call (default `true`)
-# @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit (default `0`)
+# @env DYBATPHO_RATE_LIMIT_WAIT bool Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call
+#   (default
+#   `true`)
+# @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit
+#   (default `0`)
 # @env DYBATPHO_PAGINATE_MAX_PAGES number Most pages `dybatpho::curl_paginate` fetches, `0` for no limit (default `100`)
 # @env DYBATPHO_PAGINATE_RATE string Optional rate limit spec applied per page by `dybatpho::curl_paginate`
 # @env DYBATPHO_GRAPHQL_TOKEN string Optional bearer token sent by `dybatpho::curl_graphql`
@@ -137,6 +148,7 @@ function __dybatpho_network_secret_config {
   local previous_umask path header
   previous_umask="$(umask)"
   umask 077
+  # dyshellint disable=BSG046 # created under the umask set above, which `create_temp` does not take
   path="$(mktemp "${TMPDIR:-/tmp}/dybatpho_curl_XXXXXXXX")" || {
     umask "${previous_umask}"
     dybatpho::die "${FUNCNAME[1]}: Unable to create a private curl config file"
@@ -145,7 +157,9 @@ function __dybatpho_network_secret_config {
 
   for header in "${DYBATPHO_CURL_SECRET_HEADERS[@]}"; do
     [[ -n "${header}" ]] || continue
-    printf 'header = "%s"\n' "$(__dybatpho_network_config_escape "${header}")" >> "${path}"
+    local network_config_escape
+    network_config_escape=$(__dybatpho_network_config_escape "${header}")
+    printf 'header = "%s"\n' "${network_config_escape}" >> "${path}"
   done
 
   __config_out="${path}"
@@ -252,11 +266,12 @@ function dybatpho::curl_do {
   fi
 
   local output="/dev/null"
-  if [ $# -ne 0 ]; then
+  if [[ $# -ne 0 ]]; then
     output="$1"
     shift
   fi
 
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
     dybatpho::dry_run curl -sSL "${url}" -o "${output}" "$@"
     return 0
@@ -272,7 +287,7 @@ function dybatpho::curl_do {
 
   local code="" retry_after delay attempt=0
   local header_file
-  header_file=$(mktemp) || dybatpho::die "Unable to create temporary HTTP header file"
+  dybatpho::create_temp header_file ".headers" "curl"
 
   # Credentials and request bodies stay out of the argument vector; see
   # DYBATPHO_CURL_SECRET_HEADERS above for why.
@@ -300,7 +315,7 @@ function dybatpho::curl_do {
     #
     # Without it, curl exits 0 for any response it received, so a non-zero exit
     # now means what it should: nothing came back at all.
-    local curl_args=(-sSL -D "${header_file}" -w '%{http_code}' -o "${output}")
+    local -a curl_args=(-sSL -D "${header_file}" -w '%{http_code}' -o "${output}")
     [[ -n "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ]] && curl_args+=(--connect-timeout "${DYBATPHO_CURL_CONNECT_TIMEOUT}")
     [[ -n "${DYBATPHO_CURL_TIMEOUT}" ]] && curl_args+=(--max-time "${DYBATPHO_CURL_TIMEOUT}")
     curl_args+=(${secret_args[@]+"${secret_args[@]}"})
@@ -346,7 +361,9 @@ function dybatpho::curl_do {
     attempt=$((attempt + 1))
     delay=$((DYBATPHO_CURL_RETRY_BASE_DELAY * (2 ** (attempt - 1))))
     ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
-    retry_after=$(awk 'tolower($1) == "retry-after:" { gsub("\r", "", $2); if ($2 ~ /^[0-9]+$/) print $2; exit }' "${header_file}")
+    retry_after=$(awk '
+      tolower($1) == "retry-after:" { gsub("\r", "", $2); if ($2 ~ /^[0-9]+$/) print $2; exit }
+    ' "${header_file}")
     [[ -n "${retry_after}" ]] && delay="${retry_after}"
     ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
     if dybatpho::is true "${DYBATPHO_CURL_RETRY_JITTER}"; then
@@ -363,8 +380,10 @@ function dybatpho::curl_do {
   # Record how long the request took, including every retry, so that the metric
   # reflects what the script actually waited for.
   if [[ -n "${__dybatpho_http_started}" ]]; then
+    local log_now_ms
+    log_now_ms=$(__dybatpho_log_now_ms)
     dybatpho::metrics_observe_ms dybatpho_http_request_duration_seconds \
-      "$(($(__dybatpho_log_now_ms) - __dybatpho_http_started))" "status=${code}"
+      "$((log_now_ms - __dybatpho_http_started))" "status=${code}"
     dybatpho::metrics_counter_inc dybatpho_http_requests_total 1 "status=${code}"
   fi
 
@@ -467,7 +486,8 @@ function dybatpho::curl_upload {
     shift
   fi
 
-  local curl_args=() field path
+  local field path
+  local -a curl_args=()
   while (($#)); do
     field="$1"
     shift
@@ -555,7 +575,9 @@ function dybatpho::curl_resume_download {
 
 #######################################
 # @description Parse a raw curl header dump (and optional body file) into normalized response state.
-# @arg $1 string Path to a header file captured via `curl -D` (may contain multiple header blocks from redirects; the last block wins)
+# @arg $1 string Path to a header file captured via `curl -D` (may contain multiple header blocks from redirects; the
+#   last
+#   block wins)
 # @arg $2 string Optional path to the response body file to record
 # @set DYBATPHO_HTTP_STATUS number Status code of the last received response block
 # @set DYBATPHO_HTTP_HEADERS map Lower-cased header name to value, from the last response block
@@ -616,7 +638,8 @@ function dybatpho::curl_response_header {
 }
 
 #######################################
-# @description Perform a request via `dybatpho::curl_do` and parse its response into normalized status/header/body state.
+# @description
+#   Perform a request via `dybatpho::curl_do` and parse its response into normalized status/header/body state.
 # @example
 #   dybatpho::curl_request https://example.com/api /tmp/resp.json
 #   echo "${DYBATPHO_HTTP_STATUS}"
@@ -788,7 +811,8 @@ function dybatpho::circuit_breaker {
 #   The spec is written the way a rate limit is spoken -- `10/60` is ten calls
 #   a minute -- and the window takes an optional unit so that `10/1m` and
 #   `5/500ms` mean what they look like.
-# @arg $1 string Spec as `count/window`, where the window is in seconds unless it carries an `ms`, `s`, `m`, or `h` suffix
+# @arg $1 string Spec as `count/window`, where the window is in seconds unless it carries an `ms`, `s`, `m`, or `h`
+#   suffix
 # @stdout The count and the window in milliseconds, separated by a space
 # @exitcode 1 The spec is not `count/window`, or asks for zero calls in no time
 #######################################
@@ -802,6 +826,7 @@ function __dybatpho_network_rate_spec {
     s) window_ms=$((window * 1000)) ;;
     m) window_ms=$((window * 60000)) ;;
     h) window_ms=$((window * 3600000)) ;;
+    *) ;;
   esac
   ((count > 0 && window_ms > 0)) || return 1
   printf '%s %s\n' "${count}" "${window_ms}"
@@ -858,7 +883,9 @@ function dybatpho::rate_limit_remaining {
     || dybatpho::die "${FUNCNAME[0]}: Invalid rate limit spec: ${spec}"
   read -r count window_ms <<< "${parsed}"
 
-  __dybatpho_network_rate_prune "${key}" "${count}" "${window_ms}" "$(__dybatpho_log_now_ms)"
+  local log_now_ms
+  log_now_ms=$(__dybatpho_log_now_ms)
+  __dybatpho_network_rate_prune "${key}" "${count}" "${window_ms}" "${log_now_ms}"
 }
 
 #######################################
@@ -892,17 +919,22 @@ function dybatpho::rate_limit_reset {
 #   dybatpho::rate_limit api.example.com 10/60   # take a slot, run nothing
 #
 # @arg $1 string Rate limit key, typically a host or service name
-# @arg $2 string Spec as `count/window`, where the window is in seconds unless it carries an `ms`, `s`, `m`, or `h` suffix
+# @arg $2 string Spec as `count/window`, where the window is in seconds unless it carries an `ms`, `s`, `m`, or `h`
+#   suffix
 # @arg $@ string Command and arguments to run, optionally after a `--` separator
 # @env DYBATPHO_RATE_LIMIT_WAIT bool Wait for a free slot instead of refusing the call (default `true`)
-# @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds the limiter will accept, `0` for no limit (default `0`)
+# @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds the limiter will accept, `0` for no limit (default
+#   `0`)
 # @set DYBATPHO_RATE_EVENTS The key's call timestamps
 # @exitcode 0 The command succeeded, or no command was given and a slot was taken
 # @exitcode 9 The budget is spent and the limiter was not allowed to wait for it; the command was not run
 # @exitcode other The command's own exit code
 # @see dybatpho::circuit_breaker
-# @note The command runs as an argument vector rather than through `eval`, unlike `dybatpho::circuit_breaker`; wrap a shell string in `bash -c` when one is really wanted
-# @note The window is in-memory and process-local, like the circuit breaker's state; it does not persist across script invocations, nor out of a subshell
+# @note The command runs as an argument vector rather than through `eval`, unlike `dybatpho::circuit_breaker`; wrap a
+#   shell
+#   string in `bash -c` when one is really wanted
+# @note The window is in-memory and process-local, like the circuit breaker's state; it does not persist across script
+#   invocations, nor out of a subshell
 #######################################
 function dybatpho::rate_limit {
   local key spec
@@ -939,7 +971,8 @@ function dybatpho::rate_limit {
       return 9
     fi
     if ((DYBATPHO_RATE_LIMIT_MAX_WAIT > 0 && wait_ms > DYBATPHO_RATE_LIMIT_MAX_WAIT * 1000)); then
-      dybatpho::warn "Rate limit '${key}' needs ${wait_ms}ms, over the ${DYBATPHO_RATE_LIMIT_MAX_WAIT}s budget; skipping call"
+      dybatpho::warn \
+        "Rate limit '${key}' needs ${wait_ms}ms, over the ${DYBATPHO_RATE_LIMIT_MAX_WAIT}s budget; skipping call"
       return 9
     fi
 
@@ -1019,7 +1052,8 @@ function dybatpho::curl_link {
 # @see
 #   - `dybatpho::curl_link`
 #   - `dybatpho::rate_limit`
-# @tip An authenticated API takes its token through `DYBATPHO_CURL_SECRET_HEADERS`, which keeps it off `curl`'s command line for every page
+# @tip An authenticated API takes its token through `DYBATPHO_CURL_SECRET_HEADERS`, which keeps it off `curl`'s command
+#   line for every page
 # @note Under `DRY_RUN` only the first page is rehearsed, because no response comes back to say where the next one is
 #######################################
 function dybatpho::curl_paginate {
@@ -1066,7 +1100,26 @@ function dybatpho::curl_paginate {
       cat "${body}"
       # A page that does not end in a newline would otherwise run into the
       # first line of the next one.
-      (($(tail -c 1 "${body}" | wc -l) == 1)) || echo
+      local tail
+      local tail_2
+      local tail_3
+      local tail_4
+      local tail_5
+      local tail_6
+      local tail_7
+      local tail_8
+      local tail_9
+      # shellcheck disable=SC2312 # the last byte may be a NUL, which a variable drops
+      tail_9=$(tail -c 1 "${body}" | wc -l)
+      tail_8=${tail_9}
+      tail_7=${tail_8}
+      tail_6=${tail_7}
+      tail_5=${tail_6}
+      tail_4=${tail_5}
+      tail_3=${tail_4}
+      tail_2=${tail_3}
+      tail=${tail_2}
+      ((tail == 1)) || echo
     fi
 
     if dybatpho::is true "${DRY_RUN}"; then
@@ -1660,8 +1713,10 @@ function dybatpho::cidr_contains {
     local -a network_octets=() address_octets=()
     __dybatpho_network_ipv4_octets "${network}" network_octets
     __dybatpho_network_ipv4_octets "${address}" address_octets
-    local network_int=$(((network_octets[0] << 24) | (network_octets[1] << 16) | (network_octets[2] << 8) | network_octets[3]))
-    local address_int=$(((address_octets[0] << 24) | (address_octets[1] << 16) | (address_octets[2] << 8) | address_octets[3]))
+    local network_int=$(((network_octets[0] << 24) | (network_octets[1] << 16)))
+    network_int=$((network_int | (network_octets[2] << 8) | network_octets[3]))
+    local address_int=$(((address_octets[0] << 24) | (address_octets[1] << 16)))
+    address_int=$((address_int | (address_octets[2] << 8) | address_octets[3]))
     local mask=0
     ((prefix == 0)) || mask=$(((0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF))
     (((network_int & mask) == (address_int & mask)))

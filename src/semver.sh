@@ -1,6 +1,9 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file keeps its declarations with the functions they describe.
+# dyshellint disable=BSG033
 # @file semver.sh
 # @brief Utilities for working with Semantic Versioning (semver)
+# @namespace dybatpho
 # @description
 #   This module contains helpers for parsing, validating, comparing semver strings,
 #   and detecting the release type of a version bump.
@@ -304,6 +307,7 @@ function __dybatpho_semver_expand {
       __bounds_out+=(">= 0.0.0")
       return 0
       ;;
+    *) ;;
   esac
 
   # Trailing wildcards say "any value here", which is exactly what leaving the
@@ -435,7 +439,15 @@ function dybatpho::semver_satisfies {
     || dybatpho::die "${FUNCNAME[0]}: Not a valid version: '${version}'"
 
   local prerelease
-  prerelease="$(dybatpho::semver_parse "${version}" | sed -n '4p')"
+  local semver_parse
+  local semver_parse_2
+  local semver_parse_3
+  local semver_fields
+  semver_fields=$(dybatpho::semver_parse "${version}")
+  semver_parse_3=$(printf '%s\n' "${semver_fields}" | sed -n '4p')
+  semver_parse_2=${semver_parse_3}
+  semver_parse=${semver_parse_2}
+  prerelease="${semver_parse}"
   local core="${version%%[-+]*}"
 
   # `||` separates alternatives; satisfying any one of them is enough.
@@ -593,6 +605,7 @@ function dybatpho::semver_coerce {
   local text
   dybatpho::expect_args text -- "$@"
   local core="" pre=""
+  # shellcheck disable=SC2154 # declared by `src/os.sh`
   if [[ "${text}" =~ ${DYBATPHO_VERSION_SCAN_REGEX} ]]; then
     core="${BASH_REMATCH[1]}"
     pre="${BASH_REMATCH[4]-}"

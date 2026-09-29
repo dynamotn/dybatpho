@@ -74,6 +74,8 @@ DYBATPHO_CACHE_NAMESPACE=gh dybatpho::cache_dir        # ~/.cache/dybatpho/gh
 
 ```
 
+_Function has no arguments._
+
 **🌍 Environment variables**
 
 | Variable | Type | Description |

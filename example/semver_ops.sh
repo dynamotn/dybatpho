@@ -8,15 +8,21 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# @description Run the `SEMVER VALID` section of this example.
+# @noargs
 function _demo_valid {
   dybatpho::header "SEMVER VALID"
-  local versions=("1.2.3" "v2.0.0-rc.1" "1.0.0+build.42" "1.2" "not-a-version" "")
+  local -a versions=("1.2.3" "v2.0.0-rc.1" "1.0.0+build.42" "1.2" "not-a-version" "")
   local v
   for v in "${versions[@]}"; do
-    dybatpho::info "'${v}': $(dybatpho::semver_valid "${v}" && echo valid || echo invalid)"
+    local semver_valid
+    semver_valid=$(dybatpho::semver_valid "${v}" && echo valid || echo invalid)
+    dybatpho::info "'${v}': ${semver_valid}"
   done
 }
 
+# @description Run the `SEMVER PARSE` section of this example.
+# @noargs
 function _demo_parse {
   dybatpho::header "SEMVER PARSE"
   local version="1.4.2-beta.3+exp.sha.abc123"
@@ -30,9 +36,11 @@ function _demo_parse {
   dybatpho::print "  build-metadata: ${parts[4]:-<none>}"
 }
 
+# @description Run the `SEMVER COMPARE` section of this example.
+# @noargs
 function _demo_compare {
   dybatpho::header "SEMVER COMPARE"
-  local pairs=(
+  local -a pairs=(
     "1.0.0  1.0.0"
     "2.0.0  1.9.9"
     "1.0.0  2.0.0"
@@ -43,19 +51,22 @@ function _demo_compare {
   )
   local pair v1 v2 result
   for pair in "${pairs[@]}"; do
-    read -r v1 v2 <<<"${pair}"
+    read -r v1 v2 <<< "${pair}"
     result=$(dybatpho::semver_compare "${v1}" "${v2}")
     case "${result}" in
-    -1) dybatpho::info "${v1}  <  ${v2}" ;;
-    0) dybatpho::info "${v1}  =  ${v2}" ;;
-    1) dybatpho::info "${v1}  >  ${v2}" ;;
+      -1) dybatpho::info "${v1}  <  ${v2}" ;;
+      0) dybatpho::info "${v1}  =  ${v2}" ;;
+      1) dybatpho::info "${v1}  >  ${v2}" ;;
+      *) ;;
     esac
   done
 }
 
+# @description Run the `SEMVER RELEASE TYPE` section of this example.
+# @noargs
 function _demo_release_type {
   dybatpho::header "SEMVER RELEASE TYPE"
-  local pairs=(
+  local -a pairs=(
     "1.0.0  2.0.0"
     "1.0.0  1.1.0"
     "1.0.0  1.0.1"
@@ -66,24 +77,40 @@ function _demo_release_type {
   )
   local pair old new rtype
   for pair in "${pairs[@]}"; do
-    read -r old new <<<"${pair}"
+    read -r old new <<< "${pair}"
     rtype=$(dybatpho::semver_release_type "${old}" "${new}")
     dybatpho::info "${old}  ->  ${new}  :  ${rtype}"
   done
 }
 
+# @description Run the `SEMVER BUMP` section of this example.
+# @noargs
 function _demo_bump {
   dybatpho::header "SEMVER BUMP"
   local base="1.4.2-alpha.1+build.5"
   dybatpho::info "Base version: ${base}"
-  dybatpho::print "  bump major             : $(dybatpho::semver_bump "${base}" major)"
-  dybatpho::print "  bump minor             : $(dybatpho::semver_bump "${base}" minor)"
-  dybatpho::print "  bump patch             : $(dybatpho::semver_bump "${base}" patch)"
-  dybatpho::print "  bump major + pre rc.1  : $(dybatpho::semver_bump "${base}" major "rc.1")"
-  dybatpho::print "  bump patch + build meta: $(dybatpho::semver_bump "${base}" patch "" "sha.abc123")"
-  dybatpho::print "  bump minor + both      : $(dybatpho::semver_bump "${base}" minor "beta.1" "exp.42")"
+  local semver_bump_6
+  semver_bump_6=$(dybatpho::semver_bump "${base}" major)
+  dybatpho::print "  bump major             : ${semver_bump_6}"
+  local semver_bump_5
+  semver_bump_5=$(dybatpho::semver_bump "${base}" minor)
+  dybatpho::print "  bump minor             : ${semver_bump_5}"
+  local semver_bump_4
+  semver_bump_4=$(dybatpho::semver_bump "${base}" patch)
+  dybatpho::print "  bump patch             : ${semver_bump_4}"
+  local semver_bump_3
+  semver_bump_3=$(dybatpho::semver_bump "${base}" major "rc.1")
+  dybatpho::print "  bump major + pre rc.1  : ${semver_bump_3}"
+  local semver_bump_2
+  semver_bump_2=$(dybatpho::semver_bump "${base}" patch "" "sha.abc123")
+  dybatpho::print "  bump patch + build meta: ${semver_bump_2}"
+  local semver_bump
+  semver_bump=$(dybatpho::semver_bump "${base}" minor "beta.1" "exp.42")
+  dybatpho::print "  bump minor + both      : ${semver_bump}"
 }
 
+# @description Run the `RANGE CONSTRAINTS` section of this example.
+# @noargs
 function _demo_ranges {
   dybatpho::header "RANGE CONSTRAINTS"
   # The question a dependency check actually asks, written as the requirement
@@ -106,10 +133,16 @@ function _demo_ranges {
   for reported in "1.35" "git version 2.43.0" \
     "yq (https://github.com/mikefarah/yq/) version v4.53.3" \
     "UnZip 6.00 of 20 April 2009" "grep (GNU grep) 3.12-modified"; do
-    dybatpho::print "  $(printf '%-52s' "${reported}") -> $(dybatpho::semver_coerce "${reported}")"
+    local semver_coerce
+    semver_coerce=$(dybatpho::semver_coerce "${reported}")
+    dybatpho::print "  $(printf '%-52s' "${reported}") -> ${semver_coerce}"
   done
   # What the two are for together: deciding whether an installed tool is usable.
-  if dybatpho::semver_satisfies "$(dybatpho::semver_coerce "$(dybatpho::command_version bash)")" '>=4.3'; then
+  local command_version
+  command_version=$(dybatpho::command_version bash)
+  local semver_coerce_2
+  semver_coerce_2=$(dybatpho::semver_coerce "${command_version}")
+  if dybatpho::semver_satisfies "${semver_coerce_2}" '>=4.3'; then
     dybatpho::print "  the running bash satisfies >=4.3"
   fi
 
@@ -128,17 +161,29 @@ function _demo_ranges {
   dybatpho::success "Dependency check passed: ${installed} satisfies ${required}"
 }
 
+# @description Run the `ORDERING VERSIONS` section of this example.
+# @noargs
 function _demo_ordering {
   dybatpho::header "ORDERING VERSIONS"
   # String order would put 1.10.0 before 1.9.0; version order does not.
-  dybatpho::info "Sorted: $(dybatpho::semver_sort 1.10.0 1.9.0 2.0.0 1.2.3 | tr '\n' ' ')"
-  dybatpho::info "With pre-releases: $(dybatpho::semver_sort 2.0.0 2.0.0-rc.1 2.0.0-alpha | tr '\n' ' ')"
-  dybatpho::info "Highest: $(dybatpho::semver_max 1.10.0 1.9.0 2.0.0-rc.1)"
+  local semver_sort_2
+  semver_sort_2=$(dybatpho::semver_sort 1.10.0 1.9.0 2.0.0 1.2.3 | tr '\n' ' ')
+  dybatpho::info "Sorted: ${semver_sort_2}"
+  local semver_sort
+  semver_sort=$(dybatpho::semver_sort 2.0.0 2.0.0-rc.1 2.0.0-alpha | tr '\n' ' ')
+  dybatpho::info "With pre-releases: ${semver_sort}"
+  local semver_max
+  semver_max=$(dybatpho::semver_max 1.10.0 1.9.0 2.0.0-rc.1)
+  dybatpho::info "Highest: ${semver_max}"
 
   # A list of tags keeps its `v`, so the result is usable as a tag again.
-  dybatpho::info "From a tag list: $(printf 'v1.2.0\nv1.10.0\nv1.9.0\n' | dybatpho::semver_max)"
+  local printf
+  printf=$(printf 'v1.2.0\nv1.10.0\nv1.9.0\n' | dybatpho::semver_max)
+  dybatpho::info "From a tag list: ${printf}"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_valid
   _demo_parse

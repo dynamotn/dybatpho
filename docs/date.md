@@ -28,8 +28,8 @@ implementations this module supports shift by them differently.
 ### 🚀 Highlights
 
 - [`__dybatpho_date_flavor`](#__dybatpho_date_flavor) — Print which `date` this system has: `gnu`, `bsd` or `busybox`. Detected by asking for something only one of them accepts, rather than by matching a name. BSD stays the default it always was; the new question is whether this is BusyBox, which answers to neither `--version` nor `-j`. A two-way GNU-or-BSD guess sent every BusyBox system down the BSD path, where `-r` means "read the time off this file" and the whole module failed. The answer is cached: probing twice per call is a lot for a helper that formats a date.
-- [`__dybatpho_date_is_gnu`](#__dybatpho_date_is_gnu) — 
-- [`__dybatpho_date_parse`](#__dybatpho_date_parse) — 
+- [`__dybatpho_date_is_gnu`](#__dybatpho_date_is_gnu) — Report whether `date` is the GNU one, which is what decides between `-d` and BSD's `-j -f` everywhere else in this module.
+- [`__dybatpho_date_parse`](#__dybatpho_date_parse) — Turn a date expression into an epoch, through whichever `date` the machine has.
 - [`__dybatpho_date_parse_with`](#__dybatpho_date_parse_with) — Parse a date string with an explicit input format.
 - [`dybatpho::date_now`](#dybatphodate_now) — Print the current time using a `date` format string.
 - [`dybatpho::date_today`](#dybatphodate_today) — Print today's date using a `date` format string.
@@ -67,6 +67,8 @@ two-way GNU-or-BSD guess sent every BusyBox system down the BSD path, where
 The answer is cached: probing twice per call is a lot for a helper that
 formats a date.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - `gnu`, `bsd` or `busybox`
@@ -76,12 +78,37 @@ formats a date.
 
 ### `__dybatpho_date_is_gnu`
 
+Report whether `date` is the GNU one, which is what decides
+between `-d` and BSD's `-j -f` everywhere else in this module.
+
+_Function has no arguments._
+
+**🚦 Exit codes**
+
+- `0`: `date` is GNU
+- `1`: `date` is the BSD one
 
 
 ---
 
 ### `__dybatpho_date_parse`
 
+Turn a date expression into an epoch, through whichever `date`
+the machine has.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Date expression, in any form the local `date` accepts |
+
+**📤 Output on stdout**
+
+- Seconds since the epoch
+
+**🚦 Exit codes**
+
+- `1`: The expression could not be parsed
 
 
 ---

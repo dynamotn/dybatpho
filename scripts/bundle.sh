@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file bundle.sh
 # @brief Flatten the selected modules into one self-contained file
 # @description
@@ -103,6 +106,7 @@ function __dybatpho_bundle_prologue {
     [[ " ${_core} " == *" ${_module} "* ]] || _optional="${_optional:+${_optional} }${_module}"
   done
 
+  # shellcheck disable=SC2154 # OUTPUT is set by the option spec of this script
   cat << PROLOGUE
 #!/usr/bin/env bash
 # dybatpho $(dybatpho::version) bundle
@@ -165,7 +169,8 @@ function dybatpho::load {
   local module
   for module in "\$@"; do
     dybatpho::module_loaded "\${module}" && continue
-    dybatpho::die "dybatpho::load: Module '\${module}' is not in this bundle. Regenerate it with: scripts/bundle.sh --modules \"${_modules} \${module}\""
+    dybatpho::die "dybatpho::load: Module '\${module}' is not in this bundle. Regenerate it with:\
+ scripts/bundle.sh --modules \"${_modules} \${module}\""
   done
 }
 PROLOGUE
@@ -180,11 +185,19 @@ function __dybatpho_bundle_module {
   local _module="$1"
   local _file="${DYBATPHO_DIR}/src/${_module}.sh"
   dybatpho::is file "${_file}" || dybatpho::die "No source file for module '${_module}'"
-  printf '\n#--- module: %s %s\n' "${_module}" "$(dybatpho::string_repeat '-' 40)"
-  # The shebang is dropped: only the first line of the bundle may carry one, and
-  # the rest of the file is kept verbatim so that the bundled code and the
-  # library code stay the same code.
-  tail -n +2 "${_file}"
+  local string_repeat
+  string_repeat=$(dybatpho::string_repeat '-' 40)
+  printf '\n#--- module: %s %s\n' "${_module}" "${string_repeat}"
+  # A module is sourced, so it carries no shebang: the whole file goes in,
+  # verbatim, and the bundled code stays the same code as the library code. A
+  # copy that does carry one must not lose its first real line to the drop.
+  local _first
+  IFS= read -r _first < "${_file}" || true
+  if [[ "${_first}" == '#!'* ]]; then
+    tail -n +2 "${_file}"
+  else
+    cat "${_file}"
+  fi
 }
 
 #######################################
@@ -196,6 +209,7 @@ function __dybatpho_bundle_module {
 function __dybatpho_bundle_run {
   local _modules _module _count=0
   # shellcheck disable=SC2153 # MODULES is the option variable the CLI spec declares
+  # shellcheck disable=SC2154 # set by the option spec of this script
   _modules="$(__dybatpho_bundle_resolve "${MODULES}" | tr '\n' ' ')"
   _modules="$(dybatpho::trim "${_modules}")"
   for _module in ${_modules}; do _count=$((_count + 1)); done
@@ -223,7 +237,9 @@ function __dybatpho_bundle_run {
   bash -n "${OUTPUT}" || dybatpho::die "The generated bundle is not valid Bash: ${OUTPUT}"
   __dybatpho_bundle_smoke "${OUTPUT}" "${_modules}"
 
-  dybatpho::success "Wrote $(dybatpho::file_size "${OUTPUT}") bytes to ${OUTPUT}"
+  local file_size
+  file_size=$(dybatpho::file_size "${OUTPUT}")
+  dybatpho::success "Wrote ${file_size} bytes to ${OUTPUT}"
   printf '%s\n' "${OUTPUT}"
   return 0
 }
@@ -253,6 +269,10 @@ function __dybatpho_bundle_smoke {
     || dybatpho::die "The bundle reports '${_loaded}' instead of '${_expected}'"
 }
 
+#######################################
+# @description CLI specification for this script.
+#######################################
+# @noargs
 function _spec {
   dybatpho::opts::setup "Flatten dybatpho modules into one self-contained file" \
     BUNDLE_ARGS action:"__dybatpho_bundle_run" args:none

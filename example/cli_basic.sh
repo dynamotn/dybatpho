@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# This file keeps its declarations with the functions they describe.
+# dyshellint disable=BSG033
 # @file cli_basic.sh
 # @brief A minimal CLI example using the dybatpho opts system
 # @description Shows the simplest usage of dybatpho::opts::* to build a CLI
@@ -22,7 +24,10 @@ VERSION="v1.0.0"
 # Implementation
 # ---------------------------------------------------------------------------
 
+# @description The action behind the spec: greet the name that was parsed out.
+# @noargs
 function _run {
+  # shellcheck disable=SC2154 # set by the option spec of this script
   local _msg="${GREETING:-Hello}, ${NAME}!"
 
   if [[ -n "${SHOUT:-}" ]]; then
@@ -41,6 +46,8 @@ function _run {
 # Spec
 # ---------------------------------------------------------------------------
 
+# @description The option spec of the greeter: one argument, and the flags that shape it.
+# @noargs
 function _spec {
   dybatpho::opts::setup "A minimal greeter CLI" ARGS action:"_run"
 

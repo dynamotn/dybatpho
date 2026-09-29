@@ -216,6 +216,8 @@ Remove an exact suffix from a string when it matches.
 
 Fill the transliteration table, once, when the module loads.
 
+_Function has no arguments._
+
 **🧩 Variable sets**
 
 - __DYBATPHO_STRING_ASCII

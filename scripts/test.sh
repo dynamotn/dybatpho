@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file test.sh
 # @brief Test all modules of dybatpho
 # @description
@@ -50,6 +53,7 @@ function __dybatpho_test_is_count {
 
 # @description Default for `--color`, so a terminal gets a live progress line
 #   and a pipe or a CI log gets plain text.
+# @noargs
 # @stdout `true` when stdout is a terminal, `false` otherwise
 function __dybatpho_test_tty {
   if dybatpho::is_tty stdout; then printf 'true'; else printf 'false'; fi
@@ -63,7 +67,9 @@ function __dybatpho_test_tty {
 # @stdout One file path per line
 function __dybatpho_test_collect {
   local _target
-  {
+  while read -r _file; do
+    printf '%s\t%s\n' "$(grep -c '^@test' "${_file}" || true)" "${_file}"
+  done < <(
     if (($#)); then
       for _target in "$@"; do
         if [[ -d "${_target}" ]]; then
@@ -75,9 +81,7 @@ function __dybatpho_test_collect {
     else
       find "${DYBATPHO_DIR}/test" -maxdepth 1 -name '*.bats' -type f
     fi
-  } | while read -r _file; do
-    printf '%s\t%s\n' "$(grep -c '^@test' "${_file}" || true)" "${_file}"
-  done | sort -rn | cut -f2
+  ) | sort -rn | cut -f2
 }
 
 # @description Filter a raw TAP stream down to a live view: one rewritten
@@ -87,6 +91,7 @@ function __dybatpho_test_collect {
 # @arg $1 number Total number of tests expected
 # @stdin TAP output from Bats
 function __dybatpho_test_progress {
+  # shellcheck disable=SC2154 # set by the option spec of this script
   awk -v total="$1" -v color="${COLOR}" \
     -v red="${__DYBATPHO_TEST_RED}" \
     -v dim="${__DYBATPHO_TEST_DIM}" \
@@ -149,6 +154,9 @@ function __dybatpho_test_pack {
   done
 }
 
+# This function declares no command line; it names `dybatpho::opts::setup`
+# in a comment to explain how the array it reads was filled.
+# dyshellint disable=BSG052
 # @description Run the suite and report it.
 # @noargs
 # @exitcode 0 If every test ran and passed
@@ -170,6 +178,7 @@ function __dybatpho_test_run {
   # `dybatpho::opts::setup` collects the positional arguments into an array, so
   # a path containing a space reaches the collector as one target.
   local -a _files
+  # shellcheck disable=SC2154 # set by the option spec of this script
   mapfile -t _files < <(__dybatpho_test_collect ${TEST_ARGS[@]+"${TEST_ARGS[@]}"})
   ((${#_files[@]})) || dybatpho::die "No test files found"
 
@@ -186,6 +195,7 @@ function __dybatpho_test_run {
   dybatpho::create_temp _run_dir "/" "test"
   local _tap="${_run_dir}/run.tap"
 
+  # shellcheck disable=SC2154 # set by the option spec of this script
   local -a _bats_args=(
     --print-output-on-failure
     --timing
@@ -194,12 +204,18 @@ function __dybatpho_test_run {
     --output "${_run_dir}"
     --jobs "${JOBS}"
   )
+  # shellcheck disable=SC2154 # set by the option spec of this script
   [[ "${VERBOSE_RUN}" == "true" ]] && _bats_args+=(--verbose-run)
   [[ -n "${FILTER}" ]] && _bats_args+=(--filter "${FILTER}")
 
+  local value=""
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if [[ "${COVERAGE}" == "true" ]]; then
+    printf -v value ' · coverage in chunks of %s' "${CHUNK}"
+  fi
   printf '%s%d files · %d tests · %s jobs%s%s\n\n' \
     "${_dim}" "${#_files[@]}" "${_expected}" "${JOBS}" \
-    "$([[ "${COVERAGE}" == "true" ]] && printf ' · coverage in chunks of %s' "${CHUNK}")" \
+    "${value}" \
     "${_reset}"
 
   local _start="${SECONDS}"
@@ -214,12 +230,15 @@ function __dybatpho_test_run {
     local -a _chunk_files
     # One Bats run per chunk, so each writes its own junit report; they are
     # concatenated afterwards and summarised as one.
-    while IFS= read -r _line; do
+    local test_pack_output
+    test_pack_output=$(__dybatpho_test_pack "${CHUNK}" "${_files[@]}")
+    while IFS= read -r _line || [[ -n "${_line}" ]]; do
       IFS=$'\t' read -r -a _chunk_files <<< "${_line}"
       ((${#_chunk_files[@]})) || continue
       _part="${_coverage_dir}/part${_index}"
       _chunk_out="${_run_dir}/chunk${_index}"
       mkdir -p "${_chunk_out}"
+      # shellcheck disable=SC2310 # a failing suite has to reach the summary below
       kcov \
         --clean \
         --dump-summary \
@@ -233,11 +252,12 @@ function __dybatpho_test_run {
         2>&1 | tee -a "${_tap}" | __dybatpho_test_progress "${_expected}" || true
       _parts+=("${_part}")
       _index=$((_index + 1))
-    done < <(__dybatpho_test_pack "${CHUNK}" "${_files[@]}")
+    done < <(printf '%s' "${test_pack_output}")
     cat "${_run_dir}"/chunk*/report.xml > "${_run_dir}/report.xml" 2> /dev/null
   else
     # `|| true`: a failing suite has to reach the summary below, and dybatpho
     # runs with both `errexit` and `pipefail` on.
+    # shellcheck disable=SC2310 # a failing suite has to reach the summary below
     "${BATS_CMD}" "${_bats_args[@]}" "${_files[@]}" 2>&1 \
       | tee "${_tap}" | __dybatpho_test_progress "${_expected}" || true
   fi
@@ -249,6 +269,9 @@ function __dybatpho_test_run {
   local _files_passed=0 _files_failed=0 _tests_passed=0 _tests_failed=0
   local -a _failed_files=()
   local _name _tests _failures _errors _elapsed _bad _passed _short
+  # The five attributes of one `<testsuite>` element, as tab-separated fields.
+  local _suite_fields='s/.*name="([^"]*)".*tests="([^"]*)".*failures="([^"]*)".*'
+  _suite_fields+='errors="([^"]*)".*time="([^"]*)".*/\1\t\2\t\3\t\4\t\5/'
 
   printf '\n'
   if [[ -s "${_run_dir}/report.xml" ]]; then
@@ -288,7 +311,7 @@ function __dybatpho_test_run {
       fi
     done < <(
       grep -o '<testsuite [^>]*>' "${_run_dir}/report.xml" \
-        | sed -E 's/.*name="([^"]*)".*tests="([^"]*)".*failures="([^"]*)".*errors="([^"]*)".*time="([^"]*)".*/\1\t\2\t\3\t\4\t\5/' \
+        | sed -E "${_suite_fields}" \
         | sort
     )
   else
@@ -350,6 +373,10 @@ function __dybatpho_test_run {
   exit 0
 }
 
+#######################################
+# @description CLI specification for this script.
+#######################################
+# @noargs
 function _spec {
   dybatpho::opts::setup "Run the dybatpho test suite" TEST_ARGS \
     action:"__dybatpho_test_run"
@@ -358,12 +385,16 @@ function _spec {
     on:true off:false init:="false"
   dybatpho::opts::flag "Trace every command Bats runs" VERBOSE_RUN -v --verbose-run \
     on:true off:false init:="false"
+  local test_tty
+  test_tty=$(__dybatpho_test_tty)
   # shellcheck disable=SC1083 # `--{no-}color` is dybatpho's toggle-switch syntax
   dybatpho::opts::flag "Colourise the report" COLOR --{no-}color \
-    on:true off:false init:="$(__dybatpho_test_tty)"
+    on:true off:false init:="${test_tty}"
 
+  local cpu_count
+  cpu_count=$(dybatpho::cpu_count || printf '1')
   dybatpho::opts::param "Bats workers to run at once" JOBS -j --jobs \
-    env:DYBATPHO_TEST_JOBS init:="$(dybatpho::cpu_count || printf '1')" \
+    env:DYBATPHO_TEST_JOBS init:="${cpu_count}" \
     validate:"__dybatpho_test_is_count \$OPTARG"
   dybatpho::opts::param "Test files per kcov invocation" CHUNK --chunk \
     env:DYBATPHO_TEST_CHUNK init:="5" \

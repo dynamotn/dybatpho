@@ -4,8 +4,14 @@
 #
 # The example never changes the machine: every install runs in dry-run mode, so
 # it prints the command it would have run instead of running it.
+# @description
+#   Detects the package manager of the machine and builds the install command
+#   for a dependency, without ever changing anything: the run is pinned to a
+#   pretend Debian and every install is a dry run.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules pkg
+
+dybatpho::register_common_handlers
 
 # This example has to produce the same output on any machine, so it pretends to
 # run on Debian instead of probing the real one. Drop these two lines in a real
@@ -14,7 +20,9 @@ export DYBATPHO_PKG_MANAGER="apt"
 export DYBATPHO_PKG_SUDO="true"
 
 dybatpho::header "DETECTION"
-dybatpho::print "supported: $(dybatpho::pkg_supported | tr '\n' ' ')"
+pkg_supported_2=$(dybatpho::pkg_supported | tr '\n' ' ')
+pkg_supported=${pkg_supported_2}
+dybatpho::print "supported: ${pkg_supported}"
 if manager="$(dybatpho::pkg_manager)"; then
   dybatpho::print "this machine uses: ${manager}"
 else
@@ -25,8 +33,10 @@ fi
 dybatpho::header "PACKAGE NAMES PER DISTRIBUTION"
 # The same tool is named differently everywhere, so state the exceptions once
 # and let the module pick the right one.
-dybatpho::print "fd is installed as: $(dybatpho::pkg_name fd apt:fd-find emerge:sys-apps/fd)"
-dybatpho::print "install command: $(dybatpho::pkg_install_command ripgrep jq)"
+pkg_name=$(dybatpho::pkg_name fd apt:fd-find emerge:sys-apps/fd)
+dybatpho::print "fd is installed as: ${pkg_name}"
+pkg_install_command=$(dybatpho::pkg_install_command ripgrep jq)
+dybatpho::print "install command: ${pkg_install_command}"
 
 dybatpho::header "DRY RUN"
 # A dry run changes nothing, so it never asks for confirmation.

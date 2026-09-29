@@ -1,6 +1,14 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file is sourced by `init.sh` and never run, so it carries no executable
+# bit; it lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it uses `eval`, which is how the spec engine builds
+# a parser.
+# dyshellint disable=BSG050,BSG011,BSG040
 # @file process.sh
 # @brief Utilities for process handling
+# @namespace dybatpho
 # @description
 #   This module contains helpers for script termination, signal handling, trap
 #   composition, deferred cleanup, and dry-run execution. It also bounds how
@@ -22,14 +30,18 @@ export DRY_RUN
 declare -ga DYBATPHO_CLEANUP_PATHS=()
 # Shell that already owns the cleanup trap, so it is installed exactly once.
 __dybatpho_cleanup_trap_pid=""
-# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds between SIGTERM and SIGKILL when a timed or background job is ended, default is `5`
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds between SIGTERM and SIGKILL when a timed or background job is ended,
+#   default is `5`
 DYBATPHO_TIMEOUT_KILL_AFTER="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
 export DYBATPHO_TIMEOUT_KILL_AFTER
-# @env DYBATPHO_BACKGROUND_NAMES array Names of the background jobs started by `dybatpho::background_run`, in submission order
+# @env DYBATPHO_BACKGROUND_NAMES array Names of the background jobs started by `dybatpho::background_run`, in submission
+#   order
 declare -ga DYBATPHO_BACKGROUND_NAMES=()
 # @env DYBATPHO_BACKGROUND_PIDS array Process ID of each background job, keyed by job name
 declare -gA DYBATPHO_BACKGROUND_PIDS=()
-# @env DYBATPHO_BACKGROUND_STATUS array Exit code of each background job that `dybatpho::wait_all` has reaped, keyed by job name
+# @env DYBATPHO_BACKGROUND_STATUS array Exit code of each background job that `dybatpho::wait_all` has reaped, keyed by
+#   job
+#   name
 declare -gA DYBATPHO_BACKGROUND_STATUS=()
 # Whether each background job leads its own process group, so `kill_children`
 # never signals the caller's own group by mistake.
@@ -144,8 +156,9 @@ function dybatpho::trap {
   # @arg $1 string Signal name
   # @stdout Existing trap command, or an empty string when none is registered
   #######################################
-  __dybatpho_process_gen_finalize_command() {
-    local cmds=$(trap -p "$1")
+  function __dybatpho_process_gen_finalize_command {
+    local cmds
+    cmds=$(trap -p "$1")
     cmds="${cmds#*\'}"
     cmds="${cmds%\'*}"
     echo "${cmds}"
@@ -382,6 +395,7 @@ function __dybatpho_process_timeout_fallback {
   local monitor="off"
   case "$-" in
     *m*) monitor="on" ;;
+    *) ;;
   esac
   set -m
 
@@ -507,6 +521,7 @@ function dybatpho::background_run {
   local monitor="off"
   case "$-" in
     *m*) monitor="on" ;;
+    *) ;;
   esac
   set -m
   "$@" &
@@ -588,7 +603,8 @@ function dybatpho::wait_all {
 # @set DYBATPHO_BACKGROUND_PIDS
 # @set DYBATPHO_BACKGROUND_NAMES
 # @exitcode 0 Always, so a job that had already exited cannot fail the caller
-# @tip Register it on a trap (`dybatpho::trap dybatpho::kill_children EXIT INT TERM`) so an interrupted script leaves nothing behind
+# @tip Register it on a trap (`dybatpho::trap dybatpho::kill_children EXIT INT TERM`) so an interrupted script leaves
+#   nothing behind
 #######################################
 function dybatpho::kill_children {
   local kill_after="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
@@ -622,7 +638,9 @@ function dybatpho::kill_children {
 # @arg $2 number Process ID to record, default is the current script's `$$`
 # @exitcode 0 The PID file was written
 # @exitcode 1 Stop the script when the process ID is not a number or the file cannot be written
-# @note `$$` is the script's own process ID and stays the same inside a subshell, which is what a PID file is expected to hold. Pass `${BASHPID}` explicitly to record a subshell instead.
+# @note `$$` is the script's own process ID and stays the same inside a subshell, which is what a PID file is expected
+#   to
+#   hold. Pass `${BASHPID}` explicitly to record a subshell instead.
 #######################################
 function dybatpho::pid_file_write {
   local path
@@ -658,7 +676,9 @@ function dybatpho::pid_file_write {
 # @arg $1 string Path of the PID file
 # @exitcode 0 The recorded process is running
 # @exitcode 1 There is no readable PID file, its contents are not a process ID, or that process has exited
-# @note A PID file whose process has exited can be reused by an unrelated process that happens to receive the same ID, which no PID file can detect; use `dybatpho::lock_acquire` when the answer has to be exact.
+# @note A PID file whose process has exited can be reused by an unrelated process that happens to receive the same ID,
+#   which
+#   no PID file can detect; use `dybatpho::lock_acquire` when the answer has to be exact.
 #######################################
 function dybatpho::pid_file_is_running {
   local path

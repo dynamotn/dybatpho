@@ -24,6 +24,9 @@
 
 # Capture the current source path before strict mode. Some shells invoked through
 # `bash -c/-lc` may expose an empty `BASH_SOURCE` array transiently.
+# The loaders answer with a status their caller handles — a missing module
+# stops the bootstrap with a message, not with an unexplained `errexit`.
+# shellcheck disable=SC2310
 __dybatpho_init_source="${BASH_SOURCE[0]-}"
 
 # Require bash >= v4.3. The library builds on two features that arrived in that
@@ -173,7 +176,9 @@ function __dybatpho_load_module {
 # @noargs
 #######################################
 function __dybatpho_export_functions {
-  eval "$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')"
+  local exports
+  exports=$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')
+  eval "${exports}"
 }
 
 #######################################

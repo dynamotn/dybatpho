@@ -8,36 +8,48 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# @description Run the `INDENT` section of this example.
+# @noargs
 function _demo_indent {
   local block=$'alpha\nbeta'
   dybatpho::header "INDENT"
   dybatpho::text_indent "${block}" "> "
 }
 
+# @description Run the `DEDENT` section of this example.
+# @noargs
 function _demo_dedent {
   local block=$'    line one\n      line two\n    line three'
   dybatpho::header "DEDENT"
   dybatpho::text_dedent "${block}"
 }
 
+# @description Run the `STRIP ANSI` section of this example.
+# @noargs
 function _demo_strip_ansi {
   local colored=$'\e[1;32mgreen text\e[0m\n\e[0;34mblue text\e[0m'
   dybatpho::header "STRIP ANSI"
   dybatpho::text_strip_ansi "${colored}"
 }
 
+# @description Run the `BULLET LIST` section of this example.
+# @noargs
 function _demo_bullets {
   local items=$'install dependencies\nrun tests\nship release'
   dybatpho::header "BULLET LIST"
   dybatpho::text_bullet_list "${items}" "•"
 }
 
+# @description Run the `TEXT COLUMNS` section of this example.
+# @noargs
 function _demo_columns {
   local rows=$'Key::Value\nname::dybatpho\nversion::1.0.0'
   dybatpho::header "TEXT COLUMNS"
   dybatpho::text_columns "${rows}" "::" 1
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_indent
   _demo_dedent

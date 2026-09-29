@@ -14,6 +14,7 @@ dybatpho::register_common_handlers
 # Keep the demonstration out of the real cache directory. The helper sets the
 # named variable and registers the directory for cleanup when this script ends.
 dybatpho::create_temp_dir CACHE_ROOT "cache-example"
+# shellcheck disable=SC2154 # set by the option spec of this script
 export DYBATPHO_CACHE_DIR="${CACHE_ROOT}/cache"
 export DYBATPHO_CACHE_NAMESPACE="example"
 
@@ -22,33 +23,48 @@ printf '0\n' > "${CALLS_FILE}"
 
 # @description Stand in for the slow thing a real script would cache: an API
 #   listing, a dependency resolution, a probe across a fleet.
+# @noargs
 function _expensive_listing {
-  printf '%s\n' "$(($(cat "${CALLS_FILE}") + 1))" > "${CALLS_FILE}"
+  local cat
+  cat=$(cat "${CALLS_FILE}")
+  printf '%s\n' "$((cat + 1))" > "${CALLS_FILE}"
   printf 'release-1.0\nrelease-1.1\n'
 }
 
+# @description Print the calls the pretended backend has recorded so far.
+# @noargs
 function _calls_so_far {
   cat "${CALLS_FILE}"
 }
 
 # @description The whole module in one call: ask once, reuse until it expires.
+# @noargs
 function _demo_run {
   dybatpho::header "MEMOIZING A COMMAND"
   local first second
   first="$(dybatpho::cache_run releases 3600 -- _expensive_listing)"
   second="$(dybatpho::cache_run releases 3600 -- _expensive_listing)"
-  dybatpho::print "  first call:  $(printf '%s' "${first}" | tr '\n' ' ')"
-  dybatpho::print "  second call: $(printf '%s' "${second}" | tr '\n' ' ')"
-  dybatpho::print "  the command actually ran $(_calls_so_far) time(s)"
+  local printf_2
+  printf_2=$(printf '%s' "${first}" | tr '\n' ' ')
+  dybatpho::print "  first call:  ${printf_2}"
+  local printf
+  printf=$(printf '%s' "${second}" | tr '\n' ' ')
+  dybatpho::print "  second call: ${printf}"
+  local calls_so_far_2
+  calls_so_far_2=$(_calls_so_far)
+  dybatpho::print "  the command actually ran ${calls_so_far_2} time(s)"
 
   # A time to live of zero makes nothing fresh, which is how a script offers a
   # `--refresh` flag without deleting anything.
   dybatpho::cache_run releases 0 -- _expensive_listing > /dev/null
-  dybatpho::print "  after a forced refresh it ran $(_calls_so_far) time(s)"
+  local calls_so_far
+  calls_so_far=$(_calls_so_far)
+  dybatpho::print "  after a forced refresh it ran ${calls_so_far} time(s)"
 }
 
 # @description A command that fails is never stored, so the next call asks
 #   again rather than repeating a remembered error for an hour.
+# @noargs
 function _demo_failure_is_not_remembered {
   dybatpho::header "A FAILURE IS NOT AN ANSWER"
   local status=0
@@ -63,11 +79,16 @@ function _demo_failure_is_not_remembered {
 
 # @description Store and read an entry directly, for the times the value does
 #   not come from running a command.
+# @noargs
 function _demo_direct {
   dybatpho::header "STORING A VALUE DIRECTLY"
   printf 'v4.53.3\n' | dybatpho::cache_set resolved-version
-  dybatpho::print "  stored at $(dybatpho::cache_path resolved-version)"
-  dybatpho::print "  reads back as $(dybatpho::cache_get resolved-version 3600)"
+  local cache_path
+  cache_path=$(dybatpho::cache_path resolved-version)
+  dybatpho::print "  stored at ${cache_path}"
+  local cache_get_2
+  cache_get_2=$(dybatpho::cache_get resolved-version 3600)
+  dybatpho::print "  reads back as ${cache_get_2}"
 
   # A key becomes a file name, so anything that is not already a short name
   # goes through the hash first.
@@ -75,11 +96,14 @@ function _demo_direct {
   key="$(dybatpho::cache_key "https://example.com/api/things?page=2")"
   printf 'page two\n' | dybatpho::cache_set "${key}"
   dybatpho::print "  a URL keys as ${key:0:16}..."
-  dybatpho::print "  and reads back as $(dybatpho::cache_get "${key}" 3600)"
+  local cache_get
+  cache_get=$(dybatpho::cache_get "${key}" 3600)
+  dybatpho::print "  and reads back as ${cache_get}"
 }
 
 # @description Entries expire on their modification time, so an old one is not
 #   used just because it is there.
+# @noargs
 function _demo_staleness {
   dybatpho::header "STALENESS"
   printf 'yesterday\n' | dybatpho::cache_set report
@@ -91,25 +115,37 @@ function _demo_staleness {
   else
     dybatpho::print "  older than an hour, so it is not used"
   fi
-  dybatpho::print "  but it is still there under a longer budget: $(dybatpho::cache_get report 999999999)"
+  local cache_get
+  cache_get=$(dybatpho::cache_get report 999999999)
+  dybatpho::print "  but it is still there under a longer budget: ${cache_get}"
 }
 
 # @description Namespaces keep unrelated caches from colliding on a key.
+# @noargs
 function _demo_namespaces {
   dybatpho::header "NAMESPACES"
   printf 'from github\n' | DYBATPHO_CACHE_NAMESPACE=github dybatpho::cache_set listing
   printf 'from gitlab\n' | DYBATPHO_CACHE_NAMESPACE=gitlab dybatpho::cache_set listing
-  dybatpho::print "  github: $(DYBATPHO_CACHE_NAMESPACE=github dybatpho::cache_get listing 3600)"
-  dybatpho::print "  gitlab: $(DYBATPHO_CACHE_NAMESPACE=gitlab dybatpho::cache_get listing 3600)"
+  local DYBATPHO_CACHE_NAMESPACE_github
+  DYBATPHO_CACHE_NAMESPACE_github=$(DYBATPHO_CACHE_NAMESPACE=github dybatpho::cache_get listing 3600)
+  dybatpho::print "  github: ${DYBATPHO_CACHE_NAMESPACE_github}"
+  local DYBATPHO_CACHE_NAMESPACE_gitlab
+  DYBATPHO_CACHE_NAMESPACE_gitlab=$(DYBATPHO_CACHE_NAMESPACE=gitlab dybatpho::cache_get listing 3600)
+  dybatpho::print "  gitlab: ${DYBATPHO_CACHE_NAMESPACE_gitlab}"
 
   DYBATPHO_CACHE_NAMESPACE=github dybatpho::cache_clear
   if DYBATPHO_CACHE_NAMESPACE=github dybatpho::cache_has listing 3600; then
     dybatpho::warn "  github survived being cleared"
   else
-    dybatpho::print "  github cleared, gitlab untouched: $(DYBATPHO_CACHE_NAMESPACE=gitlab dybatpho::cache_get listing 3600)"
+    local DYBATPHO_CACHE_NAMESPACE_gitlab
+    DYBATPHO_CACHE_NAMESPACE_gitlab=$(DYBATPHO_CACHE_NAMESPACE=gitlab dybatpho::cache_get listing 3600)
+    dybatpho::print \
+      "  github cleared, gitlab untouched: ${DYBATPHO_CACHE_NAMESPACE_gitlab}"
   fi
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_run
   _demo_failure_is_not_remembered

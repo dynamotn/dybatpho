@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# uses `eval`, which is how the spec engine builds a parser.
+# dyshellint disable=BSG050,BSG040
 # @file lock.sh
 # @brief Utilities for process locking and coordination
+# @namespace dybatpho
 # @description
 #   This module provides a portable file lock (Linux/macOS) built on the
 #   atomicity of `mkdir`, so it works the same way without depending on
@@ -70,13 +75,27 @@ function __dybatpho_lock_exists {
 #######################################
 # @description Print the link target that identifies the holder of a lock,
 #   as `pid:host:acquired_at`.
+# @noargs
 # @stdout The target
 #######################################
 function __dybatpho_lock_target {
+  local date
+  local date_2
+  date_2=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  date=${date_2}
+  local lock_hostname
+  lock_hostname=$(dybatpho::lock_hostname)
   printf '%s:%s:%s' \
-    "$$" "$(dybatpho::lock_hostname)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    "$$" "${lock_hostname}" "${date}"
 }
 
+#######################################
+# @description Print the host name a lock records as its owner. It is its own
+#   function so a test can replace it, which is how the stale-lock paths are
+#   exercised without a second machine.
+# @noargs
+# @stdout The host name
+#######################################
 function dybatpho::lock_hostname {
   dybatpho::hostname
 }
@@ -194,11 +213,19 @@ function dybatpho::lock_info {
   lock_path="$(dybatpho::lock_path "${name}")"
 
   dybatpho::lock_is_alive "${lock_path}" || return 1
+  local lock_field
+  lock_field=$(dybatpho::lock_field "${lock_path}" command)
+  local lock_field_2
+  lock_field_2=$(dybatpho::lock_field "${lock_path}" pid)
+  local lock_field_3
+  lock_field_3=$(dybatpho::lock_field "${lock_path}" acquired_at)
+  local lock_field_4
+  lock_field_4=$(dybatpho::lock_field "${lock_path}" host)
   printf 'pid=%s host=%s acquired_at=%s command=%s\n' \
-    "$(dybatpho::lock_field "${lock_path}" pid)" \
-    "$(dybatpho::lock_field "${lock_path}" host)" \
-    "$(dybatpho::lock_field "${lock_path}" acquired_at)" \
-    "$(dybatpho::lock_field "${lock_path}" command)"
+    "${lock_field_2}" \
+    "${lock_field_4}" \
+    "${lock_field_3}" \
+    "${lock_field}"
 }
 
 #######################################
@@ -308,15 +335,19 @@ function dybatpho::lock_acquire {
     # with `mkdir` and writing the pid afterwards left exactly such a window,
     # and a second process read the missing pid as "nobody holds this", removed
     # the lock and took it.
-    if ln -s "$(__dybatpho_lock_target)" "${lock_path}" 2> /dev/null; then
-      printf '%s' "${DYBATPHO_LOCK_COMMAND:-${0}}" \
+    local lock_target
+    lock_target=$(__dybatpho_lock_target)
+    if ln -s "${lock_target}" "${lock_path}" 2> /dev/null; then
+      printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" \
         > "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" 2> /dev/null || true
       return 0
     fi
 
     elapsed=$(($(date +%s) - start_time))
     if ((elapsed >= timeout)); then
-      dybatpho::error "Could not acquire lock ${lock_path}: $(dybatpho::lock_info "${name}" 2> /dev/null || echo 'held by an unknown process')"
+      local holder
+      holder="$(dybatpho::lock_info "${name}" 2> /dev/null || echo 'held by an unknown process')"
+      dybatpho::error "Could not acquire lock ${lock_path}: ${holder}"
       return 1
     fi
     sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"

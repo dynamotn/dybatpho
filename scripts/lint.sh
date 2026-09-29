@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file lint.sh
 # @brief Check the repository itself: shell syntax, dyshellint, changelog format
 # @description
@@ -37,6 +40,9 @@
 #   - `.github/workflows/ci.yaml`
 #   - `.shellcheckrc`
 #   - https://github.com/dynamotn/dyshellint
+# Every stage runs even after one fails, so each is called for its status
+# and the failures are counted rather than fatal.
+# shellcheck disable=SC2310
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=init.sh
 . "${SCRIPT_DIR}/../init.sh" --modules cli
@@ -45,33 +51,42 @@ dybatpho::register_common_handlers
 
 # @description Print every tracked file that is a Bash script, one per line.
 #   Extension alone is not enough — `scripts/` may hold extensionless helpers —
-#   so a file with no `.sh` suffix is admitted on its shebang instead.
+#   so a file with no `.sh` suffix is admitted on its shebang instead. A
+#   `.bash` file is sourced rather than run, so it carries no shebang either
+#   and has to be named: `test/test_helper.bash` went unchecked until it was.
+# @noargs
 # @stdout Repository-relative paths
 function __dybatpho_lint_scripts {
   local file
-  while IFS= read -r file; do
+  local git_output
+  git_output=$(git -C "${DYBATPHO_DIR}" ls-files)
+  while IFS= read -r file || [[ -n "${file}" ]]; do
     case "${file}" in
-      *.sh)
+      *.sh | *.bash)
         printf '%s\n' "${file}"
         continue
         ;;
       *.bats) continue ;;
+      *) ;;
     esac
     [[ -f "${file}" ]] || continue
     if IFS= read -r first < "${file}" && [[ "${first}" == '#!'*bash* ]]; then
       printf '%s\n' "${file}"
     fi
-  done < <(git -C "${DYBATPHO_DIR}" ls-files)
+  done < <(printf '%s' "${git_output}")
 }
 
 # @description Parse every discovered script with `bash -n`.
+# @noargs
 # @exitcode 0 Every script parses
 # @exitcode 1 At least one script has a syntax error
 function __dybatpho_lint_syntax {
   local script failures=0
-  while IFS= read -r script; do
+  local lint_scripts_output
+  lint_scripts_output=$(__dybatpho_lint_scripts)
+  while IFS= read -r script || [[ -n "${script}" ]]; do
     bash -n "${DYBATPHO_DIR}/${script}" || failures=$((failures + 1))
-  done < <(__dybatpho_lint_scripts)
+  done < <(printf '%s' "${lint_scripts_output}")
 
   if ((failures)); then
     dybatpho::error "${failures} script(s) failed to parse"
@@ -86,6 +101,7 @@ function __dybatpho_lint_syntax {
 #   having findings, `2` is the linter itself unable to run, usually a missing
 #   ShellCheck or shfmt — so a broken toolchain is not reported as a style
 #   backlog.
+# @noargs
 # @exitcode 0 `dyshellint` reports nothing
 # @exitcode 1 `dyshellint` reports at least one finding, or could not run
 function __dybatpho_lint_dyshellint {
@@ -115,6 +131,7 @@ function __dybatpho_lint_dyshellint {
 #   claims to follow: an `## [Unreleased]` section, released sections dated
 #   `YYYY-MM-DD`, only the six defined change groups, and a link reference for
 #   every version.
+# @noargs
 # @exitcode 0 The changelog is well formed
 # @exitcode 1 The changelog has at least one format violation
 function __dybatpho_lint_changelog {
@@ -123,25 +140,31 @@ function __dybatpho_lint_changelog {
 
   dybatpho::is file "${changelog}" || dybatpho::die "Missing CHANGELOG.md"
 
-  grep -qE '^## \[Unreleased\]' "${changelog}" ||
-    violations+="No '## [Unreleased]' section"$'\n'
+  grep -qE '^## \[Unreleased\]' "${changelog}" \
+    || violations+="No '## [Unreleased]' section"$'\n'
 
-  while IFS= read -r line; do
+  local grep_output
+  grep_output=$(grep -E '^## ' "${changelog}")
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     [[ "${line}" =~ ^##\ \[Unreleased\] ]] && continue
-    [[ "${line}" =~ ^##\ \[[0-9]+\.[0-9]+\.[0-9]+\]\ -\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] ||
-      violations+="Malformed release heading: ${line}"$'\n'
-  done < <(grep -E '^## ' "${changelog}")
+    [[ "${line}" =~ ^##\ \[[0-9]+\.[0-9]+\.[0-9]+\]\ -\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+      || violations+="Malformed release heading: ${line}"$'\n'
+  done < <(printf '%s' "${grep_output}")
 
-  while IFS= read -r line; do
+  local grep_output
+  grep_output=$(grep -E '^### ' "${changelog}")
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     case "${line}" in
       '### Added' | '### Changed' | '### Deprecated') ;;
       '### Removed' | '### Fixed' | '### Security') ;;
       *) violations+="Unknown change group: ${line}"$'\n' ;;
     esac
-  done < <(grep -E '^### ' "${changelog}")
+  done < <(printf '%s' "${grep_output}")
 
   local reference
-  while IFS= read -r version; do
+  local grep_output
+  grep_output=$(grep -oE '^## \[[^]]+\]' "${changelog}" | sed 's/^## \[//; s/\]$//')
+  while IFS= read -r version || [[ -n "${version}" ]]; do
     reference="$(grep -E "^\[${version}\]: " "${changelog}")" || {
       violations+="Version ${version} has no link reference at the bottom"$'\n'
       continue
@@ -149,9 +172,9 @@ function __dybatpho_lint_changelog {
     # A reference that exists but is not a URL is worse than a missing one: it
     # renders as a dead link. `scripts/release.sh` builds these, so a bug there
     # lands here silently.
-    [[ "${reference}" =~ ^\[[^]]+\]:\ https://[a-zA-Z0-9.-]+/[^[:space:]]+$ ]] ||
-      violations+="Malformed link reference: ${reference}"$'\n'
-  done < <(grep -oE '^## \[[^]]+\]' "${changelog}" | sed 's/^## \[//; s/\]$//')
+    [[ "${reference}" =~ ^\[[^]]+\]:\ https://[a-zA-Z0-9.-]+/[^[:space:]]+$ ]] \
+      || violations+="Malformed link reference: ${reference}"$'\n'
+  done < <(printf '%s' "${grep_output}")
 
   if [[ -n "${violations}" ]]; then
     dybatpho::error "CHANGELOG.md does not follow Keep a Changelog:"
@@ -163,6 +186,7 @@ function __dybatpho_lint_changelog {
 
 # @description Verify the committed documentation still matches what
 #   `scripts/docs.sh` generates from the sources.
+# @noargs
 # @exitcode 0 No drift
 # @exitcode 1 At least one generated document is stale
 function __dybatpho_lint_doc {
@@ -172,12 +196,12 @@ function __dybatpho_lint_doc {
 # @description Regenerate the single-file bundle and let its own smoke test run.
 #   `scripts/bundle.sh` already parses its output and sources it in a pristine
 #   shell; nothing ever invoked it, so those checks never protected anything.
+# @noargs
 # @exitcode 0 The bundle builds and loads
 # @exitcode 1 The bundle is broken
 function __dybatpho_lint_bundle {
   local output
-  output="$(mktemp -t dybatpho-bundle-XXXXXX.sh)"
-  dybatpho::cleanup_file_on_exit "${output}"
+  dybatpho::create_temp output ".sh" "bundle"
   DYBATPHO_FORCE=true "${SCRIPT_DIR}/bundle.sh" --modules all --output "${output}" > /dev/null
   dybatpho::success "Bundle builds and loads"
 }
@@ -185,20 +209,23 @@ function __dybatpho_lint_bundle {
 # @description Validator for `--stage`.
 # @arg $1 string Value to check
 function __dybatpho_lint_is_stage {
-  dybatpho::opts::validate_choice "$1" "all,shell,changelog,doc,bundle" ||
-    dybatpho::die "Unknown stage '$1'. Choose one of: all, shell, changelog, doc, bundle"
+  dybatpho::opts::validate_choice "$1" "all,shell,changelog,doc,bundle" \
+    || dybatpho::die "Unknown stage '$1'. Choose one of: all, shell, changelog, doc, bundle"
 }
 
 # @description Run the requested stages and summarise.
 #   Every stage runs even after one fails, so a single invocation reports the
 #   whole backlog rather than stopping at the first problem.
+# @noargs
 function __dybatpho_lint_run {
+  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${LIST}"; then
     __dybatpho_lint_scripts
     return 0
   fi
 
   local failures=0
+  # shellcheck disable=SC2154 # set by the option spec of this script
   case "${STAGE}" in
     all | shell)
       __dybatpho_lint_syntax || failures=$((failures + 1))
@@ -213,6 +240,7 @@ function __dybatpho_lint_run {
     all | bundle)
       __dybatpho_lint_bundle || failures=$((failures + 1))
       ;;
+    *) ;;
   esac
 
   ((failures)) && dybatpho::die "${failures} lint stage(s) failed"
@@ -220,6 +248,7 @@ function __dybatpho_lint_run {
 }
 
 # @description CLI specification for this script.
+# @noargs
 function _spec {
   dybatpho::opts::setup \
     "Check the repository's own shape: syntax, dyshellint, changelog, docs, bundle" \

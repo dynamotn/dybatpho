@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # @file config_ops.sh
 # @brief Example showing layered configuration and schema validation.
+# @description
+#   Builds a three-layer configuration — a base dotenv file, a per-environment
+#   override and the process environment — then declares a schema and shows
+#   what validation catches. Every file it reads is written into a temporary
+#   directory it removes on exit.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules config
 
@@ -42,10 +47,14 @@ dybatpho::config_validate
 dybatpho::config_export APP_
 
 dybatpho::header "CONFIGURATION"
+# shellcheck disable=SC2154 # set by the option spec of this script
 dybatpho::print "host: ${APP_HOST}"
+# shellcheck disable=SC2154 # set by the option spec of this script
 dybatpho::print "port: ${APP_PORT}"
 dybatpho::print "mode: ${APP_MODE}"
+# shellcheck disable=SC2154 # set by the option spec of this script
 dybatpho::print "region (default): ${APP_REGION}"
+# shellcheck disable=SC2154 # set by the option spec of this script
 dybatpho::print "endpoint (default): ${APP_ENDPOINT}"
 dybatpho::success "Configuration validated"
 

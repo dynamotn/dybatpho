@@ -1,6 +1,13 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it keeps its declarations with the functions they
+# describe.
+# dyshellint disable=BSG050,BSG011,BSG033
 # @file screen.sh
 # @brief Full-screen terminal applications: layout, widgets, and an event loop
+# @namespace dybatpho
 # @description
 #   `tui.sh` draws widgets beside a script's ordinary output. This module takes
 #   the whole terminal instead: it switches to the alternate screen, puts the
@@ -52,8 +59,11 @@
 #   `DYBATPHO_SCREEN_RECT` always holds the whole terminal, and
 #   `dybatpho::screen_layout` splits any rectangle into more of them.
 #
-# @tip Everything is drawn on `/dev/tty` rather than on stdout, so an application can still print a result that a caller captures
-# @tip Character widths are measured against an embedded Unicode table, so CJK text and emoji line up without calling out to another program
+# @tip Everything is drawn on `/dev/tty` rather than on stdout, so an application can still print a result that a caller
+#   captures
+# @tip Character widths are measured against an embedded Unicode table, so CJK text and emoji line up without calling
+#   out
+#   to another program
 # @see
 #   - `example/screen_ops.sh`
 #   - `src/tui.sh`
@@ -94,7 +104,8 @@ DYBATPHO_SCREEN_MOUSE_COLUMN=0
 DYBATPHO_SCREEN_MOUSE_ROW=0
 # @env DYBATPHO_SCREEN_INNER string Rectangle left inside the last block or popup
 DYBATPHO_SCREEN_INNER="0 0 0 0"
-# @env DYBATPHO_SCREEN_OFFSET number Index of the first item the last list or table drew, after it scrolled to keep the selection visible
+# @env DYBATPHO_SCREEN_OFFSET number Index of the first item the last list or table drew, after it scrolled to keep the
+#   selection visible
 DYBATPHO_SCREEN_OFFSET=0
 export DYBATPHO_SCREEN_WIDTH DYBATPHO_SCREEN_HEIGHT DYBATPHO_SCREEN_RECT
 export DYBATPHO_SCREEN_ACTIVE DYBATPHO_SCREEN_INNER DYBATPHO_SCREEN_OFFSET
@@ -220,9 +231,9 @@ readonly __DYBATPHO_SCREEN_ZERO=(
 #######################################
 function __dybatpho_screen_expect_int {
   [[ "${3-}" =~ ^-?[0-9]+$ ]] \
-    || dybatpho::die "${1}: ${2} must be a whole number, got '${3-}'"
+    || dybatpho::die "$1: $2 must be a whole number, got '${3-}'"
   (($3 >= $4)) \
-    || dybatpho::die "${1}: ${2} must be at least ${4}, got '${3}'"
+    || dybatpho::die "$1: $2 must be at least $4, got '$3'"
 }
 
 #######################################
@@ -253,6 +264,7 @@ __dybatpho_screen_byte_indexed=-1
 #   Under a UTF-8 locale a multi-byte character is one index and `printf '%d'`
 #   reports its codepoint; under `C` both count bytes, and a character has to be
 #   reassembled before it can be measured.
+# @noargs
 # @exitcode 0 Bash counts bytes
 # @exitcode 1 Bash counts characters
 #######################################
@@ -327,9 +339,9 @@ function __dybatpho_screen_codepoint_into {
     3) __dybatpho_screen_cp_out=$((__dybatpho_screen_cp_byte & 0x0F)) ;;
     *) __dybatpho_screen_cp_out=$((__dybatpho_screen_cp_byte & 0x07)) ;;
   esac
-  for ((__dybatpho_screen_cp_index = 1;
-    __dybatpho_screen_cp_index < ${#__dybatpho_screen_cp_char};
-    __dybatpho_screen_cp_index++)); do
+  for ((__dybatpho_screen_cp_index = 1;  \
+  __dybatpho_screen_cp_index < ${#__dybatpho_screen_cp_char};  \
+  __dybatpho_screen_cp_index++)); do
     printf -v __dybatpho_screen_cp_byte '%d' \
       "'${__dybatpho_screen_cp_char:__dybatpho_screen_cp_index:1}"
     __dybatpho_screen_cp_out=$(((__dybatpho_screen_cp_out << 6) | (__dybatpho_screen_cp_byte & 0x3F)))
@@ -357,9 +369,9 @@ function __dybatpho_screen_char_width_into {
   __dybatpho_screen_codepoint_into __dybatpho_screen_cw_cp "${__dybatpho_screen_cw_char}"
   __dybatpho_screen_cw_out=1
 
-  for ((__dybatpho_screen_cw_index = 0;
-    __dybatpho_screen_cw_index < ${#__DYBATPHO_SCREEN_ZERO[@]};
-    __dybatpho_screen_cw_index += 2)); do
+  for ((__dybatpho_screen_cw_index = 0;  \
+  __dybatpho_screen_cw_index < ${#__DYBATPHO_SCREEN_ZERO[@]};  \
+  __dybatpho_screen_cw_index += 2)); do
     ((__dybatpho_screen_cw_cp < __DYBATPHO_SCREEN_ZERO[__dybatpho_screen_cw_index])) && break
     if ((__dybatpho_screen_cw_cp <= __DYBATPHO_SCREEN_ZERO[__dybatpho_screen_cw_index + 1])); then
       __dybatpho_screen_cw_out=0
@@ -368,9 +380,9 @@ function __dybatpho_screen_char_width_into {
   done
 
   if ((__dybatpho_screen_cw_out == 1)); then
-    for ((__dybatpho_screen_cw_index = 0;
-      __dybatpho_screen_cw_index < ${#__DYBATPHO_SCREEN_WIDE[@]};
-      __dybatpho_screen_cw_index += 2)); do
+    for ((__dybatpho_screen_cw_index = 0;  \
+    __dybatpho_screen_cw_index < ${#__DYBATPHO_SCREEN_WIDE[@]};  \
+    __dybatpho_screen_cw_index += 2)); do
       ((__dybatpho_screen_cw_cp < __DYBATPHO_SCREEN_WIDE[__dybatpho_screen_cw_index])) && break
       if ((__dybatpho_screen_cw_cp <= __DYBATPHO_SCREEN_WIDE[__dybatpho_screen_cw_index + 1])); then
         __dybatpho_screen_cw_out=2
@@ -585,7 +597,9 @@ function __dybatpho_screen_style_set {
 # @arg $3 string Text to draw, without escape sequences
 # @arg $4 string Optional SGR parameters, default is `0`
 # @exitcode 0 Always, including when the position is off screen
-# @tip Pass the text without escape sequences and give the style separately; a style passed inside the text would break the column arithmetic
+# @tip Pass the text without escape sequences and give the style separately; a style passed inside the text would break
+#   the
+#   column arithmetic
 #######################################
 function dybatpho::screen_put {
   local row="${1:-0}" column="${2:-0}" text="${3-}" style="${4:-0}"
@@ -626,7 +640,9 @@ function dybatpho::screen_put {
     __dybatpho_screen_index_into start_index "${row}" "${column}"
     __dybatpho_screen_index_into end_index "${row}" "$((column + width))"
   fi
-  __dybatpho_screen_text[row]="${__dybatpho_screen_text[row]:0:start_index}${drawn}${__dybatpho_screen_text[row]:end_index}"
+  local head="${__dybatpho_screen_text[row]:0:start_index}"
+  local tail="${__dybatpho_screen_text[row]:end_index}"
+  __dybatpho_screen_text[row]="${head}${drawn}${tail}"
 
   # A row keeps the fast column-to-index path as long as every character it
   # holds spans one column and one index. Comparing the two counts says exactly
@@ -689,11 +705,15 @@ function __dybatpho_screen_render_into {
         __dybatpho_screen_r_start="${__dybatpho_screen_r_previous}"
         __dybatpho_screen_r_stop="${__dybatpho_screen_r_column}"
       else
-        __dybatpho_screen_index_into __dybatpho_screen_r_start "${__dybatpho_screen_r_row}" "${__dybatpho_screen_r_previous}"
-        __dybatpho_screen_index_into __dybatpho_screen_r_stop "${__dybatpho_screen_r_row}" "${__dybatpho_screen_r_column}"
+        __dybatpho_screen_index_into __dybatpho_screen_r_start "${__dybatpho_screen_r_row}" \
+          "${__dybatpho_screen_r_previous}"
+        __dybatpho_screen_index_into __dybatpho_screen_r_stop "${__dybatpho_screen_r_row}" \
+          "${__dybatpho_screen_r_column}"
       fi
       __dybatpho_screen_r_out+=$'\033'"[${__dybatpho_screen_r_previous_style}m"
-      __dybatpho_screen_r_out+="${__dybatpho_screen_text[__dybatpho_screen_r_row]:__dybatpho_screen_r_start:__dybatpho_screen_r_stop - __dybatpho_screen_r_start}"
+      local __dybatpho_screen_r_width=$((__dybatpho_screen_r_stop - __dybatpho_screen_r_start))
+      local __dybatpho_screen_r_line="${__dybatpho_screen_text[__dybatpho_screen_r_row]}"
+      __dybatpho_screen_r_out+="${__dybatpho_screen_r_line:__dybatpho_screen_r_start:__dybatpho_screen_r_width}"
     fi
     __dybatpho_screen_r_previous="${__dybatpho_screen_r_column}"
     __dybatpho_screen_r_previous_style="${__dybatpho_screen_r_style}"
@@ -702,7 +722,8 @@ function __dybatpho_screen_render_into {
   if ((__dybatpho_screen_r_plain)); then
     __dybatpho_screen_r_start="${__dybatpho_screen_r_previous}"
   else
-    __dybatpho_screen_index_into __dybatpho_screen_r_start "${__dybatpho_screen_r_row}" "${__dybatpho_screen_r_previous}"
+    __dybatpho_screen_index_into __dybatpho_screen_r_start "${__dybatpho_screen_r_row}" \
+      "${__dybatpho_screen_r_previous}"
   fi
   __dybatpho_screen_r_out+=$'\033'"[${__dybatpho_screen_r_previous_style}m"
   __dybatpho_screen_r_out+="${__dybatpho_screen_text[__dybatpho_screen_r_row]:__dybatpho_screen_r_start}"
@@ -772,7 +793,8 @@ function dybatpho::screen_size {
 # @noargs
 # @stderr Nothing; the frame goes to the terminal directly
 # @exitcode 0 Always
-# @tip A frame costs what changed: redrawing a screen where one list row moved sends one or two rows, not the whole screen
+# @tip A frame costs what changed: redrawing a screen where one list row moved sends one or two rows, not the whole
+#   screen
 #######################################
 function dybatpho::screen_flush {
   local row rendered key out=""
@@ -847,7 +869,8 @@ function dybatpho::screen_rect {
 # @arg $@ string One constraint per part
 # @set The named array, one rectangle per constraint, in order
 # @exitcode 1 The direction is unknown, or a constraint is malformed
-# @tip A part can come out zero-sized when the rectangle is too small for its constraints; a widget drawn into it simply draws nothing
+# @tip A part can come out zero-sized when the rectangle is too small for its constraints; a widget drawn into it simply
+#   draws nothing
 #######################################
 function dybatpho::screen_layout {
   local result_var direction rect
@@ -906,7 +929,8 @@ function dybatpho::screen_layout {
         weights[index]="${value}"
         ;;
       *)
-        dybatpho::die "${FUNCNAME[0]}: Unknown constraint '${constraint}', expected length:, percent:, ratio:, min:, max: or fill:"
+        dybatpho::die \
+          "${FUNCNAME[0]}: Unknown constraint '${constraint}', expected length:, percent:, ratio:, min:, max: or fill:"
         ;;
     esac
     fixed=$((fixed + sizes[index]))
@@ -1020,13 +1044,15 @@ function dybatpho::screen_rect_center {
 
   ((want_width <= width)) || want_width="${width}"
   ((want_height <= height)) || want_height="${height}"
-  __dybatpho_screen_c_out="$((x + (width - want_width) / 2)) $((y + (height - want_height) / 2)) ${want_width} ${want_height}"
+  __dybatpho_screen_c_out="$((x + (width - want_width) / 2)) $((y + (height - want_height) / 2))"
+  __dybatpho_screen_c_out+=" ${want_width} ${want_height}"
   return 0
 }
 
 #######################################
 # @description Note that the terminal changed size, so the next event reports it.
 #######################################
+# @noargs
 function __dybatpho_screen_on_resize {
   __dybatpho_screen_resized=true
 }
@@ -1136,7 +1162,8 @@ function dybatpho::screen_end {
 # @set DYBATPHO_SCREEN_MOUSE_ROW number Zero-based row of a mouse event
 # @exitcode 0 An event was read
 # @exitcode 1 The timeout passed with no event, and the variable is set to `timeout`
-# @tip A resize is delivered as an event rather than acted on, so an application redraws at a moment of its choosing instead of in the middle of a frame
+# @tip A resize is delivered as an event rather than acted on, so an application redraws at a moment of its choosing
+#   instead of in the middle of a frame
 #######################################
 function dybatpho::screen_event {
   dybatpho::expect_ref "$1"
@@ -1220,6 +1247,7 @@ function __dybatpho_screen_read_escape {
         D) __dybatpho_screen_esc_out="left" ;;
         H) __dybatpho_screen_esc_out="home" ;;
         F) __dybatpho_screen_esc_out="end" ;;
+        *) ;;
       esac
       return 0
       ;;
@@ -1233,6 +1261,7 @@ function __dybatpho_screen_read_escape {
     __dybatpho_screen_esc_body+="${__dybatpho_screen_esc_char}"
     case "${__dybatpho_screen_esc_char}" in
       [A-Za-z~]) break ;;
+      *) ;;
     esac
     ((${#__dybatpho_screen_esc_body} < 32)) || break
   done
@@ -1251,6 +1280,7 @@ function __dybatpho_screen_read_escape {
     '<'*)
       __dybatpho_screen_parse_mouse __dybatpho_screen_esc_out "${__dybatpho_screen_esc_body}"
       ;;
+    *) ;;
   esac
   return 0
   # kcov(enabled)
@@ -1323,6 +1353,7 @@ function __dybatpho_screen_options {
       *:*)
         __dybatpho_screen_o_out["${__dybatpho_screen_o_item%%:*}"]="${__dybatpho_screen_o_item#*:}"
         ;;
+      *) ;;
     esac
   done
 }
@@ -1405,7 +1436,8 @@ function __dybatpho_screen_align_into {
 # @arg $@ string Options: `title:`, `border:`, `style:`, `title_style:`, `align:`
 # @set DYBATPHO_SCREEN_INNER string The rectangle inside the border
 # @exitcode 0 Always, including when the rectangle is too small to draw
-# @tip `border:` takes `plain`, `rounded`, `double`, `thick`, or `none`; `none` still reserves no space, so the inner rectangle is the whole one
+# @tip `border:` takes `plain`, `rounded`, `double`, `thick`, or `none`; `none` still reserves no space, so the inner
+#   rectangle is the whole one
 #######################################
 function dybatpho::screen_block {
   local rect="${1-}"
@@ -1559,7 +1591,8 @@ function dybatpho::screen_text {
 # @arg $@ string Options: `selected:`, `offset:`, `style:`, `selected_style:`, `pointer:`
 # @set DYBATPHO_SCREEN_OFFSET number Index of the first item drawn
 # @exitcode 0 Always
-# @tip Pass `pointer:false` for a list that marks the selection by highlight alone, which reads better in a narrow column
+# @tip Pass `pointer:false` for a list that marks the selection by highlight alone, which reads better in a narrow
+#   column
 #######################################
 function dybatpho::screen_list {
   # Every local here is namespaced because the function binds a nameref to a
@@ -1581,7 +1614,8 @@ function dybatpho::screen_list {
   local __dybatpho_screen_l_count=${#__dybatpho_screen_l_items[@]}
   local __dybatpho_screen_l_selected="${__dybatpho_screen_l_options[selected]:--1}"
   local __dybatpho_screen_l_style="${__dybatpho_screen_l_options[style]:-0}"
-  local __dybatpho_screen_l_selected_style="${__dybatpho_screen_l_options[selected_style]:-${DYBATPHO_SCREEN_STYLE_SELECTED}}"
+  local __dybatpho_screen_l_selected_style
+  __dybatpho_screen_l_selected_style="${__dybatpho_screen_l_options[selected_style]:-${DYBATPHO_SCREEN_STYLE_SELECTED}}"
   local __dybatpho_screen_l_pointer="${__dybatpho_screen_l_options[pointer]:-true}"
   local __dybatpho_screen_l_offset="${__dybatpho_screen_l_options[offset]:-0}"
 
@@ -1592,17 +1626,17 @@ function dybatpho::screen_list {
       && __dybatpho_screen_l_offset=$((__dybatpho_screen_l_selected - __dybatpho_screen_l_height + 1))
   fi
   ((__dybatpho_screen_l_offset >= 0)) || __dybatpho_screen_l_offset=0
-  ((__dybatpho_screen_l_count > __dybatpho_screen_l_height
-    && __dybatpho_screen_l_offset > __dybatpho_screen_l_count - __dybatpho_screen_l_height)) \
+  ((__dybatpho_screen_l_count > __dybatpho_screen_l_height && \
+  __dybatpho_screen_l_offset > __dybatpho_screen_l_count - __dybatpho_screen_l_height)) \
     && __dybatpho_screen_l_offset=$((__dybatpho_screen_l_count - __dybatpho_screen_l_height))
   ((__dybatpho_screen_l_offset >= 0)) || __dybatpho_screen_l_offset=0
   DYBATPHO_SCREEN_OFFSET="${__dybatpho_screen_l_offset}"
 
   local __dybatpho_screen_l_index __dybatpho_screen_l_source
   local __dybatpho_screen_l_marker __dybatpho_screen_l_padded __dybatpho_screen_l_row_style
-  for ((__dybatpho_screen_l_index = 0;
-    __dybatpho_screen_l_index < __dybatpho_screen_l_height;
-    __dybatpho_screen_l_index++)); do
+  for ((__dybatpho_screen_l_index = 0;  \
+  __dybatpho_screen_l_index < __dybatpho_screen_l_height;  \
+  __dybatpho_screen_l_index++)); do
     __dybatpho_screen_l_source=$((__dybatpho_screen_l_offset + __dybatpho_screen_l_index))
     ((__dybatpho_screen_l_source < __dybatpho_screen_l_count)) || break
     __dybatpho_screen_l_marker=""
@@ -1680,16 +1714,23 @@ function dybatpho::screen_table {
     widths[column_count - 1]=$((width - each * (column_count - 1)))
   fi
 
-  __dybatpho_screen_table_row_into() {
+  #######################################
+  # @description Render one row of the table into a caller-named variable,
+  #   padding each cell to the width the column was measured at.
+  # @arg $1 string Name of the variable to write into
+  # @arg $2 string The row, with its cells separated by the delimiter
+  # @set The named variable
+  #######################################
+  function __dybatpho_screen_table_row_into {
     local -n __dybatpho_screen_tr_out="$1"
     local __dybatpho_screen_tr_line="$2"
     local -a __dybatpho_screen_tr_cells=()
     local __dybatpho_screen_tr_index __dybatpho_screen_tr_piece
     IFS="${delimiter}" read -r -a __dybatpho_screen_tr_cells <<< "${__dybatpho_screen_tr_line}"
     __dybatpho_screen_tr_out=""
-    for ((__dybatpho_screen_tr_index = 0;
-      __dybatpho_screen_tr_index < column_count;
-      __dybatpho_screen_tr_index++)); do
+    for ((__dybatpho_screen_tr_index = 0;  \
+    __dybatpho_screen_tr_index < column_count;  \
+    __dybatpho_screen_tr_index++)); do
       __dybatpho_screen_align_into __dybatpho_screen_tr_piece \
         "${__dybatpho_screen_tr_cells[__dybatpho_screen_tr_index]-}" \
         "${widths[__dybatpho_screen_tr_index]:-0}" left
@@ -1904,11 +1945,11 @@ function dybatpho::screen_sparkline {
 
   local -a levels=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █)
   local maximum="${options[max]:-0}"
-  local value
+  local point
   if ((maximum <= 0)); then
-    for value in ${__dybatpho_screen_spark_data[@]+"${__dybatpho_screen_spark_data[@]}"}; do
-      [[ "${value}" =~ ^-?[0-9]+$ ]] || continue
-      ((value > maximum)) && maximum="${value}"
+    for point in ${__dybatpho_screen_spark_data[@]+"${__dybatpho_screen_spark_data[@]}"}; do
+      [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
+      ((point > maximum)) && maximum="${point}"
     done
   fi
   ((maximum > 0)) || maximum=1
@@ -1921,10 +1962,10 @@ function dybatpho::screen_sparkline {
 
   local line="" index level
   for ((index = first; index < count; index++)); do
-    value="${__dybatpho_screen_spark_data[index]}"
-    [[ "${value}" =~ ^-?[0-9]+$ ]] || value=0
-    ((value >= 0)) || value=0
-    level=$((value * 7 / maximum))
+    point="${__dybatpho_screen_spark_data[index]}"
+    [[ "${point}" =~ ^-?[0-9]+$ ]] || point=0
+    ((point >= 0)) || point=0
+    level=$((point * 7 / maximum))
     ((level <= 7)) || level=7
     line+="${levels[level]}"
   done
@@ -1942,7 +1983,8 @@ function dybatpho::screen_sparkline {
 # @arg $2 string Name of the array holding the values
 # @arg $@ string Options: `labels:` naming an array, `style:`, `label_width:`, `max:`
 # @exitcode 0 Always
-# @tip Bars are drawn with eighth-width blocks, so a bar is accurate to an eighth of a column rather than rounded to a whole one
+# @tip Bars are drawn with eighth-width blocks, so a bar is accurate to an eighth of a column rather than rounded to a
+#   whole one
 #######################################
 function dybatpho::screen_barchart {
   local rect="${1-}" data_var="${2-}"
@@ -1961,11 +2003,11 @@ function dybatpho::screen_barchart {
     __dybatpho_screen_copy_array __dybatpho_screen_bar_names "${options[labels]}"
   fi
 
-  local maximum="${options[max]:-0}" value
+  local maximum="${options[max]:-0}" point
   if ((maximum <= 0)); then
-    for value in ${__dybatpho_screen_bar_data[@]+"${__dybatpho_screen_bar_data[@]}"}; do
-      [[ "${value}" =~ ^-?[0-9]+$ ]] || continue
-      ((value > maximum)) && maximum="${value}"
+    for point in ${__dybatpho_screen_bar_data[@]+"${__dybatpho_screen_bar_data[@]}"}; do
+      [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
+      ((point > maximum)) && maximum="${point}"
     done
   fi
   ((maximum > 0)) || maximum=1
@@ -1973,8 +2015,8 @@ function dybatpho::screen_barchart {
   local label_width="${options[label_width]:-0}"
   if ((label_width == 0)) && ((${#__dybatpho_screen_bar_names[@]} > 0)); then
     local measured
-    for value in "${__dybatpho_screen_bar_names[@]}"; do
-      __dybatpho_screen_width_into measured "${value}"
+    for point in "${__dybatpho_screen_bar_names[@]}"; do
+      __dybatpho_screen_width_into measured "${point}"
       ((measured > label_width)) && label_width="${measured}"
     done
     label_width=$((label_width + 1))
@@ -1988,14 +2030,14 @@ function dybatpho::screen_barchart {
 
   local index padded filled remainder bar cell
   for ((index = 0; index < height && index < ${#__dybatpho_screen_bar_data[@]}; index++)); do
-    value="${__dybatpho_screen_bar_data[index]}"
-    [[ "${value}" =~ ^-?[0-9]+$ ]] || value=0
-    ((value >= 0)) || value=0
+    point="${__dybatpho_screen_bar_data[index]}"
+    [[ "${point}" =~ ^-?[0-9]+$ ]] || point=0
+    ((point >= 0)) || point=0
     if ((label_width > 0)); then
       __dybatpho_screen_align_into padded "${__dybatpho_screen_bar_names[index]-}" "$((label_width - 1))" left
       dybatpho::screen_put "$((y + index))" "${x}" "${padded} " "0"
     fi
-    local eighth_total=$((value * bar_width * 8 / maximum))
+    local eighth_total=$((point * bar_width * 8 / maximum))
     filled=$((eighth_total / 8))
     remainder=$((eighth_total % 8))
     bar=""
@@ -2018,6 +2060,7 @@ declare -ga __dybatpho_screen_braille=()
 #   from `\Uxxxxxxxx` escapes first and expanded in one call, rather than
 #   calling out once per character.
 #######################################
+# @noargs
 function __dybatpho_screen_braille_table {
   ((${#__dybatpho_screen_braille[@]} == 0)) || return 0
   local format="" index piece
@@ -2051,7 +2094,9 @@ function __dybatpho_screen_braille_table {
 # @arg $2 string Name of the array holding the values
 # @arg $@ string Options: `style:`, `max:`, `min:`
 # @exitcode 0 Always
-# @tip A rectangle of 40x10 is 400 cells and costs a few milliseconds; a full-screen chart is where this model stops being cheap
+# @tip A rectangle of 40x10 is 400 cells and costs a few milliseconds; a full-screen chart is where this model stops
+#   being
+#   cheap
 #######################################
 function dybatpho::screen_chart {
   local rect="${1-}" data_var="${2-}"
@@ -2069,16 +2114,16 @@ function dybatpho::screen_chart {
 
   __dybatpho_screen_braille_table
 
-  local value minimum="${options[min]:-0}" maximum="${options[max]:-0}"
+  local point minimum="${options[min]:-0}" maximum="${options[max]:-0}"
   local have_range=0
   [[ -n "${options[max]-}" ]] && have_range=1
   if ((have_range == 0)); then
     maximum="${__dybatpho_screen_chart_data[0]}"
     minimum="${maximum}"
-    for value in "${__dybatpho_screen_chart_data[@]}"; do
-      [[ "${value}" =~ ^-?[0-9]+$ ]] || continue
-      ((value > maximum)) && maximum="${value}"
-      ((value < minimum)) && minimum="${value}"
+    for point in "${__dybatpho_screen_chart_data[@]}"; do
+      [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
+      ((point > maximum)) && maximum="${point}"
+      ((point < minimum)) && minimum="${point}"
     done
   fi
   ((maximum > minimum)) || maximum=$((minimum + 1))
@@ -2095,10 +2140,10 @@ function dybatpho::screen_chart {
   # nothing between them, which reads as noise instead of as a line.
   local previous_x=-1 previous_y=0 step_x step_y span
   for ((index = 0; index < count; index++)); do
-    value="${__dybatpho_screen_chart_data[index]}"
-    [[ "${value}" =~ ^-?[0-9]+$ ]] || continue
+    point="${__dybatpho_screen_chart_data[index]}"
+    [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
     dot_x=$((count > 1 ? index * (dots_x - 1) / (count - 1) : 0))
-    dot_y=$(((maximum - value) * (dots_y - 1) / (maximum - minimum)))
+    dot_y=$(((maximum - point) * (dots_y - 1) / (maximum - minimum)))
     ((dot_y >= 0)) || dot_y=0
     ((dot_y < dots_y)) || dot_y=$((dots_y - 1))
 

@@ -13,6 +13,8 @@ dybatpho::register_common_handlers
 # Run in dry-run mode so no actual requests are sent
 export DRY_RUN=true
 
+# @description Run the `SLACK` section of this example.
+# @noargs
 function _demo_slack {
   dybatpho::header "SLACK"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T000/B000/xxxx"
@@ -20,6 +22,8 @@ function _demo_slack {
   dybatpho::info "Slack notification dispatched"
 }
 
+# @description Run the `TELEGRAM` section of this example.
+# @noargs
 function _demo_telegram {
   dybatpho::header "TELEGRAM"
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234"
@@ -29,6 +33,8 @@ function _demo_telegram {
   dybatpho::info "Telegram notifications dispatched"
 }
 
+# @description Run the `MICROSOFT TEAMS` section of this example.
+# @noargs
 function _demo_teams {
   dybatpho::header "MICROSOFT TEAMS"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/xxx"
@@ -37,6 +43,8 @@ function _demo_teams {
   dybatpho::info "Teams notifications dispatched"
 }
 
+# @description Run the `GOOGLE CHAT` section of this example.
+# @noargs
 function _demo_google_chat {
   dybatpho::header "GOOGLE CHAT"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/xxx/messages?key=yyy&token=zzz"
@@ -44,6 +52,8 @@ function _demo_google_chat {
   dybatpho::info "Google Chat notification dispatched"
 }
 
+# @description Run the `DISCORD` section of this example.
+# @noargs
 function _demo_discord {
   dybatpho::header "DISCORD"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/000/xxx"
@@ -52,12 +62,16 @@ function _demo_discord {
   dybatpho::info "Discord notifications dispatched"
 }
 
+# @description Run the `GENERIC WEBHOOK` section of this example.
+# @noargs
 function _demo_webhook {
   dybatpho::header "GENERIC WEBHOOK"
   dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy","status":"ok"}'
   dybatpho::info "Generic webhook notification dispatched"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_slack
   _demo_telegram

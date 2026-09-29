@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 # @file cache.sh
 # @brief Utilities for remembering an answer on disk until it goes stale
+# @namespace dybatpho
 # @description
 #   A script that asks a slow question more than once -- an API listing, a
 #   dependency resolution, a `--version` probe across a fleet -- ends up writing
@@ -29,7 +30,8 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_CACHE_DIR string Directory holding cache entries, default is the XDG cache directory for `dybatpho`
-# @env DYBATPHO_CACHE_NAMESPACE string Subdirectory grouping related entries, default is `default`; empty puts entries directly in the cache directory
+# @env DYBATPHO_CACHE_NAMESPACE string Subdirectory grouping related entries, default is `default`; empty puts entries
+#   directly in the cache directory
 # @env DYBATPHO_CACHE_TTL number Seconds an entry stays fresh when a call does not say, default is `3600`
 DYBATPHO_CACHE_DIR="${DYBATPHO_CACHE_DIR:-$(dybatpho::xdg_cache_dir dybatpho)}"
 DYBATPHO_CACHE_NAMESPACE="${DYBATPHO_CACHE_NAMESPACE-default}"
@@ -49,6 +51,7 @@ __DYBATPHO_CACHE_KEY_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 # @description Print the directory entries are written to.
 #   This is `DYBATPHO_CACHE_DIR` with the namespace below it, or the cache
 #   directory itself when the namespace is empty.
+# @noargs
 # @example
 #   dybatpho::cache_dir                                   # ~/.cache/dybatpho/default
 #   DYBATPHO_CACHE_NAMESPACE=gh dybatpho::cache_dir        # ~/.cache/dybatpho/gh
@@ -98,7 +101,9 @@ function dybatpho::cache_path {
   dybatpho::expect_args key -- "$@"
   [[ "${key}" =~ ${__DYBATPHO_CACHE_KEY_REGEX} ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${key}' cannot be a file name; hash it with dybatpho::cache_key"
-  printf '%s/%s%s\n' "$(dybatpho::cache_dir)" "${key}" "${__DYBATPHO_CACHE_SUFFIX}"
+  local cache_dir
+  cache_dir=$(dybatpho::cache_dir)
+  printf '%s/%s%s\n' "${cache_dir}" "${key}" "${__DYBATPHO_CACHE_SUFFIX}"
 }
 
 #######################################
@@ -177,6 +182,7 @@ function dybatpho::cache_set {
   path="$(dybatpho::cache_path "${key}")" || return 1
   # A dry run creates no directory, and `dybatpho::file_write_atomic` requires
   # one before it looks at `DRY_RUN`, so the report is made here instead.
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
     # Drain standard input, so that whatever is feeding this is not cut off by
     # a closed pipe.
@@ -196,7 +202,9 @@ function dybatpho::cache_set {
   # `dybatpho::ensure_dir` prints the directory it made sure of, and this
   # function is on the writing end of a pipe: that path would be read as part
   # of what the caller stored.
-  dybatpho::ensure_dir "$(dybatpho::cache_dir)" 700 > /dev/null || status=$?
+  local cache_dir
+  cache_dir=$(dybatpho::cache_dir)
+  dybatpho::ensure_dir "${cache_dir}" 700 > /dev/null || status=$?
   if ((status == 0)); then
     dybatpho::file_write_atomic "${path}" || status=$?
   fi
@@ -303,7 +311,7 @@ function dybatpho::cache_run {
     return 0
   fi
 
-  dybatpho::debug "cache: miss ${key}, running ${1}"
+  dybatpho::debug "cache: miss ${key}, running $1"
   local output status=0
   output="$("$@")" || status=$?
   if ((status != 0)); then

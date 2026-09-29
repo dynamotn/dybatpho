@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# keeps its declarations with the functions they describe.
+# dyshellint disable=BSG050,BSG033
 # @file string.sh
 # @brief Utilities for working with string
+# @namespace dybatpho
 # @description
 #   This module contains helpers for trimming, splitting, matching, replacing,
 #   trimming exact prefixes/suffixes and characters, slugifying, truncating,
@@ -159,6 +164,7 @@ declare -gA __DYBATPHO_STRING_ASCII=()
 
 #######################################
 # @description Fill the transliteration table, once, when the module loads.
+# @noargs
 # @set __DYBATPHO_STRING_ASCII
 #######################################
 function __dybatpho_string_build_ascii {
@@ -400,11 +406,11 @@ function dybatpho::string_pad {
   dybatpho::expect_args input width -- "$@"
   pad_token="${3:- }"
   local padded="${input}"
-  if [ "${#padded}" -ge "${width}" ]; then
+  if [[ "${#padded}" -ge "${width}" ]]; then
     printf '%s\n' "${padded}"
     return 0
   fi
-  while [ "${#padded}" -lt "${width}" ]; do
+  while [[ "${#padded}" -lt "${width}" ]]; do
     padded="${padded}${pad_token}"
   done
   printf '%s\n' "${padded:0:${width}}"

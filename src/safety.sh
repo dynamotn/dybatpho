@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# parses its own arguments, so the raw form is what the reader sees.
+# dyshellint disable=BSG050,BSG051
 # @file safety.sh
 # @brief Guards for destructive operations
+# @namespace dybatpho
 # @description
 #   Wrappers that make irreversible operations explicit before they run:
 #
@@ -47,7 +52,8 @@
 #   ```
 # @see
 #   - `example/safety_ops.sh`
-# @tip Confine a whole script with `DYBATPHO_SAFE_ROOTS="${workdir}"` so a bad path can never reach the rest of the filesystem.
+# @tip Confine a whole script with `DYBATPHO_SAFE_ROOTS="${workdir}"` so a bad path can never reach the rest of the
+#   filesystem.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_FORCE bool Set to `true` to approve every guarded operation without prompting
@@ -61,6 +67,7 @@ DYBATPHO_PROTECTED_PATHS="${DYBATPHO_PROTECTED_PATHS:-}"
 
 #######################################
 # @description Print every path that guarded operations must never touch.
+# @noargs
 # @stdout One protected absolute path per line
 #######################################
 function __dybatpho_safety_protected_paths {
@@ -132,6 +139,7 @@ function __dybatpho_safety_strip_entry {
 
 #######################################
 # @description Return success when the script can ask the user a question.
+# @noargs
 # @exitcode 0 Input is attached to a terminal, or `DYBATPHO_INTERACTIVE` forces interactive mode
 # @exitcode 1 The script runs unattended
 # @env DYBATPHO_INTERACTIVE string `auto` detects a terminal on stdin, `true`/`false` override the detection
@@ -202,10 +210,12 @@ function dybatpho::assert_safe_path {
 
   local absolute_path protected_path
   absolute_path="$(__dybatpho_safety_absolute_path "${path}")"
-  while IFS= read -r protected_path; do
+  local safety_protected_paths_output
+  safety_protected_paths_output=$(__dybatpho_safety_protected_paths)
+  while IFS= read -r protected_path || [[ -n "${protected_path}" ]]; do
     [[ "${absolute_path}" != "${protected_path}" ]] \
       || dybatpho::die "Refusing to touch protected ${description}: ${absolute_path}"
-  done < <(__dybatpho_safety_protected_paths)
+  done < <(printf '%s' "${safety_protected_paths_output}")
 
   if [[ -n "${DYBATPHO_SAFE_ROOTS}" ]]; then
     local -a roots=()
@@ -338,7 +348,9 @@ function __dybatpho_safety_transfer_target {
   local source_path destination
   dybatpho::expect_args source_path destination -- "$@"
   if dybatpho::is dir "${destination}"; then
-    printf '%s\n' "${destination%/}/$(dybatpho::path_basename "${source_path}")"
+    local path_basename
+    path_basename=$(dybatpho::path_basename "${source_path}")
+    printf '%s\n' "${destination%/}/${path_basename}"
   else
     printf '%s\n' "${destination}"
   fi
@@ -464,7 +476,9 @@ function dybatpho::safe_extract {
 
   local entry stripped_entry target_path
   local -a collisions=()
-  while IFS= read -r entry; do
+  local archive_list_output
+  archive_list_output=$(dybatpho::archive_list "${archive_path}")
+  while IFS= read -r entry || [[ -n "${entry}" ]]; do
     [[ -n "${entry}" ]] || continue
     __dybatpho_archive_entry_is_safe "${entry}" \
       || dybatpho::die "Refusing to extract entry outside ${destination_path}: ${entry}"
@@ -476,7 +490,7 @@ function dybatpho::safe_extract {
     if dybatpho::is exist "${target_path}" && ! dybatpho::is dir "${target_path}"; then
       collisions+=("${stripped_entry}")
     fi
-  done < <(dybatpho::archive_list "${archive_path}")
+  done < <(printf '%s' "${archive_list_output}")
 
   if ((${#collisions[@]})); then
     if ! __dybatpho_safety_approve "${force}" \

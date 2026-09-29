@@ -1,6 +1,12 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break.
+# dyshellint disable=BSG050,BSG011
 # @file tui.sh
 # @brief Interactive terminal widgets: spinners, progress bars, menus, and confirmations
+# @namespace dybatpho
 # @description
 #   `cli.sh` turns a declarative spec into a parser, a help screen, and
 #   completions -- everything a command line needs before it runs. This module
@@ -21,21 +27,28 @@
 #   the menus remain usable in a command substitution and the progress of a
 #   pipeline never lands in its own output.
 #
-# @tip `DYBATPHO_TUI=never` forces the fallback rendering everywhere, which is what a CI job wants; `DYBATPHO_TUI=always` forces the drawn one, which is what a demo recording wants
-# @tip A menu asks through `dybatpho::prompt` when it cannot draw, so feeding `2` to the script answers it the same way pressing `enter` on the second entry does -- with a redirect rather than a pipe, which would run the call in a subshell and lose the answer with it
+# @tip `DYBATPHO_TUI=never` forces the fallback rendering everywhere, which is what a CI job wants;
+#   `DYBATPHO_TUI=always`
+#   forces the drawn one, which is what a demo recording wants
+# @tip A menu asks through `dybatpho::prompt` when it cannot draw, so feeding `2` to the script answers it the same way
+#   pressing `enter` on the second entry does -- with a redirect rather than a pipe, which would run the call in a
+#   subshell and lose the answer with it
 # @see
 #   - `example/tui_ops.sh`
 #   - `src/cli.sh`
 #   - `src/safety.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_TUI string When widgets draw in place (`auto|always|never`). `auto` draws only when both stdin and stderr are terminals. Default `auto`
+# @env DYBATPHO_TUI string When widgets draw in place (`auto|always|never`). `auto` draws only when both stdin and
+#   stderr
+#   are terminals. Default `auto`
 DYBATPHO_TUI="${DYBATPHO_TUI:-auto}"
 export DYBATPHO_TUI
 # @env DYBATPHO_TUI_INTERVAL string Seconds between spinner frames. Default is `DYBATPHO_SPINNER_INTERVAL`
 DYBATPHO_TUI_INTERVAL="${DYBATPHO_TUI_INTERVAL:-${DYBATPHO_SPINNER_INTERVAL:-0.1}}"
 export DYBATPHO_TUI_INTERVAL
-# @env DYBATPHO_TUI_FRAMES string Space-separated frames the spinner cycles through. Default is `DYBATPHO_SPINNER_FRAMES`
+# @env DYBATPHO_TUI_FRAMES string Space-separated frames the spinner cycles through. Default is
+#   `DYBATPHO_SPINNER_FRAMES`
 DYBATPHO_TUI_FRAMES="${DYBATPHO_TUI_FRAMES:-${DYBATPHO_SPINNER_FRAMES:-⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏}}"
 export DYBATPHO_TUI_FRAMES
 # @env DYBATPHO_TUI_BAR_WIDTH number Width of a progress bar in columns when none is given. Default `30`
@@ -47,7 +60,9 @@ export DYBATPHO_TUI_BAR_FILLED
 # @env DYBATPHO_TUI_BAR_EMPTY string Character drawn for the remaining part of a bar. Default `░`
 DYBATPHO_TUI_BAR_EMPTY="${DYBATPHO_TUI_BAR_EMPTY:-░}"
 export DYBATPHO_TUI_BAR_EMPTY
-# @env DYBATPHO_TUI_PROGRESS_STEP number Percentage granularity of the progress lines logged when there is no terminal to draw on. `0` logs every update. Default `10`
+# @env DYBATPHO_TUI_PROGRESS_STEP number Percentage granularity of the progress lines logged when there is no terminal
+#   to
+#   draw on. `0` logs every update. Default `10`
 DYBATPHO_TUI_PROGRESS_STEP="${DYBATPHO_TUI_PROGRESS_STEP:-10}"
 export DYBATPHO_TUI_PROGRESS_STEP
 # @env DYBATPHO_TUI_POINTER string Marker drawn beside the highlighted menu entry. Default `❯`
@@ -62,7 +77,9 @@ export DYBATPHO_TUI_UNCHECKED
 # @env DYBATPHO_TUI_MENU_HEIGHT number Entries a drawn menu shows at once before it scrolls. Default `10`
 DYBATPHO_TUI_MENU_HEIGHT="${DYBATPHO_TUI_MENU_HEIGHT:-10}"
 export DYBATPHO_TUI_MENU_HEIGHT
-# @env DYBATPHO_TUI_DEFAULT string Comma-separated 1-based entries a menu starts on, and the answer it uses when the script cannot ask at all. Empty means no default, and a menu that cannot ask then fails instead of choosing
+# @env DYBATPHO_TUI_DEFAULT string Comma-separated 1-based entries a menu starts on, and the answer it uses when the
+#   script
+#   cannot ask at all. Empty means no default, and a menu that cannot ask then fails instead of choosing
 DYBATPHO_TUI_DEFAULT="${DYBATPHO_TUI_DEFAULT:-}"
 export DYBATPHO_TUI_DEFAULT
 
@@ -148,6 +165,7 @@ function __dybatpho_tui_repeat_into {
 #   A script killed mid-menu would otherwise leave the terminal with no cursor,
 #   and that outlives the script: it has to be undone by hand afterwards.
 #######################################
+# @noargs
 function __dybatpho_tui_hide_cursor {
   # kcov(disabled)
   dybatpho::tui_supported || return 0
@@ -162,6 +180,7 @@ function __dybatpho_tui_hide_cursor {
 
 #######################################
 # @description Show the cursor again, if a widget hid it.
+# @noargs
 # @exitcode 0 Always, so it cannot change the exit status of a trap
 #######################################
 function __dybatpho_tui_show_cursor {
@@ -186,6 +205,7 @@ function __dybatpho_tui_draw_line {
 # @description Erase the current line on stderr and leave the cursor at its
 #   start, so the next output begins on a clean column.
 #######################################
+# @noargs
 function __dybatpho_tui_erase_line {
   printf '\r\033[K' >&2
 }
@@ -222,9 +242,9 @@ function __dybatpho_tui_duration_into {
 #######################################
 function __dybatpho_tui_expect_int {
   [[ "${3-}" =~ ^-?[0-9]+$ ]] \
-    || dybatpho::die "${1}: ${2} must be a whole number, got '${3-}'"
+    || dybatpho::die "$1: $2 must be a whole number, got '${3-}'"
   (($3 >= $4)) \
-    || dybatpho::die "${1}: ${2} must be at least ${4}, got '${3}'"
+    || dybatpho::die "$1: $2 must be at least $4, got '$3'"
 }
 
 #######################################
@@ -245,7 +265,9 @@ function __dybatpho_tui_expect_int {
 # @exitcode 1 An argument is not a whole number, or is out of range
 # @env DYBATPHO_TUI_BAR_FILLED string Character drawn for the completed part
 # @env DYBATPHO_TUI_BAR_EMPTY string Character drawn for the remaining part
-# @tip The bar carries no carriage return of its own, so it composes with a label and can be written to a file as readily as to a terminal
+# @tip The bar carries no carriage return of its own, so it composes with a label and can be written to a file as
+#   readily
+#   as to a terminal
 #######################################
 function dybatpho::tui_bar {
   local current total
@@ -458,7 +480,8 @@ function __dybatpho_tui_progress_render {
   fi
 
   # kcov(disabled)
-  local elapsed_ms=$(($(__dybatpho_log_now_ms) - __dybatpho_tui_progress_started_ms))
+  local elapsed_ms
+  elapsed_ms=$(($(__dybatpho_log_now_ms) - __dybatpho_tui_progress_started_ms))
   ((elapsed_ms >= 0)) || elapsed_ms=0
   local timing=""
   if ((current > 0 && current < total)); then
@@ -708,7 +731,9 @@ function __dybatpho_tui_menu_fallback {
       ((__dybatpho_tui_fb_token >= 1 && __dybatpho_tui_fb_token <= ${#__dybatpho_tui_fb_items[@]})) || continue
       __dybatpho_tui_fb_wanted["${__dybatpho_tui_fb_token}"]=1
     done
-    for ((__dybatpho_tui_fb_index = 1; __dybatpho_tui_fb_index <= ${#__dybatpho_tui_fb_items[@]}; __dybatpho_tui_fb_index++)); do
+    for ((__dybatpho_tui_fb_index = 1;  \
+    __dybatpho_tui_fb_index <= ${#__dybatpho_tui_fb_items[@]};  \
+    __dybatpho_tui_fb_index++)); do
       [[ -n "${__dybatpho_tui_fb_wanted[${__dybatpho_tui_fb_index}]-}" ]] || continue
       __dybatpho_tui_fb_chosen+=("${__dybatpho_tui_fb_index}")
     done
@@ -770,7 +795,9 @@ function __dybatpho_tui_menu_interactive {
   local -a __dybatpho_tui_menu_checked=() __dybatpho_tui_menu_defaults=()
   local __dybatpho_tui_menu_index
 
-  for ((__dybatpho_tui_menu_index = 0; __dybatpho_tui_menu_index < __dybatpho_tui_menu_count; __dybatpho_tui_menu_index++)); do
+  for ((__dybatpho_tui_menu_index = 0;  \
+  __dybatpho_tui_menu_index < __dybatpho_tui_menu_count;  \
+  __dybatpho_tui_menu_index++)); do
     __dybatpho_tui_menu_checked[__dybatpho_tui_menu_index]=0
   done
   __dybatpho_tui_defaults_into __dybatpho_tui_menu_defaults "${__dybatpho_tui_menu_count}"
@@ -826,9 +853,9 @@ function __dybatpho_tui_menu_interactive {
       "${__dybatpho_tui_menu_prompt}" "${__dybatpho_tui_menu_reset}" >&2
     __dybatpho_tui_menu_drawn=$((__dybatpho_tui_menu_drawn + 1))
 
-    for ((__dybatpho_tui_menu_index = __dybatpho_tui_menu_top;
-      __dybatpho_tui_menu_index < __dybatpho_tui_menu_top + __dybatpho_tui_menu_window;
-      __dybatpho_tui_menu_index++)); do
+    for ((__dybatpho_tui_menu_index = __dybatpho_tui_menu_top;  \
+    __dybatpho_tui_menu_index < __dybatpho_tui_menu_top + __dybatpho_tui_menu_window;  \
+    __dybatpho_tui_menu_index++)); do
       if ((__dybatpho_tui_menu_index == __dybatpho_tui_menu_cursor)); then
         __dybatpho_tui_menu_pointer="${DYBATPHO_TUI_POINTER}"
         __dybatpho_tui_menu_style="${__dybatpho_tui_menu_accent}"
@@ -863,7 +890,8 @@ function __dybatpho_tui_menu_interactive {
     __dybatpho_tui_read_key_into __dybatpho_tui_menu_key
     case "${__dybatpho_tui_menu_key}" in
       up | char:k)
-        __dybatpho_tui_menu_cursor=$(((__dybatpho_tui_menu_cursor - 1 + __dybatpho_tui_menu_count) % __dybatpho_tui_menu_count))
+        __dybatpho_tui_menu_cursor=$((__dybatpho_tui_menu_cursor - 1 + __dybatpho_tui_menu_count))
+        __dybatpho_tui_menu_cursor=$((__dybatpho_tui_menu_cursor % __dybatpho_tui_menu_count))
         ;;
       down | char:j)
         __dybatpho_tui_menu_cursor=$(((__dybatpho_tui_menu_cursor + 1) % __dybatpho_tui_menu_count))
@@ -878,24 +906,31 @@ function __dybatpho_tui_menu_interactive {
         ;;
       char:a)
         dybatpho::is true "${__dybatpho_tui_menu_multiple}" || continue
-        for ((__dybatpho_tui_menu_index = 0; __dybatpho_tui_menu_index < __dybatpho_tui_menu_count; __dybatpho_tui_menu_index++)); do
+        for ((__dybatpho_tui_menu_index = 0;  \
+        __dybatpho_tui_menu_index < __dybatpho_tui_menu_count;  \
+        __dybatpho_tui_menu_index++)); do
           __dybatpho_tui_menu_checked[__dybatpho_tui_menu_index]=1
         done
         ;;
       char:n)
         dybatpho::is true "${__dybatpho_tui_menu_multiple}" || continue
-        for ((__dybatpho_tui_menu_index = 0; __dybatpho_tui_menu_index < __dybatpho_tui_menu_count; __dybatpho_tui_menu_index++)); do
+        for ((__dybatpho_tui_menu_index = 0;  \
+        __dybatpho_tui_menu_index < __dybatpho_tui_menu_count;  \
+        __dybatpho_tui_menu_index++)); do
           __dybatpho_tui_menu_checked[__dybatpho_tui_menu_index]=0
         done
         ;;
       enter) __dybatpho_tui_menu_answered=true ;;
       escape | char:q | eof) __dybatpho_tui_menu_cancelled=true ;;
+      *) ;;
     esac
   done
 
   # Erase the widget so the transcript keeps the answer rather than the menu.
   printf '\033[%dA' "${__dybatpho_tui_menu_drawn}" >&2
-  for ((__dybatpho_tui_menu_index = 0; __dybatpho_tui_menu_index < __dybatpho_tui_menu_drawn; __dybatpho_tui_menu_index++)); do
+  for ((__dybatpho_tui_menu_index = 0;  \
+  __dybatpho_tui_menu_index < __dybatpho_tui_menu_drawn;  \
+  __dybatpho_tui_menu_index++)); do
     printf '\r\033[K\n' >&2
   done
   printf '\033[%dA' "${__dybatpho_tui_menu_drawn}" >&2
@@ -911,7 +946,9 @@ function __dybatpho_tui_menu_interactive {
   # for a single one, and only one of the branches ever runs for a caller.
   # shellcheck disable=SC2178,SC2128,SC2034
   if dybatpho::is true "${__dybatpho_tui_menu_multiple}"; then
-    for ((__dybatpho_tui_menu_index = 0; __dybatpho_tui_menu_index < __dybatpho_tui_menu_count; __dybatpho_tui_menu_index++)); do
+    for ((__dybatpho_tui_menu_index = 0;  \
+    __dybatpho_tui_menu_index < __dybatpho_tui_menu_count;  \
+    __dybatpho_tui_menu_index++)); do
       ((__dybatpho_tui_menu_checked[__dybatpho_tui_menu_index] == 1)) || continue
       __dybatpho_tui_menu_selected+=("${__dybatpho_tui_menu_items[__dybatpho_tui_menu_index]}")
       __dybatpho_tui_menu_positions+=("$((__dybatpho_tui_menu_index + 1))")
@@ -959,7 +996,8 @@ function __dybatpho_tui_menu_interactive {
 # @exitcode 1 The menu was cancelled, or nothing could be read and no default was set
 # @env DYBATPHO_TUI_DEFAULT string 1-based entry the menu starts on, and the answer used when it cannot ask
 # @tip Arrow keys and `j`/`k` both move, `enter` selects, and `esc` or `q` cancels
-# @note Feed the numbered fallback with a redirect (`< <(printf '2\n')`), never with a pipe. A pipe runs the call in a subshell, where the answer is written to a copy of the caller's variable and is lost on return.
+# @note Feed the numbered fallback with a redirect (`< <(printf '2\n')`), never with a pipe. A pipe runs the call in a
+#   subshell, where the answer is written to a copy of the caller's variable and is lost on return.
 #######################################
 function dybatpho::tui_menu {
   local result_var prompt
@@ -994,8 +1032,13 @@ function dybatpho::tui_menu {
 # @stderr The menu, drawn in place or printed as a numbered list
 # @exitcode 1 The menu was cancelled, or nothing could be read and no default was set
 # @env DYBATPHO_TUI_DEFAULT string Comma-separated entries preselected, and the answer used when the menu cannot ask
-# @tip `space` toggles an entry, `a` selects every entry and `n` clears them all; the numbered fallback takes the same list as `1,3`
-# @note In the drawn menu, confirming with nothing toggled is a valid answer and returns an empty array, which is how "none of these" is said. The numbered fallback has no such keystroke, so an empty line there takes `DYBATPHO_TUI_DEFAULT` or fails
+# @tip `space` toggles an entry, `a` selects every entry and `n` clears them all; the numbered fallback takes the same
+#   list
+#   as `1,3`
+# @note In the drawn menu, confirming with nothing toggled is a valid answer and returns an empty array, which is how
+#   "none
+#   of these" is said. The numbered fallback has no such keystroke, so an empty line there takes `DYBATPHO_TUI_DEFAULT`
+#   or fails
 # @note Feed the numbered fallback with a redirect rather than a pipe, for the reason given on `dybatpho::tui_menu`
 #######################################
 function dybatpho::tui_multi_menu {
@@ -1030,13 +1073,16 @@ function dybatpho::tui_multi_menu {
 # @exitcode 0 The answer is yes, or `DYBATPHO_FORCE` is enabled
 # @exitcode 1 The answer is no, the question was cancelled, or the script is not interactive
 # @env DYBATPHO_FORCE bool Answer yes without asking
-# @tip The question is the whole contract: a `--force` flag bound to `DYBATPHO_FORCE` makes every one of them answer yes at once
+# @tip The question is the whole contract: a `--force` flag bound to `DYBATPHO_FORCE` makes every one of them answer yes
+#   at
+#   once
 #######################################
 function dybatpho::tui_confirm {
   local question
   dybatpho::expect_args question -- "$@"
   local default_answer="${2:-no}"
 
+  # shellcheck disable=SC2154 # declared by `src/safety.sh`
   if dybatpho::is true "${DYBATPHO_FORCE}"; then
     dybatpho::debug "DYBATPHO_FORCE answers yes: ${question}"
     return 0
@@ -1097,6 +1143,7 @@ function dybatpho::tui_confirm {
         ;;
       enter) answered=true ;;
       escape | char:q | eof) cancelled=true ;;
+      *) ;;
     esac
   done
 

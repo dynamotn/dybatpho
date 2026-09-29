@@ -1,6 +1,12 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# keeps its declarations with the functions they describe; it parses its own
+# arguments, so the raw form is what the reader sees.
+# dyshellint disable=BSG050,BSG033,BSG051
 # @file doctor.sh
 # @brief Utilities for checking that the environment can run what a script loaded
+# @namespace dybatpho
 # @description
 #   This module answers the question a user asks after a script fails with
 #   `yq isn't installed` on line 400: what else is missing? A dybatpho module
@@ -165,7 +171,9 @@ function __dybatpho_doctor_resolve {
     fi
 
     if version="$(dybatpho::command_version "${command_name}")"; then
-      if dybatpho::semver_satisfies "$(dybatpho::semver_coerce "${version}")" "${constraint}"; then
+      local semver_coerce
+      semver_coerce=$(dybatpho::semver_coerce "${version}")
+      if dybatpho::semver_satisfies "${semver_coerce}" "${constraint}"; then
         printf '%s\t%s\t%s\n' "ok" "${path}" "${version}"
         return 0
       fi
@@ -175,7 +183,11 @@ function __dybatpho_doctor_resolve {
       version=""
     fi
 
-    if (($(__dybatpho_doctor_rank "${status}") > $(__dybatpho_doctor_rank "${best_status}"))); then
+    local doctor_rank
+    doctor_rank=$(__dybatpho_doctor_rank "${best_status}")
+    local doctor_rank_2
+    doctor_rank_2=$(__dybatpho_doctor_rank "${status}")
+    if ((doctor_rank_2 > doctor_rank)); then
       best_status="${status}"
       best_path="${path}"
       best_version="${version}"
@@ -217,6 +229,7 @@ function dybatpho::doctor_requirements {
 
 #######################################
 # @description Return success when the running Bash is new enough for the library.
+# @noargs
 # @exitcode 0 Bash is at least `DYBATPHO_BASH_MINIMUM`
 # @exitcode 1 Bash is older than the supported minimum
 #######################################
@@ -235,6 +248,7 @@ function __dybatpho_doctor_scope {
   local -n __scope_out="$1"
   local scope="$2"
   local names
+  # shellcheck disable=SC2154 # the module lists are declared by `init.sh`
   case "${scope}" in
     loaded) names="${DYBATPHO_LOADED_MODULES}" ;;
     all) names="${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES}" ;;
@@ -284,6 +298,7 @@ function __dybatpho_doctor_rows {
       case "${kind}" in
         required) specs="${DYBATPHO_DOCTOR_REQUIRED[${module}]-}" ;;
         optional) specs="${DYBATPHO_DOCTOR_OPTIONAL[${module}]-}" ;;
+        *) ;;
       esac
       for spec in ${specs}; do
         # The exit code only repeats what the status says, and a non-zero one
@@ -307,10 +322,16 @@ function __dybatpho_doctor_report_text {
   shift
   local bash_status="ok"
   dybatpho::doctor_bash_supported || bash_status="unsupported"
-  printf 'dybatpho %s (%s)\n' "$(dybatpho::version)" "${DYBATPHO_DIR}"
+  local version
+  version=$(dybatpho::version)
+  printf 'dybatpho %s (%s)\n' "${version}" "${DYBATPHO_DIR}"
   printf 'bash     %s [%s, minimum %s]\n' \
     "${BASH_VERSION}" "${bash_status}" "${DYBATPHO_BASH_MINIMUM}"
-  printf 'platform %s/%s\n' "$(uname -s)" "$(uname -m)"
+  local uname
+  uname=$(uname -m)
+  local uname_2
+  uname_2=$(uname -s)
+  printf 'platform %s/%s\n' "${uname_2}" "${uname}"
   printf 'modules  %s\n' "$*"
 
   if ((${#__rows_in[@]} == 0)); then
@@ -354,20 +375,40 @@ function __dybatpho_doctor_report_json {
   shift
   local bash_ok="false"
   dybatpho::doctor_bash_supported && bash_ok="true"
-  printf '{"version":"%s"' "$(__dybatpho_doctor_json_escape "$(dybatpho::version)")"
-  printf ',"directory":"%s"' "$(__dybatpho_doctor_json_escape "${DYBATPHO_DIR}")"
+  local version
+  version=$(dybatpho::version)
+  local doctor_json_escape_9
+  doctor_json_escape_9=$(__dybatpho_doctor_json_escape "${version}")
+  printf '{"version":"%s"' "${doctor_json_escape_9}"
+  local doctor_json_escape_5
+  doctor_json_escape_5=$(__dybatpho_doctor_json_escape "${DYBATPHO_DIR}")
+  printf ',"directory":"%s"' "${doctor_json_escape_5}"
+  local doctor_json_escape_4
+  doctor_json_escape_4=$(__dybatpho_doctor_json_escape "${BASH_VERSION}")
   printf ',"bash":{"version":"%s","minimum":"%s","ok":%s}' \
-    "$(__dybatpho_doctor_json_escape "${BASH_VERSION}")" \
+    "${doctor_json_escape_4}" \
     "${DYBATPHO_BASH_MINIMUM}" "${bash_ok}"
+  local uname
+  uname=$(uname -m)
+  local doctor_json_escape_7
+  local doctor_json_escape_8
+  doctor_json_escape_8=$(__dybatpho_doctor_json_escape "${uname}")
+  doctor_json_escape_7=${doctor_json_escape_8}
+  local uname_2
+  uname_2=$(uname -s)
+  local doctor_json_escape_11
+  doctor_json_escape_11=$(__dybatpho_doctor_json_escape "${uname_2}")
   printf ',"platform":{"system":"%s","machine":"%s"}' \
-    "$(__dybatpho_doctor_json_escape "$(uname -s)")" \
-    "$(__dybatpho_doctor_json_escape "$(uname -m)")"
+    "${doctor_json_escape_11}" \
+    "${doctor_json_escape_7}"
   local module first=1
   printf ',"modules":['
   for module in "$@"; do
     ((first)) || printf ','
     first=0
-    printf '"%s"' "$(__dybatpho_doctor_json_escape "${module}")"
+    local doctor_json_escape_3
+    doctor_json_escape_3=$(__dybatpho_doctor_json_escape "${module}")
+    printf '"%s"' "${doctor_json_escape_3}"
   done
   printf ']'
   local row spec kind status path version
@@ -377,12 +418,20 @@ function __dybatpho_doctor_report_json {
     IFS=$'\t' read -r module spec kind status path version <<< "${row}"
     ((first)) || printf ','
     first=0
+    local doctor_json_escape
+    doctor_json_escape=$(__dybatpho_doctor_json_escape "${version}")
+    local doctor_json_escape_2
+    doctor_json_escape_2=$(__dybatpho_doctor_json_escape "${spec}")
+    local doctor_json_escape_6
+    doctor_json_escape_6=$(__dybatpho_doctor_json_escape "${path}")
+    local doctor_json_escape_10
+    doctor_json_escape_10=$(__dybatpho_doctor_json_escape "${module}")
     printf '{"module":"%s","dependency":"%s","kind":"%s","status":"%s","path":"%s","version":"%s"}' \
-      "$(__dybatpho_doctor_json_escape "${module}")" \
-      "$(__dybatpho_doctor_json_escape "${spec}")" \
+      "${doctor_json_escape_10}" \
+      "${doctor_json_escape_2}" \
       "${kind}" "${status}" \
-      "$(__dybatpho_doctor_json_escape "${path}")" \
-      "$(__dybatpho_doctor_json_escape "${version}")"
+      "${doctor_json_escape_6}" \
+      "${doctor_json_escape}"
   done
   printf ']'
 }
@@ -416,16 +465,16 @@ function dybatpho::doctor {
     shift
   done
 
-  local modules=()
+  local -a modules=()
   __dybatpho_doctor_scope modules "${scope}"
-  local rows=()
+  local -a rows=()
   __dybatpho_doctor_rows rows ${modules[@]+"${modules[@]}"}
 
   # Collect what is missing before printing, so the text summary and the exit
   # code describe the same run.
   local row spec kind status version
-  local missing_required=() missing_optional=() unknown=()
-  local outdated_required=() outdated_optional=()
+  local -a missing_required=() missing_optional=() unknown=()
+  local -a outdated_required=() outdated_optional=()
   for row in "${rows[@]}"; do
     IFS=$'\t' read -r _ spec kind status _ version <<< "${row}"
     case "${status}" in
@@ -444,6 +493,7 @@ function dybatpho::doctor {
         fi
         ;;
       unknown) unknown+=("${spec}") ;;
+      *) ;;
     esac
   done
 

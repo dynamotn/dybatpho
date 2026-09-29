@@ -123,6 +123,8 @@ dybatpho::pkg_install --force --arg --no-cache --arg --no-interactive -- curl
 
 Print the managers to probe, most specific to this platform first.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - One manager name per line
@@ -254,6 +256,8 @@ Run a command through `dybatpho::dry_run` with `DRY_RUN` overridden for this cal
 
 Print every package manager this module supports.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - One manager name per line, alphabetically
@@ -271,6 +275,8 @@ Report the package manager of the current machine.
 manager="$(dybatpho::pkg_manager)" || dybatpho::die "No supported package manager"
 
 ```
+
+_Function has no arguments._
 
 **🌍 Environment variables**
 

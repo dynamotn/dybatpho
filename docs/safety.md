@@ -112,6 +112,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 
 Print every path that guarded operations must never touch.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - One protected absolute path per line
@@ -176,6 +178,8 @@ Drop the leading components of an archive entry.
 ### `dybatpho::is_interactive`
 
 Return success when the script can ask the user a question.
+
+_Function has no arguments._
 
 **🌍 Environment variables**
 

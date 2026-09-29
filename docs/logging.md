@@ -179,6 +179,8 @@ Anything with no short escape now goes out as `\u00XX`.
 
 Return an RFC 3339 timestamp for a log event.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - Current timestamp
@@ -189,6 +191,8 @@ Return an RFC 3339 timestamp for a log event.
 ### `__dybatpho_log_now_ms`
 
 Return the current time in milliseconds since the epoch, using the most precise portable source available.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 
@@ -201,6 +205,8 @@ Return the current time in milliseconds since the epoch, using the most precise 
 
 Return the elapsed time since the process started, for structured log events.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - Elapsed time in milliseconds
@@ -210,7 +216,10 @@ Return the elapsed time since the process started, for structured log events.
 
 ### `__dybatpho_log_request_id`
 
-Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID` is empty.
+Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID`
+is empty.
+
+_Function has no arguments._
 
 **🧩 Variable sets**
 
@@ -227,6 +236,8 @@ Return the correlation ID attached to every structured log event, generating and
 
 Return the current hostname attached to every structured log event, caching the result for the process lifetime.
 
+_Function has no arguments._
+
 **🌍 Environment variables**
 
 | Variable | Type | Description |
@@ -242,7 +253,8 @@ Return the current hostname attached to every structured log event, caching the 
 
 ### `__dybatpho_log_json_event`
 
-Build one structured JSON log event enriched with request ID, hostname, PID, duration, and the fields registered with `dybatpho::log_context`.
+Build one structured JSON log event enriched with request ID, hostname, PID, duration, and the fields registered
+with `dybatpho::log_context`.
 
 **🧾 Arguments**
 
@@ -279,7 +291,8 @@ Rotate a log file in place once it reaches a size threshold, keeping a bounded n
 
 ### `__dybatpho_log_write_file`
 
-Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first when needed.
+Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first
+when needed.
 
 **🧾 Arguments**
 
@@ -422,7 +435,8 @@ English call site.
 
 ### `__dybatpho_log_inspect`
 
-Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to `LOG_FILE` when configured, independently of `LOG_FORMAT`.
+Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to
+`LOG_FILE` when configured, independently of `LOG_FORMAT`.
 
 **🧾 Arguments**
 
@@ -447,6 +461,8 @@ Log a structured diagnostic message with timestamp and call-site information. Al
 ### `__dybatpho_log_get_terminal_width`
 
 Return the effective terminal width used by boxed logging helpers.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 
@@ -505,6 +521,8 @@ sequence, which keeps the measure the same under the C locale.
 ### `__dybatpho_log_indexes_bytes`
 
 Report whether Bash indexes strings by byte in this locale.
+
+_Function has no arguments._
 
 **🚦 Exit codes**
 
@@ -859,6 +877,8 @@ JSON fragment ready to be spliced into a structured event.
 Values are redacted here rather than when the field is registered, so a
 secret registered after the fact is still masked on the next event.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - `,"name":"value"` for every registered field, in registration order
@@ -869,6 +889,8 @@ secret registered after the fact is still masked on the next event.
 ### `__dybatpho_log_context_text`
 
 Render the registered context fields for a human-readable line.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 

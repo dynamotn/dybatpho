@@ -266,6 +266,8 @@ The directory is created 0700, so no other account can plant anything in it.
 Resolution is lazy because working it out needs `HOME`, and a module must
 not fail at source time on a host that has none.
 
+_Function has no arguments._
+
 **🌍 Environment variables**
 
 | Variable | Type | Description |
@@ -290,6 +292,8 @@ link. Writing the counters is a plain redirection, which follows a link and
 truncates whatever is on the other end, so a link here is either an attack
 or a mistake; either way it is not something to write through.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - Path of the counter file
@@ -305,6 +309,8 @@ or a mistake; either way it is not something to write through.
 ### `__dybatpho_ai_state_read`
 
 Print the counter document, creating it on first use.
+
+_Function has no arguments._
 
 **🌍 Environment variables**
 
@@ -362,6 +368,8 @@ refusal has to be raised by the public function the caller invoked.
 ### `__dybatpho_ai_count_call`
 
 Count one model call in the shared counter file.
+
+_Function has no arguments._
 
 **🚦 Exit codes**
 
@@ -539,6 +547,8 @@ _Function has no arguments._
 ### `__dybatpho_ai_cli_command`
 
 Resolve the command used by the `cli` backend.
+
+_Function has no arguments._
 
 **🌍 Environment variables**
 
@@ -1268,6 +1278,8 @@ _Function has no arguments._
 ### `__dybatpho_ai_tools_json`
 
 Render the tool registry as a provider-neutral tools array.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 

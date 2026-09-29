@@ -1,6 +1,13 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it parses its own arguments, so the raw form is
+# what the reader sees.
+# dyshellint disable=BSG050,BSG011,BSG051
 # @file config.sh
 # @brief Utilities for loading configuration from files and environment variables.
+# @namespace dybatpho
 # @description
 #   Configuration files are loaded in the order provided, so later files
 #   override earlier files. Environment variables loaded with
@@ -35,6 +42,15 @@ declare -gA DYBATPHO_CONFIG_SCHEMA=()
 declare -ga DYBATPHO_CONFIG_SCHEMA_KEYS=()
 declare -ga DYBATPHO_CONFIG_ERRORS=()
 
+#######################################
+# @description Store one configuration value, rejecting a key that is not a
+#   name: the key becomes part of a variable name and of the schema, so a
+#   stray character would land somewhere it cannot be looked up again.
+# @arg $1 string Configuration key
+# @arg $2 string Value
+# @set DYBATPHO_CONFIG
+# @exitcode 1 Stop the script when the key is not a valid name
+#######################################
 function __dybatpho_config_set {
   local key value
   dybatpho::expect_args key value -- "$@"
@@ -43,6 +59,12 @@ function __dybatpho_config_set {
   DYBATPHO_CONFIG["${key}"]="${value}"
 }
 
+#######################################
+# @description Read a dotenv file into the configuration: `KEY=value` a line,
+#   with `export` prefixes, quotes and trailing comments removed.
+# @arg $1 path File to read
+# @set DYBATPHO_CONFIG
+#######################################
 function __dybatpho_config_load_dotenv {
   local file line key value
   dybatpho::expect_args file -- "$@"
@@ -66,13 +88,24 @@ function __dybatpho_config_load_dotenv {
   done < "${file}" # kcov(skip)
 }
 
+#######################################
+# @description Read a JSON, YAML or TOML file into the configuration, flattening
+#   it to the dotted keys the rest of the module uses.
+# @arg $1 string Format: `json`, `yaml` or `toml`
+# @arg $2 path File to read
+# @set DYBATPHO_CONFIG
+# @exitcode 1 Stop the script when the document's root is not a mapping
+#######################################
 function __dybatpho_config_load_structured {
   local file format key value entries label root
-  format="${1}"
-  file="${2}"
+  format="$1"
+  file="$2"
   if [[ "${format}" == json ]]; then
     dybatpho::require jq
-    entries=$(jq -r 'if type != "object" then error("root must be an object") else to_entries[] | [.key, (.value | tostring)] | @tsv end' "${file}") \
+    entries=$(jq -r '
+      if type != "object" then error("root must be an object")
+      else to_entries[] | [.key, (.value | tostring)] | @tsv end
+    ' "${file}") \
       || dybatpho::die "Invalid JSON configuration: ${file}"
   else
     dybatpho::require yq
@@ -121,7 +154,7 @@ function __dybatpho_config_load_structured {
 function dybatpho::config_load {
   local optional=false
   while (($#)); do
-    case "${1}" in
+    case "$1" in
       --optional)
         optional=true
         shift
@@ -196,13 +229,15 @@ function dybatpho::config_profile {
 #######################################
 function dybatpho::config_env {
   local prefix="${1-}" variable key
-  while IFS= read -r variable; do
+  local compgen_output
+  compgen_output=$(compgen -v) # kcov(skip)
+  while IFS= read -r variable || [[ -n "${variable}" ]]; do
     [[ -n "${prefix}" && "${variable}" != "${prefix}"* ]] && continue
     key="${variable#"${prefix}"}"
     [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
     [[ -v "${variable}" ]] || continue
     __dybatpho_config_set "${key}" "${!variable}"
-  done < <(compgen -v) # kcov(skip)
+  done < <(printf '%s' "${compgen_output}")
 }
 
 #######################################
@@ -313,7 +348,7 @@ function __dybatpho_config_dotenv_value {
 function __dybatpho_config_save_dotenv {
   local file key line name rendered=""
   local -A wanted=() seen=()
-  file="${1}"
+  file="$1"
   shift
   for key in "$@"; do
     [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
@@ -363,23 +398,23 @@ function __dybatpho_config_save_dotenv {
 # @exitcode 1 `jq` or `yq` is missing, the file cannot be parsed, or the write fails
 #######################################
 function __dybatpho_config_save_structured {
-  local format file key value type expression="" separator="" literal rendered
+  local format file key setting type expression="" separator="" literal rendered
   local -a values=()
-  format="${1}"
-  file="${2}"
+  format="$1"
+  file="$2"
   shift 2
 
   for key in "$@"; do
-    value="${DYBATPHO_CONFIG[${key}]}"
+    setting="${DYBATPHO_CONFIG[${key}]}"
     type="$(__dybatpho_config_schema_attr "${key}" type string)"
     literal=""
-    if __dybatpho_validate_numeric_type "${type}" && [[ "${value}" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
-      literal="${value}"
+    if __dybatpho_validate_numeric_type "${type}" && [[ "${setting}" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+      literal="${setting}"
     elif [[ "${type}" == bool ]]; then
       # `dybatpho::is true` follows the shell's exit-code convention, where `0`
       # is success. A configuration file means the opposite by `1` and `0`, so
       # the mapping is spelled out here instead.
-      case "${value,,}" in
+      case "${setting,,}" in
         true | yes | on | 1) literal=true ;;
         false | no | off | 0) literal=false ;;
         *) literal="" ;;
@@ -389,10 +424,10 @@ function __dybatpho_config_save_structured {
       expression+="${separator}.[\"${key}\"] = ${literal}"
     elif [[ "${format}" == json ]]; then
       expression+="${separator}.[\"${key}\"] = \$ENV.__DYBATPHO_CONFIG_SAVE_${#values[@]}"
-      values+=("${value}")
+      values+=("${setting}")
     else
       expression+="${separator}.[\"${key}\"] = strenv(__DYBATPHO_CONFIG_SAVE_${#values[@]})"
-      values+=("${value}")
+      values+=("${setting}")
     fi
     separator=" | "
   done
@@ -407,8 +442,8 @@ function __dybatpho_config_save_structured {
 
   rendered="$(
     index=0
-    for value in ${values[@]+"${values[@]}"}; do
-      export "__DYBATPHO_CONFIG_SAVE_${index}=${value}"
+    for setting in ${values[@]+"${values[@]}"}; do
+      export "__DYBATPHO_CONFIG_SAVE_${index}=${setting}"
       index=$((index + 1))
     done
     case "${format}" in
@@ -461,7 +496,9 @@ function __dybatpho_config_save_structured {
 # @arg $@ string Configuration keys to write, defaulting to every loaded key in name order
 # @env DRY_RUN string When true-like, report the write instead of performing it
 # @exitcode 1 A key is invalid or unset, the format is unsupported, or the write fails
-# @tip Name the keys explicitly when `dybatpho::config_env` was used, so an unrelated environment variable is not persisted along with them.
+# @tip Name the keys explicitly when `dybatpho::config_env` was used, so an unrelated environment variable is not
+#   persisted
+#   along with them.
 #######################################
 function dybatpho::config_save {
   local file key extension
@@ -471,9 +508,11 @@ function dybatpho::config_save {
   if (($#)); then
     keys=("$@")
   elif ((${#DYBATPHO_CONFIG[@]})); then
-    while IFS= read -r key; do
+    local printf_output
+    printf_output=$(printf '%s\n' "${!DYBATPHO_CONFIG[@]}" | LC_ALL=C sort) # kcov(skip)
+    while IFS= read -r key || [[ -n "${key}" ]]; do
       keys+=("${key}")
-    done < <(printf '%s\n' "${!DYBATPHO_CONFIG[@]}" | LC_ALL=C sort) # kcov(skip)
+    done < <(printf '%s' "${printf_output}")
   fi
   ((${#keys[@]} > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected at least one configuration key"
@@ -542,7 +581,7 @@ function __dybatpho_config_schema_clear {
 function __dybatpho_config_schema_attr {
   local key attribute
   dybatpho::expect_args key attribute -- "$@"
-  printf '%s' "${DYBATPHO_CONFIG_SCHEMA[${key}.${attribute}]-${3-}}"
+  printf '%s' "${DYBATPHO_CONFIG_SCHEMA["${key}.${attribute}"]-${3-}}"
 }
 
 #######################################
@@ -579,7 +618,8 @@ function __dybatpho_config_schema_constraints {
 #######################################
 # @description Declare validation rules for a configuration key.
 # @arg $1 string Configuration key
-# @arg $2 string Type: any name `dybatpho::validate_types` prints — `string`, `int`, `bool`, `url`, `email`, `port`, `semver`, `dir`, a type of your own — or `enum`
+# @arg $2 string Type: any name `dybatpho::validate_types` prints — `string`, `int`, `bool`, `url`, `email`, `port`,
+#   `semver`, `dir`, a type of your own — or `enum`
 # @arg $@ string Rules: `required:true`, `default:value`, `min:number`, `max:number`, `choices:a,b`, `description:text`
 # @set DYBATPHO_CONFIG_SCHEMA Declared attributes, keyed by `<key>.<attribute>`
 # @set DYBATPHO_CONFIG_SCHEMA_KEYS Declaration order used by validation and documentation
@@ -613,7 +653,7 @@ function dybatpho::config_schema {
       choices)
         [[ -n "${value}" ]] || dybatpho::die "Empty \`choices\` rule for ${key}"
         ;;
-      default | description) ;; # kcov(skip)
+      default | description) ;;                                            # kcov(skip)
       *) dybatpho::die "Unsupported configuration schema rule: ${name}" ;; # kcov(skip)
     esac
     DYBATPHO_CONFIG_SCHEMA["${key}.${name}"]="${value}"
@@ -681,6 +721,7 @@ function __dybatpho_config_schema_check {
   [[ -z "${max}" ]] || rules+=("max:${max}")
 
   dybatpho::validate_value "${value}" "${rules[@]}" && return 0
+  # shellcheck disable=SC2154 # filled by `src/validate.sh`
   for reason in "${DYBATPHO_VALIDATE_ERRORS[@]}"; do
     __dybatpho_config_schema_error "${key}" "${reason}"
   done
@@ -702,7 +743,7 @@ function dybatpho::config_validate {
   for key in ${DYBATPHO_CONFIG_SCHEMA_KEYS[@]+"${DYBATPHO_CONFIG_SCHEMA_KEYS[@]}"}; do
     if [[ ! -v "DYBATPHO_CONFIG[${key}]" ]]; then
       if [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]]; then
-        DYBATPHO_CONFIG["${key}"]="${DYBATPHO_CONFIG_SCHEMA[${key}.default]}"
+        DYBATPHO_CONFIG["${key}"]="${DYBATPHO_CONFIG_SCHEMA["${key}.default"]}"
       else
         required="$(__dybatpho_config_schema_attr "${key}" required false)"
         if dybatpho::is true "${required}"; then
@@ -753,7 +794,9 @@ function __dybatpho_config_doc_json_value {
     printf 'null'
     return 0
   fi
-  printf '"%s"' "$(__dybatpho_log_json_escape "${value}")"
+  local log_json_escape
+  log_json_escape=$(__dybatpho_log_json_escape "${value}")
+  printf '"%s"' "${log_json_escape}"
 }
 
 #######################################
@@ -768,7 +811,7 @@ function dybatpho::config_doc {
   local format="${1:-markdown}" title="${2:-Configuration}"
   local key type required default constraints description separator
   case "${format}" in
-    markdown | text | json) ;; # kcov(skip)
+    markdown | text | json) ;;                                                      # kcov(skip)
     *) dybatpho::die "Unsupported configuration documentation format: ${format}" ;; # kcov(skip)
   esac
 
@@ -780,6 +823,7 @@ function dybatpho::config_doc {
       ;;
     text) printf '%s\n\n' "${title}" ;;
     json) printf '[' ;;
+    *) ;;
   esac
 
   separator=""
@@ -788,19 +832,29 @@ function dybatpho::config_doc {
     default="$(__dybatpho_config_schema_attr "${key}" default)"
     description="$(__dybatpho_config_schema_attr "${key}" description)"
     constraints="$(__dybatpho_config_schema_constraints "${key}")"
-    if dybatpho::is true "$(__dybatpho_config_schema_attr "${key}" required false)"; then
+    local config_schema_attr
+    config_schema_attr=$(__dybatpho_config_schema_attr "${key}" required false)
+    if dybatpho::is true "${config_schema_attr}"; then
       required=true
     else
       required=false
     fi
     case "${format}" in
       markdown)
+        local config_doc_cell
+        config_doc_cell=$(__dybatpho_config_doc_cell "${description}")
+        local config_doc_cell_2
+        config_doc_cell_2=$(__dybatpho_config_doc_cell "${key}" code)
+        local config_doc_cell_3
+        config_doc_cell_3=$(__dybatpho_config_doc_cell "${constraints}")
+        local config_doc_cell_4
+        config_doc_cell_4=$(__dybatpho_config_doc_cell "${default}" code)
         printf '| %s | %s | %s | %s | %s | %s |\n' \
-          "$(__dybatpho_config_doc_cell "${key}" code)" \
+          "${config_doc_cell_2}" \
           "${type}" "${required}" \
-          "$(__dybatpho_config_doc_cell "${default}" code)" \
-          "$(__dybatpho_config_doc_cell "${constraints}")" \
-          "$(__dybatpho_config_doc_cell "${description}")"
+          "${config_doc_cell_4}" \
+          "${config_doc_cell_3}" \
+          "${config_doc_cell}"
         ;;
       text)
         printf '%s\n  type: %s\n  required: %s\n' "${key}" "${type}" "${required}"
@@ -812,14 +866,23 @@ function dybatpho::config_doc {
       json)
         local declared=""
         [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]] && declared="declared" || true
+        local config_doc_json_value
+        config_doc_json_value=$(__dybatpho_config_doc_json_value "${description}")
+        local log_json_escape
+        log_json_escape=$(__dybatpho_log_json_escape "${key}")
+        local config_doc_json_value_2
+        config_doc_json_value_2=$(__dybatpho_config_doc_json_value "${constraints}")
+        local config_doc_json_value_3
+        config_doc_json_value_3=$(__dybatpho_config_doc_json_value "${default}" "${declared}")
         printf '%s{"key":"%s","type":"%s","required":%s,"default":%s,"constraints":%s,"description":%s}' \
           "${separator}" \
-          "$(__dybatpho_log_json_escape "${key}")" "${type}" "${required}" \
-          "$(__dybatpho_config_doc_json_value "${default}" "${declared}")" \
-          "$(__dybatpho_config_doc_json_value "${constraints}")" \
-          "$(__dybatpho_config_doc_json_value "${description}")"
+          "${log_json_escape}" "${type}" "${required}" \
+          "${config_doc_json_value_3}" \
+          "${config_doc_json_value_2}" \
+          "${config_doc_json_value}"
         separator=","
         ;;
+      *) ;;
     esac
   done
   if [[ "${format}" == json ]]; then

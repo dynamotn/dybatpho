@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file release.sh
 # @brief Utilities for cutting a release from a Git repository
+# @namespace dybatpho
 # @description
 #   This module turns the commits since the last tag into a release: it decides
 #   how far the version moves, writes the changelog entry, packages build output
@@ -21,7 +25,9 @@
 DYBATPHO_RELEASE_TAG_PATTERN="${DYBATPHO_RELEASE_TAG_PATTERN:-v*}"
 # @env DYBATPHO_RELEASE_CHECKSUM_ALGORITHM string Checksum algorithm for the sums file, default is `sha256`
 DYBATPHO_RELEASE_CHECKSUM_ALGORITHM="${DYBATPHO_RELEASE_CHECKSUM_ALGORITHM:-sha256}"
-# @env DYBATPHO_RELEASE_SIGN_CMD string Command that signs a file, receiving the signature path and the file path. Default signs with `gpg`
+# @env DYBATPHO_RELEASE_SIGN_CMD string Command that signs a file, receiving the signature path and the file path.
+#   Default
+#   signs with `gpg`
 DYBATPHO_RELEASE_SIGN_CMD="${DYBATPHO_RELEASE_SIGN_CMD:-}"
 # @env DYBATPHO_RELEASE_GPG_KEY string Key `gpg` signs with, default is its configured default key
 DYBATPHO_RELEASE_GPG_KEY="${DYBATPHO_RELEASE_GPG_KEY:-}"
@@ -123,8 +129,10 @@ function dybatpho::release_bump_type {
     # The whole message is read once: the breaking marker may be in the subject
     # or in a footer in the body.
     message="$(__dybatpho_git "${repo_path}" log -1 --format=%B "${sha}")"
+    local printf
+    printf=$(printf '%s\n' "${message}" | sed -n '1p')
     parsed="$(dybatpho::release_commit_parse \
-      "$(printf '%s\n' "${message}" | sed -n '1p')" "${message}")"
+      "${printf}" "${message}")"
     type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
     breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"
     if [[ "${breaking}" == "true" ]]; then
@@ -134,6 +142,7 @@ function dybatpho::release_bump_type {
     case "${type}" in
       feat) bump="minor" ;;
       fix | perf) [[ "${bump}" == "minor" ]] || bump="patch" ;;
+      *) ;;
     esac
   done < <(if [[ -n "${base_ref}" ]]; then
     dybatpho::git_commits_between "${repo_path}" "${base_ref}" "${head_ref}"
@@ -212,8 +221,10 @@ function dybatpho::release_changelog {
   while read -r sha; do
     [[ -n "${sha}" ]] || continue
     message="$(__dybatpho_git "${repo_path}" log -1 --format=%B "${sha}")"
+    local printf
+    printf=$(printf '%s\n' "${message}" | sed -n '1p')
     parsed="$(dybatpho::release_commit_parse \
-      "$(printf '%s\n' "${message}" | sed -n '1p')" "${message}")"
+      "${printf}" "${message}")"
     type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
     scope="$(printf '%s\n' "${parsed}" | sed -n '2p')"
     is_breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"
@@ -228,6 +239,7 @@ function dybatpho::release_changelog {
     case "${type}" in
       feat) features+=("${entry}") ;;
       fix | perf) fixes+=("${entry}") ;;
+      *) ;;
     esac
   done < <(if [[ -n "${base_ref}" ]]; then
     dybatpho::git_commits_between "${repo_path}" "${base_ref}" "${head_ref}"
@@ -301,8 +313,11 @@ function dybatpho::release_package {
   goos="${5:-$(dybatpho::goos)}"
   goarch="${6:-$(dybatpho::goarch)}"
 
+  local release_artifact_name
+  release_artifact_name=$(dybatpho::release_artifact_name "${name}" "${version}" "${goos}" "${goarch}")
   artifact="$(dybatpho::path_join "${output_dir}" \
-    "$(dybatpho::release_artifact_name "${name}" "${version}" "${goos}" "${goarch}")")"
+    "${release_artifact_name}")"
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
     dybatpho::dry_run "package ${source} into ${artifact}"
     printf '%s\n' "${artifact}"
@@ -344,6 +359,7 @@ function dybatpho::release_checksums {
     [[ "${entry}" == "${output}" ]] && continue
     case "${entry}" in
       *.asc | *.sig | *SHA256SUMS*) continue ;;
+      *) ;;
     esac
     artifacts+=("${entry}")
   done

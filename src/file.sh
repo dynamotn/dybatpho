@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file file.sh
 # @brief Utilities for file handling
+# @namespace dybatpho
 # @description
 #   This module contains helpers for previewing files, splitting, joining,
 #   normalizing, comparing, and rewriting paths, creating temporary files
@@ -16,7 +20,8 @@
 #   - `example/file_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, helpers that rewrite a file write through a symlink instead of replacing it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, helpers that rewrite a file write through a
+#   symlink instead of replacing it
 DYBATPHO_FILE_FOLLOW_SYMLINKS="${DYBATPHO_FILE_FOLLOW_SYMLINKS:-true}"
 
 #######################################
@@ -274,7 +279,9 @@ function dybatpho::path_change_ext {
   if [[ "${dirname}" == "." ]]; then
     printf '%s\n' "${stem}${new_ext}"
   else
-    printf '%s\n' "$(dybatpho::path_join "${dirname}" "${stem}${new_ext}")"
+    local path_join
+    path_join=$(dybatpho::path_join "${dirname}" "${stem}${new_ext}")
+    printf '%s\n' "${path_join}"
   fi
 }
 
@@ -383,6 +390,7 @@ function dybatpho::create_temp {
   local filename_format="dybatpho_${prefix}_${pid}"
   if hash "mktemp" > /dev/null 2>&1; then
     local temp_template="${parent_folder%/}/${filename_format}_XXXXXXXX"
+    # dyshellint disable=BSG046 # this is `dybatpho::create_temp` itself
     if dybatpho::is empty "${extension}"; then
       temp_path=$(mktemp -d "${temp_template}")
     else
@@ -516,7 +524,7 @@ function __dybatpho_file_staging {
 # @arg $1 string Staging file path
 #######################################
 function __dybatpho_file_discard {
-  rm -f -- "${1}" 2> /dev/null || true
+  rm -f -- "$1" 2> /dev/null || true
 }
 
 #######################################
@@ -575,7 +583,8 @@ function __dybatpho_file_commit {
 #
 # @arg $1 string Destination file path
 # @env DRY_RUN string When true-like, report the write instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
+#   it
 # @exitcode 1 The destination directory is missing or the write fails
 # @tip The destination keeps its mode, and its owner when the process may set it
 #######################################
@@ -588,6 +597,7 @@ function dybatpho::file_write_atomic {
   dybatpho::is dir "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
 
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
     # Drain standard input so that the process feeding this helper is not
     # interrupted by a closed pipe.
@@ -598,7 +608,7 @@ function dybatpho::file_write_atomic {
 
   staging="$(__dybatpho_file_staging "${path}")"
   if ! cat > "${staging}"; then
-    __dybatpho_file_discard "${staging}" # kcov(skip)
+    __dybatpho_file_discard "${staging}"                                  # kcov(skip)
     dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}" # kcov(skip)
   fi
   __dybatpho_file_commit "${staging}" "${path}"
@@ -637,7 +647,8 @@ function __dybatpho_file_sed_delimiter {
 # @arg $2 string POSIX basic regular expression to match
 # @arg $3 string Replacement text, where `&` and `\1` refer to the match
 # @env DRY_RUN string When true-like, report the rewrite instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
+#   it
 # @exitcode 1 The file is missing, `sed` fails, or no delimiter can be chosen
 # @tip This avoids `sed -i`, whose argument differs between GNU and BSD, by
 #   rewriting through a staging file instead
@@ -658,8 +669,10 @@ function dybatpho::file_replace {
   fi
 
   staging="$(__dybatpho_file_staging "${path}")"
+  local file_operand
+  file_operand=$(__dybatpho_file_operand "${path}")
   if ! sed "s${delimiter}${pattern}${delimiter}${replacement}${delimiter}g" \
-    "$(__dybatpho_file_operand "${path}")" > "${staging}"; then
+    "${file_operand}" > "${staging}"; then
     __dybatpho_file_discard "${staging}"
     dybatpho::die "${FUNCNAME[0]}: Cannot apply '${pattern}' to ${path}"
   fi
@@ -676,7 +689,8 @@ function dybatpho::file_replace {
 # @arg $1 string File path, created when it does not exist
 # @arg $2 string Exact line to guarantee
 # @env DRY_RUN string When true-like, report the change instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
+#   it
 # @exitcode 1 The parent directory is missing or the write fails
 # @tip The comparison is an exact whole-line match, not a substring or pattern
 #######################################
@@ -723,7 +737,8 @@ function dybatpho::file_ensure_line {
 # @arg $1 string File path
 # @arg $2 string Exact line to remove
 # @env DRY_RUN string When true-like, report the change instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
+#   it
 # @exitcode 1 The write fails
 # @tip The comparison is an exact whole-line match, not a substring or pattern
 #######################################
@@ -745,11 +760,12 @@ function dybatpho::file_remove_line {
   staging="$(__dybatpho_file_staging "${path}")"
   # `grep -v` reports "no match" when every line is removed, which is a valid
   # result here rather than a failure.
-  grep -vxF -- "${line}" "${path}" > "${staging}" || [[ $? -eq 1 ]] \
-    || {
-      __dybatpho_file_discard "${staging}" # kcov(skip)
-      dybatpho::die "${FUNCNAME[0]}: Cannot filter ${path}" # kcov(skip)
-    }
+  local status=0
+  grep -vxF -- "${line}" "${path}" > "${staging}" || status=$?
+  ((status <= 1)) || {
+    __dybatpho_file_discard "${staging}"                  # kcov(skip)
+    dybatpho::die "${FUNCNAME[0]}: Cannot filter ${path}" # kcov(skip)
+  }
   __dybatpho_file_commit "${staging}" "${path}"
 }
 
@@ -1135,8 +1151,46 @@ function dybatpho::file_is_binary {
     || dybatpho::die "${FUNCNAME[0]}: File doesn't exist: ${path}"
   # A NUL byte cannot survive in a shell variable, so the byte counts before and
   # after removing NULs are compared instead of the contents.
-  sampled="$(head -c 8192 -- "${path}" | wc -c)"
-  stripped="$(head -c 8192 -- "${path}" | LC_ALL=C tr -d '\000' | wc -c)"
+  local head_2
+  local head_4
+  local head_6
+  local head_8
+  local head_10
+  local head_12
+  local head_14
+  local head_16
+  local head_18
+  # shellcheck disable=SC2312 # a variable cannot hold the NUL bytes being counted
+  head_18=$(head -c 8192 -- "${path}" | wc -c)
+  head_16=${head_18}
+  head_14=${head_16}
+  head_12=${head_14}
+  head_10=${head_12}
+  head_8=${head_10}
+  head_6=${head_8}
+  head_4=${head_6}
+  head_2=${head_4}
+  sampled="${head_2}"
+  local head
+  local head_3
+  local head_5
+  local head_7
+  local head_9
+  local head_11
+  local head_13
+  local head_15
+  local head_17
+  # shellcheck disable=SC2312 # a variable cannot hold the NUL bytes being counted
+  head_17=$(head -c 8192 -- "${path}" | LC_ALL=C tr -d '\000' | wc -c)
+  head_15=${head_17}
+  head_13=${head_15}
+  head_11=${head_13}
+  head_9=${head_11}
+  head_7=${head_9}
+  head_5=${head_7}
+  head_3=${head_5}
+  head=${head_3}
+  stripped="${head}"
   ((${sampled//[^0-9]/} != ${stripped//[^0-9]/}))
 }
 

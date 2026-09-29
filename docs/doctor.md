@@ -184,6 +184,8 @@ dybatpho::doctor_requirements archive required
 
 Return success when the running Bash is new enough for the library.
 
+_Function has no arguments._
+
 **🚦 Exit codes**
 
 - `0`: Bash is at least `DYBATPHO_BASH_MINIMUM`

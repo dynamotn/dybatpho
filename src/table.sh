@@ -1,13 +1,20 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# keeps its declarations with the functions they describe.
+# dyshellint disable=BSG050,BSG033
 # @file table.sh
 # @brief Utilities for rendering aligned plain-text tables
+# @namespace dybatpho
 # @description
 #   This module contains helpers for rendering delimited row data as aligned
 #   plain text, Unicode boxed tables, or Markdown tables. It also supports
 #   explicit plain-table alignment rules and lightweight CSV rendering. It
 #   targets small script-generated tables where readability matters more than
 #   strict CSV parsing.
-# @tip Rows are provided as a single multi-line string (or stdin with `-`), and cells are split on an exact delimiter such as `|`, `,`, or `::`
+# @tip Rows are provided as a single multi-line string (or stdin with `-`), and cells are split on an exact delimiter
+#   such
+#   as `|`, `,`, or `::`
 # @see
 #   - `example/table_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -60,7 +67,9 @@ function __dybatpho_table_repeat_into {
   local -n __dybatpho_table_repeat_out="$1"
   local __dybatpho_table_repeat_index
   __dybatpho_table_repeat_out=""
-  for ((__dybatpho_table_repeat_index = 0; __dybatpho_table_repeat_index < ${3:-0}; __dybatpho_table_repeat_index++)); do
+  for ((__dybatpho_table_repeat_index = 0;  \
+  __dybatpho_table_repeat_index < ${3:-0};  \
+  __dybatpho_table_repeat_index++)); do
     __dybatpho_table_repeat_out+="${2-}"
   done
 }
@@ -163,8 +172,8 @@ function __dybatpho_table_measure_widths {
     __dybatpho_table_split_row "${row}" "${delimiter}" cells
     for index in "${!cells[@]}"; do
       __dybatpho_table_width_into cell_width "${cells[${index}]}"
-      if [[ -z "${widths_ref[${index}]+x}" ]] || ((cell_width > widths_ref[${index}])); then
-        widths_ref[${index}]=${cell_width}
+      if [[ -z "${widths_ref[${index}]+x}" ]] || ((cell_width > widths_ref[index])); then
+        widths_ref[index]=${cell_width}
       fi
     done
   done
@@ -193,16 +202,18 @@ function __dybatpho_table_parse_alignments {
 
   # shellcheck disable=SC2034 # alignments_ref is a nameref: assigning it is the output
   for index in "${!widths_ref[@]}"; do
-    alignment="$(dybatpho::lower "$(dybatpho::trim "${requested[${index}]-left}")")"
+    local trim
+    trim=$(dybatpho::trim "${requested[${index}]-left}")
+    alignment="$(dybatpho::lower "${trim}")"
     case "${alignment}" in
       "" | left | l)
-        alignments_ref[${index}]="left"
+        alignments_ref[index]="left"
         ;;
       right | r)
-        alignments_ref[${index}]="right"
+        alignments_ref[index]="right"
         ;;
       center | centre | c)
-        alignments_ref[${index}]="center"
+        alignments_ref[index]="center"
         ;;
       *)
         dybatpho::die "Unsupported table alignment: ${alignment}" # kcov(skip)
@@ -283,7 +294,7 @@ function __dybatpho_table_rule {
   local rule="${left}" index segment
 
   for index in "${!widths_ref[@]}"; do
-    __dybatpho_table_repeat_into segment "─" "$((widths_ref[${index}] + 2))"
+    __dybatpho_table_repeat_into segment "─" "$((widths_ref[index] + 2))"
     rule+="${segment}"
     if ((index < ${#widths_ref[@]} - 1)); then
       rule+="${join}"
@@ -417,7 +428,8 @@ function dybatpho::table_markdown {
   done
 }
 
-# @env DYBATPHO_TABLE_CSV_STRICT bool Refuse input whose fields are quoted, rather than splitting through the quotes. Default `true`
+# @env DYBATPHO_TABLE_CSV_STRICT bool Refuse input whose fields are quoted, rather than splitting through the quotes.
+#   Default `true`
 DYBATPHO_TABLE_CSV_STRICT="${DYBATPHO_TABLE_CSV_STRICT:-true}"
 
 #######################################

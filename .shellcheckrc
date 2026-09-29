@@ -1,11 +1,34 @@
+# ShellCheck configuration for the Bash coding style guide.
+#
+# `dyshellint` runs ShellCheck with this file, and maps its levels onto the tiers
+# of the guide: error and warning are the ✔️ SHOULD / ❌ AVOID rules, info and
+# style are the ⚠️ CONSIDER ones. No `severity=` is set here on purpose, so that
+# nothing is filtered out before dyshellint has seen it.
+
+shell=bash
+
+# `# shellcheck source=...` directives point at real files in this repository,
+# so let ShellCheck follow them.
+external-sources=true
+
+# Resolve a `source=` directive relative to the script that carries it, which is
+# how every entrypoint here reaches `scripts/lib/`.
+source-path=SCRIPTDIR
+
+# Optional checks that the guide asks for by name.
+enable=require-variable-braces    # Formatting > Variable Expansion
+enable=require-double-brackets    # Features and Bugs > Test Expression
+enable=quote-safe-variables       # Features and Bugs > Quoting
+enable=deprecate-which            # Calling Commands > Builtin Commands vs External Commands
+enable=useless-use-of-cat         # Calling Commands > Builtin Commands vs External Commands
+enable=avoid-nullary-conditions   # Features and Bugs > Testing Strings
+enable=add-default-case           # Formatting > Case statement
+enable=check-extra-masked-returns # Calling Commands > Checking Return Values
+enable=check-set-e-suppressed     # Calling Commands > Checking Return Values
+enable=check-unassigned-uppercase # Naming Conventions > Variable Names
+
 # SC2155: declare and assign separately. The library assigns in `local` on
 #   purpose throughout; splitting every one would be churn without a bug behind
 #   it.
 # SC2148: missing shebang. Modules under `src/` are sourced, never executed.
-# SC2004: `$`/`${}` is unnecessary on arithmetic variables. This contradicts
-#   `require-variable-braces` below, which the project does want: one rule asks
-#   for `${index}` everywhere and the other rejects it inside `$(( ))`. Braces
-#   everywhere is the more useful of the two, so this one goes.
-disable=SC2155,SC2148,SC2004
-enable=require-variable-braces
-external-sources=true
+disable=SC2155

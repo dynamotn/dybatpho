@@ -72,7 +72,7 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`dybatpho::screen_text`](#dybatphoscreen_text) — Draw text in a rectangle, wrapped and aligned.
 - [`dybatpho::screen_list`](#dybatphoscreen_list) — Draw a scrollable list of items with one of them selected. The list scrolls itself: the offset that keeps the selected item on screen is worked out here and published, so an application only tracks which item is selected.
 - [`dybatpho::screen_table`](#dybatphoscreen_table) — Draw a table with a header and an optional selected row.
-- [`__dybatpho_screen_table_row_into`](#__dybatpho_screen_table_row_into) — 
+- [`__dybatpho_screen_table_row_into`](#__dybatpho_screen_table_row_into) — Render one row of the table into a caller-named variable, padding each cell to the width the column was measured at.
 - [`dybatpho::screen_gauge`](#dybatphoscreen_gauge) — Draw a horizontal gauge filled to a ratio, with a label centred on it.
 - [`dybatpho::screen_tabs`](#dybatphoscreen_tabs) — Draw a row of tabs with one of them active.
 - [`dybatpho::screen_scrollbar`](#dybatphoscreen_scrollbar) — Draw a vertical scrollbar showing where a window sits in a list longer than the screen.
@@ -244,6 +244,8 @@ Report whether Bash indexes strings by byte in this locale.
 Under a UTF-8 locale a multi-byte character is one index and `printf '%d'`
 reports its codepoint; under `C` both count bytes, and a character has to be
 reassembled before it can be measured.
+
+_Function has no arguments._
 
 **🚦 Exit codes**
 
@@ -662,6 +664,8 @@ dybatpho::screen_rect_center popup "${DYBATPHO_SCREEN_RECT}" 40 10
 
 Note that the terminal changed size, so the next event reports it.
 
+_Function has no arguments._
+
 
 ---
 
@@ -1032,6 +1036,19 @@ dybatpho::screen_table "${rect}" rows header:"NAME|STATE|COUNT" selected:0
 
 ### `__dybatpho_screen_table_row_into`
 
+Render one row of the table into a caller-named variable,
+padding each cell to the width the column was measured at.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable to write into |
+| `$2` | string | The row, with its cells separated by the delimiter |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
 
 
 ---
@@ -1180,6 +1197,8 @@ Fill the Braille lookup table, once.
 The table is built with a single `printf`: the format string is assembled
 from `\Uxxxxxxxx` escapes first and expanded in one call, rather than
 calling out once per character.
+
+_Function has no arguments._
 
 
 ---

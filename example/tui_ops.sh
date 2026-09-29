@@ -17,6 +17,8 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# @description Run the `TERMINAL DETECTION` section of this example.
+# @noargs
 function _main {
   dybatpho::header "TERMINAL DETECTION"
   if dybatpho::tui_supported; then
@@ -29,7 +31,9 @@ function _main {
   # The bar is just a string, so it composes with anything that takes one.
   local step
   for step in 0 2 5; do
-    printf 'release %s\n' "$(dybatpho::tui_bar "${step}" 5 20)"
+    local tui_bar
+    tui_bar=$(dybatpho::tui_bar "${step}" 5 20)
+    printf 'release %s\n' "${tui_bar}"
   done
 
   dybatpho::header "CHOOSING A TARGET"
@@ -37,6 +41,7 @@ function _main {
   dybatpho::tui_menu environment "Deploy to which environment?" \
     dev staging prod < <(printf '2\n') \
     || dybatpho::die "No environment chosen"
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Chose ${environment}, entry ${DYBATPHO_TUI_INDEX}"
 
   local -a components=()

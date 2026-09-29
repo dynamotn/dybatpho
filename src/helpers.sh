@@ -1,6 +1,14 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file is sourced by `init.sh` and never run, so it carries no executable
+# bit; it lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# keeps its declarations with the functions they describe; it uses `eval`,
+# which is how the spec engine builds a parser; it parses its own arguments, so
+# the raw form is what the reader sees.
+# dyshellint disable=BSG050,BSG033,BSG040,BSG051
 # @file helpers.sh
 # @brief Utilities for common shell-script helper patterns.
+# @namespace dybatpho
 # @description
 #   `src/helpers.sh` groups together the small building blocks that many other
 #   modules rely on:
@@ -89,7 +97,12 @@
 #   ```
 # @see
 #   - `example/process_ops.sh`
-# @tip Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on missing configuration or dependencies.
+# @tip Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on
+#   missing
+#   configuration or dependencies.
+# The `dybatpho::is` family and the lookups below are questions, not work:
+# a caller tests them, so `set -e` is not meant to reach inside.
+# shellcheck disable=SC2310
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_RETRY_BASE_DELAY number First retry delay in seconds (default `2`)
@@ -111,13 +124,14 @@ DYBATPHO_REPL_HISTORY_FILE="${HOME}/.cache/dybatpho_repl.history"
 # @tip Prefer calling this at the top of reusable functions instead of manually unpacking `$@`
 # @exitcode 1 Stop the script if the specification is invalid or required arguments are missing
 # @exitcode 0 Assign arguments to the requested variable names and return successfully
+# @arg $@ string Variable names, then `--`, then the arguments to bind
 #######################################
 function dybatpho::expect_args {
-  local variable_names=()
+  local -a variable_names=()
   local is_error=1
 
   while (($#)); do
-    if [ "$1" = -- ]; then
+    if [[ "$1" = -- ]]; then
       is_error=0
       shift
       break
@@ -126,7 +140,8 @@ function dybatpho::expect_args {
     shift
   done
 
-  ((is_error)) && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"' # kcov(skip)
+  ((is_error)) \
+    && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"' # kcov(skip)
 
   local variable_name
   for variable_name in "${variable_names[@]}"; do
@@ -182,8 +197,10 @@ function dybatpho::expect_ref {
   # The prefix belongs to the library's own locals. A caller handing one over
   # would have its nameref bound to the library's variable rather than to its
   # own, and would never be told.
+  local reserved_hint="is reserved: names starting with \`__dybatpho\` belong to the library,"
+  reserved_hint+=" and passing one would write to the wrong place. Rename the variable in the caller."
   [[ "${name}" == __dybatpho* ]] \
-    && dybatpho::die "${caller}: '${name}' is reserved: names starting with \`__dybatpho\` belong to the library's own variables, and passing one would silently write to the wrong place. Rename the variable in the caller."
+    && dybatpho::die "${caller}: '${name}' ${reserved_hint}"
 
   return 0
 }
@@ -191,6 +208,7 @@ function dybatpho::expect_ref {
 #######################################
 # @description Check whether at least one more positional argument remains after the current one.
 # This helper is useful while manually parsing a shifting argument list.
+# @noargs
 # @example
 #   while dybatpho::still_has_args "$@" && shift; do
 #     echo "Function has next argument is $1"
@@ -199,7 +217,7 @@ function dybatpho::expect_ref {
 # @exitcode 1 No additional arguments remain
 #######################################
 function dybatpho::still_has_args {
-  [ $# -gt 1 ]
+  [[ $# -gt 1 ]]
 }
 
 #######################################
@@ -211,7 +229,7 @@ function dybatpho::still_has_args {
 #######################################
 function dybatpho::expect_envs {
   for arg in "$@"; do
-    if [ -z "${!arg:-}" ]; then
+    if [[ -z "${!arg:-}" ]]; then
       dybatpho::die "Environment variable \`${arg}\` isn't set." # kcov(skip)
     fi
   done
@@ -314,7 +332,8 @@ function dybatpho::command_exists_all {
 
 #######################################
 # @description Check whether a value matches a supported shell-oriented condition.
-# @arg $1 string Condition (command|function|file|dir|link|exist|readable|writeable|executable|set|empty|number|int|true|false)
+# @arg $1 string Condition
+#   (command|function|file|dir|link|exist|readable|writeable|executable|set|empty|number|int|true|false)
 # @arg $2 string Value to test
 # @tip Use this helper to keep calling code readable instead of scattering shell test syntax across the script
 # @exitcode 0 If matched
@@ -333,39 +352,39 @@ function dybatpho::is {
       return "$?"
       ;;
     file)
-      [ -f "${input}" ]
+      [[ -f "${input}" ]]
       return "$?"
       ;;
     dir)
-      [ -d "${input}" ]
+      [[ -d "${input}" ]]
       return "$?"
       ;;
     link)
-      [ -L "${input}" ]
+      [[ -L "${input}" ]]
       return "$?"
       ;;
     exist)
-      [ -e "${input}" ]
+      [[ -e "${input}" ]]
       return "$?"
       ;;
     readable)
-      [ -r "${input}" ]
+      [[ -r "${input}" ]]
       return "$?"
       ;;
     writeable)
-      [ -w "${input}" ]
+      [[ -w "${input}" ]]
       return "$?"
       ;;
     executable)
-      [ -x "${input}" ]
+      [[ -x "${input}" ]]
       return "$?"
       ;;
     set)
-      [ "${input+x}" = "x" ] && [ "${#input}" -gt "0" ]
+      [[ "${input+x}" == "x" ]] && [[ "${#input}" -gt "0" ]]
       return "$?"
       ;;
     empty)
-      [ "${input+x}" = "x" ] && [ "${#input}" -eq "0" ]
+      [[ "${input+x}" == "x" ]] && [[ "${#input}" -eq "0" ]]
       return "$?"
       ;;
     number)
@@ -388,6 +407,7 @@ function dybatpho::is {
         '' | *) return 1 ;;
       esac
       ;;
+    *) ;;
   esac > /dev/null 2>&1 # kcov(skip)
   return 1
 }
@@ -404,10 +424,10 @@ function dybatpho::coalesce {
     dybatpho::die "${FUNCNAME[0]}: Expected at least one value" # kcov(skip)
   fi
 
-  local value
-  for value in "$@"; do
-    if [[ -n "${value}" ]]; then
-      printf '%s\n' "${value}"
+  local candidate
+  for candidate in "$@"; do
+    if [[ -n "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
       return 0
     fi
   done
@@ -531,7 +551,7 @@ function dybatpho::retry {
   until eval "${command}"; do
     exit_code="$?"
     count="$((count + 1))"
-    if [ "${count}" -le "${retries}" ]; then
+    if [[ "${count}" -le "${retries}" ]]; then
       delay="$(__dybatpho_helpers_backoff "${count}")"
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_attempts_total
@@ -586,7 +606,11 @@ function dybatpho::breakpoint {
   local dybatpho_key_pressed
   local dybatpho_section="--------------------------------------------------------------------------------"
   local dybatpho_help
-  printf -v dybatpho_help '%s\n    d: run debugger\n    c: display source file\n    o: list options\n    p: list parameters\n    a: list indexed array\n    A: list associative array\n    q: quit' "${dybatpho_section}"
+  local dybatpho_help_format='%s\n    d: run debugger\n    c: display source file\n    o: list options\n'
+  dybatpho_help_format+='    p: list parameters\n    a: list indexed array\n    A: list associative array\n'
+  dybatpho_help_format+='    q: quit'
+  # shellcheck disable=SC2059 # the format is built above, not taken from input
+  printf -v dybatpho_help "${dybatpho_help_format}" "${dybatpho_section}"
   local source_file="${BASH_SOURCE[1]:-bash}"
   __dybatpho_log fatal "Breakpoint hit. Current line: ${source_file}:${BASH_LINENO[0]}" stderr "1;36"
   while true; do
@@ -625,12 +649,15 @@ function dybatpho::breakpoint {
         done
         echo >&2
         set -eou pipefail # Enable strict mode
+        # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
         dybatpho::is true "${DYBATPHO_USED_ERR_HANDLER}" \
-          && dybatpho::register_err_handler      # Rerun register_err_handler
-        [ "${LOG_LEVEL}" == "trace" ] && set -xv # Re-enable tracing if needed
+          && dybatpho::register_err_handler # Rerun register_err_handler
+        # dyshellint disable=BSG034 # the debugger restores the tracing it suspended
+        # shellcheck disable=SC2154 # declared by `src/logging.sh`, a core module
+        [[ "${LOG_LEVEL}" == "trace" ]] && set -xv # Re-enable tracing if needed
         ;;
       c)
-        if [ "${source_file}" != "bash" ]; then
+        if [[ "${source_file}" != "bash" ]]; then
           echo "${dybatpho_section}" >&2
           dybatpho::show_file "${BASH_SOURCE[1]}"
         fi
@@ -892,5 +919,6 @@ function dybatpho::function_list {
   # happened: a bundle holds every module in one file and none of them can be
   # told apart.
   [[ "${attributable}" == true ]] \
-    || dybatpho::die "${FUNCNAME[0]}: No function can be attributed to a module, which is how a bundle looks; ask without a module name"
+    || dybatpho::die \
+      "${FUNCNAME[0]}: No function belongs to a module, which is how a bundle looks; ask without a module"
 }

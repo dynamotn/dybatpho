@@ -24,6 +24,8 @@ readonly LOCALES=(en de fr vi ja hi ar)
 
 WORKDIR=""
 
+# @description Write the catalogs the demo translates from, into a temporary directory.
+# @noargs
 function _setup {
   # The directory and everything in it is removed when this shell exits.
   dybatpho::create_temp_dir WORKDIR i18n-demo
@@ -64,6 +66,8 @@ CATALOG
   export DYBATPHO_I18N_PATH="${WORKDIR}/locale"
 }
 
+# @description Run the `TRANSLATING MESSAGES` section of this example.
+# @noargs
 function _demo_translate {
   dybatpho::header "TRANSLATING MESSAGES"
   dybatpho::info "The same script, run under two locales"
@@ -74,15 +78,25 @@ function _demo_translate {
     # "$( )" is a subshell, so a catalog loaded inside one would be thrown away.
     dybatpho::i18n_reset
     dybatpho::i18n_init "${locale}"
-    dybatpho::print "  [${locale}] $(dybatpho::i18n_t deploy.start app=api env=production)"
-    dybatpho::print "  [${locale}] $(dybatpho::i18n_tn deploy.files 1)"
-    dybatpho::print "  [${locale}] $(dybatpho::i18n_tn deploy.files 1240)"
-    dybatpho::print "  [${locale}] $(dybatpho::i18n_t deploy.done)"
+    local i18n_t_2
+    i18n_t_2=$(dybatpho::i18n_t deploy.start app=api env=production)
+    dybatpho::print "  [${locale}] ${i18n_t_2}"
+    local i18n_tn_2
+    i18n_tn_2=$(dybatpho::i18n_tn deploy.files 1)
+    dybatpho::print "  [${locale}] ${i18n_tn_2}"
+    local i18n_tn
+    i18n_tn=$(dybatpho::i18n_tn deploy.files 1240)
+    dybatpho::print "  [${locale}] ${i18n_tn}"
+    local i18n_t
+    i18n_t=$(dybatpho::i18n_t deploy.done)
+    dybatpho::print "  [${locale}] ${i18n_t}"
   done
   dybatpho::info "Vietnamese has one plural form, so 1 and 1,240 read alike;"
   dybatpho::info "'deploy.done' has no Vietnamese entry, so it falls back to its key"
 }
 
+# @description Run the `PLURAL RULES` section of this example.
+# @noargs
 function _demo_plurals {
   dybatpho::header "PLURAL RULES"
   dybatpho::info "How many forms a language has, and which one a count takes"
@@ -90,7 +104,9 @@ function _demo_plurals {
   for language in en vi ru pl ar; do
     line=""
     for count in 0 1 2 5 21; do
-      line+="$(printf '%-6s' "$(dybatpho::i18n_plural_form "${count}" "${language}")")"
+      local i18n_plural_form
+      i18n_plural_form=$(dybatpho::i18n_plural_form "${count}" "${language}")
+      line+="$(printf '%-6s' "${i18n_plural_form}")"
     done
     dybatpho::print "  $(printf '%-4s' "${language}") ${line}"
   done
@@ -99,18 +115,26 @@ function _demo_plurals {
   dybatpho::info "'count == 1' check always makes"
 }
 
+# @description Run the `NUMBERS` section of this example.
+# @noargs
 function _demo_numbers {
   dybatpho::header "NUMBERS"
   local locale
   for locale in "${LOCALES[@]}"; do
-    dybatpho::print "  $(printf '%-4s' "${locale}") $(dybatpho::i18n_number 1234567.891 2 "${locale}")"
+    local i18n_number_2
+    i18n_number_2=$(dybatpho::i18n_number 1234567.891 2 "${locale}")
+    dybatpho::print "  $(printf '%-4s' "${locale}") ${i18n_number_2}"
   done
   dybatpho::info "Hindi groups by lakh rather than by thousand, which is why the"
   dybatpho::info "group size is data and not a hard-coded three"
   dybatpho::print "  A value wider than the machine word, formatted exactly:"
-  dybatpho::print "    $(dybatpho::i18n_number 123456789012345678901234567890 0 en)"
+  local i18n_number
+  i18n_number=$(dybatpho::i18n_number 123456789012345678901234567890 0 en)
+  dybatpho::print "    ${i18n_number}"
 }
 
+# @description Run the `CURRENCY` section of this example.
+# @noargs
 function _demo_currency {
   dybatpho::header "CURRENCY"
   dybatpho::info "How many decimals to show belongs to the currency;"
@@ -124,18 +148,29 @@ function _demo_currency {
   done
   dybatpho::table_align "${rows}" "|" "" 2 | dybatpho::text_indent - "  "
   dybatpho::print ""
-  dybatpho::print "  Negative, default:    $(dybatpho::i18n_currency -1234.5 USD en)"
-  dybatpho::print "  Negative, accounting: $(DYBATPHO_I18N_CURRENCY_NEGATIVE=parens dybatpho::i18n_currency -1234.5 USD en)"
+  local i18n_currency_2
+  i18n_currency_2=$(dybatpho::i18n_currency -1234.5 USD en)
+  dybatpho::print "  Negative, default:    ${i18n_currency_2}"
+  local in_parens
+  in_parens=$(DYBATPHO_I18N_CURRENCY_NEGATIVE=parens dybatpho::i18n_currency -1234.5 USD en)
+  dybatpho::print \
+    "  Negative, accounting: ${in_parens}"
   dybatpho::info "The minus goes outside the symbol; a naive version prints \$-1,234.50"
   # An unknown currency is a data gap rather than a reason to stop a report.
-  dybatpho::print "  Unknown code:         $(dybatpho::i18n_currency 1234.5 XPF en 2> /dev/null)"
+  local i18n_currency
+  i18n_currency=$(dybatpho::i18n_currency 1234.5 XPF en 2> /dev/null)
+  dybatpho::print "  Unknown code:         ${i18n_currency}"
 }
 
+# @description Run the `PERCENTAGES AND SIZES` section of this example.
+# @noargs
 function _demo_percent_and_bytes {
   dybatpho::header "PERCENTAGES AND SIZES"
   local locale
   for locale in en fr tr; do
-    dybatpho::print "  $(printf '%-4s' "${locale}") $(dybatpho::i18n_percent 42.5 1 "${locale}")"
+    local i18n_percent
+    i18n_percent=$(dybatpho::i18n_percent 42.5 1 "${locale}")
+    dybatpho::print "  $(printf '%-4s' "${locale}") ${i18n_percent}"
   done
   dybatpho::info "Turkish writes the sign before the number"
 
@@ -147,13 +182,21 @@ function _demo_percent_and_bytes {
   size="$(dybatpho::file_size "${sample}")"
   dybatpho::print ""
   dybatpho::print "  dybatpho::file_size reports ${size} bytes, which reads as:"
-  dybatpho::print "    IEC, en: $(dybatpho::i18n_bytes "${size}" iec en)"
-  dybatpho::print "    SI,  en: $(dybatpho::i18n_bytes "${size}" si en)"
-  dybatpho::print "    IEC, de: $(dybatpho::i18n_bytes "${size}" iec de)"
+  local i18n_bytes_3
+  i18n_bytes_3=$(dybatpho::i18n_bytes "${size}" iec en)
+  dybatpho::print "    IEC, en: ${i18n_bytes_3}"
+  local i18n_bytes_2
+  i18n_bytes_2=$(dybatpho::i18n_bytes "${size}" si en)
+  dybatpho::print "    SI,  en: ${i18n_bytes_2}"
+  local i18n_bytes
+  i18n_bytes=$(dybatpho::i18n_bytes "${size}" iec de)
+  dybatpho::print "    IEC, de: ${i18n_bytes}"
   dybatpho::info "The digits are localized; the unit symbols are not, because every"
   dybatpho::info "other tool on the machine prints them the same way"
 }
 
+# @description Run the `DATES AND TIMES` section of this example.
+# @noargs
 function _demo_dates {
   dybatpho::header "DATES AND TIMES"
   local locale rows="locale|short|full|time"
@@ -168,28 +211,41 @@ function _demo_dates {
   dybatpho::info "has not generated a locale answers in English instead of failing"
   dybatpho::print ""
   dybatpho::print "  Same instant, two timezones:"
-  dybatpho::print "    UTC:            $(dybatpho::i18n_datetime "${FIXED_EPOCH}" medium en)"
-  dybatpho::print "    Asia/Ho_Chi_Minh: $(DYBATPHO_DATE_TIMEZONE=Asia/Ho_Chi_Minh dybatpho::i18n_datetime "${FIXED_EPOCH}" medium en)"
+  local i18n_datetime
+  i18n_datetime=$(dybatpho::i18n_datetime "${FIXED_EPOCH}" medium en)
+  dybatpho::print "    UTC:            ${i18n_datetime}"
+  local saigon_time
+  saigon_time=$(DYBATPHO_DATE_TIMEZONE=Asia/Ho_Chi_Minh dybatpho::i18n_datetime "${FIXED_EPOCH}" medium en)
+  dybatpho::print "    Asia/Ho_Chi_Minh: ${saigon_time}"
 }
 
+# @description Run the `RELATIVE TIME` section of this example.
+# @noargs
 function _demo_relative {
   dybatpho::header "RELATIVE TIME"
   dybatpho::i18n_reset
   dybatpho::i18n_init en
   local offset
   for offset in 10 300 7200 259200 1209600 5259600; do
-    dybatpho::print "  $(printf '%-10s' "-${offset}s") $(dybatpho::i18n_relative $((FIXED_EPOCH - offset)) "${FIXED_EPOCH}")"
+    local label relative
+    label=$(printf '%-10s' "-${offset}s")
+    relative=$(dybatpho::i18n_relative $((FIXED_EPOCH - offset)) "${FIXED_EPOCH}")
+    dybatpho::print "  ${label} ${relative}"
   done
   dybatpho::print "  $(printf '%-10s' "+7200s") $(dybatpho::i18n_relative $((FIXED_EPOCH + 7200)) "${FIXED_EPOCH}")"
   dybatpho::info "The reference time is passed in, which is what keeps this output"
   dybatpho::info "reproducible instead of depending on when the script runs"
 }
 
+# @description Run the `TEXT DIRECTION` section of this example.
+# @noargs
 function _demo_direction {
   dybatpho::header "TEXT DIRECTION"
   local locale
   for locale in en de ja ar he fa; do
-    dybatpho::print "  $(printf '%-4s' "${locale}") $(dybatpho::i18n_direction "${locale}")"
+    local i18n_direction
+    i18n_direction=$(dybatpho::i18n_direction "${locale}")
+    dybatpho::print "  $(printf '%-4s' "${locale}") ${i18n_direction}"
   done
   local product="مرحبا"
   local wrapped
@@ -197,11 +253,15 @@ function _demo_direction {
   dybatpho::print ""
   dybatpho::print "  Spliced raw:      Package ${product} installed"
   dybatpho::print "  Spliced isolated: Package ${wrapped} installed"
-  dybatpho::print "  Stripped again:   $(dybatpho::i18n_bidi_strip "${wrapped}")"
+  local i18n_bidi_strip
+  i18n_bidi_strip=$(dybatpho::i18n_bidi_strip "${wrapped}")
+  dybatpho::print "  Stripped again:   ${i18n_bidi_strip}"
   dybatpho::info "Isolating is for display only. The markers are invisible but real,"
   dybatpho::info "so wrapped text no longer compares equal to what it was wrapped from"
 }
 
+# @description Run the `ADDING A LOCALE WITHOUT PATCHING THE MODULE` section of this example.
+# @noargs
 function _demo_register {
   dybatpho::header "ADDING A LOCALE WITHOUT PATCHING THE MODULE"
   dybatpho::i18n_register_number sv " " "," 3
@@ -212,12 +272,20 @@ function _demo_register {
   dybatpho::i18n_register_names sv weekdays \
     "måndag,tisdag,onsdag,torsdag,fredag,lördag,söndag"
   dybatpho::i18n_register_date sv date_long "d MMMM yyyy"
-  dybatpho::print "  number:   $(dybatpho::i18n_number 1234567.89 2 sv)"
-  dybatpho::print "  currency: $(dybatpho::i18n_currency 1234.5 SEK sv)"
-  dybatpho::print "  date:     $(dybatpho::i18n_date "${FIXED_EPOCH}" long sv)"
+  local i18n_number
+  i18n_number=$(dybatpho::i18n_number 1234567.89 2 sv)
+  dybatpho::print "  number:   ${i18n_number}"
+  local i18n_currency
+  i18n_currency=$(dybatpho::i18n_currency 1234.5 SEK sv)
+  dybatpho::print "  currency: ${i18n_currency}"
+  local i18n_date
+  i18n_date=$(dybatpho::i18n_date "${FIXED_EPOCH}" long sv)
+  dybatpho::print "  date:     ${i18n_date}"
   dybatpho::info "Six calls in the caller's own script, no edit to src/i18n.sh"
 }
 
+# @description Run the `KEEPING CATALOGS HONEST` section of this example.
+# @noargs
 function _demo_tooling {
   dybatpho::header "KEEPING CATALOGS HONEST"
   local source="${WORKDIR}/app.sh"
@@ -250,6 +318,8 @@ SOURCE
 # nothing set here reaches the caller. ShellCheck reads that confinement as a
 # lost assignment, which is exactly the behavior being relied on.
 # shellcheck disable=SC2030,SC2031
+# @description Run a fragment with library translation on, so its own output is localized.
+# @noargs
 function _translated {
   (
     export DYBATPHO_I18N_TRANSLATE_LIBRARY=true
@@ -257,6 +327,8 @@ function _translated {
   )
 }
 
+# @description Run the `THE LIBRARY` section of this example.
+# @noargs
 function _demo_library_ui {
   dybatpho::header "THE LIBRARY'S OWN INTERFACE"
   dybatpho::info "Translating your strings still leaves dybatpho's half of the"
@@ -278,6 +350,7 @@ function _demo_library_ui {
   dybatpho::print "  be its own message id; the call site passes a key instead:"
   (dybatpho::generate_from_spec _demo_spec --dst /tmp) 2>&1 \
     | dybatpho::text_indent - "    " || true
+  # shellcheck disable=SC2310 # the fragment is run for its output, and failure is shown, not fatal
   _translated dybatpho::generate_from_spec _demo_spec --dst /tmp 2>&1 \
     | dybatpho::text_indent - "    " || true
 
@@ -290,11 +363,16 @@ function _demo_library_ui {
 
 # The spec whose help and errors the section above renders. It is deliberately
 # plain: everything interesting in that output belongs to the library.
+# @description A small option spec, used to show a translated help screen.
+# @noargs
 function _demo_spec {
   dybatpho::opts::setup "Deploy an application" ARGS action:"true"
   dybatpho::opts::param "Where to deploy" DEST -d --dest
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _demo_spec"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _setup
   _demo_translate

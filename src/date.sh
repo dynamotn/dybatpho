@@ -1,6 +1,12 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break.
+# dyshellint disable=BSG050,BSG011
 # @file date.sh
 # @brief Utilities for working with dates and timestamps
+# @namespace dybatpho
 # @description
 #   This module contains helpers for reading the current time, validating date
 #   strings, converting between Unix timestamps and formatted dates, shifting a
@@ -32,6 +38,7 @@ __dybatpho_date_flavor_cache=""
 #
 #   The answer is cached: probing twice per call is a lot for a helper that
 #   formats a date.
+# @noargs
 # @stdout `gnu`, `bsd` or `busybox`
 function __dybatpho_date_flavor {
   if [[ -n "${__dybatpho_date_flavor_cache}" ]]; then
@@ -50,10 +57,26 @@ function __dybatpho_date_flavor {
   printf '%s\n' "${__dybatpho_date_flavor_cache}"
 }
 
+#######################################
+# @description Report whether `date` is the GNU one, which is what decides
+#   between `-d` and BSD's `-j -f` everywhere else in this module.
+# @noargs
+# @exitcode 0 `date` is GNU
+# @exitcode 1 `date` is the BSD one
+#######################################
 function __dybatpho_date_is_gnu {
-  [[ "$(__dybatpho_date_flavor)" == "gnu" ]]
+  local date_flavor
+  date_flavor=$(__dybatpho_date_flavor)
+  [[ "${date_flavor}" == "gnu" ]]
 }
 
+#######################################
+# @description Turn a date expression into an epoch, through whichever `date`
+#   the machine has.
+# @arg $1 string Date expression, in any form the local `date` accepts
+# @stdout Seconds since the epoch
+# @exitcode 1 The expression could not be parsed
+#######################################
 function __dybatpho_date_parse {
   local input
   dybatpho::expect_args input -- "$@"
@@ -69,7 +92,9 @@ function __dybatpho_date_parse {
   local input_format timestamp
   for input_format in "%Y-%m-%d %H:%M:%S" "%Y-%m-%d"; do
     timestamp="$(__dybatpho_date_parse_with "${flavor}" "${input_format}" "${input}")" || continue
-    if [[ "$(dybatpho::date_format "${timestamp}" "${input_format}" 2> /dev/null)" == "${input}" ]]; then
+    local date_format
+    date_format=$(dybatpho::date_format "${timestamp}" "${input_format}" 2> /dev/null)
+    if [[ "${date_format}" == "${input}" ]]; then
       printf '%s\n' "${timestamp}"
       return 0
     fi

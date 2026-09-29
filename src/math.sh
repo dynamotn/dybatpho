@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file math.sh
 # @brief Exact decimal arithmetic, comparison, rounding and aggregation
+# @namespace dybatpho
 # @description
 #   Bash only does integer arithmetic, so a script that has to divide, average,
 #   or add two prices reaches for `bc` or `awk`. `bc` is not installed
@@ -54,6 +58,7 @@ export DYBATPHO_MATH_MAX_EXPONENT=4096
 # @description Name the public function a failure should be reported against.
 #   The digit helpers call one another, so `FUNCNAME[1]` is usually another
 #   internal name; the caller wants to read the name they typed.
+# @noargs
 # @stdout The nearest `dybatpho::` function on the call stack
 #######################################
 function __dybatpho_math_caller {
@@ -87,7 +92,11 @@ function __dybatpho_math_parse {
   local -n __parse_frac="${__parse_frac_name}"
 
   [[ "${__parse_value}" =~ ${DYBATPHO_MATH_NUMBER_REGEX} ]] \
-    || dybatpho::die "$(__dybatpho_math_caller): Not a number: '${__parse_value}'"
+    || {
+      local math_caller_detail
+      math_caller_detail=$(__dybatpho_math_caller)
+      dybatpho::die "${math_caller_detail}: Not a number: '${__parse_value}'"
+    }
 
   local __parse_rest="${__parse_value}"
   __parse_sign=""
@@ -97,6 +106,7 @@ function __dybatpho_math_parse {
       __parse_rest="${__parse_rest#-}"
       ;;
     +*) __parse_rest="${__parse_rest#+}" ;;
+    *) ;;
   esac
 
   if [[ "${__parse_rest}" == *.* ]]; then
@@ -322,7 +332,7 @@ function __dybatpho_math_round_digits {
   done
   if ((__round_precision > 0)); then
     __round_frac="${__round_carried: -__round_precision}"
-    __round_int="${__round_carried:0:${#__round_carried} - __round_precision}"
+    __round_int="${__round_carried:0:${#__round_carried}-__round_precision}"
   else
     __round_frac=""
     __round_int="${__round_carried}"
@@ -346,7 +356,7 @@ function __dybatpho_math_unscale {
   while ((${#__unscale_digits} <= __unscale_scale)); do
     __unscale_digits="0${__unscale_digits}"
   done
-  __unscale_int="${__unscale_digits:0:${#__unscale_digits} - __unscale_scale}"
+  __unscale_int="${__unscale_digits:0:${#__unscale_digits}-__unscale_scale}"
   if ((__unscale_scale > 0)); then
     __unscale_frac="${__unscale_digits: -__unscale_scale}"
   else
@@ -508,13 +518,21 @@ function __dybatpho_math_div2 {
   dybatpho::expect_args __div2_out_name __div2_a __div2_b __div2_scale -- "$@"
   local -n __div2_out="${__div2_out_name}"
   [[ "${__div2_scale}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "$(__dybatpho_math_caller): Scale must be a non-negative integer, got '${__div2_scale}'"
+    || {
+      local math_caller_detail
+      math_caller_detail=$(__dybatpho_math_caller)
+      dybatpho::die "${math_caller_detail}: Scale must be a non-negative integer, got '${__div2_scale}'"
+    }
   local __div2_sign_a __div2_int_a __div2_frac_a
   local __div2_sign_b __div2_int_b __div2_frac_b
   __dybatpho_math_parse "${__div2_a}" __div2_sign_a __div2_int_a __div2_frac_a
   __dybatpho_math_parse "${__div2_b}" __div2_sign_b __div2_int_b __div2_frac_b
   [[ "${__div2_int_b}" != "0" || -n "${__div2_frac_b}" ]] \
-    || dybatpho::die "$(__dybatpho_math_caller): Division by zero"
+    || {
+      local math_caller_detail
+      math_caller_detail=$(__dybatpho_math_caller)
+      dybatpho::die "${math_caller_detail}: Division by zero"
+    }
 
   local __div2_num="${__div2_int_a}${__div2_frac_a}"
   local __div2_den="${__div2_int_b}${__div2_frac_b}"
@@ -751,7 +769,8 @@ function dybatpho::math_pow {
   local magnitude="${exponent#[+-]}"
   magnitude=$((10#${magnitude}))
   ((magnitude <= DYBATPHO_MATH_MAX_EXPONENT)) \
-    || dybatpho::die "${FUNCNAME[0]}: Exponent magnitude must be at most ${DYBATPHO_MATH_MAX_EXPONENT}, got '${exponent}'"
+    || dybatpho::die \
+      "${FUNCNAME[0]}: Exponent magnitude must be at most ${DYBATPHO_MATH_MAX_EXPONENT}, got '${exponent}'"
 
   local sign integer fraction
   __dybatpho_math_parse "${base}" sign integer fraction
@@ -860,7 +879,9 @@ function dybatpho::math_compare {
 function dybatpho::math_gt {
   local a b
   dybatpho::expect_args a b -- "$@"
-  (($(dybatpho::math_compare "${a}" "${b}") > 0))
+  local math_compare
+  math_compare=$(dybatpho::math_compare "${a}" "${b}")
+  ((math_compare > 0))
 }
 
 #######################################
@@ -876,7 +897,9 @@ function dybatpho::math_gt {
 function dybatpho::math_lt {
   local a b
   dybatpho::expect_args a b -- "$@"
-  (($(dybatpho::math_compare "${a}" "${b}") < 0))
+  local math_compare
+  math_compare=$(dybatpho::math_compare "${a}" "${b}")
+  ((math_compare < 0))
 }
 
 #######################################
@@ -893,7 +916,9 @@ function dybatpho::math_lt {
 function dybatpho::math_eq {
   local a b
   dybatpho::expect_args a b -- "$@"
-  (($(dybatpho::math_compare "${a}" "${b}") == 0))
+  local math_compare
+  math_compare=$(dybatpho::math_compare "${a}" "${b}")
+  ((math_compare == 0))
 }
 
 #######################################
@@ -1004,9 +1029,9 @@ function dybatpho::math_min {
   local -a values=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  local smallest="${values[0]}" value
-  for value in "${values[@]}"; do
-    dybatpho::math_lt "${value}" "${smallest}" && smallest="${value}"
+  local smallest="${values[0]}" number
+  for number in "${values[@]}"; do
+    dybatpho::math_lt "${number}" "${smallest}" && smallest="${number}"
   done
   printf '%s\n' "${smallest}"
 }
@@ -1026,9 +1051,9 @@ function dybatpho::math_max {
   local -a values=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  local largest="${values[0]}" value
-  for value in "${values[@]}"; do
-    dybatpho::math_gt "${value}" "${largest}" && largest="${value}"
+  local largest="${values[0]}" number
+  for number in "${values[@]}"; do
+    dybatpho::math_gt "${number}" "${largest}" && largest="${number}"
   done
   printf '%s\n' "${largest}"
 }
@@ -1047,9 +1072,9 @@ function dybatpho::math_max {
 function dybatpho::math_sum {
   local -a values=()
   __dybatpho_math_collect values "$@"
-  local total="0" value
-  for value in "${values[@]}"; do
-    __dybatpho_math_add2 total "${total}" "${value}"
+  local total="0" number
+  for number in "${values[@]}"; do
+    __dybatpho_math_add2 total "${total}" "${number}"
   done
   printf '%s\n' "${total}"
 }
@@ -1073,9 +1098,9 @@ function dybatpho::math_avg {
   local -a values=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  local total="0" value mean
-  for value in "${values[@]}"; do
-    __dybatpho_math_add2 total "${total}" "${value}"
+  local total="0" number mean
+  for number in "${values[@]}"; do
+    __dybatpho_math_add2 total "${total}" "${number}"
   done
   __dybatpho_math_div2 mean "${total}" "${#values[@]}" "${DYBATPHO_MATH_SCALE}"
   printf '%s\n' "${mean}"
@@ -1148,12 +1173,12 @@ function dybatpho::math_gcd {
   dybatpho::expect_args a b -- "$@"
   shift 2
   local -a values=("${a}" "${b}" "$@")
-  local value sign integer fraction
+  local number sign integer fraction
   local result="0" quotient remainder current
-  for value in "${values[@]}"; do
-    __dybatpho_math_parse "${value}" sign integer fraction
+  for number in "${values[@]}"; do
+    __dybatpho_math_parse "${number}" sign integer fraction
     [[ -z "${fraction}" ]] \
-      || dybatpho::die "${FUNCNAME[0]}: Expected whole numbers, got '${value}'"
+      || dybatpho::die "${FUNCNAME[0]}: Expected whole numbers, got '${number}'"
     current="${integer}"
     # Euclid: replace the pair by (smaller, remainder) until nothing is left.
     while [[ "${current}" != "0" ]]; do
@@ -1180,12 +1205,12 @@ function dybatpho::math_lcm {
   dybatpho::expect_args a b -- "$@"
   shift 2
   local -a values=("${a}" "${b}" "$@")
-  local value sign integer fraction
+  local number sign integer fraction
   local result="1" divisor product quotient remainder
-  for value in "${values[@]}"; do
-    __dybatpho_math_parse "${value}" sign integer fraction
+  for number in "${values[@]}"; do
+    __dybatpho_math_parse "${number}" sign integer fraction
     [[ -z "${fraction}" ]] \
-      || dybatpho::die "${FUNCNAME[0]}: Expected whole numbers, got '${value}'"
+      || dybatpho::die "${FUNCNAME[0]}: Expected whole numbers, got '${number}'"
     if [[ "${integer}" == "0" ]]; then
       printf '0\n'
       return 0

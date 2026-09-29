@@ -25,6 +25,7 @@ function _spec_root {
   dybatpho::opts::param "Internal switch" INTERNAL --internal hidden:true
   dybatpho::opts::cmd deploy _spec_deploy
   dybatpho::opts::cmd rollback _spec_rollback
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_root"
 }
 
 #######################################
@@ -34,6 +35,7 @@ function _spec_root {
 function _spec_deploy {
   dybatpho::opts::setup "Deploy a version to the target environment" DEPLOY_ARGS action:"_run_deploy"
   dybatpho::opts::param "Version tag to deploy" TAG --tag required:true
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_deploy"
 }
 
 #######################################
@@ -43,6 +45,7 @@ function _spec_deploy {
 function _spec_rollback {
   dybatpho::opts::setup "Roll back to the previous version" ROLLBACK_ARGS action:"_run_rollback"
   dybatpho::opts::flag "Skip the health check" FORCE --force
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_rollback"
 }
 
 #######################################
@@ -50,31 +53,41 @@ function _spec_rollback {
 # @noargs
 #######################################
 function _demo_reporting {
-  dybatpho::print "Mode: $(dybatpho::agent_mode)"
+  local agent_mode
+  agent_mode=$(dybatpho::agent_mode)
+  dybatpho::print "Mode: ${agent_mode}"
   dybatpho::agent_result ok service=api version=1.4.2
   dybatpho::agent_result skipped reason="already up to date"
   dybatpho::agent_error missing_config "No config file at /etc/example.yaml" \
     "Run 'example init' to create one" || true
 }
 
+# @description Run the `AS A PERSON` section of this example.
+# @noargs
 function _demo_human {
   dybatpho::header "AS A PERSON"
   DYBATPHO_AGENT_MODE=off _demo_reporting
   dybatpho::info "Plain text, meant to be read"
 }
 
+# @description Run the `AS AN AGENT` section of this example.
+# @noargs
 function _demo_agent {
   dybatpho::header "AS AN AGENT"
   DYBATPHO_AGENT_MODE=on _demo_reporting
   dybatpho::info "One JSON object per line, meant to be parsed"
 }
 
+# @description Run the `CONTEXT` section of this example.
+# @noargs
 function _demo_context {
   dybatpho::header "CONTEXT"
   DYBATPHO_AGENT_MODE=on dybatpho::agent_context
   dybatpho::info "An agent can read the environment before it acts"
 }
 
+# @description Run the `ALLOWLIST GATE` section of this example.
+# @noargs
 function _demo_gate {
   dybatpho::header "ALLOWLIST GATE"
   export DYBATPHO_AGENT_MODE=on
@@ -95,6 +108,8 @@ function _demo_gate {
   dybatpho::info "Every decision is recorded, approvals and refusals alike"
 }
 
+# @description Run the `TOOL DEFINITIONS` section of this example.
+# @noargs
 function _demo_tools {
   dybatpho::header "TOOL DEFINITIONS"
   dybatpho::print "Anthropic tool names:"
@@ -109,6 +124,8 @@ function _demo_tools {
   dybatpho::info "All three come from the same option spec the parser uses"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_human
   _demo_agent

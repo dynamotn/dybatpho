@@ -10,18 +10,23 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
+# @description Run the `TIMING A COMMAND` section of this example.
+# @noargs
 function _demo_timing {
   dybatpho::header "TIMING A COMMAND"
 
   # `metrics_time` runs the command, records how long it took, and passes the
   # exit code on, so it can wrap a step without changing what the script does.
   dybatpho::metrics_time build_duration_seconds stage=compile -- sleep 0.05
+  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Compile stage took ${DYBATPHO_METRICS_LAST_MS}ms"
 
   # A failing step is still timed, and also counted as a failure.
   dybatpho::metrics_time build_duration_seconds stage=link -- false || true
   dybatpho::info "Link stage failed after ${DYBATPHO_METRICS_LAST_MS}ms"
-  dybatpho::info "Failures so far: $(dybatpho::metrics_get counter build_failures_total stage=link)"
+  local metrics_get
+  metrics_get=$(dybatpho::metrics_get counter build_failures_total stage=link)
+  dybatpho::info "Failures so far: ${metrics_get}"
 
   # A timer suits a region that is not a single command.
   dybatpho::metrics_timer_start deploy_duration_seconds
@@ -30,6 +35,8 @@ function _demo_timing {
   dybatpho::info "Deploy took ${DYBATPHO_METRICS_LAST_MS}ms"
 }
 
+# @description Run the `COUNTERS AND GAUGES` section of this example.
+# @noargs
 function _demo_counters {
   dybatpho::header "COUNTERS AND GAUGES"
 
@@ -38,10 +45,16 @@ function _demo_counters {
   dybatpho::metrics_counter_inc artifacts_total 2 kind=checksum
   dybatpho::metrics_gauge_set queue_depth 7
 
-  dybatpho::info "Tarballs  : $(dybatpho::metrics_get counter artifacts_total kind=tarball)"
-  dybatpho::info "Checksums : $(dybatpho::metrics_get counter artifacts_total kind=checksum)"
+  local metrics_get_2
+  metrics_get_2=$(dybatpho::metrics_get counter artifacts_total kind=tarball)
+  dybatpho::info "Tarballs  : ${metrics_get_2}"
+  local metrics_get
+  metrics_get=$(dybatpho::metrics_get counter artifacts_total kind=checksum)
+  dybatpho::info "Checksums : ${metrics_get}"
 }
 
+# @description Run the `AUTOMATIC INSTRUMENTATION` section of this example.
+# @noargs
 function _demo_automatic {
   dybatpho::header "AUTOMATIC INSTRUMENTATION"
   dybatpho::info "Loading the metrics module is enough; these need no extra calls"
@@ -50,11 +63,19 @@ function _demo_automatic {
   dybatpho::retry 2 "false" > /dev/null 2>&1 || true
   dybatpho::error "a failure worth counting" 2> /dev/null
 
-  dybatpho::info "Retries      : $(dybatpho::metrics_get counter dybatpho_retry_attempts_total)"
-  dybatpho::info "Gave up      : $(dybatpho::metrics_get counter dybatpho_retry_exhausted_total)"
-  dybatpho::info "Errors logged: $(dybatpho::metrics_get counter dybatpho_log_messages_total level=error)"
+  local metrics_get_3
+  metrics_get_3=$(dybatpho::metrics_get counter dybatpho_retry_attempts_total)
+  dybatpho::info "Retries      : ${metrics_get_3}"
+  local metrics_get_2
+  metrics_get_2=$(dybatpho::metrics_get counter dybatpho_retry_exhausted_total)
+  dybatpho::info "Gave up      : ${metrics_get_2}"
+  local metrics_get
+  metrics_get=$(dybatpho::metrics_get counter dybatpho_log_messages_total level=error)
+  dybatpho::info "Errors logged: ${metrics_get}"
 }
 
+# @description Run the `PROMETHEUS EXPORT` section of this example.
+# @noargs
 function _demo_export {
   dybatpho::header "PROMETHEUS EXPORT"
 
@@ -69,6 +90,8 @@ function _demo_export {
   dybatpho::info "In production this would live in the textfile collector directory"
 }
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_timing
   _demo_counters

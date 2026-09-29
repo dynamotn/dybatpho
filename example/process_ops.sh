@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This file shares some variables with the caller or across calls on purpose,
+# which is what `local` would break.
+# dyshellint disable=BSG011
 # @file process_ops.sh
 # @brief Example showing process control utilities
 # @description Demonstrates dybatpho::retry, retry_until, dry_run, breakpoint,
@@ -18,6 +21,8 @@ dybatpho::register_common_handlers
 
 _ATTEMPT_COUNT=0
 
+# @description A command that fails twice and succeeds on the third attempt.
+# @noargs
 function _flaky_command {
   # Succeeds on the 3rd attempt
   _ATTEMPT_COUNT=$((_ATTEMPT_COUNT + 1))
@@ -28,6 +33,8 @@ function _flaky_command {
   dybatpho::info "Attempt ${_ATTEMPT_COUNT}: command succeeded"
 }
 
+# @description Run the `RETRY WITH BACKOFF` section of this example.
+# @noargs
 function _demo_retry {
   dybatpho::header "RETRY WITH BACKOFF"
   dybatpho::retry 5 _flaky_command
@@ -36,28 +43,38 @@ function _demo_retry {
 
 # --- dry_run --------------------------------------------------------------
 
+# @description A pretend deploy, so `dry_run` has something to report.
+# @arg $1 string target
 function _deploy {
   dybatpho::expect_args _target -- "$@"
   dybatpho::dry_run "rsync -avz ./dist/ ${_target}:/var/www/app/"
   dybatpho::dry_run "ssh ${_target} 'systemctl restart app'"
 }
 
+# @description Run the `DRY RUN` section of this example.
+# @noargs
 function _demo_dry_run {
   dybatpho::header "DRY RUN"
   dybatpho::info "With DRY_RUN=true, commands are printed but NOT executed"
   DRY_RUN=true _deploy "my-server.example.com"
   dybatpho::info "With DRY_RUN unset, commands execute normally"
   # shellcheck disable=SC1007 # clearing DRY_RUN for one command, not assigning a value
+  # shellcheck disable=SC2310 # the demo keeps going so the next section can run
   DRY_RUN= _deploy "my-server.example.com" || true
 }
 
 # --- expect_args ----------------------------------------------------------
 
+# @description A two-argument command, used to show how arguments are named.
+# @arg $1 string name
+# @arg $2 string greeting
 function _greet {
   dybatpho::expect_args _name _greeting -- "$@"
   dybatpho::info "${_greeting}, ${_name}!"
 }
 
+# @description Run the `EXPECT ARGS` section of this example.
+# @noargs
 function _demo_expect_args {
   dybatpho::header "EXPECT ARGS"
   _greet "Alice" "Hello"
@@ -66,6 +83,8 @@ function _demo_expect_args {
 
 # --- expect_envs ----------------------------------------------------------
 
+# @description Run the `EXPECT ENVS` section of this example.
+# @noargs
 function _demo_expect_envs {
   dybatpho::header "EXPECT ENVS"
   dybatpho::info "Checking for required environment variables..."
@@ -81,6 +100,8 @@ function _demo_expect_envs {
 
 # --- require --------------------------------------------------------------
 
+# @description Run the `REQUIRE COMMAND` section of this example.
+# @noargs
 function _demo_require {
   dybatpho::header "REQUIRE COMMAND"
   dybatpho::require "bash"
@@ -89,14 +110,22 @@ function _demo_require {
   dybatpho::info "(Requiring a missing command would call dybatpho::die)"
 }
 
+# @description Run the `COMMAND CHECKS` section of this example.
+# @noargs
 function _demo_command_checks {
   dybatpho::header "COMMAND CHECKS"
-  dybatpho::info "bash + cat available? $(dybatpho::command_exists_all bash cat && echo yes || echo no)"
-  dybatpho::info "Preferred JSON tool  : $(dybatpho::coalesce_cmd jq python3 bash)"
+  local command_exists_all
+  command_exists_all=$(dybatpho::command_exists_all bash cat && echo yes || echo no)
+  dybatpho::info "bash + cat available? ${command_exists_all}"
+  local coalesce_cmd
+  coalesce_cmd=$(dybatpho::coalesce_cmd jq python3 bash)
+  dybatpho::info "Preferred JSON tool  : ${coalesce_cmd}"
 }
 
 # --- is -------------------------------------------------------------------
 
+# @description Run the `IS — CONDITION TESTING` section of this example.
+# @noargs
 function _demo_is {
   dybatpho::header "IS — CONDITION TESTING"
 
@@ -117,32 +146,46 @@ function _demo_is {
 
 # --- coalesce -------------------------------------------------------------
 
+# @description Run the `COALESCE` section of this example.
+# @noargs
 function _demo_coalesce {
   dybatpho::header "COALESCE"
   local primary_host=""
   local fallback_host="https://backup.example.com"
-  dybatpho::info "Selected host: $(dybatpho::coalesce "${primary_host}" "${fallback_host}" "http://localhost:8080")"
+  local coalesce
+  coalesce=$(dybatpho::coalesce "${primary_host}" "${fallback_host}" "http://localhost:8080")
+  dybatpho::info "Selected host: ${coalesce}"
 }
 
+# @description Run the `DEFAULT ENV / REQUIRE ANY ENV` section of this example.
+# @noargs
 function _demo_env_defaults {
   dybatpho::header "DEFAULT ENV / REQUIRE ANY ENV"
   unset APP_ENDPOINT
-  dybatpho::info "Defaulted endpoint: $(dybatpho::default_env APP_ENDPOINT "http://localhost:8080")"
+  local default_env
+  default_env=$(dybatpho::default_env APP_ENDPOINT "http://localhost:8080")
+  dybatpho::info "Defaulted endpoint: ${default_env}"
   export APP_BACKUP_TOKEN="configured"
   dybatpho::require_envs_any APP_TOKEN APP_BACKUP_TOKEN
   dybatpho::success "At least one application token is configured"
 }
 
+# @description Run the `ASSERT` section of this example.
+# @noargs
 function _demo_assert {
   dybatpho::header "ASSERT"
   dybatpho::assert '[[ 2 -gt 1 ]]' "math should still work"
   dybatpho::success "Assertion passed"
 }
 
+# @description Run the `RETRY UNTIL` section of this example.
+# @noargs
 function _demo_retry_until {
   dybatpho::header "RETRY UNTIL"
   local fixed_attempts=0
-  _fixed_delay_flaky() {
+  # @description A command that fails once, to show a retry with a fixed delay.
+  # @noargs
+  function _fixed_delay_flaky {
     fixed_attempts=$((fixed_attempts + 1))
     [[ "${fixed_attempts}" -ge 2 ]]
   }
@@ -150,9 +193,10 @@ function _demo_retry_until {
   dybatpho::success "Fixed-delay retry succeeded"
 }
 
-
 # --- run_with_timeout -----------------------------------------------------
 
+# @description Run the `RUN WITH TIMEOUT` section of this example.
+# @noargs
 function _demo_run_with_timeout {
   dybatpho::header "RUN WITH TIMEOUT"
 
@@ -167,7 +211,9 @@ function _demo_run_with_timeout {
   fi
 
   # Unlike the `timeout` binary, this works on a shell function too.
-  _slow_function() { sleep 30; }
+  # @description A shell function that never finishes in time, for the timeout demo.
+  # @noargs
+  function _slow_function { sleep 30; }
   status=0
   dybatpho::run_with_timeout 1 _slow_function || status=$?
   dybatpho::info "A shell function also times out, reported as ${status}"
@@ -175,28 +221,39 @@ function _demo_run_with_timeout {
 
 # --- background jobs ------------------------------------------------------
 
+# @description Run the `BACKGROUND JOBS` section of this example.
+# @noargs
 function _demo_background_jobs {
   dybatpho::header "BACKGROUND JOBS"
 
-  _quick_job() { sleep 1; }
-  _failing_job() {
+  # @description A job that finishes, for the demo that waits on several at once.
+  # @noargs
+  function _quick_job { sleep 1; }
+  # @description A job that exits non-zero, so the wait has a failure to report.
+  # @noargs
+  function _failing_job {
     sleep 1
     return 4
   }
 
   dybatpho::background_run fetch _quick_job
   dybatpho::background_run build _failing_job
-  dybatpho::info "fetch is running as pid $(dybatpho::background_pid fetch)"
+  background_pid=$(dybatpho::background_pid fetch)
+  dybatpho::info "fetch is running as pid ${background_pid}"
 
   local status=0
   dybatpho::wait_all || status=$?
-  dybatpho::info "fetch exited $(dybatpho::background_status fetch)"
-  dybatpho::info "build exited $(dybatpho::background_status build)"
+  background_status_2=$(dybatpho::background_status fetch)
+  dybatpho::info "fetch exited ${background_status_2}"
+  background_status=$(dybatpho::background_status build)
+  dybatpho::info "build exited ${background_status}"
   if ((status != 0)); then
     dybatpho::warn "At least one background job failed, as expected here"
   fi
 }
 
+# @description Run the `KILL CHILDREN` section of this example.
+# @noargs
 function _demo_kill_children {
   dybatpho::header "KILL CHILDREN"
 
@@ -217,6 +274,8 @@ function _demo_kill_children {
 
 # --- PID files ------------------------------------------------------------
 
+# @description Run the `PID FILE` section of this example.
+# @noargs
 function _demo_pid_file {
   dybatpho::header "PID FILE"
 
@@ -225,7 +284,9 @@ function _demo_pid_file {
   pid_file="${run_dir}/app.pid"
 
   dybatpho::pid_file_write "${pid_file}"
-  dybatpho::info "Recorded pid $(cat "${pid_file}") in ${pid_file}"
+  local cat
+  cat=$(cat "${pid_file}")
+  dybatpho::info "Recorded pid ${cat} in ${pid_file}"
 
   if dybatpho::pid_file_is_running "${pid_file}"; then
     dybatpho::success "The recorded process is alive"
@@ -251,6 +312,8 @@ function _demo_pid_file {
 
 # --- main -----------------------------------------------------------------
 
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_retry
   _demo_dry_run

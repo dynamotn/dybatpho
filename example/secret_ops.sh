@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # @file secret_ops.sh
 # @brief Example showing how to read, mask, and store secrets safely.
+# @description
+#   Handles a credential end to end: keeps it out of the shell history, reads
+#   it without echoing, masks it in anything the script prints, and stores it
+#   in a file only its owner can read. The store lives in a temporary directory
+#   that the example removes on exit.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh"
 
@@ -22,14 +27,16 @@ printf 'tok_live_4f8c21b9\n' > "${token_file}"
 chmod 600 "${token_file}"
 declare API_TOKEN
 dybatpho::secret_from_file API_TOKEN "${token_file}"
-dybatpho::print "file token: $(dybatpho::secret_hint "${API_TOKEN}")"
+secret_hint_3=$(dybatpho::secret_hint "${API_TOKEN}")
+dybatpho::print "file token: ${secret_hint_3}"
 
 # 2. From the environment. The source variable is unset so child processes
 #    don't inherit it.
 export DEPLOY_KEY="dk_9a71e0c3f5"
 declare DEPLOY_TOKEN
 dybatpho::secret_from_env DEPLOY_TOKEN DEPLOY_KEY
-dybatpho::print "env token: $(dybatpho::secret_hint "${DEPLOY_TOKEN}")"
+secret_hint_2=$(dybatpho::secret_hint "${DEPLOY_TOKEN}")
+dybatpho::print "env token: ${secret_hint_2}"
 dybatpho::print "DEPLOY_KEY after read: ${DEPLOY_KEY:-<unset>}"
 
 # 3. From stdin. Use redirection instead of a pipe so the value lands in this
@@ -37,7 +44,8 @@ dybatpho::print "DEPLOY_KEY after read: ${DEPLOY_KEY:-<unset>}"
 declare DB_PASSWORD
 dybatpho::secret_from_stdin DB_PASSWORD "Database password: " \
   < <(printf 'pg_s3cret_pass\n')
-dybatpho::print "stdin password: $(dybatpho::secret_hint "${DB_PASSWORD}")"
+secret_hint=$(dybatpho::secret_hint "${DB_PASSWORD}")
+dybatpho::print "stdin password: ${secret_hint}"
 
 # A single entry point accepts any of the three sources.
 # shellcheck disable=SC2034 # Passed by name to dybatpho::secret_write_file.
@@ -88,5 +96,7 @@ dybatpho::header "CLEAN UP"
 dybatpho::secret_shred "${credential_file}" "${loose_file}" "${token_file}"
 dybatpho::secret_wipe API_TOKEN DEPLOY_TOKEN DB_PASSWORD WEBHOOK_SECRET LOOSE_TOKEN
 dybatpho::secret_forget
-dybatpho::print "remaining files: $(find "${secret_dir}" -type f | wc -l)"
+find_2=$(find "${secret_dir}" -type f | wc -l)
+find=${find_2}
+dybatpho::print "remaining files: ${find}"
 dybatpho::success "Secrets handled without leaking to logs, history, or disk"

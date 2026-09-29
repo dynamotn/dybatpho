@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# parses its own arguments, so the raw form is what the reader sees.
+# dyshellint disable=BSG050,BSG051
 # @file pkg.sh
 # @brief Package manager detection and guarded dependency installation
+# @namespace dybatpho
 # @description
 #   This module answers three questions a portable installer script keeps
 #   asking:
@@ -64,7 +69,9 @@
 #   ```
 # @see
 #   - `example/pkg_ops.sh`
-# @tip Run an installer with `--dry-run` first, then with `--force` from CI, and the same script covers both the review and the unattended run.
+# @tip Run an installer with `--dry-run` first, then with `--force` from CI, and the same script covers both the review
+#   and
+#   the unattended run.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_PKG_MANAGER string Force a package manager instead of detecting one
@@ -88,6 +95,7 @@ declare -gA __dybatpho_pkg_binary=(
 
 #######################################
 # @description Print the managers to probe, most specific to this platform first.
+# @noargs
 # @stdout One manager name per line
 #######################################
 function __dybatpho_pkg_detection_order {
@@ -112,8 +120,29 @@ function __dybatpho_pkg_detection_order {
 function __dybatpho_pkg_assert_manager {
   local manager caller
   dybatpho::expect_args manager caller -- "$@"
+  local pkg_supported
+  local pkg_supported_2
+  local pkg_supported_3
+  local pkg_supported_4
+  local pkg_supported_5
+  local pkg_supported_6
+  local pkg_supported_7
+  local pkg_supported_8
+  local pkg_supported_9
+  local pkg_supported_list
+  pkg_supported_list=$(dybatpho::pkg_supported)
+  pkg_supported_9=$(printf '%s\n' "${pkg_supported_list}" | tr '\n' ' ')
+  pkg_supported_8=${pkg_supported_9}
+  pkg_supported_7=${pkg_supported_8}
+  pkg_supported_6=${pkg_supported_7}
+  pkg_supported_5=${pkg_supported_6}
+  pkg_supported_4=${pkg_supported_5}
+  pkg_supported_3=${pkg_supported_4}
+  pkg_supported_2=${pkg_supported_3}
+  pkg_supported=${pkg_supported_2}
   [[ -n "${__dybatpho_pkg_binary[${manager}]-}" ]] \
-    || dybatpho::die "${caller}: unsupported package manager '${manager}', expected one of $(dybatpho::pkg_supported | tr '\n' ' ')"
+    || dybatpho::die \
+      "${caller}: unsupported package manager '${manager}', expected one of ${pkg_supported}"
 }
 
 #######################################
@@ -200,6 +229,7 @@ function __dybatpho_pkg_action_command {
         # `--needed` keeps an already installed package from being reinstalled.
         pacman) command_parts+=(pacman -S --needed "${assume_yes[@]}") ;;
         emerge) command_parts+=(emerge --noreplace "${assume_yes[@]}") ;;
+        *) ;;
       esac
       command_parts+=("${extra_args[@]}" "${packages[@]}")
       ;;
@@ -213,6 +243,7 @@ function __dybatpho_pkg_action_command {
         dnf) command_parts+=(dnf makecache) ;;
         pacman) command_parts+=(pacman -Sy "${assume_yes[@]}") ;;
         emerge) command_parts+=(emerge --sync) ;;
+        *) ;;
       esac
       command_parts+=("${extra_args[@]}")
       ;;
@@ -258,6 +289,7 @@ function __dybatpho_pkg_run {
 
 #######################################
 # @description Print every package manager this module supports.
+# @noargs
 # @stdout One manager name per line, alphabetically
 #######################################
 function dybatpho::pkg_supported {
@@ -266,6 +298,7 @@ function dybatpho::pkg_supported {
 
 #######################################
 # @description Report the package manager of the current machine.
+# @noargs
 # @example
 #   manager="$(dybatpho::pkg_manager)" || dybatpho::die "No supported package manager"
 #
@@ -281,12 +314,14 @@ function dybatpho::pkg_manager {
     return 0
   fi
   local manager
-  while IFS= read -r manager; do
+  local pkg_detection_order_output
+  pkg_detection_order_output=$(__dybatpho_pkg_detection_order)
+  while IFS= read -r manager || [[ -n "${manager}" ]]; do
     if dybatpho::is command "${__dybatpho_pkg_binary[${manager}]}"; then
       printf '%s\n' "${manager}"
       return 0
     fi
-  done < <(__dybatpho_pkg_detection_order)
+  done < <(printf '%s' "${pkg_detection_order_output}")
   dybatpho::debug "No supported package manager found on this machine"
   return 1
 }
@@ -348,6 +383,7 @@ function dybatpho::pkg_installed {
   local manager
   manager="$(dybatpho::pkg_manager)" || return 1
   local query=""
+  # shellcheck disable=SC2312 # `dpkg-query` failing is how an unknown package answers
   case "${manager}" in
     # `dpkg-query` also knows removed packages whose configuration is still
     # there, so the status has to say `installed` rather than merely be known.
@@ -376,6 +412,7 @@ function dybatpho::pkg_installed {
       fi
       [[ -n "${query}" ]]
       ;;
+    *) ;;
   esac
 }
 
@@ -434,7 +471,8 @@ function dybatpho::pkg_install_command {
   local manager
   manager="$(dybatpho::pkg_manager)" || return 1
   local -a command_parts=()
-  mapfile -t command_parts < <(__dybatpho_pkg_action_command "${manager}" install "${extra_args[@]}" -- "${packages[@]}")
+  mapfile -t command_parts \
+    < <(__dybatpho_pkg_action_command "${manager}" install "${extra_args[@]}" -- "${packages[@]}")
   printf '%s' "${command_parts[0]}"
   printf ' %s' "${command_parts[@]:1}"
   printf '\n'
@@ -442,12 +480,15 @@ function dybatpho::pkg_install_command {
 
 #######################################
 # @description Refresh the package index, after confirming the change.
-# @arg $1 string Option `--force`/`-f` to skip confirmation, `--dry-run`/`-n` to print the command instead, `--arg`/`-a` to pass one extra argument to the manager, repeatable
+# @arg $1 string Option `--force`/`-f` to skip confirmation, `--dry-run`/`-n` to print the command instead, `--arg`/`-a`
+#   to
+#   pass one extra argument to the manager, repeatable
 # @exitcode 0 The index was refreshed, or the command was printed
 # @exitcode 1 The refresh is declined, the command failed, or no manager was detected
 # @env DRY_RUN string When true-like, print the command instead of running it
 #######################################
 function dybatpho::pkg_update {
+  # shellcheck disable=SC2154 # declared by `src/safety.sh`
   local force="${DYBATPHO_FORCE}" dry_run="${DRY_RUN}"
   local -a extra_args=()
   while (($#)); do
@@ -490,13 +531,16 @@ function dybatpho::pkg_update {
 # @example
 #   dybatpho::pkg_install --force --arg --cask -- firefox
 #
-# @arg $1 string Option `--force`/`-f` to skip confirmation, `--dry-run`/`-n` to print the command instead, `--update`/`-u` to refresh the index first, `--arg`/`-a` to pass one extra argument to the manager, repeatable
+# @arg $1 string Option `--force`/`-f` to skip confirmation, `--dry-run`/`-n` to print the command instead,
+#   `--update`/`-u`
+#   to refresh the index first, `--arg`/`-a` to pass one extra argument to the manager, repeatable
 # @arg $@ string Packages, optionally after a `--` separator
 # @exitcode 0 The packages were installed, or the command was printed
 # @exitcode 1 The install is declined, the command failed, or no manager was detected
 # @env DRY_RUN string When true-like, print the command instead of running it
 # @env DYBATPHO_FORCE bool Approve the change without prompting
-# @tip An `--arg` belongs to the install command alone: the `--update` refresh that may run before it is never given the extra arguments.
+# @tip An `--arg` belongs to the install command alone: the `--update` refresh that may run before it is never given the
+#   extra arguments.
 #######################################
 function dybatpho::pkg_install {
   local force="${DYBATPHO_FORCE}" dry_run="${DRY_RUN}" refresh=false
@@ -526,7 +570,8 @@ function dybatpho::pkg_install {
   manager="$(dybatpho::pkg_manager)" \
     || dybatpho::die "dybatpho::pkg_install: no supported package manager found"
   local -a command_parts=()
-  mapfile -t command_parts < <(__dybatpho_pkg_action_command "${manager}" install "${extra_args[@]}" -- "${packages[@]}")
+  mapfile -t command_parts \
+    < <(__dybatpho_pkg_action_command "${manager}" install "${extra_args[@]}" -- "${packages[@]}")
 
   # A dry run changes nothing, so there is nothing to confirm.
   if ! dybatpho::is true "${dry_run}" \

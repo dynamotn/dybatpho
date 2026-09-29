@@ -9,7 +9,10 @@ Utilities for getting information of OS/distro
 <a id="overview"></a>
 ## ✨ Overview
 
-This module contains functions to get information of OS/distro, such as platform, distribution and architecture, plus the host facts other modules would otherwise each detect for themselves: host and user names, processor count, terminal size, and whether the script runs as root, in a container, under WSL, or on CI. Package manager detection and dependency installation live in `pkg.sh`.
+This module contains functions to get information of OS/distro, such as platform, distribution and architecture,
+plus the host facts other modules would otherwise each detect for themselves: host and user names, processor count,
+terminal size, and whether the script runs as root, in a container, under WSL, or on CI. Package manager detection
+and dependency installation live in `pkg.sh`.
 
 ### 🌍 Environment
 
@@ -57,6 +60,8 @@ This module contains functions to get information of OS/distro, such as platform
 
 Get $GOOS compilation environment
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - Return $GOOS value https://go.dev/doc/install/source#environment
@@ -67,6 +72,8 @@ Get $GOOS compilation environment
 ### `dybatpho::platform`
 
 Return the normalized host operating system name.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 
@@ -79,12 +86,16 @@ Return the normalized host operating system name.
 
 Return success when running on macOS.
 
+_Function has no arguments._
+
 
 ---
 
 ### `dybatpho::is_linux`
 
 Return success when running on Linux.
+
+_Function has no arguments._
 
 
 ---
@@ -93,6 +104,8 @@ Return success when running on Linux.
 
 Return success when running on a Windows-compatible environment
 such as Cygwin, MSYS, or MinGW.
+
+_Function has no arguments._
 
 
 ---
@@ -164,6 +177,8 @@ dybatpho::command_version tar   # 1.35
 
 Get $GOARCH compilation environment
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - Return $GOOS value https://go.dev/docs/install/source#environment
@@ -185,6 +200,8 @@ dybatpho::info "Deploying from $(dybatpho::hostname)"
 
 ```
 
+_Function has no arguments._
+
 **🌍 Environment variables**
 
 | Variable | Type | Description |
@@ -204,6 +221,8 @@ Print the name of the user the script runs as.
 This is the effective user, so a script under `sudo` reports `root` rather
 than the account that called it.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - User name, or `unknown` when nothing can answer
@@ -222,6 +241,8 @@ dybatpho::is_root || dybatpho::die "Run this with sudo"
 
 ```
 
+_Function has no arguments._
+
 **🚦 Exit codes**
 
 - `0`: The effective user is root
@@ -233,6 +254,8 @@ dybatpho::is_root || dybatpho::die "Run this with sudo"
 ### `dybatpho::kernel_version`
 
 Print the kernel release of the host.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 
@@ -257,6 +280,8 @@ itself what to do on a host that cannot answer.
 jobs="$(dybatpho::cpu_count || printf '4')"
 
 ```
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 
@@ -412,6 +437,8 @@ esac
 
 ```
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - Distribution identifier, falling back to the normalized platform name
@@ -422,6 +449,8 @@ esac
 ### `dybatpho::distro_version`
 
 Print the version of the distribution the host runs.
+
+_Function has no arguments._
 
 **📤 Output on stdout**
 
@@ -438,6 +467,8 @@ Print the version of the distribution the host runs.
 
 Return success when the script runs inside a container.
 
+_Function has no arguments._
+
 **🚦 Exit codes**
 
 - `0`: Docker, Podman, Kubernetes, or LXC owns this process
@@ -450,6 +481,8 @@ Return success when the script runs inside a container.
 
 Return success when the script runs under the Windows Subsystem
 for Linux.
+
+_Function has no arguments._
 
 **🚦 Exit codes**
 
@@ -481,6 +514,8 @@ dybatpho::is_ci && export DYBATPHO_FORCE=true
 CI=false ./deploy.sh
 
 ```
+
+_Function has no arguments._
 
 **🌍 Environment variables**
 

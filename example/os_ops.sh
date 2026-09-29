@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
 # @file os_ops.sh
 # @brief Example showing platform, host, and environment detection.
+# @description
+#   Reports what the library can tell a script about the machine it runs on:
+#   the platform and architecture in the form a release artifact is named
+#   after, the host, and the environment it detects. It only reads, so it is
+#   safe to run anywhere.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh"
 
+dybatpho::register_common_handlers
+
 dybatpho::header "PLATFORM"
-dybatpho::print "platform: $(dybatpho::platform)"
-dybatpho::print "architecture: $(dybatpho::goarch)"
-dybatpho::print "release artifact: mytool_$(dybatpho::goos)_$(dybatpho::goarch).tar.gz"
+platform=$(dybatpho::platform)
+dybatpho::print "platform: ${platform}"
+goarch_2=$(dybatpho::goarch)
+dybatpho::print "architecture: ${goarch_2}"
+goarch=$(dybatpho::goarch)
+goos=$(dybatpho::goos)
+dybatpho::print "release artifact: mytool_${goos}_${goarch}.tar.gz"
 
 if dybatpho::is_macos; then
   dybatpho::info "Running on macOS"
@@ -18,9 +29,12 @@ elif dybatpho::is_windows; then
 fi
 
 dybatpho::header "DISTRIBUTION"
-dybatpho::print "distribution: $(dybatpho::distro)"
-dybatpho::print "version: $(dybatpho::distro_version || printf 'unknown')"
-dybatpho::print "kernel: $(dybatpho::kernel_version)"
+distro=$(dybatpho::distro)
+dybatpho::print "distribution: ${distro}"
+distro_version=$(dybatpho::distro_version || printf 'unknown')
+dybatpho::print "version: ${distro_version}"
+kernel_version=$(dybatpho::kernel_version)
+dybatpho::print "kernel: ${kernel_version}"
 # The whole family is what usually decides a package name, and a derivative
 # reports its own `ID`, so `ID_LIKE` is read directly when it exists.
 if family="$(dybatpho::os_release ID_LIKE)"; then
@@ -28,8 +42,10 @@ if family="$(dybatpho::os_release ID_LIKE)"; then
 fi
 
 dybatpho::header "HOST"
-dybatpho::print "host: $(dybatpho::hostname)"
-dybatpho::print "user: $(dybatpho::user)"
+hostname=$(dybatpho::hostname)
+dybatpho::print "host: ${hostname}"
+user=$(dybatpho::user)
+dybatpho::print "user: ${user}"
 if dybatpho::is_root; then
   dybatpho::warn "Running as root"
 else
@@ -40,7 +56,10 @@ dybatpho::header "CAPACITY"
 # A host that cannot answer gets a conservative default rather than a failure.
 jobs="$(dybatpho::cpu_count || printf '4')"
 dybatpho::print "worker jobs: ${jobs}"
-dybatpho::print "terminal: $(dybatpho::terminal_width)x$(dybatpho::terminal_height)"
+terminal_height_2=$(dybatpho::terminal_height)
+terminal_height=${terminal_height_2}
+terminal_width=$(dybatpho::terminal_width)
+dybatpho::print "terminal: ${terminal_width}x${terminal_height}"
 if dybatpho::is_tty stdout; then
   dybatpho::info "Output is a terminal, a progress line is worth rendering"
 else

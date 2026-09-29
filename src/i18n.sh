@@ -1,6 +1,14 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it keeps its declarations with the functions they
+# describe; it parses its own arguments, so the raw form is what the reader
+# sees.
+# dyshellint disable=BSG050,BSG011,BSG033,BSG051
 # @file i18n.sh
 # @brief Utilities for translating messages and formatting values for a locale
+# @namespace dybatpho
 # @description
 #   This module covers the two halves of speaking a user's language. The first
 #   is internationalization: message catalogs, a locale fallback chain, named
@@ -113,6 +121,7 @@ function __dybatpho_i18n_normalize {
       __norm_out="C"
       return 0
       ;;
+    *) ;;
   esac
   local language script region modifier
   if [[ "${raw}" =~ ^([a-zA-Z]{2,8})([_-]([a-zA-Z]{4}))?([_-]([a-zA-Z]{2}|[0-9]{3}))?(\.([^@]+))?(@(.+))?$ ]]; then
@@ -182,6 +191,7 @@ function __dybatpho_i18n_resolve {
 
 #######################################
 # @description Print the locale currently in effect, resolving it on first use.
+# @noargs
 # @stdout Canonical locale tag
 #######################################
 function dybatpho::i18n_locale {
@@ -230,7 +240,7 @@ function dybatpho::i18n_set_locale {
 function dybatpho::i18n_chain {
   local locale="${1-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
-  local cached="${__dybatpho_i18n_state[chain:${locale}]-}"
+  local cached="${__dybatpho_i18n_state["chain:${locale}"]-}"
   if [[ -n "${cached}" ]]; then
     printf '%s' "${cached}"
     return 0
@@ -283,7 +293,7 @@ function dybatpho::i18n_chain {
   for candidate in ${chain[@]+"${chain[@]}"}; do
     joined+="${candidate}"$'\n'
   done
-  __dybatpho_i18n_state[chain:${locale}]="${joined}"
+  __dybatpho_i18n_state["chain:${locale}"]="${joined}"
   printf '%s' "${joined}"
 }
 
@@ -359,14 +369,16 @@ function __dybatpho_i18n_lookup {
       # English catalog that has no such category.
       language="$(__dybatpho_i18n_language "${locale}")"
       category="$(__dybatpho_i18n_plural_category "${language}" "${count}")"
-      hit="${__dybatpho_i18n_plural[${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}${category}]-${__DYBATPHO_I18N_NONE}}"
+      local plural_key="${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}${category}"
+      hit="${__dybatpho_i18n_plural[${plural_key}]-${__DYBATPHO_I18N_NONE}}"
       if [[ "${hit}" != "${__DYBATPHO_I18N_NONE}" ]]; then
         __lookup_out="${hit}"
         return 0
       fi
       # Every language has `other`, so it is the one category a catalog can be
       # relied on to carry when it omits the one this count selected.
-      hit="${__dybatpho_i18n_plural[${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}other]-${__DYBATPHO_I18N_NONE}}"
+      local other_key="${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}other"
+      hit="${__dybatpho_i18n_plural[${other_key}]-${__DYBATPHO_I18N_NONE}}"
       if [[ "${hit}" != "${__DYBATPHO_I18N_NONE}" ]]; then
         __lookup_out="${hit}"
         return 0
@@ -792,7 +804,9 @@ function dybatpho::i18n_plural_form {
   dybatpho::expect_args count -- "$@"
   local locale="${2-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
-  __dybatpho_i18n_plural_category "$(__dybatpho_i18n_language "${locale}")" "${count}"
+  local i18n_language
+  i18n_language=$(__dybatpho_i18n_language "${locale}")
+  __dybatpho_i18n_plural_category "${i18n_language}" "${count}"
 }
 
 #######################################
@@ -890,7 +904,9 @@ function dybatpho::i18n_t {
   if [[ "${locale}" != "C" ]]; then
     __dybatpho_i18n_miss "${key}" "${locale}" || true
   fi
-  __dybatpho_i18n_interpolate rendered "$(__dybatpho_i18n_fallback_text "${key}")" "$@"
+  local i18n_fallback_text
+  i18n_fallback_text=$(__dybatpho_i18n_fallback_text "${key}")
+  __dybatpho_i18n_interpolate rendered "${i18n_fallback_text}" "$@"
   printf '%s' "${rendered}"
   return 0
 }
@@ -968,6 +984,7 @@ function dybatpho::i18n_has {
 
 #######################################
 # @description Print every key that was looked up and not found in this shell.
+# @noargs
 # @stdout `<locale>`, `<key>` and the number of lookups, tab separated
 # @exitcode 1 Nothing was recorded
 #######################################
@@ -1088,7 +1105,9 @@ function dybatpho::i18n_library_plural {
     return 0
   }
   local template rendered grouped
-  grouped="$(dybatpho::i18n_number "${count}" 0 "$(dybatpho::i18n_locale)")"
+  local i18n_locale
+  i18n_locale=$(dybatpho::i18n_locale)
+  grouped="$(dybatpho::i18n_number "${count}" 0 "${i18n_locale}")"
   if __dybatpho_i18n_lookup template "${key}" "${count}"; then
     __dybatpho_i18n_interpolate rendered "${template}" \
       "count=${grouped}" "n=${grouped}" "$@"
@@ -1104,75 +1123,75 @@ function dybatpho::i18n_library_plural {
 # `3;2` is the Indian lakh system, where 12345678 reads 1,23,45,678. Holding it
 # as data rather than assuming three is the whole reason this is a table.
 declare -gA DYBATPHO_I18N_NUMBER=(
-  [en.group]="," [en.decimal]="." [en.grouping]="3" [en.minus]="-" [en.percent]="#%"
-  [en_GB.group]="," [en_GB.decimal]="." [en_GB.grouping]="3" [en_GB.minus]="-" [en_GB.percent]="#%"
-  [de.group]="." [de.decimal]="," [de.grouping]="3" [de.minus]="-" [de.percent]="# %"
-  [es.group]="." [es.decimal]="," [es.grouping]="3" [es.minus]="-" [es.percent]="# %"
-  [it.group]="." [it.decimal]="," [it.grouping]="3" [it.minus]="-" [it.percent]="#%"
-  [nl.group]="." [nl.decimal]="," [nl.grouping]="3" [nl.minus]="-" [nl.percent]="#%"
-  [pt_BR.group]="." [pt_BR.decimal]="," [pt_BR.grouping]="3" [pt_BR.minus]="-" [pt_BR.percent]="#%"
-  [pt.group]="." [pt.decimal]="," [pt.grouping]="3" [pt.minus]="-" [pt.percent]="#%"
-  [tr.group]="." [tr.decimal]="," [tr.grouping]="3" [tr.minus]="-" [tr.percent]="%#"
-  [vi.group]="." [vi.decimal]="," [vi.grouping]="3" [vi.minus]="-" [vi.percent]="#%"
-  [id.group]="." [id.decimal]="," [id.grouping]="3" [id.minus]="-" [id.percent]="#%"
-  [pl.decimal]="," [pl.grouping]="3" [pl.minus]="-" [pl.percent]="# %"
-  [ru.decimal]="," [ru.grouping]="3" [ru.minus]="-" [ru.percent]="# %"
-  [fr.decimal]="," [fr.grouping]="3" [fr.minus]="-" [fr.percent]="# %"
-  [ja.group]="," [ja.decimal]="." [ja.grouping]="3" [ja.minus]="-" [ja.percent]="#%"
-  [ko.group]="," [ko.decimal]="." [ko.grouping]="3" [ko.minus]="-" [ko.percent]="#%"
-  [zh_CN.group]="," [zh_CN.decimal]="." [zh_CN.grouping]="3" [zh_CN.minus]="-" [zh_CN.percent]="#%"
-  [zh_TW.group]="," [zh_TW.decimal]="." [zh_TW.grouping]="3" [zh_TW.minus]="-" [zh_TW.percent]="#%"
-  [zh.group]="," [zh.decimal]="." [zh.grouping]="3" [zh.minus]="-" [zh.percent]="#%"
-  [th.group]="," [th.decimal]="." [th.grouping]="3" [th.minus]="-" [th.percent]="#%"
-  [ar.group]="," [ar.decimal]="." [ar.grouping]="3" [ar.minus]="-" [ar.percent]="#%"
-  [he.group]="," [he.decimal]="." [he.grouping]="3" [he.minus]="-" [he.percent]="#%"
-  [hi.group]="," [hi.decimal]="." [hi.grouping]="3;2" [hi.minus]="-" [hi.percent]="#%"
-  [bn.group]="," [bn.decimal]="." [bn.grouping]="3;2" [bn.minus]="-" [bn.percent]="#%"
+  ["en.group"]="," ["en.decimal"]="." ["en.grouping"]="3" ["en.minus"]="-" ["en.percent"]="#%"
+  ["en_GB.group"]="," ["en_GB.decimal"]="." ["en_GB.grouping"]="3" ["en_GB.minus"]="-" ["en_GB.percent"]="#%"
+  ["de.group"]="." ["de.decimal"]="," ["de.grouping"]="3" ["de.minus"]="-" ["de.percent"]="# %"
+  ["es.group"]="." ["es.decimal"]="," ["es.grouping"]="3" ["es.minus"]="-" ["es.percent"]="# %"
+  ["it.group"]="." ["it.decimal"]="," ["it.grouping"]="3" ["it.minus"]="-" ["it.percent"]="#%"
+  ["nl.group"]="." ["nl.decimal"]="," ["nl.grouping"]="3" ["nl.minus"]="-" ["nl.percent"]="#%"
+  ["pt_BR.group"]="." ["pt_BR.decimal"]="," ["pt_BR.grouping"]="3" ["pt_BR.minus"]="-" ["pt_BR.percent"]="#%"
+  ["pt.group"]="." ["pt.decimal"]="," ["pt.grouping"]="3" ["pt.minus"]="-" ["pt.percent"]="#%"
+  ["tr.group"]="." ["tr.decimal"]="," ["tr.grouping"]="3" ["tr.minus"]="-" ["tr.percent"]="%#"
+  ["vi.group"]="." ["vi.decimal"]="," ["vi.grouping"]="3" ["vi.minus"]="-" ["vi.percent"]="#%"
+  ["id.group"]="." ["id.decimal"]="," ["id.grouping"]="3" ["id.minus"]="-" ["id.percent"]="#%"
+  ["pl.decimal"]="," ["pl.grouping"]="3" ["pl.minus"]="-" ["pl.percent"]="# %"
+  ["ru.decimal"]="," ["ru.grouping"]="3" ["ru.minus"]="-" ["ru.percent"]="# %"
+  ["fr.decimal"]="," ["fr.grouping"]="3" ["fr.minus"]="-" ["fr.percent"]="# %"
+  ["ja.group"]="," ["ja.decimal"]="." ["ja.grouping"]="3" ["ja.minus"]="-" ["ja.percent"]="#%"
+  ["ko.group"]="," ["ko.decimal"]="." ["ko.grouping"]="3" ["ko.minus"]="-" ["ko.percent"]="#%"
+  ["zh_CN.group"]="," ["zh_CN.decimal"]="." ["zh_CN.grouping"]="3" ["zh_CN.minus"]="-" ["zh_CN.percent"]="#%"
+  ["zh_TW.group"]="," ["zh_TW.decimal"]="." ["zh_TW.grouping"]="3" ["zh_TW.minus"]="-" ["zh_TW.percent"]="#%"
+  ["zh.group"]="," ["zh.decimal"]="." ["zh.grouping"]="3" ["zh.minus"]="-" ["zh.percent"]="#%"
+  ["th.group"]="," ["th.decimal"]="." ["th.grouping"]="3" ["th.minus"]="-" ["th.percent"]="#%"
+  ["ar.group"]="," ["ar.decimal"]="." ["ar.grouping"]="3" ["ar.minus"]="-" ["ar.percent"]="#%"
+  ["he.group"]="," ["he.decimal"]="." ["he.grouping"]="3" ["he.minus"]="-" ["he.percent"]="#%"
+  ["hi.group"]="," ["hi.decimal"]="." ["hi.grouping"]="3;2" ["hi.minus"]="-" ["hi.percent"]="#%"
+  ["bn.group"]="," ["bn.decimal"]="." ["bn.grouping"]="3;2" ["bn.minus"]="-" ["bn.percent"]="#%"
 )
 
 # Currency metadata, keyed `<code>.symbol` and `<code>.digits`. The digit count
 # is a property of the currency and not of the locale, which is why yen and dong
 # have none and dinars have three.
 declare -gA DYBATPHO_I18N_CURRENCY=(
-  [USD.symbol]='$' [USD.digits]=2
-  [EUR.symbol]='€' [EUR.digits]=2
-  [GBP.symbol]='£' [GBP.digits]=2
-  [CHF.symbol]='CHF' [CHF.digits]=2
-  [RUB.symbol]='₽' [RUB.digits]=2
-  [PLN.symbol]='zł' [PLN.digits]=2
-  [TRY.symbol]='₺' [TRY.digits]=2
-  [BRL.symbol]='R$' [BRL.digits]=2
-  [INR.symbol]='₹' [INR.digits]=2
-  [CNY.symbol]='¥' [CNY.digits]=2
-  [TWD.symbol]='NT$' [TWD.digits]=2
-  [THB.symbol]='฿' [THB.digits]=2
-  [ILS.symbol]='₪' [ILS.digits]=2
-  [AED.symbol]='د.إ' [AED.digits]=2
-  [AUD.symbol]='A$' [AUD.digits]=2
-  [CAD.symbol]='CA$' [CAD.digits]=2
-  [SEK.symbol]='kr' [SEK.digits]=2
-  [JPY.symbol]='¥' [JPY.digits]=0
-  [KRW.symbol]='₩' [KRW.digits]=0
-  [VND.symbol]='₫' [VND.digits]=0
-  [CLP.symbol]='$' [CLP.digits]=0
-  [ISK.symbol]='kr' [ISK.digits]=0
-  [IDR.symbol]='Rp' [IDR.digits]=0
-  [BHD.symbol]='.د.ب' [BHD.digits]=3
-  [KWD.symbol]='د.ك' [KWD.digits]=3
-  [TND.symbol]='د.ت' [TND.digits]=3
+  ["USD.symbol"]='$' ["USD.digits"]=2
+  ["EUR.symbol"]='€' ["EUR.digits"]=2
+  ["GBP.symbol"]='£' ["GBP.digits"]=2
+  ["CHF.symbol"]='CHF' ["CHF.digits"]=2
+  ["RUB.symbol"]='₽' ["RUB.digits"]=2
+  ["PLN.symbol"]='zł' ["PLN.digits"]=2
+  ["TRY.symbol"]='₺' ["TRY.digits"]=2
+  ["BRL.symbol"]='R$' ["BRL.digits"]=2
+  ["INR.symbol"]='₹' ["INR.digits"]=2
+  ["CNY.symbol"]='¥' ["CNY.digits"]=2
+  ["TWD.symbol"]='NT$' ["TWD.digits"]=2
+  ["THB.symbol"]='฿' ["THB.digits"]=2
+  ["ILS.symbol"]='₪' ["ILS.digits"]=2
+  ["AED.symbol"]='د.إ' ["AED.digits"]=2
+  ["AUD.symbol"]='A$' ["AUD.digits"]=2
+  ["CAD.symbol"]='CA$' ["CAD.digits"]=2
+  ["SEK.symbol"]='kr' ["SEK.digits"]=2
+  ["JPY.symbol"]='¥' ["JPY.digits"]=0
+  ["KRW.symbol"]='₩' ["KRW.digits"]=0
+  ["VND.symbol"]='₫' ["VND.digits"]=0
+  ["CLP.symbol"]='$' ["CLP.digits"]=0
+  ["ISK.symbol"]='kr' ["ISK.digits"]=0
+  ["IDR.symbol"]='Rp' ["IDR.digits"]=0
+  ["BHD.symbol"]='.د.ب' ["BHD.digits"]=3
+  ["KWD.symbol"]='د.ك' ["KWD.digits"]=3
+  ["TND.symbol"]='د.ت' ["TND.digits"]=3
 )
 
 # Where the symbol sits relative to the amount, per locale. `¤` is the symbol
 # and `#` the number. Dutch and German are neighbours with opposite conventions,
 # which is why this cannot be derived and has to be looked up.
 declare -gA DYBATPHO_I18N_CURRENCY_LAYOUT=(
-  [en.layout]='¤#' [en_GB.layout]='¤#' [ja.layout]='¤#' [ko.layout]='¤#'
-  [zh.layout]='¤#' [zh_CN.layout]='¤#' [zh_TW.layout]='¤#' [th.layout]='¤#'
-  [hi.layout]='¤#' [bn.layout]='¤#' [he.layout]='¤ #' [ar.layout]='¤ #'
-  [nl.layout]='¤ #' [tr.layout]='¤#' [id.layout]='¤#'
-  [de.layout]='# ¤' [fr.layout]='# ¤' [es.layout]='# ¤' [it.layout]='# ¤'
-  [pt.layout]='¤ #' [pt_BR.layout]='¤ #' [ru.layout]='# ¤' [pl.layout]='# ¤'
-  [vi.layout]='# ¤'
+  ["en.layout"]='¤#' ["en_GB.layout"]='¤#' ["ja.layout"]='¤#' ["ko.layout"]='¤#'
+  ["zh.layout"]='¤#' ["zh_CN.layout"]='¤#' ["zh_TW.layout"]='¤#' ["th.layout"]='¤#'
+  ["hi.layout"]='¤#' ["bn.layout"]='¤#' ["he.layout"]='¤ #' ["ar.layout"]='¤ #'
+  ["nl.layout"]='¤ #' ["tr.layout"]='¤#' ["id.layout"]='¤#'
+  ["de.layout"]='# ¤' ["fr.layout"]='# ¤' ["es.layout"]='# ¤' ["it.layout"]='# ¤'
+  ["pt.layout"]='¤ #' ["pt_BR.layout"]='¤ #' ["ru.layout"]='# ¤' ["pl.layout"]='# ¤'
+  ["vi.layout"]='# ¤'
 )
 
 # Languages written right to left, matched on the language subtag. Held as a
@@ -1204,9 +1223,9 @@ function __dybatpho_i18n_seed_symbols {
     narrow=" "
     nbsp=" "
   fi
-  DYBATPHO_I18N_NUMBER[fr.group]="${narrow}"
-  DYBATPHO_I18N_NUMBER[ru.group]="${narrow}"
-  DYBATPHO_I18N_NUMBER[pl.group]="${narrow}"
+  DYBATPHO_I18N_NUMBER["fr.group"]="${narrow}"
+  DYBATPHO_I18N_NUMBER["ru.group"]="${narrow}"
+  DYBATPHO_I18N_NUMBER["pl.group"]="${narrow}"
   local locale layout
   for locale in "${!DYBATPHO_I18N_CURRENCY_LAYOUT[@]}"; do
     layout="${DYBATPHO_I18N_CURRENCY_LAYOUT[${locale}]}"
@@ -1236,7 +1255,7 @@ function __dybatpho_i18n_data {
   language="$(__dybatpho_i18n_language "${locale}")"
   for candidate in "${locale}" "${locale%%@*}" "${language}" "${DYBATPHO_I18N_FALLBACK}" "en"; do
     [[ -n "${candidate}" ]] || continue
-    local hit="${__data_map[${candidate}.${field}]-${__DYBATPHO_I18N_NONE}}"
+    local hit="${__data_map["${candidate}.${field}"]-${__DYBATPHO_I18N_NONE}}"
     if [[ "${hit}" != "${__DYBATPHO_I18N_NONE}" ]]; then
       printf '%s' "${hit}"
       return 0
@@ -1321,12 +1340,12 @@ function __dybatpho_i18n_round {
     result="$((digit % 10))${result}"
     ((index--))
   done
-  combined="${combined:0:index + 1}${result}"
+  combined="${combined:0:index+1}${result}"
   ((carry)) && combined="1${combined}"
 
   if ((precision > 0)); then
     __round_frac="${combined: -precision}"
-    __round_int="${combined:0:${#combined} - precision}"
+    __round_int="${combined:0:${#combined}-precision}"
   else
     __round_frac=""
     __round_int="${combined}"
@@ -1360,10 +1379,10 @@ function __dybatpho_i18n_group {
     # The space before the minus is required: `${head:-primary}` would be read
     # as a default value rather than as an offset from the end.
     tail="${separator}${head: -primary}"
-    head="${head:0:${#head} - primary}"
+    head="${head:0:${#head}-primary}"
     while ((${#head} > secondary)); do
       tail="${separator}${head: -secondary}${tail}"
-      head="${head:0:${#head} - secondary}"
+      head="${head:0:${#head}-secondary}"
     done
   fi
   printf '%s' "${head}${tail}"
@@ -1521,7 +1540,7 @@ function dybatpho::i18n_currency {
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
   code="${code^^}"
   local symbol digits
-  symbol="${DYBATPHO_I18N_CURRENCY[${code}.symbol]-${__DYBATPHO_I18N_NONE}}"
+  symbol="${DYBATPHO_I18N_CURRENCY["${code}.symbol"]-${__DYBATPHO_I18N_NONE}}"
   if [[ "${symbol}" == "${__DYBATPHO_I18N_NONE}" ]]; then
     # ISO 4217 sanctions the code itself as a presentation form, and two digits
     # covers most currencies, so this is reported and carried on with rather
@@ -1530,7 +1549,7 @@ function dybatpho::i18n_currency {
     symbol="${code}"
     digits=2
   else
-    digits="${DYBATPHO_I18N_CURRENCY[${code}.digits]}"
+    digits="${DYBATPHO_I18N_CURRENCY["${code}.digits"]}"
     if dybatpho::is true "${DYBATPHO_I18N_ASCII}"; then
       symbol="${code}"
     fi
@@ -1541,7 +1560,9 @@ function dybatpho::i18n_currency {
   minus="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" minus)" || minus="-"
   rendered="${layout/¤/${symbol}}"
   rendered="${rendered/\#/${number}}"
-  printf '%s\n' "$(__dybatpho_i18n_negative "${rendered}" "${minus}")"
+  local i18n_negative
+  i18n_negative=$(__dybatpho_i18n_negative "${rendered}" "${minus}")
+  printf '%s\n' "${i18n_negative}"
 }
 
 #######################################
@@ -1626,109 +1647,109 @@ function dybatpho::i18n_bytes {
 # would put an off-by-one conversion at every use site. Values are comma
 # separated because no name in any shipped locale contains a comma.
 declare -gA DYBATPHO_I18N_NAMES=(
-  [en.months]="January,February,March,April,May,June,July,August,September,October,November,December"
-  [en.months_abbr]="Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec"
-  [en.weekdays]="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday"
-  [en.weekdays_abbr]="Mon,Tue,Wed,Thu,Fri,Sat,Sun"
-  [en.dayperiods]="AM,PM"
+  ["en.months"]="January,February,March,April,May,June,July,August,September,October,November,December"
+  ["en.months_abbr"]="Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec"
+  ["en.weekdays"]="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday"
+  ["en.weekdays_abbr"]="Mon,Tue,Wed,Thu,Fri,Sat,Sun"
+  ["en.dayperiods"]="AM,PM"
 
-  [de.months]="Januar,Februar,März,April,Mai,Juni,Juli,August,September,Oktober,November,Dezember"
-  [de.months_abbr]="Jan,Feb,Mär,Apr,Mai,Jun,Jul,Aug,Sep,Okt,Nov,Dez"
-  [de.weekdays]="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag"
-  [de.weekdays_abbr]="Mo,Di,Mi,Do,Fr,Sa,So"
-  [de.dayperiods]="AM,PM"
+  ["de.months"]="Januar,Februar,März,April,Mai,Juni,Juli,August,September,Oktober,November,Dezember"
+  ["de.months_abbr"]="Jan,Feb,Mär,Apr,Mai,Jun,Jul,Aug,Sep,Okt,Nov,Dez"
+  ["de.weekdays"]="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag"
+  ["de.weekdays_abbr"]="Mo,Di,Mi,Do,Fr,Sa,So"
+  ["de.dayperiods"]="AM,PM"
 
-  [fr.months]="janvier,février,mars,avril,mai,juin,juillet,août,septembre,octobre,novembre,décembre"
-  [fr.months_abbr]="janv.,févr.,mars,avr.,mai,juin,juil.,août,sept.,oct.,nov.,déc."
-  [fr.weekdays]="lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche"
-  [fr.weekdays_abbr]="lun.,mar.,mer.,jeu.,ven.,sam.,dim."
-  [fr.dayperiods]="AM,PM"
+  ["fr.months"]="janvier,février,mars,avril,mai,juin,juillet,août,septembre,octobre,novembre,décembre"
+  ["fr.months_abbr"]="janv.,févr.,mars,avr.,mai,juin,juil.,août,sept.,oct.,nov.,déc."
+  ["fr.weekdays"]="lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche"
+  ["fr.weekdays_abbr"]="lun.,mar.,mer.,jeu.,ven.,sam.,dim."
+  ["fr.dayperiods"]="AM,PM"
 
-  [es.months]="enero,febrero,marzo,abril,mayo,junio,julio,agosto,septiembre,octubre,noviembre,diciembre"
-  [es.months_abbr]="ene,feb,mar,abr,may,jun,jul,ago,sept,oct,nov,dic"
-  [es.weekdays]="lunes,martes,miércoles,jueves,viernes,sábado,domingo"
-  [es.weekdays_abbr]="lun,mar,mié,jue,vie,sáb,dom"
-  [es.dayperiods]="a. m.,p. m."
+  ["es.months"]="enero,febrero,marzo,abril,mayo,junio,julio,agosto,septiembre,octubre,noviembre,diciembre"
+  ["es.months_abbr"]="ene,feb,mar,abr,may,jun,jul,ago,sept,oct,nov,dic"
+  ["es.weekdays"]="lunes,martes,miércoles,jueves,viernes,sábado,domingo"
+  ["es.weekdays_abbr"]="lun,mar,mié,jue,vie,sáb,dom"
+  ["es.dayperiods"]="a. m.,p. m."
 
-  [it.months]="gennaio,febbraio,marzo,aprile,maggio,giugno,luglio,agosto,settembre,ottobre,novembre,dicembre"
-  [it.months_abbr]="gen,feb,mar,apr,mag,giu,lug,ago,set,ott,nov,dic"
-  [it.weekdays]="lunedì,martedì,mercoledì,giovedì,venerdì,sabato,domenica"
-  [it.weekdays_abbr]="lun,mar,mer,gio,ven,sab,dom"
-  [it.dayperiods]="AM,PM"
+  ["it.months"]="gennaio,febbraio,marzo,aprile,maggio,giugno,luglio,agosto,settembre,ottobre,novembre,dicembre"
+  ["it.months_abbr"]="gen,feb,mar,apr,mag,giu,lug,ago,set,ott,nov,dic"
+  ["it.weekdays"]="lunedì,martedì,mercoledì,giovedì,venerdì,sabato,domenica"
+  ["it.weekdays_abbr"]="lun,mar,mer,gio,ven,sab,dom"
+  ["it.dayperiods"]="AM,PM"
 
-  [pt.months]="janeiro,fevereiro,março,abril,maio,junho,julho,agosto,setembro,outubro,novembro,dezembro"
-  [pt.months_abbr]="jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"
-  [pt.weekdays]="segunda-feira,terça-feira,quarta-feira,quinta-feira,sexta-feira,sábado,domingo"
-  [pt.weekdays_abbr]="seg,ter,qua,qui,sex,sáb,dom"
-  [pt.dayperiods]="AM,PM"
+  ["pt.months"]="janeiro,fevereiro,março,abril,maio,junho,julho,agosto,setembro,outubro,novembro,dezembro"
+  ["pt.months_abbr"]="jan,fev,mar,abr,mai,jun,jul,ago,set,out,nov,dez"
+  ["pt.weekdays"]="segunda-feira,terça-feira,quarta-feira,quinta-feira,sexta-feira,sábado,domingo"
+  ["pt.weekdays_abbr"]="seg,ter,qua,qui,sex,sáb,dom"
+  ["pt.dayperiods"]="AM,PM"
 
-  [nl.months]="januari,februari,maart,april,mei,juni,juli,augustus,september,oktober,november,december"
-  [nl.months_abbr]="jan,feb,mrt,apr,mei,jun,jul,aug,sep,okt,nov,dec"
-  [nl.weekdays]="maandag,dinsdag,woensdag,donderdag,vrijdag,zaterdag,zondag"
-  [nl.weekdays_abbr]="ma,di,wo,do,vr,za,zo"
-  [nl.dayperiods]="a.m.,p.m."
+  ["nl.months"]="januari,februari,maart,april,mei,juni,juli,augustus,september,oktober,november,december"
+  ["nl.months_abbr"]="jan,feb,mrt,apr,mei,jun,jul,aug,sep,okt,nov,dec"
+  ["nl.weekdays"]="maandag,dinsdag,woensdag,donderdag,vrijdag,zaterdag,zondag"
+  ["nl.weekdays_abbr"]="ma,di,wo,do,vr,za,zo"
+  ["nl.dayperiods"]="a.m.,p.m."
 
-  [ru.months]="января,февраля,марта,апреля,мая,июня,июля,августа,сентября,октября,ноября,декабря"
-  [ru.months_abbr]="янв.,февр.,мар.,апр.,мая,июн.,июл.,авг.,сент.,окт.,нояб.,дек."
-  [ru.weekdays]="понедельник,вторник,среда,четверг,пятница,суббота,воскресенье"
-  [ru.weekdays_abbr]="пн,вт,ср,чт,пт,сб,вс"
-  [ru.dayperiods]="AM,PM"
+  ["ru.months"]="января,февраля,марта,апреля,мая,июня,июля,августа,сентября,октября,ноября,декабря"
+  ["ru.months_abbr"]="янв.,февр.,мар.,апр.,мая,июн.,июл.,авг.,сент.,окт.,нояб.,дек."
+  ["ru.weekdays"]="понедельник,вторник,среда,четверг,пятница,суббота,воскресенье"
+  ["ru.weekdays_abbr"]="пн,вт,ср,чт,пт,сб,вс"
+  ["ru.dayperiods"]="AM,PM"
 
-  [pl.months]="stycznia,lutego,marca,kwietnia,maja,czerwca,lipca,sierpnia,września,października,listopada,grudnia"
-  [pl.months_abbr]="sty,lut,mar,kwi,maj,cze,lip,sie,wrz,paź,lis,gru"
-  [pl.weekdays]="poniedziałek,wtorek,środa,czwartek,piątek,sobota,niedziela"
-  [pl.weekdays_abbr]="pon,wt,śr,czw,pt,sob,niedz"
-  [pl.dayperiods]="AM,PM"
+  ["pl.months"]="stycznia,lutego,marca,kwietnia,maja,czerwca,lipca,sierpnia,września,października,listopada,grudnia"
+  ["pl.months_abbr"]="sty,lut,mar,kwi,maj,cze,lip,sie,wrz,paź,lis,gru"
+  ["pl.weekdays"]="poniedziałek,wtorek,środa,czwartek,piątek,sobota,niedziela"
+  ["pl.weekdays_abbr"]="pon,wt,śr,czw,pt,sob,niedz"
+  ["pl.dayperiods"]="AM,PM"
 
-  [tr.months]="Ocak,Şubat,Mart,Nisan,Mayıs,Haziran,Temmuz,Ağustos,Eylül,Ekim,Kasım,Aralık"
-  [tr.months_abbr]="Oca,Şub,Mar,Nis,May,Haz,Tem,Ağu,Eyl,Eki,Kas,Ara"
-  [tr.weekdays]="Pazartesi,Salı,Çarşamba,Perşembe,Cuma,Cumartesi,Pazar"
-  [tr.weekdays_abbr]="Pzt,Sal,Çar,Per,Cum,Cmt,Paz"
-  [tr.dayperiods]="ÖÖ,ÖS"
+  ["tr.months"]="Ocak,Şubat,Mart,Nisan,Mayıs,Haziran,Temmuz,Ağustos,Eylül,Ekim,Kasım,Aralık"
+  ["tr.months_abbr"]="Oca,Şub,Mar,Nis,May,Haz,Tem,Ağu,Eyl,Eki,Kas,Ara"
+  ["tr.weekdays"]="Pazartesi,Salı,Çarşamba,Perşembe,Cuma,Cumartesi,Pazar"
+  ["tr.weekdays_abbr"]="Pzt,Sal,Çar,Per,Cum,Cmt,Paz"
+  ["tr.dayperiods"]="ÖÖ,ÖS"
 
-  [vi.months]="tháng 1,tháng 2,tháng 3,tháng 4,tháng 5,tháng 6,tháng 7,tháng 8,tháng 9,tháng 10,tháng 11,tháng 12"
-  [vi.months_abbr]="thg 1,thg 2,thg 3,thg 4,thg 5,thg 6,thg 7,thg 8,thg 9,thg 10,thg 11,thg 12"
-  [vi.weekdays]="Thứ Hai,Thứ Ba,Thứ Tư,Thứ Năm,Thứ Sáu,Thứ Bảy,Chủ Nhật"
-  [vi.weekdays_abbr]="Th 2,Th 3,Th 4,Th 5,Th 6,Th 7,CN"
-  [vi.dayperiods]="SA,CH"
+  ["vi.months"]="tháng 1,tháng 2,tháng 3,tháng 4,tháng 5,tháng 6,tháng 7,tháng 8,tháng 9,tháng 10,tháng 11,tháng 12"
+  ["vi.months_abbr"]="thg 1,thg 2,thg 3,thg 4,thg 5,thg 6,thg 7,thg 8,thg 9,thg 10,thg 11,thg 12"
+  ["vi.weekdays"]="Thứ Hai,Thứ Ba,Thứ Tư,Thứ Năm,Thứ Sáu,Thứ Bảy,Chủ Nhật"
+  ["vi.weekdays_abbr"]="Th 2,Th 3,Th 4,Th 5,Th 6,Th 7,CN"
+  ["vi.dayperiods"]="SA,CH"
 
-  [ja.months]="1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月"
-  [ja.weekdays]="月曜日,火曜日,水曜日,木曜日,金曜日,土曜日,日曜日"
-  [ja.weekdays_abbr]="月,火,水,木,金,土,日"
-  [ja.dayperiods]="午前,午後"
+  ["ja.months"]="1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月"
+  ["ja.weekdays"]="月曜日,火曜日,水曜日,木曜日,金曜日,土曜日,日曜日"
+  ["ja.weekdays_abbr"]="月,火,水,木,金,土,日"
+  ["ja.dayperiods"]="午前,午後"
 
-  [ko.months]="1월,2월,3월,4월,5월,6월,7월,8월,9월,10월,11월,12월"
-  [ko.weekdays]="월요일,화요일,수요일,목요일,금요일,토요일,일요일"
-  [ko.weekdays_abbr]="월,화,수,목,금,토,일"
-  [ko.dayperiods]="오전,오후"
+  ["ko.months"]="1월,2월,3월,4월,5월,6월,7월,8월,9월,10월,11월,12월"
+  ["ko.weekdays"]="월요일,화요일,수요일,목요일,금요일,토요일,일요일"
+  ["ko.weekdays_abbr"]="월,화,수,목,금,토,일"
+  ["ko.dayperiods"]="오전,오후"
 
-  [zh.months]="一月,二月,三月,四月,五月,六月,七月,八月,九月,十月,十一月,十二月"
-  [zh.months_abbr]="1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月"
-  [zh.weekdays]="星期一,星期二,星期三,星期四,星期五,星期六,星期日"
-  [zh.weekdays_abbr]="周一,周二,周三,周四,周五,周六,周日"
-  [zh.dayperiods]="上午,下午"
+  ["zh.months"]="一月,二月,三月,四月,五月,六月,七月,八月,九月,十月,十一月,十二月"
+  ["zh.months_abbr"]="1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月"
+  ["zh.weekdays"]="星期一,星期二,星期三,星期四,星期五,星期六,星期日"
+  ["zh.weekdays_abbr"]="周一,周二,周三,周四,周五,周六,周日"
+  ["zh.dayperiods"]="上午,下午"
 
-  [ar.months]="يناير,فبراير,مارس,أبريل,مايو,يونيو,يوليو,أغسطس,سبتمبر,أكتوبر,نوفمبر,ديسمبر"
-  [ar.weekdays]="الاثنين,الثلاثاء,الأربعاء,الخميس,الجمعة,السبت,الأحد"
-  [ar.dayperiods]="ص,م"
+  ["ar.months"]="يناير,فبراير,مارس,أبريل,مايو,يونيو,يوليو,أغسطس,سبتمبر,أكتوبر,نوفمبر,ديسمبر"
+  ["ar.weekdays"]="الاثنين,الثلاثاء,الأربعاء,الخميس,الجمعة,السبت,الأحد"
+  ["ar.dayperiods"]="ص,م"
 
-  [he.months]="ינואר,פברואר,מרץ,אפריל,מאי,יוני,יולי,אוגוסט,ספטמבר,אוקטובר,נובמבר,דצמבר"
-  [he.weekdays]="יום שני,יום שלישי,יום רביעי,יום חמישי,יום שישי,יום שבת,יום ראשון"
-  [he.dayperiods]="AM,PM"
+  ["he.months"]="ינואר,פברואר,מרץ,אפריל,מאי,יוני,יולי,אוגוסט,ספטמבר,אוקטובר,נובמבר,דצמבר"
+  ["he.weekdays"]="יום שני,יום שלישי,יום רביעי,יום חמישי,יום שישי,יום שבת,יום ראשון"
+  ["he.dayperiods"]="AM,PM"
 
-  [hi.months]="जनवरी,फ़रवरी,मार्च,अप्रैल,मई,जून,जुलाई,अगस्त,सितंबर,अक्तूबर,नवंबर,दिसंबर"
-  [hi.weekdays]="सोमवार,मंगलवार,बुधवार,गुरुवार,शुक्रवार,शनिवार,रविवार"
-  [hi.dayperiods]="पूर्वाह्न,अपराह्न"
+  ["hi.months"]="जनवरी,फ़रवरी,मार्च,अप्रैल,मई,जून,जुलाई,अगस्त,सितंबर,अक्तूबर,नवंबर,दिसंबर"
+  ["hi.weekdays"]="सोमवार,मंगलवार,बुधवार,गुरुवार,शुक्रवार,शनिवार,रविवार"
+  ["hi.dayperiods"]="पूर्वाह्न,अपराह्न"
 
-  [id.months]="Januari,Februari,Maret,April,Mei,Juni,Juli,Agustus,September,Oktober,November,Desember"
-  [id.months_abbr]="Jan,Feb,Mar,Apr,Mei,Jun,Jul,Agu,Sep,Okt,Nov,Des"
-  [id.weekdays]="Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu"
-  [id.weekdays_abbr]="Sen,Sel,Rab,Kam,Jum,Sab,Min"
-  [id.dayperiods]="AM,PM"
+  ["id.months"]="Januari,Februari,Maret,April,Mei,Juni,Juli,Agustus,September,Oktober,November,Desember"
+  ["id.months_abbr"]="Jan,Feb,Mar,Apr,Mei,Jun,Jul,Agu,Sep,Okt,Nov,Des"
+  ["id.weekdays"]="Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu"
+  ["id.weekdays_abbr"]="Sen,Sel,Rab,Kam,Jum,Sab,Min"
+  ["id.dayperiods"]="AM,PM"
 
-  [th.months]="มกราคม,กุมภาพันธ์,มีนาคม,เมษายน,พฤษภาคม,มิถุนายน,กรกฎาคม,สิงหาคม,กันยายน,ตุลาคม,พฤศจิกายน,ธันวาคม"
-  [th.weekdays]="จันทร์,อังคาร,พุธ,พฤหัสบดี,ศุกร์,เสาร์,อาทิตย์"
-  [th.dayperiods]="ก่อนเที่ยง,หลังเที่ยง"
+  ["th.months"]="มกราคม,กุมภาพันธ์,มีนาคม,เมษายน,พฤษภาคม,มิถุนายน,กรกฎาคม,สิงหาคม,กันยายน,ตุลาคม,พฤศจิกายน,ธันวาคม"
+  ["th.weekdays"]="จันทร์,อังคาร,พุธ,พฤหัสบดี,ศุกร์,เสาร์,อาทิตย์"
+  ["th.dayperiods"]="ก่อนเที่ยง,หลังเที่ยง"
 )
 
 # Date and time patterns per locale. The letters follow the CLDR convention and
@@ -1739,92 +1760,92 @@ declare -gA DYBATPHO_I18N_NAMES=(
 # day number. Whether a locale shows a 12-hour or a 24-hour clock is carried by
 # its pattern rather than by a separate flag.
 declare -gA DYBATPHO_I18N_DATE_PATTERN=(
-  [en.date_short]="M/d/yy" [en.date_medium]="MMM d, yyyy"
-  [en.date_long]="MMMM d, yyyy" [en.date_full]="EEEE, MMMM d, yyyy"
-  [en.time_short]="h:mm a" [en.time_medium]="h:mm:ss a"
-  [en.datetime_short]="{date}, {time}" [en.datetime_medium]="{date}, {time}"
-  [en.datetime_long]="{date} 'at' {time}" [en.datetime_full]="{date} 'at' {time}"
+  ["en.date_short"]="M/d/yy" ["en.date_medium"]="MMM d, yyyy"
+  ["en.date_long"]="MMMM d, yyyy" ["en.date_full"]="EEEE, MMMM d, yyyy"
+  ["en.time_short"]="h:mm a" ["en.time_medium"]="h:mm:ss a"
+  ["en.datetime_short"]="{date}, {time}" ["en.datetime_medium"]="{date}, {time}"
+  ["en.datetime_long"]="{date} 'at' {time}" ["en.datetime_full"]="{date} 'at' {time}"
 
-  [en_GB.date_short]="dd/MM/yyyy" [en_GB.date_medium]="d MMM yyyy"
-  [en_GB.date_long]="d MMMM yyyy" [en_GB.date_full]="EEEE d MMMM yyyy"
-  [en_GB.time_short]="HH:mm" [en_GB.time_medium]="HH:mm:ss"
+  ["en_GB.date_short"]="dd/MM/yyyy" ["en_GB.date_medium"]="d MMM yyyy"
+  ["en_GB.date_long"]="d MMMM yyyy" ["en_GB.date_full"]="EEEE d MMMM yyyy"
+  ["en_GB.time_short"]="HH:mm" ["en_GB.time_medium"]="HH:mm:ss"
 
-  [de.date_short]="dd.MM.yy" [de.date_medium]="dd.MM.yyyy"
-  [de.date_long]="d. MMMM yyyy" [de.date_full]="EEEE, d. MMMM yyyy"
-  [de.time_short]="HH:mm" [de.time_medium]="HH:mm:ss"
+  ["de.date_short"]="dd.MM.yy" ["de.date_medium"]="dd.MM.yyyy"
+  ["de.date_long"]="d. MMMM yyyy" ["de.date_full"]="EEEE, d. MMMM yyyy"
+  ["de.time_short"]="HH:mm" ["de.time_medium"]="HH:mm:ss"
 
-  [fr.date_short]="dd/MM/yyyy" [fr.date_medium]="d MMM yyyy"
-  [fr.date_long]="d MMMM yyyy" [fr.date_full]="EEEE d MMMM yyyy"
-  [fr.time_short]="HH:mm" [fr.time_medium]="HH:mm:ss"
+  ["fr.date_short"]="dd/MM/yyyy" ["fr.date_medium"]="d MMM yyyy"
+  ["fr.date_long"]="d MMMM yyyy" ["fr.date_full"]="EEEE d MMMM yyyy"
+  ["fr.time_short"]="HH:mm" ["fr.time_medium"]="HH:mm:ss"
 
-  [es.date_short]="d/M/yy" [es.date_medium]="d MMM yyyy"
-  [es.date_long]="d 'de' MMMM 'de' yyyy" [es.date_full]="EEEE, d 'de' MMMM 'de' yyyy"
-  [es.time_short]="H:mm" [es.time_medium]="H:mm:ss"
+  ["es.date_short"]="d/M/yy" ["es.date_medium"]="d MMM yyyy"
+  ["es.date_long"]="d 'de' MMMM 'de' yyyy" ["es.date_full"]="EEEE, d 'de' MMMM 'de' yyyy"
+  ["es.time_short"]="H:mm" ["es.time_medium"]="H:mm:ss"
 
-  [it.date_short]="dd/MM/yy" [it.date_medium]="d MMM yyyy"
-  [it.date_long]="d MMMM yyyy" [it.date_full]="EEEE d MMMM yyyy"
-  [it.time_short]="HH:mm" [it.time_medium]="HH:mm:ss"
+  ["it.date_short"]="dd/MM/yy" ["it.date_medium"]="d MMM yyyy"
+  ["it.date_long"]="d MMMM yyyy" ["it.date_full"]="EEEE d MMMM yyyy"
+  ["it.time_short"]="HH:mm" ["it.time_medium"]="HH:mm:ss"
 
-  [pt.date_short]="dd/MM/yyyy" [pt.date_medium]="d 'de' MMM 'de' yyyy"
-  [pt.date_long]="d 'de' MMMM 'de' yyyy" [pt.date_full]="EEEE, d 'de' MMMM 'de' yyyy"
-  [pt.time_short]="HH:mm" [pt.time_medium]="HH:mm:ss"
+  ["pt.date_short"]="dd/MM/yyyy" ["pt.date_medium"]="d 'de' MMM 'de' yyyy"
+  ["pt.date_long"]="d 'de' MMMM 'de' yyyy" ["pt.date_full"]="EEEE, d 'de' MMMM 'de' yyyy"
+  ["pt.time_short"]="HH:mm" ["pt.time_medium"]="HH:mm:ss"
 
-  [nl.date_short]="dd-MM-yyyy" [nl.date_medium]="d MMM yyyy"
-  [nl.date_long]="d MMMM yyyy" [nl.date_full]="EEEE d MMMM yyyy"
-  [nl.time_short]="HH:mm" [nl.time_medium]="HH:mm:ss"
+  ["nl.date_short"]="dd-MM-yyyy" ["nl.date_medium"]="d MMM yyyy"
+  ["nl.date_long"]="d MMMM yyyy" ["nl.date_full"]="EEEE d MMMM yyyy"
+  ["nl.time_short"]="HH:mm" ["nl.time_medium"]="HH:mm:ss"
 
-  [ru.date_short]="dd.MM.yyyy" [ru.date_medium]="d MMM yyyy"
-  [ru.date_long]="d MMMM yyyy" [ru.date_full]="EEEE, d MMMM yyyy"
-  [ru.time_short]="HH:mm" [ru.time_medium]="HH:mm:ss"
+  ["ru.date_short"]="dd.MM.yyyy" ["ru.date_medium"]="d MMM yyyy"
+  ["ru.date_long"]="d MMMM yyyy" ["ru.date_full"]="EEEE, d MMMM yyyy"
+  ["ru.time_short"]="HH:mm" ["ru.time_medium"]="HH:mm:ss"
 
-  [pl.date_short]="d.MM.yyyy" [pl.date_medium]="d MMM yyyy"
-  [pl.date_long]="d MMMM yyyy" [pl.date_full]="EEEE, d MMMM yyyy"
-  [pl.time_short]="HH:mm" [pl.time_medium]="HH:mm:ss"
+  ["pl.date_short"]="d.MM.yyyy" ["pl.date_medium"]="d MMM yyyy"
+  ["pl.date_long"]="d MMMM yyyy" ["pl.date_full"]="EEEE, d MMMM yyyy"
+  ["pl.time_short"]="HH:mm" ["pl.time_medium"]="HH:mm:ss"
 
-  [tr.date_short]="d.MM.yyyy" [tr.date_medium]="d MMM yyyy"
-  [tr.date_long]="d MMMM yyyy" [tr.date_full]="d MMMM yyyy EEEE"
-  [tr.time_short]="HH:mm" [tr.time_medium]="HH:mm:ss"
+  ["tr.date_short"]="d.MM.yyyy" ["tr.date_medium"]="d MMM yyyy"
+  ["tr.date_long"]="d MMMM yyyy" ["tr.date_full"]="d MMMM yyyy EEEE"
+  ["tr.time_short"]="HH:mm" ["tr.time_medium"]="HH:mm:ss"
 
-  [vi.date_short]="dd/MM/yyyy" [vi.date_medium]="d MMM, yyyy"
-  [vi.date_long]="'ngày' d 'tháng' M 'năm' yyyy"
-  [vi.date_full]="EEEE, 'ngày' d 'tháng' M 'năm' yyyy"
-  [vi.time_short]="HH:mm" [vi.time_medium]="HH:mm:ss"
+  ["vi.date_short"]="dd/MM/yyyy" ["vi.date_medium"]="d MMM, yyyy"
+  ["vi.date_long"]="'ngày' d 'tháng' M 'năm' yyyy"
+  ["vi.date_full"]="EEEE, 'ngày' d 'tháng' M 'năm' yyyy"
+  ["vi.time_short"]="HH:mm" ["vi.time_medium"]="HH:mm:ss"
 
-  [ja.date_short]="yyyy/MM/dd" [ja.date_medium]="yyyy/MM/dd"
-  [ja.date_long]="yyyy'年'M'月'd'日'" [ja.date_full]="yyyy'年'M'月'd'日' EEEE"
-  [ja.time_short]="H:mm" [ja.time_medium]="H:mm:ss"
-  [ja.datetime_medium]="{date} {time}" [ja.datetime_short]="{date} {time}"
-  [ja.datetime_long]="{date} {time}" [ja.datetime_full]="{date} {time}"
+  ["ja.date_short"]="yyyy/MM/dd" ["ja.date_medium"]="yyyy/MM/dd"
+  ["ja.date_long"]="yyyy'年'M'月'd'日'" ["ja.date_full"]="yyyy'年'M'月'd'日' EEEE"
+  ["ja.time_short"]="H:mm" ["ja.time_medium"]="H:mm:ss"
+  ["ja.datetime_medium"]="{date} {time}" ["ja.datetime_short"]="{date} {time}"
+  ["ja.datetime_long"]="{date} {time}" ["ja.datetime_full"]="{date} {time}"
 
-  [ko.date_short]="yy. M. d." [ko.date_medium]="yyyy. M. d."
-  [ko.date_long]="yyyy'년' M'월' d'일'" [ko.date_full]="yyyy'년' M'월' d'일' EEEE"
-  [ko.time_short]="a h:mm" [ko.time_medium]="a h:mm:ss"
+  ["ko.date_short"]="yy. M. d." ["ko.date_medium"]="yyyy. M. d."
+  ["ko.date_long"]="yyyy'년' M'월' d'일'" ["ko.date_full"]="yyyy'년' M'월' d'일' EEEE"
+  ["ko.time_short"]="a h:mm" ["ko.time_medium"]="a h:mm:ss"
 
-  [zh.date_short]="yyyy/M/d" [zh.date_medium]="yyyy'年'M'月'd'日'"
-  [zh.date_long]="yyyy'年'M'月'd'日'" [zh.date_full]="yyyy'年'M'月'd'日' EEEE"
-  [zh.time_short]="HH:mm" [zh.time_medium]="HH:mm:ss"
-  [zh.datetime_medium]="{date} {time}" [zh.datetime_short]="{date} {time}"
-  [zh.datetime_long]="{date} {time}" [zh.datetime_full]="{date} {time}"
+  ["zh.date_short"]="yyyy/M/d" ["zh.date_medium"]="yyyy'年'M'月'd'日'"
+  ["zh.date_long"]="yyyy'年'M'月'd'日'" ["zh.date_full"]="yyyy'年'M'月'd'日' EEEE"
+  ["zh.time_short"]="HH:mm" ["zh.time_medium"]="HH:mm:ss"
+  ["zh.datetime_medium"]="{date} {time}" ["zh.datetime_short"]="{date} {time}"
+  ["zh.datetime_long"]="{date} {time}" ["zh.datetime_full"]="{date} {time}"
 
-  [ar.date_short]="d/M/yyyy" [ar.date_medium]="dd/MM/yyyy"
-  [ar.date_long]="d MMMM yyyy" [ar.date_full]="EEEE، d MMMM yyyy"
-  [ar.time_short]="h:mm a" [ar.time_medium]="h:mm:ss a"
+  ["ar.date_short"]="d/M/yyyy" ["ar.date_medium"]="dd/MM/yyyy"
+  ["ar.date_long"]="d MMMM yyyy" ["ar.date_full"]="EEEE، d MMMM yyyy"
+  ["ar.time_short"]="h:mm a" ["ar.time_medium"]="h:mm:ss a"
 
-  [he.date_short]="d.M.yyyy" [he.date_medium]="d MMM yyyy"
-  [he.date_long]="d MMMM yyyy" [he.date_full]="EEEE, d MMMM yyyy"
-  [he.time_short]="HH:mm" [he.time_medium]="HH:mm:ss"
+  ["he.date_short"]="d.M.yyyy" ["he.date_medium"]="d MMM yyyy"
+  ["he.date_long"]="d MMMM yyyy" ["he.date_full"]="EEEE, d MMMM yyyy"
+  ["he.time_short"]="HH:mm" ["he.time_medium"]="HH:mm:ss"
 
-  [hi.date_short]="d/M/yy" [hi.date_medium]="d MMM yyyy"
-  [hi.date_long]="d MMMM yyyy" [hi.date_full]="EEEE, d MMMM yyyy"
-  [hi.time_short]="h:mm a" [hi.time_medium]="h:mm:ss a"
+  ["hi.date_short"]="d/M/yy" ["hi.date_medium"]="d MMM yyyy"
+  ["hi.date_long"]="d MMMM yyyy" ["hi.date_full"]="EEEE, d MMMM yyyy"
+  ["hi.time_short"]="h:mm a" ["hi.time_medium"]="h:mm:ss a"
 
-  [id.date_short]="dd/MM/yy" [id.date_medium]="d MMM yyyy"
-  [id.date_long]="d MMMM yyyy" [id.date_full]="EEEE, dd MMMM yyyy"
-  [id.time_short]="HH.mm" [id.time_medium]="HH.mm.ss"
+  ["id.date_short"]="dd/MM/yy" ["id.date_medium"]="d MMM yyyy"
+  ["id.date_long"]="d MMMM yyyy" ["id.date_full"]="EEEE, dd MMMM yyyy"
+  ["id.time_short"]="HH.mm" ["id.time_medium"]="HH.mm.ss"
 
-  [th.date_short]="d/M/yy" [th.date_medium]="d MMM yyyy"
-  [th.date_long]="d MMMM yyyy" [th.date_full]="EEEEที่ d MMMM yyyy"
-  [th.time_short]="HH:mm" [th.time_medium]="HH:mm:ss"
+  ["th.date_short"]="d/M/yy" ["th.date_medium"]="d MMM yyyy"
+  ["th.date_long"]="d MMMM yyyy" ["th.date_full"]="EEEEที่ d MMMM yyyy"
+  ["th.time_short"]="HH:mm" ["th.time_medium"]="HH:mm:ss"
 )
 
 #######################################
@@ -1994,7 +2015,7 @@ function __dybatpho_i18n_render_pattern {
       continue
     fi
     count=0
-    while ((index + count < length)) && [[ "${pattern:index + count:1}" == "${char}" ]]; do
+    while ((index + count < length)) && [[ "${pattern:index+count:1}" == "${char}" ]]; do
       count=$((count + 1))
     done
     run="${char}${count}"
@@ -2011,7 +2032,11 @@ function __dybatpho_i18n_render_pattern {
       E1 | E2 | E3) out+="$(dybatpho::i18n_weekday_name "${weekday}" abbr "${locale}")" ;;
       H2) out+="${hour}" ;;
       H1) out+="$((10#${hour}))" ;;
-      h2) out+="$(printf '%02d' "$(__dybatpho_i18n_hour12 "${hour}")")" ;;
+      h2)
+        local hour12
+        hour12=$(__dybatpho_i18n_hour12 "${hour}")
+        out+="$(printf '%02d' "${hour12}")"
+        ;;
       h1) out+="$(__dybatpho_i18n_hour12 "${hour}")" ;;
       m2 | m1) out+="${minute}" ;;
       s2 | s1) out+="${second}" ;;
@@ -2305,10 +2330,14 @@ function dybatpho::i18n_relative {
   local unit count
   __dybatpho_i18n_span "${delta}" unit count
   if [[ "${unit}" == "now" ]]; then
-    printf '%s\n' "$(dybatpho::i18n_t i18n.relative.now)"
+    local i18n_t
+    i18n_t=$(dybatpho::i18n_t i18n.relative.now)
+    printf '%s\n' "${i18n_t}"
     return 0
   fi
-  printf '%s\n' "$(dybatpho::i18n_tn "i18n.relative.${direction}.${unit}" "${count}")"
+  local i18n_tn
+  i18n_tn=$(dybatpho::i18n_tn "i18n.relative.${direction}.${unit}" "${count}")
+  printf '%s\n' "${i18n_tn}"
 }
 
 #######################################
@@ -2331,10 +2360,14 @@ function dybatpho::i18n_duration {
   local unit count
   __dybatpho_i18n_span "${seconds}" unit count
   if [[ "${unit}" == "now" ]]; then
-    printf '%s\n' "$(dybatpho::i18n_tn i18n.duration.minute 0)"
+    local i18n_tn_2
+    i18n_tn_2=$(dybatpho::i18n_tn i18n.duration.minute 0)
+    printf '%s\n' "${i18n_tn_2}"
     return 0
   fi
-  printf '%s\n' "$(dybatpho::i18n_tn "i18n.duration.${unit}" "${count}")"
+  local i18n_tn
+  i18n_tn=$(dybatpho::i18n_tn "i18n.duration.${unit}" "${count}")
+  printf '%s\n' "${i18n_tn}"
 }
 
 #######################################
@@ -2459,14 +2492,15 @@ function dybatpho::i18n_register_number {
   dybatpho::expect_args locale group decimal grouping -- "$@"
   local minus="${5:--}"
   [[ "${grouping}" =~ ^[0-9]+(\;[0-9]+)?$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Grouping must be a number, optionally two separated by a semicolon, got '${grouping}'"
+    || dybatpho::die \
+      "${FUNCNAME[0]}: Grouping must be a number, optionally two separated by a semicolon, got '${grouping}'"
   [[ -n "${decimal}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Decimal separator must not be empty"
   DYBATPHO_I18N_NUMBER["${locale}.group"]="${group}"
   DYBATPHO_I18N_NUMBER["${locale}.decimal"]="${decimal}"
   DYBATPHO_I18N_NUMBER["${locale}.grouping"]="${grouping}"
   DYBATPHO_I18N_NUMBER["${locale}.minus"]="${minus}"
-  [[ -n "${DYBATPHO_I18N_NUMBER[${locale}.percent]-}" ]] \
+  [[ -n "${DYBATPHO_I18N_NUMBER["${locale}.percent"]-}" ]] \
     || DYBATPHO_I18N_NUMBER["${locale}.percent"]="#%"
 }
 
@@ -2588,6 +2622,10 @@ function __dybatpho_i18n_read_msg {
   locale="$2"
   local line key category value context=""
   local -i number=0
+  # A bare key: anything but a bracket, a quote, whitespace or the separator,
+  # with an optional plural category in brackets.
+  local __dybatpho_i18n_bare_key_re='^([^][\"[:space:]=]+)(\[(zero|one|two|few|many|other)\])?'
+  __dybatpho_i18n_bare_key_re+='[[:space:]]*=[[:space:]]*(.*)$'
   # The `|| [[ -n ... ]]` clause keeps the last line when the file does not end
   # in a newline, which generators and editors both produce.
   while IFS= read -r line || [[ -n "${line}" ]]; do
@@ -2609,7 +2647,7 @@ function __dybatpho_i18n_read_msg {
     # gettext catalog does. The bare form stays available for short keys.
     if [[ "${line}" =~ ^\"([^\"]*)\"(\[(zero|one|two|few|many|other)\])?[[:space:]]*=[[:space:]]*(.*)$ ]]; then
       key="${BASH_REMATCH[1]}"
-    elif [[ "${line}" =~ ^([^][\"[:space:]=]+)(\[(zero|one|two|few|many|other)\])?[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+    elif [[ "${line}" =~ ${__dybatpho_i18n_bare_key_re} ]]; then
       key="${BASH_REMATCH[1]}"
     else
       dybatpho::die "Invalid catalog entry in ${file}:${number}: ${line}"
@@ -2686,6 +2724,12 @@ function __dybatpho_i18n_read_po {
 
   # Flush whatever entry has been accumulated so far.
   local flush_key
+  #######################################
+  # @description Store the entry the parser has just finished reading, singular
+  #   or plural, and drop it when it is marked fuzzy: a fuzzy entry is a
+  #   translator's draft, not a translation.
+  # @noargs
+  #######################################
   function __dybatpho_i18n_po_flush {
     [[ -n "${msgid}${context}" ]] || return 0
     ((fuzzy)) && return 0
@@ -2776,6 +2820,7 @@ function __dybatpho_i18n_read_po {
         msgid_plural) msgid_plural+="${piece}" ;;
         msgstr) single+="${piece}" ;;
         msgstr_n) forms["${index}"]+="${piece}" ;;
+        *) ;;
       esac
       continue
     fi
@@ -2842,6 +2887,7 @@ function __dybatpho_i18n_load_file {
 #   first. The order is deliberately the reverse of how specific each root is:
 #   a later file overrides an earlier one, so the directories a caller named
 #   themselves have to be loaded last in order to win.
+# @noargs
 # @stdout One directory per line
 #######################################
 function __dybatpho_i18n_roots {
@@ -2882,7 +2928,9 @@ function __dybatpho_i18n_discover {
   domain="$2"
   local root candidate
   local -i found=0
-  while IFS= read -r root; do
+  local i18n_roots_output
+  i18n_roots_output=$(__dybatpho_i18n_roots)
+  while IFS= read -r root || [[ -n "${root}" ]]; do
     [[ -n "${root}" ]] || continue
     for candidate in \
       "${root}/${locale}/LC_MESSAGES/${domain}.po" \
@@ -2898,7 +2946,7 @@ function __dybatpho_i18n_discover {
         found+=1
       fi
     done
-  done < <(__dybatpho_i18n_roots)
+  done < <(printf '%s' "${i18n_roots_output}")
   ((found > 0))
 }
 
@@ -2989,7 +3037,9 @@ function dybatpho::i18n_locales {
   local domain="${1:-${DYBATPHO_I18N_DOMAIN}}"
   local root entry base name
   local -A seen=()
-  while IFS= read -r root; do
+  local i18n_roots_output
+  i18n_roots_output=$(__dybatpho_i18n_roots)
+  while IFS= read -r root || [[ -n "${root}" ]]; do
     [[ -n "${root}" ]] || continue
     dybatpho::is dir "${root}" || continue
     for entry in "${root}"/*; do
@@ -3009,9 +3059,10 @@ function dybatpho::i18n_locales {
           seen["${name%.*}"]=1
           ;;
         *.po | *.msg) seen["${base%.*}"]=1 ;;
+        *) ;;
       esac
     done
-  done < <(__dybatpho_i18n_roots)
+  done < <(printf '%s' "${i18n_roots_output}")
   ((${#seen[@]} > 0)) || return 1
   # The sort runs under the C locale so that the list is identical on every
   # machine rather than following whatever collation the user happens to have.
@@ -3081,9 +3132,13 @@ function __dybatpho_i18n_scan {
   local -a files=()
   for path in "$@"; do
     if dybatpho::is dir "${path}"; then
-      while IFS= read -r file; do
+      local find_output
+      local find_scripts
+      find_scripts=$(find "${path}" -type f -name '*.sh' -o -type f -name '*.bash')
+      find_output=$(printf '%s\n' "${find_scripts}" | LC_ALL=C sort)
+      while IFS= read -r file || [[ -n "${file}" ]]; do
         files+=("${file}")
-      done < <(find "${path}" -type f -name '*.sh' -o -type f -name '*.bash' | LC_ALL=C sort)
+      done < <(printf '%s' "${find_output}")
     elif dybatpho::is file "${path}"; then
       files+=("${path}")
     else
@@ -3201,7 +3256,9 @@ function dybatpho::i18n_extract {
   # Sorted under the C locale so the template is byte identical everywhere and
   # a regenerated file diffs cleanly.
   local context bare written_context=""
-  while IFS= read -r key; do
+  local printf_output
+  printf_output=$(printf '%s\n' "${!found[@]}" | LC_ALL=C sort)
+  while IFS= read -r key || [[ -n "${key}" ]]; do
     kind="${found[${key}]}"
     context=""
     bare="${key}"
@@ -3243,7 +3300,7 @@ function dybatpho::i18n_extract {
       fi
     fi
     rendered+=$'\n'
-  done < <(printf '%s\n' "${!found[@]}" | LC_ALL=C sort)
+  done < <(printf '%s' "${printf_output}")
 
   if [[ -n "${output}" ]]; then
     printf '%s' "${rendered}" | dybatpho::file_write_atomic "${output}"
@@ -3347,7 +3404,9 @@ function dybatpho::i18n_lint {
   local -i findings=0
   local detail reference_text target_text reference_marks target_marks category
   for locale in "${targets[@]}"; do
-    while IFS= read -r key; do
+    local printf_output
+    printf_output=$(printf '%s\n' "${!reference_keys[@]}" | LC_ALL=C sort)
+    while IFS= read -r key || [[ -n "${key}" ]]; do
       [[ -n "${key}" ]] || continue
       reference_text="${__dybatpho_i18n_msg[${reference}${__DYBATPHO_I18N_US}${key}]-${__DYBATPHO_I18N_NONE}}"
       target_text="${__dybatpho_i18n_msg[${locale}${__DYBATPHO_I18N_US}${key}]-${__DYBATPHO_I18N_NONE}}"
@@ -3356,7 +3415,8 @@ function dybatpho::i18n_lint {
         # no plain form, so the plural table is consulted before reporting.
         local has_plural=0
         for category in zero one two few many other; do
-          if [[ -n "${__dybatpho_i18n_plural[${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}${category}]+set}" ]]; then
+          local plural_key="${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}${category}"
+          if [[ -n "${__dybatpho_i18n_plural[${plural_key}]+set}" ]]; then
             has_plural=1
             break
           fi
@@ -3372,17 +3432,21 @@ function dybatpho::i18n_lint {
         findings+=1
         continue
       fi
-      if [[ "${reference_text}" != "${__DYBATPHO_I18N_NONE}" \
-        && "${target_text}" != "${__DYBATPHO_I18N_NONE}" ]]; then
-        reference_marks="$(__dybatpho_i18n_placeholders "${reference_text}" | tr '\n' ' ')"
-        target_marks="$(__dybatpho_i18n_placeholders "${target_text}" | tr '\n' ' ')"
+      if [[ "${reference_text}" != "${__DYBATPHO_I18N_NONE}" &&
+        "${target_text}" != "${__DYBATPHO_I18N_NONE}" ]]; then
+        local i18n_placeholders_2
+        i18n_placeholders_2=$(__dybatpho_i18n_placeholders "${reference_text}" | tr '\n' ' ')
+        reference_marks="${i18n_placeholders_2}"
+        local i18n_placeholders
+        i18n_placeholders=$(__dybatpho_i18n_placeholders "${target_text}" | tr '\n' ' ')
+        target_marks="${i18n_placeholders}"
         if [[ "${reference_marks}" != "${target_marks}" ]]; then
           detail="reference={${reference_marks% }} target={${target_marks% }}"
           __dybatpho_i18n_finding "${format}" "${locale}" placeholder "${key}" "${detail}"
           findings+=1
         fi
       fi
-    done < <(printf '%s\n' "${!reference_keys[@]}" | LC_ALL=C sort)
+    done < <(printf '%s' "${printf_output}")
   done
   ((findings == 0))
 }

@@ -1,7 +1,18 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it keeps its declarations with the functions they
+# describe.
+# dyshellint disable=BSG050,BSG011,BSG033
 # @file os.sh
 # @brief Utilities for getting information of OS/distro
-# @description This module contains functions to get information of OS/distro, such as platform, distribution and architecture, plus the host facts other modules would otherwise each detect for themselves: host and user names, processor count, terminal size, and whether the script runs as root, in a container, under WSL, or on CI. Package manager detection and dependency installation live in `pkg.sh`.
+# @namespace dybatpho
+# @description
+#   This module contains functions to get information of OS/distro, such as platform, distribution and architecture,
+#   plus the host facts other modules would otherwise each detect for themselves: host and user names, processor count,
+#   terminal size, and whether the script runs as root, in a container, under WSL, or on CI. Package manager detection
+#   and dependency installation live in `pkg.sh`.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # The host name cannot change under a running script, so it is resolved once.
@@ -11,15 +22,20 @@ __dybatpho_os_hostname=""
 
 #######################################
 # @description Get $GOOS compilation environment
+# @noargs
 # @stdout Return $GOOS value https://go.dev/doc/install/source#environment
 #######################################
 function dybatpho::goos {
-  local os="$(dybatpho::lower "$(uname -s)")"
+  local os
+  local uname
+  uname=$(uname -s)
+  os="$(dybatpho::lower "${uname}")"
   local goos
   case "${os}" in
     cygwin_nt*) goos="windows" ;;
     linux)
-      local variant="$(dybatpho::lower "$(uname -o 2> /dev/null || true)")"
+      local variant
+      variant="$(dybatpho::lower "$(uname -o 2> /dev/null || true)")"
       case "${variant}" in
         android) goos="android" ;;
         *) goos="linux" ;;
@@ -34,6 +50,7 @@ function dybatpho::goos {
 
 #######################################
 # @description Return the normalized host operating system name.
+# @noargs
 # @stdout `linux`, `darwin`, `windows`, `android`, or the normalized uname name
 #######################################
 function dybatpho::platform {
@@ -43,23 +60,32 @@ function dybatpho::platform {
 #######################################
 # @description Return success when running on macOS.
 #######################################
+# @noargs
 function dybatpho::is_macos {
-  [[ "$(dybatpho::platform)" == "darwin" ]]
+  local platform
+  platform=$(dybatpho::platform)
+  [[ "${platform}" == "darwin" ]]
 }
 
 #######################################
 # @description Return success when running on Linux.
 #######################################
+# @noargs
 function dybatpho::is_linux {
-  [[ "$(dybatpho::platform)" == "linux" ]]
+  local platform
+  platform=$(dybatpho::platform)
+  [[ "${platform}" == "linux" ]]
 }
 
 #######################################
 # @description Return success when running on a Windows-compatible environment
 #   such as Cygwin, MSYS, or MinGW.
 #######################################
+# @noargs
 function dybatpho::is_windows {
-  [[ "$(dybatpho::platform)" == "windows" ]]
+  local platform
+  platform=$(dybatpho::platform)
+  [[ "${platform}" == "windows" ]]
 }
 
 #######################################
@@ -135,10 +161,12 @@ function dybatpho::command_version {
 
 #######################################
 # @description Get $GOARCH compilation environment
+# @noargs
 # @stdout Return $GOOS value https://go.dev/docs/install/source#environment
 #######################################
 function dybatpho::goarch {
-  local arch="$(uname -m)"
+  local arch
+  arch="$(uname -m)"
   local goarch
   case "${arch}" in
     aarch64) goarch="arm64" ;;
@@ -158,6 +186,7 @@ function dybatpho::goarch {
 #   The answer is resolved once and cached for the lifetime of the shell,
 #   because it cannot change under a running script and every structured log
 #   event asks for it.
+# @noargs
 # @example
 #   dybatpho::info "Deploying from $(dybatpho::hostname)"
 #
@@ -187,6 +216,7 @@ function dybatpho::hostname {
 # @description Print the name of the user the script runs as.
 #   This is the effective user, so a script under `sudo` reports `root` rather
 #   than the account that called it.
+# @noargs
 # @stdout User name, or `unknown` when nothing can answer
 #######################################
 function dybatpho::user {
@@ -198,6 +228,7 @@ function dybatpho::user {
 
 #######################################
 # @description Return success when the script runs as the superuser.
+# @noargs
 # @example
 #   dybatpho::is_root || dybatpho::die "Run this with sudo"
 #
@@ -205,11 +236,14 @@ function dybatpho::user {
 # @exitcode 1 The effective user is anybody else
 #######################################
 function dybatpho::is_root {
-  [[ "${EUID:-$(id -u)}" -eq 0 ]]
+  local id
+  id=$(id -u)
+  [[ "${EUID:-${id}}" -eq 0 ]]
 }
 
 #######################################
 # @description Print the kernel release of the host.
+# @noargs
 # @stdout Kernel release, such as `6.12.4-arch1-1`
 # @exitcode 1 The kernel release cannot be determined
 #######################################
@@ -224,6 +258,7 @@ function dybatpho::kernel_version {
 # @description Print how many processors the host can run work on.
 #   The count is reported rather than defaulted, so that a caller decides for
 #   itself what to do on a host that cannot answer.
+# @noargs
 # @example
 #   jobs="$(dybatpho::cpu_count || printf '4')"
 #
@@ -351,6 +386,7 @@ function dybatpho::os_release {
 # @description Print the distribution the host runs.
 #   macOS has no `os-release`, so it answers `macos`; a Linux host answers with
 #   the `ID` field, such as `ubuntu`, `debian`, `arch`, or `alpine`.
+# @noargs
 # @example
 #   case "$(dybatpho::distro)" in
 #     ubuntu | debian) dybatpho::info "Using apt" ;;
@@ -378,11 +414,14 @@ function dybatpho::distro {
 
 #######################################
 # @description Print the version of the distribution the host runs.
+# @noargs
 # @stdout Distribution version, such as `24.04` or `15.1`
 # @exitcode 1 The version cannot be determined, as on a rolling release that publishes none
 #######################################
 function dybatpho::distro_version {
-  if [[ "$(dybatpho::platform)" == "darwin" ]]; then
+  local platform
+  platform=$(dybatpho::platform)
+  if [[ "${platform}" == "darwin" ]]; then
     local product
     product="$(sw_vers -productVersion 2> /dev/null || true)"
     [[ -n "${product}" ]] || return 1
@@ -397,6 +436,7 @@ function dybatpho::distro_version {
 
 #######################################
 # @description Return success when the script runs inside a container.
+# @noargs
 # @exitcode 0 Docker, Podman, Kubernetes, or LXC owns this process
 # @exitcode 1 The script runs on the host
 #######################################
@@ -412,6 +452,7 @@ function dybatpho::is_container {
     while IFS= read -r line; do
       case "${line}" in
         *docker* | *containerd* | *kubepods* | *libpod* | *lxc*) return 0 ;;
+        *) ;;
       esac
     done < /proc/1/cgroup
   fi
@@ -421,6 +462,7 @@ function dybatpho::is_container {
 #######################################
 # @description Return success when the script runs under the Windows Subsystem
 #   for Linux.
+# @noargs
 # @exitcode 0 The host is WSL
 # @exitcode 1 The host is anything else
 #######################################
@@ -428,7 +470,9 @@ function dybatpho::is_wsl {
   [[ -n "${WSL_DISTRO_NAME:-}" || -n "${WSL_INTEROP:-}" ]] && return 0
   local release=""
   [[ ! -r /proc/sys/kernel/osrelease ]] || release="$(cat /proc/sys/kernel/osrelease 2> /dev/null || true)"
-  [[ "$(dybatpho::lower "${release}")" == *microsoft* ]]
+  local lower
+  lower=$(dybatpho::lower "${release}")
+  [[ "${lower}" == *microsoft* ]]
 }
 
 #######################################
@@ -439,6 +483,7 @@ function dybatpho::is_wsl {
 #   turns the detection off even on a runner that advertises itself by name.
 #   The service-specific variables are consulted only when `CI` is unset or
 #   empty, which is the case they are there for.
+# @noargs
 # @example
 #   dybatpho::is_ci && export DYBATPHO_FORCE=true
 #

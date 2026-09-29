@@ -1,6 +1,14 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# shares some variables with the caller or across calls on purpose, which is
+# what `local` would break; it keeps its declarations with the functions they
+# describe; it parses its own arguments, so the raw form is what the reader
+# sees.
+# dyshellint disable=BSG050,BSG011,BSG033,BSG051
 # @file metrics.sh
 # @brief Utilities for measuring a script and exporting the result to Prometheus
+# @namespace dybatpho
 # @description
 #   This module records how long a script spends in a command, how often it
 #   retried, and how many errors it hit, then renders the result in the
@@ -86,7 +94,8 @@ function __dybatpho_metrics_labels {
   shift
   __labels_out=""
   (($#)) || return 0
-  local pair key value rendered=()
+  local pair key value
+  local -a rendered=()
   for pair in "$@"; do
     [[ "${pair}" == *=* ]] \
       || dybatpho::die "${FUNCNAME[2]}: Label must be given as key=value, got '${pair}'"
@@ -100,9 +109,9 @@ function __dybatpho_metrics_labels {
     rendered+=("${key}=\"${value}\"")
   done
   __dybatpho_metrics_sort rendered
-  local joined="" item
-  for item in "${rendered[@]}"; do
-    joined="${joined:+${joined},}${item}"
+  local joined="" rendered_pair
+  for rendered_pair in "${rendered[@]}"; do
+    joined="${joined:+${joined},}${rendered_pair}"
   done
   __labels_out="{${joined}}"
 }
@@ -241,10 +250,13 @@ function dybatpho::metrics_observe_ms {
   for bound in ${DYBATPHO_METRICS_BUCKETS_MS}; do
     [[ "${bound}" =~ ^[0-9]+$ ]] \
       || dybatpho::die "${FUNCNAME[0]}: Bucket bound must be a whole number of milliseconds, got '${bound}'"
+    # The subscript is built first: inside `$(( ))` an unquoted `|` reads as
+    # bitwise or, and `shfmt` spaces it out, which changes the key.
+    local bucket_key="${key}|${bound}"
     if ((milliseconds <= bound)); then
-      __dybatpho_metrics_bucket["${key}|${bound}"]=$((${__dybatpho_metrics_bucket[${key}|${bound}]-0} + 1))
+      __dybatpho_metrics_bucket["${bucket_key}"]=$((${__dybatpho_metrics_bucket["${bucket_key}"]-0} + 1))
     else
-      __dybatpho_metrics_bucket["${key}|${bound}"]=$((${__dybatpho_metrics_bucket[${key}|${bound}]-0}))
+      __dybatpho_metrics_bucket["${bucket_key}"]=$((${__dybatpho_metrics_bucket["${bucket_key}"]-0}))
     fi
   done
 }
@@ -429,40 +441,56 @@ function __dybatpho_metrics_series {
 #######################################
 function dybatpho::metrics_render {
   local name key bound total
-  local -a names=("${!__dybatpho_metrics_type[@]}")
+  local -a names=("${!__dybatpho_metrics_type[@]}") keys=()
   __dybatpho_metrics_sort names
   for name in ${names[@]+"${names[@]}"}; do
     printf '# HELP %s %s\n' "${name}" "${__dybatpho_metrics_help[${name}]}"
     printf '# TYPE %s %s\n' "${name}" "${__dybatpho_metrics_type[${name}]}"
     case "${__dybatpho_metrics_type[${name}]}" in
       counter)
-        for key in $(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_counter); do
+        readarray -t keys < <(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_counter)
+        for key in ${keys[@]+"${keys[@]}"}; do
           printf '%s %s\n' "${key}" "${__dybatpho_metrics_counter[${key}]}"
         done
         ;;
       gauge)
-        for key in $(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_gauge); do
+        readarray -t keys < <(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_gauge)
+        for key in ${keys[@]+"${keys[@]}"}; do
           printf '%s %s\n' "${key}" "${__dybatpho_metrics_gauge[${key}]}"
         done
         ;;
       histogram)
-        for key in $(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_count); do
+        readarray -t keys < <(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_count)
+        for key in ${keys[@]+"${keys[@]}"}; do
           local IFS=,
           for bound in ${DYBATPHO_METRICS_BUCKETS_MS}; do
+            local metrics_seconds_2
+            metrics_seconds_2=$(__dybatpho_metrics_seconds "${bound}")
+            local metrics_series_4
+            metrics_series_4=$(__dybatpho_metrics_series "${key}" "_bucket" "le=\"${metrics_seconds_2}\"")
             printf '%s %s\n' \
-              "$(__dybatpho_metrics_series "${key}" "_bucket" "le=\"$(__dybatpho_metrics_seconds "${bound}")\"")" \
-              "${__dybatpho_metrics_bucket[${key}|${bound}]-0}"
+              "${metrics_series_4}" \
+              "${__dybatpho_metrics_bucket["${key}|${bound}"]-0}"
           done
           unset IFS
           total="${__dybatpho_metrics_count[${key}]}"
+          local metrics_series_2
+          metrics_series_2=$(__dybatpho_metrics_series "${key}" "_bucket" 'le="+Inf"')
           printf '%s %s\n' \
-            "$(__dybatpho_metrics_series "${key}" "_bucket" 'le="+Inf"')" "${total}"
+            "${metrics_series_2}" "${total}"
+          local metrics_seconds
+          metrics_seconds=$(__dybatpho_metrics_seconds "${__dybatpho_metrics_sum[${key}]}")
+          local metrics_series_3
+          metrics_series_3=$(__dybatpho_metrics_series "${key}" "_sum")
           printf '%s %s\n' \
-            "$(__dybatpho_metrics_series "${key}" "_sum")" \
-            "$(__dybatpho_metrics_seconds "${__dybatpho_metrics_sum[${key}]}")"
-          printf '%s %s\n' "$(__dybatpho_metrics_series "${key}" "_count")" "${total}"
+            "${metrics_series_3}" \
+            "${metrics_seconds}"
+          local metrics_series
+          metrics_series=$(__dybatpho_metrics_series "${key}" "_count")
+          printf '%s %s\n' "${metrics_series}" "${total}"
         done
         ;;
+      *) ;;
     esac
   done
 }

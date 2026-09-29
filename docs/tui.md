@@ -198,12 +198,16 @@ come back however the script ends.
 A script killed mid-menu would otherwise leave the terminal with no cursor,
 and that outlives the script: it has to be undone by hand afterwards.
 
+_Function has no arguments._
+
 
 ---
 
 ### `__dybatpho_tui_show_cursor`
 
 Show the cursor again, if a widget hid it.
+
+_Function has no arguments._
 
 **🚦 Exit codes**
 
@@ -233,6 +237,8 @@ Redraw the current line on stderr, erasing whatever was on it.
 
 Erase the current line on stderr and leave the cursor at its
 start, so the next output begins on a clean column.
+
+_Function has no arguments._
 
 
 ---

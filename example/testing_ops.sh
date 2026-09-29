@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# This file lets its internal helpers take their arguments positionally, rather
+# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
+# keeps its declarations with the functions they describe.
+# dyshellint disable=BSG050,BSG033
 # @file testing_ops.sh
 # @brief Example showing the extended assertion, snapshot, mock, and fixture helpers
 # @description Verifies a small "release" script end to end without touching the
@@ -11,13 +15,16 @@ dybatpho::register_common_handlers
 
 # Keep snapshots beside this example instead of the repository's test tree.
 dybatpho::fixture_dir EXAMPLE_ROOT
+# shellcheck disable=SC2154 # set by the option spec of this script
 export DYBATPHO_TEST_SNAPSHOT_DIR="${EXAMPLE_ROOT}/snapshots"
 
 # --- the script under test ---------------------------------------------------
 
 # A miniature release script: it reads configuration, calls an HTTP API, writes
 # a manifest, and reports what it did.
-function release_tool {
+# @description The script under test: it reads configuration, calls an API and writes a manifest.
+# @arg $1 path Directory to write the release into
+function _release_tool {
   local version="${RELEASE_VERSION:?RELEASE_VERSION must be set}"
   local out_dir="$1"
 
@@ -25,6 +32,7 @@ function release_tool {
   dybatpho::curl_do "https://api.example.test/releases/${version}" "${out_dir}/release.json" \
     || return 1
 
+  # shellcheck disable=SC2154 # set by the option spec of this script
   printf '{"version":"%s","channel":"%s"}\n' "${version}" "${RELEASE_CHANNEL}" \
     > "${out_dir}/manifest.json"
   ln -sfn "manifest.json" "${out_dir}/current.json"
@@ -63,7 +71,7 @@ dybatpho::success "Environment, git, and curl are mocked"
 # --- run the script under test ----------------------------------------------
 
 dybatpho::header "RUN"
-release_tool "${workdir}/dist"
+_release_tool "${workdir}/dist"
 
 # --- assertions --------------------------------------------------------------
 
@@ -92,17 +100,21 @@ dybatpho::success "YAML settings validated"
 dybatpho::header "MOCK ASSERTIONS"
 dybatpho::assert_http_called "api.example.test/releases/1.5.0"
 dybatpho::assert_mock_called git tag v1.5.0
-dybatpho::info "curl calls: $(dybatpho::mock_call_count curl), git calls: $(dybatpho::mock_call_count git)"
+mock_call_count_2=$(dybatpho::mock_call_count git)
+mock_call_count=${mock_call_count_2}
+mock_call_count_3=$(dybatpho::mock_call_count curl)
+dybatpho::info "curl calls: ${mock_call_count_3}, git calls: ${mock_call_count}"
 dybatpho::success "The script called the API and tagged the release"
 
 dybatpho::header "SNAPSHOT TESTING"
 # Volatile values would otherwise change the snapshot on every run.
 dybatpho::snapshot_scrub "${workdir}" '<WORKDIR>'
-dybatpho::assert_cli_snapshot release-run -- release_tool "${workdir}/dist2"
+dybatpho::assert_cli_snapshot release-run -- _release_tool "${workdir}/dist2"
 dybatpho::info "Recorded snapshot:"
-dybatpho::text_indent "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")" "  "
+cat_2=$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")
+dybatpho::text_indent "${cat_2}" "  "
 # Running again compares against the snapshot recorded a moment ago.
-dybatpho::assert_cli_snapshot release-run -- release_tool "${workdir}/dist2"
+dybatpho::assert_cli_snapshot release-run -- _release_tool "${workdir}/dist2"
 dybatpho::success "CLI output is stable across runs"
 
 dybatpho::header "GOLDEN UPDATE"
@@ -114,22 +126,24 @@ dybatpho::header "GOLDEN UPDATE"
 # The switch is read on every comparison, so it rewrites whatever the suite
 # touches. `0`, `false` and an empty value all leave the baselines alone.
 export UPDATE_SNAPSHOTS=1
-dybatpho::assert_cli_snapshot release-run -- release_tool "${workdir}/dist3"
+dybatpho::assert_cli_snapshot release-run -- _release_tool "${workdir}/dist3"
 export UPDATE_SNAPSHOTS=0
 dybatpho::info "Snapshot after the bulk update:"
-dybatpho::text_indent "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")" "  "
+cat=$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")
+dybatpho::text_indent "${cat}" "  "
 dybatpho::success "Baseline regenerated, then comparison resumed"
 
 dybatpho::header "DURATION BUDGETS"
 # A budget guards the shape of the cost, not the exact millisecond count.
 # Several runs keep the fastest, so one descheduled run does not fail a suite.
 export DYBATPHO_TEST_DURATION_RUNS=3
-dybatpho::assert_duration_under 5000 -- release_tool "${workdir}/dist4"
+dybatpho::assert_duration_under 5000 -- _release_tool "${workdir}/dist4"
+# shellcheck disable=SC2154 # set by the option spec of this script
 dybatpho::info "Fastest run: ${DYBATPHO_TEST_LAST_DURATION_MS}ms"
 
 # A benchmark only measures and reports; assert on the median when you want it
 # enforced.
-dybatpho::benchmark release-tool 3 -- release_tool "${workdir}/dist5"
+dybatpho::benchmark release-tool 3 -- _release_tool "${workdir}/dist5"
 dybatpho::success "Release path stayed inside its budget"
 
 # An overrun is reported, not fatal, like every other assertion here.
@@ -148,6 +162,7 @@ if dybatpho::assert_json_query "${workdir}/dist/manifest.json" '.version' "9.9.9
 else
   dybatpho::warn "Mismatch reported as expected"
 fi
+# shellcheck disable=SC2154 # set by the option spec of this script
 dybatpho::info "Recorded assertion failures: ${DYBATPHO_TEST_FAILURES}"
 
 # --- teardown ----------------------------------------------------------------

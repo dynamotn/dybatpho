@@ -126,6 +126,8 @@ Name the public function a failure should be reported against.
 The digit helpers call one another, so `FUNCNAME[1]` is usually another
 internal name; the caller wants to read the name they typed.
 
+_Function has no arguments._
+
 **📤 Output on stdout**
 
 - The nearest `dybatpho::` function on the call stack

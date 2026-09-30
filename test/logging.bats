@@ -48,7 +48,7 @@ teardown() {
   [[ "$(__dybatpho_log_timestamp)" =~ ^[0-9]{4}- ]]
 
   dybatpho::validate_log_level info
-  run ! dybatpho::validate_log_level nonsense
+  run_traced ! dybatpho::validate_log_level nonsense
 
   LOG_LEVEL=trace
   dybatpho::debug "debug message"
@@ -165,11 +165,11 @@ teardown() {
 }
 
 @test "__dybatpho_log output message" {
-  run --separate-stderr __dybatpho_log info test
+  run_traced --separate-stderr __dybatpho_log info test
   assert_success
   refute_stderr
   assert_output --partial test
-  run --separate-stderr __dybatpho_log info test stderr
+  run_traced --separate-stderr __dybatpho_log info test stderr
   assert_success
   refute_output
   assert_stderr --partial test
@@ -177,7 +177,7 @@ teardown() {
 
 @test "__dybatpho_log with NO_COLOR" {
   export NO_COLOR="true"
-  run --separate-stderr __dybatpho_log info test
+  run_traced --separate-stderr __dybatpho_log info test
   assert_success
   refute_output --partial "$(echo -e "\e[0;32m")"
 }
@@ -197,7 +197,7 @@ teardown() {
 @test "dybatpho::compare_log_level with higher level" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=error
-  run dybatpho::compare_log_level "debug"
+  run_traced dybatpho::compare_log_level "debug"
   assert_failure
 }
 
@@ -220,21 +220,21 @@ teardown() {
 }
 
 @test "dybatpho::validate_log_level succeeds with valid level" {
-  run --separate-stderr dybatpho::validate_log_level error
+  run_traced --separate-stderr dybatpho::validate_log_level error
   assert_success
   refute_output
-  run --separate-stderr dybatpho::validate_log_level ERROR
+  run_traced --separate-stderr dybatpho::validate_log_level ERROR
   assert_success
   refute_output
 }
 
 @test "dybatpho::validate_log_level succeeds with invalid level" {
-  run --separate-stderr dybatpho::validate_log_level foo
+  run_traced --separate-stderr dybatpho::validate_log_level foo
   assert_failure
 }
 
 @test "dybatpho::debug doesn't output anything when using default log level" {
-  run --separate-stderr dybatpho::debug foo
+  run_traced --separate-stderr dybatpho::debug foo
   assert_success
   refute_output
   refute_stderr "foo"
@@ -243,7 +243,7 @@ teardown() {
 @test "dybatpho::debug output when using debug level" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
-  run --separate-stderr dybatpho::debug foo
+  run_traced --separate-stderr dybatpho::debug foo
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;36m")"
@@ -255,7 +255,7 @@ teardown() {
 @test "dybatpho::debug_command output" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
-  run --separate-stderr dybatpho::debug_command "Who am I" "whoami"
+  run_traced --separate-stderr dybatpho::debug_command "Who am I" "whoami"
   assert_success
   refute_output
   assert_stderr --partial "${USER}"
@@ -264,7 +264,7 @@ teardown() {
 @test "structured logging emits valid JSON" {
   export LOG_FORMAT=json
   export NO_COLOR=true
-  run --separate-stderr dybatpho::error 'message with "quotes" and
+  run_traced --separate-stderr dybatpho::error 'message with "quotes" and
 a newline'
   assert_success
   refute_output
@@ -280,7 +280,7 @@ a newline'
 }
 
 @test "dybatpho::info output" {
-  run --separate-stderr dybatpho::info daylathongtin
+  run_traced --separate-stderr dybatpho::info daylathongtin
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;34m")"
@@ -290,7 +290,7 @@ a newline'
 }
 
 @test "dybatpho::print output" {
-  run --separate-stderr dybatpho::print daylathongtin
+  run_traced --separate-stderr dybatpho::print daylathongtin
   assert_success
   refute_stderr
   refute_output --partial "$(echo -e "\e[0;32m")"
@@ -299,7 +299,7 @@ a newline'
 }
 
 @test "dybatpho::progress output" {
-  run --separate-stderr dybatpho::progress daylathongtin
+  run_traced --separate-stderr dybatpho::progress daylathongtin
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[0;3;34m")"
@@ -310,26 +310,26 @@ a newline'
 }
 
 @test "dybatpho::progress_bar output" {
-  run --separate-stderr dybatpho::progress_bar 3
+  run_traced --separate-stderr dybatpho::progress_bar 3
   assert_success
   refute_stderr
   assert_output --partial "[#                                                 ]"
-  run --separate-stderr dybatpho::progress_bar 0 20
+  run_traced --separate-stderr dybatpho::progress_bar 0 20
   assert_success
   refute_stderr
   assert_output --partial "[                    ]"
-  run --separate-stderr dybatpho::progress_bar 10 20
+  run_traced --separate-stderr dybatpho::progress_bar 10 20
   assert_success
   refute_stderr
   assert_output --partial "[##                  ]"
-  run --separate-stderr dybatpho::progress_bar 100 20
+  run_traced --separate-stderr dybatpho::progress_bar 100 20
   assert_success
   refute_stderr
   assert_output --partial "[####################]"
 }
 
 @test "dybatpho::header output" {
-  run --separate-stderr dybatpho::header daylathongtin
+  run_traced --separate-stderr dybatpho::header daylathongtin
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[1;5;30;47m")"
@@ -340,7 +340,7 @@ a newline'
 }
 
 @test "dybatpho::success output" {
-  run --separate-stderr dybatpho::success daylathongtin
+  run_traced --separate-stderr dybatpho::success daylathongtin
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[1;3;32m")"
@@ -355,7 +355,7 @@ a newline'
   export COLUMNS=20
   export NO_COLOR=true
 
-  run --separate-stderr dybatpho::header "alpha beta gamma"
+  run_traced --separate-stderr dybatpho::header "alpha beta gamma"
   assert_success
   refute_stderr
   assert_output << EOF
@@ -365,7 +365,7 @@ a newline'
 ╚══════════════╝
 EOF
 
-  run --separate-stderr dybatpho::success "deploy finished cleanly"
+  run_traced --separate-stderr dybatpho::success "deploy finished cleanly"
   assert_success
   refute_stderr
   assert_output << EOF
@@ -383,7 +383,7 @@ EOF
 
   # A URL that would overflow inner_limit=36 (COLUMNS=40) must not be split mid-link
   export COLUMNS=40
-  run --separate-stderr dybatpho::header "Visit https://example.com/very/long/path/to/resource please"
+  run_traced --separate-stderr dybatpho::header "Visit https://example.com/very/long/path/to/resource please"
   assert_success
   refute_stderr
   assert_output --partial "https://example.com/very/long/path/to/resource"
@@ -403,7 +403,7 @@ EOF
   command -v python3 > /dev/null || skip "python3 required"
   export NO_COLOR=true
 
-  run --separate-stderr dybatpho::success "daylathongtin"
+  run_traced --separate-stderr dybatpho::success "daylathongtin"
   assert_success
   refute_stderr
   OUTPUT="${output}" python3 - << 'PY'
@@ -429,7 +429,7 @@ if len(set(widths)) != 1:
 PY
   assert_success
 
-  run --separate-stderr dybatpho::progress "daylathongtin"
+  run_traced --separate-stderr dybatpho::progress "daylathongtin"
   assert_success
   refute_stderr
   OUTPUT="${output}" python3 - << 'PY'
@@ -468,7 +468,7 @@ PY
 }
 
 @test "dybatpho::error output" {
-  run --separate-stderr dybatpho::error loiroine
+  run_traced --separate-stderr dybatpho::error loiroine
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[1;31m")"
@@ -478,7 +478,7 @@ PY
 }
 
 @test "dybatpho::fatal output" {
-  run --separate-stderr dybatpho::fatal loiroine
+  run_traced --separate-stderr dybatpho::fatal loiroine
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;31m")"
@@ -488,7 +488,7 @@ PY
 }
 
 @test "dybatpho::start_trace doesn't output anything when using default log level" {
-  run --separate-stderr dybatpho::start_trace
+  run_traced --separate-stderr dybatpho::start_trace
   assert_success
   refute_output
   refute_stderr "Start tracing"
@@ -497,7 +497,7 @@ PY
 @test "dybatpho::start_trace output when using trace level" {
   # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
-  run --separate-stderr dybatpho::start_trace
+  run_traced --separate-stderr dybatpho::start_trace
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;37m")"
@@ -507,7 +507,7 @@ PY
 }
 
 @test "dybatpho::end_trace doesn't output anything when using default log level" {
-  run --separate-stderr dybatpho::end_trace
+  run_traced --separate-stderr dybatpho::end_trace
   assert_success
   refute_output
   refute_stderr "End tracing"
@@ -516,7 +516,7 @@ PY
 @test "dybatpho::end_trace output when using trace level" {
   # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
-  run --separate-stderr dybatpho::end_trace
+  run_traced --separate-stderr dybatpho::end_trace
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;37m")"
@@ -529,7 +529,7 @@ PY
   export LOG_FORMAT=json
   export NO_COLOR=true
   export LOG_REQUEST_ID="req-fixed-123"
-  run --separate-stderr dybatpho::error "enriched event"
+  run_traced --separate-stderr dybatpho::error "enriched event"
   assert_success
   refute_output
   assert_stderr --partial '"request_id":"req-fixed-123"'
@@ -561,7 +561,7 @@ assert event["duration_ms"] >= 0
 @test "dybatpho::compare_log_level supports an explicit threshold override" {
   export LOG_LEVEL=error
   dybatpho::compare_log_level debug debug
-  run dybatpho::compare_log_level debug warn
+  run_traced dybatpho::compare_log_level debug warn
   assert_failure
 }
 
@@ -581,7 +581,7 @@ assert event["duration_ms"] >= 0
   export LOG_FILE="${log_file}"
   export LOG_LEVEL=info
   export LOG_FILE_LEVEL=debug
-  run --separate-stderr dybatpho::debug "hidden from stdout, visible in file"
+  run_traced --separate-stderr dybatpho::debug "hidden from stdout, visible in file"
   assert_success
   refute_stderr "hidden from stdout"
   grep -q '"message":"hidden from stdout, visible in file"' "${log_file}"
@@ -592,7 +592,7 @@ assert event["duration_ms"] >= 0
   export LOG_FILE="${log_file}"
   export LOG_LEVEL=debug
   export LOG_FILE_LEVEL=error
-  run --separate-stderr dybatpho::debug "stdout only"
+  run_traced --separate-stderr dybatpho::debug "stdout only"
   assert_success
   assert_stderr --partial "stdout only"
   [ ! -s "${log_file}" ]
@@ -644,7 +644,7 @@ assert event["duration_ms"] >= 0
 
 @test "LOG_FILE is a no-op when unset" {
   unset LOG_FILE
-  run --separate-stderr dybatpho::info "no file configured"
+  run_traced --separate-stderr dybatpho::info "no file configured"
   assert_success
   assert_stderr --partial "no file configured"
 }
@@ -707,9 +707,9 @@ assert event["duration_ms"] >= 0
   assert_equal "$(__dybatpho_log_parse_size 10MB)" "10485760"
   assert_equal "$(__dybatpho_log_parse_size 2GiB)" "2147483648"
   assert_equal "$(__dybatpho_log_parse_size 1t)" "1099511627776"
-  run ! __dybatpho_log_parse_size "ten megabytes"
-  run ! __dybatpho_log_parse_size "-1"
-  run ! __dybatpho_log_parse_size "1.5M"
+  run_traced ! __dybatpho_log_parse_size "ten megabytes"
+  run_traced ! __dybatpho_log_parse_size "-1"
+  run_traced ! __dybatpho_log_parse_size "1.5M"
 }
 
 @test "dybatpho::log_to_file configures the file sink in one call" {
@@ -791,7 +791,7 @@ assert event["duration_ms"] >= 0
 @test "dybatpho::log_context shows its fields on a text log line too" {
   export LOG_FORMAT=text
   dybatpho::log_context add run_id=abc
-  run --separate-stderr dybatpho::warn "text carries context"
+  run_traced --separate-stderr dybatpho::warn "text carries context"
   assert_stderr --partial "text carries context run_id=abc"
 }
 
@@ -801,18 +801,18 @@ assert event["duration_ms"] >= 0
 
   # An update keeps the field in the position it was first added.
   dybatpho::log_context add run_id=def
-  run dybatpho::log_context list
+  run_traced dybatpho::log_context list
   assert_success
   assert_line --index 0 "run_id=def"
   assert_line --index 1 "stage=build"
 
   dybatpho::log_context remove stage
-  run ! dybatpho::log_context get stage
-  run dybatpho::log_context list
+  run_traced ! dybatpho::log_context get stage
+  run_traced dybatpho::log_context list
   assert_output "run_id=def"
 
   dybatpho::log_context clear
-  run dybatpho::log_context list
+  run_traced dybatpho::log_context list
   assert_output ""
 }
 
@@ -866,7 +866,7 @@ assert event["duration_ms"] >= 0
 
   dybatpho::timer_start migration
   sleep 0.05
-  run --separate-stderr dybatpho::timer_end migration
+  run_traced --separate-stderr dybatpho::timer_end migration
   assert_success
   assert_stderr --partial "migration took"
 
@@ -882,12 +882,12 @@ assert event["duration_ms"] >= 0
 @test "dybatpho::timer_end logs at the level it is given" {
   export LOG_LEVEL=info
   dybatpho::timer_start quiet
-  run --separate-stderr dybatpho::timer_end quiet debug
+  run_traced --separate-stderr dybatpho::timer_end quiet debug
   assert_success
   refute_stderr --partial "quiet took"
 
   dybatpho::timer_start loud
-  run --separate-stderr dybatpho::timer_end loud warn
+  run_traced --separate-stderr dybatpho::timer_end loud warn
   assert_stderr --partial "loud took"
 }
 
@@ -904,17 +904,17 @@ assert event["duration_ms"] >= 0
 
 @test "dybatpho::spinner runs the command and passes its exit code through" {
   export DYBATPHO_SPINNER=never
-  run dybatpho::spinner "Working" -- bash -c 'echo command output; exit 0'
+  run_traced dybatpho::spinner "Working" -- bash -c 'echo command output; exit 0'
   assert_success
   assert_output --partial "command output"
 
-  run dybatpho::spinner "Failing" -- bash -c 'exit 7'
+  run_traced dybatpho::spinner "Failing" -- bash -c 'exit 7'
   assert_failure 7
 }
 
 @test "dybatpho::spinner logs the message once when there is nothing to animate" {
   export DYBATPHO_SPINNER=never
-  run --separate-stderr dybatpho::spinner "Đang tải" -- true
+  run_traced --separate-stderr dybatpho::spinner "Đang tải" -- true
   assert_success
   assert_stderr --partial "Đang tải"
 }
@@ -922,7 +922,7 @@ assert event["duration_ms"] >= 0
 @test "dybatpho::spinner animates and then erases its line" {
   export DYBATPHO_SPINNER=always
   export DYBATPHO_SPINNER_INTERVAL=0.02
-  run --separate-stderr dybatpho::spinner "Downloading" -- sleep 0.2
+  run_traced --separate-stderr dybatpho::spinner "Downloading" -- sleep 0.2
   assert_success
   assert_stderr --partial "Downloading"
   # The animation ends with the line erased rather than with a stray frame.
@@ -956,7 +956,7 @@ assert event["duration_ms"] >= 0
 @test "dybatpho::spinner redacts a registered secret in its message" {
   export DYBATPHO_SPINNER=never
   dybatpho::secret_register "spinner-secret-value"
-  run --separate-stderr dybatpho::spinner "pushing spinner-secret-value" -- true
+  run_traced --separate-stderr dybatpho::spinner "pushing spinner-secret-value" -- true
   dybatpho::secret_forget
   assert_success
   refute_stderr --partial "spinner-secret-value"
@@ -973,7 +973,7 @@ assert event["duration_ms"] >= 0
   message="$(printf 'build \033[31mFAILED\033[0m\a on "main"\ttab')"
 
   LOG_FORMAT=json LOG_LEVEL=info dybatpho::info "${message}" 2> "${out}"
-  run jq -e . "${out}"
+  run_traced jq -e . "${out}"
   assert_success
   assert_equal "$(jq -r '.message' "${out}")" "${message}"
 }

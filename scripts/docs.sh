@@ -131,8 +131,6 @@ function _spec {
 
   dybatpho::opts::flag "Fail if a committed document is stale instead of writing" \
     CHECK --check on:true off:false init:="false"
-
-  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
 }
 
 dybatpho::generate_from_spec _spec "$@"

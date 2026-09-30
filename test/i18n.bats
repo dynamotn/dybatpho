@@ -99,7 +99,7 @@ _catalog() {
 
 @test "a string that is not a locale is rejected" {
   local out=""
-  run ! __dybatpho_i18n_normalize out "not a locale!"
+  run_traced ! __dybatpho_i18n_normalize out "not a locale!"
 }
 
 @test "the locale comes from DYBATPHO_I18N_LOCALE before the environment" {
@@ -118,13 +118,13 @@ _catalog() {
 
 @test "setting the locale changes what later calls use" {
   dybatpho::i18n_set_locale vi_VN
-  run -0 dybatpho::i18n_locale
+  run_traced -0 dybatpho::i18n_locale
   assert_output "vi_VN"
 }
 
 @test "setting an invalid locale reports failure and changes nothing" {
-  run ! dybatpho::i18n_set_locale "not a locale!"
-  run -0 dybatpho::i18n_locale
+  run_traced ! dybatpho::i18n_set_locale "not a locale!"
+  run_traced -0 dybatpho::i18n_locale
   assert_output "en"
 }
 
@@ -133,7 +133,7 @@ _catalog() {
 # ---------------------------------------------------------------------------
 
 @test "the fallback chain drops the region before the script" {
-  run -0 dybatpho::i18n_chain zh_Hant_TW
+  run_traced -0 dybatpho::i18n_chain zh_Hant_TW
   assert_line --index 0 "zh_Hant_TW"
   assert_line --index 1 "zh_Hant"
   assert_line --index 2 "zh_TW"
@@ -142,14 +142,14 @@ _catalog() {
 }
 
 @test "the fallback chain of a language and region ends at the fallback locale" {
-  run -0 dybatpho::i18n_chain pt_BR
+  run_traced -0 dybatpho::i18n_chain pt_BR
   assert_line --index 0 "pt_BR"
   assert_line --index 1 "pt"
   assert_line --index 2 "en"
 }
 
 @test "the C locale has an empty chain, so nothing is ever translated" {
-  run -0 dybatpho::i18n_chain C
+  run_traced -0 dybatpho::i18n_chain C
   assert_output ""
 }
 
@@ -169,7 +169,7 @@ _catalog() {
   file="$(_catalog vi.msg 'app.greeting = Xin chào')"
   dybatpho::i18n_load vi_VN "${file}"
   dybatpho::i18n_set_locale vi_VN
-  run -0 dybatpho::i18n_t app.greeting
+  run_traced -0 dybatpho::i18n_t app.greeting
   assert_output "Xin chào"
 }
 
@@ -177,7 +177,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.greeting = Hello, {name}!')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.greeting name=Nam
+  run_traced -0 dybatpho::i18n_t app.greeting name=Nam
   assert_output "Hello, Nam!"
 }
 
@@ -185,7 +185,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.pair = {1} and {2}')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.pair alpha beta
+  run_traced -0 dybatpho::i18n_t app.pair alpha beta
   assert_output "alpha and beta"
 }
 
@@ -195,7 +195,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.what = Order: {what}')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.what "what=fish & chips"
+  run_traced -0 dybatpho::i18n_t app.what "what=fish & chips"
   assert_output "Order: fish & chips"
 }
 
@@ -203,7 +203,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.what = Value: {what}')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.what 'what=100% C:\path\to'
+  run_traced -0 dybatpho::i18n_t app.what 'what=100% C:\path\to'
   assert_output 'Value: 100% C:\path\to'
 }
 
@@ -211,7 +211,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.brace = {{literal}} and {name}')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.brace name=x
+  run_traced -0 dybatpho::i18n_t app.brace name=x
   assert_output "{literal} and x"
 }
 
@@ -219,12 +219,12 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.greeting = Hello, {name}!')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.greeting
+  run_traced -0 dybatpho::i18n_t app.greeting
   assert_output "Hello, {name}!"
 }
 
 @test "an untranslated key renders as the key itself and still succeeds" {
-  run -0 dybatpho::i18n_t no.such.key
+  run_traced -0 dybatpho::i18n_t no.such.key
   assert_output "no.such.key"
 }
 
@@ -235,7 +235,7 @@ _catalog() {
 
 @test "strict mode stops the script on an untranslated key" {
   export DYBATPHO_I18N_STRICT=true
-  run ! _child 'dybatpho::i18n_t no.such.key' 'echo reached'
+  run_traced ! _child 'dybatpho::i18n_t no.such.key' 'echo reached'
   refute_output --partial "reached"
 }
 
@@ -244,7 +244,7 @@ _catalog() {
   file="$(_catalog en.msg 'app.only = base')"
   dybatpho::i18n_load en "${file}"
   dybatpho::i18n_set_locale en_GB
-  run -0 dybatpho::i18n_t app.only
+  run_traced -0 dybatpho::i18n_t app.only
   assert_output "base"
 }
 
@@ -253,7 +253,7 @@ _catalog() {
   file="$(_catalog en.msg 'app.greeting = Hello')"
   dybatpho::i18n_load en "${file}"
   dybatpho::i18n_set_locale C
-  run -0 dybatpho::i18n_t app.greeting
+  run_traced -0 dybatpho::i18n_t app.greeting
   assert_output "app.greeting"
 }
 
@@ -262,14 +262,14 @@ _catalog() {
   file="$(_catalog en.msg 'app.here = yes')"
   dybatpho::i18n_load en "${file}"
   dybatpho::i18n_has app.here
-  run ! dybatpho::i18n_has app.absent
+  run_traced ! dybatpho::i18n_has app.absent
   # The predicate must leave no trace, or it would pollute the missing report.
-  run ! dybatpho::i18n_missing
+  run_traced ! dybatpho::i18n_missing
 }
 
 @test "a lookup that missed is reported afterwards" {
   dybatpho::i18n_t no.such.key > /dev/null
-  run -0 dybatpho::i18n_missing
+  run_traced -0 dybatpho::i18n_missing
   assert_output --partial "no.such.key"
 }
 
@@ -285,9 +285,9 @@ _catalog() {
     '@context = status' \
     'open = Currently open')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_tc menu open
+  run_traced -0 dybatpho::i18n_tc menu open
   assert_output "Open a file"
-  run -0 dybatpho::i18n_tc status open
+  run_traced -0 dybatpho::i18n_tc status open
   assert_output "Currently open"
 }
 
@@ -359,9 +359,9 @@ _catalog() {
     'app.files[one] = {count} file' \
     'app.files[other] = {count} files')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_tn app.files 1
+  run_traced -0 dybatpho::i18n_tn app.files 1
   assert_output "1 file"
-  run -0 dybatpho::i18n_tn app.files 5
+  run_traced -0 dybatpho::i18n_tn app.files 5
   assert_output "5 files"
 }
 
@@ -384,7 +384,7 @@ _catalog() {
   file="$(_catalog de.msg 'app.files[other] = {count} Dateien')"
   dybatpho::i18n_load de "${file}"
   dybatpho::i18n_set_locale de
-  run -0 dybatpho::i18n_tn app.files 1234567
+  run_traced -0 dybatpho::i18n_tn app.files 1234567
   assert_output "1.234.567 Dateien"
 }
 
@@ -392,7 +392,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.files[other] = {count} files')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_tn app.files 1
+  run_traced -0 dybatpho::i18n_tn app.files 1
   assert_output "1 files"
 }
 
@@ -400,7 +400,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.files = {count} file(s)')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_tn app.files 3
+  run_traced -0 dybatpho::i18n_tn app.files 3
   assert_output "3 file(s)"
 }
 
@@ -427,7 +427,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg 'app.two = "one\ntwo"')"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.two
+  run_traced -0 dybatpho::i18n_t app.two
   assert_line --index 0 "one"
   assert_line --index 1 "two"
 }
@@ -436,7 +436,7 @@ _catalog() {
   local file
   file="$(_catalog en.msg "app.raw = 'keep \\n and {name}'")"
   dybatpho::i18n_load en "${file}"
-  run -0 dybatpho::i18n_t app.raw
+  run_traced -0 dybatpho::i18n_t app.raw
   assert_output 'keep \n and {name}'
 }
 
@@ -445,7 +445,7 @@ _catalog() {
   file="$(_catalog vi.msg '"curl is not installed" = curl chưa được cài đặt')"
   dybatpho::i18n_load vi "${file}"
   dybatpho::i18n_set_locale vi
-  run -0 dybatpho::i18n_t "curl is not installed"
+  run_traced -0 dybatpho::i18n_t "curl is not installed"
   assert_output "curl chưa được cài đặt"
 }
 
@@ -521,7 +521,7 @@ msgid "app.guess"
 msgstr "DO NOT USE"
 PO
   dybatpho::i18n_load en "${dir}/en.po"
-  run -0 dybatpho::i18n_t app.guess
+  run_traced -0 dybatpho::i18n_t app.guess
   assert_output "app.guess"
 }
 
@@ -533,7 +533,7 @@ msgid "app.blank"
 msgstr ""
 PO
   dybatpho::i18n_load en "${dir}/en.po"
-  run -0 dybatpho::i18n_t app.blank
+  run_traced -0 dybatpho::i18n_t app.blank
   assert_output "app.blank"
 }
 
@@ -545,7 +545,7 @@ PO
 #~ msgstr "OLD"
 PO
   dybatpho::i18n_load en "${dir}/en.po"
-  run -0 dybatpho::i18n_t app.gone
+  run_traced -0 dybatpho::i18n_t app.gone
   assert_output "app.gone"
 }
 
@@ -623,7 +623,7 @@ PO
   printf 'a = 1\n' > "${dir}/de.msg"
   # shellcheck disable=2030,2031
   export DYBATPHO_I18N_PATH="${dir}"
-  run -0 dybatpho::i18n_locales
+  run_traced -0 dybatpho::i18n_locales
   assert_line --index 0 "de"
   assert_line --index 1 "vi_VN"
 }
@@ -633,7 +633,7 @@ PO
   file="$(_catalog en.msg 'app.key = value')"
   dybatpho::i18n_load en "${file}"
   dybatpho::i18n_reset
-  run -0 dybatpho::i18n_t app.key
+  run_traced -0 dybatpho::i18n_t app.key
   assert_output "app.key"
 }
 
@@ -722,7 +722,7 @@ PO
 }
 
 @test "an unknown locale falls back to English without complaining" {
-  run --separate-stderr -0 dybatpho::i18n_number 1234.5 2 xx_YY
+  run_traced --separate-stderr -0 dybatpho::i18n_number 1234.5 2 xx_YY
   assert_output "1,234.50"
   assert_equal "${stderr}" ""
 }
@@ -788,7 +788,7 @@ PO
 }
 
 @test "an unknown currency warns and uses the code, rather than stopping" {
-  run --separate-stderr -0 dybatpho::i18n_currency 1234.5 XPF en
+  run_traced --separate-stderr -0 dybatpho::i18n_currency 1234.5 XPF en
   assert_output "XPF1,234.50"
   assert_regex "${stderr}" "Unknown currency"
 }
@@ -828,7 +828,7 @@ PO
 }
 
 @test "a size near the machine word limit does not overflow" {
-  run -0 dybatpho::i18n_bytes 4611686018427387904 iec en
+  run_traced -0 dybatpho::i18n_bytes 4611686018427387904 iec en
   assert_output --partial "EiB"
 }
 
@@ -872,7 +872,7 @@ PO
 }
 
 @test "an unsupported pattern field is reported rather than ignored" {
-  run ! dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "QQQQ" en
+  run_traced ! dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "QQQQ" en
 }
 
 @test "a locale on a twelve hour clock shows a day period" {
@@ -962,7 +962,7 @@ PO
 
 @test "a large relative count is grouped for the locale" {
   dybatpho::i18n_init en
-  run -0 dybatpho::i18n_relative $((FIXED_EPOCH - 315360000000)) "${FIXED_EPOCH}"
+  run_traced -0 dybatpho::i18n_relative $((FIXED_EPOCH - 315360000000)) "${FIXED_EPOCH}"
   assert_output --partial ","
   assert_output --partial "years ago"
 }
@@ -1009,13 +1009,13 @@ PO
 }
 
 @test "left to right languages are not reported as right to left" {
-  run ! dybatpho::i18n_is_rtl en
-  run ! dybatpho::i18n_is_rtl de
-  run ! dybatpho::i18n_is_rtl ja
+  run_traced ! dybatpho::i18n_is_rtl en
+  run_traced ! dybatpho::i18n_is_rtl de
+  run_traced ! dybatpho::i18n_is_rtl ja
 }
 
 @test "the direction predicate prints nothing" {
-  run -0 dybatpho::i18n_is_rtl ar
+  run_traced -0 dybatpho::i18n_is_rtl ar
   assert_output ""
 }
 
@@ -1025,7 +1025,7 @@ PO
 }
 
 @test "a language can be registered as right to left" {
-  run ! dybatpho::i18n_is_rtl xx
+  run_traced ! dybatpho::i18n_is_rtl xx
   dybatpho::i18n_register_rtl xx
   dybatpho::i18n_is_rtl xx
 }
@@ -1140,7 +1140,7 @@ dybatpho::i18n_t app.greeting name=Nam
 dybatpho::i18n_t 'app.quoted'
 dybatpho::i18n_t "app.double"
 SOURCE
-  run -0 dybatpho::i18n_extract --locale en "${source}"
+  run_traced -0 dybatpho::i18n_extract --locale en "${source}"
   assert_output --partial "app.greeting ="
   assert_output --partial "app.quoted ="
   assert_output --partial "app.double ="
@@ -1149,7 +1149,7 @@ SOURCE
 @test "a plural call produces every category of the target language" {
   local source="${BATS_TEST_TMPDIR}/app.sh"
   printf 'dybatpho::i18n_tn app.files 5\n' > "${source}"
-  run -0 dybatpho::i18n_extract --locale ru "${source}"
+  run_traced -0 dybatpho::i18n_extract --locale ru "${source}"
   assert_output --partial "app.files[one] ="
   assert_output --partial "app.files[few] ="
   assert_output --partial "app.files[many] ="
@@ -1160,20 +1160,20 @@ SOURCE
   local source="${BATS_TEST_TMPDIR}/app.sh"
   # shellcheck disable=2016 # the key must stay unexpanded in the generated file
   printf 'dybatpho::i18n_t "app.${section}.title"\n' > "${source}"
-  run --separate-stderr -1 dybatpho::i18n_extract --locale en "${source}"
+  run_traced --separate-stderr -1 dybatpho::i18n_extract --locale en "${source}"
   assert_regex "${stderr}" "not a literal"
 }
 
 @test "a call belonging to another function is not extracted" {
   local source="${BATS_TEST_TMPDIR}/app.sh"
   printf 'my_dybatpho::i18n_t should.not.match\n' > "${source}"
-  run -1 dybatpho::i18n_extract --locale en "${source}"
+  run_traced -1 dybatpho::i18n_extract --locale en "${source}"
 }
 
 @test "a context is preserved in the extracted template" {
   local source="${BATS_TEST_TMPDIR}/app.sh"
   printf 'dybatpho::i18n_tc menu open\n' > "${source}"
-  run -0 dybatpho::i18n_extract --locale en "${source}"
+  run_traced -0 dybatpho::i18n_extract --locale en "${source}"
   assert_output --partial "@context = menu"
   assert_output --partial "open ="
 }
@@ -1181,7 +1181,7 @@ SOURCE
 @test "the extracted template can be written as a po file" {
   local source="${BATS_TEST_TMPDIR}/app.sh"
   printf 'dybatpho::i18n_t app.greeting\n' > "${source}"
-  run -0 dybatpho::i18n_extract --format po --locale en "${source}"
+  run_traced -0 dybatpho::i18n_extract --format po --locale en "${source}"
   assert_output --partial 'msgid "app.greeting"'
   assert_output --partial 'msgstr ""'
 }
@@ -1193,7 +1193,7 @@ SOURCE
   dybatpho::i18n_extract --locale en --output "${out}" "${source}"
   assert_file_exist "${out}"
   dybatpho::i18n_load en "${out}"
-  run -0 dybatpho::i18n_t app.greeting
+  run_traced -0 dybatpho::i18n_t app.greeting
   assert_output ""
 }
 
@@ -1202,7 +1202,7 @@ SOURCE
   mkdir -p "${dir}/nested"
   printf 'dybatpho::i18n_t app.one\n' > "${dir}/a.sh"
   printf 'dybatpho::i18n_t app.two\n' > "${dir}/nested/b.sh"
-  run -0 dybatpho::i18n_extract --locale en "${dir}"
+  run_traced -0 dybatpho::i18n_extract --locale en "${dir}"
   assert_output --partial "app.one ="
   assert_output --partial "app.two ="
 }
@@ -1229,7 +1229,7 @@ SOURCE
   printf 'app.a = A\napp.b = B\n' > "${dir}/vi_VN.msg"
   dybatpho::i18n_load en "${dir}/en.msg"
   dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
-  run -0 dybatpho::i18n_lint --reference en vi_VN
+  run_traced -0 dybatpho::i18n_lint --reference en vi_VN
   assert_output ""
 }
 
@@ -1240,7 +1240,7 @@ SOURCE
   printf 'app.a = A\n' > "${dir}/vi_VN.msg"
   dybatpho::i18n_load en "${dir}/en.msg"
   dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
-  run -1 dybatpho::i18n_lint --reference en vi_VN
+  run_traced -1 dybatpho::i18n_lint --reference en vi_VN
   assert_output --partial "missing"
   assert_output --partial "app.b"
 }
@@ -1254,7 +1254,7 @@ SOURCE
   printf 'app.a = Xin chào, {ten}\n' > "${dir}/vi_VN.msg"
   dybatpho::i18n_load en "${dir}/en.msg"
   dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
-  run -1 dybatpho::i18n_lint --reference en vi_VN
+  run_traced -1 dybatpho::i18n_lint --reference en vi_VN
   assert_output --partial "placeholder"
   assert_output --partial "name"
 }
@@ -1266,7 +1266,7 @@ SOURCE
   printf 'app.a = A\n' > "${dir}/vi_VN.msg"
   dybatpho::i18n_load en "${dir}/en.msg"
   dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
-  run -1 dybatpho::i18n_lint --format tsv --reference en vi_VN
+  run_traced -1 dybatpho::i18n_lint --format tsv --reference en vi_VN
   assert_output --partial "$(printf 'vi_VN\tmissing\tapp.b')"
 }
 
@@ -1277,7 +1277,7 @@ SOURCE
   printf 'app.files[other] = tệp\n' > "${dir}/vi_VN.msg"
   dybatpho::i18n_load en "${dir}/en.msg"
   dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
-  run -0 dybatpho::i18n_lint --reference en vi_VN
+  run_traced -0 dybatpho::i18n_lint --reference en vi_VN
   assert_output ""
 }
 
@@ -1292,7 +1292,7 @@ SOURCE
 
 @test "library messages are left in English by default" {
   # The whole existing test suite depends on this staying true.
-  run --separate-stderr -0 dybatpho::warn "curl is not installed"
+  run_traced --separate-stderr -0 dybatpho::warn "curl is not installed"
   assert_regex "${stderr}" "curl is not installed"
 }
 
@@ -1313,7 +1313,7 @@ SOURCE
 }
 
 @test "the message id of a library diagnostic is its English text" {
-  run -0 dybatpho::i18n_library_message "untranslated text"
+  run_traced -0 dybatpho::i18n_library_message "untranslated text"
   assert_output "untranslated text"
 }
 
@@ -1328,7 +1328,7 @@ SOURCE
     printf 'unset DYBATPHO_I18N_TRANSLATE_LIBRARY\n'
     printf 'dybatpho::i18n_library_message "a message"\n'
   } > "${script}"
-  run -0 bash "${script}"
+  run_traced -0 bash "${script}"
   assert_output "a message"
 }
 
@@ -1337,7 +1337,7 @@ SOURCE
 # ---------------------------------------------------------------------------
 
 @test "a keyed library string is left in English by default" {
-  run -0 dybatpho::i18n_library_text cli.heading_options "Options:"
+  run_traced -0 dybatpho::i18n_library_text cli.heading_options "Options:"
   assert_output "Options:"
 }
 
@@ -1413,7 +1413,7 @@ SOURCE
     printf "printf '|'\n"
     printf 'dybatpho::i18n_library_plural a.key 2 "two of them"\n'
   } > "${script}"
-  run -0 bash "${script}"
+  run_traced -0 bash "${script}"
   assert_output "in English|two of them"
 }
 
@@ -1422,7 +1422,7 @@ SOURCE
 # ---------------------------------------------------------------------------
 
 @test "the success banner keeps its English label and message by default" {
-  run -0 dybatpho::success "Repository lint passed"
+  run_traced -0 dybatpho::success "Repository lint passed"
   assert_output --partial "DONE: Repository lint passed"
 }
 
@@ -1460,7 +1460,7 @@ _i18n_spec() {
 }
 
 @test "generated help is in English by default" {
-  run -0 dybatpho::generate_help _i18n_spec
+  run_traced -0 dybatpho::generate_help _i18n_spec
   assert_output --partial "Usage:"
   assert_output --partial "Options:"
   assert_output --partial "[OPTIONS]"

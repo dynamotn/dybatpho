@@ -3,7 +3,12 @@
 # the `assert_*` of bats-assert, rather than a namespace of their own; and
 # `run_traced` sets `status`, `output` and `lines` for the test that called it,
 # which is the contract `run` already has and what `local` would break.
-# dyshellint disable=BSG004,BSG011
+#
+# BSG050 asks for `dybatpho::expect_args`, which these two cannot use: they take
+# the argument list of the command under test, behind the same optional flags
+# `run` accepts, so there is no fixed set of names to declare. `scripts/lint.sh`
+# is excused the same rule for the same reason.
+# dyshellint disable=BSG004,BSG011,BSG050
 # @file test_helper.bash
 # @brief What every `.bats` file in this repository loads first
 # @description
@@ -42,24 +47,94 @@ unset -v __dybatpho_helper_saved_trap
 bats_require_minimum_version 1.5.0
 
 # @description Like `run`, but the command executes in the current shell instead
-#   of a capturing subshell, so coverage instrumentation (which traces through
-#   stderr) still sees the executed lines. Only stdout is captured; use `run`
-#   for commands that must fail or whose stderr is asserted.
+#   of a capturing subshell, so coverage instrumentation still sees the executed
+#   lines.
+#
+#   `run` is unusable for anything the coverage report has to account for. kcov
+#   instruments Bash through a DEBUG trap, and `run` clears that trap — it does
+#   `trap - ERR DEBUG` before invoking the command — so every line a `run`
+#   executes is recorded as never having run. That is not a small effect: the
+#   suite reaches for `run` exactly where a command has to fail, so whole error
+#   paths were reported as untested while being tested all along.
+#
+#   The flags mirror `run` so a call site converts by changing the word: `!`
+#   requires a nonzero status and `-N` requires exactly N. `--separate-stderr`
+#   captures standard error into `stderr` and `stderr_lines`; without it
+#   standard error is left alone rather than folded into `output`, because the
+#   library logs there and the call sites that already use this helper assert
+#   `output` against stdout only.
+#
+#   The one thing this cannot do is host a command that ends the shell:
+#   `dybatpho::die` calls `exit`, and with no subshell to absorb it that ends the
+#   test. Those call sites keep using `run`, and the line they exercise carries a
+#   `# kcov(skip)` naming this limitation.
+# @arg $1 string Optionally `!`, `-N`, `--separate-stderr`, or `--`
 # @arg $@ string The command to run, and its arguments
 # @set status number Exit status of the command
-# @set output string What the command wrote to stdout
+# @set output string What the command wrote to stdout, and to stderr unless it
+#   was asked to keep them apart
 # @set lines array The output, one element per line
-# @exitcode 0 Always, so a failing command does not end the test
+# @set stderr string What the command wrote to stderr, with `--separate-stderr`
+# @set stderr_lines array The standard error, one element per line
+# @exitcode 0 The command ran and any expected status held
+# @exitcode 1 The status was not the one the flags asked for
 # shellcheck disable=SC2034 # status, output and lines are read by the caller
 function run_traced {
-  local output_file="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR}}}/run_traced.out"
+  local expected_rc="" separate=""
+  while (($#)) && [[ "$1" == -* || "$1" == '!' ]]; do
+    case "$1" in
+      '!') expected_rc="-1" ;;
+      -[0-9]*) expected_rc="${1#-}" ;;
+      --separate-stderr) separate="1" ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        printf "Usage error: run_traced: unknown flag '%s'\n" "$1" >&2
+        return 1
+        ;;
+    esac
+    shift
+  done
+
+  local dir="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR}}}"
+  local output_file="${dir}/run_traced.out" stderr_file="${dir}/run_traced.err"
   status=0
-  "$@" > "${output_file}" || status=$?
+  if [[ -n "${separate}" ]]; then
+    "$@" > "${output_file}" 2> "${stderr_file}" || status=$?
+  else
+    "$@" > "${output_file}" || status=$?
+  fi
   output="$(< "${output_file}")"
   if [[ -n "${output}" ]]; then
     mapfile -t lines <<< "${output}"
   else
     lines=()
+  fi
+  if [[ -n "${separate}" ]]; then
+    stderr="$(< "${stderr_file}")"
+    if [[ -n "${stderr}" ]]; then
+      mapfile -t stderr_lines <<< "${stderr}"
+    else
+      stderr_lines=()
+    fi
+  else
+    unset -v stderr stderr_lines
+  fi
+
+  if [[ -z "${expected_rc}" ]]; then
+    return 0
+  fi
+  if [[ "${expected_rc}" == "-1" ]]; then
+    if ((status == 0)); then
+      printf 'run_traced: expected nonzero exit code, got 0\n%s\n' "${output}" >&2
+      return 1
+    fi
+  elif ((status != expected_rc)); then
+    printf 'run_traced: expected exit code %s, got %s\n%s\n' \
+      "${expected_rc}" "${status}" "${output}" >&2
+    return 1
   fi
   return 0
 }

@@ -125,7 +125,7 @@ setup() {
   DYBATPHO_CONFIG=()
   dybatpho::config_env DYBATPHO_CONFIG_
   assert_equal "$(dybatpho::config_get ENV_TEST)" "loaded"
-  run dybatpho::config_get UNRELATED_CONFIG_ENV_TEST
+  run_traced dybatpho::config_get UNRELATED_CONFIG_ENV_TEST
   assert_failure
   unset DYBATPHO_CONFIG_ENV_TEST UNRELATED_CONFIG_ENV_TEST
 }
@@ -176,7 +176,7 @@ setup() {
   dybatpho::config_schema REGION string
   dybatpho::config_validate
   assert_equal "$(dybatpho::config_get PORT)" "8080"
-  run ! dybatpho::config_get REGION
+  run_traced ! dybatpho::config_get REGION
 }
 
 @test "config_validate rejects missing required and invalid values" {
@@ -351,21 +351,21 @@ setup() {
   dybatpho::config_schema PORT int default:8080 min:1 max:65535
   dybatpho::config_schema MODE enum choices:dev,prod default:dev
 
-  run dybatpho::config_doc
+  run_traced dybatpho::config_doc
   assert_success
   assert_line --index 0 "# Configuration"
   assert_line --partial "| \`HOST\` | url | true | - | - | API base URL |"
   assert_line --partial "| \`PORT\` | int | false | \`8080\` | 1..65535 | - |"
   assert_line --partial "| \`MODE\` | enum | false | \`dev\` | one of: dev, prod | - |"
 
-  run dybatpho::config_doc text "App settings"
+  run_traced dybatpho::config_doc text "App settings"
   assert_success
   assert_line --index 0 "App settings"
   assert_line --partial "  type: url"
   assert_line --partial "  constraints: 1..65535"
   assert_line --partial "  description: API base URL"
 
-  run dybatpho::config_doc json
+  run_traced dybatpho::config_doc json
   assert_success
   assert_output --partial '{"key":"HOST","type":"url","required":true,"default":null,"constraints":null,"description":"API base URL"}'
   assert_output --partial '{"key":"PORT","type":"int","required":false,"default":"8080","constraints":"1..65535","description":null}'
@@ -511,7 +511,7 @@ require_tool() {
     'PORT=9090' \
     'NOTE="has spaces # and a hash"' \
     'EMPTY=""' > "${expected}"
-  run diff -u "${expected}" "${file}"
+  run_traced diff -u "${expected}" "${file}"
   assert_success
 
   # What was written is what comes back.
@@ -544,13 +544,13 @@ require_tool() {
   dybatpho::config_set BRAVO two
   dybatpho::config_set ALPHA one
   dybatpho::config_save "${file}"
-  run cat "${file}"
+  run_traced cat "${file}"
   assert_line --index 0 'ALPHA=one'
   assert_line --index 1 'BRAVO=two'
 
   dybatpho::config_set ALPHA changed
   DRY_RUN=true dybatpho::config_save "${file}" ALPHA
-  run cat "${file}"
+  run_traced cat "${file}"
   assert_line --index 0 'ALPHA=one'
 }
 
@@ -630,7 +630,7 @@ require_tool() {
   dybatpho::config_set note 'a: literal string'
   dybatpho::config_save "${file}" port debug note
 
-  run cat "${file}"
+  run_traced cat "${file}"
   assert_line --index 0 '# service settings'
   assert_line 'host: localhost'
   # The schema is what makes these scalars rather than quoted strings.
@@ -659,7 +659,7 @@ require_tool() {
   local toml_file="${BATS_TEST_TMPDIR}/settings.toml"
   printf '# a comment\nhost = "localhost"\nport = 8080\n' > "${toml_file}"
   dybatpho::config_save "${toml_file}" port mode
-  run cat "${toml_file}"
+  run_traced cat "${toml_file}"
   assert_line 'host = "localhost"'
   assert_line 'port = 9090'
   assert_line 'mode = "prod"'

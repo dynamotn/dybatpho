@@ -510,6 +510,50 @@ and that a man page contains one `.TH` with appropriate child sections.
 - Use display options (`disp`) for `--help`, `--version`, `--schema`, `--man`,
   and other actions that do not take a value.
 
+## Test conventions
+
+### Use `run_traced`, not `run`
+
+`run_traced` from `test/test_helper.bash` is the default way to invoke the code
+under test. It takes the same flags as `run` — `!`, `-N`, `--separate-stderr` —
+so the two are interchangeable at the call site, and the assertions that read
+`status`, `output`, `lines`, `stderr` and `stderr_lines` are unchanged.
+
+The reason is coverage, and it is not a small one. kcov instruments Bash through
+a `DEBUG` trap, and `run` clears that trap (`trap - ERR DEBUG`) before invoking
+the command. Every line a `run` executes is therefore recorded as never having
+run. Because the suite reaches for `run` precisely where a command has to fail,
+whole error paths were reported as untested while being tested all along. The
+same assertion written with `run_traced` records the lines it executes.
+
+`run` stays correct for one case: a command that ends the shell. `dybatpho::die`
+calls `exit`, and `run_traced` has no subshell to absorb it, so the test would
+end there. Those call sites keep `run`, and the line they exercise carries a
+`# kcov(skip)` saying which test covers it — the line is tested, the instrument
+simply cannot observe it.
+
+The same blind spot applies to a `case` arm with no command in it (`*) ;;`):
+there is nothing for the trap to fire on, so mark those `# kcov(skip)` too.
+
+### Coverage is part of the change
+
+A change is not finished while the lines it adds are unmeasured. Run:
+
+```bash
+mise run coverage
+```
+
+and confirm, in `coverage/bats/cobertura.xml`:
+
+- every line the change adds or rewrites is covered, or carries a
+  `# kcov(skip)` naming the test that exercises it and the reason kcov cannot
+  see it;
+- the overall figure has not fallen.
+
+A line that is genuinely unreachable does not belong in the library at all;
+delete it rather than excluding it. `# kcov(skip)` is for code that a test does
+run and the instrument cannot see, never for code no test reaches.
+
 ## Tests required for CLI changes
 
 Add behavior-focused tests to `test/cli.bats`. Cover:
@@ -608,13 +652,15 @@ to the module convention.
 | Any shell script | `scripts/lint.sh --stage shell` — `dyshellint` (the style guide rules, ShellCheck and shfmt) and `bash -n` over every tracked script |
 | `CHANGELOG.md` | `scripts/lint.sh --stage changelog` — Keep a Changelog headings, dates, and well-formed link reference URLs |
 | Any public behavior | `CHANGELOG.md` entry under `## [Unreleased]`, in the same change |
+| Any new or rewritten line of a module | `mise run coverage` — the line is covered, or carries a `# kcov(skip)` naming the test that exercises it; the overall figure has not fallen. Invoke the code with `run_traced`, since `run` clears the trap kcov instruments through and hides every line it executes |
 
 ## Completion checklist
 
 1. Inspect the worktree first and preserve existing changes.
 2. Read related source, tests, documentation, and specification.
 3. Make a focused, backward-compatible change unless the contract requires otherwise.
-4. Add regression tests for new or fixed behavior.
+4. Add regression tests for new or fixed behavior, invoking the code with
+   `run_traced` so the lines they exercise are counted.
 5. Add or update a complete example for every changed public module.
 6. Add or update `docs/spec/<module>.md` for every changed public module, and
    confirm the missing-spec check above prints nothing.
@@ -625,4 +671,6 @@ to the module convention.
 8. Run targeted tests, `scripts/lint.sh`, and `git diff --check`. `scripts/lint.sh`
    covers `dyshellint`, `bash -n`, the changelog format, documentation drift and
    the bundle; `test/examples.bats` covers the examples.
-9. Review the final diff and remove temporary artifacts.
+9. Run `mise run coverage` for a change that touches a module, and confirm the
+   lines it added are covered and the overall figure has not fallen.
+10. Review the final diff and remove temporary artifacts.

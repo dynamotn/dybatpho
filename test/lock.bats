@@ -21,10 +21,10 @@ teardown() {
 }
 
 @test "dybatpho::lock_acquire then dybatpho::lock_is_held reports success" {
-  run dybatpho::lock_acquire "acquire-test"
+  run_traced dybatpho::lock_acquire "acquire-test"
   assert_success
 
-  run dybatpho::lock_is_held "acquire-test"
+  run_traced dybatpho::lock_is_held "acquire-test"
   assert_success
 
   dybatpho::lock_release "acquire-test"
@@ -33,7 +33,7 @@ teardown() {
 @test "dybatpho::lock_acquire fails fast without waiting when already held" {
   dybatpho::lock_acquire "busy"
 
-  run --separate-stderr dybatpho::lock_acquire "busy"
+  run_traced --separate-stderr dybatpho::lock_acquire "busy"
   assert_failure
   assert_stderr --partial "Could not acquire lock"
   assert_stderr --partial "pid=$$"
@@ -49,7 +49,7 @@ teardown() {
   ) &
   local releaser_pid=$!
 
-  run dybatpho::lock_acquire "waiter" 2
+  run_traced dybatpho::lock_acquire "waiter" 2
   assert_success
   wait "${releaser_pid}"
   dybatpho::lock_release "waiter"
@@ -57,14 +57,14 @@ teardown() {
 
 @test "dybatpho::lock_acquire waits up to the timeout then fails when still held" {
   dybatpho::lock_acquire "still-busy"
-  run --separate-stderr dybatpho::lock_acquire "still-busy" 1
+  run_traced --separate-stderr dybatpho::lock_acquire "still-busy" 1
   assert_failure
   dybatpho::lock_release "still-busy"
 }
 
 @test "dybatpho::lock_info prints the current holder metadata" {
   dybatpho::lock_acquire "info-test"
-  run dybatpho::lock_info "info-test"
+  run_traced dybatpho::lock_info "info-test"
   assert_success
   assert_output --partial "pid=$$"
   assert_output --partial "host=$(dybatpho::lock_hostname)"
@@ -73,21 +73,21 @@ teardown() {
 }
 
 @test "dybatpho::lock_info fails when the lock isn't held" {
-  run dybatpho::lock_info "never-acquired"
+  run_traced dybatpho::lock_info "never-acquired"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::lock_release removes a lock held by the current process" {
   dybatpho::lock_acquire "release-test"
-  run dybatpho::lock_release "release-test"
+  run_traced dybatpho::lock_release "release-test"
   assert_success
-  run dybatpho::lock_is_held "release-test"
+  run_traced dybatpho::lock_is_held "release-test"
   assert_failure
 }
 
 @test "dybatpho::lock_release is a no-op when the lock was never held" {
-  run dybatpho::lock_release "never-held"
+  run_traced dybatpho::lock_release "never-held"
   assert_success
 }
 
@@ -101,7 +101,7 @@ teardown() {
   printf '%s' "${foreign_pid}" > "${lock_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${lock_path}/host"
 
-  run --separate-stderr dybatpho::lock_release "foreign"
+  run_traced --separate-stderr dybatpho::lock_release "foreign"
   assert_failure
   assert_stderr --partial "is held by pid ${foreign_pid}"
   assert_dir_exist "${lock_path}"
@@ -118,24 +118,24 @@ teardown() {
   printf '%s' "999999" > "${lock_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${lock_path}/host"
 
-  run --separate-stderr dybatpho::lock_acquire "stale"
+  run_traced --separate-stderr dybatpho::lock_acquire "stale"
   assert_success
   assert_stderr --partial "Reclaiming stale lock"
   dybatpho::lock_release "stale"
 }
 
 @test "dybatpho::with_lock runs the command while holding the lock and releases it after" {
-  run dybatpho::with_lock "with-lock-test" 1 -- bash -c 'echo ran'
+  run_traced dybatpho::with_lock "with-lock-test" 1 -- bash -c 'echo ran'
   assert_success
   assert_output "ran"
-  run dybatpho::lock_is_held "with-lock-test"
+  run_traced dybatpho::lock_is_held "with-lock-test"
   assert_failure
 }
 
 @test "dybatpho::with_lock releases the lock even when the command fails" {
-  run dybatpho::with_lock "with-lock-fail" 1 -- bash -c 'exit 5'
+  run_traced dybatpho::with_lock "with-lock-fail" 1 -- bash -c 'exit 5'
   assert_failure 5
-  run dybatpho::lock_is_held "with-lock-fail"
+  run_traced dybatpho::lock_is_held "with-lock-fail"
   assert_failure
 }
 
@@ -161,12 +161,12 @@ teardown() {
   lock_path="$(dybatpho::lock_path "alive-test")"
   dybatpho::lock_acquire "alive-test"
 
-  run dybatpho::lock_is_alive "${lock_path}"
+  run_traced dybatpho::lock_is_alive "${lock_path}"
   assert_success
 
   dybatpho::lock_release "alive-test"
 
-  run dybatpho::lock_is_alive "${lock_path}"
+  run_traced dybatpho::lock_is_alive "${lock_path}"
   assert_failure
 }
 
@@ -178,12 +178,12 @@ teardown() {
   printf '%s' "999999" > "${lock_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${lock_path}/host"
 
-  run dybatpho::lock_is_alive "${lock_path}"
+  run_traced dybatpho::lock_is_alive "${lock_path}"
   assert_failure
 
   # A lock recorded on another host can't be probed locally, so it counts as held.
   printf '%s' "some-other-host" > "${lock_path}/host"
-  run dybatpho::lock_is_alive "${lock_path}"
+  run_traced dybatpho::lock_is_alive "${lock_path}"
   assert_success
 
   rm -rf "${lock_path}"
@@ -196,14 +196,14 @@ teardown() {
   printf '%s' "999999" > "${stale_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${stale_path}/host"
 
-  run --separate-stderr dybatpho::lock_reclaim_stale "${stale_path}"
+  run_traced --separate-stderr dybatpho::lock_reclaim_stale "${stale_path}"
   assert_success
   assert_stderr --partial "Reclaiming stale lock"
   assert_dir_not_exist "${stale_path}"
 
   live_path="$(dybatpho::lock_path "reclaim-live")"
   dybatpho::lock_acquire "reclaim-live"
-  run dybatpho::lock_reclaim_stale "${live_path}"
+  run_traced dybatpho::lock_reclaim_stale "${live_path}"
   assert_success
   # The assertion is that the lock is still held, not what it looks like on
   # disk: the claim is a symbolic link now, and that is an implementation
@@ -230,7 +230,23 @@ teardown() {
   (
     # `lock_hostname` is read while the lock is being judged, so stalling it
     # holds the second process inside exactly the window that was unsafe.
-    eval "$(declare -f dybatpho::lock_hostname | sed '2a\  sleep 0.5')"
+    #
+    # The stall goes in by renaming the original and wrapping it, rather than by
+    # editing the text `declare -f` prints. Inserting a line that way needs
+    # `sed '2a\ ...'`, which is GNU syntax: BSD sed wants the text on the line
+    # after the `a\` and rejects the one-liner with "extra characters after \ at
+    # the end of a command". On macOS the `sed` therefore failed, the stall was
+    # never inserted, and the race this test exists to catch was left to be
+    # decided by luck -- which is why the job passed and failed at random on the
+    # same commit. Parameter expansion needs no external tool and behaves the
+    # same everywhere.
+    local definition
+    definition="$(declare -f dybatpho::lock_hostname)"
+    eval "slow_lock_hostname${definition#dybatpho::lock_hostname}"
+    dybatpho::lock_hostname() {
+      sleep 0.5
+      slow_lock_hostname "$@"
+    }
     dybatpho::lock_acquire "reclaim-race" > /dev/null 2>&1 \
       && : > "${winners}/slow"
   ) &
@@ -272,7 +288,7 @@ teardown() {
     LOG_LEVEL=fatal \
     . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock \
     && dybatpho::lock_acquire exclusive 0" > "${script}"
-  run bash "${script}"
+  run_traced bash "${script}"
   assert_failure
   dybatpho::lock_release "exclusive"
 }
@@ -295,7 +311,7 @@ teardown() {
     dybatpho::with_lock trap-probe 1 -- probe
     printf 'after: %s\\n' \"\$(trap -p HUP)\"
   " > "${script}"
-  run bash "${script}"
+  run_traced bash "${script}"
   assert_success
 
   # Present while the command runs, so an interrupt during a long job releases.

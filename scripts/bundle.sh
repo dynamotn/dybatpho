@@ -281,8 +281,6 @@ function _spec {
     -m --modules env:DYBATPHO_MODULES init:="core"
   dybatpho::opts::param "Path of the generated bundle" OUTPUT \
     -o --output init:="${PWD}/dybatpho.bundle.sh"
-
-  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
 }
 
 dybatpho::generate_from_spec _spec "$@"

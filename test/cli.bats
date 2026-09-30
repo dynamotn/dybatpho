@@ -14,7 +14,7 @@ setup() {
     echo "called" >&2
   }
 
-  run --separate-stderr dybatpho::generate_from_spec _spec
+  run_traced --separate-stderr dybatpho::generate_from_spec _spec
   assert_success
   assert_stderr_line --index 0 "called"
   assert_stderr_line --index 1 "called"
@@ -177,7 +177,7 @@ setup() {
   # shellcheck disable=2030
   export LOG_LEVEL=debug
   export DYBATPHO_CLI_DEBUG=true
-  run --separate-stderr dybatpho::generate_from_spec _spec 1 2 "3\""
+  run_traced --separate-stderr dybatpho::generate_from_spec _spec 1 2 "3\""
   assert_success
   assert_stderr --partial "dybatpho::opts::parse::_spec() {"
   refute_stderr --partial "dybatpho::opts::parse::_spec \"1\""
@@ -198,25 +198,25 @@ setup() {
 
   local marker="${BATS_TEST_TMPDIR}/executed"
   local payload="x\$(touch '${marker}')y"
-  run dybatpho::generate_from_spec _spec --name "${payload}"
+  run_traced dybatpho::generate_from_spec _spec --name "${payload}"
   assert_success
   assert_line --index 0 "${payload}"
   assert_file_not_exist "${marker}"
 
   # A positional argument goes the same way.
-  run dybatpho::generate_from_spec _spec "${payload}"
+  run_traced dybatpho::generate_from_spec _spec "${payload}"
   assert_success
   assert_output --partial "${payload}"
   assert_file_not_exist "${marker}"
 
   # Backticks, a bare variable reference, and a trailing backslash.
-  run dybatpho::generate_from_spec _spec --name '`id`'
+  run_traced dybatpho::generate_from_spec _spec --name '`id`'
   assert_success
   assert_line --index 0 '`id`'
-  run dybatpho::generate_from_spec _spec --name '$HOME'
+  run_traced dybatpho::generate_from_spec _spec --name '$HOME'
   assert_success
   assert_line --index 0 '$HOME'
-  run dybatpho::generate_from_spec _spec --name 'trailing\'
+  run_traced dybatpho::generate_from_spec _spec --name 'trailing\'
   assert_success
   assert_line --index 0 'trailing\'
 }
@@ -906,7 +906,7 @@ setup() {
     dybatpho::opts::flag "Old flag" OLD_FLAG --old deprecated:"Use --new instead"
   }
 
-  run --separate-stderr dybatpho::generate_from_spec _spec --old
+  run_traced --separate-stderr dybatpho::generate_from_spec _spec --old
   assert_success
   assert_output "true"
   assert_stderr --partial "Deprecated option: --old. Use --new instead"
@@ -923,7 +923,7 @@ setup() {
     dybatpho::opts::cmd old _spec_old_cmd deprecated:"Use 'new' instead"
   }
 
-  run --separate-stderr dybatpho::generate_from_spec _spec old
+  run_traced --separate-stderr dybatpho::generate_from_spec _spec old
   assert_success
   assert_output "old-cmd"
   assert_stderr --partial "Deprecated command: old. Use 'new' instead"
@@ -1441,13 +1441,13 @@ setup() {
 }
 
 @test "dybatpho::cli_suggest reports nothing when no candidate is close" {
-  run dybatpho::cli_suggest --wildlydifferent --color --quiet
+  run_traced dybatpho::cli_suggest --wildlydifferent --color --quiet
   assert_failure
   assert_output ""
 }
 
 @test "dybatpho::cli_suggest ignores an input too short to be a typo" {
-  run dybatpho::cli_suggest -x --color
+  run_traced dybatpho::cli_suggest -x --color
   assert_failure
 }
 
@@ -1873,11 +1873,11 @@ setup() {
     dybatpho::opts::param "Mode" PATH_MODE --mode pattern:'fast|slow'
   }
 
-  run dybatpho::generate_help _spec_pattern_help
+  run_traced dybatpho::generate_help _spec_pattern_help
   assert_success
   assert_output --partial "[pattern: fast|slow]"
 
-  run dybatpho::generate_schema _spec_pattern_help patterntool
+  run_traced dybatpho::generate_schema _spec_pattern_help patterntool
   assert_success
   assert_output --partial '"pattern":"fast|slow"'
 }
@@ -1938,15 +1938,15 @@ setup() {
     dybatpho::opts::param "Contact" TYPEH_MAIL --contact type:email
   }
 
-  run dybatpho::generate_help _spec_type_help
+  run_traced dybatpho::generate_help _spec_type_help
   assert_success
   assert_output --partial "[type: email]"
 
-  run dybatpho::generate_man _spec_type_help typedtool
+  run_traced dybatpho::generate_man _spec_type_help typedtool
   assert_success
   assert_output --partial "[type: email]"
 
-  run dybatpho::generate_schema _spec_type_help typedtool
+  run_traced dybatpho::generate_schema _spec_type_help typedtool
   assert_success
   assert_output --partial '"valueType":"email"'
 }
@@ -1963,7 +1963,7 @@ setup() {
     dybatpho::opts::msg "Never shown" hidden:true
   }
 
-  run dybatpho::generate_help _spec_msg
+  run_traced dybatpho::generate_help _spec_msg
   assert_success
   assert_output --partial "Connection options:"
   assert_output --partial "Output options:"
@@ -1971,11 +1971,11 @@ setup() {
 
   # Each message keeps its own line rather than being deduped down to the first,
   # and a message never becomes a switch.
-  run dybatpho::generate_schema _spec_msg msgtool
+  run_traced dybatpho::generate_schema _spec_msg msgtool
   assert_success
   refute_output --partial "Connection options"
 
-  run dybatpho::generate_completion _spec_msg bash msgtool
+  run_traced dybatpho::generate_completion _spec_msg bash msgtool
   assert_success
   refute_output --partial "Connection options"
 }
@@ -1988,7 +1988,7 @@ setup() {
     dybatpho::opts::flag "Color" ALIGN_COLOR --color
   }
 
-  run dybatpho::generate_help _spec_msg_align
+  run_traced dybatpho::generate_help _spec_msg_align
   assert_success
   assert_line --partial "      --color  Color"
 }
@@ -2233,24 +2233,24 @@ setup() {
 }
 
 @test "dybatpho::opts::validate_choice accepts a listed value and rejects anything else" {
-  run dybatpho::opts::validate_choice "json" "text,json,yaml"
+  run_traced dybatpho::opts::validate_choice "json" "text,json,yaml"
   assert_success
 
-  run dybatpho::opts::validate_choice "text" "text,json,yaml"
+  run_traced dybatpho::opts::validate_choice "text" "text,json,yaml"
   assert_success
 
-  run dybatpho::opts::validate_choice "xml" "text,json,yaml"
+  run_traced dybatpho::opts::validate_choice "xml" "text,json,yaml"
   assert_failure
 
   # A prefix of a listed value is not itself a valid choice.
-  run dybatpho::opts::validate_choice "js" "text,json,yaml"
+  run_traced dybatpho::opts::validate_choice "js" "text,json,yaml"
   assert_failure
 }
 
 @test "dybatpho::opts::validate_choice handles a single-entry list and an empty value" {
-  run dybatpho::opts::validate_choice "only" "only"
+  run_traced dybatpho::opts::validate_choice "only" "only"
   assert_success
 
-  run dybatpho::opts::validate_choice "" "text,json"
+  run_traced dybatpho::opts::validate_choice "" "text,json"
   assert_failure
 }

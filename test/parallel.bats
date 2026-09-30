@@ -24,7 +24,7 @@ _failing_job() {
 }
 
 @test "dybatpho::parallel_map runs the command once per item" {
-  run --separate-stderr -0 dybatpho::parallel_map 2 _echo_job alpha bravo charlie
+  run_traced --separate-stderr -0 dybatpho::parallel_map 2 _echo_job alpha bravo charlie
   assert_line --index 0 "out alpha"
   assert_line --index 1 "out bravo"
   assert_line --index 2 "out charlie"
@@ -41,7 +41,7 @@ _failing_job() {
     sleep "0.$((RANDOM % 3))"
     printf 'second %s\n' "$1"
   }
-  run -0 dybatpho::parallel_map 4 _pair_job a b c
+  run_traced -0 dybatpho::parallel_map 4 _pair_job a b c
   assert_line --index 0 "first a"
   assert_line --index 1 "second a"
   assert_line --index 2 "first b"
@@ -51,7 +51,7 @@ _failing_job() {
 }
 
 @test "standard error is replayed too, and kept off standard output" {
-  run --separate-stderr -0 dybatpho::parallel_map 2 _echo_job one two
+  run_traced --separate-stderr -0 dybatpho::parallel_map 2 _echo_job one two
   assert_output "$(printf 'out one\nout two')"
   assert_equal "${stderr}" "$(printf 'err one\nerr two')"
 }
@@ -98,7 +98,7 @@ _failing_job() {
 
 @test "an item containing spaces and quotes stays one item" {
   _capture_job() { printf '[%s]\n' "$1"; }
-  run --separate-stderr -0 dybatpho::parallel_map 2 _capture_job 'two words' "it's quoted" '$(echo hi)'
+  run_traced --separate-stderr -0 dybatpho::parallel_map 2 _capture_job 'two words' "it's quoted" '$(echo hi)'
   assert_line --index 0 "[two words]"
   assert_line --index 1 "[it's quoted]"
   # The item must not be re-parsed as shell syntax.
@@ -119,12 +119,12 @@ _failing_job() {
 }
 
 @test "without fail-fast every job runs even after a failure" {
-  run -1 dybatpho::parallel_map 1 _failing_job a bad1 c d
+  run_traced -1 dybatpho::parallel_map 1 _failing_job a bad1 c d
   assert_equal "$(grep -c '^ran ' "${LOG}")" "4"
 }
 
 @test "dybatpho::parallel_run evaluates each command string" {
-  run -0 dybatpho::parallel_run 2 "printf 'one\n'" "printf 'two\n'; true"
+  run_traced -0 dybatpho::parallel_run 2 "printf 'one\n'" "printf 'two\n'; true"
   assert_line --index 0 "one"
   assert_line --index 1 "two"
 }
@@ -136,7 +136,7 @@ _failing_job() {
 }
 
 @test "an empty job list succeeds without running anything" {
-  run --separate-stderr -0 dybatpho::parallel_map 2 _echo_job
+  run_traced --separate-stderr -0 dybatpho::parallel_map 2 _echo_job
   assert_output ""
   dybatpho::parallel_map 2 _echo_job
   assert_equal "$(dybatpho::parallel_count)" "0"
@@ -147,12 +147,12 @@ _failing_job() {
 @test "a job count of zero follows the configuration, then the machine" {
   # shellcheck disable=2030
   DYBATPHO_PARALLEL_JOBS=2
-  run --separate-stderr -0 dybatpho::parallel_map 0 _echo_job a b c
+  run_traced --separate-stderr -0 dybatpho::parallel_map 0 _echo_job a b c
   assert_line --index 0 "out a"
   DYBATPHO_PARALLEL_JOBS=0
   # With nothing configured the count comes from the CPU count, which only has
   # to be a workable positive number.
-  run --separate-stderr -0 dybatpho::parallel_map 0 _echo_job a
+  run_traced --separate-stderr -0 dybatpho::parallel_map 0 _echo_job a
   assert_output "out a"
 }
 
@@ -172,9 +172,9 @@ _failing_job() {
 @test "the pool runs nothing under DRY_RUN" {
   # shellcheck disable=2030,2031
   export DRY_RUN=true
-  run --separate-stderr -0 dybatpho::parallel_map 2 _failing_job a bad1
+  run_traced --separate-stderr -0 dybatpho::parallel_map 2 _failing_job a bad1
   assert_output --partial "DRY RUN"
-  run -0 dybatpho::parallel_run 2 "touch '${BATS_TEST_TMPDIR}/side-effect'"
+  run_traced -0 dybatpho::parallel_run 2 "touch '${BATS_TEST_TMPDIR}/side-effect'"
   assert_output --partial "DRY RUN"
   unset DRY_RUN
   # Nothing ran: no job wrote to the log, and no command had its effect.
@@ -193,7 +193,7 @@ _failing_job() {
 @test "a job can call a function the caller defined, without exporting it" {
   _outer_helper() { printf 'helped %s\n' "$1"; }
   _inner_job() { _outer_helper "$1"; }
-  run --separate-stderr -0 dybatpho::parallel_map 2 _inner_job x y
+  run_traced --separate-stderr -0 dybatpho::parallel_map 2 _inner_job x y
   assert_line --index 0 "helped x"
   assert_line --index 1 "helped y"
 }

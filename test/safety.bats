@@ -13,7 +13,7 @@ setup() {
 
 @test "dybatpho::is_interactive honors the DYBATPHO_INTERACTIVE override" {
   DYBATPHO_INTERACTIVE=true dybatpho::is_interactive
-  run -1 dybatpho::is_interactive
+  run_traced -1 dybatpho::is_interactive
   # `auto` falls back to terminal detection, and tests never own a terminal.
   DYBATPHO_INTERACTIVE=auto run -1 dybatpho::is_interactive
 }
@@ -22,8 +22,8 @@ setup() {
   DYBATPHO_INTERACTIVE=true dybatpho::confirm "Continue?" <<< "y"
   DYBATPHO_INTERACTIVE=true dybatpho::confirm "Continue?" <<< "YES"
 
-  run -1 dybatpho::confirm "Continue?" <<< "n"
-  run -1 dybatpho::confirm "Continue?" <<< ""
+  run_traced -1 dybatpho::confirm "Continue?" <<< "n"
+  run_traced -1 dybatpho::confirm "Continue?" <<< ""
   DYBATPHO_INTERACTIVE=true dybatpho::confirm "Continue?" yes <<< ""
 }
 
@@ -190,7 +190,7 @@ setup() {
   assert_equal "$(cat "${destination}/source.txt")" "v1"
 
   printf 'v2\n' > "${source}"
-  run dybatpho::safe_copy "${source}" "${destination}"
+  run_traced dybatpho::safe_copy "${source}" "${destination}"
   assert_failure
   assert_equal "$(cat "${destination}/source.txt")" "v1"
 

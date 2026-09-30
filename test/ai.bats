@@ -248,7 +248,7 @@ anthropic_body() {
   run_traced dybatpho::ai_ask "my key is swordfish-token"
   unstub curl
   assert_success
-  run grep -c "swordfish-token" "${args_file}"
+  run_traced grep -c "swordfish-token" "${args_file}"
   assert_failure
 }
 
@@ -435,7 +435,7 @@ _test_tool() { printf 'tool output\n'; }
   assert_success
   assert_output "the tool said tool output"
   # The second request must carry the tool result the handler produced.
-  run grep -c "tool output" "${args_file}"
+  run_traced grep -c "tool output" "${args_file}"
   assert_success
 }
 
@@ -526,7 +526,7 @@ _test_tool() { printf 'tool output\n'; }
   run_traced dybatpho::ai_ask "q"
   unstub curl
   dybatpho::ai_cache_clear
-  run find "${DYBATPHO_AI_CACHE_DIR}" -name '*.json'
+  run_traced find "${DYBATPHO_AI_CACHE_DIR}" -name '*.json'
   assert_output ""
 }
 
@@ -541,7 +541,7 @@ _test_tool() { printf 'tool output\n'; }
 }
 
 @test "dybatpho::ai_tokens_estimate reads stdin when no argument is given" {
-  run bash -c 'printf "abcdefgh" | dybatpho::ai_tokens_estimate'
+  run_traced bash -c 'printf "abcdefgh" | dybatpho::ai_tokens_estimate'
   assert_output "2"
 }
 
@@ -585,7 +585,7 @@ _test_tool() { printf 'tool output\n'; }
 }
 
 @test "dybatpho::ai_redact reads stdin when no argument is given" {
-  run bash -c 'printf "reach me at a@b.com" | dybatpho::ai_redact'
+  run_traced bash -c 'printf "reach me at a@b.com" | dybatpho::ai_redact'
   assert_output "reach me at <email>"
 }
 
@@ -626,7 +626,7 @@ _test_tool() { printf 'tool output\n'; }
   } > "${sse_file}"
   stub_repeated curl ": cat '${sse_file}'"
 
-  run dybatpho::ai_stream "hi"
+  run_traced dybatpho::ai_stream "hi"
   assert_success
   assert_output "Hello world"
 }
@@ -640,7 +640,7 @@ _test_tool() { printf 'tool output\n'; }
   } > "${sse_file}"
   stub_repeated curl ": cat '${sse_file}'"
 
-  run dybatpho::ai_stream "hi"
+  run_traced dybatpho::ai_stream "hi"
   assert_success
   assert_output "one-two"
 }

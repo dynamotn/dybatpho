@@ -79,7 +79,7 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::tui_spinner_start logs the message when there is no terminal to animate on" {
-  run --separate-stderr dybatpho::tui_spinner_start "Resolving dependencies"
+  run_traced --separate-stderr dybatpho::tui_spinner_start "Resolving dependencies"
   assert_success
   # Nothing reaches stdout: a spinner beside a value being computed would end
   # up inside whatever captured that value.
@@ -88,7 +88,7 @@ setup() {
 }
 
 @test "dybatpho::tui_spinner_message narrates a step without a running animation" {
-  run --separate-stderr dybatpho::tui_spinner_message "Resolving logging"
+  run_traced --separate-stderr dybatpho::tui_spinner_message "Resolving logging"
   assert_success
   [[ "${stderr}" == *"Resolving logging"* ]] || fail "message not logged: ${stderr}"
 }
@@ -100,11 +100,11 @@ setup() {
 }
 
 @test "dybatpho::tui_spinner_stop reports success and returns the status it was given" {
-  run --separate-stderr dybatpho::tui_spinner_stop 0 "Resolved 3 modules"
+  run_traced --separate-stderr dybatpho::tui_spinner_stop 0 "Resolved 3 modules"
   assert_success
   [[ "${stderr}" == *"Resolved 3 modules"* ]] || fail "closing message missing: ${stderr}"
 
-  run --separate-stderr dybatpho::tui_spinner_stop 2 "Resolution failed"
+  run_traced --separate-stderr dybatpho::tui_spinner_stop 2 "Resolution failed"
   assert_equal "${status}" 2
   [[ "${stderr}" == *"Resolution failed"* ]] || fail "failure message missing: ${stderr}"
 }
@@ -119,7 +119,7 @@ setup() {
 }
 
 @test "dybatpho::tui_spinner_stop is quiet when it is given no message" {
-  run --separate-stderr dybatpho::tui_spinner_stop
+  run_traced --separate-stderr dybatpho::tui_spinner_stop
   assert_success
   assert_output ""
 }
@@ -181,7 +181,7 @@ setup() {
 }
 
 @test "dybatpho::tui_progress_stop is a no-op when nothing was started" {
-  run --separate-stderr dybatpho::tui_progress_stop "Never started"
+  run_traced --separate-stderr dybatpho::tui_progress_stop "Never started"
   assert_success
   assert_output ""
   refute_output --partial "Never started"
@@ -281,13 +281,13 @@ setup() {
 
 @test "dybatpho::tui_confirm answers yes, no, and the default off a terminal" {
   DYBATPHO_INTERACTIVE=true dybatpho::tui_confirm "Continue?" <<< "y"
-  run -1 dybatpho::tui_confirm "Continue?" <<< "n"
-  run -1 dybatpho::tui_confirm "Continue?" <<< ""
+  run_traced -1 dybatpho::tui_confirm "Continue?" <<< "n"
+  run_traced -1 dybatpho::tui_confirm "Continue?" <<< ""
   DYBATPHO_INTERACTIVE=true dybatpho::tui_confirm "Continue?" yes <<< ""
 }
 
 @test "dybatpho::tui_confirm refuses in an unattended shell and obeys DYBATPHO_FORCE" {
-  run dybatpho::tui_confirm "Continue?"
+  run_traced dybatpho::tui_confirm "Continue?"
   assert_failure
   DYBATPHO_FORCE=true dybatpho::tui_confirm "Continue?"
 }

@@ -15,15 +15,15 @@ setup() {
   dybatpho::assert_file "${file}"
   dybatpho::assert_dir "${BATS_TEST_TMPDIR}"
 
-  run --separate-stderr dybatpho::assert_file "${BATS_TEST_TMPDIR}"
+  run_traced --separate-stderr dybatpho::assert_file "${BATS_TEST_TMPDIR}"
   assert_failure
   assert_stderr --partial "Expected a regular file"
 
-  run --separate-stderr dybatpho::assert_dir "${file}"
+  run_traced --separate-stderr dybatpho::assert_dir "${file}"
   assert_failure
   assert_stderr --partial "Expected a directory"
 
-  run --separate-stderr dybatpho::assert_file "${BATS_TEST_TMPDIR}/missing" "custom diagnostic"
+  run_traced --separate-stderr dybatpho::assert_file "${BATS_TEST_TMPDIR}/missing" "custom diagnostic"
   assert_failure
   assert_stderr --partial "custom diagnostic"
 }
@@ -37,11 +37,11 @@ setup() {
   dybatpho::assert_symlink "${link}"
   dybatpho::assert_symlink "${link}" "${target}"
 
-  run --separate-stderr dybatpho::assert_symlink "${link}" "/somewhere/else"
+  run_traced --separate-stderr dybatpho::assert_symlink "${link}" "/somewhere/else"
   assert_failure
   assert_stderr --partial "points at the wrong target"
 
-  run --separate-stderr dybatpho::assert_symlink "${target}"
+  run_traced --separate-stderr dybatpho::assert_symlink "${target}"
   assert_failure
   assert_stderr --partial "Expected a symbolic link"
 }
@@ -52,7 +52,7 @@ setup() {
   local broken="${BATS_TEST_TMPDIR}/broken-link"
   ln -s "${BATS_TEST_TMPDIR}/missing-target" "${broken}"
   # A dangling symlink still occupies the path, so the assertion must fail.
-  run --separate-stderr dybatpho::assert_path_absent "${broken}"
+  run_traced --separate-stderr dybatpho::assert_path_absent "${broken}"
   assert_failure
   assert_stderr --partial "Expected nothing at"
 }
@@ -66,15 +66,15 @@ setup() {
   dybatpho::assert_file_contains "${file}" "finished"
   dybatpho::assert_file_empty "${empty}"
 
-  run --separate-stderr dybatpho::assert_file_contains "${file}" "rolled back"
+  run_traced --separate-stderr dybatpho::assert_file_contains "${file}" "rolled back"
   assert_failure
   assert_stderr --partial "does not contain: rolled back"
 
-  run --separate-stderr dybatpho::assert_file_contains "${BATS_TEST_TMPDIR}/missing" "x"
+  run_traced --separate-stderr dybatpho::assert_file_contains "${BATS_TEST_TMPDIR}/missing" "x"
   assert_failure
   assert_stderr --partial "Expected a readable file"
 
-  run --separate-stderr dybatpho::assert_file_empty "${file}"
+  run_traced --separate-stderr dybatpho::assert_file_empty "${file}"
   assert_failure
   assert_stderr --partial "Expected an empty file"
 }
@@ -89,12 +89,12 @@ setup() {
   dybatpho::assert_file_mode "${file}" 0600
 
   chmod 644 "${file}"
-  run --separate-stderr dybatpho::assert_file_mode "${file}" 600
+  run_traced --separate-stderr dybatpho::assert_file_mode "${file}" 600
   assert_failure
   assert_stderr --partial "Wrong permissions"
   assert_stderr --partial "actual:   644"
 
-  run --separate-stderr dybatpho::assert_file_mode "${BATS_TEST_TMPDIR}/missing" 600
+  run_traced --separate-stderr dybatpho::assert_file_mode "${BATS_TEST_TMPDIR}/missing" 600
   assert_failure
   assert_stderr --partial "Expected an existing path"
 }
@@ -108,13 +108,13 @@ setup() {
   unstub yq
 
   stub yq ": echo '1.4.2'"
-  run --separate-stderr dybatpho::assert_json_query "${file}" '.version' "9.9.9"
+  run_traced --separate-stderr dybatpho::assert_json_query "${file}" '.version' "9.9.9"
   assert_failure
   assert_stderr --partial "returned an unexpected value"
   unstub yq
 
   stub yq ": exit 1"
-  run --separate-stderr dybatpho::assert_json_valid "${file}"
+  run_traced --separate-stderr dybatpho::assert_json_valid "${file}"
   assert_failure
   assert_stderr --partial "Expected valid JSON"
   unstub yq
@@ -134,7 +134,7 @@ setup() {
   unstub yq
 
   stub yq ": echo '\"1.4.2\"'"
-  run --separate-stderr dybatpho::assert_json_query "${file}" '.version' "2.0.0"
+  run_traced --separate-stderr dybatpho::assert_json_query "${file}" '.version' "2.0.0"
   assert_failure
   assert_stderr --partial "returned an unexpected value"
   unstub yq
@@ -149,7 +149,7 @@ setup() {
   unstub yq
 
   stub yq ": exit 1"
-  run --separate-stderr dybatpho::assert_json_has "${file}" '.missing'
+  run_traced --separate-stderr dybatpho::assert_json_has "${file}" '.missing'
   assert_failure
   assert_stderr --partial "JSON filter did not match"
   unstub yq
@@ -172,19 +172,19 @@ setup() {
   unstub yq
 
   stub yq ": exit 1"
-  run --separate-stderr dybatpho::assert_yaml_query "${file}" '.missing' "x"
+  run_traced --separate-stderr dybatpho::assert_yaml_query "${file}" '.missing' "x"
   assert_failure
   assert_stderr --partial "YAML query failed"
   unstub yq
 
   stub yq ": exit 1"
-  run --separate-stderr dybatpho::assert_yaml_has "${file}" '.missing'
+  run_traced --separate-stderr dybatpho::assert_yaml_has "${file}" '.missing'
   assert_failure
   assert_stderr --partial "YAML expression did not match"
   unstub yq
 
   stub yq ": exit 1"
-  run --separate-stderr dybatpho::assert_yaml_valid "${file}"
+  run_traced --separate-stderr dybatpho::assert_yaml_valid "${file}"
   assert_failure
   assert_stderr --partial "Expected valid YAML"
   unstub yq
@@ -205,7 +205,7 @@ setup() {
   # A later run with the same text matches.
   dybatpho::assert_snapshot cli-output "hello world"
 
-  run --separate-stderr dybatpho::assert_snapshot cli-output "hello there"
+  run_traced --separate-stderr dybatpho::assert_snapshot cli-output "hello there"
   assert_failure
   assert_stderr --partial "does not match"
   assert_stderr --partial "-hello world"
@@ -235,7 +235,7 @@ setup() {
   dybatpho::assert_snapshot scrubbed "built on 2027-01-01"
 
   dybatpho::snapshot_scrub_reset
-  run --separate-stderr dybatpho::assert_snapshot scrubbed "built on 2027-01-01"
+  run_traced --separate-stderr dybatpho::assert_snapshot scrubbed "built on 2027-01-01"
   assert_failure
 }
 
@@ -249,7 +249,7 @@ setup() {
   dybatpho::assert_file_contains "${DYBATPHO_TEST_SNAPSHOT_DIR}/cli-run.snap" "err"
 
   # A changed exit code is a snapshot mismatch, not a passing run.
-  run --separate-stderr dybatpho::assert_cli_snapshot cli-run -- bash -c 'printf "out\n"; printf "err\n" >&2; exit 0'
+  run_traced --separate-stderr dybatpho::assert_cli_snapshot cli-run -- bash -c 'printf "out\n"; printf "err\n" >&2; exit 0'
   assert_failure
   assert_stderr --partial "does not match"
 }
@@ -275,7 +275,7 @@ setup() {
   # `0` is off here, however `dybatpho::is true` reads it: an environment
   # variable set to zero must not quietly rewrite the baseline.
   UPDATE_SNAPSHOTS=0
-  run --separate-stderr dybatpho::assert_snapshot golden "drifted"
+  run_traced --separate-stderr dybatpho::assert_snapshot golden "drifted"
   assert_failure
   assert_stderr --partial "does not match"
   assert_equal "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/golden.snap")" "regenerated"
@@ -285,12 +285,12 @@ setup() {
   dybatpho::assert_duration_under 10000 -- true
   assert [ "${DYBATPHO_TEST_LAST_DURATION_MS}" -ge 0 ]
 
-  run --separate-stderr dybatpho::assert_duration_under 0 -- true
+  run_traced --separate-stderr dybatpho::assert_duration_under 0 -- true
   assert_failure
   assert_stderr --partial "Expected to finish in under 0ms"
 
   # A command that fails is a failure, not a fast run.
-  run --separate-stderr dybatpho::assert_duration_under 10000 -- bash -c 'printf "boom\n" >&2; exit 4'
+  run_traced --separate-stderr dybatpho::assert_duration_under 10000 -- bash -c 'printf "boom\n" >&2; exit 4'
   assert_failure
   assert_stderr --partial "exited 4"
   assert_stderr --partial "boom"
@@ -382,14 +382,14 @@ setup() {
   dybatpho::assert_mock_called kubectl get pods
   dybatpho::assert_mock_called kubectl delete pod api
 
-  run --separate-stderr dybatpho::assert_mock_called kubectl apply -f manifest.yaml
+  run_traced --separate-stderr dybatpho::assert_mock_called kubectl apply -f manifest.yaml
   assert_failure
   assert_stderr --partial "was never called with"
 }
 
 @test "dybatpho::mock_command honors the requested exit code" {
   dybatpho::mock_command failing-tool 7
-  run failing-tool --now
+  run_traced failing-tool --now
   assert_failure 7
   assert_equal "$(dybatpho::mock_call_count failing-tool)" "1"
 }
@@ -403,13 +403,13 @@ setup() {
 @test "mock bookkeeping reports uncalled and unmocked commands" {
   assert_equal "$(dybatpho::mock_call_count never-mocked)" "0"
 
-  run --separate-stderr dybatpho::assert_mock_called never-mocked
+  run_traced --separate-stderr dybatpho::assert_mock_called never-mocked
   assert_failure
   assert_stderr --partial "Command was never mocked"
 
   dybatpho::mock_command idle-tool 0
   assert_equal "$(dybatpho::mock_call_count idle-tool)" "0"
-  run --separate-stderr dybatpho::assert_mock_called idle-tool
+  run_traced --separate-stderr dybatpho::assert_mock_called idle-tool
   assert_failure
   assert_stderr --partial "was never called"
 }
@@ -420,12 +420,12 @@ setup() {
   assert_equal "$(first-tool)" "one"
 
   dybatpho::unmock_command first-tool
-  run --separate-stderr dybatpho::assert_mock_called first-tool
+  run_traced --separate-stderr dybatpho::assert_mock_called first-tool
   assert_failure
   assert_equal "$(second-tool)" "two"
 
   dybatpho::unmock_all
-  run --separate-stderr dybatpho::assert_mock_called second-tool
+  run_traced --separate-stderr dybatpho::assert_mock_called second-tool
   assert_failure
 }
 
@@ -453,9 +453,9 @@ setup() {
   export DYBATPHO_CURL_MAX_RETRIES=0
   dybatpho::mock_http "api.example.test/missing" 404
 
-  run -4 dybatpho::curl_do "https://api.example.test/missing" "${BATS_TEST_TMPDIR}/out"
+  run_traced -4 dybatpho::curl_do "https://api.example.test/missing" "${BATS_TEST_TMPDIR}/out"
   # An unrouted URL falls through to the mock's default 404.
-  run -4 dybatpho::curl_do "https://api.example.test/unknown" "${BATS_TEST_TMPDIR}/out"
+  run_traced -4 dybatpho::curl_do "https://api.example.test/unknown" "${BATS_TEST_TMPDIR}/out"
 }
 
 @test "dybatpho::mock_http records requested URLs and parses response headers" {
@@ -468,7 +468,7 @@ setup() {
   assert_equal "${DYBATPHO_HTTP_STATUS}" "201"
   assert_equal "$(dybatpho::curl_response_header x-request-id)" "abc123"
 
-  run dybatpho::mock_http_calls
+  run_traced dybatpho::mock_http_calls
   assert_success
   assert_output --partial "https://example.test/data"
 }
@@ -478,7 +478,7 @@ setup() {
   dybatpho::mock_http "example.test/secure" 200 'ok'
 
   # Nothing sent out of band yet.
-  run dybatpho::mock_http_payloads
+  run_traced dybatpho::mock_http_payloads
   assert_failure
 
   local -a DYBATPHO_CURL_SECRET_HEADERS=("Authorization: Bearer shhh-token")
@@ -486,19 +486,19 @@ setup() {
   dybatpho::curl_do "https://example.test/secure" "${BATS_TEST_TMPDIR}/out"
 
   # The credential and the body were both sent, and neither was an argument.
-  run dybatpho::mock_http_payloads
+  run_traced dybatpho::mock_http_payloads
   assert_success
   assert_output --partial 'Authorization: Bearer shhh-token'
   assert_output --partial '{"field":"value"}'
 
-  run dybatpho::mock_calls curl
+  run_traced dybatpho::mock_calls curl
   assert_success
   refute_output --partial "shhh-token"
   refute_output --partial '"field":"value"'
 }
 
 @test "dybatpho::assert_http_called reports unmatched and absent requests" {
-  run --separate-stderr dybatpho::assert_http_called "never.example.test"
+  run_traced --separate-stderr dybatpho::assert_http_called "never.example.test"
   assert_failure
   assert_stderr --partial "No HTTP request was made through the mock"
 
@@ -506,7 +506,7 @@ setup() {
   dybatpho::mock_http "example.test/one" 200 "body"
   dybatpho::curl_do "https://example.test/one" "${BATS_TEST_TMPDIR}/out"
 
-  run --separate-stderr dybatpho::assert_http_called "example.test/two"
+  run_traced --separate-stderr dybatpho::assert_http_called "example.test/two"
   assert_failure
   assert_stderr --partial "No HTTP request matched"
 }
@@ -535,11 +535,11 @@ setup() {
   dybatpho::assert_mock_called tool --wait
 
   # A fragment that spans an argument boundary must not count as a call.
-  run --separate-stderr dybatpho::assert_mock_called tool "loy produc"
+  run_traced --separate-stderr dybatpho::assert_mock_called tool "loy produc"
   assert_failure
   assert_stderr --partial "was never called with"
 
-  run --separate-stderr dybatpho::assert_mock_called tool "deploy staging"
+  run_traced --separate-stderr dybatpho::assert_mock_called tool "deploy staging"
   assert_failure
 }
 
@@ -593,11 +593,11 @@ setup() {
   deploy-tool push --env staging
   deploy-tool status
 
-  run dybatpho::mock_calls deploy-tool
+  run_traced dybatpho::mock_calls deploy-tool
   assert_success
   assert_line --index 0 "push --env staging"
   assert_line --index 1 "status"
 
-  run dybatpho::mock_calls never-mocked-tool
+  run_traced dybatpho::mock_calls never-mocked-tool
   assert_failure
 }

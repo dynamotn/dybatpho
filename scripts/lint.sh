@@ -258,8 +258,6 @@ function _spec {
     on:true off:false init:="false"
   dybatpho::opts::param "Run one stage only" STAGE --stage \
     init:="all" validate:"__dybatpho_lint_is_stage \$OPTARG"
-
-  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
 }
 
 dybatpho::generate_from_spec _spec "$@"

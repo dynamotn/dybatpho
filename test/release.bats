@@ -90,7 +90,7 @@ tag() {
   tag v1.0.0
   commit "docs: tidy"
   commit "chore: bump dep"
-  run -1 dybatpho::release_bump_type "${REPO}" v1.0.0
+  run_traced -1 dybatpho::release_bump_type "${REPO}" v1.0.0
   assert_output ""
 }
 
@@ -126,7 +126,7 @@ tag() {
   commit "feat: one"
   tag v1.0.0
   commit "docs: tidy"
-  run -1 dybatpho::release_next_version "${REPO}"
+  run_traced -1 dybatpho::release_next_version "${REPO}"
   assert_output ""
 }
 
@@ -144,7 +144,7 @@ tag() {
   commit "perf: faster lookup"
   commit "feat!: drop the v1 endpoints"
   commit "docs: tidy readme"
-  run -0 dybatpho::release_changelog "${REPO}" v1.0.0 HEAD 2.0.0
+  run_traced -0 dybatpho::release_changelog "${REPO}" v1.0.0 HEAD 2.0.0
   assert_line --index 0 "## [2.0.0]"
   assert_line --partial "### Changed"
   assert_line --partial "- drop the v1 endpoints"
@@ -161,7 +161,7 @@ tag() {
   commit "feat: one"
   tag v1.0.0
   commit "fix: only a fix"
-  run -0 dybatpho::release_changelog "${REPO}" v1.0.0
+  run_traced -0 dybatpho::release_changelog "${REPO}" v1.0.0
   assert_line --index 0 "## [Unreleased]"
   assert_line --partial "### Fixed"
   refute_output --partial "### Added"
@@ -195,7 +195,7 @@ tag() {
   artifact="$(dybatpho::release_package "${source}" "${out}" mytool 1.3.0 linux amd64)"
   assert_equal "${artifact}" "${out}/mytool_1.3.0_linux_amd64.tar.gz"
   assert [ -f "${artifact}" ]
-  run dybatpho::archive_list "${artifact}"
+  run_traced dybatpho::archive_list "${artifact}"
   assert_output --partial "mytool"
 
   dybatpho::release_package "${source}" "${out}" mytool 1.3.0 darwin arm64 > /dev/null
@@ -224,7 +224,7 @@ tag() {
   # Names are recorded bare, so the file verifies from inside its own directory.
   refute grep -q '/' "${sums}"
   if dybatpho::is command sha256sum; then
-    run -0 bash -c "cd '${out}' && sha256sum -c SHA256SUMS"
+    run_traced -0 bash -c "cd '${out}' && sha256sum -c SHA256SUMS"
   fi
 }
 
@@ -302,7 +302,7 @@ SIGNER
 }
 
 @test "dybatpho::release_commit_parse separates type, scope, breaking and description" {
-  run -0 dybatpho::release_commit_parse "feat(api)!: drop the v1 endpoints"
+  run_traced -0 dybatpho::release_commit_parse "feat(api)!: drop the v1 endpoints"
   assert_line --index 0 "feat"
   assert_line --index 1 "api"
   assert_line --index 2 "true"
@@ -312,24 +312,24 @@ SIGNER
 @test "dybatpho::release_commit_parse reports an absent scope and marker" {
   # Compared whole: an absent scope is an empty line, and Bats drops empty
   # lines from the array that `assert_line` indexes into.
-  run -0 dybatpho::release_commit_parse "fix: handle empty input"
+  run_traced -0 dybatpho::release_commit_parse "fix: handle empty input"
   assert_output "$(printf 'fix\n\nfalse\nhandle empty input')"
 }
 
 @test "dybatpho::release_commit_parse reads a BREAKING CHANGE footer from the body" {
-  run -0 dybatpho::release_commit_parse "refactor: rework the loader" \
+  run_traced -0 dybatpho::release_commit_parse "refactor: rework the loader" \
     "$(printf 'Some detail.\n\nBREAKING CHANGE: the config key was renamed\n')"
   # The description still comes from the subject, not from the footer.
   assert_output "$(printf 'refactor\n\ntrue\nrework the loader')"
 }
 
 @test "dybatpho::release_commit_parse keeps an unconventional subject whole" {
-  run -0 dybatpho::release_commit_parse "Merge branch 'main' into topic"
+  run_traced -0 dybatpho::release_commit_parse "Merge branch 'main' into topic"
   assert_output "$(printf "other\n\nfalse\nMerge branch 'main' into topic")"
 }
 
 @test "dybatpho::release_commit_parse lowercases the type" {
-  run -0 dybatpho::release_commit_parse "FEAT(API): shout"
+  run_traced -0 dybatpho::release_commit_parse "FEAT(API): shout"
   assert_line --index 0 "feat"
   # The scope is left as written, because it names something in the project.
   assert_line --index 1 "API"

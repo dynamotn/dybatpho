@@ -20,7 +20,7 @@ teardown() {
   dybatpho::secret_from_file TOKEN "${file}"
   assert_equal "${TOKEN}" "super-secret-token"
 
-  run --separate-stderr dybatpho::error "call failed with ${TOKEN}"
+  run_traced --separate-stderr dybatpho::error "call failed with ${TOKEN}"
   assert_stderr --partial "call failed with ***"
   refute_stderr --partial "super-secret-token"
 }
@@ -387,7 +387,7 @@ teardown() {
 
   dybatpho::secret_check_permission "${file}"
 
-  run --separate-stderr dybatpho::secret_check_permission "${file}"
+  run_traced --separate-stderr dybatpho::secret_check_permission "${file}"
   assert_success
   assert_stderr --partial "writable by group or others"
   chmod 700 "${directory}"

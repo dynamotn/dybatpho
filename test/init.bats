@@ -43,17 +43,17 @@ loaded_line() {
 }
 
 @test "sourcing without arguments loads the core modules only" {
-  run -0 init_sh "" "$(loaded_line)"
+  run_traced -0 init_sh "" "$(loaded_line)"
   assert_output "string os logging helpers process file secret "
 }
 
 @test "sourcing without arguments leaves the optional modules out" {
-  run -0 init_sh "" 'dybatpho::module_loaded git || echo absent'
+  run_traced -0 init_sh "" 'dybatpho::module_loaded git || echo absent'
   assert_output "absent"
 }
 
 @test "the all selection loads every module" {
-  run -0 init_sh "--modules all" "$(loaded_line)"
+  run_traced -0 init_sh "--modules all" "$(loaded_line)"
   # `loaded_line` leaves a trailing space, so pad the front to make every module
   # name match the same way.
   output=" ${output}"
@@ -64,73 +64,73 @@ loaded_line() {
 }
 
 @test "an explicit module set loads only that module and the core modules" {
-  run -0 init_sh "--modules semver" "$(loaded_line)"
+  run_traced -0 init_sh "--modules semver" "$(loaded_line)"
   assert_output "string os logging helpers process file secret semver "
 }
 
 @test "a module set can be requested through DYBATPHO_MODULES" {
-  run -0 init_sh_env "semver" "" "$(loaded_line)"
+  run_traced -0 init_sh_env "semver" "" "$(loaded_line)"
   assert_output "string os logging helpers process file secret semver "
 }
 
 @test "the command line module set wins over DYBATPHO_MODULES" {
-  run -0 init_sh_env "network" "--modules semver" "$(loaded_line)"
+  run_traced -0 init_sh_env "network" "--modules semver" "$(loaded_line)"
   assert_output "string os logging helpers process file secret semver "
 }
 
 @test "a module set accepts commas and repeated names" {
-  run -0 init_sh "--modules json,semver,json" "$(loaded_line)"
+  run_traced -0 init_sh "--modules json,semver,json" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json semver "
 }
 
 @test "the core selection loads the core modules only" {
-  run -0 init_sh "--modules core" "$(loaded_line)"
+  run_traced -0 init_sh "--modules core" "$(loaded_line)"
   assert_output "string os logging helpers process file secret "
 }
 
 @test "the default and the core selection agree" {
-  run -0 init_sh "--modules core" "$(loaded_line)"
+  run_traced -0 init_sh "--modules core" "$(loaded_line)"
   local explicit="${output}"
-  run -0 init_sh "" "$(loaded_line)"
+  run_traced -0 init_sh "" "$(loaded_line)"
   assert_equal "${output}" "${explicit}"
 }
 
 @test "a module set excludes the modules that were not requested" {
-  run -0 init_sh "--modules semver" \
+  run_traced -0 init_sh "--modules semver" \
     'declare -F dybatpho::curl_do > /dev/null && echo leaked || echo absent'
   assert_output "absent"
 }
 
 @test "requesting a module loads its dependencies first" {
-  run -0 init_sh "--modules text" "$(loaded_line)"
+  run_traced -0 init_sh "--modules text" "$(loaded_line)"
   assert_output "string os logging helpers process file secret table text "
 
-  run -0 init_sh "--modules notification" "$(loaded_line)"
+  run_traced -0 init_sh "--modules notification" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json network notification "
 
-  run -0 init_sh "--modules testing" "$(loaded_line)"
+  run_traced -0 init_sh "--modules testing" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json network table text testing "
 
-  run -0 init_sh "--modules ai" "$(loaded_line)"
+  run_traced -0 init_sh "--modules ai" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json network cache ai "
 
-  run -0 init_sh "--modules agent" "$(loaded_line)"
+  run_traced -0 init_sh "--modules agent" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety json agent "
 
-  run -0 init_sh "--modules tui" "$(loaded_line)"
+  run_traced -0 init_sh "--modules tui" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety tui "
 
   # `screen` calls nothing outside the core modules, so it must load on its own
   # rather than dragging the interactive helpers in behind it.
-  run -0 init_sh "--modules screen" "$(loaded_line)"
+  run_traced -0 init_sh "--modules screen" "$(loaded_line)"
   assert_output "string os logging helpers process file secret screen "
 }
 
 @test "a dependency cycle loads every module once and terminates" {
-  run -0 init_sh "--modules safety" "$(loaded_line)"
+  run_traced -0 init_sh "--modules safety" "$(loaded_line)"
   assert_output "string os logging helpers process file secret archive validate config cli safety "
 
-  run -0 init_sh "--modules archive" "$(loaded_line)"
+  run_traced -0 init_sh "--modules archive" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli safety archive "
 }
 
@@ -139,15 +139,15 @@ loaded_line() {
   # asks for either of them has to end up with `validate` defined. The edge is
   # pinned here because a missing one does not fail at load time: it fails
   # later, on the first value anybody validates.
-  run -0 init_sh "--modules config" "$(loaded_line)"
+  run_traced -0 init_sh "--modules config" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config "
 
-  run -0 init_sh "--modules cli" 'dybatpho::validate_is port 8080 && echo reachable'
+  run_traced -0 init_sh "--modules cli" 'dybatpho::validate_is port 8080 && echo reachable'
   assert_output "reachable"
 }
 
 @test "a dependency pulled in on demand stays usable" {
-  run -0 init_sh "--modules text" 'dybatpho::text_indent body'
+  run_traced -0 init_sh "--modules text" 'dybatpho::text_indent body'
   assert_output "  body"
 }
 
@@ -159,20 +159,20 @@ loaded_line() {
 }
 
 @test "dybatpho::load adds a module after the bootstrap" {
-  run -0 init_sh "--modules core" "dybatpho::load json
+  run_traced -0 init_sh "--modules core" "dybatpho::load json
 printf '%s' '{\"a\":1}' | dybatpho::json_query - '.a'"
   assert_output "1"
 }
 
 @test "dybatpho::load resolves dependencies and is idempotent" {
-  run -0 init_sh "--modules core" "dybatpho::load text
+  run_traced -0 init_sh "--modules core" "dybatpho::load text
 dybatpho::load text
 $(loaded_line)"
   assert_output "string os logging helpers process file secret table text "
 }
 
 @test "dybatpho::load accepts several modules at once" {
-  run -0 init_sh "--modules core" "dybatpho::load json semver
+  run_traced -0 init_sh "--modules core" "dybatpho::load json semver
 $(loaded_line)"
   assert_output "string os logging helpers process file secret json semver "
 }
@@ -192,7 +192,7 @@ echo reached'
 }
 
 @test "dybatpho::module_loaded reports the current module set" {
-  run -0 init_sh "--modules semver" \
+  run_traced -0 init_sh "--modules semver" \
     'dybatpho::module_loaded semver && echo yes
 dybatpho::module_loaded network || echo no'
   assert_line --index 0 "yes"
@@ -226,7 +226,7 @@ echo reached'
   local child="${BATS_TEST_TMPDIR}/child.sh"
   printf '. %q --modules json\ndybatpho::info child\n' "${DYBATPHO_DIR}/init.sh" > "${child}"
 
-  run -0 init_sh "--modules logging" \
+  run_traced -0 init_sh "--modules logging" \
     "export DYBATPHO_LOADED_MODULES
 bash $(printf '%q' "${child}") 2>&1"
   assert_output --partial "child"
@@ -237,7 +237,7 @@ bash $(printf '%q' "${child}") 2>&1"
   # The registry is maintained by hand while the file path is derived from the
   # module name, so a registered name with no matching file would otherwise be
   # reported as loaded without ever being sourced.
-  run -0 init_sh "--modules core" \
+  run_traced -0 init_sh "--modules core" \
     'for module in $(dybatpho::module_list all); do dybatpho::load "${module}"; done
 dybatpho::module_list loaded | wc -l'
   assert_output "$(dybatpho::module_list all | wc -l)"
@@ -255,7 +255,7 @@ echo reached'
 @test "dybatpho::version reports the stamped release version" {
   local stamped
   stamped="$(head -n 1 "${DYBATPHO_DIR}/VERSION")"
-  run -0 init_sh "" 'dybatpho::version'
+  run_traced -0 init_sh "" 'dybatpho::version'
   # The commit rides along as build metadata, so the release version is the
   # start of the answer rather than the whole of it.
   assert_output --regexp "^${stamped}([+]|$)"
@@ -264,14 +264,14 @@ echo reached'
 @test "dybatpho::version names the commit the library is at" {
   local commit
   commit="$(git -C "${DYBATPHO_DIR}" rev-parse --short HEAD)"
-  run -0 init_sh "" 'dybatpho::version'
+  run_traced -0 init_sh "" 'dybatpho::version'
   assert_output --partial "+${commit}"
 }
 
 @test "dybatpho::version marks a dirty working tree" {
   # Only meaningful while the tree has uncommitted changes; a clean checkout
   # reports the commit without the marker, which is the other half of FR-018.
-  run -0 init_sh "" 'dybatpho::version'
+  run_traced -0 init_sh "" 'dybatpho::version'
   if git -C "${DYBATPHO_DIR}" diff --quiet HEAD; then
     refute_output --partial ".dirty"
   else
@@ -280,18 +280,18 @@ echo reached'
 }
 
 @test "dybatpho::version reports a version without a leading v" {
-  run -0 init_sh "" 'dybatpho::version'
+  run_traced -0 init_sh "" 'dybatpho::version'
   refute_output --regexp '^v'
   assert_output --regexp '^[0-9]'
 }
 
 @test "dybatpho::version honors a version set in the environment" {
-  run -0 env DYBATPHO_VERSION=9.9.9-test bash "$(bootstrap_script "" 'dybatpho::version')"
+  run_traced -0 env DYBATPHO_VERSION=9.9.9-test bash "$(bootstrap_script "" 'dybatpho::version')"
   assert_output "9.9.9-test"
 }
 
 @test "dybatpho::version caches its answer" {
-  run -0 init_sh "" 'dybatpho::version > /dev/null
+  run_traced -0 init_sh "" 'dybatpho::version > /dev/null
 printf "%s\n" "${DYBATPHO_VERSION}"'
   assert_output "$(dybatpho::version)"
 }
@@ -309,7 +309,7 @@ printf "%s\n" "${DYBATPHO_VERSION}"'
   git -C "${host}" -c user.email=t@example.com -c user.name=test commit -qm vendored
   local script="${BATS_TEST_TMPDIR}/vendored.sh"
   printf '. %q\ndybatpho::version\n' "${host}/vendor/init.sh" > "${script}"
-  run -0 env -u DYBATPHO_VERSION -u DYBATPHO_MODULES bash "${script}"
+  run_traced -0 env -u DYBATPHO_VERSION -u DYBATPHO_MODULES bash "${script}"
   assert_output "$(head -n 1 "${DYBATPHO_DIR}/VERSION")"
 }
 
@@ -322,13 +322,13 @@ printf "%s\n" "${DYBATPHO_VERSION}"'
   cp "${DYBATPHO_DIR}/src/"*.sh "${copy}/src/"
   local script="${BATS_TEST_TMPDIR}/nofile.sh"
   printf '. %q\ndybatpho::version\n' "${copy}/init.sh" > "${script}"
-  run -0 env -u DYBATPHO_VERSION -u DYBATPHO_MODULES bash "${script}"
+  run_traced -0 env -u DYBATPHO_VERSION -u DYBATPHO_MODULES bash "${script}"
   # The copy lives outside any repository, so `git describe` has nothing to say
   # either, and the documented last resort applies.
   assert_output --regexp '^(unknown|[0-9a-zA-Z._-]+)$'
 }
 
 @test "the doctor module is registered" {
-  run -0 init_sh "--modules doctor" 'dybatpho::module_loaded doctor && echo present'
+  run_traced -0 init_sh "--modules doctor" 'dybatpho::module_loaded doctor && echo present'
   assert_output "present"
 }

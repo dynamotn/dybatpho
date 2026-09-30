@@ -9,7 +9,7 @@ setup() {
 }
 
 @test "dybatpho::pkg_supported lists every supported manager" {
-  run -0 dybatpho::pkg_supported
+  run_traced -0 dybatpho::pkg_supported
   assert_line "apt"
   assert_line "brew"
   assert_line "apk"
@@ -129,7 +129,7 @@ setup() {
   dybatpho::pkg_installed curl
   unstub dpkg-query
   stub dpkg-query ": echo 'deinstall ok config-files'"
-  run ! dybatpho::pkg_installed curl
+  run_traced ! dybatpho::pkg_installed curl
   unstub dpkg-query
 }
 
@@ -139,7 +139,7 @@ setup() {
   dybatpho::pkg_installed curl
   unstub apk
   stub apk ": true"
-  run ! dybatpho::pkg_installed curl
+  run_traced ! dybatpho::pkg_installed curl
   unstub apk
 }
 
@@ -152,7 +152,7 @@ setup() {
 @test "dybatpho::pkg_installed reports a Homebrew package that is neither formula nor cask" {
   DYBATPHO_PKG_MANAGER=brew
   stub_repeated brew ": exit 1"
-  run ! dybatpho::pkg_installed firefox
+  run_traced ! dybatpho::pkg_installed firefox
 }
 
 @test "dybatpho::pkg_installed queries rpm on dnf and pacman on pacman" {
@@ -162,7 +162,7 @@ setup() {
   unstub rpm
   DYBATPHO_PKG_MANAGER=pacman
   stub pacman ": exit 1"
-  run ! dybatpho::pkg_installed curl
+  run_traced ! dybatpho::pkg_installed curl
   unstub pacman
 }
 
@@ -175,13 +175,13 @@ setup() {
 @test "dybatpho::pkg_missing prints only the packages that are absent" {
   DYBATPHO_PKG_MANAGER=pacman
   stub_repeated pacman ": [ \"\${3:-}\" = curl ]"
-  run -0 dybatpho::pkg_missing curl jq
+  run_traced -0 dybatpho::pkg_missing curl jq
   assert_output "jq"
 }
 
 @test "dybatpho::pkg_install prints the command under --dry-run without touching the system" {
   DYBATPHO_PKG_MANAGER=apk
-  run -0 dybatpho::pkg_install --dry-run ripgrep
+  run_traced -0 dybatpho::pkg_install --dry-run ripgrep
   assert_output --partial "DRY RUN: apk add ripgrep"
 }
 
@@ -202,7 +202,7 @@ setup() {
 @test "dybatpho::pkg_install runs the manager with --force" {
   DYBATPHO_PKG_MANAGER=apk
   stub apk "add ripgrep : echo 'installed ripgrep'"
-  run -0 dybatpho::pkg_install --force ripgrep
+  run_traced -0 dybatpho::pkg_install --force ripgrep
   assert_output --partial "installed ripgrep"
   unstub apk
 }
@@ -217,20 +217,20 @@ setup() {
 
 @test "dybatpho::pkg_install refreshes the index first with --update" {
   DYBATPHO_PKG_MANAGER=apk
-  run -0 dybatpho::pkg_install --dry-run --update -- ripgrep
+  run_traced -0 dybatpho::pkg_install --dry-run --update -- ripgrep
   assert_output --partial "DRY RUN: apk update"
   assert_output --partial "DRY RUN: apk add ripgrep"
 }
 
 @test "dybatpho::pkg_install passes extra manager arguments to the install command" {
   DYBATPHO_PKG_MANAGER=brew
-  run -0 dybatpho::pkg_install --dry-run --arg --cask --arg --HEAD -- firefox
+  run_traced -0 dybatpho::pkg_install --dry-run --arg --cask --arg --HEAD -- firefox
   assert_output --partial "DRY RUN: brew install --cask --HEAD firefox"
 }
 
 @test "dybatpho::pkg_install keeps extra manager arguments out of the --update refresh" {
   DYBATPHO_PKG_MANAGER=apk
-  run -0 dybatpho::pkg_install --dry-run --update --arg --no-cache -- ripgrep
+  run_traced -0 dybatpho::pkg_install --dry-run --update --arg --no-cache -- ripgrep
   assert_output --partial "DRY RUN: apk update"
   refute_output --partial "apk update --no-cache"
   assert_output --partial "DRY RUN: apk add --no-cache ripgrep"
@@ -239,7 +239,7 @@ setup() {
 @test "dybatpho::pkg_install reports the failure of the package manager" {
   DYBATPHO_PKG_MANAGER=apk
   stub apk "add ripgrep : exit 3"
-  run -3 dybatpho::pkg_install --force ripgrep
+  run_traced -3 dybatpho::pkg_install --force ripgrep
   unstub apk
 }
 
@@ -253,7 +253,7 @@ setup() {
 
 @test "dybatpho::pkg_install passes a package that looks like an option after --" {
   DYBATPHO_PKG_MANAGER=apk
-  run -0 dybatpho::pkg_install --dry-run -- --weird-name
+  run_traced -0 dybatpho::pkg_install --dry-run -- --weird-name
   assert_output --partial "DRY RUN: apk add --weird-name"
 }
 
@@ -268,41 +268,41 @@ setup() {
 @test "dybatpho::pkg_update refreshes with --force" {
   DYBATPHO_PKG_MANAGER=apk
   stub apk "update : echo 'index refreshed'"
-  run -0 dybatpho::pkg_update --force
+  run_traced -0 dybatpho::pkg_update --force
   assert_output --partial "index refreshed"
   unstub apk
 }
 
 @test "dybatpho::pkg_update passes extra manager arguments to the refresh" {
   DYBATPHO_PKG_MANAGER=apk
-  run -0 dybatpho::pkg_update --dry-run --arg --no-cache
+  run_traced -0 dybatpho::pkg_update --dry-run --arg --no-cache
   assert_output --partial "DRY RUN: apk update --no-cache"
 }
 
 @test "dybatpho::pkg_ensure forwards extra manager arguments to the install" {
   DYBATPHO_PKG_MANAGER=apk
   stub_repeated apk ": exit 1"
-  run -0 dybatpho::pkg_ensure --dry-run --arg --no-cache -- dybatpho-missing-package
+  run_traced -0 dybatpho::pkg_ensure --dry-run --arg --no-cache -- dybatpho-missing-package
   assert_output --partial "DRY RUN: apk add --no-cache dybatpho-missing-package"
 }
 
 @test "dybatpho::pkg_require forwards extra manager arguments to the install" {
   DYBATPHO_PKG_MANAGER=brew
-  run -0 dybatpho::pkg_require --dry-run --arg --cask dybatpho-missing-command
+  run_traced -0 dybatpho::pkg_require --dry-run --arg --cask dybatpho-missing-command
   assert_output --partial "DRY RUN: brew install --cask dybatpho-missing-command"
 }
 
 @test "dybatpho::pkg_ensure skips packages that are already installed" {
   DYBATPHO_PKG_MANAGER=pacman
   stub_repeated pacman ": [ \"\${1:-}\" = -Q ]"
-  run -0 dybatpho::pkg_ensure --force curl jq
+  run_traced -0 dybatpho::pkg_ensure --force curl jq
   refute_output --partial "Installing with"
 }
 
 @test "dybatpho::pkg_ensure installs only the missing packages" {
   DYBATPHO_PKG_MANAGER=pacman
   stub_repeated pacman ": if [ \"\${1:-}\" = -Q ]; then [ \"\${3:-}\" = curl ]; else echo \"pacman \$*\"; fi"
-  run -0 dybatpho::pkg_ensure --force curl jq
+  run_traced -0 dybatpho::pkg_ensure --force curl jq
   assert_output --partial "pacman -S --needed --noconfirm jq"
   refute_output --partial "curl"
 }
@@ -310,13 +310,13 @@ setup() {
 @test "dybatpho::pkg_require does nothing when the command is already available" {
   DYBATPHO_PKG_MANAGER=apk
   stub_repeated apk ": echo 'apk should not run'"
-  run -0 dybatpho::pkg_require sh
+  run_traced -0 dybatpho::pkg_require sh
   refute_output --partial "apk should not run"
 }
 
 @test "dybatpho::pkg_require installs the per-manager package name" {
   DYBATPHO_PKG_MANAGER=apt
-  run -0 dybatpho::pkg_require --dry-run dybatpho-missing-command \
+  run_traced -0 dybatpho::pkg_require --dry-run dybatpho-missing-command \
     apt:dybatpho-debian emerge:app-misc/dybatpho
   assert_output --partial "DRY RUN: env DEBIAN_FRONTEND=noninteractive apt-get install -y dybatpho-debian"
 }

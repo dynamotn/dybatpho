@@ -91,7 +91,7 @@ EOF
 @test "dybatpho::string_starts_with matches exact prefix" {
   dybatpho::string_starts_with "dybatpho-utils" "dybatpho"
 
-  run dybatpho::string_starts_with "dybatpho-utils" "utils"
+  run_traced dybatpho::string_starts_with "dybatpho-utils" "utils"
   assert_failure
 }
 
@@ -102,7 +102,7 @@ EOF
 @test "dybatpho::string_ends_with matches exact suffix" {
   dybatpho::string_ends_with "archive.tar.gz" ".gz"
 
-  run dybatpho::string_ends_with "archive.tar.gz" ".tar"
+  run_traced dybatpho::string_ends_with "archive.tar.gz" ".tar"
   assert_failure
 }
 
@@ -113,7 +113,7 @@ EOF
 @test "dybatpho::string_contains matches exact substring" {
   dybatpho::string_contains "hello dybatpho world" "dybatpho"
 
-  run dybatpho::string_contains "hello dybatpho world" "python"
+  run_traced dybatpho::string_contains "hello dybatpho world" "python"
   assert_failure
 }
 
@@ -160,7 +160,7 @@ EOF
 
   dybatpho::string_is_blank $'\n\t'
 
-  run dybatpho::string_is_blank " dybatpho "
+  run_traced dybatpho::string_is_blank " dybatpho "
   assert_failure
 }
 

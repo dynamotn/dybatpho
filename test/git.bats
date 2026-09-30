@@ -198,7 +198,7 @@ function _append_git_commit {
 
   dybatpho::git_has_commit "${repo_path}" "${commit_sha}"
 
-  run dybatpho::git_has_commit "${repo_path}" deadbeef
+  run_traced dybatpho::git_has_commit "${repo_path}" deadbeef
   assert_failure
 }
 
@@ -234,7 +234,7 @@ function _append_git_commit {
   dybatpho::git_is_clean "${repo_path}"
 
   printf 'dirty\n' >> "${repo_path}/README.md"
-  run dybatpho::git_is_clean "${repo_path}"
+  run_traced dybatpho::git_is_clean "${repo_path}"
   assert_failure
 }
 
@@ -261,7 +261,7 @@ function _append_git_commit {
 
   dybatpho::git_has_remote origin "${repo_path}"
 
-  run dybatpho::git_has_remote upstream "${repo_path}"
+  run_traced dybatpho::git_has_remote upstream "${repo_path}"
   assert_failure
 }
 
@@ -421,10 +421,10 @@ function _append_git_commit {
   local repo_path
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  run -1 dybatpho::git_latest_tag "${repo_path}"
+  run_traced -1 dybatpho::git_latest_tag "${repo_path}"
   assert_output ""
   git -C "${repo_path}" tag v1.0.0
-  run -1 dybatpho::git_latest_tag "${repo_path}" 'release-*'
+  run_traced -1 dybatpho::git_latest_tag "${repo_path}" 'release-*'
   assert_output ""
 }
 
@@ -439,7 +439,7 @@ function _append_git_commit {
   second="$(dybatpho::git_commit_hash "${repo_path}")"
 
   dybatpho::git_is_ancestor "${repo_path}" "${first}" "${second}"
-  run ! dybatpho::git_is_ancestor "${repo_path}" "${second}" "${first}"
+  run_traced ! dybatpho::git_is_ancestor "${repo_path}" "${second}" "${first}"
 }
 
 @test "dybatpho::git_is_ancestor counts a commit as its own ancestor" {
@@ -457,7 +457,7 @@ function _append_git_commit {
   git -C "${repo_path}" tag v1.0.0
   _append_git_commit "${repo_path}" "after the tag"
   dybatpho::git_is_ancestor "${repo_path}" v1.0.0 HEAD
-  run ! dybatpho::git_is_ancestor "${repo_path}" HEAD v1.0.0
+  run_traced ! dybatpho::git_is_ancestor "${repo_path}" HEAD v1.0.0
 }
 
 @test "dybatpho::git_is_ancestor separates unrelated branches" {
@@ -472,14 +472,14 @@ function _append_git_commit {
   _append_git_commit "${repo_path}" "only on main"
 
   # Neither branch tip reaches the other once they have diverged.
-  run ! dybatpho::git_is_ancestor "${repo_path}" "${side}" HEAD
-  run ! dybatpho::git_is_ancestor "${repo_path}" HEAD "${side}"
+  run_traced ! dybatpho::git_is_ancestor "${repo_path}" "${side}" HEAD
+  run_traced ! dybatpho::git_is_ancestor "${repo_path}" HEAD "${side}"
 }
 
 @test "dybatpho::git_is_ancestor reports an unresolvable commit" {
   local repo_path
   repo_path="$(_new_git_repo_path)"
   _create_git_repo "${repo_path}" main
-  run ! dybatpho::git_is_ancestor "${repo_path}" "no-such-ref" HEAD
-  run ! dybatpho::git_is_ancestor "${repo_path}" HEAD "no-such-ref"
+  run_traced ! dybatpho::git_is_ancestor "${repo_path}" "no-such-ref" HEAD
+  run_traced ! dybatpho::git_is_ancestor "${repo_path}" HEAD "no-such-ref"
 }

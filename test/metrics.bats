@@ -256,3 +256,18 @@ SCRIPT
     bash "${script}" "${DYBATPHO_DIR}"
   assert_output "1"
 }
+
+@test "dybatpho::metrics_get rejects a kind it does not know" {
+  run ! dybatpho::metrics_get sparkline jobs_total
+  assert_output --partial "Unknown kind 'sparkline'"
+}
+
+@test "dybatpho::metrics_render prints the header of a type it cannot expand" {
+  # A type outside the three the renderer expands still gets its HELP and TYPE
+  # lines and no series, so the exposition stays parseable rather than losing
+  # the metric. Only the recorder reaches this, so it is declared directly.
+  __dybatpho_metrics_declare summary_metric summary
+  run -0 dybatpho::metrics_render
+  assert_line "# HELP summary_metric summary_metric"
+  assert_line "# TYPE summary_metric summary"
+}

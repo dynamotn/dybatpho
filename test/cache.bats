@@ -49,9 +49,9 @@ age_entry() {
   assert_equal "$(dybatpho::cache_get greeting 3600)" "hello"
   # The default time to live applies when a call does not name one.
   assert_equal "$(dybatpho::cache_get greeting)" "hello"
-  run -0 dybatpho::cache_has greeting 3600
-  run ! dybatpho::cache_get absent 3600
-  run ! dybatpho::cache_has absent 3600
+  run_traced -0 dybatpho::cache_has greeting 3600
+  run_traced ! dybatpho::cache_get absent 3600
+  run_traced ! dybatpho::cache_has absent 3600
 }
 
 @test "dybatpho::cache_set writes nothing extra into the entry" {
@@ -64,8 +64,8 @@ age_entry() {
 @test "an entry stops being fresh once it is older than its time to live" {
   printf 'old\n' | dybatpho::cache_set aged
   age_entry aged '2 hours ago'
-  run ! dybatpho::cache_has aged 60
-  run -0 dybatpho::cache_has aged 999999999
+  run_traced ! dybatpho::cache_has aged 60
+  run_traced -0 dybatpho::cache_has aged 999999999
 }
 
 @test "a time to live of zero makes nothing fresh" {
@@ -107,7 +107,7 @@ age_entry() {
   output="$(dybatpho::cache_run failing 3600 -- boom)" || status=$?
   assert_equal "${status}" "7"
   assert_equal "${output}" ""
-  run ! dybatpho::cache_has failing 3600
+  run_traced ! dybatpho::cache_has failing 3600
 }
 
 @test "dybatpho::cache_run insists on a command after the separator" {
@@ -121,10 +121,10 @@ age_entry() {
   printf 'x\n' | dybatpho::cache_set one
   printf 'y\n' | dybatpho::cache_set two
   dybatpho::cache_forget one
-  run ! dybatpho::cache_has one 3600
-  run -0 dybatpho::cache_has two 3600
+  run_traced ! dybatpho::cache_has one 3600
+  run_traced -0 dybatpho::cache_has two 3600
   # Forgetting something that is not there is not an error.
-  run -0 dybatpho::cache_forget one
+  run_traced -0 dybatpho::cache_forget one
 }
 
 @test "dybatpho::cache_clear removes this module's entries and nothing else" {
@@ -133,14 +133,14 @@ age_entry() {
   local foreign="$(dybatpho::cache_dir)/not-ours.txt"
   printf 'keep\n' > "${foreign}"
   dybatpho::cache_clear
-  run ! dybatpho::cache_has one 3600
-  run ! dybatpho::cache_has two 3600
+  run_traced ! dybatpho::cache_has one 3600
+  run_traced ! dybatpho::cache_has two 3600
   # The directory is named by an environment variable, so emptying whatever it
   # happens to contain is not something this offers to do.
   assert_equal "$(cat "${foreign}")" "keep"
   # Clearing a namespace that was never written is not an error.
   DYBATPHO_CACHE_NAMESPACE="never-used"
-  run -0 dybatpho::cache_clear
+  run_traced -0 dybatpho::cache_clear
 }
 
 @test "namespaces keep entries of the same key apart" {
@@ -155,12 +155,12 @@ age_entry() {
 
 @test "DRY_RUN reports a write and a removal instead of performing them" {
   printf 'z\n' | DRY_RUN=true dybatpho::cache_set dryrun
-  run ! dybatpho::cache_has dryrun 3600
+  run_traced ! dybatpho::cache_has dryrun 3600
   printf 'kept\n' | dybatpho::cache_set survivor
   DRY_RUN=true dybatpho::cache_forget survivor
-  run -0 dybatpho::cache_has survivor 3600
+  run_traced -0 dybatpho::cache_has survivor 3600
   DRY_RUN=true dybatpho::cache_clear
-  run -0 dybatpho::cache_has survivor 3600
+  run_traced -0 dybatpho::cache_has survivor 3600
 }
 
 @test "an entry is private to its owner even under a permissive umask" {
@@ -173,4 +173,20 @@ age_entry() {
   # An entry holds whatever was expensive to obtain, which is not public.
   dybatpho::assert_file_mode "$(dybatpho::cache_path private)" 600
   dybatpho::assert_file_mode "$(dybatpho::cache_dir)" 700
+}
+
+@test "dybatpho::cache_forget under DRY_RUN reports the removal and keeps the entry" {
+  printf 'still here\n' | dybatpho::cache_set keeper
+  DRY_RUN=true run -0 dybatpho::cache_forget keeper
+  assert_output --partial "remove"
+  assert_output --partial "$(dybatpho::cache_path keeper)"
+  run_traced -0 dybatpho::cache_has keeper 3600
+}
+
+@test "dybatpho::cache_clear under DRY_RUN reports the directory and empties nothing" {
+  printf 'still here\n' | dybatpho::cache_set keeper
+  DRY_RUN=true run -0 dybatpho::cache_clear
+  assert_output --partial "clear"
+  assert_output --partial "$(dybatpho::cache_dir)"
+  run_traced -0 dybatpho::cache_has keeper 3600
 }

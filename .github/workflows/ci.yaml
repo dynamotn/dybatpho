@@ -127,19 +127,6 @@ jobs:
           # the runner has.
           su - test -c "LANG=C.UTF-8 LC_ALL=C.UTF-8 DYBATPHO_TEST_JOBS=4 DYBATPHO_TEST_CHUNK=5 bash $(pwd)/scripts/test.sh --coverage"
 
-      - name: "Fix coverage paths"
-        # kcov strips the longest common prefix from `filename` and records it in
-        # <sources>, which Coveralls ignores. Re-anchor the paths to the repo root.
-        run: |
-          xml=coverage/bats/cobertura.xml
-          sed -i 's#<source>.*</source>#<source>.</source>#' "${xml}"
-          for f in $(grep -o 'filename="[^"]*"' "${xml}" | sed 's/^filename="//;s/"$//' | sort -u); do
-            case "${f}" in */*) continue ;; esac
-            if [ ! -f "${f}" ] && [ -f "src/${f}" ]; then
-              sed -i "s#filename=\"${f}\"#filename=\"src/${f}\"#g" "${xml}"
-            fi
-          done
-
       - name: "Coveralls"
         uses: coverallsapp/github-action@v2
         with:

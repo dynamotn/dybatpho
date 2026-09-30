@@ -153,7 +153,7 @@ screen_raw() {
   assert_equal "${DYBATPHO_SCREEN_HEIGHT}" 12
   assert_equal "${DYBATPHO_SCREEN_RECT}" "0 0 40 12"
   # Nothing changed, so there is nothing to rebuild.
-  run dybatpho::screen_size
+  run_traced dybatpho::screen_size
   assert_failure
 }
 
@@ -444,7 +444,7 @@ screen_raw() {
 
 @test "dybatpho::screen_end is safe when no screen was ever taken over" {
   DYBATPHO_SCREEN_ACTIVE=false
-  run dybatpho::screen_end
+  run_traced dybatpho::screen_end
   assert_success
   assert_output ""
 }
@@ -455,7 +455,7 @@ screen_raw() {
   if [[ -e /dev/tty ]] && (: < /dev/tty) 2> /dev/null; then
     skip "this runner has a controlling terminal"
   fi
-  run dybatpho::screen_begin
+  run_traced dybatpho::screen_begin
   assert_failure
 }
 

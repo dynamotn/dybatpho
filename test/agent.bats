@@ -69,10 +69,10 @@ _spec_test_deploy() {
 
 @test "dybatpho::agent_detect follows the mode" {
   DYBATPHO_AGENT_MODE=on
-  run dybatpho::agent_detect
+  run_traced dybatpho::agent_detect
   assert_success
   DYBATPHO_AGENT_MODE=off
-  run dybatpho::agent_detect
+  run_traced dybatpho::agent_detect
   assert_failure
 }
 
@@ -135,13 +135,13 @@ _spec_test_deploy() {
 
 @test "dybatpho::agent_error always reports failure" {
   DYBATPHO_AGENT_MODE=on
-  run dybatpho::agent_error bad_input "wrong"
+  run_traced dybatpho::agent_error bad_input "wrong"
   assert_failure
 }
 
 @test "dybatpho::agent_error prints a structured object for an agent" {
   DYBATPHO_AGENT_MODE=on
-  run dybatpho::agent_error missing_config "No config" "Run init"
+  run_traced dybatpho::agent_error missing_config "No config" "Run init"
   assert_equal "$(dybatpho::json_get "${output}" '.status')" "error"
   assert_equal "$(dybatpho::json_get "${output}" '.code')" "missing_config"
   assert_equal "$(dybatpho::json_get "${output}" '.message')" "No config"
@@ -150,13 +150,13 @@ _spec_test_deploy() {
 
 @test "dybatpho::agent_error omits an absent hint" {
   DYBATPHO_AGENT_MODE=on
-  run dybatpho::agent_error bad_input "wrong"
+  run_traced dybatpho::agent_error bad_input "wrong"
   assert_equal "$(dybatpho::json_get "${output}" 'has("hint")')" "false"
 }
 
 @test "dybatpho::agent_error logs for a person instead of printing JSON" {
   DYBATPHO_AGENT_MODE=off
-  run --separate-stderr dybatpho::agent_error missing_config "No config" "Run init"
+  run_traced --separate-stderr dybatpho::agent_error missing_config "No config" "Run init"
   assert_failure
   assert_stderr --partial "No config"
   assert_output --partial "Hint: Run init"
@@ -202,14 +202,14 @@ _spec_test_deploy() {
 @test "dybatpho::agent_confirm allows an action on the allowlist" {
   DYBATPHO_AGENT_MODE=on
   DYBATPHO_AGENT_ALLOW="deploy restart"
-  run dybatpho::agent_confirm restart "Restart the API"
+  run_traced dybatpho::agent_confirm restart "Restart the API"
   assert_success
 }
 
 @test "dybatpho::agent_confirm refuses an action that is not listed" {
   DYBATPHO_AGENT_MODE=on
   DYBATPHO_AGENT_ALLOW="deploy"
-  run dybatpho::agent_confirm wipe "Delete everything"
+  run_traced dybatpho::agent_confirm wipe "Delete everything"
   assert_failure
   assert_equal "$(dybatpho::json_get "${output}" '.status')" "refused"
   assert_equal "$(dybatpho::json_get "${output}" '.code')" "action_not_allowed"
@@ -218,21 +218,21 @@ _spec_test_deploy() {
 
 @test "dybatpho::agent_confirm refuses everything with an empty allowlist" {
   DYBATPHO_AGENT_MODE=on
-  run dybatpho::agent_confirm deploy
+  run_traced dybatpho::agent_confirm deploy
   assert_failure
 }
 
 @test "dybatpho::agent_confirm honours the all wildcard" {
   DYBATPHO_AGENT_MODE=on
   DYBATPHO_AGENT_ALLOW="all"
-  run dybatpho::agent_confirm anything
+  run_traced dybatpho::agent_confirm anything
   assert_success
 }
 
 @test "dybatpho::agent_confirm does not match a partial action name" {
   DYBATPHO_AGENT_MODE=on
   DYBATPHO_AGENT_ALLOW="deployment"
-  run dybatpho::agent_confirm deploy
+  run_traced dybatpho::agent_confirm deploy
   assert_failure
 }
 
@@ -258,7 +258,7 @@ _spec_test_deploy() {
 }
 
 @test "dybatpho::agent_audit does nothing without a destination" {
-  run dybatpho::agent_audit deploy "detail"
+  run_traced dybatpho::agent_audit deploy "detail"
   assert_success
   assert_output ""
 }
@@ -419,10 +419,10 @@ _spec_test_deploy() {
 
 @test "__dybatpho_agent_allowed matches whole words only" {
   DYBATPHO_AGENT_ALLOW="deploy rollback"
-  run __dybatpho_agent_allowed deploy
+  run_traced __dybatpho_agent_allowed deploy
   assert_success
-  run __dybatpho_agent_allowed rollback
+  run_traced __dybatpho_agent_allowed rollback
   assert_success
-  run __dybatpho_agent_allowed deplo
+  run_traced __dybatpho_agent_allowed deplo
   assert_failure
 }

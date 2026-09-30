@@ -29,22 +29,22 @@ setup() {
 }
 
 @test "dybatpho::semver_valid rejects missing patch" {
-  run dybatpho::semver_valid "1.2"
+  run_traced dybatpho::semver_valid "1.2"
   assert_failure
 }
 
 @test "dybatpho::semver_valid rejects non-numeric version" {
-  run dybatpho::semver_valid "one.two.three"
+  run_traced dybatpho::semver_valid "one.two.three"
   assert_failure
 }
 
 @test "dybatpho::semver_valid rejects empty string" {
-  run dybatpho::semver_valid ""
+  run_traced dybatpho::semver_valid ""
   assert_failure
 }
 
 @test "dybatpho::semver_valid rejects garbage input" {
-  run dybatpho::semver_valid "not-a-version"
+  run_traced dybatpho::semver_valid "not-a-version"
   assert_failure
 }
 
@@ -278,61 +278,61 @@ setup() {
 @test "dybatpho::semver_satisfies handles caret ranges, including below 1.0" {
   dybatpho::semver_satisfies "1.4.2" "^1.2"
   dybatpho::semver_satisfies "1.2.3" "^1.2.3"
-  run ! dybatpho::semver_satisfies "2.0.0" "^1.2"
-  run ! dybatpho::semver_satisfies "1.2.0" "^1.2.3"
+  run_traced ! dybatpho::semver_satisfies "2.0.0" "^1.2"
+  run_traced ! dybatpho::semver_satisfies "1.2.0" "^1.2.3"
   # Below 1.0 the leftmost non-zero part is the one held steady.
   dybatpho::semver_satisfies "0.2.5" "^0.2.3"
-  run ! dybatpho::semver_satisfies "0.3.0" "^0.2.3"
+  run_traced ! dybatpho::semver_satisfies "0.3.0" "^0.2.3"
   dybatpho::semver_satisfies "0.0.3" "^0.0.3"
-  run ! dybatpho::semver_satisfies "0.0.4" "^0.0.3"
+  run_traced ! dybatpho::semver_satisfies "0.0.4" "^0.0.3"
 }
 
 @test "dybatpho::semver_satisfies handles tilde ranges at every specificity" {
   dybatpho::semver_satisfies "1.2.9" "~1.2.3"
-  run ! dybatpho::semver_satisfies "1.3.0" "~1.2.3"
+  run_traced ! dybatpho::semver_satisfies "1.3.0" "~1.2.3"
   dybatpho::semver_satisfies "1.2.0" "~1.2"
-  run ! dybatpho::semver_satisfies "1.3.0" "~1.2"
+  run_traced ! dybatpho::semver_satisfies "1.3.0" "~1.2"
   dybatpho::semver_satisfies "1.3.0" "~1"
-  run ! dybatpho::semver_satisfies "2.0.0" "~1"
+  run_traced ! dybatpho::semver_satisfies "2.0.0" "~1"
 }
 
 @test "dybatpho::semver_satisfies handles plain comparisons" {
   dybatpho::semver_satisfies "1.5.0" ">=1.2.0"
   dybatpho::semver_satisfies "18.1.0" ">=18"
-  run ! dybatpho::semver_satisfies "17.9.9" ">=18"
+  run_traced ! dybatpho::semver_satisfies "17.9.9" ">=18"
   dybatpho::semver_satisfies "1.0.0" "<=1.0.0"
-  run ! dybatpho::semver_satisfies "1.0.1" "<=1.0.0"
+  run_traced ! dybatpho::semver_satisfies "1.0.1" "<=1.0.0"
   dybatpho::semver_satisfies "1.2.3" "=1.2.3"
-  run ! dybatpho::semver_satisfies "1.2.4" "=1.2.3"
+  run_traced ! dybatpho::semver_satisfies "1.2.4" "=1.2.3"
 }
 
 @test "dybatpho::semver_satisfies treats several comparators as all of them" {
   dybatpho::semver_satisfies "1.5.0" ">=1.2 <1.9"
-  run ! dybatpho::semver_satisfies "1.9.0" ">=1.2 <1.9"
-  run ! dybatpho::semver_satisfies "1.1.0" ">=1.2 <1.9"
+  run_traced ! dybatpho::semver_satisfies "1.9.0" ">=1.2 <1.9"
+  run_traced ! dybatpho::semver_satisfies "1.1.0" ">=1.2 <1.9"
 }
 
 @test "dybatpho::semver_satisfies treats a double pipe as either" {
   dybatpho::semver_satisfies "3.1.0" "^1.0 || ^3.0"
   dybatpho::semver_satisfies "1.9.9" "^1.0 || ^3.0"
-  run ! dybatpho::semver_satisfies "2.5.0" "^1.0 || ^3.0"
+  run_traced ! dybatpho::semver_satisfies "2.5.0" "^1.0 || ^3.0"
 }
 
 @test "dybatpho::semver_satisfies handles wildcards and partial versions" {
   dybatpho::semver_satisfies "9.9.9" "*"
   dybatpho::semver_satisfies "1.2.7" "1.2.x"
-  run ! dybatpho::semver_satisfies "1.3.0" "1.2.x"
+  run_traced ! dybatpho::semver_satisfies "1.3.0" "1.2.x"
   dybatpho::semver_satisfies "1.2.7" "1.2"
   dybatpho::semver_satisfies "1.9.0" "1"
-  run ! dybatpho::semver_satisfies "2.0.0" "1"
+  run_traced ! dybatpho::semver_satisfies "2.0.0" "1"
   dybatpho::semver_satisfies "1.2.3" "1.2.3"
 }
 
 @test "dybatpho::semver_satisfies keeps a pre-release out of a range that never asked for one" {
   # The trap this rule exists for: without it, 2.0.0-alpha sorts below 2.0.0 and
   # would slip into a range that stops short of 2.0.0.
-  run ! dybatpho::semver_satisfies "2.0.0-alpha" "^1.0.0"
-  run ! dybatpho::semver_satisfies "1.3.0-rc.1" ">=1.0.0"
+  run_traced ! dybatpho::semver_satisfies "2.0.0-alpha" "^1.0.0"
+  run_traced ! dybatpho::semver_satisfies "1.3.0-rc.1" ">=1.0.0"
   # A range that names a pre-release of the same release does accept it.
   dybatpho::semver_satisfies "1.2.3-rc.1" "^1.2.3-rc.1"
   dybatpho::semver_satisfies "1.2.4" "^1.2.3-rc.1"
@@ -346,17 +346,17 @@ setup() {
 }
 
 @test "dybatpho::semver_sort orders by version rather than as strings" {
-  run -0 dybatpho::semver_sort 1.10.0 1.9.0 2.0.0 1.2.3
+  run_traced -0 dybatpho::semver_sort 1.10.0 1.9.0 2.0.0 1.2.3
   assert_output "$(printf '1.2.3\n1.9.0\n1.10.0\n2.0.0')"
 }
 
 @test "dybatpho::semver_sort places a pre-release before its release" {
-  run -0 dybatpho::semver_sort 2.0.0 2.0.0-rc.1 2.0.0-alpha 2.0.0-beta.2
+  run_traced -0 dybatpho::semver_sort 2.0.0 2.0.0-rc.1 2.0.0-alpha 2.0.0-beta.2
   assert_output "$(printf '2.0.0-alpha\n2.0.0-beta.2\n2.0.0-rc.1\n2.0.0')"
 }
 
 @test "dybatpho::semver_sort reads standard input and keeps a leading v" {
-  run -0 bash -c 'printf "v1.10.0\nv1.9.0\nv2.0.0\n" | dybatpho::semver_sort'
+  run_traced -0 bash -c 'printf "v1.10.0\nv1.9.0\nv2.0.0\n" | dybatpho::semver_sort'
   assert_output "$(printf 'v1.9.0\nv1.10.0\nv2.0.0')"
 }
 
@@ -430,7 +430,7 @@ setup() {
   dybatpho::semver_satisfies "$(dybatpho::semver_coerce 'yq version v4.53.3')" '>=4'
   dybatpho::semver_satisfies "$(dybatpho::semver_coerce 1.35)" '>=1.30'
   dybatpho::semver_satisfies "$(dybatpho::semver_coerce 3.12-modified)" '>=3.12'
-  run ! dybatpho::semver_satisfies "$(dybatpho::semver_coerce 'yq version v3.4.3')" '>=4'
+  run_traced ! dybatpho::semver_satisfies "$(dybatpho::semver_coerce 'yq version v3.4.3')" '>=4'
 }
 
 @test "the sort agrees with the comparison it is built on" {

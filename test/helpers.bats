@@ -52,13 +52,13 @@ setup() {
   assert_success
   refute_output
   opts=()
-  run dybatpho::still_has_args "${opts[@]}"
+  run_traced dybatpho::still_has_args "${opts[@]}"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::still_has_args with single arg" {
-  run dybatpho::still_has_args "single"
+  run_traced dybatpho::still_has_args "single"
   assert_failure
   refute_output
 }
@@ -192,7 +192,7 @@ require_fake_tool() {
   run_traced dybatpho::is "command" "bash"
   assert_success
   refute_output
-  run dybatpho::is "command" "dyfoooo"
+  run_traced dybatpho::is "command" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -204,7 +204,7 @@ require_fake_tool() {
   run_traced dybatpho::is "function" "dyfoo"
   assert_success
   refute_output
-  run dybatpho::is "function" "dyfoooo"
+  run_traced dybatpho::is "function" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -213,7 +213,7 @@ require_fake_tool() {
   run_traced dybatpho::is "file" "${BASH_SOURCE[0]}"
   assert_success
   refute_output
-  run dybatpho::is "file" "dyfoooo"
+  run_traced dybatpho::is "file" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -222,7 +222,7 @@ require_fake_tool() {
   run_traced dybatpho::is "dir" "$(dirname "${BASH_SOURCE[0]}")"
   assert_success
   refute_output
-  run dybatpho::is "dir" "dyfoooo"
+  run_traced dybatpho::is "dir" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -233,7 +233,7 @@ require_fake_tool() {
   run_traced dybatpho::is "link" "${temp}"
   assert_success
   refute_output
-  run dybatpho::is "link" "dyfoooo"
+  run_traced dybatpho::is "link" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -242,7 +242,7 @@ require_fake_tool() {
   run_traced dybatpho::is "exist" "$(dirname "${BASH_SOURCE[0]}")"
   assert_success
   refute_output
-  run dybatpho::is "exist" "dyfoooo"
+  run_traced dybatpho::is "exist" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -254,7 +254,7 @@ require_fake_tool() {
   assert_success
   refute_output
   chmod a-r "${temp}"
-  run dybatpho::is "readable" "${temp}"
+  run_traced dybatpho::is "readable" "${temp}"
   assert_failure
   refute_output
 }
@@ -266,7 +266,7 @@ require_fake_tool() {
   assert_success
   refute_output
   chmod -w "${temp}"
-  run dybatpho::is "writeable" "${temp}"
+  run_traced dybatpho::is "writeable" "${temp}"
   assert_failure
   refute_output
 }
@@ -278,14 +278,14 @@ require_fake_tool() {
   assert_success
   refute_output
   chmod -x "${temp}"
-  run dybatpho::is "executable" "${temp}"
+  run_traced dybatpho::is "executable" "${temp}"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is set" {
   local dyfoooo=""
-  run dybatpho::is "set" "${dyfoooo}"
+  run_traced dybatpho::is "set" "${dyfoooo}"
   assert_failure
   refute_output
   dyfoooo="v"
@@ -296,7 +296,7 @@ require_fake_tool() {
 
 @test "dybatpho::is with unset variable" {
   local unset_var
-  run dybatpho::is "set" "${unset_var:-}"
+  run_traced dybatpho::is "set" "${unset_var:-}"
   assert_failure
 }
 
@@ -311,7 +311,7 @@ require_fake_tool() {
   run_traced dybatpho::is "number" "1.11"
   assert_success
   refute_output
-  run dybatpho::is "number" "1a"
+  run_traced dybatpho::is "number" "1a"
   assert_failure
   refute_output
 }
@@ -326,10 +326,10 @@ require_fake_tool() {
   run_traced dybatpho::is "int" "11"
   assert_success
   refute_output
-  run dybatpho::is "int" "1.11"
+  run_traced dybatpho::is "int" "1.11"
   assert_failure
   refute_output
-  run dybatpho::is "int" "1a"
+  run_traced dybatpho::is "int" "1a"
   assert_failure
   refute_output
 }
@@ -353,10 +353,10 @@ require_fake_tool() {
   run_traced dybatpho::is "true" "oN"
   assert_success
   refute_output
-  run dybatpho::is "true" ""
+  run_traced dybatpho::is "true" ""
   assert_failure
   refute_output
-  run dybatpho::is "true" "dyfoooo"
+  run_traced dybatpho::is "true" "dyfoooo"
   assert_failure
   refute_output
 }
@@ -374,16 +374,16 @@ require_fake_tool() {
   run_traced dybatpho::is "false" "oFf"
   assert_success
   refute_output
-  run dybatpho::is "false" ""
+  run_traced dybatpho::is "false" ""
   assert_failure
   refute_output
-  run dybatpho::is "false" "dyfoooo"
+  run_traced dybatpho::is "false" "dyfoooo"
   assert_failure
   refute_output
 }
 
 @test "dybatpho::is something undefined" {
-  run dybatpho::is "fool" "I'm in love"
+  run_traced dybatpho::is "fool" "I'm in love"
   assert_failure
   refute_output
 }
@@ -407,14 +407,14 @@ require_fake_tool() {
 @test "dybatpho::command_exists_all verifies every command" {
   dybatpho::command_exists_all bash cat
 
-  run dybatpho::command_exists_all bash definitely_missing_command_xyz
+  run_traced dybatpho::command_exists_all bash definitely_missing_command_xyz
   assert_failure
 }
 
 @test "dybatpho::coalesce_cmd prints first available command" {
   assert_equal "$(dybatpho::coalesce_cmd definitely_missing_command_xyz bash cat)" "bash"
 
-  run dybatpho::coalesce_cmd definitely_missing_command_xyz another_missing_command_xyz
+  run_traced dybatpho::coalesce_cmd definitely_missing_command_xyz another_missing_command_xyz
   assert_failure
 }
 
@@ -510,7 +510,7 @@ _test_retry() {
   local sleep_args_file="${BATS_TEST_TMPDIR}/sleep-args"
   count=0
   stub sleep ": echo \"\$*\" >> ${sleep_args_file}"
-  run dybatpho::retry 2 _test_retry retry-target
+  run_traced dybatpho::retry 2 _test_retry retry-target
   unstub sleep
   assert_success
   assert_output --partial "Retrying in 4 seconds (2/2)"
@@ -575,7 +575,7 @@ _test_retry() {
     return 1
   }
   stub_repeated sleep ": echo \"\$*\" >> ${sleep_args_file}"
-  run dybatpho::retry 4 _never_succeeds capped-target
+  run_traced dybatpho::retry 4 _never_succeeds capped-target
   unstub sleep
   assert_failure
 
@@ -627,7 +627,7 @@ EOF
   # Fed directly so the key dispatch runs in this shell; unknown keys loop.
   dybatpho::breakpoint <<< "hoaApq"
 
-  run --separate-stderr dybatpho::breakpoint 2>&1 <<< "hoaApq"
+  run_traced --separate-stderr dybatpho::breakpoint 2>&1 <<< "hoaApq"
   assert_success
   refute_output
   assert_stderr --partial "Breakpoint hit"
@@ -636,20 +636,20 @@ EOF
 @test "dybatpho::is checks empty, true, and false values" {
   local empty_value=""
   dybatpho::is empty "${empty_value}"
-  run ! dybatpho::is empty "filled"
+  run_traced ! dybatpho::is empty "filled"
 
   dybatpho::is set "filled"
-  run ! dybatpho::is set ""
+  run_traced ! dybatpho::is set ""
 
   dybatpho::is true "yes"
-  run ! dybatpho::is true "maybe"
+  run_traced ! dybatpho::is true "maybe"
   dybatpho::is false "off"
-  run ! dybatpho::is false "maybe"
+  run_traced ! dybatpho::is false "maybe"
 }
 
 @test "dybatpho::coalesce and dybatpho::coalesce_cmd fail without candidates" {
-  run ! dybatpho::coalesce "" ""
-  run ! dybatpho::coalesce_cmd "dybatpho-missing-command-a" "dybatpho-missing-command-b"
+  run_traced ! dybatpho::coalesce "" ""
+  run_traced ! dybatpho::coalesce_cmd "dybatpho-missing-command-a" "dybatpho-missing-command-b"
 }
 
 @test "retry helpers give up after the retry budget is exhausted" {
@@ -673,7 +673,7 @@ EOF
   assert_equal "$(dybatpho::provides provides)" "helpers"
   # The bootstrap defines functions of its own.
   assert_equal "$(dybatpho::provides version)" "init"
-  run ! dybatpho::provides no_such_function_at_all
+  run_traced ! dybatpho::provides no_such_function_at_all
 }
 
 @test "dybatpho::provides --path points at the line that defines the function" {
@@ -691,15 +691,15 @@ EOF
   # behave, so a caller must not be able to tell it was ever on.
   shopt -u extdebug
   dybatpho::provides semver_valid > /dev/null
-  run ! shopt -p extdebug
+  run_traced ! shopt -p extdebug
   shopt -s extdebug
   dybatpho::provides semver_valid > /dev/null
-  run -0 shopt -p extdebug
+  run_traced -0 shopt -p extdebug
   shopt -u extdebug
 }
 
 @test "dybatpho::describe prints the comment the source carries" {
-  run -0 dybatpho::describe semver_valid
+  run_traced -0 dybatpho::describe semver_valid
   assert_line --index 0 --partial "dybatpho::semver_valid  (semver,"
   assert_output --partial "Return success when the string is a valid semver"
   assert_output --partial '@arg $1 string Version string to validate'
@@ -713,17 +713,17 @@ EOF
 @test "dybatpho::describe steps over a shellcheck directive above the function" {
   # `dybatpho::trim` carries one between its comment and its definition, and it
   # is addressed to a linter rather than to a reader.
-  run -0 dybatpho::describe trim
+  run_traced -0 dybatpho::describe trim
   refute_output --partial "shellcheck"
   assert_output --partial "Trim leading and trailing whitespace"
 }
 
 @test "dybatpho::describe refuses a function this shell does not have" {
-  run ! dybatpho::describe no_such_function_at_all
+  run_traced ! dybatpho::describe no_such_function_at_all
 }
 
 @test "dybatpho::function_list lists the loaded public API in order" {
-  run -0 dybatpho::function_list
+  run_traced -0 dybatpho::function_list
   assert_line "dybatpho::semver_valid"
   assert_line "dybatpho::trim"
   # Internals are not the API, and `declare -F` is right there for them.
@@ -735,7 +735,7 @@ EOF
 }
 
 @test "dybatpho::function_list limits itself to one module" {
-  run -0 dybatpho::function_list semver
+  run_traced -0 dybatpho::function_list semver
   assert_line "dybatpho::semver_valid"
   refute_line "dybatpho::trim"
   # Everything it listed really does belong to that module.

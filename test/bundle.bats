@@ -27,15 +27,15 @@ bundle() {
 }
 
 @test "bundle.sh writes the core modules by default" {
-  run -0 bundle
+  run_traced -0 bundle
   assert_file_exist "${OUTPUT}"
-  run -0 use_bundle 'dybatpho::module_list loaded | tr "\n" " "'
+  run_traced -0 use_bundle 'dybatpho::module_list loaded | tr "\n" " "'
   assert_output "${DYBATPHO_CORE_MODULES} "
 }
 
 @test "bundle.sh resolves the dependencies of a requested module" {
-  run -0 bundle --modules release
-  run -0 use_bundle 'dybatpho::module_list loaded | tr "\n" " "'
+  run_traced -0 bundle --modules release
+  run_traced -0 use_bundle 'dybatpho::module_list loaded | tr "\n" " "'
   # `release` pulls in semver, git and archive, and archive pulls in safety.
   for module in semver git archive safety release; do
     assert_output --partial " ${module}"
@@ -43,26 +43,26 @@ bundle() {
 }
 
 @test "a bundle needs no src directory beside it" {
-  run -0 bundle --modules "logging semver"
-  run -0 use_bundle 'dybatpho::semver_bump 1.2.3 minor'
+  run_traced -0 bundle --modules "logging semver"
+  run_traced -0 use_bundle 'dybatpho::semver_bump 1.2.3 minor'
   assert_output "1.3.0"
 }
 
 @test "a bundle reports the library version it was generated from" {
-  run -0 bundle
-  run -0 use_bundle 'dybatpho::version'
+  run_traced -0 bundle
+  run_traced -0 use_bundle 'dybatpho::version'
   assert_output "$(dybatpho::version)"
 }
 
 @test "a bundle refuses to be executed directly" {
-  run -0 bundle
-  run -1 bash "${OUTPUT}"
+  run_traced -0 bundle
+  run_traced -1 bash "${OUTPUT}"
   assert_output --partial "can't be executed directly"
 }
 
 @test "dybatpho::load is a no-op for a module the bundle carries" {
-  run -0 bundle --modules git
-  run -0 use_bundle 'dybatpho::load git; echo loaded'
+  run_traced -0 bundle --modules git
+  run_traced -0 use_bundle 'dybatpho::load git; echo loaded'
   assert_output "loaded"
 }
 
@@ -74,28 +74,28 @@ bundle() {
 }
 
 @test "a bundle reports only what it carries as the registry" {
-  run -0 bundle --modules git
-  run -0 use_bundle 'dybatpho::module_list all | tr "\n" " "'
+  run_traced -0 bundle --modules git
+  run_traced -0 use_bundle 'dybatpho::module_list all | tr "\n" " "'
   assert_output --partial " git"
   refute_output --partial " ai"
 }
 
 @test "dybatpho::doctor inside a bundle checks the bundled modules" {
-  run -0 bundle --modules "doctor git"
-  run use_bundle 'dybatpho::doctor --all || true'
+  run_traced -0 bundle --modules "doctor git"
+  run_traced use_bundle 'dybatpho::doctor --all || true'
   assert_output --regexp 'git +git +required +ok'
 }
 
 @test "bundle.sh refuses to overwrite an existing bundle without --force" {
-  run -0 bundle
+  run_traced -0 bundle
   DYBATPHO_FORCE=false run -1 bundle
   assert_output --partial "already exists"
 }
 
 @test "bundle.sh overwrites an existing bundle when forced" {
-  run -0 bundle
+  run_traced -0 bundle
   DYBATPHO_FORCE=true run -0 bundle --modules semver
-  run -0 use_bundle 'dybatpho::module_loaded semver && echo yes'
+  run_traced -0 use_bundle 'dybatpho::module_loaded semver && echo yes'
   assert_output "yes"
 }
 
@@ -112,34 +112,34 @@ bundle() {
 }
 
 @test "bundle.sh keeps the module source verbatim" {
-  run -0 bundle --modules semver
+  run_traced -0 bundle --modules semver
   # The bundled module is the library module, minus its shebang line.
-  run -0 grep -c "^function dybatpho::semver_bump {" "${OUTPUT}"
+  run_traced -0 grep -c "^function dybatpho::semver_bump {" "${OUTPUT}"
   assert_output "1"
-  run -0 grep -c '^#!/usr/bin/env bash' "${OUTPUT}"
+  run_traced -0 grep -c '^#!/usr/bin/env bash' "${OUTPUT}"
   assert_output "1"
 }
 
 @test "introspection inside a bundle answers what it can and refuses the rest" {
-  run -0 bundle --modules semver
+  run_traced -0 bundle --modules semver
 
   # The documentation travels with the code, so this is the part that still
   # works when there is no `src/` and no `docs/` to read.
-  run -0 use_bundle 'dybatpho::describe semver_valid'
+  run_traced -0 use_bundle 'dybatpho::describe semver_valid'
   assert_output --partial "Return success when the string is a valid semver"
   assert_output --partial '@arg $1 string Version string to validate'
 
   # A bundle holds every module in one file, so no function can be attributed
   # to a module. Naming the bundle file as the module would be a wrong answer
   # rather than a missing one.
-  run ! use_bundle 'dybatpho::provides semver_valid'
+  run_traced ! use_bundle 'dybatpho::provides semver_valid'
   assert_output ""
 
   # The line is still exactly where the function is, inside the bundle.
-  run -0 use_bundle 'dybatpho::provides --path semver_valid'
+  run_traced -0 use_bundle 'dybatpho::provides --path semver_valid'
   assert_output --partial "${OUTPUT}:"
 
   # And an empty list would read as "that module exports nothing".
-  run --separate-stderr ! use_bundle 'dybatpho::function_list semver'
+  run_traced --separate-stderr ! use_bundle 'dybatpho::function_list semver'
   assert_stderr --partial "which is how a bundle looks"
 }

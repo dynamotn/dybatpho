@@ -225,6 +225,12 @@ function __dybatpho_test_run {
     local _coverage_dir="${DYBATPHO_DIR}/coverage"
     rm -rf "${_coverage_dir}"
     mkdir -p "${_coverage_dir}"
+    local -a _kcov_source_args=(
+      --include-path="${DYBATPHO_DIR}/init.sh,${DYBATPHO_DIR}/src"
+      --strip-path="${DYBATPHO_DIR}"
+      --exclude-line="# kcov(skip)"
+      --exclude-region="# kcov(disabled):# kcov(enabled)"
+    )
     : > "${_tap}"
     local _index=0 _part _chunk_out _line
     local -a _chunk_files
@@ -242,10 +248,7 @@ function __dybatpho_test_run {
       kcov \
         --clean \
         --dump-summary \
-        --include-path="${DYBATPHO_DIR}/init.sh" \
-        --include-path="${DYBATPHO_DIR}/src" \
-        --exclude-line="# kcov(skip)" \
-        --exclude-region="# kcov(disabled):# kcov(enabled)" \
+        "${_kcov_source_args[@]}" \
         "${_part}" \
         "${BATS_CMD}" "${_bats_args[@]/${_run_dir}/${_chunk_out}}" \
         "${_chunk_files[@]}" \
@@ -358,7 +361,8 @@ function __dybatpho_test_run {
 
   if [[ "${COVERAGE}" == "true" ]]; then
     dybatpho::progress "Merging ${#_parts[@]} coverage part(s)"
-    kcov --merge "${_coverage_dir}/merged" "${_parts[@]}" > /dev/null
+    kcov --merge "${_kcov_source_args[@]}" \
+      "${_coverage_dir}/merged" "${_parts[@]}" > /dev/null
     rm -rf "${_coverage_dir}/bats"
     mv "${_coverage_dir}/merged/kcov-merged" "${_coverage_dir}/bats"
     # Leave only the merged report behind; the per-chunk parts are an
@@ -401,8 +405,6 @@ function _spec {
     validate:"__dybatpho_test_is_count \$OPTARG"
   dybatpho::opts::param "Only run tests whose name matches" FILTER -f --filter \
     init:@empty
-
-  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
 }
 
 dybatpho::generate_from_spec _spec "$@"

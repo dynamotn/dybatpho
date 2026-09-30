@@ -11,21 +11,21 @@ setup() {
 }
 
 @test 'dybatpho::register_err_handler output' {
-  run --separate-stderr dybatpho::register_err_handler
+  run_traced --separate-stderr dybatpho::register_err_handler
   assert_success
   refute_output
   refute_stderr
 }
 
 @test 'dybatpho::register_killed_handler output' {
-  run --separate-stderr dybatpho::register_killed_handler
+  run_traced --separate-stderr dybatpho::register_killed_handler
   assert_success
   refute_output
   refute_stderr
 }
 
 @test 'dybatpho::register_common_handlers output' {
-  run --separate-stderr dybatpho::register_common_handlers
+  run_traced --separate-stderr dybatpho::register_common_handlers
   assert_success
   refute_output
   refute_stderr
@@ -96,7 +96,7 @@ setup() {
   # The call itself must stay quiet, and it must remember the path.
   local filepath
   filepath="$(mktemp -p "${BATS_TEST_TMPDIR}")"
-  run --separate-stderr dybatpho::cleanup_file_on_exit "${filepath}"
+  run_traced --separate-stderr dybatpho::cleanup_file_on_exit "${filepath}"
   assert_success
   refute_output
   refute_stderr
@@ -192,7 +192,7 @@ dybatpho::cleanup_file_on_exit "${2}"
 dybatpho::cleanup_file_on_exit "${3}"
 trap -p EXIT
 SCRIPT
-  run bash "${script}" "${DYBATPHO_DIR}" "${first}" "${second}"
+  run_traced bash "${script}" "${DYBATPHO_DIR}" "${first}" "${second}"
   assert_success
   assert_equal "$(printf '%s\n' "${output}" | grep -c '__dybatpho_cleanup_run')" "1"
 }
@@ -212,7 +212,7 @@ dybatpho::cleanup_file_on_exit "${2}"
   exit 1
 }
 SCRIPT
-  run bash "${script}" "${DYBATPHO_DIR}" "${outer}"
+  run_traced bash "${script}" "${DYBATPHO_DIR}" "${outer}"
   assert_success
   assert_file_not_exist "${outer}"
 }
@@ -222,7 +222,7 @@ SCRIPT
   export DRY_RUN="true"
   local test_file="dry_run_test_file.tmp"
   rm -f "${test_file}"
-  run dybatpho::dry_run touch "${test_file}"
+  run_traced dybatpho::dry_run touch "${test_file}"
   assert_output --partial "DRY RUN: touch ${test_file}"
   assert_file_not_exist "${test_file}"
   unset DRY_RUN
@@ -266,7 +266,7 @@ SCRIPT
   export DRY_RUN="false"
   local test_file="actual_run_test_file.tmp"
   rm -f "${test_file}"
-  run dybatpho::dry_run touch "${test_file}"
+  run_traced dybatpho::dry_run touch "${test_file}"
   assert_output ""
   refute_output --regexp "DRY RUN:"
   assert_file_exist "${test_file}"
@@ -412,7 +412,7 @@ SCRIPT
   assert_output --regexp '^[0-9]+$'
 
   # An exit code exists only once the job has been waited for.
-  run dybatpho::background_status first
+  run_traced dybatpho::background_status first
   assert_failure
 
   local status=0
@@ -438,10 +438,10 @@ SCRIPT
 }
 
 @test "dybatpho::background_pid and dybatpho::background_status fail for an unknown job" {
-  run dybatpho::background_pid nosuch
+  run_traced dybatpho::background_pid nosuch
   assert_failure
   refute_output
-  run dybatpho::background_status nosuch
+  run_traced dybatpho::background_status nosuch
   assert_failure
   refute_output
 }
@@ -506,7 +506,7 @@ SCRIPT
 }
 
 @test "dybatpho::kill_children is safe to call when no job was ever started" {
-  run dybatpho::kill_children
+  run_traced dybatpho::kill_children
   assert_success
   refute_output
 }
@@ -522,7 +522,7 @@ SCRIPT
   dybatpho::pid_file_write "${pid_file}" 4242
   assert_equal "$(< "${pid_file}")" "4242"
   # The staging file used for the atomic move must not be left behind.
-  run bash -c "ls '${BATS_TEST_TMPDIR}/run' | grep -c tmp"
+  run_traced bash -c "ls '${BATS_TEST_TMPDIR}/run' | grep -c tmp"
   assert_output "0"
 }
 
@@ -536,30 +536,30 @@ SCRIPT
   local pid_file="${BATS_TEST_TMPDIR}/state.pid"
 
   dybatpho::pid_file_write "${pid_file}"
-  run dybatpho::pid_file_is_running "${pid_file}"
+  run_traced dybatpho::pid_file_is_running "${pid_file}"
   assert_success
 
   # A process id that is valid but has long since exited.
   printf '%s\n' "99999999" > "${pid_file}"
-  run dybatpho::pid_file_is_running "${pid_file}"
+  run_traced dybatpho::pid_file_is_running "${pid_file}"
   assert_failure
 
   printf '%s\n' "garbage" > "${pid_file}"
-  run dybatpho::pid_file_is_running "${pid_file}"
+  run_traced dybatpho::pid_file_is_running "${pid_file}"
   assert_failure
 
   : > "${pid_file}"
-  run dybatpho::pid_file_is_running "${pid_file}"
+  run_traced dybatpho::pid_file_is_running "${pid_file}"
   assert_failure
 
-  run dybatpho::pid_file_is_running "${BATS_TEST_TMPDIR}/absent.pid"
+  run_traced dybatpho::pid_file_is_running "${BATS_TEST_TMPDIR}/absent.pid"
   assert_failure
 }
 
 @test "dybatpho::pid_file_is_running tolerates the padding a foreign PID file may carry" {
   local pid_file="${BATS_TEST_TMPDIR}/padded.pid"
   printf ' %s \n' "$$" > "${pid_file}"
-  run dybatpho::pid_file_is_running "${pid_file}"
+  run_traced dybatpho::pid_file_is_running "${pid_file}"
   assert_success
 }
 
@@ -569,15 +569,15 @@ SCRIPT
 
   # The guard is what stops an exiting service from deleting the PID file its
   # replacement has already written.
-  run dybatpho::pid_file_remove "${pid_file}"
+  run_traced dybatpho::pid_file_remove "${pid_file}"
   assert_failure
   assert_file_exist "${pid_file}"
 
-  run dybatpho::pid_file_remove "${pid_file}" 4242
+  run_traced dybatpho::pid_file_remove "${pid_file}" 4242
   assert_success
   assert_file_not_exist "${pid_file}"
 
   # Removing a file that is already gone is not a failure.
-  run dybatpho::pid_file_remove "${pid_file}"
+  run_traced dybatpho::pid_file_remove "${pid_file}"
   assert_success
 }

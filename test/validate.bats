@@ -22,16 +22,16 @@ teardown() {
 }
 
 @test "dybatpho::validate_is rejects values that only look numeric" {
-  run dybatpho::validate_is int "1.5"
+  run_traced dybatpho::validate_is int "1.5"
   assert_failure
 
-  run dybatpho::validate_is uint "-1"
+  run_traced dybatpho::validate_is uint "-1"
   assert_failure
 
-  run dybatpho::validate_is number "twelve"
+  run_traced dybatpho::validate_is number "twelve"
   assert_failure
 
-  run dybatpho::validate_is int ""
+  run_traced dybatpho::validate_is int ""
   assert_failure
 }
 
@@ -42,7 +42,7 @@ teardown() {
   dybatpho::validate_is bool "off"
   dybatpho::validate_is bool "1"
 
-  run dybatpho::validate_is bool "maybe"
+  run_traced dybatpho::validate_is bool "maybe"
   assert_failure
 }
 
@@ -52,14 +52,14 @@ teardown() {
   dybatpho::validate_is port "65535"
 
   # Port 0 asks the kernel to choose rather than naming a port.
-  run dybatpho::validate_is port "0"
+  run_traced dybatpho::validate_is port "0"
   assert_failure
 
-  run dybatpho::validate_is port "65536"
+  run_traced dybatpho::validate_is port "65536"
   assert_failure
 
   # A long run of digits would overflow before it could be compared.
-  run dybatpho::validate_is port "99999999999999999999"
+  run_traced dybatpho::validate_is port "99999999999999999999"
   assert_failure
 }
 
@@ -67,16 +67,16 @@ teardown() {
   dybatpho::validate_is email "ops@example.com"
   dybatpho::validate_is email "first.last+tag@sub.example.co.uk"
 
-  run dybatpho::validate_is email "ops@example"
+  run_traced dybatpho::validate_is email "ops@example"
   assert_failure
 
-  run dybatpho::validate_is email "ops.example.com"
+  run_traced dybatpho::validate_is email "ops.example.com"
   assert_failure
 
-  run dybatpho::validate_is email "@example.com"
+  run_traced dybatpho::validate_is email "@example.com"
   assert_failure
 
-  run dybatpho::validate_is email "ops@-example.com"
+  run_traced dybatpho::validate_is email "ops@-example.com"
   assert_failure
 }
 
@@ -84,13 +84,13 @@ teardown() {
   dybatpho::validate_is url "https://example.com/health"
   dybatpho::validate_is url "postgres://user@db:5432/app"
 
-  run dybatpho::validate_is url "example.com"
+  run_traced dybatpho::validate_is url "example.com"
   assert_failure
 
-  run dybatpho::validate_is url "mailto:ops@example.com"
+  run_traced dybatpho::validate_is url "mailto:ops@example.com"
   assert_failure
 
-  run dybatpho::validate_is url "https://exa mple.com"
+  run_traced dybatpho::validate_is url "https://exa mple.com"
   assert_failure
 }
 
@@ -99,15 +99,15 @@ teardown() {
   dybatpho::validate_is hostname "db-01.internal"
   dybatpho::validate_is hostname "example.com."
 
-  run dybatpho::validate_is hostname "-example.com"
+  run_traced dybatpho::validate_is hostname "-example.com"
   assert_failure
 
-  run dybatpho::validate_is hostname "exa_mple.com"
+  run_traced dybatpho::validate_is hostname "exa_mple.com"
   assert_failure
 
   local too_long
   too_long="$(dybatpho::string_repeat "a" 64)"
-  run dybatpho::validate_is hostname "${too_long}.com"
+  run_traced dybatpho::validate_is hostname "${too_long}.com"
   assert_failure
 }
 
@@ -119,19 +119,19 @@ teardown() {
   dybatpho::validate_is ip "192.0.2.10"
   dybatpho::validate_is ip "2001:db8::1"
 
-  run dybatpho::validate_is ipv4 "192.0.2.256"
+  run_traced dybatpho::validate_is ipv4 "192.0.2.256"
   assert_failure
 
   # A leading zero is read as octal by much of the software downstream, so an
   # address that means two things is refused rather than guessed at.
-  run dybatpho::validate_is ipv4 "127.0.0.010"
+  run_traced dybatpho::validate_is ipv4 "127.0.0.010"
   assert_failure
 
-  run dybatpho::validate_is ipv6 "2001:db8::1::2"
+  run_traced dybatpho::validate_is ipv6 "2001:db8::1::2"
   assert_failure
 
   # A zone index names an interface rather than a part of the address.
-  run dybatpho::validate_is ipv6 "fe80::1%eth0"
+  run_traced dybatpho::validate_is ipv6 "fe80::1%eth0"
   assert_failure
 }
 
@@ -161,13 +161,13 @@ teardown() {
   dybatpho::validate_is cidr "10.0.0.0/8"
   dybatpho::validate_is cidr "2001:db8::/32"
 
-  run dybatpho::validate_is cidr "10.0.0.0/33"
+  run_traced dybatpho::validate_is cidr "10.0.0.0/33"
   assert_failure
 
-  run dybatpho::validate_is cidr "2001:db8::/129"
+  run_traced dybatpho::validate_is cidr "2001:db8::/129"
   assert_failure
 
-  run dybatpho::validate_is cidr "10.0.0.0"
+  run_traced dybatpho::validate_is cidr "10.0.0.0"
   assert_failure
 }
 
@@ -175,10 +175,10 @@ teardown() {
   dybatpho::validate_is mac "00:1b:44:11:3a:b7"
   dybatpho::validate_is mac "00-1B-44-11-3A-B7"
 
-  run dybatpho::validate_is mac "00:1b-44:11:3a:b7"
+  run_traced dybatpho::validate_is mac "00:1b-44:11:3a:b7"
   assert_failure
 
-  run dybatpho::validate_is mac "00:1b:44:11:3a"
+  run_traced dybatpho::validate_is mac "00:1b:44:11:3a"
   assert_failure
 }
 
@@ -202,16 +202,16 @@ teardown() {
   dybatpho::validate_is identifier "_MY_VAR2"
   dybatpho::validate_is nonempty " x "
 
-  run dybatpho::validate_is uuid "123e4567-e89b-12d3-a456-42661417400"
+  run_traced dybatpho::validate_is uuid "123e4567-e89b-12d3-a456-42661417400"
   assert_failure
 
-  run dybatpho::validate_is slug "Deploy-To-Prod"
+  run_traced dybatpho::validate_is slug "Deploy-To-Prod"
   assert_failure
 
-  run dybatpho::validate_is identifier "2fast"
+  run_traced dybatpho::validate_is identifier "2fast"
   assert_failure
 
-  run dybatpho::validate_is nonempty "   "
+  run_traced dybatpho::validate_is nonempty "   "
   assert_failure
 }
 
@@ -221,16 +221,16 @@ teardown() {
   dybatpho::validate_is time "23:59"
   dybatpho::validate_is time "08:30:15"
 
-  run dybatpho::validate_is date "2023-02-29"
+  run_traced dybatpho::validate_is date "2023-02-29"
   assert_failure
 
-  run dybatpho::validate_is date "2023-13-01"
+  run_traced dybatpho::validate_is date "2023-13-01"
   assert_failure
 
-  run dybatpho::validate_is date "2023-04-31"
+  run_traced dybatpho::validate_is date "2023-04-31"
   assert_failure
 
-  run dybatpho::validate_is time "24:00"
+  run_traced dybatpho::validate_is time "24:00"
   assert_failure
 }
 
@@ -239,7 +239,7 @@ teardown() {
   dybatpho::validate_is duration "1h30m"
   dybatpho::validate_is duration "500ms"
 
-  run dybatpho::validate_is duration "1hour"
+  run_traced dybatpho::validate_is duration "1hour"
   assert_failure
 }
 
@@ -258,19 +258,19 @@ teardown() {
   # The file itself is about to be created; its directory has to be there.
   dybatpho::validate_is parent_dir "${BATS_TEST_TMPDIR}/not-created-yet.log"
 
-  run dybatpho::validate_is file "${BATS_TEST_TMPDIR}/absent.txt"
+  run_traced dybatpho::validate_is file "${BATS_TEST_TMPDIR}/absent.txt"
   assert_failure
 
-  run dybatpho::validate_is dir "${file}"
+  run_traced dybatpho::validate_is dir "${file}"
   assert_failure
 
-  run dybatpho::validate_is abspath "relative/path"
+  run_traced dybatpho::validate_is abspath "relative/path"
   assert_failure
 
-  run dybatpho::validate_is parent_dir "${BATS_TEST_TMPDIR}/absent-dir/file.log"
+  run_traced dybatpho::validate_is parent_dir "${BATS_TEST_TMPDIR}/absent-dir/file.log"
   assert_failure
 
-  run dybatpho::validate_is executable "${file}"
+  run_traced dybatpho::validate_is executable "${file}"
   assert_failure
   chmod +x "${file}"
   dybatpho::validate_is executable "${file}"
@@ -297,7 +297,7 @@ teardown() {
 @test "dybatpho::validate_matches applies an extended regular expression" {
   dybatpho::validate_matches "v1.2.3" '^v[0-9]+\.[0-9]+\.[0-9]+$'
 
-  run dybatpho::validate_matches "1.2.3" '^v[0-9]'
+  run_traced dybatpho::validate_matches "1.2.3" '^v[0-9]'
   assert_failure
 }
 
@@ -319,7 +319,7 @@ teardown() {
 }
 
 @test "dybatpho::validate_value reports the type it expected" {
-  run dybatpho::validate_value "http" type:int
+  run_traced dybatpho::validate_value "http" type:int
   assert_failure
 
   dybatpho::validate_value "http" type:int || true
@@ -413,7 +413,7 @@ teardown() {
 
 @test "dybatpho::validate_errors prints nothing after a value was accepted" {
   dybatpho::validate_value "42" type:int
-  run dybatpho::validate_errors
+  run_traced dybatpho::validate_errors
   assert_success
   assert_output ""
 }
@@ -423,7 +423,7 @@ teardown() {
 # ---------------------------------------------------------------------------
 
 @test "dybatpho::validate_or_die returns quietly for a value it accepts" {
-  run --separate-stderr dybatpho::validate_or_die "--port" "8080" type:port
+  run_traced --separate-stderr dybatpho::validate_or_die "--port" "8080" type:port
   assert_success
   assert_output ""
 }
@@ -458,7 +458,7 @@ teardown() {
 }
 
 @test "dybatpho::validate_types lists the canonical names in order" {
-  run dybatpho::validate_types
+  run_traced dybatpho::validate_types
   assert_success
   assert_line "email"
   assert_line "int"
@@ -479,7 +479,7 @@ teardown() {
   dybatpho::validate_is branch "release/2.0"
   assert_equal "$(dybatpho::validate_describe branch)" "a release branch"
 
-  run dybatpho::validate_is branch "topic/x"
+  run_traced dybatpho::validate_is branch "topic/x"
   assert_failure
 
   dybatpho::validate_value "topic/x" type:branch || true
@@ -498,7 +498,7 @@ teardown() {
   function _test_never { return 1; }
   dybatpho::validate_register int _test_never "an integer we refuse"
 
-  run dybatpho::validate_is int "42"
+  run_traced dybatpho::validate_is int "42"
   assert_failure
 }
 

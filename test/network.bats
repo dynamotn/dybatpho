@@ -85,7 +85,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 }
 
 @test "dybatpho::curl_do with empty url" {
-  run --separate-stderr dybatpho::curl_do ""
+  run_traced --separate-stderr dybatpho::curl_do ""
   assert_failure
 }
 
@@ -117,7 +117,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_do with status code 200" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl ": echo '200'; echo 'hahaa' > ${temp_file}"
-  run dybatpho::curl_do https://this "${temp_file}"
+  run_traced dybatpho::curl_do https://this "${temp_file}"
   assert_success
   assert_file_not_empty "${BATS_TEST_TMPDIR}/curl_do"
   unstub curl
@@ -126,7 +126,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_do with status code 404" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl ": echo '404'"
-  run -4 dybatpho::curl_do https://this "${temp_file}"
+  run_traced -4 dybatpho::curl_do https://this "${temp_file}"
   assert_failure
   unstub curl
 }
@@ -145,7 +145,7 @@ c.close()' > "${portfile}" 2> /dev/null &
     ": echo '300'" \
     ": echo '500'" \
     ": echo '200'; echo 'hahaa' > ${temp_file}"
-  run dybatpho::curl_do https://this "${temp_file}"
+  run_traced dybatpho::curl_do https://this "${temp_file}"
   assert_success
   assert_file_not_empty "${BATS_TEST_TMPDIR}/curl_do"
   unstub curl
@@ -160,7 +160,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   stub sleep \
     ": echo \"\$1\" >> ${sleep_file}" \
     ": echo \"\$1\" >> ${sleep_file}"
-  run dybatpho::curl_do https://this
+  run_traced dybatpho::curl_do https://this
   assert_success
   assert_equal "$(cat "${sleep_file}")" $'1\n2'
   unstub sleep
@@ -178,11 +178,11 @@ c.close()' > "${portfile}" 2> /dev/null &
     ": echo '500'" \
     ": echo '101'" \
     ": echo '101'"
-  run -3 dybatpho::curl_do https://this "${temp_file}"
+  run_traced -3 dybatpho::curl_do https://this "${temp_file}"
   assert_failure
-  run -5 dybatpho::curl_do https://this "${temp_file}"
+  run_traced -5 dybatpho::curl_do https://this "${temp_file}"
   assert_failure
-  run -1 dybatpho::curl_do https://this "${temp_file}"
+  run_traced -1 dybatpho::curl_do https://this "${temp_file}"
   assert_failure
   unstub curl
 }
@@ -191,7 +191,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   export DYBATPHO_CURL_MAX_RETRIES=0
   stub curl ": return 1"
-  run --separate-stderr -1 dybatpho::curl_do https://this "${temp_file}"
+  run_traced --separate-stderr -1 dybatpho::curl_do https://this "${temp_file}"
   unstub curl
   assert_failure
   assert_stderr --partial "Error when access https://this"
@@ -207,7 +207,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_download with output" {
   local temp_file=${BATS_TEST_TMPDIR}/test/curl_download
   stub curl ": echo '200'; echo 'hahaa' > ${temp_file}"
-  run dybatpho::curl_download https://github.com "${temp_file}"
+  run_traced dybatpho::curl_download https://github.com "${temp_file}"
   assert_success
   assert_file_not_empty "${BATS_TEST_TMPDIR}/test/curl_download"
   unstub curl
@@ -231,7 +231,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 }
 
 @test "dybatpho::curl_download to readonly directory" {
-  run --separate-stderr -6 dybatpho::curl_download https://example.com /root/readonly/file.txt
+  run_traced --separate-stderr -6 dybatpho::curl_download https://example.com /root/readonly/file.txt
   assert_failure
 }
 
@@ -255,7 +255,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 }
 
 @test "dybatpho::curl_do rejects an empty URL" {
-  run ! dybatpho::curl_do ""
+  run_traced ! dybatpho::curl_do ""
 }
 
 @test "dybatpho::curl_do only prints the request when DRY_RUN is enabled" {
@@ -339,14 +339,14 @@ c.close()' > "${portfile}" 2> /dev/null &
   echo -n "hello" > "${file}"
   local digest
   digest=$(sha256sum "${file}" | awk '{print $1}')
-  run dybatpho::verify_checksum "${file}" "sha256:${digest}"
+  run_traced dybatpho::verify_checksum "${file}" "sha256:${digest}"
   assert_success
 }
 
 @test "dybatpho::verify_checksum fails on mismatch" {
   local file="${BATS_TEST_TMPDIR}/checksum_bad"
   echo -n "hello" > "${file}"
-  run -7 dybatpho::verify_checksum "${file}" "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  run_traced -7 dybatpho::verify_checksum "${file}" "sha256:0000000000000000000000000000000000000000000000000000000000000000"
   assert_failure
 }
 
@@ -370,7 +370,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   local digest
   digest=$(echo -n "hahaa" | sha256sum | awk '{print $1}')
   stub curl ": echo '200'; echo -n 'hahaa' > ${temp_file}"
-  run dybatpho::curl_resume_download https://this "${temp_file}" "sha256:${digest}"
+  run_traced dybatpho::curl_resume_download https://this "${temp_file}" "sha256:${digest}"
   assert_success
   unstub curl
 }
@@ -378,7 +378,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_resume_download fails on checksum mismatch" {
   local temp_file="${BATS_TEST_TMPDIR}/test/resume_checksum_bad"
   stub curl ": echo '200'; echo -n 'hahaa' > ${temp_file}"
-  run -7 dybatpho::curl_resume_download https://this "${temp_file}" "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  run_traced -7 dybatpho::curl_resume_download https://this "${temp_file}" "sha256:0000000000000000000000000000000000000000000000000000000000000000"
   assert_failure
   unstub curl
 }
@@ -405,7 +405,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_parse_response fails without a status line" {
   local header_file="${BATS_TEST_TMPDIR}/headers_empty.txt"
   : > "${header_file}"
-  run -1 dybatpho::curl_parse_response "${header_file}"
+  run_traced -1 dybatpho::curl_parse_response "${header_file}"
   assert_failure
 }
 
@@ -415,7 +415,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::curl_parse_response "${header_file}"
   assert_equal "$(dybatpho::curl_response_header Content-Type)" "application/json"
   assert_equal "$(dybatpho::curl_response_header X-Missing default-value)" "default-value"
-  run dybatpho::curl_response_header X-Missing
+  run_traced dybatpho::curl_response_header X-Missing
   assert_failure
 }
 
@@ -468,7 +468,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::circuit_breaker stays closed while under threshold" {
   export DYBATPHO_CIRCUIT_THRESHOLD=3
   dybatpho::circuit_reset test-service
-  run dybatpho::circuit_breaker test-service "false"
+  run_traced dybatpho::circuit_breaker test-service "false"
   assert_failure
   assert_equal "$(dybatpho::circuit_state test-service)" "closed"
   unset DYBATPHO_CIRCUIT_THRESHOLD
@@ -491,7 +491,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   export DYBATPHO_CIRCUIT_COOLDOWN=60
   dybatpho::circuit_reset blocked-service
   dybatpho::circuit_breaker blocked-service "false" || true
-  run -9 dybatpho::circuit_breaker blocked-service "true"
+  run_traced -9 dybatpho::circuit_breaker blocked-service "true"
   assert_failure
   unset DYBATPHO_CIRCUIT_THRESHOLD DYBATPHO_CIRCUIT_COOLDOWN
 }
@@ -502,7 +502,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::circuit_breaker recovering-service "false" || true
   assert_equal "$(dybatpho::circuit_state recovering-service)" "open"
   dybatpho::circuit_reset recovering-service
-  run dybatpho::circuit_breaker recovering-service "true"
+  run_traced dybatpho::circuit_breaker recovering-service "true"
   assert_success
   assert_equal "$(dybatpho::circuit_state recovering-service)" "closed"
   unset DYBATPHO_CIRCUIT_THRESHOLD
@@ -512,12 +512,12 @@ c.close()' > "${portfile}" 2> /dev/null &
 
 @test "dybatpho::rate_limit runs the command and returns its exit code" {
   dybatpho::rate_limit_reset runner
-  run dybatpho::rate_limit runner 5/60 -- printf 'called %s\n' once
+  run_traced dybatpho::rate_limit runner 5/60 -- printf 'called %s\n' once
   assert_success
   assert_output "called once"
 
   dybatpho::rate_limit_reset runner
-  run -3 dybatpho::rate_limit runner 5/60 -- bash -c 'exit 3'
+  run_traced -3 dybatpho::rate_limit runner 5/60 -- bash -c 'exit 3'
   assert_failure
 }
 
@@ -531,7 +531,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 
 @test "dybatpho::rate_limit accepts the command without a -- separator" {
   dybatpho::rate_limit_reset separator
-  run dybatpho::rate_limit separator 5/60 printf 'plain'
+  run_traced dybatpho::rate_limit separator 5/60 printf 'plain'
   assert_success
   assert_output "plain"
 }
@@ -540,7 +540,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::rate_limit_reset strict
   DYBATPHO_RATE_LIMIT_WAIT=false
   dybatpho::rate_limit strict 1/60
-  run -9 dybatpho::rate_limit strict 1/60 -- touch "${BATS_TEST_TMPDIR}/must-not-exist"
+  run_traced -9 dybatpho::rate_limit strict 1/60 -- touch "${BATS_TEST_TMPDIR}/must-not-exist"
   assert_failure
   DYBATPHO_RATE_LIMIT_WAIT=true
   [ ! -f "${BATS_TEST_TMPDIR}/must-not-exist" ]
@@ -550,7 +550,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::rate_limit_reset capped
   DYBATPHO_RATE_LIMIT_MAX_WAIT=1
   dybatpho::rate_limit capped 1/1h
-  run -9 dybatpho::rate_limit capped 1/1h -- true
+  run_traced -9 dybatpho::rate_limit capped 1/1h -- true
   assert_failure
   DYBATPHO_RATE_LIMIT_MAX_WAIT=0
 }
@@ -644,7 +644,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   )
   assert_equal "$(dybatpho::curl_link next)" "https://api.example.test/items?page=3"
   assert_equal "$(dybatpho::curl_link prev)" "https://api.example.test/items?page=1"
-  run dybatpho::curl_link last
+  run_traced dybatpho::curl_link last
   assert_failure
 }
 
@@ -652,13 +652,13 @@ c.close()' > "${portfile}" 2> /dev/null &
   DYBATPHO_HTTP_HEADERS=([link]='<https://api.example.test/items?page=9>; rel="next last"')
   assert_equal "$(dybatpho::curl_link last)" "https://api.example.test/items?page=9"
   # `nex` is a prefix of `next` and must not be mistaken for it.
-  run dybatpho::curl_link nex
+  run_traced dybatpho::curl_link nex
   assert_failure
 }
 
 @test "dybatpho::curl_link fails when the response carried no Link header" {
   DYBATPHO_HTTP_HEADERS=()
-  run dybatpho::curl_link next
+  run_traced dybatpho::curl_link next
   assert_failure
 }
 
@@ -667,7 +667,7 @@ c.close()' > "${portfile}" 2> /dev/null &
     'Link: <https://api.example.test/items?page=2>; rel="next"'
   dybatpho::mock_http "items?page=2" 200 'page-two'
 
-  run dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  run_traced dybatpho::curl_paginate "https://api.example.test/items?page=1"
   assert_success
   assert_line --index 0 "page-one"
   assert_line --index 1 "page-two"
@@ -682,7 +682,7 @@ c.close()' > "${portfile}" 2> /dev/null &
     'Link: <https://api.example.test/items?page=3>; rel="next"'
   dybatpho::mock_http "items?page=3" 200 'three'
   DYBATPHO_PAGINATE_MAX_PAGES=2
-  run dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  run_traced dybatpho::curl_paginate "https://api.example.test/items?page=1"
   DYBATPHO_PAGINATE_MAX_PAGES=100
   assert_success
   assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "2"
@@ -695,7 +695,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::mock_http "items?page=2" 200 'page-two' \
     'Link: <https://api.example.test/items?page=1>; rel="next"'
 
-  run dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  run_traced dybatpho::curl_paginate "https://api.example.test/items?page=1"
   assert_success
   assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "2"
 }
@@ -705,7 +705,7 @@ c.close()' > "${portfile}" 2> /dev/null &
     'Link: <https://api.example.test/items?page=2>; rel="next"'
   dybatpho::mock_http "items?page=2" 404 'gone'
 
-  run -4 dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  run_traced -4 dybatpho::curl_paginate "https://api.example.test/items?page=1"
   assert_failure
 }
 
@@ -745,7 +745,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::mock_http "graphql" 200 '{"data":{"viewer":{"login":"dynamotn"}}}'
   local body="${BATS_TEST_TMPDIR}/graphql.json"
   DYBATPHO_GRAPHQL_TOKEN="gql-token"
-  run dybatpho::curl_graphql "https://api.example.test/graphql" \
+  run_traced dybatpho::curl_graphql "https://api.example.test/graphql" \
     'query($login:String!){ user(login:$login){ id } }' \
     '{"login":"dynamotn"}' "${body}"
   DYBATPHO_GRAPHQL_TOKEN=""
@@ -757,14 +757,14 @@ c.close()' > "${portfile}" 2> /dev/null &
 
 @test "dybatpho::curl_graphql treats an errors array in a 200 as a failure" {
   dybatpho::mock_http "graphql" 200 '{"errors":[{"message":"Field does not exist"}]}'
-  run -4 --separate-stderr dybatpho::curl_graphql "https://api.example.test/graphql" '{ viewer { nope } }'
+  run_traced -4 --separate-stderr dybatpho::curl_graphql "https://api.example.test/graphql" '{ viewer { nope } }'
   assert_failure
   [[ "${stderr}" == *"Field does not exist"* ]]
 }
 
 @test "dybatpho::curl_graphql passes a clean response through" {
   dybatpho::mock_http "graphql" 200 '{"data":{"ok":true}}'
-  run dybatpho::curl_graphql "https://api.example.test/graphql" '{ ok }'
+  run_traced dybatpho::curl_graphql "https://api.example.test/graphql" '{ ok }'
   assert_success
 }
 
@@ -848,18 +848,18 @@ c.close()' > "${portfile}" 2> /dev/null &
 }
 
 @test "dybatpho::url_parse rejects a URL it cannot take apart" {
-  run ! dybatpho::url_parse "example.com/x"
-  run ! dybatpho::url_parse "https:///path"
-  run ! dybatpho::url_parse "https://host:notaport/x"
-  run ! dybatpho::url_parse "https://host:99999/x"
-  run ! dybatpho::url_parse "https://host:0/x"
+  run_traced ! dybatpho::url_parse "example.com/x"
+  run_traced ! dybatpho::url_parse "https:///path"
+  run_traced ! dybatpho::url_parse "https://host:notaport/x"
+  run_traced ! dybatpho::url_parse "https://host:99999/x"
+  run_traced ! dybatpho::url_parse "https://host:0/x"
 }
 
 @test "dybatpho::url_part prints a component and honors a default" {
   dybatpho::url_parse "https://example.com/health"
   assert_equal "$(dybatpho::url_part host)" "example.com"
   assert_equal "$(dybatpho::url_part port 443)" "443"
-  run ! dybatpho::url_part port
+  run_traced ! dybatpho::url_part port
 }
 
 @test "dybatpho::url_part rejects a name that is not a component" {
@@ -883,8 +883,8 @@ c.close()' > "${portfile}" 2> /dev/null &
   # `inet_aton` reads `010` as octal, so this address means one host to the
   # resolver and another to a reader. Refusing it is the only answer that does
   # not silently pick one of the two.
-  run ! dybatpho::is_ipv4 127.0.0.010
-  run ! dybatpho::is_ipv4 010.1.1.1
+  run_traced ! dybatpho::is_ipv4 127.0.0.010
+  run_traced ! dybatpho::is_ipv4 010.1.1.1
   dybatpho::is_ipv4 127.0.0.0
 }
 
@@ -905,7 +905,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::is_ipv6 refuses a zone index" {
   # `%eth0` names an interface on one host, so the address is not comparable
   # with the same text read anywhere else.
-  run ! dybatpho::is_ipv6 "fe80::1%eth0"
+  run_traced ! dybatpho::is_ipv6 "fe80::1%eth0"
   dybatpho::is_ipv6 "fe80::1"
 }
 
@@ -913,7 +913,7 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_equal "$(dybatpho::ip_version 192.0.2.1)" "4"
   assert_equal "$(dybatpho::ip_version 2001:db8::1)" "6"
   assert_equal "$(dybatpho::ip_version ::ffff:192.0.2.1)" "6"
-  run ! dybatpho::ip_version "nope"
+  run_traced ! dybatpho::ip_version "nope"
 }
 
 # --- Networks ------------------------------------------------------------
@@ -986,7 +986,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 # --- Ports ---------------------------------------------------------------
 
 @test "dybatpho::port_open reports a port nothing is listening on as closed" {
-  run ! dybatpho::port_open 127.0.0.1 1 1
+  run_traced ! dybatpho::port_open 127.0.0.1 1 1
 }
 
 @test "dybatpho::port_open finds a port that is listening" {
@@ -1003,7 +1003,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 
 @test "dybatpho::wait_port gives up within its budget" {
   local started=${SECONDS}
-  run ! dybatpho::wait_port 127.0.0.1 1 2 1
+  run_traced ! dybatpho::wait_port 127.0.0.1 1 2 1
   # The budget is what bounds the call, including the time each attempt takes.
   ((SECONDS - started <= 8)) || fail "waited $((SECONDS - started))s for a 2s budget"
 }
@@ -1027,13 +1027,13 @@ c.close()' > "${portfile}" 2> /dev/null &
 
   # Arguments are world-readable through /proc/<pid>/cmdline, so neither the
   # credential nor the body may appear there.
-  run dybatpho::mock_calls curl
+  run_traced dybatpho::mock_calls curl
   assert_success
   refute_output --partial "leak-me-not"
   refute_output --partial '"secret":"body"'
 
   # They were still sent, out of band.
-  run dybatpho::mock_http_payloads
+  run_traced dybatpho::mock_http_payloads
   assert_success
   assert_output --partial "Authorization: Bearer leak-me-not"
   assert_output --partial '{"secret":"body"}'
@@ -1046,7 +1046,7 @@ c.close()' > "${portfile}" 2> /dev/null &
     '{"message":"Validation Failed","errors":[{"field":"title","code":"missing"}]}'
 
   # 4 for a 4xx, not 1: the status is the answer, not a transport failure.
-  run -4 dybatpho::curl_do "https://api.example.test/reject" "${body}"
+  run_traced -4 dybatpho::curl_do "https://api.example.test/reject" "${body}"
 
   # The reason the request was refused has to survive; `-f` used to discard it
   # before the library ever saw it.
@@ -1057,10 +1057,10 @@ c.close()' > "${portfile}" 2> /dev/null &
   export DYBATPHO_CURL_MAX_RETRIES=0
   local body="${BATS_TEST_TMPDIR}/server-error"
   dybatpho::mock_http "api.example.test/broken" 503 '{"message":"try later"}'
-  run -5 dybatpho::curl_do "https://api.example.test/broken" "${body}"
+  run_traced -5 dybatpho::curl_do "https://api.example.test/broken" "${body}"
   assert_file_contains "${body}" "try later"
 
   # Nothing came back at all: that is the case a non-zero curl exit now means.
   dybatpho::mock_command curl 7 ""
-  run -1 dybatpho::curl_do "https://api.example.test/unreachable" "${BATS_TEST_TMPDIR}/none"
+  run_traced -1 dybatpho::curl_do "https://api.example.test/unreachable" "${BATS_TEST_TMPDIR}/none"
 }

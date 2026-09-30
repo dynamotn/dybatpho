@@ -17,7 +17,7 @@ setup() {
 @test "dybatpho::date_is_valid accepts valid dates and rejects invalid ones" {
   dybatpho::date_is_valid "2024-02-29"
 
-  run dybatpho::date_is_valid "2024-02-30"
+  run_traced dybatpho::date_is_valid "2024-02-30"
   assert_failure
 }
 
@@ -57,10 +57,10 @@ setup() {
   # not be reported as a valid date.
   stub_repeated date ": case \"\$1\" in --version) exit 1 ;; -j) [[ \$3 == '%Y-%m-%d' ]] && echo '1709251200' || exit 1 ;; -r) echo '2024-03-01' ;; *) exit 1 ;; esac"
 
-  run dybatpho::date_is_valid "2024-02-30"
+  run_traced dybatpho::date_is_valid "2024-02-30"
   assert_failure
 
-  run dybatpho::date_parse "2024-02-30"
+  run_traced dybatpho::date_parse "2024-02-30"
   assert_failure
 }
 
@@ -68,9 +68,9 @@ setup() {
   stub_repeated date ": exit 1"
 
   # Called directly so the failing branch is exercised in this shell.
-  run ! __dybatpho_date_parse "not a date"
+  run_traced ! __dybatpho_date_parse "not a date"
 
-  run dybatpho::date_parse "not a date"
+  run_traced dybatpho::date_parse "not a date"
   assert_failure
 }
 
@@ -144,7 +144,7 @@ setup() {
   assert_equal "$(dybatpho::date_diff '2024-01-01 00:00:00' '2024-01-01 00:01:00')" "60"
   assert_equal "$(dybatpho::date_diff '2024-01-01 00:00:00' '2024-01-01 01:30:00' minutes)" "90"
   assert_equal "$(dybatpho::date_diff '2024-01-01 00:00:00' '2024-01-01 01:30:00' hours)" "1"
-  run --separate-stderr ! dybatpho::date_diff 2024-01-01 2024-01-02 fortnights
+  run_traced --separate-stderr ! dybatpho::date_diff 2024-01-01 2024-01-02 fortnights
 }
 
 @test "dybatpho::date_diff truncates toward zero in both directions" {

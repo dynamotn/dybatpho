@@ -31,7 +31,7 @@ __json_path_without_yq() {
   unstub yq
 
   stub yq ": exit 1"
-  run dybatpho::json_has "package.json" ".missing"
+  run_traced dybatpho::json_has "package.json" ".missing"
   assert_failure
   unstub yq
 }
@@ -90,7 +90,7 @@ EOF
   unstub yq
 
   stub yq ": exit 1"
-  run dybatpho::yaml_has "compose.yaml" ".missing"
+  run_traced dybatpho::yaml_has "compose.yaml" ".missing"
   assert_failure
   unstub yq
 }
@@ -157,9 +157,9 @@ EOF
 
 @test "JSON and YAML helpers propagate backend failures" {
   stub_repeated yq ": exit 9"
-  run dybatpho::json_query "data.json" ".value"
+  run_traced dybatpho::json_query "data.json" ".value"
   assert_failure 9
-  run dybatpho::yaml_query "data.yaml" ".value"
+  run_traced dybatpho::yaml_query "data.yaml" ".value"
   assert_failure 9
   unstub yq
 }
@@ -208,7 +208,7 @@ EOF
   local saved_path="${PATH}"
   PATH="${BATS_TEST_TMPDIR}"
   hash -r
-  run dybatpho::json_string 'still works'
+  run_traced dybatpho::json_string 'still works'
   PATH="${saved_path}"
   hash -r
   assert_success
@@ -284,13 +284,13 @@ EOF
 }
 
 @test "dybatpho::json_valid separates documents from prose" {
-  run dybatpho::json_valid '{"a":1}'
+  run_traced dybatpho::json_valid '{"a":1}'
   assert_success
-  run dybatpho::json_valid '[1,2]'
+  run_traced dybatpho::json_valid '[1,2]'
   assert_success
-  run dybatpho::json_valid 'definitely not json'
+  run_traced dybatpho::json_valid 'definitely not json'
   assert_failure
-  run dybatpho::json_valid '{"a":'
+  run_traced dybatpho::json_valid '{"a":'
   assert_failure
 }
 

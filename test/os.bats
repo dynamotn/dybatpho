@@ -49,20 +49,20 @@ setup() {
 }
 
 @test "dybatpho::command_path fails without arguments or matches" {
-  run ! dybatpho::command_path
-  run ! dybatpho::command_path command-that-does-not-exist another-missing-command
+  run_traced ! dybatpho::command_path
+  run_traced ! dybatpho::command_path command-that-does-not-exist another-missing-command
 }
 
 @test "dybatpho::is_linux detects a Linux platform" {
   stub_repeated uname ": echo 'Linux'"
   dybatpho::is_linux
-  run ! dybatpho::is_macos
+  run_traced ! dybatpho::is_macos
 }
 
 @test "dybatpho::is_macos detects a macOS platform" {
   stub_repeated uname ": echo 'Darwin'"
   dybatpho::is_macos
-  run ! dybatpho::is_linux
+  run_traced ! dybatpho::is_linux
 }
 
 @test "dybatpho::goarch arm64" {
@@ -122,7 +122,7 @@ setup() {
 @test "dybatpho::is_windows detects a Windows-compatible platform" {
   stub_repeated uname ": echo 'MINGW64_NT-10.0-22631'"
   dybatpho::is_windows
-  run ! dybatpho::is_linux
+  run_traced ! dybatpho::is_linux
 }
 
 # ---------------------------------------------------------------------------
@@ -163,19 +163,19 @@ _child() {
   # library is loaded so that only the detection sees it.
   # `hash -r` drops the paths bash remembered while the library loaded, so the
   # narrowed PATH is what the detection actually sees.
-  run -0 _child "unset DYBATPHO_HOSTNAME" "PATH='${bin}'" "hash -r" "dybatpho::hostname"
+  run_traced -0 _child "unset DYBATPHO_HOSTNAME" "PATH='${bin}'" "hash -r" "dybatpho::hostname"
   assert_output "from-uname"
 }
 
 @test "dybatpho::hostname returns a non-empty name on this host" {
   __dybatpho_os_hostname=""
-  run -0 dybatpho::hostname
+  run_traced -0 dybatpho::hostname
   refute_output ""
   __dybatpho_os_hostname=""
 }
 
 @test "dybatpho::user reports the effective user" {
-  run -0 dybatpho::user
+  run_traced -0 dybatpho::user
   assert_output "$(id -un)"
 }
 
@@ -183,7 +183,7 @@ _child() {
   if [[ "${EUID}" -eq 0 ]]; then
     dybatpho::is_root
   else
-    run ! dybatpho::is_root
+    run_traced ! dybatpho::is_root
   fi
 }
 
@@ -198,7 +198,7 @@ _child() {
 # ---------------------------------------------------------------------------
 
 @test "dybatpho::cpu_count reports a positive number of processors" {
-  run -0 dybatpho::cpu_count
+  run_traced -0 dybatpho::cpu_count
   assert_equal "${output}" "$(printf '%s' "${output}")"
   [[ "${output}" =~ ^[1-9][0-9]*$ ]]
 }
@@ -214,10 +214,10 @@ _child() {
 }
 
 @test "dybatpho::is_tty is false for the captured streams of a test" {
-  run ! dybatpho::is_tty stdin
-  run ! dybatpho::is_tty stdout
-  run ! dybatpho::is_tty stderr
-  run ! dybatpho::is_tty 1
+  run_traced ! dybatpho::is_tty stdin
+  run_traced ! dybatpho::is_tty stdout
+  run_traced ! dybatpho::is_tty stderr
+  run_traced ! dybatpho::is_tty 1
 }
 
 @test "dybatpho::is_tty rejects a stream it does not know" {
@@ -268,7 +268,7 @@ _os_release() {
 
 @test "dybatpho::os_release fails for a field the file does not carry" {
   _os_release 'ID=ubuntu'
-  run ! dybatpho::os_release VARIANT_ID
+  run_traced ! dybatpho::os_release VARIANT_ID
   assert_output ""
 }
 
@@ -287,7 +287,7 @@ _os_release() {
   export DYBATPHO_OS_RELEASE="${BATS_TEST_TMPDIR}/absent"
   stub_repeated uname ": echo 'Linux'"
   assert_equal "$(dybatpho::distro)" "linux"
-  run ! dybatpho::distro_version
+  run_traced ! dybatpho::distro_version
 }
 
 @test "dybatpho::distro_version accepts a rolling release with only a build id" {
@@ -360,12 +360,12 @@ fake_tool() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "${dir}/faketool"
   chmod +x "${dir}/faketool"
   PATH="${dir}:${PATH}"
-  run ! dybatpho::command_version faketool
+  run_traced ! dybatpho::command_version faketool
   assert_output ""
 }
 
 @test "dybatpho::command_version fails on a command that is not installed" {
-  run ! dybatpho::command_version dyfoooo
+  run_traced ! dybatpho::command_version dyfoooo
   assert_output ""
 }
 
@@ -377,7 +377,7 @@ fake_tool() {
   printf '#!/usr/bin/env bash\ncat\n' > "${dir}/faketool"
   chmod +x "${dir}/faketool"
   PATH="${dir}:${PATH}"
-  run ! dybatpho::command_version faketool
+  run_traced ! dybatpho::command_version faketool
 }
 
 @test "dybatpho::command_version reads the version of a real command" {
@@ -402,12 +402,12 @@ fake_tool() {
   # `_child` inherits this shell's environment, and the suite itself may be
   # running on a service, so every marker is cleared before one is set back.
   local clean="unset CI GITHUB_ACTIONS GITLAB_CI JENKINS_URL BUILDKITE CIRCLECI TRAVIS TEAMCITY_VERSION TF_BUILD"
-  run ! _child "${clean}" "export GITHUB_ACTIONS=false" "dybatpho::is_ci"
-  run -0 _child "${clean}" "export GITHUB_ACTIONS=true" "dybatpho::is_ci"
-  run -0 _child "${clean}" "export GITLAB_CI=true" "dybatpho::is_ci"
+  run_traced ! _child "${clean}" "export GITHUB_ACTIONS=false" "dybatpho::is_ci"
+  run_traced -0 _child "${clean}" "export GITHUB_ACTIONS=true" "dybatpho::is_ci"
+  run_traced -0 _child "${clean}" "export GITLAB_CI=true" "dybatpho::is_ci"
   # An empty `CI` is not an answer either way, so the fallback still applies.
-  run -0 _child "${clean}" "export CI=''; export GITLAB_CI=true" "dybatpho::is_ci"
-  run ! _child "${clean}" "export CI=''; export GITLAB_CI=false" "dybatpho::is_ci"
+  run_traced -0 _child "${clean}" "export CI=''; export GITLAB_CI=true" "dybatpho::is_ci"
+  run_traced ! _child "${clean}" "export CI=''; export GITLAB_CI=false" "dybatpho::is_ci"
 }
 
 @test "dybatpho::is_ci recognizes a service and honors a disabled one" {
@@ -416,7 +416,7 @@ fake_tool() {
   # A service that sets `CI=false` means it, and nothing else is consulted for
   # it -- the suite itself runs on CI, so the negative case needs a clean shell.
   CI=false run ! dybatpho::is_ci
-  run ! _child \
+  run_traced ! _child \
     "unset CI GITHUB_ACTIONS GITLAB_CI JENKINS_URL BUILDKITE CIRCLECI TRAVIS TEAMCITY_VERSION TF_BUILD" \
     "dybatpho::is_ci"
 }

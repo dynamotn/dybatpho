@@ -375,14 +375,14 @@ function _create_traversal_test_archive {
   dybatpho::archive_is_safe "${safe_archive}"
 
   assert_equal "$(dybatpho::archive_unsafe_entries "${evil_archive}" 2> /dev/null)" "../victim.txt"
-  run -1 dybatpho::archive_is_safe "${evil_archive}"
+  run_traced -1 dybatpho::archive_is_safe "${evil_archive}"
 }
 
 @test "__dybatpho_archive_entry_is_safe rejects absolute and Windows-style entries" {
   __dybatpho_archive_entry_is_safe "bundle/nested/file.txt"
-  run -1 __dybatpho_archive_entry_is_safe "/etc/passwd"
-  run -1 __dybatpho_archive_entry_is_safe "C:/windows/system32"
-  run -1 __dybatpho_archive_entry_is_safe "bundle/../../escape"
-  run -1 __dybatpho_archive_entry_is_safe "bundle\\..\\escape"
-  run -1 __dybatpho_archive_entry_is_safe ".."
+  run_traced -1 __dybatpho_archive_entry_is_safe "/etc/passwd"
+  run_traced -1 __dybatpho_archive_entry_is_safe "C:/windows/system32"
+  run_traced -1 __dybatpho_archive_entry_is_safe "bundle/../../escape"
+  run_traced -1 __dybatpho_archive_entry_is_safe "bundle\\..\\escape"
+  run_traced -1 __dybatpho_archive_entry_is_safe ".."
 }

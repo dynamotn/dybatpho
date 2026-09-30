@@ -17,7 +17,7 @@ setup() {
 }
 
 @test "dybatpho::show_file with non-existent file" {
-  run --separate-stderr dybatpho::show_file "/non/existent/file.txt"
+  run_traced --separate-stderr dybatpho::show_file "/non/existent/file.txt"
   assert_failure
 }
 
@@ -89,16 +89,16 @@ setup() {
 
 @test "dybatpho::path_is_abs and dybatpho::path_has_ext inspect paths" {
   dybatpho::path_is_abs "/tmp/demo"
-  run ! dybatpho::path_is_abs "tmp/demo"
+  run_traced ! dybatpho::path_is_abs "tmp/demo"
   dybatpho::path_has_ext "archive.tar.gz"
   dybatpho::path_has_ext "archive.tar.gz" ".gz"
-  run ! dybatpho::path_has_ext "archive.tar.gz" "zip"
-  run ! dybatpho::path_has_ext "plainfile"
+  run_traced ! dybatpho::path_has_ext "archive.tar.gz" "zip"
+  run_traced ! dybatpho::path_has_ext "plainfile"
 
-  run dybatpho::path_is_abs "tmp/demo"
+  run_traced dybatpho::path_is_abs "tmp/demo"
   assert_failure
 
-  run dybatpho::path_has_ext "archive.tar.gz" "zip"
+  run_traced dybatpho::path_has_ext "archive.tar.gz" "zip"
   assert_failure
 }
 
@@ -117,8 +117,8 @@ setup() {
 }
 
 @test "dybatpho::create_temp with empty variable name" {
-  run ! dybatpho::create_temp "" ".txt"
-  run dybatpho::create_temp "" ".txt"
+  run_traced ! dybatpho::create_temp "" ".txt"
+  run_traced dybatpho::create_temp "" ".txt"
   assert_failure
   refute_output
 }
@@ -341,7 +341,7 @@ EOF
   printf 'new\n' | dybatpho::file_write_atomic "${target}"
   after="$(stat -c %i "${target}" 2> /dev/null || stat -f %i "${target}")"
   refute [ "${before}" = "${after}" ]
-  run find "${BATS_TEST_TMPDIR}" -name '.dybatpho_staging_*'
+  run_traced find "${BATS_TEST_TMPDIR}" -name '.dybatpho_staging_*'
   assert_output ""
 }
 
@@ -557,7 +557,7 @@ EOF
   unset DRY_RUN
   assert_equal "$(cat "${target}")" "keep = 1"
   refute [ -e "${backup}" ]
-  run find "${BATS_TEST_TMPDIR}" -name '.dybatpho_staging_*'
+  run_traced find "${BATS_TEST_TMPDIR}" -name '.dybatpho_staging_*'
   assert_output ""
 }
 
@@ -653,7 +653,7 @@ EOF
 }
 
 @test "dybatpho::find_up reports failure without output when nothing matches" {
-  run -1 dybatpho::find_up "dybatpho-no-such-marker-xyz" "${BATS_TEST_TMPDIR}"
+  run_traced -1 dybatpho::find_up "dybatpho-no-such-marker-xyz" "${BATS_TEST_TMPDIR}"
   assert_output ""
 }
 
@@ -729,7 +729,7 @@ EOF
 printf "%s\n%s\n%s\n%s\n" "$(dybatpho::xdg_config_dir)" "$(dybatpho::xdg_cache_dir)" \
   "$(dybatpho::xdg_data_dir)" "$(dybatpho::xdg_state_dir)"
 SCRIPT
-  run -0 env -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME \
+  run_traced -0 env -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME \
     HOME="${home}" bash "${script}" "${DYBATPHO_DIR}"
   assert_line --index 0 "${home}/.config"
   assert_line --index 1 "${home}/.cache"
@@ -758,7 +758,7 @@ SCRIPT
 . "${1}/init.sh"
 dybatpho::xdg_cache_dir myapp
 SCRIPT
-  run -0 env XDG_CACHE_HOME="relative/path" HOME="${home}" bash "${script}" "${DYBATPHO_DIR}"
+  run_traced -0 env XDG_CACHE_HOME="relative/path" HOME="${home}" bash "${script}" "${DYBATPHO_DIR}"
   assert_output "${home}/.cache/myapp"
 }
 
@@ -768,7 +768,7 @@ SCRIPT
 . "${1}/init.sh"
 dybatpho::xdg_config_dir
 SCRIPT
-  run ! env -u XDG_CONFIG_HOME -u HOME bash "${script}" "${DYBATPHO_DIR}"
+  run_traced ! env -u XDG_CONFIG_HOME -u HOME bash "${script}" "${DYBATPHO_DIR}"
 }
 
 @test "the XDG helpers only build a path, leaving creation to the caller" {
@@ -845,7 +845,7 @@ SCRIPT
   printf '\000' >> "${target}"
   # The NUL is past the sampled block, so the file reads as text. This is the
   # same trade-off `grep` makes, and it keeps the check to one read.
-  run ! dybatpho::file_is_binary "${target}"
+  run_traced ! dybatpho::file_is_binary "${target}"
 }
 
 @test "dybatpho::create_temp_dir creates a directory and cleans it up" {

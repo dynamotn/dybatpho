@@ -150,7 +150,7 @@ curl_payload() {
 @test "dybatpho::forge_token registers the token in the shell it runs in" {
   DYBATPHO_FORGE_TOKEN="super-secret-value"
   dybatpho::forge_token github > /dev/null
-  run dybatpho::secret_mask "token is super-secret-value"
+  run_traced dybatpho::secret_mask "token is super-secret-value"
   refute_output --partial "super-secret-value"
 }
 
@@ -168,7 +168,7 @@ curl_payload() {
 
   # Registering it in this shell is what makes masking work from here on.
   dybatpho::secret_register "${captured}"
-  run dybatpho::secret_mask "token is another-secret-value"
+  run_traced dybatpho::secret_mask "token is another-secret-value"
   refute_output --partial "another-secret-value"
 }
 
@@ -179,7 +179,7 @@ curl_payload() {
 @test "dybatpho::forge_request builds a GitHub URL and sends a bearer token" {
   dybatpho::mock_http "api.github.com" 200 '{"ok":true}'
 
-  run dybatpho::forge_request GET "issues"
+  run_traced dybatpho::forge_request GET "issues"
   assert_success
   dybatpho::assert_http_called "https://api.github.com/repos/acme/widget/issues"
   assert_regex "$(curl_payload 1)" "Authorization: Bearer test-token"
@@ -189,7 +189,7 @@ curl_payload() {
   use_gitlab
   dybatpho::mock_http "gitlab.com" 200 '{"ok":true}'
 
-  run dybatpho::forge_request GET "issues"
+  run_traced dybatpho::forge_request GET "issues"
   assert_success
   dybatpho::assert_http_called "https://gitlab.com/api/v4/projects/acme%2Fgroup%2Fwidget/issues"
   assert_regex "$(curl_payload 1)" "PRIVATE-TOKEN: test-token"
@@ -209,7 +209,7 @@ curl_payload() {
 @test "dybatpho::forge_request passes an absolute URL through untouched" {
   dybatpho::mock_http "uploads.example" 200 '{}'
 
-  run dybatpho::forge_request GET "https://uploads.example/direct"
+  run_traced dybatpho::forge_request GET "https://uploads.example/direct"
   assert_success
   dybatpho::assert_http_called "https://uploads.example/direct"
 }
@@ -217,7 +217,7 @@ curl_payload() {
 @test "dybatpho::forge_request reports a failing status to the caller" {
   dybatpho::mock_http "api.github.com" 404 '{"message":"Not Found"}'
 
-  run dybatpho::forge_request GET "issues/9999"
+  run_traced dybatpho::forge_request GET "issues/9999"
   assert_failure
 }
 
@@ -231,7 +231,7 @@ curl_payload() {
 
   assert_equal "$(dybatpho::forge_issue_find "Build failing")" "4"
 
-  run dybatpho::forge_issue_find "Nothing like this"
+  run_traced dybatpho::forge_issue_find "Nothing like this"
   assert_failure
 }
 
@@ -306,7 +306,7 @@ curl_payload() {
   # matched as text rather than parsed: feeding an error message to
   # `dybatpho::json_get` would itself die, at the top level of the test, which
   # aborts the whole file instead of failing this one case.
-  run dybatpho::forge_issue_report "Nightly failing" "log url" "ci"
+  run_traced dybatpho::forge_issue_report "Nightly failing" "log url" "ci"
   assert_success
   assert_regex "${output}" '"action":"created"'
   assert_regex "${output}" '"number":"30"'
@@ -317,7 +317,7 @@ curl_payload() {
   dybatpho::mock_http "issues?state=open" 200 '[{"number":30,"title":"Nightly failing"}]'
   dybatpho::mock_http "/issues/30/comments" 201 '{}'
 
-  run dybatpho::forge_issue_report "Nightly failing" "another failure"
+  run_traced dybatpho::forge_issue_report "Nightly failing" "another failure"
   assert_success
   assert_regex "${output}" '"action":"commented"'
   assert_regex "${output}" '"number":"30"'
@@ -351,7 +351,7 @@ curl_payload() {
 @test "dybatpho::forge_release_find fails when the tag has no release" {
   dybatpho::mock_http "api.github.com" 404 '{"message":"Not Found"}'
 
-  run dybatpho::forge_release_find "v9.9.9"
+  run_traced dybatpho::forge_release_find "v9.9.9"
   assert_failure
 }
 
@@ -426,7 +426,7 @@ curl_payload() {
   dybatpho::mock_http "packages/generic" 201 '{}'
   dybatpho::mock_http "assets/links" 201 '{}'
 
-  run dybatpho::forge_release_upload "v1.2.0" "${artifact}"
+  run_traced dybatpho::forge_release_upload "v1.2.0" "${artifact}"
   assert_success
   assert_output --partial "packages/generic/widget/v1.2.0/app-v1.2.0.tar.gz"
   # A generic package is invisible from the release page until it is linked.
@@ -483,7 +483,7 @@ curl_payload() {
   DYBATPHO_HTTP_STATUS=422
 
   printf '%s' '{"message":"Validation Failed","errors":[{"field":"title","code":"missing"}]}' > "${body}"
-  run dybatpho::forge_error "${body}"
+  run_traced dybatpho::forge_error "${body}"
   assert_success
   assert_output --partial "HTTP 422"
   assert_output --partial "Validation Failed"
@@ -491,7 +491,7 @@ curl_payload() {
 
   # GitLab words it differently.
   printf '%s' '{"error":"insufficient_scope"}' > "${body}"
-  run dybatpho::forge_error "${body}"
+  run_traced dybatpho::forge_error "${body}"
   assert_output --partial "insufficient_scope"
 }
 
@@ -500,17 +500,17 @@ curl_payload() {
   DYBATPHO_HTTP_STATUS=502
 
   printf '%s' '<html><body>Bad Gateway</body></html>' > "${body}"
-  run dybatpho::forge_error "${body}"
+  run_traced dybatpho::forge_error "${body}"
   assert_success
   assert_output --partial "HTTP 502"
   assert_output --partial "Bad Gateway"
 
   : > "${body}"
-  run dybatpho::forge_error "${body}"
+  run_traced dybatpho::forge_error "${body}"
   assert_success
   assert_output "HTTP 502"
 
-  run dybatpho::forge_error "${BATS_TEST_TMPDIR}/does-not-exist"
+  run_traced dybatpho::forge_error "${BATS_TEST_TMPDIR}/does-not-exist"
   assert_success
   assert_output "HTTP 502"
 }

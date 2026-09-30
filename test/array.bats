@@ -87,7 +87,7 @@ kiwi"
   dybatpho::array_contains "arr" "hello world"
 
   # Called directly so the non-matching branch runs in this shell.
-  run ! dybatpho::array_contains "arr" "baz"
+  run_traced ! dybatpho::array_contains "arr" "baz"
 }
 
 @test "dybatpho::array_index_of prints first matching index" {
@@ -102,7 +102,7 @@ kiwi"
 
 @test "dybatpho::array_index_of fails when element is missing" {
   arr=("apple" "banana")
-  run ! dybatpho::array_index_of "arr" "orange"
+  run_traced ! dybatpho::array_index_of "arr" "orange"
   assert_equal "$(dybatpho::array_index_of "arr" "orange" || true)" ""
 }
 
@@ -185,7 +185,7 @@ EOF
   assert_line --index 1 "<world>"
 
   arr=("hello" "world")
-  run dybatpho::array_map "arr" "_explode_on_world"
+  run_traced dybatpho::array_map "arr" "_explode_on_world"
   assert_failure 7
 }
 
@@ -215,7 +215,7 @@ EOF
     [[ "$1" == python ]]
   }
   arr=("bash" "go")
-  run ! dybatpho::array_find "arr" "_is_python"
+  run_traced ! dybatpho::array_find "arr" "_is_python"
   assert_equal "$(dybatpho::array_find "arr" "_is_python" || true)" ""
 }
 
@@ -234,14 +234,14 @@ EOF
   dybatpho::array_every "arr" "_is_lowercase_word"
 
   arr=("Bash" "go")
-  run dybatpho::array_every "arr" "_is_lowercase_word"
+  run_traced dybatpho::array_every "arr" "_is_lowercase_word"
   assert_failure
 
   arr=("Bash" "go")
   dybatpho::array_some "arr" "_is_lowercase_word"
 
   arr=("Bash" "123")
-  run dybatpho::array_some "arr" "_is_lowercase_word"
+  run_traced dybatpho::array_some "arr" "_is_lowercase_word"
   assert_failure
 }
 
@@ -265,10 +265,10 @@ EOF
   assert_equal "$(dybatpho::array_last "arr")" "gamma"
 
   arr=()
-  run dybatpho::array_first "arr"
+  run_traced dybatpho::array_first "arr"
   assert_failure
 
-  run dybatpho::array_last "arr"
+  run_traced dybatpho::array_last "arr"
   assert_failure
 }
 
@@ -365,7 +365,7 @@ EOF
 
   dybatpho::array_every "arr" "_always_true"
 
-  run dybatpho::array_some "arr" "_always_true"
+  run_traced dybatpho::array_some "arr" "_always_true"
   assert_failure
 }
 
@@ -399,10 +399,10 @@ EOF
   dybatpho::array_some "arr" "_is_long"
 
   arr=("go" "c")
-  run ! dybatpho::array_some "arr" "_is_long"
+  run_traced ! dybatpho::array_some "arr" "_is_long"
 
   arr=()
-  run ! dybatpho::array_some "arr" "_is_long"
+  run_traced ! dybatpho::array_some "arr" "_is_long"
 }
 
 @test "dybatpho::array_some fails for invalid predicate" {
@@ -597,7 +597,7 @@ EOF
 @test "the set operations print with -- and keep the first array's order" {
   local first=(c a)
   local second=(b)
-  run -0 dybatpho::array_union first second --
+  run_traced -0 dybatpho::array_union first second --
   assert_line --index 0 "c"
   assert_line --index 1 "a"
   assert_line --index 2 "b"

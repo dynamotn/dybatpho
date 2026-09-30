@@ -36,7 +36,7 @@ fail_with() {
   # The positional arguments arrive as a Bash array. Read as a string, an empty
   # one is unset, `errexit` ended the source listing inside a process
   # substitution, and the check then compared nothing and called it clean.
-  run "${REPO_ROOT}/scripts/docs.sh" --check
+  run_traced "${REPO_ROOT}/scripts/docs.sh" --check
   refute_output --partial "unbound variable"
   refute_output --partial "DOC_ARGS"
 }

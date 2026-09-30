@@ -9,7 +9,7 @@ setup() {
 @test "dybatpho::math_is_number accepts the decimal spellings" {
   local value
   for value in 0 12 -12 +12 1.5 -0.5 +.25 "7." 000123; do
-    run dybatpho::math_is_number "${value}"
+    run_traced dybatpho::math_is_number "${value}"
     assert_success
   done
 }
@@ -17,19 +17,19 @@ setup() {
 @test "dybatpho::math_is_number rejects anything that is not plain decimal" {
   local value
   for value in "" " " abc 1e3 0x10 "1,5" "1 2" "--1" "1.2.3" "."; do
-    run dybatpho::math_is_number "${value}"
+    run_traced dybatpho::math_is_number "${value}"
     assert_failure
   done
 }
 
 @test "dybatpho::math_is_integer treats a zero fraction as whole" {
-  run dybatpho::math_is_integer "2.00"
+  run_traced dybatpho::math_is_integer "2.00"
   assert_success
-  run dybatpho::math_is_integer "-7"
+  run_traced dybatpho::math_is_integer "-7"
   assert_success
-  run dybatpho::math_is_integer "2.01"
+  run_traced dybatpho::math_is_integer "2.01"
   assert_failure
-  run dybatpho::math_is_integer "abc"
+  run_traced dybatpho::math_is_integer "abc"
   assert_failure
 }
 
@@ -225,17 +225,17 @@ setup() {
 }
 
 @test "dybatpho::math_gt, math_lt and math_eq report through the exit code" {
-  run dybatpho::math_gt 2 1
+  run_traced dybatpho::math_gt 2 1
   assert_success
-  run dybatpho::math_gt 1 2
+  run_traced dybatpho::math_gt 1 2
   assert_failure
-  run dybatpho::math_lt 1 2
+  run_traced dybatpho::math_lt 1 2
   assert_success
-  run dybatpho::math_lt 2 1
+  run_traced dybatpho::math_lt 2 1
   assert_failure
-  run dybatpho::math_eq 2.50 2.5
+  run_traced dybatpho::math_eq 2.50 2.5
   assert_success
-  run dybatpho::math_eq 2.5 2.6
+  run_traced dybatpho::math_eq 2.5 2.6
   assert_failure
 }
 
@@ -470,7 +470,7 @@ setup() {
   local script="${BATS_TEST_TMPDIR}/math_alone.sh"
   printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules math" \
     "dybatpho::math_add 1 2" > "${script}"
-  run bash "${script}"
+  run_traced bash "${script}"
   assert_success
   assert_output "3"
 }

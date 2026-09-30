@@ -480,8 +480,6 @@ function _spec {
     on:true off:false init:="${DRY_RUN:-false}" export:true
   dybatpho::opts::flag "Answer every confirmation with yes" DYBATPHO_FORCE -y --yes \
     on:true off:false init:="${DYBATPHO_FORCE:-false}" export:true
-
-  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
 }
 
 dybatpho::generate_from_spec _spec "$@"

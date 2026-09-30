@@ -142,7 +142,7 @@ setup() {
   run_traced dybatpho::notify_telegram "plain text"
   unstub curl
   assert_success
-  run grep "parse_mode" "${args_file}"
+  run_traced grep "parse_mode" "${args_file}"
   assert_failure
 }
 
@@ -193,7 +193,7 @@ setup() {
   run_traced dybatpho::notify_teams "simple message"
   unstub curl
   assert_success
-  run grep '"weight":"bolder"' "${args_file}"
+  run_traced grep '"weight":"bolder"' "${args_file}"
   assert_failure
 }
 
@@ -278,7 +278,7 @@ setup() {
   run_traced dybatpho::notify_discord "simple"
   unstub curl
   assert_success
-  run grep '"username"' "${args_file}"
+  run_traced grep '"username"' "${args_file}"
   assert_failure
 }
 
@@ -310,7 +310,7 @@ setup() {
 @test "dybatpho::notify_webhook forwards extra curl arguments" {
   local args_file="${BATS_TEST_TMPDIR}/webhook-extra-args"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
-  run dybatpho::notify_webhook "https://my.service/hook" '{"event":"test"}' \
+  run_traced dybatpho::notify_webhook "https://my.service/hook" '{"event":"test"}' \
     --header "Authorization: Bearer SECRET"
   unstub curl
   assert_success
@@ -321,12 +321,12 @@ setup() {
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
   export DYBATPHO_CURL_MAX_RETRIES=0
   stub curl ": printf '404'"
-  run dybatpho::notify_slack "not found"
+  run_traced dybatpho::notify_slack "not found"
   assert_failure 4
   unstub curl
 
   stub curl ": printf '503'"
-  run dybatpho::notify_slack "unavailable"
+  run_traced dybatpho::notify_slack "unavailable"
   assert_failure 5
   unstub curl
 }
@@ -352,7 +352,7 @@ setup() {
   message="$(printf 'build \033[31mFAILED\033[0m\a on nhánh "main"')"
   local payload
   payload="$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")"
-  run jq -e . <<< "${payload}"
+  run_traced jq -e . <<< "${payload}"
   assert_success
   assert_equal "$(jq -r '.text' <<< "${payload}")" "${message}"
 }

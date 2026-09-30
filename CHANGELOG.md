@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`markdown` — build a report, a pull request body or release notes from
+  escaped pieces instead of a heredoc.** Every builder escapes the text it is
+  given, so a commit subject containing `*`, a filename containing `[` or a cell
+  containing `|` renders as the text it was. `dybatpho::md_raw` marks a fragment
+  that is already Markdown so the surrounding escape leaves it alone.
+
+  `dybatpho::md_heading`, `dybatpho::md_list`, `dybatpho::md_task_list`,
+  `dybatpho::md_link`, `dybatpho::md_badge`, `dybatpho::md_code_block`,
+  `dybatpho::md_table`, `dybatpho::md_collapsible`, `dybatpho::md_mention`,
+  `dybatpho::md_emoji`, `dybatpho::md_raw` and `dybatpho::md_escape`.
+
+  ```sh
+  . dybatpho/init.sh --modules markdown
+
+  dybatpho::md_heading 2 "What changed"
+  dybatpho::md_list "$(git log --format=%s "${previous}..HEAD")"
+  dybatpho::md_task_list $'x|Tag the commit\n|Announce the release'
+  dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}")"
+  ```
+
+  The code block fence grows past any fence inside its body, a link's URL is
+  percent-encoded, and `dybatpho::md_table` renders through `table`.
+
 ## [5.0.0] - 2026-09-30
 
 ### Added

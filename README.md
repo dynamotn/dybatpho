@@ -168,6 +168,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [text.sh](docs/text.md)        | Multi-line text blocks and formatting               |
 | [json.sh](docs/json.md)        | JSON and YAML reading/writing                       |
 | [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables              |
+| [markdown.sh](docs/markdown.md) | Headings, lists, links, badges and code blocks, with every value escaped |
 | [date.sh](docs/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
 | [i18n.sh](docs/i18n.md)        | Translations, plural rules, locale-aware numbers, money, sizes and dates |
 

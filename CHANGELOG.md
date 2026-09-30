@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`diff` — show what changed, the same way everywhere.** A colored unified
+  diff for text, and a structural comparison for JSON and YAML that answers
+  which keys moved rather than which lines did, so reordering or reformatting
+  a document reports nothing.
+
+  `dybatpho::diff_text`, `dybatpho::diff_summary`, `dybatpho::diff_json` and
+  `dybatpho::diff_yaml`. `DYBATPHO_DIFF_COLOR` decides coloring and
+  `DYBATPHO_DIFF_CONTEXT` how much context a diff carries.
+
+  ```sh
+  . dybatpho/init.sh --modules diff
+
+  if ! dybatpho::diff_text /etc/app.conf "${rendered}" current proposed; then
+    dybatpho::info "Change: $(dybatpho::diff_summary /etc/app.conf "${rendered}" || true)"
+  fi
+  dybatpho::diff_json state-before.json state-after.json
+  ```
+
+  The coloring is done by the module rather than by `diff --color`, which only
+  GNU has, so the output is the same on GNU, BSD and BusyBox. Exit codes are
+  `diff`'s own, so a call reads as a question in a conditional. `diff_text`
+  needs no external command; comparing by key needs `jq`, and `diff_yaml`
+  additionally `yq`.
+
 - **`backup` — snapshot something, keep the last N, drop the rest.** The
   retention loop that log rotation, pre-change config snapshots and local
   database dumps each rewrite, with the off-by-one settled once. A backup is
@@ -84,6 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   percent-encoded, and `dybatpho::md_table` renders through `table`.
 
 ### Changed
+
+- **`dybatpho::assert_snapshot` renders a mismatch through the `diff`
+  module** instead of dumping a raw `diff -u`, so a failing snapshot reads
+  like every other comparison the library prints and carries color where the
+  terminal takes it. The assertion's contract is unchanged.
 
 - **`dybatpho::table_csv` now names the parser to use** when it refuses a
   quoted field, instead of only saying that it will not split one. The refusal

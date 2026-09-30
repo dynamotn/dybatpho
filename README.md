@@ -170,6 +170,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables              |
 | [markdown.sh](docs/markdown.md) | Headings, lists, links, badges and code blocks, with every value escaped |
 | [csv.sh](docs/csv.md)          | Real CSV: quoted fields, embedded commas and newlines, filtering, JSON bridge |
+| [diff.sh](docs/diff.md)        | Colored unified diffs, and JSON/YAML compared by key rather than by line |
 | [date.sh](docs/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
 | [i18n.sh](docs/i18n.md)        | Translations, plural rules, locale-aware numbers, money, sizes and dates |
 

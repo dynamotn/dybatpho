@@ -108,8 +108,12 @@ loaded_line() {
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json network notification "
 
+  # `testing` renders a snapshot mismatch through `diff`, so it comes along.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network table text testing "
+  assert_output "string os logging helpers process file secret json network table text diff testing "
+
+  run_traced -0 init_sh "--modules diff" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret json diff "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json network cache ai "

@@ -89,6 +89,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # Only `dybatpho::csv_from_json` needs one, and either will do: the module
   # parses and writes CSV in Bash alone.
   [csv]="jq|yq>=4"
+  # `dybatpho::diff_text` needs nothing external beyond `diff`; comparing by
+  # key is built on one `jq` filter, and YAML reaches JSON through `yq`.
+  [diff]="jq yq>=4"
   [file]="sha256sum|shasum|openssl"
   [json]="jq"
   [logging]="python3"

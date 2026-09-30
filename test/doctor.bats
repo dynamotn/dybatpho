@@ -67,6 +67,17 @@ fake_versioned_command() {
   assert_output ""
 }
 
+@test "dybatpho::doctor_requirements lists what the diff module needs" {
+  # `dybatpho::diff_text` needs nothing beyond `diff` itself, so both entries
+  # are optional: they belong to comparing documents by key.
+  run_traced -0 dybatpho::doctor_requirements diff optional
+  assert_line --index 0 "jq"
+  assert_line --index 1 "yq>=4"
+
+  run_traced -0 dybatpho::doctor_requirements diff required
+  assert_output ""
+}
+
 @test "dybatpho::doctor_requirements lists optional dependencies" {
   run_traced -0 dybatpho::doctor_requirements json optional
   assert_output "jq"

@@ -558,7 +558,15 @@ function dybatpho::assert_snapshot {
     return 0
   fi
   __dybatpho_test_fail "Snapshot ${name} does not match ${snapshot_file}"
-  diff -u "${snapshot_file}" <(printf '%s\n' "${actual}") >&2 || true
+  # Through `diff.sh` rather than a raw `diff -u`, so a snapshot failure reads
+  # the same as every other comparison the library prints, colored included.
+  # The captured text goes to a file first: `dybatpho::diff_text` reads a side
+  # that names an existing file as that file, and a CLI whose output is a path
+  # would otherwise have that file's contents diffed instead of its own output.
+  local actual_file
+  dybatpho::create_temp actual_file ".snap" "snapshot-actual"
+  printf '%s\n' "${actual}" > "${actual_file}"
+  dybatpho::diff_text "${snapshot_file}" "${actual_file}" snapshot actual >&2 || true
   return 1
 }
 

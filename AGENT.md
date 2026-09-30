@@ -130,6 +130,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `cli.sh` | Declarative parser, help, subcommands, typo suggestions, config-bound options, completions, and CLI artifacts | `test/cli.bats`, `docs/cli.md`, `docs/spec/cli.md` |
 | `config.sh` | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `docs/config.md`, `docs/spec/config.md` |
 | `date.sh` | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `docs/date.md`, `docs/spec/date.md` |
+| `diff.sh` | Colored unified text diffs, structural JSON/YAML comparison by key, and a one-line change summary | `test/diff.bats`, `docs/diff.md`, `docs/spec/diff.md` |
 | `doctor.sh` | Environment report: Bash version, library version, and the external commands the loaded modules declare | `test/doctor.bats`, `docs/doctor.md`, `docs/spec/doctor.md` |
 | `file.sh` | Path and XDG helpers, upward search, directory creation, temporary files, atomic content rewrites, checksums, and metadata | `test/file.bats`, `docs/file.md`, `docs/spec/file.md` |
 | `forge.sh` | GitHub and GitLab detection from the remote, authenticated requests, issues, and releases | `test/forge.bats`, `docs/forge.md`, `docs/spec/forge.md` |

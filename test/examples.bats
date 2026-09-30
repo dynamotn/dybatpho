@@ -61,6 +61,7 @@ run_example() {
 @test "example/ai_ops.sh runs clean" { run_example "ai_ops.sh"; }
 @test "example/archive_ops.sh runs clean" { run_example "archive_ops.sh"; }
 @test "example/array_ops.sh runs clean" { run_example "array_ops.sh"; }
+@test "example/backup_ops.sh runs clean" { run_example "backup_ops.sh"; }
 @test "example/cache_ops.sh runs clean" { run_example "cache_ops.sh"; }
 @test "example/cli_advanced.sh runs clean" { run_example "cli_advanced.sh"; }
 @test "example/cli_basic.sh runs clean" { run_example "cli_basic.sh"; }

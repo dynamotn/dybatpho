@@ -126,6 +126,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `ai.sh` | Language model calls across Claude, OpenAI-compatible, Ollama, and CLI backends, with conversations, JSON output, streaming, tool use, caching, and budgets | `test/ai.bats`, `docs/ai.md`, `docs/spec/ai.md` |
 | `array.sh` | Create, read, join, filter, and manipulate Bash arrays | `test/array.bats`, `docs/array.md`, `docs/spec/array.md` |
 | `archive.sh` | Create, extract, and inspect archives | `test/archive.bats`, `docs/archive.md`, `docs/spec/archive.md` |
+| `backup.sh` | Timestamped snapshots written atomically, checksum sidecars, newest-first listing, guarded restore, and retention pruning | `test/backup.bats`, `docs/backup.md`, `docs/spec/backup.md` |
 | `cli.sh` | Declarative parser, help, subcommands, typo suggestions, config-bound options, completions, and CLI artifacts | `test/cli.bats`, `docs/cli.md`, `docs/spec/cli.md` |
 | `config.sh` | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `docs/config.md`, `docs/spec/config.md` |
 | `date.sh` | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `docs/date.md`, `docs/spec/date.md` |

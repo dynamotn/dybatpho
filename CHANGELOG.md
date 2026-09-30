@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`backup` — snapshot something, keep the last N, drop the rest.** The
+  retention loop that log rotation, pre-change config snapshots and local
+  database dumps each rewrite, with the off-by-one settled once. A backup is
+  written under a hidden temporary name and renamed into place, so an
+  interrupted run leaves nothing a later restore would trust, and a checksum
+  sidecar is written beside it.
+
+  `dybatpho::backup_create`, `dybatpho::backup_list`,
+  `dybatpho::backup_latest`, `dybatpho::backup_verify`,
+  `dybatpho::backup_restore` and `dybatpho::backup_prune`. Set
+  `DYBATPHO_BACKUP_EXTENSION` and `DYBATPHO_BACKUP_CHECKSUM_ALGORITHM` to
+  change the archive format or the sidecar's algorithm.
+
+  ```sh
+  . dybatpho/init.sh --modules backup
+
+  archive="$(dybatpho::backup_create /etc/nginx /var/backups nginx)"
+  dybatpho::backup_prune --keep-count 7 --name nginx --force /var/backups
+  dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)" /etc
+  ```
+
+  Backups are named with a UTC timestamp, so sorting them by name is sorting
+  them by age. A prune with no policy is refused rather than treated as "keep
+  nothing", a backup survives when any given policy keeps it, and every
+  deletion goes through `dybatpho::safe_rm`, so `DRY_RUN` and the confirmation
+  behave as they do elsewhere.
+
 - **`csv` — read the CSV that `awk -F,` gets wrong.** A field may contain the
   delimiter, a doubled quote, or a line break, and none of them end the field.
   Rows come back as an array of records; `dybatpho::csv_fields` splits one into

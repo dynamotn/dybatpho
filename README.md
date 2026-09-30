@@ -187,6 +187,7 @@ scripts/release.sh --version 3.0.0 --sign
 | ------------------------------- | ------------------------------------------------ |
 | [file.sh](docs/file.md)          | Paths, XDG dirs, temp files, atomic rewrites, idempotent lines, checksums, upward search |
 | [archive.sh](docs/archive.md)    | Create, extract and list archives                 |
+| [backup.sh](docs/backup.md)      | Timestamped snapshots, checksum sidecars, retention pruning |
 | [os.sh](docs/os.md)              | Platform/distro and architecture detection        |
 | [pkg.sh](docs/pkg.md)            | Detect the package manager and install dependencies, with confirmation and dry-run |
 

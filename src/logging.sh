@@ -58,16 +58,12 @@ DYBATPHO_TIMER_LAST_MS="${DYBATPHO_TIMER_LAST_MS:-0}"
 export DYBATPHO_TIMER_LAST_MS
 
 # Fields attached to every structured log event, keyed by field name.
-# @env __dybatpho_log_context_values
 declare -gA __dybatpho_log_context_values=()
 # Field names in the order they were first added, so events stay comparable.
-# @env __dybatpho_log_context_keys
 declare -ga __dybatpho_log_context_keys=()
 # Start time in milliseconds of each running timer, keyed by timer name.
-# @env __dybatpho_log_timer
 declare -gA __dybatpho_log_timer=()
 # Field names a structured event already carries, which a context field may not shadow.
-# @env __dybatpho_log_reserved_fields
 declare -g __dybatpho_log_reserved_fields=" timestamp level source message request_id hostname pid duration_ms "
 
 #######################################
@@ -629,7 +625,6 @@ function __dybatpho_log_indexes_bytes {
 }
 
 # Display width of each non-ASCII character seen so far, keyed by the character.
-# @env __dybatpho_log_char_width_cache
 declare -gA __dybatpho_log_char_width_cache=()
 
 #######################################

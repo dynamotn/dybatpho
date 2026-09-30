@@ -30,11 +30,6 @@ appended to a rotating log file at an independent verbosity level.
 | **`DYBATPHO_SPINNER_INTERVAL`** | string | Seconds between spinner frames. Default `0.1` |
 | **`DYBATPHO_SPINNER_FRAMES`** | string | Space-separated frames the spinner cycles through |
 | **`DYBATPHO_TIMER_LAST_MS`** | number | Elapsed milliseconds reported by the last `dybatpho::timer_end` |
-| __dybatpho_log_context_values |  |  |
-| __dybatpho_log_context_keys |  |  |
-| __dybatpho_log_timer |  |  |
-| __dybatpho_log_reserved_fields |  |  |
-| __dybatpho_log_char_width_cache |  |  |
 
 ### 🚀 Highlights
 

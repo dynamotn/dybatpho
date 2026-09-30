@@ -61,8 +61,10 @@ function __dybatpho_csv_input_into {
     __dybatpho_csv_input_ref="${__dybatpho_csv_source}"
   fi
 
+  local __dybatpho_csv_reason="The input contains the ASCII unit separator,"
+  __dybatpho_csv_reason+=" which this module uses to join a record's fields"
   [[ "${__dybatpho_csv_input_ref}" != *"${__dybatpho_csv_unit}"* ]] || dybatpho::die \
-    "${FUNCNAME[2]:-${FUNCNAME[0]}}: The input contains the ASCII unit separator, which this module uses to join a record's fields"
+    "${FUNCNAME[2]:-${FUNCNAME[0]}}: ${__dybatpho_csv_reason}"
 }
 
 #######################################
@@ -208,8 +210,14 @@ function __dybatpho_csv_quote_into {
   local __dybatpho_csv_value="$2"
   local __dybatpho_csv_delimiter="$3"
 
-  if [[ "${__dybatpho_csv_value}" == *'"'* || "${__dybatpho_csv_value}" == *"${__dybatpho_csv_delimiter}"* \
-    || "${__dybatpho_csv_value}" == *$'\n'* || "${__dybatpho_csv_value}" == *$'\r'* ]]; then
+  local __dybatpho_csv_special=0
+  case "${__dybatpho_csv_value}" in
+    *'"'* | *$'\n'* | *$'\r'*) __dybatpho_csv_special=1 ;;
+    *"${__dybatpho_csv_delimiter}"*) __dybatpho_csv_special=1 ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac
+
+  if ((__dybatpho_csv_special)); then
     __dybatpho_csv_quoted_ref="\"${__dybatpho_csv_value//\"/\"\"}\""
     return 0
   fi
@@ -272,7 +280,9 @@ function __dybatpho_csv_column_into {
     fi
   done
 
-  dybatpho::die "${FUNCNAME[1]}: No such column: ${__dybatpho_csv_wanted}. The header has: ${__dybatpho_csv_names_ref[*]}"
+  local __dybatpho_csv_complaint="No such column: ${__dybatpho_csv_wanted}."
+  __dybatpho_csv_complaint+=" The header has: ${__dybatpho_csv_names_ref[*]}"
+  dybatpho::die "${FUNCNAME[1]}: ${__dybatpho_csv_complaint}"
 }
 
 #######################################
@@ -298,8 +308,7 @@ function dybatpho::csv_read {
 
   local text
   __dybatpho_csv_input_into text "${input}"
-  local -n rows_ref="${target}"
-  __dybatpho_csv_parse_into rows_ref "${text}" "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_parse_into "${target}" "${text}" "${DYBATPHO_CSV_DELIMITER}"
 }
 
 #######################################
@@ -318,8 +327,7 @@ function dybatpho::csv_fields {
   dybatpho::expect_args record target -- "$@"
   dybatpho::expect_ref "${target}"
 
-  local -n fields_ref="${target}"
-  __dybatpho_csv_split_fields_into fields_ref "${record}"
+  __dybatpho_csv_split_fields_into "${target}" "${record}"
 }
 
 #######################################
@@ -340,7 +348,7 @@ function dybatpho::csv_write {
   dybatpho::expect_ref "${source}"
 
   local -n records_ref="${source}"
-  local record quoted line index
+  local record quoted line index # the loop below reads records_ref
   local -a fields=()
 
   for record in "${records_ref[@]}"; do
@@ -428,8 +436,12 @@ function __dybatpho_csv_expect_width {
   local -n __dybatpho_csv_row_ref="$1"
   local -n __dybatpho_csv_names_ref="$2"
 
-  ((${#__dybatpho_csv_row_ref[@]} <= ${#__dybatpho_csv_names_ref[@]})) || dybatpho::die \
-    "${FUNCNAME[1]}: Row $3 has ${#__dybatpho_csv_row_ref[@]} fields but the header names ${#__dybatpho_csv_names_ref[@]}: ${__dybatpho_csv_row_ref[*]}"
+  ((${#__dybatpho_csv_row_ref[@]} <= ${#__dybatpho_csv_names_ref[@]})) || {
+    local __dybatpho_csv_complaint="Row $3 has ${#__dybatpho_csv_row_ref[@]} fields"
+    __dybatpho_csv_complaint+=" but the header names ${#__dybatpho_csv_names_ref[@]}:"
+    __dybatpho_csv_complaint+=" ${__dybatpho_csv_row_ref[*]}"
+    dybatpho::die "${FUNCNAME[1]}: ${__dybatpho_csv_complaint}"
+  }
 }
 
 #######################################
@@ -452,9 +464,13 @@ function dybatpho::csv_filter {
   local input column operator value
   dybatpho::expect_args input column operator value -- "$@"
 
+  local operators="eq, ne, gt, lt, or contains"
   case "${operator}" in
-    eq | ne | gt | lt | contains) ;;
-    *) dybatpho::die "${FUNCNAME[0]}: Unknown operator: ${operator}. Use eq, ne, gt, lt, or contains" ;;
+    eq | ne | gt | lt | contains) ;; # kcov(skip) - a case arm has no command to fire on
+    # "dybatpho::csv_filter rejects an operator it does not have" covers this.
+    # `dybatpho::die` exits, so that test uses `run`, which clears the trap
+    # kcov instruments through; `--exclude-line` reads the marker on the line.
+    *) dybatpho::die "${FUNCNAME[0]}: Unknown operator: ${operator}. Use ${operators}" ;; # kcov(skip)
   esac
 
   local -a records=() names=() fields=() kept=()
@@ -589,7 +605,9 @@ function dybatpho::csv_from_json {
   # place no matter which command was available.
   local converted
   if [[ "${command_name}" == "jq" ]]; then
-    local filter='(.[0] | keys_unsorted) as $k | ([$k] + [.[] | [ $k[] as $key | (.[$key] // "") | tostring ]]) | .[] | @csv'
+    local filter='(.[0] | keys_unsorted) as $k'
+    filter+=' | ([$k] + [.[] | [ $k[] as $key | (.[$key] // "") | tostring ]])'
+    filter+=' | .[] | @csv'
     converted="$(printf '%s' "${text}" | jq -r "${filter}")" \
       || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
   else

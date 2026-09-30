@@ -297,6 +297,41 @@ EOF
   assert_line --index 1 "1"
 }
 
+@test "dybatpho::csv_from_json writes the same CSV when only yq is installed" {
+  # The two backends quote differently on their own, so the conversion is read
+  # back and written out by this module either way. Nothing proved the yq half
+  # of that: `jq` is installed here, so the other branch always won.
+  command -v yq > /dev/null || skip "yq is not installed"
+
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/yq_only.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
+# \`dybatpho::coalesce_cmd\` asks \`command -v\`, so the directories holding a
+# runnable jq are what has to go; shadowing the name is not enough.
+kept=""
+IFS=':' read -r -a entries <<< "\${PATH}"
+for entry in "\${entries[@]}"; do
+  [[ -x "\${entry}/jq" ]] && continue
+  kept+="\${entry}:"
+done
+PATH="\${kept%:}"
+export PATH
+command -v jq > /dev/null && exit 3
+dybatpho::csv_from_json '[{"name":"Doe, John","note":"line one\nline two","qty":"3"},{"name":"x","note":"ok","qty":"10"}]'
+SCRIPT
+
+  run_traced bash "${script}"
+  assert_success
+  assert_output << EOF
+name,note,qty
+"Doe, John","line one
+line two",3
+x,ok,10
+EOF
+}
+
 @test "dybatpho::csv_from_json reports a document that is not an array of objects" {
   run --separate-stderr dybatpho::csv_from_json '{"a":1}'
   assert_failure

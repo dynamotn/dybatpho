@@ -157,6 +157,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [process.sh](docs/process.md)      | Process management, traps, timeouts, background jobs, PID files     |
 | [lock.sh](docs/lock.md)            | Portable file locking to serialize concurrent script runs           |
 | [parallel.sh](docs/parallel.md)  | Bounded worker pool: ordered output, per-job exit codes, fail-fast |
+| [queue.sh](docs/queue.md)        | Durable job queue on disk: atomic claim, retries, dead letters      |
 
 ### 🔤 Data & text
 

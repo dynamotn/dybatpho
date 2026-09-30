@@ -149,6 +149,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `docs/process.md`, `docs/spec/process.md` |
 | `parallel.sh` | Bounded worker pool with ordered output and per-job exit codes | `test/parallel.bats`, `docs/parallel.md`, `docs/spec/parallel.md` |
 | `pkg.sh` | Package manager detection and guarded dependency installation | `test/pkg.bats`, `docs/pkg.md`, `docs/spec/pkg.md` |
+| `queue.sh` | Durable filesystem job queue: locked atomic claim, claimed-not-consumed jobs, retry budgets, and dead letters | `test/queue.bats`, `docs/queue.md`, `docs/spec/queue.md` |
 | `release.sh` | Version bumping from commits, changelog generation, per-platform packaging, checksums, and signing | `test/release.bats`, `docs/release.md`, `docs/spec/release.md` |
 | `safety.sh` | Guards for destructive operations: removal, overwrite, extraction, and system changes | `test/safety.bats`, `docs/safety.md`, `docs/spec/safety.md` |
 | `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `docs/secret.md`, `docs/spec/secret.md` |

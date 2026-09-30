@@ -69,7 +69,7 @@ DYBATPHO_CORE_MODULES="string os logging helpers process file secret"
 DYBATPHO_OPTIONAL_MODULES="array math text lock network date json validate config archive"
 DYBATPHO_OPTIONAL_MODULES+=" git table cli tui screen notification semver testing safety"
 DYBATPHO_OPTIONAL_MODULES+=" metrics ai agent pkg release parallel doctor i18n forge cache"
-DYBATPHO_OPTIONAL_MODULES+=" markdown csv backup diff"
+DYBATPHO_OPTIONAL_MODULES+=" markdown csv backup diff queue"
 # The loaded set describes the current shell, so it is deliberately neither
 # exported nor seeded from the environment. A child shell that sources `init.sh`
 # again has to source the module files itself: only `dybatpho::` functions cross
@@ -96,6 +96,7 @@ declare -A __dybatpho_module_deps=(
   [csv]="json math"
   [backup]="archive safety date"
   [diff]="json"
+  [queue]="lock date"
   [network]="json"
   [notification]="network"
   [archive]="safety"

@@ -47,6 +47,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `csv.md`
 - `backup.md`
 - `diff.md`
+- `queue.md`
 - `tui.md`
 - `screen.md`
 - `testing.md`
@@ -91,6 +92,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/csv.sh` -> `csv.md`
 - `src/backup.sh` -> `backup.md`
 - `src/diff.sh` -> `diff.md`
+- `src/queue.sh` -> `queue.md`
 - `src/tui.sh` -> `tui.md`
 - `src/screen.sh` -> `screen.md`
 - `src/json.sh` -> `json.md`

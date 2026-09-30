@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`queue` — a job queue on disk that outlives the script.** `parallel`
+  needs its jobs up front and loses them if the run dies; this is the other
+  half. A producer can add work while workers are draining, and a crashed run
+  resumes.
+
+  A job is claimed, not consumed: `dybatpho::queue_pop` moves it to `claimed`
+  and it stays there until the worker says what happened, so a worker that
+  dies leaves its job where it can be found.
+
+  `dybatpho::queue_push`, `dybatpho::queue_pop`, `dybatpho::queue_peek`,
+  `dybatpho::queue_len`, `dybatpho::queue_list`, `dybatpho::queue_read`,
+  `dybatpho::queue_complete`, `dybatpho::queue_requeue` and
+  `dybatpho::queue_dead_letter`. `DYBATPHO_QUEUE_DIR` sets where a bare queue
+  name lives, `DYBATPHO_QUEUE_TIMEOUT` how long an operation waits for the
+  lock.
+
+  ```sh
+  . dybatpho/init.sh --modules queue
+
+  dybatpho::queue_push deploys "restart api"
+
+  while dybatpho::queue_pop deploys id payload; do
+    if handle "${payload}"; then
+      dybatpho::queue_complete deploys "${id}"
+    else
+      dybatpho::queue_requeue deploys "${id}" 3
+    fi
+  done
+  ```
+
+  Claiming takes the queue's lock, so concurrent workers never run the same
+  job twice. Ordering is strict FIFO: the sequence in a job's id is handed out
+  under that lock rather than read from a clock that cannot separate two
+  pushes in the same second. A job requeued past its budget is dead-lettered
+  with its payload rather than dropped.
+
 - **`diff` — show what changed, the same way everywhere.** A colored unified
   diff for text, and a structural comparison for JSON and YAML that answers
   which keys moved rather than which lines did, so reordering or reformatting

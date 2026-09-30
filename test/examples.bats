@@ -89,6 +89,7 @@ run_example() {
 @test "example/parallel_ops.sh runs clean" { run_example "parallel_ops.sh"; }
 @test "example/pkg_ops.sh runs clean" { run_example "pkg_ops.sh"; }
 @test "example/process_ops.sh runs clean" { run_example "process_ops.sh"; }
+@test "example/queue_ops.sh runs clean" { run_example "queue_ops.sh"; }
 @test "example/release_ops.sh runs clean" { run_example "release_ops.sh"; }
 @test "example/safety_ops.sh runs clean" { run_example "safety_ops.sh"; }
 @test "example/secret_ops.sh runs clean" { run_example "secret_ops.sh"; }

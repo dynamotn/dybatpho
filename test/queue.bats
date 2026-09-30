@@ -288,6 +288,16 @@ SCRIPT
   assert_equal "$(DYBATPHO_QUEUE_DIR="${base}" dybatpho::queue_len deploys)" "1"
 }
 
+@test "a bare queue name falls back to the XDG state directory" {
+  # This is where a caller's queues land when they configure nothing, so the
+  # fallback is worth pinning. `XDG_STATE_HOME` keeps the test out of the
+  # real one.
+  DYBATPHO_QUEUE_DIR="" XDG_STATE_HOME="${BATS_TEST_TMPDIR}/state" \
+    run_traced dybatpho::queue_push deploys "a job"
+  assert_success
+  assert_dir_exist "${BATS_TEST_TMPDIR}/state/queues/deploys/pending"
+}
+
 @test "an empty queue name is refused" {
   run --separate-stderr dybatpho::queue_push "" "a job"
   assert_failure

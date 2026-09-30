@@ -23,6 +23,7 @@
 # @description Return the display width of a table cell.
 # @arg $1 string Cell text
 # @stdout Cell width
+# @internal
 #######################################
 function __dybatpho_table_cell_width {
   local __dybatpho_cell_width
@@ -38,6 +39,7 @@ function __dybatpho_table_cell_width {
 # @arg $1 string Name of the variable receiving the width
 # @arg $2 string Cell text
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_table_width_into {
   local __dybatpho_table_width_name="$1"
@@ -57,6 +59,7 @@ function __dybatpho_table_width_into {
 # @arg $2 string Text to repeat
 # @arg $3 number Number of repetitions
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_table_repeat_into {
   if dybatpho::is function __dybatpho_log_repeat_into; then
@@ -79,6 +82,7 @@ function __dybatpho_table_repeat_into {
 # @arg $1 string Cell text
 # @arg $2 number Target width
 # @stdout Right-padded cell text
+# @internal
 #######################################
 function __dybatpho_table_pad {
   local __dybatpho_pad_result
@@ -92,6 +96,7 @@ function __dybatpho_table_pad {
 # @arg $2 string Cell text
 # @arg $3 number Target width
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_table_pad_into {
   local __dybatpho_pad_name="$1"
@@ -113,6 +118,7 @@ function __dybatpho_table_pad_into {
 # @arg $1 string Row text
 # @arg $2 string Exact delimiter
 # @arg $3 string Name of the array variable to fill
+# @internal
 #######################################
 function __dybatpho_table_split_row {
   local row delimiter target_var
@@ -150,6 +156,7 @@ function __dybatpho_table_split_row {
 # @arg $1 string Name of the row array variable
 # @arg $2 string Exact delimiter
 # @arg $3 string Name of the width array variable to fill
+# @internal
 #######################################
 function __dybatpho_table_measure_widths {
   local rows_var delimiter widths_var
@@ -184,6 +191,7 @@ function __dybatpho_table_measure_widths {
 # @arg $1 string Comma-separated alignments (`left,right,center`)
 # @arg $2 string Name of the widths array variable
 # @arg $3 string Name of the alignments array variable to fill
+# @internal
 #######################################
 function __dybatpho_table_parse_alignments {
   local spec widths_var alignments_var
@@ -228,6 +236,7 @@ function __dybatpho_table_parse_alignments {
 # @arg $2 number Target width
 # @arg $3 string Alignment (`left`, `right`, `center`)
 # @stdout Formatted cell text
+# @internal
 #######################################
 function __dybatpho_table_format_cell {
   local __dybatpho_format_result
@@ -243,6 +252,7 @@ function __dybatpho_table_format_cell {
 # @arg $3 number Column width
 # @arg $4 string Alignment: `left`, `right` or `center`
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_table_format_cell_into {
   local __dybatpho_format_name="$1"
@@ -285,6 +295,7 @@ function __dybatpho_table_format_cell_into {
 # @arg $3 string Right corner character
 # @arg $4 string Name of the widths array variable
 # @stdout Rendered rule line
+# @internal
 #######################################
 function __dybatpho_table_rule {
   local left join right widths_var
@@ -452,6 +463,7 @@ DYBATPHO_TABLE_CSV_STRICT="${DYBATPHO_TABLE_CSV_STRICT:-true}"
 # @env DYBATPHO_TABLE_CSV_STRICT bool Set to `false` to split through quotes anyway
 # @exitcode 0 No row is quoted, or the check is switched off
 # @exitcode 1 Stop the script when a field is quoted
+# @internal
 #######################################
 function __dybatpho_table_reject_quoted {
   dybatpho::is true "${DYBATPHO_TABLE_CSV_STRICT}" || return 0

@@ -79,6 +79,7 @@ declare -g __dybatpho_log_reserved_fields=" timestamp level source message reque
 # @arg $4 string ANSI escape color code
 # @stdout Show the formatted message when the level passes filtering and $3 is not `stderr`
 # @stderr Show the formatted message when the level passes filtering and $3 is `stderr`
+# @internal
 #######################################
 function __dybatpho_log {
   declare -A log_colors=([trace]="0;37" [debug]="0;36" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
@@ -135,6 +136,7 @@ function __dybatpho_log {
 #   Anything with no short escape now goes out as `\u00XX`.
 # @arg $1 string Input text
 # @stdout JSON-escaped text without surrounding quotes
+# @internal
 #######################################
 function __dybatpho_log_json_escape {
   local value="${1:-}"
@@ -169,6 +171,7 @@ function __dybatpho_log_json_escape {
 # @description Return an RFC 3339 timestamp for a log event.
 # @noargs
 # @stdout Current timestamp
+# @internal
 #######################################
 function __dybatpho_log_timestamp {
   if hash "busybox" 2> /dev/null; then
@@ -185,6 +188,7 @@ function __dybatpho_log_timestamp {
 #   Return the current time in milliseconds since the epoch, using the most precise portable source available.
 # @noargs
 # @stdout Current time in milliseconds
+# @internal
 #######################################
 function __dybatpho_log_now_ms {
   if [[ -n "${EPOCHREALTIME:-}" ]]; then
@@ -209,6 +213,7 @@ DYBATPHO_LOG_START_MS="$(__dybatpho_log_now_ms)"
 # @description Return the elapsed time since the process started, for structured log events.
 # @noargs
 # @stdout Elapsed time in milliseconds
+# @internal
 #######################################
 function __dybatpho_log_duration_ms {
   local log_now_ms
@@ -223,6 +228,7 @@ function __dybatpho_log_duration_ms {
 # @noargs
 # @set LOG_REQUEST_ID string Generated correlation ID, when it was previously empty
 # @stdout Correlation ID
+# @internal
 #######################################
 function __dybatpho_log_request_id {
   if [[ -z "${LOG_REQUEST_ID:-}" ]]; then
@@ -244,6 +250,7 @@ function __dybatpho_log_request_id {
 # @noargs
 # @stdout Hostname
 # @env DYBATPHO_LOG_HOSTNAME string Hostname to log instead of the one `dybatpho::hostname` detects
+# @internal
 #######################################
 function __dybatpho_log_hostname {
   if [[ -z "${DYBATPHO_LOG_HOSTNAME:-}" ]]; then
@@ -263,6 +270,7 @@ function __dybatpho_log_hostname {
 # @arg $5 number Duration in milliseconds since the process started
 # @arg $6 string Ready-made JSON fragment of extra fields, each one leading with its own comma
 # @stdout One JSON object followed by a newline
+# @internal
 #######################################
 function __dybatpho_log_json_event {
   local timestamp="$1" level="$2" source="$3" message="$4" duration_ms="$5"
@@ -308,6 +316,7 @@ function __dybatpho_log_json_event {
 # @arg $1 string Log file path
 # @arg $2 number Maximum size in bytes before rotating, `0` disables rotation
 # @arg $3 number Number of rotated backups to keep
+# @internal
 #######################################
 function __dybatpho_log_rotate_file {
   local file="$1" max_bytes="$2" max_backups="$3"
@@ -341,6 +350,7 @@ function __dybatpho_log_rotate_file {
 # @env LOG_FILE_LEVEL string Verbosity threshold applied independently of `LOG_LEVEL`
 # @env LOG_FILE_MAX_BYTES number Rotation size threshold
 # @env LOG_FILE_MAX_BACKUPS number Number of rotated backups to keep
+# @internal
 #######################################
 function __dybatpho_log_write_file {
   local log_level="$1"
@@ -372,6 +382,7 @@ function __dybatpho_log_write_file {
 # @arg $3 string Message
 # @arg $4 string ANSI escape color code
 # @arg $5 string Ready-made JSON fragment of extra fields, each one leading with its own comma
+# @internal
 #######################################
 function __dybatpho_log_structured {
   local log_level="$1"
@@ -438,6 +449,7 @@ function dybatpho::compare_log_level {
 #   `i18n`.
 # @arg $1 string The English message
 # @stdout The translation when one exists, otherwise the message unchanged
+# @internal
 #######################################
 function __dybatpho_log_translate {
   if declare -F __dybatpho_i18n_lookup > /dev/null; then
@@ -461,6 +473,7 @@ function __dybatpho_log_translate {
 # @arg $2 string The English rendering, already complete
 # @arg $@ string `name=value` bindings for the translated template
 # @stdout The translation when one exists, otherwise $2 unchanged
+# @internal
 #######################################
 function __dybatpho_log_text {
   local key="${1-}" english="${2-}"
@@ -481,6 +494,7 @@ function __dybatpho_log_text {
 # @arg $3 string The English rendering, already complete
 # @arg $@ string Further `name=value` bindings for the translated template
 # @stdout The translation when one exists, otherwise $3 unchanged
+# @internal
 #######################################
 function __dybatpho_log_text_n {
   local key="${1-}" count="${2-}" english="${3-}"
@@ -503,6 +517,7 @@ function __dybatpho_log_text_n {
 # @arg $5 string ANSI escape color code
 # @arg $6 string Ready-made JSON fragment of extra fields, each one leading with its own comma
 # @env LOG_FILE string Optional file that receives a structured JSON event regardless of `LOG_FORMAT`
+# @internal
 #######################################
 function __dybatpho_log_inspect {
   local log_level=$1
@@ -544,6 +559,7 @@ function __dybatpho_log_inspect {
 # @description Return the effective terminal width used by boxed logging helpers.
 # @noargs
 # @stdout Terminal width, falling back to 80 columns
+# @internal
 #######################################
 function __dybatpho_log_get_terminal_width {
   dybatpho::terminal_width 80
@@ -559,6 +575,7 @@ function __dybatpho_log_get_terminal_width {
 # @arg $1 string Text to classify
 # @exitcode 0 The text is printable ASCII, optionally with tabs
 # @exitcode 1 The text holds a character that may not be one column wide
+# @internal
 #######################################
 function __dybatpho_log_is_plain_ascii {
   local LC_ALL=C
@@ -579,6 +596,7 @@ function __dybatpho_log_is_plain_ascii {
 # @arg $3 number Index of the character's first byte or character
 # @arg $4 bool `1` when Bash is indexing by byte
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_log_char_at_into {
   local -n __dybatpho_char_out="$1"
@@ -603,6 +621,7 @@ function __dybatpho_log_char_at_into {
 # @noargs
 # @exitcode 0 Bash counts bytes, so multi-byte characters must be assembled
 # @exitcode 1 Bash counts characters
+# @internal
 #######################################
 function __dybatpho_log_indexes_bytes {
   local probe=$'\303\251'
@@ -628,6 +647,7 @@ declare -gA __dybatpho_log_char_width_cache=()
 #   is the answer the previous fallback gave.
 # @arg $1 string Text whose characters to learn
 # @set __dybatpho_log_char_width_cache
+# @internal
 #######################################
 function __dybatpho_log_learn_widths {
   local text="${1-}"
@@ -676,6 +696,7 @@ PY
 # @description Return the display width of a string, accounting for wide Unicode glyphs when possible.
 # @arg $1 string Input text
 # @stdout Display width of the input
+# @internal
 #######################################
 function __dybatpho_log_width_into {
   local __dybatpho_width_name="$1"
@@ -713,6 +734,7 @@ function __dybatpho_log_width_into {
 # @arg $2 string Text to repeat
 # @arg $3 number Number of repetitions
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_log_repeat_into {
   local __dybatpho_repeat_name="$1"
@@ -732,6 +754,7 @@ function __dybatpho_log_repeat_into {
 # @description Return the display width of a string, accounting for wide Unicode glyphs when possible.
 # @arg $1 string Input text
 # @stdout Display width of the input
+# @internal
 #######################################
 function __dybatpho_log_string_display_width {
   local __dybatpho_display_width
@@ -744,6 +767,7 @@ function __dybatpho_log_string_display_width {
 # @arg $1 string Input line
 # @arg $2 number Maximum width
 # @stdout Wrapped lines
+# @internal
 #######################################
 function __dybatpho_log_wrap_line {
   local line max_width
@@ -830,6 +854,7 @@ function __dybatpho_log_wrap_line {
 # @arg $8 string Message body
 # @arg $9 string Output stream (`stdout` or `stderr`)
 # @arg $10 string ANSI color code
+# @internal
 #######################################
 function __dybatpho_log_box {
   local top_left="$1"
@@ -1048,6 +1073,7 @@ function dybatpho::fatal {
 #   secret registered after the fact is still masked on the next event.
 # @noargs
 # @stdout `,"name":"value"` for every registered field, in registration order
+# @internal
 #######################################
 function __dybatpho_log_context_json {
   ((${#__dybatpho_log_context_keys[@]} > 0)) || return 0
@@ -1071,6 +1097,7 @@ function __dybatpho_log_context_json {
 # @description Render the registered context fields for a human-readable line.
 # @noargs
 # @stdout ` name=value` for every registered field, in registration order
+# @internal
 #######################################
 function __dybatpho_log_context_text {
   ((${#__dybatpho_log_context_keys[@]} > 0)) || return 0
@@ -1089,6 +1116,7 @@ function __dybatpho_log_context_text {
 # @arg $@ string `name=value` pairs
 # @set __dybatpho_log_context_values
 # @set __dybatpho_log_context_keys
+# @internal
 #######################################
 function __dybatpho_log_context_add {
   (($# > 0)) \
@@ -1126,6 +1154,7 @@ function __dybatpho_log_context_add {
 # @arg $@ string Field names
 # @set __dybatpho_log_context_values
 # @set __dybatpho_log_context_keys
+# @internal
 #######################################
 function __dybatpho_log_context_remove {
   (($# > 0)) \
@@ -1149,6 +1178,7 @@ function __dybatpho_log_context_remove {
 # @arg $1 string Size such as `1048576`, `512K`, `10M` or `2GiB`
 # @stdout The size in bytes
 # @exitcode 1 The input is not a size this function understands
+# @internal
 #######################################
 function __dybatpho_log_parse_size {
   local input="${1-}"
@@ -1168,6 +1198,7 @@ function __dybatpho_log_parse_size {
 # @description Pause for a fractional number of seconds, falling back to one
 #   whole second where `sleep` only understands integers.
 # @arg $1 string Seconds to wait
+# @internal
 #######################################
 function __dybatpho_log_sleep {
   sleep "$1" 2> /dev/null || sleep 1
@@ -1178,6 +1209,7 @@ function __dybatpho_log_sleep {
 #   kills it. Runs as a background job, so it never returns on its own.
 # @arg $1 string Message shown beside the frame, already redacted
 # @stderr One frame per interval, redrawn over the same line
+# @internal
 #######################################
 function __dybatpho_log_spin {
   local message="${1-}"

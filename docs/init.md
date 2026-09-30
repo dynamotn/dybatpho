@@ -36,10 +36,6 @@ make use of ${DYBATPHO_DIR} to find each other.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_source_module`](#__dybatpho_source_module) — Source one module file. Every module lives at `src/<name>.sh`, so the name is all the map that is needed.
-- [`__dybatpho_module_exists`](#__dybatpho_module_exists) — Return success when a name is a known dybatpho module.
-- [`__dybatpho_load_module`](#__dybatpho_load_module) — Source a module and its dependencies, at most once each.
-- [`__dybatpho_export_functions`](#__dybatpho_export_functions) — Filter functions and re-export only dybatpho functions to subshells.
 - [`dybatpho::version`](#dybatphoversion) — Print the version of the library this shell loaded, including the commit it is at. The release version is read from the `VERSION` file next to `init.sh`, which is what a release stamps and what a vendored or bundled copy carries. When the copy is a Git working tree, the short commit is appended as SemVer build metadata — `2.0.0+af745ff`, and `+af745ff.dirty` when the tree has uncommitted changes — so a bug report names the exact code that ran rather than the last tag before it. A checkout without a `VERSION` file falls back to `git describe`, which carries the commit of its own. Only the library's own repository is consulted: a copy vendored inside another project reports its stamped version alone, because that project's commits say nothing about which dybatpho is installed.
 - [`dybatpho::load`](#dybatphoload) — Load one or more modules after `init.sh` has already been sourced.
 - [`dybatpho::module_loaded`](#dybatphomodule_loaded) — Return success when a module is already loaded.
@@ -52,74 +48,6 @@ make use of ${DYBATPHO_DIR} to find each other.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_source_module`
-
-Source one module file. Every module lives at
-`src/<name>.sh`, so the name is all the map that is needed.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Module name |
-
-**🚦 Exit codes**
-
-- `0`: The module file is sourced
-- `1`: The module is registered but has no file under `src/`
-
-
----
-
-### `__dybatpho_module_exists`
-
-Return success when a name is a known dybatpho module.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Module name |
-
-**🚦 Exit codes**
-
-- `0`: The module is part of the registry
-- `1`: The module is unknown
-
-
----
-
-### `__dybatpho_load_module`
-
-Source a module and its dependencies, at most once each.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Module name |
-
-**🧩 Variable sets**
-
-- DYBATPHO_LOADED_MODULES
-
-**🚦 Exit codes**
-
-- `0`: The module and its dependencies are loaded
-- `1`: The module is unknown
-
-
----
-
-### `__dybatpho_export_functions`
-
-Filter functions and re-export only dybatpho functions to subshells.
-
-_Function has no arguments._
-
-
----
 
 ### `dybatpho::version`
 

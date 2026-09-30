@@ -24,6 +24,7 @@
 # @stdout `yq` or `jq`
 # @exitcode 0 A supported JSON helper command exists
 # @exitcode 127 Neither `yq` nor `jq` is installed
+# @internal
 #######################################
 function __dybatpho_json_cmd {
   local command_name
@@ -45,6 +46,7 @@ function __dybatpho_json_cmd {
 # @arg $1 string Name of the variable receiving the quoted string
 # @arg $2 string Text to encode
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_json_escape_into {
   local -n __dybatpho_json_escape_out="$1"

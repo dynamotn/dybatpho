@@ -42,6 +42,7 @@ declare -ga DYBATPHO_PARALLEL_STATUS=()
 # @arg $2 string Requested count, or empty/`0` to decide automatically
 # @set The named variable, to a positive job count
 # @exitcode 1 The requested count is not a positive integer
+# @internal
 #######################################
 function __dybatpho_parallel_jobs {
   local -n __jobs_out="$1"
@@ -64,6 +65,7 @@ function __dybatpho_parallel_jobs {
 #   puts each job in its own process group, so the whole group can be ended at
 #   once.
 # @arg $@ number Process IDs to end, each the leader of its job's process group
+# @internal
 #######################################
 function __dybatpho_parallel_terminate {
   local pid
@@ -81,6 +83,7 @@ function __dybatpho_parallel_terminate {
 # @arg $2 number Number of jobs
 # @stdout Standard output of every job, in order
 # @stderr Standard error of every job, in order
+# @internal
 #######################################
 function __dybatpho_parallel_flush {
   local directory total index
@@ -98,6 +101,7 @@ function __dybatpho_parallel_flush {
 # @arg $2 number Number of jobs
 # @exitcode 0 A finished job failed
 # @exitcode 1 Every job that finished so far succeeded
+# @internal
 #######################################
 function __dybatpho_parallel_any_failed {
   local directory total index status
@@ -115,6 +119,7 @@ function __dybatpho_parallel_any_failed {
 #   `wait -n` reaps one child, so at least one entry disappears on every pass
 #   and the pool always makes progress.
 # @arg $1 string Name of the array holding the process IDs
+# @internal
 #######################################
 function __dybatpho_parallel_prune {
   local -n __pids="$1"
@@ -139,6 +144,7 @@ function __dybatpho_parallel_prune {
 # @set DYBATPHO_PARALLEL_STATUS
 # @exitcode 0 Every job that ran succeeded
 # @exitcode 1 At least one job failed
+# @internal
 #######################################
 function __dybatpho_parallel_pool {
   local concurrency launcher total directory index status failed=0 stop=false
@@ -209,6 +215,7 @@ function __dybatpho_parallel_pool {
 #######################################
 # @description Wait for every job the pool still tracks.
 # @noargs
+# @internal
 #######################################
 function __dybatpho_parallel_wait_all {
   local pid
@@ -269,6 +276,7 @@ function dybatpho::parallel_map {
   # @description Start one item's job, capturing its output and exit code.
   # @arg $1 number Job index
   # @arg $2 string Capture directory
+  # @internal
   #######################################
   # shellcheck disable=SC2329 # run by the pool through its name
   function __dybatpho_parallel_launch_item {
@@ -330,6 +338,7 @@ function dybatpho::parallel_run {
   # @description Start one command's job, capturing its output and exit code.
   # @arg $1 number Job index
   # @arg $2 string Capture directory
+  # @internal
   #######################################
   # shellcheck disable=SC2329 # run by the pool through its name
   function __dybatpho_parallel_launch_command {

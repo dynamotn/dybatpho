@@ -40,6 +40,7 @@ __dybatpho_date_flavor_cache=""
 #   formats a date.
 # @noargs
 # @stdout `gnu`, `bsd` or `busybox`
+# @internal
 function __dybatpho_date_flavor {
   if [[ -n "${__dybatpho_date_flavor_cache}" ]]; then
     printf '%s\n' "${__dybatpho_date_flavor_cache}"
@@ -63,6 +64,7 @@ function __dybatpho_date_flavor {
 # @noargs
 # @exitcode 0 `date` is GNU
 # @exitcode 1 `date` is the BSD one
+# @internal
 #######################################
 function __dybatpho_date_is_gnu {
   local date_flavor
@@ -76,6 +78,7 @@ function __dybatpho_date_is_gnu {
 # @arg $1 string Date expression, in any form the local `date` accepts
 # @stdout Seconds since the epoch
 # @exitcode 1 The expression could not be parsed
+# @internal
 #######################################
 function __dybatpho_date_parse {
   local input
@@ -110,6 +113,7 @@ function __dybatpho_date_parse {
 # @arg $3 string Date string
 # @stdout Unix timestamp
 # @exitcode 1 The string does not match the format
+# @internal
 #######################################
 function __dybatpho_date_parse_with {
   local flavor input_format input
@@ -231,6 +235,7 @@ function dybatpho::date_diff_days {
 # @arg $1 string Unit name, singular or plural
 # @stdout Seconds in one unit
 # @exitcode 1 Stop the script when the unit is not one this module measures
+# @internal
 #######################################
 function __dybatpho_date_unit_seconds {
   case "${1-}" in

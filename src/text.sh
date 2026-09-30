@@ -16,6 +16,7 @@
 # @description Read a text argument or stdin into a target array of lines.
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 string Name of the array variable to fill
+# @internal
 #######################################
 function __dybatpho_text_read_lines {
   local input target_var

@@ -30,8 +30,6 @@ A lock is a directory containing metadata about the process holding it
 
 ### 🚀 Highlights
 
-- [`__dybatpho_lock_exists`](#__dybatpho_lock_exists) — Return success when something holds this lock path, whichever form it is in: a symbolic link, which is what the atomic claim writes, or a directory, which is what versions before it wrote. `[[ -L ]]` is deliberately first and deliberately not `[[ -e ]]`: the link target is data rather than a path, so it never resolves, and `-e` reports a dangling link as absent.
-- [`__dybatpho_lock_target`](#__dybatpho_lock_target) — Print the link target that identifies the holder of a lock, as `pid:host:acquired_at`.
 - [`dybatpho::lock_hostname`](#dybatpholock_hostname) — Print the host name a lock records as its owner. It is its own function so a test can replace it, which is how the stale-lock paths are exercised without a second machine.
 - [`dybatpho::lock_path`](#dybatpholock_path) — Resolve a lock name or path into an absolute lock directory path.
 - [`dybatpho::lock_field`](#dybatpholock_field) — Read a single metadata field recorded for a lock.
@@ -39,7 +37,6 @@ A lock is a directory containing metadata about the process holding it
 - [`dybatpho::lock_is_held`](#dybatpholock_is_held) — Return success when a lock is currently held by a live process.
 - [`dybatpho::lock_info`](#dybatpholock_info) — Print information about the process currently holding a lock.
 - [`dybatpho::lock_reclaim_stale`](#dybatpholock_reclaim_stale) — Remove a lock left behind by a process that is no longer running. Deleting it in place was a way for two processes to end up holding the same lock. Both read the dead holder, both decided to reclaim, the first one removed it and took the lock, and the second one then removed *that* — a live lock — and took it as well. Reclaiming is therefore a rename rather than a delete. `rename()` fails when the source is gone, so of two processes racing to reclaim the same lock exactly one moves it aside and the loser touches nothing. The identity recorded in the lock is re-read from the moved-aside copy and compared with the one that was judged stale: they differ only when the lock was replaced between the judgement and the move, and the fresh lock is put back rather than deleted.
-- [`__dybatpho_lock_identity`](#__dybatpho_lock_identity) — Print what identifies the holder of a lock, for comparing one observation of a lock with a later one. It is the link target for the atomic form, and the recorded pid for the directory form older copies of the library wrote.
 - [`dybatpho::lock_acquire`](#dybatpholock_acquire) — Acquire a portable, cross-platform (Linux/macOS) file lock, waiting up to a timeout.
 - [`dybatpho::lock_release`](#dybatpholock_release) — Release a lock previously acquired by the current process.
 - [`dybatpho::with_lock`](#dybatphowith_lock) — Acquire a lock, run a command while holding it, then release it, even if the command fails.
@@ -85,44 +82,6 @@ dybatpho::lock_info "deploy"
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_lock_exists`
-
-Return success when something holds this lock path, whichever
-form it is in: a symbolic link, which is what the atomic claim writes, or a
-directory, which is what versions before it wrote.
-
-`[[ -L ]]` is deliberately first and deliberately not `[[ -e ]]`: the link
-target is data rather than a path, so it never resolves, and `-e` reports a
-dangling link as absent.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Lock path |
-
-**🚦 Exit codes**
-
-- `0`: A lock is present
-- `1`: Nothing is there
-
-
----
-
-### `__dybatpho_lock_target`
-
-Print the link target that identifies the holder of a lock,
-as `pid:host:acquired_at`.
-
-_Function has no arguments._
-
-**📤 Output on stdout**
-
-- The target
-
-
----
 
 ### `dybatpho::lock_hostname`
 
@@ -257,26 +216,6 @@ than deleted.
 **📤 Output on stderr**
 
 - Notice when a stale lock is reclaimed
-
-
----
-
-### `__dybatpho_lock_identity`
-
-Print what identifies the holder of a lock, for comparing one
-observation of a lock with a later one. It is the link target for the
-atomic form, and the recorded pid for the directory form older copies of
-the library wrote.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Lock path |
-
-**📤 Output on stdout**
-
-- The identity, or nothing when the lock is gone
 
 
 ---

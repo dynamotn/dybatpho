@@ -71,6 +71,7 @@
 #   left raw makes the payload something the webhook refuses.
 # @arg $1 string Input string
 # @stdout JSON-safe escaped string (without surrounding quotes)
+# @internal
 #######################################
 function __dybatpho_notification_json_escape {
   local input

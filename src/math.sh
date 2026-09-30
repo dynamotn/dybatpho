@@ -60,6 +60,7 @@ export DYBATPHO_MATH_MAX_EXPONENT=4096
 #   internal name; the caller wants to read the name they typed.
 # @noargs
 # @stdout The nearest `dybatpho::` function on the call stack
+# @internal
 #######################################
 function __dybatpho_math_caller {
   local index
@@ -83,6 +84,7 @@ function __dybatpho_math_caller {
 # @arg $4 string Name of the variable receiving the fraction digits
 # @set The three named variables
 # @exitcode 1 Stop the script when the value is not a plain decimal number
+# @internal
 #######################################
 function __dybatpho_math_parse {
   local __parse_value __parse_sign_name __parse_int_name __parse_frac_name
@@ -134,6 +136,7 @@ function __dybatpho_math_parse {
 # @description Drop the leading zeros of a digit string, in place.
 # @arg $1 string Name of the variable holding the digits
 # @set The named variable, never left empty
+# @internal
 #######################################
 function __dybatpho_math_strip {
   local -n __strip_digits="$1"
@@ -149,6 +152,7 @@ function __dybatpho_math_strip {
 # @arg $2 string First digit string
 # @arg $3 string Second digit string
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_math_cmp_abs {
   local __cmp_out_name __cmp_a __cmp_b
@@ -179,6 +183,7 @@ function __dybatpho_math_cmp_abs {
 # @arg $2 string First digit string
 # @arg $3 string Second digit string
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_math_add_abs {
   local __add_out_name __add_a __add_b
@@ -206,6 +211,7 @@ function __dybatpho_math_add_abs {
 # @arg $2 string Digit string to subtract from, never smaller than `$3`
 # @arg $3 string Digit string to subtract
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_math_sub_abs {
   local __sub_out_name __sub_a __sub_b
@@ -237,6 +243,7 @@ function __dybatpho_math_sub_abs {
 # @arg $2 string First digit string
 # @arg $3 string Second digit string
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_math_mul_abs {
   local __mul_out_name __mul_a __mul_b
@@ -272,6 +279,7 @@ function __dybatpho_math_mul_abs {
 # @arg $3 string Digit string to divide
 # @arg $4 string Digit string to divide by, never zero
 # @set The two named variables
+# @internal
 #######################################
 function __dybatpho_math_divmod_abs {
   local __div_quot_name __div_rem_name __div_a __div_b
@@ -307,6 +315,7 @@ function __dybatpho_math_divmod_abs {
 # @arg $2 string Name of the variable holding the fraction digits
 # @arg $3 number Requested number of fraction digits
 # @set The two named variables
+# @internal
 #######################################
 function __dybatpho_math_round_digits {
   local __round_int_name __round_frac_name __round_precision
@@ -347,6 +356,7 @@ function __dybatpho_math_round_digits {
 # @arg $3 string Digit string
 # @arg $4 number Number of digits that belong to the fraction
 # @set The two named variables
+# @internal
 #######################################
 function __dybatpho_math_unscale {
   local __unscale_int_name __unscale_frac_name __unscale_digits __unscale_scale
@@ -372,6 +382,7 @@ function __dybatpho_math_unscale {
 # @arg $3 string Integer digits
 # @arg $4 string Fraction digits
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_math_compose {
   local __compose_out_name __compose_sign __compose_int __compose_frac
@@ -399,6 +410,7 @@ function __dybatpho_math_compose {
 # @arg $6 string Integer digits of the second value
 # @arg $7 string Fraction digits of the second value
 # @set The three named variables
+# @internal
 #######################################
 function __dybatpho_math_align {
   local __align_a_name __align_b_name __align_scale_name
@@ -422,6 +434,7 @@ function __dybatpho_math_align {
 # @arg $2 string Value
 # @set The named variable
 # @exitcode 1 Stop the script when the value is not a number
+# @internal
 #######################################
 function __dybatpho_math_negate {
   local __neg_out_name __neg_value
@@ -444,6 +457,7 @@ function __dybatpho_math_negate {
 # @arg $3 string Second value
 # @set The named variable
 # @exitcode 1 Stop the script when either value is not a number
+# @internal
 #######################################
 function __dybatpho_math_add2 {
   local __add2_out_name __add2_a __add2_b
@@ -484,6 +498,7 @@ function __dybatpho_math_add2 {
 # @arg $3 string Second value
 # @set The named variable
 # @exitcode 1 Stop the script when either value is not a number
+# @internal
 #######################################
 function __dybatpho_math_mul2 {
   local __mul2_out_name __mul2_a __mul2_b
@@ -512,6 +527,7 @@ function __dybatpho_math_mul2 {
 # @arg $4 number Fraction digits to keep
 # @set The named variable
 # @exitcode 1 Stop the script on a bad value, a bad scale, or a zero divisor
+# @internal
 #######################################
 function __dybatpho_math_div2 {
   local __div2_out_name __div2_a __div2_b __div2_scale
@@ -564,6 +580,7 @@ function __dybatpho_math_div2 {
 # @arg $1 string Name of the array receiving the values
 # @arg $@ string Values, or none to read standard input
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_math_collect {
   local -n __collect_out="$1"

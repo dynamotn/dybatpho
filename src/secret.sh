@@ -36,6 +36,7 @@ declare -gi DYBATPHO_SECRET_COUNT=0
 # @description Report a permission problem as a fatal error or a warning.
 # @arg $1 string Message
 # @exitcode 1 Stop the script when `DYBATPHO_SECRET_STRICT_PERMS` is true-like
+# @internal
 #######################################
 function __dybatpho_secret_permission_error {
   local message
@@ -50,6 +51,7 @@ function __dybatpho_secret_permission_error {
 # @description Register one value for masking, keeping the registry sorted by length.
 # @arg $1 string Secret value
 # @arg $2 string Pass `true` to report skipped short values at debug level
+# @internal
 #######################################
 function __dybatpho_secret_register_one {
   local value="${1-}" quiet="${2:-false}"
@@ -85,6 +87,7 @@ function __dybatpho_secret_register_one {
 #######################################
 # @description Replace every registered secret inside a variable, in place.
 # @arg $1 string Name of the variable to redact
+# @internal
 #######################################
 function __dybatpho_secret_mask_var {
   local __dybatpho_mask_name
@@ -102,6 +105,7 @@ function __dybatpho_secret_mask_var {
 # @arg $1 string Path
 # @stdout Three or four digit octal mode
 # @exitcode 1 The mode cannot be read
+# @internal
 #######################################
 function __dybatpho_secret_file_mode {
   local path
@@ -125,6 +129,7 @@ function __dybatpho_secret_file_mode {
 # @arg $1 string Path
 # @stdout Numeric user id
 # @exitcode 1 The owner cannot be read
+# @internal
 #######################################
 function __dybatpho_secret_file_owner {
   local path
@@ -562,6 +567,7 @@ function dybatpho::secret_shred {
 # @description Print the size of a file in bytes.
 # @arg $1 string Path
 # @stdout Size in bytes, or `0` when it can't be determined
+# @internal
 #######################################
 function __dybatpho_secret_file_size {
   local path size

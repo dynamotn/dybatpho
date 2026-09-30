@@ -36,11 +36,6 @@ are counted without the script asking for it.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_metrics_validate_name`](#__dybatpho_metrics_validate_name) — Fail unless a string is a valid Prometheus metric or label name.
-- [`__dybatpho_metrics_sort`](#__dybatpho_metrics_sort) — Sort an array in place, in Bash. `__log` calls into this module, and `__log` has to keep working where `PATH` is restricted, so nothing here may depend on an external command.
-- [`__dybatpho_metrics_labels`](#__dybatpho_metrics_labels) — Turn `key=value` arguments into a rendered Prometheus label set. Labels are sorted so that the same set always produces the same series key, whatever order the caller passed them in.
-- [`__dybatpho_metrics_key`](#__dybatpho_metrics_key) — Build the storage key for one series. The key is returned through a variable rather than standard output, because a command substitution would validate inside a subshell, where a rejected name or label could not stop the caller from recording the series anyway.
-- [`__dybatpho_metrics_declare`](#__dybatpho_metrics_declare) — Record the type and help text of a metric, the first time it is seen.
 - [`dybatpho::metrics_help`](#dybatphometrics_help) — Describe a metric, so that the exported text explains it.
 - [`dybatpho::metrics_counter_inc`](#dybatphometrics_counter_inc) — Add to a counter, a value that only ever grows.
 - [`dybatpho::metrics_gauge_set`](#dybatphometrics_gauge_set) — Set a gauge, a value that can go up and down.
@@ -50,10 +45,7 @@ are counted without the script asking for it.
 - [`dybatpho::metrics_time`](#dybatphometrics_time) — Run a command, record how long it took, and pass its exit code on. The duration is recorded whether the command succeeded or not, and a failure also increments a failure counter named after the metric, so that a dashboard can show latency and error rate from the same run: `deploy_duration_seconds` pairs with `deploy_failures_total`.
 - [`dybatpho::metrics_get`](#dybatphometrics_get) — Read one series back, for a script that branches on its own measurements and for tests.
 - [`dybatpho::metrics_reset`](#dybatphometrics_reset) — Forget every recorded metric.
-- [`__dybatpho_metrics_seconds`](#__dybatpho_metrics_seconds) — Render whole milliseconds as the seconds value Prometheus expects.
-- [`__dybatpho_metrics_series`](#__dybatpho_metrics_series) — Rewrite a series key with a name suffix and an optional extra label. `http_duration{host="a"}` becomes `http_duration_bucket{host="a",le="0.5"}`.
 - [`dybatpho::metrics_render`](#dybatphometrics_render) — Render every recorded metric in the Prometheus text exposition format.
-- [`__dybatpho_metrics_keys_of`](#__dybatpho_metrics_keys_of) — Print the series keys of one metric, in a stable order.
 - [`dybatpho::metrics_write`](#dybatphometrics_write) — Write the rendered metrics to a file, atomically. The node exporter's textfile collector reads whatever it finds whenever it scrapes, so the file has to appear complete or not at all.
 
 <a id="see-also"></a>
@@ -63,10 +55,6 @@ are counted without the script asking for it.
 
 <a id="tips"></a>
 ## 💡 Tips
-
-### `__dybatpho_metrics_key`
-
-- The hooks in `helpers`, `logging`, and `network` test for this function to decide whether metrics are recordable. It is internal, so it never crosses a process boundary, which is exactly what makes it the right marker: a child shell inherits the exported `dybatpho::metrics_*` functions but not the helpers they call, and a guard on a public name would take the recording branch there and fail. Renaming this function means updating those guards.
 
 ### `dybatpho::metrics_timer_stop`
 
@@ -78,99 +66,6 @@ are counted without the script asking for it.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_metrics_validate_name`
-
-Fail unless a string is a valid Prometheus metric or label name.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name to validate |
-| `$2` | string | What the name is, used in the failure message |
-
-**🚦 Exit codes**
-
-- `1`: The name is not valid
-
-
----
-
-### `__dybatpho_metrics_sort`
-
-Sort an array in place, in Bash.
-`__log` calls into this module, and `__log` has to keep working where `PATH`
-is restricted, so nothing here may depend on an external command.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the array variable to sort |
-
-
----
-
-### `__dybatpho_metrics_labels`
-
-Turn `key=value` arguments into a rendered Prometheus label set.
-Labels are sorted so that the same set always produces the same series key,
-whatever order the caller passed them in.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable that receives the rendered label set |
-| `$@` | string | Label assignments such as `status=200` |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable, to the label set including braces, or empty when no labels were given
-
-**🚦 Exit codes**
-
-- `1`: An argument is not a `key=value` pair, or a key is not a valid name
-
-
----
-
-### `__dybatpho_metrics_key`
-
-Build the storage key for one series.
-The key is returned through a variable rather than standard output, because
-a command substitution would validate inside a subshell, where a rejected
-name or label could not stop the caller from recording the series anyway.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable that receives the key |
-| `$2` | string | Metric name |
-| `$@` | string | Label assignments |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable, to the series key
-
-
----
-
-### `__dybatpho_metrics_declare`
-
-Record the type and help text of a metric, the first time it is seen.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Metric name |
-| `$2` | string | Metric type |
-
-
----
 
 ### `dybatpho::metrics_help`
 
@@ -402,43 +297,6 @@ _Function has no arguments._
 
 ---
 
-### `__dybatpho_metrics_seconds`
-
-Render whole milliseconds as the seconds value Prometheus expects.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Milliseconds |
-
-**📤 Output on stdout**
-
-- Seconds with three decimal places
-
-
----
-
-### `__dybatpho_metrics_series`
-
-Rewrite a series key with a name suffix and an optional extra label.
-`http_duration{host="a"}` becomes `http_duration_bucket{host="a",le="0.5"}`.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Series key |
-| `$2` | string | Suffix appended to the metric name |
-| `$3` | string | Optional extra label, already rendered as `key="value"` |
-
-**📤 Output on stdout**
-
-- Rewritten series key
-
-
----
-
 ### `dybatpho::metrics_render`
 
 Render every recorded metric in the Prometheus text exposition format.
@@ -458,24 +316,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - Prometheus text exposition format, with metrics and series in a stable order
-
-
----
-
-### `__dybatpho_metrics_keys_of`
-
-Print the series keys of one metric, in a stable order.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Metric name |
-| `$2` | string | Name of the associative array to read |
-
-**📤 Output on stdout**
-
-- Matching series keys, sorted
 
 
 ---

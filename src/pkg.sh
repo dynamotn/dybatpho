@@ -97,6 +97,7 @@ declare -gA __dybatpho_pkg_binary=(
 # @description Print the managers to probe, most specific to this platform first.
 # @noargs
 # @stdout One manager name per line
+# @internal
 #######################################
 function __dybatpho_pkg_detection_order {
   local platform
@@ -116,6 +117,7 @@ function __dybatpho_pkg_detection_order {
 # @arg $1 string Manager name
 # @arg $2 string Function name used in the failure message
 # @exitcode 1 Stop the script when the manager is unknown
+# @internal
 #######################################
 function __dybatpho_pkg_assert_manager {
   local manager caller
@@ -150,6 +152,7 @@ function __dybatpho_pkg_assert_manager {
 # @arg $1 string Manager name
 # @stdout `sudo` when elevation is needed, nothing otherwise
 # @env DYBATPHO_PKG_SUDO string `auto` elevates when not root, `true`/`false` override the detection
+# @internal
 #######################################
 function __dybatpho_pkg_privilege {
   local manager
@@ -174,6 +177,7 @@ function __dybatpho_pkg_privilege {
 # @arg $1 string Manager name
 # @stdout Zero or more flags
 # @env DYBATPHO_PKG_ASSUME_YES bool Set to `false` to print nothing
+# @internal
 #######################################
 function __dybatpho_pkg_assume_yes_flags {
   local manager
@@ -195,6 +199,7 @@ function __dybatpho_pkg_assume_yes_flags {
 # @arg $2 string Action, `install` or `update`
 # @arg $@ string Extra manager arguments, then `--` and the packages of the `install` action
 # @stdout The command and its arguments, one word per line
+# @internal
 #######################################
 function __dybatpho_pkg_action_command {
   local manager action
@@ -258,6 +263,7 @@ function __dybatpho_pkg_action_command {
 # @arg $2 string Question shown when confirmation is needed
 # @exitcode 0 The change is approved
 # @exitcode 1 The change is declined or can't be confirmed
+# @internal
 #######################################
 function __dybatpho_pkg_approve {
   local force question
@@ -274,6 +280,7 @@ function __dybatpho_pkg_approve {
 # @arg $1 string Dry-run flag value
 # @arg $@ string The command and its arguments
 # @exitcode The exit code of the command, or 0 when it is only printed
+# @internal
 #######################################
 function __dybatpho_pkg_run {
   local dry_run

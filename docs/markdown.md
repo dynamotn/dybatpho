@@ -31,11 +31,6 @@ document object.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_md_read_lines`](#__dybatpho_md_read_lines) — Read a text argument or stdin into a target array of lines. Kept here rather than borrowed from `text.sh` so that everything except `dybatpho::md_table` works with the core modules alone.
-- [`__dybatpho_md_join_into`](#__dybatpho_md_join_into) — Join an array of lines into one newline-separated string in a named variable. The `IFS` the join needs is local to this helper, so no caller has to set and restore it around the expansion.
-- [`__dybatpho_md_escape_plain`](#__dybatpho_md_escape_plain) — Escape the characters that carry inline meaning in Markdown, writing the result into a named variable. Raw regions are not handled here: `__dybatpho_md_escape_into` splits them off first.
-- [`__dybatpho_md_escape_into`](#__dybatpho_md_escape_into) — Escape text for inline use, copying through any region that `dybatpho::md_raw` marked.
-- [`__dybatpho_md_encode_url_into`](#__dybatpho_md_encode_url_into) — Make a URL safe to place inside `(...)`, writing it into a named variable. Percent-encoding is used rather than the angle-bracket form because a URL that already contains `<` or `>` breaks that form in turn.
 - [`dybatpho::md_raw`](#dybatphomd_raw) — Mark text as Markdown that is already formatted, so a builder embeds it instead of escaping it. The marked text carries two control characters that every builder removes as it renders. Print it only through a builder: on its own it still holds them.
 - [`dybatpho::md_escape`](#dybatphomd_escape) — Escape the Markdown-significant characters in a text block. The builders in this module already escape what they are given, so this is for Markdown a caller assembles itself. Passing its output to a builder escapes the text twice.
 - [`dybatpho::md_heading`](#dybatphomd_heading) — Render an ATX heading.
@@ -43,7 +38,6 @@ document object.
 - [`dybatpho::md_task_list`](#dybatphomd_task_list) — Render a GitHub-flavored task list, one item per input line. Each line is `<state><delimiter><text>`; a line with no delimiter is an unchecked item whose text is the whole line. The state is checked for `x`, `X`, and anything `dybatpho::is true` accepts.
 - [`dybatpho::md_link`](#dybatphomd_link) — Render an inline link.
 - [`dybatpho::md_badge`](#dybatphomd_badge) — Render a shields.io badge as an image, optionally wrapped in a link. The label and value are encoded the way shields.io requires: `-` doubles, `_` doubles, and a space becomes `_`.
-- [`__dybatpho_md_badge_segment_into`](#__dybatpho_md_badge_segment_into) — Encode one half of a shields.io badge path into a named variable.
 - [`dybatpho::md_code_block`](#dybatphomd_code_block) — Render a fenced code block. The body is literal by definition, so it is not escaped. The fence grows past the longest run of backticks the body contains, which is what keeps a block that itself shows fenced Markdown from ending early.
 - [`dybatpho::md_table`](#dybatphomd_table) — Render a Markdown table through `table.sh`. Cells are passed through unescaped, because escaping them here would also escape the delimiter that separates them. Escape the values first with `dybatpho::md_escape` and assemble the rows with a delimiter of your own, such as `::`, which the escape leaves alone.
 - [`dybatpho::md_collapsible`](#dybatphomd_collapsible) — Render a collapsible `<details>` section. The summary is escaped; the body is the Markdown the caller already built, so it is emitted as given. The blank lines around the body are what let a renderer treat it as Markdown rather than as raw HTML.
@@ -62,105 +56,6 @@ document object.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_md_read_lines`
-
-Read a text argument or stdin into a target array of lines.
-Kept here rather than borrowed from `text.sh` so that everything except
-`dybatpho::md_table` works with the core modules alone.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | string | Name of the array variable to fill |
-
-**🧩 Variable sets**
-
-- **`The`** (named): array
-
-
----
-
-### `__dybatpho_md_join_into`
-
-Join an array of lines into one newline-separated string in a
-named variable. The `IFS` the join needs is local to this helper, so no
-caller has to set and restore it around the expansion.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the result |
-| `$2` | string | Name of the array of lines |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
-
-
----
-
-### `__dybatpho_md_escape_plain`
-
-Escape the characters that carry inline meaning in Markdown,
-writing the result into a named variable. Raw regions are not handled here:
-`__dybatpho_md_escape_into` splits them off first.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the result |
-| `$2` | string | Text to escape |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
-
-
----
-
-### `__dybatpho_md_escape_into`
-
-Escape text for inline use, copying through any region that
-`dybatpho::md_raw` marked.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the result |
-| `$2` | string | Text to escape |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
-
-
----
-
-### `__dybatpho_md_encode_url_into`
-
-Make a URL safe to place inside `(...)`, writing it into a named
-variable. Percent-encoding is used rather than the angle-bracket form
-because a URL that already contains `<` or `>` breaks that form in turn.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the result |
-| `$2` | string | URL |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
-
-
----
 
 ### `dybatpho::md_raw`
 
@@ -355,25 +250,6 @@ dybatpho::md_badge "build" "passing" "green"
 **📤 Output on stdout**
 
 - The rendered badge
-
-
----
-
-### `__dybatpho_md_badge_segment_into`
-
-Encode one half of a shields.io badge path into a named
-variable.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the result |
-| `$2` | string | Segment text |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
 
 
 ---

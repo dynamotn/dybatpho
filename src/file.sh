@@ -443,6 +443,7 @@ function dybatpho::create_temp {
 # @arg $2 string Path to inspect
 # @stdout Requested field
 # @exitcode 1 No `stat` implementation understood the request
+# @internal
 #######################################
 function __dybatpho_file_stat {
   local field path gnu_format bsd_format
@@ -483,6 +484,7 @@ function __dybatpho_file_stat {
 # @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When false-like, return the path unchanged so the symlink itself is replaced
 # @stdout Resolved path, or the original path when it is not a symlink
 # @exitcode 1 The symlink chain is too deep to be a valid one
+# @internal
 #######################################
 function __dybatpho_file_resolve {
   local path target depth=0
@@ -510,6 +512,7 @@ function __dybatpho_file_resolve {
 #   `mv` is only atomic within one filesystem.
 # @arg $1 string Destination path
 # @stdout Staging file path
+# @internal
 #######################################
 function __dybatpho_file_staging {
   local path directory basename
@@ -522,6 +525,7 @@ function __dybatpho_file_staging {
 #######################################
 # @description Remove a staging file that will not be committed.
 # @arg $1 string Staging file path
+# @internal
 #######################################
 function __dybatpho_file_discard {
   rm -f -- "$1" 2> /dev/null || true
@@ -534,6 +538,7 @@ function __dybatpho_file_discard {
 #   that could be read as an option is prefixed with `./` instead.
 # @arg $1 string Path
 # @stdout The path, prefixed with `./` when it starts with a dash
+# @internal
 #######################################
 function __dybatpho_file_operand {
   local path
@@ -551,6 +556,7 @@ function __dybatpho_file_operand {
 # @arg $1 string Staging file path
 # @arg $2 string Destination path
 # @exitcode 1 The staging file cannot be moved into place
+# @internal
 #######################################
 function __dybatpho_file_commit {
   local staging path mode owner operand
@@ -622,6 +628,7 @@ function dybatpho::file_write_atomic {
 # @arg $2 string Replacement text
 # @stdout Delimiter character
 # @exitcode 1 Every candidate delimiter occurs in the pattern or replacement
+# @internal
 #######################################
 function __dybatpho_file_sed_delimiter {
   local pattern replacement candidate
@@ -998,6 +1005,7 @@ function dybatpho::ensure_dir {
 # @arg $3 string Optional application name appended to the directory
 # @stdout The resolved directory
 # @exitcode 1 Neither the variable nor `HOME` is usable
+# @internal
 #######################################
 function __dybatpho_xdg_dir {
   local variable fallback application base

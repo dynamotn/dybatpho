@@ -436,6 +436,8 @@ entry missing from the published notes.
   `__dybatpho_log_write_file`). The `__dybatpho_` prefix is mandatory — a bare
   `__` or `_` prefix risks colliding with helpers defined by the calling script.
   Nested helpers declared inside a function follow the same rule.
+- Tag every internal function's comment block with `# @internal`, so the
+  generated `docs/` leave it out and document the public API only.
 - Use `printf` instead of `echo` when output must be stable or contains user data.
 - Quote variables that may contain whitespace or special characters.
 - Do not silently swallow errors; return clear failures following repository

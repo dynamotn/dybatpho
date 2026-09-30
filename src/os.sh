@@ -335,6 +335,7 @@ function dybatpho::terminal_height {
 # @arg $3 number Fallback used when neither answers
 # @stdout The dimension
 # @exitcode 1 The fallback is not a positive integer
+# @internal
 #######################################
 function __dybatpho_os_terminal_size {
   local capability="$1" size="$2" fallback="$3"

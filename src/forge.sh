@@ -100,6 +100,7 @@ DYBATPHO_FORGE_TOKEN="${DYBATPHO_FORGE_TOKEN:-}"
 #   rest of the module never has to care which one a checkout uses.
 # @arg $1 string Remote URL
 # @stdout `host/owner/repo`
+# @internal
 #######################################
 function __dybatpho_forge_normalize_url {
   local url
@@ -289,6 +290,7 @@ function dybatpho::forge_token {
 # @description Name the environment variables a forge reads its token from.
 # @arg $1 string Forge kind
 # @stdout Human-readable list for an error message
+# @internal
 #######################################
 function __dybatpho_forge_token_vars {
   local kind
@@ -307,6 +309,7 @@ function __dybatpho_forge_token_vars {
 # @arg $1 string Forge kind
 # @arg $2 string `owner/repo`
 # @stdout Path segment, with no leading or trailing slash
+# @internal
 #######################################
 function __dybatpho_forge_project_path {
   local kind repo
@@ -328,6 +331,7 @@ function __dybatpho_forge_project_path {
 #   only GitHub needs this.
 # @arg $1 string Comma-separated labels
 # @stdout JSON array of strings
+# @internal
 #######################################
 function __dybatpho_forge_labels_json {
   local labels
@@ -350,6 +354,7 @@ function __dybatpho_forge_labels_json {
 # @arg $1 string Forge kind
 # @arg $2 string Token
 # @stdout Header in `Name: value` form
+# @internal
 #######################################
 function __dybatpho_forge_auth_header {
   local kind token

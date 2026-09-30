@@ -77,6 +77,7 @@ DIST_DIR="${DYBATPHO_DIR}/dist"
 # @arg $1 string Value to check
 # @exitcode 0 The value is a valid SemVer version
 # @exitcode 1 Otherwise
+# @internal
 #######################################
 function __dybatpho_release_is_version {
   dybatpho::semver_valid "${1#v}"
@@ -86,6 +87,7 @@ function __dybatpho_release_is_version {
 # @description Print the version currently stamped in `VERSION`.
 # @noargs
 # @stdout The stamped version, without a leading `v`, or empty when unreadable
+# @internal
 #######################################
 function __dybatpho_release_current_version {
   local _version=""
@@ -100,6 +102,7 @@ function __dybatpho_release_current_version {
 # @arg $1 string Remote name
 # @stdout Repository URL without a trailing `.git`
 # @exitcode 1 Stop the script when the remote has no URL
+# @internal
 #######################################
 function __dybatpho_release_repo_url {
   local _remote
@@ -128,6 +131,7 @@ function __dybatpho_release_repo_url {
 # @arg $5 path File the rewritten changelog is written to
 # @arg $6 path File the release notes are written to
 # @exitcode 1 Stop the script when the `Unreleased` section is missing or empty
+# @internal
 #######################################
 function __dybatpho_release_render_changelog {
   local _version _date _previous _url _changelog _notes
@@ -204,6 +208,7 @@ function __dybatpho_release_render_changelog {
 # @noargs
 # @exitcode 0 The section marks a breaking change
 # @exitcode 1 Otherwise
+# @internal
 #######################################
 function __dybatpho_release_changelog_breaking {
   # `exit` runs the END block, so the answer is carried in a flag rather than in
@@ -221,6 +226,7 @@ function __dybatpho_release_changelog_breaking {
 #   can reproduce: uncommitted work, the wrong branch, or a tag that exists.
 # @arg $1 string Tag the release will carry
 # @exitcode 1 Stop the script when the repository isn't in a releasable state
+# @internal
 #######################################
 function __dybatpho_release_preflight {
   local _tag _branch _default
@@ -248,6 +254,7 @@ function __dybatpho_release_preflight {
 # @arg $3 string Currently stamped version
 # @stdout The version to release, without a leading `v`
 # @exitcode 1 Stop the script when no version can be resolved or it doesn't move forward
+# @internal
 #######################################
 function __dybatpho_release_resolve_version {
   local _requested _bump _current _next
@@ -287,6 +294,7 @@ function __dybatpho_release_resolve_version {
 # @arg $1 string Version being released
 # @arg $2 string `true` to sign the checksum file
 # @stdout One artifact path per line
+# @internal
 #######################################
 function __dybatpho_release_artifacts {
   local _version _sign _bundle _sums
@@ -319,6 +327,7 @@ function __dybatpho_release_artifacts {
 # @noargs
 # @exitcode 0 The release was cut, and published unless told not to
 # @exitcode 1 A precondition failed or a step did not complete
+# @internal
 #######################################
 function __dybatpho_release_run {
   local _version _tag _previous _date _url _changelog _notes

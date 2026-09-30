@@ -50,6 +50,7 @@ declare -ga DYBATPHO_CONFIG_ERRORS=()
 # @arg $2 string Value
 # @set DYBATPHO_CONFIG
 # @exitcode 1 Stop the script when the key is not a valid name
+# @internal
 #######################################
 function __dybatpho_config_set {
   local key value
@@ -64,6 +65,7 @@ function __dybatpho_config_set {
 #   with `export` prefixes, quotes and trailing comments removed.
 # @arg $1 path File to read
 # @set DYBATPHO_CONFIG
+# @internal
 #######################################
 function __dybatpho_config_load_dotenv {
   local file line key value
@@ -95,6 +97,7 @@ function __dybatpho_config_load_dotenv {
 # @arg $2 path File to read
 # @set DYBATPHO_CONFIG
 # @exitcode 1 Stop the script when the document's root is not a mapping
+# @internal
 #######################################
 function __dybatpho_config_load_structured {
   local file format key value entries label root
@@ -322,6 +325,7 @@ function dybatpho::config_export {
 #   parsing, and `printf '%b'` has no `\"` escape to undo.
 # @arg $1 string Value
 # @stdout The value, bare or double-quoted
+# @internal
 #######################################
 function __dybatpho_config_dotenv_value {
   local value="${1-}"
@@ -344,6 +348,7 @@ function __dybatpho_config_dotenv_value {
 # @arg $1 string Destination file, which is created when it does not exist
 # @arg $@ string Configuration keys to write
 # @exitcode 1 A key cannot be spelled as a dotenv name, or the write fails
+# @internal
 #######################################
 function __dybatpho_config_save_dotenv {
   local file key line name rendered=""
@@ -396,6 +401,7 @@ function __dybatpho_config_save_dotenv {
 # @arg $2 string Destination file, which is created when it does not exist
 # @arg $@ string Configuration keys to write
 # @exitcode 1 `jq` or `yq` is missing, the file cannot be parsed, or the write fails
+# @internal
 #######################################
 function __dybatpho_config_save_structured {
   local format file key setting type expression="" separator="" literal rendered
@@ -546,6 +552,7 @@ function dybatpho::config_save {
 # @exitcode 1 The type is not supported
 # @see
 #   - `dybatpho::validate_types`
+# @internal
 #######################################
 function __dybatpho_config_schema_type {
   local input="${1,,}"
@@ -559,6 +566,7 @@ function __dybatpho_config_schema_type {
 #######################################
 # @description Drop every attribute previously declared for a key.
 # @arg $1 string Configuration key
+# @internal
 #######################################
 function __dybatpho_config_schema_clear {
   local key attribute
@@ -577,6 +585,7 @@ function __dybatpho_config_schema_clear {
 # @arg $2 string Attribute name
 # @arg $3 string Optional fallback value
 # @stdout Attribute value
+# @internal
 #######################################
 function __dybatpho_config_schema_attr {
   local key attribute
@@ -588,6 +597,7 @@ function __dybatpho_config_schema_attr {
 # @description Describe the range and choice constraints declared for a key.
 # @arg $1 string Configuration key
 # @stdout Human readable constraints, or an empty string when none are declared
+# @internal
 #######################################
 function __dybatpho_config_schema_constraints {
   local key type min max choices unit
@@ -687,6 +697,7 @@ function dybatpho::config_schema_reset {
 # @arg $1 string Configuration key
 # @arg $2 string Reason describing the violation
 # @set DYBATPHO_CONFIG_ERRORS Appends the formatted message
+# @internal
 #######################################
 function __dybatpho_config_schema_error {
   local key reason
@@ -702,6 +713,7 @@ function __dybatpho_config_schema_error {
 # @arg $1 string Configuration key
 # @arg $2 string Effective value
 # @set DYBATPHO_CONFIG_ERRORS Appends one message per violation
+# @internal
 #######################################
 function __dybatpho_config_schema_check {
   local key value type min max reason
@@ -767,6 +779,7 @@ function dybatpho::config_validate {
 # @arg $1 string Cell text
 # @arg $2 string Optional `code` to wrap a non-empty cell in backticks
 # @stdout Markdown cell text, or `-` when the value is empty
+# @internal
 #######################################
 function __dybatpho_config_doc_cell {
   local value="${1-}" style="${2-}"
@@ -787,6 +800,7 @@ function __dybatpho_config_doc_cell {
 # @arg $1 string Attribute value
 # @arg $2 string Optional `declared` to emit an empty string instead of `null`
 # @stdout Quoted JSON string, or `null`
+# @internal
 #######################################
 function __dybatpho_config_doc_json_value {
   local value="${1-}" declared="${2-}"

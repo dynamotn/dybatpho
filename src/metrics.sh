@@ -52,6 +52,7 @@ declare -gA __dybatpho_metrics_timer=()
 # @arg $1 string Name to validate
 # @arg $2 string What the name is, used in the failure message
 # @exitcode 1 The name is not valid
+# @internal
 #######################################
 function __dybatpho_metrics_validate_name {
   local name kind
@@ -65,6 +66,7 @@ function __dybatpho_metrics_validate_name {
 #   `__log` calls into this module, and `__log` has to keep working where `PATH`
 #   is restricted, so nothing here may depend on an external command.
 # @arg $1 string Name of the array variable to sort
+# @internal
 #######################################
 function __dybatpho_metrics_sort {
   local -n __sort_target="$1"
@@ -88,6 +90,7 @@ function __dybatpho_metrics_sort {
 # @arg $@ string Label assignments such as `status=200`
 # @set The named variable, to the label set including braces, or empty when no labels were given
 # @exitcode 1 An argument is not a `key=value` pair, or a key is not a valid name
+# @internal
 #######################################
 function __dybatpho_metrics_labels {
   local -n __labels_out="$1"
@@ -131,6 +134,7 @@ function __dybatpho_metrics_labels {
 #   shell inherits the exported `dybatpho::metrics_*` functions but not the
 #   helpers they call, and a guard on a public name would take the recording
 #   branch there and fail. Renaming this function means updating those guards.
+# @internal
 #######################################
 function __dybatpho_metrics_key {
   local -n __key_out="$1"
@@ -148,6 +152,7 @@ function __dybatpho_metrics_key {
 # @description Record the type and help text of a metric, the first time it is seen.
 # @arg $1 string Metric name
 # @arg $2 string Metric type
+# @internal
 #######################################
 function __dybatpho_metrics_declare {
   local name type
@@ -391,6 +396,7 @@ function dybatpho::metrics_reset {
 # @description Render whole milliseconds as the seconds value Prometheus expects.
 # @arg $1 number Milliseconds
 # @stdout Seconds with three decimal places
+# @internal
 #######################################
 function __dybatpho_metrics_seconds {
   local milliseconds
@@ -405,6 +411,7 @@ function __dybatpho_metrics_seconds {
 # @arg $2 string Suffix appended to the metric name
 # @arg $3 string Optional extra label, already rendered as `key="value"`
 # @stdout Rewritten series key
+# @internal
 #######################################
 function __dybatpho_metrics_series {
   local key suffix extra name labels
@@ -500,6 +507,7 @@ function dybatpho::metrics_render {
 # @arg $1 string Metric name
 # @arg $2 string Name of the associative array to read
 # @stdout Matching series keys, sorted
+# @internal
 #######################################
 function __dybatpho_metrics_keys_of {
   local name array_name key

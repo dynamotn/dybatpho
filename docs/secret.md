@@ -27,11 +27,6 @@ temporary file unless explicitly requested.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_secret_permission_error`](#__dybatpho_secret_permission_error) — Report a permission problem as a fatal error or a warning.
-- [`__dybatpho_secret_register_one`](#__dybatpho_secret_register_one) — Register one value for masking, keeping the registry sorted by length.
-- [`__dybatpho_secret_mask_var`](#__dybatpho_secret_mask_var) — Replace every registered secret inside a variable, in place.
-- [`__dybatpho_secret_file_mode`](#__dybatpho_secret_file_mode) — Print the octal permission mode of a path, following symbolic links.
-- [`__dybatpho_secret_file_owner`](#__dybatpho_secret_file_owner) — Print the owner user id of a path.
 - [`dybatpho::secret_register`](#dybatphosecret_register) — Register secret values so they are masked in logs, errors, and masked output.
 - [`dybatpho::secret_forget`](#dybatphosecret_forget) — Forget every registered secret so masking stops.
 - [`dybatpho::secret_mask`](#dybatphosecret_mask) — Mask registered secrets in arguments or in stdin.
@@ -50,7 +45,6 @@ temporary file unless explicitly requested.
 - [`dybatpho::secret_no_history`](#dybatphosecret_no_history) — Stop the current shell from recording commands into a history file.
 - [`dybatpho::secret_wipe`](#dybatphosecret_wipe) — Overwrite and unset variables that hold secrets.
 - [`dybatpho::secret_shred`](#dybatphosecret_shred) — Remove files containing secrets, overwriting their content when possible.
-- [`__dybatpho_secret_file_size`](#__dybatpho_secret_file_size) — Print the size of a file in bytes.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -111,92 +105,6 @@ temporary file unless explicitly requested.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_secret_permission_error`
-
-Report a permission problem as a fatal error or a warning.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message |
-
-**🚦 Exit codes**
-
-- `1`: Stop the script when `DYBATPHO_SECRET_STRICT_PERMS` is true-like
-
-
----
-
-### `__dybatpho_secret_register_one`
-
-Register one value for masking, keeping the registry sorted by length.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Secret value |
-| `$2` | string | Pass `true` to report skipped short values at debug level |
-
-
----
-
-### `__dybatpho_secret_mask_var`
-
-Replace every registered secret inside a variable, in place.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable to redact |
-
-
----
-
-### `__dybatpho_secret_file_mode`
-
-Print the octal permission mode of a path, following symbolic links.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path |
-
-**📤 Output on stdout**
-
-- Three or four digit octal mode
-
-**🚦 Exit codes**
-
-- `1`: The mode cannot be read
-
-
----
-
-### `__dybatpho_secret_file_owner`
-
-Print the owner user id of a path.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path |
-
-**📤 Output on stdout**
-
-- Numeric user id
-
-**🚦 Exit codes**
-
-- `1`: The owner cannot be read
-
-
----
 
 ### `dybatpho::secret_register`
 
@@ -570,20 +478,3 @@ Remove files containing secrets, overwriting their content when possible.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$@` | string | File paths |
-
-
----
-
-### `__dybatpho_secret_file_size`
-
-Print the size of a file in bytes.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path |
-
-**📤 Output on stdout**
-
-- Size in bytes, or `0` when it can't be determined

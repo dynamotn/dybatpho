@@ -166,6 +166,7 @@ declare -gA __DYBATPHO_STRING_ASCII=()
 # @description Fill the transliteration table, once, when the module loads.
 # @noargs
 # @set __DYBATPHO_STRING_ASCII
+# @internal
 #######################################
 function __dybatpho_string_build_ascii {
   local spec target chars index
@@ -487,6 +488,7 @@ function dybatpho::upper {
 # @arg $1 string String to split
 # @arg $2 string Name of the array variable receiving the lower-cased words
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_string_words {
   local __words_input="${1-}"

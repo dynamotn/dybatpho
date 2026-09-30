@@ -29,7 +29,6 @@ to be written into shell code that will be evaluated later.
 - [`dybatpho::string_replace`](#dybatphostring_replace) — Replace all exact substring matches in a string.
 - [`dybatpho::string_trim_prefix`](#dybatphostring_trim_prefix) — Remove an exact prefix from a string when it matches.
 - [`dybatpho::string_trim_suffix`](#dybatphostring_trim_suffix) — Remove an exact suffix from a string when it matches.
-- [`__dybatpho_string_build_ascii`](#__dybatpho_string_build_ascii) — Fill the transliteration table, once, when the module loads.
 - [`dybatpho::string_slugify`](#dybatphostring_slugify) — Convert a string into a lowercase ASCII slug. A letter carrying a diacritic becomes the ASCII letter underneath it, so `Thế Giới` slugs to `the-gioi` rather than to `th-gi-i`. Anything else outside `a-z0-9` is a separator, and a run of separators collapses into a single `-`.
 - [`dybatpho::string_is_blank`](#dybatphostring_is_blank) — Return success when a string is empty or contains only whitespace.
 - [`dybatpho::string_trim_chars`](#dybatphostring_trim_chars) — Trim a set of exact characters from both ends of a string.
@@ -42,7 +41,6 @@ to be written into shell code that will be evaluated later.
 - [`dybatpho::url_decode`](#dybatphourl_decode) — URL-decode a string.
 - [`dybatpho::lower`](#dybatpholower) — Convert a string to lowercase.
 - [`dybatpho::upper`](#dybatphoupper) — Convert a string to uppercase.
-- [`__dybatpho_string_words`](#__dybatpho_string_words) — Split a string into the words its naming convention implies. Every case helper in this module goes through here, so they all accept the same input whatever convention it arrived in: `fooBar`, `foo_bar`, `foo-bar`, `Foo Bar` and `FOO_BAR` all give the same two words. A capital opens a new word after a lowercase letter or a digit, and at the end of a run of capitals that is followed by a lowercase one, which is what keeps `XMLHttpRequest` reading as `xml http request` rather than as one word or as one letter per word. A digit stays attached to the word it follows, so `foo2bar` is one word: splitting there would be guessing. The cost of that acronym rule is single-letter words: `ABC` reads as one word, because nothing in it says whether it was an acronym or `a b c`. A name that went through `dybatpho::string_to_pascal` as `a_b_c` does not come back. There is no rule that gets both cases right, and acronyms are the ones that turn up in real names.
 - [`dybatpho::string_to_snake`](#dybatphostring_to_snake) — Convert a string to `snake_case`.
 - [`dybatpho::string_to_kebab`](#dybatphostring_to_kebab) — Convert a string to `kebab-case`. Unlike `dybatpho::string_slugify`, this reads the word boundaries a naming convention implies, so `XMLHttpRequest` becomes `xml-http-request` rather than `xmlhttprequest`. Slugify is for prose; this is for identifiers.
 - [`dybatpho::string_to_camel`](#dybatphostring_to_camel) — Convert a string to `camelCase`.
@@ -208,19 +206,6 @@ Remove an exact suffix from a string when it matches.
 **📤 Output on stdout**
 
 - String without the matching suffix, or the original string
-
-
----
-
-### `__dybatpho_string_build_ascii`
-
-Fill the transliteration table, once, when the module loads.
-
-_Function has no arguments._
-
-**🧩 Variable sets**
-
-- __DYBATPHO_STRING_ASCII
 
 
 ---
@@ -450,39 +435,6 @@ Convert a string to uppercase.
 **📤 Output on stdout**
 
 - Converted string
-
-
----
-
-### `__dybatpho_string_words`
-
-Split a string into the words its naming convention implies.
-Every case helper in this module goes through here, so they all accept the
-same input whatever convention it arrived in: `fooBar`, `foo_bar`,
-`foo-bar`, `Foo Bar` and `FOO_BAR` all give the same two words.
-
-A capital opens a new word after a lowercase letter or a digit, and at the
-end of a run of capitals that is followed by a lowercase one, which is what
-keeps `XMLHttpRequest` reading as `xml http request` rather than as one
-word or as one letter per word. A digit stays attached to the word it
-follows, so `foo2bar` is one word: splitting there would be guessing.
-
-The cost of that acronym rule is single-letter words: `ABC` reads as one
-word, because nothing in it says whether it was an acronym or `a b c`. A
-name that went through `dybatpho::string_to_pascal` as `a_b_c` does not come
-back. There is no rule that gets both cases right, and acronyms are the ones
-that turn up in real names.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | String to split |
-| `$2` | string | Name of the array variable receiving the lower-cased words |
-
-**🧩 Variable sets**
-
-- **`The`** (named): array
 
 
 ---

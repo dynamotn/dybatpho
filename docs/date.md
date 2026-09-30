@@ -27,10 +27,6 @@ implementations this module supports shift by them differently.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_date_flavor`](#__dybatpho_date_flavor) — Print which `date` this system has: `gnu`, `bsd` or `busybox`. Detected by asking for something only one of them accepts, rather than by matching a name. BSD stays the default it always was; the new question is whether this is BusyBox, which answers to neither `--version` nor `-j`. A two-way GNU-or-BSD guess sent every BusyBox system down the BSD path, where `-r` means "read the time off this file" and the whole module failed. The answer is cached: probing twice per call is a lot for a helper that formats a date.
-- [`__dybatpho_date_is_gnu`](#__dybatpho_date_is_gnu) — Report whether `date` is the GNU one, which is what decides between `-d` and BSD's `-j -f` everywhere else in this module.
-- [`__dybatpho_date_parse`](#__dybatpho_date_parse) — Turn a date expression into an epoch, through whichever `date` the machine has.
-- [`__dybatpho_date_parse_with`](#__dybatpho_date_parse_with) — Parse a date string with an explicit input format.
 - [`dybatpho::date_now`](#dybatphodate_now) — Print the current time using a `date` format string.
 - [`dybatpho::date_today`](#dybatphodate_today) — Print today's date using a `date` format string.
 - [`dybatpho::date_is_valid`](#dybatphodate_is_valid) — Return success when a date string can be parsed by `date`.
@@ -38,7 +34,6 @@ implementations this module supports shift by them differently.
 - [`dybatpho::date_format`](#dybatphodate_format) — Format a Unix timestamp with a `date` format string.
 - [`dybatpho::date_add_days`](#dybatphodate_add_days) — Add or subtract days from a date string and print the result.
 - [`dybatpho::date_diff_days`](#dybatphodate_diff_days) — Print the whole-day difference between two date strings.
-- [`__dybatpho_date_unit_seconds`](#__dybatpho_date_unit_seconds) — Print how many seconds one unit of time is worth. Only units that are a fixed number of seconds are offered. A month and a year are not: their length depends on where in the calendar they fall, and GNU and BSD `date` disagree on how to shift by one, so a helper that took them would give a different answer per platform.
 - [`dybatpho::date_is_leap_year`](#dybatphodate_is_leap_year) — Return success when a year is a leap year. Every fourth year, except centuries, except every fourth century. The middle rule is the one that gets left out, and 1900 is the year that catches it.
 - [`dybatpho::date_days_in_month`](#dybatphodate_days_in_month) — Print how many days a month has.
 - [`dybatpho::date_month_start`](#dybatphodate_month_start) — Print the first day of the month a date falls in.
@@ -54,87 +49,6 @@ implementations this module supports shift by them differently.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_date_flavor`
-
-Print which `date` this system has: `gnu`, `bsd` or `busybox`.
-Detected by asking for something only one of them accepts, rather than by
-matching a name. BSD stays the default it always was; the new question is
-whether this is BusyBox, which answers to neither `--version` nor `-j`. A
-two-way GNU-or-BSD guess sent every BusyBox system down the BSD path, where
-`-r` means "read the time off this file" and the whole module failed.
-
-The answer is cached: probing twice per call is a lot for a helper that
-formats a date.
-
-_Function has no arguments._
-
-**📤 Output on stdout**
-
-- `gnu`, `bsd` or `busybox`
-
-
----
-
-### `__dybatpho_date_is_gnu`
-
-Report whether `date` is the GNU one, which is what decides
-between `-d` and BSD's `-j -f` everywhere else in this module.
-
-_Function has no arguments._
-
-**🚦 Exit codes**
-
-- `0`: `date` is GNU
-- `1`: `date` is the BSD one
-
-
----
-
-### `__dybatpho_date_parse`
-
-Turn a date expression into an epoch, through whichever `date`
-the machine has.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Date expression, in any form the local `date` accepts |
-
-**📤 Output on stdout**
-
-- Seconds since the epoch
-
-**🚦 Exit codes**
-
-- `1`: The expression could not be parsed
-
-
----
-
-### `__dybatpho_date_parse_with`
-
-Parse a date string with an explicit input format.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Date flavor, `bsd` or `busybox` |
-| `$2` | string | Input format |
-| `$3` | string | Date string |
-
-**📤 Output on stdout**
-
-- Unix timestamp
-
-**🚦 Exit codes**
-
-- `1`: The string does not match the format
-
-
----
 
 ### `dybatpho::date_now`
 
@@ -303,31 +217,6 @@ Print the whole-day difference between two date strings.
 **📤 Output on stdout**
 
 - Signed whole-day difference calculated as `end - start`
-
-
----
-
-### `__dybatpho_date_unit_seconds`
-
-Print how many seconds one unit of time is worth.
-Only units that are a fixed number of seconds are offered. A month and a
-year are not: their length depends on where in the calendar they fall, and
-GNU and BSD `date` disagree on how to shift by one, so a helper that took
-them would give a different answer per platform.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Unit name, singular or plural |
-
-**📤 Output on stdout**
-
-- Seconds in one unit
-
-**🚦 Exit codes**
-
-- `1`: Stop the script when the unit is not one this module measures
 
 
 ---

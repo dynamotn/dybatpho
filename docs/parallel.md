@@ -33,17 +33,8 @@ the caller has defined without exporting anything.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_parallel_jobs`](#__dybatpho_parallel_jobs) — Resolve how many jobs to run at once. The count is returned through a variable rather than printed, because a command substitution would validate inside a subshell, where a rejected count could not stop the caller from running the jobs anyway.
-- [`__dybatpho_parallel_terminate`](#__dybatpho_parallel_terminate) — End every job still running in the pool. A job is a subshell that usually has children of its own, and ending the subshell alone would orphan them. The pool runs with job control on, which puts each job in its own process group, so the whole group can be ended at once.
-- [`__dybatpho_parallel_flush`](#__dybatpho_parallel_flush) — Replay each job's captured output, in submission order.
-- [`__dybatpho_parallel_any_failed`](#__dybatpho_parallel_any_failed) — Return success when a finished job has failed.
-- [`__dybatpho_parallel_prune`](#__dybatpho_parallel_prune) — Drop the process IDs that have already been reaped. `wait -n` reaps one child, so at least one entry disappears on every pass and the pool always makes progress.
-- [`__dybatpho_parallel_pool`](#__dybatpho_parallel_pool) — Run a bounded pool over jobs started by a launcher function. The launcher receives a job index and the capture directory, and starts that one job. The pool waits with `wait -n`, so a finished job is replaced right away rather than at the end of a batch. Exit codes travel through files rather than through `wait`, because `wait -n` reports a status without saying which job it belongs to.
-- [`__dybatpho_parallel_wait_all`](#__dybatpho_parallel_wait_all) — Wait for every job the pool still tracks.
 - [`dybatpho::parallel_map`](#dybatphoparallel_map) — Run one command once per item, several items at a time. The command and each item are passed as separate arguments, so an item containing a space or a quote is handled as one value rather than re-parsed as shell syntax.
-- [`__dybatpho_parallel_launch_item`](#__dybatpho_parallel_launch_item) — Start one item's job, capturing its output and exit code.
 - [`dybatpho::parallel_run`](#dybatphoparallel_run) — Run several shell commands at once, each given as one string. Use this when the jobs differ from one another; use `dybatpho::parallel_map` when the same command runs over a list, because that form needs no quoting.
-- [`__dybatpho_parallel_launch_command`](#__dybatpho_parallel_launch_command) — Start one command's job, capturing its output and exit code.
 - [`dybatpho::parallel_status`](#dybatphoparallel_status) — Print the exit code of one job of the last run.
 - [`dybatpho::parallel_count`](#dybatphoparallel_count) — Print how many jobs the last run had.
 - [`dybatpho::parallel_failed`](#dybatphoparallel_failed) — Print how many jobs of the last run failed. A job that fail-fast prevented from starting is not counted: it did not run, so it did not fail.
@@ -68,142 +59,6 @@ the caller has defined without exporting anything.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_parallel_jobs`
-
-Resolve how many jobs to run at once.
-The count is returned through a variable rather than printed, because a
-command substitution would validate inside a subshell, where a rejected
-count could not stop the caller from running the jobs anyway.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable that receives the count |
-| `$2` | string | Requested count, or empty/`0` to decide automatically |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable, to a positive job count
-
-**🚦 Exit codes**
-
-- `1`: The requested count is not a positive integer
-
-
----
-
-### `__dybatpho_parallel_terminate`
-
-End every job still running in the pool.
-A job is a subshell that usually has children of its own, and ending the
-subshell alone would orphan them. The pool runs with job control on, which
-puts each job in its own process group, so the whole group can be ended at
-once.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$@` | number | Process IDs to end, each the leader of its job's process group |
-
-
----
-
-### `__dybatpho_parallel_flush`
-
-Replay each job's captured output, in submission order.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory holding the captured output |
-| `$2` | number | Number of jobs |
-
-**📤 Output on stdout**
-
-- Standard output of every job, in order
-
-**📤 Output on stderr**
-
-- Standard error of every job, in order
-
-
----
-
-### `__dybatpho_parallel_any_failed`
-
-Return success when a finished job has failed.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory holding the captured output |
-| `$2` | number | Number of jobs |
-
-**🚦 Exit codes**
-
-- `0`: A finished job failed
-- `1`: Every job that finished so far succeeded
-
-
----
-
-### `__dybatpho_parallel_prune`
-
-Drop the process IDs that have already been reaped.
-`wait -n` reaps one child, so at least one entry disappears on every pass
-and the pool always makes progress.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the array holding the process IDs |
-
-
----
-
-### `__dybatpho_parallel_pool`
-
-Run a bounded pool over jobs started by a launcher function.
-The launcher receives a job index and the capture directory, and starts that
-one job. The pool waits with `wait -n`, so a finished job is replaced right
-away rather than at the end of a batch. Exit codes travel through files
-rather than through `wait`, because `wait -n` reports a status without
-saying which job it belongs to.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Jobs to run at once |
-| `$2` | string | Launcher function name |
-| `$3` | number | Number of jobs |
-
-**🧩 Variable sets**
-
-- DYBATPHO_PARALLEL_STATUS
-
-**🚦 Exit codes**
-
-- `0`: Every job that ran succeeded
-- `1`: At least one job failed
-
-
----
-
-### `__dybatpho_parallel_wait_all`
-
-Wait for every job the pool still tracks.
-
-_Function has no arguments._
-
-
----
 
 ### `dybatpho::parallel_map`
 
@@ -262,20 +117,6 @@ dybatpho::parallel_map 0 _check "${hosts[@]}"
 
 ---
 
-### `__dybatpho_parallel_launch_item`
-
-Start one item's job, capturing its output and exit code.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Job index |
-| `$2` | string | Capture directory |
-
-
----
-
 ### `dybatpho::parallel_run`
 
 Run several shell commands at once, each given as one string.
@@ -322,20 +163,6 @@ dybatpho::parallel_run 3 \
 
 - `0`: Every job succeeded
 - `1`: At least one job failed
-
-
----
-
-### `__dybatpho_parallel_launch_command`
-
-Start one command's job, capturing its output and exit code.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Job index |
-| `$2` | string | Capture directory |
 
 
 ---

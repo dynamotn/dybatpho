@@ -17,7 +17,6 @@ heredocs, or normalize text before writing files.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_text_read_lines`](#__dybatpho_text_read_lines) — Read a text argument or stdin into a target array of lines.
 - [`dybatpho::text_indent`](#dybatphotext_indent) — Prefix every line in a text block with the given indent string.
 - [`dybatpho::text_dedent`](#dybatphotext_dedent) — Remove the shared leading indentation from a text block.
 - [`dybatpho::text_strip_ansi`](#dybatphotext_strip_ansi) — Strip ANSI escape sequences from a text block.
@@ -31,20 +30,6 @@ heredocs, or normalize text before writing files.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_text_read_lines`
-
-Read a text argument or stdin into a target array of lines.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | string | Name of the array variable to fill |
-
-
----
 
 ### `dybatpho::text_indent`
 

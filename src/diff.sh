@@ -48,6 +48,7 @@ DYBATPHO_DIFF_COLOR="${DYBATPHO_DIFF_COLOR-}"
 # @noargs
 # @exitcode 0 Color should be emitted
 # @exitcode 1 It should not
+# @internal
 #######################################
 function __dybatpho_diff_wants_color {
   if [[ -n "${DYBATPHO_DIFF_COLOR}" ]]; then
@@ -66,6 +67,7 @@ function __dybatpho_diff_wants_color {
 # @arg $2 string File path, `-`, or text
 # @arg $3 string Label used in the diff header
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_diff_side_into {
   local -n __dybatpho_diff_side_ref="$1"
@@ -94,6 +96,7 @@ function __dybatpho_diff_side_into {
 # @arg $1 string One line of unified diff output
 # @arg $2 string `1` to color, `0` to print plain
 # @stdout The line
+# @internal
 #######################################
 function __dybatpho_diff_paint {
   local line="$1"
@@ -212,6 +215,7 @@ function dybatpho::diff_summary {
 # @stdout One line per scalar, sorted by path
 # @exitcode 0 The document was flattened
 # @exitcode 1 The document is not valid JSON
+# @internal
 #######################################
 function __dybatpho_diff_flatten {
   # A leaf is a scalar or an empty container. `scalars` alone would not do:
@@ -308,6 +312,7 @@ function dybatpho::diff_json {
 # @arg $4 string Value, or the old value for a change
 # @arg $5 string New value, for a change
 # @stdout The formatted line
+# @internal
 #######################################
 function __dybatpho_diff_report {
   local color="$1" kind="$2" path="$3" value="$4" replacement="${5-}"

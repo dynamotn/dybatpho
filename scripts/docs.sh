@@ -38,6 +38,7 @@ SH_DOCS="${SCRIPT_DIR}/sh-docs/sh-docs"
 #   the modules it loads.
 # @noargs
 # @stdout Paths of the source files
+# @internal
 function __dybatpho_doc_sources {
   # `dybatpho::opts::setup` collects the positional arguments into a Bash array,
   # which `dybatpho::generate_from_spec` always declares, empty or not.
@@ -57,6 +58,7 @@ function __dybatpho_doc_sources {
 
 # @description Write `docs/<module>.md` for every source.
 # @noargs
+# @internal
 function __dybatpho_doc_generate {
   local _src _module _written=0
   local doc_sources_output
@@ -75,6 +77,7 @@ function __dybatpho_doc_generate {
 # @noargs
 # @exitcode 0 Every document matches its source
 # @exitcode 1 At least one document is stale
+# @internal
 function __dybatpho_doc_check {
   local _generated _src _module _stale="" _checked=0
   dybatpho::create_temp_dir _generated "doc-check"
@@ -106,6 +109,7 @@ function __dybatpho_doc_check {
 
 # @description Generate or check, depending on `--check`.
 # @noargs
+# @internal
 function __dybatpho_doc_run {
   dybatpho::require "gawk"
   [[ -x "${SH_DOCS}" ]] \

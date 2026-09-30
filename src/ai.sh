@@ -156,6 +156,7 @@ declare -gA DYBATPHO_AI_TOOL_HANDLER=()
 # @exitcode 0 `yq` or `jq` is available
 # @exitcode 127 Stop the script because neither is installed
 # @see dybatpho::json_object
+# @internal
 #######################################
 function __dybatpho_ai_require_json {
   __dybatpho_json_cmd > /dev/null
@@ -167,6 +168,7 @@ function __dybatpho_ai_require_json {
 # @env DYBATPHO_AI_REDACT bool Return the text unchanged when not true
 # @stdout Redacted text
 # @see dybatpho::secret_mask
+# @internal
 #######################################
 function __dybatpho_ai_redact {
   local text
@@ -188,6 +190,7 @@ function __dybatpho_ai_redact {
 # @exitcode 0 A handler is registered, or this is not the shell that should
 #   register one
 # @see dybatpho::cleanup_file_on_exit
+# @internal
 #######################################
 function __dybatpho_ai_state_cleanup_once {
   [[ "${BASHPID}" == "$$" ]] || return 0
@@ -209,6 +212,7 @@ function __dybatpho_ai_state_cleanup_once {
 # @env DYBATPHO_AI_STATE_FILE string Overrides the default when set
 # @set DYBATPHO_AI_STATE_FILE
 # @stdout Path of the counter file
+# @internal
 #######################################
 function __dybatpho_ai_state_path {
   if [[ -z "${DYBATPHO_AI_STATE_FILE}" ]]; then
@@ -231,6 +235,7 @@ function __dybatpho_ai_state_path {
 # @stdout Path of the counter file
 # @exitcode 0 The path is safe to write
 # @exitcode 1 Stop the script when the path is a symbolic link
+# @internal
 #######################################
 function __dybatpho_ai_state_prepare {
   local path
@@ -245,6 +250,7 @@ function __dybatpho_ai_state_prepare {
 # @noargs
 # @env DYBATPHO_AI_STATE_FILE string File the counters are kept in
 # @stdout Counter JSON
+# @internal
 #######################################
 function __dybatpho_ai_state_read {
   local path
@@ -261,6 +267,7 @@ function __dybatpho_ai_state_read {
 #######################################
 # @description Replace the counter document.
 # @arg $1 string Counter JSON
+# @internal
 #######################################
 function __dybatpho_ai_state_write {
   local document path
@@ -278,6 +285,7 @@ function __dybatpho_ai_state_write {
 # @arg $1 number Calls this operation is about to make, default `1`
 # @exitcode 0 There is budget left
 # @exitcode 1 Stop the script when the budget is exhausted
+# @internal
 #######################################
 function __dybatpho_ai_budget_check {
   local wanted="${1:-1}"
@@ -298,6 +306,7 @@ function __dybatpho_ai_budget_check {
 # @description Count one model call in the shared counter file.
 # @noargs
 # @exitcode 0 The counter was incremented
+# @internal
 #######################################
 function __dybatpho_ai_count_call {
   local ai_state_read
@@ -313,6 +322,7 @@ function __dybatpho_ai_count_call {
 # @arg $2 number Output tokens
 # @arg $3 string Model that answered
 # @arg $4 string Stop reason
+# @internal
 #######################################
 function __dybatpho_ai_record_usage {
   local input_tokens="${1:-0}" output_tokens="${2:-0}" model="${3:-}" stop_reason="${4:-}"
@@ -333,6 +343,7 @@ function __dybatpho_ai_record_usage {
 # @noargs
 # @exitcode 0 Ollama is reachable
 # @exitcode 1 Ollama is not reachable
+# @internal
 #######################################
 function __dybatpho_ai_ollama_alive {
   hash curl > /dev/null 2>&1 || return 1
@@ -416,6 +427,7 @@ function dybatpho::ai_model {
 # @stdout API key, empty for `ollama`
 # @exitcode 0 A key was found, or the backend needs none
 # @exitcode 1 Stop the script when a required key is missing
+# @internal
 #######################################
 function __dybatpho_ai_api_key {
   local provider
@@ -444,6 +456,7 @@ function __dybatpho_ai_api_key {
 # @description Resolve the base URL of an HTTP backend.
 # @arg $1 string Backend name
 # @stdout Base URL without a trailing slash
+# @internal
 #######################################
 function __dybatpho_ai_base_url {
   local provider
@@ -498,6 +511,7 @@ function dybatpho::ai_check {
 # @stdout `claude`, `llm`, or `ollama`
 # @exitcode 0 A supported client exists
 # @exitcode 127 Stop the script when no client is installed
+# @internal
 #######################################
 function __dybatpho_ai_cli_command {
   if dybatpho::is set "${DYBATPHO_AI_CLI}"; then
@@ -516,6 +530,7 @@ function __dybatpho_ai_cli_command {
 # @arg $1 string System prompt, may be empty
 # @arg $@ string Alternating role and content pairs
 # @stdout Conversation JSON
+# @internal
 #######################################
 function __dybatpho_ai_conversation_build {
   local system
@@ -536,6 +551,7 @@ function __dybatpho_ai_conversation_build {
 # @arg $2 string Tools array JSON, or `[]`
 # @arg $3 string Output schema JSON, or empty for free-form text
 # @stdout Request payload
+# @internal
 #######################################
 function __dybatpho_ai_payload_anthropic {
   local conversation tools schema
@@ -573,6 +589,7 @@ function __dybatpho_ai_payload_anthropic {
 # @arg $2 string Tools array JSON, or `[]`
 # @arg $3 string Output schema JSON, or empty for free-form text
 # @stdout Request payload
+# @internal
 #######################################
 function __dybatpho_ai_payload_openai {
   local conversation tools schema
@@ -607,6 +624,7 @@ function __dybatpho_ai_payload_openai {
 # OpenAI-compatible and Ollama APIs expect it.
 # @arg $1 string Conversation JSON
 # @stdout Message array JSON
+# @internal
 #######################################
 function __dybatpho_ai_messages_with_system {
   local conversation
@@ -628,6 +646,7 @@ function __dybatpho_ai_messages_with_system {
 # which both OpenAI-compatible endpoints and Ollama accept.
 # @arg $1 string Tools array JSON
 # @stdout Converted tools array JSON
+# @internal
 #######################################
 function __dybatpho_ai_tools_as_functions {
   local tools
@@ -645,6 +664,7 @@ function __dybatpho_ai_tools_as_functions {
 # @arg $2 string Tools array JSON, or `[]`
 # @arg $3 string Output schema JSON, or empty for free-form text
 # @stdout Request payload
+# @internal
 #######################################
 function __dybatpho_ai_payload_ollama {
   local conversation tools schema
@@ -670,6 +690,7 @@ function __dybatpho_ai_payload_ollama {
 # @arg $1 string Backend name
 # @arg $2 string Request payload
 # @stdout Hexadecimal key
+# @internal
 #######################################
 function __dybatpho_ai_cache_key {
   local provider payload
@@ -683,6 +704,7 @@ function __dybatpho_ai_cache_key {
 #   below one, and it has been documented that way, so the namespace is emptied
 #   for the call instead of the path being rebuilt.
 # @arg $@ string A `dybatpho::cache_*` function and its arguments
+# @internal
 #######################################
 function __dybatpho_ai_cache {
   DYBATPHO_CACHE_DIR="${DYBATPHO_AI_CACHE_DIR}" DYBATPHO_CACHE_NAMESPACE="" "$@"
@@ -695,6 +717,7 @@ function __dybatpho_ai_cache {
 # @stdout Cached response body
 # @exitcode 0 A fresh entry was printed
 # @exitcode 1 No usable entry
+# @internal
 #######################################
 function __dybatpho_ai_cache_read {
   local key
@@ -709,6 +732,7 @@ function __dybatpho_ai_cache_read {
 # @arg $1 string Cache key
 # @arg $2 string Response body
 # @exitcode 0 Stored, or caching is disabled
+# @internal
 #######################################
 function __dybatpho_ai_cache_write {
   local key body
@@ -744,6 +768,7 @@ function dybatpho::ai_cache_clear {
 # @arg $1 string Backend name
 # @arg $2 string Request payload, inspected for a structured output contract
 # @stdout Response body in the provider's own shape
+# @internal
 #######################################
 function __dybatpho_ai_dry_run_body {
   local provider payload
@@ -807,6 +832,7 @@ function __dybatpho_ai_dry_run_body {
 # @exitcode 4 HTTP 4xx from the provider
 # @exitcode 5 HTTP 5xx from the provider
 # @see dybatpho::curl_do
+# @internal
 #######################################
 function __dybatpho_ai_http {
   local provider payload
@@ -870,6 +896,7 @@ function __dybatpho_ai_http {
 # @arg $2 string Response body
 # @exitcode 0 The response has no error field
 # @exitcode 1 Stop the script and report the provider message
+# @internal
 #######################################
 function __dybatpho_ai_assert_no_error {
   local provider body
@@ -895,6 +922,7 @@ function __dybatpho_ai_assert_no_error {
 # @arg $1 string Backend name
 # @arg $2 string Response body
 # @stdout Assistant text, empty when the turn produced only tool calls
+# @internal
 #######################################
 function __dybatpho_ai_extract_text {
   local provider body
@@ -919,6 +947,7 @@ function __dybatpho_ai_extract_text {
 # @arg $1 string Backend name
 # @arg $2 string Response body
 # @see dybatpho::ai_usage
+# @internal
 #######################################
 function __dybatpho_ai_usage_from_response {
   local provider body
@@ -951,6 +980,7 @@ function __dybatpho_ai_usage_from_response {
 # @arg $1 string Conversation JSON
 # @stdout Assistant text
 # @exitcode 0 The client answered
+# @internal
 #######################################
 function __dybatpho_ai_cli_complete {
   local conversation
@@ -1015,6 +1045,7 @@ function __dybatpho_ai_cli_complete {
 # @arg $2 string Output schema JSON, or empty
 # @stdout Assistant text
 # @exitcode 0 The provider answered
+# @internal
 #######################################
 function __dybatpho_ai_complete {
   local conversation schema
@@ -1350,6 +1381,7 @@ function dybatpho::ai_stream {
 # @arg $1 string One event payload
 # @arg $2 string Filter selecting the text fragment
 # @stdout The fragment, with no added newline
+# @internal
 #######################################
 function __dybatpho_ai_stream_chunk {
   local event filter
@@ -1424,6 +1456,7 @@ function dybatpho::ai_tool_clear {
 # @description Render the tool registry as a provider-neutral tools array.
 # @noargs
 # @stdout JSON array, `[]` when nothing is registered
+# @internal
 #######################################
 function __dybatpho_ai_tools_json {
   local tools='[]' name definition
@@ -1447,6 +1480,7 @@ function __dybatpho_ai_tools_json {
 # @arg $1 string Tool name
 # @arg $2 string Tool arguments as JSON
 # @stdout Tool output
+# @internal
 #######################################
 function __dybatpho_ai_tool_invoke {
   local name arguments

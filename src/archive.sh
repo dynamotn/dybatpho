@@ -17,6 +17,7 @@
 # @description Detect the supported archive format from a file name.
 # @arg $1 string Archive file path
 # @stdout Archive format identifier
+# @internal
 #######################################
 function __dybatpho_archive_format {
   local archive_path
@@ -62,6 +63,7 @@ function __dybatpho_archive_format {
 # @description Return the output name produced when a single-file compressed archive is extracted.
 # @arg $1 string Archive file path
 # @stdout Default extracted file name
+# @internal
 #######################################
 function __dybatpho_archive_output_name {
   local archive_path format
@@ -91,6 +93,7 @@ function __dybatpho_archive_output_name {
 # @arg $1 string Temporary extraction directory
 # @arg $2 string Final destination directory
 # @arg $3 number Number of leading path components to remove
+# @internal
 #######################################
 function __dybatpho_archive_move_stripped {
   local source_root destination strip_components
@@ -346,6 +349,7 @@ function dybatpho::archive_list {
 # @arg $1 string Entry name as reported by `dybatpho::archive_list`
 # @exitcode 0 The entry is a safe relative path
 # @exitcode 1 The entry is absolute, escapes through `..`, or uses a Windows drive path
+# @internal
 #######################################
 function __dybatpho_archive_entry_is_safe {
   local entry

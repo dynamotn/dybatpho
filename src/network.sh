@@ -113,6 +113,7 @@ __DYBATPHO_IPV6_GROUP_REGEX='^[0-9A-Fa-f]{1,4}$'
 #   escaped or it ends the value early.
 # @arg $1 string Raw value
 # @stdout The escaped value, without its surrounding quotes
+# @internal
 #######################################
 function __dybatpho_network_config_escape {
   local value="${1-}"
@@ -136,6 +137,7 @@ function __dybatpho_network_config_escape {
 # @set The named variable
 # @exitcode 0 A config file was written, or there was nothing to write
 # @exitcode 1 Stop the script when the file cannot be created
+# @internal
 #######################################
 function __dybatpho_network_secret_config {
   local __config_out_name
@@ -169,6 +171,7 @@ function __dybatpho_network_secret_config {
 # @description Get description of HTTP status code
 # @arg $1 string Status code
 # @stdout Description of status code
+# @internal
 #######################################
 function __dybatpho_network_get_http_code {
   local code
@@ -815,6 +818,7 @@ function dybatpho::circuit_breaker {
 #   suffix
 # @stdout The count and the window in milliseconds, separated by a space
 # @exitcode 1 The spec is not `count/window`, or asks for zero calls in no time
+# @internal
 #######################################
 function __dybatpho_network_rate_spec {
   local spec="${1-}"
@@ -846,6 +850,7 @@ function __dybatpho_network_rate_spec {
 #   through a command substitution would prune the window in a subshell and
 #   keep the unpruned one, growing the list forever and computing its waits
 #   from a timestamp that had already left the window
+# @internal
 #######################################
 function __dybatpho_network_rate_prune {
   local key count window_ms now
@@ -1273,6 +1278,7 @@ function dybatpho::curl_graphql {
 # @arg $1 string Authority, such as `user:pass@host:443` or `[::1]:8080`
 # @set DYBATPHO_URL The `user`, `password`, `host`, and `port` entries
 # @exitcode 1 The authority names no host, or a port that is not a port
+# @internal
 #######################################
 function __dybatpho_network_parse_authority {
   local authority="$1"
@@ -1327,6 +1333,7 @@ function __dybatpho_network_parse_authority {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a decimal number from 1 to 65535
 # @exitcode 1 It is not
+# @internal
 #######################################
 function __dybatpho_network_is_port {
   [[ "$1" =~ ^[0-9]{1,5}$ ]] || return 1
@@ -1421,6 +1428,7 @@ function dybatpho::url_part {
 # @arg $2 string Name of the array variable receiving the four octets
 # @set The named array, to four numbers from 0 to 255
 # @exitcode 1 The value is not an IPv4 address
+# @internal
 #######################################
 function __dybatpho_network_ipv4_octets {
   local __ipv4_address="$1"
@@ -1450,6 +1458,7 @@ function __dybatpho_network_ipv4_octets {
 # @arg $2 string Name of the array variable receiving the eight groups
 # @set The named array, to eight numbers from 0 to 65535
 # @exitcode 1 The value is not an IPv6 address
+# @internal
 #######################################
 function __dybatpho_network_ipv6_groups {
   local __ipv6_address="$1"
@@ -1607,6 +1616,7 @@ function dybatpho::ip_version {
 # @arg $4 string Name of the variable receiving the IP version
 # @set The three named variables
 # @exitcode 1 The value is not a CIDR block
+# @internal
 #######################################
 function __dybatpho_network_parse_cidr {
   local __cidr_block="$1"

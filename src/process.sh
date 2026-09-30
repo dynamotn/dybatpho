@@ -155,6 +155,7 @@ function dybatpho::trap {
   # @description Read the current trap command registered for a signal.
   # @arg $1 string Signal name
   # @stdout Existing trap command, or an empty string when none is registered
+  # @internal
   #######################################
   function __dybatpho_process_gen_finalize_command {
     local cmds
@@ -180,6 +181,7 @@ function dybatpho::trap {
 #   needs.
 # @noargs
 # @exitcode 0 Always, so a failed removal cannot change the shell's exit status
+# @internal
 #######################################
 function __dybatpho_cleanup_run {
   local entry pid path
@@ -287,6 +289,7 @@ function dybatpho::dry_run {
 #   entry per call to the end of the run.
 # @arg $1 string Path to forget
 # @set DYBATPHO_CLEANUP_PATHS
+# @internal
 #######################################
 function __dybatpho_process_forget_cleanup {
   local path
@@ -310,6 +313,7 @@ function __dybatpho_process_forget_cleanup {
 # @noargs
 # @exitcode 0 A coreutils `timeout -k` is usable
 # @exitcode 1 There is no `timeout`, or it is not a coreutils one
+# @internal
 #######################################
 function __dybatpho_process_has_timeout {
   if [[ -z "${__dybatpho_process_timeout_probe}" ]]; then
@@ -337,6 +341,7 @@ function __dybatpho_process_has_timeout {
 # @arg $2 bool Whether the job leads its own process group
 # @arg $3 number Seconds to wait after SIGTERM before sending SIGKILL
 # @exitcode 0 Always, so a job that already exited cannot fail the caller
+# @internal
 #######################################
 function __dybatpho_process_end_job {
   local pid own_group kill_after
@@ -378,6 +383,7 @@ function __dybatpho_process_end_job {
 # @arg $@ string Command and arguments
 # @exitcode 124 The command was still running when the limit elapsed
 # @exitcode * Exit code of the command
+# @internal
 #######################################
 function __dybatpho_process_timeout_fallback {
   local seconds kill_after

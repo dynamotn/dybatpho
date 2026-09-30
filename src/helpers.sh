@@ -510,6 +510,7 @@ function dybatpho::assert {
 #   kept it down.
 # @arg $1 number Attempt number, counting from 1
 # @stdout Delay in seconds
+# @internal
 #######################################
 function __dybatpho_helpers_backoff {
   local attempt
@@ -678,6 +679,7 @@ function dybatpho::breakpoint {
 # @arg $1 string Function name, in full
 # @stdout Two lines: the file, then the line number
 # @exitcode 1 No such function, or Bash could not say where it came from
+# @internal
 #######################################
 function __dybatpho_helpers_locate {
   local restore
@@ -705,6 +707,7 @@ function __dybatpho_helpers_locate {
 #   been given without.
 # @arg $1 string Function name, with or without a prefix
 # @stdout The full function name
+# @internal
 #######################################
 function __dybatpho_helpers_qualify {
   local name="${1-}"
@@ -725,6 +728,7 @@ function __dybatpho_helpers_qualify {
 # @arg $1 string Path of a file the library was loaded from
 # @stdout The module name
 # @exitcode 1 The file is not a module source
+# @internal
 #######################################
 function __dybatpho_helpers_module_of {
   local file="$1"

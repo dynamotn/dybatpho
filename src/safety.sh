@@ -69,6 +69,7 @@ DYBATPHO_PROTECTED_PATHS="${DYBATPHO_PROTECTED_PATHS:-}"
 # @description Print every path that guarded operations must never touch.
 # @noargs
 # @stdout One protected absolute path per line
+# @internal
 #######################################
 function __dybatpho_safety_protected_paths {
   printf '%s\n' \
@@ -90,6 +91,7 @@ function __dybatpho_safety_protected_paths {
 # @description Turn a path into a normalized absolute path without touching the filesystem.
 # @arg $1 string Path to resolve
 # @stdout Normalized absolute path
+# @internal
 #######################################
 function __dybatpho_safety_absolute_path {
   local path
@@ -104,6 +106,7 @@ function __dybatpho_safety_absolute_path {
 # @arg $2 string Question shown when confirmation is needed
 # @exitcode 0 The operation is approved
 # @exitcode 1 The operation is declined or can't be confirmed
+# @internal
 #######################################
 function __dybatpho_safety_approve {
   local force question
@@ -120,6 +123,7 @@ function __dybatpho_safety_approve {
 # @arg $1 string Entry path
 # @arg $2 number Number of leading components to strip
 # @stdout Stripped entry, empty when the entry has too few components
+# @internal
 #######################################
 function __dybatpho_safety_strip_entry {
   local entry strip_components
@@ -343,6 +347,7 @@ function dybatpho::safe_overwrite {
 # @arg $1 string Source path
 # @arg $2 string Destination path
 # @stdout Destination path, expanded with the source name when the destination is a directory
+# @internal
 #######################################
 function __dybatpho_safety_transfer_target {
   local source_path destination
@@ -388,6 +393,7 @@ function dybatpho::safe_move {
 # @arg $@ string Options, source, and destination forwarded from the public wrapper
 # @exitcode 0 The transfer is done
 # @exitcode 1 The overwrite is declined
+# @internal
 #######################################
 function __dybatpho_safety_transfer {
   local mode

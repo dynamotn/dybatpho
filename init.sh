@@ -124,6 +124,7 @@ declare -A __dybatpho_module_deps=(
 # @arg $1 string Module name
 # @exitcode 0 The module file is sourced
 # @exitcode 1 The module is registered but has no file under `src/`
+# @internal
 #######################################
 function __dybatpho_source_module {
   local file="${DYBATPHO_DIR}/src/${1}.sh"
@@ -140,6 +141,7 @@ function __dybatpho_source_module {
 # @arg $1 string Module name
 # @exitcode 0 The module is part of the registry
 # @exitcode 1 The module is unknown
+# @internal
 #######################################
 function __dybatpho_module_exists {
   [[ " ${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES} " == *" ${1} "* ]]
@@ -151,6 +153,7 @@ function __dybatpho_module_exists {
 # @set DYBATPHO_LOADED_MODULES
 # @exitcode 0 The module and its dependencies are loaded
 # @exitcode 1 The module is unknown
+# @internal
 #######################################
 function __dybatpho_load_module {
   local module="$1"
@@ -180,6 +183,7 @@ function __dybatpho_load_module {
 #######################################
 # @description Filter functions and re-export only dybatpho functions to subshells.
 # @noargs
+# @internal
 #######################################
 function __dybatpho_export_functions {
   local exports

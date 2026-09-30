@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The generated reference in `docs/` covers the public API only.** Every
+  internal `__dybatpho_*` helper is now tagged `@internal`, so the module
+  pages list only the `dybatpho::` functions a script can rely on, and no
+  longer bury them under hundreds of private helpers.
+
 ## [5.1.0] - 2026-09-30
 
 ### Added

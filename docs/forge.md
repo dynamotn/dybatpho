@@ -37,16 +37,11 @@ token can never reach a log line even when a request is traced.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_forge_normalize_url`](#__dybatpho_forge_normalize_url) — Normalize a Git remote URL into `host/owner/repo`. Handles the three forms a remote takes — `git@host:owner/repo.git`, `ssh://git@host/owner/repo.git` and `https://host/owner/repo.git` — so the rest of the module never has to care which one a checkout uses.
 - [`dybatpho::forge_host`](#dybatphoforge_host) — Print the host of the configured remote.
 - [`dybatpho::forge_kind`](#dybatphoforge_kind) — Print which forge the repository is hosted on. `DYBATPHO_FORGE` wins when set, so a mirror or an unrecognizable host name never has to be guessed at.
 - [`dybatpho::forge_repo`](#dybatphoforge_repo) — Print the `owner/repo` the remote points at. A GitLab project may be nested in subgroups, so everything after the host is kept rather than only the last two segments.
 - [`dybatpho::forge_api`](#dybatphoforge_api) — Print the API base URL for the repository's forge. `github.com` answers on a separate API host; every other GitHub is an Enterprise install serving `/api/v3` from the same host. GitLab always serves `/api/v4` from its own host.
 - [`dybatpho::forge_token`](#dybatphoforge_token) — Print the token used to authenticate against the forge. The token is registered with `secret.sh` before it is returned, so a later log line containing it is masked instead. That registration only reaches the shell this function runs in. Capturing the token with `token="$(dybatpho::forge_token)"` runs it in a subshell, which takes the registration with it when it exits — a Bash property no function can work around. A script that holds the token itself should register it once, in its own shell: ```bash token="$(dybatpho::forge_token)" dybatpho::secret_register "${token}" ``` The module never logs the token, so this matters for what the calling script does with it rather than for the requests made here.
-- [`__dybatpho_forge_token_vars`](#__dybatpho_forge_token_vars) — Name the environment variables a forge reads its token from.
-- [`__dybatpho_forge_project_path`](#__dybatpho_forge_project_path) — Print the path segment that identifies the project on this forge. GitHub addresses a repository as `repos/owner/name`. GitLab addresses a project by its URL-encoded path, so the separating slashes become `%2F`.
-- [`__dybatpho_forge_labels_json`](#__dybatpho_forge_labels_json) — Turn a comma-separated label list into a JSON array. GitHub wants `["a","b"]`; GitLab takes the comma-separated string as-is, so only GitHub needs this.
-- [`__dybatpho_forge_auth_header`](#__dybatpho_forge_auth_header) — Print the authentication header this forge expects.
 - [`dybatpho::forge_request`](#dybatphoforge_request) — Make an authenticated request against the forge API. The path is relative to the project, so callers write `issues` rather than repeating the API base and the project identifier on every call.
 - [`dybatpho::forge_error`](#dybatphoforge_error) — Print what the forge said about the last failed request. A forge refuses a request for a reason, and puts the reason in the response body: which field was missing, that the token cannot see this repository, that a release already exists for the tag. Reporting only `HTTP 422` throws that away and leaves a bad field, an expired token and a rate limit looking identical. The status is always included, because the body is not guaranteed to be JSON, or to be there at all.
 - [`dybatpho::forge_issue_find`](#dybatphoforge_issue_find) — Print the number of an open issue whose title matches exactly. GitLab can filter server-side; GitHub cannot search titles on the issues endpoint, so the open issues are compared here. Both are exact matches, so "Build failing" never collides with "Build failing on macOS".
@@ -130,26 +125,6 @@ export DYBATPHO_FORGE_TOKEN="glpat-..."
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_forge_normalize_url`
-
-Normalize a Git remote URL into `host/owner/repo`.
-Handles the three forms a remote takes — `git@host:owner/repo.git`,
-`ssh://git@host/owner/repo.git` and `https://host/owner/repo.git` — so the
-rest of the module never has to care which one a checkout uses.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Remote URL |
-
-**📤 Output on stdout**
-
-- `host/owner/repo`
-
-
----
 
 ### `dybatpho::forge_host`
 
@@ -312,80 +287,6 @@ script does with it rather than for the requests made here.
 **🚦 Exit codes**
 
 - `1`: No token is set for this forge
-
-
----
-
-### `__dybatpho_forge_token_vars`
-
-Name the environment variables a forge reads its token from.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Forge kind |
-
-**📤 Output on stdout**
-
-- Human-readable list for an error message
-
-
----
-
-### `__dybatpho_forge_project_path`
-
-Print the path segment that identifies the project on this forge.
-GitHub addresses a repository as `repos/owner/name`. GitLab addresses a
-project by its URL-encoded path, so the separating slashes become `%2F`.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Forge kind |
-| `$2` | string | `owner/repo` |
-
-**📤 Output on stdout**
-
-- Path segment, with no leading or trailing slash
-
-
----
-
-### `__dybatpho_forge_labels_json`
-
-Turn a comma-separated label list into a JSON array.
-GitHub wants `["a","b"]`; GitLab takes the comma-separated string as-is, so
-only GitHub needs this.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Comma-separated labels |
-
-**📤 Output on stdout**
-
-- JSON array of strings
-
-
----
-
-### `__dybatpho_forge_auth_header`
-
-Print the authentication header this forge expects.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Forge kind |
-| `$2` | string | Token |
-
-**📤 Output on stdout**
-
-- Header in `Name: value` form
 
 
 ---

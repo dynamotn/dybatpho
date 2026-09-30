@@ -41,6 +41,7 @@ DYBATPHO_BACKUP_CHECKSUM_ALGORITHM="${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM:-sha256
 #   a daylight-saving change, which a local-time stamp does not.
 # @noargs
 # @stdout Timestamp in `YYYYmmddTHHMMSSZ` form
+# @internal
 #######################################
 function __dybatpho_backup_stamp {
   TZ=UTC dybatpho::date_now "%Y%m%dT%H%M%SZ"
@@ -52,6 +53,7 @@ function __dybatpho_backup_stamp {
 # @arg $2 string Directory holding the backups
 # @arg $3 string Backup name to match, or empty for every name
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_backup_collect_into {
   local -n __dybatpho_backup_found_ref="$1"
@@ -93,6 +95,7 @@ function __dybatpho_backup_collect_into {
 # @description Print the path of a backup's checksum sidecar.
 # @arg $1 string Backup archive path
 # @stdout Sidecar path
+# @internal
 #######################################
 function __dybatpho_backup_sidecar {
   printf '%s.%s\n' "$1" "${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}"

@@ -55,13 +55,9 @@ reach for at a prompt.
 - [`dybatpho::default_env`](#dybatphodefault_env) — Assign and export a default value for an environment variable when it is empty.
 - [`dybatpho::require_envs_any`](#dybatphorequire_envs_any) — Ensure that at least one of the listed environment variables is set.
 - [`dybatpho::assert`](#dybatphoassert) — Evaluate a shell condition string and stop with a message when it fails.
-- [`__dybatpho_helpers_backoff`](#__dybatpho_helpers_backoff) — Compute how long the nth retry waits. Exponential from a base delay, capped, with optional jitter — the policy the HTTP retries in `network.sh` already used, which the generic retry here did not. Jitter matters when several machines retry the same failing dependency: without it they all come back at the same instant, which is the load that kept it down.
 - [`dybatpho::retry`](#dybatphoretry) — Retry a shell command with escalating delays until it succeeds or retries are exhausted.
 - [`dybatpho::retry_until`](#dybatphoretry_until) — Retry a shell command until it succeeds or the retry budget is exhausted, using a fixed delay.
 - [`dybatpho::breakpoint`](#dybatphobreakpoint) — Open an interactive breakpoint for debugging a running script.
-- [`__dybatpho_helpers_locate`](#__dybatpho_helpers_locate) — Print the file and line a function was defined at. `declare -F` names the file only while `extdebug` is on, and that option also changes how `DEBUG` and `RETURN` traps behave, so it is switched on for the one call and put back exactly as it was found. `shopt -p` reports a non-zero status when the option is off, which under `errexit` would end the caller before anything was looked up.
-- [`__dybatpho_helpers_qualify`](#__dybatpho_helpers_qualify) — Print a function name with the `dybatpho::` prefix it may have been given without.
-- [`__dybatpho_helpers_module_of`](#__dybatpho_helpers_module_of) — Print the module a loaded source file belongs to. A module is recognised by its place rather than its name: a file directly inside a `src` directory is that module, and the bootstrap is `init`. Anything else is refused, because a bundle holds every module in one file and answering with that file's name would attribute every function in the library to a module called `dybatpho.bundle`.
 - [`dybatpho::provides`](#dybatphoprovides) — Print the module that defines a function. The answer comes from where Bash says the function was defined, so it describes the code that is actually loaded rather than what a directory listing suggests. Functions the bootstrap defines report `init`.
 - [`dybatpho::describe`](#dybatphodescribe) — Print the documentation comment of a function. The library documents itself in `docs/`, which answers the question when you are reading it. At a prompt, mid-script, the question is what a function takes and what it returns, and the answer is in a browser tab. This reads it out of the source the shell actually loaded, so it describes the code that will run, and it is there whether or not `docs/` was ever generated. The banner rules and any `shellcheck` directive between the comment and the function are dropped, one `#` and the space after it are taken off each line, and the `@description` marker is removed from the prose it introduces. Everything else, `@arg` and `@exitcode` tags included, is printed as the source wrote it.
 - [`dybatpho::function_list`](#dybatphofunction_list) — Print the public functions this shell has loaded. Without an argument this is the whole loaded API; with one it is what a single module exports, which is the list to skim when reaching for a module for the first time. Only `dybatpho::` names are listed. The `__dybatpho_` helpers are internal, and `declare -F` is right there for anyone debugging one.
@@ -484,28 +480,6 @@ Evaluate a shell condition string and stop with a message when it fails.
 
 ---
 
-### `__dybatpho_helpers_backoff`
-
-Compute how long the nth retry waits.
-Exponential from a base delay, capped, with optional jitter — the policy the
-HTTP retries in `network.sh` already used, which the generic retry here did
-not. Jitter matters when several machines retry the same failing dependency:
-without it they all come back at the same instant, which is the load that
-kept it down.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Attempt number, counting from 1 |
-
-**📤 Output on stdout**
-
-- Delay in seconds
-
-
----
-
 ### `dybatpho::retry`
 
 Retry a shell command with escalating delays until it succeeds or retries are exhausted.
@@ -573,76 +547,6 @@ _Function has no arguments._
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_REPL_HISTORY_FILE`** | string | Override where REPL history is persisted between breakpoint sessions |
-
-
----
-
-### `__dybatpho_helpers_locate`
-
-Print the file and line a function was defined at.
-`declare -F` names the file only while `extdebug` is on, and that option
-also changes how `DEBUG` and `RETURN` traps behave, so it is switched on for
-the one call and put back exactly as it was found. `shopt -p` reports a
-non-zero status when the option is off, which under `errexit` would end the
-caller before anything was looked up.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Function name, in full |
-
-**📤 Output on stdout**
-
-- Two lines: the file, then the line number
-
-**🚦 Exit codes**
-
-- `1`: No such function, or Bash could not say where it came from
-
-
----
-
-### `__dybatpho_helpers_qualify`
-
-Print a function name with the `dybatpho::` prefix it may have
-been given without.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Function name, with or without a prefix |
-
-**📤 Output on stdout**
-
-- The full function name
-
-
----
-
-### `__dybatpho_helpers_module_of`
-
-Print the module a loaded source file belongs to.
-A module is recognised by its place rather than its name: a file directly
-inside a `src` directory is that module, and the bootstrap is `init`.
-Anything else is refused, because a bundle holds every module in one file
-and answering with that file's name would attribute every function in the
-library to a module called `dybatpho.bundle`.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path of a file the library was loaded from |
-
-**📤 Output on stdout**
-
-- The module name
-
-**🚦 Exit codes**
-
-- `1`: The file is not a module source
 
 
 ---

@@ -789,6 +789,7 @@ function dybatpho::cli_apply_verbosity {
 # @stdout Configuration value
 # @exitcode 0 The key is present
 # @exitcode 1 The key is absent, or no configuration has been loaded
+# @internal
 #######################################
 function __dybatpho_cli_config_get {
   local key="${1-}"
@@ -804,6 +805,7 @@ function __dybatpho_cli_config_get {
 # @arg $2 number Count of non-option metadata args to skip after the mode flags
 # @arg $@ string Passed arguments from `dybatpho::opts::(flag|param|disp)`
 # @exitcode 0
+# @internal
 #######################################
 function __dybatpho_cli_parse_opt {
   local need_argument=$1
@@ -977,6 +979,7 @@ function __dybatpho_cli_parse_opt {
 # @arg $@ string Line of code to generate
 # @stdout Generated code
 # @exitcode 0
+# @internal
 #######################################
 function __dybatpho_cli_print_indent {
   local indent=$1
@@ -991,6 +994,7 @@ function __dybatpho_cli_print_indent {
 # @description Validate a shell variable name used by generated parser code.
 # @arg $1 string Variable name, or `-` to intentionally skip assignment
 # @exitcode 0 The name is valid, or the sentinel `-` was used
+# @internal
 #######################################
 function __dybatpho_cli_require_shell_name {
   local name="${1:-}"
@@ -1007,6 +1011,7 @@ function __dybatpho_cli_require_shell_name {
 # @arg $1 string Name of the array variable receiving the switches
 # @arg $2 string Name of the spec function
 # @exitcode 0 The array is left empty when the spec declares no long switch
+# @internal
 #######################################
 function __dybatpho_cli_collect_long_switches {
   __dybatpho_cli_require_shell_name "$1"
@@ -1042,6 +1047,7 @@ function __dybatpho_cli_collect_long_switches {
 # @exitcode 0 Resolved to exactly one switch
 # @exitcode 1 Matched nothing, so the caller reports it as unrecognized
 # @exitcode 2 Matched more than one switch; the candidates are on stdout
+# @internal
 #######################################
 function __dybatpho_cli_expand_abbr {
   local __typed="$1"
@@ -1088,6 +1094,7 @@ function __dybatpho_cli_expand_abbr {
 #              spec still cannot inject code into the parser it generates.
 # @arg $1 string Pattern to validate
 # @exitcode 0 The pattern is safe to interpolate
+# @internal
 #######################################
 function __dybatpho_cli_require_case_pattern {
   local pattern="${1:-}"
@@ -1112,6 +1119,7 @@ function __dybatpho_cli_require_case_pattern {
 # @arg $1 string Declared type name or alias
 # @stdout Canonical type name
 # @exitcode 1 The type is not registered
+# @internal
 #######################################
 function __dybatpho_cli_canonical_type {
   __dybatpho_validate_canonical "$1"
@@ -1122,6 +1130,7 @@ function __dybatpho_cli_canonical_type {
 # @arg $1 string Variable name to be assigned
 # @arg $2 string Input string to be quoted
 # @exitcode 0
+# @internal
 #######################################
 function __dybatpho_cli_assign_quoted {
   __dybatpho_cli_require_shell_name "$1"
@@ -1137,6 +1146,7 @@ function __dybatpho_cli_assign_quoted {
 # @description Prepend export of before string of command,
 #              based on `export:<bool>` switch
 # @arg $1 string String of command
+# @internal
 #######################################
 function __dybatpho_cli_prepend_export {
   # `dybatpho::is` answers a question, so a `no` is not a failure of this
@@ -1152,6 +1162,7 @@ function __dybatpho_cli_prepend_export {
 # @description Define variable from spec from `dybatpho::opts::flag`,
 #              `dybatpho::opts::param`
 # @arg $1 string Name of variable to be defined
+# @internal
 #######################################
 function __dybatpho_cli_define_var {
   [[ "$1" = "-" ]] && return 0
@@ -1237,6 +1248,7 @@ function __dybatpho_cli_define_var {
 #              to get settings of option
 # @arg $1 key:value Key-value string to extract
 # @arg $2 string Prefix of key to assign as variable
+# @internal
 #######################################
 function __dybatpho_cli_parse_key_value {
   local target="${2-}${1%%:*}"
@@ -1250,6 +1262,7 @@ function __dybatpho_cli_parse_key_value {
 # @arg $1 string Name of function that has spec of parent function or script
 # @arg $2 string Command of spec (`-` for root command trigger from CLI, otherwise is sub-command)
 # @stdout Generated logic
+# @internal
 #######################################
 function __dybatpho_cli_generate_logic {
   # `command` is read by nobody here any more -- it used to pick out the root
@@ -1300,6 +1313,7 @@ function __dybatpho_cli_generate_logic {
   # @description Emit generated code that rebuilds positional parameters from a serialized argument list.
   # @arg $1 string Shell expression that expands to serialized arguments
   # @stdout Generated parser code
+  # @internal
   #######################################
   function __dybatpho_cli_print_get_arg {
     __dybatpho_cli_print_indent 4 "eval 'set -- $1' \${1+'\"\$@\"'}"
@@ -1311,6 +1325,7 @@ function __dybatpho_cli_generate_logic {
   #   option parsing.
   # @noargs
   # @stdout Generated parser code
+  # @internal
   #######################################
   function __dybatpho_cli_print_rest {
     __dybatpho_cli_print_indent 4 'while [ $# -gt 0 ]; do'
@@ -1545,6 +1560,7 @@ function __dybatpho_cli_generate_logic {
 # @arg $1 string Name of function that has spec of parent function or script
 # @stdout Help description
 # @exitcode 0 exit code
+# @internal
 #######################################
 function __dybatpho_cli_generate_help {
   local spec
@@ -1624,6 +1640,7 @@ function __dybatpho_cli_generate_help {
 #              declared positional arguments when there are any.
 # @noargs
 # @stdout Usage line
+# @internal
 #######################################
 function __dybatpho_cli_help_usage {
   # The label and the three placeholders are translated one by one rather than
@@ -1668,6 +1685,7 @@ function dybatpho::generate_schema {
 # @arg $2 string Command name, as it appears in the schema
 # @arg $3 string Optional aliases of the command, or `@none`
 # @stdout The command as a JSON object
+# @internal
 #######################################
 function __dybatpho_cli_generate_schema_command {
   local spec="$1" name="$2" command_aliases="${3:-}" description
@@ -1776,6 +1794,7 @@ function dybatpho::generate_man {
 # @arg $3 number Manual section
 # @arg $4 bool Whether this is a subcommand rather than the root
 # @stdout The command as roff
+# @internal
 #######################################
 function __dybatpho_cli_generate_man_command {
   local spec="$1" name="$2" section="${3:-1}" nested="${4:-false}" description
@@ -1892,6 +1911,7 @@ function dybatpho::generate_completion {
 # @arg $@ string Key parts, such as the artifact kind, spec, shell, and command name
 # @exitcode 0 A cache file path was resolved
 # @exitcode 1 Caching is disabled or unavailable for this invocation
+# @internal
 #######################################
 function __dybatpho_cli_cache_file {
   __dybatpho_cli_require_shell_name "$1"
@@ -1920,6 +1940,7 @@ function __dybatpho_cli_cache_file {
 # @arg $1 string Name of the array to fill
 # @arg $@ string Option records, as `__dybatpho_cli_collect_spec_metadata` builds them
 # @set The named array, one switch per element
+# @internal
 #######################################
 function __dybatpho_cli_completion_words {
   local -n __completion_out="$1"
@@ -1939,6 +1960,7 @@ function __dybatpho_cli_completion_words {
 # @arg $3 string Command name
 # @arg $4 string Root command name, which the generated function is named after
 # @stdout The completion script for that command
+# @internal
 #######################################
 function __dybatpho_cli_generate_completion_command {
   # shellcheck disable=SC2034 # root keeps the positional signature uniform across generators
@@ -2002,6 +2024,7 @@ function __dybatpho_cli_generate_completion_command {
 # @arg $1 string Variable name to store result
 # @arg $2 string String to pad
 # @arg $3 number Minimum length
+# @internal
 #######################################
 function __dybatpho_cli_help_pad {
   __dybatpho_cli_require_shell_name "$1"
@@ -2016,6 +2039,7 @@ function __dybatpho_cli_help_pad {
 # that short+long pairs align as "-s, --long".
 # @arg $1 number Minimum pad width before appending $2
 # @arg $2 string Switch string to append
+# @internal
 #######################################
 function __dybatpho_cli_help_sw {
   __dybatpho_cli_help_pad sw "${sw}${sw:+, }" "$1"
@@ -2032,6 +2056,7 @@ function __dybatpho_cli_help_sw {
 # @arg $@ switch|key:value Switches and settings of this option
 # @stdout Record of `label<TAB>description<TAB>annotations`, where annotations
 #         are separated by a unit separator. Nothing for a hidden row.
+# @internal
 #######################################
 function __dybatpho_cli_help_row {
   local _type=$1 _var=$2 _desc=$3
@@ -2130,6 +2155,7 @@ function __dybatpho_cli_help_row {
 #              forms on the way.
 # @arg $1 switch Declared switch
 # @arg $2 bool Whether the owning option is negatable
+# @internal
 #######################################
 function __dybatpho_cli_help_add_switch {
   local -a _forms=()
@@ -2150,6 +2176,7 @@ function __dybatpho_cli_help_add_switch {
 # @arg $1 string Name of the variable holding the annotation list
 # @arg $2 string Annotation name
 # @arg $3 string Annotation value
+# @internal
 #######################################
 function __dybatpho_cli_help_annotate {
   __dybatpho_cli_require_shell_name "$1"
@@ -2165,6 +2192,7 @@ function __dybatpho_cli_help_annotate {
 #              has no value to show.
 # @arg $1 string Raw `init:` value
 # @stdout Literal default value
+# @internal
 #######################################
 function __dybatpho_cli_help_default {
   local _raw="${1-}"
@@ -2194,6 +2222,7 @@ function __dybatpho_cli_help_default {
 # @arg $1 number Description column width
 # @arg $@ string Row records from `__dybatpho_cli_help_row`
 # @stdout Rendered rows
+# @internal
 #######################################
 function __dybatpho_cli_help_render_rows {
   local _width="$1"
@@ -2233,6 +2262,7 @@ function __dybatpho_cli_help_render_rows {
 #######################################
 # @description Drop rows whose label was already collected, keeping the first.
 # @arg $1 string Name of the array of row records to rewrite in place
+# @internal
 #######################################
 function __dybatpho_cli_help_dedupe {
   __dybatpho_cli_require_shell_name "$1"
@@ -2263,6 +2293,7 @@ function __dybatpho_cli_help_dedupe {
 #              Arguments, Commands, and Options sections line up with each other.
 # @arg $1 string Name of the variable receiving the width
 # @arg $@ string Row records from `__dybatpho_cli_help_row`
+# @internal
 #######################################
 function __dybatpho_cli_help_width_for {
   __dybatpho_cli_require_shell_name "$1"
@@ -2286,6 +2317,7 @@ function __dybatpho_cli_help_width_for {
 #######################################
 # @description Add to switches list if flag/param has multiple switches
 # @arg $1 switch Switch
+# @internal
 #######################################
 function __dybatpho_cli_add_switch {
   __switch="${__switch}${__switch:+|}$1"
@@ -2307,6 +2339,7 @@ function __dybatpho_cli_add_switch {
 # @arg $@ string Known candidates
 # @stdout Suggestion suffix, or nothing when no candidate is close enough
 # @exitcode 0
+# @internal
 #######################################
 function __dybatpho_cli_suggest_suffix {
   local input="${1-}"
@@ -2335,6 +2368,7 @@ function __dybatpho_cli_suggest_suffix {
 #              Short switches and switches that already carry a negative prefix
 #              are added unchanged.
 # @arg $1 switch Switch such as `-c` or `--color`
+# @internal
 #######################################
 function __dybatpho_cli_add_plain_switch {
   local __plain="$1"
@@ -2358,6 +2392,7 @@ function __dybatpho_cli_add_plain_switch {
 # @arg $1 string Name of destination array variable
 # @arg $2 switch Declared switch
 # @arg $3 bool Whether the owning option is `negatable:true`, default `false`
+# @internal
 #######################################
 function __dybatpho_cli_expand_switch {
   __dybatpho_cli_require_shell_name "$1"
@@ -2387,6 +2422,7 @@ function __dybatpho_cli_expand_switch {
 # @arg $1 string Destination variable name, or `-` to skip assignment
 # @stdout Generated parser code
 # @note Uses caller-local `__validate` when a custom validator was configured for the current option
+# @internal
 #######################################
 function __dybatpho_cli_print_validate {
   set -- "${__validate}" "$1"
@@ -2440,6 +2476,7 @@ function __dybatpho_cli_print_validate {
 # @arg $1 string Name of destination array variable
 # @arg $2 string Comma-separated aliases
 # @exitcode 0 Aliases appended to destination array
+# @internal
 #######################################
 function __dybatpho_cli_parse_alias_list {
   __dybatpho_cli_require_shell_name "$1"
@@ -2456,6 +2493,7 @@ function __dybatpho_cli_parse_alias_list {
 # @arg $1 string Option type (`flag`, `param`, or `disp`)
 # @arg $@ string Original arguments passed to the option helper
 # @exitcode 0 Definition stored for later replay
+# @internal
 #######################################
 function __dybatpho_cli_record_persistent_def {
   local __kind="$1" __serialized="dybatpho::opts::$1" __part
@@ -2471,6 +2509,7 @@ function __dybatpho_cli_record_persistent_def {
 # @description Replay inherited persistent option definitions inside the current parser/help generation context.
 # @noargs
 # @exitcode 0 All inherited persistent definitions were replayed
+# @internal
 #######################################
 function __dybatpho_cli_replay_persistent_defs {
   local __persistent_def
@@ -2484,6 +2523,7 @@ function __dybatpho_cli_replay_persistent_defs {
 # @description Emit generated code that seeds persistent option definitions for nested help output.
 # @noargs
 # @stdout Generated parser code
+# @internal
 #######################################
 function __dybatpho_cli_print_persistent_help_defs {
   local __persistent_def __quoted_def __has_defs=false
@@ -2504,6 +2544,7 @@ function __dybatpho_cli_print_persistent_help_defs {
 #              user mistypes one.
 # @noargs
 # @stdout Generated parser code
+# @internal
 #######################################
 function __dybatpho_cli_print_known_candidates {
   local __candidate __quoted __line=""
@@ -2530,6 +2571,7 @@ function __dybatpho_cli_print_known_candidates {
 # @arg $2 string Item label shown in the warning
 # @arg $3 string Deprecation message
 # @stdout Generated parser code
+# @internal
 #######################################
 function __dybatpho_cli_print_deprecated_warning {
   local __item_type="$1" __item_label="$2" __message="$3"
@@ -2547,6 +2589,7 @@ function __dybatpho_cli_print_deprecated_warning {
 # @arg $2 string Child command name
 # @arg $@ string Original CLI arguments
 # @stdout Generated parser code
+# @internal
 #######################################
 function __dybatpho_cli_generate_child_logic {
   local __child_spec="$1" __child_command="$2"
@@ -2565,6 +2608,7 @@ function __dybatpho_cli_generate_child_logic {
 # @arg $@ string Declared argument records of `required<TAB>variadic<TAB>varname`
 # @stdout Generated parser code
 # @exitcode 0 Nothing is emitted when no argument was declared
+# @internal
 #######################################
 function __dybatpho_cli_print_arg_bindings {
   local __rest_name="$1"
@@ -2600,6 +2644,7 @@ function __dybatpho_cli_print_arg_bindings {
 # @arg $1 string Argument count rule (`none`, `exact:N`, `min:N`, `max:N`, `range:M:N`, `any`)
 # @stdout Generated parser code
 # @exitcode 0 Rule accepted and code emitted
+# @internal
 #######################################
 # shellcheck disable=SC2016 # every literal here is generated shell source, expanded by the caller
 function __dybatpho_cli_print_args_check {
@@ -2682,6 +2727,7 @@ function __dybatpho_cli_print_args_check {
 # @description Expand option switches and aliases into a caller-provided array.
 # @arg $1 string Name of destination array
 # @arg $@ switch|key:value Option metadata
+# @internal
 #######################################
 function __dybatpho_cli_collect_switches {
   __dybatpho_cli_require_shell_name "$1"
@@ -2716,6 +2762,7 @@ function __dybatpho_cli_collect_switches {
 # @description Escape a value for JSON and store it in a caller variable.
 # @arg $1 string Name of the variable to write into
 # @arg $2 string Value to quote
+# @internal
 #######################################
 function __dybatpho_cli_json_quote {
   __dybatpho_cli_require_shell_name "$1"
@@ -2735,6 +2782,7 @@ function __dybatpho_cli_json_quote {
 # @arg $3 string Name of the array to fill with the commands
 # @arg $4 string Name of the variable to fill with the description
 # @arg $5 string Optional name of the array to fill with the arguments
+# @internal
 #######################################
 function __dybatpho_cli_collect_spec_metadata {
   local __meta_spec="$1"
@@ -3209,6 +3257,7 @@ function dybatpho::opts::arg {
 # @arg $2 bool Whether the argument is required
 # @arg $3 bool Whether the argument is variadic
 # @stdout Rendered placeholder
+# @internal
 #######################################
 function __dybatpho_cli_arg_placeholder {
   local name="${1^^}" required="${2:-true}" variadic="${3:-false}" rendered
@@ -3227,6 +3276,7 @@ function __dybatpho_cli_arg_placeholder {
 # @arg $1 string Name of the variable receiving the rule
 # @arg $@ string Declared argument records of `required<TAB>variadic`
 # @exitcode 0 The variable is left untouched when nothing was declared
+# @internal
 #######################################
 function __dybatpho_cli_derive_args_rule {
   __dybatpho_cli_require_shell_name "$1"

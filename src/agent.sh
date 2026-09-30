@@ -86,6 +86,7 @@ DYBATPHO_AGENT_MARKERS+=" AIDER_ACTIVE CURSOR_AGENT OPENAI_AGENT MCP_SERVER"
 # @exitcode 0 `yq` or `jq` is available
 # @exitcode 127 Stop the script because neither is installed
 # @see dybatpho::json_object
+# @internal
 #######################################
 function __dybatpho_agent_require_json {
   __dybatpho_json_cmd > /dev/null
@@ -97,6 +98,7 @@ function __dybatpho_agent_require_json {
 # @env DYBATPHO_AGENT_ENV string Additional variable names to treat as markers
 # @exitcode 0 At least one marker variable is set and non-empty
 # @exitcode 1 No marker is present
+# @internal
 #######################################
 function __dybatpho_agent_marker_present {
   local name
@@ -284,6 +286,7 @@ function dybatpho::agent_context {
 # @env DYBATPHO_AGENT_ALLOW string Space separated action names, or `all`
 # @exitcode 0 The action is allowed
 # @exitcode 1 The action is not allowed
+# @internal
 #######################################
 function __dybatpho_agent_allowed {
   local action
@@ -401,6 +404,7 @@ function dybatpho::agent_audit_show {
 # JSON backends supports user-defined functions, and a schema can nest.
 # @arg $1 string CLI schema JSON from `dybatpho::generate_schema`
 # @stdout JSON array of `{path, description, options}` objects
+# @internal
 #######################################
 function __dybatpho_agent_flatten_schema {
   local schema
@@ -414,6 +418,7 @@ function __dybatpho_agent_flatten_schema {
 # @arg $2 string Path of the parent command, as a JSON array
 # @arg $3 string Accumulated list JSON
 # @stdout The list with this command and its descendants appended
+# @internal
 #######################################
 function __dybatpho_agent_flatten_command {
   local node parent flattened
@@ -449,6 +454,7 @@ function __dybatpho_agent_flatten_command {
 # `enum`, and `multiple:true` becomes an array of that item type.
 # @arg $1 string Options array JSON
 # @stdout JSON Schema object
+# @internal
 #######################################
 function __dybatpho_agent_options_schema {
   local options
@@ -579,6 +585,7 @@ function dybatpho::agent_tools {
 # contain is replaced, so a prefix with a space still yields a valid name.
 # @arg $1 string Flattened command entry JSON
 # @stdout Tool name
+# @internal
 #######################################
 function __dybatpho_agent_tool_name {
   local entry

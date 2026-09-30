@@ -369,6 +369,7 @@ function dybatpho::array_join {
 # @arg $1 string Name of the array to fill
 # @arg $2 string Name of the array to read
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_array_copy {
   local -n __dybatpho_array_copy_out="$1"
@@ -383,6 +384,7 @@ function __dybatpho_array_copy {
 # @arg $1 string Name of the associative array to fill
 # @arg $2 string Name of the array to read
 # @set The named associative array, one key per distinct value
+# @internal
 #######################################
 function __dybatpho_array_index {
   local -n __dybatpho_array_index_out="$1"
@@ -403,6 +405,7 @@ function __dybatpho_array_index {
 # @arg $4 bool Reverse the order
 # @exitcode 0 The left value belongs after the right one
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_array_sorts_after {
   local left="$1" right="$2" numeric="$3" reverse="$4"
@@ -445,6 +448,7 @@ function __dybatpho_array_sorts_after {
 # @arg $2 bool Compare as numbers rather than as text
 # @arg $3 bool Reverse the order
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_array_merge_sort {
   local -n __dybatpho_array_merge_values="$1"

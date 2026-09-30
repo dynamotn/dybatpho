@@ -110,6 +110,7 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
 #   that is at least installed, and `missing` says the least.
 # @arg $1 string Status
 # @stdout The rank, higher being more worth reporting
+# @internal
 #######################################
 function __dybatpho_doctor_rank {
   case "$1" in
@@ -134,6 +135,7 @@ __DYBATPHO_DOCTOR_SPEC_REGEX='^([^<>=^~]+)([<>=^~].*)$'
 #   the next with one. `^4` says what `>=4 <5` would have said.
 # @arg $1 string One alternative, such as `yq` or `yq>=4`
 # @stdout Two lines: the command name, and the range or an empty line
+# @internal
 #######################################
 function __dybatpho_doctor_split {
   if [[ "$1" =~ ${__DYBATPHO_DOCTOR_SPEC_REGEX} ]]; then
@@ -157,6 +159,7 @@ function __dybatpho_doctor_split {
 #   `outdated`, `unknown`, or `missing`
 # @exitcode 0 An alternative is installed and satisfies its constraint
 # @exitcode 1 No alternative does
+# @internal
 #######################################
 function __dybatpho_doctor_resolve {
   local spec="$1"
@@ -249,6 +252,7 @@ function dybatpho::doctor_bash_supported {
 # @arg $2 string Scope, either `loaded`, `all`, or an explicit module list
 # @set The named array, to module names in registry or load order
 # @exitcode 1 Stop the script when an explicitly named module is unknown
+# @internal
 #######################################
 function __dybatpho_doctor_scope {
   local -n __scope_out="$1"
@@ -275,6 +279,7 @@ function __dybatpho_doctor_scope {
 #   the user may be missing is of no use.
 # @arg $1 string Raw value
 # @stdout The value with the characters JSON reserves escaped
+# @internal
 #######################################
 function __dybatpho_doctor_json_escape {
   local value="$1"
@@ -293,6 +298,7 @@ function __dybatpho_doctor_json_escape {
 # @arg $1 string Name of the array variable that receives the rows
 # @arg $@ string Module names to inspect
 # @set The named array, to one row per dependency
+# @internal
 #######################################
 function __dybatpho_doctor_rows {
   local -n __rows_out="$1"
@@ -322,6 +328,7 @@ function __dybatpho_doctor_rows {
 # @arg $1 string Name of the array variable holding the rows
 # @arg $@ string Module names covered by the report
 # @stdout The environment summary, the dependency table, and a closing summary
+# @internal
 #######################################
 function __dybatpho_doctor_report_text {
   local -n __rows_in="$1"
@@ -375,6 +382,7 @@ function __dybatpho_doctor_report_text {
 # @arg $1 string Name of the array variable holding the rows
 # @arg $@ string Module names covered by the report
 # @stdout One JSON object describing the environment and every dependency
+# @internal
 #######################################
 function __dybatpho_doctor_report_json {
   local -n __rows_in="$1"

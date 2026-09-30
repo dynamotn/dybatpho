@@ -122,6 +122,7 @@ function dybatpho::validate_matches {
 # @exitcode 0 The value matches
 # @exitcode 1 The value does not match
 # @exitcode 2 The expression is not a valid ERE
+# @internal
 #######################################
 function __dybatpho_validate_match {
   [[ "$1" =~ $2 ]]
@@ -136,6 +137,7 @@ function __dybatpho_validate_match {
 # @stdout The canonical type name, when it is known
 # @exitcode 0 The type is known
 # @exitcode 1 The type is not registered
+# @internal
 #######################################
 function __dybatpho_validate_canonical {
   local name="${1,,}"
@@ -150,6 +152,7 @@ function __dybatpho_validate_canonical {
 # @arg $1 string Type name or alias
 # @exitcode 0 The type is numeric
 # @exitcode 1 The type is not numeric, or is not registered
+# @internal
 #######################################
 function __dybatpho_validate_numeric_type {
   local canonical
@@ -175,6 +178,7 @@ function __dybatpho_validate_numeric_type {
 # @set The named variable
 # @exitcode 0 The comparison was made
 # @exitcode 1 A value is not a number
+# @internal
 #######################################
 function __dybatpho_validate_number_cmp {
   local __cmp_left="$1" __cmp_right="$2"
@@ -202,6 +206,7 @@ function __dybatpho_validate_number_cmp {
 # @arg $1 string Name of the variable receiving the number
 # @arg $2 string Integer text, such as `007` or `-42`
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_validate_plain_int {
   local -n __int_out="$1"
@@ -226,6 +231,7 @@ function __dybatpho_validate_plain_int {
 # @arg $2 string Number text, such as `1.5` or `1e3`
 # @set The named variable
 # @exitcode 1 The text is not a number `printf` can read
+# @internal
 #######################################
 function __dybatpho_validate_scaled {
   local -n __scaled_out="$1"
@@ -357,6 +363,7 @@ function dybatpho::validate_register {
 # @arg $2 string Canonical type name
 # @set __DYBATPHO_VALIDATE_ALIASES
 # @exitcode 1 Stop the script when the canonical type is not registered
+# @internal
 #######################################
 function __dybatpho_validate_alias {
   local alias="$1" canonical="$2"
@@ -369,6 +376,7 @@ function __dybatpho_validate_alias {
 # @description Record one reason the value was rejected.
 # @arg $1 string Reason, phrased to follow the name of what was validated
 # @set DYBATPHO_VALIDATE_ERRORS Appends the reason
+# @internal
 #######################################
 function __dybatpho_validate_error {
   DYBATPHO_VALIDATE_ERRORS+=("$1")
@@ -565,6 +573,7 @@ function dybatpho::validate_reset {
 # @description Accept any value, including the empty string.
 # @arg $1 string Value to test
 # @exitcode 0 Always
+# @internal
 #######################################
 function __dybatpho_validate_is_string {
   [[ -n "${1+x}" ]]
@@ -575,6 +584,7 @@ function __dybatpho_validate_is_string {
 # @arg $1 string Value to test
 # @exitcode 0 The value is not blank
 # @exitcode 1 The value is empty or only whitespace
+# @internal
 #######################################
 function __dybatpho_validate_is_nonempty {
   [[ -n "${1//[[:space:]]/}" ]]
@@ -585,6 +595,7 @@ function __dybatpho_validate_is_nonempty {
 # @arg $1 string Value to test
 # @exitcode 0 The value is an integer
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_int {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_INT} ]]
@@ -595,6 +606,7 @@ function __dybatpho_validate_is_int {
 # @arg $1 string Value to test
 # @exitcode 0 The value is an unsigned integer
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_uint {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_UINT} ]]
@@ -606,6 +618,7 @@ function __dybatpho_validate_is_uint {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a number
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_number {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_NUMBER} ]]
@@ -617,6 +630,7 @@ function __dybatpho_validate_is_number {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a boolean
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_bool {
   dybatpho::is true "${1-}" || dybatpho::is false "${1-}"
@@ -629,6 +643,7 @@ function __dybatpho_validate_is_bool {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a port number from 1 to 65535
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_port {
   __dybatpho_validate_is_uint "${1-}" || return 1
@@ -643,6 +658,7 @@ function __dybatpho_validate_is_port {
 # @arg $1 string Value to test
 # @exitcode 0 The value is an email address
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_email {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_EMAIL} ]]
@@ -654,6 +670,7 @@ function __dybatpho_validate_is_email {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a URL
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_url {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_URL} ]]
@@ -667,6 +684,7 @@ function __dybatpho_validate_is_url {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a host name
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_hostname {
   local name="${1-}"
@@ -692,6 +710,7 @@ function __dybatpho_validate_is_hostname {
 # @arg $1 string Value to test
 # @exitcode 0 The value is an IPv4 address
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_ipv4 {
   [[ "${1-}" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
@@ -712,6 +731,7 @@ function __dybatpho_validate_is_ipv4 {
 # @arg $1 string Value to test
 # @exitcode 0 The value is an IPv6 address
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_ipv6 {
   local address="${1-}"
@@ -777,6 +797,7 @@ function __dybatpho_validate_is_ipv6 {
 # @arg $1 string Value to test
 # @exitcode 0 The value is an IPv4 or IPv6 address
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_ip {
   __dybatpho_validate_is_ipv4 "${1-}" || __dybatpho_validate_is_ipv6 "${1-}"
@@ -788,6 +809,7 @@ function __dybatpho_validate_is_ip {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a CIDR block
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_cidr {
   local block="${1-}"
@@ -812,6 +834,7 @@ function __dybatpho_validate_is_cidr {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a MAC address
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_mac {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_MAC} ]] || return 1
@@ -825,6 +848,7 @@ function __dybatpho_validate_is_mac {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a semantic version
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_semver {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_SEMVER} ]]
@@ -836,6 +860,7 @@ function __dybatpho_validate_is_semver {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a UUID
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_uuid {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_UUID} ]]
@@ -847,6 +872,7 @@ function __dybatpho_validate_is_uuid {
 # @arg $1 string Value to test
 # @exitcode 0 The value is hexadecimal
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_hex {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_HEX} ]]
@@ -857,6 +883,7 @@ function __dybatpho_validate_is_hex {
 # @arg $1 string Value to test
 # @exitcode 0 The value is alphabetic
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_alpha {
   [[ "${1-}" =~ ^[A-Za-z]+$ ]]
@@ -867,6 +894,7 @@ function __dybatpho_validate_is_alpha {
 # @arg $1 string Value to test
 # @exitcode 0 The value is alphanumeric
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_alnum {
   [[ "${1-}" =~ ^[A-Za-z0-9]+$ ]]
@@ -880,6 +908,7 @@ function __dybatpho_validate_is_alnum {
 # @exitcode 1 The value is not
 # @see
 #   - `dybatpho::string_slugify`
+# @internal
 #######################################
 function __dybatpho_validate_is_slug {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_SLUG} ]]
@@ -890,6 +919,7 @@ function __dybatpho_validate_is_slug {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a shell variable name
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_identifier {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_IDENTIFIER} ]]
@@ -902,6 +932,7 @@ function __dybatpho_validate_is_identifier {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a date
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_date {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_DATE} ]] || return 1
@@ -924,6 +955,7 @@ function __dybatpho_validate_is_date {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a time
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_time {
   [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_TIME} ]]
@@ -936,6 +968,7 @@ function __dybatpho_validate_is_time {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a duration
 # @exitcode 1 The value is not
+# @internal
 #######################################
 function __dybatpho_validate_is_duration {
   local value="${1-}"
@@ -948,6 +981,7 @@ function __dybatpho_validate_is_duration {
 # @arg $1 string Value to test
 # @exitcode 0 The path exists
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_validate_is_path {
   [[ -n "${1-}" ]] && dybatpho::is exist "$1"
@@ -958,6 +992,7 @@ function __dybatpho_validate_is_path {
 # @arg $1 string Value to test
 # @exitcode 0 The file exists
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_validate_is_file {
   [[ -n "${1-}" ]] && dybatpho::is file "$1"
@@ -968,6 +1003,7 @@ function __dybatpho_validate_is_file {
 # @arg $1 string Value to test
 # @exitcode 0 The directory exists
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_validate_is_dir {
   [[ -n "${1-}" ]] && dybatpho::is dir "$1"
@@ -978,6 +1014,7 @@ function __dybatpho_validate_is_dir {
 # @arg $1 string Value to test
 # @exitcode 0 The link exists
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_validate_is_symlink {
   [[ -n "${1-}" ]] && dybatpho::is link "$1"
@@ -988,6 +1025,7 @@ function __dybatpho_validate_is_symlink {
 # @arg $1 string Value to test
 # @exitcode 0 The path is readable
 # @exitcode 1 It is not
+# @internal
 #######################################
 function __dybatpho_validate_is_readable {
   [[ -n "${1-}" ]] && dybatpho::is readable "$1"
@@ -998,6 +1036,7 @@ function __dybatpho_validate_is_readable {
 # @arg $1 string Value to test
 # @exitcode 0 The path is writable
 # @exitcode 1 It is not
+# @internal
 #######################################
 function __dybatpho_validate_is_writable {
   [[ -n "${1-}" ]] && dybatpho::is writeable "$1"
@@ -1008,6 +1047,7 @@ function __dybatpho_validate_is_writable {
 # @arg $1 string Value to test
 # @exitcode 0 The path is executable
 # @exitcode 1 It is not
+# @internal
 #######################################
 function __dybatpho_validate_is_executable {
   [[ -n "${1-}" ]] && dybatpho::is executable "$1"
@@ -1020,6 +1060,7 @@ function __dybatpho_validate_is_executable {
 # @arg $1 string Value to test
 # @exitcode 0 The path is absolute
 # @exitcode 1 It is not
+# @internal
 #######################################
 function __dybatpho_validate_is_abspath {
   [[ "${1-}" == /* ]]
@@ -1032,6 +1073,7 @@ function __dybatpho_validate_is_abspath {
 # @arg $1 string Value to test
 # @exitcode 0 The parent directory exists
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_validate_is_parent_dir {
   local path="${1-}"
@@ -1048,6 +1090,7 @@ function __dybatpho_validate_is_parent_dir {
 # @set __DYBATPHO_VALIDATE_PREDICATES
 # @set __DYBATPHO_VALIDATE_DESCRIPTIONS
 # @set __DYBATPHO_VALIDATE_ALIASES
+# @internal
 #######################################
 function __dybatpho_validate_register_builtins {
   dybatpho::validate_register string __dybatpho_validate_is_string "a string"

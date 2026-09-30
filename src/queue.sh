@@ -48,6 +48,7 @@ DYBATPHO_QUEUE_TIMEOUT="${DYBATPHO_QUEUE_TIMEOUT:-10}"
 # @arg $1 string Name of the variable receiving the directory
 # @arg $2 string Queue name or path
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_queue_dir_into {
   local -n __dybatpho_queue_dir_ref="$1"
@@ -71,6 +72,7 @@ function __dybatpho_queue_dir_into {
 #######################################
 # @description Create a queue's directories if they are not there yet.
 # @arg $1 string Queue directory
+# @internal
 #######################################
 function __dybatpho_queue_prepare {
   local state
@@ -85,6 +87,7 @@ function __dybatpho_queue_prepare {
 #   a queue given as an explicit path carries its own lock with it.
 # @arg $1 string Queue directory
 # @stdout Lock path
+# @internal
 #######################################
 function __dybatpho_queue_lock {
   printf '%s/.lock\n' "$1"
@@ -97,6 +100,7 @@ function __dybatpho_queue_lock {
 # @arg $1 string Job id
 # @exitcode 0 The id is safe to use as a file name
 # @exitcode 1 Stop the script when it is not
+# @internal
 #######################################
 function __dybatpho_queue_expect_id {
   [[ "$1" =~ ^[0-9]{12}-[0-9]+$ ]] \
@@ -108,6 +112,7 @@ function __dybatpho_queue_expect_id {
 # @arg $1 string Queue directory
 # @arg $2 string State directory: `pending`, `claimed`, or `dead`
 # @stdout One job id per line
+# @internal
 #######################################
 function __dybatpho_queue_ids {
   local path
@@ -126,6 +131,7 @@ function __dybatpho_queue_ids {
 # @arg $1 string Name of the variable receiving the number
 # @arg $2 string Queue directory
 # @set The named variable, zero-padded to twelve digits
+# @internal
 #######################################
 function __dybatpho_queue_next_sequence_into {
   local -n __dybatpho_queue_seq_ref="$1"
@@ -339,6 +345,7 @@ function dybatpho::queue_list {
 # @arg $1 string State name
 # @exitcode 0 The state is known
 # @exitcode 1 Stop the script when it is not
+# @internal
 #######################################
 function __dybatpho_queue_expect_state {
   case "$1" in

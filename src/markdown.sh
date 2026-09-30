@@ -47,6 +47,7 @@ __dybatpho_md_raw_close=$'\002'
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 string Name of the array variable to fill
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_md_read_lines {
   local __dybatpho_md_input="$1"
@@ -80,6 +81,7 @@ function __dybatpho_md_read_lines {
 # @arg $1 string Name of the variable receiving the result
 # @arg $2 string Name of the array of lines
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_md_join_into {
   local -n __dybatpho_md_join_ref="$1"
@@ -95,6 +97,7 @@ function __dybatpho_md_join_into {
 # @arg $1 string Name of the variable receiving the result
 # @arg $2 string Text to escape
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_md_escape_plain {
   local -n __dybatpho_md_plain_ref="$1"
@@ -130,6 +133,7 @@ function __dybatpho_md_escape_plain {
 # @arg $1 string Name of the variable receiving the result
 # @arg $2 string Text to escape
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_md_escape_into {
   local -n __dybatpho_md_escaped_ref="$1"
@@ -165,6 +169,7 @@ function __dybatpho_md_escape_into {
 # @arg $1 string Name of the variable receiving the result
 # @arg $2 string URL
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_md_encode_url_into {
   local -n __dybatpho_md_url_ref="$1"
@@ -400,6 +405,7 @@ function dybatpho::md_badge {
 # @arg $1 string Name of the variable receiving the result
 # @arg $2 string Segment text
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_md_badge_segment_into {
   local -n __dybatpho_md_segment_ref="$1"

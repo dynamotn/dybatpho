@@ -106,6 +106,7 @@ function dybatpho::i18n_reset {
 # @arg $2 string Raw locale tag
 # @set The named variable
 # @exitcode 1 The tag is not a locale
+# @internal
 #######################################
 function __dybatpho_i18n_normalize {
   local __norm_target raw
@@ -149,6 +150,7 @@ function __dybatpho_i18n_normalize {
 # @description Print the language subtag of a locale.
 # @arg $1 string Locale tag
 # @stdout Language subtag, lowercased
+# @internal
 #######################################
 function __dybatpho_i18n_language {
   local tag="${1-}"
@@ -162,6 +164,7 @@ function __dybatpho_i18n_language {
 #   specification gives them.
 # @arg $1 string Name of the variable that receives the locale
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_i18n_resolve {
   local __resolve_target
@@ -305,6 +308,7 @@ function dybatpho::i18n_chain {
 #   ids, and rejecting punctuation would make those unusable.
 # @arg $1 string Message key
 # @exitcode 1 The key is empty or contains the separator
+# @internal
 #######################################
 function __dybatpho_i18n_check_key {
   local key="${1-}"
@@ -327,6 +331,7 @@ function __dybatpho_i18n_check_key {
 # @arg $4 string Optional plural category
 # @set __dybatpho_i18n_msg __dybatpho_i18n_plural
 # @exitcode 1 The key is not storable
+# @internal
 #######################################
 function __dybatpho_i18n_store {
   local locale key value category
@@ -350,6 +355,7 @@ function __dybatpho_i18n_store {
 # @arg $3 string Optional count; when given, plural forms are consulted first
 # @set The named variable
 # @exitcode 1 No locale in the chain carries the key
+# @internal
 #######################################
 function __dybatpho_i18n_lookup {
   local __lookup_target key count
@@ -406,6 +412,7 @@ function __dybatpho_i18n_lookup {
 # @arg $2 string Template
 # @arg $@ string `name=value` bindings, or bare values bound to `{1}`, `{2}`, ...
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_i18n_interpolate {
   local __interp_target __interp_template
@@ -486,6 +493,7 @@ declare -gA __dybatpho_i18n_plural_family=(
 # @description Print `other` for a language with a single cardinal form.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_other {
   printf 'other'
@@ -495,6 +503,7 @@ function __dybatpho_i18n_plural_other {
 # @description Print the plural category for a one-versus-other language.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_one {
   if (($1 == 1)); then printf 'one'; else printf 'other'; fi
@@ -504,6 +513,7 @@ function __dybatpho_i18n_plural_one {
 # @description Print the plural category for French, which counts zero as singular.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_fr {
   if (($1 == 0 || $1 == 1)); then printf 'one'; else printf 'other'; fi
@@ -513,6 +523,7 @@ function __dybatpho_i18n_plural_fr {
 # @description Print the plural category for Portuguese, which counts zero as singular.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_pt {
   if (($1 == 0 || $1 == 1)); then printf 'one'; else printf 'other'; fi
@@ -523,6 +534,7 @@ function __dybatpho_i18n_plural_pt {
 #   count zero as singular.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_hi {
   if (($1 == 0 || $1 == 1)); then printf 'one'; else printf 'other'; fi
@@ -534,6 +546,7 @@ function __dybatpho_i18n_plural_hi {
 #   which is what separates this rule from the Polish one below.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_ru {
   local last=$(($1 % 10)) pair=$(($1 % 100))
@@ -551,6 +564,7 @@ function __dybatpho_i18n_plural_ru {
 #   number one itself rather than anything ending in one.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_pl {
   local last=$(($1 % 10)) pair=$(($1 % 100))
@@ -568,6 +582,7 @@ function __dybatpho_i18n_plural_pl {
 #   category applies only to fractions, which integer counts never produce.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_cs {
   if (($1 == 1)); then
@@ -584,6 +599,7 @@ function __dybatpho_i18n_plural_cs {
 #   all six.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_ar {
   local pair=$(($1 % 100))
@@ -606,6 +622,7 @@ function __dybatpho_i18n_plural_ar {
 # @description Print the plural category for Hebrew, which has a dual form.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_he {
   if (($1 == 1)); then
@@ -621,6 +638,7 @@ function __dybatpho_i18n_plural_he {
 # @description Print the plural category for Lithuanian.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_lt {
   local last=$(($1 % 10)) pair=$(($1 % 100))
@@ -637,6 +655,7 @@ function __dybatpho_i18n_plural_lt {
 # @description Print the plural category for Latvian, which has a zero form.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_lv {
   local last=$(($1 % 10)) pair=$(($1 % 100))
@@ -653,6 +672,7 @@ function __dybatpho_i18n_plural_lv {
 # @description Print the plural category for Romanian.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_ro {
   local pair=$(($1 % 100))
@@ -669,6 +689,7 @@ function __dybatpho_i18n_plural_ro {
 # @description Print the plural category for Slovenian, which has a dual form.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_sl {
   local pair=$(($1 % 100))
@@ -687,6 +708,7 @@ function __dybatpho_i18n_plural_sl {
 # @description Print the plural category for Icelandic.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_is {
   local last=$(($1 % 10)) pair=$(($1 % 100))
@@ -697,6 +719,7 @@ function __dybatpho_i18n_plural_is {
 # @description Print the plural category for Macedonian.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_mk {
   local last=$(($1 % 10)) pair=$(($1 % 100))
@@ -707,6 +730,7 @@ function __dybatpho_i18n_plural_mk {
 # @description Print the plural category for Filipino and Tagalog.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_fil {
   local last=$(($1 % 10))
@@ -723,6 +747,7 @@ function __dybatpho_i18n_plural_fil {
 # @description Print the plural category for Welsh, which uses all six.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_cy {
   case "$1" in
@@ -739,6 +764,7 @@ function __dybatpho_i18n_plural_cy {
 # @description Print the plural category for Maltese.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_mt {
   local pair=$(($1 % 100))
@@ -757,6 +783,7 @@ function __dybatpho_i18n_plural_mt {
 # @description Print the plural category for Irish.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_ga {
   if (($1 == 1)); then
@@ -776,6 +803,7 @@ function __dybatpho_i18n_plural_ga {
 # @description Print the plural category for Scottish Gaelic.
 # @arg $1 number Count
 # @stdout Plural category
+# @internal
 #######################################
 function __dybatpho_i18n_plural_gd {
   if (($1 == 1 || $1 == 11)); then
@@ -814,6 +842,7 @@ function dybatpho::i18n_plural_form {
 # @arg $1 string Language subtag
 # @arg $2 number Count
 # @stdout One of `zero`, `one`, `two`, `few`, `many`, `other`
+# @internal
 #######################################
 function __dybatpho_i18n_plural_category {
   local language count
@@ -842,6 +871,7 @@ function __dybatpho_i18n_plural_category {
 # @arg $2 string Locale the lookup started from
 # @set __dybatpho_i18n_missing
 # @exitcode 1 Always, so the caller can render the fallback
+# @internal
 #######################################
 function __dybatpho_i18n_miss {
   local key locale
@@ -860,6 +890,7 @@ function __dybatpho_i18n_miss {
 # @description Render the text shown when a key has no translation.
 # @arg $1 string Message key
 # @stdout The key, wrapped in the missing marker when one is configured
+# @internal
 #######################################
 function __dybatpho_i18n_fallback_text {
   local key="$1"
@@ -1208,6 +1239,7 @@ DYBATPHO_I18N_RTL="${DYBATPHO_I18N_RTL:-ar he fa ur yi dv ps sd ug ckb arc syr n
 #   and degraded rather than assumed.
 # @noargs
 # @set DYBATPHO_I18N_NUMBER DYBATPHO_I18N_CURRENCY_LAYOUT
+# @internal
 #######################################
 function __dybatpho_i18n_seed_symbols {
   local narrow nbsp probe
@@ -1244,6 +1276,7 @@ __dybatpho_i18n_seed_symbols
 # @arg $3 string Field name
 # @stdout The value
 # @exitcode 1 No candidate carried the field
+# @internal
 #######################################
 function __dybatpho_i18n_data {
   local map_name locale field
@@ -1273,6 +1306,7 @@ function __dybatpho_i18n_data {
 # @arg $3 string Name of the variable that receives the integer digits
 # @arg $4 string Name of the variable that receives the fraction digits
 # @set The three named variables
+# @internal
 #######################################
 function __dybatpho_i18n_split_number {
   local __split_value __split_sign_name __split_int_name __split_frac_name
@@ -1311,6 +1345,7 @@ function __dybatpho_i18n_split_number {
 # @arg $2 string Name of the variable holding the fraction digits
 # @arg $3 number Requested number of fraction digits
 # @set The two named variables
+# @internal
 #######################################
 function __dybatpho_i18n_round {
   local __round_int_name __round_frac_name precision
@@ -1360,6 +1395,7 @@ function __dybatpho_i18n_round {
 # @arg $2 string Grouping specification, such as `3` or `3;2`, or `0` for none
 # @arg $3 string Group separator
 # @stdout The grouped digits
+# @internal
 #######################################
 function __dybatpho_i18n_group {
   local digits grouping separator
@@ -1499,6 +1535,7 @@ function dybatpho::i18n_percent {
 # @arg $1 string Rendered amount
 # @arg $2 string Minus glyph the number was formatted with
 # @stdout The corrected amount
+# @internal
 #######################################
 function __dybatpho_i18n_negative {
   local rendered minus
@@ -1855,6 +1892,7 @@ declare -gA DYBATPHO_I18N_DATE_PATTERN=(
 # @arg $3 number One-based index into the list
 # @stdout The name
 # @exitcode 1 The locale has no such list, or the index is outside it
+# @internal
 #######################################
 function __dybatpho_i18n_name {
   local locale set index
@@ -1942,6 +1980,7 @@ function dybatpho::i18n_weekday_name {
 # @arg $2 string Name of the array that receives year, month, day, hour, minute,
 #   second, and ISO weekday
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_i18n_date_fields {
   local __fields_stamp __fields_target
@@ -1963,6 +2002,7 @@ function __dybatpho_i18n_date_fields {
 # @description Convert a 24-hour hour into its 12-hour form.
 # @arg $1 number Hour, 0 through 23
 # @stdout Hour, 1 through 12
+# @internal
 #######################################
 function __dybatpho_i18n_hour12 {
   local hour=$((10#$1))
@@ -1981,6 +2021,7 @@ function __dybatpho_i18n_hour12 {
 # @arg $2 string Locale tag
 # @arg $@ string Calendar fields: year, month, day, hour, minute, second, weekday
 # @stdout The rendered text
+# @internal
 #######################################
 function __dybatpho_i18n_render_pattern {
   local pattern locale
@@ -2054,6 +2095,7 @@ function __dybatpho_i18n_render_pattern {
 # @arg $1 number Hour, 0 through 23
 # @arg $2 string Locale tag
 # @stdout The day period name
+# @internal
 #######################################
 function __dybatpho_i18n_dayperiod {
   local hour=$((10#$1))
@@ -2071,6 +2113,7 @@ function __dybatpho_i18n_dayperiod {
 # @arg $2 string Kind, `date` or `time` or `datetime`
 # @arg $3 string Style, `short`, `medium`, `long`, or `full`
 # @stdout The pattern
+# @internal
 #######################################
 function __dybatpho_i18n_pattern {
   local locale kind style
@@ -2227,6 +2270,7 @@ function dybatpho::i18n_date_pattern {
 #   so the normal fallback chain reaches them.
 # @noargs
 # @set __dybatpho_i18n_msg __dybatpho_i18n_plural
+# @internal
 #######################################
 function __dybatpho_i18n_seed_relative {
   __dybatpho_i18n_store en i18n.relative.now "just now"
@@ -2255,6 +2299,7 @@ function __dybatpho_i18n_seed_relative {
 # @arg $2 string Name of the variable that receives the unit
 # @arg $3 string Name of the variable that receives the count
 # @set The two named variables
+# @internal
 #######################################
 function __dybatpho_i18n_span {
   local __span_seconds __span_unit_name __span_count_name
@@ -2615,6 +2660,7 @@ function dybatpho::i18n_register_rtl {
 # @arg $2 string Locale the entries belong to
 # @set __dybatpho_i18n_msg __dybatpho_i18n_plural
 # @exitcode 1 An entry is malformed
+# @internal
 #######################################
 function __dybatpho_i18n_read_msg {
   local file locale
@@ -2676,6 +2722,7 @@ function __dybatpho_i18n_read_msg {
 #   before it runs and put back afterwards.
 # @arg $1 string Text between the quotes
 # @stdout The unescaped text
+# @internal
 #######################################
 function __dybatpho_i18n_po_unescape {
   local text="$1"
@@ -2704,6 +2751,7 @@ function __dybatpho_i18n_po_unescape {
 # @arg $1 string File path
 # @arg $2 string Locale the entries belong to
 # @set __dybatpho_i18n_msg __dybatpho_i18n_plural
+# @internal
 #######################################
 function __dybatpho_i18n_read_po {
   local file locale
@@ -2729,6 +2777,7 @@ function __dybatpho_i18n_read_po {
   #   or plural, and drop it when it is marked fuzzy: a fuzzy entry is a
   #   translator's draft, not a translation.
   # @noargs
+  # @internal
   #######################################
   function __dybatpho_i18n_po_flush {
     [[ -n "${msgid}${context}" ]] || return 0
@@ -2863,6 +2912,7 @@ declare -gA __dybatpho_i18n_po_order=(
 # @arg $2 string Locale the entries belong to
 # @set __dybatpho_i18n_files
 # @exitcode 1 The file cannot be read
+# @internal
 #######################################
 function __dybatpho_i18n_load_file {
   local file locale
@@ -2889,6 +2939,7 @@ function __dybatpho_i18n_load_file {
 #   themselves have to be loaded last in order to win.
 # @noargs
 # @stdout One directory per line
+# @internal
 #######################################
 function __dybatpho_i18n_roots {
   local -a roots=()
@@ -2921,6 +2972,7 @@ function __dybatpho_i18n_roots {
 # @arg $1 string Locale tag
 # @arg $2 string Domain
 # @exitcode 1 Nothing was found
+# @internal
 #######################################
 function __dybatpho_i18n_discover {
   local locale domain
@@ -3080,6 +3132,7 @@ function dybatpho::i18n_locales {
 # @arg $3 string Name of the variable that receives the remaining text
 # @set The two named variables
 # @exitcode 1 The argument is not a literal
+# @internal
 #######################################
 function __dybatpho_i18n_literal {
   local __lit_text __lit_key_name __lit_rest_name
@@ -3122,6 +3175,7 @@ function __dybatpho_i18n_literal {
 # @arg $1 string Name of the array that receives `<key>` and its kind
 # @arg $@ string Files or directories to scan
 # @set The named associative array, mapping key to `plain`, `plural`, or `both`
+# @internal
 #######################################
 function __dybatpho_i18n_scan {
   local __scan_target
@@ -3314,6 +3368,7 @@ function dybatpho::i18n_extract {
 # @description Print the placeholders a template uses, one per line, sorted.
 # @arg $1 string Template
 # @stdout Placeholder names
+# @internal
 #######################################
 function __dybatpho_i18n_placeholders {
   local template="$1"
@@ -3459,6 +3514,7 @@ function dybatpho::i18n_lint {
 # @arg $4 string Message key
 # @arg $5 string Optional detail
 # @stdout The finding
+# @internal
 #######################################
 function __dybatpho_i18n_finding {
   local format locale kind key detail

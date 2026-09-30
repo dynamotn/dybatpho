@@ -137,6 +137,7 @@ function dybatpho::tui_supported {
 # @arg $1 string Name of the variable receiving the sequence
 # @arg $2 string Style, as the parameters of an SGR escape
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_tui_sgr_into {
   local -n __dybatpho_tui_sgr_out="$1"
@@ -153,6 +154,7 @@ function __dybatpho_tui_sgr_into {
 # @arg $2 string Text to repeat
 # @arg $3 number Number of repetitions
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_tui_repeat_into {
   __dybatpho_log_repeat_into "$@"
@@ -166,6 +168,7 @@ function __dybatpho_tui_repeat_into {
 #   and that outlives the script: it has to be undone by hand afterwards.
 #######################################
 # @noargs
+# @internal
 function __dybatpho_tui_hide_cursor {
   # kcov(disabled)
   dybatpho::tui_supported || return 0
@@ -182,6 +185,7 @@ function __dybatpho_tui_hide_cursor {
 # @description Show the cursor again, if a widget hid it.
 # @noargs
 # @exitcode 0 Always, so it cannot change the exit status of a trap
+# @internal
 #######################################
 function __dybatpho_tui_show_cursor {
   # kcov(disabled)
@@ -196,6 +200,7 @@ function __dybatpho_tui_show_cursor {
 # @description Redraw the current line on stderr, erasing whatever was on it.
 # @arg $1 string Text to draw
 # @stderr The text, preceded by a carriage return and followed by an erase
+# @internal
 #######################################
 function __dybatpho_tui_draw_line {
   printf '\r%s\033[K' "${1-}" >&2
@@ -206,6 +211,7 @@ function __dybatpho_tui_draw_line {
 #   start, so the next output begins on a clean column.
 #######################################
 # @noargs
+# @internal
 function __dybatpho_tui_erase_line {
   printf '\r\033[K' >&2
 }
@@ -215,6 +221,7 @@ function __dybatpho_tui_erase_line {
 # @arg $1 string Name of the variable receiving the text
 # @arg $2 number Seconds
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_tui_duration_into {
   local -n __dybatpho_tui_duration_out="$1"
@@ -239,6 +246,7 @@ function __dybatpho_tui_duration_into {
 # @arg $2 string Description of the value, used in the message
 # @arg $3 string Value to check
 # @arg $4 number Smallest value accepted
+# @internal
 #######################################
 function __dybatpho_tui_expect_int {
   [[ "${3-}" =~ ^-?[0-9]+$ ]] \
@@ -293,6 +301,7 @@ function dybatpho::tui_bar {
 #   a background job, so it never returns on its own.
 # @arg $1 string Path of the file holding the current message
 # @stderr One frame per interval, redrawn over the same line
+# @internal
 #######################################
 function __dybatpho_tui_spin {
   # kcov(disabled)
@@ -442,6 +451,7 @@ function dybatpho::tui_spinner_stop {
 # @arg $1 number Exit status the work ended with
 # @arg $2 string Message
 # @stderr The banner
+# @internal
 #######################################
 function __dybatpho_tui_banner {
   local message label
@@ -457,6 +467,7 @@ function __dybatpho_tui_banner {
 #######################################
 # @description Draw or log one frame of the running progress bar.
 # @arg $1 bool `true` when this is the closing frame
+# @internal
 #######################################
 function __dybatpho_tui_progress_render {
   local final="${1:-false}"
@@ -610,6 +621,7 @@ function dybatpho::tui_progress_stop {
 #   loops never deal with escape sequences themselves.
 # @arg $1 string Name of the variable receiving the key name
 # @set The named variable to `up`, `down`, `left`, `right`, `enter`, `space`, `escape`, `eof`, or `char:<c>`
+# @internal
 #######################################
 function __dybatpho_tui_read_key_into {
   # kcov(disabled)
@@ -648,6 +660,7 @@ function __dybatpho_tui_read_key_into {
 # @arg $1 string Name of the array variable receiving the positions
 # @arg $2 number Number of entries in the menu
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_tui_defaults_into {
   local -n __dybatpho_tui_defaults_out="$1"
@@ -678,6 +691,7 @@ function __dybatpho_tui_defaults_into {
 # @arg $@ string Menu entries
 # @set The named variable, `DYBATPHO_TUI_INDEX`, and `DYBATPHO_TUI_INDEXES`
 # @exitcode 1 Nothing could be read and there is no default
+# @internal
 #######################################
 function __dybatpho_tui_menu_fallback {
   local __dybatpho_tui_fb_var="$1"
@@ -782,6 +796,7 @@ function __dybatpho_tui_menu_fallback {
 # @arg $@ string Menu entries
 # @set The named variable, `DYBATPHO_TUI_INDEX`, and `DYBATPHO_TUI_INDEXES`
 # @exitcode 1 The menu was cancelled
+# @internal
 #######################################
 function __dybatpho_tui_menu_interactive {
   # kcov(disabled)

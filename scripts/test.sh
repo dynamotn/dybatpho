@@ -47,6 +47,7 @@ BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 # @arg $1 string Value to check
 # @exitcode 0 If the value is a positive integer
 # @exitcode 1 Otherwise
+# @internal
 function __dybatpho_test_is_count {
   [[ "$1" =~ ^[1-9][0-9]*$ ]]
 }
@@ -55,6 +56,7 @@ function __dybatpho_test_is_count {
 #   and a pipe or a CI log gets plain text.
 # @noargs
 # @stdout `true` when stdout is a terminal, `false` otherwise
+# @internal
 function __dybatpho_test_tty {
   if dybatpho::is_tty stdout; then printf 'true'; else printf 'false'; fi
 }
@@ -65,6 +67,7 @@ function __dybatpho_test_tty {
 #   straggler while every other core sits idle.
 # @arg $@ path Files or directories; the whole `test/` directory when empty
 # @stdout One file path per line
+# @internal
 function __dybatpho_test_collect {
   local _target
   while read -r _file; do
@@ -90,6 +93,7 @@ function __dybatpho_test_collect {
 #   stream is what made a run unreadable.
 # @arg $1 number Total number of tests expected
 # @stdin TAP output from Bats
+# @internal
 function __dybatpho_test_progress {
   # shellcheck disable=SC2154 # set by the option spec of this script
   awk -v total="$1" -v color="${COLOR}" \
@@ -129,6 +133,7 @@ function __dybatpho_test_progress {
 # @arg $1 number Maximum files per chunk
 # @arg $@ path Test files, ordered by test count descending
 # @stdout One chunk per line, file paths separated by tabs
+# @internal
 function __dybatpho_test_pack {
   local _chunk="$1"
   shift
@@ -161,6 +166,7 @@ function __dybatpho_test_pack {
 # @noargs
 # @exitcode 0 If every test ran and passed
 # @exitcode 1 Otherwise
+# @internal
 function __dybatpho_test_run {
   if [[ "${COLOR}" == "true" ]]; then
     __DYBATPHO_TEST_RESET=$'\033[0m' __DYBATPHO_TEST_DIM=$'\033[2m'

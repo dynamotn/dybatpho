@@ -228,6 +228,7 @@ readonly __DYBATPHO_SCREEN_ZERO=(
 # @arg $2 string Description of the value, used in the message
 # @arg $3 string Value to check
 # @arg $4 number Smallest value accepted
+# @internal
 #######################################
 function __dybatpho_screen_expect_int {
   [[ "${3-}" =~ ^-?[0-9]+$ ]] \
@@ -248,6 +249,7 @@ function __dybatpho_screen_expect_int {
 # @arg $1 string Text to classify
 # @exitcode 0 The text is ASCII
 # @exitcode 1 The text holds a character that may not be one column wide
+# @internal
 #######################################
 function __dybatpho_screen_is_ascii {
   [[ "${1-}" == *[![:ascii:]]* ]] && return 1
@@ -267,6 +269,7 @@ __dybatpho_screen_byte_indexed=-1
 # @noargs
 # @exitcode 0 Bash counts bytes
 # @exitcode 1 Bash counts characters
+# @internal
 #######################################
 function __dybatpho_screen_indexes_bytes {
   if ((__dybatpho_screen_byte_indexed < 0)); then
@@ -282,6 +285,7 @@ function __dybatpho_screen_indexes_bytes {
 # @arg $1 string Name of the array variable receiving the characters
 # @arg $2 string Text to split
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_screen_chars_into {
   local -n __dybatpho_screen_chars_out="$1"
@@ -319,6 +323,7 @@ function __dybatpho_screen_chars_into {
 # @arg $1 string Name of the variable receiving the codepoint
 # @arg $2 string One character
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_codepoint_into {
   local -n __dybatpho_screen_cp_out="$1"
@@ -355,6 +360,7 @@ function __dybatpho_screen_codepoint_into {
 # @arg $1 string Name of the variable receiving the width
 # @arg $2 string One character
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_char_width_into {
   local -n __dybatpho_screen_cw_out="$1"
@@ -421,6 +427,7 @@ function dybatpho::screen_width {
 # @arg $1 string Name of the variable receiving the width
 # @arg $2 string Text to measure
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_width_into {
   local -n __dybatpho_screen_w_out="$1"
@@ -455,6 +462,7 @@ function __dybatpho_screen_width_into {
 # @arg $2 string Text to cut
 # @arg $3 number Columns available
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_truncate_into {
   local -n __dybatpho_screen_t_out="$1"
@@ -490,6 +498,7 @@ function __dybatpho_screen_truncate_into {
 # @arg $2 number Row
 # @arg $3 number Display column
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_index_into {
   local -n __dybatpho_screen_i_out="$1"
@@ -525,6 +534,7 @@ function __dybatpho_screen_index_into {
 # @arg $2 number First column covered
 # @arg $3 number First column past the span
 # @arg $4 string SGR parameters
+# @internal
 #######################################
 function __dybatpho_screen_style_set {
   local row="$1" start="$2" end="$3" style="$4"
@@ -660,6 +670,7 @@ function dybatpho::screen_put {
 # @arg $1 string Name of the variable receiving the sequence
 # @arg $2 number Row
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_render_into {
   local -n __dybatpho_screen_r_out="$1"
@@ -1053,6 +1064,7 @@ function dybatpho::screen_rect_center {
 # @description Note that the terminal changed size, so the next event reports it.
 #######################################
 # @noargs
+# @internal
 function __dybatpho_screen_on_resize {
   __dybatpho_screen_resized=true
 }
@@ -1229,6 +1241,7 @@ function dybatpho::screen_event {
 # @description Read the rest of an escape sequence and name it.
 # @arg $1 string Name of the variable receiving the event
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_read_escape {
   # kcov(disabled)
@@ -1292,6 +1305,7 @@ function __dybatpho_screen_read_escape {
 # @arg $2 string Timeout in seconds
 # @set The named variable
 # @exitcode 1 Nothing arrived before the timeout
+# @internal
 #######################################
 function __dybatpho_screen_read_char {
   # kcov(disabled)
@@ -1310,6 +1324,7 @@ function __dybatpho_screen_read_char {
 # @arg $1 string Name of the variable receiving the event
 # @arg $2 string Body of the escape sequence, starting with `<`
 # @set The named variable, `DYBATPHO_SCREEN_MOUSE_COLUMN`, `DYBATPHO_SCREEN_MOUSE_ROW`
+# @internal
 #######################################
 function __dybatpho_screen_parse_mouse {
   local -n __dybatpho_screen_m_out="$1"
@@ -1343,6 +1358,7 @@ function __dybatpho_screen_parse_mouse {
 # @arg $1 string Name of the associative array receiving the options
 # @arg $@ string The options
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_screen_options {
   local -n __dybatpho_screen_o_out="$1"
@@ -1369,6 +1385,7 @@ function __dybatpho_screen_options {
 # @arg $1 string Name of the array to fill
 # @arg $2 string Name of the array to copy
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_screen_copy_array {
   local -n __dybatpho_screen_ca_destination="$1"
@@ -1385,6 +1402,7 @@ function __dybatpho_screen_copy_array {
 # @arg $3 number Width in columns
 # @arg $4 string `left`, `center`, or `right`
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_screen_align_into {
   local -n __dybatpho_screen_a_out="$1"
@@ -1720,6 +1738,7 @@ function dybatpho::screen_table {
   # @arg $1 string Name of the variable to write into
   # @arg $2 string The row, with its cells separated by the delimiter
   # @set The named variable
+  # @internal
   #######################################
   function __dybatpho_screen_table_row_into {
     local -n __dybatpho_screen_tr_out="$1"
@@ -2061,6 +2080,7 @@ declare -ga __dybatpho_screen_braille=()
 #   calling out once per character.
 #######################################
 # @noargs
+# @internal
 function __dybatpho_screen_braille_table {
   ((${#__dybatpho_screen_braille[@]} == 0)) || return 0
   local format="" index piece

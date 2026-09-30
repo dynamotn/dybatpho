@@ -56,6 +56,7 @@ dybatpho::register_common_handlers
 #   and has to be named: `test/test_helper.bash` went unchecked until it was.
 # @noargs
 # @stdout Repository-relative paths
+# @internal
 function __dybatpho_lint_scripts {
   local file
   local git_output
@@ -80,6 +81,7 @@ function __dybatpho_lint_scripts {
 # @noargs
 # @exitcode 0 Every script parses
 # @exitcode 1 At least one script has a syntax error
+# @internal
 function __dybatpho_lint_syntax {
   local script failures=0
   local lint_scripts_output
@@ -104,6 +106,7 @@ function __dybatpho_lint_syntax {
 # @noargs
 # @exitcode 0 `dyshellint` reports nothing
 # @exitcode 1 `dyshellint` reports at least one finding, or could not run
+# @internal
 function __dybatpho_lint_dyshellint {
   dybatpho::require "dyshellint"
 
@@ -134,6 +137,7 @@ function __dybatpho_lint_dyshellint {
 # @noargs
 # @exitcode 0 The changelog is well formed
 # @exitcode 1 The changelog has at least one format violation
+# @internal
 function __dybatpho_lint_changelog {
   local changelog="${DYBATPHO_DIR}/CHANGELOG.md"
   local violations="" line version
@@ -189,6 +193,7 @@ function __dybatpho_lint_changelog {
 # @noargs
 # @exitcode 0 No drift
 # @exitcode 1 At least one generated document is stale
+# @internal
 function __dybatpho_lint_doc {
   "${SCRIPT_DIR}/docs.sh" --check
 }
@@ -199,6 +204,7 @@ function __dybatpho_lint_doc {
 # @noargs
 # @exitcode 0 The bundle builds and loads
 # @exitcode 1 The bundle is broken
+# @internal
 function __dybatpho_lint_bundle {
   local output
   dybatpho::create_temp output ".sh" "bundle"
@@ -208,6 +214,7 @@ function __dybatpho_lint_bundle {
 
 # @description Validator for `--stage`.
 # @arg $1 string Value to check
+# @internal
 function __dybatpho_lint_is_stage {
   dybatpho::opts::validate_choice "$1" "all,shell,changelog,doc,bundle" \
     || dybatpho::die "Unknown stage '$1'. Choose one of: all, shell, changelog, doc, bundle"
@@ -217,6 +224,7 @@ function __dybatpho_lint_is_stage {
 #   Every stage runs even after one fails, so a single invocation reports the
 #   whole backlog rather than stopping at the first problem.
 # @noargs
+# @internal
 function __dybatpho_lint_run {
   # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${LIST}"; then

@@ -19,6 +19,7 @@
 # @stdout Output of the `git` command
 # @tip Git hooks (e.g. `pre-commit`) export `GIT_DIR`/`GIT_INDEX_FILE`, which
 #   otherwise override `git -C` and point every call at the hook's repository
+# @internal
 #######################################
 function __dybatpho_git {
   local repo_path
@@ -36,6 +37,7 @@ function __dybatpho_git {
 # @description Ensure a path is inside a Git worktree.
 # @arg $1 string Optional repository path, default is `.`
 # @stdout The validated repository path
+# @internal
 #######################################
 function __dybatpho_git_repo_path {
   local repo_path="${1:-.}"
@@ -50,6 +52,7 @@ function __dybatpho_git_repo_path {
 # @arg $1 string Repository path
 # @arg $2 string Commit-ish to resolve
 # @stdout Full commit SHA
+# @internal
 #######################################
 function __dybatpho_git_resolve_commit {
   local repo_path commitish

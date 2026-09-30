@@ -67,6 +67,7 @@ readonly __DYBATPHO_LOCK_COMMAND_SUFFIX=".command"
 # @arg $1 string Lock path
 # @exitcode 0 A lock is present
 # @exitcode 1 Nothing is there
+# @internal
 #######################################
 function __dybatpho_lock_exists {
   [[ -L "${1-}" ]] || dybatpho::is dir "${1-}"
@@ -77,6 +78,7 @@ function __dybatpho_lock_exists {
 #   as `pid:host:acquired_at`.
 # @noargs
 # @stdout The target
+# @internal
 #######################################
 function __dybatpho_lock_target {
   local date
@@ -288,6 +290,7 @@ function dybatpho::lock_reclaim_stale {
 #   the library wrote.
 # @arg $1 string Lock path
 # @stdout The identity, or nothing when the lock is gone
+# @internal
 #######################################
 function __dybatpho_lock_identity {
   local lock_path="${1-}"

@@ -39,19 +39,13 @@ Every wrapper applies the same three rules:
 
 ### 🚀 Highlights
 
-- [`__dybatpho_safety_protected_paths`](#__dybatpho_safety_protected_paths) — Print every path that guarded operations must never touch.
-- [`__dybatpho_safety_absolute_path`](#__dybatpho_safety_absolute_path) — Turn a path into a normalized absolute path without touching the filesystem.
-- [`__dybatpho_safety_approve`](#__dybatpho_safety_approve) — Approve an operation from a force flag, otherwise ask for confirmation.
-- [`__dybatpho_safety_strip_entry`](#__dybatpho_safety_strip_entry) — Drop the leading components of an archive entry.
 - [`dybatpho::is_interactive`](#dybatphois_interactive) — Return success when the script can ask the user a question.
 - [`dybatpho::confirm`](#dybatphoconfirm) — Ask a yes/no question and return the answer as an exit code.
 - [`dybatpho::assert_safe_path`](#dybatphoassert_safe_path) — Validate a path before a destructive operation and print it as an absolute path.
 - [`dybatpho::safe_rm`](#dybatphosafe_rm) — Remove files and directories after validating them and confirming the removal.
 - [`dybatpho::safe_overwrite`](#dybatphosafe_overwrite) — Confirm that an existing file may be replaced, optionally keeping a backup.
-- [`__dybatpho_safety_transfer_target`](#__dybatpho_safety_transfer_target) — Resolve the effective destination of a copy or move.
 - [`dybatpho::safe_copy`](#dybatphosafe_copy) — Copy a file or directory, guarding the destination against an accidental overwrite.
 - [`dybatpho::safe_move`](#dybatphosafe_move) — Move a file or directory, guarding the destination against an accidental overwrite.
-- [`__dybatpho_safety_transfer`](#__dybatpho_safety_transfer) — Copy or move a path through the overwrite guard.
 - [`dybatpho::safe_extract`](#dybatphosafe_extract) — Extract an archive after rejecting entries that escape the destination.
 - [`dybatpho::safe_system`](#dybatphosafe_system) — Run a command that changes system state, after confirming it.
 
@@ -107,73 +101,6 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_safety_protected_paths`
-
-Print every path that guarded operations must never touch.
-
-_Function has no arguments._
-
-**📤 Output on stdout**
-
-- One protected absolute path per line
-
-
----
-
-### `__dybatpho_safety_absolute_path`
-
-Turn a path into a normalized absolute path without touching the filesystem.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to resolve |
-
-**📤 Output on stdout**
-
-- Normalized absolute path
-
-
----
-
-### `__dybatpho_safety_approve`
-
-Approve an operation from a force flag, otherwise ask for confirmation.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | bool | Force flag value |
-| `$2` | string | Question shown when confirmation is needed |
-
-**🚦 Exit codes**
-
-- `0`: The operation is approved
-- `1`: The operation is declined or can't be confirmed
-
-
----
-
-### `__dybatpho_safety_strip_entry`
-
-Drop the leading components of an archive entry.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Entry path |
-| `$2` | number | Number of leading components to strip |
-
-**📤 Output on stdout**
-
-- Stripped entry, empty when the entry has too few components
-
-
----
 
 ### `dybatpho::is_interactive`
 
@@ -303,24 +230,6 @@ Confirm that an existing file may be replaced, optionally keeping a backup.
 
 ---
 
-### `__dybatpho_safety_transfer_target`
-
-Resolve the effective destination of a copy or move.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Source path |
-| `$2` | string | Destination path |
-
-**📤 Output on stdout**
-
-- Destination path, expanded with the source name when the destination is a directory
-
-
----
-
 ### `dybatpho::safe_copy`
 
 Copy a file or directory, guarding the destination against an accidental overwrite.
@@ -369,25 +278,6 @@ Move a file or directory, guarding the destination against an accidental overwri
 
 - `0`: The move is done
 - `1`: The overwrite is declined, or the script stops when the source is missing
-
-
----
-
-### `__dybatpho_safety_transfer`
-
-Copy or move a path through the overwrite guard.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Mode, `copy` or `move` |
-| `$@` | string | Options, source, and destination forwarded from the public wrapper |
-
-**🚦 Exit codes**
-
-- `0`: The transfer is done
-- `1`: The overwrite is declined
 
 
 ---

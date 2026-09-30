@@ -256,6 +256,7 @@ function dybatpho::semver_release_type {
 #   before it can be compared against anything.
 # @arg $1 string Partial version such as `1`, `1.2`, or `1.2.3`
 # @stdout The version with its missing parts set to zero
+# @internal
 #######################################
 function __dybatpho_semver_fill {
   local version major minor patch
@@ -270,6 +271,7 @@ function __dybatpho_semver_fill {
 #   to know which parts were written down.
 # @arg $1 string Version or partial version
 # @stdout `1`, `2`, or `3`
+# @internal
 #######################################
 function __dybatpho_semver_specificity {
   local version core
@@ -294,6 +296,7 @@ function __dybatpho_semver_specificity {
 # @arg $2 string A single comparator such as `^1.2`, `>=1.0.0`, or `1.2.x`
 # @set The named array, with one `<operator> <version>` entry per bound
 # @exitcode 1 The comparator cannot be understood
+# @internal
 #######################################
 function __dybatpho_semver_expand {
   local -n __bounds_out="$1"
@@ -392,6 +395,7 @@ function __dybatpho_semver_expand {
 # @arg $3 string Version to compare against
 # @exitcode 0 The comparison holds
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_semver_holds {
   local version operator bound result

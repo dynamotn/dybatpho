@@ -38,7 +38,6 @@ and dependency installation live in `pkg.sh`.
 - [`dybatpho::is_tty`](#dybatphois_tty) — Return success when a standard stream is attached to a terminal.
 - [`dybatpho::terminal_width`](#dybatphoterminal_width) — Print the width of the terminal in columns. `COLUMNS` is trusted first, because a caller that sets it is deliberately asking for a width, and `tput` is only asked when a terminal is actually attached.
 - [`dybatpho::terminal_height`](#dybatphoterminal_height) — Print the height of the terminal in lines.
-- [`__dybatpho_os_terminal_size`](#__dybatpho_os_terminal_size) — Resolve one terminal dimension from the environment, `tput`, or a fallback, in that order.
 - [`dybatpho::os_release`](#dybatphoos_release) — Print one field of the host's `os-release` file.
 - [`dybatpho::distro`](#dybatphodistro) — Print the distribution the host runs. macOS has no `os-release`, so it answers `macos`; a Linux host answers with the `ID` field, such as `ubuntu`, `debian`, `arch`, or `alpine`.
 - [`dybatpho::distro_version`](#dybatphodistro_version) — Print the version of the distribution the host runs.
@@ -356,30 +355,6 @@ Print the height of the terminal in lines.
 **📤 Output on stdout**
 
 - Terminal height in lines
-
-**🚦 Exit codes**
-
-- `1`: The fallback is not a positive integer
-
-
----
-
-### `__dybatpho_os_terminal_size`
-
-Resolve one terminal dimension from the environment, `tput`, or a
-fallback, in that order.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | `tput` capability, `cols` or `lines` |
-| `$2` | string | Value of the environment variable that describes the dimension |
-| `$3` | number | Fallback used when neither answers |
-
-**📤 Output on stdout**
-
-- The dimension
 
 **🚦 Exit codes**
 

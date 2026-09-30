@@ -36,9 +36,6 @@ on a modification time that copying a directory can change.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_backup_stamp`](#__dybatpho_backup_stamp) — Print the timestamp a backup name carries. UTC, so the names keep sorting in the order the backups were taken across a daylight-saving change, which a local-time stamp does not.
-- [`__dybatpho_backup_collect_into`](#__dybatpho_backup_collect_into) — Collect a directory's backups into a named array, newest first.
-- [`__dybatpho_backup_sidecar`](#__dybatpho_backup_sidecar) — Print the path of a backup's checksum sidecar.
 - [`dybatpho::backup_create`](#dybatphobackup_create) — Take a timestamped backup of a file or directory. The archive is written under a temporary name in the destination and renamed into place, so nothing half-written is ever left looking complete. A checksum sidecar is written beside it.
 - [`dybatpho::backup_list`](#dybatphobackup_list) — List a directory's backups, newest first.
 - [`dybatpho::backup_latest`](#dybatphobackup_latest) — Print the most recent backup in a directory.
@@ -58,57 +55,6 @@ on a modification time that copying a directory can change.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_backup_stamp`
-
-Print the timestamp a backup name carries.
-UTC, so the names keep sorting in the order the backups were taken across
-a daylight-saving change, which a local-time stamp does not.
-
-_Function has no arguments._
-
-**📤 Output on stdout**
-
-- Timestamp in `YYYYmmddTHHMMSSZ` form
-
-
----
-
-### `__dybatpho_backup_collect_into`
-
-Collect a directory's backups into a named array, newest first.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the array variable to fill |
-| `$2` | string | Directory holding the backups |
-| `$3` | string | Backup name to match, or empty for every name |
-
-**🧩 Variable sets**
-
-- **`The`** (named): array
-
-
----
-
-### `__dybatpho_backup_sidecar`
-
-Print the path of a backup's checksum sidecar.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Backup archive path |
-
-**📤 Output on stdout**
-
-- Sidecar path
-
-
----
 
 ### `dybatpho::backup_create`
 

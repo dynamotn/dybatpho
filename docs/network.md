@@ -53,9 +53,6 @@ the resolver does.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_network_config_escape`](#__dybatpho_network_config_escape) — Escape a value for a double-quoted `curl` config parameter. `curl` reads a config file as `name = "value"`, where the value takes backslash escapes, so a backslash or a quote inside a header has to be escaped or it ends the value early.
-- [`__dybatpho_network_secret_config`](#__dybatpho_network_secret_config) — Write the secret headers of the current request into a private config file for `curl --config`. The file is created under `umask 077` before anything is written to it, so the credential is never on disk in a mode another account could read, and it is removed as soon as the request is over. The path is an argument, which is public; the contents are not.
-- [`__dybatpho_network_get_http_code`](#__dybatpho_network_get_http_code) — Get description of HTTP status code
 - [`dybatpho::curl_do`](#dybatphocurl_do) — Transferring data with URL by curl
 - [`dybatpho::curl_download`](#dybatphocurl_download) — Download file
 - [`dybatpho::curl_json`](#dybatphocurl_json) — Transfer JSON data with URL by curl.
@@ -70,8 +67,6 @@ the resolver does.
 - [`dybatpho::circuit_state`](#dybatphocircuit_state) — Report whether a circuit breaker key is currently open, half-open, or closed.
 - [`dybatpho::circuit_reset`](#dybatphocircuit_reset) — Reset a circuit breaker key back to the closed state.
 - [`dybatpho::circuit_breaker`](#dybatphocircuit_breaker) — Run a shell command guarded by a circuit breaker keyed by name.
-- [`__dybatpho_network_rate_spec`](#__dybatpho_network_rate_spec) — Parse a rate limit spec into a call budget and a window length. The spec is written the way a rate limit is spoken -- `10/60` is ten calls a minute -- and the window takes an optional unit so that `10/1m` and `5/500ms` mean what they look like.
-- [`__dybatpho_network_rate_prune`](#__dybatpho_network_rate_prune) — Drop the timestamps that have fallen out of a key's window, and report how many calls it has left.
 - [`dybatpho::rate_limit_remaining`](#dybatphorate_limit_remaining) — Report how many calls a rate limit key has left in its window.
 - [`dybatpho::rate_limit_reset`](#dybatphorate_limit_reset) — Forget every call recorded against a rate limit key.
 - [`dybatpho::rate_limit`](#dybatphorate_limit) — Run a command under a sliding window rate limit keyed by name. The limiter is the other half of `dybatpho::circuit_breaker`: the breaker stops calling a service that is already failing, and this stops calling one that is working faster than it agreed to be called. An API that answers `429` for the rest of the hour once a script has spent its budget is not made better by retrying -- it is made better by not spending the budget in the first place. A window holds the timestamps of the calls made inside it. While the budget has room the command runs immediately; when it is full the limiter waits exactly until the oldest call leaves the window, and then runs. Nothing is dropped, so a loop over five hundred items still finishes -- it finishes at the rate the spec allows.
@@ -79,16 +74,11 @@ the resolver does.
 - [`dybatpho::curl_paginate`](#dybatphocurl_paginate) — Fetch every page of a paginated resource, following the `Link` header's `next` relation, and print each page's body to standard output. Paging is the part of an API client that gets written once per script and wrong once per script: the loop that misses the last page, the one that rebuilds `?page=N` by hand when the server already said where the next page is, the one that never stops because the server repeats itself. This follows what the server sent, stops when it stops offering a next page, and refuses to visit the same URL twice.
 - [`dybatpho::curl_auth_bearer`](#dybatphocurl_auth_bearer) — Make a request carrying a bearer token, without putting the token on `curl`'s command line. `--header "Authorization: Bearer ..."` publishes the token in `/proc/<pid>/cmdline`, which every account on the host can read for as long as the request runs, and which `ps auxww` prints. The token goes through `DYBATPHO_CURL_SECRET_HEADERS` instead, which `dybatpho::curl_do` writes to a private config file and removes again afterwards.
 - [`dybatpho::curl_graphql`](#dybatphocurl_graphql) — Post a GraphQL query and report the errors the response carries. A GraphQL endpoint answers `200 OK` and puts the failure in the body, so a script that only checks the status code reads "the field you asked for does not exist" as a successful request. This builds the `{"query":..., "variables":...}` envelope, sends the body on standard input rather than in an argument, and turns a non-empty `errors` array into exit code `4` with the first message logged.
-- [`__dybatpho_network_parse_authority`](#__dybatpho_network_parse_authority) — Split the authority of a URL into user, password, host, and port. The authority is the awkward part of the grammar: everything in it is optional, the delimiters repeat, and an IPv6 literal carries colons of its own inside brackets.
-- [`__dybatpho_network_is_port`](#__dybatpho_network_is_port) — Return success when a value is a usable TCP or UDP port number.
 - [`dybatpho::url_parse`](#dybatphourl_parse) — Split a URL into its components. The result lands in `DYBATPHO_URL`, one entry per component, the way `dybatpho::curl_parse_response` leaves a response in `DYBATPHO_HTTP_*`. Every entry is always present; a component the URL omits is empty, so a caller reads it without guarding against an unset key. A scheme and `://` are required. `mailto:someone@example.com` has neither an authority nor a host, and guessing what its parts are called would be inventing an answer rather than parsing one. The components are returned exactly as written. Percent-escapes are left alone, because decoding them here would destroy the difference between a separator and a character that merely looks like one; `dybatpho::url_decode` is there for the caller that wants it.
 - [`dybatpho::url_part`](#dybatphourl_part) — Print one component of the last parsed URL.
-- [`__dybatpho_network_ipv4_octets`](#__dybatpho_network_ipv4_octets) — Split an IPv4 address into its four octets as numbers. A leading zero is rejected rather than ignored. `inet_aton` and much of the software built on it read `010` as octal, so `127.0.0.010` is one host to one parser and another host to the next. An address that means two things is not an address this library will agree to.
-- [`__dybatpho_network_ipv6_groups`](#__dybatpho_network_ipv6_groups) — Expand an IPv6 address into its eight groups as numbers. Everything an IPv6 address may leave out is put back here: the `::` that stands for a run of zero groups, and the dotted IPv4 tail that occupies the last two groups of a mapped address. Comparing addresses is only simple once both are written out in full. A zone index such as `%eth0` is rejected. It names an interface rather than a part of the address, and it is not comparable between two hosts.
 - [`dybatpho::is_ipv4`](#dybatphois_ipv4) — Return success when a value is an IPv4 address.
 - [`dybatpho::is_ipv6`](#dybatphois_ipv6) — Return success when a value is an IPv6 address.
 - [`dybatpho::ip_version`](#dybatphoip_version) — Print which version of IP an address is.
-- [`__dybatpho_network_parse_cidr`](#__dybatpho_network_parse_cidr) — Split a CIDR block into its address and prefix length.
 - [`dybatpho::is_cidr`](#dybatphois_cidr) — Return success when a value is a CIDR block.
 - [`dybatpho::cidr_netmask`](#dybatphocidr_netmask) — Print the dotted-decimal subnet mask of an IPv4 prefix length. There is no dotted form of an IPv6 prefix, so this is IPv4 only: the notation itself does not exist for the other version rather than being left out here.
 - [`dybatpho::cidr_contains`](#dybatphocidr_contains) — Return success when an address falls inside a CIDR block. Both versions are supported, and an address is never inside a block of the other version: `::ffff:10.0.0.1` and `10.0.0.1` name the same host to some software, but they are not the same address and this does not pretend otherwise.
@@ -132,71 +122,6 @@ the resolver does.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_network_config_escape`
-
-Escape a value for a double-quoted `curl` config parameter.
-`curl` reads a config file as `name = "value"`, where the value takes
-backslash escapes, so a backslash or a quote inside a header has to be
-escaped or it ends the value early.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Raw value |
-
-**📤 Output on stdout**
-
-- The escaped value, without its surrounding quotes
-
-
----
-
-### `__dybatpho_network_secret_config`
-
-Write the secret headers of the current request into a private
-config file for `curl --config`.
-
-The file is created under `umask 077` before anything is written to it, so
-the credential is never on disk in a mode another account could read, and it
-is removed as soon as the request is over. The path is an argument, which is
-public; the contents are not.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the config file path |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
-
-**🚦 Exit codes**
-
-- `0`: A config file was written, or there was nothing to write
-- `1`: Stop the script when the file cannot be created
-
-
----
-
-### `__dybatpho_network_get_http_code`
-
-Get description of HTTP status code
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Status code |
-
-**📤 Output on stdout**
-
-- Description of status code
-
-
----
 
 ### `dybatpho::curl_do`
 
@@ -572,60 +497,6 @@ dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example
 
 ---
 
-### `__dybatpho_network_rate_spec`
-
-Parse a rate limit spec into a call budget and a window length.
-The spec is written the way a rate limit is spoken -- `10/60` is ten calls
-a minute -- and the window takes an optional unit so that `10/1m` and
-`5/500ms` mean what they look like.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Spec as `count/window`, where the window is in seconds unless it carries an `ms`, `s`, `m`, or `h` suffix |
-
-**📤 Output on stdout**
-
-- The count and the window in milliseconds, separated by a space
-
-**🚦 Exit codes**
-
-- `1`: The spec is not `count/window`, or asks for zero calls in no time
-
-
----
-
-### `__dybatpho_network_rate_prune`
-
-Drop the timestamps that have fallen out of a key's window, and
-report how many calls it has left.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Rate limit key |
-| `$2` | number | Call budget per window |
-| `$3` | number | Window length in milliseconds |
-| `$4` | number | Current time in milliseconds |
-
-**🧩 Variable sets**
-
-- **`DYBATPHO_RATE_EVENTS`** (The): key's remaining timestamps, oldest first
-- **`__DYBATPHO_RATE_REMAINING`** (Remaining): calls in the current window
-
-**📝 Notes**
-
-- The answer is also left in a variable, because a caller that read it through a command substitution would prune the window in a subshell and keep the unpruned one, growing the list forever and computing its waits from a timestamp that had already left the window
-
-**📤 Output on stdout**
-
-- Remaining calls in the current window
-
-
----
-
 ### `dybatpho::rate_limit_remaining`
 
 Report how many calls a rate limit key has left in its window.
@@ -937,48 +808,6 @@ dybatpho::curl_graphql https://api.github.com/graphql \
 
 ---
 
-### `__dybatpho_network_parse_authority`
-
-Split the authority of a URL into user, password, host, and port.
-The authority is the awkward part of the grammar: everything in it is
-optional, the delimiters repeat, and an IPv6 literal carries colons of its
-own inside brackets.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Authority, such as `user:pass@host:443` or `[::1]:8080` |
-
-**🧩 Variable sets**
-
-- **`DYBATPHO_URL`** (The): `user`, `password`, `host`, and `port` entries
-
-**🚦 Exit codes**
-
-- `1`: The authority names no host, or a port that is not a port
-
-
----
-
-### `__dybatpho_network_is_port`
-
-Return success when a value is a usable TCP or UDP port number.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Value to test |
-
-**🚦 Exit codes**
-
-- `0`: The value is a decimal number from 1 to 65535
-- `1`: It is not
-
-
----
-
 ### `dybatpho::url_parse`
 
 Split a URL into its components.
@@ -1070,61 +899,6 @@ dybatpho::url_part port 443        # 443, the default, since none was given
 
 ---
 
-### `__dybatpho_network_ipv4_octets`
-
-Split an IPv4 address into its four octets as numbers.
-A leading zero is rejected rather than ignored. `inet_aton` and much of the
-software built on it read `010` as octal, so `127.0.0.010` is one host to
-one parser and another host to the next. An address that means two things
-is not an address this library will agree to.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Address to split |
-| `$2` | string | Name of the array variable receiving the four octets |
-
-**🧩 Variable sets**
-
-- **`The`** (named): array, to four numbers from 0 to 255
-
-**🚦 Exit codes**
-
-- `1`: The value is not an IPv4 address
-
-
----
-
-### `__dybatpho_network_ipv6_groups`
-
-Expand an IPv6 address into its eight groups as numbers.
-Everything an IPv6 address may leave out is put back here: the `::` that
-stands for a run of zero groups, and the dotted IPv4 tail that occupies the
-last two groups of a mapped address. Comparing addresses is only simple once
-both are written out in full.
-
-A zone index such as `%eth0` is rejected. It names an interface rather than
-a part of the address, and it is not comparable between two hosts.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Address to expand |
-| `$2` | string | Name of the array variable receiving the eight groups |
-
-**🧩 Variable sets**
-
-- **`The`** (named): array, to eight numbers from 0 to 65535
-
-**🚦 Exit codes**
-
-- `1`: The value is not an IPv6 address
-
-
----
-
 ### `dybatpho::is_ipv4`
 
 Return success when a value is an IPv4 address.
@@ -1209,30 +983,6 @@ dybatpho::ip_version ::1           # 6
 **🚦 Exit codes**
 
 - `1`: The value is not an IP address of either version
-
-
----
-
-### `__dybatpho_network_parse_cidr`
-
-Split a CIDR block into its address and prefix length.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Block such as `10.0.0.0/8` or `2001:db8::/32` |
-| `$2` | string | Name of the variable receiving the address |
-| `$3` | string | Name of the variable receiving the prefix length |
-| `$4` | string | Name of the variable receiving the IP version |
-
-**🧩 Variable sets**
-
-- **`The`** (three): named variables
-
-**🚦 Exit codes**
-
-- `1`: The value is not a CIDR block
 
 
 ---

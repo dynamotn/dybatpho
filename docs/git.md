@@ -16,9 +16,6 @@ information, listing changed files, and querying commit/tag relationships.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_git`](#__dybatpho_git) — Run `git` in a repository, ignoring ambient Git environment variables.
-- [`__dybatpho_git_repo_path`](#__dybatpho_git_repo_path) — Ensure a path is inside a Git worktree.
-- [`__dybatpho_git_resolve_commit`](#__dybatpho_git_resolve_commit) — Resolve a commit-ish to a full SHA.
 - [`dybatpho::git_root`](#dybatphogit_root) — Return the top-level directory of a Git repository.
 - [`dybatpho::git_branch`](#dybatphogit_branch) — Return the current branch name, or a short SHA in detached HEAD state.
 - [`dybatpho::git_default_branch`](#dybatphogit_default_branch) — Return the default branch of a Git repository.
@@ -40,10 +37,6 @@ information, listing changed files, and querying commit/tag relationships.
 <a id="tips"></a>
 ## 💡 Tips
 
-### `__dybatpho_git`
-
-- Git hooks (e.g. `pre-commit`) export `GIT_DIR`/`GIT_INDEX_FILE`, which otherwise override `git -C` and point every call at the hook's repository
-
 ### `dybatpho::git_default_branch`
 
 - Prefers `origin/HEAD`, then local `main`/`master`, then current branch
@@ -54,59 +47,6 @@ information, listing changed files, and querying commit/tag relationships.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_git`
-
-Run `git` in a repository, ignoring ambient Git environment variables.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Repository path |
-| `$@` | any | Arguments passed to `git` |
-
-**📤 Output on stdout**
-
-- Output of the `git` command
-
-
----
-
-### `__dybatpho_git_repo_path`
-
-Ensure a path is inside a Git worktree.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-
-**📤 Output on stdout**
-
-- The validated repository path
-
-
----
-
-### `__dybatpho_git_resolve_commit`
-
-Resolve a commit-ish to a full SHA.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Repository path |
-| `$2` | string | Commit-ish to resolve |
-
-**📤 Output on stdout**
-
-- Full commit SHA
-
-
----
 
 ### `dybatpho::git_root`
 

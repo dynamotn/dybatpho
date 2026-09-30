@@ -55,6 +55,7 @@ dybatpho::register_common_handlers
 # @arg $1 string Module selection, as `--modules` accepts it
 # @stdout The resolved module names, in load order, one per line
 # @exitcode 1 Stop the script when the selection names an unknown module
+# @internal
 #######################################
 function __dybatpho_bundle_resolve {
   local _selection="$1"
@@ -76,6 +77,7 @@ function __dybatpho_bundle_resolve {
 # @arg $2 string Function name
 # @stdout The function definition, from its `function` line to its closing brace
 # @exitcode 1 Stop the script when the function isn't found
+# @internal
 #######################################
 function __dybatpho_bundle_extract {
   local _file="$1" _name="$2" _body
@@ -94,6 +96,7 @@ function __dybatpho_bundle_extract {
 #   bootstrap functions a sourced bundle still has to provide.
 # @arg $1 string Space-separated module names, in load order
 # @stdout The prologue
+# @internal
 #######################################
 function __dybatpho_bundle_prologue {
   local _modules="$1"
@@ -180,6 +183,7 @@ PROLOGUE
 # @description Write one module into the bundle, without its shebang.
 # @arg $1 string Module name
 # @stdout A section header and the module source
+# @internal
 #######################################
 function __dybatpho_bundle_module {
   local _module="$1"
@@ -205,6 +209,7 @@ function __dybatpho_bundle_module {
 # @arg $1 string Ignored; positional arguments are rejected by the spec
 # @stdout Progress, then the path of the written bundle
 # @exitcode 1 Stop the script when overwriting the output is declined
+# @internal
 #######################################
 function __dybatpho_bundle_run {
   local _modules _module _count=0
@@ -252,6 +257,7 @@ function __dybatpho_bundle_run {
 # @arg $1 path The generated bundle
 # @arg $2 string The module names it is expected to report, in load order
 # @exitcode 1 Stop the script when sourcing the bundle fails or reports the wrong set
+# @internal
 #######################################
 # shellcheck disable=SC2016 # the printf literals below are generated shell source
 function __dybatpho_bundle_smoke {

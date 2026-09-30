@@ -48,6 +48,7 @@ __dybatpho_csv_unit=$'\037'
 # @arg $1 string Name of the variable receiving the text
 # @arg $2 string File path, `-`, or CSV text
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_csv_input_into {
   local -n __dybatpho_csv_input_ref="$1"
@@ -76,6 +77,7 @@ function __dybatpho_csv_input_into {
 # @arg $2 string One record
 # @arg $3 string Field delimiter
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_csv_split_into {
   local -n __dybatpho_csv_fields_ref="$1"
@@ -137,6 +139,7 @@ function __dybatpho_csv_split_into {
 # @arg $1 string Text so far
 # @exitcode 0 The quotes are unbalanced, so the record is not finished
 # @exitcode 1 The quotes are balanced
+# @internal
 #######################################
 function __dybatpho_csv_quotes_unbalanced {
   local quotes="${1//[^\"]/}"
@@ -149,6 +152,7 @@ function __dybatpho_csv_quotes_unbalanced {
 # @arg $2 string CSV text
 # @arg $3 string Field delimiter
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_csv_parse_into {
   local -n __dybatpho_csv_records_ref="$1"
@@ -204,6 +208,7 @@ function __dybatpho_csv_parse_into {
 # @arg $2 string Field value
 # @arg $3 string Field delimiter
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_csv_quote_into {
   local -n __dybatpho_csv_quoted_ref="$1"
@@ -230,6 +235,7 @@ function __dybatpho_csv_quote_into {
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string Name of the array of records
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_csv_header_into {
   local -n __dybatpho_csv_head_ref="$1"
@@ -245,6 +251,7 @@ function __dybatpho_csv_header_into {
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string One record
 # @set The named array
+# @internal
 #######################################
 function __dybatpho_csv_split_fields_into {
   local -n __dybatpho_csv_parts_ref="$1"
@@ -266,6 +273,7 @@ function __dybatpho_csv_split_fields_into {
 # @arg $2 string Name of the array of header names
 # @arg $3 string Column name
 # @set The named variable
+# @internal
 #######################################
 function __dybatpho_csv_column_into {
   local -n __dybatpho_csv_index_ref="$1"
@@ -431,6 +439,7 @@ function dybatpho::csv_col {
 # @arg $3 number Row number, counting the header as row 0
 # @exitcode 0 The row fits the header
 # @exitcode 1 The row has more fields than the header
+# @internal
 #######################################
 function __dybatpho_csv_expect_width {
   local -n __dybatpho_csv_row_ref="$1"
@@ -501,6 +510,7 @@ function dybatpho::csv_filter {
 # @arg $3 string Value to compare against
 # @exitcode 0 The field satisfies the comparison
 # @exitcode 1 It does not
+# @internal
 #######################################
 function __dybatpho_csv_matches {
   local field="$1" operator="$2" value="$3"

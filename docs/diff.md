@@ -36,14 +36,9 @@ changes nothing and a moved key is not reported as a rewrite.
 
 ### 🚀 Highlights
 
-- [`__dybatpho_diff_wants_color`](#__dybatpho_diff_wants_color) — Return success when the output should carry ANSI color. `DYBATPHO_DIFF_COLOR` decides when it is set, which is what lets a test assert on colored output without a terminal; otherwise `NO_COLOR` and whether stdout is a terminal do.
-- [`__dybatpho_diff_side_into`](#__dybatpho_diff_side_into) — Resolve one side of a comparison to a file, into a named variable. `-` is stdin, an existing file is itself, and anything else is text, which is written to a temporary file so `diff` has two paths to compare either way.
-- [`__dybatpho_diff_paint`](#__dybatpho_diff_paint) — Print a unified diff line with the color its prefix calls for.
 - [`dybatpho::diff_text`](#dybatphodiff_text) — Compare two texts and print a colored unified diff. The exit code is `diff`'s own, so the call reads as a question in a conditional: zero when the two are identical, one when they are not.
 - [`dybatpho::diff_summary`](#dybatphodiff_summary) — Summarize a text comparison as one line. `~K` counts hunks, not changed lines: a unified diff records a rewritten line as one removal and one addition, so calling that a change as well would count it twice.
-- [`__dybatpho_diff_flatten`](#__dybatpho_diff_flatten) — Flatten a JSON document to sorted `path<TAB>value` lines.
 - [`dybatpho::diff_json`](#dybatphodiff_json) — Compare two JSON documents by key rather than by line. A reordered or reformatted document reports no change, because the comparison is between the values at each path.
-- [`__dybatpho_diff_report`](#__dybatpho_diff_report) — Print one structural difference.
 - [`dybatpho::diff_yaml`](#dybatphodiff_yaml) — Compare two YAML documents by key rather than by line. Both are converted to JSON first, so anchors, quoting style and key order are not reported as changes.
 
 <a id="see-also"></a>
@@ -60,63 +55,6 @@ changes nothing and a moved key is not reported as a rewrite.
 
 <a id="reference"></a>
 ## 📚 Reference
-
-### `__dybatpho_diff_wants_color`
-
-Return success when the output should carry ANSI color.
-`DYBATPHO_DIFF_COLOR` decides when it is set, which is what lets a test
-assert on colored output without a terminal; otherwise `NO_COLOR` and
-whether stdout is a terminal do.
-
-_Function has no arguments._
-
-**🚦 Exit codes**
-
-- `0`: Color should be emitted
-- `1`: It should not
-
-
----
-
-### `__dybatpho_diff_side_into`
-
-Resolve one side of a comparison to a file, into a named
-variable. `-` is stdin, an existing file is itself, and anything else is
-text, which is written to a temporary file so `diff` has two paths to
-compare either way.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the path |
-| `$2` | string | File path, `-`, or text |
-| `$3` | string | Label used in the diff header |
-
-**🧩 Variable sets**
-
-- **`The`** (named): variable
-
-
----
-
-### `__dybatpho_diff_paint`
-
-Print a unified diff line with the color its prefix calls for.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | One line of unified diff output |
-| `$2` | string | `1` to color, `0` to print plain |
-
-**📤 Output on stdout**
-
-- The line
-
-
----
 
 ### `dybatpho::diff_text`
 
@@ -184,28 +122,6 @@ dybatpho::diff_summary "${before}" "${after}" || true
 
 ---
 
-### `__dybatpho_diff_flatten`
-
-Flatten a JSON document to sorted `path<TAB>value` lines.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | JSON file path |
-
-**📤 Output on stdout**
-
-- One line per scalar, sorted by path
-
-**🚦 Exit codes**
-
-- `0`: The document was flattened
-- `1`: The document is not valid JSON
-
-
----
-
 ### `dybatpho::diff_json`
 
 Compare two JSON documents by key rather than by line.
@@ -236,27 +152,6 @@ dybatpho::diff_json old-state.json new-state.json
 - `0`: The two documents hold the same values
 - `1`: They differ
 - `127`: `jq` is not installed
-
-
----
-
-### `__dybatpho_diff_report`
-
-Print one structural difference.
-
-**🧾 Arguments**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | `1` to color, `0` to print plain |
-| `$2` | string | Kind: `added`, `removed`, or `changed` |
-| `$3` | string | Path |
-| `$4` | string | Value, or the old value for a change |
-| `$5` | string | New value, for a change |
-
-**📤 Output on stdout**
-
-- The formatted line
 
 
 ---

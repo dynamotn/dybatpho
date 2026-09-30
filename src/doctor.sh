@@ -86,6 +86,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # and parses TOML with `-p toml`, neither of which the Python `yq` or the
   # pre-v4 Go one understands.
   [config]="jq yq>=4"
+  # Only `dybatpho::csv_from_json` needs one, and either will do: the module
+  # parses and writes CSV in Bash alone.
+  [csv]="jq|yq>=4"
   [file]="sha256sum|shasum|openssl"
   [json]="jq"
   [logging]="python3"

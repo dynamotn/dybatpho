@@ -44,6 +44,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `table.md`
 - `text.md`
 - `markdown.md`
+- `csv.md`
 - `tui.md`
 - `screen.md`
 - `testing.md`
@@ -85,6 +86,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/table.sh` -> `table.md`
 - `src/text.sh` -> `text.md`
 - `src/markdown.sh` -> `markdown.md`
+- `src/csv.sh` -> `csv.md`
 - `src/tui.sh` -> `tui.md`
 - `src/screen.sh` -> `screen.md`
 - `src/json.sh` -> `json.md`

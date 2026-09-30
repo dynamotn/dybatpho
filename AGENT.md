@@ -138,6 +138,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `json.sh` | Query, validate, pretty-print, and convert JSON/YAML | `test/json.bats`, `docs/json.md`, `docs/spec/json.md` |
 | `lock.sh` | Portable `mkdir`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `docs/lock.md`, `docs/spec/lock.md` |
 | `logging.sh` | Log levels, text/JSON logging, banners, and Bash tracing | `test/logging.bats`, `docs/logging.md`, `docs/spec/logging.md` |
+| `csv.sh` | RFC 4180 CSV: parsing quoted fields, reading columns, filtering rows, writing back, and converting to and from JSON | `test/csv.bats`, `docs/csv.md`, `docs/spec/csv.md` |
 | `markdown.sh` | Markdown builders for headings, lists, task lists, links, badges, code blocks, tables and collapsible sections, escaping every interpolated value | `test/markdown.bats`, `docs/markdown.md`, `docs/spec/markdown.md` |
 | `metrics.sh` | Timing, counters, and Prometheus text export, plus the retry/HTTP/error instrumentation | `test/metrics.bats`, `docs/metrics.md`, `docs/spec/metrics.md` |
 | `network.sh` | Curl wrappers, retries, JSON requests, and HTTP metadata | `test/network.bats`, `docs/network.md`, `docs/spec/network.md` |

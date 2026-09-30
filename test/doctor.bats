@@ -56,6 +56,17 @@ fake_versioned_command() {
   assert_output "stty"
 }
 
+@test "dybatpho::doctor_requirements lists what the csv module needs" {
+  # Parsing and writing CSV is Bash alone; only `dybatpho::csv_from_json` needs
+  # a JSON command, and either of the two will do, so it is optional rather
+  # than required.
+  run_traced -0 dybatpho::doctor_requirements csv optional
+  assert_output "jq|yq>=4"
+
+  run_traced -0 dybatpho::doctor_requirements csv required
+  assert_output ""
+}
+
 @test "dybatpho::doctor_requirements lists optional dependencies" {
   run_traced -0 dybatpho::doctor_requirements json optional
   assert_output "jq"

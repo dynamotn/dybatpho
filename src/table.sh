@@ -468,7 +468,9 @@ function __dybatpho_table_reject_quoted {
     if [[ "${row}" =~ (^|,)[[:space:]]*\" ]]; then
       dybatpho::die "${FUNCNAME[1]}: This row has a quoted field, which this module does not parse: ${row}
 It splits on every comma, so a comma inside a quoted field would silently become a column separator.
-Set DYBATPHO_TABLE_CSV_STRICT=false to split anyway, or pass the fields through a real CSV parser first."
+Parse it with the csv module first: dybatpho::csv_read reads the quoting,
+and dybatpho::csv_write hands back text this renders.
+Set DYBATPHO_TABLE_CSV_STRICT=false to split anyway."
     fi
   done
 

@@ -1,0 +1,170 @@
+# Feature Specification: CSV Data Handling
+
+**Feature Branch**: `[spec-csv]`
+**Status**: Implemented
+**Input**: Existing source analysis: `src/csv.sh`, `docs/csv.md`, `test/csv.bats`, and `example/csv_ops.sh`
+
+## Problem Statement *(mandatory)*
+
+Ops scripts keep receiving CSV — spreadsheet exports, cloud billing reports, CI artifacts — and the library had nowhere to parse it. `table.sh` renders comma-delimited text and deliberately refuses a quoted field, because it splits on every comma and a comma inside a value would silently become a column separator. Every script that needed real CSV therefore hand-rolled an `awk -F,` or `cut -d,` parser, each of which gets the same three cases wrong: a delimiter inside a quoted value, a doubled quote standing for a literal one, and a line break inside a value.
+
+## Business Value *(mandatory)*
+
+- A value that contains a comma, a quote, or a newline survives being read, filtered, and written back.
+- One parser for the whole library, so `table.sh`'s refusal has somewhere to point.
+- CSV and JSON convert into each other without a hand-written escape loop at the call site.
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Parse CSV the way the file was written (Priority: P1)
+
+As a script author, I want quoted fields read the way RFC 4180 describes so that a delimiter, a doubled quote, or a line break inside a value stays part of that value.
+
+**Independent Test**: Read a file whose fields carry each of those three cases and verify every value comes back whole.
+
+**Acceptance Scenarios**:
+
+1. **Given** a quoted field containing the delimiter, **When** the input is parsed, **Then** the value keeps the delimiter and the row keeps its column count
+2. **Given** a quoted field containing a doubled quote, **When** the input is parsed, **Then** the value holds one literal quote
+3. **Given** a quoted field containing a line break, **When** the input is parsed, **Then** the record spans the lines and stays one record
+4. **Given** a quote that is not at a field boundary, such as `5" pipe`, **When** the input is parsed, **Then** it is data and is left alone
+
+---
+
+### User Story 2 - Pick out the part of the file that matters (Priority: P1)
+
+As a script author, I want the column names, one column's values, and the rows matching a comparison so that reading a report needs no parser of my own.
+
+**Independent Test**: Print the header, one column by name, and the rows whose numeric column exceeds a threshold.
+
+**Acceptance Scenarios**:
+
+1. **Given** a column name, **When** that column is requested, **Then** its values print one per line, excluding the header
+2. **Given** a numeric column and a numeric bound, **When** rows are filtered with `gt` or `lt`, **Then** the comparison is numeric rather than lexical
+3. **Given** a column name the header does not have, **When** it is requested, **Then** the script stops and the message names the columns there are
+4. **Given** a row with more fields than the header names, **When** it is read by column, **Then** the script stops rather than dropping the extra field
+
+---
+
+### User Story 3 - Write CSV back out (Priority: P1)
+
+As a script author, I want records serialized back to CSV with only the quoting the data needs, so that a normalized file is readable and a value is never corrupted by being written.
+
+**Independent Test**: Read a file and write it back, verifying the values round-trip and that only the fields that must be quoted are.
+
+**Acceptance Scenarios**:
+
+1. **Given** a value containing the delimiter, a quote, or a line break, **When** it is written, **Then** it is quoted and any quote inside it is doubled
+2. **Given** a value needing none of that, **When** it is written, **Then** it is written bare
+
+---
+
+### User Story 4 - Move between CSV and JSON (Priority: P2)
+
+As a script author, I want CSV to become a JSON array of objects and back, so that the data can be handed to `jq` or to an HTTP request without a conversion of my own.
+
+**Independent Test**: Convert a file with quoted values to JSON and back, verifying the values are unchanged.
+
+**Acceptance Scenarios**:
+
+1. **Given** CSV with a header, **When** it is converted, **Then** the result is an array of objects keyed by the header, every value a JSON string
+2. **Given** a JSON array of objects, **When** it is converted, **Then** the keys of the first object are the header and a missing key writes an empty value
+3. **Given** a document that is not an array of objects, **When** it is converted, **Then** the script stops with a message saying so
+
+### Example Workflow
+
+```bash
+. dybatpho/init.sh --modules csv
+
+dybatpho::csv_header billing.csv
+dybatpho::csv_filter billing.csv "cost" gt 100 > expensive.csv
+
+dybatpho::csv_read billing.csv rows
+dybatpho::csv_fields "${rows[1]}" first
+printf 'owner=%s\n' "${first[1]}"
+
+dybatpho::csv_to_json billing.csv | jq '[.[] | .cost |= tonumber]'
+
+# Normalize a file: parse it, then write back only the quoting it needs.
+dybatpho::csv_write rows > normalized.csv
+```
+
+## Edge Cases
+
+- Input arrives as a file path, as `-` for stdin, or as text.
+- A row is shorter or longer than the header.
+- A record's quote is never closed, or text follows a closing quote.
+- A file uses CRLF line endings, or another delimiter such as `;`.
+- A field is empty, a row ends with the delimiter, or the input is empty.
+- The input contains the ASCII unit separator the module joins fields with.
+- Neither `jq` nor `yq` is installed and a JSON conversion is asked for.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: The module MUST parse quoted fields per RFC 4180: a quoted field ends at the next quote that is not doubled, and a doubled quote inside one is a literal quote.
+- **FR-002**: A delimiter or a line break inside a quoted field MUST stay part of that value.
+- **FR-003**: A quote that does not begin a field MUST be treated as data.
+- **FR-004**: The module MUST accept a file path, `-` for stdin, or CSV text wherever it reads input.
+- **FR-005**: Records MUST be exchanged as an array whose elements join their fields with the ASCII unit separator, and the module MUST provide a helper that splits one back apart, preserving empty trailing fields.
+- **FR-006**: Input containing that separator MUST be rejected rather than silently re-split.
+- **FR-007**: The module MUST reject a caller-supplied variable name that is not bindable.
+- **FR-008**: Serializing MUST quote a field only when it contains the delimiter, a quote, or a line break, doubling any quote inside it.
+- **FR-009**: The module MUST print the header names, and one column's values chosen by header name.
+- **FR-010**: A request for a column the header does not have MUST stop the script and name the columns it does have.
+- **FR-011**: A row with more fields than the header names MUST stop the script rather than dropping a field; a row with fewer MUST read as empty values.
+- **FR-012**: Filtering MUST support `eq`, `ne`, `gt`, `lt`, and `contains`, and MUST reject any other operator.
+- **FR-013**: `gt` and `lt` MUST compare numerically when both values are numeric, and as text otherwise.
+- **FR-014**: Filtering MUST print the header followed by the matching rows.
+- **FR-015**: Conversion to JSON MUST produce an array of objects keyed by the header, with every value a JSON string, and an empty array for input with no data rows.
+- **FR-016**: Conversion from JSON MUST take the header from the keys of the first object and write an empty value where a later object lacks a key.
+- **FR-017**: Conversion from JSON MUST produce the same quoting whichever of `jq` or `yq` is available, and MUST report a document that is not an array of objects.
+- **FR-018**: The delimiter MUST be configurable through `DYBATPHO_CSV_DELIMITER` for reading and writing alike.
+- **FR-019**: A CRLF line ending MUST NOT become part of the last field of a row.
+
+### Key Entities *(include if feature involves data)*
+
+- **Record**: One row, its fields joined by the ASCII unit separator.
+- **Header**: The first record, whose values name the columns.
+- **Delimiter**: The byte separating fields in the file, `,` unless configured otherwise.
+- **Operator**: The comparison a filter applies: `eq`, `ne`, `gt`, `lt`, or `contains`.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: A CSV export with quoted fields reads, filters, and writes back without a value changing.
+- **SC-002**: A script needs no `awk -F,` or `cut -d,` parser of its own.
+- **SC-003**: Data converts between CSV and JSON without a hand-written escape loop.
+- **SC-004**: A row that does not fit its header stops the script instead of losing a field quietly.
+
+## Integration Tests *(mandatory)*
+
+- **IT-001**: Read a quoted field containing the delimiter and verify the column count.
+- **IT-002**: Read a doubled quote as one literal quote.
+- **IT-003**: Read a line break inside a quoted field as one record.
+- **IT-004**: Read a quote that is not a field boundary as data.
+- **IT-005**: Read empty fields, a trailing delimiter, and an empty input.
+- **IT-006**: Read from a file, from stdin, and from a CRLF file.
+- **IT-007**: Reject input holding the unit separator, and a reserved variable name.
+- **IT-008**: Split a record back into fields, including an empty record.
+- **IT-009**: Write records back, quoting only what needs it, including a carriage return.
+- **IT-010**: Print the header, and one column by name.
+- **IT-011**: Read a short row as empty, and stop on a row wider than the header.
+- **IT-012**: Report an unknown column name, naming the columns there are.
+- **IT-013**: Filter with `eq`, `ne`, and `contains`.
+- **IT-014**: Filter numerically with `gt` and `lt`, and lexically for non-numeric values.
+- **IT-015**: Reject an unknown operator.
+- **IT-016**: Convert to JSON, escaping a quote and a line break, and render an empty input as `[]`.
+- **IT-017**: Convert from JSON, from a file and from stdin, and round-trip the values.
+- **IT-018**: Report a JSON document that is not an array of objects.
+- **IT-019**: Read and write with a configured delimiter.
+- **IT-020**: Return the data a record with no closing quote still has, and keep text following a closing quote.
+- **IT-021**: `dybatpho::table_csv` points at this module when it refuses a quoted field.
+
+## Acceptance Criteria *(mandatory)*
+
+1. Reading and writing CSV needs no external command; only the JSON conversion asks for `jq` or `yq`.
+2. Text output goes to stdout so the helpers compose in pipelines and command substitution.
+3. Input that cannot be represented faithfully stops the script with a message naming the row or the value, rather than producing a file that is quietly wrong.

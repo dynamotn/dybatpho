@@ -66,6 +66,7 @@ run_example() {
 @test "example/cli_basic.sh runs clean" { run_example "cli_basic.sh"; }
 @test "example/cli_ux.sh runs clean" { run_example "cli_ux.sh"; }
 @test "example/config_ops.sh runs clean" { run_example "config_ops.sh"; }
+@test "example/csv_ops.sh runs clean" { run_example "csv_ops.sh"; }
 @test "example/date_ops.sh runs clean" { run_example "date_ops.sh"; }
 @test "example/doctor_ops.sh runs clean" { run_example "doctor_ops.sh"; }
 @test "example/file_ops.sh runs clean" { run_example "file_ops.sh"; }

@@ -112,8 +112,8 @@ with a missing function. See [init.sh reference](docs/init.md) and
 
 ```sh
 . < path > /init.sh --modules doctor json archive
-dybatpho::version                  # 2.0.0+af745ff (release + current commit)
-dybatpho::doctor                   # every external tool these modules can call
+dybatpho::version # 2.0.0+af745ff (release + current commit)
+dybatpho::doctor  # every external tool these modules can call
 dybatpho::doctor --modules git --quiet || echo "git is missing here"
 ```
 
@@ -141,8 +141,8 @@ checksum file, pushes, and publishes the GitHub release with the changelog entry
 as its notes:
 
 ```sh
-scripts/release.sh --dry-run     # every check, no writes
-scripts/release.sh               # version derived from the commits
+scripts/release.sh --dry-run # every check, no writes
+scripts/release.sh           # version derived from the commits
 scripts/release.sh --version 3.0.0 --sign
 ```
 
@@ -169,6 +169,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [json.sh](docs/json.md)        | JSON and YAML reading/writing                       |
 | [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables              |
 | [markdown.sh](docs/markdown.md) | Headings, lists, links, badges and code blocks, with every value escaped |
+| [csv.sh](docs/csv.md)          | Real CSV: quoted fields, embedded commas and newlines, filtering, JSON bridge |
 | [date.sh](docs/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
 | [i18n.sh](docs/i18n.md)        | Translations, plural rules, locale-aware numbers, money, sizes and dates |
 

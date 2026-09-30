@@ -1,0 +1,344 @@
+setup() {
+  load test_helper
+  QUOTED_CSV="$(printf 'name,note,qty\n"Doe, John",ok,3\n"He said ""hi""","line one\nline two",10\nplain,x,7')"
+}
+
+@test "dybatpho::csv_read keeps a delimiter inside a quoted field in one field" {
+  # This is the case `dybatpho::table_csv` refuses: splitting on every comma
+  # turns one value into two columns and nothing says so.
+  run_traced dybatpho::csv_read "$(printf 'name,note\n"Doe, John",ok')" rows
+  assert_success
+
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'name,note\n"Doe, John",ok')" records
+  [ "${#records[@]}" -eq 2 ]
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${#fields[@]}" -eq 2 ]
+  [ "${fields[0]}" = "Doe, John" ]
+  [ "${fields[1]}" = "ok" ]
+}
+
+@test "dybatpho::csv_read reads a doubled quote as one literal quote" {
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'a\n"He said ""hi"""')" records
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${fields[0]}" = 'He said "hi"' ]
+}
+
+@test "dybatpho::csv_read keeps a line break inside a quoted field in one record" {
+  local -a records=() fields=()
+  dybatpho::csv_read "${QUOTED_CSV}" records
+  [ "${#records[@]}" -eq 4 ]
+  dybatpho::csv_fields "${records[2]}" fields
+  [ "${fields[1]}" = "$(printf 'line one\nline two')" ]
+}
+
+@test "dybatpho::csv_read leaves a quote that is not a field boundary alone" {
+  # `5" pipe` is data, not CSV quoting.
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'size,note\n5" pipe,ok')" records
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${fields[0]}" = '5" pipe' ]
+  [ "${fields[1]}" = "ok" ]
+}
+
+@test "dybatpho::csv_read handles empty fields, a trailing delimiter and an empty input" {
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'a,b,c\n1,,')" records
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${#fields[@]}" -eq 3 ]
+  [ "${fields[1]}" = "" ]
+  [ "${fields[2]}" = "" ]
+
+  dybatpho::csv_read "" records
+  [ "${#records[@]}" -eq 0 ]
+}
+
+@test "dybatpho::csv_read reads a file, stdin, and strips a CRLF line ending" {
+  local file="${BATS_TEST_TMPDIR}/in.csv"
+  printf 'name,qty\r\napi,3\r\n' > "${file}"
+
+  local -a records=() fields=()
+  dybatpho::csv_read "${file}" records
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${fields[1]}" = "3" ]
+
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/stdin.sh"
+  printf '%s\n' "printf 'a,b\nx,y\n' | { . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv && dybatpho::csv_header -; }" > "${script}"
+  run_traced bash "${script}"
+  assert_success
+  assert_output << EOF
+a
+b
+EOF
+}
+
+@test "dybatpho::csv_read refuses input holding the separator it joins fields with" {
+  run --separate-stderr dybatpho::csv_read "$(printf 'a\nx\037y')" records
+  assert_failure
+  assert_stderr --partial "unit separator"
+}
+
+@test "dybatpho::csv_read refuses a variable name that belongs to the library" {
+  run --separate-stderr dybatpho::csv_read "a" __dybatpho_rows
+  assert_failure
+  assert_stderr --partial "is reserved"
+}
+
+@test "dybatpho::csv_fields splits a record back into its values" {
+  local -a fields=()
+  run_traced dybatpho::csv_fields "$(printf 'a\037b\037c')" fields
+  assert_success
+
+  dybatpho::csv_fields "$(printf 'a\037b\037c')" fields
+  [ "${#fields[@]}" -eq 3 ]
+  [ "${fields[2]}" = "c" ]
+
+  dybatpho::csv_fields "" fields
+  [ "${#fields[@]}" -eq 1 ]
+  [ "${fields[0]}" = "" ]
+}
+
+@test "dybatpho::csv_write quotes only the fields that need it" {
+  local -a records=()
+  dybatpho::csv_read "${QUOTED_CSV}" records
+  run_traced dybatpho::csv_write records
+  assert_success
+  assert_output << EOF
+name,note,qty
+"Doe, John",ok,3
+"He said ""hi""","line one
+line two",10
+plain,x,7
+EOF
+}
+
+@test "dybatpho::csv_write round-trips a value that contains a carriage return" {
+  local -a records=() fields=()
+  local record
+  record="$(printf 'a\037one\rtwo')"
+  records=("$(printf 'k\037v')" "${record}")
+
+  local text
+  text="$(dybatpho::csv_write records)"
+  [[ "${text}" == *'"one'$'\r''two"'* ]] || {
+    printf 'a carriage return was not quoted: %q\n' "${text}" >&2
+    return 1
+  }
+
+  local -a again=()
+  dybatpho::csv_read "${text}" again
+  dybatpho::csv_fields "${again[1]}" fields
+  [ "${fields[1]}" = "$(printf 'one\rtwo')" ]
+}
+
+@test "dybatpho::csv_header prints the column names and says nothing for empty input" {
+  run_traced dybatpho::csv_header "${QUOTED_CSV}"
+  assert_success
+  assert_output << EOF
+name
+note
+qty
+EOF
+
+  run_traced dybatpho::csv_header ""
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::csv_col prints one column chosen by name" {
+  run_traced dybatpho::csv_col "${QUOTED_CSV}" "qty"
+  assert_success
+  assert_output << EOF
+3
+10
+7
+EOF
+}
+
+@test "dybatpho::csv_col reads a short row as an empty value" {
+  run_traced dybatpho::csv_col "$(printf 'a,b\n1\n2,3')" "b"
+  assert_success
+  assert_output << EOF
+
+3
+EOF
+}
+
+@test "dybatpho::csv_col stops instead of dropping a field from a wider row" {
+  run --separate-stderr dybatpho::csv_col "$(printf 'a,b\n1,2,3')" "a"
+  assert_failure
+  assert_stderr --partial "Row 1 has 3 fields but the header names 2"
+}
+
+@test "dybatpho::csv_col names the columns there are when asked for one there is not" {
+  run --separate-stderr dybatpho::csv_col "${QUOTED_CSV}" "missing"
+  assert_failure
+  assert_stderr --partial "No such column: missing"
+  assert_stderr --partial "name note qty"
+}
+
+@test "dybatpho::csv_col says nothing for an empty input" {
+  run_traced dybatpho::csv_col "" "a"
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::csv_filter keeps the rows matching eq, ne and contains" {
+  run_traced dybatpho::csv_filter "$(printf 'name,env\napi,prod\nweb,dev\ndb,prod')" "env" eq "prod"
+  assert_success
+  assert_output << EOF
+name,env
+api,prod
+db,prod
+EOF
+
+  run_traced dybatpho::csv_filter "$(printf 'name,env\napi,prod\nweb,dev')" "env" ne "prod"
+  assert_success
+  assert_line --index 1 "web,dev"
+
+  run_traced dybatpho::csv_filter "$(printf 'name,env\napi,prod\nweb,dev')" "name" contains "e"
+  assert_success
+  assert_line --index 1 "web,dev"
+}
+
+@test "dybatpho::csv_filter compares numbers as numbers and text as text" {
+  # `9` sorts after `10` as text, which is the answer a report does not want.
+  run_traced dybatpho::csv_filter "$(printf 'name,qty\na,9\nb,10\nc,2')" "qty" gt "5"
+  assert_success
+  assert_output << EOF
+name,qty
+a,9
+b,10
+EOF
+
+  run_traced dybatpho::csv_filter "$(printf 'name,qty\na,9\nb,10\nc,2')" "qty" lt "5"
+  assert_success
+  assert_line --index 1 "c,2"
+
+  run_traced dybatpho::csv_filter "$(printf 'name,tag\na,alpha\nb,zulu')" "tag" gt "m"
+  assert_success
+  assert_line --index 1 "b,zulu"
+
+  run_traced dybatpho::csv_filter "$(printf 'name,tag\na,alpha\nb,zulu')" "tag" lt "m"
+  assert_success
+  assert_line --index 1 "a,alpha"
+}
+
+@test "dybatpho::csv_filter rejects an operator it does not have" {
+  run --separate-stderr dybatpho::csv_filter "a,b" "a" "matches" "x"
+  assert_failure
+  assert_stderr --partial "Unknown operator: matches"
+}
+
+@test "dybatpho::csv_filter says nothing for an empty input" {
+  run_traced dybatpho::csv_filter "" "a" eq "x"
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::csv_to_json builds an array of objects keyed by the header" {
+  run_traced dybatpho::csv_to_json "$(printf 'name,qty\n"Doe, John",3')"
+  assert_success
+  assert_output '[{"name":"Doe, John","qty":"3"}]'
+}
+
+@test "dybatpho::csv_to_json escapes a quote and a line break in a value" {
+  run_traced dybatpho::csv_to_json "${QUOTED_CSV}"
+  assert_success
+  assert_output --partial '"name":"He said \"hi\""'
+  assert_output --partial '"note":"line one\nline two"'
+}
+
+@test "dybatpho::csv_to_json renders an empty input and a header-only input as an empty array" {
+  run_traced dybatpho::csv_to_json ""
+  assert_success
+  assert_output "[]"
+
+  run_traced dybatpho::csv_to_json "a,b"
+  assert_success
+  assert_output "[]"
+}
+
+@test "dybatpho::csv_from_json converts an array of objects back to CSV" {
+  run_traced dybatpho::csv_from_json '[{"name":"Doe, John","qty":"3"},{"name":"x","qty":"10"}]'
+  assert_success
+  assert_output << EOF
+name,qty
+"Doe, John",3
+x,10
+EOF
+}
+
+@test "dybatpho::csv_from_json round-trips the values csv_to_json wrote" {
+  local json converted
+  json="$(dybatpho::csv_to_json "${QUOTED_CSV}")"
+  run_traced dybatpho::csv_from_json "${json}"
+  assert_success
+  assert_output "${QUOTED_CSV}"
+}
+
+@test "dybatpho::csv_from_json reads a file and stdin" {
+  local file="${BATS_TEST_TMPDIR}/in.json"
+  printf '[{"a":"1"}]' > "${file}"
+  run_traced dybatpho::csv_from_json "${file}"
+  assert_success
+  assert_output << EOF
+a
+1
+EOF
+
+  local script="${BATS_TEST_TMPDIR}/from_stdin.sh"
+  printf '%s\n' "printf '[{\"a\":\"1\"}]' | { . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv && dybatpho::csv_from_json -; }" > "${script}"
+  run_traced bash "${script}"
+  assert_success
+  assert_line --index 1 "1"
+}
+
+@test "dybatpho::csv_from_json reports a document that is not an array of objects" {
+  run --separate-stderr dybatpho::csv_from_json '{"a":1}'
+  assert_failure
+  assert_stderr --partial "not an array of objects"
+}
+
+@test "DYBATPHO_CSV_DELIMITER reads and writes the files that use another delimiter" {
+  # `env` cannot run a shell function, so the variable is set for the call.
+  DYBATPHO_CSV_DELIMITER=";" \
+    run_traced dybatpho::csv_col "$(printf 'name;note\n"a;b";ok')" "name"
+  assert_success
+  assert_output "a;b"
+
+  DYBATPHO_CSV_DELIMITER=";" \
+    run_traced dybatpho::csv_filter "$(printf 'name;qty\na;9\nb;2')" "qty" gt "5"
+  assert_success
+  assert_output << EOF
+name;qty
+a;9
+EOF
+}
+
+@test "dybatpho::csv_read returns the data a record with no closing quote still has" {
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'a,b\n"unterminated,x')" records
+  [ "${#records[@]}" -eq 2 ]
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${fields[0]}" = "unterminated,x" ]
+}
+
+@test "dybatpho::csv_read keeps text that follows a closing quote" {
+  # `\"a\"x,b` is not valid CSV; dropping the `x` would be the silent loss this
+  # module exists to prevent.
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'h1,h2\n"a"x,b')" records
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${fields[0]}" = "ax" ]
+  [ "${fields[1]}" = "b" ]
+}
+
+@test "dybatpho::table_csv points at the csv module when it refuses a quoted field" {
+  run --separate-stderr dybatpho::table_csv "$(printf 'name,note\n"Doe, John",ok')" markdown
+  assert_failure
+  assert_stderr --partial "dybatpho::csv_read"
+}

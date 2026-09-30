@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`csv` — read the CSV that `awk -F,` gets wrong.** A field may contain the
+  delimiter, a doubled quote, or a line break, and none of them end the field.
+  Rows come back as an array of records; `dybatpho::csv_fields` splits one into
+  its values.
+
+  `dybatpho::csv_read`, `dybatpho::csv_fields`, `dybatpho::csv_write`,
+  `dybatpho::csv_header`, `dybatpho::csv_col`, `dybatpho::csv_filter`,
+  `dybatpho::csv_to_json` and `dybatpho::csv_from_json`. Set
+  `DYBATPHO_CSV_DELIMITER` for the files that use `;` or a tab.
+
+  ```sh
+  . dybatpho/init.sh --modules csv
+
+  dybatpho::csv_filter billing.csv "cost" gt 100 > expensive.csv
+  dybatpho::csv_read billing.csv rows
+  dybatpho::csv_fields "${rows[1]}" first
+  dybatpho::csv_to_json billing.csv | jq '[.[] | .cost |= tonumber]'
+  ```
+
+  Reading and writing need no external command; only the JSON conversion asks
+  for `jq` or `yq`. Values convert as text, because CSV carries no types and
+  guessing them is how an identifier with leading zeros becomes a number. A row
+  with more fields than its header stops the script rather than losing one.
+
 - **`markdown` — build a report, a pull request body or release notes from
   escaped pieces instead of a heredoc.** Every builder escapes the text it is
   given, so a commit subject containing `*`, a filename containing `[` or a cell
@@ -31,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The code block fence grows past any fence inside its body, a link's URL is
   percent-encoded, and `dybatpho::md_table` renders through `table`.
+
+### Changed
+
+- **`dybatpho::table_csv` now names the parser to use** when it refuses a
+  quoted field, instead of only saying that it will not split one. The refusal
+  and `DYBATPHO_TABLE_CSV_STRICT=false` are unchanged; the message points at
+  `dybatpho::csv_read` and `dybatpho::csv_write`.
 
 ## [5.0.0] - 2026-09-30
 

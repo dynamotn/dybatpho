@@ -164,6 +164,13 @@ declare -ga __dybatpho_screen_key=()
 # append instead of a rebuild of the whole list.
 declare -ga __dybatpho_screen_last_column=()
 declare -ga __dybatpho_screen_last_style=()
+# Where the last span inserted between existing runs ended up: the length of the
+# run list up to and including it, its column, and its style. Everything before
+# that point is known to start left of the column, so the next span painted
+# further right on the same row copies it as it is instead of reading it again.
+declare -ga __dybatpho_screen_hint_offset=()
+declare -ga __dybatpho_screen_hint_column=()
+declare -ga __dybatpho_screen_hint_style=()
 # Width of every non-ASCII character seen so far, keyed by the character.
 declare -gA __dybatpho_screen_char_width=()
 # Width of every non-ASCII string measured so far, keyed by the string. Only the
@@ -565,8 +572,8 @@ function __dybatpho_screen_index_into {
 #######################################
 function __dybatpho_screen_style_set {
   local row="$1" start="$2" end="$3" style="$4"
-  local -a entries=() kept=()
-  local entry column entry_style tail_style="0" rest
+  local -a entries=()
+  local entry column tail_style="0"
 
   # Nothing already on this row starts at or after the new span, so the span
   # belongs on the end and the style it interrupts is the one running to the
@@ -585,41 +592,64 @@ function __dybatpho_screen_style_set {
     return 0
   fi
 
-  rest="${__dybatpho_screen_style[row]}"
-  while [[ -n "${rest}" ]]; do
-    entry="${rest%%"${__DYBATPHO_SCREEN_RS}"*}"
-    if [[ "${entry}" == "${rest}" ]]; then
-      rest=""
-    else
-      rest="${rest#*"${__DYBATPHO_SCREEN_RS}"}"
+  # Anything drawn inside a bordered panel lands here, because the right border
+  # is already on the row, so this is paid for most cells of a real frame. Two
+  # things keep it cheap. A widget paints left to right, so when the new span
+  # starts after the one inserted last, the runs up to that one are reused as
+  # they are and only the few to the right of it are read. Those are split in
+  # one expansion -- they hold only digits, `;` and the unit separator, so there
+  # is nothing to glob -- and rebuilt in a single pass. Reading every run of the
+  # row one at a time, filtering them twice and joining them again cost a held
+  # arrow key most of a second per frame.
+  local rest="${__dybatpho_screen_style[row]}" joined=""
+  local last_column=0 last_style="0" placed=false
+  if ((start > ${__dybatpho_screen_hint_column[row]:--1})); then
+    local offset="${__dybatpho_screen_hint_offset[row]:-0}"
+    joined="${rest:0:offset}"
+    rest="${rest:offset}"
+    tail_style="${__dybatpho_screen_hint_style[row]:-0}"
+  fi
+  local IFS="${__DYBATPHO_SCREEN_RS}"
+  # shellcheck disable=SC2206 # split on the record separator on purpose
+  entries=(${rest})
+  for entry in ${entries[@]+"${entries[@]}"}; do
+    [[ -n "${entry}" ]] || continue
+    column="${entry%%"${__DYBATPHO_SCREEN_US}"*}"
+    if ((column < start)); then
+      tail_style="${entry#*"${__DYBATPHO_SCREEN_US}"}"
+      joined+="${entry}${__DYBATPHO_SCREEN_RS}"
+      last_column="${column}" last_style="${tail_style}"
+      continue
     fi
-    [[ -n "${entry}" ]] && entries+=("${entry}")
-  done
-
-  for entry in ${entries[@]+"${entries[@]}"}; do
-    column="${entry%%"${__DYBATPHO_SCREEN_US}"*}"
-    entry_style="${entry#*"${__DYBATPHO_SCREEN_US}"}"
-    ((column < start)) && kept+=("${entry}")
-    ((column <= end)) && tail_style="${entry_style}"
-  done
-
-  kept+=("${start}${__DYBATPHO_SCREEN_US}${style}")
-  ((end < DYBATPHO_SCREEN_WIDTH)) \
-    && kept+=("${end}${__DYBATPHO_SCREEN_US}${tail_style}")
-  for entry in ${entries[@]+"${entries[@]}"}; do
-    column="${entry%%"${__DYBATPHO_SCREEN_US}"*}"
-    ((column > end)) && kept+=("${entry}")
-  done
-
-  local joined="" last_column=0 last_style="0"
-  for entry in "${kept[@]}"; do
+    if ((column <= end)); then
+      # Covered by the new span; only the style it leaves in force survives.
+      tail_style="${entry#*"${__DYBATPHO_SCREEN_US}"}"
+      continue
+    fi
+    if [[ "${placed}" == false ]]; then
+      joined+="${start}${__DYBATPHO_SCREEN_US}${style}${__DYBATPHO_SCREEN_RS}"
+      __dybatpho_screen_hint_offset[row]="${#joined}"
+      ((end < DYBATPHO_SCREEN_WIDTH)) \
+        && joined+="${end}${__DYBATPHO_SCREEN_US}${tail_style}${__DYBATPHO_SCREEN_RS}"
+      placed=true
+    fi
     joined+="${entry}${__DYBATPHO_SCREEN_RS}"
-    last_column="${entry%%"${__DYBATPHO_SCREEN_US}"*}"
-    last_style="${entry#*"${__DYBATPHO_SCREEN_US}"}"
+    last_column="${column}" last_style="${entry#*"${__DYBATPHO_SCREEN_US}"}"
   done
+  if [[ "${placed}" == false ]]; then
+    joined+="${start}${__DYBATPHO_SCREEN_US}${style}${__DYBATPHO_SCREEN_RS}"
+    __dybatpho_screen_hint_offset[row]="${#joined}"
+    last_column="${start}" last_style="${style}"
+    if ((end < DYBATPHO_SCREEN_WIDTH)); then
+      joined+="${end}${__DYBATPHO_SCREEN_US}${tail_style}${__DYBATPHO_SCREEN_RS}"
+      last_column="${end}" last_style="${tail_style}"
+    fi
+  fi
   __dybatpho_screen_style[row]="${joined}"
   __dybatpho_screen_last_column[row]="${last_column}"
   __dybatpho_screen_last_style[row]="${last_style}"
+  __dybatpho_screen_hint_column[row]="${start}"
+  __dybatpho_screen_hint_style[row]="${style}"
   return 0
 }
 
@@ -784,6 +814,9 @@ function dybatpho::screen_clear {
     __dybatpho_screen_plain[row]=1
     __dybatpho_screen_last_column[row]=0
     __dybatpho_screen_last_style[row]="0"
+    __dybatpho_screen_hint_offset[row]=0
+    __dybatpho_screen_hint_column[row]=-1
+    __dybatpho_screen_hint_style[row]="0"
   done
   return 0
 }
@@ -813,6 +846,9 @@ function dybatpho::screen_size {
   __dybatpho_screen_plain=()
   __dybatpho_screen_last_column=()
   __dybatpho_screen_last_style=()
+  __dybatpho_screen_hint_offset=()
+  __dybatpho_screen_hint_column=()
+  __dybatpho_screen_hint_style=()
   # Every row is now of a different width, so nothing already on the terminal
   # can be reused: the front buffer is dropped rather than compared against.
   __dybatpho_screen_front=()
@@ -1346,6 +1382,44 @@ function __dybatpho_screen_read_char {
     IFS= read -rsn1 -t "$2" __dybatpho_screen_rc_out || return 1
   fi
   return 0
+  # kcov(enabled)
+}
+
+#######################################
+# @description Return success when an event is already waiting, so reading it
+#   with `dybatpho::screen_event` will not block.
+#
+#   A frame drawn in Bash takes longer than a terminal takes to repeat a held
+#   key, so an application that draws once per event falls further behind for
+#   as long as the key is held, and keeps moving after it is released. Handling
+#   every event that is waiting before drawing the next frame keeps the screen
+#   in step with the keyboard instead.
+# @example
+#   while true; do
+#     _draw
+#     dybatpho::screen_flush
+#     dybatpho::screen_event key || continue
+#     _handle "${key}"
+#     while dybatpho::screen_pending; do
+#       dybatpho::screen_event key
+#       _handle "${key}"
+#     done
+#   done
+#
+# @noargs
+# @exitcode 0 A key, or a resize, is waiting
+# @exitcode 1 Nothing is waiting
+# @tip Nothing is consumed: the event is still there for the next `dybatpho::screen_event`
+#######################################
+function dybatpho::screen_pending {
+  [[ "${__dybatpho_screen_resized}" == true ]] && return 0
+  # kcov(disabled)
+  # `read -t 0` reads nothing; it only reports whether input is ready.
+  if [[ -n "${__dybatpho_screen_fd}" ]]; then
+    read -r -t 0 <&"${__dybatpho_screen_fd}"
+  else
+    read -r -t 0
+  fi
   # kcov(enabled)
 }
 
@@ -2300,6 +2374,7 @@ function dybatpho::screen_popup {
 # @tip The background comes before each piece's own style, so a piece keeps its colours over it; a piece styled
 #   `""` or `0` is drawn in the background alone
 #######################################
+# dyshellint disable=BSG050 drawn for every row of every frame, like dybatpho::screen_put
 function dybatpho::screen_spans {
   local row="${1-}" column="${2-}" width="${3-}" background="${4-}"
   shift 4 2> /dev/null || return 0
@@ -2351,6 +2426,7 @@ function dybatpho::screen_spans {
 # @exitcode 0 Always
 # @tip Strip `\r` and expand tabs before passing a line; they are control characters, not text with a width
 #######################################
+# dyshellint disable=BSG050 drawn for every row of every frame, like dybatpho::screen_put
 function dybatpho::screen_ansi {
   local row="${1-}" column="${2-}" width="${3-}" rest="${4-}"
   local style="0" before params
@@ -2396,9 +2472,10 @@ function dybatpho::screen_ansi {
 # @exitcode 0 Always; hints that do not fit are cut at the edge
 #######################################
 function dybatpho::screen_keybar {
-  local x y width height
-  read -r x y width height <<< "${1-}"
-  shift || true
+  local rect x y width height
+  dybatpho::expect_args rect -- "$@"
+  shift
+  read -r x y width height <<< "${rect}"
   ((${width:-0} > 0 && ${height:-0} > 0)) || return 0
   local -a spans=()
   while (($# >= 2)); do
@@ -2432,7 +2509,8 @@ function dybatpho::screen_keybar {
 # @exitcode 1 The theme is unknown, and nothing was changed
 #######################################
 function dybatpho::screen_theme {
-  local name="${1-}"
+  local name
+  dybatpho::expect_args name -- "$@"
   [[ "${name}" == dusk && -n "${NO_COLOR:-}" ]] && name="mono"
   case "${name}" in
     default)

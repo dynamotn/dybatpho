@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::screen_spans "${row}" "${x}" "${width}" "" "✔ " "${DYBATPHO_SCREEN_STYLE_OK}" "ripgrep" "1"
   dybatpho::screen_keybar "${footer}" "space" "pick" "q" "quit"
   ```
+- **`dybatpho::screen_pending` — keep a screen in step with a held key.** It
+  reports whether a key or a resize is already waiting, without reading it. An
+  input loop that handles every waiting event before drawing the next frame no
+  longer falls behind a key held down, and stops moving as soon as the key is
+  released instead of seconds later. `example/screen_top.sh` drains its input
+  this way.
+
 ### Changed
 
 - **The generated reference in `docs/` covers the public API only.** Every
@@ -52,6 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the configured styles.** The divider was always dim and the active tab
   always reversed; they now follow `DYBATPHO_SCREEN_STYLE_DIM` and
   `DYBATPHO_SCREEN_STYLE_TAB_ACTIVE`.
+- **`screen` — a held arrow key no longer outruns a bordered screen.** Text painted inside
+  a panel -- after its right border is already on the row -- rebuilt the
+  row's whole list of style runs on every span, with several loops over it.
+  It is now one pass, and a panel painted left to right only reads the runs to
+  the right of the last span. A two-panel screen of 200x50 draws a frame about
+  a quarter faster, and the scrollbar about two and a half times faster.
 
 ## [5.1.0] - 2026-09-30
 

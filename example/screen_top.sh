@@ -572,6 +572,18 @@ function _render_once {
 }
 
 #######################################
+# @description Act on one key, in whichever mode the viewer is in.
+# @arg $1 string Event name
+#######################################
+function _handle_key {
+  case "${MODE}" in
+    filter) _handle_filter_key "$1" ;;
+    confirm) _handle_confirm_key "$1" ;;
+    *) _handle_list_key "$1" ;;
+  esac
+}
+
+#######################################
 # @description Take over the terminal and run until the user quits.
 #######################################
 # @noargs
@@ -589,11 +601,14 @@ function _run_interactive {
       _collect
       continue
     fi
-    case "${MODE}" in
-      filter) _handle_filter_key "${key}" ;;
-      confirm) _handle_confirm_key "${key}" ;;
-      *) _handle_list_key "${key}" ;;
-    esac
+    _handle_key "${key}"
+    # Keys that arrived while the frame was drawing are all handled before the
+    # next one is drawn, so a held arrow moves as fast as the key repeats and
+    # stops as soon as it is released.
+    while dybatpho::is true "${RUNNING}" && dybatpho::screen_pending; do
+      dybatpho::screen_event key || break
+      _handle_key "${key}"
+    done
   done
   dybatpho::screen_end
   return 0

@@ -106,6 +106,10 @@ SGR mouse report, and verify each is named.
    **Then** the resize is reported before any key
 5. **Given** a deadline and no input, **When** an event is read, **Then** the
    timeout is distinguishable from the end of input
+6. **Given** a key held down while frames are drawn, **When** the application
+   handles every event `dybatpho::screen_pending` reports before drawing the
+   next frame, **Then** the screen keeps up with the key and stops moving as
+   soon as it is released
 
 ---
 
@@ -142,6 +146,9 @@ cost per frame.
    **Then** only the changed rows are rendered and only those are sent
 2. **Given** a row of ASCII or single-column characters, **When** it is
    painted, **Then** no character measuring happens at all
+3. **Given** a bordered panel, **When** its content is painted left to right,
+   **Then** each span reads only the runs to the right of the last one rather
+   than every run on the row
 
 ---
 
@@ -208,6 +215,9 @@ dybatpho::screen_end
 - A chart is given one sample, or samples that are all equal.
 - A scrollbar is asked for when everything already fits.
 - The locale makes Bash index strings by byte rather than by character.
+- A key is held down and repeats faster than a frame can be drawn.
+- A span is painted between runs already on the row, such as inside a border
+  drawn first.
 - `stty` is missing.
 - A span is wider than what is left of its width, or a span is empty.
 - A coloured line holds a cursor movement or another non-colour sequence.
@@ -284,6 +294,12 @@ dybatpho::screen_end
   `DYBATPHO_SCREEN_STYLE_FOCUS` for its border unless `style:` is given, and
   tabs MUST take their active and divider styles from the theme unless
   `active_style:` or `divider_style:` is given.
+- **FR-031**: `dybatpho::screen_pending` MUST report whether a key or a resize
+  is waiting, without consuming it, so an application can handle every waiting
+  event before drawing the next frame.
+- **FR-032**: A span painted between runs already on a row MUST cost the runs to
+  the right of the span painted before it, not every run on the row, when it
+  starts after that span.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -359,6 +375,11 @@ dybatpho::screen_end
 - **IT-027**: Draw a key bar with its keys styled apart.
 - **IT-028**: Apply each theme, fall back to `mono` under `NO_COLOR`, and refuse
   an unknown theme without changing a style.
+- **IT-029**: Verify `dybatpho::screen_pending` reports a waiting key and a
+  waiting resize without consuming either, and reports nothing when no input
+  is ready.
+- **IT-030**: Paint spans between the borders of a row, out of order and
+  overlapping, and verify every run ends up in place.
 
 ## Acceptance Criteria *(mandatory)*
 

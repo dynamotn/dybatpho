@@ -58,6 +58,7 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`exec`](#exec) — 
 - [`dybatpho::screen_end`](#dybatphoscreen_end) — Give the terminal back: mouse reporting off, cursor shown, the alternate screen left, and the original line settings restored.
 - [`dybatpho::screen_event`](#dybatphoscreen_event) — Wait for the next event and report it under a stable name. Keys come back as `up`, `down`, `left`, `right`, `enter`, `space`, `tab`, `backspace`, `escape`, `home`, `end`, `pageup`, `pagedown`, `delete`, or `char:<c>`. A terminal that changed size reports `resize`, a mouse click reports `mouse:<button>`, and a closed input reports `eof`.
+- [`dybatpho::screen_pending`](#dybatphoscreen_pending) — Return success when an event is already waiting, so reading it with `dybatpho::screen_event` will not block. A frame drawn in Bash takes longer than a terminal takes to repeat a held key, so an application that draws once per event falls further behind for as long as the key is held, and keeps moving after it is released. Handling every event that is waiting before drawing the next frame keeps the screen in step with the keyboard instead.
 - [`dybatpho::screen_block`](#dybatphoscreen_block) — Draw a bordered box, optionally titled, and report the area left inside it. The inner rectangle is published rather than returned, because a block is almost always followed by a widget drawn inside it and computing that rectangle by hand is where off-by-one borders come from.
 - [`dybatpho::screen_text`](#dybatphoscreen_text) — Draw text in a rectangle, wrapped and aligned.
 - [`dybatpho::screen_list`](#dybatphoscreen_list) — Draw a scrollable list of items with one of them selected. The list scrolls itself: the offset that keeps the selected item on screen is worked out here and published, so an application only tracks which item is selected.
@@ -153,6 +154,10 @@ A rectangle is the string `x y width height`, with `x` and `y` zero-based.
 ### `dybatpho::screen_event`
 
 - A resize is delivered as an event rather than acted on, so an application redraws at a moment of its choosing instead of in the middle of a frame
+
+### `dybatpho::screen_pending`
+
+- Nothing is consumed: the event is still there for the next `dybatpho::screen_event`
 
 ### `dybatpho::screen_block`
 
@@ -553,6 +558,43 @@ esac
 
 - `0`: An event was read
 - `1`: The timeout passed with no event, and the variable is set to `timeout`
+
+
+---
+
+### `dybatpho::screen_pending`
+
+Return success when an event is already waiting, so reading it
+with `dybatpho::screen_event` will not block.
+
+A frame drawn in Bash takes longer than a terminal takes to repeat a held
+key, so an application that draws once per event falls further behind for
+as long as the key is held, and keeps moving after it is released. Handling
+every event that is waiting before drawing the next frame keeps the screen
+in step with the keyboard instead.
+
+**🧪 Example**
+
+```bash
+while true; do
+  _draw
+  dybatpho::screen_flush
+  dybatpho::screen_event key || continue
+  _handle "${key}"
+  while dybatpho::screen_pending; do
+    dybatpho::screen_event key
+    _handle "${key}"
+  done
+done
+
+```
+
+_Function has no arguments._
+
+**🚦 Exit codes**
+
+- `0`: A key, or a resize, is waiting
+- `1`: Nothing is waiting
 
 
 ---

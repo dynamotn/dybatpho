@@ -176,6 +176,21 @@ screen_raw() {
     || fail "style not restored after the span: $(screen_raw 0)"
 }
 
+@test "dybatpho::screen_put inside a bordered row keeps every run in place" {
+  # The right border is on the row before anything inside it, which is the
+  # case every panel puts its content through: each span lands between runs
+  # that are already there rather than after the last one.
+  dybatpho::screen_put 0 0 "|" "2"
+  dybatpho::screen_put 0 39 "|" "2"
+  dybatpho::screen_put 0 5 "bb" "32"
+  dybatpho::screen_put 0 2 "aa" "31"
+  dybatpho::screen_put 0 4 "cccc" "33"
+  local blank
+  printf -v blank '%*s' 31 ""
+  assert_equal "$(screen_raw 0)" \
+    $'\033[2m|\033[0m \033[31maa\033[33mcccc\033[0m'"${blank}"$'\033[2m|\033[0m'
+}
+
 @test "dybatpho::screen_put keeps wide characters aligned to the grid" {
   dybatpho::screen_put 0 0 "hello" "0"
   dybatpho::screen_put 0 6 "世界" "0"
@@ -479,6 +494,25 @@ screen_raw() {
   dybatpho::screen_event event 0.05 < <(sleep 5) || status=$?
   assert_equal "${status}" 1
   assert_equal "${event}" "timeout"
+}
+
+@test "dybatpho::screen_pending reports a waiting event without consuming it" {
+  local event status=0
+  {
+    dybatpho::screen_pending || status=$?
+    dybatpho::screen_event event
+  } <<< "j"
+  assert_equal "${status}" 0
+  assert_equal "${event}" "char:j"
+
+  status=0
+  dybatpho::screen_pending < <(sleep 5) || status=$?
+  assert_equal "${status}" 1
+
+  # A resize waiting to be reported counts, and is still there afterwards.
+  __dybatpho_screen_resized=true
+  dybatpho::screen_pending
+  assert_equal "${__dybatpho_screen_resized}" true
 }
 
 @test "dybatpho::screen_event names ordinary keys" {

@@ -287,6 +287,7 @@ dybatpho::log_context clear
 ## Edge Cases
 
 - `NO_COLOR` is set and ANSI color must be suppressed.
+- `NO_COLOR` is unset after the library loads, in a script running under `set -u`.
 - `LOG_LEVEL` is invalid.
 - `LOG_FORMAT` is set to a value other than `json` (the implementation uses
   text output).
@@ -407,6 +408,8 @@ dybatpho::log_context clear
 - **FR-033**: Measuring display width and building padding MUST be available
   in a form that writes into a caller-named variable, so boxed output does not
   fork once per line to ask how wide a line is.
+- **FR-034**: Writing a log line MUST NOT fail when `NO_COLOR` is unset, even
+  under `set -u`; an unset `NO_COLOR` means colour, as an empty one does.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -508,6 +511,8 @@ dybatpho::log_context clear
   frames are drawn on stderr and the line is erased when the command finishes.
 - **IT-019**: Verify boxed output is unchanged for ASCII, wide and combining
   characters after the width helpers stopped going through `$( )`.
+- **IT-020**: Unset `NO_COLOR` after loading the library, turn on `set -u`, and
+  verify a log line is still written.
 
 ## Acceptance Criteria *(mandatory)*
 

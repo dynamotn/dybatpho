@@ -38,6 +38,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pages list only the `dybatpho::` functions a script can rely on, and no
   longer bury them under hundreds of private helpers.
 
+### Fixed
+
+- **`logging` — a log line no longer kills a script that unset `NO_COLOR`.**
+  The renderer read `${NO_COLOR}` bare, so after `unset NO_COLOR` every log
+  call under `set -u` stopped the script with `NO_COLOR: unbound variable`.
+  An unset `NO_COLOR` now means colour, the same as an empty one.
+- **`screen` — stderr no longer disappears after `dybatpho::screen_end`.**
+  Closing the terminal ran `exec {fd}>&- 2> /dev/null`, and an `exec` without a
+  command keeps its redirections, so every message the script wrote after
+  giving the terminal back -- including its errors -- went to `/dev/null`.
+- **`screen` — the divider between tabs and the active tab no longer ignore
+  the configured styles.** The divider was always dim and the active tab
+  always reversed; they now follow `DYBATPHO_SCREEN_STYLE_DIM` and
+  `DYBATPHO_SCREEN_STYLE_TAB_ACTIVE`.
+
 ## [5.1.0] - 2026-09-30
 
 ### Added
@@ -688,7 +703,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   length — were prose a reviewer had to remember; they are now checked.
 
   ```sh
-  scripts/lint.sh --stage shell   # dyshellint and `bash -n`
+  scripts/lint.sh --stage shell # dyshellint and `bash -n`
   ```
 
   `dyshellint` is required for that stage, and the CI lint job installs it —

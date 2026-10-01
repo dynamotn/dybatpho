@@ -109,7 +109,7 @@ function __dybatpho_log {
   # `echo -e` would silently eat -- `C:\new\table` came out as a newline and a
   # tab. Callers that want a line break put a real one in the message.
   local rendered
-  if [[ -n "${NO_COLOR}" ]]; then
+  if [[ -n "${NO_COLOR:-}" ]]; then
     printf -v rendered '%s\n' "${msg}"
   else
     printf -v rendered '\033[%sm%s\033[0m\n' "${color}" "${msg}"

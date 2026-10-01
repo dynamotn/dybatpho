@@ -86,7 +86,7 @@ function __dybatpho_backup_collect_into {
   done
 
   local __dybatpho_backup_at=$((${#__dybatpho_backup_sorted[@]} - 1))
-  for ((; __dybatpho_backup_at >= 0; __dybatpho_backup_at--)); do
+  for (( ; __dybatpho_backup_at >= 0; __dybatpho_backup_at--)); do
     __dybatpho_backup_found_ref+=("${__dybatpho_backup_sorted[${__dybatpho_backup_at}]}")
   done
 }

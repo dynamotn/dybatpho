@@ -348,8 +348,9 @@ function dybatpho::queue_list {
 # @internal
 #######################################
 function __dybatpho_queue_expect_state {
+  # The first arm has no command to fire on, so kcov never marks it covered.
   case "$1" in
-    pending | claimed | dead) ;; # kcov(skip) - a case arm has no command to fire on
+    pending | claimed | dead) ;;                                                               # kcov(skip)
     *) dybatpho::die "${FUNCNAME[1]}: Not a queue state: $1. Use pending, claimed, or dead" ;; # kcov(skip)
   esac
 }

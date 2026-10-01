@@ -514,3 +514,119 @@ screen_raw() {
   assert_equal "${DYBATPHO_SCREEN_MOUSE_COLUMN}" 9
   assert_equal "${DYBATPHO_SCREEN_MOUSE_ROW}" 4
 }
+
+# =============================================================================
+# dybatpho::screen_end keeps stderr
+# =============================================================================
+
+# Take over a stand-in terminal and give it back, then write to stderr.
+_end_then_write_stderr() {
+  exec {__dybatpho_screen_fd}> /dev/null
+  __dybatpho_screen_saved_stty=""
+  DYBATPHO_SCREEN_ACTIVE=true
+  dybatpho::screen_end
+  printf 'still on stderr\n' >&2
+}
+
+@test "dybatpho::screen_end leaves the script's stderr working" {
+  run _end_then_write_stderr
+  assert_success
+  assert_output --partial "still on stderr"
+  assert_equal "${DYBATPHO_SCREEN_ACTIVE}" "false"
+}
+
+# =============================================================================
+# dybatpho::screen_block focus, dybatpho::screen_tabs styles
+# =============================================================================
+
+@test "dybatpho::screen_block draws a focused border in its own style" {
+  DYBATPHO_SCREEN_STYLE_BORDER="2" DYBATPHO_SCREEN_STYLE_FOCUS="35"
+  dybatpho::screen_block "0 0 10 3" focus:true
+  [[ "$(screen_raw 0)" == *$'\033[35m┌'* ]] || fail "focused border not styled: $(screen_raw 0)"
+  dybatpho::screen_block "0 0 10 3"
+  [[ "$(screen_raw 0)" == *$'\033[2m┌'* ]] || fail "plain border not styled: $(screen_raw 0)"
+  # An explicit style still wins over the focus.
+  dybatpho::screen_block "0 0 10 3" focus:true style:"36"
+  [[ "$(screen_raw 0)" == *$'\033[36m┌'* ]] || fail "explicit style lost: $(screen_raw 0)"
+}
+
+@test "dybatpho::screen_tabs takes its active and divider styles from the theme" {
+  local -a names=(One Two)
+  DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="1;35" DYBATPHO_SCREEN_STYLE_DIM="90"
+  dybatpho::screen_tabs "0 0 40 1" names active:1
+  [[ "$(screen_raw 0)" == *$'\033[90m │ \033[1;35m Two '* ]] || fail "theme not used: $(screen_raw 0)"
+  dybatpho::screen_tabs "0 0 40 1" names active:0 divider_style:"33"
+  [[ "$(screen_raw 0)" == *$'\033[33m │ '* ]] || fail "divider_style ignored: $(screen_raw 0)"
+}
+
+# =============================================================================
+# dybatpho::screen_spans, dybatpho::screen_ansi, dybatpho::screen_keybar
+# =============================================================================
+
+@test "dybatpho::screen_spans draws styled pieces side by side and cuts them to the width" {
+  dybatpho::screen_spans 0 0 12 "" "✔ " "32" "ripgrep" "1" " 12s" "2"
+  assert_equal "$(screen_row 0)" "✔ ripgrep 12                            "
+  [[ "$(screen_raw 0)" == *$'\033[32m✔ \033[1mripgrep\033[2m 12'* ]] \
+    || fail "pieces not styled apart: $(screen_raw 0)"
+}
+
+@test "dybatpho::screen_spans fills the width with a background" {
+  dybatpho::screen_spans 1 2 10 "44" "ab" "1"
+  assert_equal "$(screen_row 1)" "  ab                                    "
+  [[ "$(screen_raw 1)" == *$'\033[44;1mab\033[44m        \033[0m'* ]] \
+    || fail "background not filled: $(screen_raw 1)"
+}
+
+@test "dybatpho::screen_ansi keeps the colours a line was written with" {
+  dybatpho::screen_ansi 0 0 40 $'plain \033[1;31mred\033[0m \033[32mgreen\033[1m bold'
+  assert_equal "$(screen_row 0 | sed -E 's/ +$//')" "plain red green bold"
+  [[ "$(screen_raw 0)" == *$'\033[1;31mred\033[0m \033[32mgreen\033[32;1m bold'* ]] \
+    || fail "colours lost: $(screen_raw 0)"
+}
+
+@test "dybatpho::screen_ansi drops sequences that are not colours" {
+  dybatpho::screen_ansi 0 0 40 $'a\033[2Kb\033[?25lc\033[10;3Hd'
+  assert_equal "$(screen_row 0 | sed -E 's/ +$//')" "abcd"
+}
+
+@test "dybatpho::screen_keybar draws keys and what they do across the row" {
+  DYBATPHO_SCREEN_STYLE_KEYBAR="7" DYBATPHO_SCREEN_STYLE_KEY="1"
+  dybatpho::screen_keybar "0 11 40 1" "q" "quit" "space" "pick"
+  assert_equal "$(screen_row 11)" " q quit  space pick                     "
+  [[ "$(screen_raw 11)" == *$'\033[7;1m q\033[7m quit '* ]] || fail "key not styled: $(screen_raw 11)"
+  # A theme whose bar sets a foreground does not take the key's colour away.
+  DYBATPHO_SCREEN_STYLE_KEYBAR="37;44" DYBATPHO_SCREEN_STYLE_KEY="1;35"
+  dybatpho::screen_keybar "0 11 40 1" "q" "quit"
+  [[ "$(screen_raw 11)" == *$'\033[37;44;1;35m q\033[37;44m quit '* ]] || fail "key colour lost: $(screen_raw 11)"
+}
+
+# =============================================================================
+# dybatpho::screen_theme
+# =============================================================================
+
+@test "dybatpho::screen_theme sets every style from a palette" {
+  unset NO_COLOR
+  dybatpho::screen_theme dusk
+  assert_equal "${DYBATPHO_SCREEN_STYLE_FOCUS}" "38;5;141"
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "1;38;5;114"
+  dybatpho::screen_theme default
+  assert_equal "${DYBATPHO_SCREEN_STYLE_SELECTED}" "1;7"
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
+}
+
+@test "dybatpho::screen_theme falls back to mono under NO_COLOR" {
+  export NO_COLOR=1
+  dybatpho::screen_theme dusk
+  local name
+  for name in "${!DYBATPHO_SCREEN_STYLE_@}"; do
+    [[ "${!name}" != *"38;5"* && "${!name}" != *"48;5"* ]] || fail "${name} has a colour: ${!name}"
+  done
+}
+
+@test "dybatpho::screen_theme refuses an unknown theme and changes nothing" {
+  dybatpho::screen_theme default
+  run dybatpho::screen_theme neon
+  assert_failure
+  assert_output --partial "Unknown theme 'neon'"
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
+}

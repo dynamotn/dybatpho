@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`screen` — themes and styled rows, so a full-screen application looks
+  finished without choosing a colour for every widget.**
+  `dybatpho::screen_theme` sets every style of the module from a palette:
+  `default`, `dusk` (256 colours) or `mono`, and `NO_COLOR` turns `dusk` into
+  `mono`. `dybatpho::screen_spans` draws pieces of a row in their own styles
+  over an optional background, `dybatpho::screen_ansi` draws program output
+  with the colours it was written in, and `dybatpho::screen_keybar` draws a bar
+  of key hints. A block takes `focus:true` to mark the panel that has the keys,
+  and tabs take `divider_style:`.
+
+  New style variables: `DYBATPHO_SCREEN_STYLE_FOCUS`,
+  `DYBATPHO_SCREEN_STYLE_TAB_ACTIVE`, `DYBATPHO_SCREEN_STYLE_KEYBAR`,
+  `DYBATPHO_SCREEN_STYLE_KEY`, `DYBATPHO_SCREEN_STYLE_ACCENT`,
+  `DYBATPHO_SCREEN_STYLE_DIM`, `DYBATPHO_SCREEN_STYLE_OK`,
+  `DYBATPHO_SCREEN_STYLE_WARN` and `DYBATPHO_SCREEN_STYLE_ERROR`.
+
+  ```sh
+  dybatpho::screen_theme dusk
+  dybatpho::screen_block "${rect}" title:"Tools" focus:true
+  dybatpho::screen_spans "${row}" "${x}" "${width}" "" "✔ " "${DYBATPHO_SCREEN_STYLE_OK}" "ripgrep" "1"
+  dybatpho::screen_keybar "${footer}" "space" "pick" "q" "quit"
+  ```
 ### Changed
 
 - **The generated reference in `docs/` covers the public API only.** Every

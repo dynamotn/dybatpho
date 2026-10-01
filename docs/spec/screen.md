@@ -143,6 +143,34 @@ cost per frame.
 2. **Given** a row of ASCII or single-column characters, **When** it is
    painted, **Then** no character measuring happens at all
 
+---
+
+### User Story 6 - Style a screen consistently, a piece at a time (Priority: P2)
+
+As an application author, I want one call to give every widget a coherent
+palette, rows whose pieces are styled apart, program output drawn with its own
+colours, and a key bar, so that a screen looks finished without choosing a
+colour for every widget or hand-splitting escape sequences.
+
+**Independent Test**: Apply each theme, draw spans, a coloured line, a key bar,
+and a focused block, and verify the styles each one leaves in the buffer.
+
+**Acceptance Scenarios**:
+
+1. **Given** a named theme, **When** it is applied, **Then** every style
+   variable of the module is set from that palette
+2. **Given** a coloured theme and `NO_COLOR`, **When** it is applied, **Then**
+   the colourless theme is used instead
+3. **Given** an unknown theme, **When** it is applied, **Then** it is refused
+   and no style changes
+4. **Given** pieces of text with their own styles, **When** they are drawn as
+   spans, **Then** each keeps its style, they are cut to the width, and a
+   background fills the rest of the row
+5. **Given** a line holding SGR sequences, **When** it is drawn, **Then** its
+   colours are kept and any other control sequence is dropped
+6. **Given** a block drawn with focus, **When** it is drawn, **Then** its
+   border takes the focus style unless a style is given explicitly
+
 ### Example Workflow
 
 ```bash
@@ -181,6 +209,9 @@ dybatpho::screen_end
 - A scrollbar is asked for when everything already fits.
 - The locale makes Bash index strings by byte rather than by character.
 - `stty` is missing.
+- A span is wider than what is left of its width, or a span is empty.
+- A coloured line holds a cursor movement or another non-colour sequence.
+- `NO_COLOR` is set when a coloured theme is asked for.
 
 ## Requirements *(mandatory)*
 
@@ -234,6 +265,25 @@ dybatpho::screen_end
 - **FR-023**: Taking over the terminal when there is none MUST be refused
   rather than hanging.
 - **FR-024**: The module MUST declare `stty` as a required dependency.
+- **FR-025**: Giving the terminal back MUST NOT change where the script's
+  stderr goes.
+- **FR-026**: `dybatpho::screen_theme` MUST set every `DYBATPHO_SCREEN_STYLE_*`
+  variable from the `default`, `dusk`, or `mono` palette, MUST use `mono` for a
+  coloured theme when `NO_COLOR` is set, and MUST refuse an unknown theme
+  without changing any style.
+- **FR-027**: `dybatpho::screen_spans` MUST draw each piece in its own style,
+  MUST cut the pieces to the width without splitting a character, and MUST
+  fill the rest of the width with the background when one is given.
+- **FR-028**: `dybatpho::screen_ansi` MUST keep the colours of SGR sequences,
+  accumulating parameters until a reset, and MUST drop every other control
+  sequence.
+- **FR-029**: `dybatpho::screen_keybar` MUST draw each key in
+  `DYBATPHO_SCREEN_STYLE_KEY` followed by its description, over
+  `DYBATPHO_SCREEN_STYLE_KEYBAR` across the whole width.
+- **FR-030**: A block drawn with `focus:true` MUST take
+  `DYBATPHO_SCREEN_STYLE_FOCUS` for its border unless `style:` is given, and
+  tabs MUST take their active and divider styles from the theme unless
+  `active_style:` or `divider_style:` is given.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -296,6 +346,19 @@ dybatpho::screen_end
   timeout is distinguishable from end of input.
 - **IT-021**: Decode ordinary keys, arrows, navigation keys, a bare escape, and
   an SGR mouse report with its zero-based position.
+- **IT-022**: Verify stderr still reaches its destination after the terminal
+  is given back.
+- **IT-023**: Draw a focused block, a plain one, and a focused one with an
+  explicit style.
+- **IT-024**: Draw tabs with the theme's active and divider styles, and with an
+  explicit divider style.
+- **IT-025**: Draw spans with their own styles, cut to the width, and over a
+  background that fills the row.
+- **IT-026**: Draw a coloured line keeping its colours, and drop sequences that
+  are not colours.
+- **IT-027**: Draw a key bar with its keys styled apart.
+- **IT-028**: Apply each theme, fall back to `mono` under `NO_COLOR`, and refuse
+  an unknown theme without changing a style.
 
 ## Acceptance Criteria *(mandatory)*
 

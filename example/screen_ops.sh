@@ -2,10 +2,10 @@
 # @file screen_ops.sh
 # @brief Example showing the full-screen widgets and the layout solver
 # @description
-#   Builds one frame of a process dashboard -- tabs, a two-column split, a
-#   scrolling list, a table, a gauge, a sparkline, a bar chart, a Braille line
-#   chart, a scrollbar and a popup -- and prints it as text instead of taking
-#   over the terminal.
+#   Builds one frame of a process dashboard -- a theme, tabs, a two-column
+#   split, a focused panel, a scrolling list, rows of differently styled spans,
+#   a coloured log line, a gauge, a sparkline, a scrollbar, a key bar and a
+#   popup -- and prints it as text instead of taking over the terminal.
 #
 #   `dybatpho::screen_begin` is deliberately not called here, because an
 #   example has to run unattended: it would need a terminal, put it in raw
@@ -31,6 +31,9 @@ function _main {
   dybatpho::screen_size || true
   dybatpho::screen_clear
 
+  # One call styles every widget below; under NO_COLOR it falls back to mono.
+  dybatpho::screen_theme dusk
+
   local -a pods=(api-7f9 worker-2ab scheduler-91c cache-44d gateway-0ff)
   local -a tabs=(Overview Logs Settings)
   local -a rows=("api-7f9|Running|3" "worker-2ab|Idle|1" "scheduler-91c|Running|2")
@@ -42,7 +45,7 @@ function _main {
   local -a frame=() columns=() detail=()
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::screen_layout frame vertical "${DYBATPHO_SCREEN_RECT}" \
-    length:1 fill:1 length:3 length:1
+    length:1 fill:1 length:3 length:1 length:1 length:1
 
   dybatpho::screen_tabs "${frame[0]}" tabs active:0
 
@@ -50,7 +53,8 @@ function _main {
   # right.
   dybatpho::screen_layout columns horizontal "${frame[1]}" percent:40 fill:1
 
-  dybatpho::screen_block "${columns[0]}" title:"Pods" border:rounded
+  # The panel that takes the keys is the focused one.
+  dybatpho::screen_block "${columns[0]}" title:"Pods" border:rounded focus:true
   # shellcheck disable=SC2154 # set by the option spec of this script
   local list_area="${DYBATPHO_SCREEN_INNER}"
   local -a list_parts=()
@@ -72,6 +76,18 @@ function _main {
 
   dybatpho::screen_gauge "${frame[3]}" "$((selected + 1))" "${#pods[@]}" \
     label:"pod $((selected + 1))/${#pods[@]}"
+
+  # A line of program output keeps the colours it was written with, and a row
+  # of spans styles each piece apart -- here a status, a name and a duration.
+  local x y width
+  read -r x y width _ <<< "${frame[4]}"
+  dybatpho::screen_ansi "${y}" "${x}" "$((width / 2))" $'\033[1;32mReady\033[0m 5 pods scheduled'
+  # shellcheck disable=SC2154 # declared by `src/screen.sh`, loaded above
+  dybatpho::screen_spans "${y}" "$((x + width / 2))" "$((width - width / 2))" "" \
+    "✔ " "${DYBATPHO_SCREEN_STYLE_OK}" "${pods[selected]}" "${DYBATPHO_SCREEN_STYLE_ACCENT}" \
+    " 12s" "${DYBATPHO_SCREEN_STYLE_DIM}"
+
+  dybatpho::screen_keybar "${frame[5]}" "↑↓" "move" "enter" "restart" "q" "quit"
 
   # A popup is drawn last and erases what it covers, so the frame underneath
   # never has to know about it.

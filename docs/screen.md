@@ -24,6 +24,15 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 | **`DYBATPHO_SCREEN_STYLE_SELECTED`** | string | SGR parameters for a selected row. Default `1;7` |
 | **`DYBATPHO_SCREEN_STYLE_BORDER`** | string | SGR parameters for a block border. Default `2` |
 | **`DYBATPHO_SCREEN_STYLE_TITLE`** | string | SGR parameters for a block title. Default `1` |
+| **`DYBATPHO_SCREEN_STYLE_FOCUS`** | string | SGR parameters for the border of a block drawn with `focus:true`. Default `1` |
+| **`DYBATPHO_SCREEN_STYLE_TAB_ACTIVE`** | string | SGR parameters for the active tab. Default `1;7` |
+| **`DYBATPHO_SCREEN_STYLE_KEYBAR`** | string | SGR parameters for the background of a key bar. Default `7` |
+| **`DYBATPHO_SCREEN_STYLE_KEY`** | string | SGR parameters for a key named in a key bar. Default `1` |
+| **`DYBATPHO_SCREEN_STYLE_ACCENT`** | string | SGR parameters an application uses for what should stand out. Default `1` |
+| **`DYBATPHO_SCREEN_STYLE_DIM`** | string | SGR parameters for secondary text, and for the divider between tabs. Default `2` |
+| **`DYBATPHO_SCREEN_STYLE_OK`** | string | SGR parameters for success. Default `32` |
+| **`DYBATPHO_SCREEN_STYLE_WARN`** | string | SGR parameters for a warning. Default `33` |
+| **`DYBATPHO_SCREEN_STYLE_ERROR`** | string | SGR parameters for an error. Default `31` |
 | **`DYBATPHO_SCREEN_WIDTH`** | number | Columns of the terminal the buffer is sized for |
 | **`DYBATPHO_SCREEN_HEIGHT`** | number | Rows of the terminal the buffer is sized for |
 | **`DYBATPHO_SCREEN_RECT`** | string | The whole terminal as a rectangle, `x y width height` |
@@ -48,7 +57,6 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`exec`](#exec) — 
 - [`exec`](#exec) — 
 - [`dybatpho::screen_end`](#dybatphoscreen_end) — Give the terminal back: mouse reporting off, cursor shown, the alternate screen left, and the original line settings restored.
-- [`exec`](#exec) — 
 - [`dybatpho::screen_event`](#dybatphoscreen_event) — Wait for the next event and report it under a stable name. Keys come back as `up`, `down`, `left`, `right`, `enter`, `space`, `tab`, `backspace`, `escape`, `home`, `end`, `pageup`, `pagedown`, `delete`, or `char:<c>`. A terminal that changed size reports `resize`, a mouse click reports `mouse:<button>`, and a closed input reports `eof`.
 - [`dybatpho::screen_block`](#dybatphoscreen_block) — Draw a bordered box, optionally titled, and report the area left inside it. The inner rectangle is published rather than returned, because a block is almost always followed by a widget drawn inside it and computing that rectangle by hand is where off-by-one borders come from.
 - [`dybatpho::screen_text`](#dybatphoscreen_text) — Draw text in a rectangle, wrapped and aligned.
@@ -61,6 +69,10 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`dybatpho::screen_barchart`](#dybatphoscreen_barchart) — Draw horizontal bars, one per value, with optional labels.
 - [`dybatpho::screen_chart`](#dybatphoscreen_chart) — Plot a series as a line chart, using Braille dots for a resolution of two points across and four down inside every character. This is the one widget that works a cell at a time, because a chart is the one thing whose every cell differs. It is bounded by the rectangle it is given, so a chart in a corner of the screen costs what that corner is worth rather than what the whole screen would be.
 - [`dybatpho::screen_popup`](#dybatphoscreen_popup) — Blank a rectangle and draw a block over it, which is what a dialog or a menu laid over the screen needs. Whatever was underneath is erased rather than shown through, so the popup can be drawn last over a frame that knows nothing about it.
+- [`dybatpho::screen_spans`](#dybatphoscreen_spans) — Draw pieces of text side by side on one row, each in its own style, cut to a width. This is what a row needs as soon as it is more than one colour -- a check mark in green before a name in bold, a key in a key bar before what it does -- and what `dybatpho::screen_list` cannot do, because it styles a whole row at once. With a background, every piece is drawn over it and the rest of the width is filled with it, so a selected row or a status bar reads as one band.
+- [`dybatpho::screen_ansi`](#dybatphoscreen_ansi) — Draw a line that carries its own SGR colour sequences -- the output of a command, a log written by another program -- keeping its colours. Each sequence changes the style of the text after it, the way a terminal reads it: parameters accumulate until a reset. A sequence that is not a colour change, such as a cursor movement, is dropped rather than drawn, because it would move the cursor out of the frame.
+- [`dybatpho::screen_keybar`](#dybatphoscreen_keybar) — Draw a one-row bar of key hints: each key in `DYBATPHO_SCREEN_STYLE_KEY`, what it does after it, all over `DYBATPHO_SCREEN_STYLE_KEYBAR` across the whole width.
+- [`dybatpho::screen_theme`](#dybatphoscreen_theme) — Set every `DYBATPHO_SCREEN_STYLE_*` variable from a named palette, so an application gets a consistent look without choosing a colour for each widget. | Theme | Look | | --- | --- | | `default` | the module's own defaults: bold, dim, reverse and the eight basic colours | | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red | | `mono` | no colour at all, only bold, dim and reverse | `NO_COLOR` turns `dusk` into `mono`, so an application can ask for colour and still respect a user who does not want it.
 
 ## Why rows and not cells
 
@@ -145,6 +157,7 @@ A rectangle is the string `x y width height`, with `x` and `y` zero-based.
 ### `dybatpho::screen_block`
 
 - `border:` takes `plain`, `rounded`, `double`, `thick`, or `none`; `none` still reserves no space, so the inner rectangle is the whole one
+- `focus:true` draws the border in `DYBATPHO_SCREEN_STYLE_FOCUS`, which is how the panel that takes the keys stands out from the others; an explicit `style:` still wins
 
 ### `dybatpho::screen_text`
 
@@ -173,6 +186,14 @@ A rectangle is the string `x y width height`, with `x` and `y` zero-based.
 ### `dybatpho::screen_chart`
 
 - A rectangle of 40x10 is 400 cells and costs a few milliseconds; a full-screen chart is where this model stops being cheap
+
+### `dybatpho::screen_spans`
+
+- The background comes before each piece's own style, so a piece keeps its colours over it; a piece styled `""` or `0` is drawn in the background alone
+
+### `dybatpho::screen_ansi`
+
+- Strip `\r` and expand tabs before passing a line; they are control characters, not text with a width
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -494,12 +515,6 @@ _Function has no arguments._
 
 ---
 
-### `exec`
-
-
-
----
-
 ### `dybatpho::screen_event`
 
 Wait for the next event and report it under a stable name.
@@ -564,7 +579,7 @@ dybatpho::screen_list "${DYBATPHO_SCREEN_INNER}" items selected:2
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Rectangle to draw in |
-| `$@` | string | Options: `title:`, `border:`, `style:`, `title_style:`, `align:` |
+| `$@` | string | Options: `title:`, `border:`, `style:`, `title_style:`, `align:`, `focus:` |
 
 **🧩 Variable sets**
 
@@ -715,7 +730,7 @@ dybatpho::screen_tabs "${rect}" names active:0
 | --- | --- | --- |
 | `$1` | string | Rectangle to draw in |
 | `$2` | string | Name of the array holding the tab titles |
-| `$@` | string | Options: `active:`, `style:`, `active_style:`, `divider:` |
+| `$@` | string | Options: `active:`, `style:`, `active_style:`, `divider:`, `divider_style:` |
 
 **🚦 Exit codes**
 
@@ -871,3 +886,148 @@ dybatpho::screen_text "${DYBATPHO_SCREEN_INNER}" "Delete the record?" align:cent
 **🚦 Exit codes**
 
 - `0`: Always
+
+
+---
+
+### `dybatpho::screen_spans`
+
+Draw pieces of text side by side on one row, each in its own
+style, cut to a width.
+
+This is what a row needs as soon as it is more than one colour -- a check
+mark in green before a name in bold, a key in a key bar before what it does
+-- and what `dybatpho::screen_list` cannot do, because it styles a whole row
+at once. With a background, every piece is drawn over it and the rest of
+the width is filled with it, so a selected row or a status bar reads as one
+band.
+
+**🧪 Example**
+
+```bash
+dybatpho::screen_spans 3 2 30 "" "✔ " "32" "ripgrep" "1" " 2s" "2"
+dybatpho::screen_spans 4 2 30 "48;5;237" "▌ " "1;35" "selected row" "1"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Row, zero-based |
+| `$2` | number | Column, zero-based |
+| `$3` | number | Width in columns |
+| `$4` | string | SGR parameters of the background, or empty for none |
+| `$@` | string | Pairs of text and its SGR parameters |
+
+**🚦 Exit codes**
+
+- `0`: Always; a piece that does not fit is cut, and the pieces after it are dropped
+
+
+---
+
+### `dybatpho::screen_ansi`
+
+Draw a line that carries its own SGR colour sequences -- the
+output of a command, a log written by another program -- keeping its
+colours.
+
+Each sequence changes the style of the text after it, the way a terminal
+reads it: parameters accumulate until a reset. A sequence that is not a
+colour change, such as a cursor movement, is dropped rather than drawn,
+because it would move the cursor out of the frame.
+
+**🧪 Example**
+
+```bash
+dybatpho::screen_ansi 5 1 60 $'\033[1;32mok\033[0m installed ripgrep'
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Row, zero-based |
+| `$2` | number | Column, zero-based |
+| `$3` | number | Width in columns |
+| `$4` | string | The line, with its escape sequences |
+
+**🚦 Exit codes**
+
+- `0`: Always
+
+
+---
+
+### `dybatpho::screen_keybar`
+
+Draw a one-row bar of key hints: each key in
+`DYBATPHO_SCREEN_STYLE_KEY`, what it does after it, all over
+`DYBATPHO_SCREEN_STYLE_KEYBAR` across the whole width.
+
+**🧪 Example**
+
+```bash
+dybatpho::screen_keybar "${footer}" "↑↓" "move" "space" "pick" "q" "quit"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Rectangle to draw in; only its first row is used |
+| `$@` | string | Pairs of a key and what it does |
+
+**🚦 Exit codes**
+
+- `0`: Always; hints that do not fit are cut at the edge
+
+
+---
+
+### `dybatpho::screen_theme`
+
+Set every `DYBATPHO_SCREEN_STYLE_*` variable from a named
+palette, so an application gets a consistent look without choosing a
+colour for each widget.
+
+| Theme | Look |
+| --- | --- |
+| `default` | the module's own defaults: bold, dim, reverse and the eight basic colours |
+| `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red |
+| `mono` | no colour at all, only bold, dim and reverse |
+
+`NO_COLOR` turns `dusk` into `mono`, so an application can ask for colour
+and still respect a user who does not want it.
+
+**🧪 Example**
+
+```bash
+dybatpho::screen_theme dusk
+dybatpho::screen_block "${rect}" title:"Tools" focus:true
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Theme name: `default`, `dusk`, or `mono` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`NO_COLOR`** | string | Use `mono` in place of a coloured theme when set to a non-empty value |
+
+**🧩 Variable sets**
+
+- **`DYBATPHO_SCREEN_STYLE_*`** (string): Every style variable of the module, from the palette
+
+**🚦 Exit codes**
+
+- `0`: The theme was applied
+- `1`: The theme is unknown, and nothing was changed

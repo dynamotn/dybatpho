@@ -84,6 +84,33 @@ export DYBATPHO_SCREEN_STYLE_BORDER
 # @env DYBATPHO_SCREEN_STYLE_TITLE string SGR parameters for a block title. Default `1`
 DYBATPHO_SCREEN_STYLE_TITLE="${DYBATPHO_SCREEN_STYLE_TITLE:-1}"
 export DYBATPHO_SCREEN_STYLE_TITLE
+# @env DYBATPHO_SCREEN_STYLE_FOCUS string SGR parameters for the border of a block drawn with `focus:true`. Default `1`
+DYBATPHO_SCREEN_STYLE_FOCUS="${DYBATPHO_SCREEN_STYLE_FOCUS:-1}"
+export DYBATPHO_SCREEN_STYLE_FOCUS
+# @env DYBATPHO_SCREEN_STYLE_TAB_ACTIVE string SGR parameters for the active tab. Default `1;7`
+DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="${DYBATPHO_SCREEN_STYLE_TAB_ACTIVE:-1;7}"
+export DYBATPHO_SCREEN_STYLE_TAB_ACTIVE
+# @env DYBATPHO_SCREEN_STYLE_KEYBAR string SGR parameters for the background of a key bar. Default `7`
+DYBATPHO_SCREEN_STYLE_KEYBAR="${DYBATPHO_SCREEN_STYLE_KEYBAR:-7}"
+export DYBATPHO_SCREEN_STYLE_KEYBAR
+# @env DYBATPHO_SCREEN_STYLE_KEY string SGR parameters for a key named in a key bar. Default `1`
+DYBATPHO_SCREEN_STYLE_KEY="${DYBATPHO_SCREEN_STYLE_KEY:-1}"
+export DYBATPHO_SCREEN_STYLE_KEY
+# @env DYBATPHO_SCREEN_STYLE_ACCENT string SGR parameters an application uses for what should stand out. Default `1`
+DYBATPHO_SCREEN_STYLE_ACCENT="${DYBATPHO_SCREEN_STYLE_ACCENT:-1}"
+export DYBATPHO_SCREEN_STYLE_ACCENT
+# @env DYBATPHO_SCREEN_STYLE_DIM string SGR parameters for secondary text, and for the divider between tabs. Default `2`
+DYBATPHO_SCREEN_STYLE_DIM="${DYBATPHO_SCREEN_STYLE_DIM:-2}"
+export DYBATPHO_SCREEN_STYLE_DIM
+# @env DYBATPHO_SCREEN_STYLE_OK string SGR parameters for success. Default `32`
+DYBATPHO_SCREEN_STYLE_OK="${DYBATPHO_SCREEN_STYLE_OK:-32}"
+export DYBATPHO_SCREEN_STYLE_OK
+# @env DYBATPHO_SCREEN_STYLE_WARN string SGR parameters for a warning. Default `33`
+DYBATPHO_SCREEN_STYLE_WARN="${DYBATPHO_SCREEN_STYLE_WARN:-33}"
+export DYBATPHO_SCREEN_STYLE_WARN
+# @env DYBATPHO_SCREEN_STYLE_ERROR string SGR parameters for an error. Default `31`
+DYBATPHO_SCREEN_STYLE_ERROR="${DYBATPHO_SCREEN_STYLE_ERROR:-31}"
+export DYBATPHO_SCREEN_STYLE_ERROR
 
 # The state below is written for the application to read: the rectangle a block
 # left inside itself, the offset a list scrolled to, where a mouse event landed.
@@ -1144,7 +1171,10 @@ function dybatpho::screen_end {
     printf '\033[?1006l\033[?1000l\033[?25h\033[?1049l' 1>&"${__dybatpho_screen_fd}" 2> /dev/null || true
     [[ -n "${__dybatpho_screen_saved_stty}" ]] \
       && stty "${__dybatpho_screen_saved_stty}" <&"${__dybatpho_screen_fd}" 2> /dev/null
-    exec {__dybatpho_screen_fd}>&- 2> /dev/null || true
+    # The redirection is on a group, not on `exec` itself: an `exec` without a
+    # command keeps every redirection it is given, so `2> /dev/null` there
+    # would silence the script's stderr for the rest of its life.
+    { exec {__dybatpho_screen_fd}>&-; } 2> /dev/null || true
     __dybatpho_screen_fd=""
   fi
   __dybatpho_screen_saved_stty=""
@@ -1451,11 +1481,13 @@ function __dybatpho_screen_align_into {
 #   dybatpho::screen_list "${DYBATPHO_SCREEN_INNER}" items selected:2
 #
 # @arg $1 string Rectangle to draw in
-# @arg $@ string Options: `title:`, `border:`, `style:`, `title_style:`, `align:`
+# @arg $@ string Options: `title:`, `border:`, `style:`, `title_style:`, `align:`, `focus:`
 # @set DYBATPHO_SCREEN_INNER string The rectangle inside the border
 # @exitcode 0 Always, including when the rectangle is too small to draw
 # @tip `border:` takes `plain`, `rounded`, `double`, `thick`, or `none`; `none` still reserves no space, so the inner
 #   rectangle is the whole one
+# @tip `focus:true` draws the border in `DYBATPHO_SCREEN_STYLE_FOCUS`, which is how the panel that takes the keys stands
+#   out from the others; an explicit `style:` still wins
 #######################################
 function dybatpho::screen_block {
   local rect="${1-}"
@@ -1469,7 +1501,9 @@ function dybatpho::screen_block {
   ((width > 0 && height > 0)) || return 0
 
   local kind="${options[border]:-plain}"
-  local style="${options[style]:-${DYBATPHO_SCREEN_STYLE_BORDER}}"
+  local style="${DYBATPHO_SCREEN_STYLE_BORDER}"
+  dybatpho::is true "${options[focus]:-false}" && style="${DYBATPHO_SCREEN_STYLE_FOCUS}"
+  style="${options[style]:-${style}}"
   local horizontal vertical top_left top_right bottom_left bottom_right
 
   case "${kind}" in
@@ -1851,7 +1885,7 @@ function dybatpho::screen_gauge {
 #
 # @arg $1 string Rectangle to draw in
 # @arg $2 string Name of the array holding the tab titles
-# @arg $@ string Options: `active:`, `style:`, `active_style:`, `divider:`
+# @arg $@ string Options: `active:`, `style:`, `active_style:`, `divider:`, `divider_style:`
 # @exitcode 0 Always
 #######################################
 function dybatpho::screen_tabs {
@@ -1868,14 +1902,15 @@ function dybatpho::screen_tabs {
 
   local active="${options[active]:-0}"
   local style="${options[style]:-0}"
-  local active_style="${options[active_style]:-1;7}"
+  local active_style="${options[active_style]:-${DYBATPHO_SCREEN_STYLE_TAB_ACTIVE}}"
   local divider="${options[divider]:- │ }"
+  local divider_style="${options[divider_style]:-${DYBATPHO_SCREEN_STYLE_DIM}}"
 
   local index column=0 piece piece_width
   for index in "${!__dybatpho_screen_tabs_items[@]}"; do
     ((column < width)) || break
     if ((index > 0)); then
-      dybatpho::screen_put "${y}" "$((x + column))" "${divider}" "2"
+      dybatpho::screen_put "${y}" "$((x + column))" "${divider}" "${divider_style}"
       __dybatpho_screen_width_into piece_width "${divider}"
       column=$((column + piece_width))
     fi
@@ -2239,5 +2274,195 @@ function dybatpho::screen_popup {
     dybatpho::screen_put "$((y + index))" "${x}" "${blank}" "0"
   done
   dybatpho::screen_block "${rect}" "$@"
+  return 0
+}
+
+#######################################
+# @description Draw pieces of text side by side on one row, each in its own
+#   style, cut to a width.
+#
+#   This is what a row needs as soon as it is more than one colour -- a check
+#   mark in green before a name in bold, a key in a key bar before what it does
+#   -- and what `dybatpho::screen_list` cannot do, because it styles a whole row
+#   at once. With a background, every piece is drawn over it and the rest of
+#   the width is filled with it, so a selected row or a status bar reads as one
+#   band.
+# @example
+#   dybatpho::screen_spans 3 2 30 "" "✔ " "32" "ripgrep" "1" " 2s" "2"
+#   dybatpho::screen_spans 4 2 30 "48;5;237" "▌ " "1;35" "selected row" "1"
+#
+# @arg $1 number Row, zero-based
+# @arg $2 number Column, zero-based
+# @arg $3 number Width in columns
+# @arg $4 string SGR parameters of the background, or empty for none
+# @arg $@ string Pairs of text and its SGR parameters
+# @exitcode 0 Always; a piece that does not fit is cut, and the pieces after it are dropped
+# @tip The background comes before each piece's own style, so a piece keeps its colours over it; a piece styled
+#   `""` or `0` is drawn in the background alone
+#######################################
+function dybatpho::screen_spans {
+  local row="${1-}" column="${2-}" width="${3-}" background="${4-}"
+  shift 4 2> /dev/null || return 0
+  __dybatpho_screen_expect_int "${FUNCNAME[0]}" "width" "${width}" 0
+  local left="${width}" text style used
+  while (($# >= 2)) && ((left > 0)); do
+    text="$1" style="$2"
+    shift 2
+    [[ -n "${text}" ]] || continue
+    __dybatpho_screen_width_into used "${text}"
+    if ((used > left)); then
+      __dybatpho_screen_truncate_into text "${text}" "${left}"
+      __dybatpho_screen_width_into used "${text}"
+    fi
+    if [[ -n "${background}" ]]; then
+      if [[ -z "${style}" || "${style}" == 0 ]]; then
+        style="${background}"
+      else
+        style="${background};${style}"
+      fi
+    fi
+    dybatpho::screen_put "${row}" "${column}" "${text}" "${style}"
+    column=$((column + used))
+    left=$((left - used))
+  done
+  if [[ -n "${background}" ]] && ((left > 0)); then
+    printf -v text '%*s' "${left}" ""
+    dybatpho::screen_put "${row}" "${column}" "${text}" "${background}"
+  fi
+  return 0
+}
+
+#######################################
+# @description Draw a line that carries its own SGR colour sequences -- the
+#   output of a command, a log written by another program -- keeping its
+#   colours.
+#
+#   Each sequence changes the style of the text after it, the way a terminal
+#   reads it: parameters accumulate until a reset. A sequence that is not a
+#   colour change, such as a cursor movement, is dropped rather than drawn,
+#   because it would move the cursor out of the frame.
+# @example
+#   dybatpho::screen_ansi 5 1 60 $'\033[1;32mok\033[0m installed ripgrep'
+#
+# @arg $1 number Row, zero-based
+# @arg $2 number Column, zero-based
+# @arg $3 number Width in columns
+# @arg $4 string The line, with its escape sequences
+# @exitcode 0 Always
+# @tip Strip `\r` and expand tabs before passing a line; they are control characters, not text with a width
+#######################################
+function dybatpho::screen_ansi {
+  local row="${1-}" column="${2-}" width="${3-}" rest="${4-}"
+  local style="0" before params
+  local -a spans=()
+  while [[ "${rest}" == *$'\033['* ]]; do
+    before="${rest%%$'\033['*}"
+    [[ -n "${before}" ]] && spans+=("${before}" "${style}")
+    rest="${rest#*$'\033['}"
+    # The final byte of a control sequence is a letter; only `m` is a colour.
+    if [[ "${rest}" =~ ^([0-9\;?]*)([A-Za-z]) ]]; then
+      params="${BASH_REMATCH[1]}"
+      rest="${rest:${#BASH_REMATCH[0]}}"
+      [[ "${BASH_REMATCH[2]}" == m && "${params}" =~ ^[0-9\;]*$ ]] || continue
+    else
+      continue
+    fi
+    case "${params}" in
+      "" | 0 | 00) style="0" ;;
+      0\;* | 00\;*) style="${params#*;}" ;;
+      *)
+        if [[ "${style}" == "0" ]]; then
+          style="${params}"
+        else
+          style+=";${params}"
+        fi
+        ;;
+    esac
+  done
+  [[ -n "${rest}" ]] && spans+=("${rest}" "${style}")
+  ((${#spans[@]} > 0)) || return 0
+  dybatpho::screen_spans "${row}" "${column}" "${width}" "" "${spans[@]}"
+}
+
+#######################################
+# @description Draw a one-row bar of key hints: each key in
+#   `DYBATPHO_SCREEN_STYLE_KEY`, what it does after it, all over
+#   `DYBATPHO_SCREEN_STYLE_KEYBAR` across the whole width.
+# @example
+#   dybatpho::screen_keybar "${footer}" "↑↓" "move" "space" "pick" "q" "quit"
+#
+# @arg $1 string Rectangle to draw in; only its first row is used
+# @arg $@ string Pairs of a key and what it does
+# @exitcode 0 Always; hints that do not fit are cut at the edge
+#######################################
+function dybatpho::screen_keybar {
+  local x y width height
+  read -r x y width height <<< "${1-}"
+  shift || true
+  ((${width:-0} > 0 && ${height:-0} > 0)) || return 0
+  local -a spans=()
+  while (($# >= 2)); do
+    spans+=(" $1" "${DYBATPHO_SCREEN_STYLE_KEY}" " $2 " "")
+    shift 2
+  done
+  dybatpho::screen_spans "${y}" "${x}" "${width}" "${DYBATPHO_SCREEN_STYLE_KEYBAR}" "${spans[@]}"
+}
+
+#######################################
+# @description Set every `DYBATPHO_SCREEN_STYLE_*` variable from a named
+#   palette, so an application gets a consistent look without choosing a
+#   colour for each widget.
+#
+#   | Theme | Look |
+#   | --- | --- |
+#   | `default` | the module's own defaults: bold, dim, reverse and the eight basic colours |
+#   | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red |
+#   | `mono` | no colour at all, only bold, dim and reverse |
+#
+#   `NO_COLOR` turns `dusk` into `mono`, so an application can ask for colour
+#   and still respect a user who does not want it.
+# @example
+#   dybatpho::screen_theme dusk
+#   dybatpho::screen_block "${rect}" title:"Tools" focus:true
+#
+# @arg $1 string Theme name: `default`, `dusk`, or `mono`
+# @env NO_COLOR string Use `mono` in place of a coloured theme when set to a non-empty value
+# @set DYBATPHO_SCREEN_STYLE_* string Every style variable of the module, from the palette
+# @exitcode 0 The theme was applied
+# @exitcode 1 The theme is unknown, and nothing was changed
+#######################################
+function dybatpho::screen_theme {
+  local name="${1-}"
+  [[ "${name}" == dusk && -n "${NO_COLOR:-}" ]] && name="mono"
+  case "${name}" in
+    default)
+      DYBATPHO_SCREEN_STYLE_SELECTED="1;7" DYBATPHO_SCREEN_STYLE_BORDER="2"
+      DYBATPHO_SCREEN_STYLE_TITLE="1" DYBATPHO_SCREEN_STYLE_FOCUS="1"
+      DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="1;7" DYBATPHO_SCREEN_STYLE_KEYBAR="7"
+      DYBATPHO_SCREEN_STYLE_KEY="1" DYBATPHO_SCREEN_STYLE_ACCENT="1"
+      DYBATPHO_SCREEN_STYLE_DIM="2" DYBATPHO_SCREEN_STYLE_OK="32"
+      DYBATPHO_SCREEN_STYLE_WARN="33" DYBATPHO_SCREEN_STYLE_ERROR="31"
+      ;;
+    dusk)
+      DYBATPHO_SCREEN_STYLE_SELECTED="1;38;5;231;48;5;61" DYBATPHO_SCREEN_STYLE_BORDER="38;5;239"
+      DYBATPHO_SCREEN_STYLE_TITLE="1;38;5;183" DYBATPHO_SCREEN_STYLE_FOCUS="38;5;141"
+      DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="1;38;5;231;48;5;61" DYBATPHO_SCREEN_STYLE_KEYBAR="38;5;250;48;5;235"
+      DYBATPHO_SCREEN_STYLE_KEY="1;38;5;213" DYBATPHO_SCREEN_STYLE_ACCENT="1;38;5;213"
+      DYBATPHO_SCREEN_STYLE_DIM="38;5;243" DYBATPHO_SCREEN_STYLE_OK="1;38;5;114"
+      DYBATPHO_SCREEN_STYLE_WARN="38;5;221" DYBATPHO_SCREEN_STYLE_ERROR="1;38;5;203"
+      ;;
+    mono)
+      DYBATPHO_SCREEN_STYLE_SELECTED="1;7" DYBATPHO_SCREEN_STYLE_BORDER="2"
+      DYBATPHO_SCREEN_STYLE_TITLE="1" DYBATPHO_SCREEN_STYLE_FOCUS="0"
+      DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="1;7" DYBATPHO_SCREEN_STYLE_KEYBAR="7"
+      DYBATPHO_SCREEN_STYLE_KEY="1" DYBATPHO_SCREEN_STYLE_ACCENT="1"
+      DYBATPHO_SCREEN_STYLE_DIM="2" DYBATPHO_SCREEN_STYLE_OK="1"
+      DYBATPHO_SCREEN_STYLE_WARN="0" DYBATPHO_SCREEN_STYLE_ERROR="1"
+      ;;
+    *)
+      dybatpho::error "${FUNCNAME[0]}: Unknown theme '${name}', expected default, dusk or mono"
+      return 1
+      ;;
+  esac
   return 0
 }

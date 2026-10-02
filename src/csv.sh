@@ -577,6 +577,225 @@ function dybatpho::csv_select {
 }
 
 #######################################
+# @description Sort the data rows by one column and print them as CSV with
+#   the header first.
+#   The sort is stable, so rows with equal keys keep their input order, and it
+#   happens in Bash rather than through `sort`, because a value may hold a line
+#   break. `auto` compares as numbers when every non-empty value in the column
+#   is one, and as text otherwise; text compares byte by byte, the same on
+#   every machine whatever its locale. An empty value sorts last in either
+#   direction, so blanks never push the rows that matter off the top.
+# @arg $1 string CSV file path, `-` for stdin, or CSV text
+# @arg $2 string Column: header name, or 1-based position
+# @arg $3 string Order: `asc` (default) or `desc`
+# @arg $4 string Comparison: `auto` (default), `text`, or `number`
+# @stdout CSV text: the header, then the sorted rows
+# @exitcode 0 The rows were sorted, or the input was empty
+# @exitcode 1 An unknown column, order or comparison, a non-number under `number`, or a row wider than the header
+# @example
+#   dybatpho::csv_sort billing.csv cost desc
+#   dybatpho::csv_sort billing.csv owner asc text
+#######################################
+function dybatpho::csv_sort {
+  local input column order type
+  dybatpho::expect_args input column -- "$@"
+  order="${3:-asc}"
+  type="${4:-auto}"
+
+  case "${order}" in
+    asc | desc) ;; # kcov(skip) - a case arm has no command to fire on
+    # "dybatpho::csv_sort rejects an unknown order, comparison or value" covers
+    # this; `dybatpho::die` exits, so that test uses `run`.
+    *) dybatpho::die "${FUNCNAME[0]}: Unknown order: ${order}. Use asc or desc" ;; # kcov(skip)
+  esac
+  case "${type}" in
+    auto | text | number) ;; # kcov(skip) - a case arm has no command to fire on
+    *) dybatpho::die "${FUNCNAME[0]}: Unknown comparison: ${type}. Use auto, text, or number" ;; # kcov(skip)
+  esac
+
+  local -a records=() names=() fields=() keys=() order_of=() sorted=()
+  local text delimiter index at key
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_input_into text "${input}"
+  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  ((${#records[@]})) || return 0
+
+  __dybatpho_csv_header_into names records
+  __dybatpho_csv_pick_into index names "${column}"
+
+  local all_numbers=1
+  for ((at = 1; at < ${#records[@]}; at++)); do
+    __dybatpho_csv_split_fields_into fields "${records[${at}]}"
+    __dybatpho_csv_expect_width fields names "${at}"
+    key="${fields[${index}]-}"
+    keys[at]="${key}"
+    order_of+=("${at}")
+    [[ -z "${key}" ]] || dybatpho::math_is_number "${key}" || {
+      [[ "${type}" != "number" ]] \
+        || dybatpho::die "${FUNCNAME[0]}: Row ${at} has ${column}=${key}, which is not a number" # kcov(skip)
+      all_numbers=0
+    }
+  done
+
+  [[ "${type}" != "auto" ]] || {
+    type="text"
+    ((all_numbers == 0)) || type="number"
+  }
+  if [[ "${type}" == "number" ]]; then
+    # Encode each number once into a key that orders correctly as text, so
+    # the merge compares strings instead of parsing two numbers every time.
+    for at in "${!keys[@]}"; do
+      [[ -z "${keys[${at}]}" ]] || __dybatpho_csv_number_key_into "keys[${at}]" "${keys[${at}]}"
+    done
+  fi
+
+  __dybatpho_csv_merge_sort order_of keys "${order}"
+
+  sorted=("${records[0]}")
+  for at in "${order_of[@]}"; do
+    sorted+=("${records[${at}]}")
+  done
+  __dybatpho_csv_write_with sorted "${delimiter}"
+}
+
+#######################################
+# @description Sort an array of row numbers in place by their keys, stably.
+#   Bottom-up merge sort: runs of width 1, 2, 4, … are merged pairwise, taking
+#   from the left run unless the right key strictly comes first, which is what
+#   keeps equal keys in their input order.
+# @arg $1 string Name of the array of row numbers to reorder
+# @arg $2 string Name of the array mapping a row number to its key
+# @arg $3 string `asc` or `desc`
+# @set The array named by `$1`
+# @internal
+#######################################
+function __dybatpho_csv_merge_sort {
+  local -n __dybatpho_csv_rows_ref="$1"
+  local __dybatpho_csv_keys_name="$2" __dybatpho_csv_order="$3"
+  local -n __dybatpho_csv_key_ref="${__dybatpho_csv_keys_name}"
+  local -a __dybatpho_csv_from=("${__dybatpho_csv_rows_ref[@]}") __dybatpho_csv_into=()
+  local __dybatpho_csv_count="${#__dybatpho_csv_from[@]}" __dybatpho_csv_width=1
+  local __dybatpho_csv_lo __dybatpho_csv_mid __dybatpho_csv_hi __dybatpho_csv_l __dybatpho_csv_r
+
+  local __dybatpho_csv_step
+  while ((__dybatpho_csv_width < __dybatpho_csv_count)); do
+    __dybatpho_csv_into=()
+    __dybatpho_csv_step=$((2 * __dybatpho_csv_width))
+    __dybatpho_csv_lo=0
+    while ((__dybatpho_csv_lo < __dybatpho_csv_count)); do
+      __dybatpho_csv_mid=$((__dybatpho_csv_lo + __dybatpho_csv_width))
+      ((__dybatpho_csv_mid <= __dybatpho_csv_count)) || __dybatpho_csv_mid="${__dybatpho_csv_count}"
+      __dybatpho_csv_hi=$((__dybatpho_csv_lo + __dybatpho_csv_step))
+      ((__dybatpho_csv_hi <= __dybatpho_csv_count)) || __dybatpho_csv_hi="${__dybatpho_csv_count}"
+      __dybatpho_csv_l="${__dybatpho_csv_lo}"
+      __dybatpho_csv_r="${__dybatpho_csv_mid}"
+      while ((__dybatpho_csv_l < __dybatpho_csv_mid && __dybatpho_csv_r < __dybatpho_csv_hi)); do
+        if __dybatpho_csv_comes_first \
+          "${__dybatpho_csv_key_ref[${__dybatpho_csv_from[${__dybatpho_csv_r}]}]}" \
+          "${__dybatpho_csv_key_ref[${__dybatpho_csv_from[${__dybatpho_csv_l}]}]}" \
+          "${__dybatpho_csv_order}"; then
+          __dybatpho_csv_into+=("${__dybatpho_csv_from[${__dybatpho_csv_r}]}")
+          ((__dybatpho_csv_r += 1))
+        else
+          __dybatpho_csv_into+=("${__dybatpho_csv_from[${__dybatpho_csv_l}]}")
+          ((__dybatpho_csv_l += 1))
+        fi
+      done
+      for ((; __dybatpho_csv_l < __dybatpho_csv_mid; __dybatpho_csv_l++)); do
+        __dybatpho_csv_into+=("${__dybatpho_csv_from[${__dybatpho_csv_l}]}")
+      done
+      for ((; __dybatpho_csv_r < __dybatpho_csv_hi; __dybatpho_csv_r++)); do
+        __dybatpho_csv_into+=("${__dybatpho_csv_from[${__dybatpho_csv_r}]}")
+      done
+      ((__dybatpho_csv_lo += __dybatpho_csv_step))
+    done
+    __dybatpho_csv_from=("${__dybatpho_csv_into[@]}")
+    ((__dybatpho_csv_width *= 2))
+  done
+
+  __dybatpho_csv_rows_ref=("${__dybatpho_csv_from[@]}")
+}
+
+#######################################
+# @description Return success when the first key strictly comes before the
+#   second in the requested order, comparing bytes. An empty key comes after
+#   every other key, whichever the direction.
+# @arg $1 string First key
+# @arg $2 string Second key
+# @arg $3 string `asc` or `desc`
+# @exitcode 0 The first key comes first
+# @exitcode 1 It does not
+# @internal
+#######################################
+function __dybatpho_csv_comes_first {
+  local first="$1" second="$2" LC_ALL=C
+
+  [[ -n "${first}" ]] || return 1
+  [[ -n "${second}" ]] || return 0
+  if [[ "$3" == "desc" ]]; then
+    [[ "${second}" < "${first}" ]]
+  else
+    [[ "${first}" < "${second}" ]]
+  fi
+}
+
+#######################################
+# @description Encode a decimal number into a key whose byte order is its
+#   numeric order, into a named variable.
+#   A non-negative number becomes `1`, its integer digit count in five digits,
+#   the integer without leading zeros, and the fraction without trailing ones,
+#   so a longer integer sorts later and equal integers fall through to the
+#   fraction digit by digit. A negative number becomes `0` and the same parts
+#   with every digit mapped onto a letter in reverse (`9` to `a`, `0` to `j`)
+#   and a closing `~`, which reverses the order and still sorts `-0.5` before
+#   `-0.45`. Zero is non-negative whatever its sign.
+# @arg $1 string Name of the variable receiving the key
+# @arg $2 string Number, as `dybatpho::math_is_number` accepts it
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_csv_number_key_into {
+  local -n __dybatpho_csv_nkey_ref="$1"
+  local __dybatpho_csv_n="$2" __dybatpho_csv_negative=0
+  local __dybatpho_csv_int __dybatpho_csv_frac=""
+
+  case "${__dybatpho_csv_n}" in
+    -*) __dybatpho_csv_negative=1 __dybatpho_csv_n="${__dybatpho_csv_n#-}" ;;
+    +*) __dybatpho_csv_n="${__dybatpho_csv_n#+}" ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac
+  __dybatpho_csv_int="${__dybatpho_csv_n%%.*}"
+  [[ "${__dybatpho_csv_n}" != *.* ]] || __dybatpho_csv_frac="${__dybatpho_csv_n#*.}"
+
+  # Strip leading zeros from the integer and trailing zeros from the fraction:
+  # `007.50` and `7.5` are the same number and must get the same key.
+  __dybatpho_csv_int="${__dybatpho_csv_int#"${__dybatpho_csv_int%%[!0]*}"}"
+  __dybatpho_csv_frac="${__dybatpho_csv_frac%"${__dybatpho_csv_frac##*[!0]}"}"
+  [[ -n "${__dybatpho_csv_int}${__dybatpho_csv_frac}" ]] || __dybatpho_csv_negative=0
+
+  local __dybatpho_csv_width
+  if ((__dybatpho_csv_negative == 0)); then
+    printf -v __dybatpho_csv_width '%05d' "${#__dybatpho_csv_int}"
+    __dybatpho_csv_nkey_ref="1${__dybatpho_csv_width}${__dybatpho_csv_int}.${__dybatpho_csv_frac}"
+    return 0
+  fi
+
+  printf -v __dybatpho_csv_width '%05d' "$((99999 - ${#__dybatpho_csv_int}))"
+  local __dybatpho_csv_digits="${__dybatpho_csv_int}.${__dybatpho_csv_frac}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//0/j}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//1/i}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//2/h}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//3/g}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//4/f}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//5/e}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//6/d}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//7/c}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//8/b}"
+  __dybatpho_csv_digits="${__dybatpho_csv_digits//9/a}"
+  __dybatpho_csv_nkey_ref="0${__dybatpho_csv_width}${__dybatpho_csv_digits}~"
+}
+
+#######################################
 # @description Resolve a column given by name or by 1-based position to its
 #   index, into a named variable. A header name wins over a position, so a
 #   column literally called `2` is still reachable by name.

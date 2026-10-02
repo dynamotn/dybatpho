@@ -240,6 +240,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::csv_select billing.csv owner cost > owners.csv
   ```
 
+- **`csv` — sort rows by a column.** `dybatpho::csv_sort` prints the header
+  and the rows ordered by one column, `asc` or `desc`. It compares as numbers
+  when every value in the column is one (so `9` comes before `10`, and `10`
+  equals `010.0`) and byte by byte otherwise, or as `text` / `number` when you
+  say so. The sort is stable, an empty value always sorts last, and a value
+  that spans several lines stays whole.
+
+  ```sh
+  dybatpho::csv_sort billing.csv cost desc | head -n 6   # header and the top five
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

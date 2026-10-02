@@ -479,6 +479,89 @@ EOF
   assert_stderr --partial "Row 1 has 2 fields"
 }
 
+@test "dybatpho::csv_sort orders numbers by value, keeps ties stable and blanks last" {
+  local csv
+  csv="$(printf 'n,v\na,10\nb,9\nc,\nd,010.0\ne,-1.5\nf,-0.5\ng,-0.45\nh,-0\ni,.25\nj,-12\nk,+3')"
+  run_traced dybatpho::csv_sort "${csv}" v
+  assert_success
+  assert_output << 'EOF'
+n,v
+j,-12
+e,-1.5
+f,-0.5
+g,-0.45
+h,-0
+i,.25
+k,+3
+b,9
+a,10
+d,010.0
+c,
+EOF
+
+  # Descending keeps equal keys in their input order too, and the blank last.
+  run_traced dybatpho::csv_sort "${csv}" 2 desc
+  assert_success
+  assert_line --index 1 "a,10"
+  assert_line --index 2 "d,010.0"
+  assert_line --index 11 "c,"
+}
+
+@test "dybatpho::csv_sort compares text by byte and keeps multi-line values whole" {
+  # `auto` falls back to text when any value is not a number.
+  run_traced dybatpho::csv_sort "$(printf 'k\n10\nb\n9\nB')" k
+  assert_success
+  assert_output "$(printf 'k\n10\n9\nB\nb')"
+
+  # `text` forces it even on a column of numbers.
+  run_traced dybatpho::csv_sort "$(printf 'k\n10\n9\n100')" k asc text
+  assert_success
+  assert_output "$(printf 'k\n10\n100\n9')"
+
+  run_traced dybatpho::csv_sort "${QUOTED_CSV}" name desc
+  assert_success
+  assert_output << 'EOF'
+name,note,qty
+plain,x,7
+"He said ""hi""","line one
+line two",10
+"Doe, John",ok,3
+EOF
+}
+
+@test "dybatpho::csv_sort reads stdin with a configured delimiter and passes an empty input" {
+  DYBATPHO_CSV_DELIMITER=";" \
+    run_traced dybatpho::csv_sort - qty desc number <<< "$(printf 'name;qty\n"a;b";2\nc;30')"
+  assert_success
+  assert_output "$(printf 'name;qty\nc;30\n"a;b";2')"
+
+  run_traced dybatpho::csv_sort "$(printf 'name,qty')" qty
+  assert_success
+  assert_output "name,qty"
+
+  run_traced dybatpho::csv_sort "" qty
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::csv_sort rejects an unknown order, comparison or value" {
+  run --separate-stderr dybatpho::csv_sort "$(printf 'a\n1')" a sideways
+  assert_failure
+  assert_stderr --partial "Unknown order: sideways"
+
+  run --separate-stderr dybatpho::csv_sort "$(printf 'a\n1')" a asc roman
+  assert_failure
+  assert_stderr --partial "Unknown comparison: roman"
+
+  run --separate-stderr dybatpho::csv_sort "$(printf 'a\n1\nten')" a asc number
+  assert_failure
+  assert_stderr --partial "Row 2 has a=ten, which is not a number"
+
+  run --separate-stderr dybatpho::csv_sort "$(printf 'a\n1')" b
+  assert_failure
+  assert_stderr --partial "No such column: b"
+}
+
 @test "dybatpho::csv_read returns the data a record with no closing quote still has" {
   local -a records=() fields=()
   dybatpho::csv_read "$(printf 'a,b\n"unterminated,x')" records

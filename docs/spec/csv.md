@@ -45,6 +45,8 @@ As a script author, I want the column names, one column's values, and the rows m
 4. **Given** a row with more fields than the header names, **When** it is read by column, **Then** the script stops rather than dropping the extra field
 5. **Given** a list of columns by name or by 1-based position, **When** they are selected, **Then** the output is CSV holding just those columns, header included, in the order given
 6. **Given** a column that is neither a header name nor a position inside the header, **When** it is selected, **Then** the script stops and the message names the columns there are
+7. **Given** a column of numbers, **When** the rows are sorted by it, **Then** they are ordered by value, rows with equal keys keep their input order, and empty values come last in either direction
+8. **Given** a column holding any value that is not a number, **When** it is sorted with the default comparison, **Then** it is ordered as text, byte by byte, whatever the locale
 
 ---
 
@@ -95,6 +97,7 @@ As a script author, I want to read a tab- or semicolon-separated export with the
 dybatpho::csv_header billing.csv
 dybatpho::csv_filter billing.csv "cost" gt 100 > expensive.csv
 dybatpho::csv_select billing.csv owner cost > owners.csv
+dybatpho::csv_sort billing.csv cost desc | head -n 6   # header and the top five
 
 dybatpho::csv_read billing.csv rows
 dybatpho::csv_fields "${rows[1]}" first
@@ -115,6 +118,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - Input arrives as a file path, as `-` for stdin, or as text.
 - A row is shorter or longer than the header.
 - A selected column is repeated, named by a position, or a header is itself named like a number.
+- A sorted column mixes numbers and text, holds blanks, spells one number two ways (`10`, `010.0`), or holds a value with a line break.
 - A record's quote is never closed, or text follows a closing quote.
 - A file uses CRLF line endings, or another delimiter such as `;`.
 - A field is empty, a row ends with the delimiter, or the input is empty.
@@ -151,6 +155,10 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-022**: The module MUST rewrite CSV read with the configured delimiter using another delimiter, quoting each field for the delimiter it is written with.
 - **FR-023**: Selecting columns MUST print CSV with the header and every row restricted to the chosen columns in the order given, allowing a column to repeat.
 - **FR-024**: A selected column MUST resolve by header name first and by 1-based position otherwise, and one matching neither MUST stop the script naming the header.
+- **FR-025**: Sorting MUST print the header followed by the data rows ordered by one column, ascending or descending, and MUST be stable.
+- **FR-026**: The default comparison MUST be numeric when every non-empty value in the column is a number and byte-wise text otherwise; `text` and `number` MUST force one, and `number` MUST stop the script on a value that is not a number, naming the row.
+- **FR-027**: Empty values MUST sort after every other value in both directions.
+- **FR-028**: Sorting MUST reject an unknown order or comparison.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -199,6 +207,10 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-027**: Select by position, repeat a column, pad a short row, and prefer a header named like a number.
 - **IT-028**: Select from stdin with a configured delimiter, and from an empty input.
 - **IT-029**: Report an unknown column, position `0`, no columns, and a row wider than the header.
+- **IT-030**: Sort numbers by value, with signs, decimals and two spellings of one value, stably and with the blank last in both directions.
+- **IT-031**: Sort text byte by byte under `auto` and `text`, keeping a multi-line value whole.
+- **IT-032**: Sort from stdin with a configured delimiter, a header with no rows, and an empty input.
+- **IT-033**: Reject an unknown order, an unknown comparison, a non-number under `number`, and an unknown column.
 
 ## Acceptance Criteria *(mandatory)*
 

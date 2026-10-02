@@ -77,6 +77,23 @@ As an operator, I want a retention policy applied to a backup directory so that 
 5. **Given** `DRY_RUN`, **When** the directory is pruned, **Then** what would be removed is reported and nothing is deleted
 6. **Given** a pruned backup, **When** it is removed, **Then** its checksum sidecar goes with it
 
+---
+
+### User Story 5 - See what changed since a backup (Priority: P2)
+
+As an operator, I want to compare two backups, or a backup with the live data, so that I know what a restore would undo or what changed between two snapshots before I act on either.
+
+**Independent Test**: Take a backup, change the source, take another, and compare the two backups and each with the live source.
+
+**Acceptance Scenarios**:
+
+1. **Given** two backups of a directory, **When** they are compared, **Then** each added, removed, rewritten and retyped entry is reported as the tree comparison reports it, and the call reports a difference
+2. **Given** a backup and the unchanged live source, **When** they are compared, **Then** nothing is printed and the call succeeds
+3. **Given** a backup and a copy of its source restored under another name, **When** they are compared, **Then** the source's name is not counted as a difference
+4. **Given** a backup of a single file, **When** it is compared with the live file, **Then** a change to the file is reported under its name
+5. **Given** `--summary` or `--null`, **When** two sides are compared, **Then** the option reaches the tree comparison
+6. **Given** a backup that fails its checksum, has no sidecar, or holds an entry escaping the scratch directory, or a side that does not exist, **When** a comparison is asked for, **Then** it stops with exit code 2 without reading the backup
+
 ### Example Workflow
 
 ```bash
@@ -87,6 +104,9 @@ dybatpho::backup_verify "${archive}" || dybatpho::die "The backup is not readabl
 
 # Before a risky change, and after it, keep a week of history.
 dybatpho::backup_prune --keep-count 7 --name nginx --force /var/backups
+
+# What a restore would undo, before running it.
+dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx || true
 
 # Roll back to the last good snapshot.
 dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)" /etc
@@ -101,6 +121,9 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - The directory holds no backups, or holds backups of several names.
 - A retention option is missing its value or is not a number.
 - The directory is given after an end-of-options marker.
+- A comparison side is a backup, a live directory, a live file, or a path that does not exist.
+- A backup to compare fails its checksum, has no sidecar, or holds an entry that escapes.
+- A live copy of the source sits under a different name from the one the backup recorded.
 
 ## Requirements *(mandatory)*
 
@@ -125,6 +148,11 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-017**: Pruning MUST remove a pruned backup's sidecar with it.
 - **FR-018**: Pruning MUST honor `DRY_RUN` and MUST delete through the guarded removal helper.
 - **FR-019**: The archive extension and the checksum algorithm MUST be configurable.
+- **FR-020**: A comparison MUST accept a backup, a live directory or a live file on either side, treating a path that ends in the backup extension as a backup.
+- **FR-021**: A backup MUST be verified against its sidecar, and checked for entries that escape, before it is extracted for a comparison, and a failure MUST stop with exit code 2.
+- **FR-022**: A comparison MUST extract into a temporary directory removed on exit and MUST NOT write to the destination or the source.
+- **FR-023**: A directory backup MUST be compared from inside the entry it recorded, so the source's own name is not a difference; a single-file backup and a live file MUST line up by file name.
+- **FR-024**: A comparison MUST report through `dybatpho::diff_dir`, passing `--summary` and `--null` through and returning its exit code.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -161,9 +189,16 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-016**: Accept the directory after an end-of-options marker.
 - **IT-017**: Prune a directory with nothing to remove.
 - **IT-018**: Configure the extension and the checksum algorithm.
+- **IT-019**: Compare two backups record by record and as a summary.
+- **IT-020**: Compare a backup with the unchanged and the changed live source, and with a copy under another name.
+- **IT-021**: Compare a single-file backup with the live file.
+- **IT-022**: Pass `--null` through to the tree comparison.
+- **IT-023**: Stop with exit code 2 for a backup that fails its checksum, one without a sidecar, and a missing side.
+- **IT-024**: Stop with exit code 2 for a backup holding an entry that escapes.
 
 ## Acceptance Criteria *(mandatory)*
 
 1. Destinations are local paths; pushing a backup elsewhere stays with the caller.
 2. Every deletion goes through the guarded removal helper, so confirmation and `DRY_RUN` behave as they do everywhere else in the library.
 3. Integrity is checked with a checksum sidecar rather than a test extraction, which would double the disk and time a large backup costs; the atomic rename is what rules out the half-written file the test extraction would be looking for.
+4. A comparison never extracts a backup it has not verified, and never extracts outside a scratch directory of its own.

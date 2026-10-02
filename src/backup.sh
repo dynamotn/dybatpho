@@ -22,6 +22,10 @@
 #   Backups are named `<name>-<UTC timestamp>.<extension>`, which is why
 #   sorting them by name is the same as sorting them by age, with no dependence
 #   on a modification time that copying a directory can change.
+#
+#   `dybatpho::backup_diff` answers what a restore would undo: it compares two
+#   backups, or a backup and the live data, through `dybatpho::diff_dir`,
+#   extracting each verified backup into a scratch directory first.
 # @tip Destinations are local paths; pushing a backup to object storage or a
 #   network share stays with the caller
 # @env DYBATPHO_BACKUP_EXTENSION string Archive extension, default is `tar.gz`; `archive.sh` reads the format from it
@@ -371,4 +375,123 @@ function dybatpho::backup_prune {
     return
   fi
   dybatpho::safe_rm -- "${doomed[@]}"
+}
+
+#######################################
+# @description Resolve one side of a backup comparison to a directory to walk,
+#   into a named variable.
+#   A path ending in the backup extension is a backup: it must pass its
+#   checksum and hold no entry that escapes, and it is extracted into a
+#   temporary directory. An archive holds one top-level entry, the source it
+#   was taken from, so a directory source is compared from inside that entry
+#   and a single-file source from the directory holding it. A live directory
+#   is walked where it is, and a live file is copied into a temporary directory
+#   of its own so it lines up with a single-file backup.
+# @arg $1 string Name of the variable receiving the directory
+# @arg $2 string Backup archive, or a live file or directory
+# @set The named variable
+# @exitcode 0 The side was resolved
+# @exitcode 2 Stop the script when the side is missing, fails its checksum, or is unsafe to extract
+# @internal
+#######################################
+function __dybatpho_backup_root_into {
+  local -n __dybatpho_backup_root_ref="$1"
+  local __dybatpho_backup_side="$2"
+  local caller="dybatpho::backup_diff"
+
+  # Not a `__dybatpho`-prefixed name: `dybatpho::create_temp` refuses one.
+  local dybatpho_backup_scratch
+
+  if [[ "${__dybatpho_backup_side}" == *".${DYBATPHO_BACKUP_EXTENSION}" ]] \
+    && dybatpho::is file "${__dybatpho_backup_side}"; then
+    local sidecar
+    sidecar="$(__dybatpho_backup_sidecar "${__dybatpho_backup_side}")"
+    dybatpho::is file "${sidecar}" \
+      || dybatpho::die "${caller}: No checksum sidecar beside: ${__dybatpho_backup_side}" 2
+    dybatpho::backup_verify "${__dybatpho_backup_side}" \
+      || dybatpho::die "${caller}: Refusing to compare a backup that fails its checksum" 2
+    dybatpho::archive_is_safe "${__dybatpho_backup_side}" \
+      || dybatpho::die "${caller}: Refusing to extract an entry outside the scratch directory" 2
+
+    dybatpho::create_temp dybatpho_backup_scratch "/" "backup-diff"
+    dybatpho::archive_extract "${__dybatpho_backup_side}" "${dybatpho_backup_scratch}"
+
+    local -a entries=()
+    local entry
+    while IFS= read -r -d '' entry; do
+      entries+=("${entry}")
+    done < <(find "${dybatpho_backup_scratch}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
+
+    if ((${#entries[@]} == 1)) && [[ -d "${entries[0]}" && ! -L "${entries[0]}" ]]; then
+      __dybatpho_backup_root_ref="${entries[0]}"
+    else
+      __dybatpho_backup_root_ref="${dybatpho_backup_scratch}"
+    fi
+    return 0
+  fi
+
+  if dybatpho::is dir "${__dybatpho_backup_side}"; then
+    __dybatpho_backup_root_ref="${__dybatpho_backup_side}"
+    return 0
+  fi
+
+  dybatpho::is exist "${__dybatpho_backup_side}" || dybatpho::is link "${__dybatpho_backup_side}" \
+    || dybatpho::die "${caller}: Nothing to compare at: ${__dybatpho_backup_side}" 2
+
+  dybatpho::create_temp dybatpho_backup_scratch "/" "backup-diff"
+  cp -P -p -- "${__dybatpho_backup_side}" "${dybatpho_backup_scratch}/"
+  __dybatpho_backup_root_ref="${dybatpho_backup_scratch}"
+}
+
+#######################################
+# @description Show what changed between two backups, or between a backup and
+#   the live data it was taken from.
+#   Each side is a backup archive or a live file or directory. A backup is
+#   checked against its sidecar before anything is read from it and extracted
+#   into a temporary directory that is removed when the shell exits; nothing
+#   in the destination or the source is written. The two sides are then
+#   compared with `dybatpho::diff_dir`, so the records, the summary and the
+#   exit code are the ones it prints: `+` for what the second side added, `-`
+#   for what it no longer has, `~` for a rewritten file, `!` for a change of
+#   kind.
+#
+#   A backup holds its source under the source's own name, and that name is
+#   not compared: a directory backup is compared from inside it, so the older
+#   backup of `/etc/nginx` lines up with the live `/etc/nginx` or with a copy
+#   restored somewhere else.
+# @arg $1 string Options, then the older side
+# @arg $2 string The newer side
+# @opt --summary, -s Print one `+A -R ~M` line instead of the records
+# @opt --null, -z Terminate each record with NUL instead of a newline
+# @stdout The records or the summary `dybatpho::diff_dir` prints
+# @exitcode 0 The two sides hold the same entries with the same content
+# @exitcode 1 They differ
+# @exitcode 2 A side is missing, fails its checksum, or holds an entry that escapes
+# @example
+#   dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
+#   mapfile -t backups < <(dybatpho::backup_list /var/backups nginx)
+#   dybatpho::backup_diff --summary "${backups[1]}" "${backups[0]}"
+#######################################
+function dybatpho::backup_diff {
+  local -a options=()
+  while (($#)); do
+    case "$1" in
+      --summary | -s | --null | -z) options+=("$1") ;;
+      --)
+        shift
+        break
+        ;;
+      *) break ;;
+    esac
+    shift
+  done
+
+  local older newer
+  dybatpho::expect_args older newer -- "$@"
+
+  local older_root newer_root
+  __dybatpho_backup_root_into older_root "${older}"
+  __dybatpho_backup_root_into newer_root "${newer}"
+
+  dybatpho::diff_dir ${options[@]+"${options[@]}"} -- "${older_root}" "${newer_root}"
 }

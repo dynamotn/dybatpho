@@ -2,7 +2,7 @@
 # @file backup_ops.sh
 # @brief Example snapshotting a config directory and applying a retention policy
 # @description Demonstrates dybatpho::backup_create, backup_list, backup_latest,
-#   backup_verify, backup_restore, and backup_prune
+#   backup_verify, backup_diff, backup_restore, and backup_prune
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules backup
@@ -93,6 +93,28 @@ function _demo_verify {
   rm -f "${damaged}" "${damaged}.sha256"
 }
 
+# @description Show what changed since the snapshot, before restoring it.
+# @arg $1 string Workspace path
+# @arg $2 string Archive path
+function _demo_diff {
+  local workspace archive
+  dybatpho::expect_args workspace archive -- "$@"
+
+  dybatpho::header "DIFF"
+  # The risky change happens: one file is rewritten, one is added.
+  printf 'listen 9090\n' > "${workspace}/config/server.conf"
+  printf 'cache = on\n' > "${workspace}/config/cache.conf"
+
+  # Against the live directory, the comparison says what a restore would undo.
+  DYBATPHO_DIFF_COLOR=false dybatpho::backup_diff "${archive}" "${workspace}/config" || true
+
+  local after summary
+  after="$(dybatpho::backup_create "${workspace}/config" "${workspace}/backups" config)"
+  summary="$(dybatpho::backup_diff --summary "${archive}" "${after}")" || true
+  dybatpho::info "Between the two snapshots: ${summary}"
+  rm -f "${after}" "${after}.sha256"
+}
+
 # @description Restore the snapshot into a fresh directory.
 # @arg $1 string Workspace path
 # @arg $2 string Archive path
@@ -136,6 +158,7 @@ function _main {
   _plant_history "${workspace}"
   _demo_list "${workspace}"
   _demo_verify "${archive}"
+  _demo_diff "${workspace}" "${archive}"
   _demo_restore "${workspace}" "${archive}"
   _demo_prune "${workspace}"
   dybatpho::success "Backup operations demo complete"

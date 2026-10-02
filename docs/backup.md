@@ -25,6 +25,10 @@ Backups are named `<name>-<UTC timestamp>.<extension>`, which is why
 sorting them by name is the same as sorting them by age, with no dependence
 on a modification time that copying a directory can change.
 
+`dybatpho::backup_diff` answers what a restore would undo: it compares two
+backups, or a backup and the live data, through `dybatpho::diff_dir`,
+extracting each verified backup into a scratch directory first.
+
 ### 🌍 Environment
 
 | Variable | Type | Description |
@@ -42,6 +46,7 @@ on a modification time that copying a directory can change.
 - [`dybatpho::backup_verify`](#dybatphobackup_verify) — Check a backup against its checksum sidecar. A backup with no sidecar cannot be checked, which is reported rather than passed, because "nothing to compare" is not the same answer as "matches".
 - [`dybatpho::backup_restore`](#dybatphobackup_restore) — Restore a backup into a target directory. The checksum is verified first, and the extraction goes through `dybatpho::safe_extract`, so an archive whose entries would land outside the target is refused and an overwrite is confirmed.
 - [`dybatpho::backup_prune`](#dybatphobackup_prune) — Delete the backups a retention policy does not keep. A backup survives when **any** policy keeps it, so asking for both `--keep-count` and `--keep-days` keeps more rather than less: a retention rule that deletes more than the operator expected is the expensive direction to be wrong in. `--keep-count` counts from the newest by name, which is the order the backups were taken. `--keep-days` reads how old the file on disk is, so a backup copied in from elsewhere is as old as the copy.
+- [`dybatpho::backup_diff`](#dybatphobackup_diff) — Show what changed between two backups, or between a backup and the live data it was taken from. Each side is a backup archive or a live file or directory. A backup is checked against its sidecar before anything is read from it and extracted into a temporary directory that is removed when the shell exits; nothing in the destination or the source is written. The two sides are then compared with `dybatpho::diff_dir`, so the records, the summary and the exit code are the ones it prints: `+` for what the second side added, `-` for what it no longer has, `~` for a rewritten file, `!` for a change of kind. A backup holds its source under the source's own name, and that name is not compared: a directory backup is compared from inside it, so the older backup of `/etc/nginx` lines up with the live `/etc/nginx` or with a copy restored somewhere else.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -246,3 +251,49 @@ dybatpho::backup_prune --keep-count 7 --name nginx /var/backups
 
 - `0`: The pruning finished, or nothing needed removing
 - `1`: No retention policy was given, an option is malformed, or the removal was declined
+
+
+---
+
+### `dybatpho::backup_diff`
+
+Show what changed between two backups, or between a backup and
+the live data it was taken from.
+Each side is a backup archive or a live file or directory. A backup is
+checked against its sidecar before anything is read from it and extracted
+into a temporary directory that is removed when the shell exits; nothing
+in the destination or the source is written. The two sides are then
+compared with `dybatpho::diff_dir`, so the records, the summary and the
+exit code are the ones it prints: `+` for what the second side added, `-`
+for what it no longer has, `~` for a rewritten file, `!` for a change of
+kind.
+
+A backup holds its source under the source's own name, and that name is
+not compared: a directory backup is compared from inside it, so the older
+backup of `/etc/nginx` lines up with the live `/etc/nginx` or with a copy
+restored somewhere else.
+
+**🧪 Example**
+
+```bash
+dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
+mapfile -t backups < <(dybatpho::backup_list /var/backups nginx)
+dybatpho::backup_diff --summary "${backups[1]}" "${backups[0]}"
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Options, then the older side |
+| `$2` | string | The newer side |
+
+**📤 Output on stdout**
+
+- The records or the summary `dybatpho::diff_dir` prints
+
+**🚦 Exit codes**
+
+- `0`: The two sides hold the same entries with the same content
+- `1`: They differ
+- `2`: A side is missing, fails its checksum, or holds an entry that escapes

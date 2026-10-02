@@ -291,6 +291,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::diff_dir --summary /srv/www /mnt/restore/www   # +3 -1 ~2
   ```
 
+- **`backup` — see what changed since a backup.** `dybatpho::backup_diff`
+  compares two backups, or a backup with the live file or directory it was
+  taken from, and reports through `dybatpho::diff_dir`: what the newer side
+  added, removed, rewrote, or turned into another kind of entry, or a
+  `+A -R ~M` line with `--summary`. Each backup is checked against its sidecar
+  and for entries that escape before it is extracted into a scratch directory
+  removed on exit, so nothing in the backup directory or the source is
+  written, and a backup that fails either check stops the call with exit
+  code 2. The source's own name is not compared, so a backup of `/etc/nginx`
+  lines up with a copy restored anywhere else.
+
+  ```sh
+  dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
+  dybatpho::backup_diff --summary "${older}" "${newer}"   # +1 -0 ~2
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

@@ -306,3 +306,92 @@ plant() {
   assert_output --partial ".tar.bz2"
   assert_file_exist "${output}.sha512"
 }
+
+@test "dybatpho::backup_diff shows what changed between two backups" {
+  local older newer
+  older="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+  printf 'rewritten\n' > "${SOURCE}/a.txt"
+  rm "${SOURCE}/b.txt"
+  mkdir "${SOURCE}/new dir"
+  printf 'added\n' > "${SOURCE}/new dir/c.txt"
+  newer="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+
+  DYBATPHO_DIFF_COLOR=false run_traced -1 dybatpho::backup_diff "${older}" "${newer}"
+  assert_output << EOF
+~ a.txt
+- b.txt
++ new dir/
++ new dir/c.txt
+EOF
+
+  run_traced -1 dybatpho::backup_diff --summary "${older}" "${newer}"
+  assert_output "+2 -1 ~1"
+}
+
+@test "dybatpho::backup_diff compares a backup with the live source" {
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+
+  run_traced -0 dybatpho::backup_diff "${archive}" "${SOURCE}"
+  assert_output ""
+
+  printf 'third\n' > "${SOURCE}/c.txt"
+  DYBATPHO_DIFF_COLOR=false run_traced -1 dybatpho::backup_diff "${archive}" "${SOURCE}"
+  assert_output "+ c.txt"
+
+  # The source's own name is not compared, so a copy restored elsewhere lines
+  # up with the backup just as well.
+  cp -R "${SOURCE}" "${BATS_TEST_TMPDIR}/elsewhere"
+  DYBATPHO_DIFF_COLOR=false run_traced -1 dybatpho::backup_diff -- "${archive}" "${BATS_TEST_TMPDIR}/elsewhere"
+  assert_output "+ c.txt"
+}
+
+@test "dybatpho::backup_diff compares a single-file backup with the live file" {
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}/a.txt" "${DEST}" config)"
+
+  run_traced -0 dybatpho::backup_diff "${archive}" "${SOURCE}/a.txt"
+  printf 'changed\n' > "${SOURCE}/a.txt"
+  DYBATPHO_DIFF_COLOR=false run_traced -1 dybatpho::backup_diff "${archive}" "${SOURCE}/a.txt"
+  assert_output "~ a.txt"
+}
+
+@test "dybatpho::backup_diff passes --null through to the tree comparison" {
+  local archive record
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+  printf 'x\n' > "${SOURCE}/two"$'\n'"lines"
+
+  record="$(dybatpho::backup_diff --null "${archive}" "${SOURCE}" | tr '\0' '|' || true)"
+  assert_equal "${record}" "+ two"$'\n'"lines|"
+}
+
+@test "dybatpho::backup_diff refuses a backup it cannot trust" {
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+
+  # `dybatpho::die` ends the shell, so these use `run`.
+  printf 'junk' >> "${archive}"
+  run -2 dybatpho::backup_diff "${archive}" "${SOURCE}"
+  assert_output --partial "fails its checksum"
+
+  rm "${archive}.sha256"
+  run -2 dybatpho::backup_diff "${archive}" "${SOURCE}"
+  assert_output --partial "No checksum sidecar beside: ${archive}"
+
+  run -2 dybatpho::backup_diff "${SOURCE}" "${BATS_TEST_TMPDIR}/missing"
+  assert_output --partial "Nothing to compare at: ${BATS_TEST_TMPDIR}/missing"
+}
+
+@test "dybatpho::backup_diff refuses a backup holding an entry that escapes" {
+  local evil="${DEST}/evil-20260101T000000Z.tar.gz"
+  mkdir -p "${DEST}" "${BATS_TEST_TMPDIR}/evil/bundle"
+  printf 'owned\n' > "${BATS_TEST_TMPDIR}/evil/victim.txt"
+  (
+    cd "${BATS_TEST_TMPDIR}/evil/bundle"
+    tar -czf "${evil}" -P ../victim.txt 2> /dev/null
+  )
+  printf '%s  %s\n' "$(dybatpho::file_hash "${evil}" sha256)" "$(basename "${evil}")" > "${evil}.sha256"
+
+  run -2 dybatpho::backup_diff "${evil}" "${SOURCE}"
+  assert_output --partial "outside the scratch directory"
+}

@@ -342,3 +342,156 @@ teardown() {
 
   rm -rf "${legacy_path}"
 }
+
+@test "dybatpho::lock_semaphore_acquire hands out each slot once, then refuses" {
+  local first second
+  run_traced dybatpho::lock_semaphore_acquire "pool" 2 0 first
+  assert_success
+  assert_equal "${first}" "1"
+  dybatpho::lock_semaphore_acquire "pool" 2 0 second
+  assert_equal "${second}" "2"
+  # A slot is a symbolic link whose target is data, so test for the link.
+  [[ -L "${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot1.lock" ]]
+
+  run_traced --separate-stderr dybatpho::lock_semaphore_acquire "pool" 2
+  assert_failure
+  assert_stderr --partial "Could not acquire a slot of semaphore pool: all 2 are held"
+  assert_stderr --partial "slot=1 pid=$$"
+  assert_stderr --partial "slot=2 pid=$$"
+
+  dybatpho::lock_semaphore_release "pool" 2
+}
+
+@test "dybatpho::lock_semaphore_acquire sets a caller variable called slot" {
+  local slot
+  dybatpho::lock_semaphore_acquire "pool" 3 0 slot
+  assert_equal "${slot}" "1"
+  dybatpho::lock_semaphore_release "pool" 3 "${slot}"
+}
+
+@test "dybatpho::lock_semaphore_acquire waits for a slot to free up" {
+  dybatpho::lock_semaphore_acquire "pool" 1
+  (
+    sleep 0.3
+    dybatpho::lock_semaphore_release "pool" 1 1
+  ) &
+  local releaser_pid=$!
+
+  run_traced dybatpho::lock_semaphore_acquire "pool" 1 2
+  assert_success
+  wait "${releaser_pid}"
+  dybatpho::lock_semaphore_release "pool" 1
+}
+
+@test "dybatpho::lock_semaphore_acquire reclaims a slot left by a dead process" {
+  local slot_path="${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot1.lock"
+  ln -s "999999:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${slot_path}"
+
+  local slot
+  run_traced --separate-stderr dybatpho::lock_semaphore_acquire "pool" 1 0 slot
+  assert_success
+  assert_stderr --partial "Reclaiming stale lock"
+  assert_equal "${slot}" "1"
+  dybatpho::lock_semaphore_release "pool" 1
+}
+
+@test "never more holders than slots, across concurrent processes" {
+  local worker="${BATS_TEST_TMPDIR}/worker.sh"
+  cat > "${worker}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock
+export DYBATPHO_LOCK_DIR=$(printf '%q' "${DYBATPHO_LOCK_DIR}") DYBATPHO_LOCK_POLL_INTERVAL=0.05
+dybatpho::with_semaphore pool 2 30 -- bash -c '
+  printf "+\n" >> "\$1"
+  inside=\$(grep -c + "\$1"); left=\$(grep -c - "\$1" || true)
+  printf "%s\n" "\$((inside - left))" >> "\$2"
+  sleep 0.2
+  printf "%s\n" "-" >> "\$1"
+' _ "\$1" "\$2"
+SCRIPT
+  local events="${BATS_TEST_TMPDIR}/events" peaks="${BATS_TEST_TMPDIR}/peaks"
+  : > "${events}"
+  local at
+  for at in 1 2 3 4 5 6; do
+    bash "${worker}" "${events}" "${peaks}" &
+  done
+  wait
+
+  assert_equal "$(wc -l < "${peaks}" | tr -d ' ')" "6"
+  local peak
+  peak="$(sort -n "${peaks}" | tail -1)"
+  ((peak >= 1 && peak <= 2))
+  run_traced dybatpho::lock_semaphore_holders "pool" 2
+  assert_failure
+}
+
+@test "dybatpho::lock_semaphore_release frees only the named slot or the caller's own" {
+  # Long enough to outlast a slow run; it is killed at the end.
+  sleep 120 &
+  local foreign_pid=$!
+  ln -s "${foreign_pid}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" \
+    "${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot2.lock"
+  dybatpho::lock_semaphore_acquire "pool" 3
+  dybatpho::lock_semaphore_acquire "pool" 3
+
+  # Without a slot number only this process's slots go; the foreign one stays.
+  run_traced dybatpho::lock_semaphore_release "pool" 3
+  assert_success
+  run_traced dybatpho::lock_semaphore_holders "pool" 3
+  assert_success
+  assert_output --regexp "^slot=2 pid=${foreign_pid} "
+
+  run_traced --separate-stderr dybatpho::lock_semaphore_release "pool" 3 2
+  assert_failure
+  assert_stderr --partial "is held by pid ${foreign_pid}"
+
+  kill "${foreign_pid}" 2> /dev/null || true
+  rm -f "${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot2.lock"
+}
+
+@test "dybatpho::lock_semaphore_holders reports nothing for a free semaphore" {
+  run_traced dybatpho::lock_semaphore_holders "idle" 4
+  assert_failure
+  assert_output ""
+}
+
+@test "the semaphore functions refuse a bad slot count, slot or timeout" {
+  run --separate-stderr dybatpho::lock_semaphore_acquire "pool" 0
+  assert_failure
+  assert_stderr --partial "slot count must be a whole number from 1 to 9999, got: 0"
+
+  run --separate-stderr dybatpho::lock_semaphore_acquire "pool" 2 soon
+  assert_failure
+  assert_stderr --partial "timeout must be a number of seconds, got: soon"
+
+  run --separate-stderr dybatpho::lock_semaphore_release "pool" 2 3
+  assert_failure
+  assert_stderr --partial "Not a slot of pool: 3"
+
+  run --separate-stderr dybatpho::lock_semaphore_holders "pool" many
+  assert_failure
+  assert_stderr --partial "got: many"
+}
+
+@test "dybatpho::with_semaphore runs the command and gives the slot back" {
+  run_traced dybatpho::with_semaphore "pool" 2 1 -- bash -c 'echo ran; exit 4'
+  assert_failure 4
+  assert_output "ran"
+  run_traced dybatpho::lock_semaphore_holders "pool" 2
+  assert_failure
+}
+
+@test "dybatpho::with_semaphore fails when no slot frees up, and needs --" {
+  dybatpho::lock_semaphore_acquire "pool" 1
+  run_traced --separate-stderr dybatpho::with_semaphore "pool" 1 0 -- true
+  assert_failure
+  assert_stderr --partial "all 1 are held"
+  dybatpho::lock_semaphore_release "pool" 1
+
+  run --separate-stderr dybatpho::with_semaphore "pool" 1 0 true
+  assert_failure
+  assert_stderr --partial "Expected: name slots timeout -- command"
+
+  run --separate-stderr dybatpho::with_semaphore "pool" 1 0 --
+  assert_failure
+  assert_stderr --partial "Expected a command to run after --"
+}

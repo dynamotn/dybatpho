@@ -10,7 +10,9 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 dybatpho::register_common_handlers
 
-DYBATPHO_LOCK_DIR="${TMPDIR:-/tmp}"
+# A directory of its own, removed when the script ends, so two copies of this
+# example running at once -- as the test suite does -- never share a lock.
+dybatpho::create_temp_dir DYBATPHO_LOCK_DIR "lock-example"
 LOCK_NAME="lock_ops_demo"
 
 # --- acquire / release ------------------------------------------------------
@@ -91,6 +93,34 @@ function _demo_with_lock {
   dybatpho::success "Command ran and lock was released automatically"
 }
 
+# --- semaphore --------------------------------------------------------------
+
+# @description Run the `SEMAPHORE` section of this example: two slots, three
+#   workers, and the third waits for one of the first two to finish.
+# @noargs
+function _demo_semaphore {
+  dybatpho::header "SEMAPHORE"
+  local name="${LOCK_NAME}-pool" first second
+  dybatpho::lock_semaphore_acquire "${name}" 2 0 first
+  dybatpho::lock_semaphore_acquire "${name}" 2 0 second
+  dybatpho::info "Holding slots ${first} and ${second}:"
+  dybatpho::lock_semaphore_holders "${name}" 2 | cut -d' ' -f1-2
+
+  if ! dybatpho::lock_semaphore_acquire "${name}" 2 2> /dev/null; then
+    dybatpho::warn "A third worker is turned away while both slots are held"
+  fi
+
+  (
+    sleep 1
+    dybatpho::lock_semaphore_release "${name}" 2 "${first}"
+  ) &
+  local releaser_pid=$!
+  dybatpho::with_semaphore "${name}" 2 3 -- bash -c 'echo "third worker ran once a slot freed"'
+  wait "${releaser_pid}" 2> /dev/null || true
+  dybatpho::lock_semaphore_release "${name}" 2
+  dybatpho::success "Every slot given back"
+}
+
 # --- main -----------------------------------------------------------------
 
 # @description Run every section of this example, in order.
@@ -101,6 +131,7 @@ function _main {
   _demo_lock_info
   _demo_wait_with_timeout
   _demo_with_lock
+  _demo_semaphore
   dybatpho::success "Lock operations demo complete"
 }
 

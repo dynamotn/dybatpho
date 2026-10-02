@@ -112,6 +112,34 @@ both cases.
 3. **Given** the lock cannot be acquired within the timeout, **When**
    `with_lock` runs, **Then** it fails without running the command
 
+---
+
+### User Story 6 - Let a few runs in at once (Priority: P2)
+
+As a script author, I want at most N copies of a section to run at the same
+time, so that parallel downloads or builds share a machine without overloading
+it, and a crashed copy never takes a slot with it.
+
+**Independent Test**: Start more workers than slots through `with_semaphore`
+and verify the number inside never exceeds the slot count and every worker
+eventually runs.
+
+**Acceptance Scenarios**:
+
+1. **Given** a semaphore with N slots, **When** N callers acquire it, **Then**
+   each gets a distinct slot number, and the next caller is refused with every
+   holder named
+2. **Given** every slot is held, **When** a caller waits with a timeout and a
+   slot frees up, **Then** it takes that slot
+3. **Given** a slot recorded by a dead process, **When** a caller acquires,
+   **Then** the slot is reclaimed with a notice
+4. **Given** a slot number, **When** it is released, **Then** that slot frees,
+   unless another live process holds it; **Given** no slot number, **Then**
+   every slot the current process holds frees and no other
+5. **Given** `with_semaphore NAME SLOTS TIMEOUT -- COMMAND`, **When** it runs,
+   **Then** the command runs holding a slot, the slot is given back afterwards,
+   and the command's exit code is propagated
+
 ### Example Workflow
 
 ```bash
@@ -124,6 +152,10 @@ dybatpho::with_lock "deploy" 30 -- ./deploy.sh --env prod
 
 # Report who is blocking us.
 dybatpho::lock_info "deploy"
+
+# At most four downloads at once, across every copy of the script.
+dybatpho::with_semaphore downloads 4 60 -- curl -fsSLO "${url}"
+dybatpho::lock_semaphore_holders downloads 4
 ```
 
 ## Edge Cases
@@ -142,6 +174,12 @@ dybatpho::lock_info "deploy"
 - `lock_info` is called for a lock that is not held.
 - `with_lock` is called without the `--` separator or without a command.
 - `hostname` is unavailable, so the host name must come from a fallback.
+- More callers than semaphore slots arrive at the same instant.
+- A semaphore slot is held by a dead process, or by another live process when
+  it is named for release.
+- A slot count of `0`, a slot number outside the semaphore, or a timeout that
+  is not a number.
+- The caller's variable for the slot number is called `slot`.
 
 ## Requirements *(mandatory)*
 
@@ -199,6 +237,22 @@ dybatpho::lock_info "deploy"
 - **FR-020**: `with_lock` MUST release the lock when the command it is
   running is interrupted, and MUST restore the signal handlers it installed, so
   repeated calls do not accumulate handlers.
+- **FR-021**: `lock_semaphore_acquire` MUST let at most the given number of
+  slots be held at once, each slot being a lock claimed atomically and
+  reclaimed when stale, and MUST report the slot taken through an optional
+  variable.
+- **FR-022**: `lock_semaphore_acquire` MUST wait up to its timeout for a free
+  slot, and on failure MUST report every holder on stderr.
+- **FR-023**: `lock_semaphore_release` MUST release the named slot under the
+  same ownership rule as `lock_release`, and without a slot MUST release every
+  slot held by the current process and no other.
+- **FR-024**: `lock_semaphore_holders` MUST print `slot=<n>` followed by the
+  holder metadata for each held slot, and MUST fail when no slot is held.
+- **FR-025**: `with_semaphore` MUST follow the `with_lock` contract — the `--`
+  separator, release after success, failure and interruption, and the
+  command's exit code — for one slot of a semaphore.
+- **FR-026**: A slot count outside `1`..`9999`, a slot number outside the
+  semaphore, or a non-numeric timeout MUST stop the script.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -212,6 +266,8 @@ dybatpho::lock_info "deploy"
   current host.
 - **Lock Base Directory**: `DYBATPHO_LOCK_DIR`, the root used to resolve bare
   lock names.
+- **Semaphore Slot**: One of N locks named `<name>.slot<n>.lock` beside the
+  semaphore's lock path; holding any one of them is holding the semaphore.
 
 ## Success Criteria *(mandatory)*
 
@@ -225,6 +281,8 @@ dybatpho::lock_info "deploy"
   including when it fails.
 - **SC-005**: No lock operation depends on `flock` or any other tool absent
   from a default macOS install.
+- **SC-006**: However many copies start, no more than the slot count are ever
+  inside a semaphore at once.
 
 ## Integration Tests *(mandatory)*
 
@@ -250,6 +308,21 @@ dybatpho::lock_info "deploy"
   and still reported as held.
 - **IT-012**: Verify `with_lock` has a release handler installed while
   its command runs and none afterwards.
+- **IT-013**: Hand out each semaphore slot once, then refuse and name every
+  holder.
+- **IT-014**: Set a caller variable called `slot`.
+- **IT-015**: Wait for a slot freed in the background.
+- **IT-016**: Reclaim a slot recorded by a dead process.
+- **IT-017**: Run six concurrent workers through a two-slot semaphore and
+  verify no more than two were ever inside.
+- **IT-018**: Release only the caller's own slots without a slot number, and
+  refuse a named slot held by another live process.
+- **IT-019**: Report nothing for a free semaphore.
+- **IT-020**: Refuse a bad slot count, slot number, or timeout.
+- **IT-021**: Run a command through `with_semaphore`, propagate its exit code,
+  and give the slot back.
+- **IT-022**: Fail `with_semaphore` when no slot frees up, and reject a missing
+  `--` or command.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -258,3 +331,5 @@ dybatpho::lock_info "deploy"
    with the identity of the process still holding it.
 3. Failures identify the lock path and the blocking process rather than failing
    silently.
+4. A semaphore is built from the same atomic, self-describing locks, so it
+   inherits their stale reclaim and holder reporting rather than adding its own.

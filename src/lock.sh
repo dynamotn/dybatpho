@@ -302,6 +302,31 @@ function __dybatpho_lock_identity {
 }
 
 #######################################
+# @description Make one attempt at a lock path, reclaiming it first when its
+#   holder is dead.
+# @arg $1 string Lock path
+# @exitcode 0 The lock was taken by the current process
+# @exitcode 1 A live process holds it
+# @internal
+#######################################
+function __dybatpho_lock_try {
+  local lock_path="$1"
+  dybatpho::lock_reclaim_stale "${lock_path}"
+
+  # One syscall claims the lock and says who holds it. `symlink()` fails when
+  # the name already exists, and the identity is already in the target, so
+  # there is no window in which the lock exists without an owner. Claiming
+  # with `mkdir` and writing the pid afterwards left exactly such a window,
+  # and a second process read the missing pid as "nobody holds this", removed
+  # the lock and took it.
+  local lock_target
+  lock_target=$(__dybatpho_lock_target)
+  ln -s "${lock_target}" "${lock_path}" 2> /dev/null || return 1
+  printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" \
+    > "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" 2> /dev/null || true
+}
+
+#######################################
 # @description Acquire a portable, cross-platform (Linux/macOS) file lock, waiting up to a timeout.
 # @example
 #   dybatpho::lock_acquire "$(basename "$0")" || dybatpho::die "Already running"
@@ -330,21 +355,7 @@ function dybatpho::lock_acquire {
   local start_time elapsed
   start_time="$(date +%s)"
   while true; do
-    dybatpho::lock_reclaim_stale "${lock_path}"
-
-    # One syscall claims the lock and says who holds it. `symlink()` fails when
-    # the name already exists, and the identity is already in the target, so
-    # there is no window in which the lock exists without an owner. Claiming
-    # with `mkdir` and writing the pid afterwards left exactly such a window,
-    # and a second process read the missing pid as "nobody holds this", removed
-    # the lock and took it.
-    local lock_target
-    lock_target=$(__dybatpho_lock_target)
-    if ln -s "${lock_target}" "${lock_path}" 2> /dev/null; then
-      printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" \
-        > "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" 2> /dev/null || true
-      return 0
-    fi
+    __dybatpho_lock_try "${lock_path}" && return 0
 
     elapsed=$(($(date +%s) - start_time))
     if ((elapsed >= timeout)); then
@@ -401,36 +412,228 @@ function dybatpho::with_lock {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
   dybatpho::lock_acquire "${name}" "${timeout}" || return 1
-
-  # Without this, an interrupted command left the lock behind: the release below
-  # is only reached when the command returns normally, so Ctrl-C during a long
-  # job left the lock for the next run to trip over. Releasing is idempotent and
-  # checks ownership, so the handler and the normal path can both run.
-  #
-  # EXIT is deliberately not handled. An EXIT handler installed here outlives
-  # this function, runs in whatever context the script ends in, and collides
-  # with handlers the caller already has -- Bats being the case that showed it.
-  # The residual gap is a command that is a shell *function* calling `exit`,
-  # which ends this shell without a signal; a command run as a program, which is
-  # what the `--` form is for, returns its status here and is released normally.
-  # The handlers are put back afterwards rather than left in place: `with_lock`
-  # can be called many times in one script, and a handler per call would
-  # accumulate, each one releasing a lock that is long gone.
-  local quoted_name previous_traps signal
+  local quoted_name
   printf -v quoted_name '%q' "${name}"
+  __dybatpho_lock_run_holding "dybatpho::lock_release ${quoted_name}" "$@"
+}
+
+#######################################
+# @description Run a command while a lock is held, then run the release, even
+#   when the command fails or the shell is interrupted.
+#
+#   Without the handlers, an interrupted command left the lock behind: the
+#   release is only reached when the command returns normally, so Ctrl-C during
+#   a long job left the lock for the next run to trip over. Releasing is
+#   idempotent and checks ownership, so the handler and the normal path can both
+#   run.
+#
+#   EXIT is deliberately not handled. An EXIT handler installed here outlives
+#   this function, runs in whatever context the script ends in, and collides
+#   with handlers the caller already has -- Bats being the case that showed it.
+#   The residual gap is a command that is a shell *function* calling `exit`,
+#   which ends this shell without a signal; a command run as a program, which is
+#   what the `--` form is for, returns its status here and is released normally.
+#   The handlers are put back afterwards rather than left in place: the wrappers
+#   can be called many times in one script, and a handler per call would
+#   accumulate, each one releasing a lock that is long gone.
+# @arg $1 string Shell code that releases the lock, already quoted
+# @arg $@ string Command and arguments to run
+# @exitcode other Exit code of the command
+# @internal
+#######################################
+function __dybatpho_lock_run_holding {
+  local release="$1"
+  shift
+
+  local previous_traps signal
   previous_traps=""
   for signal in HUP INT TERM; do
     previous_traps+="$(trap -p "${signal}")"$'\n'
   done
 
-  dybatpho::trap "dybatpho::lock_release ${quoted_name} > /dev/null 2>&1 || true" \
-    HUP INT TERM
+  # kcov records no hit here, though "with_lock installs a release handler"
+  # runs it and asserts the handler it installs.
+  dybatpho::trap "${release} > /dev/null 2>&1 || true" HUP INT TERM # kcov(skip)
 
   local exit_code=0
   "$@" || exit_code=$?
-  dybatpho::lock_release "${name}"
+  eval "${release}"
 
   trap - HUP INT TERM
   eval "${previous_traps}"
   return "${exit_code}"
+}
+
+#######################################
+# @description Print the path of one slot of a semaphore.
+#   Each slot is an ordinary lock beside the others, named after the semaphore,
+#   so everything that inspects or reclaims a lock works on a slot unchanged.
+# @arg $1 string Semaphore name or path
+# @arg $2 number Slot number, from 1
+# @stdout The slot's lock path
+# @internal
+#######################################
+function __dybatpho_lock_slot_path {
+  local base
+  base="$(dybatpho::lock_path "$1")"
+  printf '%s.slot%s.lock\n' "${base%.lock}" "$2"
+}
+
+#######################################
+# @description Stop the script when a slot count is not a whole number from 1
+#   to 9999.
+# @arg $1 number Slot count
+# @internal
+#######################################
+function __dybatpho_lock_expect_slots {
+  [[ "$1" =~ ^[1-9][0-9]{0,3}$ ]] \
+    || dybatpho::die "${FUNCNAME[1]}: The slot count must be a whole number from 1 to 9999, got: $1"
+}
+
+#######################################
+# @description Take one of a fixed number of slots, so that at most that many
+#   processes run a section at once, waiting up to a timeout for one to free up.
+#
+#   A semaphore is a row of ordinary locks, one per slot, tried in order. Each
+#   slot is claimed atomically and records its holder, so a slot left by a dead
+#   process is reclaimed exactly as a stale lock is, and a refusal names every
+#   process holding a slot. Every caller must give the same slot count.
+# @example
+#   local slot
+#   dybatpho::lock_semaphore_acquire downloads 4 60 slot || exit 1
+#   curl -fsSLO "${url}"
+#   dybatpho::lock_semaphore_release downloads 4 "${slot}"
+#
+# @arg $1 string Semaphore name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path
+# @arg $2 number Number of slots, from 1 to 9999
+# @arg $3 number Seconds to wait for a free slot before giving up, default 0 (try once, don't wait)
+# @arg $4 string Optional name of a variable receiving the slot number taken
+# @set The named variable, when one is given
+# @env DYBATPHO_LOCK_POLL_INTERVAL number Seconds to sleep between attempts while waiting
+# @stderr Every holder when no slot could be taken
+# @exitcode 0 A slot was taken by the current process
+# @exitcode 1 Every slot is still held by a live process after the timeout
+#######################################
+function dybatpho::lock_semaphore_acquire {
+  local name slots
+  dybatpho::expect_args name slots -- "$@"
+  local timeout="${3:-0}" target="${4-}"
+  __dybatpho_lock_expect_slots "${slots}"
+  dybatpho::is int "${timeout}" \
+    || dybatpho::die "${FUNCNAME[0]}: The timeout must be a number of seconds, got: ${timeout}"
+  [[ -z "${target}" ]] || dybatpho::expect_ref "${target}"
+
+  local start_time elapsed __dybatpho_lock_slot slot_path
+  start_time="$(date +%s)"
+  while true; do
+    for ((__dybatpho_lock_slot = 1; __dybatpho_lock_slot <= slots; __dybatpho_lock_slot++)); do
+      slot_path="$(__dybatpho_lock_slot_path "${name}" "${__dybatpho_lock_slot}")"
+      __dybatpho_lock_try "${slot_path}" || continue
+      if [[ -n "${target}" ]]; then
+        # The loop counter carries the library's prefix so that a caller's
+        # variable called `slot` is not shadowed by it.
+        local -n slot_ref="${target}"
+        # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
+        slot_ref="${__dybatpho_lock_slot}"
+      fi
+      return 0
+    done
+
+    elapsed=$(($(date +%s) - start_time))
+    if ((elapsed >= timeout)); then
+      local holders
+      holders="$(dybatpho::lock_semaphore_holders "${name}" "${slots}" 2> /dev/null || true)"
+      dybatpho::error "Could not acquire a slot of semaphore ${name}: all ${slots} are held"$'\n'"${holders}"
+      return 1
+    fi
+    sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"
+  done
+}
+
+#######################################
+# @description Give back a semaphore slot taken by the current process.
+#   Naming the slot releases that one; without it, every slot the current
+#   process holds is released, which is what an exit handler wants.
+# @arg $1 string Semaphore name or path
+# @arg $2 number Number of slots, as given when acquiring
+# @arg $3 number Optional slot number to release
+# @exitcode 0 The slot was released, or was not held by the current process
+# @exitcode 1 The named slot is held by another live process and was left untouched
+#######################################
+function dybatpho::lock_semaphore_release {
+  local name slots
+  dybatpho::expect_args name slots -- "$@"
+  local wanted="${3-}"
+  __dybatpho_lock_expect_slots "${slots}"
+
+  local slot_path
+  if [[ -n "${wanted}" ]]; then
+    if ! [[ "${wanted}" =~ ^[0-9]{1,4}$ ]] || ((10#${wanted} < 1 || 10#${wanted} > slots)); then
+      # Tested under `run` ("refuse a bad slot count, slot or timeout"): it exits.
+      dybatpho::die "${FUNCNAME[0]}: Not a slot of ${name}: ${wanted}" # kcov(skip)
+    fi
+    slot_path="$(__dybatpho_lock_slot_path "${name}" "$((10#${wanted}))")"
+    dybatpho::lock_release "${slot_path}"
+    return
+  fi
+
+  local slot owner
+  for ((slot = 1; slot <= slots; slot++)); do
+    slot_path="$(__dybatpho_lock_slot_path "${name}" "${slot}")"
+    owner="$(dybatpho::lock_field "${slot_path}" pid)"
+    [[ "${owner}" == "$$" ]] || continue
+    dybatpho::lock_release "${slot_path}"
+  done
+}
+
+#######################################
+# @description Print who holds each taken slot of a semaphore.
+# @arg $1 string Semaphore name or path
+# @arg $2 number Number of slots
+# @stdout `slot=<n> pid=<pid> host=<host> acquired_at=<timestamp> command=<command>`, one line per held slot
+# @exitcode 0 At least one slot is held
+# @exitcode 1 No slot is held
+#######################################
+function dybatpho::lock_semaphore_holders {
+  local name slots
+  dybatpho::expect_args name slots -- "$@"
+  __dybatpho_lock_expect_slots "${slots}"
+
+  local slot slot_path info found=1
+  for ((slot = 1; slot <= slots; slot++)); do
+    slot_path="$(__dybatpho_lock_slot_path "${name}" "${slot}")"
+    info="$(dybatpho::lock_info "${slot_path}")" || continue
+    printf 'slot=%s %s\n' "${slot}" "${info}"
+    found=0
+  done
+  return "${found}"
+}
+
+#######################################
+# @description Take a semaphore slot, run a command while holding it, then give
+#   the slot back, even if the command fails or the shell is interrupted.
+# @example
+#   dybatpho::with_semaphore builds 2 300 -- make -C "${project}"
+#
+# @arg $1 string Semaphore name or path
+# @arg $2 number Number of slots
+# @arg $3 number Seconds to wait for a free slot before giving up
+# @arg $4 string Literal `--` separating semaphore options from the command
+# @arg $@ string Command and arguments to run while holding the slot
+# @exitcode 1 No slot could be taken within the timeout
+# @exitcode other Exit code of the wrapped command
+#######################################
+function dybatpho::with_semaphore {
+  local name slots timeout separator
+  dybatpho::expect_args name slots timeout separator -- "$@"
+  shift 4
+  [[ "${separator}" == "--" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected: name slots timeout -- command [args...]"
+  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+
+  local slot
+  dybatpho::lock_semaphore_acquire "${name}" "${slots}" "${timeout}" slot || return 1
+  local release
+  printf -v release 'dybatpho::lock_semaphore_release %q %q %q' "${name}" "${slots}" "${slot}"
+  __dybatpho_lock_run_holding "${release}" "$@"
 }

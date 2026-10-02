@@ -40,6 +40,10 @@ A lock is a directory containing metadata about the process holding it
 - [`dybatpho::lock_acquire`](#dybatpholock_acquire) — Acquire a portable, cross-platform (Linux/macOS) file lock, waiting up to a timeout.
 - [`dybatpho::lock_release`](#dybatpholock_release) — Release a lock previously acquired by the current process.
 - [`dybatpho::with_lock`](#dybatphowith_lock) — Acquire a lock, run a command while holding it, then release it, even if the command fails.
+- [`dybatpho::lock_semaphore_acquire`](#dybatpholock_semaphore_acquire) — Take one of a fixed number of slots, so that at most that many processes run a section at once, waiting up to a timeout for one to free up. A semaphore is a row of ordinary locks, one per slot, tried in order. Each slot is claimed atomically and records its holder, so a slot left by a dead process is reclaimed exactly as a stale lock is, and a refusal names every process holding a slot. Every caller must give the same slot count.
+- [`dybatpho::lock_semaphore_release`](#dybatpholock_semaphore_release) — Give back a semaphore slot taken by the current process. Naming the slot releases that one; without it, every slot the current process holds is released, which is what an exit handler wants.
+- [`dybatpho::lock_semaphore_holders`](#dybatpholock_semaphore_holders) — Print who holds each taken slot of a semaphore.
+- [`dybatpho::with_semaphore`](#dybatphowith_semaphore) — Take a semaphore slot, run a command while holding it, then give the slot back, even if the command fails or the shell is interrupted.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -303,4 +307,130 @@ dybatpho::with_lock "deploy" 30 -- ./deploy.sh --env prod
 **🚦 Exit codes**
 
 - `1`: The lock couldn't be acquired within the timeout
+- `other`: Exit code of the wrapped command
+
+
+---
+
+### `dybatpho::lock_semaphore_acquire`
+
+Take one of a fixed number of slots, so that at most that many
+processes run a section at once, waiting up to a timeout for one to free up.
+
+A semaphore is a row of ordinary locks, one per slot, tried in order. Each
+slot is claimed atomically and records its holder, so a slot left by a dead
+process is reclaimed exactly as a stale lock is, and a refusal names every
+process holding a slot. Every caller must give the same slot count.
+
+**🧪 Example**
+
+```bash
+local slot
+dybatpho::lock_semaphore_acquire downloads 4 60 slot || exit 1
+curl -fsSLO "${url}"
+dybatpho::lock_semaphore_release downloads 4 "${slot}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Semaphore name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path |
+| `$2` | number | Number of slots, from 1 to 9999 |
+| `$3` | number | Seconds to wait for a free slot before giving up, default 0 (try once, don't wait) |
+| `$4` | string | Optional name of a variable receiving the slot number taken |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_LOCK_POLL_INTERVAL`** | number | Seconds to sleep between attempts while waiting |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable, when one is given
+
+**📤 Output on stderr**
+
+- Every holder when no slot could be taken
+
+**🚦 Exit codes**
+
+- `0`: A slot was taken by the current process
+- `1`: Every slot is still held by a live process after the timeout
+
+
+---
+
+### `dybatpho::lock_semaphore_release`
+
+Give back a semaphore slot taken by the current process.
+Naming the slot releases that one; without it, every slot the current
+process holds is released, which is what an exit handler wants.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Semaphore name or path |
+| `$2` | number | Number of slots, as given when acquiring |
+| `$3` | number | Optional slot number to release |
+
+**🚦 Exit codes**
+
+- `0`: The slot was released, or was not held by the current process
+- `1`: The named slot is held by another live process and was left untouched
+
+
+---
+
+### `dybatpho::lock_semaphore_holders`
+
+Print who holds each taken slot of a semaphore.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Semaphore name or path |
+| `$2` | number | Number of slots |
+
+**📤 Output on stdout**
+
+- `slot=<n> pid=<pid> host=<host> acquired_at=<timestamp> command=<command>`, one line per held slot
+
+**🚦 Exit codes**
+
+- `0`: At least one slot is held
+- `1`: No slot is held
+
+
+---
+
+### `dybatpho::with_semaphore`
+
+Take a semaphore slot, run a command while holding it, then give
+the slot back, even if the command fails or the shell is interrupted.
+
+**🧪 Example**
+
+```bash
+dybatpho::with_semaphore builds 2 300 -- make -C "${project}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Semaphore name or path |
+| `$2` | number | Number of slots |
+| `$3` | number | Seconds to wait for a free slot before giving up |
+| `$4` | string | Literal `--` separating semaphore options from the command |
+| `$@` | string | Command and arguments to run while holding the slot |
+
+**🚦 Exit codes**
+
+- `1`: No slot could be taken within the timeout
 - `other`: Exit code of the wrapped command

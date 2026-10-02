@@ -163,6 +163,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
   ```
 
+- **`lock` — semaphores: let a few runs in at once.**
+  `dybatpho::lock_semaphore_acquire <name> <slots> [timeout] [var]` takes one of
+  a fixed number of slots, waiting up to the timeout for one to free up, and
+  names the slot it took; `dybatpho::lock_semaphore_release` gives back that
+  slot, or every slot the current process holds. Each slot is an ordinary
+  lock, so one left by a crashed process is reclaimed the same way, and a
+  refusal lists every holder, as `dybatpho::lock_semaphore_holders` does.
+  `dybatpho::with_semaphore` runs a command holding a slot and gives it back
+  afterwards, on failure and interruption too, exactly as `dybatpho::with_lock`
+  does for a lock.
+
+  ```sh
+  dybatpho::with_semaphore downloads 4 60 -- curl -fsSLO "${url}"
+  dybatpho::lock_semaphore_acquire builds 2 300 slot || exit 1
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

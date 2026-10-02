@@ -213,6 +213,43 @@ _child() {
   assert_output ""
 }
 
+@test "dybatpho::color_supported lets NO_COLOR win over everything" {
+  # A reader who cannot use colour is not expressing a preference, so this
+  # beats both FORCE_COLOR and an attached terminal.
+  NO_COLOR=1 FORCE_COLOR=1 run_traced -1 dybatpho::color_supported stdout
+  NO_COLOR=1 run_traced -1 dybatpho::color_supported stderr
+}
+
+@test "dybatpho::color_supported honours FORCE_COLOR over the stream" {
+  # The case a pipe into `less -R` or a CI log viewer needs: not a terminal,
+  # but colour is still wanted.
+  NO_COLOR="" FORCE_COLOR=1 run_traced -0 dybatpho::color_supported stdout > /dev/null
+}
+
+@test "dybatpho::color_supported refuses a terminal that cannot render colour" {
+  NO_COLOR="" FORCE_COLOR="" TERM=dumb run_traced -1 dybatpho::color_supported stdout
+}
+
+@test "dybatpho::color_supported follows the stream when nothing overrides it" {
+  # Each stream is answered separately, which is what a module writing
+  # diagnostics to stderr and data to stdout needs.
+  cat > "${BATS_TEST_TMPDIR}/color.sh" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh
+NO_COLOR="" FORCE_COLOR="" TERM=xterm
+dybatpho::color_supported stdout && printf 'stdout:yes\n' >&2 || printf 'stdout:no\n' >&2
+SCRIPT
+
+  # Redirected to a file, stdout is not a terminal and colour is not wanted.
+  run_traced --separate-stderr bash "${BATS_TEST_TMPDIR}/color.sh" > /dev/null
+  assert_stderr "stdout:no"
+}
+
+@test "dybatpho::color_supported rejects a stream it does not know" {
+  run --separate-stderr dybatpho::color_supported sideways
+  assert_failure
+  assert_stderr --partial "Stream must be stdin, stdout, or stderr"
+}
+
 @test "dybatpho::is_tty is false for the captured streams of a test" {
   run_traced ! dybatpho::is_tty stdin
   run_traced ! dybatpho::is_tty stdout

@@ -55,7 +55,7 @@ function __dybatpho_diff_wants_color {
     dybatpho::is true "${DYBATPHO_DIFF_COLOR}"
     return
   fi
-  [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]
+  dybatpho::color_supported stdout
 }
 
 #######################################

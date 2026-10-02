@@ -2496,14 +2496,19 @@ function dybatpho::screen_keybar {
 #   | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red |
 #   | `mono` | no colour at all, only bold, dim and reverse |
 #
-#   `NO_COLOR` turns `dusk` into `mono`, so an application can ask for colour
-#   and still respect a user who does not want it.
+#   A theme is downgraded to `mono` when colour is not wanted, so an
+#   application can ask for a palette and still respect the environment it
+#   runs in. `dybatpho::color_supported` decides, which means `NO_COLOR` and
+#   `TERM=dumb` both reach `mono`, and `FORCE_COLOR` keeps the palette on a
+#   stream that is not a terminal.
 # @example
 #   dybatpho::screen_theme dusk
 #   dybatpho::screen_block "${rect}" title:"Tools" focus:true
 #
 # @arg $1 string Theme name: `default`, `dusk`, or `mono`
 # @env NO_COLOR string Use `mono` in place of a coloured theme when set to a non-empty value
+# @env FORCE_COLOR string Keep a coloured theme even when stdout is not a terminal
+# @see dybatpho::color_supported
 # @set DYBATPHO_SCREEN_STYLE_* string Every style variable of the module, from the palette
 # @exitcode 0 The theme was applied
 # @exitcode 1 The theme is unknown, and nothing was changed
@@ -2511,7 +2516,15 @@ function dybatpho::screen_keybar {
 function dybatpho::screen_theme {
   local name
   dybatpho::expect_args name -- "$@"
-  [[ "${name}" == dusk && -n "${NO_COLOR:-}" ]] && name="mono"
+  # `default` is downgraded too, not only `dusk`: it carries three colours of
+  # its own, and leaving them on under `NO_COLOR` was the module answering the
+  # question differently depending on which theme was asked for. Only a known
+  # coloured theme is downgraded, so an unknown name still reaches the arm
+  # that rejects it rather than being quietly accepted as `mono`.
+  if [[ "${name}" == default || "${name}" == dusk ]] \
+    && ! dybatpho::color_supported stdout; then
+    name="mono"
+  fi
   case "${name}" in
     default)
       DYBATPHO_SCREEN_STYLE_SELECTED="1;7" DYBATPHO_SCREEN_STYLE_BORDER="2"

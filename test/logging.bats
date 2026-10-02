@@ -251,7 +251,10 @@ teardown() {
 @test "dybatpho::debug output when using debug level" {
   # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
-  run_traced --separate-stderr dybatpho::debug foo
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::debug foo
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;36m")"
@@ -288,7 +291,10 @@ a newline'
 }
 
 @test "dybatpho::info output" {
-  run_traced --separate-stderr dybatpho::info daylathongtin
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::info daylathongtin
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;34m")"
@@ -307,7 +313,10 @@ a newline'
 }
 
 @test "dybatpho::progress output" {
-  run_traced --separate-stderr dybatpho::progress daylathongtin
+  # The decision follows the stream now, and a captured stdout is not a
+  # terminal; this test is about which colour is used, not about whether
+  # colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::progress daylathongtin
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[0;3;34m")"
@@ -337,7 +346,10 @@ a newline'
 }
 
 @test "dybatpho::header output" {
-  run_traced --separate-stderr dybatpho::header daylathongtin
+  # The decision follows the stream now, and a captured stdout is not a
+  # terminal; this test is about which colour is used, not about whether
+  # colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::header daylathongtin
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[1;5;30;47m")"
@@ -348,7 +360,10 @@ a newline'
 }
 
 @test "dybatpho::success output" {
-  run_traced --separate-stderr dybatpho::success daylathongtin
+  # The decision follows the stream now, and a captured stdout is not a
+  # terminal; this test is about which colour is used, not about whether
+  # colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::success daylathongtin
   assert_success
   refute_stderr
   assert_output --partial "$(echo -e "\e[1;3;32m")"
@@ -465,7 +480,10 @@ PY
 }
 
 @test "dybatpho::warn output" {
-  run --separate-stderr dybatpho::warn haycanthan
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run --separate-stderr dybatpho::warn haycanthan
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;33")"
@@ -476,7 +494,10 @@ PY
 }
 
 @test "dybatpho::error output" {
-  run_traced --separate-stderr dybatpho::error loiroine
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::error loiroine
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[1;31m")"
@@ -486,7 +507,10 @@ PY
 }
 
 @test "dybatpho::fatal output" {
-  run_traced --separate-stderr dybatpho::fatal loiroine
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::fatal loiroine
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;31m")"
@@ -505,7 +529,10 @@ PY
 @test "dybatpho::start_trace output when using trace level" {
   # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
-  run_traced --separate-stderr dybatpho::start_trace
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::start_trace
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;37m")"
@@ -524,7 +551,10 @@ PY
 @test "dybatpho::end_trace output when using trace level" {
   # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
-  run_traced --separate-stderr dybatpho::end_trace
+  # The decision follows the stream now, and a captured stderr is not a
+  # terminal; this test is about which colour a level uses, not about
+  # whether colour is wanted.
+  FORCE_COLOR=1 run_traced --separate-stderr dybatpho::end_trace
   assert_success
   refute_output
   assert_stderr --partial "$(echo -e "\e[0;37m")"

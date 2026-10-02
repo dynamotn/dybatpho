@@ -305,6 +305,39 @@ function dybatpho::is_tty {
 }
 
 #######################################
+# @description Return success when output on a stream should carry ANSI colour.
+#   One answer for the whole library, so a script'"'"'s log lines, its diffs and
+#   its prompts agree about whether colour is wanted.
+#
+#   The order is deliberate. `NO_COLOR` wins over everything, because a reader
+#   who cannot use colour is not asking for a preference. `FORCE_COLOR` then
+#   overrides the stream, which is what a caller piping into `less -R` or a CI
+#   log viewer needs. `TERM=dumb` rules colour out, and otherwise the stream
+#   has to be a terminal.
+#
+#   The stream matters: a module that writes diagnostics to stderr and data to
+#   stdout gets a different answer for each, and a single global one would be
+#   wrong for both.
+# @example
+#   dybatpho::color_supported stderr && printf '\033[31m%s\033[0m\n' "${msg}" >&2
+#
+# @arg $1 string Stream to answer for, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`, default is `stdout`
+# @env NO_COLOR string Any non-empty value turns colour off, whatever else is set
+# @env FORCE_COLOR string Any non-empty value turns colour on even when the stream is not a terminal
+# @env TERM string `dumb` turns colour off
+# @exitcode 0 Colour should be emitted on that stream
+# @exitcode 1 It should not
+#######################################
+function dybatpho::color_supported {
+  local stream="${1:-stdout}"
+
+  [[ -z "${NO_COLOR:-}" ]] || return 1
+  [[ -z "${FORCE_COLOR:-}" ]] || return 0
+  [[ "${TERM:-}" != "dumb" ]] || return 1
+  dybatpho::is_tty "${stream}"
+}
+
+#######################################
 # @description Print the width of the terminal in columns.
 #   `COLUMNS` is trusted first, because a caller that sets it is deliberately
 #   asking for a width, and `tput` is only asked when a terminal is actually

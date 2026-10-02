@@ -639,7 +639,10 @@ _end_then_write_stderr() {
 # =============================================================================
 
 @test "dybatpho::screen_theme sets every style from a palette" {
+  # The suite has no terminal, so colour has to be asked for; that is what
+  # `FORCE_COLOR` is now for.
   unset NO_COLOR
+  export FORCE_COLOR=1
   dybatpho::screen_theme dusk
   assert_equal "${DYBATPHO_SCREEN_STYLE_FOCUS}" "38;5;141"
   assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "1;38;5;114"
@@ -648,16 +651,33 @@ _end_then_write_stderr() {
   assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
 }
 
-@test "dybatpho::screen_theme falls back to mono under NO_COLOR" {
+@test "dybatpho::screen_theme falls back to mono when colour is not wanted" {
   export NO_COLOR=1
   dybatpho::screen_theme dusk
   local name
   for name in "${!DYBATPHO_SCREEN_STYLE_@}"; do
     [[ "${!name}" != *"38;5"* && "${!name}" != *"48;5"* ]] || fail "${name} has a colour: ${!name}"
   done
+
+  # `default` is downgraded too. It used to keep its own three colours under
+  # `NO_COLOR`, which made the answer depend on which theme was asked for.
+  dybatpho::screen_theme default
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "1"
+
+  # A terminal that cannot render colour reaches `mono` as well. `TERM` is
+  # used rather than the absence of a tty: the suite'"'"'s own stdout may or may
+  # not be one, and an assertion must not depend on how it was launched.
+  unset NO_COLOR
+  export TERM=dumb
+  dybatpho::screen_theme dusk
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "1"
 }
 
 @test "dybatpho::screen_theme refuses an unknown theme and changes nothing" {
+  # An unknown name must still be rejected rather than quietly downgraded to
+  # `mono` along with the themes that are known.
+  export FORCE_COLOR=1
+  unset NO_COLOR
   dybatpho::screen_theme default
   run dybatpho::screen_theme neon
   assert_failure

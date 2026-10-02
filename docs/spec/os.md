@@ -147,6 +147,10 @@ fi
 - **FR-015a**: The CI predicate MUST let `CI` decide whenever it holds a value, in either direction, so that `CI=false` reports not-CI even on a service that also advertises itself by name. Every service sets `CI`, and it is the one variable a caller can set themselves, so anything else overriding it would leave no way to turn the detection off.
 - **FR-015b**: The CI predicate MUST consult the service-specific variables only when `CI` is unset or empty, and MUST treat a false value in one of them as that service saying nothing rather than as an answer for the whole environment.
 
+- **FR-016**: The module MUST provide one answer for whether a stream's output should carry ANSI colour, so the library does not decide it differently per module.
+- **FR-017**: `NO_COLOR` MUST turn colour off whatever else is set, `FORCE_COLOR` MUST turn it on regardless of the stream, `TERM=dumb` MUST turn it off, and otherwise the named stream MUST have to be a terminal.
+- **FR-018**: The colour answer MUST be given per stream, so a module writing diagnostics to stderr and data to stdout can ask about each.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Normalized GOOS**: The platform name returned by the OS helper for downstream artifact selection.
@@ -180,6 +184,11 @@ fi
 - **IT-012**: Verify the container, WSL, and CI predicates from the environment variables each of them defines, including `CI=false`.
 - **IT-012a**: Verify `CI` set to each of its false spellings reports not-CI while a service variable is also set to true, and that `CI=true` reports CI while a service variable is set to false. The environment must be pinned in the test rather than inherited, so the result is the same on a workstation and on a runner.
 - **IT-012b**: Verify that with every marker cleared, a service variable alone decides, and that an empty `CI` leaves the fallback in effect.
+
+- **IT-013**: `NO_COLOR` wins over `FORCE_COLOR` and over an attached terminal.
+- **IT-014**: `FORCE_COLOR` turns colour on for a stream that is not a terminal.
+- **IT-015**: `TERM=dumb` turns colour off.
+- **IT-016**: With nothing overriding it, the stream decides, and an unknown stream is rejected.
 
 ## Acceptance Criteria *(mandatory)*
 

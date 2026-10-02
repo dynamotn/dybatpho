@@ -141,7 +141,8 @@ function dybatpho::tui_supported {
 #######################################
 function __dybatpho_tui_sgr_into {
   local -n __dybatpho_tui_sgr_out="$1"
-  if [[ -n "${NO_COLOR:-}" ]]; then
+  # The widgets are drawn on stderr, so that is the stream to ask about.
+  if ! dybatpho::color_supported stderr; then
     __dybatpho_tui_sgr_out=""
     return 0
   fi

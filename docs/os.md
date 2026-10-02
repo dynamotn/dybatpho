@@ -36,6 +36,7 @@ and dependency installation live in `pkg.sh`.
 - [`dybatpho::kernel_version`](#dybatphokernel_version) — Print the kernel release of the host.
 - [`dybatpho::cpu_count`](#dybatphocpu_count) — Print how many processors the host can run work on. The count is reported rather than defaulted, so that a caller decides for itself what to do on a host that cannot answer.
 - [`dybatpho::is_tty`](#dybatphois_tty) — Return success when a standard stream is attached to a terminal.
+- [`dybatpho::color_supported`](#dybatphocolor_supported) — Return success when output on a stream should carry ANSI colour. One answer for the whole library, so a script'"'"'s log lines, its diffs and its prompts agree about whether colour is wanted. The order is deliberate. `NO_COLOR` wins over everything, because a reader who cannot use colour is not asking for a preference. `FORCE_COLOR` then overrides the stream, which is what a caller piping into `less -R` or a CI log viewer needs. `TERM=dumb` rules colour out, and otherwise the stream has to be a terminal. The stream matters: a module that writes diagnostics to stderr and data to stdout gets a different answer for each, and a single global one would be wrong for both.
 - [`dybatpho::terminal_width`](#dybatphoterminal_width) — Print the width of the terminal in columns. `COLUMNS` is trusted first, because a caller that sets it is deliberately asking for a width, and `tput` is only asked when a terminal is actually attached.
 - [`dybatpho::terminal_height`](#dybatphoterminal_height) — Print the height of the terminal in lines.
 - [`dybatpho::os_release`](#dybatphoos_release) — Print one field of the host's `os-release` file.
@@ -314,6 +315,51 @@ dybatpho::is_tty stdout && printf 'Colors are worth rendering\n'
 
 - `0`: The stream is a terminal
 - `1`: The stream is a file, a pipe, or anything else
+
+
+---
+
+### `dybatpho::color_supported`
+
+Return success when output on a stream should carry ANSI colour.
+One answer for the whole library, so a script'"'"'s log lines, its diffs and
+its prompts agree about whether colour is wanted.
+
+The order is deliberate. `NO_COLOR` wins over everything, because a reader
+who cannot use colour is not asking for a preference. `FORCE_COLOR` then
+overrides the stream, which is what a caller piping into `less -R` or a CI
+log viewer needs. `TERM=dumb` rules colour out, and otherwise the stream
+has to be a terminal.
+
+The stream matters: a module that writes diagnostics to stderr and data to
+stdout gets a different answer for each, and a single global one would be
+wrong for both.
+
+**🧪 Example**
+
+```bash
+dybatpho::color_supported stderr && printf '\033[31m%s\033[0m\n' "${msg}" >&2
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Stream to answer for, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`, default is `stdout` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`NO_COLOR`** | string | Any non-empty value turns colour off, whatever else is set |
+| **`FORCE_COLOR`** | string | Any non-empty value turns colour on even when the stream is not a terminal |
+| **`TERM`** | string | `dumb` turns colour off |
+
+**🚦 Exit codes**
+
+- `0`: Colour should be emitted on that stream
+- `1`: It should not
 
 
 ---

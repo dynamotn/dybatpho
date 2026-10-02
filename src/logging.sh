@@ -108,11 +108,13 @@ function __dybatpho_log {
   # path, a regular expression or a `sed` script carries backslashes that
   # `echo -e` would silently eat -- `C:\new\table` came out as a newline and a
   # tab. Callers that want a line break put a real one in the message.
+  # The stream decides, not just `NO_COLOR`: a log redirected to a file used to
+  # carry escape sequences into it, while a diff written beside it did not.
   local rendered
-  if [[ -n "${NO_COLOR:-}" ]]; then
-    printf -v rendered '%s\n' "${msg}"
-  else
+  if dybatpho::color_supported "${out}"; then
     printf -v rendered '\033[%sm%s\033[0m\n' "${color}" "${msg}"
+  else
+    printf -v rendered '%s\n' "${msg}"
   fi
 
   if [[ "${out}" == "stderr" ]]; then

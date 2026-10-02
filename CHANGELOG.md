@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`dybatpho::color_supported` — one answer for whether output should carry
+  colour.** `NO_COLOR` wins over everything, `FORCE_COLOR` overrides the
+  stream, `TERM=dumb` rules colour out, and otherwise the named stream has to
+  be a terminal. It answers per stream, because a module writing diagnostics
+  to stderr and data to stdout needs a different answer for each.
+
+
 - **`schedule` — when a command should run, rather than whether to retry it.**
   The three shapes a script keeps rewriting as a `sleep` loop, plus a cron
   predicate for scripts an external scheduler already runs.
@@ -34,8 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   due, so the cadence does not drift, and drops the ticks a slow run missed
   instead of queueing catch-ups. `schedule_cron_due` follows cron'"'"'s own rule
   that a restricted day of month and day of week match on either, not both.
-
-### Added
 
 - **`screen` — themes and styled rows, so a full-screen application looks
   finished without choosing a colour for every widget.**
@@ -67,6 +72,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this way.
 
 ### Changed
+
+- **Colour is now decided in one place, and the decision takes the stream into
+  account.** `logging`, `tui`, `diff` and `screen` each answered this
+  differently: `logging` and `tui` looked only at `NO_COLOR`, `screen` only
+  downgraded its `dusk` theme, and `diff` alone checked whether the output was
+  a terminal. None of them honoured `FORCE_COLOR`. All four now defer to
+  `dybatpho::color_supported`, keeping their own overrides — `DYBATPHO_DIFF_COLOR`
+  and `DYBATPHO_TUI` are unchanged.
+
+  What a consumer will notice:
+
+  - A log line redirected to a file or a pipe no longer carries escape
+    sequences. Previously it did, while a diff written beside it did not.
+  - `FORCE_COLOR` now works everywhere, so a script piped into `less -R` or a
+    CI log viewer can keep its colour.
+  - `TERM=dumb` now turns colour off.
+  - `dybatpho::screen_theme default` is downgraded to `mono` when colour is
+    not wanted, as `dusk` already was. It used to keep its own three colours
+    under `NO_COLOR`.
+
+  Set `FORCE_COLOR=1` to restore colour where output is not a terminal.
 
 - **The generated reference in `docs/` covers the public API only.** Every
   internal `__dybatpho_*` helper is now tagged `@internal`, so the module

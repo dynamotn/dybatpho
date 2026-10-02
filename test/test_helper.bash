@@ -44,6 +44,13 @@ set -T -E
 eval "${__dybatpho_helper_saved_trap}"
 unset -v __dybatpho_helper_saved_trap
 
+# Colour is decided from the environment, and a developer's shell commonly
+# exports `FORCE_COLOR` -- Node tooling sets it, and this machine had
+# `FORCE_COLOR=3`. Inherited, it makes the suite answer differently here and in
+# CI, and a test asserting on colour would pass or fail by accident. A test
+# that cares about the decision sets the variables for the call it makes.
+unset FORCE_COLOR
+
 bats_require_minimum_version 1.5.0
 
 # @description Like `run`, but the command executes in the current shell instead

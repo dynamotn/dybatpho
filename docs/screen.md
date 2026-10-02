@@ -73,7 +73,7 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`dybatpho::screen_spans`](#dybatphoscreen_spans) — Draw pieces of text side by side on one row, each in its own style, cut to a width. This is what a row needs as soon as it is more than one colour -- a check mark in green before a name in bold, a key in a key bar before what it does -- and what `dybatpho::screen_list` cannot do, because it styles a whole row at once. With a background, every piece is drawn over it and the rest of the width is filled with it, so a selected row or a status bar reads as one band.
 - [`dybatpho::screen_ansi`](#dybatphoscreen_ansi) — Draw a line that carries its own SGR colour sequences -- the output of a command, a log written by another program -- keeping its colours. Each sequence changes the style of the text after it, the way a terminal reads it: parameters accumulate until a reset. A sequence that is not a colour change, such as a cursor movement, is dropped rather than drawn, because it would move the cursor out of the frame.
 - [`dybatpho::screen_keybar`](#dybatphoscreen_keybar) — Draw a one-row bar of key hints: each key in `DYBATPHO_SCREEN_STYLE_KEY`, what it does after it, all over `DYBATPHO_SCREEN_STYLE_KEYBAR` across the whole width.
-- [`dybatpho::screen_theme`](#dybatphoscreen_theme) — Set every `DYBATPHO_SCREEN_STYLE_*` variable from a named palette, so an application gets a consistent look without choosing a colour for each widget. | Theme | Look | | --- | --- | | `default` | the module's own defaults: bold, dim, reverse and the eight basic colours | | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red | | `mono` | no colour at all, only bold, dim and reverse | `NO_COLOR` turns `dusk` into `mono`, so an application can ask for colour and still respect a user who does not want it.
+- [`dybatpho::screen_theme`](#dybatphoscreen_theme) — Set every `DYBATPHO_SCREEN_STYLE_*` variable from a named palette, so an application gets a consistent look without choosing a colour for each widget. | Theme | Look | | --- | --- | | `default` | the module's own defaults: bold, dim, reverse and the eight basic colours | | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red | | `mono` | no colour at all, only bold, dim and reverse | A theme is downgraded to `mono` when colour is not wanted, so an application can ask for a palette and still respect the environment it runs in. `dybatpho::color_supported` decides, which means `NO_COLOR` and `TERM=dumb` both reach `mono`, and `FORCE_COLOR` keeps the palette on a stream that is not a terminal.
 
 ## Why rows and not cells
 
@@ -1042,8 +1042,11 @@ colour for each widget.
 | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red |
 | `mono` | no colour at all, only bold, dim and reverse |
 
-`NO_COLOR` turns `dusk` into `mono`, so an application can ask for colour
-and still respect a user who does not want it.
+A theme is downgraded to `mono` when colour is not wanted, so an
+application can ask for a palette and still respect the environment it
+runs in. `dybatpho::color_supported` decides, which means `NO_COLOR` and
+`TERM=dumb` both reach `mono`, and `FORCE_COLOR` keeps the palette on a
+stream that is not a terminal.
 
 **🧪 Example**
 
@@ -1064,6 +1067,7 @@ dybatpho::screen_block "${rect}" title:"Tools" focus:true
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`NO_COLOR`** | string | Use `mono` in place of a coloured theme when set to a non-empty value |
+| **`FORCE_COLOR`** | string | Keep a coloured theme even when stdout is not a terminal |
 
 **🧩 Variable sets**
 
@@ -1073,3 +1077,7 @@ dybatpho::screen_block "${rect}" title:"Tools" focus:true
 
 - `0`: The theme was applied
 - `1`: The theme is unknown, and nothing was changed
+
+**🔗 See also**
+
+- [dybatpho::color_supported](#dybatphocolor_supported)

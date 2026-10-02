@@ -87,6 +87,45 @@ As a maintainer, I want conversion helpers between JSON and YAML so that scripts
 
 ---
 
+### User Story 4 - Edit a document without hand-written filters (Priority: P1)
+
+As a script author, I want to set, delete, and merge values in a JSON or YAML
+file by path, so that bumping a version, toggling a flag, or layering an
+override file never needs a filter assembled from shell variables, where one
+quotation mark in a value would change what the filter does.
+
+**Why this priority**: editing configuration in place is the most common write
+a script makes to a structured document, and interpolating values into a
+`jq`/`yq` expression is the usual way that write goes wrong.
+
+**Independent Test**: Set a nested string, a typed value, and a key containing
+filter syntax; delete a key, an array element, and an absent path; merge two
+objects; run each under both backends and compare the results.
+
+**Acceptance Scenarios**:
+
+1. **Given** a path whose parents do not exist, **When** a value is set,
+   **Then** the missing objects and arrays are created and the value is stored
+   as a string
+2. **Given** `--json`, **When** a value is set, **Then** it is parsed as JSON,
+   so numbers, booleans, `null`, arrays, and objects keep their type
+3. **Given** a value or a key containing quotes, newlines, or filter syntax,
+   **When** it is set, **Then** it is stored verbatim and nothing else in the
+   document changes
+4. **Given** a path that runs through a scalar, or indexes the wrong kind of
+   container, **When** a value is set, **Then** the call fails and an output
+   file is left untouched
+5. **Given** a path that does not exist, **When** it is deleted, **Then** the
+   document is returned unchanged
+6. **Given** two objects, **When** they are merged, **Then** nested objects are
+   merged key by key and every other value comes from the overlay
+7. **Given** a YAML document with comments, **When** it is edited, **Then** the
+   comments are kept
+8. **Given** an output file equal to the input, **When** an edit succeeds,
+   **Then** the file is replaced atomically with the result
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -100,6 +139,12 @@ fi
 dybatpho::json_to_yaml package.json package.yaml
 dybatpho::yaml_query package.yaml '.name'
 curl -sSf https://api.example.test/status | dybatpho::json_pretty -
+
+# Edit in place by path, and layer an override file.
+dybatpho::json_set package.json version 2.0.0 package.json
+dybatpho::json_set --json package.json private true package.json
+dybatpho::yaml_del compose.yaml services.debug compose.yaml
+dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 ```
 
 ## Edge Cases
@@ -108,6 +153,17 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
 - The input document path is `-` for stdin.
 - The caller wants output on stdout or in a destination file.
 - The YAML helpers rely on the Mike Farah `yq eval` CLI shape.
+- An editing path is empty, has an empty segment, ends in a lone `\`, or names
+  an index too long to be a number.
+- A key contains a `.`, a backslash, or consists of digits only, which the path
+  writes as `\.`, `\\`, and `\0` respectively.
+- A path indexes past the end of an array: setting pads with `null`, deleting
+  changes nothing.
+- A `--json` value is `null` or `false`, which is a valid value to store.
+- A merge input is an array, a scalar, `null`, or empty.
+- The `yq` backend would otherwise ignore an assignment through a scalar and
+  pad an array when deleting a missing index; the helpers make it behave as
+  `jq` does.
 
 ## Requirements *(mandatory)*
 
@@ -135,6 +191,31 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
   held in a shell variable is valid JSON.
 - **FR-015**: The in-memory helpers MUST behave identically on both backends,
   which means filters written for them stay inside the subset the two share.
+- **FR-016**: The module MUST provide `json_set` and `yaml_set`, which store a
+  value at a path, creating missing objects and arrays, and store the value as
+  a string unless `--json` asks for it to be parsed as JSON.
+- **FR-017**: A path MUST be a `.`-separated list of segments, with one optional
+  leading `.`; a segment of digits only MUST address an array element, and a
+  backslash MUST make the next character literal, so `\.`, `\\`, and `\0`
+  name a key containing a dot, a backslash, and the key `0`.
+- **FR-018**: A malformed path, a `--json` value that is not JSON, and a wrong
+  argument count MUST be rejected with a message before any backend runs.
+- **FR-019**: Setting a value through a scalar, an object key on an array, or
+  an array index on an object MUST fail on both backends with the same message.
+- **FR-020**: The module MUST provide `json_del` and `yaml_del`, which remove
+  the value at a path and MUST leave the document unchanged when the path does
+  not exist.
+- **FR-021**: The module MUST provide `json_merge` and `yaml_merge`, which
+  deep-merge two objects with the overlay winning and MUST refuse a document
+  that is not an object.
+- **FR-022**: Paths and values MUST reach the backend as arguments or
+  environment variables, never as part of the expression text.
+- **FR-023**: The editing helpers MUST print the result when no output file is
+  given, and MUST otherwise write the output file atomically, only after the
+  backend succeeded, so the output may be the input and a failure leaves it
+  untouched.
+- **FR-024**: The JSON editing helpers MUST produce the same document under
+  both backends; the YAML editing helpers MUST require `yq` and print YAML.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -143,6 +224,8 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
 - **Structured Document**: An input JSON or YAML file path, or `-` for stdin.
 - **In-Memory Document**: A JSON string a script is still assembling, held in a
   shell variable rather than written to a file.
+- **Document Path**: A `.`-separated list of object keys and array indices,
+  such as `spec.ports.0.name`, naming one value in a document for editing.
 
 ## Success Criteria *(mandatory)*
 
@@ -153,6 +236,8 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
 - **SC-003**: Conversion between JSON and YAML is available through a small reusable API.
 - **SC-004**: A script can assemble a JSON document containing arbitrary text
   without thinking about escaping, and without depending on one specific backend.
+- **SC-005**: A script can set, delete, and merge values in a JSON or YAML file
+  without writing a filter, and no value it stores can change the edit itself.
 
 ## Integration Tests *(mandatory)*
 
@@ -171,9 +256,31 @@ curl -sSf https://api.example.test/status | dybatpho::json_pretty -
   truncated input.
 - **IT-010**: Verify the in-memory helpers produce the same results under both
   the `yq` and the `jq` backend.
+- **IT-011**: Set nested values, creating missing objects and arrays, and
+  compare the result under both backends.
+- **IT-012**: Set values with and without `--json`, including `null`, `true`,
+  numbers, and nested documents.
+- **IT-013**: Set a value and a key containing quotes, newlines, and filter
+  syntax, and verify nothing else in the document changes.
+- **IT-014**: Read `\.`, `\\`, `\0`, and a key with spaces from a path.
+- **IT-015**: Refuse a path through a scalar or the wrong kind of container
+  under both backends, with the same message.
+- **IT-016**: Reject malformed paths, a non-JSON `--json` value, and a wrong
+  argument count.
+- **IT-017**: Write an edit in place, and leave the file untouched when the
+  edit fails; read a document from stdin.
+- **IT-018**: Delete keys and array elements, and leave the document unchanged
+  for absent paths, out-of-range indices, and paths through scalars.
+- **IT-019**: Deep-merge two objects, from files, from stdin, and in place, and
+  refuse arrays, scalars, and `null` under both backends.
+- **IT-020**: Propagate a malformed document, and fail with exit code 127 when
+  no backend is installed or `yq` is missing for a YAML edit.
+- **IT-021**: Edit, delete from, and merge YAML documents, keeping comments.
 
 ## Acceptance Criteria *(mandatory)*
 
 1. The module provides practical wrappers around both `yq` and `jq`, with `yq` preferred for JSON and YAML workflows.
 2. Structured-data helpers remain composable in command substitution and shell conditionals.
 3. JSON and YAML workflows are documented consistently with the rest of the project.
+4. A JSON or YAML document can be edited by path and merged without the caller
+   writing a filter, with the same result on either backend.

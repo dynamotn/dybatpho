@@ -320,3 +320,305 @@ EOF
   unstub jq
   PATH="${old_path}"
 }
+
+# ---------------------------------------------------------------------------
+# Editing documents
+# ---------------------------------------------------------------------------
+
+# @description Print a PATH holding the real `jq` and the tools the editing
+#   helpers reach for, but no `yq`, so the fallback runs for real.
+# @stdout PATH value
+__json_path_jq_only() {
+  local bin="${BATS_TEST_TMPDIR}/jq-only-bin" tool
+  mkdir -p "${bin}"
+  for tool in bash cat chmod date env jq mktemp mv rm sed tr; do
+    ln -sf "$(command -v "${tool}")" "${bin}/${tool}"
+  done
+  printf '%s\n' "${bin}"
+}
+
+# @description Run a command once with `yq` and once with only `jq`, and fail
+#   unless both print the same thing.
+# @arg $@ string Command to run
+# @stdout The shared output
+__json_both_backends() {
+  local with_yq with_jq saved_path="${PATH}"
+  with_yq="$("$@")" || return
+  PATH="$(__json_path_jq_only)"
+  hash -r
+  with_jq="$("$@")" || {
+    PATH="${saved_path}"
+    hash -r
+    return 1
+  }
+  PATH="${saved_path}"
+  hash -r
+  assert_equal "${with_jq}" "${with_yq}"
+  printf '%s\n' "${with_yq}"
+}
+
+# @description Compact a JSON document so assertions do not depend on layout.
+# @arg $1 string JSON document
+# @stdout Compact JSON
+__json_compact() {
+  jq -c . <<< "$1"
+}
+
+__json_fixture() {
+  local file="${BATS_TEST_TMPDIR}/doc.json"
+  printf '%s\n' '{"a":{"b":[1,2]},"k":"v"}' > "${file}"
+  printf '%s\n' "${file}"
+}
+
+@test "dybatpho::json_set sets a nested value and creates what is missing" {
+  local file result
+  file="$(__json_fixture)"
+  result="$(__json_both_backends dybatpho::json_set "${file}" a.c.d hello)"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"b":[1,2],"c":{"d":"hello"}},"k":"v"}'
+
+  result="$(__json_both_backends dybatpho::json_set "${file}" .a.b.1 two)"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"b":[1,"two"]},"k":"v"}'
+
+  result="$(__json_both_backends dybatpho::json_set "${file}" a.new.0.z x)"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"b":[1,2],"new":[{"z":"x"}]},"k":"v"}'
+}
+
+@test "dybatpho::json_set stores a string unless --json says otherwise" {
+  local file result
+  file="$(__json_fixture)"
+  result="$(__json_both_backends dybatpho::json_set "${file}" n 42)"
+  assert_equal "$(jq -c .n <<< "${result}")" '"42"'
+
+  result="$(__json_both_backends dybatpho::json_set --json "${file}" n 42)"
+  assert_equal "$(jq -c .n <<< "${result}")" '42'
+  result="$(__json_both_backends dybatpho::json_set --json "${file}" n true)"
+  assert_equal "$(jq -c .n <<< "${result}")" 'true'
+  result="$(__json_both_backends dybatpho::json_set --json "${file}" n null)"
+  assert_equal "$(jq -c .n <<< "${result}")" 'null'
+  result="$(__json_both_backends dybatpho::json_set --json "${file}" n '{"x":[1,{"y":2}]}')"
+  assert_equal "$(jq -c .n <<< "${result}")" '{"x":[1,{"y":2}]}'
+}
+
+@test "dybatpho::json_set never reads the path or the value as a filter" {
+  local file result value
+  file="$(__json_fixture)"
+  value="$(printf 'it "worked"\n$(whoami) ; .k = 1 | \\')"
+  result="$(__json_both_backends dybatpho::json_set "${file}" note "${value}")"
+  assert_equal "$(jq -r .note <<< "${result}")" "${value}"
+  assert_equal "$(jq -r .k <<< "${result}")" "v"
+
+  result="$(__json_both_backends dybatpho::json_set "${file}" '"] | \.k = 1 | \.["x' y)"
+  assert_equal "$(jq -r .k <<< "${result}")" "v"
+  assert_equal "$(jq -r '.["\"] | .k = 1 | .[\"x"]' <<< "${result}")" "y"
+}
+
+@test "dybatpho::json_set reads escapes in a path" {
+  local file result
+  file="$(__json_fixture)"
+  result="$(__json_both_backends dybatpho::json_set "${file}" 'k\.dot' v)"
+  assert_equal "$(jq -r '.["k.dot"]' <<< "${result}")" "v"
+  result="$(__json_both_backends dybatpho::json_set "${file}" 'a.\0' zero)"
+  assert_equal "$(jq -r '.a["0"]' <<< "${result}")" "zero"
+  result="$(__json_both_backends dybatpho::json_set "${file}" 'back\\slash' v)"
+  assert_equal "$(jq -r '.["back\\slash"]' <<< "${result}")" "v"
+  result="$(__json_both_backends dybatpho::json_set "${file}" 'two words' v)"
+  assert_equal "$(jq -r '.["two words"]' <<< "${result}")" "v"
+}
+
+@test "dybatpho::json_set refuses a path through the wrong kind of value" {
+  local file saved_path="${PATH}" path
+  file="$(__json_fixture)"
+  for path in k.x a.0 a.b.x; do
+    run_traced --separate-stderr dybatpho::json_set "${file}" "${path}" 1
+    assert_failure
+    assert_stderr --partial "Cannot set '${path}'"
+
+    PATH="$(__json_path_jq_only)"
+    run_traced --separate-stderr dybatpho::json_set "${file}" "${path}" 1
+    PATH="${saved_path}"
+    assert_failure
+    assert_stderr --partial "Cannot set '${path}'"
+  done
+}
+
+@test "dybatpho::json_set rejects a malformed path, value, or argument list" {
+  local file path
+  file="$(__json_fixture)"
+  for path in '' '.' '..' 'a..b' 'a.' 'a\' '1234567890123456789'; do
+    run --separate-stderr dybatpho::json_set "${file}" "${path}" v
+    assert_failure
+    assert_stderr --partial "Invalid path"
+  done
+  run --separate-stderr dybatpho::json_set --json "${file}" a 'not json'
+  assert_failure
+  assert_stderr --partial "not valid JSON"
+  run --separate-stderr dybatpho::json_set "${file}" a
+  assert_failure
+  assert_stderr --partial "Expected [--json]"
+}
+
+@test "dybatpho::json_set writes a file in place, and leaves it alone on failure" {
+  local file
+  file="$(__json_fixture)"
+  dybatpho::json_set "${file}" k changed "${file}"
+  assert_equal "$(jq -c . "${file}")" '{"a":{"b":[1,2]},"k":"changed"}'
+
+  run_traced dybatpho::json_set "${file}" k.x 1 "${file}"
+  assert_failure
+  assert_equal "$(jq -c . "${file}")" '{"a":{"b":[1,2]},"k":"changed"}'
+}
+
+@test "dybatpho::json_set reads stdin" {
+  local result
+  result="$(printf '%s' '{"a":1}' | dybatpho::json_set - b 2)"
+  assert_equal "$(__json_compact "${result}")" '{"a":1,"b":"2"}'
+}
+
+@test "dybatpho::json_del removes keys and elements" {
+  local file result
+  file="$(__json_fixture)"
+  result="$(__json_both_backends dybatpho::json_del "${file}" k)"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"b":[1,2]}}'
+  result="$(__json_both_backends dybatpho::json_del "${file}" a.b.0)"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"b":[2]},"k":"v"}'
+}
+
+@test "dybatpho::json_del leaves the document alone when the path is absent" {
+  local file result path
+  file="$(__json_fixture)"
+  for path in missing a.b.9 k.x zz.q.0 a.0 a.b.x; do
+    result="$(__json_both_backends dybatpho::json_del "${file}" "${path}")"
+    assert_equal "$(__json_compact "${result}")" '{"a":{"b":[1,2]},"k":"v"}'
+  done
+}
+
+@test "dybatpho::json_del writes in place and rejects a malformed path" {
+  local file
+  file="$(__json_fixture)"
+  dybatpho::json_del "${file}" a "${file}"
+  assert_equal "$(jq -c . "${file}")" '{"k":"v"}'
+  run --separate-stderr dybatpho::json_del "${file}" 'a..b'
+  assert_failure
+  assert_stderr --partial "Invalid path"
+  run --separate-stderr dybatpho::json_del "${file}"
+  assert_failure
+  assert_stderr --partial "Expected <input> <path>"
+}
+
+@test "dybatpho::json_merge deep-merges objects, the overlay winning" {
+  local base="${BATS_TEST_TMPDIR}/base.json" overlay="${BATS_TEST_TMPDIR}/overlay.json" result
+  printf '%s\n' '{"a":{"x":1,"l":[1,2]},"keep":true}' > "${base}"
+  printf '%s\n' '{"a":{"y":2,"l":[3]},"keep":null}' > "${overlay}"
+  result="$(__json_both_backends dybatpho::json_merge "${base}" "${overlay}")"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"x":1,"l":[3],"y":2},"keep":null}'
+
+  result="$(dybatpho::json_merge - "${overlay}" < "${base}")"
+  assert_equal "$(__json_compact "${result}")" '{"a":{"x":1,"l":[3],"y":2},"keep":null}'
+
+  dybatpho::json_merge "${base}" "${overlay}" "${base}"
+  assert_equal "$(jq -c . "${base}")" '{"a":{"x":1,"l":[3],"y":2},"keep":null}'
+}
+
+@test "dybatpho::json_merge refuses a document that is not an object" {
+  local base="${BATS_TEST_TMPDIR}/base.json" other="${BATS_TEST_TMPDIR}/other.json"
+  local saved_path="${PATH}" document
+  printf '%s\n' '{"a":1}' > "${base}"
+  for document in '[1,2]' 'null' '"text"'; do
+    printf '%s\n' "${document}" > "${other}"
+    run_traced --separate-stderr dybatpho::json_merge "${base}" "${other}"
+    assert_failure
+    assert_stderr --partial "both documents must be objects"
+    PATH="$(__json_path_jq_only)"
+    run_traced --separate-stderr dybatpho::json_merge "${other}" "${base}"
+    PATH="${saved_path}"
+    assert_failure
+    assert_stderr --partial "both documents must be objects"
+  done
+  run --separate-stderr dybatpho::json_merge "${base}"
+  assert_failure
+  assert_stderr --partial "Expected <base> <overlay>"
+}
+
+@test "the JSON editing helpers propagate a malformed document" {
+  local file="${BATS_TEST_TMPDIR}/broken.json" saved_path="${PATH}"
+  printf '%s\n' '{"a":' > "${file}"
+  run_traced dybatpho::json_set "${file}" a 1
+  assert_failure
+  run_traced dybatpho::json_del "${file}" a
+  assert_failure
+  PATH="$(__json_path_jq_only)"
+  run_traced dybatpho::json_set "${file}" a 1
+  PATH="${saved_path}"
+  assert_failure
+}
+
+@test "the editing helpers fail clearly without a backend" {
+  local empty_path="${BATS_TEST_TMPDIR}/empty-bin" saved_path="${PATH}"
+  mkdir -p "${empty_path}"
+  PATH="${empty_path}"
+  run -127 dybatpho::json_set data.json a 1
+  PATH="${saved_path}"
+  assert_output --partial "Neither yq nor jq is installed"
+
+  PATH="$(__json_path_jq_only)"
+  run -127 dybatpho::yaml_set data.yaml a 1
+  PATH="${saved_path}"
+  assert_output --partial "yq"
+}
+
+@test "dybatpho::yaml_set edits a YAML document and keeps its comments" {
+  local file="${BATS_TEST_TMPDIR}/values.yaml"
+  printf 'name: app # the service\nimage:\n  tag: "1.0"\n' > "${file}"
+  dybatpho::yaml_set "${file}" image.tag 2.0 "${file}"
+  dybatpho::yaml_set --json "${file}" replicas 3 "${file}"
+  dybatpho::yaml_set "${file}" port 8080 "${file}"
+  run_traced cat "${file}"
+  assert_success
+  assert_output << 'EOF2'
+name: app # the service
+image:
+  tag: "2.0"
+replicas: 3
+port: "8080"
+EOF2
+  run_traced --separate-stderr dybatpho::yaml_set "${file}" name.x 1
+  assert_failure
+  assert_stderr --partial "Cannot set 'name.x'"
+}
+
+@test "dybatpho::yaml_del removes a path and ignores an absent one" {
+  local file="${BATS_TEST_TMPDIR}/values.yaml"
+  printf 'a: 1 # one\nb:\n  - x\n  - y\n' > "${file}"
+  run_traced dybatpho::yaml_del "${file}" b.0
+  assert_success
+  assert_output << 'EOF2'
+a: 1 # one
+b:
+  - y
+EOF2
+  run_traced dybatpho::yaml_del "${file}" b.5
+  assert_success
+  assert_output "$(cat "${file}")"
+  run --separate-stderr dybatpho::yaml_del "${file}" ''
+  assert_failure
+  assert_stderr --partial "Invalid path"
+}
+
+@test "dybatpho::yaml_merge deep-merges mappings" {
+  local base="${BATS_TEST_TMPDIR}/base.yaml" overlay="${BATS_TEST_TMPDIR}/overlay.yaml"
+  local list="${BATS_TEST_TMPDIR}/list.yaml"
+  printf 'a: 1 # kept\nb:\n  x: 1\n' > "${base}"
+  printf 'b:\n  y: 2\n' > "${overlay}"
+  printf -- '- 1\n' > "${list}"
+  run_traced dybatpho::yaml_merge "${base}" "${overlay}"
+  assert_success
+  assert_output << 'EOF2'
+a: 1 # kept
+b:
+  x: 1
+  y: 2
+EOF2
+  run_traced --separate-stderr dybatpho::yaml_merge "${base}" "${list}"
+  assert_failure
+  assert_stderr --partial "both documents must be objects"
+}

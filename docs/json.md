@@ -28,6 +28,12 @@ fallback where practical.
 - [`dybatpho::json_eval`](#dybatphojson_eval) — Evaluate a filter against a JSON document held in a variable. Unlike `dybatpho::json_query`, which reads a file, this works on a document a script is still assembling.
 - [`dybatpho::json_get`](#dybatphojson_get) — Evaluate a filter and print the result as a bare scalar. Strings come back without surrounding quotes, so the result drops straight into a shell variable.
 - [`dybatpho::json_valid`](#dybatphojson_valid) — Return success when a JSON document held in a variable is valid.
+- [`dybatpho::json_set`](#dybatphojson_set) — Set the value at a path in a JSON document. The path is a list of keys separated by `.`, such as `spec.ports.0.name`, where a segment of digits indexes an array. Missing objects and arrays on the way are created. The value is stored as a string unless `--json` says it is a JSON document, which is how a number, a boolean, `null`, an array, or an object is written.
+- [`dybatpho::json_del`](#dybatphojson_del) — Remove the value at a path from a JSON document. Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does not exist leaves the document unchanged, and deleting an array element shifts the ones after it.
+- [`dybatpho::json_merge`](#dybatphojson_merge) — Deep-merge two JSON objects, the overlay winning. Objects present in both are merged key by key; any other value, arrays included, is replaced by the overlay's. Both documents must be objects.
+- [`dybatpho::yaml_set`](#dybatphoyaml_set) — Set the value at a path in a YAML document. Paths and `--json` work as in `dybatpho::json_set`. Comments and the rest of the document's layout are kept as `yq` keeps them.
+- [`dybatpho::yaml_del`](#dybatphoyaml_del) — Remove the value at a path from a YAML document. Paths work as in `dybatpho::json_set`, and an absent path is not an error.
+- [`dybatpho::yaml_merge`](#dybatphoyaml_merge) — Deep-merge two YAML mappings, the overlay winning. Merging follows `dybatpho::json_merge`: mappings merge key by key, and every other value is replaced by the overlay's.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -47,6 +53,10 @@ fallback where practical.
 ### `dybatpho::json_eval`
 
 - Write filters in the subset both backends share: `yq` has no `def`, and spells `ascii_downcase` as `downcase`
+
+### `dybatpho::json_set`
+
+- The output file is written atomically after the whole result is known, so a failure leaves it untouched
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -406,3 +416,234 @@ dybatpho::json_valid "${answer}" || dybatpho::warn "The model did not return JSO
 - `0`: The document parses as JSON
 - `1`: The document is not valid JSON
 - `127`: Neither `yq` nor `jq` is installed
+
+
+---
+
+### `dybatpho::json_set`
+
+Set the value at a path in a JSON document.
+The path is a list of keys separated by `.`, such as `spec.ports.0.name`,
+where a segment of digits indexes an array. Missing objects and arrays on
+the way are created. The value is stored as a string unless `--json` says
+it is a JSON document, which is how a number, a boolean, `null`, an array,
+or an object is written.
+
+**🧪 Examples**
+
+```bash
+dybatpho::json_set package.json version 2.0.0 package.json
+
+```
+
+```bash
+dybatpho::json_set --json config.json server.ports '[80,443]'
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional `--json`: parse the value as JSON instead of storing a string |
+| `$2` | string | JSON file path or `-` for stdin |
+| `$3` | string | Path to set; `\.` is a dot inside a key, and `\0` the key `0` |
+| `$4` | string | Value to store |
+| `$5` | string | Optional output file path, which may be the input file |
+
+**📝 Notes**
+
+- The path and the value reach the backend as arguments, never as part of the expression, so neither needs escaping
+
+**📤 Output on stdout**
+
+- Pretty JSON when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The value was set
+- `1`: Invalid arguments, path, or `--json` value
+- `other`: The backend's exit code when the input is invalid or the path runs through a scalar
+- `127`: Neither `yq` nor `jq` is installed
+
+
+---
+
+### `dybatpho::json_del`
+
+Remove the value at a path from a JSON document.
+Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does
+not exist leaves the document unchanged, and deleting an array element
+shifts the ones after it.
+
+**🧪 Example**
+
+```bash
+dybatpho::json_del package.json scripts.prepublish package.json
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | JSON file path or `-` for stdin |
+| `$2` | string | Path to remove |
+| `$3` | string | Optional output file path, which may be the input file |
+
+**📤 Output on stdout**
+
+- Pretty JSON when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The path was removed or was already absent
+- `1`: Invalid arguments or path
+- `other`: The backend's exit code when the input is invalid
+- `127`: Neither `yq` nor `jq` is installed
+
+
+---
+
+### `dybatpho::json_merge`
+
+Deep-merge two JSON objects, the overlay winning.
+Objects present in both are merged key by key; any other value, arrays
+included, is replaced by the overlay's. Both documents must be objects.
+
+**🧪 Example**
+
+```bash
+dybatpho::json_merge defaults.json local.json > effective.json
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Base JSON file path, or `-` for stdin |
+| `$2` | string | Overlay JSON file path, or `-` for stdin |
+| `$3` | string | Optional output file path, which may be either input |
+
+**📤 Output on stdout**
+
+- Pretty JSON when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The documents were merged
+- `1`: Invalid arguments
+- `other`: The backend's exit code when a document is not an object or is invalid
+- `127`: Neither `yq` nor `jq` is installed
+
+
+---
+
+### `dybatpho::yaml_set`
+
+Set the value at a path in a YAML document.
+Paths and `--json` work as in `dybatpho::json_set`. Comments and the rest of
+the document's layout are kept as `yq` keeps them.
+
+**🧪 Examples**
+
+```bash
+dybatpho::yaml_set compose.yaml services.app.image 'app:2.0' compose.yaml
+
+```
+
+```bash
+dybatpho::yaml_set --json values.yaml replicas 3
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional `--json`: parse the value as JSON instead of storing a string |
+| `$2` | string | YAML file path or `-` for stdin |
+| `$3` | string | Path to set |
+| `$4` | string | Value to store |
+| `$5` | string | Optional output file path, which may be the input file |
+
+**📤 Output on stdout**
+
+- YAML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The value was set
+- `1`: Invalid arguments, path, or `--json` value
+- `other`: The backend's exit code when the input is invalid or the path runs through a scalar
+- `127`: `yq` is not installed
+
+
+---
+
+### `dybatpho::yaml_del`
+
+Remove the value at a path from a YAML document.
+Paths work as in `dybatpho::json_set`, and an absent path is not an error.
+
+**🧪 Example**
+
+```bash
+dybatpho::yaml_del compose.yaml services.debug compose.yaml
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | YAML file path or `-` for stdin |
+| `$2` | string | Path to remove |
+| `$3` | string | Optional output file path, which may be the input file |
+
+**📤 Output on stdout**
+
+- YAML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The path was removed or was already absent
+- `1`: Invalid arguments or path
+- `other`: The backend's exit code when the input is invalid
+- `127`: `yq` is not installed
+
+
+---
+
+### `dybatpho::yaml_merge`
+
+Deep-merge two YAML mappings, the overlay winning.
+Merging follows `dybatpho::json_merge`: mappings merge key by key, and
+every other value is replaced by the overlay's.
+
+**🧪 Example**
+
+```bash
+dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Base YAML file path, or `-` for stdin |
+| `$2` | string | Overlay YAML file path, or `-` for stdin |
+| `$3` | string | Optional output file path, which may be either input |
+
+**📤 Output on stdout**
+
+- YAML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The documents were merged
+- `1`: Invalid arguments
+- `other`: The backend's exit code when a document is not a mapping or is invalid
+- `127`: `yq` is not installed

@@ -429,3 +429,476 @@ function dybatpho::json_valid {
     jq -e . <<< "${document}" > /dev/null 2>&1
   fi
 }
+
+#######################################
+# @description Resolve the JSON backend into a named variable.
+#   `__dybatpho_json_cmd` answers on stdout, so a missing tool it reports from
+#   inside `$(...)` ends only the subshell. The editing helpers resolve the
+#   backend here instead, where the failure stops the caller.
+# @arg $1 string Name of the variable receiving `yq` or `jq`
+# @set The named variable
+# @exitcode 0 A supported JSON helper command exists
+# @exitcode 127 Neither `yq` nor `jq` is installed
+# @internal
+#######################################
+function __dybatpho_json_cmd_into {
+  local -n __dybatpho_json_cmd_out="$1"
+  if dybatpho::is command yq; then
+    __dybatpho_json_cmd_out=yq
+  elif dybatpho::is command jq; then
+    __dybatpho_json_cmd_out=jq
+  else
+    dybatpho::die "Neither yq nor jq is installed" 127
+  fi
+}
+
+#######################################
+# @description Store one finished path segment, tagged with its kind.
+#   A segment of digits only that was written without any escape addresses an
+#   array element and is stored as `#<number>`; every other segment is an
+#   object key, stored as `:<key>`.
+# @arg $1 string Name of the array receiving the segment
+# @arg $2 string Segment text
+# @arg $3 string `true` when the segment contained an escape
+# @set The named array
+# @exitcode 0 The segment was stored
+# @exitcode 1 The segment is empty, or an index too long to be a number
+# @internal
+#######################################
+function __dybatpho_json_path_push {
+  local -n __dybatpho_json_push_out="$1"
+  local __dybatpho_json_push_segment="$2"
+  [[ -n "${__dybatpho_json_push_segment}" ]] || return 1
+  if [[ "$3" != true && "${__dybatpho_json_push_segment}" =~ ^[0-9]+$ ]]; then
+    ((${#__dybatpho_json_push_segment} <= 18)) || return 1
+    __dybatpho_json_push_out+=("#$((10#${__dybatpho_json_push_segment}))")
+  else
+    __dybatpho_json_push_out+=(":${__dybatpho_json_push_segment}")
+  fi
+}
+
+#######################################
+# @description Split a path such as `spec.ports.0.name` into tagged segments.
+#   Segments are separated by `.`, and one leading `.` is accepted so a path
+#   reads the way a filter would write it. A backslash makes the next character
+#   literal: `\.` is a dot inside a key, `\\` a backslash, and `\0` the object
+#   key `0` rather than the first array element.
+# @arg $1 string Name of the array receiving the segments
+# @arg $2 string Path to split
+# @set The named array
+# @exitcode 0 The path is valid
+# @exitcode 1 The path is empty, has an empty segment, or ends in a lone `\`
+# @internal
+#######################################
+function __dybatpho_json_path_split {
+  local -n __dybatpho_json_split_out="$1"
+  local __dybatpho_json_split_path="${2-}"
+  __dybatpho_json_split_out=()
+  [[ "${__dybatpho_json_split_path}" == .* ]] \
+    && __dybatpho_json_split_path="${__dybatpho_json_split_path:1}"
+  [[ -n "${__dybatpho_json_split_path}" ]] || return 1
+
+  local __dybatpho_json_split_segment="" __dybatpho_json_split_char
+  local __dybatpho_json_split_escaped=false __dybatpho_json_split_literal=false
+  local __dybatpho_json_split_index
+  for ((__dybatpho_json_split_index = 0;  \
+  __dybatpho_json_split_index < ${#__dybatpho_json_split_path};  \
+  __dybatpho_json_split_index++)); do
+    __dybatpho_json_split_char="${__dybatpho_json_split_path:__dybatpho_json_split_index:1}"
+    if [[ "${__dybatpho_json_split_escaped}" == true ]]; then
+      __dybatpho_json_split_segment+="${__dybatpho_json_split_char}"
+      __dybatpho_json_split_escaped=false
+    elif [[ "${__dybatpho_json_split_char}" == $'\\' ]]; then
+      __dybatpho_json_split_escaped=true
+      __dybatpho_json_split_literal=true
+    elif [[ "${__dybatpho_json_split_char}" == '.' ]]; then
+      __dybatpho_json_path_push "$1" "${__dybatpho_json_split_segment}" \
+        "${__dybatpho_json_split_literal}" || return 1
+      __dybatpho_json_split_segment=""
+      __dybatpho_json_split_literal=false
+    else
+      __dybatpho_json_split_segment+="${__dybatpho_json_split_char}"
+    fi
+  done
+  [[ "${__dybatpho_json_split_escaped}" == false ]] || return 1
+  __dybatpho_json_path_push "$1" "${__dybatpho_json_split_segment}" \
+    "${__dybatpho_json_split_literal}"
+}
+
+#######################################
+# @description Encode tagged path segments as a JSON array for `jq`.
+# @arg $1 string Name of the variable receiving the array, such as `["a",0]`
+# @arg $@ string Tagged segments from `__dybatpho_json_path_split`
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_json_path_array_into {
+  local -n __dybatpho_json_array_out="$1"
+  shift
+  local __dybatpho_json_array_text="" __dybatpho_json_array_item __dybatpho_json_array_quoted
+  for __dybatpho_json_array_item in "$@"; do
+    [[ -n "${__dybatpho_json_array_text}" ]] && __dybatpho_json_array_text+=","
+    if [[ "${__dybatpho_json_array_item}" == "#"* ]]; then
+      __dybatpho_json_array_text+="${__dybatpho_json_array_item:1}"
+    else
+      __dybatpho_json_escape_into __dybatpho_json_array_quoted "${__dybatpho_json_array_item:1}"
+      __dybatpho_json_array_text+="${__dybatpho_json_array_quoted}"
+    fi
+  done
+  __dybatpho_json_array_out="[${__dybatpho_json_array_text}]"
+}
+
+#######################################
+# @description Run a command and send its output to stdout or to a file.
+#   The output is captured in full before anything is written, so a failing
+#   backend leaves the destination untouched, and the destination may be the
+#   very file the command reads.
+# @arg $1 string Destination file, or empty for stdout
+# @arg $@ string Command to run
+# @stdout The command's output when no destination is given
+# @exitcode 0 The command succeeded and its output was delivered
+# @exitcode other The command's own exit code
+# @internal
+#######################################
+function __dybatpho_json_emit {
+  local output="$1"
+  shift
+  if [[ -z "${output}" ]]; then
+    "$@"
+    return
+  fi
+  local result
+  result=$("$@") || return
+  printf '%s\n' "${result}" | dybatpho::file_write_atomic "${output}"
+}
+
+#######################################
+# @description Return success when text parses as a JSON value.
+#   Unlike `jq -e`, this accepts `null` and `false`, which are values a caller
+#   may well want to store.
+# @arg $1 string Backend, `yq` or `jq`
+# @arg $2 string Candidate JSON text
+# @exitcode 0 The text is a JSON value
+# @exitcode 1 The text does not parse
+# @internal
+#######################################
+function __dybatpho_json_parses {
+  if [[ "$1" == yq ]]; then
+    yq -o=json -I=0 -p=json '.' <<< "$2" > /dev/null 2>&1
+  else
+    jq empty <<< "$2" > /dev/null 2>&1
+  fi
+}
+
+#######################################
+# @description Shared body of `json_set` and `yaml_set`.
+# @arg $1 string Public function name, for messages
+# @arg $2 string `json` or `yaml`
+# @arg $@ string The public function's own arguments
+# @internal
+#######################################
+function __dybatpho_json_set {
+  local caller="$1" format="$2"
+  shift 2
+  local typed=false
+  if [[ "${1-}" == "--json" ]]; then
+    typed=true
+    shift
+  fi
+  (($# >= 3 && $# <= 4)) \
+    || dybatpho::die "${caller}: Expected [--json] <input> <path> <value> [output], got $# arguments"
+  local input="$1" path="$2" value="$3" output="${4-}"
+
+  local -a segments=()
+  __dybatpho_json_path_split segments "${path}" \
+    || dybatpho::die "${caller}: Invalid path: '${path}'"
+
+  local backend=yq
+  if [[ "${format}" == json ]]; then
+    __dybatpho_json_cmd_into backend
+  else
+    dybatpho::require yq
+  fi
+  if [[ "${typed}" == true ]]; then
+    __dybatpho_json_parses "${backend}" "${value}" \
+      || dybatpho::die "${caller}: Value is not valid JSON: ${value}"
+  fi
+
+  local message="Cannot set '${path}': it passes through a value that is not an object or array of the matching kind"
+
+  if [[ "${backend}" == jq ]]; then
+    local path_array
+    __dybatpho_json_path_array_into path_array "${segments[@]}"
+    local value_flag=--arg
+    [[ "${typed}" == true ]] && value_flag=--argjson
+    # shellcheck disable=SC2016 # `$path`, `$value` and `$message` are jq variables
+    __dybatpho_json_emit "${output}" jq --argjson path "${path_array}" \
+      "${value_flag}" value "${value}" --arg message "${message}" \
+      'try setpath($path; $value) catch error($message)' "${input}"
+    return
+  fi
+
+  # Each segment reaches yq through its own environment variable, so nothing
+  # the caller wrote is ever parsed as part of the expression. The guards make
+  # yq refuse what jq refuses: yq would otherwise ignore an assignment through
+  # a scalar, and store a numeric segment as a key of an object.
+  local -a environment=("__dybatpho_json_error=${message}" "__dybatpho_json_value=${value}")
+  #
+  # The guards read each parent as `.[a] | .[b]` and match its tag with one
+  # regular expression: on a key that is missing, yq answers `!=`, `and` and
+  # `or` wrongly, and a chained `.[a][b]` compares differently from a pipe.
+  local filter="" parent="." target="" accessor kind index=0 segment
+  for segment in "${segments[@]}"; do
+    environment+=("__dybatpho_json_s${index}=${segment:1}")
+    if [[ "${segment}" == "#"* ]]; then
+      kind=seq
+      accessor="[env(__dybatpho_json_s${index})]"
+    else
+      kind=map
+      accessor="[strenv(__dybatpho_json_s${index})]"
+    fi
+    filter+="with(select(${parent} | tag | test(\"^!!(${kind}|null)\$\") | not);"
+    filter+=" error(strenv(__dybatpho_json_error))) | "
+    if [[ "${parent}" == "." ]]; then
+      parent=".${accessor}"
+    else
+      parent+=" | .${accessor}"
+    fi
+    target+="${accessor}"
+    index=$((index + 1))
+  done
+  parent=".${target}"
+  if [[ "${typed}" == true ]]; then
+    filter+="${parent} = (strenv(__dybatpho_json_value) | from_json)"
+  else
+    filter+="${parent} = strenv(__dybatpho_json_value)"
+  fi
+  __dybatpho_json_emit "${output}" env "${environment[@]}" \
+    yq eval "-o=${format}" "${filter}" "${input}"
+}
+
+#######################################
+# @description Shared body of `json_del` and `yaml_del`.
+# @arg $1 string Public function name, for messages
+# @arg $2 string `json` or `yaml`
+# @arg $@ string The public function's own arguments
+# @internal
+#######################################
+function __dybatpho_json_del {
+  local caller="$1" format="$2"
+  shift 2
+  (($# >= 2 && $# <= 3)) \
+    || dybatpho::die "${caller}: Expected <input> <path> [output], got $# arguments"
+  local input="$1" path="$2" output="${3-}"
+
+  local -a segments=()
+  __dybatpho_json_path_split segments "${path}" \
+    || dybatpho::die "${caller}: Invalid path: '${path}'"
+
+  local backend=yq
+  if [[ "${format}" == json ]]; then
+    __dybatpho_json_cmd_into backend
+  else
+    dybatpho::require yq
+  fi
+
+  if [[ "${backend}" == jq ]]; then
+    local path_array
+    __dybatpho_json_path_array_into path_array "${segments[@]}"
+    # A path that runs through a scalar, or indexes the wrong kind of
+    # container, names nothing, and deleting nothing is not an error.
+    # shellcheck disable=SC2016 # `$path` and `$document` are jq variables
+    __dybatpho_json_emit "${output}" jq --argjson path "${path_array}" \
+      '. as $document | try delpaths([$path]) catch $document' "${input}"
+    return
+  fi
+
+  # Walking `.[] | select(key == ...)` rather than indexing keeps yq from
+  # padding an array with nulls up to an index that was never there.
+  local -a environment=()
+  local selector="" index=0 segment
+  for segment in "${segments[@]}"; do
+    environment+=("__dybatpho_json_s${index}=${segment:1}")
+    [[ -n "${selector}" ]] && selector+=" | "
+    if [[ "${segment}" == "#"* ]]; then
+      selector+=".[] | select(key == env(__dybatpho_json_s${index}))"
+    else
+      selector+=".[] | select(key == strenv(__dybatpho_json_s${index}))"
+    fi
+    index=$((index + 1))
+  done
+  __dybatpho_json_emit "${output}" env "${environment[@]}" \
+    yq eval "-o=${format}" "del(${selector})" "${input}"
+}
+
+#######################################
+# @description Shared body of `json_merge` and `yaml_merge`.
+# @arg $1 string Public function name, for messages
+# @arg $2 string `json` or `yaml`
+# @arg $@ string The public function's own arguments
+# @internal
+#######################################
+function __dybatpho_json_merge {
+  local caller="$1" format="$2"
+  shift 2
+  (($# >= 2 && $# <= 3)) \
+    || dybatpho::die "${caller}: Expected <base> <overlay> [output], got $# arguments"
+  local base="$1" overlay="$2" output="${3-}"
+  local message="Cannot merge: both documents must be objects"
+
+  local backend=yq
+  if [[ "${format}" == json ]]; then
+    __dybatpho_json_cmd_into backend
+  else
+    dybatpho::require yq
+  fi
+
+  if [[ "${backend}" == jq ]]; then
+    # shellcheck disable=SC2016 # `$message` is a jq variable
+    __dybatpho_json_emit "${output}" jq -s --arg message "${message}" \
+      'if length == 2 and (.[0] | type) == "object" and (.[1] | type) == "object"
+       then .[0] * .[1] else error($message) end' "${base}" "${overlay}"
+    return
+  fi
+
+  __dybatpho_json_emit "${output}" env "__dybatpho_json_error=${message}" \
+    yq eval-all "-o=${format}" \
+    '[.] | with(select((length == 2 and (.[0] | tag) == "!!map" and (.[1] | tag) == "!!map") | not);
+     error(strenv(__dybatpho_json_error))) | .[0] * .[1]' "${base}" "${overlay}"
+}
+
+#######################################
+# @description Set the value at a path in a JSON document.
+#   The path is a list of keys separated by `.`, such as `spec.ports.0.name`,
+#   where a segment of digits indexes an array. Missing objects and arrays on
+#   the way are created. The value is stored as a string unless `--json` says
+#   it is a JSON document, which is how a number, a boolean, `null`, an array,
+#   or an object is written.
+# @example
+#   dybatpho::json_set package.json version 2.0.0 package.json
+#
+# @example
+#   dybatpho::json_set --json config.json server.ports '[80,443]'
+#
+# @arg $1 string Optional `--json`: parse the value as JSON instead of storing a string
+# @arg $2 string JSON file path or `-` for stdin
+# @arg $3 string Path to set; `\.` is a dot inside a key, and `\0` the key `0`
+# @arg $4 string Value to store
+# @arg $5 string Optional output file path, which may be the input file
+# @stdout Pretty JSON when no output file is provided
+# @exitcode 0 The value was set
+# @exitcode 1 Invalid arguments, path, or `--json` value
+# @exitcode other The backend's exit code when the input is invalid or the path runs through a scalar
+# @exitcode 127 Neither `yq` nor `jq` is installed
+# @note The path and the value reach the backend as arguments, never as part of
+#   the expression, so neither needs escaping
+# @tip The output file is written atomically after the whole result is known, so a failure leaves it untouched
+#######################################
+function dybatpho::json_set {
+  __dybatpho_json_set "${FUNCNAME[0]}" json "$@"
+}
+
+#######################################
+# @description Remove the value at a path from a JSON document.
+#   Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does
+#   not exist leaves the document unchanged, and deleting an array element
+#   shifts the ones after it.
+# @example
+#   dybatpho::json_del package.json scripts.prepublish package.json
+#
+# @arg $1 string JSON file path or `-` for stdin
+# @arg $2 string Path to remove
+# @arg $3 string Optional output file path, which may be the input file
+# @stdout Pretty JSON when no output file is provided
+# @exitcode 0 The path was removed or was already absent
+# @exitcode 1 Invalid arguments or path
+# @exitcode other The backend's exit code when the input is invalid
+# @exitcode 127 Neither `yq` nor `jq` is installed
+#######################################
+function dybatpho::json_del {
+  __dybatpho_json_del "${FUNCNAME[0]}" json "$@"
+}
+
+#######################################
+# @description Deep-merge two JSON objects, the overlay winning.
+#   Objects present in both are merged key by key; any other value, arrays
+#   included, is replaced by the overlay's. Both documents must be objects.
+# @example
+#   dybatpho::json_merge defaults.json local.json > effective.json
+#
+# @arg $1 string Base JSON file path, or `-` for stdin
+# @arg $2 string Overlay JSON file path, or `-` for stdin
+# @arg $3 string Optional output file path, which may be either input
+# @stdout Pretty JSON when no output file is provided
+# @exitcode 0 The documents were merged
+# @exitcode 1 Invalid arguments
+# @exitcode other The backend's exit code when a document is not an object or is invalid
+# @exitcode 127 Neither `yq` nor `jq` is installed
+#######################################
+function dybatpho::json_merge {
+  __dybatpho_json_merge "${FUNCNAME[0]}" json "$@"
+}
+
+#######################################
+# @description Set the value at a path in a YAML document.
+#   Paths and `--json` work as in `dybatpho::json_set`. Comments and the rest of
+#   the document's layout are kept as `yq` keeps them.
+# @example
+#   dybatpho::yaml_set compose.yaml services.app.image 'app:2.0' compose.yaml
+#
+# @example
+#   dybatpho::yaml_set --json values.yaml replicas 3
+#
+# @arg $1 string Optional `--json`: parse the value as JSON instead of storing a string
+# @arg $2 string YAML file path or `-` for stdin
+# @arg $3 string Path to set
+# @arg $4 string Value to store
+# @arg $5 string Optional output file path, which may be the input file
+# @stdout YAML when no output file is provided
+# @exitcode 0 The value was set
+# @exitcode 1 Invalid arguments, path, or `--json` value
+# @exitcode other The backend's exit code when the input is invalid or the path runs through a scalar
+# @exitcode 127 `yq` is not installed
+#######################################
+function dybatpho::yaml_set {
+  __dybatpho_json_set "${FUNCNAME[0]}" yaml "$@"
+}
+
+#######################################
+# @description Remove the value at a path from a YAML document.
+#   Paths work as in `dybatpho::json_set`, and an absent path is not an error.
+# @example
+#   dybatpho::yaml_del compose.yaml services.debug compose.yaml
+#
+# @arg $1 string YAML file path or `-` for stdin
+# @arg $2 string Path to remove
+# @arg $3 string Optional output file path, which may be the input file
+# @stdout YAML when no output file is provided
+# @exitcode 0 The path was removed or was already absent
+# @exitcode 1 Invalid arguments or path
+# @exitcode other The backend's exit code when the input is invalid
+# @exitcode 127 `yq` is not installed
+#######################################
+function dybatpho::yaml_del {
+  __dybatpho_json_del "${FUNCNAME[0]}" yaml "$@"
+}
+
+#######################################
+# @description Deep-merge two YAML mappings, the overlay winning.
+#   Merging follows `dybatpho::json_merge`: mappings merge key by key, and
+#   every other value is replaced by the overlay's.
+# @example
+#   dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
+#
+# @arg $1 string Base YAML file path, or `-` for stdin
+# @arg $2 string Overlay YAML file path, or `-` for stdin
+# @arg $3 string Optional output file path, which may be either input
+# @stdout YAML when no output file is provided
+# @exitcode 0 The documents were merged
+# @exitcode 1 Invalid arguments
+# @exitcode other The backend's exit code when a document is not a mapping or is invalid
+# @exitcode 127 `yq` is not installed
+#######################################
+function dybatpho::yaml_merge {
+  __dybatpho_json_merge "${FUNCNAME[0]}" yaml "$@"
+}

@@ -2,8 +2,8 @@
 # @file json_ops.sh
 # @brief Example showing JSON and YAML utilities
 # @description
-#   Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty, and
-#   yaml_to_json
+#   Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty,
+#   yaml_to_json, and the editing helpers json_set, json_del, json_merge, yaml_set, yaml_del, and yaml_merge
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules json
@@ -140,6 +140,72 @@ function _demo_in_memory {
   fi
 }
 
+# @description Print a document indented under the current section.
+# @arg $1 string Document text
+function _print_document {
+  local document
+  dybatpho::expect_args document -- "$@"
+  local line
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    dybatpho::print "  ${line}"
+  done < <(printf '%s' "${document}")
+}
+
+# @description Run the `EDITING DOCUMENTS` section of this example.
+# @noargs
+function _demo_editing {
+  dybatpho::header "EDITING DOCUMENTS"
+  if ! dybatpho::is command yq && ! dybatpho::is command jq; then
+    dybatpho::warn "yq or jq is required to run the editing demo"
+    return 0
+  fi
+
+  local config overrides
+  dybatpho::create_temp config ".json"
+  dybatpho::create_temp overrides ".json"
+  cat > "${config}" << 'EOF'
+{"server":{"host":"localhost","port":8080},"debug":true,"tags":["a","b"]}
+EOF
+  cat > "${overrides}" << 'EOF'
+{"server":{"host":"api.example.test"},"tags":["prod"]}
+EOF
+
+  dybatpho::info "Setting a string and a typed value, in place:"
+  dybatpho::json_set "${config}" server.note 'set by "deploy"' "${config}"
+  dybatpho::json_set --json "${config}" server.port 9090 "${config}"
+  dybatpho::info "Removing a key and an array element:"
+  dybatpho::json_del "${config}" debug "${config}"
+  dybatpho::json_del "${config}" tags.0 "${config}"
+  _print_document "$(< "${config}")"
+
+  dybatpho::info "Merging an override file, the override winning:"
+  local merged
+  merged=$(dybatpho::json_merge "${config}" "${overrides}")
+  _print_document "${merged}"
+
+  if dybatpho::json_set "${config}" server.port.number 1 > /dev/null 2>&1; then
+    dybatpho::error "A path through a number should have been refused"
+  else
+    dybatpho::info "A path through a number is refused, and the file is left untouched"
+  fi
+
+  if ! dybatpho::is command yq; then
+    dybatpho::warn "yq is required for the YAML editing demo"
+    return 0
+  fi
+  local values
+  dybatpho::create_temp values ".yaml"
+  cat > "${values}" << 'EOF'
+image:
+  tag: "1.0" # bumped by CI
+replicas: 1
+EOF
+  dybatpho::info "Editing YAML keeps its comments:"
+  dybatpho::yaml_set "${values}" image.tag 2.0 "${values}"
+  dybatpho::yaml_set --json "${values}" replicas 3 "${values}"
+  _print_document "$(< "${values}")"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -147,6 +213,7 @@ function _main {
   _demo_yaml_helpers
   _demo_conversion
   _demo_in_memory
+  _demo_editing
   dybatpho::success "JSON operations demo complete"
 }
 

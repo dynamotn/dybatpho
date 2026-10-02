@@ -23,6 +23,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::screen_theme catppuccin-mocha
   ```
 
+- **`json` — edit JSON and YAML documents by path.**
+  `dybatpho::json_set` and `dybatpho::yaml_set` store a value at a path such as
+  `spec.ports.0.name`, creating the objects and arrays on the way; the value is
+  a string unless `--json` says to parse it, which is how a number, a boolean,
+  `null` or a nested document is written. `dybatpho::json_del` and
+  `dybatpho::yaml_del` remove a path and leave the document alone when it is not
+  there, and `dybatpho::json_merge` and `dybatpho::yaml_merge` deep-merge an
+  override onto a base object. The path and the value are never spliced into a
+  filter, so a quotation mark or a `|` in either is stored as written. Each
+  helper prints the result, or takes an output file — which may be the input —
+  written atomically only once the edit has succeeded. A path through a scalar
+  is refused the same way on `yq` and on the `jq` fallback, and YAML edits keep
+  the document's comments.
+
+  ```sh
+  dybatpho::json_set package.json version 2.0.0 package.json
+  dybatpho::json_set --json config.json server.ports '[80,443]' config.json
+  dybatpho::yaml_del compose.yaml services.debug compose.yaml
+  dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
+  ```
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

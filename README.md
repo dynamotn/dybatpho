@@ -169,7 +169,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [string.sh](docs/string.md)    | String operations                                   |
 | [text.sh](docs/text.md)        | Multi-line text blocks and formatting               |
 | [json.sh](docs/json.md)        | JSON and YAML reading/writing                       |
-| [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables              |
+| [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables, from CSV or JSON too |
 | [markdown.sh](docs/markdown.md) | Headings, lists, links, badges and code blocks, with every value escaped |
 | [csv.sh](docs/csv.md)          | Real CSV: quoted fields, embedded commas and newlines, filtering, JSON bridge |
 | [diff.sh](docs/diff.md)        | Colored unified diffs, and JSON/YAML compared by key rather than by line |

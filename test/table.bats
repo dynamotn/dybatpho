@@ -147,3 +147,90 @@ EOF
   assert_success
   assert_output --partial "Running"
 }
+
+@test "dybatpho::table_from_csv keeps quoted commas, quotes and line breaks in their cells" {
+  local csv
+  csv="$(printf 'name,note,qty\n"Doe, John",ok,3\n"He said ""hi""","line one\nline two",10\n,a|b,7')"
+  run_traced dybatpho::table_from_csv "${csv}" box
+  assert_success
+  assert_output << 'EOF'
+┌──────────────┬───────────────────┬─────┐
+│ name         │ note              │ qty │
+├──────────────┼───────────────────┼─────┤
+│ Doe, John    │ ok                │ 3   │
+│ He said "hi" │ line one line two │ 10  │
+│              │ a|b               │ 7   │
+└──────────────┴───────────────────┴─────┘
+EOF
+
+  # Markdown escapes a pipe so the value cannot open a column of its own.
+  run_traced dybatpho::table_from_csv "${csv}" markdown
+  assert_success
+  assert_line --index 4 '|              | a\|b              | 7   |'
+
+  run_traced dybatpho::table_from_csv "${csv}" plain "left,left,right"
+  assert_success
+  assert_line --index 0 'name          note               qty'
+  assert_line --index 1 'Doe, John     ok                   3'
+}
+
+@test "dybatpho::table_from_csv reads stdin, follows the csv delimiter and draws a lone dash" {
+  DYBATPHO_CSV_DELIMITER=tab \
+    run_traced dybatpho::table_from_csv - <<< "$(printf 'a\tb\n"x,y"\tz')"
+  assert_success
+  assert_output "$(printf 'a    b\nx,y  z')"
+
+  # A table whose only cell is `-` is drawn, not taken as a request for stdin.
+  run_traced dybatpho::table_from_csv - box <<< "-"
+  assert_success
+  assert_line --index 1 "│ - │"
+
+  run_traced dybatpho::table_from_csv "" box
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::table_from_json renders an array of objects from text, a file and stdin" {
+  run_traced dybatpho::table_from_json '[{"name":"api","note":"a, b"},{"name":"web"}]' markdown
+  assert_success
+  assert_output << 'EOF'
+| name | note |
+| ---- | ---- |
+| api  | a, b |
+| web  |      |
+EOF
+
+  local file="${BATS_TEST_TMPDIR}/rows.json"
+  printf '[{"k":"v"}]' > "${file}"
+  run_traced dybatpho::table_from_json "${file}"
+  assert_success
+  assert_output "$(printf 'k\nv')"
+
+  # A caller's delimiter does not change how the conversion reads back.
+  DYBATPHO_CSV_DELIMITER=";" \
+    run_traced dybatpho::table_from_json - <<< '[{"k":"x;y"}]'
+  assert_success
+  assert_output "$(printf 'k  \nx;y')"
+
+  run_traced dybatpho::table_from_json ' [ ] '
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::table_from_csv and table_from_json reject an unknown style" {
+  run --separate-stderr dybatpho::table_from_csv "$(printf 'a\n1')" fancy
+  assert_failure
+  assert_stderr --partial "dybatpho::table_from_csv: Unsupported table style: fancy"
+
+  run --separate-stderr dybatpho::table_from_json '[{"a":1}]' fancy
+  assert_failure
+  assert_stderr --partial "dybatpho::table_from_json: Unsupported table style: fancy"
+}
+
+@test "dybatpho::table_from_json reports a document that is not an array of objects" {
+  # The conversion runs in a subshell, so its refusal comes back as a status
+  # rather than ending the caller's shell.
+  run_traced -1 --separate-stderr dybatpho::table_from_json '{"a":1}'
+  assert_output ""
+  assert_stderr --partial "not an array of objects"
+}

@@ -156,7 +156,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `docs/secret.md`, `docs/spec/secret.md` |
 | `semver.sh` | Semantic version parsing, comparison, ranges, ordering, and validation | `test/semver.bats`, `docs/semver.md`, `docs/spec/semver.md` |
 | `string.sh` | Case conversion, matching, splitting, trimming, and predicates | `test/string.bats`, `docs/string.md`, `docs/spec/string.md` |
-| `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `docs/table.md`, `docs/spec/table.md` |
+| `table.sh` | Plain-text, boxed and Markdown table rendering, from delimited rows, parsed CSV, or JSON records | `test/table.bats`, `docs/table.md`, `docs/spec/table.md` |
 | `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `docs/text.md`, `docs/spec/text.md` |
 | `tui.sh` | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `docs/tui.md`, `docs/spec/tui.md` |
 | `schedule.sh` | Fixed-cadence loops, burst debounce, once-per-period markers that outlive the process, and a cron due-predicate | `test/schedule.bats`, `docs/schedule.md`, `docs/spec/schedule.md` |

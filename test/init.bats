@@ -103,14 +103,19 @@ loaded_line() {
 
 @test "requesting a module loads its dependencies first" {
   run_traced -0 init_sh "--modules text" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret table text "
+  assert_output "string os logging helpers process file secret json math csv table text "
 
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json network notification "
 
   # `testing` renders a snapshot mismatch through `diff`, so it comes along.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network table text diff testing "
+  assert_output "string os logging helpers process file secret json network math csv table text diff testing "
+
+  # `table` renders real CSV through the parser in `csv`, so `text`, which
+  # renders through `table`, brings the parser and its JSON bridge along.
+  run_traced -0 init_sh "--modules table" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret text json math csv table "
 
   run_traced -0 init_sh "--modules diff" "$(loaded_line)"
   assert_output "string os logging helpers process file secret json diff "
@@ -172,7 +177,7 @@ printf '%s' '{\"a\":1}' | dybatpho::json_query - '.a'"
   run_traced -0 init_sh "--modules core" "dybatpho::load text
 dybatpho::load text
 $(loaded_line)"
-  assert_output "string os logging helpers process file secret table text "
+  assert_output "string os logging helpers process file secret json math csv table text "
 }
 
 @test "dybatpho::load accepts several modules at once" {

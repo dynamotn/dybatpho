@@ -525,3 +525,133 @@ function dybatpho::table_csv {
       ;;
   esac
 }
+
+#######################################
+# @description Render real CSV as a table, quoting and all.
+#   Unlike `dybatpho::table_csv`, which splits on every comma, this parses the
+#   input with `dybatpho::csv_read` first, so a quoted comma stays inside its
+#   cell, a doubled quote is one quote, and `DYBATPHO_CSV_DELIMITER` picks a
+#   semicolon or `tab` file. A table row is one line, so a line break inside a
+#   value is drawn as a space; the Markdown style also escapes `|` so a value
+#   cannot open a column of its own. Cells are trimmed, as in every renderer
+#   here.
+# @arg $1 string CSV file path, `-` for stdin, or CSV text
+# @arg $2 string Optional style: `plain`, `box`, or `markdown`, default is `plain`
+# @arg $3 string Optional comma-separated alignments for `plain` style
+# @stdout Rendered table, or nothing for an empty input
+# @exitcode 0 The table was rendered
+# @exitcode 1 The style is unknown, or the CSV cannot be read
+# @example
+#   dybatpho::table_from_csv billing.csv box
+#   dybatpho::csv_sort billing.csv cost desc | dybatpho::table_from_csv - plain "left,left,right"
+#######################################
+function dybatpho::table_from_csv {
+  local input
+  dybatpho::expect_args input -- "$@"
+  local style="${2:-plain}"
+  local align_spec="${3-}"
+  __dybatpho_table_expect_style "${style}"
+
+  local -a records=() fields=()
+  dybatpho::csv_read "${input}" records
+  ((${#records[@]})) || return 0
+
+  # The unit separator is the one byte `dybatpho::csv_read` guarantees no value
+  # holds, so it can stand between the cells without being mistaken for data.
+  local unit=$'\037' record field text=""
+  local -a cells=()
+  local IFS
+  for record in "${records[@]}"; do
+    dybatpho::csv_fields "${record}" fields
+    cells=()
+    for field in "${fields[@]}"; do
+      field="${field//$'\r\n'/ }"
+      field="${field//[$'\r\n']/ }"
+      [[ "${style}" != "markdown" ]] || field="${field//|/\\|}"
+      cells+=("${field}")
+    done
+    IFS="${unit}"
+    text+="${cells[*]}"$'\n'
+    unset IFS
+  done
+
+  __dybatpho_table_render "${style}" "${unit}" "${align_spec}" <<< "${text%$'\n'}"
+}
+
+#######################################
+# @description Render a JSON array of objects as a table.
+#   The keys of the first object become the header, in document order, and a
+#   later object missing one of them leaves that cell empty -- the conversion
+#   `dybatpho::csv_from_json` performs, rendered through
+#   `dybatpho::table_from_csv`.
+# @arg $1 string JSON file path, `-` for stdin, or JSON text
+# @arg $2 string Optional style: `plain`, `box`, or `markdown`, default is `plain`
+# @arg $3 string Optional comma-separated alignments for `plain` style
+# @stdout Rendered table, or nothing for an empty array
+# @exitcode 0 The table was rendered
+# @exitcode 1 The style is unknown, or the document is not an array of objects
+# @exitcode 127 Neither `jq` nor `yq` is installed
+# @example
+#   kubectl get pods -o json | jq '[.items[] | {name: .metadata.name, phase: .status.phase}]' \
+#     | dybatpho::table_from_json - box
+#######################################
+function dybatpho::table_from_json {
+  local input
+  dybatpho::expect_args input -- "$@"
+  local style="${2:-plain}"
+  local align_spec="${3-}"
+  __dybatpho_table_expect_style "${style}"
+
+  local document
+  if [[ "${input}" == "-" ]]; then
+    document="$(cat)"
+  elif dybatpho::is file "${input}"; then
+    document="$(cat -- "${input}")"
+  else
+    document="${input}"
+  fi
+  # An empty array has no first object to take a header from, and is simply an
+  # empty table rather than a malformed document.
+  [[ "${document//[[:space:]]/}" != "[]" ]] || return 0
+
+  # The conversion has to run in a command substitution to capture its CSV, so
+  # its failure is carried out by status rather than lost with the subshell.
+  local csv status=0
+  csv="$(DYBATPHO_CSV_DELIMITER="," dybatpho::csv_from_json "${document}")" || status=$?
+  ((status == 0)) || return "${status}"
+  DYBATPHO_CSV_DELIMITER="," dybatpho::table_from_csv - "${style}" "${align_spec}" <<< "${csv}"
+}
+
+#######################################
+# @description Stop on a table style no renderer draws.
+# @arg $1 string Style
+# @exitcode 0 The style is `plain`, `box`, or `markdown`
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_table_expect_style {
+  case "$1" in
+    plain | box | markdown) ;; # kcov(skip) - a case arm has no command to fire on
+    # "dybatpho::table_from_csv and table_from_json reject an unknown style"
+    # covers this; `dybatpho::die` exits, so that test uses `run`.
+    *) dybatpho::die "${FUNCNAME[1]}: Unsupported table style: $1. Use plain, box, or markdown" ;; # kcov(skip)
+  esac
+}
+
+#######################################
+# @description Draw rows read from stdin in one of the three styles.
+#   Reading stdin rather than taking the text as an argument means a table whose
+#   only cell is `-` is drawn, not taken for a request to read stdin.
+# @arg $1 string Style: `plain`, `box`, or `markdown`
+# @arg $2 string Exact delimiter between cells
+# @arg $3 string Comma-separated alignments for `plain` style
+# @stdout Rendered table
+# @internal
+#######################################
+function __dybatpho_table_render {
+  case "$1" in
+    box) dybatpho::table_box - "$2" ;;
+    markdown) dybatpho::table_markdown - "$2" ;;
+    *) dybatpho::table_align - "$2" "$3" 2 ;;
+  esac
+}

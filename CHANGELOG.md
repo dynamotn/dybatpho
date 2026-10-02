@@ -261,6 +261,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::csv_join services.csv owners.csv team left
   ```
 
+- **`table` — draw real CSV and JSON records.** `dybatpho::table_from_csv`
+  renders CSV through the csv parser, so a quoted comma stays in its cell
+  where `dybatpho::table_csv` would refuse the row, and follows
+  `DYBATPHO_CSV_DELIMITER` for semicolon and tab files.
+  `dybatpho::table_from_json` renders a JSON array of objects, the first
+  object's keys as the header. Both draw `plain`, `box` or `markdown`; a line
+  break inside a value is drawn as a space and Markdown escapes `|`. Loading
+  `table` — and so `text` and `markdown` — now loads `csv`, `json` and `math`
+  too.
+
+  ```sh
+  dybatpho::csv_sort billing.csv cost desc | dybatpho::table_from_csv - box
+  dybatpho::table_from_json pods.json markdown >> report.md
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

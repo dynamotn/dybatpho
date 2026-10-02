@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # @file table_ops.sh
 # @brief Example showing text table utilities
-# @description Demonstrates dybatpho::table_print, table_align, table_box, table_markdown, and table_csv
+# @description Demonstrates dybatpho::table_print, table_align, table_box, table_markdown, table_csv,
+#   table_from_csv, and table_from_json
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules table
@@ -28,6 +29,18 @@ function _main {
 
   dybatpho::header "CSV TABLE"
   dybatpho::table_csv "${csv_rows}" plain "left,right"
+
+  dybatpho::header "REAL CSV TABLE"
+  # Quoted commas and doubled quotes stay inside their cells, which the
+  # comma-splitting table_csv would refuse.
+  dybatpho::table_from_csv $'owner,cost\n"Doe, John",120\n"O""Brien, Pat",45' box
+
+  dybatpho::header "JSON TABLE"
+  if dybatpho::command_exists_all jq || dybatpho::command_exists_all yq; then
+    dybatpho::table_from_json '[{"service":"api","replicas":3},{"service":"worker"}]' markdown
+  else
+    dybatpho::warn "Neither jq nor yq is installed; skipping the JSON table"
+  fi
 
   dybatpho::success "Table operations demo complete"
 }

@@ -21,7 +21,18 @@ teardown() {
 @test "logging still writes with NO_COLOR unset under nounset" {
   # The library sets `NO_COLOR` when it loads, but a script may unset it
   # afterwards; a log line must not then die on an unbound variable.
-  run bash -c '. "${DYBATPHO_DIR}/init.sh"; unset NO_COLOR; set -u; dybatpho::info "still logging" 2>&1'
+  #
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `set -u` is on.
+  local script="${BATS_TEST_TMPDIR}/nounset.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh
+unset NO_COLOR
+set -u
+dybatpho::info "still logging" 2>&1
+SCRIPT
+
+  run bash "${script}"
   assert_success
   assert_output --partial "still logging"
 }

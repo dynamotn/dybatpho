@@ -29,6 +29,7 @@ the caller has defined without exporting anything.
 | --- | --- | --- |
 | **`DYBATPHO_PARALLEL_JOBS`** | number | Default number of jobs to run at once, default is the CPU count |
 | **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop launching and end running jobs once one fails |
+| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Longest a job may run, such as `90`, `5m` or `1h30m`; empty or `0` is no limit |
 | **`DYBATPHO_PARALLEL_STATUS`** | array | Exit code of each job of the last run, in submission order |
 
 ### 🚀 Highlights
@@ -87,11 +88,18 @@ dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}"
 
 ```
 
+```bash
+# Give up on a host that takes more than half a minute.
+dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
+
+```
+
 **🎛️ Options**
 
 | Option | Description |
 | --- | --- |
 | **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
+| **--timeout \<duration\>** | End a job that runs longer than this, recording exit `124` |
 | -- End of options, for a job count that is not one |  |
 
 **🧾 Arguments**
@@ -108,6 +116,8 @@ dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}"
 | --- | --- | --- |
 | **`DYBATPHO_PARALLEL_JOBS`** | number | Job count used when `0` is requested |
 | **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop at the first failure |
+| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Per-job limit used when `--timeout` is not given |
+| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds a timed-out job has to stop before it is killed, default is `5` |
 | **`DRY_RUN`** | string | When true-like, report the jobs instead of running them |
 
 **🧩 Variable sets**
@@ -151,6 +161,7 @@ dybatpho::parallel_run 3 \
 | Option | Description |
 | --- | --- |
 | **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
+| **--timeout \<duration\>** | End a job that runs longer than this, recording exit `124` |
 | -- End of options |  |
 
 **🧾 Arguments**
@@ -165,6 +176,8 @@ dybatpho::parallel_run 3 \
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop at the first failure |
+| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Per-job limit used when `--timeout` is not given |
+| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds a timed-out job has to stop before it is killed, default is `5` |
 | **`DRY_RUN`** | string | When true-like, report the commands instead of running them |
 
 **🧩 Variable sets**
@@ -209,7 +222,7 @@ done
 
 **📤 Output on stdout**
 
-- The job's exit code, `skipped` when fail-fast stopped it from
+- The job's exit code (`124` when `--timeout` ended it), `skipped` when fail-fast stopped it from
   starting, or `terminated` when fail-fast ended it while it was running
 
 **🚦 Exit codes**

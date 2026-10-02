@@ -180,6 +180,95 @@ _failing_job() {
   assert_output "[--fail-fast]"
 }
 
+@test "--timeout ends a job that runs too long and records 124" {
+  _slow_or_quick() {
+    if [[ "$1" == "slow" ]]; then
+      sleep 30 &
+      printf '%s' "$!" > "${BATS_TEST_TMPDIR}/sleeper"
+      wait
+      return 0
+    fi
+    printf 'quick done\n'
+  }
+  local started="${SECONDS}"
+  ! dybatpho::parallel_map --timeout 1 2 _slow_or_quick slow quick \
+    > "${BATS_TEST_TMPDIR}/stdout" 2> "${BATS_TEST_TMPDIR}/stderr"
+  ((SECONDS - started < 10))
+  assert_equal "$(dybatpho::parallel_status 0)" "124"
+  assert_equal "$(dybatpho::parallel_status 1)" "0"
+  assert_equal "$(dybatpho::parallel_failed)" "1"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/stdout")" "quick done"
+  assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
+  run_traced grep -c 'Job 0 (slow) timed out after 1s' "${BATS_TEST_TMPDIR}/stderr"
+  assert_output "1"
+}
+
+@test "a job that ignores the stop request is killed after the grace period" {
+  _stubborn() {
+    trap '' TERM
+    sleep 30 &
+    printf '%s' "$!" > "${BATS_TEST_TMPDIR}/sleeper"
+    wait
+  }
+  # shellcheck disable=2030
+  DYBATPHO_TIMEOUT_KILL_AFTER=1
+  local started="${SECONDS}"
+  ! dybatpho::parallel_run --timeout=1s 1 "_stubborn" > /dev/null 2>&1
+  DYBATPHO_TIMEOUT_KILL_AFTER=5
+  ((SECONDS - started < 10))
+  assert_equal "$(dybatpho::parallel_status 0)" "124"
+  assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
+}
+
+@test "a generous limit does not hold the pool open" {
+  # Each job's watchdog sleeps for the whole limit, so the pool must end it
+  # with the job rather than wait for it.
+  local started="${SECONDS}"
+  run_traced --separate-stderr -0 dybatpho::parallel_map --timeout 1m 2 _echo_job a b
+  ((SECONDS - started < 10))
+  assert_output "$(printf 'out a\nout b')"
+}
+
+@test "DYBATPHO_PARALLEL_TIMEOUT sets the limit when no option does" {
+  # shellcheck disable=2030
+  DYBATPHO_PARALLEL_TIMEOUT=1
+  ! dybatpho::parallel_run 1 "sleep 30" > /dev/null 2>&1
+  DYBATPHO_PARALLEL_TIMEOUT=""
+  assert_equal "$(dybatpho::parallel_status 0)" "124"
+}
+
+@test "a timed-out job counts as the failure fail-fast stops on" {
+  ! dybatpho::parallel_run --fail-fast --timeout 1 1 "sleep 30" "true" > /dev/null 2>&1
+  assert_equal "$(dybatpho::parallel_status 0)" "124"
+  assert_equal "$(dybatpho::parallel_status 1)" "skipped"
+}
+
+@test "an interrupted pool ends its jobs and their watchdogs" {
+  _sleeper() {
+    sleep 30 &
+    printf '%s' "$!" > "${BATS_TEST_TMPDIR}/sleeper"
+    wait
+  }
+  local started="${SECONDS}" pool
+  (dybatpho::parallel_map --timeout 1m 1 _sleeper a) > /dev/null 2>&1 &
+  pool=$!
+  while [[ ! -s "${BATS_TEST_TMPDIR}/sleeper" ]]; do sleep 0.05; done
+  kill -TERM "${pool}"
+  wait "${pool}" || true
+  # A watchdog left sleeping out its minute would hold the pool open that long.
+  ((SECONDS - started < 10))
+  assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
+}
+
+@test "an invalid timeout is refused" {
+  run ! dybatpho::parallel_map --timeout abc 2 _echo_job a
+  assert_output --partial "Timeout must be a duration"
+  run ! dybatpho::parallel_map --timeout -5 2 _echo_job a
+  assert_output --partial "must not be negative"
+  run ! dybatpho::parallel_run --timeout
+  assert_output --partial "--timeout needs a duration"
+}
+
 @test "dybatpho::parallel_run evaluates each command string" {
   run_traced -0 dybatpho::parallel_run 2 "printf 'one\n'" "printf 'two\n'; true"
   assert_line --index 0 "one"

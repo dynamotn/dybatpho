@@ -6,7 +6,7 @@
 # @brief Example showing bounded concurrency with ordered output
 # @description Demonstrates dybatpho::parallel_map, parallel_run,
 #   parallel_status, parallel_count, parallel_failed, fail-fast (the variable
-#   and `--fail-fast`), and DRY_RUN
+#   and `--fail-fast`), per-job time limits with `--timeout`, and DRY_RUN
 # shellcheck disable=SC2034 # DYBATPHO_PARALLEL_FAILFAST is read by the parallel module
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules parallel
@@ -121,6 +121,26 @@ function _demo_failfast {
   dybatpho::print "  broken -> ${broken}"
 }
 
+# @description Run the `TIME LIMITS` section of this example.
+# @noargs
+function _demo_timeout {
+  dybatpho::header "TIME LIMITS"
+  dybatpho::info "--timeout ends a job that runs too long and records exit 124"
+
+  # @description Probe a host; `db-01` hangs, to show what a timeout does.
+  # @arg $1 string Host to probe
+  function _probe {
+    [[ "$1" == "db-01" ]] && sleep 30
+    dybatpho::print "  $1: answered"
+  }
+  dybatpho::parallel_map --timeout 1s 3 _probe web-01 db-01 cache-01 || true
+  local index parallel_status
+  for index in 0 1 2; do
+    parallel_status=$(dybatpho::parallel_status "${index}")
+    dybatpho::print "  job ${index} -> ${parallel_status}"
+  done
+}
+
 # @description Run the `DRY RUN` section of this example.
 # @noargs
 function _demo_dry_run {
@@ -136,6 +156,7 @@ function _main {
   _demo_ordering
   _demo_run
   _demo_failfast
+  _demo_timeout
   _demo_dry_run
   dybatpho::success "Parallel demo complete"
 }

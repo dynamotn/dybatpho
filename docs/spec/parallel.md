@@ -84,6 +84,23 @@ As a script author, I want the option to stop at the first failure so that a bro
 
 ---
 
+### User Story 5 - Give up on a job that hangs (Priority: P2)
+
+As a script author, I want a time limit per job so that one host that never answers does not hold the whole run open.
+
+**Why this priority**: A hung job is the most common way a concurrent run fails to finish, and wrapping every job in a timeout by hand loses the job's process group.
+
+**Independent Test**: Run a job that sleeps past a short limit beside a quick one, and verify the slow one is ended with exit `124` while the quick one is unaffected.
+
+**Acceptance Scenarios**:
+
+1. **Given** `--timeout <duration>`, **When** a job runs longer than the limit, **Then** its process group is asked to stop, it is recorded as exit `124`, and standard error names it
+2. **Given** a job that ignores the request to stop, **When** `DYBATPHO_TIMEOUT_KILL_AFTER` seconds pass, **Then** it is killed
+3. **Given** a limit far longer than the jobs take, **When** they finish, **Then** the run ends as soon as they do
+4. **Given** fail-fast and a limit, **When** a job times out, **Then** the timeout is the failure fail-fast stops on
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -110,6 +127,9 @@ done
 - A failure that arrives after the last job has started, while the pool is draining.
 - An item that starts with `--`, which is an item rather than an option because options end at the job count.
 - An unknown option, or `--` used to end the options.
+- A job that traps or ignores `SIGTERM` when its time limit is reached.
+- A duration that cannot be read, is negative, or is missing after `--timeout`.
+- A job that exits with `124` of its own accord, which reads the same as a timeout, as it does with `timeout`.
 - A run captured in a command substitution, which happens in a subshell.
 
 ## Requirements *(mandatory)*
@@ -133,6 +153,9 @@ done
 - **FR-015**: `--fail-fast` MUST enable fail-fast for that call regardless of `DYBATPHO_PARALLEL_FAILFAST`.
 - **FR-016**: With fail-fast enabled, the first failure MUST end every job still running, together with its process group, including while the pool drains after the last job started; such a job MUST be reported as `terminated` and MUST NOT be counted by `dybatpho::parallel_failed`.
 - **FR-017**: When fail-fast stops a run, the module MUST report on standard error the index, label (item or command string), and exit code of the job that failed.
+- **FR-018**: `--timeout <duration>` and `--timeout=<duration>` MUST limit how long each job runs, reading the duration as `dybatpho::date_parse_duration` does, with `DYBATPHO_PARALLEL_TIMEOUT` as the default and an empty value or `0` meaning no limit; an unreadable, negative, or missing duration MUST stop the caller.
+- **FR-019**: A job over its limit MUST have its process group sent `SIGTERM`, then `SIGKILL` after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds (default `5`) if anything in it is still running, MUST be recorded as exit `124`, and MUST be named on standard error.
+- **FR-020**: The watchdog enforcing a limit MUST NOT keep the run open once its job has finished or the run is interrupted, and MUST NOT hold the caller's output streams.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -172,6 +195,13 @@ done
 - **IT-019**: Verify `dybatpho::parallel_run` accepts `--fail-fast` and names the failing command.
 - **IT-020**: Verify `--` ends the options and an unknown option is refused by both entry points.
 - **IT-021**: Verify an item that looks like an option is passed to the job unchanged.
+- **IT-022**: Run a slow job beside a quick one under `--timeout 1`, and verify `124`, the quick job's output and status, the warning, and that the slow job's child is gone.
+- **IT-023**: Run a job that ignores `SIGTERM` with a one-second grace, and verify it is killed and recorded as `124`.
+- **IT-024**: Verify a one-minute limit over quick jobs does not delay the run.
+- **IT-025**: Verify `DYBATPHO_PARALLEL_TIMEOUT` applies when no option is given.
+- **IT-026**: Verify a timeout triggers fail-fast.
+- **IT-027**: Verify an unreadable, negative, or missing duration is refused.
+- **IT-028**: Send `SIGTERM` to a pool running under a one-minute limit, and verify its job's child is gone and the pool ends at once rather than waiting out the watchdog.
 
 ## Acceptance Criteria *(mandatory)*
 

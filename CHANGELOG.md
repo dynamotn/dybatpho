@@ -192,6 +192,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}" || exit 1
   ```
 
+- **`parallel` — a time limit for each job.** `dybatpho::parallel_map` and
+  `dybatpho::parallel_run` take `--timeout <duration>` (or
+  `DYBATPHO_PARALLEL_TIMEOUT`), in any form `dybatpho::date_parse_duration`
+  reads, such as `90`, `30s` or `1h30m`. A job that runs past it has its whole
+  process group asked to stop, is killed `DYBATPHO_TIMEOUT_KILL_AFTER` seconds
+  later if it is still there, and is recorded as exit `124`, the code `timeout`
+  uses, with a warning naming it. A timeout is a failure like any other, so
+  `--fail-fast` stops on it, and a generous limit costs nothing: the run ends as
+  soon as its jobs do. The `parallel` module now loads `date`.
+
+  ```sh
+  dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

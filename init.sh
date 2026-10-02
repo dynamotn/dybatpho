@@ -98,6 +98,7 @@ declare -A __dybatpho_module_deps=(
   [diff]="json"
   [queue]="lock date"
   [schedule]="lock date"
+  [parallel]="date"
   [network]="json"
   [notification]="network"
   [archive]="safety"

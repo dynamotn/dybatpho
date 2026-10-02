@@ -30,6 +30,8 @@
 DYBATPHO_PARALLEL_JOBS="${DYBATPHO_PARALLEL_JOBS:-0}"
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop launching and end running jobs once one fails
 DYBATPHO_PARALLEL_FAILFAST="${DYBATPHO_PARALLEL_FAILFAST:-false}"
+# @env DYBATPHO_PARALLEL_TIMEOUT string Longest a job may run, such as `90`, `5m` or `1h30m`; empty or `0` is no limit
+DYBATPHO_PARALLEL_TIMEOUT="${DYBATPHO_PARALLEL_TIMEOUT:-}"
 # @env DYBATPHO_PARALLEL_STATUS array Exit code of each job of the last run, in submission order
 declare -ga DYBATPHO_PARALLEL_STATUS=()
 
@@ -104,7 +106,8 @@ function __dybatpho_parallel_flush {
 # @arg $1 string Name of the variable that receives how many arguments were options
 # @arg $@ string The arguments the entry point was called with
 # @set __dybatpho_parallel_opt_failfast `true` when `--fail-fast` was given
-# @exitcode 1 Stop the script on an unknown option
+# @set __dybatpho_parallel_opt_timeout The duration given to `--timeout`
+# @exitcode 1 Stop the script on an unknown option, or `--timeout` without a duration
 # @internal
 #######################################
 function __dybatpho_parallel_options {
@@ -114,6 +117,15 @@ function __dybatpho_parallel_options {
   while (($#)); do
     case "$1" in
       --fail-fast) __dybatpho_parallel_opt_failfast=true ;;
+      --timeout=*) __dybatpho_parallel_opt_timeout="${1#--timeout=}" ;;
+      --timeout)
+        # Exercised under `run` by "an invalid timeout is refused", which kcov
+        # cannot see because `dybatpho::die` ends the shell.
+        (($# >= 2)) || dybatpho::die "${FUNCNAME[1]}: --timeout needs a duration" # kcov(skip)
+        __dybatpho_parallel_opt_timeout="$2"
+        shift
+        __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
+        ;;
       --)
         __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
         return 0
@@ -129,12 +141,67 @@ function __dybatpho_parallel_options {
 }
 
 #######################################
+# @description Resolve the per-job time limit into a number of seconds.
+#   The limit is returned through a variable for the same reason as the job
+#   count: a rejected duration has to be able to stop the caller.
+# @arg $1 string Name of the variable that receives the seconds, `0` for no limit
+# @arg $2 string Duration from `--timeout`, or empty to read the configuration
+# @exitcode 1 Stop the script when the duration cannot be read or is negative
+# @internal
+#######################################
+function __dybatpho_parallel_timeout {
+  local -n __dybatpho_parallel_timeout_out="$1"
+  local requested="${2:-${DYBATPHO_PARALLEL_TIMEOUT}}" seconds=0
+  if [[ -n "${requested}" ]]; then
+    # Exercised under `run` by "an invalid timeout is refused", which kcov
+    # cannot see because `dybatpho::die` ends the shell.
+    local invalid="Timeout must be a duration such as 90, 5m or 1h30m, got '${requested}'"
+    dybatpho::date_parse_duration seconds "${requested}" 2> /dev/null \
+      || dybatpho::die "${FUNCNAME[1]}: ${invalid}" # kcov(skip)
+    ((seconds >= 0)) \
+      || dybatpho::die "${FUNCNAME[1]}: Timeout must not be negative, got '${requested}'" # kcov(skip)
+  fi
+  __dybatpho_parallel_timeout_out="${seconds}"
+}
+
+#######################################
+# @description End one job once it has run for too long.
+#   The pool runs one of these beside every job when a limit is set. It asks the
+#   job's process group to stop, then kills whatever is left after
+#   `DYBATPHO_TIMEOUT_KILL_AFTER` seconds, the grace `dybatpho::run_with_timeout`
+#   gives too. The marker it leaves is how the pool tells a job that timed out
+#   from one that was ended for another reason, since an ended job writes no
+#   status of its own.
+# @arg $1 number Process ID of the job, the leader of its process group
+# @arg $2 number Job index
+# @arg $3 string Capture directory
+# @arg $4 number Seconds the job may run
+# @internal
+#######################################
+function __dybatpho_parallel_watch {
+  local pid="$1" index="$2" directory="$3" seconds="$4"
+  local grace="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}" tick
+  [[ "${grace}" =~ ^[0-9]+$ ]] || grace=5
+  sleep "${seconds}"
+  [[ ! -f "${directory}/${index}.status" ]] || return 0
+  : > "${directory}/${index}.timeout"
+  kill -TERM -- -"${pid}" 2> /dev/null || return 0
+  for ((tick = 0; tick < grace * 10; tick++)); do
+    kill -0 -- -"${pid}" 2> /dev/null || return 0
+    sleep 0.1
+  done
+  kill -KILL -- -"${pid}" 2> /dev/null || true
+}
+
+#######################################
 # @description Reap the jobs that have finished and act on what they reported.
 #   `wait -n` blocks until at least one job ends, so every call makes progress.
 #   Exit codes travel through files rather than through `wait`, because
 #   `wait -n` reports a status without saying which job it belongs to. Under
 #   fail-fast, the first failure seen ends every job still running and stops the
-#   pool from starting more.
+#   pool from starting more. A job its watchdog ended is recorded as exit `124`,
+#   the code `timeout` uses, and that watchdog is left to finish its grace
+#   period; every other job's watchdog is ended with the job.
 # @arg $1 string Directory holding the captured output
 # @set __dybatpho_parallel_pids Only the jobs still running
 # @set __dybatpho_parallel_stop `true` once fail-fast has stopped the pool
@@ -142,16 +209,29 @@ function __dybatpho_parallel_options {
 #######################################
 function __dybatpho_parallel_reap {
   local directory="$1" pid index status message
-  local -a alive=() finished=()
+  local -a alive=() finished=() finished_pids=()
   wait -n 2> /dev/null || true
   for pid in ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"}; do
     if kill -0 "${pid}" 2> /dev/null; then
       alive+=("${pid}")
     else
       finished+=("${__dybatpho_parallel_index_of[${pid}]}")
+      finished_pids+=("${pid}")
     fi
   done
   __dybatpho_parallel_pids=(${alive[@]+"${alive[@]}"})
+
+  for pid in ${finished_pids[@]+"${finished_pids[@]}"}; do
+    index="${__dybatpho_parallel_index_of[${pid}]}"
+    if [[ ! -f "${directory}/${index}.status" && -f "${directory}/${index}.timeout" ]]; then
+      printf '124' > "${directory}/${index}.status"
+      printf -v message 'Job %s (%s) timed out after %ss' \
+        "${index}" "${__dybatpho_parallel_labels[index]}" "${__dybatpho_parallel_limit}"
+      dybatpho::warn "${message}"
+    elif [[ -n "${__dybatpho_parallel_watchdog_of[${pid}]-}" ]]; then
+      __dybatpho_parallel_terminate "${__dybatpho_parallel_watchdog_of[${pid}]}"
+    fi
+  done
 
   for index in ${finished[@]+"${finished[@]}"}; do
     [[ -f "${directory}/${index}.status" ]] || continue
@@ -165,10 +245,13 @@ function __dybatpho_parallel_reap {
   done
 
   if [[ "${__dybatpho_parallel_stop}" == true ]] && ((${#__dybatpho_parallel_pids[@]})); then
+    local -a watchdogs=()
     for pid in "${__dybatpho_parallel_pids[@]}"; do
       __dybatpho_parallel_terminated+=("${__dybatpho_parallel_index_of[${pid}]}")
+      [[ -z "${__dybatpho_parallel_watchdog_of[${pid}]-}" ]] \
+        || watchdogs+=("${__dybatpho_parallel_watchdog_of[${pid}]}")
     done
-    __dybatpho_parallel_terminate "${__dybatpho_parallel_pids[@]}"
+    __dybatpho_parallel_terminate "${__dybatpho_parallel_pids[@]}" ${watchdogs[@]+"${watchdogs[@]}"}
     __dybatpho_parallel_pids=()
   fi
   return 0
@@ -199,8 +282,10 @@ function __dybatpho_parallel_pool {
 
   local __dybatpho_parallel_failfast="${DYBATPHO_PARALLEL_FAILFAST}"
   [[ "${__dybatpho_parallel_opt_failfast:-false}" != true ]] || __dybatpho_parallel_failfast=true
+  local __dybatpho_parallel_limit
+  __dybatpho_parallel_timeout __dybatpho_parallel_limit "${__dybatpho_parallel_opt_timeout:-}"
   local __dybatpho_parallel_stop=false
-  local -A __dybatpho_parallel_index_of=()
+  local -A __dybatpho_parallel_index_of=() __dybatpho_parallel_watchdog_of=()
   local -a __dybatpho_parallel_terminated=()
 
   # Job control gives every job its own process group, which is what makes it
@@ -218,11 +303,14 @@ function __dybatpho_parallel_pool {
 
   # A job left running after an interrupt keeps working on output nobody will
   # read, so the pool ends its children before the shell goes away.
-  declare -ga __dybatpho_parallel_pids=()
-  # The list of process IDs has to expand when the signal arrives, not now,
-  # which is why this is a single-quoted string.
+  declare -ga __dybatpho_parallel_pids=() __dybatpho_parallel_watchdogs=()
+  # The lists of process IDs have to expand when the signal arrives, not now,
+  # which is why this is a single-quoted string; the escaped newline inside it
+  # continues the command when the trap runs.
   # shellcheck disable=SC2016
-  dybatpho::trap '__dybatpho_parallel_terminate ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"}' \
+  dybatpho::trap '__dybatpho_parallel_terminate \
+    ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
+    ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' \
     SIGINT SIGTERM
 
   for ((index = 0; index < total; index++)); do
@@ -233,6 +321,14 @@ function __dybatpho_parallel_pool {
     "${launcher}" "${index}" "${directory}" &
     __dybatpho_parallel_pids+=("$!")
     __dybatpho_parallel_index_of[$!]="${index}"
+    if ((__dybatpho_parallel_limit > 0)); then
+      # The watchdog leads a process group of its own, so ending the job never
+      # ends the watchdog, and it holds no output stream the caller is reading.
+      __dybatpho_parallel_watch "$!" "${index}" "${directory}" "${__dybatpho_parallel_limit}" \
+        < /dev/null > /dev/null 2>&1 &
+      __dybatpho_parallel_watchdog_of[${__dybatpho_parallel_pids[-1]}]="$!"
+      __dybatpho_parallel_watchdogs+=("$!")
+    fi
 
     while ((${#__dybatpho_parallel_pids[@]} >= concurrency)); do
       __dybatpho_parallel_reap "${directory}"
@@ -242,6 +338,13 @@ function __dybatpho_parallel_pool {
   while ((${#__dybatpho_parallel_pids[@]})); do
     __dybatpho_parallel_reap "${directory}"
   done
+  # A watchdog still running is one finishing the grace period of a job it
+  # ended; every other one was ended with its job and is only reaped here.
+  local watchdog
+  for watchdog in ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}; do
+    wait "${watchdog}" 2> /dev/null || true
+  done
+  __dybatpho_parallel_watchdogs=()
 
   for index in ${__dybatpho_parallel_terminated[@]+"${__dybatpho_parallel_terminated[@]}"}; do
     DYBATPHO_PARALLEL_STATUS[index]="terminated"
@@ -276,7 +379,12 @@ function __dybatpho_parallel_pool {
 #   # Stop everything as soon as one host fails.
 #   dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}"
 #
+# @example
+#   # Give up on a host that takes more than half a minute.
+#   dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
+#
 # @option --fail-fast Stop starting jobs and end the running ones once a job fails
+# @option --timeout <duration> End a job that runs longer than this, recording exit `124`
 # @option -- End of options, for a job count that is not one
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
 # @arg $2 string Command or function to run for each item
@@ -286,6 +394,8 @@ function __dybatpho_parallel_pool {
 # @stderr Standard error of every job, replayed in submission order
 # @env DYBATPHO_PARALLEL_JOBS number Job count used when `0` is requested
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop at the first failure
+# @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a timed-out job has to stop before it is killed, default is `5`
 # @env DRY_RUN string When true-like, report the jobs instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed
@@ -296,7 +406,7 @@ function __dybatpho_parallel_pool {
 #   `dybatpho::parallel_status` unchanged
 #######################################
 function dybatpho::parallel_map {
-  local __dybatpho_parallel_opt_failfast=false consumed
+  local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout="" consumed
   __dybatpho_parallel_options consumed "$@"
   shift "${consumed}"
   local concurrency command
@@ -347,6 +457,7 @@ function dybatpho::parallel_map {
 #     "go build ./..."
 #
 # @option --fail-fast Stop starting jobs and end the running ones once a job fails
+# @option --timeout <duration> End a job that runs longer than this, recording exit `124`
 # @option -- End of options
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
 # @arg $@ string Shell command strings, one job each
@@ -354,6 +465,8 @@ function dybatpho::parallel_map {
 # @stdout Standard output of every job, replayed in submission order
 # @stderr Standard error of every job, replayed in submission order
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop at the first failure
+# @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a timed-out job has to stop before it is killed, default is `5`
 # @env DRY_RUN string When true-like, report the commands instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed
@@ -364,7 +477,7 @@ function dybatpho::parallel_map {
 #   `dybatpho::parallel_status` unchanged
 #######################################
 function dybatpho::parallel_run {
-  local __dybatpho_parallel_opt_failfast=false consumed
+  local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout="" consumed
   __dybatpho_parallel_options consumed "$@"
   shift "${consumed}"
   local concurrency
@@ -412,7 +525,7 @@ function dybatpho::parallel_run {
 #   done
 #
 # @arg $1 number Job index, counting from zero in submission order
-# @stdout The job's exit code, `skipped` when fail-fast stopped it from
+# @stdout The job's exit code (`124` when `--timeout` ended it), `skipped` when fail-fast stopped it from
 #   starting, or `terminated` when fail-fast ended it while it was running
 # @exitcode 1 There is no job with that index
 #######################################

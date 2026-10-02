@@ -124,6 +124,33 @@ function _demo_email {
   dybatpho::info "Email dispatched"
 }
 
+# @description Run the `DELIVERY POLICY` section of this example.
+#   DRY_RUN is turned off here, and `curl` is replaced by a stub on PATH that
+#   answers 503, so the circuit breaker can be seen opening without any request
+#   leaving the machine.
+# @noargs
+function _demo_delivery_policy {
+  dybatpho::header "DELIVERY POLICY"
+  local bin
+  dybatpho::create_temp_dir bin
+  printf '#!/bin/sh\nprintf 503\n' > "${bin}/curl"
+  chmod +x "${bin}/curl"
+
+  local status
+  (
+    export PATH="${bin}:${PATH}" DRY_RUN=false
+    export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T000/B000/xxxx"
+    export DYBATPHO_NOTIFY_MAX_RETRIES=0 DYBATPHO_NOTIFY_CIRCUIT=true
+    export DYBATPHO_CIRCUIT_THRESHOLD=2
+    for attempt in 1 2 3; do
+      status=0
+      dybatpho::notify_slack "Attempt ${attempt}" 2> /dev/null || status=$?
+      dybatpho::info "Attempt ${attempt} returned ${status}"
+    done
+  )
+  dybatpho::info "The third attempt was skipped: 9 means the circuit is open"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -137,6 +164,7 @@ function _main {
   _demo_gotify
   _demo_desktop
   _demo_email
+  _demo_delivery_policy
   dybatpho::success "Notification demo complete"
 }
 

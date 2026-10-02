@@ -459,6 +459,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
   ```
 
+- **`notification` — a delivery policy for the HTTP notifiers.**
+  `DYBATPHO_NOTIFY_MAX_RETRIES` sets the retry budget of notification requests
+  alone, so an alert from a cron job can give up quickly without shortening
+  the script's other requests. `DYBATPHO_NOTIFY_CIRCUIT=true` puts each
+  provider behind `dybatpho::circuit_breaker`: once it has failed
+  `DYBATPHO_CIRCUIT_THRESHOLD` times in a row, further calls return `9` at once
+  until `DYBATPHO_CIRCUIT_COOLDOWN` passes, and the other providers keep
+  working. Circuits are named after the provider, or the host for
+  `dybatpho::notify_webhook`, never the full URL, so a webhook secret does not
+  reach the log. Both are off by default, and nothing changes until they are
+  set.
+
+  ```sh
+  export DYBATPHO_NOTIFY_MAX_RETRIES=1 DYBATPHO_NOTIFY_CIRCUIT=true
+  dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

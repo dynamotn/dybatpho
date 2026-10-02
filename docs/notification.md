@@ -23,6 +23,13 @@ notification platforms through their webhook or bot APIs:
 - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 - **Email** – A plain-text message through the local `sendmail`
 
+### 🌍 Environment
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_NOTIFY_MAX_RETRIES`** | number | Retry budget for notification requests only, replacing `DYBATPHO_CURL_MAX_RETRIES` for them; unset keeps the network module's budget |
+| **`DYBATPHO_NOTIFY_CIRCUIT`** | bool | Guard each HTTP notifier with a circuit breaker, so a provider that keeps failing is skipped with exit code `9` until its cooldown passes (default `false`) Where `dybatpho::notify_email` looks for a sendmail command, in order. The command often lives outside an ordinary user's PATH, in `/usr/sbin`, which is why the two traditional locations follow the PATH lookup. |
+
 ### 🚀 Highlights
 
 - [`dybatpho::notify_slack`](#dybatphonotify_slack) — Send a message to a Slack channel via Incoming Webhook.
@@ -109,6 +116,18 @@ dybatpho::notify_email "ops@example.com" "Backup failed" "$(tail -n 20 backup.lo
 dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy","status":"ok"}'
 ```
 
+### Delivery policy
+
+Every HTTP notifier retries through `dybatpho::curl_do`. A script that
+alerts from a cron job usually wants that shorter, and wants a provider that
+is down to stop costing time on every call:
+
+```bash
+export DYBATPHO_NOTIFY_MAX_RETRIES=1   # notifications only
+export DYBATPHO_NOTIFY_CIRCUIT=true    # skip a failing provider for a while
+dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
+```
+
 <a id="see-also"></a>
 ## 🔗 See also
 
@@ -152,10 +171,12 @@ dybatpho::notify_slack "Hello from dybatpho"
 - `1`: Missing arguments or environment variables
 - `4`: HTTP 4xx from Slack
 - `5`: HTTP 5xx from Slack
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -194,10 +215,12 @@ dybatpho::notify_telegram "*Build* passed" "Markdown"
 - `1`: Missing arguments or environment variables
 - `4`: HTTP 4xx from Telegram
 - `5`: HTTP 5xx from Telegram
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -235,10 +258,12 @@ dybatpho::notify_teams "All checks passed" "Deploy v2.0"
 - `1`: Missing arguments or environment variables
 - `4`: HTTP 4xx from Teams
 - `5`: HTTP 5xx from Teams
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -273,10 +298,12 @@ dybatpho::notify_google_chat "Release v2.0 is live"
 - `1`: Missing arguments or environment variables
 - `4`: HTTP 4xx from Google Chat
 - `5`: HTTP 5xx from Google Chat
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -313,10 +340,12 @@ dybatpho::notify_discord "Deploy done" "CI Bot"
 - `1`: Missing arguments or environment variables
 - `4`: HTTP 4xx from Discord
 - `5`: HTTP 5xx from Discord
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -349,10 +378,12 @@ dybatpho::notify_webhook "https://my.service/hook" '{"text":"hi"}' \
 - `1`: Missing arguments
 - `4`: HTTP 4xx from webhook
 - `5`: HTTP 5xx from webhook
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -440,10 +471,12 @@ dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,flop
 - `1`: Missing arguments or environment variables, or an invalid topic, server URL or priority
 - `4`: HTTP 4xx from the server, such as a refused token
 - `5`: HTTP 5xx from the server
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---
@@ -486,10 +519,12 @@ dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 - `1`: Missing arguments or environment variables, or an invalid server URL or priority
 - `4`: HTTP 4xx from the server, such as an unknown token
 - `5`: HTTP 5xx from the server
+- `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+- [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
 
 ---

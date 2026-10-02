@@ -803,3 +803,96 @@ fake_sendmail() {
   assert_output --partial "DRY RUN: ${DYBATPHO_SENDMAIL} -i -- ops@example.com"
   [ ! -e "${BATS_TEST_TMPDIR}/sendmail.args" ]
 }
+
+# ---------------------------------------------------------------------------
+# Delivery policy: DYBATPHO_NOTIFY_MAX_RETRIES and DYBATPHO_NOTIFY_CIRCUIT
+# ---------------------------------------------------------------------------
+
+@test "DYBATPHO_NOTIFY_MAX_RETRIES replaces the retry budget for notifications" {
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
+  export DYBATPHO_CURL_MAX_RETRIES=5 DYBATPHO_CURL_RETRY_BASE_DELAY=0
+  export DYBATPHO_NOTIFY_MAX_RETRIES=0
+  # One answer only: a second attempt would find no plan and fail the stub.
+  stub curl ": printf '503'"
+  run_traced -5 dybatpho::notify_slack "down"
+  unstub curl
+  assert_equal "${DYBATPHO_CURL_MAX_RETRIES}" 5
+}
+
+@test "DYBATPHO_NOTIFY_MAX_RETRIES still lets a retry succeed" {
+  export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
+  export DYBATPHO_CURL_MAX_RETRIES=0 DYBATPHO_CURL_RETRY_BASE_DELAY=0
+  export DYBATPHO_NOTIFY_MAX_RETRIES=1
+  stub curl ": printf '503'" ": printf '200'"
+  run_traced -0 dybatpho::notify_discord "flaky"
+  unstub curl
+}
+
+@test "DYBATPHO_NOTIFY_MAX_RETRIES must be a non-negative integer" {
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
+  export DYBATPHO_NOTIFY_MAX_RETRIES=many
+  run -1 dybatpho::notify_slack "hello"
+  assert_output --partial "DYBATPHO_NOTIFY_MAX_RETRIES must be a non-negative integer"
+}
+
+@test "DYBATPHO_NOTIFY_CIRCUIT fails fast once a provider keeps failing" {
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
+  export DYBATPHO_NOTIFY_CIRCUIT=true DYBATPHO_NOTIFY_MAX_RETRIES=0
+  export DYBATPHO_CIRCUIT_THRESHOLD=2 DYBATPHO_CIRCUIT_COOLDOWN=300
+  # Two failures open the circuit; the third call never reaches curl.
+  stub curl ": printf '503'" ": printf '503'"
+  run_traced -5 dybatpho::notify_slack "one"
+  run_traced -5 dybatpho::notify_slack "two"
+  run_traced --separate-stderr -9 dybatpho::notify_slack "three"
+  unstub curl
+  assert_stderr --partial "Circuit 'notify:slack' is open"
+  assert_equal "$(dybatpho::circuit_state notify:slack)" open
+}
+
+@test "DYBATPHO_NOTIFY_CIRCUIT keeps one circuit per provider" {
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
+  export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
+  export DYBATPHO_NOTIFY_CIRCUIT=true DYBATPHO_NOTIFY_MAX_RETRIES=0
+  export DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=300
+  stub curl ": printf '503'" ": printf '200'"
+  run_traced -5 dybatpho::notify_slack "slack is down"
+  run_traced -0 dybatpho::notify_discord "discord is fine"
+  unstub curl
+  assert_equal "$(dybatpho::circuit_state notify:discord)" closed
+}
+
+@test "DYBATPHO_NOTIFY_CIRCUIT names a webhook circuit by host, without credentials" {
+  export DYBATPHO_NOTIFY_CIRCUIT=true DYBATPHO_NOTIFY_MAX_RETRIES=0
+  export DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=300
+  stub curl ": printf '500'"
+  run_traced -5 dybatpho::notify_webhook "https://bot:hunter2@hooks.example.test/x?token=abc" '{}'
+  run_traced --separate-stderr -9 dybatpho::notify_webhook "https://bot:hunter2@hooks.example.test/y" '{}'
+  unstub curl
+  assert_stderr --partial "Circuit 'notify:webhook:hooks.example.test' is open"
+  refute_output --partial "hunter2"
+  [[ "${stderr}" != *hunter2* && "${stderr}" != *token=abc* ]]
+}
+
+@test "the circuit keeps sending the token out of band" {
+  local args_file="${BATS_TEST_TMPDIR}/circuit-gotify-args"
+  local config_file="${BATS_TEST_TMPDIR}/circuit-gotify-config"
+  export DYBATPHO_GOTIFY_URL="https://gotify.example.test"
+  export DYBATPHO_GOTIFY_TOKEN="CircuitToken"
+  export DYBATPHO_NOTIFY_CIRCUIT=true
+  stub_curl_with_config "${args_file}" "${config_file}"
+  run_traced -0 dybatpho::notify_gotify "through the breaker"
+  unstub curl
+  run_traced grep -- "CircuitToken" "${args_file}"
+  assert_failure
+  grep -- "X-Gotify-Key: CircuitToken" "${config_file}"
+}
+
+@test "without DYBATPHO_NOTIFY_CIRCUIT every call reaches the provider" {
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
+  unset DYBATPHO_NOTIFY_CIRCUIT
+  export DYBATPHO_NOTIFY_MAX_RETRIES=0 DYBATPHO_CIRCUIT_THRESHOLD=1
+  stub curl ": printf '503'" ": printf '503'"
+  run_traced -5 dybatpho::notify_slack "one"
+  run_traced -5 dybatpho::notify_slack "two"
+  unstub curl
+}

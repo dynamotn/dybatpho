@@ -88,12 +88,29 @@
 #   dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy","status":"ok"}'
 #   ```
 #
+#   ### Delivery policy
+#
+#   Every HTTP notifier retries through `dybatpho::curl_do`. A script that
+#   alerts from a cron job usually wants that shorter, and wants a provider that
+#   is down to stop costing time on every call:
+#
+#   ```bash
+#   export DYBATPHO_NOTIFY_MAX_RETRIES=1   # notifications only
+#   export DYBATPHO_NOTIFY_CIRCUIT=true    # skip a failing provider for a while
+#   dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
+#   ```
+#
 # @see
 #   - `example/notification_ops.sh`
 # @tip Most providers require a webhook URL or API token set via environment variables. The functions validate these
 #   before
 #   making requests.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+
+# @env DYBATPHO_NOTIFY_MAX_RETRIES number Retry budget for notification requests only, replacing
+#   `DYBATPHO_CURL_MAX_RETRIES` for them; unset keeps the network module's budget
+# @env DYBATPHO_NOTIFY_CIRCUIT bool Guard each HTTP notifier with a circuit breaker, so a provider that keeps failing
+#   is skipped with exit code `9` until its cooldown passes (default `false`)
 
 # Where `dybatpho::notify_email` looks for a sendmail command, in order. The
 # command often lives outside an ordinary user's PATH, in `/usr/sbin`, which is
@@ -118,6 +135,59 @@ function __dybatpho_notification_json_escape {
 }
 
 #######################################
+# @description Post a JSON body for one of the HTTP notifiers, with the
+#   module's delivery policy applied.
+#   The request goes through `dybatpho::curl_json`, which already retries a
+#   transport failure, a 5xx and a 408/425/429 with backoff. Two settings
+#   adjust that for notifications alone, without touching the script's other
+#   requests: `DYBATPHO_NOTIFY_MAX_RETRIES` replaces the retry budget, and
+#   `DYBATPHO_NOTIFY_CIRCUIT` guards each provider with a circuit breaker, so
+#   once an endpoint has failed `DYBATPHO_CIRCUIT_THRESHOLD` times in a row the
+#   next calls fail at once with exit code `9` instead of waiting out their
+#   retries, until `DYBATPHO_CIRCUIT_COOLDOWN` has passed.
+#
+#   A circuit is named after the provider, never the URL: a webhook URL is
+#   often the credential itself, and the name appears in the warning the
+#   breaker logs. The generic webhook gets one circuit per host.
+# @arg $1 string Provider name, which names the circuit
+# @arg $2 string URL
+# @arg $@ string Arguments for curl
+# @exitcode 9 The provider's circuit is open; nothing was sent
+# @exitcode other The exit code of `dybatpho::curl_json`
+# @internal
+#######################################
+function __dybatpho_notification_post {
+  local provider url
+  dybatpho::expect_args provider url -- "$@"
+  shift 2
+
+  if [[ -n "${DYBATPHO_NOTIFY_MAX_RETRIES-}" ]]; then
+    [[ "${DYBATPHO_NOTIFY_MAX_RETRIES}" =~ ^[0-9]+$ ]] \
+      || dybatpho::die "DYBATPHO_NOTIFY_MAX_RETRIES must be a non-negative integer" # kcov(skip)
+    # Dynamic scoping hands the budget to `dybatpho::curl_do` for this request
+    # only, and the script's own value is back once this function returns.
+    # shellcheck disable=SC2034 # read by dybatpho::curl_do
+    local DYBATPHO_CURL_MAX_RETRIES="${DYBATPHO_NOTIFY_MAX_RETRIES}"
+  fi
+
+  if ! dybatpho::is true "${DYBATPHO_NOTIFY_CIRCUIT:-false}"; then
+    dybatpho::curl_json "${url}" /dev/null "$@"
+    return
+  fi
+
+  local key="notify:${provider}"
+  if [[ "${provider}" == "webhook" ]]; then
+    # The host alone: no scheme, no path or query, no `user:password@`.
+    local host="${url#*://}"
+    host="${host%%[/?#]*}"
+    key+=":${host##*@}"
+  fi
+  local command
+  printf -v command '%q ' dybatpho::curl_json "${url}" /dev/null "$@"
+  dybatpho::circuit_breaker "${key}" "${command}"
+}
+
+#######################################
 # @description Send a message to a Slack channel via Incoming Webhook.
 # @example
 #   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../xxx"
@@ -129,7 +199,9 @@ function __dybatpho_notification_json_escape {
 # @exitcode 1 Missing arguments or environment variables
 # @exitcode 4 HTTP 4xx from Slack
 # @exitcode 5 HTTP 5xx from Slack
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_slack {
   local message
@@ -143,7 +215,7 @@ function dybatpho::notify_slack {
 
   dybatpho::debug "Sending Slack notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  dybatpho::curl_json "${DYBATPHO_SLACK_WEBHOOK_URL}" /dev/null \
+  __dybatpho_notification_post slack "${DYBATPHO_SLACK_WEBHOOK_URL}" \
     --request POST \
     --data "${payload}"
 }
@@ -164,7 +236,9 @@ function dybatpho::notify_slack {
 # @exitcode 1 Missing arguments or environment variables
 # @exitcode 4 HTTP 4xx from Telegram
 # @exitcode 5 HTTP 5xx from Telegram
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_telegram {
   local message
@@ -190,7 +264,7 @@ function dybatpho::notify_telegram {
   fi
 
   dybatpho::debug "Sending Telegram notification"
-  dybatpho::curl_json "${url}" /dev/null \
+  __dybatpho_notification_post telegram "${url}" \
     --request POST \
     --data "${payload}"
 }
@@ -210,7 +284,9 @@ function dybatpho::notify_telegram {
 # @exitcode 1 Missing arguments or environment variables
 # @exitcode 4 HTTP 4xx from Teams
 # @exitcode 5 HTTP 5xx from Teams
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_teams {
   local message
@@ -245,7 +321,7 @@ function dybatpho::notify_teams {
 
   dybatpho::debug "Sending Teams notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  dybatpho::curl_json "${DYBATPHO_TEAMS_WEBHOOK_URL}" /dev/null \
+  __dybatpho_notification_post teams "${DYBATPHO_TEAMS_WEBHOOK_URL}" \
     --request POST \
     --data "${payload}"
 }
@@ -262,7 +338,9 @@ function dybatpho::notify_teams {
 # @exitcode 1 Missing arguments or environment variables
 # @exitcode 4 HTTP 4xx from Google Chat
 # @exitcode 5 HTTP 5xx from Google Chat
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_google_chat {
   local message
@@ -276,7 +354,7 @@ function dybatpho::notify_google_chat {
 
   dybatpho::debug "Sending Google Chat notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  dybatpho::curl_json "${DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL}" /dev/null \
+  __dybatpho_notification_post google_chat "${DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL}" \
     --request POST \
     --data "${payload}"
 }
@@ -295,7 +373,9 @@ function dybatpho::notify_google_chat {
 # @exitcode 1 Missing arguments or environment variables
 # @exitcode 4 HTTP 4xx from Discord
 # @exitcode 5 HTTP 5xx from Discord
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_discord {
   local message
@@ -317,7 +397,7 @@ function dybatpho::notify_discord {
 
   dybatpho::debug "Sending Discord notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  dybatpho::curl_json "${DYBATPHO_DISCORD_WEBHOOK_URL}" /dev/null \
+  __dybatpho_notification_post discord "${DYBATPHO_DISCORD_WEBHOOK_URL}" \
     --request POST \
     --data "${payload}"
 }
@@ -337,7 +417,9 @@ function dybatpho::notify_discord {
 # @exitcode 1 Missing arguments
 # @exitcode 4 HTTP 4xx from webhook
 # @exitcode 5 HTTP 5xx from webhook
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_webhook {
   local url payload
@@ -345,7 +427,7 @@ function dybatpho::notify_webhook {
   shift 2
 
   dybatpho::debug "Sending webhook notification to ${url}"
-  dybatpho::curl_json "${url}" /dev/null \
+  __dybatpho_notification_post webhook "${url}" \
     --request POST \
     --data "${payload}" \
     "$@"
@@ -438,7 +520,9 @@ function dybatpho::notify_desktop {
 # @exitcode 1 Missing arguments or environment variables, or an invalid topic, server URL or priority
 # @exitcode 4 HTTP 4xx from the server, such as a refused token
 # @exitcode 5 HTTP 5xx from the server
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_ntfy {
   local message
@@ -496,7 +580,7 @@ function dybatpho::notify_ntfy {
   local -a DYBATPHO_CURL_SECRET_HEADERS=(${headers[@]+"${headers[@]}"})
 
   dybatpho::debug "Sending ntfy notification"
-  dybatpho::curl_json "${url}" /dev/null \
+  __dybatpho_notification_post ntfy "${url}" \
     --request POST \
     --data "${payload}"
 }
@@ -521,7 +605,9 @@ function dybatpho::notify_ntfy {
 # @exitcode 1 Missing arguments or environment variables, or an invalid server URL or priority
 # @exitcode 4 HTTP 4xx from the server, such as an unknown token
 # @exitcode 5 HTTP 5xx from the server
+# @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
 # @see dybatpho::curl_json
+# @see dybatpho::circuit_breaker
 #######################################
 function dybatpho::notify_gotify {
   local message
@@ -555,7 +641,7 @@ function dybatpho::notify_gotify {
   local -a DYBATPHO_CURL_SECRET_HEADERS=("${headers[@]}")
 
   dybatpho::debug "Sending Gotify notification"
-  dybatpho::curl_json "${url}/message" /dev/null \
+  __dybatpho_notification_post gotify "${url}/message" \
     --request POST \
     --data "${payload}"
 }

@@ -153,6 +153,29 @@ arguments and the message, and verify both, along with every refusal.
 5. **Given** no sendmail command is found, **When** `notify_email` runs,
    **Then** it fails with exit code `127`
 
+### User Story 8 - Keep a dead provider from stalling the script (Priority: P2)
+
+As the author of a cron job that alerts on every run, I want a smaller retry
+budget for notifications and a provider that keeps failing to be skipped for a
+while, so that an outage at the chat provider does not stretch every run.
+
+**Independent Test**: Stub `curl` with failing answers, enable the policy
+variables, and count how many requests reach it and which exit code each call
+returns.
+
+**Acceptance Scenarios**:
+
+1. **Given** `DYBATPHO_NOTIFY_MAX_RETRIES`, **When** an HTTP notifier runs,
+   **Then** that budget replaces `DYBATPHO_CURL_MAX_RETRIES` for the request,
+   and the script's own value is unchanged afterwards
+2. **Given** `DYBATPHO_NOTIFY_CIRCUIT=true` and a provider that has failed
+   `DYBATPHO_CIRCUIT_THRESHOLD` times in a row, **When** it is called again
+   before the cooldown, **Then** nothing is sent and the call returns `9`
+3. **Given** one provider's circuit is open, **When** another provider is
+   called, **Then** it is sent normally
+4. **Given** the circuit is off, **When** a provider keeps failing, **Then**
+   every call still reaches it
+
 ### Example Workflow
 
 ```bash
@@ -184,6 +207,9 @@ fi
 - An email recipient list with spaces and empty items, an address that starts
   with `-`, a line break meant to add a header, a body line holding only `.`,
   a long subject in a non-Latin script, or `sendmail` outside the user's PATH.
+- A non-numeric `DYBATPHO_NOTIFY_MAX_RETRIES`, or a generic webhook URL that
+  carries `user:password@` or a token in its query, which must not reach the
+  circuit's name.
 
 ## Requirements *(mandatory)*
 
@@ -250,6 +276,15 @@ fi
   `/usr/lib/sendmail`; it MUST fail with exit code `127` when none exists,
   return `sendmail`'s own exit code, and under `DRY_RUN` print the command
   instead of sending.
+- **FR-023**: Every HTTP notifier MUST use `DYBATPHO_NOTIFY_MAX_RETRIES`, when
+  it is set, as the retry budget of its request only, and MUST reject a value
+  that is not a non-negative integer.
+- **FR-024**: When `DYBATPHO_NOTIFY_CIRCUIT` is true, every HTTP notifier MUST
+  run its request through `dybatpho::circuit_breaker` under the key
+  `notify:<provider>` (`notify:webhook:<host>` for the generic webhook), so an
+  open circuit returns `9` without sending; the key MUST NOT contain the URL's
+  path, query or credentials. When it is not true, requests MUST be sent as
+  before.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -295,6 +330,11 @@ fi
 - **IT-009**: Verify `notify_email` arguments and message, the sender sources,
   subject encoding and splitting, every refusal, the sendmail lookup, exit
   code `127`, the sendmail exit code, and `DRY_RUN`.
+- **IT-010**: Verify the notification retry budget and that it does not leak,
+  its validation, a circuit opening and returning `9`, one circuit per
+  provider, a webhook circuit named by host without credentials, the token
+  staying out of band through the breaker, and the circuit being off by
+  default.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -304,4 +344,6 @@ fi
 3. Desktop notifications pass user text to the backend as data, never as code.
 4. Access tokens never reach a process's command line.
 5. Text from a variable cannot add an email header or recipient.
+6. A failing provider can be made to cost a script one fast failure instead of
+   a full retry cycle, without changing the default behavior.
 3. All notification requests share the network module's error contract.

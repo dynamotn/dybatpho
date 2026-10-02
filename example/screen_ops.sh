@@ -32,7 +32,7 @@ function _main {
   dybatpho::screen_clear
 
   # One call styles every widget below; under NO_COLOR it falls back to mono.
-  dybatpho::screen_theme dusk
+  dybatpho::screen_theme catppuccin-macchiato
 
   local -a pods=(api-7f9 worker-2ab scheduler-91c cache-44d gateway-0ff)
   local -a tabs=(Overview Logs Settings)

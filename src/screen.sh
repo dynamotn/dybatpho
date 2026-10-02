@@ -2495,6 +2495,16 @@ function dybatpho::screen_keybar {
 #   | `default` | the module's own defaults: bold, dim, reverse and the eight basic colours |
 #   | `dusk` | a 256-colour palette: violet frames and selection, soft green, amber and red |
 #   | `mono` | no colour at all, only bold, dim and reverse |
+#   | `catppuccin-latte` | [Catppuccin](https://catppuccin.com) Latte, the light flavour, in 24-bit colour |
+#   | `catppuccin-frappe` | Catppuccin Frappé, a muted dark flavour |
+#   | `catppuccin-macchiato` | Catppuccin Macchiato, a darker flavour |
+#   | `catppuccin-mocha` | Catppuccin Mocha, the darkest flavour |
+#
+#   The Catppuccin themes take mauve for frames and selection, lavender for
+#   titles, pink for keys, and the flavour's own green, yellow and red. They
+#   colour text and bars but not the screen behind them, so pick the flavour
+#   that matches the terminal: `catppuccin-latte` on a light background, one
+#   of the others on a dark one.
 #
 #   A theme is downgraded to `mono` when colour is not wanted, so an
 #   application can ask for a palette and still respect the environment it
@@ -2503,9 +2513,11 @@ function dybatpho::screen_keybar {
 #   stream that is not a terminal.
 # @example
 #   dybatpho::screen_theme dusk
+#   dybatpho::screen_theme catppuccin-mocha
 #   dybatpho::screen_block "${rect}" title:"Tools" focus:true
 #
-# @arg $1 string Theme name: `default`, `dusk`, or `mono`
+# @arg $1 string Theme name: `default`, `dusk`, `mono`, `catppuccin-latte`,
+#   `catppuccin-frappe`, `catppuccin-macchiato`, or `catppuccin-mocha`
 # @env NO_COLOR string Use `mono` in place of a coloured theme when set to a non-empty value
 # @env FORCE_COLOR string Keep a coloured theme even when stdout is not a terminal
 # @see dybatpho::color_supported
@@ -2516,14 +2528,46 @@ function dybatpho::screen_keybar {
 function dybatpho::screen_theme {
   local name
   dybatpho::expect_args name -- "$@"
-  # `default` is downgraded too, not only `dusk`: it carries three colours of
-  # its own, and leaving them on under `NO_COLOR` was the module answering the
-  # question differently depending on which theme was asked for. Only a known
-  # coloured theme is downgraded, so an unknown name still reaches the arm
-  # that rejects it rather than being quietly accepted as `mono`.
-  if [[ "${name}" == default || "${name}" == dusk ]] \
-    && ! dybatpho::color_supported stdout; then
-    name="mono"
+  # `default` is downgraded too, not only the palettes: it carries three
+  # colours of its own, and leaving them on under `NO_COLOR` was the module
+  # answering the question differently depending on which theme was asked for.
+  # Only a known coloured theme is downgraded, so an unknown name still
+  # reaches the arm that rejects it rather than being quietly accepted as
+  # `mono`.
+  case "${name}" in
+    default | dusk | catppuccin-latte | catppuccin-frappe | catppuccin-macchiato | catppuccin-mocha)
+      dybatpho::color_supported stdout || name="mono"
+      ;;
+    *) ;;
+  esac
+  # Catppuccin publishes its palette in hex; keeping the hex here makes each
+  # flavour checkable against https://catppuccin.com/palette at a glance.
+  local -a palette=()
+  case "${name}" in
+    catppuccin-latte) palette=(eff1f5 e6e9ef bcc0cc 9ca0b0 6c6f85 7287fd 8839ef ea76cb 40a02b df8e1d d20f39) ;;
+    catppuccin-frappe) palette=(303446 292c3c 51576d 737994 a5adce babbf1 ca9ee6 f4b8e4 a6d189 e5c890 e78284) ;;
+    catppuccin-macchiato) palette=(24273a 1e2030 494d64 6e738d a5adcb b7bdf8 c6a0f6 f5bde6 a6da95 eed49f ed8796) ;;
+    catppuccin-mocha) palette=(1e1e2e 181825 45475a 6c7086 a6adc8 b4befe cba6f7 f5c2e7 a6e3a1 f9e2af f38ba8) ;;
+    *) ;;
+  esac
+  if ((${#palette[@]})); then
+    local -a rgb=()
+    local hex
+    for hex in "${palette[@]}"; do
+      rgb+=("$((16#${hex:0:2}));$((16#${hex:2:2}));$((16#${hex:4:2}))")
+    done
+    # base mantle surface1 overlay0 subtext0 lavender mauve pink green yellow red
+    local base="${rgb[0]}" mantle="${rgb[1]}" surface1="${rgb[2]}" overlay0="${rgb[3]}"
+    local subtext0="${rgb[4]}" lavender="${rgb[5]}" mauve="${rgb[6]}" pink="${rgb[7]}"
+    local green="${rgb[8]}" yellow="${rgb[9]}" red="${rgb[10]}"
+    DYBATPHO_SCREEN_STYLE_SELECTED="1;38;2;${base};48;2;${mauve}" DYBATPHO_SCREEN_STYLE_BORDER="38;2;${surface1}"
+    DYBATPHO_SCREEN_STYLE_TITLE="1;38;2;${lavender}" DYBATPHO_SCREEN_STYLE_FOCUS="38;2;${mauve}"
+    DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="1;38;2;${base};48;2;${mauve}"
+    DYBATPHO_SCREEN_STYLE_KEYBAR="38;2;${subtext0};48;2;${mantle}"
+    DYBATPHO_SCREEN_STYLE_KEY="1;38;2;${pink}" DYBATPHO_SCREEN_STYLE_ACCENT="1;38;2;${pink}"
+    DYBATPHO_SCREEN_STYLE_DIM="38;2;${overlay0}" DYBATPHO_SCREEN_STYLE_OK="1;38;2;${green}"
+    DYBATPHO_SCREEN_STYLE_WARN="38;2;${yellow}" DYBATPHO_SCREEN_STYLE_ERROR="1;38;2;${red}"
+    return 0
   fi
   case "${name}" in
     default)
@@ -2551,7 +2595,8 @@ function dybatpho::screen_theme {
       DYBATPHO_SCREEN_STYLE_WARN="0" DYBATPHO_SCREEN_STYLE_ERROR="1"
       ;;
     *)
-      dybatpho::error "${FUNCNAME[0]}: Unknown theme '${name}', expected default, dusk or mono"
+      local expected="default, dusk, mono or catppuccin-{latte,frappe,macchiato,mocha}"
+      dybatpho::error "${FUNCNAME[0]}: Unknown theme '${name}', expected ${expected}"
       return 1
       ;;
   esac

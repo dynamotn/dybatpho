@@ -651,12 +651,35 @@ _end_then_write_stderr() {
   assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
 }
 
+@test "dybatpho::screen_theme sets the Catppuccin flavours in 24-bit colour" {
+  unset NO_COLOR
+  export FORCE_COLOR=1
+  dybatpho::screen_theme catppuccin-mocha
+  # mauve #cba6f7, base #1e1e2e
+  assert_equal "${DYBATPHO_SCREEN_STYLE_FOCUS}" "38;2;203;166;247"
+  assert_equal "${DYBATPHO_SCREEN_STYLE_SELECTED}" "1;38;2;30;30;46;48;2;203;166;247"
+  # green #a6e3a1
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "1;38;2;166;227;161"
+  dybatpho::screen_theme catppuccin-latte
+  # red #d20f39
+  assert_equal "${DYBATPHO_SCREEN_STYLE_ERROR}" "1;38;2;210;15;57"
+  dybatpho::screen_theme catppuccin-frappe
+  # mantle #292c3c behind subtext0 #a5adce
+  assert_equal "${DYBATPHO_SCREEN_STYLE_KEYBAR}" "38;2;165;173;206;48;2;41;44;60"
+  dybatpho::screen_theme catppuccin-macchiato
+  # yellow #eed49f
+  assert_equal "${DYBATPHO_SCREEN_STYLE_WARN}" "38;2;238;212;159"
+}
+
 @test "dybatpho::screen_theme falls back to mono when colour is not wanted" {
   export NO_COLOR=1
-  dybatpho::screen_theme dusk
-  local name
-  for name in "${!DYBATPHO_SCREEN_STYLE_@}"; do
-    [[ "${!name}" != *"38;5"* && "${!name}" != *"48;5"* ]] || fail "${name} has a colour: ${!name}"
+  local theme name
+  for theme in dusk catppuccin-latte catppuccin-frappe catppuccin-macchiato catppuccin-mocha; do
+    dybatpho::screen_theme default
+    dybatpho::screen_theme "${theme}"
+    for name in "${!DYBATPHO_SCREEN_STYLE_@}"; do
+      [[ "${!name}" != *"38;"* && "${!name}" != *"48;"* ]] || fail "${theme}: ${name} has a colour: ${!name}"
+    done
   done
 
   # `default` is downgraded too. It used to keep its own three colours under
@@ -682,5 +705,9 @@ _end_then_write_stderr() {
   run dybatpho::screen_theme neon
   assert_failure
   assert_output --partial "Unknown theme 'neon'"
+  assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
+  # Neither an unknown flavour, nor NO_COLOR turning it into a valid theme.
+  NO_COLOR=1 run dybatpho::screen_theme catppuccin-espresso
+  assert_failure
   assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
 }

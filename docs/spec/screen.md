@@ -278,9 +278,11 @@ dybatpho::screen_end
 - **FR-025**: Giving the terminal back MUST NOT change where the script's
   stderr goes.
 - **FR-026**: `dybatpho::screen_theme` MUST set every `DYBATPHO_SCREEN_STYLE_*`
-  variable from the `default`, `dusk`, or `mono` palette, MUST use `mono` for a
-  coloured theme when `NO_COLOR` is set, and MUST refuse an unknown theme
-  without changing any style.
+  variable from the `default`, `dusk`, `mono`, `catppuccin-latte`,
+  `catppuccin-frappe`, `catppuccin-macchiato`, or `catppuccin-mocha` palette,
+  the Catppuccin ones in 24-bit colour from the official hex values, MUST use
+  `mono` for a coloured theme when `dybatpho::color_supported` says colour is
+  not wanted, and MUST refuse an unknown theme without changing any style.
 - **FR-027**: `dybatpho::screen_spans` MUST draw each piece in its own style,
   MUST cut the pieces to the width without splitting a character, and MUST
   fill the rest of the width with the background when one is given.

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`screen` — the four [Catppuccin](https://catppuccin.com) flavours as
+  themes.** `dybatpho::screen_theme` now takes `catppuccin-latte`,
+  `catppuccin-frappe`, `catppuccin-macchiato` and `catppuccin-mocha`, drawn in
+  24-bit colour from Catppuccin's own palette: mauve frames and selection,
+  lavender titles, pink keys, and the flavour's green, yellow and red. The
+  themes do not paint the screen behind the text, so use `catppuccin-latte` on
+  a light terminal and one of the others on a dark one. Like `dusk`, each one
+  falls back to `mono` when `dybatpho::color_supported` says colour is not
+  wanted.
+
+  ```sh
+  dybatpho::screen_theme catppuccin-mocha
+  ```
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

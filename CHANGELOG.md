@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colour.** `NO_COLOR` wins over everything, `FORCE_COLOR` overrides the
   stream, `TERM=dumb` rules colour out, and otherwise the named stream has to
   be a terminal. It answers per stream, because a module writing diagnostics
-  to stderr and data to stdout needs a different answer for each.
+  to stderr and data to stdout needs a different answer for each. A stream it
+  does not know is reported as the caller's mistake, whatever the environment
+  would otherwise have answered.
 
 
 - **`schedule` — when a command should run, rather than whether to retry it.**

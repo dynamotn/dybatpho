@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # @file text_ops.sh
 # @brief Example showing multi-line text utilities
-# @description Demonstrates dybatpho::text_indent, text_dedent, text_strip_ansi, text_bullet_list, and text_columns
+# @description Demonstrates dybatpho::text_indent, text_dedent, text_strip_ansi, text_bullet_list, text_columns,
+#   text_box, text_center, text_number_lines, and text_truncate_lines
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules text
@@ -48,6 +49,41 @@ function _demo_columns {
   dybatpho::text_columns "${rows}" "::" 1
 }
 
+# @description Run the `BOX` section of this example.
+# @noargs
+function _demo_box {
+  local summary=$'3 files changed\n2 tests added\n0 warnings'
+  dybatpho::header "BOX"
+  dybatpho::text_box "${summary}" "Build summary"
+  dybatpho::text_box "plain ASCII for old terminals" "" ascii
+}
+
+# @description Run the `CENTER` section of this example.
+# @noargs
+function _demo_center {
+  dybatpho::header "CENTER"
+  dybatpho::text_center $'dybatpho\na bash utility library' 40
+}
+
+# @description Run the `NUMBER LINES` section of this example.
+# @noargs
+function _demo_number_lines {
+  local script=$'#!/usr/bin/env bash\nset -euo pipefail\nprintf "hello\\n"'
+  dybatpho::header "NUMBER LINES"
+  dybatpho::text_number_lines "${script}"
+  # Quote a fragment of a longer file with its real line numbers.
+  dybatpho::text_number_lines $'local name\nname="world"' 41 " | "
+}
+
+# @description Run the `TRUNCATE LINES` section of this example.
+# @noargs
+function _demo_truncate_lines {
+  local log=$'step 1 ok\nstep 2 ok\nstep 3 ok\nstep 4 ok\nstep 5 ok'
+  dybatpho::header "TRUNCATE LINES"
+  dybatpho::text_truncate_lines "${log}" 2
+  printf '%s\n' "${log}" | dybatpho::text_truncate_lines - 3 "(+{count} steps hidden)"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -56,6 +92,10 @@ function _main {
   _demo_strip_ansi
   _demo_bullets
   _demo_columns
+  _demo_box
+  _demo_center
+  _demo_number_lines
+  _demo_truncate_lines
   dybatpho::success "Text operations demo complete"
 }
 

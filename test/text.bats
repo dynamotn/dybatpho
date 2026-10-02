@@ -114,3 +114,188 @@ EOF
   assert_failure
   assert_stderr --partial "dybatpho::table_align is required"
 }
+
+@test "dybatpho::text_box draws a single border sized to the widest line" {
+  run_traced dybatpho::text_box $'alpha\nbe ta\n'
+  assert_success
+  assert_output << EOF
+┌───────┐
+│ alpha │
+│ be ta │
+│       │
+└───────┘
+EOF
+}
+
+@test "dybatpho::text_box sets a title into the top border and widens for it" {
+  run_traced dybatpho::text_box "ab" "Release notes"
+  assert_success
+  assert_output << EOF
+┌─ Release notes ─┐
+│ ab              │
+└─────────────────┘
+EOF
+
+  run_traced dybatpho::text_box $'alpha\nbeta' "Notes"
+  assert_success
+  assert_output << EOF
+┌─ Notes ─┐
+│ alpha   │
+│ beta    │
+└─────────┘
+EOF
+}
+
+@test "dybatpho::text_box supports every border style and reads stdin" {
+  run_traced dybatpho::text_box - "" ascii <<< 'a|b*c'
+  assert_success
+  assert_output << EOF
++-------+
+| a|b*c |
++-------+
+EOF
+
+  assert_equal "$(dybatpho::text_box x "" double)" $'╔═══╗\n║ x ║\n╚═══╝'
+  assert_equal "$(dybatpho::text_box x "" rounded)" $'╭───╮\n│ x │\n╰───╯'
+  assert_equal "$(dybatpho::text_box x "" heavy)" $'┏━━━┓\n┃ x ┃\n┗━━━┛'
+}
+
+@test "dybatpho::text_box handles empty input" {
+  run_traced dybatpho::text_box ""
+  assert_success
+  assert_output << EOF
+┌──┐
+│  │
+└──┘
+EOF
+}
+
+@test "dybatpho::text_box rejects an unknown style" {
+  run --separate-stderr dybatpho::text_box "x" "" dotted
+  assert_failure
+  assert_stderr --partial "Unknown box style: dotted"
+}
+
+@test "dybatpho::text_box pads by visible width, ignoring ANSI sequences" {
+  run_traced dybatpho::text_box $'\e[1mbold\e[0m\nplain'
+  assert_success
+  assert_output $'┌───────┐\n│ \e[1mbold\e[0m  │\n│ plain │\n└───────┘'
+}
+
+@test "dybatpho::text_box measures wide characters through screen when it is loaded" {
+  run_traced dybatpho::text_box $'漢字\nab' "題"
+  assert_success
+  assert_output << EOF
+┌─ 題 ─┐
+│ 漢字 │
+│ ab   │
+└──────┘
+EOF
+}
+
+@test "dybatpho::text_box counts characters when screen is not loaded" {
+  unset -f __dybatpho_screen_width_into
+  run_traced dybatpho::text_box $'漢字\nab'
+  assert_success
+  assert_output << EOF
+┌────┐
+│ 漢字 │
+│ ab │
+└────┘
+EOF
+}
+
+@test "dybatpho::text_center pads each line on the left within a width" {
+  run_traced dybatpho::text_center $'title\nsubtitle here\n\n  \nthis line is far too wide' 20
+  assert_success
+  assert_output << EOF
+       title
+   subtitle here
+
+
+this line is far too wide
+EOF
+}
+
+@test "dybatpho::text_center measures ANSI and wide text by what is shown" {
+  assert_equal "$(dybatpho::text_center $'\e[1mab\e[0m' 6)" $'  \e[1mab\e[0m'
+  assert_equal "$(dybatpho::text_center "漢字" 8)" "  漢字"
+
+  unset -f __dybatpho_screen_width_into
+  assert_equal "$(dybatpho::text_center "漢字" 8)" "   漢字"
+}
+
+@test "dybatpho::text_center defaults to the terminal width and reads stdin" {
+  COLUMNS=10 run_traced dybatpho::text_center - <<< "ab"
+  assert_success
+  assert_output "    ab"
+}
+
+@test "dybatpho::text_center rejects a width that is not a positive integer" {
+  run --separate-stderr dybatpho::text_center "x" 0
+  assert_failure
+  assert_stderr --partial "Width must be a positive integer: 0"
+
+  run --separate-stderr dybatpho::text_center "x" wide
+  assert_failure
+  assert_stderr --partial "Width must be a positive integer: wide"
+}
+
+@test "dybatpho::text_number_lines numbers every line, blank ones included" {
+  run_traced dybatpho::text_number_lines $'alpha\n\nbeta'
+  assert_success
+  assert_output $'1  alpha\n2  \n3  beta'
+}
+
+@test "dybatpho::text_number_lines right-aligns numbers from a custom start and separator" {
+  run_traced dybatpho::text_number_lines $'alpha\nbeta' 09 ": "
+  assert_success
+  assert_output << EOF
+ 9: alpha
+10: beta
+EOF
+
+  assert_equal "$(dybatpho::text_number_lines - 0 "" <<< "x")" "0x"
+}
+
+@test "dybatpho::text_number_lines rejects an invalid start line" {
+  run --separate-stderr dybatpho::text_number_lines "x" -1
+  assert_failure
+  assert_stderr --partial "Start line must be a non-negative integer: -1"
+}
+
+@test "dybatpho::text_truncate_lines keeps the first lines and counts the rest" {
+  run_traced dybatpho::text_truncate_lines $'one\ntwo\nthree\nfour' 2
+  assert_success
+  assert_output << EOF
+one
+two
+… 2 more lines
+EOF
+
+  run_traced dybatpho::text_truncate_lines $'one\ntwo' 1
+  assert_success
+  assert_output $'one\n… 1 more line'
+}
+
+@test "dybatpho::text_truncate_lines prints a block that fits unchanged" {
+  run_traced dybatpho::text_truncate_lines $'one\n two ' 2
+  assert_success
+  assert_output $'one\n two '
+
+  run_traced dybatpho::text_truncate_lines - 5 <<< "only"
+  assert_success
+  assert_output "only"
+}
+
+@test "dybatpho::text_truncate_lines fills a custom marker and accepts a zero count" {
+  run_traced dybatpho::text_truncate_lines $'a\nb\nc' 0 "(+{count} hidden, {count} total)"
+  assert_success
+  assert_output "(+3 hidden, 3 total)"
+}
+
+@test "dybatpho::text_truncate_lines rejects an invalid count" {
+  run --separate-stderr dybatpho::text_truncate_lines "x" many
+  assert_failure
+  assert_stderr --partial "Line count must be a non-negative integer: many"
+}

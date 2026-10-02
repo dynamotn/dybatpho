@@ -78,6 +78,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   local -a parts=() guesses=()
   dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'
   dybatpho::string_closest guesses "staus" 2 status start stash   # status
+- **`text` — boxes, centering, line numbers, and truncation for text blocks.**
+  `dybatpho::text_box` frames a block in a border sized to its widest line,
+  with an optional title set into the top edge and a `single`, `double`,
+  `rounded`, `heavy` or `ascii` style. `dybatpho::text_center` centers each
+  line within a width, the terminal's by default.
+  `dybatpho::text_number_lines` numbers every line, right-aligned, from any
+  start and with any separator, and `dybatpho::text_truncate_lines` keeps the
+  first lines of a block and ends with `… N more lines` or a marker of your own
+  where `{count}` stands for the lines left out. Boxing and centering measure
+  what the terminal shows: ANSI colors count for nothing, and when the `screen`
+  module is loaded a wide character counts for the two columns it occupies.
+  Every helper reads stdin when given `-`.
+
+  ```sh
+  dybatpho::text_box "$(git diff --shortstat)" "Changes" rounded
+  ./build.sh 2>&1 | dybatpho::text_truncate_lines - 20 "(+{count} lines in build.log)"
   ```
 
 ## [5.2.0] - 2026-10-02

@@ -308,21 +308,13 @@ EOF
   local script="${BATS_TEST_TMPDIR}/yq_only.sh"
   cat > "${script}" << SCRIPT
 . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
-# \`dybatpho::coalesce_cmd\` asks \`command -v\`, so the directories holding a
-# runnable jq are what has to go; shadowing the name is not enough.
-kept=""
-IFS=':' read -r -a entries <<< "\${PATH}"
-for entry in "\${entries[@]}"; do
-  [[ -x "\${entry}/jq" ]] && continue
-  kept+="\${entry}:"
-done
-PATH="\${kept%:}"
-export PATH
+# \`dybatpho::coalesce_cmd\` asks \`command -v\`, so jq has to be missing from
+# the path; shadowing the name is not enough.
 command -v jq > /dev/null && exit 3
 dybatpho::csv_from_json '[{"name":"Doe, John","note":"line one\nline two","qty":"3"},{"name":"x","note":"ok","qty":"10"}]'
 SCRIPT
 
-  run_traced bash "${script}"
+  PATH="$(path_without jq)" run_traced bash "${script}"
   assert_success
   assert_output << EOF
 name,note,qty

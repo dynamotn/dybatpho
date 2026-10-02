@@ -160,18 +160,10 @@ EOF
   local script="${BATS_TEST_TMPDIR}/no_jq.sh"
   cat > "${script}" << SCRIPT
 . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules diff
-kept=""
-IFS=':' read -r -a entries <<< "\${PATH}"
-for entry in "\${entries[@]}"; do
-  [[ -x "\${entry}/jq" ]] && continue
-  kept+="\${entry}:"
-done
-PATH="\${kept%:}"
-export PATH
 dybatpho::diff_json '{"a":1}' '{"a":2}'
 SCRIPT
 
-  run --separate-stderr bash "${script}"
+  PATH="$(path_without jq)" run --separate-stderr bash "${script}"
   assert_failure
   assert_stderr --partial "jq is required"
 }

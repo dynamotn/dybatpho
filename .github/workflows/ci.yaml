@@ -91,7 +91,9 @@ jobs:
           # locales: the base image carries no UTF-8 locale, and bash only
           # walks a string character by character under one. Without it the
           # screen widgets and `dybatpho::string_slugify` see raw bytes.
-          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk locales
+          # bzip2: `tar` shells out to it, and the backup tests archive with
+          # `DYBATPHO_BACKUP_EXTENSION=tar.bz2`.
+          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk locales bzip2
           locale -a | grep -qix 'C\.utf-\?8' || localedef -i C -f UTF-8 C.UTF-8
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"

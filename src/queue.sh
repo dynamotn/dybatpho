@@ -21,11 +21,13 @@
 #   it. A worker that dies leaves its job in `claimed`, where it can be seen
 #   and requeued, instead of vanishing between the read and the work.
 #
-#   Ordering is strict FIFO. The sequence number in a job's id is handed out
-#   under the queue's lock rather than taken from the clock, so two producers
-#   in the same second still come out in the order they arrived — a
+#   Ordering is FIFO within a priority. The sequence number in a job's id is
+#   handed out under the queue's lock rather than taken from the clock, so two
+#   producers in the same second still come out in the order they arrived — a
 #   second-resolution timestamp could not tell them apart, and `date` has no
-#   portable sub-second field.
+#   portable sub-second field. A job pushed with `--priority` is claimed ahead
+#   of every waiting job of a lower priority, and one pushed with `--delay` or
+#   `--at` waits in `pending` without being claimed until it falls due.
 # @tip A payload is text, and may be anything including newlines; encode a
 #   structured payload with `json.sh` before pushing it and decode it after
 # @tip A bare queue name lives under `DYBATPHO_QUEUE_DIR`; a name containing a
@@ -149,18 +151,195 @@ function __dybatpho_queue_next_sequence_into {
 }
 
 #######################################
+# @description Move or remove the sidecars that travel with a job: its retry
+#   count, its priority and the time it falls due.
+# @arg $1 string Queue directory
+# @arg $2 string Job id
+# @arg $3 string Source state
+# @arg $4 string Destination state, or empty to remove the sidecars
+# @internal
+#######################################
+function __dybatpho_queue_sidecars {
+  local suffix source
+  for suffix in retries priority due; do
+    source="$1/$3/$2.${suffix}"
+    dybatpho::is file "${source}" || continue
+    if [[ -n "${4-}" ]]; then
+      mv -- "${source}" "$1/$4/$2.${suffix}"
+    else
+      rm -f -- "${source}"
+    fi
+  done
+}
+
+#######################################
+# @description Read a number from a job's sidecar, into a named variable.
+#   A missing or damaged sidecar reads as the fallback, so a job written by an
+#   older copy of the module, which kept no such file, behaves as it did then.
+# @arg $1 string Name of the variable receiving the number
+# @arg $2 string Sidecar path
+# @arg $3 number Value when the sidecar is missing or not a number
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_queue_sidecar_number_into {
+  local -n __dybatpho_queue_number_ref="$1"
+  local __dybatpho_queue_number_value="$3"
+  if dybatpho::is file "$2"; then
+    read -r __dybatpho_queue_number_value < "$2" || true
+    [[ "${__dybatpho_queue_number_value}" =~ ^-?[0-9]+$ ]] \
+      || __dybatpho_queue_number_value="$3"
+  fi
+  __dybatpho_queue_number_ref="${__dybatpho_queue_number_value}"
+}
+
+#######################################
+# @description Choose the job a claim takes next, into a named variable: the
+#   highest priority among the jobs that are due, and the oldest of those.
+# @arg $1 string Name of the variable receiving the job id
+# @arg $2 string Queue directory
+# @set The named variable, empty when no job is due
+# @exitcode 0 A job is due
+# @exitcode 1 Nothing is waiting, or nothing waiting is due yet
+# @internal
+#######################################
+function __dybatpho_queue_next_into {
+  local -n __dybatpho_queue_next_ref="$1"
+  local __dybatpho_queue_directory="$2"
+  __dybatpho_queue_next_ref=""
+
+  local __dybatpho_queue_now __dybatpho_queue_best="" __dybatpho_queue_best_priority=0
+  local __dybatpho_queue_id __dybatpho_queue_priority __dybatpho_queue_due
+  __dybatpho_queue_now="$(dybatpho::date_now "%s")"
+  # The listing is oldest first, so a later job only replaces the choice when
+  # it outranks it; within one priority the first one seen, the oldest, stays.
+  while IFS= read -r __dybatpho_queue_id; do
+    [[ -n "${__dybatpho_queue_id}" ]] || continue
+    __dybatpho_queue_sidecar_number_into __dybatpho_queue_due \
+      "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_id}.due" 0
+    ((__dybatpho_queue_due <= __dybatpho_queue_now)) || continue
+    __dybatpho_queue_sidecar_number_into __dybatpho_queue_priority \
+      "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_id}.priority" 0
+    if [[ -z "${__dybatpho_queue_best}" ]] || ((__dybatpho_queue_priority > __dybatpho_queue_best_priority)); then
+      __dybatpho_queue_best="${__dybatpho_queue_id}"
+      __dybatpho_queue_best_priority="${__dybatpho_queue_priority}"
+    fi
+  # kcov never marks a loop's redirected `done` as run; every claim test runs it.
+  done < <(__dybatpho_queue_ids "${__dybatpho_queue_directory}" pending) # kcov(skip)
+
+  [[ -n "${__dybatpho_queue_best}" ]] || return 1
+  __dybatpho_queue_next_ref="${__dybatpho_queue_best}"
+}
+
+#######################################
+# @description Read the scheduling options `dybatpho::queue_push` and
+#   `dybatpho::queue_requeue` accept, into named variables.
+# @arg $1 string Name of the variable receiving the priority, or empty when the option is not accepted
+# @arg $2 string Name of the variable receiving the epoch the job falls due, empty when it is due now
+# @arg $3 string Name of the variable receiving how many arguments were options
+# @arg $@ string The caller's arguments
+# @set The named variables
+# @exitcode 0 The options were read
+# @exitcode 1 Stop the script on an unknown option or an invalid value
+# @internal
+#######################################
+function __dybatpho_queue_options_into {
+  local __dybatpho_queue_priority_name="$1"
+  local -n __dybatpho_queue_due_ref="$2"
+  local -n __dybatpho_queue_used_ref="$3"
+  shift 3
+  local __dybatpho_queue_caller="${FUNCNAME[1]}"
+
+  local __dybatpho_queue_option __dybatpho_queue_value queue_delay_seconds
+  local __dybatpho_queue_when="" __dybatpho_queue_count=0
+  while (($# > 0)); do
+    __dybatpho_queue_option="$1"
+    case "${__dybatpho_queue_option}" in
+      --)
+        __dybatpho_queue_count=$((__dybatpho_queue_count + 1))
+        break
+        ;;
+      --priority | --delay | --at)
+        (($# >= 2)) \
+          || dybatpho::die "${__dybatpho_queue_caller}: ${__dybatpho_queue_option} needs a value"
+        __dybatpho_queue_value="$2"
+        shift 2
+        __dybatpho_queue_count=$((__dybatpho_queue_count + 2))
+        ;;
+      --priority=* | --delay=* | --at=*)
+        __dybatpho_queue_value="${__dybatpho_queue_option#*=}"
+        __dybatpho_queue_option="${__dybatpho_queue_option%%=*}"
+        shift
+        __dybatpho_queue_count=$((__dybatpho_queue_count + 1))
+        ;;
+      # Tested under `run` ("refuses an invalid scheduling option"): it exits.
+      --?*) dybatpho::die "${__dybatpho_queue_caller}: Unknown option: ${__dybatpho_queue_option}" ;; # kcov(skip)
+      *) break ;;
+    esac
+
+    if [[ "${__dybatpho_queue_option}" == "--priority" ]]; then
+      [[ -n "${__dybatpho_queue_priority_name}" ]] \
+        || dybatpho::die "${__dybatpho_queue_caller}: Unknown option: --priority"
+      # Nine digits keep every comparison well inside Bash's integers.
+      [[ "${__dybatpho_queue_value}" =~ ^-?[0-9]{1,9}$ ]] \
+        || dybatpho::die "${__dybatpho_queue_caller}: Not a whole-number priority: ${__dybatpho_queue_value}"
+      local -n __dybatpho_queue_priority_ref="${__dybatpho_queue_priority_name}"
+      # Forced to base ten, so a leading zero is not read as octal.
+      if [[ "${__dybatpho_queue_value}" == -* ]]; then
+        __dybatpho_queue_priority_ref=$((-10#${__dybatpho_queue_value#-}))
+      else
+        __dybatpho_queue_priority_ref=$((10#${__dybatpho_queue_value}))
+      fi
+      continue
+    fi
+
+    # `--delay` and `--at` both name the moment the job falls due.
+    [[ -z "${__dybatpho_queue_when}" ]] \
+      || dybatpho::die "${__dybatpho_queue_caller}: Use either --delay or --at, not both"
+    if [[ "${__dybatpho_queue_option}" == "--delay" ]]; then
+      dybatpho::date_parse_duration queue_delay_seconds "${__dybatpho_queue_value}" \
+        || dybatpho::die "${__dybatpho_queue_caller}: Not a duration: ${__dybatpho_queue_value}"
+      ((queue_delay_seconds >= 0)) \
+        || dybatpho::die "${__dybatpho_queue_caller}: The delay cannot be negative, got: ${__dybatpho_queue_value}"
+      __dybatpho_queue_when=$(($(dybatpho::date_now "%s") + queue_delay_seconds))
+    else
+      [[ "${__dybatpho_queue_value}" =~ ^[0-9]{1,15}$ ]] \
+        || dybatpho::die "${__dybatpho_queue_caller}: --at takes a Unix timestamp, got: ${__dybatpho_queue_value}"
+      __dybatpho_queue_when=$((10#${__dybatpho_queue_value}))
+    fi
+  done
+
+  __dybatpho_queue_due_ref="${__dybatpho_queue_when}"
+  __dybatpho_queue_used_ref="${__dybatpho_queue_count}"
+}
+
+#######################################
 # @description Add a job to a queue.
 #   The payload is written to a temporary file and renamed into `pending`, so
 #   a worker never sees a job whose payload is still being written.
+#
+#   `--priority` puts the job ahead of every waiting job of a lower priority;
+#   jobs of one priority still leave in the order they arrived. `--delay` and
+#   `--at` keep the job in `pending`, counted and listed but not claimed, until
+#   the moment they name.
+# @option --priority <n> Whole number, higher is claimed first, default is `0`
+# @option --delay <duration> Wait this long before the job can be claimed, such as `90s`, `5m` or `PT1H`
+# @option --at <epoch> Unix timestamp before which the job cannot be claimed
 # @arg $1 string Queue name or path
 # @arg $2 string Payload text, or `-` to read it from stdin
 # @stdout The new job's id
 # @exitcode 0 The job was added
-# @exitcode 1 The queue lock could not be taken
+# @exitcode 1 The queue lock could not be taken; stop the script on an invalid option
 # @example
 #   id="$(dybatpho::queue_push deploys "restart api")"
+#   dybatpho::queue_push --priority 10 deploys "rollback api"
+#   dybatpho::queue_push --delay 15m deploys "warm caches"
 #######################################
 function dybatpho::queue_push {
+  local priority=0 due="" used=0
+  __dybatpho_queue_options_into priority due used "$@"
+  shift "${used}"
+
   local queue payload
   dybatpho::expect_args queue payload -- "$@"
 
@@ -178,6 +357,10 @@ function dybatpho::queue_push {
   local sequence identifier
   __dybatpho_queue_next_sequence_into sequence "${directory}"
   identifier="${sequence}-$(dybatpho::date_now "%s")"
+  # The sidecars go first: the job file appearing is what makes a job visible
+  # to a claim, so it must not be seen before its priority and due time are.
+  ((priority == 0)) || printf '%s\n' "${priority}" > "${directory}/pending/${identifier}.priority"
+  [[ -z "${due}" ]] || printf '%s\n' "${due}" > "${directory}/pending/${identifier}.due"
   printf '%s\n' "${text}" > "${directory}/pending/${identifier}.job"
 
   dybatpho::lock_release "${lock}"
@@ -185,7 +368,8 @@ function dybatpho::queue_push {
 }
 
 #######################################
-# @description Claim the oldest job in a queue.
+# @description Claim the next job in a queue: the oldest of the highest
+#   priority among the jobs that are due.
 #   The job moves from `pending` to `claimed` and stays there until the caller
 #   completes, requeues, or dead-letters it, so a worker that dies leaves its
 #   job where it can be found rather than losing it.
@@ -194,7 +378,7 @@ function dybatpho::queue_push {
 # @arg $3 string Name of the variable receiving the payload
 # @set Both named variables
 # @exitcode 0 A job was claimed
-# @exitcode 1 The queue is empty, or its lock could not be taken
+# @exitcode 1 No job is due, or the queue lock could not be taken
 # @example
 #   while dybatpho::queue_pop deploys id payload; do
 #     if handle "${payload}"; then
@@ -220,27 +404,18 @@ function dybatpho::queue_pop {
 
   # Choosing and moving the job happen under one lock. Apart, two workers
   # would both read the same oldest job and both go on to run it.
-  local -a waiting=()
   local identifier
-  while IFS= read -r identifier; do
-    [[ -n "${identifier}" ]] || continue
-    waiting+=("${identifier}")
-    break
-  done < <(__dybatpho_queue_ids "${directory}" pending)
-
-  if ((${#waiting[@]} == 0)); then
+  if ! __dybatpho_queue_next_into identifier "${directory}"; then
     dybatpho::lock_release "${lock}"
     return 1
   fi
 
-  identifier="${waiting[0]}"
   mv -- "${directory}/pending/${identifier}.job" "${directory}/claimed/${identifier}.job"
   # The retry count travels with the job. Left behind in `pending`, it would
   # not be found on the next requeue, the count would restart at one, and a
   # job that always fails would circulate forever instead of dead-lettering.
-  if dybatpho::is file "${directory}/pending/${identifier}.retries"; then
-    mv -- "${directory}/pending/${identifier}.retries" "${directory}/claimed/${identifier}.retries"
-  fi
+  # The priority goes with it for the same reason: a requeue keeps it.
+  __dybatpho_queue_sidecars "${directory}" "${identifier}" pending claimed
   dybatpho::lock_release "${lock}"
 
   local -n id_ref="${id_target}"
@@ -252,13 +427,13 @@ function dybatpho::queue_pop {
 }
 
 #######################################
-# @description Read the oldest waiting job without claiming it.
+# @description Read the job a claim would take next, without claiming it.
 # @arg $1 string Queue name or path
 # @arg $2 string Optional name of a variable receiving the job id
 # @set The named variable, when one is given
-# @stdout The payload of the oldest waiting job
+# @stdout The payload of the next job
 # @exitcode 0 A job was read
-# @exitcode 1 The queue is empty
+# @exitcode 1 No job is due
 # @example
 #   dybatpho::queue_peek deploys
 #######################################
@@ -272,11 +447,8 @@ function dybatpho::queue_peek {
   __dybatpho_queue_dir_into directory "${queue}"
   dybatpho::is dir "${directory}/pending" || return 1
 
-  local identifier=""
-  while IFS= read -r identifier; do
-    [[ -n "${identifier}" ]] && break
-  done < <(__dybatpho_queue_ids "${directory}" pending)
-  [[ -n "${identifier}" ]] || return 1
+  local identifier
+  __dybatpho_queue_next_into identifier "${directory}" || return 1
 
   if [[ -n "${id_target}" ]]; then
     local -n peek_id_ref="${id_target}"
@@ -375,14 +547,19 @@ function dybatpho::queue_complete {
   dybatpho::is file "${job}" \
     || dybatpho::die "${FUNCNAME[0]}: No claimed job with id: ${identifier}"
 
-  rm -f -- "${job}" "${directory}/claimed/${identifier}.retries"
+  rm -f -- "${job}"
+  __dybatpho_queue_sidecars "${directory}" "${identifier}" claimed
 }
 
 #######################################
 # @description Put a claimed job back at the end of the queue.
 #   Each requeue counts, and when a job has been requeued as many times as the
 #   budget allows it is dead-lettered instead, so a job that always fails stops
-#   circulating without being thrown away.
+#   circulating without being thrown away. The job keeps its priority, and
+#   `--delay` or `--at` hold it back before it can be claimed again, which is
+#   how a caller backs off from a failure.
+# @option --delay <duration> Wait this long before the job can be claimed again
+# @option --at <epoch> Unix timestamp before which the job cannot be claimed again
 # @arg $1 string Queue name or path
 # @arg $2 string Job id
 # @arg $3 number Optional retry budget; past it the job is dead-lettered instead
@@ -391,8 +568,13 @@ function dybatpho::queue_complete {
 # @exitcode 1 No such job is claimed, or the queue lock could not be taken
 # @example
 #   dybatpho::queue_requeue deploys "${id}" 3
+#   dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 #######################################
 function dybatpho::queue_requeue {
+  local due="" used=0
+  __dybatpho_queue_options_into "" due used "$@"
+  shift "${used}"
+
   local queue identifier
   dybatpho::expect_args queue identifier -- "$@"
   local budget="${3-}"
@@ -421,13 +603,17 @@ function dybatpho::queue_requeue {
   fi
 
   # The job goes back with a new id rather than its old one: keeping the id
-  # would put a failing job back at the head of the queue, where it would be
-  # retried before everything pushed since.
-  local payload fresh
+  # would put a failing job back at the head of its priority, where it would
+  # be retried before everything pushed since.
+  local payload fresh priority
   payload="$(< "${job}")"
-  fresh="$(dybatpho::queue_push "${queue}" "${payload}")" || return 1
+  __dybatpho_queue_sidecar_number_into priority "${directory}/claimed/${identifier}.priority" 0
+  local -a options=(--priority "${priority}")
+  [[ -z "${due}" ]] || options+=(--at "${due}")
+  fresh="$(dybatpho::queue_push "${options[@]}" -- "${queue}" "${payload}")" || return 1
   printf '%s\n' "${attempts}" > "${directory}/pending/${fresh}.retries"
-  rm -f -- "${job}" "${counter}"
+  rm -f -- "${job}"
+  __dybatpho_queue_sidecars "${directory}" "${identifier}" claimed
   printf '%s\n' "${fresh}"
 }
 
@@ -455,9 +641,7 @@ function dybatpho::queue_dead_letter {
 
   __dybatpho_queue_prepare "${directory}"
   mv -- "${job}" "${directory}/dead/${identifier}.job"
-  local counter="${directory}/claimed/${identifier}.retries"
-  dybatpho::is file "${counter}" && mv -- "${counter}" "${directory}/dead/${identifier}.retries"
-  return 0
+  __dybatpho_queue_sidecars "${directory}" "${identifier}" claimed dead
 }
 
 #######################################

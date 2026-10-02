@@ -131,6 +131,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::assert_exit_code 1 -- dybatpho::confirm "Delete everything?"
   ```
 
+- **`queue` — urgent jobs first, and jobs that wait until they are due.**
+  `dybatpho::queue_push --priority <n>` puts a job ahead of every waiting job of
+  a lower priority, while jobs of one priority still leave in the order they
+  arrived. `--delay <duration>` (such as `90s`, `15m` or `PT1H`) and
+  `--at <epoch>` keep a job in `pending`, counted and listed but neither claimed
+  nor peeked, until it falls due. `dybatpho::queue_requeue` keeps a job's
+  priority and takes the same `--delay` and `--at`, which is how a worker backs
+  off from a failure, and `dybatpho::queue_peek` now answers the job a claim
+  would take next. A queue that never uses these options is the same strict
+  FIFO as before.
+
+  ```sh
+  dybatpho::queue_push --priority 10 deploys "rollback api"
+  dybatpho::queue_push --delay 15m deploys "warm caches"
+  dybatpho::queue_requeue --delay 30s deploys "${id}" 3
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

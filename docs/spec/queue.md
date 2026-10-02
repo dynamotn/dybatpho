@@ -71,6 +71,22 @@ As an operator, I want a job that keeps failing to leave the queue without being
 2. **Given** a requeued job, **When** it is claimed again, **Then** its retry count comes with it
 3. **Given** a dead-lettered job, **When** it is read, **Then** its payload is unchanged
 
+---
+
+### User Story 5 - Put urgent work first and hold other work back (Priority: P2)
+
+As a script author, I want to push a job ahead of routine work, or schedule one for later, so that a rollback does not wait behind a backlog and a follow-up runs when it is due rather than when a worker happens to be free.
+
+**Independent Test**: Push jobs of mixed priorities and delays under a frozen clock, drain the queue, and verify the order and that nothing is claimed early.
+
+**Acceptance Scenarios**:
+
+1. **Given** jobs of several priorities, **When** they are claimed, **Then** a higher priority comes first and one priority keeps arrival order
+2. **Given** a job pushed with a delay or a timestamp, **When** it is not yet due, **Then** it is counted and listed but neither claimed nor peeked
+3. **Given** that job, **When** the clock reaches its due time, **Then** it is claimed like any other
+4. **Given** a claimed job with a priority, **When** it is requeued, **Then** it keeps its priority, and a requeue delay holds it back before it can be claimed again
+5. **Given** an invalid priority, duration, timestamp, both a delay and a timestamp, or an unknown option, **When** a push is attempted, **Then** the script is stopped with the reason
+
 ### Example Workflow
 
 ```bash
@@ -90,6 +106,11 @@ done
 
 # What could not be handled is still there to look at.
 dybatpho::queue_list deploys dead
+
+# Urgent work jumps the backlog; follow-ups wait until they are due.
+dybatpho::queue_push --priority 10 deploys "rollback api"
+dybatpho::queue_push --delay 15m deploys "warm caches"
+dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 ```
 
 ## Edge Cases
@@ -102,6 +123,10 @@ dybatpho::queue_list deploys dead
 - A state other than `pending`, `claimed` or `dead` is asked for.
 - Two producers push within the same second.
 - The queue name is bare, is a path, or is empty.
+- Every waiting job has a lower priority than one pushed later, or every waiting job is not yet due.
+- A priority is negative, has a leading zero, or is not a whole number; a delay is negative or not a duration; `--delay` and `--at` are both given.
+- A priority or due sidecar is missing, as on a job written by an older copy of the module, or damaged.
+- A queue name begins with `-`, and is separated from the options by `--`.
 
 ## Requirements *(mandatory)*
 
@@ -112,7 +137,7 @@ dybatpho::queue_list deploys dead
 - **FR-003**: A push MUST write the payload to the `pending` directory and MUST return the new job's id.
 - **FR-004**: A payload MUST be accepted as an argument or read from stdin, and MUST survive unchanged, line breaks included.
 - **FR-005**: Job ids MUST order jobs by arrival, with the sequence taken under the queue's lock rather than from the clock.
-- **FR-006**: A claim MUST take the oldest waiting job, and choosing it and moving it MUST happen under one lock.
+- **FR-006**: A claim MUST take the oldest job of the highest priority among the jobs that are due, and choosing it and moving it MUST happen under one lock.
 - **FR-007**: A claim MUST move the job to `claimed` rather than deleting it, so an unfinished job stays visible.
 - **FR-008**: A claim on an empty queue MUST report that, without failing the script.
 - **FR-009**: Completing a job MUST remove it and its retry count.
@@ -124,8 +149,14 @@ dybatpho::queue_list deploys dead
 - **FR-015**: A job id that is not of the module's own form MUST be refused, so an id cannot name a file outside the queue.
 - **FR-016**: Reading, counting and listing MUST accept `pending`, `claimed` and `dead`, and MUST reject any other state.
 - **FR-017**: Counting and listing an absent queue MUST report nothing rather than failing.
-- **FR-018**: A peek MUST read the oldest waiting job without claiming it.
+- **FR-018**: A peek MUST read the job a claim would take next, without claiming it.
 - **FR-019**: A caller-supplied variable name that is not bindable MUST be refused.
+- **FR-020**: A push MUST accept `--priority <n>`, a whole number defaulting to `0`, and a higher priority MUST be claimed before a lower one.
+- **FR-021**: A push MUST accept `--delay <duration>` or `--at <epoch>`, and a job MUST NOT be claimed or peeked before that moment while still being counted and listed as pending.
+- **FR-022**: An invalid priority, duration or timestamp, a negative delay, both `--delay` and `--at`, a missing option value, or an unknown option MUST stop the script.
+- **FR-023**: A job's priority MUST travel with it through a claim, a requeue and a dead letter, and completing the job MUST remove it.
+- **FR-024**: A requeue MUST accept `--delay` and `--at` to hold the job back before it can be claimed again, and MUST refuse `--priority`.
+- **FR-025**: A missing or damaged priority or due sidecar MUST read as priority `0` and due now.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -133,6 +164,8 @@ dybatpho::queue_list deploys dead
 - **Job id**: A zero-padded sequence number and the push time, ordering jobs by arrival.
 - **State**: `pending` (waiting), `claimed` (in flight), or `dead` (given up on).
 - **Retry count**: A sidecar beside a job, counting how often it has been requeued.
+- **Priority**: A sidecar beside a job holding its priority, written only when it is not `0`.
+- **Due time**: A sidecar beside a job holding the Unix time before which it cannot be claimed.
 
 ## Success Criteria *(mandatory)*
 
@@ -142,6 +175,7 @@ dybatpho::queue_list deploys dead
 - **SC-002**: A killed run loses no waiting work, and leaves in-flight work recoverable.
 - **SC-003**: A job that always fails leaves the queue after a bounded number of attempts, and is still readable afterwards.
 - **SC-004**: A producer can add work while workers are running.
+- **SC-005**: An urgent job is claimed before every routine job already waiting, and a scheduled job is never claimed early.
 
 ## Integration Tests *(mandatory)*
 
@@ -165,9 +199,19 @@ dybatpho::queue_list deploys dead
 - **IT-018**: Dead-letter a job and read its payload back.
 - **IT-019**: Refuse a job id that would escape the queue directory.
 - **IT-020**: Resolve a bare queue name under `DYBATPHO_QUEUE_DIR`, and refuse an empty name.
+- **IT-021**: Drain mixed priorities and verify higher first, arrival order within one priority.
+- **IT-022**: Peek the job a claim would take next.
+- **IT-023**: Hold a `--delay` job back under a frozen clock, then claim it once the clock advances.
+- **IT-024**: Hold an `--at` job back until its timestamp.
+- **IT-025**: Refuse each invalid scheduling option.
+- **IT-026**: Accept `--` before the queue name.
+- **IT-027**: Requeue with `--delay`, keeping the priority, and refuse `--priority` on a requeue.
+- **IT-028**: Remove sidecars on completion and keep them on a dead letter.
+- **IT-029**: Read damaged sidecars as the defaults.
 
 ## Acceptance Criteria *(mandatory)*
 
 1. The queue needs no daemon and no external command: it is directories, files, and the library's own lock.
 2. A job is claimed, not consumed, so every job's fate is stated by the worker rather than assumed.
 3. Nothing is deleted silently: a job that cannot be handled is filed under dead letters with its payload.
+4. Priority and delay change only which due job is claimed next; a queue that never uses them behaves exactly as strict FIFO.

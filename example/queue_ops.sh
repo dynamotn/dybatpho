@@ -2,7 +2,8 @@
 # @file queue_ops.sh
 # @brief Example draining a durable job queue with several workers
 # @description Demonstrates dybatpho::queue_push, queue_peek, queue_len, queue_pop,
-#   queue_complete, queue_requeue, queue_dead_letter, queue_list, and queue_read
+#   queue_complete, queue_requeue, queue_dead_letter, queue_list, and queue_read,
+#   with job priorities and delayed jobs
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules queue
@@ -124,6 +125,27 @@ function _demo_crash_recovery {
   dybatpho::success "Requeued; waiting again: $(dybatpho::queue_len "${queue}")"
 }
 
+# @description Show priorities and delayed jobs: a rollback jumps the
+#   backlog, and a follow-up waits in pending until it falls due.
+# @arg $1 string Queue path
+function _demo_priority_and_delay {
+  local queue
+  dybatpho::expect_args queue -- "$@"
+
+  dybatpho::header "PRIORITY AND DELAY"
+  dybatpho::queue_push "${queue}" "rebuild docs" > /dev/null
+  dybatpho::queue_push --priority 10 "${queue}" "rollback api" > /dev/null
+  # Due one minute from now, so it is counted but not claimed yet.
+  dybatpho::queue_push --delay 1m "${queue}" "warm caches" > /dev/null
+
+  local id payload
+  while dybatpho::queue_pop "${queue}" id payload; do
+    printf 'claimed   %s\n' "${payload}"
+    dybatpho::queue_complete "${queue}" "${id}"
+  done
+  dybatpho::info "Still waiting until due: $(dybatpho::queue_len "${queue}")"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -133,6 +155,8 @@ function _main {
   _demo_drain "${queue}"
   _demo_dead_letters "${queue}"
   _demo_crash_recovery "${queue}"
+  _make_queue queue
+  _demo_priority_and_delay "${queue}"
   dybatpho::success "Queue operations demo complete"
 }
 

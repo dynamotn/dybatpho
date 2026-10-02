@@ -303,3 +303,142 @@ SCRIPT
   assert_failure
   assert_stderr --partial "Expected a queue name"
 }
+
+@test "dybatpho::queue_pop claims a higher priority first, oldest first within one" {
+  dybatpho::queue_push "${QUEUE}" low > /dev/null
+  dybatpho::queue_push --priority 5 "${QUEUE}" urgent-1 > /dev/null
+  dybatpho::queue_push --priority=5 "${QUEUE}" urgent-2 > /dev/null
+  dybatpho::queue_push --priority -3 "${QUEUE}" background > /dev/null
+  dybatpho::queue_push "${QUEUE}" normal > /dev/null
+
+  local id payload
+  local -a order=()
+  while dybatpho::queue_pop "${QUEUE}" id payload; do
+    order+=("${payload}")
+    dybatpho::queue_complete "${QUEUE}" "${id}"
+  done
+  assert_equal "${order[*]}" "urgent-1 urgent-2 low normal background"
+}
+
+@test "dybatpho::queue_peek answers the job a claim would take next" {
+  dybatpho::queue_push "${QUEUE}" low > /dev/null
+  dybatpho::queue_push --priority 1 "${QUEUE}" high > /dev/null
+
+  run_traced dybatpho::queue_peek "${QUEUE}"
+  assert_success
+  assert_output "high"
+}
+
+@test "dybatpho::queue_push --delay holds a job back until it falls due" {
+  dybatpho::mock_time 1767225600
+  dybatpho::queue_push --delay 5m "${QUEUE}" later > /dev/null
+  dybatpho::queue_push "${QUEUE}" now > /dev/null
+
+  local id payload
+  dybatpho::queue_pop "${QUEUE}" id payload
+  assert_equal "${payload}" "now"
+  dybatpho::queue_complete "${QUEUE}" "${id}"
+
+  # Waiting but not due: counted and listed, not claimed or peeked.
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "1"
+  run_traced -1 dybatpho::queue_pop "${QUEUE}" id payload
+  run_traced -1 dybatpho::queue_peek "${QUEUE}"
+
+  dybatpho::mock_time_advance 300
+  run_traced dybatpho::queue_pop "${QUEUE}" id payload
+  assert_success
+  assert_equal "${payload}" "later"
+  dybatpho::unmock_time
+}
+
+@test "dybatpho::queue_push --at holds a job back until a timestamp" {
+  dybatpho::mock_time 1767225600
+  local id payload
+  id="$(dybatpho::queue_push --at 1767225660 "${QUEUE}" scheduled)"
+  assert_equal "$(< "${QUEUE}/pending/${id}.due")" "1767225660"
+  run_traced -1 dybatpho::queue_pop "${QUEUE}" id payload
+
+  dybatpho::mock_time 1767225660
+  run_traced dybatpho::queue_pop "${QUEUE}" id payload
+  assert_success
+  dybatpho::unmock_time
+}
+
+@test "dybatpho::queue_push refuses an invalid scheduling option" {
+  run --separate-stderr dybatpho::queue_push --priority high "${QUEUE}" job
+  assert_failure
+  assert_stderr --partial "Not a whole-number priority: high"
+
+  run --separate-stderr dybatpho::queue_push --delay soon "${QUEUE}" job
+  assert_failure
+  assert_stderr --partial "Not a duration: soon"
+
+  run --separate-stderr dybatpho::queue_push --delay -5m "${QUEUE}" job
+  assert_failure
+  assert_stderr --partial "delay cannot be negative"
+
+  run --separate-stderr dybatpho::queue_push --at yesterday "${QUEUE}" job
+  assert_failure
+  assert_stderr --partial "--at takes a Unix timestamp"
+
+  run --separate-stderr dybatpho::queue_push --delay 1m --at 1 "${QUEUE}" job
+  assert_failure
+  assert_stderr --partial "either --delay or --at"
+
+  run --separate-stderr dybatpho::queue_push --priority
+  assert_failure
+  assert_stderr --partial "--priority needs a value"
+
+  run --separate-stderr dybatpho::queue_push --urgent "${QUEUE}" job
+  assert_failure
+  assert_stderr --partial "Unknown option: --urgent"
+}
+
+@test "dybatpho::queue_push takes -- before a queue name that looks like an option" {
+  run_traced dybatpho::queue_push --priority 2 -- "${QUEUE}" job
+  assert_success
+  assert_equal "$(< "${QUEUE}/pending/${output}.priority")" "2"
+}
+
+@test "dybatpho::queue_requeue keeps a job's priority and backs off with --delay" {
+  dybatpho::mock_time 1767225600
+  local id payload fresh
+  dybatpho::queue_push --priority 7 "${QUEUE}" flaky > /dev/null
+  dybatpho::queue_pop "${QUEUE}" id payload
+  assert_file_exist "${QUEUE}/claimed/${id}.priority"
+
+  run_traced dybatpho::queue_requeue --delay 30s "${QUEUE}" "${id}" 3
+  assert_success
+  fresh="${output}"
+  assert_equal "$(< "${QUEUE}/pending/${fresh}.priority")" "7"
+  assert_equal "$(< "${QUEUE}/pending/${fresh}.due")" "1767225630"
+  assert_file_not_exist "${QUEUE}/claimed/${id}.priority"
+  run_traced -1 dybatpho::queue_pop "${QUEUE}" id payload
+
+  run --separate-stderr dybatpho::queue_requeue --priority 1 "${QUEUE}" "${id}"
+  assert_failure
+  assert_stderr --partial "Unknown option: --priority"
+  dybatpho::unmock_time
+}
+
+@test "completing or dead-lettering a job takes its sidecars with it" {
+  local id payload
+  dybatpho::queue_push --priority 3 "${QUEUE}" done > /dev/null
+  dybatpho::queue_pop "${QUEUE}" id payload
+  dybatpho::queue_complete "${QUEUE}" "${id}"
+  assert_file_not_exist "${QUEUE}/claimed/${id}.priority"
+
+  dybatpho::queue_push --priority 3 "${QUEUE}" poison > /dev/null
+  dybatpho::queue_pop "${QUEUE}" id payload
+  dybatpho::queue_dead_letter "${QUEUE}" "${id}"
+  assert_file_exist "${QUEUE}/dead/${id}.priority"
+}
+
+@test "a damaged priority or due sidecar reads as the default" {
+  local id payload
+  id="$(dybatpho::queue_push "${QUEUE}" job)"
+  printf 'garbage\n' > "${QUEUE}/pending/${id}.priority"
+  printf 'later\n' > "${QUEUE}/pending/${id}.due"
+  run_traced dybatpho::queue_pop "${QUEUE}" id payload
+  assert_success
+}

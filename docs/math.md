@@ -71,6 +71,10 @@ money, sizes, counters, percentages — not for cryptographic bignums.
 - [`dybatpho::math_max`](#dybatphomath_max) — Print the largest of a list of numbers.
 - [`dybatpho::math_sum`](#dybatphomath_sum) — Add up a list of numbers exactly.
 - [`dybatpho::math_avg`](#dybatphomath_avg) — Print the mean of a list of numbers.
+- [`dybatpho::math_median`](#dybatphomath_median) — Print the median of a list of numbers. The values are ordered by value; an odd count answers with the middle one as it was written, an even count with the exact mean of the two middle ones. Halving a decimal adds at most one digit, so the median is never rounded.
+- [`dybatpho::math_percentile`](#dybatphomath_percentile) — Print a percentile of a list of numbers. Percentiles are interpolated linearly between the two nearest ranks — the inclusive definition that spreadsheets call `PERCENTILE.INC`, R calls type 7 and NumPy uses by default: the values are sorted, the rank `(n - 1) * p / 100` is taken counting from zero, and a fractional rank lies that far between its neighbours. `0` is the smallest value, `100` the largest and `50` the median. Every step is a multiplication by a decimal, so the answer is exact.
+- [`dybatpho::math_sqrt`](#dybatphomath_sqrt) — Print the square root of a number. The root is computed digit by digit on the decimal value, so it is the true root rounded half away from zero at the requested width, not a binary approximation.
+- [`dybatpho::math_stddev`](#dybatphomath_stddev) — Print the standard deviation of a list of numbers. By default this is the population standard deviation, which describes the values given and divides by their count. `--sample` gives the sample standard deviation, which estimates the spread of a larger population the values were drawn from and divides by one less than the count. The variance is computed exactly from the sum and the sum of squares, so only the final square root is rounded.
 - [`dybatpho::math_clamp`](#dybatphomath_clamp) — Hold a number inside a range.
 - [`dybatpho::math_percent`](#dybatphomath_percent) — Print what percentage one number is of another.
 - [`dybatpho::math_gcd`](#dybatphomath_gcd) — Print the greatest common divisor of whole numbers.
@@ -787,6 +791,178 @@ DYBATPHO_MATH_SCALE=2 dybatpho::math_avg 10 20 25   # 18.33
 **🚦 Exit codes**
 
 - `1`: Stop the script when no value is given or one is not a number
+
+
+---
+
+### `dybatpho::math_median`
+
+Print the median of a list of numbers.
+The values are ordered by value; an odd count answers with the middle one
+as it was written, an even count with the exact mean of the two middle
+ones. Halving a decimal adds at most one digit, so the median is never
+rounded.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_median 7 1 3              # 3
+dybatpho::math_median 1 2 3 10           # 2.5
+dybatpho::math_median < durations.txt
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$@` | string | Values, or none to read them from standard input |
+
+**📥 Input on stdin**
+
+- One or more values per line, when no argument is given
+
+**📤 Output on stdout**
+
+- The median
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when no value is given or one is not a number
+
+
+---
+
+### `dybatpho::math_percentile`
+
+Print a percentile of a list of numbers.
+Percentiles are interpolated linearly between the two nearest ranks — the
+inclusive definition that spreadsheets call `PERCENTILE.INC`, R calls type 7
+and NumPy uses by default: the values are sorted, the rank
+`(n - 1) * p / 100` is taken counting from zero, and a fractional rank lies
+that far between its neighbours. `0` is the smallest value, `100` the
+largest and `50` the median. Every step is a multiplication by a decimal, so
+the answer is exact.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_percentile 90 1 2 3 4 5 6 7 8 9 10    # 9.1
+dybatpho::math_percentile 50 3 1 2                   # 2
+dybatpho::math_percentile 99 < latencies.txt
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Percentile, from `0` to `100`, fractions allowed |
+| `$@` | string | Values, or none to read them from standard input |
+
+**📥 Input on stdin**
+
+- One or more values per line, when no value argument is given
+
+**📤 Output on stdout**
+
+- The percentile
+
+**🚦 Exit codes**
+
+- `1`: Stop the script on a percentile outside `0`–`100`, an empty list, or a value that is not a number
+
+
+---
+
+### `dybatpho::math_sqrt`
+
+Print the square root of a number.
+The root is computed digit by digit on the decimal value, so it is the true
+root rounded half away from zero at the requested width, not a binary
+approximation.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_sqrt 16          # 4
+dybatpho::math_sqrt 2 5         # 1.41421
+dybatpho::math_sqrt 0.25        # 0.5
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Value, not negative |
+| `$2` | number | Fraction digits to keep, default `DYBATPHO_MATH_SCALE` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits |
+
+**📤 Output on stdout**
+
+- The square root
+
+**🚦 Exit codes**
+
+- `1`: Stop the script on a non-number, a negative value, or a bad scale
+
+
+---
+
+### `dybatpho::math_stddev`
+
+Print the standard deviation of a list of numbers.
+By default this is the population standard deviation, which describes the
+values given and divides by their count. `--sample` gives the sample
+standard deviation, which estimates the spread of a larger population the
+values were drawn from and divides by one less than the count. The
+variance is computed exactly from the sum and the sum of squares, so only
+the final square root is rounded.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_stddev 2 4 4 4 5 5 7 9            # 2
+dybatpho::math_stddev --sample 2 4 4 4 5 5 7 9   # 2.1380899353
+DYBATPHO_MATH_SCALE=3 dybatpho::math_stddev 1 2 3 4   # 1.118
+
+```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--sample** | Divide by `n - 1` instead of `n` |
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$@` | string | Values, or none to read them from standard input |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_MATH_SCALE`** | number | Fraction digits kept in the result |
+
+**📥 Input on stdin**
+
+- One or more values per line, when no value argument is given
+
+**📤 Output on stdout**
+
+- The standard deviation
+
+**🚦 Exit codes**
+
+- `1`: Stop the script on an empty list, a single value with `--sample`, or a value that is not a number
 
 
 ---

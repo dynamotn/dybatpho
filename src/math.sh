@@ -1124,6 +1124,394 @@ function dybatpho::math_avg {
 }
 
 #######################################
+# @description Compare two numbers, sign included, without a subshell.
+# @arg $1 string Name of the variable receiving `-1`, `0` or `1`
+# @arg $2 string First value
+# @arg $3 string Second value
+# @set The named variable
+# @exitcode 1 Stop the script when either value is not a number
+# @internal
+#######################################
+function __dybatpho_math_cmp2 {
+  local __cmp2_out_name __cmp2_a __cmp2_b
+  dybatpho::expect_args __cmp2_out_name __cmp2_a __cmp2_b -- "$@"
+  local -n __cmp2_out="${__cmp2_out_name}"
+  local __cmp2_sign_a __cmp2_int_a __cmp2_frac_a
+  local __cmp2_sign_b __cmp2_int_b __cmp2_frac_b
+  __dybatpho_math_parse "${__cmp2_a}" __cmp2_sign_a __cmp2_int_a __cmp2_frac_a
+  __dybatpho_math_parse "${__cmp2_b}" __cmp2_sign_b __cmp2_int_b __cmp2_frac_b
+  if [[ "${__cmp2_sign_a}" != "${__cmp2_sign_b}" ]]; then
+    if [[ -z "${__cmp2_sign_a}" ]]; then
+      __cmp2_out=1
+    else
+      __cmp2_out=-1
+    fi
+    return 0
+  fi
+  local __cmp2_digits_a __cmp2_digits_b __cmp2_scale
+  __dybatpho_math_align __cmp2_digits_a __cmp2_digits_b __cmp2_scale \
+    "${__cmp2_int_a}" "${__cmp2_frac_a}" "${__cmp2_int_b}" "${__cmp2_frac_b}"
+  __dybatpho_math_cmp_abs __cmp2_out "${__cmp2_digits_a}" "${__cmp2_digits_b}"
+  [[ -n "${__cmp2_sign_a}" ]] && __cmp2_out=$((-__cmp2_out))
+  return 0
+}
+
+#######################################
+# @description Sort numbers by value, smallest first, into an array.
+#   A bottom-up merge sort, so the number of comparisons stays at `n log n`
+#   whatever order the values arrive in. When every value is a whole number that
+#   fits in Bash's own arithmetic, the comparisons use `(( ))` instead of the
+#   digit-string comparison, which is what keeps a list of millisecond timings
+#   quick to sort.
+# @arg $1 string Name of the array receiving the sorted values, as written
+# @arg $@ string Values
+# @set The named array
+# @exitcode 1 Stop the script when a value is not a number
+# @internal
+#######################################
+function __dybatpho_math_sort {
+  local -n __sort_out="$1"
+  shift
+  local -a __sort_from=("$@") __sort_to=()
+  local __sort_value __sort_native=true
+  for __sort_value in ${__sort_from[@]+"${__sort_from[@]}"}; do
+    [[ "${__sort_value}" =~ ${DYBATPHO_MATH_NUMBER_REGEX} ]] \
+      || {
+        local math_caller_detail # kcov(skip)
+        math_caller_detail=$(__dybatpho_math_caller) # kcov(skip)
+        # kcov cannot see a die under `run`; 'math_median dies on a value that is not a number' covers it.
+        dybatpho::die "${math_caller_detail}: Not a number: '${__sort_value}'" # kcov(skip)
+      }
+    [[ "${__sort_value}" =~ ^[+-]?[0-9]{1,18}$ ]] || __sort_native=false
+  done
+
+  local __sort_n=${#__sort_from[@]} __sort_width __sort_lo __sort_mid __sort_hi
+  local __sort_i __sort_j __sort_k __sort_cmp
+  for ((__sort_width = 1; __sort_width < __sort_n; __sort_width *= 2)); do # kcov(skip) every sort runs it
+    __sort_to=()
+    for ((__sort_lo = 0; __sort_lo < __sort_n; __sort_lo += 2 * __sort_width)); do
+      __sort_mid=$((__sort_lo + __sort_width))
+      ((__sort_mid > __sort_n)) && __sort_mid=${__sort_n}
+      __sort_hi=$((__sort_lo + 2 * __sort_width))
+      ((__sort_hi > __sort_n)) && __sort_hi=${__sort_n}
+      __sort_i=${__sort_lo}
+      __sort_j=${__sort_mid}
+      __sort_k=${__sort_lo}
+      while ((__sort_i < __sort_mid && __sort_j < __sort_hi)); do
+        if [[ "${__sort_native}" == true ]]; then
+          # `10#` keeps a leading zero from being read as octal; the sign has to
+          # sit outside it.
+          local __sort_a="${__sort_from[__sort_i]}" __sort_b="${__sort_from[__sort_j]}"
+          local __sort_sa="" __sort_sb=""
+          [[ "${__sort_a}" == [+-]* ]] && __sort_sa="${__sort_a:0:1}" && __sort_a="${__sort_a:1}"
+          [[ "${__sort_b}" == [+-]* ]] && __sort_sb="${__sort_b:0:1}" && __sort_b="${__sort_b:1}"
+          if ((${__sort_sa}10#${__sort_a} <= ${__sort_sb}10#${__sort_b})); then
+            __sort_cmp=0
+          else
+            __sort_cmp=1
+          fi
+        else
+          __dybatpho_math_cmp2 __sort_cmp "${__sort_from[__sort_i]}" "${__sort_from[__sort_j]}"
+        fi
+        # Taking from the left on a tie keeps the sort stable.
+        if ((__sort_cmp <= 0)); then
+          __sort_to[__sort_k]="${__sort_from[__sort_i]}"
+          __sort_i=$((__sort_i + 1))
+        else
+          __sort_to[__sort_k]="${__sort_from[__sort_j]}"
+          __sort_j=$((__sort_j + 1))
+        fi
+        __sort_k=$((__sort_k + 1))
+      done
+      while ((__sort_i < __sort_mid)); do
+        __sort_to[__sort_k]="${__sort_from[__sort_i]}"
+        __sort_i=$((__sort_i + 1))
+        __sort_k=$((__sort_k + 1))
+      done
+      while ((__sort_j < __sort_hi)); do
+        __sort_to[__sort_k]="${__sort_from[__sort_j]}"
+        __sort_j=$((__sort_j + 1))
+        __sort_k=$((__sort_k + 1))
+      done
+    done
+    __sort_from=("${__sort_to[@]}")
+  done
+  __sort_out=(${__sort_from[@]+"${__sort_from[@]}"})
+}
+
+#######################################
+# @description Take the integer square root of a digit string, rounded down.
+#   The pencil-and-paper method: digits are brought down two at a time, and
+#   each step finds the largest next digit whose trial product still fits in the
+#   remainder. Every step is exact, so the result is the true floor.
+# @arg $1 string Name of the variable receiving the root digits
+# @arg $2 string Digit string
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_math_isqrt {
+  local __isqrt_out_name __isqrt_digits
+  dybatpho::expect_args __isqrt_out_name __isqrt_digits -- "$@"
+  local -n __isqrt_out="${__isqrt_out_name}"
+  __dybatpho_math_strip __isqrt_digits
+  ((${#__isqrt_digits} % 2)) && __isqrt_digits="0${__isqrt_digits}"
+  local __isqrt_root="0" __isqrt_rem="0" __isqrt_index
+  local __isqrt_base __isqrt_digit __isqrt_trial __isqrt_cmp
+  for ((__isqrt_index = 0; __isqrt_index < ${#__isqrt_digits}; __isqrt_index += 2)); do # kcov(skip) every root runs it
+    __isqrt_rem="${__isqrt_rem}${__isqrt_digits:__isqrt_index:2}"
+    __dybatpho_math_strip __isqrt_rem
+    # The next digit d is the largest with (20 * root + d) * d <= remainder.
+    __dybatpho_math_mul_abs __isqrt_base "${__isqrt_root}" "20"
+    for ((__isqrt_digit = 9; __isqrt_digit > 0; __isqrt_digit--)); do
+      __dybatpho_math_add_abs __isqrt_trial "${__isqrt_base}" "${__isqrt_digit}"
+      __dybatpho_math_mul_abs __isqrt_trial "${__isqrt_trial}" "${__isqrt_digit}"
+      __dybatpho_math_cmp_abs __isqrt_cmp "${__isqrt_trial}" "${__isqrt_rem}"
+      ((__isqrt_cmp <= 0)) && break
+    done
+    if ((__isqrt_digit > 0)); then
+      __dybatpho_math_sub_abs __isqrt_rem "${__isqrt_rem}" "${__isqrt_trial}"
+    fi
+    __isqrt_root="${__isqrt_root}${__isqrt_digit}"
+    __dybatpho_math_strip __isqrt_root
+  done
+  __isqrt_out="${__isqrt_root}"
+}
+
+#######################################
+# @description Take the square root of a non-negative number to a requested
+#   number of fraction digits, rounding half away from zero.
+# @arg $1 string Name of the variable receiving the root
+# @arg $2 string Value, not negative
+# @arg $3 number Fraction digits to keep
+# @set The named variable
+# @exitcode 1 Stop the script on a bad value, a negative value, or a bad scale
+# @internal
+#######################################
+function __dybatpho_math_sqrt2 {
+  local __sqrt2_out_name __sqrt2_value __sqrt2_scale
+  dybatpho::expect_args __sqrt2_out_name __sqrt2_value __sqrt2_scale -- "$@"
+  local -n __sqrt2_out="${__sqrt2_out_name}"
+  local math_caller_detail
+  [[ "${__sqrt2_scale}" =~ ^[0-9]+$ ]] \
+    || {
+      math_caller_detail=$(__dybatpho_math_caller) # kcov(skip)
+      # kcov cannot see a die under `run`; 'math_sqrt dies on a bad scale or a non-number' covers it.
+      dybatpho::die "${math_caller_detail}: Scale must be a non-negative integer, got '${__sqrt2_scale}'" # kcov(skip)
+    }
+  local __sqrt2_sign __sqrt2_int __sqrt2_frac
+  __dybatpho_math_parse "${__sqrt2_value}" __sqrt2_sign __sqrt2_int __sqrt2_frac
+  [[ -z "${__sqrt2_sign}" ]] \
+    || {
+      math_caller_detail=$(__dybatpho_math_caller) # kcov(skip)
+      # kcov cannot see a die under `run`; 'math_sqrt dies on a negative value' covers it.
+      dybatpho::die "${math_caller_detail}: No square root of a negative number: '${__sqrt2_value}'" # kcov(skip)
+    }
+  # Shift the value so its root carries one guard digit past the scale: the
+  # radicand needs twice as many fraction digits as the root, and an odd count
+  # of fraction digits gets one more zero to pair up.
+  local __sqrt2_digits="${__sqrt2_int}${__sqrt2_frac}"
+  local __sqrt2_pad=$((2 * (__sqrt2_scale + 1) - ${#__sqrt2_frac})) __sqrt2_index
+  for ((__sqrt2_index = 0; __sqrt2_index < __sqrt2_pad; __sqrt2_index++)); do
+    __sqrt2_digits="${__sqrt2_digits}0"
+  done
+  # A value with more fraction digits than the root needs loses the excess:
+  # flooring the radicand cannot change the floor of its root.
+  if ((__sqrt2_pad < 0)); then
+    __sqrt2_digits="${__sqrt2_digits:0:${#__sqrt2_digits}+__sqrt2_pad}"
+  fi
+  local __sqrt2_root __sqrt2_rint __sqrt2_rfrac
+  __dybatpho_math_isqrt __sqrt2_root "${__sqrt2_digits:-0}"
+  __dybatpho_math_unscale __sqrt2_rint __sqrt2_rfrac "${__sqrt2_root}" "$((__sqrt2_scale + 1))"
+  __dybatpho_math_round_digits __sqrt2_rint __sqrt2_rfrac "${__sqrt2_scale}"
+  __dybatpho_math_compose __sqrt2_out "" "${__sqrt2_rint}" "${__sqrt2_rfrac}"
+}
+
+#######################################
+# @description Print the median of a list of numbers.
+#   The values are ordered by value; an odd count answers with the middle one
+#   as it was written, an even count with the exact mean of the two middle
+#   ones. Halving a decimal adds at most one digit, so the median is never
+#   rounded.
+# @example
+#   dybatpho::math_median 7 1 3              # 3
+#   dybatpho::math_median 1 2 3 10           # 2.5
+#   dybatpho::math_median < durations.txt
+#
+# @arg $@ string Values, or none to read them from standard input
+# @stdin One or more values per line, when no argument is given
+# @stdout The median
+# @exitcode 1 Stop the script when no value is given or one is not a number
+#######################################
+function dybatpho::math_median {
+  local -a values=() sorted=()
+  __dybatpho_math_collect values "$@"
+  ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
+  __dybatpho_math_sort sorted "${values[@]}"
+  local count=${#sorted[@]} middle=$((${#sorted[@]} / 2))
+  if ((count % 2)); then
+    printf '%s\n' "${sorted[middle]}"
+    return 0
+  fi
+  local total result
+  __dybatpho_math_add2 total "${sorted[middle - 1]}" "${sorted[middle]}"
+  __dybatpho_math_mul2 result "${total}" "0.5"
+  printf '%s\n' "${result}"
+}
+
+#######################################
+# @description Print a percentile of a list of numbers.
+#   Percentiles are interpolated linearly between the two nearest ranks — the
+#   inclusive definition that spreadsheets call `PERCENTILE.INC`, R calls type 7
+#   and NumPy uses by default: the values are sorted, the rank
+#   `(n - 1) * p / 100` is taken counting from zero, and a fractional rank lies
+#   that far between its neighbours. `0` is the smallest value, `100` the
+#   largest and `50` the median. Every step is a multiplication by a decimal, so
+#   the answer is exact.
+# @example
+#   dybatpho::math_percentile 90 1 2 3 4 5 6 7 8 9 10    # 9.1
+#   dybatpho::math_percentile 50 3 1 2                   # 2
+#   dybatpho::math_percentile 99 < latencies.txt
+#
+# @arg $1 string Percentile, from `0` to `100`, fractions allowed
+# @arg $@ string Values, or none to read them from standard input
+# @stdin One or more values per line, when no value argument is given
+# @stdout The percentile
+# @exitcode 1 Stop the script on a percentile outside `0`–`100`, an empty list, or a value that is not a number
+#######################################
+function dybatpho::math_percentile {
+  local percentile
+  dybatpho::expect_args percentile -- "$@"
+  shift
+  dybatpho::math_is_number "${percentile}" \
+    || dybatpho::die "${FUNCNAME[0]}: Percentile must be a number from 0 to 100, got '${percentile}'"
+  local below above
+  __dybatpho_math_cmp2 below "${percentile}" "0"
+  __dybatpho_math_cmp2 above "${percentile}" "100"
+  ((below >= 0 && above <= 0)) \
+    || dybatpho::die "${FUNCNAME[0]}: Percentile must be a number from 0 to 100, got '${percentile}'"
+
+  local -a values=() sorted=()
+  __dybatpho_math_collect values "$@"
+  ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
+  __dybatpho_math_sort sorted "${values[@]}"
+
+  local rank sign whole part
+  __dybatpho_math_mul2 rank "$((${#sorted[@]} - 1))" "${percentile}"
+  __dybatpho_math_mul2 rank "${rank}" "0.01"
+  __dybatpho_math_parse "${rank}" sign whole part
+  if [[ -z "${part}" ]]; then
+    printf '%s\n' "${sorted[10#${whole}]}"
+    return 0
+  fi
+  # A fractional rank is below the last index, so its upper neighbour exists.
+  local lower="${sorted[10#${whole}]}" upper="${sorted[10#${whole} + 1]}"
+  local gap step result
+  __dybatpho_math_negate gap "${lower}"
+  __dybatpho_math_add2 gap "${upper}" "${gap}"
+  __dybatpho_math_mul2 step "${gap}" "0.${part}"
+  __dybatpho_math_add2 result "${lower}" "${step}"
+  printf '%s\n' "${result}"
+}
+
+#######################################
+# @description Print the square root of a number.
+#   The root is computed digit by digit on the decimal value, so it is the true
+#   root rounded half away from zero at the requested width, not a binary
+#   approximation.
+# @example
+#   dybatpho::math_sqrt 16          # 4
+#   dybatpho::math_sqrt 2 5         # 1.41421
+#   dybatpho::math_sqrt 0.25        # 0.5
+#
+# @arg $1 string Value, not negative
+# @arg $2 number Fraction digits to keep, default `DYBATPHO_MATH_SCALE`
+# @env DYBATPHO_MATH_SCALE number Default fraction digits
+# @stdout The square root
+# @exitcode 1 Stop the script on a non-number, a negative value, or a bad scale
+#######################################
+function dybatpho::math_sqrt {
+  local value
+  dybatpho::expect_args value -- "$@"
+  local scale="${2-${DYBATPHO_MATH_SCALE}}" result
+  __dybatpho_math_sqrt2 result "${value}" "${scale}"
+  printf '%s\n' "${result}"
+}
+
+#######################################
+# @description Print the standard deviation of a list of numbers.
+#   By default this is the population standard deviation, which describes the
+#   values given and divides by their count. `--sample` gives the sample
+#   standard deviation, which estimates the spread of a larger population the
+#   values were drawn from and divides by one less than the count. The
+#   variance is computed exactly from the sum and the sum of squares, so only
+#   the final square root is rounded.
+# @example
+#   dybatpho::math_stddev 2 4 4 4 5 5 7 9            # 2
+#   dybatpho::math_stddev --sample 2 4 4 4 5 5 7 9   # 2.1380899353
+#   DYBATPHO_MATH_SCALE=3 dybatpho::math_stddev 1 2 3 4   # 1.118
+#
+# @option --sample Divide by `n - 1` instead of `n`
+# @arg $@ string Values, or none to read them from standard input
+# @stdin One or more values per line, when no value argument is given
+# @env DYBATPHO_MATH_SCALE number Fraction digits kept in the result
+# @stdout The standard deviation
+# @exitcode 1 Stop the script on an empty list, a single value with `--sample`, or a value that is not a number
+#######################################
+function dybatpho::math_stddev {
+  local sample=false
+  if [[ "${1-}" == "--sample" ]]; then
+    sample=true
+    shift
+  fi
+  local -a values=()
+  __dybatpho_math_collect values "$@"
+  local count=${#values[@]}
+  ((count)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
+  if [[ "${sample}" == true ]] && ((count < 2)); then
+    # kcov cannot see a die under `run`; 'math_stddev dies on an empty list or a lone sample' covers it.
+    dybatpho::die "${FUNCNAME[0]}: A sample standard deviation needs at least two values" # kcov(skip)
+  fi
+
+  # variance = (n * sum(x^2) - sum(x)^2) / (n * d), with d = n or n - 1. The
+  # numerator is exact and never negative, so the only rounding is the root's.
+  local total="0" squares="0" number square
+  for number in "${values[@]}"; do
+    __dybatpho_math_add2 total "${total}" "${number}"
+    __dybatpho_math_mul2 square "${number}" "${number}"
+    __dybatpho_math_add2 squares "${squares}" "${square}"
+  done
+  local spread total_squared divisor=${count}
+  [[ "${sample}" == true ]] && divisor=$((count - 1))
+  __dybatpho_math_mul2 spread "${squares}" "${count}"
+  __dybatpho_math_mul2 total_squared "${total}" "${total}"
+  __dybatpho_math_negate total_squared "${total_squared}"
+  __dybatpho_math_add2 spread "${spread}" "${total_squared}"
+
+  # Divide with enough digits that the root keeps its own guard digit, then
+  # take the root: flooring the radicand cannot change the floor of its root,
+  # so the division is truncated rather than rounded.
+  local scale="${DYBATPHO_MATH_SCALE}" variance quotient remainder sign integer fraction
+  [[ "${scale}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${scale}'"
+  __dybatpho_math_parse "${spread}" sign integer fraction
+  local numerator="${integer}${fraction}" index
+  for ((index = 0; index < 2 * (scale + 1); index++)); do
+    numerator="${numerator}0"
+  done
+  local denominator
+  __dybatpho_math_mul_abs denominator "$((count * divisor))" "1"
+  for ((index = 0; index < ${#fraction}; index++)); do
+    denominator="${denominator}0"
+  done
+  __dybatpho_math_divmod_abs quotient remainder "${numerator}" "${denominator}"
+  __dybatpho_math_unscale integer fraction "${quotient}" "$((2 * (scale + 1)))"
+  __dybatpho_math_compose variance "" "${integer}" "${fraction}"
+  local result
+  __dybatpho_math_sqrt2 result "${variance}" "${scale}"
+  printf '%s\n' "${result}"
+}
+
+#######################################
 # @description Hold a number inside a range.
 # @example
 #   dybatpho::math_clamp 42 0 10      # 10

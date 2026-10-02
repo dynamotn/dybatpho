@@ -170,6 +170,40 @@ small range.
 
 ---
 
+### User Story 7 - Describe the spread of a list (Priority: P2)
+
+As a script author, I want the median, any percentile, and the standard
+deviation of a list of numbers, plus a square root, so that latency reports
+and benchmark summaries can say what is typical and how far values stray
+without leaving the shell.
+
+**Why this priority**: A mean hides outliers; the percentiles and the spread
+are what a timing report is actually read for, and they are where scripts
+reach for `awk` or a Python one-liner today.
+
+**Independent Test**: Compute the median, several percentiles, the population
+and sample standard deviations, and square roots of known lists and values, and
+verify each exact or rounded result and each refusal.
+
+**Acceptance Scenarios**:
+
+1. **Given** an odd number of values in any order, **When** the median is asked
+   for, **Then** the middle value by value is printed as it was written
+2. **Given** an even number of values, **When** the median is asked for,
+   **Then** the exact mean of the two middle values is printed, unrounded
+3. **Given** a percentile between `0` and `100`, **When** it is computed,
+   **Then** the result is interpolated linearly between the two nearest ranks
+   (`PERCENTILE.INC`, R type 7), with `0`, `50` and `100` meeting the minimum,
+   median and maximum
+4. **Given** a list, **When** the standard deviation is asked for, **Then** the
+   population deviation is printed, or the sample deviation with `--sample`,
+   rounded half away from zero to `DYBATPHO_MATH_SCALE`
+5. **Given** a non-negative value, **When** its square root is asked for,
+   **Then** the true root rounded half away from zero at the requested width is
+   printed; a negative value stops the script
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -209,6 +243,13 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   uniformly.
 - Values exceed what `$(( ))` can represent, in a sum, a product, or a
   comparison.
+- A percentile is below `0`, above `100`, or not a number.
+- The median or a percentile is asked of a single value, or of values that
+  tie.
+- A sample standard deviation is asked of a single value, which has no spread
+  to estimate.
+- A square root is asked of a negative value, or of a value with more fraction
+  digits than the requested width needs.
 
 ## Requirements *(mandatory)*
 
@@ -256,6 +297,23 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   a number and whether it is whole, without stopping the script.
 - **FR-018**: The module MUST depend only on the core modules, so that it loads
   on its own.
+- **FR-019**: The module MUST provide a median helper that orders values by
+  value, prints the middle value as written for an odd count, prints the exact
+  mean of the two middle values for an even count, and fails on an empty list.
+- **FR-020**: The module MUST provide a percentile helper that takes a
+  percentile from `0` to `100`, interpolates linearly between the two nearest
+  ranks counting from zero at rank `(n - 1) * p / 100`, computes the result
+  exactly, and fails on a percentile outside the range or an empty list.
+- **FR-021**: The module MUST provide a square root helper that rounds half
+  away from zero at a caller-supplied width, defaulting to
+  `DYBATPHO_MATH_SCALE`, and fails on a negative value.
+- **FR-022**: The module MUST provide a standard deviation helper that prints
+  the population deviation by default and the sample deviation with
+  `--sample`, computes the variance exactly so that only the root is rounded,
+  and fails on an empty list or on a single value with `--sample`.
+- **FR-023**: The median, percentile and standard deviation helpers MUST read
+  their values from arguments or from standard input, like the other
+  aggregates.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -282,6 +340,9 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   and the function, rather than producing a wrong number.
 - **SC-006**: Random draws over a small range are uniform rather than biased
   toward the low values.
+- **SC-007**: A script reports the median, the 90th or 99th percentile, and the
+  standard deviation of a list of timings with no external command, and gets
+  the same answer on every machine.
 
 ## Integration Tests *(mandatory)*
 
@@ -307,6 +368,18 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   they stay inside the range and cover it, and verify invalid ranges fail.
 - **IT-011**: Load the module on its own and run an operation, proving it has
   no optional-module dependency.
+- **IT-012**: Compute the median of odd and even lists, including decimals,
+  negatives, a single value and redundant zeros, from arguments and from
+  standard input, and verify an empty list and a non-number fail.
+- **IT-013**: Compute percentiles that interpolate, that land on a rank, and at
+  `0`, `50` and `100`, from arguments and from standard input, and verify an
+  out-of-range percentile and an empty list fail.
+- **IT-014**: Take exact and inexact square roots at several widths, including
+  a root beyond 64 bits, and verify a negative value, a bad width and a
+  non-number fail.
+- **IT-015**: Compute population and sample standard deviations of known lists,
+  including a single value and a custom scale, and verify an empty list, a lone
+  sample and a bad scale fail.
 
 ## Acceptance Criteria *(mandatory)*
 

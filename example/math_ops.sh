@@ -4,7 +4,8 @@
 # @description Demonstrates dybatpho::math_add, math_sub, math_mul, math_div,
 #   math_mod, math_pow, math_abs, math_neg, math_compare, math_gt, math_lt,
 #   math_eq, math_round, math_floor, math_ceil, math_trunc, math_min, math_max,
-#   math_sum, math_avg, math_clamp, math_percent, math_gcd, math_lcm,
+#   math_sum, math_avg, math_median, math_percentile, math_stddev, math_sqrt,
+#   math_clamp, math_percent, math_gcd, math_lcm,
 #   math_random, math_is_number and math_is_integer, by pricing an invoice and
 #   summarizing a batch of timings.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -95,6 +96,19 @@ function _demo_statistics {
   local DYBATPHO_MATH_SCALE_3
   DYBATPHO_MATH_SCALE_3=$(DYBATPHO_MATH_SCALE=3 dybatpho::math_avg "${durations[@]}")
   dybatpho::info "Mean    : ${DYBATPHO_MATH_SCALE_3}"
+
+  # The mean hides the outliers; the median and the percentiles do not. A
+  # percentile interpolates between the two nearest ranks, so it is exact.
+  local median p90 spread root
+  median="$(dybatpho::math_median "${durations[@]}")"
+  dybatpho::info "Median  : ${median}"
+  p90="$(dybatpho::math_percentile 90 "${durations[@]}")"
+  dybatpho::info "p90     : ${p90}"
+  # Population deviation by default; `--sample` divides by n - 1 instead.
+  spread="$(DYBATPHO_MATH_SCALE=3 dybatpho::math_stddev --sample "${durations[@]}")"
+  dybatpho::info "Std dev : ${spread} (sample)"
+  root="$(dybatpho::math_sqrt 2 6)"
+  dybatpho::info "sqrt(2) : ${root}"
 
   # A list arrives on a pipe as often as in an array.
   local printf

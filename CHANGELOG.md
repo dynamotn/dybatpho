@@ -358,6 +358,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   dybatpho::cache_stats 3600 --json   # {"entries":3,"bytes":1800,"fresh":1,...}
+- **`math` — median, percentiles, standard deviation and square roots.**
+  `dybatpho::math_median` prints the middle value of a list, or the exact mean
+  of the two middle ones. `dybatpho::math_percentile` prints any percentile
+  from `0` to `100`, interpolated linearly between the two nearest ranks — the
+  `PERCENTILE.INC` definition, R type 7, NumPy's default — so `50` is the
+  median and the answer is exact. `dybatpho::math_stddev` prints the population
+  standard deviation, or the sample one with `--sample`, rounding only the final
+  root to `DYBATPHO_MATH_SCALE`. `dybatpho::math_sqrt` takes a square root digit
+  by digit, rounded half away from zero at the width you ask for. Like the
+  other aggregates, the list comes from the arguments or from standard input,
+  and nothing outside Bash is needed.
+
+  ```sh
+  dybatpho::math_percentile 99 < latencies_ms.txt
+  dybatpho::math_stddev --sample 2 4 4 4 5 5 7 9   # 2.1380899353
+  dybatpho::math_sqrt 2 5                          # 1.41421
   ```
 
 ### Fixed

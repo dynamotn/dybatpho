@@ -345,6 +345,165 @@ setup() {
   assert_output --partial "Expected at least one value"
 }
 
+
+# ---------------------------------------------------------------------------
+# statistics
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::math_median answers the middle value as written" {
+  run_traced dybatpho::math_median 7 1 3
+  assert_output "3"
+  run_traced dybatpho::math_median 5
+  assert_output "5"
+  run_traced dybatpho::math_median 010 9 011
+  assert_output "010"
+}
+
+@test "dybatpho::math_median averages the two middle values exactly" {
+  run_traced dybatpho::math_median 1 2 3 10
+  assert_output "2.5"
+  run_traced dybatpho::math_median -1.5 2
+  assert_output "0.25"
+  run_traced dybatpho::math_median 0.1 0.2
+  assert_output "0.15"
+}
+
+@test "dybatpho::math_median orders decimals and negatives by value" {
+  run_traced dybatpho::math_median 1.10 1.9 -3 -20 0
+  assert_output "0"
+  run_traced dybatpho::math_median 99999999999999999999 1 2
+  assert_output "2"
+}
+
+@test "dybatpho::math_median reads standard input" {
+  assert_equal "$(printf '3 1\n2\n' | dybatpho::math_median)" "2"
+}
+
+@test "dybatpho::math_median dies on an empty list" {
+  run dybatpho::math_median < /dev/null
+  assert_failure
+  assert_output --partial "Expected at least one value"
+}
+
+@test "dybatpho::math_median dies on a value that is not a number" {
+  run dybatpho::math_median 1 x
+  assert_failure
+  assert_output --partial "dybatpho::math_median: Not a number: 'x'"
+}
+
+@test "dybatpho::math_percentile interpolates between the nearest ranks" {
+  run_traced dybatpho::math_percentile 90 1 2 3 4 5 6 7 8 9 10
+  assert_output "9.1"
+  run_traced dybatpho::math_percentile 25 1.5 -2 10 0.25
+  assert_output "-0.3125"
+  run_traced dybatpho::math_percentile 99.9 0 1000
+  assert_output "999"
+}
+
+@test "dybatpho::math_percentile meets the minimum, median and maximum" {
+  run_traced dybatpho::math_percentile 0 3 1 2
+  assert_output "1"
+  run_traced dybatpho::math_percentile 50 3 1 2
+  assert_output "2"
+  run_traced dybatpho::math_percentile 100 3 1 2
+  assert_output "3"
+  run_traced dybatpho::math_percentile 75 42
+  assert_output "42"
+}
+
+@test "dybatpho::math_percentile reads standard input" {
+  assert_equal "$(seq 1 100 | dybatpho::math_percentile 99)" "99.01"
+}
+
+@test "dybatpho::math_percentile dies on a percentile outside 0 to 100" {
+  local percentile
+  for percentile in 101 -1 abc 1e2; do
+    run dybatpho::math_percentile "${percentile}" 1 2
+    assert_failure
+    assert_output --partial "Percentile must be a number from 0 to 100, got '${percentile}'"
+  done
+}
+
+@test "dybatpho::math_percentile dies on an empty list" {
+  run dybatpho::math_percentile 50 < /dev/null
+  assert_failure
+  assert_output --partial "Expected at least one value"
+}
+
+@test "dybatpho::math_sqrt is exact where the root is" {
+  run_traced dybatpho::math_sqrt 16
+  assert_output "4"
+  run_traced dybatpho::math_sqrt 0.25
+  assert_output "0.5"
+  run_traced dybatpho::math_sqrt 0
+  assert_output "0"
+  run_traced dybatpho::math_sqrt 152415787532388367504942236884722755800955129
+  assert_output "12345678901234567890123"
+}
+
+@test "dybatpho::math_sqrt rounds half away from zero at the scale" {
+  run_traced dybatpho::math_sqrt 2
+  assert_output "1.4142135624"
+  run_traced dybatpho::math_sqrt 2 5
+  assert_output "1.41421"
+  run_traced dybatpho::math_sqrt 8 0
+  assert_output "3"
+  run_traced dybatpho::math_sqrt 0.0001 2
+  assert_output "0.01"
+  run_traced dybatpho::math_sqrt 0.000001234 3
+  assert_output "0.001"
+}
+
+@test "dybatpho::math_sqrt dies on a negative value" {
+  run dybatpho::math_sqrt -4
+  assert_failure
+  assert_output --partial "No square root of a negative number: '-4'"
+}
+
+@test "dybatpho::math_sqrt dies on a bad scale or a non-number" {
+  run dybatpho::math_sqrt 4 x
+  assert_failure
+  assert_output --partial "Scale must be a non-negative integer, got 'x'"
+  run dybatpho::math_sqrt four
+  assert_failure
+  assert_output --partial "Not a number: 'four'"
+}
+
+@test "dybatpho::math_stddev is the population deviation by default" {
+  run_traced dybatpho::math_stddev 2 4 4 4 5 5 7 9
+  assert_output "2"
+  run_traced dybatpho::math_stddev 5
+  assert_output "0"
+  run_traced dybatpho::math_stddev -1 1
+  assert_output "1"
+  run_traced dybatpho::math_stddev 1.5 2.5
+  assert_output "0.5"
+  run_traced dybatpho::math_stddev 0.1 0.3
+  assert_output "0.1"
+  DYBATPHO_MATH_SCALE=3 run_traced dybatpho::math_stddev 1 2 3 4
+  assert_output "1.118"
+}
+
+@test "dybatpho::math_stddev --sample divides by one less than the count" {
+  run_traced dybatpho::math_stddev --sample 2 4 4 4 5 5 7 9
+  assert_output "2.1380899353"
+  assert_equal "$(printf '10 20\n' | dybatpho::math_stddev --sample)" "7.0710678119"
+}
+
+@test "dybatpho::math_stddev dies on an empty list or a lone sample" {
+  run dybatpho::math_stddev < /dev/null
+  assert_failure
+  assert_output --partial "Expected at least one value"
+  run dybatpho::math_stddev --sample 4
+  assert_failure
+  assert_output --partial "A sample standard deviation needs at least two values"
+}
+
+@test "dybatpho::math_stddev dies on a bad scale" {
+  DYBATPHO_MATH_SCALE=x run dybatpho::math_stddev 1 2
+  assert_failure
+  assert_output --partial "Scale must be a non-negative integer, got 'x'"
+}
 # ---------------------------------------------------------------------------
 # ranges and ratios
 # ---------------------------------------------------------------------------

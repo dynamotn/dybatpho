@@ -51,6 +51,19 @@ unset -v __dybatpho_helper_saved_trap
 # that cares about the decision sets the variables for the call it makes.
 unset FORCE_COLOR
 
+# A git hook runs with the repository it fires in exported as `GIT_DIR`,
+# `GIT_INDEX_FILE` and friends, and the pre-commit hook runs this suite. Left in
+# place, every `git init`, `config`, `commit` and `tag` a test aims at its own
+# temporary repository lands in the real one instead: run from a worktree's
+# commit, the suite once set `core.bare`, rewrote `origin`, and created tags in
+# the repository being committed to. These are the names
+# `git rev-parse --local-env-vars` lists, so a test only ever reaches the
+# repository its working directory is in.
+unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS \
+  GIT_CONFIG_COUNT GIT_OBJECT_DIRECTORY GIT_DIR GIT_WORK_TREE \
+  GIT_IMPLICIT_WORK_TREE GIT_GRAFT_FILE GIT_INDEX_FILE GIT_NO_REPLACE_OBJECTS \
+  GIT_REPLACE_REF_BASE GIT_PREFIX GIT_SHALLOW_FILE GIT_COMMON_DIR
+
 bats_require_minimum_version 1.5.0
 
 # @description Like `run`, but the command executes in the current shell instead

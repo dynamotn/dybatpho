@@ -33,6 +33,12 @@ information, listing changed files, and querying commit/tag relationships.
 - [`dybatpho::git_latest_tag`](#dybatphogit_latest_tag) — Print the highest version tag in a repository. Tags are ordered the way versions compare, not the way strings do, so `v10` sorts above `v9` and the newest release is the first line.
 - [`dybatpho::git_tags_containing`](#dybatphogit_tags_containing) — List tags that contain a commit.
 - [`dybatpho::git_is_ancestor`](#dybatphogit_is_ancestor) — Return success when one commit is reachable from another. A release script asks this before acting: whether a tag is on the branch it is about to release, or whether a fix has already landed on the branch a backport is aimed at.
+- [`dybatpho::git_upstream`](#dybatphogit_upstream) — Print the upstream a branch tracks. A script asks this before it compares with, pulls from, or pushes to the remote branch, and the answer is the short name Git shows, such as `origin/main`.
+- [`dybatpho::git_ahead_behind`](#dybatphogit_ahead_behind) — Count the commits a ref is ahead of and behind another. With no base the branch is compared with its upstream, which is the "2 ahead, 1 behind" a prompt or a pre-push check wants.
+- [`dybatpho::git_state`](#dybatphogit_state) — Name the operation a repository is in the middle of. A script that is about to commit, switch branch, or rebase checks this first, so it does not act on a tree that is half way through a merge. The markers are found through `git rev-parse --git-path`, so the answer is right inside a linked worktree, whose state lives apart from the main one.
+- [`dybatpho::git_is_shallow`](#dybatphogit_is_shallow) — Return success when a repository is a shallow clone. History questions such as a commit count or the latest tag give a truncated answer in a shallow clone, which is what CI checkouts usually are.
+- [`dybatpho::git_stash_count`](#dybatphogit_stash_count) — Count the entries on the stash.
+- [`dybatpho::git_worktree_list`](#dybatphogit_worktree_list) — List the worktrees of a repository with the branch each has checked out. The main worktree comes first, then every linked one, in the order `git worktree list` reports them.
 
 <a id="tips"></a>
 ## 💡 Tips
@@ -44,6 +50,14 @@ information, listing changed files, and querying commit/tag relationships.
 ### `dybatpho::git_is_ancestor`
 
 - A commit counts as its own ancestor, which is what `git merge-base` reports and what makes "has this landed yet" answer yes for the commit itself
+
+### `dybatpho::git_state`
+
+- A rebase is reported ahead of the cherry-pick it performs underneath, because the rebase is what has to be continued or aborted
+
+### `dybatpho::git_worktree_list`
+
+- The fields are separated by a tab so that a path with spaces reads back whole with `IFS=$'\t' read -r`
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -382,3 +396,189 @@ fi
 
 - `0`: The first commit is an ancestor of the second, or they are the same commit
 - `1`: It is not, or either commit-ish cannot be resolved
+
+
+---
+
+### `dybatpho::git_upstream`
+
+Print the upstream a branch tracks.
+A script asks this before it compares with, pulls from, or pushes to the
+remote branch, and the answer is the short name Git shows, such as
+`origin/main`.
+
+**🧪 Example**
+
+```bash
+if upstream="$(dybatpho::git_upstream "." main)"; then
+  dybatpho::info "main tracks ${upstream}"
+fi
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional repository path, default is `.` |
+| `$2` | string | Optional branch name, default is the current branch |
+
+**📤 Output on stdout**
+
+- Short name of the upstream ref
+
+**🚦 Exit codes**
+
+- `0`: The branch has an upstream
+- `1`: It has none, the branch does not exist, or HEAD is detached
+
+
+---
+
+### `dybatpho::git_ahead_behind`
+
+Count the commits a ref is ahead of and behind another.
+With no base the branch is compared with its upstream, which is the
+"2 ahead, 1 behind" a prompt or a pre-push check wants.
+
+**🧪 Example**
+
+```bash
+local counts ahead behind
+counts="$(dybatpho::git_ahead_behind ".")"
+read -r ahead behind <<< "${counts}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional repository path, default is `.` |
+| `$2` | string | Optional base ref, default is the upstream of the head ref |
+| `$3` | string | Optional head ref, default is `HEAD` |
+
+**📤 Output on stdout**
+
+- `<ahead> <behind>` on one line: commits only on the head ref, then
+  commits only on the base ref
+
+**🚦 Exit codes**
+
+- `0`: Both refs resolved
+- `1`: There is no base ref and the head has no upstream, or a ref is unknown
+
+
+---
+
+### `dybatpho::git_state`
+
+Name the operation a repository is in the middle of.
+A script that is about to commit, switch branch, or rebase checks this
+first, so it does not act on a tree that is half way through a merge.
+The markers are found through `git rev-parse --git-path`, so the answer is
+right inside a linked worktree, whose state lives apart from the main one.
+
+**🧪 Example**
+
+```bash
+local state
+state="$(dybatpho::git_state ".")"
+[[ "${state}" == "none" ]] || dybatpho::die "Finish the ${state} first"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional repository path, default is `.` |
+
+**📤 Output on stdout**
+
+- One of `rebase`, `am`, `merge`, `cherry-pick`, `revert`, `bisect`, or `none`
+
+
+---
+
+### `dybatpho::git_is_shallow`
+
+Return success when a repository is a shallow clone.
+History questions such as a commit count or the latest tag give a
+truncated answer in a shallow clone, which is what CI checkouts usually are.
+
+**🧪 Example**
+
+```bash
+if dybatpho::git_is_shallow "."; then
+  git fetch --unshallow
+fi
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional repository path, default is `.` |
+
+**🚦 Exit codes**
+
+- `0`: The repository is shallow
+- `1`: It has its full history
+
+
+---
+
+### `dybatpho::git_stash_count`
+
+Count the entries on the stash.
+
+**🧪 Example**
+
+```bash
+local stashed
+stashed="$(dybatpho::git_stash_count ".")"
+((stashed == 0)) || dybatpho::warn "${stashed} stash entries left behind"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional repository path, default is `.` |
+
+**📤 Output on stdout**
+
+- Number of stash entries, `0` when there is no stash
+
+
+---
+
+### `dybatpho::git_worktree_list`
+
+List the worktrees of a repository with the branch each has checked out.
+The main worktree comes first, then every linked one, in the order
+`git worktree list` reports them.
+
+**🧪 Example**
+
+```bash
+local path branch
+while IFS=$'\t' read -r path branch; do
+  dybatpho::print "${branch} -> ${path}"
+done <<< "$(dybatpho::git_worktree_list ".")"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Optional repository path, default is `.` |
+
+**📤 Output on stdout**
+
+- One `<path>\t<branch>` line per worktree. The branch is its short
+  name, `(detached)` when HEAD is detached, or `(bare)` for a bare repository

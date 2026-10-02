@@ -118,6 +118,42 @@ As a release script, I want to know whether one commit is reachable from another
 3. **Given** two branches that have diverged, **When** either tip is compared with the other, **Then** neither reaches the other
 4. **Given** a reference that cannot be resolved, **When** reachability is asked, **Then** the call fails rather than guessing
 
+### User Story - Know where the branch stands before acting (Priority: P2)
+
+As a script that is about to commit, pull, push, or rebase, I want to know the
+branch's upstream, how far it has drifted from it, whether an operation is
+half finished, whether the clone is shallow, how much is stashed, and which
+worktrees exist, so that I refuse to act on a repository in a state the action
+would make worse.
+
+**Why this priority**: Committing into a half-finished merge or reading tags
+from a shallow clone gives a wrong result without any error.
+
+**Independent Test**: Build temporary repositories with a bare remote, diverged
+branches, conflicted merge/cherry-pick/revert/rebase/am runs, a bisect, a
+shallow clone, stash entries, and linked worktrees whose paths contain spaces.
+
+**Acceptance Scenarios**:
+
+1. **Given** a branch that tracks a remote branch, **When** `git_upstream`
+   runs, **Then** it prints the upstream's short name; **Given** no upstream,
+   an unknown branch, or detached HEAD, **Then** it prints nothing and exits 1
+2. **Given** two refs, **When** `git_ahead_behind` runs, **Then** it prints the
+   commits only on the head ref and the commits only on the base ref, in that
+   order; with no base it compares with the upstream and fails clearly when
+   there is none
+3. **Given** a conflicted merge, cherry-pick, revert, rebase, `git am`, or a
+   bisect, **When** `git_state` runs, **Then** it names that operation, and
+   prints `none` otherwise, including from a subdirectory and for each linked
+   worktree separately
+4. **Given** a shallow clone, **When** `git_is_shallow` runs, **Then** it
+   succeeds, and fails for a full clone
+5. **Given** stash entries, **When** `git_stash_count` runs, **Then** it prints
+   their number, `0` when there is no stash
+6. **Given** linked worktrees, **When** `git_worktree_list` runs, **Then** it
+   prints one tab-separated path and branch per worktree, the main one first,
+   with `(detached)` and `(bare)` for those cases
+
 ---
 
 ## Requirements *(mandatory)*
@@ -125,6 +161,25 @@ As a release script, I want to know whether one commit is reachable from another
 ### Functional Requirements
 
 - **FR-A01**: The module MUST report whether one commit is reachable from another, treating a commit as its own ancestor, accepting tags and branch names as well as hashes, and failing when either reference cannot be resolved.
+
+- **FR-B01**: `git_upstream` MUST print the short name of the upstream of the
+  current or named branch, and MUST exit 1 with no output when there is none,
+  the branch is unknown, or HEAD is detached.
+- **FR-B02**: `git_ahead_behind` MUST print `<ahead> <behind>` for a head ref
+  (default `HEAD`) against a base ref (default the head's upstream), MUST fail
+  with a diagnostic when no base is given and the head has no upstream, and
+  MUST reject unknown refs.
+- **FR-B03**: `git_state` MUST print `rebase`, `am`, `merge`, `cherry-pick`,
+  `revert`, `bisect`, or `none`, checking in that order, and MUST locate the
+  markers through the worktree's own Git paths so linked worktrees and
+  subdirectories answer for themselves.
+- **FR-B04**: `git_is_shallow` MUST succeed for a shallow repository and fail
+  otherwise.
+- **FR-B05**: `git_stash_count` MUST print the number of stash entries, `0`
+  when there is no stash.
+- **FR-B06**: `git_worktree_list` MUST print one `<path>\t<branch>` line per
+  worktree, the main worktree first, with `(detached)` for a detached HEAD and
+  `(bare)` for a bare repository, keeping paths with spaces whole.
 
 - **FR-001**: All repository helpers MUST accept an optional repository path,
   defaulting to `.` where applicable.
@@ -160,6 +215,10 @@ As a release script, I want to know whether one commit is reachable from another
   requested.
 - **Worktree State**: Clean or dirty status including untracked files.
 - **Remote**: A named Git remote and its configured URL.
+- **Upstream**: The remote-tracking branch a local branch is configured to
+  follow.
+- **Repository State**: The operation in progress in a worktree, or `none`.
+- **Worktree Entry**: A worktree path paired with its checked-out branch.
 
 ## Success Criteria *(mandatory)*
 
@@ -175,6 +234,18 @@ As a release script, I want to know whether one commit is reachable from another
 ## Integration Tests *(mandatory)*
 
 - **IT-A01**: Verify reachability along a branch, for a commit against itself, across two diverged branches, with a tag, and for an unresolvable reference.
+
+- **IT-B01**: Read the upstream of the current and a named branch, and fail
+  without one, for an unknown branch, and on detached HEAD.
+- **IT-B02**: Count ahead/behind against the upstream and between diverged
+  branches in both directions, and fail without an upstream or with an unknown
+  ref.
+- **IT-B03**: Report each in-progress operation, `none` once it is aborted, a
+  linked worktree's bisect without leaking it into the main worktree, and the
+  state from a subdirectory with a space in its name.
+- **IT-B04**: Tell a shallow clone from a full repository, count stash entries,
+  and list worktrees with spaces, detached HEAD, and a bare main repository.
+- **IT-B05**: Verify every new helper fails clearly outside a worktree.
 
 - **IT-001**: Resolve root, branch, detached HEAD, and default branch fallbacks.
 - **IT-002**: Read commit hash, short hash, subject, and author.

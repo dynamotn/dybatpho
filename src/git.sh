@@ -359,3 +359,203 @@ function dybatpho::git_is_ancestor {
   __dybatpho_git "${repo_path}" merge-base --is-ancestor \
     "${resolved_ancestor}" "${resolved_descendant}"
 }
+
+#######################################
+# @description Print the upstream a branch tracks.
+#   A script asks this before it compares with, pulls from, or pushes to the
+#   remote branch, and the answer is the short name Git shows, such as
+#   `origin/main`.
+# @example
+#   if upstream="$(dybatpho::git_upstream "." main)"; then
+#     dybatpho::info "main tracks ${upstream}"
+#   fi
+#
+# @arg $1 string Optional repository path, default is `.`
+# @arg $2 string Optional branch name, default is the current branch
+# @stdout Short name of the upstream ref
+# @exitcode 0 The branch has an upstream
+# @exitcode 1 It has none, the branch does not exist, or HEAD is detached
+#######################################
+function dybatpho::git_upstream {
+  local repo_path branch_name
+  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  branch_name="${2-}"
+  __dybatpho_git "${repo_path}" rev-parse --abbrev-ref --symbolic-full-name \
+    "${branch_name}@{upstream}" 2> /dev/null || return 1
+}
+
+#######################################
+# @description Count the commits a ref is ahead of and behind another.
+#   With no base the branch is compared with its upstream, which is the
+#   "2 ahead, 1 behind" a prompt or a pre-push check wants.
+# @example
+#   local counts ahead behind
+#   counts="$(dybatpho::git_ahead_behind ".")"
+#   read -r ahead behind <<< "${counts}"
+#
+# @arg $1 string Optional repository path, default is `.`
+# @arg $2 string Optional base ref, default is the upstream of the head ref
+# @arg $3 string Optional head ref, default is `HEAD`
+# @stdout `<ahead> <behind>` on one line: commits only on the head ref, then
+#   commits only on the base ref
+# @exitcode 0 Both refs resolved
+# @exitcode 1 There is no base ref and the head has no upstream, or a ref is unknown
+#######################################
+function dybatpho::git_ahead_behind {
+  local repo_path base_ref head_ref counts
+  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  base_ref="${2-}"
+  head_ref="${3:-HEAD}"
+  if [[ -z "${base_ref}" ]]; then
+    local head_branch=""
+    [[ "${head_ref}" == "HEAD" ]] || head_branch="${head_ref}"
+    base_ref="$(dybatpho::git_upstream "${repo_path}" "${head_branch}")" \
+      || dybatpho::die "No upstream configured for ${head_ref}"
+  fi
+  __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
+  __dybatpho_git_resolve_commit "${repo_path}" "${head_ref}" > /dev/null
+  counts="$(__dybatpho_git "${repo_path}" rev-list --left-right --count \
+    "${head_ref}...${base_ref}")"
+  printf '%s %s\n' "${counts%%[[:space:]]*}" "${counts##*[[:space:]]}"
+}
+
+#######################################
+# @description Name the operation a repository is in the middle of.
+#   A script that is about to commit, switch branch, or rebase checks this
+#   first, so it does not act on a tree that is half way through a merge.
+#   The markers are found through `git rev-parse --git-path`, so the answer is
+#   right inside a linked worktree, whose state lives apart from the main one.
+# @example
+#   local state
+#   state="$(dybatpho::git_state ".")"
+#   [[ "${state}" == "none" ]] || dybatpho::die "Finish the ${state} first"
+#
+# @arg $1 string Optional repository path, default is `.`
+# @stdout One of `rebase`, `am`, `merge`, `cherry-pick`, `revert`, `bisect`, or `none`
+# @tip A rebase is reported ahead of the cherry-pick it performs underneath,
+#   because the rebase is what has to be continued or aborted
+#######################################
+function dybatpho::git_state {
+  local repo_path
+  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  local -a names=(rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG)
+  local -a git_args=(rev-parse)
+  local name
+  for name in "${names[@]}"; do
+    git_args+=(--git-path "${name}")
+  done
+  # Keyed by the marker's name, with `-` spelled `_` so the subscript does
+  # not read as arithmetic.
+  local -A marker=()
+  local index=0 marker_path marker_paths
+  marker_paths="$(__dybatpho_git "${repo_path}" "${git_args[@]}")"
+  while IFS= read -r marker_path; do
+    # `--git-path` answers relative to the directory Git ran in.
+    [[ "${marker_path}" == /* ]] || marker_path="${repo_path}/${marker_path}"
+    marker["${names[index]//-/_}"]="${marker_path}"
+    index=$((index + 1))
+  done <<< "${marker_paths}"
+
+  if [[ -d "${marker[rebase_merge]}" ]]; then
+    printf 'rebase\n'
+  elif [[ -d "${marker[rebase_apply]}" ]]; then
+    if [[ -e "${marker[rebase_apply]}/applying" ]]; then
+      printf 'am\n'
+    else
+      printf 'rebase\n'
+    fi
+  elif [[ -e "${marker[MERGE_HEAD]}" ]]; then
+    printf 'merge\n'
+  elif [[ -e "${marker[CHERRY_PICK_HEAD]}" ]]; then
+    printf 'cherry-pick\n'
+  elif [[ -e "${marker[REVERT_HEAD]}" ]]; then
+    printf 'revert\n'
+  elif [[ -e "${marker[BISECT_LOG]}" ]]; then
+    printf 'bisect\n'
+  else
+    printf 'none\n'
+  fi
+}
+
+#######################################
+# @description Return success when a repository is a shallow clone.
+#   History questions such as a commit count or the latest tag give a
+#   truncated answer in a shallow clone, which is what CI checkouts usually are.
+# @example
+#   if dybatpho::git_is_shallow "."; then
+#     git fetch --unshallow
+#   fi
+#
+# @arg $1 string Optional repository path, default is `.`
+# @exitcode 0 The repository is shallow
+# @exitcode 1 It has its full history
+#######################################
+function dybatpho::git_is_shallow {
+  local repo_path answer
+  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  answer="$(__dybatpho_git "${repo_path}" rev-parse --is-shallow-repository)"
+  [[ "${answer}" == "true" ]]
+}
+
+#######################################
+# @description Count the entries on the stash.
+# @example
+#   local stashed
+#   stashed="$(dybatpho::git_stash_count ".")"
+#   ((stashed == 0)) || dybatpho::warn "${stashed} stash entries left behind"
+#
+# @arg $1 string Optional repository path, default is `.`
+# @stdout Number of stash entries, `0` when there is no stash
+#######################################
+function dybatpho::git_stash_count {
+  local repo_path
+  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  if ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet refs/stash > /dev/null 2>&1; then
+    printf '0\n'
+    return 0
+  fi
+  __dybatpho_git "${repo_path}" rev-list --walk-reflogs --count refs/stash
+}
+
+#######################################
+# @description List the worktrees of a repository with the branch each has checked out.
+#   The main worktree comes first, then every linked one, in the order
+#   `git worktree list` reports them.
+# @example
+#   local path branch
+#   while IFS=$'\t' read -r path branch; do
+#     dybatpho::print "${branch} -> ${path}"
+#   done <<< "$(dybatpho::git_worktree_list ".")"
+#
+# @arg $1 string Optional repository path, default is `.`
+# @stdout One `<path>\t<branch>` line per worktree. The branch is its short
+#   name, `(detached)` when HEAD is detached, or `(bare)` for a bare repository
+# @tip The fields are separated by a tab so that a path with spaces reads back
+#   whole with `IFS=$'\t' read -r`
+#######################################
+function dybatpho::git_worktree_list {
+  local repo_path
+  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  local listing
+  listing="$(__dybatpho_git "${repo_path}" worktree list --porcelain)"
+  local line worktree_path="" worktree_branch=""
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    case "${line}" in
+      "worktree "*)
+        worktree_path="${line#worktree }"
+        worktree_branch=""
+        ;;
+      "branch "*) worktree_branch="${line#branch refs/heads/}" ;;
+      detached) worktree_branch="(detached)" ;;
+      bare) worktree_branch="(bare)" ;;
+      "")
+        [[ -z "${worktree_path}" ]] \
+          || printf '%s\t%s\n' "${worktree_path}" "${worktree_branch}"
+        worktree_path=""
+        ;;
+      *) ;; # kcov(skip) the HEAD, locked and prunable lines carry nothing listed here
+    esac
+  done <<< "${listing}"
+  [[ -z "${worktree_path}" ]] \
+    || printf '%s\t%s\n' "${worktree_path}" "${worktree_branch}"
+}

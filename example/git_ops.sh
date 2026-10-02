@@ -5,7 +5,9 @@
 #              git_commit_hash/short_hash/subject/author, git_is_clean,
 #              git_remote_url, git_has_remote, git_changed_files,
 #              git_has_commit, git_commits_between, git_commit_count,
-#              and git_tags_containing
+#              git_tags_containing, git_upstream, git_ahead_behind,
+#              git_state, git_is_shallow, git_stash_count, and
+#              git_worktree_list
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules git
@@ -43,6 +45,7 @@ function _prepare_demo_repo {
     git=$(git -C "${repo_path}" rev-parse HEAD)
     git -C "${repo_path}" update-ref refs/remotes/origin/main "${git}"
     git -C "${repo_path}" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+    git -C "${repo_path}" branch -q --set-upstream-to origin/main main
   )
 }
 
@@ -119,6 +122,36 @@ function _main {
   local git_is_clean
   git_is_clean=$(dybatpho::git_is_clean "${repo_path}" && echo yes || echo no)
   dybatpho::info "Clean after edit?  ${git_is_clean}"
+
+  dybatpho::header "BRANCH STANDING"
+  local git_upstream
+  git_upstream=$(dybatpho::git_upstream "${repo_path}")
+  dybatpho::info "Upstream:          ${git_upstream}"
+  git -C "${repo_path}" commit -qam 'Local work'
+  local ahead behind counts
+  counts=$(dybatpho::git_ahead_behind "${repo_path}")
+  read -r ahead behind <<< "${counts}"
+  dybatpho::info "Against upstream:  ${ahead} ahead, ${behind} behind"
+  counts=$(dybatpho::git_ahead_behind "${repo_path}" v1.0.0)
+  read -r ahead behind <<< "${counts}"
+  dybatpho::info "Against v1.0.0:    ${ahead} ahead, ${behind} behind"
+  local git_state
+  git_state=$(dybatpho::git_state "${repo_path}")
+  dybatpho::info "In progress:       ${git_state}"
+  local git_is_shallow
+  git_is_shallow=$(dybatpho::git_is_shallow "${repo_path}" && echo yes || echo no)
+  dybatpho::info "Shallow clone?     ${git_is_shallow}"
+  git -C "${repo_path}" stash -q -u
+  local git_stash_count
+  git_stash_count=$(dybatpho::git_stash_count "${repo_path}")
+  dybatpho::info "Stash entries:     ${git_stash_count}"
+  git -C "${repo_path}" worktree add -q "${workspace}/review tree" -b review
+  dybatpho::info "Worktrees:"
+  local worktree_path worktree_branch worktrees
+  worktrees=$(dybatpho::git_worktree_list "${repo_path}")
+  while IFS=$'\t' read -r worktree_path worktree_branch; do
+    dybatpho::print "  ${worktree_branch}  ${worktree_path#"${workspace}"/}"
+  done <<< "${worktrees}"
   dybatpho::success "Git operations demo complete"
 }
 

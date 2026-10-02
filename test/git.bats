@@ -483,3 +483,250 @@ function _append_git_commit {
   run_traced ! dybatpho::git_is_ancestor "${repo_path}" "no-such-ref" HEAD
   run_traced ! dybatpho::git_is_ancestor "${repo_path}" HEAD "no-such-ref"
 }
+
+# Give a test repository a bare remote it tracks, so upstream questions have
+# an answer that never touches the network.
+function _track_git_remote {
+  local repo_path
+  dybatpho::expect_args repo_path -- "$@"
+  _require_safe_git_test_path "${repo_path}" || return $?
+  local remote_path="${repo_path}.remote.git"
+  _require_safe_git_test_path "${remote_path}" || return $?
+  (
+    unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+    git init -q --bare "${remote_path}"
+    git -C "${repo_path}" remote add origin "${remote_path}"
+    git -C "${repo_path}" push -q -u origin main
+  )
+}
+
+@test "dybatpho::git_upstream names the tracked branch" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  _track_git_remote "${repo_path}"
+
+  run_traced dybatpho::git_upstream "${repo_path}"
+  assert_success
+  assert_output "origin/main"
+  run_traced dybatpho::git_upstream "${repo_path}" main
+  assert_output "origin/main"
+}
+
+@test "dybatpho::git_upstream fails without an upstream or a branch" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+
+  run_traced -1 dybatpho::git_upstream "${repo_path}"
+  assert_output ""
+  run_traced -1 dybatpho::git_upstream "${repo_path}" no-such-branch
+  git -C "${repo_path}" checkout -q --detach
+  run_traced -1 dybatpho::git_upstream "${repo_path}"
+}
+
+@test "dybatpho::git_ahead_behind compares with the upstream by default" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  _track_git_remote "${repo_path}"
+
+  run_traced dybatpho::git_ahead_behind "${repo_path}"
+  assert_output "0 0"
+  _append_git_commit "${repo_path}" "local one"
+  _append_git_commit "${repo_path}" "local two"
+  run_traced dybatpho::git_ahead_behind "${repo_path}"
+  assert_output "2 0"
+  run_traced dybatpho::git_ahead_behind "${repo_path}" "" main
+  assert_output "2 0"
+}
+
+@test "dybatpho::git_ahead_behind counts both sides of diverged refs" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  git -C "${repo_path}" checkout -q -b side
+  _append_git_commit "${repo_path}" "only on side"
+  git -C "${repo_path}" checkout -q main
+  _append_git_commit "${repo_path}" "main one"
+  _append_git_commit "${repo_path}" "main two"
+
+  run_traced dybatpho::git_ahead_behind "${repo_path}" side
+  assert_output "2 1"
+  run_traced dybatpho::git_ahead_behind "${repo_path}" main side
+  assert_output "1 2"
+}
+
+@test "dybatpho::git_ahead_behind reports a missing upstream or ref" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+
+  run dybatpho::git_ahead_behind "${repo_path}"
+  assert_failure
+  assert_output --partial "No upstream configured for HEAD"
+  run dybatpho::git_ahead_behind "${repo_path}" no-such-ref
+  assert_failure
+  assert_output --partial "Unknown git commit: no-such-ref"
+}
+
+@test "dybatpho::git_state reports none for a quiet repository" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "none"
+}
+
+@test "dybatpho::git_state reports a conflicted merge, cherry-pick and revert" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  git -C "${repo_path}" checkout -q -b side
+  _append_git_commit "${repo_path}" "side change"
+  git -C "${repo_path}" checkout -q main
+  _append_git_commit "${repo_path}" "main change"
+
+  run_traced -1 git -C "${repo_path}" merge -q side
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "merge"
+  git -C "${repo_path}" merge --abort
+
+  run_traced -1 git -C "${repo_path}" cherry-pick side
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "cherry-pick"
+  git -C "${repo_path}" cherry-pick --abort
+
+  run_traced -1 git -C "${repo_path}" revert --no-edit HEAD~1
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "revert"
+  git -C "${repo_path}" revert --abort
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "none"
+}
+
+@test "dybatpho::git_state reports rebase, am and bisect" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  git -C "${repo_path}" checkout -q -b side
+  _append_git_commit "${repo_path}" "side change"
+  git -C "${repo_path}" checkout -q main
+  _append_git_commit "${repo_path}" "main change"
+
+  git -C "${repo_path}" checkout -q side
+  run_traced -1 git -C "${repo_path}" rebase -q main
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "rebase"
+  git -C "${repo_path}" rebase --abort
+
+  git -C "${repo_path}" format-patch -q -1 -o "${repo_path}.patches" side
+  git -C "${repo_path}" checkout -q main
+  run_traced ! git -C "${repo_path}" am -q "${repo_path}.patches"/*.patch
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "am"
+  git -C "${repo_path}" am --abort
+
+  # A rebase stopped by the apply backend keeps `rebase-apply` without `applying`.
+  mkdir "$(git -C "${repo_path}" rev-parse --absolute-git-dir)/rebase-apply"
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "rebase"
+  rmdir "$(git -C "${repo_path}" rev-parse --absolute-git-dir)/rebase-apply"
+
+  git -C "${repo_path}" bisect start > /dev/null
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "bisect"
+  git -C "${repo_path}" bisect reset > /dev/null
+}
+
+@test "dybatpho::git_state reads a linked worktree's own markers" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  local worktree_path="${repo_path}.linked tree"
+  git -C "${repo_path}" worktree add -q "${worktree_path}" -b linked
+
+  git -C "${worktree_path}" bisect start > /dev/null
+  run_traced dybatpho::git_state "${worktree_path}"
+  assert_output "bisect"
+  run_traced dybatpho::git_state "${repo_path}"
+  assert_output "none"
+}
+
+@test "dybatpho::git_state answers from a subdirectory" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  mkdir -p "${repo_path}/sub dir"
+  git -C "${repo_path}" bisect start > /dev/null
+  run_traced dybatpho::git_state "${repo_path}/sub dir"
+  assert_output "bisect"
+}
+
+@test "dybatpho::git_is_shallow tells a shallow clone from a full one" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  _append_git_commit "${repo_path}" "second"
+  run_traced ! dybatpho::git_is_shallow "${repo_path}"
+
+  local clone_path="${repo_path}.shallow"
+  git clone -q --depth 1 "file://${repo_path}" "${clone_path}"
+  run_traced dybatpho::git_is_shallow "${clone_path}"
+}
+
+@test "dybatpho::git_stash_count counts stash entries" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+
+  run_traced dybatpho::git_stash_count "${repo_path}"
+  assert_output "0"
+  printf 'one\n' >> "${repo_path}/README.md"
+  git -C "${repo_path}" stash -q
+  printf 'two\n' >> "${repo_path}/README.md"
+  git -C "${repo_path}" stash -q
+  run_traced dybatpho::git_stash_count "${repo_path}"
+  assert_output "2"
+}
+
+@test "dybatpho::git_worktree_list lists every worktree with its branch" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  git -C "${repo_path}" worktree add -q "${repo_path}.with space" -b feature
+  git -C "${repo_path}" worktree add -q --detach "${repo_path}.detached"
+
+  run_traced dybatpho::git_worktree_list "${repo_path}"
+  assert_success
+  assert_line --index 0 "${repo_path}"$'\t'"main"
+  assert_line "${repo_path}.with space"$'\t'"feature"
+  assert_line "${repo_path}.detached"$'\t'"(detached)"
+  assert_equal "${#lines[@]}" 3
+}
+
+@test "dybatpho::git_worktree_list marks a bare repository" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  local bare_path="${repo_path}.bare.git"
+  git clone -q --bare "${repo_path}" "${bare_path}"
+  git -C "${bare_path}" worktree add -q "${repo_path}.from-bare" main
+
+  run_traced dybatpho::git_worktree_list "${repo_path}.from-bare"
+  assert_line --index 0 "${bare_path}"$'\t'"(bare)"
+  assert_line --index 1 "${repo_path}.from-bare"$'\t'"main"
+}
+
+@test "New Git state helpers fail clearly outside a repository" {
+  local outside_path
+  outside_path="$(_safe_git_test_root)/outside"
+  mkdir -p "${outside_path}"
+  local helper
+  for helper in git_upstream git_ahead_behind git_state git_is_shallow \
+    git_stash_count git_worktree_list; do
+    run "dybatpho::${helper}" "${outside_path}"
+    assert_failure
+    assert_output --partial 'Not a git repository'
+  done
+}

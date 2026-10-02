@@ -94,6 +94,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   dybatpho::text_box "$(git diff --shortstat)" "Changes" rounded
   ./build.sh 2>&1 | dybatpho::text_truncate_lines - 20 "(+{count} lines in build.log)"
+- **`git` — where a branch stands before you act on it.** Six read-only
+  helpers answer what a commit, pull, push, or rebase script asks first:
+  `dybatpho::git_upstream` names the branch's upstream (`origin/main`) and
+  exits 1 when there is none, `dybatpho::git_ahead_behind` prints
+  `<ahead> <behind>` against the upstream or any ref, `dybatpho::git_state`
+  names an unfinished `merge`, `rebase`, `am`, `cherry-pick`, `revert`, or
+  `bisect` (or `none`) and answers correctly inside a linked worktree,
+  `dybatpho::git_is_shallow` spots a shallow CI clone,
+  `dybatpho::git_stash_count` counts stash entries, and
+  `dybatpho::git_worktree_list` prints each worktree's path and branch,
+  tab-separated so paths with spaces read back whole.
+
+  ```sh
+  [[ "$(dybatpho::git_state)" == none ]] || dybatpho::die "Finish it first"
+  read -r ahead behind <<< "$(dybatpho::git_ahead_behind)"
   ```
 
 ## [5.2.0] - 2026-10-02

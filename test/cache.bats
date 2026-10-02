@@ -268,3 +268,106 @@ age_entry() {
   run --separate-stderr ! dybatpho::cache_wait k later
   assert_stderr --partial "is not a number of seconds"
 }
+
+# Write an entry with a given body and modification time, as `[[CC]YY]MMDDhhmm`.
+entry_at() {
+  printf '%s' "$2" | dybatpho::cache_set "$1"
+  touch -t "$3" "$(dybatpho::cache_path "$1")"
+}
+
+remaining_entries() {
+  local path names=()
+  for path in "$(dybatpho::cache_dir)"/*.cache; do
+    [[ -f "${path}" ]] || continue
+    path="${path##*/}"
+    names+=("${path%.cache}")
+  done
+  printf '%s\n' "${names[*]-}"
+}
+
+@test "dybatpho::cache_prune --older-than removes only entries past that age" {
+  entry_at old x 200001010000
+  entry_at recent x 200001010000
+  local mtime
+  mtime="$(dybatpho::file_mtime "$(dybatpho::cache_path recent)")"
+  touch -t 200001010002 "$(dybatpho::cache_path recent)"
+  # Two minutes separate the entries; with the clock frozen just after the
+  # newer one, a limit of one minute removes exactly the older.
+  dybatpho::mock_time "$((mtime + 150))"
+  run_traced -0 dybatpho::cache_prune --older-than 60
+  dybatpho::unmock_time
+  assert_equal "$(remaining_entries)" "recent"
+  local foreign="$(dybatpho::cache_dir)/not-ours.txt"
+  printf 'keep\n' > "${foreign}"
+  touch -t 200001010000 "${foreign}"
+  run_traced -0 dybatpho::cache_prune --older-than=0
+  assert_equal "$(remaining_entries)" ""
+  assert_equal "$(cat "${foreign}")" "keep"
+}
+
+@test "dybatpho::cache_prune --max-entries removes the least recently written first" {
+  entry_at c x 200301010000
+  entry_at a x 200101010000
+  entry_at b x 200201010000
+  entry_at d x 200401010000
+  run_traced -0 dybatpho::cache_prune --max-entries 2
+  assert_equal "$(remaining_entries)" "c d"
+  run_traced -0 dybatpho::cache_prune --max-entries=5
+  assert_equal "$(remaining_entries)" "c d"
+  run_traced -0 dybatpho::cache_prune --max-entries 0
+  assert_equal "$(remaining_entries)" ""
+}
+
+@test "dybatpho::cache_prune --max-size keeps the newest entries that fit" {
+  local body
+  body="$(printf '%600s' '')"
+  entry_at one "${body}" 200101010000
+  entry_at two "${body}" 200201010000
+  entry_at three "${body}" 200301010000
+  run_traced -0 dybatpho::cache_prune --max-size 1k
+  assert_equal "$(remaining_entries)" "three"
+  run_traced -0 dybatpho::cache_prune --max-size=600
+  assert_equal "$(remaining_entries)" "three"
+  run_traced -0 dybatpho::cache_prune --max-size 599
+  assert_equal "$(remaining_entries)" ""
+}
+
+@test "dybatpho::cache_prune orders entries of the same second by name" {
+  entry_at beta x 200101010000
+  entry_at alpha x 200101010000
+  entry_at gamma x 200101010000
+  run_traced -0 dybatpho::cache_prune --max-entries 1 --max-size 1G
+  assert_equal "$(remaining_entries)" "gamma"
+}
+
+@test "dybatpho::cache_prune under DRY_RUN reports removals and removes nothing" {
+  entry_at a x 200101010000
+  entry_at b x 200201010000
+  DRY_RUN=true run_traced -0 dybatpho::cache_prune --max-entries 1 --max-size 1M
+  assert_output --partial "remove"
+  assert_output --partial "$(dybatpho::cache_path a)"
+  refute_output --partial "$(dybatpho::cache_path b)"
+  assert_equal "$(remaining_entries)" "a b"
+}
+
+@test "dybatpho::cache_prune succeeds on a namespace that was never written" {
+  DYBATPHO_CACHE_NAMESPACE="never-used"
+  run_traced -0 dybatpho::cache_prune --max-entries 1
+  mkdir -p "$(dybatpho::cache_dir)"
+  run_traced -0 dybatpho::cache_prune --max-entries 1
+}
+
+@test "dybatpho::cache_prune refuses a missing or malformed limit" {
+  run --separate-stderr ! dybatpho::cache_prune
+  assert_stderr --partial "Expected --older-than"
+  run --separate-stderr ! dybatpho::cache_prune --keep 3
+  assert_stderr --partial "got '--keep'"
+  run --separate-stderr ! dybatpho::cache_prune --max-entries
+  assert_stderr --partial "needs a value"
+  run --separate-stderr ! dybatpho::cache_prune --older-than soon
+  assert_stderr --partial "is not a number of seconds"
+  run --separate-stderr ! dybatpho::cache_prune --max-entries many
+  assert_stderr --partial "is not a number of entries"
+  run --separate-stderr ! dybatpho::cache_prune --max-size 10T
+  assert_stderr --partial "is not a size"
+}

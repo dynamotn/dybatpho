@@ -340,6 +340,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::cache_wait status 30
   ```
 
+- **`cache` — keep a namespace within bounds.** `dybatpho::cache_prune`
+  removes entries older than `--older-than <seconds>`, then the least recently
+  written ones until the namespace holds no more than `--max-entries <count>`
+  and `--max-size <size>` (bytes, or a binary `K`, `M` or `G` suffix). Like
+  `dybatpho::cache_clear` it touches only entries the module wrote, and under
+  `DRY_RUN` it reports each removal instead.
+
+  ```sh
+  dybatpho::cache_prune --older-than 604800 --max-size 50M
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

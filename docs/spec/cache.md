@@ -106,6 +106,28 @@ the entry is replaced once the refresh finishes.
    **Then** the wait returns once the refresh is done, or fails when its time
    runs out first.
 
+### User Story 6 - Keep a cache within bounds (Priority: P2)
+
+As an operator, I want to drop old entries until a namespace fits a count, a
+size, or an age, so that a cache keyed by URL does not grow without limit on a
+long-lived host.
+
+**Independent Test**: Write entries with known modification times and sizes,
+prune with each limit, and verify the entries written longest ago are the ones
+removed.
+
+**Acceptance Scenarios**:
+
+1. **Given** entries of different ages, **When** the namespace is pruned with
+   `--older-than`, **Then** exactly the entries past that age are removed.
+2. **Given** more entries than `--max-entries`, **When** the namespace is
+   pruned, **Then** the least recently written are removed until it fits.
+3. **Given** entries totalling more than `--max-size`, **When** the namespace
+   is pruned, **Then** the least recently written are removed until the rest
+   fit, and a size may carry a binary `K`, `M`, or `G` suffix.
+4. **Given** `DRY_RUN`, **When** the namespace is pruned, **Then** each
+   removal is reported and nothing is removed.
+
 ### Example Workflow
 
 ```sh
@@ -115,6 +137,8 @@ releases="$(dybatpho::cache_run gh-releases 3600 -- gh api /repos/o/r/releases)"
 
 status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
 dybatpho::cache_wait status 30
+
+dybatpho::cache_prune --older-than 604800 --max-size 50M
 
 key="$(dybatpho::cache_key "${url}")"
 if ! body="$(dybatpho::cache_get "${key}" 600)"; then
@@ -137,6 +161,9 @@ fi
 - A refresh started from inside a command substitution, which the calling
   shell's own `wait` cannot see.
 - A time to live or grace window that is not a number of seconds.
+- Several entries written within the same second when pruning by count.
+- A size limit with a suffix, in either case, or an unknown one such as `T`.
+- Pruning a namespace that was never written, or is empty.
 
 ## Requirements *(mandatory)*
 
@@ -168,6 +195,10 @@ fi
 - **FR-017**: A background refresh that fails MUST leave the existing entry in place, and its output and diagnostics MUST NOT reach the caller or hold a command substitution open.
 - **FR-018**: The module MUST offer a way to wait for the background refresh of an entry, with a time limit, returning `1` when a refresh is still running when the time runs out.
 - **FR-019**: `dybatpho::cache_run` MUST stop the script when the time to live or the grace window is not a number of seconds, or when more than one time to live is given.
+- **FR-020**: The module MUST prune the current namespace by any combination of `--older-than <seconds>`, `--max-entries <count>`, and `--max-size <size>`, each also accepted in `--option=value` form, removing entries past the age first and then the least recently written until the rest fit every limit.
+- **FR-021**: Entries written within the same second MUST be pruned in the order of their keys, so the result never depends on the file system.
+- **FR-022**: Pruning MUST consider only entries this module wrote in the current namespace, MUST succeed when the namespace does not exist, and MUST report each removal instead of performing it under `DRY_RUN`.
+- **FR-023**: Pruning MUST stop the script when no limit is given, an option is unknown or lacks its value, or a limit is malformed; a size MUST be a number of bytes with an optional binary `K`, `M`, or `G` suffix.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -187,6 +218,7 @@ fi
 - **SC-004**: A reader never sees a partially written entry.
 - **SC-005**: The library carries one cache implementation rather than one per module.
 - **SC-006**: A caller with a grace window never waits on the source while a recent answer exists, and the source is asked once per refresh however many callers find the entry stale.
+- **SC-007**: A long-lived cache stays within a stated count, size, or age without a hand-written cleanup.
 
 ## Integration Tests *(mandatory)*
 
@@ -212,6 +244,13 @@ fi
 - **IT-019**: Verify a failing background refresh leaves the old entry in place.
 - **IT-020**: Hold the refresh lock, verify a stale call starts no refresh, that waiting gives up with `1` while the lock is held and succeeds once it is released, and that clearing the namespace still succeeds.
 - **IT-021**: Verify a non-numeric time to live, grace window, or wait limit, a missing `--stale` value, and a second time to live stop the script.
+- **IT-022**: With the clock frozen, verify `--older-than` removes only the entry past the age, that `--older-than=0` removes the rest, and that a foreign file is left alone.
+- **IT-023**: Verify `--max-entries` removes the least recently written first, leaves a namespace already within the limit alone, and that zero empties it.
+- **IT-024**: Verify `--max-size` with a `k` suffix, an exact byte limit, and a limit below one entry.
+- **IT-025**: Verify entries of the same second are pruned by key when limits are combined.
+- **IT-026**: Verify `DRY_RUN` reports the removal of the oldest entry only and removes nothing.
+- **IT-027**: Verify pruning a namespace that does not exist, and one that is empty, succeeds.
+- **IT-028**: Verify no limit, an unknown option, a missing value, and malformed age, count, and size limits stop the script.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -221,3 +260,4 @@ fi
 4. Clearing a namespace touches only entries this module wrote.
 5. `src/ai.sh` holds no cache implementation of its own.
 6. With a grace window, an expired entry is answered at once and refreshed once in the background, and a failed refresh keeps it.
+7. Pruning removes the entries written longest ago until the namespace fits its limits.

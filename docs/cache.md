@@ -56,6 +56,7 @@ runs the command once.
 - [`dybatpho::cache_clear`](#dybatphocache_clear) — Remove every entry in the current namespace. Only files this module wrote are removed, recognised by their suffix. The cache directory is named by an environment variable, and emptying whatever a path happens to contain is not a thing a helper should offer to do.
 - [`dybatpho::cache_wait`](#dybatphocache_wait) — Wait until no background refresh of an entry is running. `dybatpho::cache_run --stale` answers from an expired entry and refreshes it behind the caller's back. Usually that is the point, but a script that is about to exit, or that wants the refreshed answer for a later step, calls this first. The refresh usually runs in a command substitution's subshell, which a bare `wait` in the calling shell knows nothing about.
 - [`dybatpho::cache_run`](#dybatphocache_run) — Print what a command prints, running it only when the remembered answer has gone stale. This is the whole module in one call: ask once, reuse the answer until it expires, and put the command's own output through unchanged either way. A command that fails is not stored, and its exit status is returned as it is. Remembering a failure would turn one bad minute into a whole time to live of them, and the caller could not tell a remembered error from a fresh one. Standard error is not captured either way, so a warning the command prints is seen every time rather than once. `--stale <seconds>` adds a grace window after the time to live: an entry older than the time to live but younger than the two together is printed at once, as it is, while the command runs again in the background to replace it. The caller never waits for a slow source that answered recently, and the answer is at most one refresh behind. Only one refresh of an entry runs at a time, guarded by a lock beside the entry, and a refresh that fails keeps the entry it was meant to replace. An entry older than the window is a miss, and the command runs in the foreground as usual. `dybatpho::cache_wait` waits for a refresh to finish.
+- [`dybatpho::cache_prune`](#dybatphocache_prune) — Remove old entries until the namespace fits the limits given. Entries older than `--older-than` go first. Then, while the namespace holds more than `--max-entries` entries or more than `--max-size` bytes, the oldest remaining entry is removed. Oldest means least recently written: an entry's modification time is also its age, so reading an entry cannot mark it as used without making it look fresh, and the entry the cache refreshed longest ago is the one it would refetch first anyway. Like `dybatpho::cache_clear`, only files this module wrote are considered, and only in the current namespace.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -443,3 +444,50 @@ dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
 **🔗 See also**
 
 - [- `dybatpho::cache_get` - `dybatpho::cache_wait](#dybatphocache_get-dybatphocache_wait)
+
+
+---
+
+### `dybatpho::cache_prune`
+
+Remove old entries until the namespace fits the limits given.
+Entries older than `--older-than` go first. Then, while the namespace holds
+more than `--max-entries` entries or more than `--max-size` bytes, the
+oldest remaining entry is removed. Oldest means least recently written: an
+entry's modification time is also its age, so reading an entry cannot mark
+it as used without making it look fresh, and the entry the cache refreshed
+longest ago is the one it would refetch first anyway.
+
+Like `dybatpho::cache_clear`, only files this module wrote are considered,
+and only in the current namespace.
+
+**🧪 Example**
+
+```bash
+dybatpho::cache_prune --older-than 604800
+dybatpho::cache_prune --max-entries 500 --max-size 50M
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$@` | string | At least one of `--older-than <seconds>`, `--max-entries <count>`, `--max-size <size>`; a size takes an optional binary `K`, `M` or `G` suffix |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries |
+| **`DYBATPHO_CACHE_NAMESPACE`** | string | Namespace to prune |
+| **`DRY_RUN`** | string | When true-like, report each removal instead of performing it |
+
+**🚦 Exit codes**
+
+- `0`: The namespace fits the limits, whether or not anything was removed
+- `1`: Stop the script when no limit is given, an option is unknown, or a limit is malformed
+
+**🔗 See also**
+
+- [- `dybatpho::cache_stats](#dybatphocache_stats)

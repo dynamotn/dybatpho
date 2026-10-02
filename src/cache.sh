@@ -499,3 +499,173 @@ function dybatpho::cache_run {
   printf '%s\n' "${output}" | dybatpho::cache_set "${key}"
   printf '%s\n' "${output}"
 }
+
+#######################################
+# @description Read every entry of the current namespace into an array, oldest
+#   first, as `<mtime> <bytes> <path>` lines. Entries written in the same second
+#   are ordered by path, so the order never depends on the file system.
+# @arg $1 string Name of the array receiving the records
+# @set The named array, empty when the namespace holds no entries
+# @internal
+#######################################
+function __dybatpho_cache_scan {
+  local __dybatpho_cache_scan_var
+  dybatpho::expect_args __dybatpho_cache_scan_var -- "$@"
+  local -n __dybatpho_cache_scan_out="${__dybatpho_cache_scan_var}"
+  __dybatpho_cache_scan_out=()
+  local __dybatpho_cache_scan_dir
+  __dybatpho_cache_scan_dir="$(dybatpho::cache_dir)"
+  dybatpho::is dir "${__dybatpho_cache_scan_dir}" || return 0
+  local -a __dybatpho_cache_scan_records=()
+  local __dybatpho_cache_scan_path __dybatpho_cache_scan_mtime __dybatpho_cache_scan_size
+  local __dybatpho_cache_scan_line
+  for __dybatpho_cache_scan_path in "${__dybatpho_cache_scan_dir}"/*"${__DYBATPHO_CACHE_SUFFIX}"; do
+    # An unmatched glob stays as the pattern, and a symbolic link or a
+    # directory with the suffix is not something this module wrote.
+    [[ -f "${__dybatpho_cache_scan_path}" && ! -L "${__dybatpho_cache_scan_path}" ]] || continue
+    __dybatpho_cache_scan_mtime="$(dybatpho::file_mtime "${__dybatpho_cache_scan_path}")"
+    __dybatpho_cache_scan_size="$(dybatpho::file_size "${__dybatpho_cache_scan_path}")"
+    __dybatpho_cache_scan_line="${__dybatpho_cache_scan_mtime} ${__dybatpho_cache_scan_size}"
+    __dybatpho_cache_scan_records+=("${__dybatpho_cache_scan_line} ${__dybatpho_cache_scan_path}")
+  done
+  ((${#__dybatpho_cache_scan_records[@]} > 0)) || return 0
+  local __dybatpho_cache_scan_sorted
+  __dybatpho_cache_scan_sorted="$(printf '%s\n' "${__dybatpho_cache_scan_records[@]}" | sort -k1,1n -k3)"
+  mapfile -t __dybatpho_cache_scan_out <<< "${__dybatpho_cache_scan_sorted}"
+}
+
+#######################################
+# @description Read a size such as `512`, `64K`, `10M` or `1G` into a number of
+#   bytes. The suffixes are binary, so `1K` is 1024 bytes.
+# @arg $1 string Name of the variable receiving the bytes
+# @arg $2 string The size
+# @set The named variable
+# @exitcode 0 The size was read
+# @exitcode 1 The size is not a number with an optional `K`, `M` or `G`
+# @internal
+#######################################
+function __dybatpho_cache_bytes {
+  local __dybatpho_cache_bytes_var __dybatpho_cache_bytes_text
+  dybatpho::expect_args __dybatpho_cache_bytes_var __dybatpho_cache_bytes_text -- "$@"
+  local -n __dybatpho_cache_bytes_out="${__dybatpho_cache_bytes_var}"
+  [[ "${__dybatpho_cache_bytes_text}" =~ ^([0-9]+)([KkMmGg]?)$ ]] || return 1
+  local number="${BASH_REMATCH[1]}" unit="${BASH_REMATCH[2]}"
+  case "${unit}" in
+    [Kk]) __dybatpho_cache_bytes_out=$((10#${number} * 1024)) ;;
+    [Mm]) __dybatpho_cache_bytes_out=$((10#${number} * 1024 * 1024)) ;;
+    [Gg]) __dybatpho_cache_bytes_out=$((10#${number} * 1024 * 1024 * 1024)) ;;
+    *) __dybatpho_cache_bytes_out=$((10#${number})) ;;
+  esac
+}
+
+#######################################
+# @description Remove old entries until the namespace fits the limits given.
+#   Entries older than `--older-than` go first. Then, while the namespace holds
+#   more than `--max-entries` entries or more than `--max-size` bytes, the
+#   oldest remaining entry is removed. Oldest means least recently written: an
+#   entry's modification time is also its age, so reading an entry cannot mark
+#   it as used without making it look fresh, and the entry the cache refreshed
+#   longest ago is the one it would refetch first anyway.
+#
+#   Like `dybatpho::cache_clear`, only files this module wrote are considered,
+#   and only in the current namespace.
+# @example
+#   dybatpho::cache_prune --older-than 604800
+#   dybatpho::cache_prune --max-entries 500 --max-size 50M
+#
+# @arg $@ string At least one of `--older-than <seconds>`, `--max-entries <count>`, `--max-size <size>`;
+#   a size takes an optional binary `K`, `M` or `G` suffix
+# @env DYBATPHO_CACHE_DIR string Directory holding cache entries
+# @env DYBATPHO_CACHE_NAMESPACE string Namespace to prune
+# @env DRY_RUN string When true-like, report each removal instead of performing it
+# @exitcode 0 The namespace fits the limits, whether or not anything was removed
+# @exitcode 1 Stop the script when no limit is given, an option is unknown, or a limit is malformed
+# @see
+#   - `dybatpho::cache_stats`
+#######################################
+# dyshellint disable=BSG050 every argument is an option, parsed in the loop below
+function dybatpho::cache_prune {
+  local older_than="" max_entries="" max_size="" max_bytes=""
+  local usage="${FUNCNAME[0]}: Expected --older-than <seconds>, --max-entries <count>, or --max-size <size>"
+  while (($# > 0)); do
+    case "$1" in
+      --older-than | --max-entries | --max-size)
+        (($# >= 2)) || dybatpho::die "${FUNCNAME[0]}: $1 needs a value"
+        case "$1" in
+          --older-than) older_than="$2" ;;
+          --max-entries) max_entries="$2" ;;
+          *) max_size="$2" ;;
+        esac
+        shift 2
+        ;;
+      --older-than=*)
+        older_than="${1#*=}"
+        shift
+        ;;
+      --max-entries=*)
+        max_entries="${1#*=}"
+        shift
+        ;;
+      --max-size=*)
+        max_size="${1#*=}"
+        shift
+        ;;
+      # Exercised under `run` by "cache_prune refuses a missing or malformed limit".
+      *) dybatpho::die "${usage}; got '$1'" ;; # kcov(skip)
+    esac
+  done
+  [[ -n "${older_than}${max_entries}${max_size}" ]] || dybatpho::die "${usage}"
+  [[ -z "${older_than}" || "${older_than}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${older_than}' is not a number of seconds"
+  [[ -z "${max_entries}" || "${max_entries}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${max_entries}' is not a number of entries"
+  if [[ -n "${max_size}" ]]; then
+    __dybatpho_cache_bytes max_bytes "${max_size}" \
+      || dybatpho::die "${FUNCNAME[0]}: '${max_size}' is not a size; use bytes or a K, M, or G suffix"
+  fi
+
+  local -a records=() kept=()
+  __dybatpho_cache_scan records
+  ((${#records[@]} > 0)) || return 0
+
+  local now record mtime size path count=0 total=0
+  now="$(date +%s)"
+  for record in "${records[@]}"; do
+    read -r mtime size path <<< "${record}"
+    if [[ -n "${older_than}" ]] && ((now - mtime > older_than)); then
+      __dybatpho_cache_prune_remove "${path}"
+      continue
+    fi
+    kept+=("${record}")
+    count=$((count + 1))
+    total=$((total + size))
+  done
+
+  for record in "${kept[@]}"; do
+    if ! { [[ -n "${max_entries}" ]] && ((count > max_entries)); } \
+      && ! { [[ -n "${max_bytes}" ]] && ((total > max_bytes)); }; then
+      break
+    fi
+    read -r mtime size path <<< "${record}"
+    __dybatpho_cache_prune_remove "${path}"
+    count=$((count - 1))
+    total=$((total - size))
+  done
+}
+
+#######################################
+# @description Remove one entry on behalf of `dybatpho::cache_prune`, or report
+#   the removal under `DRY_RUN`.
+# @arg $1 string Path of the entry
+# @internal
+#######################################
+function __dybatpho_cache_prune_remove {
+  local path
+  dybatpho::expect_args path -- "$@"
+  if dybatpho::is true "${DRY_RUN}"; then
+    dybatpho::dry_run remove "${path}"
+    return 0
+  fi
+  dybatpho::debug "cache: pruning ${path}"
+  rm -f -- "${path}"
+}

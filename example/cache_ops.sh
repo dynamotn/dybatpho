@@ -164,6 +164,32 @@ function _demo_namespaces {
   fi
 }
 
+# @description Keep a namespace within bounds by dropping what was written
+#   longest ago.
+# @noargs
+function _demo_prune {
+  dybatpho::header "PRUNING"
+  local DYBATPHO_CACHE_NAMESPACE="pages" page entry year=2001
+  for page in one two three four; do
+    printf 'page %s\n' "${page}" | dybatpho::cache_set "${page}"
+    entry="$(dybatpho::cache_path "${page}")"
+    touch -t "${year}01010000" "${entry}"
+    year=$((year + 1))
+  done
+  DRY_RUN=true dybatpho::cache_prune --max-entries 2
+  dybatpho::cache_prune --max-entries 2
+  local -a left=()
+  dybatpho::cache_has three 999999999 && left+=(three)
+  dybatpho::cache_has four 999999999 && left+=(four)
+  dybatpho::print "  kept the two written last: ${left[*]}"
+  dybatpho::cache_prune --older-than 0
+  if dybatpho::cache_has four 999999999; then
+    dybatpho::warn "  an entry survived --older-than 0"
+  else
+    dybatpho::print "  and --older-than 0 emptied the namespace"
+  fi
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -173,6 +199,7 @@ function _main {
   _demo_staleness
   _demo_stale_while_revalidate
   _demo_namespaces
+  _demo_prune
   dybatpho::cache_clear
   dybatpho::success "Cache operations demo complete"
 }

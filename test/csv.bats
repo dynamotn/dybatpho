@@ -346,6 +346,84 @@ a;9
 EOF
 }
 
+@test "DYBATPHO_CSV_DELIMITER=tab reads and writes TSV" {
+  local tsv
+  tsv="$(printf 'name\tnote\n"a\tb"\tok,fine\nplain\tx')"
+  DYBATPHO_CSV_DELIMITER=tab \
+    run_traced dybatpho::csv_col "${tsv}" "name"
+  assert_success
+  assert_output "$(printf 'a\tb\nplain')"
+
+  # `\t` names a tab as well, for the scripts that already write it that way.
+  DYBATPHO_CSV_DELIMITER='\t' \
+    run_traced dybatpho::csv_filter "${tsv}" "note" contains ","
+  assert_success
+  assert_output "$(printf 'name\tnote\n"a\tb"\tok,fine')"
+
+  local -a records=() fields=()
+  DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_read "${tsv}" records
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${fields[0]}" = "$(printf 'a\tb')" ]
+  [ "${fields[1]}" = "ok,fine" ]
+}
+
+@test "DYBATPHO_CSV_DELIMITER refuses a delimiter the parser cannot use" {
+  # An empty delimiter used to spin the parser forever; the others are already
+  # part of the format and would split a value or a record in the wrong place.
+  local bad
+  for bad in "" ";;" '"' $'\n' $'\r' $'\037'; do
+    DYBATPHO_CSV_DELIMITER="${bad}" \
+      run --separate-stderr dybatpho::csv_header "a,b"
+    assert_failure
+    assert_stderr --partial "dybatpho::csv_header: Invalid delimiter"
+  done
+
+  DYBATPHO_CSV_DELIMITER="" \
+    run --separate-stderr dybatpho::csv_write records
+  assert_failure
+  assert_stderr --partial "Invalid delimiter"
+}
+
+@test "dybatpho::csv_convert rewrites CSV as TSV and back" {
+  run_traced dybatpho::csv_convert "${QUOTED_CSV}" tab
+  assert_success
+  # The comma no longer needs quotes once a tab separates the fields, while the
+  # quote and the line break still do.
+  assert_output << EOF
+name	note	qty
+Doe, John	ok	3
+"He said ""hi"""	"line one
+line two"	10
+plain	x	7
+EOF
+
+  local tsv
+  tsv="$(dybatpho::csv_convert "${QUOTED_CSV}" tab)"
+  DYBATPHO_CSV_DELIMITER=tab \
+    run_traced dybatpho::csv_convert "${tsv}" ","
+  assert_success
+  assert_output "$(dybatpho::csv_convert "${QUOTED_CSV}" ",")"
+
+  # A tab inside a value is quoted when the output is TSV.
+  run_traced dybatpho::csv_convert "$(printf 'a,b\n"x\ty",z')" tab
+  assert_success
+  assert_output "$(printf 'a\tb\n"x\ty"\tz')"
+}
+
+@test "dybatpho::csv_convert reads stdin and refuses an unusable target delimiter" {
+  run_traced dybatpho::csv_convert - ";" <<< "$(printf 'a,b\n"c;d",e')"
+  assert_success
+  assert_output "$(printf 'a;b\n"c;d";e')"
+
+  run --separate-stderr dybatpho::csv_convert "a,b" ";;"
+  assert_failure
+  assert_stderr --partial "dybatpho::csv_convert: Invalid delimiter"
+
+  run_traced dybatpho::csv_convert "" tab
+  assert_success
+  assert_output ""
+}
+
 @test "dybatpho::csv_read returns the data a record with no closing quote still has" {
   local -a records=() fields=()
   dybatpho::csv_read "$(printf 'a,b\n"unterminated,x')" records

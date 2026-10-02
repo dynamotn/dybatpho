@@ -26,12 +26,12 @@
 #   into the low tens of thousands of rows; past that, reach for a real CSV tool
 # @tip Values are read and written as text, because CSV carries no types; cast
 #   in `jq` after `dybatpho::csv_to_json` when a consumer needs numbers
-# @env DYBATPHO_CSV_DELIMITER string Field delimiter, default is `,`; set it to `;` or a tab for the files that use one
+# @env DYBATPHO_CSV_DELIMITER string Field delimiter, default is `,`; set it to `;`, or to `tab` for TSV
 # @see
 #   - `example/csv_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_CSV_DELIMITER string Field delimiter every function reads, default is `,`
+# @env DYBATPHO_CSV_DELIMITER string Field delimiter every function reads, default is `,`; `tab` or `\t` names a tab
 DYBATPHO_CSV_DELIMITER="${DYBATPHO_CSV_DELIMITER:-,}"
 
 # The byte that joins the fields of one record. A record is exchanged as a
@@ -39,6 +39,53 @@ DYBATPHO_CSV_DELIMITER="${DYBATPHO_CSV_DELIMITER:-,}"
 # separator is what makes splitting it back apart unambiguous, because unlike
 # the delimiter it can never be part of a value.
 __dybatpho_csv_unit=$'\037'
+
+#######################################
+# @description Resolve a delimiter to the character it names, into a named
+#   variable, and stop on one the parser cannot work with.
+#   `tab` and `\t` name a tab, because a literal tab is awkward to type in an
+#   environment variable. Anything else must be exactly one character that is
+#   neither a quote, a line break, nor the unit separator: an empty delimiter
+#   never advances the parser, and the others are already part of the format.
+# @arg $1 string Name of the variable receiving the delimiter
+# @arg $2 string Delimiter as the caller wrote it
+# @set The named variable
+# @exitcode 0 The delimiter is usable
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_csv_delimiter_into {
+  local -n __dybatpho_csv_delim_ref="$1"
+  local __dybatpho_csv_wanted="$2"
+
+  case "${__dybatpho_csv_wanted}" in
+    tab | '\t') __dybatpho_csv_wanted=$'\t' ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac
+
+  # The refusals below are covered by "DYBATPHO_CSV_DELIMITER refuses a
+  # delimiter the parser cannot use", which has to use `run` because the path
+  # ends in `dybatpho::die`; `run` clears the trap kcov instruments through.
+  local __dybatpho_csv_problem=""
+  if ((${#__dybatpho_csv_wanted} != 1)); then
+    __dybatpho_csv_problem="it must be one character, or \`tab\`" # kcov(skip)
+  else
+    case "${__dybatpho_csv_wanted}" in
+      '"' | $'\n' | $'\r' | "${__dybatpho_csv_unit}")
+        __dybatpho_csv_problem="a quote, a line break, or the unit separator" # kcov(skip)
+        __dybatpho_csv_problem+=" cannot separate fields" # kcov(skip)
+        ;;
+      *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+    esac
+  fi
+
+  if [[ -n "${__dybatpho_csv_problem}" ]]; then
+    local __dybatpho_csv_shown                                              # kcov(skip)
+    printf -v __dybatpho_csv_shown '%q' "${__dybatpho_csv_wanted}"          # kcov(skip)
+    dybatpho::die "${FUNCNAME[1]}: Invalid delimiter ${__dybatpho_csv_shown}: ${__dybatpho_csv_problem}" # kcov(skip)
+  fi
+  __dybatpho_csv_delim_ref="${__dybatpho_csv_wanted}"
+}
 
 #######################################
 # @description Resolve an input argument to the text it names.
@@ -314,9 +361,10 @@ function dybatpho::csv_read {
   dybatpho::expect_args input target -- "$@"
   dybatpho::expect_ref "${target}"
 
-  local text
+  local text delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
   __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into "${target}" "${text}" "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_parse_into "${target}" "${text}" "${delimiter}"
 }
 
 #######################################
@@ -355,23 +403,67 @@ function dybatpho::csv_write {
   dybatpho::expect_args source -- "$@"
   dybatpho::expect_ref "${source}"
 
-  local -n records_ref="${source}"
-  local record quoted line index # the loop below reads records_ref
-  local -a fields=()
+  local delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_write_with "${source}" "${delimiter}"
+}
 
-  for record in "${records_ref[@]}"; do
-    __dybatpho_csv_split_fields_into fields "${record}"
-    line=""
-    for index in "${!fields[@]}"; do
-      __dybatpho_csv_quote_into quoted "${fields[${index}]}" "${DYBATPHO_CSV_DELIMITER}"
-      if ((index == 0)); then
-        line="${quoted}"
+#######################################
+# @description Serialize records with a delimiter the caller has resolved.
+# @arg $1 string Name of the array of records
+# @arg $2 string Field delimiter
+# @stdout CSV text, one record per line
+# @internal
+#######################################
+function __dybatpho_csv_write_with {
+  local -n __dybatpho_csv_out_ref="$1"
+  local __dybatpho_csv_delimiter="$2"
+  local __dybatpho_csv_record __dybatpho_csv_quoted __dybatpho_csv_line __dybatpho_csv_at
+  local -a __dybatpho_csv_parts=()
+
+  for __dybatpho_csv_record in "${__dybatpho_csv_out_ref[@]}"; do
+    __dybatpho_csv_split_fields_into __dybatpho_csv_parts "${__dybatpho_csv_record}"
+    __dybatpho_csv_line=""
+    for __dybatpho_csv_at in "${!__dybatpho_csv_parts[@]}"; do
+      __dybatpho_csv_quote_into __dybatpho_csv_quoted \
+        "${__dybatpho_csv_parts[${__dybatpho_csv_at}]}" "${__dybatpho_csv_delimiter}"
+      if ((__dybatpho_csv_at == 0)); then
+        __dybatpho_csv_line="${__dybatpho_csv_quoted}"
       else
-        line+="${DYBATPHO_CSV_DELIMITER}${quoted}"
+        __dybatpho_csv_line+="${__dybatpho_csv_delimiter}${__dybatpho_csv_quoted}"
       fi
     done
-    printf '%s\n' "${line}"
+    printf '%s\n' "${__dybatpho_csv_line}"
   done
+}
+
+#######################################
+# @description Rewrite CSV with another delimiter.
+#   The input is read with `DYBATPHO_CSV_DELIMITER` and written with the
+#   delimiter given, quoting each field for the delimiter it is written with:
+#   a comma inside a value no longer needs quotes in a TSV file, and a tab
+#   inside one does. This is how a comma-separated export becomes TSV, or a
+#   semicolon-separated one becomes plain CSV.
+# @arg $1 string CSV file path, `-` for stdin, or CSV text
+# @arg $2 string Delimiter to write with: one character, or `tab`
+# @stdout The records, written with the new delimiter
+# @exitcode 0 The input was rewritten
+# @exitcode 1 Either delimiter is invalid, or the input contains the ASCII unit separator
+# @example
+#   dybatpho::csv_convert report.csv tab > report.tsv
+#   DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_convert report.tsv ","
+#######################################
+function dybatpho::csv_convert {
+  local input target
+  dybatpho::expect_args input target -- "$@"
+
+  local -a records=()
+  local text from to
+  __dybatpho_csv_delimiter_into from "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_delimiter_into to "${target}"
+  __dybatpho_csv_input_into text "${input}"
+  __dybatpho_csv_parse_into records "${text}" "${from}"
+  __dybatpho_csv_write_with records "${to}"
 }
 
 #######################################
@@ -388,8 +480,10 @@ function dybatpho::csv_header {
 
   local -a records=() names=()
   local text
+  local delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
   __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   __dybatpho_csv_header_into names records
@@ -416,8 +510,10 @@ function dybatpho::csv_col {
 
   local -a records=() names=() fields=()
   local text index at
+  local delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
   __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   __dybatpho_csv_header_into names records
@@ -484,8 +580,10 @@ function dybatpho::csv_filter {
 
   local -a records=() names=() fields=() kept=()
   local text index at
+  local delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
   __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   __dybatpho_csv_header_into names records
@@ -555,8 +653,10 @@ function dybatpho::csv_to_json {
 
   local -a records=() names=() fields=()
   local text at index object document="" name_json value_json
+  local delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
   __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
 
   if ((${#records[@]} == 0)); then
     printf '[]\n'
@@ -597,6 +697,9 @@ function dybatpho::csv_from_json {
   local input
   dybatpho::expect_args input -- "$@"
 
+  local delimiter
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
+
   local command_name
   command_name=$(dybatpho::coalesce_cmd jq yq) \
     || dybatpho::die "${FUNCNAME[0]}: Neither jq nor yq is installed" 127
@@ -629,5 +732,5 @@ function dybatpho::csv_from_json {
   # `jq` uses `,` whatever the caller set, so the conversion is read back with
   # the delimiter the backend wrote and written out with the configured one.
   __dybatpho_csv_parse_into records "${converted}" ","
-  dybatpho::csv_write records
+  __dybatpho_csv_write_with records "${delimiter}"
 }

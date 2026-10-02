@@ -71,6 +71,20 @@ As a script author, I want CSV to become a JSON array of objects and back, so th
 2. **Given** a JSON array of objects, **When** it is converted, **Then** the keys of the first object are the header and a missing key writes an empty value
 3. **Given** a document that is not an array of objects, **When** it is converted, **Then** the script stops with a message saying so
 
+---
+
+### User Story 5 - Read and write TSV and other delimiters (Priority: P2)
+
+As a script author, I want to read a tab- or semicolon-separated export with the same functions, and to rewrite a file with another delimiter, so that a TSV report needs no second parser and a spreadsheet export can be handed to a tool that wants TSV.
+
+**Independent Test**: Read a TSV file with `DYBATPHO_CSV_DELIMITER=tab`, convert a CSV file to TSV and back, and verify an unusable delimiter is refused.
+
+**Acceptance Scenarios**:
+
+1. **Given** `DYBATPHO_CSV_DELIMITER` set to `tab` or `\t`, **When** a TSV file is read, **Then** fields split on tabs and a quoted tab stays part of its value
+2. **Given** CSV and a target delimiter, **When** it is converted, **Then** every record is written with the new delimiter and each field is quoted for the delimiter it is written with
+3. **Given** an empty delimiter, one longer than a character, a quote, a line break, or the unit separator, **When** any function runs, **Then** the script stops with a message naming the delimiter instead of misreading the input
+
 ### Example Workflow
 
 ```bash
@@ -87,6 +101,10 @@ dybatpho::csv_to_json billing.csv | jq '[.[] | .cost |= tonumber]'
 
 # Normalize a file: parse it, then write back only the quoting it needs.
 dybatpho::csv_write rows > normalized.csv
+
+# Hand the same data to a tool that wants TSV, and read a TSV report back.
+dybatpho::csv_convert billing.csv tab > billing.tsv
+DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 ```
 
 ## Edge Cases
@@ -98,6 +116,8 @@ dybatpho::csv_write rows > normalized.csv
 - A field is empty, a row ends with the delimiter, or the input is empty.
 - The input contains the ASCII unit separator the module joins fields with.
 - Neither `jq` nor `yq` is installed and a JSON conversion is asked for.
+- The delimiter is empty, longer than one character, a quote, a line break, or the unit separator.
+- A value holds the target delimiter of a conversion, or holds the source delimiter that no longer needs quoting.
 
 ## Requirements *(mandatory)*
 
@@ -122,12 +142,15 @@ dybatpho::csv_write rows > normalized.csv
 - **FR-017**: Conversion from JSON MUST produce the same quoting whichever of `jq` or `yq` is available, and MUST report a document that is not an array of objects.
 - **FR-018**: The delimiter MUST be configurable through `DYBATPHO_CSV_DELIMITER` for reading and writing alike.
 - **FR-019**: A CRLF line ending MUST NOT become part of the last field of a row.
+- **FR-020**: `tab` and `\t` MUST name a tab wherever a delimiter is accepted.
+- **FR-021**: Every function MUST refuse a delimiter that is not exactly one character, or that is a quote, a line break, or the unit separator, before reading its input.
+- **FR-022**: The module MUST rewrite CSV read with the configured delimiter using another delimiter, quoting each field for the delimiter it is written with.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Record**: One row, its fields joined by the ASCII unit separator.
 - **Header**: The first record, whose values name the columns.
-- **Delimiter**: The byte separating fields in the file, `,` unless configured otherwise.
+- **Delimiter**: The character separating fields in the file, `,` unless configured otherwise; `tab` names a tab.
 - **Operator**: The comparison a filter applies: `eq`, `ne`, `gt`, `lt`, or `contains`.
 
 ## Success Criteria *(mandatory)*
@@ -162,6 +185,10 @@ dybatpho::csv_write rows > normalized.csv
 - **IT-019**: Read and write with a configured delimiter.
 - **IT-020**: Return the data a record with no closing quote still has, and keep text following a closing quote.
 - **IT-021**: `dybatpho::table_csv` points at this module when it refuses a quoted field.
+- **IT-022**: Read and filter TSV with `DYBATPHO_CSV_DELIMITER` set to `tab` and to `\t`.
+- **IT-023**: Refuse an empty, multi-character, quote, line-break, and unit-separator delimiter.
+- **IT-024**: Convert CSV to TSV and back, quoting a tab inside a value only in the TSV.
+- **IT-025**: Convert from stdin, refuse an unusable target delimiter, and convert an empty input to nothing.
 
 ## Acceptance Criteria *(mandatory)*
 

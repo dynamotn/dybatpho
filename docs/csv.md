@@ -29,14 +29,15 @@ Data containing that byte is rejected rather than silently re-split.
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DYBATPHO_CSV_DELIMITER`** | string | Field delimiter, default is `,`; set it to `;` or a tab for the files that use one |
-| **`DYBATPHO_CSV_DELIMITER`** | string | Field delimiter every function reads, default is `,` |
+| **`DYBATPHO_CSV_DELIMITER`** | string | Field delimiter, default is `,`; set it to `;`, or to `tab` for TSV |
+| **`DYBATPHO_CSV_DELIMITER`** | string | Field delimiter every function reads, default is `,`; `tab` or `\t` names a tab |
 
 ### 🚀 Highlights
 
 - [`dybatpho::csv_read`](#dybatphocsv_read) — Parse CSV into an array of records. Every element is one record whose fields are joined by the ASCII unit separator; `dybatpho::csv_fields` splits one back apart. Quoted fields are parsed the way RFC 4180 describes, so a delimiter, a doubled quote, or a line break inside a value stays part of that value.
 - [`dybatpho::csv_fields`](#dybatphocsv_fields) — Split one record from `dybatpho::csv_read` into a named array of field values.
 - [`dybatpho::csv_write`](#dybatphocsv_write) — Serialize records back to CSV. A field is quoted only when it has to be: when it contains the delimiter, a quote, or a line break.
+- [`dybatpho::csv_convert`](#dybatphocsv_convert) — Rewrite CSV with another delimiter. The input is read with `DYBATPHO_CSV_DELIMITER` and written with the delimiter given, quoting each field for the delimiter it is written with: a comma inside a value no longer needs quotes in a TSV file, and a tab inside one does. This is how a comma-separated export becomes TSV, or a semicolon-separated one becomes plain CSV.
 - [`dybatpho::csv_header`](#dybatphocsv_header) — Print the column names from the first record.
 - [`dybatpho::csv_col`](#dybatphocsv_col) — Print one column's values, chosen by its header name. A row shorter than the header reads as an empty value, and a row longer than the header stops the script rather than dropping the extra field.
 - [`dybatpho::csv_filter`](#dybatphocsv_filter) — Keep the rows whose column satisfies a comparison, and print them as CSV with the header. `gt` and `lt` compare as numbers when both values are numeric, and as text otherwise, so a version column sorts the way a reader expects and a size column the way arithmetic does.
@@ -153,6 +154,41 @@ dybatpho::csv_write rows > normalized.csv
 
 - `0`: The records were written
 - `1`: The name is not bindable
+
+
+---
+
+### `dybatpho::csv_convert`
+
+Rewrite CSV with another delimiter.
+The input is read with `DYBATPHO_CSV_DELIMITER` and written with the
+delimiter given, quoting each field for the delimiter it is written with:
+a comma inside a value no longer needs quotes in a TSV file, and a tab
+inside one does. This is how a comma-separated export becomes TSV, or a
+semicolon-separated one becomes plain CSV.
+
+**🧪 Example**
+
+```bash
+dybatpho::csv_convert report.csv tab > report.tsv
+DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_convert report.tsv ","
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | CSV file path, `-` for stdin, or CSV text |
+| `$2` | string | Delimiter to write with: one character, or `tab` |
+
+**📤 Output on stdout**
+
+- The records, written with the new delimiter
+
+**🚦 Exit codes**
+
+- `0`: The input was rewritten
+- `1`: Either delimiter is invalid, or the input contains the ASCII unit separator
 
 
 ---

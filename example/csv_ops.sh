@@ -2,7 +2,7 @@
 # @file csv_ops.sh
 # @brief Example reading a billing export that quotes its fields
 # @description Demonstrates dybatpho::csv_read, csv_fields, csv_write, csv_header, csv_col,
-#   csv_filter, csv_to_json, and csv_from_json
+#   csv_filter, csv_to_json, csv_from_json, and csv_convert
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules csv
@@ -95,6 +95,21 @@ function _demo_normalize {
   dybatpho::csv_write rows
 }
 
+# @description Rewrite the export as TSV, then read the TSV back by column.
+# @arg $1 string Path of the CSV file
+function _demo_tsv {
+  local file
+  dybatpho::expect_args file -- "$@"
+  dybatpho::header "TSV"
+  local tsv
+  # The commas inside the owner names need no quotes once tabs separate the
+  # fields; the note that spans two lines still does.
+  tsv="$(dybatpho::csv_convert "${file}" tab)"
+  printf '%s\n' "${tsv}"
+  printf -- '--\n'
+  DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col "${tsv}" "owner"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -105,6 +120,7 @@ function _main {
   _demo_filter "${fixture}"
   _demo_json "${fixture}"
   _demo_normalize "${fixture}"
+  _demo_tsv "${fixture}"
   dybatpho::success "CSV operations demo complete"
 }
 

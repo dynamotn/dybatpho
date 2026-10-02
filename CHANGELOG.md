@@ -217,6 +217,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
+- **`csv` — TSV and a delimiter that cannot hang the parser.**
+  `DYBATPHO_CSV_DELIMITER` now takes `tab` (or `\t`) for tab-separated files,
+  and `dybatpho::csv_convert` rewrites a file with another delimiter, quoting
+  each field for the delimiter it is written with — a comma inside a value
+  needs no quotes in TSV, a tab inside one does. Every csv function now refuses
+  a delimiter it cannot work with — empty, longer than one character, a quote,
+  or a line break — where an empty one used to spin the parser forever.
+
+  ```sh
+  dybatpho::csv_convert billing.csv tab > billing.tsv
+  DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv owner
   ```
 
 ### Fixed

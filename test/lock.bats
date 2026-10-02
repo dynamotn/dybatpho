@@ -243,8 +243,11 @@ teardown() {
     local definition
     definition="$(declare -f dybatpho::lock_hostname)"
     eval "slow_lock_hostname${definition#dybatpho::lock_hostname}"
+    # Two seconds, not a fraction of one: the stall has to outlast however
+    # long a loaded runner takes to get back to the foreground process below,
+    # or the race is decided by scheduling rather than by the lock.
     dybatpho::lock_hostname() {
-      sleep 0.5
+      sleep 2
       slow_lock_hostname "$@"
     }
     dybatpho::lock_acquire "reclaim-race" > /dev/null 2>&1 \

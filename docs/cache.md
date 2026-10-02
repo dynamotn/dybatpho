@@ -57,6 +57,7 @@ runs the command once.
 - [`dybatpho::cache_wait`](#dybatphocache_wait) — Wait until no background refresh of an entry is running. `dybatpho::cache_run --stale` answers from an expired entry and refreshes it behind the caller's back. Usually that is the point, but a script that is about to exit, or that wants the refreshed answer for a later step, calls this first. The refresh usually runs in a command substitution's subshell, which a bare `wait` in the calling shell knows nothing about.
 - [`dybatpho::cache_run`](#dybatphocache_run) — Print what a command prints, running it only when the remembered answer has gone stale. This is the whole module in one call: ask once, reuse the answer until it expires, and put the command's own output through unchanged either way. A command that fails is not stored, and its exit status is returned as it is. Remembering a failure would turn one bad minute into a whole time to live of them, and the caller could not tell a remembered error from a fresh one. Standard error is not captured either way, so a warning the command prints is seen every time rather than once. `--stale <seconds>` adds a grace window after the time to live: an entry older than the time to live but younger than the two together is printed at once, as it is, while the command runs again in the background to replace it. The caller never waits for a slow source that answered recently, and the answer is at most one refresh behind. Only one refresh of an entry runs at a time, guarded by a lock beside the entry, and a refresh that fails keeps the entry it was meant to replace. An entry older than the window is a miss, and the command runs in the foreground as usual. `dybatpho::cache_wait` waits for a refresh to finish.
 - [`dybatpho::cache_prune`](#dybatphocache_prune) — Remove old entries until the namespace fits the limits given. Entries older than `--older-than` go first. Then, while the namespace holds more than `--max-entries` entries or more than `--max-size` bytes, the oldest remaining entry is removed. Oldest means least recently written: an entry's modification time is also its age, so reading an entry cannot mark it as used without making it look fresh, and the entry the cache refreshed longest ago is the one it would refetch first anyway. Like `dybatpho::cache_clear`, only files this module wrote are considered, and only in the current namespace.
+- [`dybatpho::cache_stats`](#dybatphocache_stats) — Describe the current namespace: how many entries it holds, how many bytes they take, how many are still fresh, and how old the oldest and newest are. Freshness is judged against the time to live given, or `DYBATPHO_CACHE_TTL`, the same way `dybatpho::cache_has` judges one entry. Ages are in seconds. A namespace that was never written reports zero everywhere rather than failing, so a report or a metric can always be made. Hits and misses are not counted. `dybatpho::cache_run` is usually called in a command substitution, whose subshell would take any count with it, and a count kept on disk would turn every read into a write.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -491,3 +492,68 @@ dybatpho::cache_prune --max-entries 500 --max-size 50M
 **🔗 See also**
 
 - [- `dybatpho::cache_stats](#dybatphocache_stats)
+
+
+---
+
+### `dybatpho::cache_stats`
+
+Describe the current namespace: how many entries it holds, how
+many bytes they take, how many are still fresh, and how old the oldest and
+newest are.
+Freshness is judged against the time to live given, or
+`DYBATPHO_CACHE_TTL`, the same way `dybatpho::cache_has` judges one entry.
+Ages are in seconds. A namespace that was never written reports zero
+everywhere rather than failing, so a report or a metric can always be made.
+
+Hits and misses are not counted. `dybatpho::cache_run` is usually called in
+a command substitution, whose subshell would take any count with it, and a
+count kept on disk would turn every read into a write.
+
+**🧪 Examples**
+
+```bash
+dybatpho::cache_stats
+# namespace  default
+# directory  /home/me/.cache/dybatpho/default
+# entries    3
+# bytes      1800
+# fresh      1
+# stale      2
+# oldest     7200
+# newest     5
+
+```
+
+```bash
+dybatpho::cache_stats 600 --json | jq .stale
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Optional seconds an entry stays fresh, default is `DYBATPHO_CACHE_TTL` |
+| `$@` | string | Optional `--json`, for one JSON object of the counts instead of aligned lines |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries |
+| **`DYBATPHO_CACHE_NAMESPACE`** | string | Namespace to describe |
+| **`DYBATPHO_CACHE_TTL`** | number | Default time to live |
+
+**📤 Output on stdout**
+
+- The report; the JSON form holds `entries`, `bytes`, `fresh`, `stale`, `oldest_age` and `newest_age`
+
+**🚦 Exit codes**
+
+- `0`: The report was printed
+- `1`: Stop the script when the time to live is not a number of seconds or an option is unknown
+
+**🔗 See also**
+
+- [- `dybatpho::cache_prune](#dybatphocache_prune)

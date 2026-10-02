@@ -351,6 +351,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::cache_prune --older-than 604800 --max-size 50M
   ```
 
+- **`cache` — see what a namespace holds.** `dybatpho::cache_stats` reports
+  the entry count, total bytes, how many entries are fresh and stale against a
+  time to live, and the ages of the oldest and newest, as aligned text or, with
+  `--json`, as one object a dashboard can read.
+
+  ```sh
+  dybatpho::cache_stats 3600 --json   # {"entries":3,"bytes":1800,"fresh":1,...}
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

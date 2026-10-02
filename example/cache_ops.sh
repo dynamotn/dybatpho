@@ -190,6 +190,16 @@ function _demo_prune {
   fi
 }
 
+# @description Describe a namespace, for a report or a metric.
+# @noargs
+function _demo_stats {
+  dybatpho::header "STATISTICS"
+  dybatpho::cache_stats 3600
+  local json
+  json="$(dybatpho::cache_stats 3600 --json)"
+  dybatpho::print "  as JSON: ${json}"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -199,6 +209,7 @@ function _main {
   _demo_staleness
   _demo_stale_while_revalidate
   _demo_namespaces
+  _demo_stats
   _demo_prune
   dybatpho::cache_clear
   dybatpho::success "Cache operations demo complete"

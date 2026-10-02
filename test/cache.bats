@@ -371,3 +371,46 @@ remaining_entries() {
   run --separate-stderr ! dybatpho::cache_prune --max-size 10T
   assert_stderr --partial "is not a size"
 }
+
+@test "dybatpho::cache_stats counts entries, bytes, freshness and ages" {
+  entry_at old "$(printf '%100s' '')" 200001010000
+  entry_at new "$(printf '%20s' '')" 200001010100
+  local newest
+  newest="$(dybatpho::file_mtime "$(dybatpho::cache_path new)")"
+  # A file this module did not write is not an entry.
+  printf 'keep\n' > "$(dybatpho::cache_dir)/not-ours.txt"
+  dybatpho::mock_time "$((newest + 10))"
+  run_traced -0 dybatpho::cache_stats 60 --json
+  assert_output '{"entries":2,"bytes":120,"fresh":1,"stale":1,"oldest_age":3610,"newest_age":10}'
+  # The time to live may follow the option, and decides what counts as fresh.
+  run_traced -0 dybatpho::cache_stats --json 5
+  assert_output --partial '"fresh":0,"stale":2'
+  DYBATPHO_CACHE_TTL=99999 run_traced -0 dybatpho::cache_stats --json
+  assert_output --partial '"fresh":2,"stale":0'
+  run_traced -0 dybatpho::cache_stats 60
+  dybatpho::unmock_time
+  assert_line "namespace  default"
+  assert_line "directory  $(dybatpho::cache_dir)"
+  assert_line "entries    2"
+  assert_line "bytes      120"
+  assert_line "fresh      1"
+  assert_line "stale      1"
+  assert_line "oldest     3610"
+  assert_line "newest     10"
+}
+
+@test "dybatpho::cache_stats reports zero for a namespace never written" {
+  DYBATPHO_CACHE_NAMESPACE=""
+  run_traced -0 dybatpho::cache_stats --json
+  assert_output '{"entries":0,"bytes":0,"fresh":0,"stale":0,"oldest_age":0,"newest_age":0}'
+  run_traced -0 dybatpho::cache_stats
+  assert_line "namespace  (none)"
+  assert_line "entries    0"
+}
+
+@test "dybatpho::cache_stats refuses a malformed time to live or option" {
+  run --separate-stderr ! dybatpho::cache_stats soon
+  assert_stderr --partial "is not a number of seconds"
+  run --separate-stderr ! dybatpho::cache_stats --yaml
+  assert_stderr --partial "Unknown option '--yaml'"
+}

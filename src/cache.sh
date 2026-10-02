@@ -669,3 +669,95 @@ function __dybatpho_cache_prune_remove {
   dybatpho::debug "cache: pruning ${path}"
   rm -f -- "${path}"
 }
+
+#######################################
+# @description Describe the current namespace: how many entries it holds, how
+#   many bytes they take, how many are still fresh, and how old the oldest and
+#   newest are.
+#   Freshness is judged against the time to live given, or
+#   `DYBATPHO_CACHE_TTL`, the same way `dybatpho::cache_has` judges one entry.
+#   Ages are in seconds. A namespace that was never written reports zero
+#   everywhere rather than failing, so a report or a metric can always be made.
+#
+#   Hits and misses are not counted. `dybatpho::cache_run` is usually called in
+#   a command substitution, whose subshell would take any count with it, and a
+#   count kept on disk would turn every read into a write.
+# @example
+#   dybatpho::cache_stats
+#   # namespace  default
+#   # directory  /home/me/.cache/dybatpho/default
+#   # entries    3
+#   # bytes      1800
+#   # fresh      1
+#   # stale      2
+#   # oldest     7200
+#   # newest     5
+#
+# @example
+#   dybatpho::cache_stats 600 --json | jq .stale
+#
+# @arg $1 number Optional seconds an entry stays fresh, default is `DYBATPHO_CACHE_TTL`
+# @arg $@ string Optional `--json`, for one JSON object of the counts instead of aligned lines
+# @env DYBATPHO_CACHE_DIR string Directory holding cache entries
+# @env DYBATPHO_CACHE_NAMESPACE string Namespace to describe
+# @env DYBATPHO_CACHE_TTL number Default time to live
+# @stdout The report; the JSON form holds `entries`, `bytes`, `fresh`, `stale`, `oldest_age` and `newest_age`
+# @exitcode 0 The report was printed
+# @exitcode 1 Stop the script when the time to live is not a number of seconds or an option is unknown
+# @see
+#   - `dybatpho::cache_prune`
+#######################################
+# dyshellint disable=BSG050 the time to live and `--json` may come in either order
+function dybatpho::cache_stats {
+  local ttl="${DYBATPHO_CACHE_TTL}" json=false
+  while (($# > 0)); do
+    case "$1" in
+      --json) json=true ;;
+      # Exercised under `run` by "cache_stats refuses a malformed time to live or option".
+      -*) dybatpho::die "${FUNCNAME[0]}: Unknown option '$1'; expected [ttl] [--json]" ;; # kcov(skip)
+      *) ttl="$1" ;;
+    esac
+    shift
+  done
+  [[ "${ttl}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
+
+  local -a records=()
+  __dybatpho_cache_scan records
+  local now record mtime size path age
+  local entries=0 bytes=0 fresh=0 stale=0 oldest=0 newest=0
+  now="$(date +%s)"
+  for record in "${records[@]}"; do
+    read -r mtime size path <<< "${record}"
+    age=$((now - mtime))
+    ((age >= 0)) || age=0
+    entries=$((entries + 1))
+    bytes=$((bytes + size))
+    if ((age < ttl)); then
+      fresh=$((fresh + 1))
+    else
+      stale=$((stale + 1))
+    fi
+    # Records come oldest first, so the first sets the oldest age and the last
+    # the newest.
+    ((entries > 1)) || oldest="${age}"
+    newest="${age}"
+  done
+
+  if [[ "${json}" == true ]]; then
+    printf '{"entries":%d,"bytes":%d,"fresh":%d,"stale":%d,"oldest_age":%d,"newest_age":%d}\n' \
+      "${entries}" "${bytes}" "${fresh}" "${stale}" "${oldest}" "${newest}"
+    return 0
+  fi
+  local directory
+  directory="$(dybatpho::cache_dir)"
+  printf '%-10s %s\n' \
+    namespace "${DYBATPHO_CACHE_NAMESPACE:-(none)}" \
+    directory "${directory}" \
+    entries "${entries}" \
+    bytes "${bytes}" \
+    fresh "${fresh}" \
+    stale "${stale}" \
+    oldest "${oldest}" \
+    newest "${newest}"
+}

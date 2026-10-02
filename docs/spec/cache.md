@@ -128,6 +128,25 @@ removed.
 4. **Given** `DRY_RUN`, **When** the namespace is pruned, **Then** each
    removal is reported and nothing is removed.
 
+### User Story 7 - See what a cache holds (Priority: P3)
+
+As an operator, I want a summary of a namespace, as text or JSON, so that I can
+decide limits for pruning and feed a dashboard without walking the directory
+myself.
+
+**Independent Test**: Write entries of known sizes and ages, freeze the clock,
+and verify the counts, bytes, freshness, and ages reported.
+
+**Acceptance Scenarios**:
+
+1. **Given** entries of known sizes and ages, **When** the namespace is
+   described against a time to live, **Then** the entry count, total bytes,
+   fresh and stale counts, and oldest and newest ages are reported.
+2. **Given** `--json`, **When** the namespace is described, **Then** the same
+   counts come back as one JSON object.
+3. **Given** a namespace never written, **When** it is described, **Then**
+   every count is zero and the call succeeds.
+
 ### Example Workflow
 
 ```sh
@@ -139,6 +158,7 @@ status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
 dybatpho::cache_wait status 30
 
 dybatpho::cache_prune --older-than 604800 --max-size 50M
+dybatpho::cache_stats 3600 --json
 
 key="$(dybatpho::cache_key "${url}")"
 if ! body="$(dybatpho::cache_get "${key}" 600)"; then
@@ -164,6 +184,7 @@ fi
 - Several entries written within the same second when pruning by count.
 - A size limit with a suffix, in either case, or an unknown one such as `T`.
 - Pruning a namespace that was never written, or is empty.
+- Describing a namespace that was never written, or with the time to live after `--json`.
 
 ## Requirements *(mandatory)*
 
@@ -199,6 +220,8 @@ fi
 - **FR-021**: Entries written within the same second MUST be pruned in the order of their keys, so the result never depends on the file system.
 - **FR-022**: Pruning MUST consider only entries this module wrote in the current namespace, MUST succeed when the namespace does not exist, and MUST report each removal instead of performing it under `DRY_RUN`.
 - **FR-023**: Pruning MUST stop the script when no limit is given, an option is unknown or lacks its value, or a limit is malformed; a size MUST be a number of bytes with an optional binary `K`, `M`, or `G` suffix.
+- **FR-024**: The module MUST describe the current namespace with its entry count, total bytes, counts of fresh and stale entries against a given or default time to live, and the ages of its oldest and newest entries, as aligned text or, with `--json`, as one JSON object with `entries`, `bytes`, `fresh`, `stale`, `oldest_age`, and `newest_age`.
+- **FR-025**: Describing a namespace MUST count only entries this module wrote, MUST report zero everywhere for a namespace never written, and MUST stop the script on a malformed time to live or an unknown option. It MUST NOT count hits and misses.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -219,6 +242,7 @@ fi
 - **SC-005**: The library carries one cache implementation rather than one per module.
 - **SC-006**: A caller with a grace window never waits on the source while a recent answer exists, and the source is asked once per refresh however many callers find the entry stale.
 - **SC-007**: A long-lived cache stays within a stated count, size, or age without a hand-written cleanup.
+- **SC-008**: An operator reads a namespace's size and freshness in one call, in a form a script or dashboard can parse.
 
 ## Integration Tests *(mandatory)*
 
@@ -251,6 +275,9 @@ fi
 - **IT-026**: Verify `DRY_RUN` reports the removal of the oldest entry only and removes nothing.
 - **IT-027**: Verify pruning a namespace that does not exist, and one that is empty, succeeds.
 - **IT-028**: Verify no limit, an unknown option, a missing value, and malformed age, count, and size limits stop the script.
+- **IT-029**: With the clock frozen, verify the JSON and text reports of two entries against several times to live, with the option before and after the time to live, and that a foreign file is not counted.
+- **IT-030**: Verify a namespace never written reports zero in both forms.
+- **IT-031**: Verify a malformed time to live and an unknown option stop the script.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -261,3 +288,4 @@ fi
 5. `src/ai.sh` holds no cache implementation of its own.
 6. With a grace window, an expired entry is answered at once and refreshed once in the background, and a failed refresh keeps it.
 7. Pruning removes the entries written longest ago until the namespace fits its limits.
+8. A namespace can be described in one call, as text or JSON.

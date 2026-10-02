@@ -25,6 +25,11 @@ removed, or given a new value. Both documents are flattened to
 `path<TAB>value` pairs and compared by path, so reordering a document
 changes nothing and a moved key is not reported as a rewrite.
 
+The tree diff walks two directories and reports each entry that was added,
+removed, rewritten, or changed kind, comparing files by content and links
+by target, so a copy with fresh timestamps is no change and a link is never
+followed into whatever it points at.
+
 ### 🌍 Environment
 
 | Variable | Type | Description |
@@ -40,6 +45,7 @@ changes nothing and a moved key is not reported as a rewrite.
 - [`dybatpho::diff_summary`](#dybatphodiff_summary) — Summarize a text comparison as one line. `~K` counts hunks, not changed lines: a unified diff records a rewritten line as one removal and one addition, so calling that a change as well would count it twice.
 - [`dybatpho::diff_json`](#dybatphodiff_json) — Compare two JSON documents by key rather than by line. A reordered or reformatted document reports no change, because the comparison is between the values at each path.
 - [`dybatpho::diff_yaml`](#dybatphodiff_yaml) — Compare two YAML documents by key rather than by line. Both are converted to JSON first, so anchors, quoting style and key order are not reported as changes.
+- [`dybatpho::diff_dir`](#dybatphodiff_dir) — Compare two directory trees entry by entry. Every path under either root is reported once, sorted bytewise so the output is the same on every machine: - `+ path` exists only in the second tree; - `- path` exists only in the first; - `~ path` is a file whose content differs, or a symbolic link whose target differs; - `! path: file -> directory` changed kind between the two trees. A directory's path carries a trailing `/` when it is added or removed, and the entries inside it are reported too, so a removed directory reads as the whole of what went with it. Files are compared by content with `cmp`, so a copy with a new modification time is no change; permissions and ownership are not compared. Symbolic links are compared by target and never followed, so a link into a large tree does not drag that tree in. A path holding a backslash, newline, tab, or carriage return is written with C escapes so each record stays on one line; `--null` prints each record raw and NUL-terminated instead, for a reader that needs the exact name.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -49,8 +55,9 @@ changes nothing and a moved key is not reported as a rewrite.
 <a id="tips"></a>
 ## 💡 Tips
 
-- Every comparison takes a file path, `-` for stdin, or the text itself, and only one side can be stdin
+- Every text and document comparison takes a file path, `-` for stdin, or the text itself, and only one side can be stdin
 - A side that names an existing file is read as that file. Text that could itself be a path -- a command's output, say -- belongs in a file first, or the wrong thing gets compared
+- `dybatpho::diff_dir` takes two directories and needs only `find`, `cmp` and `sort`
 - `dybatpho::diff_text` needs no external command; the structured diffs need `jq`, and `dybatpho::diff_yaml` needs `yq` to reach JSON first
 
 <a id="reference"></a>
@@ -184,3 +191,58 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - `0`: The two documents hold the same values
 - `1`: They differ
 - `127`: `jq` or `yq` is not installed
+
+
+---
+
+### `dybatpho::diff_dir`
+
+Compare two directory trees entry by entry.
+Every path under either root is reported once, sorted bytewise so the
+output is the same on every machine:
+
+- `+ path` exists only in the second tree;
+- `- path` exists only in the first;
+- `~ path` is a file whose content differs, or a symbolic link whose target
+  differs;
+- `! path: file -> directory` changed kind between the two trees.
+
+A directory's path carries a trailing `/` when it is added or removed, and
+the entries inside it are reported too, so a removed directory reads as
+the whole of what went with it. Files are compared by content with `cmp`,
+so a copy with a new modification time is no change; permissions and
+ownership are not compared. Symbolic links are compared by target and never
+followed, so a link into a large tree does not drag that tree in.
+
+A path holding a backslash, newline, tab, or carriage return is written
+with C escapes so each record stays on one line; `--null` prints each
+record raw and NUL-terminated instead, for a reader that needs the exact
+name.
+
+**🧪 Example**
+
+```bash
+dybatpho::diff_dir ./release-1.2 ./release-1.3
+# + bin/new-tool
+# - share/old.conf
+# ~ etc/app.conf
+# ! lib/plugins: file -> directory
+dybatpho::diff_dir --summary ./release-1.2 ./release-1.3   # +1 -1 ~2
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Options, then the first directory |
+| `$2` | string | Second directory |
+
+**📤 Output on stdout**
+
+- One record per difference, or the summary line
+
+**🚦 Exit codes**
+
+- `0`: The two trees hold the same entries with the same content
+- `1`: They differ
+- `2`: Either side is not a directory

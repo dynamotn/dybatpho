@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @file diff_ops.sh
 # @brief Example showing a config change before it is applied
-# @description Demonstrates dybatpho::diff_text, diff_summary, diff_json, and diff_yaml
+# @description Demonstrates dybatpho::diff_text, diff_summary, diff_json, diff_yaml, and diff_dir
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules diff
@@ -106,6 +106,30 @@ function _demo_yaml {
   dybatpho::diff_yaml "${workspace}/current.yaml" "${workspace}/proposed.yaml" || true
 }
 
+# @description Compare two release trees entry by entry.
+# @arg $1 string Workspace path
+function _demo_dir {
+  local workspace
+  dybatpho::expect_args workspace -- "$@"
+
+  dybatpho::header "DIRECTORY"
+  local old="${workspace}/release-1.2" new="${workspace}/release-1.3"
+  mkdir -p "${old}/etc" "${new}/etc" "${new}/bin"
+  cp "${workspace}/current.conf" "${old}/etc/app.conf"
+  cp "${workspace}/proposed.conf" "${new}/etc/app.conf"
+  printf 'unchanged\n' > "${old}/README"
+  printf 'unchanged\n' > "${new}/README"
+  printf 'legacy\n' > "${old}/legacy.sh"
+  printf '#!/bin/sh\n' > "${new}/bin/tool"
+
+  # README holds the same content on both sides, so it is not reported even
+  # though the two files were written at different times.
+  dybatpho::diff_dir "${old}" "${new}" || true
+  local summary
+  summary="$(dybatpho::diff_dir --summary "${old}" "${new}")" || true
+  dybatpho::info "Release change: ${summary}"
+}
+
 # @description Show that comparing something with itself reports nothing.
 # @arg $1 string Workspace path
 function _demo_unchanged {
@@ -127,6 +151,7 @@ function _main {
   _demo_summary "${workspace}"
   _demo_json "${workspace}"
   _demo_yaml "${workspace}"
+  _demo_dir "${workspace}"
   _demo_unchanged "${workspace}"
   dybatpho::success "Diff operations demo complete"
 }

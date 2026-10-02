@@ -22,11 +22,18 @@
 #   removed, or given a new value. Both documents are flattened to
 #   `path<TAB>value` pairs and compared by path, so reordering a document
 #   changes nothing and a moved key is not reported as a rewrite.
-# @tip Every comparison takes a file path, `-` for stdin, or the text itself,
+#
+#   The tree diff walks two directories and reports each entry that was added,
+#   removed, rewritten, or changed kind, comparing files by content and links
+#   by target, so a copy with fresh timestamps is no change and a link is never
+#   followed into whatever it points at.
+# @tip Every text and document comparison takes a file path, `-` for stdin, or the text itself,
 #   and only one side can be stdin
 # @tip A side that names an existing file is read as that file. Text that could
 #   itself be a path -- a command's output, say -- belongs in a file first, or
 #   the wrong thing gets compared
+# @tip `dybatpho::diff_dir` takes two directories and needs only `find`, `cmp`
+#   and `sort`
 # @tip `dybatpho::diff_text` needs no external command; the structured diffs
 #   need `jq`, and `dybatpho::diff_yaml` needs `yq` to reach JSON first
 # @env DYBATPHO_DIFF_COLOR string Force color on or off; the default follows `NO_COLOR` and whether stdout is a terminal
@@ -370,4 +377,205 @@ function dybatpho::diff_yaml {
   dybatpho::yaml_to_json "${second_file}" "${second_json}"
 
   dybatpho::diff_json "${first_json}" "${second_json}"
+}
+
+#######################################
+# @description Collect a directory tree into a named associative array that
+#   maps each entry's path, relative to the root, to its kind: `file`,
+#   `directory`, `symlink`, or `other`.
+#   The walk runs from inside the root, so a root that is itself a symbolic
+#   link to a directory is walked as that directory, and `find` prints the
+#   same `./`-relative paths on GNU, BSD and BusyBox. Entries are read
+#   NUL-separated, which keeps a name holding a newline in one piece.
+# @arg $1 string Name of the associative array to fill
+# @arg $2 string Directory to walk
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_diff_tree_into {
+  local -n __dybatpho_diff_tree_ref="$1"
+  local __dybatpho_diff_root="$2" __dybatpho_diff_entry __dybatpho_diff_full
+
+  while IFS= read -r -d '' __dybatpho_diff_entry; do
+    __dybatpho_diff_entry="${__dybatpho_diff_entry#./}"
+    __dybatpho_diff_full="${__dybatpho_diff_root}/${__dybatpho_diff_entry}"
+    if [[ -L "${__dybatpho_diff_full}" ]]; then
+      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="symlink"
+    elif [[ -d "${__dybatpho_diff_full}" ]]; then
+      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="directory"
+    elif [[ -f "${__dybatpho_diff_full}" ]]; then
+      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="file"
+    else
+      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="other"
+    fi
+  # kcov never records the redirection line of a loop; the body above it runs.
+  done < <(cd -- "${__dybatpho_diff_root}" && find . -mindepth 1 -print0) # kcov(skip)
+}
+
+#######################################
+# @description Render a path on one line, escaping what would break the line.
+#   A backslash, newline, tab, or carriage return is written as its C escape,
+#   so every record stays on one line and a reader can still tell `a\nb` the
+#   name from `a` and `b` the two names.
+# @arg $1 string Path
+# @stdout The escaped path, without a trailing newline
+# @internal
+#######################################
+function __dybatpho_diff_escape_path {
+  local path="$1"
+  path="${path//\\/\\\\}"
+  path="${path//$'\n'/\\n}"
+  path="${path//$'\t'/\\t}"
+  path="${path//$'\r'/\\r}"
+  printf '%s' "${path}"
+}
+
+#######################################
+# @description Print one directory difference.
+# @arg $1 string Output mode: `color`, `plain`, or `null`
+# @arg $2 string Marker: `+`, `-`, `~`, or `!`
+# @arg $3 string Path, relative to the roots
+# @arg $4 string Optional detail printed after the path, such as the two kinds
+# @stdout The formatted record
+# @internal
+#######################################
+function __dybatpho_diff_dir_report {
+  local mode="$1" marker="$2" path="$3" detail="${4-}"
+
+  if [[ "${mode}" == null ]]; then
+    printf '%s %s\0' "${marker}" "${path}"
+    return 0
+  fi
+
+  local body tint escaped
+  escaped="$(__dybatpho_diff_escape_path "${path}")"
+  printf -v body '%s %s%s' "${marker}" "${escaped}" "${detail}"
+  if [[ "${mode}" == plain ]]; then
+    printf '%s\n' "${body}"
+    return 0
+  fi
+
+  case "${marker}" in
+    '+') tint='32' ;;
+    '-') tint='31' ;;
+    '~') tint='33' ;;
+    *) tint='35' ;;
+  esac
+  printf '\033[%sm%s\033[0m\n' "${tint}" "${body}"
+}
+
+#######################################
+# @description Compare two directory trees entry by entry.
+#   Every path under either root is reported once, sorted bytewise so the
+#   output is the same on every machine:
+#
+#   - `+ path` exists only in the second tree;
+#   - `- path` exists only in the first;
+#   - `~ path` is a file whose content differs, or a symbolic link whose target
+#     differs;
+#   - `! path: file -> directory` changed kind between the two trees.
+#
+#   A directory's path carries a trailing `/` when it is added or removed, and
+#   the entries inside it are reported too, so a removed directory reads as
+#   the whole of what went with it. Files are compared by content with `cmp`,
+#   so a copy with a new modification time is no change; permissions and
+#   ownership are not compared. Symbolic links are compared by target and never
+#   followed, so a link into a large tree does not drag that tree in.
+#
+#   A path holding a backslash, newline, tab, or carriage return is written
+#   with C escapes so each record stays on one line; `--null` prints each
+#   record raw and NUL-terminated instead, for a reader that needs the exact
+#   name.
+# @arg $1 string Options, then the first directory
+# @arg $2 string Second directory
+# @opt --summary, -s Print one `+A -R ~M` line instead, the `diff_summary` shape; a change of kind counts in `~`
+# @opt --null, -z Terminate each record with NUL instead of a newline, uncolored and unescaped
+# @stdout One record per difference, or the summary line
+# @exitcode 0 The two trees hold the same entries with the same content
+# @exitcode 1 They differ
+# @exitcode 2 Either side is not a directory
+# @example
+#   dybatpho::diff_dir ./release-1.2 ./release-1.3
+#   # + bin/new-tool
+#   # - share/old.conf
+#   # ~ etc/app.conf
+#   # ! lib/plugins: file -> directory
+#   dybatpho::diff_dir --summary ./release-1.2 ./release-1.3   # +1 -1 ~2
+#######################################
+function dybatpho::diff_dir {
+  local summary=0 mode=plain
+  while (($#)); do
+    case "$1" in
+      --summary | -s) summary=1 ;;
+      --null | -z) mode=null ;;
+      --)
+        shift
+        break
+        ;;
+      *) break ;;
+    esac
+    shift
+  done
+
+  local first second
+  dybatpho::expect_args first second -- "$@"
+  # `diff` itself answers 2 for trouble, which keeps "could not compare" apart
+  # from the 1 that means "they differ".
+  dybatpho::is dir "${first}" \
+    || dybatpho::die "${FUNCNAME[0]}: Not a directory: ${first}" 2
+  dybatpho::is dir "${second}" \
+    || dybatpho::die "${FUNCNAME[0]}: Not a directory: ${second}" 2
+
+  if [[ "${mode}" == plain ]] && __dybatpho_diff_wants_color; then
+    mode=color
+  fi
+
+  local -A before=() after=()
+  __dybatpho_diff_tree_into before "${first}"
+  __dybatpho_diff_tree_into after "${second}"
+
+  local -a paths=()
+  local path
+  for path in "${!before[@]}" "${!after[@]}"; do
+    paths+=("${path}")
+  done
+
+  local added=0 removed=0 changed=0 old new
+  while IFS= read -r -d '' path; do
+    old="${before[${path}]-}"
+    new="${after[${path}]-}"
+
+    if [[ -z "${old}" ]]; then
+      added=$((added + 1))
+      ((summary)) && continue
+      [[ "${new}" != directory ]] || path+="/"
+      __dybatpho_diff_dir_report "${mode}" '+' "${path}"
+    elif [[ -z "${new}" ]]; then
+      removed=$((removed + 1))
+      ((summary)) && continue
+      [[ "${old}" != directory ]] || path+="/"
+      __dybatpho_diff_dir_report "${mode}" '-' "${path}"
+    elif [[ "${old}" != "${new}" ]]; then
+      changed=$((changed + 1))
+      ((summary)) && continue
+      __dybatpho_diff_dir_report "${mode}" '!' "${path}" ": ${old} -> ${new}"
+    elif [[ "${old}" == file ]]; then
+      cmp -s -- "${first}/${path}" "${second}/${path}" && continue
+      changed=$((changed + 1))
+      ((summary)) && continue
+      __dybatpho_diff_dir_report "${mode}" '~' "${path}"
+    elif [[ "${old}" == symlink ]]; then
+      old="$(readlink -- "${first}/${path}")" || true
+      new="$(readlink -- "${second}/${path}")" || true
+      [[ "${old}" != "${new}" ]] || continue
+      changed=$((changed + 1))
+      ((summary)) && continue
+      __dybatpho_diff_dir_report "${mode}" '~' "${path}"
+    fi
+  # kcov never records the redirection line of a loop; the body above it runs.
+  done < <(((${#paths[@]})) && printf '%s\0' "${paths[@]}" | LC_ALL=C sort -z -u) # kcov(skip)
+
+  ((summary)) && printf '+%s -%s ~%s\n' "${added}" "${removed}" "${changed}"
+  ((added + removed + changed == 0)) && return 0
+  return 1
 }

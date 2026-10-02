@@ -274,6 +274,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   dybatpho::csv_sort billing.csv cost desc | dybatpho::table_from_csv - box
   dybatpho::table_from_json pods.json markdown >> report.md
+- **`diff` — compare two directory trees.** `dybatpho::diff_dir` walks two
+  directories and prints one record per entry that changed, sorted by path:
+  `+` for an entry only in the second tree, `-` for one only in the first, `~`
+  for a file whose content or a link whose target differs, and `!` for an entry
+  that changed kind (`! plugins: file -> directory`). Files are compared by
+  content, so a copy with fresh timestamps is no change, and links are never
+  followed. A name holding a newline or a backslash is escaped onto one line,
+  and `--null` prints every record raw and NUL-terminated instead.
+  `--summary` reduces the comparison to the `+A -R ~M` line
+  `dybatpho::diff_summary` prints. The exit code is 0 when the trees match, 1
+  when they differ, and 2 when a side is not a directory.
+
+  ```sh
+  dybatpho::diff_dir ./release-1.2 ./release-1.3
+  dybatpho::diff_dir --summary /srv/www /mnt/restore/www   # +3 -1 ~2
   ```
 
 ### Fixed

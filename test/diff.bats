@@ -197,3 +197,145 @@ SCRIPT
   assert_stderr --partial "+${BATS_TEST_TMPDIR}/named"
   refute_stderr --partial "the contents of the named file"
 }
+
+# Two trees that differ in every way `dybatpho::diff_dir` reports: an added
+# file and directory, a removed file, a rewritten file, a retargeted link, and
+# an entry that changed kind. `same.txt` keeps its content but not its
+# modification time, which must not count as a change.
+make_trees() {
+  OLD="${BATS_TEST_TMPDIR}/old tree"
+  NEW="${BATS_TEST_TMPDIR}/new tree"
+  mkdir -p "${OLD}/etc" "${NEW}/etc" "${NEW}/bin"
+  printf 'same\n' > "${OLD}/same.txt"
+  printf 'same\n' > "${NEW}/same.txt"
+  touch -t 202001010000 "${OLD}/same.txt"
+  printf 'port=80\n' > "${OLD}/etc/app.conf"
+  printf 'port=443\n' > "${NEW}/etc/app.conf"
+  printf 'old\n' > "${OLD}/gone.txt"
+  printf 'tool\n' > "${NEW}/bin/tool"
+  printf 'plugin\n' > "${OLD}/plugins"
+  mkdir "${NEW}/plugins"
+  ln -s same.txt "${OLD}/current"
+  ln -s etc/app.conf "${NEW}/current"
+}
+
+@test "dybatpho::diff_dir reports added, removed, modified and retyped entries" {
+  make_trees
+  run_traced -1 dybatpho::diff_dir "${OLD}" "${NEW}"
+  assert_output << EOF
++ bin/
++ bin/tool
+~ current
+~ etc/app.conf
+- gone.txt
+! plugins: file -> directory
+EOF
+}
+
+@test "dybatpho::diff_dir says nothing and succeeds for trees with the same content" {
+  make_trees
+  run_traced -0 dybatpho::diff_dir "${OLD}" "${OLD}"
+  assert_output ""
+
+  # Copies with fresh modification times hold the same content.
+  cp -R "${OLD}" "${BATS_TEST_TMPDIR}/copy"
+  touch "${BATS_TEST_TMPDIR}/copy/same.txt"
+  run_traced -0 dybatpho::diff_dir "${OLD}" "${BATS_TEST_TMPDIR}/copy"
+  assert_output ""
+}
+
+@test "dybatpho::diff_dir --summary counts the changes in the diff_summary shape" {
+  make_trees
+  run_traced -1 dybatpho::diff_dir --summary "${OLD}" "${NEW}"
+  assert_output "+2 -1 ~3"
+
+  run_traced -0 dybatpho::diff_dir -s "${OLD}" "${OLD}"
+  assert_output "+0 -0 ~0"
+}
+
+@test "dybatpho::diff_dir reports a whole removed directory and an empty one" {
+  mkdir -p "${BATS_TEST_TMPDIR}/a/logs/old" "${BATS_TEST_TMPDIR}/a/empty" "${BATS_TEST_TMPDIR}/b"
+  printf 'x\n' > "${BATS_TEST_TMPDIR}/a/logs/old/1.log"
+
+  run_traced -1 dybatpho::diff_dir "${BATS_TEST_TMPDIR}/a" "${BATS_TEST_TMPDIR}/b"
+  assert_output << EOF
+- empty/
+- logs/
+- logs/old/
+- logs/old/1.log
+EOF
+}
+
+@test "dybatpho::diff_dir escapes an awkward name and prints it raw with --null" {
+  local first="${BATS_TEST_TMPDIR}/a" second="${BATS_TEST_TMPDIR}/b"
+  mkdir -p "${first}" "${second}"
+  printf 'x\n' > "${second}/two"$'\n'"lines"
+  printf 'x\n' > "${second}/back\\slash and space"
+
+  run_traced -1 dybatpho::diff_dir "${first}" "${second}"
+  assert_output << 'EOF'
++ back\\slash and space
++ two\nlines
+EOF
+
+  local -a records=()
+  local record
+  while IFS= read -r -d '' record; do
+    records+=("${record}")
+  done < <(dybatpho::diff_dir --null "${first}" "${second}" || true)
+  assert_equal "${#records[@]}" 2
+  assert_equal "${records[1]}" "+ two"$'\n'"lines"
+}
+
+@test "dybatpho::diff_dir compares links by target and never follows them" {
+  local first="${BATS_TEST_TMPDIR}/a" second="${BATS_TEST_TMPDIR}/b"
+  mkdir -p "${first}" "${second}" "${BATS_TEST_TMPDIR}/big"
+  printf 'x\n' > "${BATS_TEST_TMPDIR}/big/inside"
+  ln -s "${BATS_TEST_TMPDIR}/big" "${first}/link"
+  ln -s "${BATS_TEST_TMPDIR}/big" "${second}/link"
+
+  run_traced -0 dybatpho::diff_dir "${first}" "${second}"
+  assert_output ""
+}
+
+@test "dybatpho::diff_dir walks a root given through a link or with a trailing slash" {
+  make_trees
+  ln -s "${NEW}" "${BATS_TEST_TMPDIR}/latest"
+  run_traced -1 dybatpho::diff_dir --summary "${OLD}/" "${BATS_TEST_TMPDIR}/latest"
+  assert_output "+2 -1 ~3"
+}
+
+@test "dybatpho::diff_dir compares a special file by kind alone" {
+  local first="${BATS_TEST_TMPDIR}/a" second="${BATS_TEST_TMPDIR}/b"
+  mkdir -p "${first}" "${second}"
+  mkfifo "${first}/pipe" "${second}/pipe"
+  printf 'x\n' > "${second}/sock"
+  mkfifo "${first}/sock"
+
+  run_traced -1 dybatpho::diff_dir "${first}" "${second}"
+  assert_output "! sock: other -> file"
+}
+
+@test "dybatpho::diff_dir colors each kind of change differently" {
+  make_trees
+  DYBATPHO_DIFF_COLOR=true run_traced -1 dybatpho::diff_dir "${OLD}" "${NEW}"
+  assert_output --partial $'\033[32m+ bin/tool\033[0m'
+  assert_output --partial $'\033[31m- gone.txt\033[0m'
+  assert_output --partial $'\033[33m~ etc/app.conf\033[0m'
+  assert_output --partial $'\033[35m! plugins: file -> directory\033[0m'
+}
+
+@test "dybatpho::diff_dir refuses a side that is not a directory" {
+  mkdir -p "${BATS_TEST_TMPDIR}/dir"
+  # `dybatpho::die` ends the shell, so these use `run`.
+  run -2 dybatpho::diff_dir "${FIRST}" "${BATS_TEST_TMPDIR}/dir"
+  assert_output --partial "Not a directory: ${FIRST}"
+  run -2 dybatpho::diff_dir "${BATS_TEST_TMPDIR}/dir" "${BATS_TEST_TMPDIR}/missing"
+  assert_output --partial "Not a directory: ${BATS_TEST_TMPDIR}/missing"
+}
+
+@test "dybatpho::diff_dir takes the directories after an end-of-options marker" {
+  make_trees
+  run_traced -1 dybatpho::diff_dir --summary -- "${OLD}" "${NEW}"
+  assert_output "+2 -1 ~3"
+}

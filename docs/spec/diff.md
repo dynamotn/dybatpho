@@ -6,13 +6,14 @@
 
 ## Problem Statement *(mandatory)*
 
-Showing a user what changed is something scripts keep doing and keep doing differently. One shells out to `diff` with its own flags, another to `jq`, and `dybatpho::assert_snapshot` dumped whatever `diff -u` printed, uncolored and unlike every other message the library produces. Two problems sit underneath that: `diff --color` is GNU-only, so a script that wants colored output cannot simply ask for it, and a line diff of JSON or YAML reports reformatting and key reordering as changes, burying the one value that actually moved.
+Showing a user what changed is something scripts keep doing and keep doing differently. One shells out to `diff` with its own flags, another to `jq`, and `dybatpho::assert_snapshot` dumped whatever `diff -u` printed, uncolored and unlike every other message the library produces. Comparing two directory trees -- a release against the last one, a backup against the live data -- is the same problem again, solved with `diff -r`, whose output differs between GNU, BSD and BusyBox and which follows symbolic links into whatever they point at. Two problems sit underneath that: `diff --color` is GNU-only, so a script that wants colored output cannot simply ask for it, and a line diff of JSON or YAML reports reformatting and key reordering as changes, burying the one value that actually moved.
 
 ## Business Value *(mandatory)*
 
 - One place decides how a comparison is rendered, so a snapshot failure and a config preview read alike.
 - Colored output works on GNU, BSD and BusyBox, because the coloring is done here rather than asked of `diff`.
 - A structured comparison answers "which keys changed" instead of "which lines moved".
+- A tree comparison answers "which entries were added, removed, rewritten or retyped" the same way on every platform, without following links.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -72,6 +73,24 @@ As a test author, I want a snapshot mismatch rendered the way every other compar
 1. **Given** a snapshot that does not match, **When** the assertion fails, **Then** the difference is rendered through this module with `snapshot` and `actual` as the labels
 2. **Given** captured text that happens to name an existing file, **When** the assertion fails, **Then** the text is compared, not that file's contents
 
+---
+
+### User Story 5 - Compare two directory trees (Priority: P2)
+
+As an operator, I want two directory trees compared entry by entry so that I can see what a release, a sync or a restore would add, remove or rewrite.
+
+**Independent Test**: Build two trees that differ by an added, removed, rewritten, relinked and retyped entry, compare them, and verify each record, the summary and the exit code.
+
+**Acceptance Scenarios**:
+
+1. **Given** two trees, **When** they are compared, **Then** each added, removed, modified and retyped entry is printed once, sorted bytewise by path, and the call reports a difference
+2. **Given** two trees whose files hold the same content with different modification times, **When** they are compared, **Then** nothing is printed and the call succeeds
+3. **Given** `--summary`, **When** the trees are compared, **Then** one `+A -R ~M` line is printed in the shape of the text summary, with a change of kind counted in `~`
+4. **Given** a removed directory, **When** the trees are compared, **Then** the directory is reported with a trailing `/` together with every entry inside it
+5. **Given** a name holding a newline, tab, carriage return or backslash, **When** the trees are compared, **Then** it is printed with C escapes on one line, and `--null` prints it raw, NUL-terminated
+6. **Given** a symbolic link, **When** the trees are compared, **Then** its target is compared and it is never followed
+7. **Given** a side that is not a directory, **When** the trees are compared, **Then** the call stops with exit code 2
+
 ### Example Workflow
 
 ```bash
@@ -86,6 +105,10 @@ fi
 # Which keys moved between two states, ignoring how they were written.
 dybatpho::diff_json state-before.json state-after.json
 dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
+
+# What a release changes on disk, and the same in one line.
+dybatpho::diff_dir ./release-1.2 ./release-1.3 || true
+dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 ```
 
 ## Edge Cases
@@ -96,6 +119,10 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - The whole document is a scalar rather than an object.
 - Output is not a terminal, or `NO_COLOR` is set.
 - `jq` is not installed and a structured comparison is asked for.
+- A tree holds an empty directory, a symbolic link to a large tree, a FIFO, or a name with spaces, a newline or a backslash.
+- A tree root is given with a trailing slash or through a symbolic link.
+- An entry is a file in one tree and a directory in the other.
+- A side of a tree comparison is missing or is a file.
 
 ## Requirements *(mandatory)*
 
@@ -119,11 +146,21 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - **FR-016**: A YAML comparison MUST convert both documents to JSON before comparing them.
 - **FR-017**: `dybatpho::assert_snapshot` MUST render a mismatch through this module, comparing the captured text rather than any file that text may name.
 
+- **FR-018**: A tree comparison MUST report every entry present in only one tree as added or removed, a file whose content differs or a link whose target differs as modified, and an entry whose kind differs as retyped with both kinds named.
+- **FR-019**: Files MUST be compared by content, so modification time, permissions and ownership are not differences.
+- **FR-020**: Symbolic links MUST be compared by target and MUST NOT be followed; a root given through a link or with a trailing slash MUST be walked as the directory it names.
+- **FR-021**: Records MUST be sorted bytewise by path, an added or removed directory MUST carry a trailing `/`, and the entries inside it MUST be reported as well.
+- **FR-022**: A path holding a backslash, newline, tab or carriage return MUST be printed with C escapes in line output, and `--null` MUST print every record raw and NUL-terminated, without color.
+- **FR-023**: `--summary` MUST print one `+A -R ~M` line in place of the records, counting a change of kind in `~`.
+- **FR-024**: A tree comparison MUST return zero when the trees match, one when they differ, and MUST stop with two when either side is not a directory.
+- **FR-025**: Tree records MUST follow the same coloring decision as the other comparisons, with additions, removals, modifications and changes of kind colored distinctly.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Side**: One of the two things compared: a file, stdin, or literal text.
 - **Leaf**: A scalar or empty container in a structured document, addressed by its path.
 - **Hunk**: One contiguous region of change in a unified diff.
+- **Entry**: A path under a tree root, with its kind: `file`, `directory`, `symlink`, or `other`.
 
 ## Success Criteria *(mandatory)*
 
@@ -133,6 +170,7 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - **SC-002**: A reordered or reformatted document reports no change.
 - **SC-003**: A snapshot failure reads like the library's other comparisons.
 - **SC-004**: A change can be reduced to one line for a log or a pull request comment.
+- **SC-005**: Two directory trees compare to the same records on GNU, BSD and BusyBox, whatever their names contain.
 
 ## Integration Tests *(mandatory)*
 
@@ -154,9 +192,20 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - **IT-016**: Report when `jq` is not installed.
 - **IT-017**: Render a snapshot mismatch through this module, with `snapshot` and `actual` as labels.
 - **IT-018**: Compare captured text that names an existing file as text.
+- **IT-019**: Report added, removed, modified and retyped entries of two trees, sorted by path.
+- **IT-020**: Report nothing for trees with the same content, including copies with fresh modification times.
+- **IT-021**: Summarize a tree comparison as `+A -R ~M`, and report zero counts for identical trees.
+- **IT-022**: Report a removed directory with everything inside it, and an empty directory.
+- **IT-023**: Escape a name holding a newline or a backslash, and print it raw with `--null`.
+- **IT-024**: Compare links by target without following them.
+- **IT-025**: Walk a root given with a trailing slash or through a link.
+- **IT-026**: Compare a special file by kind alone.
+- **IT-027**: Color each kind of tree change distinctly.
+- **IT-028**: Stop with exit code 2 when a side is not a directory.
+- **IT-029**: Take the directories after an end-of-options marker.
 
 ## Acceptance Criteria *(mandatory)*
 
-1. The text comparison needs no external command beyond `diff`; only the structured comparisons ask for `jq`, and YAML additionally for `yq`.
+1. The text and tree comparisons need no external command beyond `diff`, `find`, `cmp` and `sort`; only the structured comparisons ask for `jq`, and YAML additionally for `yq`.
 2. Exit codes make the helpers usable in a conditional, so a script can act only when something changed.
 3. Structured comparison is built on one flattening filter rather than one per backend, which is why it requires `jq` rather than accepting either JSON tool.

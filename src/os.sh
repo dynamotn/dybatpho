@@ -296,11 +296,28 @@ function dybatpho::cpu_count {
 #######################################
 function dybatpho::is_tty {
   local stream="${1:-stdout}"
+  __dybatpho_os_assert_stream "${stream}"
   case "${stream}" in
     stdin | 0) [[ -t 0 ]] ;;
     stdout | 1) [[ -t 1 ]] ;;
-    stderr | 2) [[ -t 2 ]] ;;
-    *) dybatpho::die "${FUNCNAME[0]}: Stream must be stdin, stdout, or stderr, got '${stream}'" ;;
+    *) [[ -t 2 ]] ;;
+  esac
+}
+
+#######################################
+# @description Die unless a name is one of the three standard streams.
+#
+#   Called rather than substituted, so `dybatpho::die` ends the caller instead
+#   of a subshell of it. The name it reports is the function that asked, which
+#   is the one the caller wrote.
+# @arg $1 string Stream name to check
+# @exitcode 0 The name is a standard stream
+# @internal
+#######################################
+function __dybatpho_os_assert_stream {
+  case "$1" in
+    stdin | stdout | stderr | 0 | 1 | 2) ;;
+    *) dybatpho::die "${FUNCNAME[1]}: Stream must be stdin, stdout, or stderr, got '$1'" ;;
   esac
 }
 
@@ -331,6 +348,11 @@ function dybatpho::is_tty {
 function dybatpho::color_supported {
   local stream="${1:-stdout}"
 
+  # The name is judged before the environment answers: `NO_COLOR` is set on
+  # every run without a terminal, and a stream this function does not know
+  # would come back from there as a quiet "no colour" rather than as the
+  # error `dybatpho::is_tty` raises for the same argument.
+  __dybatpho_os_assert_stream "${stream}"
   [[ -z "${NO_COLOR:-}" ]] || return 1
   [[ -z "${FORCE_COLOR:-}" ]] || return 0
   [[ "${TERM:-}" != "dumb" ]] || return 1

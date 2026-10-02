@@ -176,17 +176,9 @@ function dybatpho::lock_is_alive {
   dybatpho::expect_args lock_path -- "$@"
   __dybatpho_lock_exists "${lock_path}" || return 1
 
-  local pid host
-  pid="$(dybatpho::lock_field "${lock_path}" pid)"
-  host="$(dybatpho::lock_field "${lock_path}" host)"
-
-  [[ -n "${pid}" ]] || return 1
-  # A lock recorded on a different host can't be checked for liveness locally,
-  # so conservatively treat it as still held.
-  if [[ -n "${host}" && "${host}" != "$(dybatpho::lock_hostname)" ]]; then
-    return 0
-  fi
-  kill -0 "${pid}" > /dev/null 2>&1
+  local holder
+  holder="$(__dybatpho_lock_identity "${lock_path}")"
+  __dybatpho_lock_holder_alive "${lock_path}" "${holder}"
 }
 
 #######################################
@@ -254,8 +246,19 @@ function dybatpho::lock_reclaim_stale {
 
   local holder pid
   holder="$(__dybatpho_lock_identity "${lock_path}")"
-  dybatpho::lock_is_alive "${lock_path}" && return 0
-  pid="$(dybatpho::lock_field "${lock_path}" pid)"
+  # The holder released it between the two reads, so there is nothing to
+  # reclaim. Going on would judge a lock this call never saw: the name is
+  # empty for a moment, reads as dead, and is moved aside the instant the next
+  # process claims it, leaving two processes holding the same lock.
+  [[ -n "${holder}" ]] || return 0
+  # Judge the holder that was read, not whatever holds the name by the time
+  # the check runs, for the same reason.
+  __dybatpho_lock_holder_alive "${lock_path}" "${holder}" && return 0
+  pid="${holder%%:*}"
+
+  # Another reclaimer may have finished between the judgement and here and
+  # put a live lock in its place; that one is not stale.
+  [[ "$(__dybatpho_lock_identity "${lock_path}")" == "${holder}" ]] || return 0
 
   # A name no other process can be moving a lock to: two reclaimers of the same
   # lock must not collide on the destination, or the rename would succeed for
@@ -265,7 +268,7 @@ function dybatpho::lock_reclaim_stale {
 
   local moved
   moved="$(__dybatpho_lock_identity "${aside}")"
-  if [[ -n "${holder}" && "${moved}" != "${holder}" ]]; then
+  if [[ "${moved}" != "${holder}" ]]; then
     # Someone reclaimed and re-took the lock while this call was deciding, so
     # what was moved aside is a live lock. Put it back if the name is still
     # free; `ln -s` refuses to replace an existing name, so a third holder is
@@ -281,6 +284,38 @@ function dybatpho::lock_reclaim_stale {
   dybatpho::warn "Reclaiming stale lock ${lock_path} (pid ${pid} is no longer running)"
   # `rm` on a symbolic link removes the link, never what it points at.
   rm -rf -- "${aside}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" > /dev/null 2>&1 || true
+}
+
+#######################################
+# @description Return success when the holder named by an identity, as
+#   `__dybatpho_lock_identity` printed it, is still alive on this host. It
+#   reads the pid and host out of the identity rather than out of the lock, so
+#   the answer is about that holder even when the lock has since changed hands.
+# @arg $1 string Lock path, for the host of a lock in the directory form
+# @arg $2 string Identity of the holder
+# @exitcode 0 The holder is alive, or recorded on another host
+# @exitcode 1 The holder is gone
+# @internal
+#######################################
+function __dybatpho_lock_holder_alive {
+  local lock_path="$1" identity="$2" pid host
+  if [[ "${identity}" == *:* ]]; then
+    pid="${identity%%:*}"
+    host="${identity#*:}"
+    host="${host%%:*}"
+  else
+    # The directory form records the pid alone, with the host in a file beside it.
+    pid="${identity}"
+    host="$(dybatpho::lock_field "${lock_path}" host)"
+  fi
+
+  [[ -n "${pid}" ]] || return 1
+  # A lock recorded on a different host can't be checked for liveness locally,
+  # so conservatively treat it as still held.
+  if [[ -n "${host}" && "${host}" != "$(dybatpho::lock_hostname)" ]]; then
+    return 0
+  fi
+  kill -0 "${pid}" > /dev/null 2>&1
 }
 
 #######################################

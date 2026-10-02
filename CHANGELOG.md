@@ -496,6 +496,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name the wrong backup and `--keep-count` could prune the newest one. The
   same-second suffix is now compared as a number, whatever the locale.
 
+- **`lock` — reclaiming a stale lock no longer steals one that just changed
+  hands.** When a holder released its lock while another process was checking
+  it, the empty name read as a dead holder, and the lock the next process
+  claimed a moment later was moved aside and deleted. Both processes then held
+  the same lock, and a semaphore could let more holders in than it has slots.
+  The check now judges the holder it actually read, and leaves a lock alone
+  once its holder has changed.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

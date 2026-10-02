@@ -169,6 +169,8 @@ dybatpho::lock_semaphore_holders downloads 4
 - The lock is held by a process on a different host, whose liveness cannot be
   checked locally.
 - The lock records a pid that no longer exists, or records no pid at all.
+- The holder releases the lock while another process is judging it, and a
+  third process claims it before the judgement is acted on.
 - `lock_release` is called for a lock that was never acquired.
 - `lock_release` is called for a lock owned by a different, still-live process.
 - `lock_info` is called for a lock that is not held.
@@ -253,6 +255,10 @@ dybatpho::lock_semaphore_holders downloads 4
   command's exit code — for one slot of a semaphore.
 - **FR-026**: A slot count outside `1`..`9999`, a slot number outside the
   semaphore, or a non-numeric timeout MUST stop the script.
+- **FR-027**: Reclaiming MUST judge the holder it read rather than whatever
+  holds the name when the check runs, MUST leave the lock alone when it was
+  released before its holder could be read, and MUST NOT move aside a lock
+  whose holder changed after it was judged stale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -323,6 +329,8 @@ dybatpho::lock_semaphore_holders downloads 4
   and give the slot back.
 - **IT-022**: Fail `with_semaphore` when no slot frees up, and reject a missing
   `--` or command.
+- **IT-023**: Leave alone, without a reclaim notice, a lock released during the
+  check and claimed by the next process.
 
 ## Acceptance Criteria *(mandatory)*
 

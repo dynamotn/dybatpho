@@ -193,6 +193,43 @@ teardown() {
   rm -rf "${lock_path}"
 }
 
+@test "dybatpho::lock_reclaim_stale leaves alone a lock handed over during the check" {
+  # The race this pins: the holder releases between the reclaimer's reads, the
+  # name is empty for a moment, and the next process claims it. Judging the
+  # empty name as a dead holder moved the new claim aside and deleted it, and
+  # two processes then held the same lock. The stubs replay that order: the
+  # release lands on the first read, and the next claim on any read after it.
+  sleep 120 &
+  local next_pid=$!
+  local lock_path claim
+  lock_path="$(dybatpho::lock_path "handover")"
+  claim="${next_pid}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z"
+  ln -s "$$:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${lock_path}"
+
+  local reads="${BATS_TEST_TMPDIR}/reads"
+  : > "${reads}"
+  eval "__dybatpho_lock_original_identity() $(declare -f __dybatpho_lock_identity | tail -n +2)"
+  __dybatpho_lock_identity() {
+    printf '.' >> "${reads}"
+    if [[ "$(< "${reads}")" == "." ]]; then
+      rm -f -- "${lock_path}"
+      return 0
+    fi
+    __dybatpho_lock_original_identity "$@"
+  }
+  dybatpho::lock_field() {
+    ln -s "${claim}" "${lock_path}" 2> /dev/null || true
+  }
+
+  run_traced --separate-stderr dybatpho::lock_reclaim_stale "${lock_path}"
+  assert_success
+  ln -s "${claim}" "${lock_path}" 2> /dev/null || true
+  assert_equal "$(readlink "${lock_path}")" "${claim}"
+  assert_equal "${stderr}" ""
+
+  kill "${next_pid}" 2> /dev/null || true
+}
+
 @test "dybatpho::lock_reclaim_stale removes a dead lock and leaves a live one alone" {
   local stale_path live_path
   stale_path="$(dybatpho::lock_path "reclaim-stale")"

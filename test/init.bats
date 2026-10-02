@@ -106,7 +106,7 @@ loaded_line() {
   assert_output "string os logging helpers process file secret json math csv table text "
 
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network notification "
+  assert_output "string os logging helpers process file secret json network validate notification "
 
   # `testing` renders a snapshot mismatch through `diff`, so it comes along.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"

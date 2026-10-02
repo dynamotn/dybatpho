@@ -443,6 +443,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
   ```
 
+- **`notification` — email through the local MTA.** `dybatpho::notify_email`
+  sends a plain-text message to comma-separated recipients through whatever
+  `sendmail` the host has — Postfix, Exim, OpenSMTPD, msmtp — looking in
+  `/usr/sbin` and `/usr/lib` too, or using `DYBATPHO_SENDMAIL`. The sender is
+  an argument or `DYBATPHO_EMAIL_FROM`. Recipients go to `sendmail` as
+  arguments rather than being read from the headers, and a line break in a
+  recipient, the sender or the subject is refused, so text from a variable
+  cannot add a header or a recipient. A subject in any language is encoded for
+  the header, the body is sent as UTF-8, and a line holding a single `.` does
+  not cut the message short. With no `sendmail` it fails with exit code `127`;
+  `DRY_RUN` prints the command and sends nothing.
+
+  ```sh
+  dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

@@ -129,6 +129,30 @@ that the application token is sent outside the argument vector.
 3. **Given** a priority outside `0`-`10` or a server URL without a scheme,
    **When** `notify_gotify` runs, **Then** it fails before making a request
 
+### User Story 7 - Email an alert through the local MTA (Priority: P2)
+
+As an administrator of a server with a mail transfer agent, I want to send a
+plain-text email from a cron job so that an alert reaches people who are not on
+any chat platform.
+
+**Independent Test**: Point `DYBATPHO_SENDMAIL` at a fake that records its
+arguments and the message, and verify both, along with every refusal.
+
+**Acceptance Scenarios**:
+
+1. **Given** recipients, a subject and a body, **When** `notify_email` runs,
+   **Then** `sendmail -i --` receives each recipient as an argument and the
+   message carries `To`, `Subject`, MIME headers, a blank line and the body
+2. **Given** a sender argument or `DYBATPHO_EMAIL_FROM`, **When**
+   `notify_email` runs, **Then** the message carries a `From` header
+3. **Given** a subject that is not ASCII, **When** `notify_email` runs, **Then**
+   the subject is RFC 2047 encoded without splitting a character
+4. **Given** a line break in the recipients, sender or subject, or an address
+   that is not an email address or starts with `-`, **When** `notify_email`
+   runs, **Then** it fails before running `sendmail`
+5. **Given** no sendmail command is found, **When** `notify_email` runs,
+   **Then** it fails with exit code `127`
+
 ### Example Workflow
 
 ```bash
@@ -157,6 +181,9 @@ fi
 - An ntfy topic with characters ntfy refuses, a server URL with no scheme or a
   trailing slash, a priority outside 1-5, or tags with spaces and empty items.
 - A Gotify priority outside 0-10, or a Gotify server URL with a trailing slash.
+- An email recipient list with spaces and empty items, an address that starts
+  with `-`, a line break meant to add a header, a body line holding only `.`,
+  a long subject in a non-Latin script, or `sendmail` outside the user's PATH.
 
 ## Requirements *(mandatory)*
 
@@ -207,6 +234,22 @@ fi
   `DYBATPHO_GOTIFY_TOKEN` sent as an out-of-band `X-Gotify-Key` header.
 - **FR-018**: `notify_gotify` MUST reject a priority outside `0`-`10` and a
   server URL that is not `http(s)` before making a request.
+- **FR-019**: `notify_email` MUST run `sendmail -i --` with every trimmed,
+  non-empty recipient as an argument, and write a message of `From` (when a
+  sender is given or `DYBATPHO_EMAIL_FROM` is set), `To`, `Subject`,
+  `MIME-Version`, a UTF-8 plain-text `Content-Type`, `8bit` transfer encoding,
+  a blank line and the body to its standard input.
+- **FR-020**: `notify_email` MUST refuse a line break in the recipients, the
+  sender or the subject, and any recipient or sender that is not an email
+  address or starts with `-`, before running `sendmail`.
+- **FR-021**: `notify_email` MUST RFC 2047 encode a subject that is not
+  printable ASCII, in encoded words of at most 75 columns that never split a
+  UTF-8 character.
+- **FR-022**: `notify_email` MUST use `DYBATPHO_SENDMAIL` when it is set, and
+  otherwise the first of `sendmail` on PATH, `/usr/sbin/sendmail` and
+  `/usr/lib/sendmail`; it MUST fail with exit code `127` when none exists,
+  return `sendmail`'s own exit code, and under `DRY_RUN` print the command
+  instead of sending.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -218,6 +261,8 @@ fi
 - **Webhook Request**: HTTP POST routed through `dybatpho::curl_json`.
 - **Desktop Backend**: `notify-send` or `osascript`, chosen by what is
   installed.
+- **Mail Message**: Headers and a plain-text body handed to `sendmail`, with
+  the recipients given as arguments.
 
 ## Success Criteria *(mandatory)*
 
@@ -247,6 +292,9 @@ fi
   topic, URL or priority, and HTTP status exit codes.
 - **IT-008**: Verify the `notify_gotify` endpoint, body, escaping, out-of-band
   token, rejection of a bad priority or URL, and HTTP status exit codes.
+- **IT-009**: Verify `notify_email` arguments and message, the sender sources,
+  subject encoding and splitting, every refusal, the sendmail lookup, exit
+  code `127`, the sendmail exit code, and `DRY_RUN`.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -255,4 +303,5 @@ fi
 2. Generic webhook calls remain extensible through additional curl arguments.
 3. Desktop notifications pass user text to the backend as data, never as code.
 4. Access tokens never reach a process's command line.
+5. Text from a variable cannot add an email header or recipient.
 3. All notification requests share the network module's error contract.

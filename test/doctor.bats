@@ -99,10 +99,11 @@ fake_versioned_command() {
 }
 
 @test "dybatpho::doctor_requirements lists what the notification module needs" {
-  # Only the desktop notifier runs a local command; the webhooks go through
+  # Only the desktop and email notifiers run a local command; the webhooks go through
   # `network`, which reports `curl` on its own row.
   run_traced -0 dybatpho::doctor_requirements notification optional
-  assert_output "notify-send|osascript"
+  assert_line --index 0 "notify-send|osascript"
+  assert_line --index 1 "sendmail"
 
   run_traced -0 dybatpho::doctor_requirements notification required
   assert_output ""

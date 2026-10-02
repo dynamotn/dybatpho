@@ -2,9 +2,10 @@
 # @file notification_ops.sh
 # @brief Example showing notification utilities
 # @description Demonstrates dybatpho::notify_slack, notify_telegram, notify_teams,
-#   notify_google_chat, notify_discord, notify_webhook, and notify_desktop using
-#   DRY_RUN mode so no real HTTP request is made and no notification is shown
-#   when running this example.
+#   notify_google_chat, notify_discord, notify_webhook, notify_ntfy,
+#   notify_gotify, notify_desktop, and notify_email using DRY_RUN mode so no real
+#   HTTP request is made, no notification is shown, and no email is sent when
+#   running this example.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules notification
@@ -109,6 +110,20 @@ function _demo_desktop {
   dybatpho::info "Desktop notifications dispatched"
 }
 
+# @description Run the `EMAIL` section of this example.
+# @noargs
+function _demo_email {
+  dybatpho::header "EMAIL"
+  export DYBATPHO_EMAIL_FROM="cron@example.com"
+  dybatpho::notify_email "ops@example.com, lead@example.com" "Backup failed" \
+    $'The nightly backup stopped at 02:14.\nSee backup.log for details.'
+  # A line break in the subject could add a header, so it is refused.
+  if ! (dybatpho::notify_email ops@example.com $'Hi\nBcc: x@example.com' "Body" 2> /dev/null); then
+    dybatpho::info "Rejected a subject carrying a header"
+  fi
+  dybatpho::info "Email dispatched"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -121,6 +136,7 @@ function _main {
   _demo_ntfy
   _demo_gotify
   _demo_desktop
+  _demo_email
   dybatpho::success "Notification demo complete"
 }
 

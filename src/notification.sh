@@ -15,6 +15,7 @@
 #   - **ntfy** – Publish to a topic on ntfy.sh or a self-hosted server
 #   - **Gotify** – Push a message to a self-hosted Gotify server
 #   - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
+#   - **Email** – A plain-text message through the local `sendmail`
 #
 # @usage
 #   ### When to use this module
@@ -74,6 +75,13 @@
 #   dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 #   ```
 #
+#   #### Send an email
+#
+#   ```bash
+#   export DYBATPHO_EMAIL_FROM="cron@example.com"
+#   dybatpho::notify_email "ops@example.com" "Backup failed" "$(tail -n 20 backup.log)"
+#   ```
+#
 #   #### Send to any webhook
 #
 #   ```bash
@@ -86,6 +94,11 @@
 #   before
 #   making requests.
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
+
+# Where `dybatpho::notify_email` looks for a sendmail command, in order. The
+# command often lives outside an ordinary user's PATH, in `/usr/sbin`, which is
+# why the two traditional locations follow the PATH lookup.
+declare -ga __DYBATPHO_NOTIFICATION_SENDMAILS=(sendmail /usr/sbin/sendmail /usr/lib/sendmail)
 
 #######################################
 # @description Escape a string for safe embedding inside a JSON string value.
@@ -545,4 +558,168 @@ function dybatpho::notify_gotify {
   dybatpho::curl_json "${url}/message" /dev/null \
     --request POST \
     --data "${payload}"
+}
+
+#######################################
+# @description Encode a header value for a mail message.
+#   Printable ASCII is its own encoding. Anything else is written as RFC 2047
+#   `Q` encoded words of UTF-8, each short enough for a header line and never
+#   splitting a character between two words, so a subject in any language
+#   arrives intact instead of as whatever the receiving MTA guesses.
+# @arg $1 string Name of the variable receiving the encoded value
+# @arg $2 string Header value, already checked to hold no line break
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_notification_mime_header {
+  local __dybatpho_mh_name __dybatpho_mh_text
+  dybatpho::expect_args __dybatpho_mh_name __dybatpho_mh_text -- "$@"
+  local -n __dybatpho_mh_out="${__dybatpho_mh_name}"
+  # Bytes, not characters, are what get encoded.
+  local LC_ALL=C
+  if [[ "${__dybatpho_mh_text}" =~ ^[[:print:]]*$ ]]; then
+    __dybatpho_mh_out="${__dybatpho_mh_text}"
+    return 0
+  fi
+
+  # Every local carries the prefix: the caller's variable may have any name,
+  # and a local of the same name would capture the result.
+  local __dybatpho_mh_all="" __dybatpho_mh_word=""
+  local __dybatpho_mh_byte __dybatpho_mh_code __dybatpho_mh_token
+  local __dybatpho_mh_i
+  for ((__dybatpho_mh_i = 0; __dybatpho_mh_i < ${#__dybatpho_mh_text}; __dybatpho_mh_i++)); do
+    __dybatpho_mh_byte="${__dybatpho_mh_text:__dybatpho_mh_i:1}"
+    printf -v __dybatpho_mh_code '%d' "'${__dybatpho_mh_byte}"
+    ((__dybatpho_mh_code < 0)) && ((__dybatpho_mh_code += 256))
+    # A word closes only before the first byte of a character (a UTF-8
+    # continuation byte is 0x80-0xBF), and early enough that the longest
+    # character still fits inside the 75 columns an encoded word may use.
+    #
+    # kcov loses its trace once a raw non-ASCII byte has gone through it, so
+    # the lines that only such a byte reaches carry `kcov(skip)`. They are run
+    # by "splits a long subject without breaking a character" and "encodes a
+    # subject that is not ASCII" in `test/notification.bats`.
+    if ((${#__dybatpho_mh_word} > 50 && (__dybatpho_mh_code < 128 || __dybatpho_mh_code > 191))); then
+      __dybatpho_mh_all+="${__dybatpho_mh_all:+$'\n' }"           # kcov(skip)
+      __dybatpho_mh_all+="=?UTF-8?Q?${__dybatpho_mh_word}?=" # kcov(skip)
+      __dybatpho_mh_word=""                                  # kcov(skip)
+    fi
+    if [[ "${__dybatpho_mh_byte}" == [A-Za-z0-9!*+/-] ]]; then
+      __dybatpho_mh_token="${__dybatpho_mh_byte}"
+    elif [[ "${__dybatpho_mh_byte}" == " " ]]; then
+      __dybatpho_mh_token="_"
+    else
+      printf -v __dybatpho_mh_token '=%02X' "${__dybatpho_mh_code}" # kcov(skip)
+    fi
+    __dybatpho_mh_word+="${__dybatpho_mh_token}"
+  done
+  __dybatpho_mh_all+="${__dybatpho_mh_all:+$'\n' }"
+  __dybatpho_mh_all+="=?UTF-8?Q?${__dybatpho_mh_word}?="
+  __dybatpho_mh_out="${__dybatpho_mh_all}"
+}
+
+#######################################
+# @description Return success when a value can be handed to `sendmail` as a
+#   recipient or a sender: an email address, which also rules out a line break,
+#   and one that cannot be read as an option.
+# @arg $1 string Address
+# @exitcode 0 The value is a usable address
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_notification_is_address {
+  local address
+  dybatpho::expect_args address -- "$@"
+  [[ "${address}" != -* ]] || return 1
+  dybatpho::validate_is email "${address}"
+}
+
+#######################################
+# @description Send a plain-text email through the local `sendmail`.
+#   Any MTA that installs a `sendmail` command will do — Postfix, Exim, OpenSMTPD,
+#   msmtp, nullmailer. The recipients are handed to it as arguments after `--`,
+#   never read back from the headers, and every address, the sender and the
+#   subject are checked for a line break first, so text from a variable cannot
+#   add a header or a recipient. A subject that is not plain ASCII is encoded
+#   for the header, and the body is sent as UTF-8; a line holding a single `.`
+#   does not end the message early.
+# @example
+#   dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
+#   dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${report}" bot@example.com
+#
+# @arg $1 string Recipients, comma-separated
+# @arg $2 string Subject
+# @arg $3 string Body
+# @arg $4 string Sender address, default is `DYBATPHO_EMAIL_FROM`, or the MTA's own default when neither is set
+# @env DYBATPHO_EMAIL_FROM string Default sender address
+# @env DYBATPHO_SENDMAIL string The sendmail command, default is `sendmail` on PATH, then `/usr/sbin/sendmail`
+#   and `/usr/lib/sendmail`
+# @env DRY_RUN string Print the sendmail command instead of sending anything
+# @exitcode 0 The message was handed to the MTA
+# @exitcode 1 Missing arguments, an invalid address, or a line break in the subject
+# @exitcode 127 No sendmail command was found
+# @exitcode other The sendmail command's own exit code
+#######################################
+function dybatpho::notify_email {
+  local recipients subject body
+  dybatpho::expect_args recipients subject body -- "$@"
+  local from="${4:-${DYBATPHO_EMAIL_FROM-}}"
+
+  # The `die` lines below are tested under `run`, which kcov cannot observe.
+  # A line break would cut the list short when it is split, so it is refused
+  # outright rather than dropping the recipients after it.
+  [[ "${recipients}" != *[$'\r\n']* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: recipients must not contain a line break" # kcov(skip)
+  local address
+  local -a addresses=() list=()
+  IFS=',' read -r -a list <<< "${recipients}"
+  for address in ${list[@]+"${list[@]}"}; do
+    address="$(dybatpho::trim "${address}")"
+    [[ -n "${address}" ]] || continue
+    __dybatpho_notification_is_address "${address}" \
+      || dybatpho::die "${FUNCNAME[0]}: '${address}' is not an email address" # kcov(skip)
+    addresses+=("${address}")
+  done
+  ((${#addresses[@]} > 0)) || dybatpho::die "${FUNCNAME[0]}: no recipient given" # kcov(skip)
+  if [[ -n "${from}" ]]; then
+    __dybatpho_notification_is_address "${from}" \
+      || dybatpho::die "${FUNCNAME[0]}: sender '${from}' is not an email address" # kcov(skip)
+  fi
+  [[ "${subject}" != *[$'\r\n']* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: subject must not contain a line break" # kcov(skip)
+
+  local sendmail="${DYBATPHO_SENDMAIL-}" candidate
+  if [[ -z "${sendmail}" ]]; then
+    for candidate in "${__DYBATPHO_NOTIFICATION_SENDMAILS[@]}"; do
+      if dybatpho::is command "${candidate}"; then
+        sendmail="${candidate}"
+        break
+      fi
+    done
+  fi
+  local -a command=("${sendmail:-sendmail}" -i -- "${addresses[@]}")
+  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
+  if dybatpho::is true "${DRY_RUN}"; then
+    dybatpho::dry_run "${command[@]}"
+    return 0
+  fi
+  local missing="No sendmail command found: install an MTA or set DYBATPHO_SENDMAIL"
+  [[ -n "${sendmail}" ]] || dybatpho::die "${missing}" 127 # kcov(skip)
+  # Not `dybatpho::require`: `hash` accepts any path that contains a slash.
+  dybatpho::is command "${sendmail}" || dybatpho::die "${sendmail} isn't installed" 127 # kcov(skip)
+
+  local encoded_subject to_header
+  __dybatpho_notification_mime_header encoded_subject "${subject}"
+  printf -v to_header '%s, ' "${addresses[@]}"
+  local message=""
+  [[ -n "${from}" ]] && message+="From: ${from}"$'\n'
+  message+="To: ${to_header%, }"$'\n'
+  message+="Subject: ${encoded_subject}"$'\n'
+  message+="MIME-Version: 1.0"$'\n'
+  message+="Content-Type: text/plain; charset=UTF-8"$'\n'
+  message+="Content-Transfer-Encoding: 8bit"$'\n'
+  message+=$'\n'"${body}"
+
+  dybatpho::debug "Sending email to ${#addresses[@]} recipient(s) through ${sendmail}"
+  "${command[@]}" <<< "${message}"
 }

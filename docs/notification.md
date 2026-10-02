@@ -21,6 +21,7 @@ notification platforms through their webhook or bot APIs:
 - **ntfy** – Publish to a topic on ntfy.sh or a self-hosted server
 - **Gotify** – Push a message to a self-hosted Gotify server
 - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
+- **Email** – A plain-text message through the local `sendmail`
 
 ### 🚀 Highlights
 
@@ -33,6 +34,7 @@ notification platforms through their webhook or bot APIs:
 - [`dybatpho::notify_desktop`](#dybatphonotify_desktop) — Show a notification on the local desktop. `notify-send` (libnotify, on Linux and the BSDs) is used when it is installed, and `osascript` (macOS) otherwise. The title and the body reach either one as separate arguments, never spliced into a command or a script, so quotes, a leading `-` or AppleScript syntax in them are shown as written. macOS has no urgency for a notification, so it is accepted there and has no effect.
 - [`dybatpho::notify_ntfy`](#dybatphonotify_ntfy) — Publish a message to an [ntfy](https://ntfy.sh) topic, on ntfy.sh or a server of your own. The message is published as JSON to the server root, so the title, the priority and the tags travel in the body and keep any character they hold. An access token is sent as a bearer header through the network module's out-of-band channel, so it never appears on curl's command line.
 - [`dybatpho::notify_gotify`](#dybatphonotify_gotify) — Push a message to a [Gotify](https://gotify.net) server. The application token is sent as the `X-Gotify-Key` header through the network module's out-of-band channel, so it never appears on curl's command line, where every user of the host could read it from the process list.
+- [`dybatpho::notify_email`](#dybatphonotify_email) — Send a plain-text email through the local `sendmail`. Any MTA that installs a `sendmail` command will do — Postfix, Exim, OpenSMTPD, msmtp, nullmailer. The recipients are handed to it as arguments after `--`, never read back from the headers, and every address, the sender and the subject are checked for a line break first, so text from a variable cannot add a header or a recipient. A subject that is not plain ASCII is encoded for the header, and the body is sent as UTF-8; a line holding a single `.` does not end the message early.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -92,6 +94,13 @@ dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 ```bash
 dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
 dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
+```
+
+#### Send an email
+
+```bash
+export DYBATPHO_EMAIL_FROM="cron@example.com"
+dybatpho::notify_email "ops@example.com" "Backup failed" "$(tail -n 20 backup.log)"
 ```
 
 #### Send to any webhook
@@ -481,3 +490,49 @@ dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+
+
+---
+
+### `dybatpho::notify_email`
+
+Send a plain-text email through the local `sendmail`.
+Any MTA that installs a `sendmail` command will do — Postfix, Exim, OpenSMTPD,
+msmtp, nullmailer. The recipients are handed to it as arguments after `--`,
+never read back from the headers, and every address, the sender and the
+subject are checked for a line break first, so text from a variable cannot
+add a header or a recipient. A subject that is not plain ASCII is encoded
+for the header, and the body is sent as UTF-8; a line holding a single `.`
+does not end the message early.
+
+**🧪 Example**
+
+```bash
+dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
+dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${report}" bot@example.com
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Recipients, comma-separated |
+| `$2` | string | Subject |
+| `$3` | string | Body |
+| `$4` | string | Sender address, default is `DYBATPHO_EMAIL_FROM`, or the MTA's own default when neither is set |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_EMAIL_FROM`** | string | Default sender address |
+| **`DYBATPHO_SENDMAIL`** | string | The sendmail command, default is `sendmail` on PATH, then `/usr/sbin/sendmail` and `/usr/lib/sendmail` |
+| **`DRY_RUN`** | string | Print the sendmail command instead of sending anything |
+
+**🚦 Exit codes**
+
+- `0`: The message was handed to the MTA
+- `1`: Missing arguments, an invalid address, or a line break in the subject
+- `127`: No sendmail command was found
+- `other`: The sendmail command's own exit code

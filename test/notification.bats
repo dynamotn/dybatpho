@@ -642,3 +642,164 @@ stub_curl_with_config() {
   run_traced -4 dybatpho::notify_gotify "refused"
   unstub curl
 }
+
+# ---------------------------------------------------------------------------
+# dybatpho::notify_email
+# ---------------------------------------------------------------------------
+
+# A sendmail that records its arguments one per line and the message it reads.
+# Every test that can reach the send step points DYBATPHO_SENDMAIL here, so the
+# host's own MTA is never run.
+fake_sendmail() {
+  local fake="${BATS_TEST_TMPDIR}/sendmail"
+  printf '#!/bin/sh\nfor arg in "$@"; do printf "%%s\\n" "$arg"; done > %q\ncat > %q\nexit %s\n' \
+    "${BATS_TEST_TMPDIR}/sendmail.args" "${BATS_TEST_TMPDIR}/sendmail.message" "${1:-0}" > "${fake}"
+  chmod +x "${fake}"
+  export DYBATPHO_SENDMAIL="${fake}"
+}
+
+@test "dybatpho::notify_email no arg" {
+  run dybatpho::notify_email
+  assert_failure
+}
+
+@test "dybatpho::notify_email hands recipients to sendmail after --" {
+  fake_sendmail
+  unset DYBATPHO_EMAIL_FROM
+  run_traced -0 dybatpho::notify_email " ops@example.com, ,lead@example.com " "Backup failed" "see log"
+  run_traced cat "${BATS_TEST_TMPDIR}/sendmail.args"
+  assert_equal "${lines[0]}" "-i"
+  assert_equal "${lines[1]}" "--"
+  assert_line --index 2 "ops@example.com"
+  assert_line --index 3 "lead@example.com"
+  assert_equal "${#lines[@]}" 4
+}
+
+@test "dybatpho::notify_email writes the headers and the body" {
+  fake_sendmail
+  run_traced -0 dybatpho::notify_email "ops@example.com,lead@example.com" "Backup failed" \
+    $'line one\n.\nline three' bot@example.com
+  run_traced cat "${BATS_TEST_TMPDIR}/sendmail.message"
+  assert_line --index 0 "From: bot@example.com"
+  assert_line --index 1 "To: ops@example.com, lead@example.com"
+  assert_line --index 2 "Subject: Backup failed"
+  assert_line --index 3 "MIME-Version: 1.0"
+  assert_line --index 4 "Content-Type: text/plain; charset=UTF-8"
+  assert_line --index 5 "Content-Transfer-Encoding: 8bit"
+  assert_equal "${lines[6]}" ""
+  assert_line --index 7 "line one"
+  assert_line --index 8 "."
+  assert_line --index 9 "line three"
+}
+
+@test "dybatpho::notify_email takes the sender from DYBATPHO_EMAIL_FROM" {
+  fake_sendmail
+  export DYBATPHO_EMAIL_FROM="cron@example.com"
+  run_traced -0 dybatpho::notify_email ops@example.com "Hi" "Body"
+  run_traced cat "${BATS_TEST_TMPDIR}/sendmail.message"
+  assert_line --index 0 "From: cron@example.com"
+}
+
+@test "dybatpho::notify_email leaves the sender to the MTA when none is set" {
+  fake_sendmail
+  unset DYBATPHO_EMAIL_FROM
+  run_traced -0 dybatpho::notify_email ops@example.com "Hi" "Body"
+  run_traced cat "${BATS_TEST_TMPDIR}/sendmail.message"
+  assert_line --index 0 "To: ops@example.com"
+  refute_output --partial "From:"
+}
+
+@test "dybatpho::notify_email encodes a subject that is not ASCII" {
+  fake_sendmail
+  run_traced -0 dybatpho::notify_email ops@example.com "Sao lưu xong" "Body"
+  run_traced cat "${BATS_TEST_TMPDIR}/sendmail.message"
+  assert_line --index 1 "Subject: =?UTF-8?Q?Sao_l=C6=B0u_xong?="
+}
+
+@test "dybatpho::notify_email splits a long subject without breaking a character" {
+  local subject="" encoded word
+  local i
+  for ((i = 0; i < 30; i++)); do subject+="ư"; done
+  __dybatpho_notification_mime_header encoded "${subject}"
+  # Each character is two bytes, `=C6=B0`, six columns; a word takes nine of
+  # them, so thirty need four words, and no word ends inside a character.
+  assert_equal "$(grep -c '=?UTF-8?Q?' <<< "${encoded}")" 4
+  while read -r word; do
+    (("${#word}" <= 75))
+    [[ "${word}" =~ ^=\?UTF-8\?Q\?(=C6=B0)+\?=$ ]]
+  done <<< "${encoded}"
+}
+
+@test "__dybatpho_notification_mime_header leaves printable ASCII alone" {
+  local encoded
+  __dybatpho_notification_mime_header encoded 'Deploy "v2" = done?'
+  assert_equal "${encoded}" 'Deploy "v2" = done?'
+}
+
+@test "dybatpho::notify_email rejects a line break in the subject" {
+  fake_sendmail
+  run -1 dybatpho::notify_email ops@example.com $'Hi\nBcc: victim@example.com' "Body"
+  assert_output --partial "subject must not contain a line break"
+  [ ! -e "${BATS_TEST_TMPDIR}/sendmail.args" ]
+}
+
+@test "dybatpho::notify_email rejects a recipient carrying a header" {
+  fake_sendmail
+  run -1 dybatpho::notify_email $'ops@example.com\nBcc: victim@example.com' "Hi" "Body"
+  assert_output --partial "recipients must not contain a line break"
+  [ ! -e "${BATS_TEST_TMPDIR}/sendmail.args" ]
+}
+
+@test "dybatpho::notify_email rejects a recipient that looks like an option" {
+  fake_sendmail
+  run -1 dybatpho::notify_email "-oi@example.com" "Hi" "Body"
+  assert_output --partial "is not an email address"
+}
+
+@test "dybatpho::notify_email rejects an invalid sender" {
+  fake_sendmail
+  run -1 dybatpho::notify_email ops@example.com "Hi" "Body" $'bot@example.com\r\nX: y'
+  assert_output --partial "sender"
+}
+
+@test "dybatpho::notify_email needs at least one recipient" {
+  fake_sendmail
+  run -1 dybatpho::notify_email " , " "Hi" "Body"
+  assert_output --partial "no recipient given"
+}
+
+@test "dybatpho::notify_email returns the sendmail exit code" {
+  fake_sendmail 75
+  run_traced -75 dybatpho::notify_email ops@example.com "Hi" "Body"
+}
+
+@test "dybatpho::notify_email finds sendmail in the traditional locations" {
+  local bin="${BATS_TEST_TMPDIR}/sbin"
+  mkdir -p "${bin}"
+  fake_sendmail
+  mv "${DYBATPHO_SENDMAIL}" "${bin}/sendmail"
+  unset DYBATPHO_SENDMAIL
+  __DYBATPHO_NOTIFICATION_SENDMAILS=(no-such-sendmail "${bin}/sendmail")
+  run_traced -0 dybatpho::notify_email ops@example.com "Hi" "Body"
+  [ -s "${BATS_TEST_TMPDIR}/sendmail.message" ]
+}
+
+@test "dybatpho::notify_email fails with 127 when no sendmail is found" {
+  unset DYBATPHO_SENDMAIL
+  __DYBATPHO_NOTIFICATION_SENDMAILS=(no-such-sendmail "${BATS_TEST_TMPDIR}/none/sendmail")
+  run -127 dybatpho::notify_email ops@example.com "Hi" "Body"
+  assert_output --partial "No sendmail command found"
+}
+
+@test "dybatpho::notify_email fails with 127 when DYBATPHO_SENDMAIL is missing" {
+  export DYBATPHO_SENDMAIL="${BATS_TEST_TMPDIR}/none/sendmail"
+  run -127 dybatpho::notify_email ops@example.com "Hi" "Body"
+  assert_output --partial "isn't installed"
+}
+
+@test "dybatpho::notify_email prints the command under DRY_RUN and sends nothing" {
+  fake_sendmail
+  DRY_RUN=true run_traced -0 dybatpho::notify_email ops@example.com "Hi" "Body"
+  assert_output --partial "DRY RUN: ${DYBATPHO_SENDMAIL} -i -- ops@example.com"
+  [ ! -e "${BATS_TEST_TMPDIR}/sendmail.args" ]
+}

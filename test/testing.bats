@@ -601,3 +601,280 @@ setup() {
   run_traced dybatpho::mock_calls never-mocked-tool
   assert_failure
 }
+
+@test "dybatpho::assert_exit_code passes on the expected status and reports any other" {
+  dybatpho::assert_exit_code 0 -- true
+  dybatpho::assert_exit_code 3 -- bash -c 'exit 3'
+
+  run_traced --separate-stderr dybatpho::assert_exit_code 0 -- bash -c 'printf "boom\n"; exit 2'
+  assert_failure
+  assert_stderr --partial "Expected exit 0, got 2"
+  assert_stderr --partial "boom"
+  # Output is captured, never printed on stdout.
+  assert_output ""
+
+  run_traced --separate-stderr dybatpho::assert_exit_code 1 -- true
+  assert_failure
+  assert_stderr --partial "Expected exit 1, got 0"
+}
+
+@test "dybatpho::assert_exit_code runs in the current shell and counts failures" {
+  DYBATPHO_TEST_FAILURES=0
+  dybatpho::mock_command flaky-tool 4
+  dybatpho::assert_exit_code 4 -- flaky-tool --once
+  dybatpho::assert_mock_called flaky-tool --once
+
+  dybatpho::assert_exit_code 0 -- flaky-tool 2> /dev/null || true
+  assert_equal "${DYBATPHO_TEST_FAILURES}" "1"
+}
+
+@test "dybatpho::assert_exit_code rejects a bad status, separator, or missing command" {
+  run --separate-stderr dybatpho::assert_exit_code 256 -- true
+  assert_failure
+  assert_stderr --partial "Expected an exit status from 0 to 255"
+
+  run --separate-stderr dybatpho::assert_exit_code abc -- true
+  assert_failure
+  assert_stderr --partial "Expected an exit status from 0 to 255"
+
+  run --separate-stderr dybatpho::assert_exit_code 0 true
+  assert_failure
+  assert_stderr --partial "Expected: status -- command"
+
+  run --separate-stderr dybatpho::assert_exit_code 0 --
+  assert_failure
+  assert_stderr --partial "Expected a command to run after --"
+}
+
+@test "dybatpho::mock_time freezes now for date and the date module" {
+  # A date that already ran is remembered by the shell; the mock must still win.
+  date +%s > /dev/null
+  dybatpho::mock_time 1767225600
+
+  assert_equal "$(date -u +%s)" "1767225600"
+  assert_equal "$(TZ=UTC dybatpho::date_now '%F %T')" "2026-01-01 00:00:00"
+  # A child process sees the same moment.
+  assert_equal "$(bash -c 'date -u +%F')" "2026-01-01"
+
+  # A call that names its own moment is passed through.
+  assert_equal "$(TZ=UTC dybatpho::date_format 0 %F)" "1970-01-01"
+  assert_equal "$(DYBATPHO_DATE_TIMEZONE=UTC dybatpho::date_parse '2024-02-29 12:34:56')" "1709210096"
+  dybatpho::assert_mock_called date
+}
+
+@test "dybatpho::mock_time drives ages computed from the clock" {
+  local file="${BATS_TEST_TMPDIR}/aged"
+  : > "${file}"
+
+  dybatpho::mock_time "$(dybatpho::file_mtime "${file}")"
+  assert_equal "$(dybatpho::file_age_seconds "${file}")" "0"
+  dybatpho::mock_time_advance 90
+  assert_equal "$(dybatpho::file_age_seconds "${file}")" "90"
+}
+
+@test "dybatpho::mock_time_advance moves the clock both ways" {
+  dybatpho::mock_time 1000
+  dybatpho::mock_time_advance 86400
+  assert_equal "$(date -u +%s)" "87400"
+  dybatpho::mock_time_advance -400
+  assert_equal "$(date -u +%s)" "87000"
+
+  # Freezing again replaces the moment instead of stacking on it.
+  dybatpho::mock_time 5
+  assert_equal "$(date -u +%s)" "5"
+}
+
+@test "dybatpho::mock_time_advance rejects bad amounts and an unfrozen clock" {
+  run --separate-stderr dybatpho::mock_time_advance 10
+  assert_failure
+  assert_stderr --partial "The clock is not frozen"
+
+  dybatpho::mock_time 10
+  run --separate-stderr dybatpho::mock_time_advance soon
+  assert_failure
+  assert_stderr --partial "Expected a whole number of seconds"
+
+  run --separate-stderr dybatpho::mock_time_advance -11
+  assert_failure
+  assert_stderr --partial "before the Unix epoch"
+}
+
+@test "dybatpho::mock_time rejects a timestamp that is not whole seconds" {
+  run --separate-stderr dybatpho::mock_time "2026-01-01"
+  assert_failure
+  assert_stderr --partial "Expected a Unix timestamp in whole seconds"
+
+  run --separate-stderr dybatpho::mock_time -5
+  assert_failure
+  assert_stderr --partial "Expected a Unix timestamp in whole seconds"
+}
+
+@test "dybatpho::mock_time drives a BSD date through -r" {
+  local bin="${BATS_TEST_TMPDIR}/bsd-bin" real moment='-r "$2"'
+  real="$(command -v date)"
+  # On GNU and BusyBox, the fake turns `-r <seconds>` into the real `-d @...`.
+  if "${real}" -d @0 +%s > /dev/null 2>&1; then
+    moment='-d "@$2"'
+  fi
+  mkdir -p "${bin}"
+  # A date that refuses `-d`, as BSD's does for a bare `@<seconds>`.
+  cat > "${bin}/date" << BSD
+#!/usr/bin/env bash
+args=()
+while ((\$#)); do
+  case "\$1" in
+    -d*) exit 1 ;;
+    -r) args+=(${moment}); shift 2 ;;
+    *) args+=("\$1"); shift ;;
+  esac
+done
+exec ${real} "\${args[@]}"
+BSD
+  chmod +x "${bin}/date"
+  PATH="${bin}:${PATH}"
+
+  dybatpho::mock_time 1767225600
+  assert_equal "$(date -u +%F)" "2026-01-01"
+  dybatpho::assert_file_contains "${DYBATPHO_TEST_MOCK_DIR}/date" '-r "${epoch}"'
+}
+
+@test "dybatpho::mock_time fails when no date can format a timestamp" {
+  local bin="${BATS_TEST_TMPDIR}/broken-bin"
+  mkdir -p "${bin}"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "${bin}/date"
+  chmod +x "${bin}/date"
+  PATH="${bin}:${PATH}"
+
+  run --separate-stderr dybatpho::mock_time 10
+  assert_failure
+  assert_stderr --partial "cannot format a given timestamp"
+
+  # Only the lookup runs without a PATH; the mock directory is made beforehand.
+  dybatpho::mock_command placeholder 0
+  mock_time_without_path() {
+    local PATH="${BATS_TEST_TMPDIR}/nowhere"
+    dybatpho::mock_time 10
+  }
+  run --separate-stderr mock_time_without_path
+  assert_failure
+  assert_stderr --partial "No date command found on PATH"
+}
+
+@test "dybatpho::unmock_time and unmock_all bring the real clock back" {
+  local real
+  real="$(date +%Y)"
+
+  dybatpho::unmock_time
+  dybatpho::mock_time 0
+  assert_equal "$(date -u +%Y)" "1970"
+  dybatpho::unmock_time
+  assert_equal "$(date +%Y)" "${real}"
+  dybatpho::unmock_time
+
+  dybatpho::mock_time 0
+  dybatpho::unmock_all
+  assert_equal "$(date +%Y)" "${real}"
+  refute [ -e "${DYBATPHO_TEST_MOCK_DIR}/time-epoch" ]
+}
+
+@test "dybatpho::mock_tty answers is_tty for the streams it names" {
+  dybatpho::mock_tty on stdout
+  run_traced dybatpho::is_tty stdout
+  assert_success
+  run_traced dybatpho::is_tty 1
+  assert_success
+  # stdin is not mocked, and in the suite it is not a terminal.
+  run_traced dybatpho::is_tty stdin
+  assert_failure
+
+  dybatpho::mock_tty on 0 2
+  run_traced dybatpho::is_tty stdin
+  assert_success
+  run_traced dybatpho::is_tty stderr
+  assert_success
+
+  # A later call changes only the streams it names.
+  dybatpho::mock_tty off stderr
+  run_traced dybatpho::is_tty stderr
+  assert_failure
+  run_traced dybatpho::is_tty stdout
+  assert_success
+
+  # No stream named means all three.
+  dybatpho::mock_tty off
+  run_traced dybatpho::is_tty stdout
+  assert_failure
+  run_traced dybatpho::is_tty stdin
+  assert_failure
+}
+
+@test "dybatpho::mock_tty steers colour and interactivity" {
+  local NO_COLOR="" FORCE_COLOR="" TERM=xterm
+  local DYBATPHO_INTERACTIVE=auto DYBATPHO_FORCE=false
+
+  dybatpho::mock_tty on stderr
+  run_traced dybatpho::color_supported stderr
+  assert_success
+  dybatpho::mock_tty off stderr
+  run_traced dybatpho::color_supported stderr
+  assert_failure
+
+  dybatpho::mock_tty on stdin
+  run_traced dybatpho::is_interactive
+  assert_success
+  dybatpho::mock_tty off stdin
+  run_traced dybatpho::is_interactive
+  assert_failure
+
+  # The environment still has the last word, as it does on a real terminal.
+  dybatpho::mock_tty on
+  NO_COLOR=1
+  run_traced dybatpho::color_supported stdout
+  assert_failure
+  DYBATPHO_INTERACTIVE=false
+  run_traced dybatpho::is_interactive
+  assert_failure
+}
+
+@test "dybatpho::mock_tty rejects a bad state or stream, and keeps stream checks" {
+  run --separate-stderr dybatpho::mock_tty maybe
+  assert_failure
+  assert_stderr --partial "Expected on or off"
+
+  run --separate-stderr dybatpho::mock_tty on stdlog
+  assert_failure
+  assert_stderr --partial "Stream must be stdin, stdout, or stderr"
+
+  dybatpho::mock_tty on
+  run --separate-stderr dybatpho::is_tty stdlog
+  assert_failure
+  assert_stderr --partial "Stream must be stdin, stdout, or stderr"
+}
+
+@test "dybatpho::unmock_tty and unmock_all restore the real is_tty" {
+  local original
+  original="$(declare -f dybatpho::is_tty)"
+  dybatpho::unmock_tty
+
+  dybatpho::mock_tty on
+  dybatpho::mock_tty on stdout
+  dybatpho::unmock_tty
+  assert_equal "$(declare -f dybatpho::is_tty)" "${original}"
+  run_traced dybatpho::is_tty stdout
+  assert_failure
+
+  dybatpho::mock_tty on
+  dybatpho::unmock_all
+  assert_equal "$(declare -f dybatpho::is_tty)" "${original}"
+  assert_equal "${#DYBATPHO_TEST_TTY[@]}" "0"
+}
+
+@test "dybatpho::unmock_command makes a hashed command resolve to the real one" {
+  dybatpho::mock_command printenv 0 "mocked"
+  assert_equal "$(printenv)" "mocked"
+  printenv > /dev/null
+  dybatpho::unmock_command printenv
+  run_traced printenv DYBATPHO_DIR
+  assert_success
+  assert_output "${DYBATPHO_DIR}"
+}

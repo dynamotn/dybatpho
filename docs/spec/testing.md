@@ -162,6 +162,68 @@ against a zero budget, and verify the pass and the reported overrun.
 5. **Given** a benchmark over several runs, **When** it finishes, **Then** it
    reports the fastest, median, and slowest run and asserts nothing
 
+### User Story 8 - Freeze the clock (Priority: P1)
+
+As a maintainer testing code that reads the time -- a schedule, a cache entry's
+age, a once-per-day marker -- I want to stop the clock at a known moment and
+move it by hand, so that a test asserts an exact outcome instead of racing the
+wall clock.
+
+**Independent Test**: Freeze the clock, read it through `date` and
+`dybatpho::date_now`, advance it, and verify the reported time follows; then
+unfreeze it and verify the real time is back.
+
+**Acceptance Scenarios**:
+
+1. **Given** a frozen clock, **When** `date`, `dybatpho::date_now`, or a child
+   process asks for the current time, **Then** each reports the frozen moment
+2. **Given** a frozen clock, **When** `date` is given an explicit moment through
+   `-d`, `-r`, `-f`, `-j`, or `-D`, **Then** the call is passed to the real
+   `date` unchanged
+3. **Given** a frozen clock, **When** it is advanced by a positive or negative
+   number of seconds, **Then** every later read reports the moved moment
+4. **Given** a frozen clock, **When** `unmock_time` or `unmock_all` runs,
+   **Then** `date` reports the real time again
+
+### User Story 9 - Pretend there is, or is not, a terminal (Priority: P2)
+
+As a maintainer testing colour output, prompts, and confirmations, I want to
+tell the library that a standard stream is or is not a terminal, so that the
+interactive path can be tested in a suite that never has one.
+
+**Independent Test**: Mock stdout as a terminal and verify `dybatpho::is_tty`
+and `dybatpho::color_supported` say so; mock stdin and verify
+`dybatpho::is_interactive` follows; unmock and verify the real answers return.
+
+**Acceptance Scenarios**:
+
+1. **Given** a stream mocked on, **When** `dybatpho::is_tty` is asked about it,
+   **Then** it succeeds, and mocked off it fails
+2. **Given** some streams mocked, **When** an unmocked stream is asked about,
+   **Then** the real file descriptor answers
+3. **Given** a mocked terminal, **When** `NO_COLOR` or a non-`auto`
+   `DYBATPHO_INTERACTIVE` is set, **Then** the environment still decides, as on
+   a real terminal
+4. **Given** mocked streams, **When** `unmock_tty` or `unmock_all` runs,
+   **Then** the original `dybatpho::is_tty` is restored
+
+### User Story 10 - Assert an exit status (Priority: P1)
+
+As a maintainer, I want to state the exit status a command must return, so that
+a test of an error path reads as one line and shows the command's output when
+the status is wrong.
+
+**Independent Test**: Assert a command's status in the passing and failing
+direction and verify the diagnostic.
+
+**Acceptance Scenarios**:
+
+1. **Given** a command that exits with the expected status, **When** the
+   assertion runs, **Then** it passes without printing the command's output
+2. **Given** a command that exits with another status, **When** the assertion
+   runs, **Then** it fails naming the expected and actual status, followed by
+   the command's output
+
 ### Example Workflow
 
 ```bash
@@ -182,6 +244,11 @@ dybatpho::assert_mock_called git tag v1.5.0
 
 dybatpho::snapshot_scrub "${workdir}" '<WORKDIR>'
 dybatpho::assert_cli_snapshot release-help -- ./release.sh --help
+
+# Time and terminals are under the test's control too.
+dybatpho::mock_time 1767225600
+dybatpho::mock_tty off stdin
+dybatpho::assert_exit_code 1 -- ./release.sh --publish
 
 dybatpho::unmock_all
 ```
@@ -209,6 +276,17 @@ dybatpho::unmock_all
 - A helper that assigns through a variable name is invoked in a pipeline, which
   would run it in a subshell and discard the assignment.
 - A fixture outlives its creating shell, or the shell fails before cleanup.
+- A command already ran in the shell, so Bash remembers its real path and would
+  bypass a mock created for it afterwards, or keep a removed mock's path.
+- `date` is GNU or BusyBox and takes a moment as `-d @<seconds>`, or BSD and
+  takes it as `-r <seconds>`, or supports neither.
+- No `date` exists on `PATH` outside the mock directory.
+- A frozen clock is moved before the Unix epoch.
+- Code waits for time to pass while the clock is frozen, such as
+  `dybatpho::lock_acquire` with a timeout on a held lock.
+- A tty stream is named by number rather than by name, or a name is unknown.
+- An expected exit status is not a number or is above `255`, which no command
+  can return.
 
 ## Requirements *(mandatory)*
 
@@ -297,6 +375,35 @@ dybatpho::unmock_all
 - **FR-029**: `mock_http_payloads` MUST fail when no mocked request has been
   made yet, matching `mock_http_calls`.
 
+- **FR-030**: `assert_exit_code` MUST run a command in the current shell, pass
+  when it exits with the expected status, and otherwise fail naming the
+  expected and actual status followed by the command's captured output. It MUST
+  reject an expected status outside `0`-`255`, a missing `--`, or a missing
+  command through the fatal path.
+- **FR-031**: `mock_time` MUST freeze the moment that `date` reports for the
+  current time, in the current shell and in every process it starts, and MUST
+  pass a `date` call that names its own moment (`-d`, `--date`, `-r`,
+  `--reference`, `-f`, `--file`, `-j`, `-D`, `-s`, `--set`, `--help`,
+  `--version`) to the real `date` unchanged.
+- **FR-032**: `mock_time` MUST drive GNU and BusyBox `date` through
+  `-d @<seconds>` and BSD `date` through `-r <seconds>`, choosing by asking
+  which one works, and MUST fail when neither works or no `date` is on `PATH`.
+- **FR-033**: `mock_time_advance` MUST move the frozen moment by a whole number
+  of seconds in either direction, and MUST fail when the clock is not frozen or
+  the move would land before the Unix epoch.
+- **FR-034**: `unmock_time` MUST restore the real clock and be a no-op when the
+  clock was not frozen; `unmock_all` MUST do the same.
+- **FR-035**: `mock_tty` MUST make `dybatpho::is_tty` report the named streams
+  (all three by default) as terminals (`on`) or not (`off`), keep the real
+  answer for every other stream, keep rejecting an unknown stream name, and
+  merge with earlier calls rather than replacing them.
+- **FR-036**: `unmock_tty` MUST restore the original `dybatpho::is_tty`
+  definition and be a no-op when nothing was mocked; `unmock_all` MUST do the
+  same.
+- **FR-037**: Creating or removing a command mock MUST take effect even for a
+  command the shell already ran, so Bash's remembered path never bypasses a
+  mock or points at a removed one.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Assertion**: A check that reports on stderr and returns `0` or `1` without
@@ -314,6 +421,10 @@ dybatpho::unmock_all
 - **Duration Budget**: A ceiling in milliseconds that a timed command must stay
   under.
 - **Benchmark Sample**: One timed run of a command, in milliseconds.
+- **Frozen Clock**: A Unix timestamp stored in the mock directory and read by
+  the mock `date` on every call.
+- **Mocked Stream**: A standard stream with an `on` or `off` answer that
+  replaces its real terminal test.
 
 ## Success Criteria *(mandatory)*
 
@@ -333,6 +444,10 @@ dybatpho::unmock_all
   `UPDATE_SNAPSHOTS=1`, with no `.snap` file edited or deleted by hand.
 - **SC-007**: A command that grows slower than its stated budget fails the suite
   with both numbers in the diagnostic.
+- **SC-008**: A test of time-dependent code asserts an exact value, with no
+  sleep and no tolerance window.
+- **SC-009**: The interactive and coloured paths are testable in a suite that
+  has no terminal.
 
 ## Integration Tests *(mandatory)*
 
@@ -371,9 +486,37 @@ dybatpho::unmock_all
   `DYBATPHO_CURL_SECRET_DATA`, reports both while `mock_calls curl` shows
   neither.
 
+- **IT-018**: Verify `assert_exit_code` passes on matching statuses, fails with
+  both statuses and the command output on a mismatch, runs in the current shell
+  so command mocks apply, counts failures, and rejects a bad status, separator,
+  or missing command.
+- **IT-019**: Freeze the clock after `date` already ran and verify `date`,
+  `dybatpho::date_now`, and a child shell report the frozen moment while
+  `dybatpho::date_format` and `dybatpho::date_parse` pass through.
+- **IT-020**: Verify `dybatpho::file_age_seconds` follows a frozen clock that is
+  then advanced.
+- **IT-021**: Advance the clock forward and back, refreeze it, and verify the
+  rejection of a bad amount, an unfrozen clock, a move before the epoch, and a
+  timestamp that is not whole seconds.
+- **IT-022**: Drive a BSD-style `date` through `-r`, and fail when no `date`
+  formats a timestamp or none is on `PATH`.
+- **IT-023**: Verify `unmock_time` and `unmock_all` bring the real clock back.
+- **IT-024**: Mock streams on and off by name and number, verify unmocked
+  streams answer for real, later calls merge, and no stream means all three.
+- **IT-025**: Verify mocked streams steer `dybatpho::color_supported` and
+  `dybatpho::is_interactive`, and that `NO_COLOR` and `DYBATPHO_INTERACTIVE`
+  still decide.
+- **IT-026**: Verify `mock_tty` rejects a bad state or stream, the mocked
+  `is_tty` still rejects an unknown stream, and `unmock_tty` and `unmock_all`
+  restore the original definition.
+- **IT-027**: Mock a command after it ran, unmock it after it ran again, and
+  verify the real command answers.
+
 ## Acceptance Criteria *(mandatory)*
 
 1. Assertions never terminate the calling shell, so a test can inspect or
    aggregate failures itself.
 2. Mocks are removed and the environment restored without manual bookkeeping.
 3. Tests written with this module run offline, and leave no files behind.
+4. Time and terminal detection are controlled by the test, not by the machine
+   it runs on.

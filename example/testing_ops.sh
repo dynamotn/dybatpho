@@ -153,6 +153,45 @@ else
   dybatpho::warn "Overrun reported as expected"
 fi
 
+dybatpho::header "EXIT CODES"
+# An error path is one line: the status it must return, then the command.
+dybatpho::mock_env RELEASE_VERSION=""
+dybatpho::assert_exit_code 1 -- bash -c 'echo "RELEASE_VERSION must be set" >&2; exit 1'
+dybatpho::mock_command git 128 "fatal: tag already exists"
+dybatpho::assert_exit_code 128 -- git tag v1.5.0
+dybatpho::success "Both failures returned the status they promise"
+
+# --- clock and terminal ------------------------------------------------------
+
+dybatpho::header "FROZEN CLOCK"
+# Every `date` asking for "now" -- here and in child processes -- answers from
+# the frozen moment, so an age or a timestamp is an exact value.
+declare stamp
+dybatpho::fixture_file stamp "written at the frozen moment"
+dybatpho::mock_time 1767225600
+now_text=$(date -u '+%F %T')
+dybatpho::info "now: ${now_text} UTC"
+# Freeze at the moment the fixture was written, then let 90 seconds pass.
+written=$(dybatpho::file_mtime "${stamp}")
+dybatpho::mock_time "${written}"
+dybatpho::mock_time_advance 90
+age=$(dybatpho::file_age_seconds "${stamp}")
+dybatpho::info "stamp age after advancing 90s: ${age}s"
+dybatpho::unmock_time
+dybatpho::success "Clock frozen, moved, and released"
+
+dybatpho::header "TERMINAL DETECTION"
+# The example runs without a terminal; pretend stderr has one to test the
+# coloured path, then pretend it has none.
+dybatpho::mock_tty on stderr
+if (unset NO_COLOR && dybatpho::color_supported stderr); then
+  dybatpho::info "stderr is treated as a colour terminal"
+fi
+dybatpho::mock_tty off stderr
+dybatpho::color_supported stderr || dybatpho::info "stderr is treated as a pipe"
+dybatpho::unmock_tty
+dybatpho::success "Terminal detection followed the mock"
+
 # --- failure reporting -------------------------------------------------------
 
 dybatpho::header "FAILURE REPORTING"

@@ -110,6 +110,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [[ "$(dybatpho::git_state)" == none ]] || dybatpho::die "Finish it first"
   read -r ahead behind <<< "$(dybatpho::git_ahead_behind)"
   ```
+- **`testing` — freeze the clock, fake a terminal, and assert an exit status.**
+  `dybatpho::mock_time` stops the clock that `date` reports at a Unix
+  timestamp, for the test shell and every process it starts, so
+  `dybatpho::date_now`, `dybatpho::file_age_seconds`, cache ages, schedules and
+  rate-limit windows give exact answers; `dybatpho::mock_time_advance` moves it
+  by any number of seconds, and `dybatpho::unmock_time` releases it. A `date`
+  call that names its own moment (`-d`, `-r`, …) still goes to the real `date`,
+  and millisecond timers keep measuring real time. `dybatpho::mock_tty` makes
+  `dybatpho::is_tty` — and so `dybatpho::color_supported` and
+  `dybatpho::is_interactive` — report a terminal or none on chosen streams,
+  undone by `dybatpho::unmock_tty`. `dybatpho::assert_exit_code` runs a command
+  and fails, showing its output, unless it exits with the stated status.
+  `dybatpho::unmock_all` now also releases the clock and the terminal mock.
+
+  ```sh
+  dybatpho::mock_time 1767225600
+  dybatpho::mock_time_advance 3600
+  dybatpho::mock_tty off stdin
+  dybatpho::assert_exit_code 1 -- dybatpho::confirm "Delete everything?"
+  ```
+
+### Fixed
+
+- **`testing` — a mock now wins over a command the shell already ran.**
+  `dybatpho::mock_command` and `dybatpho::mock_command_script` used to be
+  bypassed for a command that had already run in the same shell, because Bash
+  remembered its real path; `dybatpho::unmock_command` likewise left the shell
+  pointing at the removed mock. Both now take effect immediately.
 
 ## [5.2.0] - 2026-10-02
 

@@ -56,6 +56,7 @@ Only programming mistakes, such as a missing argument, are fatal.
 - [`dybatpho::snapshot_scrub_reset`](#dybatphosnapshot_scrub_reset) — Forget every registered snapshot substitution.
 - [`dybatpho::assert_snapshot`](#dybatphoassert_snapshot) — Compare text against a stored snapshot, creating it when missing.
 - [`dybatpho::assert_cli_snapshot`](#dybatphoassert_cli_snapshot) — Snapshot the stdout, stderr, and exit code of a command.
+- [`dybatpho::assert_exit_code`](#dybatphoassert_exit_code) — Assert that a command exits with an expected status. The command runs in the current shell, so the mocks and variables a test has set up apply to it, and its stdout and stderr are captured rather than printed. They are only shown when the status is not the one expected, which is the moment they explain something.
 - [`dybatpho::assert_duration_under`](#dybatphoassert_duration_under) — Assert that a command finishes in under a budget of milliseconds.
 - [`dybatpho::benchmark`](#dybatphobenchmark) — Time a command over several runs and report its fastest, median, and slowest.
 - [`dybatpho::mock_env`](#dybatphomock_env) — Set environment variables for the duration of a test, remembering their previous state.
@@ -70,9 +71,14 @@ Only programming mistakes, such as a missing argument, are fatal.
 - [`dybatpho::mock_http_calls`](#dybatphomock_http_calls) — Print every URL requested through the HTTP mock, oldest first.
 - [`dybatpho::mock_http_payloads`](#dybatphomock_http_payloads) — Print the request material of every mocked HTTP call that did not travel in the argument vector, newest last, one request per line. Credentials and request bodies are deliberately kept off `curl`'s command line, because arguments are readable by every account on the host through `/proc/<pid>/cmdline`. They go into a `--config` file and onto standard input instead. That is the right thing for a running script and an awkward thing for a test, which still has to be able to say "the token was sent" and "the body carried this field" -- so the mock records them here.
 - [`dybatpho::assert_http_called`](#dybatphoassert_http_called) — Assert that a URL matching a pattern was requested through the HTTP mock.
+- [`dybatpho::mock_time`](#dybatphomock_time) — Freeze the clock that `date` reports, for the code under test. The library reads the time by running `date`: `dybatpho::date_now` and `dybatpho::date_today`, and through them the `schedule`, `queue`, `backup` and `i18n` modules, as well as the ages `dybatpho::file_age_seconds` and the `cache` module compute, the rate-limit windows in `network`, and the timestamps `lock` records. This puts a `date` on `PATH` that answers every question about *now* from the frozen moment, so all of them agree on one instant, in this shell and in every command it starts. A `date` call that names its own moment -- `-d`/`--date`, `-r`, `-f`, `-j`, BusyBox's `-D` -- is passed through untouched, so parsing and formatting an explicit timestamp keep working. A relative date such as `-d tomorrow` is therefore measured from the real clock, not the frozen one. The frozen moment is not seen by `$EPOCHSECONDS`, `$EPOCHREALTIME`, `printf '%(...)T'`, `sleep`, or anything that calls `busybox date` directly. That leaves the millisecond timers -- `dybatpho::timer_start`, `dybatpho::metrics_time`, `dybatpho::assert_duration_under` -- measuring real elapsed time, which is what they are for.
+- [`dybatpho::mock_time_advance`](#dybatphomock_time_advance) — Move the frozen clock forward, or back, by a number of seconds.
+- [`dybatpho::unmock_time`](#dybatphounmock_time) — Unfreeze the clock, so `date` reports the real time again.
+- [`dybatpho::mock_tty`](#dybatphomock_tty) — Make the library see a terminal, or none, on the standard streams. This replaces `dybatpho::is_tty` until `dybatpho::unmock_tty`, so everything that asks it follows: `dybatpho::color_supported`, `dybatpho::is_interactive` and the confirmations built on it, and the privilege prompt guard. A stream that is not named keeps its real answer, and a later call changes only the streams it names. The environment still has the last word, exactly as it does on a real terminal: `NO_COLOR` and `FORCE_COLOR` decide colour, and `DYBATPHO_INTERACTIVE` set to anything but `auto` decides interactivity. Code that tests a file descriptor itself with `[[ -t ]]` is not affected -- `dybatpho::tui_supported` is one, and is steered with `DYBATPHO_TUI` instead -- and neither is a script started in a new shell, which sources the library afresh.
+- [`dybatpho::unmock_tty`](#dybatphounmock_tty) — Give `dybatpho::is_tty` back its real answers.
 - [`dybatpho::fixture_dir`](#dybatphofixture_dir) — Create a temporary fixture directory that is removed when the shell exits.
 - [`dybatpho::fixture_file`](#dybatphofixture_file) — Create a temporary fixture file holding the given content.
-- [`dybatpho::unmock_all`](#dybatphounmock_all) — Remove every mock created in this shell and restore the environment.
+- [`dybatpho::unmock_all`](#dybatphounmock_all) — Remove every mock created in this shell and restore the environment, the clock, and the terminal detection.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -143,6 +149,10 @@ dybatpho::assert_mock_called kubectl get pods
 
 - The command's own exit code is recorded inside the snapshot rather than propagated, so a CLI that exits non-zero can still be snapshotted.
 
+### `dybatpho::assert_exit_code`
+
+- A command that calls `exit` ends the shell running it. Wrap a script's function in `bash -c` or call the script itself when it exits rather than returns.
+
 ### `dybatpho::assert_duration_under`
 
 - A machine under load makes a tight budget flaky. Set `DYBATPHO_TEST_DURATION_RUNS` above `1` so a single descheduled run does not fail the suite: the fastest run is the one that measures the code rather than the machine.
@@ -169,6 +179,14 @@ dybatpho::assert_mock_called kubectl get pods
 
 - The mock replaces `curl` itself, so it also covers `command curl` calls made by `dybatpho::curl_do` and every helper built on it.
 - Following the repository's curl-stubbing convention, the mock always exits `0` and reports the status through `-w '%{http_code}'`, which is what the network module reads to decide success, retry, and its own exit code.
+
+### `dybatpho::mock_time`
+
+- The clock stays still until it is moved, so code that waits for time to pass -- `dybatpho::lock_acquire` with a timeout above `0` on a held lock -- waits forever. Move the clock with `dybatpho::mock_time_advance`, or unfreeze it around such a call.
+
+### `dybatpho::mock_time_advance`
+
+- The new moment is seen by every process at once, including one already running in the background, because the mock reads it on every call.
 
 ### `dybatpho::fixture_dir`
 
@@ -557,6 +575,48 @@ dybatpho::assert_cli_snapshot deploy-help -- ./mytool deploy --help
 
 ---
 
+### `dybatpho::assert_exit_code`
+
+Assert that a command exits with an expected status.
+
+The command runs in the current shell, so the mocks and variables a test has
+set up apply to it, and its stdout and stderr are captured rather than
+printed. They are only shown when the status is not the one expected, which
+is the moment they explain something.
+
+**🧪 Example**
+
+```bash
+dybatpho::assert_exit_code 2 -- ./mytool --unknown-flag
+dybatpho::assert_exit_code 0 -- dybatpho::semver_valid 1.2.3
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Expected exit status, from `0` to `255` |
+| `$2` | string | Literal `--` separating the status from the command |
+| `$@` | string | Command and arguments to run |
+
+**🧩 Variable sets**
+
+- **`DYBATPHO_TEST_FAILURES`** (Incremented): when the status differs
+
+**📤 Output on stderr**
+
+- A diagnostic naming the expected and actual status, followed by the
+        command's own output
+
+**🚦 Exit codes**
+
+- `0`: The command exited with the expected status
+- `1`: The command exited with any other status
+
+
+---
+
 ### `dybatpho::assert_duration_under`
 
 Assert that a command finishes in under a budget of milliseconds.
@@ -923,6 +983,171 @@ Assert that a URL matching a pattern was requested through the HTTP mock.
 
 ---
 
+### `dybatpho::mock_time`
+
+Freeze the clock that `date` reports, for the code under test.
+
+The library reads the time by running `date`: `dybatpho::date_now` and
+`dybatpho::date_today`, and through them the `schedule`, `queue`, `backup`
+and `i18n` modules, as well as the ages `dybatpho::file_age_seconds` and the
+`cache` module compute, the rate-limit windows in `network`, and the
+timestamps `lock` records. This puts a `date` on `PATH` that answers every
+question about *now* from the frozen moment, so all of them agree on one
+instant, in this shell and in every command it starts.
+
+A `date` call that names its own moment -- `-d`/`--date`, `-r`, `-f`, `-j`,
+BusyBox's `-D` -- is passed through untouched, so parsing and formatting an
+explicit timestamp keep working. A relative date such as `-d tomorrow` is
+therefore measured from the real clock, not the frozen one.
+
+The frozen moment is not seen by `$EPOCHSECONDS`, `$EPOCHREALTIME`,
+`printf '%(...)T'`, `sleep`, or anything that calls `busybox date`
+directly. That leaves the millisecond timers -- `dybatpho::timer_start`,
+`dybatpho::metrics_time`, `dybatpho::assert_duration_under` -- measuring
+real elapsed time, which is what they are for.
+
+**🧪 Example**
+
+```bash
+dybatpho::mock_time 1767225600            # 2026-01-01T00:00:00Z
+dybatpho::date_now %F                     # 2026-01-01 (in UTC)
+dybatpho::mock_time_advance 86400
+dybatpho::date_now %F                     # 2026-01-02
+dybatpho::unmock_time
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Unix timestamp to freeze the clock at |
+
+**🧩 Variable sets**
+
+- **`PATH`** (Prefixed): with the mock directory on first use
+
+**🚦 Exit codes**
+
+- `0`: The clock is frozen
+- `1`: The timestamp is not a whole number, or no usable `date` is on `PATH`
+
+**🔗 See also**
+
+- [- `dybatpho::mock_time_advance` - `dybatpho::unmock_time](#dybatphomock_time_advance-dybatphounmock_time)
+
+
+---
+
+### `dybatpho::mock_time_advance`
+
+Move the frozen clock forward, or back, by a number of seconds.
+
+**🧪 Example**
+
+```bash
+dybatpho::mock_time 1767225600
+dybatpho::mock_time_advance 3600   # one hour later
+dybatpho::mock_time_advance -60    # one minute back
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Seconds to move the clock by; negative moves it back |
+
+**🚦 Exit codes**
+
+- `0`: The clock moved
+- `1`: The amount is not a whole number, or the clock is not frozen
+
+
+---
+
+### `dybatpho::unmock_time`
+
+Unfreeze the clock, so `date` reports the real time again.
+
+_Function has no arguments._
+
+**🚦 Exit codes**
+
+- `0`: Always, including when the clock was not frozen
+
+
+---
+
+### `dybatpho::mock_tty`
+
+Make the library see a terminal, or none, on the standard streams.
+
+This replaces `dybatpho::is_tty` until `dybatpho::unmock_tty`, so everything
+that asks it follows: `dybatpho::color_supported`, `dybatpho::is_interactive`
+and the confirmations built on it, and the privilege prompt guard. A stream
+that is not named keeps its real answer, and a later call changes only the
+streams it names.
+
+The environment still has the last word, exactly as it does on a real
+terminal: `NO_COLOR` and `FORCE_COLOR` decide colour, and
+`DYBATPHO_INTERACTIVE` set to anything but `auto` decides interactivity.
+Code that tests a file descriptor itself with `[[ -t ]]` is not affected --
+`dybatpho::tui_supported` is one, and is steered with `DYBATPHO_TUI`
+instead -- and neither is a script started in a new shell, which sources the
+library afresh.
+
+**🧪 Example**
+
+```bash
+dybatpho::mock_tty on stdout stderr
+dybatpho::color_supported stderr && printf 'colour\n'
+dybatpho::mock_tty off stdin
+dybatpho::confirm "Delete?" || printf 'refused without a terminal\n'
+dybatpho::unmock_tty
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | `on` to report a terminal, `off` to report none |
+| `$@` | string | Streams to mock: `stdin`, `stdout`, `stderr`, or `0`-`2`; default is all three |
+
+**🧩 Variable sets**
+
+- **`DYBATPHO_TEST_TTY`** (Mocked): answer for each stream
+
+**🚦 Exit codes**
+
+- `0`: The streams are mocked
+- `1`: The state is not `on` or `off`, or a stream name is unknown
+
+**🔗 See also**
+
+- [dybatpho::unmock_tty](#dybatphounmock_tty)
+
+
+---
+
+### `dybatpho::unmock_tty`
+
+Give `dybatpho::is_tty` back its real answers.
+
+_Function has no arguments._
+
+**🧩 Variable sets**
+
+- **`DYBATPHO_TEST_TTY`**: Emptied
+
+**🚦 Exit codes**
+
+- `0`: Always, including when no stream was mocked
+
+
+---
+
 ### `dybatpho::fixture_dir`
 
 Create a temporary fixture directory that is removed when the shell exits.
@@ -977,6 +1202,7 @@ dybatpho::assert_json_query "${settings}" '.mode' dev
 
 ### `dybatpho::unmock_all`
 
-Remove every mock created in this shell and restore the environment.
+Remove every mock created in this shell and restore the environment,
+the clock, and the terminal detection.
 
 _Function has no arguments._

@@ -81,6 +81,8 @@ declare -g DYBATPHO_TEST_MOCK_DIR="${DYBATPHO_TEST_MOCK_DIR:-}"
 declare -ga DYBATPHO_TEST_SNAPSHOT_SCRUBS=()
 declare -gA DYBATPHO_TEST_ENV_BACKUP=()
 declare -ga DYBATPHO_TEST_ENV_KEYS=()
+declare -gA DYBATPHO_TEST_TTY=()
+declare -g DYBATPHO_TEST_TTY_ORIGINAL="${DYBATPHO_TEST_TTY_ORIGINAL:-}"
 
 #######################################
 # @description Record an assertion failure and return a failing status.
@@ -611,6 +613,50 @@ function dybatpho::assert_cli_snapshot {
 }
 
 #######################################
+# @description Assert that a command exits with an expected status.
+#
+#   The command runs in the current shell, so the mocks and variables a test has
+#   set up apply to it, and its stdout and stderr are captured rather than
+#   printed. They are only shown when the status is not the one expected, which
+#   is the moment they explain something.
+# @example
+#   dybatpho::assert_exit_code 2 -- ./mytool --unknown-flag
+#   dybatpho::assert_exit_code 0 -- dybatpho::semver_valid 1.2.3
+#
+# @arg $1 number Expected exit status, from `0` to `255`
+# @arg $2 string Literal `--` separating the status from the command
+# @arg $@ string Command and arguments to run
+# @set DYBATPHO_TEST_FAILURES Incremented when the status differs
+# @stderr A diagnostic naming the expected and actual status, followed by the
+#         command's own output
+# @exitcode 0 The command exited with the expected status
+# @exitcode 1 The command exited with any other status
+# @tip A command that calls `exit` ends the shell running it. Wrap a script's
+#      function in `bash -c` or call the script itself when it exits rather than
+#      returns.
+#######################################
+function dybatpho::assert_exit_code {
+  local expected separator
+  dybatpho::expect_args expected separator -- "$@"
+  shift 2
+  if [[ ! "${expected}" =~ ^[0-9]+$ ]] || ((10#${expected} > 255)); then
+    dybatpho::die "${FUNCNAME[0]}: Expected an exit status from 0 to 255: ${expected}"
+  fi
+  [[ "${separator}" == "--" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected: status -- command [args...]"
+  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+
+  local output_file status=0
+  dybatpho::create_temp output_file ".log" "exitcode"
+  "$@" > "${output_file}" 2>&1 || status=$?
+
+  ((status == 10#${expected})) && return 0
+  __dybatpho_test_fail \
+    "Expected exit ${expected}, got ${status}: $*" \
+    "$(< "${output_file}")"
+}
+
+#######################################
 # @description Run a command once and report how long it took.
 # @arg $1 string Path of a file collecting the command's stdout and stderr
 # @arg $2 string Variable name that receives the elapsed milliseconds
@@ -831,6 +877,9 @@ function dybatpho::mock_command_script {
   } > "${script}"
   chmod +x "${script}"
   : > "${mock_dir}/calls/${name}"
+  # Bash remembers where it last found a command, so a command that already ran
+  # in this shell would keep going to the real executable past the mock.
+  hash -d "${name}" 2> /dev/null || true
 }
 
 #######################################
@@ -966,6 +1015,7 @@ function dybatpho::unmock_command {
   dybatpho::expect_args name -- "$@"
   [[ -n "${DYBATPHO_TEST_MOCK_DIR}" ]] || return 0
   rm -f "${DYBATPHO_TEST_MOCK_DIR}/${name}" "${DYBATPHO_TEST_MOCK_DIR}/calls/${name}"
+  hash -d "${name}" 2> /dev/null || true
 }
 
 #######################################
@@ -1188,6 +1238,268 @@ function dybatpho::assert_http_called {
 }
 
 #######################################
+# @description Find the real `date` executable on `PATH`, skipping the mock directory.
+# @arg $1 string Variable name that receives the absolute path
+# @exitcode 0 A `date` executable was found
+# @exitcode 1 No `date` executable outside the mock directory is on `PATH`
+# @internal
+#######################################
+function __dybatpho_test_real_date {
+  local path_var
+  dybatpho::expect_args path_var -- "$@"
+  local -n __dybatpho_test_date_path="${path_var}"
+  local entry
+  local -a entries=()
+  IFS=: read -r -a entries <<< "${PATH}"
+  for entry in "${entries[@]}"; do
+    [[ -n "${entry}" && "${entry}" != "${DYBATPHO_TEST_MOCK_DIR}" ]] || continue
+    if [[ -x "${entry}/date" && ! -d "${entry}/date" ]]; then
+      __dybatpho_test_date_path="${entry}/date"
+      return 0
+    fi
+  done
+  # Reached under `run` by "dybatpho::mock_time fails when no date can format
+  # a timestamp", which kcov cannot see.
+  return 1 # kcov(skip)
+}
+
+#######################################
+# @description Freeze the clock that `date` reports, for the code under test.
+#
+#   The library reads the time by running `date`: `dybatpho::date_now` and
+#   `dybatpho::date_today`, and through them the `schedule`, `queue`, `backup`
+#   and `i18n` modules, as well as the ages `dybatpho::file_age_seconds` and the
+#   `cache` module compute, the rate-limit windows in `network`, and the
+#   timestamps `lock` records. This puts a `date` on `PATH` that answers every
+#   question about *now* from the frozen moment, so all of them agree on one
+#   instant, in this shell and in every command it starts.
+#
+#   A `date` call that names its own moment -- `-d`/`--date`, `-r`, `-f`, `-j`,
+#   BusyBox's `-D` -- is passed through untouched, so parsing and formatting an
+#   explicit timestamp keep working. A relative date such as `-d tomorrow` is
+#   therefore measured from the real clock, not the frozen one.
+#
+#   The frozen moment is not seen by `$EPOCHSECONDS`, `$EPOCHREALTIME`,
+#   `printf '%(...)T'`, `sleep`, or anything that calls `busybox date`
+#   directly. That leaves the millisecond timers -- `dybatpho::timer_start`,
+#   `dybatpho::metrics_time`, `dybatpho::assert_duration_under` -- measuring
+#   real elapsed time, which is what they are for.
+# @example
+#   dybatpho::mock_time 1767225600            # 2026-01-01T00:00:00Z
+#   dybatpho::date_now %F                     # 2026-01-01 (in UTC)
+#   dybatpho::mock_time_advance 86400
+#   dybatpho::date_now %F                     # 2026-01-02
+#   dybatpho::unmock_time
+#
+# @arg $1 number Unix timestamp to freeze the clock at
+# @set PATH Prefixed with the mock directory on first use
+# @exitcode 0 The clock is frozen
+# @exitcode 1 The timestamp is not a whole number, or no usable `date` is on `PATH`
+# @tip The clock stays still until it is moved, so code that waits for time to
+#      pass -- `dybatpho::lock_acquire` with a timeout above `0` on a held lock --
+#      waits forever. Move the clock with `dybatpho::mock_time_advance`, or
+#      unfreeze it around such a call.
+# @see
+#   - `dybatpho::mock_time_advance`
+#   - `dybatpho::unmock_time`
+#######################################
+function dybatpho::mock_time {
+  local epoch
+  dybatpho::expect_args epoch -- "$@"
+  [[ "${epoch}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected a Unix timestamp in whole seconds: ${epoch}"
+  __dybatpho_test_mock_init
+
+  local real_date
+  __dybatpho_test_real_date real_date \
+    || dybatpho::die "${FUNCNAME[0]}: No date command found on PATH"
+
+  # GNU and BusyBox take the moment as `-d @<seconds>`, BSD as `-r <seconds>`.
+  # Asking which one works is the portable test; the name of the system is not.
+  local flag="" prefix="" probe
+  probe="$("${real_date}" -d @0 +%s 2> /dev/null)" || probe=""
+  if [[ "${probe}" == "0" ]]; then
+    flag="-d" prefix="@"
+  else
+    probe="$("${real_date}" -r 0 +%s 2> /dev/null)" || probe=""
+    [[ "${probe}" == "0" ]] && flag="-r"
+  fi
+  [[ -n "${flag}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: ${real_date} cannot format a given timestamp"
+
+  local state="${DYBATPHO_TEST_MOCK_DIR}/time-epoch"
+  printf '%s\n' "${epoch}" > "${state}"
+
+  local state_q real_q
+  printf -v state_q '%q' "${state}"
+  printf -v real_q '%q' "${real_date}"
+  local body
+  IFS= read -r -d '' body << MOCK_DATE || true
+epoch="\$(< ${state_q})"
+for arg in "\$@"; do
+  case "\${arg}" in
+    -d* | --date* | -r* | --reference* | -f* | --file* | -j* | -D* | -s* | --set* | --help | --version)
+      exec ${real_q} "\$@"
+      ;;
+  esac
+done
+exec ${real_q} ${flag} "${prefix}\${epoch}" "\$@"
+MOCK_DATE
+  dybatpho::mock_command_script date "${body}"
+}
+
+#######################################
+# @description Move the frozen clock forward, or back, by a number of seconds.
+# @example
+#   dybatpho::mock_time 1767225600
+#   dybatpho::mock_time_advance 3600   # one hour later
+#   dybatpho::mock_time_advance -60    # one minute back
+#
+# @arg $1 number Seconds to move the clock by; negative moves it back
+# @exitcode 0 The clock moved
+# @exitcode 1 The amount is not a whole number, or the clock is not frozen
+# @tip The new moment is seen by every process at once, including one already
+#      running in the background, because the mock reads it on every call.
+#######################################
+function dybatpho::mock_time_advance {
+  local seconds
+  dybatpho::expect_args seconds -- "$@"
+  [[ "${seconds}" =~ ^-?[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected a whole number of seconds: ${seconds}"
+  local state="${DYBATPHO_TEST_MOCK_DIR}/time-epoch"
+  [[ -n "${DYBATPHO_TEST_MOCK_DIR}" && -f "${state}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: The clock is not frozen; call dybatpho::mock_time first"
+  local epoch
+  epoch="$(< "${state}")"
+  epoch=$((epoch + seconds))
+  ((epoch >= 0)) \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot move the clock before the Unix epoch"
+  printf '%s\n' "${epoch}" > "${state}"
+}
+
+#######################################
+# @description Unfreeze the clock, so `date` reports the real time again.
+# @noargs
+# @exitcode 0 Always, including when the clock was not frozen
+#######################################
+function dybatpho::unmock_time {
+  [[ -n "${DYBATPHO_TEST_MOCK_DIR}" ]] || return 0
+  dybatpho::unmock_command date
+  rm -f "${DYBATPHO_TEST_MOCK_DIR}/time-epoch"
+}
+
+#######################################
+# @description Answer `dybatpho::is_tty` from the mocked streams, and from the
+#   real file descriptors for the streams that are not mocked.
+# @arg $1 string Stream name, default is `stdout`
+# @exitcode 0 The stream is, or is mocked as, a terminal
+# @exitcode 1 The stream is not, or is mocked as not, a terminal
+# @internal
+#######################################
+# The stream is optional and defaults to stdout, exactly as in the function this
+# stands in for, so there is no fixed argument list to name.
+# dyshellint disable=BSG050
+function __dybatpho_test_tty_answer {
+  local stream="${1:-stdout}"
+  __dybatpho_os_assert_stream "${stream}"
+  local name fd
+  case "${stream}" in
+    stdin | 0) name=stdin fd=0 ;;
+    stdout | 1) name=stdout fd=1 ;;
+    *) name=stderr fd=2 ;;
+  esac
+  case "${DYBATPHO_TEST_TTY[${name}]-}" in
+    on) return 0 ;;
+    off) return 1 ;;
+    *)
+      # Run by "dybatpho::mock_tty answers is_tty for the streams it names",
+      # which asserts its answer; kcov records no hit for this test.
+      [[ -t "${fd}" ]] # kcov(skip)
+      ;;
+  esac
+}
+
+#######################################
+# @description Make the library see a terminal, or none, on the standard streams.
+#
+#   This replaces `dybatpho::is_tty` until `dybatpho::unmock_tty`, so everything
+#   that asks it follows: `dybatpho::color_supported`, `dybatpho::is_interactive`
+#   and the confirmations built on it, and the privilege prompt guard. A stream
+#   that is not named keeps its real answer, and a later call changes only the
+#   streams it names.
+#
+#   The environment still has the last word, exactly as it does on a real
+#   terminal: `NO_COLOR` and `FORCE_COLOR` decide colour, and
+#   `DYBATPHO_INTERACTIVE` set to anything but `auto` decides interactivity.
+#   Code that tests a file descriptor itself with `[[ -t ]]` is not affected --
+#   `dybatpho::tui_supported` is one, and is steered with `DYBATPHO_TUI`
+#   instead -- and neither is a script started in a new shell, which sources the
+#   library afresh.
+# @example
+#   dybatpho::mock_tty on stdout stderr
+#   dybatpho::color_supported stderr && printf 'colour\n'
+#   dybatpho::mock_tty off stdin
+#   dybatpho::confirm "Delete?" || printf 'refused without a terminal\n'
+#   dybatpho::unmock_tty
+#
+# @arg $1 string `on` to report a terminal, `off` to report none
+# @arg $@ string Streams to mock: `stdin`, `stdout`, `stderr`, or `0`-`2`; default is all three
+# @set DYBATPHO_TEST_TTY Mocked answer for each stream
+# @exitcode 0 The streams are mocked
+# @exitcode 1 The state is not `on` or `off`, or a stream name is unknown
+# @see dybatpho::unmock_tty
+#######################################
+function dybatpho::mock_tty {
+  local state
+  dybatpho::expect_args state -- "$@"
+  shift
+  [[ "${state}" == "on" || "${state}" == "off" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected on or off: ${state}"
+  (($# > 0)) || set -- stdin stdout stderr
+
+  local stream
+  local -a names=()
+  for stream in "$@"; do
+    case "${stream}" in
+      stdin | 0) names+=(stdin) ;;
+      stdout | 1) names+=(stdout) ;;
+      stderr | 2) names+=(stderr) ;;
+      # Ends the shell, so "dybatpho::mock_tty rejects a bad state or stream"
+      # runs it under `run`, which kcov cannot see.
+      *) dybatpho::die "${FUNCNAME[0]}: Stream must be stdin, stdout, or stderr, got '${stream}'" ;; # kcov(skip)
+    esac
+  done
+
+  if [[ -z "${DYBATPHO_TEST_TTY_ORIGINAL}" ]]; then
+    DYBATPHO_TEST_TTY_ORIGINAL="$(declare -f dybatpho::is_tty)"
+    # Replacing a function of another module by name is what the mock is; a
+    # literal definition is the only way to write one without documenting a
+    # second, public `dybatpho::is_tty` here.
+    # dyshellint disable=BSG040
+    eval "function dybatpho::is_tty { __dybatpho_test_tty_answer \"\$@\"; }"
+  fi
+  for stream in "${names[@]}"; do
+    DYBATPHO_TEST_TTY["${stream}"]="${state}"
+  done
+}
+
+#######################################
+# @description Give `dybatpho::is_tty` back its real answers.
+# @noargs
+# @set DYBATPHO_TEST_TTY Emptied
+# @exitcode 0 Always, including when no stream was mocked
+#######################################
+function dybatpho::unmock_tty {
+  DYBATPHO_TEST_TTY=()
+  [[ -n "${DYBATPHO_TEST_TTY_ORIGINAL}" ]] || return 0
+  # `declare -f` prints a definition that recreates the function, so running it
+  # is how the original comes back; there is no other form to restore it from.
+  # dyshellint disable=BSG040
+  eval "${DYBATPHO_TEST_TTY_ORIGINAL}"
+  DYBATPHO_TEST_TTY_ORIGINAL=""
+}
+
+#######################################
 # @description Create a temporary fixture directory that is removed when the shell exits.
 # @example
 #   dybatpho::fixture_dir workdir
@@ -1234,17 +1546,21 @@ function dybatpho::fixture_file {
 }
 
 #######################################
-# @description Remove every mock created in this shell and restore the environment.
+# @description Remove every mock created in this shell and restore the environment,
+#   the clock, and the terminal detection.
 # @noargs
 # @tip Fixtures and mocks are already removed by their exit traps; call this to reset
 #      state between test cases that share one shell.
 #######################################
 function dybatpho::unmock_all {
   dybatpho::unmock_env
+  dybatpho::unmock_tty
+  dybatpho::unmock_time
   dybatpho::snapshot_scrub_reset
   if [[ -n "${DYBATPHO_TEST_MOCK_DIR}" && -d "${DYBATPHO_TEST_MOCK_DIR}" ]]; then
     rm -rf "${DYBATPHO_TEST_MOCK_DIR:?}"/*
     mkdir -p "${DYBATPHO_TEST_MOCK_DIR}/calls"
   fi
+  hash -r
   return 0
 }

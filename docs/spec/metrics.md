@@ -101,6 +101,24 @@ As an operator, I want a script to export the median and the tail latency of a s
 
 ---
 
+### User Story 6 - Push a short-lived job's metrics (Priority: P2)
+
+As an operator, I want a cron job or CI step to push its metrics to a Prometheus Pushgateway before it exits, so that a run too short to be scraped still reaches the dashboard.
+
+**Why this priority**: The textfile collector needs a node exporter on the same host; a job in a container or on a CI runner has neither, and the Pushgateway is the standard answer.
+
+**Independent Test**: Record metrics, push them to a mocked Pushgateway, and verify the URL, method, content type, body, encoded grouping labels, and the handling of a refusal, of nothing recorded, and of `DRY_RUN`.
+
+**Acceptance Scenarios**:
+
+1. **Given** recorded metrics, **When** they are pushed with a job name and grouping labels, **Then** the rendered exposition is sent with `PUT` to `<gateway>/metrics/job/<job>/<label>/<value>…` as `text/plain; version=0.0.4`
+2. **Given** `--add`, **When** the metrics are pushed, **Then** `POST` is used so that metrics of the group not pushed again are kept
+3. **Given** a job name or grouping value that is empty or contains a `/`, **When** the URL is built, **Then** that pair is sent as `<label>@base64/<base64url value>`, and every other value is percent-encoded
+4. **Given** the Pushgateway answers with an error status, **When** the push completes, **Then** the status class is returned as the exit code and the gateway's own error text is logged
+5. **Given** nothing has been recorded, **When** a push is asked for, **Then** no request is sent, a warning says so, and the call succeeds
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -124,12 +142,15 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - A summary with a single observation, where every quantile is that value.
 - A quantile list that is empty, not numeric, or outside `0`–`1`.
 - One metric name used for both a histogram and a summary.
+- A push with nothing recorded, or under `DRY_RUN`.
+- A grouping value that is empty, contains a `/`, a space, or non-ASCII text.
+- A Pushgateway that refuses the push with a 4xx or 5xx status and an explanation.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The module MUST record counters, gauges, and duration histograms in the current shell, and MUST NOT send anything anywhere.
+- **FR-001**: The module MUST record counters, gauges, and duration histograms and summaries in the current shell, and MUST NOT send anything anywhere unless the script calls the push helper.
 - **FR-002**: The module MUST reject a metric or label name that is not a valid Prometheus name, and a counter amount or histogram observation that is not a non-negative integer.
 - **FR-003**: Validation MUST stop the caller from recording the series, and therefore MUST NOT be performed inside a command substitution, where a rejection could not reach the caller.
 - **FR-004**: Series MUST be identified by their metric name and label set, with labels ordered so that the same set recorded in a different order is one series.
@@ -149,6 +170,11 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-017**: Summary quantiles MUST be interpolated linearly between the nearest ranks, as `dybatpho::math_percentile` does, and exported in seconds without rounding.
 - **FR-018**: The module MUST refuse a quantile list that is empty or holds a value that is not a number from `0` to `1`, and MUST refuse to record one metric name as both a histogram and a summary.
 - **FR-019**: Summary totals MUST be readable through the same `sum` and `count` kinds of `dybatpho::metrics_get` as a histogram's, in milliseconds.
+- **FR-020**: The module MUST push the rendered exposition to a Pushgateway URL given by the script, under `/metrics/job/<job>` followed by one `/<label>/<value>` pair per grouping label, with content type `text/plain; version=0.0.4`, using `PUT` by default and `POST` with `--add`.
+- **FR-021**: A job name or grouping value that is empty or contains `/` MUST be sent as `<label>@base64/<value>` in the URL-safe base64 alphabet, an empty value as `=`, and every other value MUST be percent-encoded.
+- **FR-022**: The push helper MUST refuse a URL without an `http://` or `https://` scheme, an empty job name, a grouping label that is not a `key=value` pair with a valid label name, and a grouping label named `job`.
+- **FR-023**: The push helper MUST return the network module's exit code for the request and MUST log the gateway's error text when it refuses the push, rather than hiding the failure.
+- **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DRY_RUN` by printing the request instead of sending it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -169,6 +195,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **SC-004**: A collector never reads a partially written metrics file.
 - **SC-005**: A script that does not load the module is unaffected in behavior.
 - **SC-006**: A run report shows the exact median and tail latency of a repeated step from a single recording call per step.
+- **SC-007**: A job that exits before any scrape still delivers its metrics through a Pushgateway with one call.
 
 ## Integration Tests *(mandatory)*
 
@@ -192,8 +219,14 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-018**: Reject a non-integer duration, a malformed label, and an empty, non-numeric or out-of-range quantile list, and verify nothing is recorded.
 - **IT-019**: Verify a histogram name cannot take a summary observation and a summary name cannot take a histogram observation.
 - **IT-020**: Reset the metrics and verify a summary's earlier observations no longer affect its quantiles.
-- **IT-021**: Load the module on its own and verify `math` is loaded ahead of it.
+- **IT-021**: Load the module on its own and verify `math` and `network` are loaded ahead of it.
 - **IT-022**: Render a summary that has been declared but has no sample, and a type the renderer does not expand, and verify each prints its `# HELP` and `# TYPE` lines and no series.
+- **IT-023**: Push recorded metrics to a mocked Pushgateway and verify the URL with grouping labels, the `PUT` method, the content type, and the exposition body.
+- **IT-024**: Push with `--add` and verify `POST` is used.
+- **IT-025**: Push with a job and grouping values that are empty, contain a `/`, a space, and non-ASCII text, and verify the base64url and percent encodings in the URL.
+- **IT-026**: Push to a mocked Pushgateway that answers 400 with an explanation and verify the exit code `4` and the logged error text.
+- **IT-027**: Push with nothing recorded and under `DRY_RUN`, and verify no request reaches the gateway.
+- **IT-028**: Reject a URL without a scheme, an empty job, a malformed grouping label, an invalid label name, and a grouping label named `job`.
 
 ## Acceptance Criteria *(mandatory)*
 

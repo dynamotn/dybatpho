@@ -119,8 +119,9 @@ declare -A __dybatpho_module_deps=(
   # is why the version constraint lives in the report rather than in `config`,
   # whose own `yq` call would drag `semver` into every script loading `cli`.
   [doctor]="semver"
-  # A summary exports quantiles, which `math` computes exactly in Bash.
-  [metrics]="math"
+  # A summary exports quantiles, which `math` computes exactly in Bash, and a
+  # push to the Pushgateway goes through `network`'s curl wrapper.
+  [metrics]="math network"
 )
 
 #######################################

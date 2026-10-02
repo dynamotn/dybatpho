@@ -3,9 +3,9 @@
 # @brief Example showing timing, counters and Prometheus export
 # @description Demonstrates dybatpho::metrics_time, metrics_timer_start/stop,
 #   metrics_counter_inc, metrics_gauge_set, metrics_observe_ms,
-#   metrics_summary_ms, metrics_get,
-#   metrics_render, metrics_write, and the retry/HTTP/error instrumentation that
-#   loading this module turns on
+#   metrics_summary_ms, metrics_get, metrics_render, metrics_write,
+#   metrics_push, and the retry/HTTP/error instrumentation that loading this
+#   module turns on
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules metrics
 
@@ -108,6 +108,12 @@ function _demo_export {
   dybatpho::info "Wrote ${prom}"
   dybatpho::show_file "${prom}"
   dybatpho::info "In production this would live in the textfile collector directory"
+
+  # A job that exits before anything scrapes it pushes to a Pushgateway instead.
+  # `DRY_RUN` prints the request rather than sending it, which keeps this
+  # example offline; a grouping value with a `/` goes base64url-encoded.
+  DRY_RUN=true dybatpho::metrics_push http://pushgateway.example.test:9091 nightly-backup \
+    target=db path=/var/backups
 }
 
 # @description Run every section of this example, in order.

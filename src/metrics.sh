@@ -16,11 +16,14 @@
 #   cumulative buckets, or into a summary, which exports exact quantiles such
 #   as the median and the 99th percentile.
 #
-#   Metrics live in the current shell only. Nothing is sent anywhere: a script
-#   writes the rendered text to a file, and a collector such as the node
-#   exporter's textfile collector picks it up. `dybatpho::metrics_write` writes
-#   that file atomically, which is what the textfile collector requires in order
-#   never to read a half-written file.
+#   Metrics live in the current shell only, and nothing is sent anywhere unless
+#   the script asks. Either it writes the rendered text to a file, and a
+#   collector such as the node exporter's textfile collector picks it up —
+#   `dybatpho::metrics_write` writes that file atomically, which is what the
+#   textfile collector requires in order never to read a half-written file — or
+#   it pushes the text to a Prometheus Pushgateway with
+#   `dybatpho::metrics_push`, which suits a job that exits before anything
+#   could scrape it.
 #
 #   Durations are handled in whole milliseconds, because Bash has no floating
 #   point arithmetic, and rendered in seconds, because that is the unit
@@ -643,6 +646,150 @@ function dybatpho::metrics_write {
   local path
   dybatpho::expect_args path -- "$@"
   dybatpho::metrics_render | dybatpho::file_write_atomic "${path}"
+}
+
+#######################################
+# @description Encode a string as base64url, in Bash.
+#   The Pushgateway takes a grouping value that contains a `/`, or is empty, as
+#   `<label>@base64/<value>`, in the URL-safe alphabet. `base64` itself is not
+#   on every system that runs this module, and its URL-safe form even less.
+# @arg $1 string Name of the variable receiving the encoding
+# @arg $2 string Value to encode
+# @set The named variable, padded with `=` to a multiple of four
+# @internal
+#######################################
+function __dybatpho_metrics_base64url {
+  local -n __b64_out="$1"
+  local __b64_value="${2-}"
+  local LC_ALL=C
+  local __b64_alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+  local __b64_result="" __b64_index __b64_chunk __b64_bytes __b64_byte __b64_offset
+  for ((__b64_index = 0; __b64_index < ${#__b64_value}; __b64_index += 3)); do # kcov(skip) every encoding runs it
+    __b64_chunk=0
+    __b64_bytes=0
+    for ((__b64_offset = 0; __b64_offset < 3; __b64_offset++)); do
+      __b64_chunk=$((__b64_chunk << 8))
+      if ((__b64_index + __b64_offset < ${#__b64_value})); then
+        printf -v __b64_byte '%d' "'${__b64_value:__b64_index + __b64_offset:1}"
+        # Bash reports a byte above 127 as negative in some builds.
+        __b64_chunk=$((__b64_chunk | (__b64_byte & 255)))
+        __b64_bytes=$((__b64_bytes + 1))
+      fi
+    done
+    __b64_result+="${__b64_alphabet:__b64_chunk >> 18 & 63:1}"
+    __b64_result+="${__b64_alphabet:__b64_chunk >> 12 & 63:1}"
+    if ((__b64_bytes > 1)); then
+      __b64_result+="${__b64_alphabet:__b64_chunk >> 6 & 63:1}"
+    else
+      __b64_result+="="
+    fi
+    if ((__b64_bytes > 2)); then
+      __b64_result+="${__b64_alphabet:__b64_chunk & 63:1}"
+    else
+      __b64_result+="="
+    fi
+  done
+  # The Pushgateway reads an empty value as a lone `=`.
+  __b64_out="${__b64_result:-=}"
+}
+
+#######################################
+# @description Append one `/<label>/<value>` pair to a Pushgateway path.
+# @arg $1 string Name of the variable holding the path
+# @arg $2 string Label name
+# @arg $3 string Label value
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_metrics_push_segment {
+  local -n __segment_path="$1"
+  local __segment_label="$2" __segment_value="${3-}" __segment_encoded
+  if [[ -z "${__segment_value}" || "${__segment_value}" == */* ]]; then
+    __dybatpho_metrics_base64url __segment_encoded "${__segment_value}"
+    __segment_path+="/${__segment_label}@base64/${__segment_encoded}"
+  else
+    __segment_encoded="$(dybatpho::url_encode "${__segment_value}")"
+    __segment_path+="/${__segment_label}/${__segment_encoded}"
+  fi
+}
+
+#######################################
+# @description Push the recorded metrics to a Prometheus Pushgateway.
+#   A script that runs and exits is gone before Prometheus can scrape it; the
+#   Pushgateway holds what it pushed until the next scrape. The metrics are
+#   grouped under the job name and any further `key=value` labels, which become
+#   part of the URL: `/metrics/job/<job>/<key>/<value>`. A value that is empty
+#   or contains a `/` is sent base64url-encoded, the way the Pushgateway
+#   expects, and every other value is percent-encoded.
+#
+#   The default is `PUT`, which replaces every metric in the group, so a metric
+#   the script stopped recording disappears. `--add` sends `POST` instead,
+#   which replaces only the metrics pushed again and keeps the others.
+# @example
+#   dybatpho::metrics_push https://pushgateway.example.com backup host="$(hostname)"
+#   dybatpho::metrics_push --add http://localhost:9091 nightly stage=upload
+#
+# @option --add Replace only the metrics being pushed, with `POST`, instead of the whole group
+# @arg $1 string Pushgateway base URL
+# @arg $2 string Job name
+# @arg $@ string Grouping labels as `key=value`
+# @env DRY_RUN string When true-like, print the request instead of sending it
+# @stderr The Pushgateway's own error text when it refuses the push
+# @exitcode 0 The metrics were pushed, or nothing was recorded and nothing was sent
+# @exitcode 1 The URL, job or a label is not valid, or the request failed without a response
+# @exitcode 3 The Pushgateway answered with a 3xx status
+# @exitcode 4 The Pushgateway answered with a 4xx status
+# @exitcode 5 The Pushgateway answered with a 5xx status
+# @exitcode 127 curl is not installed
+#######################################
+function dybatpho::metrics_push {
+  local method=PUT
+  if [[ "${1-}" == "--add" ]]; then
+    method=POST
+    shift
+  fi
+  local gateway job
+  dybatpho::expect_args gateway job -- "$@"
+  shift 2
+  [[ "${gateway}" =~ ^https?://[^/]+ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Pushgateway URL must start with http:// or https://, got '${gateway}'"
+  [[ -n "${job}" ]] || dybatpho::die "${FUNCNAME[0]}: Job name must not be empty"
+
+  local path="${gateway%/}/metrics" pair key
+  __dybatpho_metrics_push_segment path job "${job}"
+  for pair in "$@"; do
+    [[ "${pair}" == *=* ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Grouping label must be given as key=value, got '${pair}'"
+    key="${pair%%=*}"
+    # A grouping label is a label name, which unlike a metric name has no `:`.
+    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Invalid label name '${key}'"
+    [[ "${key}" != job ]] \
+      || dybatpho::die "${FUNCNAME[0]}: The job is already the first grouping label"
+    __dybatpho_metrics_push_segment path "${key}" "${pair#*=}"
+  done
+
+  local body
+  body="$(dybatpho::metrics_render)"
+  if [[ -z "${body}" ]]; then
+    dybatpho::warn "Nothing recorded, so nothing was pushed to ${gateway}"
+    return 0
+  fi
+
+  local response status=0
+  dybatpho::create_temp response ".body" "metrics"
+  # The body travels on standard input, where every retry reads it afresh.
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local DYBATPHO_CURL_SECRET_DATA="${body}"
+  dybatpho::curl_do "${path}" "${response}" \
+    --request "${method}" \
+    --header "Content-Type: text/plain; version=0.0.4" || status=$?
+  if ((status != 0)); then
+    local detail=""
+    [[ -s "${response}" ]] && detail=": $(< "${response}")"
+    dybatpho::error "Pushgateway refused the push to ${path} (exit ${status})${detail}"
+  fi
+  return "${status}"
 }
 
 # Describe the metrics the library records on its own. Only the help text is

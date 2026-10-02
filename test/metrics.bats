@@ -264,6 +264,92 @@ setup() {
   dybatpho::unmock_all
 }
 
+@test "dybatpho::metrics_push PUTs the exposition to the job's group" {
+  dybatpho::mock_http "pushgateway.test" 200 ""
+  dybatpho::metrics_counter_inc jobs_total 3
+  run_traced -0 dybatpho::metrics_push http://pushgateway.test:9091/ backup host=web-1
+  assert_equal "$(dybatpho::mock_http_calls)" "http://pushgateway.test:9091/metrics/job/backup/host/web-1"
+  run_traced dybatpho::mock_calls curl
+  assert_output --partial "--request PUT"
+  assert_output --partial "--header Content-Type: text/plain; version=0.0.4"
+  run_traced dybatpho::mock_http_payloads
+  assert_output --partial "# TYPE jobs_total counter jobs_total 3"
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push --add POSTs so the rest of the group survives" {
+  dybatpho::mock_http "pushgateway.test" 202 ""
+  dybatpho::metrics_gauge_set queue_depth 4
+  run_traced -0 dybatpho::metrics_push --add https://pushgateway.test nightly
+  run_traced dybatpho::mock_calls curl
+  assert_output --partial "--request POST"
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push encodes grouping values the way the Pushgateway reads them" {
+  dybatpho::mock_http "pushgateway.test" 200 ""
+  dybatpho::metrics_counter_inc jobs_total
+  # A `/` or an empty value goes base64url-encoded; anything else is
+  # percent-encoded.
+  run_traced -0 dybatpho::metrics_push http://pushgateway.test "backup/db" env= "path=a b" "name=é/ü" "dir=a/b/c/d"
+  assert_equal "$(dybatpho::mock_http_calls)" \
+    "http://pushgateway.test/metrics/job@base64/YmFja3VwL2Ri/env@base64/=/path/a%20b/name@base64/w6kvw7w=/dir@base64/YS9iL2MvZA=="
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push reports the Pushgateway's refusal and its status" {
+  dybatpho::mock_http "pushgateway.test" 400 "text format parsing error in line 1"
+  dybatpho::metrics_counter_inc jobs_total
+  DYBATPHO_CURL_MAX_RETRIES=0 run_traced -4 dybatpho::metrics_push http://pushgateway.test nightly
+  # `run_traced` leaves standard error alone, so `run` reads the message.
+  DYBATPHO_CURL_MAX_RETRIES=0 run -4 dybatpho::metrics_push http://pushgateway.test nightly
+  assert_output --partial "Pushgateway refused the push to http://pushgateway.test/metrics/job/nightly (exit 4)"
+  assert_output --partial "text format parsing error in line 1"
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push sends nothing when nothing was recorded" {
+  dybatpho::mock_http "pushgateway.test" 200 ""
+  # `run` goes first: its subshell keeps the warning from being counted by the
+  # logging instrumentation, which would give the second call something to push.
+  run -0 dybatpho::metrics_push http://pushgateway.test nightly
+  assert_output --partial "Nothing recorded, so nothing was pushed"
+  run_traced -0 dybatpho::metrics_push http://pushgateway.test nightly
+  run_traced -1 dybatpho::mock_http_calls
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push prints the request under DRY_RUN" {
+  dybatpho::mock_http "pushgateway.test" 200 ""
+  dybatpho::metrics_counter_inc jobs_total
+  DRY_RUN=true run_traced -0 dybatpho::metrics_push http://pushgateway.test nightly
+  assert_output --partial "http://pushgateway.test/metrics/job/nightly"
+  run_traced -1 dybatpho::mock_http_calls
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push rejects a bad gateway, job or grouping label" {
+  dybatpho::metrics_counter_inc jobs_total
+  run dybatpho::metrics_push pushgateway.test nightly
+  assert_failure
+  assert_output --partial "Pushgateway URL must start with http:// or https://"
+  run dybatpho::metrics_push http://pushgateway.test ""
+  assert_failure
+  assert_output --partial "Job name must not be empty"
+  run dybatpho::metrics_push http://pushgateway.test nightly not-a-pair
+  assert_failure
+  assert_output --partial "Grouping label must be given as key=value, got 'not-a-pair'"
+  run dybatpho::metrics_push http://pushgateway.test nightly 9bad=x
+  assert_failure
+  assert_output --partial "dybatpho::metrics_push: Invalid label name '9bad'"
+  run dybatpho::metrics_push http://pushgateway.test nightly a:b=x
+  assert_failure
+  assert_output --partial "Invalid label name 'a:b'"
+  run dybatpho::metrics_push http://pushgateway.test nightly job=other
+  assert_failure
+  assert_output --partial "The job is already the first grouping label"
+}
+
 @test "rendering survives an ERR trap installed by register_common_handlers" {
   # `run` disables errexit, so this has to be a real strict-mode shell: an
   # earlier version returned non-zero from the series lookup whenever the last

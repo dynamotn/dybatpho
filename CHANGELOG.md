@@ -392,6 +392,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   # fetch_duration_seconds{site="docs",quantile="0.99"} 0.143
   ```
 
+- **`metrics` — push to a Prometheus Pushgateway.**
+  `dybatpho::metrics_push` sends the rendered metrics to a Pushgateway, so a
+  cron job or CI step that exits before any scrape still reaches the dashboard.
+  The job name and any `key=value` grouping labels become the URL
+  (`/metrics/job/<job>/<key>/<value>`), with a value that is empty or contains
+  a `/` sent base64url-encoded as the Pushgateway expects and every other value
+  percent-encoded. It replaces the whole group with `PUT`, or only the pushed
+  metrics with `--add` (`POST`), goes through `dybatpho::curl_do` with its
+  retries and `DRY_RUN`, returns its exit code, and logs the gateway's own error
+  text when the push is refused. With nothing recorded it sends nothing and
+  says so. Loading `metrics` now loads `network` too.
+
+  ```sh
+  dybatpho::metrics_push https://pushgateway.example.com nightly-backup host="$(hostname)"
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

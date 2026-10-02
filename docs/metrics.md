@@ -15,11 +15,14 @@ Prometheus text exposition format. Durations go into a histogram, with
 cumulative buckets, or into a summary, which exports exact quantiles such
 as the median and the 99th percentile.
 
-Metrics live in the current shell only. Nothing is sent anywhere: a script
-writes the rendered text to a file, and a collector such as the node
-exporter's textfile collector picks it up. `dybatpho::metrics_write` writes
-that file atomically, which is what the textfile collector requires in order
-never to read a half-written file.
+Metrics live in the current shell only, and nothing is sent anywhere unless
+the script asks. Either it writes the rendered text to a file, and a
+collector such as the node exporter's textfile collector picks it up —
+`dybatpho::metrics_write` writes that file atomically, which is what the
+textfile collector requires in order never to read a half-written file — or
+it pushes the text to a Prometheus Pushgateway with
+`dybatpho::metrics_push`, which suits a job that exits before anything
+could scrape it.
 
 Durations are handled in whole milliseconds, because Bash has no floating
 point arithmetic, and rendered in seconds, because that is the unit
@@ -51,6 +54,7 @@ are counted without the script asking for it.
 - [`dybatpho::metrics_reset`](#dybatphometrics_reset) — Forget every recorded metric.
 - [`dybatpho::metrics_render`](#dybatphometrics_render) — Render every recorded metric in the Prometheus text exposition format.
 - [`dybatpho::metrics_write`](#dybatphometrics_write) — Write the rendered metrics to a file, atomically. The node exporter's textfile collector reads whatever it finds whenever it scrapes, so the file has to appear complete or not at all.
+- [`dybatpho::metrics_push`](#dybatphometrics_push) — Push the recorded metrics to a Prometheus Pushgateway. A script that runs and exits is gone before Prometheus can scrape it; the Pushgateway holds what it pushed until the next scrape. The metrics are grouped under the job name and any further `key=value` labels, which become part of the URL: `/metrics/job/<job>/<key>/<value>`. A value that is empty or contains a `/` is sent base64url-encoded, the way the Pushgateway expects, and every other value is percent-encoded. The default is `PUT`, which replaces every metric in the group, so a metric the script stopped recording disappears. `--add` sends `POST` instead, which replaces only the metrics pushed again and keeps the others.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -397,3 +401,61 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 **🚦 Exit codes**
 
 - `1`: The destination directory is missing or the write fails
+
+
+---
+
+### `dybatpho::metrics_push`
+
+Push the recorded metrics to a Prometheus Pushgateway.
+A script that runs and exits is gone before Prometheus can scrape it; the
+Pushgateway holds what it pushed until the next scrape. The metrics are
+grouped under the job name and any further `key=value` labels, which become
+part of the URL: `/metrics/job/<job>/<key>/<value>`. A value that is empty
+or contains a `/` is sent base64url-encoded, the way the Pushgateway
+expects, and every other value is percent-encoded.
+
+The default is `PUT`, which replaces every metric in the group, so a metric
+the script stopped recording disappears. `--add` sends `POST` instead,
+which replaces only the metrics pushed again and keeps the others.
+
+**🧪 Example**
+
+```bash
+dybatpho::metrics_push https://pushgateway.example.com backup host="$(hostname)"
+dybatpho::metrics_push --add http://localhost:9091 nightly stage=upload
+
+```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--add** | Replace only the metrics being pushed, with `POST`, instead of the whole group |
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Pushgateway base URL |
+| `$2` | string | Job name |
+| `$@` | string | Grouping labels as `key=value` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DRY_RUN`** | string | When true-like, print the request instead of sending it |
+
+**📤 Output on stderr**
+
+- The Pushgateway's own error text when it refuses the push
+
+**🚦 Exit codes**
+
+- `0`: The metrics were pushed, or nothing was recorded and nothing was sent
+- `1`: The URL, job or a label is not valid, or the request failed without a response
+- `3`: The Pushgateway answered with a 3xx status
+- `4`: The Pushgateway answered with a 4xx status
+- `5`: The Pushgateway answered with a 5xx status
+- `127`: curl is not installed

@@ -4,7 +4,7 @@
 # @description
 #   Demonstrates dybatpho::trim, split, string matching, string_replace, string_trim_prefix, string_trim_suffix,
 #   string_trim_chars, string_is_blank, string_truncate, string_lines, string_wrap, string_slugify, string_repeat,
-#   string_pad, url_encode, url_decode, upper, lower
+#   string_pad, url_encode, url_decode, upper, lower, string_match, string_distance, string_closest
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"
@@ -211,6 +211,40 @@ function _demo_quote {
   dybatpho::print "  ssh host ${string_quote}"
 }
 
+# @description Pull a version apart with capture groups, and tell a branch name
+#   that is not a version from one that is.
+# @noargs
+function _demo_regex {
+  dybatpho::header "REGEX CAPTURES"
+  local -a parts=()
+  local ref
+  for ref in "v1.24.3" "main"; do
+    if dybatpho::string_match parts "${ref}" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'; then
+      dybatpho::print "  ${ref} -> major ${parts[1]}, minor ${parts[2]}, patch ${parts[3]}"
+    else
+      dybatpho::print "  ${ref} -> not a version tag"
+    fi
+  done
+}
+
+# @description Suggest what a user meant when a subcommand is mistyped.
+# @noargs
+function _demo_distance {
+  dybatpho::header "EDIT DISTANCE / DID YOU MEAN"
+  local distance
+  distance=$(dybatpho::string_distance kitten sitting)
+  dybatpho::info "kitten -> sitting takes ${distance} edits"
+  local -a commands=(status start stash build deploy) guesses=()
+  local typed
+  for typed in "staus" "dploy" "frobnicate"; do
+    if dybatpho::string_closest guesses "${typed}" 2 "${commands[@]}"; then
+      dybatpho::print "  ${typed}: did you mean ${guesses[*]}?"
+    else
+      dybatpho::print "  ${typed}: no close command"
+    fi
+  done
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -227,6 +261,8 @@ function _main {
   _demo_case
   _demo_naming
   _demo_quote
+  _demo_regex
+  _demo_distance
   dybatpho::success "String operations demo complete"
 }
 

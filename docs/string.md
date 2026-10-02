@@ -14,6 +14,11 @@ trimming exact prefixes/suffixes and characters, slugifying, truncating,
 counting lines, testing blank strings, wrapping text, repeating, padding,
 encoding, decoding, and case-converting shell strings.
 
+`dybatpho::string_match` hands back regular expression capture groups
+through an array, and `dybatpho::string_distance` and
+`dybatpho::string_closest` measure and rank edit distance for "did you
+mean" suggestions.
+
 The naming-convention helpers convert between `snake_case`, `kebab-case`,
 `camelCase`, and `PascalCase`, reading the word boundaries whichever
 convention the input arrived in. `dybatpho::string_quote` prepares a value
@@ -26,6 +31,7 @@ to be written into shell code that will be evaluated later.
 - [`dybatpho::string_starts_with`](#dybatphostring_starts_with) — Return success when a string starts with the given prefix.
 - [`dybatpho::string_ends_with`](#dybatphostring_ends_with) — Return success when a string ends with the given suffix.
 - [`dybatpho::string_contains`](#dybatphostring_contains) — Return success when a string contains the given substring.
+- [`dybatpho::string_match`](#dybatphostring_match) — Match a string against a Bash extended regular expression and hand back what it captured. The named array receives the whole match at index `0` and each capture group after it, the way `BASH_REMATCH` lays them out; a group that took no part in the match is an empty element, so the indexes always line up with the groups in the pattern. On a miss the array is emptied rather than left holding an earlier result. The pattern is passed as data, never written into the test, so it is read as a regular expression whatever characters it holds.
 - [`dybatpho::string_replace`](#dybatphostring_replace) — Replace all exact substring matches in a string.
 - [`dybatpho::string_trim_prefix`](#dybatphostring_trim_prefix) — Remove an exact prefix from a string when it matches.
 - [`dybatpho::string_trim_suffix`](#dybatphostring_trim_suffix) — Remove an exact suffix from a string when it matches.
@@ -46,6 +52,8 @@ to be written into shell code that will be evaluated later.
 - [`dybatpho::string_to_camel`](#dybatphostring_to_camel) — Convert a string to `camelCase`.
 - [`dybatpho::string_to_pascal`](#dybatphostring_to_pascal) — Convert a string to `PascalCase`.
 - [`dybatpho::string_quote`](#dybatphostring_quote) — Quote a string so the shell reads it back as one literal value. This is what to reach for when a value is going into generated shell code: a completion script, a `--command` argument, or anything that will be evaluated later. Writing the value in by hand leaves whitespace, quotes and `$` to be read as syntax rather than as data. The empty string quotes to `''` rather than to nothing, which is the whole point: an unquoted empty value disappears from the command it was part of.
+- [`dybatpho::string_distance`](#dybatphostring_distance) — Compute the Levenshtein edit distance between two strings. The distance is the smallest number of single-character insertions, deletions and substitutions that turn one string into the other. It is counted in characters, not bytes, so `café` is one edit from `cafe` under a UTF-8 locale. The comparison is case-sensitive; lower both sides first to ignore case.
+- [`dybatpho::string_closest`](#dybatphostring_closest) — Find the candidates closest to a string by edit distance. Every candidate within the maximum distance is scored, and the named array receives those that share the smallest score, in the order they were given and without duplicates. An exact match is distance `0`, so it wins on its own. Empty candidates are skipped. The comparison is case-sensitive, as `dybatpho::string_distance` is. This is the building block behind "did you mean" messages: pass the word a user typed and the words that would have been accepted.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -151,6 +159,50 @@ Return success when a string contains the given substring.
 
 - `0`: The input contains the substring
 - `1`: The input does not contain the substring
+
+
+---
+
+### `dybatpho::string_match`
+
+Match a string against a Bash extended regular expression and
+hand back what it captured.
+The named array receives the whole match at index `0` and each capture
+group after it, the way `BASH_REMATCH` lays them out; a group that took no
+part in the match is an empty element, so the indexes always line up with
+the groups in the pattern. On a miss the array is emptied rather than left
+holding an earlier result.
+
+The pattern is passed as data, never written into the test, so it is read
+as a regular expression whatever characters it holds.
+
+**🧪 Example**
+
+```bash
+local -a parts=()
+if dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'; then
+  printf 'major=%s minor=%s\n' "${parts[1]}" "${parts[2]}"
+fi
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the array receiving the match and its groups |
+| `$2` | string | String to match |
+| `$3` | string | Extended regular expression |
+
+**🧩 Variable sets**
+
+- **`The`** (named): array
+
+**🚦 Exit codes**
+
+- `0`: The string matches
+- `1`: The string does not match
+- `2`: The pattern is not a valid regular expression
 
 
 ---
@@ -586,3 +638,90 @@ printf 'ssh host %s\n' "$(dybatpho::string_quote "${remote_command}")"
 **📤 Output on stdout**
 
 - The value quoted for the shell
+
+
+---
+
+### `dybatpho::string_distance`
+
+Compute the Levenshtein edit distance between two strings.
+The distance is the smallest number of single-character insertions,
+deletions and substitutions that turn one string into the other. It is
+counted in characters, not bytes, so `café` is one edit from `cafe` under a
+UTF-8 locale. The comparison is case-sensitive; lower both sides first to
+ignore case.
+
+**🧪 Example**
+
+```bash
+dybatpho::string_distance kitten sitting   # 3
+dybatpho::string_distance color colour     # 1
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | First string |
+| `$2` | string | Second string |
+
+**📤 Output on stdout**
+
+- Edit distance as a decimal number
+
+**🚦 Exit codes**
+
+- `0`: Always
+
+**🔗 See also**
+
+- [- `dybatpho::string_closest](#dybatphostring_closest)
+
+
+---
+
+### `dybatpho::string_closest`
+
+Find the candidates closest to a string by edit distance.
+Every candidate within the maximum distance is scored, and the named array
+receives those that share the smallest score, in the order they were given
+and without duplicates. An exact match is distance `0`, so it wins on its
+own. Empty candidates are skipped. The comparison is case-sensitive, as
+`dybatpho::string_distance` is.
+
+This is the building block behind "did you mean" messages: pass the word a
+user typed and the words that would have been accepted.
+
+**🧪 Example**
+
+```bash
+local -a guesses=()
+if dybatpho::string_closest guesses "staus" 2 status start stash; then
+  printf 'Did you mean %s?\n' "${guesses[0]}"   # status
+fi
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the array receiving the closest candidates |
+| `$2` | string | String to compare against |
+| `$3` | number | Largest distance still counted as close, a non-negative integer |
+| `$@` | string | Candidates |
+
+**🧩 Variable sets**
+
+- **`The`** (named): array
+
+**🚦 Exit codes**
+
+- `0`: At least one candidate is within the maximum distance
+- `1`: No candidate is close enough
+- `1`: Stop the script when the maximum distance is not a non-negative integer
+
+**🔗 See also**
+
+- [- `dybatpho::string_distance](#dybatphostring_distance)

@@ -643,6 +643,8 @@ function dybatpho::opts::validate_choice {
 
 #######################################
 # @description Compute the Levenshtein edit distance between two strings.
+#   Kept for existing callers; it answers exactly as
+#   `dybatpho::string_distance`, which it delegates to.
 # @example
 #   distance="$(dybatpho::cli_levenshtein color colour)"
 #
@@ -650,34 +652,11 @@ function dybatpho::opts::validate_choice {
 # @arg $2 string Second string
 # @stdout Edit distance as a decimal number
 # @exitcode 0
+# @see
+#   - `dybatpho::string_distance`
 #######################################
 function dybatpho::cli_levenshtein {
-  local a="${1-}" b="${2-}"
-  local -i la=${#a} lb=${#b} i j cost del ins sub
-  ((la == 0)) && {
-    printf '%s\n' "${lb}"
-    return 0
-  }
-  ((lb == 0)) && {
-    printf '%s\n' "${la}"
-    return 0
-  }
-  local -a prev=() cur=()
-  for ((j = 0; j <= lb; j++)); do prev[j]=${j}; done
-  for ((i = 1; i <= la; i++)); do
-    cur=("${i}")
-    for ((j = 1; j <= lb; j++)); do
-      cost=1
-      [[ "${a:i-1:1}" == "${b:j-1:1}" ]] && cost=0
-      del=$((prev[j] + 1))
-      ins=$((cur[j - 1] + 1))
-      sub=$((prev[j - 1] + cost))
-      if ((del < ins)); then cur[j]=${del}; else cur[j]=${ins}; fi
-      ((sub < cur[j])) && cur[j]=${sub}
-    done
-    prev=("${cur[@]}")
-  done
-  printf '%s\n' "${prev[lb]}"
+  dybatpho::string_distance "${1-}" "${2-}"
 }
 
 #######################################
@@ -719,7 +698,7 @@ function dybatpho::cli_suggest {
     if [[ "${lowered_candidate}" == "${lowered_input}"* ]]; then
       distance=0
     else
-      distance="$(dybatpho::cli_levenshtein "${lowered_input}" "${lowered_candidate}")"
+      __dybatpho_string_distance_into distance "${lowered_input}" "${lowered_candidate}"
     fi
     ((distance > threshold)) && continue
     if ((best < 0 || distance < best)); then best=${distance}; fi

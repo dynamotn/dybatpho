@@ -393,3 +393,133 @@ EOF
   # Unquoted, an empty value vanishes from the command it was part of.
   assert_equal "$(dybatpho::string_quote "")" "''"
 }
+
+@test "dybatpho::string_match hands back the whole match and every group" {
+  local -a parts=()
+  run_traced dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'
+  assert_success
+  assert_equal "${#parts[@]}" 4
+  assert_equal "${parts[0]}" "v1.24.3"
+  assert_equal "${parts[1]}" "1"
+  assert_equal "${parts[2]}" "24"
+  assert_equal "${parts[3]}" "3"
+}
+
+@test "dybatpho::string_match keeps an unused group as an empty element" {
+  local -a parts=()
+  run_traced dybatpho::string_match parts "key=" '^([a-z]+)=(.*)$'
+  assert_success
+  assert_equal "${#parts[@]}" 3
+  assert_equal "${parts[1]}" "key"
+  assert_equal "${parts[2]}" ""
+  run_traced dybatpho::string_match parts "ab" '^(a)(x)?(b)$'
+  assert_success
+  assert_equal "${#parts[@]}" 4
+  assert_equal "${parts[2]}" ""
+  assert_equal "${parts[3]}" "b"
+}
+
+@test "dybatpho::string_match empties the array and returns 1 on a miss" {
+  local -a parts=(stale)
+  run_traced dybatpho::string_match parts "main" '^v[0-9]+$'
+  assert_failure 1
+  assert_equal "${#parts[@]}" 0
+}
+
+@test "dybatpho::string_match returns 2 for an invalid pattern" {
+  local -a parts=()
+  run_traced dybatpho::string_match parts "abc" '(['
+  assert_failure 2
+  assert_equal "${#parts[@]}" 0
+}
+
+@test "dybatpho::string_match reads special characters in the text literally" {
+  local -a parts=()
+  run_traced dybatpho::string_match parts 'say "hi" $HOME * ;' '^say "(.*)" (.*)$'
+  assert_success
+  assert_equal "${parts[1]}" "hi"
+  assert_equal "${parts[2]}" '$HOME * ;'
+  run_traced dybatpho::string_match parts "" '^$'
+  assert_success
+  assert_equal "${parts[0]}" ""
+}
+
+@test "dybatpho::string_match rejects an invalid array name" {
+  run dybatpho::string_match "not valid" "a" "a"
+  assert_failure
+  assert_output --partial "Invalid variable name"
+}
+
+@test "dybatpho::string_distance measures edit distance" {
+  run_traced dybatpho::string_distance kitten sitting
+  assert_success
+  assert_output "3"
+  assert_equal "$(dybatpho::string_distance color color)" "0"
+  assert_equal "$(dybatpho::string_distance color colour)" "1"
+  assert_equal "$(dybatpho::string_distance Color color)" "1"
+  assert_equal "$(dybatpho::string_distance "" abc)" "3"
+  assert_equal "$(dybatpho::string_distance abc "")" "3"
+  assert_equal "$(dybatpho::string_distance "" "")" "0"
+  assert_equal "$(dybatpho::string_distance 'a b*' 'a_b?')" "2"
+}
+
+@test "dybatpho::string_distance counts characters, not bytes" {
+  local probe="é"
+  ((${#probe} == 1)) || skip "the test locale does not decode UTF-8"
+  assert_equal "$(dybatpho::string_distance café cafe)" "1"
+  assert_equal "$(dybatpho::string_distance 漢字 漢)" "1"
+}
+
+@test "dybatpho::cli_levenshtein answers as dybatpho::string_distance" {
+  local a b
+  for a in "" color kitten; do
+    for b in "" colour sitting; do
+      assert_equal "$(dybatpho::cli_levenshtein "${a}" "${b}")" "$(dybatpho::string_distance "${a}" "${b}")"
+    done
+  done
+}
+
+@test "dybatpho::string_closest returns every candidate at the best distance" {
+  local -a guesses=()
+  run_traced dybatpho::string_closest guesses "staus" 2 status start stash statuses
+  assert_success
+  assert_equal "${guesses[*]}" "status"
+  run_traced dybatpho::string_closest guesses "cat" 1 bat hat cat dog
+  assert_success
+  assert_equal "${guesses[*]}" "cat"
+  run_traced dybatpho::string_closest guesses "cot" 1 bat cat cut cat "" dog
+  assert_success
+  assert_equal "${guesses[*]}" "cat cut"
+}
+
+@test "dybatpho::string_closest returns 1 when nothing is close enough" {
+  local -a guesses=(stale)
+  run_traced dybatpho::string_closest guesses "deploy" 1 status build
+  assert_failure 1
+  assert_equal "${#guesses[@]}" 0
+  run_traced dybatpho::string_closest guesses "deploy" 3
+  assert_failure 1
+  assert_equal "${#guesses[@]}" 0
+}
+
+@test "dybatpho::string_closest with distance 0 accepts only an exact match" {
+  local -a guesses=()
+  run_traced dybatpho::string_closest guesses "build" 0 builds build
+  assert_success
+  assert_equal "${guesses[*]}" "build"
+  run_traced dybatpho::string_closest guesses "buil" 0 builds build
+  assert_failure 1
+}
+
+@test "dybatpho::string_closest rejects an invalid maximum distance" {
+  local -a guesses=()
+  run dybatpho::string_closest guesses "a" -1 a
+  assert_failure
+  assert_output --partial "Invalid maximum distance"
+  run dybatpho::string_closest guesses "a" two a
+  assert_failure
+  assert_output --partial "Invalid maximum distance"
+  run dybatpho::string_closest "bad name" "a" 1 a
+  assert_failure
+  assert_output --partial "Invalid variable name"
+}

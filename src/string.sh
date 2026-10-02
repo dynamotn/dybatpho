@@ -12,6 +12,11 @@
 #   counting lines, testing blank strings, wrapping text, repeating, padding,
 #   encoding, decoding, and case-converting shell strings.
 #
+#   `dybatpho::string_match` hands back regular expression capture groups
+#   through an array, and `dybatpho::string_distance` and
+#   `dybatpho::string_closest` measure and rank edit distance for "did you
+#   mean" suggestions.
+#
 #   The naming-convention helpers convert between `snake_case`, `kebab-case`,
 #   `camelCase`, and `PascalCase`, reading the word boundaries whichever
 #   convention the input arrived in. `dybatpho::string_quote` prepares a value
@@ -100,6 +105,61 @@ function dybatpho::string_contains {
   local input="${1-}"
   local needle="${2-}"
   [[ -z "${needle}" || "${input#*"${needle}"}" != "${input}" ]]
+}
+
+#######################################
+# @description Match a string against a Bash extended regular expression and
+#   hand back what it captured.
+#   The named array receives the whole match at index `0` and each capture
+#   group after it, the way `BASH_REMATCH` lays them out; a group that took no
+#   part in the match is an empty element, so the indexes always line up with
+#   the groups in the pattern. On a miss the array is emptied rather than left
+#   holding an earlier result.
+#
+#   The pattern is passed as data, never written into the test, so it is read
+#   as a regular expression whatever characters it holds.
+# @example
+#   local -a parts=()
+#   if dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'; then
+#     printf 'major=%s minor=%s\n' "${parts[1]}" "${parts[2]}"
+#   fi
+#
+# @arg $1 string Name of the array receiving the match and its groups
+# @arg $2 string String to match
+# @arg $3 string Extended regular expression
+# @set The named array
+# @exitcode 0 The string matches
+# @exitcode 1 The string does not match
+# @exitcode 2 The pattern is not a valid regular expression
+#######################################
+function dybatpho::string_match {
+  dybatpho::expect_ref "${1-}"
+  local -n __dybatpho_string_match_out="$1"
+  local __dybatpho_string_match_text="${2-}" __dybatpho_string_match_regex="${3-}"
+  local -i __dybatpho_string_match_status=0
+
+  __dybatpho_string_match_out=()
+  __dybatpho_string_regex_test "${__dybatpho_string_match_text}" "${__dybatpho_string_match_regex}" \
+    || __dybatpho_string_match_status=$?
+  ((__dybatpho_string_match_status == 0)) || return "${__dybatpho_string_match_status}"
+  __dybatpho_string_match_out=("${BASH_REMATCH[@]}")
+}
+
+#######################################
+# @description Run a regular expression test and answer with its own status.
+#   Bash answers `1` for a miss and `2` for a pattern it cannot compile, and the
+#   caller needs to tell those apart; leaving the test as the last command of a
+#   function is what carries that status out. `BASH_REMATCH` is global, so the
+#   groups survive the return.
+# @arg $1 string String to match
+# @arg $2 string Extended regular expression
+# @exitcode 0 The string matches
+# @exitcode 1 The string does not match
+# @exitcode 2 The pattern is not a valid regular expression
+# @internal
+#######################################
+function __dybatpho_string_regex_test {
+  [[ "$1" =~ $2 ]]
 }
 
 #######################################
@@ -638,4 +698,124 @@ function dybatpho::string_to_pascal {
 #######################################
 function dybatpho::string_quote {
   printf '%q\n' "${1-}"
+}
+
+#######################################
+# @description Compute the Levenshtein edit distance between two strings.
+#   The distance is the smallest number of single-character insertions,
+#   deletions and substitutions that turn one string into the other. It is
+#   counted in characters, not bytes, so `café` is one edit from `cafe` under a
+#   UTF-8 locale. The comparison is case-sensitive; lower both sides first to
+#   ignore case.
+# @example
+#   dybatpho::string_distance kitten sitting   # 3
+#   dybatpho::string_distance color colour     # 1
+#
+# @arg $1 string First string
+# @arg $2 string Second string
+# @stdout Edit distance as a decimal number
+# @exitcode 0 Always
+# @see
+#   - `dybatpho::string_closest`
+#######################################
+function dybatpho::string_distance {
+  local distance
+  __dybatpho_string_distance_into distance "${1-}" "${2-}"
+  printf '%s\n' "${distance}"
+}
+
+#######################################
+# @description Compute an edit distance into a variable, without a subshell.
+#   Ranking a candidate list calls this once per candidate, which is the reason
+#   it writes through a reference rather than printing.
+# @arg $1 string Name of the variable receiving the distance
+# @arg $2 string First string
+# @arg $3 string Second string
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_string_distance_into {
+  local -n __dybatpho_string_dist_out="$1"
+  local __dybatpho_string_dist_a="${2-}" __dybatpho_string_dist_b="${3-}"
+  local -i la=${#__dybatpho_string_dist_a} lb=${#__dybatpho_string_dist_b}
+  local -i i j cost del ins sub
+  if ((la == 0 || lb == 0)); then
+    __dybatpho_string_dist_out=$((la + lb))
+    return 0
+  fi
+  local -a prev=() cur=()
+  for ((j = 0; j <= lb; j++)); do prev[j]=${j}; done
+  # kcov records the outer arithmetic loop header as unrun although the
+  # "string_distance measures edit distance" test iterates it.
+  for ((i = 1; i <= la; i++)); do # kcov(skip)
+    cur=("${i}")
+    for ((j = 1; j <= lb; j++)); do
+      cost=1
+      [[ "${__dybatpho_string_dist_a:i-1:1}" == "${__dybatpho_string_dist_b:j-1:1}" ]] && cost=0
+      del=$((prev[j] + 1))
+      ins=$((cur[j - 1] + 1))
+      sub=$((prev[j - 1] + cost))
+      if ((del < ins)); then cur[j]=${del}; else cur[j]=${ins}; fi
+      ((sub < cur[j])) && cur[j]=${sub}
+    done
+    prev=("${cur[@]}")
+  done
+  __dybatpho_string_dist_out=${prev[lb]}
+}
+
+#######################################
+# @description Find the candidates closest to a string by edit distance.
+#   Every candidate within the maximum distance is scored, and the named array
+#   receives those that share the smallest score, in the order they were given
+#   and without duplicates. An exact match is distance `0`, so it wins on its
+#   own. Empty candidates are skipped. The comparison is case-sensitive, as
+#   `dybatpho::string_distance` is.
+#
+#   This is the building block behind "did you mean" messages: pass the word a
+#   user typed and the words that would have been accepted.
+# @example
+#   local -a guesses=()
+#   if dybatpho::string_closest guesses "staus" 2 status start stash; then
+#     printf 'Did you mean %s?\n' "${guesses[0]}"   # status
+#   fi
+#
+# @arg $1 string Name of the array receiving the closest candidates
+# @arg $2 string String to compare against
+# @arg $3 number Largest distance still counted as close, a non-negative integer
+# @arg $@ string Candidates
+# @set The named array
+# @exitcode 0 At least one candidate is within the maximum distance
+# @exitcode 1 No candidate is close enough
+# @exitcode 1 Stop the script when the maximum distance is not a non-negative integer
+# @see
+#   - `dybatpho::string_distance`
+#######################################
+function dybatpho::string_closest {
+  dybatpho::expect_ref "${1-}"
+  local -n __dybatpho_string_closest_out="$1"
+  local __dybatpho_string_closest_input="${2-}" __dybatpho_string_closest_max="${3-}"
+  [[ "${__dybatpho_string_closest_max}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "dybatpho::string_closest: Invalid maximum distance: '${__dybatpho_string_closest_max}'"
+  shift 3 || shift $#
+
+  local -i __dybatpho_string_closest_best=-1 __dybatpho_string_closest_d
+  local __dybatpho_string_closest_candidate
+  local -a __dybatpho_string_closest_found=()
+  local -A __dybatpho_string_closest_seen=()
+  for __dybatpho_string_closest_candidate in "$@"; do
+    [[ -n "${__dybatpho_string_closest_candidate}" ]] || continue
+    [[ -z "${__dybatpho_string_closest_seen[${__dybatpho_string_closest_candidate}]-}" ]] || continue
+    __dybatpho_string_closest_seen[${__dybatpho_string_closest_candidate}]=1
+    __dybatpho_string_distance_into __dybatpho_string_closest_d \
+      "${__dybatpho_string_closest_input}" "${__dybatpho_string_closest_candidate}"
+    ((__dybatpho_string_closest_d <= 10#${__dybatpho_string_closest_max})) || continue
+    if ((__dybatpho_string_closest_best < 0 || __dybatpho_string_closest_d < __dybatpho_string_closest_best)); then
+      __dybatpho_string_closest_best=${__dybatpho_string_closest_d}
+      __dybatpho_string_closest_found=()
+    fi
+    ((__dybatpho_string_closest_d == __dybatpho_string_closest_best)) \
+      && __dybatpho_string_closest_found+=("${__dybatpho_string_closest_candidate}")
+  done
+  __dybatpho_string_closest_out=(${__dybatpho_string_closest_found[@]+"${__dybatpho_string_closest_found[@]}"})
+  ((${#__dybatpho_string_closest_found[@]} > 0))
 }

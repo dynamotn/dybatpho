@@ -60,6 +60,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::date_is_before "$(dybatpho::date_today)" 2026-12-31 && echo valid
   dybatpho::date_iso_week 2024-12-30          # 2025-W01
   dybatpho::date_in_tz "2024-02-29 12:00:00" Asia/Tokyo
+- **`string` — regular expression captures and "did you mean" ranking.**
+  `dybatpho::string_match` matches a string against an extended regular
+  expression and writes the whole match and every capture group into an array
+  you name, so a version or a `key=value` pair comes apart without touching
+  `BASH_REMATCH`. It returns `1` on a miss and `2` for an invalid pattern, and
+  empties the array either way.
+
+  `dybatpho::string_distance` prints the Levenshtein edit distance between two
+  strings, counted in characters, and `dybatpho::string_closest` ranks a list of
+  candidates by it, returning every candidate tied at the smallest distance
+  within the maximum you give. Any script can now answer a mistyped word the way
+  the CLI parser answers a mistyped option. `dybatpho::cli_levenshtein` now
+  delegates to `dybatpho::string_distance` and answers exactly as before.
+
+  ```sh
+  local -a parts=() guesses=()
+  dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'
+  dybatpho::string_closest guesses "staus" 2 status start stash   # status
   ```
 
 ## [5.2.0] - 2026-10-02

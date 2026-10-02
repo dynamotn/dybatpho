@@ -32,7 +32,7 @@ Utilities for building CLI parsers from shell specs.
 - [`dybatpho::prompt`](#dybatphoprompt) — Read a line from the terminal (or stdin) with an optional default.
 - [`dybatpho::select`](#dybatphoselect) — Prompt for one or more values from a comma-separated list or numeric range.
 - [`dybatpho::opts::validate_choice`](#dybatphooptsvalidate_choice) — Check that a value belongs to a comma-separated choice list.
-- [`dybatpho::cli_levenshtein`](#dybatphocli_levenshtein) — Compute the Levenshtein edit distance between two strings.
+- [`dybatpho::cli_levenshtein`](#dybatphocli_levenshtein) — Compute the Levenshtein edit distance between two strings. Kept for existing callers; it answers exactly as `dybatpho::string_distance`, which it delegates to.
 - [`dybatpho::cli_suggest`](#dybatphocli_suggest) — Print the candidates closest to a mistyped switch or command name. Leading dashes are ignored while comparing, so `--colr` still matches `--color`, and a candidate that shares a prefix with the input always wins over a pure edit-distance match.
 - [`dybatpho::cli_verbosity_level`](#dybatphocli_verbosity_level) — Raise a log level by the number of times a counting `-v` flag was repeated.
 - [`dybatpho::cli_apply_verbosity`](#dybatphocli_apply_verbosity) — Apply a repeat count from a counting `-v` flag to `LOG_LEVEL`.
@@ -698,6 +698,8 @@ Check that a value belongs to a comma-separated choice list.
 ### `dybatpho::cli_levenshtein`
 
 Compute the Levenshtein edit distance between two strings.
+Kept for existing callers; it answers exactly as
+`dybatpho::string_distance`, which it delegates to.
 
 **🧪 Example**
 
@@ -720,6 +722,10 @@ distance="$(dybatpho::cli_levenshtein color colour)"
 **🚦 Exit codes**
 
 - 0
+
+**🔗 See also**
+
+- [- `dybatpho::string_distance](#dybatphostring_distance)
 
 
 ---

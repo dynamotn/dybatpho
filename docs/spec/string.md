@@ -6,7 +6,7 @@
 
 ## Problem Statement *(mandatory)*
 
-Shell scripts repeatedly need trimming, splitting, exact prefix/suffix/substring checks, exact text replacement, exact prefix/suffix removal, character trimming, line counting, truncation, wrapping, blank checks, slug creation, URL-safe transformations, and case normalization, but native shell syntax for these tasks is terse and inconsistent.
+Shell scripts repeatedly need trimming, splitting, exact prefix/suffix/substring checks, exact text replacement, exact prefix/suffix removal, character trimming, line counting, truncation, wrapping, blank checks, slug creation, URL-safe transformations, case normalization, regular expression captures, and "did you mean" suggestions, but native shell syntax for these tasks is terse and inconsistent.
 
 ## Business Value *(mandatory)*
 
@@ -17,6 +17,7 @@ Shell scripts repeatedly need trimming, splitting, exact prefix/suffix/substring
 - Keep exact affix-removal workflows inside reusable helpers instead of inline parameter expansion.
 - Make shell-safe identifiers and filenames easier to derive from free-form labels.
 - Cover more day-to-day formatting workflows such as truncating labels, wrapping output, and checking blank values.
+- Let any script, not only the CLI parser, extract fields with a regular expression and suggest the word a user probably meant.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -110,6 +111,39 @@ As a maintainer, I want URL encode/decode helpers so that scripts can safely pas
 
 ---
 
+### User Story 7 - Extract fields with a regular expression (Priority: P2)
+
+As a script author, I want a regex helper that hands back its capture groups so that I can pull a version, key, or identifier apart without reaching into `BASH_REMATCH` by hand.
+
+**Why this priority**: Parsing structured strings is common, and the raw `[[ =~ ]]` form is easy to get wrong when the pattern is quoted.
+
+**Independent Test**: Match strings with and without optional groups, a miss, and an invalid pattern, then verify the array contents and exit status.
+
+**Acceptance Scenarios**:
+
+1. **Given** a string matching a pattern with three groups, **When** the match helper runs, **Then** the array holds the whole match at index 0 and each group after it
+2. **Given** an optional group that does not participate, **When** the match helper runs, **Then** that group is an empty element and later groups keep their indexes
+3. **Given** a string that does not match, **When** the match helper runs, **Then** it returns 1 and the array is empty
+4. **Given** an invalid pattern, **When** the match helper runs, **Then** it returns 2 and the array is empty
+
+---
+
+### User Story 8 - Suggest the closest word (Priority: P3)
+
+As a script author, I want an edit-distance helper and a ranking helper so that I can answer a mistyped word with "did you mean" in any script.
+
+**Why this priority**: The CLI parser already does this for its own options; other scripts accept words too (subcommands dispatched by hand, environment names, profile names).
+
+**Independent Test**: Measure distances for known pairs, then rank candidate lists with ties, duplicates, empty entries, and nothing close.
+
+**Acceptance Scenarios**:
+
+1. **Given** `kitten` and `sitting`, **When** the distance helper runs, **Then** it prints `3`
+2. **Given** a typo and a candidate list, **When** the closest helper runs, **Then** the array holds every candidate sharing the smallest distance within the maximum, in input order
+3. **Given** no candidate within the maximum distance, **When** the closest helper runs, **Then** it returns 1 and the array is empty
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -126,6 +160,12 @@ fi
 
 query="q=$(dybatpho::url_encode "${title}")"
 printf '%s\n' "$(dybatpho::string_pad "name" 12)|$(dybatpho::upper "${slug}")"
+
+local -a parts=() guesses=()
+dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$' \
+  && dybatpho::info "major ${parts[1]}"
+dybatpho::string_closest guesses "staus" 2 status start stash \
+  && dybatpho::warn "Did you mean ${guesses[0]}?"
 ```
 
 ## Edge Cases
@@ -139,6 +179,11 @@ printf '%s\n' "$(dybatpho::string_pad "name" 12)|$(dybatpho::upper "${slug}")"
 - Padding tokens may be omitted, empty, or longer than one character.
 - Wrapping may receive blank input or a width smaller than one word.
 - Encoding input contains reserved or unreserved URL characters.
+- A regular expression is invalid, has groups that do not participate, or is matched against empty or special-character text.
+- The receiving array already holds an earlier result.
+- Edit distance is measured against an empty string, between strings differing only in case, or on multibyte characters.
+- A candidate list is empty, contains duplicates or empty entries, or has several candidates tied at the best distance.
+- The maximum distance is zero, negative, or not a number.
 
 ## Requirements *(mandatory)*
 
@@ -170,6 +215,13 @@ printf '%s\n' "$(dybatpho::string_pad "name" 12)|$(dybatpho::upper "${slug}")"
 - **FR-022a**: Word splitting MUST break before a capital that follows a lowercase letter or a digit, and at the end of a run of capitals followed by a lowercase letter, so that `XMLHttpRequest` reads as three words.
 - **FR-022b**: Word splitting MUST keep a digit attached to the word before it, and MUST return nothing for input holding no letters or digits.
 - **FR-023**: The module MUST provide a helper that quotes a value so the shell reads it back as one literal, including the empty string, for use in shell code that will be evaluated later.
+- **FR-024**: The module MUST provide a regular expression helper that writes the whole match and every capture group into a caller-named array, with a non-participating group as an empty element.
+- **FR-024a**: The regular expression helper MUST return 1 and empty the array when the string does not match, and MUST return 2 and empty the array when the pattern is invalid.
+- **FR-024b**: The array name MUST be validated before it is written, and a name reserved for the library MUST be refused.
+- **FR-025**: The module MUST provide a helper that prints the Levenshtein edit distance between two strings, counted in characters under the active locale and case-sensitive.
+- **FR-026**: The module MUST provide a helper that writes into a caller-named array every candidate sharing the smallest edit distance from the input, within a caller-given maximum, in input order, without duplicates, and skipping empty candidates.
+- **FR-026a**: The closest-candidate helper MUST return 1 and empty the array when no candidate is close enough, and MUST stop the script when the maximum distance is not a non-negative integer.
+- **FR-027**: `dybatpho::cli_levenshtein` MUST keep answering exactly as the distance helper.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -178,6 +230,8 @@ printf '%s\n' "$(dybatpho::string_pad "name" 12)|$(dybatpho::upper "${slug}")"
 - **Affix Fragment**: A caller-provided exact prefix or suffix that may be removed from the input.
 - **Slug Separator**: The normalized `-` separator inserted between slug tokens.
 - **Padding Token**: The character or token appended repeatedly to extend a string to a requested width.
+- **Match Array**: The caller-named array receiving the whole match at index 0 and each capture group after it.
+- **Candidate List**: The words an input is compared against when ranking by edit distance.
 
 ## Success Criteria *(mandatory)*
 
@@ -190,6 +244,7 @@ printf '%s\n' "$(dybatpho::string_pad "name" 12)|$(dybatpho::upper "${slug}")"
 - **SC-005**: Callers can generate simple repeated and padded output without manual shell loops.
 - **SC-006**: Encoding and decoding behavior is predictable for common HTTP use cases.
 - **SC-007**: String utilities remain safe to chain in pipes or command substitutions.
+- **SC-008**: Callers can extract capture groups and build "did you mean" suggestions with one helper call each.
 
 ## Integration Tests *(mandatory)*
 
@@ -205,9 +260,14 @@ printf '%s\n' "$(dybatpho::string_pad "name" 12)|$(dybatpho::upper "${slug}")"
 - **IT-010**: Verify a run of capitals breaks where the word ends, that a digit stays attached to the word before it, and that input with no letters or digits returns nothing.
 - **IT-011**: Verify the kebab helper and the slug helper differ on a name whose word boundaries are implied by its case.
 - **IT-012**: Verify the quoting helper round-trips through `eval` for values containing spaces, quotes, `$`, a semicolon, a tab, a glob, and the empty string.
+- **IT-013**: Match a version against a three-group pattern and verify the whole match and each group, and verify a non-participating group is an empty element.
+- **IT-014**: Verify a miss returns 1 and an invalid pattern returns 2, each leaving the array empty, and that an invalid array name is refused.
+- **IT-015**: Verify edit distances for known pairs, empty strings, case differences, and multibyte characters, and that `dybatpho::cli_levenshtein` agrees with the distance helper.
+- **IT-016**: Rank candidate lists with ties, duplicates, empty entries, a zero maximum, and nothing close, and verify an invalid maximum or array name is refused.
 
 ## Acceptance Criteria *(mandatory)*
 
 1. The module covers the major string transformations, exact-match checks, affix trimming, slug creation, replacement workflows, and output-formatting helpers advertised in examples and tests.
 2. Predicate-style helpers use shell success and failure semantics suitable for control flow.
 3. Output-oriented helpers keep a focused stdout contract for easy shell composition.
+4. Helpers that return several values write them into a caller-named array and validate that name first.

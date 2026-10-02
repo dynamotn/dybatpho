@@ -562,6 +562,99 @@ EOF
   assert_stderr --partial "No such column: b"
 }
 
+@test "dybatpho::csv_join pairs every match in order and drops the repeated key" {
+  local left right
+  left="$(printf 'svc,team\napi,core\nweb,ui\ndb,\ncache,core\nedge,ops')"
+  right="$(printf 'team,owner\ncore,"Doe, J"\ncore,Ann\nui,Bob\n,Nobody')"
+
+  run_traced dybatpho::csv_join "${left}" "${right}" team
+  assert_success
+  assert_output << 'EOF'
+svc,team,owner
+api,core,"Doe, J"
+api,core,Ann
+web,ui,Bob
+cache,core,"Doe, J"
+cache,core,Ann
+EOF
+}
+
+@test "dybatpho::csv_join left keeps every left row and pads what did not match" {
+  local left right
+  left="$(printf 'svc,team\napi,core\ndb,\nedge')"
+  right="$(printf 'name,owner,chan\ncore,Ann,#core\n,Nobody,#x\nops,Eve')"
+
+  # A blank key matches nothing, even a blank key on the other side, and a
+  # short left row is padded before the right columns are appended.
+  run_traced dybatpho::csv_join "${left}" "${right}" team left name
+  assert_success
+  assert_output << 'EOF'
+svc,team,owner,chan
+api,core,Ann,#core
+db,,,
+edge,,,
+EOF
+
+  # A short right row reads as empty values under its header.
+  run_traced dybatpho::csv_join "$(printf 'svc,team\nproxy,ops')" "${right}" team inner name
+  assert_success
+  assert_output "$(printf 'svc,team,owner,chan\nproxy,ops,Eve,')"
+}
+
+@test "dybatpho::csv_join matches keys holding glob, subscript and shell characters" {
+  local left right
+  left="$(printf 'k,a\n@,1\n*,2\na]b,3\n"x y",4\n$(id),5')"
+  right="$(printf 'k,b\n*,S\n@,A\na]b,B\nx y,X\n$(id),D')"
+  run_traced dybatpho::csv_join "${left}" "${right}" k
+  assert_success
+  assert_output << 'EOF'
+k,a,b
+@,1,A
+*,2,S
+a]b,3,B
+x y,4,X
+$(id),5,D
+EOF
+}
+
+@test "dybatpho::csv_join reads one side from stdin, keeps the delimiter and handles empty sides" {
+  DYBATPHO_CSV_DELIMITER=";" \
+    run_traced dybatpho::csv_join - "$(printf 'id;note\n1;"a;b"')" id <<< "$(printf 'id;name\n1;x\n2;y')"
+  assert_success
+  assert_output "$(printf 'id;name;note\n1;x;"a;b"')"
+
+  run_traced dybatpho::csv_join "" "$(printf 'id,v\n1,2')" id
+  assert_success
+  assert_output ""
+
+  # An empty right side has no columns to add; a left join keeps the rows.
+  run_traced dybatpho::csv_join "$(printf 'id,v\n1,2')" "" id left
+  assert_success
+  assert_output "$(printf 'id,v\n1,2')"
+
+  run_traced dybatpho::csv_join "$(printf 'id,v\n1,2')" "$(printf 'id\n1')" id
+  assert_success
+  assert_output "$(printf 'id,v\n1,2')"
+}
+
+@test "dybatpho::csv_join rejects an unknown type, a missing key and two stdins" {
+  run --separate-stderr dybatpho::csv_join "$(printf 'a\n1')" "$(printf 'a\n1')" a outer
+  assert_failure
+  assert_stderr --partial "Unknown join type: outer"
+
+  run --separate-stderr dybatpho::csv_join "$(printf 'a\n1')" "$(printf 'b\n1')" a
+  assert_failure
+  assert_stderr --partial "No such column: a"
+
+  run --separate-stderr dybatpho::csv_join - - a
+  assert_failure
+  assert_stderr --partial "Only one input can be read from stdin"
+
+  run --separate-stderr dybatpho::csv_join "$(printf 'a\n1')" "$(printf 'a\n1,2')" a
+  assert_failure
+  assert_stderr --partial "Row 1 has 2 fields"
+}
+
 @test "dybatpho::csv_read returns the data a record with no closing quote still has" {
   local -a records=() fields=()
   dybatpho::csv_read "$(printf 'a,b\n"unterminated,x')" records

@@ -77,6 +77,21 @@ As a script author, I want CSV to become a JSON array of objects and back, so th
 
 ---
 
+### User Story 6 - Join two files on a key (Priority: P2)
+
+As a script author, I want to combine two exports on a shared column — services and their owners, hosts and their costs — so that a report needs no hand-written lookup loop.
+
+**Independent Test**: Join a services file to an owners file on the team column, inner and left, and verify every match appears in order.
+
+**Acceptance Scenarios**:
+
+1. **Given** two inputs sharing a key column, **When** they are joined, **Then** the header is the left columns and the right columns without the right key, and each left row is followed by one row per right match, in the right input's order
+2. **Given** a `left` join, **When** a left row has no match, **Then** it is kept with the right columns empty
+3. **Given** a key named differently on each side, **When** the right key is given, **Then** the inputs join on those two columns
+4. **Given** an empty key on either side, **When** the inputs are joined, **Then** it matches nothing
+
+---
+
 ### User Story 5 - Read and write TSV and other delimiters (Priority: P2)
 
 As a script author, I want to read a tab- or semicolon-separated export with the same functions, and to rewrite a file with another delimiter, so that a TSV report needs no second parser and a spreadsheet export can be handed to a tool that wants TSV.
@@ -98,6 +113,7 @@ dybatpho::csv_header billing.csv
 dybatpho::csv_filter billing.csv "cost" gt 100 > expensive.csv
 dybatpho::csv_select billing.csv owner cost > owners.csv
 dybatpho::csv_sort billing.csv cost desc | head -n 6   # header and the top five
+dybatpho::csv_join billing.csv owners.csv owner left name
 
 dybatpho::csv_read billing.csv rows
 dybatpho::csv_fields "${rows[1]}" first
@@ -118,6 +134,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - Input arrives as a file path, as `-` for stdin, or as text.
 - A row is shorter or longer than the header.
 - A selected column is repeated, named by a position, or a header is itself named like a number.
+- A join key repeats on the right, is blank, is missing from a side, or holds glob or shell characters; one side is empty or holds only its key.
 - A sorted column mixes numbers and text, holds blanks, spells one number two ways (`10`, `010.0`), or holds a value with a line break.
 - A record's quote is never closed, or text follows a closing quote.
 - A file uses CRLF line endings, or another delimiter such as `;`.
@@ -159,6 +176,10 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-026**: The default comparison MUST be numeric when every non-empty value in the column is a number and byte-wise text otherwise; `text` and `number` MUST force one, and `number` MUST stop the script on a value that is not a number, naming the row.
 - **FR-027**: Empty values MUST sort after every other value in both directions.
 - **FR-028**: Sorting MUST reject an unknown order or comparison.
+- **FR-029**: Joining MUST print the left header followed by the right header without the right key, then one row per pair of matching left and right rows, in left order and then right order.
+- **FR-030**: A `left` join MUST keep every left row, with empty right columns where nothing matched; `inner`, the default, MUST keep only matched rows.
+- **FR-031**: An empty key MUST match nothing, and the right key column MUST default to the left one's name.
+- **FR-032**: Joining MUST reject an unknown join type, a key column a side lacks, and reading both inputs from stdin.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -211,6 +232,11 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-031**: Sort text byte by byte under `auto` and `text`, keeping a multi-line value whole.
 - **IT-032**: Sort from stdin with a configured delimiter, a header with no rows, and an empty input.
 - **IT-033**: Reject an unknown order, an unknown comparison, a non-number under `number`, and an unknown column.
+- **IT-034**: Inner-join with repeated right keys, a quoted value, and blank keys on both sides.
+- **IT-035**: Left-join with a differently named right key, padding unmatched and short rows.
+- **IT-036**: Join on keys holding `@`, `*`, `]`, a space, and `$(...)`.
+- **IT-037**: Join with one side on stdin and a configured delimiter, an empty left, an empty right, and a right side holding only its key.
+- **IT-038**: Reject an unknown join type, a missing key column, two stdins, and a row wider than its header.
 
 ## Acceptance Criteria *(mandatory)*
 

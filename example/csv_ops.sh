@@ -2,7 +2,7 @@
 # @file csv_ops.sh
 # @brief Example reading a billing export that quotes its fields
 # @description Demonstrates dybatpho::csv_read, csv_fields, csv_write, csv_header, csv_col,
-#   csv_filter, csv_to_json, csv_from_json, csv_convert, csv_select, and csv_sort
+#   csv_filter, csv_to_json, csv_from_json, csv_convert, csv_select, csv_sort, and csv_join
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules csv
@@ -92,6 +92,20 @@ function _demo_sort {
   dybatpho::csv_sort "${file}" cost desc
 }
 
+# @description Attach each service's on-call channel from a second file.
+# @arg $1 string Path of the CSV file
+function _demo_join {
+  local file
+  dybatpho::expect_args file -- "$@"
+  dybatpho::header "JOIN"
+  local owners channels
+  owners="$(dybatpho::csv_select "${file}" service owner)"
+  # The second file names its key `service` too; db has no channel, so a left
+  # join keeps it with the channel left empty.
+  channels="$(printf 'service,channel\napi,#api-oncall\nweb,#web-oncall\n')"
+  dybatpho::csv_join "${owners}" "${channels}" service left
+}
+
 # @description Convert to JSON and back, showing the values survive the trip.
 # @arg $1 string Path of the CSV file
 function _demo_json {
@@ -142,6 +156,7 @@ function _main {
   _demo_filter "${fixture}"
   _demo_select "${fixture}"
   _demo_sort "${fixture}"
+  _demo_join "${fixture}"
   _demo_json "${fixture}"
   _demo_normalize "${fixture}"
   _demo_tsv "${fixture}"

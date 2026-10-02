@@ -659,6 +659,142 @@ function dybatpho::csv_sort {
 }
 
 #######################################
+# @description Join two CSV inputs on a key column and print the result as
+#   CSV.
+#   The output header is every left column followed by every right column
+#   except the right key, which would repeat the left one. Rows come out in
+#   the left input's order, and a left row matching several right rows gives
+#   one output row per match, in the right input's order, the way SQL does.
+#   `inner` keeps only the left rows with a match; `left` keeps every left row
+#   and leaves the right columns empty where nothing matched. An empty key
+#   matches nothing, the way SQL's `NULL` does, so blank cells never pair up
+#   into rows nobody meant to relate.
+# @arg $1 string Left CSV: file path, `-` for stdin, or CSV text
+# @arg $2 string Right CSV: file path, `-` for stdin, or CSV text
+# @arg $3 string Key column name in the left input
+# @arg $4 string Join type: `inner` (default) or `left`
+# @arg $5 string Key column name in the right input, default is the left one
+# @stdout CSV text: the joined header, then the joined rows
+# @exitcode 0 The inputs were joined
+# @exitcode 1 An unknown join type or key column, both inputs read from stdin, or a row wider than its header
+# @tip A column named the same on both sides appears twice in the output;
+#   `dybatpho::csv_col` and the other by-name helpers then read the left one
+# @example
+#   dybatpho::csv_join services.csv owners.csv team
+#   dybatpho::csv_join services.csv costs.csv service left name
+#######################################
+function dybatpho::csv_join {
+  local left_input right_input key type right_key
+  dybatpho::expect_args left_input right_input key -- "$@"
+  type="${4:-inner}"
+  right_key="${5:-${key}}"
+
+  case "${type}" in
+    inner | left) ;; # kcov(skip) - a case arm has no command to fire on
+    # "dybatpho::csv_join rejects an unknown type, a missing key and two
+    # stdins" covers this; `dybatpho::die` exits, so that test uses `run`.
+    *) dybatpho::die "${FUNCNAME[0]}: Unknown join type: ${type}. Use inner or left" ;; # kcov(skip)
+  esac
+  [[ "${left_input}" != "-" || "${right_input}" != "-" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Only one input can be read from stdin" # kcov(skip)
+
+  local -a left=() right=() left_names=() right_names=() fields=() extra=() joined=()
+  local text delimiter left_index right_index at value row
+  local -A matches=()
+  local IFS
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_input_into text "${left_input}"
+  __dybatpho_csv_parse_into left "${text}" "${delimiter}"
+  __dybatpho_csv_input_into text "${right_input}"
+  __dybatpho_csv_parse_into right "${text}" "${delimiter}"
+  ((${#left[@]})) || return 0
+
+  __dybatpho_csv_header_into left_names left
+  __dybatpho_csv_column_into left_index left_names "${key}"
+  __dybatpho_csv_header_into right_names right
+  ((${#right[@]})) || right_names=("${right_key}")
+  __dybatpho_csv_column_into right_index right_names "${right_key}"
+
+  # Index the right rows by key, keeping every match in input order.
+  local -a right_rest=()
+  for ((at = 1; at < ${#right[@]}; at++)); do
+    __dybatpho_csv_split_fields_into fields "${right[${at}]}"
+    __dybatpho_csv_expect_width fields right_names "${at}"
+    value="${fields[${right_index}]-}"
+    [[ -n "${value}" ]] || continue
+    matches["${value}"]+="${matches[${value}]+ }${at}"
+  done
+
+  __dybatpho_csv_without_into extra right_names "${right_index}"
+  IFS="${__dybatpho_csv_unit}"
+  joined=("${left_names[*]}${__dybatpho_csv_unit}${extra[*]}")
+  unset IFS
+
+  local -a empty_right=()
+  for ((at = 1; at < ${#right_names[@]}; at++)); do
+    empty_right+=("")
+  done
+
+  local -a left_fields=()
+  for ((at = 1; at < ${#left[@]}; at++)); do
+    __dybatpho_csv_split_fields_into left_fields "${left[${at}]}"
+    __dybatpho_csv_expect_width left_fields left_names "${at}"
+    # Pad a short row, so the right columns line up under their header.
+    while ((${#left_fields[@]} < ${#left_names[@]})); do
+      left_fields+=("")
+    done
+    value="${left_fields[${left_index}]}"
+
+    if [[ -n "${value}" && -n "${matches[${value}]+set}" ]]; then
+      for row in ${matches[${value}]}; do
+        __dybatpho_csv_split_fields_into fields "${right[${row}]}"
+        while ((${#fields[@]} < ${#right_names[@]})); do
+          fields+=("")
+        done
+        __dybatpho_csv_without_into right_rest fields "${right_index}"
+        IFS="${__dybatpho_csv_unit}"
+        joined+=("${left_fields[*]}${__dybatpho_csv_unit}${right_rest[*]}")
+        unset IFS
+      done
+    elif [[ "${type}" == "left" ]]; then
+      IFS="${__dybatpho_csv_unit}"
+      joined+=("${left_fields[*]}${__dybatpho_csv_unit}${empty_right[*]}")
+      unset IFS
+    fi
+  done
+
+  # A right side holding nothing but its key leaves no column to append, and
+  # the joined records then carry one trailing empty field too many.
+  if ((${#right_names[@]} == 1)); then
+    for at in "${!joined[@]}"; do
+      joined[at]="${joined[${at}]%"${__dybatpho_csv_unit}"}"
+    done
+  fi
+  __dybatpho_csv_write_with joined "${delimiter}"
+}
+
+#######################################
+# @description Copy an array without the element at one index, into a named
+#   array.
+# @arg $1 string Name of the array variable to fill
+# @arg $2 string Name of the source array
+# @arg $3 number Index to leave out
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_csv_without_into {
+  local -n __dybatpho_csv_without_ref="$1"
+  local -n __dybatpho_csv_source_ref="$2"
+  local __dybatpho_csv_skip="$3" __dybatpho_csv_at
+  __dybatpho_csv_without_ref=()
+
+  for __dybatpho_csv_at in "${!__dybatpho_csv_source_ref[@]}"; do
+    ((__dybatpho_csv_at == __dybatpho_csv_skip)) \
+      || __dybatpho_csv_without_ref+=("${__dybatpho_csv_source_ref[${__dybatpho_csv_at}]}")
+  done
+}
+
+#######################################
 # @description Sort an array of row numbers in place by their keys, stably.
 #   Bottom-up merge sort: runs of width 1, 2, 4, … are merged pairwise, taking
 #   from the left run unless the right key strictly comes first, which is what

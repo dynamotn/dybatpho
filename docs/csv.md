@@ -42,6 +42,7 @@ Data containing that byte is rejected rather than silently re-split.
 - [`dybatpho::csv_col`](#dybatphocsv_col) — Print one column's values, chosen by its header name. A row shorter than the header reads as an empty value, and a row longer than the header stops the script rather than dropping the extra field.
 - [`dybatpho::csv_select`](#dybatphocsv_select) — Print chosen columns, in the order given, as CSV with the header. A column is named by its header, or by its position counting from `1` when no header carries that name, so `3` picks the third column unless a column is literally called `3`. A column may be chosen more than once, and a row shorter than the header reads as empty values.
 - [`dybatpho::csv_sort`](#dybatphocsv_sort) — Sort the data rows by one column and print them as CSV with the header first. The sort is stable, so rows with equal keys keep their input order, and it happens in Bash rather than through `sort`, because a value may hold a line break. `auto` compares as numbers when every non-empty value in the column is one, and as text otherwise; text compares byte by byte, the same on every machine whatever its locale. An empty value sorts last in either direction, so blanks never push the rows that matter off the top.
+- [`dybatpho::csv_join`](#dybatphocsv_join) — Join two CSV inputs on a key column and print the result as CSV. The output header is every left column followed by every right column except the right key, which would repeat the left one. Rows come out in the left input's order, and a left row matching several right rows gives one output row per match, in the right input's order, the way SQL does. `inner` keeps only the left rows with a match; `left` keeps every left row and leaves the right columns empty where nothing matched. An empty key matches nothing, the way SQL's `NULL` does, so blank cells never pair up into rows nobody meant to relate.
 - [`dybatpho::csv_filter`](#dybatphocsv_filter) — Keep the rows whose column satisfies a comparison, and print them as CSV with the header. `gt` and `lt` compare as numbers when both values are numeric, and as text otherwise, so a version column sorts the way a reader expects and a size column the way arithmetic does.
 - [`dybatpho::csv_to_json`](#dybatphocsv_to_json) — Convert CSV to a JSON array of objects, keyed by the header. Every value is a JSON string, because CSV carries no types and guessing them is how an identifier with leading zeros or a version number becomes the wrong value. Cast in `jq` when a consumer needs numbers.
 - [`dybatpho::csv_from_json`](#dybatphocsv_from_json) — Convert a JSON array of objects to CSV. The keys of the first object become the header, in their document order, and a later object missing one of them writes an empty value there.
@@ -60,6 +61,10 @@ Data containing that byte is rejected rather than silently re-split.
 ### `dybatpho::csv_col`
 
 - A value containing a line break spans lines here; read through `dybatpho::csv_read` when every value has to stay one item
+
+### `dybatpho::csv_join`
+
+- A column named the same on both sides appears twice in the output; `dybatpho::csv_col` and the other by-name helpers then read the left one
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -322,6 +327,48 @@ dybatpho::csv_sort billing.csv owner asc text
 
 - `0`: The rows were sorted, or the input was empty
 - `1`: An unknown column, order or comparison, a non-number under `number`, or a row wider than the header
+
+
+---
+
+### `dybatpho::csv_join`
+
+Join two CSV inputs on a key column and print the result as
+CSV.
+The output header is every left column followed by every right column
+except the right key, which would repeat the left one. Rows come out in
+the left input's order, and a left row matching several right rows gives
+one output row per match, in the right input's order, the way SQL does.
+`inner` keeps only the left rows with a match; `left` keeps every left row
+and leaves the right columns empty where nothing matched. An empty key
+matches nothing, the way SQL's `NULL` does, so blank cells never pair up
+into rows nobody meant to relate.
+
+**🧪 Example**
+
+```bash
+dybatpho::csv_join services.csv owners.csv team
+dybatpho::csv_join services.csv costs.csv service left name
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Left CSV: file path, `-` for stdin, or CSV text |
+| `$2` | string | Right CSV: file path, `-` for stdin, or CSV text |
+| `$3` | string | Key column name in the left input |
+| `$4` | string | Join type: `inner` (default) or `left` |
+| `$5` | string | Key column name in the right input, default is the left one |
+
+**📤 Output on stdout**
+
+- CSV text: the joined header, then the joined rows
+
+**🚦 Exit codes**
+
+- `0`: The inputs were joined
+- `1`: An unknown join type or key column, both inputs read from stdin, or a row wider than its header
 
 
 ---

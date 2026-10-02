@@ -251,6 +251,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::csv_sort billing.csv cost desc | head -n 6   # header and the top five
   ```
 
+- **`csv` — join two files on a key.** `dybatpho::csv_join` combines two
+  inputs on a key column, `inner` by default or `left` to keep every left row,
+  with the right key named separately when the two files disagree. Every match
+  becomes its own row, in the left file's order and then the right's, the
+  right key is not repeated, and a blank key matches nothing.
+
+  ```sh
+  dybatpho::csv_join services.csv owners.csv team left
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

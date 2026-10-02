@@ -91,6 +91,26 @@ that holds nothing else and verify which one runs and the arguments it gets.
 4. **Given** `DRY_RUN` is enabled, **When** `notify_desktop` runs, **Then** it
    prints the command it would run and shows nothing
 
+### User Story 5 - Push to a phone through ntfy (Priority: P2)
+
+As an operator without a team chat, I want to publish to an ntfy topic, on
+ntfy.sh or my own server, so that an alert reaches my phone.
+
+**Independent Test**: Stub `curl` and verify the JSON body, the server URL, the
+priority mapping, and that a token travels outside the argument vector.
+
+**Acceptance Scenarios**:
+
+1. **Given** `DYBATPHO_NTFY_TOPIC` and a message, **When** `notify_ntfy` runs,
+   **Then** it posts `{"topic":...,"message":...}` to `https://ntfy.sh`
+2. **Given** a title, a priority name and comma-separated tags, **When**
+   `notify_ntfy` runs, **Then** the body carries the title, the priority number
+   and the trimmed, non-empty tags
+3. **Given** `DYBATPHO_NTFY_TOKEN`, **When** `notify_ntfy` runs, **Then** the
+   token is sent as a bearer header and never appears on curl's command line
+4. **Given** an invalid topic, server URL or priority, **When** `notify_ntfy`
+   runs, **Then** it fails before making a request
+
 ### Example Workflow
 
 ```bash
@@ -116,6 +136,8 @@ fi
 - A desktop title starts with `-`, or a title or body contains quotes or
   AppleScript syntax.
 - No desktop backend is installed, or `notify-send` finds no desktop session.
+- An ntfy topic with characters ntfy refuses, a server URL with no scheme or a
+  trailing slash, a priority outside 1-5, or tags with spaces and empty items.
 
 ## Requirements *(mandatory)*
 
@@ -151,6 +173,16 @@ fi
 - **FR-013**: `notify_desktop` MUST fail with exit code `127` when no backend is
   installed, MUST return a backend's own non-zero exit code, and under
   `DRY_RUN` MUST print the command instead of running it.
+- **FR-014**: `notify_ntfy` MUST publish a JSON body holding the topic from
+  `DYBATPHO_NTFY_TOPIC`, the message, and the optional title, priority and tags
+  to `DYBATPHO_NTFY_URL` (default `https://ntfy.sh`, trailing slashes removed).
+- **FR-015**: `notify_ntfy` MUST accept priorities `1`-`5` and the names `min`,
+  `low`, `default`, `high`, `max` and `urgent`, and MUST reject a topic outside
+  ntfy's 1-64 letters, digits, `-` and `_`, a server URL that is not `http(s)`,
+  or any other priority before making a request.
+- **FR-016**: `notify_ntfy` MUST send `DYBATPHO_NTFY_TOKEN`, when set, as a
+  bearer header through the network module's out-of-band headers, never as a
+  curl argument.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -186,6 +218,9 @@ fi
 - **IT-006**: Verify `notify_desktop` arguments for `notify-send` and the
   `osascript` fallback, verbatim titles that look like flags, the urgency
   rules, the missing-backend exit code, a backend's exit code, and `DRY_RUN`.
+- **IT-007**: Verify the `notify_ntfy` body, default and custom server URLs,
+  every priority name, tag trimming, the out-of-band token, rejection of a bad
+  topic, URL or priority, and HTTP status exit codes.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -193,4 +228,5 @@ fi
    shapes without exposing credentials in output.
 2. Generic webhook calls remain extensible through additional curl arguments.
 3. Desktop notifications pass user text to the backend as data, never as code.
+4. Access tokens never reach a process's command line.
 3. All notification requests share the network module's error contract.

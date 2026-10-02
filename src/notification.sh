@@ -12,6 +12,7 @@
 #   - **Google Chat** – Incoming Webhook
 #   - **Discord** – Incoming Webhook
 #   - **Generic** – Any webhook that accepts a raw JSON POST body
+#   - **ntfy** – Publish to a topic on ntfy.sh or a self-hosted server
 #   - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 #
 # @usage
@@ -48,6 +49,13 @@
 #   ```bash
 #   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/..."
 #   dybatpho::notify_teams "All checks passed" "Deploy complete"
+#   ```
+#
+#   #### Publish to an ntfy topic
+#
+#   ```bash
+#   export DYBATPHO_NTFY_TOPIC="backups-7f3a"
+#   dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning"
 #   ```
 #
 #   #### Show a desktop notification
@@ -383,4 +391,90 @@ function dybatpho::notify_desktop {
 
   dybatpho::debug "Sending desktop notification through ${command[0]}"
   dybatpho::dry_run "${command[@]}"
+}
+
+#######################################
+# @description Publish a message to an [ntfy](https://ntfy.sh) topic, on
+#   ntfy.sh or a server of your own.
+#   The message is published as JSON to the server root, so the title, the
+#   priority and the tags travel in the body and keep any character they hold.
+#   An access token is sent as a bearer header through the network module's
+#   out-of-band channel, so it never appears on curl's command line.
+# @example
+#   export DYBATPHO_NTFY_TOPIC="backups-7f3a"
+#   dybatpho::notify_ntfy "Backup finished"
+#   dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,floppy_disk"
+#
+# @arg $1 string Message text
+# @arg $2 string Optional title
+# @arg $3 string Optional priority: `1`-`5`, or `min`, `low`, `default`, `high`, `max` or `urgent`
+# @arg $4 string Optional comma-separated tags; a tag that names an emoji is shown as one
+# @env DYBATPHO_NTFY_TOPIC string Topic to publish to: letters, digits, `-` and `_`, at most 64 characters
+# @env DYBATPHO_NTFY_URL string Server URL, default is `https://ntfy.sh`
+# @env DYBATPHO_NTFY_TOKEN string Optional access token for a protected topic
+# @exitcode 0 Message published
+# @exitcode 1 Missing arguments or environment variables, or an invalid topic, server URL or priority
+# @exitcode 4 HTTP 4xx from the server, such as a refused token
+# @exitcode 5 HTTP 5xx from the server
+# @see dybatpho::curl_json
+#######################################
+function dybatpho::notify_ntfy {
+  local message
+  dybatpho::expect_args message -- "$@"
+  local title="${2-}" priority="${3-}" tags="${4-}"
+  dybatpho::expect_envs DYBATPHO_NTFY_TOPIC
+  local url="${DYBATPHO_NTFY_URL:-https://ntfy.sh}"
+  local token="${DYBATPHO_NTFY_TOKEN-}"
+
+  # The `die` lines below are tested under `run`, which kcov cannot observe.
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
+  [[ "${DYBATPHO_NTFY_TOPIC}" =~ ^[-_A-Za-z0-9]{1,64}$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: topic must be 1-64 letters, digits, '-' or '_'" # kcov(skip)
+  [[ "${url}" =~ ^https?://[^[:space:]]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: server URL must start with http:// or https://" # kcov(skip)
+  while [[ "${url}" == */ ]]; do url="${url%/}"; done
+
+  case "${priority}" in
+    '' | [1-5]) ;; # kcov(skip)
+    min) priority=1 ;;
+    low) priority=2 ;;
+    default) priority=3 ;;
+    high) priority=4 ;;
+    max | urgent) priority=5 ;;
+    *) dybatpho::die "${FUNCNAME[0]}: priority must be 1-5, min, low, default, high, max or urgent" ;; # kcov(skip)
+  esac
+
+  local payload escaped
+  escaped=$(__dybatpho_notification_json_escape "${DYBATPHO_NTFY_TOPIC}")
+  payload="{\"topic\":\"${escaped}\""
+  escaped=$(__dybatpho_notification_json_escape "${message}")
+  payload+=",\"message\":\"${escaped}\""
+  if [[ -n "${title}" ]]; then
+    escaped=$(__dybatpho_notification_json_escape "${title}")
+    payload+=",\"title\":\"${escaped}\""
+  fi
+  [[ -n "${priority}" ]] && payload+=",\"priority\":${priority}"
+  if [[ -n "${tags}" ]]; then
+    local tag list=""
+    local -a tag_list=()
+    IFS=',' read -r -a tag_list <<< "${tags}"
+    for tag in ${tag_list[@]+"${tag_list[@]}"}; do
+      tag="$(dybatpho::trim "${tag}")"
+      [[ -n "${tag}" ]] || continue
+      escaped=$(__dybatpho_notification_json_escape "${tag}")
+      list+="${list:+,}\"${escaped}\""
+    done
+    [[ -n "${list}" ]] && payload+=",\"tags\":[${list}]"
+  fi
+  payload+="}"
+
+  local -a headers=(${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"})
+  [[ -n "${token}" ]] && headers+=("Authorization: Bearer ${token}")
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local -a DYBATPHO_CURL_SECRET_HEADERS=(${headers[@]+"${headers[@]}"})
+
+  dybatpho::debug "Sending ntfy notification"
+  dybatpho::curl_json "${url}" /dev/null \
+    --request POST \
+    --data "${payload}"
 }

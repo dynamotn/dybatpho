@@ -71,6 +71,18 @@ function _demo_webhook {
   dybatpho::info "Generic webhook notification dispatched"
 }
 
+# @description Run the `NTFY` section of this example.
+# @noargs
+function _demo_ntfy {
+  dybatpho::header "NTFY"
+  export DYBATPHO_NTFY_TOPIC="backups-7f3a"
+  dybatpho::notify_ntfy "Backup finished"
+  # A self-hosted server, a priority name and emoji tags.
+  DYBATPHO_NTFY_URL="https://ntfy.example.test" \
+    dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,floppy_disk"
+  dybatpho::info "ntfy notifications dispatched"
+}
+
 # @description Run the `DESKTOP` section of this example.
 # @noargs
 function _demo_desktop {
@@ -94,6 +106,7 @@ function _main {
   _demo_google_chat
   _demo_discord
   _demo_webhook
+  _demo_ntfy
   _demo_desktop
   dybatpho::success "Notification demo complete"
 }

@@ -419,6 +419,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ./backup.sh && dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
   ```
 
+- **`notification` — ntfy.** `dybatpho::notify_ntfy` publishes a message to
+  the topic in `DYBATPHO_NTFY_TOPIC`, on ntfy.sh or the server in
+  `DYBATPHO_NTFY_URL`, with an optional title, a priority given as `1`-`5` or
+  as `min` through `urgent`, and comma-separated tags. `DYBATPHO_NTFY_TOKEN`
+  unlocks a protected topic and is sent outside curl's command line, so other
+  users of the host cannot read it from the process list. A topic ntfy would
+  refuse, a server URL without a scheme, or an unknown priority stops the
+  call before any request is made.
+
+  ```sh
+  export DYBATPHO_NTFY_TOPIC=backups-7f3a
+  dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent warning
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

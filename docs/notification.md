@@ -18,6 +18,7 @@ notification platforms through their webhook or bot APIs:
 - **Google Chat** – Incoming Webhook
 - **Discord** – Incoming Webhook
 - **Generic** – Any webhook that accepts a raw JSON POST body
+- **ntfy** – Publish to a topic on ntfy.sh or a self-hosted server
 - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 
 ### 🚀 Highlights
@@ -29,6 +30,7 @@ notification platforms through their webhook or bot APIs:
 - [`dybatpho::notify_discord`](#dybatphonotify_discord) — Send a message to a Discord channel via Incoming Webhook.
 - [`dybatpho::notify_webhook`](#dybatphonotify_webhook) — Send a raw JSON payload to an arbitrary webhook URL via HTTP POST.
 - [`dybatpho::notify_desktop`](#dybatphonotify_desktop) — Show a notification on the local desktop. `notify-send` (libnotify, on Linux and the BSDs) is used when it is installed, and `osascript` (macOS) otherwise. The title and the body reach either one as separate arguments, never spliced into a command or a script, so quotes, a leading `-` or AppleScript syntax in them are shown as written. macOS has no urgency for a notification, so it is accepted there and has no effect.
+- [`dybatpho::notify_ntfy`](#dybatphonotify_ntfy) — Publish a message to an [ntfy](https://ntfy.sh) topic, on ntfy.sh or a server of your own. The message is published as JSON to the server root, so the title, the priority and the tags travel in the body and keep any character they hold. An access token is sent as a bearer header through the network module's out-of-band channel, so it never appears on curl's command line.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -66,6 +68,13 @@ dybatpho::notify_telegram "Build #42 passed" "Markdown"
 ```bash
 export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/..."
 dybatpho::notify_teams "All checks passed" "Deploy complete"
+```
+
+#### Publish to an ntfy topic
+
+```bash
+export DYBATPHO_NTFY_TOPIC="backups-7f3a"
+dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning"
 ```
 
 #### Show a desktop notification
@@ -367,3 +376,52 @@ dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 - `1`: Missing or empty title, or an unknown urgency
 - `127`: Neither `notify-send` nor `osascript` is installed
 - `other`: The backend's own exit code, such as `notify-send` finding no desktop session
+
+
+---
+
+### `dybatpho::notify_ntfy`
+
+Publish a message to an [ntfy](https://ntfy.sh) topic, on
+ntfy.sh or a server of your own.
+The message is published as JSON to the server root, so the title, the
+priority and the tags travel in the body and keep any character they hold.
+An access token is sent as a bearer header through the network module's
+out-of-band channel, so it never appears on curl's command line.
+
+**🧪 Example**
+
+```bash
+export DYBATPHO_NTFY_TOPIC="backups-7f3a"
+dybatpho::notify_ntfy "Backup finished"
+dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,floppy_disk"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message text |
+| `$2` | string | Optional title |
+| `$3` | string | Optional priority: `1`-`5`, or `min`, `low`, `default`, `high`, `max` or `urgent` |
+| `$4` | string | Optional comma-separated tags; a tag that names an emoji is shown as one |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_NTFY_TOPIC`** | string | Topic to publish to: letters, digits, `-` and `_`, at most 64 characters |
+| **`DYBATPHO_NTFY_URL`** | string | Server URL, default is `https://ntfy.sh` |
+| **`DYBATPHO_NTFY_TOKEN`** | string | Optional access token for a protected topic |
+
+**🚦 Exit codes**
+
+- `0`: Message published
+- `1`: Missing arguments or environment variables, or an invalid topic, server URL or priority
+- `4`: HTTP 4xx from the server, such as a refused token
+- `5`: HTTP 5xx from the server
+
+**🔗 See also**
+
+- [dybatpho::curl_json](#dybatphocurl_json)

@@ -468,3 +468,110 @@ desktop_path() {
   DRY_RUN=true PATH="${bin}" run_traced -0 dybatpho::notify_desktop "Title"
   assert_output --partial "DRY RUN: notify-send --urgency=normal -- Title"
 }
+
+# ---------------------------------------------------------------------------
+# dybatpho::notify_ntfy
+# ---------------------------------------------------------------------------
+
+# A curl stub that records its arguments and, when it is given a `--config`
+# file, that file's contents too: the out-of-band headers live there.
+stub_curl_with_config() {
+  local args_file="$1" config_file="$2"
+  stub curl ": echo \"\$*\" > ${args_file}; prev=; for a in \"\$@\"; do [ \"\$prev\" = --config ] && cat \"\$a\" > ${config_file}; prev=\$a; done; echo '200'"
+}
+
+@test "dybatpho::notify_ntfy no arg" {
+  run dybatpho::notify_ntfy
+  assert_failure
+}
+
+@test "dybatpho::notify_ntfy missing env" {
+  unset DYBATPHO_NTFY_TOPIC
+  run --separate-stderr dybatpho::notify_ntfy "hello"
+  assert_failure
+  assert_stderr --partial "DYBATPHO_NTFY_TOPIC"
+}
+
+@test "dybatpho::notify_ntfy posts topic and message to ntfy.sh by default" {
+  local args_file="${BATS_TEST_TMPDIR}/ntfy-args"
+  export DYBATPHO_NTFY_TOPIC="backups-7f3a"
+  unset DYBATPHO_NTFY_URL DYBATPHO_NTFY_TOKEN
+  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  run_traced dybatpho::notify_ntfy "Backup finished"
+  unstub curl
+  assert_success
+  grep -- '--request POST' "${args_file}"
+  grep -- '--data {"topic":"backups-7f3a","message":"Backup finished"}' "${args_file}"
+  grep -- ' https://ntfy.sh$' "${args_file}"
+  run_traced grep -- '--config' "${args_file}"
+  assert_failure
+}
+
+@test "dybatpho::notify_ntfy adds title, named priority and trimmed tags" {
+  local args_file="${BATS_TEST_TMPDIR}/ntfy-full-args"
+  export DYBATPHO_NTFY_TOPIC="ops"
+  export DYBATPHO_NTFY_URL="https://ntfy.example.test///"
+  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  run_traced dybatpho::notify_ntfy 'Disk "/var" at 97%' "Disk almost full" urgent " warning, ,floppy_disk "
+  unstub curl
+  assert_success
+  grep -- '"message":"Disk \\"/var\\" at 97%"' "${args_file}"
+  grep -- '"title":"Disk almost full"' "${args_file}"
+  grep -- '"priority":5' "${args_file}"
+  grep -- '"tags":\["warning","floppy_disk"\]' "${args_file}"
+  grep -- ' https://ntfy.example.test$' "${args_file}"
+}
+
+@test "dybatpho::notify_ntfy maps every priority name to its number" {
+  local args_file="${BATS_TEST_TMPDIR}/ntfy-priority-args" name expected
+  export DYBATPHO_NTFY_TOPIC="ops"
+  for name in min:1 low:2 default:3 high:4 max:5 2:2; do
+    expected="${name#*:}"
+    stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+    run_traced dybatpho::notify_ntfy "m" "" "${name%%:*}"
+    unstub curl
+    assert_success
+    grep -- "\"priority\":${expected}}" "${args_file}"
+  done
+}
+
+@test "dybatpho::notify_ntfy sends the token out of band" {
+  local args_file="${BATS_TEST_TMPDIR}/ntfy-token-args"
+  local config_file="${BATS_TEST_TMPDIR}/ntfy-token-config"
+  export DYBATPHO_NTFY_TOPIC="private"
+  export DYBATPHO_NTFY_TOKEN="tk_not_on_the_command_line"
+  stub_curl_with_config "${args_file}" "${config_file}"
+  run_traced dybatpho::notify_ntfy "secret topic"
+  unstub curl
+  assert_success
+  run_traced grep -- "tk_not_on_the_command_line" "${args_file}"
+  assert_failure
+  grep -- "Authorization: Bearer tk_not_on_the_command_line" "${config_file}"
+}
+
+@test "dybatpho::notify_ntfy rejects an invalid topic" {
+  export DYBATPHO_NTFY_TOPIC="has space"
+  run -1 dybatpho::notify_ntfy "hello"
+  assert_output --partial "topic must be 1-64 letters"
+}
+
+@test "dybatpho::notify_ntfy rejects a server URL without a scheme" {
+  export DYBATPHO_NTFY_TOPIC="ops"
+  export DYBATPHO_NTFY_URL="ntfy.example.test"
+  run -1 dybatpho::notify_ntfy "hello"
+  assert_output --partial "server URL must start with http:// or https://"
+}
+
+@test "dybatpho::notify_ntfy rejects an unknown priority" {
+  export DYBATPHO_NTFY_TOPIC="ops"
+  run -1 dybatpho::notify_ntfy "hello" "" 6
+  assert_output --partial "priority must be 1-5"
+}
+
+@test "dybatpho::notify_ntfy returns the HTTP client status" {
+  export DYBATPHO_NTFY_TOPIC="ops"
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub curl ": printf '403'"
+  run_traced -4 dybatpho::notify_ntfy "refused"
+  unstub curl
+}

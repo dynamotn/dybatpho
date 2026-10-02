@@ -104,6 +104,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # `timeout` bounds the connection `dybatpho::port_open` makes. Without it the
   # probe still works and waits as long as the system's own TCP timeout.
   [network]="sha256sum md5sum timeout"
+  # `dybatpho::notify_desktop` needs one of the two, and only that function
+  # does: every other notifier is an HTTP request made through `network`.
+  [notification]="notify-send|osascript"
   [os]="hostname nproc|sysctl|getconf tput"
   [release]="gpg"
 )

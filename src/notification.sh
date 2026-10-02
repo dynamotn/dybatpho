@@ -12,6 +12,7 @@
 #   - **Google Chat** – Incoming Webhook
 #   - **Discord** – Incoming Webhook
 #   - **Generic** – Any webhook that accepts a raw JSON POST body
+#   - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 #
 # @usage
 #   ### When to use this module
@@ -47,6 +48,13 @@
 #   ```bash
 #   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/..."
 #   dybatpho::notify_teams "All checks passed" "Deploy complete"
+#   ```
+#
+#   #### Show a desktop notification
+#
+#   ```bash
+#   dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
+#   dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 #   ```
 #
 #   #### Send to any webhook
@@ -311,4 +319,68 @@ function dybatpho::notify_webhook {
     --request POST \
     --data "${payload}" \
     "$@"
+}
+
+#######################################
+# @description Show a notification on the local desktop.
+#   `notify-send` (libnotify, on Linux and the BSDs) is used when it is
+#   installed, and `osascript` (macOS) otherwise. The title and the body reach
+#   either one as separate arguments, never spliced into a command or a script,
+#   so quotes, a leading `-` or AppleScript syntax in them are shown as written.
+#   macOS has no urgency for a notification, so it is accepted there and has no
+#   effect.
+# @example
+#   dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
+#   dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
+#
+# @arg $1 string Title
+# @arg $2 string Body, default is empty
+# @arg $3 string Urgency: `low`, `normal` or `critical`, default is `normal`
+# @env DRY_RUN string Print the command instead of showing the notification; with no backend installed, the
+#   `notify-send` form is printed
+# @exitcode 0 The notification was handed to the desktop
+# @exitcode 1 Missing or empty title, or an unknown urgency
+# @exitcode 127 Neither `notify-send` nor `osascript` is installed
+# @exitcode other The backend's own exit code, such as `notify-send` finding no desktop session
+#######################################
+function dybatpho::notify_desktop {
+  local title
+  dybatpho::expect_args title -- "$@"
+  local body="${2-}" urgency="${3:-normal}"
+  # The `die` lines below are tested under `run`, which kcov cannot observe.
+  dybatpho::is empty "${title}" && dybatpho::die "${FUNCNAME[0]}: title must not be empty" # kcov(skip)
+  case "${urgency}" in
+    low | normal | critical) ;; # kcov(skip)
+    *) dybatpho::die "${FUNCNAME[0]}: urgency must be low, normal or critical, not '${urgency}'" ;; # kcov(skip)
+  esac
+
+  local backend
+  # shellcheck disable=SC2154 # `DRY_RUN` is declared by `src/process.sh`, a core module
+  if dybatpho::is command notify-send; then
+    backend="notify-send"
+  elif dybatpho::is command osascript; then
+    backend="osascript"
+  elif dybatpho::is true "${DRY_RUN}"; then
+    # Nothing would run anyway, so show the command most hosts would use.
+    backend="notify-send"
+  else
+    dybatpho::die "No desktop notification backend: install notify-send (libnotify) or osascript" 127 # kcov(skip)
+  fi
+
+  local -a command=()
+  if [[ "${backend}" == "notify-send" ]]; then
+    # `--` ends the options, so a title such as `-u` is a title.
+    command=(notify-send "--urgency=${urgency}" -- "${title}")
+    [[ -n "${body}" ]] && command+=("${body}")
+  else
+    # The words go to the script as `argv` rather than into its text. The
+    # leading `dybatpho` is the first operand, which ends osascript's option
+    # parsing, so a title that starts with `-` is not read as a flag.
+    command=(osascript -e 'on run argv')
+    command+=(-e 'display notification (item 3 of argv) with title (item 2 of argv)')
+    command+=(-e 'end run' dybatpho "${title}" "${body}")
+  fi
+
+  dybatpho::debug "Sending desktop notification through ${command[0]}"
+  dybatpho::dry_run "${command[@]}"
 }

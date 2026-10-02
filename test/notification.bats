@@ -356,3 +356,115 @@ setup() {
   assert_success
   assert_equal "$(jq -r '.text' <<< "${payload}")" "${message}"
 }
+
+# ---------------------------------------------------------------------------
+# dybatpho::notify_desktop
+# ---------------------------------------------------------------------------
+
+# A PATH holding only the named fake backends, plus the `date` the logger reads,
+# so the real `notify-send` of the host is never reached and "installed" means
+# exactly what the test says. Each fake writes its arguments one per line.
+desktop_path() {
+  local bin="${BATS_TEST_TMPDIR}/desktop-bin" name
+  mkdir -p "${bin}"
+  ln -sf "$(command -v date)" "${bin}/date"
+  for name in "$@"; do
+    printf '#!/bin/sh\nfor arg in "$@"; do printf "%%s\\n" "$arg"; done > %q\n' \
+      "${BATS_TEST_TMPDIR}/${name}.args" > "${bin}/${name}"
+    chmod +x "${bin}/${name}"
+  done
+  printf '%s' "${bin}"
+}
+
+@test "dybatpho::notify_desktop no arg" {
+  run dybatpho::notify_desktop
+  assert_failure
+}
+
+@test "dybatpho::notify_desktop rejects an empty title" {
+  local bin
+  bin="$(desktop_path notify-send)"
+  PATH="${bin}" run -1 dybatpho::notify_desktop ""
+  assert_output --partial "title must not be empty"
+  [ ! -e "${BATS_TEST_TMPDIR}/notify-send.args" ]
+}
+
+@test "dybatpho::notify_desktop rejects an unknown urgency" {
+  local bin
+  bin="$(desktop_path notify-send)"
+  PATH="${bin}" run -1 dybatpho::notify_desktop "Title" "Body" urgent
+  assert_output --partial "urgency must be low, normal or critical, not 'urgent'"
+  [ ! -e "${BATS_TEST_TMPDIR}/notify-send.args" ]
+}
+
+@test "dybatpho::notify_desktop passes title, body and urgency to notify-send" {
+  local bin
+  bin="$(desktop_path notify-send osascript)"
+  PATH="${bin}" run_traced -0 dybatpho::notify_desktop "Backup done" "42 files" critical
+  run_traced cat "${BATS_TEST_TMPDIR}/notify-send.args"
+  assert_line --index 0 "--urgency=critical"
+  assert_equal "${lines[1]}" "--"
+  assert_line --index 2 "Backup done"
+  assert_line --index 3 "42 files"
+  [ ! -e "${BATS_TEST_TMPDIR}/osascript.args" ]
+}
+
+@test "dybatpho::notify_desktop defaults to normal urgency and omits an empty body" {
+  local bin
+  bin="$(desktop_path notify-send)"
+  PATH="${bin}" run_traced -0 dybatpho::notify_desktop "Only a title"
+  run_traced cat "${BATS_TEST_TMPDIR}/notify-send.args"
+  assert_output $'--urgency=normal\n--\nOnly a title'
+}
+
+@test "dybatpho::notify_desktop passes a title that looks like a flag verbatim" {
+  local bin
+  bin="$(desktop_path notify-send)"
+  PATH="${bin}" run_traced -0 dybatpho::notify_desktop "-u low" 'say "hi" $(id)'
+  run_traced cat "${BATS_TEST_TMPDIR}/notify-send.args"
+  assert_equal "${lines[2]}" "-u low"
+  assert_line --index 3 'say "hi" $(id)'
+}
+
+@test "dybatpho::notify_desktop falls back to osascript with the words as argv" {
+  local bin
+  bin="$(desktop_path osascript)"
+  PATH="${bin}" run_traced -0 dybatpho::notify_desktop '-Deploy "v2"' 'end tell' low
+  run_traced cat "${BATS_TEST_TMPDIR}/osascript.args"
+  assert_equal "${lines[0]}" "-e"
+  assert_line --index 1 "on run argv"
+  assert_line --index 3 "display notification (item 3 of argv) with title (item 2 of argv)"
+  assert_line --index 6 "dybatpho"
+  assert_equal "${lines[7]}" '-Deploy "v2"'
+  assert_line --index 8 "end tell"
+}
+
+@test "dybatpho::notify_desktop fails with 127 when no backend is installed" {
+  local bin
+  bin="$(desktop_path)"
+  PATH="${bin}" run -127 dybatpho::notify_desktop "Title"
+  assert_output --partial "No desktop notification backend"
+}
+
+@test "dybatpho::notify_desktop returns the backend's exit code" {
+  local bin
+  bin="$(desktop_path)"
+  printf '#!/bin/sh\nexit 3\n' > "${bin}/notify-send"
+  chmod +x "${bin}/notify-send"
+  PATH="${bin}" run_traced -3 dybatpho::notify_desktop "No session"
+}
+
+@test "dybatpho::notify_desktop prints the command under DRY_RUN" {
+  local bin
+  bin="$(desktop_path notify-send)"
+  DRY_RUN=true PATH="${bin}" run_traced -0 dybatpho::notify_desktop "Title" "Body"
+  assert_output --partial "DRY RUN: notify-send --urgency=normal -- Title Body"
+  [ ! -e "${BATS_TEST_TMPDIR}/notify-send.args" ]
+}
+
+@test "dybatpho::notify_desktop prints the notify-send form under DRY_RUN with no backend" {
+  local bin
+  bin="$(desktop_path)"
+  DRY_RUN=true PATH="${bin}" run_traced -0 dybatpho::notify_desktop "Title"
+  assert_output --partial "DRY RUN: notify-send --urgency=normal -- Title"
+}

@@ -406,6 +406,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   dybatpho::metrics_push https://pushgateway.example.com nightly-backup host="$(hostname)"
+- **`notification` — desktop notifications.** `dybatpho::notify_desktop`
+  shows a title, an optional body and a `low`, `normal` or `critical` urgency
+  through `notify-send` on Linux and the BSDs, or `osascript` on macOS. The
+  text reaches either one as separate arguments, so quotes, a title starting
+  with `-`, or AppleScript syntax are shown as written rather than run. With
+  no backend installed it fails with exit code `127`, and `DRY_RUN` prints the
+  command instead of showing anything. `dybatpho::doctor` lists the two
+  backends as optional dependencies of the module.
+
+  ```sh
+  ./backup.sh && dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
   ```
 
 ### Fixed

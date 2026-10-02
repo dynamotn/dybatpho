@@ -2,8 +2,9 @@
 # @file notification_ops.sh
 # @brief Example showing notification utilities
 # @description Demonstrates dybatpho::notify_slack, notify_telegram, notify_teams,
-#   notify_google_chat, notify_discord, and notify_webhook using DRY_RUN mode so
-#   no real HTTP requests are made when running this example.
+#   notify_google_chat, notify_discord, notify_webhook, and notify_desktop using
+#   DRY_RUN mode so no real HTTP request is made and no notification is shown
+#   when running this example.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules notification
@@ -70,6 +71,20 @@ function _demo_webhook {
   dybatpho::info "Generic webhook notification dispatched"
 }
 
+# @description Run the `DESKTOP` section of this example.
+# @noargs
+function _demo_desktop {
+  dybatpho::header "DESKTOP"
+  # notify-send on Linux, osascript on macOS; DRY_RUN prints the command.
+  dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
+  dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
+  # An unknown urgency is refused before anything runs.
+  if ! (dybatpho::notify_desktop "Title" "Body" urgent 2> /dev/null); then
+    dybatpho::info "Rejected an unknown urgency"
+  fi
+  dybatpho::info "Desktop notifications dispatched"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -79,6 +94,7 @@ function _main {
   _demo_google_chat
   _demo_discord
   _demo_webhook
+  _demo_desktop
   dybatpho::success "Notification demo complete"
 }
 

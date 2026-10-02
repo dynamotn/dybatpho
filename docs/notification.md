@@ -18,6 +18,7 @@ notification platforms through their webhook or bot APIs:
 - **Google Chat** – Incoming Webhook
 - **Discord** – Incoming Webhook
 - **Generic** – Any webhook that accepts a raw JSON POST body
+- **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 
 ### 🚀 Highlights
 
@@ -27,6 +28,7 @@ notification platforms through their webhook or bot APIs:
 - [`dybatpho::notify_google_chat`](#dybatphonotify_google_chat) — Send a message to a Google Chat space via Incoming Webhook.
 - [`dybatpho::notify_discord`](#dybatphonotify_discord) — Send a message to a Discord channel via Incoming Webhook.
 - [`dybatpho::notify_webhook`](#dybatphonotify_webhook) — Send a raw JSON payload to an arbitrary webhook URL via HTTP POST.
+- [`dybatpho::notify_desktop`](#dybatphonotify_desktop) — Show a notification on the local desktop. `notify-send` (libnotify, on Linux and the BSDs) is used when it is installed, and `osascript` (macOS) otherwise. The title and the body reach either one as separate arguments, never spliced into a command or a script, so quotes, a leading `-` or AppleScript syntax in them are shown as written. macOS has no urgency for a notification, so it is accepted there and has no effect.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -64,6 +66,13 @@ dybatpho::notify_telegram "Build #42 passed" "Markdown"
 ```bash
 export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/..."
 dybatpho::notify_teams "All checks passed" "Deploy complete"
+```
+
+#### Show a desktop notification
+
+```bash
+dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
+dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 ```
 
 #### Send to any webhook
@@ -316,3 +325,45 @@ dybatpho::notify_webhook "https://my.service/hook" '{"text":"hi"}' \
 **🔗 See also**
 
 - [dybatpho::curl_json](#dybatphocurl_json)
+
+
+---
+
+### `dybatpho::notify_desktop`
+
+Show a notification on the local desktop.
+`notify-send` (libnotify, on Linux and the BSDs) is used when it is
+installed, and `osascript` (macOS) otherwise. The title and the body reach
+either one as separate arguments, never spliced into a command or a script,
+so quotes, a leading `-` or AppleScript syntax in them are shown as written.
+macOS has no urgency for a notification, so it is accepted there and has no
+effect.
+
+**🧪 Example**
+
+```bash
+dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
+dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Title |
+| `$2` | string | Body, default is empty |
+| `$3` | string | Urgency: `low`, `normal` or `critical`, default is `normal` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DRY_RUN`** | string | Print the command instead of showing the notification; with no backend installed, the `notify-send` form is printed |
+
+**🚦 Exit codes**
+
+- `0`: The notification was handed to the desktop
+- `1`: Missing or empty title, or an unknown urgency
+- `127`: Neither `notify-send` nor `osascript` is installed
+- `other`: The backend's own exit code, such as `notify-send` finding no desktop session

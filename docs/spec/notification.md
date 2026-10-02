@@ -70,6 +70,27 @@ carriage returns, and tabs and inspect the generated value.
    provider helper builds its payload, **Then** those characters are escaped
    as JSON string content
 
+### User Story 4 - Notify the person at the desktop (Priority: P2)
+
+As someone running a long job on my own machine, I want a desktop notification
+when it ends so that I do not have to watch the terminal.
+
+**Independent Test**: Put fake `notify-send` and `osascript` commands on a PATH
+that holds nothing else and verify which one runs and the arguments it gets.
+
+**Acceptance Scenarios**:
+
+1. **Given** `notify-send` is installed, **When** `notify_desktop` runs with a
+   title, body and urgency, **Then** `notify-send` receives the urgency, `--`,
+   the title and the body as separate arguments
+2. **Given** only `osascript` is installed, **When** `notify_desktop` runs,
+   **Then** the title and body reach the AppleScript as `argv`, not as script
+   text
+3. **Given** neither backend is installed, **When** `notify_desktop` runs,
+   **Then** it fails with exit code `127` and names both backends
+4. **Given** `DRY_RUN` is enabled, **When** `notify_desktop` runs, **Then** it
+   prints the command it would run and shows nothing
+
 ### Example Workflow
 
 ```bash
@@ -92,6 +113,9 @@ fi
 - Optional provider metadata is omitted or empty.
 - HTTP 4xx, 5xx, transport failures, or retries occur.
 - `notify_webhook` receives additional curl options.
+- A desktop title starts with `-`, or a title or body contains quotes or
+  AppleScript syntax.
+- No desktop backend is installed, or `notify-send` finds no desktop session.
 
 ## Requirements *(mandatory)*
 
@@ -118,6 +142,15 @@ fi
   carriage returns, and tabs.
 - **FR-010**: Provider requests MUST use the network module's JSON request
   behavior and status exit codes.
+- **FR-011**: `notify_desktop` MUST show a notification through `notify-send`
+  when it is installed and through `osascript` otherwise, passing the title and
+  body as separate arguments and never as part of a command or script text.
+- **FR-012**: `notify_desktop` MUST accept the urgencies `low`, `normal`
+  (default) and `critical`, and MUST reject an empty title or any other urgency
+  before running a backend.
+- **FR-013**: `notify_desktop` MUST fail with exit code `127` when no backend is
+  installed, MUST return a backend's own non-zero exit code, and under
+  `DRY_RUN` MUST print the command instead of running it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -127,6 +160,8 @@ fi
   environment variables.
 - **JSON Payload**: Provider-specific or caller-supplied request body.
 - **Webhook Request**: HTTP POST routed through `dybatpho::curl_json`.
+- **Desktop Backend**: `notify-send` or `osascript`, chosen by what is
+  installed.
 
 ## Success Criteria *(mandatory)*
 
@@ -148,10 +183,14 @@ fi
 - **IT-004**: Verify JSON escaping for quotes, backslashes, and control
   characters.
 - **IT-005**: Verify missing configuration and HTTP 4xx/5xx failures.
+- **IT-006**: Verify `notify_desktop` arguments for `notify-send` and the
+  `osascript` fallback, verbatim titles that look like flags, the urgency
+  rules, the missing-backend exit code, a backend's exit code, and `DRY_RUN`.
 
 ## Acceptance Criteria *(mandatory)*
 
 1. Supported provider helpers use documented environment variables and payload
    shapes without exposing credentials in output.
 2. Generic webhook calls remain extensible through additional curl arguments.
+3. Desktop notifications pass user text to the backend as data, never as code.
 3. All notification requests share the network module's error contract.

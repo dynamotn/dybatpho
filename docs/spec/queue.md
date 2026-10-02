@@ -87,6 +87,24 @@ As a script author, I want to push a job ahead of routine work, or schedule one 
 4. **Given** a claimed job with a priority, **When** it is requeued, **Then** it keeps its priority, and a requeue delay holds it back before it can be claimed again
 5. **Given** an invalid priority, duration, timestamp, both a delay and a timestamp, or an unknown option, **When** a push is attempted, **Then** the script is stopped with the reason
 
+---
+
+### User Story 6 - Run a worker without writing the loop (Priority: P2)
+
+As a script author, I want to hand a queue and a handler to one call, so that claiming, completing, retrying with backoff, dead-lettering and waiting for new work are not rewritten in every worker.
+
+**Independent Test**: Push jobs, run the worker with a handler that succeeds, fails or exits, and verify every job ends completed, requeued with the expected due time, or dead-lettered.
+
+**Acceptance Scenarios**:
+
+1. **Given** jobs and a handler that succeeds, **When** the worker runs, **Then** each job is handled in claim order with its payload as the last argument and its id in `DYBATPHO_QUEUE_JOB_ID`, and completed
+2. **Given** a handler that fails, **When** the worker runs, **Then** the job is requeued until the retry budget is spent and then dead-lettered with a warning
+3. **Given** a base backoff, **When** a job keeps failing, **Then** each retry is held back twice as long as the one before, never longer than the cap
+4. **Given** a handler that calls `exit`, **When** the worker runs, **Then** only that job fails and the worker carries on
+5. **Given** no `--poll`, **When** nothing is due, **Then** the worker returns; **Given** `--poll`, **Then** it waits and looks again until `--idle` runs out
+6. **Given** `--max-jobs`, **When** that many jobs have been handled, **Then** the worker returns
+7. **Given** an invalid option or a handler that does not exist, **When** the worker starts, **Then** the script is stopped with the reason
+
 ### Example Workflow
 
 ```bash
@@ -111,6 +129,9 @@ dybatpho::queue_list deploys dead
 dybatpho::queue_push --priority 10 deploys "rollback api"
 dybatpho::queue_push --delay 15m deploys "warm caches"
 dybatpho::queue_requeue --delay 30s deploys "${id}" 3
+
+# Or let the module run the loop, retries and backoff included.
+dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys handle
 ```
 
 ## Edge Cases
@@ -127,6 +148,10 @@ dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 - A priority is negative, has a leading zero, or is not a whole number; a delay is negative or not a duration; `--delay` and `--at` are both given.
 - A priority or due sidecar is missing, as on a job written by an older copy of the module, or damaged.
 - A queue name begins with `-`, and is separated from the options by `--`.
+- A worker's handler is a function, a program, or missing; it succeeds, fails, or calls `exit`.
+- A backoff that doubles past the cap, or a base backoff larger than the cap.
+- A worker polls a queue that stays empty, or that a producer fills after the worker started.
+- The clock is frozen or jumps while a worker waits.
 
 ## Requirements *(mandatory)*
 
@@ -157,6 +182,13 @@ dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 - **FR-023**: A job's priority MUST travel with it through a claim, a requeue and a dead letter, and completing the job MUST remove it.
 - **FR-024**: A requeue MUST accept `--delay` and `--at` to hold the job back before it can be claimed again, and MUST refuse `--priority`.
 - **FR-025**: A missing or damaged priority or due sidecar MUST read as priority `0` and due now.
+- **FR-026**: A worker MUST claim each due job in claim order and call the handler with the given arguments followed by the payload, with the job id in `DYBATPHO_QUEUE_JOB_ID`.
+- **FR-027**: A handler that succeeds MUST have its job completed; one that fails MUST have its job requeued with the retry budget given by `--retries` (default `3`), and a job past the budget MUST be dead-lettered with a warning.
+- **FR-028**: With `--backoff`, a retry MUST be held back by the base delay doubled for each earlier attempt, capped at `--max-backoff` (default one hour).
+- **FR-029**: The handler MUST run in a subshell, so one that exits fails only its own job.
+- **FR-030**: Without `--poll` a worker MUST return once no job is due; with it, the worker MUST wait that long and look again, and with `--idle` MUST return after that long without a job, counted in polls rather than read from the clock.
+- **FR-031**: A worker MUST return after `--max-jobs` jobs when that is not `0`.
+- **FR-032**: An invalid or unknown worker option, a zero poll interval, or a handler that is not a command MUST stop the script.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -176,6 +208,7 @@ dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 - **SC-003**: A job that always fails leaves the queue after a bounded number of attempts, and is still readable afterwards.
 - **SC-004**: A producer can add work while workers are running.
 - **SC-005**: An urgent job is claimed before every routine job already waiting, and a scheduled job is never claimed early.
+- **SC-006**: A complete worker, retries and backoff included, is one call.
 
 ## Integration Tests *(mandatory)*
 
@@ -208,6 +241,16 @@ dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 - **IT-027**: Requeue with `--delay`, keeping the priority, and refuse `--priority` on a requeue.
 - **IT-028**: Remove sidecars on completion and keep them on a dead letter.
 - **IT-029**: Read damaged sidecars as the defaults.
+- **IT-030**: Drain a queue with a function handler, in claim order, with arguments, payload and job id.
+- **IT-031**: Return at once from an empty queue.
+- **IT-032**: Retry a failing job and dead-letter it past the budget with a warning.
+- **IT-033**: Fail only the job whose handler exits.
+- **IT-034**: Back off exponentially under a frozen clock, up to the cap, and leave a job that is not due.
+- **IT-035**: Stop after `--max-jobs`.
+- **IT-036**: Wait with `--poll` for a job pushed later, and return once `--idle` runs out.
+- **IT-037**: Run a program handler with arguments.
+- **IT-038**: Refuse each invalid worker option and a missing handler.
+- **IT-039**: Accept `--` before the queue name.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -3,7 +3,7 @@
 # @brief Example draining a durable job queue with several workers
 # @description Demonstrates dybatpho::queue_push, queue_peek, queue_len, queue_pop,
 #   queue_complete, queue_requeue, queue_dead_letter, queue_list, and queue_read,
-#   with job priorities and delayed jobs
+#   with job priorities, delayed jobs, and dybatpho::queue_work running the loop
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules queue
@@ -143,7 +143,42 @@ function _demo_priority_and_delay {
     printf 'claimed   %s\n' "${payload}"
     dybatpho::queue_complete "${queue}" "${id}"
   done
-  dybatpho::info "Still waiting until due: $(dybatpho::queue_len "${queue}")"
+  local waiting
+  waiting="$(dybatpho::queue_len "${queue}")"
+  dybatpho::info "Still waiting until due: ${waiting}"
+}
+
+# @description Handle one job for the worker; payloads naming a flaky
+#   service fail, which drives the retries.
+# @arg $1 string Payload
+# @exitcode 0 The job was handled
+# @exitcode 1 It failed
+function _worker_handler {
+  local payload
+  dybatpho::expect_args payload -- "$@"
+  if [[ "${payload}" == *flaky* ]]; then
+    printf 'failed    %s\n' "${payload}"
+    return 1
+  fi
+  printf 'handled   %s (%s)\n' "${payload}" "${DYBATPHO_QUEUE_JOB_ID:-}"
+}
+
+# @description Let the module run the worker loop: claim, handle, complete,
+#   retry, and dead-letter past the budget.
+# @arg $1 string Queue path
+function _demo_worker {
+  local queue
+  dybatpho::expect_args queue -- "$@"
+
+  dybatpho::header "WORKER"
+  dybatpho::queue_push "${queue}" "restart api" > /dev/null
+  dybatpho::queue_push "${queue}" "restart flaky" > /dev/null
+  dybatpho::queue_push --priority 5 "${queue}" "rollback web" > /dev/null
+
+  dybatpho::queue_work --retries 1 "${queue}" _worker_handler
+  local dead
+  dead="$(dybatpho::queue_len "${queue}" dead)"
+  dybatpho::info "Dead letters: ${dead}"
 }
 
 # @description Run every section of this example, in order.
@@ -157,6 +192,8 @@ function _main {
   _demo_crash_recovery "${queue}"
   _make_queue queue
   _demo_priority_and_delay "${queue}"
+  _make_queue queue
+  _demo_worker "${queue}"
   dybatpho::success "Queue operations demo complete"
 }
 

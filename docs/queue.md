@@ -51,6 +51,7 @@ of every waiting job of a lower priority, and one pushed with `--delay` or
 - [`dybatpho::queue_requeue`](#dybatphoqueue_requeue) — Put a claimed job back at the end of the queue. Each requeue counts, and when a job has been requeued as many times as the budget allows it is dead-lettered instead, so a job that always fails stops circulating without being thrown away. The job keeps its priority, and `--delay` or `--at` hold it back before it can be claimed again, which is how a caller backs off from a failure.
 - [`dybatpho::queue_dead_letter`](#dybatphoqueue_dead_letter) — Move a claimed job to the queue's dead letters. A job that cannot be handled is kept rather than deleted, so an operator can read it, fix the cause, and push it again.
 - [`dybatpho::queue_read`](#dybatphoqueue_read) — Read a job's payload from any state, into a named variable.
+- [`dybatpho::queue_work`](#dybatphoqueue_work) — Run a worker over a queue: claim each job that is due, hand its payload to a handler, and settle the job by how the handler exited. A handler that succeeds completes its job. One that fails has the job requeued, held back by a backoff that doubles with every attempt, until the retry budget is spent and the job is filed under dead letters instead. The handler runs in a subshell, so one that calls `exit` or `dybatpho::die` fails its own job rather than ending the worker. Without `--poll` the worker returns as soon as no job is due, which drains a queue and stops. With it, the worker sleeps that long whenever nothing is due and looks again, for as long as `--idle` allows or, without it, until `--max-jobs` is reached. Several workers may run over one queue at once: each claim is made under the queue's lock. A worker killed in the middle of a job leaves that job in `claimed`, where `dybatpho::queue_list` shows it and `dybatpho::queue_requeue` puts it back.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -365,3 +366,73 @@ dybatpho::queue_read deploys "${id}" payload dead
 
 - `0`: The job was read
 - `1`: No job with that id is in the queue
+
+
+---
+
+### `dybatpho::queue_work`
+
+Run a worker over a queue: claim each job that is due, hand its
+payload to a handler, and settle the job by how the handler exited.
+
+A handler that succeeds completes its job. One that fails has the job
+requeued, held back by a backoff that doubles with every attempt, until
+the retry budget is spent and the job is filed under dead letters instead.
+The handler runs in a subshell, so one that calls `exit` or
+`dybatpho::die` fails its own job rather than ending the worker.
+
+Without `--poll` the worker returns as soon as no job is due, which drains
+a queue and stops. With it, the worker sleeps that long whenever nothing is
+due and looks again, for as long as `--idle` allows or, without it, until
+`--max-jobs` is reached. Several workers may run over one queue at once:
+each claim is made under the queue's lock.
+
+A worker killed in the middle of a job leaves that job in `claimed`, where
+`dybatpho::queue_list` shows it and `dybatpho::queue_requeue` puts it back.
+
+**🧪 Examples**
+
+```bash
+handle_deploy() { ./deploy.sh "$1"; }
+dybatpho::queue_work --retries 5 --backoff 10s deploys handle_deploy
+
+```
+
+```bash
+# A long-running worker that gives up after ten quiet minutes.
+dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
+```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--retries \<n\>** | Requeues a failing job gets before it is dead-lettered, default is `3` |
+| **--backoff \<duration\>** | Delay before the first retry, doubled for each one after, default is `0` |
+| **--max-backoff \<duration\>** | Longest a retry is held back, default is `1h` |
+| **--max-jobs \<n\>** | Return after handling this many jobs, `0` for no limit, default is `0` |
+| **--poll \<duration\>** | Wait this long and look again when no job is due, instead of returning |
+| **--idle \<duration\>** | With `--poll`, return after going this long without a job |
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Queue name or path |
+| `$2` | string | Handler command, a function or a program |
+| `$@` | string | Arguments passed to the handler before the payload |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_QUEUE_JOB_ID`** | string | Set for the handler to the id of the job it is handling |
+
+**📤 Output on stderr**
+
+- A warning for each job that is dead-lettered
+
+**🚦 Exit codes**
+
+- `0`: The worker stopped: nothing was due, the idle time ran out, or the job limit was reached
+- `1`: Stop the script on an invalid option or a missing handler

@@ -442,3 +442,152 @@ SCRIPT
   run_traced dybatpho::queue_pop "${QUEUE}" id payload
   assert_success
 }
+
+@test "dybatpho::queue_work drains a queue and completes each job" {
+  local log="${BATS_TEST_TMPDIR}/handled.txt"
+  record() { printf '%s %s %s\n' "$1" "$2" "${DYBATPHO_QUEUE_JOB_ID%%-*}" >> "${log}"; }
+  dybatpho::queue_push "${QUEUE}" one > /dev/null
+  dybatpho::queue_push --priority 1 "${QUEUE}" two > /dev/null
+
+  run_traced dybatpho::queue_work "${QUEUE}" record tag
+  assert_success
+  assert_equal "$(< "${log}")" "$(printf 'tag two 000000000002\ntag one 000000000001')"
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
+  assert_equal "$(dybatpho::queue_len "${QUEUE}" claimed)" "0"
+}
+
+@test "dybatpho::queue_work returns at once on an empty queue" {
+  noop() { :; }
+  run_traced dybatpho::queue_work "${QUEUE}" noop
+  assert_success
+}
+
+@test "dybatpho::queue_work retries a failing job and dead-letters it past the budget" {
+  local count="${BATS_TEST_TMPDIR}/count"
+  fail() {
+    printf 'x' >> "${count}"
+    return 1
+  }
+  dybatpho::queue_push "${QUEUE}" poison > /dev/null
+
+  run_traced --separate-stderr dybatpho::queue_work --retries 2 "${QUEUE}" fail
+  assert_success
+  assert_equal "$(< "${count}")" "xxx"
+  assert_equal "$(dybatpho::queue_len "${QUEUE}" dead)" "1"
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
+  [[ "${stderr}" == *"failed 3 times; moved to dead letters"* ]]
+}
+
+@test "dybatpho::queue_work isolates a handler that exits" {
+  quits() { exit 3; }
+  dybatpho::queue_push "${QUEUE}" job > /dev/null
+
+  run_traced --separate-stderr dybatpho::queue_work --retries=0 "${QUEUE}" quits
+  assert_success
+  assert_equal "$(dybatpho::queue_len "${QUEUE}" dead)" "1"
+}
+
+@test "dybatpho::queue_work backs off exponentially up to the cap" {
+  dybatpho::mock_time 1767225600
+  fail() { return 1; }
+  local id payload
+  dybatpho::queue_push "${QUEUE}" flaky > /dev/null
+
+  # First failure: held back by the base delay.
+  dybatpho::queue_work --backoff 10s --max-backoff 25s --max-jobs 1 "${QUEUE}" fail
+  id="$(dybatpho::queue_list "${QUEUE}")"
+  assert_equal "$(< "${QUEUE}/pending/${id}.due")" "1767225610"
+
+  # Second: doubled. Third: doubled again, but capped.
+  dybatpho::mock_time_advance 10
+  dybatpho::queue_work --backoff 10s --max-backoff 25s --max-jobs 1 "${QUEUE}" fail
+  id="$(dybatpho::queue_list "${QUEUE}")"
+  assert_equal "$(< "${QUEUE}/pending/${id}.due")" "1767225630"
+
+  dybatpho::mock_time_advance 20
+  dybatpho::queue_work --backoff 10s --max-backoff 25s --max-jobs 1 "${QUEUE}" fail
+  id="$(dybatpho::queue_list "${QUEUE}")"
+  assert_equal "$(< "${QUEUE}/pending/${id}.due")" "1767225655"
+
+  # Not due yet, so a draining worker leaves it alone.
+  run_traced dybatpho::queue_work "${QUEUE}" fail
+  assert_success
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "1"
+  dybatpho::unmock_time
+}
+
+@test "dybatpho::queue_work stops after --max-jobs" {
+  local log="${BATS_TEST_TMPDIR}/handled.txt"
+  record() { printf '%s\n' "$1" >> "${log}"; }
+  local job
+  for job in a b c; do dybatpho::queue_push "${QUEUE}" "${job}" > /dev/null; done
+
+  run_traced dybatpho::queue_work --max-jobs 2 "${QUEUE}" record
+  assert_success
+  assert_equal "$(< "${log}")" "$(printf 'a\nb')"
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "1"
+}
+
+@test "dybatpho::queue_work --poll waits for work and --idle ends the wait" {
+  local log="${BATS_TEST_TMPDIR}/handled.txt"
+  record() { printf '%s\n' "$1" >> "${log}"; }
+  # A producer that arrives after the worker has started looking.
+  (
+    sleep 1
+    dybatpho::queue_push "${QUEUE}" late > /dev/null
+  ) &
+
+  run_traced dybatpho::queue_work --poll 1s --idle 2s "${QUEUE}" record
+  assert_success
+  wait
+  assert_equal "$(< "${log}")" "late"
+}
+
+@test "dybatpho::queue_work runs a program handler with arguments" {
+  local handler="${BATS_TEST_TMPDIR}/handler.sh"
+  printf '#!/usr/bin/env bash\nprintf "%%s|%%s\\n" "$1" "$2" >> "%s"\n' "${BATS_TEST_TMPDIR}/out" > "${handler}"
+  chmod +x "${handler}"
+  dybatpho::queue_push "${QUEUE}" "a payload" > /dev/null
+
+  run_traced dybatpho::queue_work "${QUEUE}" "${handler}" --flag
+  assert_success
+  assert_equal "$(< "${BATS_TEST_TMPDIR}/out")" "--flag|a payload"
+}
+
+@test "dybatpho::queue_work refuses an invalid option or a missing handler" {
+  run --separate-stderr dybatpho::queue_work --retries many "${QUEUE}" true
+  assert_failure
+  assert_stderr --partial "--retries takes a whole number, got: many"
+
+  run --separate-stderr dybatpho::queue_work --backoff soon "${QUEUE}" true
+  assert_failure
+  assert_stderr --partial "--backoff takes a duration, got: soon"
+
+  run --separate-stderr dybatpho::queue_work --idle -5s "${QUEUE}" true
+  assert_failure
+  assert_stderr --partial "--idle cannot be negative"
+
+  run --separate-stderr dybatpho::queue_work --poll 0 "${QUEUE}" true
+  assert_failure
+  assert_stderr --partial "--poll must be at least one second"
+
+  run --separate-stderr dybatpho::queue_work --max-jobs
+  assert_failure
+  assert_stderr --partial "--max-jobs needs a value"
+
+  run --separate-stderr dybatpho::queue_work --forever "${QUEUE}" true
+  assert_failure
+  assert_stderr --partial "Unknown option: --forever"
+
+  run --separate-stderr dybatpho::queue_work "${QUEUE}" no-such-handler-here
+  assert_failure
+  assert_stderr --partial "Handler not found: no-such-handler-here"
+}
+
+@test "dybatpho::queue_work accepts -- before the queue name" {
+  noop() { :; }
+  dybatpho::queue_push "${QUEUE}" job > /dev/null
+  run_traced dybatpho::queue_work --max-backoff=1m -- "${QUEUE}" noop
+  assert_success
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
+}

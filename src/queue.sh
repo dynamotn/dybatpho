@@ -681,3 +681,159 @@ function dybatpho::queue_read {
   done
   return 1
 }
+
+#######################################
+# @description Read the options `dybatpho::queue_work` accepts, into an
+#   associative array whose keys are the option names without their dashes,
+#   plus `used`, the number of arguments that were options.
+# @arg $1 string Name of the associative array receiving the settings
+# @arg $@ string The caller's arguments
+# @set The named array
+# @exitcode 0 The options were read
+# @exitcode 1 Stop the script on an unknown option or an invalid value
+# @internal
+#######################################
+function __dybatpho_queue_work_options {
+  local -n __dybatpho_queue_work_ref="$1"
+  shift
+
+  local option value work_seconds used=0
+  while (($# > 0)); do
+    option="$1"
+    case "${option}" in
+      --)
+        used=$((used + 1))
+        break
+        ;;
+      --retries | --backoff | --max-backoff | --max-jobs | --poll | --idle)
+        (($# >= 2)) || dybatpho::die "dybatpho::queue_work: ${option} needs a value"
+        value="$2"
+        shift 2
+        used=$((used + 2))
+        ;;
+      --retries=* | --backoff=* | --max-backoff=* | --max-jobs=* | --poll=* | --idle=*)
+        value="${option#*=}"
+        option="${option%%=*}"
+        shift
+        used=$((used + 1))
+        ;;
+      # Tested under `run` ("queue_work refuses an invalid option"): it exits.
+      --?*) dybatpho::die "dybatpho::queue_work: Unknown option: ${option}" ;; # kcov(skip)
+      *) break ;;
+    esac
+
+    if [[ "${option}" == "--retries" || "${option}" == "--max-jobs" ]]; then
+      [[ "${value}" =~ ^[0-9]{1,9}$ ]] \
+        || dybatpho::die "dybatpho::queue_work: ${option} takes a whole number, got: ${value}"
+      __dybatpho_queue_work_ref["${option#--}"]=$((10#${value}))
+      continue
+    fi
+
+    dybatpho::date_parse_duration work_seconds "${value}" \
+      || dybatpho::die "dybatpho::queue_work: ${option} takes a duration, got: ${value}"
+    ((work_seconds >= 0)) || dybatpho::die "dybatpho::queue_work: ${option} cannot be negative, got: ${value}"
+    if [[ "${option}" == "--poll" ]]; then
+      ((work_seconds > 0)) || dybatpho::die "dybatpho::queue_work: --poll must be at least one second"
+    fi
+    __dybatpho_queue_work_ref["${option#--}"]="${work_seconds}"
+  done
+  __dybatpho_queue_work_ref[used]="${used}"
+}
+
+#######################################
+# @description Run a worker over a queue: claim each job that is due, hand its
+#   payload to a handler, and settle the job by how the handler exited.
+#
+#   A handler that succeeds completes its job. One that fails has the job
+#   requeued, held back by a backoff that doubles with every attempt, until
+#   the retry budget is spent and the job is filed under dead letters instead.
+#   The handler runs in a subshell, so one that calls `exit` or
+#   `dybatpho::die` fails its own job rather than ending the worker.
+#
+#   Without `--poll` the worker returns as soon as no job is due, which drains
+#   a queue and stops. With it, the worker sleeps that long whenever nothing is
+#   due and looks again, for as long as `--idle` allows or, without it, until
+#   `--max-jobs` is reached. Several workers may run over one queue at once:
+#   each claim is made under the queue's lock.
+#
+#   A worker killed in the middle of a job leaves that job in `claimed`, where
+#   `dybatpho::queue_list` shows it and `dybatpho::queue_requeue` puts it back.
+# @option --retries <n> Requeues a failing job gets before it is dead-lettered, default is `3`
+# @option --backoff <duration> Delay before the first retry, doubled for each one after, default is `0`
+# @option --max-backoff <duration> Longest a retry is held back, default is `1h`
+# @option --max-jobs <n> Return after handling this many jobs, `0` for no limit, default is `0`
+# @option --poll <duration> Wait this long and look again when no job is due, instead of returning
+# @option --idle <duration> With `--poll`, return after going this long without a job
+# @arg $1 string Queue name or path
+# @arg $2 string Handler command, a function or a program
+# @arg $@ string Arguments passed to the handler before the payload
+# @env DYBATPHO_QUEUE_JOB_ID string Set for the handler to the id of the job it is handling
+# @stderr A warning for each job that is dead-lettered
+# @exitcode 0 The worker stopped: nothing was due, the idle time ran out, or the job limit was reached
+# @exitcode 1 Stop the script on an invalid option or a missing handler
+# @example
+#   handle_deploy() { ./deploy.sh "$1"; }
+#   dybatpho::queue_work --retries 5 --backoff 10s deploys handle_deploy
+#
+# @example
+#   # A long-running worker that gives up after ten quiet minutes.
+#   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
+#######################################
+function dybatpho::queue_work {
+  local -A settings=([retries]=3 [backoff]=0 [max-backoff]=3600 [max-jobs]=0 [poll]="" [idle]="")
+  __dybatpho_queue_work_options settings "$@"
+  shift "${settings[used]}"
+  local retries="${settings[retries]}" backoff="${settings[backoff]}"
+  local max_backoff="${settings[max-backoff]}" max_jobs="${settings[max-jobs]}"
+  local poll="${settings[poll]}" idle="${settings[idle]}"
+
+  local queue handler
+  dybatpho::expect_args queue handler -- "$@"
+  shift 2
+  dybatpho::command_exists_all "${handler}" \
+    || dybatpho::die "${FUNCNAME[0]}: Handler not found: ${handler}"
+
+  local directory
+  __dybatpho_queue_dir_into directory "${queue}"
+
+  local handled=0 waited=0 id payload attempts delay outcome
+  while ((max_jobs == 0 || handled < max_jobs)); do
+    if ! dybatpho::queue_pop "${queue}" id payload; then
+      [[ -n "${poll}" ]] || return 0
+      # Idle time is counted in polls rather than read from the clock, so a
+      # frozen or jumping clock cannot keep a worker alive or end it early.
+      if [[ -n "${idle}" ]] && ((waited >= idle)); then
+        return 0
+      fi
+      sleep "${poll}"
+      waited=$((waited + poll))
+      continue
+    fi
+    waited=0
+    handled=$((handled + 1))
+
+    if (DYBATPHO_QUEUE_JOB_ID="${id}" "${handler}" "$@" "${payload}"); then
+      dybatpho::queue_complete "${queue}" "${id}"
+      continue
+    fi
+
+    __dybatpho_queue_sidecar_number_into attempts "${directory}/claimed/${id}.retries" 0
+    delay=0
+    if ((backoff > 0)); then
+      # Doubling stops at the cap rather than after it, so a long retry run
+      # never overflows the multiplication.
+      delay="${backoff}"
+      while ((attempts > 0 && delay < max_backoff)); do
+        delay=$((delay * 2))
+        attempts=$((attempts - 1))
+      done
+      ((delay <= max_backoff)) || delay="${max_backoff}"
+    fi
+
+    local -a requeue=(dybatpho::queue_requeue)
+    ((delay == 0)) || requeue+=(--delay "${delay}")
+    outcome="$("${requeue[@]}" -- "${queue}" "${id}" "${retries}")"
+    [[ -n "${outcome}" ]] \
+      || dybatpho::warn "Job ${id} in ${queue} failed $((retries + 1)) times; moved to dead letters"
+  done
+}

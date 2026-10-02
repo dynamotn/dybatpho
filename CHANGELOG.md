@@ -148,6 +148,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::queue_requeue --delay 30s deploys "${id}" 3
   ```
 
+- **`queue` — a ready-made worker.** `dybatpho::queue_work <queue> <handler>`
+  claims each job that is due, calls the handler with the payload as its last
+  argument and the job's id in `DYBATPHO_QUEUE_JOB_ID`, completes the job when
+  the handler succeeds, and requeues it when it fails, until `--retries` (default
+  `3`) is spent and the job is dead-lettered with a warning. `--backoff` holds
+  each retry back twice as long as the last, up to `--max-backoff`. The handler
+  runs in a subshell, so one that exits fails only its own job. Without
+  `--poll` the worker drains the queue and returns; with it, it waits for new
+  work until `--idle` runs out, and `--max-jobs` stops it after a number of jobs.
+
+  ```sh
+  dybatpho::queue_work --retries 5 --backoff 10s deploys handle_deploy
+  dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

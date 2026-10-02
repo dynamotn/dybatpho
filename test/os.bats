@@ -1,5 +1,20 @@
 setup() {
   load test_helper
+  __os_saved_path="${PATH}"
+  __os_saved_term="${TERM:-}"
+}
+
+# Bash before 5.3 leaves an assignment that precedes a function call set in the
+# shell after the call returns, and Bats runs every test of a file in one
+# shell. The `PATH=` and `TERM=dumb` that some tests here put in front of `run`
+# therefore rode along into the next test on every CI runner while this file
+# passed on a 5.3 host: `dybatpho::color_supported` answered a leaked
+# `TERM=dumb` instead of judging the stream it was given.
+teardown() {
+  PATH="${__os_saved_path}"
+  TERM="${__os_saved_term}"
+  NO_COLOR=""
+  unset FORCE_COLOR
 }
 
 @test "dybatpho::goos linux" {

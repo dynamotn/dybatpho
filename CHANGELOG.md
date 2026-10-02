@@ -206,6 +206,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
   ```
 
+- **`parallel` — progress while a long run works.** `--progress` (or
+  `DYBATPHO_PARALLEL_PROGRESS=true`) on `dybatpho::parallel_map` and
+  `dybatpho::parallel_run` reports finished jobs on standard error while the
+  run is still going. When the `tui` module is loaded it drives
+  `dybatpho::tui_progress_start` and its bar, which logs on a percentage grid
+  when there is no terminal; without `tui`, each finished job prints a plain
+  `Jobs: 3/10 finished` line. Standard output still carries only what the jobs
+  wrote, so a run can be piped or redirected with progress on.
+
+  ```sh
+  dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

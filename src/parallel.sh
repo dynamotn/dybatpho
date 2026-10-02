@@ -32,6 +32,8 @@ DYBATPHO_PARALLEL_JOBS="${DYBATPHO_PARALLEL_JOBS:-0}"
 DYBATPHO_PARALLEL_FAILFAST="${DYBATPHO_PARALLEL_FAILFAST:-false}"
 # @env DYBATPHO_PARALLEL_TIMEOUT string Longest a job may run, such as `90`, `5m` or `1h30m`; empty or `0` is no limit
 DYBATPHO_PARALLEL_TIMEOUT="${DYBATPHO_PARALLEL_TIMEOUT:-}"
+# @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report on standard error how many jobs have finished
+DYBATPHO_PARALLEL_PROGRESS="${DYBATPHO_PARALLEL_PROGRESS:-false}"
 # @env DYBATPHO_PARALLEL_STATUS array Exit code of each job of the last run, in submission order
 declare -ga DYBATPHO_PARALLEL_STATUS=()
 
@@ -107,6 +109,7 @@ function __dybatpho_parallel_flush {
 # @arg $@ string The arguments the entry point was called with
 # @set __dybatpho_parallel_opt_failfast `true` when `--fail-fast` was given
 # @set __dybatpho_parallel_opt_timeout The duration given to `--timeout`
+# @set __dybatpho_parallel_opt_progress `true` when `--progress` was given
 # @exitcode 1 Stop the script on an unknown option, or `--timeout` without a duration
 # @internal
 #######################################
@@ -117,6 +120,7 @@ function __dybatpho_parallel_options {
   while (($#)); do
     case "$1" in
       --fail-fast) __dybatpho_parallel_opt_failfast=true ;;
+      --progress) __dybatpho_parallel_opt_progress=true ;;
       --timeout=*) __dybatpho_parallel_opt_timeout="${1#--timeout=}" ;;
       --timeout)
         # Exercised under `run` by "an invalid timeout is refused", which kcov
@@ -194,6 +198,43 @@ function __dybatpho_parallel_watch {
 }
 
 #######################################
+# @description Report how far the pool has got, when progress was asked for.
+#   The `tui` progress bar draws it when that module is loaded, which also gives
+#   a log line per percentage step when standard error is not a terminal. The
+#   module is not a dependency: without it, each finished job prints one plain
+#   line. Progress only ever goes to standard error, so the jobs' replayed
+#   output on standard output stays exactly what the jobs wrote.
+# @arg $1 string `start`, `step` or `stop`
+# @arg $2 number Total jobs for `start`, jobs just finished for `step`
+# @stderr The progress bar, or a `Jobs: <done>/<total> finished` line per step
+# @internal
+#######################################
+function __dybatpho_parallel_progress {
+  local action="$1" count="${2-0}"
+  [[ "${__dybatpho_parallel_progress}" == true ]] || return 0
+  if declare -F __dybatpho_tui_progress_render > /dev/null; then
+    case "${action}" in
+      start) dybatpho::tui_progress_start "Jobs" "${count}" ;;
+      step) ((count == 0)) || dybatpho::tui_progress_step "${count}" ;;
+      *) dybatpho::tui_progress_stop ;;
+    esac
+    return 0
+  fi
+  case "${action}" in
+    start)
+      __dybatpho_parallel_done=0
+      __dybatpho_parallel_total="${count}"
+      ;;
+    step)
+      ((count > 0)) || return 0
+      __dybatpho_parallel_done=$((__dybatpho_parallel_done + count))
+      printf 'Jobs: %s/%s finished\n' "${__dybatpho_parallel_done}" "${__dybatpho_parallel_total}" >&2
+      ;;
+    *) ;; # kcov(skip) empty arm: the plain report has nothing to close
+  esac
+}
+
+#######################################
 # @description Reap the jobs that have finished and act on what they reported.
 #   `wait -n` blocks until at least one job ends, so every call makes progress.
 #   Exit codes travel through files rather than through `wait`, because
@@ -232,6 +273,8 @@ function __dybatpho_parallel_reap {
       __dybatpho_parallel_terminate "${__dybatpho_parallel_watchdog_of[${pid}]}"
     fi
   done
+
+  __dybatpho_parallel_progress step "${#finished[@]}"
 
   for index in ${finished[@]+"${finished[@]}"}; do
     [[ -f "${directory}/${index}.status" ]] || continue
@@ -284,6 +327,12 @@ function __dybatpho_parallel_pool {
   [[ "${__dybatpho_parallel_opt_failfast:-false}" != true ]] || __dybatpho_parallel_failfast=true
   local __dybatpho_parallel_limit
   __dybatpho_parallel_timeout __dybatpho_parallel_limit "${__dybatpho_parallel_opt_timeout:-}"
+  local __dybatpho_parallel_progress=false
+  if [[ "${__dybatpho_parallel_opt_progress:-false}" == true ]] \
+    || dybatpho::is true "${DYBATPHO_PARALLEL_PROGRESS}"; then
+    __dybatpho_parallel_progress=true
+  fi
+  local __dybatpho_parallel_done=0 __dybatpho_parallel_total=0
   local __dybatpho_parallel_stop=false
   local -A __dybatpho_parallel_index_of=() __dybatpho_parallel_watchdog_of=()
   local -a __dybatpho_parallel_terminated=()
@@ -313,6 +362,7 @@ function __dybatpho_parallel_pool {
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' \
     SIGINT SIGTERM
 
+  __dybatpho_parallel_progress start "${total}"
   for ((index = 0; index < total; index++)); do
     # Fail-fast leaves the remaining jobs unstarted, which the status of an
     # unstarted job records as empty rather than as a failure.
@@ -345,6 +395,7 @@ function __dybatpho_parallel_pool {
     wait "${watchdog}" 2> /dev/null || true
   done
   __dybatpho_parallel_watchdogs=()
+  __dybatpho_parallel_progress stop
 
   for index in ${__dybatpho_parallel_terminated[@]+"${__dybatpho_parallel_terminated[@]}"}; do
     DYBATPHO_PARALLEL_STATUS[index]="terminated"
@@ -383,8 +434,13 @@ function __dybatpho_parallel_pool {
 #   # Give up on a host that takes more than half a minute.
 #   dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
 #
+# @example
+#   # Show a bar while a long list converts; the output stays clean.
+#   dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
+#
 # @option --fail-fast Stop starting jobs and end the running ones once a job fails
 # @option --timeout <duration> End a job that runs longer than this, recording exit `124`
+# @option --progress Report on standard error how many jobs have finished
 # @option -- End of options, for a job count that is not one
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
 # @arg $2 string Command or function to run for each item
@@ -395,6 +451,7 @@ function __dybatpho_parallel_pool {
 # @env DYBATPHO_PARALLEL_JOBS number Job count used when `0` is requested
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop at the first failure
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
+# @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a timed-out job has to stop before it is killed, default is `5`
 # @env DRY_RUN string When true-like, report the jobs instead of running them
 # @exitcode 0 Every job succeeded
@@ -406,7 +463,8 @@ function __dybatpho_parallel_pool {
 #   `dybatpho::parallel_status` unchanged
 #######################################
 function dybatpho::parallel_map {
-  local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout="" consumed
+  local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
+  local __dybatpho_parallel_opt_progress=false consumed
   __dybatpho_parallel_options consumed "$@"
   shift "${consumed}"
   local concurrency command
@@ -458,6 +516,7 @@ function dybatpho::parallel_map {
 #
 # @option --fail-fast Stop starting jobs and end the running ones once a job fails
 # @option --timeout <duration> End a job that runs longer than this, recording exit `124`
+# @option --progress Report on standard error how many jobs have finished
 # @option -- End of options
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
 # @arg $@ string Shell command strings, one job each
@@ -466,6 +525,7 @@ function dybatpho::parallel_map {
 # @stderr Standard error of every job, replayed in submission order
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop at the first failure
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
+# @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a timed-out job has to stop before it is killed, default is `5`
 # @env DRY_RUN string When true-like, report the commands instead of running them
 # @exitcode 0 Every job succeeded
@@ -477,7 +537,8 @@ function dybatpho::parallel_map {
 #   `dybatpho::parallel_status` unchanged
 #######################################
 function dybatpho::parallel_run {
-  local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout="" consumed
+  local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
+  local __dybatpho_parallel_opt_progress=false consumed
   __dybatpho_parallel_options consumed "$@"
   shift "${consumed}"
   local concurrency

@@ -30,6 +30,7 @@ the caller has defined without exporting anything.
 | **`DYBATPHO_PARALLEL_JOBS`** | number | Default number of jobs to run at once, default is the CPU count |
 | **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop launching and end running jobs once one fails |
 | **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Longest a job may run, such as `90`, `5m` or `1h30m`; empty or `0` is no limit |
+| **`DYBATPHO_PARALLEL_PROGRESS`** | string | When true-like, report on standard error how many jobs have finished |
 | **`DYBATPHO_PARALLEL_STATUS`** | array | Exit code of each job of the last run, in submission order |
 
 ### 🚀 Highlights
@@ -94,12 +95,19 @@ dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
 
 ```
 
+```bash
+# Show a bar while a long list converts; the output stays clean.
+dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
+
+```
+
 **🎛️ Options**
 
 | Option | Description |
 | --- | --- |
 | **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
 | **--timeout \<duration\>** | End a job that runs longer than this, recording exit `124` |
+| **--progress** | Report on standard error how many jobs have finished |
 | -- End of options, for a job count that is not one |  |
 
 **🧾 Arguments**
@@ -117,6 +125,7 @@ dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
 | **`DYBATPHO_PARALLEL_JOBS`** | number | Job count used when `0` is requested |
 | **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop at the first failure |
 | **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Per-job limit used when `--timeout` is not given |
+| **`DYBATPHO_PARALLEL_PROGRESS`** | string | When true-like, report progress as `--progress` does |
 | **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds a timed-out job has to stop before it is killed, default is `5` |
 | **`DRY_RUN`** | string | When true-like, report the jobs instead of running them |
 
@@ -162,6 +171,7 @@ dybatpho::parallel_run 3 \
 | --- | --- |
 | **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
 | **--timeout \<duration\>** | End a job that runs longer than this, recording exit `124` |
+| **--progress** | Report on standard error how many jobs have finished |
 | -- End of options |  |
 
 **🧾 Arguments**
@@ -177,6 +187,7 @@ dybatpho::parallel_run 3 \
 | --- | --- | --- |
 | **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop at the first failure |
 | **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Per-job limit used when `--timeout` is not given |
+| **`DYBATPHO_PARALLEL_PROGRESS`** | string | When true-like, report progress as `--progress` does |
 | **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds a timed-out job has to stop before it is killed, default is `5` |
 | **`DRY_RUN`** | string | When true-like, report the commands instead of running them |
 

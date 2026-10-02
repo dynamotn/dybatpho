@@ -269,6 +269,43 @@ _failing_job() {
   assert_output --partial "--timeout needs a duration"
 }
 
+@test "--progress reports on standard error and leaves standard output alone" {
+  # No terminal here, so the bar logs one line per percentage step.
+  run_traced --separate-stderr -0 dybatpho::parallel_map --progress 1 _echo_job a b c
+  assert_output "$(printf 'out a\nout b\nout c')"
+  assert_regex "${stderr}" 'Jobs: 100% \(3/3\)'
+}
+
+@test "DYBATPHO_PARALLEL_PROGRESS turns progress on without the option" {
+  # shellcheck disable=2030
+  DYBATPHO_PARALLEL_PROGRESS=true
+  run_traced --separate-stderr -0 dybatpho::parallel_run 2 "true" "true"
+  DYBATPHO_PARALLEL_PROGRESS=false
+  assert_regex "${stderr}" 'Jobs: 100% \(2/2\)'
+}
+
+@test "without progress the pool reports nothing of its own" {
+  run_traced --separate-stderr -0 dybatpho::parallel_map 1 _echo_job a
+  assert_equal "${stderr}" "err a"
+}
+
+@test "progress without the tui module prints one line per finished job" {
+  # The child inherits the exported `dybatpho::tui_progress_*` names but not the
+  # internals behind them, which is exactly the shell the guard has to detect.
+  # Spawned from a script file, not `bash -c`, for the kcov hook's sake.
+  local script="${BATS_TEST_TMPDIR}/child_progress.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules parallel
+_job() { printf 'out %s\n' "$1"; }
+dybatpho::parallel_map --progress 1 _job a b c 2> "${2}"
+SCRIPT
+  run -0 env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${DYBATPHO_DIR}" "${BATS_TEST_TMPDIR}/stderr"
+  assert_output "$(printf 'out a\nout b\nout c')"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/stderr")" \
+    "$(printf 'Jobs: 1/3 finished\nJobs: 2/3 finished\nJobs: 3/3 finished')"
+}
+
 @test "dybatpho::parallel_run evaluates each command string" {
   run_traced -0 dybatpho::parallel_run 2 "printf 'one\n'" "printf 'two\n'; true"
   assert_line --index 0 "one"

@@ -101,6 +101,22 @@ As a script author, I want a time limit per job so that one host that never answ
 
 ---
 
+### User Story 6 - See how far a long run has got (Priority: P3)
+
+As a script author, I want to see how many jobs have finished while a long run is working so that a quiet terminal does not look like a hang.
+
+**Why this priority**: A convenience: the run's results are the same with or without it.
+
+**Independent Test**: Run a list with `--progress` and verify standard error reports the jobs finishing while standard output carries only the jobs' own output.
+
+**Acceptance Scenarios**:
+
+1. **Given** `--progress` and the `tui` module loaded, **When** jobs finish, **Then** the `tui` progress bar advances, or logs on a percentage grid when standard error is not a terminal
+2. **Given** `--progress` without the `tui` module, **When** each job finishes, **Then** one `Jobs: <done>/<total> finished` line is written to standard error
+3. **Given** progress in any form, **When** the run ends, **Then** standard output holds exactly what the jobs wrote
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -130,6 +146,7 @@ done
 - A job that traps or ignores `SIGTERM` when its time limit is reached.
 - A duration that cannot be read, is negative, or is missing after `--timeout`.
 - A job that exits with `124` of its own accord, which reads the same as a timeout, as it does with `timeout`.
+- A child shell that inherited the exported `dybatpho::tui_progress_*` functions without loading `tui`, which must take the plain report.
 - A run captured in a command substitution, which happens in a subshell.
 
 ## Requirements *(mandatory)*
@@ -156,6 +173,7 @@ done
 - **FR-018**: `--timeout <duration>` and `--timeout=<duration>` MUST limit how long each job runs, reading the duration as `dybatpho::date_parse_duration` does, with `DYBATPHO_PARALLEL_TIMEOUT` as the default and an empty value or `0` meaning no limit; an unreadable, negative, or missing duration MUST stop the caller.
 - **FR-019**: A job over its limit MUST have its process group sent `SIGTERM`, then `SIGKILL` after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds (default `5`) if anything in it is still running, MUST be recorded as exit `124`, and MUST be named on standard error.
 - **FR-020**: The watchdog enforcing a limit MUST NOT keep the run open once its job has finished or the run is interrupted, and MUST NOT hold the caller's output streams.
+- **FR-021**: `--progress`, or a true-like `DYBATPHO_PARALLEL_PROGRESS`, MUST report finished jobs on standard error only: through the `tui` progress bar when that module is loaded, detected by an internal `tui` helper rather than a public name, and otherwise as one `Jobs: <done>/<total> finished` line per reap; `tui` MUST NOT become a dependency of `parallel`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -202,6 +220,10 @@ done
 - **IT-026**: Verify a timeout triggers fail-fast.
 - **IT-027**: Verify an unreadable, negative, or missing duration is refused.
 - **IT-028**: Send `SIGTERM` to a pool running under a one-minute limit, and verify its job's child is gone and the pool ends at once rather than waiting out the watchdog.
+- **IT-029**: Verify `--progress` leaves standard output as the jobs wrote it and reports `3/3` on standard error.
+- **IT-030**: Verify `DYBATPHO_PARALLEL_PROGRESS` turns progress on without the option.
+- **IT-031**: Verify a run without progress writes nothing of its own to standard error.
+- **IT-032**: In a child shell that loads only `parallel`, verify one plain progress line per finished job.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -6,7 +6,8 @@
 # @brief Example showing bounded concurrency with ordered output
 # @description Demonstrates dybatpho::parallel_map, parallel_run,
 #   parallel_status, parallel_count, parallel_failed, fail-fast (the variable
-#   and `--fail-fast`), per-job time limits with `--timeout`, and DRY_RUN
+#   and `--fail-fast`), per-job time limits with `--timeout`, `--progress`,
+#   and DRY_RUN
 # shellcheck disable=SC2034 # DYBATPHO_PARALLEL_FAILFAST is read by the parallel module
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules parallel
@@ -141,6 +142,21 @@ function _demo_timeout {
   done
 }
 
+# @description Run the `PROGRESS` section of this example.
+# @noargs
+function _demo_progress {
+  dybatpho::header "PROGRESS"
+  dybatpho::info "--progress reports finished jobs on standard error; the output stays clean"
+
+  # @description Pretend to convert one file.
+  # @arg $1 string File to convert
+  function _convert {
+    sleep 0.1
+    printf '  converted %s\n' "$1"
+  }
+  dybatpho::parallel_map --progress 2 _convert a.png b.png c.png d.png
+}
+
 # @description Run the `DRY RUN` section of this example.
 # @noargs
 function _demo_dry_run {
@@ -157,6 +173,7 @@ function _main {
   _demo_run
   _demo_failfast
   _demo_timeout
+  _demo_progress
   _demo_dry_run
   dybatpho::success "Parallel demo complete"
 }

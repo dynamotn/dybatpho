@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`schedule` — when a command should run, rather than whether to retry it.**
+  The three shapes a script keeps rewriting as a `sleep` loop, plus a cron
+  predicate for scripts an external scheduler already runs.
+
+  `dybatpho::schedule_every`, `dybatpho::schedule_debounce`,
+  `dybatpho::schedule_once_per`, `dybatpho::schedule_reset` and
+  `dybatpho::schedule_cron_due`. `DYBATPHO_SCHEDULE_DIR` sets where the
+  markers live.
+
+  ```sh
+  . dybatpho/init.sh --modules schedule
+
+  dybatpho::schedule_once_per day token-expiry -- dybatpho::warn "The token expires soon"
+  dybatpho::schedule_debounce 2 rebuild -- make
+  dybatpho::schedule_cron_due "*/15 * * * *" && collect_metrics
+  dybatpho::schedule_every 60 -- check_health
+  ```
+
+  `schedule_once_per` keeps its marker on disk, so "once a day" holds across
+  separate invocations rather than only within one run. `schedule_debounce`
+  acts after a burst settles, not at its start, which is what an editor'"'"'s
+  write-then-rename needs. `schedule_every` measures from when each run was
+  due, so the cadence does not drift, and drops the ticks a slow run missed
+  instead of queueing catch-ups. `schedule_cron_due` follows cron'"'"'s own rule
+  that a restricted day of month and day of week match on either, not both.
+
+### Added
+
 - **`screen` — themes and styled rows, so a full-screen application looks
   finished without choosing a colour for every widget.**
   `dybatpho::screen_theme` sets every style of the module from a palette:

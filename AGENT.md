@@ -158,6 +158,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `table.sh` | Plain-text and Markdown table rendering | `test/table.bats`, `docs/table.md`, `docs/spec/table.md` |
 | `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `docs/text.md`, `docs/spec/text.md` |
 | `tui.sh` | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `docs/tui.md`, `docs/spec/tui.md` |
+| `schedule.sh` | Fixed-cadence loops, burst debounce, once-per-period markers that outlive the process, and a cron due-predicate | `test/schedule.bats`, `docs/schedule.md`, `docs/spec/schedule.md` |
 | `screen.sh` | Full-screen applications: alternate screen and raw mode, a constraint layout solver, a widget set, Unicode-correct column measurement, and an event loop over keys, mouse and resize | `test/screen.bats`, `docs/screen.md`, `docs/spec/screen.md` |
 | `testing.sh` | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `docs/testing.md`, `docs/spec/testing.md` |
 | `validate.sh` | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `docs/validate.md`, `docs/spec/validate.md` |

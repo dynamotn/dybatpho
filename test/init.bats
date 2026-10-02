@@ -125,7 +125,11 @@ loaded_line() {
   assert_output "string os logging helpers process file secret validate config cli safety archive date json diff backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network cache ai "
+  assert_output "string os logging helpers process file secret json network lock cache ai "
+
+  # `cache` guards its background refresh with a lock.
+  run_traced -0 init_sh "--modules cache" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret lock cache "
 
   run_traced -0 init_sh "--modules agent" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety json agent "

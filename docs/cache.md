@@ -31,6 +31,10 @@ Entries are written through `dybatpho::file_write_atomic`, so a reader sees
 either the previous entry or the complete new one, never half of a write in
 progress.
 
+The `lock` module guards the background refresh `dybatpho::cache_run
+--stale` starts, so that a burst of callers finding the same stale entry
+runs the command once.
+
 ### 🌍 Environment
 
 | Variable | Type | Description |
@@ -38,6 +42,7 @@ progress.
 | **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries, default is the XDG cache directory for `dybatpho` |
 | **`DYBATPHO_CACHE_NAMESPACE`** | string | Subdirectory grouping related entries, default is `default`; empty puts entries directly in the cache directory |
 | **`DYBATPHO_CACHE_TTL`** | number | Seconds an entry stays fresh when a call does not say, default is `3600` |
+| **`DYBATPHO_CACHE_STALE`** | number | Seconds `dybatpho::cache_run` may serve an expired entry while it refreshes in the background, default is `0` (never) |
 
 ### 🚀 Highlights
 
@@ -49,7 +54,8 @@ progress.
 - [`dybatpho::cache_set`](#dybatphocache_set) — Store standard input as an entry. The write goes through `dybatpho::file_write_atomic`, so a reader sees the previous entry or the whole new one, and two writers cannot interleave.
 - [`dybatpho::cache_forget`](#dybatphocache_forget) — Remove one entry.
 - [`dybatpho::cache_clear`](#dybatphocache_clear) — Remove every entry in the current namespace. Only files this module wrote are removed, recognised by their suffix. The cache directory is named by an environment variable, and emptying whatever a path happens to contain is not a thing a helper should offer to do.
-- [`dybatpho::cache_run`](#dybatphocache_run) — Print what a command prints, running it only when the remembered answer has gone stale. This is the whole module in one call: ask once, reuse the answer until it expires, and put the command's own output through unchanged either way. A command that fails is not stored, and its exit status is returned as it is. Remembering a failure would turn one bad minute into a whole time to live of them, and the caller could not tell a remembered error from a fresh one. Standard error is not captured either way, so a warning the command prints is seen every time rather than once.
+- [`dybatpho::cache_wait`](#dybatphocache_wait) — Wait until no background refresh of an entry is running. `dybatpho::cache_run --stale` answers from an expired entry and refreshes it behind the caller's back. Usually that is the point, but a script that is about to exit, or that wants the refreshed answer for a later step, calls this first. The refresh usually runs in a command substitution's subshell, which a bare `wait` in the calling shell knows nothing about.
+- [`dybatpho::cache_run`](#dybatphocache_run) — Print what a command prints, running it only when the remembered answer has gone stale. This is the whole module in one call: ask once, reuse the answer until it expires, and put the command's own output through unchanged either way. A command that fails is not stored, and its exit status is returned as it is. Remembering a failure would turn one bad minute into a whole time to live of them, and the caller could not tell a remembered error from a fresh one. Standard error is not captured either way, so a warning the command prints is seen every time rather than once. `--stale <seconds>` adds a grace window after the time to live: an entry older than the time to live but younger than the two together is printed at once, as it is, while the command runs again in the background to replace it. The caller never waits for a slow source that answered recently, and the answer is at most one refresh behind. Only one refresh of an entry runs at a time, guarded by a lock beside the entry, and a refresh that fails keeps the entry it was meant to replace. An entry older than the window is a miss, and the command runs in the foreground as usual. `dybatpho::cache_wait` waits for a refresh to finish.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -329,6 +335,44 @@ _Function has no arguments._
 
 ---
 
+### `dybatpho::cache_wait`
+
+Wait until no background refresh of an entry is running.
+`dybatpho::cache_run --stale` answers from an expired entry and refreshes it
+behind the caller's back. Usually that is the point, but a script that is
+about to exit, or that wants the refreshed answer for a later step, calls
+this first. The refresh usually runs in a command substitution's subshell,
+which a bare `wait` in the calling shell knows nothing about.
+
+**🧪 Example**
+
+```bash
+status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
+dybatpho::cache_wait status 30 || dybatpho::warn "status refresh still running"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Entry key |
+| `$2` | number | Seconds to wait at most, default is `60` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_LOCK_POLL_INTERVAL`** | number | Seconds to sleep between checks |
+
+**🚦 Exit codes**
+
+- `0`: No refresh of the entry is running
+- `1`: A refresh was still running when the time ran out
+
+
+---
+
 ### `dybatpho::cache_run`
 
 Print what a command prints, running it only when the remembered
@@ -341,6 +385,16 @@ is. Remembering a failure would turn one bad minute into a whole time to
 live of them, and the caller could not tell a remembered error from a fresh
 one. Standard error is not captured either way, so a warning the command
 prints is seen every time rather than once.
+
+`--stale <seconds>` adds a grace window after the time to live: an entry
+older than the time to live but younger than the two together is printed
+at once, as it is, while the command runs again in the background to
+replace it. The caller never waits for a slow source that answered recently,
+and the answer is at most one refresh behind. Only one refresh of an entry
+runs at a time, guarded by a lock beside the entry, and a refresh that fails
+keeps the entry it was meant to replace. An entry older than the window is
+a miss, and the command runs in the foreground as usual.
+`dybatpho::cache_wait` waits for a refresh to finish.
 
 **🧪 Examples**
 
@@ -355,19 +409,26 @@ dybatpho::cache_run tags -- git ls-remote --tags origin
 
 ```
 
+```bash
+# Fresh for five minutes, then served stale for up to a day while it refreshes.
+dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
+
+```
+
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Entry key |
 | `$2` | number | Optional seconds the entry stays fresh, before `--` |
-| `$@` | string | `--` followed by the command and its arguments |
+| `$@` | string | Optional `--stale <seconds>`, then `--` followed by the command and its arguments |
 
 **🌍 Environment variables**
 
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_CACHE_TTL`** | number | Default time to live |
+| **`DYBATPHO_CACHE_STALE`** | number | Default grace window in seconds, `0` (none) unless set |
 
 **📤 Output on stdout**
 
@@ -375,10 +436,10 @@ dybatpho::cache_run tags -- git ls-remote --tags origin
 
 **🚦 Exit codes**
 
-- `0`: The output came from a fresh entry, or the command succeeded
+- `0`: The output came from a fresh or stale entry, or the command succeeded
 - `other`: The command failed, with its own exit status, and nothing was stored
-- `1`: Stop the script when no command is given after `--`
+- `1`: Stop the script when no command is given after `--`, or a time is not a number of seconds
 
 **🔗 See also**
 
-- [- `dybatpho::cache_get](#dybatphocache_get)
+- [- `dybatpho::cache_get` - `dybatpho::cache_wait](#dybatphocache_get-dybatphocache_wait)

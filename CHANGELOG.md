@@ -325,6 +325,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   dybatpho::backup_create --incremental /srv/www /var/backups www
   dybatpho::backup_prune --keep-count 30 --name www --force /var/backups
+- **`cache` — answer from a recent entry while it refreshes.**
+  `dybatpho::cache_run` takes `--stale <seconds>` (or `DYBATPHO_CACHE_STALE`):
+  an entry past its time to live but within that grace window is printed at
+  once while the command runs again in the background to replace it, so a
+  prompt or status line never waits on a slow source that answered recently.
+  One refresh of an entry runs at a time however many callers find it stale,
+  and a refresh that fails keeps the entry it was meant to replace.
+  `dybatpho::cache_wait` waits for a refresh to finish, for a script that is
+  about to exit or wants the new answer. The `cache` module now loads `lock`.
+
+  ```sh
+  status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
+  dybatpho::cache_wait status 30
   ```
 
 ### Fixed
@@ -334,6 +347,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bypassed for a command that had already run in the same shell, because Bash
   remembered its real path; `dybatpho::unmock_command` likewise left the shell
   pointing at the removed mock. Both now take effect immediately.
+
+- **`cache` — a time to live that is not a number now stops `dybatpho::cache_run`.**
+  It used to be rejected inside a command substitution, so the error was
+  printed and the command ran anyway, uncached.
 
 ## [5.2.0] - 2026-10-02
 

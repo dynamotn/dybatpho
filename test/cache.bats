@@ -190,3 +190,81 @@ age_entry() {
   assert_output --partial "$(dybatpho::cache_dir)"
   run_traced -0 dybatpho::cache_has keeper 3600
 }
+
+@test "dybatpho::cache_run --stale serves an expired entry and refreshes it behind" {
+  local counter="${BATS_TEST_TMPDIR}/runs"
+  printf '0\n' > "${counter}"
+  fetch() {
+    printf '%s\n' "$(($(cat "${counter}") + 1))" > "${counter}"
+    printf 'new\n'
+  }
+  printf 'old\n' | dybatpho::cache_set swr
+  age_entry swr '2 hours ago'
+
+  run_traced -0 dybatpho::cache_run swr 60 --stale 999999999 -- fetch
+  assert_output "old"
+  run_traced -0 dybatpho::cache_wait swr 10
+  assert_equal "$(cat "${counter}")" "1"
+  assert_equal "$(dybatpho::cache_get swr 60)" "new"
+}
+
+@test "dybatpho::cache_run treats an entry older than the stale window as a miss" {
+  fetch() { printf 'new\n'; }
+  printf 'old\n' | dybatpho::cache_set swr
+  age_entry swr '2 hours ago'
+  # The `=` form and the environment default are the same option.
+  run_traced -0 dybatpho::cache_run swr 60 --stale=60 -- fetch
+  assert_output "new"
+  age_entry swr '2 hours ago'
+  DYBATPHO_CACHE_STALE=60 run_traced -0 dybatpho::cache_run swr 60 -- fetch
+  assert_output "new"
+}
+
+@test "dybatpho::cache_run --stale keeps the entry when the refresh fails" {
+  boom() { return 3; }
+  printf 'old\n' | dybatpho::cache_set swr
+  age_entry swr '2 hours ago'
+  run_traced -0 dybatpho::cache_run swr --stale 999999999 -- boom
+  assert_output "old"
+  run_traced -0 dybatpho::cache_wait swr 10
+  assert_equal "$(dybatpho::cache_get swr 999999999)" "old"
+}
+
+@test "dybatpho::cache_run --stale starts no second refresh while one runs" {
+  local counter="${BATS_TEST_TMPDIR}/runs"
+  printf '0\n' > "${counter}"
+  fetch() {
+    printf '%s\n' "$(($(cat "${counter}") + 1))" > "${counter}"
+    printf 'new\n'
+  }
+  printf 'old\n' | dybatpho::cache_set swr
+  age_entry swr '2 hours ago'
+  local lock
+  lock="$(dybatpho::cache_path swr)"
+  lock="${lock%.cache}.lock"
+  # This shell holds the refresh lock, as a refresh already under way would.
+  dybatpho::lock_acquire "${lock}"
+  run_traced -0 dybatpho::cache_run swr 60 --stale 999999999 -- fetch
+  assert_output "old"
+  sleep 0.3
+  assert_equal "$(cat "${counter}")" "0"
+  # A refresh still under way makes the wait give up when its time runs out.
+  DYBATPHO_LOCK_POLL_INTERVAL=0.1 run_traced -1 dybatpho::cache_wait swr 1
+  dybatpho::lock_release "${lock}"
+  run_traced -0 dybatpho::cache_wait swr 0
+  # The lock is not an entry, so clearing the namespace never trips over it.
+  run_traced -0 dybatpho::cache_clear
+}
+
+@test "dybatpho::cache_run refuses a time that is not a number of seconds" {
+  run --separate-stderr ! dybatpho::cache_run k soon -- true
+  assert_stderr --partial "is not a number of seconds"
+  run --separate-stderr ! dybatpho::cache_run k 60 --stale never -- true
+  assert_stderr --partial "for --stale"
+  run --separate-stderr ! dybatpho::cache_run k 60 --stale
+  assert_stderr --partial "Expected:"
+  run --separate-stderr ! dybatpho::cache_run k 60 70 -- true
+  assert_stderr --partial "Expected:"
+  run --separate-stderr ! dybatpho::cache_wait k later
+  assert_stderr --partial "is not a number of seconds"
+}

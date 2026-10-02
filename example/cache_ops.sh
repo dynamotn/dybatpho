@@ -120,6 +120,26 @@ function _demo_staleness {
   dybatpho::print "  but it is still there under a longer budget: ${cache_get}"
 }
 
+# @description With a grace window, an expired entry is still answered at once
+#   while the command runs again in the background to replace it.
+# @noargs
+function _demo_stale_while_revalidate {
+  dybatpho::header "STALE WHILE REVALIDATE"
+  printf 'release-0.9\n' | dybatpho::cache_set listing
+  local entry
+  entry="$(dybatpho::cache_path listing)"
+  touch -d '2 hours ago' "${entry}" 2> /dev/null || touch -t 200001010000 "${entry}"
+  local answer
+  answer="$(dybatpho::cache_run listing 3600 --stale 86400 -- _expensive_listing)"
+  dybatpho::print "  answered at once from the expired entry: ${answer}"
+  # The refresh ran inside the command substitution's subshell, which a plain
+  # `wait` here cannot see; this waits for its lock instead.
+  dybatpho::cache_wait listing 10
+  local refreshed
+  refreshed="$(dybatpho::cache_get listing 3600 | tr '\n' ' ')"
+  dybatpho::print "  and the background refresh replaced it: ${refreshed}"
+}
+
 # @description Namespaces keep unrelated caches from colliding on a key.
 # @noargs
 function _demo_namespaces {
@@ -151,6 +171,7 @@ function _main {
   _demo_failure_is_not_remembered
   _demo_direct
   _demo_staleness
+  _demo_stale_while_revalidate
   _demo_namespaces
   dybatpho::cache_clear
   dybatpho::success "Cache operations demo complete"

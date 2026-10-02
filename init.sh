@@ -108,6 +108,7 @@ declare -A __dybatpho_module_deps=(
   [tui]="cli safety"
   [testing]="json network text diff"
   [ai]="network json cache"
+  [cache]="lock"
   [agent]="cli safety json"
   [pkg]="safety"
   [release]="semver git archive"

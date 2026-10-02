@@ -79,12 +79,42 @@ configuration names, so that a documented setting such as
 **Independent Test**: Set the cache directory with an empty namespace and
 verify entries land directly in it.
 
+### User Story 5 - Answer at once from a recent answer while it refreshes (Priority: P2)
+
+As a script author, I want an expired entry to be answered immediately while
+the command runs again in the background, so that a prompt or status line never
+waits on a slow source that answered a moment ago.
+
+**Independent Test**: Backdate an entry past its time to live, run it through
+the cache with a grace window, and verify the old answer comes back at once and
+the entry is replaced once the refresh finishes.
+
+**Acceptance Scenarios**:
+
+1. **Given** an entry older than its time to live but within the grace window,
+   **When** the command is run through the cache with `--stale`, **Then** the
+   stored output is printed and the command runs once in the background to
+   replace it.
+2. **Given** an entry older than the time to live and the grace window
+   together, **When** the call is made, **Then** it is a miss and the command
+   runs in the foreground.
+3. **Given** a refresh of that entry already running, **When** another call
+   finds the entry stale, **Then** no second refresh starts.
+4. **Given** a background refresh whose command fails, **When** it ends,
+   **Then** the entry it was meant to replace is still there.
+5. **Given** a refresh under way, **When** the script waits for the entry,
+   **Then** the wait returns once the refresh is done, or fails when its time
+   runs out first.
+
 ### Example Workflow
 
 ```sh
 . dybatpho/init.sh --modules cache
 
 releases="$(dybatpho::cache_run gh-releases 3600 -- gh api /repos/o/r/releases)"
+
+status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
+dybatpho::cache_wait status 30
 
 key="$(dybatpho::cache_key "${url}")"
 if ! body="$(dybatpho::cache_get "${key}" 600)"; then
@@ -102,6 +132,11 @@ fi
 - A file in the cache directory that this module did not write.
 - `DRY_RUN` set, with no cache directory in existence yet.
 - A command that prints to standard error as well as standard output.
+- Several calls finding the same stale entry at once, from one shell or many.
+- A background refresh that fails, or is interrupted while it runs.
+- A refresh started from inside a command substitution, which the calling
+  shell's own `wait` cannot see.
+- A time to live or grace window that is not a number of seconds.
 
 ## Requirements *(mandatory)*
 
@@ -128,11 +163,19 @@ fi
   `umask 022` a new file would otherwise be readable by every account on the
   host.
 
+- **FR-015**: `dybatpho::cache_run` MUST accept a grace window, as `--stale <seconds>`, `--stale=<seconds>`, or `DYBATPHO_CACHE_STALE`, defaulting to none. An entry older than the time to live but younger than the time to live and the window together MUST be printed at once while the command runs again in the background to replace it; an entry older than both MUST be a miss.
+- **FR-016**: At most one background refresh of an entry MUST run at a time, guarded by a lock beside the entry that is taken before the refresh starts and released when it ends, including when it is interrupted. The lock MUST NOT be mistaken for an entry by clearing a namespace.
+- **FR-017**: A background refresh that fails MUST leave the existing entry in place, and its output and diagnostics MUST NOT reach the caller or hold a command substitution open.
+- **FR-018**: The module MUST offer a way to wait for the background refresh of an entry, with a time limit, returning `1` when a refresh is still running when the time runs out.
+- **FR-019**: `dybatpho::cache_run` MUST stop the script when the time to live or the grace window is not a number of seconds, or when more than one time to live is given.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Entry**: One stored answer, named by its key and aged by its modification time.
 - **Namespace**: A subdirectory grouping entries that belong together.
 - **Time to live**: The number of seconds an entry stays usable.
+- **Grace window**: The seconds after the time to live during which an entry is still answered while it is refreshed.
+- **Refresh lock**: The lock beside an entry held for as long as its background refresh runs.
 
 ## Success Criteria *(mandatory)*
 
@@ -143,6 +186,7 @@ fi
 - **SC-003**: A transient failure is retried on the next call rather than remembered.
 - **SC-004**: A reader never sees a partially written entry.
 - **SC-005**: The library carries one cache implementation rather than one per module.
+- **SC-006**: A caller with a grace window never waits on the source while a recent answer exists, and the source is asked once per refresh however many callers find the entry stale.
 
 ## Integration Tests *(mandatory)*
 
@@ -163,6 +207,11 @@ fi
 - **IT-015**: Verify the `ai` module still answers from its cache and still clears it, through its own documented environment variables.
 - **IT-016**: Verify a stored entry is `0600` and its directory `0700`, under a
   permissive `umask`.
+- **IT-017**: Backdate an entry, run it with `--stale`, and verify the old answer is printed, the command ran once, and the entry holds the new answer after waiting.
+- **IT-018**: Verify an entry older than the time to live and the window is a miss, through `--stale=` and through `DYBATPHO_CACHE_STALE`.
+- **IT-019**: Verify a failing background refresh leaves the old entry in place.
+- **IT-020**: Hold the refresh lock, verify a stale call starts no refresh, that waiting gives up with `1` while the lock is held and succeeds once it is released, and that clearing the namespace still succeeds.
+- **IT-021**: Verify a non-numeric time to live, grace window, or wait limit, a missing `--stale` value, and a second time to live stop the script.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -171,3 +220,4 @@ fi
 3. Entries expire on their modification time, and a zero time to live forces a refresh.
 4. Clearing a namespace touches only entries this module wrote.
 5. `src/ai.sh` holds no cache implementation of its own.
+6. With a grace window, an expired entry is answered at once and refreshed once in the background, and a failed refresh keeps it.

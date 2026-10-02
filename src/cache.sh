@@ -24,6 +24,10 @@
 #   Entries are written through `dybatpho::file_write_atomic`, so a reader sees
 #   either the previous entry or the complete new one, never half of a write in
 #   progress.
+#
+#   The `lock` module guards the background refresh `dybatpho::cache_run
+#   --stale` starts, so that a burst of callers finding the same stale entry
+#   runs the command once.
 # @see
 #   - `example/cache_ops.sh`
 #   - `dybatpho::file_age_seconds`
@@ -33,9 +37,12 @@
 # @env DYBATPHO_CACHE_NAMESPACE string Subdirectory grouping related entries, default is `default`; empty puts entries
 #   directly in the cache directory
 # @env DYBATPHO_CACHE_TTL number Seconds an entry stays fresh when a call does not say, default is `3600`
+# @env DYBATPHO_CACHE_STALE number Seconds `dybatpho::cache_run` may serve an expired entry while it refreshes in the
+#   background, default is `0` (never)
 DYBATPHO_CACHE_DIR="${DYBATPHO_CACHE_DIR:-$(dybatpho::xdg_cache_dir dybatpho)}"
 DYBATPHO_CACHE_NAMESPACE="${DYBATPHO_CACHE_NAMESPACE-default}"
 DYBATPHO_CACHE_TTL="${DYBATPHO_CACHE_TTL:-3600}"
+DYBATPHO_CACHE_STALE="${DYBATPHO_CACHE_STALE:-0}"
 
 # Entries carry a suffix so that clearing a namespace can be specific about what
 # it deletes. The cache directory is named by an environment variable, and a
@@ -260,6 +267,133 @@ function dybatpho::cache_clear {
   find "${directory}" -maxdepth 1 -type f -name "*${__DYBATPHO_CACHE_SUFFIX}" -delete
 }
 
+
+#######################################
+# @description Read the age of an entry into a variable.
+# @arg $1 string Name of the variable receiving the age in seconds
+# @arg $2 string Path of the entry
+# @set The named variable
+# @exitcode 0 The entry exists and its age was read
+# @exitcode 1 There is no entry, or its age cannot be read
+# @internal
+#######################################
+function __dybatpho_cache_age {
+  local __dybatpho_cache_age_var __dybatpho_cache_age_path __dybatpho_cache_age_value
+  dybatpho::expect_args __dybatpho_cache_age_var __dybatpho_cache_age_path -- "$@"
+  local -n __dybatpho_cache_age_out="${__dybatpho_cache_age_var}"
+  dybatpho::is file "${__dybatpho_cache_age_path}" || return 1
+  __dybatpho_cache_age_value="$(dybatpho::file_age_seconds "${__dybatpho_cache_age_path}")" \
+    || return 1
+  __dybatpho_cache_age_out="${__dybatpho_cache_age_value}"
+}
+
+#######################################
+# @description Print the lock path that guards the background refresh of an
+#   entry. It sits beside the entry, so a namespace keeps its own refreshes, and
+#   it does not end in the entry suffix, so clearing a namespace never mistakes
+#   it for an entry.
+# @arg $1 string Path of the entry
+# @stdout The lock path
+# @internal
+#######################################
+function __dybatpho_cache_refresh_lock {
+  local path
+  dybatpho::expect_args path -- "$@"
+  printf '%s.lock\n' "${path%"${__DYBATPHO_CACHE_SUFFIX}"}"
+}
+
+#######################################
+# @description Run a command and store what it prints, leaving the entry alone
+#   when the command fails.
+# @arg $1 string Entry key
+# @arg $@ string The command and its arguments
+# @exitcode 0 The command succeeded and its output was stored
+# @exitcode other The command failed, with its own exit status
+# @internal
+#######################################
+function __dybatpho_cache_refresh {
+  local key
+  dybatpho::expect_args key -- "$@"
+  shift
+  local output status=0
+  output="$("$@")" || status=$?
+  ((status == 0)) || return "${status}"
+  printf '%s\n' "${output}" | dybatpho::cache_set "${key}"
+}
+
+#######################################
+# @description Start refreshing an entry in the background, unless a refresh of
+#   it is already running.
+#   The lock beside the entry is taken here, before the refresh is started, and
+#   released by the refresh when it ends however it ends. Taking it first means
+#   there is no moment in which a refresh has been started but holds nothing,
+#   so a burst of calls that all find the same stale entry starts one refresh,
+#   and `dybatpho::cache_wait` cannot miss one that has not begun yet. The
+#   refresh's output and diagnostics go nowhere: the caller has already been
+#   answered, and a command substitution waiting on the caller must not be kept
+#   open by a process it does not know about.
+# @arg $1 string Entry key
+# @arg $2 string Path of the entry
+# @arg $@ string The command and its arguments
+# @internal
+#######################################
+function __dybatpho_cache_refresh_background {
+  local key path
+  dybatpho::expect_args key path -- "$@"
+  shift 2
+  local lock
+  lock="$(__dybatpho_cache_refresh_lock "${path}")"
+  if ! dybatpho::lock_acquire "${lock}" 0 > /dev/null 2>&1; then
+    dybatpho::debug "cache: ${key} is already being refreshed"
+    return 0
+  fi
+  dybatpho::debug "cache: stale ${key}, refreshing in the background"
+  (
+    # The lock records the calling shell, which a subshell shares, so the
+    # refresh is entitled to release it. A signal ends the subshell through
+    # `exit`, which is what makes the EXIT handler run.
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    trap 'dybatpho::lock_release "${lock}" > /dev/null 2>&1 || true' EXIT
+    __dybatpho_cache_refresh "${key}" "$@"
+  ) < /dev/null > /dev/null 2>&1 & # kcov(skip) - run by the --stale tests; kcov never records a subshell's closing line
+}
+
+#######################################
+# @description Wait until no background refresh of an entry is running.
+#   `dybatpho::cache_run --stale` answers from an expired entry and refreshes it
+#   behind the caller's back. Usually that is the point, but a script that is
+#   about to exit, or that wants the refreshed answer for a later step, calls
+#   this first. The refresh usually runs in a command substitution's subshell,
+#   which a bare `wait` in the calling shell knows nothing about.
+# @example
+#   status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
+#   dybatpho::cache_wait status 30 || dybatpho::warn "status refresh still running"
+#
+# @arg $1 string Entry key
+# @arg $2 number Seconds to wait at most, default is `60`
+# @env DYBATPHO_LOCK_POLL_INTERVAL number Seconds to sleep between checks
+# @exitcode 0 No refresh of the entry is running
+# @exitcode 1 A refresh was still running when the time ran out
+#######################################
+function dybatpho::cache_wait {
+  local key
+  dybatpho::expect_args key -- "$@"
+  local timeout="${2:-60}"
+  [[ "${timeout}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${timeout}' is not a number of seconds"
+  local path lock start
+  path="$(dybatpho::cache_path "${key}")" || return 1
+  lock="$(__dybatpho_cache_refresh_lock "${path}")"
+  start="${SECONDS}"
+  while dybatpho::lock_is_held "${lock}"; do
+    ((SECONDS - start < timeout)) || return 1
+    # shellcheck disable=SC2154 # declared by `src/lock.sh`, which this module loads
+    sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"
+  done
+}
+
 #######################################
 # @description Print what a command prints, running it only when the remembered
 #   answer has gone stale.
@@ -271,6 +405,16 @@ function dybatpho::cache_clear {
 #   live of them, and the caller could not tell a remembered error from a fresh
 #   one. Standard error is not captured either way, so a warning the command
 #   prints is seen every time rather than once.
+#
+#   `--stale <seconds>` adds a grace window after the time to live: an entry
+#   older than the time to live but younger than the two together is printed
+#   at once, as it is, while the command runs again in the background to
+#   replace it. The caller never waits for a slow source that answered recently,
+#   and the answer is at most one refresh behind. Only one refresh of an entry
+#   runs at a time, guarded by a lock beside the entry, and a refresh that fails
+#   keeps the entry it was meant to replace. An entry older than the window is
+#   a miss, and the command runs in the foreground as usual.
+#   `dybatpho::cache_wait` waits for a refresh to finish.
 # @example
 #   releases="$(dybatpho::cache_run gh-releases 3600 -- gh api /repos/o/r/releases)"
 #
@@ -278,37 +422,72 @@ function dybatpho::cache_clear {
 #   # Without a time to live, DYBATPHO_CACHE_TTL decides.
 #   dybatpho::cache_run tags -- git ls-remote --tags origin
 #
+# @example
+#   # Fresh for five minutes, then served stale for up to a day while it refreshes.
+#   dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
+#
 # @arg $1 string Entry key
 # @arg $2 number Optional seconds the entry stays fresh, before `--`
-# @arg $@ string `--` followed by the command and its arguments
+# @arg $@ string Optional `--stale <seconds>`, then `--` followed by the command and its arguments
 # @env DYBATPHO_CACHE_TTL number Default time to live
+# @env DYBATPHO_CACHE_STALE number Default grace window in seconds, `0` (none) unless set
 # @stdout The command's output, from the entry or from running it
-# @exitcode 0 The output came from a fresh entry, or the command succeeded
+# @exitcode 0 The output came from a fresh or stale entry, or the command succeeded
 # @exitcode other The command failed, with its own exit status, and nothing was stored
-# @exitcode 1 Stop the script when no command is given after `--`
+# @exitcode 1 Stop the script when no command is given after `--`, or a time is not a number of seconds
 # @see
 #   - `dybatpho::cache_get`
+#   - `dybatpho::cache_wait`
 #######################################
 function dybatpho::cache_run {
   local key
   dybatpho::expect_args key -- "$@"
   shift
-  local ttl="${DYBATPHO_CACHE_TTL}"
-  if [[ "${1-}" != "--" ]]; then
-    ttl="${1-}"
-    shift
-  fi
-  [[ "${1-}" == "--" ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Expected: ${key} [ttl] -- command [args...]"
+  local ttl="${DYBATPHO_CACHE_TTL}" stale="${DYBATPHO_CACHE_STALE}" ttl_given=false
+  local usage="${FUNCNAME[0]}: Expected: ${key} [ttl] [--stale seconds] -- command [args...]"
+  while (($# > 0)) && [[ "$1" != "--" ]]; do
+    case "$1" in
+      --stale)
+        (($# >= 2)) || dybatpho::die "${usage}"
+        stale="$2"
+        shift 2
+        ;;
+      --stale=*)
+        stale="${1#--stale=}"
+        shift
+        ;;
+      *)
+        [[ "${ttl_given}" == false ]] || dybatpho::die "${usage}"
+        ttl="$1"
+        ttl_given=true
+        shift
+        ;;
+    esac
+  done
+  [[ "${1-}" == "--" ]] || dybatpho::die "${usage}"
   shift
   (($# > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+  [[ "${ttl}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
+  [[ "${stale}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${stale}' is not a number of seconds for --stale"
 
-  local cached
-  if cached="$(dybatpho::cache_get "${key}" "${ttl}")"; then
-    dybatpho::debug "cache: hit ${key}"
-    printf '%s\n' "${cached}"
-    return 0
+  local path age cached
+  path="$(dybatpho::cache_path "${key}")" || return 1
+  if __dybatpho_cache_age age "${path}"; then
+    if ((age < ttl)); then
+      dybatpho::debug "cache: hit ${key}"
+      cached="$(cat "${path}")"
+      printf '%s\n' "${cached}"
+      return 0
+    fi
+    if ((stale > 0 && age < ttl + stale)); then
+      cached="$(cat "${path}")"
+      __dybatpho_cache_refresh_background "${key}" "${path}" "$@"
+      printf '%s\n' "${cached}"
+      return 0
+    fi
   fi
 
   dybatpho::debug "cache: miss ${key}, running $1"

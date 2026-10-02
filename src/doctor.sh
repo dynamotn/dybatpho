@@ -93,6 +93,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # key is built on one `jq` filter, and YAML reaches JSON through `yq`.
   [diff]="jq yq>=4"
   [file]="sha256sum|shasum|openssl"
+  # Either will do, and neither is required: a script already running as root
+  # needs no escalation at all.
+  [privilege]="sudo|doas"
   [json]="jq"
   [logging]="python3"
   # `timeout` bounds the connection `dybatpho::port_open` makes. Without it the

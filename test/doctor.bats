@@ -78,6 +78,16 @@ fake_versioned_command() {
   assert_output ""
 }
 
+@test "dybatpho::doctor_requirements lists what the privilege module needs" {
+  # Neither is required: a script already running as root escalates nothing,
+  # so an absent `sudo` is a missing capability rather than a broken module.
+  run_traced -0 dybatpho::doctor_requirements privilege optional
+  assert_output "sudo|doas"
+
+  run_traced -0 dybatpho::doctor_requirements privilege required
+  assert_output ""
+}
+
 @test "dybatpho::doctor_requirements lists optional dependencies" {
   run_traced -0 dybatpho::doctor_requirements json optional
   assert_output "jq"

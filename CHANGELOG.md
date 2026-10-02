@@ -11,6 +11,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`privilege` — ask for sudo once, and hold it for the whole run.** `pkg`
+  could put `sudo` in front of one command; a script running twenty of them
+  over several minutes needs the prompt up front, the ticket kept alive, and
+  no child able to stop and ask again halfway through.
+
+  `dybatpho::privilege_needed`, `dybatpho::privilege_command`,
+  `dybatpho::privilege_acquire`, `dybatpho::privilege_release` and
+  `dybatpho::privilege_run`.
+
+  ```sh
+  . dybatpho/init.sh --modules privilege
+
+  dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
+  dybatpho::privilege_run -- apt-get install -y the-tools
+  dybatpho::privilege_release
+  ```
+
+  `--shield` puts a non-interactive escalation command first on `PATH`, so a
+  child cannot hang the run with a prompt nothing can display. The background
+  refresher watches its parent rather than waiting to be signalled, so a
+  script that is killed outright does not leave it behind. With no cached
+  ticket and no terminal the call fails instead of blocking, which is what a
+  run from cron needs. `DYBATPHO_PRIVILEGE_SUSPEND_HOOK` is how a full-screen
+  caller gives the terminal back around the prompt.
+
 - **`array` — order a dependency graph instead of resolving one by hand.**
   `dybatpho::array_toposort` reads an associative array of edges and returns
   an order where a dependency comes before what needs it;

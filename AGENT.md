@@ -146,6 +146,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `network.sh` | Curl wrappers, retries, JSON requests, and HTTP metadata | `test/network.bats`, `docs/network.md`, `docs/spec/network.md` |
 | `notification.sh` | Webhook notifications and JSON payloads | `test/notification.bats`, `docs/notification.md`, `docs/spec/notification.md` |
 | `os.sh` | OS, architecture, distribution, and host facts: name, user, processors, terminal size, root/container/WSL/CI detection | `test/os.bats`, `docs/os.md`, `docs/spec/os.md` |
+| `privilege.sh` | Acquiring an escalation once, holding its ticket for the run, shielding children from prompting, and tearing it all down | `test/privilege.bats`, `docs/privilege.md`, `docs/spec/privilege.md` |
 | `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `docs/process.md`, `docs/spec/process.md` |
 | `parallel.sh` | Bounded worker pool with ordered output and per-job exit codes | `test/parallel.bats`, `docs/parallel.md`, `docs/spec/parallel.md` |
 | `pkg.sh` | Package manager detection and guarded dependency installation | `test/pkg.bats`, `docs/pkg.md`, `docs/spec/pkg.md` |

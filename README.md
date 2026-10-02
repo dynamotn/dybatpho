@@ -193,6 +193,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [backup.sh](docs/backup.md)      | Timestamped snapshots, checksum sidecars, retention pruning |
 | [os.sh](docs/os.md)              | Platform/distro and architecture detection        |
 | [pkg.sh](docs/pkg.md)            | Detect the package manager and install dependencies, with confirmation and dry-run |
+| [privilege.sh](docs/privilege.md) | Ask for sudo once, hold it for the whole run, and stop children prompting |
 
 ### 🌐 Network & notifications
 

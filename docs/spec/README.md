@@ -49,6 +49,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `diff.md`
 - `queue.md`
 - `schedule.md`
+- `privilege.md`
 - `tui.md`
 - `screen.md`
 - `testing.md`
@@ -95,6 +96,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/diff.sh` -> `diff.md`
 - `src/queue.sh` -> `queue.md`
 - `src/schedule.sh` -> `schedule.md`
+- `src/privilege.sh` -> `privilege.md`
 - `src/tui.sh` -> `tui.md`
 - `src/screen.sh` -> `screen.md`
 - `src/json.sh` -> `json.md`

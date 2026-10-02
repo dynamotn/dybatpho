@@ -395,3 +395,238 @@ EOF
   run -2 dybatpho::backup_diff "${evil}" "${SOURCE}"
   assert_output --partial "outside the scratch directory"
 }
+
+# @description Take an incremental snapshot, the way every snapshot test does.
+# @arg $@ string Arguments after `--incremental`
+# @stdout The snapshot path
+snapshot() {
+  dybatpho::backup_create --incremental "$@"
+}
+
+@test "dybatpho::backup_create --incremental writes a snapshot directory and its sidecar" {
+  run_traced dybatpho::backup_create --incremental "${SOURCE}" "${DEST}" site
+  assert_success
+  assert_output --regexp "${DEST}/site-[0-9]{8}T[0-9]{6}Z\.snapshot$"
+
+  local snap="${output}"
+  assert_dir_exist "${snap}"
+  assert_file_exist "${snap}.sha256"
+  assert_equal "$(cat "${snap}/source/a.txt")" "first"
+  # Nothing half-written is left behind.
+  run_traced -0 find "${DEST}" -name '.*partial*'
+  assert_output ""
+}
+
+@test "dybatpho::backup_create --incremental hard-links what did not change" {
+  local older newer
+  older="$(snapshot "${SOURCE}" "${DEST}" site)"
+  printf 'rewritten\n' > "${SOURCE}/b.txt"
+  newer="$(dybatpho::backup_create -i "${SOURCE}/" "${DEST}" site)"
+
+  assert [ "${older}/source/a.txt" -ef "${newer}/source/a.txt" ]
+  refute [ "${older}/source/b.txt" -ef "${newer}/source/b.txt" ]
+  assert_equal "$(cat "${older}/source/b.txt")" "second"
+  assert_equal "$(cat "${newer}/source/b.txt")" "rewritten"
+}
+
+@test "dybatpho::backup_create --incremental links without rsync too" {
+  local older newer
+  mkdir -p "${SOURCE}/sub dir" "${SOURCE}/locked"
+  printf 'deep\n' > "${SOURCE}/sub dir/c.txt"
+  printf 'secret\n' > "${SOURCE}/locked/d.txt"
+  chmod 0555 "${SOURCE}/locked"
+  printf 'mode\n' > "${SOURCE}/m.sh"
+  ln -s a.txt "${SOURCE}/link"
+  mkfifo "${SOURCE}/pipe"
+
+  PATH="$(path_without rsync)" run_traced dybatpho::backup_create -i "${SOURCE}" "${DEST}" site
+  assert_success
+  older="${output}"
+  printf 'rewritten\n' > "${SOURCE}/b.txt"
+  chmod 0755 "${SOURCE}/m.sh"
+  PATH="$(path_without rsync)" run_traced dybatpho::backup_create -i "${SOURCE}" "${DEST}" site
+  assert_success
+  newer="${output}"
+  chmod 0755 "${SOURCE}/locked" "${older}/source/locked" "${newer}/source/locked"
+
+  assert [ "${older}/source/a.txt" -ef "${newer}/source/a.txt" ]
+  assert [ "${older}/source/sub dir/c.txt" -ef "${newer}/source/sub dir/c.txt" ]
+  refute [ "${older}/source/b.txt" -ef "${newer}/source/b.txt" ]
+  # Same content under a new mode is a new file, or the older snapshot's copy
+  # would change mode with it.
+  refute [ "${older}/source/m.sh" -ef "${newer}/source/m.sh" ]
+  assert_equal "$(readlink "${newer}/source/link")" "a.txt"
+  assert_file_not_exist "${newer}/source/pipe"
+  assert_equal "$(cat "${newer}/source/locked/d.txt")" "secret"
+  run_traced -0 dybatpho::backup_verify "${newer}"
+}
+
+@test "dybatpho::backup_create --incremental keeps the directory modes of the source" {
+  mkdir -p "${SOURCE}/locked"
+  printf 'secret\n' > "${SOURCE}/locked/d.txt"
+  chmod 0555 "${SOURCE}/locked"
+
+  local snap
+  snap="$(PATH="$(path_without rsync)" snapshot "${SOURCE}" "${DEST}" site)"
+  local mode
+  mode="$(__dybatpho_file_stat mode "${snap}/source/locked")"
+  # Unlocked again before asserting, so bats can clean the directory up.
+  chmod 0755 "${SOURCE}/locked" "${snap}/source/locked"
+  assert_equal "${mode}" "555"
+}
+
+@test "dybatpho::backup_create --incremental snapshots a single file" {
+  local older newer
+  older="$(snapshot "${SOURCE}/a.txt" "${DEST}" config)"
+  newer="$(PATH="$(path_without rsync)" snapshot "${SOURCE}/a.txt" "${DEST}" config)"
+  assert_file_exist "${older}/a.txt"
+  assert [ "${older}/a.txt" -ef "${newer}/a.txt" ]
+}
+
+@test "dybatpho::backup_create --incremental leaves nothing behind when a file cannot be read" {
+  [[ "${EUID}" -ne 0 ]] || skip "root reads every file"
+  chmod 000 "${SOURCE}/b.txt"
+
+  PATH="$(path_without rsync)" run --separate-stderr dybatpho::backup_create -i "${SOURCE}" "${DEST}" site
+  chmod 644 "${SOURCE}/b.txt"
+  assert_failure
+  assert_stderr --partial "Could not snapshot: "
+  run_traced -0 dybatpho::backup_list "${DEST}"
+  assert_output ""
+  run_traced -0 find "${DEST}" -mindepth 1
+  assert_output ""
+}
+
+@test "dybatpho::backup_verify checks a snapshot's whole tree" {
+  local snap
+  snap="$(snapshot "${SOURCE}" "${DEST}" site)"
+  run_traced -0 dybatpho::backup_verify "${snap}"
+
+  printf 'intruder\n' > "${snap}/source/new.txt"
+  run_traced --separate-stderr -1 dybatpho::backup_verify "${snap}"
+  assert_stderr --partial "does not match its sidecar"
+  rm "${snap}/source/new.txt"
+
+  rm "${snap}/source/a.txt"
+  printf 'tampered\n' > "${snap}/source/a.txt"
+  run_traced -1 dybatpho::backup_verify "${snap}"
+
+  rm "${snap}.sha256"
+  run --separate-stderr dybatpho::backup_verify "${snap}"
+  assert_failure
+  assert_stderr --partial "No checksum sidecar beside"
+}
+
+@test "dybatpho::backup_list merges archives and snapshots in the order they were taken" {
+  plant "site-20260101T000000Z.tar.gz"
+  mkdir -p "${DEST}/site-20260201T000000Z.snapshot" "${DEST}/site-20260401T000000Z.snapshot"
+  plant "site-20260301T000000Z.tar.gz"
+  # A file with the suffix is not a snapshot, and neither is a link to one.
+  printf 'x\n' > "${DEST}/site-20260501T000000Z.snapshot"
+  ln -s "${DEST}/site-20260401T000000Z.snapshot" "${DEST}/site-20260601T000000Z.snapshot"
+
+  run_traced -0 dybatpho::backup_list "${DEST}" site
+  assert_output << EOF
+${DEST}/site-20260401T000000Z.snapshot
+${DEST}/site-20260301T000000Z.tar.gz
+${DEST}/site-20260201T000000Z.snapshot
+${DEST}/site-20260101T000000Z.tar.gz
+EOF
+
+  run_traced -0 dybatpho::backup_latest "${DEST}"
+  assert_output "${DEST}/site-20260401T000000Z.snapshot"
+}
+
+@test "dybatpho::backup_restore copies a snapshot back as plain files" {
+  local snap target="${BATS_TEST_TMPDIR}/restored"
+  snap="$(snapshot "${SOURCE}" "${DEST}" site)"
+
+  run_traced -0 dybatpho::backup_restore --force "${snap}" "${target}"
+  assert_equal "$(cat "${target}/source/a.txt")" "first"
+  refute [ "${target}/source/a.txt" -ef "${snap}/source/a.txt" ]
+
+  # Restoring over it again asks first, and refuses without a terminal.
+  printf 'local edit\n' > "${target}/source/a.txt"
+  run_traced --separate-stderr -1 dybatpho::backup_restore "${snap}" "${target}"
+  assert_stderr --partial "Aborted restore"
+  assert_equal "$(cat "${target}/source/a.txt")" "local edit"
+
+  DYBATPHO_FORCE=true run_traced -0 dybatpho::backup_restore "${snap}" "${target}"
+  assert_equal "$(cat "${target}/source/a.txt")" "first"
+}
+
+@test "dybatpho::backup_restore restores a single-file snapshot, and reports under DRY_RUN" {
+  local snap target="${BATS_TEST_TMPDIR}/restored"
+  snap="$(snapshot "${SOURCE}/a.txt" "${DEST}" config)"
+
+  DRY_RUN=true run_traced -0 dybatpho::backup_restore --force "${snap}" "${target}"
+  assert_file_not_exist "${target}/a.txt"
+
+  run_traced -0 dybatpho::backup_restore --force "${snap}" "${target}"
+  assert_equal "$(cat "${target}/a.txt")" "first"
+}
+
+@test "dybatpho::backup_restore refuses a tampered snapshot and an ambiguous one" {
+  local snap target="${BATS_TEST_TMPDIR}/restored"
+  snap="$(snapshot "${SOURCE}" "${DEST}" site)"
+  printf 'extra\n' > "${snap}/stray"
+
+  run_traced --separate-stderr -1 dybatpho::backup_restore --force "${snap}" "${target}"
+  assert_file_not_exist "${target}/source/a.txt"
+
+  # A sidecar that agrees with a snapshot holding two entries still leaves no
+  # single entry to restore.
+  local checksum
+  __dybatpho_backup_tree_hash_into checksum "${snap}"
+  printf '%s  %s\n' "${checksum}" "$(basename "${snap}")" > "${snap}.sha256"
+  run --separate-stderr dybatpho::backup_restore --force "${snap}" "${target}"
+  assert_failure
+  assert_stderr --partial "Expected one entry in snapshot"
+}
+
+@test "dybatpho::backup_prune removes a snapshot without breaking the ones it shares files with" {
+  local older newer
+  older="$(snapshot "${SOURCE}" "${DEST}" site)"
+  printf 'rewritten\n' > "${SOURCE}/b.txt"
+  newer="$(snapshot "${SOURCE}" "${DEST}" site)"
+
+  run_traced -0 dybatpho::backup_prune --keep-count 1 --force "${DEST}"
+  assert_dir_not_exist "${older}"
+  assert_file_not_exist "${older}.sha256"
+  assert_equal "$(cat "${newer}/source/a.txt")" "first"
+  run_traced -0 dybatpho::backup_verify "${newer}"
+}
+
+@test "dybatpho::backup_diff compares snapshots with each other and with the live source" {
+  local older newer
+  older="$(snapshot "${SOURCE}" "${DEST}" site)"
+  printf 'rewritten\n' > "${SOURCE}/b.txt"
+  newer="$(snapshot "${SOURCE}" "${DEST}" site)"
+
+  DYBATPHO_DIFF_COLOR=false run_traced -1 dybatpho::backup_diff "${older}" "${newer}"
+  assert_output "~ b.txt"
+  run_traced -0 dybatpho::backup_diff "${newer}" "${SOURCE}"
+
+  # A snapshot lines up with an archive of the same source too.
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" site)"
+  run_traced -0 dybatpho::backup_diff "${newer}" "${archive}"
+
+  printf 'tampered\n' >> "${newer}/source/b.txt"
+  run -2 dybatpho::backup_diff "${older}" "${newer}"
+  assert_output --partial "fails its checksum"
+  rm "${newer}.sha256"
+  run -2 dybatpho::backup_diff "${older}" "${newer}"
+  assert_output --partial "No checksum sidecar beside: ${newer}"
+}
+
+@test "dybatpho::backup_create --incremental does not overwrite a snapshot taken in the same second" {
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+
+  local first second
+  first="$(snapshot "${SOURCE}" "${DEST}" site)"
+  second="$(snapshot "${SOURCE}" "${DEST}" site)"
+  assert_equal "${first}" "${DEST}/site-20260101T000000Z.snapshot"
+  assert_equal "${second}" "${DEST}/site-20260101T000000Z-1.snapshot"
+  assert [ "${first}/source/a.txt" -ef "${second}/source/a.txt" ]
+}

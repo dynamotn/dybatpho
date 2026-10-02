@@ -25,6 +25,11 @@ Backups are named `<name>-<UTC timestamp>.<extension>`, which is why
 sorting them by name is the same as sorting them by age, with no dependence
 on a modification time that copying a directory can change.
 
+`--incremental` takes a snapshot directory instead of an archive, in which
+every file unchanged since the previous snapshot is a hard link to it, so a
+long history of a large tree costs one copy plus what changed. Snapshots
+are listed, verified, restored, compared and pruned like archives.
+
 `dybatpho::backup_diff` answers what a restore would undo: it compares two
 backups, or a backup and the live data, through `dybatpho::diff_dir`,
 extracting each verified backup into a scratch directory first.
@@ -40,13 +45,13 @@ extracting each verified backup into a scratch directory first.
 
 ### 🚀 Highlights
 
-- [`dybatpho::backup_create`](#dybatphobackup_create) — Take a timestamped backup of a file or directory. The archive is written under a temporary name in the destination and renamed into place, so nothing half-written is ever left looking complete. A checksum sidecar is written beside it.
-- [`dybatpho::backup_list`](#dybatphobackup_list) — List a directory's backups, newest first.
+- [`dybatpho::backup_create`](#dybatphobackup_create) — Take a timestamped backup of a file or directory. The archive is written under a temporary name in the destination and renamed into place, so nothing half-written is ever left looking complete. A checksum sidecar is written beside it. With `--incremental`, the backup is a directory named `<name>-<UTC timestamp>.snapshot` instead of an archive: a plain copy of the source in which every file unchanged since the newest earlier snapshot of the same name is a hard link to that snapshot's copy, so a nightly run costs only what changed. `rsync --link-dest` is used when installed, and a walk in Bash otherwise. Pruning a snapshot never touches another one: a hard-linked file lives on until the last snapshot naming it is removed. Files are shared, so a snapshot is read and restored, never edited in place. Special files are skipped, and the sidecar holds a fingerprint of the tree -- each entry's path, kind, and checksum or link target.
+- [`dybatpho::backup_list`](#dybatphobackup_list) — List a directory's backups, newest first. Archives and incremental snapshots are listed together, in the order they were taken.
 - [`dybatpho::backup_latest`](#dybatphobackup_latest) — Print the most recent backup in a directory.
-- [`dybatpho::backup_verify`](#dybatphobackup_verify) — Check a backup against its checksum sidecar. A backup with no sidecar cannot be checked, which is reported rather than passed, because "nothing to compare" is not the same answer as "matches".
-- [`dybatpho::backup_restore`](#dybatphobackup_restore) — Restore a backup into a target directory. The checksum is verified first, and the extraction goes through `dybatpho::safe_extract`, so an archive whose entries would land outside the target is refused and an overwrite is confirmed.
+- [`dybatpho::backup_verify`](#dybatphobackup_verify) — Check a backup against its checksum sidecar. A backup with no sidecar cannot be checked, which is reported rather than passed, because "nothing to compare" is not the same answer as "matches". An incremental snapshot is checked by recomputing the fingerprint of its tree, so a file changed, added, or removed inside it is caught.
+- [`dybatpho::backup_restore`](#dybatphobackup_restore) — Restore a backup into a target directory. The checksum is verified first, and the extraction goes through `dybatpho::safe_extract`, so an archive whose entries would land outside the target is refused and an overwrite is confirmed. A snapshot is restored the same way: verified, then its one entry is copied into the target -- `<target>/<source name>`, as an archive extracts -- after confirming when that entry already exists there. The copy holds plain files, so editing it never reaches the snapshot.
 - [`dybatpho::backup_prune`](#dybatphobackup_prune) — Delete the backups a retention policy does not keep. A backup survives when **any** policy keeps it, so asking for both `--keep-count` and `--keep-days` keeps more rather than less: a retention rule that deletes more than the operator expected is the expensive direction to be wrong in. `--keep-count` counts from the newest by name, which is the order the backups were taken. `--keep-days` reads how old the file on disk is, so a backup copied in from elsewhere is as old as the copy.
-- [`dybatpho::backup_diff`](#dybatphobackup_diff) — Show what changed between two backups, or between a backup and the live data it was taken from. Each side is a backup archive or a live file or directory. A backup is checked against its sidecar before anything is read from it and extracted into a temporary directory that is removed when the shell exits; nothing in the destination or the source is written. The two sides are then compared with `dybatpho::diff_dir`, so the records, the summary and the exit code are the ones it prints: `+` for what the second side added, `-` for what it no longer has, `~` for a rewritten file, `!` for a change of kind. A backup holds its source under the source's own name, and that name is not compared: a directory backup is compared from inside it, so the older backup of `/etc/nginx` lines up with the live `/etc/nginx` or with a copy restored somewhere else.
+- [`dybatpho::backup_diff`](#dybatphobackup_diff) — Show what changed between two backups, or between a backup and the live data it was taken from. Each side is a backup archive, an incremental snapshot, or a live file or directory. A backup is checked against its sidecar before anything is read from it, and an archive is extracted into a temporary directory that is removed when the shell exits; nothing in the destination or the source is written. The two sides are then compared with `dybatpho::diff_dir`, so the records, the summary and the exit code are the ones it prints: `+` for what the second side added, `-` for what it no longer has, `~` for a rewritten file, `!` for a change of kind. A backup holds its source under the source's own name, and that name is not compared: a directory backup is compared from inside it, so the older backup of `/etc/nginx` lines up with the live `/etc/nginx` or with a copy restored somewhere else.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -57,6 +62,7 @@ extracting each verified backup into a scratch directory first.
 ## 💡 Tips
 
 - Destinations are local paths; pushing a backup to object storage or a network share stays with the caller
+- A snapshot shares its unchanged files with other snapshots, so read and restore it, never edit inside it
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -68,28 +74,41 @@ The archive is written under a temporary name in the destination and
 renamed into place, so nothing half-written is ever left looking complete.
 A checksum sidecar is written beside it.
 
+With `--incremental`, the backup is a directory named
+`<name>-<UTC timestamp>.snapshot` instead of an archive: a plain copy of
+the source in which every file unchanged since the newest earlier snapshot
+of the same name is a hard link to that snapshot's copy, so a nightly run
+costs only what changed. `rsync --link-dest` is used when installed, and a
+walk in Bash otherwise. Pruning a snapshot never touches another one: a
+hard-linked file lives on until the last snapshot naming it is removed.
+Files are shared, so a snapshot is read and restored, never edited in
+place. Special files are skipped, and the sidecar holds a fingerprint of
+the tree -- each entry's path, kind, and checksum or link target.
+
 **🧪 Example**
 
 ```bash
 archive="$(dybatpho::backup_create /etc/nginx /var/backups)"
+snapshot="$(dybatpho::backup_create --incremental /srv/www /var/backups www)"
 ```
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$1` | string | File or directory to back up |
-| `$2` | string | Destination directory, created when missing |
-| `$3` | string | Optional name for the backup, default is the source's base name |
+| `$1` | string | Option `--incremental`/`-i` to take a hard-linked snapshot directory |
+| `$2` | string | File or directory to back up |
+| `$3` | string | Destination directory, created when missing |
+| `$4` | string | Optional name for the backup, default is the source's base name |
 
 **📤 Output on stdout**
 
-- Path of the archive that was created
+- Path of the archive or snapshot that was created
 
 **🚦 Exit codes**
 
 - `0`: The backup was taken
-- `1`: The source does not exist, or the archive could not be written
+- `1`: The source does not exist, or the backup could not be written
 
 
 ---
@@ -97,6 +116,8 @@ archive="$(dybatpho::backup_create /etc/nginx /var/backups)"
 ### `dybatpho::backup_list`
 
 List a directory's backups, newest first.
+Archives and incremental snapshots are listed together, in the order they
+were taken.
 
 **🧪 Example**
 
@@ -113,7 +134,7 @@ dybatpho::backup_list /var/backups nginx
 
 **📤 Output on stdout**
 
-- One archive path per line, newest first
+- One archive or snapshot path per line, newest first
 
 **🚦 Exit codes**
 
@@ -141,7 +162,7 @@ dybatpho::backup_restore "$(dybatpho::backup_latest /var/backups nginx)" /etc
 
 **📤 Output on stdout**
 
-- Path of the newest archive
+- Path of the newest archive or snapshot
 
 **🚦 Exit codes**
 
@@ -156,6 +177,8 @@ dybatpho::backup_restore "$(dybatpho::backup_latest /var/backups nginx)" /etc
 Check a backup against its checksum sidecar.
 A backup with no sidecar cannot be checked, which is reported rather than
 passed, because "nothing to compare" is not the same answer as "matches".
+An incremental snapshot is checked by recomputing the fingerprint of its
+tree, so a file changed, added, or removed inside it is caught.
 
 **🧪 Example**
 
@@ -167,12 +190,12 @@ dybatpho::backup_verify "${archive}" || dybatpho::die "Corrupted backup"
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$1` | string | Backup archive path |
+| `$1` | string | Backup archive or snapshot path |
 
 **🚦 Exit codes**
 
 - `0`: The archive matches its sidecar
-- `1`: The archive is missing, has no sidecar, or does not match it
+- `1`: The backup is missing, has no sidecar, or does not match it
 
 
 ---
@@ -183,6 +206,11 @@ Restore a backup into a target directory.
 The checksum is verified first, and the extraction goes through
 `dybatpho::safe_extract`, so an archive whose entries would land outside
 the target is refused and an overwrite is confirmed.
+
+A snapshot is restored the same way: verified, then its one entry is
+copied into the target -- `<target>/<source name>`, as an archive
+extracts -- after confirming when that entry already exists there. The
+copy holds plain files, so editing it never reaches the snapshot.
 
 **🧪 Example**
 
@@ -195,19 +223,19 @@ dybatpho::backup_restore --force "${archive}" /etc/nginx
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Option `--force`/`-f` to skip the overwrite confirmation |
-| `$2` | string | Backup archive path |
+| `$2` | string | Backup archive or snapshot path |
 | `$3` | string | Target directory, created when missing |
 
 **🌍 Environment variables**
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, `safe_extract` reports instead of extracting |
+| **`DRY_RUN`** | string | When true-like, report the extraction or copy instead of performing it |
 
 **🚦 Exit codes**
 
 - `0`: The backup was restored
-- `1`: The archive fails its checksum, the overwrite is declined, or an entry escapes the target
+- `1`: The backup fails its checksum, the overwrite is declined, or an entry escapes the target
 
 
 ---
@@ -259,10 +287,11 @@ dybatpho::backup_prune --keep-count 7 --name nginx /var/backups
 
 Show what changed between two backups, or between a backup and
 the live data it was taken from.
-Each side is a backup archive or a live file or directory. A backup is
-checked against its sidecar before anything is read from it and extracted
-into a temporary directory that is removed when the shell exits; nothing
-in the destination or the source is written. The two sides are then
+Each side is a backup archive, an incremental snapshot, or a live file or
+directory. A backup is checked against its sidecar before anything is read
+from it, and an archive is extracted into a temporary directory that is
+removed when the shell exits; nothing in the destination or the source is
+written. The two sides are then
 compared with `dybatpho::diff_dir`, so the records, the summary and the
 exit code are the ones it prints: `+` for what the second side added, `-`
 for what it no longer has, `~` for a rewritten file, `!` for a change of

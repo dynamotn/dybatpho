@@ -23,11 +23,18 @@
 #   sorting them by name is the same as sorting them by age, with no dependence
 #   on a modification time that copying a directory can change.
 #
+#   `--incremental` takes a snapshot directory instead of an archive, in which
+#   every file unchanged since the previous snapshot is a hard link to it, so a
+#   long history of a large tree costs one copy plus what changed. Snapshots
+#   are listed, verified, restored, compared and pruned like archives.
+#
 #   `dybatpho::backup_diff` answers what a restore would undo: it compares two
 #   backups, or a backup and the live data, through `dybatpho::diff_dir`,
 #   extracting each verified backup into a scratch directory first.
 # @tip Destinations are local paths; pushing a backup to object storage or a
 #   network share stays with the caller
+# @tip A snapshot shares its unchanged files with other snapshots, so read and
+#   restore it, never edit inside it
 # @env DYBATPHO_BACKUP_EXTENSION string Archive extension, default is `tar.gz`; `archive.sh` reads the format from it
 # @env DYBATPHO_BACKUP_CHECKSUM_ALGORITHM string Algorithm for the sidecar, default is `sha256`
 # @see
@@ -52,10 +59,26 @@ function __dybatpho_backup_stamp {
 }
 
 #######################################
+# @description Return success when a path is an incremental snapshot: a real
+#   directory, not a link to one, named with the `.snapshot` suffix.
+# @arg $1 string Path
+# @exitcode 0 The path is a snapshot
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_backup_is_snapshot {
+  [[ "$1" == *.snapshot && -d "$1" && ! -L "$1" ]]
+}
+
+#######################################
 # @description Collect a directory's backups into a named array, newest first.
+#   Archives and incremental snapshots are both backups. Each kind is globbed
+#   on its own, which keeps each list in name order, and the two are merged by
+#   name, so the result stays in the order the backups were taken.
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string Directory holding the backups
 # @arg $3 string Backup name to match, or empty for every name
+# @arg $4 string Kind to collect: `archive`, `snapshot`, or empty for both
 # @set The named array
 # @internal
 #######################################
@@ -63,30 +86,62 @@ function __dybatpho_backup_collect_into {
   local -n __dybatpho_backup_found_ref="$1"
   local __dybatpho_backup_dir="$2"
   local __dybatpho_backup_name="${3-}"
+  local __dybatpho_backup_kind="${4-}"
   __dybatpho_backup_found_ref=()
 
   dybatpho::is dir "${__dybatpho_backup_dir}" || return 0
 
-  local -a __dybatpho_backup_candidates=()
-  # The two cases are written out rather than folded into one pattern
-  # variable: a `*` that comes from a quoted expansion is the character, not
-  # the wildcard, so the unfiltered listing would match nothing at all.
-  if [[ -n "${__dybatpho_backup_name}" ]]; then
-    __dybatpho_backup_candidates=("${__dybatpho_backup_dir}/${__dybatpho_backup_name}"-*."${DYBATPHO_BACKUP_EXTENSION}")
-  else
-    __dybatpho_backup_candidates=("${__dybatpho_backup_dir}"/*-*."${DYBATPHO_BACKUP_EXTENSION}")
+  local -a __dybatpho_backup_archives=() __dybatpho_backup_snapshots=()
+  local __dybatpho_backup_path
+  # The cases are written out rather than folded into one pattern variable: a
+  # `*` that comes from a quoted expansion is the character, not the wildcard,
+  # so the unfiltered listing would match nothing at all. A glob is already
+  # sorted ascending, and the names carry a sortable UTC stamp, so no `sort`
+  # is needed and a path holding a newline does no harm. A glob that matched
+  # nothing stays literal, which the kind checks below drop.
+  if [[ "${__dybatpho_backup_kind}" != snapshot ]]; then
+    if [[ -n "${__dybatpho_backup_name}" ]]; then
+      __dybatpho_backup_archives=("${__dybatpho_backup_dir}/${__dybatpho_backup_name}"-*."${DYBATPHO_BACKUP_EXTENSION}")
+    else
+      __dybatpho_backup_archives=("${__dybatpho_backup_dir}"/*-*."${DYBATPHO_BACKUP_EXTENSION}")
+    fi
+  fi
+  if [[ "${__dybatpho_backup_kind}" != archive ]]; then
+    if [[ -n "${__dybatpho_backup_name}" ]]; then
+      __dybatpho_backup_snapshots=("${__dybatpho_backup_dir}/${__dybatpho_backup_name}"-*.snapshot)
+    else
+      __dybatpho_backup_snapshots=("${__dybatpho_backup_dir}"/*-*.snapshot)
+    fi
   fi
 
-  local -a __dybatpho_backup_sorted=()
-  local __dybatpho_backup_path
-
-  # A glob is already sorted ascending, and the names carry a sortable UTC
-  # stamp, so reversing it is the whole of "newest first" -- no `sort`, and no
-  # trouble from a path that contains a newline. A glob that matched nothing
-  # stays literal, which the file check below drops.
-  for __dybatpho_backup_path in "${__dybatpho_backup_candidates[@]}"; do
+  local -a __dybatpho_backup_files=() __dybatpho_backup_trees=()
+  for __dybatpho_backup_path in ${__dybatpho_backup_archives[@]+"${__dybatpho_backup_archives[@]}"}; do
     dybatpho::is file "${__dybatpho_backup_path}" || continue
-    __dybatpho_backup_sorted+=("${__dybatpho_backup_path}")
+    __dybatpho_backup_files+=("${__dybatpho_backup_path}")
+  done
+  for __dybatpho_backup_path in ${__dybatpho_backup_snapshots[@]+"${__dybatpho_backup_snapshots[@]}"}; do
+    __dybatpho_backup_is_snapshot "${__dybatpho_backup_path}" || continue
+    __dybatpho_backup_trees+=("${__dybatpho_backup_path}")
+  done
+
+  # Merge the two ascending lists into one, compared the way the glob sorted
+  # each of them.
+  local -a __dybatpho_backup_sorted=()
+  local __dybatpho_backup_i=0 __dybatpho_backup_j=0
+  local __dybatpho_backup_files_n="${#__dybatpho_backup_files[@]}"
+  local __dybatpho_backup_trees_n="${#__dybatpho_backup_trees[@]}"
+  local __dybatpho_backup_file __dybatpho_backup_snap
+  while ((__dybatpho_backup_i < __dybatpho_backup_files_n || __dybatpho_backup_j < __dybatpho_backup_trees_n)); do
+    __dybatpho_backup_file="${__dybatpho_backup_files[${__dybatpho_backup_i}]-}"
+    __dybatpho_backup_snap="${__dybatpho_backup_trees[${__dybatpho_backup_j}]-}"
+    if [[ -n "${__dybatpho_backup_file}" ]] \
+      && [[ -z "${__dybatpho_backup_snap}" || "${__dybatpho_backup_file}" < "${__dybatpho_backup_snap}" ]]; then
+      __dybatpho_backup_sorted+=("${__dybatpho_backup_file}")
+      __dybatpho_backup_i=$((__dybatpho_backup_i + 1))
+    else
+      __dybatpho_backup_sorted+=("${__dybatpho_backup_snap}")
+      __dybatpho_backup_j=$((__dybatpho_backup_j + 1))
+    fi
   done
 
   local __dybatpho_backup_at=$((${#__dybatpho_backup_sorted[@]} - 1))
@@ -106,20 +161,225 @@ function __dybatpho_backup_sidecar {
 }
 
 #######################################
+# @description Fingerprint a snapshot tree into a named variable.
+#   Every entry is recorded as its kind, its path, and what identifies its
+#   content -- a file's checksum, a link's target -- in bytewise path order,
+#   and the record is hashed with the sidecar algorithm. The record is
+#   NUL-separated, so a name holding a newline cannot be mistaken for two.
+#   Modification times and permissions are left out: a hard-linked file shares
+#   them with every snapshot that links it, so they are not the snapshot's own.
+# @arg $1 string Name of the variable receiving the checksum
+# @arg $2 string Snapshot directory
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_backup_tree_hash_into {
+  local -n __dybatpho_backup_hash_ref="$1"
+  local __dybatpho_backup_tree="$2"
+  local __dybatpho_backup_entry __dybatpho_backup_full __dybatpho_backup_kind __dybatpho_backup_payload
+  local __dybatpho_backup_algorithm="${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}"
+
+  # Not a `__dybatpho`-prefixed name: `dybatpho::create_temp` refuses one.
+  local dybatpho_backup_manifest
+  dybatpho::create_temp dybatpho_backup_manifest ".manifest" "backup"
+
+  while IFS= read -r -d '' __dybatpho_backup_entry; do
+    [[ "${__dybatpho_backup_entry}" != . ]] || continue
+    __dybatpho_backup_entry="${__dybatpho_backup_entry#./}"
+    __dybatpho_backup_full="${__dybatpho_backup_tree}/${__dybatpho_backup_entry}"
+    __dybatpho_backup_payload=""
+    if [[ -L "${__dybatpho_backup_full}" ]]; then
+      __dybatpho_backup_kind="symlink"
+      __dybatpho_backup_payload="$(readlink -- "${__dybatpho_backup_full}")"
+    elif [[ -d "${__dybatpho_backup_full}" ]]; then
+      __dybatpho_backup_kind="directory"
+    else
+      __dybatpho_backup_kind="file"
+      __dybatpho_backup_payload="$(dybatpho::file_hash "${__dybatpho_backup_full}" "${__dybatpho_backup_algorithm}")"
+    fi
+    printf '%s\0%s\0%s\0' "${__dybatpho_backup_kind}" "${__dybatpho_backup_entry}" \
+      "${__dybatpho_backup_payload}" >> "${dybatpho_backup_manifest}"
+  done < <(cd -- "${__dybatpho_backup_tree}" && find . -print0 | LC_ALL=C sort -z) # kcov(skip)
+
+  __dybatpho_backup_hash_ref="$(dybatpho::file_hash "${dybatpho_backup_manifest}" "${__dybatpho_backup_algorithm}")"
+}
+
+#######################################
+# @description Copy a source into a snapshot directory, hard-linking every
+#   file that is unchanged since the previous snapshot instead of copying it.
+#   `rsync --link-dest` does the work when it is installed. Otherwise the
+#   source is walked here: a regular file whose content and mode match the
+#   previous snapshot's is linked to it, any other file is copied with its
+#   mode and times, links are recreated, and directories get their mode once
+#   everything inside them is written, so a read-only directory can still be
+#   filled. Special files -- FIFOs, sockets, devices -- are skipped on both
+#   paths, as `rsync --no-D` skips them.
+# @arg $1 string Absolute source path, with no trailing slash
+# @arg $2 string Absolute snapshot directory being filled
+# @arg $3 string Absolute path of the previous snapshot, or empty for none
+# @exitcode 0 The source was copied
+# @exitcode 1 A file could not be read or written
+# @internal
+#######################################
+function __dybatpho_backup_link_copy {
+  local source="$1" partial="$2" previous="${3-}"
+  local base
+  base="$(dybatpho::path_basename "${source}")"
+
+  if dybatpho::is command rsync; then
+    local -a link=()
+    [[ -z "${previous}" ]] || link=("--link-dest=${previous}")
+    # `rsync` reports each special file it skips on stdout, which would land
+    # in the path `dybatpho::backup_create` prints; its errors stay on stderr.
+    rsync -a --no-D ${link[@]+"${link[@]}"} -- "${source}" "${partial}/" > /dev/null
+    return
+  fi
+
+  local entry from to old mode target from_mode old_mode linked
+  local -a directories=() entries=(.)
+  if [[ -d "${source}" && ! -L "${source}" ]]; then
+    entries=()
+    while IFS= read -r -d '' entry; do
+      entries+=("${entry}")
+    done < <(cd -- "${source}" && find . -print0) # kcov(skip)
+  fi
+
+  for entry in "${entries[@]}"; do
+    if [[ "${entry}" == . ]]; then
+      from="${source}"
+      to="${partial}/${base}"
+      old="${previous:+${previous}/${base}}"
+    else
+      entry="${entry#./}"
+      from="${source}/${entry}"
+      to="${partial}/${base}/${entry}"
+      old="${previous:+${previous}/${base}/${entry}}"
+    fi
+
+    if [[ -L "${from}" ]]; then
+      target="$(readlink -- "${from}")" || return 1
+      ln -s -- "${target}" "${to}" || return 1
+    elif [[ -d "${from}" ]]; then
+      mkdir -p -- "${to}" || return 1
+      directories+=("${from}" "${to}")
+    elif [[ -f "${from}" ]]; then
+      linked=0
+      if [[ -n "${old}" && -f "${old}" && ! -L "${old}" ]] && cmp -s -- "${from}" "${old}"; then
+        from_mode="$(__dybatpho_file_stat mode "${from}")" || from_mode=""
+        old_mode="$(__dybatpho_file_stat mode "${old}")" || old_mode=""
+        # A link can still fail -- the link count of a file shared by many
+        # snapshots has a ceiling on some filesystems -- and a copy is then
+        # the correct, if larger, answer.
+        if [[ -n "${from_mode}" && "${from_mode}" == "${old_mode}" ]] \
+          && ln -- "${old}" "${to}" 2> /dev/null; then
+          linked=1
+        fi
+      fi
+      ((linked)) || cp -p -- "${from}" "${to}" || return 1
+    fi
+  done
+
+  # Deepest first, so a read-only parent is locked only after its children.
+  local at=$((${#directories[@]} - 2))
+  for (( ; at >= 0; at -= 2)); do
+    mode="$(__dybatpho_file_stat mode "${directories[${at}]}")" || continue
+    chmod "${mode}" "${directories[$((at + 1))]}"
+  done
+}
+
+#######################################
+# @description Take an incremental snapshot: a directory holding a copy of the
+#   source, whose unchanged files are hard links into the newest earlier
+#   snapshot of the same name.
+#   The snapshot is filled under a hidden temporary name in the destination
+#   and renamed into place, and its sidecar records the fingerprint
+#   `dybatpho::backup_verify` checks.
+# @arg $1 string Source path
+# @arg $2 string Destination directory, already created
+# @arg $3 string Backup name
+# @arg $4 string Timestamp for the name
+# @stdout Path of the snapshot that was created
+# @internal
+#######################################
+function __dybatpho_backup_snapshot {
+  local source="$1" destination="$2" name="$3" stamp="$4"
+  local caller="dybatpho::backup_create"
+
+  # Absolute paths throughout: `rsync` reads `host:path` in an argument as a
+  # remote location, and an absolute path is never read that way.
+  local source_dir base
+  source_dir="$(dybatpho::path_dirname "${source}")"
+  source_dir="$(cd -- "${source_dir}" && pwd -P)"
+  base="$(dybatpho::path_basename "${source}")"
+  source="${source_dir%/}/${base}"
+  destination="$(cd -- "${destination}" && pwd -P)"
+
+  local final="${destination}/${name}-${stamp}.snapshot"
+  local suffix=1
+  while dybatpho::is exist "${final}"; do
+    final="${destination}/${name}-${stamp}-${suffix}.snapshot"
+    suffix=$((suffix + 1))
+  done
+
+  local -a previous=()
+  __dybatpho_backup_collect_into previous "${destination}" "${name}" snapshot
+  local link_dest=""
+  ((${#previous[@]} == 0)) || link_dest="${previous[0]}"
+
+  local partial="${destination}/.${name}-${stamp}.$$.partial.snapshot"
+  mkdir -- "${partial}"
+  # "dybatpho::backup_create --incremental leaves nothing behind when a file
+  # cannot be read" covers these two lines. `dybatpho::die` exits, so that test
+  # uses `run`, which clears the trap kcov instruments through.
+  if ! __dybatpho_backup_link_copy "${source}" "${partial}" "${link_dest}"; then
+    rm -rf -- "${partial}"                                     # kcov(skip)
+    dybatpho::die "${caller}: Could not snapshot: ${source}" # kcov(skip)
+  fi
+
+  local checksum
+  __dybatpho_backup_tree_hash_into checksum "${partial}"
+
+  mv -- "${partial}" "${final}"
+  printf '%s  %s\n' "${checksum}" "$(dybatpho::path_basename "${final}")" \
+    > "$(__dybatpho_backup_sidecar "${final}")"
+
+  printf '%s\n' "${final}"
+}
+
+#######################################
 # @description Take a timestamped backup of a file or directory.
 #   The archive is written under a temporary name in the destination and
 #   renamed into place, so nothing half-written is ever left looking complete.
 #   A checksum sidecar is written beside it.
-# @arg $1 string File or directory to back up
-# @arg $2 string Destination directory, created when missing
-# @arg $3 string Optional name for the backup, default is the source's base name
-# @stdout Path of the archive that was created
+#
+#   With `--incremental`, the backup is a directory named
+#   `<name>-<UTC timestamp>.snapshot` instead of an archive: a plain copy of
+#   the source in which every file unchanged since the newest earlier snapshot
+#   of the same name is a hard link to that snapshot's copy, so a nightly run
+#   costs only what changed. `rsync --link-dest` is used when installed, and a
+#   walk in Bash otherwise. Pruning a snapshot never touches another one: a
+#   hard-linked file lives on until the last snapshot naming it is removed.
+#   Files are shared, so a snapshot is read and restored, never edited in
+#   place. Special files are skipped, and the sidecar holds a fingerprint of
+#   the tree -- each entry's path, kind, and checksum or link target.
+# @arg $1 string Option `--incremental`/`-i` to take a hard-linked snapshot directory
+# @arg $2 string File or directory to back up
+# @arg $3 string Destination directory, created when missing
+# @arg $4 string Optional name for the backup, default is the source's base name
+# @stdout Path of the archive or snapshot that was created
 # @exitcode 0 The backup was taken
-# @exitcode 1 The source does not exist, or the archive could not be written
+# @exitcode 1 The source does not exist, or the backup could not be written
 # @example
 #   archive="$(dybatpho::backup_create /etc/nginx /var/backups)"
+#   snapshot="$(dybatpho::backup_create --incremental /srv/www /var/backups www)"
 #######################################
 function dybatpho::backup_create {
+  local incremental=0
+  if [[ "${1-}" == "--incremental" || "${1-}" == "-i" ]]; then
+    incremental=1
+    shift
+  fi
+
   local source destination
   dybatpho::expect_args source destination -- "$@"
   local name="${3-}"
@@ -135,6 +395,11 @@ function dybatpho::backup_create {
 
   local stamp final
   stamp="$(__dybatpho_backup_stamp)"
+  if ((incremental)); then
+    __dybatpho_backup_snapshot "${source}" "${destination}" "${name}" "${stamp}"
+    return
+  fi
+
   final="${destination}/${name}-${stamp}.${DYBATPHO_BACKUP_EXTENSION}"
 
   # Two backups of the same source within one second would otherwise overwrite
@@ -168,9 +433,11 @@ function dybatpho::backup_create {
 
 #######################################
 # @description List a directory's backups, newest first.
+#   Archives and incremental snapshots are listed together, in the order they
+#   were taken.
 # @arg $1 string Directory holding the backups
 # @arg $2 string Optional backup name to match, default is every name
-# @stdout One archive path per line, newest first
+# @stdout One archive or snapshot path per line, newest first
 # @exitcode 0 The listing was printed, empty when there is nothing to list
 # @example
 #   dybatpho::backup_list /var/backups nginx
@@ -190,7 +457,7 @@ function dybatpho::backup_list {
 # @description Print the most recent backup in a directory.
 # @arg $1 string Directory holding the backups
 # @arg $2 string Optional backup name to match, default is every name
-# @stdout Path of the newest archive
+# @stdout Path of the newest archive or snapshot
 # @exitcode 0 A backup was found
 # @exitcode 1 The directory holds no backup
 # @example
@@ -211,9 +478,11 @@ function dybatpho::backup_latest {
 # @description Check a backup against its checksum sidecar.
 #   A backup with no sidecar cannot be checked, which is reported rather than
 #   passed, because "nothing to compare" is not the same answer as "matches".
-# @arg $1 string Backup archive path
+#   An incremental snapshot is checked by recomputing the fingerprint of its
+#   tree, so a file changed, added, or removed inside it is caught.
+# @arg $1 string Backup archive or snapshot path
 # @exitcode 0 The archive matches its sidecar
-# @exitcode 1 The archive is missing, has no sidecar, or does not match it
+# @exitcode 1 The backup is missing, has no sidecar, or does not match it
 # @example
 #   dybatpho::backup_verify "${archive}" || dybatpho::die "Corrupted backup"
 #######################################
@@ -221,7 +490,7 @@ function dybatpho::backup_verify {
   local archive
   dybatpho::expect_args archive -- "$@"
 
-  dybatpho::is file "${archive}" \
+  dybatpho::is file "${archive}" || __dybatpho_backup_is_snapshot "${archive}" \
     || dybatpho::die "${FUNCNAME[0]}: No such backup: ${archive}"
 
   local sidecar
@@ -231,7 +500,11 @@ function dybatpho::backup_verify {
 
   local recorded actual
   read -r recorded _ < "${sidecar}"
-  actual="$(dybatpho::file_hash "${archive}" "${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}")"
+  if __dybatpho_backup_is_snapshot "${archive}"; then
+    __dybatpho_backup_tree_hash_into actual "${archive}"
+  else
+    actual="$(dybatpho::file_hash "${archive}" "${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}")"
+  fi
 
   if [[ "${recorded}" != "${actual}" ]]; then
     dybatpho::error "${FUNCNAME[0]}: ${archive} does not match its sidecar"
@@ -242,16 +515,92 @@ function dybatpho::backup_verify {
 }
 
 #######################################
+# @description Find the one entry a backup holds, into a named variable.
+#   An archive or snapshot holds the source under its own name, so a
+#   directory source is reached through that entry; anything else -- a single
+#   file, or a backup that does not hold exactly one entry -- is read from the
+#   directory itself.
+# @arg $1 string Name of the variable receiving the path
+# @arg $2 string Directory holding the extracted or snapshotted entry
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_backup_entry_root_into {
+  local -n __dybatpho_backup_entry_ref="$1"
+  local __dybatpho_backup_holder="$2" __dybatpho_backup_item
+  local -a __dybatpho_backup_items=()
+
+  while IFS= read -r -d '' __dybatpho_backup_item; do
+    __dybatpho_backup_items+=("${__dybatpho_backup_item}")
+  done < <(find "${__dybatpho_backup_holder}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
+
+  if ((${#__dybatpho_backup_items[@]} == 1)) \
+    && [[ -d "${__dybatpho_backup_items[0]}" && ! -L "${__dybatpho_backup_items[0]}" ]]; then
+    __dybatpho_backup_entry_ref="${__dybatpho_backup_items[0]}"
+  else
+    __dybatpho_backup_entry_ref="${__dybatpho_backup_holder}"
+  fi
+}
+
+#######################################
+# @description Copy a verified snapshot's entry into a target directory.
+# @arg $1 string `--force`, or empty to confirm an overwrite
+# @arg $2 string Snapshot directory
+# @arg $3 string Target directory, already created
+# @exitcode 0 The snapshot was restored
+# @exitcode 1 The overwrite was declined
+# @internal
+#######################################
+function __dybatpho_backup_restore_snapshot {
+  local force="$1" snapshot="$2" target="$3"
+  # `dybatpho::confirm` reads `DYBATPHO_FORCE` itself when not forced here.
+  local approve=false
+  [[ -z "${force}" ]] || approve=true
+
+  local target_path
+  target_path="$(dybatpho::assert_safe_path "${target}" "destination")" || return $?
+
+  local entry
+  local -a entries=()
+  while IFS= read -r -d '' entry; do
+    entries+=("${entry}")
+  done < <(find "${snapshot}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
+  ((${#entries[@]} == 1)) \
+    || dybatpho::die "dybatpho::backup_restore: Expected one entry in snapshot: ${snapshot}"
+  entry="${entries[0]}"
+
+  local landing
+  landing="${target_path%/}/$(dybatpho::path_basename "${entry}")"
+  if [[ -e "${landing}" || -L "${landing}" ]] \
+    && ! __dybatpho_safety_approve "${approve}" "Overwrite ${landing} from ${snapshot}?"; then
+    dybatpho::warn "Aborted restore of ${snapshot}"
+    return 1
+  fi
+
+  if [[ -d "${entry}" && ! -L "${entry}" ]]; then
+    dybatpho::dry_run mkdir -p -- "${landing}"
+    dybatpho::dry_run cp -R -p -- "${entry}/." "${landing}/"
+  else
+    dybatpho::dry_run cp -P -p -- "${entry}" "${target_path%/}/"
+  fi
+}
+
+#######################################
 # @description Restore a backup into a target directory.
 #   The checksum is verified first, and the extraction goes through
 #   `dybatpho::safe_extract`, so an archive whose entries would land outside
 #   the target is refused and an overwrite is confirmed.
+#
+#   A snapshot is restored the same way: verified, then its one entry is
+#   copied into the target -- `<target>/<source name>`, as an archive
+#   extracts -- after confirming when that entry already exists there. The
+#   copy holds plain files, so editing it never reaches the snapshot.
 # @arg $1 string Option `--force`/`-f` to skip the overwrite confirmation
-# @arg $2 string Backup archive path
+# @arg $2 string Backup archive or snapshot path
 # @arg $3 string Target directory, created when missing
 # @exitcode 0 The backup was restored
-# @exitcode 1 The archive fails its checksum, the overwrite is declined, or an entry escapes the target
-# @env DRY_RUN string When true-like, `safe_extract` reports instead of extracting
+# @exitcode 1 The backup fails its checksum, the overwrite is declined, or an entry escapes the target
+# @env DRY_RUN string When true-like, report the extraction or copy instead of performing it
 # @example
 #   dybatpho::backup_restore --force "${archive}" /etc/nginx
 #######################################
@@ -267,6 +616,11 @@ function dybatpho::backup_restore {
 
   dybatpho::backup_verify "${archive}" || return 1
   dybatpho::ensure_dir "${target}" > /dev/null
+
+  if __dybatpho_backup_is_snapshot "${archive}"; then
+    __dybatpho_backup_restore_snapshot "${force}" "${archive}" "${target}"
+    return
+  fi
 
   if [[ -n "${force}" ]]; then
     dybatpho::safe_extract "${force}" "${archive}" "${target}"
@@ -370,25 +724,29 @@ function dybatpho::backup_prune {
 
   ((${#doomed[@]})) || return 0
 
+  # `--recursive` because a snapshot is a directory. Removing one never
+  # reaches another: a file hard-linked between snapshots lives on until the
+  # last snapshot naming it is gone.
   if [[ -n "${force}" ]]; then
-    dybatpho::safe_rm "${force}" -- "${doomed[@]}"
+    dybatpho::safe_rm "${force}" --recursive -- "${doomed[@]}"
     return
   fi
-  dybatpho::safe_rm -- "${doomed[@]}"
+  dybatpho::safe_rm --recursive -- "${doomed[@]}"
 }
 
 #######################################
 # @description Resolve one side of a backup comparison to a directory to walk,
 #   into a named variable.
-#   A path ending in the backup extension is a backup: it must pass its
-#   checksum and hold no entry that escapes, and it is extracted into a
-#   temporary directory. An archive holds one top-level entry, the source it
-#   was taken from, so a directory source is compared from inside that entry
-#   and a single-file source from the directory holding it. A live directory
-#   is walked where it is, and a live file is copied into a temporary directory
+#   A snapshot directory, or a path ending in the backup extension, is a
+#   backup: it must pass its checksum, and an archive must hold no entry that
+#   escapes before it is extracted into a temporary directory; a snapshot is
+#   read in place. A backup holds one top-level entry, the source it was taken
+#   from, so a directory source is compared from inside that entry and a
+#   single-file source from the directory holding it. A live directory is
+#   walked where it is, and a live file is copied into a temporary directory
 #   of its own so it lines up with a single-file backup.
 # @arg $1 string Name of the variable receiving the directory
-# @arg $2 string Backup archive, or a live file or directory
+# @arg $2 string Backup archive or snapshot, or a live file or directory
 # @set The named variable
 # @exitcode 0 The side was resolved
 # @exitcode 2 Stop the script when the side is missing, fails its checksum, or is unsafe to extract
@@ -401,6 +759,15 @@ function __dybatpho_backup_root_into {
 
   # Not a `__dybatpho`-prefixed name: `dybatpho::create_temp` refuses one.
   local dybatpho_backup_scratch
+
+  if __dybatpho_backup_is_snapshot "${__dybatpho_backup_side}"; then
+    dybatpho::is file "$(__dybatpho_backup_sidecar "${__dybatpho_backup_side}")" \
+      || dybatpho::die "${caller}: No checksum sidecar beside: ${__dybatpho_backup_side}" 2
+    dybatpho::backup_verify "${__dybatpho_backup_side}" \
+      || dybatpho::die "${caller}: Refusing to compare a backup that fails its checksum" 2
+    __dybatpho_backup_entry_root_into __dybatpho_backup_root_ref "${__dybatpho_backup_side}"
+    return 0
+  fi
 
   if [[ "${__dybatpho_backup_side}" == *".${DYBATPHO_BACKUP_EXTENSION}" ]] \
     && dybatpho::is file "${__dybatpho_backup_side}"; then
@@ -416,17 +783,7 @@ function __dybatpho_backup_root_into {
     dybatpho::create_temp dybatpho_backup_scratch "/" "backup-diff"
     dybatpho::archive_extract "${__dybatpho_backup_side}" "${dybatpho_backup_scratch}"
 
-    local -a entries=()
-    local entry
-    while IFS= read -r -d '' entry; do
-      entries+=("${entry}")
-    done < <(find "${dybatpho_backup_scratch}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
-
-    if ((${#entries[@]} == 1)) && [[ -d "${entries[0]}" && ! -L "${entries[0]}" ]]; then
-      __dybatpho_backup_root_ref="${entries[0]}"
-    else
-      __dybatpho_backup_root_ref="${dybatpho_backup_scratch}"
-    fi
+    __dybatpho_backup_entry_root_into __dybatpho_backup_root_ref "${dybatpho_backup_scratch}"
     return 0
   fi
 
@@ -446,10 +803,11 @@ function __dybatpho_backup_root_into {
 #######################################
 # @description Show what changed between two backups, or between a backup and
 #   the live data it was taken from.
-#   Each side is a backup archive or a live file or directory. A backup is
-#   checked against its sidecar before anything is read from it and extracted
-#   into a temporary directory that is removed when the shell exits; nothing
-#   in the destination or the source is written. The two sides are then
+#   Each side is a backup archive, an incremental snapshot, or a live file or
+#   directory. A backup is checked against its sidecar before anything is read
+#   from it, and an archive is extracted into a temporary directory that is
+#   removed when the shell exits; nothing in the destination or the source is
+#   written. The two sides are then
 #   compared with `dybatpho::diff_dir`, so the records, the summary and the
 #   exit code are the ones it prints: `+` for what the second side added, `-`
 #   for what it no longer has, `~` for a rewritten file, `!` for a change of

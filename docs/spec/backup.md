@@ -94,6 +94,25 @@ As an operator, I want to compare two backups, or a backup with the live data, s
 5. **Given** `--summary` or `--null`, **When** two sides are compared, **Then** the option reaches the tree comparison
 6. **Given** a backup that fails its checksum, has no sidecar, or holds an entry escaping the scratch directory, or a side that does not exist, **When** a comparison is asked for, **Then** it stops with exit code 2 without reading the backup
 
+---
+
+### User Story 6 - Keep many snapshots for the price of one (Priority: P2)
+
+As an operator, I want nightly snapshots that store only what changed since the last one, so that a long history of a large tree fits on the disk and each snapshot can still be read, compared and restored on its own.
+
+**Independent Test**: Take two incremental snapshots of a tree with one file changed in between, with and without `rsync`, and verify the unchanged files are hard links to the earlier snapshot while each snapshot verifies, compares, restores and prunes independently.
+
+**Acceptance Scenarios**:
+
+1. **Given** `--incremental`, **When** a backup is taken, **Then** a `<name>-<UTC timestamp>.snapshot` directory holding a copy of the source is written atomically, with a sidecar beside it
+2. **Given** an earlier snapshot of the same name, **When** another is taken, **Then** every file whose content and mode are unchanged is a hard link to the earlier copy, and every other file is a new copy
+3. **Given** `rsync` is not installed, **When** a snapshot is taken, **Then** the source is walked in Bash with the same result, keeping links, file modes and directory modes and skipping special files
+4. **Given** a snapshot, **When** a file inside it is added, removed or changed, **Then** verification reports it
+5. **Given** a directory holding archives and snapshots, **When** it is listed, **Then** both appear together, newest first
+6. **Given** a snapshot, **When** it is restored, **Then** its entry is copied into the target as plain files, after confirming an overwrite unless forced, and `DRY_RUN` reports the copy
+7. **Given** two snapshots sharing files, **When** one is pruned, **Then** the other still verifies and holds every file
+8. **Given** a file that cannot be read, **When** a snapshot is taken, **Then** the script stops and nothing is left in the destination
+
 ### Example Workflow
 
 ```bash
@@ -107,6 +126,9 @@ dybatpho::backup_prune --keep-count 7 --name nginx --force /var/backups
 
 # What a restore would undo, before running it.
 dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx || true
+
+# A nightly history of a large tree, each night costing only what changed.
+dybatpho::backup_create --incremental /srv/www /var/backups www
 
 # Roll back to the last good snapshot.
 dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)" /etc
@@ -124,6 +146,11 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - A comparison side is a backup, a live directory, a live file, or a path that does not exist.
 - A backup to compare fails its checksum, has no sidecar, or holds an entry that escapes.
 - A live copy of the source sits under a different name from the one the backup recorded.
+- An incremental snapshot is taken with or without `rsync`, of a directory or of a single file, with no earlier snapshot, or twice in one second.
+- A source holds a symbolic link, a FIFO, a read-only directory, or a file that cannot be read.
+- A file's content is unchanged but its mode is not.
+- A snapshot is tampered with after it was taken, or holds more than one entry.
+- A file with the snapshot suffix, or a link to a snapshot, sits among the backups.
 
 ## Requirements *(mandatory)*
 
@@ -153,11 +180,20 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-022**: A comparison MUST extract into a temporary directory removed on exit and MUST NOT write to the destination or the source.
 - **FR-023**: A directory backup MUST be compared from inside the entry it recorded, so the source's own name is not a difference; a single-file backup and a live file MUST line up by file name.
 - **FR-024**: A comparison MUST report through `dybatpho::diff_dir`, passing `--summary` and `--null` through and returning its exit code.
+- **FR-025**: `--incremental` MUST write a directory named `<name>-<UTC timestamp>.snapshot` under a hidden temporary name and rename it into place, MUST take a distinct name when one is taken, and MUST stop the script leaving nothing behind when the copy fails.
+- **FR-026**: A snapshot MUST hard-link each regular file whose content and mode match the newest earlier snapshot of the same name, MUST copy every other file with its mode and times, MUST recreate symbolic links, MUST give directories the source's mode, and MUST skip special files.
+- **FR-027**: A snapshot MUST use `rsync --link-dest` when it is installed and MUST produce the same tree without it.
+- **FR-028**: A snapshot's sidecar MUST record a checksum over every entry's path, kind, and content checksum or link target, and verification MUST recompute it.
+- **FR-029**: Listing, resolving the latest backup, and pruning MUST treat archives and snapshot directories alike, in the order they were taken, and MUST NOT count a file or a link that carries the snapshot suffix.
+- **FR-030**: Restoring a snapshot MUST verify it, MUST copy its one entry into the target as plain files, MUST confirm an overwrite unless forced, MUST honor `DRY_RUN`, and MUST stop when the snapshot does not hold exactly one entry.
+- **FR-031**: Pruning a snapshot MUST remove its directory and sidecar without affecting a file another snapshot links.
+- **FR-032**: A comparison MUST accept a snapshot on either side, verified before it is read.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Backup**: A timestamped archive of one source, in a destination directory.
 - **Sidecar**: The checksum file written beside a backup, named after its algorithm.
+- **Snapshot**: A timestamped directory copy of one source whose unchanged files are hard links shared with earlier snapshots.
 - **Retention Policy**: `--keep-count`, `--keep-days`, or both, deciding which backups survive.
 
 ## Success Criteria *(mandatory)*
@@ -168,6 +204,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **SC-002**: An interrupted backup run never leaves a file that a later restore would trust.
 - **SC-003**: A corrupted archive is caught before it overwrites anything.
 - **SC-004**: A retention policy can be reviewed with `DRY_RUN` before it runs unattended.
+- **SC-005**: A history of snapshots of a tree costs the disk one copy plus what changed between them.
 
 ## Integration Tests *(mandatory)*
 
@@ -195,6 +232,20 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-022**: Pass `--null` through to the tree comparison.
 - **IT-023**: Stop with exit code 2 for a backup that fails its checksum, one without a sidecar, and a missing side.
 - **IT-024**: Stop with exit code 2 for a backup holding an entry that escapes.
+- **IT-025**: Write a snapshot directory and its sidecar, leaving nothing half-written.
+- **IT-026**: Hard-link unchanged files and copy changed ones, with `rsync`.
+- **IT-027**: Do the same without `rsync`, keeping links, skipping a FIFO, filling a read-only directory, and copying a file whose mode changed.
+- **IT-028**: Keep a read-only directory's mode without `rsync`.
+- **IT-029**: Snapshot a single file and link it the next time.
+- **IT-030**: Stop and leave nothing behind when a file cannot be read.
+- **IT-031**: Verify a snapshot's tree, and report a file added, a file changed, and a missing sidecar.
+- **IT-032**: List archives and snapshots together, ignoring a file and a link with the suffix, and resolve the latest.
+- **IT-033**: Restore a snapshot as plain files, refuse an unconfirmed overwrite, and overwrite when forced.
+- **IT-034**: Restore a single-file snapshot, and report it under `DRY_RUN`.
+- **IT-035**: Refuse a tampered snapshot, and one holding more than one entry.
+- **IT-036**: Prune a snapshot while the one sharing its files still verifies.
+- **IT-037**: Compare snapshots with each other, with the live source and with an archive, and refuse a tampered one or one without a sidecar.
+- **IT-038**: Take two snapshots in the same second under distinct names.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -202,3 +253,4 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 2. Every deletion goes through the guarded removal helper, so confirmation and `DRY_RUN` behave as they do everywhere else in the library.
 3. Integrity is checked with a checksum sidecar rather than a test extraction, which would double the disk and time a large backup costs; the atomic rename is what rules out the half-written file the test extraction would be looking for.
 4. A comparison never extracts a backup it has not verified, and never extracts outside a scratch directory of its own.
+5. A snapshot is a plain directory tree, readable without this library; the hard links are what make it cheap, and nothing but the sidecar is needed to trust it.

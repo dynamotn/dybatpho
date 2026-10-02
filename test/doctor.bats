@@ -78,6 +78,16 @@ fake_versioned_command() {
   assert_output ""
 }
 
+@test "dybatpho::doctor_requirements lists what the backup module needs" {
+  # Archives go through `archive`, which declares its own tools; `rsync` only
+  # speeds up incremental snapshots, which work without it.
+  run_traced -0 dybatpho::doctor_requirements backup optional
+  assert_output "rsync"
+
+  run_traced -0 dybatpho::doctor_requirements backup required
+  assert_output ""
+}
+
 @test "dybatpho::doctor_requirements lists what the privilege module needs" {
   # Neither is required: a script already running as root escalates nothing,
   # so an absent `sudo` is a missing capability rather than a broken module.

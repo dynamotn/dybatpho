@@ -307,6 +307,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::backup_diff --summary "${older}" "${newer}"   # +1 -0 ~2
   ```
 
+- **`backup` — incremental snapshots that share unchanged files.**
+  `dybatpho::backup_create --incremental` writes a `<name>-<timestamp>.snapshot`
+  directory instead of an archive: a plain copy of the source in which every
+  file unchanged since the previous snapshot of the same name is a hard link
+  to it, so a nightly history of a large tree costs one copy plus what
+  changed. It uses `rsync --link-dest` when installed and walks the source in
+  Bash otherwise, with the same result. `dybatpho::backup_list`,
+  `dybatpho::backup_latest`, `dybatpho::backup_verify`,
+  `dybatpho::backup_restore`, `dybatpho::backup_diff` and
+  `dybatpho::backup_prune` take snapshots as they take archives: the sidecar
+  fingerprints the whole tree, a restore copies plain files back, and pruning
+  one snapshot never breaks another that shares its files. Special files are
+  skipped, and a snapshot is meant to be read and restored, never edited in
+  place, since its files are shared.
+
+  ```sh
+  dybatpho::backup_create --incremental /srv/www /var/backups www
+  dybatpho::backup_prune --keep-count 30 --name www --force /var/backups
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

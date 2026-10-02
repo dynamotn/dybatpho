@@ -2,7 +2,8 @@
 # @file backup_ops.sh
 # @brief Example snapshotting a config directory and applying a retention policy
 # @description Demonstrates dybatpho::backup_create, backup_list, backup_latest,
-#   backup_verify, backup_diff, backup_restore, and backup_prune
+#   backup_verify, backup_diff, backup_restore, and backup_prune, with archives
+#   and incremental snapshots
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules backup
@@ -115,6 +116,33 @@ function _demo_diff {
   rm -f "${after}" "${after}.sha256"
 }
 
+# @description Take two incremental snapshots and show what they share.
+# @arg $1 string Workspace path
+function _demo_incremental {
+  local workspace
+  dybatpho::expect_args workspace -- "$@"
+
+  dybatpho::header "INCREMENTAL"
+  local snapshots="${workspace}/snapshots" first second
+  first="$(dybatpho::backup_create --incremental "${workspace}/config" "${snapshots}" config)"
+  printf 'level = debug\n' > "${workspace}/config/logging.conf"
+  second="$(dybatpho::backup_create --incremental "${workspace}/config" "${snapshots}" config)"
+
+  # An unchanged file is the same file on disk in both snapshots; only the
+  # rewritten one was copied again.
+  local file
+  for file in server.conf logging.conf; do
+    if [[ "${first}/config/${file}" -ef "${second}/config/${file}" ]]; then
+      dybatpho::info "${file}: shared with the previous snapshot"
+    else
+      dybatpho::info "${file}: copied, it changed"
+    fi
+  done
+
+  dybatpho::backup_verify "${second}" && dybatpho::success "The snapshot matches its sidecar"
+  DYBATPHO_DIFF_COLOR=false dybatpho::backup_diff "${first}" "${second}" || true
+}
+
 # @description Restore the snapshot into a fresh directory.
 # @arg $1 string Workspace path
 # @arg $2 string Archive path
@@ -159,6 +187,7 @@ function _main {
   _demo_list "${workspace}"
   _demo_verify "${archive}"
   _demo_diff "${workspace}" "${archive}"
+  _demo_incremental "${workspace}"
   _demo_restore "${workspace}" "${archive}"
   _demo_prune "${workspace}"
   dybatpho::success "Backup operations demo complete"

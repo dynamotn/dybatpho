@@ -11,7 +11,9 @@ Utilities for measuring a script and exporting the result to Prometheus
 
 This module records how long a script spends in a command, how often it
 retried, and how many errors it hit, then renders the result in the
-Prometheus text exposition format.
+Prometheus text exposition format. Durations go into a histogram, with
+cumulative buckets, or into a summary, which exports exact quantiles such
+as the median and the 99th percentile.
 
 Metrics live in the current shell only. Nothing is sent anywhere: a script
 writes the rendered text to a file, and a collector such as the node
@@ -32,6 +34,7 @@ are counted without the script asking for it.
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_METRICS_BUCKETS_MS`** | string | Comma-separated histogram bucket bounds in milliseconds |
+| **`DYBATPHO_METRICS_QUANTILES`** | string | Comma-separated quantiles a summary exports, each from `0` to `1` |
 | **`DYBATPHO_METRICS_LAST_MS`** | number | Elapsed milliseconds published by the timing helpers |
 
 ### 🚀 Highlights
@@ -40,6 +43,7 @@ are counted without the script asking for it.
 - [`dybatpho::metrics_counter_inc`](#dybatphometrics_counter_inc) — Add to a counter, a value that only ever grows.
 - [`dybatpho::metrics_gauge_set`](#dybatphometrics_gauge_set) — Set a gauge, a value that can go up and down.
 - [`dybatpho::metrics_observe_ms`](#dybatphometrics_observe_ms) — Record one duration in a histogram. The value is taken in milliseconds because that is what Bash can measure with integer arithmetic, and exported in seconds because that is what Prometheus expects.
+- [`dybatpho::metrics_summary_ms`](#dybatphometrics_summary_ms) — Record one duration in a summary, which exports quantiles. A histogram only says how many observations fell under each bucket bound, and a dashboard estimates percentiles from that. A summary keeps every observation for the life of the shell and exports the exact quantiles listed in `DYBATPHO_METRICS_QUANTILES`, interpolated the way `dybatpho::math_percentile` does, together with `_sum` and `_count`. That suits a script, which records tens or hundreds of durations and exits; a long-running loop that records without end should use a histogram.
 - [`dybatpho::metrics_timer_start`](#dybatphometrics_timer_start) — Start a named timer.
 - [`dybatpho::metrics_timer_stop`](#dybatphometrics_timer_stop) — Stop a timer, record its duration, and print the elapsed milliseconds.
 - [`dybatpho::metrics_time`](#dybatphometrics_time) — Run a command, record how long it took, and pass its exit code on. The duration is recorded whether the command succeeded or not, and a failure also increments a failure counter named after the metric, so that a dashboard can show latency and error rate from the same run: `deploy_duration_seconds` pairs with `deploy_failures_total`.
@@ -55,6 +59,10 @@ are counted without the script asking for it.
 
 <a id="tips"></a>
 ## 💡 Tips
+
+### `dybatpho::metrics_summary_ms`
+
+- `dybatpho::metrics_get sum` and `dybatpho::metrics_get count` read a summary's totals back in milliseconds, as they do for a histogram
 
 ### `dybatpho::metrics_timer_stop`
 
@@ -173,6 +181,47 @@ dybatpho::metrics_observe_ms http_request_duration_seconds 143 host=example.com
 **🚦 Exit codes**
 
 - `1`: The name, a label, or the duration is not valid
+
+
+---
+
+### `dybatpho::metrics_summary_ms`
+
+Record one duration in a summary, which exports quantiles.
+A histogram only says how many observations fell under each bucket bound,
+and a dashboard estimates percentiles from that. A summary keeps every
+observation for the life of the shell and exports the exact quantiles listed
+in `DYBATPHO_METRICS_QUANTILES`, interpolated the way
+`dybatpho::math_percentile` does, together with `_sum` and `_count`. That
+suits a script, which records tens or hundreds of durations and exits; a
+long-running loop that records without end should use a histogram.
+
+**🧪 Example**
+
+```bash
+dybatpho::metrics_summary_ms step_duration_seconds 143 step=fetch
+dybatpho::metrics_render
+# step_duration_seconds{step="fetch",quantile="0.5"} 0.143
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Metric name, conventionally ending in `_seconds` |
+| `$2` | number | Observed duration in whole milliseconds |
+| `$@` | string | Label assignments |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_METRICS_QUANTILES`** | string | Quantiles to export, each from `0` to `1` |
+
+**🚦 Exit codes**
+
+- `1`: The name, a label, the duration or a quantile is not valid, or the metric is already a histogram
 
 
 ---

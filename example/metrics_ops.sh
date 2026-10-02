@@ -2,7 +2,8 @@
 # @file metrics_ops.sh
 # @brief Example showing timing, counters and Prometheus export
 # @description Demonstrates dybatpho::metrics_time, metrics_timer_start/stop,
-#   metrics_counter_inc, metrics_gauge_set, metrics_observe_ms, metrics_get,
+#   metrics_counter_inc, metrics_gauge_set, metrics_observe_ms,
+#   metrics_summary_ms, metrics_get,
 #   metrics_render, metrics_write, and the retry/HTTP/error instrumentation that
 #   loading this module turns on
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -53,6 +54,25 @@ function _demo_counters {
   dybatpho::info "Checksums : ${metrics_get}"
 }
 
+# @description Run the `PERCENTILES OF A STEP` section of this example.
+# @noargs
+function _demo_summary {
+  dybatpho::header "PERCENTILES OF A STEP"
+
+  # A summary keeps every observation and exports exact quantiles, which suits
+  # a script that repeats a step a few dozen times and then exits.
+  dybatpho::metrics_help fetch_duration_seconds "Time to fetch one page"
+  local milliseconds
+  for milliseconds in 120 95 310 101 88 97 1250 104; do
+    dybatpho::metrics_summary_ms fetch_duration_seconds "${milliseconds}" site=docs
+  done
+  # shellcheck disable=SC2154 # declared by `src/metrics.sh`
+  dybatpho::info "Quantiles exported: ${DYBATPHO_METRICS_QUANTILES}"
+  local fetches
+  fetches="$(dybatpho::metrics_get count fetch_duration_seconds site=docs)"
+  dybatpho::info "Fetches recorded  : ${fetches}"
+}
+
 # @description Run the `AUTOMATIC INSTRUMENTATION` section of this example.
 # @noargs
 function _demo_automatic {
@@ -95,6 +115,7 @@ function _demo_export {
 function _main {
   _demo_timing
   _demo_counters
+  _demo_summary
   _demo_automatic
   _demo_export
   dybatpho::success "Metrics demo complete"

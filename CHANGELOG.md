@@ -376,6 +376,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::math_sqrt 2 5                          # 1.41421
   ```
 
+- **`metrics` — summaries with exact quantiles.**
+  `dybatpho::metrics_summary_ms` records a duration in a Prometheus summary:
+  every observation is kept for the life of the shell, and
+  `dybatpho::metrics_render` exports the quantiles listed in
+  `DYBATPHO_METRICS_QUANTILES` — `0.5,0.9,0.99` by default — each interpolated
+  exactly between the nearest ranks, in seconds, followed by `_sum` and
+  `_count`. Where a histogram leaves the dashboard to estimate the 99th
+  percentile from buckets, a summary states it. `dybatpho::metrics_get sum` and
+  `count` read a summary's totals back, and one metric name cannot be recorded
+  as both a histogram and a summary. Loading `metrics` now loads `math` too.
+
+  ```sh
+  dybatpho::metrics_summary_ms fetch_duration_seconds 143 site=docs
+  # fetch_duration_seconds{site="docs",quantile="0.99"} 0.143
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

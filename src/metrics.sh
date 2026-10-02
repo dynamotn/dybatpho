@@ -12,7 +12,9 @@
 # @description
 #   This module records how long a script spends in a command, how often it
 #   retried, and how many errors it hit, then renders the result in the
-#   Prometheus text exposition format.
+#   Prometheus text exposition format. Durations go into a histogram, with
+#   cumulative buckets, or into a summary, which exports exact quantiles such
+#   as the median and the 99th percentile.
 #
 #   Metrics live in the current shell only. Nothing is sent anywhere: a script
 #   writes the rendered text to a file, and a collector such as the node
@@ -33,6 +35,8 @@
 
 # @env DYBATPHO_METRICS_BUCKETS_MS string Comma-separated histogram bucket bounds in milliseconds
 DYBATPHO_METRICS_BUCKETS_MS="${DYBATPHO_METRICS_BUCKETS_MS:-5,10,25,50,100,250,500,1000,2500,5000,10000}"
+# @env DYBATPHO_METRICS_QUANTILES string Comma-separated quantiles a summary exports, each from `0` to `1`
+DYBATPHO_METRICS_QUANTILES="${DYBATPHO_METRICS_QUANTILES:-0.5,0.9,0.99}"
 # @env DYBATPHO_METRICS_LAST_MS number Elapsed milliseconds published by the timing helpers
 DYBATPHO_METRICS_LAST_MS="${DYBATPHO_METRICS_LAST_MS:-0}"
 
@@ -43,6 +47,9 @@ declare -gA __dybatpho_metrics_gauge=()
 declare -gA __dybatpho_metrics_sum=()
 declare -gA __dybatpho_metrics_count=()
 declare -gA __dybatpho_metrics_bucket=()
+# Every observation of a summary, space-separated, because a quantile is
+# computed from the whole list rather than from running totals.
+declare -gA __dybatpho_metrics_samples=()
 declare -gA __dybatpho_metrics_help=()
 declare -gA __dybatpho_metrics_type=()
 declare -gA __dybatpho_metrics_timer=()
@@ -245,6 +252,8 @@ function dybatpho::metrics_observe_ms {
   [[ "${milliseconds}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Duration must be a non-negative integer of milliseconds, got '${milliseconds}'"
   __dybatpho_metrics_key key "${name}" "$@"
+  [[ "${__dybatpho_metrics_type[${name}]-}" != summary ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Metric '${name}' is already recorded as a summary"
   __dybatpho_metrics_declare "${name}" histogram
 
   __dybatpho_metrics_sum["${key}"]=$((${__dybatpho_metrics_sum[${key}]-0} + milliseconds))
@@ -264,6 +273,69 @@ function dybatpho::metrics_observe_ms {
       __dybatpho_metrics_bucket["${bucket_key}"]=$((${__dybatpho_metrics_bucket["${bucket_key}"]-0}))
     fi
   done
+}
+
+#######################################
+# @description Fail unless every quantile in `DYBATPHO_METRICS_QUANTILES` is a
+#   number from `0` to `1`.
+# @noargs
+# @env DYBATPHO_METRICS_QUANTILES string Quantiles to validate
+# @exitcode 1 A quantile is missing, not a number, or outside `0`–`1`
+# @internal
+#######################################
+function __dybatpho_metrics_validate_quantiles {
+  local quantile below above
+  local -a quantiles=()
+  IFS=, read -r -a quantiles <<< "${DYBATPHO_METRICS_QUANTILES}"
+  ((${#quantiles[@]})) \
+    || dybatpho::die "${FUNCNAME[1]}: DYBATPHO_METRICS_QUANTILES must list at least one quantile"
+  for quantile in "${quantiles[@]}"; do
+    dybatpho::math_is_number "${quantile}" \
+      || dybatpho::die "${FUNCNAME[1]}: Quantile must be a number from 0 to 1, got '${quantile}'"
+    below="$(dybatpho::math_compare "${quantile}" 0)"
+    above="$(dybatpho::math_compare "${quantile}" 1)"
+    ((below >= 0 && above <= 0)) \
+      || dybatpho::die "${FUNCNAME[1]}: Quantile must be a number from 0 to 1, got '${quantile}'"
+  done
+}
+
+#######################################
+# @description Record one duration in a summary, which exports quantiles.
+#   A histogram only says how many observations fell under each bucket bound,
+#   and a dashboard estimates percentiles from that. A summary keeps every
+#   observation for the life of the shell and exports the exact quantiles listed
+#   in `DYBATPHO_METRICS_QUANTILES`, interpolated the way
+#   `dybatpho::math_percentile` does, together with `_sum` and `_count`. That
+#   suits a script, which records tens or hundreds of durations and exits; a
+#   long-running loop that records without end should use a histogram.
+# @example
+#   dybatpho::metrics_summary_ms step_duration_seconds 143 step=fetch
+#   dybatpho::metrics_render
+#   # step_duration_seconds{step="fetch",quantile="0.5"} 0.143
+#
+# @arg $1 string Metric name, conventionally ending in `_seconds`
+# @arg $2 number Observed duration in whole milliseconds
+# @arg $@ string Label assignments
+# @env DYBATPHO_METRICS_QUANTILES string Quantiles to export, each from `0` to `1`
+# @exitcode 1 The name, a label, the duration or a quantile is not valid, or the metric is already a histogram
+# @tip `dybatpho::metrics_get sum` and `dybatpho::metrics_get count` read a
+#   summary's totals back in milliseconds, as they do for a histogram
+#######################################
+function dybatpho::metrics_summary_ms {
+  local name milliseconds key
+  dybatpho::expect_args name milliseconds -- "$@"
+  shift 2
+  [[ "${milliseconds}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Duration must be a non-negative integer of milliseconds, got '${milliseconds}'"
+  __dybatpho_metrics_validate_quantiles
+  __dybatpho_metrics_key key "${name}" "$@"
+  [[ "${__dybatpho_metrics_type[${name}]-summary}" == summary ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Metric '${name}' is already recorded as a ${__dybatpho_metrics_type[${name}]}"
+  __dybatpho_metrics_declare "${name}" summary
+  __dybatpho_metrics_sum["${key}"]=$((${__dybatpho_metrics_sum[${key}]-0} + milliseconds))
+  __dybatpho_metrics_count["${key}"]=$((${__dybatpho_metrics_count[${key}]-0} + 1))
+  local samples="${__dybatpho_metrics_samples[${key}]-}"
+  __dybatpho_metrics_samples["${key}"]="${samples:+${samples} }${milliseconds}"
 }
 
 #######################################
@@ -387,6 +459,7 @@ function dybatpho::metrics_reset {
   __dybatpho_metrics_sum=()
   __dybatpho_metrics_count=()
   __dybatpho_metrics_bucket=()
+  __dybatpho_metrics_samples=()
   __dybatpho_metrics_help=()
   __dybatpho_metrics_type=()
   __dybatpho_metrics_timer=()
@@ -495,6 +568,35 @@ function dybatpho::metrics_render {
           local metrics_series
           metrics_series=$(__dybatpho_metrics_series "${key}" "_count")
           printf '%s %s\n' "${metrics_series}" "${total}"
+        done
+        ;;
+      summary)
+        local listed
+        listed="$(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_count)"
+        keys=()
+        if [[ -n "${listed}" ]]; then
+          readarray -t keys <<< "${listed}"
+        fi
+        __dybatpho_metrics_validate_quantiles
+        local -a quantiles=() samples=()
+        local quantile percentile value series
+        IFS=, read -r -a quantiles <<< "${DYBATPHO_METRICS_QUANTILES}"
+        for key in ${keys[@]+"${keys[@]}"}; do
+          read -r -a samples <<< "${__dybatpho_metrics_samples[${key}]}"
+          for quantile in "${quantiles[@]}"; do
+            percentile="$(dybatpho::math_mul "${quantile}" 100)"
+            value="$(dybatpho::math_percentile "${percentile}" "${samples[@]}")"
+            # Milliseconds to seconds is a shift of the decimal point, so the
+            # exported quantile is as exact as the interpolation.
+            value="$(dybatpho::math_mul "${value}" 0.001)"
+            series="$(__dybatpho_metrics_series "${key}" "" "quantile=\"${quantile}\"")"
+            printf '%s %s\n' "${series}" "${value}"
+          done
+          value="$(__dybatpho_metrics_seconds "${__dybatpho_metrics_sum[${key}]}")"
+          series="$(__dybatpho_metrics_series "${key}" "_sum")"
+          printf '%s %s\n' "${series}" "${value}"
+          series="$(__dybatpho_metrics_series "${key}" "_count")"
+          printf '%s %s\n' "${series}" "${__dybatpho_metrics_count[${key}]}"
         done
         ;;
       *) ;;

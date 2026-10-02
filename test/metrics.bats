@@ -86,6 +86,79 @@ setup() {
   assert_line --partial 'd_seconds_sum{host="b"} 0.020'
 }
 
+@test "dybatpho::metrics_summary_ms exports exact quantiles, sum and count" {
+  local ms
+  for ms in 300 100 1000 200 400; do
+    dybatpho::metrics_summary_ms step_duration_seconds "${ms}" step=fetch
+  done
+  run_traced dybatpho::metrics_render
+  assert_line --index 0 "# HELP step_duration_seconds step_duration_seconds"
+  assert_line --index 1 "# TYPE step_duration_seconds summary"
+  assert_line --index 2 'step_duration_seconds{step="fetch",quantile="0.5"} 0.3'
+  assert_line --index 3 'step_duration_seconds{step="fetch",quantile="0.9"} 0.76'
+  assert_line --index 4 'step_duration_seconds{step="fetch",quantile="0.99"} 0.976'
+  assert_line --index 5 'step_duration_seconds_sum{step="fetch"} 2.000'
+  assert_line --index 6 'step_duration_seconds_count{step="fetch"} 5'
+  assert_equal "$(dybatpho::metrics_get count step_duration_seconds step=fetch)" "5"
+  assert_equal "$(dybatpho::metrics_get sum step_duration_seconds step=fetch)" "2000"
+}
+
+@test "dybatpho::metrics_summary_ms keeps label sets apart and handles one sample" {
+  dybatpho::metrics_summary_ms d_seconds 10 host=a
+  dybatpho::metrics_summary_ms d_seconds 30 host=a
+  dybatpho::metrics_summary_ms d_seconds 7 host=b
+  run_traced dybatpho::metrics_render
+  assert_line 'd_seconds{host="a",quantile="0.5"} 0.02'
+  assert_line 'd_seconds{host="b",quantile="0.99"} 0.007'
+  assert_line 'd_seconds_count{host="b"} 1'
+}
+
+@test "dybatpho::metrics_summary_ms exports an unlabelled series and custom quantiles" {
+  DYBATPHO_METRICS_QUANTILES="0,1"
+  dybatpho::metrics_summary_ms d_seconds 0
+  dybatpho::metrics_summary_ms d_seconds 1500
+  run_traced dybatpho::metrics_render
+  assert_line 'd_seconds{quantile="0"} 0'
+  assert_line 'd_seconds{quantile="1"} 1.5'
+  assert_line 'd_seconds_sum 1.500'
+  refute_line --partial 'quantile="0.5"'
+}
+
+@test "dybatpho::metrics_summary_ms rejects a bad duration, quantile or label" {
+  run ! dybatpho::metrics_summary_ms d_seconds 1.5
+  run ! dybatpho::metrics_summary_ms d_seconds -1
+  run ! dybatpho::metrics_summary_ms d_seconds 5 'not-a-pair'
+  DYBATPHO_METRICS_QUANTILES="0.5,1.5" run dybatpho::metrics_summary_ms d_seconds 5
+  assert_failure
+  assert_output --partial "Quantile must be a number from 0 to 1, got '1.5'"
+  DYBATPHO_METRICS_QUANTILES="median" run dybatpho::metrics_summary_ms d_seconds 5
+  assert_failure
+  assert_output --partial "got 'median'"
+  DYBATPHO_METRICS_QUANTILES="" run dybatpho::metrics_summary_ms d_seconds 5
+  assert_failure
+  assert_output --partial "must list at least one quantile"
+  assert_equal "$(dybatpho::metrics_get count d_seconds)" "0"
+}
+
+@test "a metric cannot be both a histogram and a summary" {
+  dybatpho::metrics_observe_ms h_seconds 5
+  run dybatpho::metrics_summary_ms h_seconds 5
+  assert_failure
+  assert_output --partial "Metric 'h_seconds' is already recorded as a histogram"
+  dybatpho::metrics_summary_ms s_seconds 5
+  run dybatpho::metrics_observe_ms s_seconds 5
+  assert_failure
+  assert_output --partial "Metric 's_seconds' is already recorded as a summary"
+}
+
+@test "dybatpho::metrics_reset forgets the samples of a summary" {
+  dybatpho::metrics_summary_ms d_seconds 900
+  dybatpho::metrics_reset
+  dybatpho::metrics_summary_ms d_seconds 100
+  run_traced dybatpho::metrics_render
+  assert_line 'd_seconds{quantile="0.99"} 0.1'
+}
+
 @test "dybatpho::metrics_timer_stop records the duration and publishes it" {
   dybatpho::metrics_timer_start work_duration_seconds
   sleep 0.05
@@ -263,11 +336,18 @@ SCRIPT
 }
 
 @test "dybatpho::metrics_render prints the header of a type it cannot expand" {
-  # A type outside the three the renderer expands still gets its HELP and TYPE
+  # A type outside the four the renderer expands still gets its HELP and TYPE
   # lines and no series, so the exposition stays parseable rather than losing
   # the metric. Only the recorder reaches this, so it is declared directly.
+  __dybatpho_metrics_declare untyped_metric untyped
+  run_traced -0 dybatpho::metrics_render
+  assert_output "# HELP untyped_metric untyped_metric
+# TYPE untyped_metric untyped"
+}
+
+@test "dybatpho::metrics_render prints only the header of a summary with no sample" {
   __dybatpho_metrics_declare summary_metric summary
-  run -0 dybatpho::metrics_render
-  assert_line "# HELP summary_metric summary_metric"
-  assert_line "# TYPE summary_metric summary"
+  run_traced -0 dybatpho::metrics_render
+  assert_output "# HELP summary_metric summary_metric
+# TYPE summary_metric summary"
 }

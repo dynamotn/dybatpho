@@ -137,6 +137,11 @@ loaded_line() {
   run_traced -0 init_sh "--modules tui" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety tui "
 
+  # A summary's quantiles come from `math`, and a missing edge would only fail
+  # at render time, long after the observations were recorded.
+  run_traced -0 init_sh "--modules metrics" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret math metrics "
+
   # `screen` calls nothing outside the core modules, so it must load on its own
   # rather than dragging the interactive helpers in behind it.
   run_traced -0 init_sh "--modules screen" "$(loaded_line)"

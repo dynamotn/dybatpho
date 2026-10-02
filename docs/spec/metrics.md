@@ -85,6 +85,22 @@ As an operator, I want the recorded metrics in a file my collector already reads
 
 ---
 
+### User Story 5 - Report percentiles of a step's duration (Priority: P2)
+
+As an operator, I want a script to export the median and the tail latency of a step it repeats, so that a dashboard shows exact quantiles without estimating them from buckets.
+
+**Why this priority**: A histogram answers "how many were under 100ms"; the question a run report is read for is usually "what was the 99th percentile", and a script records few enough durations to keep them all.
+
+**Independent Test**: Record several durations in a summary, render, and verify the quantile series, `_sum`, `_count`, the configured quantile list, and the refusals.
+
+**Acceptance Scenarios**:
+
+1. **Given** durations recorded in a summary, **When** the metrics are rendered, **Then** a `summary` type line is followed by one series per quantile in `DYBATPHO_METRICS_QUANTILES`, carrying a `quantile` label and the exact value in seconds, then `_sum` and `_count`
+2. **Given** a custom `DYBATPHO_METRICS_QUANTILES`, **When** a duration is recorded, **Then** the listed quantiles are validated as numbers from `0` to `1` and exported instead of the default `0.5,0.9,0.99`
+3. **Given** a metric already recorded as a histogram, **When** a summary observation uses the same name, **Then** it is refused, and the reverse is refused too
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -105,6 +121,9 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - A metric described but never given a sample.
 - Nothing recorded at all, so there is nothing to export.
 - An ERR trap installed by `dybatpho::register_common_handlers` while rendering.
+- A summary with a single observation, where every quantile is that value.
+- A quantile list that is empty, not numeric, or outside `0`–`1`.
+- One metric name used for both a histogram and a summary.
 
 ## Requirements *(mandatory)*
 
@@ -126,6 +145,10 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-014**: The instrumented modules MUST behave exactly as before when the module is not loaded, and MUST NOT depend on it.
 - **FR-014a**: The instrumentation hooks MUST decide whether to record by testing for an internal helper of this module, never for one of its exported public functions. A child shell inherits the public functions without the internal helpers they call, so a hook guarded on a public name would try to record where recording is impossible and abort the script.
 - **FR-015**: Rendering MUST succeed under `set -e` and an ERR trap.
+- **FR-016**: The module MUST record durations in a summary that keeps every observation and renders, per series, one `quantile`-labelled sample for each quantile in `DYBATPHO_METRICS_QUANTILES` (default `0.5,0.9,0.99`), followed by `_sum` and `_count`, under a `summary` type line.
+- **FR-017**: Summary quantiles MUST be interpolated linearly between the nearest ranks, as `dybatpho::math_percentile` does, and exported in seconds without rounding.
+- **FR-018**: The module MUST refuse a quantile list that is empty or holds a value that is not a number from `0` to `1`, and MUST refuse to record one metric name as both a histogram and a summary.
+- **FR-019**: Summary totals MUST be readable through the same `sum` and `count` kinds of `dybatpho::metrics_get` as a histogram's, in milliseconds.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -133,6 +156,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **Counter**: A value that only grows, such as a request or error count.
 - **Gauge**: A value that can move in either direction, such as a queue depth.
 - **Histogram**: A set of cumulative duration buckets with a sum and a count.
+- **Summary**: Every observed duration of a series, exported as exact quantiles with a sum and a count.
 - **Exposition**: The rendered text a Prometheus collector reads.
 
 ## Success Criteria *(mandatory)*
@@ -144,6 +168,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **SC-003**: The exported file is accepted by a Prometheus collector as valid exposition text.
 - **SC-004**: A collector never reads a partially written metrics file.
 - **SC-005**: A script that does not load the module is unaffected in behavior.
+- **SC-006**: A run report shows the exact median and tail latency of a repeated step from a single recording call per step.
 
 ## Integration Tests *(mandatory)*
 
@@ -161,6 +186,14 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-012**: Exhaust a retry, log errors, and issue a mocked HTTP request, and verify each was counted automatically.
 - **IT-013**: Render under `dybatpho::register_common_handlers` and verify no ERR trap fires.
 - **IT-014**: From a shell that has loaded the module, run a child script that loads only `logging`, and another that loads the core modules and retries, and verify both complete instead of failing on a missing internal helper; run a third child that loads the module itself and verify it still records.
+- **IT-015**: Record durations in a summary and verify the type line, the default quantiles, `_sum`, `_count`, and the totals read back through `dybatpho::metrics_get`.
+- **IT-016**: Record summaries under different label sets and with a single observation, and verify each series' quantiles.
+- **IT-017**: Configure a custom quantile list, including `0` and `1`, on an unlabelled series, and verify only those quantiles are exported.
+- **IT-018**: Reject a non-integer duration, a malformed label, and an empty, non-numeric or out-of-range quantile list, and verify nothing is recorded.
+- **IT-019**: Verify a histogram name cannot take a summary observation and a summary name cannot take a histogram observation.
+- **IT-020**: Reset the metrics and verify a summary's earlier observations no longer affect its quantiles.
+- **IT-021**: Load the module on its own and verify `math` is loaded ahead of it.
+- **IT-022**: Render a summary that has been declared but has no sample, and a type the renderer does not expand, and verify each prints its `# HELP` and `# TYPE` lines and no series.
 
 ## Acceptance Criteria *(mandatory)*
 

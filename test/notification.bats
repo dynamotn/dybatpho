@@ -575,3 +575,70 @@ stub_curl_with_config() {
   run_traced -4 dybatpho::notify_ntfy "refused"
   unstub curl
 }
+
+# ---------------------------------------------------------------------------
+# dybatpho::notify_gotify
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::notify_gotify no arg" {
+  run dybatpho::notify_gotify
+  assert_failure
+}
+
+@test "dybatpho::notify_gotify missing env" {
+  unset DYBATPHO_GOTIFY_URL DYBATPHO_GOTIFY_TOKEN
+  run --separate-stderr dybatpho::notify_gotify "hello"
+  assert_failure
+  assert_stderr --partial "DYBATPHO_GOTIFY_URL"
+}
+
+@test "dybatpho::notify_gotify posts the message to /message with the key out of band" {
+  local args_file="${BATS_TEST_TMPDIR}/gotify-args"
+  local config_file="${BATS_TEST_TMPDIR}/gotify-config"
+  export DYBATPHO_GOTIFY_URL="https://gotify.example.test/"
+  export DYBATPHO_GOTIFY_TOKEN="AppTokenNotInArgv"
+  stub_curl_with_config "${args_file}" "${config_file}"
+  run_traced dybatpho::notify_gotify "Backup finished"
+  unstub curl
+  assert_success
+  grep -- '--request POST' "${args_file}"
+  grep -- '--data {"message":"Backup finished"}' "${args_file}"
+  grep -- ' https://gotify.example.test/message$' "${args_file}"
+  run_traced grep -- "AppTokenNotInArgv" "${args_file}"
+  assert_failure
+  grep -- "X-Gotify-Key: AppTokenNotInArgv" "${config_file}"
+}
+
+@test "dybatpho::notify_gotify adds an escaped title and a priority" {
+  local args_file="${BATS_TEST_TMPDIR}/gotify-full-args"
+  export DYBATPHO_GOTIFY_URL="http://gotify.local"
+  export DYBATPHO_GOTIFY_TOKEN="tok"
+  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  run_traced dybatpho::notify_gotify $'line1\nline2' 'Disk "full"' 10
+  unstub curl
+  assert_success
+  grep -- '--data {"message":"line1\\nline2","title":"Disk \\"full\\"","priority":10}' "${args_file}"
+}
+
+@test "dybatpho::notify_gotify rejects a priority outside 0-10" {
+  export DYBATPHO_GOTIFY_URL="https://gotify.example.test"
+  export DYBATPHO_GOTIFY_TOKEN="tok"
+  run -1 dybatpho::notify_gotify "hello" "" 11
+  assert_output --partial "priority must be a number from 0 to 10"
+}
+
+@test "dybatpho::notify_gotify rejects a server URL without a scheme" {
+  export DYBATPHO_GOTIFY_URL="gotify.example.test"
+  export DYBATPHO_GOTIFY_TOKEN="tok"
+  run -1 dybatpho::notify_gotify "hello"
+  assert_output --partial "server URL must start with http:// or https://"
+}
+
+@test "dybatpho::notify_gotify returns the HTTP client status" {
+  export DYBATPHO_GOTIFY_URL="https://gotify.example.test"
+  export DYBATPHO_GOTIFY_TOKEN="wrong"
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub curl ": printf '401'"
+  run_traced -4 dybatpho::notify_gotify "refused"
+  unstub curl
+}

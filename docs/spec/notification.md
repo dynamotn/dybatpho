@@ -111,6 +111,24 @@ priority mapping, and that a token travels outside the argument vector.
 4. **Given** an invalid topic, server URL or priority, **When** `notify_ntfy`
    runs, **Then** it fails before making a request
 
+### User Story 6 - Push to a self-hosted Gotify server (Priority: P2)
+
+As an operator who runs Gotify, I want to push a message with a title and a
+priority so that alerts stay on infrastructure I control.
+
+**Independent Test**: Stub `curl` and verify the endpoint, the JSON body, and
+that the application token is sent outside the argument vector.
+
+**Acceptance Scenarios**:
+
+1. **Given** `DYBATPHO_GOTIFY_URL`, `DYBATPHO_GOTIFY_TOKEN` and a message,
+   **When** `notify_gotify` runs, **Then** it posts `{"message":...}` to
+   `<server>/message` with the token in an `X-Gotify-Key` header
+2. **Given** a title and a priority, **When** `notify_gotify` runs, **Then** the
+   body carries both
+3. **Given** a priority outside `0`-`10` or a server URL without a scheme,
+   **When** `notify_gotify` runs, **Then** it fails before making a request
+
 ### Example Workflow
 
 ```bash
@@ -138,6 +156,7 @@ fi
 - No desktop backend is installed, or `notify-send` finds no desktop session.
 - An ntfy topic with characters ntfy refuses, a server URL with no scheme or a
   trailing slash, a priority outside 1-5, or tags with spaces and empty items.
+- A Gotify priority outside 0-10, or a Gotify server URL with a trailing slash.
 
 ## Requirements *(mandatory)*
 
@@ -183,6 +202,11 @@ fi
 - **FR-016**: `notify_ntfy` MUST send `DYBATPHO_NTFY_TOKEN`, when set, as a
   bearer header through the network module's out-of-band headers, never as a
   curl argument.
+- **FR-017**: `notify_gotify` MUST post a JSON body holding the message and the
+  optional title and priority to `<DYBATPHO_GOTIFY_URL>/message`, with
+  `DYBATPHO_GOTIFY_TOKEN` sent as an out-of-band `X-Gotify-Key` header.
+- **FR-018**: `notify_gotify` MUST reject a priority outside `0`-`10` and a
+  server URL that is not `http(s)` before making a request.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -221,6 +245,8 @@ fi
 - **IT-007**: Verify the `notify_ntfy` body, default and custom server URLs,
   every priority name, tag trimming, the out-of-band token, rejection of a bad
   topic, URL or priority, and HTTP status exit codes.
+- **IT-008**: Verify the `notify_gotify` endpoint, body, escaping, out-of-band
+  token, rejection of a bad priority or URL, and HTTP status exit codes.
 
 ## Acceptance Criteria *(mandatory)*
 

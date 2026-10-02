@@ -83,6 +83,18 @@ function _demo_ntfy {
   dybatpho::info "ntfy notifications dispatched"
 }
 
+# @description Run the `GOTIFY` section of this example.
+# @noargs
+function _demo_gotify {
+  dybatpho::header "GOTIFY"
+  export DYBATPHO_GOTIFY_URL="https://gotify.example.test"
+  export DYBATPHO_GOTIFY_TOKEN="AbCdEf123456"
+  # The token goes in a header outside the command line, so DRY_RUN does not
+  # print it either.
+  dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
+  dybatpho::info "Gotify notification dispatched"
+}
+
 # @description Run the `DESKTOP` section of this example.
 # @noargs
 function _demo_desktop {
@@ -107,6 +119,7 @@ function _main {
   _demo_discord
   _demo_webhook
   _demo_ntfy
+  _demo_gotify
   _demo_desktop
   dybatpho::success "Notification demo complete"
 }

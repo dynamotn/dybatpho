@@ -13,6 +13,7 @@
 #   - **Discord** – Incoming Webhook
 #   - **Generic** – Any webhook that accepts a raw JSON POST body
 #   - **ntfy** – Publish to a topic on ntfy.sh or a self-hosted server
+#   - **Gotify** – Push a message to a self-hosted Gotify server
 #   - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 #
 # @usage
@@ -56,6 +57,14 @@
 #   ```bash
 #   export DYBATPHO_NTFY_TOPIC="backups-7f3a"
 #   dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning"
+#   ```
+#
+#   #### Push to a Gotify server
+#
+#   ```bash
+#   export DYBATPHO_GOTIFY_URL="https://gotify.example.com"
+#   export DYBATPHO_GOTIFY_TOKEN="AbCdEf123456"
+#   dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 #   ```
 #
 #   #### Show a desktop notification
@@ -475,6 +484,65 @@ function dybatpho::notify_ntfy {
 
   dybatpho::debug "Sending ntfy notification"
   dybatpho::curl_json "${url}" /dev/null \
+    --request POST \
+    --data "${payload}"
+}
+
+#######################################
+# @description Push a message to a [Gotify](https://gotify.net) server.
+#   The application token is sent as the `X-Gotify-Key` header through the
+#   network module's out-of-band channel, so it never appears on curl's command
+#   line, where every user of the host could read it from the process list.
+# @example
+#   export DYBATPHO_GOTIFY_URL="https://gotify.example.com"
+#   export DYBATPHO_GOTIFY_TOKEN="AbCdEf123456"
+#   dybatpho::notify_gotify "Backup finished"
+#   dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
+#
+# @arg $1 string Message text
+# @arg $2 string Optional title; Gotify shows the application name without one
+# @arg $3 string Optional priority from `0` to `10`
+# @env DYBATPHO_GOTIFY_URL string Server URL, such as `https://gotify.example.com`
+# @env DYBATPHO_GOTIFY_TOKEN string Application token the message is posted as
+# @exitcode 0 Message pushed
+# @exitcode 1 Missing arguments or environment variables, or an invalid server URL or priority
+# @exitcode 4 HTTP 4xx from the server, such as an unknown token
+# @exitcode 5 HTTP 5xx from the server
+# @see dybatpho::curl_json
+#######################################
+function dybatpho::notify_gotify {
+  local message
+  dybatpho::expect_args message -- "$@"
+  local title="${2-}" priority="${3-}"
+  dybatpho::expect_envs DYBATPHO_GOTIFY_URL DYBATPHO_GOTIFY_TOKEN
+
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
+  local url="${DYBATPHO_GOTIFY_URL}"
+  # The `die` lines below are tested under `run`, which kcov cannot observe.
+  [[ "${url}" =~ ^https?://[^[:space:]]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: server URL must start with http:// or https://" # kcov(skip)
+  [[ -z "${priority}" || "${priority}" =~ ^([0-9]|10)$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: priority must be a number from 0 to 10" # kcov(skip)
+  while [[ "${url}" == */ ]]; do url="${url%/}"; done
+
+  local payload escaped
+  escaped=$(__dybatpho_notification_json_escape "${message}")
+  payload="{\"message\":\"${escaped}\""
+  if [[ -n "${title}" ]]; then
+    escaped=$(__dybatpho_notification_json_escape "${title}")
+    payload+=",\"title\":\"${escaped}\""
+  fi
+  [[ -n "${priority}" ]] && payload+=",\"priority\":${priority}"
+  payload+="}"
+
+  local -a headers=(${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"})
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
+  headers+=("X-Gotify-Key: ${DYBATPHO_GOTIFY_TOKEN}")
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("${headers[@]}")
+
+  dybatpho::debug "Sending Gotify notification"
+  dybatpho::curl_json "${url}/message" /dev/null \
     --request POST \
     --data "${payload}"
 }

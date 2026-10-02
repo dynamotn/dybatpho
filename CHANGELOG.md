@@ -433,6 +433,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent warning
   ```
 
+- **`notification` — Gotify.** `dybatpho::notify_gotify` pushes a message,
+  with an optional title and a priority from `0` to `10`, to the server in
+  `DYBATPHO_GOTIFY_URL` as the application whose token is in
+  `DYBATPHO_GOTIFY_TOKEN`. The token travels in the `X-Gotify-Key` header
+  outside curl's command line, so it cannot be read from the process list.
+
+  ```sh
+  dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

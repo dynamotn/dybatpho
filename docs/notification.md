@@ -19,6 +19,7 @@ notification platforms through their webhook or bot APIs:
 - **Discord** – Incoming Webhook
 - **Generic** – Any webhook that accepts a raw JSON POST body
 - **ntfy** – Publish to a topic on ntfy.sh or a self-hosted server
+- **Gotify** – Push a message to a self-hosted Gotify server
 - **Desktop** – `notify-send` on Linux and the BSDs, `osascript` on macOS
 
 ### 🚀 Highlights
@@ -31,6 +32,7 @@ notification platforms through their webhook or bot APIs:
 - [`dybatpho::notify_webhook`](#dybatphonotify_webhook) — Send a raw JSON payload to an arbitrary webhook URL via HTTP POST.
 - [`dybatpho::notify_desktop`](#dybatphonotify_desktop) — Show a notification on the local desktop. `notify-send` (libnotify, on Linux and the BSDs) is used when it is installed, and `osascript` (macOS) otherwise. The title and the body reach either one as separate arguments, never spliced into a command or a script, so quotes, a leading `-` or AppleScript syntax in them are shown as written. macOS has no urgency for a notification, so it is accepted there and has no effect.
 - [`dybatpho::notify_ntfy`](#dybatphonotify_ntfy) — Publish a message to an [ntfy](https://ntfy.sh) topic, on ntfy.sh or a server of your own. The message is published as JSON to the server root, so the title, the priority and the tags travel in the body and keep any character they hold. An access token is sent as a bearer header through the network module's out-of-band channel, so it never appears on curl's command line.
+- [`dybatpho::notify_gotify`](#dybatphonotify_gotify) — Push a message to a [Gotify](https://gotify.net) server. The application token is sent as the `X-Gotify-Key` header through the network module's out-of-band channel, so it never appears on curl's command line, where every user of the host could read it from the process list.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -75,6 +77,14 @@ dybatpho::notify_teams "All checks passed" "Deploy complete"
 ```bash
 export DYBATPHO_NTFY_TOPIC="backups-7f3a"
 dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning"
+```
+
+#### Push to a Gotify server
+
+```bash
+export DYBATPHO_GOTIFY_URL="https://gotify.example.com"
+export DYBATPHO_GOTIFY_TOKEN="AbCdEf123456"
+dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 ```
 
 #### Show a desktop notification
@@ -420,6 +430,52 @@ dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,flop
 - `0`: Message published
 - `1`: Missing arguments or environment variables, or an invalid topic, server URL or priority
 - `4`: HTTP 4xx from the server, such as a refused token
+- `5`: HTTP 5xx from the server
+
+**🔗 See also**
+
+- [dybatpho::curl_json](#dybatphocurl_json)
+
+
+---
+
+### `dybatpho::notify_gotify`
+
+Push a message to a [Gotify](https://gotify.net) server.
+The application token is sent as the `X-Gotify-Key` header through the
+network module's out-of-band channel, so it never appears on curl's command
+line, where every user of the host could read it from the process list.
+
+**🧪 Example**
+
+```bash
+export DYBATPHO_GOTIFY_URL="https://gotify.example.com"
+export DYBATPHO_GOTIFY_TOKEN="AbCdEf123456"
+dybatpho::notify_gotify "Backup finished"
+dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Message text |
+| `$2` | string | Optional title; Gotify shows the application name without one |
+| `$3` | string | Optional priority from `0` to `10` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_GOTIFY_URL`** | string | Server URL, such as `https://gotify.example.com` |
+| **`DYBATPHO_GOTIFY_TOKEN`** | string | Application token the message is posted as |
+
+**🚦 Exit codes**
+
+- `0`: Message pushed
+- `1`: Missing arguments or environment variables, or an invalid server URL or priority
+- `4`: HTTP 4xx from the server, such as an unknown token
 - `5`: HTTP 5xx from the server
 
 **🔗 See also**

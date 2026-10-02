@@ -169,3 +169,35 @@ function assert_process_dead {
   esac
   fail "process ${pid} is still running (state: ${state:-alive})"
 }
+
+# @description Print a `PATH` on which one command cannot be found.
+#
+#   Dropping every directory that holds the command takes the rest of that
+#   directory with it: `jq` lives in `/usr/bin` on a CI runner, so the stripped
+#   path loses `date` too and the library dies on its own log line instead of
+#   on the missing backend. This mirrors each such directory into a sandbox of
+#   symlinks with that one name left out, so only the named command goes
+#   missing. `command -v` is what the library asks, so the name has to be
+#   absent rather than shadowed.
+# @arg $1 string Name of the command to hide
+# @stdout A `PATH` whose entries hold everything but that command
+function path_without {
+  local tool="$1" bin="${BATS_TEST_TMPDIR}/path-without-$1"
+  local kept="" entry name target
+  local -a entries=()
+  mkdir -p "${bin}"
+  IFS=':' read -r -a entries <<< "${PATH}"
+  for entry in "${entries[@]}"; do
+    [[ -n "${entry}" ]] || continue
+    if [[ ! -x "${entry}/${tool}" ]]; then
+      kept+="${entry}:"
+      continue
+    fi
+    for target in "${entry}"/*; do
+      name="${target##*/}"
+      [[ "${name}" != "${tool}" ]] || continue
+      [[ -e "${bin}/${name}" ]] || ln -s "${target}" "${bin}/${name}" 2> /dev/null
+    done
+  done
+  printf '%s\n' "${bin}:${kept%:}"
+}

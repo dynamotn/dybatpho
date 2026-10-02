@@ -2,8 +2,8 @@
 # @file date_ops.sh
 # @brief Example showing date and timestamp utilities
 # @description
-#   Demonstrates dybatpho::date_now, date_today, date_is_valid, date_parse, date_format, date_add_days, and
-#   date_diff_days
+#   Demonstrates dybatpho::date_now, date_today, date_is_valid, date_parse, date_format, date_add_days,
+#   date_diff_days, date_parse_duration, date_is_before, date_is_after, date_iso_week, and date_in_tz
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules date
@@ -121,6 +121,51 @@ function _demo_spans {
   dybatpho::print "  on a clock: ${date_seconds_to_hms}"
 }
 
+# @description Read lengths of time the way people and machines write them,
+#   and refuse the ones that cannot be counted.
+# @noargs
+function _demo_durations {
+  dybatpho::header "DURATIONS"
+  local input seconds
+  for input in 90 5m 1h30m "1w 2d" 1:01:01 PT1H30M P1DT2H; do
+    dybatpho::date_parse_duration seconds "${input}"
+    dybatpho::print "  $(printf '%-8s' "${input}") = ${seconds} seconds"
+  done
+  for input in 1M P1Y 1h1h; do
+    if dybatpho::date_parse_duration seconds "${input}" 2> /dev/null; then
+      dybatpho::print "  ${input} accepted?"
+    else
+      dybatpho::print "  ${input} refused: months, years and repeated units are not durations"
+    fi
+  done
+}
+
+# @description Order dates, name the ISO week they fall in, and read them in
+#   another timezone.
+# @noargs
+function _demo_order_and_zones {
+  dybatpho::header "ORDER, WEEKS AND ZONES"
+  local expires="2024-03-01" checked="2024-02-29 23:59:59"
+  if dybatpho::date_is_before "${checked}" "${expires}"; then
+    dybatpho::print "  ${checked} is before ${expires}: still valid"
+  fi
+  if ! dybatpho::date_is_after "${expires}" "2024-03-01 00:00:00"; then
+    dybatpho::print "  ${expires} is the same moment as midnight, not after it"
+  fi
+  local date
+  for date in 2024-02-29 2021-01-01 2024-12-30; do
+    local date_iso_week
+    date_iso_week=$(dybatpho::date_iso_week "${date}")
+    dybatpho::print "  ${date} is in ${date_iso_week}"
+  done
+  local zone
+  for zone in UTC Asia/Ho_Chi_Minh America/New_York; do
+    local date_in_tz
+    date_in_tz=$(dybatpho::date_in_tz "2024-07-01 12:00:00" "${zone}")
+    dybatpho::print "  noon UTC in $(printf '%-16s' "${zone}") ${date_in_tz}"
+  done
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -130,6 +175,8 @@ function _main {
   _demo_validate
   _demo_calendar
   _demo_spans
+  _demo_durations
+  _demo_order_and_zones
   dybatpho::success "Date operations demo complete"
 }
 

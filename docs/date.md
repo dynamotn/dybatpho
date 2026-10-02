@@ -41,6 +41,11 @@ implementations this module supports shift by them differently.
 - [`dybatpho::date_add`](#dybatphodate_add) — Add or subtract a span of time from a date string. The units are the ones that are a fixed number of seconds: seconds, minutes, hours, days, and weeks. Months and years are left out on purpose, since their length depends on the calendar and the two `date` implementations this module supports shift by them differently.
 - [`dybatpho::date_diff`](#dybatphodate_diff) — Print the difference between two dates in a chosen unit. The result is truncated toward zero, so a span of 47 hours is one day rather than two, and it is signed: an end before the start is negative.
 - [`dybatpho::date_seconds_to_hms`](#dybatphodate_seconds_to_hms) — Print a number of seconds as `H:MM:SS`. The hours are not wrapped at a day, so a span of 90000 seconds reads as `25:00:00`: this is a length of time rather than a time of day. A negative span keeps its sign. For a duration written the way a sentence would put it, in the reader's own language, `dybatpho::i18n_duration` is the one to call.
+- [`dybatpho::date_parse_duration`](#dybatphodate_parse_duration) — Parse a written length of time into a number of seconds. Three spellings are understood, so a value can come from a person, from a clock, or from a machine: - a bare number of seconds, or parts with a unit, largest first, each used at most once: `w`, `d`, `h`, `m` and `s`, optionally separated by spaces, as in `90s`, `5m`, `1h30m`, `2d`, `1w 2d`; - the `H:MM:SS` clock that `dybatpho::date_seconds_to_hms` writes, so the two helpers undo each other; - an ISO 8601 duration made of weeks, days, hours, minutes and seconds: `PT1H30M`, `P1DT2H`, `P2W`. Months and years are refused in every spelling, for the same reason `dybatpho::date_add` refuses them: their length depends on where in the calendar they fall. A leading `-` makes the span negative. The result is returned through a variable rather than printed, because the function validates its input, and a refusal inside a command substitution would not reach the caller.
+- [`dybatpho::date_is_before`](#dybatphodate_is_before) — Return success when the first date comes strictly before the second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`, so a bare date means midnight there and two spellings of the same moment are equal, not ordered.
+- [`dybatpho::date_is_after`](#dybatphodate_is_after) — Return success when the first date comes strictly after the second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`.
+- [`dybatpho::date_iso_week`](#dybatphodate_iso_week) — Print the ISO 8601 week a date falls in. ISO weeks start on a Monday, and week 1 is the one holding the year's first Thursday, so the first days of January can belong to the last week of the year before, and the last days of December to week 1 of the next. That is why the week-year is printed beside the week: `2021-01-01` is in `2020-W53`. The week is worked out from the day of the year and the day of the week, rather than from `%G` and `%V`, so the answer does not depend on which `date` the system has. The format takes three placeholders: `%G` for the week-year, `%V` for the two-digit week, and `%u` for the day of the week from 1 (Monday) to 7. `%%` writes a percent sign, and anything else is copied as it is.
+- [`dybatpho::date_in_tz`](#dybatphodate_in_tz) — Print a date as it reads in another timezone. The date is parsed in `DYBATPHO_DATE_TIMEZONE`, as everywhere else in this module, and written in the zone asked for. The zone has to be in the system's zone database: `date` itself answers in UTC for a name it cannot find, on every platform this module supports, so an unknown zone is refused rather than passed on.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -482,3 +487,238 @@ dybatpho::date_seconds_to_hms -61     # -0:01:01
 **🔗 See also**
 
 - [- `dybatpho::i18n_duration](#dybatphoi18n_duration)
+
+
+---
+
+### `dybatpho::date_parse_duration`
+
+Parse a written length of time into a number of seconds.
+Three spellings are understood, so a value can come from a person, from a
+clock, or from a machine:
+
+- a bare number of seconds, or parts with a unit, largest first, each used
+  at most once: `w`, `d`, `h`, `m` and `s`, optionally separated by spaces,
+  as in `90s`, `5m`, `1h30m`, `2d`, `1w 2d`;
+- the `H:MM:SS` clock that `dybatpho::date_seconds_to_hms` writes, so the
+  two helpers undo each other;
+- an ISO 8601 duration made of weeks, days, hours, minutes and seconds:
+  `PT1H30M`, `P1DT2H`, `P2W`.
+
+Months and years are refused in every spelling, for the same reason
+`dybatpho::date_add` refuses them: their length depends on where in the
+calendar they fall. A leading `-` makes the span negative.
+
+The result is returned through a variable rather than printed, because the
+function validates its input, and a refusal inside a command substitution
+would not reach the caller.
+
+**🧪 Example**
+
+```bash
+local seconds
+dybatpho::date_parse_duration seconds 1h30m     # 5400
+dybatpho::date_parse_duration seconds 1:01:01   # 3661
+dybatpho::date_parse_duration seconds PT1H30M   # 5400
+dybatpho::date_parse_duration seconds "${TIMEOUT}" || dybatpho::die "Bad timeout"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the number of seconds |
+| `$2` | string | Duration to parse |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable, only when the duration is valid
+
+**📤 Output on stderr**
+
+- Why the duration was refused
+
+**🚦 Exit codes**
+
+- `0`: The duration is valid
+- `1`: The duration is empty, malformed, uses a calendar unit, or is too large to count
+
+**🔗 See also**
+
+- [- `dybatpho::date_seconds_to_hms](#dybatphodate_seconds_to_hms)
+
+
+---
+
+### `dybatpho::date_is_before`
+
+Return success when the first date comes strictly before the
+second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`, so a bare date means
+midnight there and two spellings of the same moment are equal, not ordered.
+
+**🧪 Example**
+
+```bash
+dybatpho::date_is_before 2024-02-28 2024-02-29            # yes
+dybatpho::date_is_before "2024-02-29 12:00:00" 2024-02-29 # no
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Date string that may come first |
+| `$2` | string | Date string to compare it with |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_DATE_TIMEZONE`** | string | Timezone used while parsing both dates |
+
+**🚦 Exit codes**
+
+- `0`: The first date is earlier
+- `1`: It is the same moment or later
+- `1`: Stop the script when either date cannot be parsed
+
+**🔗 See also**
+
+- [- `dybatpho::date_is_after](#dybatphodate_is_after)
+
+
+---
+
+### `dybatpho::date_is_after`
+
+Return success when the first date comes strictly after the
+second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`.
+
+**🧪 Example**
+
+```bash
+dybatpho::date_is_after 2024-03-01 2024-02-29   # yes
+dybatpho::date_is_after 2024-02-29 2024-02-29   # no
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Date string that may come last |
+| `$2` | string | Date string to compare it with |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_DATE_TIMEZONE`** | string | Timezone used while parsing both dates |
+
+**🚦 Exit codes**
+
+- `0`: The first date is later
+- `1`: It is the same moment or earlier
+- `1`: Stop the script when either date cannot be parsed
+
+**🔗 See also**
+
+- [- `dybatpho::date_is_before](#dybatphodate_is_before)
+
+
+---
+
+### `dybatpho::date_iso_week`
+
+Print the ISO 8601 week a date falls in.
+ISO weeks start on a Monday, and week 1 is the one holding the year's first
+Thursday, so the first days of January can belong to the last week of the
+year before, and the last days of December to week 1 of the next. That is
+why the week-year is printed beside the week: `2021-01-01` is in `2020-W53`.
+
+The week is worked out from the day of the year and the day of the week,
+rather than from `%G` and `%V`, so the answer does not depend on which
+`date` the system has.
+
+The format takes three placeholders: `%G` for the week-year, `%V` for the
+two-digit week, and `%u` for the day of the week from 1 (Monday) to 7.
+`%%` writes a percent sign, and anything else is copied as it is.
+
+**🧪 Example**
+
+```bash
+dybatpho::date_iso_week 2024-02-29          # 2024-W09
+dybatpho::date_iso_week 2021-01-01          # 2020-W53
+dybatpho::date_iso_week 2024-12-30 '%G%V'   # 202501
+dybatpho::date_iso_week 2024-02-29 '%G-W%V-%u'   # 2024-W09-4
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Date string |
+| `$2` | string | Optional format, default is `%G-W%V` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_DATE_TIMEZONE`** | string | Timezone used while parsing the date |
+
+**📤 Output on stdout**
+
+- The week, written with the format
+
+**🚦 Exit codes**
+
+- `1`: The date cannot be parsed
+
+
+---
+
+### `dybatpho::date_in_tz`
+
+Print a date as it reads in another timezone.
+The date is parsed in `DYBATPHO_DATE_TIMEZONE`, as everywhere else in this
+module, and written in the zone asked for. The zone has to be in the
+system's zone database: `date` itself answers in UTC for a name it cannot
+find, on every platform this module supports, so an unknown zone is refused
+rather than passed on.
+
+**🧪 Example**
+
+```bash
+dybatpho::date_in_tz "2024-02-29 12:00:00" Asia/Tokyo
+# 2024-02-29 21:00:00 +0900
+DYBATPHO_DATE_TIMEZONE=Europe/Paris dybatpho::date_in_tz "2024-07-01 09:00:00" America/New_York '%F %R %Z'
+# 2024-07-01 03:00 EDT
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Date string |
+| `$2` | string | Target timezone, such as `Asia/Ho_Chi_Minh` or `UTC` |
+| `$3` | string | Optional output format, default is `%F %T %z` |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_DATE_TIMEZONE`** | string | Timezone the date is read in |
+| **`TZDIR`** | string | Zone database directory, default is `/usr/share/zoneinfo` |
+
+**📤 Output on stdout**
+
+- The date in the target timezone
+
+**🚦 Exit codes**
+
+- `1`: The date cannot be parsed
+- `1`: Stop the script when the timezone is not in the zone database

@@ -42,6 +42,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::json_set --json config.json server.ports '[80,443]' config.json
   dybatpho::yaml_del compose.yaml services.debug compose.yaml
   dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
+- **`date` — read durations, order dates, ISO weeks and timezone
+  conversion.** `dybatpho::date_parse_duration` turns `90`, `90s`, `1h30m`,
+  `1w 2d`, the `H:MM:SS` clock that `dybatpho::date_seconds_to_hms` writes, and
+  ISO 8601 such as `PT1H30M` or `P1DT2H` into a number of seconds, returned
+  through a variable so a refusal reaches the caller. Months and years are
+  refused, as `dybatpho::date_add` refuses them, and so is a total too large
+  for Bash to count. `dybatpho::date_is_before` and `dybatpho::date_is_after`
+  order two dates strictly and stop the script on a date they cannot read.
+  `dybatpho::date_iso_week` prints the ISO 8601 week with its week-year
+  (`2021-01-01` is `2020-W53`), the same on GNU, BSD and BusyBox.
+  `dybatpho::date_in_tz` prints a date as another timezone reads it, and
+  refuses a zone missing from the zone database instead of answering in UTC.
+
+  ```sh
+  dybatpho::date_parse_duration timeout "${TIMEOUT:-5m}" || exit 1
+  dybatpho::date_is_before "$(dybatpho::date_today)" 2026-12-31 && echo valid
+  dybatpho::date_iso_week 2024-12-30          # 2025-W01
+  dybatpho::date_in_tz "2024-02-29 12:00:00" Asia/Tokyo
   ```
 
 ## [5.2.0] - 2026-10-02

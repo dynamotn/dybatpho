@@ -76,6 +76,54 @@ As a script author, I want a helper that prints the signed difference in days be
 
 ---
 
+### User Story 5 - Read a length of time from configuration (Priority: P2)
+
+As a script author, I want to turn a timeout, interval, or retention period written as `90s`, `1h30m`, `1:01:01`, or `PT1H30M` into a number of seconds so that options and configuration values can be written the way people say them.
+
+**Why this priority**: Timeouts, cache lifetimes, and schedule intervals are all lengths of time, and every script that reads one otherwise grows its own parser.
+
+**Independent Test**: Parse each spelling into a known number of seconds, round-trip the clock spelling through the clock helper, and verify malformed, calendar-unit, and overflowing values are refused without touching the target variable.
+
+**Acceptance Scenarios**:
+
+1. **Given** a duration made of parts with units, **When** the parser runs, **Then** the target variable holds the total number of seconds
+2. **Given** the clock spelling written by the clock helper, **When** the parser runs, **Then** it recovers the original number of seconds
+3. **Given** a duration that names months or years, is malformed, or is too large to count, **When** the parser runs, **Then** it fails with a message and leaves the target unchanged
+
+---
+
+### User Story 6 - Order two dates (Priority: P2)
+
+As a script author, I want predicates that say whether one date comes before or after another so that expiry and freshness checks read as conditions.
+
+**Why this priority**: Comparing two timestamps by hand means parsing both and remembering which way round the subtraction goes.
+
+**Independent Test**: Compare earlier, later, and identical moments written in different spellings, and verify an unreadable date stops the script instead of answering.
+
+**Acceptance Scenarios**:
+
+1. **Given** an earlier and a later date, **When** the before predicate runs, **Then** it succeeds, and the after predicate fails
+2. **Given** two spellings of the same moment, **When** either predicate runs, **Then** it fails
+3. **Given** a date that cannot be parsed, **When** either predicate runs, **Then** the script stops with a message naming the date
+
+---
+
+### User Story 7 - Week numbers and other timezones (Priority: P3)
+
+As a script author, I want the ISO 8601 week a date falls in and the same date as another timezone reads it so that weekly reports and messages to people elsewhere are correct.
+
+**Why this priority**: ISO weeks and zone conversions are where hand-written arithmetic is most often wrong, but fewer scripts need them.
+
+**Independent Test**: Compute the week of dates around year boundaries, including 53-week years, and convert a date into a zone with and without daylight saving; verify an unknown zone is refused.
+
+**Acceptance Scenarios**:
+
+1. **Given** a date in the first days of January, **When** the week helper runs, **Then** it can report the last week of the previous week-year
+2. **Given** a known timezone, **When** the conversion helper runs, **Then** it prints the date as that zone reads it
+3. **Given** a timezone that is not in the zone database, **When** the conversion helper runs, **Then** the script stops instead of answering in UTC
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -88,6 +136,12 @@ if dybatpho::date_is_valid "2026-01-15"; then
 fi
 
 dybatpho::info "Run started at $(dybatpho::date_format "${started_at}" "%F %T")"
+
+timeout=""
+dybatpho::date_parse_duration timeout "${TIMEOUT:-5m}" || dybatpho::die "Bad timeout"
+dybatpho::date_is_before "$(dybatpho::date_today)" "${expires_at}" || dybatpho::warn "Expired"
+dybatpho::info "Report for $(dybatpho::date_iso_week "$(dybatpho::date_today)")"
+dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T')" Asia/Tokyo)"
 ```
 
 ## Edge Cases
@@ -96,6 +150,14 @@ dybatpho::info "Run started at $(dybatpho::date_format "${started_at}" "%F %T")"
 - A timestamp is formatted with a custom output format.
 - A day offset is negative.
 - The configured timezone changes formatting or parsing behavior.
+- A duration is empty, has a trailing space, repeats a unit, puts a smaller unit before a larger one, or names months or years.
+- A duration's total does not fit in a Bash integer, which would otherwise wrap around to a negative number.
+- A duration is negative, or negative zero.
+- Two dates compared are the same moment written differently.
+- A date compared cannot be parsed, which must not read as a "no".
+- A date in the first days of January belongs to the previous ISO week-year, or one in the last days of December to the next.
+- A year has 53 ISO weeks.
+- A timezone name is misspelled, is a path, or is a POSIX rule string, any of which `date` would quietly treat as UTC.
 
 ## Requirements *(mandatory)*
 
@@ -127,12 +189,20 @@ dybatpho::info "Run started at $(dybatpho::date_format "${started_at}" "%F %T")"
 - **FR-012b**: A rejected unit MUST stop the caller even when the caller has switched `errexit` off, so that a validation helper failing inside a command substitution can never leave the caller with an answer computed from unvalidated input.
 - **FR-013**: The day-offset and day-difference helpers MUST keep their existing behaviour while being expressed in terms of the general helpers.
 - **FR-014**: The module MUST print a number of seconds as `H:MM:SS`, without wrapping the hours at a day and keeping the sign of a negative span.
+- **FR-015**: The module MUST parse a duration into a number of seconds, accepting a bare number of seconds; parts with the units `w`, `d`, `h`, `m`, and `s`, largest first, each at most once, optionally separated by single runs of spaces; the `H:MM:SS` clock the clock helper writes; and an ISO 8601 duration of weeks, days, hours, minutes, and seconds. A leading `-` MUST make the result negative, and negative zero MUST be reported as `0`.
+- **FR-015a**: The duration parser MUST return its result through a named variable, MUST leave that variable unchanged and fail with a message on stderr when it refuses the input, and MUST refuse months and years in every spelling.
+- **FR-015b**: The duration parser MUST refuse a duration whose total exceeds the largest Bash integer rather than returning a wrapped value.
+- **FR-016**: The module MUST provide predicates reporting whether one date comes strictly before, or strictly after, another, both parsed in the configured timezone, and MUST stop the script when either date cannot be parsed.
+- **FR-017**: The module MUST print the ISO 8601 week a date falls in together with its week-year, default `%G-W%V`, accepting `%G`, `%V`, `%u`, and `%%` in the format and copying anything else, and computing the week from the day of the year and the day of the week so that the answer does not depend on the platform's `date`.
+- **FR-018**: The module MUST print a date, parsed in the configured timezone, as it reads in a named target timezone, default format `%F %T %z`. It MUST accept `UTC`, `GMT`, and any path-shaped name that exists under `TZDIR` or `/usr/share/zoneinfo`, and MUST stop the script for any other zone rather than letting `date` fall back to UTC.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Date String**: A caller-provided textual date or datetime value parsed by the underlying `date` command.
 - **Unix Timestamp**: A seconds-since-epoch integer used for storage and arithmetic.
 - **Day Offset**: A signed whole-number amount of days applied to a base date.
+- **Duration**: A written length of time, in seconds, parts with units, a clock, or ISO 8601, measured in fixed-length units only.
+- **ISO Week**: A Monday-based week number paired with the week-year it belongs to, which differs from the calendar year around January 1.
 
 ## Success Criteria *(mandatory)*
 
@@ -158,6 +228,17 @@ dybatpho::info "Run started at $(dybatpho::date_format "${started_at}" "%F %T")"
 - **IT-012**: Verify the clock helper for a span under an hour, over a day, and negative, and that a fractional value stops the script.
 - **IT-013**: Parse, format and shift dates on a BusyBox userland, where `-D`
   replaces `-j -f` and `-r` means something else entirely.
+- **IT-014**: Parse bare seconds, every unit, spaced and zero-padded parts, zero, and negative values into seconds.
+- **IT-015**: Round-trip the clock helper's output through the duration parser, and refuse a clock with out-of-range or unpadded minutes.
+- **IT-016**: Parse ISO 8601 durations of weeks, days, hours, minutes, and seconds, and refuse months, years, and empty designators.
+- **IT-017**: Refuse malformed durations with a message, leave the target variable unchanged, and refuse an invalid variable name.
+- **IT-018**: Accept the largest Bash integer and refuse every duration whose total would exceed it.
+- **IT-019**: Order earlier, later, and identical moments with both predicates.
+- **IT-020**: Stop the script when either compared date cannot be parsed.
+- **IT-021**: Compute ISO weeks across year boundaries and in 53-week and 52-week years.
+- **IT-022**: Write an ISO week with each format placeholder, a literal percent, and an unknown placeholder, and fail on an unparseable date.
+- **IT-023**: Convert a date into another zone, into UTC, and across a daylight-saving offset from a non-UTC source zone.
+- **IT-024**: Refuse an unknown zone, a path, an absolute zone file, and a POSIX rule string, and follow a zone database moved through `TZDIR`.
 
 ## Acceptance Criteria *(mandatory)*
 

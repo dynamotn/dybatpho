@@ -467,3 +467,354 @@ function dybatpho::date_seconds_to_hms {
   printf '%s%d:%02d:%02d\n' \
     "${sign}" "$((total / 3600))" "$(((total % 3600) / 60))" "$((total % 60))"
 }
+
+#######################################
+# @description Add one part of a duration to a running total, refusing an
+#   amount that would carry the total past the largest number Bash can hold.
+#   Bash arithmetic wraps silently, so a duration of a hundred quintillion weeks
+#   would otherwise come back as a negative number of seconds.
+# @arg $1 string Name of the variable holding the running total
+# @arg $2 string Amount, as written: digits, possibly with leading zeros
+# @arg $3 number Seconds in one unit of the amount
+# @exitcode 0 The part was added
+# @exitcode 1 The digits are too many or the total would overflow
+# @internal
+#######################################
+function __dybatpho_date_duration_add {
+  local -n __dybatpho_date_dur_total="$1"
+  local __dybatpho_date_dur_digits="$2" __dybatpho_date_dur_unit="$3"
+  local __dybatpho_date_dur_max=9223372036854775807
+  # The digits are checked as text before they are read as a number, since a
+  # number past the maximum has already wrapped by the time it can be compared.
+  # Leading zeros do not count against the length.
+  __dybatpho_date_dur_digits="${__dybatpho_date_dur_digits#"${__dybatpho_date_dur_digits%%[!0]*}"}"
+  [[ -n "${__dybatpho_date_dur_digits}" ]] || return 0
+  ((${#__dybatpho_date_dur_digits} <= ${#__dybatpho_date_dur_max})) || return 1
+  if ((${#__dybatpho_date_dur_digits} == ${#__dybatpho_date_dur_max})); then
+    # Compared in two halves that each fit in a number: the leading ten digits,
+    # then the trailing nine.
+    local __dybatpho_date_dur_high="$((10#${__dybatpho_date_dur_digits:0:10}))"
+    local __dybatpho_date_dur_low="$((10#${__dybatpho_date_dur_digits:10}))"
+    ((__dybatpho_date_dur_high <= 9223372036)) || return 1
+    ((__dybatpho_date_dur_high < 9223372036 || __dybatpho_date_dur_low <= 854775807)) || return 1
+  fi
+  local __dybatpho_date_dur_amount="$((10#${__dybatpho_date_dur_digits}))"
+  ((__dybatpho_date_dur_amount <= (__dybatpho_date_dur_max - __dybatpho_date_dur_total) / __dybatpho_date_dur_unit)) \
+    || return 1
+  __dybatpho_date_dur_total=$((__dybatpho_date_dur_total + __dybatpho_date_dur_amount * __dybatpho_date_dur_unit))
+}
+
+#######################################
+# @description Parse a written length of time into a number of seconds.
+#   Three spellings are understood, so a value can come from a person, from a
+#   clock, or from a machine:
+#
+#   - a bare number of seconds, or parts with a unit, largest first, each used
+#     at most once: `w`, `d`, `h`, `m` and `s`, optionally separated by spaces,
+#     as in `90s`, `5m`, `1h30m`, `2d`, `1w 2d`;
+#   - the `H:MM:SS` clock that `dybatpho::date_seconds_to_hms` writes, so the
+#     two helpers undo each other;
+#   - an ISO 8601 duration made of weeks, days, hours, minutes and seconds:
+#     `PT1H30M`, `P1DT2H`, `P2W`.
+#
+#   Months and years are refused in every spelling, for the same reason
+#   `dybatpho::date_add` refuses them: their length depends on where in the
+#   calendar they fall. A leading `-` makes the span negative.
+#
+#   The result is returned through a variable rather than printed, because the
+#   function validates its input, and a refusal inside a command substitution
+#   would not reach the caller.
+# @example
+#   local seconds
+#   dybatpho::date_parse_duration seconds 1h30m     # 5400
+#   dybatpho::date_parse_duration seconds 1:01:01   # 3661
+#   dybatpho::date_parse_duration seconds PT1H30M   # 5400
+#   dybatpho::date_parse_duration seconds "${TIMEOUT}" || dybatpho::die "Bad timeout"
+#
+# @arg $1 string Name of the variable receiving the number of seconds
+# @arg $2 string Duration to parse
+# @set The named variable, only when the duration is valid
+# @stderr Why the duration was refused
+# @exitcode 0 The duration is valid
+# @exitcode 1 The duration is empty, malformed, uses a calendar unit, or is too large to count
+# @see
+#   - `dybatpho::date_seconds_to_hms`
+#######################################
+function dybatpho::date_parse_duration {
+  dybatpho::expect_ref "${1-}"
+  local -n __dybatpho_date_pd_out="$1"
+  local __dybatpho_date_pd_input="${2-}"
+  local __dybatpho_date_pd_text="${__dybatpho_date_pd_input}"
+  local __dybatpho_date_pd_sign="" __dybatpho_date_pd_total=0
+  local __dybatpho_date_pd_ok=0
+  local __dybatpho_date_pd_iso='^P(([0-9]+)W)?(([0-9]+)D)?(T(([0-9]+)H)?(([0-9]+)M)?(([0-9]+)S)?)?$'
+  local __dybatpho_date_pd_parts_re='^(([0-9]+)w *)?(([0-9]+)d *)?(([0-9]+)h *)?(([0-9]+)m *)?(([0-9]+)s)?$'
+
+  if [[ "${__dybatpho_date_pd_text}" == -* ]]; then
+    __dybatpho_date_pd_sign="-"
+    __dybatpho_date_pd_text="${__dybatpho_date_pd_text#-}"
+  fi
+
+  if [[ "${__dybatpho_date_pd_text}" =~ ^[0-9]+$ ]]; then
+    __dybatpho_date_duration_add __dybatpho_date_pd_total "${__dybatpho_date_pd_text}" 1 \
+      && __dybatpho_date_pd_ok=1
+  elif [[ "${__dybatpho_date_pd_text}" =~ ^([0-9]+):([0-5][0-9]):([0-5][0-9])$ ]]; then
+    __dybatpho_date_duration_add __dybatpho_date_pd_total "${BASH_REMATCH[1]}" 3600 \
+      && __dybatpho_date_duration_add __dybatpho_date_pd_total "${BASH_REMATCH[2]}" 60 \
+      && __dybatpho_date_duration_add __dybatpho_date_pd_total "${BASH_REMATCH[3]}" 1 \
+      && __dybatpho_date_pd_ok=1
+  else
+    # Both remaining spellings name weeks, days, hours, minutes and seconds in
+    # that order, and differ only in where their regular expression captures
+    # each amount.
+    local -a __dybatpho_date_pd_groups=()
+    if [[ "${__dybatpho_date_pd_text}" =~ ${__dybatpho_date_pd_iso} ]] \
+      && [[ "${__dybatpho_date_pd_text}" != "P" && "${__dybatpho_date_pd_text}" != *T ]]; then
+      __dybatpho_date_pd_groups=(2 4 7 9 11)
+    elif [[ "${__dybatpho_date_pd_text}" =~ ${__dybatpho_date_pd_parts_re} ]] \
+      && [[ -n "${__dybatpho_date_pd_text}" && "${__dybatpho_date_pd_text}" != *" " ]]; then
+      __dybatpho_date_pd_groups=(2 4 6 8 10)
+    fi
+    if ((${#__dybatpho_date_pd_groups[@]} > 0)); then
+      # The amounts are copied out before anything else runs, since every call
+      # below runs regular expressions of its own and would overwrite
+      # `BASH_REMATCH`.
+      local -a __dybatpho_date_pd_amounts=()
+      local -a __dybatpho_date_pd_units=(604800 86400 3600 60 1)
+      local __dybatpho_date_pd_i
+      for __dybatpho_date_pd_i in "${__dybatpho_date_pd_groups[@]}"; do
+        __dybatpho_date_pd_amounts+=("${BASH_REMATCH[__dybatpho_date_pd_i]}")
+      done
+      __dybatpho_date_pd_ok=1
+      for __dybatpho_date_pd_i in 0 1 2 3 4; do
+        __dybatpho_date_duration_add __dybatpho_date_pd_total \
+          "${__dybatpho_date_pd_amounts[__dybatpho_date_pd_i]}" \
+          "${__dybatpho_date_pd_units[__dybatpho_date_pd_i]}" \
+          || {
+            __dybatpho_date_pd_ok=0
+            break
+          }
+      done
+    fi
+  fi
+
+  if ((__dybatpho_date_pd_ok == 0)); then
+    local __dybatpho_date_pd_hint="expected seconds, H:MM:SS, parts such as 1h30m, or ISO 8601 such as PT1H30M"
+    dybatpho::error "${FUNCNAME[0]}: '${__dybatpho_date_pd_input}' is not a duration, ${__dybatpho_date_pd_hint}"
+    return 1
+  fi
+  __dybatpho_date_pd_out="${__dybatpho_date_pd_sign}${__dybatpho_date_pd_total}"
+  [[ "${__dybatpho_date_pd_out}" != "-0" ]] || __dybatpho_date_pd_out=0
+}
+
+#######################################
+# @description Parse both dates a comparison is asked about, stopping the
+#   script when either one cannot be read. A comparison that answered "no" for a
+#   date it could not parse would be indistinguishable from a real answer.
+# @arg $1 string Name of the function asking, for the message
+# @arg $2 string First date string
+# @arg $3 string Second date string
+# @stdout The two timestamps, separated by a space
+# @exitcode 1 Stop the script when either date cannot be parsed
+# @internal
+#######################################
+function __dybatpho_date_compare_pair {
+  local caller="$1" first="$2" second="$3"
+  local first_ts second_ts
+  first_ts=$(__dybatpho_date_parse "${first}" 2> /dev/null) \
+    || dybatpho::die "${caller}: '${first}' is not a valid date"
+  second_ts=$(__dybatpho_date_parse "${second}" 2> /dev/null) \
+    || dybatpho::die "${caller}: '${second}' is not a valid date"
+  printf '%s %s\n' "${first_ts}" "${second_ts}"
+}
+
+#######################################
+# @description Return success when the first date comes strictly before the
+#   second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`, so a bare date means
+#   midnight there and two spellings of the same moment are equal, not ordered.
+# @example
+#   dybatpho::date_is_before 2024-02-28 2024-02-29            # yes
+#   dybatpho::date_is_before "2024-02-29 12:00:00" 2024-02-29 # no
+#
+# @arg $1 string Date string that may come first
+# @arg $2 string Date string to compare it with
+# @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing both dates
+# @exitcode 0 The first date is earlier
+# @exitcode 1 It is the same moment or later
+# @exitcode 1 Stop the script when either date cannot be parsed
+# @see
+#   - `dybatpho::date_is_after`
+#######################################
+function dybatpho::date_is_before {
+  local first second
+  dybatpho::expect_args first second -- "$@"
+  local pair
+  # The status is checked here: a refusal inside the substitution only ends
+  # that subshell.
+  pair="$(__dybatpho_date_compare_pair "${FUNCNAME[0]}" "${first}" "${second}")" || exit 1
+  (("${pair% *}" < "${pair#* }"))
+}
+
+#######################################
+# @description Return success when the first date comes strictly after the
+#   second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`.
+# @example
+#   dybatpho::date_is_after 2024-03-01 2024-02-29   # yes
+#   dybatpho::date_is_after 2024-02-29 2024-02-29   # no
+#
+# @arg $1 string Date string that may come last
+# @arg $2 string Date string to compare it with
+# @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing both dates
+# @exitcode 0 The first date is later
+# @exitcode 1 It is the same moment or earlier
+# @exitcode 1 Stop the script when either date cannot be parsed
+# @see
+#   - `dybatpho::date_is_before`
+#######################################
+function dybatpho::date_is_after {
+  local first second
+  dybatpho::expect_args first second -- "$@"
+  local pair
+  pair="$(__dybatpho_date_compare_pair "${FUNCNAME[0]}" "${first}" "${second}")" || exit 1
+  (("${pair% *}" > "${pair#* }"))
+}
+
+#######################################
+# @description Print how many ISO 8601 weeks a year has: 53 when it starts on a
+#   Thursday, or is a leap year that starts on a Wednesday, and 52 otherwise.
+# @arg $1 number Year
+# @stdout `52` or `53`
+# @internal
+#######################################
+function __dybatpho_date_iso_weeks_in_year {
+  local year="$1"
+  local this=$(((year + year / 4 - year / 100 + year / 400) % 7))
+  local prior=$((((year - 1) + (year - 1) / 4 - (year - 1) / 100 + (year - 1) / 400) % 7))
+  if ((this == 4 || prior == 3)); then
+    printf '53\n'
+  else
+    printf '52\n'
+  fi
+}
+
+#######################################
+# @description Print the ISO 8601 week a date falls in.
+#   ISO weeks start on a Monday, and week 1 is the one holding the year's first
+#   Thursday, so the first days of January can belong to the last week of the
+#   year before, and the last days of December to week 1 of the next. That is
+#   why the week-year is printed beside the week: `2021-01-01` is in `2020-W53`.
+#
+#   The week is worked out from the day of the year and the day of the week,
+#   rather than from `%G` and `%V`, so the answer does not depend on which
+#   `date` the system has.
+#
+#   The format takes three placeholders: `%G` for the week-year, `%V` for the
+#   two-digit week, and `%u` for the day of the week from 1 (Monday) to 7.
+#   `%%` writes a percent sign, and anything else is copied as it is.
+# @example
+#   dybatpho::date_iso_week 2024-02-29          # 2024-W09
+#   dybatpho::date_iso_week 2021-01-01          # 2020-W53
+#   dybatpho::date_iso_week 2024-12-30 '%G%V'   # 202501
+#   dybatpho::date_iso_week 2024-02-29 '%G-W%V-%u'   # 2024-W09-4
+#
+# @arg $1 string Date string
+# @arg $2 string Optional format, default is `%G-W%V`
+# @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing the date
+# @stdout The week, written with the format
+# @exitcode 1 The date cannot be parsed
+#######################################
+function dybatpho::date_iso_week {
+  local input
+  dybatpho::expect_args input -- "$@"
+  local format="${2:-%G-W%V}"
+  local timestamp
+  timestamp=$(dybatpho::date_parse "${input}") || return $?
+  local fields year day_of_year weekday
+  fields="$(dybatpho::date_format "${timestamp}" '%Y %j %u')"
+  read -r year day_of_year weekday <<< "${fields}"
+  year=$((10#${year}))
+  day_of_year=$((10#${day_of_year}))
+  weekday=$((10#${weekday}))
+
+  local week=$(((day_of_year - weekday + 10) / 7))
+  local weeks_in_year
+  weeks_in_year="$(__dybatpho_date_iso_weeks_in_year "${year}")"
+  if ((week < 1)); then
+    year=$((year - 1))
+    week="$(__dybatpho_date_iso_weeks_in_year "${year}")"
+  elif ((week > weeks_in_year)); then
+    year=$((year + 1))
+    week=1
+  fi
+
+  local result="" char i
+  for ((i = 0; i < ${#format}; i++)); do
+    char="${format:i:1}"
+    if [[ "${char}" != "%" || $((i + 1)) -ge ${#format} ]]; then
+      result+="${char}"
+      continue
+    fi
+    i=$((i + 1))
+    case "${format:i:1}" in
+      G) result+="${year}" ;;
+      V) result+="$(printf '%02d' "${week}")" ;;
+      u) result+="${weekday}" ;;
+      %) result+="%" ;;
+      *) result+="%${format:i:1}" ;;
+    esac
+  done
+  printf '%s\n' "${result}"
+}
+
+#######################################
+# @description Report whether a timezone name can be honored, rather than
+#   letting `date` quietly fall back to UTC: GNU, BSD and BusyBox all answer in
+#   UTC for a zone they cannot find, which would turn a typo into a wrong time.
+#   `UTC` and `GMT` are always known; any other name must be a file under the
+#   zone database, `TZDIR` or `/usr/share/zoneinfo`.
+# @arg $1 string Timezone name
+# @exitcode 0 The zone is known
+# @exitcode 1 It is not, or the name is not a zone name at all
+# @internal
+#######################################
+function __dybatpho_date_zone_known {
+  local zone="$1"
+  [[ "${zone}" == "UTC" || "${zone}" == "GMT" ]] && return 0
+  # Path-shaped names only: no leading slash, no `..`, nothing a shell would
+  # read twice. A POSIX rule string such as `EST5EDT,M3.2.0` is not accepted.
+  [[ "${zone}" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ ]] || return 1
+  [[ -f "${TZDIR:-/usr/share/zoneinfo}/${zone}" ]]
+}
+
+#######################################
+# @description Print a date as it reads in another timezone.
+#   The date is parsed in `DYBATPHO_DATE_TIMEZONE`, as everywhere else in this
+#   module, and written in the zone asked for. The zone has to be in the
+#   system's zone database: `date` itself answers in UTC for a name it cannot
+#   find, on every platform this module supports, so an unknown zone is refused
+#   rather than passed on.
+# @example
+#   dybatpho::date_in_tz "2024-02-29 12:00:00" Asia/Tokyo
+#   # 2024-02-29 21:00:00 +0900
+#   DYBATPHO_DATE_TIMEZONE=Europe/Paris dybatpho::date_in_tz "2024-07-01 09:00:00" America/New_York '%F %R %Z'
+#   # 2024-07-01 03:00 EDT
+#
+# @arg $1 string Date string
+# @arg $2 string Target timezone, such as `Asia/Ho_Chi_Minh` or `UTC`
+# @arg $3 string Optional output format, default is `%F %T %z`
+# @env DYBATPHO_DATE_TIMEZONE string Timezone the date is read in
+# @env TZDIR string Zone database directory, default is `/usr/share/zoneinfo`
+# @stdout The date in the target timezone
+# @exitcode 1 The date cannot be parsed
+# @exitcode 1 Stop the script when the timezone is not in the zone database
+#######################################
+function dybatpho::date_in_tz {
+  local input zone
+  dybatpho::expect_args input zone -- "$@"
+  local format="${3:-%F %T %z}"
+  __dybatpho_date_zone_known "${zone}" \
+    || dybatpho::die "${FUNCNAME[0]}: '${zone}' is not a timezone in ${TZDIR:-/usr/share/zoneinfo}"
+  local timestamp
+  timestamp=$(dybatpho::date_parse "${input}") || return $?
+  DYBATPHO_DATE_TIMEZONE="${zone}" dybatpho::date_format "${timestamp}" "${format}"
+}

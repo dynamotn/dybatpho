@@ -258,7 +258,9 @@ function dybatpho::lock_reclaim_stale {
 
   # Another reclaimer may have finished between the judgement and here and
   # put a live lock in its place; that one is not stale.
-  [[ "$(__dybatpho_lock_identity "${lock_path}")" == "${holder}" ]] || return 0
+  local current
+  current="$(__dybatpho_lock_identity "${lock_path}")"
+  [[ "${current}" == "${holder}" ]] || return 0
 
   # A name no other process can be moving a lock to: two reclaimers of the same
   # lock must not collide on the destination, or the rename would succeed for

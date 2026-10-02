@@ -245,6 +245,39 @@ function _demo_sets {
 
 # @description Run every section of this example, in order.
 # @noargs
+# @description Order a dependency graph, and ask what a root pulls in.
+# @noargs
+function _demo_graph {
+  dybatpho::header "DEPENDENCY GRAPH"
+  # The shape `init.sh` keeps its own module dependencies in: an entry maps to
+  # the entries it needs, separated by spaces.
+  local -A deps=(
+    [cli]="config validate"
+    [config]="validate"
+    [tui]="cli safety"
+    [safety]="archive"
+  )
+
+  local -a order=()
+  dybatpho::array_toposort deps order
+  printf 'load order: %s\n' "${order[*]}"
+
+  # Only what one entry reaches, for "what would installing this pull in".
+  local -a needed=()
+  dybatpho::array_closure deps needed tui
+  printf 'tui needs:  %s\n' "${needed[*]}"
+
+  # A cycle is reported rather than refused: some graphs have one on purpose,
+  # and an order is still useful.
+  local -A cyclic=([text]="table" [table]="text")
+  local -a broken=()
+  if ! dybatpho::array_toposort cyclic broken; then
+    printf 'cycle found, order still usable: %s\n' "${broken[*]}"
+  fi
+}
+
+# @description Run every section of this example, in order.
+# @noargs
 function _main {
   _demo_print
   _demo_reverse
@@ -260,6 +293,7 @@ function _main {
   _demo_pipeline
   _demo_order
   _demo_sets
+  _demo_graph
   dybatpho::success "Array operations demo complete"
 }
 

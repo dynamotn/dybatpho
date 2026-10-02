@@ -14,6 +14,12 @@
 #
 #   Every helper takes an array by name and changes it in place, with a final
 #   `--` to print the result as well.
+#
+#   Two helpers read an associative array as a dependency graph instead:
+#   `dybatpho::array_toposort` orders it so a dependency comes before what
+#   needs it, and `dybatpho::array_closure` answers what a set of roots pulls
+#   in. They fill a named array rather than changing one in place, because the
+#   graph and the result are different things.
 # @see
 #   - `example/array_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -757,4 +763,188 @@ function dybatpho::array_difference {
   if [[ "${3-}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
+}
+
+#######################################
+# @description Walk a dependency graph depth-first, appending each entry after
+#   everything it depends on.
+#   The traversal state is passed by name rather than left to Bash's dynamic
+#   scoping: the recursion then says what it reads and writes, and the state
+#   stays a local of the public function that owns it.
+# @arg $1 string Entry to visit
+# @arg $2 string Name of the associative array of edges
+# @arg $3 string Name of the associative array tracking visited entries
+# @arg $4 string Name of the array collecting the result
+# @arg $5 string Name of the flag set when a cycle is found
+# @set The named state, result and flag
+#######################################
+function __dybatpho_array_graph_visit {
+  local __dybatpho_array_graph_node="$1"
+  # shellcheck disable=SC2178
+  local -n __dybatpho_array_graph_edges="$2"
+  local -n __dybatpho_array_graph_seen="$3"
+  local -n __dybatpho_array_graph_built="$4"
+  local -n __dybatpho_array_graph_broken="$5"
+
+  case "${__dybatpho_array_graph_seen[${__dybatpho_array_graph_node}]-}" in
+    done) return 0 ;;
+    open)
+      # The entry is still being visited further up the stack, so this edge
+      # closes a cycle. It is dropped rather than followed, which is what lets
+      # an order come back at all; the caller is told through the exit code.
+      # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
+      __dybatpho_array_graph_broken=1
+      return 0
+      ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
+  esac
+
+  __dybatpho_array_graph_seen["${__dybatpho_array_graph_node}"]="open"
+
+  # Edges are followed in the order they were written. That order is already
+  # deterministic, and it is the one the author chose.
+  local __dybatpho_array_graph_dep
+  for __dybatpho_array_graph_dep in ${__dybatpho_array_graph_edges[${__dybatpho_array_graph_node}]-}; do
+    __dybatpho_array_graph_visit "${__dybatpho_array_graph_dep}" "$2" "$3" "$4" "$5"
+  done
+
+  __dybatpho_array_graph_seen["${__dybatpho_array_graph_node}"]="done"
+  __dybatpho_array_graph_built+=("${__dybatpho_array_graph_node}")
+}
+
+#######################################
+# @description Collect the entries a traversal should start from, into a named
+#   array: the roots given, or every key of the graph in a stable order.
+# @arg $1 string Name of the array receiving the starting entries
+# @arg $2 string Name of the associative array of edges
+# @arg $@ string Roots, if any
+#######################################
+function __dybatpho_array_graph_roots_into {
+  local -n __dybatpho_array_graph_roots="$1"
+  # shellcheck disable=SC2178
+  local -n __dybatpho_array_graph_all="$2"
+  shift 2
+
+  if (($#)); then
+    __dybatpho_array_graph_roots=("$@")
+    return 0
+  fi
+
+  # Sorted, not in whatever order Bash happens to hash the keys into: two runs
+  # over the same graph have to produce the same order, or a loader built on
+  # this would shuffle occasionally and only occasionally be wrong.
+  local -a __dybatpho_array_graph_keys=()
+  mapfile -t __dybatpho_array_graph_keys < <(
+    ((${#__dybatpho_array_graph_all[@]})) \
+      && printf '%s\n' "${!__dybatpho_array_graph_all[@]}" | LC_ALL=C sort
+  )
+  __dybatpho_array_graph_roots=("${__dybatpho_array_graph_keys[@]}")
+}
+
+#######################################
+# @description Order a dependency graph so every entry comes after the entries
+#   it depends on.
+#   The graph is an associative array mapping an entry to the entries it
+#   depends on, separated by spaces -- the shape `init.sh` already keeps its
+#   module dependencies in. An entry named only as a dependency, with no
+#   entry of its own, is part of the result: a leaf is still something to
+#   order.
+#
+#   With roots given, only what they reach is ordered. Without them, the whole
+#   graph is, starting from its keys in sorted order so two runs agree.
+#
+#   A cycle is reported rather than refused. The edge that would close it is
+#   dropped and the rest of the order still comes back, because a cycle is
+#   legitimate in some graphs -- `init.sh` allows one on purpose, since calls
+#   between modules resolve at run time -- and a caller that cares reads the
+#   exit code.
+# @example
+#   declare -A deps=([cli]="config validate" [config]="validate" [validate]="")
+#   dybatpho::array_toposort deps order
+#   printf '%s\n' "${order[@]}"  # validate, config, cli
+#
+# @arg $1 string Name of the associative array of edges
+# @arg $2 string Name of the array receiving the ordered entries
+# @arg $@ string Optional roots; without them the whole graph is ordered
+# @set The named array
+# @exitcode 0 The graph was ordered and holds no cycle
+# @exitcode 1 The graph was ordered with a cycle broken
+#######################################
+function dybatpho::array_toposort {
+  local __dybatpho_array_graph_map __dybatpho_array_graph_out
+  dybatpho::expect_args __dybatpho_array_graph_map __dybatpho_array_graph_out -- "$@"
+  shift 2
+  dybatpho::expect_ref "${__dybatpho_array_graph_map}"
+  dybatpho::expect_ref "${__dybatpho_array_graph_out}"
+
+  local -A __dybatpho_array_graph_state=()
+  local -a __dybatpho_array_graph_order=()
+  local __dybatpho_array_graph_cycle=0
+
+  local -a __dybatpho_array_graph_start=()
+  __dybatpho_array_graph_roots_into __dybatpho_array_graph_start \
+    "${__dybatpho_array_graph_map}" "$@"
+
+  local __dybatpho_array_graph_root
+  for __dybatpho_array_graph_root in ${__dybatpho_array_graph_start[@]+"${__dybatpho_array_graph_start[@]}"}; do
+    __dybatpho_array_graph_visit "${__dybatpho_array_graph_root}" \
+      "${__dybatpho_array_graph_map}" __dybatpho_array_graph_state \
+      __dybatpho_array_graph_order __dybatpho_array_graph_cycle
+  done
+
+  # shellcheck disable=SC2178
+  local -n __dybatpho_array_graph_result="${__dybatpho_array_graph_out}"
+  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
+  __dybatpho_array_graph_result=(${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"})
+
+  ((__dybatpho_array_graph_cycle == 0))
+}
+
+#######################################
+# @description Collect everything reachable from some roots in a dependency
+#   graph, the roots included.
+#   This answers "what does this pull in", where `dybatpho::array_toposort`
+#   answers "in what order". The result is sorted, so it is a set rather than
+#   a walk: a caller that wants the order asks for the order.
+# @example
+#   declare -A deps=([cli]="config validate" [config]="validate")
+#   dybatpho::array_closure deps needed cli
+#   printf '%s\n' "${needed[@]}"  # cli, config, validate
+#
+# @arg $1 string Name of the associative array of edges
+# @arg $2 string Name of the array receiving the reachable entries
+# @arg $@ string Roots to start from
+# @set The named array
+# @exitcode 0 The reachable set was collected
+# @exitcode 1 No root was given
+#######################################
+function dybatpho::array_closure {
+  local __dybatpho_array_graph_map __dybatpho_array_graph_out
+  dybatpho::expect_args __dybatpho_array_graph_map __dybatpho_array_graph_out -- "$@"
+  shift 2
+  dybatpho::expect_ref "${__dybatpho_array_graph_map}"
+  dybatpho::expect_ref "${__dybatpho_array_graph_out}"
+  (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one root to start from"
+
+  local -A __dybatpho_array_graph_state=()
+  local -a __dybatpho_array_graph_order=()
+  local __dybatpho_array_graph_cycle=0
+
+  local __dybatpho_array_graph_root
+  for __dybatpho_array_graph_root in "$@"; do
+    __dybatpho_array_graph_visit "${__dybatpho_array_graph_root}" \
+      "${__dybatpho_array_graph_map}" __dybatpho_array_graph_state \
+      __dybatpho_array_graph_order __dybatpho_array_graph_cycle
+  done
+
+  local -a __dybatpho_array_graph_sorted=()
+  mapfile -t __dybatpho_array_graph_sorted < <(
+    ((${#__dybatpho_array_graph_order[@]})) \
+      && printf '%s\n' "${__dybatpho_array_graph_order[@]}" | LC_ALL=C sort -u
+  )
+
+  # shellcheck disable=SC2178
+  local -n __dybatpho_array_graph_reachable="${__dybatpho_array_graph_out}"
+  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
+  __dybatpho_array_graph_reachable=(${__dybatpho_array_graph_sorted[@]+"${__dybatpho_array_graph_sorted[@]}"})
 }

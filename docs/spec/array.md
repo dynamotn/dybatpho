@@ -179,6 +179,13 @@ fi
 - **FR-021a**: Each set operation MUST produce a set, with every value appearing once, in the order the first array had them. Difference MUST be one-sided: values only the second array holds are not added.
 - **FR-022**: The helpers added here MUST NOT shadow a caller's array that happens to share a name with one of their own local variables.
 
+- **FR-023**: The module MUST order a dependency graph given as an associative array mapping an entry to the entries it depends on, so every dependency comes before what names it.
+- **FR-024**: An entry named only as a dependency MUST appear in the order, because a leaf is still something that has to come first.
+- **FR-025**: Ordering MUST be deterministic across runs, which means starting from the graph's keys in a sorted order rather than the order Bash hashes them into.
+- **FR-026**: Given roots, ordering MUST cover only what those roots reach.
+- **FR-027**: A cycle MUST be reported through the exit code while an order is still produced, because a cycle is legitimate in some graphs and refusing to order one would refuse the graph.
+- **FR-028**: The module MUST collect the entries reachable from some roots, the roots included, as a sorted set, and MUST reject a call with no root.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Named Array**: A Bash array referenced by variable name rather than copied by value.
@@ -215,6 +222,14 @@ fi
 - **IT-012**: Sort arrays named after the helper's own locals and verify the caller's values are the ones sorted.
 - **IT-013**: Slice from an index, with a count, and from a negative start; verify a start or count outside the array leaves it empty or clamps, and that `--` prints in either argument position.
 - **IT-014**: Verify union, intersection, and difference against overlapping, disjoint, and empty arrays, that duplicates collapse, and that difference adds nothing from the second array.
+
+- **IT-015**: Order a chain so each dependency precedes what needs it.
+- **IT-016**: Order only what the given roots reach.
+- **IT-017**: Produce the same order on two runs over the same graph.
+- **IT-018**: Include an entry named only as a dependency.
+- **IT-019**: Report a cycle through the exit code and still return an order.
+- **IT-020**: Order the library's own module graph, with every non-cyclic edge respected.
+- **IT-021**: Collect the reachable set from a root, walk a cycle without looping, and reject a call with no root.
 
 ## Acceptance Criteria *(mandatory)*
 

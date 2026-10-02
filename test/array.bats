@@ -602,3 +602,128 @@ EOF
   assert_line --index 1 "a"
   assert_line --index 2 "b"
 }
+
+@test "dybatpho::array_toposort puts a dependency before what needs it" {
+  declare -A deps=([cli]="config validate" [config]="validate" [validate]="")
+  local -a order=()
+  run_traced -0 dybatpho::array_toposort deps order
+
+  dybatpho::array_toposort deps order
+  assert_equal "${order[*]}" "validate config cli"
+}
+
+@test "dybatpho::array_toposort orders only what the given roots reach" {
+  declare -A graph=([a]="b c" [b]="d" [c]="d" [d]="" [z]="y" [y]="")
+  local -a reached=()
+  dybatpho::array_toposort graph reached a
+  assert_equal "${reached[*]}" "d b c a"
+}
+
+@test "dybatpho::array_toposort gives the same order every run" {
+  # Bash hashes the keys of an associative array in no useful order, so a
+  # loader built on an unsorted walk would shuffle occasionally -- and be
+  # wrong only occasionally, which is the worst way to be wrong.
+  declare -A graph=([a]="b c" [b]="d" [c]="d" [d]="" [z]="y" [y]="")
+  local -a first=() second=()
+  dybatpho::array_toposort graph first
+  dybatpho::array_toposort graph second
+  assert_equal "${first[*]}" "${second[*]}"
+  assert_equal "${first[*]}" "d b c a y z"
+}
+
+@test "dybatpho::array_toposort includes an entry named only as a dependency" {
+  # A leaf has no entry of its own, and leaving it out would hand back an
+  # order missing the thing that has to come first.
+  declare -A deps=([app]="libfoo")
+  local -a order=()
+  dybatpho::array_toposort deps order
+  assert_equal "${order[*]}" "libfoo app"
+}
+
+@test "dybatpho::array_toposort reports a cycle and still returns an order" {
+  # A cycle is legitimate in some graphs: `init.sh` has `text` and `table`
+  # depend on each other on purpose, because the calls resolve at run time.
+  # Refusing to order such a graph would be refusing to load the library.
+  declare -A cyclic=([a]="b" [b]="c" [c]="a")
+  local -a order=()
+  run_traced -1 dybatpho::array_toposort cyclic order
+
+  dybatpho::array_toposort cyclic order || true
+  assert_equal "${#order[@]}" "3"
+}
+
+@test "dybatpho::array_toposort orders the library's own module graph" {
+  # The real graph, not a fixture: every edge that is not part of a cycle
+  # must put the dependency first, or the loader would source a module before
+  # something it calls.
+  declare -A graph=()
+  local key
+  for key in "${!__dybatpho_module_deps[@]}"; do
+    graph["${key}"]="${__dybatpho_module_deps[${key}]}"
+  done
+
+  local -a order=()
+  # `text` and `table` form a deliberate cycle, so a cycle is expected here.
+  dybatpho::array_toposort graph order || true
+
+  local -A position=()
+  local at
+  for at in "${!order[@]}"; do
+    position["${order[${at}]}"]="${at}"
+  done
+
+  local dependency violations=""
+  for key in "${!graph[@]}"; do
+    for dependency in ${graph[${key}]}; do
+      ((position[${dependency}] < position[${key}])) && continue
+      # An edge whose other end names this one back is part of a cycle, and
+      # one of the two has to come second.
+      [[ " ${graph[${dependency}]-} " == *" ${key} "* ]] && continue
+      violations+="${dependency} must come before ${key}"$'\n'
+    done
+  done
+  [ -z "${violations}" ] || fail "${violations}"
+}
+
+@test "dybatpho::array_toposort handles an empty graph" {
+  declare -A empty=()
+  local -a order=()
+  run_traced -0 dybatpho::array_toposort empty order
+
+  dybatpho::array_toposort empty order
+  assert_equal "${#order[@]}" "0"
+}
+
+@test "dybatpho::array_closure collects everything the roots reach" {
+  declare -A graph=([a]="b c" [b]="d" [c]="d" [d]="" [z]="y")
+  local -a needed=()
+  run_traced -0 dybatpho::array_closure graph needed a
+
+  dybatpho::array_closure graph needed a
+  assert_equal "${needed[*]}" "a b c d"
+
+  # Sorted, so it reads as a set; the ordering question is answered by
+  # `dybatpho::array_toposort`.
+  dybatpho::array_closure graph needed z
+  assert_equal "${needed[*]}" "y z"
+}
+
+@test "dybatpho::array_closure walks a cycle without looping forever" {
+  declare -A cyclic=([a]="b" [b]="a")
+  local -a needed=()
+  dybatpho::array_closure cyclic needed a
+  assert_equal "${needed[*]}" "a b"
+}
+
+@test "dybatpho::array_closure needs a root, and a bindable name" {
+  local -a needed=()
+  declare -A graph=([a]="b")
+
+  run --separate-stderr dybatpho::array_closure graph needed
+  assert_failure
+  assert_stderr --partial "Expected at least one root"
+
+  run --separate-stderr dybatpho::array_closure graph __dybatpho_needed a
+  assert_failure
+  assert_stderr --partial "is reserved"
+}

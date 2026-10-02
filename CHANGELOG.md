@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`array` — order a dependency graph instead of resolving one by hand.**
+  `dybatpho::array_toposort` reads an associative array of edges and returns
+  an order where a dependency comes before what needs it;
+  `dybatpho::array_closure` answers what a set of roots pulls in.
+
+  ```sh
+  declare -A deps=([cli]="config validate" [config]="validate")
+  dybatpho::array_toposort deps order   # validate config cli
+  dybatpho::array_closure deps needed cli
+  ```
+
+  The order is the same on every run, because the walk starts from the keys
+  sorted rather than in the order Bash hashes them into. An entry named only
+  as a dependency is in the result, since a leaf still has to come first. A
+  cycle is reported through the exit code with an order still returned: some
+  graphs have one on purpose, and `init.sh`'s own `text`/`table` pair is one.
+
 - **`dybatpho::color_supported` — one answer for whether output should carry
   colour.** `NO_COLOR` wins over everything, `FORCE_COLOR` overrides the
   stream, `TERM=dumb` rules colour out, and otherwise the named stream has to

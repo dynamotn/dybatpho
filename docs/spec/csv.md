@@ -43,6 +43,8 @@ As a script author, I want the column names, one column's values, and the rows m
 2. **Given** a numeric column and a numeric bound, **When** rows are filtered with `gt` or `lt`, **Then** the comparison is numeric rather than lexical
 3. **Given** a column name the header does not have, **When** it is requested, **Then** the script stops and the message names the columns there are
 4. **Given** a row with more fields than the header names, **When** it is read by column, **Then** the script stops rather than dropping the extra field
+5. **Given** a list of columns by name or by 1-based position, **When** they are selected, **Then** the output is CSV holding just those columns, header included, in the order given
+6. **Given** a column that is neither a header name nor a position inside the header, **When** it is selected, **Then** the script stops and the message names the columns there are
 
 ---
 
@@ -92,6 +94,7 @@ As a script author, I want to read a tab- or semicolon-separated export with the
 
 dybatpho::csv_header billing.csv
 dybatpho::csv_filter billing.csv "cost" gt 100 > expensive.csv
+dybatpho::csv_select billing.csv owner cost > owners.csv
 
 dybatpho::csv_read billing.csv rows
 dybatpho::csv_fields "${rows[1]}" first
@@ -111,6 +114,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 
 - Input arrives as a file path, as `-` for stdin, or as text.
 - A row is shorter or longer than the header.
+- A selected column is repeated, named by a position, or a header is itself named like a number.
 - A record's quote is never closed, or text follows a closing quote.
 - A file uses CRLF line endings, or another delimiter such as `;`.
 - A field is empty, a row ends with the delimiter, or the input is empty.
@@ -145,6 +149,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-020**: `tab` and `\t` MUST name a tab wherever a delimiter is accepted.
 - **FR-021**: Every function MUST refuse a delimiter that is not exactly one character, or that is a quote, a line break, or the unit separator, before reading its input.
 - **FR-022**: The module MUST rewrite CSV read with the configured delimiter using another delimiter, quoting each field for the delimiter it is written with.
+- **FR-023**: Selecting columns MUST print CSV with the header and every row restricted to the chosen columns in the order given, allowing a column to repeat.
+- **FR-024**: A selected column MUST resolve by header name first and by 1-based position otherwise, and one matching neither MUST stop the script naming the header.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -189,6 +195,10 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-023**: Refuse an empty, multi-character, quote, line-break, and unit-separator delimiter.
 - **IT-024**: Convert CSV to TSV and back, quoting a tab inside a value only in the TSV.
 - **IT-025**: Convert from stdin, refuse an unusable target delimiter, and convert an empty input to nothing.
+- **IT-026**: Select named columns in a new order, keeping quoted values.
+- **IT-027**: Select by position, repeat a column, pad a short row, and prefer a header named like a number.
+- **IT-028**: Select from stdin with a configured delimiter, and from an empty input.
+- **IT-029**: Report an unknown column, position `0`, no columns, and a row wider than the header.
 
 ## Acceptance Criteria *(mandatory)*
 

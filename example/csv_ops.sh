@@ -2,7 +2,7 @@
 # @file csv_ops.sh
 # @brief Example reading a billing export that quotes its fields
 # @description Demonstrates dybatpho::csv_read, csv_fields, csv_write, csv_header, csv_col,
-#   csv_filter, csv_to_json, csv_from_json, and csv_convert
+#   csv_filter, csv_to_json, csv_from_json, csv_convert, and csv_select
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules csv
@@ -70,6 +70,18 @@ function _demo_filter {
   dybatpho::csv_filter "${file}" "cost" gt 50
 }
 
+# @description Keep only the columns a report needs, in the order it wants.
+# @arg $1 string Path of the CSV file
+function _demo_select {
+  local file
+  dybatpho::expect_args file -- "$@"
+  dybatpho::header "SELECT"
+  # By name, then by position: column 1 is the service.
+  dybatpho::csv_select "${file}" owner cost
+  printf -- '--\n'
+  dybatpho::csv_select "${file}" 4 1
+}
+
 # @description Convert to JSON and back, showing the values survive the trip.
 # @arg $1 string Path of the CSV file
 function _demo_json {
@@ -118,6 +130,7 @@ function _main {
   _demo_read "${fixture}"
   _demo_records "${fixture}"
   _demo_filter "${fixture}"
+  _demo_select "${fixture}"
   _demo_json "${fixture}"
   _demo_normalize "${fixture}"
   _demo_tsv "${fixture}"

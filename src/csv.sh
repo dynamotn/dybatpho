@@ -527,6 +527,94 @@ function dybatpho::csv_col {
 }
 
 #######################################
+# @description Print chosen columns, in the order given, as CSV with the header.
+#   A column is named by its header, or by its position counting from `1` when
+#   no header carries that name, so `3` picks the third column unless a column
+#   is literally called `3`. A column may be chosen more than once, and a row
+#   shorter than the header reads as empty values.
+# @arg $1 string CSV file path, `-` for stdin, or CSV text
+# @arg $@ string Columns to keep: header names or 1-based positions
+# @stdout CSV text: the chosen header, then every row's chosen fields
+# @exitcode 0 The columns were printed, or the input was empty
+# @exitcode 1 A column matches neither a name nor a position, or a row is wider than the header
+# @example
+#   dybatpho::csv_select billing.csv owner cost
+#   dybatpho::csv_select billing.csv 4 1   # cost first, then service
+#######################################
+function dybatpho::csv_select {
+  local input
+  dybatpho::expect_args input -- "$@"
+  shift
+  (($#)) || dybatpho::die "${FUNCNAME[0]}: Name at least one column to keep"
+
+  local -a records=() names=() fields=() picks=() chosen=() kept=()
+  local text delimiter column index at pick
+  local IFS
+  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_input_into text "${input}"
+  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  ((${#records[@]})) || return 0
+
+  __dybatpho_csv_header_into names records
+  for column in "$@"; do
+    __dybatpho_csv_pick_into index names "${column}"
+    picks+=("${index}")
+  done
+
+  for ((at = 0; at < ${#records[@]}; at++)); do
+    __dybatpho_csv_split_fields_into fields "${records[${at}]}"
+    __dybatpho_csv_expect_width fields names "${at}"
+    chosen=()
+    for pick in "${picks[@]}"; do
+      chosen+=("${fields[${pick}]-}")
+    done
+    IFS="${__dybatpho_csv_unit}"
+    kept+=("${chosen[*]}")
+    unset IFS
+  done
+
+  __dybatpho_csv_write_with kept "${delimiter}"
+}
+
+#######################################
+# @description Resolve a column given by name or by 1-based position to its
+#   index, into a named variable. A header name wins over a position, so a
+#   column literally called `2` is still reachable by name.
+# @arg $1 string Name of the variable receiving the index
+# @arg $2 string Name of the array of header names
+# @arg $3 string Header name, or a position counting from `1`
+# @set The named variable
+# @exitcode 0 The column was found
+# @exitcode 1 Neither a name nor a position matches
+# @internal
+#######################################
+function __dybatpho_csv_pick_into {
+  local -n __dybatpho_csv_pick_ref="$1"
+  local -n __dybatpho_csv_header_ref="$2"
+  local __dybatpho_csv_wanted="$3" __dybatpho_csv_at
+
+  for __dybatpho_csv_at in "${!__dybatpho_csv_header_ref[@]}"; do
+    if [[ "${__dybatpho_csv_header_ref[${__dybatpho_csv_at}]}" == "${__dybatpho_csv_wanted}" ]]; then
+      __dybatpho_csv_pick_ref="${__dybatpho_csv_at}"
+      return 0
+    fi
+  done
+
+  if [[ "${__dybatpho_csv_wanted}" =~ ^[1-9][0-9]*$ ]] \
+    && ((10#${__dybatpho_csv_wanted} <= ${#__dybatpho_csv_header_ref[@]})); then
+    __dybatpho_csv_pick_ref="$((10#${__dybatpho_csv_wanted} - 1))"
+    return 0
+  fi
+
+  local __dybatpho_csv_complaint="No such column: ${__dybatpho_csv_wanted}."
+  __dybatpho_csv_complaint+=" The header has ${#__dybatpho_csv_header_ref[@]} columns:"
+  __dybatpho_csv_complaint+=" ${__dybatpho_csv_header_ref[*]}"
+  # "dybatpho::csv_select reports a column that is neither a name nor a
+  # position" covers this; `dybatpho::die` exits, so that test uses `run`.
+  dybatpho::die "${FUNCNAME[1]}: ${__dybatpho_csv_complaint}" # kcov(skip)
+}
+
+#######################################
 # @description Stop when a row carries more fields than the header names.
 #   Printing such a row would drop the extra field, which is the silent loss
 #   this module exists to prevent.

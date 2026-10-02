@@ -230,6 +230,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv owner
   ```
 
+- **`csv` — keep just the columns a report needs.** `dybatpho::csv_select`
+  prints CSV holding the columns you name, header included, in the order you
+  name them. A column is chosen by its header or by its position from `1`; a
+  header literally named like a number still wins, a column may repeat, and an
+  unknown one stops the script naming the columns there are.
+
+  ```sh
+  dybatpho::csv_select billing.csv owner cost > owners.csv
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

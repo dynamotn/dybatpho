@@ -424,6 +424,61 @@ EOF
   assert_output ""
 }
 
+@test "dybatpho::csv_select keeps the named columns in the order given" {
+  run_traced dybatpho::csv_select "${QUOTED_CSV}" qty name
+  assert_success
+  assert_output << 'EOF'
+qty,name
+3,"Doe, John"
+10,"He said ""hi"""
+7,plain
+EOF
+}
+
+@test "dybatpho::csv_select takes positions, repeats a column and pads a short row" {
+  run_traced dybatpho::csv_select "$(printf 'a,b,c\n1,2,3\n4,5')" 3 1 a
+  assert_success
+  assert_output << 'EOF'
+c,a,a
+3,1,1
+,4,4
+EOF
+
+  # A header literally named `2` is reached by name before position.
+  run_traced dybatpho::csv_select "$(printf 'x,2\nleft,right')" 2
+  assert_success
+  assert_output "$(printf '2\nright')"
+}
+
+@test "dybatpho::csv_select reads stdin, keeps the delimiter and passes an empty input" {
+  DYBATPHO_CSV_DELIMITER=";" \
+    run_traced dybatpho::csv_select - note <<< "$(printf 'name;note\na;"x;y"')"
+  assert_success
+  assert_output "$(printf 'note\n"x;y"')"
+
+  run_traced dybatpho::csv_select "" name
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::csv_select reports a column that is neither a name nor a position" {
+  run --separate-stderr dybatpho::csv_select "$(printf 'a,b\n1,2')" 3
+  assert_failure
+  assert_stderr --partial "No such column: 3. The header has 2 columns: a b"
+
+  run --separate-stderr dybatpho::csv_select "$(printf 'a,b\n1,2')" 0
+  assert_failure
+  assert_stderr --partial "No such column: 0"
+
+  run --separate-stderr dybatpho::csv_select "$(printf 'a,b\n1,2')"
+  assert_failure
+  assert_stderr --partial "Name at least one column"
+
+  run --separate-stderr dybatpho::csv_select "$(printf 'a\n1,2')" a
+  assert_failure
+  assert_stderr --partial "Row 1 has 2 fields"
+}
+
 @test "dybatpho::csv_read returns the data a record with no closing quote still has" {
   local -a records=() fields=()
   dybatpho::csv_read "$(printf 'a,b\n"unterminated,x')" records

@@ -40,6 +40,7 @@ Data containing that byte is rejected rather than silently re-split.
 - [`dybatpho::csv_convert`](#dybatphocsv_convert) — Rewrite CSV with another delimiter. The input is read with `DYBATPHO_CSV_DELIMITER` and written with the delimiter given, quoting each field for the delimiter it is written with: a comma inside a value no longer needs quotes in a TSV file, and a tab inside one does. This is how a comma-separated export becomes TSV, or a semicolon-separated one becomes plain CSV.
 - [`dybatpho::csv_header`](#dybatphocsv_header) — Print the column names from the first record.
 - [`dybatpho::csv_col`](#dybatphocsv_col) — Print one column's values, chosen by its header name. A row shorter than the header reads as an empty value, and a row longer than the header stops the script rather than dropping the extra field.
+- [`dybatpho::csv_select`](#dybatphocsv_select) — Print chosen columns, in the order given, as CSV with the header. A column is named by its header, or by its position counting from `1` when no header carries that name, so `3` picks the third column unless a column is literally called `3`. A column may be chosen more than once, and a row shorter than the header reads as empty values.
 - [`dybatpho::csv_filter`](#dybatphocsv_filter) — Keep the rows whose column satisfies a comparison, and print them as CSV with the header. `gt` and `lt` compare as numbers when both values are numeric, and as text otherwise, so a version column sorts the way a reader expects and a size column the way arithmetic does.
 - [`dybatpho::csv_to_json`](#dybatphocsv_to_json) — Convert CSV to a JSON array of objects, keyed by the header. Every value is a JSON string, because CSV carries no types and guessing them is how an identifier with leading zeros or a version number becomes the wrong value. Cast in `jq` when a consumer needs numbers.
 - [`dybatpho::csv_from_json`](#dybatphocsv_from_json) — Convert a JSON array of objects to CSV. The keys of the first object become the header, in their document order, and a later object missing one of them writes an empty value there.
@@ -247,6 +248,40 @@ dybatpho::csv_col report.csv "Region"
 
 - `0`: The column was printed
 - `1`: No column has that name, or a row has more fields than the header
+
+
+---
+
+### `dybatpho::csv_select`
+
+Print chosen columns, in the order given, as CSV with the header.
+A column is named by its header, or by its position counting from `1` when
+no header carries that name, so `3` picks the third column unless a column
+is literally called `3`. A column may be chosen more than once, and a row
+shorter than the header reads as empty values.
+
+**🧪 Example**
+
+```bash
+dybatpho::csv_select billing.csv owner cost
+dybatpho::csv_select billing.csv 4 1   # cost first, then service
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | CSV file path, `-` for stdin, or CSV text |
+| `$@` | string | Columns to keep: header names or 1-based positions |
+
+**📤 Output on stdout**
+
+- CSV text: the chosen header, then every row's chosen fields
+
+**🚦 Exit codes**
+
+- `0`: The columns were printed, or the input was empty
+- `1`: A column matches neither a name nor a position, or a row is wider than the header
 
 
 ---

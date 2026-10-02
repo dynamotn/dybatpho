@@ -724,16 +724,20 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::curl_auth_bearer "https://api.example.test/me" "s3cr3t" "${body}"
   assert_equal "$(cat "${body}")" '{"login":"dynamotn"}'
   # The token travels in curl's config file, never in its arguments.
-  dybatpho::mock_http_payloads | grep -q 'Authorization: Bearer s3cr3t'
-  ! dybatpho::mock_calls curl | grep -q 's3cr3t'
+  #
+  # Through a here-string, not a pipe: `grep -q` leaves as soon as it matches
+  # and the writer then dies of SIGPIPE, which `pipefail` reports as a failed
+  # pipeline on a userland whose grep does not read to the end.
+  grep -q 'Authorization: Bearer s3cr3t' <<< "$(dybatpho::mock_http_payloads)"
+  ! grep -q 's3cr3t' <<< "$(dybatpho::mock_calls curl)"
 }
 
 @test "dybatpho::curl_auth_bearer keeps the secret headers the caller already set" {
   dybatpho::mock_http "api.example.test/me" 200 '{}'
   local -a DYBATPHO_CURL_SECRET_HEADERS=("X-Trace: abc123")
   dybatpho::curl_auth_bearer "https://api.example.test/me" "s3cr3t"
-  dybatpho::mock_http_payloads | grep -q 'X-Trace: abc123'
-  dybatpho::mock_http_payloads | grep -q 'Authorization: Bearer s3cr3t'
+  grep -q 'X-Trace: abc123' <<< "$(dybatpho::mock_http_payloads)"
+  grep -q 'Authorization: Bearer s3cr3t' <<< "$(dybatpho::mock_http_payloads)"
 }
 
 @test "dybatpho::curl_auth_bearer refuses an empty token" {
@@ -751,8 +755,8 @@ c.close()' > "${portfile}" 2> /dev/null &
   DYBATPHO_GRAPHQL_TOKEN=""
   assert_success
   assert_equal "$(dybatpho::json_get "$(< "${body}")" '.data.viewer.login')" "dynamotn"
-  dybatpho::mock_http_payloads | grep -q '"login": *"dynamotn"'
-  dybatpho::mock_http_payloads | grep -q 'Authorization: Bearer gql-token'
+  grep -q '"login": *"dynamotn"' <<< "$(dybatpho::mock_http_payloads)"
+  grep -q 'Authorization: Bearer gql-token' <<< "$(dybatpho::mock_http_payloads)"
 }
 
 @test "dybatpho::curl_graphql treats an errors array in a 200 as a failure" {

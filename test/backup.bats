@@ -118,6 +118,30 @@ plant() {
   assert_line --index 2 "${DEST}/snap-20260101T000000Z.tar.gz"
 }
 
+@test "dybatpho::backup_list orders backups from the same second by their suffix" {
+  # The suffix is the only thing telling these apart, and a name comparison
+  # gets it wrong: under C collation `-1.` sorts before `.`, and everywhere
+  # `-10` sorts before `-2`.
+  plant "snap-20260101T000000Z.tar.gz"
+  plant "snap-20260101T000000Z-1.tar.gz"
+  plant "snap-20260101T000000Z-2.tar.gz"
+  plant "snap-20260101T000000Z-10.tar.gz"
+  plant "snap-20251231T235959Z-3.tar.gz"
+  mkdir -p "${DEST}/snap-20260101T000000Z-11.snapshot"
+
+  local locale
+  for locale in C "${LANG:-C}"; do
+    LC_ALL="${locale}" run_traced dybatpho::backup_list "${DEST}" snap
+    assert_success
+    assert_line --index 0 "${DEST}/snap-20260101T000000Z-11.snapshot"
+    assert_line --index 1 "${DEST}/snap-20260101T000000Z-10.tar.gz"
+    assert_line --index 2 "${DEST}/snap-20260101T000000Z-2.tar.gz"
+    assert_line --index 3 "${DEST}/snap-20260101T000000Z-1.tar.gz"
+    assert_line --index 4 "${DEST}/snap-20260101T000000Z.tar.gz"
+    assert_line --index 5 "${DEST}/snap-20251231T235959Z-3.tar.gz"
+  done
+}
+
 @test "dybatpho::backup_list matches one name and says nothing for an empty directory" {
   plant "snap-20260101T000000Z.tar.gz"
   plant "other-20260301T000000Z.tar.gz"

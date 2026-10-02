@@ -488,6 +488,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It used to be rejected inside a command substitution, so the error was
   printed and the command ran anyway, uncached.
 
+- **`backup` — backups taken in the same second are listed in the order they
+  were taken.** `dybatpho::backup_list`, `dybatpho::backup_latest` and
+  `dybatpho::backup_prune` ordered names the way the shell's collation did, so
+  under the C locale `snap-<stamp>-1` counted as older than `snap-<stamp>`, and
+  under every locale `-10` counted as older than `-2`. `backup_latest` could
+  name the wrong backup and `--keep-count` could prune the newest one. The
+  same-second suffix is now compared as a number, whatever the locale.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

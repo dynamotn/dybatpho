@@ -71,10 +71,37 @@ function __dybatpho_backup_is_snapshot {
 }
 
 #######################################
+# @description Build the key that orders a backup among the others.
+#   The key is the backup name, the UTC stamp, and the same-second suffix
+#   zero-padded to nine digits, joined by a byte lower than any character a
+#   name can hold, so a byte-wise comparison orders by name, then by the time
+#   the backup was taken, then by the suffix as a number. A file name that does
+#   not carry a stamp keys as itself.
+# @arg $1 string Name of the variable receiving the key
+# @arg $2 string Path of the backup
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_backup_sort_key_into {
+  local -n __dybatpho_backup_key_ref="$1"
+  local __dybatpho_backup_base="${2##*/}"
+  __dybatpho_backup_base="${__dybatpho_backup_base%.snapshot}"
+  __dybatpho_backup_base="${__dybatpho_backup_base%."${DYBATPHO_BACKUP_EXTENSION}"}"
+
+  if [[ "${__dybatpho_backup_base}" =~ ^(.*)-([0-9]{8}T[0-9]{6}Z)(-([0-9]+))?$ ]]; then
+    printf -v __dybatpho_backup_key_ref '%s\001%s\001%09d' \
+      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "$((10#${BASH_REMATCH[4]:-0}))"
+  else
+    __dybatpho_backup_key_ref="${__dybatpho_backup_base}"
+  fi
+}
+
+#######################################
 # @description Collect a directory's backups into a named array, newest first.
 #   Archives and incremental snapshots are both backups. Each kind is globbed
-#   on its own, which keeps each list in name order, and the two are merged by
-#   name, so the result stays in the order the backups were taken.
+#   on its own, and the two are ordered together by name, stamp and
+#   same-second suffix, so the result stays in the order the backups were taken
+#   whatever the caller's collation.
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string Directory holding the backups
 # @arg $3 string Backup name to match, or empty for every name
@@ -95,10 +122,10 @@ function __dybatpho_backup_collect_into {
   local __dybatpho_backup_path
   # The cases are written out rather than folded into one pattern variable: a
   # `*` that comes from a quoted expansion is the character, not the wildcard,
-  # so the unfiltered listing would match nothing at all. A glob is already
-  # sorted ascending, and the names carry a sortable UTC stamp, so no `sort`
-  # is needed and a path holding a newline does no harm. A glob that matched
-  # nothing stays literal, which the kind checks below drop.
+  # so the unfiltered listing would match nothing at all. The order comes from
+  # the sort keys below, not from the glob, so no `sort` is needed and a path
+  # holding a newline does no harm. A glob that matched nothing stays literal,
+  # which the kind checks below drop.
   if [[ "${__dybatpho_backup_kind}" != snapshot ]]; then
     if [[ -n "${__dybatpho_backup_name}" ]]; then
       __dybatpho_backup_archives=("${__dybatpho_backup_dir}/${__dybatpho_backup_name}"-*."${DYBATPHO_BACKUP_EXTENSION}")
@@ -124,27 +151,30 @@ function __dybatpho_backup_collect_into {
     __dybatpho_backup_trees+=("${__dybatpho_backup_path}")
   done
 
-  # Merge the two ascending lists into one, compared the way the glob sorted
-  # each of them.
-  local -a __dybatpho_backup_sorted=()
-  local __dybatpho_backup_i=0 __dybatpho_backup_j=0
-  local __dybatpho_backup_files_n="${#__dybatpho_backup_files[@]}"
-  local __dybatpho_backup_trees_n="${#__dybatpho_backup_trees[@]}"
-  local __dybatpho_backup_file __dybatpho_backup_snap
-  while ((__dybatpho_backup_i < __dybatpho_backup_files_n || __dybatpho_backup_j < __dybatpho_backup_trees_n)); do
-    __dybatpho_backup_file="${__dybatpho_backup_files[${__dybatpho_backup_i}]-}"
-    __dybatpho_backup_snap="${__dybatpho_backup_trees[${__dybatpho_backup_j}]-}"
-    if [[ -n "${__dybatpho_backup_file}" ]] \
-      && [[ -z "${__dybatpho_backup_snap}" || "${__dybatpho_backup_file}" < "${__dybatpho_backup_snap}" ]]; then
-      __dybatpho_backup_sorted+=("${__dybatpho_backup_file}")
-      __dybatpho_backup_i=$((__dybatpho_backup_i + 1))
-    else
-      __dybatpho_backup_sorted+=("${__dybatpho_backup_snap}")
-      __dybatpho_backup_j=$((__dybatpho_backup_j + 1))
-    fi
+  # Order both kinds together by sort key rather than trusting the glob. The
+  # glob compares whole names under the caller's collation, which gets the
+  # same-second suffix wrong: `-1.` against `.` flips between collations, so
+  # `snap-<stamp>-1` could count as older than `snap-<stamp>`, and `-10` sorts
+  # before `-2` under every collation. The keys compare byte by byte.
+  local LC_ALL=C
+  local -a __dybatpho_backup_sorted=() __dybatpho_backup_keys=()
+  local __dybatpho_backup_key __dybatpho_backup_at
+  for __dybatpho_backup_path in \
+    ${__dybatpho_backup_files[@]+"${__dybatpho_backup_files[@]}"} \
+    ${__dybatpho_backup_trees[@]+"${__dybatpho_backup_trees[@]}"}; do
+    __dybatpho_backup_sort_key_into __dybatpho_backup_key "${__dybatpho_backup_path}"
+    __dybatpho_backup_at="${#__dybatpho_backup_sorted[@]}"
+    while ((__dybatpho_backup_at > 0)) \
+      && [[ "${__dybatpho_backup_keys[__dybatpho_backup_at - 1]}" > "${__dybatpho_backup_key}" ]]; do
+      __dybatpho_backup_sorted[__dybatpho_backup_at]="${__dybatpho_backup_sorted[__dybatpho_backup_at - 1]}"
+      __dybatpho_backup_keys[__dybatpho_backup_at]="${__dybatpho_backup_keys[__dybatpho_backup_at - 1]}"
+      __dybatpho_backup_at=$((__dybatpho_backup_at - 1))
+    done
+    __dybatpho_backup_sorted[__dybatpho_backup_at]="${__dybatpho_backup_path}"
+    __dybatpho_backup_keys[__dybatpho_backup_at]="${__dybatpho_backup_key}"
   done
 
-  local __dybatpho_backup_at=$((${#__dybatpho_backup_sorted[@]} - 1))
+  __dybatpho_backup_at=$((${#__dybatpho_backup_sorted[@]} - 1))
   for (( ; __dybatpho_backup_at >= 0; __dybatpho_backup_at--)); do
     __dybatpho_backup_found_ref+=("${__dybatpho_backup_sorted[${__dybatpho_backup_at}]}")
   done

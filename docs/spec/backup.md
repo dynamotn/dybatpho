@@ -138,6 +138,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 
 - The source does not exist, or the destination has to be created.
 - Two backups are taken within the same second.
+- Ten or more backups are taken within the same second, so a suffix of `-10` sits beside `-2`, and the caller's collation orders `-1.` before or after `.`.
 - The archiver fails partway through.
 - A backup has no checksum sidecar, or does not match the one it has.
 - The directory holds no backups, or holds backups of several names.
@@ -188,6 +189,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-030**: Restoring a snapshot MUST verify it, MUST copy its one entry into the target as plain files, MUST confirm an overwrite unless forced, MUST honor `DRY_RUN`, and MUST stop when the snapshot does not hold exactly one entry.
 - **FR-031**: Pruning a snapshot MUST remove its directory and sidecar without affecting a file another snapshot links.
 - **FR-032**: A comparison MUST accept a snapshot on either side, verified before it is read.
+- **FR-033**: Listing, resolving the latest and pruning MUST order backups by name, then UTC stamp, then same-second suffix compared as a number, archives and snapshots together, independently of the caller's collation.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -246,6 +248,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-036**: Prune a snapshot while the one sharing its files still verifies.
 - **IT-037**: Compare snapshots with each other, with the live source and with an archive, and refuse a tampered one or one without a sidecar.
 - **IT-038**: Take two snapshots in the same second under distinct names.
+- **IT-039**: List archives and a snapshot taken in the same second newest first by suffix, `-10` before `-2` and `-1` before the unsuffixed name, under C collation and the session's own.
 
 ## Acceptance Criteria *(mandatory)*
 

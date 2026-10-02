@@ -71,13 +71,16 @@ As a script author, I want the option to stop at the first failure so that a bro
 
 **Why this priority**: Useful, but the default of running everything is what most callers want, since it reports on the whole list.
 
-**Independent Test**: Run a failing job in the middle of a list with fail-fast on, and verify that the jobs after it never ran.
+**Independent Test**: Run a failing job in the middle of a list with fail-fast on, and verify that the jobs after it never ran and the jobs beside it were ended.
 
 **Acceptance Scenarios**:
 
 1. **Given** fail-fast is on and a job fails, **When** the run continues, **Then** the remaining jobs are never started
 2. **Given** a job that never started, **When** its status is read, **Then** it is reported as skipped rather than as a failure
 3. **Given** fail-fast is off, **When** a job fails, **Then** every other job still runs
+4. **Given** fail-fast is on and a job fails while another is still running, **When** the failure is seen, **Then** the running job is ended together with its children, reported as terminated, and not counted as a failure
+5. **Given** fail-fast stops a run, **When** the run ends, **Then** standard error names the job that failed, its label, and its exit code
+6. **Given** `--fail-fast` before the job count, **When** the run starts, **Then** it behaves as `DYBATPHO_PARALLEL_FAILFAST=true` does, for that call only
 
 ---
 
@@ -104,6 +107,9 @@ done
 - A status read for an index that has no job.
 - A job that starts a child of its own, which must not outlive an interrupted run.
 - A caller whose shell already had job control enabled.
+- A failure that arrives after the last job has started, while the pool is draining.
+- An item that starts with `--`, which is an item rather than an option because options end at the job count.
+- An unknown option, or `--` used to end the options.
 - A run captured in a command substitution, which happens in a subshell.
 
 ## Requirements *(mandatory)*
@@ -123,12 +129,16 @@ done
 - **FR-011**: The pool MUST restore the caller's job-control setting, which it changes in order to give each job its own process group.
 - **FR-012**: The module MUST honor `DRY_RUN` by reporting the jobs and running none of them.
 - **FR-013**: The pool MUST keep itself full by waiting for the next job to finish, rather than draining and refilling in batches.
+- **FR-014**: `dybatpho::parallel_map` and `dybatpho::parallel_run` MUST accept leading options before the job count, MUST treat everything from the job count on as positional, MUST accept `--` to end the options, and MUST stop the caller on an unknown option.
+- **FR-015**: `--fail-fast` MUST enable fail-fast for that call regardless of `DYBATPHO_PARALLEL_FAILFAST`.
+- **FR-016**: With fail-fast enabled, the first failure MUST end every job still running, together with its process group, including while the pool drains after the last job started; such a job MUST be reported as `terminated` and MUST NOT be counted by `dybatpho::parallel_failed`.
+- **FR-017**: When fail-fast stops a run, the module MUST report on standard error the index, label (item or command string), and exit code of the job that failed.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Job**: One unit of work, with its own captured output and exit code.
 - **Pool**: The bound on how many jobs run at once.
-- **Status**: The exit code of one job, or the fact that it never ran.
+- **Status**: The exit code of one job, or the fact that it never ran (`skipped`) or was ended by fail-fast (`terminated`).
 
 ## Success Criteria *(mandatory)*
 
@@ -157,6 +167,11 @@ done
 - **IT-014**: Verify the caller's job-control setting is the same after a run as before it.
 - **IT-015**: Verify a job can call a function defined by the caller.
 - **IT-016**: Verify that capturing a run in a command substitution leaves the recorded statuses untouched.
+- **IT-017**: Verify `--fail-fast` stops the pool the same way the variable does.
+- **IT-018**: Start a slow job beside a failing one with `--fail-fast`, and verify the slow job and its child are ended, it reads as `terminated`, it is not counted as failed, and standard error names the failing job.
+- **IT-019**: Verify `dybatpho::parallel_run` accepts `--fail-fast` and names the failing command.
+- **IT-020**: Verify `--` ends the options and an unknown option is refused by both entry points.
+- **IT-021**: Verify an item that looks like an option is passed to the job unchanged.
 
 ## Acceptance Criteria *(mandatory)*
 

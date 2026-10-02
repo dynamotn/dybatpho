@@ -37,7 +37,7 @@ the caller has defined without exporting anything.
 - [`dybatpho::parallel_run`](#dybatphoparallel_run) — Run several shell commands at once, each given as one string. Use this when the jobs differ from one another; use `dybatpho::parallel_map` when the same command runs over a list, because that form needs no quoting.
 - [`dybatpho::parallel_status`](#dybatphoparallel_status) — Print the exit code of one job of the last run.
 - [`dybatpho::parallel_count`](#dybatphoparallel_count) — Print how many jobs the last run had.
-- [`dybatpho::parallel_failed`](#dybatphoparallel_failed) — Print how many jobs of the last run failed. A job that fail-fast prevented from starting is not counted: it did not run, so it did not fail.
+- [`dybatpho::parallel_failed`](#dybatphoparallel_failed) — Print how many jobs of the last run failed. A job that fail-fast prevented from starting, or ended while it ran, is not counted: it was stopped because another job failed, not because it did.
 
 <a id="see-also"></a>
 ## 🔗 See also
@@ -80,6 +80,19 @@ dybatpho::parallel_map 4 _convert ./images/*.png
 dybatpho::parallel_map 0 _check "${hosts[@]}"
 
 ```
+
+```bash
+# Stop everything as soon as one host fails.
+dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}"
+
+```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
+| -- End of options, for a job count that is not one |  |
 
 **🧾 Arguments**
 
@@ -132,6 +145,13 @@ dybatpho::parallel_run 3 \
   "go build ./..."
 
 ```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
+| -- End of options |  |
 
 **🧾 Arguments**
 
@@ -189,7 +209,8 @@ done
 
 **📤 Output on stdout**
 
-- The job's exit code, or `skipped` when fail-fast stopped it from running
+- The job's exit code, `skipped` when fail-fast stopped it from
+  starting, or `terminated` when fail-fast ended it while it was running
 
 **🚦 Exit codes**
 
@@ -214,8 +235,8 @@ _Function has no arguments._
 ### `dybatpho::parallel_failed`
 
 Print how many jobs of the last run failed.
-A job that fail-fast prevented from starting is not counted: it did not run,
-so it did not fail.
+A job that fail-fast prevented from starting, or ended while it ran, is not
+counted: it was stopped because another job failed, not because it did.
 
 _Function has no arguments._
 

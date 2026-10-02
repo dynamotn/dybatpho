@@ -5,7 +5,8 @@
 # @file parallel_ops.sh
 # @brief Example showing bounded concurrency with ordered output
 # @description Demonstrates dybatpho::parallel_map, parallel_run,
-#   parallel_status, parallel_count, parallel_failed, fail-fast, and DRY_RUN
+#   parallel_status, parallel_count, parallel_failed, fail-fast (the variable
+#   and `--fail-fast`), and DRY_RUN
 # shellcheck disable=SC2034 # DYBATPHO_PARALLEL_FAILFAST is read by the parallel module
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules parallel
@@ -100,6 +101,24 @@ function _demo_failfast {
     dybatpho::print "  job ${index} -> ${parallel_status}"
   done
   dybatpho::info "A skipped job never ran, so it counts as neither pass nor fail"
+
+  dybatpho::info "--fail-fast also ends a job that is still running when another fails"
+  # @description A long build beside a short one that fails.
+  # @arg $1 string Name of the job
+  function _build {
+    if [[ "$1" == "slow" ]]; then
+      sleep 10
+      return 0
+    fi
+    sleep 0.2
+    return 2
+  }
+  dybatpho::parallel_map --fail-fast 2 _build slow broken || true
+  local slow broken
+  slow=$(dybatpho::parallel_status 0)
+  broken=$(dybatpho::parallel_status 1)
+  dybatpho::print "  slow -> ${slow}"
+  dybatpho::print "  broken -> ${broken}"
 }
 
 # @description Run the `DRY RUN` section of this example.

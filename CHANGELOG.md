@@ -177,6 +177,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   dybatpho::with_semaphore downloads 4 60 -- curl -fsSLO "${url}"
   dybatpho::lock_semaphore_acquire builds 2 300 slot || exit 1
+- **`parallel` — fail-fast now ends the jobs still running, and says why.**
+  `dybatpho::parallel_map` and `dybatpho::parallel_run` take a `--fail-fast`
+  option before the job count, the per-call form of
+  `DYBATPHO_PARALLEL_FAILFAST=true`. Fail-fast used to stop only new jobs from
+  starting and then waited for the ones already running, however long they
+  took; the first failure now ends every running job together with the
+  processes it started, including while the last jobs drain. Such a job reads
+  `terminated` from `dybatpho::parallel_status` and, like a `skipped` one, is
+  not counted by `dybatpho::parallel_failed`. A warning on standard error names
+  the job that failed, its item or command, and its exit code.
+
+  ```sh
+  dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}" || exit 1
   ```
 
 ### Fixed

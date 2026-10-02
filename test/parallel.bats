@@ -123,6 +123,63 @@ _failing_job() {
   assert_equal "$(grep -c '^ran ' "${LOG}")" "4"
 }
 
+@test "--fail-fast stops the pool the way the variable does" {
+  ! dybatpho::parallel_map --fail-fast 1 _failing_job a bad1 c > /dev/null 2>&1
+  assert_equal "$(tr '\n' ' ' < "${LOG}")" "ran a ran bad1 "
+  assert_equal "$(dybatpho::parallel_status 2)" "skipped"
+}
+
+@test "fail-fast ends a job still running when another fails" {
+  # Both jobs start at once, so the failure arrives while the pool is draining:
+  # the slow job must be ended there rather than waited for.
+  _slow_or_bad() {
+    if [[ "$1" == "slow" ]]; then
+      sleep 30 &
+      printf '%s' "$!" > "${BATS_TEST_TMPDIR}/sleeper"
+      wait
+      printf 'slow finished\n' >> "${LOG}"
+      return 0
+    fi
+    while [[ ! -s "${BATS_TEST_TMPDIR}/sleeper" ]]; do sleep 0.05; done
+    return 3
+  }
+  local started="${SECONDS}"
+  ! dybatpho::parallel_map --fail-fast 3 _slow_or_bad slow bad \
+    > /dev/null 2> "${BATS_TEST_TMPDIR}/stderr"
+  ((SECONDS - started < 10))
+  assert_equal "$(dybatpho::parallel_status 0)" "terminated"
+  assert_equal "$(dybatpho::parallel_status 1)" "3"
+  # Ended because another job failed, so it is not a failure of its own.
+  assert_equal "$(dybatpho::parallel_failed)" "1"
+  refute grep -q 'slow finished' "${LOG}"
+  # The job's own child goes with it, since the whole process group is ended.
+  assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
+  run_traced grep -c 'Job 1 (bad) failed with exit 3' "${BATS_TEST_TMPDIR}/stderr"
+  assert_output "1"
+}
+
+@test "dybatpho::parallel_run takes --fail-fast too" {
+  ! dybatpho::parallel_run --fail-fast 1 "true" "exit 4" "true" > /dev/null 2> "${BATS_TEST_TMPDIR}/stderr"
+  assert_equal "$(dybatpho::parallel_status 1)" "4"
+  assert_equal "$(dybatpho::parallel_status 2)" "skipped"
+  run_traced grep -c 'Job 1 (exit 4) failed with exit 4' "${BATS_TEST_TMPDIR}/stderr"
+  assert_output "1"
+}
+
+@test "-- ends the options, and an unknown option is refused" {
+  run_traced --separate-stderr -0 dybatpho::parallel_map -- 2 _echo_job a
+  assert_output "out a"
+  run ! dybatpho::parallel_map --fast 2 _echo_job a
+  assert_output --partial "Unknown option '--fast'"
+  run ! dybatpho::parallel_run --fast 2 "true"
+}
+
+@test "an item that looks like an option is still an item" {
+  _capture_job() { printf '[%s]\n' "$1"; }
+  run_traced --separate-stderr -0 dybatpho::parallel_map 1 _capture_job --fail-fast
+  assert_output "[--fail-fast]"
+}
+
 @test "dybatpho::parallel_run evaluates each command string" {
   run_traced -0 dybatpho::parallel_run 2 "printf 'one\n'" "printf 'two\n'; true"
   assert_line --index 0 "one"

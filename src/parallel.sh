@@ -96,62 +96,112 @@ function __dybatpho_parallel_flush {
 }
 
 #######################################
-# @description Return success when a finished job has failed.
-# @arg $1 string Directory holding the captured output
-# @arg $2 number Number of jobs
-# @exitcode 0 A finished job failed
-# @exitcode 1 Every job that finished so far succeeded
+# @description Read the options that may lead a pool call.
+#   Options come before the job count and nothing after it is read as one, so an
+#   item that happens to start with `--` stays an item. Every option sets a
+#   variable the calling entry point declared, which is how the pool reads them
+#   without a second argument list.
+# @arg $1 string Name of the variable that receives how many arguments were options
+# @arg $@ string The arguments the entry point was called with
+# @set __dybatpho_parallel_opt_failfast `true` when `--fail-fast` was given
+# @exitcode 1 Stop the script on an unknown option
 # @internal
 #######################################
-function __dybatpho_parallel_any_failed {
-  local directory total index status
-  dybatpho::expect_args directory total -- "$@"
-  for ((index = 0; index < total; index++)); do
-    [[ -f "${directory}/${index}.status" ]] || continue
-    status="$(cat -- "${directory}/${index}.status")"
-    [[ "${status}" == "0" ]] || return 0
+function __dybatpho_parallel_options {
+  local -n __dybatpho_parallel_consumed="$1"
+  shift
+  __dybatpho_parallel_consumed=0
+  while (($#)); do
+    case "$1" in
+      --fail-fast) __dybatpho_parallel_opt_failfast=true ;;
+      --)
+        __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
+        return 0
+        ;;
+      # Exercised under `run` by "-- ends the options, and an unknown option is
+      # refused", which kcov cannot see because `dybatpho::die` ends the shell.
+      --*) dybatpho::die "${FUNCNAME[1]}: Unknown option '$1'" ;; # kcov(skip)
+      *) return 0 ;;
+    esac
+    shift
+    __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
   done
-  return 1
 }
 
 #######################################
-# @description Drop the process IDs that have already been reaped.
-#   `wait -n` reaps one child, so at least one entry disappears on every pass
-#   and the pool always makes progress.
-# @arg $1 string Name of the array holding the process IDs
+# @description Reap the jobs that have finished and act on what they reported.
+#   `wait -n` blocks until at least one job ends, so every call makes progress.
+#   Exit codes travel through files rather than through `wait`, because
+#   `wait -n` reports a status without saying which job it belongs to. Under
+#   fail-fast, the first failure seen ends every job still running and stops the
+#   pool from starting more.
+# @arg $1 string Directory holding the captured output
+# @set __dybatpho_parallel_pids Only the jobs still running
+# @set __dybatpho_parallel_stop `true` once fail-fast has stopped the pool
 # @internal
 #######################################
-function __dybatpho_parallel_prune {
-  local -n __pids="$1"
-  local pid
-  local -a alive=()
-  for pid in ${__pids[@]+"${__pids[@]}"}; do
-    kill -0 "${pid}" 2> /dev/null && alive+=("${pid}")
+function __dybatpho_parallel_reap {
+  local directory="$1" pid index status message
+  local -a alive=() finished=()
+  wait -n 2> /dev/null || true
+  for pid in ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"}; do
+    if kill -0 "${pid}" 2> /dev/null; then
+      alive+=("${pid}")
+    else
+      finished+=("${__dybatpho_parallel_index_of[${pid}]}")
+    fi
   done
-  __pids=(${alive[@]+"${alive[@]}"})
+  __dybatpho_parallel_pids=(${alive[@]+"${alive[@]}"})
+
+  for index in ${finished[@]+"${finished[@]}"}; do
+    [[ -f "${directory}/${index}.status" ]] || continue
+    status="$(< "${directory}/${index}.status")"
+    [[ "${status}" != "0" && "${__dybatpho_parallel_stop}" != true ]] || continue
+    dybatpho::is true "${__dybatpho_parallel_failfast}" || continue
+    __dybatpho_parallel_stop=true
+    printf -v message 'Job %s (%s) failed with exit %s, stopping the remaining jobs' \
+      "${index}" "${__dybatpho_parallel_labels[index]}" "${status}"
+    dybatpho::warn "${message}"
+  done
+
+  if [[ "${__dybatpho_parallel_stop}" == true ]] && ((${#__dybatpho_parallel_pids[@]})); then
+    for pid in "${__dybatpho_parallel_pids[@]}"; do
+      __dybatpho_parallel_terminated+=("${__dybatpho_parallel_index_of[${pid}]}")
+    done
+    __dybatpho_parallel_terminate "${__dybatpho_parallel_pids[@]}"
+    __dybatpho_parallel_pids=()
+  fi
+  return 0
 }
 
 #######################################
 # @description Run a bounded pool over jobs started by a launcher function.
 #   The launcher receives a job index and the capture directory, and starts that
-#   one job. The pool waits with `wait -n`, so a finished job is replaced right
-#   away rather than at the end of a batch. Exit codes travel through files
-#   rather than through `wait`, because `wait -n` reports a status without
-#   saying which job it belongs to.
+#   one job. A finished job is replaced right away rather than at the end of a
+#   batch, and the pool keeps watching while the last jobs drain, so fail-fast
+#   ends a long job that is still running when another one fails.
 # @arg $1 number Jobs to run at once
 # @arg $2 string Launcher function name
 # @arg $3 number Number of jobs
+# @arg $4 string Name of the array labelling each job in diagnostics
 # @set DYBATPHO_PARALLEL_STATUS
 # @exitcode 0 Every job that ran succeeded
 # @exitcode 1 At least one job failed
 # @internal
 #######################################
 function __dybatpho_parallel_pool {
-  local concurrency launcher total directory index status failed=0 stop=false
-  dybatpho::expect_args concurrency launcher total -- "$@"
+  local concurrency launcher total labels directory index status failed=0
+  dybatpho::expect_args concurrency launcher total labels -- "$@"
+  local -n __dybatpho_parallel_labels="${labels}"
 
   dybatpho::create_temp directory "/" "parallel"
   DYBATPHO_PARALLEL_STATUS=()
+
+  local __dybatpho_parallel_failfast="${DYBATPHO_PARALLEL_FAILFAST}"
+  [[ "${__dybatpho_parallel_opt_failfast:-false}" != true ]] || __dybatpho_parallel_failfast=true
+  local __dybatpho_parallel_stop=false
+  local -A __dybatpho_parallel_index_of=()
+  local -a __dybatpho_parallel_terminated=()
 
   # Job control gives every job its own process group, which is what makes it
   # possible to end a job together with whatever it started. It is restored
@@ -178,30 +228,27 @@ function __dybatpho_parallel_pool {
   for ((index = 0; index < total; index++)); do
     # Fail-fast leaves the remaining jobs unstarted, which the status of an
     # unstarted job records as empty rather than as a failure.
-    [[ "${stop}" == true ]] && continue
+    [[ "${__dybatpho_parallel_stop}" != true ]] || break
 
     "${launcher}" "${index}" "${directory}" &
     __dybatpho_parallel_pids+=("$!")
+    __dybatpho_parallel_index_of[$!]="${index}"
 
-    if ((${#__dybatpho_parallel_pids[@]} >= concurrency)); then
-      # `wait -n` blocks until one job finishes, which keeps the pool full
-      # instead of draining it between batches.
-      wait -n 2> /dev/null || true
-      __dybatpho_parallel_prune __dybatpho_parallel_pids
-      if dybatpho::is true "${DYBATPHO_PARALLEL_FAILFAST}" \
-        && __dybatpho_parallel_any_failed "${directory}" "${total}"; then
-        stop=true
-        __dybatpho_parallel_terminate ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"}
-        __dybatpho_parallel_pids=()
-      fi
-    fi
+    while ((${#__dybatpho_parallel_pids[@]} >= concurrency)); do
+      __dybatpho_parallel_reap "${directory}"
+    done
   done
 
-  __dybatpho_parallel_wait_all
+  while ((${#__dybatpho_parallel_pids[@]})); do
+    __dybatpho_parallel_reap "${directory}"
+  done
 
+  for index in ${__dybatpho_parallel_terminated[@]+"${__dybatpho_parallel_terminated[@]}"}; do
+    DYBATPHO_PARALLEL_STATUS[index]="terminated"
+  done
   for ((index = 0; index < total; index++)); do
     [[ -f "${directory}/${index}.status" ]] || continue
-    status="$(cat -- "${directory}/${index}.status")"
+    status="$(< "${directory}/${index}.status")"
     DYBATPHO_PARALLEL_STATUS[index]="${status}"
     [[ "${status}" == "0" ]] || failed=$((failed + 1))
   done
@@ -210,19 +257,6 @@ function __dybatpho_parallel_pool {
 
   __dybatpho_parallel_flush "${directory}" "${total}"
   ((failed == 0))
-}
-
-#######################################
-# @description Wait for every job the pool still tracks.
-# @noargs
-# @internal
-#######################################
-function __dybatpho_parallel_wait_all {
-  local pid
-  for pid in ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"}; do
-    wait "${pid}" 2> /dev/null || true
-  done
-  __dybatpho_parallel_pids=()
 }
 
 #######################################
@@ -238,6 +272,12 @@ function __dybatpho_parallel_wait_all {
 #   # Let the job count follow the machine.
 #   dybatpho::parallel_map 0 _check "${hosts[@]}"
 #
+# @example
+#   # Stop everything as soon as one host fails.
+#   dybatpho::parallel_map --fail-fast 4 _deploy "${hosts[@]}"
+#
+# @option --fail-fast Stop starting jobs and end the running ones once a job fails
+# @option -- End of options, for a job count that is not one
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
 # @arg $2 string Command or function to run for each item
 # @arg $@ string Items, one job each
@@ -256,6 +296,9 @@ function __dybatpho_parallel_wait_all {
 #   `dybatpho::parallel_status` unchanged
 #######################################
 function dybatpho::parallel_map {
+  local __dybatpho_parallel_opt_failfast=false consumed
+  __dybatpho_parallel_options consumed "$@"
+  shift "${consumed}"
   local concurrency command
   dybatpho::expect_args concurrency command -- "$@"
   shift 2
@@ -290,7 +333,7 @@ function dybatpho::parallel_map {
   }
 
   __dybatpho_parallel_pool "${concurrency}" __dybatpho_parallel_launch_item \
-    "${#__dybatpho_parallel_items[@]}"
+    "${#__dybatpho_parallel_items[@]}" __dybatpho_parallel_items
 }
 
 #######################################
@@ -303,6 +346,8 @@ function dybatpho::parallel_map {
 #     "cargo build --release" \
 #     "go build ./..."
 #
+# @option --fail-fast Stop starting jobs and end the running ones once a job fails
+# @option -- End of options
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
 # @arg $@ string Shell command strings, one job each
 # @set DYBATPHO_PARALLEL_STATUS
@@ -319,6 +364,9 @@ function dybatpho::parallel_map {
 #   `dybatpho::parallel_status` unchanged
 #######################################
 function dybatpho::parallel_run {
+  local __dybatpho_parallel_opt_failfast=false consumed
+  __dybatpho_parallel_options consumed "$@"
+  shift "${consumed}"
   local concurrency
   dybatpho::expect_args concurrency -- "$@"
   shift
@@ -352,7 +400,7 @@ function dybatpho::parallel_run {
   }
 
   __dybatpho_parallel_pool "${concurrency}" __dybatpho_parallel_launch_command \
-    "${#__dybatpho_parallel_commands[@]}"
+    "${#__dybatpho_parallel_commands[@]}" __dybatpho_parallel_commands
 }
 
 #######################################
@@ -364,7 +412,8 @@ function dybatpho::parallel_run {
 #   done
 #
 # @arg $1 number Job index, counting from zero in submission order
-# @stdout The job's exit code, or `skipped` when fail-fast stopped it from running
+# @stdout The job's exit code, `skipped` when fail-fast stopped it from
+#   starting, or `terminated` when fail-fast ended it while it was running
 # @exitcode 1 There is no job with that index
 #######################################
 function dybatpho::parallel_status {
@@ -392,15 +441,18 @@ function dybatpho::parallel_count {
 
 #######################################
 # @description Print how many jobs of the last run failed.
-#   A job that fail-fast prevented from starting is not counted: it did not run,
-#   so it did not fail.
+#   A job that fail-fast prevented from starting, or ended while it ran, is not
+#   counted: it was stopped because another job failed, not because it did.
 # @noargs
 # @stdout Number of failed jobs
 #######################################
 function dybatpho::parallel_failed {
   local status failed=0
   for status in ${DYBATPHO_PARALLEL_STATUS[@]+"${DYBATPHO_PARALLEL_STATUS[@]}"}; do
-    [[ -n "${status}" && "${status}" != "0" ]] && failed=$((failed + 1))
+    case "${status}" in
+      "" | 0 | terminated) ;; # kcov(skip) empty arm, taken by every passing job
+      *) failed=$((failed + 1)) ;;
+    esac
   done
   printf '%s\n' "${failed}"
 }

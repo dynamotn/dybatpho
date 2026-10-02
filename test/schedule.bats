@@ -272,6 +272,9 @@ note() {
 }
 
 @test "dybatpho::schedule_cron_due defaults to the current time" {
+  # A frozen clock keeps "now" in one minute: read live, the minute could turn
+  # between computing the expression and evaluating it.
+  dybatpho::mock_time 1790946330
   local now minute hour
   now="$(dybatpho::date_now "%s")"
   minute="$(dybatpho::date_format "${now}" "%M")"
@@ -279,4 +282,5 @@ note() {
 
   run_traced -0 dybatpho::schedule_cron_due "$((10#${minute})) $((10#${hour})) * * *"
   run_traced -0 dybatpho::schedule_cron_due "* * * * *"
+  dybatpho::unmock_time
 }

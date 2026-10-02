@@ -2,6 +2,12 @@ setup() {
   load test_helper
   export DYBATPHO_LOCK_DIR="${BATS_TEST_TMPDIR}"
   export DYBATPHO_LOCK_POLL_INTERVAL="0.1"
+  # A pid one above the kernel's ceiling can never be running. A fixed number
+  # such as 999999 can: Linux allows pids up to 4194304, and on a busy machine
+  # a real process held one, which made a dead lock look alive.
+  local pid_max=99999
+  [[ -r /proc/sys/kernel/pid_max ]] && pid_max="$(< /proc/sys/kernel/pid_max)"
+  DEAD_PID="$((pid_max + 1))"
 }
 
 teardown() {
@@ -114,8 +120,7 @@ teardown() {
   local lock_path
   lock_path="$(dybatpho::lock_path "stale")"
   mkdir "${lock_path}"
-  # 999999 is exceedingly unlikely to be a running pid in the test environment.
-  printf '%s' "999999" > "${lock_path}/pid"
+  printf '%s' "${DEAD_PID}" > "${lock_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${lock_path}/host"
 
   run_traced --separate-stderr dybatpho::lock_acquire "stale"
@@ -174,8 +179,7 @@ teardown() {
   local lock_path
   lock_path="$(dybatpho::lock_path "alive-dead")"
   mkdir "${lock_path}"
-  # 999999 is exceedingly unlikely to be a running pid in the test environment.
-  printf '%s' "999999" > "${lock_path}/pid"
+  printf '%s' "${DEAD_PID}" > "${lock_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${lock_path}/host"
 
   run_traced dybatpho::lock_is_alive "${lock_path}"
@@ -193,7 +197,7 @@ teardown() {
   local stale_path live_path
   stale_path="$(dybatpho::lock_path "reclaim-stale")"
   mkdir "${stale_path}"
-  printf '%s' "999999" > "${stale_path}/pid"
+  printf '%s' "${DEAD_PID}" > "${stale_path}/pid"
   printf '%s' "$(dybatpho::lock_hostname)" > "${stale_path}/host"
 
   run_traced --separate-stderr dybatpho::lock_reclaim_stale "${stale_path}"
@@ -223,7 +227,7 @@ teardown() {
   # which is not a test.
   local lock_path winners
   lock_path="$(dybatpho::lock_path "reclaim-race")"
-  ln -s "999999:$(dybatpho::lock_hostname):2020-01-01T00:00:00Z" "${lock_path}"
+  ln -s "${DEAD_PID}:$(dybatpho::lock_hostname):2020-01-01T00:00:00Z" "${lock_path}"
   winners="${BATS_TEST_TMPDIR}/race-winners"
   mkdir -p "${winners}"
 
@@ -385,7 +389,7 @@ teardown() {
 
 @test "dybatpho::lock_semaphore_acquire reclaims a slot left by a dead process" {
   local slot_path="${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot1.lock"
-  ln -s "999999:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${slot_path}"
+  ln -s "${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${slot_path}"
 
   local slot
   run_traced --separate-stderr dybatpho::lock_semaphore_acquire "pool" 1 0 slot

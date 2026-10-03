@@ -34,17 +34,21 @@ function __dybatpho_git {
 }
 
 #######################################
-# @description Ensure a path is inside a Git worktree.
-# @arg $1 string Optional repository path, default is `.`
-# @stdout The validated repository path
+# @description Stop the script unless a path is inside a Git worktree.
+#   It runs in the caller's shell: checked inside `$(...)`, the refusal ended
+#   only the subshell, and a predicate such as `dybatpho::git_is_clean` read a
+#   path that is not a repository as a plain "no".
+# @arg $1 string Repository path
+# @exitcode 0 The path is inside a worktree
+# @exitcode 1 Stop the script when it is not
 # @internal
 #######################################
-function __dybatpho_git_repo_path {
-  local repo_path="${1:-.}"
+function __dybatpho_git_expect_repo {
+  local repo_path
+  dybatpho::expect_args repo_path -- "$@"
   dybatpho::require git
   __dybatpho_git "${repo_path}" rev-parse --is-inside-work-tree > /dev/null 2>&1 \
     || dybatpho::die "Not a git repository: ${repo_path}"
-  printf '%s\n' "${repo_path}"
 }
 
 #######################################
@@ -68,7 +72,8 @@ function __dybatpho_git_resolve_commit {
 #######################################
 function dybatpho::git_root {
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git "${repo_path}" rev-parse --show-toplevel
 }
 
@@ -79,7 +84,8 @@ function dybatpho::git_root {
 #######################################
 function dybatpho::git_branch {
   local repo_path branch_name
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   branch_name="$(__dybatpho_git "${repo_path}" symbolic-ref --quiet --short HEAD 2> /dev/null || true)"
   if [[ -n "${branch_name}" ]]; then
     printf '%s\n' "${branch_name}"
@@ -96,7 +102,8 @@ function dybatpho::git_branch {
 #######################################
 function dybatpho::git_default_branch {
   local repo_path remote_head
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   remote_head="$(__dybatpho_git "${repo_path}" symbolic-ref --quiet --short \
     refs/remotes/origin/HEAD 2> /dev/null || true)"
   if [[ -n "${remote_head}" ]]; then
@@ -128,7 +135,8 @@ function dybatpho::git_default_branch {
 #######################################
 function dybatpho::git_commit_hash {
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git_resolve_commit "${repo_path}" "${2:-HEAD}"
 }
 
@@ -140,7 +148,8 @@ function dybatpho::git_commit_hash {
 #######################################
 function dybatpho::git_commit_short_hash {
   local repo_path resolved
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   resolved="$(__dybatpho_git_resolve_commit "${repo_path}" "${2:-HEAD}")" || return $?
   __dybatpho_git "${repo_path}" rev-parse --short=7 "${resolved}"
 }
@@ -153,7 +162,8 @@ function dybatpho::git_commit_short_hash {
 #######################################
 function dybatpho::git_commit_subject {
   local repo_path resolved
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   resolved="$(__dybatpho_git_resolve_commit "${repo_path}" "${2:-HEAD}")" || return $?
   __dybatpho_git "${repo_path}" log -1 --format=%s "${resolved}"
 }
@@ -166,7 +176,8 @@ function dybatpho::git_commit_subject {
 #######################################
 function dybatpho::git_commit_author {
   local repo_path resolved
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   resolved="$(__dybatpho_git_resolve_commit "${repo_path}" "${2:-HEAD}")" || return $?
   __dybatpho_git "${repo_path}" log -1 --format=%aN "${resolved}"
 }
@@ -180,7 +191,8 @@ function dybatpho::git_commit_author {
 #######################################
 function dybatpho::git_has_commit {
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git "${repo_path}" rev-parse --verify --quiet "${2:-HEAD}^{commit}" > /dev/null 2>&1
 }
 
@@ -195,7 +207,7 @@ function dybatpho::git_commits_between {
   local repo_path base_ref
   dybatpho::expect_args repo_path base_ref -- "$@"
   local head_ref="${3:-HEAD}"
-  repo_path="$(__dybatpho_git_repo_path "${repo_path}")" || return $?
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
   __dybatpho_git_resolve_commit "${repo_path}" "${head_ref}" > /dev/null
   __dybatpho_git "${repo_path}" rev-list --reverse "${base_ref}..${head_ref}"
@@ -212,7 +224,7 @@ function dybatpho::git_commit_count {
   local repo_path base_ref
   dybatpho::expect_args repo_path base_ref -- "$@"
   local head_ref="${3:-HEAD}"
-  repo_path="$(__dybatpho_git_repo_path "${repo_path}")" || return $?
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
   __dybatpho_git_resolve_commit "${repo_path}" "${head_ref}" > /dev/null
   __dybatpho_git "${repo_path}" rev-list --count "${base_ref}..${head_ref}"
@@ -226,7 +238,8 @@ function dybatpho::git_commit_count {
 #######################################
 function dybatpho::git_is_clean {
   local repo_path status_output
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   status_output="$(__dybatpho_git "${repo_path}" status --porcelain --untracked-files=normal)"
   [[ -z "${status_output}" ]]
 }
@@ -240,7 +253,8 @@ function dybatpho::git_is_clean {
 function dybatpho::git_remote_url {
   local remote_name="${1:-origin}"
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${2:-.}")" || return $?
+  repo_path="${2:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git "${repo_path}" remote get-url "${remote_name}"
 }
 
@@ -254,7 +268,8 @@ function dybatpho::git_remote_url {
 function dybatpho::git_has_remote {
   local remote_name="${1:-origin}"
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${2:-.}")" || return $?
+  repo_path="${2:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   __dybatpho_git "${repo_path}" remote get-url "${remote_name}" > /dev/null 2>&1
 }
 
@@ -267,7 +282,8 @@ function dybatpho::git_has_remote {
 #######################################
 function dybatpho::git_changed_files {
   local repo_path base_ref
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   base_ref="${2:-HEAD}"
   {
     __dybatpho_git "${repo_path}" diff --name-only "${base_ref}" --
@@ -292,7 +308,8 @@ function dybatpho::git_changed_files {
 #######################################
 function dybatpho::git_latest_tag {
   local repo_path pattern tag
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   pattern="${2:-*}"
   local git
   local git_2
@@ -327,7 +344,8 @@ function dybatpho::git_latest_tag {
 #######################################
 function dybatpho::git_tags_containing {
   local repo_path resolved
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   resolved="$(__dybatpho_git_resolve_commit "${repo_path}" "${2:-HEAD}")" || return $?
   __dybatpho_git "${repo_path}" tag --contains "${resolved}" | sort
 }
@@ -353,7 +371,7 @@ function dybatpho::git_tags_containing {
 function dybatpho::git_is_ancestor {
   local repo_path ancestor descendant resolved_ancestor resolved_descendant
   dybatpho::expect_args repo_path ancestor descendant -- "$@"
-  repo_path="$(__dybatpho_git_repo_path "${repo_path}")" || return $?
+  __dybatpho_git_expect_repo "${repo_path}"
   resolved_ancestor="$(__dybatpho_git_resolve_commit "${repo_path}" "${ancestor}")" || return $?
   resolved_descendant="$(__dybatpho_git_resolve_commit "${repo_path}" "${descendant}")" || return $?
   __dybatpho_git "${repo_path}" merge-base --is-ancestor \
@@ -378,7 +396,8 @@ function dybatpho::git_is_ancestor {
 #######################################
 function dybatpho::git_upstream {
   local repo_path branch_name
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   branch_name="${2-}"
   __dybatpho_git "${repo_path}" rev-parse --abbrev-ref --symbolic-full-name \
     "${branch_name}@{upstream}" 2> /dev/null || return 1
@@ -403,7 +422,8 @@ function dybatpho::git_upstream {
 #######################################
 function dybatpho::git_ahead_behind {
   local repo_path base_ref head_ref counts
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   base_ref="${2-}"
   head_ref="${3:-HEAD}"
   if [[ -z "${base_ref}" ]]; then
@@ -437,7 +457,8 @@ function dybatpho::git_ahead_behind {
 #######################################
 function dybatpho::git_state {
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   local -a names=(rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG)
   local -a git_args=(rev-parse)
   local name
@@ -492,7 +513,8 @@ function dybatpho::git_state {
 #######################################
 function dybatpho::git_is_shallow {
   local repo_path answer
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   answer="$(__dybatpho_git "${repo_path}" rev-parse --is-shallow-repository)"
   [[ "${answer}" == "true" ]]
 }
@@ -509,7 +531,8 @@ function dybatpho::git_is_shallow {
 #######################################
 function dybatpho::git_stash_count {
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   if ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet refs/stash > /dev/null 2>&1; then
     printf '0\n'
     return 0
@@ -535,7 +558,8 @@ function dybatpho::git_stash_count {
 #######################################
 function dybatpho::git_worktree_list {
   local repo_path
-  repo_path="$(__dybatpho_git_repo_path "${1:-.}")" || return $?
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
   local listing
   listing="$(__dybatpho_git "${repo_path}" worktree list --porcelain)"
   local line worktree_path="" worktree_branch=""

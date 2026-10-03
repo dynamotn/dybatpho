@@ -1271,30 +1271,34 @@ function __dybatpho_i18n_seed_symbols {
 __dybatpho_i18n_seed_symbols
 
 #######################################
-# @description Read one field of locale data, degrading from the exact tag to
-#   the bare language, then to the configured fallback, then to English.
-#   The last step matters: a missing group separator that came back empty would
-#   silently turn 1234 into 1234 rather than 1,234.
-# @arg $1 string Name of the map to read
-# @arg $2 string Locale tag
-# @arg $3 string Field name
-# @stdout The value
+# @description Read one field of locale data into a variable, degrading from
+#   the exact tag to the bare language, then to the configured fallback, then to
+#   English. The last step matters: a missing group separator that came back
+#   empty would silently turn 1234 into 1234 rather than 1,234. It fills a
+#   variable rather than printing, because formatting one number reads four
+#   fields and each `$(...)` was a fork.
+# @arg $1 string Name of the variable receiving the value
+# @arg $2 string Name of the map to read
+# @arg $3 string Locale tag
+# @arg $4 string Field name
+# @set The named variable, when a candidate carried the field
 # @exitcode 1 No candidate carried the field
 # @internal
 #######################################
-function __dybatpho_i18n_data {
-  local map_name locale field
-  map_name="$1"
-  locale="$2"
-  field="$3"
-  local -n __data_map="${map_name}"
-  local language candidate
-  language="$(__dybatpho_i18n_language "${locale}")"
-  for candidate in "${locale}" "${locale%%@*}" "${language}" "${DYBATPHO_I18N_FALLBACK}" "en"; do
-    [[ -n "${candidate}" ]] || continue
-    local hit="${__data_map["${candidate}.${field}"]-${__DYBATPHO_I18N_NONE}}"
-    if [[ "${hit}" != "${__DYBATPHO_I18N_NONE}" ]]; then
-      printf '%s' "${hit}"
+function __dybatpho_i18n_data_into {
+  local __data_var __data_map_name __data_locale __data_field
+  dybatpho::expect_args __data_var __data_map_name __data_locale __data_field -- "$@"
+  local -n __data_out="${__data_var}"
+  local -n __data_map="${__data_map_name}"
+  local __data_language="${__data_locale%%@*}"
+  __data_language="${__data_language%%[_-]*}"
+  local __data_candidate __data_hit
+  for __data_candidate in "${__data_locale}" "${__data_locale%%@*}" "${__data_language}" \
+    "${DYBATPHO_I18N_FALLBACK}" "en"; do
+    [[ -n "${__data_candidate}" ]] || continue
+    __data_hit="${__data_map["${__data_candidate}.${__data_field}"]-${__DYBATPHO_I18N_NONE}}"
+    if [[ "${__data_hit}" != "${__DYBATPHO_I18N_NONE}" ]]; then
+      __data_out="${__data_hit}"
       return 0
     fi
   done
@@ -1489,10 +1493,10 @@ function __dybatpho_i18n_number_into {
 
   local __num_group_sep __num_decimal_sep __num_grouping
   local __num_minus __num_grouped
-  __num_group_sep="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" group)" || __num_group_sep=","
-  __num_decimal_sep="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" decimal)" || __num_decimal_sep="."
-  __num_grouping="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" grouping)" || __num_grouping="3"
-  __num_minus="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" minus)" || __num_minus="-"
+  __dybatpho_i18n_data_into __num_group_sep DYBATPHO_I18N_NUMBER "${__num_locale}" group || __num_group_sep=","
+  __dybatpho_i18n_data_into __num_decimal_sep DYBATPHO_I18N_NUMBER "${__num_locale}" decimal || __num_decimal_sep="."
+  __dybatpho_i18n_data_into __num_grouping DYBATPHO_I18N_NUMBER "${__num_locale}" grouping || __num_grouping="3"
+  __dybatpho_i18n_data_into __num_minus DYBATPHO_I18N_NUMBER "${__num_locale}" minus || __num_minus="-"
   __num_grouped="$(__dybatpho_i18n_group "${__num_integer}" "${__num_grouping}" "${__num_group_sep}")"
 
   # Rounding turns -0.004 into -0, which no locale wants to see printed.
@@ -1557,7 +1561,7 @@ function dybatpho::i18n_percent {
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
   local number pattern
   __dybatpho_i18n_number_into number "${value}" "${precision}" "${locale}"
-  pattern="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" percent)" || pattern="#%"
+  __dybatpho_i18n_data_into pattern DYBATPHO_I18N_NUMBER "${locale}" percent || pattern="#%"
   local rendered="${pattern//\#/${number}}"
   printf '%s\n' "${rendered}"
 }
@@ -1627,8 +1631,8 @@ function dybatpho::i18n_currency {
   fi
   local number layout minus rendered
   __dybatpho_i18n_number_into number "${amount}" "${digits}" "${locale}"
-  layout="$(__dybatpho_i18n_data DYBATPHO_I18N_CURRENCY_LAYOUT "${locale}" layout)" || layout='¤#'
-  minus="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" minus)" || minus="-"
+  __dybatpho_i18n_data_into layout DYBATPHO_I18N_CURRENCY_LAYOUT "${locale}" layout || layout='¤#'
+  __dybatpho_i18n_data_into minus DYBATPHO_I18N_NUMBER "${locale}" minus || minus="-"
   rendered="${layout/¤/${symbol}}"
   rendered="${rendered/\#/${number}}"
   local i18n_negative
@@ -1710,7 +1714,7 @@ function dybatpho::i18n_bytes {
 }
 
 # Month, weekday, and day-period names. These maps are read through a nameref in
-# `__dybatpho_i18n_data` rather than by name, which static analysis cannot
+# `__dybatpho_i18n_data_into` rather than by name, which static analysis cannot
 # follow, so they look unused where they are written.
 # shellcheck disable=SC2034
 # Weekdays are stored Monday first so that
@@ -1934,7 +1938,7 @@ function __dybatpho_i18n_name {
   set="$2"
   index="$3"
   local list
-  list="$(__dybatpho_i18n_data DYBATPHO_I18N_NAMES "${locale}" "${set}")" || return 1
+  __dybatpho_i18n_data_into list DYBATPHO_I18N_NAMES "${locale}" "${set}" || return 1
   local -a names=()
   local old_ifs="${IFS}"
   IFS=','
@@ -2182,7 +2186,7 @@ function __dybatpho_i18n_pattern {
   esac
   local candidate pattern
   for candidate in "${order[@]}"; do
-    pattern="$(__dybatpho_i18n_data DYBATPHO_I18N_DATE_PATTERN "${locale}" "${kind}_${candidate}")" \
+    __dybatpho_i18n_data_into pattern DYBATPHO_I18N_DATE_PATTERN "${locale}" "${kind}_${candidate}" \
       && {
         printf '%s' "${pattern}"
         return 0

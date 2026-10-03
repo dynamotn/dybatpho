@@ -742,7 +742,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a key that cannot be a file name read as a cache miss. Likewise
   `dybatpho::i18n_percent`, `dybatpho::i18n_currency`, `dybatpho::i18n_bytes`
   and the counted messages printed a bare `%` or symbol and succeeded on a
-  value that is not a number; they now stop and name the function called.
+  value that is not a number; they now stop and name the function called. The
+  `dybatpho::git_*` helpers likewise stop on a path that is not a repository
+  instead of reading it as "no", and the `ai` counters stop on a counter file
+  that is a symbolic link instead of returning a bare failure.
 
 ### Security
 

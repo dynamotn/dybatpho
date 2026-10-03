@@ -356,7 +356,9 @@ setup() {
 }
 
 @test "dybatpho::semver_sort reads standard input and keeps a leading v" {
-  run_traced -0 bash -c 'printf "v1.10.0\nv1.9.0\nv2.0.0\n" | dybatpho::semver_sort'
+  local list="${BATS_TEST_TMPDIR}/versions"
+  printf 'v1.10.0\nv1.9.0\nv2.0.0\n' > "${list}"
+  run_traced -0 dybatpho::semver_sort < "${list}"
   assert_output "$(printf 'v1.9.0\nv1.10.0\nv2.0.0')"
 }
 

@@ -129,21 +129,25 @@ function __dybatpho_validate_match {
 }
 
 #######################################
-# @description Resolve a type name, or an alias of one, to its canonical name.
-#   This never terminates the script: it is called from inside a command
-#   substitution, where `dybatpho::die` would only end the subshell and leave
-#   the caller reporting success on an empty value.
-# @arg $1 string Declared type name
-# @stdout The canonical type name, when it is known
+# @description Resolve a type name, or an alias of one, to its canonical name,
+#   into a variable. It fills a variable rather than printing so that callers
+#   need no `$(...)`, and it never terminates the script, so each caller words
+#   its own refusal.
+# @arg $1 string Name of the variable receiving the canonical type name
+# @arg $2 string Declared type name
+# @set The named variable, when the type is known
 # @exitcode 0 The type is known
 # @exitcode 1 The type is not registered
 # @internal
 #######################################
 function __dybatpho_validate_canonical {
-  local name="${1,,}"
-  name="${__DYBATPHO_VALIDATE_ALIASES[${name}]-${name}}"
-  [[ -v "__DYBATPHO_VALIDATE_PREDICATES[${name}]" ]] || return 1
-  printf '%s' "${name}"
+  local __dybatpho_validate_canonical_var __dybatpho_validate_canonical_name
+  dybatpho::expect_args __dybatpho_validate_canonical_var __dybatpho_validate_canonical_name -- "$@"
+  local -n __dybatpho_validate_canonical_out="${__dybatpho_validate_canonical_var}"
+  local __canon_key="${__dybatpho_validate_canonical_name,,}"
+  __canon_key="${__DYBATPHO_VALIDATE_ALIASES[${__canon_key}]-${__canon_key}}"
+  [[ -v "__DYBATPHO_VALIDATE_PREDICATES[${__canon_key}]" ]] || return 1
+  __dybatpho_validate_canonical_out="${__canon_key}"
 }
 
 #######################################
@@ -156,7 +160,7 @@ function __dybatpho_validate_canonical {
 #######################################
 function __dybatpho_validate_numeric_type {
   local canonical
-  canonical="$(__dybatpho_validate_canonical "${1-}")" || return 1
+  __dybatpho_validate_canonical canonical "${1-}" || return 1
   [[ -v "__DYBATPHO_VALIDATE_NUMERIC[${canonical}]" ]]
 }
 
@@ -273,7 +277,7 @@ function __dybatpho_validate_scaled {
 function dybatpho::validate_is {
   local type value canonical
   dybatpho::expect_args type value -- "$@"
-  canonical="$(__dybatpho_validate_canonical "${type}")" \
+  __dybatpho_validate_canonical canonical "${type}" \
     || dybatpho::die "${FUNCNAME[0]}: '${type}' is not a known type"
   "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"
 }
@@ -294,7 +298,7 @@ function dybatpho::validate_is {
 function dybatpho::validate_describe {
   local type canonical
   dybatpho::expect_args type -- "$@"
-  canonical="$(__dybatpho_validate_canonical "${type}")" \
+  __dybatpho_validate_canonical canonical "${type}" \
     || dybatpho::die "${FUNCNAME[0]}: '${type}' is not a known type"
   printf '%s\n' "${__DYBATPHO_VALIDATE_DESCRIPTIONS[${canonical}]}"
 }
@@ -449,7 +453,7 @@ function dybatpho::validate_value {
   done
 
   local canonical
-  canonical="$(__dybatpho_validate_canonical "${type}")" \
+  __dybatpho_validate_canonical canonical "${type}" \
     || dybatpho::die "${FUNCNAME[0]}: '${type}' is not a known type"
 
   if ! "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"; then
@@ -478,7 +482,7 @@ function dybatpho::validate_value {
 
   local measured subject order
   if [[ -n "${min}" || -n "${max}" ]]; then
-    if __dybatpho_validate_numeric_type "${canonical}"; then
+    if [[ -v "__DYBATPHO_VALIDATE_NUMERIC[${canonical}]" ]]; then
       measured="${value}"
       subject=""
     else

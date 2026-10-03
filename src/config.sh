@@ -547,20 +547,23 @@ function dybatpho::config_save {
 #   there without `config` carrying a second copy of the check. `enum` is the
 #   one name `config` owns: it is not a type but a `choices` rule, which the
 #   validator receives as such.
-# @arg $1 string Declared type
-# @stdout Canonical type name, or `enum`
+# @arg $1 string Name of the variable receiving the canonical type name, or `enum`
+# @arg $2 string Declared type
+# @set The named variable, when the type is supported
 # @exitcode 1 The type is not supported
 # @see
 #   - `dybatpho::validate_types`
 # @internal
 #######################################
 function __dybatpho_config_schema_type {
-  local input="${1,,}"
-  [[ "${input}" == enum ]] && {
-    printf 'enum'
+  local __dybatpho_config_type_var __dybatpho_config_type_input
+  dybatpho::expect_args __dybatpho_config_type_var __dybatpho_config_type_input -- "$@"
+  local -n __dybatpho_config_type_out="${__dybatpho_config_type_var}"
+  if [[ "${__dybatpho_config_type_input,,}" == enum ]]; then
+    __dybatpho_config_type_out=enum
     return 0
-  }
-  __dybatpho_validate_canonical "${input}"
+  fi
+  __dybatpho_validate_canonical "${__dybatpho_config_type_var}" "${__dybatpho_config_type_input}"
 }
 
 #######################################
@@ -642,7 +645,7 @@ function dybatpho::config_schema {
   dybatpho::expect_args key declared_type -- "$@"
   [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
     || dybatpho::die "Invalid configuration key: ${key}"
-  type="$(__dybatpho_config_schema_type "${declared_type}")" \
+  __dybatpho_config_schema_type type "${declared_type}" \
     || dybatpho::die "Unsupported configuration type: ${declared_type}"
   __dybatpho_config_schema_clear "${key}"
   DYBATPHO_CONFIG_SCHEMA["${key}.type"]="${type}"

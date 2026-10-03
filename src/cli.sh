@@ -991,7 +991,8 @@ function __dybatpho_cli_print_indent {
 function __dybatpho_cli_require_shell_name {
   local name="${1:-}"
   [[ "${name}" == "-" ]] && return 0
-  dybatpho::validate_is identifier "${name}" \
+  # shellcheck disable=SC2154 # declared by `src/validate.sh`, which `cli` loads
+  [[ "${name}" =~ ${__DYBATPHO_VALIDATE_RE_IDENTIFIER} ]] \
     || dybatpho::die "$(__dybatpho_log_text cli.invalid_var_name \
       "Invalid shell variable name: ${name}" "name=${name}")"
 }
@@ -1101,20 +1102,6 @@ function __dybatpho_cli_require_case_pattern {
   [[ "${pattern}" =~ ${allowed} ]] \
     || dybatpho::die "$(__dybatpho_log_text cli.invalid_pattern \
       "Invalid pattern: ${pattern}" "pattern=${pattern}")"
-}
-
-#######################################
-# @description Resolve the name given by `type:<name>` to the canonical type
-#              the generated parser will call. Kept separate from
-#              `__dybatpho_validate_canonical` only so the `cli` module has one
-#              place to name the validator it depends on.
-# @arg $1 string Declared type name or alias
-# @stdout Canonical type name
-# @exitcode 1 The type is not registered
-# @internal
-#######################################
-function __dybatpho_cli_canonical_type {
-  __dybatpho_validate_canonical "$1"
 }
 
 #######################################
@@ -2430,7 +2417,7 @@ function __dybatpho_cli_print_validate {
     # built instead of on the first value a user types. A canonical name is
     # `^[a-z][a-z0-9_]*$`, which is why it can be interpolated unquoted.
     local __type_canonical
-    __type_canonical="$(__dybatpho_cli_canonical_type "${__type}")" \
+    __dybatpho_validate_canonical __type_canonical "${__type}" \
       || dybatpho::die "$(__dybatpho_log_text cli.unknown_type \
         "Unknown type: ${__type}" "type=${__type}")"
     __dybatpho_cli_print_indent 4 "dybatpho::validate_is ${__type_canonical} \"\$OPTARG\" || { set \"type:${__type_canonical}\" \"\$OPTARG\"; break; }"

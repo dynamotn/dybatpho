@@ -19,20 +19,6 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# @description Resolve the preferred command for JSON helpers.
-# @noargs
-# @stdout `yq` or `jq`
-# @exitcode 0 A supported JSON helper command exists
-# @exitcode 127 Neither `yq` nor `jq` is installed
-# @internal
-#######################################
-function __dybatpho_json_cmd {
-  local command_name
-  command_name=$(dybatpho::coalesce_cmd yq jq) || dybatpho::die "Neither yq nor jq is installed" 127
-  printf '%s\n' "${command_name}"
-}
-
-#######################################
 # @description Quote text as a JSON string, into a named variable.
 #   Escaping a string is the one JSON operation that needs no parser, and
 #   forking `yq` or `jq` for it cost ~12ms a call -- enough to dominate any
@@ -107,7 +93,7 @@ function dybatpho::json_query {
   dybatpho::expect_args input filter -- "$@"
   shift 2
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
   if [[ "${json_cmd}" == "yq" ]]; then
     yq eval -o=json "${filter}" "${input}" "$@"
   else
@@ -127,7 +113,7 @@ function dybatpho::json_has {
   local input filter
   dybatpho::expect_args input filter -- "$@"
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
   if [[ "${json_cmd}" == "yq" ]]; then
     yq eval -e "${filter}" "${input}" > /dev/null
   else
@@ -148,7 +134,7 @@ function dybatpho::json_pretty {
   dybatpho::expect_args input -- "$@"
   local output="${2-}"
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
   if [[ -n "${output}" ]]; then
     if [[ "${json_cmd}" == "yq" ]]; then
       yq eval -o=json '.' "${input}" > "${output}"
@@ -308,7 +294,7 @@ function dybatpho::json_object {
   fi
 
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
 
   # Every pair is assigned in a single backend invocation. Building the object
   # one key at a time would fork once per field, which is the difference
@@ -372,7 +358,7 @@ function dybatpho::json_eval {
   local document filter
   dybatpho::expect_args document filter -- "$@"
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
   if [[ "${json_cmd}" == "yq" ]]; then
     yq -o=json -I=0 "${filter}" <<< "${document}"
   else
@@ -400,7 +386,7 @@ function dybatpho::json_get {
   local document filter
   dybatpho::expect_args document filter -- "$@"
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
   if [[ "${json_cmd}" == "yq" ]]; then
     yq "${filter}" <<< "${document}"
   else
@@ -422,30 +408,44 @@ function dybatpho::json_valid {
   local document
   dybatpho::expect_args document -- "$@"
   local json_cmd
-  json_cmd=$(__dybatpho_json_cmd)
+  __dybatpho_json_cmd_into json_cmd
   __dybatpho_json_parses "${json_cmd}" "${document}"
 }
 
 #######################################
 # @description Resolve the JSON backend into a named variable.
-#   `__dybatpho_json_cmd` answers on stdout, so a missing tool it reports from
-#   inside `$(...)` ends only the subshell. The editing helpers resolve the
-#   backend here instead, where the failure stops the caller.
+#   Every helper resolves the backend here rather than through `$(...)`, where a
+#   missing tool reported from inside the substitution would end only the
+#   subshell, and where each call cost two forks before `yq` or `jq` ran at all.
+#   The answer is remembered for as long as `PATH` is unchanged: a test that
+#   hides one backend, or a script that installs one, changes `PATH`, and the
+#   next call looks again.
 # @arg $1 string Name of the variable receiving `yq` or `jq`
 # @set The named variable
+# @set __DYBATPHO_JSON_CMD The backend last resolved
+# @set __DYBATPHO_JSON_CMD_PATH The `PATH` it was resolved under
 # @exitcode 0 A supported JSON helper command exists
 # @exitcode 127 Neither `yq` nor `jq` is installed
 # @internal
 #######################################
 function __dybatpho_json_cmd_into {
-  local -n __dybatpho_json_cmd_out="$1"
+  local __dybatpho_json_cmd_var
+  dybatpho::expect_args __dybatpho_json_cmd_var -- "$@"
+  local -n __dybatpho_json_cmd_out="${__dybatpho_json_cmd_var}"
+  if [[ -n "${__DYBATPHO_JSON_CMD-}" && "${__DYBATPHO_JSON_CMD_PATH-}" == "${PATH}" ]] \
+    && dybatpho::is command "${__DYBATPHO_JSON_CMD}"; then
+    __dybatpho_json_cmd_out="${__DYBATPHO_JSON_CMD}"
+    return 0
+  fi
   if dybatpho::is command yq; then
-    __dybatpho_json_cmd_out=yq
+    __DYBATPHO_JSON_CMD=yq
   elif dybatpho::is command jq; then
-    __dybatpho_json_cmd_out=jq
+    __DYBATPHO_JSON_CMD=jq
   else
     dybatpho::die "Neither yq nor jq is installed" 127
   fi
+  __DYBATPHO_JSON_CMD_PATH="${PATH}"
+  __dybatpho_json_cmd_out="${__DYBATPHO_JSON_CMD}"
 }
 
 #######################################

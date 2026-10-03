@@ -25,37 +25,45 @@
 DYBATPHO_DATE_TIMEZONE="${DYBATPHO_DATE_TIMEZONE:-UTC}"
 
 # Which `date` this system has, filled in on first use by
-# `__dybatpho_date_flavor`. Per shell, so a test that stubs `date` gets its own
-# answer: each Bats test runs in its own process and starts with this empty.
+# `__dybatpho_date_flavor_into`, and the `PATH` it was found under. Per shell,
+# so a test that stubs `date` gets its own answer: each Bats test runs in its
+# own process and starts with this empty, and a stub that changes `PATH` makes
+# the next call look again.
 __dybatpho_date_flavor_cache=""
+__dybatpho_date_flavor_path=""
 
-# @description Print which `date` this system has: `gnu`, `bsd` or `busybox`.
+#######################################
+# @description Work out which `date` this system has: `gnu`, `bsd` or
+#   `busybox`, into a variable.
 #   Detected by asking for something only one of them accepts, rather than by
 #   matching a name. BSD stays the default it always was; the new question is
 #   whether this is BusyBox, which answers to neither `--version` nor `-j`. A
 #   two-way GNU-or-BSD guess sent every BusyBox system down the BSD path, where
 #   `-r` means "read the time off this file" and the whole module failed.
 #
-#   The answer is cached: probing twice per call is a lot for a helper that
-#   formats a date.
-# @noargs
-# @stdout `gnu`, `bsd` or `busybox`
+#   The answer is cached in the calling shell, which is why this fills a
+#   variable rather than printing: a cache written inside `$(...)` is gone
+#   when the substitution ends, and every call probed `date` again.
+# @arg $1 string Name of the variable receiving the flavour
+# @set The named variable
 # @internal
-function __dybatpho_date_flavor {
-  if [[ -n "${__dybatpho_date_flavor_cache}" ]]; then
-    printf '%s\n' "${__dybatpho_date_flavor_cache}"
-    return 0
+#######################################
+function __dybatpho_date_flavor_into {
+  local __dybatpho_date_flavor_var
+  dybatpho::expect_args __dybatpho_date_flavor_var -- "$@"
+  local -n __dybatpho_date_flavor_out="${__dybatpho_date_flavor_var}"
+  if [[ -z "${__dybatpho_date_flavor_cache}" || "${__dybatpho_date_flavor_path}" != "${PATH}" ]]; then
+    if date --version > /dev/null 2>&1; then
+      __dybatpho_date_flavor_cache="gnu"
+    elif date -D "%Y" -d "2024" +%s > /dev/null 2>&1; then
+      # Only BusyBox takes the input format through `-D`.
+      __dybatpho_date_flavor_cache="busybox"
+    else
+      __dybatpho_date_flavor_cache="bsd"
+    fi
+    __dybatpho_date_flavor_path="${PATH}"
   fi
-
-  if date --version > /dev/null 2>&1; then
-    __dybatpho_date_flavor_cache="gnu"
-  elif date -D "%Y" -d "2024" +%s > /dev/null 2>&1; then
-    # Only BusyBox takes the input format through `-D`.
-    __dybatpho_date_flavor_cache="busybox"
-  else
-    __dybatpho_date_flavor_cache="bsd"
-  fi
-  printf '%s\n' "${__dybatpho_date_flavor_cache}"
+  __dybatpho_date_flavor_out="${__dybatpho_date_flavor_cache}"
 }
 
 #######################################
@@ -68,7 +76,7 @@ function __dybatpho_date_flavor {
 #######################################
 function __dybatpho_date_is_gnu {
   local date_flavor
-  date_flavor=$(__dybatpho_date_flavor)
+  __dybatpho_date_flavor_into date_flavor
   [[ "${date_flavor}" == "gnu" ]]
 }
 
@@ -84,7 +92,7 @@ function __dybatpho_date_parse {
   local input
   dybatpho::expect_args input -- "$@"
   local flavor
-  flavor="$(__dybatpho_date_flavor)"
+  __dybatpho_date_flavor_into flavor
   if [[ "${flavor}" == "gnu" ]]; then
     TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s
     return
@@ -191,7 +199,9 @@ function dybatpho::date_format {
   local timestamp
   dybatpho::expect_args timestamp -- "$@"
   local format="${2:-%F %T}"
-  case "$(__dybatpho_date_flavor)" in
+  local flavor
+  __dybatpho_date_flavor_into flavor
+  case "${flavor}" in
     # BusyBox spells this the way GNU does. Only BSD takes the seconds through
     # `-r`, which on the other two means "read the time off this file".
     gnu | busybox) TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "@${timestamp}" +"${format}" ;;

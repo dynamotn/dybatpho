@@ -51,6 +51,26 @@ function dybatpho::semver_parse {
 }
 
 #######################################
+# @description Split a semver string into its five parts, in an array.
+# @arg $1 string Name of the array receiving major, minor, patch, pre-release
+#   and build-metadata
+# @arg $2 string Version string
+# @set The named array
+# @exitcode 0 The version was split
+# @exitcode 1 The string is not a valid semver
+# @internal
+#######################################
+function __dybatpho_semver_parse_into {
+  local __svp_var __svp_version
+  dybatpho::expect_args __svp_var __svp_version -- "$@"
+  local -n __svp_out="${__svp_var}"
+  [[ "${__svp_version}" =~ ${DYBATPHO_SEMVER_REGEX} ]] || return 1
+  # Group 4 and 6 carry the leading `-` and `+`; 5 and 7 are the parts.
+  __svp_out=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+    "${BASH_REMATCH[5]}" "${BASH_REMATCH[7]}")
+}
+
+#######################################
 # @description Compare two semver strings according to semver 2.0.0 precedence rules.
 # @arg $1 string First version
 # @arg $2 string Second version
@@ -61,97 +81,114 @@ function dybatpho::semver_parse {
 function dybatpho::semver_compare {
   local v1 v2
   dybatpho::expect_args v1 v2 -- "$@"
+  local order
+  __dybatpho_semver_cmp_into order "${v1}" "${v2}"
+  printf '%s\n' "${order}"
+}
 
-  dybatpho::semver_valid "${v1}" || dybatpho::die "semver_compare: '${v1}' is not a valid semver"
-  dybatpho::semver_valid "${v2}" || dybatpho::die "semver_compare: '${v2}' is not a valid semver"
+#######################################
+# @description Compare two semver strings into a variable, with the precedence
+#   rules of `dybatpho::semver_compare`. Sorting and range checks compare many
+#   times, and each `$(dybatpho::semver_compare …)` cost a fork and two more to
+#   parse the versions; this runs in the caller's shell.
+# @arg $1 string Name of the variable receiving `-1`, `0` or `1`
+# @arg $2 string First version
+# @arg $3 string Second version
+# @set The named variable
+# @exitcode 1 Stop the script when either version is not valid
+# @internal
+#######################################
+function __dybatpho_semver_cmp_into {
+  # Every local carries a prefix, so the caller's variable is never shadowed.
+  local __sv_var __sv_v1 __sv_v2
+  dybatpho::expect_args __sv_var __sv_v1 __sv_v2 -- "$@"
+  local -n __sv_out="${__sv_var}"
 
-  local -a parts1 parts2
-  mapfile -t parts1 < <(dybatpho::semver_parse "${v1}")
-  mapfile -t parts2 < <(dybatpho::semver_parse "${v2}")
+  local -a __sv_p1 __sv_p2
+  __dybatpho_semver_parse_into __sv_p1 "${__sv_v1}" \
+    || dybatpho::die "semver_compare: '${__sv_v1}' is not a valid semver"
+  __dybatpho_semver_parse_into __sv_p2 "${__sv_v2}" \
+    || dybatpho::die "semver_compare: '${__sv_v2}' is not a valid semver"
 
-  local major1="${parts1[0]}" minor1="${parts1[1]}" patch1="${parts1[2]}" pre1="${parts1[3]}"
-  local major2="${parts2[0]}" minor2="${parts2[1]}" patch2="${parts2[2]}" pre2="${parts2[3]}"
-
-  # Compare numeric core: major.minor.patch
-  local -a numeric_fields=("${major1}:${major2}" "${minor1}:${minor2}" "${patch1}:${patch2}")
-  local field
-  for field in "${numeric_fields[@]}"; do
-    local a="${field%%:*}" b="${field##*:}"
-    if ((10#${a} > 10#${b})); then
-      printf '1\n'
+  # Compare the numeric core: major.minor.patch.
+  local __sv_i
+  for __sv_i in 0 1 2; do
+    if ((10#${__sv_p1[__sv_i]} > 10#${__sv_p2[__sv_i]})); then
+      __sv_out=1
       return 0
-    elif ((10#${a} < 10#${b})); then
-      printf -- '-1\n'
+    elif ((10#${__sv_p1[__sv_i]} < 10#${__sv_p2[__sv_i]})); then
+      __sv_out=-1
       return 0
     fi
   done
 
-  # Numeric cores are equal — compare pre-release
-  # A version with a pre-release has lower precedence than one without
-  if [[ -z "${pre1}" && -z "${pre2}" ]]; then
-    printf '0\n'
+  # The numeric cores are equal, so the pre-release decides. A version with a
+  # pre-release has lower precedence than one without.
+  local __sv_pre1="${__sv_p1[3]}" __sv_pre2="${__sv_p2[3]}"
+  if [[ -z "${__sv_pre1}" && -z "${__sv_pre2}" ]]; then
+    __sv_out=0
     return 0
-  elif [[ -n "${pre1}" && -z "${pre2}" ]]; then
-    printf -- '-1\n'
+  elif [[ -n "${__sv_pre1}" && -z "${__sv_pre2}" ]]; then
+    __sv_out=-1
     return 0
-  elif [[ -z "${pre1}" && -n "${pre2}" ]]; then
-    printf '1\n'
+  elif [[ -z "${__sv_pre1}" && -n "${__sv_pre2}" ]]; then
+    __sv_out=1
     return 0
   fi
 
-  # Both have pre-release — compare identifier by identifier
-  local -a ids1 ids2
-  IFS='.' read -r -a ids1 <<< "${pre1}"
-  IFS='.' read -r -a ids2 <<< "${pre2}"
+  # Both have a pre-release: compare identifier by identifier.
+  local -a __sv_ids1 __sv_ids2
+  IFS='.' read -r -a __sv_ids1 <<< "${__sv_pre1}"
+  IFS='.' read -r -a __sv_ids2 <<< "${__sv_pre2}"
 
-  local max_len="${#ids1[@]}"
-  ((${#ids2[@]} > max_len)) && max_len="${#ids2[@]}"
+  local __sv_len="${#__sv_ids1[@]}"
+  ((${#__sv_ids2[@]} > __sv_len)) && __sv_len="${#__sv_ids2[@]}"
 
-  local i
-  for ((i = 0; i < max_len; i++)); do
-    local id1="${ids1[i]-}" id2="${ids2[i]-}"
+  local __sv_id1 __sv_id2 __sv_num1 __sv_num2
+  for ((__sv_i = 0; __sv_i < __sv_len; __sv_i++)); do
+    __sv_id1="${__sv_ids1[__sv_i]-}"
+    __sv_id2="${__sv_ids2[__sv_i]-}"
 
-    # A shorter pre-release has lower precedence
-    if [[ -z "${id1}" && -n "${id2}" ]]; then
-      printf -- '-1\n'
+    # A shorter pre-release has lower precedence.
+    if [[ -z "${__sv_id1}" && -n "${__sv_id2}" ]]; then
+      __sv_out=-1
       return 0
-    elif [[ -n "${id1}" && -z "${id2}" ]]; then
-      printf '1\n'
+    elif [[ -n "${__sv_id1}" && -z "${__sv_id2}" ]]; then
+      __sv_out=1
       return 0
     fi
 
-    local is_num1=false is_num2=false
-    [[ "${id1}" =~ ^[0-9]+$ ]] && is_num1=true
-    [[ "${id2}" =~ ^[0-9]+$ ]] && is_num2=true
+    __sv_num1=false
+    __sv_num2=false
+    [[ "${__sv_id1}" =~ ^[0-9]+$ ]] && __sv_num1=true
+    [[ "${__sv_id2}" =~ ^[0-9]+$ ]] && __sv_num2=true
 
-    if [[ "${is_num1}" == true && "${is_num2}" == true ]]; then
-      if ((10#${id1} > 10#${id2})); then
-        printf '1\n'
+    if [[ "${__sv_num1}" == true && "${__sv_num2}" == true ]]; then
+      if ((10#${__sv_id1} > 10#${__sv_id2})); then
+        __sv_out=1
         return 0
-      elif ((10#${id1} < 10#${id2})); then
-        printf -- '-1\n'
-        return 0
-      fi
-    elif [[ "${is_num1}" == true && "${is_num2}" == false ]]; then
-      # Numeric identifiers have lower precedence than alphanumeric
-      printf -- '-1\n'
-      return 0
-    elif [[ "${is_num1}" == false && "${is_num2}" == true ]]; then
-      printf '1\n'
-      return 0
-    else
-      # Both alphanumeric — lexicographic comparison
-      if [[ "${id1}" > "${id2}" ]]; then
-        printf '1\n'
-        return 0
-      elif [[ "${id1}" < "${id2}" ]]; then
-        printf -- '-1\n'
+      elif ((10#${__sv_id1} < 10#${__sv_id2})); then
+        __sv_out=-1
         return 0
       fi
+    elif [[ "${__sv_num1}" == true ]]; then
+      # Numeric identifiers have lower precedence than alphanumeric ones.
+      __sv_out=-1
+      return 0
+    elif [[ "${__sv_num2}" == true ]]; then
+      __sv_out=1
+      return 0
+    elif [[ "${__sv_id1}" > "${__sv_id2}" ]]; then
+      # Both alphanumeric: compare lexically.
+      __sv_out=1
+      return 0
+    elif [[ "${__sv_id1}" < "${__sv_id2}" ]]; then
+      __sv_out=-1
+      return 0
     fi
   done
 
-  printf '0\n'
+  __sv_out=0
 }
 
 #######################################
@@ -177,7 +214,7 @@ function dybatpho::semver_bump {
   dybatpho::semver_valid "${version}" || dybatpho::die "semver_bump: '${version}' is not a valid semver"
 
   local -a parts
-  mapfile -t parts < <(dybatpho::semver_parse "${version}")
+  __dybatpho_semver_parse_into parts "${version}"
   local major="${parts[0]}" minor="${parts[1]}" patch="${parts[2]}"
 
   case "${part}" in
@@ -227,8 +264,8 @@ function dybatpho::semver_release_type {
   dybatpho::semver_valid "${new_ver}" || dybatpho::die "semver_release_type: '${new_ver}' is not valid"
 
   local -a old_parts new_parts
-  mapfile -t old_parts < <(dybatpho::semver_parse "${old_ver}")
-  mapfile -t new_parts < <(dybatpho::semver_parse "${new_ver}")
+  __dybatpho_semver_parse_into old_parts "${old_ver}"
+  __dybatpho_semver_parse_into new_parts "${new_ver}"
 
   local old_major="${old_parts[0]}" old_minor="${old_parts[1]}" old_patch="${old_parts[2]}"
   local old_pre="${old_parts[3]}" old_build="${old_parts[4]}"
@@ -400,7 +437,7 @@ function __dybatpho_semver_expand {
 function __dybatpho_semver_holds {
   local version operator bound result
   dybatpho::expect_args version operator bound -- "$@"
-  result="$(dybatpho::semver_compare "${version}" "${bound}")"
+  __dybatpho_semver_cmp_into result "${version}" "${bound}"
   case "${operator}" in
     '=') ((result == 0)) ;;
     '>') ((result > 0)) ;;
@@ -442,16 +479,9 @@ function dybatpho::semver_satisfies {
   dybatpho::semver_valid "${version}" \
     || dybatpho::die "${FUNCNAME[0]}: Not a valid version: '${version}'"
 
-  local prerelease
-  local semver_parse
-  local semver_parse_2
-  local semver_parse_3
-  local semver_fields
-  semver_fields=$(dybatpho::semver_parse "${version}")
-  semver_parse_3=$(printf '%s\n' "${semver_fields}" | sed -n '4p')
-  semver_parse_2=${semver_parse_3}
-  semver_parse=${semver_parse_2}
-  prerelease="${semver_parse}"
+  # The check above just matched, so its groups are the parts; 5 is the
+  # pre-release without its leading `-`.
+  local prerelease="${BASH_REMATCH[5]}"
   local core="${version%%[-+]*}"
 
   # `||` separates alternatives; satisfying any one of them is enough.
@@ -533,12 +563,13 @@ function dybatpho::semver_sort {
   # An insertion sort keeps the comparison in `dybatpho::semver_compare`, which
   # already knows the specification's ordering rules, rather than reimplementing
   # them for `sort`.
-  local index position candidate
+  local index position candidate order
   for ((index = 1; index < ${#versions[@]}; index++)); do
     candidate="${versions[index]}"
     position=$((index - 1))
-    while ((position >= 0)) \
-      && (($(dybatpho::semver_compare "${versions[position]#v}" "${candidate#v}") > 0)); do
+    while ((position >= 0)); do
+      __dybatpho_semver_cmp_into order "${versions[position]#v}" "${candidate#v}"
+      ((order > 0)) || break
       versions[position + 1]="${versions[position]}"
       position=$((position - 1))
     done

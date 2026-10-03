@@ -122,7 +122,7 @@ function __dybatpho_test_fail {
 # @internal
 #######################################
 function __dybatpho_test_need_json {
-  declare -F __dybatpho_json_cmd > /dev/null && return 0
+  declare -F __dybatpho_json_cmd_into > /dev/null && return 0
   __dybatpho_test_fail "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
 

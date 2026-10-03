@@ -140,7 +140,7 @@ DYBATPHO_AI_OLLAMA_MODEL=${DYBATPHO_AI_OLLAMA_MODEL:-llama3.2}
 # `/tmp` that is an arbitrary-file-overwrite primitive: another account
 # pre-creates that name as a link to a file of yours and the next run truncates
 # it. A directory only you can write closes that off, and
-# `__dybatpho_ai_state_prepare` refuses to follow a link even there.
+# `__dybatpho_ai_state_prepare_into` refuses to follow a link even there.
 #
 # @env DYBATPHO_AI_STATE_FILE string File the call and token counters are kept in; resolved on first use
 DYBATPHO_AI_STATE_FILE=${DYBATPHO_AI_STATE_FILE:-}
@@ -159,7 +159,10 @@ declare -gA DYBATPHO_AI_TOOL_HANDLER=()
 # @internal
 #######################################
 function __dybatpho_ai_require_json {
-  __dybatpho_json_cmd > /dev/null
+  # Only the refusal matters here: which backend answered does not.
+  # shellcheck disable=SC2034 # out-param of the resolver; nothing reads it
+  local backend
+  __dybatpho_json_cmd_into backend
 }
 
 #######################################
@@ -197,52 +200,62 @@ function __dybatpho_ai_state_cleanup_once {
   [[ -n "${__dybatpho_ai_state_cleanup-}" ]] && return 0
   __dybatpho_ai_state_cleanup=1
   local ai_state_path
-  ai_state_path=$(__dybatpho_ai_state_path)
+  __dybatpho_ai_state_path_into ai_state_path
   dybatpho::cleanup_file_on_exit "${ai_state_path}"
 }
 
 #######################################
-# @description Resolve the counter file, defaulting to a private directory under
-#   the XDG state home rather than to a predictable name in a shared `/tmp`.
+# @description Resolve the counter file into a variable, defaulting to a
+#   private directory under the XDG state home rather than to a predictable name
+#   in a shared `/tmp`.
 #
 #   The directory is created 0700, so no other account can plant anything in it.
 #   Resolution is lazy because working it out needs `HOME`, and a module must
-#   not fail at source time on a host that has none.
-# @noargs
+#   not fail at source time on a host that has none. It runs in the caller's
+#   shell, so the resolved path is remembered there: from inside `$(...)` the
+#   answer was worked out, and the directory checked, on every call.
+# @arg $1 string Name of the variable receiving the path of the counter file
 # @env DYBATPHO_AI_STATE_FILE string Overrides the default when set
 # @set DYBATPHO_AI_STATE_FILE
-# @stdout Path of the counter file
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_ai_state_path {
+function __dybatpho_ai_state_path_into {
+  local __dybatpho_ai_state_var
+  dybatpho::expect_args __dybatpho_ai_state_var -- "$@"
+  local -n __dybatpho_ai_state_out="${__dybatpho_ai_state_var}"
   if [[ -z "${DYBATPHO_AI_STATE_FILE}" ]]; then
-    local directory
-    directory="$(dybatpho::xdg_state_dir dybatpho)"
+    local __dybatpho_ai_state_dir
+    __dybatpho_ai_state_dir="$(dybatpho::xdg_state_dir dybatpho)"
     # The counters are bookkeeping, not an effect the caller asked for, so a dry
     # run still needs the directory: without it the first count aborts.
-    DRY_RUN=false dybatpho::ensure_dir "${directory}" 700 > /dev/null
-    DYBATPHO_AI_STATE_FILE="${directory}/ai_state_$$"
+    DRY_RUN=false dybatpho::ensure_dir "${__dybatpho_ai_state_dir}" 700 > /dev/null
+    DYBATPHO_AI_STATE_FILE="${__dybatpho_ai_state_dir}/ai_state_$$"
   fi
-  printf '%s\n' "${DYBATPHO_AI_STATE_FILE}"
+  __dybatpho_ai_state_out="${DYBATPHO_AI_STATE_FILE}"
 }
 
 #######################################
-# @description Return the counter file, refusing to use it through a symbolic
-#   link. Writing the counters is a plain redirection, which follows a link and
-#   truncates whatever is on the other end, so a link here is either an attack
-#   or a mistake; either way it is not something to write through.
-# @noargs
-# @stdout Path of the counter file
+# @description Resolve the counter file into a variable, refusing to use it
+#   through a symbolic link. Writing the counters is a plain redirection, which
+#   follows a link and truncates whatever is on the other end, so a link here is
+#   either an attack or a mistake; either way it is not something to write
+#   through.
+# @arg $1 string Name of the variable receiving the path of the counter file
+# @set The named variable
 # @exitcode 0 The path is safe to write
 # @exitcode 1 Stop the script when the path is a symbolic link
 # @internal
 #######################################
-function __dybatpho_ai_state_prepare {
-  local path
-  path="$(__dybatpho_ai_state_path)"
-  [[ -L "${path}" ]] \
-    && dybatpho::die "ai: refusing to use ${path}, it is a symbolic link"
-  printf '%s\n' "${path}"
+function __dybatpho_ai_state_prepare_into {
+  local __dybatpho_ai_prepare_var
+  dybatpho::expect_args __dybatpho_ai_prepare_var -- "$@"
+  local -n __dybatpho_ai_prepare_out="${__dybatpho_ai_prepare_var}"
+  local __dybatpho_ai_prepare_path
+  __dybatpho_ai_state_path_into __dybatpho_ai_prepare_path
+  [[ -L "${__dybatpho_ai_prepare_path}" ]] \
+    && dybatpho::die "ai: refusing to use ${__dybatpho_ai_prepare_path}, it is a symbolic link"
+  __dybatpho_ai_prepare_out="${__dybatpho_ai_prepare_path}"
 }
 
 #######################################
@@ -254,7 +267,7 @@ function __dybatpho_ai_state_prepare {
 #######################################
 function __dybatpho_ai_state_read {
   local path
-  path="$(__dybatpho_ai_state_prepare)" || return 1
+  __dybatpho_ai_state_prepare_into path
   if [[ ! -f "${path}" ]]; then
     local empty_usage='{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,'
     empty_usage+='"last_model":"","last_stop_reason":""}'
@@ -272,7 +285,7 @@ function __dybatpho_ai_state_read {
 function __dybatpho_ai_state_write {
   local document path
   dybatpho::expect_args document -- "$@"
-  path="$(__dybatpho_ai_state_prepare)" || return 1
+  __dybatpho_ai_state_prepare_into path
   printf '%s\n' "${document}" > "${path}"
 }
 

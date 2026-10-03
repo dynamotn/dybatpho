@@ -89,7 +89,10 @@ DYBATPHO_AGENT_MARKERS+=" AIDER_ACTIVE CURSOR_AGENT OPENAI_AGENT MCP_SERVER"
 # @internal
 #######################################
 function __dybatpho_agent_require_json {
-  __dybatpho_json_cmd > /dev/null
+  # Only the refusal matters here: which backend answered does not.
+  # shellcheck disable=SC2034 # out-param of the resolver; nothing reads it
+  local backend
+  __dybatpho_json_cmd_into backend
 }
 
 #######################################

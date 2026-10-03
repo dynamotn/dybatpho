@@ -1044,6 +1044,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused it, the same ambiguity as an octet written `010`. Both modules now
   read addresses through one parser, so they give the same answer.
 
+- **`release` — an unknown ref stops the release instead of reporting nothing
+  to release.** `dybatpho::release_bump_type` and `dybatpho::release_changelog`
+  checked the base and head refs inside a process substitution, so a mistyped
+  tag printed a fatal error and the caller carried on as if the range were
+  empty. The refs are now checked first, in the caller's shell.
+
 ### Security
 
 - **`notification` — webhook URLs, bot tokens and messages no longer appear on

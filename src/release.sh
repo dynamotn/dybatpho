@@ -128,6 +128,15 @@ function __dybatpho_release_commits_into {
   local __dybatpho_release_head="$4" __dybatpho_release_record
   __dybatpho_release_messages_ref=()
 
+  # Checked here, in the caller's shell: inside the process substitution below
+  # a bad ref only ended that subshell, and the caller read an empty range as
+  # "nothing to release".
+  __dybatpho_git_expect_repo "${__dybatpho_release_repo}"
+  if [[ -n "${__dybatpho_release_base}" ]]; then
+    __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_base}" > /dev/null
+  fi
+  __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_head}" > /dev/null
+
   while IFS= read -r -d $'\x1e' __dybatpho_release_record; do
     # `git log` ends every record with a newline, which lands in front of the
     # next one.
@@ -142,9 +151,6 @@ function __dybatpho_release_commits_into {
     # excludes its base, which would drop the repository's first commit, so
     # that case reads the whole history instead.
     if [[ -n "${__dybatpho_release_base}" ]]; then
-      __dybatpho_git_expect_repo "${__dybatpho_release_repo}"
-      __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_base}" > /dev/null
-      __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_head}" > /dev/null
       __dybatpho_git "${__dybatpho_release_repo}" log --reverse \
         --format='%H%x1f%B%x1e' "${__dybatpho_release_base}..${__dybatpho_release_head}"
     else

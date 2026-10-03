@@ -94,6 +94,36 @@ tag() {
   assert_output ""
 }
 
+@test "an unknown ref stops release_bump_type and release_changelog" {
+  # Checked inside the process substitution, a bad ref printed a fatal error
+  # and the caller read "nothing to release" and carried on.
+  commit "feat: one"
+  tag v1.0.0
+  commit "fix: two"
+  local script="${BATS_TEST_TMPDIR}/bad-ref.sh" fn
+  for fn in release_bump_type release_changelog; do
+    printf '%s\n' \
+      ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules release" \
+      "dybatpho::${fn} $(printf '%q' "${REPO}") v9.9.9 || true" \
+      "dybatpho::${fn} $(printf '%q' "${REPO}") v1.0.0 no-such-head || true" \
+      "printf 'carried on\\n'" > "${script}"
+    run --separate-stderr bash "${script}"
+    assert_failure
+    refute_output --partial "carried on"
+    assert_stderr --partial "Unknown git commit: v9.9.9"
+  done
+
+  # Without a base the whole history is read, and the head is still checked.
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules release" \
+    "dybatpho::release_bump_type $(printf '%q' "${REPO}") '' no-such-head || true" \
+    "printf 'carried on\\n'" > "${script}"
+  run --separate-stderr bash "${script}"
+  assert_failure
+  refute_output --partial "carried on"
+  assert_stderr --partial "Unknown git commit: no-such-head"
+}
+
 @test "dybatpho::release_next_version bumps from the latest tag" {
   commit "feat: one"
   tag v1.2.3

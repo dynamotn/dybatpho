@@ -223,20 +223,11 @@ function dybatpho::forge_api {
     return 0
   fi
 
-  local kind host
+  local kind host api
   kind="$(dybatpho::forge_kind "$@")"
   host="$(dybatpho::forge_host "$@")"
-  case "${kind}" in
-    github)
-      if [[ "${host}" == "github.com" ]]; then
-        printf 'https://api.github.com\n'
-      else
-        printf 'https://%s/api/v3\n' "${host}"
-      fi
-      ;;
-    gitlab) printf 'https://%s/api/v4\n' "${host}" ;;
-    *) ;;
-  esac
+  __dybatpho_forge_api_for_into api "${kind}" "${host}"
+  printf '%s\n' "${api}"
 }
 
 #######################################
@@ -266,24 +257,152 @@ function dybatpho::forge_api {
 #######################################
 function dybatpho::forge_token {
   local kind="${1:-}"
-  [[ -n "${kind}" ]] || kind="$(dybatpho::forge_kind)"
+  if [[ -z "${kind}" ]]; then
+    local -A context=()
+    __dybatpho_forge_context_into context
+    kind="${context[kind]}"
+  fi
+  local token
+  __dybatpho_forge_token_into token "${kind}"
+  printf '%s\n' "${token}"
+}
 
-  local token="${DYBATPHO_FORGE_TOKEN}"
-  if [[ -z "${token}" ]]; then
-    case "${kind}" in
-      github) token="${GITHUB_TOKEN:-${GH_TOKEN:-}}" ;;
-      gitlab) token="${GITLAB_TOKEN:-${CI_JOB_TOKEN:-}}" ;;
+#######################################
+# @description Resolve the forge token into a variable, registered with
+#   `secret.sh` in the caller's own shell.
+#   Resolving it here rather than through `dybatpho::forge_token` is what keeps
+#   the registration: a command substitution takes it away when it exits, which
+#   left every request this module made with its token unmasked afterwards.
+# @arg $1 string Name of the variable receiving the token
+# @arg $2 string Forge kind
+# @set The named variable
+# @exitcode 1 Stop the script when no token is set for this forge
+# @internal
+#######################################
+function __dybatpho_forge_token_into {
+  local -n __dybatpho_forge_token_out="$1"
+  local __dybatpho_forge_token_kind="$2"
+  local __dybatpho_forge_token_value="${DYBATPHO_FORGE_TOKEN}"
+  if [[ -z "${__dybatpho_forge_token_value}" ]]; then
+    case "${__dybatpho_forge_token_kind}" in
+      github) __dybatpho_forge_token_value="${GITHUB_TOKEN:-${GH_TOKEN:-}}" ;;
+      gitlab) __dybatpho_forge_token_value="${GITLAB_TOKEN:-${CI_JOB_TOKEN:-}}" ;;
       *) ;;
     esac
   fi
 
-  local forge_token_vars
-  forge_token_vars=$(__dybatpho_forge_token_vars "${kind}")
-  [[ -n "${token}" ]] || dybatpho::die \
-    "No ${kind} token. Set DYBATPHO_FORGE_TOKEN, or ${forge_token_vars}"
+  if [[ -z "${__dybatpho_forge_token_value}" ]]; then
+    local __dybatpho_forge_token_vars
+    __dybatpho_forge_token_vars=$(__dybatpho_forge_token_vars "${__dybatpho_forge_token_kind}")
+    dybatpho::die "No ${__dybatpho_forge_token_kind} token. Set DYBATPHO_FORGE_TOKEN, or ${__dybatpho_forge_token_vars}"
+  fi
 
-  dybatpho::secret_register "${token}"
-  printf '%s\n' "${token}"
+  dybatpho::secret_register "${__dybatpho_forge_token_value}"
+  __dybatpho_forge_token_out="${__dybatpho_forge_token_value}"
+}
+
+#######################################
+# @description Resolve what a forge call needs in one pass, in the caller's shell.
+#   Asking `forge_kind`, `forge_repo`, `forge_api` and `forge_host` separately
+#   read the remote four times per request, each through command substitutions
+#   that also swallowed their own fatal errors. Here the remote is read at most
+#   once, and not at all when every value it would answer is overridden.
+#   `kind` is always resolved; the other fields only when asked for.
+# @arg $1 string Name of the associative array receiving the fields
+# @arg $@ string Fields wanted besides `kind`: `host`, `repo`, `api`, `token`
+# @set The named array: `kind`, and `host`, `repo`, `api`, `token` as asked
+# @exitcode 1 Stop the script when the remote, the forge or the token can't be resolved
+# @internal
+#######################################
+function __dybatpho_forge_context_into {
+  local -n __dybatpho_forge_ctx="$1"
+  shift
+  local __dybatpho_forge_ctx_want=" $* "
+  local __dybatpho_forge_ctx_remote="${DYBATPHO_FORGE_REMOTE}"
+
+  case "${DYBATPHO_FORGE}" in
+    "" | github | gitlab) ;;
+    *) dybatpho::die "DYBATPHO_FORGE must be 'github' or 'gitlab', got '${DYBATPHO_FORGE}'" ;;
+  esac
+
+  # The remote is read only when something it answers is not overridden.
+  local __dybatpho_forge_ctx_url=""
+  if [[ -z "${DYBATPHO_FORGE}" || "${__dybatpho_forge_ctx_want}" == *" host "* ]] \
+    || [[ "${__dybatpho_forge_ctx_want}" == *" repo "* && -z "${DYBATPHO_FORGE_REPO}" ]] \
+    || [[ "${__dybatpho_forge_ctx_want}" == *" api "* && -z "${DYBATPHO_FORGE_API}" ]]; then
+    __dybatpho_forge_ctx_url="$(dybatpho::git_remote_url "${__dybatpho_forge_ctx_remote}" .)" \
+      || dybatpho::die "No URL for remote '${__dybatpho_forge_ctx_remote}'"
+    __dybatpho_forge_ctx_url="$(__dybatpho_forge_normalize_url "${__dybatpho_forge_ctx_url}")"
+    __dybatpho_forge_ctx[host]="${__dybatpho_forge_ctx_url%%/*}"
+  fi
+
+  if [[ -n "${DYBATPHO_FORGE}" ]]; then
+    __dybatpho_forge_ctx[kind]="${DYBATPHO_FORGE}"
+  else
+    case "${__dybatpho_forge_ctx[host]}" in
+      github.com | github.*) __dybatpho_forge_ctx[kind]=github ;;
+      gitlab.com | gitlab.*) __dybatpho_forge_ctx[kind]=gitlab ;;
+      *)
+        local __dybatpho_forge_ctx_hint="set DYBATPHO_FORGE to 'github' or 'gitlab'"
+        dybatpho::die "Cannot tell which forge '${__dybatpho_forge_ctx[host]}' is; ${__dybatpho_forge_ctx_hint}"
+        ;;
+    esac
+  fi
+
+  if [[ "${__dybatpho_forge_ctx_want}" == *" repo "* ]]; then
+    if [[ -n "${DYBATPHO_FORGE_REPO}" ]]; then
+      __dybatpho_forge_ctx[repo]="${DYBATPHO_FORGE_REPO}"
+    else
+      local __dybatpho_forge_ctx_project="${__dybatpho_forge_ctx_url#*/}"
+      [[ "${__dybatpho_forge_ctx_project}" != "${__dybatpho_forge_ctx_url}" \
+        && -n "${__dybatpho_forge_ctx_project}" ]] \
+        || dybatpho::die "Remote '${__dybatpho_forge_ctx_remote}' has no owner/repo path: ${__dybatpho_forge_ctx_url}"
+      __dybatpho_forge_ctx[repo]="${__dybatpho_forge_ctx_project}"
+    fi
+  fi
+
+  if [[ "${__dybatpho_forge_ctx_want}" == *" api "* ]]; then
+    if [[ -n "${DYBATPHO_FORGE_API}" ]]; then
+      __dybatpho_forge_ctx[api]="${DYBATPHO_FORGE_API%/}"
+    else
+      local __dybatpho_forge_ctx_api
+      __dybatpho_forge_api_for_into __dybatpho_forge_ctx_api \
+        "${__dybatpho_forge_ctx[kind]}" "${__dybatpho_forge_ctx[host]}"
+      __dybatpho_forge_ctx[api]="${__dybatpho_forge_ctx_api}"
+    fi
+  fi
+
+  if [[ "${__dybatpho_forge_ctx_want}" == *" token "* ]]; then
+    local __dybatpho_forge_ctx_token
+    __dybatpho_forge_token_into __dybatpho_forge_ctx_token "${__dybatpho_forge_ctx[kind]}"
+    __dybatpho_forge_ctx[token]="${__dybatpho_forge_ctx_token}"
+  fi
+}
+
+#######################################
+# @description Work out the API base URL of a forge from its kind and host.
+#   `github.com` answers on a separate API host; every other GitHub is an
+#   Enterprise install serving `/api/v3` from the same host. GitLab always
+#   serves `/api/v4` from its own host.
+# @arg $1 string Name of the variable receiving the URL
+# @arg $2 string Forge kind
+# @arg $3 string Host
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_forge_api_for_into {
+  local -n __dybatpho_forge_api_out="$1"
+  case "$2" in
+    github)
+      if [[ "$3" == "github.com" ]]; then
+        __dybatpho_forge_api_out="https://api.github.com"
+      else
+        __dybatpho_forge_api_out="https://$3/api/v3"
+      fi
+      ;;
+    gitlab) __dybatpho_forge_api_out="https://$3/api/v4" ;;
+    *) ;;
+  esac
 }
 
 #######################################
@@ -397,20 +516,22 @@ function dybatpho::forge_request {
     shift $#
   fi
 
-  local kind token url
-  kind="$(dybatpho::forge_kind)"
-  token="$(dybatpho::forge_token "${kind}")"
-
+  # The forge, its token and -- for a relative path -- the project are
+  # resolved here, in the caller's shell, so the token stays registered for
+  # masking and a remote that can't be read stops the script.
+  local -A context=()
+  local url
   case "${path}" in
-    http://* | https://*) url="${path}" ;;
+    http://* | https://*)
+      __dybatpho_forge_context_into context token
+      url="${path}"
+      ;;
     *)
-      local forge_repo
-      forge_repo=$(dybatpho::forge_repo)
-      local forge_api
-      forge_api=$(dybatpho::forge_api)
-      url="${forge_api}/$(__dybatpho_forge_project_path "${kind}" "${forge_repo}")/${path#/}"
+      __dybatpho_forge_context_into context token repo api
+      url="${context[api]}/$(__dybatpho_forge_project_path "${context[kind]}" "${context[repo]}")/${path#/}"
       ;;
   esac
+  local kind="${context[kind]}" token="${context[token]}"
 
   local -a args=(
     --request "${method}"
@@ -495,6 +616,27 @@ function dybatpho::forge_error {
 }
 
 #######################################
+# @description Run a forge request and stop the script with the forge's own
+#   reason when it fails.
+#   The same four lines followed every request that must not fail; the reason is
+#   read from the response once the request has failed, never before.
+# @arg $1 string What failed, the start of the error message
+# @arg $2 string Response body file the request writes to
+# @arg $@ string The request command and its arguments
+# @exitcode 0 The request succeeded
+# @exitcode 1 Stop the script, naming the status and the forge's message
+# @internal
+#######################################
+function __dybatpho_forge_or_die {
+  local what="$1" response="$2"
+  shift 2
+  "$@" && return 0
+  local detail
+  detail=$(dybatpho::forge_error "${response}")
+  dybatpho::die "${what}: ${detail}"
+}
+
+#######################################
 # @description Print the number of an open issue whose title matches exactly.
 #   GitLab can filter server-side; GitHub cannot search titles on the issues
 #   endpoint, so the open issues are compared here. Both are exact matches, so
@@ -509,7 +651,9 @@ function dybatpho::forge_issue_find {
   dybatpho::expect_args title -- "$@"
 
   local kind body number
-  kind="$(dybatpho::forge_kind)"
+  local -A context=()
+  __dybatpho_forge_context_into context
+  kind="${context[kind]}"
   dybatpho::create_temp body ".json"
 
   case "${kind}" in
@@ -551,7 +695,9 @@ function dybatpho::forge_issue_create {
   local labels="${3-}"
 
   local kind payload response number
-  kind="$(dybatpho::forge_kind)"
+  local -A context=()
+  __dybatpho_forge_context_into context
+  kind="${context[kind]}"
   dybatpho::create_temp response ".json"
 
   case "${kind}" in
@@ -562,24 +708,16 @@ function dybatpho::forge_issue_create {
       [[ -n "${labels}" ]] \
         && payload="$(dybatpho::json_eval "${payload}" \
           ".labels = ${forge_labels_json}")"
-      dybatpho::forge_request POST "issues" "${payload}" "${response}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die "Could not create issue '${title}': ${forge_error_detail}"
-        }
+      __dybatpho_forge_or_die "Could not create issue '${title}'" "${response}" \
+        dybatpho::forge_request POST "issues" "${payload}" "${response}"
       number="$(dybatpho::json_get "$(< "${response}")" '.number')"
       ;;
     gitlab)
       payload="$(dybatpho::json_object title "${title}" description "${body}")"
       [[ -n "${labels}" ]] \
         && payload="$(dybatpho::json_eval "${payload}" ".labels = $(dybatpho::json_string "${labels}")")"
-      dybatpho::forge_request POST "issues" "${payload}" "${response}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die "Could not create issue '${title}': ${forge_error_detail}"
-        }
+      __dybatpho_forge_or_die "Could not create issue '${title}'" "${response}" \
+        dybatpho::forge_request POST "issues" "${payload}" "${response}"
       number="$(dybatpho::json_get "$(< "${response}")" '.iid')"
       ;;
     *) ;;
@@ -599,7 +737,9 @@ function dybatpho::forge_issue_comment {
   dybatpho::expect_args number body -- "$@"
 
   local kind payload path
-  kind="$(dybatpho::forge_kind)"
+  local -A context=()
+  __dybatpho_forge_context_into context
+  kind="${context[kind]}"
   payload="$(dybatpho::json_object body "${body}")"
   case "${kind}" in
     github) path="issues/${number}/comments" ;;
@@ -609,12 +749,8 @@ function dybatpho::forge_issue_comment {
 
   local response
   dybatpho::create_temp response ".json"
-  dybatpho::forge_request POST "${path}" "${payload}" "${response}" \
-    || {
-      local forge_error_detail
-      forge_error_detail=$(dybatpho::forge_error "${response}")
-      dybatpho::die "Could not comment on issue ${number}: ${forge_error_detail}"
-    }
+  __dybatpho_forge_or_die "Could not comment on issue ${number}" "${response}" \
+    dybatpho::forge_request POST "${path}" "${payload}" "${response}"
 }
 
 #######################################
@@ -663,10 +799,9 @@ function dybatpho::forge_issue_url {
   local number
   dybatpho::expect_args number -- "$@"
 
-  local kind host repo
-  kind="$(dybatpho::forge_kind)"
-  host="$(dybatpho::forge_host)"
-  repo="$(dybatpho::forge_repo)"
+  local -A context=()
+  __dybatpho_forge_context_into context host repo
+  local kind="${context[kind]}" host="${context[host]}" repo="${context[repo]}"
   case "${kind}" in
     github) printf 'https://%s/%s/issues/%s\n' "${host}" "${repo}" "${number}" ;;
     gitlab) printf 'https://%s/%s/-/issues/%s\n' "${host}" "${repo}" "${number}" ;;
@@ -688,7 +823,9 @@ function dybatpho::forge_release_find {
   dybatpho::expect_args tag -- "$@"
 
   local kind body value
-  kind="$(dybatpho::forge_kind)"
+  local -A context=()
+  __dybatpho_forge_context_into context
+  kind="${context[kind]}"
   dybatpho::create_temp body ".json"
 
   case "${kind}" in
@@ -731,7 +868,9 @@ function dybatpho::forge_release_create {
   local name="${2:-${tag}}" notes="${3-}" draft="${4:-false}"
 
   local kind payload response value
-  kind="$(dybatpho::forge_kind)"
+  local -A context=()
+  __dybatpho_forge_context_into context
+  kind="${context[kind]}"
   dybatpho::create_temp response ".json"
 
   case "${kind}" in
@@ -739,24 +878,16 @@ function dybatpho::forge_release_create {
       payload="$(dybatpho::json_object tag_name "${tag}" name "${name}" body "${notes}")"
       dybatpho::is true "${draft}" \
         && payload="$(dybatpho::json_eval "${payload}" '.draft = true')"
-      dybatpho::forge_request POST "releases" "${payload}" "${response}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die "Could not create release '${tag}': ${forge_error_detail}"
-        }
+      __dybatpho_forge_or_die "Could not create release '${tag}'" "${response}" \
+        dybatpho::forge_request POST "releases" "${payload}" "${response}"
       value="$(dybatpho::json_get "$(< "${response}")" '.id')"
       ;;
     gitlab)
       dybatpho::is true "${draft}" \
         && dybatpho::die "GitLab has no draft release; hold the tag back instead"
       payload="$(dybatpho::json_object tag_name "${tag}" name "${name}" description "${notes}")"
-      dybatpho::forge_request POST "releases" "${payload}" "${response}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die "Could not create release '${tag}': ${forge_error_detail}"
-        }
+      __dybatpho_forge_or_die "Could not create release '${tag}'" "${response}" \
+        dybatpho::forge_request POST "releases" "${payload}" "${response}"
       value="$(dybatpho::json_get "$(< "${response}")" '.tag_name')"
       ;;
     *) ;;
@@ -784,23 +915,22 @@ function dybatpho::forge_release_upload {
   dybatpho::expect_args tag file -- "$@"
   dybatpho::is file "${file}" || dybatpho::die "No such file to upload: ${file}"
 
-  local kind release name response
-  kind="$(dybatpho::forge_kind)"
+  local -A context=()
+  __dybatpho_forge_context_into context token repo
+  local kind="${context[kind]}" token="${context[token]}" repo="${context[repo]}"
+  local release name response
   release="$(dybatpho::forge_release_find "${tag}")" \
     || dybatpho::die "No release for tag '${tag}'; create it before uploading assets"
   name="$(dybatpho::path_basename "${file}")"
   dybatpho::create_temp response ".json"
-
-  local token repo
-  token="$(dybatpho::forge_token "${kind}")"
-  repo="$(dybatpho::forge_repo)"
 
   case "${kind}" in
     github)
       # Assets go to a different host than the rest of the API, so this is the
       # one request that cannot go through `dybatpho::forge_request`.
       local host upload_url
-      host="$(dybatpho::forge_host)"
+      __dybatpho_forge_context_into context host
+      host="${context[host]}"
       if [[ "${host}" == "github.com" ]]; then
         upload_url="https://uploads.github.com"
       else
@@ -812,22 +942,17 @@ function dybatpho::forge_release_upload {
       local -a DYBATPHO_CURL_SECRET_HEADERS=(
         "$(__dybatpho_forge_auth_header github "${token}")"
       )
-      dybatpho::curl_request "${upload_url}" "${response}" \
+      __dybatpho_forge_or_die "Could not upload ${name}" "${response}" \
+        dybatpho::curl_request "${upload_url}" "${response}" \
         --request POST \
         --header "Content-Type: application/octet-stream" \
-        --data-binary "@${file}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die "Could not upload ${name}: ${forge_error_detail}"
-        }
+        --data-binary "@${file}"
       dybatpho::json_get "$(< "${response}")" '.browser_download_url'
       ;;
     gitlab)
       local package_url
-      local forge_api
-      forge_api=$(dybatpho::forge_api)
-      package_url="${forge_api}/$(__dybatpho_forge_project_path gitlab "${repo}")"
+      __dybatpho_forge_context_into context api
+      package_url="${context[api]}/$(__dybatpho_forge_project_path gitlab "${repo}")"
       local path_basename
       path_basename=$(dybatpho::path_basename "${repo}")
       package_url="${package_url}/packages/generic/$(dybatpho::url_encode "${path_basename}")"
@@ -840,28 +965,19 @@ function dybatpho::forge_release_upload {
       local -a DYBATPHO_CURL_SECRET_HEADERS=(
         "$(__dybatpho_forge_auth_header gitlab "${token}")"
       )
-      dybatpho::curl_request "${package_url}" "${response}" \
+      __dybatpho_forge_or_die "Could not upload ${name}" "${response}" \
+        dybatpho::curl_request "${package_url}" "${response}" \
         --request PUT \
-        --upload-file "${file}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die "Could not upload ${name}: ${forge_error_detail}"
-        }
+        --upload-file "${file}"
 
       # A generic package is not visible from the release until it is linked.
       local link_payload
       link_payload="$(dybatpho::json_object name "${name}" url "${package_url}")"
       # The reason is read from the link request's own response, once it has
       # failed: read earlier, it was the upload's answer, which had succeeded.
-      dybatpho::forge_request POST \
-        "releases/${url_encode}/assets/links" "${link_payload}" "${response}" \
-        || {
-          local forge_error_detail
-          forge_error_detail=$(dybatpho::forge_error "${response}")
-          dybatpho::die \
-            "Uploaded ${name} but could not link it to release '${tag}': ${forge_error_detail}"
-        }
+      __dybatpho_forge_or_die "Uploaded ${name} but could not link it to release '${tag}'" "${response}" \
+        dybatpho::forge_request POST \
+        "releases/${url_encode}/assets/links" "${link_payload}" "${response}"
       printf '%s\n' "${package_url}"
       ;;
     *) ;;

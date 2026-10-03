@@ -1000,6 +1000,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   description went out raw and the schema was not JSON. Every control
   character is now escaped, by the same escaper the rest of the library uses.
 
+- **`forge` — a request's token stays masked, and the remote is read once.**
+  `dybatpho::forge_request` and every helper built on it resolved the token
+  inside a command substitution, so its registration with `secret.sh` was gone
+  before the request returned and the script's later log lines printed the
+  token whole. The forge, the project and the token are now resolved in the
+  calling shell: the token stays masked, a request reads the remote once
+  instead of four times and not at all when `DYBATPHO_FORGE`,
+  `DYBATPHO_FORGE_REPO` and `DYBATPHO_FORGE_API` are all set, and a remote or a
+  forge that can't be resolved now stops the script instead of carrying on with
+  an empty value.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

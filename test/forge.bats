@@ -214,6 +214,62 @@ curl_payload() {
   dybatpho::assert_http_called "https://uploads.example/direct"
 }
 
+@test "dybatpho::forge_request leaves its token registered in the calling shell" {
+  # The token was resolved inside a command substitution, which took the
+  # registration with it, so a later log line of the script printed it whole.
+  DYBATPHO_FORGE_TOKEN="request-secret-value"
+  dybatpho::mock_http "api.github.com" 200 '{"ok":true}'
+
+  dybatpho::forge_request GET "issues"
+  run_traced dybatpho::secret_mask "token is request-secret-value"
+  refute_output --partial "request-secret-value"
+}
+
+@test "dybatpho::forge_request reads the remote once and not at all when overridden" {
+  dybatpho::mock_http "api.github.com" 200 '{"ok":true}'
+  local real_git
+  real_git="$(command -v git)"
+  dybatpho::mock_command_script git \
+    "printf x >> '${BATS_TEST_TMPDIR}/git-calls'; exec '${real_git}' \"\$@\""
+
+  # As many git processes as reading the remote once takes.
+  dybatpho::git_remote_url origin . > /dev/null
+  local once
+  once="$(< "${BATS_TEST_TMPDIR}/git-calls")"
+  : > "${BATS_TEST_TMPDIR}/git-calls"
+  dybatpho::forge_request GET "issues"
+  assert_equal "$(< "${BATS_TEST_TMPDIR}/git-calls")" "${once}"
+
+  # Every value overridden: a script run outside any checkout still works.
+  : > "${BATS_TEST_TMPDIR}/git-calls"
+  DYBATPHO_FORGE=github DYBATPHO_FORGE_REPO=acme/widget \
+    DYBATPHO_FORGE_API=https://api.github.com \
+    dybatpho::forge_request GET "issues"
+  assert_equal "$(< "${BATS_TEST_TMPDIR}/git-calls")" ""
+}
+
+@test "dybatpho::forge_request stops on a remote, a host or an override it can't use" {
+  git -C "${REPO}" remote set-url origin "git@code.internal:a/b.git"
+  run dybatpho::forge_request GET "issues"
+  assert_failure
+  assert_output --partial "Cannot tell which forge 'code.internal' is"
+
+  DYBATPHO_FORGE_REMOTE=nope
+  run dybatpho::forge_request GET "issues"
+  assert_failure
+  assert_output --partial "No URL for remote 'nope'"
+
+  DYBATPHO_FORGE=bitbucket
+  run dybatpho::forge_request GET "issues"
+  assert_failure
+  assert_output --partial "must be 'github' or 'gitlab'"
+
+  DYBATPHO_FORGE=github DYBATPHO_FORGE_REMOTE=origin DYBATPHO_FORGE_TOKEN=""
+  run dybatpho::forge_request GET "issues"
+  assert_failure
+  assert_output --partial "No github token"
+}
+
 @test "dybatpho::forge_request reports a failing status to the caller" {
   dybatpho::mock_http "api.github.com" 404 '{"message":"Not Found"}'
 

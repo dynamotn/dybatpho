@@ -113,6 +113,9 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   a property of Bash subshells and is documented rather than worked around.
 - Every request honors `DRY_RUN`, so a publishing script can be rehearsed.
 - A GitLab asset uploads but linking it to the release is refused.
+- A request made by the module resolves its own token: that registration must
+  stay in the calling shell, so the script's later log lines mask the token.
+- Every value the remote would answer is overridden, so no checkout is needed.
 
 ## Requirements *(mandatory)*
 
@@ -162,6 +165,11 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   guaranteed to be present or to be JSON.
 - **FR-015**: When a GitLab asset uploads but linking it to the release fails,
   the error MUST carry the link request's own message, never the upload's.
+- **FR-016**: A request MUST resolve the forge, its project and its token in the
+  calling shell: the token MUST stay registered with `secret.sh` afterwards, the
+  remote MUST be read at most once per request and not at all when
+  `DYBATPHO_FORGE`, `DYBATPHO_FORGE_REPO` and `DYBATPHO_FORGE_API` answer it, and
+  a remote, forge or token that can't be resolved MUST stop the script.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -215,6 +223,9 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   falls back to the status.
 - **IT-024**: Verify a GitLab upload whose link request is refused with a 403
   reports the link's message and not the successful upload's.
+- **IT-025**: Verify a request leaves its token masked in the calling shell, reads
+  the remote no more than one read takes, reads it not at all when every value
+  is overridden, and stops on a remote, a host or an override it can't use.
 
 ## Acceptance Criteria *(mandatory)*
 

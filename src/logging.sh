@@ -209,13 +209,45 @@ function __dybatpho_log_json_escape {
 # @internal
 #######################################
 function __dybatpho_log_timestamp {
-  if hash "busybox" 2> /dev/null; then
-    busybox date +%Y-%m-%dT%H:%M:%S%:z
-  elif date --version > /dev/null 2>&1; then
-    date --rfc-3339="seconds"
-  else
-    date +%Y-%m-%dT%H:%M:%S%z
+  local timestamp
+  __dybatpho_log_timestamp_into timestamp
+  printf '%s\n' "${timestamp}"
+}
+
+#######################################
+# @description Store an RFC 3339 timestamp for a log event in a variable.
+#   The stamp still comes from `date`, not `printf '%(...)T'`: the three
+#   platforms write it differently (GNU separates the date with a space), and
+#   `dybatpho::mock_time` freezes the clock by standing in for `date`, which a
+#   builtin would not see. What is remembered is which `date` this is, keyed by
+#   where `busybox` and `date` resolve, so the `date --version` probe runs once
+#   rather than on every line.
+# @arg $1 string Name of the variable receiving the timestamp
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_timestamp_into {
+  local -n __dybatpho_log_ts_out="$1"
+  # `hash` fills BASH_CMDS without starting a process, and an empty entry is
+  # what a command missing from PATH leaves.
+  hash busybox 2> /dev/null || true
+  hash date 2> /dev/null || true
+  local __dybatpho_log_ts_key="${PATH}|${BASH_CMDS[busybox]-}|${BASH_CMDS[date]-}"
+  if [[ "${__dybatpho_log_ts_key}" != "${__DYBATPHO_LOG_TS_KEY-}" ]]; then
+    if [[ -n "${BASH_CMDS[busybox]-}" ]]; then
+      __DYBATPHO_LOG_TS_FLAVOR=busybox
+    elif date --version > /dev/null 2>&1; then
+      __DYBATPHO_LOG_TS_FLAVOR=gnu
+    else
+      __DYBATPHO_LOG_TS_FLAVOR=portable
+    fi
+    __DYBATPHO_LOG_TS_KEY="${__dybatpho_log_ts_key}"
   fi
+  case "${__DYBATPHO_LOG_TS_FLAVOR}" in
+    busybox) __dybatpho_log_ts_out="$(busybox date +%Y-%m-%dT%H:%M:%S%:z)" ;;
+    gnu) __dybatpho_log_ts_out="$(date --rfc-3339="seconds")" ;;
+    *) __dybatpho_log_ts_out="$(date +%Y-%m-%dT%H:%M:%S%z)" ;;
+  esac
 }
 
 #######################################
@@ -226,18 +258,32 @@ function __dybatpho_log_timestamp {
 # @internal
 #######################################
 function __dybatpho_log_now_ms {
+  local now_ms
+  __dybatpho_log_now_ms_into now_ms
+  printf '%s' "${now_ms}"
+}
+
+#######################################
+# @description Store the current time in milliseconds since the epoch in a
+#   variable, without starting a process when `EPOCHREALTIME` is available.
+# @arg $1 string Name of the variable receiving the time
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_now_ms_into {
+  local -n __dybatpho_log_now_out="$1"
   if [[ -n "${EPOCHREALTIME:-}" ]]; then
-    local whole="${EPOCHREALTIME%%.*}" frac="${EPOCHREALTIME#*.}"
-    printf '%s' $((whole * 1000 + 10#${frac:0:3}))
+    local __dybatpho_log_now_whole="${EPOCHREALTIME%%.*}" __dybatpho_log_now_frac="${EPOCHREALTIME#*.}"
+    __dybatpho_log_now_out=$((__dybatpho_log_now_whole * 1000 + 10#${__dybatpho_log_now_frac:0:3}))
     return 0
   fi
-  local nanoseconds
-  if nanoseconds=$(date +%s%N 2> /dev/null) && [[ "${nanoseconds}" =~ ^[0-9]+$ ]]; then
-    printf '%s' $((nanoseconds / 1000000))
+  local __dybatpho_log_now_ns
+  if __dybatpho_log_now_ns=$(date +%s%N 2> /dev/null) && [[ "${__dybatpho_log_now_ns}" =~ ^[0-9]+$ ]]; then
+    __dybatpho_log_now_out=$((__dybatpho_log_now_ns / 1000000))
     return 0
   fi
   # kcov(disabled) - only reachable without EPOCHREALTIME or GNU/busybox date
-  printf '%s' $((SECONDS * 1000))
+  __dybatpho_log_now_out=$((SECONDS * 1000))
   # kcov(enabled)
 }
 
@@ -252,7 +298,7 @@ DYBATPHO_LOG_START_MS="$(__dybatpho_log_now_ms)"
 #######################################
 function __dybatpho_log_duration_ms {
   local log_now_ms
-  log_now_ms=$(__dybatpho_log_now_ms)
+  __dybatpho_log_now_ms_into log_now_ms
   printf '%s' "$((log_now_ms - DYBATPHO_LOG_START_MS))"
 }
 
@@ -317,8 +363,10 @@ function __dybatpho_log_json_event {
   local event_format='{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s",'
   event_format+='"hostname":"%s","pid":%s,"duration_ms":%s%s%s}\n'
   # shellcheck disable=SC2059 # the format is built above, not taken from input
-  local log_context_json
-  log_context_json=$(__dybatpho_log_context_json)
+  local log_context_json=""
+  if ((${#__dybatpho_log_context_keys[@]} > 0)); then
+    log_context_json=$(__dybatpho_log_context_json)
+  fi
   local log_json_escape
   __dybatpho_log_json_escape_into log_json_escape "${message}"
   local log_json_escape_2
@@ -397,15 +445,21 @@ function __dybatpho_log_write_file {
 
   __dybatpho_log_redact message
 
-  local log_dir
-  log_dir=$(dirname "${LOG_FILE}")
+  # What `dirname` answers, without starting it: a name with no slash lives in
+  # the current directory, and one directly under `/` in the root.
+  local log_dir="."
+  if [[ "${LOG_FILE}" == */* ]]; then
+    log_dir="${LOG_FILE%/*}"
+    log_dir="${log_dir:-/}"
+  fi
   [[ -d "${log_dir}" ]] || mkdir -p "${log_dir}" 2> /dev/null || return 0
 
   __dybatpho_log_rotate_file "${LOG_FILE}" "${LOG_FILE_MAX_BYTES}" "${LOG_FILE_MAX_BACKUPS}"
-  local log_duration_ms
-  log_duration_ms=$(__dybatpho_log_duration_ms)
-  __dybatpho_log_json_event "$(__dybatpho_log_timestamp)" "${log_level}" "${source}" \
-    "${message}" "${log_duration_ms}" "${extra_fields}" >> "${LOG_FILE}"
+  local log_now_ms log_timestamp
+  __dybatpho_log_now_ms_into log_now_ms
+  __dybatpho_log_timestamp_into log_timestamp
+  __dybatpho_log_json_event "${log_timestamp}" "${log_level}" "${source}" \
+    "${message}" "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}" >> "${LOG_FILE}"
 }
 
 #######################################
@@ -423,14 +477,37 @@ function __dybatpho_log_structured {
   local extra_fields="${4:-}"
   local timestamp
   dybatpho::compare_log_level "${log_level}" || return 0
-  timestamp=$(__dybatpho_log_timestamp)
+  __dybatpho_log_timestamp_into timestamp
 
   __dybatpho_log_redact message
 
-  local log_duration_ms
-  log_duration_ms=$(__dybatpho_log_duration_ms)
+  local log_now_ms
+  __dybatpho_log_now_ms_into log_now_ms
   __dybatpho_log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" \
-    "${log_duration_ms}" "${extra_fields}" >&2
+    "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}" >&2
+}
+
+#######################################
+# @description Return success unless a line at this level is certain to be
+#   dropped by both the terminal threshold and `LOG_FILE`. It prints nothing and
+#   answers "wanted" whenever a level it reads is not valid, so the full path
+#   still reports the bad value exactly as before.
+# @arg $1 string Level of the line
+# @exitcode 0 Some destination may take the line, or a level is not valid
+# @exitcode 1 No destination takes the line
+# @internal
+#######################################
+function __dybatpho_log_wanted {
+  local -A ranks=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
+  local level="${1,,}" threshold="${LOG_LEVEL,,}"
+  [[ -n "${level}" && -n "${ranks[${level}]+set}" ]] || return 0
+  [[ -n "${threshold}" && -n "${ranks[${threshold}]+set}" ]] || return 0
+  ((ranks[${level}] <= ranks[${threshold}])) && return 0
+  [[ -n "${LOG_FILE:-}" ]] || return 1
+  threshold="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
+  threshold="${threshold,,}"
+  [[ -n "${ranks[${threshold}]+set}" ]] || return 0
+  ((ranks[${level}] <= ranks[${threshold}]))
 }
 
 #######################################
@@ -446,8 +523,8 @@ function dybatpho::compare_log_level {
   declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
   local level="$1"
   local runtime_level="${2:-${LOG_LEVEL}}"
-  level=$(dybatpho::lower "${level}")
-  runtime_level=$(dybatpho::lower "${runtime_level}")
+  level="${level,,}"
+  runtime_level="${runtime_level,,}"
 
   dybatpho::validate_log_level "${runtime_level}" || return 1
   dybatpho::validate_log_level "${level}" || return 1
@@ -544,6 +621,10 @@ function __dybatpho_log_text_n {
 #######################################
 function __dybatpho_log_inspect {
   local log_level=$1
+  # A line neither the terminal nor `LOG_FILE` will take stops here, before the
+  # source lookup, the translation, the context and the timestamp, each of
+  # which used to start a process for a line that was then thrown away.
+  __dybatpho_log_wanted "${log_level}" || return 0
   local log_level_text=$2
   local message="${3:-}"
   local indicator="${4:-0}"
@@ -563,15 +644,24 @@ function __dybatpho_log_inspect {
   local color="${5:-}"
   # Only the message is translated here: the level label beside it is padded to
   # a fixed width for the column separators and must not change.
-  message="$(__dybatpho_log_translate "${message}")"
+  if declare -F __dybatpho_i18n_lookup > /dev/null; then
+    message="$(__dybatpho_log_translate "${message}")"
+  else
+    # What the substitution above did to an untranslated message, without a
+    # subshell: trailing newlines go.
+    while [[ "${message}" == *$'\n' ]]; do
+      message="${message%$'\n'}"
+    done
+  fi
   __dybatpho_log_write_file "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   if [[ "${LOG_FORMAT}" == "json" ]]; then
     __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   else
-    local log_context_text
-    log_context_text=$(__dybatpho_log_context_text)
-    local log_timestamp
-    log_timestamp=$(__dybatpho_log_timestamp)
+    local log_context_text="" log_timestamp
+    if ((${#__dybatpho_log_context_keys[@]} > 0)); then
+      log_context_text=$(__dybatpho_log_context_text)
+    fi
+    __dybatpho_log_timestamp_into log_timestamp
     __dybatpho_log "${log_level}" \
       "${log_timestamp} ‖ ${log_level_text} ‖ ${indicator}: ${message}${log_context_text}" \
       stderr "${color}"
@@ -1136,8 +1226,7 @@ function __dybatpho_log_box {
 # @exitcode 1 The input is invalid
 #######################################
 function dybatpho::validate_log_level {
-  local level="$1"
-  level=$(dybatpho::lower "${level}")
+  local level="${1,,}"
   if [[ "${level}" =~ ^(trace|debug|info|warn|error|fatal)$ ]]; then
     return 0
   else

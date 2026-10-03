@@ -639,6 +639,31 @@ assert event["duration_ms"] >= 0
   [ ! -s "${log_file}" ]
 }
 
+@test "a log line no destination takes reads no clock" {
+  # A filtered line used to translate, gather context and stamp itself before
+  # finding out nobody wanted it; on a chatty script that was most of its time.
+  local calls="${BATS_TEST_TMPDIR}/clock-calls"
+  date() {
+    printf 'date\n' >> "${calls}"
+    command date "$@"
+  }
+  busybox() {
+    printf 'busybox\n' >> "${calls}"
+    command busybox "$@"
+  }
+
+  LOG_LEVEL=info LOG_FILE="" run_traced dybatpho::debug "dropped"
+  assert_success
+  assert_file_not_exist "${calls}"
+
+  # The same line still reaches a file whose own threshold takes it.
+  local log_file="${BATS_TEST_TMPDIR}/kept.log"
+  LOG_LEVEL=info LOG_FILE="${log_file}" LOG_FILE_LEVEL=debug run_traced dybatpho::debug "kept"
+  assert_success
+  grep -q '"message":"kept"' "${log_file}"
+  assert_file_exist "${calls}"
+}
+
 @test "LOG_FILE creates missing parent directories" {
   local log_file="${BATS_TEST_TMPDIR}/nested/dir/app.log"
   export LOG_FILE="${log_file}"

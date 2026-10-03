@@ -43,7 +43,7 @@ __json_path_without_yq() {
     ": printf '{\n  \"name\": \"dybatpho\"\n}\n'"
   run_traced dybatpho::json_pretty "package.json"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 {
   "name": "dybatpho"
 }
@@ -52,7 +52,7 @@ EOF
   dybatpho::json_pretty "package.json" "${output_file}"
   run_traced cat "${output_file}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 {
   "name": "dybatpho"
 }
@@ -102,7 +102,7 @@ EOF
     ": printf 'name: dybatpho\nenabled: true\n'"
   run_traced dybatpho::yaml_pretty "compose.yaml"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name: dybatpho
 enabled: true
 EOF
@@ -110,7 +110,7 @@ EOF
   dybatpho::yaml_pretty "compose.yaml" "${output_file}"
   run_traced cat "${output_file}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name: dybatpho
 enabled: true
 EOF
@@ -597,7 +597,7 @@ __json_fixture() {
   dybatpho::yaml_set "${file}" port 8080 "${file}"
   run_traced cat "${file}"
   assert_success
-  assert_output << 'EOF2'
+  assert_output - << 'EOF2'
 name: app # the service
 image:
   tag: "2.0"
@@ -614,7 +614,7 @@ EOF2
   printf 'a: 1 # one\nb:\n  - x\n  - y\n' > "${file}"
   run_traced dybatpho::yaml_del "${file}" b.0
   assert_success
-  assert_output << 'EOF2'
+  assert_output - << 'EOF2'
 a: 1 # one
 b:
   - y
@@ -635,7 +635,7 @@ EOF2
   printf -- '- 1\n' > "${list}"
   run_traced dybatpho::yaml_merge "${base}" "${overlay}"
   assert_success
-  assert_output << 'EOF2'
+  assert_output - << 'EOF2'
 a: 1 # kept
 b:
   x: 1

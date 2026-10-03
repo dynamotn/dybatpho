@@ -152,6 +152,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - A backoff that doubles past the cap, or a base backoff larger than the cap.
 - A worker polls a queue that stays empty, or that a producer fills after the worker started.
 - The clock is frozen or jumps while a worker waits.
+- The variable names a caller passes to `queue_pop`, `queue_peek` or `queue_read` match a name the function uses internally, such as `identifier` or `lock`.
 
 ## Requirements *(mandatory)*
 
@@ -189,6 +190,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **FR-030**: Without `--poll` a worker MUST return once no job is due; with it, the worker MUST wait that long and look again, and with `--idle` MUST return after that long without a job, counted in polls rather than read from the clock.
 - **FR-031**: A worker MUST return after `--max-jobs` jobs when that is not `0`.
 - **FR-032**: An invalid or unknown worker option, a zero poll interval, or a handler that is not a command MUST stop the script.
+- **FR-033**: `queue_pop`, `queue_peek` and `queue_read` MUST fill the caller's named variables whatever the names are, short of the reserved `__dybatpho` prefix.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -251,6 +253,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **IT-037**: Run a program handler with arguments.
 - **IT-038**: Refuse each invalid worker option and a missing handler.
 - **IT-039**: Accept `--` before the queue name.
+- **IT-040**: Pop, peek and read into variables called `identifier`, `lock`, `directory`, `state` and `target`, and find each one filled.
 
 ## Acceptance Criteria *(mandatory)*
 

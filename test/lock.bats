@@ -413,6 +413,17 @@ teardown() {
   dybatpho::lock_semaphore_release "pool" 3 "${slot}"
 }
 
+@test "dybatpho::lock_semaphore_acquire sets caller variables named like its locals" {
+  local timeout="" slot_path="" target=""
+  dybatpho::lock_semaphore_acquire "pool" 3 0 timeout
+  dybatpho::lock_semaphore_acquire "pool" 3 0 slot_path
+  dybatpho::lock_semaphore_acquire "pool" 3 0 target
+  assert_equal "${timeout}" "1"
+  assert_equal "${slot_path}" "2"
+  assert_equal "${target}" "3"
+  dybatpho::lock_semaphore_release "pool" 3
+}
+
 @test "dybatpho::lock_semaphore_acquire waits for a slot to free up" {
   dybatpho::lock_semaphore_acquire "pool" 1
   (

@@ -290,6 +290,7 @@ dybatpho::unmock_all
   can return.
 - A JSON or YAML assertion runs in a suite that loaded `testing` without
   `json`, or a snapshot mismatches in a suite that did not load `diff`.
+- The variable a caller names for a fixture matches a name the helper uses internally, such as `content`.
 
 ## Requirements *(mandatory)*
 
@@ -417,6 +418,7 @@ dybatpho::unmock_all
 - **FR-040**: A snapshot comparison MUST create, update and match snapshots
   without `diff`. On a mismatch without it, the assertion MUST still fail, and
   MUST say the difference needs `diff` to be shown instead of drawing it.
+- **FR-041**: `fixture_dir` and `fixture_file` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -531,6 +533,7 @@ dybatpho::unmock_all
   fails with the message naming `json` and returns, and a snapshot mismatch
   fails with the message naming `diff`; once both are loaded, verify the JSON
   assertion passes and the mismatch is drawn as a diff.
+- **IT-030**: Create a fixture file into a variable called `content` and find it filled with the fixture's path.
 
 ## Acceptance Criteria *(mandatory)*
 

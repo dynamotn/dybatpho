@@ -766,6 +766,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::diff_yaml` likewise compared a file that `yq` could not read as an
   empty document. Both now stop with exit code `2` and name the side that does
   not parse.
+- **`queue` and `testing` — a caller's variable is filled whatever it is
+  called.** `dybatpho::queue_pop`, `dybatpho::queue_peek`,
+  `dybatpho::queue_read` and `dybatpho::fixture_file` wrote their answer
+  through a reference to the name the caller passed, and when that name
+  matched one of their own variables — `identifier`, `lock`, `directory`,
+  `state`, `target`, `content` — the answer landed there instead and the
+  caller's variable stayed empty, with no error. `queue_pop jobs identifier
+  payload` now sets `identifier`.
 
 ### Security
 

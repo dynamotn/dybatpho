@@ -389,41 +389,45 @@ function dybatpho::queue_push {
 #   done
 #######################################
 function dybatpho::queue_pop {
-  local queue id_target payload_target
-  dybatpho::expect_args queue id_target payload_target -- "$@"
-  dybatpho::expect_ref "${id_target}"
-  dybatpho::expect_ref "${payload_target}"
+  # Every local carries the library's prefix: the namerefs below bind to names
+  # the caller chooses, and one that matched a plain local here would resolve
+  # to that local and leave the caller's variable untouched.
+  local __dybatpho_queue_name __dybatpho_queue_id_target __dybatpho_queue_payload_target
+  dybatpho::expect_args __dybatpho_queue_name __dybatpho_queue_id_target __dybatpho_queue_payload_target -- "$@"
+  dybatpho::expect_ref "${__dybatpho_queue_id_target}"
+  dybatpho::expect_ref "${__dybatpho_queue_payload_target}"
 
-  local directory
-  __dybatpho_queue_dir_into directory "${queue}"
-  __dybatpho_queue_prepare "${directory}"
+  local __dybatpho_queue_directory
+  __dybatpho_queue_dir_into __dybatpho_queue_directory "${__dybatpho_queue_name}"
+  __dybatpho_queue_prepare "${__dybatpho_queue_directory}"
 
-  local lock
-  lock="$(__dybatpho_queue_lock "${directory}")"
-  dybatpho::lock_acquire "${lock}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
+  local __dybatpho_queue_lock_path
+  __dybatpho_queue_lock_path="$(__dybatpho_queue_lock "${__dybatpho_queue_directory}")"
+  dybatpho::lock_acquire "${__dybatpho_queue_lock_path}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
 
   # Choosing and moving the job happen under one lock. Apart, two workers
   # would both read the same oldest job and both go on to run it.
-  local identifier
-  if ! __dybatpho_queue_next_into identifier "${directory}"; then
-    dybatpho::lock_release "${lock}"
+  local __dybatpho_queue_identifier
+  if ! __dybatpho_queue_next_into __dybatpho_queue_identifier "${__dybatpho_queue_directory}"; then
+    dybatpho::lock_release "${__dybatpho_queue_lock_path}"
     return 1
   fi
 
-  mv -- "${directory}/pending/${identifier}.job" "${directory}/claimed/${identifier}.job"
+  mv -- "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_identifier}.job" \
+    "${__dybatpho_queue_directory}/claimed/${__dybatpho_queue_identifier}.job"
   # The retry count travels with the job. Left behind in `pending`, it would
   # not be found on the next requeue, the count would restart at one, and a
   # job that always fails would circulate forever instead of dead-lettering.
   # The priority goes with it for the same reason: a requeue keeps it.
-  __dybatpho_queue_sidecars "${directory}" "${identifier}" pending claimed
-  dybatpho::lock_release "${lock}"
+  __dybatpho_queue_sidecars "${__dybatpho_queue_directory}" "${__dybatpho_queue_identifier}" pending claimed
+  dybatpho::lock_release "${__dybatpho_queue_lock_path}"
 
-  local -n id_ref="${id_target}"
-  local -n payload_ref="${payload_target}"
+  local -n __dybatpho_queue_id_ref="${__dybatpho_queue_id_target}"
+  local -n __dybatpho_queue_payload_ref="${__dybatpho_queue_payload_target}"
   # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-  id_ref="${identifier}"
+  __dybatpho_queue_id_ref="${__dybatpho_queue_identifier}"
   # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-  payload_ref="$(< "${directory}/claimed/${identifier}.job")"
+  __dybatpho_queue_payload_ref="$(< "${__dybatpho_queue_directory}/claimed/${__dybatpho_queue_identifier}.job")"
 }
 
 #######################################
@@ -438,24 +442,24 @@ function dybatpho::queue_pop {
 #   dybatpho::queue_peek deploys
 #######################################
 function dybatpho::queue_peek {
-  local queue
-  dybatpho::expect_args queue -- "$@"
-  local id_target="${2-}"
-  [[ -z "${id_target}" ]] || dybatpho::expect_ref "${id_target}"
+  local __dybatpho_queue_name
+  dybatpho::expect_args __dybatpho_queue_name -- "$@"
+  local __dybatpho_queue_id_target="${2-}"
+  [[ -z "${__dybatpho_queue_id_target}" ]] || dybatpho::expect_ref "${__dybatpho_queue_id_target}"
 
-  local directory
-  __dybatpho_queue_dir_into directory "${queue}"
-  dybatpho::is dir "${directory}/pending" || return 1
+  local __dybatpho_queue_directory
+  __dybatpho_queue_dir_into __dybatpho_queue_directory "${__dybatpho_queue_name}"
+  dybatpho::is dir "${__dybatpho_queue_directory}/pending" || return 1
 
-  local identifier
-  __dybatpho_queue_next_into identifier "${directory}" || return 1
+  local __dybatpho_queue_identifier
+  __dybatpho_queue_next_into __dybatpho_queue_identifier "${__dybatpho_queue_directory}" || return 1
 
-  if [[ -n "${id_target}" ]]; then
-    local -n peek_id_ref="${id_target}"
+  if [[ -n "${__dybatpho_queue_id_target}" ]]; then
+    local -n __dybatpho_queue_peek_ref="${__dybatpho_queue_id_target}"
     # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-    peek_id_ref="${identifier}"
+    __dybatpho_queue_peek_ref="${__dybatpho_queue_identifier}"
   fi
-  printf '%s\n' "$(< "${directory}/pending/${identifier}.job")"
+  printf '%s\n' "$(< "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_identifier}.job")"
 }
 
 #######################################
@@ -657,25 +661,26 @@ function dybatpho::queue_dead_letter {
 #   dybatpho::queue_read deploys "${id}" payload dead
 #######################################
 function dybatpho::queue_read {
-  local queue identifier target
-  dybatpho::expect_args queue identifier target -- "$@"
-  __dybatpho_queue_expect_id "${identifier}"
-  dybatpho::expect_ref "${target}"
-  local wanted="${4-}"
-  [[ -z "${wanted}" ]] || __dybatpho_queue_expect_state "${wanted}"
+  local __dybatpho_queue_name __dybatpho_queue_identifier __dybatpho_queue_target
+  dybatpho::expect_args __dybatpho_queue_name __dybatpho_queue_identifier __dybatpho_queue_target -- "$@"
+  __dybatpho_queue_expect_id "${__dybatpho_queue_identifier}"
+  dybatpho::expect_ref "${__dybatpho_queue_target}"
+  local __dybatpho_queue_wanted="${4-}"
+  [[ -z "${__dybatpho_queue_wanted}" ]] || __dybatpho_queue_expect_state "${__dybatpho_queue_wanted}"
 
-  local directory
-  __dybatpho_queue_dir_into directory "${queue}"
+  local __dybatpho_queue_directory
+  __dybatpho_queue_dir_into __dybatpho_queue_directory "${__dybatpho_queue_name}"
 
-  local -a states=(pending claimed dead)
-  [[ -z "${wanted}" ]] || states=("${wanted}")
+  local -a __dybatpho_queue_states=(pending claimed dead)
+  [[ -z "${__dybatpho_queue_wanted}" ]] || __dybatpho_queue_states=("${__dybatpho_queue_wanted}")
 
-  local -n payload_ref="${target}"
-  local state
-  for state in "${states[@]}"; do
-    if dybatpho::is file "${directory}/${state}/${identifier}.job"; then
+  local -n __dybatpho_queue_read_ref="${__dybatpho_queue_target}"
+  local __dybatpho_queue_state __dybatpho_queue_file
+  for __dybatpho_queue_state in "${__dybatpho_queue_states[@]}"; do
+    __dybatpho_queue_file="${__dybatpho_queue_directory}/${__dybatpho_queue_state}/${__dybatpho_queue_identifier}.job"
+    if dybatpho::is file "${__dybatpho_queue_file}"; then
       # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-      payload_ref="$(< "${directory}/${state}/${identifier}.job")"
+      __dybatpho_queue_read_ref="$(< "${__dybatpho_queue_file}")"
       return 0
     fi
   done

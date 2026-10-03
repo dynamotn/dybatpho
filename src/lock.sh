@@ -548,35 +548,38 @@ function __dybatpho_lock_expect_slots {
 # @exitcode 1 Every slot is still held by a live process after the timeout
 #######################################
 function dybatpho::lock_semaphore_acquire {
-  local name slots
-  dybatpho::expect_args name slots -- "$@"
-  local timeout="${3:-0}" target="${4-}"
-  __dybatpho_lock_expect_slots "${slots}"
-  dybatpho::is int "${timeout}" \
-    || dybatpho::die "${FUNCNAME[0]}: The timeout must be a number of seconds, got: ${timeout}"
-  [[ -z "${target}" ]] || dybatpho::expect_ref "${target}"
+  # Every local carries the library's prefix, so a caller's variable for the
+  # slot number is never shadowed by one of them, whatever it is called.
+  local __dybatpho_lock_name __dybatpho_lock_slots
+  dybatpho::expect_args __dybatpho_lock_name __dybatpho_lock_slots -- "$@"
+  local __dybatpho_lock_timeout="${3:-0}" __dybatpho_lock_target="${4-}"
+  __dybatpho_lock_expect_slots "${__dybatpho_lock_slots}"
+  dybatpho::is int "${__dybatpho_lock_timeout}" \
+    || dybatpho::die "${FUNCNAME[0]}: The timeout must be a number of seconds, got: ${__dybatpho_lock_timeout}"
+  [[ -z "${__dybatpho_lock_target}" ]] || dybatpho::expect_ref "${__dybatpho_lock_target}"
 
-  local start_time elapsed __dybatpho_lock_slot slot_path
-  start_time="$(date +%s)"
+  local __dybatpho_lock_start __dybatpho_lock_elapsed __dybatpho_lock_slot __dybatpho_lock_slot_path
+  __dybatpho_lock_start="$(date +%s)"
   while true; do
-    for ((__dybatpho_lock_slot = 1; __dybatpho_lock_slot <= slots; __dybatpho_lock_slot++)); do
-      slot_path="$(__dybatpho_lock_slot_path "${name}" "${__dybatpho_lock_slot}")"
-      __dybatpho_lock_try "${slot_path}" || continue
-      if [[ -n "${target}" ]]; then
-        # The loop counter carries the library's prefix so that a caller's
-        # variable called `slot` is not shadowed by it.
-        local -n slot_ref="${target}"
+    for ((__dybatpho_lock_slot = 1; __dybatpho_lock_slot <= __dybatpho_lock_slots; __dybatpho_lock_slot++)); do
+      __dybatpho_lock_slot_path="$(__dybatpho_lock_slot_path "${__dybatpho_lock_name}" "${__dybatpho_lock_slot}")"
+      __dybatpho_lock_try "${__dybatpho_lock_slot_path}" || continue
+      if [[ -n "${__dybatpho_lock_target}" ]]; then
+        local -n __dybatpho_lock_slot_ref="${__dybatpho_lock_target}"
         # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-        slot_ref="${__dybatpho_lock_slot}"
+        __dybatpho_lock_slot_ref="${__dybatpho_lock_slot}"
       fi
       return 0
     done
 
-    elapsed=$(($(date +%s) - start_time))
-    if ((elapsed >= timeout)); then
-      local holders
-      holders="$(dybatpho::lock_semaphore_holders "${name}" "${slots}" 2> /dev/null || true)"
-      dybatpho::error "Could not acquire a slot of semaphore ${name}: all ${slots} are held"$'\n'"${holders}"
+    __dybatpho_lock_elapsed=$(($(date +%s) - __dybatpho_lock_start))
+    if ((__dybatpho_lock_elapsed >= __dybatpho_lock_timeout)); then
+      local __dybatpho_lock_holders
+      __dybatpho_lock_holders="$(dybatpho::lock_semaphore_holders \
+        "${__dybatpho_lock_name}" "${__dybatpho_lock_slots}" 2> /dev/null || true)"
+      local __dybatpho_lock_message="Could not acquire a slot of semaphore ${__dybatpho_lock_name}:"
+      __dybatpho_lock_message+=" all ${__dybatpho_lock_slots} are held"$'\n'"${__dybatpho_lock_holders}"
+      dybatpho::error "${__dybatpho_lock_message}"
       return 1
     fi
     sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"

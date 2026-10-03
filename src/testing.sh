@@ -1575,10 +1575,10 @@ function dybatpho::unmock_tty {
 #      is removed by an `EXIT`/`HUP`/`INT`/`TERM` trap even when the script fails.
 #######################################
 function dybatpho::fixture_dir {
-  local path_var
-  dybatpho::expect_args path_var -- "$@"
-  dybatpho::expect_ref "${path_var}"
-  dybatpho::create_temp "${path_var}" "" "fixture"
+  local __dybatpho_test_fixture_var
+  dybatpho::expect_args __dybatpho_test_fixture_var -- "$@"
+  dybatpho::expect_ref "${__dybatpho_test_fixture_var}"
+  dybatpho::create_temp "${__dybatpho_test_fixture_var}" "" "fixture"
 }
 
 #######################################
@@ -1596,16 +1596,19 @@ function dybatpho::fixture_dir {
 #      assigned variable would not survive in the caller.
 #######################################
 function dybatpho::fixture_file {
-  local path_var content
-  dybatpho::expect_args path_var content -- "$@"
-  dybatpho::expect_ref "${path_var}"
-  local extension="${3:-.txt}"
-  dybatpho::create_temp "${path_var}" "${extension}" "fixture"
-  local -n fixture_path="${path_var}"
-  if [[ "${content}" == "-" ]]; then
-    cat > "${fixture_path}"
+  # Every local carries the library's prefix: `create_temp` and the nameref
+  # below bind to the name the caller chose, and one matching a plain local
+  # here would resolve to that local instead of the caller's variable.
+  local __dybatpho_test_fixture_var __dybatpho_test_fixture_content
+  dybatpho::expect_args __dybatpho_test_fixture_var __dybatpho_test_fixture_content -- "$@"
+  dybatpho::expect_ref "${__dybatpho_test_fixture_var}"
+  local __dybatpho_test_fixture_extension="${3:-.txt}"
+  dybatpho::create_temp "${__dybatpho_test_fixture_var}" "${__dybatpho_test_fixture_extension}" "fixture"
+  local -n __dybatpho_test_fixture_ref="${__dybatpho_test_fixture_var}"
+  if [[ "${__dybatpho_test_fixture_content}" == "-" ]]; then
+    cat > "${__dybatpho_test_fixture_ref}"
   else
-    printf '%s\n' "${content}" > "${fixture_path}"
+    printf '%s\n' "${__dybatpho_test_fixture_content}" > "${__dybatpho_test_fixture_ref}"
   fi
 }
 

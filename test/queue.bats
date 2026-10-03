@@ -69,6 +69,30 @@ setup() {
   assert_stderr --partial "is reserved"
 }
 
+@test "dybatpho::queue_pop, queue_peek and queue_read fill caller variables named like their locals" {
+  # A nameref bound to a name the function also declares as a local resolves
+  # to that local, and the caller's variable is silently left alone.
+  dybatpho::queue_push "${QUEUE}" "first" > /dev/null
+  dybatpho::queue_push "${QUEUE}" "second" > /dev/null
+
+  local identifier="" lock=""
+  dybatpho::queue_peek "${QUEUE}" identifier > /dev/null
+  assert_equal "${identifier%%-*}" "000000000001"
+
+  dybatpho::queue_pop "${QUEUE}" identifier lock
+  assert_equal "${identifier%%-*}" "000000000001"
+  assert_equal "${lock}" "first"
+
+  local directory="" state=""
+  dybatpho::queue_pop "${QUEUE}" directory state
+  assert_equal "${state}" "second"
+  local target=""
+  dybatpho::queue_read "${QUEUE}" "${directory}" target
+  assert_equal "${target}" "second"
+  dybatpho::queue_read "${QUEUE}" "${directory}" state claimed
+  assert_equal "${state}" "second"
+}
+
 @test "concurrent workers never claim the same job twice" {
   # This is the whole reason the module exists: a directory-of-files queue
   # without a lock lets two workers read the same oldest job and both run it.

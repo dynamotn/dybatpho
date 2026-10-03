@@ -118,11 +118,11 @@ loaded_line() {
   assert_output "string os logging helpers process file secret text table "
 
   run_traced -0 init_sh "--modules diff" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json diff "
+  assert_output "string os logging helpers process file secret diff "
 
   # `backup_diff` compares two snapshots through `diff_dir`.
   run_traced -0 init_sh "--modules backup" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli safety archive date json diff backup "
+  assert_output "string os logging helpers process file secret validate config cli safety archive date diff backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
   assert_output "string os logging helpers process file secret network json lock cache ai "

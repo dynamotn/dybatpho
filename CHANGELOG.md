@@ -498,6 +498,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules network json   # or: dybatpho::load json
   ```
 
+- **BREAKING: `diff` no longer loads `json`.** Only `dybatpho::diff_yaml`
+  needs it, to convert YAML before comparing, and it now stops with
+  `dybatpho::diff_yaml needs the json module, load it with: dybatpho::load json`
+  when it is missing; `dybatpho::diff_text`, `diff_summary`, `diff_json` and
+  `diff_dir` work without it. Loading `backup` no longer brings `json` either.
+  A script that calls `dybatpho::diff_yaml`, or any `dybatpho::json_*` helper,
+  having asked only for `diff` or `backup` must now ask for `json` too:
+
+  ```sh
+  . dybatpho/init.sh --modules diff json   # or: dybatpho::load json
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

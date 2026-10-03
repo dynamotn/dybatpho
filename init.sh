@@ -95,7 +95,6 @@ declare -A __dybatpho_module_deps=(
   [markdown]="table"
   [csv]="json math"
   [backup]="archive safety date diff"
-  [diff]="json"
   [queue]="lock date"
   [schedule]="lock date"
   [parallel]="date"

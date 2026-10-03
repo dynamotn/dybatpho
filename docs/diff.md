@@ -182,6 +182,10 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 | `$1` | string | YAML file path, `-` for stdin, or YAML text |
 | `$2` | string | YAML file path, `-` for stdin, or YAML text |
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules diff json`
+
 **📤 Output on stdout**
 
 - One line per difference, in the form `dybatpho::diff_json` prints

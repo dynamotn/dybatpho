@@ -361,10 +361,12 @@ function __dybatpho_diff_report {
 # @exitcode 127 `jq` or `yq` is not installed
 # @example
 #   dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules diff json`
 #######################################
 function dybatpho::diff_yaml {
   local first second
   dybatpho::expect_args first second -- "$@"
+  __dybatpho_diff_need_json
 
   local first_file second_file
   __dybatpho_diff_side_into first_file "${first}" "a"
@@ -377,6 +379,27 @@ function dybatpho::diff_yaml {
   dybatpho::yaml_to_json "${second_file}" "${second_json}"
 
   dybatpho::diff_json "${first_json}" "${second_json}"
+}
+
+#######################################
+# @description Stop unless the `json` module is loaded.
+#   Converting YAML to JSON is the `json` module's work. Text, JSON and
+#   directory comparisons need nothing from it -- `diff_json` reads its input
+#   with `jq` directly -- and `backup` and `testing` compare through this
+#   module, so registering `json` as a dependency would load it into every
+#   script that only diffs text; the YAML comparison asks for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `json`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `json` module is not loaded
+# @internal
+#######################################
+function __dybatpho_diff_need_json {
+  declare -F __dybatpho_json_cmd > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
 
 #######################################

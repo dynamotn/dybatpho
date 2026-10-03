@@ -4,7 +4,7 @@
 # @description Demonstrates dybatpho::diff_text, diff_summary, diff_json, diff_yaml, and diff_dir
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules diff
+. "${SCRIPTDIR}/../init.sh" --modules diff json
 
 dybatpho::register_common_handlers
 

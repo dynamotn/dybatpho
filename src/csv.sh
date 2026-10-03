@@ -101,13 +101,7 @@ function __dybatpho_csv_input_into {
   local -n __dybatpho_csv_input_ref="$1"
   local __dybatpho_csv_source="$2"
 
-  if [[ "${__dybatpho_csv_source}" == "-" ]]; then
-    __dybatpho_csv_input_ref="$(cat)"
-  elif dybatpho::is file "${__dybatpho_csv_source}"; then
-    __dybatpho_csv_input_ref="$(cat -- "${__dybatpho_csv_source}")"
-  else
-    __dybatpho_csv_input_ref="${__dybatpho_csv_source}"
-  fi
+  __dybatpho_string_input_into __dybatpho_csv_input_ref "${__dybatpho_csv_source}" files
 
   local __dybatpho_csv_reason="The input contains the ASCII unit separator,"
   __dybatpho_csv_reason+=" which this module uses to join a record's fields"
@@ -1066,13 +1060,7 @@ function dybatpho::csv_from_json {
     || dybatpho::die "${FUNCNAME[0]}: Neither jq nor yq is installed" 127
 
   local text
-  if [[ "${input}" == "-" ]]; then
-    text="$(cat)"
-  elif dybatpho::is file "${input}"; then
-    text="$(cat -- "${input}")"
-  else
-    text="${input}"
-  fi
+  __dybatpho_string_input_into text "${input}" files
 
   # Both backends are asked for CSV and the result is then read back and
   # written out by this module, so the quoting a caller sees comes from one

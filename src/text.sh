@@ -21,35 +21,6 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# @description Read a text argument or stdin into a target array of lines.
-# @arg $1 string Input text or `-` for stdin
-# @arg $2 string Name of the array variable to fill
-# @internal
-#######################################
-function __dybatpho_text_read_lines {
-  local input target_var
-  dybatpho::expect_args input target_var -- "$@"
-  local -n target_ref="${target_var}"
-  target_ref=()
-
-  if [[ "${input}" == "-" ]]; then
-    local line
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-      target_ref+=("${line}")
-    done
-  else
-    # `<<<` ends the text with a newline of its own, so one the text already
-    # ends with is dropped first; otherwise an argument would read one more,
-    # empty line than the same text arriving on stdin.
-    mapfile -t target_ref <<< "${input%$'\n'}"
-  fi
-
-  if ((${#target_ref[@]} == 0)); then
-    target_ref=("")
-  fi
-}
-
-#######################################
 # @description Prefix every line in a text block with the given indent string.
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 string Optional indent prefix, default is two spaces
@@ -62,7 +33,7 @@ function dybatpho::text_indent {
   local -a lines=()
   local line
 
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     printf '%s%s\n' "${prefix}" "${line}"
   done
@@ -79,7 +50,7 @@ function dybatpho::text_dedent {
   local -a lines=()
   local line indent_length min_indent=-1
 
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
 
   for line in "${lines[@]}"; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
@@ -119,7 +90,7 @@ function dybatpho::text_strip_ansi {
   local -a lines=()
   local line
 
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     __dybatpho_text_strip_ansi_into line "${line}"
     printf '%s\n' "${line}"
@@ -139,7 +110,7 @@ function dybatpho::text_bullet_list {
   local -a lines=()
   local line
 
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     if dybatpho::string_is_blank "${line}"; then
       printf '\n'
@@ -275,7 +246,7 @@ function dybatpho::text_box {
 
   local -a lines=() widths=()
   local line width inner=0 title_width=0 index
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     __dybatpho_text_width_into width "${line}"
     widths+=("${width}")
@@ -335,7 +306,7 @@ function dybatpho::text_center {
 
   local -a lines=()
   local line line_width
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     if dybatpho::string_is_blank "${line}"; then
       printf '\n'
@@ -379,7 +350,7 @@ function dybatpho::text_number_lines {
 
   local -a lines=()
   local index last digits
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   last=$((start + ${#lines[@]} - 1))
   digits=${#last}
   for index in "${!lines[@]}"; do
@@ -416,7 +387,7 @@ function dybatpho::text_truncate_lines {
 
   local -a lines=()
   local index hidden
-  __dybatpho_text_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   if ((${#lines[@]} <= count)); then
     printf '%s\n' "${lines[@]}"
     return 0

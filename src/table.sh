@@ -262,7 +262,7 @@ function dybatpho::table_align {
   local row index line gap_text="" cell_text
 
   [[ "${gap}" =~ ^[0-9]+$ ]] || dybatpho::die "Gap width must be a non-negative integer: ${gap}"
-  __dybatpho_text_read_lines "${input}" rows
+  __dybatpho_string_read_lines_into rows "${input}"
   __dybatpho_table_measure_widths rows "${delimiter}" widths
   __dybatpho_table_parse_alignments "${align_spec}" widths alignments
   __dybatpho_log_repeat_into gap_text " " "${gap}"
@@ -298,7 +298,7 @@ function dybatpho::table_box {
   local -a rows=() widths=() cells=()
   local row row_index index line cell_text
 
-  __dybatpho_text_read_lines "${input}" rows
+  __dybatpho_string_read_lines_into rows "${input}"
   __dybatpho_table_measure_widths rows "${delimiter}" widths
 
   __dybatpho_table_rule "┌" "┬" "┐" widths
@@ -331,7 +331,7 @@ function dybatpho::table_markdown {
   local -a rows=() widths=() cells=()
   local row row_index index line separator segment width cell_text
 
-  __dybatpho_text_read_lines "${input}" rows
+  __dybatpho_string_read_lines_into rows "${input}"
   __dybatpho_table_measure_widths rows "${delimiter}" widths
 
   for row_index in "${!rows[@]}"; do
@@ -389,7 +389,7 @@ function __dybatpho_table_reject_quoted {
 
   local -a rows=()
   local row
-  __dybatpho_text_read_lines "${1-}" rows
+  __dybatpho_string_read_lines_into rows "${1-}"
 
   for row in "${rows[@]}"; do
     # A quote right after a field boundary -- the start of the row or a comma,
@@ -423,9 +423,7 @@ function dybatpho::table_csv {
 
   # Standard input can only be read once, and both the check below and the
   # renderer need it, so it is materialised here first.
-  if [[ "${input}" == "-" ]]; then
-    input="$(cat)"
-  fi
+  __dybatpho_string_input_into input "${input}"
 
   __dybatpho_table_reject_quoted "${input}"
 
@@ -524,13 +522,7 @@ function dybatpho::table_from_json {
   __dybatpho_table_expect_style "${style}"
 
   local document
-  if [[ "${input}" == "-" ]]; then
-    document="$(cat)"
-  elif dybatpho::is file "${input}"; then
-    document="$(cat -- "${input}")"
-  else
-    document="${input}"
-  fi
+  __dybatpho_string_input_into document "${input}" files
   # The conversion has to run in a command substitution to capture its CSV, so
   # its failure is carried out by status rather than lost with the subshell.
   local csv status=0

@@ -42,42 +42,6 @@ __dybatpho_md_raw_open=$'\001'
 __dybatpho_md_raw_close=$'\002'
 
 #######################################
-# @description Read a text argument or stdin into a target array of lines.
-#   Kept here rather than borrowed from `text.sh` so that everything except
-#   `dybatpho::md_table` works with the core modules alone.
-# @arg $1 string Input text or `-` for stdin
-# @arg $2 string Name of the array variable to fill
-# @set The named array
-# @internal
-#######################################
-function __dybatpho_md_read_lines {
-  local __dybatpho_md_input="$1"
-  local -n __dybatpho_md_lines_ref="$2"
-  __dybatpho_md_lines_ref=()
-
-  if [[ "${__dybatpho_md_input}" == "-" ]]; then
-    local __dybatpho_md_line
-    while IFS= read -r __dybatpho_md_line || [[ -n "${__dybatpho_md_line}" ]]; do
-      __dybatpho_md_lines_ref+=("${__dybatpho_md_line}")
-    done
-  else
-    # `<<<` ends the text with a newline of its own, so one the text already
-    # ends with is dropped first, keeping an argument and stdin in agreement.
-    mapfile -t __dybatpho_md_lines_ref <<< "${__dybatpho_md_input%$'\n'}"
-  fi
-
-  if ((${#__dybatpho_md_lines_ref[@]} == 0)); then
-    # Stdin that closes without a line leaves the array empty, and a builder
-    # then expands it under `set -u`. One empty line renders an empty block
-    # instead. `test/markdown.bats` covers it through
-    # "dybatpho::md_escape reads stdin and handles empty input"; kcov does not
-    # record the line, because the read above consumed stdin to EOF in the same
-    # shell its own trap reports through.
-    __dybatpho_md_lines_ref=("") # kcov(skip)
-  fi
-}
-
-#######################################
 # @description Join an array of lines into one newline-separated string in a
 #   named variable. The `IFS` the join needs is local to this helper, so no
 #   caller has to set and restore it around the expansion.
@@ -205,7 +169,7 @@ function dybatpho::md_raw {
   local -a lines=()
 
   local text
-  __dybatpho_md_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   __dybatpho_md_join_into text lines
   printf '%s%s%s\n' "${__dybatpho_md_raw_open}" "${text}" "${__dybatpho_md_raw_close}"
 }
@@ -227,7 +191,7 @@ function dybatpho::md_escape {
   local -a lines=()
   local escaped text
 
-  __dybatpho_md_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   __dybatpho_md_join_into text lines
   __dybatpho_md_escape_into escaped "${text}"
   printf '%s\n' "${escaped}"
@@ -280,7 +244,7 @@ function dybatpho::md_list {
     suffix="${BASH_REMATCH[2]}"
   fi
 
-  __dybatpho_md_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
       printf '\n'
@@ -316,7 +280,7 @@ function dybatpho::md_task_list {
   local -a lines=()
   local line state text escaped box
 
-  __dybatpho_md_read_lines "${input}" lines
+  __dybatpho_string_read_lines_into lines "${input}"
   for line in "${lines[@]}"; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
       printf '\n'
@@ -471,7 +435,7 @@ function dybatpho::md_code_block {
     || dybatpho::die "${FUNCNAME[0]}: Language must not contain a backtick, got: ${language}"
 
   local -a lines=()
-  __dybatpho_md_read_lines "${body}" lines
+  __dybatpho_string_read_lines_into lines "${body}"
 
   local text
   __dybatpho_md_join_into text lines
@@ -545,7 +509,7 @@ function dybatpho::md_collapsible {
   local escaped
 
   __dybatpho_md_escape_into escaped "${summary}"
-  __dybatpho_md_read_lines "${body}" lines
+  __dybatpho_string_read_lines_into lines "${body}"
 
   printf '<details>\n'
   printf '<summary>%s</summary>\n\n' "${escaped}"

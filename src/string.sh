@@ -96,6 +96,58 @@ function __dybatpho_string_split_into {
 }
 
 #######################################
+# @description Read a function's input into a variable: the text itself, or
+#   standard input when it is `-`, or, for a function that documents taking a
+#   path, the contents of the file it names.
+#   Standard input and a file are read the way `$(cat)` reads them, so the
+#   trailing newlines are dropped and a module sees the same text whichever way
+#   it arrived. Reading a file is opt-in, because a function that never took a
+#   path must not start treating a text that happens to name a file as one.
+# @arg $1 string Name of the variable receiving the input
+# @arg $2 string The text, `-` for standard input, or a file path
+# @arg $3 string `files` to read an existing file named by `$2`
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_string_input_into {
+  local -n __dybatpho_string_input_ref="$1"
+  if [[ "$2" == "-" ]]; then
+    __dybatpho_string_input_ref="$(cat)"
+  elif [[ "${3-}" == "files" && -f "$2" ]]; then
+    __dybatpho_string_input_ref="$(< "$2")"
+  else
+    __dybatpho_string_input_ref="$2"
+  fi
+}
+
+#######################################
+# @description Read a function's input into an array of lines: the text
+#   itself, or standard input when it is `-`.
+#   The two agree line for line. `<<<` ends the text with a newline of its own,
+#   so one the text already ends with is dropped first, and a last line that
+#   standard input ends without a newline is still read. Input with no line at
+#   all gives one empty line rather than an empty array, so a caller can expand
+#   the result under `set -u` and render an empty block.
+# @arg $1 string Name of the array receiving the lines
+# @arg $2 string The text, or `-` for standard input
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_string_read_lines_into {
+  local -n __dybatpho_string_lines_ref="$1"
+  __dybatpho_string_lines_ref=()
+  if [[ "$2" == "-" ]]; then
+    local __dybatpho_string_lines_line
+    while IFS= read -r __dybatpho_string_lines_line || [[ -n "${__dybatpho_string_lines_line}" ]]; do
+      __dybatpho_string_lines_ref+=("${__dybatpho_string_lines_line}")
+    done
+  else
+    mapfile -t __dybatpho_string_lines_ref <<< "${2%$'\n'}"
+  fi
+  ((${#__dybatpho_string_lines_ref[@]})) || __dybatpho_string_lines_ref=("")
+}
+
+#######################################
 # @description Return success when a string starts with the given prefix.
 # @arg $1 string Input string
 # @arg $2 string Prefix to match

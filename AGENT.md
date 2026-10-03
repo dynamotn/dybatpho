@@ -212,7 +212,7 @@ or a registered name with no file behind it.
 
 Verify the dependency table against the real call graph rather than by eye.
 **Match internal helpers too**: `table.sh` reaches `text.sh` only through
-`__dybatpho_text_read_lines`, and an edge found by reading `dybatpho::` calls
+`__dybatpho_text_width_into`, and an edge found by reading `dybatpho::` calls
 alone would miss it.
 
 ```bash

@@ -538,3 +538,34 @@ EOF
   assert_failure
   assert_output --partial "Invalid variable name"
 }
+
+@test "__dybatpho_string_read_lines_into reads an argument and stdin alike" {
+  local -a from_arg=() from_stdin=()
+  __dybatpho_string_read_lines_into from_arg $'a\nb\n'
+  __dybatpho_string_read_lines_into from_stdin - < <(printf 'a\nb')
+  assert_equal "${#from_arg[@]}" 2
+  assert_equal "${from_arg[*]}" "a b"
+  assert_equal "${from_stdin[*]}" "${from_arg[*]}"
+
+  local -a empty=()
+  __dybatpho_string_read_lines_into empty - < /dev/null
+  assert_equal "${#empty[@]}" 1
+  assert_equal "${empty[0]}" ""
+}
+
+@test "__dybatpho_string_input_into reads a file only when asked to" {
+  local path="${BATS_TEST_TMPDIR}/input.txt" text
+  printf 'from the file\n\n' > "${path}"
+
+  __dybatpho_string_input_into text "${path}"
+  assert_equal "${text}" "${path}"
+
+  __dybatpho_string_input_into text "${path}" files
+  assert_equal "${text}" "from the file"
+
+  __dybatpho_string_input_into text - < <(printf 'from stdin\n\n')
+  assert_equal "${text}" "from stdin"
+
+  __dybatpho_string_input_into text "plain text" files
+  assert_equal "${text}" "plain text"
+}

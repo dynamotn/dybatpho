@@ -106,7 +106,7 @@ loaded_line() {
   assert_output "string os logging helpers process file secret table text "
 
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network validate notification "
+  assert_output "string os logging helpers process file secret network validate notification "
 
   # `testing` renders a snapshot mismatch through `diff`, so it comes along.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"
@@ -125,7 +125,7 @@ loaded_line() {
   assert_output "string os logging helpers process file secret validate config cli safety archive date json diff backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network lock cache ai "
+  assert_output "string os logging helpers process file secret network json lock cache ai "
 
   # `cache` guards its background refresh with a lock.
   run_traced -0 init_sh "--modules cache" "$(loaded_line)"

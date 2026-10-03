@@ -795,6 +795,10 @@ dybatpho::curl_graphql https://api.github.com/graphql \
 - **`DYBATPHO_HTTP_STATUS`** (The): response status code
 - **`DYBATPHO_HTTP_HEADERS`** (The): response headers
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules network json`
+
 **🚦 Exit codes**
 
 - `0`: The endpoint answered 2xx and the response carried no errors

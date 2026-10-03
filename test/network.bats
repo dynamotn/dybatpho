@@ -1116,3 +1116,29 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::mock_command curl 7 ""
   run_traced -1 dybatpho::curl_do "https://api.example.test/unreachable" "${BATS_TEST_TMPDIR}/none"
 }
+
+@test "dybatpho::curl_graphql asks for the json module when it is not loaded" {
+  # `network` does not load `json`, so a script that only downloads files does
+  # not pay for it. A child shell started from a file, without the functions
+  # this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules network\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::is_ipv4 10.0.0.1 && echo ipv4'
+    printf '%s\n' "dybatpho::curl_graphql https://api.example.test/graphql '{ viewer { login } }' '[1]'"
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_line --index 0 "ipv4"
+  assert_output --partial "dybatpho::curl_graphql needs the json module, load it with: dybatpho::load json"
+
+  # Once the script loads it, the call gets as far as checking its variables,
+  # which is where the bad ones above are turned away.
+  sed -i 's/--modules network/--modules network json/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_output --partial "Variables must be a JSON object: [1]"
+  refute_output --partial "needs the json module"
+}

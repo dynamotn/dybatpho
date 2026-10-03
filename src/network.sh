@@ -1246,10 +1246,12 @@ function dybatpho::curl_auth_bearer {
 # @exitcode 4 The endpoint answered 4xx, or answered with a non-empty `errors` array
 # @exitcode 5 The endpoint answered 5xx
 # @see dybatpho::curl_request
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules network json`
 #######################################
 function dybatpho::curl_graphql {
   local url query
   dybatpho::expect_args url query -- "$@"
+  __dybatpho_network_need_json
   shift 2
   local variables="{}" output="/dev/null"
   if (($# > 0)); then
@@ -1309,6 +1311,27 @@ function dybatpho::curl_graphql {
 
   [[ -n "${scratch}" ]] && rm -f "${scratch}"
   return "${exit_code}"
+}
+
+#######################################
+# @description Stop unless the `json` module is loaded.
+#   Building the GraphQL envelope and reading its `errors` array is the `json`
+#   module's work. Every request helper lives in `network`, and `notification`,
+#   `forge`, `ai` and `metrics_push` all build on it, so registering `json` as a
+#   dependency would load it into every script that only downloads a file; the
+#   one helper that needs it asks for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `json`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `json` module is not loaded
+# @internal
+#######################################
+function __dybatpho_network_need_json {
+  declare -F __dybatpho_json_cmd > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
 
 #######################################

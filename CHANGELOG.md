@@ -481,6 +481,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
   ```
 
+### Changed
+
+- **BREAKING: `network` no longer loads `json`.** Loading `network` -- directly
+  or through `notification`, `forge`, `ai` or `testing` -- used to bring the
+  `json` module along. Only `dybatpho::curl_graphql` needs it, and it now stops
+  with `dybatpho::curl_graphql needs the json module, load it with: dybatpho::load
+  json` when it is missing; every other request helper works without it. A
+  script that calls `dybatpho::curl_graphql`, or any `dybatpho::json_*` helper,
+  having asked only for `network` must now ask for `json` too:
+
+  ```sh
+  # before
+  . dybatpho/init.sh --modules network
+  # after
+  . dybatpho/init.sh --modules network json   # or: dybatpho::load json
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

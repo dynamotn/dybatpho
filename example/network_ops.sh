@@ -15,7 +15,7 @@
 #   real code paths.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules network
+. "${SCRIPTDIR}/../init.sh" --modules network json
 
 dybatpho::register_common_handlers
 

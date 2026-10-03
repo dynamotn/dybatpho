@@ -192,6 +192,7 @@ dybatpho::circuit_breaker api.example.test \
 - A rate limit key's window empties while the script is doing something else, so the budget is whole again.
 - A paginated collection's last page offers no `next` relation, one entry names several relations at once, or the pages form a cycle.
 - A GraphQL response answers `200 OK` while carrying an `errors` array, or the caller passes variables that are not a JSON object.
+- The GraphQL helper is called by a script that loaded `network` without `json`.
 
 ## Requirements *(mandatory)*
 
@@ -259,6 +260,10 @@ dybatpho::circuit_breaker api.example.test \
   progress line MUST be reduced to its scheme, host and port, with any user
   information, path, query or fragment replaced by `/[redacted]`, and a value
   that is not a URL replaced by `[redacted URL]`.
+- **FR-033**: Loading the module MUST NOT load `json`. The GraphQL helper, which
+  builds and reads JSON, MUST stop before sending anything with `<function> needs
+  the json module, load it with: dybatpho::load json` when `json` is not loaded;
+  every other helper MUST work without it.
 
 - **FR-020**: The module MUST split a URL into scheme, user, password, host, port, path,
   query, and fragment, requiring a scheme and `://`, and MUST present every component,
@@ -420,6 +425,9 @@ dybatpho::circuit_breaker api.example.test \
   path, a query token and a fragment logs only `scheme://host:port/[redacted]`,
   and that the redaction keeps the scheme, host and port of plain, IPv6 and
   path-less URLs.
+- **IT-031**: Verify a script that loads `network` alone can use the address
+  helpers, that its GraphQL call stops with the message naming `json`, and that
+  once it loads `json` the same call gets as far as validating its variables.
 - **IT-024**: Verify a request carrying `DYBATPHO_CURL_SECRET_HEADERS` and
   `DYBATPHO_CURL_SECRET_DATA` sends both, while neither appears among the
   arguments the mocked `curl` was called with.

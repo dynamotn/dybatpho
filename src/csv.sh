@@ -1165,9 +1165,12 @@ function dybatpho::csv_from_json {
   # place no matter which command was available.
   local converted
   if [[ "${command_name}" == "jq" ]]; then
-    local filter='(.[0] | keys_unsorted) as $k'
+    # An empty array has no first object to take a header from, and is still
+    # an array of objects: it converts to nothing, as it does through `yq`.
+    local filter='if . == [] then empty else'
+    filter+=' (.[0] | keys_unsorted) as $k'
     filter+=' | ([$k] + [.[] | [ $k[] as $key | (.[$key] // "") | tostring ]])'
-    filter+=' | .[] | @csv'
+    filter+=' | .[] | @csv end'
     converted="$(printf '%s' "${text}" | jq -r "${filter}")" \
       || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
   else

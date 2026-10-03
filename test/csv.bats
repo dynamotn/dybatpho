@@ -350,6 +350,27 @@ x,ok,10
 EOF
 }
 
+@test "dybatpho::csv_from_json writes nothing for an empty array on either backend" {
+  # An empty array is an array of objects with none in it. `jq` used to stop
+  # on it, reading the header from a first object that is not there.
+  run_traced --separate-stderr dybatpho::csv_from_json '[]'
+  assert_success
+  assert_output ""
+  assert_equal "${stderr}" ""
+
+  command -v yq > /dev/null || skip "yq is not installed"
+  local script="${BATS_TEST_TMPDIR}/yq_only_empty.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
+command -v jq > /dev/null && exit 3
+dybatpho::csv_from_json '[]'
+SCRIPT
+
+  PATH="$(path_without jq)" run_traced bash "${script}"
+  assert_success
+  assert_output ""
+}
+
 @test "dybatpho::csv_from_json reports a document that is not an array of objects" {
   run --separate-stderr dybatpho::csv_from_json '{"a":1}'
   assert_failure

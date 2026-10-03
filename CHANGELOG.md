@@ -514,6 +514,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   then again as an extra field `x`, so the row was one column wider than its
   header. Every reader now keeps `ax` as the one field it is.
 
+- **`csv` — `dybatpho::csv_from_json` accepts an empty array.** With `jq` as
+  the backend, `[]` was refused as "not an array of objects", while `yq`
+  converted it to nothing. Both now write nothing and succeed.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

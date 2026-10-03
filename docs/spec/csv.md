@@ -137,6 +137,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - A join key repeats on the right, is blank, is missing from a side, or holds glob or shell characters; one side is empty or holds only its key.
 - A sorted column mixes numbers and text, holds blanks, spells one number two ways (`10`, `010.0`), or holds a value with a line break.
 - A record's quote is never closed, or text follows a closing quote.
+- The JSON to convert is an empty array.
 - A file uses CRLF line endings, or another delimiter such as `;`.
 - A field is empty, a row ends with the delimiter, or the input is empty.
 - The input contains the ASCII unit separator the module joins fields with.
@@ -181,6 +182,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-031**: An empty key MUST match nothing, and the right key column MUST default to the left one's name.
 - **FR-032**: Joining MUST reject an unknown join type, a key column a side lacks, and reading both inputs from stdin.
 - **FR-033**: Text between a closing quote and the next delimiter, or the end of the record, MUST be kept in that one field and MUST NOT be read again as a field of its own.
+- **FR-034**: Conversion from JSON MUST write nothing and succeed for an empty array, the same on the `jq` and `yq` backends.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -239,6 +241,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-037**: Join with one side on stdin and a configured delimiter, an empty left, an empty right, and a right side holding only its key.
 - **IT-038**: Reject an unknown join type, a missing key column, two stdins, and a row wider than its header.
 - **IT-039**: Read stray text after a closing quote as part of that field, in the middle of a record, at its end, and before a trailing delimiter.
+- **IT-040**: Convert an empty JSON array to no output and no error, through `jq` and through `yq` alone.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -706,6 +706,42 @@ EOF
   assert_output ""
 }
 
+@test "the file writers never write through a link planted at a staging name" {
+  # The staging name used to be `.dybatpho_staging_<name>.<pid>`, and a process
+  # id is easy to guess. Anyone who could write to the directory could plant a
+  # link at it and have the rewrite land in the file the link pointed at. The
+  # stub plays that attacker at the moment the name is being worked out: it
+  # plants a link named after its own process and after its parent, which is
+  # the subshell that computed the old name. Reading the parent needs `/proc`.
+  [[ -r "/proc/${BASHPID}/stat" ]] || skip "needs /proc to find the parent process"
+  local dir="${BATS_TEST_TMPDIR}/planted dir" victim="${BATS_TEST_TMPDIR}/victim"
+  mkdir -p "${dir}"
+  printf 'untouched\n' > "${victim}"
+  printf 'old\n' > "${dir}/app.conf"
+  eval "__test_path_basename() $(declare -f dybatpho::path_basename | tail -n +2)"
+  # shellcheck disable=SC2329 # invoked by the writers
+  dybatpho::path_basename() {
+    local pid parent _
+    read -r _ _ _ parent _ < "/proc/${BASHPID}/stat"
+    for pid in "${BASHPID}" "${parent}"; do
+      ln -s "${victim}" "${dir}/.dybatpho_staging_app.conf.${pid}" 2> /dev/null || true
+    done
+    __test_path_basename "$@"
+  }
+
+  printf 'new\n' | dybatpho::file_write_atomic "${dir}/app.conf"
+  dybatpho::file_replace "${dir}/app.conf" 'new' 'replaced'
+  dybatpho::file_ensure_line "${dir}/app.conf" 'added'
+  dybatpho::file_remove_line "${dir}/app.conf" 'added'
+
+  assert_equal "$(cat "${victim}")" "untouched"
+  [[ -f "${dir}/app.conf" && ! -L "${dir}/app.conf" ]]
+  assert_equal "$(cat "${dir}/app.conf")" "replaced"
+  # Nothing but the planted links is left over.
+  run_traced find "${dir}" -name '.dybatpho_staging_*' ! -type l
+  assert_output ""
+}
+
 @test "a rewrite that cannot be committed leaves no staging file behind" {
   local dir="${BATS_TEST_TMPDIR}/readonly"
   mkdir -p "${dir}"

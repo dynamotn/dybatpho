@@ -846,6 +846,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **`file` — a rewrite no longer writes through a link planted at its staging
+  name.** `dybatpho::file_write_atomic`, `dybatpho::file_replace`,
+  `dybatpho::file_ensure_line` and `dybatpho::file_remove_line` staged the new
+  contents in `.dybatpho_staging_<name>.<pid>` and opened it with a plain
+  redirection. A process id is easy to guess, so anyone who could write to the
+  destination's directory could plant a link there and have the contents land
+  in any file the script could write. The staging file now carries a random
+  suffix and is created exclusively; a name that is already taken is skipped.
+
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`
   logged `Error when access <url>` and `No more retries left to run curl <url>`
   with the whole URL, and the download, pagination and GraphQL helpers did the

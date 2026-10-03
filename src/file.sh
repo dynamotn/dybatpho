@@ -507,19 +507,49 @@ function __dybatpho_file_resolve {
 }
 
 #######################################
-# @description Print the path of a staging file next to a destination.
+# @description Create a staging file next to a destination, and set a
+#   variable to its path.
 #   The staging file has to share a directory with the destination, because
-#   `mv` is only atomic within one filesystem.
-# @arg $1 string Destination path
-# @stdout Staging file path
+#   `mv` is only atomic within one filesystem. Its name carries a random suffix
+#   and it is created exclusively: a name built from the process id alone could
+#   be guessed, and anyone able to write to the directory could plant a link
+#   there and have the rewrite land in the file the link points at. With
+#   `noclobber`, a name that is already taken, link or not, is refused and a
+#   fresh one is tried. The file is created through a redirection, so its mode
+#   follows the umask as a plain write would.
+# @arg $1 string Name of the variable receiving the staging file path
+# @arg $2 string Destination path
+# @set The named variable
+# @exitcode 1 No staging file can be created in the destination's directory
 # @internal
 #######################################
-function __dybatpho_file_staging {
-  local path directory basename
-  dybatpho::expect_args path -- "$@"
-  directory="$(dybatpho::path_dirname "${path}")"
-  basename="$(dybatpho::path_basename "${path}")"
-  printf '%s/.dybatpho_staging_%s.%s\n' "${directory%/}" "${basename}" "${BASHPID}"
+function __dybatpho_file_staging_into {
+  local -n __dybatpho_file_staging_ref="$1"
+  local __dybatpho_file_staging_path="$2"
+  local __dybatpho_file_staging_dir __dybatpho_file_staging_base
+  local __dybatpho_file_staging_name __dybatpho_file_staging_try=0
+  __dybatpho_file_staging_dir="${__dybatpho_file_staging_path%/*}"
+  [[ "${__dybatpho_file_staging_path}" == */* ]] || __dybatpho_file_staging_dir="."
+  [[ -n "${__dybatpho_file_staging_dir}" ]] || __dybatpho_file_staging_dir="/"
+  __dybatpho_file_staging_base="${__dybatpho_file_staging_path##*/}"
+
+  while ((__dybatpho_file_staging_try++ < 20)); do
+    __dybatpho_file_staging_name="${__dybatpho_file_staging_dir%/}/.dybatpho_staging_${__dybatpho_file_staging_base}"
+    __dybatpho_file_staging_name+=".${BASHPID}.${RANDOM}${RANDOM}"
+    if (set -C && : > "${__dybatpho_file_staging_name}") 2> /dev/null; then
+      # `noclobber` still opens an existing non-regular file, such as a link
+      # to a device, so what was opened has to be the plain file just made.
+      if [[ -f "${__dybatpho_file_staging_name}" && ! -L "${__dybatpho_file_staging_name}" ]]; then
+        __dybatpho_file_staging_ref="${__dybatpho_file_staging_name}"
+        return 0
+      fi
+      continue
+    fi
+    # A name that is free and still could not be created means the directory
+    # refuses the write; trying other names will not change that.
+    [[ -e "${__dybatpho_file_staging_name}" || -L "${__dybatpho_file_staging_name}" ]] || return 1
+  done
+  return 1
 }
 
 #######################################
@@ -612,7 +642,8 @@ function dybatpho::file_write_atomic {
     return 0
   fi
 
-  staging="$(__dybatpho_file_staging "${path}")"
+  __dybatpho_file_staging_into staging "${path}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
   if ! cat > "${staging}"; then
     __dybatpho_file_discard "${staging}"                                  # kcov(skip)
     dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}" # kcov(skip)
@@ -675,7 +706,8 @@ function dybatpho::file_replace {
     return 0
   fi
 
-  staging="$(__dybatpho_file_staging "${path}")"
+  __dybatpho_file_staging_into staging "${path}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
   local file_operand
   file_operand=$(__dybatpho_file_operand "${path}")
   if ! sed "s${delimiter}${pattern}${delimiter}${replacement}${delimiter}g" \
@@ -720,7 +752,8 @@ function dybatpho::file_ensure_line {
     return 0
   fi
 
-  staging="$(__dybatpho_file_staging "${path}")"
+  __dybatpho_file_staging_into staging "${path}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
   if dybatpho::is file "${path}"; then
     cat -- "${path}" > "${staging}"
     # A file whose last line has no newline would otherwise absorb the new line.
@@ -764,7 +797,8 @@ function dybatpho::file_remove_line {
     return 0
   fi
 
-  staging="$(__dybatpho_file_staging "${path}")"
+  __dybatpho_file_staging_into staging "${path}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
   # `grep -v` reports "no match" when every line is removed, which is a valid
   # result here rather than a failure.
   local status=0

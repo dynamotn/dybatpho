@@ -103,9 +103,6 @@ declare -gA DYBATPHO_URL=()
 # is taken apart separately, because its own grammar is the awkward part.
 __DYBATPHO_URL_REGEX='^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*)(\?([^#]*))?(#(.*))?$'
 
-# One group of an IPv6 address: one to four hexadecimal digits.
-__DYBATPHO_IPV6_GROUP_REGEX='^[0-9A-Fa-f]{1,4}$'
-
 #######################################
 # @description Reduce a URL to the form the library may write to a log.
 #   Many URLs are credentials in their own right: a Slack, Discord, Teams or
@@ -1464,132 +1461,7 @@ function dybatpho::url_part {
   fi
 }
 
-#######################################
-# @description Split an IPv4 address into its four octets as numbers.
-#   A leading zero is rejected rather than ignored. `inet_aton` and much of the
-#   software built on it read `010` as octal, so `127.0.0.010` is one host to
-#   one parser and another host to the next. An address that means two things
-#   is not an address this library will agree to.
-# @arg $1 string Address to split
-# @arg $2 string Name of the array variable receiving the four octets
-# @set The named array, to four numbers from 0 to 255
-# @exitcode 1 The value is not an IPv4 address
-# @internal
-#######################################
-function __dybatpho_network_ipv4_octets {
-  local __ipv4_address="$1"
-  local -n __ipv4_out="$2"
-  [[ "${__ipv4_address}" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] \
-    || return 1
-  local -a __ipv4_matched=("${BASH_REMATCH[@]:1:4}")
-  local __ipv4_octet
-  __ipv4_out=()
-  for __ipv4_octet in "${__ipv4_matched[@]}"; do
-    [[ "${__ipv4_octet}" == "0" || "${__ipv4_octet}" != 0* ]] || return 1
-    ((10#${__ipv4_octet} <= 255)) || return 1
-    __ipv4_out+=("$((10#${__ipv4_octet}))")
-  done
-}
 
-#######################################
-# @description Expand an IPv6 address into its eight groups as numbers.
-#   Everything an IPv6 address may leave out is put back here: the `::` that
-#   stands for a run of zero groups, and the dotted IPv4 tail that occupies the
-#   last two groups of a mapped address. Comparing addresses is only simple once
-#   both are written out in full.
-#
-#   A zone index such as `%eth0` is rejected. It names an interface rather than
-#   a part of the address, and it is not comparable between two hosts.
-# @arg $1 string Address to expand
-# @arg $2 string Name of the array variable receiving the eight groups
-# @set The named array, to eight numbers from 0 to 65535
-# @exitcode 1 The value is not an IPv6 address
-# @internal
-#######################################
-function __dybatpho_network_ipv6_groups {
-  local __ipv6_address="$1"
-  local -n __ipv6_out="$2"
-  [[ "${__ipv6_address}" != *%* ]] || return 1
-  [[ "${__ipv6_address}" == *:* ]] || return 1
-  # A single colon at either end belongs to a `::` or to nothing at all. Without
-  # this, `read -a` drops the empty trailing field and `1:2:3:4:5:6:7:8:` would
-  # count as eight groups.
-  [[ "${__ipv6_address}" != *: || "${__ipv6_address}" == *:: ]] || return 1
-  [[ "${__ipv6_address}" != :* || "${__ipv6_address}" == ::* ]] || return 1
-
-  local __ipv6_head __ipv6_tail __ipv6_has_double=0
-  if [[ "${__ipv6_address}" == *::* ]]; then
-    __ipv6_has_double=1
-    __ipv6_head="${__ipv6_address%%::*}"
-    __ipv6_tail="${__ipv6_address#*::}"
-    # `::` stands for "the rest is zero", so a second one has nothing left to say.
-    [[ "${__ipv6_tail}" != *::* ]] || return 1
-  else
-    __ipv6_head="${__ipv6_address}"
-    __ipv6_tail=""
-  fi
-
-  local -a __ipv6_head_parts=() __ipv6_tail_parts=()
-  [[ -z "${__ipv6_head}" ]] || IFS=':' read -r -a __ipv6_head_parts <<< "${__ipv6_head}"
-  [[ -z "${__ipv6_tail}" ]] || IFS=':' read -r -a __ipv6_tail_parts <<< "${__ipv6_tail}"
-
-  # A dotted tail, as in `::ffff:192.0.2.1`, is two groups written in decimal.
-  local -a __ipv6_mapped=()
-  local __ipv6_mapped_in_tail=0 __ipv6_last=""
-  if ((${#__ipv6_tail_parts[@]})); then
-    __ipv6_last="${__ipv6_tail_parts[-1]}"
-    __ipv6_mapped_in_tail=1
-  elif ((${#__ipv6_head_parts[@]})); then
-    __ipv6_last="${__ipv6_head_parts[-1]}"
-  fi
-  if [[ "${__ipv6_last}" == *.* ]]; then
-    local -a __ipv6_octets=()
-    __dybatpho_network_ipv4_octets "${__ipv6_last}" __ipv6_octets || return 1
-    __ipv6_mapped=(
-      "$(((__ipv6_octets[0] << 8) | __ipv6_octets[1]))"
-      "$(((__ipv6_octets[2] << 8) | __ipv6_octets[3]))"
-    )
-    if ((__ipv6_mapped_in_tail)); then
-      unset '__ipv6_tail_parts[-1]'
-    else
-      unset '__ipv6_head_parts[-1]'
-    fi
-  else
-    __ipv6_mapped_in_tail=0
-  fi
-
-  local -a __ipv6_lead=() __ipv6_trail=()
-  local __ipv6_part
-  for __ipv6_part in ${__ipv6_head_parts[@]+"${__ipv6_head_parts[@]}"}; do
-    [[ "${__ipv6_part}" =~ ${__DYBATPHO_IPV6_GROUP_REGEX} ]] || return 1
-    __ipv6_lead+=("$((16#${__ipv6_part}))")
-  done
-  for __ipv6_part in ${__ipv6_tail_parts[@]+"${__ipv6_tail_parts[@]}"}; do
-    [[ "${__ipv6_part}" =~ ${__DYBATPHO_IPV6_GROUP_REGEX} ]] || return 1
-    __ipv6_trail+=("$((16#${__ipv6_part}))")
-  done
-  if ((${#__ipv6_mapped[@]})); then
-    if ((__ipv6_mapped_in_tail)); then
-      __ipv6_trail+=("${__ipv6_mapped[@]}")
-    else
-      __ipv6_lead+=("${__ipv6_mapped[@]}")
-    fi
-  fi
-
-  local __ipv6_have=$((${#__ipv6_lead[@]} + ${#__ipv6_trail[@]}))
-  local __ipv6_index
-  if ((__ipv6_has_double)); then
-    # `::` has to stand for at least one group, or it would be spelled `:`.
-    ((__ipv6_have <= 7)) || return 1
-    for ((__ipv6_index = __ipv6_have; __ipv6_index < 8; __ipv6_index++)); do
-      __ipv6_lead+=(0)
-    done
-  else
-    ((__ipv6_have == 8)) || return 1
-  fi
-
-  __ipv6_out=("${__ipv6_lead[@]}" ${__ipv6_trail[@]+"${__ipv6_trail[@]}"})
-}
 
 #######################################
 # @description Return success when a value is an IPv4 address.
@@ -1605,9 +1477,7 @@ function __dybatpho_network_ipv6_groups {
 function dybatpho::is_ipv4 {
   local address
   dybatpho::expect_args address -- "$@"
-  # shellcheck disable=SC2034 # octets is filled through a nameref; only the exit code is wanted
-  local -a octets=()
-  __dybatpho_network_ipv4_octets "${address}" octets
+  __dybatpho_helpers_ipv4_octets "${address}" -
 }
 
 #######################################
@@ -1627,9 +1497,7 @@ function dybatpho::is_ipv4 {
 function dybatpho::is_ipv6 {
   local address
   dybatpho::expect_args address -- "$@"
-  # shellcheck disable=SC2034 # groups is filled through a nameref; only the exit code is wanted
-  local -a groups=()
-  __dybatpho_network_ipv6_groups "${address}" groups
+  __dybatpho_helpers_ipv6_groups "${address}" -
 }
 
 #######################################
@@ -1654,41 +1522,6 @@ function dybatpho::ip_version {
   fi
 }
 
-#######################################
-# @description Split a CIDR block into its address and prefix length.
-# @arg $1 string Block such as `10.0.0.0/8` or `2001:db8::/32`
-# @arg $2 string Name of the variable receiving the address
-# @arg $3 string Name of the variable receiving the prefix length
-# @arg $4 string Name of the variable receiving the IP version
-# @set The three named variables
-# @exitcode 1 The value is not a CIDR block
-# @internal
-#######################################
-function __dybatpho_network_parse_cidr {
-  local __cidr_block="$1"
-  local -n __cidr_address_out="$2"
-  local -n __cidr_prefix_out="$3"
-  local -n __cidr_version_out="$4"
-  [[ "${__cidr_block}" == */* ]] || return 1
-  local __cidr_address="${__cidr_block%/*}"
-  local __cidr_prefix="${__cidr_block##*/}"
-  [[ "${__cidr_prefix}" =~ ^[0-9]{1,3}$ ]] || return 1
-  # A leading zero here is the same ambiguity as in an octet, and `/08` is not a
-  # prefix length anyone writes on purpose.
-  [[ "${__cidr_prefix}" == "0" || "${__cidr_prefix}" != 0* ]] || return 1
-
-  local __cidr_version
-  __cidr_version="$(dybatpho::ip_version "${__cidr_address}")" || return 1
-  if ((__cidr_version == 4)); then
-    ((10#${__cidr_prefix} <= 32)) || return 1
-  else
-    ((10#${__cidr_prefix} <= 128)) || return 1
-  fi
-
-  __cidr_address_out="${__cidr_address}"
-  __cidr_prefix_out="$((10#${__cidr_prefix}))"
-  __cidr_version_out="${__cidr_version}"
-}
 
 #######################################
 # @description Return success when a value is a CIDR block.
@@ -1704,8 +1537,7 @@ function __dybatpho_network_parse_cidr {
 function dybatpho::is_cidr {
   local block
   dybatpho::expect_args block -- "$@"
-  local address="" prefix="" version=""
-  __dybatpho_network_parse_cidr "${block}" address prefix version
+  __dybatpho_helpers_parse_cidr "${block}" - - -
 }
 
 #######################################
@@ -1758,7 +1590,7 @@ function dybatpho::cidr_contains {
   local block address
   dybatpho::expect_args block address -- "$@"
   local network="" prefix="" version=""
-  __dybatpho_network_parse_cidr "${block}" network prefix version \
+  __dybatpho_helpers_parse_cidr "${block}" network prefix version \
     || dybatpho::die "${FUNCNAME[0]}: '${block}' is not a CIDR block"
   local address_version
   address_version="$(dybatpho::ip_version "${address}")" \
@@ -1767,8 +1599,8 @@ function dybatpho::cidr_contains {
 
   if ((version == 4)); then
     local -a network_octets=() address_octets=()
-    __dybatpho_network_ipv4_octets "${network}" network_octets
-    __dybatpho_network_ipv4_octets "${address}" address_octets
+    __dybatpho_helpers_ipv4_octets "${network}" network_octets
+    __dybatpho_helpers_ipv4_octets "${address}" address_octets
     local network_int=$(((network_octets[0] << 24) | (network_octets[1] << 16)))
     network_int=$((network_int | (network_octets[2] << 8) | network_octets[3]))
     local address_int=$(((address_octets[0] << 24) | (address_octets[1] << 16)))
@@ -1780,8 +1612,8 @@ function dybatpho::cidr_contains {
   fi
 
   local -a network_groups=() address_groups=()
-  __dybatpho_network_ipv6_groups "${network}" network_groups
-  __dybatpho_network_ipv6_groups "${address}" address_groups
+  __dybatpho_helpers_ipv6_groups "${network}" network_groups
+  __dybatpho_helpers_ipv6_groups "${address}" address_groups
   local remaining="${prefix}" index bits mask
   for ((index = 0; index < 8; index++)); do
     ((remaining > 0)) || break

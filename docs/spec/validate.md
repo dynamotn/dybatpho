@@ -180,6 +180,7 @@ dybatpho::opts::param "Port" PORT --port type:port
 ## Edge Cases
 
 - A type name arrives in a different case, or as one of the accepted aliases.
+- A CIDR prefix length is written with a leading zero, such as `/08`.
 - A predicate is asked about the empty string, or about a value holding only
   whitespace.
 - A numeric value is written with leading zeros, which shell arithmetic reads
@@ -272,6 +273,9 @@ dybatpho::opts::param "Port" PORT --port type:port
   `Expected <description>: <value>`.
 - **FR-024**: A declared `type:` MUST appear in generated help and man output
   as `[type: <name>]` and in the generated JSON schema as `valueType`.
+- **FR-025**: The `ipv4`, `ipv6` and `cidr` types MUST read addresses through
+  the same core parser as the `network` module, and MUST refuse a CIDR prefix
+  length written with a leading zero.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -350,6 +354,8 @@ dybatpho::opts::param "Port" PORT --port type:port
   and the JSON schema.
 - **IT-023**: Verify `validate` is loaded ahead of `config` and reachable from
   a script that asked only for `cli`.
+- **IT-024**: Refuse `10.0.0.0/08` and `2001:db8::/032`, accept `10.0.0.0/0`,
+  and answer every IPv4, IPv6 and CIDR sample the way `network` does.
 
 ## Acceptance Criteria *(mandatory)*
 

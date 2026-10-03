@@ -711,23 +711,16 @@ function __dybatpho_validate_is_hostname {
 # @description Return success when a value is an IPv4 address.
 #   A leading zero is refused rather than ignored, because `inet_aton` and the
 #   software built on it read `010` as octal: an address that means two things
-#   is not one this library will agree to. `dybatpho::is_ipv4` in the `network`
-#   module answers the same question the same way, and the two are pinned
-#   against each other in `test/validate.bats`.
+#   is not one this library will agree to. The parser is the core one that
+#   `dybatpho::is_ipv4` in the `network` module uses too, so the two cannot
+#   answer differently.
 # @arg $1 string Value to test
 # @exitcode 0 The value is an IPv4 address
 # @exitcode 1 The value is not
 # @internal
 #######################################
 function __dybatpho_validate_is_ipv4 {
-  [[ "${1-}" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
-  local -a octets=("${BASH_REMATCH[@]:1:4}")
-  local octet
-  for octet in "${octets[@]}"; do
-    [[ "${octet}" == "0" || "${octet}" != 0* ]] || return 1
-    ((10#${octet} <= 255)) || return 1
-  done
-  return 0
+  __dybatpho_helpers_ipv4_octets "${1-}" -
 }
 
 #######################################
@@ -741,62 +734,7 @@ function __dybatpho_validate_is_ipv4 {
 # @internal
 #######################################
 function __dybatpho_validate_is_ipv6 {
-  local address="${1-}"
-  [[ -n "${address}" && "${address}" != *%* ]] || return 1
-  # Only the characters an address is written with; everything else is rejected
-  # before the shape is examined.
-  [[ "${address}" =~ ^[0-9a-fA-F:.]+$ ]] || return 1
-  # `::` is the one abbreviation, so a second one leaves the length ambiguous.
-  local remainder="${address#*::}"
-  [[ "${address}" == *::* && "${remainder}" == *::* ]] && return 1
-
-  local head tail
-  if [[ "${address}" == *::* ]]; then
-    head="${address%%::*}"
-    tail="${address#*::}"
-  else
-    head="${address}"
-    tail=""
-  fi
-
-  local -a groups=()
-  local trailing_v4=0 part
-  # A dotted tail occupies the last two groups, so it is counted as two and
-  # removed before the colon-separated groups are counted.
-  local last="${tail:-${head}}"
-  if [[ "${last}" == *.* ]]; then
-    part="${last##*:}"
-    __dybatpho_validate_is_ipv4 "${part}" || return 1
-    trailing_v4=2
-    if [[ -n "${tail}" ]]; then
-      tail="${tail%"${part}"}"
-      tail="${tail%:}"
-    else
-      head="${head%"${part}"}"
-      head="${head%:}"
-    fi
-  fi
-
-  local counted=0 section
-  for section in "${head}" "${tail}"; do
-    [[ -n "${section}" ]] || continue
-    # A section may not begin or end with a stray colon once `::` is removed.
-    [[ "${section}" == :* || "${section}" == *: ]] && return 1
-    IFS=':' read -r -a groups <<< "${section}"
-    for part in ${groups[@]+"${groups[@]}"}; do
-      [[ "${part}" =~ ^[0-9a-fA-F]{1,4}$ ]] || return 1
-      counted=$((counted + 1))
-    done
-  done
-  counted=$((counted + trailing_v4))
-
-  if [[ "${address}" == *::* ]]; then
-    # `::` must stand for at least one group, otherwise it was written where a
-    # plain colon belonged.
-    ((counted <= 7))
-  else
-    ((counted == 8))
-  fi
+  __dybatpho_helpers_ipv6_groups "${1-}" -
 }
 
 #######################################
@@ -812,27 +750,16 @@ function __dybatpho_validate_is_ip {
 
 #######################################
 # @description Return success when a value is a CIDR block: an IP address, a
-#   slash, and a prefix length that fits the address's version.
+#   slash, and a prefix length that fits the address's version. A prefix with a
+#   leading zero, such as `/08`, is refused for the same reason as an octet with
+#   one.
 # @arg $1 string Value to test
 # @exitcode 0 The value is a CIDR block
 # @exitcode 1 The value is not
 # @internal
 #######################################
 function __dybatpho_validate_is_cidr {
-  local block="${1-}"
-  [[ "${block}" == */* ]] || return 1
-  local address="${block%/*}" prefix="${block##*/}"
-  __dybatpho_validate_is_uint "${prefix}" || return 1
-  # A prefix is at most three digits, so anything longer cannot be one and
-  # would overflow the comparison below.
-  ((${#prefix} <= 3)) || return 1
-  if __dybatpho_validate_is_ipv4 "${address}"; then
-    ((10#${prefix} <= 32))
-  elif __dybatpho_validate_is_ipv6 "${address}"; then
-    ((10#${prefix} <= 128))
-  else
-    return 1
-  fi
+  __dybatpho_helpers_parse_cidr "${1-}" - - -
 }
 
 #######################################

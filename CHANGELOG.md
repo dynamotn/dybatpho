@@ -1017,6 +1017,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `600` secret reached through a symbolic link failed the assertion. The mode
   is now read through the library's one `stat` helper, which follows links.
 
+- **`validate` — a CIDR prefix with a leading zero is no longer a CIDR block.**
+  `dybatpho::validate_is cidr 10.0.0.0/08` passed while `dybatpho::is_cidr`
+  refused it, the same ambiguity as an octet written `010`. Both modules now
+  read addresses through one parser, so they give the same answer.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

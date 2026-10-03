@@ -136,9 +136,8 @@ teardown() {
 }
 
 @test "dybatpho::validate_is answers IP questions the same way the network module does" {
-  # `network` owns the richer parser and `validate` owns the shared predicate.
-  # They are two implementations of one rule, so they are pinned against each
-  # other here: a fix to one that does not reach the other fails this test.
+  # Both modules read addresses through one core parser; this pins that they
+  # keep doing so, so a copy that drifts from the other fails here.
   local address expected actual
   for address in \
     "192.0.2.10" "192.0.2.256" "127.0.0.010" "0.0.0.0" "255.255.255.255" \
@@ -155,6 +154,20 @@ teardown() {
     actual=no && dybatpho::validate_is ipv6 "${address}" && actual=yes
     assert_equal "ipv6 ${address} ${actual}" "ipv6 ${address} ${expected}"
   done
+  for address in \
+    "10.0.0.0/8" "10.0.0.0/08" "10.0.0.0/0" "10.0.0.0/00" "10.0.0.0/33" \
+    "2001:db8::/32" "2001:db8::/032" "2001:db8::/129" "10.0.0.0" "/8"; do
+    expected=no && dybatpho::is_cidr "${address}" && expected=yes
+    actual=no && dybatpho::validate_is cidr "${address}" && actual=yes
+    assert_equal "cidr ${address} ${actual}" "cidr ${address} ${expected}"
+  done
+}
+
+@test "dybatpho::validate_is refuses a CIDR prefix with a leading zero" {
+  # `/08` is the same ambiguity as an octet written `010`.
+  run_traced -1 dybatpho::validate_is cidr "10.0.0.0/08"
+  run_traced -1 dybatpho::validate_is cidr "2001:db8::/032"
+  run_traced -0 dybatpho::validate_is cidr "10.0.0.0/0"
 }
 
 @test "dybatpho::validate_is checks a CIDR prefix against the address version" {

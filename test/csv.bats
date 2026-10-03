@@ -95,7 +95,7 @@ setup() {
   printf '%s\n' "printf 'a,b\nx,y\n' | { . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv && dybatpho::csv_header -; }" > "${script}"
   run_traced bash "${script}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 a
 b
 EOF
@@ -132,7 +132,7 @@ EOF
   dybatpho::csv_read "${QUOTED_CSV}" records
   run_traced dybatpho::csv_write records
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name,note,qty
 "Doe, John",ok,3
 "He said ""hi""","line one
@@ -163,7 +163,7 @@ EOF
 @test "dybatpho::csv_header prints the column names and says nothing for empty input" {
   run_traced dybatpho::csv_header "${QUOTED_CSV}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name
 note
 qty
@@ -177,7 +177,7 @@ EOF
 @test "dybatpho::csv_col prints one column chosen by name" {
   run_traced dybatpho::csv_col "${QUOTED_CSV}" "qty"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 3
 10
 7
@@ -187,7 +187,7 @@ EOF
 @test "dybatpho::csv_col reads a short row as an empty value" {
   run_traced dybatpho::csv_col "$(printf 'a,b\n1\n2,3')" "b"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 
 3
 EOF
@@ -215,7 +215,7 @@ EOF
 @test "dybatpho::csv_filter keeps the rows matching eq, ne and contains" {
   run_traced dybatpho::csv_filter "$(printf 'name,env\napi,prod\nweb,dev\ndb,prod')" "env" eq "prod"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name,env
 api,prod
 db,prod
@@ -234,7 +234,7 @@ EOF
   # `9` sorts after `10` as text, which is the answer a report does not want.
   run_traced dybatpho::csv_filter "$(printf 'name,qty\na,9\nb,10\nc,2')" "qty" gt "5"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name,qty
 a,9
 b,10
@@ -291,7 +291,7 @@ EOF
 @test "dybatpho::csv_from_json converts an array of objects back to CSV" {
   run_traced dybatpho::csv_from_json '[{"name":"Doe, John","qty":"3"},{"name":"x","qty":"10"}]'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name,qty
 "Doe, John",3
 x,10
@@ -311,7 +311,7 @@ EOF
   printf '[{"a":"1"}]' > "${file}"
   run_traced dybatpho::csv_from_json "${file}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 a
 1
 EOF
@@ -342,7 +342,7 @@ SCRIPT
 
   PATH="$(path_without jq)" run_traced bash "${script}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name,note,qty
 "Doe, John","line one
 line two",3
@@ -387,7 +387,7 @@ SCRIPT
   DYBATPHO_CSV_DELIMITER=";" \
     run_traced dybatpho::csv_filter "$(printf 'name;qty\na;9\nb;2')" "qty" gt "5"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 name;qty
 a;9
 EOF
@@ -436,7 +436,7 @@ EOF
   assert_success
   # The comma no longer needs quotes once a tab separates the fields, while the
   # quote and the line break still do.
-  assert_output << EOF
+  assert_output - << EOF
 name	note	qty
 Doe, John	ok	3
 "He said ""hi"""	"line one
@@ -474,7 +474,7 @@ EOF
 @test "dybatpho::csv_select keeps the named columns in the order given" {
   run_traced dybatpho::csv_select "${QUOTED_CSV}" qty name
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 qty,name
 3,"Doe, John"
 10,"He said ""hi"""
@@ -485,7 +485,7 @@ EOF
 @test "dybatpho::csv_select takes positions, repeats a column and pads a short row" {
   run_traced dybatpho::csv_select "$(printf 'a,b,c\n1,2,3\n4,5')" 3 1 a
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 c,a,a
 3,1,1
 ,4,4
@@ -531,7 +531,7 @@ EOF
   csv="$(printf 'n,v\na,10\nb,9\nc,\nd,010.0\ne,-1.5\nf,-0.5\ng,-0.45\nh,-0\ni,.25\nj,-12\nk,+3')"
   run_traced dybatpho::csv_sort "${csv}" v
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 n,v
 j,-12
 e,-1.5
@@ -567,7 +567,7 @@ EOF
 
   run_traced dybatpho::csv_sort "${QUOTED_CSV}" name desc
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 name,note,qty
 plain,x,7
 "He said ""hi""","line one
@@ -616,7 +616,7 @@ EOF
 
   run_traced dybatpho::csv_join "${left}" "${right}" team
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 svc,team,owner
 api,core,"Doe, J"
 api,core,Ann
@@ -635,7 +635,7 @@ EOF
   # short left row is padded before the right columns are appended.
   run_traced dybatpho::csv_join "${left}" "${right}" team left name
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 svc,team,owner,chan
 api,core,Ann,#core
 db,,,
@@ -654,7 +654,7 @@ EOF
   right="$(printf 'k,b\n*,S\n@,A\na]b,B\nx y,X\n$(id),D')"
   run_traced dybatpho::csv_join "${left}" "${right}" k
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 k,a,b
 @,1,A
 *,2,S

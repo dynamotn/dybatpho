@@ -853,6 +853,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   meanwhile moves the backup on to the next suffix. `--incremental` snapshots
   are published the same way.
 
+- **`doctor` — `--json` stays valid JSON whatever a path holds.**
+  `dybatpho::doctor --json` escaped only backslash, quote, tab, newline and
+  carriage return, so a dependency path, version or library directory holding
+  any other control character -- an ANSI escape, say -- made the whole report
+  unparseable. It now escapes every control character, the way the JSON log
+  format does.
+
 ### Security
 
 - **`file` — a rewrite no longer writes through a link planted at its staging

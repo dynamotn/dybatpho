@@ -247,6 +247,23 @@ fake_versioned_command() {
   printf '%s' "${output}" | jq -e '.bash.ok == true' > /dev/null
 }
 
+@test "dybatpho::doctor --json escapes control characters in a path" {
+  # Only five characters were escaped, so a path holding any other control
+  # character -- an ANSI escape, say -- made the whole report invalid JSON.
+  local bin="${BATS_TEST_TMPDIR}/bin"$'\033'"[1m"$'\001'
+  mkdir -p "${bin}"
+  printf '#!/bin/sh\nexit 0\n' > "${bin}/curl"
+  PATH="${ORIGINAL_PATH}" chmod +x "${bin}/curl"
+  PATH="${bin}"
+
+  run_traced -0 dybatpho::doctor --modules network --json
+  PATH="${ORIGINAL_PATH}"
+  assert_output --partial '\u001b[1m\u0001/curl'
+  if dybatpho::is command jq; then
+    printf '%s' "${output}" | jq -e '.dependencies[0].status == "ok"' > /dev/null
+  fi
+}
+
 @test "dybatpho::doctor rejects an unknown module" {
   run -1 dybatpho::doctor --modules nosuch
   assert_output --partial "Unknown module 'nosuch'"

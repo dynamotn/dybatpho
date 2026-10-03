@@ -284,24 +284,6 @@ function __dybatpho_doctor_scope {
 }
 
 #######################################
-# @description Escape a value for use inside a JSON string.
-#   The report is written without `jq`, because a diagnostic that needs a tool
-#   the user may be missing is of no use.
-# @arg $1 string Raw value
-# @stdout The value with the characters JSON reserves escaped
-# @internal
-#######################################
-function __dybatpho_doctor_json_escape {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\t'/\\t}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  printf '%s' "${value}"
-}
-
-#######################################
 # @description Collect every dependency row a scope produces.
 #   A row is `module<TAB>spec<TAB>kind<TAB>status<TAB>path<TAB>version`, which
 #   keeps the text and JSON renderers reading the same data.
@@ -389,6 +371,10 @@ function __dybatpho_doctor_report_text {
 
 #######################################
 # @description Print the report as a single JSON object.
+#   Strings go through the core logging escaper rather than `jq`, because a
+#   diagnostic that needs a tool the user may be missing is of no use; that
+#   escaper spells every control character, so a path or version holding one
+#   still yields valid JSON.
 # @arg $1 string Name of the array variable holding the rows
 # @arg $@ string Module names covered by the report
 # @stdout One JSON object describing the environment and every dependency
@@ -402,13 +388,13 @@ function __dybatpho_doctor_report_json {
   local version
   version=$(dybatpho::version)
   local doctor_json_escape_9
-  doctor_json_escape_9=$(__dybatpho_doctor_json_escape "${version}")
+  doctor_json_escape_9=$(__dybatpho_log_json_escape "${version}")
   printf '{"version":"%s"' "${doctor_json_escape_9}"
   local doctor_json_escape_5
-  doctor_json_escape_5=$(__dybatpho_doctor_json_escape "${DYBATPHO_DIR}")
+  doctor_json_escape_5=$(__dybatpho_log_json_escape "${DYBATPHO_DIR}")
   printf ',"directory":"%s"' "${doctor_json_escape_5}"
   local doctor_json_escape_4
-  doctor_json_escape_4=$(__dybatpho_doctor_json_escape "${BASH_VERSION}")
+  doctor_json_escape_4=$(__dybatpho_log_json_escape "${BASH_VERSION}")
   printf ',"bash":{"version":"%s","minimum":"%s","ok":%s}' \
     "${doctor_json_escape_4}" \
     "${DYBATPHO_BASH_MINIMUM}" "${bash_ok}"
@@ -416,12 +402,12 @@ function __dybatpho_doctor_report_json {
   uname=$(uname -m)
   local doctor_json_escape_7
   local doctor_json_escape_8
-  doctor_json_escape_8=$(__dybatpho_doctor_json_escape "${uname}")
+  doctor_json_escape_8=$(__dybatpho_log_json_escape "${uname}")
   doctor_json_escape_7=${doctor_json_escape_8}
   local uname_2
   uname_2=$(uname -s)
   local doctor_json_escape_11
-  doctor_json_escape_11=$(__dybatpho_doctor_json_escape "${uname_2}")
+  doctor_json_escape_11=$(__dybatpho_log_json_escape "${uname_2}")
   printf ',"platform":{"system":"%s","machine":"%s"}' \
     "${doctor_json_escape_11}" \
     "${doctor_json_escape_7}"
@@ -431,7 +417,7 @@ function __dybatpho_doctor_report_json {
     ((first)) || printf ','
     first=0
     local doctor_json_escape_3
-    doctor_json_escape_3=$(__dybatpho_doctor_json_escape "${module}")
+    doctor_json_escape_3=$(__dybatpho_log_json_escape "${module}")
     printf '"%s"' "${doctor_json_escape_3}"
   done
   printf ']'
@@ -443,13 +429,13 @@ function __dybatpho_doctor_report_json {
     ((first)) || printf ','
     first=0
     local doctor_json_escape
-    doctor_json_escape=$(__dybatpho_doctor_json_escape "${version}")
+    doctor_json_escape=$(__dybatpho_log_json_escape "${version}")
     local doctor_json_escape_2
-    doctor_json_escape_2=$(__dybatpho_doctor_json_escape "${spec}")
+    doctor_json_escape_2=$(__dybatpho_log_json_escape "${spec}")
     local doctor_json_escape_6
-    doctor_json_escape_6=$(__dybatpho_doctor_json_escape "${path}")
+    doctor_json_escape_6=$(__dybatpho_log_json_escape "${path}")
     local doctor_json_escape_10
-    doctor_json_escape_10=$(__dybatpho_doctor_json_escape "${module}")
+    doctor_json_escape_10=$(__dybatpho_log_json_escape "${module}")
     printf '{"module":"%s","dependency":"%s","kind":"%s","status":"%s","path":"%s","version":"%s"}' \
       "${doctor_json_escape_10}" \
       "${doctor_json_escape_2}" \

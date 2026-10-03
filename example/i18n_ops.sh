@@ -12,7 +12,7 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # needs a display width rather than a character count, which is what
 # `dybatpho::table_align` measures and a plain `printf '%-20s'` does not.
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules i18n table text cli
+. "${SCRIPTDIR}/../init.sh" --modules i18n date table text cli
 
 dybatpho::register_common_handlers
 

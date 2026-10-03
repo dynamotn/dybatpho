@@ -626,6 +626,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules schedule lock   # after
   ```
 
+- **BREAKING: `i18n` no longer loads `date`.** Message catalogs, plural rules,
+  numbers, money, sizes and text direction never needed it, so a script that
+  only translates no longer pays for it. `dybatpho::i18n_date`,
+  `dybatpho::i18n_time`, `dybatpho::i18n_datetime`,
+  `dybatpho::i18n_date_pattern`, and `dybatpho::i18n_relative` when it reads
+  the clock, now stop the script with `... needs the date module, load it
+  with: dybatpho::load date` when `date` is not loaded. A relative time given
+  a reference time still works without it. A script that formats dates, or
+  called `dybatpho::date_*` relying on `i18n` to load it, has to ask for it:
+
+  ```sh
+  . dybatpho/init.sh --modules i18n        # before
+  . dybatpho/init.sh --modules i18n date   # after
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

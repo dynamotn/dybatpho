@@ -1545,3 +1545,44 @@ _i18n_spec_abbr() {
   run --separate-stderr -1 dybatpho::generate_from_spec _i18n_spec_abbr --co
   assert_regex "${stderr}" "Ambiguous option: --co"
 }
+
+@test "dybatpho::i18n date and time helpers ask for the date module when it is not loaded" {
+  # `i18n` does not load `date`, so a script that only translates messages or
+  # formats numbers does not pay for it. A child shell started from a file,
+  # without the functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules i18n\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'export DYBATPHO_I18N_LOCALE=en DYBATPHO_DATE_TIMEZONE=UTC DYBATPHO_I18N_NOW=""'
+    printf '%s\n' 'dybatpho::i18n_init en'
+    printf '%s\n' 'dybatpho::i18n_number 1234.5'
+    printf '%s\n' "dybatpho::\${1} ${FIXED_EPOCH} \${2-}"
+  } > "${script}"
+
+  local fn
+  for fn in i18n_date i18n_time i18n_datetime; do
+    run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${fn}"
+    assert_failure
+    assert_line --index 0 "1,234.5"
+    assert_output --partial "dybatpho::${fn} needs the date module, load it with: dybatpho::load date"
+  done
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" i18n_date_pattern "{yyyy}"
+  assert_failure
+  assert_output --partial "dybatpho::i18n_date_pattern needs the date module"
+
+  # A relative time against a reference needs no clock, and so no `date`.
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" i18n_relative "$((FIXED_EPOCH + 259200))"
+  assert_success
+  assert_line --index 1 "3 days ago"
+  # Without one it reads the clock, which is the `date` module's job.
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" i18n_relative
+  assert_failure
+  assert_output --partial "dybatpho::i18n_relative needs the date module"
+
+  # Once the script loads it, the same calls format.
+  sed -i 's/--modules i18n$/--modules i18n date/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" i18n_date
+  assert_success
+  assert_line --index 1 "Feb 29, 2024"
+}

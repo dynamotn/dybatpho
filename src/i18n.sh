@@ -25,6 +25,9 @@
 #   silently answers in English. A localization library that returns the wrong
 #   language rather than an error is worse than useless, so the only thing
 #   `date` is asked for is the numeric calendar fields, under `LC_ALL=C`.
+#   Those fields, and the clock, come from the `date` module, which this one
+#   does not load: a script formatting dates or times loads it too, and the
+#   date and time helpers stop with a message naming it when it is missing.
 #
 #   Fractional values are rendered by manipulating digit strings, never through
 #   `printf '%f'`. That conversion follows `LC_NUMERIC`, so on a machine with a
@@ -35,6 +38,7 @@
 #
 #   Catalogs are read from a dependency-free `key = value` format and from GNU
 #   gettext `.po` files. Nothing here needs `jq`, `gettext`, `bc`, or `awk`.
+# @tip Load `date` as well to format dates and times: `--modules i18n date`
 # @see
 #   - `example/i18n_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -1971,6 +1975,26 @@ function dybatpho::i18n_weekday_name {
 }
 
 #######################################
+# @description Stop unless the `date` module is loaded.
+#   Formatting a timestamp reads its calendar fields through `date`, and so
+#   does reading the clock. Message catalogs, plurals, numbers and text
+#   direction need neither, so `date` is not a dependency of the module and
+#   the functions that need it ask for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `date`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `date` module is not loaded
+# @internal
+#######################################
+function __dybatpho_i18n_need_date {
+  declare -F __dybatpho_date_parse > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the date module, load it with: dybatpho::load date"
+}
+
+#######################################
 # @description Read the numeric calendar fields of a timestamp.
 #   This is the only place the module runs `date`, and it asks only for numbers,
 #   which are the same in every locale. `LC_ALL=C` is scoped to the function and
@@ -1989,8 +2013,6 @@ function __dybatpho_i18n_date_fields {
   local -n __fields_out="${__fields_target}"
   [[ "${__fields_stamp}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[1]}: Timestamp must be an integer, got '${__fields_stamp}'"
-  dybatpho::is function dybatpho::date_format \
-    || dybatpho::die "${FUNCNAME[1]}: The 'date' module is required for date formatting"
   local LC_ALL=C
   local raw
   raw="$(dybatpho::date_format "${__fields_stamp}" "%Y %m %d %H %M %S %u")" \
@@ -2155,6 +2177,7 @@ function __dybatpho_i18n_pattern {
 function dybatpho::i18n_date {
   local timestamp
   dybatpho::expect_args timestamp -- "$@"
+  __dybatpho_i18n_need_date
   local style="${2:-medium}"
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
@@ -2185,6 +2208,7 @@ function dybatpho::i18n_date {
 function dybatpho::i18n_time {
   local timestamp
   dybatpho::expect_args timestamp -- "$@"
+  __dybatpho_i18n_need_date
   local style="${2:-short}"
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
@@ -2208,6 +2232,7 @@ function dybatpho::i18n_time {
 function dybatpho::i18n_datetime {
   local timestamp
   dybatpho::expect_args timestamp -- "$@"
+  __dybatpho_i18n_need_date
   local style="${2:-medium}"
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
@@ -2253,6 +2278,7 @@ function dybatpho::i18n_datetime {
 function dybatpho::i18n_date_pattern {
   local timestamp pattern
   dybatpho::expect_args timestamp pattern -- "$@"
+  __dybatpho_i18n_need_date
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
   local -a fields=()
@@ -2358,6 +2384,7 @@ function dybatpho::i18n_relative {
     if [[ -n "${DYBATPHO_I18N_NOW}" ]]; then
       now="${DYBATPHO_I18N_NOW}"
     else
+      __dybatpho_i18n_need_date
       now="$(dybatpho::date_now)"
     fi
   fi

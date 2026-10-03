@@ -139,6 +139,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - A script compares backups without having loaded the `diff` module.
 - The source does not exist, or the destination has to be created.
 - Two backups are taken within the same second.
+- Something takes the chosen name, or the name of its sidecar, after the name is chosen and before the backup is moved there.
 - Ten or more backups are taken within the same second, so a suffix of `-10` sits beside `-2`, and the caller's collation orders `-1.` before or after `.`.
 - The archiver fails partway through.
 - A backup has no checksum sidecar, or does not match the one it has.
@@ -192,6 +193,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-032**: A comparison MUST accept a snapshot on either side, verified before it is read.
 - **FR-033**: Listing, resolving the latest and pruning MUST order backups by name, then UTC stamp, then same-second suffix compared as a number, archives and snapshots together, independently of the caller's collation.
 - **FR-034**: Loading the module MUST NOT load `diff`. A comparison MUST stop the script, naming the `diff` module and how to load it, when that module is not loaded, before any backup is verified or extracted; every other operation MUST work without it.
+- **FR-035**: A backup MUST appear under its final name only once its complete sidecar is beside it, the sidecar MUST be written under a hidden name and renamed into place, and the name MUST be claimed through its sidecar so that a name taken meanwhile -- by a file, a directory or another run -- is skipped for the next suffix rather than overwritten or entered.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -252,6 +254,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-038**: Take two snapshots in the same second under distinct names.
 - **IT-039**: List archives and a snapshot taken in the same second newest first by suffix, `-10` before `-2` and `-1` before the unsuffixed name, under C collation and the session's own.
 - **IT-040**: In a script that loaded `backup` alone, verify an archive, have a comparison stop and name the `diff` module, and compare once `diff` is loaded.
+- **IT-041**: With the clock frozen, take a backup while the unsuffixed sidecar name is held, and while a directory appears at the chosen archive or snapshot name before the move, verifying the backup lands under the next suffix, verifies, and leaves the squatting directory empty.
 
 ## Acceptance Criteria *(mandatory)*
 

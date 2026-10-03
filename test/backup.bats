@@ -77,6 +77,70 @@ plant() {
   assert_file_exist "${second}"
 }
 
+@test "dybatpho::backup_create never shows a backup without its complete sidecar" {
+  # The backup used to be moved into place first and its sidecar written after,
+  # with a plain redirection. When that write failed -- here because something
+  # already holds the sidecar's name -- the backup stayed listed with no
+  # sidecar, and every later verify, restore and comparison refused it.
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+  mkdir -p "${DEST}/snap-20260101T000000Z.tar.gz.sha256"
+
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+  assert_equal "${archive}" "${DEST}/snap-20260101T000000Z-1.tar.gz"
+
+  local -a listed=()
+  mapfile -t listed < <(dybatpho::backup_list "${DEST}" snap)
+  assert_equal "${#listed[@]}" "1"
+  run_traced dybatpho::backup_verify "${listed[0]}"
+  assert_success
+  # The sidecar was written whole under a hidden name and renamed into place.
+  run_traced find "${DEST}" -name '.*partial*'
+  assert_output ""
+}
+
+@test "dybatpho::backup_create takes another name when its own is taken before the move" {
+  # The free name was chosen first and the backup moved there afterwards. A
+  # directory that appeared at that name in between swallowed the archive,
+  # which `mv` moved inside it, and the path printed was the directory.
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+  eval "__test_file_hash() $(declare -f dybatpho::file_hash | tail -n +2)"
+  # shellcheck disable=SC2329 # invoked by backup_create
+  dybatpho::file_hash() {
+    mkdir -p "${DEST}/snap-20260101T000000Z.tar.gz"
+    __test_file_hash "$@"
+  }
+
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+  assert_equal "${archive}" "${DEST}/snap-20260101T000000Z-1.tar.gz"
+  [[ -f "${archive}" ]]
+  run_traced find "${DEST}/snap-20260101T000000Z.tar.gz" -mindepth 1
+  assert_output ""
+}
+
+@test "dybatpho::backup_create --incremental takes another name when its own is taken" {
+  # A directory move onto a name that turned into a directory lands inside it,
+  # so a snapshot published there would have been nested a level too deep.
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+  eval "__test_tree_hash_into() $(declare -f __dybatpho_backup_tree_hash_into | tail -n +2)"
+  # shellcheck disable=SC2329 # invoked by backup_create
+  __dybatpho_backup_tree_hash_into() {
+    mkdir -p "${DEST}/snap-20260101T000000Z.snapshot"
+    __test_tree_hash_into "$@"
+  }
+
+  local snapshot
+  snapshot="$(dybatpho::backup_create --incremental "${SOURCE}" "${DEST}" snap)"
+  assert_equal "${snapshot}" "${DEST}/snap-20260101T000000Z-1.snapshot"
+  assert_file_exist "${snapshot}/source/a.txt"
+  run_traced find "${DEST}/snap-20260101T000000Z.snapshot" -mindepth 1
+  assert_output ""
+  eval "__dybatpho_backup_tree_hash_into() $(declare -f __test_tree_hash_into | tail -n +2)"
+  run_traced dybatpho::backup_verify "${snapshot}"
+  assert_success
+}
+
 @test "dybatpho::backup_verify accepts an intact backup and reports a corrupted one" {
   local archive
   archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"

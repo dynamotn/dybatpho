@@ -194,6 +194,87 @@ function __dybatpho_backup_sidecar {
 }
 
 #######################################
+# @description Move a finished backup into place under a free name, with its
+#   complete sidecar already beside it, and set a variable to the final path.
+#   The sidecar's name is claimed first, exclusively, so two runs that pick the
+#   same name cannot both take it. Its contents are written under a hidden name
+#   and renamed over the claim, all before the backup itself appears: a listed
+#   backup always has a sidecar that `dybatpho::backup_verify` can read. The
+#   backup is then moved without ever landing on a name that something else
+#   took meanwhile. An archive is hard-linked into place, which fails rather
+#   than replacing anything, and a snapshot directory that a plain `mv` dropped
+#   inside a directory that appeared at its name is taken back out. Either way
+#   the next suffix is tried.
+# @arg $1 string Name of the variable receiving the final path
+# @arg $2 string The finished backup, under its hidden temporary name
+# @arg $3 string Destination directory
+# @arg $4 string Backup name
+# @arg $5 string Timestamp for the name
+# @arg $6 string What follows the name: the archive extension, or `snapshot`
+# @arg $7 string Checksum to record in the sidecar
+# @set The named variable
+# @exitcode 1 The backup could not be moved into place
+# @internal
+#######################################
+function __dybatpho_backup_publish_into {
+  local -n __dybatpho_backup_final_ref="$1"
+  local __dybatpho_backup_partial="$2" __dybatpho_backup_dest="$3"
+  local __dybatpho_backup_label="$4-$5" __dybatpho_backup_kind="$6" __dybatpho_backup_sum="$7"
+  local __dybatpho_backup_final __dybatpho_backup_side __dybatpho_backup_staged
+  local __dybatpho_backup_suffix=0
+
+  while ((__dybatpho_backup_suffix < 10000)); do
+    __dybatpho_backup_final="${__dybatpho_backup_dest}/${__dybatpho_backup_label}"
+    ((__dybatpho_backup_suffix == 0)) || __dybatpho_backup_final+="-${__dybatpho_backup_suffix}"
+    __dybatpho_backup_final+=".${__dybatpho_backup_kind}"
+    __dybatpho_backup_suffix=$((__dybatpho_backup_suffix + 1))
+    __dybatpho_backup_side="$(__dybatpho_backup_sidecar "${__dybatpho_backup_final}")"
+
+    (set -C && : > "${__dybatpho_backup_side}") 2> /dev/null || continue
+    if [[ ! -f "${__dybatpho_backup_side}" || -L "${__dybatpho_backup_side}" ]] \
+      || dybatpho::is exist "${__dybatpho_backup_final}" || [[ -L "${__dybatpho_backup_final}" ]]; then
+      [[ ! -f "${__dybatpho_backup_side}" || -L "${__dybatpho_backup_side}" ]] \
+        || rm -f -- "${__dybatpho_backup_side}"
+      continue
+    fi
+
+    __dybatpho_backup_staged="${__dybatpho_backup_dest}/.${__dybatpho_backup_final##*/}.$$.partial"
+    __dybatpho_backup_staged+=".${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}"
+    if ! printf '%s  %s\n' "${__dybatpho_backup_sum}" "${__dybatpho_backup_final##*/}" \
+      > "${__dybatpho_backup_staged}" \
+      || ! mv -f -- "${__dybatpho_backup_staged}" "${__dybatpho_backup_side}"; then
+      rm -f -- "${__dybatpho_backup_staged}" "${__dybatpho_backup_side}" # kcov(skip)
+      return 1                                                        # kcov(skip)
+    fi
+
+    if [[ -d "${__dybatpho_backup_partial}" ]]; then
+      if ! mv -- "${__dybatpho_backup_partial}" "${__dybatpho_backup_final}"; then
+        rm -f -- "${__dybatpho_backup_side}" # kcov(skip)
+        return 1                             # kcov(skip)
+      fi
+      if [[ -e "${__dybatpho_backup_final}/${__dybatpho_backup_partial##*/}" ]]; then
+        mv -- "${__dybatpho_backup_final}/${__dybatpho_backup_partial##*/}" "${__dybatpho_backup_partial}"
+        rm -f -- "${__dybatpho_backup_side}"
+        continue
+      fi
+    elif ln -- "${__dybatpho_backup_partial}" "${__dybatpho_backup_final}" 2> /dev/null; then
+      rm -f -- "${__dybatpho_backup_partial}"
+    elif dybatpho::is exist "${__dybatpho_backup_final}"; then
+      rm -f -- "${__dybatpho_backup_side}"
+      continue
+    elif ! mv -- "${__dybatpho_backup_partial}" "${__dybatpho_backup_final}"; then
+      # A filesystem without hard links still takes the plain rename.
+      rm -f -- "${__dybatpho_backup_side}" # kcov(skip)
+      return 1                             # kcov(skip)
+    fi
+
+    __dybatpho_backup_final_ref="${__dybatpho_backup_final}"
+    return 0
+  done
+  return 1 # kcov(skip)
+}
+
+#######################################
 # @description Fingerprint a snapshot tree into a named variable.
 #   Every entry is recorded as its kind, its path, and what identifies its
 #   content -- a file's checksum, a link's target -- in bytewise path order,
@@ -347,13 +428,6 @@ function __dybatpho_backup_snapshot {
   source="${source_dir%/}/${base}"
   destination="$(cd -- "${destination}" && pwd -P)"
 
-  local final="${destination}/${name}-${stamp}.snapshot"
-  local suffix=1
-  while dybatpho::is exist "${final}"; do
-    final="${destination}/${name}-${stamp}-${suffix}.snapshot"
-    suffix=$((suffix + 1))
-  done
-
   local -a previous=()
   __dybatpho_backup_collect_into previous "${destination}" "${name}" snapshot
   local link_dest=""
@@ -372,9 +446,12 @@ function __dybatpho_backup_snapshot {
   local checksum
   __dybatpho_backup_tree_hash_into checksum "${partial}"
 
-  mv -- "${partial}" "${final}"
-  printf '%s  %s\n' "${checksum}" "$(dybatpho::path_basename "${final}")" \
-    > "$(__dybatpho_backup_sidecar "${final}")"
+  local final
+  if ! __dybatpho_backup_publish_into final "${partial}" "${destination}" "${name}" "${stamp}" \
+    snapshot "${checksum}"; then
+    rm -rf -- "${partial}"                                                  # kcov(skip)
+    dybatpho::die "${caller}: Could not store the snapshot in: ${destination}" # kcov(skip)
+  fi
 
   printf '%s\n' "${final}"
 }
@@ -433,16 +510,6 @@ function dybatpho::backup_create {
     return
   fi
 
-  final="${destination}/${name}-${stamp}.${DYBATPHO_BACKUP_EXTENSION}"
-
-  # Two backups of the same source within one second would otherwise overwrite
-  # each other, and the second would look like the only one ever taken.
-  local suffix=1
-  while dybatpho::is exist "${final}"; do
-    final="${destination}/${name}-${stamp}-${suffix}.${DYBATPHO_BACKUP_EXTENSION}"
-    suffix=$((suffix + 1))
-  done
-
   # The temporary lives in the destination so the rename stays on one
   # filesystem, which is what makes it atomic. It keeps the real extension,
   # because `archive.sh` reads the format from it, and it starts with a dot,
@@ -457,9 +524,14 @@ function dybatpho::backup_create {
   local checksum
   checksum="$(dybatpho::file_hash "${partial}" "${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}")"
 
-  mv -- "${partial}" "${final}"
-  printf '%s  %s\n' "${checksum}" "$(dybatpho::path_basename "${final}")" \
-    > "$(__dybatpho_backup_sidecar "${final}")"
+  # Two backups of the same source within one second would otherwise overwrite
+  # each other, and the second would look like the only one ever taken, so the
+  # name gets a suffix when it is taken.
+  if ! __dybatpho_backup_publish_into final "${partial}" "${destination}" "${name}" "${stamp}" \
+    "${DYBATPHO_BACKUP_EXTENSION}" "${checksum}"; then
+    rm -f -- "${partial}"                                                         # kcov(skip)
+    dybatpho::die "${FUNCNAME[0]}: Could not store the backup in: ${destination}" # kcov(skip)
+  fi
 
   printf '%s\n' "${final}"
 }

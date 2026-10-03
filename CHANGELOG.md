@@ -843,6 +843,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::table_box`, `dybatpho::table_align` and the other renderers.
   Colour now counts for nothing, and cells are measured exactly as `text`
   measures a line.
+- **`backup` — a backup is never listed without its sidecar, and never lands
+  inside something that took its name.** `dybatpho::backup_create` picked a
+  free name, moved the archive there, and only then wrote the checksum sidecar
+  with a plain redirection: a write that failed left a backup that every
+  verify and restore refused, and a directory that appeared at the name in the
+  meantime swallowed the archive. The sidecar is now claimed first, written
+  whole and renamed into place before the backup appears, and a name taken
+  meanwhile moves the backup on to the next suffix. `--incremental` snapshots
+  are published the same way.
 
 ### Security
 

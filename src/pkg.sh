@@ -94,22 +94,63 @@ declare -gA __dybatpho_pkg_binary=(
 )
 
 #######################################
-# @description Print the managers to probe, most specific to this platform first.
-# @noargs
-# @stdout One manager name per line
+# @description Fill an array with the managers to probe, most specific to this
+#   platform first.
+# @arg $1 string Name of the array variable to fill
+# @set The named array
 # @internal
 #######################################
-function __dybatpho_pkg_detection_order {
-  local platform
-  platform="$(dybatpho::platform)"
-  case "${platform}" in
+function __dybatpho_pkg_detection_order_into {
+  local -n __dybatpho_pkg_order_ref="$1"
+  local __dybatpho_pkg_platform
+  __dybatpho_pkg_platform="$(dybatpho::platform)"
+  case "${__dybatpho_pkg_platform}" in
     # Homebrew is the only one of the six that is at home on macOS.
-    darwin) printf '%s\n' brew ;;
+    darwin) __dybatpho_pkg_order_ref=(brew) ;;
     # A Linux box may also carry Homebrew, but the distribution manager owns the
     # system packages, so it is probed first.
-    linux) printf '%s\n' apt dnf pacman apk emerge brew ;;
-    *) printf '%s\n' brew apt dnf pacman apk emerge ;;
+    linux) __dybatpho_pkg_order_ref=(apt dnf pacman apk emerge brew) ;;
+    *) __dybatpho_pkg_order_ref=(brew apt dnf pacman apk emerge) ;;
   esac
+}
+
+#######################################
+# @description Detect the package manager once, into a variable, for the
+#   functions that act on several packages. Detection probes up to six commands
+#   and asks for the platform; resolving it per package is what made a check of
+#   twenty packages cost a couple of hundred processes.
+#
+#   An unsupported `DYBATPHO_PKG_MANAGER` is reported the way the callers have
+#   always reported it: through a subshell, so the message is printed and the
+#   caller sees a failure it decides how to handle, rather than its script
+#   stopping where it used to carry on. Only that error path pays for the fork.
+# @arg $1 string Name of the variable receiving the manager
+# @set The named variable
+# @exitcode 0 A supported manager was found
+# @exitcode 1 None is installed, or the override is not a supported manager
+# @internal
+#######################################
+function __dybatpho_pkg_manager_into {
+  local -n __dybatpho_pkg_manager_ref="$1"
+  if [[ -n "${DYBATPHO_PKG_MANAGER}" ]]; then
+    if [[ -z "${__dybatpho_pkg_binary[${DYBATPHO_PKG_MANAGER}]-}" ]]; then
+      (__dybatpho_pkg_assert_manager "${DYBATPHO_PKG_MANAGER}" "dybatpho::pkg_manager")
+      return 1
+    fi
+    __dybatpho_pkg_manager_ref="${DYBATPHO_PKG_MANAGER}"
+    return 0
+  fi
+  local -a __dybatpho_pkg_candidates=()
+  __dybatpho_pkg_detection_order_into __dybatpho_pkg_candidates
+  local __dybatpho_pkg_candidate
+  for __dybatpho_pkg_candidate in "${__dybatpho_pkg_candidates[@]}"; do
+    if dybatpho::is command "${__dybatpho_pkg_binary[${__dybatpho_pkg_candidate}]}"; then
+      __dybatpho_pkg_manager_ref="${__dybatpho_pkg_candidate}"
+      return 0
+    fi
+  done
+  dybatpho::debug "No supported package manager found on this machine"
+  return 1
 }
 
 #######################################
@@ -131,45 +172,49 @@ function __dybatpho_pkg_assert_manager {
 }
 
 #######################################
-# @description Print the privilege escalation prefix for a manager, one word per line.
-# @arg $1 string Manager name
-# @stdout `sudo` when elevation is needed, nothing otherwise
+# @description Fill an array with the privilege escalation prefix for a manager.
+# @arg $1 string Name of the array variable to fill
+# @arg $2 string Manager name
+# @set The named array: `sudo` when elevation is needed, empty otherwise
 # @env DYBATPHO_PKG_SUDO string `auto` elevates when not root, `true`/`false` override the detection
 # @internal
 #######################################
-function __dybatpho_pkg_privilege {
-  local manager
-  dybatpho::expect_args manager -- "$@"
+function __dybatpho_pkg_privilege_into {
+  local -n __dybatpho_pkg_privilege_ref="$1"
+  local __dybatpho_pkg_privilege_manager="$2"
+  __dybatpho_pkg_privilege_ref=()
   # Homebrew refuses to run under sudo, so it never gets a prefix.
-  [[ "${manager}" != "brew" ]] || return 0
+  [[ "${__dybatpho_pkg_privilege_manager}" != "brew" ]] || return 0
   case "${DYBATPHO_PKG_SUDO}" in
     auto | '')
       ! dybatpho::is_root || return 0
       dybatpho::is command sudo || return 0
-      printf '%s\n' sudo
+      __dybatpho_pkg_privilege_ref=(sudo)
       ;;
     *)
-      dybatpho::is true "${DYBATPHO_PKG_SUDO}" && printf '%s\n' sudo
+      dybatpho::is true "${DYBATPHO_PKG_SUDO}" && __dybatpho_pkg_privilege_ref=(sudo)
       ;;
   esac
   return 0
 }
 
 #######################################
-# @description Print the non-interactive flags a manager needs, one word per line.
-# @arg $1 string Manager name
-# @stdout Zero or more flags
-# @env DYBATPHO_PKG_ASSUME_YES bool Set to `false` to print nothing
+# @description Fill an array with the non-interactive flags a manager needs.
+# @arg $1 string Name of the array variable to fill
+# @arg $2 string Manager name
+# @set The named array: zero or more flags
+# @env DYBATPHO_PKG_ASSUME_YES bool Set to `false` to leave it empty
 # @internal
 #######################################
-function __dybatpho_pkg_assume_yes_flags {
-  local manager
-  dybatpho::expect_args manager -- "$@"
+function __dybatpho_pkg_assume_yes_into {
+  local -n __dybatpho_pkg_assume_ref="$1"
+  local __dybatpho_pkg_assume_manager="$2"
+  __dybatpho_pkg_assume_ref=()
   dybatpho::is true "${DYBATPHO_PKG_ASSUME_YES}" || return 0
-  case "${manager}" in
-    apt | dnf) printf '%s\n' -y ;;
-    pacman) printf '%s\n' --noconfirm ;;
-    emerge) printf '%s\n' --ask=n ;;
+  case "${__dybatpho_pkg_assume_manager}" in
+    apt | dnf) __dybatpho_pkg_assume_ref=(-y) ;;
+    pacman) __dybatpho_pkg_assume_ref=(--noconfirm) ;;
+    emerge) __dybatpho_pkg_assume_ref=(--ask=n) ;;
     # `apk add` and `brew install` never prompt.
     *) ;;
   esac
@@ -177,67 +222,69 @@ function __dybatpho_pkg_assume_yes_flags {
 }
 
 #######################################
-# @description Print the command for an action, one word per line.
-# @arg $1 string Manager name
-# @arg $2 string Action, `install` or `update`
+# @description Fill an array with the command for an action.
+# @arg $1 string Name of the array variable to fill
+# @arg $2 string Manager name
+# @arg $3 string Action, `install` or `update`
 # @arg $@ string Extra manager arguments, then `--` and the packages of the `install` action
-# @stdout The command and its arguments, one word per line
+# @set The named array: the command and its arguments
 # @internal
 #######################################
-function __dybatpho_pkg_action_command {
-  local manager action
-  dybatpho::expect_args manager action -- "$@"
-  shift 2
+function __dybatpho_pkg_action_command_into {
+  local -n __dybatpho_pkg_cmd_ref="$1"
+  local __dybatpho_pkg_cmd_manager="$2" __dybatpho_pkg_cmd_action="$3"
+  shift 3
   # Everything before `--` is a flag for the manager itself, everything after
   # it is a package name.
-  local -a extra_args=() packages=()
+  local -a __dybatpho_pkg_cmd_extra=() __dybatpho_pkg_cmd_packages=()
   while (($#)); do
     if [[ "$1" == "--" ]]; then
       shift
-      packages+=("$@")
+      __dybatpho_pkg_cmd_packages+=("$@")
       break
     fi
-    extra_args+=("$1")
+    __dybatpho_pkg_cmd_extra+=("$1")
     shift
   done
-  local -a command_parts=()
-  mapfile -t command_parts < <(__dybatpho_pkg_privilege "${manager}")
-  local -a assume_yes=()
-  mapfile -t assume_yes < <(__dybatpho_pkg_assume_yes_flags "${manager}")
+  __dybatpho_pkg_privilege_into __dybatpho_pkg_cmd_ref "${__dybatpho_pkg_cmd_manager}"
+  local -a __dybatpho_pkg_cmd_yes=()
+  __dybatpho_pkg_assume_yes_into __dybatpho_pkg_cmd_yes "${__dybatpho_pkg_cmd_manager}"
 
-  case "${action}" in
+  case "${__dybatpho_pkg_cmd_action}" in
     install)
-      case "${manager}" in
+      case "${__dybatpho_pkg_cmd_manager}" in
         # `apt-get` drives debconf, which opens a dialog on some packages unless
         # the frontend is told that nobody is watching.
-        apt) command_parts+=(env DEBIAN_FRONTEND=noninteractive apt-get install "${assume_yes[@]}") ;;
-        brew) command_parts+=(brew install) ;;
-        apk) command_parts+=(apk add) ;;
-        dnf) command_parts+=(dnf install "${assume_yes[@]}") ;;
+        apt)
+          __dybatpho_pkg_cmd_ref+=(env DEBIAN_FRONTEND=noninteractive apt-get install
+            "${__dybatpho_pkg_cmd_yes[@]}")
+          ;;
+        brew) __dybatpho_pkg_cmd_ref+=(brew install) ;;
+        apk) __dybatpho_pkg_cmd_ref+=(apk add) ;;
+        dnf) __dybatpho_pkg_cmd_ref+=(dnf install "${__dybatpho_pkg_cmd_yes[@]}") ;;
         # `--needed` keeps an already installed package from being reinstalled.
-        pacman) command_parts+=(pacman -S --needed "${assume_yes[@]}") ;;
-        emerge) command_parts+=(emerge --noreplace "${assume_yes[@]}") ;;
+        pacman) __dybatpho_pkg_cmd_ref+=(pacman -S --needed "${__dybatpho_pkg_cmd_yes[@]}") ;;
+        emerge) __dybatpho_pkg_cmd_ref+=(emerge --noreplace "${__dybatpho_pkg_cmd_yes[@]}") ;;
         *) ;;
       esac
-      command_parts+=("${extra_args[@]}" "${packages[@]}")
+      __dybatpho_pkg_cmd_ref+=("${__dybatpho_pkg_cmd_extra[@]}" "${__dybatpho_pkg_cmd_packages[@]}")
       ;;
     update)
       # Only `pacman -Sy` prompts while refreshing an index, so it is the one
       # refresh that carries the non-interactive flag.
-      case "${manager}" in
-        apt) command_parts+=(apt-get update) ;;
-        brew) command_parts+=(brew update) ;;
-        apk) command_parts+=(apk update) ;;
-        dnf) command_parts+=(dnf makecache) ;;
-        pacman) command_parts+=(pacman -Sy "${assume_yes[@]}") ;;
-        emerge) command_parts+=(emerge --sync) ;;
+      case "${__dybatpho_pkg_cmd_manager}" in
+        apt) __dybatpho_pkg_cmd_ref+=(apt-get update) ;;
+        brew) __dybatpho_pkg_cmd_ref+=(brew update) ;;
+        apk) __dybatpho_pkg_cmd_ref+=(apk update) ;;
+        dnf) __dybatpho_pkg_cmd_ref+=(dnf makecache) ;;
+        pacman) __dybatpho_pkg_cmd_ref+=(pacman -Sy "${__dybatpho_pkg_cmd_yes[@]}") ;;
+        emerge) __dybatpho_pkg_cmd_ref+=(emerge --sync) ;;
         *) ;;
       esac
-      command_parts+=("${extra_args[@]}")
+      __dybatpho_pkg_cmd_ref+=("${__dybatpho_pkg_cmd_extra[@]}")
       ;;
-    *) dybatpho::die "__dybatpho_pkg_action_command: unknown action '${action}'" ;;
+    *) dybatpho::die "__dybatpho_pkg_action_command_into: unknown action '${__dybatpho_pkg_cmd_action}'" ;;
   esac
-  printf '%s\n' "${command_parts[@]}"
 }
 
 #######################################
@@ -298,22 +345,12 @@ function dybatpho::pkg_supported {
 # @env DYBATPHO_PKG_MANAGER string When set, this manager is reported without probing
 #######################################
 function dybatpho::pkg_manager {
-  if [[ -n "${DYBATPHO_PKG_MANAGER}" ]]; then
-    __dybatpho_pkg_assert_manager "${DYBATPHO_PKG_MANAGER}" "dybatpho::pkg_manager"
-    printf '%s\n' "${DYBATPHO_PKG_MANAGER}"
-    return 0
-  fi
+  # Called directly, an unsupported override stops the script, as it always has.
+  [[ -z "${DYBATPHO_PKG_MANAGER}" ]] \
+    || __dybatpho_pkg_assert_manager "${DYBATPHO_PKG_MANAGER}" "dybatpho::pkg_manager"
   local manager
-  local pkg_detection_order_output
-  pkg_detection_order_output=$(__dybatpho_pkg_detection_order)
-  while IFS= read -r manager || [[ -n "${manager}" ]]; do
-    if dybatpho::is command "${__dybatpho_pkg_binary[${manager}]}"; then
-      printf '%s\n' "${manager}"
-      return 0
-    fi
-  done < <(printf '%s' "${pkg_detection_order_output}")
-  dybatpho::debug "No supported package manager found on this machine"
-  return 1
+  __dybatpho_pkg_manager_into manager || return 1
+  printf '%s\n' "${manager}"
 }
 
 #######################################
@@ -325,7 +362,7 @@ function dybatpho::pkg_manager {
 function dybatpho::pkg_manager_available {
   local manager="${1:-}"
   if [[ -z "${manager}" ]]; then
-    manager="$(dybatpho::pkg_manager)" || return 1
+    __dybatpho_pkg_manager_into manager || return 1
   fi
   __dybatpho_pkg_assert_manager "${manager}" "dybatpho::pkg_manager_available"
   dybatpho::is command "${__dybatpho_pkg_binary[${manager}]}"
@@ -347,7 +384,7 @@ function dybatpho::pkg_name {
   dybatpho::expect_args default_name -- "$@"
   shift
   local manager
-  manager="$(dybatpho::pkg_manager)" || return 1
+  __dybatpho_pkg_manager_into manager || return 1
   local override
   for override in "$@"; do
     [[ "${override}" == *:* ]] \
@@ -371,7 +408,21 @@ function dybatpho::pkg_installed {
   local package
   dybatpho::expect_args package -- "$@"
   local manager
-  manager="$(dybatpho::pkg_manager)" || return 1
+  __dybatpho_pkg_manager_into manager || return 1
+  __dybatpho_pkg_installed_with "${manager}" "${package}"
+}
+
+#######################################
+# @description Return success when a package is installed, according to a
+#   manager the caller already detected.
+# @arg $1 string Manager name
+# @arg $2 string Package name
+# @exitcode 0 The package is installed
+# @exitcode 1 The package is missing
+# @internal
+#######################################
+function __dybatpho_pkg_installed_with {
+  local manager="$1" package="$2"
   local query=""
   # shellcheck disable=SC2312 # `dpkg-query` failing is how an unknown package answers
   case "${manager}" in
@@ -418,10 +469,16 @@ function dybatpho::pkg_installed {
 #######################################
 function dybatpho::pkg_missing {
   (($#)) || dybatpho::die "dybatpho::pkg_missing: expected at least one package"
-  dybatpho::pkg_manager > /dev/null || return 1
+  # An unsupported override stops the script here, as the direct call to
+  # `dybatpho::pkg_manager` this replaces did.
+  [[ -z "${DYBATPHO_PKG_MANAGER}" ]] \
+    || __dybatpho_pkg_assert_manager "${DYBATPHO_PKG_MANAGER}" "dybatpho::pkg_manager"
+  # Detected once for the whole list, not once per package.
+  local manager
+  __dybatpho_pkg_manager_into manager || return 1
   local package
   for package in "$@"; do
-    dybatpho::pkg_installed "${package}" || printf '%s\n' "${package}"
+    __dybatpho_pkg_installed_with "${manager}" "${package}" || printf '%s\n' "${package}"
   done
 }
 
@@ -459,10 +516,9 @@ function dybatpho::pkg_install_command {
   done
   ((${#packages[@]})) || dybatpho::die "dybatpho::pkg_install_command: expected at least one package"
   local manager
-  manager="$(dybatpho::pkg_manager)" || return 1
+  __dybatpho_pkg_manager_into manager || return 1
   local -a command_parts=()
-  mapfile -t command_parts \
-    < <(__dybatpho_pkg_action_command "${manager}" install "${extra_args[@]}" -- "${packages[@]}")
+  __dybatpho_pkg_action_command_into command_parts "${manager}" install "${extra_args[@]}" -- "${packages[@]}"
   printf '%s' "${command_parts[0]}"
   printf ' %s' "${command_parts[@]:1}"
   printf '\n'
@@ -495,10 +551,10 @@ function dybatpho::pkg_update {
     shift
   done
   local manager
-  manager="$(dybatpho::pkg_manager)" \
+  __dybatpho_pkg_manager_into manager \
     || dybatpho::die "dybatpho::pkg_update: no supported package manager found"
   local -a command_parts=()
-  mapfile -t command_parts < <(__dybatpho_pkg_action_command "${manager}" update "${extra_args[@]}")
+  __dybatpho_pkg_action_command_into command_parts "${manager}" update "${extra_args[@]}"
 
   # A dry run changes nothing, so there is nothing to confirm.
   if ! dybatpho::is true "${dry_run}" \
@@ -557,11 +613,10 @@ function dybatpho::pkg_install {
   done
   ((${#packages[@]})) || dybatpho::die "dybatpho::pkg_install: expected at least one package"
   local manager
-  manager="$(dybatpho::pkg_manager)" \
+  __dybatpho_pkg_manager_into manager \
     || dybatpho::die "dybatpho::pkg_install: no supported package manager found"
   local -a command_parts=()
-  mapfile -t command_parts \
-    < <(__dybatpho_pkg_action_command "${manager}" install "${extra_args[@]}" -- "${packages[@]}")
+  __dybatpho_pkg_action_command_into command_parts "${manager}" install "${extra_args[@]}" -- "${packages[@]}"
 
   # A dry run changes nothing, so there is nothing to confirm.
   if ! dybatpho::is true "${dry_run}" \

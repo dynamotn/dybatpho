@@ -304,9 +304,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed on exit, so nothing in the backup directory or the source is
   written, and a backup that fails either check stops the call with exit
   code 2. The source's own name is not compared, so a backup of `/etc/nginx`
-  lines up with a copy restored anywhere else.
+  lines up with a copy restored anywhere else. The comparison is the `diff`
+  module's, which `backup` does not load, so a script that compares backups
+  loads it too; without it the call stops with a message naming it.
 
   ```sh
+  . dybatpho/init.sh --modules backup diff
   dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
   dybatpho::backup_diff --summary "${older}" "${newer}"   # +1 -0 ~2
   ```

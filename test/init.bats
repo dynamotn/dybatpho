@@ -134,9 +134,9 @@ loaded_line() {
   run_traced -0 init_sh "--modules csv" "$(loaded_line)"
   assert_output "string os logging helpers process file secret math csv "
 
-  # `backup_diff` compares two snapshots through `diff_dir`.
+  # `backup_diff` compares through `diff_dir` only when the script loaded `diff`.
   run_traced -0 init_sh "--modules backup" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret archive validate cli safety date diff backup "
+  assert_output "string os logging helpers process file secret archive validate cli safety date backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
   assert_output "string os logging helpers process file secret network json cache ai "

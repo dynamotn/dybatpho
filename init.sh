@@ -92,7 +92,7 @@ export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 declare -A __dybatpho_module_deps=(
   [table]="text"
   [csv]="math"
-  [backup]="archive safety date diff"
+  [backup]="archive safety date"
   [queue]="lock date"
   [schedule]="date"
   [notification]="network validate"

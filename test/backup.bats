@@ -654,3 +654,29 @@ EOF
   assert_equal "${second}" "${DEST}/site-20260101T000000Z-1.snapshot"
   assert [ "${first}/source/a.txt" -ef "${second}/source/a.txt" ]
 }
+
+@test "dybatpho::backup_diff asks for the diff module when it is not loaded" {
+  # `backup` does not load `diff`, so a script that only takes and restores
+  # backups does not pay for it. A child shell started from a file, without
+  # the functions this process exports, shows what such a script sees.
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules backup\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'dybatpho::backup_verify %q && printf "verified\\n"\n' "${archive}"
+    printf 'dybatpho::backup_diff --summary %q %q\n' "${archive}" "${SOURCE}"
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_line --index 0 "verified"
+  assert_output --partial "dybatpho::backup_diff needs the diff module, load it with: dybatpho::load diff"
+
+  # Once the script loads it, the same comparison runs and finds nothing.
+  sed -i 's/--modules backup$/--modules backup diff/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_line "+0 -0 ~0"
+}

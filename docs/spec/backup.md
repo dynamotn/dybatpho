@@ -136,6 +136,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 
 ## Edge Cases
 
+- A script compares backups without having loaded the `diff` module.
 - The source does not exist, or the destination has to be created.
 - Two backups are taken within the same second.
 - Ten or more backups are taken within the same second, so a suffix of `-10` sits beside `-2`, and the caller's collation orders `-1.` before or after `.`.
@@ -190,6 +191,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-031**: Pruning a snapshot MUST remove its directory and sidecar without affecting a file another snapshot links.
 - **FR-032**: A comparison MUST accept a snapshot on either side, verified before it is read.
 - **FR-033**: Listing, resolving the latest and pruning MUST order backups by name, then UTC stamp, then same-second suffix compared as a number, archives and snapshots together, independently of the caller's collation.
+- **FR-034**: Loading the module MUST NOT load `diff`. A comparison MUST stop the script, naming the `diff` module and how to load it, when that module is not loaded, before any backup is verified or extracted; every other operation MUST work without it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -249,6 +251,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-037**: Compare snapshots with each other, with the live source and with an archive, and refuse a tampered one or one without a sidecar.
 - **IT-038**: Take two snapshots in the same second under distinct names.
 - **IT-039**: List archives and a snapshot taken in the same second newest first by suffix, `-10` before `-2` and `-1` before the unsuffixed name, under C collation and the session's own.
+- **IT-040**: In a script that loaded `backup` alone, verify an archive, have a comparison stop and name the `diff` module, and compare once `diff` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

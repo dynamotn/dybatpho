@@ -32,7 +32,9 @@ are listed, verified, restored, compared and pruned like archives.
 
 `dybatpho::backup_diff` answers what a restore would undo: it compares two
 backups, or a backup and the live data, through `dybatpho::diff_dir`,
-extracting each verified backup into a scratch directory first.
+extracting each verified backup into a scratch directory first. That
+comparison is the `diff` module's, which this one does not load: a script
+that compares backups loads `diff` as well.
 
 ### 🌍 Environment
 
@@ -61,6 +63,7 @@ extracting each verified backup into a scratch directory first.
 <a id="tips"></a>
 ## 💡 Tips
 
+- Load `diff` as well to compare backups: `--modules backup diff`
 - Destinations are local paths; pushing a backup to object storage or a network share stays with the caller
 - A snapshot shares its unchanged files with other snapshots, so read and restore it, never edit inside it
 
@@ -326,3 +329,4 @@ dybatpho::backup_diff --summary "${backups[1]}" "${backups[0]}"
 - `0`: The two sides hold the same entries with the same content
 - `1`: They differ
 - `2`: A side is missing, fails its checksum, or holds an entry that escapes
+- `1`: Stop the script when the `diff` module is not loaded

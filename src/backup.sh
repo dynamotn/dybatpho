@@ -30,7 +30,10 @@
 #
 #   `dybatpho::backup_diff` answers what a restore would undo: it compares two
 #   backups, or a backup and the live data, through `dybatpho::diff_dir`,
-#   extracting each verified backup into a scratch directory first.
+#   extracting each verified backup into a scratch directory first. That
+#   comparison is the `diff` module's, which this one does not load: a script
+#   that compares backups loads `diff` as well.
+# @tip Load `diff` as well to compare backups: `--modules backup diff`
 # @tip Destinations are local paths; pushing a backup to object storage or a
 #   network share stays with the caller
 # @tip A snapshot shares its unchanged files with other snapshots, so read and
@@ -855,6 +858,7 @@ function __dybatpho_backup_root_into {
 # @exitcode 0 The two sides hold the same entries with the same content
 # @exitcode 1 They differ
 # @exitcode 2 A side is missing, fails its checksum, or holds an entry that escapes
+# @exitcode 1 Stop the script when the `diff` module is not loaded
 # @example
 #   dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
 #   mapfile -t backups < <(dybatpho::backup_list /var/backups nginx)
@@ -876,6 +880,10 @@ function dybatpho::backup_diff {
 
   local older newer
   dybatpho::expect_args older newer -- "$@"
+  # The guard names an internal helper: a child shell inherits the exported
+  # `dybatpho::` functions without the internals `diff_dir` calls.
+  declare -F __dybatpho_diff_tree_into > /dev/null \
+    || dybatpho::die "${FUNCNAME[0]} needs the diff module, load it with: dybatpho::load diff"
 
   local older_root newer_root
   __dybatpho_backup_root_into older_root "${older}"

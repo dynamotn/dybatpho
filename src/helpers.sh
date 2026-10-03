@@ -228,6 +228,7 @@ function dybatpho::still_has_args {
 # @exitcode 1 Stop the script if any variable is unset or empty
 #######################################
 function dybatpho::expect_envs {
+  local arg
   for arg in "$@"; do
     if [[ -z "${!arg:-}" ]]; then
       dybatpho::die "Environment variable \`${arg}\` isn't set." # kcov(skip)

@@ -809,6 +809,7 @@ function __dybatpho_cli_config_get {
 function __dybatpho_cli_parse_opt {
   local need_argument=$1
   local skip_meta=$2
+  local i
   shift 2
 
   # `negatable:` and `count:` change how the switches that precede them in the
@@ -982,7 +983,7 @@ function __dybatpho_cli_parse_opt {
 # @internal
 #######################################
 function __dybatpho_cli_print_indent {
-  local indent=$1
+  local indent=$1 i
   shift
   for ((i = indent; i > 0; i--)); do
     echo -n "  "
@@ -1285,6 +1286,7 @@ function __dybatpho_cli_generate_logic {
   local __has_sub_cmd="false"
   local __has_help="false"
   declare -a __sub_specs=()
+  local sub_spec __required_check
   declare -a __prompt_defs=()
   declare -a __known_switches=()
   declare -a __declared_args=()
@@ -1671,7 +1673,7 @@ function __dybatpho_cli_generate_schema_command {
   local spec="$1" name="$2" command_aliases="${3:-}" description
   local -a options=() commands=() arguments=()
   __dybatpho_cli_collect_spec_metadata "${spec}" options commands description arguments
-  local q_name q_description option first=true aliases="${command_aliases}"
+  local q_name q_description option argument command first=true aliases="${command_aliases}"
   # `@none` is the sentinel an alias-less command records, not a real alias.
   [[ "${aliases}" = "@none" ]] && aliases=""
   __dybatpho_cli_json_quote q_name "${name}"
@@ -1785,6 +1787,7 @@ function __dybatpho_cli_generate_man_command {
   escaped="${escaped//\"/\\\"}"
   local synopsis="${escaped} [OPTIONS]"
   local arg_item arg_name arg_desc arg_required arg_variadic arg_placeholder
+  local option command
   for arg_item in ${arguments[@]+"${arguments[@]}"}; do
     IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
     arg_placeholder="$(__dybatpho_cli_arg_placeholder "${arg_name}" "${arg_required}" "${arg_variadic}")"
@@ -2472,6 +2475,7 @@ function __dybatpho_cli_parse_alias_list {
   __dybatpho_cli_require_shell_name "$1"
   local -n __alias_out="$1"
   local __alias_raw="${2:-}" __alias_item
+  local -a __alias_items=()
   IFS=',' read -r -a __alias_items <<< "${__alias_raw}"
   for __alias_item in "${__alias_items[@]}"; do
     [[ -n "${__alias_item}" ]] && __alias_out+=("${__alias_item}")

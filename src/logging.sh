@@ -981,6 +981,7 @@ function dybatpho::progress_bar {
   local percentage="$1"
   local length="${2:-50}"
   local elapsed=$((percentage * length / 100))
+  local prog total
 
   printf -v prog "%${elapsed}s"
   printf -v total "%$((length - elapsed))s"

@@ -73,7 +73,7 @@ function __dybatpho_test_tty {
 # @stdout One file path per line
 # @internal
 function __dybatpho_test_collect {
-  local _target
+  local _target _file
   while read -r _file; do
     printf '%s\t%s\n' "$(grep -c '^@test' "${_file}" || true)" "${_file}"
   done < <(

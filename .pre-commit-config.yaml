@@ -19,11 +19,14 @@ repos:
           - file
         files: \.(sh|bats|md)$|^\.shellcheckrc$
         pass_filenames: false
+      # Only the tests covering the staged files run here; CI runs the suite.
+      # `require_serial` keeps the file list in one invocation, so the runner
+      # sees every change at once and Bats owns the parallelism.
       - id: test
-        name: Test all test cases
-        entry: bash scripts/test.sh
+        name: Test the changed files
+        entry: bash scripts/test.sh --related
         language: system
         types:
           - file
-        files: \.(sh|bats)$
-        pass_filenames: false
+        files: \.(sh|bats|bash)$
+        require_serial: true

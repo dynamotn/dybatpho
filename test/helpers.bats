@@ -479,7 +479,7 @@ require_fake_tool() {
   }
   run_traced _default_env_assigns
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 fallback
 fallback
 EOF
@@ -491,7 +491,7 @@ EOF
   }
   run_traced _default_env_preserves
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 custom
 custom
 EOF

@@ -58,27 +58,100 @@ DYBATPHO_RELEASE_GPG_KEY="${DYBATPHO_RELEASE_GPG_KEY:-}"
 #   the whole subject as its description
 #######################################
 function dybatpho::release_commit_parse {
-  local subject body type="other" scope="" breaking="false" description
+  local subject
   dybatpho::expect_args subject -- "$@"
-  body="${2-}"
-  description="${subject}"
+  local -a parsed=()
+  __dybatpho_release_parse_into parsed "${subject}" "${2-}"
+  printf '%s\n%s\n%s\n%s\n' "${parsed[@]}"
+}
+
+#######################################
+# @description Break a commit message into its Conventional Commits parts, in
+#   the caller's shell. `dybatpho::release_commit_parse` prints the same four
+#   parts; this fills an array instead, so walking a range of commits costs no
+#   subshell per commit.
+# @arg $1 string Name of the array receiving type, scope, `true`/`false` for
+#   breaking, and description, in that order
+# @arg $2 string Commit subject line
+# @arg $3 string Optional commit body, searched for a `BREAKING CHANGE:` footer
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_release_parse_into {
+  local -n __dybatpho_release_parsed_ref="$1"
+  local __dybatpho_release_subject="$2" __dybatpho_release_body="${3-}"
+  local __dybatpho_release_type="other" __dybatpho_release_scope=""
+  local __dybatpho_release_breaking="false"
+  local __dybatpho_release_description="${__dybatpho_release_subject}"
 
   # `type(scope)!: summary`, where the scope and the breaking marker are optional.
-  if [[ "${subject}" =~ ^([a-zA-Z]+)(\(([^\)]*)\))?(!)?:[[:space:]]*(.*)$ ]]; then
-    type="$(dybatpho::lower "${BASH_REMATCH[1]}")"
-    scope="${BASH_REMATCH[3]}"
-    [[ -n "${BASH_REMATCH[4]}" ]] && breaking="true"
-    description="${BASH_REMATCH[5]}"
+  if [[ "${__dybatpho_release_subject}" =~ ^([a-zA-Z]+)(\(([^\)]*)\))?(!)?:[[:space:]]*(.*)$ ]]; then
+    __dybatpho_release_type="${BASH_REMATCH[1],,}"
+    __dybatpho_release_scope="${BASH_REMATCH[3]}"
+    [[ -n "${BASH_REMATCH[4]}" ]] && __dybatpho_release_breaking="true"
+    __dybatpho_release_description="${BASH_REMATCH[5]}"
   fi
 
   # The convention allows a footer instead of the `!` marker, and the footer
-  # lives in the body rather than in the subject.
-  if [[ "${breaking}" == "false" ]] \
-    && printf '%s\n' "${body}" | grep -q '^BREAKING[ -]CHANGE:'; then
-    breaking="true"
+  # lives in the body rather than in the subject. It has to start a line, so
+  # the body is searched with a newline in front of it.
+  if [[ "${__dybatpho_release_breaking}" == "false" ]] \
+    && [[ $'\n'"${__dybatpho_release_body}" == *$'\n'BREAKING[\ -]CHANGE:* ]]; then
+    __dybatpho_release_breaking="true"
   fi
 
-  printf '%s\n%s\n%s\n%s\n' "${type}" "${scope}" "${breaking}" "${description}"
+  __dybatpho_release_parsed_ref=(
+    "${__dybatpho_release_type}"
+    "${__dybatpho_release_scope}"
+    "${__dybatpho_release_breaking}"
+    "${__dybatpho_release_description}"
+  )
+}
+
+#######################################
+# @description Collect the full messages of the commits in a range, oldest
+#   first, from one `git log` instead of one per commit.
+#   Each record is the hash and the message, separated by a unit separator and
+#   ended by a record separator, so a message holding blank lines or a footer
+#   arrives whole. Trailing newlines are dropped, as a command substitution of
+#   `git log -1 --format=%B` would drop them.
+# @arg $1 string Name of the array receiving the messages
+# @arg $2 string Repository path
+# @arg $3 string Base ref, excluded from the range, or empty to read the whole history
+# @arg $4 string Head ref
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_release_commits_into {
+  local -n __dybatpho_release_messages_ref="$1"
+  local __dybatpho_release_repo="$2" __dybatpho_release_base="$3"
+  local __dybatpho_release_head="$4" __dybatpho_release_record
+  __dybatpho_release_messages_ref=()
+
+  while IFS= read -r -d $'\x1e' __dybatpho_release_record; do
+    # `git log` ends every record with a newline, which lands in front of the
+    # next one.
+    __dybatpho_release_record="${__dybatpho_release_record#$'\n'}"
+    __dybatpho_release_record="${__dybatpho_release_record#*$'\x1f'}"
+    while [[ "${__dybatpho_release_record}" == *$'\n' ]]; do
+      __dybatpho_release_record="${__dybatpho_release_record%$'\n'}"
+    done
+    __dybatpho_release_messages_ref+=("${__dybatpho_release_record}")
+  done < <(
+    # An empty base means nothing has been released yet. A `base..head` range
+    # excludes its base, which would drop the repository's first commit, so
+    # that case reads the whole history instead.
+    if [[ -n "${__dybatpho_release_base}" ]]; then
+      __dybatpho_git_expect_repo "${__dybatpho_release_repo}"
+      __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_base}" > /dev/null
+      __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_head}" > /dev/null
+      __dybatpho_git "${__dybatpho_release_repo}" log --reverse \
+        --format='%H%x1f%B%x1e' "${__dybatpho_release_base}..${__dybatpho_release_head}"
+    else
+      __dybatpho_git "${__dybatpho_release_repo}" log --reverse \
+        --format='%H%x1f%B%x1e' "${__dybatpho_release_head}"
+    fi
+  )
 }
 
 #######################################
@@ -91,15 +164,14 @@ function dybatpho::release_commit_parse {
 # @stdout One of `breaking`, `feat`, `fix`, `perf`, the declared type, or `other`
 #######################################
 function dybatpho::release_commit_type {
-  local subject parsed type breaking
+  local subject
   dybatpho::expect_args subject -- "$@"
-  parsed="$(dybatpho::release_commit_parse "${subject}")"
-  type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
-  breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"
-  if [[ "${breaking}" == "true" ]]; then
+  local -a parsed=()
+  __dybatpho_release_parse_into parsed "${subject}"
+  if [[ "${parsed[2]}" == "true" ]]; then
     printf 'breaking\n'
   else
-    printf '%s\n' "${type}"
+    printf '%s\n' "${parsed[0]}"
   fi
 }
 
@@ -117,36 +189,26 @@ function dybatpho::release_commit_type {
 # @exitcode 1 No commit in the range calls for a release
 #######################################
 function dybatpho::release_bump_type {
-  local repo_path base_ref head_ref sha message parsed type breaking bump=""
+  local repo_path base_ref head_ref message bump=""
   dybatpho::expect_args repo_path base_ref -- "$@"
   head_ref="${3:-HEAD}"
 
-  # An empty base means nothing has been released yet. `git_commits_between`
-  # excludes its base ref, which would drop the repository's first commit, so
-  # that case reads the whole history instead.
-  while read -r sha; do
-    [[ -n "${sha}" ]] || continue
-    # The whole message is read once: the breaking marker may be in the subject
-    # or in a footer in the body.
-    message="$(__dybatpho_git "${repo_path}" log -1 --format=%B "${sha}")"
-    local subject="${message%%$'\n'*}"
-    parsed="$(dybatpho::release_commit_parse "${subject}" "${message}")"
-    type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
-    breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"
-    if [[ "${breaking}" == "true" ]]; then
+  local -a messages=() parsed=()
+  __dybatpho_release_commits_into messages "${repo_path}" "${base_ref}" "${head_ref}"
+  for message in ${messages[@]+"${messages[@]}"}; do
+    # The whole message is parsed: the breaking marker may be in the subject or
+    # in a footer in the body.
+    __dybatpho_release_parse_into parsed "${message%%$'\n'*}" "${message}"
+    if [[ "${parsed[2]}" == "true" ]]; then
       printf 'major\n'
       return 0
     fi
-    case "${type}" in
+    case "${parsed[0]}" in
       feat) bump="minor" ;;
       fix | perf) [[ "${bump}" == "minor" ]] || bump="patch" ;;
       *) ;;
     esac
-  done < <(if [[ -n "${base_ref}" ]]; then
-    dybatpho::git_commits_between "${repo_path}" "${base_ref}" "${head_ref}"
-  else
-    __dybatpho_git "${repo_path}" rev-list --reverse "${head_ref}"
-  fi)
+  done
 
   [[ -n "${bump}" ]] || return 1
   printf '%s\n' "${bump}"
@@ -209,39 +271,28 @@ function dybatpho::release_next_version {
 #   `chore`, are left out: they are part of the history, not of the release notes
 #######################################
 function dybatpho::release_changelog {
-  local repo_path base_ref head_ref version sha type scope
-  local message parsed is_breaking description entry
+  local repo_path base_ref head_ref version message entry
   dybatpho::expect_args repo_path base_ref -- "$@"
   head_ref="${3:-HEAD}"
   version="${4:-Unreleased}"
 
-  local -a breaking=() features=() fixes=()
-  while read -r sha; do
-    [[ -n "${sha}" ]] || continue
-    message="$(__dybatpho_git "${repo_path}" log -1 --format=%B "${sha}")"
-    local subject="${message%%$'\n'*}"
-    parsed="$(dybatpho::release_commit_parse "${subject}" "${message}")"
-    type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
-    scope="$(printf '%s\n' "${parsed}" | sed -n '2p')"
-    is_breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"
-    description="$(printf '%s\n' "${parsed}" | sed -n '4p')"
+  local -a messages=() parsed=() breaking=() features=() fixes=()
+  __dybatpho_release_commits_into messages "${repo_path}" "${base_ref}" "${head_ref}"
+  for message in ${messages[@]+"${messages[@]}"}; do
+    __dybatpho_release_parse_into parsed "${message%%$'\n'*}" "${message}"
     # The scope says where the change landed and is worth keeping; the type
     # prefix is dropped, because the heading already conveys it.
-    entry="- ${scope:+**${scope}**: }${description}"
-    if [[ "${is_breaking}" == "true" ]]; then
+    entry="- ${parsed[1]:+**${parsed[1]}**: }${parsed[3]}"
+    if [[ "${parsed[2]}" == "true" ]]; then
       breaking+=("${entry}")
       continue
     fi
-    case "${type}" in
+    case "${parsed[0]}" in
       feat) features+=("${entry}") ;;
       fix | perf) fixes+=("${entry}") ;;
       *) ;;
     esac
-  done < <(if [[ -n "${base_ref}" ]]; then
-    dybatpho::git_commits_between "${repo_path}" "${base_ref}" "${head_ref}"
-  else
-    __dybatpho_git "${repo_path}" rev-list --reverse "${head_ref}"
-  fi)
+  done
 
   printf '## [%s]\n' "${version}"
   if ((${#breaking[@]})); then

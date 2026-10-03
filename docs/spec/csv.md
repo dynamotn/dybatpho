@@ -185,6 +185,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-033**: Text between a closing quote and the next delimiter, or the end of the record, MUST be kept in that one field and MUST NOT be read again as a field of its own.
 - **FR-034**: Conversion from JSON MUST write nothing and succeed for an empty array, the same on the `jq` and `yq` backends.
 - **FR-035**: Loading the module MUST NOT load `json`. Conversion to JSON MUST stop before reading its input with `<function> needs the json module, load it with: dybatpho::load json` when `json` is not loaded; every other function, including conversion from JSON, MUST work without it.
+- **FR-036**: Refusing input that contains the ASCII unit separator MUST name the public function that was called, whether it reads its input directly or through the shared loader.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -246,6 +247,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-040**: Convert an empty JSON array to no output and no error, through `jq` and through `yq` alone.
 - **IT-041**: Verify a script that loads `csv` alone can read a column, that its conversion to JSON stops with the message naming `json`, and that once it loads `json` the same call converts.
 - **IT-042**: Choose a column by position in `csv_col`, `csv_filter` and `csv_join`, and prefer a header literally named like the position.
+- **IT-043**: Refuse a unit separator in `csv_read` and in `csv_col`, and report each under its own name.
 
 ## Acceptance Criteria *(mandatory)*
 

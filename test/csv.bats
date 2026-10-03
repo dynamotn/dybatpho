@@ -107,6 +107,18 @@ EOF
   assert_stderr --partial "unit separator"
 }
 
+@test "a refused unit separator is reported under the function that was called" {
+  # The refusal named the function one frame too far up -- whatever called the
+  # public function -- so the message pointed away from the call at fault.
+  run --separate-stderr dybatpho::csv_read "$(printf 'a\nx\037y')" records
+  assert_failure
+  assert_stderr --partial "dybatpho::csv_read: The input contains the ASCII unit separator"
+
+  run --separate-stderr dybatpho::csv_col "$(printf 'a\nx\037y')" a
+  assert_failure
+  assert_stderr --partial "dybatpho::csv_col: The input contains the ASCII unit separator"
+}
+
 @test "dybatpho::csv_read refuses a variable name that belongs to the library" {
   run --separate-stderr dybatpho::csv_read "a" __dybatpho_rows
   assert_failure

@@ -95,13 +95,13 @@ function __dybatpho_csv_delimiter_into {
 #   choosing a different function for each.
 # @arg $1 string Name of the variable receiving the text
 # @arg $2 string File path, `-`, or CSV text
-# @arg $3 string Name the unit-separator refusal is reported under
+# @arg $3 string Name the unit-separator refusal is reported under, default is the calling function
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_csv_input_into {
   local -n __dybatpho_csv_input_ref="$1"
-  local __dybatpho_csv_source="$2" __dybatpho_csv_who="${3:-${FUNCNAME[2]:-${FUNCNAME[0]}}}"
+  local __dybatpho_csv_source="$2" __dybatpho_csv_who="${3:-${FUNCNAME[1]:-${FUNCNAME[0]}}}"
 
   __dybatpho_string_input_into __dybatpho_csv_input_ref "${__dybatpho_csv_source}" files
 
@@ -308,7 +308,7 @@ function __dybatpho_csv_header_into {
 function __dybatpho_csv_load_into {
   local __dybatpho_csv_load_text
   __dybatpho_csv_delimiter_into "$3" "${DYBATPHO_CSV_DELIMITER}" "${FUNCNAME[1]}"
-  __dybatpho_csv_input_into __dybatpho_csv_load_text "$4" "${FUNCNAME[2]:-__dybatpho_csv_input_into}"
+  __dybatpho_csv_input_into __dybatpho_csv_load_text "$4" "${FUNCNAME[1]}"
   local -n __dybatpho_csv_load_delim="$3"
   __dybatpho_csv_parse_into "$1" "${__dybatpho_csv_load_text}" "${__dybatpho_csv_load_delim}"
   __dybatpho_csv_header_into "$2" "$1"

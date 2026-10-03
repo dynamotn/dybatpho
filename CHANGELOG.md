@@ -1050,6 +1050,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag printed a fatal error and the caller carried on as if the range were
   empty. The refs are now checked first, in the caller's shell.
 
+- **`csv` — refusing the unit separator names the function you called.** The
+  message for input holding the ASCII unit separator named the function one
+  frame too far up -- whatever had called `dybatpho::csv_read`,
+  `dybatpho::csv_col` or another reader -- so it pointed away from the call at
+  fault. It now names the reader itself.
+
 ### Security
 
 - **`notification` — webhook URLs, bot tokens and messages no longer appear on

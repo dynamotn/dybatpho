@@ -225,9 +225,15 @@ function dybatpho::secret_mask {
 #######################################
 function dybatpho::secret_mask_run {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command"
-  local status=0
+  # The status of a pipeline is its last command's unless `pipefail` is on, and
+  # the last command is the masker, which always succeeds. `pipefail` is turned
+  # on for this one pipeline and put back the way the caller had it.
+  local had_pipefail=false status=0
+  [[ ! -o pipefail ]] || had_pipefail=true
+  set -o pipefail
   # shellcheck disable=SC2119 # Masking reads the piped stream, not our arguments.
   "$@" 2>&1 | dybatpho::secret_mask || status=$?
+  [[ "${had_pipefail}" == true ]] || set +o pipefail
   return "${status}"
 }
 

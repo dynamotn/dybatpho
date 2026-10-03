@@ -795,6 +795,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   response, which had succeeded, before linking the asset to the release, so a
   refused link was reported with a stale or empty reason. It now reports what
   GitLab said about the link request.
+- **`secret` — `dybatpho::secret_mask_run` returns the command's exit code
+  without `pipefail`.** The status of the pipeline was the masker's, which
+  always succeeds, so a failing command looked like a success unless the
+  script had turned `pipefail` on.
 
 ### Security
 

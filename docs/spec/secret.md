@@ -140,6 +140,7 @@ dybatpho::secret_wipe TOKEN
 - `shred` isn't installed, so the file content is overwritten before removal.
 - Masking is requested from a child shell where the registry doesn't exist.
 - A variable passed to `secret_wipe` is already unset.
+- A command fails while `pipefail` is off, so the pipeline would report the masker's status.
 
 ## Requirements *(mandatory)*
 
@@ -187,6 +188,7 @@ dybatpho::secret_wipe TOKEN
   and otherwise zeroing the file, before removing it.
 - **FR-018**: Secret values and the masking registry MUST NOT be exported to
   child processes.
+- **FR-019**: `secret_mask_run` MUST return the command's own exit code whether or not `pipefail` is set, and the masker's only when the command succeeded, and MUST leave `pipefail` as the caller had it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -240,6 +242,7 @@ dybatpho::secret_wipe TOKEN
 - **IT-012**: Wipe variables, shred files with and without `shred`, and verify
   `secret_no_history` settings.
 - **IT-013**: Verify JSON logging masks registered secrets.
+- **IT-014**: Run `secret_mask_run` on a command exiting 3 in a shell with `pipefail` off and verify it returns 3 and leaves `pipefail` off.
 
 ## Acceptance Criteria *(mandatory)*
 

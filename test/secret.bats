@@ -211,6 +211,25 @@ teardown() {
   assert_output --partial "Expected a command"
 }
 
+@test "secret_mask_run returns the command's exit code without pipefail" {
+  # The status of a pipeline is its last command's unless `pipefail` is on,
+  # and the last command here is the masker, which always succeeds.
+  local script="${BATS_TEST_TMPDIR}/nopipefail.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh" \
+    "set +o pipefail" \
+    "status=0" \
+    "dybatpho::secret_mask_run bash -c 'exit 3' || status=\$?" \
+    "printf 'status=%s\n' \"\${status}\"" \
+    "[[ -o pipefail ]] && echo pipefail=on || echo pipefail=off" > "${script}"
+
+  run_traced bash "${script}"
+  assert_success
+  assert_line --index 0 "status=3"
+  # The option is the caller's, and is left the way the caller had it.
+  assert_line --index 1 "pipefail=off"
+}
+
 @test "secret_hint reveals only the suffix of a secret" {
   local hint="${BATS_TEST_TMPDIR}/hint"
   dybatpho::secret_hint "abcdefghij" > "${hint}"

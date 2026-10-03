@@ -785,7 +785,8 @@ function dybatpho::metrics_push {
       || dybatpho::die "${FUNCNAME[0]}: Grouping label must be given as key=value, got '${pair}'"
     key="${pair%%=*}"
     # A grouping label is a label name, which unlike a metric name has no `:`.
-    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+    [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
       || dybatpho::die "${FUNCNAME[0]}: Invalid label name '${key}'"
     [[ "${key}" != job ]] \
       || dybatpho::die "${FUNCNAME[0]}: The job is already the first grouping label"

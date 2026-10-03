@@ -60,7 +60,9 @@ declare -gA __DYBATPHO_VALIDATE_NUMERIC=()
 # name to know what is being matched, and a test can pin one directly.
 __DYBATPHO_VALIDATE_RE_INT='^[+-]?[0-9]+$'
 __DYBATPHO_VALIDATE_RE_UINT='^[0-9]+$'
-__DYBATPHO_VALIDATE_RE_NUMBER='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$'
+# The same expression `dybatpho::is number` uses, defined once in core `helpers`.
+# shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+__DYBATPHO_VALIDATE_RE_NUMBER="${__DYBATPHO_HELPERS_RE_NUMBER}"
 # The practical address rather than the one RFC 5322 allows. A quoted local
 # part and a bracketed address literal are legal and effectively never typed
 # into a configuration file, and accepting them costs the rejection of the
@@ -78,7 +80,8 @@ __DYBATPHO_VALIDATE_RE_UUID='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 __DYBATPHO_VALIDATE_RE_MAC='^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$'
 __DYBATPHO_VALIDATE_RE_HEX='^(0[xX])?[0-9a-fA-F]+$'
 __DYBATPHO_VALIDATE_RE_SLUG='^[a-z0-9]+(-[a-z0-9]+)*$'
-__DYBATPHO_VALIDATE_RE_IDENTIFIER='^[a-zA-Z_][a-zA-Z0-9_]*$'
+# shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+__DYBATPHO_VALIDATE_RE_IDENTIFIER="${__DYBATPHO_HELPERS_RE_IDENTIFIER}"
 __DYBATPHO_VALIDATE_RE_HOSTNAME='^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*\.?$'
 __DYBATPHO_VALIDATE_RE_DATE='^([0-9]{4})-([0-9]{2})-([0-9]{2})$'
 __DYBATPHO_VALIDATE_RE_TIME='^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$'

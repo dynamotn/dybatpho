@@ -43,6 +43,19 @@ declare -ga DYBATPHO_CONFIG_SCHEMA_KEYS=()
 declare -ga DYBATPHO_CONFIG_ERRORS=()
 
 #######################################
+# @description Stop the script when a configuration key is not a name. A key
+#   becomes part of a variable name and of the schema, so a stray character
+#   would land somewhere it cannot be looked up again.
+# @arg $1 string Configuration key
+# @exitcode 1 Stop the script when the key is not a valid name
+# @internal
+#######################################
+function __dybatpho_config_require_key {
+  [[ "${1-}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
+    || dybatpho::die "Invalid configuration key: ${1-}"
+}
+
+#######################################
 # @description Store one configuration value, rejecting a key that is not a
 #   name: the key becomes part of a variable name and of the schema, so a
 #   stray character would land somewhere it cannot be looked up again.
@@ -55,8 +68,7 @@ declare -ga DYBATPHO_CONFIG_ERRORS=()
 function __dybatpho_config_set {
   local key value
   dybatpho::expect_args key value -- "$@"
-  [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
-    || dybatpho::die "Invalid configuration key: ${key}"
+  __dybatpho_config_require_key "${key}"
   DYBATPHO_CONFIG["${key}"]="${value}"
 }
 
@@ -276,7 +288,8 @@ function dybatpho::config_env {
   while IFS= read -r variable || [[ -n "${variable}" ]]; do
     [[ -n "${prefix}" && "${variable}" != "${prefix}"* ]] && continue
     key="${variable#"${prefix}"}"
-    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+    [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] || continue
     [[ -v "${variable}" ]] || continue
     __dybatpho_config_set "${key}" "${!variable}"
   done < <(printf '%s' "${compgen_output}")
@@ -312,8 +325,7 @@ function dybatpho::config_set {
 function dybatpho::config_get {
   local key
   dybatpho::expect_args key -- "$@"
-  [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
-    || dybatpho::die "Invalid configuration key: ${key}"
+  __dybatpho_config_require_key "${key}"
   if [[ -v "DYBATPHO_CONFIG[${key}]" ]]; then
     printf '%s\n' "${DYBATPHO_CONFIG[${key}]}"
   elif (($# > 1)); then
@@ -332,8 +344,7 @@ function dybatpho::config_require {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one key"
   local key
   for key in "$@"; do
-    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
-      || dybatpho::die "Invalid configuration key: ${key}"
+    __dybatpho_config_require_key "${key}"
     [[ -v "DYBATPHO_CONFIG[${key}]" ]] \
       || dybatpho::die "Required configuration is missing: ${key}"
   done
@@ -346,10 +357,12 @@ function dybatpho::config_require {
 #######################################
 function dybatpho::config_export {
   local prefix="${1-}" key
-  [[ -z "${prefix}" || "${prefix}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+  # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+  [[ -z "${prefix}" || "${prefix}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
     || dybatpho::die "Invalid configuration variable prefix: ${prefix}"
   for key in "${!DYBATPHO_CONFIG[@]}"; do
-    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+    [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
       || dybatpho::die "Cannot export configuration key as variable: ${key}"
     export "${prefix}${key}=${DYBATPHO_CONFIG[${key}]}"
   done
@@ -395,7 +408,8 @@ function __dybatpho_config_save_dotenv {
   file="$1"
   shift
   for key in "$@"; do
-    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+    [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
       || dybatpho::die "Cannot save configuration key to a dotenv file: ${key}"
     wanted["${key}"]=1
   done
@@ -563,8 +577,7 @@ function dybatpho::config_save {
     || dybatpho::die "${FUNCNAME[0]}: Expected at least one configuration key"
 
   for key in "${keys[@]}"; do
-    [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
-      || dybatpho::die "Invalid configuration key: ${key}"
+    __dybatpho_config_require_key "${key}"
     [[ -v "DYBATPHO_CONFIG[${key}]" ]] \
       || dybatpho::die "Cannot save a configuration key that is not set: ${key}"
   done
@@ -682,8 +695,7 @@ function __dybatpho_config_schema_constraints {
 function dybatpho::config_schema {
   local key declared_type type rule name value known
   dybatpho::expect_args key declared_type -- "$@"
-  [[ "${key}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
-    || dybatpho::die "Invalid configuration key: ${key}"
+  __dybatpho_config_require_key "${key}"
   __dybatpho_config_schema_type type "${declared_type}" \
     || dybatpho::die "Unsupported configuration type: ${declared_type}"
   __dybatpho_config_schema_clear "${key}"

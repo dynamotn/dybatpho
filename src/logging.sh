@@ -1105,7 +1105,8 @@ function __dybatpho_log_context_add {
       || dybatpho::die "dybatpho::log_context: '${pair}' is not a name=value pair"
     name="${pair%%=*}"
     value="${pair#*=}"
-    if [[ ! "${name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
+    if [[ ! "${name}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]]; then
       dybatpho::die "dybatpho::log_context: '${name}' is not a valid field name"
     fi
     if [[ "${__dybatpho_log_reserved_fields}" == *" ${name} "* ]]; then

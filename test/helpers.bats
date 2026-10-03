@@ -851,3 +851,37 @@ EOF
   dybatpho::array_sort mine
   assert_equal "${mine[*]}" "a b c"
 }
+
+@test "the exported checks agree with the shared expressions" {
+  # `dybatpho::is` and the name checks spell their expressions out so a child
+  # shell can run them; these constants are what every other module reads.
+  local value
+  for value in 0 7 -7 +7 007 08 1.5 .5 5. 1e3 abc "'a" 0x1F "" " 1"; do
+    if [[ "${value}" =~ ${__DYBATPHO_HELPERS_RE_INT} ]]; then
+      dybatpho::is int "${value}"
+    else
+      run_traced -1 dybatpho::is int "${value}"
+    fi
+    if [[ "${value}" =~ ${__DYBATPHO_HELPERS_RE_NUMBER} ]]; then
+      dybatpho::is number "${value}"
+    else
+      run_traced -1 dybatpho::is number "${value}"
+    fi
+  done
+  assert_equal "${__DYBATPHO_VALIDATE_RE_IDENTIFIER}" "${__DYBATPHO_HELPERS_RE_IDENTIFIER}"
+}
+
+@test "the exported checks run in a shell that never sourced the library" {
+  # Only `dybatpho::` functions are exported, so a child inherits them without
+  # the module's variables; a check reading one would stop under `set -u`.
+  local script="${BATS_TEST_TMPDIR}/detached.sh"
+  {
+    printf 'set -euo pipefail\n'
+    printf 'dybatpho::is int 42\n'
+    printf 'dybatpho::is number 1.5\n'
+    printf 'name=x; dybatpho::expect_ref name\n'
+    printf 'printf ok\n'
+  } > "${script}"
+  run_traced -0 bash "${script}"
+  assert_output "ok"
+}

@@ -361,6 +361,11 @@ function dybatpho::command_exists_all {
 # octal, so every int it passes can go straight into `(( ))` as written.
 __DYBATPHO_HELPERS_RE_INT='^[+-]?(0|[1-9][0-9]*)$'
 __DYBATPHO_HELPERS_RE_NUMBER='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$'
+# A shell variable name, as `validate.sh` names it for its `identifier` type.
+# Exported `dybatpho::` functions spell these expressions out instead of reading
+# the constants, because a child shell inherits the functions without the
+# variables; `test/helpers.bats` pins the two spellings together.
+__DYBATPHO_HELPERS_RE_IDENTIFIER='^[a-zA-Z_][a-zA-Z0-9_]*$'
 
 #######################################
 # @description Check whether a value matches a supported shell-oriented condition.
@@ -425,11 +430,13 @@ function dybatpho::is {
       return "$?"
       ;;
     number)
-      [[ "${input}" =~ ${__DYBATPHO_HELPERS_RE_NUMBER} ]]
+      # Written out rather than read from the constants above: a child shell
+      # inherits this exported function without the module's variables.
+      [[ "${input}" =~ ^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$ ]]
       return "$?"
       ;;
     int)
-      [[ "${input}" =~ ${__DYBATPHO_HELPERS_RE_INT} ]]
+      [[ "${input}" =~ ^[+-]?(0|[1-9][0-9]*)$ ]]
       return "$?"
       ;;
     true)

@@ -37,7 +37,7 @@ document object.
 - [`dybatpho::md_list`](#dybatphomd_list) — Render a bullet or ordered list, one item per input line. A marker of `1.` or `1)` numbers the items from that value; any other marker is used literally on every item. Blank input lines stay blank, so a list can be split into visual groups.
 - [`dybatpho::md_task_list`](#dybatphomd_task_list) — Render a GitHub-flavored task list, one item per input line. Each line is `<state><delimiter><text>`; a line with no delimiter is an unchecked item whose text is the whole line. The state is checked for `x`, `X`, and anything `dybatpho::is true` accepts.
 - [`dybatpho::md_link`](#dybatphomd_link) — Render an inline link.
-- [`dybatpho::md_badge`](#dybatphomd_badge) — Render a shields.io badge as an image, optionally wrapped in a link. The label and value are encoded the way shields.io requires: `-` doubles, `_` doubles, and a space becomes `_`.
+- [`dybatpho::md_badge`](#dybatphomd_badge) — Render a shields.io badge as an image, optionally wrapped in a link. The label and value are encoded the way shields.io requires: `-` doubles, `_` doubles, and a space becomes `_`. Every other character that is not safe in a URL path, the color's included, is percent-encoded.
 - [`dybatpho::md_code_block`](#dybatphomd_code_block) — Render a fenced code block. The body is literal by definition, so it is not escaped. The fence grows past the longest run of backticks the body contains, which is what keeps a block that itself shows fenced Markdown from ending early.
 - [`dybatpho::md_table`](#dybatphomd_table) — Render a Markdown table through `table.sh`. Cells are passed through unescaped, because escaping them here would also escape the delimiter that separates them. Escape the values first with `dybatpho::md_escape` and assemble the rows with a delimiter of your own, such as `::`, which the escape leaves alone.
 - [`dybatpho::md_collapsible`](#dybatphomd_collapsible) — Render a collapsible `<details>` section. The summary is escaped; the body is the Markdown the caller already built, so it is emitted as given. The blank lines around the body are what let a renderer treat it as Markdown rather than as raw HTML.
@@ -229,7 +229,8 @@ dybatpho::md_link "the docs" "https://example.com/a b"
 
 Render a shields.io badge as an image, optionally wrapped in a
 link. The label and value are encoded the way shields.io requires: `-`
-doubles, `_` doubles, and a space becomes `_`.
+doubles, `_` doubles, and a space becomes `_`. Every other character that
+is not safe in a URL path, the color's included, is percent-encoded.
 
 **🧪 Example**
 

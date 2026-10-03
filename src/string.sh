@@ -355,6 +355,21 @@ function dybatpho::string_trim_chars {
 }
 
 #######################################
+# @description Stop when a width or count is not a whole number.
+#   Without the check the value went straight into arithmetic, so a word gave
+#   a raw Bash error naming the word as a variable, and a leading zero was read
+#   as octal.
+# @arg $1 string The value
+# @exitcode 0 The value is a whole number, optionally negative
+# @exitcode 1 Stop the script when it is not
+# @internal
+#######################################
+function __dybatpho_string_expect_int {
+  [[ "${1-}" =~ ^-?(0|[1-9][0-9]*)$ ]] \
+    || dybatpho::die "${FUNCNAME[1]}: ${1-} is not a whole number"
+}
+
+#######################################
 # @description Truncate a string to a maximum width and append a suffix when needed.
 # @arg $1 string Input string
 # @arg $2 number Maximum width
@@ -364,6 +379,7 @@ function dybatpho::string_trim_chars {
 function dybatpho::string_truncate {
   local input width suffix
   dybatpho::expect_args input width -- "$@"
+  __dybatpho_string_expect_int "${width}"
   suffix="${3:-...}"
   if ((width <= 0)); then
     printf '\n'
@@ -407,6 +423,7 @@ function dybatpho::string_lines {
 function dybatpho::string_wrap {
   local input width indent
   dybatpho::expect_args input width -- "$@"
+  __dybatpho_string_expect_int "${width}"
   indent="${3-}"
   if ((width <= 0)); then
     printf '%s\n' "${input}"
@@ -443,6 +460,7 @@ function dybatpho::string_wrap {
 function dybatpho::string_repeat {
   local input count
   dybatpho::expect_args input count -- "$@"
+  __dybatpho_string_expect_int "${count}"
   local repeated=""
   local i
   if ((count <= 0)); then
@@ -465,6 +483,7 @@ function dybatpho::string_repeat {
 function dybatpho::string_pad {
   local input width pad_token
   dybatpho::expect_args input width -- "$@"
+  __dybatpho_string_expect_int "${width}"
   pad_token="${3:- }"
   local padded="${input}"
   if [[ "${#padded}" -ge "${width}" ]]; then

@@ -184,6 +184,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - Edit distance is measured against an empty string, between strings differing only in case, or on multibyte characters.
 - A candidate list is empty, contains duplicates or empty entries, or has several candidates tied at the best distance.
 - The maximum distance is zero, negative, or not a number.
+- A width or count given to `string_pad`, `string_truncate`, `string_repeat` or `string_wrap` is a word, or a number with a leading zero.
 
 ## Requirements *(mandatory)*
 
@@ -222,6 +223,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **FR-026**: The module MUST provide a helper that writes into a caller-named array every candidate sharing the smallest edit distance from the input, within a caller-given maximum, in input order, without duplicates, and skipping empty candidates.
 - **FR-026a**: The closest-candidate helper MUST return 1 and empty the array when no candidate is close enough, and MUST stop the script when the maximum distance is not a non-negative integer.
 - **FR-027**: `dybatpho::cli_levenshtein` MUST keep answering exactly as the distance helper.
+- **FR-028**: `string_pad`, `string_truncate`, `string_repeat` and `string_wrap` MUST stop with a message naming the function and the value when the width or count is not a whole number; a negative number keeps its existing meaning.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -264,6 +266,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **IT-014**: Verify a miss returns 1 and an invalid pattern returns 2, each leaving the array empty, and that an invalid array name is refused.
 - **IT-015**: Verify edit distances for known pairs, empty strings, case differences, and multibyte characters, and that `dybatpho::cli_levenshtein` agrees with the distance helper.
 - **IT-016**: Rank candidate lists with ties, duplicates, empty entries, a zero maximum, and nothing close, and verify an invalid maximum or array name is refused.
+- **IT-017**: Pass `abc` and `08` as the width or count to each helper and find a clear refusal; pass `-3` to `string_truncate` and find an empty line.
 
 ## Acceptance Criteria *(mandatory)*
 

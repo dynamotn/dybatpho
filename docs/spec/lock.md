@@ -183,6 +183,7 @@ dybatpho::lock_semaphore_holders downloads 4
   is not a number.
 - The caller's variable for the slot number is called `slot`.
 - The variable a caller names for the slot number matches a name the semaphore uses internally, such as `timeout`.
+- `lock_acquire` is given a timeout that is not a number of seconds.
 
 ## Requirements *(mandatory)*
 
@@ -261,6 +262,7 @@ dybatpho::lock_semaphore_holders downloads 4
   released before its holder could be read, and MUST NOT move aside a lock
   whose holder changed after it was judged stale.
 - **FR-028**: `lock_semaphore_acquire` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
+- **FR-029**: `lock_acquire` MUST stop with a message naming the value when its timeout is not a whole number of seconds, before it touches the lock.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -334,6 +336,7 @@ dybatpho::lock_semaphore_holders downloads 4
 - **IT-023**: Leave alone, without a reclaim notice, a lock released during the
   check and claimed by the next process.
 - **IT-024**: Acquire slots into variables called `timeout`, `slot_path` and `target`, and find each one filled.
+- **IT-025**: Call `lock_acquire` with the timeout `soon` and find a clear refusal and no lock taken.
 
 ## Acceptance Criteria *(mandatory)*
 

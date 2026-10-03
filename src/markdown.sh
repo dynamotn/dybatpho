@@ -370,7 +370,8 @@ function dybatpho::md_link {
 #######################################
 # @description Render a shields.io badge as an image, optionally wrapped in a
 #   link. The label and value are encoded the way shields.io requires: `-`
-#   doubles, `_` doubles, and a space becomes `_`.
+#   doubles, `_` doubles, and a space becomes `_`. Every other character that
+#   is not safe in a URL path, the color's included, is percent-encoded.
 # @arg $1 string Badge label, the left half
 # @arg $2 string Badge value, the right half
 # @arg $3 string Optional color, default is `blue`
@@ -385,12 +386,13 @@ function dybatpho::md_badge {
   dybatpho::expect_args label value -- "$@"
   local color="${3:-blue}"
   local link="${4-}"
-  local label_part value_part alt badge encoded
+  local label_part value_part color_part alt badge encoded
 
   __dybatpho_md_badge_segment_into label_part "${label}"
   __dybatpho_md_badge_segment_into value_part "${value}"
+  __dybatpho_md_percent_encode_into color_part "${color}"
   __dybatpho_md_escape_into alt "${label}: ${value}"
-  badge="![${alt}](https://img.shields.io/badge/${label_part}-${value_part}-${color})"
+  badge="![${alt}](https://img.shields.io/badge/${label_part}-${value_part}-${color_part})"
 
   if [[ -n "${link}" ]]; then
     __dybatpho_md_encode_url_into encoded "${link}"
@@ -415,7 +417,35 @@ function __dybatpho_md_badge_segment_into {
   __dybatpho_md_segment="${__dybatpho_md_segment//_/__}"
   __dybatpho_md_segment="${__dybatpho_md_segment//-/--}"
   __dybatpho_md_segment="${__dybatpho_md_segment// /_}"
-  __dybatpho_md_segment_ref="${__dybatpho_md_segment}"
+  __dybatpho_md_percent_encode_into __dybatpho_md_segment_ref "${__dybatpho_md_segment}"
+}
+
+#######################################
+# @description Percent-encode every byte of a URL path segment outside the
+#   unreserved set, into a named variable.
+#   `/` would add a segment, `?` and `#` would end the path, `%` would start an
+#   escape, and `(` or `)` would end the Markdown that holds the URL.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string Segment text
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_md_percent_encode_into {
+  local -n __dybatpho_md_percent_ref="$1"
+  local LC_ALL=C
+  local __dybatpho_md_percent_in="${2-}" __dybatpho_md_percent_out="" __dybatpho_md_percent_char
+  local -i __dybatpho_md_percent_i __dybatpho_md_percent_n="${#__dybatpho_md_percent_in}"
+  for ((__dybatpho_md_percent_i = 0; __dybatpho_md_percent_i < __dybatpho_md_percent_n; __dybatpho_md_percent_i++)); do
+    __dybatpho_md_percent_char="${__dybatpho_md_percent_in:__dybatpho_md_percent_i:1}"
+    case "${__dybatpho_md_percent_char}" in
+      [a-zA-Z0-9._~-]) __dybatpho_md_percent_out+="${__dybatpho_md_percent_char}" ;;
+      *)
+        printf -v __dybatpho_md_percent_char '%%%02X' "'${__dybatpho_md_percent_char}"
+        __dybatpho_md_percent_out+="${__dybatpho_md_percent_char}"
+        ;;
+    esac
+  done
+  __dybatpho_md_percent_ref="${__dybatpho_md_percent_out}"
 }
 
 #######################################

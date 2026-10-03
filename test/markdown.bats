@@ -119,6 +119,14 @@ EOF
   assert_output '[![v: 1.0](https://img.shields.io/badge/v-1.0-blue)](https://example.com/r%20e)'
 }
 
+@test "dybatpho::md_badge percent-encodes characters that would break the badge URL" {
+  # `/` would add a path segment, `?` and `#` would end the path, `%` would
+  # start an escape, and `)` would close the Markdown image early.
+  run_traced dybatpho::md_badge "a/b?" "50%#1 (ok)" "#ff0000"
+  assert_success
+  assert_output '![a/b?: 50%#1 (ok)](https://img.shields.io/badge/a%2Fb%3F-50%25%231_%28ok%29-%23ff0000)'
+}
+
 @test "dybatpho::md_code_block fences the body without escaping it" {
   run_traced dybatpho::md_code_block bash 'ls -la *.sh'
   assert_success

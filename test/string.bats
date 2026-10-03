@@ -230,6 +230,21 @@ EOF
   assert_equal "$(dybatpho::string_pad "dybatpho" 3)" "dybatpho"
 }
 
+@test "string helpers refuse a width or count that is not a whole number" {
+  local helper
+  for helper in string_truncate string_wrap string_repeat string_pad; do
+    run --separate-stderr "dybatpho::${helper}" hello abc
+    assert_failure
+    assert_stderr --partial "dybatpho::${helper}: abc is not a whole number"
+  done
+  run --separate-stderr dybatpho::string_pad hello 08
+  assert_failure
+  assert_stderr --partial "08 is not a whole number"
+  run_traced dybatpho::string_truncate hello -3
+  assert_success
+  assert_output ""
+}
+
 @test "dybatpho::url_encode output string" {
   assert_equal "$(dybatpho::url_encode "https://github.com/dynamotn/dybatpho/?f=This is sample string")" "https%3A%2F%2Fgithub.com%2Fdynamotn%2Fdybatpho%2F%3Ff%3DThis%20is%20sample%20string"
 }

@@ -889,6 +889,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence or an empty mapping stays one value, as compact JSON. Tabs,
   line breaks and backslashes inside values also survive loading, which they
   did not through `yq`.
+- **`string`, `markdown` and `lock` — bad numbers and unsafe badge text are
+  refused or encoded instead of misbehaving.** `dybatpho::string_pad`,
+  `dybatpho::string_truncate`, `dybatpho::string_repeat` and
+  `dybatpho::string_wrap` now stop with "`<value>` is not a whole number"
+  where a word used to give a raw Bash error, and a leading zero was read as
+  octal. `dybatpho::lock_acquire` refuses a timeout that is not a number of
+  seconds, as `dybatpho::lock_semaphore_acquire` already did.
+  `dybatpho::md_badge` percent-encodes `/`, `?`, `#`, `%`, parentheses and
+  every other unsafe character in the label, value and color, which used to
+  produce a broken badge link.
 
 ### Security
 

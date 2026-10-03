@@ -68,6 +68,16 @@ teardown() {
   dybatpho::lock_release "still-busy"
 }
 
+@test "dybatpho::lock_acquire refuses a timeout that is not a number of seconds" {
+  # Arithmetic on the raw value either failed with a Bash error or, for a word
+  # that happened to name an unset variable, read it as zero.
+  run --separate-stderr dybatpho::lock_acquire "timeout-check" soon
+  assert_failure
+  assert_stderr --partial "The timeout must be a number of seconds, got: soon"
+  run_traced dybatpho::lock_is_held "timeout-check"
+  assert_failure
+}
+
 @test "dybatpho::lock_info prints the current holder metadata" {
   dybatpho::lock_acquire "info-test"
   run_traced dybatpho::lock_info "info-test"

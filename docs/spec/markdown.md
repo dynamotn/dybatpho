@@ -96,6 +96,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - A raw region is cut so its closing mark is missing.
 - A heading level, an emoji shortcode, an account name, or a code-block language is invalid.
 - `dybatpho::md_table` is called without the `table` module loaded.
+- A badge's label, value or color holds a character that is not safe in a URL path, such as `/`, `?`, `#`, `%` or a parenthesis.
 
 ## Requirements *(mandatory)*
 
@@ -118,6 +119,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-015**: The collapsible builder MUST escape its summary and MUST emit its body unchanged, surrounded by blank lines.
 - **FR-016**: The mention and emoji builders MUST accept an already-delimited argument without doubling the delimiter, and MUST reject a value that cannot render.
 - **FR-017**: Every builder that takes a text block MUST accept stdin when the input argument is `-`.
+- **FR-018**: `md_badge` MUST percent-encode every character of the label, value and color outside the unreserved URL set, after the shields.io doubling of `-` and `_` and the space-to-`_` rule.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -148,6 +150,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **IT-010**: Embed a raw fragment in a builder, including one whose closing mark was cut.
 - **IT-011**: Escape inline and line-leading syntax, a backslash, stdin, and empty input.
 - **IT-012**: Render a mention and an emoji shortcode, and reject invalid values of each.
+- **IT-013**: Render a badge whose label, value and color hold `/`, `?`, `#`, `%`, a space and parentheses, and find each percent-encoded in the URL.
 
 ## Acceptance Criteria *(mandatory)*
 

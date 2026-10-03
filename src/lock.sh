@@ -385,6 +385,8 @@ function dybatpho::lock_acquire {
   local name timeout
   dybatpho::expect_args name -- "$@"
   timeout="${2:-0}"
+  dybatpho::is int "${timeout}" \
+    || dybatpho::die "${FUNCNAME[0]}: The timeout must be a number of seconds, got: ${timeout}"
 
   local lock_path
   lock_path="$(dybatpho::lock_path "${name}")"

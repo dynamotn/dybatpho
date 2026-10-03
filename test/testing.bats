@@ -525,6 +525,26 @@ setup() {
   assert_equal "$(cat "${BATS_TEST_TMPDIR}/dash")" "OTHER"
 }
 
+@test "dybatpho::mock_http keeps its script out of the execution trace" {
+  # kcov reads coverage from `xtrace`, and a traced value holding both a line
+  # break and a single quote is printed in a form kcov misreads, after which it
+  # records nothing more in the process. The mock script is exactly such a
+  # value, so it must reach its file without ever being expanded in a command.
+  local trace="${BATS_TEST_TMPDIR}/trace"
+  exec {trace_fd}> "${trace}"
+  BASH_XTRACEFD="${trace_fd}"
+  set -x
+  dybatpho::mock_http "api.test" 200 "ok"
+  set +x
+  unset BASH_XTRACEFD
+  exec {trace_fd}>&-
+
+  run_traced grep -c 'body_on_stdin=0' "${trace}"
+  assert_output "0"
+  run_traced grep -c 'body_on_stdin=0' "${DYBATPHO_TEST_MOCK_DIR}/curl"
+  assert_output "1"
+}
+
 @test "dybatpho::assert_mock_called matches whole arguments, not fragments" {
   dybatpho::mock_command tool 0
   tool deploy production --wait

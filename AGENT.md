@@ -544,6 +544,18 @@ simply cannot observe it.
 The same blind spot applies to a `case` arm with no command in it (`*) ;;`):
 there is nothing for the trap to fire on, so mark those `# kcov(skip)` too.
 
+kcov reads the lines it records from Bash's `xtrace`, and one shape of trace
+ends the recording for the rest of the test process: a traced command that
+expands a value holding both a line break and a single quote. Bash prints such
+a value as `$'...\'...'`, kcov's parser takes the `\'` for the closing quote,
+and every later trace line is swallowed as the tail of an unterminated string.
+The symptom is a test whose later calls show as never run. Keep such a value
+out of a command's arguments and out of an assignment in the code under test
+and in the test itself: write it through a here-document or a file instead,
+which the trace does not echo. `dybatpho::mock_http` does this for its `curl`
+script. `run_traced` itself is not affected, `--separate-stderr` included: its
+captures were measured and keep recording.
+
 ### Coverage is part of the change
 
 A change is not finished while the lines it adds are unmeasured. Run:

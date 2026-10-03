@@ -866,6 +866,25 @@ function dybatpho::mock_command_script {
   dybatpho::expect_args name body -- "$@"
   [[ "${name}" =~ ^[a-zA-Z0-9_.-]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Invalid command name: ${name}"
+  __dybatpho_test_mock_script_write "${name}" <<< "${body}"
+}
+
+#######################################
+# @description Install a mock command whose body is read from standard input.
+#   The body never passes through an argument or a variable, which is what
+#   keeps a long body visible to coverage: kcov reads Bash's `xtrace`, and a
+#   traced command that expands a value holding both a line break and a single
+#   quote is printed as `$'...\'...'`, which kcov's trace parser misreads as an
+#   unterminated quote, recording nothing more for the rest of the process.
+#   A here-document is not part of the trace.
+# @arg $1 string Command name to mock, already validated
+# @stdin Shell body executed by the mock
+# @set PATH Prefixed with the mock directory on first use
+# @internal
+#######################################
+function __dybatpho_test_mock_script_write {
+  local name
+  dybatpho::expect_args name -- "$@"
   __dybatpho_test_mock_init
   local mock_dir="${DYBATPHO_TEST_MOCK_DIR}"
 
@@ -873,7 +892,7 @@ function dybatpho::mock_command_script {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'printf "%%s\\n" "$*" >> %q\n' "${mock_dir}/calls/${name}"
-    printf '%s\n' "${body}"
+    cat
   } > "${script}"
   chmod +x "${script}"
   : > "${mock_dir}/calls/${name}"
@@ -1078,8 +1097,10 @@ function dybatpho::mock_http {
   printf -v calls_q '%q' "${mock_dir}/http-calls"
   printf -v payloads_q '%q' "${mock_dir}/http-payloads"
 
-  dybatpho::mock_command_script curl "$(
-    cat << MOCK_CURL
+  # Through standard input rather than `mock_command_script`'s argument: this
+  # body holds both line breaks and single quotes, and as an argument it would
+  # end coverage for the rest of every test that mocks HTTP.
+  __dybatpho_test_mock_script_write curl << MOCK_CURL
 routes=${routes_q}
 route_dir=${route_dir_q}
 calls=${calls_q}
@@ -1163,7 +1184,6 @@ fi
 printf '%s' "\${status}"
 exit 0
 MOCK_CURL
-  )"
 }
 
 #######################################

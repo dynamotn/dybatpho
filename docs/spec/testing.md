@@ -260,6 +260,7 @@ dybatpho::unmock_all
 - `stat` uses GNU syntax on Linux and BSD syntax on macOS.
 - The JSON or YAML backend is unavailable, or the document is malformed.
 - A backend prints a string scalar with its surrounding JSON quotes.
+- The suite runs under kcov, which reads `xtrace` and stops recording after a traced value that holds both a line break and a single quote.
 - A document is supplied on stdin rather than as a file path.
 - A snapshot does not exist yet, or must be deliberately rewritten.
 - Snapshotted output contains colors, timestamps, temporary paths, or pids.
@@ -403,6 +404,9 @@ dybatpho::unmock_all
 - **FR-037**: Creating or removing a command mock MUST take effect even for a
   command the shell already ran, so Bash's remembered path never bypasses a
   mock or points at a removed one.
+- **FR-038**: `mock_http` MUST write its `curl` script without expanding it in
+  a traced command, so a coverage tool reading `xtrace` keeps recording the
+  rest of the test.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -511,6 +515,8 @@ dybatpho::unmock_all
   restore the original definition.
 - **IT-027**: Mock a command after it ran, unmock it after it ran again, and
   verify the real command answers.
+- **IT-028**: Trace `mock_http` with `xtrace` and verify the trace never holds
+  the mock script, while the installed script does.
 
 ## Acceptance Criteria *(mandatory)*
 

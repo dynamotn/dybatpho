@@ -541,6 +541,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed whether or not the file existed, because the shell's `hash` takes
   any name holding a `/` on trust. A path now has to be an executable file.
 
+- **`testing` — code after `dybatpho::mock_http` shows up in coverage again.**
+  The mock passed its `curl` script through a traced argument, and kcov stops
+  recording a process once the trace holds a value with both a line break and
+  a single quote, so under kcov every line a test ran after mocking HTTP was
+  reported as never run. The script is now written without entering the
+  trace.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

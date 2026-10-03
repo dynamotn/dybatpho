@@ -266,14 +266,23 @@ function dybatpho::schedule_once_per {
   local bucket
   __dybatpho_schedule_bucket_into bucket "${period}"
 
+  # Reading the marker and writing it are one step under a short claim, so
+  # callers started together cannot all read "not yet" and all run.
+  local claim="${directory}/${key}.claim"
+  __dybatpho_schedule_claim "${claim}" || return 1
+
   if dybatpho::is file "${marker}"; then
     local recorded=""
     read -r recorded < "${marker}" || true
     if [[ "${period}" =~ ^[0-9]+$ ]]; then
       local age
       age="$(dybatpho::file_age_seconds "${marker}")"
-      ((age < period)) && return 9
+      if ((age < period)); then
+        rm -f -- "${claim}"
+        return 9
+      fi
     elif [[ "${recorded}" == "${bucket}" ]]; then
+      rm -f -- "${claim}"
       return 9
     fi
   fi
@@ -281,9 +290,44 @@ function dybatpho::schedule_once_per {
   # The marker is written before the command runs. A command that fails would
   # otherwise run again on the next invocation, which is the opposite of what
   # "at most once per period" promises; a caller that wants a retry on failure
-  # wants `dybatpho::retry`, not this.
-  printf '%s\n' "${bucket}" > "${marker}"
+  # wants `dybatpho::retry`, not this. It is written aside and renamed into
+  # place, so a reader never sees it half written.
+  printf '%s\n' "${bucket}" > "${marker}.$$.partial"
+  mv -f -- "${marker}.$$.partial" "${marker}"
+  rm -f -- "${claim}"
   "${command[@]}"
+}
+
+#######################################
+# @description Take the short claim `dybatpho::schedule_once_per` holds while
+#   it reads and writes a marker.
+#   The claim is a file created only if it does not exist yet, which one
+#   caller wins and the others wait for. It does not need the `lock` module:
+#   the section it guards is two file operations long, so a claim older than
+#   a few seconds belongs to a caller that died inside it and is removed.
+# @arg $1 string Claim file path
+# @exitcode 0 The claim was taken
+# @exitcode 1 It stayed taken for longer than the wait allows
+# @internal
+#######################################
+function __dybatpho_schedule_claim {
+  local claim="$1" attempt=0 age
+  until (set -C && printf '%s\n' "$$" > "${claim}") 2> /dev/null; do
+    # The claim can vanish between the test and the read; that is age 0.
+    age=0
+    if dybatpho::is file "${claim}"; then
+      age="$(dybatpho::file_age_seconds "${claim}" 2> /dev/null)" || age=0
+    fi
+    if ((age > 5)); then
+      rm -f -- "${claim}"
+      continue
+    fi
+    if ((++attempt > 400)); then
+      dybatpho::error "${FUNCNAME[1]}: ${claim} is still claimed after waiting"
+      return 1
+    fi
+    sleep 0.05
+  done
 }
 
 #######################################

@@ -103,6 +103,7 @@ dybatpho::schedule_every 60 -- check_health
 - A cron field is zero-padded, has a zero step, or is not a number.
 - A cron expression names Sunday as `7` rather than `0`.
 - A script debounces without having loaded the `lock` module.
+- Several callers start `schedule_once_per` for the same key at the same moment, or one dies while holding the short claim around the marker.
 
 ## Requirements *(mandatory)*
 
@@ -127,6 +128,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-017**: A malformed expression MUST be reported with its own exit code, distinct from "not due".
 - **FR-018**: An invalid interval, window, period, or run count MUST stop the script.
 - **FR-019**: Loading the module MUST NOT load `lock`; the debounce MUST stop the script, naming the `lock` module and how to load it, when that module is not loaded, before it registers a trigger.
+- **FR-020**: `schedule_once_per` MUST read and write its marker as one step under a claim, so only one of several simultaneous callers runs the command; MUST write the marker atomically; and MUST clear a claim older than a few seconds as left by a caller that died.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -168,6 +170,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-020**: Report a malformed expression, and reject an invalid field.
 - **IT-021**: Default the cron predicate to the current time.
 - **IT-022**: In a script that loaded `schedule` alone, run a once-per-day command, have the debounce stop and name the `lock` module, and debounce once `lock` is loaded.
+- **IT-023**: Start a dozen callers at once for each of several keys, with a named period and with seconds, and find exactly one run per key; plant a stale claim and find the next call runs and removes it.
 
 ## Acceptance Criteria *(mandatory)*
 

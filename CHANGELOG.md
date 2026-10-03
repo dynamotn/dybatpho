@@ -874,6 +874,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--bump` rejected every value, because its choices were written with `|`
   where the spec separates them with commas; `--bump major|minor|patch` now
   parses.
+- **`schedule` — `dybatpho::schedule_once_per` runs once even when callers
+  race.** It read the marker and wrote it as two separate steps, so callers
+  started at the same moment could all find the period unused and all run the
+  command. The check and the write now happen under a short claim, the marker
+  is written atomically, and a claim left by a caller that died is cleared
+  after a few seconds. No extra module is needed.
 
 ### Security
 

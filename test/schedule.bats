@@ -138,6 +138,40 @@ note() {
   run_traced -9 dybatpho::schedule_once_per month m -- note again
 }
 
+@test "dybatpho::schedule_once_per runs once when many callers race for the same period" {
+  # Reading the marker and writing it were two separate steps, so callers
+  # started together could all read "not yet" and all run. Several rounds of
+  # simultaneous callers, each on its own key, give the race room to show.
+  local script="${BATS_TEST_TMPDIR}/racer.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules schedule" \
+    'dybatpho::schedule_once_per "$1" "$2" -- printf "ran\n" >> "$3" || true' > "${script}"
+
+  local round period caller
+  for round in 1 2 3 4 5 6; do
+    period=day
+    ((round % 2)) || period=3600
+    for caller in $(seq 1 12); do
+      bash "${script}" "${period}" "race-${round}" "${LOG}.${round}" &
+    done
+    wait
+    assert_equal "$(wc -l < "${LOG}.${round}" | tr -d ' ')" "1"
+  done
+}
+
+@test "dybatpho::schedule_once_per clears a claim left by a caller that died" {
+  # The claim guards two file operations, so one that has been held for
+  # seconds belongs to a process that died inside them, not to a live caller.
+  mkdir -p "${DYBATPHO_SCHEDULE_DIR}"
+  printf '99999\n' > "${DYBATPHO_SCHEDULE_DIR}/stale.claim"
+  touch -t 202001010000 "${DYBATPHO_SCHEDULE_DIR}/stale.claim"
+
+  run_traced dybatpho::schedule_once_per day stale -- note ran
+  assert_success
+  assert_equal "$(cat "${LOG}")" "ran"
+  assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/stale.claim"
+}
+
 @test "dybatpho::schedule_once_per rejects a period it does not know" {
   run --separate-stderr dybatpho::schedule_once_per fortnight k -- true
   assert_failure

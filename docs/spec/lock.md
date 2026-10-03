@@ -160,6 +160,7 @@ dybatpho::lock_semaphore_holders downloads 4
 
 ## Edge Cases
 
+- A wait runs while `dybatpho::mock_time` has frozen the `date` clock.
 - A bare lock name, an explicit relative path, and an explicit absolute path
   must all resolve to a lock directory.
 - A name that already ends in `.lock` must not gain a second `.lock` suffix.
@@ -263,6 +264,7 @@ dybatpho::lock_semaphore_holders downloads 4
   whose holder changed after it was judged stale.
 - **FR-028**: `lock_semaphore_acquire` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
 - **FR-029**: `lock_acquire` MUST stop with a message naming the value when its timeout is not a whole number of seconds, before it touches the lock.
+- **FR-030**: `lock_acquire` and `lock_semaphore_acquire` MUST share one wait loop that times the wait with Bash's own clock, so a poll starts no `date` process and a frozen `date` clock does not hold a wait open, and MUST ask for the host name at most once per call.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -337,6 +339,7 @@ dybatpho::lock_semaphore_holders downloads 4
   check and claimed by the next process.
 - **IT-024**: Acquire slots into variables called `timeout`, `slot_path` and `target`, and find each one filled.
 - **IT-025**: Call `lock_acquire` with the timeout `soon` and find a clear refusal and no lock taken.
+- **IT-026**: Wait for a held lock while the `date` clock is frozen and find the wait ends on time; wait for a held lock and a full semaphore and find the host name asked for once each.
 
 ## Acceptance Criteria *(mandatory)*
 

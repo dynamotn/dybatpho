@@ -1341,10 +1341,10 @@ function __dybatpho_test_real_date {
 # @set PATH Prefixed with the mock directory on first use
 # @exitcode 0 The clock is frozen
 # @exitcode 1 The timestamp is not a whole number, or no usable `date` is on `PATH`
-# @tip The clock stays still until it is moved, so code that waits for time to
-#      pass -- `dybatpho::lock_acquire` with a timeout above `0` on a held lock --
-#      waits forever. Move the clock with `dybatpho::mock_time_advance`, or
-#      unfreeze it around such a call.
+# @tip The clock stays still until it is moved, so code that waits for `date`
+#      to move waits forever. Move the clock with `dybatpho::mock_time_advance`,
+#      or unfreeze it around such a call. Lock waits are not affected: they are
+#      timed by Bash's own clock.
 # @see
 #   - `dybatpho::mock_time_advance`
 #   - `dybatpho::unmock_time`

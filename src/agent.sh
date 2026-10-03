@@ -412,117 +412,129 @@ function dybatpho::agent_audit_show {
 function __dybatpho_agent_flatten_schema {
   local schema
   dybatpho::expect_args schema -- "$@"
-  __dybatpho_agent_flatten_command "${schema}" '[]' '[]'
+  local -a entries=()
+  __dybatpho_agent_flatten_into entries "${schema}" '[]'
+  local IFS=,
+  printf '[%s]\n' "${entries[*]}"
 }
 
 #######################################
-# @description Append one command and its subcommands to a flat list.
-# @arg $1 string Command node JSON
-# @arg $2 string Path of the parent command, as a JSON array
-# @arg $3 string Accumulated list JSON
-# @stdout The list with this command and its descendants appended
+# @description Append one command and its subcommands to a list of entries.
+#   One read per command answers the entry, its name and its subcommands, each
+#   as a line of compact JSON, where reading them field by field and appending
+#   to a growing document took around eight processes per command.
+# @arg $1 string Name of the array the compact entries are appended to
+# @arg $2 string Command node JSON
+# @arg $3 string Path of the parent command, as a JSON array
+# @set The named array
 # @internal
 #######################################
-function __dybatpho_agent_flatten_command {
-  local node parent flattened
-  dybatpho::expect_args node parent flattened -- "$@"
-
-  local name path description options entry
-  name=$(dybatpho::json_get "${node}" '.name')
-  local json_string
-  json_string=$(dybatpho::json_string "${name}")
-  path=$(dybatpho::json_eval "${parent}" ". + [${json_string}]")
-  description=$(dybatpho::json_get "${node}" '.description')
-  options=$(dybatpho::json_eval "${node}" '[.options[]? | select(.hidden != true)]')
-  entry=$(dybatpho::json_object \
-    path:json "${path}" description "${description}" options:json "${options}")
-  flattened=$(dybatpho::json_eval "${flattened}" ". + [${entry}]")
-
-  local total index=0
-  total=$(dybatpho::json_get "${node}" '[.commands[]?] | length')
-  while ((index < total)); do
-    local json_eval
-    json_eval=$(dybatpho::json_eval "${node}" ".commands[${index}]")
-    flattened=$(__dybatpho_agent_flatten_command \
-      "${json_eval}" \
-      "${path}" "${flattened}")
-    index=$((index + 1))
+function __dybatpho_agent_flatten_into {
+  local __dybatpho_agent_flat_var __dybatpho_agent_flat_node __dybatpho_agent_flat_parent
+  dybatpho::expect_args __dybatpho_agent_flat_var __dybatpho_agent_flat_node \
+    __dybatpho_agent_flat_parent -- "$@"
+  local -n __dybatpho_agent_flat_out="${__dybatpho_agent_flat_var}"
+  local __dybatpho_agent_flat_lines
+  __dybatpho_agent_flat_lines=$(dybatpho::json_get "${__dybatpho_agent_flat_node}" \
+    "(${__dybatpho_agent_flat_parent} + [(.name | tostring)]) as \$path
+      | ({\"path\": \$path, \"description\": (.description | tostring),
+          \"options\": [.options[]? | select(.hidden != true)]} | @json),
+        (.name | tostring | @json),
+        (.commands[]? | @json)")
+  local -a __dybatpho_agent_flat_parts=()
+  mapfile -t __dybatpho_agent_flat_parts <<< "${__dybatpho_agent_flat_lines}"
+  __dybatpho_agent_flat_out+=("${__dybatpho_agent_flat_parts[0]}")
+  # The children's parent path is this one with the name appended, spelled
+  # here from the backend's own rendering of the name: `yq` drops an output
+  # that depends only on a variable, so the path can't come back as a line.
+  local __dybatpho_agent_flat_path="${__dybatpho_agent_flat_parent%]}"
+  [[ "${__dybatpho_agent_flat_path}" == "[" ]] || __dybatpho_agent_flat_path+=","
+  __dybatpho_agent_flat_path+="${__dybatpho_agent_flat_parts[1]}]"
+  local __dybatpho_agent_flat_index
+  for ((__dybatpho_agent_flat_index = 2; __dybatpho_agent_flat_index < ${#__dybatpho_agent_flat_parts[@]}; \
+  __dybatpho_agent_flat_index++)); do
+    __dybatpho_agent_flatten_into "${__dybatpho_agent_flat_var}" \
+      "${__dybatpho_agent_flat_parts[__dybatpho_agent_flat_index]}" "${__dybatpho_agent_flat_path}"
   done
-  printf '%s\n' "${flattened}"
 }
 
 #######################################
-# @description Build a JSON Schema object from a command's option list.
-# Flags become booleans, parameters become strings, `choices:` becomes an
-# `enum`, and `multiple:true` becomes an array of that item type.
-# @arg $1 string Options array JSON
-# @stdout JSON Schema object
+# @description Build the filter that renders a command entry's options as a
+#   JSON Schema object, in one pass over the entry.
+#   Each option became a property through several reads and a growing document
+#   rewritten per option, around ten processes each. A filter does it in the
+#   one read that renders the whole tool. The two backends differ in exactly
+#   two words, the reduction and the lower-casing, so those are chosen here;
+#   and every branch reads its own input, because a `yq` literal ignores an
+#   empty input and would answer even where `select` matched nothing.
+# @arg $1 string Name of the variable receiving the filter
+# @set The named variable, an expression over one entry
 # @internal
 #######################################
-function __dybatpho_agent_options_schema {
-  local options
-  dybatpho::expect_args options -- "$@"
+function __dybatpho_agent_options_filter_into {
+  local __dybatpho_agent_opts_var
+  dybatpho::expect_args __dybatpho_agent_opts_var -- "$@"
+  local -n __dybatpho_agent_opts_out="${__dybatpho_agent_opts_var}"
+  local __dybatpho_agent_opts_cmd __dybatpho_agent_opts_down __dybatpho_agent_opts_reduce
+  __dybatpho_json_cmd_into __dybatpho_agent_opts_cmd
+  # `$opt` is a variable of the filter, not of the shell.
+  # shellcheck disable=SC2016
+  if [[ "${__dybatpho_agent_opts_cmd}" == "yq" ]]; then
+    __dybatpho_agent_opts_down=downcase
+    __dybatpho_agent_opts_reduce='.options[] as $opt ireduce'
+  else
+    __dybatpho_agent_opts_down=ascii_downcase
+    __dybatpho_agent_opts_reduce='reduce .options[] as $opt'
+  fi
+  local enum='((select(((.choices // "") | tostring) != "") | {"enum": (.choices | split(","))}) // {})'
+  local description='"description": (.description | tostring)'
+  local property="(\$opt | (select(.type == \"flag\") | {\"type\": \"boolean\", ${description}})
+    // (select(.multiple == true)
+      | {\"type\": \"array\", ${description}, \"items\": ({\"type\": \"string\"} + ${enum})})
+    // ({\"type\": \"string\", ${description}} + ${enum}))"
+  __dybatpho_agent_opts_out="{\"type\": \"object\",
+    \"properties\": (${__dybatpho_agent_opts_reduce} ({};
+      . + {((\$opt | .name | tostring) | ${__dybatpho_agent_opts_down}): ${property}})),
+    \"required\": [.options[] | select(.required == true)
+      | (.name | tostring | ${__dybatpho_agent_opts_down})],
+    \"additionalProperties\": false}"
+}
 
-  local total index=0
-  total=$(dybatpho::json_get "${options}" 'length')
-  local properties='{}' required='[]'
-  local option name key type description choices multiple property
+#######################################
+# @description Render every flattened command as a tool definition.
+#   The tool names are read for all commands at once and made safe here, a byte
+#   at a time as `tr` did; each definition is then one read of its entry.
+# @arg $1 string Name of the array receiving one compact definition per command
+# @arg $2 string Flattened command list JSON
+# @arg $3 string Template of the definition, with `@NAME@` and `@SCHEMA@`
+#   standing for the tool name literal and the input schema expression
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_agent_each_tool_into {
+  local __dybatpho_agent_each_var __dybatpho_agent_each_commands __dybatpho_agent_each_template
+  dybatpho::expect_args __dybatpho_agent_each_var __dybatpho_agent_each_commands \
+    __dybatpho_agent_each_template -- "$@"
+  local -n __dybatpho_agent_each_out="${__dybatpho_agent_each_var}"
+  local __dybatpho_agent_each_schema
+  __dybatpho_agent_options_filter_into __dybatpho_agent_each_schema
 
-  while ((index < total)); do
-    option=$(dybatpho::json_eval "${options}" ".[${index}]")
-    name=$(dybatpho::json_get "${option}" '.name')
-    # The option name is lowercased here because the two JSON backends spell
-    # their case conversion differently.
-    key=$(dybatpho::lower "${name}")
-    type=$(dybatpho::json_get "${option}" '.type')
-    description=$(dybatpho::json_get "${option}" '.description')
-    choices=$(dybatpho::json_get "${option}" '.choices // ""')
-    multiple=$(dybatpho::json_get "${option}" '.multiple')
+  local __dybatpho_agent_each_names
+  __dybatpho_agent_each_names=$(dybatpho::json_get "${__dybatpho_agent_each_commands}" \
+    '.[] | .path | join("_")')
+  local -a __dybatpho_agent_each_list=()
+  [[ -z "${__dybatpho_agent_each_names}" ]] \
+    || mapfile -t __dybatpho_agent_each_list <<< "${__dybatpho_agent_each_names}"
 
-    local -a enum=()
-    if dybatpho::is set "${choices}"; then
-      local json_string
-      json_string=$(dybatpho::json_string "${choices}")
-      enum=(enum:json "$(dybatpho::json_eval \
-        "${json_string}" 'split(",")')")
-    fi
-
-    if [[ "${type}" == "flag" ]]; then
-      property=$(dybatpho::json_object type boolean description "${description}")
-    elif [[ "${multiple}" == "true" ]]; then
-      local items
-      if ((${#enum[@]} > 0)); then
-        items=$(dybatpho::json_object type string "${enum[@]}")
-      else
-        items=$(dybatpho::json_object type string)
-      fi
-      property=$(dybatpho::json_object \
-        type array description "${description}" items:json "${items}")
-    else
-      property=$(dybatpho::json_object \
-        type string description "${description}" "${enum[@]}")
-    fi
-
-    local json_object
-    json_object=$(dybatpho::json_object "${key}:json" "${property}")
-    properties=$(dybatpho::json_eval "${properties}" \
-      ". + ${json_object}")
-    local json_get
-    json_get=$(dybatpho::json_get "${option}" '.required')
-    if [[ "${json_get}" == "true" ]]; then
-      local key_json
-      key_json=$(dybatpho::json_string "${key}")
-      required=$(dybatpho::json_eval "${required}" \
-        ". + [${key_json}]")
-    fi
-    index=$((index + 1))
+  local __dybatpho_agent_each_index=0 __dybatpho_agent_each_name __dybatpho_agent_each_filter
+  for __dybatpho_agent_each_name in ${__dybatpho_agent_each_list[@]+"${__dybatpho_agent_each_list[@]}"}; do
+    __dybatpho_agent_tool_name_into __dybatpho_agent_each_name "${__dybatpho_agent_each_name}"
+    __dybatpho_agent_each_filter="${__dybatpho_agent_each_template//@NAME@/\"${__dybatpho_agent_each_name}\"}"
+    __dybatpho_agent_each_filter="${__dybatpho_agent_each_filter//@SCHEMA@/${__dybatpho_agent_each_schema}}"
+    __dybatpho_agent_each_out+=("$(dybatpho::json_get "${__dybatpho_agent_each_commands}" \
+      ".[${__dybatpho_agent_each_index}] | (${__dybatpho_agent_each_filter}) | @json")")
+    __dybatpho_agent_each_index=$((__dybatpho_agent_each_index + 1))
   done
-
-  dybatpho::json_object \
-    type object \
-    properties:json "${properties}" \
-    required:json "${required}" \
-    additionalProperties:json false
 }
 
 #######################################
@@ -554,48 +566,40 @@ function dybatpho::agent_tools {
     anthropic | openai) ;;
     *) dybatpho::die "dybatpho::agent_tools: Unknown format '${format}', expected anthropic or openai" ;;
   esac
-  local schema commands tools='[]' entry description input_schema tool_name definition
+  local schema commands
   schema=$(dybatpho::generate_schema "${spec}" "${name}")
   commands=$(__dybatpho_agent_flatten_schema "${schema}")
 
-  local index=0 total
-  total=$(dybatpho::json_get "${commands}" 'length')
-  while ((index < total)); do
-    entry=$(dybatpho::json_eval "${commands}" ".[${index}]")
-    description=$(dybatpho::json_get "${entry}" '.description')
-    tool_name=$(__dybatpho_agent_tool_name "${entry}")
-    local json_eval
-    json_eval=$(dybatpho::json_eval "${entry}" '.options')
-    input_schema=$(__dybatpho_agent_options_schema "${json_eval}")
-    if [[ "${format}" == "anthropic" ]]; then
-      definition=$(dybatpho::json_object \
-        name "${tool_name}" description "${description}" input_schema:json "${input_schema}")
-    else
-      local function_definition
-      function_definition=$(dybatpho::json_object \
-        name "${tool_name}" description "${description}" parameters:json "${input_schema}")
-      definition=$(dybatpho::json_object type function function:json "${function_definition}")
-    fi
-    tools=$(dybatpho::json_eval "${tools}" ". + [${definition}]")
-    index=$((index + 1))
-  done
-  printf '%s\n' "${tools}"
+  local template
+  if [[ "${format}" == "anthropic" ]]; then
+    template='{"name": @NAME@, "description": (.description | tostring), "input_schema": (@SCHEMA@)}'
+  else
+    template='{"type": "function", "function": {"name": @NAME@,
+      "description": (.description | tostring), "parameters": (@SCHEMA@)}}'
+  fi
+  local -a definitions=()
+  __dybatpho_agent_each_tool_into definitions "${commands}" "${template}"
+  local IFS=,
+  printf '[%s]\n' "${definitions[*]}"
 }
 
 #######################################
 # @description Derive a callable tool name from a flattened command entry.
 # The command path is joined with underscores and anything a tool name may not
 # contain is replaced, so a prefix with a space still yields a valid name.
-# @arg $1 string Flattened command entry JSON
-# @stdout Tool name
+# @arg $1 string Name of the variable receiving the tool name
+# @arg $2 string Command path joined with underscores
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_agent_tool_name {
-  local entry
-  dybatpho::expect_args entry -- "$@"
-  local path
-  path=$(dybatpho::json_get "${entry}" '.path | join("_")')
-  printf '%s' "${path}" | tr -c 'a-zA-Z0-9_' '_'
+function __dybatpho_agent_tool_name_into {
+  local __dybatpho_agent_tool_name_var __dybatpho_agent_tool_name_path
+  dybatpho::expect_args __dybatpho_agent_tool_name_var __dybatpho_agent_tool_name_path -- "$@"
+  local -n __dybatpho_agent_tool_name_out="${__dybatpho_agent_tool_name_var}"
+  # Byte by byte, as `tr` replaced them: a character outside ASCII becomes one
+  # underscore per byte it takes, whatever the locale.
+  local LC_ALL=C
+  __dybatpho_agent_tool_name_out="${__dybatpho_agent_tool_name_path//[^a-zA-Z0-9_]/_}"
 }
 
 #######################################
@@ -620,34 +624,23 @@ function dybatpho::agent_mcp {
   dybatpho::expect_args spec -- "$@"
   name="${2:-${0##*/}}"
   command="${3:-$0}"
-  local schema commands tools='[]' entry description input_schema tool_name argv definition
+  local schema commands
   schema=$(dybatpho::generate_schema "${spec}" "${name}")
   commands=$(__dybatpho_agent_flatten_schema "${schema}")
 
-  local index=0 total
-  total=$(dybatpho::json_get "${commands}" 'length')
-  while ((index < total)); do
-    entry=$(dybatpho::json_eval "${commands}" ".[${index}]")
-    description=$(dybatpho::json_get "${entry}" '.description')
-    tool_name=$(__dybatpho_agent_tool_name "${entry}")
-    local json_eval
-    json_eval=$(dybatpho::json_eval "${entry}" '.options')
-    input_schema=$(__dybatpho_agent_options_schema "${json_eval}")
-    # The first path element is the root name, which the command already names.
-    # `.path | .[1:]` rather than `.path[1:]`: yq 4.52 applies the latter slice to
-    # the enclosing object, not to `.path`.
-    local json_string
-    json_string=$(dybatpho::json_string "${command}")
-    argv=$(dybatpho::json_eval "${entry}" \
-      "[${json_string}] + (.path | .[1:])")
-    definition=$(dybatpho::json_object \
-      name "${tool_name}" \
-      description "${description}" \
-      inputSchema:json "${input_schema}" \
-      x-dybatpho-command:json "${argv}")
-    tools=$(dybatpho::json_eval "${tools}" ". + [${definition}]")
-    index=$((index + 1))
-  done
-
+  # The first path element is the root name, which the command already names.
+  # `.path | .[1:]` rather than `.path[1:]`: yq 4.52 applies the latter slice to
+  # the enclosing object, not to `.path`.
+  local command_json
+  command_json=$(dybatpho::json_string "${command}")
+  local template='{"name": @NAME@, "description": (.description | tostring),
+    "inputSchema": (@SCHEMA@), "x-dybatpho-command": (['"${command_json}"'] + (.path | .[1:]))}'
+  local -a definitions=()
+  __dybatpho_agent_each_tool_into definitions "${commands}" "${template}"
+  local tools
+  tools="[$(
+    IFS=,
+    printf '%s' "${definitions[*]}"
+  )]"
   dybatpho::json_object name "${name}" version 1.0.0 tools:json "${tools}"
 }

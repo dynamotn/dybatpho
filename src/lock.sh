@@ -74,17 +74,70 @@ function __dybatpho_lock_exists {
 }
 
 #######################################
-# @description Print the link target that identifies the holder of a lock,
-#   as `pid:host:acquired_at`.
-# @noargs
-# @stdout The target
+# @description Build the link target that identifies the holder of a lock,
+#   as `pid:host:acquired_at`, into a variable.
+#   The time comes from Bash's own clock, so building it starts no process: a
+#   claim is attempted on every poll, and two processes per attempt -- `date`
+#   and the host name -- were most of what polling a held lock cost.
+# @arg $1 string Name of the variable receiving the target
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_lock_target {
-  local acquired_at host
-  acquired_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  host=$(dybatpho::lock_hostname)
-  printf '%s:%s:%s' "$$" "${host}" "${acquired_at}"
+function __dybatpho_lock_target_into {
+  local -n __dybatpho_lock_target_out="$1"
+  local __dybatpho_lock_target_at __dybatpho_lock_target_host
+  TZ=UTC printf -v __dybatpho_lock_target_at '%(%Y-%m-%dT%H:%M:%SZ)T' -1
+  __dybatpho_lock_host_into __dybatpho_lock_target_host
+  __dybatpho_lock_target_out="$$:${__dybatpho_lock_target_host}:${__dybatpho_lock_target_at}"
+}
+
+#######################################
+# @description Read the host name a lock records, at most once per wait.
+#   A waiting call declares `__dybatpho_lock_host_cache` local, and the name is
+#   asked for the first time it is needed and kept for the rest of that call.
+#   Outside such a call it is asked every time, so a test that replaces
+#   `dybatpho::lock_hostname` is always heard.
+# @arg $1 string Name of the variable receiving the host name
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_lock_host_into {
+  local -n __dybatpho_lock_host_out="$1"
+  if [[ -v __dybatpho_lock_host_cache ]]; then
+    # The waiting call declared it local; filling it is how the name is kept.
+    # dyshellint disable=BSG011 written through to the caller's local on purpose
+    [[ -n "${__dybatpho_lock_host_cache}" ]] \
+      || __dybatpho_lock_host_cache="$(dybatpho::lock_hostname)"
+    __dybatpho_lock_host_out="${__dybatpho_lock_host_cache}"
+    return 0
+  fi
+  __dybatpho_lock_host_out="$(dybatpho::lock_hostname)"
+}
+
+#######################################
+# @description Retry an attempt until it succeeds or a timeout runs out.
+#   The one wait loop both a lock and a semaphore use. Elapsed time is read from
+#   Bash's own clock rather than from `date`, so a poll starts no process for
+#   it, and a clock frozen by `dybatpho::mock_time` does not hold a wait open.
+# @arg $1 number Seconds to keep trying; `0` tries once
+# @arg $@ string The attempt command and its arguments
+# @env DYBATPHO_LOCK_POLL_INTERVAL number Seconds to sleep between attempts
+# @exitcode 0 An attempt succeeded
+# @exitcode 1 The timeout ran out first
+# @internal
+#######################################
+function __dybatpho_lock_wait {
+  local __dybatpho_lock_wait_timeout="$1"
+  shift
+  local __dybatpho_lock_wait_start __dybatpho_lock_wait_now
+  printf -v __dybatpho_lock_wait_start '%(%s)T' -1
+  while true; do
+    "$@" && return 0
+    printf -v __dybatpho_lock_wait_now '%(%s)T' -1
+    ((__dybatpho_lock_wait_now - __dybatpho_lock_wait_start >= __dybatpho_lock_wait_timeout)) \
+      && return 1
+    sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"
+  done
 }
 
 #######################################
@@ -304,8 +357,10 @@ function __dybatpho_lock_holder_alive {
   [[ -n "${pid}" ]] || return 1
   # A lock recorded on a different host can't be checked for liveness locally,
   # so conservatively treat it as still held.
-  if [[ -n "${host}" && "${host}" != "$(dybatpho::lock_hostname)" ]]; then
-    return 0
+  if [[ -n "${host}" ]]; then
+    local local_host
+    __dybatpho_lock_host_into local_host
+    [[ "${host}" == "${local_host}" ]] || return 0
   fi
   kill -0 "${pid}" > /dev/null 2>&1
 }
@@ -347,7 +402,7 @@ function __dybatpho_lock_try {
   # and a second process read the missing pid as "nobody holds this", removed
   # the lock and took it.
   local lock_target
-  lock_target=$(__dybatpho_lock_target)
+  __dybatpho_lock_target_into lock_target
   ln -s "${lock_target}" "${lock_path}" 2> /dev/null || return 1
   printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" \
     > "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" 2> /dev/null || true
@@ -381,20 +436,12 @@ function dybatpho::lock_acquire {
   local lock_path
   lock_path="$(dybatpho::lock_path "${name}")"
 
-  local start_time elapsed
-  start_time="$(date +%s)"
-  while true; do
-    __dybatpho_lock_try "${lock_path}" && return 0
-
-    elapsed=$(($(date +%s) - start_time))
-    if ((elapsed >= timeout)); then
-      local holder
-      holder="$(dybatpho::lock_info "${name}" 2> /dev/null || echo 'held by an unknown process')"
-      dybatpho::error "Could not acquire lock ${lock_path}: ${holder}"
-      return 1
-    fi
-    sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"
-  done
+  local __dybatpho_lock_host_cache=""
+  __dybatpho_lock_wait "${timeout}" __dybatpho_lock_try "${lock_path}" && return 0
+  local holder
+  holder="$(dybatpho::lock_info "${name}" 2> /dev/null || echo 'held by an unknown process')"
+  dybatpho::error "Could not acquire lock ${lock_path}: ${holder}"
+  return 1
 }
 
 #######################################
@@ -550,32 +597,48 @@ function dybatpho::lock_semaphore_acquire {
     || dybatpho::die "${FUNCNAME[0]}: The timeout must be a number of seconds, got: ${__dybatpho_lock_timeout}"
   [[ -z "${__dybatpho_lock_target}" ]] || dybatpho::expect_ref "${__dybatpho_lock_target}"
 
-  local __dybatpho_lock_start __dybatpho_lock_elapsed __dybatpho_lock_slot __dybatpho_lock_slot_path
-  __dybatpho_lock_start="$(date +%s)"
-  while true; do
-    for ((__dybatpho_lock_slot = 1; __dybatpho_lock_slot <= __dybatpho_lock_slots; __dybatpho_lock_slot++)); do
-      __dybatpho_lock_slot_path="$(__dybatpho_lock_slot_path "${__dybatpho_lock_name}" "${__dybatpho_lock_slot}")"
-      __dybatpho_lock_try "${__dybatpho_lock_slot_path}" || continue
-      if [[ -n "${__dybatpho_lock_target}" ]]; then
-        local -n __dybatpho_lock_slot_ref="${__dybatpho_lock_target}"
-        # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-        __dybatpho_lock_slot_ref="${__dybatpho_lock_slot}"
-      fi
-      return 0
-    done
-
-    __dybatpho_lock_elapsed=$(($(date +%s) - __dybatpho_lock_start))
-    if ((__dybatpho_lock_elapsed >= __dybatpho_lock_timeout)); then
-      local __dybatpho_lock_holders
-      __dybatpho_lock_holders="$(dybatpho::lock_semaphore_holders \
-        "${__dybatpho_lock_name}" "${__dybatpho_lock_slots}" 2> /dev/null || true)"
-      local __dybatpho_lock_message="Could not acquire a slot of semaphore ${__dybatpho_lock_name}:"
-      __dybatpho_lock_message+=" all ${__dybatpho_lock_slots} are held"$'\n'"${__dybatpho_lock_holders}"
-      dybatpho::error "${__dybatpho_lock_message}"
-      return 1
+  local __dybatpho_lock_host_cache="" __dybatpho_lock_taken="" __dybatpho_lock_base
+  __dybatpho_lock_base="$(dybatpho::lock_path "${__dybatpho_lock_name}")"
+  if __dybatpho_lock_wait "${__dybatpho_lock_timeout}" \
+    __dybatpho_lock_try_slots __dybatpho_lock_taken "${__dybatpho_lock_base%.lock}" "${__dybatpho_lock_slots}"; then
+    if [[ -n "${__dybatpho_lock_target}" ]]; then
+      local -n __dybatpho_lock_slot_ref="${__dybatpho_lock_target}"
+      # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
+      __dybatpho_lock_slot_ref="${__dybatpho_lock_taken}"
     fi
-    sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"
+    return 0
+  fi
+
+  local __dybatpho_lock_holders
+  __dybatpho_lock_holders="$(dybatpho::lock_semaphore_holders \
+    "${__dybatpho_lock_name}" "${__dybatpho_lock_slots}" 2> /dev/null || true)"
+  local __dybatpho_lock_message="Could not acquire a slot of semaphore ${__dybatpho_lock_name}:"
+  __dybatpho_lock_message+=" all ${__dybatpho_lock_slots} are held"$'\n'"${__dybatpho_lock_holders}"
+  dybatpho::error "${__dybatpho_lock_message}"
+  return 1
+}
+
+#######################################
+# @description Make one pass over a semaphore's slots, taking the first free one.
+# @arg $1 string Name of the variable receiving the slot number taken
+# @arg $2 string Semaphore lock path without its `.lock` suffix, resolved once per wait
+# @arg $3 number Number of slots
+# @set The named variable, when a slot was taken
+# @exitcode 0 A slot was taken by the current process
+# @exitcode 1 Every slot is held by a live process
+# @internal
+#######################################
+function __dybatpho_lock_try_slots {
+  local -n __dybatpho_lock_try_slot_out="$1"
+  local __dybatpho_lock_try_base="$2" __dybatpho_lock_try_slots_n="$3"
+  local __dybatpho_lock_try_slot
+  for ((__dybatpho_lock_try_slot = 1; __dybatpho_lock_try_slot <= __dybatpho_lock_try_slots_n; \
+  __dybatpho_lock_try_slot++)); do
+    __dybatpho_lock_try "${__dybatpho_lock_try_base}.slot${__dybatpho_lock_try_slot}.lock" || continue
+    __dybatpho_lock_try_slot_out="${__dybatpho_lock_try_slot}"
+    return 0
   done
+  return 1
 }
 
 #######################################

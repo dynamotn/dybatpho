@@ -182,7 +182,7 @@ dybatpho::assert_mock_called kubectl get pods
 
 ### `dybatpho::mock_time`
 
-- The clock stays still until it is moved, so code that waits for time to pass -- `dybatpho::lock_acquire` with a timeout above `0` on a held lock -- waits forever. Move the clock with `dybatpho::mock_time_advance`, or unfreeze it around such a call.
+- The clock stays still until it is moved, so code that waits for `date` to move waits forever. Move the clock with `dybatpho::mock_time_advance`, or unfreeze it around such a call. Lock waits are not affected: they are timed by Bash's own clock.
 
 ### `dybatpho::mock_time_advance`
 

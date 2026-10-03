@@ -409,12 +409,34 @@ _spec_test_deploy() {
   assert_equal "$(dybatpho::json_eval "${flattened}" '.[1].path')" '["mytool","deploy"]'
 }
 
-@test "__dybatpho_agent_options_schema handles an empty option list" {
-  local schema
-  schema=$(__dybatpho_agent_options_schema '[]')
-  assert_equal "$(dybatpho::json_get "${schema}" '.type')" "object"
-  assert_equal "$(dybatpho::json_eval "${schema}" '.properties')" "{}"
-  assert_equal "$(dybatpho::json_eval "${schema}" '.required')" "[]"
+@test "__dybatpho_agent_options_filter_into handles an empty option list" {
+  local filter schema
+  __dybatpho_agent_options_filter_into filter
+  schema=$(dybatpho::json_eval '{"options":[]}' "${filter}")
+  assert_equal "${schema}" '{"type":"object","properties":{},"required":[],"additionalProperties":false}'
+}
+
+@test "__dybatpho_agent_flatten_schema reads each command once" {
+  # Walking the tree took around eight backend processes per command, plus a
+  # rewrite of the growing list for each one.
+  local schema real_yq real_jq count="${BATS_TEST_TMPDIR}/backend-calls"
+  schema="$(dybatpho::generate_schema _spec_test_root mytool)"
+  real_yq="$(command -v yq || true)"
+  real_jq="$(command -v jq || true)"
+  [[ -z "${real_yq}" ]] \
+    || dybatpho::mock_command_script yq "printf x >> '${count}'; exec '${real_yq}' \"\$@\""
+  [[ -z "${real_jq}" ]] \
+    || dybatpho::mock_command_script jq "printf x >> '${count}'; exec '${real_jq}' \"\$@\""
+  : > "${count}"
+  __dybatpho_agent_flatten_schema "${schema}" > /dev/null
+  assert_equal "$(< "${count}")" "xx"
+  dybatpho::unmock_all
+}
+
+@test "a tool name replaces every byte a tool name can't hold" {
+  local name
+  __dybatpho_agent_tool_name_into name "my tool_é-1"
+  assert_equal "${name}" "my_tool____1"
 }
 
 @test "__dybatpho_agent_allowed matches whole words only" {

@@ -319,6 +319,61 @@ teardown() {
   dybatpho::lock_release "reclaim-race"
 }
 
+@test "a lock wait is timed by Bash's own clock, so a frozen date clock does not hold it" {
+  sleep 120 &
+  local holder_pid=$!
+  ln -s "${holder_pid}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" \
+    "$(dybatpho::lock_path "frozen-wait")"
+  dybatpho::mock_time 1767225600
+
+  # Waited for in the background, so a wait that never ends fails the test
+  # instead of hanging it.
+  (
+    status=0
+    dybatpho::lock_acquire "frozen-wait" 1 2> /dev/null || status=$?
+    printf '%s' "${status}" > "${BATS_TEST_TMPDIR}/waited"
+  ) &
+  local waiter=$! tries=0
+  while [[ ! -s "${BATS_TEST_TMPDIR}/waited" ]] && ((tries < 100)); do
+    sleep 0.1
+    tries=$((tries + 1))
+  done
+  kill "${waiter}" 2> /dev/null || true
+  kill "${holder_pid}" 2> /dev/null || true
+  dybatpho::unmock_time
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/waited" 2> /dev/null)" "1"
+}
+
+@test "a wait asks for the host name once, however many times it polls" {
+  sleep 120 &
+  local holder_pid=$!
+  local here
+  here="$(dybatpho::lock_hostname)"
+  ln -s "${holder_pid}:${here}:2026-01-01T00:00:00Z" "$(dybatpho::lock_path "polled")"
+  ln -s "${holder_pid}:${here}:2026-01-01T00:00:00Z" "${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot1.lock"
+  ln -s "${holder_pid}:${here}:2026-01-01T00:00:00Z" "${DYBATPHO_LOCK_DIR}/dybatpho-pool.slot2.lock"
+
+  local asked="${BATS_TEST_TMPDIR}/asked"
+  local definition
+  definition="$(declare -f dybatpho::lock_hostname)"
+  eval "counted_lock_hostname${definition#dybatpho::lock_hostname}"
+  dybatpho::lock_hostname() {
+    printf 'x' >> "${asked}"
+    counted_lock_hostname
+  }
+  DYBATPHO_LOCK_POLL_INTERVAL=0.05
+
+  : > "${asked}"
+  run_traced -1 dybatpho::lock_acquire "polled" 1
+  assert_equal "$(< "${asked}")" "x"
+
+  : > "${asked}"
+  run_traced -1 dybatpho::lock_semaphore_acquire "pool" 2 1
+  assert_equal "$(< "${asked}")" "x"
+
+  kill "${holder_pid}" 2> /dev/null || true
+}
+
 @test "a lock is claimed atomically, with its owner already in it" {
   local lock_path
   lock_path="$(dybatpho::lock_path "atomic-claim")"

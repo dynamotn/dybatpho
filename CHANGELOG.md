@@ -162,7 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rate-limit windows give exact answers; `dybatpho::mock_time_advance` moves it
   by any number of seconds, and `dybatpho::unmock_time` releases it. A `date`
   call that names its own moment (`-d`, `-r`, …) still goes to the real `date`,
-  and millisecond timers keep measuring real time. `dybatpho::mock_tty` makes
+  and millisecond timers and lock waits keep measuring real time.
+  `dybatpho::mock_tty` makes
   `dybatpho::is_tty` — and so `dybatpho::color_supported` and
   `dybatpho::is_interactive` — report a terminal or none on chosen streams,
   undone by `dybatpho::unmock_tty`. `dybatpho::assert_exit_code` runs a command

@@ -283,8 +283,8 @@ dybatpho::unmock_all
   takes it as `-r <seconds>`, or supports neither.
 - No `date` exists on `PATH` outside the mock directory.
 - A frozen clock is moved before the Unix epoch.
-- Code waits for time to pass while the clock is frozen, such as
-  `dybatpho::lock_acquire` with a timeout on a held lock.
+- Code waits for the `date` clock to move while it is frozen. Lock waits are
+  not among them: they are timed by Bash's own clock.
 - A tty stream is named by number rather than by name, or a name is unknown.
 - An expected exit status is not a number or is above `255`, which no command
   can return.

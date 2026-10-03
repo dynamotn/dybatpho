@@ -967,7 +967,7 @@ function dybatpho::i18n_tn {
     || dybatpho::die "${FUNCNAME[0]}: Count must be an integer, got '${count}'"
   local locale template rendered grouped
   locale="$(dybatpho::i18n_locale)"
-  grouped="$(dybatpho::i18n_number "${count}" 0 "${locale}")"
+  __dybatpho_i18n_number_into grouped "${count}" 0 "${locale}"
   if __dybatpho_i18n_lookup template "${key}" "${count}"; then
     __dybatpho_i18n_interpolate rendered "${template}" \
       "count=${grouped}" "n=${grouped}" "$@"
@@ -1142,7 +1142,7 @@ function dybatpho::i18n_library_plural {
   local template rendered grouped
   local i18n_locale
   i18n_locale=$(dybatpho::i18n_locale)
-  grouped="$(dybatpho::i18n_number "${count}" 0 "${i18n_locale}")"
+  __dybatpho_i18n_number_into grouped "${count}" 0 "${i18n_locale}"
   if __dybatpho_i18n_lookup template "${key}" "${count}"; then
     __dybatpho_i18n_interpolate rendered "${template}" \
       "count=${grouped}" "n=${grouped}" "$@"
@@ -1309,15 +1309,17 @@ function __dybatpho_i18n_data {
 # @arg $2 string Name of the variable that receives the sign
 # @arg $3 string Name of the variable that receives the integer digits
 # @arg $4 string Name of the variable that receives the fraction digits
+# @arg $5 string Optional function name to report a bad value against, default is the caller
 # @set The three named variables
 # @internal
 #######################################
 function __dybatpho_i18n_split_number {
-  local __split_value __split_sign_name __split_int_name __split_frac_name
+  local __split_value __split_sign_name __split_int_name __split_frac_name __split_who
   __split_value="$1"
   __split_sign_name="$2"
   __split_int_name="$3"
   __split_frac_name="$4"
+  __split_who="${5:-${FUNCNAME[1]}}"
   local -n __split_sign="${__split_sign_name}"
   local -n __split_int="${__split_int_name}"
   local -n __split_frac="${__split_frac_name}"
@@ -1325,12 +1327,12 @@ function __dybatpho_i18n_split_number {
   # locale, which is exactly what this module must not depend on.
   local LC_ALL=C
   [[ "${__split_value}" =~ ^[[:space:]]*([+-]?)([0-9]*)(\.([0-9]*))?[[:space:]]*$ ]] \
-    || dybatpho::die "${FUNCNAME[1]}: Not a number: ${__split_value}"
+    || dybatpho::die "${__split_who}: Not a number: ${__split_value}"
   __split_sign="${BASH_REMATCH[1]}"
   __split_int="${BASH_REMATCH[2]}"
   __split_frac="${BASH_REMATCH[4]-}"
   [[ -n "${__split_int}${__split_frac}" ]] \
-    || dybatpho::die "${FUNCNAME[1]}: Not a number: ${__split_value}"
+    || dybatpho::die "${__split_who}: Not a number: ${__split_value}"
   __split_int="${__split_int:-0}"
   # Leading zeros would otherwise survive grouping as 0,001,234.
   while [[ "${__split_int}" == 0?* ]]; do
@@ -1445,34 +1447,62 @@ function __dybatpho_i18n_group {
 function dybatpho::i18n_number {
   local value
   dybatpho::expect_args value -- "$@"
-  local precision="${2-}"
-  local locale="${3-}"
-  [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
-  local sign integer fraction
-  __dybatpho_i18n_split_number "${value}" sign integer fraction
-  if [[ -z "${precision}" ]]; then
-    precision=${#fraction}
-    ((precision <= 6)) || precision=6
-  fi
-  [[ "${precision}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Precision must be a non-negative integer, got '${precision}'"
-  __dybatpho_i18n_round integer fraction "${precision}"
+  local formatted
+  __dybatpho_i18n_number_into formatted "${value}" "${2-}" "${3-}"
+  printf '%s\n' "${formatted}"
+}
 
-  local group_sep decimal_sep grouping minus grouped
-  group_sep="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" group)" || group_sep=","
-  decimal_sep="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" decimal)" || decimal_sep="."
-  grouping="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" grouping)" || grouping="3"
-  minus="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" minus)" || minus="-"
-  grouped="$(__dybatpho_i18n_group "${integer}" "${grouping}" "${group_sep}")"
+#######################################
+# @description Format a number the way a locale writes it, into a variable.
+#   Everything that formats a number on the way to a larger string goes through
+#   this rather than `$(dybatpho::i18n_number …)`: a value that is not a number
+#   has to stop the script, and from inside a command substitution the stop
+#   would end only the subshell while the caller printed what was left.
+# @arg $1 string Name of the variable receiving the formatted number
+# @arg $2 string Value, in plain decimal notation
+# @arg $3 number Optional fraction digits, default keeps what the input had
+# @arg $4 string Optional locale, default is the active locale
+# @set The named variable
+# @exitcode 1 Stop the script when the value is not a number or the precision is not an integer
+# @internal
+#######################################
+function __dybatpho_i18n_number_into {
+  # Every local carries a prefix, so the caller's own variable, named `grouped`
+  # or `number` say, is never shadowed by one of these.
+  local __num_var __num_value
+  dybatpho::expect_args __num_var __num_value -- "$@"
+  local -n __num_out="${__num_var}"
+  local __num_precision="${3-}"
+  local __num_locale="${4-}"
+  [[ -n "${__num_locale}" ]] || __num_locale="$(dybatpho::i18n_locale)"
+  local __num_sign __num_integer __num_fraction
+  # A bad value is reported against the public function the script called.
+  __dybatpho_i18n_split_number "${__num_value}" \
+    __num_sign __num_integer __num_fraction "${FUNCNAME[1]}"
+  if [[ -z "${__num_precision}" ]]; then
+    __num_precision=${#__num_fraction}
+    ((__num_precision <= 6)) || __num_precision=6
+  fi
+  [[ "${__num_precision}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[1]}: Precision must be a non-negative integer, got '${__num_precision}'"
+  __dybatpho_i18n_round __num_integer __num_fraction "${__num_precision}"
+
+  local __num_group_sep __num_decimal_sep __num_grouping
+  local __num_minus __num_grouped
+  __num_group_sep="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" group)" || __num_group_sep=","
+  __num_decimal_sep="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" decimal)" || __num_decimal_sep="."
+  __num_grouping="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" grouping)" || __num_grouping="3"
+  __num_minus="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${__num_locale}" minus)" || __num_minus="-"
+  __num_grouped="$(__dybatpho_i18n_group "${__num_integer}" "${__num_grouping}" "${__num_group_sep}")"
 
   # Rounding turns -0.004 into -0, which no locale wants to see printed.
-  if [[ "${grouped}" == "0" && "${fraction}" != *[1-9]* ]]; then
-    sign=""
+  if [[ "${__num_grouped}" == "0" && "${__num_fraction}" != *[1-9]* ]]; then
+    __num_sign=""
   fi
-  if ((precision > 0)); then
-    printf '%s%s%s%s\n' "${sign:+${minus}}" "${grouped}" "${decimal_sep}" "${fraction}"
+  if ((__num_precision > 0)); then
+    __num_out="${__num_sign:+${__num_minus}}${__num_grouped}${__num_decimal_sep}${__num_fraction}"
   else
-    printf '%s%s\n' "${sign:+${minus}}" "${grouped}"
+    __num_out="${__num_sign:+${__num_minus}}${__num_grouped}"
   fi
 }
 
@@ -1526,7 +1556,7 @@ function dybatpho::i18n_percent {
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
   local number pattern
-  number="$(dybatpho::i18n_number "${value}" "${precision}" "${locale}")"
+  __dybatpho_i18n_number_into number "${value}" "${precision}" "${locale}"
   pattern="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" percent)" || pattern="#%"
   local rendered="${pattern//\#/${number}}"
   printf '%s\n' "${rendered}"
@@ -1596,7 +1626,7 @@ function dybatpho::i18n_currency {
     fi
   fi
   local number layout minus rendered
-  number="$(dybatpho::i18n_number "${amount}" "${digits}" "${locale}")"
+  __dybatpho_i18n_number_into number "${amount}" "${digits}" "${locale}"
   layout="$(__dybatpho_i18n_data DYBATPHO_I18N_CURRENCY_LAYOUT "${locale}" layout)" || layout='¤#'
   minus="$(__dybatpho_i18n_data DYBATPHO_I18N_NUMBER "${locale}" minus)" || minus="-"
   rendered="${layout/¤/${symbol}}"
@@ -1667,14 +1697,14 @@ function dybatpho::i18n_bytes {
     if ((index > 0 && remainder * 2 >= divisor)); then
       whole=$((whole + 1))
     fi
-    formatted="$(dybatpho::i18n_number "${whole}" 0 "${locale}")"
+    __dybatpho_i18n_number_into formatted "${whole}" 0 "${locale}"
   else
     local tenths=$(((remainder * 10 + divisor / 2) / divisor))
     if ((tenths >= 10)); then
       whole=$((whole + 1))
       tenths=0
     fi
-    formatted="$(dybatpho::i18n_number "${whole}.${tenths}" 1 "${locale}")"
+    __dybatpho_i18n_number_into formatted "${whole}.${tenths}" 1 "${locale}"
   fi
   printf '%s %s\n' "${formatted}" "${units[index]}"
 }

@@ -110,11 +110,33 @@ function dybatpho::cache_key {
 function dybatpho::cache_path {
   local key
   dybatpho::expect_args key -- "$@"
-  [[ "${key}" =~ ${__DYBATPHO_CACHE_KEY_REGEX} ]] \
-    || dybatpho::die "${FUNCNAME[0]}: '${key}' cannot be a file name; hash it with dybatpho::cache_key"
-  local cache_dir
-  cache_dir=$(dybatpho::cache_dir)
-  printf '%s/%s%s\n' "${cache_dir}" "${key}" "${__DYBATPHO_CACHE_SUFFIX}"
+  local path
+  __dybatpho_cache_path_into path "${key}"
+  printf '%s\n' "${path}"
+}
+
+#######################################
+# @description Work out the path an entry is stored at, into a variable.
+#   Every accessor resolves its path through this rather than
+#   `$(dybatpho::cache_path …)`: a key that cannot be a file name has to stop
+#   the script, and from inside a command substitution the stop would end only
+#   the subshell while the caller read it as a cache miss.
+# @arg $1 string Name of the variable receiving the path
+# @arg $2 string Entry key
+# @set The named variable
+# @exitcode 1 Stop the script when the key cannot be a file name
+# @internal
+#######################################
+function __dybatpho_cache_path_into {
+  local __dybatpho_cache_path_var __dybatpho_cache_path_key
+  dybatpho::expect_args __dybatpho_cache_path_var __dybatpho_cache_path_key -- "$@"
+  local -n __dybatpho_cache_path_out="${__dybatpho_cache_path_var}"
+  if ! [[ "${__dybatpho_cache_path_key}" =~ ${__DYBATPHO_CACHE_KEY_REGEX} ]]; then
+    local __dybatpho_cache_path_hint="hash it with dybatpho::cache_key"
+    dybatpho::die "${FUNCNAME[1]}: '${__dybatpho_cache_path_key}' cannot be a file name; ${__dybatpho_cache_path_hint}"
+  fi
+  local __dybatpho_cache_path_dir="${DYBATPHO_CACHE_DIR}${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
+  __dybatpho_cache_path_out="${__dybatpho_cache_path_dir}/${__dybatpho_cache_path_key}${__DYBATPHO_CACHE_SUFFIX}"
 }
 
 #######################################
@@ -139,11 +161,9 @@ function dybatpho::cache_has {
   local ttl="${2:-${DYBATPHO_CACHE_TTL}}"
   [[ "${ttl}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
-  local path
-  path="$(dybatpho::cache_path "${key}")" || return 1
-  dybatpho::is file "${path}" || return 1
-  local age
-  age="$(dybatpho::file_age_seconds "${path}")" || return 1
+  local path age
+  __dybatpho_cache_path_into path "${key}"
+  __dybatpho_cache_age age "${path}" || return 1
   ((age < ttl))
 }
 
@@ -168,7 +188,7 @@ function dybatpho::cache_get {
   dybatpho::expect_args key -- "$@"
   dybatpho::cache_has "${key}" "${2-}" || return 1
   local path
-  path="$(dybatpho::cache_path "${key}")" || return 1
+  __dybatpho_cache_path_into path "${key}"
   cat "${path}"
 }
 
@@ -190,7 +210,7 @@ function dybatpho::cache_set {
   local key
   dybatpho::expect_args key -- "$@"
   local path
-  path="$(dybatpho::cache_path "${key}")" || return 1
+  __dybatpho_cache_path_into path "${key}"
   # A dry run creates no directory, and `dybatpho::file_write_atomic` requires
   # one before it looks at `DRY_RUN`, so the report is made here instead.
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
@@ -236,7 +256,7 @@ function dybatpho::cache_forget {
   local key
   dybatpho::expect_args key -- "$@"
   local path
-  path="$(dybatpho::cache_path "${key}")" || return 1
+  __dybatpho_cache_path_into path "${key}"
   if dybatpho::is true "${DRY_RUN}"; then
     dybatpho::dry_run remove "${path}"
     return 0
@@ -409,7 +429,7 @@ function dybatpho::cache_wait {
   [[ "${timeout}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${timeout}' is not a number of seconds"
   local path lock start
-  path="$(dybatpho::cache_path "${key}")" || return 1
+  __dybatpho_cache_path_into path "${key}"
   lock="$(__dybatpho_cache_refresh_lock "${path}")"
   start="${SECONDS}"
   while dybatpho::lock_is_held "${lock}"; do
@@ -501,7 +521,7 @@ function dybatpho::cache_run {
   ((stale == 0)) || __dybatpho_cache_need_lock
 
   local path age cached
-  path="$(dybatpho::cache_path "${key}")" || return 1
+  __dybatpho_cache_path_into path "${key}"
   if __dybatpho_cache_age age "${path}"; then
     if ((age < ttl)); then
       dybatpho::debug "cache: hit ${key}"

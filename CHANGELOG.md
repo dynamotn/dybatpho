@@ -733,6 +733,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script running pools in a loop collected one more handler per call, each
   ending process IDs that were long gone. The handlers the pool found are now
   put back when it ends.
+- **Helpers that check their input now stop the script from inside a
+  condition too.** `dybatpho::math_gt`, `dybatpho::math_lt`,
+  `dybatpho::math_eq`, `dybatpho::agent_detect` and the `dybatpho::cache_*`
+  accessors validated inside a command substitution, where a refusal ended only
+  the subshell: `if dybatpho::math_gt abc 1` printed a fatal error and carried
+  on as "no", an unknown `DYBATPHO_AGENT_MODE` ran on as a person driving, and
+  a key that cannot be a file name read as a cache miss. Likewise
+  `dybatpho::i18n_percent`, `dybatpho::i18n_currency`, `dybatpho::i18n_bytes`
+  and the counted messages printed a bare `%` or symbol and succeeded on a
+  value that is not a number; they now stop and name the function called.
 
 ### Security
 

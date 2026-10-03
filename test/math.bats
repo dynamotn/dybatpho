@@ -633,3 +633,21 @@ setup() {
   assert_success
   assert_output "3"
 }
+
+@test "dybatpho::math_gt, math_lt and math_eq stop the script on a value that is not a number" {
+  # In a condition `set -e` is off, so a refusal raised inside `$(...)` used to
+  # end only the subshell: the caller read the empty answer as "no" and went
+  # on. A script started from a file shows what a real caller sees.
+  local script="${BATS_TEST_TMPDIR}/compare.sh" fn
+  for fn in math_gt math_lt math_eq; do
+    {
+      printf '. %q --modules math\n' "${DYBATPHO_DIR}/init.sh"
+      printf 'if dybatpho::%s abc 1; then :; fi\n' "${fn}"
+      printf '%s\n' 'printf "carried on\n"'
+    } > "${script}"
+    run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+    assert_failure
+    assert_output --partial "Not a number: 'abc'"
+    refute_output --partial "carried on"
+  done
+}

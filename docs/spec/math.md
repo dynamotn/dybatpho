@@ -250,6 +250,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   to estimate.
 - A square root is asked of a negative value, or of a value with more fraction
   digits than the requested width needs.
+- A comparison is asked about a value that is not a number from inside an `if`, where `set -e` does not apply.
 
 ## Requirements *(mandatory)*
 
@@ -314,6 +315,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **FR-023**: The median, percentile and standard deviation helpers MUST read
   their values from arguments or from standard input, like the other
   aggregates.
+- **FR-024**: `math_compare`, `math_gt`, `math_lt` and `math_eq` MUST validate their values in the caller's shell, so a value that is not a number stops the script even when the comparison is a condition.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -380,6 +382,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **IT-015**: Compute population and sample standard deviations of known lists,
   including a single value and a custom scale, and verify an empty list, a lone
   sample and a bad scale fail.
+- **IT-016**: From a script file, have `math_gt`, `math_lt` and `math_eq` used as a condition stop the script on `abc`, before the next command runs.
 
 ## Acceptance Criteria *(mandatory)*
 

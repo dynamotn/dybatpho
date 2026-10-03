@@ -125,14 +125,34 @@ function __dybatpho_agent_marker_present {
 # @exitcode 1 Stop the script when the configured mode is unknown
 #######################################
 function dybatpho::agent_mode {
+  local mode
+  __dybatpho_agent_mode_into mode
+  printf '%s\n' "${mode}"
+}
+
+#######################################
+# @description Work out the agent mode into a variable.
+#   The callers that branch on the mode use this rather than
+#   `$(dybatpho::agent_mode)`: an unknown `DYBATPHO_AGENT_MODE` has to stop the
+#   script, and from inside a command substitution the stop would end only the
+#   subshell while the caller carried on as though a person were driving.
+# @arg $1 string Name of the variable receiving `on` or `off`
+# @set The named variable
+# @exitcode 1 Stop the script when the configured mode is unknown
+# @internal
+#######################################
+function __dybatpho_agent_mode_into {
+  local __dybatpho_agent_mode_var
+  dybatpho::expect_args __dybatpho_agent_mode_var -- "$@"
+  local -n __dybatpho_agent_mode_out="${__dybatpho_agent_mode_var}"
   case "${DYBATPHO_AGENT_MODE}" in
-    on) printf 'on\n' ;;
-    off) printf 'off\n' ;;
+    on) __dybatpho_agent_mode_out=on ;;
+    off) __dybatpho_agent_mode_out=off ;;
     auto)
       if __dybatpho_agent_marker_present; then
-        printf 'on\n'
+        __dybatpho_agent_mode_out=on
       else
-        printf 'off\n'
+        __dybatpho_agent_mode_out=off
       fi
       ;;
     *)
@@ -152,9 +172,9 @@ function dybatpho::agent_mode {
 # @see dybatpho::agent_mode
 #######################################
 function dybatpho::agent_detect {
-  local agent_mode
-  agent_mode=$(dybatpho::agent_mode)
-  [[ "${agent_mode}" == "on" ]]
+  local mode
+  __dybatpho_agent_mode_into mode
+  [[ "${mode}" == "on" ]]
 }
 
 #######################################
@@ -361,9 +381,7 @@ function dybatpho::agent_audit {
   directory=$(dirname "${DYBATPHO_AGENT_AUDIT_FILE}")
   mkdir -p "${directory}"
   local agent_mode
-  local agent_mode_2
-  agent_mode_2=$(dybatpho::agent_mode)
-  agent_mode=${agent_mode_2}
+  __dybatpho_agent_mode_into agent_mode
   local date
   date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dybatpho::json_object \

@@ -1586,3 +1586,20 @@ _i18n_spec_abbr() {
   assert_success
   assert_line --index 1 "Feb 29, 2024"
 }
+
+@test "the formatters that build on dybatpho::i18n_number stop on a value that is not a number" {
+  # They used to format the number inside `$(...)`, where the refusal ended
+  # only the subshell: `i18n_percent abc` printed a bare `%` and succeeded.
+  run --separate-stderr dybatpho::i18n_percent abc 0 en
+  assert_failure
+  assert_output ""
+  assert_stderr --partial "dybatpho::i18n_percent: Not a number: abc"
+
+  run --separate-stderr dybatpho::i18n_currency abc EUR en
+  assert_failure
+  assert_stderr --partial "dybatpho::i18n_currency: Not a number: abc"
+
+  run --separate-stderr dybatpho::i18n_number 1.5 x en
+  assert_failure
+  assert_stderr --partial "dybatpho::i18n_number: Precision must be a non-negative integer, got 'x'"
+}

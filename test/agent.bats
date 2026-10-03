@@ -426,3 +426,18 @@ _spec_test_deploy() {
   run_traced __dybatpho_agent_allowed deplo
   assert_failure
 }
+
+@test "dybatpho::agent_detect stops the script on an unknown mode" {
+  # It used to read the mode through `$(...)`, so an unknown mode ended only
+  # that subshell and the caller carried on as though a person were driving.
+  local script="${BATS_TEST_TMPDIR}/detect.sh"
+  {
+    printf '. %q --modules agent\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'if ! dybatpho::agent_detect; then printf "carried on as a person\n"; fi'
+  } > "${script}"
+  DYBATPHO_AGENT_MODE=sometimes \
+    run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_output --partial "Unknown mode 'sometimes'"
+  refute_output --partial "carried on"
+}

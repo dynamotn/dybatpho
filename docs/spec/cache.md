@@ -186,6 +186,7 @@ fi
 - A size limit with a suffix, in either case, or an unknown one such as `T`.
 - Pruning a namespace that was never written, or is empty.
 - Describing a namespace that was never written, or with the time to live after `--json`.
+- An accessor is given a key that cannot be a file name from inside a condition.
 
 ## Requirements *(mandatory)*
 
@@ -224,6 +225,7 @@ fi
 - **FR-024**: The module MUST describe the current namespace with its entry count, total bytes, counts of fresh and stale entries against a given or default time to live, and the ages of its oldest and newest entries, as aligned text or, with `--json`, as one JSON object with `entries`, `bytes`, `fresh`, `stale`, `oldest_age`, and `newest_age`.
 - **FR-025**: Describing a namespace MUST count only entries this module wrote, MUST report zero everywhere for a namespace never written, and MUST stop the script on a malformed time to live or an unknown option. It MUST NOT count hits and misses.
 - **FR-026**: Loading the module MUST NOT load `lock`. A grace window, from `--stale` or `DYBATPHO_CACHE_STALE`, and `cache_wait` MUST stop the script, naming the `lock` module and how to load it, when that module is not loaded, before an entry is read; caching without a grace window MUST work without it.
+- **FR-027**: Every accessor MUST resolve an entry's path in the caller's shell, so a key that cannot be a file name stops the script instead of reading as a missing entry.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -281,6 +283,7 @@ fi
 - **IT-030**: Verify a namespace never written reports zero in both forms.
 - **IT-031**: Verify a malformed time to live and an unknown option stop the script.
 - **IT-032**: In a script that loaded `cache` alone, cache a command, have `--stale` and `cache_wait` stop and name the `lock` module, and run both once `lock` is loaded.
+- **IT-033**: From a script file, have `cache_get` used as a condition stop the script on `../escape` before the branch for a miss runs.
 
 ## Acceptance Criteria *(mandatory)*
 

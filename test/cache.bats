@@ -448,3 +448,18 @@ remaining_entries() {
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" wait
   assert_success
 }
+
+@test "a key that cannot be a file name stops the script instead of reading as a miss" {
+  # The accessors used to resolve the path through `$(...)`, so the refusal
+  # ended only the subshell and the caller took the entry for missing.
+  local script="${BATS_TEST_TMPDIR}/badkey.sh"
+  {
+    printf '. %q --modules cache\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'DYBATPHO_CACHE_DIR=%q\n' "${BATS_TEST_TMPDIR}/cache"
+    printf '%s\n' 'if ! dybatpho::cache_get "../escape" 60; then printf "treated as a miss\n"; fi'
+  } > "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_output --partial "cannot be a file name"
+  refute_output --partial "treated as a miss"
+}

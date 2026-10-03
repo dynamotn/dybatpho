@@ -748,6 +748,7 @@ function dybatpho::math_div {
 function dybatpho::math_mod {
   local a b
   dybatpho::expect_args a b -- "$@"
+  # shellcheck disable=SC2034 # out-param of the parse; the remainder takes the dividend's sign
   local sign_a int_a frac_a sign_b int_b frac_b
   __dybatpho_math_parse "${a}" sign_a int_a frac_a
   __dybatpho_math_parse "${b}" sign_b int_b frac_b
@@ -861,25 +862,8 @@ function dybatpho::math_neg {
 function dybatpho::math_compare {
   local a b
   dybatpho::expect_args a b -- "$@"
-  local sign_a int_a frac_a sign_b int_b frac_b
-  __dybatpho_math_parse "${a}" sign_a int_a frac_a
-  __dybatpho_math_parse "${b}" sign_b int_b frac_b
-
-  if [[ "${sign_a}" != "${sign_b}" ]]; then
-    if [[ -z "${sign_a}" ]]; then
-      printf '1\n'
-    else
-      printf -- '-1\n'
-    fi
-    return 0
-  fi
-
-  local digits_a digits_b scale result
-  __dybatpho_math_align digits_a digits_b scale \
-    "${int_a}" "${frac_a}" "${int_b}" "${frac_b}"
-  __dybatpho_math_cmp_abs result "${digits_a}" "${digits_b}"
-  # Below zero the larger magnitude is the smaller number.
-  [[ -n "${sign_a}" ]] && result=$((-result))
+  local result
+  __dybatpho_math_cmp2 result "${a}" "${b}"
   printf '%s\n' "${result}"
 }
 
@@ -896,9 +880,12 @@ function dybatpho::math_compare {
 function dybatpho::math_gt {
   local a b
   dybatpho::expect_args a b -- "$@"
-  local math_compare
-  math_compare=$(dybatpho::math_compare "${a}" "${b}")
-  ((math_compare > 0))
+  # In this shell, not in `$(...)`: a value that is not a number has to stop
+  # the script, and from a subshell the stop would end only the subshell while
+  # the caller read the empty answer as "no".
+  local order
+  __dybatpho_math_cmp2 order "${a}" "${b}"
+  ((order > 0))
 }
 
 #######################################
@@ -914,9 +901,12 @@ function dybatpho::math_gt {
 function dybatpho::math_lt {
   local a b
   dybatpho::expect_args a b -- "$@"
-  local math_compare
-  math_compare=$(dybatpho::math_compare "${a}" "${b}")
-  ((math_compare < 0))
+  # In this shell, not in `$(...)`: a value that is not a number has to stop
+  # the script, and from a subshell the stop would end only the subshell while
+  # the caller read the empty answer as "no".
+  local order
+  __dybatpho_math_cmp2 order "${a}" "${b}"
+  ((order < 0))
 }
 
 #######################################
@@ -933,9 +923,12 @@ function dybatpho::math_lt {
 function dybatpho::math_eq {
   local a b
   dybatpho::expect_args a b -- "$@"
-  local math_compare
-  math_compare=$(dybatpho::math_compare "${a}" "${b}")
-  ((math_compare == 0))
+  # In this shell, not in `$(...)`: a value that is not a number has to stop
+  # the script, and from a subshell the stop would end only the subshell while
+  # the caller read the empty answer as "no".
+  local order
+  __dybatpho_math_cmp2 order "${a}" "${b}"
+  ((order == 0))
 }
 
 #######################################

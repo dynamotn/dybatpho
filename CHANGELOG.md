@@ -602,6 +602,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules cli config    # after
   ```
 
+- **BREAKING: `release` no longer loads `archive`.** Only
+  `dybatpho::release_package` writes through the archive module; versioning,
+  the changelog, checksums and signing do not. `dybatpho::release_package`
+  stops with `dybatpho::release_package needs the archive module, load it
+  with: dybatpho::load archive` before it creates anything. A script that
+  packages artifacts, or calls any `archive_*` function, after loading only
+  `release` has to ask for `archive`:
+
+  ```sh
+  . dybatpho/init.sh --modules release            # before
+  . dybatpho/init.sh --modules release archive    # after
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

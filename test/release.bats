@@ -202,6 +202,38 @@ tag() {
   assert [ -f "${out}/mytool_1.3.0_darwin_arm64.tar.gz" ]
 }
 
+@test "dybatpho::release_package asks for the archive module when it is not loaded" {
+  # `release` does not load `archive`, so a script that only versions and
+  # writes the changelog does not pay for it. A child shell started from a
+  # file, without the functions this process exports, shows what such a script
+  # sees: the guard fires before the source is looked at or anything is made.
+  local source="${BATS_TEST_TMPDIR}/build"
+  mkdir -p "${source}"
+  printf 'binary\n' > "${source}/mytool"
+  local out="${BATS_TEST_TMPDIR}/dist"
+
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules release\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::release_artifact_name mytool 1.3.0 linux amd64'
+    printf '%s\n' 'dybatpho::release_package "${1}" "${2}" mytool 1.3.0 linux amd64'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${source}" "${out}"
+  assert_failure
+  assert_line --index 0 "mytool_1.3.0_linux_amd64.tar.gz"
+  assert_output --partial "dybatpho::release_package needs the archive module, load it with: dybatpho::load archive"
+  assert [ ! -e "${out}" ]
+
+  # Once the script loads it, the same call packages.
+  sed -i 's/--modules release/--modules release archive/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${source}" "${out}"
+  assert_success
+  assert_line --index 1 "${out}/mytool_1.3.0_linux_amd64.tar.gz"
+  assert [ -f "${out}/mytool_1.3.0_linux_amd64.tar.gz" ]
+}
+
 @test "dybatpho::release_package creates the output directory and rejects a missing source" {
   local source="${BATS_TEST_TMPDIR}/build2"
   mkdir -p "${source}"

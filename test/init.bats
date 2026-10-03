@@ -123,6 +123,10 @@ loaded_line() {
   run_traced -0 init_sh "--modules markdown" "$(loaded_line)"
   assert_output "string os logging helpers process file secret markdown "
 
+  # `release` packages an artifact only when the script loaded `archive` itself.
+  run_traced -0 init_sh "--modules release" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret semver git release "
+
   run_traced -0 init_sh "--modules diff" "$(loaded_line)"
   assert_output "string os logging helpers process file secret diff "
 

@@ -62,6 +62,10 @@ creating a GitHub release stays with the caller, who owns those credentials.
 
 - Commits of a type that does not move the version, such as `docs` or `chore`, are left out: they are part of the history, not of the release notes
 
+### `dybatpho::release_package`
+
+- The artifact is written by the `archive` module, which `release` does not load; load it alongside: `--modules release archive`
+
 ### `dybatpho::release_checksums`
 
 - The file names are recorded without a directory component, so the file verifies from inside the directory it describes
@@ -304,6 +308,7 @@ dybatpho::release_package ./dist/linux_amd64 ./release mytool 1.3.0 linux amd64
 **🚦 Exit codes**
 
 - `1`: The source is missing or the archive cannot be created
+- `1`: Stop the script when the `archive` module is not loaded
 
 
 ---

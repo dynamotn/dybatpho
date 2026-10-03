@@ -304,10 +304,21 @@ function dybatpho::release_artifact_name {
 # @stdout Path of the artifact that was created
 # @env DRY_RUN string When true-like, print the path without packaging anything
 # @exitcode 1 The source is missing or the archive cannot be created
+# @exitcode 1 Stop the script when the `archive` module is not loaded
+# @tip The artifact is written by the `archive` module, which `release` does
+#   not load; load it alongside: `--modules release archive`
 #######################################
 function dybatpho::release_package {
   local source output_dir name version goos goarch artifact
   dybatpho::expect_args source output_dir name version -- "$@"
+  # Only packaging needs `archive`; versioning, the changelog, checksums and
+  # signing do not, so registering it as a dependency would load it for all of
+  # them. The guard names an internal helper on purpose: `dybatpho::` functions
+  # are exported and a child shell inherits them without the internals they
+  # call, so testing the public name would pass in a child that never loaded
+  # `archive` and then fail on the first internal call.
+  declare -F __dybatpho_archive_format > /dev/null \
+    || dybatpho::die "${FUNCNAME[0]} needs the archive module, load it with: dybatpho::load archive"
   [[ -e "${source}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Source doesn't exist: ${source}"
   goos="${5:-$(dybatpho::goos)}"

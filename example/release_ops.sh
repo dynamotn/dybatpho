@@ -8,7 +8,7 @@
 #   release_next_version, release_changelog, release_artifact_name,
 #   release_package, release_checksums, release_sign, and dybatpho::git_latest_tag
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
-. "${SCRIPTDIR}/../init.sh" --modules release
+. "${SCRIPTDIR}/../init.sh" --modules release archive
 
 dybatpho::register_common_handlers
 

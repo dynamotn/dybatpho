@@ -118,6 +118,7 @@ dybatpho::release_sign "${sums}"
 - A checksum file or signature already present in the artifact directory.
 - An artifact directory holding nothing to checksum.
 - A signing tool that is not `gpg`.
+- An artifact is packaged while the `archive` module is not loaded.
 
 ## Requirements *(mandatory)*
 
@@ -139,6 +140,7 @@ dybatpho::release_sign "${sums}"
 - **FR-013**: Every helper that writes MUST honor `DRY_RUN` by reporting the intended path and leaving the filesystem untouched.
 - **FR-014**: The module MUST NOT contact any forge: producing files is its whole job, and publishing them stays with the caller.
 - **FR-015**: `dybatpho::git_latest_tag` MUST order tags as versions rather than as strings, MUST accept a pattern, and MUST report failure when nothing matches.
+- **FR-016**: Loading `release` MUST NOT load `archive`; packaging MUST stop with a message naming the `archive` module and how to load it when that module is not loaded, before it inspects the source or creates anything.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -176,6 +178,7 @@ dybatpho::release_sign "${sums}"
 - **IT-013**: Sign with a configured command, with an explicit signature path, and reject a missing file.
 - **IT-014**: Run every writing helper under `DRY_RUN` and verify nothing is created.
 - **IT-015**: Verify that the latest-tag lookup orders by version, honors a pattern, and fails when nothing matches.
+- **IT-016**: In a child shell that loaded only `release`, verify packaging stops with the message naming `archive` and creates nothing, and packages once `archive` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

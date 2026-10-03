@@ -106,7 +106,7 @@ declare -A __dybatpho_module_deps=(
   [cache]="lock"
   [agent]="cli safety json"
   [pkg]="safety"
-  [release]="semver git archive"
+  [release]="semver git"
   [forge]="network json git"
   [i18n]="date"
   # A dependency may name a version, and comparing versions is what `semver` is

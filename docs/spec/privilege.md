@@ -93,6 +93,7 @@ dybatpho::privilege_release
 - No terminal, with and without a cached ticket.
 - Release called twice, or without an acquire.
 - `DRY_RUN` set.
+- `dybatpho::privilege_acquire` is called again while the escalation is already held, with or without `--shield`.
 
 ## Requirements *(mandatory)*
 
@@ -113,6 +114,7 @@ dybatpho::privilege_release
 - **FR-013**: Running one command MUST read the same whether or not elevation is needed.
 - **FR-014**: `DRY_RUN` MUST report what would happen and change nothing.
 - **FR-015**: An unknown option MUST stop the script.
+- **FR-016**: A second `privilege_acquire` while the escalation is held MUST NOT authenticate again, start a second refresher, put a second wrapper on `PATH`, or register the release again, and MUST add a wrapper the first call left out when `--shield` is now given.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -143,6 +145,7 @@ dybatpho::privilege_release
 - **IT-009**: Shield a child so it runs non-interactively and fails instead of prompting.
 - **IT-010**: Start a refresher on acquire and stop it on release.
 - **IT-011**: Remove the shield from `PATH` on release, and release twice harmlessly.
+- **IT-012**: Acquire twice with `--shield` and verify one refresher, one wrapper and unchanged traps, and that release restores `PATH` and stops the refresher.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -51,6 +51,11 @@ DYBATPHO_PRIVILEGE_REFRESH="${DYBATPHO_PRIVILEGE_REFRESH:-60}"
 # `dybatpho::privilege_release` is what clears them.
 DYBATPHO_PRIVILEGE_KEEPALIVE_PID=""
 DYBATPHO_PRIVILEGE_SHIELD_DIR=""
+# Whether this process holds the escalation, and whether the release is
+# already among its traps. A second acquire reads them so it adds only what
+# the first one did not: no second refresher, wrapper or trap.
+__DYBATPHO_PRIVILEGE_HELD="false"
+__DYBATPHO_PRIVILEGE_TRAPPED="false"
 
 #######################################
 # @description Print the escalation command this host should use.
@@ -168,7 +173,9 @@ function __dybatpho_privilege_shield {
 #######################################
 # @description Authenticate once and hold the escalation for this run.
 #   Nothing happens when elevation is not needed, so a caller can ask
-#   unconditionally. When a prompt is required and the session cannot answer
+#   unconditionally. Asking again while the escalation is held adds only what
+#   was not there yet, such as the wrapper a first call without `--shield`
+#   left out; it never starts a second refresher or wrapper. When a prompt is required and the session cannot answer
 #   one, this fails rather than blocking on a password nothing will type --
 #   which is what a script run from cron needs.
 # @arg $1 string Options, in any order
@@ -203,7 +210,10 @@ function dybatpho::privilege_acquire {
     return 0
   fi
 
-  if ! __dybatpho_privilege_cached "${command_name}"; then
+  # Already held: the ticket is live, and asking `-n -v` again would go
+  # through the wrapper a `--shield` put first on `PATH`.
+  if [[ "${__DYBATPHO_PRIVILEGE_HELD}" != "true" ]] \
+    && ! __dybatpho_privilege_cached "${command_name}"; then
     # A prompt is coming. Refuse it where nobody can answer, rather than
     # letting the script hang on a terminal that is not there.
     if ! dybatpho::is_tty stdin; then
@@ -218,17 +228,23 @@ function dybatpho::privilege_acquire {
     ((status == 0)) || return 1
   fi
 
-  if dybatpho::is true "${keepalive}" && [[ "${command_name}" == "sudo" ]]; then
+  if dybatpho::is true "${keepalive}" && [[ "${command_name}" == "sudo" ]] \
+    && [[ -z "${DYBATPHO_PRIVILEGE_KEEPALIVE_PID}" ]]; then
     __dybatpho_privilege_keepalive "${command_name}" "${DYBATPHO_PRIVILEGE_REFRESH}"
   fi
 
-  if dybatpho::is true "${shield}"; then
+  if dybatpho::is true "${shield}" && [[ -z "${DYBATPHO_PRIVILEGE_SHIELD_DIR}" ]]; then
     __dybatpho_privilege_shield "${command_name}"
   fi
+  __DYBATPHO_PRIVILEGE_HELD="true"
 
   # Registered after the work above succeeded, so a failed acquire leaves no
-  # teardown behind for a resource that was never taken.
-  dybatpho::trap "dybatpho::privilege_release" EXIT HUP INT TERM
+  # teardown behind for a resource that was never taken. Once is enough: a
+  # release that has nothing left to let go of does nothing.
+  if [[ "${__DYBATPHO_PRIVILEGE_TRAPPED}" != "true" ]]; then
+    dybatpho::trap "dybatpho::privilege_release" EXIT HUP INT TERM
+    __DYBATPHO_PRIVILEGE_TRAPPED="true"
+  fi
   return 0
 }
 
@@ -251,6 +267,7 @@ function dybatpho::privilege_release {
     export PATH
     DYBATPHO_PRIVILEGE_SHIELD_DIR=""
   fi
+  __DYBATPHO_PRIVILEGE_HELD="false"
   return 0
 }
 

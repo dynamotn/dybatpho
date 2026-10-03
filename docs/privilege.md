@@ -47,7 +47,7 @@ own work needs no privilege at all.
 - [`__dybatpho_privilege_cached`](#__dybatpho_privilege_cached) — Return success when the escalation command already holds a valid ticket, so no prompt would appear.
 - [`__dybatpho_privilege_keepalive`](#__dybatpho_privilege_keepalive) — Keep the escalation ticket alive until this process ends. The refresher watches the parent rather than being signalled by it: a script killed outright never gets to signal anything, and a refresher left behind would hold a ticket for a process that no longer exists.
 - [`__dybatpho_privilege_shield`](#__dybatpho_privilege_shield) — Put a non-interactive escalation command first on `PATH`. Without this, a child process deep inside a package manager can stop and ask for a password that nothing is in a position to display. The wrapper makes that failure loud and immediate instead of a run that hangs.
-- [`dybatpho::privilege_acquire`](#dybatphoprivilege_acquire) — Authenticate once and hold the escalation for this run. Nothing happens when elevation is not needed, so a caller can ask unconditionally. When a prompt is required and the session cannot answer one, this fails rather than blocking on a password nothing will type -- which is what a script run from cron needs.
+- [`dybatpho::privilege_acquire`](#dybatphoprivilege_acquire) — Authenticate once and hold the escalation for this run. Nothing happens when elevation is not needed, so a caller can ask unconditionally. Asking again while the escalation is held adds only what was not there yet, such as the wrapper a first call without `--shield` left out; it never starts a second refresher or wrapper. When a prompt is required and the session cannot answer one, this fails rather than blocking on a password nothing will type -- which is what a script run from cron needs.
 - [`dybatpho::privilege_release`](#dybatphoprivilege_release) — Let the escalation go: stop the refresher and take the wrapper off `PATH`. Calling it when nothing was acquired does nothing.
 - [`dybatpho::privilege_run`](#dybatphoprivilege_run) — Run one command elevated, for a caller that needs that and no session. When elevation is not needed the command runs as it is, so the call reads the same either way.
 
@@ -183,7 +183,9 @@ makes that failure loud and immediate instead of a run that hangs.
 
 Authenticate once and hold the escalation for this run.
 Nothing happens when elevation is not needed, so a caller can ask
-unconditionally. When a prompt is required and the session cannot answer
+unconditionally. Asking again while the escalation is held adds only what
+was not there yet, such as the wrapper a first call without `--shield`
+left out; it never starts a second refresher or wrapper. When a prompt is required and the session cannot answer
 one, this fails rather than blocking on a password nothing will type --
 which is what a script run from cron needs.
 

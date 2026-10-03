@@ -190,6 +190,31 @@ teardown() {
   unset -f dybatpho::is_root
 }
 
+@test "dybatpho::privilege_acquire called twice holds one refresher, one shield and one trap" {
+  # A second call used to start a second refresher, orphaning the first, put a
+  # second wrapper in front of PATH that release then left behind, and append
+  # the release to the traps again.
+  dybatpho::is_root() { return 1; }
+  : > "${TICKET}"
+  local path_before="${PATH}"
+  DYBATPHO_PRIVILEGE_REFRESH=1 dybatpho::privilege_acquire --shield
+  local refresher="${DYBATPHO_PRIVILEGE_KEEPALIVE_PID}"
+  local shield="${DYBATPHO_PRIVILEGE_SHIELD_DIR}"
+  local traps
+  traps="$(trap -p EXIT)"
+
+  DYBATPHO_PRIVILEGE_REFRESH=1 dybatpho::privilege_acquire --shield
+  assert_equal "${DYBATPHO_PRIVILEGE_KEEPALIVE_PID}" "${refresher}"
+  assert_equal "${DYBATPHO_PRIVILEGE_SHIELD_DIR}" "${shield}"
+  assert_equal "$(trap -p EXIT)" "${traps}"
+
+  dybatpho::privilege_release
+  assert_equal "${PATH}" "${path_before}"
+  sleep 1
+  run_traced -1 kill -0 "${refresher}"
+  unset -f dybatpho::is_root
+}
+
 @test "dybatpho::privilege_release takes the shield off PATH and repeats harmlessly" {
   dybatpho::is_root() { return 1; }
   : > "${TICKET}"

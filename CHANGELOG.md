@@ -862,7 +862,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script that is killed outright does not leave it behind. With no cached
   ticket and no terminal the call fails instead of blocking, which is what a
   run from cron needs. `DYBATPHO_PRIVILEGE_SUSPEND_HOOK` is how a full-screen
-  caller gives the terminal back around the prompt.
+  caller gives the terminal back around the prompt. Calling
+  `dybatpho::privilege_acquire` again while the escalation is held adds only
+  what the first call left out, such as the `--shield` wrapper; it never
+  starts a second refresher or wrapper.
 
 - **`array` — order a dependency graph instead of resolving one by hand.**
   `dybatpho::array_toposort` reads an associative array of edges and returns

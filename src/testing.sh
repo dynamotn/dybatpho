@@ -1172,6 +1172,16 @@ while ((\$#)); do
       ;;
   esac
 done
+# A secret URL travels in the config file, as \`url = "..."\`, not as an argument.
+if [[ -z "\${url}" && -n "\${config_file}" && -r "\${config_file}" ]]; then
+  while IFS= read -r line; do
+    if [[ "\${line}" == 'url = "'*'"' ]]; then
+      url="\${line#url = \"}"
+      url="\${url%\"}"
+      url="\${url//\\\\\"/\"}"
+    fi
+  done < "\${config_file}"
+fi
 printf '%s\n' "\${url}" >> "\${calls}"
 
 # Record the request material that does not travel in the argument vector, so a

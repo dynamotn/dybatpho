@@ -1118,6 +1118,22 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_output --partial '{"secret":"body"}'
 }
 
+@test "a secret URL goes to curl out of band as well" {
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  dybatpho::mock_http "hooks.example.test/T0/WebhookSecret" 200 'ok'
+
+  local DYBATPHO_CURL_SECRET_URL=true
+  dybatpho::curl_do "https://hooks.example.test/T0/WebhookSecret" "${BATS_TEST_TMPDIR}/out"
+
+  run_traced dybatpho::mock_calls curl
+  assert_success
+  refute_output --partial "WebhookSecret"
+  # It still reached the right endpoint, through the config file.
+  run_traced dybatpho::mock_http_calls
+  assert_output "https://hooks.example.test/T0/WebhookSecret"
+  assert_file_contains "${BATS_TEST_TMPDIR}/out" "ok"
+}
+
 @test "an HTTP error keeps its body and reports its own status" {
   export DYBATPHO_CURL_MAX_RETRIES=0
   local body="${BATS_TEST_TMPDIR}/error-body"

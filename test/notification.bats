@@ -2,6 +2,15 @@ setup() {
   load test_helper
 }
 
+# A curl stub that records what a request sent: its arguments, then what went
+# out of band, the `--config` file holding the URL and secret headers and the
+# body read from standard input. Every notifier sends the URL and the body that
+# way, so a test asserting on them reads the whole record.
+stub_curl_recording() {
+  local record="$1" status="${2:-200}"
+  stub curl ": echo \"\$*\" > ${record}; prev=; for a in \"\$@\"; do [ \"\$prev\" = --config ] && cat \"\$a\" >> ${record}; [ \"\$a\" = @- ] && cat >> ${record}; prev=\$a; done; printf '${status}'"
+}
+
 # ---------------------------------------------------------------------------
 # dybatpho::notify_slack
 # ---------------------------------------------------------------------------
@@ -21,29 +30,54 @@ setup() {
 @test "dybatpho::notify_slack sends POST with JSON payload" {
   local args_file="${BATS_TEST_TMPDIR}/slack-curl-args"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_slack "hello slack"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
-  grep -- '--data {"text":"hello slack"}' "${args_file}"
+  grep -- '{"text":"hello slack"}' "${args_file}"
   grep -- '--header Content-Type: application/json' "${args_file}"
+}
+
+@test "a notification keeps its URL, token and message off curl's command line" {
+  # Every account on the host can read a process's arguments, and a webhook URL
+  # is the credential itself; Telegram's bot token sits in its path.
+  local args_file="${BATS_TEST_TMPDIR}/argv" config_file="${BATS_TEST_TMPDIR}/out-of-band"
+  export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T0/B0/WebhookSecret"
+  stub_curl_with_config "${args_file}" "${config_file}"
+  run_traced dybatpho::notify_slack "private message"
+  unstub curl
+  assert_success
+  run_traced grep -e "WebhookSecret" -e "private message" "${args_file}"
+  assert_failure
+  grep -- 'url = "https://hooks.slack.com/services/T0/B0/WebhookSecret"' "${config_file}"
+  grep -- '{"text":"private message"}' "${config_file}"
+
+  rm -f "${args_file}" "${config_file}"
+  export DYBATPHO_TELEGRAM_BOT_TOKEN="123:BotSecret" DYBATPHO_TELEGRAM_CHAT_ID="-1"
+  stub_curl_with_config "${args_file}" "${config_file}"
+  run_traced dybatpho::notify_telegram "private message"
+  unstub curl
+  assert_success
+  run_traced grep -e "BotSecret" -e "private message" "${args_file}"
+  assert_failure
+  grep -- 'url = "https://api.telegram.org/bot123:BotSecret/sendMessage"' "${config_file}"
 }
 
 @test "dybatpho::notify_slack escapes special characters in message" {
   local args_file="${BATS_TEST_TMPDIR}/slack-escape-args"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_slack 'say "hi"'
   unstub curl
   assert_success
-  grep -- '--data {"text":"say \\\"hi\\\""}' "${args_file}"
+  grep -- '{"text":"say \\\"hi\\\""}' "${args_file}"
 }
 
 @test "dybatpho::notify_slack uses DYBATPHO_SLACK_WEBHOOK_URL as endpoint" {
   local args_file="${BATS_TEST_TMPDIR}/slack-url-args"
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/MYTOKEN"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_slack "test"
   unstub curl
   assert_success
@@ -70,7 +104,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/telegram-curl-args"
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_telegram "build done"
   unstub curl
   assert_success
@@ -83,7 +117,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/telegram-url-args"
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_telegram "test"
   unstub curl
   assert_success
@@ -94,7 +128,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/telegram-parse-args"
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_telegram "**bold**" "Markdown"
   unstub curl
   assert_success
@@ -105,7 +139,7 @@ setup() {
   local args_file="${BATS_TEST_TMPDIR}/telegram-noparse-args"
   export DYBATPHO_TELEGRAM_BOT_TOKEN="123:TOKEN"
   export DYBATPHO_TELEGRAM_CHAT_ID="-100999"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_telegram "plain text"
   unstub curl
   assert_success
@@ -132,7 +166,7 @@ setup() {
 @test "dybatpho::notify_teams sends POST with Adaptive Card payload" {
   local args_file="${BATS_TEST_TMPDIR}/teams-curl-args"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_teams "deploy done"
   unstub curl
   assert_success
@@ -144,7 +178,7 @@ setup() {
 @test "dybatpho::notify_teams with title includes title TextBlock" {
   local args_file="${BATS_TEST_TMPDIR}/teams-title-args"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_teams "all checks passed" "Deploy v2.0"
   unstub curl
   assert_success
@@ -156,7 +190,7 @@ setup() {
 @test "dybatpho::notify_teams without title omits title TextBlock" {
   local args_file="${BATS_TEST_TMPDIR}/teams-notitle-args"
   export DYBATPHO_TEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_teams "simple message"
   unstub curl
   assert_success
@@ -183,18 +217,18 @@ setup() {
 @test "dybatpho::notify_google_chat sends POST with text payload" {
   local args_file="${BATS_TEST_TMPDIR}/gchat-curl-args"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_google_chat "release live"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
-  grep -- '--data {"text":"release live"}' "${args_file}"
+  grep -- '{"text":"release live"}' "${args_file}"
 }
 
 @test "dybatpho::notify_google_chat uses DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL as endpoint" {
   local args_file="${BATS_TEST_TMPDIR}/gchat-url-args"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/MYSPACE"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_google_chat "test"
   unstub curl
   assert_success
@@ -220,7 +254,7 @@ setup() {
 @test "dybatpho::notify_discord sends POST with content payload" {
   local args_file="${BATS_TEST_TMPDIR}/discord-curl-args"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_discord "build passed"
   unstub curl
   assert_success
@@ -231,7 +265,7 @@ setup() {
 @test "dybatpho::notify_discord with username includes username field" {
   local args_file="${BATS_TEST_TMPDIR}/discord-user-args"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_discord "deploy done" "CI Bot"
   unstub curl
   assert_success
@@ -241,7 +275,7 @@ setup() {
 @test "dybatpho::notify_discord without username omits username field" {
   local args_file="${BATS_TEST_TMPDIR}/discord-nouser-args"
   export DYBATPHO_DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_discord "simple"
   unstub curl
   assert_success
@@ -265,12 +299,12 @@ setup() {
 
 @test "dybatpho::notify_webhook sends POST to given URL with payload" {
   local args_file="${BATS_TEST_TMPDIR}/webhook-curl-args"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy"}'
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
-  grep -- '--data {"event":"deploy"}' "${args_file}"
+  grep -- '{"event":"deploy"}' "${args_file}"
   grep "https://my.service/hook" "${args_file}"
 }
 
@@ -287,7 +321,7 @@ setup() {
 
 @test "dybatpho::notify_webhook forwards extra curl arguments" {
   local args_file="${BATS_TEST_TMPDIR}/webhook-extra-args"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_webhook "https://my.service/hook" '{"event":"test"}' \
     --header "Authorization: Bearer SECRET"
   unstub curl
@@ -312,7 +346,7 @@ setup() {
 @test "notification helpers escape all JSON control characters" {
   local args_file="${BATS_TEST_TMPDIR}/notification-escape-args"
   export DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL="https://chat.googleapis.com/v1/spaces/TEST"
-  stub curl ": echo \"\$*\" > ${args_file}; printf '200'"
+  stub_curl_recording "${args_file}"
   dybatpho::notify_google_chat $'slash\\quote"\nreturn\rtab\t'
   unstub curl
   run_traced cat "${args_file}"
@@ -451,11 +485,12 @@ desktop_path() {
 # dybatpho::notify_ntfy
 # ---------------------------------------------------------------------------
 
-# A curl stub that records its arguments and, when it is given a `--config`
-# file, that file's contents too: the out-of-band headers live there.
+# A curl stub that keeps the arguments apart from what went out of band: the
+# `--config` file, with the URL and the secret headers, and the body on
+# standard input are recorded in the second file.
 stub_curl_with_config() {
   local args_file="$1" config_file="$2"
-  stub curl ": echo \"\$*\" > ${args_file}; prev=; for a in \"\$@\"; do [ \"\$prev\" = --config ] && cat \"\$a\" > ${config_file}; prev=\$a; done; echo '200'"
+  stub curl ": echo \"\$*\" > ${args_file}; prev=; for a in \"\$@\"; do [ \"\$prev\" = --config ] && cat \"\$a\" >> ${config_file}; [ \"\$a\" = @- ] && cat >> ${config_file}; prev=\$a; done; echo '200'"
 }
 
 @test "dybatpho::notify_ntfy no arg" {
@@ -474,14 +509,14 @@ stub_curl_with_config() {
   local args_file="${BATS_TEST_TMPDIR}/ntfy-args"
   export DYBATPHO_NTFY_TOPIC="backups-7f3a"
   unset DYBATPHO_NTFY_URL DYBATPHO_NTFY_TOKEN
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_ntfy "Backup finished"
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
-  grep -- '--data {"topic":"backups-7f3a","message":"Backup finished"}' "${args_file}"
-  grep -- ' https://ntfy.sh$' "${args_file}"
-  run_traced grep -- '--config' "${args_file}"
+  grep -- '{"topic":"backups-7f3a","message":"Backup finished"}' "${args_file}"
+  grep -- 'url = "https://ntfy.sh"' "${args_file}"
+  run_traced grep -- 'Authorization' "${args_file}"
   assert_failure
 }
 
@@ -489,7 +524,7 @@ stub_curl_with_config() {
   local args_file="${BATS_TEST_TMPDIR}/ntfy-full-args"
   export DYBATPHO_NTFY_TOPIC="ops"
   export DYBATPHO_NTFY_URL="https://ntfy.example.test///"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_ntfy 'Disk "/var" at 97%' "Disk almost full" urgent " warning, ,floppy_disk "
   unstub curl
   assert_success
@@ -497,7 +532,7 @@ stub_curl_with_config() {
   grep -- '"title":"Disk almost full"' "${args_file}"
   grep -- '"priority":5' "${args_file}"
   grep -- '"tags":\["warning","floppy_disk"\]' "${args_file}"
-  grep -- ' https://ntfy.example.test$' "${args_file}"
+  grep -- 'url = "https://ntfy.example.test"' "${args_file}"
 }
 
 @test "dybatpho::notify_ntfy refuses tags holding a line break" {
@@ -514,7 +549,7 @@ stub_curl_with_config() {
 @test "dybatpho::notify_ntfy keeps a line break in the title" {
   local args_file="${BATS_TEST_TMPDIR}/ntfy-title-args"
   export DYBATPHO_NTFY_TOPIC="ops"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_ntfy "m" $'two\nlines'
   unstub curl
   assert_success
@@ -526,7 +561,7 @@ stub_curl_with_config() {
   export DYBATPHO_NTFY_TOPIC="ops"
   for name in min:1 low:2 default:3 high:4 max:5 2:2; do
     expected="${name#*:}"
-    stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+    stub_curl_recording "${args_file}"
     run_traced dybatpho::notify_ntfy "m" "" "${name%%:*}"
     unstub curl
     assert_success
@@ -601,8 +636,8 @@ stub_curl_with_config() {
   unstub curl
   assert_success
   grep -- '--request POST' "${args_file}"
-  grep -- '--data {"message":"Backup finished"}' "${args_file}"
-  grep -- ' https://gotify.example.test/message$' "${args_file}"
+  grep -- '{"message":"Backup finished"}' "${config_file}"
+  grep -- 'url = "https://gotify.example.test/message"' "${config_file}"
   run_traced grep -- "AppTokenNotInArgv" "${args_file}"
   assert_failure
   grep -- "X-Gotify-Key: AppTokenNotInArgv" "${config_file}"
@@ -612,11 +647,11 @@ stub_curl_with_config() {
   local args_file="${BATS_TEST_TMPDIR}/gotify-full-args"
   export DYBATPHO_GOTIFY_URL="http://gotify.local"
   export DYBATPHO_GOTIFY_TOKEN="tok"
-  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  stub_curl_recording "${args_file}"
   run_traced dybatpho::notify_gotify $'line1\nline2' 'Disk "full"' 10
   unstub curl
   assert_success
-  grep -- '--data {"message":"line1\\nline2","title":"Disk \\"full\\"","priority":10}' "${args_file}"
+  grep -- '{"message":"line1\\nline2","title":"Disk \\"full\\"","priority":10}' "${args_file}"
 }
 
 @test "dybatpho::notify_gotify rejects a priority outside 0-10" {

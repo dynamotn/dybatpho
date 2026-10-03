@@ -50,6 +50,7 @@ the resolver does.
 | **`DYBATPHO_WAIT_PORT_INTERVAL`** | number | Seconds `dybatpho::wait_port` sleeps between attempts (default `1`) |
 | **`DYBATPHO_CURL_SECRET_HEADERS`** | array | Headers to pass out of band, as `Name: value` |
 | **`DYBATPHO_CURL_SECRET_DATA`** | string | Request body to pass on stdin instead of in an argument |
+| **`DYBATPHO_CURL_SECRET_URL`** | bool | Pass the URL out of band too (default `false`) |
 
 ### 🚀 Highlights
 

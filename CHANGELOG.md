@@ -1024,6 +1024,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **`notification` — webhook URLs, bot tokens and messages no longer appear on
+  `curl`'s command line.** Every account on the host can read a process's
+  arguments, and `dybatpho::notify_slack`, `notify_teams`, `notify_discord`,
+  `notify_google_chat` and `notify_webhook` passed the webhook URL -- the
+  credential itself -- and the message there, as did `notify_telegram` with its
+  bot token in the URL. The URL now travels in the private config file and the
+  body on standard input. `dybatpho::curl_do` gains `DYBATPHO_CURL_SECRET_URL`
+  for a script of its own that needs the same.
+
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**
   `dybatpho::ai_stream` rehearsed and logged its request with the full URL, so
   a self-hosted base URL holding `user:password` or a key in its path showed up

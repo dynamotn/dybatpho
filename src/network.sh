@@ -85,6 +85,11 @@ DYBATPHO_HTTP_BODY_FILE=""
 declare -ga DYBATPHO_CURL_SECRET_HEADERS=()
 # @env DYBATPHO_CURL_SECRET_DATA string Request body to pass on stdin instead of in an argument
 DYBATPHO_CURL_SECRET_DATA=""
+# A webhook URL is often the credential itself, and a bot token can sit in the
+# path. With this set the URL goes into the same private config file, as
+# `url = "..."`, instead of onto the command line.
+# @env DYBATPHO_CURL_SECRET_URL bool Pass the URL out of band too (default `false`)
+DYBATPHO_CURL_SECRET_URL=${DYBATPHO_CURL_SECRET_URL:-false}
 
 # Per-key in-memory state used by `dybatpho::circuit_breaker`.
 declare -gA DYBATPHO_CIRCUIT_FAILURES=()
@@ -161,6 +166,7 @@ function __dybatpho_network_config_escape {
 #   is removed as soon as the request is over. The path is an argument, which is
 #   public; the contents are not.
 # @arg $1 string Name of the variable receiving the config file path
+# @arg $2 string URL to write as `url = "..."` when `DYBATPHO_CURL_SECRET_URL` is on
 # @set The named variable
 # @exitcode 0 A config file was written, or there was nothing to write
 # @exitcode 1 Stop the script when the file cannot be created
@@ -169,10 +175,13 @@ function __dybatpho_network_config_escape {
 function __dybatpho_network_secret_config {
   local __config_out_name
   dybatpho::expect_args __config_out_name -- "$@"
+  local __config_url="${2-}"
   local -n __config_out="${__config_out_name}"
   __config_out=""
 
-  ((${#DYBATPHO_CURL_SECRET_HEADERS[@]})) || return 0
+  local __config_secret_url=false
+  [[ -z "${__config_url}" ]] || ! dybatpho::is true "${DYBATPHO_CURL_SECRET_URL}" || __config_secret_url=true
+  ((${#DYBATPHO_CURL_SECRET_HEADERS[@]})) || [[ "${__config_secret_url}" == true ]] || return 0
 
   local previous_umask path header
   previous_umask="$(umask)"
@@ -184,14 +193,43 @@ function __dybatpho_network_secret_config {
   }
   umask "${previous_umask}"
 
-  for header in "${DYBATPHO_CURL_SECRET_HEADERS[@]}"; do
+  local network_config_escape
+  for header in ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}; do
     [[ -n "${header}" ]] || continue
-    local network_config_escape
     network_config_escape=$(__dybatpho_network_config_escape "${header}")
     printf 'header = "%s"\n' "${network_config_escape}" >> "${path}"
   done
+  if [[ "${__config_secret_url}" == true ]]; then
+    network_config_escape=$(__dybatpho_network_config_escape "${__config_url}")
+    printf 'url = "%s"\n' "${network_config_escape}" >> "${path}"
+  fi
 
   __config_out="${path}"
+}
+
+#######################################
+# @description Run a command with more secret headers on top of the ones the
+#   caller already set. The list is copied into a `local` for the command alone,
+#   so the headers reach `dybatpho::curl_do` out of band and are gone once the
+#   command returns. An empty header is skipped, which is how an optional token
+#   that is not set adds nothing.
+# @arg $@ string Headers as `Name: value`, then `--`, then the command and its arguments
+# @exitcode * The command's exit code
+# @internal
+#######################################
+function __dybatpho_network_with_secret_headers {
+  local -a __dybatpho_network_wsh_added=()
+  while (($#)) && [[ "$1" != "--" ]]; do
+    [[ -z "$1" ]] || __dybatpho_network_wsh_added+=("$1")
+    shift
+  done
+  shift
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local -a DYBATPHO_CURL_SECRET_HEADERS=(
+    ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}
+    ${__dybatpho_network_wsh_added[@]+"${__dybatpho_network_wsh_added[@]}"}
+  )
+  "$@"
 }
 
 #######################################
@@ -326,9 +364,13 @@ function dybatpho::curl_do {
   # Credentials and request bodies stay out of the argument vector; see
   # DYBATPHO_CURL_SECRET_HEADERS above for why.
   local secret_config=""
-  __dybatpho_network_secret_config secret_config
+  __dybatpho_network_secret_config secret_config "${url}"
   local -a secret_args=()
   [[ -n "${secret_config}" ]] && secret_args+=(--config "${secret_config}")
+  # The config file carries the URL when it is a secret; otherwise it is the
+  # last argument as usual.
+  local -a url_args=("${url}")
+  dybatpho::is true "${DYBATPHO_CURL_SECRET_URL}" && url_args=()
   local body_on_stdin=false
   if [[ -n "${DYBATPHO_CURL_SECRET_DATA}" ]]; then
     secret_args+=(--data-binary @-)
@@ -360,12 +402,12 @@ function dybatpho::curl_do {
 
     : > "${header_file}"
     if [[ "${body_on_stdin}" == true ]]; then
-      code=$(command curl "${curl_args[@]}" "${url}" <<< "${DYBATPHO_CURL_SECRET_DATA}") || {
+      code=$(command curl "${curl_args[@]}" ${url_args[@]+"${url_args[@]}"} <<< "${DYBATPHO_CURL_SECRET_DATA}") || {
         code="000"
         dybatpho::error "Error when access ${shown_url}"
       }
     else
-      code=$(command curl "${curl_args[@]}" "${url}") || {
+      code=$(command curl "${curl_args[@]}" ${url_args[@]+"${url_args[@]}"}) || {
         code="000"
         dybatpho::error "Error when access ${shown_url}"
       }
@@ -1191,13 +1233,8 @@ function dybatpho::curl_auth_bearer {
     shift
   fi
 
-  local -a headers=(
-    ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}
-    "Authorization: Bearer ${token}"
-  )
-  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-  local -a DYBATPHO_CURL_SECRET_HEADERS=("${headers[@]}")
-  dybatpho::curl_request "${url}" "${output}" "$@"
+  __dybatpho_network_with_secret_headers "Authorization: Bearer ${token}" -- \
+    dybatpho::curl_request "${url}" "${output}" "$@"
 }
 
 #######################################
@@ -1269,14 +1306,14 @@ function dybatpho::curl_graphql {
     --header "Accept: application/json"
     --header "Content-Type: application/json"
   )
-  local -a headers=(${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"})
-  [[ -n "${DYBATPHO_GRAPHQL_TOKEN}" ]] && headers+=("Authorization: Bearer ${DYBATPHO_GRAPHQL_TOKEN}")
-  local -a DYBATPHO_CURL_SECRET_HEADERS=(${headers[@]+"${headers[@]}"})
+  local authorization=""
+  [[ -z "${DYBATPHO_GRAPHQL_TOKEN}" ]] || authorization="Authorization: Bearer ${DYBATPHO_GRAPHQL_TOKEN}"
   # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
   local DYBATPHO_CURL_SECRET_DATA="${payload}"
 
   local exit_code=0
-  dybatpho::curl_request "${url}" "${response}" "${args[@]}" "$@" || exit_code=$?
+  __dybatpho_network_with_secret_headers "${authorization}" -- \
+    dybatpho::curl_request "${url}" "${response}" "${args[@]}" "$@" || exit_code=$?
 
   if ((exit_code == 0)) && ! dybatpho::is true "${DRY_RUN}"; then
     local message=""

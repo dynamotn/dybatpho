@@ -132,17 +132,25 @@ declare -ga __DYBATPHO_NOTIFICATION_SENDMAILS=(sendmail /usr/sbin/sendmail /usr/
 #   A circuit is named after the provider, never the URL: a webhook URL is
 #   often the credential itself, and the name appears in the warning the
 #   breaker logs. The generic webhook gets one circuit per host.
+#
+#   The URL and the JSON body never reach `curl`'s command line, which every
+#   account on the host can read: a webhook URL is the credential, a bot token
+#   sits in Telegram's path, and the body is the message. Both go through the
+#   network module's private config file and standard input instead.
 # @arg $1 string Provider name, which names the circuit
 # @arg $2 string URL
-# @arg $@ string Arguments for curl
+# @arg $3 string JSON body
+# @arg $@ string Other arguments for curl
 # @exitcode 9 The provider's circuit is open; nothing was sent
 # @exitcode other The exit code of `dybatpho::curl_json`
 # @internal
 #######################################
 function __dybatpho_notification_post {
-  local provider url
-  dybatpho::expect_args provider url -- "$@"
-  shift 2
+  local provider url payload
+  dybatpho::expect_args provider url payload -- "$@"
+  shift 3
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local DYBATPHO_CURL_SECRET_DATA="${payload}" DYBATPHO_CURL_SECRET_URL=true
 
   if [[ -n "${DYBATPHO_NOTIFY_MAX_RETRIES-}" ]]; then
     [[ "${DYBATPHO_NOTIFY_MAX_RETRIES}" =~ ^[0-9]+$ ]] \
@@ -198,9 +206,8 @@ function dybatpho::notify_slack {
 
   dybatpho::debug "Sending Slack notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  __dybatpho_notification_post slack "${DYBATPHO_SLACK_WEBHOOK_URL}" \
-    --request POST \
-    --data "${payload}"
+  __dybatpho_notification_post slack "${DYBATPHO_SLACK_WEBHOOK_URL}" "${payload}" \
+    --request POST
 }
 
 #######################################
@@ -247,9 +254,8 @@ function dybatpho::notify_telegram {
   fi
 
   dybatpho::debug "Sending Telegram notification"
-  __dybatpho_notification_post telegram "${url}" \
-    --request POST \
-    --data "${payload}"
+  __dybatpho_notification_post telegram "${url}" "${payload}" \
+    --request POST
 }
 
 #######################################
@@ -304,9 +310,8 @@ function dybatpho::notify_teams {
 
   dybatpho::debug "Sending Teams notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  __dybatpho_notification_post teams "${DYBATPHO_TEAMS_WEBHOOK_URL}" \
-    --request POST \
-    --data "${payload}"
+  __dybatpho_notification_post teams "${DYBATPHO_TEAMS_WEBHOOK_URL}" "${payload}" \
+    --request POST
 }
 
 #######################################
@@ -337,9 +342,8 @@ function dybatpho::notify_google_chat {
 
   dybatpho::debug "Sending Google Chat notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  __dybatpho_notification_post google_chat "${DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL}" \
-    --request POST \
-    --data "${payload}"
+  __dybatpho_notification_post google_chat "${DYBATPHO_GOOGLE_CHAT_WEBHOOK_URL}" "${payload}" \
+    --request POST
 }
 
 #######################################
@@ -380,9 +384,8 @@ function dybatpho::notify_discord {
 
   dybatpho::debug "Sending Discord notification"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  __dybatpho_notification_post discord "${DYBATPHO_DISCORD_WEBHOOK_URL}" \
-    --request POST \
-    --data "${payload}"
+  __dybatpho_notification_post discord "${DYBATPHO_DISCORD_WEBHOOK_URL}" "${payload}" \
+    --request POST
 }
 
 #######################################
@@ -413,9 +416,8 @@ function dybatpho::notify_webhook {
   local shown_url
   __dybatpho_network_redact_url_into shown_url "${url}"
   dybatpho::debug "Sending webhook notification to ${shown_url}"
-  __dybatpho_notification_post webhook "${url}" \
+  __dybatpho_notification_post webhook "${url}" "${payload}" \
     --request POST \
-    --data "${payload}" \
     "$@"
 }
 
@@ -566,15 +568,13 @@ function dybatpho::notify_ntfy {
   fi
   payload+="}"
 
-  local -a headers=(${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"})
-  [[ -n "${token}" ]] && headers+=("Authorization: Bearer ${token}")
-  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-  local -a DYBATPHO_CURL_SECRET_HEADERS=(${headers[@]+"${headers[@]}"})
+  local authorization=""
+  [[ -z "${token}" ]] || authorization="Authorization: Bearer ${token}"
 
   dybatpho::debug "Sending ntfy notification"
-  __dybatpho_notification_post ntfy "${url}" \
-    --request POST \
-    --data "${payload}"
+  __dybatpho_network_with_secret_headers "${authorization}" -- \
+    __dybatpho_notification_post ntfy "${url}" "${payload}" \
+    --request POST
 }
 
 #######################################
@@ -626,16 +626,11 @@ function dybatpho::notify_gotify {
   [[ -n "${priority}" ]] && payload+=",\"priority\":${priority}"
   payload+="}"
 
-  local -a headers=(${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"})
-  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  headers+=("X-Gotify-Key: ${DYBATPHO_GOTIFY_TOKEN}")
-  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-  local -a DYBATPHO_CURL_SECRET_HEADERS=("${headers[@]}")
-
   dybatpho::debug "Sending Gotify notification"
-  __dybatpho_notification_post gotify "${url}/message" \
-    --request POST \
-    --data "${payload}"
+  # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
+  __dybatpho_network_with_secret_headers "X-Gotify-Key: ${DYBATPHO_GOTIFY_TOKEN}" -- \
+    __dybatpho_notification_post gotify "${url}/message" "${payload}" \
+    --request POST
 }
 
 #######################################

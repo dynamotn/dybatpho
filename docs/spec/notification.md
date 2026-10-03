@@ -194,6 +194,7 @@ fi
 
 - A script sends email without having loaded the `validate` module.
 - Missing message, URL, payload, webhook URL, token, or chat ID.
+- Another account on the host lists processes while a notification is sent.
 - The webhook URL is the secret itself, so it must not reach a debug line.
 - ntfy tags hold a line break, which would cut the list short.
 - Message text contains quotes, backslashes, newlines, carriage returns, or
@@ -295,6 +296,10 @@ fi
   line feed before any request is made, and MUST keep a line break in the
   title and the message.
 - **FR-027**: Loading the module MUST NOT load `validate`. `notify_email` MUST stop the script, naming the `validate` module and how to load it, when that module is not loaded, before any address is read or `sendmail` is looked up; the webhook and desktop notifiers MUST work without it.
+- **FR-028**: Every HTTP notifier MUST send its URL and its JSON body out of
+  band -- the URL through the network module's private config file and the body
+  on standard input -- so neither a webhook URL, a bot token nor the message
+  appears on `curl`'s command line.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -350,6 +355,9 @@ fi
 - **IT-012**: Refuse ntfy tags holding a line feed or a carriage return, and
   publish a title holding a line break unchanged.
 - **IT-013**: In a script that loaded `notification` alone, have `notify_email` stop and name the `validate` module without printing a command, and reach the dry run once `validate` is loaded.
+- **IT-014**: Send through Slack and Telegram and find neither the webhook
+  secret, the bot token nor the message among curl's arguments, while the
+  config file and standard input carry them.
 
 ## Acceptance Criteria *(mandatory)*
 

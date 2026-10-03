@@ -271,6 +271,12 @@ dybatpho::circuit_breaker api.example.test \
   shell, scoping the overrides to the call, so what the request records there --
   its HTTP metrics among them -- is kept, and the global timeouts are unchanged
   afterwards.
+- **FR-035**: With `DYBATPHO_CURL_SECRET_URL` on, `dybatpho::curl_do` MUST
+  write the URL into its private config file as `url = "..."` and leave it off
+  `curl`'s argument vector; with it off, the URL MUST stay the last argument.
+- **FR-036**: Adding secret headers for one request MUST go through one helper
+  that copies the caller's list into a `local`, so the headers reach `curl_do`
+  out of band and are gone once the request returns.
 
 - **FR-020**: The module MUST split a URL into scheme, user, password, host, port, path,
   query, and fragment, requiring a scheme and `://`, and MUST present every component,
@@ -440,6 +446,8 @@ dybatpho::circuit_breaker api.example.test \
   `scheme://host/[redacted]`.
 - **IT-033**: Verify a request made through `dybatpho::curl_timeout` is counted
   in `dybatpho_http_requests_total` and leaves the global timeouts empty.
+- **IT-034**: Send a request with `DYBATPHO_CURL_SECRET_URL` on and find the
+  URL absent from curl's arguments, yet requested.
 - **IT-024**: Verify a request carrying `DYBATPHO_CURL_SECRET_HEADERS` and
   `DYBATPHO_CURL_SECRET_DATA` sends both, while neither appears among the
   arguments the mocked `curl` was called with.

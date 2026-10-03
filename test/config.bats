@@ -77,6 +77,55 @@ setup() {
   unstub yq
 }
 
+@test "config_load reaches nested JSON, YAML and TOML values by dotted key" {
+  # Only the top level used to be read, so a nested value came back as one
+  # JSON blob under its parent and `server.port` was never there to find.
+  command -v jq > /dev/null || skip "jq is not installed"
+  command -v yq > /dev/null || skip "yq is not installed"
+  local json_file="${BATS_TEST_TMPDIR}/nested.json"
+  local yaml_file="${BATS_TEST_TMPDIR}/nested.yaml"
+  local toml_file="${BATS_TEST_TMPDIR}/nested.toml"
+  printf '%s\n' '{"name":"app","server":{"port":8080,"tls":{"enabled":true},"hosts":["a","b"]},"empty":{},"quote":"tab\there\\x"}' > "${json_file}"
+  printf '%s\n' 'name: app' 'server:' '  port: 8080' '  tls:' '    enabled: true' '  hosts: [a, b]' 'empty: {}' 'quote: "tab\there\\x"' > "${yaml_file}"
+  printf '%s\n' 'name = "app"' 'quote = "tab\there\\x"' '[server]' 'port = 8080' 'hosts = ["a", "b"]' '[server.tls]' 'enabled = true' > "${toml_file}"
+
+  local file
+  for file in "${json_file}" "${yaml_file}" "${toml_file}"; do
+    DYBATPHO_CONFIG=()
+    dybatpho::config_load "${file}"
+    assert_equal "$(dybatpho::config_get name)" "app"
+    assert_equal "$(dybatpho::config_get server.port)" "8080"
+    assert_equal "$(dybatpho::config_get server.tls.enabled)" "true"
+    # A sequence is one value, kept as compact JSON, and is not walked into.
+    assert_equal "$(dybatpho::config_get server.hosts)" '["a","b"]'
+    run_traced dybatpho::config_get server.hosts.0 ""
+    assert_output ""
+    # A tab and a backslash inside a value survive the trip.
+    assert_equal "$(dybatpho::config_get quote)" $'tab\there\\x'
+  done
+  # An empty mapping has nothing to walk into, so it is a value as well.
+  DYBATPHO_CONFIG=()
+  dybatpho::config_load "${yaml_file}"
+  assert_equal "$(dybatpho::config_get empty)" "{}"
+}
+
+@test "a config: binding reads a nested value from a loaded file" {
+  command -v yq > /dev/null || skip "yq is not installed"
+  local file="${BATS_TEST_TMPDIR}/bound.yaml"
+  printf '%s\n' 'server:' '  port: 9090' > "${file}"
+  DYBATPHO_CONFIG=()
+  dybatpho::config_load "${file}"
+
+  # shellcheck disable=2329
+  _spec_nested_binding() {
+    dybatpho::opts::setup "Nested binding" - action:'printf "%s\n" "${PORT}"'
+    dybatpho::opts::param "Port" PORT --port config:server.port init:="80"
+  }
+  run_traced dybatpho::generate_from_spec _spec_nested_binding
+  assert_success
+  assert_output "9090"
+}
+
 @test "config_load reports invalid dotenv and structured configuration" {
   local dotenv="${BATS_TEST_TMPDIR}/invalid.env"
   local json_file="${BATS_TEST_TMPDIR}/invalid.json"

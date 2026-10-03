@@ -93,6 +93,20 @@ function __dybatpho_config_load_dotenv {
 #######################################
 # @description Read a JSON, YAML or TOML file into the configuration, flattening
 #   it to the dotted keys the rest of the module uses.
+#
+#   Nested mappings are walked down to their values, so `server: {port: 8080}`
+#   is stored under `server.port`, which is the key a `config:server.port`
+#   binding and `dybatpho::config_get server.port` ask for. A sequence is a
+#   value of its own rather than something to walk into: it is stored under its
+#   key as compact JSON (`["a","b"]`), and so is an empty mapping (`{}`). A key
+#   that already holds a dot, such as `"server.port": 1`, lands on the same
+#   dotted key as the nested form; when a file spells it both ways, the one read
+#   later wins.
+#
+#   Both backends print a key, a tab and the value with tabs, line breaks,
+#   carriage returns and backslashes escaped, the way `jq`'s `@tsv` does; the
+#   value is unescaped once it is read, so a line break inside a value survives.
+#   `yq`'s own `@tsv` is not used for this: it quotes the way CSV does.
 # @arg $1 string Format: `json`, `yaml` or `toml`
 # @arg $2 path File to read
 # @set DYBATPHO_CONFIG
@@ -106,8 +120,14 @@ function __dybatpho_config_load_structured {
   if [[ "${format}" == json ]]; then
     dybatpho::require jq
     entries=$(jq -r '
-      if type != "object" then error("root must be an object")
-      else to_entries[] | [.key, (.value | tostring)] | @tsv end
+      def flat($prefix):
+        to_entries[]
+        | ($prefix + [.key]) as $path
+        | if (.value | type) == "object" and (.value | length) > 0
+          then .value | flat($path)
+          else [($path | join(".")), (.value | tostring)] | @tsv
+          end;
+      if type != "object" then error("root must be an object") else flat([]) end
     ' "${file}") \
       || dybatpho::die "Invalid JSON configuration: ${file}"
   else
@@ -129,11 +149,26 @@ function __dybatpho_config_load_structured {
       || dybatpho::die "Invalid ${label} configuration: ${file}"
     [[ "${root}" == "!!map" ]] \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
-    entries=$(yq "${parse[@]}" -r 'to_entries[] | [.key, (.value | tostring)] | @tsv' "${file}") \
+    # `yq` has no recursive definitions, so the walk visits every node and keeps
+    # the leaves no sequence encloses: values, sequences and empty mappings.
+    # `${0}${0}` doubles a backslash; a replacement spelled with backslashes is
+    # unescaped once more than it looks.
+    # shellcheck disable=SC2016 # `${0}` is yq's match reference, not a shell expansion
+    entries=$(yq "${parse[@]}" -r '
+      ..
+      | select(path | length > 0)
+      | select(parents | all_c(tag != "!!seq"))
+      | select(tag != "!!map" or length == 0)
+      | (path | join(".")) + "\t" + (
+          ((select(tag == "!!seq" or tag == "!!map") | to_json(0)) // tostring)
+          | sub("\\x5c"; "${0}${0}") | sub("\t"; "\\\\t") | sub("\n"; "\\\\n") | sub("\r"; "\\\\r")
+        )
+    ' "${file}") \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
   fi
   if [[ -n "${entries}" ]]; then
     while IFS=$'\t' read -r key value; do
+      printf -v value '%b' "${value}"
       __dybatpho_config_set "${key}" "${value}"
     done <<< "${entries}"
   fi
@@ -151,6 +186,10 @@ function __dybatpho_config_load_structured {
 # @arg $1 string Optional `--optional`, to skip files that do not exist instead of failing
 # @arg $@ string Files in dotenv, JSON, YAML, or TOML format, in increasing precedence order
 # @set DYBATPHO_CONFIG Merged values, where a later file replaces an earlier one
+# @note A nested JSON, YAML, or TOML mapping is stored under dotted keys, so
+#   `server: {port: 8080}` is read back with `dybatpho::config_get server.port`.
+#   A sequence and an empty mapping are values of their own, kept as compact
+#   JSON under their key.
 # @exitcode 1 A required file is missing, or a file has an unsupported format or invalid configuration
 # @tip Pass `--` before a file whose own name starts with `--`.
 #######################################

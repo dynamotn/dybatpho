@@ -220,6 +220,7 @@ dybatpho::config_save ./config.yaml PORT
 - No configuration files or no required keys are supplied.
 - A file is missing or has an unsupported extension.
 - Dotenv contains an invalid assignment, inline comments, or quoted escapes.
+- A structured file nests mappings, holds sequences or empty mappings, or carries a tab, line break, or backslash inside a value.
 - JSON/YAML is malformed or its root is not an object/mapping.
 - A structured backend emits a key containing characters that are not allowed
   by the configuration-key grammar.
@@ -323,6 +324,11 @@ dybatpho::config_save ./config.yaml PORT
   string otherwise.
 - **FR-028**: `config_save` MUST reject a key that is not set, a key a dotenv
   file cannot spell, an unsupported format, and an empty key list.
+- **FR-029**: Loading JSON, YAML, or TOML MUST store every value of a nested
+  mapping under its dotted path (`server.port`), MUST store a sequence or an
+  empty mapping under its own key as compact JSON without walking into it, and
+  MUST keep tabs, line breaks, and backslashes in values; the `jq` and `yq`
+  backends MUST produce the same keys and values.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -403,6 +409,10 @@ dybatpho::config_save ./config.yaml PORT
   sequence root and a malformed document.
 - **IT-020**: Save to real YAML, JSON, and TOML files and verify the comments,
   the untouched keys, and the number and boolean scalars the schema selects.
+- **IT-021**: Load the same nested document as JSON, YAML, and TOML and verify
+  each dotted key, the sequence kept as JSON, the empty mapping, and a value
+  holding a tab and a backslash; then verify a `config:server.port` binding
+  reads the nested value.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -106,6 +106,10 @@ dybatpho::config_load --optional /etc/app.env "${HOME}/.config/app.env"
 
 - **`DYBATPHO_CONFIG`** (Merged): values, where a later file replaces an earlier one
 
+**📝 Notes**
+
+- A nested JSON, YAML, or TOML mapping is stored under dotted keys, so `server: {port: 8080}` is read back with `dybatpho::config_get server.port`. A sequence and an empty mapping are values of their own, kept as compact JSON under their key.
+
 **🚦 Exit codes**
 
 - `1`: A required file is missing, or a file has an unsupported format or invalid configuration

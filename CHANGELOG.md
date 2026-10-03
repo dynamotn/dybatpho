@@ -881,6 +881,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is written atomically, and a claim left by a caller that died is cleared
   after a few seconds. No extra module is needed.
 
+- **`config` — nested JSON, YAML and TOML values are reachable by dotted key.**
+  `dybatpho::config_load` read only the top level of a structured file, so
+  `server: {port: 8080}` was stored as one JSON blob under `server`, and
+  `dybatpho::config_get server.port` and a `config:server.port` option binding
+  never found the value. Nested mappings are now stored under dotted keys; a
+  sequence or an empty mapping stays one value, as compact JSON. Tabs,
+  line breaks and backslashes inside values also survive loading, which they
+  did not through `yq`.
+
 ### Security
 
 - **`file` — a rewrite no longer writes through a link planted at its staging

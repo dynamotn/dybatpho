@@ -108,9 +108,10 @@ loaded_line() {
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
   assert_output "string os logging helpers process file secret network validate notification "
 
-  # `testing` renders a snapshot mismatch through `diff`, so it comes along.
+  # `testing` loads only what every assertion uses: the JSON and YAML
+  # assertions ask for `json`, and a snapshot mismatch for `diff` to draw it.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json network table text diff testing "
+  assert_output "string os logging helpers process file secret table text testing "
 
   # `table` renders real CSV only when the script loaded `csv` itself, so
   # neither it nor `text`, which renders through it, brings the parser along.

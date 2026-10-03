@@ -522,6 +522,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules csv json   # or: dybatpho::load json
   ```
 
+- **BREAKING: `testing` loads only `text`, not `json`, `diff` or `network`.**
+  The JSON and YAML assertions -- `dybatpho::assert_json_valid`,
+  `assert_json_query`, `assert_json_has`, `assert_yaml_valid`,
+  `assert_yaml_query` and `assert_yaml_has` -- need `json`; without it each one
+  fails as an assertion with `<function> needs the json module, load it with:
+  dybatpho::load json`, and returns rather than ending the test. Snapshots
+  still record and compare without `diff`; a mismatch still fails, and says it
+  needs `diff` to show the difference instead of drawing it. Nothing in
+  `testing` used `network`. A suite that uses those assertions, wants snapshot
+  mismatches drawn, or calls a `json`, `diff` or `network` helper having asked
+  only for `testing` must now ask for those modules too:
+
+  ```sh
+  . dybatpho/init.sh --modules testing json diff   # or: dybatpho::load json diff
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

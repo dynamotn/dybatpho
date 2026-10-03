@@ -9,7 +9,7 @@
 #              network, the real filesystem layout, or the developer's environment.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules testing network text
+. "${SCRIPTDIR}/../init.sh" --modules testing network text json diff
 
 dybatpho::register_common_handlers
 

@@ -288,6 +288,8 @@ dybatpho::unmock_all
 - A tty stream is named by number rather than by name, or a name is unknown.
 - An expected exit status is not a number or is above `255`, which no command
   can return.
+- A JSON or YAML assertion runs in a suite that loaded `testing` without
+  `json`, or a snapshot mismatches in a suite that did not load `diff`.
 
 ## Requirements *(mandatory)*
 
@@ -407,6 +409,14 @@ dybatpho::unmock_all
 - **FR-038**: `mock_http` MUST write its `curl` script without expanding it in
   a traced command, so a coverage tool reading `xtrace` keeps recording the
   rest of the test.
+- **FR-039**: Loading the module MUST load `text` only, not `json`, `diff` or
+  `network`. A JSON or YAML assertion run without `json` MUST fail as an
+  assertion -- counted, reported as `<function> needs the json module, load it
+  with: dybatpho::load json`, and returning `1` without ending the shell or
+  reading its input.
+- **FR-040**: A snapshot comparison MUST create, update and match snapshots
+  without `diff`. On a mismatch without it, the assertion MUST still fail, and
+  MUST say the difference needs `diff` to be shown instead of drawing it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -517,6 +527,10 @@ dybatpho::unmock_all
   verify the real command answers.
 - **IT-028**: Trace `mock_http` with `xtrace` and verify the trace never holds
   the mock script, while the installed script does.
+- **IT-029**: In a suite that loads `testing` alone, verify a JSON assertion
+  fails with the message naming `json` and returns, and a snapshot mismatch
+  fails with the message naming `diff`; once both are loaded, verify the JSON
+  assertion passes and the mismatch is drawn as a diff.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -351,6 +351,10 @@ Assert that a document is parsable JSON.
 | --- | --- | --- |
 | `$1` | string | JSON file path, or `-` for stdin |
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+
 **🚦 Exit codes**
 
 - `0`: The document parses as JSON
@@ -378,6 +382,10 @@ dybatpho::assert_json_query package.json '.version' "1.4.2"
 | `$2` | string | Query filter understood by the JSON backend |
 | `$3` | string | Expected query result |
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+
 **🚦 Exit codes**
 
 - `0`: The query result matches
@@ -397,6 +405,10 @@ Assert that a JSON filter matches something in the document.
 | `$1` | string | JSON file path, or `-` for stdin |
 | `$2` | string | Query filter that must succeed |
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+
 **🚦 Exit codes**
 
 - `0`: The filter matched
@@ -414,6 +426,10 @@ Assert that a document is parsable YAML.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | YAML file path, or `-` for stdin |
+
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 
 **🚦 Exit codes**
 
@@ -435,6 +451,10 @@ Assert that a YAML expression prints an expected value.
 | `$2` | string | `yq` expression |
 | `$3` | string | Expected result |
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+
 **🚦 Exit codes**
 
 - `0`: The expression result matches
@@ -453,6 +473,10 @@ Assert that a YAML expression matches something in the document.
 | --- | --- | --- |
 | `$1` | string | YAML file path, or `-` for stdin |
 | `$2` | string | `yq` expression that must succeed |
+
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 
 **🚦 Exit codes**
 
@@ -525,6 +549,10 @@ dybatpho::assert_snapshot version-output "$(./mytool --version)"
 | **`DYBATPHO_TEST_SNAPSHOT_DIR`** | string | Directory holding the `.snap` files |
 | **`DYBATPHO_TEST_UPDATE_SNAPSHOTS`** | string | Set to `1`, `true`, `yes`, or `on` to rewrite the snapshot |
 | **`UPDATE_SNAPSHOTS`** | string | Unprefixed alias for the same switch |
+
+**📝 Notes**
+
+- Showing the difference on a mismatch needs the `diff` module: `dybatpho::load diff`
 
 **📤 Output on stderr**
 

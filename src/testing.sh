@@ -102,6 +102,31 @@ function __dybatpho_test_fail {
 }
 
 #######################################
+# @description Fail the calling assertion unless the `json` module is loaded.
+#   Querying a document is the `json` module's work, and only the JSON and YAML
+#   assertions do it. Registering it as a dependency would load it into every
+#   test suite that only checks files and mocks, so those assertions ask for it
+#   instead. Like every assertion here, the check reports and returns rather
+#   than ending the test shell, so a suite sees an ordinary failing assertion
+#   that names the module to load.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `json`
+#   and then fail on the first internal call.
+# @noargs
+# @set DYBATPHO_TEST_FAILURES Incremented by one when the module is missing
+# @stderr The diagnostic naming the module, when it is missing
+# @exitcode 0 The `json` module is loaded
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_test_need_json {
+  declare -F __dybatpho_json_cmd > /dev/null && return 0
+  __dybatpho_test_fail "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
+}
+
+#######################################
 # @description Resolve an input that is either a file path or `-` for stdin into a readable file.
 # @arg $1 string File path, or `-` to buffer stdin into a fixture
 # @arg $2 string Variable name that receives the resolved path
@@ -303,10 +328,12 @@ function dybatpho::assert_file_mode {
 # @arg $1 string JSON file path, or `-` for stdin
 # @exitcode 0 The document parses as JSON
 # @exitcode 1 The document is missing or malformed
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 #######################################
 function dybatpho::assert_json_valid {
   local input
   dybatpho::expect_args input -- "$@"
+  __dybatpho_test_need_json || return 1
   local file
   __dybatpho_test_input_file "${input}" file
   if ! dybatpho::json_query "${file}" '.' > /dev/null 2>&1; then
@@ -352,10 +379,12 @@ function __dybatpho_test_scalar_matches {
 # @exitcode 1 The query failed or returned a different value
 # @tip String scalars are compared without their JSON quoting, so an expected
 #      value of `1.4.2` matches a backend result of `"1.4.2"`.
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 #######################################
 function dybatpho::assert_json_query {
   local input filter expected
   dybatpho::expect_args input filter expected -- "$@"
+  __dybatpho_test_need_json || return 1
   local file actual
   __dybatpho_test_input_file "${input}" file
   if ! actual="$(dybatpho::json_query "${file}" "${filter}" 2> /dev/null)"; then
@@ -378,10 +407,12 @@ function dybatpho::assert_json_query {
 # @arg $2 string Query filter that must succeed
 # @exitcode 0 The filter matched
 # @exitcode 1 The filter did not match
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 #######################################
 function dybatpho::assert_json_has {
   local input filter
   dybatpho::expect_args input filter -- "$@"
+  __dybatpho_test_need_json || return 1
   local file
   __dybatpho_test_input_file "${input}" file
   if ! dybatpho::json_has "${file}" "${filter}"; then
@@ -396,10 +427,12 @@ function dybatpho::assert_json_has {
 # @arg $1 string YAML file path, or `-` for stdin
 # @exitcode 0 The document parses as YAML
 # @exitcode 1 The document is missing or malformed
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 #######################################
 function dybatpho::assert_yaml_valid {
   local input
   dybatpho::expect_args input -- "$@"
+  __dybatpho_test_need_json || return 1
   local file
   __dybatpho_test_input_file "${input}" file
   if ! dybatpho::yaml_query "${file}" '.' > /dev/null 2>&1; then
@@ -418,10 +451,12 @@ function dybatpho::assert_yaml_valid {
 # @exitcode 1 The expression failed or returned a different value
 # @tip String scalars are compared without their JSON quoting, so an expected
 #      value of `1.4.2` matches a backend result of `"1.4.2"`.
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 #######################################
 function dybatpho::assert_yaml_query {
   local input expression expected
   dybatpho::expect_args input expression expected -- "$@"
+  __dybatpho_test_need_json || return 1
   local file actual
   __dybatpho_test_input_file "${input}" file
   if ! actual="$(dybatpho::yaml_query "${file}" "${expression}" 2> /dev/null)"; then
@@ -444,10 +479,12 @@ function dybatpho::assert_yaml_query {
 # @arg $2 string `yq` expression that must succeed
 # @exitcode 0 The expression matched
 # @exitcode 1 The expression did not match
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
 #######################################
 function dybatpho::assert_yaml_has {
   local input expression
   dybatpho::expect_args input expression -- "$@"
+  __dybatpho_test_need_json || return 1
   local file
   __dybatpho_test_input_file "${input}" file
   if ! dybatpho::yaml_has "${file}" "${expression}"; then
@@ -539,6 +576,7 @@ function __dybatpho_test_updating_snapshots {
 # @tip A missing snapshot is written and passes, so the first run records the baseline.
 # @tip Trailing blank lines are not preserved, because the text passes through a
 #      command substitution; a snapshot cannot assert on them.
+# @note Showing the difference on a mismatch needs the `diff` module: `dybatpho::load diff`
 #######################################
 function dybatpho::assert_snapshot {
   local name actual
@@ -566,6 +604,12 @@ function dybatpho::assert_snapshot {
     return 0
   fi
   __dybatpho_test_fail "Snapshot ${name} does not match ${snapshot_file}"
+  # The difference is drawn by `diff`, which `testing` does not load: the
+  # mismatch is reported either way, and only its rendering needs the module.
+  if ! declare -F __dybatpho_diff_paint > /dev/null; then
+    dybatpho::error "${FUNCNAME[0]} needs the diff module to show the difference, load it with: dybatpho::load diff"
+    return 1
+  fi
   # Through `diff.sh` rather than a raw `diff -u`, so a snapshot failure reads
   # the same as every other comparison the library prints, colored included.
   # The captured text goes to a file first: `dybatpho::diff_text` reads a side

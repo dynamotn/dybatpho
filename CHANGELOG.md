@@ -902,6 +902,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**
+  `dybatpho::ai_stream` rehearsed and logged its request with the full URL, so
+  a self-hosted base URL holding `user:password` or a key in its path showed up
+  in the rehearsal and in debug logs. Both now show the scheme and host only,
+  the way every other network log line does.
+
 - **`file` — a rewrite no longer writes through a link planted at its staging
   name.** `dybatpho::file_write_atomic`, `dybatpho::file_replace`,
   `dybatpho::file_ensure_line` and `dybatpho::file_remove_line` staged the new

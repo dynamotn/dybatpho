@@ -167,6 +167,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - `DRY_RUN` enabled for a rehearsal.
 - A streamed request refused with an HTTP error, whose error object matches no
   delta, or one that never reaches the provider.
+- A base URL that carries credentials or a key in its path, rehearsed under
+  `DRY_RUN` or logged at debug level.
 
 ## Requirements *(mandatory)*
 
@@ -231,6 +233,9 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   and the provider's message and printing no answer -- and `1` when no response
   arrived or curl failed. It MUST honour `DYBATPHO_CURL_CONNECT_TIMEOUT` and
   `DYBATPHO_CURL_TIMEOUT`, with `DYBATPHO_AI_TIMEOUT` as the overall limit.
+- **FR-024**: A streamed request MUST show its URL redacted to the scheme and
+  host in a `DRY_RUN` rehearsal and in its debug line, never the credentials or
+  path of the base URL.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -289,6 +294,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-014**: Verify a streamed 401 returns `4` with the status and the
   provider's message on stderr and nothing on stdout, a 529 returns `5`, and a
   request that never reached the server returns `1`.
+- **IT-015**: Verify a `DRY_RUN` stream against a base URL holding
+  credentials and a secret path prints the host only.
 
 ## Acceptance Criteria *(mandatory)*
 

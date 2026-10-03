@@ -703,6 +703,21 @@ _test_tool() { printf 'tool output\n'; }
   assert_equal "$(dybatpho::ai_usage_field calls)" "0"
 }
 
+@test "dybatpho::ai_stream rehearses without printing the whole URL" {
+  # A self-hosted base URL can carry credentials or a key in its path, so the
+  # rehearsal shows it the way every network log line does.
+  DRY_RUN=true
+  DYBATPHO_AI_PROVIDER=ollama
+  DYBATPHO_AI_BASE_URL="https://user:hunter2@llm.example.com/k/secret-path"
+  run_traced dybatpho::ai_stream "q"
+  assert_success
+  # The rehearsal quotes each argument, so the brackets come back escaped.
+  assert_output --partial "https://llm.example.com/"
+  assert_output --partial "redacted"
+  refute_output --partial "hunter2"
+  refute_output --partial "secret-path"
+}
+
 @test "the counter file defaults to a private directory, not a shared one" {
   local state_home="${BATS_TEST_TMPDIR}/state"
   DYBATPHO_AI_STATE_FILE=""

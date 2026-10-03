@@ -1338,13 +1338,17 @@ function dybatpho::ai_stream {
     *) ;;
   esac
 
+  # A self-hosted base URL can hold credentials or a key in its path, so the
+  # rehearsal and the debug line show it redacted, like every network log line.
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
   if dybatpho::is true "${DRY_RUN-}"; then
-    dybatpho::dry_run "curl --no-buffer ${url}"
+    dybatpho::dry_run curl --no-buffer "${shown_url}"
     return 0
   fi
 
   __dybatpho_ai_count_call
-  dybatpho::debug "ai: streaming from ${url}"
+  dybatpho::debug "ai: streaming from ${shown_url}"
   local filter
   case "${provider}" in
     anthropic)

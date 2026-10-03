@@ -187,3 +187,13 @@ fail_with() {
   [ -z "${violations}" ] ||
     fail_with "Functions that can collide with a caller's helpers (AGENT.md 'Bash conventions'):" "${violations}"
 }
+
+@test "an output assertion fed a here document reads it" {
+  # bats-assert compares against stdin only when told to with `-`. Given a here
+  # document but no `-`, it ignores the document and only checks that there was
+  # some output, so the expectation in the document is never compared at all.
+  local violations=""
+  violations="$(grep -nE '(assert|refute)_(output|stderr)[[:space:]]*<<' "${REPO_ROOT}"/test/*.bats || true)"
+  [ -z "${violations}" ] ||
+    fail_with "Output assertions that ignore their here document (add \`-\`):" "${violations}"
+}

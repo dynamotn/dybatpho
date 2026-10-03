@@ -800,8 +800,7 @@ function dybatpho::notify_email {
   fi
   local missing="No sendmail command found: install an MTA or set DYBATPHO_SENDMAIL"
   [[ -n "${sendmail}" ]] || dybatpho::die "${missing}" 127 # kcov(skip)
-  # Not `dybatpho::require`: `hash` accepts any path that contains a slash.
-  dybatpho::is command "${sendmail}" || dybatpho::die "${sendmail} isn't installed" 127 # kcov(skip)
+  dybatpho::require "${sendmail}" # kcov(skip)
 
   local encoded_subject to_header
   __dybatpho_notification_mime_header encoded_subject "${subject}"

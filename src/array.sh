@@ -32,7 +32,7 @@
 function dybatpho::array_print {
   dybatpho::expect_ref "$1"
   local -n __dybatpho_array_ref="$1"
-  printf '%s\n' "${__dybatpho_array_ref[@]}"
+  printf '%s\n' ${__dybatpho_array_ref[@]+"${__dybatpho_array_ref[@]}"}
 }
 
 #######################################
@@ -53,7 +53,7 @@ function dybatpho::array_reverse {
     __dybatpho_array_result+=("${__dybatpho_array_ref[${__dybatpho_array_indices[${__dybatpho_array_i}]}]}")
   done
 
-  __dybatpho_array_ref=("${__dybatpho_array_result[@]}")
+  __dybatpho_array_ref=(${__dybatpho_array_result[@]+"${__dybatpho_array_result[@]}"})
   if [[ "${2-""}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
@@ -155,7 +155,7 @@ function dybatpho::array_compact {
     [[ -n "${__dybatpho_array_ref[${__dybatpho_array_i}]}" ]] \
       && __dybatpho_array_compacted+=("${__dybatpho_array_ref[${__dybatpho_array_i}]}")
   done
-  __dybatpho_array_ref=("${__dybatpho_array_compacted[@]}")
+  __dybatpho_array_ref=(${__dybatpho_array_compacted[@]+"${__dybatpho_array_compacted[@]}"})
   if [[ "${2-""}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
@@ -182,7 +182,7 @@ function dybatpho::array_filter {
       __dybatpho_array_filtered+=("${__dybatpho_array_ref[${__dybatpho_array_i}]}")
     fi
   done
-  __dybatpho_array_ref=("${__dybatpho_array_filtered[@]}")
+  __dybatpho_array_ref=(${__dybatpho_array_filtered[@]+"${__dybatpho_array_filtered[@]}"})
   if [[ "${3-""}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
@@ -210,7 +210,7 @@ function dybatpho::array_map {
     ((status == 0)) || return "${status}"
     __dybatpho_array_mapped+=("${__dybatpho_array_mapped_value}")
   done
-  __dybatpho_array_ref=("${__dybatpho_array_mapped[@]}")
+  __dybatpho_array_ref=(${__dybatpho_array_mapped[@]+"${__dybatpho_array_mapped[@]}"})
   if [[ "${3-""}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
@@ -306,7 +306,7 @@ function dybatpho::array_reject {
       __dybatpho_array_rejected+=("${__dybatpho_array_ref[${__dybatpho_array_i}]}")
     fi
   done
-  __dybatpho_array_ref=("${__dybatpho_array_rejected[@]}")
+  __dybatpho_array_ref=(${__dybatpho_array_rejected[@]+"${__dybatpho_array_rejected[@]}"})
   if [[ "${3-""}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
@@ -359,12 +359,12 @@ function dybatpho::array_join {
   local __dybatpho_array_separator="$2"
   local __dybatpho_array_i
 
-  if [[ ${#__dybatpho_array_ref[@]} -eq 0 ]]; then
-    return
-  fi
-  printf -- "%s" "${__dybatpho_array_ref[0]}"
-  for ((__dybatpho_array_i = 1; __dybatpho_array_i < ${#__dybatpho_array_ref[@]}; __dybatpho_array_i++)); do
-    printf -- "%s%s" "${__dybatpho_array_separator}" "${__dybatpho_array_ref[${__dybatpho_array_i}]}"
+  # By index rather than by counting from zero, so a sparse array joins the
+  # elements it holds instead of reading an index it does not have.
+  local __dybatpho_array_lead=""
+  for __dybatpho_array_i in "${!__dybatpho_array_ref[@]}"; do
+    printf -- "%s%s" "${__dybatpho_array_lead}" "${__dybatpho_array_ref[${__dybatpho_array_i}]}"
+    __dybatpho_array_lead="${__dybatpho_array_separator}"
   done
 }
 
@@ -506,7 +506,7 @@ function __dybatpho_array_merge_sort {
 
       __dybatpho_array_merge_start=${__dybatpho_array_merge_end}
     done
-    __dybatpho_array_merge_values=("${__dybatpho_array_merge_buffer[@]}")
+    __dybatpho_array_merge_values=(${__dybatpho_array_merge_buffer[@]+"${__dybatpho_array_merge_buffer[@]}"})
     __dybatpho_array_merge_width=$((__dybatpho_array_merge_width * 2))
   done
 }
@@ -838,7 +838,7 @@ function __dybatpho_array_graph_roots_into {
     ((${#__dybatpho_array_graph_all[@]})) \
       && printf '%s\n' "${!__dybatpho_array_graph_all[@]}" | LC_ALL=C sort
   )
-  __dybatpho_array_graph_roots=("${__dybatpho_array_graph_keys[@]}")
+  __dybatpho_array_graph_roots=(${__dybatpho_array_graph_keys[@]+"${__dybatpho_array_graph_keys[@]}"})
 }
 
 #######################################

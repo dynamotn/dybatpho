@@ -279,6 +279,18 @@ EOF
   refute_output
 }
 
+@test "dybatpho::array_join walks a sparse array by its indexes" {
+  # Counting 0..n-1 read index 0, which a sparse array may not have, and
+  # stopped short of the highest index.
+  local -a arr=()
+  arr[2]="b"
+  arr[5]="c"
+  arr[9]="d"
+  run_traced dybatpho::array_join "arr" ","
+  assert_success
+  assert_output "b,c,d"
+}
+
 @test "dybatpho::array_join single element" {
   arr=("hello")
   assert_equal "$(dybatpho::array_join "arr" ",")" "hello"

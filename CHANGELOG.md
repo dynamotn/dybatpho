@@ -805,6 +805,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   expanded `*` to the names of the files in the working directory, so
   `printf '1 * 3\n' | dybatpho::math_sum` could add up file names.
 
+- **`array` — sparse and empty arrays.** `dybatpho::array_join` counted
+  from index 0, so a sparse array stopped the script with `unbound variable`
+  or lost its last elements; it now joins the elements the array holds. On
+  Bash 4.3, the oldest version the library supports, `"${empty[@]}"` counts
+  as unset under `nounset`, so `dybatpho::array_print`, `array_compact`,
+  `array_filter`, `array_map`, `array_reject`, every `--` print and
+  `dybatpho::array_toposort` stopped the script on an empty array or an empty
+  result. They now handle one.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

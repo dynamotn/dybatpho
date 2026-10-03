@@ -38,7 +38,10 @@ function __dybatpho_text_read_lines {
       target_ref+=("${line}")
     done
   else
-    mapfile -t target_ref <<< "${input}"
+    # `<<<` ends the text with a newline of its own, so one the text already
+    # ends with is dropped first; otherwise an argument would read one more,
+    # empty line than the same text arriving on stdin.
+    mapfile -t target_ref <<< "${input%$'\n'}"
   fi
 
   if ((${#target_ref[@]} == 0)); then

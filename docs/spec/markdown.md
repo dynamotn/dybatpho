@@ -90,6 +90,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 ## Edge Cases
 
 - Input arrives through stdin with `-`, or is empty, or contains blank lines.
+- Text passed as an argument ends with a newline.
 - A value begins with a character that opens a block, or contains a backslash.
 - A code body contains a fence as long as or longer than the default one.
 - A URL contains a space, a parenthesis, or an angle bracket.
@@ -120,6 +121,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-016**: The mention and emoji builders MUST accept an already-delimited argument without doubling the delimiter, and MUST reject a value that cannot render.
 - **FR-017**: Every builder that takes a text block MUST accept stdin when the input argument is `-`.
 - **FR-018**: `md_badge` MUST percent-encode every character of the label, value and color outside the unreserved URL set, after the shields.io doubling of `-` and `_` and the space-to-`_` rule.
+- **FR-019**: Text passed as an argument MUST split into the same lines as the same text on stdin; one trailing newline MUST NOT add an empty item.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -151,6 +153,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **IT-011**: Escape inline and line-leading syntax, a backslash, stdin, and empty input.
 - **IT-012**: Render a mention and an emoji shortcode, and reject invalid values of each.
 - **IT-013**: Render a badge whose label, value and color hold `/`, `?`, `#`, `%`, a space and parentheses, and find each percent-encoded in the URL.
+- **IT-014**: Render a list from text ending in a newline, as an argument and on stdin, and get the same items with no empty one at the end.
 
 ## Acceptance Criteria *(mandatory)*
 

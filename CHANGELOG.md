@@ -973,6 +973,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   could go unretried. The loop now keeps its counters out of the caller's
   names.
 
+- **`text` and `markdown` — text ending in a newline no longer grows an empty
+  last line.** Passed as an argument, `$'a\nb\n'` read as three lines, the last
+  one empty, while the same text on stdin read as two, so
+  `dybatpho::text_indent` printed an extra indented line and `dybatpho::md_list`
+  an empty item. An argument now splits the way stdin does.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

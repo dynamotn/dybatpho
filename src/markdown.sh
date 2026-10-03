@@ -61,7 +61,9 @@ function __dybatpho_md_read_lines {
       __dybatpho_md_lines_ref+=("${__dybatpho_md_line}")
     done
   else
-    mapfile -t __dybatpho_md_lines_ref <<< "${__dybatpho_md_input}"
+    # `<<<` ends the text with a newline of its own, so one the text already
+    # ends with is dropped first, keeping an argument and stdin in agreement.
+    mapfile -t __dybatpho_md_lines_ref <<< "${__dybatpho_md_input%$'\n'}"
   fi
 
   if ((${#__dybatpho_md_lines_ref[@]} == 0)); then

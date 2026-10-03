@@ -60,6 +60,20 @@ version 1.0.0
 EOF
 }
 
+@test "dybatpho::text_indent reads a trailing newline the same from an argument and from stdin" {
+  # `mapfile <<<` adds a newline of its own, so an argument ending in one used
+  # to grow an extra, indented empty line that the same text on stdin did not.
+  local literal piped
+  literal="$(dybatpho::text_indent $'a\nb\n' "> "; printf .)"
+  piped="$(printf 'a\nb\n' | dybatpho::text_indent - "> "; printf .)"
+  assert_equal "${literal}" $'> a\n> b\n.'
+  assert_equal "${literal}" "${piped}"
+
+  # A blank line before the end is still a line of its own.
+  literal="$(dybatpho::text_indent $'a\n\n' "> "; printf .)"
+  assert_equal "${literal}" $'> a\n> \n.'
+}
+
 @test "dybatpho::text_indent uses its default prefix and handles empty input" {
   assert_equal "$(dybatpho::text_indent "alpha")" "  alpha"
 
@@ -139,7 +153,6 @@ EOF
 ┌───────┐
 │ alpha │
 │ be ta │
-│       │
 └───────┘
 EOF
 }

@@ -112,6 +112,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - ANSI sequences occur alongside ordinary text.
 - A bullet marker, delimiter, or gap is omitted or empty.
 - `text_columns` is called while the `table` module it draws through is not loaded.
+- Text passed as an argument ends with a newline, which stdin input does too.
 - A box title is wider than every line, or the input is empty.
 - A line contains ANSI sequences or wide characters, whose bytes, characters, and columns all differ.
 - A line is wider than the centering width, or the width is zero or not a number.
@@ -135,6 +136,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **FR-011**: The module MUST provide a helper that prints the first `count` lines of a block followed by a marker naming how many lines were left out, MUST print a block that fits unchanged and without a marker, MUST replace `{count}` in a custom marker, and MUST fail on a count that is not a non-negative integer.
 - **FR-012**: Every helper MUST accept stdin when the input argument is `-`.
 - **FR-013**: Loading `text` MUST NOT load `table`; the column helper MUST stop with a message naming the `table` module and how to load it when that module is not loaded, before reading its input.
+- **FR-014**: Text passed as an argument MUST split into the same lines as the same text on stdin: one trailing newline ends the last line rather than adding an empty one.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -171,6 +173,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **IT-012**: Number lines including blanks, from a custom start with leading zeros and a custom separator, and reject an invalid start.
 - **IT-013**: Truncate a block with the default singular and plural markers, print a fitting block unchanged, fill a custom marker with a zero count, and reject an invalid count.
 - **IT-014**: In a child shell that loaded only `text`, stop the column helper with the message naming `table`, then align the same block once `table` is loaded.
+- **IT-015**: Indent a block ending in a newline given as an argument and on stdin, and get the same lines; keep a blank line that comes before the final newline.
 
 ## Acceptance Criteria *(mandatory)*
 

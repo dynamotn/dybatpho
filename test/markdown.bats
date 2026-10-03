@@ -52,6 +52,15 @@ EOF
 EOF
 }
 
+@test "dybatpho::md_list reads a trailing newline the same from an argument and from stdin" {
+  # The argument used to gain an empty last item that stdin did not.
+  local literal piped
+  literal="$(dybatpho::md_list $'a\nb\n'; printf .)"
+  piped="$(printf 'a\nb\n' | dybatpho::md_list -; printf .)"
+  assert_equal "${literal}" $'- a\n- b\n.'
+  assert_equal "${literal}" "${piped}"
+}
+
 @test "dybatpho::md_list escapes an item that would otherwise start a block" {
   # A value read from elsewhere can start with `-` or `#`; unescaped it nests a
   # list or opens a heading inside the item.

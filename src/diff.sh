@@ -252,6 +252,7 @@ function __dybatpho_diff_flatten {
 # @stdout One line per difference: `+ path = value`, `- path = value`, or `~ path: old -> new`
 # @exitcode 0 The two documents hold the same values
 # @exitcode 1 They differ
+# @exitcode 2 Either document is not valid JSON
 # @exitcode 127 `jq` is not installed
 # @example
 #   dybatpho::diff_json old-state.json new-state.json
@@ -268,6 +269,8 @@ function dybatpho::diff_json {
   local first_file second_file
   __dybatpho_diff_side_into first_file "${first}" "a"
   __dybatpho_diff_side_into second_file "${second}" "b"
+  __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${first_file}" first
+  __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${second_file}" second
 
   local -A before=() after=()
   local path value
@@ -309,6 +312,23 @@ function dybatpho::diff_json {
 
   ((differed == 0)) && return 0
   return 1
+}
+
+#######################################
+# @description Stop unless a file holds at least one JSON value.
+#   The comparison reads each side through a process substitution, whose exit
+#   status is lost, so a document that does not parse used to flatten to
+#   nothing -- and two broken documents then compared as identical. An empty
+#   file is refused too: it holds no value to compare.
+# @arg $1 string Name of the public function, for the message
+# @arg $2 string File to check
+# @arg $3 string Which side it is: `first` or `second`
+# @exitcode 2 The file is not valid JSON
+# @internal
+#######################################
+function __dybatpho_diff_expect_json {
+  jq -e 'true' -- "$2" > /dev/null 2>&1 \
+    || dybatpho::die "$1: Not valid JSON: the $3 document" 2
 }
 
 #######################################
@@ -358,6 +378,7 @@ function __dybatpho_diff_report {
 # @stdout One line per difference, in the form `dybatpho::diff_json` prints
 # @exitcode 0 The two documents hold the same values
 # @exitcode 1 They differ
+# @exitcode 2 Either document is not valid YAML
 # @exitcode 127 `jq` or `yq` is not installed
 # @example
 #   dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
@@ -375,8 +396,13 @@ function dybatpho::diff_yaml {
   local first_json second_json
   dybatpho::create_temp first_json ".json" "diff-a"
   dybatpho::create_temp second_json ".json" "diff-b"
-  dybatpho::yaml_to_json "${first_file}" "${first_json}"
-  dybatpho::yaml_to_json "${second_file}" "${second_json}"
+  # The conversion's status is checked rather than left to `set -e`: a caller
+  # testing the result in a condition has errexit suspended, and a document
+  # that did not convert would then compare as an empty one.
+  dybatpho::yaml_to_json "${first_file}" "${first_json}" 2> /dev/null \
+    || dybatpho::die "${FUNCNAME[0]}: Not valid YAML: the first document" 2
+  dybatpho::yaml_to_json "${second_file}" "${second_json}" 2> /dev/null \
+    || dybatpho::die "${FUNCNAME[0]}: Not valid YAML: the second document" 2
 
   dybatpho::diff_json "${first_json}" "${second_json}"
 }

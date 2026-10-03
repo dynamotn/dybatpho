@@ -137,6 +137,30 @@ EOF
   assert_output "~ .: 5 -> 6"
 }
 
+@test "dybatpho::diff_json refuses a document that does not parse" {
+  # Two broken documents used to flatten to nothing on both sides and read as
+  # identical, so a corrupt file passed as "no change".
+  run -2 --separate-stderr dybatpho::diff_json '{"a":' 'nope'
+  assert_output ""
+  assert_stderr --partial "dybatpho::diff_json: Not valid JSON: the first document"
+
+  run -2 --separate-stderr dybatpho::diff_json '{"a":1}' '{"a":'
+  assert_stderr --partial "dybatpho::diff_json: Not valid JSON: the second document"
+
+  # An empty document holds no JSON value either.
+  run -2 --separate-stderr dybatpho::diff_json '' '{}'
+  assert_stderr --partial "Not valid JSON: the first document"
+}
+
+@test "dybatpho::diff_yaml refuses a document that does not parse" {
+  run -2 --separate-stderr dybatpho::diff_yaml 'a: [1' 'a: [1'
+  assert_output ""
+  assert_stderr --partial "dybatpho::diff_yaml: Not valid YAML: the first document"
+
+  run -2 --separate-stderr dybatpho::diff_yaml 'a: 1' 'a: [1'
+  assert_stderr --partial "dybatpho::diff_yaml: Not valid YAML: the second document"
+}
+
 @test "dybatpho::diff_yaml compares two documents by key" {
   local first="${BATS_TEST_TMPDIR}/a.yaml" second="${BATS_TEST_TMPDIR}/b.yaml"
   printf 'replicas: 2\nlabels:\n  app: api\n' > "${first}"

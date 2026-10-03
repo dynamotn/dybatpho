@@ -759,6 +759,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reported as never run. The script is now written without entering the
   trace.
 
+- **`diff` — a document that does not parse is no longer reported as
+  unchanged.** `dybatpho::diff_json` read each side through a process
+  substitution whose failure was lost, so two broken documents -- or a broken
+  one against an empty one -- compared as identical and returned `0`.
+  `dybatpho::diff_yaml` likewise compared a file that `yq` could not read as an
+  empty document. Both now stop with exit code `2` and name the side that does
+  not parse.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

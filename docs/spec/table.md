@@ -102,6 +102,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 
 - Empty input or input supplied through stdin with `-`.
 - Rows contain uneven numbers of cells or leading/trailing whitespace.
+- The last column is narrower in some rows than in others, so a plain table would otherwise end those rows in padding.
 - A cell carries ANSI colour sequences or wide characters.
 - A custom delimiter is multi-character.
 - A table has only a header row or no meaningful rows.
@@ -141,6 +142,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **FR-016**: An empty CSV input or an empty JSON array MUST render nothing, and an unknown style MUST stop the script.
 - **FR-017**: Loading `table` MUST NOT load `csv`. The CSV and JSON renderers MUST stop the script, naming the `csv` module and how to load it, when it is not loaded, before reading any input; the other renderers MUST work without it.
 - **FR-018**: Cells MUST be measured without their ANSI escape sequences and with wide characters counted as the columns they occupy, using the same measurement as `text`.
+- **FR-019**: A plain aligned row MUST NOT end in whitespace: the last column is not padded to its width.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -176,6 +178,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **IT-013**: Report a JSON document that is not an array of objects without ending the caller.
 - **IT-014**: In a shell that loaded `table` alone, draw a plain table, stop both CSV and JSON renderers with the message naming `dybatpho::load csv`, and render once `csv` is loaded.
 - **IT-015**: Draw a box table with a coloured cell and verify it is padded by its visible width, keeping the right border in line.
+- **IT-016**: Render a plain table whose last column varies in width and compare the whole output exactly, so no row ends in padding.
 
 ## Acceptance Criteria *(mandatory)*
 

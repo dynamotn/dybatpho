@@ -958,6 +958,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every other unsafe character in the label, value and color, which used to
   produce a broken badge link.
 
+- **`table` — plain tables no longer end their rows in spaces.**
+  `dybatpho::table_print`, `dybatpho::table_align` and everything drawn
+  through them (`dybatpho::text_columns`, the plain style of
+  `dybatpho::table_csv`) padded the last column to its width, so every row
+  shorter than the widest ended in trailing whitespace. Rows now end at their
+  last character; the box and Markdown styles are unchanged.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

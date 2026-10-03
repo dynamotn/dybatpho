@@ -5,7 +5,7 @@ setup() {
 @test "dybatpho::table_print aligns delimited rows into columns" {
   run_traced dybatpho::table_print $'Name|Role|State\nAlice|Dev|Active\nBob|Ops|Paused'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 Name   Role  State
 Alice  Dev   Active
 Bob    Ops   Paused
@@ -219,7 +219,7 @@ EOF
   DYBATPHO_CSV_DELIMITER=";" \
     run_traced dybatpho::table_from_json - <<< '[{"k":"x;y"}]'
   assert_success
-  assert_output "$(printf 'k  \nx;y')"
+  assert_output "$(printf 'k\nx;y')"
 
   run_traced dybatpho::table_from_json ' [ ] '
   assert_success

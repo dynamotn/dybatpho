@@ -355,6 +355,9 @@ function dybatpho::table_align {
         line+="${gap_text}"
       fi
     done
+    # Cells are trimmed, so anything after the last non-blank character is
+    # padding the last column does not need.
+    line="${line%"${line##*[! ]}"}"
     printf '%s\n' "${line}"
   done
 }

@@ -35,22 +35,15 @@ function __dybatpho_table_cell_width {
 # @description Measure a cell, writing the width into a named variable.
 #   The renderers measure every cell of every row, and reaching the measurement
 #   through `$( )` forked once per cell -- the single largest cost in drawing a
-#   table.
+#   table. The measurement is the one `text` uses: ANSI colour is stripped
+#   first, so a coloured cell is padded by what the terminal shows.
 # @arg $1 string Name of the variable receiving the width
 # @arg $2 string Cell text
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_table_width_into {
-  local __dybatpho_table_width_name="$1"
-  local __dybatpho_table_width_text="${2-}"
-  if dybatpho::is function __dybatpho_log_width_into; then
-    __dybatpho_log_width_into "${__dybatpho_table_width_name}" "${__dybatpho_table_width_text}"
-    return 0
-  fi
-  # kcov(skip) - only when table.sh is used without logging.sh
-  local -n __dybatpho_table_width_out="${__dybatpho_table_width_name}"
-  __dybatpho_table_width_out="${#__dybatpho_table_width_text}"
+  __dybatpho_text_width_into "$1" "${2-}"
 }
 
 #######################################

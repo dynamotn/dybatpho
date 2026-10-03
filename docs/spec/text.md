@@ -77,7 +77,7 @@ As a script author, I want to put a border around a summary, center a banner, nu
 
 1. **Given** a multi-line block and a title, **When** the box helper runs, **Then** the block is framed by a border as wide as its widest line or title, with the title set into the top edge
 2. **Given** a border style of `single`, `double`, `rounded`, `heavy`, or `ascii`, **When** the box helper runs, **Then** the border uses that style's characters, and an unknown style is rejected
-3. **Given** lines that contain ANSI color sequences or wide characters, **When** the box or center helper runs, **Then** padding follows the visible width rather than the byte or character count, using the `screen` module's measurement when it is loaded
+3. **Given** lines that contain ANSI color sequences or wide characters, **When** the box or center helper runs, **Then** padding follows the visible width rather than the byte or character count, measured the way `table` measures its cells
 4. **Given** a width, **When** the center helper runs, **Then** each line is padded on the left only, blank lines stay blank, and a line wider than the width is unchanged
 5. **Given** a block and a first line number, **When** the number helper runs, **Then** every line, blank ones included, carries its number right-aligned to the widest number
 6. **Given** a block longer than a count, **When** the truncate helper runs, **Then** the first `count` lines are printed followed by a marker naming how many were left out, and a block that fits is printed unchanged
@@ -113,7 +113,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - A bullet marker, delimiter, or gap is omitted or empty.
 - `text_columns` is called while the `table` module it draws through is not loaded.
 - A box title is wider than every line, or the input is empty.
-- A line contains ANSI sequences or wide characters, with or without the `screen` module loaded.
+- A line contains ANSI sequences or wide characters, whose bytes, characters, and columns all differ.
 - A line is wider than the centering width, or the width is zero or not a number.
 - A first line number has leading zeros, such as `09`.
 - A block already fits within the truncation count, or the count is zero.
@@ -129,7 +129,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **FR-005**: The module MUST provide a helper that prefixes non-empty lines as bullet items.
 - **FR-006**: The module MUST provide a helper that aligns delimited text blocks into plain columns.
 - **FR-007**: The module MUST provide a helper that frames a text block in a border sized to its widest line or optional title, with `single`, `double`, `rounded`, `heavy`, and `ascii` styles, and MUST fail on an unknown style.
-- **FR-008**: Width-sensitive helpers MUST measure a line without its ANSI escape sequences, and MUST use the `screen` module's Unicode-aware measurement when that module is loaded, falling back to the character count otherwise, without depending on `screen`.
+- **FR-008**: Width-sensitive helpers MUST measure a line without its ANSI escape sequences, MUST count a wide character as the two columns it occupies with the core measurement, whether or not `screen` is loaded, and MUST measure exactly as `table` measures its cells.
 - **FR-009**: The module MUST provide a helper that centers each line within an explicit width or, when none is given, the terminal width, padding on the left only, and MUST fail on a width that is not a positive integer.
 - **FR-010**: The module MUST provide a helper that prefixes every line with its number, starting from an optional first number, right-aligned to the widest number, with an optional separator, and MUST fail on a start that is not a non-negative integer.
 - **FR-011**: The module MUST provide a helper that prints the first `count` lines of a block followed by a marker naming how many lines were left out, MUST print a block that fits unchanged and without a marker, MUST replace `{count}` in a custom marker, and MUST fail on a count that is not a non-negative integer.
@@ -152,7 +152,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **SC-001**: Scripts can format or normalize multi-line text without inlining custom loops.
 - **SC-002**: Heredoc-like content can be dedented cleanly before output.
 - **SC-003**: Colored console output can be converted to plain text for reuse.
-- **SC-004**: Boxed and centered output keeps straight edges for colored text, and for wide characters when `screen` is loaded.
+- **SC-004**: Boxed and centered output keeps straight edges for colored text and for wide characters.
 - **SC-005**: Long blocks can be numbered or shortened for display without external tools such as `nl` or `head`.
 
 ## Integration Tests *(mandatory)*
@@ -165,7 +165,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **IT-006**: Align delimited text into columns with a custom gap.
 - **IT-007**: Box a block sized to its widest line, and a short block widened to fit its title.
 - **IT-008**: Box with every border style, read from stdin, handle empty input, and reject an unknown style.
-- **IT-009**: Box colored text by visible width, and wide characters with and without `screen` loaded.
+- **IT-009**: Box colored text by visible width, and wide characters by their columns with and without `screen` loaded.
 - **IT-010**: Center lines within a width, keep blank and over-wide lines, and default to the terminal width.
 - **IT-011**: Center colored and wide text by visible width, and reject an invalid width.
 - **IT-012**: Number lines including blanks, from a custom start with leading zeros and a custom separator, and reject an invalid start.
@@ -177,4 +177,4 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 1. Output-oriented helpers print focused text suitable for command substitution or direct console output.
 2. The module keeps multi-line formatting behavior deterministic for tests and docs.
 3. Invalid styles, widths, start numbers, and counts fail with a clear error instead of producing malformed output.
-4. The module does not load or require `screen`; it only uses its measurement when another part of the script loaded it.
+4. The module does not load or require `screen`; its measurement is the core one, so the result does not depend on which modules are loaded.

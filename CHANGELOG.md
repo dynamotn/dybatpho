@@ -87,9 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start and with any separator, and `dybatpho::text_truncate_lines` keeps the
   first lines of a block and ends with `… N more lines` or a marker of your own
   where `{count}` stands for the lines left out. Boxing and centering measure
-  what the terminal shows: ANSI colors count for nothing, and when the `screen`
-  module is loaded a wide character counts for the two columns it occupies.
-  Every helper reads stdin when given `-`.
+  what the terminal shows: ANSI colors count for nothing, and a wide character
+  counts for the two columns it occupies, measured the same way `table`
+  measures its cells. Every helper reads stdin when given `-`.
 
   ```sh
   dybatpho::text_box "$(git diff --shortstat)" "Changes" rounded
@@ -836,6 +836,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   left its `~` to be read as the next key. Escape sequences are now read to
   their end, and keys the widgets do not use are ignored rather than read as
   Escape.
+
+- **`table` — a coloured cell no longer pushes the right border out of line.**
+  Cells were measured with their ANSI escape sequences included, so a cell such
+  as `\e[32mok\e[0m` counted as twelve columns and got too little padding in
+  `dybatpho::table_box`, `dybatpho::table_align` and the other renderers.
+  Colour now counts for nothing, and cells are measured exactly as `text`
+  measures a line.
 
 ### Security
 

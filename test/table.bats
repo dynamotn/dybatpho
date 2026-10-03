@@ -95,6 +95,15 @@ EOF
   assert_line --index 1 "| --- | --- |"
 }
 
+@test "dybatpho::table_box pads a coloured cell by what the terminal shows" {
+  # The escape codes used to count as columns, so a coloured cell got less
+  # padding than a plain one and the right border broke out of line.
+  run_traced dybatpho::table_box $'name,status\nweb,\e[32mok\e[0m\napi,down' ","
+  assert_success
+  assert_line --index 3 $'│ web  │ \e[32mok\e[0m     │'
+  assert_line --index 4 '│ api  │ down   │'
+}
+
 @test "dybatpho::table_print handles empty rows and cells without a display helper" {
   run_traced dybatpho::table_print $'\nAlpha|Beta' "|"
   assert_success

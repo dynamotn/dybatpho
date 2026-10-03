@@ -193,31 +193,45 @@ function __dybatpho_text_need_table {
 }
 
 #######################################
+# @description Remove ANSI escape sequences from one line, writing the result
+#   into a named variable without a subshell.
+#   The match runs in the C locale: the sequence is defined by byte ranges, and
+#   a range such as `[ -/]` is not well defined under a UTF-8 collation.
+# @arg $1 string Name of the variable receiving the stripped line
+# @arg $2 string Line to strip
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_text_strip_ansi_into {
+  local __dybatpho_text_strip_target __dybatpho_text_strip_line
+  dybatpho::expect_args __dybatpho_text_strip_target __dybatpho_text_strip_line -- "$@"
+  local -n __dybatpho_text_strip_out="${__dybatpho_text_strip_target}"
+  if [[ "${__dybatpho_text_strip_line}" == *$'\e'* ]]; then
+    local LC_ALL=C
+    local __dybatpho_text_strip_re=$'\e''\[[0-?]*[ -/]*[@-~]'
+    while [[ "${__dybatpho_text_strip_line}" =~ ${__dybatpho_text_strip_re} ]]; do
+      __dybatpho_text_strip_line="${__dybatpho_text_strip_line/"${BASH_REMATCH[0]}"/}"
+    done
+  fi
+  __dybatpho_text_strip_out="${__dybatpho_text_strip_line}"
+}
+
+#######################################
 # @description Measure the columns a line occupies on a terminal.
-#   ANSI escape sequences are removed before measuring. The Unicode-aware
-#   measurement of the `screen` module is used when it is loaded; otherwise the
-#   character count stands in for the width.
+#   ANSI escape sequences are removed first, then the line is measured with the
+#   core logging measurement, which counts a wide glyph as the two columns it
+#   occupies. `table` measures its cells through this helper too, so a box drawn
+#   by either module is sized the same way.
 # @arg $1 string Name of the variable receiving the width
 # @arg $2 string Line to measure
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_text_width_into {
-  local __dybatpho_text_w_target __dybatpho_text_w_line
-  dybatpho::expect_args __dybatpho_text_w_target __dybatpho_text_w_line -- "$@"
-  local -n __dybatpho_text_w_out="${__dybatpho_text_w_target}"
-
-  if [[ "${__dybatpho_text_w_line}" == *$'\e'* ]]; then
-    __dybatpho_text_w_line="$(dybatpho::text_strip_ansi "${__dybatpho_text_w_line}")"
-  fi
-
-  # A guard on the internal helper, not the public function: a child shell
-  # inherits exported public functions without the internals they call.
-  if declare -F __dybatpho_screen_width_into > /dev/null; then
-    __dybatpho_screen_width_into __dybatpho_text_w_out "${__dybatpho_text_w_line}"
-  else
-    __dybatpho_text_w_out="${#__dybatpho_text_w_line}"
-  fi
+  local __dybatpho_text_w_target __dybatpho_text_w_text __dybatpho_text_w_line
+  dybatpho::expect_args __dybatpho_text_w_target __dybatpho_text_w_text -- "$@"
+  __dybatpho_text_strip_ansi_into __dybatpho_text_w_line "${__dybatpho_text_w_text}"
+  __dybatpho_log_width_into "${__dybatpho_text_w_target}" "${__dybatpho_text_w_line}"
 }
 
 #######################################

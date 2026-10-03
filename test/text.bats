@@ -199,10 +199,10 @@ EOF
   assert_output $'┌───────┐\n│ \e[1mbold\e[0m  │\n│ plain │\n└───────┘'
 }
 
-@test "dybatpho::text_box measures wide characters through screen when it is loaded" {
+@test "dybatpho::text_box measures wide characters by the columns they take" {
   run_traced dybatpho::text_box $'漢字\nab' "題"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 ┌─ 題 ─┐
 │ 漢字 │
 │ ab   │
@@ -210,15 +210,19 @@ EOF
 EOF
 }
 
-@test "dybatpho::text_box counts characters when screen is not loaded" {
+@test "dybatpho::text_box sizes wide characters correctly without screen" {
+  # The measurement is the core one, not screen's: a box drawn without the
+  # screen module used to count characters and come out too narrow.
+  # Bytes, characters and columns all differ for this line (8, 3 and 5), so a
+  # box sized by any measure but the columns comes out the wrong width.
   unset -f __dybatpho_screen_width_into
-  run_traced dybatpho::text_box $'漢字\nab'
+  run_traced dybatpho::text_box $'日本é\nab'
   assert_success
-  assert_output << EOF
-┌────┐
-│ 漢字 │
-│ ab │
-└────┘
+  assert_output - << EOF
+┌───────┐
+│ 日本é │
+│ ab    │
+└───────┘
 EOF
 }
 
@@ -239,7 +243,7 @@ EOF
   assert_equal "$(dybatpho::text_center "漢字" 8)" "  漢字"
 
   unset -f __dybatpho_screen_width_into
-  assert_equal "$(dybatpho::text_center "漢字" 8)" "   漢字"
+  assert_equal "$(dybatpho::text_center "漢字" 8)" "  漢字"
 }
 
 @test "dybatpho::text_center defaults to the terminal width and reads stdin" {

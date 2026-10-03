@@ -747,6 +747,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of reading it as "no", and the `ai` counters stop on a counter file
   that is a symbolic link instead of returning a bare failure.
 
+- **`helpers` — `dybatpho::require` no longer passes a path that is not
+  there.** A command given as a path, such as `/usr/sbin/sendmail`, counted as
+  installed whether or not the file existed, because the shell's `hash` takes
+  any name holding a `/` on trust. A path now has to be an executable file.
+
+- **`testing` — code after `dybatpho::mock_http` shows up in coverage again.**
+  The mock passed its `curl` script through a traced argument, and kcov stops
+  recording a process once the trace holds a value with both a line break and
+  a single quote, so under kcov every line a test ran after mocking HTTP was
+  reported as never run. The script is now written without entering the
+  trace.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`
@@ -760,6 +772,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`notification` — `dybatpho::notify_webhook` no longer logs its URL.** Its
   debug line, `Sending webhook notification to <url>`, wrote the whole webhook
   URL whenever `LOG_LEVEL` was `debug`; it now shows the host only.
+
 - **`network` — a `DRY_RUN` rehearsal no longer prints the whole URL.**
   `dybatpho::curl_do` under `DRY_RUN` printed `curl -sSL <url>` with the URL
   as given, so rehearsing a notification wrote the webhook path, a Telegram
@@ -780,18 +793,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unsafe entries and `dybatpho::archive_is_safe` passed it. Both now fail with
   an error naming the archive, and `dybatpho::safe_extract` and
   `dybatpho::backup_diff` refuse it before extracting anything.
-
-- **`helpers` — `dybatpho::require` no longer passes a path that is not
-  there.** A command given as a path, such as `/usr/sbin/sendmail`, counted as
-  installed whether or not the file existed, because the shell's `hash` takes
-  any name holding a `/` on trust. A path now has to be an executable file.
-
-- **`testing` — code after `dybatpho::mock_http` shows up in coverage again.**
-  The mock passed its `curl` script through a traced argument, and kcov stops
-  recording a process once the trace holds a value with both a line break and
-  a single quote, so under kcov every line a test ran after mocking HTTP was
-  reported as never run. The script is now written without entering the
-  trace.
 
 ## [5.2.0] - 2026-10-02
 

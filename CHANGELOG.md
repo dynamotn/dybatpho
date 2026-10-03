@@ -518,6 +518,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the backend, `[]` was refused as "not an array of objects", while `yq`
   converted it to nothing. Both now write nothing and succeed.
 
+- **`json` — `dybatpho::json_valid` accepts `null` and `false`.** With only
+  `jq` installed it ran `jq -e`, which judges the value rather than the text,
+  so the valid documents `null` and `false` were refused; with `yq` they were
+  accepted, and so was blank text. Both backends now accept every JSON value
+  and refuse blank text.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

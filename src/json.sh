@@ -423,11 +423,7 @@ function dybatpho::json_valid {
   dybatpho::expect_args document -- "$@"
   local json_cmd
   json_cmd=$(__dybatpho_json_cmd)
-  if [[ "${json_cmd}" == "yq" ]]; then
-    yq -o=json -I=0 -p=json '.' <<< "${document}" > /dev/null 2>&1
-  else
-    jq -e . <<< "${document}" > /dev/null 2>&1
-  fi
+  __dybatpho_json_parses "${json_cmd}" "${document}"
 }
 
 #######################################
@@ -575,7 +571,8 @@ function __dybatpho_json_emit {
 #######################################
 # @description Return success when text parses as a JSON value.
 #   Unlike `jq -e`, this accepts `null` and `false`, which are values a caller
-#   may well want to store.
+#   may well want to store. Blank text is refused on both backends: each reads
+#   it as an empty stream and would call it valid, but it holds no value.
 # @arg $1 string Backend, `yq` or `jq`
 # @arg $2 string Candidate JSON text
 # @exitcode 0 The text is a JSON value
@@ -583,6 +580,7 @@ function __dybatpho_json_emit {
 # @internal
 #######################################
 function __dybatpho_json_parses {
+  [[ "$2" == *[![:space:]]* ]] || return 1
   if [[ "$1" == yq ]]; then
     yq -o=json -I=0 -p=json '.' <<< "$2" > /dev/null 2>&1
   else

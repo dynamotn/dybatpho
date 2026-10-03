@@ -294,6 +294,29 @@ EOF
   assert_failure
 }
 
+@test "dybatpho::json_valid accepts null and false and refuses blank text on both backends" {
+  # `jq -e` fails on a document whose value is `null` or `false`, which is a
+  # statement about the value, not about whether the text is JSON.
+  command -v yq > /dev/null || skip "yq is not installed"
+  local saved_path="${PATH}" backend document
+  for backend in yq jq; do
+    if [[ "${backend}" == jq ]]; then
+      PATH="$(__json_path_jq_only)"
+      hash -r
+    fi
+    for document in null false 0 '"text"' '{"a":null}'; do
+      dybatpho::json_valid "${document}" \
+        || { PATH="${saved_path}"; printf '%s refused %s\n' "${backend}" "${document}" >&2; return 1; }
+    done
+    for document in ' ' '{' 'not json'; do
+      ! dybatpho::json_valid "${document}" \
+        || { PATH="${saved_path}"; printf '%s accepted [%s]\n' "${backend}" "${document}" >&2; return 1; }
+    done
+  done
+  PATH="${saved_path}"
+  hash -r
+}
+
 @test "the in-memory helpers round-trip a document through both directions" {
   local document
   document=$(dybatpho::json_object text "$(printf 'quote " and\nnewline')")

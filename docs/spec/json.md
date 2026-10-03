@@ -160,6 +160,7 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - A path indexes past the end of an array: setting pads with `null`, deleting
   changes nothing.
 - A `--json` value is `null` or `false`, which is a valid value to store.
+- A document checked with `json_valid` is `null`, `false`, or blank.
 - A merge input is an array, a scalar, `null`, or empty.
 - The `yq` backend would otherwise ignore an assignment through a scalar and
   pad an array when deleting a missing index; the helpers make it behave as
@@ -216,6 +217,8 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
   untouched.
 - **FR-024**: The JSON editing helpers MUST produce the same document under
   both backends; the YAML editing helpers MUST require `yq` and print YAML.
+- **FR-025**: `json_valid` MUST accept any JSON value, `null` and `false`
+  included, and MUST refuse blank text, with the same answer on both backends.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -276,6 +279,8 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **IT-020**: Propagate a malformed document, and fail with exit code 127 when
   no backend is installed or `yq` is missing for a YAML edit.
 - **IT-021**: Edit, delete from, and merge YAML documents, keeping comments.
+- **IT-022**: Accept `null`, `false`, `0`, a string and an object, and refuse blank
+  text, a truncated object and prose, with `yq` and with only `jq`.
 
 ## Acceptance Criteria *(mandatory)*
 

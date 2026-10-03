@@ -61,9 +61,8 @@
 #
 # @tip Everything is drawn on `/dev/tty` rather than on stdout, so an application can still print a result that a caller
 #   captures
-# @tip Character widths are measured against an embedded Unicode table, so CJK text and emoji line up without calling
-#   out
-#   to another program
+# @tip Character widths come from the Unicode tables built into the core `logging` module, so CJK text and emoji line
+#   up without calling out to another program
 # @see
 #   - `example/screen_ops.sh`
 #   - `src/tui.sh`
@@ -171,14 +170,6 @@ declare -ga __dybatpho_screen_last_style=()
 declare -ga __dybatpho_screen_hint_offset=()
 declare -ga __dybatpho_screen_hint_column=()
 declare -ga __dybatpho_screen_hint_style=()
-# Width of every non-ASCII character seen so far, keyed by the character.
-declare -gA __dybatpho_screen_char_width=()
-# Width of every non-ASCII string measured so far, keyed by the string. Only the
-# slow path is cached: ASCII is answered by its own length and never gets here.
-# A frame redraws the same borders, pointers and titles over and over, so this
-# turns the second and every later frame into a lookup.
-declare -gA __dybatpho_screen_string_width=()
-
 # Terminal state captured by `dybatpho::screen_begin` and restored by
 # `dybatpho::screen_end`.
 __dybatpho_screen_saved_stty=""
@@ -188,73 +179,6 @@ __dybatpho_screen_trapped=false
 
 readonly __DYBATPHO_SCREEN_US=$'\x1f'
 readonly __DYBATPHO_SCREEN_RS=$'\x1e'
-
-# Codepoint ranges that occupy two terminal columns, as `start end` pairs in
-# ascending order: Hangul jamo, the CJK blocks, the fullwidth forms, and the
-# emoji blocks that terminals draw double width.
-readonly __DYBATPHO_SCREEN_WIDE=(
-  0x1100 0x115F 0x231A 0x231B 0x2329 0x232A 0x23E9 0x23EC
-  0x23F0 0x23F0 0x23F3 0x23F3 0x25FD 0x25FE 0x2614 0x2615
-  0x2648 0x2653 0x267F 0x267F 0x2693 0x2693 0x26A1 0x26A1
-  0x26AA 0x26AB 0x26BD 0x26BE 0x26C4 0x26C5 0x26CE 0x26CE
-  0x26D4 0x26D4 0x26EA 0x26EA 0x26F2 0x26F3 0x26F5 0x26F5
-  0x26FA 0x26FA 0x26FD 0x26FD 0x2705 0x2705 0x270A 0x270B
-  0x2728 0x2728 0x274C 0x274C 0x274E 0x274E 0x2753 0x2755
-  0x2757 0x2757 0x2795 0x2797 0x27B0 0x27B0 0x27BF 0x27BF
-  0x2B1B 0x2B1C 0x2B50 0x2B50 0x2B55 0x2B55
-  0x2E80 0x303E 0x3041 0x33FF 0x3400 0x4DBF 0x4E00 0x9FFF
-  0xA000 0xA4CF 0xA960 0xA97F 0xAC00 0xD7A3 0xF900 0xFAFF
-  0xFE10 0xFE19 0xFE30 0xFE6F 0xFF00 0xFF60 0xFFE0 0xFFE6
-  0x16FE0 0x16FE4 0x17000 0x18AFF 0x1B000 0x1B152
-  0x1F004 0x1F004 0x1F0CF 0x1F0CF 0x1F18E 0x1F18E
-  0x1F191 0x1F19A 0x1F200 0x1F320 0x1F32D 0x1F335
-  0x1F337 0x1F37C 0x1F37E 0x1F393 0x1F3A0 0x1F3CA
-  0x1F3CF 0x1F3D3 0x1F3E0 0x1F3F0 0x1F3F4 0x1F3F4
-  0x1F3F8 0x1F43E 0x1F440 0x1F440 0x1F442 0x1F4FC
-  0x1F4FF 0x1F53D 0x1F54B 0x1F54E 0x1F550 0x1F567
-  0x1F57A 0x1F57A 0x1F595 0x1F596 0x1F5A4 0x1F5A4
-  0x1F5FB 0x1F64F 0x1F680 0x1F6C5 0x1F6CC 0x1F6CC
-  0x1F6D0 0x1F6D2 0x1F6D5 0x1F6D7 0x1F6EB 0x1F6EC
-  0x1F6F4 0x1F6FC 0x1F7E0 0x1F7EB 0x1F90C 0x1F93A
-  0x1F93C 0x1F945 0x1F947 0x1F9FF 0x1FA70 0x1FAFF
-  0x20000 0x2FFFD 0x30000 0x3FFFD
-)
-
-# Codepoint ranges that occupy no column at all: combining marks, the zero-width
-# and directional controls, and the variation selectors.
-readonly __DYBATPHO_SCREEN_ZERO=(
-  0x0300 0x036F 0x0483 0x0489 0x0591 0x05BD 0x05BF 0x05BF
-  0x05C1 0x05C2 0x05C4 0x05C5 0x05C7 0x05C7 0x0610 0x061A
-  0x064B 0x065F 0x0670 0x0670 0x06D6 0x06DC 0x06DF 0x06E4
-  0x06E7 0x06E8 0x06EA 0x06ED 0x0711 0x0711 0x0730 0x074A
-  0x07A6 0x07B0 0x07EB 0x07F3 0x0816 0x0819 0x081B 0x0823
-  0x0825 0x0827 0x0829 0x082D 0x0859 0x085B 0x08E3 0x0903
-  0x093A 0x093C 0x0941 0x0948 0x094D 0x094D 0x0951 0x0957
-  0x0962 0x0963 0x0981 0x0981 0x09BC 0x09BC 0x09C1 0x09C4
-  0x09CD 0x09CD 0x0A01 0x0A02 0x0A3C 0x0A3C 0x0A41 0x0A42
-  0x0A47 0x0A48 0x0A4B 0x0A4D 0x0E31 0x0E31 0x0E34 0x0E3A
-  0x0E47 0x0E4E 0x0EB1 0x0EB1 0x0EB4 0x0EBC 0x0EC8 0x0ECD
-  0x0F18 0x0F19 0x0F35 0x0F35 0x0F37 0x0F37 0x0F39 0x0F39
-  0x0F71 0x0F7E 0x0F80 0x0F84 0x0F86 0x0F87 0x102D 0x1030
-  0x1032 0x1037 0x1039 0x103A 0x1058 0x1059 0x135D 0x135F
-  0x1712 0x1714 0x1732 0x1734 0x17B4 0x17B5 0x17B7 0x17BD
-  0x17C6 0x17C6 0x17C9 0x17D3 0x180B 0x180E 0x18A9 0x18A9
-  0x1A17 0x1A18 0x1AB0 0x1ABE 0x1B00 0x1B03 0x1B34 0x1B34
-  0x1B36 0x1B3A 0x1B3C 0x1B3C 0x1B42 0x1B42 0x1B6B 0x1B73
-  0x1DC0 0x1DFF 0x200B 0x200F 0x202A 0x202E 0x2060 0x2064
-  0x206A 0x206F 0x20D0 0x20F0 0x2CEF 0x2CF1 0x2D7F 0x2D7F
-  0x2DE0 0x2DFF 0x302A 0x302F 0x3099 0x309A 0xA66F 0xA672
-  0xA674 0xA67D 0xA69E 0xA69F 0xA6F0 0xA6F1 0xA802 0xA802
-  0xA806 0xA806 0xA80B 0xA80B 0xA825 0xA826 0xA8C4 0xA8C5
-  0xA8E0 0xA8F1 0xA926 0xA92D 0xA947 0xA951 0xAA29 0xAA2E
-  0xAA31 0xAA32 0xAA35 0xAA36 0xAA43 0xAA43 0xAA4C 0xAA4C
-  0xAAB0 0xAAB0 0xAAB2 0xAAB4 0xAAB7 0xAAB8 0xAABE 0xAABF
-  0xAAC1 0xAAC1 0xABE5 0xABE5 0xABE8 0xABE8 0xABED 0xABED
-  0xFB1E 0xFB1E 0xFE00 0xFE0F 0xFE20 0xFE2F 0xFEFF 0xFEFF
-  0x101FD 0x101FD 0x102E0 0x102E0 0x1D167 0x1D169
-  0x1D17B 0x1D182 0x1D185 0x1D18B 0x1D1AA 0x1D1AD
-  0x1D242 0x1D244 0xE0100 0xE01EF
-)
 
 #######################################
 # @description Validate a whole number, or end the script naming what was wrong.
@@ -272,174 +196,13 @@ function __dybatpho_screen_expect_int {
 }
 
 #######################################
-# @description Return success when a string is nothing but printable ASCII,
-#   which is the case where one character is one index and one column, so no
-#   measuring is needed at all.
-#
-#   The test is `[:ascii:]` rather than a byte range under a local `LC_ALL=C`.
-#   Assigning `LC_ALL` makes Bash reload its locale data on the way in and again
-#   on the way out, which measured at 47 microseconds a call against 14 for this
-#   form -- and this sits under every segment of every frame.
-# @arg $1 string Text to classify
-# @exitcode 0 The text is ASCII
-# @exitcode 1 The text holds a character that may not be one column wide
-# @internal
-#######################################
-function __dybatpho_screen_is_ascii {
-  [[ "${1-}" == *[![:ascii:]]* ]] && return 1
-  return 0
-}
-
-# Whether Bash indexes strings by byte in this locale, worked out once. The
-# probe is cheap but it sits under every character measured, and a screen
-# redrawn sixty times a second measures a great many.
-__dybatpho_screen_byte_indexed=-1
-
-#######################################
-# @description Report whether Bash indexes strings by byte in this locale.
-#   Under a UTF-8 locale a multi-byte character is one index and `printf '%d'`
-#   reports its codepoint; under `C` both count bytes, and a character has to be
-#   reassembled before it can be measured.
-# @noargs
-# @exitcode 0 Bash counts bytes
-# @exitcode 1 Bash counts characters
-# @internal
-#######################################
-function __dybatpho_screen_indexes_bytes {
-  if ((__dybatpho_screen_byte_indexed < 0)); then
-    local probe=$'\303\251'
-    __dybatpho_screen_byte_indexed=0
-    ((${#probe} != 1)) && __dybatpho_screen_byte_indexed=1
-  fi
-  ((__dybatpho_screen_byte_indexed == 1))
-}
-
-#######################################
-# @description Split text into characters, whatever the locale indexes by.
-# @arg $1 string Name of the array variable receiving the characters
-# @arg $2 string Text to split
-# @set The named array
-# @internal
-#######################################
-function __dybatpho_screen_chars_into {
-  local -n __dybatpho_screen_chars_out="$1"
-  local __dybatpho_screen_chars_text="$2"
-  local __dybatpho_screen_chars_index=0 __dybatpho_screen_chars_lead
-  local __dybatpho_screen_chars_length __dybatpho_screen_chars_bytes=0
-
-  __dybatpho_screen_chars_out=()
-  __dybatpho_screen_indexes_bytes && __dybatpho_screen_chars_bytes=1
-
-  while ((__dybatpho_screen_chars_index < ${#__dybatpho_screen_chars_text})); do
-    __dybatpho_screen_chars_length=1
-    if ((__dybatpho_screen_chars_bytes)); then
-      printf -v __dybatpho_screen_chars_lead '%d' \
-        "'${__dybatpho_screen_chars_text:__dybatpho_screen_chars_index:1}"
-      if ((__dybatpho_screen_chars_lead >= 240)); then
-        __dybatpho_screen_chars_length=4
-      elif ((__dybatpho_screen_chars_lead >= 224)); then
-        __dybatpho_screen_chars_length=3
-      elif ((__dybatpho_screen_chars_lead >= 192)); then
-        __dybatpho_screen_chars_length=2
-      fi
-    fi
-    __dybatpho_screen_chars_out+=(
-      "${__dybatpho_screen_chars_text:__dybatpho_screen_chars_index:__dybatpho_screen_chars_length}"
-    )
-    __dybatpho_screen_chars_index=$((__dybatpho_screen_chars_index + __dybatpho_screen_chars_length))
-  done
-}
-
-#######################################
-# @description Decode one character to its Unicode codepoint, including when
-#   the locale makes Bash index by byte and the character arrives as its UTF-8
-#   bytes.
-# @arg $1 string Name of the variable receiving the codepoint
-# @arg $2 string One character
-# @set The named variable
-# @internal
-#######################################
-function __dybatpho_screen_codepoint_into {
-  local -n __dybatpho_screen_cp_out="$1"
-  local __dybatpho_screen_cp_char="$2"
-  local __dybatpho_screen_cp_byte __dybatpho_screen_cp_index
-
-  if ((${#__dybatpho_screen_cp_char} == 1)); then
-    printf -v __dybatpho_screen_cp_out '%d' "'${__dybatpho_screen_cp_char}"
-    return 0
-  fi
-
-  # Several indexes for one character means Bash is counting bytes, so the
-  # codepoint is rebuilt from the UTF-8 sequence: the lead byte carries the high
-  # bits and every continuation byte adds six more.
-  printf -v __dybatpho_screen_cp_byte '%d' "'${__dybatpho_screen_cp_char:0:1}"
-  case "${#__dybatpho_screen_cp_char}" in
-    2) __dybatpho_screen_cp_out=$((__dybatpho_screen_cp_byte & 0x1F)) ;;
-    3) __dybatpho_screen_cp_out=$((__dybatpho_screen_cp_byte & 0x0F)) ;;
-    *) __dybatpho_screen_cp_out=$((__dybatpho_screen_cp_byte & 0x07)) ;;
-  esac
-  for ((__dybatpho_screen_cp_index = 1;  \
-  __dybatpho_screen_cp_index < ${#__dybatpho_screen_cp_char};  \
-  __dybatpho_screen_cp_index++)); do
-    printf -v __dybatpho_screen_cp_byte '%d' \
-      "'${__dybatpho_screen_cp_char:__dybatpho_screen_cp_index:1}"
-    __dybatpho_screen_cp_out=$(((__dybatpho_screen_cp_out << 6) | (__dybatpho_screen_cp_byte & 0x3F)))
-  done
-}
-
-#######################################
-# @description Return the number of columns one character occupies, against the
-#   embedded Unicode tables. Every character measured is remembered, so a screen
-#   redrawn sixty times a second measures each distinct glyph once.
-# @arg $1 string Name of the variable receiving the width
-# @arg $2 string One character
-# @set The named variable
-# @internal
-#######################################
-function __dybatpho_screen_char_width_into {
-  local -n __dybatpho_screen_cw_out="$1"
-  local __dybatpho_screen_cw_char="$2"
-
-  if [[ -n "${__dybatpho_screen_char_width[${__dybatpho_screen_cw_char}]-}" ]]; then
-    __dybatpho_screen_cw_out="${__dybatpho_screen_char_width[${__dybatpho_screen_cw_char}]}"
-    return 0
-  fi
-
-  local __dybatpho_screen_cw_cp __dybatpho_screen_cw_index
-  __dybatpho_screen_codepoint_into __dybatpho_screen_cw_cp "${__dybatpho_screen_cw_char}"
-  __dybatpho_screen_cw_out=1
-
-  for ((__dybatpho_screen_cw_index = 0;  \
-  __dybatpho_screen_cw_index < ${#__DYBATPHO_SCREEN_ZERO[@]};  \
-  __dybatpho_screen_cw_index += 2)); do
-    ((__dybatpho_screen_cw_cp < __DYBATPHO_SCREEN_ZERO[__dybatpho_screen_cw_index])) && break
-    if ((__dybatpho_screen_cw_cp <= __DYBATPHO_SCREEN_ZERO[__dybatpho_screen_cw_index + 1])); then
-      __dybatpho_screen_cw_out=0
-      break
-    fi
-  done
-
-  if ((__dybatpho_screen_cw_out == 1)); then
-    for ((__dybatpho_screen_cw_index = 0;  \
-    __dybatpho_screen_cw_index < ${#__DYBATPHO_SCREEN_WIDE[@]};  \
-    __dybatpho_screen_cw_index += 2)); do
-      ((__dybatpho_screen_cw_cp < __DYBATPHO_SCREEN_WIDE[__dybatpho_screen_cw_index])) && break
-      if ((__dybatpho_screen_cw_cp <= __DYBATPHO_SCREEN_WIDE[__dybatpho_screen_cw_index + 1])); then
-        __dybatpho_screen_cw_out=2
-        break
-      fi
-    done
-  fi
-
-  __dybatpho_screen_char_width["${__dybatpho_screen_cw_char}"]="${__dybatpho_screen_cw_out}"
-}
-
-#######################################
 # @description Return the number of terminal columns a string occupies.
 #
-#   Text that is nothing but printable ASCII is its own length, which is the
+#   Text that is nothing but ASCII is its own length, which is the
 #   overwhelmingly common case and is answered without looking at a single
-#   character.
+#   character. Anything else is measured against the Unicode tables built into
+#   the core `logging` module, the same measure `text`, `table` and the boxed
+#   log helpers use, so a screen and a log line never disagree about a glyph.
 # @example
 #   local columns
 #   dybatpho::screen_width columns "漢字ab"   # 6
@@ -451,42 +214,7 @@ function __dybatpho_screen_char_width_into {
 #######################################
 function dybatpho::screen_width {
   dybatpho::expect_ref "$1"
-  __dybatpho_screen_width_into "$1" "${2-}"
-}
-
-#######################################
-# @description Measure a string, without validating the target name.
-#   Painting calls this for every segment it draws, and the check in the public
-#   entry point is worth a regular expression per frame, not per segment.
-# @arg $1 string Name of the variable receiving the width
-# @arg $2 string Text to measure
-# @set The named variable
-# @internal
-#######################################
-function __dybatpho_screen_width_into {
-  local -n __dybatpho_screen_w_out="$1"
-  local __dybatpho_screen_w_text="${2-}"
-
-  if __dybatpho_screen_is_ascii "${__dybatpho_screen_w_text}"; then
-    __dybatpho_screen_w_out="${#__dybatpho_screen_w_text}"
-    return 0
-  fi
-
-  if [[ -n "${__dybatpho_screen_string_width[${__dybatpho_screen_w_text}]-}" ]]; then
-    __dybatpho_screen_w_out="${__dybatpho_screen_string_width[${__dybatpho_screen_w_text}]}"
-    return 0
-  fi
-
-  local -a __dybatpho_screen_w_chars=()
-  local __dybatpho_screen_w_char __dybatpho_screen_w_each
-  __dybatpho_screen_chars_into __dybatpho_screen_w_chars "${__dybatpho_screen_w_text}"
-  __dybatpho_screen_w_out=0
-  for __dybatpho_screen_w_char in ${__dybatpho_screen_w_chars[@]+"${__dybatpho_screen_w_chars[@]}"}; do
-    __dybatpho_screen_char_width_into __dybatpho_screen_w_each "${__dybatpho_screen_w_char}"
-    __dybatpho_screen_w_out=$((__dybatpho_screen_w_out + __dybatpho_screen_w_each))
-  done
-  __dybatpho_screen_string_width["${__dybatpho_screen_w_text}"]="${__dybatpho_screen_w_out}"
-  return 0
+  __dybatpho_log_width_into "$1" "${2-}"
 }
 
 #######################################
@@ -507,17 +235,17 @@ function __dybatpho_screen_truncate_into {
     return 0
   fi
 
-  if __dybatpho_screen_is_ascii "${__dybatpho_screen_t_text}"; then
+  if __dybatpho_log_is_ascii "${__dybatpho_screen_t_text}"; then
     __dybatpho_screen_t_out="${__dybatpho_screen_t_text:0:__dybatpho_screen_t_limit}"
     return 0
   fi
 
   local -a __dybatpho_screen_t_chars=()
   local __dybatpho_screen_t_char __dybatpho_screen_t_each __dybatpho_screen_t_used=0
-  __dybatpho_screen_chars_into __dybatpho_screen_t_chars "${__dybatpho_screen_t_text}"
+  __dybatpho_log_chars_into __dybatpho_screen_t_chars "${__dybatpho_screen_t_text}"
   __dybatpho_screen_t_out=""
   for __dybatpho_screen_t_char in ${__dybatpho_screen_t_chars[@]+"${__dybatpho_screen_t_chars[@]}"}; do
-    __dybatpho_screen_char_width_into __dybatpho_screen_t_each "${__dybatpho_screen_t_char}"
+    __dybatpho_log_char_width_into __dybatpho_screen_t_each "${__dybatpho_screen_t_char}"
     ((__dybatpho_screen_t_used + __dybatpho_screen_t_each > __dybatpho_screen_t_limit)) && break
     __dybatpho_screen_t_out+="${__dybatpho_screen_t_char}"
     __dybatpho_screen_t_used=$((__dybatpho_screen_t_used + __dybatpho_screen_t_each))
@@ -546,10 +274,10 @@ function __dybatpho_screen_index_into {
   local -a __dybatpho_screen_i_chars=()
   local __dybatpho_screen_i_char __dybatpho_screen_i_each
   local __dybatpho_screen_i_used=0 __dybatpho_screen_i_index=0
-  __dybatpho_screen_chars_into __dybatpho_screen_i_chars "${__dybatpho_screen_text[__dybatpho_screen_i_row]}"
+  __dybatpho_log_chars_into __dybatpho_screen_i_chars "${__dybatpho_screen_text[__dybatpho_screen_i_row]}"
   for __dybatpho_screen_i_char in ${__dybatpho_screen_i_chars[@]+"${__dybatpho_screen_i_chars[@]}"}; do
     ((__dybatpho_screen_i_used >= __dybatpho_screen_i_column)) && break
-    __dybatpho_screen_char_width_into __dybatpho_screen_i_each "${__dybatpho_screen_i_char}"
+    __dybatpho_log_char_width_into __dybatpho_screen_i_each "${__dybatpho_screen_i_char}"
     __dybatpho_screen_i_used=$((__dybatpho_screen_i_used + __dybatpho_screen_i_each))
     __dybatpho_screen_i_index=$((__dybatpho_screen_i_index + ${#__dybatpho_screen_i_char}))
   done
@@ -689,10 +417,10 @@ function dybatpho::screen_put {
   local drawn="${text}" width
   # Measuring first means the common case -- text that fits -- never walks the
   # string a second time to cut it.
-  __dybatpho_screen_width_into width "${drawn}"
+  __dybatpho_log_width_into width "${drawn}"
   if ((width > available)); then
     __dybatpho_screen_truncate_into drawn "${drawn}" "${available}"
-    __dybatpho_screen_width_into width "${drawn}"
+    __dybatpho_log_width_into width "${drawn}"
   fi
   [[ -n "${drawn}" ]] || return 0
   ((width > 0)) || return 0
@@ -1514,11 +1242,11 @@ function __dybatpho_screen_align_into {
   local __dybatpho_screen_a_measured __dybatpho_screen_a_gap
   local __dybatpho_screen_a_left __dybatpho_screen_a_right
 
-  __dybatpho_screen_width_into __dybatpho_screen_a_measured "${__dybatpho_screen_a_text}"
+  __dybatpho_log_width_into __dybatpho_screen_a_measured "${__dybatpho_screen_a_text}"
   if ((__dybatpho_screen_a_measured > __dybatpho_screen_a_width)); then
     __dybatpho_screen_truncate_into __dybatpho_screen_a_out \
       "${__dybatpho_screen_a_text}" "${__dybatpho_screen_a_width}"
-    __dybatpho_screen_width_into __dybatpho_screen_a_measured "${__dybatpho_screen_a_out}"
+    __dybatpho_log_width_into __dybatpho_screen_a_measured "${__dybatpho_screen_a_out}"
     __dybatpho_screen_a_text="${__dybatpho_screen_a_out}"
   fi
 
@@ -1622,7 +1350,7 @@ function dybatpho::screen_block {
     local title_column=$((x + 1))
     if [[ "${options[align]-}" == center ]]; then
       local title_width
-      __dybatpho_screen_width_into title_width "${placed}"
+      __dybatpho_log_width_into title_width "${placed}"
       title_column=$((x + (width - title_width) / 2))
     fi
     dybatpho::screen_put "${y}" "${title_column}" "${placed}" \
@@ -1669,7 +1397,7 @@ function dybatpho::screen_text {
       lines+=("${line}")
       continue
     fi
-    __dybatpho_screen_width_into current_width "${line}"
+    __dybatpho_log_width_into current_width "${line}"
     if ((current_width <= width)); then
       lines+=("${line}")
       continue
@@ -1677,7 +1405,7 @@ function dybatpho::screen_text {
     current=""
     current_width=0
     for word in ${line}; do
-      __dybatpho_screen_width_into word_width "${word}"
+      __dybatpho_log_width_into word_width "${word}"
       if ((current_width > 0 && current_width + 1 + word_width > width)); then
         lines+=("${current}")
         current="${word}"
@@ -1944,7 +1672,7 @@ function dybatpho::screen_gauge {
 
   if [[ -n "${label}" ]]; then
     local label_width
-    __dybatpho_screen_width_into label_width "${label}"
+    __dybatpho_log_width_into label_width "${label}"
     dybatpho::screen_put "${y}" "$((x + (width - label_width) / 2))" "${label}" "1"
   fi
   return 0
@@ -1984,11 +1712,11 @@ function dybatpho::screen_tabs {
     ((column < width)) || break
     if ((index > 0)); then
       dybatpho::screen_put "${y}" "$((x + column))" "${divider}" "${divider_style}"
-      __dybatpho_screen_width_into piece_width "${divider}"
+      __dybatpho_log_width_into piece_width "${divider}"
       column=$((column + piece_width))
     fi
     piece=" ${__dybatpho_screen_tabs_items[index]} "
-    __dybatpho_screen_width_into piece_width "${piece}"
+    __dybatpho_log_width_into piece_width "${piece}"
     if ((index == active)); then
       dybatpho::screen_put "${y}" "$((x + column))" "${piece}" "${active_style}"
     else
@@ -2143,7 +1871,7 @@ function dybatpho::screen_barchart {
   if ((label_width == 0)) && ((${#__dybatpho_screen_bar_names[@]} > 0)); then
     local measured
     for point in "${__dybatpho_screen_bar_names[@]}"; do
-      __dybatpho_screen_width_into measured "${point}"
+      __dybatpho_log_width_into measured "${point}"
       ((measured > label_width)) && label_width="${measured}"
     done
     label_width=$((label_width + 1))
@@ -2202,7 +1930,7 @@ function __dybatpho_screen_braille_table {
   # character.
   # shellcheck disable=SC2059
   printf -v all "${format}"
-  __dybatpho_screen_chars_into __dybatpho_screen_braille "${all}"
+  __dybatpho_log_chars_into __dybatpho_screen_braille "${all}"
   return 0
 }
 
@@ -2383,10 +2111,10 @@ function dybatpho::screen_spans {
     text="$1" style="$2"
     shift 2
     [[ -n "${text}" ]] || continue
-    __dybatpho_screen_width_into used "${text}"
+    __dybatpho_log_width_into used "${text}"
     if ((used > left)); then
       __dybatpho_screen_truncate_into text "${text}" "${left}"
-      __dybatpho_screen_width_into used "${text}"
+      __dybatpho_log_width_into used "${text}"
     fi
     if [[ -n "${background}" ]]; then
       if [[ -z "${style}" || "${style}" == 0 ]]; then

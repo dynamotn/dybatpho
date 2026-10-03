@@ -93,7 +93,7 @@ SCRIPT
   assert_file_contains "${out}" "#####"
 }
 
-@test "boxed output falls back to plain widths without python3" {
+@test "boxed output measures and wraps with no external program on PATH" {
   local out="${BATS_TEST_TMPDIR}/fallback-out"
   local empty_bin="${BATS_TEST_TMPDIR}/empty-bin"
   local old_path="${PATH}"
@@ -101,7 +101,7 @@ SCRIPT
   export COLUMNS=24
   export NO_COLOR=true
 
-  # Without python3 the wrapping and width helpers use their pure-bash paths.
+  # Widths come from the built-in tables, so an empty PATH changes nothing.
   PATH="${empty_bin}"
   dybatpho::header "alpha beta gamma delta epsilon" > "${out}"
   dybatpho::success "https://example.com/a/very/long/link" >> "${out}"
@@ -1041,4 +1041,74 @@ assert event["duration_ms"] >= 0
     __dybatpho_json_escape_into quoted "${sample}"
     assert_equal "${quoted}" "${expected}"
   done
+}
+
+@test "the display-width measure uses the built-in Unicode tables" {
+  local width
+  # ASCII is its own length, control characters included.
+  __dybatpho_log_width_into width "plain text"
+  assert_equal "${width}" 10
+  # CJK, Hangul, fullwidth forms and emoji take two columns.
+  __dybatpho_log_width_into width "日本語"
+  assert_equal "${width}" 6
+  __dybatpho_log_width_into width "한국"
+  assert_equal "${width}" 4
+  __dybatpho_log_width_into width "ＡＢ"
+  assert_equal "${width}" 4
+  __dybatpho_log_width_into width "✅🚀"
+  assert_equal "${width}" 4
+  # Combining and enclosing marks, format characters and variation selectors
+  # take none: `é` written as e + U+0301, a zero-width space, a zero-width
+  # joiner and VS16 add nothing to the letters around them.
+  __dybatpho_log_width_into width $'é'
+  assert_equal "${width}" 1
+  __dybatpho_log_width_into width $'a​b‍c️'
+  assert_equal "${width}" 3
+  # A mark with no canonical combining class still takes no column; the old
+  # measure, asking `unicodedata.combining`, counted it as one.
+  __dybatpho_log_width_into width $'के'
+  assert_equal "${width}" 1
+  # The soft hyphen is drawn, so it keeps its column.
+  __dybatpho_log_width_into width $'a­b'
+  assert_equal "${width}" 3
+  # Both ends of the wide table, through the binary search.
+  __dybatpho_log_width_into width $'ᄀ\U0003fffd'
+  assert_equal "${width}" 4
+  # The measure needs no external program at all.
+  PATH="${BATS_TEST_TMPDIR}/nothing" __dybatpho_log_width_into width "漢字ab"
+  assert_equal "${width}" 6
+}
+
+@test "the display-width measure gives the same answer under the C locale" {
+  # Bash indexes by byte under C, so each glyph arrives as its UTF-8 bytes and
+  # has to be reassembled before it is looked up.
+  local width
+  LC_ALL=C __dybatpho_log_width_into width "日本é✅"
+  assert_equal "${width}" 7
+  __dybatpho_log_width_into width "日本é✅"
+  assert_equal "${width}" 7
+}
+
+@test "the display-width string cache is bounded" {
+  local width index
+  __DYBATPHO_LOG_WIDTH_CACHE_MAX=4
+  for index in 1 2 3 4 5 6; do
+    __dybatpho_log_width_into width "é${index}"
+  done
+  ((${#__dybatpho_log_string_width[@]} <= 4))
+  assert_equal "${width}" 2
+}
+
+@test "boxed lines wrap by display columns under the C locale" {
+  # Walking the line byte by byte measured every piece of a multi-byte glyph
+  # on its own, so a CJK line wrapped at the wrong place under the C locale.
+  # The line is exactly 7 columns but 10 bytes, so it fits only when measured
+  # in columns.
+  assert_equal "$(__dybatpho_log_wrap_line "日本 語" 7)" "日本 語"
+  LC_ALL=C run_traced __dybatpho_log_wrap_line "日本 語" 7
+  assert_success
+  assert_output "日本 語"
+  LC_ALL=C run_traced __dybatpho_log_wrap_line "日本 語 テキ" 7
+  assert_success
+  assert_output $'日本 語\nテキ'
 }

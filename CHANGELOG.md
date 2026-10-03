@@ -711,6 +711,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules i18n date   # after
   ```
 
+- **Display width comes from one built-in measure, with no `python3`.**
+  The boxed log helpers (`dybatpho::header`, `dybatpho::success`, …), `table`,
+  `text` and `screen` now share one measure built on Unicode 16.0 tables
+  embedded in the core `logging` module, where the log helpers and `table`
+  used to ask `python3` and `screen` had tables of its own that missed about a
+  thousand wide characters and three hundred marks. `python3` is no longer
+  looked for, and `dybatpho::doctor` no longer lists it. Widths follow the
+  `wcwidth` convention terminals use, which differs from the old `python3`
+  answer for format characters such as the zero-width space, joiner and
+  variation selectors, for enclosing marks, for nonspacing marks with no
+  combining class (Devanagari vowel signs, for one) and for the Hangul medial
+  and final jamo: each now takes no column instead of one. Under the C locale
+  a boxed line also wraps by columns rather than by bytes. Measuring 1000
+  mixed strings went from about 680 ms to 260 ms.
+
 ### Fixed
 
 - **`math` — a last value without a newline is no longer dropped.** The

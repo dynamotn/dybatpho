@@ -18,10 +18,10 @@ readable console output, embed heredocs, or normalize text before writing
 files.
 
 The helpers that pad or center measure each line by what a terminal shows:
-ANSI escape sequences count for nothing, and when the `screen` module is
-loaded its Unicode-aware measurement is used, so a CJK character or an emoji
-counts for the two columns it occupies. Without `screen`, a line is measured
-by its character count, which is exact for every character one column wide.
+ANSI escape sequences count for nothing, and the library's built-in Unicode
+tables give a CJK character or an emoji the two columns it occupies and a
+combining mark none -- the same measure `table`, `screen` and the boxed log
+helpers use.
 
 ### 🚀 Highlights
 
@@ -30,7 +30,7 @@ by its character count, which is exact for every character one column wide.
 - [`dybatpho::text_strip_ansi`](#dybatphotext_strip_ansi) — Strip ANSI escape sequences from a text block.
 - [`dybatpho::text_bullet_list`](#dybatphotext_bullet_list) — Prefix each non-empty line in a text block as a bullet item.
 - [`dybatpho::text_columns`](#dybatphotext_columns) — Align a delimited text block into plain columns. The columns are laid out by `dybatpho::table_align`, so the `table` module has to be loaded; `text` does not load it on its own.
-- [`dybatpho::text_box`](#dybatphotext_box) — Draw a border around a text block, with an optional title set into the top edge. The box is as wide as the widest line or the title, whichever is wider, with one space of padding on each side. Lines are padded by their visible width, so colored text and, with the `screen` module loaded, wide characters keep the right edge straight.
+- [`dybatpho::text_box`](#dybatphotext_box) — Draw a border around a text block, with an optional title set into the top edge. The box is as wide as the widest line or the title, whichever is wider, with one space of padding on each side. Lines are padded by their visible width, so colored text and wide characters keep the right edge straight.
 - [`dybatpho::text_center`](#dybatphotext_center) — Center each line of a text block within a width. Lines are padded on the left only, so no trailing whitespace is added. When the padding cannot be split evenly, the extra column goes to the right. A line at least as wide as the width is printed unchanged, and a blank line stays blank. Widths are measured as `dybatpho::text_box` measures them.
 - [`dybatpho::text_number_lines`](#dybatphotext_number_lines) — Prefix each line of a text block with its line number. Numbers are right-aligned to the width of the last one, so a block of ten or more lines keeps its text in one column. Blank lines are numbered too.
 - [`dybatpho::text_truncate_lines`](#dybatphotext_truncate_lines) — Keep the first lines of a text block and say how many were left out. A block that already fits is printed unchanged, with no marker. Otherwise the first `count` lines are printed, followed by a marker line. The default marker reads `… 1 more line` or `… N more lines`; a custom marker has every `{count}` replaced by the number of lines left out.
@@ -152,8 +152,7 @@ Draw a border around a text block, with an optional title set
 into the top edge.
 The box is as wide as the widest line or the title, whichever is wider,
 with one space of padding on each side. Lines are padded by their visible
-width, so colored text and, with the `screen` module loaded, wide
-characters keep the right edge straight.
+width, so colored text and wide characters keep the right edge straight.
 
 **🧪 Example**
 

@@ -288,6 +288,8 @@ dybatpho::log_context clear
 
 - `NO_COLOR` is set and ANSI color must be suppressed.
 - `NO_COLOR` is unset after the library loads, in a script running under `set -u`.
+- A boxed line holds CJK text or emoji and the locale is C, so Bash indexes it
+  by byte.
 - `LOG_LEVEL` is invalid.
 - `LOG_FORMAT` is set to a value other than `json` (the implementation uses
   text output).
@@ -335,8 +337,9 @@ dybatpho::log_context clear
   timestamp, level, source, and message fields.
 - **FR-008**: JSON log messages MUST escape backslashes, quotes, newlines,
   carriage returns, and tabs.
-- **FR-009**: Boxed banners MUST wrap content to terminal width and account for
-  wide Unicode glyphs when `python3` is available.
+- **FR-009**: Boxed banners MUST wrap content to terminal width, measured in
+  display columns, so wide Unicode glyphs count for two columns and combining
+  marks for none, under any locale and with no external program.
 - **FR-010**: The module MUST provide a percentage progress-bar helper with a
   configurable width.
 - **FR-011**: Text and JSON log output MUST redact values registered with
@@ -410,6 +413,14 @@ dybatpho::log_context clear
   fork once per line to ask how wide a line is.
 - **FR-034**: Writing a log line MUST NOT fail when `NO_COLOR` is unset, even
   under `set -u`; an unset `NO_COLOR` means colour, as an empty one does.
+- **FR-035**: The module MUST provide the library's one display-width measure,
+  built on embedded Unicode tables: nonspacing and enclosing marks, format
+  characters other than the soft hyphen, and the Hangul medial and final jamo
+  take no column; characters of East Asian Width Wide or Fullwidth take two;
+  everything else takes one. It MUST give the same answer whether Bash indexes
+  strings by byte or by character, and MUST NOT start another process.
+- **FR-036**: The display-width string cache MUST be bounded, so a long run
+  measuring endless distinct strings does not grow without limit.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -513,6 +524,15 @@ dybatpho::log_context clear
   characters after the width helpers stopped going through `$( )`.
 - **IT-020**: Unset `NO_COLOR` after loading the library, turn on `set -u`, and
   verify a log line is still written.
+- **IT-021**: Measure ASCII, CJK, Hangul, fullwidth letters, emoji, a combining
+  accent, a mark with no combining class, zero-width space, joiner and VS16, a
+  soft hyphen, both ends of the wide table, and all of it with an empty `PATH`.
+- **IT-022**: Measure the same mixed string under the C locale and under UTF-8,
+  and get the same width.
+- **IT-023**: Lower the string-cache limit, measure more distinct strings than
+  it allows, and find the cache within the limit.
+- **IT-024**: Wrap a line that fits in columns but not in bytes under the C
+  locale, and get it on one line; wrap a longer one at its space.
 
 ## Acceptance Criteria *(mandatory)*
 

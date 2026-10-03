@@ -237,9 +237,9 @@ dybatpho::screen_end
   whatever style was in force after it.
 - **FR-004**: Flushing MUST send only the rows that changed, and MUST NOT
   render a row whose text and runs are unchanged.
-- **FR-005**: Character widths MUST be measured against embedded Unicode tables
-  covering the double-width and zero-width ranges, without calling another
-  program.
+- **FR-005**: Character widths MUST be measured with the core display-width
+  measure (`logging` FR-035), the same one `text`, `table` and the boxed log
+  helpers use, without calling another program.
 - **FR-006**: Measuring MUST be correct whether the locale makes Bash index
   strings by character or by byte.
 - **FR-007**: A row MUST keep its fast column-to-index path while every

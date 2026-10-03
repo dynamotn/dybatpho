@@ -12,10 +12,10 @@
 #   files.
 #
 #   The helpers that pad or center measure each line by what a terminal shows:
-#   ANSI escape sequences count for nothing, and when the `screen` module is
-#   loaded its Unicode-aware measurement is used, so a CJK character or an emoji
-#   counts for the two columns it occupies. Without `screen`, a line is measured
-#   by its character count, which is exact for every character one column wide.
+#   ANSI escape sequences count for nothing, and the library's built-in Unicode
+#   tables give a CJK character or an emoji the two columns it occupies and a
+#   combining mark none -- the same measure `table`, `screen` and the boxed log
+#   helpers use.
 # @see
 #   - `example/text_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -241,8 +241,7 @@ function __dybatpho_text_width_into {
 #   into the top edge.
 #   The box is as wide as the widest line or the title, whichever is wider,
 #   with one space of padding on each side. Lines are padded by their visible
-#   width, so colored text and, with the `screen` module loaded, wide
-#   characters keep the right edge straight.
+#   width, so colored text and wide characters keep the right edge straight.
 # @example
 #   dybatpho::text_box $'alpha\nbeta' "Notes"
 #   # ┌─ Notes ─┐

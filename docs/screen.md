@@ -44,7 +44,7 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 
 ### 🚀 Highlights
 
-- [`dybatpho::screen_width`](#dybatphoscreen_width) — Return the number of terminal columns a string occupies. Text that is nothing but printable ASCII is its own length, which is the overwhelmingly common case and is answered without looking at a single character.
+- [`dybatpho::screen_width`](#dybatphoscreen_width) — Return the number of terminal columns a string occupies. Text that is nothing but ASCII is its own length, which is the overwhelmingly common case and is answered without looking at a single character. Anything else is measured against the Unicode tables built into the core `logging` module, the same measure `text`, `table` and the boxed log helpers use, so a screen and a log line never disagree about a glyph.
 - [`dybatpho::screen_put`](#dybatphoscreen_put) — Draw text into the buffer at one position, clipped to the screen. Nothing reaches the terminal until `dybatpho::screen_flush` runs.
 - [`dybatpho::screen_clear`](#dybatphoscreen_clear) — Reset the buffer to blank, which is where every frame starts.
 - [`dybatpho::screen_size`](#dybatphoscreen_size) — Resize the buffer to the terminal, and report whether it changed.
@@ -129,7 +129,7 @@ A rectangle is the string `x y width height`, with `x` and `y` zero-based.
 ## 💡 Tips
 
 - Everything is drawn on `/dev/tty` rather than on stdout, so an application can still print a result that a caller captures
-- Character widths are measured against an embedded Unicode table, so CJK text and emoji line up without calling out to another program
+- Character widths come from the Unicode tables built into the core `logging` module, so CJK text and emoji line up without calling out to another program
 
 ### `dybatpho::screen_put`
 
@@ -207,9 +207,11 @@ A rectangle is the string `x y width height`, with `x` and `y` zero-based.
 
 Return the number of terminal columns a string occupies.
 
-Text that is nothing but printable ASCII is its own length, which is the
+Text that is nothing but ASCII is its own length, which is the
 overwhelmingly common case and is answered without looking at a single
-character.
+character. Anything else is measured against the Unicode tables built into
+the core `logging` module, the same measure `text`, `table` and the boxed
+log helpers use, so a screen and a log line never disagree about a glyph.
 
 **🧪 Example**
 

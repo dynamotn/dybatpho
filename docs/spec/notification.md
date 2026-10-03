@@ -194,6 +194,7 @@ fi
 
 - Missing message, URL, payload, webhook URL, token, or chat ID.
 - The webhook URL is the secret itself, so it must not reach a debug line.
+- ntfy tags hold a line break, which would cut the list short.
 - Message text contains quotes, backslashes, newlines, carriage returns, or
   tabs.
 - Optional provider metadata is omitted or empty.
@@ -289,6 +290,9 @@ fi
 - **FR-025**: A notifier MUST NOT write a webhook URL to a log line in full; it
   MUST show only the scheme, host and port, the way the network module redacts
   every URL it logs.
+- **FR-026**: `notify_ntfy` MUST refuse tags holding a carriage return or a
+  line feed before any request is made, and MUST keep a line break in the
+  title and the message.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -341,6 +345,8 @@ fi
   default.
 - **IT-011**: Verify the webhook debug line names only the host of a URL whose
   path and query carry the secret.
+- **IT-012**: Refuse ntfy tags holding a line feed or a carriage return, and
+  publish a title holding a line break unchanged.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -533,6 +533,27 @@ stub_curl_with_config() {
   grep -- ' https://ntfy.example.test$' "${args_file}"
 }
 
+@test "dybatpho::notify_ntfy refuses tags holding a line break" {
+  # Read from one line, the tags after a break were dropped without a word.
+  export DYBATPHO_NTFY_TOPIC="ops"
+  local tags
+  for tags in $'warning\nfloppy_disk' $'warning\rfloppy_disk'; do
+    run --separate-stderr dybatpho::notify_ntfy "m" "" "" "${tags}"
+    assert_failure
+    assert_stderr --partial "tags must not contain a line break"
+  done
+}
+
+@test "dybatpho::notify_ntfy keeps a line break in the title" {
+  local args_file="${BATS_TEST_TMPDIR}/ntfy-title-args"
+  export DYBATPHO_NTFY_TOPIC="ops"
+  stub curl ": echo \"\$*\" > ${args_file}; echo '200'"
+  run_traced dybatpho::notify_ntfy "m" $'two\nlines'
+  unstub curl
+  assert_success
+  grep -- '"title":"two\\nlines"' "${args_file}"
+}
+
 @test "dybatpho::notify_ntfy maps every priority name to its number" {
   local args_file="${BATS_TEST_TMPDIR}/ntfy-priority-args" name expected
   export DYBATPHO_NTFY_TOPIC="ops"

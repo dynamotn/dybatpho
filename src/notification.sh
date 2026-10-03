@@ -520,7 +520,8 @@ function dybatpho::notify_desktop {
 # @env DYBATPHO_NTFY_URL string Server URL, default is `https://ntfy.sh`
 # @env DYBATPHO_NTFY_TOKEN string Optional access token for a protected topic
 # @exitcode 0 Message published
-# @exitcode 1 Missing arguments or environment variables, or an invalid topic, server URL or priority
+# @exitcode 1 Missing arguments or environment variables, an invalid topic, server URL or priority, or tags
+#   holding a line break
 # @exitcode 4 HTTP 4xx from the server, such as a refused token
 # @exitcode 5 HTTP 5xx from the server
 # @exitcode 9 `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent
@@ -552,6 +553,11 @@ function dybatpho::notify_ntfy {
     max | urgent) priority=5 ;;
     *) dybatpho::die "${FUNCNAME[0]}: priority must be 1-5, min, low, default, high, max or urgent" ;; # kcov(skip)
   esac
+  # Tags are split on commas from one line, so a line break would silently drop
+  # every tag after it. The title and the message travel as JSON strings and
+  # keep their line breaks.
+  [[ "${tags}" != *[$'\r\n']* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: tags must not contain a line break" # kcov(skip)
 
   local payload escaped
   escaped=$(__dybatpho_notification_json_escape "${DYBATPHO_NTFY_TOPIC}")

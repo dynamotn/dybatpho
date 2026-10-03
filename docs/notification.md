@@ -468,7 +468,7 @@ dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,flop
 **🚦 Exit codes**
 
 - `0`: Message published
-- `1`: Missing arguments or environment variables, or an invalid topic, server URL or priority
+- `1`: Missing arguments or environment variables, an invalid topic, server URL or priority, or tags holding a line break
 - `4`: HTTP 4xx from the server, such as a refused token
 - `5`: HTTP 5xx from the server
 - `9`: `DYBATPHO_NOTIFY_CIRCUIT` is on and this provider\'s circuit is open; nothing was sent

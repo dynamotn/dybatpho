@@ -430,8 +430,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as `min` through `urgent`, and comma-separated tags. `DYBATPHO_NTFY_TOKEN`
   unlocks a protected topic and is sent outside curl's command line, so other
   users of the host cannot read it from the process list. A topic ntfy would
-  refuse, a server URL without a scheme, or an unknown priority stops the
-  call before any request is made.
+  refuse, a server URL without a scheme, an unknown priority, or tags holding
+  a line break stop the call before any request is made.
 
   ```sh
   export DYBATPHO_NTFY_TOPIC=backups-7f3a

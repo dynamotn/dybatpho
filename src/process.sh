@@ -148,6 +148,29 @@ function dybatpho::killed_process_handler {
 }
 
 #######################################
+# @description Read the command currently registered for a signal.
+#   `trap -p` prints the handler as shell words, `trap -- '<command>' <signal>`,
+#   with any quote inside the command escaped, so the command is the third word
+#   once the shell has parsed them back. Cutting the text at its first and last
+#   quote instead left those escapes in place, and a handler holding a quote
+#   came back as a different command.
+# @arg $1 string Name of the variable receiving the command
+# @arg $2 string Signal name
+# @set The named variable, empty when nothing is registered
+# @internal
+#######################################
+function __dybatpho_process_trap_command_into {
+  local -n __dybatpho_process_trap_ref="$1"
+  local __dybatpho_process_trap_listing
+  __dybatpho_process_trap_listing="$(trap -p "$2")"
+  __dybatpho_process_trap_ref=""
+  [[ -n "${__dybatpho_process_trap_listing}" ]] || return 0
+  # `trap -p` quotes everything it prints, so parsing it runs nothing.
+  eval "set -- ${__dybatpho_process_trap_listing}"
+  __dybatpho_process_trap_ref="${3-}"
+}
+
+#######################################
 # @description Append a command to one or more trap handlers without discarding existing traps.
 # @arg $1 string Command to run when the signal is trapped
 # @arg $@ string Signals to trap
@@ -156,25 +179,12 @@ function dybatpho::trap {
   local command
   dybatpho::expect_args command -- "$@"
   shift
-  #######################################
-  # @description Read the current trap command registered for a signal.
-  # @arg $1 string Signal name
-  # @stdout Existing trap command, or an empty string when none is registered
-  # @internal
-  #######################################
-  function __dybatpho_process_gen_finalize_command {
-    local cmds
-    cmds=$(trap -p "$1")
-    cmds="${cmds#*\'}"
-    cmds="${cmds%\'*}"
-    echo "${cmds}"
-  }
 
-  local finalize_command
+  local signal finalize_command
   for signal in "$@"; do
-    finalize_command=$(__dybatpho_process_gen_finalize_command "${signal}")
+    __dybatpho_process_trap_command_into finalize_command "${signal}"
     finalize_command="${finalize_command}${finalize_command:+; }${command}"
-    # shellcheck disable=SC2064,SC2086
+    # shellcheck disable=SC2064
     trap "${finalize_command}" "${signal}"
   done
 }

@@ -719,6 +719,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was not released. The handler now exits with 130 or 143 as before and the
   EXIT handlers run on the way out.
 
+- **`process` — `dybatpho::trap` keeps a handler that contains a quote.** It
+  read the handler already registered by cutting the `trap -p` listing at its
+  first and last quote, which left any quote inside the handler in its escaped
+  form, so the handler it put back was a different command — usually one the
+  shell could not even parse. It also set a `signal` variable in the caller's
+  scope. The handler now comes back exactly as it was registered, and nothing
+  in the caller changes.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

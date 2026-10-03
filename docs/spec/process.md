@@ -180,6 +180,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - A PID file is missing, unreadable, empty, malformed, padded with whitespace by
   another tool, or records a process that has exited.
 - A PID file is removed by a process other than the one it records.
+- An existing trap handler contains a quote, which `trap -p` prints escaped.
 - A script with EXIT handlers composed through `dybatpho::trap` (temporary-file
   cleanup, terminal restore, privilege release) is ended by SIGINT or SIGTERM.
 
@@ -226,6 +227,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-021**: The SIGINT and SIGTERM handlers MUST leave the EXIT trap armed,
   so the EXIT handlers composed through `dybatpho::trap` still run when the
   script is interrupted.
+- **FR-022**: Trap composition MUST put back an existing handler exactly as it
+  was registered, quotes included, and MUST NOT change any variable of the
+  caller.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -279,6 +283,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-011**: End a script that registered the signal handlers and a cleanup
   path with SIGTERM and SIGINT, and verify the exit codes and that the path
   was removed.
+- **IT-012**: Compose onto an EXIT handler that contains a quote and verify
+  both handlers run as written, and that a caller's `signal` variable is left
+  alone.
 
 ## Acceptance Criteria *(mandatory)*
 

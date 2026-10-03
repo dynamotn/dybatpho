@@ -122,6 +122,32 @@ SCRIPT
   assert_line --index 1 second
 }
 
+@test 'dybatpho::trap keeps an existing handler that contains quotes' {
+  # The existing handler was read by cutting `trap -p` at its first and last
+  # quote, which left a quote inside it in its escaped `'\''` form, so the
+  # handler put back was a different command from the one it replaced.
+  # shellcheck disable=2329
+  _trap_quoted() {
+    trap "printf '%s\\n' \"it's here\"" EXIT
+    dybatpho::trap 'echo second' EXIT
+  }
+  run _trap_quoted
+  assert_success
+  assert_line --index 0 "it's here"
+  assert_line --index 1 second
+}
+
+@test 'dybatpho::trap does not leak its loop variable' {
+  local signal=kept
+  dybatpho::trap ':' USR1
+  trap - USR1
+  assert_equal "${signal}" kept
+  unset signal
+  dybatpho::trap ':' USR2
+  trap - USR2
+  [[ ! -v signal ]]
+}
+
 @test 'dybatpho::cleanup_file_on_exit action' {
   # The call itself must stay quiet, and it must remember the path.
   local filepath

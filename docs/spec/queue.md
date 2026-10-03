@@ -153,6 +153,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - A worker polls a queue that stays empty, or that a producer fills after the worker started.
 - The clock is frozen or jumps while a worker waits.
 - The variable names a caller passes to `queue_pop`, `queue_peek` or `queue_read` match a name the function uses internally, such as `identifier` or `lock`.
+- A worker claims a requeued job the instant it becomes visible, before anything else is written about it.
 
 ## Requirements *(mandatory)*
 
@@ -191,6 +192,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **FR-031**: A worker MUST return after `--max-jobs` jobs when that is not `0`.
 - **FR-032**: An invalid or unknown worker option, a zero poll interval, or a handler that is not a command MUST stop the script.
 - **FR-033**: `queue_pop`, `queue_peek` and `queue_read` MUST fill the caller's named variables whatever the names are, short of the reserved `__dybatpho` prefix.
+- **FR-034**: `queue_requeue` MUST write the requeued job's retry count, priority and due time, under the queue lock, before the job itself becomes claimable, so a worker that claims it at once still carries the count.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -254,6 +256,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **IT-038**: Refuse each invalid worker option and a missing handler.
 - **IT-039**: Accept `--` before the queue name.
 - **IT-040**: Pop, peek and read into variables called `identifier`, `lock`, `directory`, `state` and `target`, and find each one filled.
+- **IT-041**: Requeue a job while a stub claims it the moment it appears, and find its retry count beside the claimed job and none left in `pending`.
 
 ## Acceptance Criteria *(mandatory)*
 

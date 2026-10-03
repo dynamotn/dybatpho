@@ -237,6 +237,41 @@ SCRIPT
   assert_equal "$(dybatpho::queue_len "${QUEUE}" dead)" "1"
 }
 
+@test "dybatpho::queue_requeue keeps the retry count when a worker claims the job at once" {
+  # A requeued job becomes claimable the moment its job file appears. A count
+  # written after that is left behind in `pending` when a worker is quick, the
+  # next requeue starts again from one, and the job never dead-letters. The
+  # stub replays the quick worker: it claims the job as soon as the push that
+  # made it visible returns.
+  local id payload
+  dybatpho::queue_push "${QUEUE}" "always fails" > /dev/null
+  dybatpho::queue_pop "${QUEUE}" id payload
+
+  eval "__dybatpho_test_real_push() $(declare -f dybatpho::queue_push | tail -n +2)"
+  dybatpho::queue_push() {
+    local fresh
+    fresh="$(__dybatpho_test_real_push "$@")" || return 1
+    local quick_id quick_payload
+    dybatpho::queue_pop "${QUEUE}" quick_id quick_payload
+    printf '%s\n' "${fresh}"
+  }
+
+  local requeued
+  requeued="$(dybatpho::queue_requeue "${QUEUE}" "${id}" 5)"
+  unset -f dybatpho::queue_push
+  eval "dybatpho::queue_push() $(declare -f __dybatpho_test_real_push | tail -n +2)"
+
+  # Whether the stub ran (old protocol) or not (new one), claim the job now if
+  # it is still waiting, then look at the count it carries.
+  if [[ -e "${QUEUE}/pending/${requeued}.job" ]]; then
+    dybatpho::queue_pop "${QUEUE}" id payload
+  fi
+  assert_file_exist "${QUEUE}/claimed/${requeued}.retries"
+  assert_equal "$(< "${QUEUE}/claimed/${requeued}.retries")" "1"
+  run_traced find "${QUEUE}/pending" -name '*.retries'
+  assert_output ""
+}
+
 @test "dybatpho::queue_requeue carries the retry count through a claim" {
   # The count lives beside the job; left behind in pending when the job was
   # claimed, it would restart at one and the budget would never run out.

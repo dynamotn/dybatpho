@@ -775,6 +775,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller's variable stayed empty, with no error. `queue_pop jobs identifier
   payload` now sets `identifier`.
 
+- **`queue` — a requeued job keeps its retry count when a worker claims it at
+  once.** `dybatpho::queue_requeue` made the job claimable first and wrote its
+  retry count afterwards, so a worker that took it in between left the count
+  behind in `pending`. The next requeue counted from one again, and a job that
+  always fails could circulate forever instead of reaching the dead letters.
+  The job and its count are now written together under the queue lock.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

@@ -354,17 +354,47 @@ function dybatpho::queue_push {
   lock="$(__dybatpho_queue_lock "${directory}")"
   dybatpho::lock_acquire "${lock}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
 
-  local sequence identifier
-  __dybatpho_queue_next_sequence_into sequence "${directory}"
-  identifier="${sequence}-$(dybatpho::date_now "%s")"
-  # The sidecars go first: the job file appearing is what makes a job visible
-  # to a claim, so it must not be seen before its priority and due time are.
-  ((priority == 0)) || printf '%s\n' "${priority}" > "${directory}/pending/${identifier}.priority"
-  [[ -z "${due}" ]] || printf '%s\n' "${due}" > "${directory}/pending/${identifier}.due"
-  printf '%s\n' "${text}" > "${directory}/pending/${identifier}.job"
+  local identifier
+  __dybatpho_queue_push_locked identifier "${directory}" "${text}" "${priority}" "${due}" 0
 
   dybatpho::lock_release "${lock}"
   printf '%s\n' "${identifier}"
+}
+
+#######################################
+# @description Write a new pending job and everything that travels with it,
+#   into a named variable holding its id. The caller holds the queue lock.
+#   The sidecars are written before the job file because the job file
+#   appearing is what makes a job visible to a claim: a priority, a due time or
+#   a retry count written after it can be missed by a worker that claims the
+#   job at once, and a retry count left behind restarts the job's budget.
+# @arg $1 string Name of the variable receiving the job id
+# @arg $2 string Queue directory
+# @arg $3 string Payload
+# @arg $4 number Priority, `0` when it has none
+# @arg $5 number Epoch the job falls due, empty when it is due now
+# @arg $6 number Requeues so far, `0` for a new job
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_queue_push_locked {
+  local -n __dybatpho_queue_pushed_ref="$1"
+  local __dybatpho_queue_push_dir="$2" __dybatpho_queue_push_text="$3"
+  local __dybatpho_queue_push_priority="${4:-0}" __dybatpho_queue_push_due="${5-}"
+  local __dybatpho_queue_push_retries="${6:-0}"
+
+  local __dybatpho_queue_push_seq __dybatpho_queue_push_base
+  __dybatpho_queue_next_sequence_into __dybatpho_queue_push_seq "${__dybatpho_queue_push_dir}"
+  __dybatpho_queue_pushed_ref="${__dybatpho_queue_push_seq}-$(dybatpho::date_now "%s")"
+  __dybatpho_queue_push_base="${__dybatpho_queue_push_dir}/pending/${__dybatpho_queue_pushed_ref}"
+
+  ((__dybatpho_queue_push_priority == 0)) \
+    || printf '%s\n' "${__dybatpho_queue_push_priority}" > "${__dybatpho_queue_push_base}.priority"
+  [[ -z "${__dybatpho_queue_push_due}" ]] \
+    || printf '%s\n' "${__dybatpho_queue_push_due}" > "${__dybatpho_queue_push_base}.due"
+  ((__dybatpho_queue_push_retries == 0)) \
+    || printf '%s\n' "${__dybatpho_queue_push_retries}" > "${__dybatpho_queue_push_base}.retries"
+  printf '%s\n' "${__dybatpho_queue_push_text}" > "${__dybatpho_queue_push_base}.job"
 }
 
 #######################################
@@ -590,11 +620,9 @@ function dybatpho::queue_requeue {
   dybatpho::is file "${job}" \
     || dybatpho::die "${FUNCNAME[0]}: No claimed job with id: ${identifier}"
 
-  local attempts=0 counter="${directory}/claimed/${identifier}.retries"
-  if dybatpho::is file "${counter}"; then
-    read -r attempts < "${counter}"
-    [[ "${attempts}" =~ ^[0-9]+$ ]] || attempts=0
-  fi
+  local attempts
+  __dybatpho_queue_sidecar_number_into attempts "${directory}/claimed/${identifier}.retries" 0
+  ((attempts >= 0)) || attempts=0
   attempts=$((attempts + 1))
 
   if [[ -n "${budget}" ]]; then
@@ -612,12 +640,16 @@ function dybatpho::queue_requeue {
   local payload fresh priority
   payload="$(< "${job}")"
   __dybatpho_queue_sidecar_number_into priority "${directory}/claimed/${identifier}.priority" 0
-  local -a options=(--priority "${priority}")
-  [[ -z "${due}" ]] || options+=(--at "${due}")
-  fresh="$(dybatpho::queue_push "${options[@]}" -- "${queue}" "${payload}")" || return 1
-  printf '%s\n' "${attempts}" > "${directory}/pending/${fresh}.retries"
+
+  # The new job, its retry count included, is written under the queue lock in
+  # one step, so no worker can claim it before the count is in place.
+  local lock
+  lock="$(__dybatpho_queue_lock "${directory}")"
+  dybatpho::lock_acquire "${lock}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
+  __dybatpho_queue_push_locked fresh "${directory}" "${payload}" "${priority}" "${due}" "${attempts}"
   rm -f -- "${job}"
   __dybatpho_queue_sidecars "${directory}" "${identifier}" claimed
+  dybatpho::lock_release "${lock}"
   printf '%s\n' "${fresh}"
 }
 

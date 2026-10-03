@@ -112,6 +112,7 @@ dybatpho::release_sign "${sums}"
 
 - A repository with no tag at all.
 - A tag that is not a semantic version.
+- `scripts/release.sh` is given options that contradict each other, such as `--no-push` while publishing.
 - A commit subject that follows no convention, such as a merge commit.
 - A breaking change declared in the footer rather than in the subject.
 - A range whose commits call for no release.
@@ -144,6 +145,7 @@ dybatpho::release_sign "${sums}"
 - **FR-015**: `dybatpho::git_latest_tag` MUST order tags as versions rather than as strings, MUST accept a pattern, and MUST report failure when nothing matches.
 - **FR-016**: Loading `release` MUST NOT load `archive`; packaging MUST stop with a message naming the `archive` module and how to load it when that module is not loaded, before it inspects the source or creates anything.
 - **FR-017**: A configured signing command MUST receive the signature path and the file path as one argument each, and neither path MUST ever be read as shell syntax; the command itself is run as the project wrote it.
+- **FR-018**: `scripts/release.sh` MUST refuse contradicting options -- `--version` with `--bump`, publishing with `--no-push`, `--sign` with `--no-bundle`, and `--draft` with `--no-publish` -- before it reads the commits or changes the tree, and MUST accept every documented `--bump` value.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -183,6 +185,7 @@ dybatpho::release_sign "${sums}"
 - **IT-015**: Verify that the latest-tag lookup orders by version, honors a pattern, and fails when nothing matches.
 - **IT-016**: In a child shell that loaded only `release`, verify packaging stops with the message naming `archive` and creates nothing, and packages once `archive` is loaded.
 - **IT-017**: Sign a file whose path holds a space and a command substitution with a configured command that takes an option of its own, and verify the command receives the option and the two paths as three arguments and the substitution never runs.
+- **IT-018**: Run `scripts/release.sh --dry-run` with each contradicting pair of options and verify each is refused with its own message before the release header, and that `--bump minor` parses.
 
 ## Acceptance Criteria *(mandatory)*
 

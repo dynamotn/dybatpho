@@ -25,7 +25,8 @@ This document describes the repository workflow and conventions to preserve.
   covered by `test/bundle.bats` and specified in `docs/spec/doctor.md`.
 - `scripts/release.sh` — cut a release: stamp `VERSION` and `CHANGELOG.md`,
   regenerate `docs/`, commit, tag, and publish the GitHub release. Run it with
-  `--dry-run` first.
+  `--dry-run` first. Its option checks are covered by `test/release_script.bats`
+  and specified in `docs/spec/release.md`.
 - `VERSION` — the version this copy reports through `dybatpho::version`;
   `scripts/release.sh` stamps it in the same commit that tags the release.
 - `.mise.toml` — standard tasks such as `mise run test` and `mise run doc`.

@@ -249,16 +249,21 @@ function __dybatpho_release_preflight {
 
 #######################################
 # @description Resolve the version to release from the options and the commits.
-# @arg $1 string Value of `--version`, empty when not given
-# @arg $2 string Value of `--bump`, empty when not given
-# @arg $3 string Currently stamped version
-# @stdout The version to release, without a leading `v`
+#   The answer comes back through a variable rather than standard output: a
+#   refusal has to stop the script, and `dybatpho::die` inside `$( )` would only
+#   end the subshell.
+# @arg $1 string Name of the variable receiving the version, without a leading `v`
+# @arg $2 string Value of `--version`, empty when not given
+# @arg $3 string Value of `--bump`, empty when not given
+# @arg $4 string Currently stamped version
+# @set The named variable
 # @exitcode 1 Stop the script when no version can be resolved or it doesn't move forward
 # @internal
 #######################################
-function __dybatpho_release_resolve_version {
-  local _requested _bump _current _next
-  dybatpho::expect_args _requested _bump _current -- "$@"
+function __dybatpho_release_resolve_version_into {
+  local _target _requested _bump _current _next
+  dybatpho::expect_args _target _requested _bump _current -- "$@"
+  local -n _resolved="${_target}"
 
   if [[ -n "${_requested}" ]]; then
     _next="${_requested#v}"
@@ -283,7 +288,36 @@ function __dybatpho_release_resolve_version {
     && [[ "$(dybatpho::semver_compare "${_next}" "${_current}")" != "1" ]]; then
     dybatpho::die "Version ${_next} doesn't move forward from the stamped ${_current}"
   fi
-  printf '%s\n' "${_next}"
+  _resolved="${_next}"
+}
+
+#######################################
+# @description Refuse a combination of options that cannot all be honoured.
+#   It runs before anything else, so a release that would stop half way -- say,
+#   publishing a tag that was never pushed -- is refused before the tree is
+#   stamped, committed or tagged.
+# @noargs
+# @exitcode 1 Stop the script when two options contradict each other
+# @internal
+#######################################
+function __dybatpho_release_check_options {
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if [[ -n "${RELEASE_VERSION}" && -n "${BUMP}" ]]; then
+    dybatpho::die "--version and --bump both choose the version; pass only one of them"
+  fi
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${PUSH}"; then
+    dybatpho::die "--publish needs the tag pushed; drop --no-push or pass --no-publish"
+  fi
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if dybatpho::is true "${SIGN}" && dybatpho::is false "${BUNDLE}"; then
+    dybatpho::die "--sign needs the checksum file the bundle step writes; drop --no-bundle or --sign"
+  fi
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if dybatpho::is true "${DRAFT}" && dybatpho::is false "${PUBLISH}"; then
+    dybatpho::die "--draft needs --publish; there is no release to mark as a draft"
+  fi
+  return 0
 }
 
 #######################################
@@ -333,6 +367,7 @@ function __dybatpho_release_run {
   local _version _tag _previous _date _url _changelog _notes
   local -a _artifacts=()
 
+  __dybatpho_release_check_options
   dybatpho::require "git"
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::is true "${DOCS}" && dybatpho::require "gawk"
@@ -349,7 +384,7 @@ function __dybatpho_release_run {
   local _current
   _current="$(__dybatpho_release_current_version)"
   # shellcheck disable=SC2154 # set by the option spec of this script
-  _version="$(__dybatpho_release_resolve_version "${RELEASE_VERSION}" "${BUMP}" "${_current}")"
+  __dybatpho_release_resolve_version_into _version "${RELEASE_VERSION}" "${BUMP}" "${_current}"
   _tag="v${_version}"
   __dybatpho_release_preflight "${_tag}"
 
@@ -418,9 +453,6 @@ function __dybatpho_release_run {
   fi
 
   if dybatpho::is true "${PUBLISH}"; then
-    if dybatpho::is false "${PUSH}"; then
-      dybatpho::die "--publish needs the tag pushed; drop --no-push or pass --no-publish"
-    fi
     local forge_kind
     forge_kind=$(dybatpho::forge_kind)
     dybatpho::progress "Creating the ${forge_kind} release"
@@ -465,7 +497,7 @@ function _spec {
   dybatpho::opts::param "Release this exact version instead of deriving one" RELEASE_VERSION --version \
     init:@empty validate:"__dybatpho_release_is_version \$OPTARG"
   dybatpho::opts::param "Move the stamped version by one level" BUMP --bump \
-    init:@empty choices:"major|minor|patch"
+    init:@empty choices:"major,minor,patch"
   dybatpho::opts::param "Remote to push the branch and the tag to" REMOTE --remote \
     init:="origin"
 

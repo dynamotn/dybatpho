@@ -866,6 +866,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the call in the caller's shell, and the global timeouts are still left
   untouched.
 
+- **`scripts/release.sh` — contradicting options are refused before anything
+  changes, and `--bump` works.** Asking to publish with `--no-push` was only
+  refused after the tree had been stamped, committed and tagged, leaving a
+  half-made release behind. That case, `--version` with `--bump`, `--sign`
+  with `--no-bundle`, and `--draft` with `--no-publish` are now refused first.
+  `--bump` rejected every value, because its choices were written with `|`
+  where the spec separates them with commas; `--bump major|minor|patch` now
+  parses.
+
 ### Security
 
 - **`file` — a rewrite no longer writes through a link planted at its staging

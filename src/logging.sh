@@ -378,16 +378,14 @@ function __dybatpho_log_write_file {
 # @arg $1 string Log level
 # @arg $2 string Source location
 # @arg $3 string Message
-# @arg $4 string ANSI escape color code
-# @arg $5 string Ready-made JSON fragment of extra fields, each one leading with its own comma
+# @arg $4 string Ready-made JSON fragment of extra fields, each one leading with its own comma
 # @internal
 #######################################
 function __dybatpho_log_structured {
   local log_level="$1"
   local source="$2"
   local message="$3"
-  local color="${4:-}"
-  local extra_fields="${5:-}"
+  local extra_fields="${4:-}"
   local timestamp
   dybatpho::compare_log_level "${log_level}" || return 0
   timestamp=$(__dybatpho_log_timestamp)
@@ -396,16 +394,10 @@ function __dybatpho_log_structured {
     __dybatpho_secret_mask_var message
   fi
 
-  if [[ "${LOG_FORMAT}" == "json" ]]; then
-    local log_duration_ms
-    log_duration_ms=$(__dybatpho_log_duration_ms)
-    __dybatpho_log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" \
-      "${log_duration_ms}" "${extra_fields}" >&2
-  else
-    local log_context_text
-    log_context_text=$(__dybatpho_log_context_text)
-    __dybatpho_log "${log_level}" "${timestamp} ‖ ${source}: ${message}${log_context_text}" stderr "${color}"
-  fi
+  local log_duration_ms
+  log_duration_ms=$(__dybatpho_log_duration_ms)
+  __dybatpho_log_json_event "${timestamp}" "${log_level}" "${source}" "${message}" \
+    "${log_duration_ms}" "${extra_fields}" >&2
 }
 
 #######################################
@@ -541,7 +533,7 @@ function __dybatpho_log_inspect {
   message="$(__dybatpho_log_translate "${message}")"
   __dybatpho_log_write_file "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   if [[ "${LOG_FORMAT}" == "json" ]]; then
-    __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${color}" "${extra_fields}"
+    __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   else
     local log_context_text
     log_context_text=$(__dybatpho_log_context_text)
@@ -745,18 +737,6 @@ function __dybatpho_log_repeat_into {
   for ((__dybatpho_repeat_index = 0; __dybatpho_repeat_index < __dybatpho_repeat_count; __dybatpho_repeat_index++)); do
     __dybatpho_repeat_out+="${__dybatpho_repeat_token}"
   done
-}
-
-#######################################
-# @description Return the display width of a string, accounting for wide Unicode glyphs when possible.
-# @arg $1 string Input text
-# @stdout Display width of the input
-# @internal
-#######################################
-function __dybatpho_log_string_display_width {
-  local __dybatpho_display_width
-  __dybatpho_log_width_into __dybatpho_display_width "${1:-}"
-  printf '%s\n' "${__dybatpho_display_width}"
 }
 
 #######################################

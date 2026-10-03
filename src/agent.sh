@@ -81,21 +81,6 @@ DYBATPHO_AGENT_MARKERS="CLAUDECODE CLAUDE_CODE CLAUDE_AGENT ANTHROPIC_AGENT AI_A
 DYBATPHO_AGENT_MARKERS+=" AIDER_ACTIVE CURSOR_AGENT OPENAI_AGENT MCP_SERVER"
 
 #######################################
-# @description Fail loudly when no JSON backend is installed.
-# @noargs
-# @exitcode 0 `yq` or `jq` is available
-# @exitcode 127 Stop the script because neither is installed
-# @see dybatpho::json_object
-# @internal
-#######################################
-function __dybatpho_agent_require_json {
-  # Only the refusal matters here: which backend answered does not.
-  # shellcheck disable=SC2034 # out-param of the resolver; nothing reads it
-  local backend
-  __dybatpho_json_cmd_into backend
-}
-
-#######################################
 # @description Return success when an agent runtime marker is present.
 # @noargs
 # @env DYBATPHO_AGENT_ENV string Additional variable names to treat as markers

@@ -20,18 +20,6 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 #######################################
-# @description Return the display width of a table cell.
-# @arg $1 string Cell text
-# @stdout Cell width
-# @internal
-#######################################
-function __dybatpho_table_cell_width {
-  local __dybatpho_cell_width
-  __dybatpho_table_width_into __dybatpho_cell_width "${1-}"
-  printf '%s\n' "${__dybatpho_cell_width}"
-}
-
-#######################################
 # @description Measure a cell, writing the width into a named variable.
 #   The renderers measure every cell of every row, and reaching the measurement
 #   through `$( )` forked once per cell -- the single largest cost in drawing a
@@ -44,43 +32,6 @@ function __dybatpho_table_cell_width {
 #######################################
 function __dybatpho_table_width_into {
   __dybatpho_text_width_into "$1" "${2-}"
-}
-
-#######################################
-# @description Repeat a string into a named variable, without a subshell.
-# @arg $1 string Name of the variable receiving the result
-# @arg $2 string Text to repeat
-# @arg $3 number Number of repetitions
-# @set The named variable
-# @internal
-#######################################
-function __dybatpho_table_repeat_into {
-  if dybatpho::is function __dybatpho_log_repeat_into; then
-    __dybatpho_log_repeat_into "$@"
-    return 0
-  fi
-  # kcov(skip) - only when table.sh is used without logging.sh
-  local -n __dybatpho_table_repeat_out="$1"
-  local __dybatpho_table_repeat_index
-  __dybatpho_table_repeat_out=""
-  for ((__dybatpho_table_repeat_index = 0;  \
-  __dybatpho_table_repeat_index < ${3:-0};  \
-  __dybatpho_table_repeat_index++)); do
-    __dybatpho_table_repeat_out+="${2-}"
-  done
-}
-
-#######################################
-# @description Pad a cell to the requested display width.
-# @arg $1 string Cell text
-# @arg $2 number Target width
-# @stdout Right-padded cell text
-# @internal
-#######################################
-function __dybatpho_table_pad {
-  local __dybatpho_pad_result
-  __dybatpho_table_pad_into __dybatpho_pad_result "${1-}" "${2-}"
-  printf '%s' "${__dybatpho_pad_result}"
 }
 
 #######################################
@@ -100,7 +51,7 @@ function __dybatpho_table_pad_into {
   local __dybatpho_pad_width __dybatpho_pad_padding=""
   __dybatpho_table_width_into __dybatpho_pad_width "${__dybatpho_pad_text}"
   if ((__dybatpho_pad_target > __dybatpho_pad_width)); then
-    __dybatpho_table_repeat_into __dybatpho_pad_padding " " \
+    __dybatpho_log_repeat_into __dybatpho_pad_padding " " \
       "$((__dybatpho_pad_target - __dybatpho_pad_width))"
   fi
   __dybatpho_pad_out="${__dybatpho_pad_text}${__dybatpho_pad_padding}"
@@ -159,14 +110,11 @@ function __dybatpho_table_measure_widths {
   local row cell_width index
   local -a cells=()
   widths_ref=()
-  # Measuring a cell happens inside `$(...)`, and a subshell cannot hand its
-  # learned character widths back, so the whole table is learned once here, in
-  # this shell, before any measuring starts.
-  if dybatpho::is function __dybatpho_log_learn_widths; then
-    for row in "${rows_ref[@]}"; do
-      __dybatpho_log_learn_widths "${row}"
-    done
-  fi
+  # The character widths are learned once for the whole table, in this shell,
+  # so measuring each cell afterwards reads them instead of asking again.
+  for row in "${rows_ref[@]}"; do
+    __dybatpho_log_learn_widths "${row}"
+  done
 
   for row in "${rows_ref[@]}"; do
     __dybatpho_table_split_row "${row}" "${delimiter}" cells
@@ -224,20 +172,6 @@ function __dybatpho_table_parse_alignments {
 }
 
 #######################################
-# @description Format a cell according to width and alignment.
-# @arg $1 string Cell text
-# @arg $2 number Target width
-# @arg $3 string Alignment (`left`, `right`, `center`)
-# @stdout Formatted cell text
-# @internal
-#######################################
-function __dybatpho_table_format_cell {
-  local __dybatpho_format_result
-  __dybatpho_table_format_cell_into __dybatpho_format_result "${1-}" "${2-}" "${3-}"
-  printf '%s' "${__dybatpho_format_result}"
-}
-
-#######################################
 # @description Align a cell in its column, writing the result into a named
 #   variable rather than onto stdout, so building a row costs no processes.
 # @arg $1 string Name of the variable receiving the cell
@@ -264,13 +198,13 @@ function __dybatpho_table_format_cell_into {
 
   case "${__dybatpho_format_alignment}" in
     right)
-      __dybatpho_table_repeat_into __dybatpho_format_left " " "${__dybatpho_format_pad_size}"
+      __dybatpho_log_repeat_into __dybatpho_format_left " " "${__dybatpho_format_pad_size}"
       __dybatpho_format_out="${__dybatpho_format_left}${__dybatpho_format_text}"
       ;;
     center)
-      __dybatpho_table_repeat_into __dybatpho_format_left " " \
+      __dybatpho_log_repeat_into __dybatpho_format_left " " \
         "$((__dybatpho_format_pad_size / 2))"
-      __dybatpho_table_repeat_into __dybatpho_format_right " " \
+      __dybatpho_log_repeat_into __dybatpho_format_right " " \
         "$((__dybatpho_format_pad_size - __dybatpho_format_pad_size / 2))"
       __dybatpho_format_out="${__dybatpho_format_left}${__dybatpho_format_text}${__dybatpho_format_right}"
       ;;
@@ -298,7 +232,7 @@ function __dybatpho_table_rule {
   local rule="${left}" index segment
 
   for index in "${!widths_ref[@]}"; do
-    __dybatpho_table_repeat_into segment "─" "$((widths_ref[index] + 2))"
+    __dybatpho_log_repeat_into segment "─" "$((widths_ref[index] + 2))"
     rule+="${segment}"
     if ((index < ${#widths_ref[@]} - 1)); then
       rule+="${join}"
@@ -342,7 +276,7 @@ function dybatpho::table_align {
   __dybatpho_text_read_lines "${input}" rows
   __dybatpho_table_measure_widths rows "${delimiter}" widths
   __dybatpho_table_parse_alignments "${align_spec}" widths alignments
-  __dybatpho_table_repeat_into gap_text " " "${gap}"
+  __dybatpho_log_repeat_into gap_text " " "${gap}"
 
   for row in "${rows[@]}"; do
     __dybatpho_table_split_row "${row}" "${delimiter}" cells
@@ -427,7 +361,7 @@ function dybatpho::table_markdown {
         if ((width < 3)); then
           width=3
         fi
-        __dybatpho_table_repeat_into segment "-" "${width}"
+        __dybatpho_log_repeat_into segment "-" "${width}"
         separator+=" ${segment} |"
       done
       printf '%s\n' "${separator}"

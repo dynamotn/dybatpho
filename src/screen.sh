@@ -1260,7 +1260,7 @@ function dybatpho::screen_event {
   fi
 
   # kcov(disabled)
-  local __dybatpho_screen_e_char __dybatpho_screen_e_rest="" __dybatpho_screen_e_status=0
+  local __dybatpho_screen_e_char __dybatpho_screen_e_status=0
   # The flags are in an array because the timeout is optional; `-r` is always
   # among them, which a static check cannot see through the expansion.
   # shellcheck disable=SC2162
@@ -1298,7 +1298,6 @@ function dybatpho::screen_event {
       ;;
     *) __dybatpho_screen_e_out="char:${__dybatpho_screen_e_char}" ;;
   esac
-  : "${__dybatpho_screen_e_rest}"
   return 0
   # kcov(enabled)
 }

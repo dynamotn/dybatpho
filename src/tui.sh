@@ -1169,7 +1169,7 @@ function dybatpho::tui_confirm {
   dybatpho::is true "${default_answer}" || yes=0
 
   local bold accent dim reset key line
-  local answered=false cancelled=false drawn=false
+  local answered=false cancelled=false
   __dybatpho_tui_sgr_into bold "1"
   __dybatpho_tui_sgr_into accent "1;7;36"
   __dybatpho_tui_sgr_into dim "2"
@@ -1194,7 +1194,6 @@ function dybatpho::tui_confirm {
       "${no_style}" "${no_label}" "${reset}" \
       "${dim}" "${hint}" "${reset}"
     __dybatpho_tui_draw_line "${line}"
-    drawn=true
 
     if [[ "${answered}" == true || "${cancelled}" == true ]]; then
       break
@@ -1219,7 +1218,8 @@ function dybatpho::tui_confirm {
     esac
   done
 
-  [[ "${drawn}" == true ]] && __dybatpho_tui_erase_line
+  # The loop draws before it reads a key, so a line is always there to erase.
+  __dybatpho_tui_erase_line
   __dybatpho_tui_show_cursor
 
   if [[ "${cancelled}" == true ]]; then

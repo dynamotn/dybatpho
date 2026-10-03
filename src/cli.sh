@@ -1247,20 +1247,15 @@ function __dybatpho_cli_parse_key_value {
 #######################################
 # @description Generate logic from spec of script/function to get options
 # @arg $1 string Name of function that has spec of parent function or script
-# @arg $2 string Command of spec (`-` for root command trigger from CLI, otherwise is sub-command)
+# @arg $@ string Original CLI arguments
 # @stdout Generated logic
 # @internal
 #######################################
 function __dybatpho_cli_generate_logic {
-  # `command` is read by nobody here any more -- it used to pick out the root
-  # spec so the arguments could be appended to the generated file -- but it is
-  # still the second argument every caller passes and `expect_args` still has
-  # to account for it.
-  # shellcheck disable=SC2034 # kept for the argument contract
-  local spec command
-  dybatpho::expect_args spec command -- "$@"
+  local spec
+  dybatpho::expect_args spec -- "$@"
   declare -F "${spec}" > /dev/null || return 0
-  shift 2
+  shift
 
   # For get list of options, separated by space
   local IFS=" "
@@ -1525,7 +1520,7 @@ function __dybatpho_cli_generate_logic {
     local _sub_spec _cmd_match _cmd_name _cmd_deprecated
     IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
     [[ "${_cmd_match}" = "${_cmd_name}" ]] || continue
-    __dybatpho_cli_generate_child_logic "${_sub_spec}" "${_cmd_name}" "$@"
+    __dybatpho_cli_generate_child_logic "${_sub_spec}" "$@"
   done
 
   # The root spec is not triggered from inside the generated file. Writing the
@@ -2581,16 +2576,15 @@ function __dybatpho_cli_print_deprecated_warning {
 #######################################
 # @description Generate parser logic for a child command with inherited persistent option definitions.
 # @arg $1 string Child spec function
-# @arg $2 string Child command name
 # @arg $@ string Original CLI arguments
 # @stdout Generated parser code
 # @internal
 #######################################
 function __dybatpho_cli_generate_child_logic {
-  local __child_spec="$1" __child_command="$2"
-  shift 2
+  local __child_spec="$1"
+  shift
   local -a __persistent_inherited_defs=("${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}")
-  __dybatpho_cli_generate_logic "${__child_spec}" "${__child_command}" "$@"
+  __dybatpho_cli_generate_logic "${__child_spec}" "$@"
 }
 
 #######################################
@@ -3333,7 +3327,7 @@ function dybatpho::generate_from_spec {
   __current_cmd_path=""
   local gen_file
   dybatpho::create_temp gen_file ".sh" "genopts"
-  __dybatpho_cli_generate_logic "${spec}" - "$@" >> "${gen_file}"
+  __dybatpho_cli_generate_logic "${spec}" "$@" >> "${gen_file}"
   if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
     dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
   fi

@@ -145,12 +145,6 @@ SCRIPT
   dybatpho::secret_forget
 }
 
-@test "__dybatpho_log_structured renders text output when the format is not json" {
-  LOG_FORMAT=text
-  __dybatpho_log_structured info "source.sh:12" "structured text message"
-  __dybatpho_log_structured trace "source.sh:12" "filtered out"
-}
-
 @test "__dybatpho_log_wrap_line handles non-positive widths and empty lines" {
   assert_equal "$(__dybatpho_log_wrap_line "unwrapped text" 0)" "unwrapped text"
   assert_equal "$(__dybatpho_log_wrap_line "" 10)" ""

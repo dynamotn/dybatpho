@@ -214,6 +214,17 @@ c.close()' > "${portfile}" 2> /dev/null &
   refute_stderr --partial "token=abc"
 }
 
+@test "dybatpho::curl_do keeps a secret URL out of the log when the body goes on stdin" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_do"
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub curl ": return 1"
+  DYBATPHO_CURL_SECRET_DATA='{"text":"hi"}' run_traced --separate-stderr -1 dybatpho::curl_do \
+    "https://hooks.example.com/services/T000/B000/XXXXSECRET" "${temp_file}"
+  unstub curl
+  assert_stderr --partial "Error when access https://hooks.example.com/[redacted]"
+  refute_stderr --partial "XXXXSECRET"
+}
+
 @test "__dybatpho_network_redact_url_into keeps the scheme, host and port only" {
   local shown url
   local -A cases=(

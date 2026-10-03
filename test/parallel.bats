@@ -411,3 +411,30 @@ SCRIPT
   assert_equal "$(dybatpho::parallel_status 1)" "5"
   assert_equal "$(dybatpho::parallel_failed)" "1"
 }
+
+@test "dybatpho::parallel_run --timeout asks for the date module only for a duration it cannot read itself" {
+  # `parallel` does not load `date`, so a pool without a limit, or with one in
+  # plain seconds, does not pay for it. A child shell started from a file,
+  # without the functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules parallel\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::parallel_run --timeout "${1}" 1 "printf ran"'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" 30
+  assert_success
+  assert_output --partial "ran"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" 5m
+  assert_failure
+  assert_output --partial "dybatpho::parallel_run --timeout 5m needs the date module, load it with: dybatpho::load date"
+  refute_output --partial "ran"
+
+  # Once the script loads it, the same duration is read.
+  sed -i 's/--modules parallel$/--modules parallel date/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" 5m
+  assert_success
+  assert_output --partial "ran"
+}

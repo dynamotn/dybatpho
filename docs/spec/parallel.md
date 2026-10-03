@@ -135,6 +135,7 @@ done
 
 ## Edge Cases
 
+- A script limits jobs with a duration such as `5m` without having loaded the `date` module.
 - An empty work list.
 - A job count that is not a positive integer.
 - A status read for an index that has no job.
@@ -174,6 +175,7 @@ done
 - **FR-019**: A job over its limit MUST have its process group sent `SIGTERM`, then `SIGKILL` after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds (default `5`) if anything in it is still running, MUST be recorded as exit `124`, and MUST be named on standard error.
 - **FR-020**: The watchdog enforcing a limit MUST NOT keep the run open once its job has finished or the run is interrupted, and MUST NOT hold the caller's output streams.
 - **FR-021**: `--progress`, or a true-like `DYBATPHO_PARALLEL_PROGRESS`, MUST report finished jobs on standard error only: through the `tui` progress bar when that module is loaded, detected by an internal `tui` helper rather than a public name, and otherwise as one `Jobs: <done>/<total> finished` line per reap; `tui` MUST NOT become a dependency of `parallel`.
+- **FR-022**: Loading the module MUST NOT load `date`. A time limit in plain seconds MUST work without it; any other duration MUST stop the caller, naming the `date` module and how to load it, when that module is not loaded, before any job starts or anything is created.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -224,6 +226,7 @@ done
 - **IT-030**: Verify `DYBATPHO_PARALLEL_PROGRESS` turns progress on without the option.
 - **IT-031**: Verify a run without progress writes nothing of its own to standard error.
 - **IT-032**: In a child shell that loads only `parallel`, verify one plain progress line per finished job.
+- **IT-033**: In a child shell that loads only `parallel`, run with a limit in seconds, have a `5m` limit stop the call and name the `date` module without running the job, and run with it once `date` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

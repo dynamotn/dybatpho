@@ -95,7 +95,6 @@ declare -A __dybatpho_module_deps=(
   [backup]="archive safety date diff"
   [queue]="lock date"
   [schedule]="date"
-  [parallel]="date"
   [notification]="network validate"
   [cli]="validate"
   [config]="validate"

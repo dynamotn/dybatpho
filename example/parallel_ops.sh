@@ -10,7 +10,7 @@
 #   and DRY_RUN
 # shellcheck disable=SC2034 # DYBATPHO_PARALLEL_FAILFAST is read by the parallel module
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
-. "${SCRIPTDIR}/../init.sh" --modules parallel
+. "${SCRIPTDIR}/../init.sh" --modules parallel date
 
 dybatpho::register_common_handlers
 

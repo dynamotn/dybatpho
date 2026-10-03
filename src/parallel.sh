@@ -148,15 +148,30 @@ function __dybatpho_parallel_options {
 # @description Resolve the per-job time limit into a number of seconds.
 #   The limit is returned through a variable for the same reason as the job
 #   count: a rejected duration has to be able to stop the caller.
+#
+#   A bare number of seconds is read here. Any other form, such as `5m` or
+#   `1h30m`, is read by `dybatpho::date_parse_duration`, and the `date` module
+#   is not a dependency of this one: a pool without a limit, or with a limit in
+#   seconds, should not load it. The guard names an internal helper, since a
+#   child shell inherits the exported `dybatpho::` functions without the
+#   internals they call.
 # @arg $1 string Name of the variable that receives the seconds, `0` for no limit
 # @arg $2 string Duration from `--timeout`, or empty to read the configuration
-# @exitcode 1 Stop the script when the duration cannot be read or is negative
+# @exitcode 1 Stop the script when the duration cannot be read, is negative, or
+#   needs the `date` module and it is not loaded
 # @internal
 #######################################
 function __dybatpho_parallel_timeout {
   local -n __dybatpho_parallel_timeout_out="$1"
   local requested="${2:-${DYBATPHO_PARALLEL_TIMEOUT}}" seconds=0
-  if [[ -n "${requested}" ]]; then
+  if [[ "${requested}" =~ ^[0-9]{1,9}$ ]]; then
+    seconds=$((10#${requested}))
+  elif [[ -n "${requested}" ]]; then
+    # The refusal is exercised by "--timeout asks for the date module" in a
+    # child shell, which kcov does not follow.
+    local needs_date="${FUNCNAME[2]} --timeout ${requested} needs the date module"
+    declare -F __dybatpho_date_parse > /dev/null \
+      || dybatpho::die "${needs_date}, load it with: dybatpho::load date" # kcov(skip)
     # Exercised under `run` by "an invalid timeout is refused", which kcov
     # cannot see because `dybatpho::die` ends the shell.
     local invalid="Timeout must be a duration such as 90, 5m or 1h30m, got '${requested}'"
@@ -320,13 +335,15 @@ function __dybatpho_parallel_pool {
   dybatpho::expect_args concurrency launcher total labels -- "$@"
   local -n __dybatpho_parallel_labels="${labels}"
 
+  # Resolved before anything is created, so a refused limit leaves nothing behind.
+  local __dybatpho_parallel_limit
+  __dybatpho_parallel_timeout __dybatpho_parallel_limit "${__dybatpho_parallel_opt_timeout:-}"
+
   dybatpho::create_temp directory "/" "parallel"
   DYBATPHO_PARALLEL_STATUS=()
 
   local __dybatpho_parallel_failfast="${DYBATPHO_PARALLEL_FAILFAST}"
   [[ "${__dybatpho_parallel_opt_failfast:-false}" != true ]] || __dybatpho_parallel_failfast=true
-  local __dybatpho_parallel_limit
-  __dybatpho_parallel_timeout __dybatpho_parallel_limit "${__dybatpho_parallel_opt_timeout:-}"
   local __dybatpho_parallel_progress=false
   if [[ "${__dybatpho_parallel_opt_progress:-false}" == true ]] \
     || dybatpho::is true "${DYBATPHO_PARALLEL_PROGRESS}"; then

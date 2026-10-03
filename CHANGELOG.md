@@ -200,9 +200,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   later if it is still there, and is recorded as exit `124`, the code `timeout`
   uses, with a warning naming it. A timeout is a failure like any other, so
   `--fail-fast` stops on it, and a generous limit costs nothing: the run ends as
-  soon as its jobs do. The `parallel` module now loads `date`.
+  soon as its jobs do. A limit in plain seconds needs nothing else; any other
+  form is read by the `date` module, which `parallel` does not load, and
+  without it the call stops with a message naming it.
 
   ```sh
+  . dybatpho/init.sh --modules parallel date
   dybatpho::parallel_map --timeout 30s 8 _check "${hosts[@]}"
   ```
 

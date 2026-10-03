@@ -782,6 +782,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   always fails could circulate forever instead of reaching the dead letters.
   The job and its count are now written together under the queue lock.
 
+- **`ai` — a refused stream is reported instead of read as an empty
+  answer.** `dybatpho::ai_stream` never looked at the HTTP status, so a
+  rejected key or a rate limit printed an empty line and returned `0`. It now
+  returns `4` or `5` (and `3`, as `dybatpho::curl_do` does) with the status and
+  the provider's message, and `1` when the request never reached the provider.
+  It also honours `DYBATPHO_CURL_CONNECT_TIMEOUT` and `DYBATPHO_CURL_TIMEOUT`
+  like every other request, under `DYBATPHO_AI_TIMEOUT`.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

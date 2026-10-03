@@ -165,6 +165,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   write back to its parent.
 - A cached entry that has outlived its time to live.
 - `DRY_RUN` enabled for a rehearsal.
+- A streamed request refused with an HTTP error, whose error object matches no
+  delta, or one that never reaches the provider.
 
 ## Requirements *(mandatory)*
 
@@ -224,6 +226,11 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   file it points at.
 - **FR-022a**: The module MUST refuse to read or write the counter file when it
   is a symbolic link, wherever it has been pointed.
+- **FR-023**: `dybatpho::ai_stream` MUST read the HTTP status of the stream and
+  return `3`, `4` or `5` for a 3xx, 4xx or 5xx answer -- reporting the status
+  and the provider's message and printing no answer -- and `1` when no response
+  arrived or curl failed. It MUST honour `DYBATPHO_CURL_CONNECT_TIMEOUT` and
+  `DYBATPHO_CURL_TIMEOUT`, with `DYBATPHO_AI_TIMEOUT` as the overall limit.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -279,6 +286,9 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-013**: Verify the counter file defaults under the XDG state home, that
   its directory is `0700`, and that a symbolic link in its place is refused
   rather than written through.
+- **IT-014**: Verify a streamed 401 returns `4` with the status and the
+  provider's message on stderr and nothing on stdout, a 529 returns `5`, and a
+  request that never reached the server returns `1`.
 
 ## Acceptance Criteria *(mandatory)*
 

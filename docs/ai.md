@@ -520,7 +520,10 @@ dybatpho::ai_stream "Explain this stack trace" | tee /tmp/answer.txt
 **🚦 Exit codes**
 
 - `0`: The stream completed
-- `1`: Missing arguments or a provider error
+- `1`: Missing arguments, or the request never reached the provider or broke off
+- `3`: The provider answered with HTTP 3xx
+- `4`: The provider answered with HTTP 4xx, such as a rejected key or a rate limit
+- `5`: The provider answered with HTTP 5xx
 
 
 ---

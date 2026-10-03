@@ -1283,7 +1283,10 @@ ${schema}"
 # @arg $2 string Optional system prompt
 # @stdout Assistant answer, written incrementally
 # @exitcode 0 The stream completed
-# @exitcode 1 Missing arguments or a provider error
+# @exitcode 1 Missing arguments, or the request never reached the provider or broke off
+# @exitcode 3 The provider answered with HTTP 3xx
+# @exitcode 4 The provider answered with HTTP 4xx, such as a rejected key or a rate limit
+# @exitcode 5 The provider answered with HTTP 5xx
 # @note Usage counters are not updated for streamed Anthropic calls because the totals arrive in a trailing event this
 #   helper does not buffer
 #######################################
@@ -1358,31 +1361,72 @@ function dybatpho::ai_stream {
 
   local stream_config=""
   __dybatpho_network_secret_config stream_config
-  local -a stream_args=()
+  # The status comes from the response headers and curl's own exit code from a
+  # file: both are lost otherwise, because the body is read through a process
+  # substitution. Without them a refused request -- whose error object matches
+  # no delta filter -- printed an empty answer and returned 0.
+  local header_file curl_status_file
+  dybatpho::create_temp header_file ".headers" "ai_stream"
+  dybatpho::create_temp curl_status_file ".status" "ai_stream"
+  local -a stream_args=(--silent --no-buffer --show-error --request POST -D "${header_file}")
+  # The same timeouts `dybatpho::curl_do` honours, then the per-call limit,
+  # which wins as it does for a buffered call.
+  [[ -n "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ]] \
+    && stream_args+=(--connect-timeout "${DYBATPHO_CURL_CONNECT_TIMEOUT}")
+  [[ -n "${DYBATPHO_CURL_TIMEOUT}" ]] && stream_args+=(--max-time "${DYBATPHO_CURL_TIMEOUT}")
+  stream_args+=(--max-time "${DYBATPHO_AI_TIMEOUT}")
   [[ -n "${stream_config}" ]] && stream_args+=(--config "${stream_config}")
 
-  local line data
+  local line data body=""
   # Server-sent events prefix every payload with `data: `; Ollama streams bare
   # JSON objects. Both are handled by stripping an optional prefix per line.
-  # The payload arrives on stdin, so it is not an argument either.
+  # The payload arrives on stdin, so it is not an argument either. Each payload
+  # is also kept, so an error response can be reported by its message.
   while IFS= read -r line; do
     [[ -z "${line}" ]] && continue
     data="${line#data: }"
     [[ "${data}" == "[DONE]" ]] && break
     [[ "${data}" == event:* ]] && continue
+    body+="${data}"$'\n'
     __dybatpho_ai_stream_chunk "${data}" "${filter}"
   done < <(
-    curl --silent --no-buffer --show-error \
-      --request POST \
-      --max-time "${DYBATPHO_AI_TIMEOUT}" \
+    local curl_status=0
+    command curl "${stream_args[@]}" \
       --header "Content-Type: application/json" \
       --header "Accept: text/event-stream" \
       ${headers[@]+"${headers[@]}"} \
-      ${stream_args[@]+"${stream_args[@]}"} \
       --data-binary @- \
-      "${url}" <<< "${payload}"
+      "${url}" <<< "${payload}" || curl_status=$?
+    printf '%s' "${curl_status}" > "${curl_status_file}"
   )
   [[ -n "${stream_config}" ]] && rm -f "${stream_config}"
+
+  local code="" protocol status rest curl_status
+  while IFS=' ' read -r protocol status rest; do
+    [[ "${protocol}" == HTTP/* ]] && code="${status%$'\r'}"
+  done < "${header_file}"
+  curl_status="$(< "${curl_status_file}")"
+  rm -f "${header_file}" "${curl_status_file}"
+
+  if [[ ! "${code}" =~ ^[0-9]{3}$ ]] || [[ "${curl_status:-1}" != 0 && "${code}" == 2* ]]; then
+    local shown_url
+    __dybatpho_network_redact_url_into shown_url "${url}"
+    dybatpho::error "Error when access ${shown_url}"
+    return 1
+  fi
+  if [[ "${code}" != 2* ]]; then
+    local description message=""
+    description=$(__dybatpho_network_get_http_code "${code}")
+    # The message is best effort: an error body that is not JSON still gets
+    # its status reported.
+    message=$(dybatpho::json_get "${body}" '.error.message // ""' 2> /dev/null) || message=""
+    dybatpho::error "ai: ${provider} answered ${description}${message:+: ${message}}"
+    case "${code}" in
+      3*) return 3 ;;
+      4*) return 4 ;;
+      *) return 5 ;;
+    esac
+  fi
   printf '\n'
 }
 

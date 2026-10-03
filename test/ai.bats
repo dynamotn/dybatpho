@@ -29,6 +29,20 @@ stub_curl_body() {
   stub_repeated curl ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; if [ -n \"\${out}\" ]; then cat '${body_file}' > \"\${out}\"; fi; echo 200"
 }
 
+# Stub curl as a streaming endpoint: write an HTTP status line to whatever path
+# follows `-D`, which is how `dybatpho::ai_stream` learns the status, then
+# stream the file as the body. A status of `none` writes no headers and exits 7,
+# the way curl does when it never reaches the server.
+stub_curl_stream() {
+  local status="$1" body_file="$2"
+  local script=": hdr=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -D ]; then hdr=\"\${a}\"; fi; prev=\"\${a}\"; done;"
+  if [[ "${status}" == none ]]; then
+    stub_repeated curl "${script} exit 7"
+    return 0
+  fi
+  stub_repeated curl "${script} printf 'HTTP/1.1 ${status} X\\r\\n\\r\\n' > \"\${hdr}\"; cat '${body_file}'"
+}
+
 # Build a well-formed Anthropic response around arbitrary assistant text.
 anthropic_body() {
   local block usage
@@ -624,11 +638,46 @@ _test_tool() { printf 'tool output\n'; }
     printf 'data: {"type":"message_stop"}\n'
     printf 'data: [DONE]\n'
   } > "${sse_file}"
-  stub_repeated curl ": cat '${sse_file}'"
+  stub_curl_stream 200 "${sse_file}"
 
   run_traced dybatpho::ai_stream "hi"
   assert_success
   assert_output "Hello world"
+}
+
+@test "dybatpho::ai_stream reports an HTTP error instead of an empty answer" {
+  # A refused request streams an error object, which matches no delta filter;
+  # read without its status it printed an empty line and returned 0.
+  local body_file="${BATS_TEST_TMPDIR}/stream-401.json"
+  printf '%s\n' '{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}' \
+    > "${body_file}"
+  stub_curl_stream 401 "${body_file}"
+
+  run_traced -4 --separate-stderr dybatpho::ai_stream "hi"
+  assert_output ""
+  assert_stderr --partial "401 (unauthorized)"
+  assert_stderr --partial "invalid x-api-key"
+}
+
+@test "dybatpho::ai_stream returns 5 when the provider fails" {
+  local body_file="${BATS_TEST_TMPDIR}/stream-529.json"
+  printf '%s\n' '{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}' \
+    > "${body_file}"
+  stub_curl_stream 529 "${body_file}"
+
+  run_traced -5 --separate-stderr dybatpho::ai_stream "hi"
+  assert_output ""
+  assert_stderr --partial "Overloaded"
+}
+
+@test "dybatpho::ai_stream reports a request that never reached the server" {
+  local body_file="${BATS_TEST_TMPDIR}/unused.sse"
+  : > "${body_file}"
+  stub_curl_stream none "${body_file}"
+
+  run_traced -1 --separate-stderr dybatpho::ai_stream "hi"
+  assert_output ""
+  assert_stderr --partial "Error when access https://api.anthropic.com"
 }
 
 @test "dybatpho::ai_stream parses the bare JSON objects Ollama streams" {
@@ -638,7 +687,7 @@ _test_tool() { printf 'tool output\n'; }
     printf '{"message":{"content":"one"}}\n'
     printf '{"message":{"content":"-two"}}\n'
   } > "${sse_file}"
-  stub_repeated curl ": cat '${sse_file}'"
+  stub_curl_stream 200 "${sse_file}"
 
   run_traced dybatpho::ai_stream "hi"
   assert_success

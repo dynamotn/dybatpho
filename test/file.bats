@@ -636,6 +636,29 @@ EOF
   assert_output --partial "Too many levels of symbolic links"
 }
 
+@test "a symlink loop stops a rewrite before it stages anything" {
+  # The loop was refused inside a command substitution, so the writer carried
+  # on with an empty path wherever errexit was suspended -- under `if`, `||` or
+  # bats' `run` -- and staged a file in the working directory, which a parallel
+  # test then saw as a stray file in the repository.
+  local work="${BATS_TEST_TMPDIR}/loop work"
+  mkdir -p "${work}"
+  ln -s "${work}/loop_b" "${work}/loop_a"
+  ln -s "${work}/loop_a" "${work}/loop_b"
+  local script="${BATS_TEST_TMPDIR}/loop.sh"
+  printf '%s\n' \
+    "cd $(printf '%q' "${work}")" \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh" \
+    "if ! dybatpho::file_ensure_line $(printf '%q' "${work}/loop_a") x; then :; fi" \
+    "printf 'carried on\n'" > "${script}"
+
+  run --separate-stderr bash "${script}"
+  assert_stderr --partial "dybatpho::file_ensure_line: Too many levels of symbolic links"
+  refute_stderr --partial "Cannot write"
+  refute_output --partial "carried on"
+  assert_equal "$(ls -A "${work}" | tr '\n' ' ')" "loop_a loop_b "
+}
+
 @test "file metadata describes the target of a symlink, not the link" {
   local target="${BATS_TEST_TMPDIR}/sized_target"
   printf '0123456789\n' > "${target}"

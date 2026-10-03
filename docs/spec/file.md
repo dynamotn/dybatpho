@@ -335,6 +335,7 @@ dybatpho::show_file "${report_file}"
 - **FR-043**: A rewrite MUST stage in a file it created exclusively under an unpredictable name in the destination's directory, and MUST NOT write through a link or any other file that already held that name.
 - **FR-044**: `dybatpho::create_temp` and `dybatpho::create_temp_dir` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
 - **FR-045**: A rewrite MUST stop and leave the destination untouched when its new contents cannot be produced, including when the existing file cannot be read.
+- **FR-046**: A rewrite whose destination is a symlink chain too deep to resolve MUST stop before it stages anything, also where errexit is suspended, and MUST report the refusal under the public function that was called.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -398,6 +399,7 @@ dybatpho::show_file "${report_file}"
 - **IT-029**: Plant links at the staging names the old process-id scheme would have used, run every writer, and verify the link target is untouched, the destination is a regular file with the new contents, and no staging file is left over.
 - **IT-030**: Create a temporary file into variables named like the helper's former locals (`path_var`, `extension`, `parent_folder`, `pid`, `temp_path`, `prefix`), and a directory into `path_var`, and find each one filled.
 - **IT-031**: Refuse to append a line to a file that cannot be read, leaving its contents unchanged.
+- **IT-032**: Rewrite through a symlink loop under `if !` from a script in its own directory, and leave that directory exactly as it was.
 
 ## Acceptance Criteria *(mandatory)*
 

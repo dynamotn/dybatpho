@@ -517,36 +517,49 @@ function __dybatpho_file_walk_into {
 }
 
 #######################################
-# @description Follow a symlink chain to the file it ends at.
+# @description Follow a symlink chain to the file it ends at, and set a
+#   variable to it.
 #   Committing a rewrite means renaming a staging file onto the destination,
 #   which would replace a symlink with a regular file and quietly detach it from
 #   whatever it pointed at. Resolving first writes through the link instead, so
 #   a dotfile symlinked into a repository keeps pointing there and the file in
 #   the repository is the one that changes.
-# @arg $1 string Path to resolve
+#
+#   It runs in the caller's shell, so a chain too deep to be valid stops the
+#   script there. Called inside `$(...)`, the refusal ended only the
+#   substitution, and wherever errexit was suspended the writer carried on with
+#   an empty path and staged a file in the working directory.
+# @arg $1 string Name of the variable receiving the resolved path
+# @arg $2 string Path to resolve
+# @arg $3 string Name the refusal is reported under
 # @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When false-like, return the path unchanged so the symlink itself is replaced
-# @stdout Resolved path, or the original path when it is not a symlink
-# @exitcode 1 The symlink chain is too deep to be a valid one
+# @set The named variable: the resolved path, or the path itself when it is not a symlink
 # @internal
 #######################################
-function __dybatpho_file_resolve {
-  local path target depth=0
-  dybatpho::expect_args path -- "$@"
+function __dybatpho_file_resolve_into {
+  local -n __dybatpho_file_resolve_ref="$1"
+  local __dybatpho_file_resolve_path="$2" __dybatpho_file_resolve_caller="$3"
+  local __dybatpho_file_resolve_target __dybatpho_file_resolve_depth=0
   if ! dybatpho::is true "${DYBATPHO_FILE_FOLLOW_SYMLINKS}"; then
-    printf '%s\n' "${path}"
+    __dybatpho_file_resolve_ref="${__dybatpho_file_resolve_path}"
     return 0
   fi
   # Plain `readlink` reads one level on every platform, unlike `readlink -f`,
   # which BSD and older macOS do not provide.
-  while [[ -L "${path}" ]]; do
-    if ((depth++ >= 40)); then
-      dybatpho::die "${FUNCNAME[1]}: Too many levels of symbolic links: ${path}"
+  while [[ -L "${__dybatpho_file_resolve_path}" ]]; do
+    if ((__dybatpho_file_resolve_depth++ >= 40)); then
+      local __dybatpho_file_resolve_why="Too many levels of symbolic links"
+      dybatpho::die "${__dybatpho_file_resolve_caller}: ${__dybatpho_file_resolve_why}: ${__dybatpho_file_resolve_path}"
     fi
-    target="$(readlink -- "${path}")"
-    [[ "${target}" == /* ]] || target="$(dybatpho::path_dirname "${path}")/${target}"
-    path="$(dybatpho::path_normalize "${target}")"
+    __dybatpho_file_resolve_target="$(readlink -- "${__dybatpho_file_resolve_path}")"
+    if [[ "${__dybatpho_file_resolve_target}" != /* ]]; then
+      local __dybatpho_file_resolve_dir
+      __dybatpho_file_resolve_dir="$(dybatpho::path_dirname "${__dybatpho_file_resolve_path}")"
+      __dybatpho_file_resolve_target="${__dybatpho_file_resolve_dir}/${__dybatpho_file_resolve_target}"
+    fi
+    __dybatpho_file_resolve_path="$(dybatpho::path_normalize "${__dybatpho_file_resolve_target}")"
   done
-  printf '%s\n' "${path}"
+  __dybatpho_file_resolve_ref="${__dybatpho_file_resolve_path}"
 }
 
 #######################################
@@ -700,7 +713,7 @@ function dybatpho::file_write_atomic {
   local path directory
   dybatpho::expect_args path -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
-  path="$(__dybatpho_file_resolve "${path}")"
+  __dybatpho_file_resolve_into path "${path}" "${FUNCNAME[0]}"
   directory="$(dybatpho::path_dirname "${path}")"
   dybatpho::is dir "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
@@ -773,7 +786,7 @@ function dybatpho::file_replace {
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
   dybatpho::is file "${path}" \
     || dybatpho::die "${FUNCNAME[0]}: File doesn't exist: ${path}"
-  path="$(__dybatpho_file_resolve "${path}")"
+  __dybatpho_file_resolve_into path "${path}" "${FUNCNAME[0]}"
   delimiter="$(__dybatpho_file_sed_delimiter "${pattern}" "${replacement}")" \
     || dybatpho::die "${FUNCNAME[0]}: Cannot find a usable sed delimiter for '${pattern}'"
 
@@ -820,7 +833,7 @@ function dybatpho::file_ensure_line {
   local path line directory
   dybatpho::expect_args path line -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
-  path="$(__dybatpho_file_resolve "${path}")"
+  __dybatpho_file_resolve_into path "${path}" "${FUNCNAME[0]}"
   directory="$(dybatpho::path_dirname "${path}")"
   dybatpho::is dir "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
@@ -877,7 +890,7 @@ function dybatpho::file_remove_line {
   local path line
   dybatpho::expect_args path line -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
-  path="$(__dybatpho_file_resolve "${path}")"
+  __dybatpho_file_resolve_into path "${path}" "${FUNCNAME[0]}"
   if ! dybatpho::is file "${path}" || ! grep -qxF -- "${line}" "${path}"; then
     dybatpho::debug "Line already absent from ${path}"
     return 0

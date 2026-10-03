@@ -1056,6 +1056,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::csv_col` or another reader -- so it pointed away from the call at
   fault. It now names the reader itself.
 
+- **`file` — a symlink loop stops a rewrite before it writes anything.**
+  `dybatpho::file_write_atomic`, `dybatpho::file_replace`,
+  `dybatpho::file_ensure_line` and `dybatpho::file_remove_line` refused a
+  symlink chain too deep to resolve inside a command substitution, so wherever
+  errexit was suspended -- under `if`, `||`, or a test runner -- they carried on
+  with an empty path, staged a file in the current directory and failed to
+  move it onto nothing. They now stop at the refusal.
+
 ### Security
 
 - **`notification` — webhook URLs, bot tokens and messages no longer appear on

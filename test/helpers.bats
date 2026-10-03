@@ -573,41 +573,56 @@ _test_retry() {
   assert_equal "$(tr '\n' ' ' < "${sleep_args_file}")" '2 4 '
 }
 
-@test "__dybatpho_helpers_backoff grows exponentially and stops at the cap" {
+@test "__dybatpho_helpers_backoff_into grows exponentially and stops at the cap" {
   DYBATPHO_RETRY_BASE_DELAY=2
   DYBATPHO_RETRY_MAX_DELAY=30
   DYBATPHO_RETRY_JITTER=false
 
+  local delay
+  backoff() {
+    __dybatpho_helpers_backoff_into delay "$@"
+    printf '%s\n' "${delay}"
+  }
   # 2, 4, 8, 16, then the cap rather than 32.
-  assert_equal "$(__dybatpho_helpers_backoff 1)" "2"
-  assert_equal "$(__dybatpho_helpers_backoff 2)" "4"
-  assert_equal "$(__dybatpho_helpers_backoff 3)" "8"
-  assert_equal "$(__dybatpho_helpers_backoff 4)" "16"
-  assert_equal "$(__dybatpho_helpers_backoff 5)" "30"
-  assert_equal "$(__dybatpho_helpers_backoff 20)" "30"
+  assert_equal "$(backoff 1)" "2"
+  assert_equal "$(backoff 2)" "4"
+  assert_equal "$(backoff 3)" "8"
+  assert_equal "$(backoff 4)" "16"
+  assert_equal "$(backoff 5)" "30"
+  assert_equal "$(backoff 20)" "30"
 }
 
-@test "__dybatpho_helpers_backoff honours a different base and cap" {
+@test "__dybatpho_helpers_backoff_into honours a different base and cap" {
   DYBATPHO_RETRY_BASE_DELAY=1
   DYBATPHO_RETRY_MAX_DELAY=5
   DYBATPHO_RETRY_JITTER=false
+  local delay
+  backoff() {
+    __dybatpho_helpers_backoff_into delay "$@"
+    printf '%s\n' "${delay}"
+  }
 
-  assert_equal "$(__dybatpho_helpers_backoff 1)" "1"
-  assert_equal "$(__dybatpho_helpers_backoff 3)" "4"
-  assert_equal "$(__dybatpho_helpers_backoff 4)" "5"
+  assert_equal "$(backoff 1)" "1"
+  assert_equal "$(backoff 3)" "4"
+  assert_equal "$(backoff 4)" "5"
 }
 
-@test "__dybatpho_helpers_backoff adds jitter without exceeding the cap" {
+@test "__dybatpho_helpers_backoff_into adds jitter without exceeding the cap" {
   DYBATPHO_RETRY_BASE_DELAY=2
   DYBATPHO_RETRY_MAX_DELAY=30
   DYBATPHO_RETRY_JITTER=true
 
+  backoff() {
+    local out
+    __dybatpho_helpers_backoff_into out "$@"
+    printf '%s\n' "${out}"
+  }
   # Jitter is random, so the contract is a range: at least the undisturbed
   # delay, at most one base delay more, and never past the cap.
   local i delay varied=false first
-  first="$(__dybatpho_helpers_backoff 3)"
+  first="$(backoff 3)"
   for i in $(seq 1 25); do
-    delay="$(__dybatpho_helpers_backoff 3)"
+    delay="$(backoff 3)"
     [ "${delay}" -ge 8 ] || fail "jitter reduced the delay below the base: ${delay}"
     [ "${delay}" -le 10 ] || fail "jitter exceeded one base delay: ${delay}"
     [ "${delay}" = "${first}" ] || varied=true
@@ -617,8 +632,21 @@ _test_retry() {
 
   DYBATPHO_RETRY_MAX_DELAY=8
   for i in $(seq 1 10); do
-    assert_equal "$(__dybatpho_helpers_backoff 3)" "8"
+    assert_equal "$(backoff 3)" "8"
   done
+}
+
+@test "__dybatpho_helpers_backoff_into takes explicit settings and an override" {
+  local delay
+  __dybatpho_helpers_backoff_into delay 3 5 100 false
+  assert_equal "${delay}" "20"
+  __dybatpho_helpers_backoff_into delay 3 5 100 false 7
+  assert_equal "${delay}" "7"
+  __dybatpho_helpers_backoff_into delay 3 5 100 false 900
+  assert_equal "${delay}" "100"
+  # A long run stops doubling at the cap instead of overflowing.
+  __dybatpho_helpers_backoff_into delay 200 1 3600 false
+  assert_equal "${delay}" "3600"
 }
 
 @test "dybatpho::retry waits longer each time and never past the cap" {

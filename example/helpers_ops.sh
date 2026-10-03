@@ -35,9 +35,10 @@ dybatpho::retry 2 "grep -q ready '${attempt_file}'" "readiness check"
 # How long a retry waits is configurable, and the delay grows exponentially from
 # the base up to the cap: 2, 4, 8, 16, then 30 with these defaults.
 dybatpho::print "backoff with the defaults:"
+helpers_backoff=""
 for attempt in 1 2 3 4 5 6; do
-  helpers_backoff_3=$(__dybatpho_helpers_backoff "${attempt}")
-  dybatpho::print "  attempt ${attempt}: ${helpers_backoff_3}s"
+  __dybatpho_helpers_backoff_into helpers_backoff "${attempt}"
+  dybatpho::print "  attempt ${attempt}: ${helpers_backoff}s"
 done
 
 # Jitter spreads retries out when several machines are waiting on the same
@@ -46,12 +47,11 @@ DYBATPHO_RETRY_BASE_DELAY=1
 DYBATPHO_RETRY_MAX_DELAY=10
 DYBATPHO_RETRY_JITTER=true
 dybatpho::print "same attempt, three draws with jitter on:"
-helpers_backoff_2=$(__dybatpho_helpers_backoff 4)
-helpers_backoff=${helpers_backoff_2}
-helpers_backoff_5=$(__dybatpho_helpers_backoff 4)
-helpers_backoff_4=${helpers_backoff_5}
-helpers_backoff_6=$(__dybatpho_helpers_backoff 4)
-dybatpho::print "  ${helpers_backoff_6}s ${helpers_backoff_4}s ${helpers_backoff}s"
+first_draw="" second_draw="" third_draw=""
+__dybatpho_helpers_backoff_into first_draw 4
+__dybatpho_helpers_backoff_into second_draw 4
+__dybatpho_helpers_backoff_into third_draw 4
+dybatpho::print "  ${first_draw}s ${second_draw}s ${third_draw}s"
 
 dybatpho::header "ASKING THE LIBRARY ABOUT ITSELF"
 # The question that comes up mid-script is what a function takes, and the

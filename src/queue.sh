@@ -828,14 +828,7 @@ function dybatpho::queue_work {
     __dybatpho_queue_sidecar_number_into attempts "${directory}/claimed/${id}.retries" 0
     delay=0
     if ((backoff > 0)); then
-      # Doubling stops at the cap rather than after it, so a long retry run
-      # never overflows the multiplication.
-      delay="${backoff}"
-      while ((attempts > 0 && delay < max_backoff)); do
-        delay=$((delay * 2))
-        attempts=$((attempts - 1))
-      done
-      ((delay <= max_backoff)) || delay="${max_backoff}"
+      __dybatpho_helpers_backoff_into delay "$((attempts + 1))" "${backoff}" "${max_backoff}" false
     fi
 
     local -a requeue=(dybatpho::queue_requeue)

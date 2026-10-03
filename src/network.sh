@@ -399,17 +399,11 @@ function dybatpho::curl_do {
     fi
 
     attempt=$((attempt + 1))
-    delay=$((DYBATPHO_CURL_RETRY_BASE_DELAY * (2 ** (attempt - 1))))
-    ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
     retry_after=$(awk '
       tolower($1) == "retry-after:" { gsub("\r", "", $2); if ($2 ~ /^[0-9]+$/) print $2; exit }
     ' "${header_file}")
-    [[ -n "${retry_after}" ]] && delay="${retry_after}"
-    ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
-    if dybatpho::is true "${DYBATPHO_CURL_RETRY_JITTER}"; then
-      ((delay += RANDOM % (DYBATPHO_CURL_RETRY_BASE_DELAY + 1)))
-      ((delay > DYBATPHO_CURL_RETRY_MAX_DELAY)) && delay="${DYBATPHO_CURL_RETRY_MAX_DELAY}"
-    fi
+    __dybatpho_helpers_backoff_into delay "${attempt}" "${DYBATPHO_CURL_RETRY_BASE_DELAY}" \
+      "${DYBATPHO_CURL_RETRY_MAX_DELAY}" "${DYBATPHO_CURL_RETRY_JITTER}" "${retry_after}"
     if declare -F __dybatpho_metrics_key > /dev/null; then
       dybatpho::metrics_counter_inc dybatpho_http_retries_total
     fi

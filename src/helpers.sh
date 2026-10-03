@@ -813,25 +813,48 @@ function dybatpho::assert {
 
 #######################################
 # @description Compute how long the nth retry waits.
-#   Exponential from a base delay, capped, with optional jitter — the policy the
-#   HTTP retries in `network.sh` already used, which the generic retry here did
-#   not. Jitter matters when several machines retry the same failing dependency:
-#   without it they all come back at the same instant, which is the load that
-#   kept it down.
-# @arg $1 number Attempt number, counting from 1
-# @stdout Delay in seconds
+#   Exponential from a base delay, capped, with optional jitter. This is the one
+#   policy behind `dybatpho::retry`, the HTTP retries in `network.sh` and the
+#   requeue delays of `dybatpho::queue_work`. Jitter matters when several
+#   machines retry the same failing dependency: without it they all come back
+#   at the same instant, which is the load that kept it down.
+#
+#   The delay doubles until it reaches the cap rather than being raised to a
+#   power, so a long run of retries never overflows the arithmetic. An override,
+#   such as a server's `Retry-After`, replaces the computed delay and is still
+#   capped and jittered.
+# @arg $1 string Name of the variable receiving the delay in seconds
+# @arg $2 number Attempt number, counting from 1
+# @arg $3 number Base delay, default is `DYBATPHO_RETRY_BASE_DELAY`
+# @arg $4 number Longest delay, default is `DYBATPHO_RETRY_MAX_DELAY`
+# @arg $5 bool Add up to one base delay of random jitter, default is `DYBATPHO_RETRY_JITTER`
+# @arg $6 number Delay to use instead of the computed one, when not empty
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_helpers_backoff {
-  local attempt
-  dybatpho::expect_args attempt -- "$@"
-  local delay=$((DYBATPHO_RETRY_BASE_DELAY * (2 ** (attempt - 1))))
-  ((delay > DYBATPHO_RETRY_MAX_DELAY)) && delay="${DYBATPHO_RETRY_MAX_DELAY}"
-  if dybatpho::is true "${DYBATPHO_RETRY_JITTER}"; then
-    ((delay += RANDOM % (DYBATPHO_RETRY_BASE_DELAY + 1)))
-    ((delay > DYBATPHO_RETRY_MAX_DELAY)) && delay="${DYBATPHO_RETRY_MAX_DELAY}"
+function __dybatpho_helpers_backoff_into {
+  local -n __dybatpho_helpers_bo_ref="$1"
+  local -i __dybatpho_helpers_bo_attempt="$2"
+  local -i __dybatpho_helpers_bo_base="${3:-${DYBATPHO_RETRY_BASE_DELAY}}"
+  local -i __dybatpho_helpers_bo_max="${4:-${DYBATPHO_RETRY_MAX_DELAY}}"
+  local __dybatpho_helpers_bo_jitter="${5:-${DYBATPHO_RETRY_JITTER}}"
+  local __dybatpho_helpers_bo_override="${6-}"
+
+  local -i __dybatpho_helpers_bo_delay="${__dybatpho_helpers_bo_base}"
+  while ((__dybatpho_helpers_bo_attempt > 1 && __dybatpho_helpers_bo_delay < __dybatpho_helpers_bo_max)); do
+    __dybatpho_helpers_bo_delay=$((__dybatpho_helpers_bo_delay * 2))
+    __dybatpho_helpers_bo_attempt=$((__dybatpho_helpers_bo_attempt - 1))
+  done
+  [[ -z "${__dybatpho_helpers_bo_override}" ]] \
+    || __dybatpho_helpers_bo_delay="${__dybatpho_helpers_bo_override}"
+  ((__dybatpho_helpers_bo_delay <= __dybatpho_helpers_bo_max)) \
+    || __dybatpho_helpers_bo_delay="${__dybatpho_helpers_bo_max}"
+  if dybatpho::is true "${__dybatpho_helpers_bo_jitter}"; then
+    ((__dybatpho_helpers_bo_delay += RANDOM % (__dybatpho_helpers_bo_base + 1)))
+    ((__dybatpho_helpers_bo_delay <= __dybatpho_helpers_bo_max)) \
+      || __dybatpho_helpers_bo_delay="${__dybatpho_helpers_bo_max}"
   fi
-  printf '%s\n' "${delay}"
+  __dybatpho_helpers_bo_ref="${__dybatpho_helpers_bo_delay}"
 }
 
 #######################################
@@ -865,7 +888,7 @@ function dybatpho::retry {
     __dybatpho_retry_exit_code="$?"
     __dybatpho_retry_count="$((__dybatpho_retry_count + 1))"
     if [[ "${__dybatpho_retry_count}" -le "${__dybatpho_retry_retries}" ]]; then
-      __dybatpho_retry_delay="$(__dybatpho_helpers_backoff "${__dybatpho_retry_count}")"
+      __dybatpho_helpers_backoff_into __dybatpho_retry_delay "${__dybatpho_retry_count}"
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_attempts_total
       fi

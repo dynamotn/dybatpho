@@ -612,10 +612,6 @@ function dybatpho::table_from_json {
   else
     document="${input}"
   fi
-  # An empty array has no first object to take a header from, and is simply an
-  # empty table rather than a malformed document.
-  [[ "${document//[[:space:]]/}" != "[]" ]] || return 0
-
   # The conversion has to run in a command substitution to capture its CSV, so
   # its failure is carried out by status rather than lost with the subshell.
   local csv status=0

@@ -297,23 +297,28 @@ function __dybatpho_backup_tree_hash_into {
   local dybatpho_backup_manifest
   dybatpho::create_temp dybatpho_backup_manifest ".manifest" "backup"
 
-  while IFS= read -r -d '' __dybatpho_backup_entry; do
-    [[ "${__dybatpho_backup_entry}" != . ]] || continue
-    __dybatpho_backup_entry="${__dybatpho_backup_entry#./}"
+  local -a __dybatpho_backup_paths=() __dybatpho_backup_kinds=()
+  __dybatpho_file_walk_into __dybatpho_backup_paths __dybatpho_backup_kinds "${__dybatpho_backup_tree}"
+  local -i __dybatpho_backup_at
+  for ((__dybatpho_backup_at = 0; __dybatpho_backup_at < ${#__dybatpho_backup_paths[@]}; __dybatpho_backup_at++)); do
+    __dybatpho_backup_entry="${__dybatpho_backup_paths[__dybatpho_backup_at]}"
     __dybatpho_backup_full="${__dybatpho_backup_tree}/${__dybatpho_backup_entry}"
     __dybatpho_backup_payload=""
-    if [[ -L "${__dybatpho_backup_full}" ]]; then
-      __dybatpho_backup_kind="symlink"
-      __dybatpho_backup_payload="$(readlink -- "${__dybatpho_backup_full}")"
-    elif [[ -d "${__dybatpho_backup_full}" ]]; then
-      __dybatpho_backup_kind="directory"
-    else
-      __dybatpho_backup_kind="file"
-      __dybatpho_backup_payload="$(dybatpho::file_hash "${__dybatpho_backup_full}" "${__dybatpho_backup_algorithm}")"
-    fi
+    # Anything that is neither a link nor a directory is hashed as a file.
+    case "${__dybatpho_backup_kinds[__dybatpho_backup_at]}" in
+      symlink)
+        __dybatpho_backup_kind="symlink"
+        __dybatpho_backup_payload="$(readlink -- "${__dybatpho_backup_full}")"
+        ;;
+      directory) __dybatpho_backup_kind="directory" ;;
+      *)
+        __dybatpho_backup_kind="file"
+        __dybatpho_backup_payload="$(dybatpho::file_hash "${__dybatpho_backup_full}" "${__dybatpho_backup_algorithm}")"
+        ;;
+    esac
     printf '%s\0%s\0%s\0' "${__dybatpho_backup_kind}" "${__dybatpho_backup_entry}" \
       "${__dybatpho_backup_payload}" >> "${dybatpho_backup_manifest}"
-  done < <(cd -- "${__dybatpho_backup_tree}" && find . -print0 | LC_ALL=C sort -z) # kcov(skip)
+  done
 
   __dybatpho_backup_hash_ref="$(dybatpho::file_hash "${dybatpho_backup_manifest}" "${__dybatpho_backup_algorithm}")"
 }
@@ -350,13 +355,13 @@ function __dybatpho_backup_link_copy {
   fi
 
   local entry from to old mode target from_mode old_mode linked
-  local -a directories=() entries=(.)
+  # The source itself comes first, then everything inside it, parents ahead of
+  # what they hold.
+  local -a directories=() entries=()
   if [[ -d "${source}" && ! -L "${source}" ]]; then
-    entries=()
-    while IFS= read -r -d '' entry; do
-      entries+=("${entry}")
-    done < <(cd -- "${source}" && find . -print0) # kcov(skip)
+    __dybatpho_file_walk_into entries - "${source}"
   fi
+  entries=(. ${entries[@]+"${entries[@]}"})
 
   for entry in "${entries[@]}"; do
     if [[ "${entry}" == . ]]; then
@@ -364,7 +369,6 @@ function __dybatpho_backup_link_copy {
       to="${partial}/${base}"
       old="${previous:+${previous}/${base}}"
     else
-      entry="${entry#./}"
       from="${source}/${entry}"
       to="${partial}/${base}/${entry}"
       old="${previous:+${previous}/${base}/${entry}}"

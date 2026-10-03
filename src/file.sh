@@ -475,6 +475,48 @@ function __dybatpho_file_stat {
 }
 
 #######################################
+# @description Walk a directory tree into two parallel arrays: each entry's
+#   path relative to the root, and its kind, one of `file`, `directory`,
+#   `symlink` or `other`.
+#   The walk runs from inside the root, so a root that is itself a symbolic
+#   link to a directory is walked as that directory, and `find` prints the same
+#   `./`-relative paths on GNU, BSD and BusyBox. Entries are read
+#   NUL-separated, which keeps a name holding a newline in one piece, and come
+#   back in byte order, which puts every directory ahead of what it holds. The
+#   root itself is not an entry, and a symbolic link is never followed.
+# @arg $1 string Name of the array receiving the relative paths
+# @arg $2 string Name of the array receiving the kinds, or `-`
+# @arg $3 string Directory to walk
+# @set The two named arrays
+# @internal
+#######################################
+function __dybatpho_file_walk_into {
+  local -a __dybatpho_file_walk_unwanted=()
+  local -n __dybatpho_file_walk_paths="$1"
+  local -n __dybatpho_file_walk_kinds="${2/#-/__dybatpho_file_walk_unwanted}"
+  local __dybatpho_file_walk_root="$3" __dybatpho_file_walk_entry __dybatpho_file_walk_full
+  __dybatpho_file_walk_paths=()
+  __dybatpho_file_walk_kinds=()
+
+  while IFS= read -r -d '' __dybatpho_file_walk_entry; do
+    __dybatpho_file_walk_entry="${__dybatpho_file_walk_entry#./}"
+    __dybatpho_file_walk_full="${__dybatpho_file_walk_root}/${__dybatpho_file_walk_entry}"
+    __dybatpho_file_walk_paths+=("${__dybatpho_file_walk_entry}")
+    if [[ -L "${__dybatpho_file_walk_full}" ]]; then
+      __dybatpho_file_walk_kinds+=(symlink)
+    elif [[ -d "${__dybatpho_file_walk_full}" ]]; then
+      __dybatpho_file_walk_kinds+=(directory)
+    elif [[ -f "${__dybatpho_file_walk_full}" ]]; then
+      __dybatpho_file_walk_kinds+=(file)
+    else
+      __dybatpho_file_walk_kinds+=(other)
+    fi
+  # kcov never records the redirection line of a loop; the body above it runs.
+  # An unreadable root lists nothing rather than stopping the caller, as before.
+  done < <(cd -- "${__dybatpho_file_walk_root}" && find . -mindepth 1 -print0 | LC_ALL=C sort -z || true) # kcov(skip)
+}
+
+#######################################
 # @description Follow a symlink chain to the file it ends at.
 #   Committing a rewrite means renaming a staging file onto the destination,
 #   which would replace a symlink with a regular file and quietly detach it from

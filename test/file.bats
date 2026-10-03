@@ -974,3 +974,22 @@ SCRIPT
     refute [ -e "${leftover}" ]
   done <<< "${probe}"
 }
+
+@test "the tree walk lists entries in byte order with their kinds, without following links" {
+  local root="${BATS_TEST_TMPDIR}/walk root"
+  mkdir -p "${root}/a/b" "${root}/a-c"
+  printf 'x' > "${root}/a/b/file"
+  printf 'y' > "${root}/new"$'\n'"line"
+  ln -s a "${root}/link"
+  mkfifo "${root}/pipe"
+
+  local -a paths=() kinds=()
+  __dybatpho_file_walk_into paths kinds "${root}"
+  local -a listed=()
+  local at
+  for ((at = 0; at < ${#paths[@]}; at++)); do
+    listed+=("${paths[at]}=${kinds[at]}")
+  done
+  assert_equal "${listed[*]}" \
+    "a=directory a-c=directory a/b=directory a/b/file=file link=symlink new"$'\n'"line=file pipe=other"
+}

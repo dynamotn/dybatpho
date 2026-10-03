@@ -430,11 +430,8 @@ function __dybatpho_diff_need_json {
 #######################################
 # @description Collect a directory tree into a named associative array that
 #   maps each entry's path, relative to the root, to its kind: `file`,
-#   `directory`, `symlink`, or `other`.
-#   The walk runs from inside the root, so a root that is itself a symbolic
-#   link to a directory is walked as that directory, and `find` prints the
-#   same `./`-relative paths on GNU, BSD and BusyBox. Entries are read
-#   NUL-separated, which keeps a name holding a newline in one piece.
+#   `directory`, `symlink`, or `other`, as `__dybatpho_file_walk_into` reads
+#   them.
 # @arg $1 string Name of the associative array to fill
 # @arg $2 string Directory to walk
 # @set The named array
@@ -442,22 +439,13 @@ function __dybatpho_diff_need_json {
 #######################################
 function __dybatpho_diff_tree_into {
   local -n __dybatpho_diff_tree_ref="$1"
-  local __dybatpho_diff_root="$2" __dybatpho_diff_entry __dybatpho_diff_full
-
-  while IFS= read -r -d '' __dybatpho_diff_entry; do
-    __dybatpho_diff_entry="${__dybatpho_diff_entry#./}"
-    __dybatpho_diff_full="${__dybatpho_diff_root}/${__dybatpho_diff_entry}"
-    if [[ -L "${__dybatpho_diff_full}" ]]; then
-      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="symlink"
-    elif [[ -d "${__dybatpho_diff_full}" ]]; then
-      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="directory"
-    elif [[ -f "${__dybatpho_diff_full}" ]]; then
-      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="file"
-    else
-      __dybatpho_diff_tree_ref["${__dybatpho_diff_entry}"]="other"
-    fi
-  # kcov never records the redirection line of a loop; the body above it runs.
-  done < <(cd -- "${__dybatpho_diff_root}" && find . -mindepth 1 -print0) # kcov(skip)
+  local -a __dybatpho_diff_paths=() __dybatpho_diff_kinds=()
+  __dybatpho_file_walk_into __dybatpho_diff_paths __dybatpho_diff_kinds "$2"
+  local __dybatpho_diff_at __dybatpho_diff_path
+  for __dybatpho_diff_at in "${!__dybatpho_diff_paths[@]}"; do
+    __dybatpho_diff_path="${__dybatpho_diff_paths[__dybatpho_diff_at]}"
+    __dybatpho_diff_tree_ref["${__dybatpho_diff_path}"]="${__dybatpho_diff_kinds[__dybatpho_diff_at]}"
+  done
 }
 
 #######################################

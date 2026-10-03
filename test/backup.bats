@@ -405,7 +405,7 @@ plant() {
   newer="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
 
   DYBATPHO_DIFF_COLOR=false run_traced -1 dybatpho::backup_diff "${older}" "${newer}"
-  assert_output << EOF
+  assert_output - << EOF
 ~ a.txt
 - b.txt
 + new dir/
@@ -614,7 +614,7 @@ snapshot() {
   ln -s "${DEST}/site-20260401T000000Z.snapshot" "${DEST}/site-20260601T000000Z.snapshot"
 
   run_traced -0 dybatpho::backup_list "${DEST}" site
-  assert_output << EOF
+  assert_output - << EOF
 ${DEST}/site-20260401T000000Z.snapshot
 ${DEST}/site-20260301T000000Z.tar.gz
 ${DEST}/site-20260201T000000Z.snapshot

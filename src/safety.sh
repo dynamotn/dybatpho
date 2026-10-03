@@ -251,20 +251,8 @@ function dybatpho::assert_safe_path {
 function dybatpho::safe_rm {
   local force="${DYBATPHO_FORCE}" recursive=false
   local -a targets=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      -r | --recursive) recursive=true ;;
-      --)
-        shift
-        targets+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::safe_rm: unknown option: $1" ;;
-      *) targets+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into targets - '-f|--force=force -r|--recursive=recursive' '' '-*' \
+    'dybatpho::safe_rm: unknown option: {option}' '' -- "$@"
   ((${#targets[@]})) || dybatpho::die "dybatpho::safe_rm: expected at least one path"
 
   local -a removals=()
@@ -309,20 +297,8 @@ function dybatpho::safe_rm {
 function dybatpho::safe_overwrite {
   local force="${DYBATPHO_FORCE}" backup=false
   local -a targets=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      -b | --backup) backup=true ;;
-      --)
-        shift
-        targets+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::safe_overwrite: unknown option: $1" ;;
-      *) targets+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into targets - '-f|--force=force -b|--backup=backup' '' '-*' \
+    'dybatpho::safe_overwrite: unknown option: {option}' '' -- "$@"
   ((${#targets[@]} == 1)) || dybatpho::die "dybatpho::safe_overwrite: expected exactly one destination"
 
   local absolute_path
@@ -401,20 +377,8 @@ function __dybatpho_safety_transfer {
   shift
   local force="${DYBATPHO_FORCE}" backup=false
   local -a positional=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      -b | --backup) backup=true ;;
-      --)
-        shift
-        positional+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::safe_${mode}: unknown option: $1" ;;
-      *) positional+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into positional - '-f|--force=force -b|--backup=backup' '' '-*' \
+    "dybatpho::safe_${mode}: unknown option: {option}" '' -- "$@"
   ((${#positional[@]} == 2)) || dybatpho::die "dybatpho::safe_${mode}: expected a source and a destination"
 
   local source_path="${positional[0]}" destination="${positional[1]}"
@@ -466,19 +430,8 @@ function dybatpho::safe_extract {
   __dybatpho_helpers_need_module archive __dybatpho_archive_entry_is_safe "${FUNCNAME[0]}"
   local force="${DYBATPHO_FORCE}"
   local -a positional=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      --)
-        shift
-        positional+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::safe_extract: unknown option: $1" ;;
-      *) positional+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into positional - '-f|--force=force' '' '-*' \
+    'dybatpho::safe_extract: unknown option: {option}' '' -- "$@"
   ((${#positional[@]})) || dybatpho::die "dybatpho::safe_extract: expected an archive path"
 
   local archive_path="${positional[0]}"
@@ -534,23 +487,15 @@ function dybatpho::safe_extract {
 #######################################
 function dybatpho::safe_system {
   local force="${DYBATPHO_FORCE}" description=""
-  local -a command_args=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      --)
-        shift
-        command_args+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::safe_system: unknown option: $1" ;;
-      *)
-        [[ -z "${description}" ]] || dybatpho::die "dybatpho::safe_system: expected a single description before --"
-        description="$1"
-        ;;
-    esac
-    shift
-  done
+  local -a arguments=() parsed=() command_args=()
+  __dybatpho_helpers_options_into arguments parsed '-f|--force=force' '' '-*' \
+    'dybatpho::safe_system: unknown option: {option}' '' -- "$@"
+  # Everything before `--` is the description, everything after it the command.
+  local described="${#arguments[@]}"
+  ((parsed[1] < 0)) || described="${parsed[1]}"
+  ((described <= 1)) || dybatpho::die "dybatpho::safe_system: expected a single description before --"
+  ((described == 0)) || description="${arguments[0]}"
+  command_args=("${arguments[@]:described}")
   [[ -n "${description}" ]] || dybatpho::die "dybatpho::safe_system: expected a description"
   ((${#command_args[@]})) || dybatpho::die "dybatpho::safe_system: expected a command after --"
 

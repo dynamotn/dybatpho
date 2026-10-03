@@ -116,32 +116,13 @@ function __dybatpho_parallel_flush {
 function __dybatpho_parallel_options {
   local -n __dybatpho_parallel_consumed="$1"
   shift
-  __dybatpho_parallel_consumed=0
-  while (($#)); do
-    case "$1" in
-      --fail-fast) __dybatpho_parallel_opt_failfast=true ;;
-      --progress) __dybatpho_parallel_opt_progress=true ;;
-      --timeout=*) __dybatpho_parallel_opt_timeout="${1#--timeout=}" ;;
-      --timeout)
-        # Exercised under `run` by "an invalid timeout is refused", which kcov
-        # cannot see because `dybatpho::die` ends the shell.
-        (($# >= 2)) || dybatpho::die "${FUNCNAME[1]}: --timeout needs a duration" # kcov(skip)
-        __dybatpho_parallel_opt_timeout="$2"
-        shift
-        __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
-        ;;
-      --)
-        __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
-        return 0
-        ;;
-      # Exercised under `run` by "-- ends the options, and an unknown option is
-      # refused", which kcov cannot see because `dybatpho::die` ends the shell.
-      --*) dybatpho::die "${FUNCNAME[1]}: Unknown option '$1'" ;; # kcov(skip)
-      *) return 0 ;;
-    esac
-    shift
-    __dybatpho_parallel_consumed=$((__dybatpho_parallel_consumed + 1))
-  done
+  local -a __dybatpho_parallel_parsed=()
+  local __dybatpho_parallel_spec="--fail-fast=__dybatpho_parallel_opt_failfast"
+  __dybatpho_parallel_spec+=" --progress=__dybatpho_parallel_opt_progress"
+  __dybatpho_parallel_spec+=" --timeout=__dybatpho_parallel_opt_timeout:duration"
+  __dybatpho_helpers_options_into - __dybatpho_parallel_parsed "${__dybatpho_parallel_spec}" leading,attached '--*' \
+    "${FUNCNAME[1]}: Unknown option '{option}'" "${FUNCNAME[1]}: {option} needs a {noun}" -- "$@"
+  __dybatpho_parallel_consumed="${__dybatpho_parallel_parsed[0]}"
 }
 
 #######################################

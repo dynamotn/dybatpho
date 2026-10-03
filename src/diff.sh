@@ -552,18 +552,9 @@ function __dybatpho_diff_dir_report {
 #######################################
 function dybatpho::diff_dir {
   local summary=0 mode=plain
-  while (($#)); do
-    case "$1" in
-      --summary | -s) summary=1 ;;
-      --null | -z) mode=null ;;
-      --)
-        shift
-        break
-        ;;
-      *) break ;;
-    esac
-    shift
-  done
+  local -a parsed=()
+  __dybatpho_helpers_options_into - parsed '--summary|-s=summary=1 --null|-z=mode=null' leading '' '' '' -- "$@"
+  shift "${parsed[0]}"
 
   local first second
   dybatpho::expect_args first second -- "$@"

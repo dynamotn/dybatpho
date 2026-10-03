@@ -759,40 +759,17 @@ function dybatpho::backup_restore {
 #######################################
 function dybatpho::backup_prune {
   local keep_count="" keep_days="" name="" force="" directory=""
-
-  while (($#)); do
-    case "$1" in
-      --keep-count)
-        keep_count="${2-}"
-        shift 2 || dybatpho::die "${FUNCNAME[0]}: --keep-count needs a number"
-        ;;
-      --keep-days)
-        keep_days="${2-}"
-        shift 2 || dybatpho::die "${FUNCNAME[0]}: --keep-days needs a number"
-        ;;
-      --name)
-        name="${2-}"
-        shift 2 || dybatpho::die "${FUNCNAME[0]}: --name needs a value"
-        ;;
-      --force | -f)
-        force="--force"
-        shift
-        ;;
-      --)
-        shift
-        directory="${1-}"
-        break
-        ;;
-      # "dybatpho::backup_prune rejects a malformed option" covers this.
-      # `dybatpho::die` exits, so that test uses `run`, which clears the trap
-      # kcov instruments through.
-      -*) dybatpho::die "${FUNCNAME[0]}: Unrecognized option: $1" ;; # kcov(skip)
-      *)
-        directory="$1"
-        shift
-        ;;
-    esac
-  done
+  local -a arguments=() parsed=()
+  __dybatpho_helpers_options_into arguments parsed \
+    '--keep-count=keep_count:number --keep-days=keep_days:number --name=name: --force|-f=force=--force' \
+    '' '-*' "${FUNCNAME[0]}: Unrecognized option: {option}" "${FUNCNAME[0]}: {option} needs a {noun}" -- "$@"
+  # The last directory named before `--` wins, and the first one after it
+  # overrides them all.
+  if ((parsed[1] >= 0)); then
+    directory="${arguments[parsed[1]]-}"
+  elif ((${#arguments[@]})); then
+    directory="${arguments[-1]}"
+  fi
 
   [[ -n "${directory}" ]] || dybatpho::die "${FUNCNAME[0]}: Expected a directory to prune"
 
@@ -937,18 +914,9 @@ function __dybatpho_backup_root_into {
 #   dybatpho::backup_diff --summary "${backups[1]}" "${backups[0]}"
 #######################################
 function dybatpho::backup_diff {
-  local -a options=()
-  while (($#)); do
-    case "$1" in
-      --summary | -s | --null | -z) options+=("$1") ;;
-      --)
-        shift
-        break
-        ;;
-      *) break ;;
-    esac
-    shift
-  done
+  local -a options=() parsed=()
+  __dybatpho_helpers_options_into - parsed '--summary|-s|--null|-z=options+' leading '' '' '' -- "$@"
+  shift "${parsed[0]}"
 
   local older newer
   dybatpho::expect_args older newer -- "$@"

@@ -360,6 +360,170 @@ function __dybatpho_helpers_sort {
   __dybatpho_helpers_sort_ref=(${__dybatpho_helpers_sort_from[@]+"${__dybatpho_helpers_sort_from[@]}"})
 }
 
+#######################################
+# @description Read the options of a function that parses its own, setting
+#   the caller's variables as the specification says.
+#
+#   Each entry of the specification is `names=targets`: switches joined by `|`,
+#   then what each switch does to one or more of the caller's variables, joined
+#   by `,`. A target is one of:
+#
+#   - `var`        a flag, which sets `var` to `true`
+#   - `var=value`  a flag, which sets `var` to `value`
+#   - `var+`       a flag, which appends the switch itself to the array `var`
+#   - `var:`       an option, which sets `var` to the value that follows it
+#   - `var+:`      an option, which appends that value to the array `var`
+#   - `var++:`     an option, which appends the switch and the value to `var`
+#
+#   An option may name what its value is after the colon, `var:number`, which
+#   is the `{noun}` of the message for a missing value; it is `value` otherwise.
+#   The switch recorded by `var++:` is the switch's name, so a `--name=value`
+#   form reads back as `--name` and `value`.
+#
+#   The mode is a comma-separated set of words. `leading` stops at the first
+#   argument that is not an option, the way a command's own flags come before
+#   its arguments; otherwise other arguments are collected as positionals
+#   wherever they appear. `attached` also takes `--name=value`. `strict` takes
+#   no positional at all, `--` included. `keep-dashes` leaves `--` alone instead
+#   of reading it as the end of the options.
+#
+#   An argument that is not a known switch but matches the glob is refused with
+#   the unknown-option message; an empty glob refuses nothing.
+#
+#   The caller's variables are set through dynamic scope, so every name here is
+#   prefixed: an unprefixed local would capture the caller's variable of the
+#   same name.
+# @arg $1 string Name of the array receiving the positional arguments, or `-`
+# @arg $2 string Name of the array receiving `[0]` the number of arguments read
+#   and `[1]` how many positionals came before `--`, or `-1` without one; or `-`
+# @arg $3 string Specification, whitespace-separated entries
+# @arg $4 string Mode, comma-separated words, may be empty
+# @arg $5 string Glob an unknown option matches, such as `-*` or `--?*`
+# @arg $6 string Message for an unknown option, `{option}` is the argument
+# @arg $7 string Message for a missing value, with `{option}` and `{noun}`
+# @arg $8 string `--`, then the arguments to read
+# @set The named arrays, and the caller's variables named by the specification
+# @exitcode 0 The options were read
+# @exitcode 1 Stop the script on an unknown option or a missing value
+# @internal
+#######################################
+function __dybatpho_helpers_options_into {
+  # `-` names an output the caller has no use for.
+  local -a __dybatpho_helpers_po_unwanted_positional=() __dybatpho_helpers_po_unwanted_info=()
+  local -n __dybatpho_helpers_po_positional="${1/#-/__dybatpho_helpers_po_unwanted_positional}"
+  local -n __dybatpho_helpers_po_info="${2/#-/__dybatpho_helpers_po_unwanted_info}"
+  local __dybatpho_helpers_po_spec="$3" __dybatpho_helpers_po_mode=",$4,"
+  local __dybatpho_helpers_po_glob="$5" __dybatpho_helpers_po_unknown="$6"
+  local __dybatpho_helpers_po_missing="$7"
+  shift 8
+
+  local -A __dybatpho_helpers_po_targets=()
+  local __dybatpho_helpers_po_entry __dybatpho_helpers_po_name
+  local -a __dybatpho_helpers_po_names=()
+  for __dybatpho_helpers_po_entry in ${__dybatpho_helpers_po_spec}; do
+    IFS='|' read -r -a __dybatpho_helpers_po_names <<< "${__dybatpho_helpers_po_entry%%=*}"
+    for __dybatpho_helpers_po_name in "${__dybatpho_helpers_po_names[@]}"; do
+      __dybatpho_helpers_po_targets["${__dybatpho_helpers_po_name}"]="${__dybatpho_helpers_po_entry#*=}"
+    done
+  done
+
+  local -i __dybatpho_helpers_po_used=0 __dybatpho_helpers_po_split=-1
+  local __dybatpho_helpers_po_arg __dybatpho_helpers_po_value __dybatpho_helpers_po_has_value
+  local __dybatpho_helpers_po_target __dybatpho_helpers_po_noun __dybatpho_helpers_po_message
+  local __dybatpho_helpers_po_ends __dybatpho_helpers_po_refused
+  local -a __dybatpho_helpers_po_list=()
+  __dybatpho_helpers_po_positional=()
+  while (($#)); do
+    __dybatpho_helpers_po_arg="$1"
+    __dybatpho_helpers_po_has_value=false
+    if [[ "${__dybatpho_helpers_po_mode}" == *,attached,* && "${__dybatpho_helpers_po_arg}" == --?*=* ]] \
+      && [[ -n "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg%%=*}]+set}" ]] \
+      && [[ "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg%%=*}]}" == *:* ]]; then
+      __dybatpho_helpers_po_value="${__dybatpho_helpers_po_arg#*=}"
+      __dybatpho_helpers_po_arg="${__dybatpho_helpers_po_arg%%=*}"
+      __dybatpho_helpers_po_has_value=true
+    fi
+
+    if [[ -z "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]+set}" ]]; then
+      __dybatpho_helpers_po_ends=false __dybatpho_helpers_po_refused=false
+      if [[ "${__dybatpho_helpers_po_arg}" == "--" && "${__dybatpho_helpers_po_mode}" != *,keep-dashes,* ]]; then
+        __dybatpho_helpers_po_ends=true
+      fi
+      if [[ "${__dybatpho_helpers_po_mode}" == *,strict,* ]]; then
+        __dybatpho_helpers_po_refused=true
+      elif [[ "${__dybatpho_helpers_po_ends}" == false && -n "${__dybatpho_helpers_po_glob}" ]]; then
+        # The glob is matched as a pattern on purpose, so it stays unquoted.
+        # shellcheck disable=SC2053
+        [[ "${__dybatpho_helpers_po_arg}" != ${__dybatpho_helpers_po_glob} ]] \
+          || __dybatpho_helpers_po_refused=true
+      fi
+      [[ "${__dybatpho_helpers_po_refused}" == false ]] \
+        || dybatpho::die "${__dybatpho_helpers_po_unknown//\{option\}/${__dybatpho_helpers_po_arg}}"
+      if [[ "${__dybatpho_helpers_po_ends}" == true ]]; then
+        shift
+        __dybatpho_helpers_po_used+=1
+        if [[ "${__dybatpho_helpers_po_mode}" != *,leading,* ]]; then
+          __dybatpho_helpers_po_split="${#__dybatpho_helpers_po_positional[@]}"
+          __dybatpho_helpers_po_positional+=("$@")
+          __dybatpho_helpers_po_used+=$#
+        fi
+        break
+      fi
+      [[ "${__dybatpho_helpers_po_mode}" != *,leading,* ]] || break
+      __dybatpho_helpers_po_positional+=("$1")
+      shift
+      __dybatpho_helpers_po_used+=1
+      continue
+    fi
+
+    IFS=',' read -r -a __dybatpho_helpers_po_list <<< "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]}"
+    if [[ "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]}" == *:* ]] \
+      && [[ "${__dybatpho_helpers_po_has_value}" == false ]]; then
+      if (($# < 2)); then
+        __dybatpho_helpers_po_noun="${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]##*:}"
+        __dybatpho_helpers_po_message="${__dybatpho_helpers_po_missing//\{option\}/${__dybatpho_helpers_po_arg}}"
+        dybatpho::die "${__dybatpho_helpers_po_message//\{noun\}/${__dybatpho_helpers_po_noun:-value}}"
+      fi
+      __dybatpho_helpers_po_value="$2"
+      shift
+      __dybatpho_helpers_po_used+=1
+    fi
+    shift
+    __dybatpho_helpers_po_used+=1
+
+    for __dybatpho_helpers_po_target in "${__dybatpho_helpers_po_list[@]}"; do
+      case "${__dybatpho_helpers_po_target}" in
+        *++:*) __dybatpho_helpers_options_append "${__dybatpho_helpers_po_target%%++:*}" \
+          "${__dybatpho_helpers_po_arg}" "${__dybatpho_helpers_po_value}" ;;
+        *+:*) __dybatpho_helpers_options_append "${__dybatpho_helpers_po_target%%+:*}" \
+          "${__dybatpho_helpers_po_value}" ;;
+        *:*) printf -v "${__dybatpho_helpers_po_target%%:*}" '%s' "${__dybatpho_helpers_po_value}" ;;
+        *+) __dybatpho_helpers_options_append "${__dybatpho_helpers_po_target%+}" \
+          "${__dybatpho_helpers_po_arg}" ;;
+        *=*) printf -v "${__dybatpho_helpers_po_target%%=*}" '%s' "${__dybatpho_helpers_po_target#*=}" ;;
+        *) printf -v "${__dybatpho_helpers_po_target}" '%s' true ;;
+      esac
+    done
+  done
+
+  __dybatpho_helpers_po_info=("${__dybatpho_helpers_po_used}" "${__dybatpho_helpers_po_split}")
+}
+
+#######################################
+# @description Append values to an array named by the caller's caller, for
+#   `__dybatpho_helpers_options_into`. It is a function of its own so that the
+#   reference is declared afresh for every array it is pointed at.
+# @arg $1 string Name of the array
+# @arg $@ string Values to append
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_helpers_options_append {
+  local -n __dybatpho_helpers_pa_ref="$1"
+  shift
+  __dybatpho_helpers_pa_ref+=("$@")
+}
+
 # What tells a version range apart from the exit code that may sit in the same
 # argument. The pattern is held in a variable for two reasons: written inline
 # and unquoted, `<` and `>` are read as redirections before the conditional ever

@@ -916,3 +916,44 @@ EOF
   __dybatpho_helpers_sort order @int-key keys
   assert_equal "${order[*]}" "1 3 4 0 2"
 }
+
+@test "the option reader sets flags, values and arrays, and keeps positionals" {
+  local force=false mode=plain count=""
+  local -a positional=() info=() extra=() options=() events=()
+  __dybatpho_helpers_options_into positional info \
+    '-f|--force=force -m=mode=null -c=count:number -a|--arg=extra+: -o=options+ -e=events++:' \
+    '' '-*' 'unknown {option}' 'missing {option} {noun}' \
+    -- one -f -m -c 3 two -a x -o -e y -- -z three
+  assert_equal "${force}|${mode}|${count}" "true|null|3"
+  assert_equal "${extra[*]}|${options[*]}|${events[*]}" "x|-o|-e y"
+  assert_equal "${positional[*]}" "one two -z three"
+  assert_equal "${info[*]}" "14 2"
+}
+
+@test "the option reader stops at the first argument in leading mode" {
+  local timeout="" fast=false
+  local -a info=()
+  __dybatpho_helpers_options_into - info '--fast=fast --timeout=timeout:' leading,attached '--?*' \
+    'unknown {option}' 'missing {option}' -- --fast --timeout=5 item --later
+  assert_equal "${fast}|${timeout}|${info[0]}" "true|5|2"
+
+  __dybatpho_helpers_options_into - info '--times=timeout:' leading,keep-dashes '' '' 'missing' -- -- cmd
+  assert_equal "${info[0]}" "0"
+}
+
+@test "the option reader refuses unknown options and missing values" {
+  run --separate-stderr __dybatpho_helpers_options_into - - '-f=force' '' '-*' \
+    'caller: unknown option: {option}' '' -- -q
+  assert_failure
+  assert_stderr --partial "caller: unknown option: -q"
+
+  run --separate-stderr __dybatpho_helpers_options_into - - '-c=count:number' '' '-*' \
+    '' 'caller: {option} needs a {noun}' -- -c
+  assert_failure
+  assert_stderr --partial "caller: -c needs a number"
+
+  run --separate-stderr __dybatpho_helpers_options_into - - '-f=force' strict '' \
+    'caller: unknown option: {option}' '' -- --
+  assert_failure
+  assert_stderr --partial "caller: unknown option: --"
+}

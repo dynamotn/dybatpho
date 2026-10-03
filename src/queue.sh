@@ -251,31 +251,16 @@ function __dybatpho_queue_options_into {
   local __dybatpho_queue_caller="${FUNCNAME[1]}"
 
   local __dybatpho_queue_option __dybatpho_queue_value queue_delay_seconds
-  local __dybatpho_queue_when="" __dybatpho_queue_count=0
+  local __dybatpho_queue_when=""
+  local -a __dybatpho_queue_events=() __dybatpho_queue_parsed=()
+  __dybatpho_helpers_options_into - __dybatpho_queue_parsed \
+    '--priority|--delay|--at=__dybatpho_queue_events++:' leading,attached '--?*' \
+    "${__dybatpho_queue_caller}: Unknown option: {option}" \
+    "${__dybatpho_queue_caller}: {option} needs a value" -- "$@"
+  set -- "${__dybatpho_queue_events[@]}"
   while (($# > 0)); do
-    __dybatpho_queue_option="$1"
-    case "${__dybatpho_queue_option}" in
-      --)
-        __dybatpho_queue_count=$((__dybatpho_queue_count + 1))
-        break
-        ;;
-      --priority | --delay | --at)
-        (($# >= 2)) \
-          || dybatpho::die "${__dybatpho_queue_caller}: ${__dybatpho_queue_option} needs a value"
-        __dybatpho_queue_value="$2"
-        shift 2
-        __dybatpho_queue_count=$((__dybatpho_queue_count + 2))
-        ;;
-      --priority=* | --delay=* | --at=*)
-        __dybatpho_queue_value="${__dybatpho_queue_option#*=}"
-        __dybatpho_queue_option="${__dybatpho_queue_option%%=*}"
-        shift
-        __dybatpho_queue_count=$((__dybatpho_queue_count + 1))
-        ;;
-      # Tested under `run` ("refuses an invalid scheduling option"): it exits.
-      --?*) dybatpho::die "${__dybatpho_queue_caller}: Unknown option: ${__dybatpho_queue_option}" ;; # kcov(skip)
-      *) break ;;
-    esac
+    __dybatpho_queue_option="$1" __dybatpho_queue_value="$2"
+    shift 2
 
     if [[ "${__dybatpho_queue_option}" == "--priority" ]]; then
       [[ -n "${__dybatpho_queue_priority_name}" ]] \
@@ -310,7 +295,7 @@ function __dybatpho_queue_options_into {
   done
 
   __dybatpho_queue_due_ref="${__dybatpho_queue_when}"
-  __dybatpho_queue_used_ref="${__dybatpho_queue_count}"
+  __dybatpho_queue_used_ref="${__dybatpho_queue_parsed[0]}"
 }
 
 #######################################
@@ -734,30 +719,16 @@ function __dybatpho_queue_work_options {
   local -n __dybatpho_queue_work_ref="$1"
   shift
 
-  local option value work_seconds used=0
+  local option value work_seconds
+  local -a events=() parsed=()
+  __dybatpho_helpers_options_into - parsed \
+    '--retries|--backoff|--max-backoff|--max-jobs|--poll|--idle=events++:' leading,attached '--?*' \
+    'dybatpho::queue_work: Unknown option: {option}' \
+    'dybatpho::queue_work: {option} needs a value' -- "$@"
+  set -- "${events[@]}"
   while (($# > 0)); do
-    option="$1"
-    case "${option}" in
-      --)
-        used=$((used + 1))
-        break
-        ;;
-      --retries | --backoff | --max-backoff | --max-jobs | --poll | --idle)
-        (($# >= 2)) || dybatpho::die "dybatpho::queue_work: ${option} needs a value"
-        value="$2"
-        shift 2
-        used=$((used + 2))
-        ;;
-      --retries=* | --backoff=* | --max-backoff=* | --max-jobs=* | --poll=* | --idle=*)
-        value="${option#*=}"
-        option="${option%%=*}"
-        shift
-        used=$((used + 1))
-        ;;
-      # Tested under `run` ("queue_work refuses an invalid option"): it exits.
-      --?*) dybatpho::die "dybatpho::queue_work: Unknown option: ${option}" ;; # kcov(skip)
-      *) break ;;
-    esac
+    option="$1" value="$2"
+    shift 2
 
     if [[ "${option}" == "--retries" || "${option}" == "--max-jobs" ]]; then
       [[ "${value}" =~ ^[0-9]{1,9}$ ]] \
@@ -774,7 +745,7 @@ function __dybatpho_queue_work_options {
     fi
     __dybatpho_queue_work_ref["${option#--}"]="${work_seconds}"
   done
-  __dybatpho_queue_work_ref[used]="${used}"
+  __dybatpho_queue_work_ref[used]="${parsed[0]}"
 }
 
 #######################################

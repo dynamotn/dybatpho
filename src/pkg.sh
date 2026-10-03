@@ -497,23 +497,9 @@ function dybatpho::pkg_missing {
 #######################################
 function dybatpho::pkg_install_command {
   local -a extra_args=() packages=()
-  while (($#)); do
-    case "$1" in
-      -a | --arg)
-        (($# > 1)) || dybatpho::die "dybatpho::pkg_install_command: expected a value after $1"
-        extra_args+=("$2")
-        shift
-        ;;
-      --)
-        shift
-        packages+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::pkg_install_command: unknown option: $1" ;;
-      *) packages+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into packages - '-a|--arg=extra_args+:' '' '-*' \
+    'dybatpho::pkg_install_command: unknown option: {option}' \
+    'dybatpho::pkg_install_command: expected a value after {option}' -- "$@"
   ((${#packages[@]})) || dybatpho::die "dybatpho::pkg_install_command: expected at least one package"
   local manager
   __dybatpho_pkg_manager_into manager || return 1
@@ -537,19 +523,10 @@ function dybatpho::pkg_update {
   # shellcheck disable=SC2154 # declared by `src/safety.sh`
   local force="${DYBATPHO_FORCE}" dry_run="${DRY_RUN}"
   local -a extra_args=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      -n | --dry-run) dry_run=true ;;
-      -a | --arg)
-        (($# > 1)) || dybatpho::die "dybatpho::pkg_update: expected a value after $1"
-        extra_args+=("$2")
-        shift
-        ;;
-      *) dybatpho::die "dybatpho::pkg_update: unknown option: $1" ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into - - \
+    '-f|--force=force -n|--dry-run=dry_run -a|--arg=extra_args+:' strict '' \
+    'dybatpho::pkg_update: unknown option: {option}' \
+    'dybatpho::pkg_update: expected a value after {option}' -- "$@"
   local manager
   __dybatpho_pkg_manager_into manager \
     || dybatpho::die "dybatpho::pkg_update: no supported package manager found"
@@ -591,26 +568,10 @@ function dybatpho::pkg_update {
 function dybatpho::pkg_install {
   local force="${DYBATPHO_FORCE}" dry_run="${DRY_RUN}" refresh=false
   local -a extra_args=() packages=()
-  while (($#)); do
-    case "$1" in
-      -f | --force) force=true ;;
-      -n | --dry-run) dry_run=true ;;
-      -u | --update) refresh=true ;;
-      -a | --arg)
-        (($# > 1)) || dybatpho::die "dybatpho::pkg_install: expected a value after $1"
-        extra_args+=("$2")
-        shift
-        ;;
-      --)
-        shift
-        packages+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::pkg_install: unknown option: $1" ;;
-      *) packages+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into packages - \
+    '-f|--force=force -n|--dry-run=dry_run -u|--update=refresh -a|--arg=extra_args+:' '' '-*' \
+    'dybatpho::pkg_install: unknown option: {option}' \
+    'dybatpho::pkg_install: expected a value after {option}' -- "$@"
   ((${#packages[@]})) || dybatpho::die "dybatpho::pkg_install: expected at least one package"
   local manager
   __dybatpho_pkg_manager_into manager \
@@ -645,24 +606,10 @@ function dybatpho::pkg_install {
 #######################################
 function dybatpho::pkg_ensure {
   local -a options=() packages=()
-  while (($#)); do
-    case "$1" in
-      -f | --force | -n | --dry-run | -u | --update) options+=("$1") ;;
-      -a | --arg)
-        (($# > 1)) || dybatpho::die "dybatpho::pkg_ensure: expected a value after $1"
-        options+=("$1" "$2")
-        shift
-        ;;
-      --)
-        shift
-        packages+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::pkg_ensure: unknown option: $1" ;;
-      *) packages+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into packages - \
+    '-f|--force|-n|--dry-run|-u|--update=options+ -a|--arg=options++:' '' '-*' \
+    'dybatpho::pkg_ensure: unknown option: {option}' \
+    'dybatpho::pkg_ensure: expected a value after {option}' -- "$@"
   ((${#packages[@]})) || dybatpho::die "dybatpho::pkg_ensure: expected at least one package"
   dybatpho::pkg_manager > /dev/null \
     || dybatpho::die "dybatpho::pkg_ensure: no supported package manager found"
@@ -689,28 +636,10 @@ function dybatpho::pkg_ensure {
 function dybatpho::pkg_require {
   local dry_run="${DRY_RUN}"
   local -a options=() arguments=()
-  while (($#)); do
-    case "$1" in
-      -n | --dry-run)
-        dry_run=true
-        options+=("$1")
-        ;;
-      -f | --force | -u | --update) options+=("$1") ;;
-      -a | --arg)
-        (($# > 1)) || dybatpho::die "dybatpho::pkg_require: expected a value after $1"
-        options+=("$1" "$2")
-        shift
-        ;;
-      --)
-        shift
-        arguments+=("$@")
-        break
-        ;;
-      -*) dybatpho::die "dybatpho::pkg_require: unknown option: $1" ;;
-      *) arguments+=("$1") ;;
-    esac
-    shift
-  done
+  __dybatpho_helpers_options_into arguments - \
+    '-n|--dry-run=dry_run,options+ -f|--force|-u|--update=options+ -a|--arg=options++:' '' '-*' \
+    'dybatpho::pkg_require: unknown option: {option}' \
+    'dybatpho::pkg_require: expected a value after {option}' -- "$@"
   ((${#arguments[@]})) || dybatpho::die "dybatpho::pkg_require: expected a command name"
   local command_name="${arguments[0]}"
   if dybatpho::is command "${command_name}"; then

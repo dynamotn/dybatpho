@@ -96,15 +96,10 @@ function dybatpho::schedule_every {
   shift
 
   local times=0
-  while (($#)); do
-    case "${1-}" in
-      --times)
-        times="${2-}"
-        shift 2 || dybatpho::die "${FUNCNAME[0]}: --times needs a number"
-        ;;
-      *) break ;;
-    esac
-  done
+  local -a parsed=()
+  __dybatpho_helpers_options_into - parsed '--times=times:number' leading,keep-dashes '' '' \
+    "${FUNCNAME[0]}: {option} needs a {noun}" -- "$@"
+  shift "${parsed[0]}"
 
   dybatpho::is int "${interval}" && ((interval > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: The interval must be a positive number of seconds, got: ${interval}"

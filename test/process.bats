@@ -71,6 +71,36 @@ setup() {
   assert_stderr
 }
 
+@test 'dybatpho::killed_process_handler still runs the EXIT handlers' {
+  # The handler cleared EXIT along with the signals, so every EXIT handler
+  # composed through `dybatpho::trap` was skipped on Ctrl-C or TERM: temporary
+  # files stayed behind, and a full-screen script left the terminal raw.
+  local script="${BATS_TEST_TMPDIR}/killed.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::register_killed_handler
+# A signal inherited as ignored (bats --jobs does this) can't be trapped.
+[[ "$(trap -p "SIG${3}")" == *killed_process_handler* ]] || exit 99
+dybatpho::cleanup_file_on_exit "${2}"
+kill -"${3}" "$$"
+sleep 5
+SCRIPT
+  local signal code file
+  for signal in TERM INT; do
+    file="${BATS_TEST_TMPDIR}/left-by-${signal}"
+    touch "${file}"
+    code=0
+    bash "${script}" "${DYBATPHO_DIR}" "${file}" "${signal}" 2> /dev/null || code=$?
+    [[ "${code}" == 99 ]] && continue
+    if [[ "${signal}" == TERM ]]; then
+      assert_equal "${code}" 143
+    else
+      assert_equal "${code}" 130
+    fi
+    assert_file_not_exist "${file}"
+  done
+}
+
 @test 'dybatpho::trap on exit' {
   run --separate-stderr dybatpho::trap 'echo 2; echo 3' ERR EXIT
   assert_success

@@ -180,6 +180,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - A PID file is missing, unreadable, empty, malformed, padded with whitespace by
   another tool, or records a process that has exited.
 - A PID file is removed by a process other than the one it records.
+- A script with EXIT handlers composed through `dybatpho::trap` (temporary-file
+  cleanup, terminal restore, privilege release) is ended by SIGINT or SIGTERM.
 
 ## Requirements *(mandatory)*
 
@@ -221,6 +223,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   unreadable, empty, or malformed file and for a process that has exited.
 - **FR-020**: PID file removal MUST leave a file that records a different
   process alone, and MUST succeed when the file is already gone.
+- **FR-021**: The SIGINT and SIGTERM handlers MUST leave the EXIT trap armed,
+  so the EXIT handlers composed through `dybatpho::trap` still run when the
+  script is interrupted.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -271,6 +276,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   the registry are all gone.
 - **IT-010**: Write, check, and remove a PID file across the live, stale,
   malformed, missing, padded, and foreign-owner cases.
+- **IT-011**: End a script that registered the signal handlers and a cleanup
+  path with SIGTERM and SIGINT, and verify the exit codes and that the path
+  was removed.
 
 ## Acceptance Criteria *(mandatory)*
 

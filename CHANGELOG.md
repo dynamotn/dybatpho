@@ -709,6 +709,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepted, and so was blank text. Both backends now accept every JSON value
   and refuse blank text.
 
+- **`process` — Ctrl-C and TERM no longer skip the EXIT handlers.**
+  `dybatpho::killed_process_handler`, installed by
+  `dybatpho::register_killed_handler` and `dybatpho::register_common_handlers`,
+  cleared the EXIT trap before exiting, so everything composed onto it through
+  `dybatpho::trap` was skipped on an interrupt: files registered with
+  `dybatpho::cleanup_file_on_exit` stayed behind, a full-screen script left the
+  terminal in raw mode on the alternate screen, and a held privilege escalation
+  was not released. The handler now exits with 130 or 143 as before and the
+  EXIT handlers run on the way out.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

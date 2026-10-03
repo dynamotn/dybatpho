@@ -118,6 +118,8 @@ function dybatpho::run_err_handler {
 
 #######################################
 # @description Handle SIGINT or SIGTERM received by the current process.
+#   It exits with 130 or 143, and the EXIT handlers registered through
+#   `dybatpho::trap` still run on the way out.
 # @arg $1 string Signal
 #######################################
 function dybatpho::killed_process_handler {
@@ -125,7 +127,10 @@ function dybatpho::killed_process_handler {
   local signal
   dybatpho::expect_args signal -- "$@"
 
-  trap - SIGINT SIGTERM EXIT
+  # EXIT stays armed: exiting below runs it, which is how the handlers composed
+  # through `dybatpho::trap` -- temporary-file cleanup, giving the terminal
+  # back, releasing an escalation -- still run after Ctrl-C or a TERM.
+  trap - SIGINT SIGTERM
   case ${signal} in
     SIGINT)
       dybatpho::error 'Interrupt by CTRL+C'

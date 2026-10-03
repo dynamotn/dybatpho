@@ -34,7 +34,7 @@ writes PID files.
 - [`dybatpho::register_killed_handler`](#dybatphoregister_killed_handler) — Register handlers for SIGINT and SIGTERM.
 - [`dybatpho::register_common_handlers`](#dybatphoregister_common_handlers) — Register both error and signal handlers.
 - [`dybatpho::run_err_handler`](#dybatphorun_err_handler) — Handle a command failure captured by `dybatpho::register_err_handler`.
-- [`dybatpho::killed_process_handler`](#dybatphokilled_process_handler) — Handle SIGINT or SIGTERM received by the current process.
+- [`dybatpho::killed_process_handler`](#dybatphokilled_process_handler) — Handle SIGINT or SIGTERM received by the current process. It exits with 130 or 143, and the EXIT handlers registered through `dybatpho::trap` still run on the way out.
 - [`dybatpho::trap`](#dybatphotrap) — Append a command to one or more trap handlers without discarding existing traps.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
@@ -152,6 +152,8 @@ Handle a command failure captured by `dybatpho::register_err_handler`.
 ### `dybatpho::killed_process_handler`
 
 Handle SIGINT or SIGTERM received by the current process.
+It exits with 130 or 143, and the EXIT handlers registered through
+`dybatpho::trap` still run on the way out.
 
 **🧾 Arguments**
 

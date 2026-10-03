@@ -52,7 +52,7 @@ document object.
 <a id="tips"></a>
 ## 💡 Tips
 
-- `dybatpho::md_table` renders through `table.sh`, so that module must be loaded for it; every other builder needs only the core modules
+- `dybatpho::md_table` renders through `table.sh`, so that module must be loaded for it; `markdown` does not load it, and every other builder needs only the core modules
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -295,6 +295,7 @@ such as `::`, which the escape leaves alone.
 **🧪 Example**
 
 ```bash
+. dybatpho/init.sh --modules markdown table
 dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 ```
 
@@ -312,6 +313,7 @@ dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 **🚦 Exit codes**
 
 - `0`: The table is rendered
+- `1`: Stop the script when the `table` module is not loaded
 
 
 ---

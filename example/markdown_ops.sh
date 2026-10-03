@@ -5,7 +5,7 @@
 #   md_code_block, md_table, md_collapsible, md_raw, md_escape, md_mention, and md_emoji
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules markdown
+. "${SCRIPTDIR}/../init.sh" --modules markdown table
 
 dybatpho::register_common_handlers
 

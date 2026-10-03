@@ -27,7 +27,8 @@
 #   command substitution and ordinary concatenation rather than through a
 #   document object.
 # @tip `dybatpho::md_table` renders through `table.sh`, so that module must be
-#   loaded for it; every other builder needs only the core modules
+#   loaded for it; `markdown` does not load it, and every other builder needs
+#   only the core modules
 # @see
 #   - `example/markdown_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -476,7 +477,9 @@ function dybatpho::md_code_block {
 # @arg $2 string Optional delimiter, default is `|`
 # @stdout The rendered table
 # @exitcode 0 The table is rendered
+# @exitcode 1 Stop the script when the `table` module is not loaded
 # @example
+#   . dybatpho/init.sh --modules markdown table
 #   dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 #######################################
 function dybatpho::md_table {
@@ -484,8 +487,12 @@ function dybatpho::md_table {
   dybatpho::expect_args input -- "$@"
   local delimiter="${2:-|}"
 
-  dybatpho::is function dybatpho::table_markdown || dybatpho::die \
-    "${FUNCNAME[0]}: dybatpho::table_markdown is required; load the table module"
+  # The guard names an internal helper on purpose: `dybatpho::` functions are
+  # exported and a child shell inherits them without the internals they call,
+  # so testing the public name would pass in a child that never loaded `table`
+  # and then fail on the first internal call.
+  declare -F __dybatpho_table_measure_widths > /dev/null \
+    || dybatpho::die "${FUNCNAME[0]} needs the table module, load it with: dybatpho::load table"
   dybatpho::table_markdown "${input}" "${delimiter}"
 }
 

@@ -114,7 +114,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-011**: The badge builder MUST encode its label and value the way shields.io requires, and MUST accept an optional link.
 - **FR-012**: The code-block builder MUST NOT escape its body, and MUST choose a fence longer than the longest backtick run the body contains.
 - **FR-013**: The code-block builder MUST reject a language containing a backtick.
-- **FR-014**: The table builder MUST render through `dybatpho::table_markdown` and MUST report when that module is not loaded.
+- **FR-014**: The table builder MUST render through `dybatpho::table_markdown`. Loading `markdown` MUST NOT load `table`, and the table builder MUST stop with a message naming the `table` module and how to load it when that module is not loaded.
 - **FR-015**: The collapsible builder MUST escape its summary and MUST emit its body unchanged, surrounded by blank lines.
 - **FR-016**: The mention and emoji builders MUST accept an already-delimited argument without doubling the delimiter, and MUST reject a value that cannot render.
 - **FR-017**: Every builder that takes a text block MUST accept stdin when the input argument is `-`.
@@ -143,7 +143,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **IT-005**: Render a link with a percent-encoded URL and an optional quoted title.
 - **IT-006**: Render a badge with shields.io encoding, a default color, and a wrapping link.
 - **IT-007**: Render a code block, grow its fence past a body that contains one, and reject a language containing a backtick.
-- **IT-008**: Render a table, and report when the table module is not loaded.
+- **IT-008**: Render a table, and, in a child shell that loaded only `markdown`, stop the table builder with the message naming `table` while the other builders still work.
 - **IT-009**: Render a collapsible section with an escaped summary and an unescaped body.
 - **IT-010**: Embed a raw fragment in a builder, including one whose closing mark was cut.
 - **IT-011**: Escape inline and line-leading syntax, a backslash, stdin, and empty input.

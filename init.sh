@@ -91,7 +91,6 @@ export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 # resolve at run time, so modules may reference each other.
 declare -A __dybatpho_module_deps=(
   [table]="text"
-  [markdown]="table"
   [csv]="math"
   [backup]="archive safety date diff"
   [queue]="lock date"

@@ -549,6 +549,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules text table    # after
   ```
 
+- **BREAKING: `markdown` no longer loads `table`.** Only `dybatpho::md_table`
+  renders through the table module, so the other builders now load with the
+  core modules alone. `dybatpho::md_table` stops with `dybatpho::md_table
+  needs the table module, load it with: dybatpho::load table` when it is
+  missing. A script that calls `md_table`, or any `table_*` function, after
+  loading only `markdown` has to ask for `table`:
+
+  ```sh
+  . dybatpho/init.sh --modules markdown          # before
+  . dybatpho/init.sh --modules markdown table    # after
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

@@ -160,17 +160,30 @@ EOF
 EOF
 }
 
-@test "dybatpho::md_table reports when the table module is not loaded" {
-  # From a file, not \`bash -c\`: a \`-c\` shell has an empty \`BASH_SOURCE\`, which
-  # the kcov hook expands on every command once \`init.sh\` turns on \`set -u\`.
+@test "dybatpho::md_table asks for the table module when it is not loaded" {
+  # `markdown` does not load `table`, so a script that only builds headings and
+  # lists does not pay for the renderer. A child shell started from a file --
+  # not \`bash -c\`, whose empty \`BASH_SOURCE\` the kcov hook trips over --
+  # and without the functions this process exports, shows what such a script
+  # sees.
   local script="${BATS_TEST_TMPDIR}/no_table.sh"
-  printf '%s\n' ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh" \
-    "unset -f dybatpho::table_markdown" \
-    ". $(printf '%q' "${DYBATPHO_DIR}")/src/markdown.sh" \
-    "dybatpho::md_table 'a|b'" > "${script}"
-  run --separate-stderr bash "${script}"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules markdown\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::md_heading 2 Report'
+    printf '%s\n' "dybatpho::md_table 'a|b'"
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure
-  assert_stderr --partial "load the table module"
+  assert_line --index 0 "## Report"
+  assert_output --partial "dybatpho::md_table needs the table module, load it with: dybatpho::load table"
+
+  # Once the script loads it, the same call renders.
+  sed -i 's/--modules markdown/--modules markdown table/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_output --partial "| a | b |"
 }
 
 @test "dybatpho::md_collapsible escapes the summary and keeps the body as Markdown" {

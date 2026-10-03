@@ -119,6 +119,10 @@ loaded_line() {
   run_traced -0 init_sh "--modules table" "$(loaded_line)"
   assert_output "string os logging helpers process file secret text table "
 
+  # `markdown` renders a table only when the script loaded `table` itself.
+  run_traced -0 init_sh "--modules markdown" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret markdown "
+
   run_traced -0 init_sh "--modules diff" "$(loaded_line)"
   assert_output "string os logging helpers process file secret diff "
 

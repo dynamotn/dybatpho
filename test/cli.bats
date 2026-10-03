@@ -2105,6 +2105,35 @@ setup() {
   assert_output --partial "<SOURCE>"
 }
 
+@test "an empty description keeps every later field of the option in place" {
+  # A tab is whitespace to `read`, so two tabs in a row used to collapse and
+  # every field after an empty one moved left: the switch became the
+  # description and the schema was not even valid JSON.
+  # shellcheck disable=2329
+  _spec_empty_fields() {
+    dybatpho::opts::setup "Empty fields" EMPTY_ARGS action:"echo ran"
+    dybatpho::opts::param "" TOKEN --token env:API_TOKEN
+    dybatpho::opts::flag "" QUIET --quiet
+    dybatpho::opts::arg "" FILE
+  }
+
+  run_traced dybatpho::generate_schema _spec_empty_fields tool
+  assert_output --partial '{"type":"param","name":"TOKEN","description":"","switches":["--token"],"env":"API_TOKEN"'
+  assert_output --partial '{"type":"flag","name":"QUIET","description":"","switches":["--quiet"]'
+  assert_output --partial '"arguments":[{"name":"FILE","description":"","required":true,"variadic":false}]'
+  run_traced jq -e . <<< "${output}"
+
+  run_traced dybatpho::generate_man _spec_empty_fields tool
+  assert_output --partial "--token <TOKEN>"
+  assert_output --partial "[env: API_TOKEN]"
+
+  # In help the annotation stays on its own line under the empty description
+  # rather than sliding into the description column.
+  __current_cmd_path=""
+  run_traced dybatpho::generate_help _spec_empty_fields
+  assert_output --regexp $'--token <TOKEN> *\n +\\[env: API_TOKEN\\]'
+}
+
 @test "generated help lists the automatic --help option" {
   # shellcheck disable=2329
   _spec_auto_help_row() {

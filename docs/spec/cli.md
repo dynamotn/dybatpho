@@ -152,6 +152,7 @@ dybatpho::generate_man _spec mytool
 
 - A user passes an unrecognized option, a forbidden argument, or an invalid subcommand.
 - A parameter is required but omitted.
+- An option or a positional argument is declared with an empty description.
 - A spec uses aliases, hidden items, deprecated items, persistent parent options, and nested command paths simultaneously.
 - A prompt receives EOF or an empty value without a default.
 - A choice list contains multiple values and the user enters a mixture of names
@@ -223,6 +224,7 @@ dybatpho::generate_man _spec mytool
 - **FR-028**: Loading `cli` MUST NOT load `config`. A `config:<key>` binding
   MUST fall through to `init:` without error when the `config` module is not
   loaded, whatever characters the key contains.
+- **FR-029**: Option, command, and argument metadata MUST keep every field in place when one of them is empty, so an empty description never shifts the switches, environment name, or any later field in the schema, man page, completions, or help.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -262,6 +264,7 @@ dybatpho::generate_man _spec mytool
 - **IT-010**: Declare positional arguments and verify the usage line, the `Arguments` section, the derived count rule, and the schema and man-page entries all describe them.
 - **IT-011**: Generate completion twice for one spec and verify the second run reuses the cached artifact, and that disabling the cache writes nothing.
 - **IT-012**: In a child shell that loaded only `cli`, verify plain and dotted `config:` bindings fall through to their defaults, and that the plain one reads the loaded file once `config` is loaded.
+- **IT-013**: Declare a parameter, a flag, and an argument with empty descriptions, and verify the schema stays valid JSON with every field in place, the man page names the switch and its environment variable, and help keeps the annotation on its own line.
 
 ## Acceptance Criteria *(mandatory)*
 

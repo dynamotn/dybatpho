@@ -820,6 +820,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   comma under some locales all passed, while `08` failed and `010` passed as
   octal 8. `number` now accepts what `dybatpho::validate_is number` accepts,
   and `int` an optionally signed decimal integer without a leading zero.
+- **`cli` — an empty description no longer shifts an option's metadata.**
+  Option, command and argument metadata was kept as tab-separated fields, and
+  `read` merges a run of tabs, so declaring `dybatpho::opts::param "" TOKEN
+  --token env:API_TOKEN` moved every later field one place left: the switch
+  became the description, `dybatpho::generate_schema` emitted invalid JSON, and
+  the man page and completions named the wrong values. Help also showed the
+  `[env: …]` annotation in the description column. Every field now stays in
+  place, and specs with descriptions produce byte-identical artifacts.
 
 ### Security
 

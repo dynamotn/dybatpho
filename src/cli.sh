@@ -545,6 +545,13 @@ DYBATPHO_CLI_CACHE_DIR="${DYBATPHO_CLI_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cac
 # `label:` a spec might set.
 readonly __DYBATPHO_CLI_MSG_LABEL=$'\x02msg'
 
+# Field separator of the spec metadata records the generators read back. Not a
+# tab: a tab is whitespace to `read`, which merges a run of them into one, so an
+# empty field (a description of "") moved every later field one place left. The
+# unit separator is not whitespace, so `read` keeps empty fields where they are,
+# and it cannot occur in a description or a switch a spec writes.
+readonly __DYBATPHO_CLI_META_SEP=$'\x1f'
+
 #######################################
 # @description Read a line from the terminal (or stdin) with an optional default.
 # @arg $1 string Prompt text
@@ -1016,7 +1023,7 @@ function __dybatpho_cli_collect_long_switches {
   __dybatpho_cli_collect_spec_metadata "${__long_spec}" __long_options __long_commands __long_description
   local __long_item __long_switches __long_switch
   for __long_item in ${__long_options[@]+"${__long_options[@]}"}; do
-    IFS=$'\t' read -r _ _ _ __long_switches _ <<< "${__long_item}"
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r _ _ _ __long_switches _ <<< "${__long_item}"
     for __long_switch in ${__long_switches}; do
       case "${__long_switch}" in
         --?*) __long_out+=("${__long_switch}") ;;
@@ -1687,7 +1694,7 @@ function __dybatpho_cli_generate_schema_command {
   for option in "${options[@]}"; do
     local type var desc switches env multiple choices prompt hidden required deprecated label config count negatable
     local pattern value_type
-    IFS=$'\t' read -r type var desc switches env multiple choices prompt hidden \
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r type var desc switches env multiple choices prompt hidden \
       required deprecated label config count negatable pattern value_type <<< "${option}"
     [[ "${env}" = "@none" ]] && env=""
     [[ "${choices}" = "@none" ]] && choices=""
@@ -1731,7 +1738,7 @@ function __dybatpho_cli_generate_schema_command {
   first=true
   for argument in ${arguments[@]+"${arguments[@]}"}; do
     local arg_name arg_desc arg_required arg_variadic q_arg_name q_arg_desc
-    IFS=$'\t' read -r arg_name arg_desc arg_required arg_variadic <<< "${argument}"
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${argument}"
     __dybatpho_cli_json_quote q_arg_name "${arg_name}"
     __dybatpho_cli_json_quote q_arg_desc "${arg_desc}"
     [[ "${first}" = true ]] || printf ","
@@ -1743,7 +1750,7 @@ function __dybatpho_cli_generate_schema_command {
   first=true
   for command in "${commands[@]}"; do
     local cmd child aliases child_hidden child_deprecated
-    IFS=$'\t' read -r cmd child aliases child_hidden child_deprecated <<< "${command}"
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases child_hidden child_deprecated <<< "${command}"
     [[ "${first}" = true ]] || printf ","
     first=false
     __dybatpho_cli_generate_schema_command "${child}" "${cmd}" "${aliases}"
@@ -1785,7 +1792,7 @@ function __dybatpho_cli_generate_man_command {
   local synopsis="${escaped} [OPTIONS]"
   local arg_item arg_name arg_desc arg_required arg_variadic arg_placeholder
   for arg_item in ${arguments[@]+"${arguments[@]}"}; do
-    IFS=$'\t' read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
     arg_placeholder="$(__dybatpho_cli_arg_placeholder "${arg_name}" "${arg_required}" "${arg_variadic}")"
     synopsis="${synopsis} ${arg_placeholder}"
   done
@@ -1796,7 +1803,7 @@ function __dybatpho_cli_generate_man_command {
     if ((${#arguments[@]})); then
       printf '.SH ARGUMENTS\n'
       for arg_item in "${arguments[@]}"; do
-        IFS=$'\t' read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
+        IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
         arg_placeholder="$(__dybatpho_cli_arg_placeholder "${arg_name}" "${arg_required}" "${arg_variadic}")"
         printf '.TP\n.B %s\n%s\n' "${arg_placeholder}" "${arg_desc}"
       done
@@ -1808,7 +1815,7 @@ function __dybatpho_cli_generate_man_command {
   for option in "${options[@]}"; do
     local type var desc switches env multiple choices prompt hidden required deprecated label config count negatable
     local pattern value_type
-    IFS=$'\t' read -r type var desc switches env multiple choices prompt hidden \
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r type var desc switches env multiple choices prompt hidden \
       required deprecated label config count negatable pattern value_type <<< "${option}"
     [[ "${env}" = "@none" ]] && env=""
     [[ "${deprecated}" = "@none" ]] && deprecated=""
@@ -1834,7 +1841,7 @@ function __dybatpho_cli_generate_man_command {
     for command in "${commands[@]}"; do
       local cmd child aliases child_hidden child_deprecated
       # shellcheck disable=SC2034 # child_deprecated fills a field slot this loop doesn't read
-      IFS=$'\t' read -r cmd child aliases child_hidden child_deprecated <<< "${command}"
+      IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases child_hidden child_deprecated <<< "${command}"
       [[ "${child_hidden:-false}" = true ]] && continue
       printf '.TP\n.B %s\n' "${cmd}"
       __dybatpho_cli_generate_man_command "${child}" "${cmd}" "${section}" true
@@ -1925,7 +1932,7 @@ function __dybatpho_cli_completion_words {
   local -n __completion_out="$1"
   local -a options=("${@:2}") option switches switch
   for option in "${options[@]}"; do
-    IFS=$'\t' read -r _ _ _ switches _ _ _ _ hidden _ _ _ _ _ _ <<< "${option}"
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r _ _ _ switches _ _ _ _ hidden _ _ _ _ _ _ <<< "${option}"
     [[ "${hidden:-false}" = true ]] && continue
     for switch in ${switches}; do __completion_out+=("${switch}"); done
   done
@@ -1949,7 +1956,7 @@ function __dybatpho_cli_generate_completion_command {
   __dybatpho_cli_completion_words words "${options[@]}"
   local word_list="${words[*]}" cmd_list="" command cmd child aliases hidden deprecated
   for command in "${commands[@]}"; do
-    IFS=$'\t' read -r cmd child aliases hidden deprecated <<< "${command}"
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases hidden deprecated <<< "${command}"
     if [[ "${hidden:-false}" != true ]]; then
       # `@none` is the sentinel an alias-less command records, not a word the
       # user can ever type.
@@ -1990,7 +1997,7 @@ function __dybatpho_cli_generate_completion_command {
         esac
       done
       for command in "${commands[@]}"; do
-        IFS=$'\t' read -r cmd child aliases hidden deprecated <<< "${command}"
+        IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases hidden deprecated <<< "${command}"
         [[ "${hidden:-false}" = true ]] || printf "complete -c %s -f -a %q\n" "${name}" "${cmd}"
       done
       ;;
@@ -2210,7 +2217,17 @@ function __dybatpho_cli_help_render_rows {
   __dybatpho_cli_help_pad _blank "" "${_width}"
   for _row in "$@"; do
     [[ -n "${_row}" ]] || continue
-    IFS=$'\t' read -r _label _desc _annotations <<< "${_row}"
+    # Split by hand rather than with `read`: a tab is whitespace to `read`, so an
+    # empty description would collapse into the separators around it and the
+    # annotations would land in the description column.
+    _label="${_row%%$'\t'*}"
+    _desc=""
+    [[ "${_row}" == *$'\t'* ]] && _desc="${_row#*$'\t'}"
+    _annotations=""
+    if [[ "${_desc}" == *$'\t'* ]]; then
+      _annotations="${_desc#*$'\t'}"
+      _desc="${_desc%%$'\t'*}"
+    fi
     # A `msg` row is free text, not an option: it owns the whole line instead of
     # the description column, so a spec can head a group of options with it.
     if [[ "${_label}" = "${__DYBATPHO_CLI_MSG_LABEL}" ]]; then
@@ -2755,6 +2772,20 @@ function __dybatpho_cli_json_quote {
 }
 
 #######################################
+# @description Join metadata fields into one record with the metadata separator.
+# @arg $1 string Name of the variable receiving the record
+# @arg $@ string Fields, in record order
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_cli_meta_join {
+  local -n __meta_join_out="$1"
+  shift
+  local IFS="${__DYBATPHO_CLI_META_SEP}"
+  __meta_join_out="$*"
+}
+
+#######################################
 # @description Collect option and command metadata from a CLI spec.
 # @arg $1 string Spec function
 # @arg $2 string Name of the array to fill with the options
@@ -2881,12 +2912,12 @@ function dybatpho::opts::flag {
     __dybatpho_cli_parse_opt false 2 "$@"
     local -a __meta_switches=()
     __dybatpho_cli_collect_switches __meta_switches "${@:3}"
-    local __meta_record="flag"
-    __meta_record+=$'\t'"${var}"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t'"${__env:-@none}"
-    __meta_record+=$'\t'"${__multiple:-false}"$'\t'"${__choices:-@none}"$'\t'"${__prompt:-@none}"
-    __meta_record+=$'\t'"${__hidden:-false}"$'\t'"${__required:-false}"$'\t'"${__deprecated:-@none}"
-    __meta_record+=$'\t'"${__label:-@none}"$'\t'"${__config:-@none}"$'\t'"${__count:-false}"
-    __meta_record+=$'\t'"${__negatable:-false}"$'\t'"${__pattern:-@none}"$'\t'"${__type:-@none}"
+    local __meta_record
+    __dybatpho_cli_meta_join __meta_record flag "${var}" "${description}" "${__meta_switches[*]}" \
+      "${__env:-@none}" "${__multiple:-false}" "${__choices:-@none}" "${__prompt:-@none}" \
+      "${__hidden:-false}" "${__required:-false}" "${__deprecated:-@none}" "${__label:-@none}" \
+      "${__config:-@none}" "${__count:-false}" "${__negatable:-false}" "${__pattern:-@none}" \
+      "${__type:-@none}"
     __meta_options+=("${__meta_record}")
     return 0
   fi
@@ -2942,12 +2973,12 @@ function dybatpho::opts::param {
     __dybatpho_cli_parse_opt true 2 "$@"
     local -a __meta_switches=()
     __dybatpho_cli_collect_switches __meta_switches "${@:3}"
-    local __meta_record="param"
-    __meta_record+=$'\t'"${var}"$'\t'"${description}"$'\t'"${__meta_switches[*]}"$'\t'"${__env:-@none}"
-    __meta_record+=$'\t'"${__multiple:-false}"$'\t'"${__choices:-@none}"$'\t'"${__prompt:-@none}"
-    __meta_record+=$'\t'"${__hidden:-false}"$'\t'"${__required:-false}"$'\t'"${__deprecated:-@none}"
-    __meta_record+=$'\t'"${__label:-@none}"$'\t'"${__config:-@none}"$'\t'"${__count:-false}"
-    __meta_record+=$'\t'"${__negatable:-false}"$'\t'"${__pattern:-@none}"$'\t'"${__type:-@none}"
+    local __meta_record
+    __dybatpho_cli_meta_join __meta_record param "${var}" "${description}" "${__meta_switches[*]}" \
+      "${__env:-@none}" "${__multiple:-false}" "${__choices:-@none}" "${__prompt:-@none}" \
+      "${__hidden:-false}" "${__required:-false}" "${__deprecated:-@none}" "${__label:-@none}" \
+      "${__config:-@none}" "${__count:-false}" "${__negatable:-false}" "${__pattern:-@none}" \
+      "${__type:-@none}"
     __meta_options+=("${__meta_record}")
     return 0
   fi
@@ -3031,10 +3062,10 @@ function dybatpho::opts::disp {
     __dybatpho_cli_parse_opt false 1 "$@"
     local -a __meta_switches=()
     __dybatpho_cli_collect_switches __meta_switches "${@:2}"
-    local __meta_record="disp"
-    __meta_record+=$'\t'"-"$'\t'"${description}"
-    __meta_record+=$'\t'"${__meta_switches[*]}"$'\t@none\tfalse\t@none\t@none\t'"${__hidden:-false}"$'\tfalse\t'"${__deprecated:-@none}"
-    __meta_record+=$'\t'"${__label:-@none}"$'\t@none\tfalse\tfalse\t@none'
+    local __meta_record
+    __dybatpho_cli_meta_join __meta_record disp - "${description}" "${__meta_switches[*]}" \
+      @none false @none @none "${__hidden:-false}" false "${__deprecated:-@none}" \
+      "${__label:-@none}" @none false false @none
     __meta_options+=("${__meta_record}")
     return 0
   fi
@@ -3132,9 +3163,9 @@ function dybatpho::opts::cmd {
   done
 
   if dybatpho::is true "${__meta_mode:-false}"; then
-    local __meta_record="${sub_cmd}"
-    __meta_record+=$'\t'"${sub_spec}"$'\t'"${__cmd_aliases[*]:-@none}"$'\t'"${__cmd_hidden:-false}"
-    __meta_record+=$'\t'"${__cmd_deprecated:-@none}"
+    local __meta_record
+    __dybatpho_cli_meta_join __meta_record "${sub_cmd}" "${sub_spec}" "${__cmd_aliases[*]:-@none}" \
+      "${__cmd_hidden:-false}" "${__cmd_deprecated:-@none}"
     __meta_commands+=("${__meta_record}")
     return 0
   fi
@@ -3205,7 +3236,9 @@ function dybatpho::opts::arg {
   done
 
   if dybatpho::is true "${__meta_mode:-false}"; then
-    __meta_args+=("${var}"$'\t'"${description}"$'\t'"${__arg_required}"$'\t'"${__arg_variadic}")
+    local __meta_record
+    __dybatpho_cli_meta_join __meta_record "${var}" "${description}" "${__arg_required}" "${__arg_variadic}"
+    __meta_args+=("${__meta_record}")
     return 0
   fi
 

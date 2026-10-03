@@ -287,13 +287,33 @@ function dybatpho::tui_bar {
   __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Total units" "${total}" 1
   __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Bar width" "${width}" 1
 
-  ((current <= total)) || current="${total}"
-  local percentage=$((current * 100 / total))
-  local filled=$((current * width / total))
-  local filled_text empty_text
-  __dybatpho_tui_repeat_into filled_text "${DYBATPHO_TUI_BAR_FILLED}" "${filled}"
-  __dybatpho_tui_repeat_into empty_text "${DYBATPHO_TUI_BAR_EMPTY}" "$((width - filled))"
-  printf '[%s%s] %3d%%' "${filled_text}" "${empty_text}" "${percentage}"
+  local bar
+  __dybatpho_tui_bar_into bar "${current}" "${total}" "${width}"
+  printf '%s' "${bar}"
+}
+
+#######################################
+# @description Render a progress bar into a variable, from values already
+#   checked, so a redraw neither starts a subshell nor validates again.
+# @arg $1 string Name of the variable receiving the bar
+# @arg $2 number Units of work completed
+# @arg $3 number Units of work in total, at least 1
+# @arg $4 number Bar width in characters, at least 1
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_tui_bar_into {
+  local -n __dybatpho_tui_bar_out="$1"
+  local __dybatpho_tui_bar_current="$2" __dybatpho_tui_bar_total="$3" __dybatpho_tui_bar_width="$4"
+  ((__dybatpho_tui_bar_current <= __dybatpho_tui_bar_total)) \
+    || __dybatpho_tui_bar_current="${__dybatpho_tui_bar_total}"
+  local __dybatpho_tui_bar_filled=$((__dybatpho_tui_bar_current * __dybatpho_tui_bar_width / __dybatpho_tui_bar_total))
+  local __dybatpho_tui_bar_full __dybatpho_tui_bar_empty
+  __dybatpho_tui_repeat_into __dybatpho_tui_bar_full "${DYBATPHO_TUI_BAR_FILLED}" "${__dybatpho_tui_bar_filled}"
+  __dybatpho_tui_repeat_into __dybatpho_tui_bar_empty "${DYBATPHO_TUI_BAR_EMPTY}" \
+    "$((__dybatpho_tui_bar_width - __dybatpho_tui_bar_filled))"
+  printf -v __dybatpho_tui_bar_out '[%s%s] %3d%%' "${__dybatpho_tui_bar_full}" "${__dybatpho_tui_bar_empty}" \
+    "$((__dybatpho_tui_bar_current * 100 / __dybatpho_tui_bar_total))"
 }
 
 #######################################
@@ -306,17 +326,7 @@ function dybatpho::tui_bar {
 #######################################
 function __dybatpho_tui_spin {
   # kcov(disabled)
-  local file="$1"
-  local -a frames=()
-  read -r -a frames <<< "${DYBATPHO_TUI_FRAMES}"
-  ((${#frames[@]} > 0)) || frames=('-' "\\" '|' '/')
-  local index=0 message=""
-  while true; do
-    message="$(< "${file}")" 2> /dev/null || message=""
-    printf '\r%s %s\033[K' "${frames[index % ${#frames[@]}]}" "${message}" >&2
-    index=$((index + 1))
-    sleep "${DYBATPHO_TUI_INTERVAL}" 2> /dev/null || sleep 1
-  done
+  __dybatpho_log_spin_loop "${DYBATPHO_TUI_FRAMES}" "${DYBATPHO_TUI_INTERVAL}" "" "$1"
   # kcov(enabled)
 }
 
@@ -488,8 +498,9 @@ function __dybatpho_tui_progress_render {
   fi
 
   # kcov(disabled)
-  local elapsed_ms
-  elapsed_ms=$(($(__dybatpho_log_now_ms) - __dybatpho_tui_progress_started_ms))
+  local now_ms elapsed_ms
+  __dybatpho_log_now_ms_into now_ms
+  elapsed_ms=$((now_ms - __dybatpho_tui_progress_started_ms))
   ((elapsed_ms >= 0)) || elapsed_ms=0
   local timing=""
   if ((current > 0 && current < total)); then
@@ -504,7 +515,11 @@ function __dybatpho_tui_progress_render {
   local bold reset bar line
   __dybatpho_tui_sgr_into bold "1"
   __dybatpho_tui_sgr_into reset "0"
-  bar="$(dybatpho::tui_bar "${current}" "${total}")"
+  # The same checks `dybatpho::tui_bar` makes, under its name, without the
+  # subshell that capturing its output cost on every frame.
+  local width="${DYBATPHO_TUI_BAR_WIDTH}"
+  __dybatpho_tui_expect_int dybatpho::tui_bar "Bar width" "${width}" 1
+  __dybatpho_tui_bar_into bar "${current}" "${total}" "${width}"
   printf -v line '%s%s%s %s (%s/%s)%s' \
     "${bold}" "${__dybatpho_tui_progress_label}" "${reset}" \
     "${bar}" "${current}" "${total}" "${timing}"
@@ -537,7 +552,7 @@ function dybatpho::tui_progress_start {
   __dybatpho_tui_progress_label="${label}"
   DYBATPHO_TUI_PROGRESS_TOTAL="${total}"
   DYBATPHO_TUI_PROGRESS_CURRENT=0
-  __dybatpho_tui_progress_started_ms="$(__dybatpho_log_now_ms)"
+  __dybatpho_log_now_ms_into __dybatpho_tui_progress_started_ms
   __dybatpho_tui_progress_reported=-1
   __dybatpho_tui_progress_active=true
   __dybatpho_tui_hide_cursor

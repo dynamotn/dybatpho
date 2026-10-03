@@ -1505,15 +1505,39 @@ function __dybatpho_log_sleep {
 # @internal
 #######################################
 function __dybatpho_log_spin {
-  local message="${1-}"
+  __dybatpho_log_spin_loop "${DYBATPHO_SPINNER_FRAMES}" "${DYBATPHO_SPINNER_INTERVAL}" "${1-}"
+}
+
+#######################################
+# @description The animation both spinners run: `dybatpho::spinner` here and
+#   the `tui` one. When a state file is given, the message is read from it on
+#   every frame, so the shell that owns the spinner can change it; reading it
+#   with `read` rather than `$(< file)` keeps a frame from starting a process.
+# @arg $1 string Space-separated frames
+# @arg $2 string Seconds between frames
+# @arg $3 string Message shown beside the frame, already redacted
+# @arg $4 string Optional file the message is re-read from on every frame
+# @stderr One frame per interval, redrawn over the same line
+# @internal
+#######################################
+function __dybatpho_log_spin_loop {
+  local interval="$2" message="${3-}" file="${4-}"
   local -a frames=()
-  read -r -a frames <<< "${DYBATPHO_SPINNER_FRAMES}"
+  read -r -a frames <<< "$1"
   ((${#frames[@]} > 0)) || frames=('-' "\\" '|' '/')
   local index=0
   while true; do
+    if [[ -n "${file}" ]]; then
+      message=""
+      { IFS= read -r -d '' message < "${file}"; } 2> /dev/null || true
+      # What `$(< file)` used to leave: trailing newlines go.
+      while [[ "${message}" == *$'\n' ]]; do
+        message="${message%$'\n'}"
+      done
+    fi
     printf '\r%s %s\033[K' "${frames[index % ${#frames[@]}]}" "${message}" >&2
     index=$((index + 1))
-    __dybatpho_log_sleep "${DYBATPHO_SPINNER_INTERVAL}"
+    __dybatpho_log_sleep "${interval}"
   done
 }
 

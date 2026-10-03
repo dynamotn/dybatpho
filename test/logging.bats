@@ -996,6 +996,27 @@ assert event["duration_ms"] >= 0
   unset DYBATPHO_SPINNER_INTERVAL
 }
 
+@test "the spinner loop re-reads its message from a state file on every frame" {
+  # The tui spinner runs this loop with a file its owner rewrites; a message
+  # changed mid-run shows on the next frame, and a trailing newline in the file
+  # does not break the line.
+  local state="${BATS_TEST_TMPDIR}/spin-state" err="${BATS_TEST_TMPDIR}/spin-err"
+  printf 'first\n' > "${state}"
+  __dybatpho_log_spin_loop "x" 0.02 "" "${state}" 2> "${err}" &
+  local spinning=$!
+  sleep 0.2
+  printf 'second' > "${state}"
+  sleep 0.2
+  kill "${spinning}"
+  wait "${spinning}" 2> /dev/null || true
+
+  local drawn
+  drawn="$(< "${err}")"
+  [[ "${drawn}" == *$'\rx first\033[K'* ]]
+  [[ "${drawn}" == *$'\rx second\033[K'* ]]
+  [[ "${drawn}" != *$'first\n'* ]]
+}
+
 @test "dybatpho::spinner records the outcome as a structured event" {
   local log_file="${BATS_TEST_TMPDIR}/spinner.log"
   dybatpho::log_to_file "${log_file}" level:debug

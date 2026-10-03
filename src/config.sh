@@ -221,7 +221,7 @@ function dybatpho::config_load {
     esac
   done
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one configuration file"
-  local file extension
+  local file format
   for file in "$@"; do
     if ! dybatpho::is file "${file}"; then
       [[ "${optional}" == true ]] \
@@ -229,14 +229,13 @@ function dybatpho::config_load {
       dybatpho::debug "Skipping missing configuration file: ${file}"
       continue
     fi
-    extension="${file##*.}"
-    case "${extension,,}" in
-      env | dotenv) __dybatpho_config_load_dotenv "${file}" ;;
-      json) __dybatpho_config_load_structured json "${file}" ;;
-      yaml | yml) __dybatpho_config_load_structured yaml "${file}" ;;
-      toml) __dybatpho_config_load_structured toml "${file}" ;;
-      *) dybatpho::die "Unsupported configuration format: ${file}" ;; # kcov(skip)
-    esac
+    __dybatpho_config_format_into format "${file}" \
+      || dybatpho::die "Unsupported configuration format: ${file}" # kcov(skip)
+    if [[ "${format}" == dotenv ]]; then
+      __dybatpho_config_load_dotenv "${file}"
+    else
+      __dybatpho_config_load_structured "${format}" "${file}"
+    fi
   done
 }
 
@@ -465,7 +464,7 @@ function __dybatpho_config_save_structured {
 
   for key in "$@"; do
     setting="${DYBATPHO_CONFIG[${key}]}"
-    type="$(__dybatpho_config_schema_attr "${key}" type string)"
+    __dybatpho_config_schema_attr_into type "${key}" type string
     literal=""
     if __dybatpho_validate_numeric_type "${type}" && [[ "${setting}" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
       literal="${setting}"
@@ -560,7 +559,7 @@ function __dybatpho_config_save_structured {
 #   along with them.
 #######################################
 function dybatpho::config_save {
-  local file key extension
+  local file key format
   dybatpho::expect_args file -- "$@"
   shift
   local -a keys=()
@@ -582,13 +581,34 @@ function dybatpho::config_save {
       || dybatpho::die "Cannot save a configuration key that is not set: ${key}"
   done
 
-  extension="${file##*.}"
-  case "${extension,,}" in
-    env | dotenv) __dybatpho_config_save_dotenv "${file}" "${keys[@]}" ;;
-    json) __dybatpho_config_save_structured json "${file}" "${keys[@]}" ;;
-    yaml | yml) __dybatpho_config_save_structured yaml "${file}" "${keys[@]}" ;;
-    toml) __dybatpho_config_save_structured toml "${file}" "${keys[@]}" ;;
-    *) dybatpho::die "Unsupported configuration format: ${file}" ;; # kcov(skip)
+  __dybatpho_config_format_into format "${file}" \
+    || dybatpho::die "Unsupported configuration format: ${file}" # kcov(skip)
+  if [[ "${format}" == dotenv ]]; then
+    __dybatpho_config_save_dotenv "${file}" "${keys[@]}"
+  else
+    __dybatpho_config_save_structured "${format}" "${file}" "${keys[@]}"
+  fi
+}
+
+#######################################
+# @description Name the configuration format a file's extension selects.
+#   Loading and saving read the same extensions, so the mapping lives here once.
+# @arg $1 string Name of the variable receiving `dotenv`, `json`, `yaml` or `toml`
+# @arg $2 string File path
+# @set The named variable
+# @exitcode 0 The extension names a supported format
+# @exitcode 1 It does not
+# @internal
+#######################################
+function __dybatpho_config_format_into {
+  local -n __dybatpho_config_format_out="$1"
+  local __dybatpho_config_format_extension="${2##*.}"
+  case "${__dybatpho_config_format_extension,,}" in
+    env | dotenv) __dybatpho_config_format_out=dotenv ;;
+    json) __dybatpho_config_format_out=json ;;
+    yaml | yml) __dybatpho_config_format_out=yaml ;;
+    toml) __dybatpho_config_format_out=toml ;;
+    *) return 1 ;;
   esac
 }
 
@@ -635,47 +655,60 @@ function __dybatpho_config_schema_clear {
 }
 
 #######################################
-# @description Print a schema attribute, or a fallback when it is not declared.
-# @arg $1 string Configuration key
-# @arg $2 string Attribute name
-# @arg $3 string Optional fallback value
-# @stdout Attribute value
+# @description Read a schema attribute, or a fallback when it is not declared,
+#   into a named variable.
+#   Trailing newlines are dropped, as reading it through `$(...)` used to.
+# @arg $1 string Name of the variable receiving the value
+# @arg $2 string Configuration key
+# @arg $3 string Attribute name
+# @arg $4 string Optional fallback value
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_config_schema_attr {
-  local key attribute
-  dybatpho::expect_args key attribute -- "$@"
-  printf '%s' "${DYBATPHO_CONFIG_SCHEMA["${key}.${attribute}"]-${3-}}"
+function __dybatpho_config_schema_attr_into {
+  local -n __dybatpho_config_attr_out="$1"
+  local __dybatpho_config_attr_name="$2.$3"
+  local __dybatpho_config_attr_value="${DYBATPHO_CONFIG_SCHEMA["${__dybatpho_config_attr_name}"]-${4-}}"
+  while [[ "${__dybatpho_config_attr_value}" == *$'\n' ]]; do
+    __dybatpho_config_attr_value="${__dybatpho_config_attr_value%$'\n'}"
+  done
+  __dybatpho_config_attr_out="${__dybatpho_config_attr_value}"
 }
 
 #######################################
 # @description Describe the range and choice constraints declared for a key.
-# @arg $1 string Configuration key
-# @stdout Human readable constraints, or an empty string when none are declared
+# @arg $1 string Name of the variable receiving the description
+# @arg $2 string Configuration key
+# @set The named variable: human readable constraints, or empty when none are
+#   declared
 # @internal
 #######################################
-function __dybatpho_config_schema_constraints {
-  local key type min max choices unit
-  dybatpho::expect_args key -- "$@"
-  type="$(__dybatpho_config_schema_attr "${key}" type string)"
-  min="$(__dybatpho_config_schema_attr "${key}" min)"
-  max="$(__dybatpho_config_schema_attr "${key}" max)"
-  choices="$(__dybatpho_config_schema_attr "${key}" choices)"
-  if [[ "${type}" == enum ]]; then
-    printf 'one of: %s' "${choices//,/, }"
+function __dybatpho_config_schema_constraints_into {
+  local -n __dybatpho_config_c_out="$1"
+  local __dybatpho_config_c_key="$2"
+  local __dybatpho_config_c_type __dybatpho_config_c_min
+  local __dybatpho_config_c_max __dybatpho_config_c_choices
+  local __dybatpho_config_c_unit
+  __dybatpho_config_schema_attr_into __dybatpho_config_c_type "${__dybatpho_config_c_key}" type string
+  __dybatpho_config_schema_attr_into __dybatpho_config_c_min "${__dybatpho_config_c_key}" min
+  __dybatpho_config_schema_attr_into __dybatpho_config_c_max "${__dybatpho_config_c_key}" max
+  __dybatpho_config_schema_attr_into __dybatpho_config_c_choices "${__dybatpho_config_c_key}" choices
+  __dybatpho_config_c_out=""
+  if [[ "${__dybatpho_config_c_type}" == enum ]]; then
+    __dybatpho_config_c_out="one of: ${__dybatpho_config_c_choices//,/, }"
     return 0
   fi
-  if __dybatpho_validate_numeric_type "${type}"; then
-    unit=""
+  if __dybatpho_validate_numeric_type "${__dybatpho_config_c_type}"; then
+    __dybatpho_config_c_unit=""
   else
-    unit=" characters"
+    __dybatpho_config_c_unit=" characters"
   fi
-  if [[ -n "${min}" && -n "${max}" ]]; then
-    printf '%s..%s%s' "${min}" "${max}" "${unit}"
-  elif [[ -n "${min}" ]]; then
-    printf '>= %s%s' "${min}" "${unit}"
-  elif [[ -n "${max}" ]]; then
-    printf '<= %s%s' "${max}" "${unit}"
+  if [[ -n "${__dybatpho_config_c_min}" && -n "${__dybatpho_config_c_max}" ]]; then
+    __dybatpho_config_c_out="${__dybatpho_config_c_min}..${__dybatpho_config_c_max}${__dybatpho_config_c_unit}"
+  elif [[ -n "${__dybatpho_config_c_min}" ]]; then
+    __dybatpho_config_c_out=">= ${__dybatpho_config_c_min}${__dybatpho_config_c_unit}"
+  elif [[ -n "${__dybatpho_config_c_max}" ]]; then
+    __dybatpho_config_c_out="<= ${__dybatpho_config_c_max}${__dybatpho_config_c_unit}"
   fi
   return 0
 }
@@ -722,7 +755,9 @@ function dybatpho::config_schema {
     esac
     DYBATPHO_CONFIG_SCHEMA["${key}.${name}"]="${value}"
   done
-  if [[ "${type}" == enum && -z "$(__dybatpho_config_schema_attr "${key}" choices)" ]]; then
+  local declared_choices
+  __dybatpho_config_schema_attr_into declared_choices "${key}" choices
+  if [[ "${type}" == enum && -z "${declared_choices}" ]]; then
     dybatpho::die "Configuration schema for ${key} requires \`choices\`"
   fi
   known=false
@@ -772,17 +807,19 @@ function __dybatpho_config_schema_error {
 function __dybatpho_config_schema_check {
   local key value type min max reason
   dybatpho::expect_args key value -- "$@"
-  type="$(__dybatpho_config_schema_attr "${key}" type string)"
+  __dybatpho_config_schema_attr_into type "${key}" type string
   local -a rules=()
   if [[ "${type}" == enum ]]; then
     # An enum constrains the value to a list rather than to a shape, so it
     # reaches the validator as a `choices` rule over a plain string.
-    rules+=("choices:$(__dybatpho_config_schema_attr "${key}" choices)")
+    local choices
+    __dybatpho_config_schema_attr_into choices "${key}" choices
+    rules+=("choices:${choices}")
   else
     rules+=("type:${type}")
   fi
-  min="$(__dybatpho_config_schema_attr "${key}" min)"
-  max="$(__dybatpho_config_schema_attr "${key}" max)"
+  __dybatpho_config_schema_attr_into min "${key}" min
+  __dybatpho_config_schema_attr_into max "${key}" max
   [[ -z "${min}" ]] || rules+=("min:${min}")
   [[ -z "${max}" ]] || rules+=("max:${max}")
 
@@ -811,7 +848,7 @@ function dybatpho::config_validate {
       if [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]]; then
         DYBATPHO_CONFIG["${key}"]="${DYBATPHO_CONFIG_SCHEMA["${key}.default"]}"
       else
-        required="$(__dybatpho_config_schema_attr "${key}" required false)"
+        __dybatpho_config_schema_attr_into required "${key}" required false
         if dybatpho::is true "${required}"; then
           __dybatpho_config_schema_error "${key}" "required value is missing"
         fi
@@ -830,41 +867,44 @@ function dybatpho::config_validate {
 
 #######################################
 # @description Render one Markdown table cell, escaping pipes and marking empties.
-# @arg $1 string Cell text
-# @arg $2 string Optional `code` to wrap a non-empty cell in backticks
-# @stdout Markdown cell text, or `-` when the value is empty
+# @arg $1 string Name of the variable receiving the cell
+# @arg $2 string Cell text
+# @arg $3 string Optional `code` to wrap a non-empty cell in backticks
+# @set The named variable: Markdown cell text, or `-` when the value is empty
 # @internal
 #######################################
-function __dybatpho_config_doc_cell {
-  local value="${1-}" style="${2-}"
-  if [[ -z "${value}" ]]; then
-    printf -- '-'
+function __dybatpho_config_doc_cell_into {
+  local -n __dybatpho_config_cell_out="$1"
+  local __dybatpho_config_cell_value="${2-}"
+  if [[ -z "${__dybatpho_config_cell_value}" ]]; then
+    __dybatpho_config_cell_out='-'
     return 0
   fi
-  value="${value//|/\\|}"
-  if [[ "${style}" == code ]]; then
-    printf '%s%s%s' '`' "${value}" '`'
+  __dybatpho_config_cell_value="${__dybatpho_config_cell_value//|/\\|}"
+  if [[ "${3-}" == code ]]; then
+    __dybatpho_config_cell_out='`'"${__dybatpho_config_cell_value}"'`'
   else
-    printf '%s' "${value}"
+    __dybatpho_config_cell_out="${__dybatpho_config_cell_value}"
   fi
 }
 
 #######################################
 # @description Render one JSON value, emitting `null` for an undeclared attribute.
-# @arg $1 string Attribute value
-# @arg $2 string Optional `declared` to emit an empty string instead of `null`
-# @stdout Quoted JSON string, or `null`
+# @arg $1 string Name of the variable receiving the value
+# @arg $2 string Attribute value
+# @arg $3 string Optional `declared` to emit an empty string instead of `null`
+# @set The named variable: quoted JSON string, or `null`
 # @internal
 #######################################
-function __dybatpho_config_doc_json_value {
-  local value="${1-}" declared="${2-}"
-  if [[ -z "${value}" && "${declared}" != declared ]]; then
-    printf 'null'
+function __dybatpho_config_doc_json_value_into {
+  local -n __dybatpho_config_json_out="$1"
+  local __dybatpho_config_json_value="${2-}"
+  if [[ -z "${__dybatpho_config_json_value}" && "${3-}" != declared ]]; then
+    __dybatpho_config_json_out='null'
     return 0
   fi
-  local log_json_escape
-  __dybatpho_log_json_escape_into log_json_escape "${value}"
-  printf '"%s"' "${log_json_escape}"
+  __dybatpho_log_json_escape_into __dybatpho_config_json_value "${__dybatpho_config_json_value}"
+  __dybatpho_config_json_out="\"${__dybatpho_config_json_value}\""
 }
 
 #######################################
@@ -878,6 +918,7 @@ function __dybatpho_config_doc_json_value {
 function dybatpho::config_doc {
   local format="${1:-markdown}" title="${2:-Configuration}"
   local key type required default constraints description separator
+  local key_cell default_cell constraints_cell description_cell declared required_attr
   case "${format}" in
     markdown | text | json) ;;                                                      # kcov(skip)
     *) dybatpho::die "Unsupported configuration documentation format: ${format}" ;; # kcov(skip)
@@ -896,33 +937,25 @@ function dybatpho::config_doc {
 
   separator=""
   for key in ${DYBATPHO_CONFIG_SCHEMA_KEYS[@]+"${DYBATPHO_CONFIG_SCHEMA_KEYS[@]}"}; do
-    type="$(__dybatpho_config_schema_attr "${key}" type string)"
-    default="$(__dybatpho_config_schema_attr "${key}" default)"
-    description="$(__dybatpho_config_schema_attr "${key}" description)"
-    constraints="$(__dybatpho_config_schema_constraints "${key}")"
-    local config_schema_attr
-    config_schema_attr=$(__dybatpho_config_schema_attr "${key}" required false)
-    if dybatpho::is true "${config_schema_attr}"; then
+    __dybatpho_config_schema_attr_into type "${key}" type string
+    __dybatpho_config_schema_attr_into default "${key}" default
+    __dybatpho_config_schema_attr_into description "${key}" description
+    __dybatpho_config_schema_constraints_into constraints "${key}"
+    __dybatpho_config_schema_attr_into required_attr "${key}" required false
+    if dybatpho::is true "${required_attr}"; then
       required=true
     else
       required=false
     fi
     case "${format}" in
       markdown)
-        local config_doc_cell
-        config_doc_cell=$(__dybatpho_config_doc_cell "${description}")
-        local config_doc_cell_2
-        config_doc_cell_2=$(__dybatpho_config_doc_cell "${key}" code)
-        local config_doc_cell_3
-        config_doc_cell_3=$(__dybatpho_config_doc_cell "${constraints}")
-        local config_doc_cell_4
-        config_doc_cell_4=$(__dybatpho_config_doc_cell "${default}" code)
+        __dybatpho_config_doc_cell_into key_cell "${key}" code
+        __dybatpho_config_doc_cell_into default_cell "${default}" code
+        __dybatpho_config_doc_cell_into constraints_cell "${constraints}"
+        __dybatpho_config_doc_cell_into description_cell "${description}"
         printf '| %s | %s | %s | %s | %s | %s |\n' \
-          "${config_doc_cell_2}" \
-          "${type}" "${required}" \
-          "${config_doc_cell_4}" \
-          "${config_doc_cell_3}" \
-          "${config_doc_cell}"
+          "${key_cell}" "${type}" "${required}" \
+          "${default_cell}" "${constraints_cell}" "${description_cell}"
         ;;
       text)
         printf '%s\n  type: %s\n  required: %s\n' "${key}" "${type}" "${required}"
@@ -932,22 +965,16 @@ function dybatpho::config_doc {
         printf '\n'
         ;;
       json)
-        local declared=""
+        declared=""
         [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]] && declared="declared" || true
-        local config_doc_json_value
-        config_doc_json_value=$(__dybatpho_config_doc_json_value "${description}")
-        local log_json_escape
-        __dybatpho_log_json_escape_into log_json_escape "${key}"
-        local config_doc_json_value_2
-        config_doc_json_value_2=$(__dybatpho_config_doc_json_value "${constraints}")
-        local config_doc_json_value_3
-        config_doc_json_value_3=$(__dybatpho_config_doc_json_value "${default}" "${declared}")
+        __dybatpho_log_json_escape_into key_cell "${key}"
+        __dybatpho_config_doc_json_value_into default_cell "${default}" "${declared}"
+        __dybatpho_config_doc_json_value_into constraints_cell "${constraints}"
+        __dybatpho_config_doc_json_value_into description_cell "${description}"
         printf '%s{"key":"%s","type":"%s","required":%s,"default":%s,"constraints":%s,"description":%s}' \
           "${separator}" \
-          "${log_json_escape}" "${type}" "${required}" \
-          "${config_doc_json_value_3}" \
-          "${config_doc_json_value_2}" \
-          "${config_doc_json_value}"
+          "${key_cell}" "${type}" "${required}" \
+          "${default_cell}" "${constraints_cell}" "${description_cell}"
         separator=","
         ;;
       *) ;;

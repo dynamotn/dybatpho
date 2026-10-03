@@ -754,47 +754,53 @@ function __dybatpho_helpers_locate {
 }
 
 #######################################
-# @description Print a function name with the `dybatpho::` prefix it may have
-#   been given without.
-# @arg $1 string Function name, with or without a prefix
-# @stdout The full function name
+# @description Write a function name with the `dybatpho::` prefix it may have
+#   been given without into a named variable.
+# @arg $1 string Name of the variable receiving the full function name
+# @arg $2 string Function name, with or without a prefix
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_helpers_qualify {
-  local name="${1-}"
-  if [[ "${name}" == dybatpho::* || "${name}" == __dybatpho_* ]]; then
-    printf '%s\n' "${name}"
+function __dybatpho_helpers_qualify_into {
+  local -n __dybatpho_helpers_qualify_out="$1"
+  local __dybatpho_helpers_qualify_name="${2-}"
+  if [[ "${__dybatpho_helpers_qualify_name}" == dybatpho::* \
+    || "${__dybatpho_helpers_qualify_name}" == __dybatpho_* ]]; then
+    __dybatpho_helpers_qualify_out="${__dybatpho_helpers_qualify_name}"
   else
-    printf 'dybatpho::%s\n' "${name}"
+    __dybatpho_helpers_qualify_out="dybatpho::${__dybatpho_helpers_qualify_name}"
   fi
 }
 
 #######################################
-# @description Print the module a loaded source file belongs to.
+# @description Write the module a loaded source file belongs to into a named
+#   variable.
 #   A module is recognised by its place rather than its name: a file directly
 #   inside a `src` directory is that module, and the bootstrap is `init`.
 #   Anything else is refused, because a bundle holds every module in one file
 #   and answering with that file's name would attribute every function in the
 #   library to a module called `dybatpho.bundle`.
-# @arg $1 string Path of a file the library was loaded from
-# @stdout The module name
+# @arg $1 string Name of the variable receiving the module name
+# @arg $2 string Path of a file the library was loaded from
+# @set The named variable
 # @exitcode 1 The file is not a module source
 # @internal
 #######################################
-function __dybatpho_helpers_module_of {
-  local file="$1"
-  local name="${file##*/}"
+function __dybatpho_helpers_module_of_into {
+  local -n __dybatpho_helpers_module_out="$1"
+  local __dybatpho_helpers_module_file="$2"
+  local __dybatpho_helpers_module_name="${__dybatpho_helpers_module_file##*/}"
   # The bootstrap is recognised by its own name rather than by comparing against
   # `DYBATPHO_DIR`: that variable is fully resolved while the path Bash reports
   # is whatever was written at the `source`, and a library reached through a
   # symlink would never match.
-  if [[ "${name}" == "init.sh" ]]; then
-    printf 'init\n'
+  if [[ "${__dybatpho_helpers_module_name}" == "init.sh" ]]; then
+    __dybatpho_helpers_module_out=init
     return 0
   fi
-  local directory="${file%/*}"
-  [[ "${directory##*/}" == "src" ]] || return 1
-  printf '%s\n' "${name%.sh}"
+  local __dybatpho_helpers_module_directory="${__dybatpho_helpers_module_file%/*}"
+  [[ "${__dybatpho_helpers_module_directory##*/}" == "src" ]] || return 1
+  __dybatpho_helpers_module_out="${__dybatpho_helpers_module_name%.sh}"
 }
 
 #######################################
@@ -826,7 +832,7 @@ function dybatpho::provides {
   fi
   local name
   dybatpho::expect_args name -- "$@"
-  name="$(__dybatpho_helpers_qualify "${name}")"
+  __dybatpho_helpers_qualify_into name "${name}"
 
   local -a location=()
   mapfile -t location < <(__dybatpho_helpers_locate "${name}")
@@ -836,7 +842,9 @@ function dybatpho::provides {
     printf '%s:%s\n' "${location[0]}" "${location[1]}"
     return 0
   fi
-  __dybatpho_helpers_module_of "${location[0]}"
+  local module
+  __dybatpho_helpers_module_of_into module "${location[0]}" || return 1
+  printf '%s\n' "${module}"
 }
 
 #######################################
@@ -866,7 +874,7 @@ function dybatpho::provides {
 function dybatpho::describe {
   local name
   dybatpho::expect_args name -- "$@"
-  name="$(__dybatpho_helpers_qualify "${name}")"
+  __dybatpho_helpers_qualify_into name "${name}"
 
   local -a location=()
   mapfile -t location < <(__dybatpho_helpers_locate "${name}")
@@ -894,7 +902,7 @@ function dybatpho::describe {
   done
 
   local origin
-  if origin="$(__dybatpho_helpers_module_of "${file}")"; then
+  if __dybatpho_helpers_module_of_into origin "${file}"; then
     printf '%s  (%s, %s:%s)\n' "${name}" "${origin}" "${file}" "${line}"
   else
     printf '%s  (%s:%s)\n' "${name}" "${file}" "${line}"
@@ -961,15 +969,27 @@ function dybatpho::function_list {
     return 0
   fi
 
-  local name owner attributable=false
-  for name in "${names[@]}"; do
-    if owner="$(dybatpho::provides "${name}" 2> /dev/null)"; then
+  # Every name is located by one `declare -F` under `extdebug`, switched on in
+  # the process substitution only, so the caller's shell never sees the option
+  # and the list costs one process rather than several per function.
+  local name line file owner attributable=false
+  while read -r name line file; do
+    [[ -n "${file}" && "${line}" =~ ^[0-9]+$ ]] || continue
+    # Bash reports the path as it was written at the `source`; a `.` or `..`
+    # segment would hide the `src` directory a module is recognised by.
+    if [[ "${file}" == *'//'* || "${file}" == *'/./'* || "${file}" == *'/../'* ]]; then
+      file="$(dybatpho::path_normalize "${file}" 2> /dev/null || printf '%s' "${file}")"
+    fi
+    if __dybatpho_helpers_module_of_into owner "${file}"; then
       attributable=true
       if [[ "${owner}" == "${module}" ]]; then
         printf '%s\n' "${name}"
       fi
     fi
-  done
+  done < <(
+    shopt -s extdebug
+    declare -F "${names[@]}" 2> /dev/null
+  )
   # An empty list would read as "that module exports nothing", which is not what
   # happened: a bundle holds every module in one file and none of them can be
   # told apart.

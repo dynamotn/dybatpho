@@ -32,10 +32,24 @@
 #######################################
 # shellcheck disable=SC2317
 function dybatpho::trim {
-  local value="${1-}"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
+  local value
+  __dybatpho_string_trim_into value "${1-}"
   printf '%s\n' "${value}"
+}
+
+#######################################
+# @description Trim leading and trailing whitespace into a named variable.
+#   The fork-free form of `dybatpho::trim`, for callers that trim inside a loop.
+# @arg $1 string Name of the variable receiving the trimmed string
+# @arg $2 string String to trim
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_string_trim_into {
+  local -n __dybatpho_string_trim_out="$1"
+  local __dybatpho_string_trim_value="${2-}"
+  __dybatpho_string_trim_value="${__dybatpho_string_trim_value#"${__dybatpho_string_trim_value%%[![:space:]]*}"}"
+  __dybatpho_string_trim_out="${__dybatpho_string_trim_value%"${__dybatpho_string_trim_value##*[![:space:]]}"}"
 }
 
 #######################################
@@ -53,19 +67,32 @@ function dybatpho::trim {
 # @stdout Print each split part on its own line
 #######################################
 function dybatpho::split {
-  local input="${1-}" delimiter="${2-}"
-  if [[ -z "${delimiter}" ]]; then
-    printf '%s\n' "${input}"
-    return 0
-  fi
   local -a parts=()
-  local rest="${input}"
-  while [[ "${rest}" == *"${delimiter}"* ]]; do
-    parts+=("${rest%%"${delimiter}"*}")
-    rest="${rest#*"${delimiter}"}"
-  done
-  parts+=("${rest}")
+  __dybatpho_string_split_into parts "${1-}" "${2-}"
   printf '%s\n' "${parts[@]}"
+}
+
+#######################################
+# @description Split a string on an exact delimiter into a named array.
+#   The fork-free form of `dybatpho::split`, with the same fields: an empty
+#   delimiter gives the input as the only element.
+# @arg $1 string Name of the array receiving the fields
+# @arg $2 string String to split
+# @arg $3 string Delimiter string
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_string_split_into {
+  local -n __dybatpho_string_split_out="$1"
+  local __dybatpho_string_split_rest="${2-}" __dybatpho_string_split_delimiter="${3-}"
+  __dybatpho_string_split_out=()
+  if [[ -n "${__dybatpho_string_split_delimiter}" ]]; then
+    while [[ "${__dybatpho_string_split_rest}" == *"${__dybatpho_string_split_delimiter}"* ]]; do
+      __dybatpho_string_split_out+=("${__dybatpho_string_split_rest%%"${__dybatpho_string_split_delimiter}"*}")
+      __dybatpho_string_split_rest="${__dybatpho_string_split_rest#*"${__dybatpho_string_split_delimiter}"}"
+    done
+  fi
+  __dybatpho_string_split_out+=("${__dybatpho_string_split_rest}")
 }
 
 #######################################
@@ -282,7 +309,7 @@ unset -f __dybatpho_string_build_ascii
 function dybatpho::string_slugify {
   local input slug char mapped
   dybatpho::expect_args input -- "$@"
-  input=$(dybatpho::lower "${input}")
+  input="${input,,}"
   slug=""
   local last_was_separator=false
   local i
@@ -322,10 +349,9 @@ function dybatpho::string_slugify {
 # @exitcode 1 The input contains non-whitespace characters
 #######################################
 function dybatpho::string_is_blank {
-  local input trimmed
+  local input
   dybatpho::expect_args input -- "$@"
-  trimmed=$(dybatpho::trim "${input}")
-  [[ -z "${trimmed}" ]]
+  [[ "${input}" != *[![:space:]]* ]]
 }
 
 #######################################

@@ -121,11 +121,8 @@ function dybatpho::text_strip_ansi {
 
   __dybatpho_text_read_lines "${input}" lines
   for line in "${lines[@]}"; do
-    # The ranges are byte ranges, and BSD sed rejects `[ -/]` as an invalid
-    # range under a UTF-8 collation, so the match runs in the C locale.
-    local stripped
-    stripped=$(printf '%s' "${line}" | LC_ALL=C sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g')
-    printf '%s\n' "${stripped}"
+    __dybatpho_text_strip_ansi_into line "${line}"
+    printf '%s\n' "${line}"
   done
 }
 

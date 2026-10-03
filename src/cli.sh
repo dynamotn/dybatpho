@@ -983,12 +983,11 @@ function __dybatpho_cli_parse_opt {
 # @internal
 #######################################
 function __dybatpho_cli_print_indent {
-  local indent=$1 i
+  local indent=$1
   shift
-  for ((i = indent; i > 0; i--)); do
-    echo -n "  "
-  done
-  echo "$@"
+  # One `printf`, not an `echo -n` per level: this runs for every generated
+  # line, and `echo` would swallow a line that is exactly `-n` or `-e`.
+  printf '%*s%s\n' "$((indent * 2))" '' "$*"
 }
 
 #######################################

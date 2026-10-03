@@ -70,24 +70,20 @@ function __dybatpho_table_split_row {
   local -n target_ref="${target_var}"
   target_ref=()
 
-  # Splitting and trimming in place. `mapfile < <(dybatpho::split ...)` is a
-  # process substitution and `$(dybatpho::trim ...)` is another process per
-  # cell, and a table pays both for every cell of every row -- which was most of
-  # what drawing one cost.
-  local rest="${row}" field
+  # Splitting and trimming in the caller's shell. `mapfile < <(dybatpho::split
+  # ...)` is a process substitution and `$(dybatpho::trim ...)` is another
+  # process per cell, and a table pays both for every cell of every row --
+  # which was most of what drawing one cost.
   if [[ -z "${delimiter}" ]]; then
     target_ref=("${row}")
   else
-    while [[ "${rest}" == *"${delimiter}"* ]]; do
-      field="${rest%%"${delimiter}"*}"
-      rest="${rest#*"${delimiter}"}"
-      field="${field#"${field%%[![:space:]]*}"}"
-      field="${field%"${field##*[![:space:]]}"}"
-      target_ref+=("${field}")
+    local -a __dybatpho_table_fields=()
+    local __dybatpho_table_field
+    __dybatpho_string_split_into __dybatpho_table_fields "${row}" "${delimiter}"
+    for __dybatpho_table_field in "${__dybatpho_table_fields[@]}"; do
+      __dybatpho_string_trim_into __dybatpho_table_field "${__dybatpho_table_field}"
+      target_ref+=("${__dybatpho_table_field}")
     done
-    rest="${rest#"${rest%%[![:space:]]*}"}"
-    rest="${rest%"${rest##*[![:space:]]}"}"
-    target_ref+=("${rest}")
   fi
 
   if ((${#target_ref[@]} == 0)); then
@@ -140,14 +136,13 @@ function __dybatpho_table_parse_alignments {
 
   alignments_ref=()
   if [[ -n "${spec}" ]]; then
-    mapfile -t requested < <(dybatpho::split "${spec}" ",")
+    __dybatpho_string_split_into requested "${spec}" ","
   fi
 
   # shellcheck disable=SC2034 # alignments_ref is a nameref: assigning it is the output
   for index in "${!widths_ref[@]}"; do
-    local trim
-    trim=$(dybatpho::trim "${requested[${index}]-left}")
-    alignment="$(dybatpho::lower "${trim}")"
+    __dybatpho_string_trim_into alignment "${requested[${index}]-left}"
+    alignment="${alignment,,}"
     case "${alignment}" in
       "" | left | l)
         alignments_ref[index]="left"

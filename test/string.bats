@@ -17,15 +17,15 @@ setup() {
 @test "dybatpho::split output string" {
   run_traced dybatpho::split "apples,oranges,pears,grapes" ","
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 apples
 oranges
 pears
 grapes
 EOF
-  run_traced dybatpho::split "hello---world---my---name---is---dynamo" ","
+  run_traced dybatpho::split "hello---world---my---name---is---dynamo" "---"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 hello
 world
 my
@@ -81,7 +81,7 @@ c"
 @test "dybatpho::split with multi-character delimiter" {
   run_traced dybatpho::split "hello---world---dybatpho" "---"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 hello
 world
 dybatpho
@@ -193,7 +193,7 @@ EOF
 @test "dybatpho::string_wrap wraps words and supports indentation" {
   run_traced dybatpho::string_wrap "alpha beta gamma delta" 10
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 alpha beta
 gamma
 delta
@@ -201,7 +201,7 @@ EOF
 
   run_traced dybatpho::string_wrap "alpha beta gamma delta" 10 "> "
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 alpha beta
 > gamma
 > delta

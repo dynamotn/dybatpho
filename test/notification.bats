@@ -928,3 +928,27 @@ fake_sendmail() {
   run_traced -5 dybatpho::notify_slack "two"
   unstub curl
 }
+
+@test "dybatpho::notify_email asks for the validate module when it is not loaded" {
+  # `notification` does not load `validate`, so a script that only posts to
+  # webhooks does not pay for it. A child shell started from a file, without
+  # the functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules notification\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'export DRY_RUN=true DYBATPHO_SENDMAIL=sendmail'
+    printf '%s\n' 'dybatpho::notify_email ops@example.com "Subject" "Body"'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_output --partial "dybatpho::notify_email needs the validate module, load it with: dybatpho::load validate"
+  refute_output --partial "sendmail -i"
+
+  # Once the script loads it, the same call goes as far as the dry run.
+  sed -i 's/--modules notification$/--modules notification validate/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_output --partial "sendmail -i -- ops@example.com"
+}

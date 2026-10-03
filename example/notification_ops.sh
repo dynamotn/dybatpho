@@ -8,7 +8,7 @@
 #   running this example.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules notification
+. "${SCRIPTDIR}/../init.sh" --modules notification validate
 
 dybatpho::register_common_handlers
 

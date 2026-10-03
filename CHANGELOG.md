@@ -468,9 +468,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot add a header or a recipient. A subject in any language is encoded for
   the header, the body is sent as UTF-8, and a line holding a single `.` does
   not cut the message short. With no `sendmail` it fails with exit code `127`;
-  `DRY_RUN` prints the command and sends nothing.
+  `DRY_RUN` prints the command and sends nothing. Addresses are checked by the
+  `validate` module, which `notification` does not load, so a script that
+  sends email loads it too; without it the call stops with a message naming
+  it.
 
   ```sh
+  . dybatpho/init.sh --modules notification validate
   dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
   ```
 

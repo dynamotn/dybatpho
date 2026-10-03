@@ -192,6 +192,7 @@ fi
 
 ## Edge Cases
 
+- A script sends email without having loaded the `validate` module.
 - Missing message, URL, payload, webhook URL, token, or chat ID.
 - The webhook URL is the secret itself, so it must not reach a debug line.
 - ntfy tags hold a line break, which would cut the list short.
@@ -293,6 +294,7 @@ fi
 - **FR-026**: `notify_ntfy` MUST refuse tags holding a carriage return or a
   line feed before any request is made, and MUST keep a line break in the
   title and the message.
+- **FR-027**: Loading the module MUST NOT load `validate`. `notify_email` MUST stop the script, naming the `validate` module and how to load it, when that module is not loaded, before any address is read or `sendmail` is looked up; the webhook and desktop notifiers MUST work without it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -347,6 +349,7 @@ fi
   path and query carry the secret.
 - **IT-012**: Refuse ntfy tags holding a line feed or a carriage return, and
   publish a title holding a line break unchanged.
+- **IT-013**: In a script that loaded `notification` alone, have `notify_email` stop and name the `validate` module without printing a command, and reach the dry run once `validate` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

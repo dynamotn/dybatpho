@@ -41,7 +41,7 @@ notification platforms through their webhook or bot APIs:
 - [`dybatpho::notify_desktop`](#dybatphonotify_desktop) — Show a notification on the local desktop. `notify-send` (libnotify, on Linux and the BSDs) is used when it is installed, and `osascript` (macOS) otherwise. The title and the body reach either one as separate arguments, never spliced into a command or a script, so quotes, a leading `-` or AppleScript syntax in them are shown as written. macOS has no urgency for a notification, so it is accepted there and has no effect.
 - [`dybatpho::notify_ntfy`](#dybatphonotify_ntfy) — Publish a message to an [ntfy](https://ntfy.sh) topic, on ntfy.sh or a server of your own. The message is published as JSON to the server root, so the title, the priority and the tags travel in the body and keep any character they hold. An access token is sent as a bearer header through the network module's out-of-band channel, so it never appears on curl's command line.
 - [`dybatpho::notify_gotify`](#dybatphonotify_gotify) — Push a message to a [Gotify](https://gotify.net) server. The application token is sent as the `X-Gotify-Key` header through the network module's out-of-band channel, so it never appears on curl's command line, where every user of the host could read it from the process list.
-- [`dybatpho::notify_email`](#dybatphonotify_email) — Send a plain-text email through the local `sendmail`. Any MTA that installs a `sendmail` command will do — Postfix, Exim, OpenSMTPD, msmtp, nullmailer. The recipients are handed to it as arguments after `--`, never read back from the headers, and every address, the sender and the subject are checked for a line break first, so text from a variable cannot add a header or a recipient. A subject that is not plain ASCII is encoded for the header, and the body is sent as UTF-8; a line holding a single `.` does not end the message early.
+- [`dybatpho::notify_email`](#dybatphonotify_email) — Send a plain-text email through the local `sendmail`. Any MTA that installs a `sendmail` command will do — Postfix, Exim, OpenSMTPD, msmtp, nullmailer. The recipients are handed to it as arguments after `--`, never read back from the headers, and every address, the sender and the subject are checked for a line break first, so text from a variable cannot add a header or a recipient. A subject that is not plain ASCII is encoded for the header, and the body is sent as UTF-8; a line holding a single `.` does not end the message early. Addresses are checked by the `validate` module, which this one does not load: the webhook notifiers have no address to check, so only a script that sends email loads it.
 
 <a id="usage"></a>
 ## 🚀 Usage
@@ -137,6 +137,10 @@ dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
 ## 💡 Tips
 
 - Most providers require a webhook URL or API token set via environment variables. The functions validate these before making requests.
+
+### `dybatpho::notify_email`
+
+- Load `validate` as well to send email: `--modules notification validate`
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -540,6 +544,10 @@ add a header or a recipient. A subject that is not plain ASCII is encoded
 for the header, and the body is sent as UTF-8; a line holding a single `.`
 does not end the message early.
 
+Addresses are checked by the `validate` module, which this one does not
+load: the webhook notifiers have no address to check, so only a script that
+sends email loads it.
+
 **🧪 Example**
 
 ```bash
@@ -568,6 +576,6 @@ dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${re
 **🚦 Exit codes**
 
 - `0`: The message was handed to the MTA
-- `1`: Missing arguments, an invalid address, or a line break in the subject
+- `1`: Missing arguments, an invalid address, a line break in the subject, or the `validate` module not loaded
 - `127`: No sendmail command was found
 - `other`: The sendmail command's own exit code

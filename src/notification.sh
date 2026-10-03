@@ -738,6 +738,11 @@ function __dybatpho_notification_is_address {
 #   add a header or a recipient. A subject that is not plain ASCII is encoded
 #   for the header, and the body is sent as UTF-8; a line holding a single `.`
 #   does not end the message early.
+#
+#   Addresses are checked by the `validate` module, which this one does not
+#   load: the webhook notifiers have no address to check, so only a script that
+#   sends email loads it.
+# @tip Load `validate` as well to send email: `--modules notification validate`
 # @example
 #   dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
 #   dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${report}" bot@example.com
@@ -751,13 +756,18 @@ function __dybatpho_notification_is_address {
 #   and `/usr/lib/sendmail`
 # @env DRY_RUN string Print the sendmail command instead of sending anything
 # @exitcode 0 The message was handed to the MTA
-# @exitcode 1 Missing arguments, an invalid address, or a line break in the subject
+# @exitcode 1 Missing arguments, an invalid address, a line break in the subject, or the `validate` module not loaded
 # @exitcode 127 No sendmail command was found
 # @exitcode other The sendmail command's own exit code
 #######################################
 function dybatpho::notify_email {
   local recipients subject body
   dybatpho::expect_args recipients subject body -- "$@"
+  # The guard names an internal helper: a child shell inherits the exported
+  # `dybatpho::` functions without the internals `validate_is` calls. It is
+  # exercised in a child shell, which kcov does not follow.
+  declare -F __dybatpho_validate_match > /dev/null \
+    || dybatpho::die "${FUNCNAME[0]} needs the validate module, load it with: dybatpho::load validate" # kcov(skip)
   local from="${4:-${DYBATPHO_EMAIL_FROM-}}"
 
   # The `die` lines below are tested under `run`, which kcov cannot observe.

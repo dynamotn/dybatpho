@@ -107,7 +107,7 @@ loaded_line() {
   assert_output "string os logging helpers process file secret text "
 
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret network validate notification "
+  assert_output "string os logging helpers process file secret network notification "
 
   # `testing` loads only what every assertion uses: the JSON and YAML
   # assertions ask for `json`, and a snapshot mismatch for `diff` to draw it.

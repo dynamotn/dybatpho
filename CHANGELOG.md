@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`privilege` — ask for sudo once, and hold it for the whole run.** `pkg`
+  could put `sudo` in front of one command; a script running twenty of them
+  over several minutes needs the prompt up front, the ticket kept alive, and
+  no child able to stop and ask again halfway through.
+
+  `dybatpho::privilege_needed`, `dybatpho::privilege_command`,
+  `dybatpho::privilege_acquire`, `dybatpho::privilege_release` and
+  `dybatpho::privilege_run`.
+
+  ```sh
+  . dybatpho/init.sh --modules privilege
+
+  dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
+  dybatpho::privilege_run -- apt-get install -y the-tools
+  dybatpho::privilege_release
+  ```
+
+  `--shield` puts a non-interactive escalation command first on `PATH`, so a
+  child cannot hang the run with a prompt nothing can display. The background
+  refresher watches its parent rather than waiting to be signalled, so a
+  script that is killed outright does not leave it behind. With no cached
+  ticket and no terminal the call fails instead of blocking, which is what a
+  run from cron needs. `DYBATPHO_PRIVILEGE_SUSPEND_HOOK` is how a full-screen
+  caller gives the terminal back around the prompt. Calling
+  `dybatpho::privilege_acquire` again while the escalation is held adds only
+  what the first call left out, such as the `--shield` wrapper; it never
+  starts a second refresher or wrapper.
+
+- **`array` — order a dependency graph instead of resolving one by hand.**
+  `dybatpho::array_toposort` reads an associative array of edges and returns
+  an order where a dependency comes before what needs it;
+  `dybatpho::array_closure` answers what a set of roots pulls in.
+
+  ```sh
+  declare -A deps=([cli]="config validate" [config]="validate")
+  dybatpho::array_toposort deps order   # validate config cli
+  dybatpho::array_closure deps needed cli
+  ```
+
+  The order is the same on every run, because the walk starts from the keys
+  sorted rather than in the order Bash hashes them into. An entry named only
+  as a dependency is in the result, since a leaf still has to come first. A
+  cycle is reported through the exit code with an order still returned: some
+  graphs have one on purpose, and `init.sh`'s own `text`/`table` pair is one.
+
 - **`screen` — the four [Catppuccin](https://catppuccin.com) flavours as
   themes.** `dybatpho::screen_theme` now takes `catppuccin-latte`,
   `catppuccin-frappe`, `catppuccin-macchiato` and `catppuccin-mocha`, drawn in
@@ -960,51 +1005,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [5.2.0] - 2026-10-02
 
 ### Added
-
-- **`privilege` — ask for sudo once, and hold it for the whole run.** `pkg`
-  could put `sudo` in front of one command; a script running twenty of them
-  over several minutes needs the prompt up front, the ticket kept alive, and
-  no child able to stop and ask again halfway through.
-
-  `dybatpho::privilege_needed`, `dybatpho::privilege_command`,
-  `dybatpho::privilege_acquire`, `dybatpho::privilege_release` and
-  `dybatpho::privilege_run`.
-
-  ```sh
-  . dybatpho/init.sh --modules privilege
-
-  dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
-  dybatpho::privilege_run -- apt-get install -y the-tools
-  dybatpho::privilege_release
-  ```
-
-  `--shield` puts a non-interactive escalation command first on `PATH`, so a
-  child cannot hang the run with a prompt nothing can display. The background
-  refresher watches its parent rather than waiting to be signalled, so a
-  script that is killed outright does not leave it behind. With no cached
-  ticket and no terminal the call fails instead of blocking, which is what a
-  run from cron needs. `DYBATPHO_PRIVILEGE_SUSPEND_HOOK` is how a full-screen
-  caller gives the terminal back around the prompt. Calling
-  `dybatpho::privilege_acquire` again while the escalation is held adds only
-  what the first call left out, such as the `--shield` wrapper; it never
-  starts a second refresher or wrapper.
-
-- **`array` — order a dependency graph instead of resolving one by hand.**
-  `dybatpho::array_toposort` reads an associative array of edges and returns
-  an order where a dependency comes before what needs it;
-  `dybatpho::array_closure` answers what a set of roots pulls in.
-
-  ```sh
-  declare -A deps=([cli]="config validate" [config]="validate")
-  dybatpho::array_toposort deps order   # validate config cli
-  dybatpho::array_closure deps needed cli
-  ```
-
-  The order is the same on every run, because the walk starts from the keys
-  sorted rather than in the order Bash hashes them into. An entry named only
-  as a dependency is in the result, since a leaf still has to come first. A
-  cycle is reported through the exit code with an order still returned: some
-  graphs have one on purpose, and `init.sh`'s own `text`/`table` pair is one.
 
 - **`dybatpho::color_supported` — one answer for whether output should carry
   colour.** `NO_COLOR` wins over everything, `FORCE_COLOR` overrides the

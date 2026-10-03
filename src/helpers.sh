@@ -236,6 +236,28 @@ function dybatpho::expect_envs {
   done
 }
 
+#######################################
+# @description Stop the script unless an optional module is loaded, saying who
+#   needs it and how to load it. A module that calls another one only from a
+#   few of its functions guards those functions with this rather than loading
+#   the other module for every script.
+#
+#   The marker has to be an internal `__dybatpho_` helper of the needed module,
+#   never a public function: public functions are exported, so a child shell
+#   inherits them without the internals they call, and a guard on a public name
+#   would pass there and then fail on the first internal call.
+# @arg $1 string Module that is needed
+# @arg $2 string Internal helper of that module whose presence means it is loaded
+# @arg $3 string What needs the module, usually the public function's name
+# @arg $4 number Exit code to stop with, default is `1`
+# @exitcode 0 The module is loaded
+# @internal
+#######################################
+function __dybatpho_helpers_need_module {
+  declare -F "$2" > /dev/null \
+    || dybatpho::die "$3 needs the $1 module, load it with: dybatpho::load $1" "${4:-1}"
+}
+
 # What tells a version range apart from the exit code that may sit in the same
 # argument. The pattern is held in a variable for two reasons: written inline
 # and unquoted, `<` and `>` are read as redirections before the conditional ever
@@ -305,14 +327,8 @@ function dybatpho::require {
   fi
   [[ -n "${range}" ]] || return 0
 
-  # The guard names an internal helper on purpose: `dybatpho::` functions are
-  # exported and a child shell inherits them without the internals they call,
-  # so testing the public name would pass here in a child that never loaded
-  # `semver` and then fail on the first internal call.
-  declare -F __dybatpho_semver_holds > /dev/null \
-    || dybatpho::die \
-      "${command_name} ${range} needs the semver module, load it with: dybatpho::load semver" \
-      "${exit_code}"
+  __dybatpho_helpers_need_module semver __dybatpho_semver_holds \
+    "${command_name} ${range}" "${exit_code}"
 
   local found
   found="$(dybatpho::command_version "${command_name}")" \

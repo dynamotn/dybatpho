@@ -400,8 +400,7 @@ function __dybatpho_cache_refresh_background {
 # @internal
 #######################################
 function __dybatpho_cache_need_lock {
-  declare -F __dybatpho_lock_try > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the lock module, load it with: dybatpho::load lock"
+  __dybatpho_helpers_need_module lock __dybatpho_lock_try "${FUNCNAME[1]}"
 }
 
 #######################################

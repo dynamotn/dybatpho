@@ -1148,8 +1148,7 @@ function dybatpho::csv_to_json {
 # @internal
 #######################################
 function __dybatpho_csv_need_json {
-  declare -F __dybatpho_json_escape_into > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
+  __dybatpho_helpers_need_module json __dybatpho_json_escape_into "${FUNCNAME[1]}"
 }
 
 #######################################

@@ -188,8 +188,7 @@ function dybatpho::text_columns {
 # @internal
 #######################################
 function __dybatpho_text_need_table {
-  declare -F __dybatpho_table_measure_widths > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the table module, load it with: dybatpho::load table"
+  __dybatpho_helpers_need_module table __dybatpho_table_measure_widths "${FUNCNAME[1]}"
 }
 
 #######################################

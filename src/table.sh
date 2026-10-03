@@ -567,8 +567,7 @@ function dybatpho::table_from_json {
 # @internal
 #######################################
 function __dybatpho_table_need_csv {
-  declare -F __dybatpho_csv_parse_into > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the csv module, load it with: dybatpho::load csv"
+  __dybatpho_helpers_need_module csv __dybatpho_csv_parse_into "${FUNCNAME[1]}"
 }
 
 #######################################

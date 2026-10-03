@@ -296,8 +296,7 @@ function dybatpho::metrics_observe_ms {
 # @internal
 #######################################
 function __dybatpho_metrics_need {
-  declare -F "$2" > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the $1 module, load it with: dybatpho::load $1"
+  __dybatpho_helpers_need_module "$1" "$2" "${FUNCNAME[1]}"
 }
 
 #######################################

@@ -313,8 +313,7 @@ function dybatpho::release_package {
   # are exported and a child shell inherits them without the internals they
   # call, so testing the public name would pass in a child that never loaded
   # `archive` and then fail on the first internal call.
-  declare -F __dybatpho_archive_format > /dev/null \
-    || dybatpho::die "${FUNCNAME[0]} needs the archive module, load it with: dybatpho::load archive"
+  __dybatpho_helpers_need_module archive __dybatpho_archive_format "${FUNCNAME[0]}"
   [[ -e "${source}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Source doesn't exist: ${source}"
   goos="${5:-$(dybatpho::goos)}"

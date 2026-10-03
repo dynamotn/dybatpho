@@ -2024,8 +2024,7 @@ function dybatpho::i18n_weekday_name {
 # @internal
 #######################################
 function __dybatpho_i18n_need_date {
-  declare -F __dybatpho_date_parse > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the date module, load it with: dybatpho::load date"
+  __dybatpho_helpers_need_module date __dybatpho_date_parse "${FUNCNAME[1]}"
 }
 
 #######################################

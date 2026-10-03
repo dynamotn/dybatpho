@@ -766,8 +766,7 @@ function dybatpho::notify_email {
   # The guard names an internal helper: a child shell inherits the exported
   # `dybatpho::` functions without the internals `validate_is` calls. It is
   # exercised in a child shell, which kcov does not follow.
-  declare -F __dybatpho_validate_match > /dev/null \
-    || dybatpho::die "${FUNCNAME[0]} needs the validate module, load it with: dybatpho::load validate" # kcov(skip)
+  __dybatpho_helpers_need_module validate __dybatpho_validate_match "${FUNCNAME[0]}"
   local from="${4:-${DYBATPHO_EMAIL_FROM-}}"
 
   # The `die` lines below are tested under `run`, which kcov cannot observe.

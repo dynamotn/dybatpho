@@ -1319,8 +1319,7 @@ function dybatpho::curl_graphql {
 # @internal
 #######################################
 function __dybatpho_network_need_json {
-  declare -F __dybatpho_json_cmd_into > /dev/null \
-    || dybatpho::die "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
+  __dybatpho_helpers_need_module json __dybatpho_json_cmd_into "${FUNCNAME[1]}"
 }
 
 #######################################

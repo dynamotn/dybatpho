@@ -463,8 +463,7 @@ function dybatpho::safe_extract {
   # shell inherits them without the internals they call, so testing the public
   # name would pass in a child that never loaded `archive` and then fail on the
   # first internal call.
-  declare -F __dybatpho_archive_entry_is_safe > /dev/null \
-    || dybatpho::die "${FUNCNAME[0]} needs the archive module, load it with: dybatpho::load archive"
+  __dybatpho_helpers_need_module archive __dybatpho_archive_entry_is_safe "${FUNCNAME[0]}"
   local force="${DYBATPHO_FORCE}"
   local -a positional=()
   while (($#)); do

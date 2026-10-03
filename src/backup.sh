@@ -954,8 +954,7 @@ function dybatpho::backup_diff {
   dybatpho::expect_args older newer -- "$@"
   # The guard names an internal helper: a child shell inherits the exported
   # `dybatpho::` functions without the internals `diff_dir` calls.
-  declare -F __dybatpho_diff_tree_into > /dev/null \
-    || dybatpho::die "${FUNCNAME[0]} needs the diff module, load it with: dybatpho::load diff"
+  __dybatpho_helpers_need_module diff __dybatpho_diff_tree_into "${FUNCNAME[0]}"
 
   local older_root newer_root
   __dybatpho_backup_root_into older_root "${older}"

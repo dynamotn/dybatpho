@@ -521,8 +521,7 @@ function dybatpho::md_table {
   # exported and a child shell inherits them without the internals they call,
   # so testing the public name would pass in a child that never loaded `table`
   # and then fail on the first internal call.
-  declare -F __dybatpho_table_measure_widths > /dev/null \
-    || dybatpho::die "${FUNCNAME[0]} needs the table module, load it with: dybatpho::load table"
+  __dybatpho_helpers_need_module table __dybatpho_table_measure_widths "${FUNCNAME[0]}"
   dybatpho::table_markdown "${input}" "${delimiter}"
 }
 

@@ -727,6 +727,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scope. The handler now comes back exactly as it was registered, and nothing
   in the caller changes.
 
+- **`parallel` — a pool no longer leaves its interrupt handler behind.**
+  `dybatpho::parallel_map` and `dybatpho::parallel_run` appended a handler to
+  SIGINT and SIGTERM that ends the pool's jobs, and never took it out, so a
+  script running pools in a loop collected one more handler per call, each
+  ending process IDs that were long gone. The handlers the pool found are now
+  put back when it ends.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

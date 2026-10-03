@@ -149,6 +149,7 @@ done
 - A job that exits with `124` of its own accord, which reads the same as a timeout, as it does with `timeout`.
 - A child shell that inherited the exported `dybatpho::tui_progress_*` functions without loading `tui`, which must take the plain report.
 - A run captured in a command substitution, which happens in a subshell.
+- A script that runs pools in a loop, and has SIGINT or SIGTERM handlers of its own.
 
 ## Requirements *(mandatory)*
 
@@ -176,6 +177,7 @@ done
 - **FR-020**: The watchdog enforcing a limit MUST NOT keep the run open once its job has finished or the run is interrupted, and MUST NOT hold the caller's output streams.
 - **FR-021**: `--progress`, or a true-like `DYBATPHO_PARALLEL_PROGRESS`, MUST report finished jobs on standard error only: through the `tui` progress bar when that module is loaded, detected by an internal `tui` helper rather than a public name, and otherwise as one `Jobs: <done>/<total> finished` line per reap; `tui` MUST NOT become a dependency of `parallel`.
 - **FR-022**: Loading the module MUST NOT load `date`. A time limit in plain seconds MUST work without it; any other duration MUST stop the caller, naming the `date` module and how to load it, when that module is not loaded, before any job starts or anything is created.
+- **FR-023**: A run MUST put back the SIGINT and SIGTERM handlers it found once it ends, so its terminate handler does not outlive it and repeated runs do not accumulate handlers.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -227,6 +229,7 @@ done
 - **IT-031**: Verify a run without progress writes nothing of its own to standard error.
 - **IT-032**: In a child shell that loads only `parallel`, verify one plain progress line per finished job.
 - **IT-033**: In a child shell that loads only `parallel`, run with a limit in seconds, have a `5m` limit stop the call and name the `date` module without running the job, and run with it once `date` is loaded.
+- **IT-034**: In a child shell with a SIGTERM handler of its own, run several pools and verify the SIGINT and SIGTERM handlers are the same after each one and never name the pool's terminate handler.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -438,3 +438,28 @@ SCRIPT
   assert_success
   assert_output --partial "ran"
 }
+
+@test "a pool puts back the signal handlers it found" {
+  # Each pool appended its terminate handler to SIGINT and SIGTERM and never
+  # took it out, so a script running pools in a loop collected one more handler
+  # per call, each ending process IDs long since gone.
+  local script="${BATS_TEST_TMPDIR}/pools.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules parallel
+_job() { :; }
+trap 'echo caller' SIGTERM
+# The first pool registers its temporary directory for cleanup, which installs
+# the one cleanup handler a shell keeps; the handlers are read after it.
+dybatpho::parallel_map 2 _job a b > /dev/null 2>&1
+before="$(trap -p SIGTERM)"
+before_int="$(trap -p SIGINT)"
+for _ in 1 2 3; do
+  dybatpho::parallel_map 2 _job a b > /dev/null 2>&1
+done
+[[ "$(trap -p SIGTERM)" == "${before}" ]] || { trap -p SIGTERM; exit 1; }
+[[ "$(trap -p SIGINT)" == "${before_int}" ]] || { trap -p SIGINT; exit 2; }
+[[ "${before}${before_int}" != *parallel_terminate* ]] || exit 3
+SCRIPT
+  run_traced bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+}

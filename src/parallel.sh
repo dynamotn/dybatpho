@@ -368,7 +368,11 @@ function __dybatpho_parallel_pool {
   done
 
   # A job left running after an interrupt keeps working on output nobody will
-  # read, so the pool ends its children before the shell goes away.
+  # read, so the pool ends its children before the shell goes away. The
+  # handlers it found are put back at the end, so a script running pools in a
+  # loop does not collect one more handler per call.
+  local __dybatpho_parallel_traps
+  __dybatpho_process_traps_save_into __dybatpho_parallel_traps SIGINT SIGTERM
   declare -ga __dybatpho_parallel_pids=() __dybatpho_parallel_watchdogs=()
   # The lists of process IDs have to expand when the signal arrives, not now,
   # which is why this is a single-quoted string; the escaped newline inside it
@@ -425,6 +429,7 @@ function __dybatpho_parallel_pool {
   done
 
   [[ "${__dybatpho_parallel_monitor}" == "on" ]] || set +m
+  __dybatpho_process_traps_restore "${__dybatpho_parallel_traps}" SIGINT SIGTERM
 
   __dybatpho_parallel_flush "${directory}" "${total}"
   ((failed == 0))

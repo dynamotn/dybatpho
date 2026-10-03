@@ -548,6 +548,7 @@ function dybatpho::table_csv {
 function dybatpho::table_from_csv {
   local input
   dybatpho::expect_args input -- "$@"
+  __dybatpho_table_need_csv
   local style="${2:-plain}"
   local align_spec="${3-}"
   __dybatpho_table_expect_style "${style}"
@@ -598,6 +599,7 @@ function dybatpho::table_from_csv {
 function dybatpho::table_from_json {
   local input
   dybatpho::expect_args input -- "$@"
+  __dybatpho_table_need_csv
   local style="${2:-plain}"
   local align_spec="${3-}"
   __dybatpho_table_expect_style "${style}"
@@ -620,6 +622,27 @@ function dybatpho::table_from_json {
   csv="$(DYBATPHO_CSV_DELIMITER="," dybatpho::csv_from_json "${document}")" || status=$?
   ((status == 0)) || return "${status}"
   DYBATPHO_CSV_DELIMITER="," dybatpho::table_from_csv - "${style}" "${align_spec}" <<< "${csv}"
+}
+
+#######################################
+# @description Stop unless the `csv` module is loaded.
+#   Reading CSV and turning JSON records into rows is the `csv` module's work,
+#   and it brings `json` and `math` with it. Registering it as a dependency
+#   would load all three into every script that draws a plain table -- and
+#   through `text`, `markdown` and `testing`, far more scripts than that -- so
+#   the two renderers that need it ask for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `csv`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `csv` module is not loaded
+# @internal
+#######################################
+function __dybatpho_table_need_csv {
+  declare -F __dybatpho_csv_parse_into > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the csv module, load it with: dybatpho::load csv"
 }
 
 #######################################

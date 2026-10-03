@@ -107,6 +107,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - An invalid alignment name or negative/non-numeric gap is supplied.
 - A CSV value holds the delimiter, a quote, a line break, or `|`; the only cell is `-`; the file uses `;` or a tab.
 - A JSON document is an empty array, is not an array of objects, or no JSON processor is installed.
+- The script loaded `table` but not `csv`, and asks for a CSV or JSON rendering.
 
 ## Requirements *(mandatory)*
 
@@ -137,6 +138,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **FR-014**: A line break inside a CSV value MUST be drawn as a space, and the Markdown style MUST escape `|` inside a value.
 - **FR-015**: The module MUST render a JSON array of objects, taking the header from the keys of the first object and leaving a missing key's cell empty, and MUST report a document that is not an array of objects through its exit status.
 - **FR-016**: An empty CSV input or an empty JSON array MUST render nothing, and an unknown style MUST stop the script.
+- **FR-017**: Loading `table` MUST NOT load `csv`. The CSV and JSON renderers MUST stop the script, naming the `csv` module and how to load it, when it is not loaded, before reading any input; the other renderers MUST work without it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -170,6 +172,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **IT-011**: Render JSON from text, a file and stdin under a caller's delimiter, and an empty array.
 - **IT-012**: Reject an unknown style for both renderers.
 - **IT-013**: Report a JSON document that is not an array of objects without ending the caller.
+- **IT-014**: In a shell that loaded `table` alone, draw a plain table, stop both CSV and JSON renderers with the message naming `dybatpho::load csv`, and render once `csv` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

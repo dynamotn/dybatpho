@@ -267,9 +267,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DYBATPHO_CSV_DELIMITER` for semicolon and tab files.
   `dybatpho::table_from_json` renders a JSON array of objects, the first
   object's keys as the header. Both draw `plain`, `box` or `markdown`; a line
-  break inside a value is drawn as a space and Markdown escapes `|`. Loading
-  `table` — and so `text` and `markdown` — now loads `csv`, `json` and `math`
-  too.
+  break inside a value is drawn as a space and Markdown escapes `|`. Both need
+  the `csv` module, which `table` does not load for you, so a script that only
+  draws plain tables does not pay for the parser; without it they stop and say
+  `dybatpho::load csv`.
 
   ```sh
   dybatpho::csv_sort billing.csv cost desc | dybatpho::table_from_csv - box

@@ -234,3 +234,31 @@ EOF
   assert_output ""
   assert_stderr --partial "not an array of objects"
 }
+
+@test "dybatpho::table_from_csv and table_from_json ask for the csv module when it is not loaded" {
+  # `table` does not load `csv`, so a script that only drew plain tables does
+  # not pay for the parser. A child shell started from a file, without the
+  # functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules table\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::table_print "a,b" ","'
+    printf '%s\n' "dybatpho::\${1} 'a,b' box"
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_csv
+  assert_failure
+  assert_line --index 0 "a  b"
+  assert_output --partial "dybatpho::table_from_csv needs the csv module, load it with: dybatpho::load csv"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_json
+  assert_failure
+  assert_output --partial "dybatpho::table_from_json needs the csv module, load it with: dybatpho::load csv"
+
+  # Once the script loads it, the same call renders.
+  sed -i 's/--modules table/--modules table csv/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_csv
+  assert_success
+  assert_output --partial "│ a │ b │"
+}

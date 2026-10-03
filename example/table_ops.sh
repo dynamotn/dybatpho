@@ -5,7 +5,7 @@
 #   table_from_csv, and table_from_json
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules table
+. "${SCRIPTDIR}/../init.sh" --modules table csv
 
 dybatpho::register_common_handlers
 

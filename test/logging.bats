@@ -392,22 +392,20 @@ a newline'
   run_traced --separate-stderr dybatpho::header "alpha beta gamma"
   assert_success
   refute_stderr
-  assert_output << EOF
-╔══════════════╗
-║ alpha beta   ║
-║ gamma        ║
-╚══════════════╝
+  assert_output - << EOF
+╔══════════════════╗
+║ alpha beta gamma ║
+╚══════════════════╝
 EOF
 
   run_traced --separate-stderr dybatpho::success "deploy finished cleanly"
   assert_success
   refute_stderr
-  assert_output << EOF
-╭────────────────╮
-│ ✅ DONE: deploy │
-│ finished       │
-│ cleanly        │
-╰────────────────╯
+  assert_output - << EOF
+╭──────────────────╮
+│ ✅ DONE: deploy  │
+│ finished cleanly │
+╰──────────────────╯
 EOF
 }
 

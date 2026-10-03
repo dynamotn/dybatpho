@@ -138,6 +138,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - The caller wants fixed-delay retries instead of escalating delays.
 - An assertion condition contains shell syntax evaluated through `eval`.
 - Breakpoint is invoked in unattended CI rather than an interactive terminal.
+- `dybatpho::is int` or `dybatpho::is number` is given a quoted character such as `'a`, a hexadecimal `0x1F`, surrounding blanks, a decimal comma, or an integer with a leading zero.
 
 ## Requirements *(mandatory)*
 
@@ -192,6 +193,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-017a**: Rendering MUST drop the banner rules and any `shellcheck` directive standing between the comment and the definition, MUST remove one comment marker and the space after it from each line, and MUST remove the `@description` marker from the prose it introduces, leaving every other tag as written.
 - **FR-017b**: The output MUST open with a heading naming the function and where it came from, including the module when one can be named.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.
+- **FR-019**: `dybatpho::is number` MUST accept exactly what `validate_is number` accepts, and `dybatpho::is int` MUST accept only optionally signed decimal integers without a leading zero, a subset of what `validate_is int` accepts; neither MUST depend on `printf` or `LC_NUMERIC`.
 - **FR-018a**: Listing MUST NOT depend on an external command, since its purpose is to answer when nothing else is at hand.
 - **FR-018b**: Listing for a module MUST stop the script when that module is not loaded, and when no function can be attributed to a module at all, rather than returning an empty list that would read as "this module exports nothing".
 
@@ -240,6 +242,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
   while still sorting an ordinary one.
 - **IT-018**: Verify the command check accepts an executable given by path, and
   refuses a missing path, a file without the executable bit, and a directory.
+- **IT-019**: Refuse `'a`, `0x1F`, blanks, `1,5`, `inf`, `010` and `08` as ints and the non-numbers among them as numbers, and verify over a sample set that `is number` agrees with `validate_is number` and that every value `is int` accepts, `validate_is int` accepts too.
 
 ## Acceptance Criteria *(mandatory)*
 

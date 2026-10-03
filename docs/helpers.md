@@ -49,7 +49,7 @@ reach for at a prompt.
 - [`dybatpho::expect_envs`](#dybatphoexpect_envs) — Ensure that required environment variables are set.
 - [`dybatpho::require`](#dybatphorequire) — Ensure that a required command is installed, and new enough. With a version range, the command is asked what version it is through `dybatpho::command_version`, the answer is normalized by `dybatpho::semver_coerce`, and the result is matched with `dybatpho::semver_satisfies`. The range is written the way that function documents it: `>=1.6`, `^4`, `>=1.2 <2`, `1.2.x`, or alternatives with `||`. The range has to open with one of `>`, `<`, `=`, `^`, or `~`. A bare `4` is a valid range on its own elsewhere, but this argument has meant an exit code since before ranges existed here, and no amount of cleverness makes `require jq 3` mean both things at once. Matching a version needs the optional `semver` module. Rather than let a range pass unchecked in a script that did not load it, this stops with a message naming what to load: a requirement that is silently not enforced is worse than one that was never written. A command whose version cannot be read is also a failure, for the same reason. `dybatpho::doctor` treats that case as a report rather than a failure, because a report is allowed to say "I could not tell".
 - [`dybatpho::command_exists_all`](#dybatphocommand_exists_all) — Return success when all listed commands are available.
-- [`dybatpho::is`](#dybatphois) — Check whether a value matches a supported shell-oriented condition.
+- [`dybatpho::is`](#dybatphois) — Check whether a value matches a supported shell-oriented condition. `number` is a plain decimal, optionally signed, with an optional fraction and exponent (`-1.5`, `.5`, `1e3`), the same as `validate_is number`. `int` is an optionally signed decimal integer with no leading zero, since Bash arithmetic reads one as octal. Neither accepts blanks, `0x`, a locale's decimal comma, or the quoted character codes `printf` takes.
 - [`dybatpho::coalesce`](#dybatphocoalesce) — Print the first non-empty value from a list of fallbacks.
 - [`dybatpho::coalesce_cmd`](#dybatphocoalesce_cmd) — Print the first available command from a list of candidates.
 - [`dybatpho::default_env`](#dybatphodefault_env) — Assign and export a default value for an environment variable when it is empty.
@@ -365,6 +365,11 @@ Return success when all listed commands are available.
 ### `dybatpho::is`
 
 Check whether a value matches a supported shell-oriented condition.
+`number` is a plain decimal, optionally signed, with an optional fraction
+and exponent (`-1.5`, `.5`, `1e3`), the same as `validate_is number`.
+`int` is an optionally signed decimal integer with no leading zero, since
+Bash arithmetic reads one as octal. Neither accepts blanks, `0x`, a
+locale's decimal comma, or the quoted character codes `printf` takes.
 
 **🧾 Arguments**
 

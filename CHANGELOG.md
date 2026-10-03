@@ -814,6 +814,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::array_toposort` stopped the script on an empty array or an empty
   result. They now handle one.
 
+- **`helpers` — `dybatpho::is int` and `dybatpho::is number` accept only
+  numbers.** They were answered by `printf '%d'` and `printf '%f'`, so `'a`
+  (a character code), `0x1F`, a value with blanks around it, and a decimal
+  comma under some locales all passed, while `08` failed and `010` passed as
+  octal 8. `number` now accepts what `dybatpho::validate_is number` accepts,
+  and `int` an optionally signed decimal integer without a leading zero.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

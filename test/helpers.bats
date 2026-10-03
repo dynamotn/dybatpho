@@ -359,6 +359,40 @@ require_fake_tool() {
   refute_output
 }
 
+@test "dybatpho::is int and number refuse what printf would coerce" {
+  # These used to go through `printf '%d'` and `printf '%f'`, which take a
+  # leading quote as a character code, read `0x` as hexadecimal, skip leading
+  # blanks, and follow `LC_NUMERIC`.
+  local value
+  for value in "'a" '"a' 0x1F " 12" "12 " 1,5 inf nan ""; do
+    run_traced -1 dybatpho::is int "${value}"
+    run_traced -1 dybatpho::is number "${value}"
+  done
+  # A leading zero is octal to Bash arithmetic, so `010` would count as 8 and
+  # `08` stop a script; an int is a value arithmetic reads as written.
+  run_traced -1 dybatpho::is int 010
+  run_traced -1 dybatpho::is int 08
+  run_traced -0 dybatpho::is int 0
+  run_traced -0 dybatpho::is int +7
+  run_traced -0 dybatpho::is number 1e3
+  run_traced -0 dybatpho::is number .5
+  run_traced -0 dybatpho::is number 010
+}
+
+@test "dybatpho::is int and number never accept what validate_is rejects" {
+  # The two checks share one meaning of a number; `is int` is only stricter
+  # about leading zeros, which arithmetic reads as octal.
+  local value status expected
+  for value in 0 7 -7 +7 010 08 1.5 .5 5. -1e3 1E+3 1e 'x' "'a" 0x1F 1,5 "" " 1" inf; do
+    if dybatpho::is int "${value}"; then
+      dybatpho::validate_is int "${value}" || fail "is int accepts '${value}', validate_is does not"
+    fi
+    dybatpho::is number "${value}" && status=0 || status=1
+    dybatpho::validate_is number "${value}" && expected=0 || expected=1
+    assert_equal "${status}" "${expected}"
+  done
+}
+
 @test "dybatpho::is true" {
   run_traced dybatpho::is "true" "0"
   assert_success

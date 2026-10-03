@@ -338,8 +338,20 @@ function dybatpho::command_exists_all {
   return 0
 }
 
+# What `dybatpho::is int` and `dybatpho::is number` accept. `number` is the
+# expression `validate.sh` uses for its own `number` type, so the two checks
+# agree; `int` also refuses a leading zero, which Bash arithmetic reads as
+# octal, so every int it passes can go straight into `(( ))` as written.
+__DYBATPHO_HELPERS_RE_INT='^[+-]?(0|[1-9][0-9]*)$'
+__DYBATPHO_HELPERS_RE_NUMBER='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$'
+
 #######################################
 # @description Check whether a value matches a supported shell-oriented condition.
+#   `number` is a plain decimal, optionally signed, with an optional fraction
+#   and exponent (`-1.5`, `.5`, `1e3`), the same as `validate_is number`.
+#   `int` is an optionally signed decimal integer with no leading zero, since
+#   Bash arithmetic reads one as octal. Neither accepts blanks, `0x`, a
+#   locale's decimal comma, or the quoted character codes `printf` takes.
 # @arg $1 string Condition
 #   (command|function|file|dir|link|exist|readable|writeable|executable|set|empty|number|int|true|false)
 # @arg $2 string Value to test
@@ -396,11 +408,11 @@ function dybatpho::is {
       return "$?"
       ;;
     number)
-      printf -- '%f' "${input:-null}"
+      [[ "${input}" =~ ${__DYBATPHO_HELPERS_RE_NUMBER} ]]
       return "$?"
       ;;
     int)
-      printf -- '%d' "${input:-null}"
+      [[ "${input}" =~ ${__DYBATPHO_HELPERS_RE_INT} ]]
       return "$?"
       ;;
     true)

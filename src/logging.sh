@@ -67,6 +67,23 @@ declare -gA __dybatpho_log_timer=()
 declare -g __dybatpho_log_reserved_fields=" timestamp level source message request_id hostname pid duration_ms "
 
 #######################################
+# @description Mask registered secrets in a variable before it is written
+#   anywhere. It does nothing until a secret has been registered, so output
+#   costs nothing extra in the usual case, and nothing when the masking
+#   internals are missing, as in a child shell that inherited only the exported
+#   functions. Every writer in the library goes through here, so the hook
+#   contract lives in one place.
+# @arg $1 string Name of the variable to mask in place
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_redact {
+  ((${DYBATPHO_SECRET_COUNT:-0} > 0)) || return 0
+  declare -F __dybatpho_secret_mask_var > /dev/null || return 0
+  __dybatpho_secret_mask_var "$1"
+}
+
+#######################################
 # @description Log a message to stdout or stderr, optionally with ANSI color.
 # @set LOG_LEVEL string Runtime log level of the current script
 # @arg $1 string Log level of message
@@ -85,9 +102,7 @@ function __dybatpho_log {
   local color="${4:-${log_colors[${show_log_level}]}}"
 
   # Redact registered secrets before anything reaches stdout or stderr.
-  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-    __dybatpho_secret_mask_var msg
-  fi
+  __dybatpho_log_redact msg
 
   dybatpho::validate_log_level "${LOG_LEVEL}" || return 1
   dybatpho::validate_log_level "${show_log_level}" || return 1
@@ -358,9 +373,7 @@ function __dybatpho_log_write_file {
   [[ -n "${LOG_FILE:-}" ]] || return 0
   dybatpho::compare_log_level "${log_level}" "${LOG_FILE_LEVEL:-${LOG_LEVEL}}" || return 0
 
-  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-    __dybatpho_secret_mask_var message
-  fi
+  __dybatpho_log_redact message
 
   local log_dir
   log_dir=$(dirname "${LOG_FILE}")
@@ -390,9 +403,7 @@ function __dybatpho_log_structured {
   dybatpho::compare_log_level "${log_level}" || return 0
   timestamp=$(__dybatpho_log_timestamp)
 
-  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-    __dybatpho_secret_mask_var message
-  fi
+  __dybatpho_log_redact message
 
   local log_duration_ms
   log_duration_ms=$(__dybatpho_log_duration_ms)
@@ -1058,9 +1069,7 @@ function __dybatpho_log_context_json {
   local key value
   for key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
     value="${__dybatpho_log_context_values[${key}]-}"
-    if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-      __dybatpho_secret_mask_var value
-    fi
+    __dybatpho_log_redact value
     local log_json_escape
     log_json_escape=$(__dybatpho_log_json_escape "${value}")
     local log_json_escape_2
@@ -1082,9 +1091,7 @@ function __dybatpho_log_context_text {
   local key value
   for key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
     value="${__dybatpho_log_context_values[${key}]-}"
-    if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-      __dybatpho_secret_mask_var value
-    fi
+    __dybatpho_log_redact value
     printf ' %s=%s' "${key}" "${value}"
   done
 }
@@ -1442,9 +1449,7 @@ function dybatpho::spinner {
   (($# > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected a command after --"
 
-  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-    __dybatpho_secret_mask_var message
-  fi
+  __dybatpho_log_redact message
 
   local animate=false
   case "${DYBATPHO_SPINNER}" in

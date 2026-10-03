@@ -354,9 +354,7 @@ function dybatpho::tui_spinner_start {
     return 1
   fi
 
-  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-    __dybatpho_secret_mask_var message
-  fi
+  __dybatpho_log_redact message
 
   if ! dybatpho::tui_supported; then
     __dybatpho_tui_spinner_file=""
@@ -391,9 +389,7 @@ function dybatpho::tui_spinner_message {
   local message
   dybatpho::expect_args message -- "$@"
 
-  if ((${DYBATPHO_SECRET_COUNT:-0} > 0)) && declare -F __dybatpho_secret_mask_var > /dev/null; then
-    __dybatpho_secret_mask_var message
-  fi
+  __dybatpho_log_redact message
 
   if [[ -z "${__dybatpho_tui_spinner_file}" ]]; then
     if [[ -z "${DYBATPHO_TUI_SPINNER_PID}" ]] && dybatpho::tui_supported; then

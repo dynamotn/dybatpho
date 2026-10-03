@@ -1093,10 +1093,12 @@ function __dybatpho_csv_matches {
 # @exitcode 1 A row has more fields than the header
 # @example
 #   dybatpho::csv_to_json report.csv | dybatpho::json_pretty -
+# @note Needs the `json` module: `dybatpho::load json`, or `--modules csv json`
 #######################################
 function dybatpho::csv_to_json {
   local input
   dybatpho::expect_args input -- "$@"
+  __dybatpho_csv_need_json
 
   local -a records=() names=() fields=()
   local text at index object document="" name_json value_json
@@ -1126,6 +1128,28 @@ function dybatpho::csv_to_json {
   done
 
   printf '[%s]\n' "${document}"
+}
+
+#######################################
+# @description Stop unless the `json` module is loaded.
+#   Encoding each value as a JSON string is the `json` module's work, and only
+#   the conversion to JSON does it: reading, filtering, sorting, joining and
+#   the conversion from JSON, which runs `jq` or `yq` itself, need nothing from
+#   it. Registering it as a dependency would load it into every script that
+#   only reads a spreadsheet -- and into every `table` that renders one -- so
+#   the conversion asks for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `json`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `json` module is not loaded
+# @internal
+#######################################
+function __dybatpho_csv_need_json {
+  declare -F __dybatpho_json_escape_into > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
 
 #######################################

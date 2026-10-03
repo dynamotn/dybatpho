@@ -427,6 +427,10 @@ dybatpho::csv_to_json report.csv | dybatpho::json_pretty -
 | --- | --- | --- |
 | `$1` | string | CSV file path, `-` for stdin, or CSV text |
 
+**📝 Notes**
+
+- Needs the `json` module: `dybatpho::load json`, or `--modules csv json`
+
 **📤 Output on stdout**
 
 - Compact JSON array

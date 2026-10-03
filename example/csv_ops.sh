@@ -5,7 +5,7 @@
 #   csv_filter, csv_to_json, csv_from_json, csv_convert, csv_select, csv_sort, and csv_join
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules csv
+. "${SCRIPTDIR}/../init.sh" --modules csv json
 
 dybatpho::register_common_handlers
 

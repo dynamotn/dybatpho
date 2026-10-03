@@ -510,6 +510,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules diff json   # or: dybatpho::load json
   ```
 
+- **BREAKING: `csv` no longer loads `json`.** Only `dybatpho::csv_to_json`
+  needs it, to encode each value, and it now stops with
+  `dybatpho::csv_to_json needs the json module, load it with: dybatpho::load
+  json` when it is missing; every other `csv` function, including
+  `dybatpho::csv_from_json`, works without it. `csv` still loads `math`. A
+  script that calls `dybatpho::csv_to_json`, or any `dybatpho::json_*` helper,
+  having asked only for `csv` must now ask for `json` too:
+
+  ```sh
+  . dybatpho/init.sh --modules csv json   # or: dybatpho::load json
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

@@ -144,6 +144,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - Neither `jq` nor `yq` is installed and a JSON conversion is asked for.
 - The delimiter is empty, longer than one character, a quote, a line break, or the unit separator.
 - A value holds the target delimiter of a conversion, or holds the source delimiter that no longer needs quoting.
+- Conversion to JSON is asked for by a script that loaded `csv` without `json`.
 
 ## Requirements *(mandatory)*
 
@@ -183,6 +184,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-032**: Joining MUST reject an unknown join type, a key column a side lacks, and reading both inputs from stdin.
 - **FR-033**: Text between a closing quote and the next delimiter, or the end of the record, MUST be kept in that one field and MUST NOT be read again as a field of its own.
 - **FR-034**: Conversion from JSON MUST write nothing and succeed for an empty array, the same on the `jq` and `yq` backends.
+- **FR-035**: Loading the module MUST NOT load `json`. Conversion to JSON MUST stop before reading its input with `<function> needs the json module, load it with: dybatpho::load json` when `json` is not loaded; every other function, including conversion from JSON, MUST work without it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -242,6 +244,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-038**: Reject an unknown join type, a missing key column, two stdins, and a row wider than its header.
 - **IT-039**: Read stray text after a closing quote as part of that field, in the middle of a record, at its end, and before a trailing delimiter.
 - **IT-040**: Convert an empty JSON array to no output and no error, through `jq` and through `yq` alone.
+- **IT-041**: Verify a script that loads `csv` alone can read a column, that its conversion to JSON stops with the message naming `json`, and that once it loads `json` the same call converts.
 
 ## Acceptance Criteria *(mandatory)*
 

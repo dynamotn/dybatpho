@@ -416,6 +416,36 @@ SCRIPT
   assert_output "1"
 }
 
+@test "summaries ask for math and a push asks for network when they are not loaded" {
+  # `metrics` loads neither, so counting and timing never pull in `curl`. The
+  # child inherits the public `math` and `network` functions this process
+  # exports, which is why the guards test internal helpers instead.
+  local script="${BATS_TEST_TMPDIR}/child_narrow.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules "${2}"
+dybatpho::metrics_counter_inc jobs_total
+dybatpho::metrics_render | grep '^jobs_total'
+case "${3}" in
+  summary) dybatpho::metrics_summary_ms fetch_seconds 10 && dybatpho::metrics_render | grep quantile=\"0.5\" ;;
+  push) DRY_RUN=true dybatpho::metrics_push http://gateway.invalid nightly ;;
+esac
+SCRIPT
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${DYBATPHO_DIR}" metrics summary
+  assert_failure
+  assert_line --index 0 "jobs_total 1"
+  assert_output --partial "dybatpho::metrics_summary_ms needs the math module, load it with: dybatpho::load math"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${DYBATPHO_DIR}" metrics push
+  assert_failure
+  assert_output --partial "dybatpho::metrics_push needs the network module, load it with: dybatpho::load network"
+
+  run -0 env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${DYBATPHO_DIR}" "metrics math" summary
+  assert_output --partial 'fetch_seconds{quantile="0.5"} 0.01'
+}
+
 @test "dybatpho::metrics_get rejects a kind it does not know" {
   run ! dybatpho::metrics_get sparkline jobs_total
   assert_output --partial "Unknown kind 'sparkline'"

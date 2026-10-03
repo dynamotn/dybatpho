@@ -7,7 +7,7 @@
 #   metrics_push, and the retry/HTTP/error instrumentation that loading this
 #   module turns on
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
-. "${SCRIPTDIR}/../init.sh" --modules metrics
+. "${SCRIPTDIR}/../init.sh" --modules metrics math network
 
 dybatpho::register_common_handlers
 

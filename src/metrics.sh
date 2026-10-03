@@ -279,6 +279,28 @@ function dybatpho::metrics_observe_ms {
 }
 
 #######################################
+# @description Stop unless an optional module the caller is about to use is
+#   loaded. Summaries take their quantiles from `math` and a push goes out
+#   through `network`; registering either as a dependency would load it, and
+#   with `network` require `curl`, in every script that only counts or times
+#   things -- which, through the hooks in `helpers`, `logging` and `network`,
+#   is any script that loads `metrics` at all.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded the
+#   module and then fail on the first internal call.
+# @arg $1 string Module name, `math` or `network`
+# @arg $2 string Internal helper of that module whose presence proves it loaded
+# @exitcode 1 The module is not loaded
+# @internal
+#######################################
+function __dybatpho_metrics_need {
+  declare -F "$2" > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the $1 module, load it with: dybatpho::load $1"
+}
+
+#######################################
 # @description Fail unless every quantile in `DYBATPHO_METRICS_QUANTILES` is a
 #   number from `0` to `1`.
 # @noargs
@@ -328,6 +350,7 @@ function dybatpho::metrics_summary_ms {
   local name milliseconds key
   dybatpho::expect_args name milliseconds -- "$@"
   shift 2
+  __dybatpho_metrics_need math __dybatpho_math_parse
   [[ "${milliseconds}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Duration must be a non-negative integer of milliseconds, got '${milliseconds}'"
   __dybatpho_metrics_validate_quantiles
@@ -751,6 +774,7 @@ function dybatpho::metrics_push {
   local gateway job
   dybatpho::expect_args gateway job -- "$@"
   shift 2
+  __dybatpho_metrics_need network __dybatpho_network_get_http_code
   [[ "${gateway}" =~ ^https?://[^/]+ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Pushgateway URL must start with http:// or https://, got '${gateway}'"
   [[ -n "${job}" ]] || dybatpho::die "${FUNCNAME[0]}: Job name must not be empty"

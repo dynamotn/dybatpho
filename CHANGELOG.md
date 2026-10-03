@@ -386,7 +386,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_count`. Where a histogram leaves the dashboard to estimate the 99th
   percentile from buckets, a summary states it. `dybatpho::metrics_get sum` and
   `count` read a summary's totals back, and one metric name cannot be recorded
-  as both a histogram and a summary. Loading `metrics` now loads `math` too.
+  as both a histogram and a summary. Summaries need the `math` module, which
+  `metrics` does not load for you; without it the call stops and says
+  `dybatpho::load math`.
 
   ```sh
   dybatpho::metrics_summary_ms fetch_duration_seconds 143 site=docs
@@ -403,7 +405,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metrics with `--add` (`POST`), goes through `dybatpho::curl_do` with its
   retries and `DRY_RUN`, returns its exit code, and logs the gateway's own error
   text when the push is refused. With nothing recorded it sends nothing and
-  says so. Loading `metrics` now loads `network` too.
+  says so. A push needs the `network` module, which `metrics` does not load
+  for you, so counting and timing never require `curl`; without it the push
+  stops and says `dybatpho::load network`.
 
   ```sh
   dybatpho::metrics_push https://pushgateway.example.com nightly-backup host="$(hostname)"

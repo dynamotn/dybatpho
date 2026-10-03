@@ -142,6 +142,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - A summary with a single observation, where every quantile is that value.
 - A quantile list that is empty, not numeric, or outside `0`–`1`.
 - One metric name used for both a histogram and a summary.
+- A script loads `metrics` alone and then records a summary or pushes.
 - A push with nothing recorded, or under `DRY_RUN`.
 - A grouping value that is empty, contains a `/`, a space, or non-ASCII text.
 - A Pushgateway that refuses the push with a 4xx or 5xx status and an explanation.
@@ -175,6 +176,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-022**: The push helper MUST refuse a URL without an `http://` or `https://` scheme, an empty job name, a grouping label that is not a `key=value` pair with a valid label name, and a grouping label named `job`.
 - **FR-023**: The push helper MUST return the network module's exit code for the request and MUST log the gateway's error text when it refuses the push, rather than hiding the failure.
 - **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DRY_RUN` by printing the request instead of sending it.
+- **FR-025**: Loading `metrics` MUST NOT load `math` or `network`. Recording a summary MUST stop the script, naming the `math` module and how to load it, when `math` is not loaded, and a push MUST do the same for `network`, each before recording or sending anything; counters, gauges, histograms and timers MUST work without either.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -219,7 +221,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-018**: Reject a non-integer duration, a malformed label, and an empty, non-numeric or out-of-range quantile list, and verify nothing is recorded.
 - **IT-019**: Verify a histogram name cannot take a summary observation and a summary name cannot take a histogram observation.
 - **IT-020**: Reset the metrics and verify a summary's earlier observations no longer affect its quantiles.
-- **IT-021**: Load the module on its own and verify `math` and `network` are loaded ahead of it.
+- **IT-021**: Load the module on its own and verify nothing optional is loaded ahead of it; in such a shell count and render, verify a summary stops naming `dybatpho::load math` and a push stops naming `dybatpho::load network`, and verify a summary renders once `math` is loaded.
 - **IT-022**: Render a summary that has been declared but has no sample, and a type the renderer does not expand, and verify each prints its `# HELP` and `# TYPE` lines and no series.
 - **IT-023**: Push recorded metrics to a mocked Pushgateway and verify the URL with grouping labels, the `PUT` method, the content type, and the exposition body.
 - **IT-024**: Push with `--add` and verify `POST` is used.

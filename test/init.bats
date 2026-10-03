@@ -137,11 +137,10 @@ loaded_line() {
   run_traced -0 init_sh "--modules tui" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli archive safety tui "
 
-  # A summary's quantiles come from `math` and a push goes through `network`; a
-  # missing edge would only fail at render or push time, long after the
-  # observations were recorded.
+  # `metrics` loads nothing on its own: summaries ask for `math` and a push
+  # asks for `network`, so counting and timing never pull in `curl`.
   run_traced -0 init_sh "--modules metrics" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret math json network metrics "
+  assert_output "string os logging helpers process file secret metrics "
 
   # `screen` calls nothing outside the core modules, so it must load on its own
   # rather than dragging the interactive helpers in behind it.

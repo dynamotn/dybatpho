@@ -357,47 +357,47 @@ function dybatpho::path_relative {
 #   run; Bats removes its own directory instead.
 #######################################
 function dybatpho::create_temp {
-  local path_var extension
-  dybatpho::expect_args path_var extension -- "$@"
+  local __dybatpho_tmp_var __dybatpho_tmp_ext
+  dybatpho::expect_args __dybatpho_tmp_var __dybatpho_tmp_ext -- "$@"
   shift 2
 
-  if dybatpho::is empty "${path_var}"; then
+  if dybatpho::is empty "${__dybatpho_tmp_var}"; then
     return 1
   fi
-  dybatpho::expect_ref "${path_var}"
+  dybatpho::expect_ref "${__dybatpho_tmp_var}"
 
   # Ensure existed parent folder
-  local parent_folder="${2-}"
-  if [[ -z "${parent_folder}" ]]; then
-    parent_folder="${TMPDIR:-/tmp}"
+  local __dybatpho_tmp_parent="${2-}"
+  if [[ -z "${__dybatpho_tmp_parent}" ]]; then
+    __dybatpho_tmp_parent="${TMPDIR:-/tmp}"
     # Bats re-arms its own EXIT trap after each test body, which discards the
     # cleanup trap registered here, so a temporary file left in /tmp would
     # outlive the run. Bats removes its own temporary directory instead, and
     # that is exactly the lifetime a file created by a test should have.
-    local bats_folder="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR:-}}}"
-    if [[ -n "${bats_folder}" ]] && dybatpho::is dir "${bats_folder}"; then
-      parent_folder="${bats_folder}"
+    local __dybatpho_tmp_bats="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR:-}}}"
+    if [[ -n "${__dybatpho_tmp_bats}" ]] && dybatpho::is dir "${__dybatpho_tmp_bats}"; then
+      __dybatpho_tmp_parent="${__dybatpho_tmp_bats}"
     fi
   fi
-  if ! dybatpho::is dir "${parent_folder}"; then
-    dybatpho::die "Folder ${parent_folder} is not existed" # kcov(skip)
+  if ! dybatpho::is dir "${__dybatpho_tmp_parent}"; then
+    dybatpho::die "Folder ${__dybatpho_tmp_parent} is not existed" # kcov(skip)
   fi
 
-  extension=${extension%%/*} # Remove '/' and after in extension, for security
-  local pid="${BASHPID}"
-  local -n temp_path="${path_var}"
-  local prefix="${1:-temp}"
-  local filename_format="dybatpho_${prefix}_${pid}"
+  __dybatpho_tmp_ext=${__dybatpho_tmp_ext%%/*} # Remove '/' and after in extension, for security
+  local __dybatpho_tmp_pid="${BASHPID}"
+  local -n __dybatpho_tmp_path="${__dybatpho_tmp_var}"
+  local __dybatpho_tmp_prefix="${1:-temp}"
+  local __dybatpho_tmp_format="dybatpho_${__dybatpho_tmp_prefix}_${__dybatpho_tmp_pid}"
   if hash "mktemp" > /dev/null 2>&1; then
-    local temp_template="${parent_folder%/}/${filename_format}_XXXXXXXX"
+    local __dybatpho_tmp_template="${__dybatpho_tmp_parent%/}/${__dybatpho_tmp_format}_XXXXXXXX"
     # dyshellint disable=BSG046 # this is `dybatpho::create_temp` itself
-    if dybatpho::is empty "${extension}"; then
-      temp_path=$(mktemp -d "${temp_template}")
+    if dybatpho::is empty "${__dybatpho_tmp_ext}"; then
+      __dybatpho_tmp_path=$(mktemp -d "${__dybatpho_tmp_template}")
     else
-      temp_path=$(mktemp "${temp_template}")
-      local extended_temp_path="${temp_path}${extension}"
-      mv "${temp_path}" "${extended_temp_path}"
-      temp_path="${extended_temp_path}"
+      __dybatpho_tmp_path=$(mktemp "${__dybatpho_tmp_template}")
+      local __dybatpho_tmp_extended="${__dybatpho_tmp_path}${__dybatpho_tmp_ext}"
+      mv "${__dybatpho_tmp_path}" "${__dybatpho_tmp_extended}"
+      __dybatpho_tmp_path="${__dybatpho_tmp_extended}"
     fi
   else
     # kcov(disabled)
@@ -409,30 +409,31 @@ function dybatpho::create_temp {
     # `mkdir` already fails on an existing name. For a file, `set -C` makes
     # `>` refuse to open one that exists, symbolic link included, which is the
     # `O_EXCL` this path would otherwise be missing.
-    local -i attempt
-    local suffix previous_umask
-    previous_umask="$(umask)"
+    local -i __dybatpho_tmp_attempt
+    local __dybatpho_tmp_suffix __dybatpho_tmp_umask
+    __dybatpho_tmp_umask="$(umask)"
     umask 077
-    for ((attempt = 0; attempt < 10; attempt++)); do
-      printf -v suffix '%04x%04x' "${RANDOM}" "${RANDOM}"
-      if dybatpho::is empty "${extension}"; then
-        temp_path="${parent_folder%/}/${filename_format}_${suffix}"
-        mkdir "${temp_path}" 2> /dev/null && break
+    for ((__dybatpho_tmp_attempt = 0; __dybatpho_tmp_attempt < 10; __dybatpho_tmp_attempt++)); do
+      printf -v __dybatpho_tmp_suffix '%04x%04x' "${RANDOM}" "${RANDOM}"
+      if dybatpho::is empty "${__dybatpho_tmp_ext}"; then
+        __dybatpho_tmp_path="${__dybatpho_tmp_parent%/}/${__dybatpho_tmp_format}_${__dybatpho_tmp_suffix}"
+        mkdir "${__dybatpho_tmp_path}" 2> /dev/null && break
       else
-        temp_path="${parent_folder%/}/${filename_format}_${suffix}${extension}"
+        __dybatpho_tmp_path="${__dybatpho_tmp_parent%/}/${__dybatpho_tmp_format}_${__dybatpho_tmp_suffix}"
+        __dybatpho_tmp_path+="${__dybatpho_tmp_ext}"
         (
           set -C
-          : > "${temp_path}"
+          : > "${__dybatpho_tmp_path}"
         ) 2> /dev/null && break
       fi
-      temp_path=""
+      __dybatpho_tmp_path=""
     done
-    umask "${previous_umask}"
-    [[ -n "${temp_path}" ]] \
-      || dybatpho::die "${FUNCNAME[0]}: Unable to create a temporary path under ${parent_folder}"
+    umask "${__dybatpho_tmp_umask}"
+    [[ -n "${__dybatpho_tmp_path}" ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Unable to create a temporary path under ${__dybatpho_tmp_parent}"
     # kcov(enabled)
   fi
-  dybatpho::cleanup_file_on_exit "${temp_path}"
+  dybatpho::cleanup_file_on_exit "${__dybatpho_tmp_path}"
 }
 
 #######################################
@@ -1252,8 +1253,8 @@ function dybatpho::file_is_binary {
 # @tip The directory is removed with its contents when the shell exits
 #######################################
 function dybatpho::create_temp_dir {
-  local path_var
-  dybatpho::expect_args path_var -- "$@"
+  local __dybatpho_file_tmpdir_var
+  dybatpho::expect_args __dybatpho_file_tmpdir_var -- "$@"
   shift
-  dybatpho::create_temp "${path_var}" "" ${1+"$1"} ${2+"$2"}
+  dybatpho::create_temp "${__dybatpho_file_tmpdir_var}" "" ${1+"$1"} ${2+"$2"}
 }

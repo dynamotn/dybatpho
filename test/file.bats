@@ -142,6 +142,23 @@ setup() {
   refute_output
 }
 
+@test "dybatpho::create_temp fills a caller variable named like its locals" {
+  # The path is returned through a name the caller chose, so a caller variable
+  # sharing a name with one of the function's own locals must still be filled.
+  local name path_var extension parent_folder pid temp_path prefix
+  for name in path_var extension parent_folder pid temp_path prefix; do
+    printf -v "${name}" '%s' ""
+    dybatpho::create_temp "${name}" ".txt"
+    [[ -n "${!name}" && -f "${!name}" ]] || {
+      printf 'create_temp left %s empty\n' "${name}" >&2
+      return 1
+    }
+  done
+
+  dybatpho::create_temp_dir path_var
+  assert_dir_exist "${path_var}"
+}
+
 @test "dybatpho::create_temp create temp folder" {
   # shellcheck disable=2329
   _create() {

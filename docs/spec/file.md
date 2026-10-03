@@ -332,6 +332,7 @@ dybatpho::show_file "${report_file}"
 - **FR-041**: The module MUST report whether a file is binary, by looking for a NUL byte in its first block, and MUST treat an empty file as text.
 - **FR-042**: The module MUST provide a helper that creates a temporary directory registered for cleanup, without the caller having to express "directory" as an extension argument.
 - **FR-043**: A rewrite MUST stage in a file it created exclusively under an unpredictable name in the destination's directory, and MUST NOT write through a link or any other file that already held that name.
+- **FR-044**: `dybatpho::create_temp` and `dybatpho::create_temp_dir` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -393,6 +394,7 @@ dybatpho::show_file "${report_file}"
 - **IT-027**: Classify a text file, a file containing a NUL byte, an empty file, and a file whose only NUL is past the sampled block.
 - **IT-028**: Create a temporary directory with a prefix and a custom parent, and verify it is removed when the shell exits.
 - **IT-029**: Plant links at the staging names the old process-id scheme would have used, run every writer, and verify the link target is untouched, the destination is a regular file with the new contents, and no staging file is left over.
+- **IT-030**: Create a temporary file into variables named like the helper's former locals (`path_var`, `extension`, `parent_folder`, `pid`, `temp_path`, `prefix`), and a directory into `path_var`, and find each one filled.
 
 ## Acceptance Criteria *(mandatory)*
 

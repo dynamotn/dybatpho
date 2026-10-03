@@ -591,6 +591,12 @@ setup() {
   dybatpho::assert_file_contains "${content}" "payload"
 }
 
+@test "dybatpho::fixture_dir fills a caller variable named like a create_temp local" {
+  local path_var=""
+  dybatpho::fixture_dir path_var
+  dybatpho::assert_dir "${path_var}"
+}
+
 @test "fixtures are removed by the exit trap when their shell ends" {
   local marker="${BATS_TEST_TMPDIR}/fixture-path"
   # The fixture is created in a subshell, so its exit trap must clean it up.

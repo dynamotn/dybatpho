@@ -534,6 +534,7 @@ dybatpho::unmock_all
   fails with the message naming `diff`; once both are loaded, verify the JSON
   assertion passes and the mismatch is drawn as a diff.
 - **IT-030**: Create a fixture file into a variable called `content` and find it filled with the fixture's path.
+- **IT-031**: Create a fixture directory into a variable called `path_var` and find it filled with the fixture's path.
 
 ## Acceptance Criteria *(mandatory)*
 

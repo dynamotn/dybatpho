@@ -668,6 +668,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`file` — `dybatpho::create_temp` fills a variable whatever its name.**
+  The path is returned through the name the caller passes, and a caller
+  variable called `path_var`, `extension`, `parent_folder`, `pid`, `temp_path`
+  or `prefix` resolved to the function's own local of that name instead, so it
+  was left empty. `dybatpho::create_temp_dir` and `dybatpho::fixture_dir`,
+  which go through it, had the same gap.
+
 - **`testing` — a mock now wins over a command the shell already ran.**
   `dybatpho::mock_command` and `dybatpho::mock_command_script` used to be
   bypassed for a command that had already run in the same shell, because Bash

@@ -536,6 +536,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`notification` — `dybatpho::notify_webhook` no longer logs its URL.** Its
   debug line, `Sending webhook notification to <url>`, wrote the whole webhook
   URL whenever `LOG_LEVEL` was `debug`; it now shows the host only.
+- **`helpers` — `dybatpho::require` no longer passes a path that is not
+  there.** A command given as a path, such as `/usr/sbin/sendmail`, counted as
+  installed whether or not the file existed, because the shell's `hash` takes
+  any name holding a `/` on trust. A path now has to be an executable file.
 
 ## [5.2.0] - 2026-10-02
 

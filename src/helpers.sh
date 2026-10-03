@@ -292,8 +292,16 @@ function dybatpho::require {
     exit_code="${2:-127}"
   fi
 
-  hash "${command_name}" > /dev/null 2>&1 \
-    || dybatpho::die "${command_name} isn't installed" "${exit_code}"
+  # `hash` looks a bare name up on `PATH`, but takes a name holding a `/` on
+  # trust and succeeds without checking that anything is there, so a path has
+  # to be an executable file in its own right.
+  if [[ "${command_name}" == */* ]]; then
+    [[ -f "${command_name}" && -x "${command_name}" ]] \
+      || dybatpho::die "${command_name} isn't installed" "${exit_code}"
+  else
+    hash "${command_name}" > /dev/null 2>&1 \
+      || dybatpho::die "${command_name} isn't installed" "${exit_code}"
+  fi
   [[ -n "${range}" ]] || return 0
 
   # The guard names an internal helper on purpose: `dybatpho::` functions are

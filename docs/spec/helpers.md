@@ -132,6 +132,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - A predicate is asked to evaluate an unsupported condition.
 - `is number` or `is int` receives a non-numeric value.
 - A command or environment list is empty.
+- A required command is given as a path that is missing, is a directory, or is a file without the executable bit.
 - Coalesce receives no candidate values or only empty values.
 - Retry is used with a noisy shell command string that needs a shorter description.
 - The caller wants fixed-delay retries instead of escalating delays.
@@ -151,6 +152,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-003d**: When a range is given and the optional `semver` module is not loaded, the command check MUST stop the script with a message naming what to load, rather than let the range pass unchecked.
 - **FR-003e**: When a range is given and the installed version cannot be read, the command check MUST stop the script, because a requirement that cannot be verified has not been met.
 - **FR-003f**: The command check MUST normalize the reported version before matching it, so that a command answering `1.35` or `3.12-modified` is judged on the release it is.
+- **FR-003g**: A command given as a path (a name holding `/`) MUST count as installed only when it is an existing executable file, not merely because the shell's command table accepts the name.
 - **FR-004**: The module MUST provide `is` conditions for command, function,
   file, directory, link, existence, readable, writable, executable, set,
   empty, number, integer, true, and false values.
@@ -236,6 +238,8 @@ _deploy prod "${DEPLOY_TOKEN:-}"
   non-identifier, and rejects a reserved `__dybatpho` name; and verify
   `array_sort` refuses a reserved name rather than silently sorting nothing,
   while still sorting an ordinary one.
+- **IT-018**: Verify the command check accepts an executable given by path, and
+  refuses a missing path, a file without the executable bit, and a directory.
 
 ## Acceptance Criteria *(mandatory)*
 

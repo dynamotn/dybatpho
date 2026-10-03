@@ -105,6 +105,25 @@ setup() {
   assert_stderr --partial "dyfoooo isn't installed"
 }
 
+@test "dybatpho::require checks a command given as a path" {
+  # `hash` accepts any name holding a `/` without looking, so a path has to be
+  # checked for an executable file.
+  local dir="${BATS_TEST_TMPDIR}/require_path"
+  mkdir -p "${dir}"
+  printf '#!/usr/bin/env bash\n' > "${dir}/tool"
+  chmod +x "${dir}/tool"
+  printf 'data\n' > "${dir}/plain"
+
+  run_traced -0 dybatpho::require "${dir}/tool"
+
+  run --separate-stderr -127 dybatpho::require "${dir}/absent"
+  assert_stderr --partial "${dir}/absent isn't installed"
+  run --separate-stderr -127 dybatpho::require "${dir}/plain"
+  assert_stderr --partial "${dir}/plain isn't installed"
+  run --separate-stderr -5 dybatpho::require "${dir}" 5
+  assert_stderr --partial "${dir} isn't installed"
+}
+
 @test "dybatpho::require with custom exit code" {
   run --separate-stderr -99 dybatpho::require "nonexistent_command_xyz" 99
   assert_failure

@@ -45,7 +45,7 @@ Only programming mistakes, such as a missing argument, are fatal.
 - [`dybatpho::assert_path_absent`](#dybatphoassert_path_absent) — Assert that nothing exists at a path.
 - [`dybatpho::assert_file_contains`](#dybatphoassert_file_contains) — Assert that a file contains an exact substring.
 - [`dybatpho::assert_file_empty`](#dybatphoassert_file_empty) — Assert that a file exists and holds no content.
-- [`dybatpho::assert_file_mode`](#dybatphoassert_file_mode) — Assert that a file or directory carries exact octal permissions.
+- [`dybatpho::assert_file_mode`](#dybatphoassert_file_mode) — Assert that a file or directory carries exact octal permissions. A symbolic link is followed, so the mode checked is the one of the file it points at.
 - [`dybatpho::assert_json_valid`](#dybatphoassert_json_valid) — Assert that a document is parsable JSON.
 - [`dybatpho::assert_json_query`](#dybatphoassert_json_query) — Assert that a JSON query prints an expected value.
 - [`dybatpho::assert_json_has`](#dybatphoassert_json_has) — Assert that a JSON filter matches something in the document.
@@ -318,6 +318,8 @@ Assert that a file exists and holds no content.
 ### `dybatpho::assert_file_mode`
 
 Assert that a file or directory carries exact octal permissions.
+A symbolic link is followed, so the mode checked is the one of the file it
+points at.
 
 **🧪 Example**
 

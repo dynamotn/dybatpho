@@ -257,6 +257,7 @@ dybatpho::unmock_all
 
 - The asserted path is missing, is the wrong type, or is a dangling symlink.
 - A mode is written with and without a leading zero.
+- The path whose mode is asserted is a symbolic link to the file.
 - `stat` uses GNU syntax on Linux and BSD syntax on macOS.
 - The JSON or YAML backend is unavailable, or the document is malformed.
 - A backend prints a string scalar with its surrounding JSON quotes.
@@ -419,6 +420,7 @@ dybatpho::unmock_all
   without `diff`. On a mismatch without it, the assertion MUST still fail, and
   MUST say the difference needs `diff` to be shown instead of drawing it.
 - **FR-041**: `fixture_dir` and `fixture_file` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
+- **FR-042**: `assert_file_mode` MUST follow a symbolic link and compare the mode of the file it points at.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -535,6 +537,7 @@ dybatpho::unmock_all
   assertion passes and the mismatch is drawn as a diff.
 - **IT-030**: Create a fixture file into a variable called `content` and find it filled with the fixture's path.
 - **IT-031**: Create a fixture directory into a variable called `path_var` and find it filled with the fixture's path.
+- **IT-032**: Assert `600` on a link to a `600` file and see it pass.
 
 ## Acceptance Criteria *(mandatory)*
 

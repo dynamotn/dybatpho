@@ -99,6 +99,17 @@ setup() {
   assert_stderr --partial "Expected an existing path"
 }
 
+@test "dybatpho::assert_file_mode checks the file a link points at" {
+  # A link's own mode is 777 on Linux whatever the file allows, so checking it
+  # would fail every secret reached through a link.
+  local file="${BATS_TEST_TMPDIR}/secret.txt" link="${BATS_TEST_TMPDIR}/secret.link"
+  printf 'token\n' > "${file}"
+  chmod 600 "${file}"
+  ln -s "${file}" "${link}"
+
+  run_traced -0 dybatpho::assert_file_mode "${link}" 600
+}
+
 @test "dybatpho::assert_json_valid and assert_json_query use the JSON backend" {
   local file="${BATS_TEST_TMPDIR}/package.json"
   printf '{"version":"1.4.2"}' > "${file}"

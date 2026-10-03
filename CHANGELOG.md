@@ -1012,6 +1012,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forge that can't be resolved now stops the script instead of carrying on with
   an empty value.
 
+- **`testing` — `dybatpho::assert_file_mode` checks the file a link points at.**
+  It read the mode of the link itself, which is always `777` on Linux, so a
+  `600` secret reached through a symbolic link failed the assertion. The mode
+  is now read through the library's one `stat` helper, which follows links.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

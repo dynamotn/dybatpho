@@ -286,6 +286,8 @@ function dybatpho::assert_file_empty {
 
 #######################################
 # @description Assert that a file or directory carries exact octal permissions.
+#   A symbolic link is followed, so the mode checked is the one of the file it
+#   points at.
 # @example
 #   dybatpho::assert_file_mode "${HOME}/.netrc" 600
 #
@@ -304,12 +306,12 @@ function dybatpho::assert_file_mode {
   fi
 
   local actual
-  if ! actual="$(stat -c '%a' "${path}" 2> /dev/null)"; then
-    # kcov(disabled) - the BSD stat fallback doesn't run on the Linux CI image
-    if ! actual="$(stat -f '%Lp' "${path}" 2> /dev/null)"; then
-      __dybatpho_test_fail "Unable to read permissions of: ${path}"
-      return 1
-    fi
+  # The mode is the one of the file a link points at: a link's own mode is
+  # always 777 on Linux, which says nothing about who can read the file.
+  if ! actual="$(__dybatpho_file_stat mode "${path}")"; then
+    # kcov(disabled) - every path that exists has a mode `stat` can read
+    __dybatpho_test_fail "Unable to read permissions of: ${path}"
+    return 1
     # kcov(enabled)
   fi
   # Compare numerically so `600` and `0600` describe the same mode.

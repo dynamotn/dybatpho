@@ -110,18 +110,7 @@ function __dybatpho_secret_mask_var {
 function __dybatpho_secret_file_mode {
   local path
   dybatpho::expect_args path -- "$@"
-  local mode
-  if mode=$(stat -L -c '%a' "${path}" 2> /dev/null); then
-    printf '%s\n' "${mode}"
-    return 0
-  fi
-  # kcov(disabled)
-  if mode=$(stat -L -f '%Lp' "${path}" 2> /dev/null); then
-    printf '%s\n' "${mode}"
-    return 0
-  fi
-  return 1
-  # kcov(enabled)
+  __dybatpho_file_stat mode "${path}"
 }
 
 #######################################
@@ -135,17 +124,8 @@ function __dybatpho_secret_file_owner {
   local path
   dybatpho::expect_args path -- "$@"
   local owner
-  if owner=$(stat -L -c '%u' "${path}" 2> /dev/null); then
-    printf '%s\n' "${owner}"
-    return 0
-  fi
-  # kcov(disabled)
-  if owner=$(stat -L -f '%u' "${path}" 2> /dev/null); then
-    printf '%s\n' "${owner}"
-    return 0
-  fi
-  return 1
-  # kcov(enabled)
+  owner="$(__dybatpho_file_stat owner "${path}")" || return 1
+  printf '%s\n' "${owner%%:*}"
 }
 
 #######################################
@@ -576,17 +556,7 @@ function dybatpho::secret_shred {
 # @internal
 #######################################
 function __dybatpho_secret_file_size {
-  local path size
+  local path
   dybatpho::expect_args path -- "$@"
-  if size=$(stat -L -c '%s' "${path}" 2> /dev/null); then
-    printf '%s\n' "${size}"
-    return 0
-  fi
-  # kcov(disabled)
-  if size=$(stat -L -f '%z' "${path}" 2> /dev/null); then
-    printf '%s\n' "${size}"
-    return 0
-  fi
-  printf '0\n'
-  # kcov(enabled)
+  __dybatpho_file_stat size "${path}" || printf '0\n'
 }

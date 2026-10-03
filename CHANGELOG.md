@@ -483,6 +483,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The pre-commit hook tests only what a commit changes.** It passes the
+  staged files to `scripts/test.sh --related`, which runs the test file of each
+  changed module, of the modules calling it directly, and of any test or
+  example calling it, instead of the whole suite. A change to `init.sh`, a core
+  module, the test helper or the runner still runs everything, and CI keeps
+  running the full suite.
+
+  ```sh
+  scripts/test.sh --related src/json.sh src/csv.sh
+  ```
+
 - **BREAKING: `network` no longer loads `json`.** Loading `network` -- directly
   or through `notification`, `forge`, `ai` or `testing` -- used to bring the
   `json` module along. Only `dybatpho::curl_graphql` needs it, and it now stops

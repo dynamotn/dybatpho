@@ -22,11 +22,15 @@
 #   `--chunk` files and merges the parts into `coverage/bats`, the layout the CI
 #   upload step expects.
 #
+#   `--related` takes changed files instead of test files and runs only the
+#   `.bats` files that cover them, which is what the pre-commit hook passes.
+#
 # @example
 #   scripts/test.sh                       # whole suite, no coverage
 #   scripts/test.sh test/cli.bats         # one file, or several
 #   scripts/test.sh --coverage            # whole suite + coverage report
 #   scripts/test.sh --filter semver       # only tests whose name matches
+#   scripts/test.sh --related src/json.sh # the tests a change can break
 #
 # @env DYBATPHO_TEST_JOBS number Initial value of `--jobs`.
 # @env DYBATPHO_TEST_CHUNK number Initial value of `--chunk`.
@@ -85,6 +89,90 @@ function __dybatpho_test_collect {
       find "${DYBATPHO_DIR}/test" -maxdepth 1 -name '*.bats' -type f
     fi
   ) | sort -rn | cut -f2
+}
+
+# @description Print the names of the functions a module defines, public and
+#   internal alike: a module that asks for another one probes it through an
+#   internal name, so both count as a use.
+# @arg $1 string Module name
+# @stdout One function name per line
+# @internal
+function __dybatpho_test_functions_of {
+  sed -nE 's/^function ([A-Za-z0-9_:]+).*/\1/p' "${DYBATPHO_DIR}/src/$1.sh"
+}
+
+# @description Map changed files to the `.bats` files that can catch a
+#   regression in them, so a commit runs a few files instead of the suite.
+#
+#   A module is covered by its own test file, by the test file of every module
+#   that calls into it, and by any test or example calling it. Calls are found
+#   by name rather than read from the dependency table in `init.sh`, because a
+#   module may ask for another one at run time without declaring it. Anything every
+#   test passes through — `init.sh`, a core module, the test helper, this
+#   runner — maps to the whole suite.
+# @arg $@ path Changed files, relative to the repository root or absolute
+# @stdout One test path per line, or the `test/` directory for the whole suite
+# @internal
+function __dybatpho_test_related {
+  local _test_dir="${DYBATPHO_DIR}/test"
+  local -A _modules=() _tests=()
+  local _file _name
+  for _file in "$@"; do
+    _file="${_file#"${DYBATPHO_DIR}"/}"
+    _file="${_file#./}"
+    case "${_file}" in
+      init.sh | scripts/test.sh | test/test_helper.bash | test/lib/*)
+        printf '%s\n' "${_test_dir}"
+        return 0
+        ;;
+      src/*.sh)
+        _name="${_file#src/}"
+        _name="${_name%.sh}"
+        if [[ " ${DYBATPHO_CORE_MODULES} " == *" ${_name} "* ]]; then
+          printf '%s\n' "${_test_dir}"
+          return 0
+        fi
+        _modules["${_name}"]=1
+        _tests["${_test_dir}/conventions.bats"]=1
+        ;;
+      test/*.bats) _tests["${DYBATPHO_DIR}/${_file}"]=1 ;;
+      example/*.sh) _tests["${_test_dir}/examples.bats"]=1 ;;
+      scripts/*.sh)
+        while read -r _name; do
+          _tests["${_name}"]=1
+        done < <(grep -lF "${_file}" "${_test_dir}"/*.bats || true)
+        ;;
+      *) ;;
+    esac
+  done
+
+  if ((${#_modules[@]})); then
+    local _patterns
+    # `create_temp` registers the file for cleanup on exit.
+    dybatpho::create_temp _patterns ".txt" "test-related"
+    for _name in "${!_modules[@]}"; do
+      __dybatpho_test_functions_of "${_name}"
+    done > "${_patterns}"
+    # Only direct callers: followed transitively, `json` alone reaches through
+    # `network`, `validate` and `cli` to most of the suite, and CI runs the
+    # whole of it anyway.
+    while read -r _file; do
+      _name="$(basename "${_file}" .sh)"
+      _tests["${_test_dir}/${_name}.bats"]=1
+    done < <(grep -lwFf "${_patterns}" "${DYBATPHO_DIR}"/src/*.sh || true)
+    # A test file of another area, or an example, may call the module directly.
+    while read -r _file; do
+      _tests["${_file}"]=1
+    done < <(grep -lwFf "${_patterns}" "${_test_dir}"/*.bats || true)
+    if grep -qwFf "${_patterns}" "${DYBATPHO_DIR}"/example/*.sh; then
+      _tests["${_test_dir}/examples.bats"]=1
+    fi
+  fi
+
+  for _file in "${!_tests[@]}"; do
+    [[ -f "${_file}" ]] && printf '%s\n' "${_file}"
+  done
+  return 0
 }
 
 # @description Filter a raw TAP stream down to a live view: one rewritten
@@ -183,9 +271,19 @@ function __dybatpho_test_run {
 
   # `dybatpho::opts::setup` collects the positional arguments into an array, so
   # a path containing a space reaches the collector as one target.
-  local -a _files
   # shellcheck disable=SC2154 # set by the option spec of this script
-  mapfile -t _files < <(__dybatpho_test_collect ${TEST_ARGS[@]+"${TEST_ARGS[@]}"})
+  local -a _targets=(${TEST_ARGS[@]+"${TEST_ARGS[@]}"})
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if [[ "${RELATED}" == "true" ]]; then
+    mapfile -t _targets < <(__dybatpho_test_related ${_targets[@]+"${_targets[@]}"})
+    if ! ((${#_targets[@]})); then
+      printf '%sNo test covers the changed files%s\n' "${_dim}" "${_reset}"
+      exit 0
+    fi
+  fi
+
+  local -a _files
+  mapfile -t _files < <(__dybatpho_test_collect ${_targets[@]+"${_targets[@]}"})
   ((${#_files[@]})) || dybatpho::die "No test files found"
 
   local -A _expected_in
@@ -393,6 +491,8 @@ function _spec {
 
   dybatpho::opts::flag "Collect coverage with kcov" COVERAGE -c --coverage \
     on:true off:false init:="false"
+  dybatpho::opts::flag "Treat the arguments as changed files and run their tests" \
+    RELATED -r --related on:true off:false init:="false"
   dybatpho::opts::flag "Trace every command Bats runs" VERBOSE_RUN -v --verbose-run \
     on:true off:false init:="false"
   local test_tty

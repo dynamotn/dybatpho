@@ -18,7 +18,9 @@ This document describes the repository workflow and conventions to preserve.
   `docs/init.md` for the bootstrap's own public functions.
 - `docs/spec/` — Spec Kit-style feature specifications.
 - `CHANGELOG.md` — user-visible history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
-- `scripts/test.sh` — test runner; `--coverage` adds the kcov report.
+- `scripts/test.sh` — test runner; `--coverage` adds the kcov report, and
+  `--related <changed files>` runs only the tests covering them (the
+  pre-commit hook uses it).
 - `scripts/bundle.sh` — flatten a module selection into one vendorable file;
   covered by `test/bundle.bats` and specified in `docs/spec/doctor.md`.
 - `scripts/release.sh` — cut a release: stamp `VERSION` and `CHANGELOG.md`,

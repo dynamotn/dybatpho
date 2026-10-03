@@ -3,39 +3,6 @@ setup() {
 }
 
 # ---------------------------------------------------------------------------
-# __dybatpho_notification_json_escape
-# ---------------------------------------------------------------------------
-
-@test "__dybatpho_notification_json_escape no arg" {
-  run __dybatpho_notification_json_escape
-  assert_failure
-}
-
-@test "__dybatpho_notification_json_escape plain string" {
-  assert_equal "$(__dybatpho_notification_json_escape "hello world")" "hello world"
-}
-
-@test "__dybatpho_notification_json_escape escapes double quotes" {
-  assert_equal "$(__dybatpho_notification_json_escape 'say "hi"')" 'say \"hi\"'
-}
-
-@test "__dybatpho_notification_json_escape escapes backslash" {
-  assert_equal "$(__dybatpho_notification_json_escape 'C:\path')" 'C:\\path'
-}
-
-@test "__dybatpho_notification_json_escape escapes newline" {
-  assert_equal "$(__dybatpho_notification_json_escape $'line1\nline2')" 'line1\nline2'
-}
-
-@test "__dybatpho_notification_json_escape escapes tab" {
-  assert_equal "$(__dybatpho_notification_json_escape $'col1\tcol2')" 'col1\tcol2'
-}
-
-@test "__dybatpho_notification_json_escape escapes carriage return" {
-  assert_equal "$(__dybatpho_notification_json_escape $'text\rmore')" 'text\rmore'
-}
-
-# ---------------------------------------------------------------------------
 # dybatpho::notify_slack
 # ---------------------------------------------------------------------------
 
@@ -355,14 +322,14 @@ setup() {
   assert_output --partial '\rtab\t'
 }
 
-@test "__dybatpho_notification_json_escape spells out every control character" {
+@test "a notification payload spells out every control character" {
   # A notification usually carries the output of the command that failed,
   # colour codes and all. Left raw, a control character makes the payload
   # something the webhook refuses, so the message never arrives.
   local message
   message="$(printf 'build \033[31mFAILED\033[0m\a on nhánh "main"')"
   local payload
-  payload="$(printf '{"text":"%s"}' "$(__dybatpho_notification_json_escape "${message}")")"
+  payload="$(printf '{"text":"%s"}' "$(__dybatpho_log_json_escape "${message}")")"
   run_traced jq -e . <<< "${payload}"
   assert_success
   assert_equal "$(jq -r '.text' <<< "${payload}")" "${message}"

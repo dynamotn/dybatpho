@@ -1018,3 +1018,27 @@ assert event["duration_ms"] >= 0
   assert_success
   assert_equal "$(jq -r '.message' "${out}")" "${message}"
 }
+
+@test "the one JSON string escaper agrees with jq on every control character" {
+  # `json`, `notification`, `doctor`, `config`, the log events and the CLI
+  # schema all escape through `__dybatpho_log_json_escape_into`, so this table
+  # pins all of them at once: every byte jq would have to escape, plus the two
+  # it always escapes and text it must leave alone.
+  local -a samples=('plain' 'say "hi"' 'C:\new\table' 'nhánh 日本 😀' '')
+  local code char
+  for ((code = 1; code < 32; code++)); do
+    printf -v char "\\$(printf '%03o' "${code}")"
+    samples+=("a${char}b")
+  done
+  samples+=($'del\177del' $'mixed\t"\\\033[0m\n')
+
+  local sample escaped quoted expected
+  for sample in "${samples[@]}"; do
+    __dybatpho_log_json_escape_into escaped "${sample}"
+    expected="$(jq -n --arg s "${sample}" '$s')"
+    assert_equal "\"${escaped}\"" "${expected}"
+    # The quoting form used by `json` is the same escaper with quotes around it.
+    __dybatpho_json_escape_into quoted "${sample}"
+    assert_equal "${quoted}" "${expected}"
+  done
+}

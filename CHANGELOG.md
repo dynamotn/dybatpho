@@ -979,6 +979,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::text_indent` printed an extra indented line and `dybatpho::md_list`
   an empty item. An argument now splits the way stdin does.
 
+- **`cli` — a description holding a control character no longer breaks the
+  JSON schema.** `dybatpho::generate_schema` escaped only newlines, carriage
+  returns and tabs, so a bell, a form feed or an ANSI colour code in a
+  description went out raw and the schema was not JSON. Every control
+  character is now escaped, by the same escaper the rest of the library uses.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

@@ -863,7 +863,7 @@ function __dybatpho_config_doc_json_value {
     return 0
   fi
   local log_json_escape
-  log_json_escape=$(__dybatpho_log_json_escape "${value}")
+  __dybatpho_log_json_escape_into log_json_escape "${value}"
   printf '"%s"' "${log_json_escape}"
 }
 
@@ -937,7 +937,7 @@ function dybatpho::config_doc {
         local config_doc_json_value
         config_doc_json_value=$(__dybatpho_config_doc_json_value "${description}")
         local log_json_escape
-        log_json_escape=$(__dybatpho_log_json_escape "${key}")
+        __dybatpho_log_json_escape_into log_json_escape "${key}"
         local config_doc_json_value_2
         config_doc_json_value_2=$(__dybatpho_config_doc_json_value "${constraints}")
         local config_doc_json_value_3

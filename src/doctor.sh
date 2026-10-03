@@ -386,14 +386,14 @@ function __dybatpho_doctor_report_json {
   local version
   version=$(dybatpho::version)
   local version_json directory_json bash_json system_json machine_json
-  version_json=$(__dybatpho_log_json_escape "${version}")
-  directory_json=$(__dybatpho_log_json_escape "${DYBATPHO_DIR}")
-  bash_json=$(__dybatpho_log_json_escape "${BASH_VERSION}")
+  __dybatpho_log_json_escape_into version_json "${version}"
+  __dybatpho_log_json_escape_into directory_json "${DYBATPHO_DIR}"
+  __dybatpho_log_json_escape_into bash_json "${BASH_VERSION}"
   local system machine
   system=$(uname -s)
   machine=$(uname -m)
-  system_json=$(__dybatpho_log_json_escape "${system}")
-  machine_json=$(__dybatpho_log_json_escape "${machine}")
+  __dybatpho_log_json_escape_into system_json "${system}"
+  __dybatpho_log_json_escape_into machine_json "${machine}"
   printf '{"version":"%s"' "${version_json}"
   printf ',"directory":"%s"' "${directory_json}"
   printf ',"bash":{"version":"%s","minimum":"%s","ok":%s}' \
@@ -405,7 +405,7 @@ function __dybatpho_doctor_report_json {
   for module in "$@"; do
     ((first)) || printf ','
     first=0
-    module_json=$(__dybatpho_log_json_escape "${module}")
+    __dybatpho_log_json_escape_into module_json "${module}"
     printf '"%s"' "${module_json}"
   done
   printf ']'
@@ -416,10 +416,10 @@ function __dybatpho_doctor_report_json {
     IFS=$'\t' read -r module spec kind status path version <<< "${row}"
     ((first)) || printf ','
     first=0
-    module_json=$(__dybatpho_log_json_escape "${module}")
-    spec_json=$(__dybatpho_log_json_escape "${spec}")
-    path_json=$(__dybatpho_log_json_escape "${path}")
-    version_json=$(__dybatpho_log_json_escape "${version}")
+    __dybatpho_log_json_escape_into module_json "${module}"
+    __dybatpho_log_json_escape_into spec_json "${spec}"
+    __dybatpho_log_json_escape_into path_json "${path}"
+    __dybatpho_log_json_escape_into version_json "${version}"
     printf '{"module":"%s","dependency":"%s","kind":"%s","status":"%s","path":"%s","version":"%s"}' \
       "${module_json}" "${spec_json}" "${kind}" "${status}" \
       "${path_json}" "${version_json}"

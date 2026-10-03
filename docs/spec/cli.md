@@ -153,6 +153,7 @@ dybatpho::generate_man _spec mytool
 - A user passes an unrecognized option, a forbidden argument, or an invalid subcommand.
 - A parameter is required but omitted.
 - An option or a positional argument is declared with an empty description.
+- A description holds a control character, such as a bell or an ANSI colour code.
 - A spec uses aliases, hidden items, deprecated items, persistent parent options, and nested command paths simultaneously.
 - A prompt receives EOF or an empty value without a default.
 - A choice list contains multiple values and the user enters a mixture of names
@@ -225,6 +226,7 @@ dybatpho::generate_man _spec mytool
   MUST fall through to `init:` without error when the `config` module is not
   loaded, whatever characters the key contains.
 - **FR-029**: Option, command, and argument metadata MUST keep every field in place when one of them is empty, so an empty description never shifts the switches, environment name, or any later field in the schema, man page, completions, or help.
+- **FR-030**: The JSON schema MUST escape every control character in a string value, the way the library's JSON string escaper does, so any description yields valid JSON.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -265,6 +267,7 @@ dybatpho::generate_man _spec mytool
 - **IT-011**: Generate completion twice for one spec and verify the second run reuses the cached artifact, and that disabling the cache writes nothing.
 - **IT-012**: In a child shell that loaded only `cli`, verify plain and dotted `config:` bindings fall through to their defaults, and that the plain one reads the loaded file once `config` is loaded.
 - **IT-013**: Declare a parameter, a flag, and an argument with empty descriptions, and verify the schema stays valid JSON with every field in place, the man page names the switch and its environment variable, and help keeps the annotation on its own line.
+- **IT-014**: Generate the schema for a command and a flag whose descriptions hold a bell, ANSI colour codes and a form feed, and read both descriptions back intact with `jq`.
 
 ## Acceptance Criteria *(mandatory)*
 

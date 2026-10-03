@@ -2317,3 +2317,20 @@ setup() {
   run_traced dybatpho::opts::validate_choice "" "text,json"
   assert_failure
 }
+
+@test "dybatpho::generate_schema writes valid JSON for a description holding control characters" {
+  # Only the newline, carriage return and tab used to be escaped, so a bell or
+  # an ANSI colour code in a description went out raw and the schema was not
+  # JSON at all.
+  _spec_control_chars() {
+    dybatpho::opts::setup $'Ring \a and \033[1mbold\033[0m' ARGS
+    dybatpho::opts::flag $'Form\ffeed' FEED --feed
+  }
+
+  run_traced dybatpho::generate_schema _spec_control_chars tool
+  assert_success
+  run_traced jq -r '.description, .options[0].description' <<< "${output}"
+  assert_success
+  assert_line --index 0 $'Ring \a and \033[1mbold\033[0m'
+  assert_line --index 1 $'Form\ffeed'
+}

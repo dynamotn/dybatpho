@@ -118,23 +118,6 @@
 declare -ga __DYBATPHO_NOTIFICATION_SENDMAILS=(sendmail /usr/sbin/sendmail /usr/lib/sendmail)
 
 #######################################
-# @description Escape a string for safe embedding inside a JSON string value.
-#   The rule is the same one the log events follow, and `logging` is a core
-#   module, so the escaping lives there rather than in a second copy that can
-#   drift. That matters here: a notification often carries the output of a
-#   command that failed, ANSI colour sequences and all, and a control character
-#   left raw makes the payload something the webhook refuses.
-# @arg $1 string Input string
-# @stdout JSON-safe escaped string (without surrounding quotes)
-# @internal
-#######################################
-function __dybatpho_notification_json_escape {
-  local input
-  dybatpho::expect_args input -- "$@"
-  __dybatpho_log_json_escape "${input}"
-}
-
-#######################################
 # @description Post a JSON body for one of the HTTP notifiers, with the
 #   module's delivery policy applied.
 #   The request goes through `dybatpho::curl_json`, which already retries a
@@ -210,7 +193,7 @@ function dybatpho::notify_slack {
 
   local payload
   local notification_json_escape
-  notification_json_escape=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into notification_json_escape "${message}"
   payload=$(printf '{"text":"%s"}' "${notification_json_escape}")
 
   dybatpho::debug "Sending Slack notification"
@@ -249,14 +232,14 @@ function dybatpho::notify_telegram {
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
   local url="https://api.telegram.org/bot${DYBATPHO_TELEGRAM_BOT_TOKEN}/sendMessage"
   local escaped_message escaped_chat_id
-  escaped_message=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into escaped_message "${message}"
   # shellcheck disable=SC2154 # required by `dybatpho::expect_envs` above
-  escaped_chat_id=$(__dybatpho_notification_json_escape "${DYBATPHO_TELEGRAM_CHAT_ID}")
+  __dybatpho_log_json_escape_into escaped_chat_id "${DYBATPHO_TELEGRAM_CHAT_ID}"
 
   local payload
   if [[ -n "${parse_mode}" ]]; then
     local escaped_parse_mode
-    escaped_parse_mode=$(__dybatpho_notification_json_escape "${parse_mode}")
+    __dybatpho_log_json_escape_into escaped_parse_mode "${parse_mode}"
     printf -v payload '{"chat_id":"%s","text":"%s","parse_mode":"%s"}' "${escaped_chat_id}" "${escaped_message}" \
       "${escaped_parse_mode}"
   else
@@ -295,12 +278,12 @@ function dybatpho::notify_teams {
   dybatpho::expect_envs DYBATPHO_TEAMS_WEBHOOK_URL
 
   local escaped_message
-  escaped_message=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into escaped_message "${message}"
 
   local body_blocks
   if [[ -n "${title}" ]]; then
     local escaped_title
-    escaped_title=$(__dybatpho_notification_json_escape "${title}")
+    __dybatpho_log_json_escape_into escaped_title "${title}"
     local blocks_format='[{"type":"TextBlock","text":"%s","weight":"bolder","size":"medium"},'
     blocks_format+='{"type":"TextBlock","text":"%s","wrap":true}]'
     # shellcheck disable=SC2059 # the format is built above, not taken from input
@@ -349,7 +332,7 @@ function dybatpho::notify_google_chat {
 
   local payload
   local notification_json_escape
-  notification_json_escape=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into notification_json_escape "${message}"
   payload=$(printf '{"text":"%s"}' "${notification_json_escape}")
 
   dybatpho::debug "Sending Google Chat notification"
@@ -384,12 +367,12 @@ function dybatpho::notify_discord {
   dybatpho::expect_envs DYBATPHO_DISCORD_WEBHOOK_URL
 
   local escaped_message
-  escaped_message=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into escaped_message "${message}"
 
   local payload
   if [[ -n "${username}" ]]; then
     local escaped_username
-    escaped_username=$(__dybatpho_notification_json_escape "${username}")
+    __dybatpho_log_json_escape_into escaped_username "${username}"
     printf -v payload '{"content":"%s","username":"%s"}' "${escaped_message}" "${escaped_username}"
   else
     printf -v payload '{"content":"%s"}' "${escaped_message}"
@@ -560,12 +543,12 @@ function dybatpho::notify_ntfy {
     || dybatpho::die "${FUNCNAME[0]}: tags must not contain a line break" # kcov(skip)
 
   local payload escaped
-  escaped=$(__dybatpho_notification_json_escape "${DYBATPHO_NTFY_TOPIC}")
+  __dybatpho_log_json_escape_into escaped "${DYBATPHO_NTFY_TOPIC}"
   payload="{\"topic\":\"${escaped}\""
-  escaped=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into escaped "${message}"
   payload+=",\"message\":\"${escaped}\""
   if [[ -n "${title}" ]]; then
-    escaped=$(__dybatpho_notification_json_escape "${title}")
+    __dybatpho_log_json_escape_into escaped "${title}"
     payload+=",\"title\":\"${escaped}\""
   fi
   [[ -n "${priority}" ]] && payload+=",\"priority\":${priority}"
@@ -576,7 +559,7 @@ function dybatpho::notify_ntfy {
     for tag in ${tag_list[@]+"${tag_list[@]}"}; do
       tag="$(dybatpho::trim "${tag}")"
       [[ -n "${tag}" ]] || continue
-      escaped=$(__dybatpho_notification_json_escape "${tag}")
+      __dybatpho_log_json_escape_into escaped "${tag}"
       list+="${list:+,}\"${escaped}\""
     done
     [[ -n "${list}" ]] && payload+=",\"tags\":[${list}]"
@@ -634,10 +617,10 @@ function dybatpho::notify_gotify {
   while [[ "${url}" == */ ]]; do url="${url%/}"; done
 
   local payload escaped
-  escaped=$(__dybatpho_notification_json_escape "${message}")
+  __dybatpho_log_json_escape_into escaped "${message}"
   payload="{\"message\":\"${escaped}\""
   if [[ -n "${title}" ]]; then
-    escaped=$(__dybatpho_notification_json_escape "${title}")
+    __dybatpho_log_json_escape_into escaped "${title}"
     payload+=",\"title\":\"${escaped}\""
   fi
   [[ -n "${priority}" ]] && payload+=",\"priority\":${priority}"

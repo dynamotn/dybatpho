@@ -25,10 +25,10 @@
 #   loop that builds a request body or a structured log line. The result
 #   carries its own surrounding quotes.
 #
-#   Bytes below 0x20 that JSON has no short escape for go out as `\u00XX`, as
-#   does `DEL`, which is what `jq` emits for it. Everything else is passed
-#   through, which is what keeps UTF-8 text readable: JSON takes it verbatim
-#   and only `"` and `\` need escaping.
+#   The escaping itself is the core `__dybatpho_log_json_escape_into`, the
+#   library's one JSON string escaper: bytes below 0x20 with no short escape go
+#   out as `\u00XX`, as does `DEL`, which is what `jq` emits for it, and UTF-8
+#   text passes through verbatim.
 # @arg $1 string Name of the variable receiving the quoted string
 # @arg $2 string Text to encode
 # @set The named variable
@@ -36,47 +36,9 @@
 #######################################
 function __dybatpho_json_escape_into {
   local -n __dybatpho_json_escape_out="$1"
-  local __dybatpho_json_escape_text="${2-}"
-  local __dybatpho_json_escape_result='"'
-  local __dybatpho_json_escape_char __dybatpho_json_escape_index __dybatpho_json_escape_code
-
-  # The cheap path: text with nothing to escape is the common case, and this
-  # avoids walking it character by character. `[[:cntrl:]]` rather than a
-  # `\x01`-`\x1f` range, because a bracket range is resolved by the locale's
-  # collation and a multi-byte character can fall inside one.
-  if [[ "${__dybatpho_json_escape_text}" != *[\\\"]* &&
-    "${__dybatpho_json_escape_text}" != *[[:cntrl:]]* ]]; then
-    __dybatpho_json_escape_out="\"${__dybatpho_json_escape_text}\""
-    return 0
-  fi
-
-  for ((__dybatpho_json_escape_index = 0;  \
-  __dybatpho_json_escape_index < ${#__dybatpho_json_escape_text};  \
-  __dybatpho_json_escape_index++)); do
-    __dybatpho_json_escape_char="${__dybatpho_json_escape_text:__dybatpho_json_escape_index:1}"
-    case "${__dybatpho_json_escape_char}" in
-      '"') __dybatpho_json_escape_result+='\"' ;;
-      $'\\') __dybatpho_json_escape_result+=$'\\\\' ;;
-      $'\b') __dybatpho_json_escape_result+='\b' ;;
-      $'\f') __dybatpho_json_escape_result+='\f' ;;
-      $'\n') __dybatpho_json_escape_result+='\n' ;;
-      $'\r') __dybatpho_json_escape_result+='\r' ;;
-      $'\t') __dybatpho_json_escape_result+='\t' ;;
-      *)
-        # Anything else is passed through unless it is a control character
-        # JSON has no short escape for. The code point decides that, so a
-        # multi-byte character is never mistaken for one.
-        printf -v __dybatpho_json_escape_code '%d' "'${__dybatpho_json_escape_char}"
-        if ((__dybatpho_json_escape_code < 32 || __dybatpho_json_escape_code == 127)); then
-          printf -v __dybatpho_json_escape_result '%s\\u%04x' \
-            "${__dybatpho_json_escape_result}" "${__dybatpho_json_escape_code}"
-        else
-          __dybatpho_json_escape_result+="${__dybatpho_json_escape_char}"
-        fi
-        ;;
-    esac
-  done
-  __dybatpho_json_escape_out="${__dybatpho_json_escape_result}\""
+  local __dybatpho_json_escape_body
+  __dybatpho_log_json_escape_into __dybatpho_json_escape_body "${2-}"
+  __dybatpho_json_escape_out="\"${__dybatpho_json_escape_body}\""
 }
 
 #######################################

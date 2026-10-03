@@ -2759,13 +2759,9 @@ function __dybatpho_cli_collect_switches {
 #######################################
 function __dybatpho_cli_json_quote {
   __dybatpho_cli_require_shell_name "$1"
-  local __value="${2-}"
-  __value="${__value//\\/\\\\}"
-  __value="${__value//\"/\\\"}"
-  __value="${__value//$'\n'/\\n}"
-  __value="${__value//$'\r'/\\r}"
-  __value="${__value//$'\t'/\\t}"
-  printf -v "$1" '%s' "\"${__value}\""
+  local __dybatpho_cli_json_value
+  __dybatpho_log_json_escape_into __dybatpho_cli_json_value "${2-}"
+  printf -v "$1" '%s' "\"${__dybatpho_cli_json_value}\""
 }
 
 #######################################

@@ -140,44 +140,66 @@ function __dybatpho_log {
 }
 
 #######################################
-# @description Escape a string for use as a JSON string value.
+# @description Escape a string for use as a JSON string value, into a variable.
+#   This is the library's one JSON string escaper: `json`, `notification`,
+#   `doctor`, `config` and the generated CLI schema all go through it.
 #   JSON forbids a raw control character inside a string, and only five of them
 #   have a short escape. Leaving the rest alone produced a line no parser would
 #   read: a message carrying an ANSI colour sequence -- which is what logging
 #   the output of any coloured command gives you -- made the whole event
 #   invalid, and a log shipper drops an invalid line without saying so.
-#   Anything with no short escape now goes out as `\u00XX`.
+#   Anything with no short escape goes out as `\u00XX`, and so does DEL.
+# @arg $1 string Name of the variable receiving the escaped text
+# @arg $2 string Input text
+# @set The named variable, without surrounding quotes
+# @internal
+#######################################
+function __dybatpho_log_json_escape_into {
+  local -n __dybatpho_log_json_escape_out="$1"
+  local __dybatpho_log_json_value="${2-}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//\\/\\\\}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//\"/\\\"}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\n'/\\n}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\r'/\\r}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\t'/\\t}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\b'/\\b}"
+  __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\f'/\\f}"
+  # The walk below costs a pass per character, so it runs only when something
+  # is left that the substitutions above could not spell.
+  if [[ "${__dybatpho_log_json_value}" == *[[:cntrl:]]* ]]; then
+    local __dybatpho_log_json_walked="" __dybatpho_log_json_index
+    local __dybatpho_log_json_char __dybatpho_log_json_code
+    for ((__dybatpho_log_json_index = 0;  \
+    __dybatpho_log_json_index < ${#__dybatpho_log_json_value};  \
+    __dybatpho_log_json_index++)); do
+      __dybatpho_log_json_char="${__dybatpho_log_json_value:__dybatpho_log_json_index:1}"
+      # The code point decides, not a bracket range: a range is resolved by the
+      # locale's collation and a multi-byte character can fall inside one.
+      printf -v __dybatpho_log_json_code '%d' "'${__dybatpho_log_json_char}"
+      if ((__dybatpho_log_json_code < 32 || __dybatpho_log_json_code == 127)); then
+        printf -v __dybatpho_log_json_walked '%s\\u%04x' \
+          "${__dybatpho_log_json_walked}" "${__dybatpho_log_json_code}"
+      else
+        __dybatpho_log_json_walked+="${__dybatpho_log_json_char}"
+      fi
+    done
+    __dybatpho_log_json_value="${__dybatpho_log_json_walked}"
+  fi
+  __dybatpho_log_json_escape_out="${__dybatpho_log_json_value}"
+}
+
+#######################################
+# @description Escape a string for use as a JSON string value.
+#   The printing form of `__dybatpho_log_json_escape_into`, for a caller that
+#   writes the result straight out.
 # @arg $1 string Input text
 # @stdout JSON-escaped text without surrounding quotes
 # @internal
 #######################################
 function __dybatpho_log_json_escape {
-  local value="${1:-}"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\t'/\\t}"
-  value="${value//$'\b'/\\b}"
-  value="${value//$'\f'/\\f}"
-  # The walk below costs a pass per character, so it runs only when something
-  # is left that the substitutions above could not spell.
-  if [[ "${value}" == *[[:cntrl:]]* ]]; then
-    local escaped="" index char code
-    for ((index = 0; index < ${#value}; index++)); do
-      char="${value:index:1}"
-      # The code point decides, not a bracket range: a range is resolved by the
-      # locale's collation and a multi-byte character can fall inside one.
-      printf -v code '%d' "'${char}"
-      if ((code < 32 || code == 127)); then
-        printf -v escaped '%s\\u%04x' "${escaped}" "${code}"
-      else
-        escaped+="${char}"
-      fi
-    done
-    value="${escaped}"
-  fi
-  printf '%s' "${value}"
+  local escaped
+  __dybatpho_log_json_escape_into escaped "${1-}"
+  printf '%s' "${escaped}"
 }
 
 #######################################
@@ -298,17 +320,17 @@ function __dybatpho_log_json_event {
   local log_context_json
   log_context_json=$(__dybatpho_log_context_json)
   local log_json_escape
-  log_json_escape=$(__dybatpho_log_json_escape "${message}")
+  __dybatpho_log_json_escape_into log_json_escape "${message}"
   local log_json_escape_2
-  log_json_escape_2=$(__dybatpho_log_json_escape "${timestamp}")
+  __dybatpho_log_json_escape_into log_json_escape_2 "${timestamp}"
   local log_json_escape_3
-  log_json_escape_3=$(__dybatpho_log_json_escape "${DYBATPHO_LOG_HOSTNAME}")
+  __dybatpho_log_json_escape_into log_json_escape_3 "${DYBATPHO_LOG_HOSTNAME}"
   local log_json_escape_4
-  log_json_escape_4=$(__dybatpho_log_json_escape "${source}")
+  __dybatpho_log_json_escape_into log_json_escape_4 "${source}"
   local log_json_escape_5
-  log_json_escape_5=$(__dybatpho_log_json_escape "${LOG_REQUEST_ID}")
+  __dybatpho_log_json_escape_into log_json_escape_5 "${LOG_REQUEST_ID}"
   local log_json_escape_6
-  log_json_escape_6=$(__dybatpho_log_json_escape "${level}")
+  __dybatpho_log_json_escape_into log_json_escape_6 "${level}"
   # shellcheck disable=SC2059 # the format is built above, not taken from input
   printf "${event_format}" \
     "${log_json_escape_2}" \
@@ -1071,9 +1093,9 @@ function __dybatpho_log_context_json {
     value="${__dybatpho_log_context_values[${key}]-}"
     __dybatpho_log_redact value
     local log_json_escape
-    log_json_escape=$(__dybatpho_log_json_escape "${value}")
+    __dybatpho_log_json_escape_into log_json_escape "${value}"
     local log_json_escape_2
-    log_json_escape_2=$(__dybatpho_log_json_escape "${key}")
+    __dybatpho_log_json_escape_into log_json_escape_2 "${key}"
     printf ',"%s":"%s"' \
       "${log_json_escape_2}" \
       "${log_json_escape}"
@@ -1404,7 +1426,7 @@ function dybatpho::timer_end {
 
   local extra_fields
   local log_json_escape
-  log_json_escape=$(__dybatpho_log_json_escape "${name}")
+  __dybatpho_log_json_escape_into log_json_escape "${name}"
   printf -v extra_fields ',"timer":"%s","elapsed_ms":%s' \
     "${log_json_escape}" "${elapsed}"
   local message

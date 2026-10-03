@@ -729,6 +729,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the log lines do, as `https://hooks.slack.com/[redacted]`. This reaches
   every helper built on it, `dybatpho::metrics_push` included.
 
+- **`release` — a configured signing command no longer runs shell syntax from
+  a path.** `dybatpho::release_sign` appended the signature and file paths to
+  `DYBATPHO_RELEASE_SIGN_CMD` unquoted and evaluated the result, so a path with
+  a space was split into several arguments and one holding `$(...)` or `;` ran
+  it. Each path now reaches the command as exactly one argument; the command
+  itself is still run as written.
+
 - **`archive` — an archive that cannot be listed is no longer reported safe.**
   `dybatpho::archive_unsafe_entries` ignored a failed listing, so a corrupt or
   truncated archive, or a zip with no `unzip` installed, came back with no

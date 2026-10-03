@@ -298,6 +298,35 @@ SIGNER
   assert_equal "$(cat "${signature}")" "signature of ${target}"
 }
 
+@test "dybatpho::release_sign hands the signing command each path as one argument" {
+  # The command is a template the project writes, but the paths are data: one
+  # holding a space must not split, and one holding a command substitution
+  # must not run it.
+  local dir="${BATS_TEST_TMPDIR}/sign dir"
+  mkdir -p "${dir}"
+  # A file name can't hold a `/`, so the injected command writes to the
+  # working directory, which the test then checks.
+  cd "${BATS_TEST_TMPDIR}"
+  local target="${dir}/SUMS \$(touch pwned); x"
+  printf 'sums\n' > "${target}"
+  # shellcheck disable=2030,2031
+  DYBATPHO_RELEASE_SIGN_CMD="${BATS_TEST_TMPDIR}/signer3 --flag"
+  cat > "${BATS_TEST_TMPDIR}/signer3" << 'SIGNER'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${BATS_TEST_TMPDIR}/signer3.args"
+printf 'sig\n' > "$2"
+SIGNER
+  chmod +x "${BATS_TEST_TMPDIR}/signer3"
+
+  run_traced -0 dybatpho::release_sign "${target}"
+  DYBATPHO_RELEASE_SIGN_CMD=""
+  assert_output "${target}.asc"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/signer3.args")" \
+    "$(printf '%s\n' --flag "${target}.asc" "${target}")"
+  assert [ -f "${target}.asc" ]
+  assert [ ! -e "${BATS_TEST_TMPDIR}/pwned" ]
+}
+
 @test "dybatpho::release_sign accepts an explicit signature path and rejects a missing file" {
   local target="${BATS_TEST_TMPDIR}/artifact"
   printf 'x\n' > "${target}"

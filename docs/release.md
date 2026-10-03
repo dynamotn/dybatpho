@@ -382,7 +382,7 @@ DYBATPHO_RELEASE_SIGN_CMD="minisign -S -m" dybatpho::release_sign ./release/SHA2
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DYBATPHO_RELEASE_SIGN_CMD`** | string | Command receiving the signature path and then the file path |
+| **`DYBATPHO_RELEASE_SIGN_CMD`** | string | Command receiving the signature path and the file path, one argument each |
 | **`DYBATPHO_RELEASE_GPG_KEY`** | string | Key `gpg` signs with |
 | **`DRY_RUN`** | string | When true-like, print the path without signing |
 

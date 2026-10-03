@@ -404,7 +404,7 @@ function dybatpho::release_checksums {
 #
 # @arg $1 string File to sign
 # @arg $2 string Optional signature path, default is `<file>.asc`
-# @env DYBATPHO_RELEASE_SIGN_CMD string Command receiving the signature path and then the file path
+# @env DYBATPHO_RELEASE_SIGN_CMD string Command receiving the signature path and the file path, one argument each
 # @env DYBATPHO_RELEASE_GPG_KEY string Key `gpg` signs with
 # @env DRY_RUN string When true-like, print the path without signing
 # @stdout Path of the signature
@@ -426,9 +426,12 @@ function dybatpho::release_sign {
   fi
 
   if [[ -n "${DYBATPHO_RELEASE_SIGN_CMD}" ]]; then
-    # The command is a template the project owns, so it is run as written with
-    # the two paths appended.
-    dybatpho::dry_run "${DYBATPHO_RELEASE_SIGN_CMD} ${signature} ${path}" \
+    # The command is a template the project owns, so it is run as written; the
+    # two paths are data, so each is quoted into exactly one argument and never
+    # read as shell.
+    local sign_command
+    printf -v sign_command '%s %q %q' "${DYBATPHO_RELEASE_SIGN_CMD}" "${signature}" "${path}"
+    dybatpho::dry_run "${sign_command}" \
       || dybatpho::die "${FUNCNAME[0]}: Signing ${path} failed"
   else
     dybatpho::require gpg

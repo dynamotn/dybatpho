@@ -197,6 +197,43 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_stderr --partial "Error when access https://this"
 }
 
+@test "dybatpho::curl_do keeps a secret URL out of its log lines" {
+  # A webhook URL is a credential: the path is the secret. So is a token in the
+  # query, and a password in the authority. None of them may reach a log line.
+  local temp_file="${BATS_TEST_TMPDIR}/curl_do"
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  stub curl ": return 1"
+  run_traced --separate-stderr -1 dybatpho::curl_do \
+    "https://bot:hunter2@hooks.example.com:8443/services/T000/B000/XXXXSECRET?token=abc#frag" \
+    "${temp_file}"
+  unstub curl
+  assert_stderr --partial "Error when access https://hooks.example.com:8443/[redacted]"
+  assert_stderr --partial "No more retries left to run curl https://hooks.example.com:8443/[redacted]."
+  refute_stderr --partial "XXXXSECRET"
+  refute_stderr --partial "hunter2"
+  refute_stderr --partial "token=abc"
+}
+
+@test "__dybatpho_network_redact_url_into keeps the scheme, host and port only" {
+  local shown url
+  local -A cases=(
+    ["https://hooks.slack.com/services/T/B/secret"]="https://hooks.slack.com/[redacted]"
+    ["https://user:pass@example.com"]="https://example.com/[redacted]"
+    ["http://[::1]:8080/x?y=z"]="http://[::1]:8080/[redacted]"
+    ["https://example.com?key=secret"]="https://example.com/[redacted]"
+    ["https://example.com/"]="https://example.com"
+    ["https://example.com"]="https://example.com"
+    ["not a url/with/secret"]="[redacted URL]"
+  )
+  for url in "${!cases[@]}"; do
+    __dybatpho_network_redact_url_into shown "${url}"
+    assert_equal "${shown}" "${cases[${url}]}"
+  done
+  # An associative array cannot hold an empty key, so the empty URL is apart.
+  __dybatpho_network_redact_url_into shown ""
+  assert_equal "${shown}" "[redacted URL]"
+}
+
 @test "dybatpho::curl_download not have right spec" {
   run dybatpho::curl_download
   assert_failure

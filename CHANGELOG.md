@@ -523,6 +523,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the valid documents `null` and `false` were refused; with `yq` they were
   accepted, and so was blank text. Both backends now accept every JSON value
   and refuse blank text.
+### Security
+
+- **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`
+  logged `Error when access <url>` and `No more retries left to run curl <url>`
+  with the whole URL, and the download, pagination and GraphQL helpers did the
+  same in their progress, debug and error lines. A Slack, Discord, Teams or
+  Google Chat webhook URL is the secret itself, so a failed notification wrote
+  it to stderr and to `LOG_FILE`. Those lines now show only the scheme, host
+  and port, as `https://hooks.slack.com/[redacted]`.
 
 ## [5.2.0] - 2026-10-02
 

@@ -107,6 +107,36 @@ __DYBATPHO_URL_REGEX='^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*)(\?([^#]*))?
 __DYBATPHO_IPV6_GROUP_REGEX='^[0-9A-Fa-f]{1,4}$'
 
 #######################################
+# @description Reduce a URL to the form the library may write to a log.
+#   Many URLs are credentials in their own right: a Slack, Discord, Teams or
+#   Google Chat webhook is a secret path, a signed download carries its token
+#   in the query, and `user:password@` sits in the authority. A log line, and
+#   the `LOG_FILE` it may be copied to, keeps only what says where the request
+#   went: the scheme, the host and the port. Anything after them is replaced by
+#   `/[redacted]`, and a value that is not a URL at all by `[redacted URL]`. A
+#   bare `/` path says nothing, so `https://example.com/` reads
+#   `https://example.com`.
+# @arg $1 string Name of the variable receiving the redacted URL
+# @arg $2 string URL
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_network_redact_url_into {
+  local -n __dybatpho_network_redacted_ref="$1"
+  local __dybatpho_network_raw_url="${2-}"
+  if ! [[ "${__dybatpho_network_raw_url}" =~ ^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)(.*)$ ]]; then
+    __dybatpho_network_redacted_ref="[redacted URL]"
+    return 0
+  fi
+  local scheme="${BASH_REMATCH[1]}" authority="${BASH_REMATCH[2]}" rest="${BASH_REMATCH[3]}"
+  # The host cannot hold an `@`, so the last one ends any `user:password`.
+  __dybatpho_network_redacted_ref="${scheme}://${authority##*@}"
+  if [[ "${authority}" == *@* || (-n "${rest}" && "${rest}" != "/") ]]; then
+    __dybatpho_network_redacted_ref+="/[redacted]"
+  fi
+}
+
+#######################################
 # @description Escape a value for a double-quoted `curl` config parameter.
 #   `curl` reads a config file as `name = "value"`, where the value takes
 #   backslash escapes, so a backslash or a quote inside a header has to be
@@ -303,6 +333,9 @@ function dybatpho::curl_do {
     secret_args+=(--data-binary @-)
     body_on_stdin=true
   fi
+  # The URL only ever reaches a log line in its redacted form.
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
   # Keep the body path owned by the caller; only response headers are temporary.
   local __dybatpho_http_started=""
   if declare -F __dybatpho_metrics_key > /dev/null; then
@@ -328,12 +361,12 @@ function dybatpho::curl_do {
     if [[ "${body_on_stdin}" == true ]]; then
       code=$(command curl "${curl_args[@]}" "${url}" <<< "${DYBATPHO_CURL_SECRET_DATA}") || {
         code="000"
-        dybatpho::error "Error when access ${url}"
+        dybatpho::error "Error when access ${shown_url}"
       }
     else
       code=$(command curl "${curl_args[@]}" "${url}") || {
         code="000"
-        dybatpho::error "Error when access ${url}"
+        dybatpho::error "Error when access ${shown_url}"
       }
     fi
     # A response that is not three digits is not a response: curl printed
@@ -356,7 +389,7 @@ function dybatpho::curl_do {
       esac
     fi
     if ((attempt >= DYBATPHO_CURL_MAX_RETRIES)); then
-      dybatpho::warn "No more retries left to run curl ${url}."
+      dybatpho::warn "No more retries left to run curl ${shown_url}."
       rm -f "${header_file}" ${secret_config:+"${secret_config}"}
       break
     fi
@@ -413,7 +446,9 @@ function dybatpho::curl_download {
   local url dst_file
   dybatpho::expect_args url dst_file -- "$@"
   shift 2
-  dybatpho::progress "Downloading ${url}"
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
+  dybatpho::progress "Downloading ${shown_url}"
 
   # Create destination folder
   local dst_dir
@@ -568,7 +603,9 @@ function dybatpho::curl_resume_download {
   dst_dir=$(dirname "${dst_file}") || return 6
   mkdir -p "${dst_dir}" || return 6
 
-  dybatpho::progress "Downloading ${url} (resume enabled)"
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
+  dybatpho::progress "Downloading ${shown_url} (resume enabled)"
   dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent -C - "$@" || return $?
 
   if [[ -n "${checksum}" ]]; then
@@ -1079,10 +1116,11 @@ function dybatpho::curl_paginate {
   local body
   dybatpho::create_temp body ".body"
   local -A visited=()
-  local page=0 next exit_code=0
+  local page=0 next exit_code=0 shown_url
   while [[ -n "${url}" ]]; do
     if [[ -v "visited[${url}]" ]]; then
-      dybatpho::warn "Pagination came back to ${url}; stopping"
+      __dybatpho_network_redact_url_into shown_url "${url}"
+      dybatpho::warn "Pagination came back to ${shown_url}; stopping"
       break
     fi
     visited["${url}"]=1
@@ -1093,7 +1131,8 @@ function dybatpho::curl_paginate {
     fi
     [[ -n "${rate_key}" ]] && dybatpho::rate_limit "${rate_key}" "${DYBATPHO_PAGINATE_RATE}"
 
-    dybatpho::debug "Fetching page ${page}: ${url}"
+    __dybatpho_network_redact_url_into shown_url "${url}"
+    dybatpho::debug "Fetching page ${page}: ${shown_url}"
     : > "${body}"
     exit_code=0
     dybatpho::curl_request "${url}" "${body}" "$@" || exit_code=$?
@@ -1261,7 +1300,9 @@ function dybatpho::curl_graphql {
     local message=""
     message="$(dybatpho::json_get "$(< "${response}")" '.errors[0].message // ""' 2> /dev/null)" || message=""
     if [[ -n "${message}" && "${message}" != "null" ]]; then
-      dybatpho::error "GraphQL error from ${url}: ${message}"
+      local shown_url
+      __dybatpho_network_redact_url_into shown_url "${url}"
+      dybatpho::error "GraphQL error from ${shown_url}: ${message}"
       exit_code=4
     fi
   fi

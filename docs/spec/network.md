@@ -173,6 +173,8 @@ dybatpho::circuit_breaker api.example.test \
 ## Edge Cases
 
 - Curl is not installed.
+- The URL is itself a credential: a webhook whose path is the secret, a signed
+  download with a token in its query, or a password in the authority.
 - The request returns a 3xx, 4xx, or 5xx status.
 - The request output is omitted, in which case it is discarded to `/dev/null`.
 - The caller wants JSON headers or HEAD-only metadata without rebuilding curl flags manually.
@@ -253,6 +255,10 @@ dybatpho::circuit_breaker api.example.test \
   envelope, sends it on standard input, refuses variables that are not a JSON object, and
   reports a non-empty `errors` array in an otherwise successful response as a client error
   with the first message logged.
+- **FR-032**: Every URL the module writes to a log, an error, a warning or a
+  progress line MUST be reduced to its scheme, host and port, with any user
+  information, path, query or fragment replaced by `/[redacted]`, and a value
+  that is not a URL replaced by `[redacted URL]`.
 
 - **FR-020**: The module MUST split a URL into scheme, user, password, host, port, path,
   query, and fragment, requiring a scheme and `://`, and MUST present every component,
@@ -410,6 +416,10 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-029**: Verify the GraphQL helper sends the query and variables, reports an `errors` array
   in a `200` response as exit code 4 with the message logged, passes a clean response through,
   and refuses variables that are not a JSON object.
+- **IT-030**: Verify a failing request to a URL carrying a password, a secret
+  path, a query token and a fragment logs only `scheme://host:port/[redacted]`,
+  and that the redaction keeps the scheme, host and port of plain, IPv6 and
+  path-less URLs.
 - **IT-024**: Verify a request carrying `DYBATPHO_CURL_SECRET_HEADERS` and
   `DYBATPHO_CURL_SECRET_DATA` sends both, while neither appears among the
   arguments the mocked `curl` was called with.

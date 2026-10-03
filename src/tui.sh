@@ -621,13 +621,15 @@ function dybatpho::tui_progress_stop {
 # @description Read one keypress and report it under a stable name, so the menu
 #   loops never deal with escape sequences themselves.
 # @arg $1 string Name of the variable receiving the key name
-# @set The named variable to `up`, `down`, `left`, `right`, `enter`, `space`, `escape`, `eof`, or `char:<c>`
+# @set The named variable to `up`, `down`, `left`, `right`, `home`, `end`,
+#   `insert`, `delete`, `pageup`, `pagedown`, `enter`, `space`, `escape`, `eof`,
+#   `char:<c>`, or `unknown` for any other escape sequence
 # @internal
 #######################################
 function __dybatpho_tui_read_key_into {
   # kcov(disabled)
   local -n __dybatpho_tui_key_out="$1"
-  local __dybatpho_tui_key_char __dybatpho_tui_key_rest=""
+  local __dybatpho_tui_key_char
 
   if ! IFS= read -rsn1 __dybatpho_tui_key_char; then
     __dybatpho_tui_key_out="eof"
@@ -637,21 +639,75 @@ function __dybatpho_tui_read_key_into {
     # `read -n1` strips the newline, so `enter` arrives as an empty character.
     '') __dybatpho_tui_key_out="enter" ;;
     ' ') __dybatpho_tui_key_out="space" ;;
-    $'\033')
-      # An escape on its own is the cancel key; an escape followed by `[A` is an
-      # arrow. The timeout is what tells them apart, so it has to be short
-      # enough not to be felt and long enough for the rest of the sequence.
-      IFS= read -rsn2 -t 0.05 __dybatpho_tui_key_rest || __dybatpho_tui_key_rest=""
-      case "${__dybatpho_tui_key_rest}" in
-        '[A') __dybatpho_tui_key_out="up" ;;
-        '[B') __dybatpho_tui_key_out="down" ;;
-        '[C') __dybatpho_tui_key_out="right" ;;
-        '[D') __dybatpho_tui_key_out="left" ;;
-        *) __dybatpho_tui_key_out="escape" ;;
-      esac
-      ;;
+    $'\033') __dybatpho_tui_read_escape_into __dybatpho_tui_key_out ;;
     *) __dybatpho_tui_key_out="char:${__dybatpho_tui_key_char}" ;;
   esac
+  # kcov(enabled)
+}
+
+#######################################
+# @description Read the rest of an escape sequence and name the key it encodes.
+#   An escape on its own is the cancel key, and the timeout is what tells it
+#   apart from the start of a sequence, so it has to be short enough not to be
+#   felt and long enough for the rest to arrive. A sequence is read to its end
+#   rather than to a fixed length: `ESC O A` is an arrow in application cursor
+#   mode, and `ESC [ 3 ~` is Delete, whose `~` would otherwise be left behind
+#   and read as the next key.
+# @arg $1 string Name of the variable receiving the key name
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_tui_read_escape_into {
+  # kcov(disabled)
+  local -n __dybatpho_tui_esc_out="$1"
+  local __dybatpho_tui_esc_char __dybatpho_tui_esc_body=""
+
+  __dybatpho_tui_esc_out="escape"
+  IFS= read -rsn1 -t 0.05 __dybatpho_tui_esc_char || return 0
+  case "${__dybatpho_tui_esc_char}" in
+    O)
+      __dybatpho_tui_esc_out="unknown"
+      IFS= read -rsn1 -t 0.05 __dybatpho_tui_esc_char || return 0
+      case "${__dybatpho_tui_esc_char}" in
+        A) __dybatpho_tui_esc_out="up" ;;
+        B) __dybatpho_tui_esc_out="down" ;;
+        C) __dybatpho_tui_esc_out="right" ;;
+        D) __dybatpho_tui_esc_out="left" ;;
+        H) __dybatpho_tui_esc_out="home" ;;
+        F) __dybatpho_tui_esc_out="end" ;;
+        *) ;;
+      esac
+      return 0
+      ;;
+    '[') ;;
+    *) return 0 ;;
+  esac
+
+  # A CSI sequence ends at a letter or a tilde; anything longer than a key is
+  # cut off rather than read forever.
+  __dybatpho_tui_esc_out="unknown"
+  while IFS= read -rsn1 -t 0.05 __dybatpho_tui_esc_char; do
+    __dybatpho_tui_esc_body+="${__dybatpho_tui_esc_char}"
+    case "${__dybatpho_tui_esc_char}" in
+      [A-Za-z~]) break ;;
+      *) ;;
+    esac
+    ((${#__dybatpho_tui_esc_body} < 32)) || break
+  done
+  case "${__dybatpho_tui_esc_body}" in
+    A) __dybatpho_tui_esc_out="up" ;;
+    B) __dybatpho_tui_esc_out="down" ;;
+    C) __dybatpho_tui_esc_out="right" ;;
+    D) __dybatpho_tui_esc_out="left" ;;
+    H | '1~' | '7~') __dybatpho_tui_esc_out="home" ;;
+    F | '4~' | '8~') __dybatpho_tui_esc_out="end" ;;
+    '2~') __dybatpho_tui_esc_out="insert" ;;
+    '3~') __dybatpho_tui_esc_out="delete" ;;
+    '5~') __dybatpho_tui_esc_out="pageup" ;;
+    '6~') __dybatpho_tui_esc_out="pagedown" ;;
+    *) ;;
+  esac
+  return 0
   # kcov(enabled)
 }
 

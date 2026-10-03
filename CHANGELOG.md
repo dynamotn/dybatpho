@@ -829,6 +829,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `[env: …]` annotation in the description column. Every field now stays in
   place, and specs with descriptions produce byte-identical artifacts.
 
+- **`tui` — menus understand every arrow-key encoding and leave nothing
+  behind.** The menus and the confirmation read exactly two bytes after an
+  escape, so a terminal in application cursor mode, which sends `ESC O A` for
+  an arrow, cancelled the menu instead of moving it, and Delete (`ESC [ 3 ~`)
+  left its `~` to be read as the next key. Escape sequences are now read to
+  their end, and keys the widgets do not use are ignored rather than read as
+  Escape.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

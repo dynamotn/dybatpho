@@ -188,6 +188,30 @@ setup() {
 }
 
 # =============================================================================
+# key decoding
+# =============================================================================
+
+@test "keys arriving as escape sequences are named whole" {
+  # Application cursor mode sends `ESC O A` for an arrow, which used to read as
+  # Escape and cancel the menu; Delete is `ESC [ 3 ~`, whose `~` used to be left
+  # behind and read as the next key. From a file, not `bash -c`: the reader is
+  # an internal helper a `-c` child would not inherit.
+  local script="${BATS_TEST_TMPDIR}/keys.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules tui" \
+    'key=""; seen=""' \
+    'while __dybatpho_tui_read_key_into key; [[ "${key}" != eof ]]; do seen+="${key} "; done' \
+    'printf "%s\n" "${seen}"' > "${script}"
+
+  run_traced bash "${script}" < <(printf '\033OA\033[3~x\033[B\033OB\033[5~\033[1;5C')
+  assert_success
+  assert_output "up delete char:x down down pageup unknown "
+
+  run_traced bash "${script}" < <(printf '\033')
+  assert_output "escape "
+}
+
+# =============================================================================
 # dybatpho::tui_menu
 # =============================================================================
 

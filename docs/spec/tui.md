@@ -171,6 +171,8 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 ## Edge Cases
 
 - Streams are captured, piped, or redirected, in any combination.
+- The terminal sends arrows in application cursor mode (`ESC O A`), or a key
+  whose sequence is longer than three bytes, such as Delete (`ESC [ 3 ~`).
 - `DYBATPHO_TUI` forces the drawn rendering where there is no terminal, or the
   fallback where there is one.
 - A menu is answered with a position outside the list, with a non-number, with
@@ -246,6 +248,10 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   hook before it is drawn or logged.
 - **FR-025**: The drawn menu MUST scroll rather than overflow when the list is
   longer than `DYBATPHO_TUI_MENU_HEIGHT`, keeping the highlighted entry visible.
+- **FR-026**: The drawn widgets MUST read an escape sequence to its end, MUST
+  treat `ESC O A`–`ESC O D` as arrows, and MUST NOT treat any sequence other
+  than a lone escape as the cancel key or leave part of it to be read as the
+  next key.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -298,6 +304,8 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **IT-012**: The confirmation answers yes, no, and the default off a terminal,
   refuses in an unattended shell, obeys `DYBATPHO_FORCE`, and keeps stdout
   clean.
+- **IT-013**: Arrows in both cursor modes, Delete, Page Up, a modified arrow,
+  and a lone escape each decode to one key name, with no character left over.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -15,7 +15,7 @@ EOF
 @test "dybatpho::table_box renders a boxed table with a header separator" {
   run_traced dybatpho::table_box $'Name|Role\nAlice|Dev\nBob|Ops'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 ┌───────┬──────┐
 │ Name  │ Role │
 ├───────┼──────┤
@@ -28,7 +28,7 @@ EOF
 @test "dybatpho::table_markdown renders a markdown table and honors custom delimiters" {
   run_traced dybatpho::table_markdown $'Name,Role\nAlice,Dev\nBob,Ops' ","
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 | Name  | Role |
 | ----- | ---- |
 | Alice | Dev  |
@@ -37,9 +37,9 @@ EOF
 }
 
 @test "dybatpho::table_print reads from stdin when input is -" {
-  run_traced dybatpho::table_print - <<< $'Name|Role\nAlice|Dev\nBob|Ops\n'
+  run_traced dybatpho::table_print - <<< $'Name|Role\nAlice|Dev\nBob|Ops'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 Name   Role
 Alice  Dev
 Bob    Ops
@@ -49,17 +49,17 @@ EOF
 @test "dybatpho::table_align supports per-column alignment and custom gap width" {
   run_traced dybatpho::table_align $'Name|Count\nApples|3\nPears|12' "|" "left,right" 3
   assert_success
-  assert_output << EOF
-Name   Count
-Apples     3
-Pears     12
+  assert_output - << EOF
+Name     Count
+Apples       3
+Pears       12
 EOF
 }
 
 @test "dybatpho::table_csv renders comma-delimited rows in plain and markdown styles" {
   run_traced dybatpho::table_csv $'Name,Count\nApples,3\nPears,12' plain "left,right"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 Name    Count
 Apples      3
 Pears      12
@@ -67,7 +67,7 @@ EOF
 
   run_traced dybatpho::table_csv $'Name,Count\nApples,3\nPears,12' markdown
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 | Name   | Count |
 | ------ | ----- |
 | Apples | 3     |
@@ -162,7 +162,7 @@ EOF
   csv="$(printf 'name,note,qty\n"Doe, John",ok,3\n"He said ""hi""","line one\nline two",10\n,a|b,7')"
   run_traced dybatpho::table_from_csv "${csv}" box
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 ┌──────────────┬───────────────────┬─────┐
 │ name         │ note              │ qty │
 ├──────────────┼───────────────────┼─────┤
@@ -202,7 +202,7 @@ EOF
 @test "dybatpho::table_from_json renders an array of objects from text, a file and stdin" {
   run_traced dybatpho::table_from_json '[{"name":"api","note":"a, b"},{"name":"web"}]' markdown
   assert_success
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 | name | note |
 | ---- | ---- |
 | api  | a, b |

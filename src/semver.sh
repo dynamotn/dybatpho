@@ -529,6 +529,22 @@ function dybatpho::semver_satisfies {
 }
 
 #######################################
+# @description Return success when one version has lower precedence than
+#   another, for `__dybatpho_helpers_sort`. A leading `v` is ignored.
+# @arg $1 string Version that might come first
+# @arg $2 string Version it is compared with
+# @exitcode 0 The first version is lower
+# @exitcode 1 It is not
+# @internal
+#######################################
+# dyshellint disable=BSG050 a sort calls this once per comparison, so it skips the argument loop
+function __dybatpho_semver_before {
+  local __dybatpho_semver_before_order
+  __dybatpho_semver_cmp_into __dybatpho_semver_before_order "${1#v}" "${2#v}"
+  ((__dybatpho_semver_before_order < 0))
+}
+
+#######################################
 # @description Print versions in order, lowest first.
 #   Ordering follows the specification rather than string order, so `1.10.0`
 #   comes after `1.9.0` and a pre-release comes before the release it precedes.
@@ -560,21 +576,11 @@ function dybatpho::semver_sort {
       || dybatpho::die "${FUNCNAME[0]}: Not a valid version: '${version}'"
   done
 
-  # An insertion sort keeps the comparison in `dybatpho::semver_compare`, which
-  # already knows the specification's ordering rules, rather than reimplementing
-  # them for `sort`.
-  local index position candidate order
-  for ((index = 1; index < ${#versions[@]}; index++)); do
-    candidate="${versions[index]}"
-    position=$((index - 1))
-    while ((position >= 0)); do
-      __dybatpho_semver_cmp_into order "${versions[position]#v}" "${candidate#v}"
-      ((order > 0)) || break
-      versions[position + 1]="${versions[position]}"
-      position=$((position - 1))
-    done
-    versions[position + 1]="${candidate}"
-  done
+  # The comparison stays in `__dybatpho_semver_cmp_into`, which already knows
+  # the specification's ordering rules, rather than being reimplemented for
+  # `sort`; the merge sort keeps versions that compare equal, such as `1.0.0`
+  # and `v1.0.0`, in the order they were given.
+  __dybatpho_helpers_sort versions __dybatpho_semver_before
   printf '%s\n' "${versions[@]}"
 }
 

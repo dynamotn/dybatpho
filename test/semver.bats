@@ -445,3 +445,11 @@ setup() {
     assert [ "$(dybatpho::semver_compare "${sorted[index - 1]}" "${sorted[index]}")" -le 0 ]
   done
 }
+
+@test "dybatpho::semver_sort keeps versions of equal precedence in the order given" {
+  # Build metadata does not affect precedence, so these three tie; a stable
+  # sort leaves them as written rather than reordering them by text.
+  run_traced dybatpho::semver_sort 2.0.0 1.0.0+b v1.0.0 1.0.0+a 0.9.0
+  assert_success
+  assert_output "$(printf '%s\n' 0.9.0 1.0.0+b v1.0.0 1.0.0+a 2.0.0)"
+}

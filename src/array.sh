@@ -404,111 +404,31 @@ function __dybatpho_array_index {
 }
 
 #######################################
-# @description Return success when one value must sort after another.
-# @arg $1 string Left value
-# @arg $2 string Right value
+# @description Return success when one value has to come before another, for
+#   `__dybatpho_helpers_sort`.
+#   Text compares by the current locale's collation, the same rule `sort`
+#   follows; numbers compare by value. Equal values never come before each
+#   other, which is what lets the sort keep them in their original order.
+# @arg $1 string Value that might come first
+# @arg $2 string Value it is compared with
 # @arg $3 bool Compare as numbers rather than as text
 # @arg $4 bool Reverse the order
-# @exitcode 0 The left value belongs after the right one
+# @exitcode 0 The first value comes first
 # @exitcode 1 It does not
 # @internal
 #######################################
-function __dybatpho_array_sorts_after {
-  local left="$1" right="$2" numeric="$3" reverse="$4"
-  local order
-  if [[ "${numeric}" == true ]]; then
-    if ((left > right)); then
-      order=1
-    elif ((left < right)); then
-      order=-1
+function __dybatpho_array_before {
+  if [[ "$3" == true ]]; then
+    if [[ "$4" == true ]]; then
+      (($1 > $2))
     else
-      order=0
+      (($1 < $2))
     fi
+  elif [[ "$4" == true ]]; then
+    [[ "$1" > "$2" ]]
   else
-    if [[ "${left}" > "${right}" ]]; then
-      order=1
-    elif [[ "${left}" < "${right}" ]]; then
-      order=-1
-    else
-      order=0
-    fi
+    [[ "$1" < "$2" ]]
   fi
-  if [[ "${reverse}" == true ]]; then
-    ((order < 0))
-  else
-    ((order > 0))
-  fi
-}
-
-#######################################
-# @description Sort an array of values in place, bottom-up and stable.
-#   Runs of length one are already sorted, so the passes start by merging pairs
-#   of them and double the run length until one run covers everything. That is
-#   `n log n` comparisons instead of the `n²` an insertion sort pays, and the
-#   comparison stays in `__dybatpho_array_sorts_after` so text, numeric and
-#   reversed order are all decided in one place.
-#
-#   The merge takes the left run whenever the two compare equal, which is what
-#   makes the sort stable.
-# @arg $1 string Name of the array to sort in place
-# @arg $2 bool Compare as numbers rather than as text
-# @arg $3 bool Reverse the order
-# @set The named array
-# @internal
-#######################################
-function __dybatpho_array_merge_sort {
-  local -n __dybatpho_array_merge_values="$1"
-  local __dybatpho_array_merge_numeric="$2" __dybatpho_array_merge_reverse="$3"
-  local __dybatpho_array_merge_count="${#__dybatpho_array_merge_values[@]}"
-  ((__dybatpho_array_merge_count > 1)) || return 0
-
-  local -a __dybatpho_array_merge_buffer=()
-  local __dybatpho_array_merge_width=1
-  local __dybatpho_array_merge_start __dybatpho_array_merge_middle __dybatpho_array_merge_end
-  local __dybatpho_array_merge_left __dybatpho_array_merge_right __dybatpho_array_merge_out
-
-  while ((__dybatpho_array_merge_width < __dybatpho_array_merge_count)); do
-    __dybatpho_array_merge_buffer=()
-    __dybatpho_array_merge_start=0
-    while ((__dybatpho_array_merge_start < __dybatpho_array_merge_count)); do
-      __dybatpho_array_merge_middle=$((__dybatpho_array_merge_start + __dybatpho_array_merge_width))
-      ((__dybatpho_array_merge_middle > __dybatpho_array_merge_count)) \
-        && __dybatpho_array_merge_middle=${__dybatpho_array_merge_count}
-      __dybatpho_array_merge_end=$((__dybatpho_array_merge_middle + __dybatpho_array_merge_width))
-      ((__dybatpho_array_merge_end > __dybatpho_array_merge_count)) \
-        && __dybatpho_array_merge_end=${__dybatpho_array_merge_count}
-
-      __dybatpho_array_merge_left=${__dybatpho_array_merge_start}
-      __dybatpho_array_merge_right=${__dybatpho_array_merge_middle}
-      while ((__dybatpho_array_merge_left < __dybatpho_array_merge_middle)) \
-        && ((__dybatpho_array_merge_right < __dybatpho_array_merge_end)); do
-        if __dybatpho_array_sorts_after \
-          "${__dybatpho_array_merge_values[${__dybatpho_array_merge_left}]}" \
-          "${__dybatpho_array_merge_values[${__dybatpho_array_merge_right}]}" \
-          "${__dybatpho_array_merge_numeric}" "${__dybatpho_array_merge_reverse}"; then
-          __dybatpho_array_merge_buffer+=("${__dybatpho_array_merge_values[${__dybatpho_array_merge_right}]}")
-          __dybatpho_array_merge_right=$((__dybatpho_array_merge_right + 1))
-        else
-          __dybatpho_array_merge_buffer+=("${__dybatpho_array_merge_values[${__dybatpho_array_merge_left}]}")
-          __dybatpho_array_merge_left=$((__dybatpho_array_merge_left + 1))
-        fi
-      done
-      for ((__dybatpho_array_merge_out = __dybatpho_array_merge_left;  \
-      __dybatpho_array_merge_out < __dybatpho_array_merge_middle;  \
-      __dybatpho_array_merge_out++)); do
-        __dybatpho_array_merge_buffer+=("${__dybatpho_array_merge_values[${__dybatpho_array_merge_out}]}")
-      done
-      for ((__dybatpho_array_merge_out = __dybatpho_array_merge_right;  \
-      __dybatpho_array_merge_out < __dybatpho_array_merge_end;  \
-      __dybatpho_array_merge_out++)); do
-        __dybatpho_array_merge_buffer+=("${__dybatpho_array_merge_values[${__dybatpho_array_merge_out}]}")
-      done
-
-      __dybatpho_array_merge_start=${__dybatpho_array_merge_end}
-    done
-    __dybatpho_array_merge_values=(${__dybatpho_array_merge_buffer[@]+"${__dybatpho_array_merge_buffer[@]}"})
-    __dybatpho_array_merge_width=$((__dybatpho_array_merge_width * 2))
-  done
 }
 
 #######################################
@@ -576,7 +496,7 @@ function dybatpho::array_sort {
     done
   fi
 
-  __dybatpho_array_merge_sort __dybatpho_array_sort_values \
+  __dybatpho_helpers_sort __dybatpho_array_sort_values __dybatpho_array_before \
     "${__dybatpho_array_sort_numeric}" "${__dybatpho_array_sort_reverse}"
 
   __dybatpho_array_copy "$1" __dybatpho_array_sort_values

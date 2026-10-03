@@ -1152,8 +1152,64 @@ function __dybatpho_math_cmp2 {
 }
 
 #######################################
+# @description Encode a decimal number into a key whose byte order is its
+#   numeric order, into a named variable.
+#   A non-negative number becomes `1`, its integer digit count in five digits,
+#   the integer without leading zeros, and the fraction without trailing ones,
+#   so a longer integer sorts later and equal integers fall through to the
+#   fraction digit by digit. A negative number becomes `0` and the same parts
+#   with every digit mapped onto a letter in reverse (`9` to `a`, `0` to `j`)
+#   and a closing `~`, which reverses the order and still sorts `-0.5` before
+#   `-0.45`. Zero is non-negative whatever its sign.
+# @arg $1 string Name of the variable receiving the key
+# @arg $2 string Number, as `dybatpho::math_is_number` accepts it
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_math_sort_key_into {
+  local -n __dybatpho_math_key_ref="$1"
+  local __dybatpho_math_key_n="$2" __dybatpho_math_key_negative=0
+  local __dybatpho_math_key_int __dybatpho_math_key_frac=""
+
+  case "${__dybatpho_math_key_n}" in
+    -*) __dybatpho_math_key_negative=1 __dybatpho_math_key_n="${__dybatpho_math_key_n#-}" ;;
+    +*) __dybatpho_math_key_n="${__dybatpho_math_key_n#+}" ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac
+  __dybatpho_math_key_int="${__dybatpho_math_key_n%%.*}"
+  [[ "${__dybatpho_math_key_n}" != *.* ]] || __dybatpho_math_key_frac="${__dybatpho_math_key_n#*.}"
+
+  # Strip leading zeros from the integer and trailing zeros from the fraction:
+  # `007.50` and `7.5` are the same number and must get the same key.
+  __dybatpho_math_key_int="${__dybatpho_math_key_int#"${__dybatpho_math_key_int%%[!0]*}"}"
+  __dybatpho_math_key_frac="${__dybatpho_math_key_frac%"${__dybatpho_math_key_frac##*[!0]}"}"
+  [[ -n "${__dybatpho_math_key_int}${__dybatpho_math_key_frac}" ]] || __dybatpho_math_key_negative=0
+
+  local __dybatpho_math_key_width
+  if ((__dybatpho_math_key_negative == 0)); then
+    printf -v __dybatpho_math_key_width '%05d' "${#__dybatpho_math_key_int}"
+    __dybatpho_math_key_ref="1${__dybatpho_math_key_width}${__dybatpho_math_key_int}.${__dybatpho_math_key_frac}"
+    return 0
+  fi
+
+  printf -v __dybatpho_math_key_width '%05d' "$((99999 - ${#__dybatpho_math_key_int}))"
+  local __dybatpho_math_key_digits="${__dybatpho_math_key_int}.${__dybatpho_math_key_frac}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//0/j}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//1/i}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//2/h}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//3/g}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//4/f}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//5/e}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//6/d}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//7/c}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//8/b}"
+  __dybatpho_math_key_digits="${__dybatpho_math_key_digits//9/a}"
+  __dybatpho_math_key_ref="0${__dybatpho_math_key_width}${__dybatpho_math_key_digits}~"
+}
+
+#######################################
 # @description Sort numbers by value, smallest first, into an array.
-#   A bottom-up merge sort, so the number of comparisons stays at `n log n`
+#   A stable merge sort, so the number of comparisons stays at `n log n`
 #   whatever order the values arrive in. When every value is a whole number that
 #   fits in Bash's own arithmetic, the comparisons use `(( ))` instead of the
 #   digit-string comparison, which is what keeps a list of millisecond timings
@@ -1167,7 +1223,7 @@ function __dybatpho_math_cmp2 {
 function __dybatpho_math_sort {
   local -n __sort_out="$1"
   shift
-  local -a __sort_from=("$@") __sort_to=()
+  local -a __sort_from=("$@")
   local __sort_value __sort_native=true
   for __sort_value in ${__sort_from[@]+"${__sort_from[@]}"}; do
     [[ "${__sort_value}" =~ ${DYBATPHO_MATH_NUMBER_REGEX} ]] \
@@ -1180,57 +1236,42 @@ function __dybatpho_math_sort {
     [[ "${__sort_value}" =~ ^[+-]?[0-9]{1,18}$ ]] || __sort_native=false
   done
 
-  local __sort_n=${#__sort_from[@]} __sort_width __sort_lo __sort_mid __sort_hi
-  local __sort_i __sort_j __sort_k __sort_cmp
-  for ((__sort_width = 1; __sort_width < __sort_n; __sort_width *= 2)); do # kcov(skip) every sort runs it
-    __sort_to=()
-    for ((__sort_lo = 0; __sort_lo < __sort_n; __sort_lo += 2 * __sort_width)); do
-      __sort_mid=$((__sort_lo + __sort_width))
-      ((__sort_mid > __sort_n)) && __sort_mid=${__sort_n}
-      __sort_hi=$((__sort_lo + 2 * __sort_width))
-      ((__sort_hi > __sort_n)) && __sort_hi=${__sort_n}
-      __sort_i=${__sort_lo}
-      __sort_j=${__sort_mid}
-      __sort_k=${__sort_lo}
-      while ((__sort_i < __sort_mid && __sort_j < __sort_hi)); do
-        if [[ "${__sort_native}" == true ]]; then
-          # `10#` keeps a leading zero from being read as octal; the sign has to
-          # sit outside it.
-          local __sort_a="${__sort_from[__sort_i]}" __sort_b="${__sort_from[__sort_j]}"
-          local __sort_sa="" __sort_sb=""
-          [[ "${__sort_a}" == [+-]* ]] && __sort_sa="${__sort_a:0:1}" && __sort_a="${__sort_a:1}"
-          [[ "${__sort_b}" == [+-]* ]] && __sort_sb="${__sort_b:0:1}" && __sort_b="${__sort_b:1}"
-          if ((${__sort_sa}10#${__sort_a} <= ${__sort_sb}10#${__sort_b})); then
-            __sort_cmp=0
-          else
-            __sort_cmp=1
-          fi
-        else
-          __dybatpho_math_cmp2 __sort_cmp "${__sort_from[__sort_i]}" "${__sort_from[__sort_j]}"
-        fi
-        # Taking from the left on a tie keeps the sort stable.
-        if ((__sort_cmp <= 0)); then
-          __sort_to[__sort_k]="${__sort_from[__sort_i]}"
-          __sort_i=$((__sort_i + 1))
-        else
-          __sort_to[__sort_k]="${__sort_from[__sort_j]}"
-          __sort_j=$((__sort_j + 1))
-        fi
-        __sort_k=$((__sort_k + 1))
-      done
-      while ((__sort_i < __sort_mid)); do
-        __sort_to[__sort_k]="${__sort_from[__sort_i]}"
-        __sort_i=$((__sort_i + 1))
-        __sort_k=$((__sort_k + 1))
-      done
-      while ((__sort_j < __sort_hi)); do
-        __sort_to[__sort_k]="${__sort_from[__sort_j]}"
-        __sort_j=$((__sort_j + 1))
-        __sort_k=$((__sort_k + 1))
-      done
+  if [[ "${__sort_native}" == true ]]; then
+    # Each value becomes a plain integer key once, so the sort compares in
+    # Bash's own arithmetic without a call per comparison. `10#` keeps a
+    # leading zero from being read as octal; the sign has to sit outside it.
+    local -a __sort_keys=() __sort_order=()
+    local __sort_at __sort_sign __sort_digits
+    for __sort_at in "${!__sort_from[@]}"; do
+      __sort_digits="${__sort_from[__sort_at]}"
+      __sort_sign=""
+      [[ "${__sort_digits}" == [+-]* ]] && __sort_sign="${__sort_digits:0:1}" && __sort_digits="${__sort_digits:1}"
+      __sort_keys[__sort_at]=$((${__sort_sign}10#${__sort_digits}))
+      __sort_order+=("${__sort_at}")
     done
-    __sort_from=("${__sort_to[@]}")
-  done
+    __dybatpho_helpers_sort __sort_order @int-key __sort_keys
+    local -a __sort_sorted=()
+    for __sort_at in ${__sort_order[@]+"${__sort_order[@]}"}; do
+      __sort_sorted+=("${__sort_from[__sort_at]}")
+    done
+    __sort_from=(${__sort_sorted[@]+"${__sort_sorted[@]}"})
+  else
+    # Each value is encoded once into a key whose byte order is its numeric
+    # order, so the sort compares strings inline instead of aligning two
+    # digit strings on every comparison.
+    local -a __sort_keys=() __sort_order=()
+    local __sort_at
+    for __sort_at in "${!__sort_from[@]}"; do
+      __dybatpho_math_sort_key_into "__sort_keys[${__sort_at}]" "${__sort_from[__sort_at]}"
+      __sort_order+=("${__sort_at}")
+    done
+    __dybatpho_helpers_sort __sort_order @bytes-key __sort_keys
+    local -a __sort_sorted=()
+    for __sort_at in ${__sort_order[@]+"${__sort_order[@]}"}; do
+      __sort_sorted+=("${__sort_from[__sort_at]}")
+    done
+    __sort_from=(${__sort_sorted[@]+"${__sort_sorted[@]}"})
+  fi
   __sort_out=(${__sort_from[@]+"${__sort_from[@]}"})
 }
 

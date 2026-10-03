@@ -497,7 +497,7 @@ EOF
   # one field leave the rest of the order alone.
   local values=(b1 a1 b2 a2 b3 a3)
   # shellcheck disable=2329
-  __dybatpho_array_sorts_after() { [[ "${1:0:1}" > "${2:0:1}" ]]; }
+  __dybatpho_array_before() { [[ "${1:0:1}" < "${2:0:1}" ]]; }
   dybatpho::array_sort values
   assert_equal "${values[*]}" "a1 a2 a3 b1 b2 b3"
 }

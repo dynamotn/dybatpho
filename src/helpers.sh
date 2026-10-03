@@ -258,6 +258,108 @@ function __dybatpho_helpers_need_module {
     || dybatpho::die "$3 needs the $1 module, load it with: dybatpho::load $1" "${4:-1}"
 }
 
+#######################################
+# @description Sort an array in place, bottom-up and stable, deciding the order
+#   through a comparator function.
+#   Runs of length one are already sorted, so the passes merge pairs of them
+#   and double the run length until one run covers everything: `n log n`
+#   comparisons whatever order the values arrive in, where an insertion sort
+#   pays `n²`. The merge takes from the left run unless the right value
+#   strictly comes first, which is what keeps equal values in the order they
+#   arrived in. Everything stays in Bash, so a value holding a newline is
+#   sorted whole and no external `sort` is needed.
+#
+#   The comparator is called as `<comparator> <a> <b> [args...]` and succeeds
+#   exactly when `a` has to come before `b`; for values that compare equal it
+#   fails. A module that sorts by a key rather than by the value itself sorts
+#   an array of indexes and has the comparator look the keys up, so each key is
+#   worked out once rather than on every comparison.
+#
+#   `@int-key <keys>` in place of a comparator sorts an array of indexes by the
+#   whole numbers the named array holds for them, smallest first, and
+#   `@bytes-key <keys>` by the strings it holds, in byte order. Both compare
+#   inline: a function call per comparison is most of what a sort costs in
+#   Bash, and a list of timings is exactly where that shows.
+# @arg $1 string Name of the array to sort in place
+# @arg $2 string Comparator function, `@int-key` or `@bytes-key`
+# @arg $@ string Extra arguments passed to every comparator call, or the name of the keys array for a key mode
+# @set The named array, reindexed from zero
+# @internal
+#######################################
+function __dybatpho_helpers_sort {
+  local -n __dybatpho_helpers_sort_ref="$1"
+  local __dybatpho_helpers_sort_before="$2"
+  shift 2
+  local -a __dybatpho_helpers_sort_from=(${__dybatpho_helpers_sort_ref[@]+"${__dybatpho_helpers_sort_ref[@]}"})
+  local -a __dybatpho_helpers_sort_into=()
+  local __dybatpho_helpers_sort_n="${#__dybatpho_helpers_sort_from[@]}"
+  local __dybatpho_helpers_sort_width=1 __dybatpho_helpers_sort_lo __dybatpho_helpers_sort_mid
+  local __dybatpho_helpers_sort_hi __dybatpho_helpers_sort_l __dybatpho_helpers_sort_r
+  local __dybatpho_helpers_sort_mode=call
+  case "${__dybatpho_helpers_sort_before}" in
+    @int-key | @bytes-key)
+      __dybatpho_helpers_sort_mode="${__dybatpho_helpers_sort_before}"
+      local -n __dybatpho_helpers_sort_keys="$1"
+      # Byte order whatever the caller's collation; it only reaches the
+      # inline comparison, since no comparator is called in a key mode.
+      local LC_ALL=C
+      ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac
+
+  while ((__dybatpho_helpers_sort_width < __dybatpho_helpers_sort_n)); do
+    __dybatpho_helpers_sort_into=()
+    for ((__dybatpho_helpers_sort_lo = 0; __dybatpho_helpers_sort_lo < __dybatpho_helpers_sort_n; \
+      __dybatpho_helpers_sort_lo += 2 * __dybatpho_helpers_sort_width)); do
+      __dybatpho_helpers_sort_mid=$((__dybatpho_helpers_sort_lo + __dybatpho_helpers_sort_width))
+      ((__dybatpho_helpers_sort_mid <= __dybatpho_helpers_sort_n)) \
+        || __dybatpho_helpers_sort_mid="${__dybatpho_helpers_sort_n}"
+      __dybatpho_helpers_sort_hi=$((__dybatpho_helpers_sort_mid + __dybatpho_helpers_sort_width))
+      ((__dybatpho_helpers_sort_hi <= __dybatpho_helpers_sort_n)) \
+        || __dybatpho_helpers_sort_hi="${__dybatpho_helpers_sort_n}"
+      __dybatpho_helpers_sort_l="${__dybatpho_helpers_sort_lo}"
+      __dybatpho_helpers_sort_r="${__dybatpho_helpers_sort_mid}"
+      while ((__dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid \
+        && __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi)); do
+        if case "${__dybatpho_helpers_sort_mode}" in
+          @int-key)
+            ((__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]] \
+              < __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]))
+            ;;
+          @bytes-key)
+            [[ "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]]}" \
+              < "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]}" ]]
+            ;;
+          *)
+            "${__dybatpho_helpers_sort_before}" \
+              "${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}" \
+              "${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}" "$@"
+            ;;
+        esac; then
+          __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}")
+          ((__dybatpho_helpers_sort_r += 1))
+        else
+          __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}")
+          ((__dybatpho_helpers_sort_l += 1))
+        fi
+      done
+      # Index loops rather than `${array[@]:offset:length}`: a Bash array is a
+      # linked list, so a slice walks from the start every time and the narrow
+      # early passes would cost `n²`.
+      for (( ; __dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid; __dybatpho_helpers_sort_l++)); do
+        __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}")
+      done
+      for (( ; __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi; __dybatpho_helpers_sort_r++)); do
+        __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}")
+      done
+    done
+    __dybatpho_helpers_sort_from=("${__dybatpho_helpers_sort_into[@]}")
+    ((__dybatpho_helpers_sort_width *= 2))
+  done
+
+  __dybatpho_helpers_sort_ref=(${__dybatpho_helpers_sort_from[@]+"${__dybatpho_helpers_sort_from[@]}"})
+}
+
 # What tells a version range apart from the exit code that may sit in the same
 # argument. The pattern is held in a variable for two reasons: written inline
 # and unquoted, `<` and `>` are read as redirections before the conditional ever

@@ -72,24 +72,17 @@ function __dybatpho_metrics_validate_name {
 }
 
 #######################################
-# @description Sort an array in place, in Bash.
-#   `__log` calls into this module, and `__log` has to keep working where `PATH`
-#   is restricted, so nothing here may depend on an external command.
-# @arg $1 string Name of the array variable to sort
+# @description Return success when one string sorts before another, for
+#   `__dybatpho_helpers_sort`. `__log` calls into this module, and `__log` has
+#   to keep working where `PATH` is restricted, so the sort stays in Bash.
+# @arg $1 string String that might come first
+# @arg $2 string String it is compared with
+# @exitcode 0 The first string sorts first
+# @exitcode 1 It does not
 # @internal
 #######################################
-function __dybatpho_metrics_sort {
-  local -n __sort_target="$1"
-  local i j item
-  for ((i = 1; i < ${#__sort_target[@]}; i++)); do
-    item="${__sort_target[i]}"
-    j=$((i - 1))
-    while ((j >= 0)) && [[ "${__sort_target[j]}" > "${item}" ]]; do
-      __sort_target[j + 1]="${__sort_target[j]}"
-      j=$((j - 1))
-    done
-    __sort_target[j + 1]="${item}"
-  done
+function __dybatpho_metrics_before {
+  [[ "$1" < "$2" ]]
 }
 
 #######################################
@@ -121,7 +114,7 @@ function __dybatpho_metrics_labels {
     value="${value//$'\n'/\\n}"
     rendered+=("${key}=\"${value}\"")
   done
-  __dybatpho_metrics_sort rendered
+  __dybatpho_helpers_sort rendered __dybatpho_metrics_before
   local joined="" rendered_pair
   for rendered_pair in "${rendered[@]}"; do
     joined="${joined:+${joined},}${rendered_pair}"
@@ -547,7 +540,7 @@ function __dybatpho_metrics_series {
 function dybatpho::metrics_render {
   local name key bound total
   local -a names=("${!__dybatpho_metrics_type[@]}") keys=()
-  __dybatpho_metrics_sort names
+  __dybatpho_helpers_sort names __dybatpho_metrics_before
   for name in ${names[@]+"${names[@]}"}; do
     printf '# HELP %s %s\n' "${name}" "${__dybatpho_metrics_help[${name}]}"
     printf '# TYPE %s %s\n' "${name}" "${__dybatpho_metrics_type[${name}]}"
@@ -648,7 +641,7 @@ function __dybatpho_metrics_keys_of {
       matched+=("${key}")
     fi
   done
-  __dybatpho_metrics_sort matched
+  __dybatpho_helpers_sort matched __dybatpho_metrics_before
   ((${#matched[@]})) && printf '%s\n' "${matched[@]}"
   return 0
 }

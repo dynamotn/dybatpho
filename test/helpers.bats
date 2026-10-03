@@ -885,3 +885,34 @@ EOF
   run_traced -0 bash "${script}"
   assert_output "ok"
 }
+
+@test "__dybatpho_helpers_sort orders through the comparator and keeps ties in place" {
+  # shellcheck disable=2329
+  by_first_letter() { [[ "${1:0:1}" < "${2:0:1}" ]]; }
+  local values=(b1 a1 c1 b2 a2 $'a\nline' b3)
+  __dybatpho_helpers_sort values by_first_letter
+  assert_equal "${#values[@]}" 7
+  assert_equal "${values[0]} ${values[1]}" "a1 a2"
+  assert_equal "${values[2]}" $'a\nline'
+  assert_equal "${values[3]} ${values[4]} ${values[5]} ${values[6]}" "b1 b2 b3 c1"
+}
+
+@test "__dybatpho_helpers_sort passes extra arguments and handles short lists" {
+  # shellcheck disable=2329
+  by_length() { if [[ "$3" == desc ]]; then ((${#1} > ${#2})); else ((${#1} < ${#2})); fi; }
+  local words=(ccc a bb dddd)
+  __dybatpho_helpers_sort words by_length desc
+  assert_equal "${words[*]}" "dddd ccc bb a"
+
+  local empty=() one=(x)
+  __dybatpho_helpers_sort empty by_length
+  assert_equal "${#empty[@]}" 0
+  __dybatpho_helpers_sort one by_length
+  assert_equal "${one[*]}" "x"
+}
+
+@test "__dybatpho_helpers_sort orders indexes by integer keys inline" {
+  local -a keys=(30 -5 30 0 12) order=(0 1 2 3 4)
+  __dybatpho_helpers_sort order @int-key keys
+  assert_equal "${order[*]}" "1 3 4 0 2"
+}

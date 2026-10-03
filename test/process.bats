@@ -148,6 +148,21 @@ SCRIPT
   [[ ! -v signal ]]
 }
 
+@test 'saved trap handlers come back exactly, and an empty one stays empty' {
+  trap "printf '%s\\n' \"it's USR1\"" USR1
+  trap - USR2
+  local saved before_usr1
+  before_usr1="$(trap -p USR1)"
+  __dybatpho_process_traps_save_into saved USR1 USR2
+
+  dybatpho::trap 'echo added' USR1 USR2
+  __dybatpho_process_traps_restore "${saved}" USR1 USR2
+
+  assert_equal "$(trap -p USR1)" "${before_usr1}"
+  assert_equal "$(trap -p USR2)" ""
+  trap - USR1
+}
+
 @test 'dybatpho::cleanup_file_on_exit action' {
   # The call itself must stay quiet, and it must remember the path.
   local filepath

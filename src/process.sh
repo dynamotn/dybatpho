@@ -171,6 +171,44 @@ function __dybatpho_process_trap_command_into {
 }
 
 #######################################
+# @description Save the handlers of some signals, for
+#   `__dybatpho_process_traps_restore` to put back. A function that adds a
+#   handler for its own duration takes it out again this way, rather than
+#   leaving one more handler behind on every call.
+# @arg $1 string Name of the variable receiving the saved handlers
+# @arg $@ string Signals to save
+# @set The named variable, as the shell code that reinstates the handlers
+# @internal
+#######################################
+function __dybatpho_process_traps_save_into {
+  local -n __dybatpho_process_saved_ref="$1"
+  shift
+  local __dybatpho_process_saved_signal
+  __dybatpho_process_saved_ref=""
+  for __dybatpho_process_saved_signal in "$@"; do
+    __dybatpho_process_saved_ref+="$(trap -p "${__dybatpho_process_saved_signal}")"$'\n'
+  done
+}
+
+#######################################
+# @description Put back the handlers `__dybatpho_process_traps_save_into` saved,
+#   clearing whatever the signals have now. A signal that had no handler is
+#   left with none.
+# @arg $1 string The saved handlers
+# @arg $@ string Signals they were saved for
+# @internal
+#######################################
+function __dybatpho_process_traps_restore {
+  local __dybatpho_process_saved="$1"
+  shift
+  trap - "$@"
+  # `trap -p` prints the commands that reinstate the handlers, so running them
+  # is how they come back; there is no other form to build here.
+  # dyshellint disable=BSG040
+  eval "${__dybatpho_process_saved}"
+}
+
+#######################################
 # @description Append a command to one or more trap handlers without discarding existing traps.
 # @arg $1 string Command to run when the signal is trapped
 # @arg $@ string Signals to trap

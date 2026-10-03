@@ -482,11 +482,8 @@ function __dybatpho_lock_run_holding {
   local release="$1"
   shift
 
-  local previous_traps signal
-  previous_traps=""
-  for signal in HUP INT TERM; do
-    previous_traps+="$(trap -p "${signal}")"$'\n'
-  done
+  local previous_traps
+  __dybatpho_process_traps_save_into previous_traps HUP INT TERM
 
   # kcov records no hit here, though "with_lock installs a release handler"
   # runs it and asserts the handler it installs.
@@ -496,8 +493,7 @@ function __dybatpho_lock_run_holding {
   "$@" || exit_code=$?
   eval "${release}"
 
-  trap - HUP INT TERM
-  eval "${previous_traps}"
+  __dybatpho_process_traps_restore "${previous_traps}" HUP INT TERM
   return "${exit_code}"
 }
 

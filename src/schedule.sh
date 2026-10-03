@@ -116,10 +116,8 @@ function dybatpho::schedule_every {
 
   # The previous handlers are restored rather than left replaced: a script may
   # call this more than once, and its own Ctrl-C handling has to survive.
-  local previous_traps="" signal
-  for signal in HUP INT TERM; do
-    previous_traps+="$(trap -p "${signal}")"$'\n'
-  done
+  local previous_traps
+  __dybatpho_process_traps_save_into previous_traps HUP INT TERM
   # The flag is a local, not a module global: a signal is handled inside this
   # function, so the handler sees this frame's variables and nothing leaks out
   # to the next caller.
@@ -148,11 +146,7 @@ function dybatpho::schedule_every {
     ((stopped)) && break
   done
 
-  trap - HUP INT TERM
-  # `trap -p` prints the commands that reinstate the handlers, so running them
-  # is how they come back; there is no other form to build here.
-  # dyshellint disable=BSG040
-  eval "${previous_traps}"
+  __dybatpho_process_traps_restore "${previous_traps}" HUP INT TERM
   return 0
 }
 

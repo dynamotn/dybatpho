@@ -5,7 +5,7 @@
 #   schedule_reset, schedule_debounce, and schedule_cron_due
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules schedule
+. "${SCRIPTDIR}/../init.sh" --modules schedule lock
 
 dybatpho::register_common_handlers
 

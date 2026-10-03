@@ -157,6 +157,26 @@ function dybatpho::schedule_every {
 }
 
 #######################################
+# @description Stop unless the `lock` module is loaded.
+#   Only the debounce takes a lock, to read and bump its counter in one step.
+#   Registering `lock` as a dependency would load it into every script that
+#   only runs on a cadence or once a day, so the one function that needs it
+#   asks for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `lock`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `lock` module is not loaded
+# @internal
+#######################################
+function __dybatpho_schedule_need_lock {
+  declare -F __dybatpho_lock_try > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the lock module, load it with: dybatpho::load lock"
+}
+
+#######################################
 # @description Run a command once a burst of triggers has settled.
 #   Every trigger calls this. Each call registers itself, waits out the
 #   window, and then runs the command only if nothing else registered while it
@@ -172,14 +192,16 @@ function dybatpho::schedule_every {
 # @arg $3 string Literal `--` separating the key from the command
 # @arg $@ string Command and arguments to run
 # @exitcode 0 The command ran, and its own exit code is returned
-# @exitcode 1 The window or the key is invalid
+# @exitcode 1 The window or the key is invalid, or the `lock` module is not loaded
 # @exitcode 9 A later trigger arrived, so this call did nothing
+# @tip Needs the `lock` module: load it with `--modules schedule lock`
 # @example
 #   dybatpho::schedule_debounce 2 rebuild -- make
 #######################################
 function dybatpho::schedule_debounce {
   local window key
   dybatpho::expect_args window key -- "$@"
+  __dybatpho_schedule_need_lock
   shift 2
   dybatpho::is int "${window}" && ((window > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: The window must be a positive number of seconds, got: ${window}"

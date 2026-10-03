@@ -284,3 +284,29 @@ note() {
   run_traced -0 dybatpho::schedule_cron_due "* * * * *"
   dybatpho::unmock_time
 }
+
+@test "dybatpho::schedule_debounce asks for the lock module when it is not loaded" {
+  # `schedule` does not load `lock`, so a script that only runs on a cadence
+  # does not pay for it. A child shell started from a file, without the
+  # functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules schedule\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'export DYBATPHO_SCHEDULE_DIR=%q\n' "${DYBATPHO_SCHEDULE_DIR}"
+    # A second run inside the same day skips this, with status 9.
+    printf '%s\n' 'dybatpho::schedule_once_per day narrow -- printf "once\n" || true'
+    printf '%s\n' 'dybatpho::schedule_debounce 1 narrow -- printf "settled\n"'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_failure
+  assert_line --index 0 "once"
+  assert_output --partial "dybatpho::schedule_debounce needs the lock module, load it with: dybatpho::load lock"
+
+  # Once the script loads it, the same call runs.
+  sed -i 's/--modules schedule$/--modules schedule lock/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_line "settled"
+}

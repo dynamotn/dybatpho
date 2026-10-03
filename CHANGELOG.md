@@ -613,6 +613,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   . dybatpho/init.sh --modules release            # before
   . dybatpho/init.sh --modules release archive    # after
+- **BREAKING: `schedule` no longer loads `lock`.** Only
+  `dybatpho::schedule_debounce` takes a lock, so a script that runs on a
+  cadence, once per period, or checks a cron expression no longer pays for the
+  lock module. `dybatpho::schedule_debounce` now stops the script with
+  `... needs the lock module, load it with: dybatpho::load lock` when `lock`
+  is not loaded. A script that debounces, or that called `dybatpho::lock_*`
+  relying on `schedule` to load it, has to ask for it:
+
+  ```sh
+  . dybatpho/init.sh --modules schedule        # before
+  . dybatpho/init.sh --modules schedule lock   # after
   ```
 
 ### Fixed

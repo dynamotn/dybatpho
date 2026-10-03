@@ -1641,6 +1641,40 @@ setup() {
   unset CONFIG_PREC_ENV
 }
 
+@test "config:<key> falls through to its default when the config module is not loaded" {
+  # `cli` does not load `config`. A child shell started from a file, without
+  # the functions this process exports, shows what a script that asks for
+  # `cli` alone gets: no configuration layer, and no error for a bound key --
+  # not even a dotted one, which `DYBATPHO_CONFIG` would read as arithmetic
+  # were it not an associative array.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh" settings="${BATS_TEST_TMPDIR}/app.env"
+  printf 'SERVER_PORT=9999\n' > "${settings}"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules cli\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::module_loaded config && echo "config loaded" || echo "config absent"'
+    printf '%s\n' 'if declare -F dybatpho::config_load > /dev/null; then dybatpho::config_load "${1}"; fi'
+    printf '%s\n' '_spec() {'
+    printf '%s\n' '  dybatpho::opts::setup "Bound" ARGS action:'"'"'printf "port=%s\n" "${PORT}"'"'"
+    printf '%s\n' '  dybatpho::opts::param "Port" PORT --port config:SERVER_PORT init:="8080"'
+    printf '%s\n' '  dybatpho::opts::param "Host" HOST --host config:server.host init:="localhost"'
+    printf '%s\n' '}'
+    printf '%s\n' 'dybatpho::generate_from_spec _spec'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${settings}"
+  assert_success
+  assert_line --index 0 "config absent"
+  assert_line --index 1 "port=8080"
+
+  # Once the script loads it, the bound key is read.
+  sed -i 's/--modules cli$/--modules cli config/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${settings}"
+  assert_success
+  assert_line --index 0 "config loaded"
+  assert_line --index 1 "port=9999"
+}
+
 @test "config:<key> is shown in help and schema" {
   # shellcheck disable=2329
   _spec_config_help() {

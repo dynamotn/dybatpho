@@ -342,6 +342,7 @@ giving one precedence chain across the whole CLI:
 **flag > `env:` > `config:` > `init:`**
 
 ```bash
+. dybatpho/init.sh --modules cli config
 dybatpho::config_load ./app.yaml          # before generate_from_spec
 
 function _spec {
@@ -354,7 +355,9 @@ function _spec {
 The configuration has to be loaded before `dybatpho::generate_from_spec`,
 because that is when the parser resolves an option's initial value. A key
 that is absent, or a CLI that never loaded any configuration at all, simply
-falls through to `init:`.
+falls through to `init:`. `cli` does not load the `config` module itself,
+so a script that binds options this way asks for it:
+`--modules cli config`.
 
 #### Named positional arguments
 

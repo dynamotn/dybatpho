@@ -314,6 +314,7 @@
 #   **flag > `env:` > `config:` > `init:`**
 #
 #   ```bash
+#   . dybatpho/init.sh --modules cli config
 #   dybatpho::config_load ./app.yaml          # before generate_from_spec
 #
 #   function _spec {
@@ -326,7 +327,9 @@
 #   The configuration has to be loaded before `dybatpho::generate_from_spec`,
 #   because that is when the parser resolves an option's initial value. A key
 #   that is absent, or a CLI that never loaded any configuration at all, simply
-#   falls through to `init:`.
+#   falls through to `init:`. `cli` does not load the `config` module itself,
+#   so a script that binds options this way asks for it:
+#   `--modules cli config`.
 #
 #   #### Named positional arguments
 #
@@ -764,6 +767,15 @@ function dybatpho::cli_apply_verbosity {
 #              loaded by `src/config.sh`. Missing keys and an unloaded config
 #              module both report failure so the generated parser falls through
 #              to the option's declared default.
+#
+#              `cli` does not load `config`: only this lookup touches it, and
+#              registering it as a dependency would load it into every script
+#              that parses an option. The guard is what makes that safe. With
+#              `config` absent, `DYBATPHO_CONFIG` is not an associative array,
+#              and testing a key such as `server.port` against it would be
+#              read as arithmetic and stop the script. It names an internal
+#              helper on purpose: `dybatpho::` functions are exported and a
+#              child shell inherits them without the internals they call.
 # @arg $1 string Configuration key
 # @stdout Configuration value
 # @exitcode 0 The key is present
@@ -773,6 +785,7 @@ function dybatpho::cli_apply_verbosity {
 function __dybatpho_cli_config_get {
   local key="${1-}"
   [[ -n "${key}" ]] || return 1
+  declare -F __dybatpho_config_set > /dev/null || return 1
   [[ -v "DYBATPHO_CONFIG[${key}]" ]] || return 1
   printf '%s' "${DYBATPHO_CONFIG[${key}]}"
 }

@@ -159,6 +159,8 @@ dybatpho::generate_man _spec mytool
 - A multi-value prompt receives an invalid, descending, or out-of-range numeric
   range.
 - An environment variable is configured with an invalid shell identifier.
+- An option is bound with `config:<key>` while the `config` module is not
+  loaded, including a dotted key such as `server.port`.
 - Completion generation is requested for an unsupported shell.
 - Schema or man-page metadata contains quotes, backslashes, or newlines.
 - A standalone prompt or selection helper receives EOF or an invalid choice.
@@ -218,6 +220,9 @@ dybatpho::generate_man _spec mytool
 - **FR-027**: `dybatpho::generate_completion` MUST cache its output keyed by a
   hash of the script declaring the spec, and MUST bypass the cache when
   `DYBATPHO_CLI_CACHE` is false or the declaring script cannot be read.
+- **FR-028**: Loading `cli` MUST NOT load `config`. A `config:<key>` binding
+  MUST fall through to `init:` without error when the `config` module is not
+  loaded, whatever characters the key contains.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -256,6 +261,7 @@ dybatpho::generate_man _spec mytool
 - **IT-009**: Bind an option with both `env:` and `config:`, and verify the resolved value follows flag > environment > configuration > default.
 - **IT-010**: Declare positional arguments and verify the usage line, the `Arguments` section, the derived count rule, and the schema and man-page entries all describe them.
 - **IT-011**: Generate completion twice for one spec and verify the second run reuses the cached artifact, and that disabling the cache writes nothing.
+- **IT-012**: In a child shell that loaded only `cli`, verify plain and dotted `config:` bindings fall through to their defaults, and that the plain one reads the loaded file once `config` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

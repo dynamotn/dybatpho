@@ -132,7 +132,7 @@ loaded_line() {
 
   # `backup_diff` compares two snapshots through `diff_dir`.
   run_traced -0 init_sh "--modules backup" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret archive validate config cli safety date diff backup "
+  assert_output "string os logging helpers process file secret archive validate cli safety date diff backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
   assert_output "string os logging helpers process file secret network json lock cache ai "
@@ -142,10 +142,10 @@ loaded_line() {
   assert_output "string os logging helpers process file secret lock cache "
 
   run_traced -0 init_sh "--modules agent" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli safety json agent "
+  assert_output "string os logging helpers process file secret validate cli safety json agent "
 
   run_traced -0 init_sh "--modules tui" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli safety tui "
+  assert_output "string os logging helpers process file secret validate cli safety tui "
 
   # `metrics` loads nothing on its own: summaries ask for `math` and a push
   # asks for `network`, so counting and timing never pull in `curl`.
@@ -171,7 +171,7 @@ dybatpho::load semver
 
 @test "safety and archive load without each other" {
   run_traced -0 init_sh "--modules safety" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli safety "
+  assert_output "string os logging helpers process file secret validate cli safety "
 
   run_traced -0 init_sh "--modules archive" "$(loaded_line)"
   assert_output "string os logging helpers process file secret archive "
@@ -187,6 +187,11 @@ dybatpho::load semver
 
   run_traced -0 init_sh "--modules cli" 'dybatpho::validate_is port 8080 && echo reachable'
   assert_output "reachable"
+
+  # `cli` reads a `config:` binding only when the script loaded `config`
+  # itself, so the validator is all it brings along.
+  run_traced -0 init_sh "--modules cli" "$(loaded_line)"
+  assert_output "string os logging helpers process file secret validate cli "
 }
 
 @test "a dependency pulled in on demand stays usable" {

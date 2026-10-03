@@ -97,7 +97,7 @@ declare -A __dybatpho_module_deps=(
   [schedule]="lock date"
   [parallel]="date"
   [notification]="network validate"
-  [cli]="config validate"
+  [cli]="validate"
   [config]="validate"
   [safety]="cli"
   [tui]="cli safety"
@@ -112,7 +112,7 @@ declare -A __dybatpho_module_deps=(
   # A dependency may name a version, and comparing versions is what `semver` is
   # for. The edge is cheap here: a diagnostic is not on anyone's hot path, which
   # is why the version constraint lives in the report rather than in `config`,
-  # whose own `yq` call would drag `semver` into every script loading `cli`.
+  # whose own `yq` call would drag `semver` into every script loading `config`.
   [doctor]="semver"
 )
 

@@ -587,6 +587,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules archive safety    # after
   ```
 
+- **BREAKING: `cli` no longer loads `config`.** The parser never called the
+  configuration module: a `config:<key>` binding reads the
+  `DYBATPHO_CONFIG` array that `dybatpho::config_load` fills. Loading `cli` --
+  and through it `safety`, `tui`, `agent` and `pkg` -- now brings only
+  `validate`. Without `config` loaded, every `config:` binding falls through
+  to its `init:` default, as it already did when no configuration was loaded.
+  A script that calls `dybatpho::config_load`, `config_get` or any other
+  `config_*` function after loading only `cli` (or a module that loads it)
+  has to ask for `config`:
+
+  ```sh
+  . dybatpho/init.sh --modules cli           # before
+  . dybatpho/init.sh --modules cli config    # after
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

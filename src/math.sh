@@ -594,7 +594,9 @@ function __dybatpho_math_collect {
   # A line may hold several values, which is what `awk` or `cut` hands over.
   # `read -a` splits them without the pathname expansion an unquoted
   # expansion would add, so a `*` is a value rather than the file names here.
-  while read -r -a __collect_fields; do
+  # A last line without a newline makes `read` fail after filling the fields,
+  # so a non-empty array still counts.
+  while read -r -a __collect_fields || ((${#__collect_fields[@]})); do
     __collect_out+=(${__collect_fields[@]+"${__collect_fields[@]}"})
   done
 }

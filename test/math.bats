@@ -340,6 +340,13 @@ setup() {
   assert_equal "$(printf '1 2\n3\n' | dybatpho::math_sum)" "6"
 }
 
+@test "dybatpho::math_sum reads a last line that has no newline" {
+  # `printf` and `<<<`-less pipelines often end without one; the last value
+  # still counts.
+  assert_equal "$(printf '1 2\n3' | dybatpho::math_sum)" "6"
+  assert_equal "$(printf '4' | dybatpho::math_max)" "4"
+}
+
 @test "dybatpho::math_sum of nothing is zero" {
   assert_equal "$(dybatpho::math_sum < /dev/null)" "0"
 }

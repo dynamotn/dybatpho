@@ -713,6 +713,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`math` — a last value without a newline is no longer dropped.** The
+  functions that read values from standard input (`dybatpho::math_sum`,
+  `dybatpho::math_min`, `dybatpho::math_max`, `dybatpho::math_avg` and the
+  rest) skipped a final line that had no trailing newline, so
+  `printf '1\n2' | dybatpho::math_sum` printed `1`.
+
 - **`file` — `dybatpho::create_temp` fills a variable whatever its name.**
   The path is returned through the name the caller passes, and a caller
   variable called `path_var`, `extension`, `parent_folder`, `pid`, `temp_path`

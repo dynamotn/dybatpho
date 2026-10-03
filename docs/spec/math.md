@@ -252,6 +252,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   digits than the requested width needs.
 - A comparison is asked about a value that is not a number from inside an `if`, where `set -e` does not apply.
 - A value read from standard input is a glob character such as `*` or `?`.
+- Standard input ends without a newline after its last value.
 
 ## Requirements *(mandatory)*
 
@@ -318,6 +319,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   aggregates.
 - **FR-024**: `math_compare`, `math_gt`, `math_lt` and `math_eq` MUST validate their values in the caller's shell, so a value that is not a number stops the script even when the comparison is a condition.
 - **FR-025**: Values read from standard input MUST be split on whitespace without pathname expansion, so a `*` or `?` is read as itself.
+- **FR-026**: A function reading values from standard input MUST count the values on a last line that has no trailing newline.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -386,6 +388,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   sample and a bad scale fail.
 - **IT-016**: From a script file, have `math_gt`, `math_lt` and `math_eq` used as a condition stop the script on `abc`, before the next command runs.
 - **IT-017**: Feed `1 * 3` to `math_sum` in a directory holding files and verify `*` is refused as not a number rather than expanded.
+- **IT-018**: Sum and take the maximum of standard input whose last line has no newline, and find the last value counted.
 
 ## Acceptance Criteria *(mandatory)*
 

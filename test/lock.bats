@@ -98,7 +98,10 @@ teardown() {
 }
 
 @test "dybatpho::lock_release refuses to remove a lock held by another live process" {
-  sleep 5 &
+  # Long enough to outlast a slow run; it is killed at the end. A few seconds
+  # was not: on a loaded machine the stand-in exited before the release was
+  # attempted, and the lock then read as stale rather than foreign.
+  sleep 120 &
   local foreign_pid=$!
 
   local lock_path

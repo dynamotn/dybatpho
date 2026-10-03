@@ -73,17 +73,17 @@ function __dybatpho_csv_delimiter_into {
     case "${__dybatpho_csv_wanted}" in
       '"' | $'\n' | $'\r' | "${__dybatpho_csv_unit}")
         __dybatpho_csv_problem="a quote, a line break, or the unit separator" # kcov(skip)
-        __dybatpho_csv_problem+=" cannot separate fields" # kcov(skip)
+        __dybatpho_csv_problem+=" cannot separate fields"                     # kcov(skip)
         ;;
       *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
     esac
   fi
 
   if [[ -n "${__dybatpho_csv_problem}" ]]; then
-    local __dybatpho_csv_shown                                              # kcov(skip)
-    printf -v __dybatpho_csv_shown '%q' "${__dybatpho_csv_wanted}"          # kcov(skip)
+    local __dybatpho_csv_shown                                                                    # kcov(skip)
+    printf -v __dybatpho_csv_shown '%q' "${__dybatpho_csv_wanted}"                                # kcov(skip)
     __dybatpho_csv_problem="Invalid delimiter ${__dybatpho_csv_shown}: ${__dybatpho_csv_problem}" # kcov(skip)
-    dybatpho::die "${__dybatpho_csv_caller}: ${__dybatpho_csv_problem}"                       # kcov(skip)
+    dybatpho::die "${__dybatpho_csv_caller}: ${__dybatpho_csv_problem}"                           # kcov(skip)
   fi
   __dybatpho_csv_delim_ref="${__dybatpho_csv_wanted}"
 }
@@ -595,7 +595,7 @@ function dybatpho::csv_sort {
     *) dybatpho::die "${FUNCNAME[0]}: Unknown order: ${order}. Use asc or desc" ;; # kcov(skip)
   esac
   case "${type}" in
-    auto | text | number) ;; # kcov(skip) - a case arm has no command to fire on
+    auto | text | number) ;;                                                                     # kcov(skip) - a case arm has no command to fire on
     *) dybatpho::die "${FUNCNAME[0]}: Unknown comparison: ${type}. Use auto, text, or number" ;; # kcov(skip)
   esac
 
@@ -798,7 +798,6 @@ function __dybatpho_csv_row_before {
     [[ "${__dybatpho_csv_first}" < "${__dybatpho_csv_second}" ]]
   fi
 }
-
 
 #######################################
 # @description Resolve a column given by name or by 1-based position to its

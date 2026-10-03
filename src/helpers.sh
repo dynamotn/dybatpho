@@ -309,8 +309,8 @@ function __dybatpho_helpers_sort {
 
   while ((__dybatpho_helpers_sort_width < __dybatpho_helpers_sort_n)); do
     __dybatpho_helpers_sort_into=()
-    for ((__dybatpho_helpers_sort_lo = 0; __dybatpho_helpers_sort_lo < __dybatpho_helpers_sort_n; \
-      __dybatpho_helpers_sort_lo += 2 * __dybatpho_helpers_sort_width)); do
+    for ((__dybatpho_helpers_sort_lo = 0; __dybatpho_helpers_sort_lo < __dybatpho_helpers_sort_n;  \
+    __dybatpho_helpers_sort_lo += 2 * __dybatpho_helpers_sort_width)); do
       __dybatpho_helpers_sort_mid=$((__dybatpho_helpers_sort_lo + __dybatpho_helpers_sort_width))
       ((__dybatpho_helpers_sort_mid <= __dybatpho_helpers_sort_n)) \
         || __dybatpho_helpers_sort_mid="${__dybatpho_helpers_sort_n}"
@@ -319,23 +319,22 @@ function __dybatpho_helpers_sort {
         || __dybatpho_helpers_sort_hi="${__dybatpho_helpers_sort_n}"
       __dybatpho_helpers_sort_l="${__dybatpho_helpers_sort_lo}"
       __dybatpho_helpers_sort_r="${__dybatpho_helpers_sort_mid}"
-      while ((__dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid \
-        && __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi)); do
+      while ((__dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid && \
+        __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi)); do
         if case "${__dybatpho_helpers_sort_mode}" in
           @int-key)
-            ((__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]] \
-              < __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]))
+            ((__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]] < \
+            __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]))
             ;;
           @bytes-key)
-            [[ "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]]}" \
-              < "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]}" ]]
+            [[ "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]]}" < "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]}" ]]
             ;;
           *)
             "${__dybatpho_helpers_sort_before}" \
               "${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}" \
               "${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}" "$@"
             ;;
-        esac; then
+        esac then
           __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}")
           ((__dybatpho_helpers_sort_r += 1))
         else
@@ -1237,8 +1236,8 @@ function __dybatpho_helpers_locate {
 function __dybatpho_helpers_qualify_into {
   local -n __dybatpho_helpers_qualify_out="$1"
   local __dybatpho_helpers_qualify_name="${2-}"
-  if [[ "${__dybatpho_helpers_qualify_name}" == dybatpho::* \
-    || "${__dybatpho_helpers_qualify_name}" == __dybatpho_* ]]; then
+  if [[ "${__dybatpho_helpers_qualify_name}" == dybatpho::* ||
+    "${__dybatpho_helpers_qualify_name}" == __dybatpho_* ]]; then
     __dybatpho_helpers_qualify_out="${__dybatpho_helpers_qualify_name}"
   else
     __dybatpho_helpers_qualify_out="dybatpho::${__dybatpho_helpers_qualify_name}"

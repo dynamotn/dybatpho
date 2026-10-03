@@ -291,7 +291,6 @@ function dybatpho::cache_clear {
   find "${directory}" -maxdepth 1 -type f -name "*${__DYBATPHO_CACHE_SUFFIX}" -delete
 }
 
-
 #######################################
 # @description Read the age of an entry into a variable.
 # @arg $1 string Name of the variable receiving the age in seconds

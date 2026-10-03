@@ -224,7 +224,7 @@ function __dybatpho_queue_next_into {
       __dybatpho_queue_best="${__dybatpho_queue_id}"
       __dybatpho_queue_best_priority="${__dybatpho_queue_priority}"
     fi
-  # kcov never marks a loop's redirected `done` as run; every claim test runs it.
+    # kcov never marks a loop's redirected `done` as run; every claim test runs it.
   done < <(__dybatpho_queue_ids "${__dybatpho_queue_directory}" pending) # kcov(skip)
 
   [[ -n "${__dybatpho_queue_best}" ]] || return 1
@@ -788,11 +788,11 @@ function __dybatpho_queue_work_options {
 #   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
 #######################################
 function dybatpho::queue_work {
-  local -A settings=([retries]=3 [backoff]=0 [max-backoff]=3600 [max-jobs]=0 [poll]="" [idle]="")
+  local -A settings=([retries]=3 [backoff]=0 [max - backoff]=3600 [max - jobs]=0 [poll]="" [idle]="")
   __dybatpho_queue_work_options settings "$@"
   shift "${settings[used]}"
   local retries="${settings[retries]}" backoff="${settings[backoff]}"
-  local max_backoff="${settings[max-backoff]}" max_jobs="${settings[max-jobs]}"
+  local max_backoff="${settings[max - backoff]}" max_jobs="${settings[max - jobs]}"
   local poll="${settings[poll]}" idle="${settings[idle]}"
 
   local queue handler

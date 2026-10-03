@@ -685,21 +685,21 @@ function __dybatpho_metrics_base64url {
     for ((__b64_offset = 0; __b64_offset < 3; __b64_offset++)); do
       __b64_chunk=$((__b64_chunk << 8))
       if ((__b64_index + __b64_offset < ${#__b64_value})); then
-        printf -v __b64_byte '%d' "'${__b64_value:__b64_index + __b64_offset:1}"
+        printf -v __b64_byte '%d' "'${__b64_value:__b64_index+__b64_offset:1}"
         # Bash reports a byte above 127 as negative in some builds.
         __b64_chunk=$((__b64_chunk | (__b64_byte & 255)))
         __b64_bytes=$((__b64_bytes + 1))
       fi
     done
-    __b64_result+="${__b64_alphabet:__b64_chunk >> 18 & 63:1}"
-    __b64_result+="${__b64_alphabet:__b64_chunk >> 12 & 63:1}"
+    __b64_result+="${__b64_alphabet:__b64_chunk>>18&63:1}"
+    __b64_result+="${__b64_alphabet:__b64_chunk>>12&63:1}"
     if ((__b64_bytes > 1)); then
-      __b64_result+="${__b64_alphabet:__b64_chunk >> 6 & 63:1}"
+      __b64_result+="${__b64_alphabet:__b64_chunk>>6&63:1}"
     else
       __b64_result+="="
     fi
     if ((__b64_bytes > 2)); then
-      __b64_result+="${__b64_alphabet:__b64_chunk & 63:1}"
+      __b64_result+="${__b64_alphabet:__b64_chunk&63:1}"
     else
       __b64_result+="="
     fi

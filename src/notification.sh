@@ -450,7 +450,7 @@ function dybatpho::notify_desktop {
   # The `die` lines below are tested under `run`, which kcov cannot observe.
   dybatpho::is empty "${title}" && dybatpho::die "${FUNCNAME[0]}: title must not be empty" # kcov(skip)
   case "${urgency}" in
-    low | normal | critical) ;; # kcov(skip)
+    low | normal | critical) ;;                                                                     # kcov(skip)
     *) dybatpho::die "${FUNCNAME[0]}: urgency must be low, normal or critical, not '${urgency}'" ;; # kcov(skip)
   esac
 
@@ -673,7 +673,7 @@ function __dybatpho_notification_mime_header {
     # by "splits a long subject without breaking a character" and "encodes a
     # subject that is not ASCII" in `test/notification.bats`.
     if ((${#__dybatpho_mh_word} > 50 && (__dybatpho_mh_code < 128 || __dybatpho_mh_code > 191))); then
-      __dybatpho_mh_all+="${__dybatpho_mh_all:+$'\n' }"           # kcov(skip)
+      __dybatpho_mh_all+="${__dybatpho_mh_all:+$'\n' }"      # kcov(skip)
       __dybatpho_mh_all+="=?UTF-8?Q?${__dybatpho_mh_word}?=" # kcov(skip)
       __dybatpho_mh_word=""                                  # kcov(skip)
     fi
@@ -787,7 +787,7 @@ function dybatpho::notify_email {
   fi
   local missing="No sendmail command found: install an MTA or set DYBATPHO_SENDMAIL"
   [[ -n "${sendmail}" ]] || dybatpho::die "${missing}" 127 # kcov(skip)
-  dybatpho::require "${sendmail}" # kcov(skip)
+  dybatpho::require "${sendmail}"                          # kcov(skip)
 
   local encoded_subject to_header
   __dybatpho_notification_mime_header encoded_subject "${subject}"

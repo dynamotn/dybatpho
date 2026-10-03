@@ -1228,7 +1228,7 @@ function __dybatpho_math_sort {
   for __sort_value in ${__sort_from[@]+"${__sort_from[@]}"}; do
     [[ "${__sort_value}" =~ ${DYBATPHO_MATH_NUMBER_REGEX} ]] \
       || {
-        local math_caller_detail # kcov(skip)
+        local math_caller_detail                     # kcov(skip)
         math_caller_detail=$(__dybatpho_math_caller) # kcov(skip)
         # kcov cannot see a die under `run`; 'math_median dies on a value that is not a number' covers it.
         dybatpho::die "${math_caller_detail}: Not a number: '${__sort_value}'" # kcov(skip)

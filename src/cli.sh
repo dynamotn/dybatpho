@@ -828,7 +828,7 @@ function __dybatpho_cli_label_switch {
       local __switch_error # kcov(skip)
       __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias \
         "Invalid switch alias: $2" "alias=$2") # kcov(skip)
-      dybatpho::die "${__switch_error}"         # kcov(skip)
+      dybatpho::die "${__switch_error}"        # kcov(skip)
       ;;
   esac
 }
@@ -860,7 +860,7 @@ function __dybatpho_cli_case_switch {
       local __switch_error # kcov(skip)
       __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias \
         "Invalid switch alias: $1" "alias=$1") # kcov(skip)
-      dybatpho::die "${__switch_error}"         # kcov(skip)
+      dybatpho::die "${__switch_error}"        # kcov(skip)
       ;;
   esac
 }

@@ -511,8 +511,8 @@ function __dybatpho_file_walk_into {
     else
       __dybatpho_file_walk_kinds+=(other)
     fi
-  # kcov never records the redirection line of a loop; the body above it runs.
-  # An unreadable root lists nothing rather than stopping the caller, as before.
+    # kcov never records the redirection line of a loop; the body above it runs.
+    # An unreadable root lists nothing rather than stopping the caller, as before.
   done < <(cd -- "${__dybatpho_file_walk_root}" && find . -mindepth 1 -print0 | LC_ALL=C sort -z || true) # kcov(skip)
 }
 

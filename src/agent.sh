@@ -451,7 +451,7 @@ function __dybatpho_agent_flatten_into {
   [[ "${__dybatpho_agent_flat_path}" == "[" ]] || __dybatpho_agent_flat_path+=","
   __dybatpho_agent_flat_path+="${__dybatpho_agent_flat_parts[1]}]"
   local __dybatpho_agent_flat_index
-  for ((__dybatpho_agent_flat_index = 2; __dybatpho_agent_flat_index < ${#__dybatpho_agent_flat_parts[@]}; \
+  for ((__dybatpho_agent_flat_index = 2; __dybatpho_agent_flat_index < ${#__dybatpho_agent_flat_parts[@]};  \
   __dybatpho_agent_flat_index++)); do
     __dybatpho_agent_flatten_into "${__dybatpho_agent_flat_var}" \
       "${__dybatpho_agent_flat_parts[__dybatpho_agent_flat_index]}" "${__dybatpho_agent_flat_path}"

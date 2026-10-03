@@ -1498,8 +1498,6 @@ function dybatpho::url_part {
   fi
 }
 
-
-
 #######################################
 # @description Return success when a value is an IPv4 address.
 # @example
@@ -1558,7 +1556,6 @@ function dybatpho::ip_version {
     return 1
   fi
 }
-
 
 #######################################
 # @description Return success when a value is a CIDR block.

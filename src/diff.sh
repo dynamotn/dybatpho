@@ -599,7 +599,7 @@ function dybatpho::diff_dir {
       ((summary)) && continue
       __dybatpho_diff_dir_report "${mode}" '~' "${path}"
     fi
-  # kcov never records the redirection line of a loop; the body above it runs.
+    # kcov never records the redirection line of a loop; the body above it runs.
   done < <(((${#paths[@]})) && printf '%s\0' "${paths[@]}" | LC_ALL=C sort -z -u) # kcov(skip)
 
   ((summary)) && printf '+%s -%s ~%s\n' "${added}" "${removed}" "${changed}"

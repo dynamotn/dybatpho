@@ -244,7 +244,7 @@ function __dybatpho_backup_publish_into {
       > "${__dybatpho_backup_staged}" \
       || ! mv -f -- "${__dybatpho_backup_staged}" "${__dybatpho_backup_side}"; then
       rm -f -- "${__dybatpho_backup_staged}" "${__dybatpho_backup_side}" # kcov(skip)
-      return 1                                                        # kcov(skip)
+      return 1                                                           # kcov(skip)
     fi
 
     if [[ -d "${__dybatpho_backup_partial}" ]]; then
@@ -443,7 +443,7 @@ function __dybatpho_backup_snapshot {
   # cannot be read" covers these two lines. `dybatpho::die` exits, so that test
   # uses `run`, which clears the trap kcov instruments through.
   if ! __dybatpho_backup_link_copy "${source}" "${partial}" "${link_dest}"; then
-    rm -rf -- "${partial}"                                     # kcov(skip)
+    rm -rf -- "${partial}"                                   # kcov(skip)
     dybatpho::die "${caller}: Could not snapshot: ${source}" # kcov(skip)
   fi
 
@@ -453,7 +453,7 @@ function __dybatpho_backup_snapshot {
   local final
   if ! __dybatpho_backup_publish_into final "${partial}" "${destination}" "${name}" "${stamp}" \
     snapshot "${checksum}"; then
-    rm -rf -- "${partial}"                                                  # kcov(skip)
+    rm -rf -- "${partial}"                                                     # kcov(skip)
     dybatpho::die "${caller}: Could not store the snapshot in: ${destination}" # kcov(skip)
   fi
 

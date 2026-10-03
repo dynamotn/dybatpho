@@ -354,8 +354,8 @@ function __dybatpho_forge_context_into {
       __dybatpho_forge_ctx[repo]="${DYBATPHO_FORGE_REPO}"
     else
       local __dybatpho_forge_ctx_project="${__dybatpho_forge_ctx_url#*/}"
-      [[ "${__dybatpho_forge_ctx_project}" != "${__dybatpho_forge_ctx_url}" \
-        && -n "${__dybatpho_forge_ctx_project}" ]] \
+      [[ "${__dybatpho_forge_ctx_project}" != "${__dybatpho_forge_ctx_url}" &&
+        -n "${__dybatpho_forge_ctx_project}" ]] \
         || dybatpho::die "Remote '${__dybatpho_forge_ctx_remote}' has no owner/repo path: ${__dybatpho_forge_ctx_url}"
       __dybatpho_forge_ctx[repo]="${__dybatpho_forge_ctx_project}"
     fi

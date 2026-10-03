@@ -632,7 +632,7 @@ function __dybatpho_lock_try_slots {
   local -n __dybatpho_lock_try_slot_out="$1"
   local __dybatpho_lock_try_base="$2" __dybatpho_lock_try_slots_n="$3"
   local __dybatpho_lock_try_slot
-  for ((__dybatpho_lock_try_slot = 1; __dybatpho_lock_try_slot <= __dybatpho_lock_try_slots_n; \
+  for ((__dybatpho_lock_try_slot = 1; __dybatpho_lock_try_slot <= __dybatpho_lock_try_slots_n;  \
   __dybatpho_lock_try_slot++)); do
     __dybatpho_lock_try "${__dybatpho_lock_try_base}.slot${__dybatpho_lock_try_slot}.lock" || continue
     __dybatpho_lock_try_slot_out="${__dybatpho_lock_try_slot}"

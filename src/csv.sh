@@ -158,10 +158,14 @@ function __dybatpho_csv_split_into {
       # Anything between the closing quote and the delimiter is not valid CSV.
       # It is kept rather than dropped, because dropping it is the silent data
       # loss this module exists to avoid.
+      # When no delimiter follows, the stray text is the end of the record:
+      # leaving it in the remainder made the next pass read it again as a
+      # field of its own.
       if [[ -n "${__dybatpho_csv_rest}" && "${__dybatpho_csv_rest}" != "${__dybatpho_csv_delimiter}"* ]]; then
         __dybatpho_csv_field+="${__dybatpho_csv_rest%%"${__dybatpho_csv_delimiter}"*}"
-        __dybatpho_csv_rest="${__dybatpho_csv_rest#*"${__dybatpho_csv_delimiter}"}"
         __dybatpho_csv_fields_ref+=("${__dybatpho_csv_field}")
+        [[ "${__dybatpho_csv_rest}" == *"${__dybatpho_csv_delimiter}"* ]] || break
+        __dybatpho_csv_rest="${__dybatpho_csv_rest#*"${__dybatpho_csv_delimiter}"}"
         continue
       fi
       __dybatpho_csv_fields_ref+=("${__dybatpho_csv_field}")

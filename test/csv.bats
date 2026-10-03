@@ -42,6 +42,32 @@ setup() {
   [ "${fields[1]}" = "ok" ]
 }
 
+@test "dybatpho::csv_read keeps stray text after a closing quote in that one field" {
+  # `"a"x` is not valid CSV, but it is one field. At the end of a record the
+  # stray text used to come back a second time as a field of its own.
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'a,b\n1,"two"x\n"one"x,2\n"one"x,')" records
+  [ "${#records[@]}" -eq 4 ]
+
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${#fields[@]}" -eq 2 ]
+  [ "${fields[1]}" = "twox" ]
+
+  dybatpho::csv_fields "${records[2]}" fields
+  [ "${#fields[@]}" -eq 2 ]
+  [ "${fields[0]}" = "onex" ]
+  [ "${fields[1]}" = "2" ]
+
+  dybatpho::csv_fields "${records[3]}" fields
+  [ "${#fields[@]}" -eq 2 ]
+  [ "${fields[0]}" = "onex" ]
+  [ "${fields[1]}" = "" ]
+
+  run_traced dybatpho::csv_col "$(printf 'a,b\n1,"two"x')" b
+  assert_success
+  assert_output "twox"
+}
+
 @test "dybatpho::csv_read handles empty fields, a trailing delimiter and an empty input" {
   local -a records=() fields=()
   dybatpho::csv_read "$(printf 'a,b,c\n1,,')" records

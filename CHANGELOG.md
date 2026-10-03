@@ -509,6 +509,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The check now judges the holder it actually read, and leaves a lock alone
   once its holder has changed.
 
+- **`csv` — stray text after a closing quote is no longer read twice.** A
+  malformed field such as `"a"x` at the end of a record came back as `ax` and
+  then again as an extra field `x`, so the row was one column wider than its
+  header. Every reader now keeps `ax` as the one field it is.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

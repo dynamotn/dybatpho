@@ -110,7 +110,7 @@ kiwi"
   arr=("apple" "" "banana" "" "cherry")
   run_traced dybatpho::array_compact "arr" "--"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 apple
 banana
 cherry
@@ -132,7 +132,7 @@ EOF
   arr=("go" "bash" "golang" "rust")
   run_traced dybatpho::array_filter "arr" "_keep_go_like" "--"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 go
 golang
 EOF
@@ -163,7 +163,7 @@ EOF
   arr=("go" "bash" "dybatpho")
   run_traced dybatpho::array_map "arr" "_upper_word" "--"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 GO
 BASH
 DYBATPHO
@@ -252,7 +252,7 @@ EOF
   arr=("go" "bash" "golang" "rust")
   run_traced dybatpho::array_reject "arr" "_is_go_like" "--"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 bash
 rust
 EOF

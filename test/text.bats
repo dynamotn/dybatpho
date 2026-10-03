@@ -5,16 +5,16 @@ setup() {
 @test "dybatpho::text_indent prefixes each line and supports custom indent strings" {
   run_traced dybatpho::text_indent $'alpha\nbeta' "> "
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 > alpha
 > beta
 EOF
 }
 
 @test "dybatpho::text_indent reads from stdin when input is -" {
-  run_traced dybatpho::text_indent - "-- " <<< $'alpha\nbeta\n'
+  run_traced dybatpho::text_indent - "-- " <<< $'alpha\nbeta'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 -- alpha
 -- beta
 EOF
@@ -23,7 +23,7 @@ EOF
 @test "dybatpho::text_dedent removes shared leading indentation" {
   run_traced dybatpho::text_dedent $'    alpha\n      beta\n\n    gamma'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 alpha
   beta
 
@@ -34,7 +34,7 @@ EOF
 @test "dybatpho::text_strip_ansi removes color escape sequences" {
   run_traced dybatpho::text_strip_ansi $'\e[1;32malpha\e[0m\n\e[0;34mbeta\e[0m'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 alpha
 beta
 EOF
@@ -43,7 +43,7 @@ EOF
 @test "dybatpho::text_bullet_list prefixes non-empty lines and preserves blanks" {
   run_traced dybatpho::text_bullet_list $'alpha\n\nbeta' "*"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 * alpha
 
 * beta
@@ -53,7 +53,7 @@ EOF
 @test "dybatpho::text_columns aligns delimited text with a custom gap" {
   run_traced dybatpho::text_columns $'Key::Value\nname::dybatpho\nversion::1.0.0' "::" 1
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 Key     Value
 name    dybatpho
 version 1.0.0
@@ -69,7 +69,7 @@ EOF
 @test "dybatpho::text_dedent handles unindented and all-blank input" {
   run_traced dybatpho::text_dedent $'alpha\n  beta'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 alpha
   beta
 EOF
@@ -92,7 +92,7 @@ EOF
 @test "dybatpho::text_bullet_list uses the default marker for blank and non-blank lines" {
   run_traced dybatpho::text_bullet_list $'one\n\n two'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 - one
 
 -  two
@@ -102,7 +102,7 @@ EOF
 @test "dybatpho::text_columns uses default delimiter and gap" {
   run_traced dybatpho::text_columns $'a|bb\nccc|d'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 a    bb
 ccc  d
 EOF
@@ -135,7 +135,7 @@ EOF
 @test "dybatpho::text_box draws a single border sized to the widest line" {
   run_traced dybatpho::text_box $'alpha\nbe ta\n'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 ┌───────┐
 │ alpha │
 │ be ta │
@@ -147,7 +147,7 @@ EOF
 @test "dybatpho::text_box sets a title into the top border and widens for it" {
   run_traced dybatpho::text_box "ab" "Release notes"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 ┌─ Release notes ─┐
 │ ab              │
 └─────────────────┘
@@ -155,7 +155,7 @@ EOF
 
   run_traced dybatpho::text_box $'alpha\nbeta' "Notes"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 ┌─ Notes ─┐
 │ alpha   │
 │ beta    │
@@ -166,7 +166,7 @@ EOF
 @test "dybatpho::text_box supports every border style and reads stdin" {
   run_traced dybatpho::text_box - "" ascii <<< 'a|b*c'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 +-------+
 | a|b*c |
 +-------+
@@ -180,7 +180,7 @@ EOF
 @test "dybatpho::text_box handles empty input" {
   run_traced dybatpho::text_box ""
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 ┌──┐
 │  │
 └──┘
@@ -229,7 +229,7 @@ EOF
 @test "dybatpho::text_center pads each line on the left within a width" {
   run_traced dybatpho::text_center $'title\nsubtitle here\n\n  \nthis line is far too wide' 20
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
        title
    subtitle here
 
@@ -271,7 +271,7 @@ EOF
 @test "dybatpho::text_number_lines right-aligns numbers from a custom start and separator" {
   run_traced dybatpho::text_number_lines $'alpha\nbeta' 09 ": "
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
  9: alpha
 10: beta
 EOF
@@ -288,7 +288,7 @@ EOF
 @test "dybatpho::text_truncate_lines keeps the first lines and counts the rest" {
   run_traced dybatpho::text_truncate_lines $'one\ntwo\nthree\nfour' 2
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 one
 two
 … 2 more lines

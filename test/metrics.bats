@@ -323,7 +323,10 @@ setup() {
   dybatpho::mock_http "pushgateway.test" 200 ""
   dybatpho::metrics_counter_inc jobs_total
   DRY_RUN=true run_traced -0 dybatpho::metrics_push http://pushgateway.test nightly
-  assert_output --partial "http://pushgateway.test/metrics/job/nightly"
+  # The rehearsal shows the gateway the way every logged URL is shown: its
+  # host, with the path that carries the grouping labels redacted.
+  assert_output --partial 'http://pushgateway.test/\[redacted\]'
+  assert_output --partial "--request PUT"
   run_traced -1 dybatpho::mock_http_calls
   dybatpho::unmock_all
 }

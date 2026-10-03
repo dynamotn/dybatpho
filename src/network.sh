@@ -306,7 +306,11 @@ function dybatpho::curl_do {
 
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
-    dybatpho::dry_run curl -sSL "${url}" -o "${output}" "$@"
+    # A rehearsal is logged like any real run, so it shows the URL the way the
+    # log lines below do: a webhook path or credentials are the secret itself.
+    local rehearsed_url
+    __dybatpho_network_redact_url_into rehearsed_url "${url}"
+    dybatpho::dry_run curl -sSL "${rehearsed_url}" -o "${output}" "$@"
     return 0
   fi
 

@@ -315,6 +315,21 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_output --partial "https://example.com"
 }
 
+@test "dybatpho::curl_do keeps a secret URL out of its DRY_RUN rehearsal" {
+  # A rehearsal is logged like any other run, and a webhook URL -- or a bot
+  # token in the path, or credentials before the host -- is the secret itself.
+  DRY_RUN=true
+  run_traced dybatpho::curl_do "https://bot:token@hooks.example.com/services/T0/B0/s3cr3t?sig=abc" /dev/null
+  DRY_RUN=""
+  assert_success
+  assert_output --partial "DRY RUN"
+  # The rehearsal prints the command shell-quoted, hence the escaped brackets.
+  assert_output --partial 'https://hooks.example.com/\[redacted\]'
+  refute_output --partial "s3cr3t"
+  refute_output --partial "sig=abc"
+  refute_output --partial "token"
+}
+
 @test "dybatpho::curl_do maps a failed curl invocation to status 000" {
   export DYBATPHO_CURL_MAX_RETRIES=0
   stub_repeated curl ": exit 1"

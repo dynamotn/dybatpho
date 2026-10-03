@@ -174,7 +174,8 @@ dybatpho::circuit_breaker api.example.test \
 
 - Curl is not installed.
 - The URL is itself a credential: a webhook whose path is the secret, a signed
-  download with a token in its query, or a password in the authority.
+  download with a token in its query, or a password in the authority. That
+  holds for a `DRY_RUN` rehearsal too, which is logged like a real run.
 - The request returns a 3xx, 4xx, or 5xx status.
 - The request output is omitted, in which case it is discarded to `/dev/null`.
 - The caller wants JSON headers or HEAD-only metadata without rebuilding curl flags manually.
@@ -259,7 +260,8 @@ dybatpho::circuit_breaker api.example.test \
 - **FR-032**: Every URL the module writes to a log, an error, a warning or a
   progress line MUST be reduced to its scheme, host and port, with any user
   information, path, query or fragment replaced by `/[redacted]`, and a value
-  that is not a URL replaced by `[redacted URL]`.
+  that is not a URL replaced by `[redacted URL]`. The `DRY_RUN` rehearsal of a
+  request MUST show its URL the same way.
 - **FR-033**: Loading the module MUST NOT load `json`. The GraphQL helper, which
   builds and reads JSON, MUST stop before sending anything with `<function> needs
   the json module, load it with: dybatpho::load json` when `json` is not loaded;
@@ -428,6 +430,9 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-031**: Verify a script that loads `network` alone can use the address
   helpers, that its GraphQL call stops with the message naming `json`, and that
   once it loads `json` the same call gets as far as validating its variables.
+- **IT-032**: Verify the `DRY_RUN` rehearsal of a request to a URL carrying
+  credentials, a secret path and a query token prints only
+  `scheme://host/[redacted]`.
 - **IT-024**: Verify a request carrying `DYBATPHO_CURL_SECRET_HEADERS` and
   `DYBATPHO_CURL_SECRET_DATA` sends both, while neither appears among the
   arguments the mocked `curl` was called with.

@@ -175,7 +175,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-021**: A job name or grouping value that is empty or contains `/` MUST be sent as `<label>@base64/<value>` in the URL-safe base64 alphabet, an empty value as `=`, and every other value MUST be percent-encoded.
 - **FR-022**: The push helper MUST refuse a URL without an `http://` or `https://` scheme, an empty job name, a grouping label that is not a `key=value` pair with a valid label name, and a grouping label named `job`.
 - **FR-023**: The push helper MUST return the network module's exit code for the request and MUST log the gateway's error text when it refuses the push, rather than hiding the failure.
-- **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DRY_RUN` by printing the request instead of sending it.
+- **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DRY_RUN` by printing the request instead of sending it, with the gateway URL shown as its scheme and host only, like every URL the network module logs.
 - **FR-025**: Loading `metrics` MUST NOT load `math` or `network`. Recording a summary MUST stop the script, naming the `math` module and how to load it, when `math` is not loaded, and a push MUST do the same for `network`, each before recording or sending anything; counters, gauges, histograms and timers MUST work without either.
 
 ### Key Entities *(include if feature involves data)*

@@ -722,6 +722,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`notification` — `dybatpho::notify_webhook` no longer logs its URL.** Its
   debug line, `Sending webhook notification to <url>`, wrote the whole webhook
   URL whenever `LOG_LEVEL` was `debug`; it now shows the host only.
+- **`network` — a `DRY_RUN` rehearsal no longer prints the whole URL.**
+  `dybatpho::curl_do` under `DRY_RUN` printed `curl -sSL <url>` with the URL
+  as given, so rehearsing a notification wrote the webhook path, a Telegram
+  bot token or `user:password@` to the log. The rehearsal now shows the URL as
+  the log lines do, as `https://hooks.slack.com/[redacted]`. This reaches
+  every helper built on it, `dybatpho::metrics_push` included.
+
 - **`archive` — an archive that cannot be listed is no longer reported safe.**
   `dybatpho::archive_unsafe_entries` ignored a failed listing, so a corrupt or
   truncated archive, or a zip with no `unzip` installed, came back with no

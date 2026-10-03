@@ -533,6 +533,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it to stderr and to `LOG_FILE`. Those lines now show only the scheme, host
   and port, as `https://hooks.slack.com/[redacted]`.
 
+- **`notification` — `dybatpho::notify_webhook` no longer logs its URL.** Its
+  debug line, `Sending webhook notification to <url>`, wrote the whole webhook
+  URL whenever `LOG_LEVEL` was `debug`; it now shows the host only.
+
 ## [5.2.0] - 2026-10-02
 
 ### Added

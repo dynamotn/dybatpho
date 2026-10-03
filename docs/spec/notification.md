@@ -193,6 +193,7 @@ fi
 ## Edge Cases
 
 - Missing message, URL, payload, webhook URL, token, or chat ID.
+- The webhook URL is the secret itself, so it must not reach a debug line.
 - Message text contains quotes, backslashes, newlines, carriage returns, or
   tabs.
 - Optional provider metadata is omitted or empty.
@@ -285,6 +286,9 @@ fi
   open circuit returns `9` without sending; the key MUST NOT contain the URL's
   path, query or credentials. When it is not true, requests MUST be sent as
   before.
+- **FR-025**: A notifier MUST NOT write a webhook URL to a log line in full; it
+  MUST show only the scheme, host and port, the way the network module redacts
+  every URL it logs.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -335,6 +339,8 @@ fi
   provider, a webhook circuit named by host without credentials, the token
   staying out of band through the breaker, and the circuit being off by
   default.
+- **IT-011**: Verify the webhook debug line names only the host of a URL whose
+  path and query carry the secret.
 
 ## Acceptance Criteria *(mandatory)*
 

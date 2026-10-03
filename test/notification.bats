@@ -307,6 +307,17 @@ setup() {
   grep "https://my.service/hook" "${args_file}"
 }
 
+@test "dybatpho::notify_webhook keeps the webhook URL out of its debug line" {
+  stub curl ": echo '200'"
+  LOG_LEVEL=debug run_traced --separate-stderr dybatpho::notify_webhook \
+    "https://hooks.example.test/services/T000/B000/XXXXSECRET?token=abc" '{}'
+  unstub curl
+  assert_success
+  assert_stderr --partial "Sending webhook notification to https://hooks.example.test/[redacted]"
+  refute_stderr --partial "XXXXSECRET"
+  refute_stderr --partial "token=abc"
+}
+
 @test "dybatpho::notify_webhook forwards extra curl arguments" {
   local args_file="${BATS_TEST_TMPDIR}/webhook-extra-args"
   stub curl ": echo \"\$*\" > ${args_file}; echo '200'"

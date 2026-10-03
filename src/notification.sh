@@ -426,7 +426,10 @@ function dybatpho::notify_webhook {
   dybatpho::expect_args url payload -- "$@"
   shift 2
 
-  dybatpho::debug "Sending webhook notification to ${url}"
+  # The URL is often the credential itself, so only its host reaches the log.
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
+  dybatpho::debug "Sending webhook notification to ${shown_url}"
   __dybatpho_notification_post webhook "${url}" \
     --request POST \
     --data "${payload}" \

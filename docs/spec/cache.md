@@ -169,6 +169,7 @@ fi
 
 ## Edge Cases
 
+- A script serves stale entries or waits for a refresh without having loaded the `lock` module.
 - A key that could leave the cache directory, such as `../escape` or `a/b`.
 - A key that is an arbitrary value: a URL, a request body, a whole command line.
 - An entry written moments ago against a time to live of zero.
@@ -222,6 +223,7 @@ fi
 - **FR-023**: Pruning MUST stop the script when no limit is given, an option is unknown or lacks its value, or a limit is malformed; a size MUST be a number of bytes with an optional binary `K`, `M`, or `G` suffix.
 - **FR-024**: The module MUST describe the current namespace with its entry count, total bytes, counts of fresh and stale entries against a given or default time to live, and the ages of its oldest and newest entries, as aligned text or, with `--json`, as one JSON object with `entries`, `bytes`, `fresh`, `stale`, `oldest_age`, and `newest_age`.
 - **FR-025**: Describing a namespace MUST count only entries this module wrote, MUST report zero everywhere for a namespace never written, and MUST stop the script on a malformed time to live or an unknown option. It MUST NOT count hits and misses.
+- **FR-026**: Loading the module MUST NOT load `lock`. A grace window, from `--stale` or `DYBATPHO_CACHE_STALE`, and `cache_wait` MUST stop the script, naming the `lock` module and how to load it, when that module is not loaded, before an entry is read; caching without a grace window MUST work without it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -278,6 +280,7 @@ fi
 - **IT-029**: With the clock frozen, verify the JSON and text reports of two entries against several times to live, with the option before and after the time to live, and that a foreign file is not counted.
 - **IT-030**: Verify a namespace never written reports zero in both forms.
 - **IT-031**: Verify a malformed time to live and an unknown option stop the script.
+- **IT-032**: In a script that loaded `cache` alone, cache a command, have `--stale` and `cache_wait` stop and name the `lock` module, and run both once `lock` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

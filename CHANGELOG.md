@@ -334,9 +334,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   One refresh of an entry runs at a time however many callers find it stale,
   and a refresh that fails keeps the entry it was meant to replace.
   `dybatpho::cache_wait` waits for a refresh to finish, for a script that is
-  about to exit or wants the new answer. The `cache` module now loads `lock`.
+  about to exit or wants the new answer. Both need the `lock` module, which
+  `cache` does not load, so a script that only caches does not pay for it:
+  without `lock`, `--stale` and `dybatpho::cache_wait` stop the script with a
+  message naming it.
 
   ```sh
+  . dybatpho/init.sh --modules cache lock
   status="$(dybatpho::cache_run status 300 --stale 86400 -- fetch_status)"
   dybatpho::cache_wait status 30
   ```

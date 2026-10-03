@@ -7,7 +7,7 @@
 #   cache did anything.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules cache
+. "${SCRIPTDIR}/../init.sh" --modules cache lock
 
 dybatpho::register_common_handlers
 

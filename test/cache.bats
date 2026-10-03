@@ -414,3 +414,37 @@ remaining_entries() {
   run --separate-stderr ! dybatpho::cache_stats --yaml
   assert_stderr --partial "Unknown option '--yaml'"
 }
+
+@test "dybatpho::cache_run --stale and dybatpho::cache_wait ask for the lock module when it is not loaded" {
+  # `cache` does not load `lock`, so a script that only caches, `ai` among
+  # them, does not pay for it. A child shell started from a file, without the
+  # functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules cache\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'export DYBATPHO_CACHE_DIR=%q\n' "${BATS_TEST_TMPDIR}/narrow-cache"
+    printf '%s\n' 'dybatpho::cache_run plain 60 -- printf "plain\n"'
+    printf '%s\n' 'case "${1}" in'
+    printf '%s\n' '  run) dybatpho::cache_run swr 60 --stale 60 -- printf "swr\n" ;;'
+    printf '%s\n' '  wait) dybatpho::cache_wait swr 1 ;;'
+    printf '%s\n' 'esac'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" run
+  assert_failure
+  assert_line --index 0 "plain"
+  assert_output --partial "dybatpho::cache_run needs the lock module, load it with: dybatpho::load lock"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" wait
+  assert_failure
+  assert_output --partial "dybatpho::cache_wait needs the lock module, load it with: dybatpho::load lock"
+
+  # Once the script loads it, both run.
+  sed -i 's/--modules cache$/--modules cache lock/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" run
+  assert_success
+  assert_line "swr"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" wait
+  assert_success
+}

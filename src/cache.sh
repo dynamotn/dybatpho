@@ -27,7 +27,11 @@
 #
 #   The `lock` module guards the background refresh `dybatpho::cache_run
 #   --stale` starts, so that a burst of callers finding the same stale entry
-#   runs the command once.
+#   runs the command once. Plain caching needs no lock, so the module does not
+#   load it: a script that serves stale entries loads `lock` as well, and
+#   `--stale` and `dybatpho::cache_wait` stop with a message naming it when it
+#   is missing.
+# @tip Load `lock` as well to serve stale entries: `--modules cache lock`
 # @see
 #   - `example/cache_ops.sh`
 #   - `dybatpho::file_age_seconds`
@@ -361,6 +365,26 @@ function __dybatpho_cache_refresh_background {
 }
 
 #######################################
+# @description Stop unless the `lock` module is loaded.
+#   Only serving a stale entry takes a lock, to start one background refresh
+#   per entry and to let `dybatpho::cache_wait` see it. Registering `lock` as a
+#   dependency would load it into every script that only caches, `ai` among
+#   them, so the two paths that need it ask for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `lock`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `lock` module is not loaded
+# @internal
+#######################################
+function __dybatpho_cache_need_lock {
+  declare -F __dybatpho_lock_try > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the lock module, load it with: dybatpho::load lock"
+}
+
+#######################################
 # @description Wait until no background refresh of an entry is running.
 #   `dybatpho::cache_run --stale` answers from an expired entry and refreshes it
 #   behind the caller's back. Usually that is the point, but a script that is
@@ -380,6 +404,7 @@ function __dybatpho_cache_refresh_background {
 function dybatpho::cache_wait {
   local key
   dybatpho::expect_args key -- "$@"
+  __dybatpho_cache_need_lock
   local timeout="${2:-60}"
   [[ "${timeout}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${timeout}' is not a number of seconds"
@@ -389,7 +414,7 @@ function dybatpho::cache_wait {
   start="${SECONDS}"
   while dybatpho::lock_is_held "${lock}"; do
     ((SECONDS - start < timeout)) || return 1
-    # shellcheck disable=SC2154 # declared by `src/lock.sh`, which this module loads
+    # shellcheck disable=SC2154 # declared by `src/lock.sh`, which the guard above requires
     sleep "${DYBATPHO_LOCK_POLL_INTERVAL}"
   done
 }
@@ -434,7 +459,8 @@ function dybatpho::cache_wait {
 # @stdout The command's output, from the entry or from running it
 # @exitcode 0 The output came from a fresh or stale entry, or the command succeeded
 # @exitcode other The command failed, with its own exit status, and nothing was stored
-# @exitcode 1 Stop the script when no command is given after `--`, or a time is not a number of seconds
+# @exitcode 1 Stop the script when no command is given after `--`, a time is not a number of seconds, or a
+#   grace window is asked for without the `lock` module loaded
 # @see
 #   - `dybatpho::cache_get`
 #   - `dybatpho::cache_wait`
@@ -472,6 +498,7 @@ function dybatpho::cache_run {
     || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
   [[ "${stale}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${stale}' is not a number of seconds for --stale"
+  ((stale == 0)) || __dybatpho_cache_need_lock
 
   local path age cached
   path="$(dybatpho::cache_path "${key}")" || return 1

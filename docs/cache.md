@@ -4,7 +4,7 @@ Utilities for remembering an answer on disk until it goes stale
 
 > 🧭 Source: [src/cache.sh](../src/cache.sh)
 >
-> Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
+> Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
 ## ✨ Overview
@@ -33,7 +33,10 @@ progress.
 
 The `lock` module guards the background refresh `dybatpho::cache_run
 --stale` starts, so that a burst of callers finding the same stale entry
-runs the command once.
+runs the command once. Plain caching needs no lock, so the module does not
+load it: a script that serves stale entries loads `lock` as well, and
+`--stale` and `dybatpho::cache_wait` stop with a message naming it when it
+is missing.
 
 ### 🌍 Environment
 
@@ -64,6 +67,11 @@ runs the command once.
 
 - [example/cache_ops.sh](../example/cache_ops.sh)
 - [dybatpho::file_age_seconds](#dybatphofile_age_seconds)
+
+<a id="tips"></a>
+## 💡 Tips
+
+- Load `lock` as well to serve stale entries: `--modules cache lock`
 
 <a id="reference"></a>
 ## 📚 Reference
@@ -440,7 +448,7 @@ dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
 
 - `0`: The output came from a fresh or stale entry, or the command succeeded
 - `other`: The command failed, with its own exit status, and nothing was stored
-- `1`: Stop the script when no command is given after `--`, or a time is not a number of seconds
+- `1`: Stop the script when no command is given after `--`, a time is not a number of seconds, or a grace window is asked for without the `lock` module loaded
 
 **🔗 See also**
 

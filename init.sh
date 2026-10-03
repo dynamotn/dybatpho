@@ -97,7 +97,6 @@ declare -A __dybatpho_module_deps=(
   [schedule]="lock date"
   [parallel]="date"
   [notification]="network validate"
-  [archive]="safety"
   [cli]="config validate"
   [config]="validate"
   [safety]="cli"

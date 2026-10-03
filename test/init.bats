@@ -132,7 +132,7 @@ loaded_line() {
 
   # `backup_diff` compares two snapshots through `diff_dir`.
   run_traced -0 init_sh "--modules backup" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli safety archive date diff backup "
+  assert_output "string os logging helpers process file secret archive validate config cli safety date diff backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
   assert_output "string os logging helpers process file secret network json lock cache ai "
@@ -159,11 +159,22 @@ loaded_line() {
 }
 
 @test "a dependency cycle loads every module once and terminates" {
+  # The registry holds no cycle of its own any more -- the one between `safety`
+  # and `archive` went with the edge `archive` never used -- so the test plants
+  # one between two modules that are not loaded yet.
+  run_traced -0 init_sh "--modules core" '__dybatpho_module_deps[semver]="git"
+__dybatpho_module_deps[git]="semver"
+dybatpho::load semver
+'"$(loaded_line)"
+  assert_output "string os logging helpers process file secret git semver "
+}
+
+@test "safety and archive load without each other" {
   run_traced -0 init_sh "--modules safety" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli safety "
 
   run_traced -0 init_sh "--modules archive" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli safety archive "
+  assert_output "string os logging helpers process file secret archive "
 }
 
 @test "the shared validator is loaded ahead of the modules that check with it" {

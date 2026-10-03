@@ -575,6 +575,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules safety archive    # after
   ```
 
+- **BREAKING: `archive` no longer loads `safety`.** `archive` never called it:
+  guarded extraction is `safety`'s `dybatpho::safe_extract`, which asks for
+  `archive` rather than the other way round. Loading `archive` now brings only
+  the core modules. A script that loads `archive` and then calls
+  `dybatpho::safe_extract`, `dybatpho::confirm` or another `safety` function
+  has to ask for `safety` as well:
+
+  ```sh
+  . dybatpho/init.sh --modules archive           # before
+  . dybatpho/init.sh --modules archive safety    # after
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

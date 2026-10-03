@@ -77,6 +77,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - A non-zero strip-components count is supplied for a single-file compressed
   archive, which is rejected.
 - An archive contains entries that become empty after path stripping.
+- A script loads `archive` alone, without the `safety` module that offers the
+  guarded `safe_extract`.
 
 ## Requirements *(mandatory)*
 
@@ -97,6 +99,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
   it is absolute, equal to `..`, prefixed by `../`, traverses through `/../`,
   uses backslash separators around a traversal, or carries a Windows drive
   letter. Guarded extraction lives in `safety.md`.
+- **FR-010**: Loading `archive` MUST NOT load `safety`; every archive helper
+  MUST work with the core modules alone.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -127,6 +131,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **IT-008**: Reject unsupported archive extensions and invalid strip behavior.
 - **IT-009**: Report the traversal entries of a hostile archive with
   `archive_unsafe_entries`, and confirm `archive_is_safe` accepts a benign one.
+- **IT-010**: In a child shell that loaded only `archive`, create, check, and
+  extract an archive while `safety` stays unloaded.
 
 ## Acceptance Criteria *(mandatory)*
 

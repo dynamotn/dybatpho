@@ -34,7 +34,7 @@ and `.zst`. Extraction also supports optional strip-components behavior.
 
 ### `dybatpho::archive_unsafe_entries`
 
-- Use `dybatpho::safe_extract` to validate and extract in one step
+- Use `dybatpho::safe_extract` to validate and extract in one step; it lives in the `safety` module, which `archive` does not load
 
 <a id="reference"></a>
 ## 📚 Reference

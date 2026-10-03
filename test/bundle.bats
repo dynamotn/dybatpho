@@ -34,10 +34,10 @@ bundle() {
 }
 
 @test "bundle.sh resolves the dependencies of a requested module" {
-  run_traced -0 bundle --modules release
+  run_traced -0 bundle --modules tui
   run_traced -0 use_bundle 'dybatpho::module_list loaded | tr "\n" " "'
-  # `release` pulls in semver, git and archive, and archive pulls in safety.
-  for module in semver git archive safety release; do
+  # `tui` pulls in cli and safety, and cli pulls in validate.
+  for module in validate cli safety tui; do
     assert_output --partial " ${module}"
   done
 }

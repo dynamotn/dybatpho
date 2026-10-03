@@ -369,7 +369,8 @@ function __dybatpho_archive_entry_is_safe {
 # @description List archive entries that would escape the extraction directory.
 # @arg $1 string Archive file path
 # @stdout One unsafe entry per line, empty when the archive is safe
-# @tip Use `dybatpho::safe_extract` to validate and extract in one step
+# @tip Use `dybatpho::safe_extract` to validate and extract in one step; it
+#   lives in the `safety` module, which `archive` does not load
 #######################################
 function dybatpho::archive_unsafe_entries {
   local archive_path

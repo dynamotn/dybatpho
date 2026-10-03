@@ -386,3 +386,31 @@ function _create_traversal_test_archive {
   run_traced -1 __dybatpho_archive_entry_is_safe "bundle\\..\\escape"
   run_traced -1 __dybatpho_archive_entry_is_safe ".."
 }
+
+@test "archive loads and works without the safety module" {
+  # `archive` calls nothing in `safety`, so it no longer loads it. A child shell
+  # started from a file, without the functions this process exports, shows
+  # what a script that asks for `archive` alone gets.
+  local source_dir="${BATS_TEST_TMPDIR}/bundle"
+  local archive_path="${BATS_TEST_TMPDIR}/bundle.tar.gz"
+  local destination="${BATS_TEST_TMPDIR}/out"
+  mkdir -p "${source_dir}"
+  printf 'hello\n' > "${source_dir}/file.txt"
+
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules archive\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::module_loaded safety && echo "safety loaded" || echo "safety absent"'
+    printf '%s\n' 'dybatpho::archive_create "${1}" "${2}" > /dev/null'
+    printf '%s\n' 'dybatpho::archive_is_safe "${2}" && echo safe'
+    printf '%s\n' 'dybatpho::archive_extract "${2}" "${3}" > /dev/null'
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${source_dir}" "${archive_path}" "${destination}"
+  assert_success
+  assert_line --index 0 "safety absent"
+  assert_line --index 1 "safe"
+  assert_equal "$(cat "${destination}/bundle/file.txt")" "hello"
+}

@@ -11,7 +11,7 @@ setup() {
 
 @test "dybatpho::diff_text prints a unified diff and reports the difference" {
   run_traced -1 dybatpho::diff_text "${FIRST}" "${SECOND}" current proposed
-  assert_output << EOF
+  assert_output - << EOF
 --- current
 +++ proposed
 @@ -1,3 +1,4 @@
@@ -60,7 +60,7 @@ EOF
   printf 'one\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n' > "${SECOND}"
 
   DYBATPHO_DIFF_CONTEXT=0 run_traced -1 dybatpho::diff_text "${FIRST}" "${SECOND}" a b
-  assert_output << EOF
+  assert_output - << EOF
 --- a
 +++ b
 @@ -7 +7 @@
@@ -85,7 +85,7 @@ EOF
   printf '{"labels":{"app":"api","tier":"web"},"replicas":3}' > "${second}"
 
   run_traced -1 dybatpho::diff_json "${first}" "${second}"
-  assert_output << EOF
+  assert_output - << EOF
 - gone = true
 + labels.tier = "web"
 ~ replicas: 2 -> 3
@@ -104,7 +104,7 @@ EOF
 
 @test "dybatpho::diff_json walks into arrays by index" {
   run_traced -1 dybatpho::diff_json '{"xs":[1,2,3]}' '{"xs":[1,9,3,4]}'
-  assert_output << EOF
+  assert_output - << EOF
 ~ xs.1: 2 -> 9
 + xs.3 = 4
 EOF
@@ -126,7 +126,7 @@ EOF
   # An empty object is a leaf as much as a scalar is; treating it as neither
   # would pass over a key whose value was replaced wholesale.
   run_traced -1 dybatpho::diff_json '{"a":{}}' '{"a":{"b":1}}'
-  assert_output << EOF
+  assert_output - << EOF
 - a = {}
 + a.b = 1
 EOF
@@ -167,7 +167,7 @@ EOF
   printf 'labels:\n  app: api\n  tier: web\nreplicas: 3\n' > "${second}"
 
   run_traced -1 dybatpho::diff_yaml "${first}" "${second}"
-  assert_output << EOF
+  assert_output - << EOF
 + labels.tier = "web"
 ~ replicas: 2 -> 3
 EOF
@@ -246,7 +246,7 @@ make_trees() {
 @test "dybatpho::diff_dir reports added, removed, modified and retyped entries" {
   make_trees
   run_traced -1 dybatpho::diff_dir "${OLD}" "${NEW}"
-  assert_output << EOF
+  assert_output - << EOF
 + bin/
 + bin/tool
 ~ current
@@ -282,7 +282,7 @@ EOF
   printf 'x\n' > "${BATS_TEST_TMPDIR}/a/logs/old/1.log"
 
   run_traced -1 dybatpho::diff_dir "${BATS_TEST_TMPDIR}/a" "${BATS_TEST_TMPDIR}/b"
-  assert_output << EOF
+  assert_output - << EOF
 - empty/
 - logs/
 - logs/old/
@@ -297,7 +297,7 @@ EOF
   printf 'x\n' > "${second}/back\\slash and space"
 
   run_traced -1 dybatpho::diff_dir "${first}" "${second}"
-  assert_output << 'EOF'
+  assert_output - << 'EOF'
 + back\\slash and space
 + two\nlines
 EOF

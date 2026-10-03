@@ -251,6 +251,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - A square root is asked of a negative value, or of a value with more fraction
   digits than the requested width needs.
 - A comparison is asked about a value that is not a number from inside an `if`, where `set -e` does not apply.
+- A value read from standard input is a glob character such as `*` or `?`.
 
 ## Requirements *(mandatory)*
 
@@ -316,6 +317,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   their values from arguments or from standard input, like the other
   aggregates.
 - **FR-024**: `math_compare`, `math_gt`, `math_lt` and `math_eq` MUST validate their values in the caller's shell, so a value that is not a number stops the script even when the comparison is a condition.
+- **FR-025**: Values read from standard input MUST be split on whitespace without pathname expansion, so a `*` or `?` is read as itself.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -383,6 +385,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   including a single value and a custom scale, and verify an empty list, a lone
   sample and a bad scale fail.
 - **IT-016**: From a script file, have `math_gt`, `math_lt` and `math_eq` used as a condition stop the script on `abc`, before the next command runs.
+- **IT-017**: Feed `1 * 3` to `math_sum` in a directory holding files and verify `*` is refused as not a number rather than expanded.
 
 ## Acceptance Criteria *(mandatory)*
 

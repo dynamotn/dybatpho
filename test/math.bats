@@ -326,6 +326,20 @@ setup() {
   assert_equal "$(printf '1.5\n2.5\n' | dybatpho::math_sum)" "4"
 }
 
+@test "dybatpho::math_sum reads a glob character on standard input literally" {
+  # Values on a line were split by an unquoted expansion, which also expanded
+  # `*` to the names of the files in the working directory.
+  local dir="${BATS_TEST_TMPDIR}/glob"
+  mkdir -p "${dir}"
+  : > "${dir}/9"
+  cd "${dir}"
+  run --separate-stderr dybatpho::math_sum < <(printf '1 * 3\n')
+  assert_failure
+  assert_stderr --partial "Not a number: '*'"
+
+  assert_equal "$(printf '1 2\n3\n' | dybatpho::math_sum)" "6"
+}
+
 @test "dybatpho::math_sum of nothing is zero" {
   assert_equal "$(dybatpho::math_sum < /dev/null)" "0"
 }

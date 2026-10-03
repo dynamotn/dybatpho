@@ -800,6 +800,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   always succeeds, so a failing command looked like a success unless the
   script had turned `pipefail` on.
 
+- **`math` — a `*` or `?` on standard input is read as itself.** The
+  aggregates split each line of input with an unquoted expansion, which also
+  expanded `*` to the names of the files in the working directory, so
+  `printf '1 * 3\n' | dybatpho::math_sum` could add up file names.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

@@ -590,12 +590,12 @@ function __dybatpho_math_collect {
     __collect_out=("$@")
     return 0
   fi
-  local __collect_line __collect_field
-  while IFS= read -r __collect_line; do
-    # A line may hold several values, which is what `awk` or `cut` hands over.
-    for __collect_field in ${__collect_line}; do
-      __collect_out+=("${__collect_field}")
-    done
+  local -a __collect_fields=()
+  # A line may hold several values, which is what `awk` or `cut` hands over.
+  # `read -a` splits them without the pathname expansion an unquoted
+  # expansion would add, so a `*` is a value rather than the file names here.
+  while read -r -a __collect_fields; do
+    __collect_out+=(${__collect_fields[@]+"${__collect_fields[@]}"})
   done
 }
 

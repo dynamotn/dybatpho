@@ -433,6 +433,23 @@ curl_payload() {
   dybatpho::assert_http_called "releases/v1.2.0/assets/links"
 }
 
+@test "dybatpho::forge_release_upload reports why GitLab refused the link" {
+  # The message used to be read from the upload's own, successful response
+  # before the link request ran, so a refused link reported a stale message.
+  use_gitlab
+  local artifact="${BATS_TEST_TMPDIR}/app-v1.2.0.tar.gz"
+  printf 'payload' > "${artifact}"
+
+  dybatpho::mock_http "releases/v1.2.0" 200 '{"tag_name":"v1.2.0"}'
+  dybatpho::mock_http "packages/generic" 201 '{"message":"201 Created"}'
+  dybatpho::mock_http "assets/links" 403 '{"message":"403 Forbidden - link refused"}'
+
+  run dybatpho::forge_release_upload "v1.2.0" "${artifact}"
+  assert_failure
+  assert_output --partial "could not link it to release 'v1.2.0': HTTP 403: 403 Forbidden - link refused"
+  refute_output --partial "201 Created"
+}
+
 @test "dybatpho::forge_release_upload refuses a missing file or a missing release" {
   run dybatpho::forge_release_upload "v1.2.0" "${BATS_TEST_TMPDIR}/absent.tar.gz"
   assert_failure

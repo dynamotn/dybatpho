@@ -790,6 +790,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It also honours `DYBATPHO_CURL_CONNECT_TIMEOUT` and `DYBATPHO_CURL_TIMEOUT`
   like every other request, under `DYBATPHO_AI_TIMEOUT`.
 
+- **`forge` — a refused GitLab asset link reports its own reason.**
+  `dybatpho::forge_release_upload` read the error message from the upload's
+  response, which had succeeded, before linking the asset to the release, so a
+  refused link was reported with a stale or empty reason. It now reports what
+  GitLab said about the link request.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

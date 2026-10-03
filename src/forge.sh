@@ -856,16 +856,16 @@ function dybatpho::forge_release_upload {
       # A generic package is not visible from the release until it is linked.
       local link_payload
       link_payload="$(dybatpho::json_object name "${name}" url "${package_url}")"
-      local forge_error
-      local forge_error_2
-      forge_error_2=$(dybatpho::forge_error "${response}")
-      forge_error=${forge_error_2}
-      local url_encode_2
-      url_encode_2=$(dybatpho::url_encode "${tag}")
+      # The reason is read from the link request's own response, once it has
+      # failed: read earlier, it was the upload's answer, which had succeeded.
       dybatpho::forge_request POST \
-        "releases/${url_encode_2}/assets/links" "${link_payload}" "${response}" \
-        || dybatpho::die \
-          "Uploaded ${name} but could not link it to release '${tag}': ${forge_error}"
+        "releases/${url_encode}/assets/links" "${link_payload}" "${response}" \
+        || {
+          local forge_error_detail
+          forge_error_detail=$(dybatpho::forge_error "${response}")
+          dybatpho::die \
+            "Uploaded ${name} but could not link it to release '${tag}': ${forge_error_detail}"
+        }
       printf '%s\n' "${package_url}"
       ;;
     *) ;;

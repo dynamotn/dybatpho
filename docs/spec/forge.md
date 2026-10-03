@@ -112,6 +112,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - A token registered inside a command substitution does not survive it; this is
   a property of Bash subshells and is documented rather than worked around.
 - Every request honors `DRY_RUN`, so a publishing script can be rehearsed.
+- A GitLab asset uploads but linking it to the release is refused.
 
 ## Requirements *(mandatory)*
 
@@ -159,6 +160,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   only the HTTP status, so a bad field, an expired token and a rate limit are
   told apart. The status MUST still be included, because a body is not
   guaranteed to be present or to be JSON.
+- **FR-015**: When a GitLab asset uploads but linking it to the release fails,
+  the error MUST carry the link request's own message, never the upload's.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -210,6 +213,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **IT-023**: Verify the forge's message and field-level detail are reported
   for a 422, for both forges' wordings, and that a missing or non-JSON body
   falls back to the status.
+- **IT-024**: Verify a GitLab upload whose link request is refused with a 403
+  reports the link's message and not the successful upload's.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -235,6 +235,47 @@ anthropic_body() {
   assert_stderr --partial "bad model"
 }
 
+@test "dybatpho::ai_ask keeps the trailing newlines of the answer" {
+  # The response is read in one pass whose output ends in a marker, so the
+  # answer's own trailing newlines survive the command substitution.
+  stub_curl_body "$(anthropic_body $'two lines\nend\n\n')"
+  dybatpho::ai_ask "q" > "${BATS_TEST_TMPDIR}/answer"
+  unstub curl
+  assert_equal "$(od -An -c "${BATS_TEST_TMPDIR}/answer" | tr -s ' ')" \
+    "$(printf 'two lines\nend\n\n\n' | od -An -c | tr -s ' ')"
+}
+
+@test "dybatpho::ai_ask reads a body that is not JSON the way it always did" {
+  # The one-pass read cannot parse it, so the separate reads take over, and
+  # they treat an unreadable body as an empty answer rather than an error.
+  stub_curl_body 'not json at all'
+  run_traced dybatpho::ai_ask "q"
+  unstub curl
+  assert_success
+  assert_output ""
+}
+
+@test "the cli backend flattens the conversation under upper-case speaker labels" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=claude
+  stub_repeated claude ': cat'
+  local chat
+  dybatpho::ai_conversation_new chat ""
+  dybatpho::ai_conversation_add "${chat}" user $'first\nquestion'
+  dybatpho::ai_conversation_add "${chat}" assistant "a reply"
+  run_traced dybatpho::ai_chat "${chat}" "second"
+  unstub claude
+  assert_success
+  assert_output - << 'EOF'
+USER: first
+question
+
+ASSISTANT: a reply
+
+USER: second
+EOF
+}
+
 @test "dybatpho::ai_ask extracts text from an openai response" {
   DYBATPHO_AI_PROVIDER=openai
   OPENAI_API_KEY="k"

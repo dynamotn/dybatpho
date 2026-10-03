@@ -341,12 +341,15 @@ function __dybatpho_ai_record_usage {
   local input_tokens="${1:-0}" output_tokens="${2:-0}" model="${3:-}" stop_reason="${4:-}"
   [[ "${input_tokens}" =~ ^[0-9]+$ ]] || input_tokens=0
   [[ "${output_tokens}" =~ ^[0-9]+$ ]] || output_tokens=0
+  # The object is spelled here rather than built by a JSON backend: it is four
+  # known fields, and a process per response to assemble them was half of what
+  # recording usage cost.
+  local model_json stop_json
+  __dybatpho_log_json_escape_into model_json "${model}"
+  __dybatpho_log_json_escape_into stop_json "${stop_reason}"
   local last
-  last=$(dybatpho::json_object \
-    last_input:json "${input_tokens}" \
-    last_output:json "${output_tokens}" \
-    last_model "${model}" \
-    last_stop_reason "${stop_reason}")
+  printf -v last '{"last_input":%s,"last_output":%s,"last_model":"%s","last_stop_reason":"%s"}' \
+    "${input_tokens}" "${output_tokens}" "${model_json}" "${stop_json}"
   __dybatpho_ai_state_write "$(dybatpho::json_eval "$(__dybatpho_ai_state_read)" \
     ". + ${last} | .total_input += ${input_tokens} | .total_output += ${output_tokens}")"
 }
@@ -549,13 +552,19 @@ function __dybatpho_ai_conversation_build {
   local system
   dybatpho::expect_args system -- "$@"
   shift
-  local messages='[]' turn
+  # Every value is a plain string, so the document is spelled here with the
+  # library's one escaper: building it through a JSON backend cost two
+  # processes per turn and one more for the envelope.
+  local messages="" escaped_role escaped_content escaped_system
   while (($# >= 2)); do
-    turn=$(dybatpho::json_object role "$1" content "$2")
+    __dybatpho_log_json_escape_into escaped_role "$1"
+    __dybatpho_log_json_escape_into escaped_content "$2"
     shift 2
-    messages=$(dybatpho::json_eval "${messages}" ". + [${turn}]")
+    [[ -n "${messages}" ]] && messages+=","
+    messages+="{\"role\":\"${escaped_role}\",\"content\":\"${escaped_content}\"}"
   done
-  dybatpho::json_object system "${system}" messages:json "${messages}"
+  __dybatpho_log_json_escape_into escaped_system "${system}"
+  printf '{"system":"%s","messages":[%s]}\n' "${escaped_system}" "${messages}"
 }
 
 #######################################
@@ -851,34 +860,23 @@ function __dybatpho_ai_http {
   local provider payload
   dybatpho::expect_args provider payload -- "$@"
 
-  local cache_key body
-  cache_key=$(__dybatpho_ai_cache_key "${provider}" "${payload}")
-  if body=$(__dybatpho_ai_cache_read "${cache_key}"); then
-    printf '%s\n' "${body}"
-    return 0
+  # Hashing the payload costs a pipeline per request, so it is skipped unless
+  # the cache is actually on.
+  local cache_key="" body
+  if dybatpho::is true "${DYBATPHO_AI_CACHE}"; then
+    cache_key=$(__dybatpho_ai_cache_key "${provider}" "${payload}")
+    if body=$(__dybatpho_ai_cache_read "${cache_key}"); then
+      printf '%s\n' "${body}"
+      return 0
+    fi
   fi
 
-  local url base
-  base=$(__dybatpho_ai_base_url "${provider}")
+  local url
+  local -a headers=()
   # The API key and the prompt both go to curl out of band: an argument is
   # world-readable through `/proc/<pid>/cmdline` for the life of the request.
-  local -a headers=()
   local -a DYBATPHO_CURL_SECRET_HEADERS=()
-  case "${provider}" in
-    anthropic)
-      url="${base}/v1/messages"
-      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: $(__dybatpho_ai_api_key anthropic)")
-      headers+=(--header "anthropic-version: ${DYBATPHO_AI_ANTHROPIC_VERSION}")
-      ;;
-    openai)
-      url="${base}/chat/completions"
-      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer $(__dybatpho_ai_api_key openai)")
-      ;;
-    ollama)
-      url="${base}/api/chat"
-      ;;
-    *) ;;
-  esac
+  __dybatpho_ai_endpoint_into "${provider}" url headers
 
   if dybatpho::is true "${DRY_RUN-}"; then
     dybatpho::info "🧪 DRY RUN: POST ${url} as ${provider}"
@@ -899,8 +897,41 @@ function __dybatpho_ai_http {
     ${headers[@]+"${headers[@]}"} || return $?
 
   body=$(cat "${response_file}")
-  __dybatpho_ai_cache_write "${cache_key}" "${body}"
+  [[ -z "${cache_key}" ]] || __dybatpho_ai_cache_write "${cache_key}" "${body}"
   printf '%s\n' "${body}"
+}
+
+#######################################
+# @description Resolve where a backend is reached and what it must be told.
+#   The buffered and the streaming call both send to the same place, so the
+#   choice is made once, here. The key goes into `DYBATPHO_CURL_SECRET_HEADERS`,
+#   which the caller declares local, so it never becomes a curl argument.
+# @arg $1 string Backend name, `anthropic`, `openai` or `ollama`
+# @arg $2 string Name of the variable receiving the URL
+# @arg $3 string Name of the array receiving extra curl header arguments
+# @set The named variable and array, and the caller's `DYBATPHO_CURL_SECRET_HEADERS`
+# @internal
+#######################################
+function __dybatpho_ai_endpoint_into {
+  local __dybatpho_ai_ep_provider="$1"
+  local -n __dybatpho_ai_ep_url="$2" __dybatpho_ai_ep_headers="$3"
+  local __dybatpho_ai_ep_base
+  __dybatpho_ai_ep_base=$(__dybatpho_ai_base_url "${__dybatpho_ai_ep_provider}")
+  case "${__dybatpho_ai_ep_provider}" in
+    anthropic)
+      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/v1/messages"
+      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: $(__dybatpho_ai_api_key anthropic)")
+      __dybatpho_ai_ep_headers+=(--header "anthropic-version: ${DYBATPHO_AI_ANTHROPIC_VERSION}")
+      ;;
+    openai)
+      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/chat/completions"
+      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer $(__dybatpho_ai_api_key openai)")
+      ;;
+    ollama)
+      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/api/chat"
+      ;;
+    *) ;;
+  esac
 }
 
 #######################################
@@ -989,6 +1020,68 @@ function __dybatpho_ai_usage_from_response {
 }
 
 #######################################
+# @description Check a provider response, record its usage and take its text,
+#   reading the document once.
+#   Asking for the error, the four usage fields and the text separately started
+#   a JSON backend six times per response. One filter answers all of them as
+#   lines, the text last because it is the only field that can hold a newline,
+#   and a trailing marker keeps the text's own trailing newlines from being
+#   eaten by the command substitution. A body the filter cannot read falls back
+#   to the separate questions, which is how such a body was always handled.
+# @arg $1 string Name of the variable receiving the assistant text
+# @arg $2 string Backend name
+# @arg $3 string Response body
+# @set The named variable
+# @exitcode 1 Stop the script when the response carries an error object
+# @internal
+#######################################
+function __dybatpho_ai_response_into {
+  local -n __dybatpho_ai_resp_text="$1"
+  local __dybatpho_ai_resp_provider="$2" __dybatpho_ai_resp_body="$3"
+  local __dybatpho_ai_resp_fields
+  case "${__dybatpho_ai_resp_provider}" in
+    anthropic)
+      __dybatpho_ai_resp_fields='(.usage.input_tokens // 0), (.usage.output_tokens // 0),
+        (.stop_reason // ""), ([.content[]? | select(.type == "text") | .text] | join(""))'
+      ;;
+    openai)
+      __dybatpho_ai_resp_fields='(.usage.prompt_tokens // 0), (.usage.completion_tokens // 0),
+        (.choices[0].finish_reason // ""), (.choices[0].message.content // "")'
+      ;;
+    ollama)
+      __dybatpho_ai_resp_fields='(.prompt_eval_count // 0), (.eval_count // 0),
+        (.done_reason // ""), (.message.content // "")'
+      ;;
+    *) ;;
+  esac
+
+  local __dybatpho_ai_resp_digest
+  if ! __dybatpho_ai_resp_digest=$(dybatpho::json_get "${__dybatpho_ai_resp_body}" \
+    "[([.error? | select(. != null)] | length), (.model // \"\"), ${__dybatpho_ai_resp_fields}]
+      | map(tostring) | join(\"\\n\") + \"#\"" 2> /dev/null); then
+    __dybatpho_ai_assert_no_error "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}"
+    __dybatpho_ai_usage_from_response "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}"
+    __dybatpho_ai_resp_text=$(__dybatpho_ai_extract_text \
+      "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}")
+    return 0
+  fi
+  __dybatpho_ai_resp_digest="${__dybatpho_ai_resp_digest%#}"
+
+  local -a __dybatpho_ai_resp_head=()
+  local __dybatpho_ai_resp_index
+  for __dybatpho_ai_resp_index in 0 1 2 3 4; do
+    __dybatpho_ai_resp_head+=("${__dybatpho_ai_resp_digest%%$'\n'*}")
+    __dybatpho_ai_resp_digest="${__dybatpho_ai_resp_digest#*$'\n'}"
+  done
+  if [[ "${__dybatpho_ai_resp_head[0]}" != "0" ]]; then
+    __dybatpho_ai_assert_no_error "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}"
+  fi
+  __dybatpho_ai_record_usage "${__dybatpho_ai_resp_head[2]}" "${__dybatpho_ai_resp_head[3]}" \
+    "${__dybatpho_ai_resp_head[1]}" "${__dybatpho_ai_resp_head[4]}"
+  __dybatpho_ai_resp_text="${__dybatpho_ai_resp_digest}"
+}
+
+#######################################
 # @description Complete a conversation through the `cli` backend.
 # @arg $1 string Conversation JSON
 # @stdout Assistant text
@@ -1006,13 +1099,19 @@ function __dybatpho_ai_cli_complete {
   # prompt with explicit speaker labels rather than a structured message list.
   # The labels are built here rather than in a filter because the two JSON
   # backends spell their case conversion differently.
+  # The roles are fixed words, so all of them come back in one read; only the
+  # contents, which can hold anything, are read one at a time.
   local count index=0 role content
-  count=$(dybatpho::json_get "${conversation}" '.messages | length')
+  local -a roles=()
+  local role_lines
+  role_lines=$(dybatpho::json_get "${conversation}" '.messages[].role')
+  [[ -z "${role_lines}" ]] || mapfile -t roles <<< "${role_lines}"
+  count="${#roles[@]}"
   prompt=""
   while ((index < count)); do
-    role=$(dybatpho::json_get "${conversation}" ".messages[${index}].role")
+    role="${roles[index]}"
     content=$(dybatpho::json_get "${conversation}" ".messages[${index}].content")
-    prompt+="$(dybatpho::upper "${role}"): ${content}"
+    prompt+="${role^^}: ${content}"
     ((index + 1 < count)) && prompt+=$'\n\n'
     index=$((index + 1))
   done
@@ -1072,12 +1171,11 @@ function __dybatpho_ai_complete {
     return 0
   fi
 
-  local payload body
+  local payload body text
   payload=$("__dybatpho_ai_payload_${provider}" "${conversation}" '[]' "${schema}")
   body=$(__dybatpho_ai_http "${provider}" "${payload}")
-  __dybatpho_ai_assert_no_error "${provider}" "${body}"
-  __dybatpho_ai_usage_from_response "${provider}" "${body}"
-  __dybatpho_ai_extract_text "${provider}" "${body}"
+  __dybatpho_ai_response_into text "${provider}" "${body}"
+  printf '%s\n' "${text}"
 }
 
 #######################################
@@ -1309,34 +1407,17 @@ function dybatpho::ai_stream {
 
   __dybatpho_ai_budget_check
 
-  local conversation payload url base
+  local conversation payload url
   conversation=$(__dybatpho_ai_conversation_build "${system}" user "${prompt}")
   payload=$("__dybatpho_ai_payload_${provider}" "${conversation}" '[]' "")
-  base=$(__dybatpho_ai_base_url "${provider}")
+  payload=$(dybatpho::json_eval "${payload}" '.stream = true')
 
   local -a headers=()
   # Streaming talks to curl directly rather than through `dybatpho::curl_do`, so
   # it builds the same private config file itself: the key must not become an
   # argument, where `/proc/<pid>/cmdline` publishes it to the whole host.
   local -a DYBATPHO_CURL_SECRET_HEADERS=()
-  case "${provider}" in
-    anthropic)
-      url="${base}/v1/messages"
-      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: $(__dybatpho_ai_api_key anthropic)")
-      headers+=(--header "anthropic-version: ${DYBATPHO_AI_ANTHROPIC_VERSION}")
-      payload=$(dybatpho::json_eval "${payload}" '.stream = true')
-      ;;
-    openai)
-      url="${base}/chat/completions"
-      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer $(__dybatpho_ai_api_key openai)")
-      payload=$(dybatpho::json_eval "${payload}" '.stream = true')
-      ;;
-    ollama)
-      url="${base}/api/chat"
-      payload=$(dybatpho::json_eval "${payload}" '.stream = true')
-      ;;
-    *) ;;
-  esac
+  __dybatpho_ai_endpoint_into "${provider}" url headers
 
   # A self-hosted base URL can hold credentials or a key in its path, so the
   # rehearsal and the debug line show it redacted, like every network log line.
@@ -1611,8 +1692,8 @@ function dybatpho::ai_run {
     conversation=$(dybatpho::json_object system "${system}" messages:json "${messages}")
     payload=$("__dybatpho_ai_payload_${provider}" "${conversation}" "${tools}" "")
     body=$(__dybatpho_ai_http "${provider}" "${payload}")
-    __dybatpho_ai_assert_no_error "${provider}" "${body}"
-    __dybatpho_ai_usage_from_response "${provider}" "${body}"
+    local text
+    __dybatpho_ai_response_into text "${provider}" "${body}"
 
     # `@json` renders the tool arguments as text both backends spell the same
     # way, so a handler always receives one JSON string.
@@ -1634,7 +1715,7 @@ function dybatpho::ai_run {
     local total
     total=$(dybatpho::json_get "${calls}" 'length')
     if [[ "${total}" == "0" ]]; then
-      __dybatpho_ai_extract_text "${provider}" "${body}"
+      printf '%s\n' "${text}"
       return 0
     fi
 
@@ -1655,12 +1736,19 @@ function dybatpho::ai_run {
     esac
     messages=$(dybatpho::json_eval "${messages}" ". + [${assistant}]")
 
-    local index=0 call_id call_name call_arguments result entry
+    local index=0 call_id call_name call_arguments result entry call
     local results='[]'
     while ((index < total)); do
-      call_id=$(dybatpho::json_get "${calls}" ".[${index}].id")
-      call_name=$(dybatpho::json_get "${calls}" ".[${index}].name")
-      call_arguments=$(dybatpho::json_get "${calls}" ".[${index}].arguments")
+      # One read per call rather than one per field. The arguments come last
+      # because they are the only field that can span lines, and the marker
+      # keeps their trailing newlines out of reach of the substitution.
+      call=$(dybatpho::json_get "${calls}" \
+        ".[${index}] | [.id, .name, .arguments] | map(tostring) | join(\"\\n\") + \"#\"")
+      call="${call%#}"
+      call_id="${call%%$'\n'*}"
+      call="${call#*$'\n'}"
+      call_name="${call%%$'\n'*}"
+      call_arguments="${call#*$'\n'}"
       result=$(__dybatpho_ai_tool_invoke "${call_name}" "${call_arguments}")
       case "${provider}" in
         anthropic)

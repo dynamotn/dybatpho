@@ -77,21 +77,9 @@ function dybatpho::array_reverse {
 #######################################
 function dybatpho::array_unique {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
-  local -n __dybatpho_array_ref="$1"
-  local -A __dybatpho_array_unique_seen=()
   local -a __dybatpho_array_unique_result=()
-  local __dybatpho_array_unique_value
-
-  for __dybatpho_array_unique_value in ${__dybatpho_array_ref[@]+"${__dybatpho_array_ref[@]}"}; do
-    [[ -n "${__dybatpho_array_unique_value}" ]] || continue
-    [[ -v "__dybatpho_array_unique_seen[${__dybatpho_array_unique_value}]" ]] && continue
-    __dybatpho_array_unique_seen["${__dybatpho_array_unique_value}"]=1
-    __dybatpho_array_unique_result+=("${__dybatpho_array_unique_value}")
-  done
-
-  # shellcheck disable=SC2190 # __dybatpho_array_ref is indexed; the nameref misleads ShellCheck
-  __dybatpho_array_ref=(${__dybatpho_array_unique_result[@]+"${__dybatpho_array_unique_result[@]}"})
+  __dybatpho_array_set_op_into __dybatpho_array_unique_result unique "$1"
+  __dybatpho_array_copy "$1" __dybatpho_array_unique_result
   if [[ "${2-""}" == "--" ]]; then
     dybatpho::array_print "$1"
   fi
@@ -386,20 +374,50 @@ function __dybatpho_array_copy {
 }
 
 #######################################
-# @description Build a lookup of the values an array holds.
-# @arg $1 string Name of the associative array to fill
-# @arg $2 string Name of the array to read
-# @set The named associative array, one key per distinct value
+# @description Compute a set operation over arrays into an array.
+#   The result is a set: every value appears once, in the order it was first
+#   seen. `unique` deduplicates the first array; `union` adds the second
+#   array's values after the first's; `intersect` keeps the first array's
+#   values the second also holds; `difference` keeps those it does not.
+#
+#   Empty elements are dropped by every operation, as `dybatpho::array_unique`
+#   always did: an empty string is no value, and Bash cannot use it as the key
+#   that tracks what has been seen.
+# @arg $1 string Name of the array receiving the result
+# @arg $2 string Operation: `unique`, `union`, `intersect` or `difference`
+# @arg $3 string Name of the first array
+# @arg $4 string Name of the second array, for every operation but `unique`
+# @set The named result array
 # @internal
 #######################################
-function __dybatpho_array_index {
-  local -n __dybatpho_array_index_out="$1"
-  # shellcheck disable=SC2178
-  local -n __dybatpho_array_index_in="$2"
-  __dybatpho_array_index_out=()
-  local __dybatpho_array_index_value
-  for __dybatpho_array_index_value in ${__dybatpho_array_index_in[@]+"${__dybatpho_array_index_in[@]}"}; do
-    __dybatpho_array_index_out["${__dybatpho_array_index_value}"]=1
+function __dybatpho_array_set_op_into {
+  local -n __dybatpho_array_set_out="$1"
+  local __dybatpho_array_set_mode="$2"
+  local -a __dybatpho_array_set_values=() __dybatpho_array_set_second=()
+  local -A __dybatpho_array_set_other=() __dybatpho_array_set_seen=()
+  local __dybatpho_array_set_value
+  __dybatpho_array_copy __dybatpho_array_set_values "$3"
+  [[ "${__dybatpho_array_set_mode}" == unique ]] || __dybatpho_array_copy __dybatpho_array_set_second "$4"
+
+  if [[ "${__dybatpho_array_set_mode}" == union ]]; then
+    __dybatpho_array_set_values+=(${__dybatpho_array_set_second[@]+"${__dybatpho_array_set_second[@]}"})
+  else
+    for __dybatpho_array_set_value in ${__dybatpho_array_set_second[@]+"${__dybatpho_array_set_second[@]}"}; do
+      [[ -n "${__dybatpho_array_set_value}" ]] && __dybatpho_array_set_other["${__dybatpho_array_set_value}"]=1
+    done
+  fi
+
+  __dybatpho_array_set_out=()
+  for __dybatpho_array_set_value in ${__dybatpho_array_set_values[@]+"${__dybatpho_array_set_values[@]}"}; do
+    [[ -n "${__dybatpho_array_set_value}" ]] || continue
+    [[ -v "__dybatpho_array_set_seen[${__dybatpho_array_set_value}]" ]] && continue
+    case "${__dybatpho_array_set_mode}" in
+      intersect) [[ -v "__dybatpho_array_set_other[${__dybatpho_array_set_value}]" ]] || continue ;;
+      difference) [[ -v "__dybatpho_array_set_other[${__dybatpho_array_set_value}]" ]] && continue ;;
+      *) ;;
+    esac
+    __dybatpho_array_set_seen["${__dybatpho_array_set_value}"]=1
+    __dybatpho_array_set_out+=("${__dybatpho_array_set_value}")
   done
 }
 
@@ -573,7 +591,8 @@ function dybatpho::array_slice {
 #   The result is a set: every value appears once, in the order it was first
 #   seen, the first array's values ahead of the second's. A set operation that
 #   kept duplicates would not be one, so `dybatpho::array_unique` afterwards has
-#   nothing left to do.
+#   nothing left to do. Empty elements are dropped, as `dybatpho::array_unique`
+#   drops them.
 # @example
 #   allowed=(read write read)
 #   extra=(write admin)
@@ -587,21 +606,8 @@ function dybatpho::array_slice {
 function dybatpho::array_union {
   dybatpho::expect_ref "$1"
   dybatpho::expect_ref "$2"
-  local -a __dybatpho_array_set_values=() __dybatpho_array_set_addition=()
-  __dybatpho_array_copy __dybatpho_array_set_values "$1"
-  __dybatpho_array_copy __dybatpho_array_set_addition "$2"
-  ((${#__dybatpho_array_set_addition[@]} == 0)) || __dybatpho_array_set_values+=("${__dybatpho_array_set_addition[@]}")
-
-  local -A __dybatpho_array_set_seen=()
   local -a __dybatpho_array_set_result=()
-  local __dybatpho_array_set_value
-  for __dybatpho_array_set_value in ${__dybatpho_array_set_values[@]+"${__dybatpho_array_set_values[@]}"}; do
-    if [[ ! -v "__dybatpho_array_set_seen[${__dybatpho_array_set_value}]" ]]; then
-      __dybatpho_array_set_seen["${__dybatpho_array_set_value}"]=1
-      __dybatpho_array_set_result+=("${__dybatpho_array_set_value}")
-    fi
-  done
-
+  __dybatpho_array_set_op_into __dybatpho_array_set_result union "$1" "$2"
   __dybatpho_array_copy "$1" __dybatpho_array_set_result
   if [[ "${3-}" == "--" ]]; then
     dybatpho::array_print "$1"
@@ -610,7 +616,8 @@ function dybatpho::array_union {
 
 #######################################
 # @description Keep only the values an array shares with another, in place.
-#   The result is a set, in the order the first array had them.
+#   The result is a set, in the order the first array had them, without empty
+#   elements.
 # @example
 #   requested=(read write admin)
 #   granted=(write read)
@@ -624,22 +631,8 @@ function dybatpho::array_union {
 function dybatpho::array_intersect {
   dybatpho::expect_ref "$1"
   dybatpho::expect_ref "$2"
-  local -A __dybatpho_array_set_other=()
-  __dybatpho_array_index __dybatpho_array_set_other "$2"
-  local -a __dybatpho_array_set_values=()
-  __dybatpho_array_copy __dybatpho_array_set_values "$1"
-
-  local -A __dybatpho_array_set_seen=()
   local -a __dybatpho_array_set_result=()
-  local __dybatpho_array_set_value
-  for __dybatpho_array_set_value in ${__dybatpho_array_set_values[@]+"${__dybatpho_array_set_values[@]}"}; do
-    if [[ -v "__dybatpho_array_set_other[${__dybatpho_array_set_value}]" ]] \
-      && [[ ! -v "__dybatpho_array_set_seen[${__dybatpho_array_set_value}]" ]]; then
-      __dybatpho_array_set_seen["${__dybatpho_array_set_value}"]=1
-      __dybatpho_array_set_result+=("${__dybatpho_array_set_value}")
-    fi
-  done
-
+  __dybatpho_array_set_op_into __dybatpho_array_set_result intersect "$1" "$2"
   __dybatpho_array_copy "$1" __dybatpho_array_set_result
   if [[ "${3-}" == "--" ]]; then
     dybatpho::array_print "$1"
@@ -648,8 +641,9 @@ function dybatpho::array_intersect {
 
 #######################################
 # @description Drop the values an array shares with another, in place.
-#   The result is a set, in the order the first array had them. The operation is
-#   one-sided: values only the second array holds are not added.
+#   The result is a set, in the order the first array had them, without empty
+#   elements. The operation is one-sided: values only the second array holds
+#   are not added.
 # @example
 #   wanted=(read write admin)
 #   granted=(write)
@@ -663,22 +657,8 @@ function dybatpho::array_intersect {
 function dybatpho::array_difference {
   dybatpho::expect_ref "$1"
   dybatpho::expect_ref "$2"
-  local -A __dybatpho_array_set_other=()
-  __dybatpho_array_index __dybatpho_array_set_other "$2"
-  local -a __dybatpho_array_set_values=()
-  __dybatpho_array_copy __dybatpho_array_set_values "$1"
-
-  local -A __dybatpho_array_set_seen=()
   local -a __dybatpho_array_set_result=()
-  local __dybatpho_array_set_value
-  for __dybatpho_array_set_value in ${__dybatpho_array_set_values[@]+"${__dybatpho_array_set_values[@]}"}; do
-    if [[ ! -v "__dybatpho_array_set_other[${__dybatpho_array_set_value}]" ]] \
-      && [[ ! -v "__dybatpho_array_set_seen[${__dybatpho_array_set_value}]" ]]; then
-      __dybatpho_array_set_seen["${__dybatpho_array_set_value}"]=1
-      __dybatpho_array_set_result+=("${__dybatpho_array_set_value}")
-    fi
-  done
-
+  __dybatpho_array_set_op_into __dybatpho_array_set_result difference "$1" "$2"
   __dybatpho_array_copy "$1" __dybatpho_array_set_result
   if [[ "${3-}" == "--" ]]; then
     dybatpho::array_print "$1"

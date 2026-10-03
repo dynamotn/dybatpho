@@ -144,6 +144,7 @@ fi
 - The find predicate matches nothing in a dense or sparse array.
 - The caller asks for the first or last value of an empty array.
 - An array is sparse, so its indexes do not run from 0 to its length minus one; or a helper is given, or produces, an empty array under `nounset` on Bash 4.3.
+- A set operation receives an empty element in either array.
 
 ## Requirements *(mandatory)*
 
@@ -187,6 +188,7 @@ fi
 - **FR-027**: A cycle MUST be reported through the exit code while an order is still produced, because a cycle is legitimate in some graphs and refusing to order one would refuse the graph.
 - **FR-028**: The module MUST collect the entries reachable from some roots, the roots included, as a sorted set, and MUST reject a call with no root.
 - **FR-029**: `array_join` MUST join the elements a sparse array holds, in index order, and every helper MUST accept and produce an empty array under `nounset` on Bash 4.3, where `"${empty[@]}"` counts as unset.
+- **FR-030**: Union, intersection and difference MUST drop empty elements, as deduplication does, rather than fail on them.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -233,6 +235,7 @@ fi
 - **IT-020**: Order the library's own module graph, with every non-cyclic edge respected.
 - **IT-021**: Collect the reachable set from a root, walk a cycle without looping, and reject a call with no root.
 - **IT-022**: Join a sparse array with indexes 2, 5 and 9 and verify only its three elements are joined; on Bash 4.3 run each helper on an empty array, and each filter down to an empty result, under `nounset`.
+- **IT-023**: Verify union, intersection, and difference drop empty elements from either array instead of stopping.
 
 ## Acceptance Criteria *(mandatory)*
 

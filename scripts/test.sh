@@ -46,6 +46,11 @@ dybatpho::register_common_handlers
 
 BATS_CMD="${DYBATPHO_DIR}/test/lib/core/bin/bats"
 
+# How many `@test` cases each collected file declares, keyed by its path.
+# `__dybatpho_test_collect_into` counts each file once; the ordering, the chunk
+# packing and the expected total all read it from here.
+declare -A __DYBATPHO_TEST_COUNTS=()
+
 # @description Validator for the option values that must be a worker or chunk
 #   count.
 # @arg $1 string Value to check
@@ -66,29 +71,38 @@ function __dybatpho_test_tty {
 }
 
 # @description Collect the `.bats` files to run, ordered by test count
-#   descending. Bats hands files to its workers in the order it receives them,
-#   so starting the longest file first stops a run from ending with a lone
-#   straggler while every other core sits idle.
+#   descending, and record each file's count in `__DYBATPHO_TEST_COUNTS`. Bats
+#   hands files to its workers in the order it receives them, so starting the
+#   longest file first stops a run from ending with a lone straggler while
+#   every other core sits idle.
+# @arg $1 string Name of the array receiving the file paths
 # @arg $@ path Files or directories; the whole `test/` directory when empty
-# @stdout One file path per line
+# @set The named array, and `__DYBATPHO_TEST_COUNTS`
 # @internal
-function __dybatpho_test_collect {
+function __dybatpho_test_collect_into {
+  local -n _collected="$1"
+  shift
+  local -a _found=()
   local _target _file
-  while read -r _file; do
-    printf '%s\t%s\n' "$(grep -c '^@test' "${_file}" || true)" "${_file}"
-  done < <(
-    if (($#)); then
-      for _target in "$@"; do
-        if [[ -d "${_target}" ]]; then
-          find "${_target}" -maxdepth 1 -name '*.bats' -type f
-        else
-          echo "${_target}"
-        fi
-      done
-    else
-      find "${DYBATPHO_DIR}/test" -maxdepth 1 -name '*.bats' -type f
-    fi
-  ) | sort -rn | cut -f2
+  if (($#)); then
+    for _target in "$@"; do
+      if [[ -d "${_target}" ]]; then
+        mapfile -t -O "${#_found[@]}" _found < <(find "${_target}" -maxdepth 1 -name '*.bats' -type f)
+      else
+        _found+=("${_target}")
+      fi
+    done
+  else
+    mapfile -t _found < <(find "${DYBATPHO_DIR}/test" -maxdepth 1 -name '*.bats' -type f)
+  fi
+  for _file in ${_found[@]+"${_found[@]}"}; do
+    __DYBATPHO_TEST_COUNTS["${_file}"]="$(grep -c '^@test' "${_file}" || true)"
+  done
+  mapfile -t _collected < <(
+    for _file in ${_found[@]+"${_found[@]}"}; do
+      printf '%s\t%s\n' "${__DYBATPHO_TEST_COUNTS["${_file}"]}" "${_file}"
+    done | sort -rn | cut -f2
+  )
 }
 
 # @description Print the names of the functions a module defines, public and
@@ -238,13 +252,213 @@ function __dybatpho_test_pack {
       ((_held[_b] < _chunk)) || continue
       ((_best < 0 || _load[_b] < _load[_best])) && _best="${_b}"
     done
-    _load[_best]=$((_load[_best] + $(grep -c '^@test' "${_file}" || true)))
+    _load[_best]=$((_load[_best] + ${__DYBATPHO_TEST_COUNTS["${_file}"]:-0}))
     _held[_best]=$((_held[_best] + 1))
     _names[_best]+="${_file}"$'\t'
   done
   for ((_b = 0; _b < _bins; _b++)); do
     printf '%s\n' "${_names[_b]%$'\t'}"
   done
+}
+
+# @description Set the colours the report uses, or none when `--no-color`.
+# @noargs
+# @set `__DYBATPHO_TEST_RESET`, `__DYBATPHO_TEST_DIM`, `__DYBATPHO_TEST_RED`,
+#   `__DYBATPHO_TEST_GREEN` and `__DYBATPHO_TEST_BOLD`
+# @internal
+function __dybatpho_test_palette {
+  if [[ "${COLOR}" == "true" ]]; then
+    __DYBATPHO_TEST_RESET=$'\033[0m' __DYBATPHO_TEST_DIM=$'\033[2m'
+    __DYBATPHO_TEST_RED=$'\033[31m' __DYBATPHO_TEST_GREEN=$'\033[32m'
+    __DYBATPHO_TEST_BOLD=$'\033[1m'
+  else
+    __DYBATPHO_TEST_RESET="" __DYBATPHO_TEST_DIM=""
+    __DYBATPHO_TEST_RED="" __DYBATPHO_TEST_GREEN=""
+    __DYBATPHO_TEST_BOLD=""
+  fi
+}
+
+# The steps below read the run's state through Bash's dynamic scope rather
+# than taking a dozen arguments each: `_files`, `_expected`, `_expected_in`,
+# `_run_dir`, `_tap`, `_bats_args`, `_coverage_dir` and `_kcov_source_args`
+# are locals of `__dybatpho_test_run`. What a step hands back goes through a
+# variable the run names.
+
+# @description Run Bats once over every collected file, feeding the live
+#   progress view and keeping the raw TAP for the summary.
+# @noargs
+# @internal
+function __dybatpho_test_bats {
+  # `|| true`: a failing suite has to reach the summary below, and dybatpho
+  # runs with both `errexit` and `pipefail` on.
+  # shellcheck disable=SC2310 # a failing suite has to reach the summary below
+  "${BATS_CMD}" "${_bats_args[@]}" "${_files[@]}" 2>&1 \
+    | tee "${_tap}" | __dybatpho_test_progress "${_expected}" || true
+}
+
+# @description Run Bats under kcov once per chunk of files, so no single kcov
+#   process accumulates trace state for the whole suite, and gather each
+#   chunk's junit report into one.
+# @arg $1 string Name of the array receiving the coverage directory of every chunk
+# @set The named array
+# @internal
+function __dybatpho_test_bats_coverage {
+  local -n _chunk_parts="$1"
+  dybatpho::require "kcov"
+  rm -rf "${_coverage_dir}"
+  mkdir -p "${_coverage_dir}"
+  : > "${_tap}"
+  local _index=0 _part _chunk_out _line
+  local -a _chunk_files
+  # One Bats run per chunk, so each writes its own junit report; they are
+  # concatenated afterwards and summarised as one.
+  local test_pack_output
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  test_pack_output=$(__dybatpho_test_pack "${CHUNK}" "${_files[@]}")
+  while IFS= read -r _line || [[ -n "${_line}" ]]; do
+    IFS=$'\t' read -r -a _chunk_files <<< "${_line}"
+    ((${#_chunk_files[@]})) || continue
+    _part="${_coverage_dir}/part${_index}"
+    _chunk_out="${_run_dir}/chunk${_index}"
+    mkdir -p "${_chunk_out}"
+    # shellcheck disable=SC2310 # a failing suite has to reach the summary below
+    kcov \
+      --clean \
+      --dump-summary \
+      "${_kcov_source_args[@]}" \
+      "${_part}" \
+      "${BATS_CMD}" "${_bats_args[@]/${_run_dir}/${_chunk_out}}" \
+      "${_chunk_files[@]}" \
+      2>&1 | tee -a "${_tap}" | __dybatpho_test_progress "${_expected}" || true
+    _chunk_parts+=("${_part}")
+    _index=$((_index + 1))
+  done < <(printf '%s' "${test_pack_output}")
+  cat "${_run_dir}"/chunk*/report.xml > "${_run_dir}/report.xml" 2> /dev/null
+}
+
+# @description Print the per-file table, the totals, and every failure once.
+#   The table is read back from the junit report rather than the TAP stream:
+#   TAP carries no file attribution, and with `--jobs` the lines from
+#   different files interleave.
+# @arg $1 number Seconds the run took
+# @arg $2 string Name of the variable receiving the number of failed files
+# @arg $3 string Name of the variable receiving the number of tests that never ran
+# @set The two named variables
+# @internal
+function __dybatpho_test_summary {
+  local _elapsed_total="$1"
+  local -n _summary_failed="$2" _summary_missing="$3"
+  local _failed_count=0 _never_ran=0
+  local _reset="${__DYBATPHO_TEST_RESET}" _dim="${__DYBATPHO_TEST_DIM}"
+  local _red="${__DYBATPHO_TEST_RED}" _green="${__DYBATPHO_TEST_GREEN}"
+  local _bold="${__DYBATPHO_TEST_BOLD}"
+  local _files_passed=0 _tests_passed=0 _tests_failed=0
+  local -a _failed_files=()
+  local _name _tests _failures _errors _elapsed _bad _passed _short
+  # The five attributes of one `<testsuite>` element, as tab-separated fields.
+  local _suite_fields='s/.*name="([^"]*)".*tests="([^"]*)".*failures="([^"]*)".*'
+  _suite_fields+='errors="([^"]*)".*time="([^"]*)".*/\1\t\2\t\3\t\4\t\5/'
+
+  printf '\n'
+  if [[ -s "${_run_dir}/report.xml" ]]; then
+    while IFS=$'\t' read -r _name _tests _failures _errors _elapsed; do
+      _bad=$((_failures + _errors))
+      _passed=$((_tests - _bad))
+      _tests_passed=$((_tests_passed + _passed))
+      _tests_failed=$((_tests_failed + _bad))
+      # A file can report fewer tests than it declares when a worker dies
+      # mid-run. Counting the remainder as a clean pass is how that goes
+      # unnoticed, so a shortfall fails the file on its own.
+      _short=0
+      [[ -z "${FILTER}" ]] \
+        && _short=$((${_expected_in["${_name}"]:-_tests} - _tests))
+      if ((_short > 0)); then
+        _failed_count=$((_failed_count + 1))
+        _failed_files+=("${_name}")
+        printf '  %s✘%s %-18s %s%3d passed%s, %s%d never ran%s %s%6.1fs%s\n' \
+          "${_red}" "${_reset}" "${_name}" \
+          "${_dim}" "${_passed}" "${_reset}" \
+          "${_red}" "${_short}" "${_reset}" \
+          "${_dim}" "${_elapsed}" "${_reset}"
+      elif ((_bad == 0)); then
+        _files_passed=$((_files_passed + 1))
+        printf '  %s✔%s %-18s %s%3d passed%s %s%6.1fs%s\n' \
+          "${_green}" "${_reset}" "${_name}" \
+          "${_dim}" "${_passed}" "${_reset}" \
+          "${_dim}" "${_elapsed}" "${_reset}"
+      else
+        _failed_count=$((_failed_count + 1))
+        _failed_files+=("${_name}")
+        printf '  %s✘%s %-18s %s%3d passed%s, %s%d failed%s %s%6.1fs%s\n' \
+          "${_red}" "${_reset}" "${_name}" \
+          "${_dim}" "${_passed}" "${_reset}" \
+          "${_red}" "${_bad}" "${_reset}" \
+          "${_dim}" "${_elapsed}" "${_reset}"
+      fi
+    done < <(
+      grep -o '<testsuite [^>]*>' "${_run_dir}/report.xml" \
+        | sed -E "${_suite_fields}" \
+        | sort
+    )
+  else
+    printf '  %s✘ Bats produced no report — see the output above%s\n' \
+      "${_red}" "${_reset}"
+    _failed_count=1
+  fi
+
+  local _executed=$((_tests_passed + _tests_failed))
+  printf '\n%sFiles%s  %d passed, %d failed, %d total\n' \
+    "${_bold}" "${_reset}" "${_files_passed}" "${_failed_count}" "${#_files[@]}"
+  if [[ -n "${FILTER}" ]]; then
+    printf '%sTests%s  %d passed, %d failed, %d matched %s\n' \
+      "${_bold}" "${_reset}" "${_tests_passed}" "${_tests_failed}" \
+      "${_executed}" "${FILTER}"
+  else
+    printf '%sTests%s  %d passed, %d failed, %d of %d\n' \
+      "${_bold}" "${_reset}" "${_tests_passed}" "${_tests_failed}" \
+      "${_executed}" "${_expected}"
+  fi
+  printf '%sTime%s   %ds\n' "${_bold}" "${_reset}" "${_elapsed_total}"
+
+  # A test that never ran is not a pass. Bats only says so in a warning line
+  # that used to scroll past unnoticed, so it gets its own verdict here.
+  if [[ -z "${FILTER}" ]] && ((_executed < _expected)); then
+    _never_ran=$((_expected - _executed))
+    printf '\n%s%s%d test(s) never ran%s — a worker died or a file failed to load.\n' \
+      "${_bold}" "${_red}" "${_never_ran}" "${_reset}"
+  fi
+
+  # Replayed only when something failed, so a green run stops at the table above
+  # and a red run still shows every assertion message without a second run.
+  if ((${#_failed_files[@]} || _never_ran)); then
+    printf '\n%s%sFailures%s\n\n' "${_bold}" "${_red}" "${_reset}"
+    awk '
+      /^not ok /        { show = 1; sub(/^not ok [0-9]+ /, ""); print "  \xe2\x9c\x98 " $0; next }
+      /^ok /            { show = 0; next }
+      /^1\.\./          { show = 0; next }
+      /^# bats warning/ { print "  " $0; next }
+      show              { print "    " $0 }
+    ' "${_tap}"
+  fi
+  _summary_failed="${_failed_count}"
+  _summary_missing="${_never_ran}"
+}
+
+# @description Merge the per-chunk coverage into `coverage/bats`, the layout
+#   the CI upload step expects, and drop the parts.
+# @arg $@ path Coverage directory of every chunk
+# @internal
+function __dybatpho_test_coverage_merge {
+  local -a _parts=("$@")
+  dybatpho::progress "Merging ${#_parts[@]} coverage part(s)"
+  kcov --merge "${_kcov_source_args[@]}" \
+    "${_coverage_dir}/merged" "${_parts[@]}" > /dev/null
+  rm -rf "${_coverage_dir}/bats"
+  mv "${_coverage_dir}/merged/kcov-merged" "${_coverage_dir}/bats"
+  # Leave only the merged report behind; the per-chunk parts are an
+  # implementation detail and are several times its size.
+  rm -rf "${_coverage_dir}/merged" "${_parts[@]}"
+  dybatpho::success "Coverage written to ${_coverage_dir}/bats"
 }
 
 # This function declares no command line; it names `dybatpho::opts::setup`
@@ -256,18 +470,8 @@ function __dybatpho_test_pack {
 # @exitcode 1 Otherwise
 # @internal
 function __dybatpho_test_run {
-  if [[ "${COLOR}" == "true" ]]; then
-    __DYBATPHO_TEST_RESET=$'\033[0m' __DYBATPHO_TEST_DIM=$'\033[2m'
-    __DYBATPHO_TEST_RED=$'\033[31m' __DYBATPHO_TEST_GREEN=$'\033[32m'
-    __DYBATPHO_TEST_BOLD=$'\033[1m'
-  else
-    __DYBATPHO_TEST_RESET="" __DYBATPHO_TEST_DIM=""
-    __DYBATPHO_TEST_RED="" __DYBATPHO_TEST_GREEN=""
-    __DYBATPHO_TEST_BOLD=""
-  fi
+  __dybatpho_test_palette
   local _reset="${__DYBATPHO_TEST_RESET}" _dim="${__DYBATPHO_TEST_DIM}"
-  local _red="${__DYBATPHO_TEST_RED}" _green="${__DYBATPHO_TEST_GREEN}"
-  local _bold="${__DYBATPHO_TEST_BOLD}"
 
   # `dybatpho::opts::setup` collects the positional arguments into an array, so
   # a path containing a space reaches the collector as one target.
@@ -282,14 +486,14 @@ function __dybatpho_test_run {
     fi
   fi
 
-  local -a _files
-  mapfile -t _files < <(__dybatpho_test_collect ${_targets[@]+"${_targets[@]}"})
+  local -a _files=()
+  __dybatpho_test_collect_into _files ${_targets[@]+"${_targets[@]}"}
   ((${#_files[@]})) || dybatpho::die "No test files found"
 
   local -A _expected_in
   local _expected=0 _file _count
   for _file in "${_files[@]}"; do
-    _count="$(grep -c '^@test' "${_file}" || true)"
+    _count="${__DYBATPHO_TEST_COUNTS["${_file}"]}"
     _expected_in["$(basename "${_file}")"]="${_count}"
     _expected=$((_expected + _count))
   done
@@ -322,157 +526,25 @@ function __dybatpho_test_run {
     "${value}" \
     "${_reset}"
 
-  local _start="${SECONDS}"
+  local _coverage_dir="${DYBATPHO_DIR}/coverage"
+  local -a _kcov_source_args=(
+    --include-path="${DYBATPHO_DIR}/init.sh,${DYBATPHO_DIR}/src"
+    --strip-path="${DYBATPHO_DIR}"
+    --exclude-line="# kcov(skip)"
+    --exclude-region="# kcov(disabled):# kcov(enabled)"
+  )
   local -a _parts=()
+  local _start="${SECONDS}"
   if [[ "${COVERAGE}" == "true" ]]; then
-    dybatpho::require "kcov"
-    local _coverage_dir="${DYBATPHO_DIR}/coverage"
-    rm -rf "${_coverage_dir}"
-    mkdir -p "${_coverage_dir}"
-    local -a _kcov_source_args=(
-      --include-path="${DYBATPHO_DIR}/init.sh,${DYBATPHO_DIR}/src"
-      --strip-path="${DYBATPHO_DIR}"
-      --exclude-line="# kcov(skip)"
-      --exclude-region="# kcov(disabled):# kcov(enabled)"
-    )
-    : > "${_tap}"
-    local _index=0 _part _chunk_out _line
-    local -a _chunk_files
-    # One Bats run per chunk, so each writes its own junit report; they are
-    # concatenated afterwards and summarised as one.
-    local test_pack_output
-    test_pack_output=$(__dybatpho_test_pack "${CHUNK}" "${_files[@]}")
-    while IFS= read -r _line || [[ -n "${_line}" ]]; do
-      IFS=$'\t' read -r -a _chunk_files <<< "${_line}"
-      ((${#_chunk_files[@]})) || continue
-      _part="${_coverage_dir}/part${_index}"
-      _chunk_out="${_run_dir}/chunk${_index}"
-      mkdir -p "${_chunk_out}"
-      # shellcheck disable=SC2310 # a failing suite has to reach the summary below
-      kcov \
-        --clean \
-        --dump-summary \
-        "${_kcov_source_args[@]}" \
-        "${_part}" \
-        "${BATS_CMD}" "${_bats_args[@]/${_run_dir}/${_chunk_out}}" \
-        "${_chunk_files[@]}" \
-        2>&1 | tee -a "${_tap}" | __dybatpho_test_progress "${_expected}" || true
-      _parts+=("${_part}")
-      _index=$((_index + 1))
-    done < <(printf '%s' "${test_pack_output}")
-    cat "${_run_dir}"/chunk*/report.xml > "${_run_dir}/report.xml" 2> /dev/null
+    __dybatpho_test_bats_coverage _parts
   else
-    # `|| true`: a failing suite has to reach the summary below, and dybatpho
-    # runs with both `errexit` and `pipefail` on.
-    # shellcheck disable=SC2310 # a failing suite has to reach the summary below
-    "${BATS_CMD}" "${_bats_args[@]}" "${_files[@]}" 2>&1 \
-      | tee "${_tap}" | __dybatpho_test_progress "${_expected}" || true
-  fi
-  local _elapsed_total=$((SECONDS - _start))
-
-  # Read the per-file table back from the junit report rather than the TAP
-  # stream: TAP carries no file attribution, and with `--jobs` the lines from
-  # different files interleave.
-  local _files_passed=0 _files_failed=0 _tests_passed=0 _tests_failed=0
-  local -a _failed_files=()
-  local _name _tests _failures _errors _elapsed _bad _passed _short
-  # The five attributes of one `<testsuite>` element, as tab-separated fields.
-  local _suite_fields='s/.*name="([^"]*)".*tests="([^"]*)".*failures="([^"]*)".*'
-  _suite_fields+='errors="([^"]*)".*time="([^"]*)".*/\1\t\2\t\3\t\4\t\5/'
-
-  printf '\n'
-  if [[ -s "${_run_dir}/report.xml" ]]; then
-    while IFS=$'\t' read -r _name _tests _failures _errors _elapsed; do
-      _bad=$((_failures + _errors))
-      _passed=$((_tests - _bad))
-      _tests_passed=$((_tests_passed + _passed))
-      _tests_failed=$((_tests_failed + _bad))
-      # A file can report fewer tests than it declares when a worker dies
-      # mid-run. Counting the remainder as a clean pass is how that goes
-      # unnoticed, so a shortfall fails the file on its own.
-      _short=0
-      [[ -z "${FILTER}" ]] \
-        && _short=$((${_expected_in["${_name}"]:-_tests} - _tests))
-      if ((_short > 0)); then
-        _files_failed=$((_files_failed + 1))
-        _failed_files+=("${_name}")
-        printf '  %s✘%s %-18s %s%3d passed%s, %s%d never ran%s %s%6.1fs%s\n' \
-          "${_red}" "${_reset}" "${_name}" \
-          "${_dim}" "${_passed}" "${_reset}" \
-          "${_red}" "${_short}" "${_reset}" \
-          "${_dim}" "${_elapsed}" "${_reset}"
-      elif ((_bad == 0)); then
-        _files_passed=$((_files_passed + 1))
-        printf '  %s✔%s %-18s %s%3d passed%s %s%6.1fs%s\n' \
-          "${_green}" "${_reset}" "${_name}" \
-          "${_dim}" "${_passed}" "${_reset}" \
-          "${_dim}" "${_elapsed}" "${_reset}"
-      else
-        _files_failed=$((_files_failed + 1))
-        _failed_files+=("${_name}")
-        printf '  %s✘%s %-18s %s%3d passed%s, %s%d failed%s %s%6.1fs%s\n' \
-          "${_red}" "${_reset}" "${_name}" \
-          "${_dim}" "${_passed}" "${_reset}" \
-          "${_red}" "${_bad}" "${_reset}" \
-          "${_dim}" "${_elapsed}" "${_reset}"
-      fi
-    done < <(
-      grep -o '<testsuite [^>]*>' "${_run_dir}/report.xml" \
-        | sed -E "${_suite_fields}" \
-        | sort
-    )
-  else
-    printf '  %s✘ Bats produced no report — see the output above%s\n' \
-      "${_red}" "${_reset}"
-    _files_failed=1
+    __dybatpho_test_bats
   fi
 
-  local _executed=$((_tests_passed + _tests_failed))
-  printf '\n%sFiles%s  %d passed, %d failed, %d total\n' \
-    "${_bold}" "${_reset}" "${_files_passed}" "${_files_failed}" "${#_files[@]}"
-  if [[ -n "${FILTER}" ]]; then
-    printf '%sTests%s  %d passed, %d failed, %d matched %s\n' \
-      "${_bold}" "${_reset}" "${_tests_passed}" "${_tests_failed}" \
-      "${_executed}" "${FILTER}"
-  else
-    printf '%sTests%s  %d passed, %d failed, %d of %d\n' \
-      "${_bold}" "${_reset}" "${_tests_passed}" "${_tests_failed}" \
-      "${_executed}" "${_expected}"
-  fi
-  printf '%sTime%s   %ds\n' "${_bold}" "${_reset}" "${_elapsed_total}"
-
-  # A test that never ran is not a pass. Bats only says so in a warning line
-  # that used to scroll past unnoticed, so it gets its own verdict here.
-  local _missing=0
-  if [[ -z "${FILTER}" ]] && ((_executed < _expected)); then
-    _missing=$((_expected - _executed))
-    printf '\n%s%s%d test(s) never ran%s — a worker died or a file failed to load.\n' \
-      "${_bold}" "${_red}" "${_missing}" "${_reset}"
-  fi
-
-  # Replayed only when something failed, so a green run stops at the table above
-  # and a red run still shows every assertion message without a second run.
-  if ((${#_failed_files[@]} || _missing)); then
-    printf '\n%s%sFailures%s\n\n' "${_bold}" "${_red}" "${_reset}"
-    awk '
-      /^not ok /        { show = 1; sub(/^not ok [0-9]+ /, ""); print "  \xe2\x9c\x98 " $0; next }
-      /^ok /            { show = 0; next }
-      /^1\.\./          { show = 0; next }
-      /^# bats warning/ { print "  " $0; next }
-      show              { print "    " $0 }
-    ' "${_tap}"
-  fi
-
+  local _files_failed _missing
+  __dybatpho_test_summary "$((SECONDS - _start))" _files_failed _missing
   if [[ "${COVERAGE}" == "true" ]]; then
-    dybatpho::progress "Merging ${#_parts[@]} coverage part(s)"
-    kcov --merge "${_kcov_source_args[@]}" \
-      "${_coverage_dir}/merged" "${_parts[@]}" > /dev/null
-    rm -rf "${_coverage_dir}/bats"
-    mv "${_coverage_dir}/merged/kcov-merged" "${_coverage_dir}/bats"
-    # Leave only the merged report behind; the per-chunk parts are an
-    # implementation detail and are several times its size.
-    rm -rf "${_coverage_dir}/merged" "${_parts[@]}"
-    dybatpho::success "Coverage written to ${_coverage_dir}/bats"
+    __dybatpho_test_coverage_merge "${_parts[@]}"
   fi
 
   if ((_files_failed || _missing)); then

@@ -56,7 +56,7 @@ __dybatpho_csv_unit=$'\037'
 #######################################
 function __dybatpho_csv_delimiter_into {
   local -n __dybatpho_csv_delim_ref="$1"
-  local __dybatpho_csv_wanted="$2"
+  local __dybatpho_csv_wanted="$2" __dybatpho_csv_caller="${3:-${FUNCNAME[1]}}"
 
   case "${__dybatpho_csv_wanted}" in
     tab | '\t') __dybatpho_csv_wanted=$'\t' ;;
@@ -82,7 +82,8 @@ function __dybatpho_csv_delimiter_into {
   if [[ -n "${__dybatpho_csv_problem}" ]]; then
     local __dybatpho_csv_shown                                              # kcov(skip)
     printf -v __dybatpho_csv_shown '%q' "${__dybatpho_csv_wanted}"          # kcov(skip)
-    dybatpho::die "${FUNCNAME[1]}: Invalid delimiter ${__dybatpho_csv_shown}: ${__dybatpho_csv_problem}" # kcov(skip)
+    __dybatpho_csv_problem="Invalid delimiter ${__dybatpho_csv_shown}: ${__dybatpho_csv_problem}" # kcov(skip)
+    dybatpho::die "${__dybatpho_csv_caller}: ${__dybatpho_csv_problem}"                       # kcov(skip)
   fi
   __dybatpho_csv_delim_ref="${__dybatpho_csv_wanted}"
 }
@@ -94,19 +95,20 @@ function __dybatpho_csv_delimiter_into {
 #   choosing a different function for each.
 # @arg $1 string Name of the variable receiving the text
 # @arg $2 string File path, `-`, or CSV text
+# @arg $3 string Name the unit-separator refusal is reported under
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_csv_input_into {
   local -n __dybatpho_csv_input_ref="$1"
-  local __dybatpho_csv_source="$2"
+  local __dybatpho_csv_source="$2" __dybatpho_csv_who="${3:-${FUNCNAME[2]:-${FUNCNAME[0]}}}"
 
   __dybatpho_string_input_into __dybatpho_csv_input_ref "${__dybatpho_csv_source}" files
 
   local __dybatpho_csv_reason="The input contains the ASCII unit separator,"
   __dybatpho_csv_reason+=" which this module uses to join a record's fields"
   [[ "${__dybatpho_csv_input_ref}" != *"${__dybatpho_csv_unit}"* ]] || dybatpho::die \
-    "${FUNCNAME[2]:-${FUNCNAME[0]}}: ${__dybatpho_csv_reason}"
+    "${__dybatpho_csv_who}: ${__dybatpho_csv_reason}"
 }
 
 #######################################
@@ -292,6 +294,27 @@ function __dybatpho_csv_header_into {
 }
 
 #######################################
+# @description Read a public function's input the way every reader in this
+#   module starts: resolve the delimiter, read the input, parse it into
+#   records, and split the header into column names.
+#   Errors are reported under the public function that called this.
+# @arg $1 string Name of the array receiving the records
+# @arg $2 string Name of the array receiving the header's column names, empty for empty input
+# @arg $3 string Name of the variable receiving the delimiter
+# @arg $4 string File path, `-` for stdin, or CSV text
+# @set The three named variables
+# @internal
+#######################################
+function __dybatpho_csv_load_into {
+  local __dybatpho_csv_load_text
+  __dybatpho_csv_delimiter_into "$3" "${DYBATPHO_CSV_DELIMITER}" "${FUNCNAME[1]}"
+  __dybatpho_csv_input_into __dybatpho_csv_load_text "$4" "${FUNCNAME[2]:-__dybatpho_csv_input_into}"
+  local -n __dybatpho_csv_load_delim="$3"
+  __dybatpho_csv_parse_into "$1" "${__dybatpho_csv_load_text}" "${__dybatpho_csv_load_delim}"
+  __dybatpho_csv_header_into "$2" "$1"
+}
+
+#######################################
 # @description Split a record on the unit separator into a named array.
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string One record
@@ -310,32 +333,6 @@ function __dybatpho_csv_split_fields_into {
     __dybatpho_csv_remaining="${__dybatpho_csv_remaining#*"${__dybatpho_csv_unit}"}"
   done
   __dybatpho_csv_parts_ref+=("${__dybatpho_csv_remaining}")
-}
-
-#######################################
-# @description Resolve a column name to its index, into a named variable.
-# @arg $1 string Name of the variable receiving the index
-# @arg $2 string Name of the array of header names
-# @arg $3 string Column name
-# @set The named variable
-# @internal
-#######################################
-function __dybatpho_csv_column_into {
-  local -n __dybatpho_csv_index_ref="$1"
-  local -n __dybatpho_csv_names_ref="$2"
-  local __dybatpho_csv_wanted="$3"
-  local __dybatpho_csv_at
-
-  for __dybatpho_csv_at in "${!__dybatpho_csv_names_ref[@]}"; do
-    if [[ "${__dybatpho_csv_names_ref[${__dybatpho_csv_at}]}" == "${__dybatpho_csv_wanted}" ]]; then
-      __dybatpho_csv_index_ref="${__dybatpho_csv_at}"
-      return 0
-    fi
-  done
-
-  local __dybatpho_csv_complaint="No such column: ${__dybatpho_csv_wanted}."
-  __dybatpho_csv_complaint+=" The header has: ${__dybatpho_csv_names_ref[*]}"
-  dybatpho::die "${FUNCNAME[1]}: ${__dybatpho_csv_complaint}"
 }
 
 #######################################
@@ -477,26 +474,23 @@ function dybatpho::csv_header {
   dybatpho::expect_args input -- "$@"
 
   local -a records=() names=()
-  local text
   local delimiter
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  __dybatpho_csv_load_into records names delimiter "${input}"
   ((${#records[@]})) || return 0
 
-  __dybatpho_csv_header_into names records
   printf '%s\n' "${names[@]}"
 }
 
 #######################################
-# @description Print one column's values, chosen by its header name.
+# @description Print one column's values, chosen by its header name or by its
+#   1-based position when no header carries that name.
 #   A row shorter than the header reads as an empty value, and a row longer
 #   than the header stops the script rather than dropping the extra field.
 # @arg $1 string CSV file path, `-` for stdin, or CSV text
-# @arg $2 string Column name
+# @arg $2 string Column: header name, or 1-based position
 # @stdout One value per line, excluding the header
 # @exitcode 0 The column was printed
-# @exitcode 1 No column has that name, or a row has more fields than the header
+# @exitcode 1 No column has that name or position, or a row has more fields than the header
 # @tip A value containing a line break spans lines here; read through
 #   `dybatpho::csv_read` when every value has to stay one item
 # @example
@@ -507,15 +501,12 @@ function dybatpho::csv_col {
   dybatpho::expect_args input column -- "$@"
 
   local -a records=() names=() fields=()
-  local text index at
+  local index at
   local delimiter
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  __dybatpho_csv_load_into records names delimiter "${input}"
   ((${#records[@]})) || return 0
 
-  __dybatpho_csv_header_into names records
-  __dybatpho_csv_column_into index names "${column}"
+  __dybatpho_csv_pick_into index names "${column}"
 
   for ((at = 1; at < ${#records[@]}; at++)); do
     __dybatpho_csv_split_fields_into fields "${records[${at}]}"
@@ -546,14 +537,11 @@ function dybatpho::csv_select {
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Name at least one column to keep"
 
   local -a records=() names=() fields=() picks=() chosen=() kept=()
-  local text delimiter column index at pick
+  local delimiter column index at pick
   local IFS
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  __dybatpho_csv_load_into records names delimiter "${input}"
   ((${#records[@]})) || return 0
 
-  __dybatpho_csv_header_into names records
   for column in "$@"; do
     __dybatpho_csv_pick_into index names "${column}"
     picks+=("${index}")
@@ -612,13 +600,10 @@ function dybatpho::csv_sort {
   esac
 
   local -a records=() names=() fields=() keys=() order_of=() sorted=()
-  local text delimiter index at key
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  local delimiter index at key
+  __dybatpho_csv_load_into records names delimiter "${input}"
   ((${#records[@]})) || return 0
 
-  __dybatpho_csv_header_into names records
   __dybatpho_csv_pick_into index names "${column}"
 
   local all_numbers=1
@@ -669,9 +654,9 @@ function dybatpho::csv_sort {
 #   into rows nobody meant to relate.
 # @arg $1 string Left CSV: file path, `-` for stdin, or CSV text
 # @arg $2 string Right CSV: file path, `-` for stdin, or CSV text
-# @arg $3 string Key column name in the left input
+# @arg $3 string Key column in the left input: header name, or 1-based position
 # @arg $4 string Join type: `inner` (default) or `left`
-# @arg $5 string Key column name in the right input, default is the left one
+# @arg $5 string Key column in the right input, the same way, default is the left one
 # @stdout CSV text: the joined header, then the joined rows
 # @exitcode 0 The inputs were joined
 # @exitcode 1 An unknown join type or key column, both inputs read from stdin, or a row wider than its header
@@ -697,21 +682,16 @@ function dybatpho::csv_join {
     || dybatpho::die "${FUNCNAME[0]}: Only one input can be read from stdin" # kcov(skip)
 
   local -a left=() right=() left_names=() right_names=() fields=() extra=() joined=()
-  local text delimiter left_index right_index at value row
+  local delimiter left_index right_index at value row
   local -A matches=()
   local IFS
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${left_input}"
-  __dybatpho_csv_parse_into left "${text}" "${delimiter}"
-  __dybatpho_csv_input_into text "${right_input}"
-  __dybatpho_csv_parse_into right "${text}" "${delimiter}"
+  __dybatpho_csv_load_into left left_names delimiter "${left_input}"
+  __dybatpho_csv_load_into right right_names delimiter "${right_input}"
   ((${#left[@]})) || return 0
 
-  __dybatpho_csv_header_into left_names left
-  __dybatpho_csv_column_into left_index left_names "${key}"
-  __dybatpho_csv_header_into right_names right
+  __dybatpho_csv_pick_into left_index left_names "${key}"
   ((${#right[@]})) || right_names=("${right_key}")
-  __dybatpho_csv_column_into right_index right_names "${right_key}"
+  __dybatpho_csv_pick_into right_index right_names "${right_key}"
 
   # Index the right rows by key, keeping every match in input order.
   local -a right_rest=()
@@ -888,7 +868,7 @@ function __dybatpho_csv_expect_width {
 #   otherwise, so a version column sorts the way a reader expects and a size
 #   column the way arithmetic does.
 # @arg $1 string CSV file path, `-` for stdin, or CSV text
-# @arg $2 string Column name
+# @arg $2 string Column: header name, or 1-based position
 # @arg $3 string Operator: `eq`, `ne`, `gt`, `lt`, or `contains`
 # @arg $4 string Value to compare against
 # @stdout CSV text: the header, then the matching rows
@@ -911,15 +891,12 @@ function dybatpho::csv_filter {
   esac
 
   local -a records=() names=() fields=() kept=()
-  local text index at
+  local index at
   local delimiter
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  __dybatpho_csv_load_into records names delimiter "${input}"
   ((${#records[@]})) || return 0
 
-  __dybatpho_csv_header_into names records
-  __dybatpho_csv_column_into index names "${column}"
+  __dybatpho_csv_pick_into index names "${column}"
   kept=("${records[0]}")
 
   for ((at = 1; at < ${#records[@]}; at++)); do
@@ -986,18 +963,15 @@ function dybatpho::csv_to_json {
   __dybatpho_csv_need_json
 
   local -a records=() names=() fields=()
-  local text at index object document="" name_json value_json
+  local at index object document="" name_json value_json
   local delimiter
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into records "${text}" "${delimiter}"
+  __dybatpho_csv_load_into records names delimiter "${input}"
 
   if ((${#records[@]} == 0)); then
     printf '[]\n'
     return 0
   fi
 
-  __dybatpho_csv_header_into names records
   for ((at = 1; at < ${#records[@]}; at++)); do
     __dybatpho_csv_split_fields_into fields "${records[${at}]}"
     __dybatpho_csv_expect_width fields names "${at}"

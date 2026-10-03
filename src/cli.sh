@@ -798,6 +798,74 @@ function __dybatpho_cli_config_get {
 }
 
 #######################################
+# @description Record one switch of an option on the first pass over its spec:
+#   the long switch becomes the label shown in help unless a long one is
+#   already there, and a short one joins the cluster of short flags or
+#   parameters the parser accepts.
+#   `alias:`, each name in `aliases:`, and a bare switch all go through here,
+#   so the three spellings of the same switch cannot drift apart.
+# @arg $1 bool Whether the option takes an argument
+# @arg $2 string Switch, such as `-v` or `--verbose`
+# @exitcode 1 Stop the script when the switch is neither `-x` nor `--name`
+# @internal
+#######################################
+function __dybatpho_cli_label_switch {
+  case $2 in
+    --*)
+      if [[ -z "${__label}" ]] || [[ "${__label#--}" == "${__label}" ]]; then
+        __label="$2"
+      fi
+      ;;
+    -?)
+      [[ -n "${__label}" ]] || __label="$2"
+      if dybatpho::is true "$1"; then
+        __params="${__params}${2#-}"
+      else
+        __flags="${__flags}${2#-}"
+      fi
+      ;;
+    *)
+      local __switch_error # kcov(skip)
+      __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias \
+        "Invalid switch alias: $2" "alias=$2") # kcov(skip)
+      dybatpho::die "${__switch_error}"         # kcov(skip)
+      ;;
+  esac
+}
+
+#######################################
+# @description Add one switch of an option to the `case` pattern the generated
+#   parser matches, on the second pass over its spec. `--{no-}name` expands to
+#   `--name` and `--no-name`, and `--with{out}-name` to `--with-name` and
+#   `--without-name`.
+#   `alias:`, each name in `aliases:`, and a bare switch all go through here,
+#   so the three spellings of the same switch cannot drift apart.
+# @arg $1 string Switch, such as `-v`, `--verbose` or `--{no-}color`
+# @exitcode 1 Stop the script when the switch is neither `-x` nor `--name`
+# @internal
+#######################################
+function __dybatpho_cli_case_switch {
+  local __switch_name
+  case $1 in
+    --\{no-\}*)
+      __switch_name=${1#--?no-?}
+      __dybatpho_cli_add_switch "'--${__switch_name}'|'--no-${__switch_name}'"
+      ;;
+    --with\{out\}-*)
+      __switch_name=${1#--*-}
+      __dybatpho_cli_add_switch "'--with-${__switch_name}'|'--without-${__switch_name}'"
+      ;;
+    -? | --*) __dybatpho_cli_add_plain_switch "$1" ;;
+    *)
+      local __switch_error # kcov(skip)
+      __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias \
+        "Invalid switch alias: $1" "alias=$1") # kcov(skip)
+      dybatpho::die "${__switch_error}"         # kcov(skip)
+      ;;
+  esac
+}
+
+#######################################
 # @description Parse options with a spec from `dybatpho::opts::flag`,
 #              `dybatpho::opts::param`
 # @arg $1 bool Flag that defined option that take argument in spec
@@ -809,7 +877,6 @@ function __dybatpho_cli_config_get {
 function __dybatpho_cli_parse_opt {
   local need_argument=$1
   local skip_meta=$2
-  local i
   shift 2
 
   # `negatable:` and `count:` change how the switches that precede them in the
@@ -841,65 +908,17 @@ function __dybatpho_cli_parse_opt {
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
-        alias:*)
-          case ${1#alias:} in
-            --*)
-              if [[ -z "${__label}" ]] || [[ "${__label#--}" == "${__label}" ]]; then
-                __label="${1#alias:}"
-              fi
-              ;;
-            -?)
-              [[ -n "${__label}" ]] || __label="${1#alias:}"
-              local __alias_switch="${1#alias:}"
-              dybatpho::is true "${need_argument}" \
-                && __params="${__params}${__alias_switch#-}" \
-                || __flags="${__flags}${__alias_switch#-}"
-              ;;
-            *)
-              local __alias_error
-              __alias_error=$(__dybatpho_log_text cli.invalid_switch_alias \
-                "Invalid switch alias: ${1#alias:}" "alias=${1#alias:}")
-              dybatpho::die "${__alias_error}" # kcov(skip)
-              ;;
-          esac
-          ;;
+        alias:*) __dybatpho_cli_label_switch "${need_argument}" "${1#alias:}" ;;
         aliases:*)
           local -a __opt_aliases=()
           local __opt_alias
           __dybatpho_cli_parse_alias_list __opt_aliases "${1#aliases:}"
           for __opt_alias in "${__opt_aliases[@]}"; do
-            case ${__opt_alias} in
-              --*)
-                if [[ -z "${__label}" ]] || [[ "${__label#--}" == "${__label}" ]]; then
-                  __label="${__opt_alias}"
-                fi
-                ;;
-              -?)
-                [[ -n "${__label}" ]] || __label="${__opt_alias}"
-                dybatpho::is true "${need_argument}" \
-                  && __params="${__params}${__opt_alias#-}" \
-                  || __flags="${__flags}${__opt_alias#-}"
-                ;;
-              *)
-                local log_text
-                log_text=$(__dybatpho_log_text cli.invalid_switch_alias "Invalid switch alias: ${__opt_alias}" "alias=${__opt_alias}")
-                dybatpho::die "${log_text}" # kcov(skip)
-                ;;
-            esac
+            __dybatpho_cli_label_switch "${need_argument}" "${__opt_alias}"
           done
           ;;
         [!-]*) __dybatpho_cli_parse_key_value "$1" "__" ;;
-        --*)
-          if [[ -z "${__label}" ]] || [[ "${__label#--}" == "${__label}" ]]; then
-            __label="$1"
-          fi
-          ;;
-        -?)
-          [[ -n "${__label}" ]] || __label="$1"
-          dybatpho::is true "${need_argument}" \
-            && __params="${__params}${1#-}" \
-            || __flags="${__flags}${1#-}"
-          ;;
+        --* | -?) __dybatpho_cli_label_switch "${need_argument}" "$1" ;;
         *) ;;
       esac
       shift
@@ -912,58 +931,16 @@ function __dybatpho_cli_parse_opt {
     shift "${skip_meta}"
     while (($#)); do
       case $1 in
-        alias:*)
-          case ${1#alias:} in
-            --\{no-\}*)
-              i=${1#alias:--?no-?}
-              __dybatpho_cli_add_switch "'--${i}'|'--no-${i}'"
-              ;;
-            --with\{out\}-*)
-              i=${1#alias:--*-}
-              __dybatpho_cli_add_switch "'--with-${i}'|'--without-${i}'"
-              ;;
-            -? | --*) __dybatpho_cli_add_plain_switch "${1#alias:}" ;;
-            *)
-              local __alias_message # kcov(skip)
-              __alias_message=$(__dybatpho_log_text cli.invalid_switch_alias \
-                "Invalid switch alias: ${1#alias:}" "alias=${1#alias:}") # kcov(skip)
-              dybatpho::die "${__alias_message}"                         # kcov(skip)
-              ;;
-          esac
-          ;;
+        alias:*) __dybatpho_cli_case_switch "${1#alias:}" ;;
         aliases:*)
           local -a __opt_aliases=()
           local __opt_alias
           __dybatpho_cli_parse_alias_list __opt_aliases "${1#aliases:}"
           for __opt_alias in "${__opt_aliases[@]}"; do
-            case ${__opt_alias} in
-              --\{no-\}*)
-                i=${__opt_alias#--?no-?}
-                __dybatpho_cli_add_switch "'--${i}'|'--no-${i}'"
-                ;;
-              --with\{out\}-*)
-                i=${__opt_alias#--*-}
-                __dybatpho_cli_add_switch "'--with-${i}'|'--without-${i}'"
-                ;;
-              -? | --*) __dybatpho_cli_add_plain_switch "${__opt_alias}" ;;
-              *)
-                local __opt_alias_message # kcov(skip)
-                __opt_alias_message=$(__dybatpho_log_text cli.invalid_switch_alias \
-                  "Invalid switch alias: ${__opt_alias}" "alias=${__opt_alias}") # kcov(skip)
-                dybatpho::die "${__opt_alias_message}"                           # kcov(skip)
-                ;;
-            esac
+            __dybatpho_cli_case_switch "${__opt_alias}"
           done
           ;;
-        --\{no-\}*)
-          i=${1#--?no-?}
-          __dybatpho_cli_add_switch "'--${i}'|'--no-${i}'"
-          ;;
-        --with\{out\}-*)
-          i=${1#--*-}
-          __dybatpho_cli_add_switch "'--with-${i}'|'--without-${i}'"
-          ;;
-        -? | --*) __dybatpho_cli_add_plain_switch "$1" ;;
+        --\{no-\}* | --with\{out\}-* | -? | --*) __dybatpho_cli_case_switch "$1" ;;
         *) __dybatpho_cli_parse_key_value "$1" "__" ;;
       esac
       shift

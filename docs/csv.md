@@ -39,7 +39,7 @@ Data containing that byte is rejected rather than silently re-split.
 - [`dybatpho::csv_write`](#dybatphocsv_write) — Serialize records back to CSV. A field is quoted only when it has to be: when it contains the delimiter, a quote, or a line break.
 - [`dybatpho::csv_convert`](#dybatphocsv_convert) — Rewrite CSV with another delimiter. The input is read with `DYBATPHO_CSV_DELIMITER` and written with the delimiter given, quoting each field for the delimiter it is written with: a comma inside a value no longer needs quotes in a TSV file, and a tab inside one does. This is how a comma-separated export becomes TSV, or a semicolon-separated one becomes plain CSV.
 - [`dybatpho::csv_header`](#dybatphocsv_header) — Print the column names from the first record.
-- [`dybatpho::csv_col`](#dybatphocsv_col) — Print one column's values, chosen by its header name. A row shorter than the header reads as an empty value, and a row longer than the header stops the script rather than dropping the extra field.
+- [`dybatpho::csv_col`](#dybatphocsv_col) — Print one column's values, chosen by its header name or by its 1-based position when no header carries that name. A row shorter than the header reads as an empty value, and a row longer than the header stops the script rather than dropping the extra field.
 - [`dybatpho::csv_select`](#dybatphocsv_select) — Print chosen columns, in the order given, as CSV with the header. A column is named by its header, or by its position counting from `1` when no header carries that name, so `3` picks the third column unless a column is literally called `3`. A column may be chosen more than once, and a row shorter than the header reads as empty values.
 - [`dybatpho::csv_sort`](#dybatphocsv_sort) — Sort the data rows by one column and print them as CSV with the header first. The sort is stable, so rows with equal keys keep their input order, and it happens in Bash rather than through `sort`, because a value may hold a line break. `auto` compares as numbers when every non-empty value in the column is one, and as text otherwise; text compares byte by byte, the same on every machine whatever its locale. An empty value sorts last in either direction, so blanks never push the rows that matter off the top.
 - [`dybatpho::csv_join`](#dybatphocsv_join) — Join two CSV inputs on a key column and print the result as CSV. The output header is every left column followed by every right column except the right key, which would repeat the left one. Rows come out in the left input's order, and a left row matching several right rows gives one output row per match, in the right input's order, the way SQL does. `inner` keeps only the left rows with a match; `left` keeps every left row and leaves the right columns empty where nothing matched. An empty key matches nothing, the way SQL's `NULL` does, so blank cells never pair up into rows nobody meant to relate.
@@ -229,7 +229,8 @@ dybatpho::csv_header report.csv
 
 ### `dybatpho::csv_col`
 
-Print one column's values, chosen by its header name.
+Print one column's values, chosen by its header name or by its
+1-based position when no header carries that name.
 A row shorter than the header reads as an empty value, and a row longer
 than the header stops the script rather than dropping the extra field.
 
@@ -244,7 +245,7 @@ dybatpho::csv_col report.csv "Region"
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | CSV file path, `-` for stdin, or CSV text |
-| `$2` | string | Column name |
+| `$2` | string | Column: header name, or 1-based position |
 
 **📤 Output on stdout**
 
@@ -253,7 +254,7 @@ dybatpho::csv_col report.csv "Region"
 **🚦 Exit codes**
 
 - `0`: The column was printed
-- `1`: No column has that name, or a row has more fields than the header
+- `1`: No column has that name or position, or a row has more fields than the header
 
 
 ---
@@ -357,9 +358,9 @@ dybatpho::csv_join services.csv costs.csv service left name
 | --- | --- | --- |
 | `$1` | string | Left CSV: file path, `-` for stdin, or CSV text |
 | `$2` | string | Right CSV: file path, `-` for stdin, or CSV text |
-| `$3` | string | Key column name in the left input |
+| `$3` | string | Key column in the left input: header name, or 1-based position |
 | `$4` | string | Join type: `inner` (default) or `left` |
-| `$5` | string | Key column name in the right input, default is the left one |
+| `$5` | string | Key column in the right input, the same way, default is the left one |
 
 **📤 Output on stdout**
 
@@ -392,7 +393,7 @@ dybatpho::csv_filter billing.csv "Cost" gt 100
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | CSV file path, `-` for stdin, or CSV text |
-| `$2` | string | Column name |
+| `$2` | string | Column: header name, or 1-based position |
 | `$3` | string | Operator: `eq`, `ne`, `gt`, `lt`, or `contains` |
 | `$4` | string | Value to compare against |
 

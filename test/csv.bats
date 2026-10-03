@@ -749,3 +749,24 @@ EOF
   assert_success
   assert_line --index 1 '[{"name":"ada"}]'
 }
+
+@test "dybatpho::csv_col, csv_filter and csv_join take a column by position too" {
+  local services=$'service,team,cost\napi,core,12\nweb,edge,7\n'
+  local owners=$'team,owner\ncore,ann\nedge,bob\n'
+
+  run_traced dybatpho::csv_col "${services}" 3
+  assert_success
+  assert_output "$(printf '12\n7')"
+
+  run_traced dybatpho::csv_filter "${services}" 2 eq edge
+  assert_success
+  assert_output "$(printf 'service,team,cost\nweb,edge,7')"
+
+  run_traced dybatpho::csv_join "${services}" "${owners}" 2 inner 1
+  assert_success
+  assert_output "$(printf 'service,team,cost,owner\napi,core,12,ann\nweb,edge,7,bob')"
+
+  # A header literally named like a position wins over the position.
+  run_traced dybatpho::csv_col $'2,1\nx,y\n' 1
+  assert_output "y"
+}

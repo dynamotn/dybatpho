@@ -60,6 +60,68 @@ function __dybatpho_archive_format {
 }
 
 #######################################
+# @description Fill in how tar is told a tar archive's compression, for the
+#   formats tar reads and writes itself: a letter bundled into the mode, such
+#   as the `z` of `-czf`, or, for zstd, which has no portable letter, an option
+#   ahead of everything else.
+# @arg $1 string Name of the array receiving the options that go first
+# @arg $2 string Name of the variable receiving the letter bundled into the mode
+# @arg $3 string Archive format, as `__dybatpho_archive_format` prints it
+# @set The two named variables
+# @exitcode 0 The format is a tar archive
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_archive_tar_mode_into {
+  local prefix_var letter_var format
+  dybatpho::expect_args prefix_var letter_var format -- "$@"
+  local -n __dybatpho_archive_prefix_ref="${prefix_var}"
+  local -n __dybatpho_archive_letter_ref="${letter_var}"
+  __dybatpho_archive_prefix_ref=()
+  __dybatpho_archive_letter_ref=""
+  case "${format}" in
+    tar.gz) __dybatpho_archive_letter_ref=z ;;
+    tar.xz) __dybatpho_archive_letter_ref=J ;;
+    tar.bz2) __dybatpho_archive_letter_ref=j ;;
+    tar.zst) __dybatpho_archive_prefix_ref=(--zstd) ;;
+    tar) ;;
+    *) return 1 ;;
+  esac
+}
+
+#######################################
+# @description Fill in the command that compresses and decompresses a
+#   single-file format, which holds one file and no names.
+# @arg $1 string Name of the variable receiving the command
+# @arg $2 string Name of the array receiving its compress arguments
+# @arg $3 string Name of the array receiving its decompress arguments
+# @arg $4 string Archive format, as `__dybatpho_archive_format` prints it
+# @set The three named variables
+# @exitcode 0 The format is a single-file format
+# @exitcode 1 It is not
+# @internal
+#######################################
+function __dybatpho_archive_codec_into {
+  local tool_var pack_var unpack_var format
+  dybatpho::expect_args tool_var pack_var unpack_var format -- "$@"
+  local -n __dybatpho_archive_tool_ref="${tool_var}"
+  local -n __dybatpho_archive_pack_ref="${pack_var}" __dybatpho_archive_unpack_ref="${unpack_var}"
+  __dybatpho_archive_pack_ref=(-c)
+  __dybatpho_archive_unpack_ref=(-dc)
+  case "${format}" in
+    xz) __dybatpho_archive_tool_ref=xz ;;
+    gz) __dybatpho_archive_tool_ref=gzip ;;
+    bz2) __dybatpho_archive_tool_ref=bzip2 ;;
+    zst)
+      __dybatpho_archive_tool_ref=zstd
+      __dybatpho_archive_pack_ref=(-q -c)
+      __dybatpho_archive_unpack_ref=(-d -q -c)
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+#######################################
 # @description Return the output name produced when a single-file compressed archive is extracted.
 # @arg $1 string Archive file path
 # @stdout Default extracted file name
@@ -69,23 +131,13 @@ function __dybatpho_archive_output_name {
   local archive_path format
   dybatpho::expect_args archive_path -- "$@"
   format=$(__dybatpho_archive_format "${archive_path}") || return $?
-  case "${format}" in
-    xz)
-      dybatpho::path_basename "${archive_path}" ".xz"
-      ;;
-    gz)
-      dybatpho::path_basename "${archive_path}" ".gz"
-      ;;
-    bz2)
-      dybatpho::path_basename "${archive_path}" ".bz2"
-      ;;
-    zst)
-      dybatpho::path_basename "${archive_path}" ".zst"
-      ;;
-    *)
-      dybatpho::path_basename "${archive_path}"
-      ;;
-  esac
+  local tool
+  local -a pack=() unpack=()
+  if __dybatpho_archive_codec_into tool pack unpack "${format}"; then
+    dybatpho::path_basename "${archive_path}" ".${format}"
+  else
+    dybatpho::path_basename "${archive_path}"
+  fi
 }
 
 #######################################
@@ -98,38 +150,36 @@ function __dybatpho_archive_output_name {
 function __dybatpho_archive_move_stripped {
   local source_root destination strip_components
   dybatpho::expect_args source_root destination strip_components -- "$@"
-  local path rel stripped dir_path
+  local kind path rel stripped dir_path find_entries find_output
+  local -a parts=()
 
-  # `find -printf '%P'` would say this in one flag, but it is GNU-only: neither
-  # BusyBox nor BSD has it, and this is the zip path of an extractor the library
-  # documents as portable. The prefix comes off here instead.
-  local find_dirs find_output                            # kcov(skip)
-  find_dirs=$(find "${source_root}" -mindepth 1 -type d) # kcov(skip)
-  find_output=$(printf '%s\n' "${find_dirs}" | sort)     # kcov(skip)
-  while IFS= read -r path || [[ -n "${path}" ]]; do
-    rel="${path#"${source_root}/"}"
-    [[ -z "${rel}" || "${rel}" == "${path}" ]] && continue
-    stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" '
-      NF > n { for (i = n + 1; i <= NF; i++) printf "%s%s", $i, (i < NF ? "/" : "") }
-    ')
-    [[ -z "${stripped}" ]] && continue
-    mkdir -p "${destination}/${stripped}"
-  done < <(printf '%s' "${find_output}")
-
-  local find_files                                          # kcov(skip)
-  find_files=$(find "${source_root}" -mindepth 1 ! -type d) # kcov(skip)
-  find_output=$(printf '%s\n' "${find_files}" | sort)       # kcov(skip)
-  while IFS= read -r path || [[ -n "${path}" ]]; do
-    rel="${path#"${source_root}/"}"
-    [[ -z "${rel}" || "${rel}" == "${path}" ]] && continue
-    stripped=$(printf '%s\n' "${rel}" | awk -F/ -v n="${strip_components}" '
-      NF > n { for (i = n + 1; i <= NF; i++) printf "%s%s", $i, (i < NF ? "/" : "") }
-    ')
-    [[ -z "${stripped}" ]] && continue
-    dir_path=$(dybatpho::path_dirname "${destination}/${stripped}")
-    mkdir -p "${dir_path}"
-    mv "${source_root}/${rel}" "${destination}/${stripped}"
-  done < <(printf '%s' "${find_output}")
+  # Directories first, so every file has somewhere to land. `find -printf '%P'`
+  # would drop the prefix in one flag, but it is GNU-only: neither BusyBox nor
+  # BSD has it, and this is the zip path of an extractor the library documents
+  # as portable. The prefix comes off here instead.
+  for kind in directories files; do
+    if [[ "${kind}" == directories ]]; then
+      find_entries=$(find "${source_root}" -mindepth 1 -type d) # kcov(skip)
+    else
+      find_entries=$(find "${source_root}" -mindepth 1 ! -type d) # kcov(skip)
+    fi
+    find_output=$(printf '%s\n' "${find_entries}" | sort) # kcov(skip)
+    while IFS= read -r path || [[ -n "${path}" ]]; do
+      rel="${path#"${source_root}/"}"
+      [[ -z "${rel}" || "${rel}" == "${path}" ]] && continue
+      IFS=/ read -r -a parts <<< "${rel}"
+      ((${#parts[@]} > strip_components)) || continue
+      printf -v stripped '%s/' "${parts[@]:strip_components}"
+      stripped="${stripped%/}"
+      if [[ "${kind}" == directories ]]; then
+        mkdir -p "${destination}/${stripped}"
+      else
+        dir_path=$(dybatpho::path_dirname "${destination}/${stripped}")
+        mkdir -p "${dir_path}"
+        mv "${source_root}/${rel}" "${destination}/${stripped}"
+      fi
+    done < <(printf '%s' "${find_output}")
+  done
 }
 
 #######################################
@@ -148,67 +198,30 @@ function dybatpho::archive_create {
   source_dir=$(dybatpho::path_dirname "${source_path}")
   source_name=$(dybatpho::path_basename "${source_path}")
 
-  case "${format}" in
-    tar.gz)
-      dybatpho::require tar
-      tar -C "${source_dir}" -czf "${output_path}" "${source_name}"
-      ;;
-    tar.xz)
-      dybatpho::require tar
-      tar -C "${source_dir}" -cJf "${output_path}" "${source_name}"
-      ;;
-    tar.bz2)
-      dybatpho::require tar
-      tar -C "${source_dir}" -cjf "${output_path}" "${source_name}"
-      ;;
-    tar.zst)
-      dybatpho::require tar
-      tar --zstd -C "${source_dir}" -cf "${output_path}" "${source_name}"
-      ;;
-    tar)
-      dybatpho::require tar
-      tar -C "${source_dir}" -cf "${output_path}" "${source_name}"
-      ;;
-    xz)
-      dybatpho::require xz
-      dybatpho::is file "${source_path}" || dybatpho::die \
-        "Single-file archive formats require a file source: ${source_path}"
-      xz -c "${source_path}" > "${output_path}"
-      ;;
-    gz)
-      dybatpho::require gzip
-      dybatpho::is file "${source_path}" || dybatpho::die \
-        "Single-file archive formats require a file source: ${source_path}"
-      gzip -c "${source_path}" > "${output_path}"
-      ;;
-    bz2)
-      dybatpho::require bzip2
-      dybatpho::is file "${source_path}" || dybatpho::die \
-        "Single-file archive formats require a file source: ${source_path}"
-      bzip2 -c "${source_path}" > "${output_path}"
-      ;;
-    zst)
-      dybatpho::require zstd
-      dybatpho::is file "${source_path}" || dybatpho::die \
-        "Single-file archive formats require a file source: ${source_path}"
-      zstd -q -c "${source_path}" > "${output_path}"
-      ;;
-    zip)
-      dybatpho::require zip
-      if dybatpho::path_is_abs "${output_path}"; then
-        output_abs="${output_path}"
-      else
-        local pwd
-        pwd=$(pwd)
-        output_abs="$(dybatpho::path_join "${pwd}" "${output_path}")"
-      fi
-      ( # kcov(skip) - subshell keeps the caller's working directory
-        cd "${source_dir}" || exit
-        zip -rq "${output_abs}" "${source_name}"
-      )
-      ;;
-    *) ;;
-  esac
+  local tool letter
+  local -a prefix=() pack=() unpack=()
+  if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
+    dybatpho::require tar
+    tar ${prefix[@]+"${prefix[@]}"} -C "${source_dir}" "-c${letter}f" "${output_path}" "${source_name}"
+  elif __dybatpho_archive_codec_into tool pack unpack "${format}"; then
+    dybatpho::require "${tool}"
+    dybatpho::is file "${source_path}" || dybatpho::die \
+      "Single-file archive formats require a file source: ${source_path}"
+    "${tool}" "${pack[@]}" "${source_path}" > "${output_path}"
+  else
+    dybatpho::require zip
+    if dybatpho::path_is_abs "${output_path}"; then
+      output_abs="${output_path}"
+    else
+      local pwd
+      pwd=$(pwd)
+      output_abs="$(dybatpho::path_join "${pwd}" "${output_path}")"
+    fi
+    ( # kcov(skip) - subshell keeps the caller's working directory
+      cd "${source_dir}" || exit
+      zip -rq "${output_abs}" "${source_name}"
+    )
+  fi
 }
 
 #######################################
@@ -233,72 +246,29 @@ function dybatpho::archive_extract {
   fi
   mkdir -p "${destination}"
 
-  case "${format}" in
-    tar.gz)
-      dybatpho::require tar
-      tar -xzf "${archive_path}" -C "${destination}" "${strip_args[@]}"
-      ;;
-    tar.xz)
-      dybatpho::require tar
-      tar -xJf "${archive_path}" -C "${destination}" "${strip_args[@]}"
-      ;;
-    tar.bz2)
-      dybatpho::require tar
-      tar -xjf "${archive_path}" -C "${destination}" "${strip_args[@]}"
-      ;;
-    tar.zst)
-      dybatpho::require tar
-      tar --zstd -xf "${archive_path}" -C "${destination}" "${strip_args[@]}"
-      ;;
-    tar)
-      dybatpho::require tar
-      tar -xf "${archive_path}" -C "${destination}" "${strip_args[@]}"
-      ;;
-    zip)
-      dybatpho::require unzip
-      if ((strip_components == 0)); then
-        unzip -q "${archive_path}" -d "${destination}"
-      else
-        local temp_dir
-        dybatpho::create_temp temp_dir ""
-        unzip -q "${archive_path}" -d "${temp_dir}"
-        __dybatpho_archive_move_stripped "${temp_dir}" "${destination}" "${strip_components}"
-      fi
-      ;;
-    xz)
-      dybatpho::require xz
-      ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      local archive_output_name_4
-      archive_output_name_4=$(__dybatpho_archive_output_name "${archive_path}")
-      xz -dc "${archive_path}" \
-        > "$(dybatpho::path_join "${destination}" "${archive_output_name_4}")"
-      ;;
-    gz)
-      dybatpho::require gzip
-      ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      local archive_output_name_3
-      archive_output_name_3=$(__dybatpho_archive_output_name "${archive_path}")
-      gzip -dc "${archive_path}" \
-        > "$(dybatpho::path_join "${destination}" "${archive_output_name_3}")"
-      ;;
-    bz2)
-      dybatpho::require bzip2
-      ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      local archive_output_name_2
-      archive_output_name_2=$(__dybatpho_archive_output_name "${archive_path}")
-      bzip2 -dc "${archive_path}" \
-        > "$(dybatpho::path_join "${destination}" "${archive_output_name_2}")"
-      ;;
-    zst)
-      dybatpho::require zstd
-      ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
-      local archive_output_name
-      archive_output_name=$(__dybatpho_archive_output_name "${archive_path}")
-      zstd -d -q -c "${archive_path}" \
-        > "$(dybatpho::path_join "${destination}" "${archive_output_name}")"
-      ;;
-    *) ;;
-  esac
+  local tool name letter
+  local -a prefix=() pack=() unpack=()
+  if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
+    dybatpho::require tar
+    tar ${prefix[@]+"${prefix[@]}"} "-x${letter}f" "${archive_path}" -C "${destination}" \
+      ${strip_args[@]+"${strip_args[@]}"}
+  elif __dybatpho_archive_codec_into tool pack unpack "${format}"; then
+    dybatpho::require "${tool}"
+    ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
+    name=$(__dybatpho_archive_output_name "${archive_path}")
+    "${tool}" "${unpack[@]}" "${archive_path}" \
+      > "$(dybatpho::path_join "${destination}" "${name}")"
+  else
+    dybatpho::require unzip
+    if ((strip_components == 0)); then
+      unzip -q "${archive_path}" -d "${destination}"
+    else
+      local temp_dir
+      dybatpho::create_temp temp_dir ""
+      unzip -q "${archive_path}" -d "${temp_dir}"
+      __dybatpho_archive_move_stripped "${temp_dir}" "${destination}" "${strip_components}"
+    fi
+  fi
 }
 
 #######################################
@@ -312,36 +282,17 @@ function dybatpho::archive_list {
   local format
   format=$(__dybatpho_archive_format "${archive_path}") || return $?
 
-  case "${format}" in
-    tar.gz)
-      dybatpho::require tar
-      tar -tzf "${archive_path}"
-      ;;
-    tar.xz)
-      dybatpho::require tar
-      tar -tJf "${archive_path}"
-      ;;
-    tar.bz2)
-      dybatpho::require tar
-      tar -tjf "${archive_path}"
-      ;;
-    tar.zst)
-      dybatpho::require tar
-      tar --zstd -tf "${archive_path}"
-      ;;
-    tar)
-      dybatpho::require tar
-      tar -tf "${archive_path}"
-      ;;
-    xz | gz | bz2 | zst)
-      __dybatpho_archive_output_name "${archive_path}"
-      ;;
-    zip)
-      dybatpho::require unzip
-      unzip -Z1 "${archive_path}"
-      ;;
-    *) ;;
-  esac
+  local tool letter
+  local -a prefix=() pack=() unpack=()
+  if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
+    dybatpho::require tar
+    tar ${prefix[@]+"${prefix[@]}"} "-t${letter}f" "${archive_path}"
+  elif __dybatpho_archive_codec_into tool pack unpack "${format}"; then
+    __dybatpho_archive_output_name "${archive_path}"
+  else
+    dybatpho::require unzip
+    unzip -Z1 "${archive_path}"
+  fi
 }
 
 #######################################

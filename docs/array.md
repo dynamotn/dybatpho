@@ -43,9 +43,9 @@ graph and the result are different things.
 - [`dybatpho::array_join`](#dybatphoarray_join) — Join array elements with a separator into one string.
 - [`dybatpho::array_sort`](#dybatphoarray_sort) — Sort an array in place. Text is ordered by the current locale's collation, the same rule `sort` follows, so a script that needs one fixed order everywhere sets `LC_ALL` as it would for `sort`. `--numeric` compares values as numbers, which is the reason a shell script wants a sort at all: as text, `10` comes before `9`. It takes integers, negative ones included, and stops the script on anything else rather than quietly ordering it as text. The sort is a bottom-up merge sort rather than a pipe through `sort(1)`: it keeps an element containing a newline intact and needs no external command. It is also stable, so values that compare equal stay in the order they arrived in. The insertion sort it replaces cost a comparison per pair and took ~39s over 2000 elements, which is a size a list of files or packages reaches without trying.
 - [`dybatpho::array_slice`](#dybatphoarray_slice) — Keep a run of an array in place and drop the rest. A negative start counts back from the end, so `-2` takes the last two elements without the caller working out the length first. A start past either end leaves an empty array rather than failing: asking for elements that are not there is a shape the data can have, not a mistake in the call.
-- [`dybatpho::array_union`](#dybatphoarray_union) — Replace an array with the union of it and another, in place. The result is a set: every value appears once, in the order it was first seen, the first array's values ahead of the second's. A set operation that kept duplicates would not be one, so `dybatpho::array_unique` afterwards has nothing left to do.
-- [`dybatpho::array_intersect`](#dybatphoarray_intersect) — Keep only the values an array shares with another, in place. The result is a set, in the order the first array had them.
-- [`dybatpho::array_difference`](#dybatphoarray_difference) — Drop the values an array shares with another, in place. The result is a set, in the order the first array had them. The operation is one-sided: values only the second array holds are not added.
+- [`dybatpho::array_union`](#dybatphoarray_union) — Replace an array with the union of it and another, in place. The result is a set: every value appears once, in the order it was first seen, the first array's values ahead of the second's. A set operation that kept duplicates would not be one, so `dybatpho::array_unique` afterwards has nothing left to do. Empty elements are dropped, as `dybatpho::array_unique` drops them.
+- [`dybatpho::array_intersect`](#dybatphoarray_intersect) — Keep only the values an array shares with another, in place. The result is a set, in the order the first array had them, without empty elements.
+- [`dybatpho::array_difference`](#dybatphoarray_difference) — Drop the values an array shares with another, in place. The result is a set, in the order the first array had them, without empty elements. The operation is one-sided: values only the second array holds are not added.
 - [`__dybatpho_array_graph_visit`](#__dybatpho_array_graph_visit) — Walk a dependency graph depth-first, appending each entry after everything it depends on. The traversal state is passed by name rather than left to Bash's dynamic scoping: the recursion then says what it reads and writes, and the state stays a local of the public function that owns it.
 - [`__dybatpho_array_graph_roots_into`](#__dybatpho_array_graph_roots_into) — Collect the entries a traversal should start from, into a named array: the roots given, or every key of the graph in a stable order.
 - [`dybatpho::array_toposort`](#dybatphoarray_toposort) — Order a dependency graph so every entry comes after the entries it depends on. The graph is an associative array mapping an entry to the entries it depends on, separated by spaces -- the shape `init.sh` already keeps its module dependencies in. An entry named only as a dependency, with no entry of its own, is part of the result: a leaf is still something to order. With roots given, only what they reach is ordered. Without them, the whole graph is, starting from its keys in sorted order so two runs agree. A cycle is reported rather than refused. The edge that would close it is dropped and the rest of the order still comes back, because a cycle is legitimate in some graphs -- `init.sh` allows one on purpose, since calls between modules resolve at run time -- and a caller that cares reads the exit code.
@@ -464,7 +464,8 @@ Replace an array with the union of it and another, in place.
 The result is a set: every value appears once, in the order it was first
 seen, the first array's values ahead of the second's. A set operation that
 kept duplicates would not be one, so `dybatpho::array_unique` afterwards has
-nothing left to do.
+nothing left to do. Empty elements are dropped, as `dybatpho::array_unique`
+drops them.
 
 **🧪 Example**
 
@@ -493,7 +494,8 @@ dybatpho::array_union allowed extra --   # read write admin
 ### `dybatpho::array_intersect`
 
 Keep only the values an array shares with another, in place.
-The result is a set, in the order the first array had them.
+The result is a set, in the order the first array had them, without empty
+elements.
 
 **🧪 Example**
 
@@ -522,8 +524,9 @@ dybatpho::array_intersect requested granted --   # read write
 ### `dybatpho::array_difference`
 
 Drop the values an array shares with another, in place.
-The result is a set, in the order the first array had them. The operation is
-one-sided: values only the second array holds are not added.
+The result is a set, in the order the first array had them, without empty
+elements. The operation is one-sided: values only the second array holds
+are not added.
 
 **🧪 Example**
 

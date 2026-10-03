@@ -739,3 +739,20 @@ EOF
   assert_failure
   assert_stderr --partial "is reserved"
 }
+
+@test "dybatpho::array_union, array_intersect and array_difference drop empty elements" {
+  # Bash cannot use an empty string as the key that tracks what was seen, so
+  # these used to stop with "bad array subscript"; they now drop empties the
+  # way dybatpho::array_unique always has.
+  local left=(x "" y "" x) right=("" z y)
+  dybatpho::array_union left right
+  assert_equal "${left[*]}" "x y z"
+
+  left=(x "" y)
+  dybatpho::array_intersect left right
+  assert_equal "${left[*]}" "y"
+
+  left=(x "" y)
+  dybatpho::array_difference left right
+  assert_equal "${left[*]}" "x"
+}

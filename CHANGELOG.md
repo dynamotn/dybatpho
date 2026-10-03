@@ -302,7 +302,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`csv` — join two files on a key.** `dybatpho::csv_join` combines two
   inputs on a key column, `inner` by default or `left` to keep every left row,
-  with the right key named separately when the two files disagree. Every match
+  with the right key named separately when the two files disagree; either key
+  is a header name or a 1-based position. Every match
   becomes its own row, in the left file's order and then the right's, the
   right key is not repeated, and a blank key matches nothing.
 
@@ -543,6 +544,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`csv` — `dybatpho::csv_col` and `dybatpho::csv_filter` take a column by
+  position as well as by name.** A column is looked up by its header name
+  first and, when no header carries that name, by its 1-based position, the
+  way `dybatpho::csv_select` and `dybatpho::csv_sort` already read it. A
+  missing column is now reported with the number of columns the header has.
+
+  ```sh
+  dybatpho::csv_col report.csv 3
+  ```
+
 - **The pre-commit hook tests only what a commit changes.** It passes the
   staged files to `scripts/test.sh --related`, which runs the test file of each
   changed module, of the modules calling it directly, and of any test or
@@ -728,6 +739,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mixed strings went from about 680 ms to 260 ms.
 
 ### Fixed
+
+- **`array` — set operations no longer stop on an empty element.**
+  `dybatpho::array_union`, `dybatpho::array_intersect` and
+  `dybatpho::array_difference` stopped with `bad array subscript` when either
+  array held an empty string. They now drop empty elements, as
+  `dybatpho::array_unique` always has.
+
+- **`file` — `dybatpho::file_ensure_line` no longer empties a file it cannot
+  read.** On an existing file the process could not read, it went on and
+  replaced the file with nothing but the new line. It now stops and leaves the
+  file as it was.
 
 - **`math` — a last value without a newline is no longer dropped.** The
   functions that read values from standard input (`dybatpho::math_sum`,

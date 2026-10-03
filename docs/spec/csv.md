@@ -173,7 +173,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-021**: Every function MUST refuse a delimiter that is not exactly one character, or that is a quote, a line break, or the unit separator, before reading its input.
 - **FR-022**: The module MUST rewrite CSV read with the configured delimiter using another delimiter, quoting each field for the delimiter it is written with.
 - **FR-023**: Selecting columns MUST print CSV with the header and every row restricted to the chosen columns in the order given, allowing a column to repeat.
-- **FR-024**: A selected column MUST resolve by header name first and by 1-based position otherwise, and one matching neither MUST stop the script naming the header.
+- **FR-024**: A column chosen by `csv_select`, `csv_sort`, `csv_col`, `csv_filter` or `csv_join` MUST resolve by header name first and by 1-based position otherwise, and one matching neither MUST stop the script naming the header.
 - **FR-025**: Sorting MUST print the header followed by the data rows ordered by one column, ascending or descending, and MUST be stable.
 - **FR-026**: The default comparison MUST be numeric when every non-empty value in the column is a number and byte-wise text otherwise; `text` and `number` MUST force one, and `number` MUST stop the script on a value that is not a number, naming the row.
 - **FR-027**: Empty values MUST sort after every other value in both directions.
@@ -245,6 +245,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-039**: Read stray text after a closing quote as part of that field, in the middle of a record, at its end, and before a trailing delimiter.
 - **IT-040**: Convert an empty JSON array to no output and no error, through `jq` and through `yq` alone.
 - **IT-041**: Verify a script that loads `csv` alone can read a column, that its conversion to JSON stops with the message naming `json`, and that once it loads `json` the same call converts.
+- **IT-042**: Choose a column by position in `csv_col`, `csv_filter` and `csv_join`, and prefer a header literally named like the position.
 
 ## Acceptance Criteria *(mandatory)*
 

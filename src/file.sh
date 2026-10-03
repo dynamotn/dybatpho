@@ -628,12 +628,13 @@ function __dybatpho_file_operand {
 #   how the file is accessed.
 # @arg $1 string Staging file path
 # @arg $2 string Destination path
+# @arg $3 string Public function the failure is reported for
 # @exitcode 1 The staging file cannot be moved into place
 # @internal
 #######################################
 function __dybatpho_file_commit {
-  local staging path mode owner operand
-  dybatpho::expect_args staging path -- "$@"
+  local staging path caller mode owner operand
+  dybatpho::expect_args staging path caller -- "$@"
   if dybatpho::is file "${path}"; then
     operand="$(__dybatpho_file_operand "${staging}")"
     mode="$(__dybatpho_file_stat mode "${path}" || true)"
@@ -645,8 +646,36 @@ function __dybatpho_file_commit {
   fi
   if ! mv -f -- "${staging}" "${path}"; then
     __dybatpho_file_discard "${staging}"
-    dybatpho::die "${FUNCNAME[1]}: Cannot write ${path}"
+    dybatpho::die "${caller}: Cannot write ${path}"
   fi
+}
+
+#######################################
+# @description Rewrite a file through a staging file: create the staging file
+#   next to it, let a producer write the new contents there, and move it into
+#   place, so readers see either the previous contents or the complete new
+#   ones. A producer that fails leaves the destination untouched and the
+#   staging file removed.
+#   Every in-place writer of this module goes through here, so the exclusive
+#   staging file, the failure handling and the commit live in one place.
+# @arg $1 string Public function the failures are reported for
+# @arg $2 string Destination path, already resolved
+# @arg $3 string What to report when the producer fails
+# @arg $4 string Producer, called with the staging path and the rest of the arguments
+# @arg $@ string Extra arguments for the producer
+# @exitcode 1 Stop the script when the staging file cannot be created, the producer fails, or the move fails
+# @internal
+#######################################
+function __dybatpho_file_rewrite {
+  local caller="$1" path="$2" failure="$3" producer="$4" staging
+  shift 4
+  __dybatpho_file_staging_into staging "${path}" \
+    || dybatpho::die "${caller}: Cannot write staging file for ${path}"
+  if ! "${producer}" "${staging}" "$@"; then
+    __dybatpho_file_discard "${staging}"
+    dybatpho::die "${caller}: ${failure}"
+  fi
+  __dybatpho_file_commit "${staging}" "${path}" "${caller}"
 }
 
 #######################################
@@ -668,7 +697,7 @@ function __dybatpho_file_commit {
 # @tip The destination keeps its mode, and its owner when the process may set it
 #######################################
 function dybatpho::file_write_atomic {
-  local path directory staging
+  local path directory
   dybatpho::expect_args path -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
   path="$(__dybatpho_file_resolve "${path}")"
@@ -685,14 +714,18 @@ function dybatpho::file_write_atomic {
     return 0
   fi
 
-  __dybatpho_file_staging_into staging "${path}" \
-    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
-  if ! cat > "${staging}"; then
-    __dybatpho_file_discard "${staging}"                                  # kcov(skip)
-    dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}" # kcov(skip)
-  fi
-  __dybatpho_file_commit "${staging}" "${path}"
+  __dybatpho_file_rewrite "${FUNCNAME[0]}" "${path}" \
+    "Cannot write staging file for ${path}" __dybatpho_file_produce_stdin
   dybatpho::debug "Wrote ${path}"
+}
+
+#######################################
+# @description Producer for `dybatpho::file_write_atomic`: standard input.
+# @arg $1 string Staging file path
+# @internal
+#######################################
+function __dybatpho_file_produce_stdin {
+  cat > "$1"
 }
 
 #######################################
@@ -735,7 +768,7 @@ function __dybatpho_file_sed_delimiter {
 #   rewriting through a staging file instead
 #######################################
 function dybatpho::file_replace {
-  local path pattern replacement delimiter staging
+  local path pattern replacement delimiter
   dybatpho::expect_args path pattern replacement -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
   dybatpho::is file "${path}" \
@@ -749,16 +782,23 @@ function dybatpho::file_replace {
     return 0
   fi
 
-  __dybatpho_file_staging_into staging "${path}" \
-    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
   local file_operand
   file_operand=$(__dybatpho_file_operand "${path}")
-  if ! sed "s${delimiter}${pattern}${delimiter}${replacement}${delimiter}g" \
-    "${file_operand}" > "${staging}"; then
-    __dybatpho_file_discard "${staging}"
-    dybatpho::die "${FUNCNAME[0]}: Cannot apply '${pattern}' to ${path}"
-  fi
-  __dybatpho_file_commit "${staging}" "${path}"
+  __dybatpho_file_rewrite "${FUNCNAME[0]}" "${path}" \
+    "Cannot apply '${pattern}' to ${path}" __dybatpho_file_produce_sed \
+    "s${delimiter}${pattern}${delimiter}${replacement}${delimiter}g" "${file_operand}"
+}
+
+#######################################
+# @description Producer for `dybatpho::file_replace`: the file run through one
+#   `sed` substitution.
+# @arg $1 string Staging file path
+# @arg $2 string `sed` script
+# @arg $3 string Source file, as `__dybatpho_file_operand` renders it
+# @internal
+#######################################
+function __dybatpho_file_produce_sed {
+  sed "$2" "$3" > "$1"
 }
 
 #######################################
@@ -777,7 +817,7 @@ function dybatpho::file_replace {
 # @tip The comparison is an exact whole-line match, not a substring or pattern
 #######################################
 function dybatpho::file_ensure_line {
-  local path line directory staging
+  local path line directory
   dybatpho::expect_args path line -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
   path="$(__dybatpho_file_resolve "${path}")"
@@ -795,19 +835,27 @@ function dybatpho::file_ensure_line {
     return 0
   fi
 
-  __dybatpho_file_staging_into staging "${path}" \
-    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
-  if dybatpho::is file "${path}"; then
-    cat -- "${path}" > "${staging}"
+  __dybatpho_file_rewrite "${FUNCNAME[0]}" "${path}" \
+    "Cannot write staging file for ${path}" __dybatpho_file_produce_appended "${path}" "${line}"
+}
+
+#######################################
+# @description Producer for `dybatpho::file_ensure_line`: the file, if any,
+#   with the line appended.
+# @arg $1 string Staging file path
+# @arg $2 string Source file path
+# @arg $3 string Line to append
+# @internal
+#######################################
+function __dybatpho_file_produce_appended {
+  if dybatpho::is file "$2"; then
+    cat -- "$2" > "$1" || return
     # A file whose last line has no newline would otherwise absorb the new line.
-    if [[ -s "${staging}" ]] && [[ "$(tail -c 1 -- "${staging}")" != "" ]]; then
-      printf '\n' >> "${staging}"
+    if [[ -s "$1" ]] && [[ "$(tail -c 1 -- "$1")" != "" ]]; then
+      printf '\n' >> "$1"
     fi
-  else
-    : > "${staging}"
   fi
-  printf '%s\n' "${line}" >> "${staging}"
-  __dybatpho_file_commit "${staging}" "${path}"
+  printf '%s\n' "$3" >> "$1"
 }
 
 #######################################
@@ -826,7 +874,7 @@ function dybatpho::file_ensure_line {
 # @tip The comparison is an exact whole-line match, not a substring or pattern
 #######################################
 function dybatpho::file_remove_line {
-  local path line staging
+  local path line
   dybatpho::expect_args path line -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
   path="$(__dybatpho_file_resolve "${path}")"
@@ -840,17 +888,26 @@ function dybatpho::file_remove_line {
     return 0
   fi
 
-  __dybatpho_file_staging_into staging "${path}" \
-    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
+  __dybatpho_file_rewrite "${FUNCNAME[0]}" "${path}" \
+    "Cannot filter ${path}" __dybatpho_file_produce_without "${path}" "${line}"
+}
+
+#######################################
+# @description Producer for `dybatpho::file_remove_line`: the file without
+#   every occurrence of the line.
+# @arg $1 string Staging file path
+# @arg $2 string Source file path
+# @arg $3 string Line to drop
+# @exitcode 0 The file was filtered, including down to nothing
+# @exitcode other `grep` failed
+# @internal
+#######################################
+function __dybatpho_file_produce_without {
   # `grep -v` reports "no match" when every line is removed, which is a valid
   # result here rather than a failure.
   local status=0
-  grep -vxF -- "${line}" "${path}" > "${staging}" || status=$?
-  ((status <= 1)) || {
-    __dybatpho_file_discard "${staging}"                  # kcov(skip)
-    dybatpho::die "${FUNCNAME[0]}: Cannot filter ${path}" # kcov(skip)
-  }
-  __dybatpho_file_commit "${staging}" "${path}"
+  grep -vxF -- "$3" "$2" > "$1" || status=$?
+  ((status <= 1))
 }
 
 #######################################

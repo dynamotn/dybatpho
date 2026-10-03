@@ -993,3 +993,15 @@ SCRIPT
   assert_equal "${listed[*]}" \
     "a=directory a-c=directory a/b=directory a/b/file=file link=symlink new"$'\n'"line=file pipe=other"
 }
+
+@test "dybatpho::file_ensure_line leaves a file it cannot read untouched" {
+  [[ "$(id -u)" != 0 ]] || skip "root reads any file"
+  local path="${BATS_TEST_TMPDIR}/locked.conf"
+  printf 'keep me\n' > "${path}"
+  chmod 200 "${path}"
+
+  run --separate-stderr dybatpho::file_ensure_line "${path}" "new line"
+  assert_failure
+  chmod 600 "${path}"
+  assert_equal "$(cat "${path}")" "keep me"
+}

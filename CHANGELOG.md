@@ -860,6 +860,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unparseable. It now escapes every control character, the way the JSON log
   format does.
 
+- **`network` — a request made through `dybatpho::curl_timeout` is counted.**
+  It ran the request in a subshell to scope its timeouts, so the HTTP metrics
+  the request recorded were thrown away with it. The overrides are now scoped
+  to the call in the caller's shell, and the global timeouts are still left
+  untouched.
+
 ### Security
 
 - **`file` — a rewrite no longer writes through a link planted at its staging

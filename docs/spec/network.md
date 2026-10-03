@@ -188,6 +188,7 @@ dybatpho::circuit_breaker api.example.test \
 - A header dump has no status line at all.
 - A requested response header is missing and no default is supplied.
 - Per-request timeout overrides are partially supplied (only connect, only total, or neither).
+- A per-request timeout override is used while the metrics hooks are recording HTTP requests.
 - A circuit breaker's cooldown elapses, allowing a half-open trial request.
 - A rate limit spec names a window in milliseconds, seconds, minutes, or hours, or is not `count/window` at all.
 - A rate limit key's window empties while the script is doing something else, so the budget is whole again.
@@ -266,6 +267,10 @@ dybatpho::circuit_breaker api.example.test \
   builds and reads JSON, MUST stop before sending anything with `<function> needs
   the json module, load it with: dybatpho::load json` when `json` is not loaded;
   every other helper MUST work without it.
+- **FR-034**: `dybatpho::curl_timeout` MUST run its request in the caller's
+  shell, scoping the overrides to the call, so what the request records there --
+  its HTTP metrics among them -- is kept, and the global timeouts are unchanged
+  afterwards.
 
 - **FR-020**: The module MUST split a URL into scheme, user, password, host, port, path,
   query, and fragment, requiring a scheme and `://`, and MUST present every component,
@@ -433,6 +438,8 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-032**: Verify the `DRY_RUN` rehearsal of a request to a URL carrying
   credentials, a secret path and a query token prints only
   `scheme://host/[redacted]`.
+- **IT-033**: Verify a request made through `dybatpho::curl_timeout` is counted
+  in `dybatpho_http_requests_total` and leaves the global timeouts empty.
 - **IT-024**: Verify a request carrying `DYBATPHO_CURL_SECRET_HEADERS` and
   `DYBATPHO_CURL_SECRET_DATA` sends both, while neither appears among the
   arguments the mocked `curl` was called with.

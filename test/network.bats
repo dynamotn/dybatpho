@@ -523,6 +523,18 @@ c.close()' > "${portfile}" 2> /dev/null &
   unstub curl
 }
 
+@test "dybatpho::curl_timeout keeps the request in the HTTP metrics" {
+  # The request used to run in a subshell, so the counters and timings the
+  # metrics hooks recorded for it were thrown away with that subshell.
+  dybatpho::metrics_reset
+  stub curl ": echo '200'"
+  dybatpho::curl_timeout https://this /dev/null 2 10
+  unstub curl
+  assert_equal "$(dybatpho::metrics_get counter dybatpho_http_requests_total status=200)" "1"
+  assert_equal "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ""
+  assert_equal "${DYBATPHO_CURL_TIMEOUT}" ""
+}
+
 @test "dybatpho::curl_timeout rejects non-numeric overrides" {
   run --separate-stderr dybatpho::curl_timeout https://this /dev/null abc
   assert_failure

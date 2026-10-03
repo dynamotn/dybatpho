@@ -758,11 +758,12 @@ function dybatpho::curl_timeout {
   [[ -z "${total_timeout}" || "${total_timeout}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "Total timeout must be a non-negative integer"
 
-  (
-    [[ -n "${connect_timeout}" ]] && DYBATPHO_CURL_CONNECT_TIMEOUT="${connect_timeout}"
-    [[ -n "${total_timeout}" ]] && DYBATPHO_CURL_TIMEOUT="${total_timeout}"
-    dybatpho::curl_do "${url}" "${output}" "$@"
-  )
+  # Scoped with `local` rather than a subshell: `curl_do` reads the overrides
+  # through dynamic scoping either way, but a subshell also threw away what the
+  # request recorded in this shell, such as its HTTP metrics.
+  local DYBATPHO_CURL_CONNECT_TIMEOUT="${connect_timeout:-${DYBATPHO_CURL_CONNECT_TIMEOUT}}"
+  local DYBATPHO_CURL_TIMEOUT="${total_timeout:-${DYBATPHO_CURL_TIMEOUT}}"
+  dybatpho::curl_do "${url}" "${output}" "$@"
 }
 
 #######################################

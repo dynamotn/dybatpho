@@ -1001,27 +1001,9 @@ function dybatpho::mock_call_count {
     printf '0'
     return 0
   fi
-  local printf
-  local printf_2
-  local printf_3
-  local printf_4
-  local printf_5
-  local printf_6
-  local printf_7
-  local printf_8
-  local printf_9
-  local line_count
-  line_count=$(printf '%s\n' "${output}" | wc -l)
-  printf_9=$(printf '%s' "${line_count}" | tr -d ' ')
-  printf_8=${printf_9}
-  printf_7=${printf_8}
-  printf_6=${printf_7}
-  printf_5=${printf_6}
-  printf_4=${printf_5}
-  printf_3=${printf_4}
-  printf_2=${printf_3}
-  printf=${printf_2}
-  printf '%s' "${printf}"
+  # One call per line: the newlines between them, plus the last line.
+  local newlines="${output//[!$'\n']/}"
+  printf '%s' "$((${#newlines} + 1))"
 }
 
 #######################################

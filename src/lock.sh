@@ -81,14 +81,10 @@ function __dybatpho_lock_exists {
 # @internal
 #######################################
 function __dybatpho_lock_target {
-  local date
-  local date_2
-  date_2=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  date=${date_2}
-  local lock_hostname
-  lock_hostname=$(dybatpho::lock_hostname)
-  printf '%s:%s:%s' \
-    "$$" "${lock_hostname}" "${date}"
+  local acquired_at host
+  acquired_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  host=$(dybatpho::lock_hostname)
+  printf '%s:%s:%s' "$$" "${host}" "${acquired_at}"
 }
 
 #######################################
@@ -207,19 +203,13 @@ function dybatpho::lock_info {
   lock_path="$(dybatpho::lock_path "${name}")"
 
   dybatpho::lock_is_alive "${lock_path}" || return 1
-  local lock_field
-  lock_field=$(dybatpho::lock_field "${lock_path}" command)
-  local lock_field_2
-  lock_field_2=$(dybatpho::lock_field "${lock_path}" pid)
-  local lock_field_3
-  lock_field_3=$(dybatpho::lock_field "${lock_path}" acquired_at)
-  local lock_field_4
-  lock_field_4=$(dybatpho::lock_field "${lock_path}" host)
+  local pid host acquired_at command
+  pid=$(dybatpho::lock_field "${lock_path}" pid)
+  host=$(dybatpho::lock_field "${lock_path}" host)
+  acquired_at=$(dybatpho::lock_field "${lock_path}" acquired_at)
+  command=$(dybatpho::lock_field "${lock_path}" command)
   printf 'pid=%s host=%s acquired_at=%s command=%s\n' \
-    "${lock_field_2}" \
-    "${lock_field_4}" \
-    "${lock_field_3}" \
-    "${lock_field}"
+    "${pid}" "${host}" "${acquired_at}" "${command}"
 }
 
 #######################################

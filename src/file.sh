@@ -1194,46 +1194,10 @@ function dybatpho::file_is_binary {
     || dybatpho::die "${FUNCNAME[0]}: File doesn't exist: ${path}"
   # A NUL byte cannot survive in a shell variable, so the byte counts before and
   # after removing NULs are compared instead of the contents.
-  local head_2
-  local head_4
-  local head_6
-  local head_8
-  local head_10
-  local head_12
-  local head_14
-  local head_16
-  local head_18
   # shellcheck disable=SC2312 # a variable cannot hold the NUL bytes being counted
-  head_18=$(head -c 8192 -- "${path}" | wc -c)
-  head_16=${head_18}
-  head_14=${head_16}
-  head_12=${head_14}
-  head_10=${head_12}
-  head_8=${head_10}
-  head_6=${head_8}
-  head_4=${head_6}
-  head_2=${head_4}
-  sampled="${head_2}"
-  local head
-  local head_3
-  local head_5
-  local head_7
-  local head_9
-  local head_11
-  local head_13
-  local head_15
-  local head_17
+  sampled=$(head -c 8192 -- "${path}" | wc -c)
   # shellcheck disable=SC2312 # a variable cannot hold the NUL bytes being counted
-  head_17=$(head -c 8192 -- "${path}" | LC_ALL=C tr -d '\000' | wc -c)
-  head_15=${head_17}
-  head_13=${head_15}
-  head_11=${head_13}
-  head_9=${head_11}
-  head_7=${head_9}
-  head_5=${head_7}
-  head_3=${head_5}
-  head=${head_3}
-  stripped="${head}"
+  stripped=$(head -c 8192 -- "${path}" | LC_ALL=C tr -d '\000' | wc -c)
   ((${sampled//[^0-9]/} != ${stripped//[^0-9]/}))
 }
 

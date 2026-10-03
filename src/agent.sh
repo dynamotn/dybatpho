@@ -285,15 +285,12 @@ function dybatpho::agent_context {
     'split(" ") | map(select(length > 0))')
   git=$(dybatpho::json_object repository:json "${repository}" branch "${branch}")
 
-  local uname
-  local uname_2
-  uname_2=$(uname -m)
-  uname=${uname_2}
-  local uname_3
-  uname_3=$(uname -s)
+  local os arch
+  os=$(uname -s)
+  arch=$(uname -m)
   dybatpho::json_object \
-    os "${uname_3}" \
-    arch "${uname}" \
+    os "${os}" \
+    arch "${arch}" \
     bash "${BASH_VERSION}" \
     cwd "${PWD}" \
     git:json "${git}" \
@@ -385,10 +382,10 @@ function dybatpho::agent_audit {
   mkdir -p "${directory}"
   local agent_mode
   __dybatpho_agent_mode_into agent_mode
-  local date
-  date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  local timestamp
+  timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dybatpho::json_object \
-    timestamp "${date}" \
+    timestamp "${timestamp}" \
     script "${0##*/}" \
     mode "${agent_mode}" \
     action "${action}" \
@@ -528,10 +525,10 @@ function __dybatpho_agent_options_schema {
     local json_get
     json_get=$(dybatpho::json_get "${option}" '.required')
     if [[ "${json_get}" == "true" ]]; then
-      local json_string_2
-      json_string_2=$(dybatpho::json_string "${key}")
+      local key_json
+      key_json=$(dybatpho::json_string "${key}")
       required=$(dybatpho::json_eval "${required}" \
-        ". + [${json_string_2}]")
+        ". + [${key_json}]")
     fi
     index=$((index + 1))
   done

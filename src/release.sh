@@ -129,10 +129,8 @@ function dybatpho::release_bump_type {
     # The whole message is read once: the breaking marker may be in the subject
     # or in a footer in the body.
     message="$(__dybatpho_git "${repo_path}" log -1 --format=%B "${sha}")"
-    local printf
-    printf=$(printf '%s\n' "${message}" | sed -n '1p')
-    parsed="$(dybatpho::release_commit_parse \
-      "${printf}" "${message}")"
+    local subject="${message%%$'\n'*}"
+    parsed="$(dybatpho::release_commit_parse "${subject}" "${message}")"
     type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
     breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"
     if [[ "${breaking}" == "true" ]]; then
@@ -221,10 +219,8 @@ function dybatpho::release_changelog {
   while read -r sha; do
     [[ -n "${sha}" ]] || continue
     message="$(__dybatpho_git "${repo_path}" log -1 --format=%B "${sha}")"
-    local printf
-    printf=$(printf '%s\n' "${message}" | sed -n '1p')
-    parsed="$(dybatpho::release_commit_parse \
-      "${printf}" "${message}")"
+    local subject="${message%%$'\n'*}"
+    parsed="$(dybatpho::release_commit_parse "${subject}" "${message}")"
     type="$(printf '%s\n' "${parsed}" | sed -n '1p')"
     scope="$(printf '%s\n' "${parsed}" | sed -n '2p')"
     is_breaking="$(printf '%s\n' "${parsed}" | sed -n '3p')"

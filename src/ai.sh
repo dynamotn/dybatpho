@@ -798,29 +798,29 @@ function __dybatpho_ai_dry_run_body {
   model=$(dybatpho::ai_model "${provider}")
   case "${provider}" in
     anthropic)
-      local json_object_4
-      json_object_4=$(dybatpho::json_object input_tokens:json 0 output_tokens:json 0)
-      local json_object_5
-      json_object_5=$(dybatpho::json_object type text text "${text}")
+      local usage
+      usage=$(dybatpho::json_object input_tokens:json 0 output_tokens:json 0)
+      local block
+      block=$(dybatpho::json_object type text text "${text}")
       dybatpho::json_object \
         model "${model}" \
         stop_reason end_turn \
-        content:json "[${json_object_5}]" \
-        usage:json "${json_object_4}"
+        content:json "[${block}]" \
+        usage:json "${usage}"
       ;;
     openai)
       local choice
-      local json_object_3
-      json_object_3=$(dybatpho::json_object role assistant content "${text}")
+      local message
+      message=$(dybatpho::json_object role assistant content "${text}")
       choice=$(dybatpho::json_object \
         finish_reason stop \
-        message:json "${json_object_3}")
-      local json_object_2
-      json_object_2=$(dybatpho::json_object prompt_tokens:json 0 completion_tokens:json 0)
+        message:json "${message}")
+      local usage
+      usage=$(dybatpho::json_object prompt_tokens:json 0 completion_tokens:json 0)
       dybatpho::json_object \
         model "${model}" \
         choices:json "[${choice}]" \
-        usage:json "${json_object_2}"
+        usage:json "${usage}"
       ;;
     ollama)
       local json_object

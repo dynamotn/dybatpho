@@ -1149,26 +1149,10 @@ function dybatpho::curl_paginate {
       cat "${body}"
       # A page that does not end in a newline would otherwise run into the
       # first line of the next one.
-      local tail
-      local tail_2
-      local tail_3
-      local tail_4
-      local tail_5
-      local tail_6
-      local tail_7
-      local tail_8
-      local tail_9
+      local ends_in_newline
       # shellcheck disable=SC2312 # the last byte may be a NUL, which a variable drops
-      tail_9=$(tail -c 1 "${body}" | wc -l)
-      tail_8=${tail_9}
-      tail_7=${tail_8}
-      tail_6=${tail_7}
-      tail_5=${tail_6}
-      tail_4=${tail_5}
-      tail_3=${tail_4}
-      tail_2=${tail_3}
-      tail=${tail_2}
-      ((tail == 1)) || echo
+      ends_in_newline=$(tail -c 1 "${body}" | wc -l)
+      ((ends_in_newline == 1)) || echo
     fi
 
     if dybatpho::is true "${DRY_RUN}"; then

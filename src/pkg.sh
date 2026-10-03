@@ -122,29 +122,12 @@ function __dybatpho_pkg_detection_order {
 function __dybatpho_pkg_assert_manager {
   local manager caller
   dybatpho::expect_args manager caller -- "$@"
-  local pkg_supported
-  local pkg_supported_2
-  local pkg_supported_3
-  local pkg_supported_4
-  local pkg_supported_5
-  local pkg_supported_6
-  local pkg_supported_7
-  local pkg_supported_8
-  local pkg_supported_9
-  local pkg_supported_list
-  pkg_supported_list=$(dybatpho::pkg_supported)
-  pkg_supported_9=$(printf '%s\n' "${pkg_supported_list}" | tr '\n' ' ')
-  pkg_supported_8=${pkg_supported_9}
-  pkg_supported_7=${pkg_supported_8}
-  pkg_supported_6=${pkg_supported_7}
-  pkg_supported_5=${pkg_supported_6}
-  pkg_supported_4=${pkg_supported_5}
-  pkg_supported_3=${pkg_supported_4}
-  pkg_supported_2=${pkg_supported_3}
-  pkg_supported=${pkg_supported_2}
-  [[ -n "${__dybatpho_pkg_binary[${manager}]-}" ]] \
-    || dybatpho::die \
-      "${caller}: unsupported package manager '${manager}', expected one of ${pkg_supported}"
+  [[ -n "${__dybatpho_pkg_binary[${manager}]-}" ]] && return 0
+  # The list is only worth building for the message.
+  local supported
+  supported=$(dybatpho::pkg_supported)
+  dybatpho::die \
+    "${caller}: unsupported package manager '${manager}', expected one of ${supported//$'\n'/ } "
 }
 
 #######################################

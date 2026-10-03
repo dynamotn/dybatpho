@@ -202,11 +202,10 @@ function __dybatpho_doctor_resolve {
       version=""
     fi
 
-    local doctor_rank
-    doctor_rank=$(__dybatpho_doctor_rank "${best_status}")
-    local doctor_rank_2
-    doctor_rank_2=$(__dybatpho_doctor_rank "${status}")
-    if ((doctor_rank_2 > doctor_rank)); then
+    local best_rank rank
+    best_rank=$(__dybatpho_doctor_rank "${best_status}")
+    rank=$(__dybatpho_doctor_rank "${status}")
+    if ((rank > best_rank)); then
       best_status="${status}"
       best_path="${path}"
       best_version="${version}"
@@ -332,11 +331,10 @@ function __dybatpho_doctor_report_text {
   printf 'dybatpho %s (%s)\n' "${version}" "${DYBATPHO_DIR}"
   printf 'bash     %s [%s, minimum %s]\n' \
     "${BASH_VERSION}" "${bash_status}" "${DYBATPHO_BASH_MINIMUM}"
-  local uname
-  uname=$(uname -m)
-  local uname_2
-  uname_2=$(uname -s)
-  printf 'platform %s/%s\n' "${uname_2}" "${uname}"
+  local system machine
+  system=$(uname -s)
+  machine=$(uname -m)
+  printf 'platform %s/%s\n' "${system}" "${machine}"
   printf 'modules  %s\n' "$*"
 
   if ((${#__rows_in[@]} == 0)); then
@@ -387,61 +385,44 @@ function __dybatpho_doctor_report_json {
   dybatpho::doctor_bash_supported && bash_ok="true"
   local version
   version=$(dybatpho::version)
-  local doctor_json_escape_9
-  doctor_json_escape_9=$(__dybatpho_log_json_escape "${version}")
-  printf '{"version":"%s"' "${doctor_json_escape_9}"
-  local doctor_json_escape_5
-  doctor_json_escape_5=$(__dybatpho_log_json_escape "${DYBATPHO_DIR}")
-  printf ',"directory":"%s"' "${doctor_json_escape_5}"
-  local doctor_json_escape_4
-  doctor_json_escape_4=$(__dybatpho_log_json_escape "${BASH_VERSION}")
+  local version_json directory_json bash_json system_json machine_json
+  version_json=$(__dybatpho_log_json_escape "${version}")
+  directory_json=$(__dybatpho_log_json_escape "${DYBATPHO_DIR}")
+  bash_json=$(__dybatpho_log_json_escape "${BASH_VERSION}")
+  local system machine
+  system=$(uname -s)
+  machine=$(uname -m)
+  system_json=$(__dybatpho_log_json_escape "${system}")
+  machine_json=$(__dybatpho_log_json_escape "${machine}")
+  printf '{"version":"%s"' "${version_json}"
+  printf ',"directory":"%s"' "${directory_json}"
   printf ',"bash":{"version":"%s","minimum":"%s","ok":%s}' \
-    "${doctor_json_escape_4}" \
-    "${DYBATPHO_BASH_MINIMUM}" "${bash_ok}"
-  local uname
-  uname=$(uname -m)
-  local doctor_json_escape_7
-  local doctor_json_escape_8
-  doctor_json_escape_8=$(__dybatpho_log_json_escape "${uname}")
-  doctor_json_escape_7=${doctor_json_escape_8}
-  local uname_2
-  uname_2=$(uname -s)
-  local doctor_json_escape_11
-  doctor_json_escape_11=$(__dybatpho_log_json_escape "${uname_2}")
+    "${bash_json}" "${DYBATPHO_BASH_MINIMUM}" "${bash_ok}"
   printf ',"platform":{"system":"%s","machine":"%s"}' \
-    "${doctor_json_escape_11}" \
-    "${doctor_json_escape_7}"
-  local module first=1
+    "${system_json}" "${machine_json}"
+  local module module_json first=1
   printf ',"modules":['
   for module in "$@"; do
     ((first)) || printf ','
     first=0
-    local doctor_json_escape_3
-    doctor_json_escape_3=$(__dybatpho_log_json_escape "${module}")
-    printf '"%s"' "${doctor_json_escape_3}"
+    module_json=$(__dybatpho_log_json_escape "${module}")
+    printf '"%s"' "${module_json}"
   done
   printf ']'
-  local row spec kind status path version
+  local row spec kind status path version spec_json path_json
   first=1
   printf ',"dependencies":['
   for row in "${__rows_in[@]}"; do
     IFS=$'\t' read -r module spec kind status path version <<< "${row}"
     ((first)) || printf ','
     first=0
-    local doctor_json_escape
-    doctor_json_escape=$(__dybatpho_log_json_escape "${version}")
-    local doctor_json_escape_2
-    doctor_json_escape_2=$(__dybatpho_log_json_escape "${spec}")
-    local doctor_json_escape_6
-    doctor_json_escape_6=$(__dybatpho_log_json_escape "${path}")
-    local doctor_json_escape_10
-    doctor_json_escape_10=$(__dybatpho_log_json_escape "${module}")
+    module_json=$(__dybatpho_log_json_escape "${module}")
+    spec_json=$(__dybatpho_log_json_escape "${spec}")
+    path_json=$(__dybatpho_log_json_escape "${path}")
+    version_json=$(__dybatpho_log_json_escape "${version}")
     printf '{"module":"%s","dependency":"%s","kind":"%s","status":"%s","path":"%s","version":"%s"}' \
-      "${doctor_json_escape_10}" \
-      "${doctor_json_escape_2}" \
-      "${kind}" "${status}" \
-      "${doctor_json_escape_6}" \
-      "${doctor_json_escape}"
+      "${module_json}" "${spec_json}" "${kind}" "${status}" \
+      "${path_json}" "${version_json}"
   done
   printf ']'
 }

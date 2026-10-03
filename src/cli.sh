@@ -855,9 +855,10 @@ function __dybatpho_cli_parse_opt {
                 || __flags="${__flags}${__alias_switch#-}"
               ;;
             *)
-              local log_text_2
-              log_text_2=$(__dybatpho_log_text cli.invalid_switch_alias "Invalid switch alias: ${1#alias:}" "alias=${1#alias:}")
-              dybatpho::die "${log_text_2}" # kcov(skip)
+              local __alias_error
+              __alias_error=$(__dybatpho_log_text cli.invalid_switch_alias \
+                "Invalid switch alias: ${1#alias:}" "alias=${1#alias:}")
+              dybatpho::die "${__alias_error}" # kcov(skip)
               ;;
           esac
           ;;
@@ -1160,9 +1161,9 @@ function __dybatpho_cli_define_var {
   local __config_key="${__config:-}"
   if [[ -n "${__env_name}" ]] && [[ "${__init}" != "@unset" ]]; then
     __dybatpho_cli_print_indent 0 "if [ \"\${${__env_name}+x}\" ]; then"
-    local cli_prepend_export_3
-    cli_prepend_export_3=$(__dybatpho_cli_prepend_export "$1=\${${__env_name}}")
-    __dybatpho_cli_print_indent 1 "${cli_prepend_export_3}"
+    local __env_line
+    __env_line=$(__dybatpho_cli_prepend_export "$1=\${${__env_name}}")
+    __dybatpho_cli_print_indent 1 "${__env_line}"
     __dybatpho_cli_print_indent 0 "else"
     local __saved_env="${__env}"
     local __fallback
@@ -1206,9 +1207,9 @@ function __dybatpho_cli_define_var {
       case ${__init} in @on) __init=${__on} ;; *) ;; esac
       case ${__init} in @off) __init=${__off} ;; *) ;; esac
       case ${__init} in =*)
-        local cli_prepend_export_2
-        cli_prepend_export_2=$(__dybatpho_cli_prepend_export "$1${__init}")
-        __dybatpho_cli_print_indent 0 "${cli_prepend_export_2}"
+        local __init_line
+        __init_line=$(__dybatpho_cli_prepend_export "$1${__init}")
+        __dybatpho_cli_print_indent 0 "${__init_line}"
         return 0
         ;;
       *) ;;
@@ -1258,9 +1259,7 @@ function __dybatpho_cli_generate_logic {
   # shellcheck disable=SC2034 # kept for the argument contract
   local spec command
   dybatpho::expect_args spec command -- "$@"
-  local type_2
-  type_2=$(type -t "${spec}")
-  [[ "${type_2}" != 'function' ]] && return
+  declare -F "${spec}" > /dev/null || return 0
   shift 2
 
   # For get list of options, separated by space
@@ -1594,16 +1593,16 @@ function __dybatpho_cli_generate_help {
   # piece carries a stable key instead of being looked up by its English.
   if ((${#__help_arg_rows[@]})); then
     dybatpho::print ""
-    local log_text_3
-    log_text_3=$(__dybatpho_log_text cli.heading_arguments "Arguments:")
-    dybatpho::print "${log_text_3}"
+    local __heading
+    __heading=$(__dybatpho_log_text cli.heading_arguments "Arguments:")
+    dybatpho::print "${__heading}"
     __dybatpho_cli_help_render_rows "${__width}" "${__help_arg_rows[@]}"
   fi
   if ((${#__help_cmd_rows[@]})); then
     dybatpho::print ""
-    local log_text_2
-    log_text_2=$(__dybatpho_log_text cli.heading_commands "Commands:")
-    dybatpho::print "${log_text_2}"
+    local __heading
+    __heading=$(__dybatpho_log_text cli.heading_commands "Commands:")
+    dybatpho::print "${__heading}"
     __dybatpho_cli_help_render_rows "${__width}" "${__help_cmd_rows[@]}"
   fi
   dybatpho::print ""

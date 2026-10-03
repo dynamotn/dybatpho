@@ -311,27 +311,9 @@ function dybatpho::git_latest_tag {
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
   pattern="${2:-*}"
-  local git
-  local git_2
-  local git_3
-  local git_4
-  local git_5
-  local git_6
-  local git_7
-  local git_8
-  local git_9
   local git_tags
   git_tags=$(__dybatpho_git "${repo_path}" tag --list "${pattern}" --sort=-v:refname)
-  git_9=$(printf '%s\n' "${git_tags}" | head -n 1)
-  git_8=${git_9}
-  git_7=${git_8}
-  git_6=${git_7}
-  git_5=${git_6}
-  git_4=${git_5}
-  git_3=${git_4}
-  git_2=${git_3}
-  git=${git_2}
-  tag="${git}"
+  tag="${git_tags%%$'\n'*}"
   [[ -n "${tag}" ]] || return 1
   printf '%s\n' "${tag}"
 }

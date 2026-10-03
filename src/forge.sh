@@ -471,27 +471,23 @@ function dybatpho::forge_error {
     return 0
   }
 
-  if ! dybatpho::json_valid "${body}"; then
-    # Not JSON: an HTML error page or a proxy's plain text. A little of it is
-    # more use than none of it, and all of it is not worth a log line.
-    local string_truncate_2
-    string_truncate_2=$(dybatpho::string_truncate "${body//$'\n'/ }" 200)
-    printf '%s: %s\n' "${status_text}" "${string_truncate_2}"
-    return 0
+  local message="" detail=""
+  if dybatpho::json_valid "${body}"; then
+    # GitHub uses `message`, GitLab uses `message` or `error`.
+    message="$(dybatpho::json_get "${body}" \
+      '[.message?, .error?, .error_description?] | map(select(. != null and . != "")) | .[0] // ""')"
+    # GitHub says which field it did not like in a separate array.
+    detail="$(dybatpho::json_get "${body}" \
+      '[.errors[]? | [.field?, .code?] | map(select(. != null)) | join(" ")] | join(", ")' 2> /dev/null || true)"
   fi
 
-  local message detail
-  # GitHub uses `message`, GitLab uses `message` or `error`.
-  message="$(dybatpho::json_get "${body}" \
-    '[.message?, .error?, .error_description?] | map(select(. != null and . != "")) | .[0] // ""')"
-  # GitHub says which field it did not like in a separate array.
-  detail="$(dybatpho::json_get "${body}" \
-    '[.errors[]? | [.field?, .code?] | map(select(. != null)) | join(" ")] | join(", ")' 2> /dev/null || true)"
-
   if [[ -z "${message}" && -z "${detail}" ]]; then
-    local string_truncate
-    string_truncate=$(dybatpho::string_truncate "${body//$'\n'/ }" 200)
-    printf '%s: %s\n' "${status_text}" "${string_truncate}"
+    # Not JSON, or JSON naming no error: an HTML error page or a proxy's plain
+    # text. A little of it is more use than none of it, and all of it is not
+    # worth a log line.
+    local excerpt
+    excerpt=$(dybatpho::string_truncate "${body//$'\n'/ }" 200)
+    printf '%s: %s\n' "${status_text}" "${excerpt}"
     return 0
   fi
 
@@ -519,10 +515,10 @@ function dybatpho::forge_issue_find {
   case "${kind}" in
     github)
       dybatpho::forge_request GET "issues?state=open&per_page=100" "" "${body}" || return 1
-      local json_string_2
-      json_string_2=$(dybatpho::json_string "${title}")
+      local title_json
+      title_json=$(dybatpho::json_string "${title}")
       number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == ${json_string_2}) | .number" | head -n 1)"
+        ".[] | select(.title == ${title_json}) | .number" | head -n 1)"
       ;;
     gitlab)
       local url_encode

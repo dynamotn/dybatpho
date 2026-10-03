@@ -166,6 +166,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - `DRY_RUN` is enabled, so no operation may change the filesystem.
 - `safe_extract` is called while the `archive` module it lists and extracts
   through is not loaded.
+- `safe_extract` is given an archive that cannot be listed, so its entries
+  cannot be checked.
 
 ## Requirements *(mandatory)*
 
@@ -232,6 +234,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **FR-023**: Loading `safety` MUST NOT load `archive`; `safe_extract` MUST
   stop with a message naming the `archive` module and how to load it when that
   module is not loaded, before it inspects the archive or the destination.
+- **FR-024**: `safe_extract` MUST stop before writing anything when the archive
+  cannot be listed, since its entries cannot be checked.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -293,6 +297,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **IT-012**: In a child shell that loaded only `safety`, verify `safe_extract`
   stops with the message naming `archive` before looking at the archive, and
   extracts once `archive` is loaded.
+- **IT-013**: Verify `safe_extract` refuses a corrupt archive with an error
+  naming it.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -495,7 +495,9 @@ function dybatpho::safe_extract {
   local entry stripped_entry target_path
   local -a collisions=()
   local archive_list_output
-  archive_list_output=$(dybatpho::archive_list "${archive_path}")
+  # An archive that cannot be listed cannot be checked, so it is not extracted.
+  __dybatpho_archive_list_into archive_list_output "${archive_path}" \
+    || dybatpho::die "Refusing to extract ${archive_path}: its entries can't be checked"
   while IFS= read -r entry || [[ -n "${entry}" ]]; do
     [[ -n "${entry}" ]] || continue
     __dybatpho_archive_entry_is_safe "${entry}" \

@@ -722,6 +722,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`notification` — `dybatpho::notify_webhook` no longer logs its URL.** Its
   debug line, `Sending webhook notification to <url>`, wrote the whole webhook
   URL whenever `LOG_LEVEL` was `debug`; it now shows the host only.
+- **`archive` — an archive that cannot be listed is no longer reported safe.**
+  `dybatpho::archive_unsafe_entries` ignored a failed listing, so a corrupt or
+  truncated archive, or a zip with no `unzip` installed, came back with no
+  unsafe entries and `dybatpho::archive_is_safe` passed it. Both now fail with
+  an error naming the archive, and `dybatpho::safe_extract` and
+  `dybatpho::backup_diff` refuse it before extracting anything.
+
 - **`helpers` — `dybatpho::require` no longer passes a path that is not
   there.** A command given as a path, such as `/usr/sbin/sendmail`, counted as
   installed whether or not the file existed, because the shell's `hash` takes

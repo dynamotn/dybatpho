@@ -350,6 +350,18 @@ function _create_traversal_archive {
   [ ! -e "${BATS_TEST_TMPDIR}/victim.txt" ]
 }
 
+@test "dybatpho::safe_extract refuses an archive it cannot list" {
+  # The entries are checked before anything is written, so an archive whose
+  # entries cannot be read must stop there rather than be extracted unchecked.
+  local archive_path="${BATS_TEST_TMPDIR}/corrupt.tar.gz"
+  local destination="${BATS_TEST_TMPDIR}/out"
+  printf 'not an archive\n' > "${archive_path}"
+
+  run dybatpho::safe_extract --force "${archive_path}" "${destination}"
+  assert_failure
+  assert_output --partial "Can't list archive ${archive_path}"
+}
+
 @test "dybatpho::safe_extract confirms before overwriting existing files" {
   local archive_path="${BATS_TEST_TMPDIR}/safe.tar.gz"
   local destination="${BATS_TEST_TMPDIR}/out"

@@ -79,6 +79,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - An archive contains entries that become empty after path stripping.
 - A script loads `archive` alone, without the `safety` module that offers the
   guarded `safe_extract`.
+- An archive cannot be listed: it is corrupt or truncated, or it is a zip and
+  `unzip` is not installed.
 
 ## Requirements *(mandatory)*
 
@@ -101,6 +103,9 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
   letter. Guarded extraction lives in `safety.md`.
 - **FR-010**: Loading `archive` MUST NOT load `safety`; every archive helper
   MUST work with the core modules alone.
+- **FR-011**: `archive_unsafe_entries` and `archive_is_safe` MUST fail, with an
+  error on stderr and a non-zero status other than `0`, when the archive cannot
+  be listed; an unlistable archive MUST NOT be reported as safe.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -133,6 +138,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
   `archive_unsafe_entries`, and confirm `archive_is_safe` accepts a benign one.
 - **IT-010**: In a child shell that loaded only `archive`, create, check, and
   extract an archive while `safety` stays unloaded.
+- **IT-011**: Refuse a corrupt archive in both `archive_unsafe_entries` and
+  `archive_is_safe`, with an error naming it.
 
 ## Acceptance Criteria *(mandatory)*
 

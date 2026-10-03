@@ -378,6 +378,21 @@ function _create_traversal_test_archive {
   run_traced -1 dybatpho::archive_is_safe "${evil_archive}"
 }
 
+@test "dybatpho::archive_is_safe refuses an archive it cannot list" {
+  # Nothing listed is not the same as nothing unsafe. A corrupt archive, or a
+  # zip without `unzip`, lists no entries, and reading that as "no entry
+  # escapes" passed the guard for an archive that was never checked.
+  local corrupt="${BATS_TEST_TMPDIR}/corrupt.tar.gz"
+  printf 'not an archive\n' > "${corrupt}"
+
+  run_traced --separate-stderr ! dybatpho::archive_unsafe_entries "${corrupt}"
+  assert_output ""
+  assert_stderr --partial "Can't list archive ${corrupt}"
+
+  run_traced --separate-stderr ! dybatpho::archive_is_safe "${corrupt}"
+  assert_stderr --partial "Can't list archive ${corrupt}"
+}
+
 @test "__dybatpho_archive_entry_is_safe rejects absolute and Windows-style entries" {
   __dybatpho_archive_entry_is_safe "bundle/nested/file.txt"
   run_traced -1 __dybatpho_archive_entry_is_safe "/etc/passwd"

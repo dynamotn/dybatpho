@@ -345,6 +345,32 @@ function dybatpho::archive_list {
 }
 
 #######################################
+# @description Capture an archive's listing, failing when it cannot be read.
+#   The listing runs in a command substitution to be captured, so its failure
+#   is carried out by status and reported here, where it can still reach the
+#   caller; ignoring it reads an unreadable archive as one with no entries.
+# @arg $1 string Name of the variable receiving the listing
+# @arg $2 string Archive file path
+# @set The named variable
+# @stderr An error when the archive cannot be listed
+# @exitcode 0 The archive was listed
+# @exitcode other The listing failed, with its status
+# @internal
+#######################################
+function __dybatpho_archive_list_into {
+  local __dybatpho_archive_listing_var __dybatpho_archive_listed
+  dybatpho::expect_args __dybatpho_archive_listing_var __dybatpho_archive_listed -- "$@"
+  local -n __dybatpho_archive_listing_ref="${__dybatpho_archive_listing_var}"
+  local __dybatpho_archive_status=0
+  __dybatpho_archive_listing_ref="$(dybatpho::archive_list "${__dybatpho_archive_listed}")" \
+    || __dybatpho_archive_status=$?
+  if ((__dybatpho_archive_status != 0)); then
+    dybatpho::error "Can't list archive ${__dybatpho_archive_listed}, so its entries can't be checked"
+    return "${__dybatpho_archive_status}"
+  fi
+}
+
+#######################################
 # @description Return success when an archive entry stays inside the extraction directory.
 # @arg $1 string Entry name as reported by `dybatpho::archive_list`
 # @exitcode 0 The entry is a safe relative path
@@ -367,8 +393,14 @@ function __dybatpho_archive_entry_is_safe {
 
 #######################################
 # @description List archive entries that would escape the extraction directory.
+#   An archive that cannot be listed -- corrupt, truncated, or a zip with no
+#   `unzip` installed -- is a failure, not an empty list: no entry was checked,
+#   so none can be vouched for.
 # @arg $1 string Archive file path
 # @stdout One unsafe entry per line, empty when the archive is safe
+# @stderr An error when the archive cannot be listed
+# @exitcode 0 The archive was listed; the unsafe entries, if any, are on stdout
+# @exitcode other The archive could not be listed
 # @tip Use `dybatpho::safe_extract` to validate and extract in one step; it
 #   lives in the `safety` module, which `archive` does not load
 #######################################
@@ -377,7 +409,7 @@ function dybatpho::archive_unsafe_entries {
   dybatpho::expect_args archive_path -- "$@"
   local entry
   local archive_list_output
-  archive_list_output=$(dybatpho::archive_list "${archive_path}")
+  __dybatpho_archive_list_into archive_list_output "${archive_path}" || return $?
   while IFS= read -r entry || [[ -n "${entry}" ]]; do
     [[ -n "${entry}" ]] || continue
     if ! __dybatpho_archive_entry_is_safe "${entry}"; then
@@ -389,8 +421,10 @@ function dybatpho::archive_unsafe_entries {
 #######################################
 # @description Return success when no archive entry escapes the extraction directory.
 # @arg $1 string Archive file path
+# @stderr An error when the archive cannot be listed
 # @exitcode 0 Every entry is a safe relative path
 # @exitcode 1 At least one entry is absolute or traverses outside the destination
+# @exitcode other The archive could not be listed, so nothing was checked
 #######################################
 function dybatpho::archive_is_safe {
   local archive_path

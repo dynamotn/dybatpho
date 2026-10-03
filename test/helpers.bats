@@ -561,13 +561,16 @@ _test_retry() {
 
 @test "dybatpho::retry sleeps between attempts" {
   local sleep_args_file="${BATS_TEST_TMPDIR}/sleep-args"
+  # `_test_retry` keeps its own `count`; it must not be the one `retry` counts
+  # attempts with, or the second failure is never retried.
   count=0
-  stub sleep ": echo \"\$*\" >> ${sleep_args_file}"
+  stub_repeated sleep ": echo \"\$*\" >> ${sleep_args_file}"
   run_traced dybatpho::retry 2 _test_retry retry-target
   unstub sleep
   assert_success
+  assert_output --partial "Retrying in 2 seconds (1/2)"
   assert_output --partial "Retrying in 4 seconds (2/2)"
-  assert_equal "$(cat "${sleep_args_file}")" '4'
+  assert_equal "$(tr '\n' ' ' < "${sleep_args_file}")" '2 4 '
 }
 
 @test "__dybatpho_helpers_backoff grows exponentially and stops at the cap" {
@@ -652,14 +655,14 @@ _test_retry() {
     [[ "${count}" -ge 3 ]]
   }
   count=0
-  stub sleep ": echo \"\$*\" >> ${sleep_args_file}"
+  stub_repeated sleep ": echo \"\$*\" >> ${sleep_args_file}"
   run_traced dybatpho::retry_until 3 1 _retry_until_flaky retry-until-target
   unstub sleep
   assert_success
   assert_output --partial "Retrying in 1 seconds (2/3)"
   run_traced cat "${sleep_args_file}"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 1
 1
 EOF

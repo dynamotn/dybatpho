@@ -135,6 +135,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - A required command is given as a path that is missing, is a directory, or is a file without the executable bit.
 - Coalesce receives no candidate values or only empty values.
 - Retry is used with a noisy shell command string that needs a shorter description.
+- The retried command keeps state in a variable whose name matches one the retry loop uses, such as `count` or `delay`.
 - The caller wants fixed-delay retries instead of escalating delays.
 - An assertion condition contains shell syntax evaluated through `eval`.
 - Breakpoint is invoked in unattended CI rather than an interactive terminal.
@@ -194,6 +195,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-017b**: The output MUST open with a heading naming the function and where it came from, including the module when one can be named.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.
 - **FR-019**: `dybatpho::is number` MUST accept exactly what `validate_is number` accepts, and `dybatpho::is int` MUST accept only optionally signed decimal integers without a leading zero, a subset of what `validate_is int` accepts; neither MUST depend on `printf` or `LC_NUMERIC`.
+- **FR-020**: `dybatpho::retry` and `dybatpho::retry_until` MUST NOT shadow the caller's variables in the command they evaluate: their own bookkeeping uses names in the `__dybatpho_` namespace.
 - **FR-018a**: Listing MUST NOT depend on an external command, since its purpose is to answer when nothing else is at hand.
 - **FR-018b**: Listing for a module MUST stop the script when that module is not loaded, and when no function can be attributed to a module at all, rather than returning an empty list that would read as "this module exports nothing".
 
@@ -243,6 +245,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-018**: Verify the command check accepts an executable given by path, and
   refuses a missing path, a file without the executable bit, and a directory.
 - **IT-019**: Refuse `'a`, `0x1F`, blanks, `1,5`, `inf`, `010` and `08` as ints and the non-numbers among them as numbers, and verify over a sample set that `is number` agrees with `validate_is number` and that every value `is int` accepts, `validate_is int` accepts too.
+- **IT-020**: Retry a command that counts its own attempts in a global `count` with both `retry` and `retry_until`, and verify every failure is retried and slept on in order.
 
 ## Acceptance Criteria *(mandatory)*
 

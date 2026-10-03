@@ -965,6 +965,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shorter than the widest ended in trailing whitespace. Rows now end at their
   last character; the box and Markdown styles are unchanged.
 
+- **`helpers` — a retried command keeps its own variables.**
+  `dybatpho::retry` and `dybatpho::retry_until` evaluate the command inside
+  their own scope, and their loop counters were plain locals named `count`,
+  `delay`, `retries` and `command`. A command that kept state in a variable of
+  the same name changed the loop's count instead of its own, so an attempt
+  could go unretried. The loop now keeps its counters out of the caller's
+  names.
+
 ### Security
 
 - **`ai` — a `DRY_RUN` stream no longer prints the whole URL.**

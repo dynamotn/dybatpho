@@ -563,29 +563,32 @@ function __dybatpho_helpers_backoff {
 # @tip Pass a short description when the raw command is noisy so retry logs stay readable
 #######################################
 function dybatpho::retry {
-  local retries command
-  dybatpho::expect_args retries command -- "$@"
+  # Prefixed: the command is evaluated in this function's scope, so a plain
+  # `count` or `delay` here would shadow the caller's own variable of that name.
+  local __dybatpho_retry_retries __dybatpho_retry_command
+  dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_command -- "$@"
   shift 2
-  local exit_code count delay
+  local __dybatpho_retry_exit_code __dybatpho_retry_count __dybatpho_retry_delay
 
-  count=0
-  until eval "${command}"; do
-    exit_code="$?"
-    count="$((count + 1))"
-    if [[ "${count}" -le "${retries}" ]]; then
-      delay="$(__dybatpho_helpers_backoff "${count}")"
+  __dybatpho_retry_count=0
+  until eval "${__dybatpho_retry_command}"; do
+    __dybatpho_retry_exit_code="$?"
+    __dybatpho_retry_count="$((__dybatpho_retry_count + 1))"
+    if [[ "${__dybatpho_retry_count}" -le "${__dybatpho_retry_retries}" ]]; then
+      __dybatpho_retry_delay="$(__dybatpho_helpers_backoff "${__dybatpho_retry_count}")"
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_attempts_total
       fi
-      dybatpho::progress "Retrying in ${delay} seconds (${count}/${retries})..."
-      sleep "${delay}" || true
+      dybatpho::progress "Retrying in ${__dybatpho_retry_delay} seconds" \
+        "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})..."
+      sleep "${__dybatpho_retry_delay}" || true
     else
       # Out of retries :(
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_exhausted_total
       fi
-      dybatpho::warn "No more retries left to run ${1:-${command}}."
-      return "${exit_code}"
+      dybatpho::warn "No more retries left to run ${1:-${__dybatpho_retry_command}}."
+      return "${__dybatpho_retry_exit_code}"
     fi
   done
 }
@@ -601,19 +604,23 @@ function dybatpho::retry {
 # @tip The command is executed with `eval`, so pass it as one shell command string
 #######################################
 function dybatpho::retry_until {
-  local retries delay_seconds command
-  dybatpho::expect_args retries delay_seconds command -- "$@"
+  # Prefixed for the same reason as `dybatpho::retry`: the command runs in this
+  # function's scope and must see the caller's variables, not these.
+  local __dybatpho_retry_retries __dybatpho_retry_delay_seconds __dybatpho_retry_command
+  dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_delay_seconds \
+    __dybatpho_retry_command -- "$@"
   shift 3
-  local exit_code=0 count=0
-  until eval "${command}"; do
-    exit_code=$?
-    count=$((count + 1))
-    if ((count > retries)); then
-      dybatpho::warn "No more retries left to run ${1:-${command}}."
-      return "${exit_code}"
+  local __dybatpho_retry_exit_code=0 __dybatpho_retry_count=0
+  until eval "${__dybatpho_retry_command}"; do
+    __dybatpho_retry_exit_code=$?
+    __dybatpho_retry_count=$((__dybatpho_retry_count + 1))
+    if ((__dybatpho_retry_count > __dybatpho_retry_retries)); then
+      dybatpho::warn "No more retries left to run ${1:-${__dybatpho_retry_command}}."
+      return "${__dybatpho_retry_exit_code}"
     fi
-    dybatpho::progress "Retrying in ${delay_seconds} seconds (${count}/${retries})..."
-    sleep "${delay_seconds}" || true
+    dybatpho::progress "Retrying in ${__dybatpho_retry_delay_seconds} seconds" \
+      "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})..."
+    sleep "${__dybatpho_retry_delay_seconds}" || true
   done
 }
 

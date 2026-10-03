@@ -5,7 +5,7 @@
 #   text_box, text_center, text_number_lines, and text_truncate_lines
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules text
+. "${SCRIPTDIR}/../init.sh" --modules text table
 
 dybatpho::register_common_handlers
 

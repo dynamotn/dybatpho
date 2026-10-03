@@ -111,7 +111,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - Lines have different indentation depths.
 - ANSI sequences occur alongside ordinary text.
 - A bullet marker, delimiter, or gap is omitted or empty.
-- The table dependency required by `text_columns` is unavailable.
+- `text_columns` is called while the `table` module it draws through is not loaded.
 - A box title is wider than every line, or the input is empty.
 - A line contains ANSI sequences or wide characters, with or without the `screen` module loaded.
 - A line is wider than the centering width, or the width is zero or not a number.
@@ -134,6 +134,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **FR-010**: The module MUST provide a helper that prefixes every line with its number, starting from an optional first number, right-aligned to the widest number, with an optional separator, and MUST fail on a start that is not a non-negative integer.
 - **FR-011**: The module MUST provide a helper that prints the first `count` lines of a block followed by a marker naming how many lines were left out, MUST print a block that fits unchanged and without a marker, MUST replace `{count}` in a custom marker, and MUST fail on a count that is not a non-negative integer.
 - **FR-012**: Every helper MUST accept stdin when the input argument is `-`.
+- **FR-013**: Loading `text` MUST NOT load `table`; the column helper MUST stop with a message naming the `table` module and how to load it when that module is not loaded, before reading its input.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -169,6 +170,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **IT-011**: Center colored and wide text by visible width, and reject an invalid width.
 - **IT-012**: Number lines including blanks, from a custom start with leading zeros and a custom separator, and reject an invalid start.
 - **IT-013**: Truncate a block with the default singular and plural markers, print a fitting block unchanged, fill a custom marker with a zero count, and reject an invalid count.
+- **IT-014**: In a child shell that loaded only `text`, stop the column helper with the message naming `table`, then align the same block once `table` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

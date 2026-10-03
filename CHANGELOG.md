@@ -536,6 +536,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   . dybatpho/init.sh --modules testing json diff   # or: dybatpho::load json diff
+- **BREAKING: `text` no longer loads `table`.** Only `dybatpho::text_columns`
+  draws through the table renderer, so loading `text` -- or `testing`, which
+  loads it -- no longer brings `table` along. `dybatpho::text_columns` now
+  stops with `dybatpho::text_columns needs the table module, load it with:
+  dybatpho::load table` when it is missing, instead of a message naming
+  `dybatpho::table_align`. A script that calls `text_columns`, or any
+  `table_*` function, after loading only `text` has to ask for `table`:
+
+  ```sh
+  . dybatpho/init.sh --modules text          # before
+  . dybatpho/init.sh --modules text table    # after
   ```
 
 ### Fixed
@@ -580,6 +591,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the valid documents `null` and `false` were refused; with `yq` they were
   accepted, and so was blank text. Both backends now accept every JSON value
   and refuse blank text.
+
 ### Security
 
 - **`network` — URLs no longer reach the log in full.** `dybatpho::curl_do`

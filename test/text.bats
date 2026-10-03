@@ -108,11 +108,28 @@ ccc  d
 EOF
 }
 
-@test "dybatpho::text_columns reports a missing table dependency" {
-  unset -f dybatpho::table_align
-  run --separate-stderr dybatpho::text_columns "a|b"
+@test "dybatpho::text_columns asks for the table module when it is not loaded" {
+  # `text` does not load `table`, so a script that only indents or strips text
+  # does not pay for the renderer. A child shell started from a file, without
+  # the functions this process exports, shows what such a script sees.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules text\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::text_indent body'
+    printf '%s\n' "dybatpho::text_columns 'a|bb'"
+  } > "${script}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure
-  assert_stderr --partial "dybatpho::table_align is required"
+  assert_line --index 0 "  body"
+  assert_output --partial "dybatpho::text_columns needs the table module, load it with: dybatpho::load table"
+
+  # Once the script loads it, the same call aligns.
+  sed -i 's/--modules text/--modules text table/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_line --index 1 "a  bb"
 }
 
 @test "dybatpho::text_box draws a single border sized to the widest line" {

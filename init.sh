@@ -90,7 +90,6 @@ export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 # optional-to-optional edges are listed here. Cycles are allowed: function calls
 # resolve at run time, so modules may reference each other.
 declare -A __dybatpho_module_deps=(
-  [text]="table"
   [table]="text"
   [markdown]="table"
   [csv]="math"

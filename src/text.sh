@@ -151,19 +151,45 @@ function dybatpho::text_bullet_list {
 
 #######################################
 # @description Align a delimited text block into plain columns.
+#   The columns are laid out by `dybatpho::table_align`, so the `table` module
+#   has to be loaded; `text` does not load it on its own.
+# @example
+#   . dybatpho/init.sh --modules text table
+#   dybatpho::text_columns $'name|version\ndybatpho|6.0.0'
+#
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 string Optional exact delimiter, default is `|`
 # @arg $3 number Optional gap width between columns, default is 2
 # @stdout Plain aligned columns
+# @exitcode 1 Stop the script when the `table` module is not loaded
 #######################################
 function dybatpho::text_columns {
   local input
   dybatpho::expect_args input -- "$@"
+  __dybatpho_text_need_table
   local delimiter="${2:-|}"
   local gap="${3:-2}"
-  dybatpho::is function dybatpho::table_align || dybatpho::die \
-    "dybatpho::table_align is required for dybatpho::text_columns"
   dybatpho::table_align "${input}" "${delimiter}" "" "${gap}"
+}
+
+#######################################
+# @description Stop unless the `table` module is loaded.
+#   Only `dybatpho::text_columns` draws through `table`, and registering it as
+#   a dependency would load it into every script that only indents or strips
+#   text -- including, through `testing`, every test suite -- so the one
+#   function that needs it asks for it instead.
+#
+#   The guard names an internal helper on purpose: `dybatpho::` functions are
+#   exported and a child shell inherits them without the internals they call,
+#   so testing the public name would pass in a child that never loaded `table`
+#   and then fail on the first internal call.
+# @noargs
+# @exitcode 1 The `table` module is not loaded
+# @internal
+#######################################
+function __dybatpho_text_need_table {
+  declare -F __dybatpho_table_measure_widths > /dev/null \
+    || dybatpho::die "${FUNCNAME[1]} needs the table module, load it with: dybatpho::load table"
 }
 
 #######################################

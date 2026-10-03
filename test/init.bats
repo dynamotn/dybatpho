@@ -102,8 +102,9 @@ loaded_line() {
 }
 
 @test "requesting a module loads its dependencies first" {
+  # `text` aligns columns only when the script loaded `table` itself.
   run_traced -0 init_sh "--modules text" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret table text "
+  assert_output "string os logging helpers process file secret text "
 
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
   assert_output "string os logging helpers process file secret network validate notification "
@@ -111,10 +112,10 @@ loaded_line() {
   # `testing` loads only what every assertion uses: the JSON and YAML
   # assertions ask for `json`, and a snapshot mismatch for `diff` to draw it.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret table text testing "
+  assert_output "string os logging helpers process file secret text testing "
 
-  # `table` renders real CSV only when the script loaded `csv` itself, so
-  # neither it nor `text`, which renders through it, brings the parser along.
+  # `table` renders real CSV only when the script loaded `csv` itself, so it
+  # does not bring the parser along.
   run_traced -0 init_sh "--modules table" "$(loaded_line)"
   assert_output "string os logging helpers process file secret text table "
 
@@ -195,7 +196,7 @@ printf '%s' '{\"a\":1}' | dybatpho::json_query - '.a'"
   run_traced -0 init_sh "--modules core" "dybatpho::load text
 dybatpho::load text
 $(loaded_line)"
-  assert_output "string os logging helpers process file secret table text "
+  assert_output "string os logging helpers process file secret text "
 }
 
 @test "dybatpho::load accepts several modules at once" {

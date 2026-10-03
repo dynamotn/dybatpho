@@ -21,7 +21,7 @@ setup() {
 @test "dybatpho::md_list renders a bullet list and escapes each item" {
   run_traced dybatpho::md_list $'first *item*\nsecond'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 - first \*item\*
 - second
 EOF
@@ -30,7 +30,7 @@ EOF
 @test "dybatpho::md_list numbers the items when the marker is ordered" {
   run_traced dybatpho::md_list $'first\nsecond\nthird' "1."
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 1. first
 2. second
 3. third
@@ -45,7 +45,7 @@ EOF
 @test "dybatpho::md_list keeps blank lines and takes a custom marker" {
   run_traced dybatpho::md_list $'alpha\n\nbeta' "*"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 * alpha
 
 * beta
@@ -57,7 +57,7 @@ EOF
   # list or opens a heading inside the item.
   run_traced dybatpho::md_list $'- already a bullet\n# not a heading'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 - \- already a bullet
 - \# not a heading
 EOF
@@ -73,7 +73,7 @@ EOF
 @test "dybatpho::md_task_list renders checked and unchecked items" {
   run_traced dybatpho::md_task_list $'x|Write the spec\n|Ship it\ntrue|Done too\nno|Not yet'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 - [x] Write the spec
 - [ ] Ship it
 - [x] Done too
@@ -84,7 +84,7 @@ EOF
 @test "dybatpho::md_task_list treats a line without the delimiter as unchecked" {
   run_traced dybatpho::md_task_list $'Plain line\n\nX::Done' "::"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 - [ ] Plain line
 
 - [x] Done
@@ -130,7 +130,7 @@ EOF
 @test "dybatpho::md_code_block fences the body without escaping it" {
   run_traced dybatpho::md_code_block bash 'ls -la *.sh'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 \`\`\`bash
 ls -la *.sh
 \`\`\`
@@ -161,7 +161,7 @@ EOF
 @test "dybatpho::md_table renders through the table module" {
   run_traced dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 | Name  | Role |
 | ----- | ---- |
 | Alice | Dev  |
@@ -197,7 +197,7 @@ EOF
 @test "dybatpho::md_collapsible escapes the summary and keeps the body as Markdown" {
   run_traced dybatpho::md_collapsible "Full log *raw*" $'first\nsecond'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 <details>
 <summary>Full log \*raw\*</summary>
 
@@ -234,7 +234,7 @@ EOF
 
   run_traced dybatpho::md_escape $'# heading\n1. item\n+ plus\nmid - dash'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 \# heading
 \1. item
 \+ plus
@@ -251,7 +251,7 @@ EOF
 @test "dybatpho::md_escape reads stdin and handles empty input" {
   run_traced dybatpho::md_escape - <<< $'*one*\n*two*\n'
   assert_success
-  assert_output << EOF
+  assert_output - << EOF
 \*one\*
 \*two\*
 EOF

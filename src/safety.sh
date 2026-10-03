@@ -449,10 +449,22 @@ function __dybatpho_safety_transfer {
 # @exitcode 0 The archive is extracted
 # @exitcode 1 Overwriting existing files is declined
 # @exitcode 1 Stop the script when an entry is absolute or traverses outside the destination
+# @exitcode 1 Stop the script when the `archive` module is not loaded
 # @stdout Command output from the selected extractor, if any
 # @tip Symlink targets stored inside an archive aren't inspected; extract untrusted archives into a scratch directory
+# @tip The entries are listed and extracted by the `archive` module, which
+#   `safety` does not load; load it alongside: `--modules safety archive`
 #######################################
 function dybatpho::safe_extract {
+  # Only this guard needs `archive`, and registering it as a dependency would
+  # load it into every script that confirms a prompt or removes a file -- and,
+  # through `cli` and `tui`, into far more than that. The guard names an
+  # internal helper on purpose: `dybatpho::` functions are exported and a child
+  # shell inherits them without the internals they call, so testing the public
+  # name would pass in a child that never loaded `archive` and then fail on the
+  # first internal call.
+  declare -F __dybatpho_archive_entry_is_safe > /dev/null \
+    || dybatpho::die "${FUNCNAME[0]} needs the archive module, load it with: dybatpho::load archive"
   local force="${DYBATPHO_FORCE}"
   local -a positional=()
   while (($#)); do

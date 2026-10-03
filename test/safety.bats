@@ -307,6 +307,38 @@ function _create_traversal_archive {
   assert_equal "$(cat "${destination}/stripped/nested/file.txt")" "hello"
 }
 
+@test "dybatpho::safe_extract asks for the archive module when it is not loaded" {
+  # `safety` does not load `archive`, so a script that only confirms or removes
+  # does not pay for it. A child shell started from a file, without the
+  # functions this process exports, shows what such a script sees: the guard
+  # fires before the archive path is even looked at.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules safety\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::is_interactive || echo "not interactive"'
+    printf '%s\n' 'dybatpho::safe_extract --force "${1}" "${2}"'
+  } > "${script}"
+
+  local archive_path="${BATS_TEST_TMPDIR}/safe.tar.gz"
+  local destination="${BATS_TEST_TMPDIR}/out"
+  _create_test_archive "${archive_path}"
+
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${BATS_TEST_TMPDIR}/absent.tar.gz" "${destination}"
+  assert_failure
+  assert_line --index 0 "not interactive"
+  assert_output --partial "dybatpho::safe_extract needs the archive module, load it with: dybatpho::load archive"
+  refute_output --partial "Archive doesn't exist"
+
+  # Once the script loads it, the same call extracts.
+  sed -i 's/--modules safety/--modules safety archive/' "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${archive_path}" "${destination}"
+  assert_success
+  assert_equal "$(cat "${destination}/bundle/nested/file.txt")" "hello"
+}
+
 @test "dybatpho::safe_extract refuses archives that escape the destination" {
   local archive_path="${BATS_TEST_TMPDIR}/evil.tar.gz"
   local destination="${BATS_TEST_TMPDIR}/out"

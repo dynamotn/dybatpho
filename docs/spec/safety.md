@@ -164,6 +164,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   archives should be extracted into a scratch directory.
 - The shell has no terminal, so a confirmation can't be asked.
 - `DRY_RUN` is enabled, so no operation may change the filesystem.
+- `safe_extract` is called while the `archive` module it lists and extracts
+  through is not loaded.
 
 ## Requirements *(mandatory)*
 
@@ -227,6 +229,9 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   path, so a file whose name begins with a dash can still be operated on.
 - **FR-022**: `safe_copy` and `safe_move` MUST forward `--backup` to the
   overwrite guard, and MUST reject unknown options like the other wrappers.
+- **FR-023**: Loading `safety` MUST NOT load `archive`; `safe_extract` MUST
+  stop with a message naming the `archive` module and how to load it when that
+  module is not loaded, before it inspects the archive or the destination.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -285,6 +290,9 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   one, honors `DRY_RUN`, and validates its description, separator, and options.
 - **IT-011**: Verify `safe_rm` under `DRY_RUN` prints the `rm` command and keeps
   the file.
+- **IT-012**: In a child shell that loaded only `safety`, verify `safe_extract`
+  stops with the message naming `archive` before looking at the archive, and
+  extracts once `archive` is loaded.
 
 ## Acceptance Criteria *(mandatory)*
 

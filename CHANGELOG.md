@@ -561,6 +561,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   . dybatpho/init.sh --modules markdown table    # after
   ```
 
+- **BREAKING: `safety` no longer loads `archive`.** Only
+  `dybatpho::safe_extract` lists and extracts through the archive module, so
+  loading `safety` -- or `tui`, `agent` and `pkg`, which load it -- no longer
+  brings `archive` along. `dybatpho::safe_extract` stops
+  with `dybatpho::safe_extract needs the archive module, load it with:
+  dybatpho::load archive` before it looks at the archive. A script that calls
+  `safe_extract`, or any `archive_*` function, after loading only `safety`
+  has to ask for `archive`:
+
+  ```sh
+  . dybatpho/init.sh --modules safety            # before
+  . dybatpho/init.sh --modules safety archive    # after
+  ```
+
 ### Fixed
 
 - **`testing` — a mock now wins over a command the shell already ran.**

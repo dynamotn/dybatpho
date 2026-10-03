@@ -142,10 +142,10 @@ loaded_line() {
   assert_output "string os logging helpers process file secret lock cache "
 
   run_traced -0 init_sh "--modules agent" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli archive safety json agent "
+  assert_output "string os logging helpers process file secret validate config cli safety json agent "
 
   run_traced -0 init_sh "--modules tui" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config cli archive safety tui "
+  assert_output "string os logging helpers process file secret validate config cli safety tui "
 
   # `metrics` loads nothing on its own: summaries ask for `math` and a push
   # asks for `network`, so counting and timing never pull in `curl`.
@@ -160,7 +160,7 @@ loaded_line() {
 
 @test "a dependency cycle loads every module once and terminates" {
   run_traced -0 init_sh "--modules safety" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret archive validate config cli safety "
+  assert_output "string os logging helpers process file secret validate config cli safety "
 
   run_traced -0 init_sh "--modules archive" "$(loaded_line)"
   assert_output "string os logging helpers process file secret validate config cli safety archive "

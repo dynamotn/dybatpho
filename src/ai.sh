@@ -1220,16 +1220,30 @@ function dybatpho::ai_ask {
 # @see dybatpho::create_temp
 #######################################
 function dybatpho::ai_conversation_new {
-  local path_var system
-  dybatpho::expect_args path_var -- "$@"
-  dybatpho::expect_ref "${path_var}"
-  system="${2:-${DYBATPHO_AI_SYSTEM}}"
+  dybatpho::expect_ref "${1-}"
+  # The file is made in a helper of its own scope: the path is written through
+  # the name the caller passes, and a plain local here of the same name
+  # (`file`, `system`) would receive it instead.
+  local __dybatpho_ai_conversation_file
+  __dybatpho_ai_conversation_file_into __dybatpho_ai_conversation_file "${2:-${DYBATPHO_AI_SYSTEM}}"
+  local -n __dybatpho_ai_conversation_path="$1"
+  # shellcheck disable=SC2034 # The caller reads the value through the nameref.
+  __dybatpho_ai_conversation_path="${__dybatpho_ai_conversation_file}"
+}
+
+#######################################
+# @description Create a conversation file holding an optional system prompt.
+# @arg $1 string Name of the variable receiving the file path
+# @arg $2 string System prompt, or empty for none
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_ai_conversation_file_into {
+  local -n __dybatpho_ai_conversation_ref="$1"
   local file
   dybatpho::create_temp file ".json" "ai_chat"
-  __dybatpho_ai_conversation_build "${system}" > "${file}"
-  local -n conversation_path="${path_var}"
-  # shellcheck disable=SC2034 # The caller reads the value through the nameref.
-  conversation_path="${file}"
+  __dybatpho_ai_conversation_build "$2" > "${file}"
+  __dybatpho_ai_conversation_ref="${file}"
 }
 
 #######################################

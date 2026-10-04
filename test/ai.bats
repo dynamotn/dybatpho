@@ -153,6 +153,18 @@ anthropic_body() {
   assert_failure
 }
 
+@test "dybatpho::ai_conversation_new fills a variable whatever it is named" {
+  # The path is written through the caller's name; `file`, `system` and
+  # `path_var` were the function's own locals and kept it.
+  local each
+  for each in file system path_var conversation_path; do
+    unset "${each}"
+    dybatpho::ai_conversation_new "${each}" "be brief"
+    assert_file_exist "${!each}"
+    assert_equal "$(dybatpho::json_get "$(cat "${!each}")" '.system')" "be brief"
+  done
+}
+
 @test "dybatpho::ai_conversation_new stores the system prompt" {
   local chat
   dybatpho::ai_conversation_new chat "Be terse"

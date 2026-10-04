@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locals had those names, so an option variable named `spec` or a positional
   array named `gen_file` never reached the action.
 
+- **`ai` — `dybatpho::ai_conversation_new` fills a variable whatever it is
+  called.** A caller variable named `file`, `system` or `path_var` was one of
+  the function's own locals, so it never received the conversation path.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

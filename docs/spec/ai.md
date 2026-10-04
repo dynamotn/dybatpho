@@ -236,6 +236,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-024**: A streamed request MUST show its URL redacted to the scheme and
   host in a `DRY_RUN` rehearsal and in its debug line, never the credentials or
   path of the base URL.
+- **FR-025**: `ai_conversation_new` MUST write the conversation path into the variable the caller named, whatever that name is.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -296,6 +297,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   request that never reached the server returns `1`.
 - **IT-015**: Verify a `DRY_RUN` stream against a base URL holding
   credentials and a secret path prints the host only.
+- **IT-016**: Start conversations into variables named `file`, `system`, `path_var` and `conversation_path`, and find the file with its system prompt.
 
 ## Acceptance Criteria *(mandatory)*
 

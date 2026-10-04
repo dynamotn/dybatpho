@@ -72,9 +72,25 @@ __DYBATPHO_CACHE_KEY_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 # @stdout The directory entries live in
 #######################################
 function dybatpho::cache_dir {
-  local __dybatpho_cache_base
-  __dybatpho_cache_base_into __dybatpho_cache_base
-  printf '%s\n' "${__dybatpho_cache_base}${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
+  local __dybatpho_cache_dir
+  __dybatpho_cache_dir_into __dybatpho_cache_dir
+  printf '%s\n' "${__dybatpho_cache_dir}"
+}
+
+#######################################
+# @description Set a variable to the directory of the current namespace, in the
+#   caller's shell, so that a missing `HOME` stops the public function that
+#   needed the directory instead of only a command substitution.
+# @arg $1 string Name of the variable receiving the directory
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_cache_dir_into {
+  local __dybatpho_cache_dir_var
+  dybatpho::expect_args __dybatpho_cache_dir_var -- "$@"
+  local -n __dybatpho_cache_dir_ref="${__dybatpho_cache_dir_var}"
+  __dybatpho_cache_base_into __dybatpho_cache_dir_ref
+  __dybatpho_cache_dir_ref+="${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
 }
 
 #######################################
@@ -91,8 +107,17 @@ function __dybatpho_cache_base_into {
   dybatpho::expect_args __dybatpho_cache_base_var -- "$@"
   local -n __dybatpho_cache_base_ref="${__dybatpho_cache_base_var}"
   __dybatpho_cache_base_ref="${DYBATPHO_CACHE_DIR}"
-  [[ -n "${__dybatpho_cache_base_ref}" ]] \
-    || __dybatpho_cache_base_ref="$(dybatpho::xdg_cache_dir dybatpho)"
+  [[ -z "${__dybatpho_cache_base_ref}" ]] || return 0
+  # A refusal names the public function the script called.
+  local __dybatpho_cache_base_who="${FUNCNAME[1]}" __dybatpho_cache_base_fn
+  for __dybatpho_cache_base_fn in "${FUNCNAME[@]:1}"; do
+    if [[ "${__dybatpho_cache_base_fn}" == dybatpho::* ]]; then
+      __dybatpho_cache_base_who="${__dybatpho_cache_base_fn}"
+      break
+    fi
+  done
+  __dybatpho_xdg_dir_into __dybatpho_cache_base_ref "${__dybatpho_cache_base_who}" \
+    XDG_CACHE_HOME ".cache" dybatpho
 }
 
 #######################################
@@ -256,7 +281,7 @@ function dybatpho::cache_set {
   # function is on the writing end of a pipe: that path would be read as part
   # of what the caller stored.
   local cache_dir
-  cache_dir=$(dybatpho::cache_dir)
+  __dybatpho_cache_dir_into cache_dir
   dybatpho::ensure_dir "${cache_dir}" 700 > /dev/null || status=$?
   if ((status == 0)); then
     dybatpho::file_write_atomic "${path}" || status=$?
@@ -303,7 +328,7 @@ function dybatpho::cache_forget {
 #######################################
 function dybatpho::cache_clear {
   local directory
-  directory="$(dybatpho::cache_dir)"
+  __dybatpho_cache_dir_into directory
   dybatpho::is dir "${directory}" || return 0
   if dybatpho::is true "${DRY_RUN}"; then
     dybatpho::dry_run clear "${directory}"
@@ -581,7 +606,7 @@ function __dybatpho_cache_scan {
   local -n __dybatpho_cache_scan_out="${__dybatpho_cache_scan_var}"
   __dybatpho_cache_scan_out=()
   local __dybatpho_cache_scan_dir
-  __dybatpho_cache_scan_dir="$(dybatpho::cache_dir)"
+  __dybatpho_cache_dir_into __dybatpho_cache_scan_dir
   dybatpho::is dir "${__dybatpho_cache_scan_dir}" || return 0
   local -a __dybatpho_cache_scan_records=()
   local __dybatpho_cache_scan_path __dybatpho_cache_scan_mtime __dybatpho_cache_scan_size
@@ -817,7 +842,7 @@ function dybatpho::cache_stats {
     return 0
   fi
   local directory
-  directory="$(dybatpho::cache_dir)"
+  __dybatpho_cache_dir_into directory
   printf '%-10s %s\n' \
     namespace "${DYBATPHO_CACHE_NAMESPACE:-(none)}" \
     directory "${directory}" \

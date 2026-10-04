@@ -77,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`cache` — an empty `DYBATPHO_CACHE_DIR` no longer puts entries at `/`.**
   Emptied after the module loaded, the setting made `dybatpho::cache_dir` and
   every entry resolve under the root of the filesystem; it now falls back to
-  the user cache directory, as at load time.
+  the user cache directory, as at load time, and stops the function that needed
+  it when neither `XDG_CACHE_HOME` nor `HOME` is set.
 
 - **`secret` — `secret_write_file` and `secret_with_file` use your secret
   whatever its variable is called.** A secret held in a variable named like one

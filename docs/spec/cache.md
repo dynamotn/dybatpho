@@ -227,6 +227,7 @@ fi
 - **FR-026**: Loading the module MUST NOT load `lock`. A grace window, from `--stale` or `DYBATPHO_CACHE_STALE`, and `cache_wait` MUST stop the script, naming the `lock` module and how to load it, when that module is not loaded, before an entry is read; caching without a grace window MUST work without it.
 - **FR-027**: Every accessor MUST resolve an entry's path in the caller's shell, so a key that cannot be a file name stops the script instead of reading as a missing entry.
 - **FR-028**: The cache directory MUST fall back to the user cache when `DYBATPHO_CACHE_DIR` is empty, never resolve to the root of the filesystem.
+- **FR-029**: Falling back from an empty `DYBATPHO_CACHE_DIR` MUST happen in the caller's shell, so that with neither `XDG_CACHE_HOME` nor `HOME` set the public function stops instead of writing from `/`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -286,6 +287,7 @@ fi
 - **IT-032**: In a script that loaded `cache` alone, cache a command, have `--stale` and `cache_wait` stop and name the `lock` module, and run both once `lock` is loaded.
 - **IT-033**: From a script file, have `cache_get` used as a condition stop the script on `../escape` before the branch for a miss runs.
 - **IT-034**: Resolve the cache directory with `DYBATPHO_CACHE_DIR` emptied and a namespace set, and get a path under `XDG_CACHE_HOME`.
+- **IT-035**: Store an entry with the cache directory emptied and no home, under `if !`, and stop naming `dybatpho::cache_set`.
 
 ## Acceptance Criteria *(mandatory)*
 

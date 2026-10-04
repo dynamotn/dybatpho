@@ -22,6 +22,20 @@ age_entry() {
   assert_output "${BATS_TEST_TMPDIR}/xdg/dybatpho/ns"
 }
 
+@test "an emptied cache directory with no home stops the call that needed it" {
+  # The fallback was resolved inside a command substitution, so without HOME
+  # the refusal ended only the substitution and the write carried on from `/`.
+  local script="${BATS_TEST_TMPDIR}/nohome.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules cache" \
+    'unset HOME XDG_CACHE_HOME; DYBATPHO_CACHE_DIR=""' \
+    'if ! dybatpho::cache_set key <<< v; then :; fi' \
+    "printf 'carried on\n'" > "${script}"
+  run --separate-stderr bash "${script}"
+  assert_stderr --partial "dybatpho::cache_set: Neither XDG_CACHE_HOME nor HOME is set"
+  refute_output --partial "carried on"
+}
+
 @test "dybatpho::cache_dir puts a namespace below the cache directory" {
   assert_equal "$(dybatpho::cache_dir)" "${DYBATPHO_CACHE_DIR}/default"
   DYBATPHO_CACHE_NAMESPACE="gh"

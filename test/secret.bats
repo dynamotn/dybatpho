@@ -128,6 +128,26 @@ teardown() {
   done
 }
 
+@test "secret_write_file refuses a path that is no file and leaves no copy of the secret" {
+  # An empty path staged the secret as `.dybatpho_secret.<pid>` in the working
+  # directory and a directory got a copy moved inside it; either way the
+  # plain-text secret stayed on disk after the call failed.
+  local work="${BATS_TEST_TMPDIR}/secret work"
+  mkdir -p "${work}/taken"
+  local script="${BATS_TEST_TMPDIR}/write.sh"
+  printf '%s\n' \
+    "cd $(printf '%q' "${work}")" \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh" \
+    "token=s3cret" \
+    "(dybatpho::secret_write_file '' token) 2> /dev/null || printf 'empty refused\\n'" \
+    "(dybatpho::secret_write_file taken token) 2> /dev/null || printf 'directory refused\\n'" \
+    "(dybatpho::secret_write_file taken/ token) 2> /dev/null || printf 'slash refused\\n'" > "${script}"
+  run_traced bash "${script}"
+  assert_output "$(printf 'empty refused\ndirectory refused\nslash refused')"
+  assert_equal "$(ls -A "${work}" | tr '\n' ' ')" "taken "
+  assert_equal "$(ls -A "${work}/taken")" ""
+}
+
 @test "secret_from_env copies the value and unsets the source variable" {
   export APP_TOKEN="environment-secret"
   local TOKEN

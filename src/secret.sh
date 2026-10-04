@@ -421,22 +421,35 @@ function dybatpho::secret_write_file {
   [[ -n "${__dybatpho_secret_source:-}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty"
 
+  # An empty path, or one naming a directory, has no file to write; staging for
+  # it would leave a plain-text copy of the secret in the working directory,
+  # or inside that directory, once the move failed.
+  [[ -n "${__dybatpho_secret_path}" && "${__dybatpho_secret_path}" != */ \
+    && ! -d "${__dybatpho_secret_path}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Not a file path: '${__dybatpho_secret_path}'"
+
   local __dybatpho_secret_directory
   __dybatpho_secret_directory="$(dirname -- "${__dybatpho_secret_path}")"
   dybatpho::is dir "${__dybatpho_secret_directory}" \
     || dybatpho::die "Directory of secret file doesn't exist: ${__dybatpho_secret_directory}"
 
+  # The staging name carries a random part and is created with noclobber, so a
+  # file or link planted at a name built from the process id alone can't have
+  # the secret written through it.
   local __dybatpho_secret_staging __dybatpho_secret_previous_umask
   __dybatpho_secret_previous_umask="$(umask)"
   umask 077
-  __dybatpho_secret_staging="${__dybatpho_secret_path}.dybatpho_secret.${BASHPID}"
-  : > "${__dybatpho_secret_staging}" \
-    || dybatpho::die "Cannot create secret file: ${__dybatpho_secret_staging}"
-  chmod 600 "${__dybatpho_secret_staging}"
-  printf '%s\n' "${__dybatpho_secret_source}" > "${__dybatpho_secret_staging}"
+  __dybatpho_secret_staging="${__dybatpho_secret_path}.dybatpho_secret.${BASHPID}.${RANDOM}${RANDOM}"
+  if ! (set -C && printf '%s\n' "${__dybatpho_secret_source}" > "${__dybatpho_secret_staging}") 2> /dev/null; then
+    umask "${__dybatpho_secret_previous_umask}"
+    dybatpho::die "Cannot create secret file: ${__dybatpho_secret_staging}"
+  fi
   umask "${__dybatpho_secret_previous_umask}"
-  mv -f "${__dybatpho_secret_staging}" "${__dybatpho_secret_path}" \
-    || dybatpho::die "Cannot write secret file: ${__dybatpho_secret_path}"
+  chmod 600 "${__dybatpho_secret_staging}"
+  if ! mv -f -- "${__dybatpho_secret_staging}" "${__dybatpho_secret_path}"; then
+    dybatpho::secret_shred "${__dybatpho_secret_staging}"
+    dybatpho::die "Cannot write secret file: ${__dybatpho_secret_path}"
+  fi
 }
 
 #######################################

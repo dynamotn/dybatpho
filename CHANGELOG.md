@@ -85,6 +85,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaced by the function's own value: `secret_write_file` wrote the
   destination path into the secret file instead of the secret.
 
+### Security
+
+- **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the
+  secret.** An empty path staged the secret as `.dybatpho_secret.<pid>` in the
+  working directory, and a path naming a directory moved a copy inside it; the
+  plain-text file stayed behind after the call failed. Both are now refused
+  before anything is written, a failed move shreds the staging file, and the
+  staging file is created with a random name and without following a file or
+  link already there, so one planted at the name built from the process id
+  can no longer receive the secret.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

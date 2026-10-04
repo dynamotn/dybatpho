@@ -700,24 +700,24 @@ function dybatpho::assert_cli_snapshot {
 #      returns.
 #######################################
 function dybatpho::assert_exit_code {
-  local expected separator
-  dybatpho::expect_args expected separator -- "$@"
+  local __dybatpho_test_exit_expected __dybatpho_test_exit_separator
+  dybatpho::expect_args __dybatpho_test_exit_expected __dybatpho_test_exit_separator -- "$@"
   shift 2
-  if [[ ! "${expected}" =~ ^[0-9]+$ ]] || ((10#${expected} > 255)); then
-    dybatpho::die "${FUNCNAME[0]}: Expected an exit status from 0 to 255: ${expected}"
+  if [[ ! "${__dybatpho_test_exit_expected}" =~ ^[0-9]+$ ]] || ((10#${__dybatpho_test_exit_expected} > 255)); then
+    dybatpho::die "${FUNCNAME[0]}: Expected an exit status from 0 to 255: ${__dybatpho_test_exit_expected}"
   fi
-  [[ "${separator}" == "--" ]] \
+  [[ "${__dybatpho_test_exit_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: status -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
-  local output_file status=0
-  dybatpho::create_temp output_file ".log" "exitcode"
-  "$@" > "${output_file}" 2>&1 || status=$?
+  local __dybatpho_test_exit_output_file __dybatpho_test_exit_status=0
+  __dybatpho_create_temp_into __dybatpho_test_exit_output_file ".log" "exitcode"
+  "$@" > "${__dybatpho_test_exit_output_file}" 2>&1 || __dybatpho_test_exit_status=$?
 
-  ((status == 10#${expected})) && return 0
+  ((__dybatpho_test_exit_status == 10#${__dybatpho_test_exit_expected})) && return 0
   __dybatpho_test_fail \
-    "Expected exit ${expected}, got ${status}: $*" \
-    "$(< "${output_file}")"
+    "Expected exit ${__dybatpho_test_exit_expected}, got ${__dybatpho_test_exit_status}: $*" \
+    "$(< "${__dybatpho_test_exit_output_file}")"
 }
 
 #######################################
@@ -729,16 +729,16 @@ function dybatpho::assert_exit_code {
 # @internal
 #######################################
 function __dybatpho_test_time_command {
-  local output_file elapsed_var
-  dybatpho::expect_args output_file elapsed_var -- "$@"
+  local __dybatpho_test_tc_output_file __dybatpho_test_tc_elapsed_var
+  dybatpho::expect_args __dybatpho_test_tc_output_file __dybatpho_test_tc_elapsed_var -- "$@"
   shift 2
-  local -n __elapsed="${elapsed_var}"
-  local started status=0
-  started="$(__dybatpho_log_now_ms)"
-  "$@" >> "${output_file}" 2>&1 || status=$?
-  __elapsed=$(($(__dybatpho_log_now_ms) - started))
-  ((__elapsed < 0)) && __elapsed=0
-  return "${status}"
+  local -n __dybatpho_test_tc_out="${__dybatpho_test_tc_elapsed_var}"
+  local __dybatpho_test_tc_started __dybatpho_test_tc_status=0
+  __dybatpho_test_tc_started="$(__dybatpho_log_now_ms)"
+  "$@" >> "${__dybatpho_test_tc_output_file}" 2>&1 || __dybatpho_test_tc_status=$?
+  __dybatpho_test_tc_out=$(($(__dybatpho_log_now_ms) - __dybatpho_test_tc_started))
+  ((__dybatpho_test_tc_out < 0)) && __dybatpho_test_tc_out=0
+  return "${__dybatpho_test_tc_status}"
 }
 
 #######################################
@@ -765,42 +765,44 @@ function __dybatpho_test_time_command {
 #      five milliseconds.
 #######################################
 function dybatpho::assert_duration_under {
-  local budget separator
-  dybatpho::expect_args budget separator -- "$@"
+  local __dybatpho_test_dur_budget __dybatpho_test_dur_separator
+  dybatpho::expect_args __dybatpho_test_dur_budget __dybatpho_test_dur_separator -- "$@"
   shift 2
-  [[ "${budget}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Expected a budget in milliseconds: ${budget}"
-  [[ "${separator}" == "--" ]] \
+  [[ "${__dybatpho_test_dur_budget}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected a budget in milliseconds: ${__dybatpho_test_dur_budget}"
+  [[ "${__dybatpho_test_dur_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: milliseconds -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
-  local runs="${DYBATPHO_TEST_DURATION_RUNS}"
-  [[ "${runs}" =~ ^[1-9][0-9]*$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: DYBATPHO_TEST_DURATION_RUNS must be a positive number: ${runs}"
+  local __dybatpho_test_dur_runs="${DYBATPHO_TEST_DURATION_RUNS}"
+  [[ "${__dybatpho_test_dur_runs}" =~ ^[1-9][0-9]*$ ]] \
+    || dybatpho::die \
+      "${FUNCNAME[0]}: DYBATPHO_TEST_DURATION_RUNS must be a positive number: ${__dybatpho_test_dur_runs}"
 
-  local output_file
-  dybatpho::create_temp output_file ".log" "duration"
+  local __dybatpho_test_dur_output_file
+  __dybatpho_create_temp_into __dybatpho_test_dur_output_file ".log" "duration"
 
-  local run elapsed status=0 fastest=""
-  for ((run = 0; run < runs; run++)); do
-    __dybatpho_test_time_command "${output_file}" elapsed "$@" || status=$?
-    if ((status != 0)); then
+  local __dybatpho_test_dur_run __dybatpho_test_dur_elapsed __dybatpho_test_dur_status=0 __dybatpho_test_dur_fastest=""
+  for ((__dybatpho_test_dur_run = 0; __dybatpho_test_dur_run < __dybatpho_test_dur_runs; __dybatpho_test_dur_run++)); do
+    __dybatpho_test_time_command "${__dybatpho_test_dur_output_file}" __dybatpho_test_dur_elapsed "$@" || \
+      __dybatpho_test_dur_status=$?
+    if ((__dybatpho_test_dur_status != 0)); then
       __dybatpho_test_fail \
-        "Command exited ${status} while timing it: $*" \
-        "$(< "${output_file}")"
+        "Command exited ${__dybatpho_test_dur_status} while timing it: $*" \
+        "$(< "${__dybatpho_test_dur_output_file}")"
       return 1
     fi
-    if [[ -z "${fastest}" ]] || ((elapsed < fastest)); then
-      fastest="${elapsed}"
+    if [[ -z "${__dybatpho_test_dur_fastest}" ]] || ((__dybatpho_test_dur_elapsed < __dybatpho_test_dur_fastest)); then
+      __dybatpho_test_dur_fastest="${__dybatpho_test_dur_elapsed}"
     fi
   done
 
-  DYBATPHO_TEST_LAST_DURATION_MS="${fastest}"
-  if ((fastest < budget)); then
+  DYBATPHO_TEST_LAST_DURATION_MS="${__dybatpho_test_dur_fastest}"
+  if ((__dybatpho_test_dur_fastest < __dybatpho_test_dur_budget)); then
     return 0
   fi
-  __dybatpho_test_fail \
-    "Expected to finish in under ${budget}ms, took ${fastest}ms over ${runs} run(s): $*"
+  local __dybatpho_test_dur_took="took ${__dybatpho_test_dur_fastest}ms over ${__dybatpho_test_dur_runs} run(s)"
+  __dybatpho_test_fail "Expected to finish in under ${__dybatpho_test_dur_budget}ms, ${__dybatpho_test_dur_took}: $*"
   return 1
 }
 
@@ -827,39 +829,42 @@ function dybatpho::assert_duration_under {
 #      leaves a median where it was.
 #######################################
 function dybatpho::benchmark {
-  local label runs separator
-  dybatpho::expect_args label runs separator -- "$@"
+  local __dybatpho_test_bench_label __dybatpho_test_bench_runs __dybatpho_test_bench_separator
+  dybatpho::expect_args __dybatpho_test_bench_label __dybatpho_test_bench_runs __dybatpho_test_bench_separator -- "$@"
   shift 3
-  [[ "${runs}" =~ ^[1-9][0-9]*$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Expected a positive number of runs: ${runs}"
-  [[ "${separator}" == "--" ]] \
+  [[ "${__dybatpho_test_bench_runs}" =~ ^[1-9][0-9]*$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected a positive number of runs: ${__dybatpho_test_bench_runs}"
+  [[ "${__dybatpho_test_bench_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: label runs -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
-  local output_file
-  dybatpho::create_temp output_file ".log" "benchmark"
+  local __dybatpho_test_bench_output_file
+  __dybatpho_create_temp_into __dybatpho_test_bench_output_file ".log" "benchmark"
 
-  local run elapsed status=0
-  local -a samples=()
-  for ((run = 0; run < runs; run++)); do
-    __dybatpho_test_time_command "${output_file}" elapsed "$@" || status=$?
-    if ((status != 0)); then
+  local __dybatpho_test_bench_run __dybatpho_test_bench_elapsed __dybatpho_test_bench_status=0
+  local -a __dybatpho_test_bench_samples=()
+  for ((__dybatpho_test_bench_run = 0; __dybatpho_test_bench_run < __dybatpho_test_bench_runs; \
+    __dybatpho_test_bench_run++)); do
+    __dybatpho_test_time_command "${__dybatpho_test_bench_output_file}" __dybatpho_test_bench_elapsed "$@" || \
+      __dybatpho_test_bench_status=$?
+    if ((__dybatpho_test_bench_status != 0)); then
+      local __dybatpho_test_bench_which="run $((__dybatpho_test_bench_run + 1)) of ${__dybatpho_test_bench_runs}"
       __dybatpho_test_fail \
-        "Command exited ${status} on run $((run + 1)) of ${runs}: $*" \
-        "$(< "${output_file}")"
+        "Command exited ${__dybatpho_test_bench_status} on ${__dybatpho_test_bench_which}: $*" \
+        "$(< "${__dybatpho_test_bench_output_file}")"
       return 1
     fi
-    samples+=("${elapsed}")
+    __dybatpho_test_bench_samples+=("${__dybatpho_test_bench_elapsed}")
   done
 
-  local -a sorted=()
-  mapfile -t sorted < <(printf '%s\n' "${samples[@]}" | sort -n)
-  DYBATPHO_TEST_BENCH_MIN_MS="${sorted[0]}"
-  DYBATPHO_TEST_BENCH_MAX_MS="${sorted[-1]}"
-  DYBATPHO_TEST_BENCH_MEDIAN_MS="${sorted[$((${#sorted[@]} / 2))]}"
+  local -a __dybatpho_test_bench_sorted=()
+  mapfile -t __dybatpho_test_bench_sorted < <(printf '%s\n' "${__dybatpho_test_bench_samples[@]}" | sort -n)
+  DYBATPHO_TEST_BENCH_MIN_MS="${__dybatpho_test_bench_sorted[0]}"
+  DYBATPHO_TEST_BENCH_MAX_MS="${__dybatpho_test_bench_sorted[-1]}"
+  DYBATPHO_TEST_BENCH_MEDIAN_MS="${__dybatpho_test_bench_sorted[$((${#__dybatpho_test_bench_sorted[@]} / 2))]}"
   DYBATPHO_TEST_LAST_DURATION_MS="${DYBATPHO_TEST_BENCH_MEDIAN_MS}"
   printf '%s runs=%s min=%sms median=%sms max=%sms\n' \
-    "${label}" "${runs}" "${DYBATPHO_TEST_BENCH_MIN_MS}" \
+    "${__dybatpho_test_bench_label}" "${__dybatpho_test_bench_runs}" "${DYBATPHO_TEST_BENCH_MIN_MS}" \
     "${DYBATPHO_TEST_BENCH_MEDIAN_MS}" "${DYBATPHO_TEST_BENCH_MAX_MS}"
 }
 

@@ -169,6 +169,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `directory` and `total` hid the caller's variables of the same names. They
   are now prefixed.
 
+- **`testing` — a command under an exit or timing assertion sees the
+  caller's variables.** `dybatpho::assert_exit_code`, `dybatpho::benchmark`
+  and `dybatpho::assert_duration_under` ran the command in their own scope,
+  where locals such as `expected`, `status`, `output_file` and `runs` hid the
+  caller's variables, and a command assigning `expected` could pass an
+  assertion it should have failed. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

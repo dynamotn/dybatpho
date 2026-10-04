@@ -980,3 +980,23 @@ BSD
   assert_output --partial "snapshot rc=1"
   refute_output --partial "needs the"
 }
+
+@test "a command run by the timing and exit assertions sees the caller's variables" {
+  # The command runs in the assertion's scope, where its locals hid the
+  # caller's variables of the same names, and assigning to one changed the
+  # verdict.
+  local expected="caller" status="caller" output_file="caller" runs="caller" elapsed="caller" budget="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() {
+    printf '%s %s %s %s %s %s\n' "${expected}" "${status}" "${output_file}" "${runs}" "${elapsed}" "${budget}" > "${seen}"
+  }
+  dybatpho::assert_exit_code 0 -- look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+  dybatpho::benchmark scoped 1 -- look > /dev/null
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+  dybatpho::assert_duration_under 600000 -- look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+  # A command that claims the expected status does not change the verdict.
+  claim() { expected=3; return 3; }
+  run_traced ! dybatpho::assert_exit_code 0 -- claim
+}

@@ -275,6 +275,7 @@ dybatpho::show_file "${report_file}"
 
 ## Edge Cases
 
+- A subdirectory or file the process has no permission to read.
 - The target variable name is empty or invalid.
 - The caller requests a custom parent directory that does not exist.
 - The extension includes unsafe slash content that must not survive into the created file suffix.
@@ -337,6 +338,7 @@ dybatpho::show_file "${report_file}"
 - **FR-045**: A rewrite MUST stop and leave the destination untouched when its new contents cannot be produced, including when the existing file cannot be read.
 - **FR-046**: A rewrite whose destination is a symlink chain too deep to resolve MUST stop before it stages anything, also where errexit is suspended, and MUST report the refusal under the public function that was called.
 - **FR-047**: The four file writers MUST refuse a destination that is a directory before staging anything.
+- **FR-048**: `dir_size` MUST return 1 and report when part of the tree cannot be read, printing the size of what could, and MUST walk the tree once; `file_is_binary` MUST stop on a file it cannot read rather than call it text.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -402,6 +404,7 @@ dybatpho::show_file "${report_file}"
 - **IT-031**: Refuse to append a line to a file that cannot be read, leaving its contents unchanged.
 - **IT-032**: Rewrite through a symlink loop under `if !` from a script in its own directory, and leave that directory exactly as it was.
 - **IT-033**: Write and add a line to a directory, refuse both under the function that was called, and leave the directory empty.
+- **IT-034**: Size a tree with an unreadable subdirectory and get the readable part with exit 1, and refuse to classify an unreadable file.
 
 ## Acceptance Criteria *(mandatory)*
 

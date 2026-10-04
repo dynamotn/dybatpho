@@ -903,9 +903,13 @@ bytes="$(dybatpho::dir_size ./build)"
 
 - Total size in bytes, `0` for a directory holding no files
 
+**📤 Output on stderr**
+
+- An error when part of the tree could not be read
+
 **🚦 Exit codes**
 
-- `1`: The directory is missing
+- `1`: The directory is missing, or part of it could not be read; the size printed then counts only what could be read
 
 
 ---
@@ -936,7 +940,7 @@ fi
 **🚦 Exit codes**
 
 - `0`: The file contains a NUL byte in its first block
-- `1`: The file looks like text, or is empty
+- `1`: The file looks like text, or is empty; stop the script when it cannot be read
 
 
 ---

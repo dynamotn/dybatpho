@@ -169,6 +169,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commit, when there is no `HEAD` to compare with, the files already staged
   are listed too instead of going missing.
 
+- **`file` — reading part of a tree or nothing of a file is no longer a clean
+  answer.** `dybatpho::dir_size` left out every subdirectory it could not enter
+  and still returned success, so a partial total read as the real one; it now
+  prints what it could count, reports the rest, and returns 1. It also walked
+  the tree a second time with the BSD form of `stat` whenever such an error
+  occurred. `dybatpho::file_is_binary` read nothing from a file it had no
+  permission to read and called it text; it now stops with "Cannot read file".
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

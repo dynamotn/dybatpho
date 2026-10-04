@@ -1294,7 +1294,9 @@ function dybatpho::file_mtime {
 #
 # @arg $1 string Directory path
 # @stdout Total size in bytes, `0` for a directory holding no files
-# @exitcode 1 The directory is missing
+# @stderr An error when part of the tree could not be read
+# @exitcode 1 The directory is missing, or part of it could not be read; the
+#   size printed then counts only what could be read
 # @tip Symbolic links are not counted at all, the way `du` treats them, so a
 #   link to a file inside the same tree cannot count its target twice
 #######################################
@@ -1303,13 +1305,19 @@ function dybatpho::dir_size {
   dybatpho::expect_args directory -- "$@"
   dybatpho::is dir "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
-  # One `stat` call for the whole tree rather than one per file, trying the GNU
-  # form before the BSD one as everywhere else in this module.
-  total="$({
-    find "${directory}" -type f -exec stat -L -c '%s' {} + 2> /dev/null \
-      || find "${directory}" -type f -exec stat -L -f '%z' {} + 2> /dev/null
-  } | awk '{ total += $1 } END { printf "%d\n", total }')"
+  # One `stat` call for the whole tree rather than one per file. The flavour is
+  # asked once, up front: falling back after a failed `find` walked the tree a
+  # second time whenever any part of it could not be read.
+  local -a stat_size=(stat -L -c '%s')
+  stat -c '%s' -- "${directory}" > /dev/null 2>&1 || stat_size=(stat -L -f '%z')
+  local sizes status=0
+  sizes="$(find "${directory}" -type f -exec "${stat_size[@]}" {} + 2> /dev/null)" || status=$?
+  total="$(printf '%s\n' "${sizes}" | awk '{ total += $1 } END { printf "%d\n", total }')"
   printf '%s\n' "${total:-0}"
+  if ((status != 0)); then
+    dybatpho::error "${FUNCNAME[0]}: Part of ${directory} could not be read; the size counts only the rest"
+    return 1
+  fi
 }
 
 #######################################
@@ -1325,7 +1333,7 @@ function dybatpho::dir_size {
 #
 # @arg $1 string File path
 # @exitcode 0 The file contains a NUL byte in its first block
-# @exitcode 1 The file looks like text, or is empty
+# @exitcode 1 The file looks like text, or is empty; stop the script when it cannot be read
 # @tip Check this before a text rewrite, which would otherwise mangle a binary
 #######################################
 function dybatpho::file_is_binary {
@@ -1333,6 +1341,9 @@ function dybatpho::file_is_binary {
   dybatpho::expect_args path -- "$@"
   dybatpho::is file "${path}" \
     || dybatpho::die "${FUNCNAME[0]}: File doesn't exist: ${path}"
+  # Reading nothing would count as a block with no NUL byte, and report an
+  # unreadable binary as text.
+  [[ -r "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Cannot read file: ${path}"
   # A NUL byte cannot survive in a shell variable, so the byte counts before and
   # after removing NULs are compared instead of the contents.
   # shellcheck disable=SC2312 # a variable cannot hold the NUL bytes being counted

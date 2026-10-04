@@ -919,6 +919,38 @@ SCRIPT
   assert_equal "$(dybatpho::dir_size "${tree}")" "1000"
 }
 
+@test "dybatpho::dir_size reports a tree it could not read in full" {
+  # A subdirectory it could not enter was left out of the total, and the size
+  # came back as a success; the fallback for BSD `stat` also walked the tree a
+  # second time whenever `find` reported such an error.
+  [[ "$(id -u)" != 0 ]] || skip "root reads every directory"
+  local tree="${BATS_TEST_TMPDIR}/partly locked"
+  mkdir -p "${tree}/open" "${tree}/locked"
+  printf '1234' > "${tree}/open/a"
+  printf '123456' > "${tree}/locked/b"
+  chmod 000 "${tree}/locked"
+
+  run --separate-stderr dybatpho::dir_size "${tree}"
+  chmod 700 "${tree}/locked"
+  assert_failure
+  assert_output "4"
+  assert_stderr --partial "could not be read"
+}
+
+@test "dybatpho::file_is_binary stops on a file it cannot read" {
+  # Reading nothing counted as a block with no NUL byte, so an unreadable
+  # binary file was reported as text.
+  [[ "$(id -u)" != 0 ]] || skip "root reads every file"
+  local path="${BATS_TEST_TMPDIR}/locked.bin"
+  printf 'a\0b' > "${path}"
+  chmod 000 "${path}"
+
+  run --separate-stderr dybatpho::file_is_binary "${path}"
+  chmod 600 "${path}"
+  assert_failure
+  assert_stderr --partial "Cannot read file"
+}
+
 @test "dybatpho::file_is_binary tells a binary from text" {
   printf 'plain text\n' > "${BATS_TEST_TMPDIR}/text"
   printf 'abc\000def' > "${BATS_TEST_TMPDIR}/binary"

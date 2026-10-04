@@ -228,6 +228,7 @@ dybatpho::generate_man _spec mytool
 - **FR-029**: Option, command, and argument metadata MUST keep every field in place when one of them is empty, so an empty description never shifts the switches, environment name, or any later field in the schema, man page, completions, or help.
 - **FR-030**: The JSON schema MUST escape every control character in a string value, the way the library's JSON string escaper does, so any description yields valid JSON.
 - **FR-031**: The generated parser MUST assign the option and positional variables the spec names whatever those names are, including `spec` and `gen_file`.
+- **FR-032**: A spec function, and the actions and hooks it names, MUST see the caller's variables: the parser, help, schema, man and completion generators MUST keep their state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -270,6 +271,7 @@ dybatpho::generate_man _spec mytool
 - **IT-013**: Declare a parameter, a flag, and an argument with empty descriptions, and verify the schema stays valid JSON with every field in place, the man page names the switch and its environment variable, and help keeps the annotation on its own line.
 - **IT-014**: Generate the schema for a command and a flag whose descriptions hold a bell, ANSI colour codes and a form feed, and read both descriptions back intact with `jq`.
 - **IT-015**: Parse an option into a variable named `spec` and positionals into an array named `gen_file`, and read both in the action.
+- **IT-016**: Generate help for, and run, a spec whose description and action read variables named like the generators' locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

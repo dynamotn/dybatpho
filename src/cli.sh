@@ -1229,9 +1229,9 @@ function __dybatpho_cli_parse_key_value {
 # @internal
 #######################################
 function __dybatpho_cli_generate_logic {
-  local spec
-  dybatpho::expect_args spec -- "$@"
-  declare -F "${spec}" > /dev/null || return 0
+  local __dybatpho_cli_logic_spec
+  dybatpho::expect_args __dybatpho_cli_logic_spec -- "$@"
+  declare -F "${__dybatpho_cli_logic_spec}" > /dev/null || return 0
   shift
 
   # For get list of options, separated by space
@@ -1262,7 +1262,7 @@ function __dybatpho_cli_generate_logic {
   local __has_sub_cmd="false"
   local __has_help="false"
   declare -a __sub_specs=()
-  local sub_spec __required_check
+  local __dybatpho_cli_logic_sub_spec __required_check
   declare -a __prompt_defs=()
   declare -a __known_switches=()
   declare -a __declared_args=()
@@ -1301,7 +1301,7 @@ function __dybatpho_cli_generate_logic {
   # Initial all variables before get value of options
   local __done_initial=false
   __dybatpho_cli_replay_persistent_defs
-  "${spec}" "$*"
+  "${__dybatpho_cli_logic_spec}" "$*"
   # An explicit `args:<rule>` always wins; otherwise the declared positional
   # arguments describe the count well enough to validate it.
   case "${__args}" in
@@ -1310,7 +1310,7 @@ function __dybatpho_cli_generate_logic {
       ;;
     *) ;;
   esac
-  __dybatpho_cli_print_indent 0 "dybatpho::opts::parse::${spec}() {"
+  __dybatpho_cli_print_indent 0 "dybatpho::opts::parse::${__dybatpho_cli_logic_spec}() {"
   __dybatpho_cli_print_indent 1 'local __rest_argc=0'
   # The rest variable is an array now, so it can no longer double as the
   # "stop parsing" sentinel the way a scalar did: writing `end` into it would
@@ -1351,7 +1351,7 @@ function __dybatpho_cli_generate_logic {
   # compared against the ones the command accepts.
   if dybatpho::is true "${__abbr}"; then
     local -a __abbr_long=()
-    __dybatpho_cli_collect_long_switches __abbr_long "${spec}"
+    __dybatpho_cli_collect_long_switches __abbr_long "${__dybatpho_cli_logic_spec}"
     if ((${#__abbr_long[@]})); then
       local __abbr_list="" __abbr_switch
       for __abbr_switch in "${__abbr_long[@]}"; do
@@ -1378,11 +1378,11 @@ function __dybatpho_cli_generate_logic {
   __dybatpho_cli_replay_persistent_defs
   if dybatpho::is false "${__has_help}"; then
     __dybatpho_cli_print_indent 3 "--help|-h)"
-    __dybatpho_cli_print_indent 4 "dybatpho::generate_help ${spec}"
+    __dybatpho_cli_print_indent 4 "dybatpho::generate_help ${__dybatpho_cli_logic_spec}"
     __dybatpho_cli_print_indent 4 "exit 0"
     __dybatpho_cli_print_indent 4 ";;"
   fi
-  "${spec}" "$*"
+  "${__dybatpho_cli_logic_spec}" "$*"
   __dybatpho_cli_print_indent 3 "--)"
   __dybatpho_cli_print_indent 4 "shift"
   __dybatpho_cli_print_rest
@@ -1398,14 +1398,18 @@ function __dybatpho_cli_generate_logic {
     __dybatpho_cli_print_rest
   else
     __dybatpho_cli_print_indent 4 "case \$1 in"
-    for sub_spec in "${__sub_specs[@]}"; do
-      local _sub_spec _cmd_match _cmd_name _cmd_deprecated
-      IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
-      __dybatpho_cli_print_indent 5 "${_cmd_match})"
-      [[ -n "${_cmd_deprecated}" ]] && __dybatpho_cli_print_deprecated_warning "command" "${_cmd_name}" "${_cmd_deprecated}"
-      __dybatpho_cli_print_indent 6 "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${_cmd_name}\""
+    for __dybatpho_cli_logic_sub_spec in "${__sub_specs[@]}"; do
+      local __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name
+      local __dybatpho_cli_logic__cmd_deprecated
+      IFS=$'\t' read -r __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name \
+        __dybatpho_cli_logic__cmd_deprecated <<< "${__dybatpho_cli_logic_sub_spec}"
+      __dybatpho_cli_print_indent 5 "${__dybatpho_cli_logic__cmd_match})"
+      [[ -n "${__dybatpho_cli_logic__cmd_deprecated}" ]] && __dybatpho_cli_print_deprecated_warning "command" \
+        "${__dybatpho_cli_logic__cmd_name}" "${__dybatpho_cli_logic__cmd_deprecated}"
+      __dybatpho_cli_print_indent 6 \
+        "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${__dybatpho_cli_logic__cmd_name}\""
       __dybatpho_cli_print_indent 6 "shift"
-      __dybatpho_cli_print_indent 6 "dybatpho::opts::parse::${_sub_spec} \"\$@\""
+      __dybatpho_cli_print_indent 6 "dybatpho::opts::parse::${__dybatpho_cli_logic__sub_spec} \"\$@\""
       __dybatpho_cli_print_indent 6 ";;"
     done
     __dybatpho_cli_print_indent 5 "*)"
@@ -1491,14 +1495,16 @@ function __dybatpho_cli_generate_logic {
   __dybatpho_cli_print_indent 1 "esac"
   [[ -n "${__error}" ]] && __dybatpho_cli_print_indent 1 "${__error}" '"$@" >&2 || exit $?'
   __dybatpho_cli_print_indent 1 'dybatpho::die "$1" 1'
-  __dybatpho_cli_print_indent 0 "} # End of dybatpho::opts::parse::${spec}"
+  __dybatpho_cli_print_indent 0 "} # End of dybatpho::opts::parse::${__dybatpho_cli_logic_spec}"
 
   # Generate sub-command logics
-  for sub_spec in "${__sub_specs[@]}"; do
-    local _sub_spec _cmd_match _cmd_name _cmd_deprecated
-    IFS=$'\t' read -r _sub_spec _cmd_match _cmd_name _cmd_deprecated <<< "${sub_spec}"
-    [[ "${_cmd_match}" = "${_cmd_name}" ]] || continue
-    __dybatpho_cli_generate_child_logic "${_sub_spec}" "$@"
+  for __dybatpho_cli_logic_sub_spec in "${__sub_specs[@]}"; do
+    local __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name
+    local __dybatpho_cli_logic__cmd_deprecated
+    IFS=$'\t' read -r __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name \
+      __dybatpho_cli_logic__cmd_deprecated <<< "${__dybatpho_cli_logic_sub_spec}"
+    [[ "${__dybatpho_cli_logic__cmd_match}" = "${__dybatpho_cli_logic__cmd_name}" ]] || continue
+    __dybatpho_cli_generate_child_logic "${__dybatpho_cli_logic__sub_spec}" "$@"
   done
 
   # The root spec is not triggered from inside the generated file. Writing the
@@ -1521,11 +1527,11 @@ function __dybatpho_cli_generate_logic {
 # @internal
 #######################################
 function __dybatpho_cli_generate_help {
-  local spec
-  dybatpho::expect_args spec -- "$@"
-  local type
-  type=$(type -t "${spec}")
-  [[ "${type}" != 'function' ]] && return
+  local __dybatpho_cli_help_spec
+  dybatpho::expect_args __dybatpho_cli_help_spec -- "$@"
+  local __dybatpho_cli_help_type
+  __dybatpho_cli_help_type=$(type -t "${__dybatpho_cli_help_spec}")
+  [[ "${__dybatpho_cli_help_type}" != 'function' ]] && return
 
   __help_mode=true
   __dybatpho_cli_replay_persistent_defs
@@ -1535,7 +1541,7 @@ function __dybatpho_cli_generate_help {
   for __persistent_def in "${__persistent_help_defs[@]}"; do
     eval "${__persistent_def}"
   done
-  "${spec}"
+  "${__dybatpho_cli_help_spec}"
   # A command that declares no help option of its own is still given `--help`
   # and `-h` by the parser, so the generated help lists them too.
   if dybatpho::is false "${__has_help}"; then
@@ -1555,9 +1561,9 @@ function __dybatpho_cli_generate_help {
     ${__help_cmd_rows[@]+"${__help_cmd_rows[@]}"} \
     ${__help_opt_rows[@]+"${__help_opt_rows[@]}"}
 
-  local cli_help_usage
-  cli_help_usage=$(__dybatpho_cli_help_usage)
-  dybatpho::print "${cli_help_usage}"
+  local __dybatpho_cli_help_cli_help_usage
+  __dybatpho_cli_help_cli_help_usage=$(__dybatpho_cli_help_usage)
+  dybatpho::print "${__dybatpho_cli_help_cli_help_usage}"
   if [[ -n "${__help_description}" ]]; then
     dybatpho::print ""
     dybatpho::print "${__help_description}"
@@ -1579,9 +1585,9 @@ function __dybatpho_cli_generate_help {
     __dybatpho_cli_help_render_rows "${__width}" "${__help_cmd_rows[@]}"
   fi
   dybatpho::print ""
-  local log_text
-  log_text=$(__dybatpho_log_text cli.heading_options "Options:")
-  dybatpho::print "${log_text}"
+  local __dybatpho_cli_help_log_text
+  __dybatpho_cli_help_log_text=$(__dybatpho_log_text cli.heading_options "Options:")
+  dybatpho::print "${__dybatpho_cli_help_log_text}"
   __dybatpho_cli_help_render_rows "${__width}" ${__help_opt_rows[@]+"${__help_opt_rows[@]}"}
   if ((${#__help_cmd_rows[@]})); then
     local __invocation="${0##*/}${__help_subcmd:+ ${__help_subcmd}}"
@@ -1630,9 +1636,9 @@ function __dybatpho_cli_help_usage {
 # @stdout JSON schema
 #######################################
 function dybatpho::generate_schema {
-  local spec name="${2:-${0##*/}}"
-  dybatpho::expect_args spec -- "$@"
-  __dybatpho_cli_generate_schema_command "${spec}" "${name}"
+  local __dybatpho_cli_gs_spec __dybatpho_cli_gs_name="${2:-${0##*/}}"
+  dybatpho::expect_args __dybatpho_cli_gs_spec -- "$@"
+  __dybatpho_cli_generate_schema_command "${__dybatpho_cli_gs_spec}" "${__dybatpho_cli_gs_name}"
 }
 
 #######################################
@@ -1646,86 +1652,111 @@ function dybatpho::generate_schema {
 # @internal
 #######################################
 function __dybatpho_cli_generate_schema_command {
-  local spec="$1" name="$2" command_aliases="${3:-}" description
-  local -a options=() commands=() arguments=()
-  __dybatpho_cli_collect_spec_metadata "${spec}" options commands description arguments
-  local q_name q_description option argument command first=true aliases="${command_aliases}"
+  local __dybatpho_cli_gsc_spec="$1" __dybatpho_cli_gsc_name="$2" __dybatpho_cli_gsc_command_aliases="${3:-}" \
+    __dybatpho_cli_gsc_description
+  local -a __dybatpho_cli_gsc_options=() __dybatpho_cli_gsc_commands=() __dybatpho_cli_gsc_arguments=()
+  __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gsc_spec}" __dybatpho_cli_gsc_options \
+    __dybatpho_cli_gsc_commands __dybatpho_cli_gsc_description __dybatpho_cli_gsc_arguments
+  local __dybatpho_cli_gsc_q_name __dybatpho_cli_gsc_q_description __dybatpho_cli_gsc_option \
+    __dybatpho_cli_gsc_argument __dybatpho_cli_gsc_command __dybatpho_cli_gsc_first=true \
+    __dybatpho_cli_gsc_aliases="${__dybatpho_cli_gsc_command_aliases}"
   # `@none` is the sentinel an alias-less command records, not a real alias.
-  [[ "${aliases}" = "@none" ]] && aliases=""
-  __dybatpho_cli_json_quote q_name "${name}"
-  __dybatpho_cli_json_quote q_description "${description}"
-  local alias alias_first=true
-  printf '{"name":%s,"description":%s,"aliases":[' "${q_name}" "${q_description}"
-  for alias in ${aliases:-}; do
-    __dybatpho_cli_json_quote alias "${alias}"
-    [[ "${alias_first}" = true ]] || printf ","
-    alias_first=false
-    printf "%s" "${alias}"
+  [[ "${__dybatpho_cli_gsc_aliases}" = "@none" ]] && __dybatpho_cli_gsc_aliases=""
+  __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_name "${__dybatpho_cli_gsc_name}"
+  __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_description "${__dybatpho_cli_gsc_description}"
+  local __dybatpho_cli_gsc_alias __dybatpho_cli_gsc_alias_first=true
+  printf '{"name":%s,"description":%s,"aliases":[' "${__dybatpho_cli_gsc_q_name}" "${__dybatpho_cli_gsc_q_description}"
+  for __dybatpho_cli_gsc_alias in ${__dybatpho_cli_gsc_aliases:-}; do
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_alias "${__dybatpho_cli_gsc_alias}"
+    [[ "${__dybatpho_cli_gsc_alias_first}" = true ]] || printf ","
+    __dybatpho_cli_gsc_alias_first=false
+    printf "%s" "${__dybatpho_cli_gsc_alias}"
   done
   printf '],"options":['
-  for option in "${options[@]}"; do
-    local type var desc switches env multiple choices prompt hidden required deprecated label config count negatable
-    local pattern value_type
-    IFS="${__DYBATPHO_CLI_META_SEP}" read -r type var desc switches env multiple choices prompt hidden \
-      required deprecated label config count negatable pattern value_type <<< "${option}"
-    [[ "${env}" = "@none" ]] && env=""
-    [[ "${choices}" = "@none" ]] && choices=""
-    [[ "${prompt}" = "@none" ]] && prompt=""
-    [[ "${deprecated}" = "@none" ]] && deprecated=""
-    [[ "${label}" = "@none" ]] && label=""
-    [[ "${config}" = "@none" ]] && config=""
-    [[ "${pattern}" = "@none" ]] && pattern=""
-    [[ "${value_type:-@none}" = "@none" ]] && value_type=""
-    local q_type q_var q_desc q_env q_choices q_prompt q_deprecated q_label q_config q_pattern q_value_type
-    __dybatpho_cli_json_quote q_config "${config}"
-    __dybatpho_cli_json_quote q_type "${type}"
-    __dybatpho_cli_json_quote q_var "${var}"
-    __dybatpho_cli_json_quote q_desc "${desc}"
-    __dybatpho_cli_json_quote q_env "${env}"
-    __dybatpho_cli_json_quote q_choices "${choices}"
-    __dybatpho_cli_json_quote q_prompt "${prompt}"
-    __dybatpho_cli_json_quote q_deprecated "${deprecated}"
-    __dybatpho_cli_json_quote q_label "${label}"
-    __dybatpho_cli_json_quote q_pattern "${pattern}"
-    __dybatpho_cli_json_quote q_value_type "${value_type}"
-    [[ "${first}" = true ]] || printf ","
-    first=false
-    printf '{"type":%s,"name":%s,"description":%s,"switches":[' "${q_type}" "${q_var}" "${q_desc}"
-    local switch switch_first=true
-    for switch in ${switches}; do
-      __dybatpho_cli_json_quote switch "${switch}"
-      [[ "${switch_first}" = true ]] || printf ","
-      switch_first=false
-      printf "%s" "${switch}"
+  for __dybatpho_cli_gsc_option in "${__dybatpho_cli_gsc_options[@]}"; do
+    local __dybatpho_cli_gsc_type __dybatpho_cli_gsc_var __dybatpho_cli_gsc_desc __dybatpho_cli_gsc_switches
+    local __dybatpho_cli_gsc_env __dybatpho_cli_gsc_multiple __dybatpho_cli_gsc_choices __dybatpho_cli_gsc_prompt
+    local __dybatpho_cli_gsc_hidden __dybatpho_cli_gsc_required __dybatpho_cli_gsc_deprecated __dybatpho_cli_gsc_label
+    local __dybatpho_cli_gsc_config __dybatpho_cli_gsc_count __dybatpho_cli_gsc_negatable
+    local __dybatpho_cli_gsc_pattern __dybatpho_cli_gsc_value_type
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gsc_type __dybatpho_cli_gsc_var __dybatpho_cli_gsc_desc \
+      __dybatpho_cli_gsc_switches __dybatpho_cli_gsc_env __dybatpho_cli_gsc_multiple __dybatpho_cli_gsc_choices \
+      __dybatpho_cli_gsc_prompt __dybatpho_cli_gsc_hidden \
+      __dybatpho_cli_gsc_required __dybatpho_cli_gsc_deprecated __dybatpho_cli_gsc_label __dybatpho_cli_gsc_config \
+        __dybatpho_cli_gsc_count __dybatpho_cli_gsc_negatable __dybatpho_cli_gsc_pattern __dybatpho_cli_gsc_value_type \
+        <<< "${__dybatpho_cli_gsc_option}"
+    [[ "${__dybatpho_cli_gsc_env}" = "@none" ]] && __dybatpho_cli_gsc_env=""
+    [[ "${__dybatpho_cli_gsc_choices}" = "@none" ]] && __dybatpho_cli_gsc_choices=""
+    [[ "${__dybatpho_cli_gsc_prompt}" = "@none" ]] && __dybatpho_cli_gsc_prompt=""
+    [[ "${__dybatpho_cli_gsc_deprecated}" = "@none" ]] && __dybatpho_cli_gsc_deprecated=""
+    [[ "${__dybatpho_cli_gsc_label}" = "@none" ]] && __dybatpho_cli_gsc_label=""
+    [[ "${__dybatpho_cli_gsc_config}" = "@none" ]] && __dybatpho_cli_gsc_config=""
+    [[ "${__dybatpho_cli_gsc_pattern}" = "@none" ]] && __dybatpho_cli_gsc_pattern=""
+    [[ "${__dybatpho_cli_gsc_value_type:-@none}" = "@none" ]] && __dybatpho_cli_gsc_value_type=""
+    local __dybatpho_cli_gsc_q_type __dybatpho_cli_gsc_q_var __dybatpho_cli_gsc_q_desc __dybatpho_cli_gsc_q_env
+    local __dybatpho_cli_gsc_q_choices __dybatpho_cli_gsc_q_prompt __dybatpho_cli_gsc_q_deprecated
+    local __dybatpho_cli_gsc_q_label __dybatpho_cli_gsc_q_config __dybatpho_cli_gsc_q_pattern
+    local __dybatpho_cli_gsc_q_value_type
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_config "${__dybatpho_cli_gsc_config}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_type "${__dybatpho_cli_gsc_type}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_var "${__dybatpho_cli_gsc_var}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_desc "${__dybatpho_cli_gsc_desc}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_env "${__dybatpho_cli_gsc_env}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_choices "${__dybatpho_cli_gsc_choices}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_prompt "${__dybatpho_cli_gsc_prompt}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_deprecated "${__dybatpho_cli_gsc_deprecated}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_label "${__dybatpho_cli_gsc_label}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_pattern "${__dybatpho_cli_gsc_pattern}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_value_type "${__dybatpho_cli_gsc_value_type}"
+    [[ "${__dybatpho_cli_gsc_first}" = true ]] || printf ","
+    __dybatpho_cli_gsc_first=false
+    printf '{"type":%s,"name":%s,"description":%s,"switches":[' "${__dybatpho_cli_gsc_q_type}" \
+      "${__dybatpho_cli_gsc_q_var}" "${__dybatpho_cli_gsc_q_desc}"
+    local __dybatpho_cli_gsc_switch __dybatpho_cli_gsc_switch_first=true
+    for __dybatpho_cli_gsc_switch in ${__dybatpho_cli_gsc_switches}; do
+      __dybatpho_cli_json_quote __dybatpho_cli_gsc_switch "${__dybatpho_cli_gsc_switch}"
+      [[ "${__dybatpho_cli_gsc_switch_first}" = true ]] || printf ","
+      __dybatpho_cli_gsc_switch_first=false
+      printf "%s" "${__dybatpho_cli_gsc_switch}"
     done
-    local option_format='],"env":%s,"config":%s,"multiple":%s,"count":%s,"negatable":%s,"choices":%s,'
-    option_format+='"pattern":%s,"valueType":%s,"prompt":%s,"hidden":%s,"required":%s,"deprecated":%s,"label":%s}'
+    local \
+      __dybatpho_cli_gsc_option_format='],"env":%s,"config":%s,"multiple":%s,"count":%s,"negatable":%s,"choices":%s,'
+    __dybatpho_cli_gsc_option_format+='"pattern":%s,"valueType":%s,"prompt":%s,"hidden":%s,"required":%s,"deprecated":%s,"label":%s}'
     # shellcheck disable=SC2059 # the format is built above, not taken from input
-    printf "${option_format}" \
-      "${q_env}" "${q_config}" "${multiple:-false}" "${count:-false}" "${negatable:-false}" \
-      "${q_choices}" "${q_pattern}" "${q_value_type}" "${q_prompt}" "${hidden:-false}" \
-      "${required:-false}" "${q_deprecated}" "${q_label}"
+    printf "${__dybatpho_cli_gsc_option_format}" \
+      "${__dybatpho_cli_gsc_q_env}" "${__dybatpho_cli_gsc_q_config}" "${__dybatpho_cli_gsc_multiple:-false}" \
+        "${__dybatpho_cli_gsc_count:-false}" "${__dybatpho_cli_gsc_negatable:-false}" \
+      "${__dybatpho_cli_gsc_q_choices}" "${__dybatpho_cli_gsc_q_pattern}" "${__dybatpho_cli_gsc_q_value_type}" \
+        "${__dybatpho_cli_gsc_q_prompt}" "${__dybatpho_cli_gsc_hidden:-false}" \
+      "${__dybatpho_cli_gsc_required:-false}" "${__dybatpho_cli_gsc_q_deprecated}" "${__dybatpho_cli_gsc_q_label}"
   done
   printf '],"arguments":['
-  first=true
-  for argument in ${arguments[@]+"${arguments[@]}"}; do
-    local arg_name arg_desc arg_required arg_variadic q_arg_name q_arg_desc
-    IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${argument}"
-    __dybatpho_cli_json_quote q_arg_name "${arg_name}"
-    __dybatpho_cli_json_quote q_arg_desc "${arg_desc}"
-    [[ "${first}" = true ]] || printf ","
-    first=false
+  __dybatpho_cli_gsc_first=true
+  for __dybatpho_cli_gsc_argument in ${__dybatpho_cli_gsc_arguments[@]+"${__dybatpho_cli_gsc_arguments[@]}"}; do
+    local __dybatpho_cli_gsc_arg_name __dybatpho_cli_gsc_arg_desc __dybatpho_cli_gsc_arg_required
+    local __dybatpho_cli_gsc_arg_variadic __dybatpho_cli_gsc_q_arg_name __dybatpho_cli_gsc_q_arg_desc
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gsc_arg_name __dybatpho_cli_gsc_arg_desc \
+      __dybatpho_cli_gsc_arg_required __dybatpho_cli_gsc_arg_variadic <<< "${__dybatpho_cli_gsc_argument}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_arg_name "${__dybatpho_cli_gsc_arg_name}"
+    __dybatpho_cli_json_quote __dybatpho_cli_gsc_q_arg_desc "${__dybatpho_cli_gsc_arg_desc}"
+    [[ "${__dybatpho_cli_gsc_first}" = true ]] || printf ","
+    __dybatpho_cli_gsc_first=false
     printf '{"name":%s,"description":%s,"required":%s,"variadic":%s}' \
-      "${q_arg_name}" "${q_arg_desc}" "${arg_required:-true}" "${arg_variadic:-false}"
+      "${__dybatpho_cli_gsc_q_arg_name}" "${__dybatpho_cli_gsc_q_arg_desc}" "${__dybatpho_cli_gsc_arg_required:-true}" \
+        "${__dybatpho_cli_gsc_arg_variadic:-false}"
   done
   printf '],"commands":['
-  first=true
-  for command in "${commands[@]}"; do
-    local cmd child aliases child_hidden child_deprecated
-    IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases child_hidden child_deprecated <<< "${command}"
-    [[ "${first}" = true ]] || printf ","
-    first=false
-    __dybatpho_cli_generate_schema_command "${child}" "${cmd}" "${aliases}"
+  __dybatpho_cli_gsc_first=true
+  for __dybatpho_cli_gsc_command in "${__dybatpho_cli_gsc_commands[@]}"; do
+    local __dybatpho_cli_gsc_cmd __dybatpho_cli_gsc_child __dybatpho_cli_gsc_aliases __dybatpho_cli_gsc_child_hidden
+    local __dybatpho_cli_gsc_child_deprecated
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gsc_cmd __dybatpho_cli_gsc_child \
+      __dybatpho_cli_gsc_aliases __dybatpho_cli_gsc_child_hidden __dybatpho_cli_gsc_child_deprecated <<< \
+      "${__dybatpho_cli_gsc_command}"
+    [[ "${__dybatpho_cli_gsc_first}" = true ]] || printf ","
+    __dybatpho_cli_gsc_first=false
+    __dybatpho_cli_generate_schema_command "${__dybatpho_cli_gsc_child}" "${__dybatpho_cli_gsc_cmd}" \
+      "${__dybatpho_cli_gsc_aliases}"
   done
   printf "]}"
 }
@@ -1738,9 +1769,9 @@ function __dybatpho_cli_generate_schema_command {
 # @stdout Man page
 #######################################
 function dybatpho::generate_man {
-  local spec name="${2:-${0##*/}}"
-  dybatpho::expect_args spec -- "$@"
-  __dybatpho_cli_generate_man_command "${spec}" "${name}" 1
+  local __dybatpho_cli_gm_spec __dybatpho_cli_gm_name="${2:-${0##*/}}"
+  dybatpho::expect_args __dybatpho_cli_gm_spec -- "$@"
+  __dybatpho_cli_generate_man_command "${__dybatpho_cli_gm_spec}" "${__dybatpho_cli_gm_name}" 1
 }
 
 #######################################
@@ -1755,69 +1786,86 @@ function dybatpho::generate_man {
 # @internal
 #######################################
 function __dybatpho_cli_generate_man_command {
-  local spec="$1" name="$2" section="${3:-1}" nested="${4:-false}" description
-  local -a options=() commands=() arguments=()
-  __dybatpho_cli_collect_spec_metadata "${spec}" options commands description arguments
-  local escaped
-  escaped="${name//\\/\\\\}"
-  escaped="${escaped//\"/\\\"}"
-  local synopsis="${escaped} [OPTIONS]"
-  local arg_item arg_name arg_desc arg_required arg_variadic arg_placeholder
-  local option command
-  for arg_item in ${arguments[@]+"${arguments[@]}"}; do
-    IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
-    arg_placeholder="$(__dybatpho_cli_arg_placeholder "${arg_name}" "${arg_required}" "${arg_variadic}")"
-    synopsis="${synopsis} ${arg_placeholder}"
+  local __dybatpho_cli_gmc_spec="$1" __dybatpho_cli_gmc_name="$2" __dybatpho_cli_gmc_section="${3:-1}" \
+    __dybatpho_cli_gmc_nested="${4:-false}" __dybatpho_cli_gmc_description
+  local -a __dybatpho_cli_gmc_options=() __dybatpho_cli_gmc_commands=() __dybatpho_cli_gmc_arguments=()
+  __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gmc_spec}" __dybatpho_cli_gmc_options \
+    __dybatpho_cli_gmc_commands __dybatpho_cli_gmc_description __dybatpho_cli_gmc_arguments
+  local __dybatpho_cli_gmc_escaped
+  __dybatpho_cli_gmc_escaped="${__dybatpho_cli_gmc_name//\\/\\\\}"
+  __dybatpho_cli_gmc_escaped="${__dybatpho_cli_gmc_escaped//\"/\\\"}"
+  local __dybatpho_cli_gmc_synopsis="${__dybatpho_cli_gmc_escaped} [OPTIONS]"
+  local __dybatpho_cli_gmc_arg_item __dybatpho_cli_gmc_arg_name __dybatpho_cli_gmc_arg_desc
+  local __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic __dybatpho_cli_gmc_arg_placeholder
+  local __dybatpho_cli_gmc_option __dybatpho_cli_gmc_command
+  for __dybatpho_cli_gmc_arg_item in ${__dybatpho_cli_gmc_arguments[@]+"${__dybatpho_cli_gmc_arguments[@]}"}; do
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_arg_name __dybatpho_cli_gmc_arg_desc \
+      __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic <<< "${__dybatpho_cli_gmc_arg_item}"
+    __dybatpho_cli_gmc_arg_placeholder="$(__dybatpho_cli_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}")"
+    __dybatpho_cli_gmc_synopsis="${__dybatpho_cli_gmc_synopsis} ${__dybatpho_cli_gmc_arg_placeholder}"
   done
-  if [[ "${nested}" = false ]]; then
-    printf '.TH "%s" "%s" "" "" "dybatpho"\n' "${escaped}" "${section}"
-    printf '.SH NAME\n%s \\- %s\n' "${escaped}" "${description}"
-    printf '.SH SYNOPSIS\n.B %s\n' "${synopsis}"
-    if ((${#arguments[@]})); then
+  if [[ "${__dybatpho_cli_gmc_nested}" = false ]]; then
+    printf '.TH "%s" "%s" "" "" "dybatpho"\n' "${__dybatpho_cli_gmc_escaped}" "${__dybatpho_cli_gmc_section}"
+    printf '.SH NAME\n%s \\- %s\n' "${__dybatpho_cli_gmc_escaped}" "${__dybatpho_cli_gmc_description}"
+    printf '.SH SYNOPSIS\n.B %s\n' "${__dybatpho_cli_gmc_synopsis}"
+    if ((${#__dybatpho_cli_gmc_arguments[@]})); then
       printf '.SH ARGUMENTS\n'
-      for arg_item in "${arguments[@]}"; do
-        IFS="${__DYBATPHO_CLI_META_SEP}" read -r arg_name arg_desc arg_required arg_variadic <<< "${arg_item}"
-        arg_placeholder="$(__dybatpho_cli_arg_placeholder "${arg_name}" "${arg_required}" "${arg_variadic}")"
-        printf '.TP\n.B %s\n%s\n' "${arg_placeholder}" "${arg_desc}"
+      for __dybatpho_cli_gmc_arg_item in "${__dybatpho_cli_gmc_arguments[@]}"; do
+        IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_arg_name __dybatpho_cli_gmc_arg_desc \
+          __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic <<< "${__dybatpho_cli_gmc_arg_item}"
+        __dybatpho_cli_gmc_arg_placeholder="$(__dybatpho_cli_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}")"
+        printf '.TP\n.B %s\n%s\n' "${__dybatpho_cli_gmc_arg_placeholder}" "${__dybatpho_cli_gmc_arg_desc}"
       done
     fi
     printf '.SH OPTIONS\n'
   else
-    printf '.SS %s\n%s\n' "${escaped}" "${description}"
+    printf '.SS %s\n%s\n' "${__dybatpho_cli_gmc_escaped}" "${__dybatpho_cli_gmc_description}"
   fi
-  for option in "${options[@]}"; do
-    local type var desc switches env multiple choices prompt hidden required deprecated label config count negatable
-    local pattern value_type
-    IFS="${__DYBATPHO_CLI_META_SEP}" read -r type var desc switches env multiple choices prompt hidden \
-      required deprecated label config count negatable pattern value_type <<< "${option}"
-    [[ "${env}" = "@none" ]] && env=""
-    [[ "${deprecated}" = "@none" ]] && deprecated=""
-    [[ "${label}" = "@none" ]] && label=""
-    [[ "${config}" = "@none" ]] && config=""
-    [[ "${choices}" = "@none" ]] && choices=""
-    [[ "${pattern}" = "@none" ]] && pattern=""
-    [[ "${value_type:-@none}" = "@none" ]] && value_type=""
-    [[ "${hidden:-false}" = true ]] && continue
-    local option_label="${switches// /, }"
-    [[ "${type}" = param ]] && option_label="${option_label} <${var}>"
-    printf '.TP\n.B %s\n%s' "${option_label}" "${desc}"
-    [[ "${required:-false}" = true ]] && printf ' (required)'
-    [[ -n "${choices}" ]] && printf ' [choices: %s]' "${choices//,/, }"
-    [[ -n "${pattern}" ]] && printf ' [pattern: %s]' "${pattern}"
-    [[ -n "${value_type}" ]] && printf ' [type: %s]' "${value_type}"
-    [[ -n "${env}" ]] && printf ' [env: %s]' "${env}"
-    [[ -n "${config}" ]] && printf ' [config: %s]' "${config}"
+  for __dybatpho_cli_gmc_option in "${__dybatpho_cli_gmc_options[@]}"; do
+    local __dybatpho_cli_gmc_type __dybatpho_cli_gmc_var __dybatpho_cli_gmc_desc __dybatpho_cli_gmc_switches
+    local __dybatpho_cli_gmc_env __dybatpho_cli_gmc_multiple __dybatpho_cli_gmc_choices __dybatpho_cli_gmc_prompt
+    local __dybatpho_cli_gmc_hidden __dybatpho_cli_gmc_required __dybatpho_cli_gmc_deprecated __dybatpho_cli_gmc_label
+    local __dybatpho_cli_gmc_config __dybatpho_cli_gmc_count __dybatpho_cli_gmc_negatable
+    local __dybatpho_cli_gmc_pattern __dybatpho_cli_gmc_value_type
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_type __dybatpho_cli_gmc_var __dybatpho_cli_gmc_desc \
+      __dybatpho_cli_gmc_switches __dybatpho_cli_gmc_env __dybatpho_cli_gmc_multiple __dybatpho_cli_gmc_choices \
+      __dybatpho_cli_gmc_prompt __dybatpho_cli_gmc_hidden \
+      __dybatpho_cli_gmc_required __dybatpho_cli_gmc_deprecated __dybatpho_cli_gmc_label __dybatpho_cli_gmc_config \
+        __dybatpho_cli_gmc_count __dybatpho_cli_gmc_negatable __dybatpho_cli_gmc_pattern __dybatpho_cli_gmc_value_type \
+        <<< "${__dybatpho_cli_gmc_option}"
+    [[ "${__dybatpho_cli_gmc_env}" = "@none" ]] && __dybatpho_cli_gmc_env=""
+    [[ "${__dybatpho_cli_gmc_deprecated}" = "@none" ]] && __dybatpho_cli_gmc_deprecated=""
+    [[ "${__dybatpho_cli_gmc_label}" = "@none" ]] && __dybatpho_cli_gmc_label=""
+    [[ "${__dybatpho_cli_gmc_config}" = "@none" ]] && __dybatpho_cli_gmc_config=""
+    [[ "${__dybatpho_cli_gmc_choices}" = "@none" ]] && __dybatpho_cli_gmc_choices=""
+    [[ "${__dybatpho_cli_gmc_pattern}" = "@none" ]] && __dybatpho_cli_gmc_pattern=""
+    [[ "${__dybatpho_cli_gmc_value_type:-@none}" = "@none" ]] && __dybatpho_cli_gmc_value_type=""
+    [[ "${__dybatpho_cli_gmc_hidden:-false}" = true ]] && continue
+    local __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_switches// /, }"
+    [[ "${__dybatpho_cli_gmc_type}" = param ]] && \
+      __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_option_label} <${__dybatpho_cli_gmc_var}>"
+    printf '.TP\n.B %s\n%s' "${__dybatpho_cli_gmc_option_label}" "${__dybatpho_cli_gmc_desc}"
+    [[ "${__dybatpho_cli_gmc_required:-false}" = true ]] && printf ' (required)'
+    [[ -n "${__dybatpho_cli_gmc_choices}" ]] && printf ' [choices: %s]' "${__dybatpho_cli_gmc_choices//,/, }"
+    [[ -n "${__dybatpho_cli_gmc_pattern}" ]] && printf ' [pattern: %s]' "${__dybatpho_cli_gmc_pattern}"
+    [[ -n "${__dybatpho_cli_gmc_value_type}" ]] && printf ' [type: %s]' "${__dybatpho_cli_gmc_value_type}"
+    [[ -n "${__dybatpho_cli_gmc_env}" ]] && printf ' [env: %s]' "${__dybatpho_cli_gmc_env}"
+    [[ -n "${__dybatpho_cli_gmc_config}" ]] && printf ' [config: %s]' "${__dybatpho_cli_gmc_config}"
     printf '\n'
   done
-  if [[ "${#commands[@]}" -gt 0 ]]; then
+  if [[ "${#__dybatpho_cli_gmc_commands[@]}" -gt 0 ]]; then
     printf '.SH COMMANDS\n'
-    for command in "${commands[@]}"; do
-      local cmd child aliases child_hidden child_deprecated
+    for __dybatpho_cli_gmc_command in "${__dybatpho_cli_gmc_commands[@]}"; do
+      local __dybatpho_cli_gmc_cmd __dybatpho_cli_gmc_child __dybatpho_cli_gmc_aliases __dybatpho_cli_gmc_child_hidden
+      local __dybatpho_cli_gmc_child_deprecated
       # shellcheck disable=SC2034 # child_deprecated fills a field slot this loop doesn't read
-      IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases child_hidden child_deprecated <<< "${command}"
-      [[ "${child_hidden:-false}" = true ]] && continue
-      printf '.TP\n.B %s\n' "${cmd}"
-      __dybatpho_cli_generate_man_command "${child}" "${cmd}" "${section}" true
+      IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_cmd __dybatpho_cli_gmc_child \
+        __dybatpho_cli_gmc_aliases __dybatpho_cli_gmc_child_hidden __dybatpho_cli_gmc_child_deprecated <<< \
+        "${__dybatpho_cli_gmc_command}"
+      [[ "${__dybatpho_cli_gmc_child_hidden:-false}" = true ]] && continue
+      printf '.TP\n.B %s\n' "${__dybatpho_cli_gmc_cmd}"
+      __dybatpho_cli_generate_man_command "${__dybatpho_cli_gmc_child}" "${__dybatpho_cli_gmc_cmd}" \
+        "${__dybatpho_cli_gmc_section}" true
     done
   fi
 }
@@ -1835,27 +1883,28 @@ function __dybatpho_cli_generate_man_command {
 # @stdout Completion script
 #######################################
 function dybatpho::generate_completion {
-  local spec shell name="${3:-${0##*/}}"
-  dybatpho::expect_args spec shell -- "$@"
-  case "${shell}" in
+  local __dybatpho_cli_gc_spec __dybatpho_cli_gc_shell __dybatpho_cli_gc_name="${3:-${0##*/}}"
+  dybatpho::expect_args __dybatpho_cli_gc_spec __dybatpho_cli_gc_shell -- "$@"
+  case "${__dybatpho_cli_gc_shell}" in
     bash | zsh | fish) ;; # kcov(skip)
     *) dybatpho::die "$(__dybatpho_log_text cli.unsupported_shell \
-      "Unsupported completion shell: ${shell}" "shell=${shell}")" 1 ;; # kcov(skip)
+      "Unsupported completion shell: ${__dybatpho_cli_gc_shell}" "shell=${__dybatpho_cli_gc_shell}")" 1 ;; # kcov(skip)
   esac
 
-  local cache_file=""
-  if __dybatpho_cli_cache_file cache_file completion "${spec}" "${shell}" "${name}" \
-    && [[ -s "${cache_file}" ]]; then
-    dybatpho::debug "Reusing cached ${shell} completion at ${cache_file}"
-    cat -- "${cache_file}"
+  local __dybatpho_cli_gc_cache_file=""
+  if __dybatpho_cli_cache_file __dybatpho_cli_gc_cache_file completion "${__dybatpho_cli_gc_spec}" \
+    "${__dybatpho_cli_gc_shell}" "${__dybatpho_cli_gc_name}" \
+    && [[ -s "${__dybatpho_cli_gc_cache_file}" ]]; then
+    dybatpho::debug "Reusing cached ${__dybatpho_cli_gc_shell} completion at ${__dybatpho_cli_gc_cache_file}"
+    cat -- "${__dybatpho_cli_gc_cache_file}"
     return 0
   fi
 
-  local generated
-  generated="$(__dybatpho_cli_generate_completion_command "${spec}" "${shell}" "${name}" "${name}")"
-  printf '%s\n' "${generated}"
-  if [[ -n "${cache_file}" ]]; then
-    printf '%s\n' "${generated}" > "${cache_file}" 2> /dev/null || true
+  local __dybatpho_cli_gc_generated
+  __dybatpho_cli_gc_generated="$(__dybatpho_cli_generate_completion_command "${__dybatpho_cli_gc_spec}" "${__dybatpho_cli_gc_shell}" "${__dybatpho_cli_gc_name}" "${__dybatpho_cli_gc_name}")"
+  printf '%s\n' "${__dybatpho_cli_gc_generated}"
+  if [[ -n "${__dybatpho_cli_gc_cache_file}" ]]; then
+    printf '%s\n' "${__dybatpho_cli_gc_generated}" > "${__dybatpho_cli_gc_cache_file}" 2> /dev/null || true
   fi
   return 0
 }
@@ -1923,55 +1972,67 @@ function __dybatpho_cli_completion_words {
 #######################################
 function __dybatpho_cli_generate_completion_command {
   # shellcheck disable=SC2034 # root keeps the positional signature uniform across generators
-  local spec="$1" shell="$2" name="$3" root="$4" description
-  local -a options=() commands=() words=()
-  __dybatpho_cli_collect_spec_metadata "${spec}" options commands description
-  __dybatpho_cli_completion_words words "${options[@]}"
-  local word_list="${words[*]}" cmd_list="" command cmd child aliases hidden deprecated
-  for command in "${commands[@]}"; do
-    IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases hidden deprecated <<< "${command}"
-    if [[ "${hidden:-false}" != true ]]; then
+  local __dybatpho_cli_gcc_spec="$1" __dybatpho_cli_gcc_shell="$2" __dybatpho_cli_gcc_name="$3" \
+    __dybatpho_cli_gcc_root="$4" __dybatpho_cli_gcc_description
+  local -a __dybatpho_cli_gcc_options=() __dybatpho_cli_gcc_commands=() __dybatpho_cli_gcc_words=()
+  __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gcc_spec}" __dybatpho_cli_gcc_options \
+    __dybatpho_cli_gcc_commands __dybatpho_cli_gcc_description
+  __dybatpho_cli_completion_words __dybatpho_cli_gcc_words "${__dybatpho_cli_gcc_options[@]}"
+  local __dybatpho_cli_gcc_word_list="${__dybatpho_cli_gcc_words[*]}" __dybatpho_cli_gcc_cmd_list="" \
+    __dybatpho_cli_gcc_command __dybatpho_cli_gcc_cmd __dybatpho_cli_gcc_child __dybatpho_cli_gcc_aliases \
+    __dybatpho_cli_gcc_hidden __dybatpho_cli_gcc_deprecated
+  for __dybatpho_cli_gcc_command in "${__dybatpho_cli_gcc_commands[@]}"; do
+    IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gcc_cmd __dybatpho_cli_gcc_child \
+      __dybatpho_cli_gcc_aliases __dybatpho_cli_gcc_hidden __dybatpho_cli_gcc_deprecated <<< \
+      "${__dybatpho_cli_gcc_command}"
+    if [[ "${__dybatpho_cli_gcc_hidden:-false}" != true ]]; then
       # `@none` is the sentinel an alias-less command records, not a word the
       # user can ever type.
-      [[ "${aliases}" = "@none" ]] && aliases=""
-      cmd_list+=" ${cmd}${aliases:+ ${aliases}}"
+      [[ "${__dybatpho_cli_gcc_aliases}" = "@none" ]] && __dybatpho_cli_gcc_aliases=""
+      __dybatpho_cli_gcc_cmd_list+=" ${__dybatpho_cli_gcc_cmd}${__dybatpho_cli_gcc_aliases:+ ${__dybatpho_cli_gcc_aliases}}"
       # shellcheck disable=SC2034 # out-params required by collect_spec_metadata's signature
-      local -a child_options=() child_commands=()
+      local -a __dybatpho_cli_gcc_child_options=() __dybatpho_cli_gcc_child_commands=()
       # shellcheck disable=SC2034 # out-param required by collect_spec_metadata's signature
-      local child_description
-      __dybatpho_cli_collect_spec_metadata "${child}" child_options child_commands child_description
-      __dybatpho_cli_completion_words words "${child_options[@]}"
+      local __dybatpho_cli_gcc_child_description
+      __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gcc_child}" __dybatpho_cli_gcc_child_options \
+        __dybatpho_cli_gcc_child_commands __dybatpho_cli_gcc_child_description
+      __dybatpho_cli_completion_words __dybatpho_cli_gcc_words "${__dybatpho_cli_gcc_child_options[@]}"
     fi
   done
-  word_list="${words[*]}"
-  case "${shell}" in
+  __dybatpho_cli_gcc_word_list="${__dybatpho_cli_gcc_words[*]}"
+  case "${__dybatpho_cli_gcc_shell}" in
     bash)
       # shellcheck disable=SC2016 # this is generated shell source, expanded by the caller's shell
-      local bash_template='_%s_completion() {\n  local cur="${COMP_WORDS[COMP_CWORD]}"\n'
+      local __dybatpho_cli_gcc_bash_template='_%s_completion() {\n  local cur="${COMP_WORDS[COMP_CWORD]}"\n'
       # shellcheck disable=SC2016 # this is generated shell source, expanded by the caller's shell
-      bash_template+='  COMPREPLY=( $(compgen -W %q -- "${cur}") )\n}\ncomplete -F _%s_completion %s\n'
+      __dybatpho_cli_gcc_bash_template+='  COMPREPLY=( $(compgen -W %q -- "${cur}") )\n}\ncomplete -F _%s_completion %s\n'
       # shellcheck disable=SC2059 # the template is built above, not taken from input
-      printf "${bash_template}" \
-        "${name//[^a-zA-Z0-9_]/_}" "${word_list} ${cmd_list} --help -h" \
-        "${name//[^a-zA-Z0-9_]/_}" "${name}"
+      printf "${__dybatpho_cli_gcc_bash_template}" \
+        "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" \
+          "${__dybatpho_cli_gcc_word_list} ${__dybatpho_cli_gcc_cmd_list} --help -h" \
+        "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" "${__dybatpho_cli_gcc_name}"
       ;;
     zsh)
       printf '_%s_completion() {\n  _arguments "*: :((%s))"\n}\ncompdef _%s_completion %s\n' \
-        "${name//[^a-zA-Z0-9_]/_}" "${word_list} ${cmd_list} --help -h" \
-        "${name//[^a-zA-Z0-9_]/_}" "${name}"
+        "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" \
+          "${__dybatpho_cli_gcc_word_list} ${__dybatpho_cli_gcc_cmd_list} --help -h" \
+        "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" "${__dybatpho_cli_gcc_name}"
       ;;
     fish)
-      local switch
-      for switch in "${words[@]}"; do
-        case "${switch}" in
-          --*) printf "complete -c %s -l %s\n" "${name}" "${switch#--}" ;;
-          -?) printf "complete -c %s -s %s\n" "${name}" "${switch#-}" ;;
+      local __dybatpho_cli_gcc_switch
+      for __dybatpho_cli_gcc_switch in "${__dybatpho_cli_gcc_words[@]}"; do
+        case "${__dybatpho_cli_gcc_switch}" in
+          --*) printf "complete -c %s -l %s\n" "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_switch#--}" ;;
+          -?) printf "complete -c %s -s %s\n" "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_switch#-}" ;;
           *) ;;
         esac
       done
-      for command in "${commands[@]}"; do
-        IFS="${__DYBATPHO_CLI_META_SEP}" read -r cmd child aliases hidden deprecated <<< "${command}"
-        [[ "${hidden:-false}" = true ]] || printf "complete -c %s -f -a %q\n" "${name}" "${cmd}"
+      for __dybatpho_cli_gcc_command in "${__dybatpho_cli_gcc_commands[@]}"; do
+        IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gcc_cmd __dybatpho_cli_gcc_child \
+          __dybatpho_cli_gcc_aliases __dybatpho_cli_gcc_hidden __dybatpho_cli_gcc_deprecated <<< \
+          "${__dybatpho_cli_gcc_command}"
+        [[ "${__dybatpho_cli_gcc_hidden:-false}" = true ]] || printf "complete -c %s -f -a %q\n" \
+          "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_cmd}"
       done
       ;;
     *) ;;
@@ -2972,7 +3033,7 @@ function dybatpho::opts::param {
       __prompt_defs+=("${var}"$'\x1f'"${__prompt}"$'\x1f'"${__choices}"$'\x1f'"${__multiple}"$'\x1f'"${__export}")
     fi
     if dybatpho::is true "${__required}"; then
-      local __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
+      local __required_marker="__dybatpho_required_${__dybatpho_cli_logic_spec//[^a-zA-Z0-9_]/_}_${var}"
       local __saved_init="${__init}" __saved_export="${__export}"
       __init="@empty"
       __export="false"
@@ -2984,7 +3045,7 @@ function dybatpho::opts::param {
   else
     local __required_marker=""
     if dybatpho::is true "${__required}"; then
-      __required_marker="__dybatpho_required_${spec//[^a-zA-Z0-9_]/_}_${var}"
+      __required_marker="__dybatpho_required_${__dybatpho_cli_logic_spec//[^a-zA-Z0-9_]/_}_${var}"
     fi
     __dybatpho_cli_print_indent 3 "${__switch})"
     [[ -n "${__deprecated}" ]] && __dybatpho_cli_print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
@@ -3114,8 +3175,8 @@ function dybatpho::opts::msg {
 # @tip Aliases are accepted during dispatch and are included in generated help and schema metadata.
 #######################################
 function dybatpho::opts::cmd {
-  local sub_cmd sub_spec
-  dybatpho::expect_args sub_cmd sub_spec -- "$@"
+  local __dybatpho_cli_cmd_sub_cmd __dybatpho_cli_cmd_sub_spec
+  dybatpho::expect_args __dybatpho_cli_cmd_sub_cmd __dybatpho_cli_cmd_sub_spec -- "$@"
   shift 2
 
   local -a __cmd_aliases=()
@@ -3133,7 +3194,8 @@ function dybatpho::opts::cmd {
 
   if dybatpho::is true "${__meta_mode:-false}"; then
     local __meta_record
-    __dybatpho_cli_meta_join __meta_record "${sub_cmd}" "${sub_spec}" "${__cmd_aliases[*]:-@none}" \
+    __dybatpho_cli_meta_join __meta_record "${__dybatpho_cli_cmd_sub_cmd}" "${__dybatpho_cli_cmd_sub_spec}" \
+      "${__cmd_aliases[*]:-@none}" \
       "${__cmd_hidden:-false}" "${__cmd_deprecated:-@none}"
     __meta_commands+=("${__meta_record}")
     return 0
@@ -3143,23 +3205,25 @@ function dybatpho::opts::cmd {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local __cmd_desc="" __cmd_desc_mode=true
-    "${sub_spec}"
-    local __cmd_label="${sub_cmd}"
+    "${__dybatpho_cli_cmd_sub_spec}"
+    local __cmd_label="${__dybatpho_cli_cmd_sub_cmd}"
     for __cmd_alias in "${__cmd_aliases[@]}"; do
       __cmd_label="${__cmd_label}, ${__cmd_alias}"
     done
-    local _line
-    _line=$(__dybatpho_cli_help_row cmd "${__cmd_label}" "${__cmd_desc}" \
+    local __dybatpho_cli_cmd__line
+    __dybatpho_cli_cmd__line=$(__dybatpho_cli_help_row cmd "${__cmd_label}" "${__cmd_desc}" \
       "hidden:${__cmd_hidden}" "deprecated:${__cmd_deprecated}")
-    [[ -n "${_line}" ]] && __help_cmd_rows+=("${_line}")
+    [[ -n "${__dybatpho_cli_cmd__line}" ]] && __help_cmd_rows+=("${__dybatpho_cli_cmd__line}")
     return 0
   fi
 
   if dybatpho::is true "${__done_initial}"; then
     __has_sub_cmd="true"
-    __sub_specs+=("${sub_spec}"$'\t'"${sub_cmd}"$'\t'"${sub_cmd}"$'\t'"${__cmd_deprecated}")
+    local __dybatpho_cli_cmd_spec="${__dybatpho_cli_cmd_sub_spec}" \
+      __dybatpho_cli_cmd_name="${__dybatpho_cli_cmd_sub_cmd}"
+    __sub_specs+=("${__dybatpho_cli_cmd_spec}"$'\t'"${__dybatpho_cli_cmd_name}"$'\t'"${__dybatpho_cli_cmd_name}"$'\t'"${__cmd_deprecated}")
     for __cmd_alias in "${__cmd_aliases[@]}"; do
-      __sub_specs+=("${sub_spec}"$'\t'"${__cmd_alias}"$'\t'"${sub_cmd}"$'\t'"${__cmd_deprecated}")
+      __sub_specs+=("${__dybatpho_cli_cmd_spec}"$'\t'"${__cmd_alias}"$'\t'"${__dybatpho_cli_cmd_name}"$'\t'"${__cmd_deprecated}")
     done
   fi
 }
@@ -3345,8 +3409,8 @@ function dybatpho::generate_from_spec {
 # @tip A command receives automatic `--help` and `-h` unless the spec declares its own help display option.
 #######################################
 function dybatpho::generate_help {
-  local spec
-  dybatpho::expect_args spec -- "$@"
+  local __dybatpho_cli_gh_spec
+  dybatpho::expect_args __dybatpho_cli_gh_spec -- "$@"
 
   # Help generation state — local here, visible to the whole call chain via
   # bash dynamic scoping (dybatpho::opts::* write, __dybatpho_cli_generate_help reads)
@@ -3362,5 +3426,5 @@ function dybatpho::generate_help {
   local -a __help_cmd_rows=()
   local -a __help_arg_rows=()
 
-  __dybatpho_cli_generate_help "${spec}"
+  __dybatpho_cli_generate_help "${__dybatpho_cli_gh_spec}"
 }

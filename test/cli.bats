@@ -2351,3 +2351,26 @@ setup() {
   assert_line --index 0 $'Ring \a and \033[1mbold\033[0m'
   assert_line --index 1 $'Form\ffeed'
 }
+
+@test "a spec and its action see the caller's variables, not the generator's" {
+  # The spec and the action run inside the generators' scope, where locals such
+  # as `spec`, `type`, `sub_spec` and `sub_cmd` hid the caller's variables.
+  local script="${BATS_TEST_TMPDIR}/scoped.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules cli
+spec="caller" type="caller" sub_spec="caller" sub_cmd="caller"
+_run() { printf 'action %s %s %s %s\n' "\${spec}" "\${type}" "\${sub_spec}" "\${sub_cmd}"; }
+_spec_child() { dybatpho::opts::setup "child \${spec} \${type}" CHILD_ARGS action:"_run"; }
+_spec() {
+  dybatpho::opts::setup "root \${spec} \${type} \${sub_spec}" ARGS action:"_run"
+  dybatpho::opts::cmd go _spec_child
+}
+dybatpho::generate_from_spec _spec "\$@"
+SCRIPT
+  # `--help` ends the script, so the help and the action run separately.
+  run_traced bash "${script}" --help
+  assert_output --partial "root caller caller caller"
+  run_traced bash "${script}" go
+  assert_output --partial "action caller caller caller caller"
+  refute_output --partial "action _spec"
+}

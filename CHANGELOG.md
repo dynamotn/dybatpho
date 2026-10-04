@@ -212,6 +212,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `separator`, `exit_code` and the capture files hid the caller's variables
   of the same names. They are now prefixed.
 
+- **`cli` — a spec and its actions see the caller's variables.** Specs,
+  actions and hooks run inside the generators' scope, where locals such as
+  `spec`, `type`, `name`, `sub_spec` and `sub_cmd` hid the caller's
+  variables of the same names -- a description reading `${type}` showed
+  `function`. The parser, help, schema, man and completion generators now keep
+  their state in prefixed locals; their output is unchanged.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

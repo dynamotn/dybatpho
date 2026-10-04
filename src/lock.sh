@@ -484,16 +484,17 @@ function dybatpho::lock_release {
 # @exitcode other Exit code of the wrapped command
 #######################################
 function dybatpho::with_lock {
-  local name timeout separator
-  dybatpho::expect_args name timeout separator -- "$@"
+  local __dybatpho_lock_with_name __dybatpho_lock_with_timeout __dybatpho_lock_with_separator
+  dybatpho::expect_args __dybatpho_lock_with_name __dybatpho_lock_with_timeout __dybatpho_lock_with_separator -- "$@"
   shift 3
-  [[ "${separator}" == "--" ]] || dybatpho::die "${FUNCNAME[0]}: Expected: name timeout -- command [args...]"
+  [[ "${__dybatpho_lock_with_separator}" == "--" ]] || dybatpho::die \
+    "${FUNCNAME[0]}: Expected: name timeout -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
-  dybatpho::lock_acquire "${name}" "${timeout}" || return 1
-  local quoted_name
-  printf -v quoted_name '%q' "${name}"
-  __dybatpho_lock_run_holding "dybatpho::lock_release ${quoted_name}" "$@"
+  dybatpho::lock_acquire "${__dybatpho_lock_with_name}" "${__dybatpho_lock_with_timeout}" || return 1
+  local __dybatpho_lock_with_quoted_name
+  printf -v __dybatpho_lock_with_quoted_name '%q' "${__dybatpho_lock_with_name}"
+  __dybatpho_lock_run_holding "dybatpho::lock_release ${__dybatpho_lock_with_quoted_name}" "$@"
 }
 
 #######################################
@@ -521,11 +522,11 @@ function dybatpho::with_lock {
 # @internal
 #######################################
 function __dybatpho_lock_run_holding {
-  local release="$1"
+  local __dybatpho_lock_hold_release="$1"
   shift
 
-  local previous_traps
-  __dybatpho_process_traps_save_into previous_traps HUP INT TERM
+  local __dybatpho_lock_hold_previous_traps
+  __dybatpho_process_traps_save_into __dybatpho_lock_hold_previous_traps HUP INT TERM
 
   # The release handler stands alone while the command runs: appended after the
   # caller's, it never ran when that handler exited. It records the signal, and
@@ -537,19 +538,19 @@ function __dybatpho_lock_run_holding {
     # kcov records no hit here, though "with_lock installs a release handler"
     # runs it and asserts the handler it installs.
     __dybatpho_process_trap_only \
-      "${release} > /dev/null 2>&1 || true; __dybatpho_lock_caught=${__dybatpho_lock_signal}" \
+      "${__dybatpho_lock_hold_release} > /dev/null 2>&1 || true; __dybatpho_lock_caught=${__dybatpho_lock_signal}" \
       "${__dybatpho_lock_signal}" # kcov(skip)
   done
 
-  local exit_code=0
-  "$@" || exit_code=$?
-  eval "${release}"
+  local __dybatpho_lock_hold_exit_code=0
+  "$@" || __dybatpho_lock_hold_exit_code=$?
+  eval "${__dybatpho_lock_hold_release}"
 
-  __dybatpho_process_traps_restore "${previous_traps}" HUP INT TERM
+  __dybatpho_process_traps_restore "${__dybatpho_lock_hold_previous_traps}" HUP INT TERM
   if [[ -n "${__dybatpho_lock_caught}" ]]; then
     kill -s "${__dybatpho_lock_caught}" "${BASHPID}"
   fi
-  return "${exit_code}"
+  return "${__dybatpho_lock_hold_exit_code}"
 }
 
 #######################################
@@ -603,6 +604,26 @@ function __dybatpho_lock_expect_slots {
 # @exitcode 1 Every slot is still held by a live process after the timeout
 #######################################
 function dybatpho::lock_semaphore_acquire {
+  local __dybatpho_lock_sem_name __dybatpho_lock_sem_slots
+  dybatpho::expect_args __dybatpho_lock_sem_name __dybatpho_lock_sem_slots -- "$@"
+  [[ -z "${4-}" ]] || dybatpho::expect_ref "$4"
+  __dybatpho_lock_semaphore_acquire "$@"
+}
+
+#######################################
+# @description Take a semaphore slot, as `dybatpho::lock_semaphore_acquire`
+#   does, without refusing a library-owned variable for the slot number: the
+#   library's own runners keep that number in a prefixed local, which the
+#   public check rightly refuses from a caller.
+# @arg $1 string Semaphore name or path
+# @arg $2 number Number of slots
+# @arg $3 number Seconds to wait for a free slot
+# @arg $4 string Name of the variable receiving the slot number taken
+# @exitcode 0 A slot was taken
+# @exitcode 1 Every slot stayed held for the whole wait
+# @internal
+#######################################
+function __dybatpho_lock_semaphore_acquire {
   # Every local carries the library's prefix, so a caller's variable for the
   # slot number is never shadowed by one of them, whatever it is called.
   local __dybatpho_lock_name __dybatpho_lock_slots
@@ -610,8 +631,8 @@ function dybatpho::lock_semaphore_acquire {
   local __dybatpho_lock_timeout="${3:-0}" __dybatpho_lock_target="${4-}"
   __dybatpho_lock_expect_slots "${__dybatpho_lock_slots}"
   dybatpho::is int "${__dybatpho_lock_timeout}" \
-    || dybatpho::die "${FUNCNAME[0]}: The timeout must be a number of seconds, got: ${__dybatpho_lock_timeout}"
-  [[ -z "${__dybatpho_lock_target}" ]] || dybatpho::expect_ref "${__dybatpho_lock_target}"
+    || dybatpho::die \
+      "dybatpho::lock_semaphore_acquire: The timeout must be a number of seconds, got: ${__dybatpho_lock_timeout}"
 
   local __dybatpho_lock_host_cache="" __dybatpho_lock_taken="" __dybatpho_lock_base
   __dybatpho_lock_base="$(dybatpho::lock_path "${__dybatpho_lock_name}")"
@@ -731,16 +752,20 @@ function dybatpho::lock_semaphore_holders {
 # @exitcode other Exit code of the wrapped command
 #######################################
 function dybatpho::with_semaphore {
-  local name slots timeout separator
-  dybatpho::expect_args name slots timeout separator -- "$@"
+  local __dybatpho_lock_semrun_name __dybatpho_lock_semrun_slots __dybatpho_lock_semrun_timeout
+  local __dybatpho_lock_semrun_separator
+  dybatpho::expect_args __dybatpho_lock_semrun_name __dybatpho_lock_semrun_slots __dybatpho_lock_semrun_timeout \
+    __dybatpho_lock_semrun_separator -- "$@"
   shift 4
-  [[ "${separator}" == "--" ]] \
+  [[ "${__dybatpho_lock_semrun_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: name slots timeout -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
-  local slot
-  dybatpho::lock_semaphore_acquire "${name}" "${slots}" "${timeout}" slot || return 1
-  local release
-  printf -v release 'dybatpho::lock_semaphore_release %q %q %q' "${name}" "${slots}" "${slot}"
-  __dybatpho_lock_run_holding "${release}" "$@"
+  local __dybatpho_lock_semrun_slot
+  __dybatpho_lock_semaphore_acquire "${__dybatpho_lock_semrun_name}" "${__dybatpho_lock_semrun_slots}" \
+    "${__dybatpho_lock_semrun_timeout}" __dybatpho_lock_semrun_slot || return 1
+  local __dybatpho_lock_semrun_release
+  printf -v __dybatpho_lock_semrun_release 'dybatpho::lock_semaphore_release %q %q %q' \
+    "${__dybatpho_lock_semrun_name}" "${__dybatpho_lock_semrun_slots}" "${__dybatpho_lock_semrun_slot}"
+  __dybatpho_lock_run_holding "${__dybatpho_lock_semrun_release}" "$@"
 }

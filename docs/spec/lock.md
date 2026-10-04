@@ -267,6 +267,7 @@ dybatpho::lock_semaphore_holders downloads 4
 - **FR-030**: `lock_acquire` and `lock_semaphore_acquire` MUST share one wait loop that times the wait with Bash's own clock, so a poll starts no `date` process and a frozen `date` clock does not hold a wait open, and MUST ask for the host name at most once per call.
 - **FR-031**: A bare lock name MUST resolve under the default temporary directory when `DYBATPHO_LOCK_DIR` is empty, never at the root of the filesystem.
 - **FR-032**: `with_lock` and `with_semaphore` MUST release before a caller handler answers HUP, INT or TERM, and MUST raise the signal again once released, so a script asked to stop does stop.
+- **FR-033**: A command run by `with_lock` or `with_semaphore` MUST see the caller's variables: the runners MUST keep their own state in prefixed locals, so a same-named variable is neither shadowed nor able to change the release.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -344,6 +345,7 @@ dybatpho::lock_semaphore_holders downloads 4
 - **IT-026**: Wait for a held lock while the `date` clock is frozen and find the wait ends on time; wait for a held lock and a full semaphore and find the host name asked for once each.
 - **IT-027**: Resolve a bare lock name with `DYBATPHO_LOCK_DIR` emptied and get a path under `TMPDIR`.
 - **IT-028**: TERM a script holding a lock, with and without `killed_process_handler`; the lock is gone and the script exits 143 without carrying on.
+- **IT-029**: Run a command under a lock and under a semaphore that reads and overwrites variables named like the runners' locals, and see the caller's values and a released lock.
 
 ## Acceptance Criteria *(mandatory)*
 

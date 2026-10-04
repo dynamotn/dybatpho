@@ -116,6 +116,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after the cleanup. With no handler of the script's own, a TERM during
   `with_lock` now ends the script once the lock is released, where it used to
   be swallowed.
+- **`lock` — a command run under a lock sees the caller's variables.**
+  `dybatpho::with_lock` and `dybatpho::with_semaphore` run the command in their
+  own scope, where their locals -- `name`, `timeout`, `slot`, `release`,
+  `exit_code` -- hid the caller's variables of the same names, and a command
+  assigning to one of them could change which lock was released. The runners
+  now keep their state in prefixed locals.
 
 ### Security
 

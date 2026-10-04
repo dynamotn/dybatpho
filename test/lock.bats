@@ -657,3 +657,20 @@ SCRIPT
   assert_failure
   assert_stderr --partial "Expected a command to run after --"
 }
+
+@test "a command run under a lock or a semaphore sees the caller's variables, not the library's" {
+  # The command runs in the library's scope, so a library local of the same
+  # name hid the caller's variable from it, and the command could overwrite the
+  # library's state through it.
+  local name="caller" timeout="caller" slot="caller" release="caller" exit_code="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s %s %s\n' "${name}" "${timeout}" "${slot}" "${release}" "${exit_code}" > "${seen}"; }
+  dybatpho::with_lock "scoped" 1 -- look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller"
+  dybatpho::with_semaphore "scoped-pool" 2 1 -- look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller"
+  # Overwriting a same-named variable leaves the lock's own work intact.
+  clobber() { release=":" exit_code=0; return 3; }
+  run_traced -3 dybatpho::with_lock "scoped" 1 -- clobber
+  run_traced ! dybatpho::lock_is_held "scoped"
+}

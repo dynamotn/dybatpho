@@ -99,7 +99,7 @@ src/i18n.sh	dybatpho::i18n_duration	dybatpho::i18n_tn	library keys and a count t
 src/i18n.sh	dybatpho::i18n_locales	__dybatpho_i18n_roots	with no HOME the user catalogue directory is simply not searched
 src/i18n.sh	dybatpho::i18n_relative	dybatpho::i18n_t	library key
 src/i18n.sh	dybatpho::i18n_relative	dybatpho::i18n_tn	library keys and a count this function computed
-src/lock.sh	dybatpho::lock_semaphore_acquire	dybatpho::lock_semaphore_holders	the slot count was checked in the caller's shell first
+src/lock.sh	__dybatpho_lock_semaphore_acquire	dybatpho::lock_semaphore_holders	the slot count was checked in the caller's shell first
 src/math.sh	dybatpho::math_lcm	dybatpho::math_gcd	operands were checked to be whole numbers first
 src/metrics.sh	__dybatpho_metrics_validate_quantiles	dybatpho::math_compare	the quantile was checked to be a number first
 src/metrics.sh	dybatpho::metrics_render	dybatpho::math_mul	quantiles and samples were checked when recorded and rendered

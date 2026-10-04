@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   under an internal helper's name; it now names `dybatpho::i18n_load` or the
   registration function that was called.
 
+- **`metrics` — a bad name or label is refused by the function you called.**
+  `dybatpho::metrics_time` and `dybatpho::metrics_timer_stop` reported an
+  invalid metric name or label under `dybatpho::metrics_observe_ms`, and
+  `metrics_time` only did so after the timed command had already run.
+  `dybatpho::metrics_timer_start` accepted any name and left the refusal to
+  the stop. All three now check up front and name themselves.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

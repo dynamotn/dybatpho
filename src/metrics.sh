@@ -369,6 +369,10 @@ function dybatpho::metrics_summary_ms {
 function dybatpho::metrics_timer_start {
   local name
   dybatpho::expect_args name -- "$@"
+  # Checked through the key builder, which reports under the function two
+  # frames up -- this one -- rather than only when the timer is stopped.
+  local __dybatpho_metrics_check
+  __dybatpho_metrics_key __dybatpho_metrics_check "${name}"
   __dybatpho_metrics_timer["${name}"]="$(__dybatpho_log_now_ms)"
 }
 
@@ -392,6 +396,8 @@ function dybatpho::metrics_timer_stop {
   elapsed=$(($(__dybatpho_log_now_ms) - started))
   ((elapsed < 0)) && elapsed=0
   unset "__dybatpho_metrics_timer[${name}]"
+  local __dybatpho_metrics_check
+  __dybatpho_metrics_key __dybatpho_metrics_check "${name}" "$@"
   dybatpho::metrics_observe_ms "${name}" "${elapsed}" "$@"
   DYBATPHO_METRICS_LAST_MS="${elapsed}"
 }
@@ -423,6 +429,10 @@ function dybatpho::metrics_time {
     || dybatpho::die "${FUNCNAME[0]}: Expected '--' between the labels and the command"
   shift
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command after '--'"
+  # Refuse a bad name or label before the command runs, and under this
+  # function's name rather than the recorder's.
+  local __dybatpho_metrics_check
+  __dybatpho_metrics_key __dybatpho_metrics_check "${name}" ${labels[@]+"${labels[@]}"}
 
   local started elapsed status=0
   started="$(__dybatpho_log_now_ms)"

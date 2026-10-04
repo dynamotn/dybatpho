@@ -159,6 +159,28 @@ setup() {
   assert_line 'd_seconds{quantile="0.99"} 0.1'
 }
 
+@test "a bad metric name or label is refused by the function that was called" {
+  # These record through dybatpho::metrics_observe_ms, which used to report the
+  # refusal under its own name -- and only after the timed command had run.
+  local ran="${BATS_TEST_TMPDIR}/ran"
+  run --separate-stderr dybatpho::metrics_time 'bad name' -- touch "${ran}"
+  assert_failure
+  assert_stderr --partial "dybatpho::metrics_time: Invalid metric name 'bad name'"
+  assert_file_not_exist "${ran}"
+
+  run --separate-stderr dybatpho::metrics_time ok_seconds nolabel -- touch "${ran}"
+  assert_stderr --partial "dybatpho::metrics_time: Label must be given as key=value"
+  assert_file_not_exist "${ran}"
+
+  run --separate-stderr dybatpho::metrics_timer_start 'bad name'
+  assert_failure
+  assert_stderr --partial "dybatpho::metrics_timer_start: Invalid metric name 'bad name'"
+
+  dybatpho::metrics_timer_start ok_seconds
+  run --separate-stderr dybatpho::metrics_timer_stop ok_seconds nolabel
+  assert_stderr --partial "dybatpho::metrics_timer_stop: Label must be given as key=value"
+}
+
 @test "dybatpho::metrics_timer_stop records the duration and publishes it" {
   dybatpho::metrics_timer_start work_duration_seconds
   sleep 0.05

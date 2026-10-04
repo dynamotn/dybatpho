@@ -937,3 +937,28 @@ _test_tool() { printf 'tool output\n'; }
   assert_output --partial "symbolic link"
   assert_equal "$(cat "${victim}")" "do not overwrite me"
 }
+
+@test "a tool run by ai_run sees the caller's variables, not the loop's" {
+  # A tool runs in the scope of the loop that called it, where locals such as
+  # `name`, `status`, `prompt` and `step` hid the caller's variables of the
+  # same names.
+  local first="${BATS_TEST_TMPDIR}/round-1.json" second="${BATS_TEST_TMPDIR}/round-2.json"
+  local seen="${BATS_TEST_TMPDIR}/seen" call usage
+  call=$(dybatpho::json_object type tool_use id toolu_1 name t input:json '{}')
+  usage=$(dybatpho::json_object input_tokens:json 1 output_tokens:json 1)
+  dybatpho::json_object content:json "[${call}]" stop_reason tool_use usage:json "${usage}" > "${first}"
+  anthropic_body 'done' > "${second}"
+  local name="caller" status="caller" handler="caller" prompt="caller" step="caller" messages="caller"
+  look_tool() {
+    printf '%s %s %s %s %s %s\n' "${name}" "${status}" "${handler}" "${prompt}" "${step}" "${messages}" > "${seen}"
+    printf 'ok\n'
+  }
+  dybatpho::ai_tool_register t "desc" '{"type":"object"}' look_tool
+  stub curl \
+    ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; cat > /dev/null; cat ${first} > \"\${out}\"; echo 200" \
+    ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; cat > /dev/null; cat ${second} > \"\${out}\"; echo 200"
+  # Called directly: the test helper's own `status` would hide the caller's.
+  dybatpho::ai_run "question" > /dev/null
+  unstub curl
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+}

@@ -191,6 +191,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `arguments` and `command_args` hid the caller's variables of the same names.
   They are now prefixed.
 
+- **`ai` — a tool run by `dybatpho::ai_run` sees the caller's variables.**
+  Tools ran in the scope of the loop that called them, where locals such as
+  `name`, `status`, `handler`, `prompt`, `step` and `messages` hid the caller's
+  variables of the same names. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

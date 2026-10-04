@@ -249,6 +249,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-034**: A request MUST NOT be sent when the backend needs an API key and none is set; the call MUST stop before the request, while a `DRY_RUN` rehearsal MUST still work without a key.
 - **FR-035**: The `cli` backend MUST look up its command in the caller's shell, so that a configured or detected client that is not installed stops the call with status 127 instead of answering with nothing.
 - **FR-036**: `ai_stream` MUST read the stream to its end before judging curl's exit status, so a server that closes the connection after `[DONE]` is not reported as a failed request.
+- **FR-037**: A tool run by `ai_run` MUST see the caller's variables: the loop and the tool invoker MUST keep their state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -326,6 +327,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-030**: Ask through the `cli` backend with `DYBATPHO_AI_CLI` naming a command that does not exist, and fail with 127 and no answer.
 - **IT-031**: Answer an HTTP 500 to `ai_json` with retries left, and fail after one request without reporting invalid JSON.
 - **IT-032**: Stream a response whose server lingers after `[DONE]`, and return the answer with exit 0.
+- **IT-033**: Run a tool through `ai_run` that reads variables named like the loop's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

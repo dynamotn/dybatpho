@@ -1692,20 +1692,22 @@ function __dybatpho_ai_tools_json {
 # @internal
 #######################################
 function __dybatpho_ai_tool_invoke {
-  local name arguments
-  dybatpho::expect_args name arguments -- "$@"
-  local handler="${DYBATPHO_AI_TOOL_HANDLER[${name}]-}"
-  if dybatpho::is empty "${handler}"; then
-    printf 'Error: no tool named %s is registered\n' "${name}"
+  local __dybatpho_ai_tool_name __dybatpho_ai_tool_arguments
+  dybatpho::expect_args __dybatpho_ai_tool_name __dybatpho_ai_tool_arguments -- "$@"
+  local __dybatpho_ai_tool_handler="${DYBATPHO_AI_TOOL_HANDLER[${__dybatpho_ai_tool_name}]-}"
+  if dybatpho::is empty "${__dybatpho_ai_tool_handler}"; then
+    printf 'Error: no tool named %s is registered\n' "${__dybatpho_ai_tool_name}"
     return 0
   fi
-  dybatpho::debug "ai: invoking tool ${name}"
-  local output status=0
-  output=$("${handler}" "${arguments}" 2>&1) || status=$?
-  if ((status != 0)); then
-    printf 'Error: tool %s exited with status %d\n%s\n' "${name}" "${status}" "${output}"
+  dybatpho::debug "ai: invoking tool ${__dybatpho_ai_tool_name}"
+  local __dybatpho_ai_tool_output __dybatpho_ai_tool_status=0
+  __dybatpho_ai_tool_output=$("${__dybatpho_ai_tool_handler}" "${__dybatpho_ai_tool_arguments}" 2>&1) || \
+    __dybatpho_ai_tool_status=$?
+  if ((__dybatpho_ai_tool_status != 0)); then
+    printf 'Error: tool %s exited with status %d\n%s\n' "${__dybatpho_ai_tool_name}" "${__dybatpho_ai_tool_status}" \
+      "${__dybatpho_ai_tool_output}"
   else
-    printf '%s\n' "${output}"
+    printf '%s\n' "${__dybatpho_ai_tool_output}"
   fi
 }
 
@@ -1729,18 +1731,18 @@ function __dybatpho_ai_tool_invoke {
 # @tip Handlers receive their arguments as one JSON string; parse it with `dybatpho::json_query`
 #######################################
 function dybatpho::ai_run {
-  local prompt system
-  dybatpho::expect_args prompt -- "$@"
-  system="${2:-${DYBATPHO_AI_SYSTEM}}"
-  prompt=$(__dybatpho_ai_redact "${prompt}")
+  local __dybatpho_ai_run_prompt __dybatpho_ai_run_system
+  dybatpho::expect_args __dybatpho_ai_run_prompt -- "$@"
+  __dybatpho_ai_run_system="${2:-${DYBATPHO_AI_SYSTEM}}"
+  __dybatpho_ai_run_prompt=$(__dybatpho_ai_redact "${__dybatpho_ai_run_prompt}")
 
-  local provider
-  __dybatpho_ai_provider_into provider
-  case "${provider}" in
+  local __dybatpho_ai_run_provider
+  __dybatpho_ai_provider_into __dybatpho_ai_run_provider
+  case "${__dybatpho_ai_run_provider}" in
     anthropic | openai) ;;
     *)
-      dybatpho::debug "ai: ${provider} has no tool-use loop, answering directly"
-      dybatpho::ai_ask "${prompt}" "${system}"
+      dybatpho::debug "ai: ${__dybatpho_ai_run_provider} has no tool-use loop, answering directly"
+      dybatpho::ai_ask "${__dybatpho_ai_run_prompt}" "${__dybatpho_ai_run_system}"
       return $?
       ;;
   esac
@@ -1749,97 +1751,106 @@ function dybatpho::ai_run {
     || dybatpho::die "dybatpho::ai_run: No tools registered, use dybatpho::ai_tool_register first"
 
   __dybatpho_ai_require_json
-  local tools messages payload body step=1
-  tools=$(__dybatpho_ai_tools_json)
-  messages="[$(dybatpho::json_object role user content "${prompt}")]"
+  local __dybatpho_ai_run_tools __dybatpho_ai_run_messages __dybatpho_ai_run_payload __dybatpho_ai_run_body \
+    __dybatpho_ai_run_step=1
+  __dybatpho_ai_run_tools=$(__dybatpho_ai_tools_json)
+  __dybatpho_ai_run_messages="[$(dybatpho::json_object role user content "${__dybatpho_ai_run_prompt}")]"
 
-  while ((step <= DYBATPHO_AI_MAX_STEPS)); do
+  while ((__dybatpho_ai_run_step <= DYBATPHO_AI_MAX_STEPS)); do
     __dybatpho_ai_budget_check
-    local conversation
-    conversation=$(dybatpho::json_object system "${system}" messages:json "${messages}")
-    payload=$("__dybatpho_ai_payload_${provider}" "${conversation}" "${tools}" "")
-    body=$(__dybatpho_ai_http "${provider}" "${payload}") || return $?
-    local text
-    __dybatpho_ai_response_into text "${provider}" "${body}"
+    local __dybatpho_ai_run_conversation
+    __dybatpho_ai_run_conversation=$(dybatpho::json_object system "${__dybatpho_ai_run_system}" \
+      messages:json "${__dybatpho_ai_run_messages}")
+    __dybatpho_ai_run_payload=$("__dybatpho_ai_payload_${__dybatpho_ai_run_provider}" \
+      "${__dybatpho_ai_run_conversation}" "${__dybatpho_ai_run_tools}" "")
+    __dybatpho_ai_run_body=$(__dybatpho_ai_http "${__dybatpho_ai_run_provider}" "${__dybatpho_ai_run_payload}") \
+      || return $?
+    local __dybatpho_ai_run_text
+    __dybatpho_ai_response_into __dybatpho_ai_run_text "${__dybatpho_ai_run_provider}" "${__dybatpho_ai_run_body}"
 
     # `@json` renders the tool arguments as text both backends spell the same
     # way, so a handler always receives one JSON string.
-    local calls
-    case "${provider}" in
+    local __dybatpho_ai_run_calls
+    case "${__dybatpho_ai_run_provider}" in
       anthropic)
-        calls=$(dybatpho::json_eval "${body}" \
+        __dybatpho_ai_run_calls=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" \
           '[.content[]? | select(.type == "tool_use")
             | {"id": .id, "name": .name, "arguments": (.input | @json)}]')
         ;;
       openai)
-        calls=$(dybatpho::json_eval "${body}" \
+        __dybatpho_ai_run_calls=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" \
           '[.choices[0].message.tool_calls[]?
             | {"id": .id, "name": .function.name, "arguments": .function.arguments}]')
         ;;
       *) ;;
     esac
 
-    local total
-    total=$(dybatpho::json_get "${calls}" 'length')
-    if [[ "${total}" == "0" ]]; then
-      printf '%s\n' "${text}"
+    local __dybatpho_ai_run_total
+    __dybatpho_ai_run_total=$(dybatpho::json_get "${__dybatpho_ai_run_calls}" 'length')
+    if [[ "${__dybatpho_ai_run_total}" == "0" ]]; then
+      printf '%s\n' "${__dybatpho_ai_run_text}"
       return 0
     fi
 
     # Echo the assistant turn back verbatim so tool results line up with the
     # call ids the provider issued, then append one result per call.
-    local assistant
-    case "${provider}" in
+    local __dybatpho_ai_run_assistant
+    case "${__dybatpho_ai_run_provider}" in
       anthropic)
-        local json_eval
-        json_eval=$(dybatpho::json_eval "${body}" '.content')
-        assistant=$(dybatpho::json_object \
-          role assistant content:json "${json_eval}")
+        local __dybatpho_ai_run_json_eval
+        __dybatpho_ai_run_json_eval=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" '.content')
+        __dybatpho_ai_run_assistant=$(dybatpho::json_object \
+          role assistant content:json "${__dybatpho_ai_run_json_eval}")
         ;;
       openai)
-        assistant=$(dybatpho::json_eval "${body}" '.choices[0].message')
+        __dybatpho_ai_run_assistant=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" '.choices[0].message')
         ;;
       *) ;;
     esac
-    messages=$(dybatpho::json_eval "${messages}" ". + [${assistant}]")
+    __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" \
+      ". + [${__dybatpho_ai_run_assistant}]")
 
-    local index=0 call_id call_name call_arguments result entry call
-    local results='[]'
-    while ((index < total)); do
+    local __dybatpho_ai_run_index=0 __dybatpho_ai_run_call_id __dybatpho_ai_run_call_name \
+      __dybatpho_ai_run_call_arguments __dybatpho_ai_run_result __dybatpho_ai_run_entry __dybatpho_ai_run_call
+    local __dybatpho_ai_run_results='[]'
+    while ((__dybatpho_ai_run_index < __dybatpho_ai_run_total)); do
       # One read per call rather than one per field. The arguments come last
       # because they are the only field that can span lines, and the marker
       # keeps their trailing newlines out of reach of the substitution.
-      call=$(dybatpho::json_get "${calls}" \
-        ".[${index}] | [.id, .name, .arguments] | map(tostring) | join(\"\\n\") + \"#\"")
-      call="${call%#}"
-      call_id="${call%%$'\n'*}"
-      call="${call#*$'\n'}"
-      call_name="${call%%$'\n'*}"
-      call_arguments="${call#*$'\n'}"
-      result=$(__dybatpho_ai_tool_invoke "${call_name}" "${call_arguments}")
-      case "${provider}" in
+      __dybatpho_ai_run_call=$(dybatpho::json_get "${__dybatpho_ai_run_calls}" \
+        ".[${__dybatpho_ai_run_index}] | [.id, .name, .arguments] | map(tostring) | join(\"\\n\") + \"#\"")
+      __dybatpho_ai_run_call="${__dybatpho_ai_run_call%#}"
+      __dybatpho_ai_run_call_id="${__dybatpho_ai_run_call%%$'\n'*}"
+      __dybatpho_ai_run_call="${__dybatpho_ai_run_call#*$'\n'}"
+      __dybatpho_ai_run_call_name="${__dybatpho_ai_run_call%%$'\n'*}"
+      __dybatpho_ai_run_call_arguments="${__dybatpho_ai_run_call#*$'\n'}"
+      __dybatpho_ai_run_result=$(__dybatpho_ai_tool_invoke "${__dybatpho_ai_run_call_name}" \
+        "${__dybatpho_ai_run_call_arguments}")
+      case "${__dybatpho_ai_run_provider}" in
         anthropic)
-          entry=$(dybatpho::json_object \
-            type tool_result tool_use_id "${call_id}" content "${result}")
-          results=$(dybatpho::json_eval "${results}" ". + [${entry}]")
+          __dybatpho_ai_run_entry=$(dybatpho::json_object \
+            type tool_result tool_use_id "${__dybatpho_ai_run_call_id}" content "${__dybatpho_ai_run_result}")
+          __dybatpho_ai_run_results=$(dybatpho::json_eval "${__dybatpho_ai_run_results}" \
+            ". + [${__dybatpho_ai_run_entry}]")
           ;;
         openai)
-          entry=$(dybatpho::json_object \
-            role tool tool_call_id "${call_id}" content "${result}")
-          messages=$(dybatpho::json_eval "${messages}" ". + [${entry}]")
+          __dybatpho_ai_run_entry=$(dybatpho::json_object \
+            role tool tool_call_id "${__dybatpho_ai_run_call_id}" content "${__dybatpho_ai_run_result}")
+          __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" \
+            ". + [${__dybatpho_ai_run_entry}]")
           ;;
         *) ;;
       esac
-      index=$((index + 1))
+      __dybatpho_ai_run_index=$((__dybatpho_ai_run_index + 1))
     done
 
-    if [[ "${provider}" == "anthropic" ]]; then
-      local json_object
-      json_object=$(dybatpho::json_object role user content:json "${results}")
-      messages=$(dybatpho::json_eval "${messages}" \
-        ". + [${json_object}]")
+    if [[ "${__dybatpho_ai_run_provider}" == "anthropic" ]]; then
+      local __dybatpho_ai_run_json_object
+      __dybatpho_ai_run_json_object=$(dybatpho::json_object role user content:json "${__dybatpho_ai_run_results}")
+      __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" \
+        ". + [${__dybatpho_ai_run_json_object}]")
     fi
-    step=$((step + 1))
+    __dybatpho_ai_run_step=$((__dybatpho_ai_run_step + 1))
   done
   dybatpho::die "dybatpho::ai_run: Gave up after ${DYBATPHO_AI_MAX_STEPS} tool rounds"
 }

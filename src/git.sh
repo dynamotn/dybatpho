@@ -279,16 +279,31 @@ function dybatpho::git_has_remote {
 # @arg $2 string Optional base ref, default is `HEAD`
 # @stdout One changed file path per line, sorted byte-wise and deduplicated,
 #   so the order does not depend on the caller's locale
+# @exitcode 1 Stop the script when the base names no commit, or a Git command fails
 #######################################
 function dybatpho::git_changed_files {
-  local repo_path base_ref
+  local repo_path base_ref tracked untracked
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
   base_ref="${2:-HEAD}"
-  {
-    __dybatpho_git "${repo_path}" diff --name-only "${base_ref}" --
-    __dybatpho_git "${repo_path}" ls-files --others --exclude-standard
-  } | awk 'NF' | LC_ALL=C sort -u
+  # Each half is collected on its own and checked: piped together, a failing
+  # `diff` was hidden behind the `ls-files` that ran after it, and a base that
+  # named nothing produced a short list rather than an error.
+  if [[ "${base_ref}" == HEAD ]] \
+    && ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet HEAD > /dev/null 2>&1; then
+    # Before the first commit there is no HEAD to compare with, so every file
+    # in the index is new: the staged list plus anything changed since.
+    tracked="$(__dybatpho_git "${repo_path}" diff --cached --name-only --)" \
+      && tracked+=$'\n'"$(__dybatpho_git "${repo_path}" diff --name-only --)" \
+      || dybatpho::die "${FUNCNAME[0]}: git diff failed in ${repo_path}"
+  else
+    __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
+    tracked="$(__dybatpho_git "${repo_path}" diff --name-only "${base_ref}" --)" \
+      || dybatpho::die "${FUNCNAME[0]}: git diff failed in ${repo_path}"
+  fi
+  untracked="$(__dybatpho_git "${repo_path}" ls-files --others --exclude-standard)" \
+    || dybatpho::die "${FUNCNAME[0]}: git ls-files failed in ${repo_path}"
+  printf '%s\n%s\n' "${tracked}" "${untracked}" | awk 'NF' | LC_ALL=C sort -u
 }
 
 #######################################

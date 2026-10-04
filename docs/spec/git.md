@@ -95,6 +95,7 @@ dybatpho::git_changed_files "${root}" "${base}"
 
 ## Edge Cases
 
+- A base ref that names no commit, and a repository with no commit yet.
 - The path is outside any Git worktree.
 - Git is not installed.
 - HEAD is detached or the repository has no preferred branch fallback.
@@ -204,6 +205,7 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
 - **FR-012**: All helpers MUST target the requested repository path even when
   Git environment variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, and
   related) are exported by a surrounding Git hook.
+- **FR-013**: `git_changed_files` MUST stop when the base names no commit or a Git command fails, and before the first commit MUST list staged files together with untracked ones.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -256,6 +258,7 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
 - **IT-007**: Verify all repository helpers fail clearly outside a worktree.
 - **IT-008**: Verify helpers work when run with `GIT_DIR`/`GIT_INDEX_FILE` set,
   as happens inside a `pre-commit` hook.
+- **IT-009**: Refuse a base that names no commit, and list staged and untracked files in a repository with no commit.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -275,6 +275,39 @@ function _append_git_commit {
   assert_equal "$(dybatpho::git_changed_files "${repo_path}")" $'README.md\nnotes.txt'
 }
 
+@test "dybatpho::git_changed_files refuses a base that names no commit" {
+  # The tracked half failed on the bad ref while the untracked half still
+  # listed its files, and the group answered with the last command's success:
+  # a typo in the base read as a short, plausible list.
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  printf 'new\n' > "${repo_path}/notes.txt"
+
+  run --separate-stderr dybatpho::git_changed_files "${repo_path}" no-such-ref
+  assert_failure
+  assert_output ""
+  assert_stderr --partial "Unknown git commit: no-such-ref"
+}
+
+@test "dybatpho::git_changed_files lists staged files before the first commit" {
+  # With no commit yet, `diff HEAD` failed and only untracked files came back,
+  # so everything already added to the index went missing.
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git init -q -b main "${repo_path}"
+    printf 'a\n' > "${repo_path}/staged.txt"
+    git -C "${repo_path}" add staged.txt
+  )
+  printf 'b\n' > "${repo_path}/loose.txt"
+
+  run_traced -0 --separate-stderr dybatpho::git_changed_files "${repo_path}"
+  assert_output $'loose.txt\nstaged.txt'
+  assert_stderr ""
+}
+
 @test "dybatpho::git_tags_containing lists tags containing a commit" {
   local repo_path
   repo_path="$(_new_git_repo_path)"

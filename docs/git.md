@@ -313,6 +313,10 @@ List changed files relative to a base ref, including untracked.
 - One changed file path per line, sorted byte-wise and deduplicated,
   so the order does not depend on the caller's locale
 
+**🚦 Exit codes**
+
+- `1`: Stop the script when the base names no commit, or a Git command fails
+
 
 ---
 

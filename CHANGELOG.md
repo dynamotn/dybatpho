@@ -162,6 +162,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request: the answer was printed and the call still returned 1 with "Error
   when access". It now reads the stream to its end first.
 
+- **`git` — `dybatpho::git_changed_files` no longer hides a failed comparison.**
+  A base that named no commit failed the tracked half while the untracked half
+  still listed its files, so a typo in the base came back as a short,
+  successful list. It now stops with "Unknown git commit". Before the first
+  commit, when there is no `HEAD` to compare with, the files already staged
+  are listed too instead of going missing.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

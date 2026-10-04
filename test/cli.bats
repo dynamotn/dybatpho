@@ -181,6 +181,25 @@ setup() {
   assert_output --partial "Child command"
 }
 
+@test "dybatpho::generate_from_spec leaves no generated file behind, even after exec" {
+  # The parser was written to a temporary file removed only by the EXIT trap,
+  # and an action that ends with `exec` -- a test runner handing over to bats,
+  # say -- replaces the shell before that trap runs, leaving one file per run.
+  local tmp="${BATS_TEST_TMPDIR}/genopts-tmp" script="${BATS_TEST_TMPDIR}/exec.sh"
+  mkdir -p "${tmp}"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules cli" \
+    '_spec() { dybatpho::opts::setup "demo" ARGS action:"_main"; }' \
+    '_main() { exec true; }' \
+    'dybatpho::generate_from_spec _spec "$@"' > "${script}"
+
+  # Outside bats, as a real script runs: under bats `create_temp` would use the
+  # test's own directory instead of TMPDIR.
+  run_traced -0 env -u BATS_TEST_TMPDIR -u BATS_FILE_TMPDIR -u BATS_RUN_TMPDIR \
+    TMPDIR="${tmp}" bash "${script}"
+  assert_equal "$(ls -A "${tmp}")" ""
+}
+
 @test "dybatpho::generate_from_spec keeps the arguments out of the generated file" {
   # The arguments used to be written into the generated file as shell source
   # and the file sourced, so every value went through a round of expansion.

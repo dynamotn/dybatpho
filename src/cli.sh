@@ -3393,6 +3393,10 @@ function dybatpho::generate_from_spec {
   fi
   # shellcheck disable=1090
   . "${__dybatpho_cli_gen_file}"
+  # Sourced, the file has done its job. It goes now rather than on the EXIT
+  # trap, which an action ending in `exec` never reaches: such a script used to
+  # leave one file behind per run.
+  rm -f -- "${__dybatpho_cli_gen_file}"
   # The generated file only defines parsers. Running one is done here, with the
   # argument vector this function was given, so nothing a caller typed is ever
   # read as shell source.

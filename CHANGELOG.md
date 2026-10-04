@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`cli` — a parser leaves no file behind when the action ends in `exec`.**
+  `dybatpho::generate_from_spec` wrote the generated parser to a temporary
+  file that only the EXIT trap removed, and a script whose action hands over
+  with `exec` -- a test runner starting bats, say -- never reaches that trap,
+  so every run left a `dybatpho_genopts_*.sh` in the temporary directory. The
+  file is now removed as soon as it has been sourced.
+
 - **`init.sh` — dependencies still resolve after sourcing it inside a
   function.** The module dependency map was declared local to that function,
   so a later `dybatpho::load forge` loaded `forge` without `network`, `json`

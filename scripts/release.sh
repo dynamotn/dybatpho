@@ -415,7 +415,9 @@ function __dybatpho_release_run {
 
   if dybatpho::is true "${DOCS}"; then
     dybatpho::progress "Regenerating docs/"
-    dybatpho::dry_run "${SCRIPT_DIR}/docs.sh"
+    # Two arguments, not one: `dry_run` evaluates a lone string, and a checkout
+    # under a directory with a space in its name split that path in two.
+    dybatpho::dry_run bash "${SCRIPT_DIR}/docs.sh"
   fi
 
   dybatpho::progress "Committing and tagging ${_tag}"

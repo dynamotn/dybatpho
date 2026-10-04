@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`scripts/release.sh` — a checkout with a space in its path can release.**
+  The docs step handed `dybatpho::dry_run` the path of `docs.sh` as a single
+  string, which it evaluates, so under such a directory the path split in two
+  and the release stopped after stamping `VERSION`.
+
 - **`schedule` — `dybatpho::schedule_once_per` no longer writes through a
   planted link.** Its marker was staged at `<marker>.<pid>.partial` with a
   plain redirection, a name anyone able to write to the schedule directory

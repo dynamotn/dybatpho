@@ -35,3 +35,28 @@ release() {
   assert_stderr --partial "--version and --bump"
   refute_stderr --partial "Validation error"
 }
+
+@test "release.sh regenerates the docs from a checkout whose path has a space" {
+  # The docs step handed `dybatpho::dry_run` the script path as one string,
+  # which it evaluates; under a directory with a space in its name the path
+  # split in two and the release stopped after stamping VERSION.
+  local repo="${BATS_TEST_TMPDIR}/re lease"
+  mkdir -p "${repo}/scripts" "${repo}/docs"
+  cp -R "${DYBATPHO_DIR}/src" "${repo}/src"
+  cp "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${DYBATPHO_DIR}/CHANGELOG.md" "${repo}/"
+  cp "${RELEASE_SH}" "${repo}/scripts/release.sh"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'printf "regenerated\n" > "$(cd "$(dirname "$0")/.." && pwd)/docs/marker"' > "${repo}/scripts/docs.sh"
+  chmod +x "${repo}/scripts/docs.sh"
+  git -C "${repo}" init -q
+  git -C "${repo}" remote add origin "git@github.com:example/release-space.git"
+  git -C "${repo}" -c user.name=t -c user.email=t@example.test add -A
+  git -C "${repo}" -c user.name=t -c user.email=t@example.test commit -q -m "feat: start"
+
+  run --separate-stderr env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test \
+    "${repo}/scripts/release.sh" --version 9.9.9 --no-push --no-publish --no-bundle --yes
+  assert_success
+  assert_equal "$(cat "${repo}/docs/marker")" "regenerated"
+  assert_equal "$(git -C "${repo}" log -1 --format=%s)" "chore(release): v9.9.9"
+}

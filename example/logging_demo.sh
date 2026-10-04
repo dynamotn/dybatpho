@@ -137,9 +137,10 @@ function _demo_file_logging {
     done
   )
   dybatpho::info "Files present after rotation:"
-  local ls
-  ls=$(ls -1 "${demo_dir}")
-  dybatpho::print "${ls}"
+  local -a present=("${demo_dir}"/*)
+  local names
+  printf -v names '%s\n' "${present[@]##*/}"
+  dybatpho::print "${names%$'\n'}"
 }
 
 # @description Run the `CONFIGURING THE FILE SINK IN ONE CALL` section of this example.

@@ -852,6 +852,22 @@ _test_tool() { printf 'tool output\n'; }
   assert_output "one-two"
 }
 
+@test "dybatpho::ai_stream keeps a last chunk that has no newline" {
+  # A server can close the stream right after its final object; `read` fails
+  # on that last line, so the end of the answer was dropped.
+  DYBATPHO_AI_PROVIDER=ollama
+  local sse_file="${BATS_TEST_TMPDIR}/stream-unterminated.sse"
+  {
+    printf '{"message":{"content":"one"}}\n'
+    printf '{"message":{"content":"-two"}}'
+  } > "${sse_file}"
+  stub_curl_stream 200 "${sse_file}"
+
+  run_traced dybatpho::ai_stream "hi"
+  assert_success
+  assert_output "one-two"
+}
+
 @test "dybatpho::ai_stream makes no request under DRY_RUN" {
   DRY_RUN=true
   run_traced dybatpho::ai_stream "q"

@@ -250,6 +250,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-035**: The `cli` backend MUST look up its command in the caller's shell, so that a configured or detected client that is not installed stops the call with status 127 instead of answering with nothing.
 - **FR-036**: `ai_stream` MUST read the stream to its end before judging curl's exit status, so a server that closes the connection after `[DONE]` is not reported as a failed request.
 - **FR-037**: A tool run by `ai_run` MUST see the caller's variables: the loop and the tool invoker MUST keep their state in prefixed locals.
+- **FR-038**: Streaming MUST print a final chunk that ends without a newline.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -328,6 +329,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-031**: Answer an HTTP 500 to `ai_json` with retries left, and fail after one request without reporting invalid JSON.
 - **IT-032**: Stream a response whose server lingers after `[DONE]`, and return the answer with exit 0.
 - **IT-033**: Run a tool through `ai_run` that reads variables named like the loop's locals, and see the caller's values.
+- **IT-034**: Stream Ollama objects whose last one has no trailing newline and get the whole answer.
 
 ## Acceptance Criteria *(mandatory)*
 

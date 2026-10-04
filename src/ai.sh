@@ -1530,7 +1530,9 @@ function dybatpho::ai_stream {
   # Reading carries on to the end even after `[DONE]`: the substitution writes
   # curl's exit status only once curl has exited, and the end of its output is
   # the one point at which that file is known to be written.
-  while IFS= read -r line; do
+  # A stream can end on a chunk with no newline; `read` fails on it even
+  # though it filled the variable.
+  while IFS= read -r line || [[ -n "${line}" ]]; do
     [[ "${finished}" == false ]] || continue
     [[ -z "${line}" ]] && continue
     data="${line#data: }"
@@ -1554,7 +1556,7 @@ function dybatpho::ai_stream {
   [[ -n "${stream_config}" ]] && rm -f "${stream_config}"
 
   local code="" protocol status rest curl_status
-  while IFS=' ' read -r protocol status rest; do
+  while IFS=' ' read -r protocol status rest || [[ -n "${protocol}" ]]; do
     [[ "${protocol}" == HTTP/* ]] && code="${status%$'\r'}"
   done < "${header_file}"
   curl_status="$(< "${curl_status_file}")"

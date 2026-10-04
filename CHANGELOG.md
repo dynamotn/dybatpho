@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`ai` — `dybatpho::ai_stream` keeps a last chunk with no newline.** A
+  provider that closed the stream right after its final object, without a
+  newline, lost the end of the answer.
+
 - **`agent` — `dybatpho::agent_audit_show` prints a last record with no
   newline.** A log that had been trimmed or written by another tool lost its
   final record, because `read` fails on a last line without a newline.

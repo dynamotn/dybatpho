@@ -723,3 +723,14 @@ SCRIPT
   [[ -s "${pauses}" ]]
   assert_equal "$(sort -u "${pauses}")" "${DYBATPHO_QUEUE_POLL_INTERVAL}"
 }
+
+@test "a queue handler sees the caller's variables, not the worker's" {
+  # The handler runs in a subshell of the worker, where the worker's locals hid
+  # the caller's variables of the same names.
+  local queue="caller" handler="caller" id="caller" retries="caller" directory="caller" handled="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s %s %s %s\n' "${queue}" "${handler}" "${id}" "${retries}" "${directory}" "${handled}" > "${seen}"; }
+  dybatpho::queue_push "${QUEUE}" payload > /dev/null
+  run_traced -0 dybatpho::queue_work --max-jobs 1 "${QUEUE}" look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+}

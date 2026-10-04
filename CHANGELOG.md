@@ -158,6 +158,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `failures` and `now` hid the caller's variables of the same names. They are
   now prefixed.
 
+- **`queue` — a handler run by `dybatpho::queue_work` sees the caller's
+  variables.** It ran in a subshell of the worker, where locals such as `queue`,
+  `handler`, `id`, `retries` and `directory` hid the caller's variables of the
+  same names. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

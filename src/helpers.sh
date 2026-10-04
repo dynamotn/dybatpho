@@ -259,6 +259,28 @@ function __dybatpho_helpers_need_module {
 }
 
 #######################################
+# @description Set a variable to the public function a script called, for a
+#   helper several frames below it to report under. A helper that names
+#   `FUNCNAME[1]` names whatever called it, which is an internal function as soon
+#   as a public one delegates to an internal one; this walks up to the first
+#   `dybatpho::` frame above the helper's caller instead.
+# @arg $1 string Name of the variable receiving the function name
+# @set The named variable: the nearest public caller, or the helper's caller when there is none
+# @internal
+#######################################
+function __dybatpho_helpers_public_caller_into {
+  local -n __dybatpho_helpers_pc_ref="$1"
+  local __dybatpho_helpers_pc_fn
+  __dybatpho_helpers_pc_ref="${FUNCNAME[2]-main}"
+  for __dybatpho_helpers_pc_fn in "${FUNCNAME[@]:2}"; do
+    if [[ "${__dybatpho_helpers_pc_fn}" == dybatpho::* ]]; then
+      __dybatpho_helpers_pc_ref="${__dybatpho_helpers_pc_fn}"
+      return 0
+    fi
+  done
+}
+
+#######################################
 # @description Sort an array in place, bottom-up and stable, deciding the order
 #   through a comparator function.
 #   Runs of length one are already sorted, so the passes merge pairs of them

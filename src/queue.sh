@@ -57,10 +57,11 @@ DYBATPHO_QUEUE_POLL_INTERVAL="${DYBATPHO_QUEUE_POLL_INTERVAL:-0.05}"
 #######################################
 function __dybatpho_queue_dir_into {
   local -n __dybatpho_queue_dir_ref="$1"
-  local __dybatpho_queue_name="$2"
+  local __dybatpho_queue_name="$2" __dybatpho_queue_who
+  __dybatpho_helpers_public_caller_into __dybatpho_queue_who
 
   [[ -n "${__dybatpho_queue_name}" ]] \
-    || dybatpho::die "${FUNCNAME[1]}: Expected a queue name"
+    || dybatpho::die "${__dybatpho_queue_who}: Expected a queue name"
 
   if [[ "${__dybatpho_queue_name}" == */* ]]; then
     __dybatpho_queue_dir_ref="${__dybatpho_queue_name}"
@@ -69,7 +70,7 @@ function __dybatpho_queue_dir_into {
 
   local __dybatpho_queue_base="${DYBATPHO_QUEUE_DIR}"
   if [[ -z "${__dybatpho_queue_base}" ]]; then
-    __dybatpho_xdg_dir_into __dybatpho_queue_base "${FUNCNAME[1]}" XDG_STATE_HOME ".local/state"
+    __dybatpho_xdg_dir_into __dybatpho_queue_base "${__dybatpho_queue_who}" XDG_STATE_HOME ".local/state"
     __dybatpho_queue_base+="/queues"
   fi
   __dybatpho_queue_dir_ref="${__dybatpho_queue_base}/${__dybatpho_queue_name}"
@@ -426,13 +427,30 @@ function __dybatpho_queue_push_locked {
 #   done
 #######################################
 function dybatpho::queue_pop {
+  local __dybatpho_queue_pop_name __dybatpho_queue_pop_id __dybatpho_queue_pop_payload
+  dybatpho::expect_args __dybatpho_queue_pop_name __dybatpho_queue_pop_id __dybatpho_queue_pop_payload -- "$@"
+  dybatpho::expect_ref "${__dybatpho_queue_pop_id}"
+  dybatpho::expect_ref "${__dybatpho_queue_pop_payload}"
+  __dybatpho_queue_pop "$@"
+}
+
+#######################################
+# @description Claim the next job, as `dybatpho::queue_pop` does, without
+#   refusing a library-owned variable for the id or the payload: the worker keeps
+#   both in prefixed locals, which the public check rightly refuses from a caller.
+# @arg $1 string Queue name or path
+# @arg $2 string Name of the variable receiving the job id
+# @arg $3 string Name of the variable receiving the payload
+# @exitcode 0 A job was claimed
+# @exitcode 1 The queue had no job due
+# @internal
+#######################################
+function __dybatpho_queue_pop {
   # Every local carries the library's prefix: the namerefs below bind to names
   # the caller chooses, and one that matched a plain local here would resolve
   # to that local and leave the caller's variable untouched.
   local __dybatpho_queue_name __dybatpho_queue_id_target __dybatpho_queue_payload_target
   dybatpho::expect_args __dybatpho_queue_name __dybatpho_queue_id_target __dybatpho_queue_payload_target -- "$@"
-  dybatpho::expect_ref "${__dybatpho_queue_id_target}"
-  dybatpho::expect_ref "${__dybatpho_queue_payload_target}"
 
   local __dybatpho_queue_directory
   __dybatpho_queue_dir_into __dybatpho_queue_directory "${__dybatpho_queue_name}"
@@ -810,53 +828,66 @@ function __dybatpho_queue_work_options {
 #   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
 #######################################
 function dybatpho::queue_work {
-  local -A settings=([retries]=3 [backoff]=0 ["max-backoff"]=3600 ["max-jobs"]=0 [poll]="" [idle]="")
-  __dybatpho_queue_work_options settings "$@"
-  shift "${settings[used]}"
-  local retries="${settings[retries]}" backoff="${settings[backoff]}"
-  local max_backoff="${settings["max-backoff"]}" max_jobs="${settings["max-jobs"]}"
-  local poll="${settings[poll]}" idle="${settings[idle]}"
+  local -A __dybatpho_queue_work_settings=([retries]=3 [backoff]=0 ["max-backoff"]=3600 ["max-jobs"]=0 [poll]="" \
+    [idle]="")
+  __dybatpho_queue_work_options __dybatpho_queue_work_settings "$@"
+  shift "${__dybatpho_queue_work_settings[used]}"
+  local __dybatpho_queue_work_retries="${__dybatpho_queue_work_settings[retries]}" \
+    __dybatpho_queue_work_backoff="${__dybatpho_queue_work_settings[backoff]}"
+  local __dybatpho_queue_work_max_backoff="${__dybatpho_queue_work_settings["max-backoff"]}" \
+    __dybatpho_queue_work_max_jobs="${__dybatpho_queue_work_settings["max-jobs"]}"
+  local __dybatpho_queue_work_poll="${__dybatpho_queue_work_settings[poll]}" \
+    __dybatpho_queue_work_idle="${__dybatpho_queue_work_settings[idle]}"
 
-  local queue handler
-  dybatpho::expect_args queue handler -- "$@"
+  local __dybatpho_queue_work_queue __dybatpho_queue_work_handler
+  dybatpho::expect_args __dybatpho_queue_work_queue __dybatpho_queue_work_handler -- "$@"
   shift 2
-  dybatpho::command_exists_all "${handler}" \
-    || dybatpho::die "${FUNCNAME[0]}: Handler not found: ${handler}"
+  dybatpho::command_exists_all "${__dybatpho_queue_work_handler}" \
+    || dybatpho::die "${FUNCNAME[0]}: Handler not found: ${__dybatpho_queue_work_handler}"
 
-  local directory
-  __dybatpho_queue_dir_into directory "${queue}"
+  local __dybatpho_queue_work_directory
+  __dybatpho_queue_dir_into __dybatpho_queue_work_directory "${__dybatpho_queue_work_queue}"
 
-  local handled=0 waited=0 id payload attempts delay outcome
-  while ((max_jobs == 0 || handled < max_jobs)); do
-    if ! dybatpho::queue_pop "${queue}" id payload; then
-      [[ -n "${poll}" ]] || return 0
+  local __dybatpho_queue_work_handled=0 __dybatpho_queue_work_waited=0 __dybatpho_queue_work_id \
+    __dybatpho_queue_work_payload __dybatpho_queue_work_attempts __dybatpho_queue_work_delay \
+    __dybatpho_queue_work_outcome
+  while ((__dybatpho_queue_work_max_jobs == 0 || __dybatpho_queue_work_handled < __dybatpho_queue_work_max_jobs)); do
+    if ! __dybatpho_queue_pop "${__dybatpho_queue_work_queue}" __dybatpho_queue_work_id __dybatpho_queue_work_payload; \
+      then
+      [[ -n "${__dybatpho_queue_work_poll}" ]] || return 0
       # Idle time is counted in polls rather than read from the clock, so a
       # frozen or jumping clock cannot keep a worker alive or end it early.
-      if [[ -n "${idle}" ]] && ((waited >= idle)); then
+      if [[ -n "${__dybatpho_queue_work_idle}" ]] && ((__dybatpho_queue_work_waited >= __dybatpho_queue_work_idle)); \
+        then
         return 0
       fi
-      sleep "${poll}"
-      waited=$((waited + poll))
+      sleep "${__dybatpho_queue_work_poll}"
+      __dybatpho_queue_work_waited=$((__dybatpho_queue_work_waited + __dybatpho_queue_work_poll))
       continue
     fi
-    waited=0
-    handled=$((handled + 1))
+    __dybatpho_queue_work_waited=0
+    __dybatpho_queue_work_handled=$((__dybatpho_queue_work_handled + 1))
 
-    if (DYBATPHO_QUEUE_JOB_ID="${id}" "${handler}" "$@" "${payload}"); then
-      dybatpho::queue_complete "${queue}" "${id}"
+    if (DYBATPHO_QUEUE_JOB_ID="${__dybatpho_queue_work_id}" "${__dybatpho_queue_work_handler}" "$@" \
+      "${__dybatpho_queue_work_payload}"); then
+      dybatpho::queue_complete "${__dybatpho_queue_work_queue}" "${__dybatpho_queue_work_id}"
       continue
     fi
 
-    __dybatpho_queue_sidecar_number_into attempts "${directory}/claimed/${id}.retries" 0
-    delay=0
-    if ((backoff > 0)); then
-      __dybatpho_helpers_backoff_into delay "$((attempts + 1))" "${backoff}" "${max_backoff}" false
+    __dybatpho_queue_sidecar_number_into __dybatpho_queue_work_attempts \
+      "${__dybatpho_queue_work_directory}/claimed/${__dybatpho_queue_work_id}.retries" 0
+    __dybatpho_queue_work_delay=0
+    if ((__dybatpho_queue_work_backoff > 0)); then
+      __dybatpho_helpers_backoff_into __dybatpho_queue_work_delay "$((__dybatpho_queue_work_attempts + 1))" \
+        "${__dybatpho_queue_work_backoff}" "${__dybatpho_queue_work_max_backoff}" false
     fi
 
-    local -a requeue=(dybatpho::queue_requeue)
-    ((delay == 0)) || requeue+=(--delay "${delay}")
-    outcome="$("${requeue[@]}" -- "${queue}" "${id}" "${retries}")"
-    [[ -n "${outcome}" ]] \
-      || dybatpho::warn "Job ${id} in ${queue} failed $((retries + 1)) times; moved to dead letters"
+    local -a __dybatpho_queue_work_requeue=(dybatpho::queue_requeue)
+    ((__dybatpho_queue_work_delay == 0)) || __dybatpho_queue_work_requeue+=(--delay "${__dybatpho_queue_work_delay}")
+    __dybatpho_queue_work_requeue+=(-- "${__dybatpho_queue_work_queue}" "${__dybatpho_queue_work_id}")
+    __dybatpho_queue_work_outcome="$("${__dybatpho_queue_work_requeue[@]}" "${__dybatpho_queue_work_retries}")"
+    local __dybatpho_queue_work_dead="Job ${__dybatpho_queue_work_id} in ${__dybatpho_queue_work_queue} failed"
+    __dybatpho_queue_work_dead+=" $((__dybatpho_queue_work_retries + 1)) times; moved to dead letters"
+    [[ -n "${__dybatpho_queue_work_outcome}" ]] || dybatpho::warn "${__dybatpho_queue_work_dead}"
   done
 }

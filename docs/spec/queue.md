@@ -195,6 +195,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **FR-034**: `queue_requeue` MUST write the requeued job's retry count, priority and due time, under the queue lock, before the job itself becomes claimable, so a worker that claims it at once still carries the count.
 - **FR-035**: The default queue directory MUST be resolved in the caller's shell, so that with neither XDG_STATE_HOME nor HOME set the function that was called stops instead of placing queues under `/`.
 - **FR-036**: A queue operation waiting for a busy queue lock MUST try again every `DYBATPHO_QUEUE_POLL_INTERVAL` seconds (default `0.05`), so it gets a turn against workers that keep re-taking the lock instead of failing after its whole wait.
+- **FR-037**: A handler run by `queue_work` MUST see the caller's variables: the worker MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -261,6 +262,7 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **IT-041**: Requeue a job while a stub claims it the moment it appears, and find its retry count beside the claimed job and none left in `pending`.
 - **IT-042**: Push with neither XDG_STATE_HOME nor HOME set under `if !`, and stop under the name of `queue_push` without touching `/queues`.
 - **IT-043**: Push while another process holds the queue lock nine tenths of the time, freeing it briefly, and find the push succeeds within its wait.
+- **IT-044**: Work a job with a handler that reads variables named like the worker's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

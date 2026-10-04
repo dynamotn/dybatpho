@@ -6,7 +6,7 @@ Utilities for building CLI parsers from shell specs.
 >
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 >
-> Reference sections: [Spec functions](#spec-functions) · [Parse functions](#parse-functions)
+> Reference sections: [Spec functions](#spec-functions)
 
 <a id="overview"></a>
 ## ✨ Overview
@@ -46,7 +46,7 @@ Utilities for building CLI parsers from shell specs.
 - [`dybatpho::opts::msg`](#dybatphooptsmsg) — Place a line of free text in the generated help, so a long option list can be broken into labelled groups. It declares no switch and affects nothing but help output.
 - [`dybatpho::opts::cmd`](#dybatphooptscmd) — Define a sub-command in spec
 - [`dybatpho::opts::arg`](#dybatphooptsarg) — Declare a positional argument. Its value is assigned to the named variable once parsing succeeds, and it also gives the usage line a real placeholder and the generated help, schema, and man page an `Arguments` section. Every value still lands in the rest array named by `dybatpho::opts::setup` as well.
-- [`dybatpho::generate_from_spec`](#dybatphogenerate_from_spec) — Functions to parse spec and put value of options to variable with corresponding name Define spec of parent function or script, spec contains below commands
+- [`dybatpho::generate_from_spec`](#dybatphogenerate_from_spec) — Define spec of parent function or script, spec contains below commands
 - [`dybatpho::generate_help`](#dybatphogenerate_help) — Show help description of root command/sub-command. Declares help state as locals so dybatpho::opts::* in the call chain can read/write them via bash dynamic scoping.
 
 <a id="usage"></a>
@@ -622,11 +622,6 @@ declared somewhere with no readable source file is never cached.
 
 - Declare arguments in the order they are typed; a variadic argument must come last.
 
-### `dybatpho::generate_from_spec`
-
-- Generate the parser once at the end of the script after defining the complete spec tree.
-- The generated parser preserves the original command-line arguments while dispatching nested subcommands.
-
 ### `dybatpho::generate_help`
 
 - The current subcommand path is tracked automatically during parser dispatch
@@ -1064,12 +1059,10 @@ dybatpho::opts::arg "Extra files" EXTRA required:false variadic:true
 - `0`: exit code
 
 
-<a id="parse-functions"></a>
-### 🧩 Parse functions
+---
 
-#### `dybatpho::generate_from_spec`
+### `dybatpho::generate_from_spec`
 
-Functions to parse spec and put value of options to variable with corresponding name
 Define spec of parent function or script, spec contains below commands
 
 **🧾 Arguments**

@@ -54,6 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locals named `result_var` and `prompt`, so a caller variable with either name
   never received the choice.
 
+- **`cli` — options and positionals may be called `spec` or `gen_file`.**
+  The generated parser runs inside `dybatpho::generate_from_spec`, whose own
+  locals had those names, so an option variable named `spec` or a positional
+  array named `gen_file` never reached the action.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

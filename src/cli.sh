@@ -3291,28 +3291,48 @@ function __dybatpho_cli_derive_args_rule {
 # @tip The generated parser preserves the original command-line arguments while dispatching nested subcommands.
 
 #######################################
+# @description Create the file a generated parser is written to.
+#   `dybatpho::create_temp` refuses a library-prefixed name, and the variable
+#   in `dybatpho::generate_from_spec` has to carry one, so the file is made
+#   here under a plain name, in a scope the parser never runs in.
+# @arg $1 string Name of the variable receiving the path
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_cli_generated_file_into {
+  local -n __dybatpho_cli_generated_ref="$1"
+  local gen_file
+  dybatpho::create_temp gen_file ".sh" "genopts"
+  __dybatpho_cli_generated_ref="${gen_file}"
+}
+
+#######################################
 # @description Define spec of parent function or script, spec contains below commands
 # @arg $1 string Name of function that has spec of parent function or script
 # @exitcode 0 exit code
 #######################################
 function dybatpho::generate_from_spec {
-  local spec
-  dybatpho::expect_args spec -- "$@"
+  # The generated parser runs inside this function and assigns the variables
+  # the spec names, so these locals carry the module prefix: an option or
+  # positional variable called `spec` would otherwise be set here and lost.
+  local __dybatpho_cli_spec
+  dybatpho::expect_args __dybatpho_cli_spec -- "$@"
   shift
 
   __current_cmd_path=""
-  local gen_file
-  dybatpho::create_temp gen_file ".sh" "genopts"
-  __dybatpho_cli_generate_logic "${spec}" "$@" >> "${gen_file}"
+  local __dybatpho_cli_gen_file
+  __dybatpho_cli_generated_file_into __dybatpho_cli_gen_file
+  __dybatpho_cli_generate_logic "${__dybatpho_cli_spec}" "$@" >> "${__dybatpho_cli_gen_file}"
   if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
-    dybatpho::debug_command "Generate script of \"${spec}\" - \"$*\"" "dybatpho::show_file '${gen_file}'"
+    dybatpho::debug_command "Generate script of \"${__dybatpho_cli_spec}\" - \"$*\"" \
+      "dybatpho::show_file '${__dybatpho_cli_gen_file}'"
   fi
   # shellcheck disable=1090
-  . "${gen_file}"
+  . "${__dybatpho_cli_gen_file}"
   # The generated file only defines parsers. Running one is done here, with the
   # argument vector this function was given, so nothing a caller typed is ever
   # read as shell source.
-  "dybatpho::opts::parse::${spec}" "$@"
+  "dybatpho::opts::parse::${__dybatpho_cli_spec}" "$@"
 }
 
 #######################################

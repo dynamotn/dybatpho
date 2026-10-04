@@ -20,6 +20,23 @@ setup() {
   assert_stderr_line --index 1 "called"
 }
 
+@test "dybatpho::generate_from_spec sets options and positionals named spec or gen_file" {
+  # The parser runs inside generate_from_spec and assigns the variables the
+  # spec names; `spec` and `gen_file` were that function's own locals, so an
+  # option or positional array with either name came back empty.
+  # shellcheck disable=2329
+  _spec_named() {
+    dybatpho::opts::setup "Named" gen_file action:"_named_action"
+    dybatpho::opts::param "A value" spec --value
+  }
+  # shellcheck disable=2329
+  _named_action() { printf 'spec=%s rest=%s\n' "${spec}" "${gen_file[*]}"; }
+  local spec="" gen_file=()
+  run_traced dybatpho::generate_from_spec _spec_named --value hello one two
+  assert_success
+  assert_output "spec=hello rest=one two"
+}
+
 @test "commands get automatic help when no help option is declared" {
   _spec_auto_help() { dybatpho::opts::setup "Automatic help command" -; }
   # Display actions exit the shell, so these need the isolating form of `run`.

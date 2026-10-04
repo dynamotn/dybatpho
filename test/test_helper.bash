@@ -217,7 +217,9 @@ function path_without {
       [[ -e "${target}" || -L "${target}" ]] || continue
       name="${target##*/}"
       [[ "${name}" != "${tool}" ]] || continue
-      [[ -e "${bin}/${name}" ]] || ln -s "${target}" "${bin}/${name}" 2> /dev/null
+      # A link already made for a dangling target fails `-e`, so `-L` stops a
+      # second `ln` that would fail under errexit.
+      [[ -e "${bin}/${name}" || -L "${bin}/${name}" ]] || ln -s "${target}" "${bin}/${name}"
     done
   done
   printf '%s\n' "${bin}:${kept%:}"

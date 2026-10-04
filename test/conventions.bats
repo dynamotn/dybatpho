@@ -272,3 +272,25 @@ fail_with() {
   [ -z "${violations}" ] ||
     fail_with "Calls that can stop the script from inside a command substitution (fix them, or review and list them in test/die-in-substitution.allow):" "${violations}"
 }
+
+@test "every requirement, scenario and integration test in a spec has its own id" {
+  # Two specs ended up with two FR-016s, FR-027s and IT-025s after merges, so a
+  # reference to one of them named two different rules.
+  local spec line id problems=""
+  local -A seen=()
+  for spec in "${REPO_ROOT}"/docs/spec/*.md; do
+    seen=()
+    while IFS= read -r line; do
+      # Three digits, or a group letter and two digits (`FR-B01`), with an
+      # optional lowercase letter for a clause added under one (`FR-017a`).
+      if [[ ! "${line}" =~ ^-\ \*\*((FR|IT|SC)-([0-9]{3}|[A-Z][0-9]{2})[a-z]?)\*\*: ]]; then
+        problems+="${spec#"${REPO_ROOT}"/}: malformed id: ${line:0:40}"$'\n'
+        continue
+      fi
+      id="${BASH_REMATCH[1]}"
+      [[ -z "${seen[${id}]-}" ]] || problems+="${spec#"${REPO_ROOT}"/}: ${id} is used twice"$'\n'
+      seen[${id}]=1
+    done < <(grep -E '^- \*\*(FR|IT|SC)-' "${spec}")
+  done
+  [ -z "${problems}" ] || fail_with "Spec ids must be unique and well formed:" "${problems}"
+}

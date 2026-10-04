@@ -186,13 +186,13 @@ _deploy prod "${DEPLOY_TOKEN:-}"
   reserved namespace so that the check covers them.
 
 - **FR-021**: The module MUST report which module defines a loaded function, accepting the name with or without the `dybatpho::` prefix, and MUST report `init` for a function the bootstrap defines.
-- **FR-016a**: The lookup MUST use what Bash knows about the running shell rather than the contents of a directory, so the answer describes the code that is actually loaded.
-- **FR-016b**: The lookup MUST switch `extdebug` on only for the one call it needs and MUST restore the option exactly as it found it, because that option also changes how `DEBUG` and `RETURN` traps behave.
-- **FR-016c**: The module MUST also be able to report the file and line a function was defined at, and that line MUST be the line holding the definition.
-- **FR-016d**: A function whose defining file is not a module source MUST NOT be attributed to a module. A bundle holds every module in one file, and naming that file as the module would be a wrong answer rather than a missing one.
+- **FR-021a**: The lookup MUST use what Bash knows about the running shell rather than the contents of a directory, so the answer describes the code that is actually loaded.
+- **FR-021b**: The lookup MUST switch `extdebug` on only for the one call it needs and MUST restore the option exactly as it found it, because that option also changes how `DEBUG` and `RETURN` traps behave.
+- **FR-021c**: The module MUST also be able to report the file and line a function was defined at, and that line MUST be the line holding the definition.
+- **FR-021d**: A function whose defining file is not a module source MUST NOT be attributed to a module. A bundle holds every module in one file, and naming that file as the module would be a wrong answer rather than a missing one.
 - **FR-022**: The module MUST print the documentation comment of a loaded function, read out of the source the shell loaded, so it is available whether or not the generated documentation was ever produced or shipped.
-- **FR-017a**: Rendering MUST drop the banner rules and any `shellcheck` directive standing between the comment and the definition, MUST remove one comment marker and the space after it from each line, and MUST remove the `@description` marker from the prose it introduces, leaving every other tag as written.
-- **FR-017b**: The output MUST open with a heading naming the function and where it came from, including the module when one can be named.
+- **FR-022a**: Rendering MUST drop the banner rules and any `shellcheck` directive standing between the comment and the definition, MUST remove one comment marker and the space after it from each line, and MUST remove the `@description` marker from the prose it introduces, leaving every other tag as written.
+- **FR-022b**: The output MUST open with a heading naming the function and where it came from, including the module when one can be named.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.
 - **FR-019**: `dybatpho::is number` MUST accept exactly what `validate_is number` accepts, and `dybatpho::is int` MUST accept only optionally signed decimal integers without a leading zero, a subset of what `validate_is int` accepts; neither MUST depend on `printf` or `LC_NUMERIC`.
 - **FR-020**: `dybatpho::retry` and `dybatpho::retry_until` MUST NOT shadow the caller's variables in the command they evaluate: their own bookkeeping uses names in the `__dybatpho_` namespace.

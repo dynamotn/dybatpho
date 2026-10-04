@@ -175,7 +175,10 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
   detect which is present rather than assuming that anything without
   `--version` is BSD: BusyBox parses with `-D` instead of `-j -f`, and reads
   `-r` as a reference file rather than a timestamp, so a two-way guess made
-  every helper in the module fail there.
+  every helper in the module fail there. It MUST detect each one by the flag
+  the module uses with it, `-D` for BusyBox and `-d @<seconds>` for GNU, not
+  by `--version`, so a GNU-compatible `date` without that option is still
+  driven with `-d`.
 - **FR-008b**: Parsing MUST reject a date that the platform would roll over
   (`2024-02-30` becoming `2024-03-01`) on every platform that rolls it over,
   which is both BSD and BusyBox.
@@ -239,6 +242,7 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **IT-022**: Write an ISO week with each format placeholder, a literal percent, and an unknown placeholder, and fail on an unparseable date.
 - **IT-023**: Convert a date into another zone, into UTC, and across a daylight-saving offset from a non-UTC source zone.
 - **IT-024**: Refuse an unknown zone, a path, an absolute zone file, and a POSIX rule string, and follow a zone database moved through `TZDIR`.
+- **IT-025**: Detect a `date` that accepts `-d` but has no `--version` as GNU, and one that takes `-D` as BusyBox.
 
 ## Acceptance Criteria *(mandatory)*
 

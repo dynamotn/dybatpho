@@ -35,11 +35,13 @@ __dybatpho_date_flavor_path=""
 #######################################
 # @description Work out which `date` this system has: `gnu`, `bsd` or
 #   `busybox`, into a variable.
-#   Detected by asking for something only one of them accepts, rather than by
-#   matching a name. BSD stays the default it always was; the new question is
-#   whether this is BusyBox, which answers to neither `--version` nor `-j`. A
-#   two-way GNU-or-BSD guess sent every BusyBox system down the BSD path, where
-#   `-r` means "read the time off this file" and the whole module failed.
+#   Detected by asking for the flags the module goes on to use, rather than by
+#   matching a name or a `--version` banner. Only BusyBox takes an input format
+#   through `-D`, so it is asked first; then `-d @0` is the GNU way to read a
+#   timestamp, which a GNU-compatible `date` without `--version` also accepts.
+#   BSD stays the default it always was. A two-way GNU-or-BSD guess sent every
+#   BusyBox system down the BSD path, where `-r` means "read the time off this
+#   file" and the whole module failed.
 #
 #   The answer is cached in the calling shell, which is why this fills a
 #   variable rather than printing: a cache written inside `$(...)` is gone
@@ -53,11 +55,11 @@ function __dybatpho_date_flavor_into {
   dybatpho::expect_args __dybatpho_date_flavor_var -- "$@"
   local -n __dybatpho_date_flavor_out="${__dybatpho_date_flavor_var}"
   if [[ -z "${__dybatpho_date_flavor_cache}" || "${__dybatpho_date_flavor_path}" != "${PATH}" ]]; then
-    if date --version > /dev/null 2>&1; then
-      __dybatpho_date_flavor_cache="gnu"
-    elif date -D "%Y" -d "2024" +%s > /dev/null 2>&1; then
+    if date -D "%Y" -d "2024" +%s > /dev/null 2>&1; then
       # Only BusyBox takes the input format through `-D`.
       __dybatpho_date_flavor_cache="busybox"
+    elif date -d "@0" +%s > /dev/null 2>&1; then
+      __dybatpho_date_flavor_cache="gnu"
     else
       __dybatpho_date_flavor_cache="bsd"
     fi

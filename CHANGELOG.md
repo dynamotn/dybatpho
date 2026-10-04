@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`date` — a GNU-compatible `date` without `--version` is driven with `-d`.**
+  The module told GNU `date` apart by whether `date --version` succeeded, so a
+  `date` that reads `-d @<seconds>` but has no `--version` was taken for BSD
+  and handed `-j -f`, which it does not know. Every `dybatpho::date_*` helper
+  now asks for the flag it is going to use: `-D` for BusyBox, then `-d` for
+  GNU, and BSD otherwise.
+
 - **`cli` — a parser leaves no file behind when the action ends in `exec`.**
   `dybatpho::generate_from_spec` wrote the generated parser to a temporary
   file that only the EXIT trap removed, and a script whose action hands over

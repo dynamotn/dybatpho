@@ -35,6 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`parallel` — ending a pool no longer stalls in a container without an
+  init.** When a job or its watchdog was ended, its orphaned children went to
+  PID 1, and a PID 1 that never reaps — `docker run` without `--init`, or a CI
+  job's container — left them as zombies in the process group. The pool took
+  those for processes still running and waited out the whole
+  `DYBATPHO_TIMEOUT_KILL_AFTER` grace for each group, so a pool with
+  `--timeout`, or one that was interrupted, took seconds longer per job to
+  return. A group holding only zombies now counts as ended wherever `/proc`
+  exists.
+
 - **`cli` — a parser leaves no file behind when the action ends in `exec`.**
   `dybatpho::generate_from_spec` wrote the generated parser to a temporary
   file that only the EXIT trap removed, and a script whose action hands over

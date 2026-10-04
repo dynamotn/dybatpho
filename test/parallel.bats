@@ -313,6 +313,33 @@ _failing_job() {
   assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/stubborn")"
 }
 
+@test "a process group holding only zombies counts as ended" {
+  # In a container whose PID 1 never reaps, an ended job's orphans stay zombies
+  # in its group, and `kill -0` on the group kept answering: every group the
+  # pool ended then cost the whole grace period. The holder below plays that
+  # PID 1: it leads no group it is asked about, and never reaps the two groups
+  # it started, one running and one already exited.
+  [[ -r /proc/self/stat ]] || skip "needs /proc to tell a zombie apart"
+  local groups="${BATS_TEST_TMPDIR}/groups" holder live dead state="" tick
+  # shellcheck disable=SC2016
+  bash -c 'set -m; sleep 30 & live=$!; sleep 0.1 & printf "%s %s\n" "${live}" "$!" > "$1"; exec sleep 30' \
+    _ "${groups}" &
+  holder=$!
+  while [[ ! -s "${groups}" ]]; do sleep 0.05; done
+  read -r live dead < "${groups}"
+  for ((tick = 0; tick < 100; tick++)); do
+    read -r state < "/proc/${dead}/stat" || break
+    state="${state##*) }"
+    [[ "${state%% *}" != Z ]] || break
+    sleep 0.05
+  done
+  kill -0 -- -"${dead}"
+  assert __dybatpho_parallel_group_alive "${live}"
+  refute __dybatpho_parallel_group_alive "${dead}"
+  kill -KILL -- "${holder}" -"${live}" 2> /dev/null || true
+  wait "${holder}" 2> /dev/null || true
+}
+
 @test "a pool cleans up before a caller handler that exits on the signal" {
   # Handlers composed by appending ran the caller's first, and one that exits --
   # `killed_process_handler`, or a plain `trap 'exit' TERM` -- ended the shell

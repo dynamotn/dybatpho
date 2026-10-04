@@ -63,6 +63,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   called.** A caller variable named `file`, `system` or `path_var` was one of
   the function's own locals, so it never received the conversation path.
 
+- **`process` — `dybatpho::pid_file_write` no longer leaves a stray file
+  behind.** An empty path staged `.<pid>.tmp` in the current directory and an
+  existing directory got one inside it, and the staging file stayed there when
+  the move failed. Both are now refused before anything is written, the
+  staging file is created without following anything already at its name, and
+  it is removed if the move fails.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

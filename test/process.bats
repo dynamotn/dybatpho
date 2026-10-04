@@ -584,6 +584,24 @@ SCRIPT
 
 # --- PID files ------------------------------------------------------------
 
+@test "dybatpho::pid_file_write refuses a path it cannot write and leaves nothing behind" {
+  # An empty path staged `.<pid>.tmp` in the working directory and then failed
+  # to move it onto nothing, leaving the staging file there.
+  local work="${BATS_TEST_TMPDIR}/pid work"
+  mkdir -p "${work}/taken"
+  local script="${BATS_TEST_TMPDIR}/pid.sh"
+  printf '%s\n' \
+    "cd $(printf '%q' "${work}")" \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh" \
+    "(dybatpho::pid_file_write '') 2> /dev/null || printf 'empty refused\\n'" \
+    "(dybatpho::pid_file_write taken/) 2> /dev/null || printf 'directory refused\\n'" \
+    "(dybatpho::pid_file_write taken) 2> /dev/null || printf 'existing directory refused\\n'" > "${script}"
+  run_traced bash "${script}"
+  assert_output "$(printf 'empty refused\ndirectory refused\nexisting directory refused')"
+  assert_equal "$(ls -A "${work}" | tr '\n' ' ')" "taken "
+  assert_equal "$(ls -A "${work}/taken")" ""
+}
+
 @test "dybatpho::pid_file_write records a process id, creating the directory it needs" {
   local pid_file="${BATS_TEST_TMPDIR}/run/app.pid"
   dybatpho::pid_file_write "${pid_file}"

@@ -708,16 +708,26 @@ function dybatpho::pid_file_write {
   [[ "${pid}" =~ ^[1-9][0-9]*$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Process ID must be a positive integer, got '${pid}'"
 
+  # An empty path, or one naming a directory, has no file to write; staging
+  # for it would leave `.<pid>.tmp` in the working directory, or in the
+  # directory, with nothing to move it onto.
+  [[ -n "${path}" && "${path}" != */ && ! -d "${path}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Not a file path: '${path}'"
+
   local directory="${path%/*}"
   [[ "${directory}" == "${path}" ]] && directory="."
   [[ -d "${directory}" ]] || mkdir -p -- "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Cannot create directory ${directory}"
 
+  # Created with noclobber, so a file or link already at the staging name is
+  # refused rather than written through.
   local staged="${path}.${BASHPID}.tmp"
-  printf '%s\n' "${pid}" > "${staged}" \
+  (set -C && printf '%s\n' "${pid}" > "${staged}") 2> /dev/null \
     || dybatpho::die "${FUNCNAME[0]}: Cannot write ${path}"
-  mv -f -- "${staged}" "${path}" \
-    || dybatpho::die "${FUNCNAME[0]}: Cannot move ${staged} to ${path}"
+  if ! mv -f -- "${staged}" "${path}"; then
+    rm -f -- "${staged}"
+    dybatpho::die "${FUNCNAME[0]}: Cannot move ${staged} to ${path}"
+  fi
   dybatpho::debug "Wrote pid ${pid} to ${path}"
 }
 

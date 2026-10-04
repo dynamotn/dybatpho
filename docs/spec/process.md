@@ -230,6 +230,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-022**: Trap composition MUST put back an existing handler exactly as it
   was registered, quotes included, and MUST NOT change any variable of the
   caller.
+- **FR-023**: `pid_file_write` MUST refuse an empty path or one naming a directory before staging anything, MUST create its staging file without following a file or link already at that name, and MUST remove the staging file when the move fails.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -286,6 +287,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-012**: Compose onto an EXIT handler that contains a quote and verify
   both handlers run as written, and that a caller's `signal` variable is left
   alone.
+- **IT-013**: Write a pid file to an empty path, a path ending in `/` and an existing directory from a script in its own directory, refuse all three, and leave that directory as it was.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -240,7 +240,7 @@ function dybatpho::schedule_debounce {
 # @arg $3 string Literal `--` separating the key from the command
 # @arg $@ string Command and arguments to run
 # @exitcode 0 The command ran, and its own exit code is returned
-# @exitcode 1 The period or the key is invalid
+# @exitcode 1 The period or the key is invalid, or another caller held the claim for the whole wait
 # @exitcode 9 The command already ran in this period, so nothing was done
 # @example
 #   dybatpho::schedule_once_per day warn-expiry -- dybatpho::warn "The token expires soon"
@@ -306,23 +306,30 @@ function dybatpho::schedule_once_per {
 # @internal
 #######################################
 function __dybatpho_schedule_claim {
-  local claim="$1" attempt=0 age
-  until (set -C && printf '%s\n' "$$" > "${claim}") 2> /dev/null; do
-    # The claim can vanish between the test and the read; that is age 0.
-    age=0
-    if dybatpho::is file "${claim}"; then
+  local claim="$1" attempt=0 age noclobber=false
+  [[ "$-" == *C* ]] && noclobber=true
+  set -C
+  # `noclobber` is set in this shell rather than in a subshell, so an attempt
+  # costs no process; the caller's own setting is put back on every way out.
+  until { printf '%s\n' "$$" > "${claim}"; } 2> /dev/null; do
+    # A claim is only stale after seconds, so its age is read once a second
+    # rather than on every attempt. The claim can vanish between the test and
+    # the read; that is age 0.
+    if ((attempt % 20 == 0)) && dybatpho::is file "${claim}"; then
       age="$(dybatpho::file_age_seconds "${claim}" 2> /dev/null)" || age=0
-    fi
-    if ((age > 5)); then
-      rm -f -- "${claim}"
-      continue
+      if ((age > 5)); then
+        rm -f -- "${claim}"
+        continue
+      fi
     fi
     if ((++attempt > 400)); then
+      [[ "${noclobber}" == true ]] || set +C
       dybatpho::error "${FUNCNAME[1]}: ${claim} is still claimed after waiting"
       return 1
     fi
     sleep 0.05
   done
+  [[ "${noclobber}" == true ]] || set +C
 }
 
 #######################################

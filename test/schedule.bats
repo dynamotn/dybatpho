@@ -172,6 +172,28 @@ note() {
   assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/stale.claim"
 }
 
+@test "dybatpho::schedule_once_per gives up on a claim another caller keeps" {
+  # A fresh claim belongs to a live caller, so it is waited for rather than
+  # removed; one that stays fresh for the whole wait makes the call give up
+  # without running anything or touching the marker. The claim is kept fresh
+  # by reporting its age as 0 -- a live caller re-taking it would look the
+  # same -- and the pause between attempts is skipped, since neither is what
+  # is under test.
+  # shellcheck disable=SC2329
+  sleep() { :; }
+  # shellcheck disable=SC2329
+  dybatpho::file_age_seconds() { printf '0\n'; }
+  mkdir -p "${DYBATPHO_SCHEDULE_DIR}"
+  printf '%s\n' "$$" > "${DYBATPHO_SCHEDULE_DIR}/held.claim"
+
+  run_traced --separate-stderr -1 dybatpho::schedule_once_per day held -- note ran
+  assert_stderr --partial "dybatpho::schedule_once_per: ${DYBATPHO_SCHEDULE_DIR}/held.claim is still claimed"
+  assert_equal "$(cat "${LOG}")" ""
+  assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/held.last"
+  assert_file_exist "${DYBATPHO_SCHEDULE_DIR}/held.claim"
+  unset -f sleep
+}
+
 @test "dybatpho::schedule_once_per rejects a period it does not know" {
   run --separate-stderr dybatpho::schedule_once_per fortnight k -- true
   assert_failure

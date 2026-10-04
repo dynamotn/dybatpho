@@ -130,6 +130,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-019**: Loading the module MUST NOT load `lock`; the debounce MUST stop the script, naming the `lock` module and how to load it, when that module is not loaded, before it registers a trigger.
 - **FR-020**: `schedule_once_per` MUST read and write its marker as one step under a claim, so only one of several simultaneous callers runs the command; MUST write the marker atomically; and MUST clear a claim older than a few seconds as left by a caller that died.
 - **FR-021**: The default marker directory MUST be resolved in the caller's shell, so that with neither XDG_STATE_HOME nor HOME set the function that was called stops instead of placing markers under `/`.
+- **FR-022**: `schedule_once_per` MUST give up with exit code 1, running nothing and leaving the marker alone, when a fresh claim is held for the whole wait, and MUST report the claim it waited for.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -173,6 +174,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-022**: In a script that loaded `schedule` alone, run a once-per-day command, have the debounce stop and name the `lock` module, and debounce once `lock` is loaded.
 - **IT-023**: Start a dozen callers at once for each of several keys, with a named period and with seconds, and find exactly one run per key; plant a stale claim and find the next call runs and removes it.
 - **IT-024**: Reset a key with neither XDG_STATE_HOME nor HOME set under `if !`, and stop under the name of `schedule_reset` without touching `/schedule`.
+- **IT-025**: Hold a claim that stays fresh for the whole wait and find the call returns 1, names the claim, runs nothing, and writes no marker.
 
 ## Acceptance Criteria *(mandatory)*
 

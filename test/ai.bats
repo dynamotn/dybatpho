@@ -692,7 +692,10 @@ _test_tool() { printf 'tool output\n'; }
 }
 
 @test "dybatpho::ai_tokens_estimate reads stdin when no argument is given" {
-  run_traced bash -c 'printf "abcdefgh" | dybatpho::ai_tokens_estimate'
+  # Stdin from a file in this shell, not a `bash -c` child: a `-c` shell has an
+  # empty `BASH_SOURCE`, and coverage never sees the lines it runs.
+  printf 'abcdefgh' > "${BATS_TEST_TMPDIR}/text"
+  run_traced dybatpho::ai_tokens_estimate < "${BATS_TEST_TMPDIR}/text"
   assert_output "2"
 }
 
@@ -736,7 +739,8 @@ _test_tool() { printf 'tool output\n'; }
 }
 
 @test "dybatpho::ai_redact reads stdin when no argument is given" {
-  run_traced bash -c 'printf "reach me at a@b.com" | dybatpho::ai_redact'
+  printf 'reach me at a@b.com' > "${BATS_TEST_TMPDIR}/text"
+  run_traced dybatpho::ai_redact < "${BATS_TEST_TMPDIR}/text"
   assert_output "reach me at <email>"
 }
 

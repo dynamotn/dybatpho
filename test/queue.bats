@@ -673,13 +673,17 @@ SCRIPT
   # A queue operation holds its lock for milliseconds, but a waiter only looked
   # again once a second, so against busy workers that took the lock straight
   # back it could miss every free moment and fail after its full wait. The
-  # stand-in keeps the lock nine tenths of the time.
+  # stand-in keeps the lock nine tenths of the time. The wait is long enough
+  # for a dozen free moments, so a loaded machine slowing each attempt does not
+  # turn a missed one into a failure; the test below pins the poll interval
+  # itself, which is what this depends on.
+  export DYBATPHO_QUEUE_TIMEOUT=8
   dybatpho::queue_push "${QUEUE}" seed > /dev/null
   local holder="${BATS_TEST_TMPDIR}/holder.sh"
   printf '%s\n' \
     ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock" \
     'export DYBATPHO_LOCK_POLL_INTERVAL=0.01' \
-    'end=$((SECONDS + 4))' \
+    'end=$((SECONDS + 10))' \
     'while ((SECONDS < end)); do' \
     '  dybatpho::lock_acquire "$1" 5 2> /dev/null || continue' \
     '  sleep 0.54' \
@@ -694,4 +698,28 @@ SCRIPT
   kill "${holding}" 2> /dev/null || true
   wait "${holding}" 2> /dev/null || true
   assert_success
+}
+
+@test "a queue operation waits on a busy lock at the queue's own poll interval" {
+  # Deterministic half of the test above: with the lock held throughout, every
+  # pause between attempts is recorded, and each one has to be the queue's
+  # interval rather than the lock module's default of a second.
+  dybatpho::queue_push "${QUEUE}" seed > /dev/null
+  sleep 120 &
+  local holder=$!
+  ln -s "${holder}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${QUEUE}/.lock"
+  local pauses="${BATS_TEST_TMPDIR}/pauses"
+  : > "${pauses}"
+  # shellcheck disable=SC2329
+  sleep() {
+    printf '%s\n' "$1" >> "${pauses}"
+    command sleep 0.01
+  }
+  DYBATPHO_QUEUE_TIMEOUT=1 run --separate-stderr dybatpho::queue_push "${QUEUE}" blocked
+  unset -f sleep
+  kill "${holder}" 2> /dev/null || true
+  rm -f "${QUEUE}/.lock"
+  assert_failure
+  [[ -s "${pauses}" ]]
+  assert_equal "$(sort -u "${pauses}")" "${DYBATPHO_QUEUE_POLL_INTERVAL}"
 }

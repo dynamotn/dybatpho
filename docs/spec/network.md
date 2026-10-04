@@ -325,6 +325,7 @@ dybatpho::circuit_breaker api.example.test \
 - **FR-038**: The exit code MUST reflect the class of the HTTP status that
   came back — 3, 4 or 5 — and MUST be reserved for a transport failure, where no
   response was received at all.
+- **FR-039**: A command run by `circuit_breaker` or `rate_limit` MUST see the caller's variables: both MUST keep their state in prefixed locals, so a command cannot change the recorded failures or the spent budget.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -454,6 +455,7 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-035**: Verify a 422 and a 503 both return their status class and leave
   their body in the output file, and that a transport failure is reported
   separately.
+- **IT-036**: Run a command behind a circuit and behind a rate limit that reads variables named like their locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

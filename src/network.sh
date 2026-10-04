@@ -849,39 +849,42 @@ function dybatpho::circuit_reset {
 # @note Circuit breaker state is in-memory and process-local; it does not persist across script invocations
 #######################################
 function dybatpho::circuit_breaker {
-  local key command
-  dybatpho::expect_args key command -- "$@"
+  local __dybatpho_network_cb_key __dybatpho_network_cb_command
+  dybatpho::expect_args __dybatpho_network_cb_key __dybatpho_network_cb_command -- "$@"
   shift 2
 
-  local failures="${DYBATPHO_CIRCUIT_FAILURES[${key}]:-0}"
-  local opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${key}]:-0}"
-  local now
-  now=$(date +%s)
+  local __dybatpho_network_cb_failures="${DYBATPHO_CIRCUIT_FAILURES[${__dybatpho_network_cb_key}]:-0}"
+  local __dybatpho_network_cb_opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${__dybatpho_network_cb_key}]:-0}"
+  local __dybatpho_network_cb_now
+  __dybatpho_network_cb_now=$(date +%s)
 
-  if ((opened_at > 0)); then
-    local elapsed=$((now - opened_at))
-    if ((elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
-      dybatpho::warn "Circuit '${key}' is open; skipping request (retry in $((DYBATPHO_CIRCUIT_COOLDOWN - elapsed))s)"
+  if ((__dybatpho_network_cb_opened_at > 0)); then
+    local __dybatpho_network_cb_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cb_opened_at))
+    if ((__dybatpho_network_cb_elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
+      local __dybatpho_network_cb_left=$((DYBATPHO_CIRCUIT_COOLDOWN - __dybatpho_network_cb_elapsed))
+      dybatpho::warn \
+        "Circuit '${__dybatpho_network_cb_key}' is open; skipping request (retry in ${__dybatpho_network_cb_left}s)"
       return 9
     fi
-    dybatpho::debug "Circuit '${key}' cooldown elapsed; allowing a trial request"
+    dybatpho::debug "Circuit '${__dybatpho_network_cb_key}' cooldown elapsed; allowing a trial request"
   fi
 
-  local exit_code=0
-  eval "${command}" || exit_code=$?
+  local __dybatpho_network_cb_exit_code=0
+  eval "${__dybatpho_network_cb_command}" || __dybatpho_network_cb_exit_code=$?
 
-  if ((exit_code == 0)); then
-    DYBATPHO_CIRCUIT_FAILURES["${key}"]=0
-    DYBATPHO_CIRCUIT_OPENED_AT["${key}"]=0
+  if ((__dybatpho_network_cb_exit_code == 0)); then
+    DYBATPHO_CIRCUIT_FAILURES["${__dybatpho_network_cb_key}"]=0
+    DYBATPHO_CIRCUIT_OPENED_AT["${__dybatpho_network_cb_key}"]=0
   else
-    failures=$((failures + 1))
-    DYBATPHO_CIRCUIT_FAILURES["${key}"]="${failures}"
-    if ((failures >= DYBATPHO_CIRCUIT_THRESHOLD)); then
-      DYBATPHO_CIRCUIT_OPENED_AT["${key}"]="${now}"
-      dybatpho::warn "Circuit '${key}' opened after ${failures} consecutive failures"
+    __dybatpho_network_cb_failures=$((__dybatpho_network_cb_failures + 1))
+    DYBATPHO_CIRCUIT_FAILURES["${__dybatpho_network_cb_key}"]="${__dybatpho_network_cb_failures}"
+    if ((__dybatpho_network_cb_failures >= DYBATPHO_CIRCUIT_THRESHOLD)); then
+      DYBATPHO_CIRCUIT_OPENED_AT["${__dybatpho_network_cb_key}"]="${__dybatpho_network_cb_now}"
+      dybatpho::warn \
+        "Circuit '${__dybatpho_network_cb_key}' opened after ${__dybatpho_network_cb_failures} consecutive failures"
     fi
   fi
-  return "${exit_code}"
+  return "${__dybatpho_network_cb_exit_code}"
 }
 
 #######################################
@@ -1017,53 +1020,62 @@ function dybatpho::rate_limit_reset {
 #   invocations, nor out of a subshell
 #######################################
 function dybatpho::rate_limit {
-  local key spec
-  dybatpho::expect_args key spec -- "$@"
+  local __dybatpho_network_rl_key __dybatpho_network_rl_spec
+  dybatpho::expect_args __dybatpho_network_rl_key __dybatpho_network_rl_spec -- "$@"
   shift 2
   if [[ "${1-}" == "--" ]]; then
     shift
   fi
 
-  local parsed count window_ms
-  parsed="$(__dybatpho_network_rate_spec "${spec}")" \
-    || dybatpho::die "${FUNCNAME[0]}: Invalid rate limit spec: ${spec}"
-  read -r count window_ms <<< "${parsed}"
+  local __dybatpho_network_rl_parsed __dybatpho_network_rl_count __dybatpho_network_rl_window_ms
+  __dybatpho_network_rl_parsed="$(__dybatpho_network_rate_spec "${__dybatpho_network_rl_spec}")" \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid rate limit spec: ${__dybatpho_network_rl_spec}"
+  read -r __dybatpho_network_rl_count __dybatpho_network_rl_window_ms <<< "${__dybatpho_network_rl_parsed}"
   [[ "${DYBATPHO_RATE_LIMIT_MAX_WAIT}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "DYBATPHO_RATE_LIMIT_MAX_WAIT must be a non-negative integer"
 
-  local now remaining oldest wait_ms
+  local __dybatpho_network_rl_now __dybatpho_network_rl_remaining __dybatpho_network_rl_oldest
+  local __dybatpho_network_rl_wait_ms
   while :; do
-    now="$(__dybatpho_log_now_ms)"
+    __dybatpho_network_rl_now="$(__dybatpho_log_now_ms)"
     # Read through the variable rather than a command substitution, so that the
     # pruned window is the one this shell keeps.
-    __dybatpho_network_rate_prune "${key}" "${count}" "${window_ms}" "${now}" > /dev/null
-    remaining="${__DYBATPHO_RATE_REMAINING}"
-    ((remaining > 0)) && break
+    __dybatpho_network_rate_prune "${__dybatpho_network_rl_key}" "${__dybatpho_network_rl_count}" \
+      "${__dybatpho_network_rl_window_ms}" "${__dybatpho_network_rl_now}" > /dev/null
+    __dybatpho_network_rl_remaining="${__DYBATPHO_RATE_REMAINING}"
+    ((__dybatpho_network_rl_remaining > 0)) && break
 
     # The window is full, so the next free slot opens one window after the
     # oldest call still inside it.
-    oldest="${DYBATPHO_RATE_EVENTS[${key}]%% *}"
-    wait_ms=$((oldest + window_ms - now))
-    ((wait_ms < 1)) && wait_ms=1
+    __dybatpho_network_rl_oldest="${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]%% *}"
+    __dybatpho_network_rl_wait_ms=$((__dybatpho_network_rl_oldest + __dybatpho_network_rl_window_ms - \
+      __dybatpho_network_rl_now))
+    ((__dybatpho_network_rl_wait_ms < 1)) && __dybatpho_network_rl_wait_ms=1
 
     if ! dybatpho::is true "${DYBATPHO_RATE_LIMIT_WAIT}"; then
-      dybatpho::warn "Rate limit '${key}' is spent; skipping call (free in ${wait_ms}ms)"
+      dybatpho::warn \
+        "Rate limit '${__dybatpho_network_rl_key}' is spent; skipping call (free in ${__dybatpho_network_rl_wait_ms}ms)"
       return 9
     fi
-    if ((DYBATPHO_RATE_LIMIT_MAX_WAIT > 0 && wait_ms > DYBATPHO_RATE_LIMIT_MAX_WAIT * 1000)); then
-      dybatpho::warn \
-        "Rate limit '${key}' needs ${wait_ms}ms, over the ${DYBATPHO_RATE_LIMIT_MAX_WAIT}s budget; skipping call"
+    if ((DYBATPHO_RATE_LIMIT_MAX_WAIT > 0 && __dybatpho_network_rl_wait_ms > DYBATPHO_RATE_LIMIT_MAX_WAIT * 1000)); then
+      local __dybatpho_network_rl_over="needs ${__dybatpho_network_rl_wait_ms}ms"
+      __dybatpho_network_rl_over+=", over the ${DYBATPHO_RATE_LIMIT_MAX_WAIT}s budget"
+      dybatpho::warn "Rate limit '${__dybatpho_network_rl_key}' ${__dybatpho_network_rl_over}; skipping call"
       return 9
     fi
 
     if declare -F __dybatpho_metrics_key > /dev/null; then
-      dybatpho::metrics_counter_inc dybatpho_rate_limit_waits_total 1 "key=${key}"
+      dybatpho::metrics_counter_inc dybatpho_rate_limit_waits_total 1 "key=${__dybatpho_network_rl_key}"
     fi
-    dybatpho::debug "Rate limit '${key}': waiting ${wait_ms}ms for a free slot"
-    sleep "$(printf '%d.%03d' $((wait_ms / 1000)) $((wait_ms % 1000)))" || true
+    dybatpho::debug \
+      "Rate limit '${__dybatpho_network_rl_key}': waiting ${__dybatpho_network_rl_wait_ms}ms for a free slot"
+    sleep "$(printf '%d.%03d' $((__dybatpho_network_rl_wait_ms / 1000)) $((__dybatpho_network_rl_wait_ms % 1000)))" || \
+      true
   done
 
-  DYBATPHO_RATE_EVENTS["${key}"]="${DYBATPHO_RATE_EVENTS[${key}]:+${DYBATPHO_RATE_EVENTS[${key}]} }${now}"
+  local __dybatpho_network_rl_events="${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]-}"
+  __dybatpho_network_rl_events="${__dybatpho_network_rl_events:+${__dybatpho_network_rl_events} }"
+  DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]="${__dybatpho_network_rl_events}${__dybatpho_network_rl_now}"
   (($#)) || return 0
   "$@"
 }

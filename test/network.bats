@@ -1185,3 +1185,16 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_output --partial "Variables must be a JSON object: [1]"
   refute_output --partial "needs the json module"
 }
+
+@test "a command run behind a circuit or a rate limit sees the caller's variables" {
+  # The command runs in the library's scope, where its locals hid the caller's
+  # variables of the same names, and assigning to one changed the recorded
+  # failures or the spent budget.
+  local key="caller" command="caller" failures="caller" now="caller" count="caller" remaining="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s %s %s %s\n' "${key}" "${command}" "${failures}" "${now}" "${count}" "${remaining}" > "${seen}"; }
+  dybatpho::circuit_breaker scoped look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+  dybatpho::rate_limit scoped 5/60 -- look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+}

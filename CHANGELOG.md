@@ -152,6 +152,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variables, and a command assigning to `times` or `ran` changed how often the
   loop ran. They are now prefixed.
 
+- **`network` — a command run behind a circuit or a rate limit sees the
+  caller's variables.** `dybatpho::circuit_breaker` and `dybatpho::rate_limit`
+  ran the command in their own scope, where locals such as `key`, `command`,
+  `failures` and `now` hid the caller's variables of the same names. They are
+  now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

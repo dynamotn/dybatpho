@@ -284,10 +284,10 @@ function dybatpho::privilege_release {
 #   dybatpho::privilege_run -- systemctl restart nginx
 #######################################
 function dybatpho::privilege_run {
-  local separator
-  dybatpho::expect_args separator -- "$@"
+  local __dybatpho_privilege_run_separator
+  dybatpho::expect_args __dybatpho_privilege_run_separator -- "$@"
   shift
-  [[ "${separator}" == "--" ]] \
+  [[ "${__dybatpho_privilege_run_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: -- command [args...]"
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command after \`--\`"
 
@@ -296,7 +296,7 @@ function dybatpho::privilege_run {
     return
   fi
 
-  local command_name
-  command_name="$(dybatpho::privilege_command)"
-  dybatpho::dry_run "${command_name}" "$@"
+  local __dybatpho_privilege_run_command_name
+  __dybatpho_privilege_run_command_name="$(dybatpho::privilege_command)"
+  dybatpho::dry_run "${__dybatpho_privilege_run_command_name}" "$@"
 }

@@ -115,6 +115,7 @@ dybatpho::privilege_release
 - **FR-014**: `DRY_RUN` MUST report what would happen and change nothing.
 - **FR-015**: An unknown option MUST stop the script.
 - **FR-016**: A second `privilege_acquire` while the escalation is held MUST NOT authenticate again, start a second refresher, put a second wrapper on `PATH`, or register the release again, and MUST add a wrapper the first call left out when `--shield` is now given.
+- **FR-017**: A command run by `privilege_run` MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -146,6 +147,7 @@ dybatpho::privilege_release
 - **IT-010**: Start a refresher on acquire and stop it on release.
 - **IT-011**: Remove the shield from `PATH` on release, and release twice harmlessly.
 - **IT-012**: Acquire twice with `--shield` and verify one refresher, one wrapper and unchanged traps, and that release restores `PATH` and stops the refresher.
+- **IT-013**: Run a command through `privilege_run` with no escalation needed that reads variables named like the runner's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

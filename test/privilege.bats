@@ -244,3 +244,14 @@ teardown() {
   assert_file_not_exist "${TICKET}"
   unset -f dybatpho::is_root
 }
+
+@test "a command run by privilege_run sees the caller's variables, not the runner's" {
+  # Without an escalation to take, the command runs in the runner's scope,
+  # where its locals hid the caller's variables of the same names.
+  local separator="caller" command_name="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s\n' "${separator}" "${command_name}" > "${seen}"; }
+  dybatpho::privilege_needed() { return 1; }
+  dybatpho::privilege_run -- look
+  assert_equal "$(cat "${seen}")" "caller caller"
+}

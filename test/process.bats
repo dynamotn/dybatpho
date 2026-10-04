@@ -680,3 +680,14 @@ SCRIPT
   dybatpho::run_with_timeout 5 look
   assert_equal "$(cat "${seen}")" "caller caller caller caller"
 }
+
+@test "a background job sees the caller's variables, not the starter's" {
+  # The job is a subshell of the starter, where its locals hid the caller's
+  # variables of the same names.
+  local name="caller" monitor="caller" pid="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s\n' "${name}" "${monitor}" "${pid}" > "${seen}"; }
+  dybatpho::background_run scoped look
+  dybatpho::wait_all
+  assert_equal "$(cat "${seen}")" "caller caller caller"
+}

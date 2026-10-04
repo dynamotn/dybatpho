@@ -202,6 +202,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variables of the same names, and the debugger read every line into a global
   `line`, overwriting the script's. They now use prefixed locals.
 
+- **`process` — a job started by `dybatpho::background_run` sees the
+  caller's variables.** The job is a subshell of the starter, where `name`
+  and `monitor` hid the caller's variables of the same names. They are now
+  prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

@@ -593,35 +593,35 @@ function dybatpho::run_with_timeout {
 # @exitcode 1 Stop the script when the name is invalid, already running, or no command was given
 #######################################
 function dybatpho::background_run {
-  local name
-  dybatpho::expect_args name -- "$@"
+  local __dybatpho_process_bg_name
+  dybatpho::expect_args __dybatpho_process_bg_name -- "$@"
   shift
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected: name command [args...]"
-  [[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Invalid job name: ${name}"
-  if [[ -n "${DYBATPHO_BACKGROUND_PIDS[${name}]+set}" ]] \
-    && kill -0 "${DYBATPHO_BACKGROUND_PIDS[${name}]}" 2> /dev/null; then
-    dybatpho::die "${FUNCNAME[0]}: Job '${name}' is already running"
+  [[ "${__dybatpho_process_bg_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid job name: ${__dybatpho_process_bg_name}"
+  if [[ -n "${DYBATPHO_BACKGROUND_PIDS[${__dybatpho_process_bg_name}]+set}" ]] \
+    && kill -0 "${DYBATPHO_BACKGROUND_PIDS[${__dybatpho_process_bg_name}]}" 2> /dev/null; then
+    dybatpho::die "${FUNCNAME[0]}: Job '${__dybatpho_process_bg_name}' is already running"
   fi
 
-  local monitor="off"
+  local __dybatpho_process_bg_monitor="off"
   case "$-" in
-    *m*) monitor="on" ;;
+    *m*) __dybatpho_process_bg_monitor="on" ;;
     *) ;;
   esac
   set -m
   "$@" &
-  local pid=$!
-  [[ "${monitor}" == "on" ]] || set +m
+  local __dybatpho_process_bg_pid=$!
+  [[ "${__dybatpho_process_bg_monitor}" == "on" ]] || set +m
 
   # A name started again after its previous job was reaped keeps its original
   # place in the order, so the order stays the submission order.
-  [[ -n "${DYBATPHO_BACKGROUND_PIDS[${name}]+set}" ]] \
-    || DYBATPHO_BACKGROUND_NAMES+=("${name}")
-  DYBATPHO_BACKGROUND_PIDS["${name}"]="${pid}"
-  DYBATPHO_BACKGROUND_GROUPS["${name}"]=true
-  unset "DYBATPHO_BACKGROUND_STATUS[${name}]"
-  dybatpho::debug "Started background job '${name}' as pid ${pid}"
+  [[ -n "${DYBATPHO_BACKGROUND_PIDS[${__dybatpho_process_bg_name}]+set}" ]] \
+    || DYBATPHO_BACKGROUND_NAMES+=("${__dybatpho_process_bg_name}")
+  DYBATPHO_BACKGROUND_PIDS["${__dybatpho_process_bg_name}"]="${__dybatpho_process_bg_pid}"
+  DYBATPHO_BACKGROUND_GROUPS["${__dybatpho_process_bg_name}"]=true
+  unset "DYBATPHO_BACKGROUND_STATUS[${__dybatpho_process_bg_name}]"
+  dybatpho::debug "Started background job '${__dybatpho_process_bg_name}' as pid ${__dybatpho_process_bg_pid}"
 }
 
 #######################################

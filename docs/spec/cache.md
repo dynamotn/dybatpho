@@ -228,6 +228,7 @@ fi
 - **FR-027**: Every accessor MUST resolve an entry's path in the caller's shell, so a key that cannot be a file name stops the script instead of reading as a missing entry.
 - **FR-028**: The cache directory MUST fall back to the user cache when `DYBATPHO_CACHE_DIR` is empty, never resolve to the root of the filesystem.
 - **FR-029**: Falling back from an empty `DYBATPHO_CACHE_DIR` MUST happen in the caller's shell, so that with neither `XDG_CACHE_HOME` nor `HOME` set the public function stops instead of writing from `/`.
+- **FR-030**: A command run by `cache_run`, including its background refresh, MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -288,6 +289,7 @@ fi
 - **IT-033**: From a script file, have `cache_get` used as a condition stop the script on `../escape` before the branch for a miss runs.
 - **IT-034**: Resolve the cache directory with `DYBATPHO_CACHE_DIR` emptied and a namespace set, and get a path under `XDG_CACHE_HOME`.
 - **IT-035**: Store an entry with the cache directory emptied and no home, under `if !`, and stop naming `dybatpho::cache_set`.
+- **IT-036**: Run a command through `cache_run` that reads variables named like the runner's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

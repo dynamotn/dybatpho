@@ -128,6 +128,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scope, where its locals -- `seconds`, `kill_after`, `marker`, `monitor` --
   hid the caller's variables of the same names. They are now prefixed.
 
+- **`cache` — a command run by `dybatpho::cache_run` sees the caller's
+  variables.** It ran in the runner's scope, where locals such as `key`,
+  `path`, `ttl` and `status` hid the caller's variables of the same names.
+  They are now prefixed, in the background refresh too.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

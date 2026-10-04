@@ -382,13 +382,13 @@ function __dybatpho_cache_refresh_lock {
 # @internal
 #######################################
 function __dybatpho_cache_refresh {
-  local key
-  dybatpho::expect_args key -- "$@"
+  local __dybatpho_cache_refresh_key
+  dybatpho::expect_args __dybatpho_cache_refresh_key -- "$@"
   shift
-  local output status=0
-  output="$("$@")" || status=$?
-  ((status == 0)) || return "${status}"
-  printf '%s\n' "${output}" | dybatpho::cache_set "${key}"
+  local __dybatpho_cache_refresh_output __dybatpho_cache_refresh_status=0
+  __dybatpho_cache_refresh_output="$("$@")" || __dybatpho_cache_refresh_status=$?
+  ((__dybatpho_cache_refresh_status == 0)) || return "${__dybatpho_cache_refresh_status}"
+  printf '%s\n' "${__dybatpho_cache_refresh_output}" | dybatpho::cache_set "${__dybatpho_cache_refresh_key}"
 }
 
 #######################################
@@ -408,16 +408,16 @@ function __dybatpho_cache_refresh {
 # @internal
 #######################################
 function __dybatpho_cache_refresh_background {
-  local key path
-  dybatpho::expect_args key path -- "$@"
+  local __dybatpho_cache_refresh_bg_key __dybatpho_cache_refresh_bg_path
+  dybatpho::expect_args __dybatpho_cache_refresh_bg_key __dybatpho_cache_refresh_bg_path -- "$@"
   shift 2
-  local lock
-  lock="$(__dybatpho_cache_refresh_lock "${path}")"
-  if ! dybatpho::lock_acquire "${lock}" 0 > /dev/null 2>&1; then
-    dybatpho::debug "cache: ${key} is already being refreshed"
+  local __dybatpho_cache_refresh_bg_lock
+  __dybatpho_cache_refresh_bg_lock="$(__dybatpho_cache_refresh_lock "${__dybatpho_cache_refresh_bg_path}")"
+  if ! dybatpho::lock_acquire "${__dybatpho_cache_refresh_bg_lock}" 0 > /dev/null 2>&1; then
+    dybatpho::debug "cache: ${__dybatpho_cache_refresh_bg_key} is already being refreshed"
     return 0
   fi
-  dybatpho::debug "cache: stale ${key}, refreshing in the background"
+  dybatpho::debug "cache: stale ${__dybatpho_cache_refresh_bg_key}, refreshing in the background"
   (
     # The lock records the calling shell, which a subshell shares, so the
     # refresh is entitled to release it. A signal ends the subshell through
@@ -425,8 +425,8 @@ function __dybatpho_cache_refresh_background {
     trap 'exit 129' HUP
     trap 'exit 130' INT
     trap 'exit 143' TERM
-    trap 'dybatpho::lock_release "${lock}" > /dev/null 2>&1 || true' EXIT
-    __dybatpho_cache_refresh "${key}" "$@"
+    trap 'dybatpho::lock_release "${__dybatpho_cache_refresh_bg_lock}" > /dev/null 2>&1 || true' EXIT
+    __dybatpho_cache_refresh "${__dybatpho_cache_refresh_bg_key}" "$@"
   ) < /dev/null > /dev/null 2>&1 & # kcov(skip) - run by the --stale tests; kcov never records a subshell's closing line
 }
 
@@ -531,65 +531,68 @@ function dybatpho::cache_wait {
 #   - `dybatpho::cache_wait`
 #######################################
 function dybatpho::cache_run {
-  local key
-  dybatpho::expect_args key -- "$@"
+  local __dybatpho_cache_run_key
+  dybatpho::expect_args __dybatpho_cache_run_key -- "$@"
   shift
-  local ttl="${DYBATPHO_CACHE_TTL}" stale="${DYBATPHO_CACHE_STALE}" ttl_given=false
-  local usage="${FUNCNAME[0]}: Expected: ${key} [ttl] [--stale seconds] -- command [args...]"
+  local __dybatpho_cache_run_ttl="${DYBATPHO_CACHE_TTL}" __dybatpho_cache_run_stale="${DYBATPHO_CACHE_STALE}" \
+    __dybatpho_cache_run_ttl_given=false
+  local __dybatpho_cache_run_usage="${FUNCNAME[0]}: Expected: ${__dybatpho_cache_run_key}"
+  __dybatpho_cache_run_usage+=" [ttl] [--stale seconds] -- command [args...]"
   while (($# > 0)) && [[ "$1" != "--" ]]; do
     case "$1" in
       --stale)
-        (($# >= 2)) || dybatpho::die "${usage}"
-        stale="$2"
+        (($# >= 2)) || dybatpho::die "${__dybatpho_cache_run_usage}"
+        __dybatpho_cache_run_stale="$2"
         shift 2
         ;;
       --stale=*)
-        stale="${1#--stale=}"
+        __dybatpho_cache_run_stale="${1#--stale=}"
         shift
         ;;
       *)
-        [[ "${ttl_given}" == false ]] || dybatpho::die "${usage}"
-        ttl="$1"
-        ttl_given=true
+        [[ "${__dybatpho_cache_run_ttl_given}" == false ]] || dybatpho::die "${__dybatpho_cache_run_usage}"
+        __dybatpho_cache_run_ttl="$1"
+        __dybatpho_cache_run_ttl_given=true
         shift
         ;;
     esac
   done
-  [[ "${1-}" == "--" ]] || dybatpho::die "${usage}"
+  [[ "${1-}" == "--" ]] || dybatpho::die "${__dybatpho_cache_run_usage}"
   shift
   (($# > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
-  [[ "${ttl}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
-  [[ "${stale}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: '${stale}' is not a number of seconds for --stale"
-  ((stale == 0)) || __dybatpho_cache_need_lock
+  [[ "${__dybatpho_cache_run_ttl}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${__dybatpho_cache_run_ttl}' is not a number of seconds"
+  [[ "${__dybatpho_cache_run_stale}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${__dybatpho_cache_run_stale}' is not a number of seconds for --stale"
+  ((__dybatpho_cache_run_stale == 0)) || __dybatpho_cache_need_lock
 
-  local path age cached
-  __dybatpho_cache_path_into path "${key}"
-  if __dybatpho_cache_age age "${path}"; then
-    if ((age < ttl)); then
-      dybatpho::debug "cache: hit ${key}"
-      cached="$(cat "${path}")"
-      printf '%s\n' "${cached}"
+  local __dybatpho_cache_run_path __dybatpho_cache_run_age __dybatpho_cache_run_cached
+  __dybatpho_cache_path_into __dybatpho_cache_run_path "${__dybatpho_cache_run_key}"
+  if __dybatpho_cache_age __dybatpho_cache_run_age "${__dybatpho_cache_run_path}"; then
+    if ((__dybatpho_cache_run_age < __dybatpho_cache_run_ttl)); then
+      dybatpho::debug "cache: hit ${__dybatpho_cache_run_key}"
+      __dybatpho_cache_run_cached="$(cat "${__dybatpho_cache_run_path}")"
+      printf '%s\n' "${__dybatpho_cache_run_cached}"
       return 0
     fi
-    if ((stale > 0 && age < ttl + stale)); then
-      cached="$(cat "${path}")"
-      __dybatpho_cache_refresh_background "${key}" "${path}" "$@"
-      printf '%s\n' "${cached}"
+    if ((__dybatpho_cache_run_stale > 0 && __dybatpho_cache_run_age < __dybatpho_cache_run_ttl + \
+      __dybatpho_cache_run_stale)); then
+      __dybatpho_cache_run_cached="$(cat "${__dybatpho_cache_run_path}")"
+      __dybatpho_cache_refresh_background "${__dybatpho_cache_run_key}" "${__dybatpho_cache_run_path}" "$@"
+      printf '%s\n' "${__dybatpho_cache_run_cached}"
       return 0
     fi
   fi
 
-  dybatpho::debug "cache: miss ${key}, running $1"
-  local output status=0
-  output="$("$@")" || status=$?
-  if ((status != 0)); then
-    return "${status}"
+  dybatpho::debug "cache: miss ${__dybatpho_cache_run_key}, running $1"
+  local __dybatpho_cache_run_output __dybatpho_cache_run_status=0
+  __dybatpho_cache_run_output="$("$@")" || __dybatpho_cache_run_status=$?
+  if ((__dybatpho_cache_run_status != 0)); then
+    return "${__dybatpho_cache_run_status}"
   fi
-  printf '%s\n' "${output}" | dybatpho::cache_set "${key}"
-  printf '%s\n' "${output}"
+  printf '%s\n' "${__dybatpho_cache_run_output}" | dybatpho::cache_set "${__dybatpho_cache_run_key}"
+  printf '%s\n' "${__dybatpho_cache_run_output}"
 }
 
 #######################################

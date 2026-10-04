@@ -485,3 +485,11 @@ remaining_entries() {
   assert_output --partial "cannot be a file name"
   refute_output --partial "treated as a miss"
 }
+
+@test "a command run by cache_run sees the caller's variables, not the library's" {
+  # The command runs in the library's scope, where its locals hid the caller's
+  # variables of the same names.
+  local key="caller" path="caller" ttl="caller" status="caller" usage="caller" output="caller"
+  look() { printf '%s %s %s %s %s %s\n' "${key}" "${path}" "${ttl}" "${status}" "${usage}" "${output}"; }
+  assert_equal "$(dybatpho::cache_run scoped 0 -- look)" "caller caller caller caller caller caller"
+}

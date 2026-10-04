@@ -1,0 +1,110 @@
+# Reviewed calls, inside a command substitution, to a function that can stop
+# the script with `dybatpho::die`. `test/conventions.bats` runs
+# `test/die-in-substitution.awk` over the library and fails on any such call
+# that is not listed here, because a refusal inside `$(...)` ends only the
+# substitution and the caller carries on (AGENT.md, "Never validate inside a
+# command substitution").
+#
+# Before adding a line, fix the call if you can: validate in the caller's shell
+# first, return the value through a nameref (`<name>_into`), or read the
+# substitution's status on the spot (`|| return $?`). List a call only when the
+# refusal it could raise is impossible for the caller's input, and say why.
+#
+# Format, one entry per line, fields separated by a single tab:
+#   file<TAB>function<TAB>callee<TAB>why the call cannot carry on wrongly
+# `*` in the file or function field matches any. Blank lines and lines starting
+# with `#` are ignored.
+
+# Callees whose only possible refusal is not caller input
+*	*	__dybatpho_agent_flatten_schema	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_ai_extract_text	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_ai_messages_with_system	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_ai_tool_invoke	reaches dybatpho::die only through metric-label and stream checks on library literals
+*	*	__dybatpho_ai_tools_as_functions	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_ai_tools_json	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_cli_help_row	refuses only a malformed option spec, the script author's error at definition time
+*	*	__dybatpho_cli_help_usage	reaches dybatpho::die only through metric-label and stream checks on library literals
+*	*	__dybatpho_cli_suggest_suffix	reaches dybatpho::die only through metric-label and stream checks on library literals
+*	*	__dybatpho_file_stat	refuses only an unknown field name; every caller passes a literal
+*	*	__dybatpho_log_get_terminal_width	refuses only a non-numeric default, and the default is a literal
+*	*	__dybatpho_log_text	library message templates only; refuses a defect in the library's own constants, not caller input
+*	*	__dybatpho_log_text_n	library message templates only; refuses a defect in the library's own constants, not caller input
+*	*	__dybatpho_log_translate	library message templates only; refuses a defect in the library's own constants, not caller input
+*	*	__dybatpho_secret_file_mode	reaches dybatpho::die only through the stat field check
+*	*	__dybatpho_secret_file_size	reaches dybatpho::die only through the stat field check
+*	*	dybatpho::json_eval	refuses only a missing yq/jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::json_get	refuses only a missing yq/jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::json_object	refuses only a missing yq/jq or an odd field count written in the library, never caller input
+*	*	dybatpho::json_query	refuses only a missing yq/jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::path_join	refuses only an empty segment list; every caller passes segments
+*	*	dybatpho::string_repeat	count is a literal
+*	*	dybatpho::string_truncate	width is a literal
+*	*	dybatpho::terminal_height	refuses only a non-numeric default, and the default is a literal
+*	*	dybatpho::terminal_width	refuses only a non-numeric default, and the default is a literal
+
+# Reviewed sites
+scripts/bundle.sh	__dybatpho_bundle_run	__dybatpho_bundle_resolve	repository script run under errexit: the failed assignment ends the run
+scripts/bundle.sh	__dybatpho_bundle_run	dybatpho::file_size	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_artifacts	dybatpho::release_checksums	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_preflight	dybatpho::git_branch	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_preflight	dybatpho::git_default_branch	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_repo_url	dybatpho::forge_host	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_repo_url	dybatpho::forge_repo	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_resolve_version_into	dybatpho::semver_bump	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_resolve_version_into	dybatpho::semver_compare	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_run	__dybatpho_release_artifacts	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_run	__dybatpho_release_repo_url	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_run	dybatpho::forge_kind	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_run	dybatpho::forge_release_upload	repository script run under errexit: the failed assignment ends the run
+scripts/release.sh	__dybatpho_release_run	dybatpho::git_latest_tag	repository script run under errexit: the failed assignment ends the run
+scripts/test.sh	_spec	__dybatpho_test_tty	repository script run under errexit: the failed assignment ends the run
+src/agent.sh	dybatpho::agent_mcp	dybatpho::generate_schema	refuses only a malformed option spec, the script author's error at definition time
+src/agent.sh	dybatpho::agent_tools	dybatpho::generate_schema	refuses only a malformed option spec, the script author's error at definition time
+src/ai.sh	__dybatpho_ai_cli_complete	dybatpho::ai_model	provider is the literal cli, which ai_model accepts
+src/ai.sh	__dybatpho_ai_dry_run_body	dybatpho::ai_model	provider was already resolved in the caller's shell
+src/ai.sh	__dybatpho_ai_endpoint_into	__dybatpho_ai_base_url	provider was already resolved in the caller's shell
+src/ai.sh	__dybatpho_ai_http	__dybatpho_ai_cache_key	the key is built from a resolved provider and a hash
+src/ai.sh	__dybatpho_ai_http	__dybatpho_ai_cache_read	read under `if`: a refusal is a cache miss
+src/ai.sh	__dybatpho_ai_payload_anthropic	dybatpho::ai_model	provider is a literal ai_model accepts
+src/ai.sh	__dybatpho_ai_payload_ollama	dybatpho::ai_model	provider is a literal ai_model accepts
+src/ai.sh	__dybatpho_ai_payload_openai	dybatpho::ai_model	provider is a literal ai_model accepts
+src/ai.sh	dybatpho::ai_check	dybatpho::ai_model	provider was already resolved in the caller's shell
+src/archive.sh	dybatpho::archive_extract	__dybatpho_archive_output_name	the format was checked in the caller's shell first
+src/backup.sh	__dybatpho_backup_tree_hash_into	dybatpho::file_hash	hashes files this function just walked, with a validated algorithm
+src/backup.sh	dybatpho::backup_create	dybatpho::file_hash	hashes the archive this call just wrote
+src/backup.sh	dybatpho::backup_prune	dybatpho::file_age_seconds	ages backups this call just listed
+src/backup.sh	dybatpho::backup_verify	dybatpho::file_hash	an unreadable archive leaves the checksum empty, which verify then reports as a mismatch
+src/cache.sh	__dybatpho_cache_scan	dybatpho::file_mtime	reads entries this call just listed
+src/cache.sh	__dybatpho_cache_scan	dybatpho::file_size	reads entries this call just listed
+src/cli.sh	__dybatpho_cli_define_var	__dybatpho_cli_config_get	text of the generated parser, not a call made here
+src/cli.sh	__dybatpho_cli_define_var	__dybatpho_cli_define_var	re-renders a definition this function already validated
+src/cli.sh	__dybatpho_cli_generate_logic	dybatpho::select	text of the generated parser, not a call made here
+src/cli.sh	__dybatpho_cli_generate_logic	dybatpho::validate_describe	text of the generated parser, not a call made here
+src/doctor.sh	__dybatpho_doctor_resolve	dybatpho::semver_coerce	the version text came from command_version, which only returns a version
+src/doctor.sh	__dybatpho_doctor_rows	__dybatpho_doctor_resolve	read with `|| true`: a refusal is reported as an unknown version
+src/file.sh	__dybatpho_xdg_dir_into	__dybatpho_xdg_dir	the HOME check that could refuse ran in the caller's shell first
+src/forge.sh	__dybatpho_forge_or_die	dybatpho::forge_error	only shapes a message for the die that follows
+src/forge.sh	dybatpho::forge_api	dybatpho::forge_host	an empty kind is reported as an unknown forge, status 1
+src/forge.sh	dybatpho::forge_api	dybatpho::forge_kind	an empty kind is reported as an unknown forge, status 1
+src/forge.sh	dybatpho::forge_issue_report	dybatpho::forge_issue_find	read under `if`; a refusal reads as no open issue (a separate class: failure taken for absence)
+src/forge.sh	dybatpho::forge_issue_report	dybatpho::forge_issue_url	the number was checked by the request that returned it
+src/forge.sh	dybatpho::forge_kind	dybatpho::forge_host	an empty host is reported as an unknown forge, status 1
+src/i18n.sh	__dybatpho_i18n_discover	__dybatpho_i18n_roots	with no HOME the user catalogue directory is simply not searched
+src/i18n.sh	__dybatpho_i18n_lookup	__dybatpho_i18n_plural_category	library plural rules only; the count is checked before the lookup
+src/i18n.sh	__dybatpho_i18n_render_pattern	dybatpho::i18n_month_name	month index comes from calendar fields already read
+src/i18n.sh	__dybatpho_i18n_render_pattern	dybatpho::i18n_weekday_name	weekday index comes from calendar fields already read
+src/i18n.sh	__dybatpho_i18n_roots	dybatpho::xdg_data_dir	with no HOME the user catalogue directory is simply not searched
+src/i18n.sh	dybatpho::i18n_datetime	dybatpho::i18n_date	the timestamp was read in the caller's shell first
+src/i18n.sh	dybatpho::i18n_datetime	dybatpho::i18n_time	the timestamp was read in the caller's shell first
+src/i18n.sh	dybatpho::i18n_duration	dybatpho::i18n_tn	library keys and a count this function computed
+src/i18n.sh	dybatpho::i18n_locales	__dybatpho_i18n_roots	with no HOME the user catalogue directory is simply not searched
+src/i18n.sh	dybatpho::i18n_relative	dybatpho::i18n_t	library key
+src/i18n.sh	dybatpho::i18n_relative	dybatpho::i18n_tn	library keys and a count this function computed
+src/lock.sh	dybatpho::lock_semaphore_acquire	dybatpho::lock_semaphore_holders	the slot count was checked in the caller's shell first
+src/math.sh	dybatpho::math_lcm	dybatpho::math_gcd	operands were checked to be whole numbers first
+src/metrics.sh	__dybatpho_metrics_validate_quantiles	dybatpho::math_compare	the quantile was checked to be a number first
+src/metrics.sh	dybatpho::metrics_render	dybatpho::math_mul	quantiles and samples were checked when recorded and rendered
+src/metrics.sh	dybatpho::metrics_render	dybatpho::math_percentile	quantiles and samples were checked when recorded and rendered
+src/release.sh	dybatpho::release_checksums	dybatpho::file_hash	hashes artifacts this call just listed, with a validated algorithm
+src/schedule.sh	dybatpho::schedule_once_per	dybatpho::file_age_seconds	the marker was checked to exist first
+src/semver.sh	dybatpho::semver_max	dybatpho::semver_sort	an empty result is refused right after, so the call never carries on

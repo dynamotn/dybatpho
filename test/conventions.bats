@@ -248,3 +248,27 @@ fail_with() {
   assert_equal "$(ls -A "${work}" | tr '\n' ' ')" "taken "
   assert_equal "$(ls -A "${work}/taken" | tr '\n' ' ')" ""
 }
+
+@test "no function that can stop the script is called inside a command substitution" {
+  # `dybatpho::die` inside `$(...)` ends only the substitution, so the caller
+  # carries on -- usually with an empty value -- after a refusal meant to stop
+  # the script. The scanner finds every such call; `die-in-substitution.allow`
+  # lists the ones reviewed as unable to carry on wrongly, each with its reason.
+  local scan allow violations="" file fn callee line entry
+  scan="$(cd "${REPO_ROOT}" && awk -f test/die-in-substitution.awk src/*.sh scripts/*.sh init.sh)"
+  allow="$(grep -v -e '^#' -e '^[[:space:]]*$' "${REPO_ROOT}/test/die-in-substitution.allow" | cut -f1-3)"
+  while IFS=$'\t' read -r file fn callee line; do
+    [ -n "${file}" ] || continue
+    entry=""
+    while IFS=$'\t' read -r a_file a_fn a_callee; do
+      [[ "${a_callee}" == "${callee}" ]] || continue
+      [[ "${a_file}" == "*" || "${a_file}" == "${file}" ]] || continue
+      [[ "${a_fn}" == "*" || "${a_fn}" == "${fn}" ]] || continue
+      entry=found
+      break
+    done <<< "${allow}"
+    [ -n "${entry}" ] || violations+="${file}:${line}: ${fn} calls ${callee} inside \$(...)"$'\n'
+  done <<< "${scan}"
+  [ -z "${violations}" ] ||
+    fail_with "Calls that can stop the script from inside a command substitution (fix them, or review and list them in test/die-in-substitution.allow):" "${violations}"
+}

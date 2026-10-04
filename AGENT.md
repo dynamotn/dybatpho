@@ -452,7 +452,11 @@ entry missing from the published notes.
   and reports success. A helper that validates must return its result through a
   nameref parameter instead, the way `dybatpho::create_temp` does. This has
   already caught `metrics`, `parallel`, and `semver`; the symptom is a function
-  that prints a fatal error and still exits zero.
+  that prints a fatal error and still exits zero. `test/conventions.bats` holds
+  the line mechanically: `test/die-in-substitution.awk` finds every call, inside
+  `$(...)`, to a function that can reach `dybatpho::die`, and each one must be
+  fixed or listed, with the reason it cannot carry on wrongly, in
+  `test/die-in-substitution.allow`.
 - Validate and quote every option or variable inserted into generated shell code.
 
 ## CLI change workflow

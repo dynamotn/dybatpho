@@ -1083,17 +1083,19 @@ function __dybatpho_tui_menu_interactive {
 #   subshell, where the answer is written to a copy of the caller's variable and is lost on return.
 #######################################
 function dybatpho::tui_menu {
-  local result_var prompt
-  dybatpho::expect_args result_var prompt -- "$@"
-  dybatpho::expect_ref "${result_var}"
+  # Prefixed, because the choice is written through the name the caller passes
+  # and a plain local of that name would receive it instead.
+  local __dybatpho_tui_result_var __dybatpho_tui_prompt
+  dybatpho::expect_args __dybatpho_tui_result_var __dybatpho_tui_prompt -- "$@"
+  dybatpho::expect_ref "${__dybatpho_tui_result_var}"
   shift 2
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one menu entry"
 
   if dybatpho::tui_supported; then
-    __dybatpho_tui_menu_interactive "${result_var}" false "${prompt}" "$@"
+    __dybatpho_tui_menu_interactive "${__dybatpho_tui_result_var}" false "${__dybatpho_tui_prompt}" "$@"
     return $?
   fi
-  __dybatpho_tui_menu_fallback "${result_var}" false "${prompt}" "$@"
+  __dybatpho_tui_menu_fallback "${__dybatpho_tui_result_var}" false "${__dybatpho_tui_prompt}" "$@"
 }
 
 #######################################
@@ -1125,17 +1127,19 @@ function dybatpho::tui_menu {
 # @note Feed the numbered fallback with a redirect rather than a pipe, for the reason given on `dybatpho::tui_menu`
 #######################################
 function dybatpho::tui_multi_menu {
-  local result_var prompt
-  dybatpho::expect_args result_var prompt -- "$@"
-  dybatpho::expect_ref "${result_var}"
+  # Prefixed, because the choice is written through the name the caller passes
+  # and a plain local of that name would receive it instead.
+  local __dybatpho_tui_result_var __dybatpho_tui_prompt
+  dybatpho::expect_args __dybatpho_tui_result_var __dybatpho_tui_prompt -- "$@"
+  dybatpho::expect_ref "${__dybatpho_tui_result_var}"
   shift 2
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one menu entry"
 
   if dybatpho::tui_supported; then
-    __dybatpho_tui_menu_interactive "${result_var}" true "${prompt}" "$@"
+    __dybatpho_tui_menu_interactive "${__dybatpho_tui_result_var}" true "${__dybatpho_tui_prompt}" "$@"
     return $?
   fi
-  __dybatpho_tui_menu_fallback "${result_var}" true "${prompt}" "$@"
+  __dybatpho_tui_menu_fallback "${__dybatpho_tui_result_var}" true "${__dybatpho_tui_prompt}" "$@"
 }
 
 #######################################

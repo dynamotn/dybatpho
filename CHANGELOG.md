@@ -49,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `variable` or `source` without the secret, and `secret_from_env` read its own
   local instead of an environment variable named `name` or `mode`.
 
+- **`tui` — the menus return the choice whatever your variable is called.**
+  `dybatpho::tui_menu` and `dybatpho::tui_multi_menu` kept their arguments in
+  locals named `result_var` and `prompt`, so a caller variable with either name
+  never received the choice.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

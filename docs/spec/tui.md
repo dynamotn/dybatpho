@@ -252,6 +252,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   treat `ESC O A`–`ESC O D` as arrows, and MUST NOT treat any sequence other
   than a lone escape as the cancel key or leave part of it to be read as the
   next key.
+- **FR-027**: `tui_menu` and `tui_multi_menu` MUST write the choice into the variable the caller named, whatever that name is, including `prompt` and `result_var`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -306,6 +307,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   clean.
 - **IT-013**: Arrows in both cursor modes, Delete, Page Up, a modified arrow,
   and a lone escape each decode to one key name, with no character left over.
+- **IT-014**: Choose from both menus into variables named `prompt` and `result_var`, and get the choice back.
 
 ## Acceptance Criteria *(mandatory)*
 

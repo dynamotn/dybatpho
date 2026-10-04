@@ -223,6 +223,23 @@ setup() {
   assert_equal "${DYBATPHO_TUI_INDEXES}" "2"
 }
 
+@test "the menus return the choice whatever the caller's variable is named" {
+  # The choice is written through the name the caller passes; `prompt` and
+  # `result_var` were the wrappers' own locals and kept the answer.
+  local each
+  for each in prompt result_var; do
+    unset "${each}"
+    dybatpho::tui_menu "${each}" "Pick" alpha beta <<< "2" 2> /dev/null
+    assert_equal "${!each}" "beta"
+    unset "${each}"
+    local -a "${each}=()"
+    dybatpho::tui_multi_menu "${each}" "Pick" alpha beta gamma <<< "1,3" 2> /dev/null
+    local -n chosen="${each}"
+    assert_equal "${chosen[*]}" "alpha gamma"
+    unset -n chosen
+  done
+}
+
 @test "dybatpho::tui_menu asks again after an answer that names no entry" {
   local chosen=""
   dybatpho::tui_menu chosen "Environment?" dev staging prod <<< $'9\nnope\n1'

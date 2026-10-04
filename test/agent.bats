@@ -463,3 +463,14 @@ _spec_test_deploy() {
   assert_output --partial "Unknown mode 'sometimes'"
   refute_output --partial "carried on"
 }
+
+@test "a spec read by agent_tools or agent_mcp sees the caller's variables" {
+  # The spec runs while the schema is generated, inside these functions' scope,
+  # where `spec`, `name`, `format` and `command` hid the caller's variables.
+  local spec="caller" name="caller" format="caller" command="caller"
+  _scoped_spec() { dybatpho::opts::setup "seen ${spec} ${name} ${format} ${command}" ARGS action:":"; }
+  run_traced dybatpho::agent_tools _scoped_spec tool anthropic
+  assert_output --partial "seen caller caller caller caller"
+  run_traced dybatpho::agent_mcp _scoped_spec tool ./tool.sh
+  assert_output --partial "seen caller caller caller caller"
+}

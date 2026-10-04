@@ -216,6 +216,7 @@ fi
   module works on whichever backend the rest of the library found rather than
   requiring a specific one.
 - **FR-018**: `agent_detect`, and every helper that branches on it, MUST resolve the mode in the caller's shell, so an unknown `DYBATPHO_AGENT_MODE` stops the script instead of reading as a person driving.
+- **FR-019**: A spec read by `agent_tools` or `agent_mcp` MUST see the caller's variables: both MUST keep the locals that are in scope while the spec runs under the library's prefix.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -261,6 +262,7 @@ fi
 - **IT-009**: Verify the module behaves identically under both the `yq` and the
   `jq` backend.
 - **IT-010**: From a script file with `DYBATPHO_AGENT_MODE=sometimes`, have `agent_detect` used as a condition stop the script before the branch for a person runs.
+- **IT-011**: Generate tool and MCP definitions from a spec whose description reads variables named like their locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

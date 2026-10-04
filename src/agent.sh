@@ -558,29 +558,37 @@ function __dybatpho_agent_each_tool_into {
 #   editing
 #######################################
 function dybatpho::agent_tools {
-  local spec name format
-  dybatpho::expect_args spec -- "$@"
-  name="${2:-${0##*/}}"
-  format="${3:-anthropic}"
-  case "${format}" in
+  local __dybatpho_agent_tools_spec __dybatpho_agent_tools_name __dybatpho_agent_tools_format
+  dybatpho::expect_args __dybatpho_agent_tools_spec -- "$@"
+  __dybatpho_agent_tools_name="${2:-${0##*/}}"
+  __dybatpho_agent_tools_format="${3:-anthropic}"
+  case "${__dybatpho_agent_tools_format}" in
     anthropic | openai) ;;
-    *) dybatpho::die "dybatpho::agent_tools: Unknown format '${format}', expected anthropic or openai" ;;
+    *)
+      dybatpho::die \
+        "dybatpho::agent_tools: Unknown format '${__dybatpho_agent_tools_format}', expected anthropic or openai"
+      ;;
   esac
-  local schema commands
-  schema=$(dybatpho::generate_schema "${spec}" "${name}")
-  commands=$(__dybatpho_agent_flatten_schema "${schema}")
+  local __dybatpho_agent_tools_schema __dybatpho_agent_tools_commands
+  __dybatpho_agent_tools_schema=$(dybatpho::generate_schema "${__dybatpho_agent_tools_spec}" \
+    "${__dybatpho_agent_tools_name}")
+  __dybatpho_agent_tools_commands=$(__dybatpho_agent_flatten_schema "${__dybatpho_agent_tools_schema}")
 
-  local template
-  if [[ "${format}" == "anthropic" ]]; then
-    template='{"name": @NAME@, "description": (.description | tostring), "input_schema": (@SCHEMA@)}'
+  local __dybatpho_agent_tools_template
+  if [[ "${__dybatpho_agent_tools_format}" == "anthropic" ]]; then
+    __dybatpho_agent_tools_template='{"name": @NAME@, "description": (.description | tostring),
+      "input_schema": (@SCHEMA@)}'
   else
-    template='{"type": "function", "function": {"name": @NAME@,
+    __dybatpho_agent_tools_template='{"type": "function", "function": {"name": @NAME@,
       "description": (.description | tostring), "parameters": (@SCHEMA@)}}'
   fi
-  local -a definitions=()
-  __dybatpho_agent_each_tool_into definitions "${commands}" "${template}"
-  local IFS=,
-  printf '[%s]\n' "${definitions[*]}"
+  local -a __dybatpho_agent_tools_definitions=()
+  __dybatpho_agent_each_tool_into __dybatpho_agent_tools_definitions "${__dybatpho_agent_tools_commands}" \
+    "${__dybatpho_agent_tools_template}"
+  (
+    IFS=,
+    printf '[%s]\n' "${__dybatpho_agent_tools_definitions[*]}"
+  )
 }
 
 #######################################
@@ -620,27 +628,28 @@ function __dybatpho_agent_tool_name_into {
 #   command
 #######################################
 function dybatpho::agent_mcp {
-  local spec name command
-  dybatpho::expect_args spec -- "$@"
-  name="${2:-${0##*/}}"
-  command="${3:-$0}"
-  local schema commands
-  schema=$(dybatpho::generate_schema "${spec}" "${name}")
-  commands=$(__dybatpho_agent_flatten_schema "${schema}")
+  local __dybatpho_agent_mcp_spec __dybatpho_agent_mcp_name __dybatpho_agent_mcp_command
+  dybatpho::expect_args __dybatpho_agent_mcp_spec -- "$@"
+  __dybatpho_agent_mcp_name="${2:-${0##*/}}"
+  __dybatpho_agent_mcp_command="${3:-$0}"
+  local __dybatpho_agent_mcp_schema __dybatpho_agent_mcp_commands
+  __dybatpho_agent_mcp_schema=$(dybatpho::generate_schema "${__dybatpho_agent_mcp_spec}" "${__dybatpho_agent_mcp_name}")
+  __dybatpho_agent_mcp_commands=$(__dybatpho_agent_flatten_schema "${__dybatpho_agent_mcp_schema}")
 
   # The first path element is the root name, which the command already names.
   # `.path | .[1:]` rather than `.path[1:]`: yq 4.52 applies the latter slice to
   # the enclosing object, not to `.path`.
-  local command_json
-  command_json=$(dybatpho::json_string "${command}")
-  local template='{"name": @NAME@, "description": (.description | tostring),
-    "inputSchema": (@SCHEMA@), "x-dybatpho-command": (['"${command_json}"'] + (.path | .[1:]))}'
-  local -a definitions=()
-  __dybatpho_agent_each_tool_into definitions "${commands}" "${template}"
-  local tools
-  tools="[$(
+  local __dybatpho_agent_mcp_command_json
+  __dybatpho_agent_mcp_command_json=$(dybatpho::json_string "${__dybatpho_agent_mcp_command}")
+  local __dybatpho_agent_mcp_template='{"name": @NAME@, "description": (.description | tostring),
+    "inputSchema": (@SCHEMA@), "x-dybatpho-command": (['"${__dybatpho_agent_mcp_command_json}"'] + (.path | .[1:]))}'
+  local -a __dybatpho_agent_mcp_definitions=()
+  __dybatpho_agent_each_tool_into __dybatpho_agent_mcp_definitions "${__dybatpho_agent_mcp_commands}" \
+    "${__dybatpho_agent_mcp_template}"
+  local __dybatpho_agent_mcp_tools
+  __dybatpho_agent_mcp_tools="[$(
     IFS=,
-    printf '%s' "${definitions[*]}"
+    printf '%s' "${__dybatpho_agent_mcp_definitions[*]}"
   )]"
-  dybatpho::json_object name "${name}" version 1.0.0 tools:json "${tools}"
+  dybatpho::json_object name "${__dybatpho_agent_mcp_name}" version 1.0.0 tools:json "${__dybatpho_agent_mcp_tools}"
 }

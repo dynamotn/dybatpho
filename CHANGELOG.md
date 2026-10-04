@@ -219,6 +219,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `function`. The parser, help, schema, man and completion generators now keep
   their state in prefixed locals; their output is unchanged.
 
+- **`agent` — a spec read by `dybatpho::agent_tools` or
+  `dybatpho::agent_mcp` sees the caller's variables.** The spec runs while
+  the schema is generated, inside these functions' scope, where `spec`,
+  `name`, `format` and `command` hid the caller's variables of the same
+  names. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

@@ -796,8 +796,18 @@ function dybatpho::metrics_push {
     __dybatpho_metrics_push_segment path "${key}" "${pair#*=}"
   done
 
+  # Rendering happens inside a command substitution, where a refusal would end
+  # only the substitution and the push would carry on. The one thing it can
+  # refuse is the quantile list, so that is checked here first.
+  local recorded
+  for recorded in ${__dybatpho_metrics_type[@]+"${__dybatpho_metrics_type[@]}"}; do
+    if [[ "${recorded}" == summary ]]; then
+      __dybatpho_metrics_validate_quantiles
+      break
+    fi
+  done
   local body
-  body="$(dybatpho::metrics_render)"
+  body="$(dybatpho::metrics_render)" || return $?
   if [[ -z "${body}" ]]; then
     dybatpho::warn "Nothing recorded, so nothing was pushed to ${gateway}"
     return 0

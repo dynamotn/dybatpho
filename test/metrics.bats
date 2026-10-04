@@ -299,6 +299,20 @@ setup() {
   dybatpho::unmock_all
 }
 
+@test "dybatpho::metrics_push stops on quantiles it cannot render before sending" {
+  # The exposition was rendered inside a command substitution, so quantiles
+  # made invalid after the summary was recorded ended only that substitution,
+  # and the push went on and reported success.
+  dybatpho::mock_http "pushgateway.test" 200 ""
+  dybatpho::metrics_summary_ms request_ms 12
+  DYBATPHO_METRICS_QUANTILES="0.5,abc"
+  run --separate-stderr dybatpho::metrics_push http://pushgateway.test:9091/ backup
+  assert_failure
+  assert_stderr --partial "dybatpho::metrics_push: Quantile must be a number from 0 to 1, got 'abc'"
+  assert_equal "$(dybatpho::mock_http_calls)" ""
+  dybatpho::unmock_all
+}
+
 @test "dybatpho::metrics_push --add POSTs so the rest of the group survives" {
   dybatpho::mock_http "pushgateway.test" 202 ""
   dybatpho::metrics_gauge_set queue_depth 4

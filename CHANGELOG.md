@@ -148,6 +148,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only that substitution and `dybatpho::ai_ask` returned success with no
   answer. It now stops with status 127.
 
+- **`metrics` — `dybatpho::metrics_push` stops on quantiles it cannot render.**
+  The exposition was rendered inside a command substitution, so when
+  `DYBATPHO_METRICS_QUANTILES` became invalid after a summary was recorded, the
+  refusal ended only that substitution and the push reported success. The
+  quantiles are now checked before anything is rendered or sent.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

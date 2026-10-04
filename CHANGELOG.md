@@ -106,6 +106,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limit. The pool now starts nothing more, ends every job and watchdog, puts
   the caller's handlers back and raises the signal again.
 
+- **`lock` and `parallel` — cleanup runs before a handler that exits.**
+  `dybatpho::with_lock`, `dybatpho::with_semaphore` and the `parallel` pools
+  appended their signal handlers after the script's own, so a handler that
+  exits -- `dybatpho::killed_process_handler`, or a plain `trap 'exit 1' TERM`
+  -- ended the shell first: the lock stayed behind and the pool's jobs kept
+  running. Their handlers now stand alone while they hold something, then put
+  the script's handlers back and raise the signal again, so those run once and
+  after the cleanup. With no handler of the script's own, a TERM during
+  `with_lock` now ends the script once the lock is released, where it used to
+  be swallowed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

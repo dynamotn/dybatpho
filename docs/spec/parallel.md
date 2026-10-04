@@ -180,6 +180,7 @@ done
 - **FR-023**: A run MUST put back the SIGINT and SIGTERM handlers it found once it ends, so its terminate handler does not outlive it and repeated runs do not accumulate handlers.
 - **FR-024**: A refused `--timeout` MUST be reported under the public function that was called, not under the pool that reads it.
 - **FR-025**: An interrupt (SIGINT or SIGTERM) MUST stop the pool from starting further jobs, end every job and watchdog it started -- including any started around the signal -- restore the caller's handlers, and then raise the same signal again, so the shell ends or the caller's handler runs as without a pool.
+- **FR-026**: An interrupted pool MUST end its jobs before any handler of the caller runs, including one that exits.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -234,6 +235,7 @@ done
 - **IT-034**: In a child shell with a SIGTERM handler of its own, run several pools and verify the SIGINT and SIGTERM handlers are the same after each one and never name the pool's terminate handler.
 - **IT-035**: Refuse an unreadable and a negative `--timeout`, and report each under `dybatpho::parallel_map` or `dybatpho::parallel_run`.
 - **IT-036**: Have the first of two jobs send SIGTERM to the pool under a one-minute timeout; the pool ends within seconds with status 143, the second job never starts, and the first job's child is gone.
+- **IT-037**: TERM a pool under `killed_process_handler` and see the job receive the pool's TERM before the shell exits with 143.
 
 ## Acceptance Criteria *(mandatory)*
 

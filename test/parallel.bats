@@ -287,6 +287,31 @@ _failing_job() {
   assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
 }
 
+@test "a pool cleans up before a caller handler that exits on the signal" {
+  # Handlers composed by appending ran the caller's first, and one that exits --
+  # `killed_process_handler`, or a plain `trap 'exit' TERM` -- ended the shell
+  # before the pool's cleanup ran, so its jobs were never told to stop. The job
+  # records the TERM the pool sends it.
+  local script="${BATS_TEST_TMPDIR}/killed_pool.sh"
+  local ready="${BATS_TEST_TMPDIR}/ready" told="${BATS_TEST_TMPDIR}/told"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules parallel" \
+    "dybatpho::register_killed_handler" \
+    "_job() {" \
+    "  trap 'printf told > $(printf '%q' "${told}"); exit 0' TERM" \
+    "  printf ready > $(printf '%q' "${ready}")" \
+    "  local i; for ((i = 0; i < 300; i++)); do sleep 0.1; done" \
+    "}" \
+    "( while [[ ! -s $(printf '%q' "${ready}") ]]; do sleep 0.05; done; kill -TERM \$\$ ) &" \
+    "dybatpho::parallel_map 1 _job a > /dev/null 2>&1" \
+    "printf 'carried on\\n'" > "${script}"
+  run bash "${script}"
+  assert_equal "${status}" "143"
+  refute_output --partial "carried on"
+  # The pool waits for the job it ends, so the record is there by now.
+  assert_file_exist "${told}"
+}
+
 @test "an invalid timeout is refused" {
   run ! dybatpho::parallel_map --timeout abc 2 _echo_job a
   assert_output --partial "dybatpho::parallel_map: Timeout must be a duration"

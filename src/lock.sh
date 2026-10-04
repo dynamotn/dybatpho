@@ -527,15 +527,28 @@ function __dybatpho_lock_run_holding {
   local previous_traps
   __dybatpho_process_traps_save_into previous_traps HUP INT TERM
 
-  # kcov records no hit here, though "with_lock installs a release handler"
-  # runs it and asserts the handler it installs.
-  dybatpho::trap "${release} > /dev/null 2>&1 || true" HUP INT TERM # kcov(skip)
+  # The release handler stands alone while the command runs: appended after the
+  # caller's, it never ran when that handler exited. It records the signal, and
+  # once the lock is released and the caller's handlers are back the signal is
+  # raised again, so they run once, after the release -- or the shell ends, as
+  # it would have without a lock.
+  local __dybatpho_lock_caught="" __dybatpho_lock_signal
+  for __dybatpho_lock_signal in HUP INT TERM; do
+    # kcov records no hit here, though "with_lock installs a release handler"
+    # runs it and asserts the handler it installs.
+    __dybatpho_process_trap_only \
+      "${release} > /dev/null 2>&1 || true; __dybatpho_lock_caught=${__dybatpho_lock_signal}" \
+      "${__dybatpho_lock_signal}" # kcov(skip)
+  done
 
   local exit_code=0
   "$@" || exit_code=$?
   eval "${release}"
 
   __dybatpho_process_traps_restore "${previous_traps}" HUP INT TERM
+  if [[ -n "${__dybatpho_lock_caught}" ]]; then
+    kill -s "${__dybatpho_lock_caught}" "${BASHPID}"
+  fi
   return "${exit_code}"
 }
 

@@ -79,6 +79,12 @@ function __dybatpho_parallel_terminate {
   for pid in "$@"; do
     wait "${pid}" 2> /dev/null || true
   done
+  # A child the job forked as the signal went out can miss it -- it is still
+  # between fork and exec -- and outlive its job. Its process group outlives
+  # the leader while it runs, so a second signal to the group reaches it.
+  for pid in "$@"; do
+    kill -TERM -- -"${pid}" 2> /dev/null || true
+  done
 }
 
 #######################################
@@ -358,7 +364,10 @@ function __dybatpho_parallel_pool {
   local __dybatpho_parallel_traps
   __dybatpho_process_traps_save_into __dybatpho_parallel_traps SIGINT SIGTERM
   declare -ga __dybatpho_parallel_pids=() __dybatpho_parallel_watchdogs=()
-  # The handler only records the signal and ends what is running; the pool
+  # The handler stands alone while the pool runs, rather than after the
+  # caller's: a caller handler that exits would otherwise end the shell before
+  # the jobs were told to stop. It only records the signal and ends what is
+  # running; the pool
   # itself then stops starting jobs, ends the watchdogs and jobs started around
   # the signal, and raises the signal again once the caller's handlers are back,
   # so the shell ends -- or the caller's own handler runs -- as it would have
@@ -370,11 +379,11 @@ function __dybatpho_parallel_pool {
   # which is why these are single-quoted strings; the escaped newline inside
   # them continues the command when the trap runs.
   # shellcheck disable=SC2016
-  dybatpho::trap '__dybatpho_parallel_interrupted=INT; __dybatpho_parallel_terminate \
+  __dybatpho_process_trap_only '__dybatpho_parallel_interrupted=INT; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGINT
   # shellcheck disable=SC2016
-  dybatpho::trap '__dybatpho_parallel_interrupted=TERM; __dybatpho_parallel_terminate \
+  __dybatpho_process_trap_only '__dybatpho_parallel_interrupted=TERM; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGTERM
 

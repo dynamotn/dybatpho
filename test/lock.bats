@@ -442,6 +442,41 @@ teardown() {
   assert_line "after: "
 }
 
+@test "dybatpho::with_lock releases before a caller handler that exits on the signal" {
+  # The release handler was appended, so a caller handler that exits on TERM --
+  # `killed_process_handler` here -- ran first and the lock was left behind.
+  local script="${BATS_TEST_TMPDIR}/killed_lock.sh"
+  printf '%s\n' \
+    "export DYBATPHO_LOCK_DIR=$(printf '%q' "${DYBATPHO_LOCK_DIR}") LOG_LEVEL=fatal" \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock" \
+    "dybatpho::register_killed_handler" \
+    "( sleep 1; kill -TERM \$\$ ) &" \
+    "dybatpho::with_lock held 5 -- sleep 3" \
+    "printf 'carried on\\n'" > "${script}"
+  run bash "${script}"
+  assert_equal "${status}" "143"
+  refute_output --partial "carried on"
+  run_traced dybatpho::lock_is_held held
+  assert_failure
+  [[ ! -e "$(dybatpho::lock_path held)" && ! -L "$(dybatpho::lock_path held)" ]]
+}
+
+@test "dybatpho::with_lock lets a TERM end the script once the lock is released" {
+  # With nothing of the caller's on TERM, the release handler took the signal
+  # and returned, so a script asked to stop carried on after the command.
+  local script="${BATS_TEST_TMPDIR}/term_lock.sh"
+  printf '%s\n' \
+    "export DYBATPHO_LOCK_DIR=$(printf '%q' "${DYBATPHO_LOCK_DIR}") LOG_LEVEL=fatal" \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock" \
+    "( sleep 1; kill -TERM \$\$ ) &" \
+    "dybatpho::with_lock held 5 -- sleep 3" \
+    "printf 'carried on\\n'" > "${script}"
+  run bash "${script}"
+  assert_equal "${status}" "143"
+  refute_output --partial "carried on"
+  [[ ! -e "$(dybatpho::lock_path held)" && ! -L "$(dybatpho::lock_path held)" ]]
+}
+
 @test "a lock written by an older version is still understood" {
   # Before the atomic claim the lock was a directory of fields. A copy of the
   # library that meets one has to read it rather than treat it as free.

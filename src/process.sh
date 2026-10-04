@@ -209,6 +209,30 @@ function __dybatpho_process_traps_restore {
 }
 
 #######################################
+# @description Make a command the only handler of one or more signals, for the
+#   length of a call.
+#   A function that holds something for the length of a call -- a lock, a pool
+#   of jobs -- has to let go of it before anything else answers the signal.
+#   Appending its handler with `dybatpho::trap` put it after the caller's, and
+#   a caller handler that exits (`dybatpho::killed_process_handler`, or a plain
+#   `trap 'exit 1' TERM`) ended the shell before the cleanup ran. So the
+#   function saves the handlers with `__dybatpho_process_traps_save_into`,
+#   installs its own alone with this, puts the saved ones back with
+#   `__dybatpho_process_traps_restore` when it is done, and raises the signal
+#   again if one arrived, so the caller's handlers run once and after the
+#   cleanup -- or the shell ends, as it would have with no handler at all.
+# @arg $1 string Command to run when the signal is trapped
+# @arg $@ string Signals to trap
+# @internal
+#######################################
+function __dybatpho_process_trap_only {
+  local __dybatpho_process_only_command="$1"
+  shift
+  # shellcheck disable=SC2064
+  trap "${__dybatpho_process_only_command}" "$@"
+}
+
+#######################################
 # @description Append a command to one or more trap handlers without discarding existing traps.
 # @arg $1 string Command to run when the signal is trapped
 # @arg $@ string Signals to trap

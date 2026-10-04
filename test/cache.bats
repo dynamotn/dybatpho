@@ -14,6 +14,14 @@ age_entry() {
   touch -d "$2" "${path}" 2> /dev/null || touch -t 200001010000 "${path}"
 }
 
+@test "dybatpho::cache_dir falls back to the user cache when the directory is empty" {
+  # Emptied after loading, the setting used to put entries at the root of the
+  # filesystem.
+  XDG_CACHE_HOME="${BATS_TEST_TMPDIR}/xdg" DYBATPHO_CACHE_DIR="" DYBATPHO_CACHE_NAMESPACE=ns \
+    run_traced dybatpho::cache_dir
+  assert_output "${BATS_TEST_TMPDIR}/xdg/dybatpho/ns"
+}
+
 @test "dybatpho::cache_dir puts a namespace below the cache directory" {
   assert_equal "$(dybatpho::cache_dir)" "${DYBATPHO_CACHE_DIR}/default"
   DYBATPHO_CACHE_NAMESPACE="gh"

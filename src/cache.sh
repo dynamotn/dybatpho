@@ -72,7 +72,27 @@ __DYBATPHO_CACHE_KEY_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 # @stdout The directory entries live in
 #######################################
 function dybatpho::cache_dir {
-  printf '%s\n' "${DYBATPHO_CACHE_DIR}${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
+  local __dybatpho_cache_base
+  __dybatpho_cache_base_into __dybatpho_cache_base
+  printf '%s\n' "${__dybatpho_cache_base}${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
+}
+
+#######################################
+# @description Resolve the directory the cache lives in.
+#   Emptied after loading, `DYBATPHO_CACHE_DIR` would put entries at the root
+#   of the filesystem, so an empty value falls back to the user cache, as it
+#   does when the module loads.
+# @arg $1 string Name of the variable receiving the directory
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_cache_base_into {
+  local __dybatpho_cache_base_var
+  dybatpho::expect_args __dybatpho_cache_base_var -- "$@"
+  local -n __dybatpho_cache_base_ref="${__dybatpho_cache_base_var}"
+  __dybatpho_cache_base_ref="${DYBATPHO_CACHE_DIR}"
+  [[ -n "${__dybatpho_cache_base_ref}" ]] \
+    || __dybatpho_cache_base_ref="$(dybatpho::xdg_cache_dir dybatpho)"
 }
 
 #######################################
@@ -135,7 +155,9 @@ function __dybatpho_cache_path_into {
     local __dybatpho_cache_path_hint="hash it with dybatpho::cache_key"
     dybatpho::die "${FUNCNAME[1]}: '${__dybatpho_cache_path_key}' cannot be a file name; ${__dybatpho_cache_path_hint}"
   fi
-  local __dybatpho_cache_path_dir="${DYBATPHO_CACHE_DIR}${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
+  local __dybatpho_cache_path_dir
+  __dybatpho_cache_base_into __dybatpho_cache_path_dir
+  __dybatpho_cache_path_dir+="${DYBATPHO_CACHE_NAMESPACE:+/${DYBATPHO_CACHE_NAMESPACE}}"
   __dybatpho_cache_path_out="${__dybatpho_cache_path_dir}/${__dybatpho_cache_path_key}${__DYBATPHO_CACHE_SUFFIX}"
 }
 

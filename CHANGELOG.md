@@ -104,7 +104,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remaining jobs, the shell no longer died on SIGTERM, and a `--timeout`
   watchdog started just after the signal held the pool open for its whole
   limit. The pool now starts nothing more, ends every job and watchdog, puts
-  the caller's handlers back and raises the signal again.
+  the caller's handlers back and raises the signal again. It keeps signalling
+  each job's process group until it is empty and ends what is still there with
+  `KILL` once `DYBATPHO_TIMEOUT_KILL_AFTER` has passed, so a child that lost
+  the signal -- one forked from a shell with an `EXIT` trap just as it arrived
+  -- no longer outlives the pool. The same holds when `--fail-fast` ends jobs.
 
 - **`lock` and `parallel` — cleanup runs before a handler that exits.**
   `dybatpho::with_lock`, `dybatpho::with_semaphore` and the `parallel` pools

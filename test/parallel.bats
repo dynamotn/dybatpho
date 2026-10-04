@@ -287,6 +287,32 @@ _failing_job() {
   assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
 }
 
+@test "an interrupted pool leaves no process of a job alive, even one that loses the signal" {
+  # A child forked just before the signal runs with its shell's handlers until
+  # it execs, and a shell with an EXIT trap catches TERM there and forgets it;
+  # the child then outlived the pool. A child that ignores TERM is the
+  # deterministic form of that: the pool must keep signalling the group and end
+  # what is left with KILL once the grace period is over.
+  local child="${BATS_TEST_TMPDIR}/stubborn.sh"
+  printf '%s\n' "trap '' TERM" ': > "$1"' 'while :; do sleep 0.1; done' > "${child}"
+  _stubborn() {
+    while [[ ! -s "${BATS_TEST_TMPDIR}/pool" ]]; do sleep 0.05; done
+    bash "${child}" "${BATS_TEST_TMPDIR}/ready" &
+    printf '%s' "$!" > "${BATS_TEST_TMPDIR}/stubborn"
+    while [[ ! -e "${BATS_TEST_TMPDIR}/ready" ]]; do sleep 0.05; done
+    kill -TERM "$(< "${BATS_TEST_TMPDIR}/pool")"
+    wait
+  }
+  local started="${SECONDS}" pool status=0
+  (DYBATPHO_TIMEOUT_KILL_AFTER=1 dybatpho::parallel_map 1 _stubborn only) > /dev/null 2>&1 &
+  pool=$!
+  printf '%s' "${pool}" > "${BATS_TEST_TMPDIR}/pool"
+  wait "${pool}" || status=$?
+  ((SECONDS - started < 10))
+  assert_equal "${status}" "143"
+  assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/stubborn")"
+}
+
 @test "a pool cleans up before a caller handler that exits on the signal" {
   # Handlers composed by appending ran the caller's first, and one that exits --
   # `killed_process_handler`, or a plain `trap 'exit' TERM` -- ended the shell

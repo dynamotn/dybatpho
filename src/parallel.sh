@@ -63,28 +63,48 @@ function __dybatpho_parallel_jobs {
 }
 
 #######################################
-# @description End every job still running in the pool.
+# @description End every job still running in the pool, and everything it
+#   started.
 #   A job is a subshell that usually has children of its own, and ending the
 #   subshell alone would orphan them. The pool runs with job control on, which
 #   puts each job in its own process group, so the whole group can be ended at
 #   once.
+#
+#   One signal to the group is not enough. A child forked just before it runs,
+#   until it execs, with the handlers of the shell that forked it, and a shell
+#   with an `EXIT` trap -- any script using `dybatpho::cleanup_file_on_exit` --
+#   catches `TERM` there: the child records the signal, replaces itself with its
+#   program and forgets it, and then outlives the pool. So every group is
+#   signalled again until it is empty, and what is still there once
+#   `DYBATPHO_TIMEOUT_KILL_AFTER` seconds have passed is ended with `KILL`, the
+#   grace a timed-out job is given.
 # @arg $@ number Process IDs to end, each the leader of its job's process group
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a group may outlive the first signal before `KILL`, default is `5`
 # @internal
 #######################################
 function __dybatpho_parallel_terminate {
-  local pid
+  local pid grace="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}" tick
+  [[ "${grace}" =~ ^[0-9]+$ ]] || grace=5
   for pid in "$@"; do
     kill -TERM -- -"${pid}" 2> /dev/null || kill -TERM "${pid}" 2> /dev/null || true
   done
   for pid in "$@"; do
     wait "${pid}" 2> /dev/null || true
   done
-  # A child the job forked as the signal went out can miss it -- it is still
-  # between fork and exec -- and outlive its job. Its process group outlives
-  # the leader while it runs, so a second signal to the group reaches it.
-  for pid in "$@"; do
-    kill -TERM -- -"${pid}" 2> /dev/null || true
+  local -a alive=("$@")
+  for ((tick = 0; ${#alive[@]} && tick < grace * 10; tick++)); do
+    local -a still=()
+    for pid in "${alive[@]}"; do
+      kill -TERM -- -"${pid}" 2> /dev/null && still+=("${pid}")
+    done
+    alive=(${still[@]+"${still[@]}"})
+    ((${#alive[@]})) || break
+    sleep 0.1
   done
+  for pid in ${alive[@]+"${alive[@]}"}; do
+    kill -KILL -- -"${pid}" 2> /dev/null || true
+  done
+  return 0
 }
 
 #######################################

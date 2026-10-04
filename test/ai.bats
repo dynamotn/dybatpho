@@ -414,6 +414,22 @@ EOF
   assert_stderr --partial "DYBATPHO_AI_CLI is 'no-such-ai-cli' but that command is not installed"
 }
 
+@test "dybatpho::ai_json fails on a refused request instead of retrying it" {
+  # The answer was fetched inside a command substitution whose status was never
+  # read, so a refused request looked like an answer that was not JSON: the
+  # call sent it again, and again, then blamed the model for bad JSON.
+  local body_file="${BATS_TEST_TMPDIR}/refused.json" count="${BATS_TEST_TMPDIR}/requests"
+  printf '%s' '{"error":{"message":"overloaded"}}' > "${body_file}"
+  stub_repeated curl ": printf x >> '${count}'; out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; if [ -n \"\${out}\" ]; then cat '${body_file}' > \"\${out}\"; fi; echo 500"
+  DYBATPHO_CURL_MAX_RETRIES=0
+  DYBATPHO_AI_JSON_RETRIES=3
+  run --separate-stderr dybatpho::ai_json "q" '{"type":"object"}'
+  unstub curl
+  assert_failure
+  refute_stderr --partial "No valid JSON"
+  assert_equal "$(cat "${count}")" "x"
+}
+
 @test "dybatpho::ai_chat rejects a missing conversation file" {
   run --separate-stderr dybatpho::ai_chat "${BATS_TEST_TMPDIR}/absent.json" "q"
   assert_failure

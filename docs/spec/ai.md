@@ -318,6 +318,11 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-024**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
 - **IT-025**: Ask with no API key set and fail without sending a request; rehearse the same call under `DRY_RUN` and succeed.
 - **IT-026**: Ask through the `cli` backend with `DYBATPHO_AI_CLI` naming a command that does not exist, and fail with 127 and no answer.
+- **IT-027**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
+- **IT-028**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
+- **IT-029**: Ask with no API key set and fail without sending a request; rehearse the same call under `DRY_RUN` and succeed.
+- **IT-030**: Ask through the `cli` backend with `DYBATPHO_AI_CLI` naming a command that does not exist, and fail with 127 and no answer.
+- **IT-031**: Answer an HTTP 500 to `ai_json` with retries left, and fail after one request without reporting invalid JSON.
 
 ## Acceptance Criteria *(mandatory)*
 

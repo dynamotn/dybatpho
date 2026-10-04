@@ -116,9 +116,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   module does not know, `dybatpho::ai_ask` went on with no backend, tripped
   over several more errors and returned success; and when the provider
   answered with an HTTP error, `dybatpho::ai_ask` printed an empty answer and
-  succeeded, while `dybatpho::ai_chat` recorded that empty answer as the
-  assistant's turn. Both now fail with the request's status, and a failed turn
-  is left out of the conversation.
+  succeeded, `dybatpho::ai_chat` recorded that empty answer as the
+  assistant's turn, and `dybatpho::ai_json` took it for an answer that was not
+  JSON and sent the request again until its retries ran out. All three now fail
+  with the request's status, and a failed turn is left out of the conversation.
 
 - **`i18n` — `dybatpho::i18n_datetime` stops on a timestamp it cannot read.**
   The date and the time were each formatted inside a command substitution, so

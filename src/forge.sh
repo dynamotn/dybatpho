@@ -778,7 +778,9 @@ function dybatpho::forge_issue_report {
     dybatpho::forge_issue_comment "${number}" "${body}"
     action="commented"
   else
-    number="$(dybatpho::forge_issue_create "${title}" "${body}" "${labels}")"
+    # A refusal ends this substitution with its status; going on would report
+    # an issue that was never opened.
+    number="$(dybatpho::forge_issue_create "${title}" "${body}" "${labels}")" || return $?
     action="created"
   fi
 

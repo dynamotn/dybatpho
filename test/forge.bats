@@ -369,6 +369,19 @@ curl_payload() {
   assert_regex "${output}" '"url":"https://github.com/acme/widget/issues/30"'
 }
 
+@test "dybatpho::forge_issue_report fails when the forge refuses the new issue" {
+  # The issue was created inside a command substitution, so a refusal ended
+  # only that substitution: the report went on with no issue number, built a
+  # link to it, and succeeded.
+  dybatpho::mock_http "issues?state=open" 200 '[]'
+  dybatpho::mock_http "/repos/acme/widget/issues" 403 '{"message":"Resource not accessible"}'
+
+  run --separate-stderr dybatpho::forge_issue_report "Nightly failing" "log url" "ci"
+  assert_failure
+  refute_output --partial '"action":"created"'
+  assert_stderr --partial "Could not create issue"
+}
+
 @test "dybatpho::forge_issue_report comments on the issue that is already open" {
   dybatpho::mock_http "issues?state=open" 200 '[{"number":30,"title":"Nightly failing"}]'
   dybatpho::mock_http "/issues/30/comments" 201 '{}'

@@ -124,6 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a timestamp that was not a number ended only those substitutions: the call
   printed `, ` and succeeded. It now stops, naming `dybatpho::i18n_datetime`.
 
+- **`forge` — `dybatpho::forge_issue_report` fails when the issue cannot be
+  opened.** The issue was created inside a command substitution whose status
+  was never read, so when the forge refused it the report went on with no issue
+  number, printed `"action":"created"` with a link to nothing, and succeeded.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

@@ -170,6 +170,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   remote MUST be read at most once per request and not at all when
   `DYBATPHO_FORGE`, `DYBATPHO_FORGE_REPO` and `DYBATPHO_FORGE_API` answer it, and
   a remote, forge or token that can't be resolved MUST stop the script.
+- **FR-017**: `forge_issue_report` MUST fail when the forge refuses to open the issue, instead of reporting an issue with no number.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -226,6 +227,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **IT-025**: Verify a request leaves its token masked in the calling shell, reads
   the remote no more than one read takes, reads it not at all when every value
   is overridden, and stops on a remote, a host or an override it can't use.
+- **IT-026**: Report an issue whose creation the forge refuses with HTTP 403, and fail without printing a created report.
 
 ## Acceptance Criteria *(mandatory)*
 

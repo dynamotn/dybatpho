@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.1] - 2026-10-04
+
 ### Fixed
 
 - **`scripts/release.sh` — a checkout with a space in its path can release.**
@@ -3918,7 +3920,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::safe_extract` validates an archive before extracting it. This blocks
   path-traversal entries such as `../../etc/passwd` in an untrusted archive.
 
-[Unreleased]: https://gitlab.com/dynamo-tools/dybatpho/compare/v6.0.0...HEAD
+[Unreleased]: https://gitlab.com/dynamo-tools/dybatpho/compare/v6.0.1...HEAD
+[6.0.1]: https://gitlab.com/dynamo-tools/dybatpho/compare/v6.0.0...v6.0.1
 [6.0.0]: https://gitlab.com/dynamo-tools/dybatpho/compare/v5.2.0...v6.0.0
 [5.2.0]: https://github.com/dynamotn/dybatpho/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/dynamotn/dybatpho/compare/v5.0.0...v5.1.0

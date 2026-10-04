@@ -319,7 +319,8 @@ function dybatpho::diff_json {
 #   The comparison reads each side through a process substitution, whose exit
 #   status is lost, so a document that does not parse used to flatten to
 #   nothing -- and two broken documents then compared as identical. An empty
-#   file is refused too: it holds no value to compare.
+#   file is refused too: it holds no value to compare. The values are counted
+#   rather than left to `-e`, which jq 1.6 lets pass on no input at all.
 # @arg $1 string Name of the public function, for the message
 # @arg $2 string File to check
 # @arg $3 string Which side it is: `first` or `second`
@@ -327,7 +328,7 @@ function dybatpho::diff_json {
 # @internal
 #######################################
 function __dybatpho_diff_expect_json {
-  jq -e 'true' -- "$2" > /dev/null 2>&1 \
+  jq -s -e 'length > 0' -- "$2" > /dev/null 2>&1 \
     || dybatpho::die "$1: Not valid JSON: the $3 document" 2
 }
 

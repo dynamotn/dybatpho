@@ -436,12 +436,13 @@ function __dybatpho_diff_need_json {
 # @arg $1 string Name of the associative array to fill
 # @arg $2 string Directory to walk
 # @set The named array
+# @exitcode 1 Part of the tree could not be read
 # @internal
 #######################################
 function __dybatpho_diff_tree_into {
   local -n __dybatpho_diff_tree_ref="$1"
   local -a __dybatpho_diff_paths=() __dybatpho_diff_kinds=()
-  __dybatpho_file_walk_into __dybatpho_diff_paths __dybatpho_diff_kinds "$2"
+  __dybatpho_file_walk_into __dybatpho_diff_paths __dybatpho_diff_kinds "$2" || return 1
   local __dybatpho_diff_at __dybatpho_diff_path
   for __dybatpho_diff_at in "${!__dybatpho_diff_paths[@]}"; do
     __dybatpho_diff_path="${__dybatpho_diff_paths[__dybatpho_diff_at]}"
@@ -559,8 +560,12 @@ function dybatpho::diff_dir {
   fi
 
   local -A before=() after=()
-  __dybatpho_diff_tree_into before "${first}"
-  __dybatpho_diff_tree_into after "${second}"
+  # A tree that cannot be read in full is trouble, not a difference: calling
+  # it identical would vouch for contents that were never compared.
+  __dybatpho_diff_tree_into before "${first}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot read every entry under ${first}" 2
+  __dybatpho_diff_tree_into after "${second}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot read every entry under ${second}" 2
 
   local -a paths=()
   local path

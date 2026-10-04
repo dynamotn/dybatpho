@@ -113,6 +113,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 
 ## Edge Cases
 
+- A subdirectory one of the trees holds but the process cannot enter.
 - A side is a file, `-` for stdin, or the text itself, and text may look like a path.
 - The two sides are identical, or one is empty.
 - A JSON value is `null`, an empty object, or an empty array.
@@ -158,6 +159,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 - **FR-025**: Tree records MUST follow the same coloring decision as the other comparisons, with additions, removals, modifications and changes of kind colored distinctly.
 - **FR-026**: Loading the module MUST NOT load `json`. The YAML comparison MUST stop before reading its input with `<function> needs the json module, load it with: dybatpho::load json` when `json` is not loaded; the text, JSON and tree comparisons MUST work without it.
 - **FR-027**: A JSON or YAML comparison MUST stop with exit code `2` and `<function>: Not valid JSON: the <first|second> document` (or `Not valid YAML`) when either side does not parse or holds no value, and MUST NOT print a difference or report the documents as identical.
+- **FR-028**: `diff_dir` MUST stop with exit 2 when either tree cannot be read in full, rather than compare the part it could list.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -209,6 +211,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 - **IT-029**: Take the directories after an end-of-options marker.
 - **IT-030**: Verify a script that loads `diff` alone can summarize text, that its YAML comparison stops with the message naming `json`, and that once it loads `json` the same call reports the changed key.
 - **IT-031**: Verify two broken JSON documents, a broken second document, an empty document, and broken YAML on either side all stop with exit code `2` and name the side, printing nothing on stdout.
+- **IT-032**: Compare two trees whose differing subdirectories cannot be entered, and stop with exit 2.
 
 ## Acceptance Criteria *(mandatory)*
 

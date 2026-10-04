@@ -484,10 +484,16 @@ function __dybatpho_file_stat {
 #   NUL-separated, which keeps a name holding a newline in one piece, and come
 #   back in byte order, which puts every directory ahead of what it holds. The
 #   root itself is not an entry, and a symbolic link is never followed.
+#
+#   A part of the tree that cannot be read makes the walk fail, though the
+#   arrays still hold everything that was listed: `find` lists what it can and
+#   reports the rest, and passing that on as a complete tree let a comparison
+#   or a checksum stand in for contents nobody had read.
 # @arg $1 string Name of the array receiving the relative paths
 # @arg $2 string Name of the array receiving the kinds, or `-`
 # @arg $3 string Directory to walk
 # @set The two named arrays
+# @exitcode 1 The root, or something under it, could not be read
 # @internal
 #######################################
 function __dybatpho_file_walk_into {
@@ -497,6 +503,16 @@ function __dybatpho_file_walk_into {
   local __dybatpho_file_walk_root="$3" __dybatpho_file_walk_entry __dybatpho_file_walk_full
   __dybatpho_file_walk_paths=()
   __dybatpho_file_walk_kinds=()
+
+  # Listed into a file first, so `find`'s status survives: a process
+  # substitution would drop it, and a NUL-separated list cannot be held in a
+  # variable. Not a `__dybatpho`-prefixed name: `dybatpho::create_temp` refuses one.
+  local dybatpho_file_walk_list __dybatpho_file_walk_status=0
+  dybatpho::create_temp dybatpho_file_walk_list ".walk" "walk"
+  (cd -- "${__dybatpho_file_walk_root}" && find . -mindepth 1 -print0) \
+    > "${dybatpho_file_walk_list}" || __dybatpho_file_walk_status=1
+  LC_ALL=C sort -z -o "${dybatpho_file_walk_list}" -- "${dybatpho_file_walk_list}" \
+    || __dybatpho_file_walk_status=1
 
   while IFS= read -r -d '' __dybatpho_file_walk_entry; do
     __dybatpho_file_walk_entry="${__dybatpho_file_walk_entry#./}"
@@ -512,8 +528,9 @@ function __dybatpho_file_walk_into {
       __dybatpho_file_walk_kinds+=(other)
     fi
     # kcov never records the redirection line of a loop; the body above it runs.
-    # An unreadable root lists nothing rather than stopping the caller, as before.
-  done < <(cd -- "${__dybatpho_file_walk_root}" && find . -mindepth 1 -print0 | LC_ALL=C sort -z || true) # kcov(skip)
+  done < "${dybatpho_file_walk_list}" # kcov(skip)
+  rm -f -- "${dybatpho_file_walk_list}"
+  return "${__dybatpho_file_walk_status}"
 }
 
 #######################################

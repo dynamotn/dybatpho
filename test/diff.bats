@@ -256,6 +256,22 @@ make_trees() {
 EOF
 }
 
+@test "dybatpho::diff_dir refuses a tree it cannot read in full" {
+  # `find` listed what it could and the rest went unread, so two trees whose
+  # hidden contents differed came back as identical.
+  [[ "$(id -u)" != 0 ]] || skip "root reads every directory"
+  local left="${BATS_TEST_TMPDIR}/left" right="${BATS_TEST_TMPDIR}/right"
+  mkdir -p "${left}/hidden" "${right}/hidden"
+  printf 'one\n' > "${left}/hidden/f"
+  printf 'two\n' > "${right}/hidden/f"
+  chmod 000 "${left}/hidden" "${right}/hidden"
+
+  run --separate-stderr dybatpho::diff_dir "${left}" "${right}"
+  chmod 700 "${left}/hidden" "${right}/hidden"
+  assert_failure 2
+  assert_stderr --partial "Cannot read every entry under ${left}"
+}
+
 @test "dybatpho::diff_dir says nothing and succeeds for trees with the same content" {
   make_trees
   run_traced -0 dybatpho::diff_dir "${OLD}" "${OLD}"

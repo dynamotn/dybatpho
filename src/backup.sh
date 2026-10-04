@@ -298,7 +298,9 @@ function __dybatpho_backup_tree_hash_into {
   dybatpho::create_temp dybatpho_backup_manifest ".manifest" "backup"
 
   local -a __dybatpho_backup_paths=() __dybatpho_backup_kinds=()
-  __dybatpho_file_walk_into __dybatpho_backup_paths __dybatpho_backup_kinds "${__dybatpho_backup_tree}"
+  # A checksum over part of a tree would vouch for files nobody read.
+  __dybatpho_file_walk_into __dybatpho_backup_paths __dybatpho_backup_kinds "${__dybatpho_backup_tree}" \
+    || dybatpho::die "Cannot read every entry under ${__dybatpho_backup_tree}"
   local -i __dybatpho_backup_at
   for ((__dybatpho_backup_at = 0; __dybatpho_backup_at < ${#__dybatpho_backup_paths[@]}; __dybatpho_backup_at++)); do
     __dybatpho_backup_entry="${__dybatpho_backup_paths[__dybatpho_backup_at]}"
@@ -359,7 +361,11 @@ function __dybatpho_backup_link_copy {
   # what they hold.
   local -a directories=() entries=()
   if [[ -d "${source}" && ! -L "${source}" ]]; then
-    __dybatpho_file_walk_into entries - "${source}"
+    # A snapshot missing what could not be read is not a backup of the source.
+    if ! __dybatpho_file_walk_into entries - "${source}"; then
+      dybatpho::error "Cannot read every entry under ${source}"
+      return 1
+    fi
   fi
   entries=(. ${entries[@]+"${entries[@]}"})
 

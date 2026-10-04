@@ -194,6 +194,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   did for a path that could not be read, and an unreadable file inside the
   tree is reported the same way.
 
+- **`diff` and `backup` — a tree that cannot be read in full is refused, not
+  half-read.** The walk behind `dybatpho::diff_dir` and incremental snapshots
+  took what `find` could list and passed over the rest: `diff_dir` called two
+  trees identical while the contents of a subdirectory it could not enter
+  differed, and `dybatpho::backup_create --incremental` without `rsync`
+  recorded such a subdirectory as an empty one and reported success. `diff_dir`
+  now stops with exit 2, the snapshot is refused and nothing is left behind,
+  and checking a snapshot whose tree cannot be read stops as well.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

@@ -519,6 +519,23 @@ snapshot() {
   assert_equal "$(cat "${newer}/source/b.txt")" "rewritten"
 }
 
+@test "dybatpho::backup_create --incremental without rsync refuses an unreadable part" {
+  # The copy walked what `find` could list and passed over the rest, so a
+  # directory it could not enter was snapshotted as an empty one and the
+  # backup reported success.
+  [[ "$(id -u)" != 0 ]] || skip "root reads every directory"
+  mkdir -p "${SOURCE}/sealed"
+  printf 'inside\n' > "${SOURCE}/sealed/e.txt"
+  chmod 000 "${SOURCE}/sealed"
+
+  PATH="$(path_without rsync)" run --separate-stderr dybatpho::backup_create -i "${SOURCE}" "${DEST}" site
+  chmod 700 "${SOURCE}/sealed"
+  assert_failure
+  assert_stderr --partial "Cannot read every entry under"
+  run_traced find "${DEST}" -name '*.snapshot'
+  assert_output ""
+}
+
 @test "dybatpho::backup_create --incremental links without rsync too" {
   local older newer
   mkdir -p "${SOURCE}/sub dir" "${SOURCE}/locked"

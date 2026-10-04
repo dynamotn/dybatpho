@@ -36,7 +36,6 @@ case a variable cannot cover.
 - [`dybatpho::schedule_every`](#dybatphoschedule_every) — Run a command on a fixed cadence until it is interrupted. The first run is immediate. The cadence is measured from when each run was due rather than from when the last one ended, so the schedule does not drift; a run that overruns its slot makes the missed ticks be skipped rather than queued, because catching up by running the same command four times in a row is never what the caller meant. `SIGINT`, `SIGTERM` and `SIGHUP` end the loop after the run in progress, and the handlers in place before the call are put back afterwards.
 - [`dybatpho::schedule_debounce`](#dybatphoschedule_debounce) — Run a command once a burst of triggers has settled. Every trigger calls this. Each call registers itself, waits out the window, and then runs the command only if nothing else registered while it waited — so a burst of events produces exactly one run, after the burst ends rather than at its start. That is what an editor's write-then-rename needs: running on the first event would read a file that is still half written. The call blocks for the length of the window, so a trigger loop should call it in the background when it must keep reading events.
 - [`dybatpho::schedule_once_per`](#dybatphoschedule_once_per) — Run a command at most once in each period. The marker is a file, so the limit holds across separate invocations of the script rather than only within one run. A named period is a calendar bucket -- `hour` means "once in this clock hour", not "once in any sixty minutes" -- while a number of seconds measures from the last run.
-- [`until`](#until) — 
 - [`__dybatpho_schedule_bucket_into`](#__dybatpho_schedule_bucket_into) — Work out the bucket a period puts the current time in.
 - [`dybatpho::schedule_reset`](#dybatphoschedule_reset) — Forget what a key has recorded, so the next call runs.
 - [`dybatpho::schedule_cron_due`](#dybatphoschedule_cron_due) — Return success when a time matches a cron expression. This answers "am I due", which is what a script run from an existing scheduler needs. It deliberately does not compute the next fire time: that needs a full calendar walk, and a half-right answer about when something will next run is worse than no answer. Fields are the usual five -- minute, hour, day of month, month, day of week -- each one `*`, a number, `a-b`, a comma-separated list, or any of those with a `/n` step. Sunday is `0` or `7`. When both day of month and day of week are restricted, the expression matches if **either** does, which is what cron itself does and what a hand-written check almost always gets wrong.
@@ -214,12 +213,6 @@ dybatpho::schedule_once_per day warn-expiry -- dybatpho::warn "The token expires
 - `0`: The command ran, and its own exit code is returned
 - `1`: The period or the key is invalid, or another caller held the claim for the whole wait
 - `9`: The command already ran in this period, so nothing was done
-
-
----
-
-### `until`
-
 
 
 ---

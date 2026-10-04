@@ -311,7 +311,9 @@ function __dybatpho_schedule_claim {
   set -C
   # `noclobber` is set in this shell rather than in a subshell, so an attempt
   # costs no process; the caller's own setting is put back on every way out.
-  until { printf '%s\n' "$$" > "${claim}"; } 2> /dev/null; do
+  # Standard error is redirected first, so the refusal of a taken claim is
+  # silenced along with it.
+  until printf '%s\n' "$$" 2> /dev/null > "${claim}"; do
     # A claim is only stale after seconds, so its age is read once a second
     # rather than on every attempt. The claim can vanish between the test and
     # the read; that is age 0.

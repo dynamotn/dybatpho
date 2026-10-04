@@ -161,6 +161,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **FR-016**: Inside a bundle, loading a carried module MUST succeed, and loading any other module MUST fail with the command that regenerates the bundle with it.
 - **FR-017**: The bundler MUST refuse to overwrite an existing output file without approval, MUST honor `DRY_RUN`, and MUST verify that the file it wrote parses and can be sourced.
 - **FR-018**: The JSON report MUST escape every control character in the strings it writes, so it parses whatever a path or version holds, and MUST do so without `jq`.
+- **FR-019**: `scripts/bundle.sh` MUST read every bootstrap function it copies from `init.sh` before it opens the output, and MUST stop without writing a bundle when one cannot be found.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -207,6 +208,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **IT-015**: Verify the bundler refuses to overwrite without approval, overwrites when forced, and writes nothing under `DRY_RUN`.
 - **IT-016**: Verify the bundler rejects an unknown module and keeps the module source verbatim apart from the shebang.
 - **IT-017**: Verify a dependency found under a directory whose name holds an ANSI escape and a `\x01` is reported with `\u001b` and `\u0001`, and that the report parses.
+- **IT-018**: Bundle from a copy of the library whose `init.sh` misspells a bootstrap function header, and fail with no output file.
 
 ## Acceptance Criteria *(mandatory)*
 

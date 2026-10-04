@@ -129,6 +129,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was never read, so when the forge refused it the report went on with no issue
   number, printed `"action":"created"` with a link to nothing, and succeeded.
 
+- **`scripts/bundle.sh` stops when a bootstrap function cannot be copied.** The
+  functions it copies from `init.sh` into the bundle's prologue were pasted in
+  by command substitutions inside a here document, whose failure nothing read:
+  a function it could not find left a hole, and the bundle was still reported
+  as written. They are now read before the output is opened, and a missing one
+  stops the run without leaving a bundle behind.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

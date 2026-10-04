@@ -143,3 +143,22 @@ bundle() {
   run_traced --separate-stderr ! use_bundle 'dybatpho::function_list semver'
   assert_stderr --partial "which is how a bundle looks"
 }
+
+@test "a bootstrap function that cannot be found stops the bundle before it is written" {
+  # Each bootstrap function was pasted into the prologue by a command
+  # substitution inside a here document, whose failure nothing reads, so a
+  # function the extractor could not find left a hole and the bundle was still
+  # reported as written. A copy of the library whose `init.sh` spells one header
+  # differently plays the missing function.
+  local copy="${BATS_TEST_TMPDIR}/library copy"
+  mkdir -p "${copy}"
+  cp -R "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${DYBATPHO_DIR}/src" "${DYBATPHO_DIR}/scripts" "${copy}/"
+  sed -i.orig 's/^function dybatpho::module_loaded {$/function dybatpho::module_loaded  {/' "${copy}/init.sh"
+  rm -f "${copy}/init.sh.orig"
+
+  run --separate-stderr env -u DYBATPHO_DIR -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${copy}/scripts/bundle.sh" --modules semver -o "${OUTPUT}"
+  assert_failure
+  assert_stderr --partial "Can't find function 'dybatpho::module_loaded'"
+  assert_file_not_exist "${OUTPUT}"
+}

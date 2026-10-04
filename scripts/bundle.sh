@@ -73,22 +73,27 @@ function __dybatpho_bundle_resolve {
 # @description Copy one function out of a source file, without its doc block.
 #   The bundle needs the bootstrap's own functions, and copying them at
 #   generation time keeps the generated file from drifting away from `init.sh`.
-# @arg $1 path File to read
-# @arg $2 string Function name
-# @stdout The function definition, from its `function` line to its closing brace
+#   It runs in the caller's shell and fills a variable: pasted into the
+#   prologue by a command substitution inside a here document, a function it
+#   could not find left a hole whose failure nothing read, and the bundle was
+#   still reported as written.
+# @arg $1 string Name of the variable receiving the definition
+# @arg $2 path File to read
+# @arg $3 string Function name
+# @set The named variable: the definition, from its `function` line to its closing brace
 # @exitcode 1 Stop the script when the function isn't found
 # @internal
 #######################################
-function __dybatpho_bundle_extract {
-  local _file="$1" _name="$2" _body
-  _body="$(awk -v name="${_name}" '
+function __dybatpho_bundle_extract_into {
+  local -n __dybatpho_bundle_extract_ref="$1"
+  local _file="$2" _name="$3"
+  __dybatpho_bundle_extract_ref="$(awk -v name="${_name}" '
     $0 == "function " name " {" { collecting = 1 }
     collecting { print }
     collecting && $0 == "}" { exit }
   ' "${_file}")"
-  [[ -n "${_body}" ]] \
+  [[ -n "${__dybatpho_bundle_extract_ref}" ]] \
     || dybatpho::die "Can't find function '${_name}' in ${_file}"
-  printf '%s\n' "${_body}"
 }
 
 #######################################
@@ -155,15 +160,15 @@ DYBATPHO_OPTIONAL_MODULES="${_optional}"
 DYBATPHO_LOADED_MODULES="${_modules}"
 export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 
-$(__dybatpho_bundle_extract "${DYBATPHO_DIR}/init.sh" "__dybatpho_module_exists")
+${_bootstrap_module_exists}
 
-$(__dybatpho_bundle_extract "${DYBATPHO_DIR}/init.sh" "__dybatpho_export_functions")
+${_bootstrap_export_functions}
 
-$(__dybatpho_bundle_extract "${DYBATPHO_DIR}/init.sh" "dybatpho::version")
+${_bootstrap_version}
 
-$(__dybatpho_bundle_extract "${DYBATPHO_DIR}/init.sh" "dybatpho::module_loaded")
+${_bootstrap_module_loaded}
 
-$(__dybatpho_bundle_extract "${DYBATPHO_DIR}/init.sh" "dybatpho::module_list")
+${_bootstrap_module_list}
 
 # A bundle has nothing to source: every module it carries is already loaded, and
 # a module it doesn't carry can only come from regenerating it.
@@ -224,6 +229,18 @@ function __dybatpho_bundle_run {
     dybatpho::info "DRY_RUN: would write ${_count} module(s) to ${OUTPUT}"
     return 0
   fi
+
+  # The prologue pastes these in from `init.sh`. They are read here, before the
+  # output is opened, so a function that cannot be found stops the run without
+  # leaving a partial bundle behind.
+  local _bootstrap_module_exists _bootstrap_export_functions _bootstrap_version
+  local _bootstrap_module_loaded _bootstrap_module_list
+  local _init="${DYBATPHO_DIR}/init.sh"
+  __dybatpho_bundle_extract_into _bootstrap_module_exists "${_init}" __dybatpho_module_exists
+  __dybatpho_bundle_extract_into _bootstrap_export_functions "${_init}" __dybatpho_export_functions
+  __dybatpho_bundle_extract_into _bootstrap_version "${_init}" dybatpho::version
+  __dybatpho_bundle_extract_into _bootstrap_module_loaded "${_init}" dybatpho::module_loaded
+  __dybatpho_bundle_extract_into _bootstrap_module_list "${_init}" dybatpho::module_list
 
   dybatpho::safe_overwrite "${OUTPUT}" || dybatpho::die "Aborted: ${OUTPUT} already exists"
   local _dir

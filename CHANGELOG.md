@@ -109,6 +109,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `ai` counter file was a symbolic link. Each now stops under the name of
   the function that was called.
 
+- **`ai` — an unknown backend or a refused request fails the call.** The
+  backend was resolved, and the response fetched, inside command substitutions
+  whose failures were never read. With `DYBATPHO_AI_PROVIDER` set to a name the
+  module does not know, `dybatpho::ai_ask` went on with no backend, tripped
+  over several more errors and returned success; and when the provider
+  answered with an HTTP error, `dybatpho::ai_ask` printed an empty answer and
+  succeeded, while `dybatpho::ai_chat` recorded that empty answer as the
+  assistant's turn. Both now fail with the request's status, and a failed turn
+  is left out of the conversation.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

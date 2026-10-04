@@ -377,6 +377,46 @@ function __dybatpho_ai_ollama_alive {
 }
 
 #######################################
+# @description Resolve the active backend into a named variable, in the
+#   caller's shell.
+#   The library resolves the backend before every call; inside `$(...)` an
+#   unknown or missing backend ended only that substitution, and the call went
+#   on with an empty provider. Here the refusal stops the call.
+# @arg $1 string Name of the variable receiving the backend name
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_ai_provider_into {
+  local -n __dybatpho_ai_provider_ref="$1"
+  case "${DYBATPHO_AI_PROVIDER}" in
+    anthropic | openai | ollama | cli)
+      __dybatpho_ai_provider_ref="${DYBATPHO_AI_PROVIDER}"
+      return 0
+      ;;
+    auto) ;;
+    *)
+      local expected="expected auto, anthropic, openai, ollama or cli"
+      dybatpho::die "dybatpho::ai_provider: Unknown provider '${DYBATPHO_AI_PROVIDER}'; ${expected}"
+      ;;
+  esac
+
+  if dybatpho::is set "${DYBATPHO_AI_API_KEY}"; then
+    __dybatpho_ai_provider_ref=anthropic
+  elif dybatpho::is set "${ANTHROPIC_API_KEY-}"; then
+    __dybatpho_ai_provider_ref=anthropic
+  elif dybatpho::is set "${OPENAI_API_KEY-}"; then
+    __dybatpho_ai_provider_ref=openai
+  elif __dybatpho_ai_ollama_alive; then
+    __dybatpho_ai_provider_ref=ollama
+  elif dybatpho::coalesce_cmd claude llm ollama > /dev/null 2>&1; then
+    __dybatpho_ai_provider_ref=cli
+  else
+    dybatpho::die \
+      "dybatpho::ai_provider: No AI backend. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, run ollama, or install a CLI"
+  fi
+}
+
+#######################################
 # @description Resolve which backend a call will use.
 # Detection order for `auto`: an Anthropic key, an OpenAI key, a live local
 # Ollama daemon, then any supported command line client.
@@ -393,32 +433,9 @@ function __dybatpho_ai_ollama_alive {
 # @exitcode 1 Stop the script when the pinned name is unknown, or nothing is configured
 #######################################
 function dybatpho::ai_provider {
-  case "${DYBATPHO_AI_PROVIDER}" in
-    anthropic | openai | ollama | cli)
-      printf '%s\n' "${DYBATPHO_AI_PROVIDER}"
-      return 0
-      ;;
-    auto) ;;
-    *)
-      dybatpho::die \
-        "${FUNCNAME[0]}: Unknown provider '${DYBATPHO_AI_PROVIDER}'; expected auto, anthropic, openai, ollama or cli"
-      ;;
-  esac
-
-  if dybatpho::is set "${DYBATPHO_AI_API_KEY}"; then
-    printf 'anthropic\n'
-  elif dybatpho::is set "${ANTHROPIC_API_KEY-}"; then
-    printf 'anthropic\n'
-  elif dybatpho::is set "${OPENAI_API_KEY-}"; then
-    printf 'openai\n'
-  elif __dybatpho_ai_ollama_alive; then
-    printf 'ollama\n'
-  elif dybatpho::coalesce_cmd claude llm ollama > /dev/null 2>&1; then
-    printf 'cli\n'
-  else
-    dybatpho::die \
-      "dybatpho::ai_provider: No AI backend. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, run ollama, or install a CLI"
-  fi
+  local provider
+  __dybatpho_ai_provider_into provider
+  printf '%s\n' "${provider}"
 }
 
 #######################################
@@ -437,7 +454,7 @@ function dybatpho::ai_model {
     return 0
   fi
   local provider="${1:-}"
-  dybatpho::is empty "${provider}" && provider=$(dybatpho::ai_provider)
+  dybatpho::is empty "${provider}" && __dybatpho_ai_provider_into provider
   case "${provider}" in
     anthropic | cli) printf '%s\n' "${DYBATPHO_AI_ANTHROPIC_MODEL}" ;;
     openai) printf '%s\n' "${DYBATPHO_AI_OPENAI_MODEL}" ;;
@@ -513,7 +530,7 @@ function __dybatpho_ai_base_url {
 function dybatpho::ai_check {
   __dybatpho_ai_require_json
   local provider
-  provider=$(dybatpho::ai_provider)
+  __dybatpho_ai_provider_into provider
   case "${provider}" in
     anthropic | openai | ollama)
       hash curl > /dev/null 2>&1 || dybatpho::die "ai: curl is required by the ${provider} backend" 127
@@ -1173,7 +1190,7 @@ function __dybatpho_ai_complete {
   dybatpho::expect_args conversation -- "$@"
   schema="${2:-}"
   local provider
-  provider=$(dybatpho::ai_provider)
+  __dybatpho_ai_provider_into provider
 
   if [[ "${provider}" == "cli" ]]; then
     __dybatpho_ai_cli_complete "${conversation}"
@@ -1182,7 +1199,7 @@ function __dybatpho_ai_complete {
 
   local payload body text
   payload=$("__dybatpho_ai_payload_${provider}" "${conversation}" '[]' "${schema}")
-  body=$(__dybatpho_ai_http "${provider}" "${payload}")
+  body=$(__dybatpho_ai_http "${provider}" "${payload}") || return $?
   __dybatpho_ai_response_into text "${provider}" "${body}"
   printf '%s\n' "${text}"
 }
@@ -1326,7 +1343,9 @@ function dybatpho::ai_chat {
   local answer
   local cat
   cat=$(cat "${file}")
-  answer=$(__dybatpho_ai_complete "${cat}")
+  # A refused or failed call ends the substitution with its status; recording
+  # its empty output as the assistant's turn would corrupt the conversation.
+  answer=$(__dybatpho_ai_complete "${cat}") || return $?
   dybatpho::ai_conversation_add "${file}" assistant "${answer}"
   printf '%s\n' "${answer}"
 }
@@ -1359,7 +1378,7 @@ function dybatpho::ai_json {
 
   prompt=$(__dybatpho_ai_redact "${prompt}")
   local provider
-  provider=$(dybatpho::ai_provider)
+  __dybatpho_ai_provider_into provider
 
   local effective_prompt="${prompt}"
   local native_schema="${schema}"
@@ -1379,7 +1398,7 @@ ${schema}"
     __dybatpho_ai_budget_check
     local conversation
     conversation=$(__dybatpho_ai_conversation_build "${system}" user "${effective_prompt}")
-    answer=$(__dybatpho_ai_complete "${conversation}" "${native_schema}")
+    answer=$(__dybatpho_ai_complete "${conversation}" "${native_schema}") || return $?
     # Models sometimes wrap JSON in a fence even when told not to; strip it
     # before parsing rather than failing a well-formed answer on packaging.
     candidate=$(printf '%s\n' "${answer}" \
@@ -1418,7 +1437,7 @@ function dybatpho::ai_stream {
   prompt=$(__dybatpho_ai_redact "${prompt}")
 
   local provider
-  provider=$(dybatpho::ai_provider)
+  __dybatpho_ai_provider_into provider
   case "${provider}" in
     anthropic | openai | ollama) ;;
     *)
@@ -1691,7 +1710,7 @@ function dybatpho::ai_run {
   prompt=$(__dybatpho_ai_redact "${prompt}")
 
   local provider
-  provider=$(dybatpho::ai_provider)
+  __dybatpho_ai_provider_into provider
   case "${provider}" in
     anthropic | openai) ;;
     *)
@@ -1714,7 +1733,7 @@ function dybatpho::ai_run {
     local conversation
     conversation=$(dybatpho::json_object system "${system}" messages:json "${messages}")
     payload=$("__dybatpho_ai_payload_${provider}" "${conversation}" "${tools}" "")
-    body=$(__dybatpho_ai_http "${provider}" "${payload}")
+    body=$(__dybatpho_ai_http "${provider}" "${payload}") || return $?
     local text
     __dybatpho_ai_response_into text "${provider}" "${body}"
 

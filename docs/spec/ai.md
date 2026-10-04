@@ -238,6 +238,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   path of the base URL.
 - **FR-025**: `ai_conversation_new` MUST write the conversation path into the variable the caller named, whatever that name is.
 - **FR-026**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
+- **FR-027**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
+- **FR-028**: The backend MUST be resolved in the caller's shell, and a call MUST fail with the request's status when the provider refuses or cannot be reached, so that neither an unknown backend nor a failed request is reported as an empty answer; `ai_chat` MUST NOT record a failed call's output as the assistant's turn.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -300,6 +302,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   credentials and a secret path prints the host only.
 - **IT-016**: Start conversations into variables named `file`, `system`, `path_var` and `conversation_path`, and find the file with its system prompt.
 - **IT-017**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
+- **IT-018**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
+- **IT-019**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -346,6 +346,46 @@ EOF
   assert_equal "$(dybatpho::json_get "$(cat "${chat}")" '.messages[1].content')" "a reply"
 }
 
+@test "an unknown provider stops the call before anything is sent" {
+  # The provider was resolved inside a command substitution, so the refusal
+  # ended only the substitution: the call went on with an empty provider,
+  # tripped over four more errors on the way, and returned success.
+  local script="${BATS_TEST_TMPDIR}/bad-provider.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules ai" \
+    "DYBATPHO_AI_PROVIDER=bogus" \
+    "DYBATPHO_AI_STATE_FILE=$(printf '%q' "${BATS_TEST_TMPDIR}/bad-provider-state.json")" \
+    "if ! dybatpho::ai_ask 'q'; then :; fi" \
+    "printf 'carried on\n'" > "${script}"
+
+  run --separate-stderr bash "${script}"
+  assert_failure
+  assert_stderr --partial "dybatpho::ai_provider: Unknown provider 'bogus'"
+  refute_stderr --partial "command not found"
+  refute_stderr --partial "has no base URL"
+  refute_output --partial "carried on"
+}
+
+@test "a refused request fails the call instead of answering with nothing" {
+  # The response was fetched inside a command substitution whose status was
+  # never read, so an HTTP error made `ai_ask` print an empty answer and
+  # succeed, and `ai_chat` record that empty answer in the conversation.
+  local body_file="${BATS_TEST_TMPDIR}/refused.json"
+  printf '%s' '{"error":{"message":"overloaded"}}' > "${body_file}"
+  stub_repeated curl ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; if [ -n \"\${out}\" ]; then cat '${body_file}' > \"\${out}\"; fi; echo 500"
+  DYBATPHO_CURL_MAX_RETRIES=0
+  run --separate-stderr dybatpho::ai_ask "q"
+  assert_failure
+  assert_output ""
+
+  local chat
+  dybatpho::ai_conversation_new chat "sys"
+  run --separate-stderr dybatpho::ai_chat "${chat}" "a question"
+  unstub curl
+  assert_failure
+  assert_equal "$(dybatpho::json_get "$(cat "${chat}")" '[.messages[] | select(.role == "assistant")] | length')" "0"
+}
+
 @test "dybatpho::ai_chat rejects a missing conversation file" {
   run --separate-stderr dybatpho::ai_chat "${BATS_TEST_TMPDIR}/absent.json" "q"
   assert_failure

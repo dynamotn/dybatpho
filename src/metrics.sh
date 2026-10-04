@@ -417,12 +417,12 @@ function dybatpho::metrics_timer_stop {
 # @exitcode * The exit code of the command
 #######################################
 function dybatpho::metrics_time {
-  local name
-  dybatpho::expect_args name -- "$@"
+  local __dybatpho_metrics_time_name
+  dybatpho::expect_args __dybatpho_metrics_time_name -- "$@"
   shift
-  local -a labels=()
+  local -a __dybatpho_metrics_time_labels=()
   while (($#)) && [[ "$1" != "--" ]]; do
-    labels+=("$1")
+    __dybatpho_metrics_time_labels+=("$1")
     shift
   done
   [[ "${1-}" == "--" ]] \
@@ -432,21 +432,24 @@ function dybatpho::metrics_time {
   # Refuse a bad name or label before the command runs, and under this
   # function's name rather than the recorder's.
   local __dybatpho_metrics_check
-  __dybatpho_metrics_key __dybatpho_metrics_check "${name}" ${labels[@]+"${labels[@]}"}
+  __dybatpho_metrics_key __dybatpho_metrics_check "${__dybatpho_metrics_time_name}" \
+    ${__dybatpho_metrics_time_labels[@]+"${__dybatpho_metrics_time_labels[@]}"}
 
-  local started elapsed status=0
-  started="$(__dybatpho_log_now_ms)"
-  "$@" || status=$?
-  elapsed=$(($(__dybatpho_log_now_ms) - started))
-  ((elapsed < 0)) && elapsed=0
-  dybatpho::metrics_observe_ms "${name}" "${elapsed}" ${labels[@]+"${labels[@]}"}
-  DYBATPHO_METRICS_LAST_MS="${elapsed}"
-  if ((status != 0)); then
-    local base="${name%_seconds}"
-    base="${base%_duration}"
-    dybatpho::metrics_counter_inc "${base}_failures_total" 1 ${labels[@]+"${labels[@]}"}
+  local __dybatpho_metrics_time_started __dybatpho_metrics_time_elapsed __dybatpho_metrics_time_status=0
+  __dybatpho_metrics_time_started="$(__dybatpho_log_now_ms)"
+  "$@" || __dybatpho_metrics_time_status=$?
+  __dybatpho_metrics_time_elapsed=$(($(__dybatpho_log_now_ms) - __dybatpho_metrics_time_started))
+  ((__dybatpho_metrics_time_elapsed < 0)) && __dybatpho_metrics_time_elapsed=0
+  dybatpho::metrics_observe_ms "${__dybatpho_metrics_time_name}" "${__dybatpho_metrics_time_elapsed}" \
+    ${__dybatpho_metrics_time_labels[@]+"${__dybatpho_metrics_time_labels[@]}"}
+  DYBATPHO_METRICS_LAST_MS="${__dybatpho_metrics_time_elapsed}"
+  if ((__dybatpho_metrics_time_status != 0)); then
+    local __dybatpho_metrics_time_base="${__dybatpho_metrics_time_name%_seconds}"
+    __dybatpho_metrics_time_base="${__dybatpho_metrics_time_base%_duration}"
+    dybatpho::metrics_counter_inc "${__dybatpho_metrics_time_base}_failures_total" 1 \
+      ${__dybatpho_metrics_time_labels[@]+"${__dybatpho_metrics_time_labels[@]}"}
   fi
-  return "${status}"
+  return "${__dybatpho_metrics_time_status}"
 }
 
 #######################################

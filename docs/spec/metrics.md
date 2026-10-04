@@ -179,6 +179,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-025**: Loading `metrics` MUST NOT load `math` or `network`. Recording a summary MUST stop the script, naming the `math` module and how to load it, when `math` is not loaded, and a push MUST do the same for `network`, each before recording or sending anything; counters, gauges, histograms and timers MUST work without either.
 - **FR-026**: `metrics_time`, `metrics_timer_start` and `metrics_timer_stop` MUST refuse an invalid metric name or label under their own name, and `metrics_time` MUST do so before running the command.
 - **FR-027**: `metrics_push` MUST check the quantile list in the caller's shell before rendering, so that a list made invalid after a summary was recorded stops the push instead of reporting success.
+- **FR-028**: A command timed by `metrics_time` MUST see the caller's variables and MUST NOT change what is recorded by assigning to one: the timer MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -233,6 +234,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-028**: Reject a URL without a scheme, an empty job, a malformed grouping label, an invalid label name, and a grouping label named `job`.
 - **IT-029**: Refuse a bad name and a bad label in `metrics_time` without running the command, a bad name in `metrics_timer_start`, and a bad label in `metrics_timer_stop`, each under its own name.
 - **IT-030**: Record a summary, make `DYBATPHO_METRICS_QUANTILES` invalid, push, and fail under the name of `metrics_push` without sending a request.
+- **IT-031**: Time a command that reads variables named like the timer's locals and assigns to one, and see the caller's values and the metric recorded under its own name.
 
 ## Acceptance Criteria *(mandatory)*
 

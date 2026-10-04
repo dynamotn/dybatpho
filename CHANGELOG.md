@@ -133,6 +133,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `path`, `ttl` and `status` hid the caller's variables of the same names.
   They are now prefixed, in the background refresh too.
 
+- **`metrics` — a command timed by `dybatpho::metrics_time` sees the
+  caller's variables.** It ran in the timer's scope, where `name`,
+  `labels`, `started` and `status` hid the caller's variables, and a command
+  assigning to `name` changed the metric the time was recorded under. They are
+  now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

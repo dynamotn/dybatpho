@@ -506,3 +506,19 @@ SCRIPT
   assert_output "# HELP summary_metric summary_metric
 # TYPE summary_metric summary"
 }
+
+@test "a command timed by metrics_time sees the caller's variables, not the library's" {
+  # The command runs in the timer's scope, where its locals hid the caller's
+  # variables of the same names, and assigning to one changed what was recorded.
+  local name="caller" labels="caller" started="caller" status="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() {
+    printf '%s %s %s %s\n' "${name}" "${labels}" "${started}" "${status}" > "${seen}"
+    name="clobbered"
+  }
+  dybatpho::metrics_time scoped_ms -- look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller"
+  run_traced dybatpho::metrics_render
+  assert_output --partial "scoped_ms"
+  refute_output --partial "clobbered"
+}

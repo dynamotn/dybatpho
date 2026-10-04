@@ -101,6 +101,23 @@ b
 EOF
 }
 
+@test "the csv readers and writer use an array whatever the caller named it" {
+  # Each of these reads or fills the array through the name the caller chose,
+  # so a name shared with one of the function's own locals lost the records.
+  local name
+  for name in input target text delimiter record source; do
+    unset "${name}"
+    local -a "${name}=()"
+    dybatpho::csv_read $'a,b\n1,2' "${name}"
+    local -n records="${name}"
+    assert_equal "${#records[@]}" 2
+    assert_equal "$(dybatpho::csv_write "${name}")" $'a,b\n1,2'
+    dybatpho::csv_fields $'1\037x,y\0373' "${name}"
+    assert_equal "${records[1]}" "x,y"
+    unset -n records
+  done
+}
+
 @test "dybatpho::csv_read refuses input holding the separator it joins fields with" {
   run --separate-stderr dybatpho::csv_read "$(printf 'a\nx\037y')" records
   assert_failure

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::parallel_map` and `dybatpho::parallel_run` reported an unreadable
   or negative timeout under an internal helper's name instead of their own.
 
+- **`csv` — reading into or writing from an array works whatever it is named.**
+  `dybatpho::csv_read`, `dybatpho::csv_fields` and `dybatpho::csv_write` kept
+  their arguments in plain locals such as `target`, `text` and `source`, so an
+  array the caller had given one of those names came back empty or was written
+  as nothing.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

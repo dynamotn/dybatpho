@@ -352,14 +352,17 @@ function __dybatpho_csv_split_fields_into {
 #   printf '%s\n' "${first[0]}"
 #######################################
 function dybatpho::csv_read {
-  local input target
-  dybatpho::expect_args input target -- "$@"
-  dybatpho::expect_ref "${target}"
+  # The locals carry the module prefix: the array is filled through the name
+  # the caller passes, and a plain local of the same name would take the rows.
+  local __dybatpho_csv_read_input __dybatpho_csv_read_target
+  dybatpho::expect_args __dybatpho_csv_read_input __dybatpho_csv_read_target -- "$@"
+  dybatpho::expect_ref "${__dybatpho_csv_read_target}"
 
-  local text delimiter
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_input_into text "${input}"
-  __dybatpho_csv_parse_into "${target}" "${text}" "${delimiter}"
+  local __dybatpho_csv_read_text __dybatpho_csv_read_delimiter
+  __dybatpho_csv_delimiter_into __dybatpho_csv_read_delimiter "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_input_into __dybatpho_csv_read_text "${__dybatpho_csv_read_input}"
+  __dybatpho_csv_parse_into "${__dybatpho_csv_read_target}" \
+    "${__dybatpho_csv_read_text}" "${__dybatpho_csv_read_delimiter}"
 }
 
 #######################################
@@ -374,11 +377,11 @@ function dybatpho::csv_read {
 #   dybatpho::csv_fields "${rows[0]}" header
 #######################################
 function dybatpho::csv_fields {
-  local record target
-  dybatpho::expect_args record target -- "$@"
-  dybatpho::expect_ref "${target}"
+  local __dybatpho_csv_fields_record __dybatpho_csv_fields_target
+  dybatpho::expect_args __dybatpho_csv_fields_record __dybatpho_csv_fields_target -- "$@"
+  dybatpho::expect_ref "${__dybatpho_csv_fields_target}"
 
-  __dybatpho_csv_split_fields_into "${target}" "${record}"
+  __dybatpho_csv_split_fields_into "${__dybatpho_csv_fields_target}" "${__dybatpho_csv_fields_record}"
 }
 
 #######################################
@@ -394,13 +397,13 @@ function dybatpho::csv_fields {
 #   dybatpho::csv_write rows > normalized.csv
 #######################################
 function dybatpho::csv_write {
-  local source
-  dybatpho::expect_args source -- "$@"
-  dybatpho::expect_ref "${source}"
+  local __dybatpho_csv_write_source
+  dybatpho::expect_args __dybatpho_csv_write_source -- "$@"
+  dybatpho::expect_ref "${__dybatpho_csv_write_source}"
 
-  local delimiter
-  __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
-  __dybatpho_csv_write_with "${source}" "${delimiter}"
+  local __dybatpho_csv_write_delimiter
+  __dybatpho_csv_delimiter_into __dybatpho_csv_write_delimiter "${DYBATPHO_CSV_DELIMITER}"
+  __dybatpho_csv_write_with "${__dybatpho_csv_write_source}" "${__dybatpho_csv_write_delimiter}"
 }
 
 #######################################

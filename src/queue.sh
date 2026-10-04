@@ -66,7 +66,8 @@ function __dybatpho_queue_dir_into {
 
   local __dybatpho_queue_base="${DYBATPHO_QUEUE_DIR}"
   if [[ -z "${__dybatpho_queue_base}" ]]; then
-    __dybatpho_queue_base="$(dybatpho::xdg_state_dir)/queues"
+    __dybatpho_xdg_dir_into __dybatpho_queue_base "${FUNCNAME[1]}" XDG_STATE_HOME ".local/state"
+    __dybatpho_queue_base+="/queues"
   fi
   __dybatpho_queue_dir_ref="${__dybatpho_queue_base}/${__dybatpho_queue_name}"
 }

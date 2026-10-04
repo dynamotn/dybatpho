@@ -38,7 +38,8 @@ function __dybatpho_schedule_dir_into {
   local -n __dybatpho_schedule_dir_ref="$1"
   __dybatpho_schedule_dir_ref="${DYBATPHO_SCHEDULE_DIR}"
   if [[ -z "${__dybatpho_schedule_dir_ref}" ]]; then
-    __dybatpho_schedule_dir_ref="$(dybatpho::xdg_state_dir)/schedule"
+    __dybatpho_xdg_dir_into __dybatpho_schedule_dir_ref "${FUNCNAME[1]}" XDG_STATE_HOME ".local/state"
+    __dybatpho_schedule_dir_ref+="/schedule"
   fi
   dybatpho::ensure_dir "${__dybatpho_schedule_dir_ref}" > /dev/null
 }

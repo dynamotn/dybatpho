@@ -237,6 +237,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   host in a `DRY_RUN` rehearsal and in its debug line, never the credentials or
   path of the base URL.
 - **FR-025**: `ai_conversation_new` MUST write the conversation path into the variable the caller named, whatever that name is.
+- **FR-026**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -298,6 +299,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-015**: Verify a `DRY_RUN` stream against a base URL holding
   credentials and a secret path prints the host only.
 - **IT-016**: Start conversations into variables named `file`, `system`, `path_var` and `conversation_path`, and find the file with its system prompt.
+- **IT-017**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
 
 ## Acceptance Criteria *(mandatory)*
 

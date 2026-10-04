@@ -793,6 +793,38 @@ _test_tool() { printf 'tool output\n'; }
   dybatpho::assert_dir "${state_home}/dybatpho"
 }
 
+@test "a counter file that cannot be placed stops the call that needed it" {
+  # The state file was resolved inside a command substitution, so a refusal --
+  # no HOME to put it under, or a symbolic link in its place -- ended only the
+  # substitution, and the usage report went on to print a row of nulls.
+  local script="${BATS_TEST_TMPDIR}/no-home.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules ai" \
+    "unset HOME XDG_STATE_HOME; DYBATPHO_AI_STATE_FILE=" \
+    "if ! dybatpho::ai_usage; then :; fi" \
+    "printf 'carried on\n'" > "${script}"
+
+  run --separate-stderr bash "${script}"
+  assert_failure
+  assert_stderr --partial "Neither XDG_STATE_HOME nor HOME is set"
+  refute_output --partial "calls="
+  refute_output --partial "carried on"
+
+  local victim="${BATS_TEST_TMPDIR}/victim"
+  printf '{}\n' > "${victim}"
+  ln -s "${victim}" "${BATS_TEST_TMPDIR}/state-link"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules ai" \
+    "DYBATPHO_AI_STATE_FILE=$(printf '%q' "${BATS_TEST_TMPDIR}/state-link")" \
+    "if ! dybatpho::ai_usage; then :; fi" \
+    "printf 'carried on\n'" > "${script}"
+  run --separate-stderr bash "${script}"
+  assert_failure
+  assert_stderr --partial "symbolic link"
+  refute_output --partial "calls="
+  refute_output --partial "carried on"
+}
+
 @test "the counter file is refused when it is a symbolic link" {
   local victim="${BATS_TEST_TMPDIR}/victim"
   printf 'do not overwrite me\n' > "${victim}"

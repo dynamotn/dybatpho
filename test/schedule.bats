@@ -344,3 +344,20 @@ note() {
   assert_success
   assert_line "settled"
 }
+
+@test "a schedule with no state directory stops in the function that was called" {
+  # Resolved inside a command substitution, the missing directory left the
+  # markers under `/schedule`, at the root of the filesystem.
+  local script="${BATS_TEST_TMPDIR}/no-home.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules schedule" \
+    "unset HOME XDG_STATE_HOME; DYBATPHO_SCHEDULE_DIR=" \
+    "if ! dybatpho::schedule_reset nightly; then :; fi" \
+    "printf 'carried on\n'" > "${script}"
+
+  run --separate-stderr bash "${script}"
+  assert_failure
+  assert_stderr --partial "dybatpho::schedule_reset: Neither XDG_STATE_HOME nor HOME is set"
+  refute_stderr --partial "/schedule"
+  refute_output --partial "carried on"
+}

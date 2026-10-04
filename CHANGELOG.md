@@ -100,6 +100,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   staging file is created with a random name and without following a file or
   link already there, so one planted at the name built from the process id
   can no longer receive the secret.
+- **`queue`, `schedule`, `ai` — a missing state directory stops the call that
+  needed it.** With neither `XDG_STATE_HOME` nor `HOME` set, the default
+  directory was resolved inside a command substitution, so the refusal ended
+  only that substitution: `queue` and `schedule` went on to place their files
+  under `/queues` and `/schedule` at the root of the filesystem, and
+  `dybatpho::ai_usage` printed a row of empty counters. The same happened when
+  the `ai` counter file was a symbolic link. Each now stops under the name of
+  the function that was called.
 
 ## [6.0.0] - 2026-10-04
 

@@ -226,7 +226,7 @@ function __dybatpho_ai_state_path_into {
   local -n __dybatpho_ai_state_out="${__dybatpho_ai_state_var}"
   if [[ -z "${DYBATPHO_AI_STATE_FILE}" ]]; then
     local __dybatpho_ai_state_dir
-    __dybatpho_ai_state_dir="$(dybatpho::xdg_state_dir dybatpho)"
+    __dybatpho_xdg_dir_into __dybatpho_ai_state_dir ai XDG_STATE_HOME ".local/state" dybatpho
     # The counters are bookkeeping, not an effect the caller asked for, so a dry
     # run still needs the directory: without it the first count aborts.
     DRY_RUN=false dybatpho::ensure_dir "${__dybatpho_ai_state_dir}" 700 > /dev/null
@@ -259,22 +259,26 @@ function __dybatpho_ai_state_prepare_into {
 }
 
 #######################################
-# @description Print the counter document, creating it on first use.
-# @noargs
+# @description Read the counter document into a named variable, creating it
+#   on first use.
+#   It runs in the caller's shell, so a counter file that cannot be placed --
+#   no HOME to put it under, or a symbolic link in its place -- stops the call
+#   that needed it, rather than only the substitution reading it.
+# @arg $1 string Name of the variable receiving the counter JSON
 # @env DYBATPHO_AI_STATE_FILE string File the counters are kept in
-# @stdout Counter JSON
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_ai_state_read {
-  local path
-  __dybatpho_ai_state_prepare_into path
-  if [[ ! -f "${path}" ]]; then
-    local empty_usage='{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,'
-    empty_usage+='"last_model":"","last_stop_reason":""}'
-    printf '%s\n' "${empty_usage}" \
-      > "${path}"
+function __dybatpho_ai_state_read_into {
+  local -n __dybatpho_ai_read_ref="$1"
+  local __dybatpho_ai_read_path
+  __dybatpho_ai_state_prepare_into __dybatpho_ai_read_path
+  if [[ ! -f "${__dybatpho_ai_read_path}" ]]; then
+    local __dybatpho_ai_read_empty='{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,'
+    __dybatpho_ai_read_empty+='"last_model":"","last_stop_reason":""}'
+    printf '%s\n' "${__dybatpho_ai_read_empty}" > "${__dybatpho_ai_read_path}"
   fi
-  cat "${path}"
+  __dybatpho_ai_read_ref="$(< "${__dybatpho_ai_read_path}")"
 }
 
 #######################################
@@ -305,11 +309,14 @@ function __dybatpho_ai_budget_check {
   # Every public entry point passes through here, which makes it the place to
   # arrange cleanup of the counter file in the caller's own shell.
   __dybatpho_ai_state_cleanup_once
+  # The counters are read again deep inside command substitutions; reading them
+  # here first places the file in this shell, so a refusal stops the call
+  # rather than only a subshell.
+  local state
+  __dybatpho_ai_state_read_into state
   ((DYBATPHO_AI_MAX_CALLS > 0)) || return 0
   local calls
-  local ai_state_read
-  ai_state_read=$(__dybatpho_ai_state_read)
-  calls=$(dybatpho::json_get "${ai_state_read}" '.calls')
+  calls=$(dybatpho::json_get "${state}" '.calls')
   if ((calls + wanted > DYBATPHO_AI_MAX_CALLS)); then
     dybatpho::die "ai: call budget of ${DYBATPHO_AI_MAX_CALLS} calls is exhausted"
   fi
@@ -323,7 +330,7 @@ function __dybatpho_ai_budget_check {
 #######################################
 function __dybatpho_ai_count_call {
   local ai_state_read
-  ai_state_read=$(__dybatpho_ai_state_read)
+  __dybatpho_ai_state_read_into ai_state_read
   local json_eval
   json_eval=$(dybatpho::json_eval "${ai_state_read}" '.calls += 1')
   __dybatpho_ai_state_write "${json_eval}"
@@ -350,7 +357,9 @@ function __dybatpho_ai_record_usage {
   local last
   printf -v last '{"last_input":%s,"last_output":%s,"last_model":"%s","last_stop_reason":"%s"}' \
     "${input_tokens}" "${output_tokens}" "${model_json}" "${stop_json}"
-  __dybatpho_ai_state_write "$(dybatpho::json_eval "$(__dybatpho_ai_state_read)" \
+  local state
+  __dybatpho_ai_state_read_into state
+  __dybatpho_ai_state_write "$(dybatpho::json_eval "${state}" \
     ". + ${last} | .total_input += ${input_tokens} | .total_output += ${output_tokens}")"
 }
 
@@ -1833,7 +1842,7 @@ function dybatpho::ai_usage {
   local scope="${1:-last}"
   __dybatpho_ai_state_cleanup_once
   local state
-  state=$(__dybatpho_ai_state_read)
+  __dybatpho_ai_state_read_into state
   case "${scope}" in
     last)
       local last_filter='"calls=\(.calls) input=\(.last_input) output=\(.last_output) '
@@ -1870,7 +1879,7 @@ function dybatpho::ai_usage_field {
   esac
   __dybatpho_ai_state_cleanup_once
   local ai_state_read
-  ai_state_read=$(__dybatpho_ai_state_read)
+  __dybatpho_ai_state_read_into ai_state_read
   dybatpho::json_get "${ai_state_read}" ".${field}"
 }
 

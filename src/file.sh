@@ -1176,6 +1176,32 @@ function __dybatpho_xdg_dir {
 }
 
 #######################################
+# @description Resolve an XDG base directory into a named variable, in the
+#   caller's shell.
+#   The public `dybatpho::xdg_*_dir` functions print, so a module that called
+#   them inside `$(...)` lost their refusal with the subshell: with neither the
+#   variable nor HOME set, it carried on and placed its files under `/`. The
+#   check runs here instead, where it stops the script under the name of the
+#   function the caller was running.
+# @arg $1 string Name of the variable receiving the directory
+# @arg $2 string Name to report a refusal under
+# @arg $3 string XDG variable, such as `XDG_STATE_HOME`
+# @arg $4 string Fallback below HOME, such as `.local/state`
+# @arg $5 string Optional application subdirectory
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_xdg_dir_into {
+  local -n __dybatpho_xdg_into_ref="$1"
+  local __dybatpho_xdg_into_variable="$3"
+  if [[ "${!__dybatpho_xdg_into_variable-}" != /* && -z "${HOME-}" ]]; then
+    dybatpho::die "$2: Neither ${__dybatpho_xdg_into_variable} nor HOME is set"
+  fi
+  # Nothing left in it can refuse, so the substitution is only a capture.
+  __dybatpho_xdg_into_ref="$(__dybatpho_xdg_dir "$3" "$4" "${5-}")"
+}
+
+#######################################
 # @description Print the directory a program's configuration belongs in.
 # @example
 #   config="$(dybatpho::ensure_dir "$(dybatpho::xdg_config_dir myapp)")"

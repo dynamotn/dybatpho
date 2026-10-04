@@ -650,3 +650,21 @@ SCRIPT
   assert_success
   assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
 }
+
+@test "a queue with no state directory stops in the function that was called" {
+  # The state directory was resolved inside a command substitution, so with
+  # neither XDG_STATE_HOME nor HOME set the refusal ended only the substitution
+  # and the queue was placed under `/queues`, at the root of the filesystem.
+  local script="${BATS_TEST_TMPDIR}/no-home.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules queue" \
+    "unset HOME XDG_STATE_HOME; DYBATPHO_QUEUE_DIR=" \
+    "if ! dybatpho::queue_push jobs payload; then :; fi" \
+    "printf 'carried on\n'" > "${script}"
+
+  run --separate-stderr bash "${script}"
+  assert_failure
+  assert_stderr --partial "dybatpho::queue_push: Neither XDG_STATE_HOME nor HOME is set"
+  refute_stderr --partial "/queues"
+  refute_output --partial "carried on"
+}

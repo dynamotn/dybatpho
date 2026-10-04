@@ -260,6 +260,33 @@ _failing_job() {
   assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
 }
 
+@test "an interrupted pool starts nothing more and ends as the signal would" {
+  # The handler ended the jobs it knew about and returned, so the pool went on:
+  # it started the remaining jobs, and a watchdog started after the signal kept
+  # the pool waiting out its whole limit. The first job signals the pool itself,
+  # which puts the interrupt between two jobs every time.
+  _signals_pool() {
+    if [[ "$1" == second ]]; then
+      : > "${BATS_TEST_TMPDIR}/second-ran"
+      return 0
+    fi
+    while [[ ! -s "${BATS_TEST_TMPDIR}/pool" ]]; do sleep 0.05; done
+    sleep 30 &
+    printf '%s' "$!" > "${BATS_TEST_TMPDIR}/sleeper"
+    kill -TERM "$(< "${BATS_TEST_TMPDIR}/pool")"
+    wait
+  }
+  local started="${SECONDS}" pool status=0
+  (dybatpho::parallel_map --timeout 1m 1 _signals_pool first second) > /dev/null 2>&1 &
+  pool=$!
+  printf '%s' "${pool}" > "${BATS_TEST_TMPDIR}/pool"
+  wait "${pool}" || status=$?
+  ((SECONDS - started < 10))
+  assert_equal "${status}" "143"
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/second-ran"
+  assert_process_dead "$(cat "${BATS_TEST_TMPDIR}/sleeper")"
+}
+
 @test "an invalid timeout is refused" {
   run ! dybatpho::parallel_map --timeout abc 2 _echo_job a
   assert_output --partial "dybatpho::parallel_map: Timeout must be a duration"

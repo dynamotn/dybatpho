@@ -358,20 +358,31 @@ function __dybatpho_parallel_pool {
   local __dybatpho_parallel_traps
   __dybatpho_process_traps_save_into __dybatpho_parallel_traps SIGINT SIGTERM
   declare -ga __dybatpho_parallel_pids=() __dybatpho_parallel_watchdogs=()
+  # The handler only records the signal and ends what is running; the pool
+  # itself then stops starting jobs, ends the watchdogs and jobs started around
+  # the signal, and raises the signal again once the caller's handlers are back,
+  # so the shell ends -- or the caller's own handler runs -- as it would have
+  # without a pool. Returning from the handler and carrying on started the
+  # remaining jobs, and a watchdog started just after the signal held the pool
+  # open for its whole limit.
+  local __dybatpho_parallel_interrupted=""
   # The lists of process IDs have to expand when the signal arrives, not now,
-  # which is why this is a single-quoted string; the escaped newline inside it
-  # continues the command when the trap runs.
+  # which is why these are single-quoted strings; the escaped newline inside
+  # them continues the command when the trap runs.
   # shellcheck disable=SC2016
-  dybatpho::trap '__dybatpho_parallel_terminate \
+  dybatpho::trap '__dybatpho_parallel_interrupted=INT; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
-    ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' \
-    SIGINT SIGTERM
+    ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGINT
+  # shellcheck disable=SC2016
+  dybatpho::trap '__dybatpho_parallel_interrupted=TERM; __dybatpho_parallel_terminate \
+    ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
+    ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGTERM
 
   __dybatpho_parallel_progress start "${total}"
   for ((index = 0; index < total; index++)); do
     # Fail-fast leaves the remaining jobs unstarted, which the status of an
     # unstarted job records as empty rather than as a failure.
-    [[ "${__dybatpho_parallel_stop}" != true ]] || break
+    [[ "${__dybatpho_parallel_stop}" != true && -z "${__dybatpho_parallel_interrupted}" ]] || break
 
     "${launcher}" "${index}" "${directory}" &
     __dybatpho_parallel_pids+=("$!")
@@ -385,14 +396,22 @@ function __dybatpho_parallel_pool {
       __dybatpho_parallel_watchdogs+=("$!")
     fi
 
-    while ((${#__dybatpho_parallel_pids[@]} >= concurrency)); do
+    while ((${#__dybatpho_parallel_pids[@]} >= concurrency)) && [[ -z "${__dybatpho_parallel_interrupted}" ]]; do
       __dybatpho_parallel_reap "${directory}"
     done
   done
 
-  while ((${#__dybatpho_parallel_pids[@]})); do
+  while ((${#__dybatpho_parallel_pids[@]})) && [[ -z "${__dybatpho_parallel_interrupted}" ]]; do
     __dybatpho_parallel_reap "${directory}"
   done
+  if [[ -n "${__dybatpho_parallel_interrupted}" ]]; then
+    # Whatever started between the signal and here is ended too; nothing is
+    # waited out.
+    __dybatpho_parallel_terminate \
+      ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
+      ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}
+    __dybatpho_parallel_pids=()
+  fi
   # A watchdog still running is one finishing the grace period of a job it
   # ended; every other one was ended with its job and is only reaped here.
   local watchdog
@@ -414,6 +433,12 @@ function __dybatpho_parallel_pool {
 
   [[ "${__dybatpho_parallel_monitor}" == "on" ]] || set +m
   __dybatpho_process_traps_restore "${__dybatpho_parallel_traps}" SIGINT SIGTERM
+  if [[ -n "${__dybatpho_parallel_interrupted}" ]]; then
+    kill -s "${__dybatpho_parallel_interrupted}" "${BASHPID}"
+    # Still here means the caller's handler took the signal and carried on.
+    [[ "${__dybatpho_parallel_interrupted}" == INT ]] && return 130
+    return 143
+  fi
 
   __dybatpho_parallel_flush "${directory}" "${total}"
   ((failed == 0))

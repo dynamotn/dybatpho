@@ -179,6 +179,7 @@ done
 - **FR-022**: Loading the module MUST NOT load `date`. A time limit in plain seconds MUST work without it; any other duration MUST stop the caller, naming the `date` module and how to load it, when that module is not loaded, before any job starts or anything is created.
 - **FR-023**: A run MUST put back the SIGINT and SIGTERM handlers it found once it ends, so its terminate handler does not outlive it and repeated runs do not accumulate handlers.
 - **FR-024**: A refused `--timeout` MUST be reported under the public function that was called, not under the pool that reads it.
+- **FR-025**: An interrupt (SIGINT or SIGTERM) MUST stop the pool from starting further jobs, end every job and watchdog it started -- including any started around the signal -- restore the caller's handlers, and then raise the same signal again, so the shell ends or the caller's handler runs as without a pool.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -232,6 +233,7 @@ done
 - **IT-033**: In a child shell that loads only `parallel`, run with a limit in seconds, have a `5m` limit stop the call and name the `date` module without running the job, and run with it once `date` is loaded.
 - **IT-034**: In a child shell with a SIGTERM handler of its own, run several pools and verify the SIGINT and SIGTERM handlers are the same after each one and never name the pool's terminate handler.
 - **IT-035**: Refuse an unreadable and a negative `--timeout`, and report each under `dybatpho::parallel_map` or `dybatpho::parallel_run`.
+- **IT-036**: Have the first of two jobs send SIGTERM to the pool under a one-minute timeout; the pool ends within seconds with status 143, the second job never starts, and the first job's child is gone.
 
 ## Acceptance Criteria *(mandatory)*
 

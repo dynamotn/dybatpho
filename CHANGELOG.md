@@ -98,6 +98,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the search itself fails, keeping 1 for no match, and the report fails
   without creating anything.
 
+- **`parallel` — an interrupted pool stops instead of carrying on.** The
+  pool's SIGINT/SIGTERM handler ended the jobs it knew about and returned, so
+  `dybatpho::parallel_map` and `dybatpho::parallel_run` went on to start the
+  remaining jobs, the shell no longer died on SIGTERM, and a `--timeout`
+  watchdog started just after the signal held the pool open for its whole
+  limit. The pool now starts nothing more, ends every job and watchdog, puts
+  the caller's handlers back and raises the signal again.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

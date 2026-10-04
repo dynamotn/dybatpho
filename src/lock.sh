@@ -8,11 +8,14 @@
 # @namespace dybatpho
 # @description
 #   This module provides a portable file lock (Linux/macOS) built on the
-#   atomicity of `mkdir`, so it works the same way without depending on
-#   `flock`, which isn't shipped by default on macOS.
+#   atomicity of `ln -s`: creating a symbolic link fails when the name already
+#   exists, so one call both claims the lock and records who holds it. It works
+#   the same way without depending on `flock`, which isn't shipped by default
+#   on macOS.
 #
-#   A lock is a directory containing metadata about the process holding it
-#   (pid, hostname, command, and acquisition time), which lets callers:
+#   A lock is a symbolic link whose target records the process holding it
+#   (pid, hostname, and acquisition time), with the command kept in a
+#   `.command` file beside it, which lets callers:
 #
 #   - prevent two runs of the same script from executing concurrently
 #   - wait for a lock with a timeout instead of failing immediately
@@ -426,7 +429,7 @@ function __dybatpho_lock_try {
 # @stderr Info about the current holder when the lock can't be acquired
 # @exitcode 0 The lock was acquired by the current process
 # @exitcode 1 The lock is still held by another live process after the timeout elapses
-# @tip Uses `mkdir` for atomic lock creation, so no dependency on `flock` is required
+# @tip Claims the lock with one `ln -s`, which fails when the lock exists, so no dependency on `flock` is required
 # @tip Pair with `dybatpho::lock_release` in a trap so the lock is always freed on exit
 #######################################
 function dybatpho::lock_acquire {

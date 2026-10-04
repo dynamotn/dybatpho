@@ -110,7 +110,7 @@ function dybatpho::run_err_handler {
   local i=0
   printf -- '%s\n' "Aborting on error ${exit_code}:" "--------------------" >&2
   while caller "${i}" >&2; do
-    ((i++))
+    i=$((i + 1))
   done
   exit "${exit_code}"
   # kcov(enabled)

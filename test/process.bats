@@ -59,6 +59,26 @@ setup() {
   assert_stderr
 }
 
+@test 'dybatpho::run_err_handler exits with the failing status and the whole stack' {
+  # The frame counter was advanced with `((i++))`, which fails when it is 0,
+  # so the handler stopped after the first frame and the script exited 1
+  # instead of with the status of the command that failed.
+  local script="${BATS_TEST_TMPDIR}/err.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh" \
+    'dybatpho::register_err_handler' \
+    'inner() { (exit 7); }' \
+    'middle() { inner; }' \
+    'outer() { middle; }' \
+    'outer' > "${script}"
+  run --separate-stderr bash "${script}"
+  assert_equal "${status}" 7
+  assert_stderr --partial "Aborting on error 7:"
+  assert_stderr --partial " inner "
+  assert_stderr --partial " middle "
+  assert_stderr --partial " outer "
+}
+
 @test 'dybatpho::killed_process_handler output' {
   run --separate-stderr dybatpho::killed_process_handler SIGTERM
   assert_failure

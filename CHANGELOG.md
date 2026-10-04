@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`process` — the error handler exits with the status that failed and prints
+  the whole stack.** After `dybatpho::register_err_handler`, a command failing
+  with status 7 made the script exit 1 and printed only the first frame,
+  because the frame counter stepped with a statement that fails at 0 under
+  `set -e`.
+
 - **`i18n` — a number that rounds up through every digit no longer stops the
   script.** `dybatpho::i18n_number 9.996 2 en`, and every value that carries
   all the way up such as `99.996`, ended the calling script with no output

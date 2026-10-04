@@ -235,6 +235,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-025**: A function run by `run_with_timeout` MUST see the caller's variables: the timeout and its fallback MUST keep their state in prefixed locals.
 - **FR-026**: A function run by `run_with_timeout` MUST see the caller's variables: the timeout and its fallback MUST keep their state in prefixed locals.
 - **FR-027**: A command started by `background_run` MUST see the caller's variables: the starter MUST keep its state in prefixed locals.
+- **FR-028**: The error handler MUST print every frame of the stack and exit with the status of the command that failed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -296,6 +297,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-015**: Run a function under a time limit that reads variables named like the runner's locals, and see the caller's values.
 - **IT-016**: Run a function under a time limit that reads variables named like the runner's locals, and see the caller's values.
 - **IT-017**: Start a background job that reads variables named like the starter's locals, and see the caller's values.
+- **IT-018**: Fail with status 7 three functions deep after `register_err_handler`, and exit 7 with all three frames printed.
 
 ## Acceptance Criteria *(mandatory)*
 

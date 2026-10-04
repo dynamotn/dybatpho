@@ -262,9 +262,9 @@ _failing_job() {
 
 @test "an invalid timeout is refused" {
   run ! dybatpho::parallel_map --timeout abc 2 _echo_job a
-  assert_output --partial "Timeout must be a duration"
-  run ! dybatpho::parallel_map --timeout -5 2 _echo_job a
-  assert_output --partial "must not be negative"
+  assert_output --partial "dybatpho::parallel_map: Timeout must be a duration"
+  run ! dybatpho::parallel_run --timeout -5 2 -- true
+  assert_output --partial "dybatpho::parallel_run: Timeout must not be negative"
   run ! dybatpho::parallel_run --timeout
   assert_output --partial "--timeout needs a duration"
 }

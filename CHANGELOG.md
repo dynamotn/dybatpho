@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   function kept the mapper's exit status in a local of that name, so a caller
   whose array was called `status` got it back unmapped.
 
+- **`parallel` — a refused `--timeout` names the function you called.**
+  `dybatpho::parallel_map` and `dybatpho::parallel_run` reported an unreadable
+  or negative timeout under an internal helper's name instead of their own.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

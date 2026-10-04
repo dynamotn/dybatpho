@@ -145,21 +145,24 @@ function __dybatpho_parallel_options {
 function __dybatpho_parallel_timeout {
   local -n __dybatpho_parallel_timeout_out="$1"
   local requested="${2:-${DYBATPHO_PARALLEL_TIMEOUT}}" seconds=0
+  # Called from the pool, so the public function the script called is two
+  # frames up; one frame up is the pool itself.
+  local caller="${FUNCNAME[2]}"
   if [[ "${requested}" =~ ^[0-9]{1,9}$ ]]; then
     seconds=$((10#${requested}))
   elif [[ -n "${requested}" ]]; then
     # The refusal is exercised by "--timeout asks for the date module" in a
     # child shell, which kcov does not follow.
-    local needs_date="${FUNCNAME[2]} --timeout ${requested} needs the date module"
+    local needs_date="${caller} --timeout ${requested} needs the date module"
     declare -F __dybatpho_date_parse > /dev/null \
       || dybatpho::die "${needs_date}, load it with: dybatpho::load date" # kcov(skip)
     # Exercised under `run` by "an invalid timeout is refused", which kcov
     # cannot see because `dybatpho::die` ends the shell.
     local invalid="Timeout must be a duration such as 90, 5m or 1h30m, got '${requested}'"
     dybatpho::date_parse_duration seconds "${requested}" 2> /dev/null \
-      || dybatpho::die "${FUNCNAME[1]}: ${invalid}" # kcov(skip)
+      || dybatpho::die "${caller}: ${invalid}" # kcov(skip)
     ((seconds >= 0)) \
-      || dybatpho::die "${FUNCNAME[1]}: Timeout must not be negative, got '${requested}'" # kcov(skip)
+      || dybatpho::die "${caller}: Timeout must not be negative, got '${requested}'" # kcov(skip)
   fi
   __dybatpho_parallel_timeout_out="${seconds}"
 }

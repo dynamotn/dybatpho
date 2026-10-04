@@ -178,6 +178,7 @@ done
 - **FR-021**: `--progress`, or a true-like `DYBATPHO_PARALLEL_PROGRESS`, MUST report finished jobs on standard error only: through the `tui` progress bar when that module is loaded, detected by an internal `tui` helper rather than a public name, and otherwise as one `Jobs: <done>/<total> finished` line per reap; `tui` MUST NOT become a dependency of `parallel`.
 - **FR-022**: Loading the module MUST NOT load `date`. A time limit in plain seconds MUST work without it; any other duration MUST stop the caller, naming the `date` module and how to load it, when that module is not loaded, before any job starts or anything is created.
 - **FR-023**: A run MUST put back the SIGINT and SIGTERM handlers it found once it ends, so its terminate handler does not outlive it and repeated runs do not accumulate handlers.
+- **FR-024**: A refused `--timeout` MUST be reported under the public function that was called, not under the pool that reads it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -230,6 +231,7 @@ done
 - **IT-032**: In a child shell that loads only `parallel`, verify one plain progress line per finished job.
 - **IT-033**: In a child shell that loads only `parallel`, run with a limit in seconds, have a `5m` limit stop the call and name the `date` module without running the job, and run with it once `date` is loaded.
 - **IT-034**: In a child shell with a SIGTERM handler of its own, run several pools and verify the SIGINT and SIGTERM handlers are the same after each one and never name the pool's terminate handler.
+- **IT-035**: Refuse an unreadable and a negative `--timeout`, and report each under `dybatpho::parallel_map` or `dybatpho::parallel_run`.
 
 ## Acceptance Criteria *(mandatory)*
 

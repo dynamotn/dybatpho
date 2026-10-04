@@ -49,30 +49,37 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 dybatpho::register_common_handlers
 
-# @description Print every tracked file that is a Bash script, one per line.
+# @description Collect every tracked file that is a Bash script into a named array.
 #   Extension alone is not enough — `scripts/` may hold extensionless helpers —
 #   so a file with no `.sh` suffix is admitted on its shebang instead. A
 #   `.bash` file is sourced rather than run, so it carries no shebang either
 #   and has to be named: `test/test_helper.bash` went unchecked until it was.
-# @noargs
-# @stdout Repository-relative paths
+# @arg $1 string Name of the array receiving repository-relative paths
+# @set The named array
+# @exitcode 1 Stop the script when git cannot list the repository
 # @internal
-function __dybatpho_lint_scripts {
-  local file
-  local git_output
-  git_output=$(git -C "${DYBATPHO_DIR}" ls-files)
+function __dybatpho_lint_scripts_into {
+  local -n __dybatpho_lint_found="$1"
+  local file first git_output
+  __dybatpho_lint_found=()
+  # Checked in the caller's shell: an unread listing used to come back empty,
+  # and every stage then passed over a repository it had not looked at.
+  git_output=$(git -C "${DYBATPHO_DIR}" ls-files) \
+    || dybatpho::die "Cannot list the repository's files with git"
   while IFS= read -r file || [[ -n "${file}" ]]; do
     case "${file}" in
       *.sh | *.bash)
-        printf '%s\n' "${file}"
+        __dybatpho_lint_found+=("${file}")
         continue
         ;;
       *.bats) continue ;;
       *) ;;
     esac
-    [[ -f "${file}" ]] || continue
-    if IFS= read -r first < "${file}" && [[ "${first}" == '#!'*bash* ]]; then
-      printf '%s\n' "${file}"
+    # Repository-relative, as `git ls-files` prints it, not relative to
+    # wherever the script happens to be run from.
+    [[ -f "${DYBATPHO_DIR}/${file}" ]] || continue
+    if IFS= read -r first < "${DYBATPHO_DIR}/${file}" && [[ "${first}" == '#!'*bash* ]]; then
+      __dybatpho_lint_found+=("${file}")
     fi
   done < <(printf '%s' "${git_output}")
 }
@@ -84,11 +91,11 @@ function __dybatpho_lint_scripts {
 # @internal
 function __dybatpho_lint_syntax {
   local script failures=0
-  local lint_scripts_output
-  lint_scripts_output=$(__dybatpho_lint_scripts)
-  while IFS= read -r script || [[ -n "${script}" ]]; do
+  local -a found=()
+  __dybatpho_lint_scripts_into found
+  for script in ${found[@]+"${found[@]}"}; do
     bash -n "${DYBATPHO_DIR}/${script}" || failures=$((failures + 1))
-  done < <(printf '%s' "${lint_scripts_output}")
+  done
 
   if ((failures)); then
     dybatpho::error "${failures} script(s) failed to parse"
@@ -111,7 +118,7 @@ function __dybatpho_lint_dyshellint {
   dybatpho::require "dyshellint"
 
   local -a scripts=()
-  mapfile -t scripts < <(__dybatpho_lint_scripts)
+  __dybatpho_lint_scripts_into scripts
   if [[ "${#scripts[@]}" -eq 0 ]]; then
     dybatpho::warn "No scripts discovered to check"
     return 0
@@ -228,7 +235,9 @@ function __dybatpho_lint_is_stage {
 function __dybatpho_lint_run {
   # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${LIST}"; then
-    __dybatpho_lint_scripts
+    local -a listed=()
+    __dybatpho_lint_scripts_into listed
+    ((${#listed[@]} == 0)) || printf '%s\n' "${listed[@]}"
     return 0
   fi
 

@@ -163,6 +163,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `handler`, `id`, `retries` and `directory` hid the caller's variables of the
   same names. They are now prefixed.
 
+- **`parallel` — a job sees the caller's variables.** Jobs started by
+  `dybatpho::parallel_map` and `dybatpho::parallel_run` ran in subshells of
+  the pool, where locals such as `concurrency`, `command`, `index`,
+  `directory` and `total` hid the caller's variables of the same names. They
+  are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

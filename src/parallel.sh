@@ -321,15 +321,18 @@ function __dybatpho_parallel_reap {
 # @internal
 #######################################
 function __dybatpho_parallel_pool {
-  local concurrency launcher total labels directory index status failed=0
-  dybatpho::expect_args concurrency launcher total labels -- "$@"
-  local -n __dybatpho_parallel_labels="${labels}"
+  local __dybatpho_parallel_pool_concurrency __dybatpho_parallel_pool_launcher __dybatpho_parallel_pool_total \
+    __dybatpho_parallel_pool_labels __dybatpho_parallel_pool_directory __dybatpho_parallel_pool_index \
+    __dybatpho_parallel_pool_status __dybatpho_parallel_pool_failed=0
+  dybatpho::expect_args __dybatpho_parallel_pool_concurrency __dybatpho_parallel_pool_launcher \
+    __dybatpho_parallel_pool_total __dybatpho_parallel_pool_labels -- "$@"
+  local -n __dybatpho_parallel_labels="${__dybatpho_parallel_pool_labels}"
 
   # Resolved before anything is created, so a refused limit leaves nothing behind.
   local __dybatpho_parallel_limit
   __dybatpho_parallel_timeout __dybatpho_parallel_limit "${__dybatpho_parallel_opt_timeout:-}"
 
-  dybatpho::create_temp directory "/" "parallel"
+  __dybatpho_create_temp_into __dybatpho_parallel_pool_directory "/" "parallel"
   DYBATPHO_PARALLEL_STATUS=()
 
   local __dybatpho_parallel_failfast="${DYBATPHO_PARALLEL_FAILFAST}"
@@ -353,8 +356,9 @@ function __dybatpho_parallel_pool {
     *) ;;
   esac
   set -m
-  for ((index = 0; index < total; index++)); do
-    DYBATPHO_PARALLEL_STATUS[index]=""
+  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total; \
+    __dybatpho_parallel_pool_index++)); do
+    DYBATPHO_PARALLEL_STATUS[__dybatpho_parallel_pool_index]=""
   done
 
   # A job left running after an interrupt keeps working on output nobody will
@@ -387,31 +391,34 @@ function __dybatpho_parallel_pool {
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGTERM
 
-  __dybatpho_parallel_progress start "${total}"
-  for ((index = 0; index < total; index++)); do
+  __dybatpho_parallel_progress start "${__dybatpho_parallel_pool_total}"
+  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total; \
+    __dybatpho_parallel_pool_index++)); do
     # Fail-fast leaves the remaining jobs unstarted, which the status of an
     # unstarted job records as empty rather than as a failure.
     [[ "${__dybatpho_parallel_stop}" != true && -z "${__dybatpho_parallel_interrupted}" ]] || break
 
-    "${launcher}" "${index}" "${directory}" &
+    "${__dybatpho_parallel_pool_launcher}" "${__dybatpho_parallel_pool_index}" "${__dybatpho_parallel_pool_directory}" &
     __dybatpho_parallel_pids+=("$!")
-    __dybatpho_parallel_index_of[$!]="${index}"
+    __dybatpho_parallel_index_of[$!]="${__dybatpho_parallel_pool_index}"
     if ((__dybatpho_parallel_limit > 0)); then
       # The watchdog leads a process group of its own, so ending the job never
       # ends the watchdog, and it holds no output stream the caller is reading.
-      __dybatpho_parallel_watch "$!" "${index}" "${directory}" "${__dybatpho_parallel_limit}" \
+      __dybatpho_parallel_watch "$!" "${__dybatpho_parallel_pool_index}" "${__dybatpho_parallel_pool_directory}" \
+        "${__dybatpho_parallel_limit}" \
         < /dev/null > /dev/null 2>&1 &
       __dybatpho_parallel_watchdog_of[${__dybatpho_parallel_pids[-1]}]="$!"
       __dybatpho_parallel_watchdogs+=("$!")
     fi
 
-    while ((${#__dybatpho_parallel_pids[@]} >= concurrency)) && [[ -z "${__dybatpho_parallel_interrupted}" ]]; do
-      __dybatpho_parallel_reap "${directory}"
+    while ((${#__dybatpho_parallel_pids[@]} >= __dybatpho_parallel_pool_concurrency)) \
+      && [[ -z "${__dybatpho_parallel_interrupted}" ]]; do
+      __dybatpho_parallel_reap "${__dybatpho_parallel_pool_directory}"
     done
   done
 
   while ((${#__dybatpho_parallel_pids[@]})) && [[ -z "${__dybatpho_parallel_interrupted}" ]]; do
-    __dybatpho_parallel_reap "${directory}"
+    __dybatpho_parallel_reap "${__dybatpho_parallel_pool_directory}"
   done
   if [[ -n "${__dybatpho_parallel_interrupted}" ]]; then
     # Whatever started between the signal and here is ended too; nothing is
@@ -423,21 +430,24 @@ function __dybatpho_parallel_pool {
   fi
   # A watchdog still running is one finishing the grace period of a job it
   # ended; every other one was ended with its job and is only reaped here.
-  local watchdog
-  for watchdog in ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}; do
-    wait "${watchdog}" 2> /dev/null || true
+  local __dybatpho_parallel_pool_watchdog
+  for __dybatpho_parallel_pool_watchdog in ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}; do
+    wait "${__dybatpho_parallel_pool_watchdog}" 2> /dev/null || true
   done
   __dybatpho_parallel_watchdogs=()
   __dybatpho_parallel_progress stop
 
-  for index in ${__dybatpho_parallel_terminated[@]+"${__dybatpho_parallel_terminated[@]}"}; do
-    DYBATPHO_PARALLEL_STATUS[index]="terminated"
+  for __dybatpho_parallel_pool_index in ${__dybatpho_parallel_terminated[@]+"${__dybatpho_parallel_terminated[@]}"}; do
+    DYBATPHO_PARALLEL_STATUS[__dybatpho_parallel_pool_index]="terminated"
   done
-  for ((index = 0; index < total; index++)); do
-    [[ -f "${directory}/${index}.status" ]] || continue
-    status="$(< "${directory}/${index}.status")"
-    DYBATPHO_PARALLEL_STATUS[index]="${status}"
-    [[ "${status}" == "0" ]] || failed=$((failed + 1))
+  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total; \
+    __dybatpho_parallel_pool_index++)); do
+    local __dybatpho_parallel_pool_file="${__dybatpho_parallel_pool_directory}/${__dybatpho_parallel_pool_index}.status"
+    [[ -f "${__dybatpho_parallel_pool_file}" ]] || continue
+    __dybatpho_parallel_pool_status="$(< "${__dybatpho_parallel_pool_file}")"
+    DYBATPHO_PARALLEL_STATUS[__dybatpho_parallel_pool_index]="${__dybatpho_parallel_pool_status}"
+    [[ "${__dybatpho_parallel_pool_status}" == "0" ]] || \
+      __dybatpho_parallel_pool_failed=$((__dybatpho_parallel_pool_failed + 1))
   done
 
   [[ "${__dybatpho_parallel_monitor}" == "on" ]] || set +m
@@ -449,8 +459,8 @@ function __dybatpho_parallel_pool {
     return 143
   fi
 
-  __dybatpho_parallel_flush "${directory}" "${total}"
-  ((failed == 0))
+  __dybatpho_parallel_flush "${__dybatpho_parallel_pool_directory}" "${__dybatpho_parallel_pool_total}"
+  ((__dybatpho_parallel_pool_failed == 0))
 }
 
 #######################################
@@ -504,21 +514,21 @@ function __dybatpho_parallel_pool {
 #######################################
 function dybatpho::parallel_map {
   local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
-  local __dybatpho_parallel_opt_progress=false consumed
-  __dybatpho_parallel_options consumed "$@"
-  shift "${consumed}"
-  local concurrency command
-  dybatpho::expect_args concurrency command -- "$@"
+  local __dybatpho_parallel_opt_progress=false __dybatpho_parallel_map_consumed
+  __dybatpho_parallel_options __dybatpho_parallel_map_consumed "$@"
+  shift "${__dybatpho_parallel_map_consumed}"
+  local __dybatpho_parallel_map_concurrency __dybatpho_parallel_map_command
+  dybatpho::expect_args __dybatpho_parallel_map_concurrency __dybatpho_parallel_map_command -- "$@"
   shift 2
-  __dybatpho_parallel_jobs concurrency "${concurrency}"
+  __dybatpho_parallel_jobs __dybatpho_parallel_map_concurrency "${__dybatpho_parallel_map_concurrency}"
   (($#)) || return 0
 
   local -a __dybatpho_parallel_items=("$@")
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
-    local job
-    for job in "${__dybatpho_parallel_items[@]}"; do
-      dybatpho::dry_run "${command}" "${job}"
+    local __dybatpho_parallel_map_job
+    for __dybatpho_parallel_map_job in "${__dybatpho_parallel_items[@]}"; do
+      dybatpho::dry_run "${__dybatpho_parallel_map_command}" "${__dybatpho_parallel_map_job}"
     done
     return 0
   fi
@@ -531,16 +541,18 @@ function dybatpho::parallel_map {
   #######################################
   # shellcheck disable=SC2329 # run by the pool through its name
   function __dybatpho_parallel_launch_item {
-    local index="$1" directory="$2" code=0
+    local __dybatpho_parallel_map_index="$1" __dybatpho_parallel_map_directory="$2" __dybatpho_parallel_map_code=0
     # The job runs one subshell deeper so that a command calling `exit` ends
     # only itself. Without that, the exit would skip the line below and the job
     # would be reported as never having run.
-    ("${command}" "${__dybatpho_parallel_items[index]}") \
-      > "${directory}/${index}.out" 2> "${directory}/${index}.err" || code=$?
-    printf '%s' "${code}" > "${directory}/${index}.status"
+    ("${__dybatpho_parallel_map_command}" "${__dybatpho_parallel_items[__dybatpho_parallel_map_index]}") \
+      > "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.out" 2> \
+        "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.err" || __dybatpho_parallel_map_code=$?
+    printf '%s' "${__dybatpho_parallel_map_code}" > \
+      "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.status"
   }
 
-  __dybatpho_parallel_pool "${concurrency}" __dybatpho_parallel_launch_item \
+  __dybatpho_parallel_pool "${__dybatpho_parallel_map_concurrency}" __dybatpho_parallel_launch_item \
     "${#__dybatpho_parallel_items[@]}" __dybatpho_parallel_items
 }
 
@@ -578,20 +590,20 @@ function dybatpho::parallel_map {
 #######################################
 function dybatpho::parallel_run {
   local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
-  local __dybatpho_parallel_opt_progress=false consumed
-  __dybatpho_parallel_options consumed "$@"
-  shift "${consumed}"
-  local concurrency
-  dybatpho::expect_args concurrency -- "$@"
+  local __dybatpho_parallel_opt_progress=false __dybatpho_parallel_run_consumed
+  __dybatpho_parallel_options __dybatpho_parallel_run_consumed "$@"
+  shift "${__dybatpho_parallel_run_consumed}"
+  local __dybatpho_parallel_run_concurrency
+  dybatpho::expect_args __dybatpho_parallel_run_concurrency -- "$@"
   shift
-  __dybatpho_parallel_jobs concurrency "${concurrency}"
+  __dybatpho_parallel_jobs __dybatpho_parallel_run_concurrency "${__dybatpho_parallel_run_concurrency}"
   (($#)) || return 0
 
   local -a __dybatpho_parallel_commands=("$@")
   if dybatpho::is true "${DRY_RUN}"; then
-    local command
-    for command in "${__dybatpho_parallel_commands[@]}"; do
-      dybatpho::dry_run "${command}"
+    local __dybatpho_parallel_run_command
+    for __dybatpho_parallel_run_command in "${__dybatpho_parallel_commands[@]}"; do
+      dybatpho::dry_run "${__dybatpho_parallel_run_command}"
     done
     return 0
   fi
@@ -604,16 +616,18 @@ function dybatpho::parallel_run {
   #######################################
   # shellcheck disable=SC2329 # run by the pool through its name
   function __dybatpho_parallel_launch_command {
-    local index="$1" directory="$2" code=0
+    local __dybatpho_parallel_run_index="$1" __dybatpho_parallel_run_directory="$2" __dybatpho_parallel_run_code=0
     # `exit` is ordinary inside a command string, so the evaluation runs one
     # subshell deeper: otherwise the exit would skip the line below and the job
     # would be reported as never having run.
-    (eval "${__dybatpho_parallel_commands[index]}") \
-      > "${directory}/${index}.out" 2> "${directory}/${index}.err" || code=$?
-    printf '%s' "${code}" > "${directory}/${index}.status"
+    (eval "${__dybatpho_parallel_commands[__dybatpho_parallel_run_index]}") \
+      > "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.out" 2> \
+        "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.err" || __dybatpho_parallel_run_code=$?
+    printf '%s' "${__dybatpho_parallel_run_code}" > \
+      "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.status"
   }
 
-  __dybatpho_parallel_pool "${concurrency}" __dybatpho_parallel_launch_command \
+  __dybatpho_parallel_pool "${__dybatpho_parallel_run_concurrency}" __dybatpho_parallel_launch_command \
     "${#__dybatpho_parallel_commands[@]}" __dybatpho_parallel_commands
 }
 

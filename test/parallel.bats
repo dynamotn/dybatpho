@@ -515,3 +515,13 @@ SCRIPT
   run_traced bash "${script}" "${DYBATPHO_DIR}"
   assert_success
 }
+
+@test "a parallel job sees the caller's variables, not the pool's" {
+  # Jobs run in subshells of the pool, where its locals hid the caller's
+  # variables of the same names.
+  local concurrency="caller" command="caller" index="caller" directory="caller" total="caller" status="caller"
+  look() { printf '%s %s %s %s %s %s\n' "${concurrency}" "${command}" "${index}" "${directory}" "${total}" "${status}"; }
+  # Called directly: the test helper's own `status` would hide the caller's.
+  assert_equal "$(dybatpho::parallel_map 1 look item)" "caller caller caller caller caller caller"
+  assert_equal "$(dybatpho::parallel_run 1 look)" "caller caller caller caller caller caller"
+}

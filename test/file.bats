@@ -636,6 +636,21 @@ EOF
   assert_output --partial "Too many levels of symbolic links"
 }
 
+@test "the file writers refuse a directory as their destination" {
+  # The rename that commits a rewrite moves the staging file inside a directory
+  # it is pointed at, so writing to a directory succeeded and left a stray
+  # `.dybatpho_staging_*` file in it.
+  local target="${BATS_TEST_TMPDIR}/a directory"
+  mkdir -p "${target}"
+  run --separate-stderr dybatpho::file_write_atomic "${target}" <<< "x"
+  assert_failure
+  assert_stderr --partial "dybatpho::file_write_atomic: Not a file: ${target}"
+  run --separate-stderr dybatpho::file_ensure_line "${target}" "line"
+  assert_failure
+  assert_stderr --partial "dybatpho::file_ensure_line: Not a file: ${target}"
+  assert_equal "$(ls -A "${target}")" ""
+}
+
 @test "a symlink loop stops a rewrite before it stages anything" {
   # The loop was refused inside a command substitution, so the writer carried
   # on with an empty path wherever errexit was suspended -- under `if`, `||` or

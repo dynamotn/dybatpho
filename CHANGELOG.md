@@ -85,6 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaced by the function's own value: `secret_write_file` wrote the
   destination path into the secret file instead of the secret.
 
+- **`file` — the file writers refuse a directory as their destination.**
+  `dybatpho::file_write_atomic`, `file_replace`, `file_ensure_line` and
+  `file_remove_line` pointed at a directory moved their staging file inside it
+  and reported success; they now stop before writing anything.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

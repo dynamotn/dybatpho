@@ -682,6 +682,9 @@ function __dybatpho_file_commit {
 function __dybatpho_file_rewrite {
   local caller="$1" path="$2" failure="$3" producer="$4" staging
   shift 4
+  # The rename that commits the rewrite would move the staging file inside a
+  # directory rather than replace it, and report success.
+  [[ ! -d "${path}" ]] || dybatpho::die "${caller}: Not a file: ${path}"
   __dybatpho_file_staging_into staging "${path}" \
     || dybatpho::die "${caller}: Cannot write staging file for ${path}"
   if ! "${producer}" "${staging}" "$@"; then

@@ -172,6 +172,31 @@ note() {
   assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/stale.claim"
 }
 
+@test "dybatpho::schedule_once_per runs once when many callers find the same stale claim" {
+  # Every waiter that judged the claim stale removed it, so one could remove
+  # the fresh claim another had just taken in its place, and two callers then
+  # ran in the same period. Several rounds give the race room to show.
+  mkdir -p "${DYBATPHO_SCHEDULE_DIR}"
+  local script="${BATS_TEST_TMPDIR}/racer.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules schedule" \
+    'dybatpho::schedule_once_per day "$1" -- printf "ran\n" >> "$2" || true' > "${script}"
+
+  local round caller
+  for round in 1 2 3 4 5 6 7 8; do
+    printf '1\n' > "${DYBATPHO_SCHEDULE_DIR}/stale-${round}.claim"
+    touch -t 202001010000 "${DYBATPHO_SCHEDULE_DIR}/stale-${round}.claim"
+    for caller in $(seq 1 12); do
+      bash "${script}" "stale-${round}" "${LOG}.${round}" &
+    done
+    wait
+    assert_equal "$(wc -l < "${LOG}.${round}" | tr -d ' ')" "1"
+  done
+  run_traced ls "${DYBATPHO_SCHEDULE_DIR}"
+  refute_output --partial "claim"
+  refute_output --partial "reclaim"
+}
+
 @test "dybatpho::schedule_once_per gives up on a claim another caller keeps" {
   # A fresh claim belongs to a live caller, so it is waited for rather than
   # removed; one that stays fresh for the whole wait makes the call give up

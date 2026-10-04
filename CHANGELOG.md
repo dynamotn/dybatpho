@@ -202,6 +202,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recorded such a subdirectory as an empty one and reported success. `diff_dir`
   now stops with exit 2, the snapshot is refused and nothing is left behind,
   and checking a snapshot whose tree cannot be read stops as well.
+- **`schedule` — a stale claim no longer lets two callers run in one period.**
+  When several `dybatpho::schedule_once_per` callers found a claim left by a
+  caller that died, each of them removed it, and one could remove the fresh
+  claim another had just taken in its place, so the command ran two or three
+  times in the period. One waiter at a time now clears a stale claim, and only
+  after checking it is still stale.
 
 ## [6.0.0] - 2026-10-04
 

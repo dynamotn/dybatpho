@@ -306,7 +306,7 @@ function dybatpho::schedule_once_per {
 # @internal
 #######################################
 function __dybatpho_schedule_claim {
-  local claim="$1" attempt=0 age noclobber=false
+  local claim="$1" attempt=0 noclobber=false
   [[ "$-" == *C* ]] && noclobber=true
   set -C
   # `noclobber` is set in this shell rather than in a subshell, so an attempt
@@ -315,12 +315,19 @@ function __dybatpho_schedule_claim {
     # A claim is only stale after seconds, so its age is read once a second
     # rather than on every attempt. The claim can vanish between the test and
     # the read; that is age 0.
-    if ((attempt % 20 == 0)) && dybatpho::is file "${claim}"; then
-      age="$(dybatpho::file_age_seconds "${claim}" 2> /dev/null)" || age=0
-      if ((age > 5)); then
-        rm -f -- "${claim}"
+    if ((attempt % 20 == 0)) && __dybatpho_schedule_claim_stale "${claim}"; then
+      # Only the caller holding the reclaim may remove a stale claim, and it
+      # looks again once it holds it: every waiter judges the claim stale at
+      # once, and one removing it after another had already taken a fresh
+      # claim in its place let two callers run in the same period.
+      if mkdir -- "${claim}.reclaim" 2> /dev/null; then
+        __dybatpho_schedule_claim_stale "${claim}" && rm -f -- "${claim}"
+        rmdir -- "${claim}.reclaim" 2> /dev/null || true
         continue
       fi
+      # A reclaim is three file operations long, so one this old was left by
+      # a caller that died holding it.
+      __dybatpho_schedule_claim_stale "${claim}.reclaim" && rmdir -- "${claim}.reclaim" 2> /dev/null
     fi
     if ((++attempt > 400)); then
       [[ "${noclobber}" == true ]] || set +C
@@ -330,6 +337,22 @@ function __dybatpho_schedule_claim {
     sleep 0.05
   done
   [[ "${noclobber}" == true ]] || set +C
+}
+
+#######################################
+# @description Return success when a claim, or the reclaim guarding it, is
+#   older than a live caller would ever hold it.
+# @arg $1 string Claim or reclaim path
+# @exitcode 0 It exists and is stale
+# @exitcode 1 It is gone or still fresh
+# @internal
+#######################################
+function __dybatpho_schedule_claim_stale {
+  [[ -e "$1" ]] || return 1
+  local age
+  # The path can vanish between the test and the read; that is age 0.
+  age="$(dybatpho::file_age_seconds "$1" 2> /dev/null)" || age=0
+  ((age > 5))
 }
 
 #######################################

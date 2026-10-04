@@ -403,6 +403,17 @@ EOF
   DRY_RUN=true run_traced -0 dybatpho::ai_ask "q"
 }
 
+@test "a command line backend that is not installed stops the call" {
+  # The command was looked up inside a command substitution, so its refusal
+  # ended only that substitution and the call returned success with no answer.
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=no-such-ai-cli
+  run --separate-stderr dybatpho::ai_ask "q"
+  assert_failure 127
+  assert_output ""
+  assert_stderr --partial "DYBATPHO_AI_CLI is 'no-such-ai-cli' but that command is not installed"
+}
+
 @test "dybatpho::ai_chat rejects a missing conversation file" {
   run --separate-stderr dybatpho::ai_chat "${BATS_TEST_TMPDIR}/absent.json" "q"
   assert_failure

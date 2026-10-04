@@ -543,7 +543,8 @@ function dybatpho::ai_check {
       __dybatpho_ai_api_key_into key "${provider}"
       ;;
     cli)
-      __dybatpho_ai_cli_command > /dev/null
+      local command
+      __dybatpho_ai_cli_command_into command
       ;;
     *) ;;
   esac
@@ -553,23 +554,29 @@ function dybatpho::ai_check {
 }
 
 #######################################
-# @description Resolve the command used by the `cli` backend.
-# @noargs
+# @description Resolve the command used by the `cli` backend into a named
+#   variable, in the caller's shell.
+#   Looked up inside `$(...)`, a missing client ended only the substitution and
+#   the call returned success with no answer; here it stops the call.
+# @arg $1 string Name of the variable receiving the command
 # @env DYBATPHO_AI_CLI string Pin a command instead of probing
-# @stdout `claude`, `llm`, or `ollama`
+# @set The named variable: `claude`, `llm`, or `ollama`
 # @exitcode 0 A supported client exists
 # @exitcode 127 Stop the script when no client is installed
 # @internal
 #######################################
-function __dybatpho_ai_cli_command {
+function __dybatpho_ai_cli_command_into {
+  local -n __dybatpho_ai_cli_ref="$1"
   if dybatpho::is set "${DYBATPHO_AI_CLI}"; then
     hash "${DYBATPHO_AI_CLI}" > /dev/null 2>&1 \
       || dybatpho::die "ai: DYBATPHO_AI_CLI is '${DYBATPHO_AI_CLI}' but that command is not installed" 127
-    printf '%s\n' "${DYBATPHO_AI_CLI}"
+    __dybatpho_ai_cli_ref="${DYBATPHO_AI_CLI}"
     return 0
   fi
-  dybatpho::coalesce_cmd claude llm ollama \
+  local __dybatpho_ai_cli_found
+  __dybatpho_ai_cli_found="$(dybatpho::coalesce_cmd claude llm ollama)" \
     || dybatpho::die "ai: no supported CLI found, install claude, llm or ollama" 127
+  __dybatpho_ai_cli_ref="${__dybatpho_ai_cli_found}"
 }
 
 #######################################
@@ -1129,7 +1136,7 @@ function __dybatpho_ai_cli_complete {
   local conversation
   dybatpho::expect_args conversation -- "$@"
   local command system prompt model
-  command=$(__dybatpho_ai_cli_command)
+  __dybatpho_ai_cli_command_into command
   model=$(dybatpho::ai_model cli)
   system=$(dybatpho::json_get "${conversation}" '.system // ""')
   # Command line clients are single-shot, so the history is flattened into one

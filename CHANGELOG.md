@@ -142,6 +142,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   header, and the call failed only on the provider's `401`. It now stops before
   the request; a `DRY_RUN` rehearsal still needs no key.
 
+- **`ai` — a command line backend that is not installed stops the call.** The
+  `cli` backend looked its command up inside a command substitution, so when
+  `DYBATPHO_AI_CLI` named a command that was not installed, the refusal ended
+  only that substitution and `dybatpho::ai_ask` returned success with no
+  answer. It now stops with status 127.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

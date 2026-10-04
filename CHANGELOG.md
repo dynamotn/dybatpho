@@ -740,6 +740,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`logging` — boxed lines are measured right under the C locale on musl.**
+  On Alpine and other musl systems the C locale reports a byte above `0x7F`
+  as a codepoint near `0xDF00` rather than as the byte, so every multi-byte
+  glyph was taken for a four-byte one. A CJK or accented line was measured
+  too narrow, and a boxed line did not wrap where it should. Only the byte
+  itself is read now.
+
 - **`array` — set operations no longer stop on an empty element.**
   `dybatpho::array_union`, `dybatpho::array_intersect` and
   `dybatpho::array_difference` stopped with `bad array subscript` when either

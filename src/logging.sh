@@ -879,6 +879,9 @@ function __dybatpho_log_chars_into {
     if ((__dybatpho_log_chars_bytes)); then
       printf -v __dybatpho_log_chars_lead '%d' \
         "'${__dybatpho_log_chars_text:__dybatpho_log_chars_index:1}"
+      # Only the byte itself: glibc can report a high byte as negative, and
+      # musl's C locale maps it to the codepoint `0xDF00` plus the byte.
+      __dybatpho_log_chars_lead=$((__dybatpho_log_chars_lead & 0xFF))
       if ((__dybatpho_log_chars_lead >= 240)); then
         __dybatpho_log_chars_length=4
       elif ((__dybatpho_log_chars_lead >= 224)); then

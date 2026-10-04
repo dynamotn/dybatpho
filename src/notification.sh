@@ -663,7 +663,9 @@ function __dybatpho_notification_mime_header {
   for ((__dybatpho_mh_i = 0; __dybatpho_mh_i < ${#__dybatpho_mh_text}; __dybatpho_mh_i++)); do
     __dybatpho_mh_byte="${__dybatpho_mh_text:__dybatpho_mh_i:1}"
     printf -v __dybatpho_mh_code '%d' "'${__dybatpho_mh_byte}"
-    ((__dybatpho_mh_code < 0)) && ((__dybatpho_mh_code += 256))
+    # Only the byte itself: glibc can report a high byte as negative, and
+    # musl's C locale maps it to the codepoint `0xDF00` plus the byte.
+    __dybatpho_mh_code=$((__dybatpho_mh_code & 0xFF))
     # A word closes only before the first byte of a character (a UTF-8
     # continuation byte is 0x80-0xBF), and early enough that the longest
     # character still fits inside the 75 columns an encoded word may use.

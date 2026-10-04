@@ -295,6 +295,7 @@ function __dybatpho_helpers_sort {
   local __dybatpho_helpers_sort_n="${#__dybatpho_helpers_sort_from[@]}"
   local __dybatpho_helpers_sort_width=1 __dybatpho_helpers_sort_lo __dybatpho_helpers_sort_mid
   local __dybatpho_helpers_sort_hi __dybatpho_helpers_sort_l __dybatpho_helpers_sort_r
+  local __dybatpho_helpers_sort_left __dybatpho_helpers_sort_right __dybatpho_helpers_sort_key
   local __dybatpho_helpers_sort_mode=call
   case "${__dybatpho_helpers_sort_before}" in
     @int-key | @bytes-key)
@@ -321,24 +322,28 @@ function __dybatpho_helpers_sort {
       __dybatpho_helpers_sort_r="${__dybatpho_helpers_sort_mid}"
       while ((__dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid && \
         __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi)); do
+        __dybatpho_helpers_sort_right="${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}"
+        __dybatpho_helpers_sort_left="${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}"
         if case "${__dybatpho_helpers_sort_mode}" in
           @int-key)
-            ((__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]] < \
-            __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]))
+            ((__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_right] < \
+            __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_left]))
             ;;
           @bytes-key)
-            [[ "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]]}" < "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]]}" ]]
+            # shfmt joins a `[[ ]]` test onto one line, so one side is read
+            # first to keep that line short.
+            __dybatpho_helpers_sort_key="${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_right]}"
+            [[ "${__dybatpho_helpers_sort_key}" < "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_left]}" ]]
             ;;
           *)
             "${__dybatpho_helpers_sort_before}" \
-              "${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}" \
-              "${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}" "$@"
+              "${__dybatpho_helpers_sort_right}" "${__dybatpho_helpers_sort_left}" "$@"
             ;;
         esac then
-          __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}")
+          __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_right}")
           ((__dybatpho_helpers_sort_r += 1))
         else
-          __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}")
+          __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_left}")
           ((__dybatpho_helpers_sort_l += 1))
         fi
       done

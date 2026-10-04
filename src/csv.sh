@@ -595,7 +595,8 @@ function dybatpho::csv_sort {
     *) dybatpho::die "${FUNCNAME[0]}: Unknown order: ${order}. Use asc or desc" ;; # kcov(skip)
   esac
   case "${type}" in
-    auto | text | number) ;;                                                                     # kcov(skip) - a case arm has no command to fire on
+    # A case arm has no command to fire on.
+    auto | text | number) ;;                                                                     # kcov(skip)
     *) dybatpho::die "${FUNCNAME[0]}: Unknown comparison: ${type}. Use auto, text, or number" ;; # kcov(skip)
   esac
 

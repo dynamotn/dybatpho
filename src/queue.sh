@@ -788,11 +788,11 @@ function __dybatpho_queue_work_options {
 #   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
 #######################################
 function dybatpho::queue_work {
-  local -A settings=([retries]=3 [backoff]=0 [max - backoff]=3600 [max - jobs]=0 [poll]="" [idle]="")
+  local -A settings=([retries]=3 [backoff]=0 ["max-backoff"]=3600 ["max-jobs"]=0 [poll]="" [idle]="")
   __dybatpho_queue_work_options settings "$@"
   shift "${settings[used]}"
   local retries="${settings[retries]}" backoff="${settings[backoff]}"
-  local max_backoff="${settings[max - backoff]}" max_jobs="${settings[max - jobs]}"
+  local max_backoff="${settings["max-backoff"]}" max_jobs="${settings["max-jobs"]}"
   local poll="${settings[poll]}" idle="${settings[idle]}"
 
   local queue handler

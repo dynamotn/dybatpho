@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`helpers` — `dybatpho::default_env` sets a variable whatever its name.**
+  A variable called `env_name` or `default_value` was shadowed by the
+  function's own locals and never received its default.
+
 - **`helpers` — `dybatpho::expect_args` fills a variable whatever its name.**
   The names and arguments were collected into plain locals, so a function that
   declared `variable_name`, `variable_names` or `is_error` and named it in

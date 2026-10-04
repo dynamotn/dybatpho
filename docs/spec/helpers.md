@@ -195,6 +195,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-022b**: The output MUST open with a heading naming the function and where it came from, including the module when one can be named.
 - **FR-023**: Code evaluated by `assert` or by the `breakpoint` debugger MUST see the caller's variables: both MUST keep their state in prefixed locals, and the debugger MUST NOT assign a global.
 - **FR-024**: `expect_args` MUST fill the caller's variables whatever their names, including `variable_name`, `variable_names` and `is_error`.
+- **FR-025**: `default_env` MUST set and export the named variable whatever its name, including `env_name` and `default_value`.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.
 - **FR-019**: `dybatpho::is number` MUST accept exactly what `validate_is number` accepts, and `dybatpho::is int` MUST accept only optionally signed decimal integers without a leading zero, a subset of what `validate_is int` accepts; neither MUST depend on `printf` or `LC_NUMERIC`.
 - **FR-020**: `dybatpho::retry` and `dybatpho::retry_until` MUST NOT shadow the caller's variables in the command they evaluate: their own bookkeeping uses names in the `__dybatpho_` namespace.
@@ -250,6 +251,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-020**: Retry a command that counts its own attempts in a global `count` with both `retry` and `retry_until`, and verify every failure is retried and slept on in order.
 - **IT-021**: Evaluate code through `assert` and the debugger that reads variables named like their locals, and see the caller's values with the caller's `line` untouched.
 - **IT-022**: Read arguments into variables named `variable_name`, `variable_names` and `is_error`, and find each value.
+- **IT-023**: Default variables named `env_name` and `default_value`, and find each set.
 
 ## Acceptance Criteria *(mandatory)*
 

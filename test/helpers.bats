@@ -483,6 +483,18 @@ require_fake_tool() {
   assert_failure
 }
 
+@test "dybatpho::default_env sets a variable named like its own locals" {
+  # The name and default were held in plain locals, so a variable called
+  # `env_name` or `default_value` was shadowed and never set.
+  local name
+  for name in env_name default_value; do
+    eval "_probe() { unset ${name}; dybatpho::default_env ${name} fallback > /dev/null; printf '%s' \"\${${name}-unset}\"; }"
+    run_traced _probe
+    assert_success
+    assert_output "fallback"
+  done
+}
+
 @test "dybatpho::default_env assigns and preserves environment values" {
   _default_env_assigns() {
     unset DYBATPHO_SAMPLE_ENV

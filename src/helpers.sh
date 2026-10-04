@@ -980,15 +980,16 @@ function dybatpho::coalesce_cmd {
 # @stdout Effective value after applying the default
 #######################################
 function dybatpho::default_env {
-  local env_name default_value
-  dybatpho::expect_args env_name default_value -- "$@"
-  [[ "${env_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || dybatpho::die "Invalid environment variable name: ${env_name}"
-  if [[ -z "${!env_name:-}" ]]; then
-    printf -v "${env_name}" '%s' "${default_value}"
+  local __dybatpho_default_env_name __dybatpho_default_env_value
+  dybatpho::expect_args __dybatpho_default_env_name __dybatpho_default_env_value -- "$@"
+  [[ "${__dybatpho_default_env_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+    || dybatpho::die "Invalid environment variable name: ${__dybatpho_default_env_name}"
+  if [[ -z "${!__dybatpho_default_env_name:-}" ]]; then
+    printf -v "${__dybatpho_default_env_name}" '%s' "${__dybatpho_default_env_value}"
     # shellcheck disable=SC2163 # exporting the variable this name refers to, as intended
-    export "${env_name}"
+    export "${__dybatpho_default_env_name}"
   fi
-  printf '%s\n' "${!env_name}"
+  printf '%s\n' "${!__dybatpho_default_env_name}"
 }
 
 #######################################

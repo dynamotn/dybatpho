@@ -438,3 +438,13 @@ function _create_traversal_archive {
   assert_failure
   assert_output --partial "unknown option: --unknown"
 }
+
+@test "a command run by safe_system sees the caller's variables, not the guard's" {
+  # The command runs in the guard's scope, where its locals hid the caller's
+  # variables of the same names.
+  local force="caller" description="caller" arguments="caller" command_args="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s %s\n' "${force}" "${description}" "${arguments}" "${command_args}" > "${seen}"; }
+  dybatpho::safe_system --force "scoped change" -- look 2> /dev/null
+  assert_equal "$(cat "${seen}")" "caller caller caller caller"
+}

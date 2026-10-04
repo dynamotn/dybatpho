@@ -186,6 +186,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `command_name` hid the caller's variables of the same names. They are now
   prefixed.
 
+- **`safety` — a command run by `dybatpho::safe_system` sees the caller's
+  variables.** It ran in the guard's scope, where `force`, `description`,
+  `arguments` and `command_args` hid the caller's variables of the same names.
+  They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

@@ -236,6 +236,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   module is not loaded, before it inspects the archive or the destination.
 - **FR-024**: `safe_extract` MUST stop before writing anything when the archive
   cannot be listed, since its entries cannot be checked.
+- **FR-025**: A command run by `safe_system` MUST see the caller's variables: the guard MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -299,6 +300,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   extracts once `archive` is loaded.
 - **IT-013**: Verify `safe_extract` refuses a corrupt archive with an error
   naming it.
+- **IT-014**: Run an approved command through `safe_system` that reads variables named like the guard's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

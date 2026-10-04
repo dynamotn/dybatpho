@@ -486,23 +486,29 @@ function dybatpho::safe_extract {
 #   dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 #######################################
 function dybatpho::safe_system {
-  local force="${DYBATPHO_FORCE}" description=""
-  local -a arguments=() parsed=() command_args=()
-  __dybatpho_helpers_options_into arguments parsed '-f|--force=force' '' '-*' \
+  local __dybatpho_safety_system_force="${DYBATPHO_FORCE}" __dybatpho_safety_system_description=""
+  local -a __dybatpho_safety_system_arguments=() __dybatpho_safety_system_parsed=() \
+    __dybatpho_safety_system_command_args=()
+  __dybatpho_helpers_options_into __dybatpho_safety_system_arguments __dybatpho_safety_system_parsed \
+    '-f|--force=__dybatpho_safety_system_force' '' '-*' \
     'dybatpho::safe_system: unknown option: {option}' '' -- "$@"
   # Everything before `--` is the description, everything after it the command.
-  local described="${#arguments[@]}"
-  ((parsed[1] < 0)) || described="${parsed[1]}"
-  ((described <= 1)) || dybatpho::die "dybatpho::safe_system: expected a single description before --"
-  ((described == 0)) || description="${arguments[0]}"
-  command_args=("${arguments[@]:described}")
-  [[ -n "${description}" ]] || dybatpho::die "dybatpho::safe_system: expected a description"
-  ((${#command_args[@]})) || dybatpho::die "dybatpho::safe_system: expected a command after --"
+  local __dybatpho_safety_system_described="${#__dybatpho_safety_system_arguments[@]}"
+  ((__dybatpho_safety_system_parsed[1] < 0)) || \
+    __dybatpho_safety_system_described="${__dybatpho_safety_system_parsed[1]}"
+  ((__dybatpho_safety_system_described <= 1)) || dybatpho::die \
+    "dybatpho::safe_system: expected a single description before --"
+  ((__dybatpho_safety_system_described == 0)) || \
+    __dybatpho_safety_system_description="${__dybatpho_safety_system_arguments[0]}"
+  __dybatpho_safety_system_command_args=("${__dybatpho_safety_system_arguments[@]:__dybatpho_safety_system_described}")
+  [[ -n "${__dybatpho_safety_system_description}" ]] || dybatpho::die "dybatpho::safe_system: expected a description"
+  ((${#__dybatpho_safety_system_command_args[@]})) || dybatpho::die "dybatpho::safe_system: expected a command after --"
 
-  if ! __dybatpho_safety_approve "${force}" "Apply system change: ${description}?"; then
-    dybatpho::warn "Skipped system change: ${description}"
+  if ! __dybatpho_safety_approve "${__dybatpho_safety_system_force}" \
+    "Apply system change: ${__dybatpho_safety_system_description}?"; then
+    dybatpho::warn "Skipped system change: ${__dybatpho_safety_system_description}"
     return 1
   fi
-  dybatpho::info "Applying system change: ${description}"
-  dybatpho::dry_run "${command_args[@]}"
+  dybatpho::info "Applying system change: ${__dybatpho_safety_system_description}"
+  dybatpho::dry_run "${__dybatpho_safety_system_command_args[@]}"
 }

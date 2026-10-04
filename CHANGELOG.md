@@ -145,6 +145,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `status` hid the caller's variables of the same names. They are now
   prefixed.
 
+- **`schedule` — a scheduled command sees the caller's variables.**
+  `dybatpho::schedule_every`, `dybatpho::schedule_debounce` and
+  `dybatpho::schedule_once_per` ran the command in their own scope, where locals
+  such as `times`, `ran`, `key`, `period` and `command` hid the caller's
+  variables, and a command assigning to `times` or `ran` changed how often the
+  loop ran. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

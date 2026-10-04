@@ -92,57 +92,60 @@ function __dybatpho_schedule_command_into {
 #   dybatpho::schedule_every 60 --times 5 -- dybatpho::info "tick"
 #######################################
 function dybatpho::schedule_every {
-  local interval
-  dybatpho::expect_args interval -- "$@"
+  local __dybatpho_schedule_every_interval
+  dybatpho::expect_args __dybatpho_schedule_every_interval -- "$@"
   shift
 
-  local times=0
-  local -a parsed=()
-  __dybatpho_helpers_options_into - parsed '--times=times:number' leading,keep-dashes '' '' \
+  local __dybatpho_schedule_every_times=0
+  local -a __dybatpho_schedule_every_parsed=()
+  __dybatpho_helpers_options_into - __dybatpho_schedule_every_parsed '--times=__dybatpho_schedule_every_times:number' \
+    leading,keep-dashes '' '' \
     "${FUNCNAME[0]}: {option} needs a {noun}" -- "$@"
-  shift "${parsed[0]}"
+  shift "${__dybatpho_schedule_every_parsed[0]}"
 
-  dybatpho::is int "${interval}" && ((interval > 0)) \
-    || dybatpho::die "${FUNCNAME[0]}: The interval must be a positive number of seconds, got: ${interval}"
-  dybatpho::is int "${times}" && ((times >= 0)) \
-    || dybatpho::die "${FUNCNAME[0]}: --times must be a number, got: ${times}"
+  dybatpho::is int "${__dybatpho_schedule_every_interval}" && ((__dybatpho_schedule_every_interval > 0)) \
+    || dybatpho::die \
+      "${FUNCNAME[0]}: The interval must be a positive number of seconds, got: ${__dybatpho_schedule_every_interval}"
+  dybatpho::is int "${__dybatpho_schedule_every_times}" && ((__dybatpho_schedule_every_times >= 0)) \
+    || dybatpho::die "${FUNCNAME[0]}: --times must be a number, got: ${__dybatpho_schedule_every_times}"
 
-  local -a command=()
-  __dybatpho_schedule_command_into command "$@"
+  local -a __dybatpho_schedule_every_command=()
+  __dybatpho_schedule_command_into __dybatpho_schedule_every_command "$@"
 
   # The previous handlers are restored rather than left replaced: a script may
   # call this more than once, and its own Ctrl-C handling has to survive.
-  local previous_traps
-  __dybatpho_process_traps_save_into previous_traps HUP INT TERM
+  local __dybatpho_schedule_every_previous_traps
+  __dybatpho_process_traps_save_into __dybatpho_schedule_every_previous_traps HUP INT TERM
   # The flag is a local, not a module global: a signal is handled inside this
   # function, so the handler sees this frame's variables and nothing leaks out
   # to the next caller.
-  local stopped=0
-  dybatpho::trap "stopped=1" HUP INT TERM
+  local __dybatpho_schedule_every_stopped=0
+  dybatpho::trap "__dybatpho_schedule_every_stopped=1" HUP INT TERM
 
-  local due now ran=0 waited
-  due="$(dybatpho::date_now "%s")"
+  local __dybatpho_schedule_every_due __dybatpho_schedule_every_now __dybatpho_schedule_every_ran=0 \
+    __dybatpho_schedule_every_waited
+  __dybatpho_schedule_every_due="$(dybatpho::date_now "%s")"
   while :; do
-    "${command[@]}" || true
-    ran=$((ran + 1))
+    "${__dybatpho_schedule_every_command[@]}" || true
+    __dybatpho_schedule_every_ran=$((__dybatpho_schedule_every_ran + 1))
 
-    ((times > 0 && ran >= times)) && break
-    ((stopped)) && break
+    ((__dybatpho_schedule_every_times > 0 && __dybatpho_schedule_every_ran >= __dybatpho_schedule_every_times)) && break
+    ((__dybatpho_schedule_every_stopped)) && break
 
-    due=$((due + interval))
-    now="$(dybatpho::date_now "%s")"
+    __dybatpho_schedule_every_due=$((__dybatpho_schedule_every_due + __dybatpho_schedule_every_interval))
+    __dybatpho_schedule_every_now="$(dybatpho::date_now "%s")"
     # A run that took longer than its slot has already missed one or more
     # ticks. They are dropped, not queued.
-    while ((due <= now)); do
-      due=$((due + interval))
+    while ((__dybatpho_schedule_every_due <= __dybatpho_schedule_every_now)); do
+      __dybatpho_schedule_every_due=$((__dybatpho_schedule_every_due + __dybatpho_schedule_every_interval))
     done
 
-    waited=$((due - now))
-    sleep "${waited}"
-    ((stopped)) && break
+    __dybatpho_schedule_every_waited=$((__dybatpho_schedule_every_due - __dybatpho_schedule_every_now))
+    sleep "${__dybatpho_schedule_every_waited}"
+    ((__dybatpho_schedule_every_stopped)) && break
   done
 
-  __dybatpho_process_traps_restore "${previous_traps}" HUP INT TERM
+  __dybatpho_process_traps_restore "${__dybatpho_schedule_every_previous_traps}" HUP INT TERM
   return 0
 }
 
@@ -188,45 +191,48 @@ function __dybatpho_schedule_need_lock {
 #   dybatpho::schedule_debounce 2 rebuild -- make
 #######################################
 function dybatpho::schedule_debounce {
-  local window key
-  dybatpho::expect_args window key -- "$@"
+  local __dybatpho_schedule_debounce_window __dybatpho_schedule_debounce_key
+  dybatpho::expect_args __dybatpho_schedule_debounce_window __dybatpho_schedule_debounce_key -- "$@"
   __dybatpho_schedule_need_lock
   shift 2
-  dybatpho::is int "${window}" && ((window > 0)) \
-    || dybatpho::die "${FUNCNAME[0]}: The window must be a positive number of seconds, got: ${window}"
-  __dybatpho_schedule_expect_key "${key}"
+  dybatpho::is int "${__dybatpho_schedule_debounce_window}" && ((__dybatpho_schedule_debounce_window > 0)) \
+    || dybatpho::die \
+      "${FUNCNAME[0]}: The window must be a positive number of seconds, got: ${__dybatpho_schedule_debounce_window}"
+  __dybatpho_schedule_expect_key "${__dybatpho_schedule_debounce_key}"
 
-  local -a command=()
-  __dybatpho_schedule_command_into command "$@"
+  local -a __dybatpho_schedule_debounce_command=()
+  __dybatpho_schedule_command_into __dybatpho_schedule_debounce_command "$@"
 
-  local directory
-  __dybatpho_schedule_dir_into directory
-  local ticket="${directory}/${key}.trigger"
-  local lock="${directory}/${key}.lock"
+  local __dybatpho_schedule_debounce_directory
+  __dybatpho_schedule_dir_into __dybatpho_schedule_debounce_directory
+  local __dybatpho_schedule_debounce_base="${__dybatpho_schedule_debounce_directory}"
+  __dybatpho_schedule_debounce_base+="/${__dybatpho_schedule_debounce_key}"
+  local __dybatpho_schedule_debounce_ticket="${__dybatpho_schedule_debounce_base}.trigger"
+  local __dybatpho_schedule_debounce_lock="${__dybatpho_schedule_debounce_base}.lock"
 
   # Reading and bumping the counter is one step: two triggers arriving
   # together would otherwise take the same number, and both would believe they
   # were last.
-  dybatpho::lock_acquire "${lock}" 10 || return 1
-  local counter=0
-  if dybatpho::is file "${ticket}"; then
-    read -r counter < "${ticket}"
-    [[ "${counter}" =~ ^[0-9]+$ ]] || counter=0
+  dybatpho::lock_acquire "${__dybatpho_schedule_debounce_lock}" 10 || return 1
+  local __dybatpho_schedule_debounce_counter=0
+  if dybatpho::is file "${__dybatpho_schedule_debounce_ticket}"; then
+    read -r __dybatpho_schedule_debounce_counter < "${__dybatpho_schedule_debounce_ticket}"
+    [[ "${__dybatpho_schedule_debounce_counter}" =~ ^[0-9]+$ ]] || __dybatpho_schedule_debounce_counter=0
   fi
-  counter=$((counter + 1))
-  printf '%s\n' "${counter}" > "${ticket}"
-  dybatpho::lock_release "${lock}"
+  __dybatpho_schedule_debounce_counter=$((__dybatpho_schedule_debounce_counter + 1))
+  printf '%s\n' "${__dybatpho_schedule_debounce_counter}" > "${__dybatpho_schedule_debounce_ticket}"
+  dybatpho::lock_release "${__dybatpho_schedule_debounce_lock}"
 
-  sleep "${window}"
+  sleep "${__dybatpho_schedule_debounce_window}"
 
-  local latest=0
-  read -r latest < "${ticket}"
-  [[ "${latest}" =~ ^[0-9]+$ ]] || latest=0
-  if ((latest != counter)); then
+  local __dybatpho_schedule_debounce_latest=0
+  read -r __dybatpho_schedule_debounce_latest < "${__dybatpho_schedule_debounce_ticket}"
+  [[ "${__dybatpho_schedule_debounce_latest}" =~ ^[0-9]+$ ]] || __dybatpho_schedule_debounce_latest=0
+  if ((__dybatpho_schedule_debounce_latest != __dybatpho_schedule_debounce_counter)); then
     return 9
   fi
 
-  "${command[@]}"
+  "${__dybatpho_schedule_debounce_command[@]}"
 }
 
 #######################################
@@ -246,38 +252,38 @@ function dybatpho::schedule_debounce {
 #   dybatpho::schedule_once_per day warn-expiry -- dybatpho::warn "The token expires soon"
 #######################################
 function dybatpho::schedule_once_per {
-  local period key
-  dybatpho::expect_args period key -- "$@"
+  local __dybatpho_schedule_once_period __dybatpho_schedule_once_key
+  dybatpho::expect_args __dybatpho_schedule_once_period __dybatpho_schedule_once_key -- "$@"
   shift 2
-  __dybatpho_schedule_expect_key "${key}"
+  __dybatpho_schedule_expect_key "${__dybatpho_schedule_once_key}"
 
-  local -a command=()
-  __dybatpho_schedule_command_into command "$@"
+  local -a __dybatpho_schedule_once_command=()
+  __dybatpho_schedule_command_into __dybatpho_schedule_once_command "$@"
 
-  local directory
-  __dybatpho_schedule_dir_into directory
-  local marker="${directory}/${key}.last"
+  local __dybatpho_schedule_once_directory
+  __dybatpho_schedule_dir_into __dybatpho_schedule_once_directory
+  local __dybatpho_schedule_once_marker="${__dybatpho_schedule_once_directory}/${__dybatpho_schedule_once_key}.last"
 
-  local bucket
-  __dybatpho_schedule_bucket_into bucket "${period}"
+  local __dybatpho_schedule_once_bucket
+  __dybatpho_schedule_bucket_into __dybatpho_schedule_once_bucket "${__dybatpho_schedule_once_period}"
 
   # Reading the marker and writing it are one step under a short claim, so
   # callers started together cannot all read "not yet" and all run.
-  local claim="${directory}/${key}.claim"
-  __dybatpho_schedule_claim "${claim}" || return 1
+  local __dybatpho_schedule_once_claim="${__dybatpho_schedule_once_directory}/${__dybatpho_schedule_once_key}.claim"
+  __dybatpho_schedule_claim "${__dybatpho_schedule_once_claim}" || return 1
 
-  if dybatpho::is file "${marker}"; then
-    local recorded=""
-    read -r recorded < "${marker}" || true
-    if [[ "${period}" =~ ^[0-9]+$ ]]; then
-      local age
-      age="$(dybatpho::file_age_seconds "${marker}")"
-      if ((age < period)); then
-        rm -f -- "${claim}"
+  if dybatpho::is file "${__dybatpho_schedule_once_marker}"; then
+    local __dybatpho_schedule_once_recorded=""
+    read -r __dybatpho_schedule_once_recorded < "${__dybatpho_schedule_once_marker}" || true
+    if [[ "${__dybatpho_schedule_once_period}" =~ ^[0-9]+$ ]]; then
+      local __dybatpho_schedule_once_age
+      __dybatpho_schedule_once_age="$(dybatpho::file_age_seconds "${__dybatpho_schedule_once_marker}")"
+      if ((__dybatpho_schedule_once_age < __dybatpho_schedule_once_period)); then
+        rm -f -- "${__dybatpho_schedule_once_claim}"
         return 9
       fi
-    elif [[ "${recorded}" == "${bucket}" ]]; then
-      rm -f -- "${claim}"
+    elif [[ "${__dybatpho_schedule_once_recorded}" == "${__dybatpho_schedule_once_bucket}" ]]; then
+      rm -f -- "${__dybatpho_schedule_once_claim}"
       return 9
     fi
   fi
@@ -287,10 +293,10 @@ function dybatpho::schedule_once_per {
   # "at most once per period" promises; a caller that wants a retry on failure
   # wants `dybatpho::retry`, not this. It is written aside and renamed into
   # place, so a reader never sees it half written.
-  printf '%s\n' "${bucket}" > "${marker}.$$.partial"
-  mv -f -- "${marker}.$$.partial" "${marker}"
-  rm -f -- "${claim}"
-  "${command[@]}"
+  printf '%s\n' "${__dybatpho_schedule_once_bucket}" > "${__dybatpho_schedule_once_marker}.$$.partial"
+  mv -f -- "${__dybatpho_schedule_once_marker}.$$.partial" "${__dybatpho_schedule_once_marker}"
+  rm -f -- "${__dybatpho_schedule_once_claim}"
+  "${__dybatpho_schedule_once_command[@]}"
 }
 
 #######################################

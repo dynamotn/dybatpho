@@ -134,6 +134,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-022**: `schedule_once_per` MUST give up with exit code 1, running nothing and leaving the marker alone, when a fresh claim is held for the whole wait, and MUST report the claim it waited for.
 - **FR-023**: `schedule_once_per` MUST give up with exit code 1, running nothing and leaving the marker alone, when a fresh claim is held for the whole wait, and MUST report the claim it waited for.
 - **FR-024**: Removing a stale claim MUST be done by one waiter at a time, which MUST check the claim is still stale before removing it, so a fresh claim taken in its place is never removed.
+- **FR-025**: A command run by `schedule_every`, `schedule_debounce` or `schedule_once_per` MUST see the caller's variables: the schedulers MUST keep their state in prefixed locals, so a command cannot end or extend the loop by assigning to one.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -180,6 +181,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-025**: Hold a claim that stays fresh for the whole wait and find the call returns 1, names the claim, runs nothing, and writes no marker.
 - **IT-026**: Hold a claim that stays fresh for the whole wait and find the call returns 1, names the claim, runs nothing, and writes no marker.
 - **IT-027**: Plant a stale claim, start a dozen callers at once, and find exactly one run per round over several rounds, with no claim or reclaim left behind.
+- **IT-028**: Schedule a command with each scheduler that reads variables named like their locals, and see the caller's values on every run.
 
 ## Acceptance Criteria *(mandatory)*
 

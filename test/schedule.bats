@@ -408,3 +408,16 @@ note() {
   refute_stderr --partial "/schedule"
   refute_output --partial "carried on"
 }
+
+@test "a scheduled command sees the caller's variables, not the scheduler's" {
+  # The command runs in the scheduler's scope, where its locals hid the
+  # caller's variables of the same names, and `times` or `ran` could be
+  # overwritten from inside the loop.
+  local times="caller" ran="caller" command="caller" key="caller" directory="caller" period="caller"
+  look() { printf '%s %s %s %s %s %s\n' "${times}" "${ran}" "${command}" "${key}" "${directory}" "${period}" >> "${LOG}"; }
+  run_traced dybatpho::schedule_every 1 --times 1 -- look
+  run_traced dybatpho::schedule_once_per day scoped -- look
+  run_traced dybatpho::schedule_debounce 1 scoped -- look
+  assert_equal "$(sort -u "${LOG}")" "caller caller caller caller caller caller"
+  assert_equal "$(wc -l < "${LOG}" | tr -d ' ')" "3"
+}

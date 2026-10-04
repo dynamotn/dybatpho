@@ -488,18 +488,18 @@ function dybatpho::safe_extract {
 function dybatpho::safe_system {
   local __dybatpho_safety_system_force="${DYBATPHO_FORCE}" __dybatpho_safety_system_description=""
   local -a __dybatpho_safety_system_arguments=() __dybatpho_safety_system_parsed=() \
-    __dybatpho_safety_system_command_args=()
+  __dybatpho_safety_system_command_args=()
   __dybatpho_helpers_options_into __dybatpho_safety_system_arguments __dybatpho_safety_system_parsed \
     '-f|--force=__dybatpho_safety_system_force' '' '-*' \
     'dybatpho::safe_system: unknown option: {option}' '' -- "$@"
   # Everything before `--` is the description, everything after it the command.
   local __dybatpho_safety_system_described="${#__dybatpho_safety_system_arguments[@]}"
-  ((__dybatpho_safety_system_parsed[1] < 0)) || \
-    __dybatpho_safety_system_described="${__dybatpho_safety_system_parsed[1]}"
+  ((__dybatpho_safety_system_parsed[1] < 0)) \
+    || __dybatpho_safety_system_described="${__dybatpho_safety_system_parsed[1]}"
   ((__dybatpho_safety_system_described <= 1)) || dybatpho::die \
     "dybatpho::safe_system: expected a single description before --"
-  ((__dybatpho_safety_system_described == 0)) || \
-    __dybatpho_safety_system_description="${__dybatpho_safety_system_arguments[0]}"
+  ((__dybatpho_safety_system_described == 0)) \
+    || __dybatpho_safety_system_description="${__dybatpho_safety_system_arguments[0]}"
   __dybatpho_safety_system_command_args=("${__dybatpho_safety_system_arguments[@]:__dybatpho_safety_system_described}")
   [[ -n "${__dybatpho_safety_system_description}" ]] || dybatpho::die "dybatpho::safe_system: expected a description"
   ((${#__dybatpho_safety_system_command_args[@]})) || dybatpho::die "dybatpho::safe_system: expected a command after --"

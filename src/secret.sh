@@ -331,7 +331,7 @@ function dybatpho::secret_from_env {
   [[ "${__dybatpho_secret_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Invalid environment variable name: ${__dybatpho_secret_name}"
   case "${__dybatpho_secret_mode}" in
-    keep | unset) ;;                                                                   # kcov(skip)
+    keep | unset) ;;                                                                                     # kcov(skip)
     *) dybatpho::die "${FUNCNAME[0]}: Expected \`keep\` or \`unset\`, got: ${__dybatpho_secret_mode}" ;; # kcov(skip)
   esac
 
@@ -424,8 +424,8 @@ function dybatpho::secret_write_file {
   # An empty path, or one naming a directory, has no file to write; staging for
   # it would leave a plain-text copy of the secret in the working directory,
   # or inside that directory, once the move failed.
-  [[ -n "${__dybatpho_secret_path}" && "${__dybatpho_secret_path}" != */ \
-    && ! -d "${__dybatpho_secret_path}" ]] \
+  [[ -n "${__dybatpho_secret_path}" && "${__dybatpho_secret_path}" != */ &&
+    ! -d "${__dybatpho_secret_path}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Not a file path: '${__dybatpho_secret_path}'"
 
   local __dybatpho_secret_directory

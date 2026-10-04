@@ -668,13 +668,13 @@ function dybatpho::assert_cli_snapshot {
   local __dybatpho_test_cli_stdout_file __dybatpho_test_cli_stderr_file __dybatpho_test_cli_exit_code=0
   __dybatpho_create_temp_into __dybatpho_test_cli_stdout_file ".out" "snapshot"
   __dybatpho_create_temp_into __dybatpho_test_cli_stderr_file ".err" "snapshot"
-  "$@" > "${__dybatpho_test_cli_stdout_file}" 2> "${__dybatpho_test_cli_stderr_file}" || \
-    __dybatpho_test_cli_exit_code=$?
+  "$@" > "${__dybatpho_test_cli_stdout_file}" 2> "${__dybatpho_test_cli_stderr_file}" \
+    || __dybatpho_test_cli_exit_code=$?
 
   local __dybatpho_test_cli_document
   printf -v __dybatpho_test_cli_document '$ %s\n--- exit: %s\n--- stdout:\n%s\n--- stderr:\n%s' \
     "$*" "${__dybatpho_test_cli_exit_code}" "$(< "${__dybatpho_test_cli_stdout_file}")" \
-      "$(< "${__dybatpho_test_cli_stderr_file}")"
+    "$(< "${__dybatpho_test_cli_stderr_file}")"
   dybatpho::assert_snapshot "${__dybatpho_test_cli_name}" "${__dybatpho_test_cli_document}"
 }
 
@@ -786,8 +786,8 @@ function dybatpho::assert_duration_under {
 
   local __dybatpho_test_dur_run __dybatpho_test_dur_elapsed __dybatpho_test_dur_status=0 __dybatpho_test_dur_fastest=""
   for ((__dybatpho_test_dur_run = 0; __dybatpho_test_dur_run < __dybatpho_test_dur_runs; __dybatpho_test_dur_run++)); do
-    __dybatpho_test_time_command "${__dybatpho_test_dur_output_file}" __dybatpho_test_dur_elapsed "$@" || \
-      __dybatpho_test_dur_status=$?
+    __dybatpho_test_time_command "${__dybatpho_test_dur_output_file}" __dybatpho_test_dur_elapsed "$@" \
+      || __dybatpho_test_dur_status=$?
     if ((__dybatpho_test_dur_status != 0)); then
       __dybatpho_test_fail \
         "Command exited ${__dybatpho_test_dur_status} while timing it: $*" \
@@ -845,10 +845,10 @@ function dybatpho::benchmark {
 
   local __dybatpho_test_bench_run __dybatpho_test_bench_elapsed __dybatpho_test_bench_status=0
   local -a __dybatpho_test_bench_samples=()
-  for ((__dybatpho_test_bench_run = 0; __dybatpho_test_bench_run < __dybatpho_test_bench_runs; \
-    __dybatpho_test_bench_run++)); do
-    __dybatpho_test_time_command "${__dybatpho_test_bench_output_file}" __dybatpho_test_bench_elapsed "$@" || \
-      __dybatpho_test_bench_status=$?
+  for ((__dybatpho_test_bench_run = 0; __dybatpho_test_bench_run < __dybatpho_test_bench_runs;  \
+  __dybatpho_test_bench_run++)); do
+    __dybatpho_test_time_command "${__dybatpho_test_bench_output_file}" __dybatpho_test_bench_elapsed "$@" \
+      || __dybatpho_test_bench_status=$?
     if ((__dybatpho_test_bench_status != 0)); then
       local __dybatpho_test_bench_which="run $((__dybatpho_test_bench_run + 1)) of ${__dybatpho_test_bench_runs}"
       __dybatpho_test_fail \

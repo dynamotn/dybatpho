@@ -376,8 +376,8 @@ function __dybatpho_parallel_pool {
     *) ;;
   esac
   set -m
-  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total; \
-    __dybatpho_parallel_pool_index++)); do
+  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total;  \
+  __dybatpho_parallel_pool_index++)); do
     DYBATPHO_PARALLEL_STATUS[__dybatpho_parallel_pool_index]=""
   done
 
@@ -412,8 +412,8 @@ function __dybatpho_parallel_pool {
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGTERM
 
   __dybatpho_parallel_progress start "${__dybatpho_parallel_pool_total}"
-  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total; \
-    __dybatpho_parallel_pool_index++)); do
+  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total;  \
+  __dybatpho_parallel_pool_index++)); do
     # Fail-fast leaves the remaining jobs unstarted, which the status of an
     # unstarted job records as empty rather than as a failure.
     [[ "${__dybatpho_parallel_stop}" != true && -z "${__dybatpho_parallel_interrupted}" ]] || break
@@ -460,14 +460,14 @@ function __dybatpho_parallel_pool {
   for __dybatpho_parallel_pool_index in ${__dybatpho_parallel_terminated[@]+"${__dybatpho_parallel_terminated[@]}"}; do
     DYBATPHO_PARALLEL_STATUS[__dybatpho_parallel_pool_index]="terminated"
   done
-  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total; \
-    __dybatpho_parallel_pool_index++)); do
+  for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total;  \
+  __dybatpho_parallel_pool_index++)); do
     local __dybatpho_parallel_pool_file="${__dybatpho_parallel_pool_directory}/${__dybatpho_parallel_pool_index}.status"
     [[ -f "${__dybatpho_parallel_pool_file}" ]] || continue
     __dybatpho_parallel_pool_status="$(< "${__dybatpho_parallel_pool_file}")"
     DYBATPHO_PARALLEL_STATUS[__dybatpho_parallel_pool_index]="${__dybatpho_parallel_pool_status}"
-    [[ "${__dybatpho_parallel_pool_status}" == "0" ]] || \
-      __dybatpho_parallel_pool_failed=$((__dybatpho_parallel_pool_failed + 1))
+    [[ "${__dybatpho_parallel_pool_status}" == "0" ]] \
+      || __dybatpho_parallel_pool_failed=$((__dybatpho_parallel_pool_failed + 1))
   done
 
   [[ "${__dybatpho_parallel_monitor}" == "on" ]] || set +m
@@ -567,7 +567,7 @@ function dybatpho::parallel_map {
     # would be reported as never having run.
     ("${__dybatpho_parallel_map_command}" "${__dybatpho_parallel_items[__dybatpho_parallel_map_index]}") \
       > "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.out" 2> \
-        "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.err" || __dybatpho_parallel_map_code=$?
+      "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.err" || __dybatpho_parallel_map_code=$?
     printf '%s' "${__dybatpho_parallel_map_code}" > \
       "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.status"
   }
@@ -642,7 +642,7 @@ function dybatpho::parallel_run {
     # would be reported as never having run.
     (eval "${__dybatpho_parallel_commands[__dybatpho_parallel_run_index]}") \
       > "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.out" 2> \
-        "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.err" || __dybatpho_parallel_run_code=$?
+      "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.err" || __dybatpho_parallel_run_code=$?
     printf '%s' "${__dybatpho_parallel_run_code}" > \
       "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.status"
   }

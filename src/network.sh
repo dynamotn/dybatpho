@@ -1069,8 +1069,8 @@ function dybatpho::rate_limit {
     fi
     dybatpho::debug \
       "Rate limit '${__dybatpho_network_rl_key}': waiting ${__dybatpho_network_rl_wait_ms}ms for a free slot"
-    sleep "$(printf '%d.%03d' $((__dybatpho_network_rl_wait_ms / 1000)) $((__dybatpho_network_rl_wait_ms % 1000)))" || \
-      true
+    sleep "$(printf '%d.%03d' $((__dybatpho_network_rl_wait_ms / 1000)) $((__dybatpho_network_rl_wait_ms % 1000)))" \
+      || true
   done
 
   local __dybatpho_network_rl_events="${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]-}"

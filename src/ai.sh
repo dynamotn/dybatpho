@@ -1701,8 +1701,8 @@ function __dybatpho_ai_tool_invoke {
   fi
   dybatpho::debug "ai: invoking tool ${__dybatpho_ai_tool_name}"
   local __dybatpho_ai_tool_output __dybatpho_ai_tool_status=0
-  __dybatpho_ai_tool_output=$("${__dybatpho_ai_tool_handler}" "${__dybatpho_ai_tool_arguments}" 2>&1) || \
-    __dybatpho_ai_tool_status=$?
+  __dybatpho_ai_tool_output=$("${__dybatpho_ai_tool_handler}" "${__dybatpho_ai_tool_arguments}" 2>&1) \
+    || __dybatpho_ai_tool_status=$?
   if ((__dybatpho_ai_tool_status != 0)); then
     printf 'Error: tool %s exited with status %d\n%s\n' "${__dybatpho_ai_tool_name}" "${__dybatpho_ai_tool_status}" \
       "${__dybatpho_ai_tool_output}"

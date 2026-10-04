@@ -828,7 +828,7 @@ function __dybatpho_queue_work_options {
 #   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
 #######################################
 function dybatpho::queue_work {
-  local -A __dybatpho_queue_work_settings=([retries]=3 [backoff]=0 ["max-backoff"]=3600 ["max-jobs"]=0 [poll]="" \
+  local -A __dybatpho_queue_work_settings=([retries]=3 [backoff]=0 ["max-backoff"]=3600 ["max-jobs"]=0 [poll]=""
     [idle]="")
   __dybatpho_queue_work_options __dybatpho_queue_work_settings "$@"
   shift "${__dybatpho_queue_work_settings[used]}"
@@ -852,13 +852,13 @@ function dybatpho::queue_work {
     __dybatpho_queue_work_payload __dybatpho_queue_work_attempts __dybatpho_queue_work_delay \
     __dybatpho_queue_work_outcome
   while ((__dybatpho_queue_work_max_jobs == 0 || __dybatpho_queue_work_handled < __dybatpho_queue_work_max_jobs)); do
-    if ! __dybatpho_queue_pop "${__dybatpho_queue_work_queue}" __dybatpho_queue_work_id __dybatpho_queue_work_payload; \
-      then
+    if ! __dybatpho_queue_pop "${__dybatpho_queue_work_queue}" \
+      __dybatpho_queue_work_id __dybatpho_queue_work_payload; then
       [[ -n "${__dybatpho_queue_work_poll}" ]] || return 0
       # Idle time is counted in polls rather than read from the clock, so a
       # frozen or jumping clock cannot keep a worker alive or end it early.
-      if [[ -n "${__dybatpho_queue_work_idle}" ]] && ((__dybatpho_queue_work_waited >= __dybatpho_queue_work_idle)); \
-        then
+      if [[ -n "${__dybatpho_queue_work_idle}" ]] \
+        && ((__dybatpho_queue_work_waited >= __dybatpho_queue_work_idle)); then
         return 0
       fi
       sleep "${__dybatpho_queue_work_poll}"

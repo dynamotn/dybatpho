@@ -1683,8 +1683,8 @@ function __dybatpho_cli_generate_schema_command {
       __dybatpho_cli_gsc_switches __dybatpho_cli_gsc_env __dybatpho_cli_gsc_multiple __dybatpho_cli_gsc_choices \
       __dybatpho_cli_gsc_prompt __dybatpho_cli_gsc_hidden \
       __dybatpho_cli_gsc_required __dybatpho_cli_gsc_deprecated __dybatpho_cli_gsc_label __dybatpho_cli_gsc_config \
-        __dybatpho_cli_gsc_count __dybatpho_cli_gsc_negatable __dybatpho_cli_gsc_pattern __dybatpho_cli_gsc_value_type \
-        <<< "${__dybatpho_cli_gsc_option}"
+      __dybatpho_cli_gsc_count __dybatpho_cli_gsc_negatable __dybatpho_cli_gsc_pattern __dybatpho_cli_gsc_value_type \
+      <<< "${__dybatpho_cli_gsc_option}"
     [[ "${__dybatpho_cli_gsc_env}" = "@none" ]] && __dybatpho_cli_gsc_env=""
     [[ "${__dybatpho_cli_gsc_choices}" = "@none" ]] && __dybatpho_cli_gsc_choices=""
     [[ "${__dybatpho_cli_gsc_prompt}" = "@none" ]] && __dybatpho_cli_gsc_prompt=""
@@ -1725,9 +1725,9 @@ function __dybatpho_cli_generate_schema_command {
     # shellcheck disable=SC2059 # the format is built above, not taken from input
     printf "${__dybatpho_cli_gsc_option_format}" \
       "${__dybatpho_cli_gsc_q_env}" "${__dybatpho_cli_gsc_q_config}" "${__dybatpho_cli_gsc_multiple:-false}" \
-        "${__dybatpho_cli_gsc_count:-false}" "${__dybatpho_cli_gsc_negatable:-false}" \
+      "${__dybatpho_cli_gsc_count:-false}" "${__dybatpho_cli_gsc_negatable:-false}" \
       "${__dybatpho_cli_gsc_q_choices}" "${__dybatpho_cli_gsc_q_pattern}" "${__dybatpho_cli_gsc_q_value_type}" \
-        "${__dybatpho_cli_gsc_q_prompt}" "${__dybatpho_cli_gsc_hidden:-false}" \
+      "${__dybatpho_cli_gsc_q_prompt}" "${__dybatpho_cli_gsc_hidden:-false}" \
       "${__dybatpho_cli_gsc_required:-false}" "${__dybatpho_cli_gsc_q_deprecated}" "${__dybatpho_cli_gsc_q_label}"
   done
   printf '],"arguments":['
@@ -1743,7 +1743,7 @@ function __dybatpho_cli_generate_schema_command {
     __dybatpho_cli_gsc_first=false
     printf '{"name":%s,"description":%s,"required":%s,"variadic":%s}' \
       "${__dybatpho_cli_gsc_q_arg_name}" "${__dybatpho_cli_gsc_q_arg_desc}" "${__dybatpho_cli_gsc_arg_required:-true}" \
-        "${__dybatpho_cli_gsc_arg_variadic:-false}"
+      "${__dybatpho_cli_gsc_arg_variadic:-false}"
   done
   printf '],"commands":['
   __dybatpho_cli_gsc_first=true
@@ -1831,8 +1831,8 @@ function __dybatpho_cli_generate_man_command {
       __dybatpho_cli_gmc_switches __dybatpho_cli_gmc_env __dybatpho_cli_gmc_multiple __dybatpho_cli_gmc_choices \
       __dybatpho_cli_gmc_prompt __dybatpho_cli_gmc_hidden \
       __dybatpho_cli_gmc_required __dybatpho_cli_gmc_deprecated __dybatpho_cli_gmc_label __dybatpho_cli_gmc_config \
-        __dybatpho_cli_gmc_count __dybatpho_cli_gmc_negatable __dybatpho_cli_gmc_pattern __dybatpho_cli_gmc_value_type \
-        <<< "${__dybatpho_cli_gmc_option}"
+      __dybatpho_cli_gmc_count __dybatpho_cli_gmc_negatable __dybatpho_cli_gmc_pattern __dybatpho_cli_gmc_value_type \
+      <<< "${__dybatpho_cli_gmc_option}"
     [[ "${__dybatpho_cli_gmc_env}" = "@none" ]] && __dybatpho_cli_gmc_env=""
     [[ "${__dybatpho_cli_gmc_deprecated}" = "@none" ]] && __dybatpho_cli_gmc_deprecated=""
     [[ "${__dybatpho_cli_gmc_label}" = "@none" ]] && __dybatpho_cli_gmc_label=""
@@ -1842,8 +1842,8 @@ function __dybatpho_cli_generate_man_command {
     [[ "${__dybatpho_cli_gmc_value_type:-@none}" = "@none" ]] && __dybatpho_cli_gmc_value_type=""
     [[ "${__dybatpho_cli_gmc_hidden:-false}" = true ]] && continue
     local __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_switches// /, }"
-    [[ "${__dybatpho_cli_gmc_type}" = param ]] && \
-      __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_option_label} <${__dybatpho_cli_gmc_var}>"
+    [[ "${__dybatpho_cli_gmc_type}" = param ]] \
+      && __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_option_label} <${__dybatpho_cli_gmc_var}>"
     printf '.TP\n.B %s\n%s' "${__dybatpho_cli_gmc_option_label}" "${__dybatpho_cli_gmc_desc}"
     [[ "${__dybatpho_cli_gmc_required:-false}" = true ]] && printf ' (required)'
     [[ -n "${__dybatpho_cli_gmc_choices}" ]] && printf ' [choices: %s]' "${__dybatpho_cli_gmc_choices//,/, }"
@@ -2009,13 +2009,13 @@ function __dybatpho_cli_generate_completion_command {
       # shellcheck disable=SC2059 # the template is built above, not taken from input
       printf "${__dybatpho_cli_gcc_bash_template}" \
         "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" \
-          "${__dybatpho_cli_gcc_word_list} ${__dybatpho_cli_gcc_cmd_list} --help -h" \
+        "${__dybatpho_cli_gcc_word_list} ${__dybatpho_cli_gcc_cmd_list} --help -h" \
         "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" "${__dybatpho_cli_gcc_name}"
       ;;
     zsh)
       printf '_%s_completion() {\n  _arguments "*: :((%s))"\n}\ncompdef _%s_completion %s\n' \
         "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" \
-          "${__dybatpho_cli_gcc_word_list} ${__dybatpho_cli_gcc_cmd_list} --help -h" \
+        "${__dybatpho_cli_gcc_word_list} ${__dybatpho_cli_gcc_cmd_list} --help -h" \
         "${__dybatpho_cli_gcc_name//[^a-zA-Z0-9_]/_}" "${__dybatpho_cli_gcc_name}"
       ;;
     fish)

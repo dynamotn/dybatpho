@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`process` — `dybatpho::kill_children` and `dybatpho::run_with_timeout` end
+  a child that outlives its job.** Both sent SIGTERM to the job's process
+  group, but then watched the job alone: once it had exited they stopped, and
+  a child it had started that ignores SIGTERM kept running, never sent SIGKILL.
+  They now wait on the whole group, and send SIGKILL to it when anything in it
+  is still there after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds.
+
 - **`date` — a GNU-compatible `date` without `--version` is driven with `-d`.**
   The module told GNU `date` apart by whether `date --version` succeeded, so a
   `date` that reads `-d @<seconds>` but has no `--version` was taken for BSD

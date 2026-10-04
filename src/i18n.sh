@@ -3262,7 +3262,11 @@ function __dybatpho_i18n_scan {
     if dybatpho::is dir "${path}"; then
       local find_output
       local find_scripts
-      find_scripts=$(find "${path}" -type f -name '*.sh' -o -type f -name '*.bash')
+      # A part of the tree `find` cannot enter fails the capture; what it did
+      # list is still scanned, and the gap is reported the way an unreadable
+      # path is, instead of ending a script under errexit without a word.
+      find_scripts=$(find "${path}" -type f -name '*.sh' -o -type f -name '*.bash' 2> /dev/null) \
+        || dybatpho::warn "${FUNCNAME[1]}: Cannot read everything under '${path}'"
       find_output=$(printf '%s\n' "${find_scripts}" | LC_ALL=C sort)
       while IFS= read -r file || [[ -n "${file}" ]]; do
         files+=("${file}")
@@ -3275,6 +3279,10 @@ function __dybatpho_i18n_scan {
   done
   local -i number
   for file in ${files[@]+"${files[@]}"}; do
+    if [[ ! -r "${file}" ]]; then
+      dybatpho::warn "${FUNCNAME[1]}: Cannot read '${file}'"
+      continue
+    fi
     number=0
     while IFS= read -r line || [[ -n "${line}" ]]; do
       number+=1

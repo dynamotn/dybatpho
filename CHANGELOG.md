@@ -185,6 +185,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   character, an expression `sed` cannot run is refused when it is registered,
   and a substitution that still fails makes the snapshot assertion fail.
 
+- **`i18n` — extracting from a tree with an unreadable part warns instead of
+  stopping silently.** `dybatpho::i18n_extract` and `dybatpho::i18n_lint`
+  captured the list of scripts with `find`, which fails when it cannot enter
+  a subdirectory: a script under errexit then stopped with no message of the
+  library's own, and one without it went on as though that part did not exist.
+  Both now scan what they can read and warn about the rest, as they already
+  did for a path that could not be read, and an unreadable file inside the
+  tree is reported the same way.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

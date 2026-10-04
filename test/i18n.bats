@@ -1165,6 +1165,32 @@ SOURCE
   assert_output --partial "app.double ="
 }
 
+@test "a tree with an unreadable part is extracted with a warning, not dropped" {
+  # `find` failing on one subdirectory failed the assignment that captured its
+  # list: a script under errexit stopped there with no message at all, and one
+  # without it carried on as though the part it missed did not exist.
+  [[ "$(id -u)" != 0 ]] || skip "root reads every directory"
+  local tree="${BATS_TEST_TMPDIR}/src tree"
+  mkdir -p "${tree}/open" "${tree}/locked"
+  printf 'dybatpho::i18n_t app.open\n' > "${tree}/open/a.sh"
+  printf 'dybatpho::i18n_t app.hidden\n' > "${tree}/locked/b.sh"
+  printf 'dybatpho::i18n_t app.unreadable\n' > "${tree}/open/c.sh"
+  chmod 000 "${tree}/locked" "${tree}/open/c.sh"
+  local script="${BATS_TEST_TMPDIR}/extract.sh"
+  printf '%s\n' \
+    "set -e" \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules i18n" \
+    "dybatpho::i18n_extract --locale en $(printf '%q' "${tree}")" > "${script}"
+
+  run --separate-stderr bash "${script}"
+  chmod 700 "${tree}/locked"
+  chmod 600 "${tree}/open/c.sh"
+  assert_success
+  assert_output --partial "app.open ="
+  assert_stderr --partial "Cannot read everything under"
+  assert_stderr --partial "Cannot read '${tree}/open/c.sh'"
+}
+
 @test "a plural call produces every category of the target language" {
   local source="${BATS_TEST_TMPDIR}/app.sh"
   printf 'dybatpho::i18n_tn app.files 5\n' > "${source}"

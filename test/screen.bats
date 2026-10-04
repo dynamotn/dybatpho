@@ -406,6 +406,56 @@ screen_raw() {
 # dybatpho::screen_sparkline, dybatpho::screen_barchart, dybatpho::screen_chart
 # =============================================================================
 
+# @description Draw every widget that reads an array by name from arrays
+#   called `$1`, and print the rows they drew.
+draw_named() {
+  dybatpho::screen_clear
+  local -n named="$1"
+  named=("a,b" "1,2")
+  dybatpho::screen_table "0 0 20 3" "$1" header:true delimiter:,
+  named=(One Two)
+  dybatpho::screen_tabs "0 3 20 1" "$1" active:1
+  named=(1 5 3 8)
+  dybatpho::screen_sparkline "0 4 10 1" "$1"
+  dybatpho::screen_chart "0 5 10 2" "$1"
+  dybatpho::screen_barchart "0 7 20 3" "$1"
+  local -a values=(1 5 3)
+  named=(a b c)
+  dybatpho::screen_barchart "20 7 20 3" values "labels:$1"
+  local row
+  for ((row = 0; row < 10; row++)); do
+    screen_row "${row}"
+    printf '\n'
+  done
+}
+
+@test "rectangles, layouts and widgets work whatever the caller named its variables" {
+  # Each of these writes or reads through a name the caller chose, so a name
+  # shared with one of their own locals lost the result or drew nothing.
+  local expected inner center name
+  dybatpho::screen_rect_inner inner "0 0 10 6" 1
+  dybatpho::screen_rect_center center "0 0 10 10" 4 2
+  local -a parts=()
+  dybatpho::screen_layout parts vertical "0 0 100 30" length:3 fill:1
+  expected="$(draw_named zz_safe)"
+  [[ "${expected}" == *One*Two* ]]
+  for name in x y width height margin inner_width inner_height want_width \
+    rect options rows_var result_var direction sizes index total offset; do
+    unset "${name}"
+    dybatpho::screen_rect_inner "${name}" "0 0 10 6" 1
+    assert_equal "${!name}" "${inner}"
+    dybatpho::screen_rect_center "${name}" "0 0 10 10" 4 2
+    assert_equal "${!name}" "${center}"
+    unset "${name}"
+    local -a "${name}=()"
+    dybatpho::screen_layout "${name}" vertical "0 0 100 30" length:3 fill:1
+    local -n laid="${name}"
+    assert_equal "${laid[*]}" "${parts[*]}"
+    unset -n laid
+    assert_equal "$(draw_named "${name}")" "${expected}"
+  done
+}
+
 @test "dybatpho::screen_sparkline scales the series to the block ladder" {
   local -a samples=(0 4 8)
   dybatpho::screen_sparkline "0 0 10 1" samples

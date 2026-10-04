@@ -675,13 +675,33 @@ function dybatpho::screen_rect {
 #   draws nothing
 #######################################
 function dybatpho::screen_layout {
-  local result_var direction rect
-  dybatpho::expect_args result_var direction rect -- "$@"
-  dybatpho::expect_ref "${result_var}"
-  shift 3
-  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one constraint"
+  # The parts are worked out under a name of the module's own and only then
+  # written through the caller's: a caller array named like one of the working
+  # locals (`rect`, `sizes`, `width`) would otherwise receive nothing.
+  (($# >= 3)) || dybatpho::die "${FUNCNAME[0]}: Expected args: result_var direction rect constraint..."
+  dybatpho::expect_ref "$1"
+  (($# > 3)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one constraint"
+  local -a __dybatpho_screen_l_parts=()
+  __dybatpho_screen_layout_into __dybatpho_screen_l_parts "${@:2}"
+  local -n __dybatpho_screen_l_result="$1"
+  __dybatpho_screen_l_result=(${__dybatpho_screen_l_parts[@]+"${__dybatpho_screen_l_parts[@]}"})
+  return 0
+}
 
-  local -n __dybatpho_screen_l_out="${result_var}"
+#######################################
+# @description Split a rectangle into parts by constraint, for
+#   `dybatpho::screen_layout`, which it reports refusals under.
+# @arg $1 string Name of the array receiving the rectangles
+# @arg $2 string `vertical` or `horizontal`
+# @arg $3 string Rectangle to split
+# @arg $@ string One constraint per part
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_screen_layout_into {
+  local -n __dybatpho_screen_l_out="$1"
+  local direction="$2" rect="$3"
+  shift 3
   local x y width height
   read -r x y width height <<< "${rect}"
 
@@ -689,7 +709,7 @@ function dybatpho::screen_layout {
   case "${direction}" in
     vertical) total="${height}" ;;
     horizontal) total="${width}" ;;
-    *) dybatpho::die "${FUNCNAME[0]}: Direction must be vertical or horizontal, got '${direction}'" ;;
+    *) dybatpho::die "${FUNCNAME[1]}: Direction must be vertical or horizontal, got '${direction}'" ;;
   esac
   ((total > 0)) || total=0
 
@@ -702,37 +722,37 @@ function dybatpho::screen_layout {
     caps[index]=-1
     case "${constraint}" in
       length:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[0]}" "A length" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A length" "${value}" 0
         sizes[index]="${value}"
         ;;
       percent:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[0]}" "A percentage" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A percentage" "${value}" 0
         sizes[index]=$((total * value / 100))
         ;;
       ratio:*)
         [[ "${value}" =~ ^([0-9]+)/([0-9]+)$ ]] \
-          || dybatpho::die "${FUNCNAME[0]}: A ratio must be written A/B, got '${value}'"
+          || dybatpho::die "${FUNCNAME[1]}: A ratio must be written A/B, got '${value}'"
         ((BASH_REMATCH[2] > 0)) \
-          || dybatpho::die "${FUNCNAME[0]}: A ratio cannot be divided by zero"
+          || dybatpho::die "${FUNCNAME[1]}: A ratio cannot be divided by zero"
         sizes[index]=$((total * BASH_REMATCH[1] / BASH_REMATCH[2]))
         ;;
       min:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[0]}" "A minimum" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A minimum" "${value}" 0
         sizes[index]="${value}"
         weights[index]=1
         ;;
       max:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[0]}" "A maximum" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A maximum" "${value}" 0
         weights[index]=1
         caps[index]="${value}"
         ;;
       fill:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[0]}" "A fill weight" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A fill weight" "${value}" 0
         weights[index]="${value}"
         ;;
       *)
         dybatpho::die \
-          "${FUNCNAME[0]}: Unknown constraint '${constraint}', expected length:, percent:, ratio:, min:, max: or fill:"
+          "${FUNCNAME[1]}: Unknown constraint '${constraint}', expected length:, percent:, ratio:, min:, max: or fill:"
         ;;
     esac
     fixed=$((fixed + sizes[index]))
@@ -811,17 +831,35 @@ function dybatpho::screen_layout {
 #######################################
 function dybatpho::screen_rect_inner {
   dybatpho::expect_ref "$1"
+  # Worked out under a name of the module's own and only then written through
+  # the caller's: a caller variable named like one of the working locals
+  # (`width`, `x`, `margin`) would otherwise receive nothing.
+  local __dybatpho_screen_in_result
+  __dybatpho_screen_rect_inner_into __dybatpho_screen_in_result "${2-}" "${3:-1}"
   local -n __dybatpho_screen_in_out="$1"
-  local margin="${3:-1}"
+  __dybatpho_screen_in_out="${__dybatpho_screen_in_result}"
+  return 0
+}
+
+#######################################
+# @description Shrink a rectangle by a margin on every side.
+# @arg $1 string Name of the variable receiving the rectangle
+# @arg $2 string Rectangle to shrink
+# @arg $3 number Margin in cells
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_screen_rect_inner_into {
+  local -n __dybatpho_screen_in_ref="$1"
+  local margin="$3"
   local x y width height
-  read -r x y width height <<< "${2-}"
+  read -r x y width height <<< "$2"
 
   local inner_width=$((width - margin * 2))
   local inner_height=$((height - margin * 2))
   ((inner_width > 0)) || inner_width=0
   ((inner_height > 0)) || inner_height=0
-  __dybatpho_screen_in_out="$((x + margin)) $((y + margin)) ${inner_width} ${inner_height}"
-  return 0
+  __dybatpho_screen_in_ref="$((x + margin)) $((y + margin)) ${inner_width} ${inner_height}"
 }
 
 #######################################
@@ -839,16 +877,34 @@ function dybatpho::screen_rect_inner {
 #######################################
 function dybatpho::screen_rect_center {
   dybatpho::expect_ref "$1"
+  # Worked out under a module name first, for the reason given in
+  # `dybatpho::screen_rect_inner`.
+  local __dybatpho_screen_c_result
+  __dybatpho_screen_rect_center_into __dybatpho_screen_c_result "${2-}" "${3:-0}" "${4:-0}"
   local -n __dybatpho_screen_c_out="$1"
-  local want_width="${3:-0}" want_height="${4:-0}"
+  __dybatpho_screen_c_out="${__dybatpho_screen_c_result}"
+  return 0
+}
+
+#######################################
+# @description Centre a rectangle of a given size inside another.
+# @arg $1 string Name of the variable receiving the rectangle
+# @arg $2 string Rectangle to centre inside
+# @arg $3 number Wanted width
+# @arg $4 number Wanted height
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_screen_rect_center_into {
+  local -n __dybatpho_screen_c_ref="$1"
+  local want_width="$3" want_height="$4"
   local x y width height
-  read -r x y width height <<< "${2-}"
+  read -r x y width height <<< "$2"
 
   ((want_width <= width)) || want_width="${width}"
   ((want_height <= height)) || want_height="${height}"
-  __dybatpho_screen_c_out="$((x + (width - want_width) / 2)) $((y + (height - want_height) / 2))"
-  __dybatpho_screen_c_out+=" ${want_width} ${want_height}"
-  return 0
+  __dybatpho_screen_c_ref="$((x + (width - want_width) / 2)) $((y + (height - want_height) / 2))"
+  __dybatpho_screen_c_ref+=" ${want_width} ${want_height}"
 }
 
 #######################################
@@ -1524,12 +1580,14 @@ function dybatpho::screen_list {
 # @tip `widths:` takes a comma-separated list of column widths; without it the columns share the space evenly
 #######################################
 function dybatpho::screen_table {
-  local rect="${1-}" rows_var="${2-}"
+  # The caller's array is copied before any local is declared: a plain local
+  # sharing its name (`rect`, `options`, `width`) would be read instead.
+  local -a __dybatpho_screen_table_rows=()
+  __dybatpho_screen_copy_array __dybatpho_screen_table_rows "${2-}"
+  local rect="${1-}"
   shift 2 2> /dev/null || true
   local -A options=()
   __dybatpho_screen_options options "$@"
-  local -a __dybatpho_screen_table_rows=()
-  __dybatpho_screen_copy_array __dybatpho_screen_table_rows "${rows_var}"
 
   local x y width height
   read -r x y width height <<< "${rect}"
@@ -1690,12 +1748,14 @@ function dybatpho::screen_gauge {
 # @exitcode 0 Always
 #######################################
 function dybatpho::screen_tabs {
-  local rect="${1-}" tabs_var="${2-}"
+  # The caller's array is copied before any local is declared: a plain local
+  # sharing its name (`rect`, `options`, `width`) would be read instead.
+  local -a __dybatpho_screen_tabs_items=()
+  __dybatpho_screen_copy_array __dybatpho_screen_tabs_items "${2-}"
+  local rect="${1-}"
   shift 2 2> /dev/null || true
   local -A options=()
   __dybatpho_screen_options options "$@"
-  local -a __dybatpho_screen_tabs_items=()
-  __dybatpho_screen_copy_array __dybatpho_screen_tabs_items "${tabs_var}"
 
   local x y width height
   read -r x y width height <<< "${rect}"
@@ -1787,12 +1847,14 @@ function dybatpho::screen_scrollbar {
 # @tip Without `max:` the line scales to its own largest value, so a quiet series still fills the row
 #######################################
 function dybatpho::screen_sparkline {
-  local rect="${1-}" data_var="${2-}"
+  # The caller's array is copied before any local is declared: a plain local
+  # sharing its name (`rect`, `options`, `width`) would be read instead.
+  local -a __dybatpho_screen_spark_data=()
+  __dybatpho_screen_copy_array __dybatpho_screen_spark_data "${2-}"
+  local rect="${1-}"
   shift 2 2> /dev/null || true
   local -A options=()
   __dybatpho_screen_options options "$@"
-  local -a __dybatpho_screen_spark_data=()
-  __dybatpho_screen_copy_array __dybatpho_screen_spark_data "${data_var}"
 
   local x y width height
   read -r x y width height <<< "${rect}"
@@ -1842,21 +1904,24 @@ function dybatpho::screen_sparkline {
 #   whole one
 #######################################
 function dybatpho::screen_barchart {
-  local rect="${1-}" data_var="${2-}"
+  # Both caller arrays, the values and the labels the options name, are copied
+  # before any plain local is declared: one sharing their name (`rect`,
+  # `options`, `width`) would be read instead.
+  local -a __dybatpho_screen_bar_data=() __dybatpho_screen_bar_names=()
+  __dybatpho_screen_copy_array __dybatpho_screen_bar_data "${2-}"
+  local -A __dybatpho_screen_bar_options=()
+  __dybatpho_screen_options __dybatpho_screen_bar_options "${@:3}"
+  if [[ -n "${__dybatpho_screen_bar_options[labels]-}" ]]; then
+    __dybatpho_screen_copy_array __dybatpho_screen_bar_names "${__dybatpho_screen_bar_options[labels]}"
+  fi
+  local rect="${1-}"
   shift 2 2> /dev/null || true
   local -A options=()
   __dybatpho_screen_options options "$@"
-  local -a __dybatpho_screen_bar_data=()
-  __dybatpho_screen_copy_array __dybatpho_screen_bar_data "${data_var}"
 
   local x y width height
   read -r x y width height <<< "${rect}"
   ((width > 0 && height > 0)) || return 0
-
-  local -a __dybatpho_screen_bar_names=()
-  if [[ -n "${options[labels]-}" ]]; then
-    __dybatpho_screen_copy_array __dybatpho_screen_bar_names "${options[labels]}"
-  fi
 
   local maximum="${options[max]:-0}" point
   if ((maximum <= 0)); then
@@ -1955,12 +2020,14 @@ function __dybatpho_screen_braille_table {
 #   cheap
 #######################################
 function dybatpho::screen_chart {
-  local rect="${1-}" data_var="${2-}"
+  # The caller's array is copied before any local is declared: a plain local
+  # sharing its name (`rect`, `options`, `width`) would be read instead.
+  local -a __dybatpho_screen_chart_data=()
+  __dybatpho_screen_copy_array __dybatpho_screen_chart_data "${2-}"
+  local rect="${1-}"
   shift 2 2> /dev/null || true
   local -A options=()
   __dybatpho_screen_options options "$@"
-  local -a __dybatpho_screen_chart_data=()
-  __dybatpho_screen_copy_array __dybatpho_screen_chart_data "${data_var}"
 
   local x y width height
   read -r x y width height <<< "${rect}"

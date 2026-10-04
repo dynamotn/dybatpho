@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::metrics_timer_start` accepted any name and left the refusal to
   the stop. All three now check up front and name themselves.
 
+- **`screen` — rectangles, layouts and widgets work whatever your variables
+  are called.** `dybatpho::screen_rect_inner`, `dybatpho::screen_rect_center`
+  and `dybatpho::screen_layout` left a variable named like one of their working
+  locals (`x`, `width`, `rect`, `sizes` and so on) empty, and
+  `dybatpho::screen_table`, `screen_tabs`, `screen_sparkline`, `screen_chart`
+  and `screen_barchart` drew nothing from an array called `rect`, `options`
+  or, for bar chart labels, `width`.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

@@ -113,6 +113,21 @@ teardown() {
   assert_equal "${out}" "from-mode-env"
 }
 
+@test "secret_write_file and secret_with_file use the secret whatever its variable is named" {
+  # Both read the secret through the caller's variable name, after declaring
+  # locals such as `path`, `directory` and `descriptor`; a secret held in a
+  # variable with one of those names was replaced by the function's own value.
+  local each target="${BATS_TEST_TMPDIR}/written"
+  for each in path directory staging previous_umask descriptor fallback argument command status; do
+    unset "${each}"
+    printf -v "${each}" '%s' "s3cret-${each}"
+    rm -f "${target}"
+    dybatpho::secret_write_file "${target}" "${each}"
+    assert_equal "$(cat "${target}")" "s3cret-${each}"
+    assert_equal "$(dybatpho::secret_with_file "${each}" cat '{}')" "s3cret-${each}"
+  done
+}
+
 @test "secret_from_env copies the value and unsets the source variable" {
   export APP_TOKEN="environment-secret"
   local TOKEN

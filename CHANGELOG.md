@@ -79,6 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every entry resolve under the root of the filesystem; it now falls back to
   the user cache directory, as at load time.
 
+- **`secret` — `secret_write_file` and `secret_with_file` use your secret
+  whatever its variable is called.** A secret held in a variable named like one
+  of their locals -- `path`, `directory`, `descriptor` and others -- was
+  replaced by the function's own value: `secret_write_file` wrote the
+  destination path into the secret file instead of the secret.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

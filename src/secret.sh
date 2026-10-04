@@ -414,26 +414,29 @@ function dybatpho::secret_read {
 # @tip The file is created with mode 600 through a private temporary file and moved into place atomically
 #######################################
 function dybatpho::secret_write_file {
-  local path __dybatpho_secret_var
-  dybatpho::expect_args path __dybatpho_secret_var -- "$@"
+  local __dybatpho_secret_path __dybatpho_secret_var
+  dybatpho::expect_args __dybatpho_secret_path __dybatpho_secret_var -- "$@"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
   local -n __dybatpho_secret_source="${__dybatpho_secret_var}"
   [[ -n "${__dybatpho_secret_source:-}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty"
 
-  local directory
-  directory="$(dirname -- "${path}")"
-  dybatpho::is dir "${directory}" || dybatpho::die "Directory of secret file doesn't exist: ${directory}"
+  local __dybatpho_secret_directory
+  __dybatpho_secret_directory="$(dirname -- "${__dybatpho_secret_path}")"
+  dybatpho::is dir "${__dybatpho_secret_directory}" \
+    || dybatpho::die "Directory of secret file doesn't exist: ${__dybatpho_secret_directory}"
 
-  local staging previous_umask
-  previous_umask="$(umask)"
+  local __dybatpho_secret_staging __dybatpho_secret_previous_umask
+  __dybatpho_secret_previous_umask="$(umask)"
   umask 077
-  staging="${path}.dybatpho_secret.${BASHPID}"
-  : > "${staging}" || dybatpho::die "Cannot create secret file: ${staging}"
-  chmod 600 "${staging}"
-  printf '%s\n' "${__dybatpho_secret_source}" > "${staging}"
-  umask "${previous_umask}"
-  mv -f "${staging}" "${path}" || dybatpho::die "Cannot write secret file: ${path}"
+  __dybatpho_secret_staging="${__dybatpho_secret_path}.dybatpho_secret.${BASHPID}"
+  : > "${__dybatpho_secret_staging}" \
+    || dybatpho::die "Cannot create secret file: ${__dybatpho_secret_staging}"
+  chmod 600 "${__dybatpho_secret_staging}"
+  printf '%s\n' "${__dybatpho_secret_source}" > "${__dybatpho_secret_staging}"
+  umask "${__dybatpho_secret_previous_umask}"
+  mv -f "${__dybatpho_secret_staging}" "${__dybatpho_secret_path}" \
+    || dybatpho::die "Cannot write secret file: ${__dybatpho_secret_path}"
 }
 
 #######################################
@@ -455,9 +458,12 @@ function dybatpho::secret_with_file {
   local -n __dybatpho_secret_source="${__dybatpho_secret_var}"
   [[ -n "${__dybatpho_secret_source:-}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty"
+  # Read before any other local exists: the nameref resolves at each use, and a
+  # caller variable named `path` or `descriptor` would otherwise be shadowed.
+  local __dybatpho_secret_value="${__dybatpho_secret_source}"
 
   local descriptor path fallback=false
-  exec {descriptor}< <(printf '%s\n' "${__dybatpho_secret_source}")
+  exec {descriptor}< <(printf '%s\n' "${__dybatpho_secret_value}")
   path="/dev/fd/${descriptor}"
   if ! dybatpho::is readable "${path}"; then
     # kcov(disabled)
@@ -470,7 +476,7 @@ function dybatpho::secret_with_file {
     # dyshellint disable=BSG046 # created under the umask set above, which `create_temp` does not take
     path="$(mktemp "${TMPDIR:-/tmp}/dybatpho_secret_${BASHPID}_XXXXXXXX")"
     umask "${previous_umask}"
-    printf '%s\n' "${__dybatpho_secret_source}" > "${path}"
+    printf '%s\n' "${__dybatpho_secret_value}" > "${path}"
     # kcov(enabled)
   fi
 

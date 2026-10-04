@@ -190,6 +190,7 @@ dybatpho::secret_wipe TOKEN
   child processes.
 - **FR-019**: `secret_mask_run` MUST return the command's own exit code whether or not `pipefail` is set, and the masker's only when the command succeeded, and MUST leave `pipefail` as the caller had it.
 - **FR-020**: The secret readers MUST fill the variable the caller named, and `secret_from_env` MUST read the environment variable the caller named, whatever those names are, including names the functions use for their own locals.
+- **FR-021**: `secret_write_file` and `secret_with_file` MUST use the secret held in the variable the caller named, whatever that name is, including names the functions use for their own locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -245,6 +246,7 @@ dybatpho::secret_wipe TOKEN
 - **IT-013**: Verify JSON logging masks registered secrets.
 - **IT-014**: Run `secret_mask_run` on a command exiting 3 in a shell with `pipefail` off and verify it returns 3 and leaves `pipefail` off.
 - **IT-015**: Read a secret from the environment, a file, stdin and `secret_read` into variables named `path`, `name`, `mode`, `prompt`, `variable` and `source`, and from an environment variable named `mode`.
+- **IT-016**: Write and pass on secrets held in variables named `path`, `directory`, `staging`, `previous_umask`, `descriptor`, `fallback`, `argument`, `command` and `status`, and get each secret back.
 
 ## Acceptance Criteria *(mandatory)*
 

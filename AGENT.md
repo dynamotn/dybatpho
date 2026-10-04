@@ -457,6 +457,18 @@ entry missing from the published notes.
   `$(...)`, to a function that can reach `dybatpho::die`, and each one must be
   fixed or listed, with the reason it cannot carry on wrongly, in
   `test/die-in-substitution.allow`.
+- Prefix every local of a function that runs its caller's code -- a command
+  after `--`, a callback, a handler, a spec -- or that binds a nameref to a
+  name its caller chose, with `__dybatpho_<module>_`. Bash scopes variables
+  dynamically, so the caller's code sees those locals: a plain `status` or
+  `name` hides the caller's variable of that name, and the code can overwrite
+  the function's state through it. A library function that must hand such a
+  prefixed name to a public helper which refuses `__dybatpho` names, like
+  `dybatpho::create_temp`, uses its internal counterpart
+  (`__dybatpho_create_temp_into`). `test/conventions.bats` holds the line:
+  `test/scope-leak.awk` finds those functions, following code handed on with
+  `"$@"`, and each plain local must be prefixed or the function listed, with
+  its reason, in `test/scope-leak.allow`.
 - Validate and quote every option or variable inserted into generated shell code.
 
 ## CLI change workflow

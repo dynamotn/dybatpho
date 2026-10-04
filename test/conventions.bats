@@ -294,3 +294,25 @@ fail_with() {
   done
   [ -z "${problems}" ] || fail_with "Spec ids must be unique and well formed:" "${problems}"
 }
+
+@test "no caller's code or variable name can reach a function's plain locals" {
+  # Bash scopes variables dynamically: code a function runs for its caller --
+  # a command after `--`, a callback, a handler -- sees that function's locals,
+  # and so does a nameref bound to a name the caller chose. A plain local such
+  # as `status` or `name` then hides the caller's variable or is overwritten
+  # through it. `scope-leak.awk` finds such functions; `scope-leak.allow` lists
+  # the ones reviewed as safe, each with its reason.
+  local scan violations="" file fn kind name line
+  local -A allowed=()
+  while IFS=$'\t' read -r file fn _; do
+    [[ -z "${file}" || "${file}" == \#* ]] || allowed["${file}"$'\t'"${fn}"]=1
+  done < "${REPO_ROOT}/test/scope-leak.allow"
+  scan="$(cd "${REPO_ROOT}" && awk -v allow=test/scope-leak.allow -f test/scope-leak.awk src/*.sh scripts/*.sh init.sh)"
+  while IFS=$'\t' read -r file fn kind name line; do
+    [ -n "${file}" ] || continue
+    [[ -z "${allowed["${file}"$'\t'"${fn}"]-}" ]] || continue
+    violations+="${file}:${line}: ${fn} (${kind}) has plain local ${name}"$'\n'
+  done <<< "${scan}"
+  [ -z "${violations}" ] ||
+    fail_with "Plain locals a caller's code or variable name can reach (prefix them with __dybatpho_<module>_, or review and list the function in test/scope-leak.allow):" "${violations}"
+}

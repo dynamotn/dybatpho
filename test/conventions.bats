@@ -197,3 +197,54 @@ fail_with() {
   [ -z "${violations}" ] ||
     fail_with "Output assertions that ignore their here document (add \`-\`):" "${violations}"
 }
+
+@test "no function leaves files in the working directory when a path is empty or a directory" {
+  # A writer handed an empty path, a path ending in `/`, or a directory used to
+  # stage its file in the working directory and leave it there when the move
+  # failed; when that directory is the repository, a test running in parallel
+  # sees a stray file. Every call below runs from an empty directory, with the
+  # home, cache, state and temporary directories pointed elsewhere so a
+  # legitimate write cannot land in it, and the directory has to stay empty
+  # apart from what the test put there.
+  local work="${BATS_TEST_TMPDIR}/cwd" elsewhere="${BATS_TEST_TMPDIR}/elsewhere"
+  mkdir -p "${work}/taken" "${elsewhere}"
+  local script="${BATS_TEST_TMPDIR}/probe.sh"
+  {
+    printf 'cd %q\n' "${work}"
+    printf 'export HOME=%q TMPDIR=%q XDG_CACHE_HOME=%q XDG_STATE_HOME=%q XDG_DATA_HOME=%q\n' \
+      "${elsewhere}" "${elsewhere}" "${elsewhere}/cache" "${elsewhere}/state" "${elsewhere}/data"
+    printf '. %q/init.sh --modules all\n' "${REPO_ROOT}"
+    printf '%s\n' 'set +e' 'DYBATPHO_LOCK_DIR="" DYBATPHO_CACHE_DIR="" DYBATPHO_QUEUE_DIR=""' \
+      'DYBATPHO_SCHEDULE_DIR=""' 'export secret=value'
+    local target call
+    for target in "''" taken taken/; do
+      for call in \
+        "printf x | dybatpho::file_write_atomic ${target}" \
+        "dybatpho::file_replace ${target} a b" \
+        "dybatpho::file_ensure_line ${target} line" \
+        "dybatpho::file_remove_line ${target} line" \
+        "dybatpho::pid_file_write ${target}" \
+        "dybatpho::secret_write_file ${target} secret" \
+        "dybatpho::metrics_write ${target}" \
+        "dybatpho::config_save ${target}" \
+        "dybatpho::json_set '{}' a b ${target}" \
+        "dybatpho::archive_create /etc/hostname ${target}" \
+        "dybatpho::backup_create ${target} ${elsewhere}" \
+        "dybatpho::cache_set ${target} <<< value" \
+        "dybatpho::schedule_once_per day ${target} -- true"; do
+        printf '(%s) < /dev/null > /dev/null 2>&1\n' "${call}"
+      done
+    done
+    # A queue, a backup destination or an explicit lock path may name a
+    # directory on purpose, so those are only probed with an empty name.
+    printf '%s\n' "(dybatpho::queue_push '' payload) < /dev/null > /dev/null 2>&1" \
+      "(dybatpho::lock_acquire '') < /dev/null > /dev/null 2>&1" \
+      "(dybatpho::backup_create /etc/hostname '') < /dev/null > /dev/null 2>&1"
+    printf '%s\n' 'dybatpho::lock_acquire probe; dybatpho::lock_release probe' \
+      'dybatpho::cache_set probe <<< value' 'dybatpho::queue_push probe payload > /dev/null'
+  } > "${script}"
+
+  run_traced bash "${script}"
+  assert_equal "$(ls -A "${work}" | tr '\n' ' ')" "taken "
+  assert_equal "$(ls -A "${work}/taken" | tr '\n' ' ')" ""
+}

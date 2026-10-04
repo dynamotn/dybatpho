@@ -176,6 +176,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller's variables, and a command assigning `expected` could pass an
   assertion it should have failed. They are now prefixed.
 
+- **`logging` — a command run under `dybatpho::spinner` sees the caller's
+  variables.** It ran in the spinner's scope, where `message`, `animate`,
+  `spinner_pid`, `started` and `status` hid the caller's variables of the same
+  names. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

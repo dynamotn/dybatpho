@@ -1774,8 +1774,8 @@ function dybatpho::timer_end {
 # @tip Registered secrets are redacted in the message before it is drawn
 #######################################
 function dybatpho::spinner {
-  local message
-  dybatpho::expect_args message -- "$@"
+  local __dybatpho_log_spinner_message
+  dybatpho::expect_args __dybatpho_log_spinner_message -- "$@"
   shift
   [[ "${1-}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected -- between the message and the command"
@@ -1783,50 +1783,53 @@ function dybatpho::spinner {
   (($# > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected a command after --"
 
-  __dybatpho_log_redact message
+  __dybatpho_log_redact __dybatpho_log_spinner_message
 
-  local animate=false
+  local __dybatpho_log_spinner_animate=false
   case "${DYBATPHO_SPINNER}" in
     never) ;;
-    always) animate=true ;;
+    always) __dybatpho_log_spinner_animate=true ;;
     *)
       if [[ -t 2 ]] && dybatpho::compare_log_level info; then
-        animate=true
+        __dybatpho_log_spinner_animate=true
       fi
       ;;
   esac
 
-  local spinner_pid=""
-  if [[ "${animate}" == true ]]; then
-    __dybatpho_log_spin "${message}" &
-    spinner_pid=$!
+  local __dybatpho_log_spinner_spinner_pid=""
+  if [[ "${__dybatpho_log_spinner_animate}" == true ]]; then
+    __dybatpho_log_spin "${__dybatpho_log_spinner_message}" &
+    __dybatpho_log_spinner_spinner_pid=$!
   else
-    __dybatpho_log_inspect info "SPIN ⏳       " "${message}"
+    __dybatpho_log_inspect info "SPIN ⏳       " "${__dybatpho_log_spinner_message}"
   fi
 
-  local started status=0
-  started="$(__dybatpho_log_now_ms)"
-  "$@" || status=$?
+  local __dybatpho_log_spinner_started __dybatpho_log_spinner_status=0
+  __dybatpho_log_spinner_started="$(__dybatpho_log_now_ms)"
+  "$@" || __dybatpho_log_spinner_status=$?
 
-  if [[ -n "${spinner_pid}" ]]; then
-    kill "${spinner_pid}" 2> /dev/null || true
-    wait "${spinner_pid}" 2> /dev/null || true
+  if [[ -n "${__dybatpho_log_spinner_spinner_pid}" ]]; then
+    kill "${__dybatpho_log_spinner_spinner_pid}" 2> /dev/null || true
+    wait "${__dybatpho_log_spinner_spinner_pid}" 2> /dev/null || true
     # Erase the frame so the next line starts on a clean column, whether the
     # command printed anything of its own or not.
     printf '\r\033[K' >&2
   fi
 
-  local elapsed
-  elapsed=$(($(__dybatpho_log_now_ms) - started))
-  if ((elapsed < 0)); then
-    elapsed=0
+  local __dybatpho_log_spinner_elapsed
+  __dybatpho_log_spinner_elapsed=$(($(__dybatpho_log_now_ms) - __dybatpho_log_spinner_started))
+  if ((__dybatpho_log_spinner_elapsed < 0)); then
+    __dybatpho_log_spinner_elapsed=0
   fi
-  local extra_fields
-  printf -v extra_fields ',"elapsed_ms":%s,"exit_code":%s' "${elapsed}" "${status}"
+  local __dybatpho_log_spinner_extra_fields
+  printf -v __dybatpho_log_spinner_extra_fields ',"elapsed_ms":%s,"exit_code":%s' "${__dybatpho_log_spinner_elapsed}" \
+    "${__dybatpho_log_spinner_status}"
+  local __dybatpho_log_spinner_done="${__dybatpho_log_spinner_message} finished in"
+  __dybatpho_log_spinner_done+=" ${__dybatpho_log_spinner_elapsed}ms with exit code ${__dybatpho_log_spinner_status}"
   __dybatpho_log_inspect debug "SPIN ⏳       " \
-    "${message} finished in ${elapsed}ms with exit code ${status}" 0 "" "${extra_fields}"
+    "${__dybatpho_log_spinner_done}" 0 "" "${__dybatpho_log_spinner_extra_fields}"
 
-  return "${status}"
+  return "${__dybatpho_log_spinner_status}"
 }
 
 #######################################

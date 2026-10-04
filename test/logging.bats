@@ -1158,3 +1158,13 @@ assert event["duration_ms"] >= 0
   assert_success
   assert_output $'日本 語\nテキ'
 }
+
+@test "a command run under a spinner sees the caller's variables, not the spinner's" {
+  # The command runs in the spinner's scope, where its locals hid the caller's
+  # variables of the same names.
+  local message="caller" animate="caller" spinner_pid="caller" started="caller" status="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s %s %s\n' "${message}" "${animate}" "${spinner_pid}" "${started}" "${status}" > "${seen}"; }
+  DYBATPHO_SPINNER=never dybatpho::spinner "working" -- look 2> /dev/null
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller"
+}

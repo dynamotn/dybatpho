@@ -421,6 +421,7 @@ dybatpho::log_context clear
   strings by byte or by character, and MUST NOT start another process.
 - **FR-036**: The display-width string cache MUST be bounded, so a long run
   measuring endless distinct strings does not grow without limit.
+- **FR-037**: A command run by `spinner` MUST see the caller's variables: the spinner MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -533,6 +534,7 @@ dybatpho::log_context clear
   it allows, and find the cache within the limit.
 - **IT-024**: Wrap a line that fits in columns but not in bytes under the C
   locale, and get it on one line; wrap a longer one at its space.
+- **IT-025**: Run a command under a spinner that reads variables named like the spinner's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

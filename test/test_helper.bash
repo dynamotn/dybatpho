@@ -214,6 +214,7 @@ function path_without {
       continue
     fi
     for target in "${entry}"/*; do
+      [[ -e "${target}" || -L "${target}" ]] || continue
       name="${target##*/}"
       [[ "${name}" != "${tool}" ]] || continue
       [[ -e "${bin}/${name}" ]] || ln -s "${target}" "${bin}/${name}" 2> /dev/null

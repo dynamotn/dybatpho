@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`helpers` — `dybatpho::expect_args` fills a variable whatever its name.**
+  The names and arguments were collected into plain locals, so a function that
+  declared `variable_name`, `variable_names` or `is_error` and named it in
+  `expect_args` never received the value.
+
 - **`array` — `dybatpho::array_map` maps an array named `status`.** The
   function kept the mapper's exit status in a local of that name, so a caller
   whose array was called `status` got it back unmapped.

@@ -127,30 +127,30 @@ DYBATPHO_REPL_HISTORY_FILE="${HOME}/.cache/dybatpho_repl.history"
 # @arg $@ string Variable names, then `--`, then the arguments to bind
 #######################################
 function dybatpho::expect_args {
-  local -a variable_names=()
-  local is_error=1
+  local -a __dybatpho_expect_names=()
+  local __dybatpho_expect_unsplit=1
 
   while (($#)); do
     if [[ "$1" = -- ]]; then
-      is_error=0
+      __dybatpho_expect_unsplit=0
       shift
       break
     fi
-    variable_names+=("$1")
+    __dybatpho_expect_names+=("$1")
     shift
   done
 
-  ((is_error)) \
+  ((__dybatpho_expect_unsplit)) \
     && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"' # kcov(skip)
 
-  local variable_name
-  for variable_name in "${variable_names[@]}"; do
-    [[ "${variable_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
-      || dybatpho::die "${FUNCNAME[1]:--}: Invalid variable name: ${variable_name}"
+  local __dybatpho_expect_name
+  for __dybatpho_expect_name in "${__dybatpho_expect_names[@]}"; do
+    [[ "${__dybatpho_expect_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+      || dybatpho::die "${FUNCNAME[1]:--}: Invalid variable name: ${__dybatpho_expect_name}"
     if ! (($#)); then
-      dybatpho::die "${FUNCNAME[1]:--}: Expected args: ${variable_names[*]:-}" # kcov(skip)
+      dybatpho::die "${FUNCNAME[1]:--}: Expected args: ${__dybatpho_expect_names[*]:-}" # kcov(skip)
     fi
-    printf -v "${variable_name}" '%s' "$1"
+    printf -v "${__dybatpho_expect_name}" '%s' "$1"
     shift
   done
 }

@@ -46,6 +46,18 @@ setup() {
   assert_stderr --partial "Invalid variable name: bad-name"
 }
 
+@test "dybatpho::expect_args fills a caller variable named like its own locals" {
+  # The arguments were collected into plain locals, so a caller variable with
+  # one of their names was shadowed and never received its value.
+  local name
+  for name in variable_name variable_names is_error; do
+    eval "_probe() { local ${name}; dybatpho::expect_args ${name} -- \"\$@\"; printf '%s' \"\${${name}}\"; }"
+    run_traced _probe "value of ${name}"
+    assert_success
+    assert_output "value of ${name}"
+  done
+}
+
 @test "dybatpho::still_has_args logic" {
   declare -a opts=('opt1' 'opt2' '--opt3')
   run_traced dybatpho::still_has_args "${opts[@]}"

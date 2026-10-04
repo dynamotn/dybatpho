@@ -86,7 +86,6 @@ src/file.sh	__dybatpho_xdg_dir_into	__dybatpho_xdg_dir	the HOME check that could
 src/forge.sh	__dybatpho_forge_or_die	dybatpho::forge_error	only shapes a message for the die that follows
 src/forge.sh	dybatpho::forge_api	dybatpho::forge_host	an empty kind is reported as an unknown forge, status 1
 src/forge.sh	dybatpho::forge_api	dybatpho::forge_kind	an empty kind is reported as an unknown forge, status 1
-src/forge.sh	dybatpho::forge_issue_report	dybatpho::forge_issue_find	read under `if`; a refusal reads as no open issue (a separate class: failure taken for absence)
 src/forge.sh	dybatpho::forge_issue_report	dybatpho::forge_issue_url	the number was checked by the request that returned it
 src/forge.sh	dybatpho::forge_kind	dybatpho::forge_host	an empty host is reported as an unknown forge, status 1
 src/i18n.sh	__dybatpho_i18n_discover	__dybatpho_i18n_roots	with no HOME the user catalogue directory is simply not searched

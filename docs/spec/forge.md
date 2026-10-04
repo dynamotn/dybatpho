@@ -171,6 +171,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   `DYBATPHO_FORGE`, `DYBATPHO_FORGE_REPO` and `DYBATPHO_FORGE_API` answer it, and
   a remote, forge or token that can't be resolved MUST stop the script.
 - **FR-017**: `forge_issue_report` MUST fail when the forge refuses to open the issue, instead of reporting an issue with no number.
+- **FR-018**: `forge_issue_find` MUST exit 1 only when the lookup succeeded and no open issue matches, and 2 when the lookup itself failed; `forge_issue_report` MUST create nothing and fail when the lookup failed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -228,6 +229,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   the remote no more than one read takes, reads it not at all when every value
   is overridden, and stops on a remote, a host or an override it can't use.
 - **IT-026**: Report an issue whose creation the forge refuses with HTTP 403, and fail without printing a created report.
+- **IT-027**: Answer the issue search with a 502, and see `forge_issue_find` exit 2 and `forge_issue_report` fail without sending a POST.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -645,6 +645,7 @@ function __dybatpho_forge_or_die {
 # @stdout Issue number, or nothing when no open issue has that title
 # @exitcode 0 A matching issue exists
 # @exitcode 1 No open issue has that title
+# @exitcode 2 The lookup itself failed, so whether one is open is unknown
 #######################################
 function dybatpho::forge_issue_find {
   local title
@@ -658,25 +659,27 @@ function dybatpho::forge_issue_find {
 
   case "${kind}" in
     github)
-      dybatpho::forge_request GET "issues?state=open&per_page=100" "" "${body}" || return 1
+      dybatpho::forge_request GET "issues?state=open&per_page=100" "" "${body}" || return 2
       local title_json
       title_json=$(dybatpho::json_string "${title}")
       number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == ${title_json}) | .number" | head -n 1)"
+        ".[] | select(.title == ${title_json}) | .number")" || return 2
       ;;
     gitlab)
       local url_encode
       url_encode=$(dybatpho::url_encode "${title}")
       dybatpho::forge_request GET \
-        "issues?state=opened&search=${url_encode}&in=title" "" "${body}" || return 1
+        "issues?state=opened&search=${url_encode}&in=title" "" "${body}" || return 2
       local json_string
       json_string=$(dybatpho::json_string "${title}")
       number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == ${json_string}) | .iid" | head -n 1)"
+        ".[] | select(.title == ${json_string}) | .iid")" || return 2
       ;;
     *) ;;
   esac
 
+  # The first match wins, as the list comes back newest first.
+  number="${number%%$'\n'*}"
   [[ -n "${number}" && "${number}" != "null" ]] || return 1
   printf '%s\n' "${number}"
 }
@@ -773,16 +776,26 @@ function dybatpho::forge_issue_report {
   dybatpho::expect_args title body -- "$@"
   local labels="${3-}"
 
-  local number action
-  if number="$(dybatpho::forge_issue_find "${title}")"; then
-    dybatpho::forge_issue_comment "${number}" "${body}"
-    action="commented"
-  else
-    # A refusal ends this substitution with its status; going on would report
-    # an issue that was never opened.
-    number="$(dybatpho::forge_issue_create "${title}" "${body}" "${labels}")" || return $?
-    action="created"
-  fi
+  local number action status=0
+  number="$(dybatpho::forge_issue_find "${title}")" || status=$?
+  case "${status}" in
+    0)
+      dybatpho::forge_issue_comment "${number}" "${body}"
+      action="commented"
+      ;;
+    1)
+      # A refusal ends this substitution with its status; going on would report
+      # an issue that was never opened.
+      number="$(dybatpho::forge_issue_create "${title}" "${body}" "${labels}")" || return $?
+      action="created"
+      ;;
+    *)
+      # A lookup that failed says nothing about whether the issue is open, and
+      # opening one anyway files a duplicate on every transient error.
+      dybatpho::error "${FUNCNAME[0]}: Could not look for an open issue titled ${title}"
+      return "${status}"
+      ;;
+  esac
 
   local forge_issue_url
   forge_issue_url=$(dybatpho::forge_issue_url "${number}")

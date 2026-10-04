@@ -396,6 +396,7 @@ endpoint, so the open issues are compared here. Both are exact matches, so
 
 - `0`: A matching issue exists
 - `1`: No open issue has that title
+- `2`: The lookup itself failed, so whether one is open is unknown
 
 
 ---

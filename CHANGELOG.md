@@ -91,6 +91,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `file_remove_line` pointed at a directory moved their staging file inside it
   and reported success; they now stop before writing anything.
 
+- **`forge` — a failed issue search no longer opens a duplicate issue.**
+  `dybatpho::forge_issue_report` read any failure of the search as "no open
+  issue", so a transient API error filed a second issue next to the one
+  already tracking the failure. `dybatpho::forge_issue_find` now exits 2 when
+  the search itself fails, keeping 1 for no match, and the report fails
+  without creating anything.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

@@ -354,8 +354,10 @@ curl_payload() {
 
 @test "dybatpho::forge_issue_report opens an issue when none is open yet" {
   # The search returns nothing, so the create route answers the POST.
-  dybatpho::mock_http "issues?state=open" 200 '[]'
+  # The lookup URL also contains the create path, and the last matching route
+  # answers, so the lookup's route goes last.
   dybatpho::mock_http "/repos/acme/widget/issues" 201 '{"number":30}'
+  dybatpho::mock_http "issues?state=open" 200 '[]'
 
   # Two layers of care here. `run` keeps a rejected request inside this test,
   # because the module reports one with `dybatpho::die`. And the result is
@@ -373,13 +375,43 @@ curl_payload() {
   # The issue was created inside a command substitution, so a refusal ended
   # only that substitution: the report went on with no issue number, built a
   # link to it, and succeeded.
-  dybatpho::mock_http "issues?state=open" 200 '[]'
   dybatpho::mock_http "/repos/acme/widget/issues" 403 '{"message":"Resource not accessible"}'
+  dybatpho::mock_http "issues?state=open" 200 '[]'
 
   run --separate-stderr dybatpho::forge_issue_report "Nightly failing" "log url" "ci"
   assert_failure
   refute_output --partial '"action":"created"'
   assert_stderr --partial "Could not create issue"
+}
+
+@test "dybatpho::forge_issue_report opens nothing when the lookup fails" {
+  # A failed search read as "no open issue", so a transient API error opened a
+  # second issue next to the one already tracking the failure.
+  DYBATPHO_CURL_MAX_RETRIES=0
+  dybatpho::mock_http "/repos/acme/widget/issues" 201 '{"number":30}'
+  dybatpho::mock_http "issues?state=open" 502 '{"message":"Bad gateway"}'
+
+  run --separate-stderr dybatpho::forge_issue_report "Nightly failing" "log url" "ci"
+  assert_failure
+  refute_output --partial '"action":"created"'
+  local calls
+  calls="$(dybatpho::mock_calls curl)"
+  [[ "${calls}" != *"-X POST"* && "${calls}" != *"--request POST"* ]] || {
+    printf 'an issue was created after the lookup failed:\n%s\n' "${calls}" >&2
+    return 1
+  }
+}
+
+@test "dybatpho::forge_issue_find tells a failed lookup from no match" {
+  DYBATPHO_CURL_MAX_RETRIES=0
+  dybatpho::mock_http "issues?state=open" 200 '[]'
+  run_traced -1 dybatpho::forge_issue_find "Nightly failing"
+
+  dybatpho::unmock_all
+  dybatpho::mock_http "issues?state=open" 502 '{"message":"Bad gateway"}'
+  run --separate-stderr dybatpho::forge_issue_find "Nightly failing"
+  assert_equal "${status}" "2"
+  assert_output ""
 }
 
 @test "dybatpho::forge_issue_report comments on the issue that is already open" {

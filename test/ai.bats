@@ -782,6 +782,23 @@ _test_tool() { printf 'tool output\n'; }
   assert_output "Hello world"
 }
 
+@test "dybatpho::ai_stream succeeds when the server lingers after [DONE]" {
+  # The loop stopped reading at `[DONE]` and read curl's exit status at once,
+  # before the substitution had written it; a connection the server closed a
+  # moment later therefore read as a failed request.
+  local sse_file="${BATS_TEST_TMPDIR}/stream-linger.sse"
+  {
+    printf 'data: {"type":"content_block_delta","delta":{"text":"Hello"}}\n'
+    printf 'data: [DONE]\n'
+  } > "${sse_file}"
+  local script=": hdr=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -D ]; then hdr=\"\${a}\"; fi; prev=\"\${a}\"; done;"
+  stub_repeated curl "${script} printf 'HTTP/1.1 200 X\\r\\n\\r\\n' > \"\${hdr}\"; cat '${sse_file}'; sleep 1"
+
+  run_traced --separate-stderr dybatpho::ai_stream "hi"
+  assert_success
+  assert_output "Hello"
+}
+
 @test "dybatpho::ai_stream reports an HTTP error instead of an empty answer" {
   # A refused request streams an error object, which matches no delta filter;
   # read without its status it printed an empty line and returned 0.

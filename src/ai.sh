@@ -1522,15 +1522,22 @@ function dybatpho::ai_stream {
   stream_args+=(--max-time "${DYBATPHO_AI_TIMEOUT}")
   [[ -n "${stream_config}" ]] && stream_args+=(--config "${stream_config}")
 
-  local line data body=""
+  local line data body="" finished=false
   # Server-sent events prefix every payload with `data: `; Ollama streams bare
   # JSON objects. Both are handled by stripping an optional prefix per line.
   # The payload arrives on stdin, so it is not an argument either. Each payload
   # is also kept, so an error response can be reported by its message.
+  # Reading carries on to the end even after `[DONE]`: the substitution writes
+  # curl's exit status only once curl has exited, and the end of its output is
+  # the one point at which that file is known to be written.
   while IFS= read -r line; do
+    [[ "${finished}" == false ]] || continue
     [[ -z "${line}" ]] && continue
     data="${line#data: }"
-    [[ "${data}" == "[DONE]" ]] && break
+    if [[ "${data}" == "[DONE]" ]]; then
+      finished=true
+      continue
+    fi
     [[ "${data}" == event:* ]] && continue
     body+="${data}"$'\n'
     __dybatpho_ai_stream_chunk "${data}" "${filter}"

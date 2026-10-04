@@ -155,6 +155,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DYBATPHO_METRICS_QUANTILES` became invalid after a summary was recorded, the
   refusal ended only that substitution and the push reported success. The
   quantiles are now checked before anything is rendered or sent.
+- **`ai` — a stream the server closes a moment after `[DONE]` is no longer
+  reported as failed.** `dybatpho::ai_stream` stopped reading at `[DONE]` and
+  read curl's exit status straight away, before the stream had finished
+  writing it, so a connection the server held open briefly read as a failed
+  request: the answer was printed and the call still returned 1 with "Error
+  when access". It now reads the stream to its end first.
 
 ## [6.0.0] - 2026-10-04
 

@@ -153,6 +153,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 
 ## Edge Cases
 
+- The server keeps the connection open for a moment after sending `[DONE]`.
 - No backend configured, or a pinned backend whose credentials are missing.
 - Neither `yq` nor `jq` is installed.
 - Prompts containing quotes, backslashes, newlines, or non-ASCII text.
@@ -247,6 +248,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-033**: The backend MUST be resolved in the caller's shell, and a call MUST fail with the request's status when the provider refuses or cannot be reached, so that neither an unknown backend nor a failed request is reported as an empty answer; `ai_chat` MUST NOT record a failed call's output as the assistant's turn.
 - **FR-034**: A request MUST NOT be sent when the backend needs an API key and none is set; the call MUST stop before the request, while a `DRY_RUN` rehearsal MUST still work without a key.
 - **FR-035**: The `cli` backend MUST look up its command in the caller's shell, so that a configured or detected client that is not installed stops the call with status 127 instead of answering with nothing.
+- **FR-036**: `ai_stream` MUST read the stream to its end before judging curl's exit status, so a server that closes the connection after `[DONE]` is not reported as a failed request.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -323,6 +325,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-029**: Ask with no API key set and fail without sending a request; rehearse the same call under `DRY_RUN` and succeed.
 - **IT-030**: Ask through the `cli` backend with `DYBATPHO_AI_CLI` naming a command that does not exist, and fail with 127 and no answer.
 - **IT-031**: Answer an HTTP 500 to `ai_json` with retries left, and fail after one request without reporting invalid JSON.
+- **IT-032**: Stream a response whose server lingers after `[DONE]`, and return the answer with exit 0.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -208,13 +208,13 @@ function dybatpho::secret_mask_run {
   # The status of a pipeline is its last command's unless `pipefail` is on, and
   # the last command is the masker, which always succeeds. `pipefail` is turned
   # on for this one pipeline and put back the way the caller had it.
-  local had_pipefail=false status=0
-  [[ ! -o pipefail ]] || had_pipefail=true
+  local __dybatpho_secret_mr_had_pipefail=false __dybatpho_secret_mr_status=0
+  [[ ! -o pipefail ]] || __dybatpho_secret_mr_had_pipefail=true
   set -o pipefail
   # shellcheck disable=SC2119 # Masking reads the piped stream, not our arguments.
-  "$@" 2>&1 | dybatpho::secret_mask || status=$?
-  [[ "${had_pipefail}" == true ]] || set +o pipefail
-  return "${status}"
+  "$@" 2>&1 | dybatpho::secret_mask || __dybatpho_secret_mr_status=$?
+  [[ "${__dybatpho_secret_mr_had_pipefail}" == true ]] || set +o pipefail
+  return "${__dybatpho_secret_mr_status}"
 }
 
 #######################################
@@ -475,40 +475,40 @@ function dybatpho::secret_with_file {
   # caller variable named `path` or `descriptor` would otherwise be shadowed.
   local __dybatpho_secret_value="${__dybatpho_secret_source}"
 
-  local descriptor path fallback=false
-  exec {descriptor}< <(printf '%s\n' "${__dybatpho_secret_value}")
-  path="/dev/fd/${descriptor}"
-  if ! dybatpho::is readable "${path}"; then
+  local __dybatpho_secret_wf_descriptor __dybatpho_secret_wf_path __dybatpho_secret_wf_fallback=false
+  exec {__dybatpho_secret_wf_descriptor}< <(printf '%s\n' "${__dybatpho_secret_value}")
+  __dybatpho_secret_wf_path="/dev/fd/${__dybatpho_secret_wf_descriptor}"
+  if ! dybatpho::is readable "${__dybatpho_secret_wf_path}"; then
     # kcov(disabled)
-    exec {descriptor}<&-
-    fallback=true
+    exec {__dybatpho_secret_wf_descriptor}<&-
+    __dybatpho_secret_wf_fallback=true
     dybatpho::warn "/dev/fd isn't available, falling back to a private temporary file"
-    local previous_umask
-    previous_umask="$(umask)"
+    local __dybatpho_secret_wf_previous_umask
+    __dybatpho_secret_wf_previous_umask="$(umask)"
     umask 077
     # dyshellint disable=BSG046 # created under the umask set above, which `create_temp` does not take
-    path="$(mktemp "${TMPDIR:-/tmp}/dybatpho_secret_${BASHPID}_XXXXXXXX")"
-    umask "${previous_umask}"
-    printf '%s\n' "${__dybatpho_secret_value}" > "${path}"
+    __dybatpho_secret_wf_path="$(mktemp "${TMPDIR:-/tmp}/dybatpho_secret_${BASHPID}_XXXXXXXX")"
+    umask "${__dybatpho_secret_wf_previous_umask}"
+    printf '%s\n' "${__dybatpho_secret_value}" > "${__dybatpho_secret_wf_path}"
     # kcov(enabled)
   fi
 
-  local -a command=()
-  local argument
-  for argument in "$@"; do
-    command+=("${argument//\{\}/${path}}")
+  local -a __dybatpho_secret_wf_command=()
+  local __dybatpho_secret_wf_argument
+  for __dybatpho_secret_wf_argument in "$@"; do
+    __dybatpho_secret_wf_command+=("${__dybatpho_secret_wf_argument//\{\}/${__dybatpho_secret_wf_path}}")
   done
 
-  local status=0
-  "${command[@]}" || status=$?
-  if [[ "${fallback}" == true ]]; then
+  local __dybatpho_secret_wf_status=0
+  "${__dybatpho_secret_wf_command[@]}" || __dybatpho_secret_wf_status=$?
+  if [[ "${__dybatpho_secret_wf_fallback}" == true ]]; then
     # kcov(disabled)
-    dybatpho::secret_shred "${path}"
+    dybatpho::secret_shred "${__dybatpho_secret_wf_path}"
     # kcov(enabled)
   else
-    exec {descriptor}<&-
+    exec {__dybatpho_secret_wf_descriptor}<&-
   fi
-  return "${status}"
+  return "${__dybatpho_secret_wf_status}"
 }
 
 #######################################

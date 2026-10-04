@@ -544,3 +544,18 @@ teardown() {
   dybatpho::secret_shred "${file}"
   assert_file_not_exist "${file}"
 }
+
+@test "a command run with a secret, or masked, sees the caller's variables" {
+  # The command runs in the library's scope, where its locals hid the caller's
+  # variables of the same names.
+  local path="caller" descriptor="caller" fallback="caller" status="caller" command="caller" had_pipefail="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen" token="s3cr3t-value"
+  look() {
+    printf '%s %s %s %s %s %s\n' "${path}" "${descriptor}" "${fallback}" "${status}" "${command}" \
+      "${had_pipefail}" > "${seen}"
+  }
+  dybatpho::secret_with_file token look {}
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+  dybatpho::secret_mask_run look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
+}

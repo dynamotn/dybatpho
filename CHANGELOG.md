@@ -139,6 +139,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assigning to `name` changed the metric the time was recorded under. They are
   now prefixed.
 
+- **`secret` — a command run with a secret sees the caller's variables.**
+  `dybatpho::secret_with_file` and `dybatpho::secret_mask_run` ran the command
+  in their own scope, where locals such as `path`, `descriptor`, `command` and
+  `status` hid the caller's variables of the same names. They are now
+  prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

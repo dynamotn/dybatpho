@@ -250,6 +250,29 @@ setup() {
   assert_failure
 }
 
+@test "dybatpho::snapshot_scrub takes a pattern holding the old separator" {
+  # The substitution was built with `|` as its separator, so a pattern holding
+  # one -- a literal `|` in a basic expression -- broke `sed`, the text came
+  # back empty, and the first run recorded an empty snapshot as the baseline.
+  dybatpho::snapshot_scrub 'id=[0-9]*|' 'id=<N>|'
+  dybatpho::assert_snapshot piped "row id=42|done"
+  assert_equal "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/piped.snap")" "row id=<N>|done"
+}
+
+@test "dybatpho::snapshot_scrub refuses an expression sed cannot run" {
+  run_traced --separate-stderr dybatpho::snapshot_scrub 'a\(' 'b'
+  assert_failure
+  assert_stderr --partial "not a substitution sed can run"
+  assert_equal "${#DYBATPHO_TEST_SNAPSHOT_SCRUBS[@]}" 0
+
+  # One that slips past registration still fails the snapshot instead of
+  # recording an empty one.
+  DYBATPHO_TEST_SNAPSHOT_SCRUBS+=('s/(/')
+  run_traced --separate-stderr dybatpho::assert_snapshot broken "anything"
+  assert_failure
+  assert_file_not_exist "${DYBATPHO_TEST_SNAPSHOT_DIR}/broken.snap"
+}
+
 @test "dybatpho::assert_cli_snapshot captures stdout, stderr, and the exit code" {
   dybatpho::assert_cli_snapshot cli-run -- bash -c 'printf "out\n"; printf "err\n" >&2; exit 3'
 

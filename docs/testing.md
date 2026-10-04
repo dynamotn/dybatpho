@@ -510,6 +510,14 @@ dybatpho::snapshot_scrub '/tmp/[A-Za-z0-9_]*' '<TMPDIR>'
 
 - **`DYBATPHO_TEST_SNAPSHOT_SCRUBS`** (Appends): the substitution
 
+**📤 Output on stderr**
+
+- An error when `sed` cannot run the substitution
+
+**🚦 Exit codes**
+
+- `1`: The substitution is not one `sed` can run; nothing is registered
+
 
 ---
 

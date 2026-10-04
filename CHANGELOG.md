@@ -177,6 +177,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   occurred. `dybatpho::file_is_binary` read nothing from a file it had no
   permission to read and called it text; it now stops with "Cannot read file".
 
+- **`testing` — a snapshot scrub can no longer blank the snapshot.**
+  `dybatpho::snapshot_scrub` built its substitution with `|` as the separator,
+  so a pattern holding a literal `|` broke `sed`; the scrubbed text then came
+  back empty, `dybatpho::assert_snapshot` compared the empty string, and on a
+  first run recorded it as the baseline. The separator is now a control
+  character, an expression `sed` cannot run is refused when it is registered,
+  and a substitution that still fails makes the snapshot assertion fail.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

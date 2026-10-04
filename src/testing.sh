@@ -504,13 +504,25 @@ function dybatpho::assert_yaml_has {
 # @arg $1 string Basic regular expression understood by `sed`
 # @arg $2 string Replacement text
 # @set DYBATPHO_TEST_SNAPSHOT_SCRUBS Appends the substitution
+# @stderr An error when `sed` cannot run the substitution
+# @exitcode 1 The substitution is not one `sed` can run; nothing is registered
 # @tip Use this to remove timestamps, temporary paths, and process ids that would
 #      otherwise make a snapshot fail on every run.
 #######################################
 function dybatpho::snapshot_scrub {
   local pattern replacement
   dybatpho::expect_args pattern replacement -- "$@"
-  DYBATPHO_TEST_SNAPSHOT_SCRUBS+=("s|${pattern}|${replacement}|g")
+  # The separator is a control character rather than `|`, which a basic
+  # expression reads as a literal and a scrub may well need to match.
+  local separator=$'\001' expression
+  expression="s${separator}${pattern}${separator}${replacement}${separator}g"
+  # Tried once on empty input, so a broken expression is refused here rather
+  # than blanking every snapshot it is later applied to.
+  if ! sed -e "${expression}" < /dev/null > /dev/null 2>&1; then
+    dybatpho::error "${FUNCNAME[0]}: '${pattern}' -> '${replacement}' is not a substitution sed can run"
+    return 1
+  fi
+  DYBATPHO_TEST_SNAPSHOT_SCRUBS+=("${expression}")
 }
 
 #######################################
@@ -526,6 +538,7 @@ function dybatpho::snapshot_scrub_reset {
 # @description Normalize text for snapshotting by stripping colors and applying scrubs.
 # @arg $1 string Text to normalize
 # @stdout Normalized text
+# @exitcode 1 A registered substitution failed
 # @internal
 #######################################
 function __dybatpho_test_normalize {
@@ -534,7 +547,9 @@ function __dybatpho_test_normalize {
   text="$(dybatpho::text_strip_ansi "${text}")"
   local script
   for script in ${DYBATPHO_TEST_SNAPSHOT_SCRUBS[@]+"${DYBATPHO_TEST_SNAPSHOT_SCRUBS[@]}"}; do
-    text="$(printf '%s\n' "${text}" | sed -e "${script}")"
+    # `sed` ends the pipeline, so its status is the substitution's: a failure
+    # must not pass on the empty text it leaves behind.
+    text="$(printf '%s\n' "${text}" | sed -e "${script}")" || return 1
   done
   printf '%s' "${text}"
 }
@@ -590,7 +605,10 @@ function dybatpho::assert_snapshot {
   else
     actual="$(cat)"
   fi
-  actual="$(__dybatpho_test_normalize "${actual}")"
+  if ! actual="$(__dybatpho_test_normalize "${actual}")"; then
+    __dybatpho_test_fail "Snapshot ${name} could not be scrubbed: a registered substitution failed"
+    return 1
+  fi
 
   local snapshot_file="${DYBATPHO_TEST_SNAPSHOT_DIR%/}/${name}.snap"
   if [[ ! -f "${snapshot_file}" ]] || __dybatpho_test_updating_snapshots; then

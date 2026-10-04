@@ -101,6 +101,52 @@ function __dybatpho_safety_absolute_path {
 }
 
 #######################################
+# @description Resolve the directories of a normalized absolute path through
+#   their symbolic links, and keep the last component as it is.
+#   The deepest directory that exists is resolved with `cd -P`; the components
+#   below it, which do not exist yet, are appended unchanged. The last
+#   component is never followed: `rm` and `mv` act on a link itself, not on
+#   what it points to, so a link is judged where it is.
+# @arg $1 string Normalized absolute path
+# @stdout The path with its directories resolved
+# @internal
+#######################################
+function __dybatpho_safety_physical_path {
+  local path
+  dybatpho::expect_args path -- "$@"
+  if [[ "${path}" == "/" ]]; then
+    printf '/\n'
+    return 0
+  fi
+  local parent="${path%/*}" leaf="${path##*/}" rest="" resolved
+  parent="${parent:-/}"
+  while [[ ! -d "${parent}" ]]; do
+    rest="/${parent##*/}${rest}"
+    parent="${parent%/*}"
+    parent="${parent:-/}"
+  done
+  resolved="$(CDPATH='' cd -P -- "${parent}" 2> /dev/null && pwd)" || resolved="${parent}"
+  printf '%s\n' "${resolved%/}${rest}/${leaf}"
+}
+
+#######################################
+# @description Resolve a directory through its symbolic links, or keep the
+#   path as it is when it is not a directory that can be entered.
+# @arg $1 string Normalized absolute path
+# @stdout The resolved directory, or the path unchanged
+# @internal
+#######################################
+function __dybatpho_safety_physical_dir {
+  local path resolved
+  dybatpho::expect_args path -- "$@"
+  if resolved="$(CDPATH='' cd -P -- "${path}" 2> /dev/null && pwd)"; then
+    printf '%s\n' "${resolved}"
+  else
+    printf '%s\n' "${path}"
+  fi
+}
+
+#######################################
 # @description Approve an operation from a force flag, otherwise ask for confirmation.
 # @arg $1 bool Force flag value
 # @arg $2 string Question shown when confirmation is needed
@@ -199,9 +245,13 @@ function dybatpho::confirm {
 
 #######################################
 # @description Validate a path before a destructive operation and print it as an absolute path.
+#   The checks are made on the path as written and on the path its
+#   directories resolve to through symbolic links, so a link inside a safe
+#   root that points elsewhere cannot carry the operation out of it. The last
+#   component is not followed, as `rm` and `mv` act on a link itself.
 # @arg $1 string Path to validate
 # @arg $2 string Optional wording used in error messages, default is `path`
-# @stdout Normalized absolute path
+# @stdout Normalized absolute path, as written
 # @exitcode 1 Stop the script when the path is empty, protected, or outside `DYBATPHO_SAFE_ROOTS`
 # @env DYBATPHO_SAFE_ROOTS string Colon-separated roots the path must stay inside when set
 # @env DYBATPHO_PROTECTED_PATHS string Extra colon-separated paths that are always rejected
@@ -212,29 +262,52 @@ function dybatpho::assert_safe_path {
   local description="${2:-path}"
   [[ -n "${path//[[:space:]]/}" ]] || dybatpho::die "Refusing to use an empty ${description}"
 
-  local absolute_path protected_path
+  local absolute_path physical_path shown protected_path protected_physical candidate
   absolute_path="$(__dybatpho_safety_absolute_path "${path}")"
+  physical_path="$(__dybatpho_safety_physical_path "${absolute_path}")"
+  shown="${absolute_path}"
+  [[ "${physical_path}" == "${absolute_path}" ]] || shown="${absolute_path} (resolves to ${physical_path})"
   local safety_protected_paths_output
   safety_protected_paths_output=$(__dybatpho_safety_protected_paths)
   while IFS= read -r protected_path || [[ -n "${protected_path}" ]]; do
-    [[ "${absolute_path}" != "${protected_path}" ]] \
-      || dybatpho::die "Refusing to touch protected ${description}: ${absolute_path}"
+    [[ -n "${protected_path}" ]] || continue
+    # A first-level directory lives under `/`, which is never a link, so it is
+    # elsewhere only when it is a link itself, like `/tmp` on macOS; skipping
+    # the others saves a process each. A deeper path such as `${HOME}` may pass
+    # through a link anywhere, and is always resolved.
+    protected_physical="${protected_path}"
+    if [[ -L "${protected_path}" || "${protected_path#/}" == */* ]]; then
+      protected_physical="$(__dybatpho_safety_physical_dir "${protected_path}")"
+    fi
+    for candidate in "${protected_path}" "${protected_physical}"; do
+      if [[ "${absolute_path}" == "${candidate}" || "${physical_path}" == "${candidate}" ]]; then
+        # Ends the shell, so `run` hides it: "rejects empty and protected paths" runs it
+        dybatpho::die "Refusing to touch protected ${description}: ${shown}" # kcov(skip)
+      fi
+    done
   done < <(printf '%s' "${safety_protected_paths_output}")
 
   if [[ -n "${DYBATPHO_SAFE_ROOTS}" ]]; then
     local -a roots=()
-    local root root_absolute is_inside=false
+    local root root_absolute root_physical is_inside=false
     IFS=':' read -r -a roots <<< "${DYBATPHO_SAFE_ROOTS}"
     for root in "${roots[@]}"; do
       [[ -n "${root}" ]] || continue
       root_absolute="$(__dybatpho_safety_absolute_path "${root}")"
-      if [[ "${absolute_path}" == "${root_absolute}" || "${absolute_path}" == "${root_absolute%/}/"* ]]; then
+      root_physical="$(__dybatpho_safety_physical_dir "${root_absolute}")"
+      # The root itself as written, which may be a link, or anything beneath
+      # where it resolves to.
+      if [[ "${absolute_path}" == "${root_absolute}" || "${physical_path}" == "${root_physical}" ]]; then
+        is_inside=true
+        break
+      fi
+      if [[ "${physical_path}" == "${root_physical%/}/"* ]]; then
         is_inside=true
         break
       fi
     done
     dybatpho::is true "${is_inside}" \
-      || dybatpho::die "Refusing to touch ${description} outside DYBATPHO_SAFE_ROOTS: ${absolute_path}"
+      || dybatpho::die "Refusing to touch ${description} outside DYBATPHO_SAFE_ROOTS: ${shown}"
   fi
   printf '%s\n' "${absolute_path}"
 }

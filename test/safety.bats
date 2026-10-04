@@ -79,6 +79,43 @@ setup() {
   assert_output --partial "outside DYBATPHO_SAFE_ROOTS"
 }
 
+@test "dybatpho::assert_safe_path compares a root that does not exist yet as written" {
+  local root="${BATS_TEST_TMPDIR}/root"
+  mkdir -p "${root}"
+
+  DYBATPHO_SAFE_ROOTS="${root}/new" run_traced dybatpho::assert_safe_path "${root}/new/file"
+  assert_success
+  assert_output "${root}/new/file"
+}
+
+@test "dybatpho::assert_safe_path follows the links in the directories of a path" {
+  local root="${BATS_TEST_TMPDIR}/root" outside="${BATS_TEST_TMPDIR}/outside"
+  mkdir -p "${root}" "${outside}/keep"
+  ln -s "${outside}" "${root}/link"
+  local outside_physical
+  outside_physical="$(cd -P -- "${outside}" && pwd)"
+
+  # Inside the root as written, outside it once the link is followed.
+  DYBATPHO_SAFE_ROOTS="${root}" run dybatpho::assert_safe_path "${root}/link/file"
+  assert_failure
+  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${root}/link/file (resolves to ${outside_physical}/file)"
+
+  # The link itself is inside the root: removing it does not touch its target.
+  DYBATPHO_SAFE_ROOTS="${root}" run_traced dybatpho::assert_safe_path "${root}/link"
+  assert_success
+  assert_output "${root}/link"
+
+  # A root given through a link still admits the paths beneath it.
+  DYBATPHO_SAFE_ROOTS="${root}/link" run_traced dybatpho::assert_safe_path "${root}/link/file"
+  assert_success
+  assert_output "${root}/link/file"
+
+  # A protected directory reached through a link is still protected.
+  DYBATPHO_PROTECTED_PATHS="${outside}/keep" run dybatpho::assert_safe_path "${root}/link/keep"
+  assert_failure
+  assert_output --partial "Refusing to touch protected path: ${root}/link/keep"
+}
+
 # ---------------------------------------------------------------------------
 # safe_rm
 # ---------------------------------------------------------------------------

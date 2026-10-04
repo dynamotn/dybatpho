@@ -81,6 +81,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when called directly under `set -e`; inside `$(...)` it worked. It now prints
   `10.00`.
 
+### Security
+
+- **`safety` — a symbolic link in a directory of a path no longer carries a
+  guarded operation out of `DYBATPHO_SAFE_ROOTS`.** `dybatpho::assert_safe_path`
+  compared the path only as written, so with `DYBATPHO_SAFE_ROOTS=/work`,
+  `dybatpho::safe_rm -r /work/link/data` passed the check and removed
+  `/etc/data` when `/work/link` pointed at `/etc`. The directories of the path,
+  of each root and of each protected path are now resolved before they are
+  compared, and the error names where the path resolves to. The last component
+  is still not followed, so removing or replacing a link inside a root acts on
+  the link, and the printed path is the one written.
+
 ## [6.0.1] - 2026-10-04
 
 ### Fixed

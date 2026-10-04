@@ -37,8 +37,10 @@ of every waiting job of a lower priority, and one pushed with `--delay` or
 | --- | --- | --- |
 | **`DYBATPHO_QUEUE_DIR`** | string | Base directory for bare queue names, default is the XDG state directory |
 | **`DYBATPHO_QUEUE_TIMEOUT`** | number | Seconds to wait for the queue lock, default is `10` |
+| **`DYBATPHO_QUEUE_POLL_INTERVAL`** | number | Seconds between attempts at a busy queue lock, default is `0.05` |
 | **`DYBATPHO_QUEUE_DIR`** | string | Where a bare queue name resolves to |
 | **`DYBATPHO_QUEUE_TIMEOUT`** | number | Seconds a queue operation waits for the lock, default is `10` |
+| **`DYBATPHO_QUEUE_POLL_INTERVAL`** | number | Seconds between attempts at a busy queue lock, default is `0.05` |
 
 ### 🚀 Highlights
 

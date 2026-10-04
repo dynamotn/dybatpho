@@ -34,6 +34,7 @@
 #   slash is used as the directory itself
 # @env DYBATPHO_QUEUE_DIR string Base directory for bare queue names, default is the XDG state directory
 # @env DYBATPHO_QUEUE_TIMEOUT number Seconds to wait for the queue lock, default is `10`
+# @env DYBATPHO_QUEUE_POLL_INTERVAL number Seconds between attempts at a busy queue lock, default is `0.05`
 # @see
 #   - `example/queue_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -42,6 +43,8 @@
 DYBATPHO_QUEUE_DIR="${DYBATPHO_QUEUE_DIR:-}"
 # @env DYBATPHO_QUEUE_TIMEOUT number Seconds a queue operation waits for the lock, default is `10`
 DYBATPHO_QUEUE_TIMEOUT="${DYBATPHO_QUEUE_TIMEOUT:-10}"
+# @env DYBATPHO_QUEUE_POLL_INTERVAL number Seconds between attempts at a busy queue lock, default is `0.05`
+DYBATPHO_QUEUE_POLL_INTERVAL="${DYBATPHO_QUEUE_POLL_INTERVAL:-0.05}"
 
 #######################################
 # @description Resolve a queue name to its directory, into a named variable.
@@ -94,6 +97,24 @@ function __dybatpho_queue_prepare {
 #######################################
 function __dybatpho_queue_lock {
   printf '%s/.lock\n' "$1"
+}
+
+#######################################
+# @description Take a queue's lock, waiting up to `DYBATPHO_QUEUE_TIMEOUT`.
+#   A queue operation holds its lock for a few file operations, so a waiter
+#   looks again every `DYBATPHO_QUEUE_POLL_INTERVAL` rather than at the lock
+#   module's once a second: against workers that take the lock straight back,
+#   a waiter that looked that rarely could miss every free moment and fail
+#   after its whole wait.
+# @arg $1 string Lock path
+# @exitcode 0 The lock is held
+# @exitcode 1 It stayed taken for the whole wait
+# @internal
+#######################################
+function __dybatpho_queue_acquire {
+  # shellcheck disable=SC2034 # read by dybatpho::lock_acquire
+  local DYBATPHO_LOCK_POLL_INTERVAL="${DYBATPHO_QUEUE_POLL_INTERVAL}"
+  dybatpho::lock_acquire "$1" "${DYBATPHO_QUEUE_TIMEOUT}"
 }
 
 #######################################
@@ -338,7 +359,7 @@ function dybatpho::queue_push {
 
   local lock
   lock="$(__dybatpho_queue_lock "${directory}")"
-  dybatpho::lock_acquire "${lock}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
+  __dybatpho_queue_acquire "${lock}" || return 1
 
   local identifier
   __dybatpho_queue_push_locked identifier "${directory}" "${text}" "${priority}" "${due}" 0
@@ -419,7 +440,7 @@ function dybatpho::queue_pop {
 
   local __dybatpho_queue_lock_path
   __dybatpho_queue_lock_path="$(__dybatpho_queue_lock "${__dybatpho_queue_directory}")"
-  dybatpho::lock_acquire "${__dybatpho_queue_lock_path}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
+  __dybatpho_queue_acquire "${__dybatpho_queue_lock_path}" || return 1
 
   # Choosing and moving the job happen under one lock. Apart, two workers
   # would both read the same oldest job and both go on to run it.
@@ -631,7 +652,7 @@ function dybatpho::queue_requeue {
   # one step, so no worker can claim it before the count is in place.
   local lock
   lock="$(__dybatpho_queue_lock "${directory}")"
-  dybatpho::lock_acquire "${lock}" "${DYBATPHO_QUEUE_TIMEOUT}" || return 1
+  __dybatpho_queue_acquire "${lock}" || return 1
   __dybatpho_queue_push_locked fresh "${directory}" "${payload}" "${priority}" "${due}" "${attempts}"
   rm -f -- "${job}"
   __dybatpho_queue_sidecars "${directory}" "${identifier}" claimed

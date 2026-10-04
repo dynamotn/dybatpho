@@ -202,6 +202,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recorded such a subdirectory as an empty one and reported success. `diff_dir`
   now stops with exit 2, the snapshot is refused and nothing is left behind,
   and checking a snapshot whose tree cannot be read stops as well.
+- **`queue` — a push or pop no longer fails against busy workers.** A queue
+  operation waited for the queue lock by looking again once a second, so
+  against workers that kept taking the lock straight back it could miss every
+  free moment and give up after `DYBATPHO_QUEUE_TIMEOUT`, failing
+  `dybatpho::queue_push` or `dybatpho::queue_pop` while the lock was free most
+  of the time. Queue operations now look again every
+  `DYBATPHO_QUEUE_POLL_INTERVAL` seconds, `0.05` by default.
+
 - **`schedule` — a stale claim no longer lets two callers run in one period.**
   When several `dybatpho::schedule_once_per` callers found a claim left by a
   caller that died, each of them removed it, and one could remove the fresh

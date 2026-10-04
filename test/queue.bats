@@ -668,3 +668,30 @@ SCRIPT
   refute_stderr --partial "/queues"
   refute_output --partial "carried on"
 }
+
+@test "a queue operation gets a turn on a lock that others keep re-taking" {
+  # A queue operation holds its lock for milliseconds, but a waiter only looked
+  # again once a second, so against busy workers that took the lock straight
+  # back it could miss every free moment and fail after its full wait. The
+  # stand-in keeps the lock nine tenths of the time.
+  dybatpho::queue_push "${QUEUE}" seed > /dev/null
+  local holder="${BATS_TEST_TMPDIR}/holder.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules lock" \
+    'export DYBATPHO_LOCK_POLL_INTERVAL=0.01' \
+    'end=$((SECONDS + 4))' \
+    'while ((SECONDS < end)); do' \
+    '  dybatpho::lock_acquire "$1" 5 2> /dev/null || continue' \
+    '  sleep 0.54' \
+    '  dybatpho::lock_release "$1"' \
+    '  sleep 0.06' \
+    'done' > "${holder}"
+  bash "${holder}" "${QUEUE}/.lock" &
+  local holding=$!
+  sleep 0.2
+
+  run_traced dybatpho::queue_push "${QUEUE}" "made it"
+  kill "${holding}" 2> /dev/null || true
+  wait "${holding}" 2> /dev/null || true
+  assert_success
+}

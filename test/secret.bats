@@ -86,6 +86,33 @@ teardown() {
   assert_stderr --partial "symbolic link"
 }
 
+@test "the secret readers fill a variable whatever it is named" {
+  # Each writes the secret through the name the caller chose, and from_env also
+  # reads the environment variable named by the caller; names shared with the
+  # functions' own locals lost the secret or read the wrong variable.
+  local file="${BATS_TEST_TMPDIR}/secret"
+  printf 'from-file\n' > "${file}"
+  chmod 600 "${file}"
+  local each
+  for each in path name mode prompt variable source; do
+    unset "${each}"
+    export DYBATPHO_TEST_SECRET=from-env
+    dybatpho::secret_from_env "${each}" DYBATPHO_TEST_SECRET keep
+    assert_equal "${!each}" "from-env"
+    dybatpho::secret_read "${each}" env:DYBATPHO_TEST_SECRET
+    assert_equal "${!each}" "from-env"
+    dybatpho::secret_from_file "${each}" "${file}"
+    assert_equal "${!each}" "from-file"
+    dybatpho::secret_from_stdin "${each}" <<< "from-stdin"
+    assert_equal "${!each}" "from-stdin"
+  done
+  # The environment variable may itself carry one of those names.
+  local out
+  mode=from-mode-env
+  dybatpho::secret_from_env out mode keep
+  assert_equal "${out}" "from-mode-env"
+}
+
 @test "secret_from_env copies the value and unsets the source variable" {
   export APP_TOKEN="environment-secret"
   local TOKEN

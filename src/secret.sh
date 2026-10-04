@@ -299,14 +299,14 @@ function dybatpho::secret_check_permission {
 # @tip Permissions are validated with `dybatpho::secret_check_permission` before the file is read
 #######################################
 function dybatpho::secret_from_file {
-  local __dybatpho_secret_var path
-  dybatpho::expect_args __dybatpho_secret_var path -- "$@"
+  local __dybatpho_secret_var __dybatpho_secret_path
+  dybatpho::expect_args __dybatpho_secret_var __dybatpho_secret_path -- "$@"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
-  dybatpho::secret_check_permission "${path}"
+  dybatpho::secret_check_permission "${__dybatpho_secret_path}"
 
   local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
-  __dybatpho_secret_dest="$(< "${path}")"
-  [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "Secret file is empty: ${path}"
+  __dybatpho_secret_dest="$(< "${__dybatpho_secret_path}")"
+  [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "Secret file is empty: ${__dybatpho_secret_path}"
   dybatpho::secret_register "${__dybatpho_secret_dest}"
 }
 
@@ -324,22 +324,23 @@ function dybatpho::secret_from_file {
 # @tip The source variable is unset by default so the secret isn't inherited by child processes
 #######################################
 function dybatpho::secret_from_env {
-  local __dybatpho_secret_var name mode
-  dybatpho::expect_args __dybatpho_secret_var name -- "$@"
-  mode="${3:-unset}"
+  local __dybatpho_secret_var __dybatpho_secret_name __dybatpho_secret_mode
+  dybatpho::expect_args __dybatpho_secret_var __dybatpho_secret_name -- "$@"
+  __dybatpho_secret_mode="${3:-unset}"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
-  [[ "${name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Invalid environment variable name: ${name}"
-  case "${mode}" in
+  [[ "${__dybatpho_secret_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid environment variable name: ${__dybatpho_secret_name}"
+  case "${__dybatpho_secret_mode}" in
     keep | unset) ;;                                                                   # kcov(skip)
-    *) dybatpho::die "${FUNCNAME[0]}: Expected \`keep\` or \`unset\`, got: ${mode}" ;; # kcov(skip)
+    *) dybatpho::die "${FUNCNAME[0]}: Expected \`keep\` or \`unset\`, got: ${__dybatpho_secret_mode}" ;; # kcov(skip)
   esac
 
-  [[ -n "${!name:-}" ]] || dybatpho::die "Environment variable \`${name}\` isn't set or is empty"
+  [[ -n "${!__dybatpho_secret_name:-}" ]] \
+    || dybatpho::die "Environment variable \`${__dybatpho_secret_name}\` isn't set or is empty"
   local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
-  __dybatpho_secret_dest="${!name}"
+  __dybatpho_secret_dest="${!__dybatpho_secret_name}"
   dybatpho::secret_register "${__dybatpho_secret_dest}"
-  [[ "${mode}" == unset ]] && unset -v "${name}"
+  [[ "${__dybatpho_secret_mode}" == unset ]] && unset -v "${__dybatpho_secret_name}"
   return 0
 }
 
@@ -357,16 +358,16 @@ function dybatpho::secret_from_env {
 # @tip Reads a single line; use `dybatpho::secret_from_file` for multiline material such as private keys
 #######################################
 function dybatpho::secret_from_stdin {
-  local __dybatpho_secret_var prompt
+  local __dybatpho_secret_var __dybatpho_secret_prompt
   dybatpho::expect_args __dybatpho_secret_var -- "$@"
-  prompt="${2-}"
+  __dybatpho_secret_prompt="${2-}"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
 
   local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
   __dybatpho_secret_dest=""
   if [[ -t 0 ]]; then
     # kcov(disabled)
-    [[ -n "${prompt}" ]] && printf '%s' "${prompt}" >&2
+    [[ -n "${__dybatpho_secret_prompt}" ]] && printf '%s' "${__dybatpho_secret_prompt}" >&2
     IFS= read -rs __dybatpho_secret_dest || true
     printf '\n' >&2
     # kcov(enabled)
@@ -392,13 +393,13 @@ function dybatpho::secret_from_stdin {
 # @exitcode 1 The source is unsupported or the secret can't be read
 #######################################
 function dybatpho::secret_read {
-  local variable source
-  dybatpho::expect_args variable source -- "$@"
-  case "${source}" in
-    file:*) dybatpho::secret_from_file "${variable}" "${source#file:}" ;;
-    env:*) dybatpho::secret_from_env "${variable}" "${source#env:}" ;;
-    stdin | -) dybatpho::secret_from_stdin "${variable}" "${3-}" ;;
-    *) dybatpho::die "Unsupported secret source: ${source}" ;; # kcov(skip)
+  local __dybatpho_secret_variable __dybatpho_secret_source
+  dybatpho::expect_args __dybatpho_secret_variable __dybatpho_secret_source -- "$@"
+  case "${__dybatpho_secret_source}" in
+    file:*) dybatpho::secret_from_file "${__dybatpho_secret_variable}" "${__dybatpho_secret_source#file:}" ;;
+    env:*) dybatpho::secret_from_env "${__dybatpho_secret_variable}" "${__dybatpho_secret_source#env:}" ;;
+    stdin | -) dybatpho::secret_from_stdin "${__dybatpho_secret_variable}" "${3-}" ;;
+    *) dybatpho::die "Unsupported secret source: ${__dybatpho_secret_source}" ;; # kcov(skip)
   esac
 }
 

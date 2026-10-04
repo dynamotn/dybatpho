@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `screen_barchart` drew nothing from an array called `rect`, `options`
   or, for bar chart labels, `width`.
 
+- **`secret` — the secret readers work whatever your variables are called.**
+  `dybatpho::secret_from_env`, `secret_from_file`, `secret_from_stdin` and
+  `secret_read` left a variable named `name`, `mode`, `path`, `prompt`,
+  `variable` or `source` without the secret, and `secret_from_env` read its own
+  local instead of an environment variable named `name` or `mode`.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

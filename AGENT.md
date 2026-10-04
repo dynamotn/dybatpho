@@ -134,7 +134,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `config.sh` | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `docs/config.md`, `docs/spec/config.md` |
 | `date.sh` | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `docs/date.md`, `docs/spec/date.md` |
 | `diff.sh` | Colored unified text diffs, structural JSON/YAML comparison by key, and a one-line change summary | `test/diff.bats`, `docs/diff.md`, `docs/spec/diff.md` |
-| `doctor.sh` | Environment report: Bash version, library version, and the external commands the loaded modules declare | `test/doctor.bats`, `docs/doctor.md`, `docs/spec/doctor.md` |
+| `doctor.sh` | Environment report: Bash version, library version, the module dependency graph, and the external commands the loaded modules declare | `test/doctor.bats`, `docs/doctor.md`, `docs/spec/doctor.md` |
 | `file.sh` | Path and XDG helpers, upward search, directory creation, temporary files, atomic content rewrites, checksums, and metadata | `test/file.bats`, `docs/file.md`, `docs/spec/file.md` |
 | `forge.sh` | GitHub and GitLab detection from the remote, authenticated requests, issues, and releases | `test/forge.bats`, `docs/forge.md`, `docs/spec/forge.md` |
 | `git.sh` | Safe repository, branch, commit, reachability, and Git operations | `test/git.bats`, `docs/git.md`, `docs/spec/git.md` |
@@ -193,7 +193,9 @@ A new module in `src/` is not reachable until it is registered in `init.sh`:
    calls; core modules are implicit. Cycles are allowed because calls resolve at
    run time, but each edge must reflect a real call. A missing edge does not
    fail at load time — it fails later, when a function from the unloaded module
-   turns out to be undefined.
+   turns out to be undefined. An edge naming a module the registry does not
+   know makes `dybatpho::doctor` fail, since it walks the same map with
+   `dybatpho::array_toposort`.
 3. Extend `test/init.bats` when the module adds a dependency edge worth pinning.
    The suite already fails when a registered module has no file under `src/`,
    and when the registry and `src/` drift apart.
@@ -222,7 +224,7 @@ for s in src/*.sh; do
   while read -r fn; do OWNER["${fn}"]="${m}"; done < <(
     sed -n 's/^function \([A-Za-z_][A-Za-z_0-9:]*\).*/\1/p' "${s}")
 done
-CORE=" string os logging helpers process file secret "
+CORE=" string os logging helpers process file secret array "
 for s in src/*.sh; do
   m="$(basename "${s}" .sh)"; opt=""
   for fn in $(grep -oE '\b(dybatpho::[a-z_0-9]+|__[a-z_0-9]+)' "${s}" | sort -u); do

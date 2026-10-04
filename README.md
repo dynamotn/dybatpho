@@ -86,7 +86,7 @@ dybatpho::info "Greetings from dybatpho!"
 **3. Name the modules you need:**
 
 Sourcing `init.sh` with no argument loads only the core modules — `string`,
-`os`, `logging`, `helpers`, `process`, `file` and `secret`. Everything else is asked
+`os`, `logging`, `helpers`, `process`, `file`, `secret` and `array`. Everything else is asked
 for by name, and dybatpho resolves the dependencies between modules for you:
 
 ```sh

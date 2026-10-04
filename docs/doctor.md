@@ -49,6 +49,13 @@ Only **required** dependencies that are missing or outdated make
 problem, and so is `unknown`: a probe that could not read a version has not
 shown that anything is wrong.
 
+The report also walks the module dependency graph with
+`dybatpho::array_toposort`, the same edges the loader follows. An explicit
+`--modules` list is widened to every module it pulls in, in load order, so
+the tools a dependency needs are reported too. An edge naming a module the
+registry does not know fails the report, because the loader would stop on
+it; a cycle is only noted, because the loader allows one.
+
 ### 🌍 Environment
 
 | Variable | Type | Description |

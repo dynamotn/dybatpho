@@ -64,9 +64,9 @@ export DYBATPHO_DIR
 
 # Module registry
 # @env DYBATPHO_CORE_MODULES string Modules that call each other and are always loaded
-DYBATPHO_CORE_MODULES="string os logging helpers process file secret"
+DYBATPHO_CORE_MODULES="string os logging helpers process file secret array"
 # @env DYBATPHO_OPTIONAL_MODULES string Modules that are only loaded when requested
-DYBATPHO_OPTIONAL_MODULES="array math text lock network date json validate config archive"
+DYBATPHO_OPTIONAL_MODULES="math text lock network date json validate config archive"
 DYBATPHO_OPTIONAL_MODULES+=" git table cli tui screen notification semver testing safety"
 DYBATPHO_OPTIONAL_MODULES+=" metrics ai agent pkg release parallel doctor i18n forge cache"
 DYBATPHO_OPTIONAL_MODULES+=" markdown csv backup diff queue schedule privilege"
@@ -88,8 +88,10 @@ export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 
 # Dependencies between optional modules. Core modules are implicit, so only the
 # optional-to-optional edges are listed here. Cycles are allowed: function calls
-# resolve at run time, so modules may reference each other.
-declare -A __dybatpho_module_deps=(
+# resolve at run time, so modules may reference each other. The map is global
+# even when `init.sh` is sourced from inside a function: `dybatpho::load` and
+# `dybatpho::doctor` read it long after that function has returned.
+declare -gA __dybatpho_module_deps=(
   [table]="text"
   [csv]="math"
   [backup]="archive safety date"

@@ -113,6 +113,14 @@ function __dybatpho_bundle_prologue {
   for _module in ${_modules}; do
     [[ " ${_core} " == *" ${_module} "* ]] || _optional="${_optional:+${_optional} }${_module}"
   done
+  # The edges between the bundled modules, so that `dybatpho::doctor` walks the
+  # same graph inside the bundle as outside it. A bundle holds every dependency
+  # of what it carries, so no edge points outside it.
+  local _deps=""
+  for _module in ${_modules}; do
+    [[ -n "${__dybatpho_module_deps[${_module}]-}" ]] || continue
+    _deps="${_deps}  [${_module}]=\"${__dybatpho_module_deps[${_module}]}\""$'\n'
+  done
 
   # shellcheck disable=SC2154 # OUTPUT is set by the option spec of this script
   cat << PROLOGUE
@@ -159,6 +167,8 @@ DYBATPHO_CORE_MODULES="${_core}"
 DYBATPHO_OPTIONAL_MODULES="${_optional}"
 DYBATPHO_LOADED_MODULES="${_modules}"
 export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
+declare -gA __dybatpho_module_deps=(
+${_deps})
 
 ${_bootstrap_module_exists}
 

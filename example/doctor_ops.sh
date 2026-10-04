@@ -4,7 +4,8 @@
 # @file doctor_ops.sh
 # @brief Example showing the environment report a script can run before it works
 # @description Demonstrates dybatpho::version, dybatpho::doctor with a module
-#   scope, --json and --quiet, dybatpho::doctor_requirements, and
+#   scope widened along the module graph, --json and --quiet,
+#   dybatpho::doctor_requirements, and
 #   dybatpho::doctor_bash_supported
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules doctor json archive git
@@ -39,6 +40,16 @@ function _demo_scope {
   # Useful before `dybatpho::load`: ask whether the environment can support a
   # module before the script commits to it.
   dybatpho::doctor --modules "archive,git" || true
+}
+
+# @description Run the `A MODULE BRINGS ITS DEPENDENCIES` section of this example.
+# @noargs
+function _demo_graph {
+  dybatpho::header "A MODULE BRINGS ITS DEPENDENCIES"
+  # `release` loads `semver` and `git`, so the report widens the list to them,
+  # in the order the loader would source them, and checks the edges on the way:
+  # the `graph` line says whether every dependency names a known module.
+  dybatpho::doctor --modules release || true
 }
 
 # @description Run the `WHAT ONE MODULE CALLS` section of this example.
@@ -119,6 +130,7 @@ function _demo_versioned_dependency {
 _demo_version
 _demo_report
 _demo_scope
+_demo_graph
 _demo_requirements
 _demo_versioned_dependency
 _demo_quiet

@@ -42,13 +42,15 @@ As a script author, I want to check the environment for modules I have not loade
 
 **Why this priority**: Scripts routinely decide between an archive format, a JSON tool, or a network path depending on what is installed.
 
-**Independent Test**: Ask for an explicit module list and for the whole registry, and verify the report covers exactly those modules.
+**Independent Test**: Ask for an explicit module list and for the whole registry, and verify the report covers exactly those modules and what they load.
 
 **Acceptance Scenarios**:
 
-1. **Given** an explicit module list, **When** the report runs with it, **Then** it covers those modules and nothing else
+1. **Given** an explicit module list, **When** the report runs with it, **Then** it covers those modules and every module they load through the registry's dependency edges, in load order, and nothing else
 2. **Given** the whole registry is requested, **When** the report runs, **Then** it covers every registered module
 3. **Given** a name that is not a module, **When** the report runs with it, **Then** the run stops with a message naming the unknown module
+4. **Given** a registry edge names a module the registry does not know, **When** the report covers the module declaring it, **Then** the report names the edge and fails
+5. **Given** the covered modules depend on each other in a cycle, **When** the report runs, **Then** it notes the cycle without failing
 
 ---
 
@@ -131,6 +133,8 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - The version file is empty, ends without a newline, or carries a leading `v`.
 - The copy is not a Git working tree, or is vendored inside another one, so no commit of its own can be named.
 - A dependency's path, a version or the library directory holds a control character, such as an ANSI escape.
+- A module asked for explicitly loads other modules, whose own external dependencies a check on that module alone would miss.
+- A registry edge points at a name that is not a module, or the edges form a cycle, which the loader allows.
 
 ## Requirements *(mandatory)*
 
@@ -139,6 +143,8 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **FR-001**: The module MUST declare, per module, the external commands that module can call, split into required and optional.
 - **FR-002**: A dependency MUST be able to name alternatives, and MUST count as satisfied when any one of them is installed.
 - **FR-003**: The report MUST cover the loaded modules by default, an explicit module list when given one, and the whole registry on request.
+- **FR-003a**: An explicit module list MUST be widened to every module it reaches through the registry's dependency edges, ordered with `dybatpho::array_toposort` so each dependency comes before the module that needs it, the order the loader sources them in.
+- **FR-003b**: The report MUST walk the dependency graph of the modules it covers, MUST fail and name every edge that points at a module the registry does not know, and MUST note a cycle without failing on it, because the loader allows one.
 - **FR-002a**: A dependency MUST be able to name a version range, written in the range syntax of `dybatpho::semver_satisfies` without spaces, and an alternative carrying one MUST count as satisfied only when the installed version falls inside it.
 - **FR-002b**: The module MUST ask a dependency for its version only when that dependency names a range, so that a report never executes a tool nothing has an opinion about.
 - **FR-002c**: When no alternative of a dependency satisfies it, the report MUST name the most specific outcome available, preferring an alternative that is installed but outdated over one whose version could not be read, and either over nothing being installed.
@@ -162,6 +168,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **FR-017**: The bundler MUST refuse to overwrite an existing output file without approval, MUST honor `DRY_RUN`, and MUST verify that the file it wrote parses and can be sourced.
 - **FR-018**: The JSON report MUST escape every control character in the strings it writes, so it parses whatever a path or version holds, and MUST do so without `jq`.
 - **FR-019**: `scripts/bundle.sh` MUST read every bootstrap function it copies from `init.sh` before it opens the output, and MUST stop without writing a bundle when one cannot be found.
+- **FR-020**: A generated bundle MUST carry the registry's dependency edges between the modules it holds, so the report walks the same graph inside the bundle as outside it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -169,6 +176,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **Dependency spec**: One command name, or several alternatives any one of which satisfies it.
 - **Report row**: The module, dependency, kind, status, and resolved path of one checked dependency.
 - **Bundle**: A generated single file carrying the bootstrap and a resolved module set.
+- **Module graph**: The registry's dependency edges between modules, as `init.sh` declares them; reported as `graph` in the text report and as `{"cycle":…,"unknown":[…]}` in the JSON one.
 
 ## Success Criteria *(mandatory)*
 
@@ -196,6 +204,9 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **IT-006e**: Verify an any-of dependency prefers an alternative inside its range, and reports `outdated` rather than `missing` when only an out-of-range alternative is installed.
 - **IT-006f**: Verify a dependency that names no range is never executed by the report.
 - **IT-007**: Verify the default scope, an explicit list, a comma separated list, and the whole registry.
+- **IT-007a**: Verify an explicit `forge` is widened to `network json git forge`, and that the `yq` of `json` is reported.
+- **IT-007b**: Verify a sound graph is reported `ok`, an edge to an unknown module is named and fails the run in both the text and the JSON report, and a cycle is noted without failing.
+- **IT-007c**: Verify the report inside a bundle widens an explicit list along the bundled edges.
 - **IT-008**: Verify quiet mode prints nothing and reports through the exit code in both directions.
 - **IT-009**: Verify JSON mode emits one parseable object containing the version, Bash details, modules, dependencies, and overall result.
 - **IT-009a**: Verify JSON mode carries the detected version of a dependency and reports an outdated required dependency as not ok.

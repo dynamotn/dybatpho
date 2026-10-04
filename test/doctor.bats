@@ -200,6 +200,47 @@ fake_versioned_command() {
   assert_output --partial "modules  string array"
 }
 
+@test "dybatpho::doctor widens an explicit module list to what it loads, in load order" {
+  # `forge` loads `network`, `json` and `git`, so a check on `forge` alone
+  # would miss the `yq` that `json` needs.
+  run_traced dybatpho::doctor --modules forge
+  assert_output --partial "modules  network json git forge"
+  assert_output --partial "json     yq>=4"
+}
+
+@test "dybatpho::doctor reports a sound module graph as ok" {
+  run_traced -0 dybatpho::doctor --modules "string array"
+  assert_output --partial "graph    ok"
+}
+
+@test "dybatpho::doctor fails on a module dependency the registry does not know" {
+  __dybatpho_module_deps[array]="nosuch"
+  run_traced -1 dybatpho::doctor --modules array
+  assert_output --partial "graph    unknown dependency"
+  assert_output --partial "Unknown module dependency: array -> nosuch"
+  assert_output --partial "modules  array"
+  unset '__dybatpho_module_deps[array]'
+}
+
+@test "dybatpho::doctor notes a module dependency cycle without failing on it" {
+  only_fakes
+  fake_command git
+  __dybatpho_module_deps[semver]="git"
+  __dybatpho_module_deps[git]="semver"
+  run_traced -0 dybatpho::doctor --modules git
+  assert_output --partial "graph    cycle (allowed"
+  assert_output --partial "modules  semver git"
+  unset '__dybatpho_module_deps[semver]' '__dybatpho_module_deps[git]'
+}
+
+@test "dybatpho::doctor --json describes the module graph" {
+  __dybatpho_module_deps[array]="nosuch"
+  run_traced -1 dybatpho::doctor --modules array --json
+  assert_output --partial '"graph":{"cycle":false,"unknown":["array -> nosuch"]}'
+  assert_output --partial '"ok":false'
+  unset '__dybatpho_module_deps[array]'
+}
+
 @test "dybatpho::doctor covers the registry with --all" {
   run_traced dybatpho::doctor --all
   assert_output --partial "archive"

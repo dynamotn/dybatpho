@@ -173,6 +173,8 @@ fi
   another repository MUST NOT report that repository's commit. See `docs/spec/doctor.md` for the diagnostics and
   the bundle that build on it.
 - **FR-019**: Sourcing `init.sh` again in a shell that already loaded the library, or loading an already-loaded module, MUST NOT fail on a constant a module declares read-only.
+- **FR-020**: The core modules MUST include `array`, so the dependency-graph helpers `dybatpho::array_toposort` and `dybatpho::array_closure` are available in every module set, which is what lets `doctor` walk the module graph with them.
+- **FR-021**: The module dependency map MUST stay global when `init.sh` is sourced from inside a function, so that `dybatpho::load` and `dybatpho::doctor` still resolve dependencies after that function returns.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -243,6 +245,8 @@ fi
   caches the answer in `DYBATPHO_VERSION`, honors a value already set in the
   environment, and still answers in a copy that has no `VERSION` file.
 - **IT-018**: Source `init.sh` twice with `--modules all` from one script, then load four modules again, and see no `readonly variable` error.
+- **IT-019**: Source `init.sh` with no module set and verify `dybatpho::array_toposort` and `dybatpho::array_closure` are defined.
+- **IT-020**: Source `init.sh` from inside a function, call `dybatpho::load forge` after it returns, and verify `network`, `json` and `git` are loaded ahead of `forge`.
 
 ## Acceptance Criteria *(mandatory)*
 

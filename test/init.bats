@@ -44,7 +44,7 @@ loaded_line() {
 
 @test "sourcing without arguments loads the core modules only" {
   run_traced -0 init_sh "" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret "
+  assert_output "string os logging helpers process file secret array "
 }
 
 @test "sourcing without arguments leaves the optional modules out" {
@@ -65,27 +65,47 @@ loaded_line() {
 
 @test "an explicit module set loads only that module and the core modules" {
   run_traced -0 init_sh "--modules semver" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret semver "
+  assert_output "string os logging helpers process file secret array semver "
 }
 
 @test "a module set can be requested through DYBATPHO_MODULES" {
   run_traced -0 init_sh_env "semver" "" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret semver "
+  assert_output "string os logging helpers process file secret array semver "
 }
 
 @test "the command line module set wins over DYBATPHO_MODULES" {
   run_traced -0 init_sh_env "network" "--modules semver" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret semver "
+  assert_output "string os logging helpers process file secret array semver "
 }
 
 @test "a module set accepts commas and repeated names" {
   run_traced -0 init_sh "--modules json,semver,json" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret json semver "
+  assert_output "string os logging helpers process file secret array json semver "
+}
+
+@test "the array helpers are core and need no module request" {
+  # `doctor` walks the module graph with `dybatpho::array_toposort`, so the
+  # graph helpers have to be there whatever a script asked for.
+  run_traced -0 init_sh "" 'declare -F dybatpho::array_toposort dybatpho::array_closure > /dev/null && echo present'
+  assert_output "present"
+}
+
+@test "the dependency map outlives a function that sourced init.sh" {
+  # A plain `declare -A` in a sourced file is local to the function sourcing
+  # it, so a later `dybatpho::load` resolved no dependency at all.
+  local script="${BATS_TEST_TMPDIR}/in_function.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf 'bootstrap() { . %q; }\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'bootstrap' 'dybatpho::load forge' "$(loaded_line)"
+  } > "${script}"
+  run_traced -0 env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_output --partial "array network json git forge "
 }
 
 @test "the core selection loads the core modules only" {
   run_traced -0 init_sh "--modules core" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret "
+  assert_output "string os logging helpers process file secret array "
 }
 
 @test "the default and the core selection agree" {
@@ -104,62 +124,62 @@ loaded_line() {
 @test "requesting a module loads its dependencies first" {
   # `text` aligns columns only when the script loaded `table` itself.
   run_traced -0 init_sh "--modules text" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret text "
+  assert_output "string os logging helpers process file secret array text "
 
   run_traced -0 init_sh "--modules notification" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret network notification "
+  assert_output "string os logging helpers process file secret array network notification "
 
   # `testing` loads only what every assertion uses: the JSON and YAML
   # assertions ask for `json`, and a snapshot mismatch for `diff` to draw it.
   run_traced -0 init_sh "--modules testing" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret text testing "
+  assert_output "string os logging helpers process file secret array text testing "
 
   # `table` renders real CSV only when the script loaded `csv` itself, so it
   # does not bring the parser along.
   run_traced -0 init_sh "--modules table" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret text table "
+  assert_output "string os logging helpers process file secret array text table "
 
   # `markdown` renders a table only when the script loaded `table` itself.
   run_traced -0 init_sh "--modules markdown" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret markdown "
+  assert_output "string os logging helpers process file secret array markdown "
 
   # `release` packages an artifact only when the script loaded `archive` itself.
   run_traced -0 init_sh "--modules release" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret semver git release "
+  assert_output "string os logging helpers process file secret array semver git release "
 
   run_traced -0 init_sh "--modules diff" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret diff "
+  assert_output "string os logging helpers process file secret array diff "
 
   # `csv` compares numbers through `math`, and asks for `json` only to write it.
   run_traced -0 init_sh "--modules csv" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret math csv "
+  assert_output "string os logging helpers process file secret array math csv "
 
   # `backup_diff` compares through `diff_dir` only when the script loaded `diff`.
   run_traced -0 init_sh "--modules backup" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret archive validate cli safety date backup "
+  assert_output "string os logging helpers process file secret array archive validate cli safety date backup "
 
   run_traced -0 init_sh "--modules ai" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret network json cache ai "
+  assert_output "string os logging helpers process file secret array network json cache ai "
 
   # `cache` takes a lock only to serve stale entries, and asks for it then.
   run_traced -0 init_sh "--modules cache" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret cache "
+  assert_output "string os logging helpers process file secret array cache "
 
   run_traced -0 init_sh "--modules agent" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate cli safety json agent "
+  assert_output "string os logging helpers process file secret array validate cli safety json agent "
 
   run_traced -0 init_sh "--modules tui" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate cli safety tui "
+  assert_output "string os logging helpers process file secret array validate cli safety tui "
 
   # `metrics` loads nothing on its own: summaries ask for `math` and a push
   # asks for `network`, so counting and timing never pull in `curl`.
   run_traced -0 init_sh "--modules metrics" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret metrics "
+  assert_output "string os logging helpers process file secret array metrics "
 
   # `screen` calls nothing outside the core modules, so it must load on its own
   # rather than dragging the interactive helpers in behind it.
   run_traced -0 init_sh "--modules screen" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret screen "
+  assert_output "string os logging helpers process file secret array screen "
 }
 
 @test "a dependency cycle loads every module once and terminates" {
@@ -170,15 +190,15 @@ loaded_line() {
 __dybatpho_module_deps[git]="semver"
 dybatpho::load semver
 '"$(loaded_line)"
-  assert_output "string os logging helpers process file secret git semver "
+  assert_output "string os logging helpers process file secret array git semver "
 }
 
 @test "safety and archive load without each other" {
   run_traced -0 init_sh "--modules safety" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate cli safety "
+  assert_output "string os logging helpers process file secret array validate cli safety "
 
   run_traced -0 init_sh "--modules archive" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret archive "
+  assert_output "string os logging helpers process file secret array archive "
 }
 
 @test "the shared validator is loaded ahead of the modules that check with it" {
@@ -187,7 +207,7 @@ dybatpho::load semver
   # pinned here because a missing one does not fail at load time: it fails
   # later, on the first value anybody validates.
   run_traced -0 init_sh "--modules config" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate config "
+  assert_output "string os logging helpers process file secret array validate config "
 
   run_traced -0 init_sh "--modules cli" 'dybatpho::validate_is port 8080 && echo reachable'
   assert_output "reachable"
@@ -195,7 +215,7 @@ dybatpho::load semver
   # `cli` reads a `config:` binding only when the script loaded `config`
   # itself, so the validator is all it brings along.
   run_traced -0 init_sh "--modules cli" "$(loaded_line)"
-  assert_output "string os logging helpers process file secret validate cli "
+  assert_output "string os logging helpers process file secret array validate cli "
 }
 
 @test "a dependency pulled in on demand stays usable" {
@@ -220,13 +240,13 @@ printf '%s' '{\"a\":1}' | dybatpho::json_query - '.a'"
   run_traced -0 init_sh "--modules core" "dybatpho::load text
 dybatpho::load text
 $(loaded_line)"
-  assert_output "string os logging helpers process file secret text "
+  assert_output "string os logging helpers process file secret array text "
 }
 
 @test "dybatpho::load accepts several modules at once" {
   run_traced -0 init_sh "--modules core" "dybatpho::load json semver
 $(loaded_line)"
-  assert_output "string os logging helpers process file secret json semver "
+  assert_output "string os logging helpers process file secret array json semver "
 }
 
 @test "dybatpho::load without arguments stops the script" {

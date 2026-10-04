@@ -7,7 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`array` is a core module.** Sourcing `init.sh` with no module set now
+  loads `array` too, so every script can call the array helpers, including
+  `dybatpho::array_toposort` and `dybatpho::array_closure`, without asking for
+  them. `--modules array` still works and simply has nothing left to load.
+  `dybatpho::module_list core` and `optional` list it on the core side.
+
+- **`doctor` — an explicit module list covers what it loads, and the module
+  graph is checked.** `dybatpho::doctor --modules forge` now reports
+  `network json git forge`, in load order, so the `yq` that `json` needs is
+  listed instead of being found missing halfway through the script. The report
+  walks the dependency graph with `dybatpho::array_toposort` and prints a
+  `graph` line (a `"graph"` object in `--json`): an edge pointing at a module
+  the registry does not know fails the report, and a cycle is noted without
+  failing. Bundles made by `scripts/bundle.sh` carry the edges between their
+  modules, so the check works inside a bundle too.
+
 ### Fixed
+
+- **`init.sh` — dependencies still resolve after sourcing it inside a
+  function.** The module dependency map was declared local to that function,
+  so a later `dybatpho::load forge` loaded `forge` without `network`, `json`
+  or `git`.
 
 - **`ai` — `dybatpho::ai_stream` keeps a last chunk with no newline.** A
   provider that closed the stream right after its final object, without a

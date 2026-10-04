@@ -18,6 +18,13 @@ teardown() {
   assert_equal "$(dybatpho::lock_path "myjob")" "${DYBATPHO_LOCK_DIR}/dybatpho-myjob.lock"
 }
 
+@test "dybatpho::lock_path falls back to the temporary directory when the lock directory is empty" {
+  # Emptied after loading, the setting used to put every lock at the root of
+  # the filesystem, as `/dybatpho-<name>.lock`.
+  DYBATPHO_LOCK_DIR="" TMPDIR="${BATS_TEST_TMPDIR}" run_traced dybatpho::lock_path "myjob"
+  assert_output "${BATS_TEST_TMPDIR}/dybatpho-myjob.lock"
+}
+
 @test "dybatpho::lock_path keeps an explicit path as-is" {
   assert_equal "$(dybatpho::lock_path "/tmp/custom/myjob")" "/tmp/custom/myjob.lock"
 }

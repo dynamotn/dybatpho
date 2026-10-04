@@ -164,7 +164,10 @@ function dybatpho::lock_path {
   if [[ "${name}" == */* ]]; then
     lock_path="${name}"
   else
-    lock_path="${DYBATPHO_LOCK_DIR%/}/dybatpho-${name}"
+    # Emptied after loading, the setting would put the lock at the root of the
+    # filesystem; fall back to the default the module starts with.
+    local directory="${DYBATPHO_LOCK_DIR:-${TMPDIR:-/tmp}}"
+    lock_path="${directory%/}/dybatpho-${name}"
   fi
   dybatpho::string_ends_with "${lock_path}" ".lock" || lock_path="${lock_path}.lock"
   printf '%s\n' "${lock_path}"

@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   staging file is created without following anything already at its name, and
   it is removed if the move fails.
 
+- **`lock` — an empty `DYBATPHO_LOCK_DIR` no longer puts locks at `/`.**
+  Emptied after the module loaded, the setting turned a bare lock name into
+  `/dybatpho-<name>.lock`; it now falls back to `TMPDIR`, as at load time.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

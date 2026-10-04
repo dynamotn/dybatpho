@@ -265,6 +265,7 @@ dybatpho::lock_semaphore_holders downloads 4
 - **FR-028**: `lock_semaphore_acquire` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
 - **FR-029**: `lock_acquire` MUST stop with a message naming the value when its timeout is not a whole number of seconds, before it touches the lock.
 - **FR-030**: `lock_acquire` and `lock_semaphore_acquire` MUST share one wait loop that times the wait with Bash's own clock, so a poll starts no `date` process and a frozen `date` clock does not hold a wait open, and MUST ask for the host name at most once per call.
+- **FR-031**: A bare lock name MUST resolve under the default temporary directory when `DYBATPHO_LOCK_DIR` is empty, never at the root of the filesystem.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -340,6 +341,7 @@ dybatpho::lock_semaphore_holders downloads 4
 - **IT-024**: Acquire slots into variables called `timeout`, `slot_path` and `target`, and find each one filled.
 - **IT-025**: Call `lock_acquire` with the timeout `soon` and find a clear refusal and no lock taken.
 - **IT-026**: Wait for a held lock while the `date` clock is frozen and find the wait ends on time; wait for a held lock and a full semaphore and find the host name asked for once each.
+- **IT-027**: Resolve a bare lock name with `DYBATPHO_LOCK_DIR` emptied and get a path under `TMPDIR`.
 
 ## Acceptance Criteria *(mandatory)*
 

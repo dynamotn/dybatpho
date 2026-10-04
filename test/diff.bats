@@ -382,7 +382,7 @@ EOF
   assert_output --partial "dybatpho::diff_yaml needs the json module, load it with: dybatpho::load json"
 
   # Once the script loads it, the same call reports the change.
-  sed -i 's/--modules diff/--modules diff json/' "${script}"
+  sed_in_place 's/--modules diff/--modules diff json/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure 1
   assert_output --partial "~ a: 1 -> 2"

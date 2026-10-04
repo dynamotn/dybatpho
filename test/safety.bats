@@ -332,7 +332,7 @@ function _create_traversal_archive {
   refute_output --partial "Archive doesn't exist"
 
   # Once the script loads it, the same call extracts.
-  sed -i 's/--modules safety/--modules safety archive/' "${script}"
+  sed_in_place 's/--modules safety/--modules safety archive/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
     bash "${script}" "${archive_path}" "${destination}"
   assert_success

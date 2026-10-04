@@ -257,7 +257,7 @@ tag() {
   assert [ ! -e "${out}" ]
 
   # Once the script loads it, the same call packages.
-  sed -i 's/--modules release/--modules release archive/' "${script}"
+  sed_in_place 's/--modules release/--modules release archive/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${source}" "${out}"
   assert_success
   assert_line --index 1 "${out}/mytool_1.3.0_linux_amd64.tar.gz"

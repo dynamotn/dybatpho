@@ -221,3 +221,16 @@ function path_without {
   done
   printf '%s\n' "${bin}:${kept%:}"
 }
+
+# @description Rewrite a file through a `sed` script.
+#
+#   `sed -i` takes its backup suffix as an optional attached argument on GNU and
+#   a mandatory separate one on BSD, so no single spelling works on both: BSD
+#   reads a bare `-i` script as the suffix and the file name as the script. The
+#   rewrite goes through a staging file instead.
+# @arg $1 string `sed` script
+# @arg $2 string File to rewrite
+function sed_in_place {
+  local script="$1" file="$2"
+  sed -e "${script}" "${file}" > "${file}.sed" && mv -f -- "${file}.sed" "${file}"
+}

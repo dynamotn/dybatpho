@@ -949,7 +949,7 @@ fake_sendmail() {
   refute_output --partial "sendmail -i"
 
   # Once the script loads it, the same call goes as far as the dry run.
-  sed -i 's/--modules notification$/--modules notification validate/' "${script}"
+  sed_in_place 's/--modules notification$/--modules notification validate/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
   assert_output --partial "sendmail -i -- ops@example.com"

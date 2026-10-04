@@ -1581,7 +1581,7 @@ _i18n_spec_abbr() {
   assert_output --partial "dybatpho::i18n_relative needs the date module"
 
   # Once the script loads it, the same calls format.
-  sed -i 's/--modules i18n$/--modules i18n date/' "${script}"
+  sed_in_place 's/--modules i18n$/--modules i18n date/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" i18n_date
   assert_success
   assert_line --index 1 "Feb 29, 2024"

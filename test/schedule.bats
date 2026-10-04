@@ -339,7 +339,7 @@ note() {
   assert_output --partial "dybatpho::schedule_debounce needs the lock module, load it with: dybatpho::load lock"
 
   # Once the script loads it, the same call runs.
-  sed -i 's/--modules schedule$/--modules schedule lock/' "${script}"
+  sed_in_place 's/--modules schedule$/--modules schedule lock/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
   assert_line "settled"

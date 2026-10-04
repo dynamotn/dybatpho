@@ -1179,7 +1179,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 
   # Once the script loads it, the call gets as far as checking its variables,
   # which is where the bad ones above are turned away.
-  sed -i 's/--modules network/--modules network json/' "${script}"
+  sed_in_place 's/--modules network/--modules network json/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure
   assert_output --partial "Variables must be a JSON object: [1]"

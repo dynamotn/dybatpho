@@ -1,7 +1,9 @@
 setup() {
   load test_helper
   SOURCE="${BATS_TEST_TMPDIR}/source"
-  DEST="${BATS_TEST_TMPDIR}/backups"
+  # Physical, as an incremental backup reports it: the macOS temporary
+  # directory sits behind the `/var` -> `/private/var` symlink.
+  DEST="$(cd -- "${BATS_TEST_TMPDIR}" && pwd -P)/backups"
   mkdir -p "${SOURCE}"
   printf 'first\n' > "${SOURCE}/a.txt"
   printf 'second\n' > "${SOURCE}/b.txt"
@@ -739,7 +741,7 @@ EOF
   assert_output --partial "dybatpho::backup_diff needs the diff module, load it with: dybatpho::load diff"
 
   # Once the script loads it, the same comparison runs and finds nothing.
-  sed -i 's/--modules backup$/--modules backup diff/' "${script}"
+  sed_in_place 's/--modules backup$/--modules backup diff/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
   assert_line "+0 -0 ~0"

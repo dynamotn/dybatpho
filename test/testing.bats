@@ -949,7 +949,7 @@ BSD
 
   # Once the suite loads them, the JSON assertion passes and the mismatch is drawn.
   rm -rf "${BATS_TEST_TMPDIR}/snaps"
-  sed -i 's/--modules testing/--modules testing json diff/' "${script}"
+  sed_in_place 's/--modules testing/--modules testing json diff/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
   assert_output --partial "json rc=0"

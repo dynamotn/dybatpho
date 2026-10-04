@@ -756,7 +756,7 @@ EOF
   assert_output --partial "dybatpho::csv_to_json needs the json module, load it with: dybatpho::load json"
 
   # Once the script loads it, the same call converts.
-  sed -i 's/--modules csv/--modules csv json/' "${script}"
+  sed_in_place 's/--modules csv/--modules csv json/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
   assert_line --index 1 '[{"name":"ada"}]'

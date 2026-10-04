@@ -266,7 +266,7 @@ EOF
   assert_output --partial "dybatpho::table_from_json needs the csv module, load it with: dybatpho::load csv"
 
   # Once the script loads it, the same call renders.
-  sed -i 's/--modules table/--modules table csv/' "${script}"
+  sed_in_place 's/--modules table/--modules table csv/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_csv
   assert_success
   assert_output --partial "│ a │ b │"

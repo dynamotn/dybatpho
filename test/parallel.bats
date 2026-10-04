@@ -433,7 +433,7 @@ SCRIPT
   refute_output --partial "ran"
 
   # Once the script loads it, the same duration is read.
-  sed -i 's/--modules parallel$/--modules parallel date/' "${script}"
+  sed_in_place 's/--modules parallel$/--modules parallel date/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" 5m
   assert_success
   assert_output --partial "ran"

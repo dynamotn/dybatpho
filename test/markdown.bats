@@ -197,7 +197,7 @@ EOF
   assert_output --partial "dybatpho::md_table needs the table module, load it with: dybatpho::load table"
 
   # Once the script loads it, the same call renders.
-  sed -i 's/--modules markdown/--modules markdown table/' "${script}"
+  sed_in_place 's/--modules markdown/--modules markdown table/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
   assert_output --partial "| a | b |"

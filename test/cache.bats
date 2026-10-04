@@ -441,7 +441,7 @@ remaining_entries() {
   assert_output --partial "dybatpho::cache_wait needs the lock module, load it with: dybatpho::load lock"
 
   # Once the script loads it, both run.
-  sed -i 's/--modules cache$/--modules cache lock/' "${script}"
+  sed_in_place 's/--modules cache$/--modules cache lock/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" run
   assert_success
   assert_line "swr"

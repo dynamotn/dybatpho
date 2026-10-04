@@ -1668,7 +1668,7 @@ setup() {
   assert_line --index 1 "port=8080"
 
   # Once the script loads it, the bound key is read.
-  sed -i 's/--modules cli$/--modules cli config/' "${script}"
+  sed_in_place 's/--modules cli$/--modules cli config/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${settings}"
   assert_success
   assert_line --index 0 "config loaded"

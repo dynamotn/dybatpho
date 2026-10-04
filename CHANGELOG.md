@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`agent` — `dybatpho::agent_audit_show` prints a last record with no
+  newline.** A log that had been trimmed or written by another tool lost its
+  final record, because `read` fails on a last line without a newline.
+
 - **`process` — the error handler exits with the status that failed and prints
   the whole stack.** After `dybatpho::register_err_handler`, a command failing
   with status 7 made the script exit 1 and printed only the first frame,

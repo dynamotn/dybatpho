@@ -217,6 +217,7 @@ fi
   requiring a specific one.
 - **FR-018**: `agent_detect`, and every helper that branches on it, MUST resolve the mode in the caller's shell, so an unknown `DYBATPHO_AGENT_MODE` stops the script instead of reading as a person driving.
 - **FR-019**: A spec read by `agent_tools` or `agent_mcp` MUST see the caller's variables: both MUST keep the locals that are in scope while the spec runs under the library's prefix.
+- **FR-020**: Showing the audit log MUST print every record, including a last one that ends without a newline.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -263,6 +264,7 @@ fi
   `jq` backend.
 - **IT-010**: From a script file with `DYBATPHO_AGENT_MODE=sometimes`, have `agent_detect` used as a condition stop the script before the branch for a person runs.
 - **IT-011**: Generate tool and MCP definitions from a spec whose description reads variables named like their locals, and see the caller's values.
+- **IT-012**: Append a record without a trailing newline to the audit log and find it printed.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -280,6 +280,18 @@ _spec_test_deploy() {
   assert_output --partial "deploy version 1.0"
 }
 
+@test "dybatpho::agent_audit_show prints a last record that has no newline" {
+  # `read` fails on a final line without a newline, so the loop dropped the
+  # last record of a log that had been trimmed or written by another tool.
+  DYBATPHO_AGENT_AUDIT_FILE="${BATS_TEST_TMPDIR}/audit.jsonl"
+  dybatpho::agent_audit deploy "version 1.0"
+  printf '%s' "$(dybatpho::json_object timestamp t action rollback detail "version 0.9")" \
+    >> "${DYBATPHO_AGENT_AUDIT_FILE}"
+  run_traced dybatpho::agent_audit_show
+  assert_line --index 0 --partial "deploy version 1.0"
+  assert_line --index 1 "t rollback version 0.9"
+}
+
 @test "dybatpho::agent_audit_show is silent when nothing was recorded" {
   DYBATPHO_AGENT_AUDIT_FILE="${BATS_TEST_TMPDIR}/absent.jsonl"
   run_traced dybatpho::agent_audit_show

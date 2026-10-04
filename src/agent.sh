@@ -394,7 +394,9 @@ function dybatpho::agent_audit_show {
   local record
   # The log is JSON Lines, so each record is rendered on its own rather than
   # handing the whole file to a backend that expects one document.
-  while IFS= read -r record; do
+  # A log trimmed or written by another tool can end without a newline, and
+  # `read` fails on that last line even though it filled the variable.
+  while IFS= read -r record || [[ -n "${record}" ]]; do
     dybatpho::is empty "${record}" && continue
     dybatpho::json_get "${record}" '[.timestamp, .action, .detail] | join(" ")'
   done < "${DYBATPHO_AGENT_AUDIT_FILE}"

@@ -543,14 +543,14 @@ DYBATPHO_CLI_CACHE_DIR="${DYBATPHO_CLI_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cac
 # Label marking a help row as free text from `dybatpho::opts::msg`. `\x02` is a
 # control character, so it cannot collide with a switch, a command name, or a
 # `label:` a spec might set.
-readonly __DYBATPHO_CLI_MSG_LABEL=$'\x02msg'
+[[ -n "${__DYBATPHO_CLI_MSG_LABEL-}" ]] || readonly __DYBATPHO_CLI_MSG_LABEL=$'\x02msg'
 
 # Field separator of the spec metadata records the generators read back. Not a
 # tab: a tab is whitespace to `read`, which merges a run of them into one, so an
 # empty field (a description of "") moved every later field one place left. The
 # unit separator is not whitespace, so `read` keeps empty fields where they are,
 # and it cannot occur in a description or a switch a spec writes.
-readonly __DYBATPHO_CLI_META_SEP=$'\x1f'
+[[ -n "${__DYBATPHO_CLI_META_SEP-}" ]] || readonly __DYBATPHO_CLI_META_SEP=$'\x1f'
 
 #######################################
 # @description Read a line from the terminal (or stdin) with an optional default.

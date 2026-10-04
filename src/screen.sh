@@ -177,8 +177,8 @@ __dybatpho_screen_fd=""
 __dybatpho_screen_resized=false
 __dybatpho_screen_trapped=false
 
-readonly __DYBATPHO_SCREEN_US=$'\x1f'
-readonly __DYBATPHO_SCREEN_RS=$'\x1e'
+[[ -n "${__DYBATPHO_SCREEN_US-}" ]] || readonly __DYBATPHO_SCREEN_US=$'\x1f'
+[[ -n "${__DYBATPHO_SCREEN_RS-}" ]] || readonly __DYBATPHO_SCREEN_RS=$'\x1e'
 
 #######################################
 # @description Validate a whole number, or end the script naming what was wrong.

@@ -384,3 +384,20 @@ printf "%s\n" "${DYBATPHO_VERSION}"'
   run_traced -0 init_sh "--modules doctor" 'dybatpho::module_loaded doctor && echo present'
   assert_output "present"
 }
+
+@test "sourcing init.sh twice in one shell redeclares nothing read-only" {
+  # A library constant declared `readonly` at the top of a module could not be
+  # declared again, so a second source of init.sh -- or a script that sources
+  # a helper which sources it too -- printed `readonly variable` for each one.
+  local script="${BATS_TEST_TMPDIR}/twice.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf '. %q --modules all\n' "${DYBATPHO_DIR}/init.sh"
+    printf '. %q --modules all\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' "dybatpho::load cache lock screen cli" "printf 'loaded twice\n'"
+  } > "${script}"
+  run --separate-stderr env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_output "loaded twice"
+  refute_stderr --partial "readonly variable"
+}

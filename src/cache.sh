@@ -52,7 +52,7 @@ DYBATPHO_CACHE_STALE="${DYBATPHO_CACHE_STALE:-0}"
 # it deletes. The cache directory is named by an environment variable, and a
 # helper that removed every file it found in one would be a poor thing to point
 # at the wrong path by accident.
-readonly __DYBATPHO_CACHE_SUFFIX=".cache"
+[[ -n "${__DYBATPHO_CACHE_SUFFIX-}" ]] || readonly __DYBATPHO_CACHE_SUFFIX=".cache"
 
 # A key becomes a file name, so it may only hold what a file name should. An
 # arbitrary value goes through `dybatpho::cache_key` first.

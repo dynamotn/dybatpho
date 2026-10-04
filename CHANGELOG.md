@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`init.sh` can be sourced twice in one shell.** The read-only constants of
+  `cache`, `cli`, `lock` and `screen` were declared unconditionally, so a
+  second source of `init.sh` -- such as a script that sources a helper which
+  sources the library too -- printed `readonly variable` for each one.
+
 - **`helpers` — `dybatpho::default_env` sets a variable whatever its name.**
   A variable called `env_name` or `default_value` was shadowed by the
   function's own locals and never received its default.

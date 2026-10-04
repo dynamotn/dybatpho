@@ -172,6 +172,7 @@ fi
   metadata, marked when the tree has uncommitted changes; a copy vendored inside
   another repository MUST NOT report that repository's commit. See `docs/spec/doctor.md` for the diagnostics and
   the bundle that build on it.
+- **FR-019**: Sourcing `init.sh` again in a shell that already loaded the library, or loading an already-loaded module, MUST NOT fail on a constant a module declares read-only.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -241,6 +242,7 @@ fi
   ignores the commits of a project it is vendored into,
   caches the answer in `DYBATPHO_VERSION`, honors a value already set in the
   environment, and still answers in a copy that has no `VERSION` file.
+- **IT-018**: Source `init.sh` twice with `--modules all` from one script, then load four modules again, and see no `readonly variable` error.
 
 ## Acceptance Criteria *(mandatory)*
 

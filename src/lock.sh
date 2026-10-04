@@ -54,7 +54,7 @@ DYBATPHO_LOCK_POLL_INTERVAL="${DYBATPHO_LOCK_POLL_INTERVAL:-1}"
 #######################################
 # Suffix of the file holding the command that took a lock, beside the lock
 # itself. See `dybatpho::lock_field`.
-readonly __DYBATPHO_LOCK_COMMAND_SUFFIX=".command"
+[[ -n "${__DYBATPHO_LOCK_COMMAND_SUFFIX-}" ]] || readonly __DYBATPHO_LOCK_COMMAND_SUFFIX=".command"
 
 #######################################
 # @description Return success when something holds this lock path, whichever

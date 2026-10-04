@@ -17,7 +17,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A script that relied on that, such as `$(cmd; echo fallback)`, needs an
   explicit `|| true` now. Bash 4.3 keeps its default behaviour.
 
+- **`array` is a core module.** Sourcing `init.sh` with no module set now
+  loads `array` too, so every script can call the array helpers, including
+  `dybatpho::array_toposort` and `dybatpho::array_closure`, without asking for
+  them. `--modules array` still works and simply has nothing left to load.
+  `dybatpho::module_list core` and `optional` list it on the core side.
+
+- **`doctor` — an explicit module list covers what it loads, and the module
+  graph is checked.** `dybatpho::doctor --modules forge` now reports
+  `network json git forge`, in load order, so the `yq` that `json` needs is
+  listed instead of being found missing halfway through the script. The report
+  walks the dependency graph with `dybatpho::array_toposort` and prints a
+  `graph` line (a `"graph"` object in `--json`): an edge pointing at a module
+  the registry does not know fails the report, and a cycle is noted without
+  failing. Bundles made by `scripts/bundle.sh` carry the edges between their
+  modules, so the check works inside a bundle too.
+
 ### Fixed
+
+- **`init.sh` — dependencies still resolve after sourcing it inside a
+  function.** The module dependency map was declared local to that function,
+  so a later `dybatpho::load forge` loaded `forge` without `network`, `json`
+  or `git`.
 
 - **`ai` — `dybatpho::ai_stream` keeps a last chunk with no newline.** A
   provider that closed the stream right after its final object, without a
@@ -453,7 +474,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   declare -A deps=([cli]="config validate" [config]="validate")
-  dybatpho::array_toposort deps order   # validate config cli
+  dybatpho::array_toposort deps order # validate config cli
   dybatpho::array_closure deps needed cli
   ```
 
@@ -531,7 +552,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   local -a parts=() guesses=()
   dybatpho::string_match parts "v1.24.3" '^v([0-9]+)\.([0-9]+)\.([0-9]+)$'
-  dybatpho::string_closest guesses "staus" 2 status start stash   # status
+  dybatpho::string_closest guesses "staus" 2 status start stash # status
 - **`text` — boxes, centering, line numbers, and truncation for text blocks.**
   `dybatpho::text_box` frames a block in a border sized to its widest line,
   with an optional title set into the top edge and a `single`, `double`,
@@ -706,7 +727,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that spans several lines stays whole.
 
   ```sh
-  dybatpho::csv_sort billing.csv cost desc | head -n 6   # header and the top five
+  dybatpho::csv_sort billing.csv cost desc | head -n 6 # header and the top five
   ```
 
 - **`csv` — join two files on a key.** `dybatpho::csv_join` combines two
@@ -748,7 +769,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   dybatpho::diff_dir ./release-1.2 ./release-1.3
-  dybatpho::diff_dir --summary /srv/www /mnt/restore/www   # +3 -1 ~2
+  dybatpho::diff_dir --summary /srv/www /mnt/restore/www # +3 -1 ~2
   ```
 
 - **`backup` — see what changed since a backup.** `dybatpho::backup_diff`
@@ -767,7 +788,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sh
   . dybatpho/init.sh --modules backup diff
   dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
-  dybatpho::backup_diff --summary "${older}" "${newer}"   # +1 -0 ~2
+  dybatpho::backup_diff --summary "${older}" "${newer}" # +1 -0 ~2
   ```
 
 - **`backup` — incremental snapshots that share unchanged files.**
@@ -824,7 +845,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--json`, as one object a dashboard can read.
 
   ```sh
-  dybatpho::cache_stats 3600 --json   # {"entries":3,"bytes":1800,"fresh":1,...}
+  dybatpho::cache_stats 3600 --json # {"entries":3,"bytes":1800,"fresh":1,...}
 - **`math` — median, percentiles, standard deviation and square roots.**
   `dybatpho::math_median` prints the middle value of a list, or the exact mean
   of the two middle ones. `dybatpho::math_percentile` prints any percentile
@@ -839,8 +860,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   dybatpho::math_percentile 99 < latencies_ms.txt
-  dybatpho::math_stddev --sample 2 4 4 4 5 5 7 9   # 2.1380899353
-  dybatpho::math_sqrt 2 5                          # 1.41421
+  dybatpho::math_stddev --sample 2 4 4 4 5 5 7 9 # 2.1380899353
+  dybatpho::math_sqrt 2 5                        # 1.41421
   ```
 
 - **`metrics` — summaries with exact quantiles.**
@@ -986,7 +1007,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   # before
   . dybatpho/init.sh --modules network
   # after
-  . dybatpho/init.sh --modules network json   # or: dybatpho::load json
+  . dybatpho/init.sh --modules network json # or: dybatpho::load json
   ```
 
 - **BREAKING: `diff` no longer loads `json`.** Only `dybatpho::diff_yaml`
@@ -998,7 +1019,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   having asked only for `diff` or `backup` must now ask for `json` too:
 
   ```sh
-  . dybatpho/init.sh --modules diff json   # or: dybatpho::load json
+  . dybatpho/init.sh --modules diff json # or: dybatpho::load json
   ```
 
 - **BREAKING: `csv` no longer loads `json`.** Only `dybatpho::csv_to_json`
@@ -1010,7 +1031,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   having asked only for `csv` must now ask for `json` too:
 
   ```sh
-  . dybatpho/init.sh --modules csv json   # or: dybatpho::load json
+  . dybatpho/init.sh --modules csv json # or: dybatpho::load json
   ```
 
 - **BREAKING: `testing` loads only `text`, not `json`, `diff` or `network`.**
@@ -1026,7 +1047,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only for `testing` must now ask for those modules too:
 
   ```sh
-  . dybatpho/init.sh --modules testing json diff   # or: dybatpho::load json diff
+  . dybatpho/init.sh --modules testing json diff # or: dybatpho::load json diff
 - **BREAKING: `text` no longer loads `table`.** Only `dybatpho::text_columns`
   draws through the table renderer, so loading `text` -- or `testing`, which
   loads it -- no longer brings `table` along. `dybatpho::text_columns` now
@@ -1036,8 +1057,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `table_*` function, after loading only `text` has to ask for `table`:
 
   ```sh
-  . dybatpho/init.sh --modules text          # before
-  . dybatpho/init.sh --modules text table    # after
+  . dybatpho/init.sh --modules text       # before
+  . dybatpho/init.sh --modules text table # after
   ```
 
 - **BREAKING: `markdown` no longer loads `table`.** Only `dybatpho::md_table`
@@ -1048,8 +1069,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loading only `markdown` has to ask for `table`:
 
   ```sh
-  . dybatpho/init.sh --modules markdown          # before
-  . dybatpho/init.sh --modules markdown table    # after
+  . dybatpho/init.sh --modules markdown       # before
+  . dybatpho/init.sh --modules markdown table # after
   ```
 
 - **BREAKING: `safety` no longer loads `archive`.** Only
@@ -1062,8 +1083,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has to ask for `archive`:
 
   ```sh
-  . dybatpho/init.sh --modules safety            # before
-  . dybatpho/init.sh --modules safety archive    # after
+  . dybatpho/init.sh --modules safety         # before
+  . dybatpho/init.sh --modules safety archive # after
   ```
 
 - **BREAKING: `archive` no longer loads `safety`.** `archive` never called it:
@@ -1074,8 +1095,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has to ask for `safety` as well:
 
   ```sh
-  . dybatpho/init.sh --modules archive           # before
-  . dybatpho/init.sh --modules archive safety    # after
+  . dybatpho/init.sh --modules archive        # before
+  . dybatpho/init.sh --modules archive safety # after
   ```
 
 - **BREAKING: `cli` no longer loads `config`.** The parser never called the
@@ -1089,8 +1110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has to ask for `config`:
 
   ```sh
-  . dybatpho/init.sh --modules cli           # before
-  . dybatpho/init.sh --modules cli config    # after
+  . dybatpho/init.sh --modules cli        # before
+  . dybatpho/init.sh --modules cli config # after
   ```
 
 - **BREAKING: `release` no longer loads `archive`.** Only
@@ -1103,7 +1124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```sh
   . dybatpho/init.sh --modules release            # before
-  . dybatpho/init.sh --modules release archive    # after
+  . dybatpho/init.sh --modules release archive # after
 - **BREAKING: `schedule` no longer loads `lock`.** Only
   `dybatpho::schedule_debounce` takes a lock, so a script that runs on a
   cadence, once per period, or checks a cron expression no longer pays for the
@@ -1113,8 +1134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relying on `schedule` to load it, has to ask for it:
 
   ```sh
-  . dybatpho/init.sh --modules schedule        # before
-  . dybatpho/init.sh --modules schedule lock   # after
+  . dybatpho/init.sh --modules schedule      # before
+  . dybatpho/init.sh --modules schedule lock # after
   ```
 
 - **BREAKING: `i18n` no longer loads `date`.** Message catalogs, plural rules,
@@ -1128,8 +1149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   called `dybatpho::date_*` relying on `i18n` to load it, has to ask for it:
 
   ```sh
-  . dybatpho/init.sh --modules i18n        # before
-  . dybatpho/init.sh --modules i18n date   # after
+  . dybatpho/init.sh --modules i18n      # before
+  . dybatpho/init.sh --modules i18n date # after
   ```
 
 - **Display width comes from one built-in measure, with no `python3`.**

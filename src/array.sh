@@ -20,6 +20,9 @@
 #   needs it, and `dybatpho::array_closure` answers what a set of roots pulls
 #   in. They fill a named array rather than changing one in place, because the
 #   graph and the result are different things.
+#
+#   This is a core module, loaded with every module set, so it may call only
+#   other core modules. `doctor` walks the module graph with the graph helpers.
 # @see
 #   - `example/array_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"

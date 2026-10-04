@@ -47,6 +47,13 @@
 #   `dybatpho::doctor` fail. An optional entry is information rather than a
 #   problem, and so is `unknown`: a probe that could not read a version has not
 #   shown that anything is wrong.
+#
+#   The report also walks the module dependency graph with
+#   `dybatpho::array_toposort`, the same edges the loader follows. An explicit
+#   `--modules` list is widened to every module it pulls in, in load order, so
+#   the tools a dependency needs are reported too. An edge naming a module the
+#   registry does not know fails the report, because the loader would stop on
+#   it; a cycle is only noted, because the loader allows one.
 # @see
 #   - `example/doctor_ops.sh`
 #   - `scripts/bundle.sh`
@@ -282,6 +289,71 @@ function __dybatpho_doctor_scope {
 }
 
 #######################################
+# @description Walk the module dependency graph a report covers.
+#   The report follows the same registry edges the loader does, ordered by
+#   `dybatpho::array_toposort`, rather than taking them on trust. An edge that
+#   names a module the registry does not know stops every script loading the
+#   module that declares it, so it is a failure. A cycle is only noted: the
+#   loader allows one on purpose, since calls between modules resolve at run
+#   time.
+#
+#   Widening a list matters for an explicit `--modules`. A script asking for
+#   `forge` also loads `json`, and a check on `forge` alone would leave the
+#   `yq` that `json` needs for the script to discover halfway through.
+# @arg $1 string Name of the array holding the modules; widened in place with `expand`
+# @arg $2 string Name of the array receiving `module -> dependency` for each unknown edge
+# @arg $3 string Name of the variable set to 1 when the graph holds a cycle, else 0
+# @arg $4 string `expand` to replace the modules by everything they reach, in
+#   load order, with every dependency ahead of the module that needs it
+# @set The named arrays and flag
+# @internal
+#######################################
+function __dybatpho_doctor_graph {
+  local -n __graph_modules="$1"
+  local -n __graph_unknown="$2"
+  local -n __graph_cycle="$3"
+  local expand="${4-}"
+  __graph_unknown=()
+  __graph_cycle=0
+  # Without roots `dybatpho::array_toposort` orders the whole graph, which is
+  # not what an empty scope asked about.
+  ((${#__graph_modules[@]})) || return 0
+
+  # `dybatpho::array_toposort` refuses a name under the library's own prefix,
+  # so the edges are copied into a local first.
+  local -A module_edges=()
+  local module
+  # shellcheck disable=SC2154 # the dependency map is declared by `init.sh`
+  for module in ${__dybatpho_module_deps[@]+"${!__dybatpho_module_deps[@]}"}; do
+    module_edges["${module}"]="${__dybatpho_module_deps[${module}]}"
+  done
+
+  local -a order=()
+  dybatpho::array_toposort module_edges order "${__graph_modules[@]}" \
+    || __graph_cycle=1
+
+  # The order also holds every name an edge points at, so an unknown one is
+  # dropped from the modules and reported against the module that named it.
+  local -a known=()
+  for module in ${order[@]+"${order[@]}"}; do
+    if __dybatpho_module_exists "${module}"; then
+      known+=("${module}")
+    fi
+  done
+  local dep
+  for module in ${known[@]+"${known[@]}"}; do
+    for dep in ${module_edges[${module}]-}; do
+      __dybatpho_module_exists "${dep}" \
+        || __graph_unknown+=("${module} -> ${dep}")
+    done
+  done
+
+  if [[ "${expand}" == "expand" ]]; then
+    __graph_modules=(${known[@]+"${known[@]}"})
+  fi
+}
+
+#######################################
 # @description Collect every dependency row a scope produces.
 #   A row is `module<TAB>spec<TAB>kind<TAB>status<TAB>path<TAB>version`, which
 #   keeps the text and JSON renderers reading the same data.
@@ -316,13 +388,17 @@ function __dybatpho_doctor_rows {
 #######################################
 # @description Print the report as aligned text.
 # @arg $1 string Name of the array variable holding the rows
+# @arg $2 string Name of the array variable holding the unknown module edges
+# @arg $3 number 1 when the module graph holds a cycle, else 0
 # @arg $@ string Module names covered by the report
 # @stdout The environment summary, the dependency table, and a closing summary
 # @internal
 #######################################
 function __dybatpho_doctor_report_text {
   local -n __rows_in="$1"
-  shift
+  local -n __unknown_in="$2"
+  local cycle="$3"
+  shift 3
   local bash_status="ok"
   dybatpho::doctor_bash_supported || bash_status="unsupported"
   local version
@@ -335,6 +411,14 @@ function __dybatpho_doctor_report_text {
   machine=$(uname -m)
   printf 'platform %s/%s\n' "${system}" "${machine}"
   printf 'modules  %s\n' "$*"
+  local graph=""
+  if ((${#__unknown_in[@]})); then
+    graph="unknown dependency"
+  fi
+  if ((cycle)); then
+    graph="${graph:+${graph}, }cycle (allowed, calls between modules resolve at run time)"
+  fi
+  printf 'graph    %s\n' "${graph:-ok}"
 
   if ((${#__rows_in[@]} == 0)); then
     printf '\nNo external dependency is needed by these modules.\n'
@@ -373,13 +457,17 @@ function __dybatpho_doctor_report_text {
 #   escaper spells every control character, so a path or version holding one
 #   still yields valid JSON.
 # @arg $1 string Name of the array variable holding the rows
+# @arg $2 string Name of the array variable holding the unknown module edges
+# @arg $3 number 1 when the module graph holds a cycle, else 0
 # @arg $@ string Module names covered by the report
 # @stdout One JSON object describing the environment and every dependency
 # @internal
 #######################################
 function __dybatpho_doctor_report_json {
   local -n __rows_in="$1"
-  shift
+  local -n __unknown_in="$2"
+  local cycle="$3"
+  shift 3
   local bash_ok="false"
   dybatpho::doctor_bash_supported && bash_ok="true"
   local version
@@ -408,6 +496,17 @@ function __dybatpho_doctor_report_json {
     printf '"%s"' "${module_json}"
   done
   printf ']'
+  local cycle_json="false" edge edge_json
+  ((cycle == 0)) || cycle_json="true"
+  printf ',"graph":{"cycle":%s,"unknown":[' "${cycle_json}"
+  first=1
+  for edge in ${__unknown_in[@]+"${__unknown_in[@]}"}; do
+    ((first)) || printf ','
+    first=0
+    __dybatpho_log_json_escape_into edge_json "${edge}"
+    printf '"%s"' "${edge_json}"
+  done
+  printf ']}'
   local row spec kind status path version spec_json path_json
   first=1
   printf ',"dependencies":['
@@ -457,6 +556,16 @@ function dybatpho::doctor {
 
   local -a modules=()
   __dybatpho_doctor_scope modules "${scope}"
+  # The loaded set already holds every dependency, and `--all` the whole
+  # registry, so only an explicit list has anything to widen.
+  local expand="expand"
+  case "${scope}" in
+    loaded | all) expand="" ;;
+    *) ;;
+  esac
+  local -a graph_unknown=()
+  local graph_cycle=0
+  __dybatpho_doctor_graph modules graph_unknown graph_cycle "${expand}"
   local -a rows=()
   __dybatpho_doctor_rows rows ${modules[@]+"${modules[@]}"}
 
@@ -496,6 +605,9 @@ function dybatpho::doctor {
   # could not tell" is not the same claim as "it is wrong".
   ((${#outdated_required[@]} == 0)) || healthy=1
   dybatpho::doctor_bash_supported || healthy=1
+  # A dependency the registry cannot resolve makes the loader stop, so the
+  # module declaring it fails before any external command comes into play.
+  ((${#graph_unknown[@]} == 0)) || healthy=1
 
   if [[ "${quiet}" == "true" ]]; then
     return "${healthy}"
@@ -504,12 +616,14 @@ function dybatpho::doctor {
   if [[ "${format}" == "json" ]]; then
     local ok="true"
     ((healthy == 0)) || ok="false"
-    __dybatpho_doctor_report_json rows ${modules[@]+"${modules[@]}"}
+    __dybatpho_doctor_report_json rows graph_unknown "${graph_cycle}" \
+      ${modules[@]+"${modules[@]}"}
     printf ',"ok":%s}\n' "${ok}"
     return "${healthy}"
   fi
 
-  __dybatpho_doctor_report_text rows ${modules[@]+"${modules[@]}"}
+  __dybatpho_doctor_report_text rows graph_unknown "${graph_cycle}" \
+    ${modules[@]+"${modules[@]}"}
   printf '\n'
   if ((${#missing_optional[@]} > 0)); then
     printf 'Optional, some functions are unavailable: %s\n' "${missing_optional[*]}"
@@ -526,6 +640,10 @@ function dybatpho::doctor {
   if ((${#outdated_required[@]} > 0)); then
     printf 'Required, too old: %s\n' "${outdated_required[*]}"
   fi
+  local edge
+  for edge in ${graph_unknown[@]+"${graph_unknown[@]}"}; do
+    printf 'Unknown module dependency: %s\n' "${edge}"
+  done
   dybatpho::doctor_bash_supported \
     || printf 'Bash %s is older than the supported minimum %s\n' \
       "${BASH_VERSION}" "${DYBATPHO_BASH_MINIMUM}"

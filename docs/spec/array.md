@@ -190,6 +190,7 @@ fi
 - **FR-029**: `array_join` MUST join the elements a sparse array holds, in index order, and every helper MUST accept and produce an empty array under `nounset` on Bash 4.3, where `"${empty[@]}"` counts as unset.
 - **FR-030**: Union, intersection and difference MUST drop empty elements, as deduplication does, rather than fail on them.
 - **FR-031**: Every function that takes an array by name MUST read and write the array the caller named whatever that name is, including a name the function uses for a local of its own.
+- **FR-032**: The module MUST be a core module, loaded with every module set, and MUST therefore call only other core modules; `docs/spec/init.md` (FR-020, IT-019) pins it, and `doctor` builds its module-graph check on the graph helpers.
 
 ### Key Entities *(include if feature involves data)*
 

@@ -86,6 +86,15 @@ bundle() {
   assert_output --regexp 'git +git +required +ok'
 }
 
+@test "dybatpho::doctor inside a bundle walks the bundled dependency graph" {
+  # Without the edges, a bundle would check `forge` alone and miss the `yq`
+  # its `json` dependency needs.
+  run_traced -0 bundle --modules "doctor forge"
+  run_traced use_bundle 'dybatpho::doctor --modules forge || true'
+  assert_output --partial "modules  network json git forge"
+  assert_output --partial "graph    ok"
+}
+
 @test "bundle.sh refuses to overwrite an existing bundle without --force" {
   run_traced -0 bundle
   DYBATPHO_FORCE=false run -1 bundle

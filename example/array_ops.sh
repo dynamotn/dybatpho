@@ -12,7 +12,7 @@
 #   which ShellCheck cannot follow through the nameref on the other side.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
-. "${SCRIPTDIR}/../init.sh" --modules array
+. "${SCRIPTDIR}/../init.sh"
 
 dybatpho::register_common_handlers
 

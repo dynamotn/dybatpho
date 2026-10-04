@@ -463,21 +463,21 @@ function __dybatpho_process_end_job {
 # @internal
 #######################################
 function __dybatpho_process_timeout_fallback {
-  local seconds kill_after
-  dybatpho::expect_args seconds kill_after -- "$@"
+  local __dybatpho_process_fallback_seconds __dybatpho_process_fallback_kill_after
+  dybatpho::expect_args __dybatpho_process_fallback_seconds __dybatpho_process_fallback_kill_after -- "$@"
   shift 2
 
-  local marker
-  dybatpho::create_temp marker ".timeout"
+  local __dybatpho_process_fallback_marker
+  __dybatpho_create_temp_into __dybatpho_process_fallback_marker ".timeout"
   # `dybatpho::create_temp` creates the file; the watchdog signals a timeout by
   # putting something in it, so an empty marker means the command finished in
   # time.
 
   # Job control is what gives the command its own process group; it is restored
   # afterwards so the caller's shell is left as it was found.
-  local monitor="off"
+  local __dybatpho_process_fallback_monitor="off"
   case "$-" in
-    *m*) monitor="on" ;;
+    *m*) __dybatpho_process_fallback_monitor="on" ;;
     *) ;;
   esac
   set -m
@@ -486,10 +486,10 @@ function __dybatpho_process_timeout_fallback {
   local command_pid=$!
 
   (
-    sleep "${seconds}"
+    sleep "${__dybatpho_process_fallback_seconds}"
     kill -0 "${command_pid}" 2> /dev/null || exit 0
-    printf 'timeout\n' > "${marker}"
-    __dybatpho_process_end_job "${command_pid}" true "${kill_after}"
+    printf 'timeout\n' > "${__dybatpho_process_fallback_marker}"
+    __dybatpho_process_end_job "${command_pid}" true "${__dybatpho_process_fallback_kill_after}"
   ) &
   local watchdog_pid=$!
 
@@ -501,12 +501,12 @@ function __dybatpho_process_timeout_fallback {
   kill -TERM "${watchdog_pid}" 2> /dev/null || true
   wait "${watchdog_pid}" 2> /dev/null || true
 
-  [[ "${monitor}" == "on" ]] || set +m
+  [[ "${__dybatpho_process_fallback_monitor}" == "on" ]] || set +m
 
   local timed_out=false
-  [[ -s "${marker}" ]] && timed_out=true
-  rm -f -- "${marker}" > /dev/null 2>&1 || true
-  __dybatpho_process_forget_cleanup "${marker}"
+  [[ -s "${__dybatpho_process_fallback_marker}" ]] && timed_out=true
+  rm -f -- "${__dybatpho_process_fallback_marker}" > /dev/null 2>&1 || true
+  __dybatpho_process_forget_cleanup "${__dybatpho_process_fallback_marker}"
   [[ "${timed_out}" == true ]] && return 124
   return "${status}"
 }
@@ -542,29 +542,32 @@ function __dybatpho_process_timeout_fallback {
 # @tip Compare the exit code against 124 to tell a timeout apart from a command that failed on its own
 #######################################
 function dybatpho::run_with_timeout {
-  local seconds
-  dybatpho::expect_args seconds -- "$@"
+  local __dybatpho_process_timeout_seconds
+  dybatpho::expect_args __dybatpho_process_timeout_seconds -- "$@"
   shift
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected: seconds command [args...]"
-  [[ "${seconds}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Timeout must be a non-negative integer, got '${seconds}'"
+  [[ "${__dybatpho_process_timeout_seconds}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die \
+      "${FUNCNAME[0]}: Timeout must be a non-negative integer, got '${__dybatpho_process_timeout_seconds}'"
 
-  local kill_after="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
-  [[ "${kill_after}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: DYBATPHO_TIMEOUT_KILL_AFTER must be a non-negative integer, got '${kill_after}'"
+  local __dybatpho_process_timeout_kill_after="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
+  local __dybatpho_process_timeout_why="DYBATPHO_TIMEOUT_KILL_AFTER must be a non-negative integer"
+  [[ "${__dybatpho_process_timeout_kill_after}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: ${__dybatpho_process_timeout_why}, got '${__dybatpho_process_timeout_kill_after}'"
 
   # Zero is "no limit", the same meaning `timeout` gives it.
-  if ((seconds == 0)); then
+  if ((__dybatpho_process_timeout_seconds == 0)); then
     "$@"
     return $?
   fi
 
   if ! dybatpho::is function "$1" > /dev/null 2>&1 \
     && __dybatpho_process_has_timeout; then
-    timeout -k "${kill_after}" "${seconds}" "$@"
+    timeout -k "${__dybatpho_process_timeout_kill_after}" "${__dybatpho_process_timeout_seconds}" "$@"
     return $?
   fi
-  __dybatpho_process_timeout_fallback "${seconds}" "${kill_after}" "$@"
+  __dybatpho_process_timeout_fallback "${__dybatpho_process_timeout_seconds}" \
+    "${__dybatpho_process_timeout_kill_after}" "$@"
 }
 
 #######################################

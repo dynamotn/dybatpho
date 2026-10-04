@@ -670,3 +670,13 @@ SCRIPT
   run_traced dybatpho::pid_file_remove "${pid_file}"
   assert_success
 }
+
+@test "a function run under a time limit sees the caller's variables, not the library's" {
+  # A shell function runs in the library's scope, where its locals hid the
+  # caller's variables of the same names.
+  local seconds="caller" kill_after="caller" marker="caller" monitor="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  look() { printf '%s %s %s %s\n' "${seconds}" "${kill_after}" "${marker}" "${monitor}" > "${seen}"; }
+  dybatpho::run_with_timeout 5 look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller"
+}

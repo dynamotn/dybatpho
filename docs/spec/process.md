@@ -232,6 +232,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   caller.
 - **FR-023**: `pid_file_write` MUST refuse an empty path or one naming a directory before staging anything, MUST create its staging file without following a file or link already at that name, and MUST remove the staging file when the move fails.
 - **FR-024**: A handler installed for the length of a call MUST run alone while the call holds what it cleans up, and the caller's handlers MUST be restored and the signal raised again afterwards, so they run once and after the cleanup.
+- **FR-025**: A function run by `run_with_timeout` MUST see the caller's variables: the timeout and its fallback MUST keep their state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -290,6 +291,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   alone.
 - **IT-013**: Write a pid file to an empty path, a path ending in `/` and an existing directory from a script in its own directory, refuse all three, and leave that directory as it was.
 - **IT-014**: Hold a lock and run a pool under `dybatpho::register_killed_handler`, send TERM, and see each cleanup happen before the shell exits with 143.
+- **IT-015**: Run a function under a time limit that reads variables named like the runner's locals, and see the caller's values.
 
 ## Acceptance Criteria *(mandatory)*
 

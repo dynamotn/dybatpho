@@ -580,6 +580,25 @@ function __dybatpho_file_resolve_into {
 }
 
 #######################################
+# @description Create a temporary file or directory, as `dybatpho::create_temp`
+#   does, into a variable owned by the library.
+#   `dybatpho::create_temp` refuses a `__dybatpho` name, rightly, from a caller;
+#   a library function that runs the caller's command afterwards still has to
+#   keep the path in a prefixed local, or the command would see it. The path is
+#   made here in a local that is gone before the caller runs anything.
+# @arg $1 string Name of the library variable receiving the path
+# @arg $@ string The remaining `dybatpho::create_temp` arguments: extension, prefix, parent
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_create_temp_into {
+  local target="$1" path
+  shift
+  dybatpho::create_temp path "$@" || return
+  printf -v "${target}" '%s' "${path}"
+}
+
+#######################################
 # @description Create a staging file next to a destination, and set a
 #   variable to its path.
 #   The staging file has to share a directory with the destination, because

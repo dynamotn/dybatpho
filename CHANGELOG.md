@@ -123,6 +123,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assigning to one of them could change which lock was released. The runners
   now keep their state in prefixed locals.
 
+- **`process` — a function run under a time limit sees the caller's
+  variables.** `dybatpho::run_with_timeout` runs a shell function in its own
+  scope, where its locals -- `seconds`, `kill_after`, `marker`, `monitor` --
+  hid the caller's variables of the same names. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

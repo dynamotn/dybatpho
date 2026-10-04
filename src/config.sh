@@ -374,21 +374,23 @@ function dybatpho::config_export {
 #   escapes the loader expands. The double quote itself is left alone on
 #   purpose: the loader strips the outer pair by position rather than by
 #   parsing, and `printf '%b'` has no `\"` escape to undo.
-# @arg $1 string Value
-# @stdout The value, bare or double-quoted
+# @arg $1 string Name of the variable receiving the rendered value
+# @arg $2 string Value
+# @set The named variable: the value, bare or double-quoted
 # @internal
 #######################################
-function __dybatpho_config_dotenv_value {
-  local value="${1-}"
-  if [[ -n "${value}" && "${value}" =~ ^[A-Za-z0-9_./:@%+=,-]+$ ]]; then
-    printf '%s' "${value}"
+function __dybatpho_config_dotenv_value_into {
+  local -n __dybatpho_config_dotenv_ref="$1"
+  local __dybatpho_config_dv="${2-}"
+  if [[ -n "${__dybatpho_config_dv}" && "${__dybatpho_config_dv}" =~ ^[A-Za-z0-9_./:@%+=,-]+$ ]]; then
+    __dybatpho_config_dotenv_ref="${__dybatpho_config_dv}"
     return 0
   fi
-  value="${value//\\/\\\\}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\t'/\\t}"
-  value="${value//$'\r'/\\r}"
-  printf '"%s"' "${value}"
+  __dybatpho_config_dv="${__dybatpho_config_dv//\\/\\\\}"
+  __dybatpho_config_dv="${__dybatpho_config_dv//$'\n'/\\n}"
+  __dybatpho_config_dv="${__dybatpho_config_dv//$'\t'/\\t}"
+  __dybatpho_config_dv="${__dybatpho_config_dv//$'\r'/\\r}"
+  __dybatpho_config_dotenv_ref="\"${__dybatpho_config_dv}\""
 }
 
 #######################################
@@ -402,7 +404,7 @@ function __dybatpho_config_dotenv_value {
 # @internal
 #######################################
 function __dybatpho_config_save_dotenv {
-  local file key line name rendered=""
+  local file key line name value rendered=""
   local -A wanted=() seen=()
   file="$1"
   shift
@@ -423,7 +425,8 @@ function __dybatpho_config_save_dotenv {
       # the last assignment is the one the loader keeps, so leaving a stale
       # copy behind would quietly undo the save.
       if [[ -n "${name}" && -v "wanted[${name}]" ]]; then
-        rendered+="${name}=$(__dybatpho_config_dotenv_value "${DYBATPHO_CONFIG[${name}]}")"$'\n'
+        __dybatpho_config_dotenv_value_into value "${DYBATPHO_CONFIG[${name}]}"
+        rendered+="${name}=${value}"$'\n'
         seen["${name}"]=1
       else
         rendered+="${line}"$'\n'
@@ -433,7 +436,8 @@ function __dybatpho_config_save_dotenv {
 
   for key in "$@"; do
     [[ -v "seen[${key}]" ]] && continue
-    rendered+="${key}=$(__dybatpho_config_dotenv_value "${DYBATPHO_CONFIG[${key}]}")"$'\n'
+    __dybatpho_config_dotenv_value_into value "${DYBATPHO_CONFIG[${key}]}"
+    rendered+="${key}=${value}"$'\n'
   done
   printf '%s' "${rendered}" | dybatpho::file_write_atomic "${file}"
 }

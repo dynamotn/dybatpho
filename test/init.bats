@@ -52,6 +52,18 @@ loaded_line() {
   assert_output "absent"
 }
 
+@test "sourcing turns on inherit_errexit where Bash has it" {
+  ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[1] >= 4)) || skip "Bash 4.3 has no inherit_errexit"
+  run_traced -0 init_sh "" 'shopt -q inherit_errexit && echo on'
+  assert_output "on"
+}
+
+@test "a failing command stops the command substitution it runs in" {
+  ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[1] >= 4)) || skip "Bash 4.3 has no inherit_errexit"
+  run_traced '!' init_sh "" 'value="$(false; echo reached)"; echo "after ${value}"'
+  refute_output --partial "reached"
+}
+
 @test "the all selection loads every module" {
   run_traced -0 init_sh "--modules all" "$(loaded_line)"
   # `loaded_line` leaves a trailing space, so pad the front to make every module

@@ -52,6 +52,12 @@ fi
 set -euo pipefail          # Strict mode
 shopt -s nullglob globstar # Safer and better globbing
 shopt -s extglob           # Extended globbing
+# Errexit is off inside `$(...)` unless this option passes it down, so a
+# failing command there would be ignored and the substitution would carry on.
+# The option arrived in Bash 4.4; Bash 4.3 keeps its default behaviour.
+if ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[1] >= 4)); then
+  shopt -s inherit_errexit
+fi
 
 # Get path to root of repository and export to subshell
 if [[ -z "${__dybatpho_init_source}" ]]; then

@@ -129,7 +129,7 @@ fi
 
 - **FR-001**: The bootstrap MUST require Bash v4.3 or newer before loading library code, because the library returns values through nameref parameters and waits with `wait -n`, neither of which exists earlier.
 - **FR-002**: The bootstrap MUST refuse direct execution and require sourcing.
-- **FR-003**: The bootstrap MUST enable the default strict and globbing shell options expected by the library.
+- **FR-003**: The bootstrap MUST enable the default strict and globbing shell options expected by the library, and on Bash 4.4 or newer MUST turn on `inherit_errexit`, so that a failing command inside `$(...)` stops the substitution instead of being ignored.
 - **FR-004**: The bootstrap MUST set and export `DYBATPHO_DIR` to the repository root path.
 - **FR-005**: The bootstrap MUST load the core modules, and only the core
   modules, when no module set is requested, and MUST load every shipped module

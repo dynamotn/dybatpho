@@ -100,12 +100,12 @@ bats_require_minimum_version 1.5.0
 # @exitcode 1 The status was not the one the flags asked for
 # shellcheck disable=SC2034 # status, output and lines are read by the caller
 function run_traced {
-  local expected_rc="" separate=""
+  local __run_traced_expected_rc="" __run_traced_separate=""
   while (($#)) && [[ "$1" == -* || "$1" == '!' ]]; do
     case "$1" in
-      '!') expected_rc="-1" ;;
-      -[0-9]*) expected_rc="${1#-}" ;;
-      --separate-stderr) separate="1" ;;
+      '!') __run_traced_expected_rc="-1" ;;
+      -[0-9]*) __run_traced_expected_rc="${1#-}" ;;
+      --separate-stderr) __run_traced_separate="1" ;;
       --)
         shift
         break
@@ -118,22 +118,23 @@ function run_traced {
     shift
   done
 
-  local dir="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR}}}"
-  local output_file="${dir}/run_traced.out" stderr_file="${dir}/run_traced.err"
+  local __run_traced_dir="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR}}}"
+  local __run_traced_output_file="${__run_traced_dir}/run_traced.out"
+  local __run_traced_stderr_file="${__run_traced_dir}/run_traced.err"
   status=0
-  if [[ -n "${separate}" ]]; then
-    "$@" > "${output_file}" 2> "${stderr_file}" || status=$?
+  if [[ -n "${__run_traced_separate}" ]]; then
+    "$@" > "${__run_traced_output_file}" 2> "${__run_traced_stderr_file}" || status=$?
   else
-    "$@" > "${output_file}" || status=$?
+    "$@" > "${__run_traced_output_file}" || status=$?
   fi
-  output="$(< "${output_file}")"
+  output="$(< "${__run_traced_output_file}")"
   if [[ -n "${output}" ]]; then
     mapfile -t lines <<< "${output}"
   else
     lines=()
   fi
-  if [[ -n "${separate}" ]]; then
-    stderr="$(< "${stderr_file}")"
+  if [[ -n "${__run_traced_separate}" ]]; then
+    stderr="$(< "${__run_traced_stderr_file}")"
     if [[ -n "${stderr}" ]]; then
       mapfile -t stderr_lines <<< "${stderr}"
     else
@@ -143,17 +144,17 @@ function run_traced {
     unset -v stderr stderr_lines
   fi
 
-  if [[ -z "${expected_rc}" ]]; then
+  if [[ -z "${__run_traced_expected_rc}" ]]; then
     return 0
   fi
-  if [[ "${expected_rc}" == "-1" ]]; then
+  if [[ "${__run_traced_expected_rc}" == "-1" ]]; then
     if ((status == 0)); then
       printf 'run_traced: expected nonzero exit code, got 0\n%s\n' "${output}" >&2
       return 1
     fi
-  elif ((status != expected_rc)); then
+  elif ((status != 10#${__run_traced_expected_rc})); then
     printf 'run_traced: expected exit code %s, got %s\n%s\n' \
-      "${expected_rc}" "${status}" "${output}" >&2
+      "${__run_traced_expected_rc}" "${status}" "${output}" >&2
     return 1
   fi
   return 0
@@ -207,7 +208,7 @@ function path_without {
   local -a entries=()
   mkdir -p "${bin}"
   IFS=':' read -r -a entries <<< "${PATH}"
-  for entry in "${entries[@]}"; do
+  for entry in ${entries[@]+"${entries[@]}"}; do
     [[ -n "${entry}" ]] || continue
     if [[ ! -x "${entry}/${tool}" ]]; then
       kept+="${entry}:"

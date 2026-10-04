@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`init.sh` — a failing command stops the command substitution it runs in.**
+  On Bash 4.4 or newer the bootstrap now turns on `inherit_errexit` next to
+  `set -euo pipefail`. Bash turns errexit off inside `$(...)` otherwise, so
+  `value="$(step_one; step_two)"` ran `step_two` after `step_one` failed, and a
+  function called through a substitution carried on past its first failure.
+  A script that relied on that, such as `$(cmd; echo fallback)`, needs an
+  explicit `|| true` now. Bash 4.3 keeps its default behaviour.
+
 ### Fixed
 
 - **`ai` — `dybatpho::ai_stream` keeps a last chunk with no newline.** A

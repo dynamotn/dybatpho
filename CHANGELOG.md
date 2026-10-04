@@ -207,6 +207,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `monitor` hid the caller's variables of the same names. They are now
   prefixed.
 
+- **`testing` — a command run by `dybatpho::assert_cli_snapshot` sees the
+  caller's variables.** It ran in the assertion's scope, where `name`,
+  `separator`, `exit_code` and the capture files hid the caller's variables
+  of the same names. They are now prefixed.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

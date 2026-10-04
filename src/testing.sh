@@ -658,22 +658,24 @@ function dybatpho::assert_snapshot {
 #      propagated, so a CLI that exits non-zero can still be snapshotted.
 #######################################
 function dybatpho::assert_cli_snapshot {
-  local name separator
-  dybatpho::expect_args name separator -- "$@"
+  local __dybatpho_test_cli_name __dybatpho_test_cli_separator
+  dybatpho::expect_args __dybatpho_test_cli_name __dybatpho_test_cli_separator -- "$@"
   shift 2
-  [[ "${separator}" == "--" ]] \
+  [[ "${__dybatpho_test_cli_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: name -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
 
-  local stdout_file stderr_file exit_code=0
-  dybatpho::create_temp stdout_file ".out" "snapshot"
-  dybatpho::create_temp stderr_file ".err" "snapshot"
-  "$@" > "${stdout_file}" 2> "${stderr_file}" || exit_code=$?
+  local __dybatpho_test_cli_stdout_file __dybatpho_test_cli_stderr_file __dybatpho_test_cli_exit_code=0
+  __dybatpho_create_temp_into __dybatpho_test_cli_stdout_file ".out" "snapshot"
+  __dybatpho_create_temp_into __dybatpho_test_cli_stderr_file ".err" "snapshot"
+  "$@" > "${__dybatpho_test_cli_stdout_file}" 2> "${__dybatpho_test_cli_stderr_file}" || \
+    __dybatpho_test_cli_exit_code=$?
 
-  local document
-  printf -v document '$ %s\n--- exit: %s\n--- stdout:\n%s\n--- stderr:\n%s' \
-    "$*" "${exit_code}" "$(< "${stdout_file}")" "$(< "${stderr_file}")"
-  dybatpho::assert_snapshot "${name}" "${document}"
+  local __dybatpho_test_cli_document
+  printf -v __dybatpho_test_cli_document '$ %s\n--- exit: %s\n--- stdout:\n%s\n--- stderr:\n%s' \
+    "$*" "${__dybatpho_test_cli_exit_code}" "$(< "${__dybatpho_test_cli_stdout_file}")" \
+      "$(< "${__dybatpho_test_cli_stderr_file}")"
+  dybatpho::assert_snapshot "${__dybatpho_test_cli_name}" "${__dybatpho_test_cli_document}"
 }
 
 #######################################

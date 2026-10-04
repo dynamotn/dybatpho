@@ -1000,3 +1000,13 @@ BSD
   claim() { expected=3; return 3; }
   run_traced ! dybatpho::assert_exit_code 0 -- claim
 }
+
+@test "a command snapshotted by assert_cli_snapshot sees the caller's variables" {
+  # The command runs in the assertion's scope, where its locals hid the
+  # caller's variables of the same names.
+  local name="caller" separator="caller" exit_code="caller" stdout_file="caller"
+  look() { printf '%s %s %s %s\n' "${name}" "${separator}" "${exit_code}" "${stdout_file}"; }
+  dybatpho::assert_cli_snapshot scoped-cli -- look
+  run_traced cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/scoped-cli.snap"
+  assert_output --partial "caller caller caller caller"
+}

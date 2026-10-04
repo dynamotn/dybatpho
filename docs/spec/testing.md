@@ -424,6 +424,7 @@ dybatpho::unmock_all
 - **FR-042**: `assert_file_mode` MUST follow a symbolic link and compare the mode of the file it points at.
 - **FR-043**: `snapshot_scrub` MUST accept a pattern or replacement holding `|`, MUST refuse an expression `sed` cannot run without registering it, and `assert_snapshot` MUST fail rather than compare or record text a failed substitution left empty.
 - **FR-044**: A command run by `assert_exit_code`, `benchmark` or `assert_duration_under` MUST see the caller's variables and MUST NOT change the verdict by assigning to one: they MUST keep their state in prefixed locals.
+- **FR-045**: A command run by `assert_cli_snapshot` MUST see the caller's variables: the assertion MUST keep its state in prefixed locals.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -543,6 +544,7 @@ dybatpho::unmock_all
 - **IT-032**: Assert `600` on a link to a `600` file and see it pass.
 - **IT-033**: Scrub a pattern holding `|`, refuse a broken expression, and fail a snapshot whose substitution fails without writing a baseline.
 - **IT-034**: Run a command through each assertion that reads variables named like their locals, and see the caller's values; a command assigning the expected status still fails the assertion.
+- **IT-035**: Snapshot a command that reads variables named like the assertion's locals, and see the caller's values in the snapshot.
 
 ## Acceptance Criteria *(mandatory)*
 

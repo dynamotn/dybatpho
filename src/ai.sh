@@ -464,33 +464,38 @@ function dybatpho::ai_model {
 }
 
 #######################################
-# @description Resolve the API key for an HTTP backend.
-# @arg $1 string Backend name
-# @stdout API key, empty for `ollama`
+# @description Resolve the API key for an HTTP backend into a named variable,
+#   in the caller's shell.
+#   Read inside `$(...)`, a missing key ended only the substitution, and the
+#   request went out with an empty key header; here it stops the call before
+#   anything is sent.
+# @arg $1 string Name of the variable receiving the key
+# @arg $2 string Backend name
+# @set The named variable: the key, empty for `ollama`
 # @exitcode 0 A key was found, or the backend needs none
 # @exitcode 1 Stop the script when a required key is missing
 # @internal
 #######################################
-function __dybatpho_ai_api_key {
-  local provider
-  dybatpho::expect_args provider -- "$@"
+function __dybatpho_ai_api_key_into {
+  local -n __dybatpho_ai_key_ref="$1"
+  local __dybatpho_ai_key_provider="$2"
   if dybatpho::is set "${DYBATPHO_AI_API_KEY}"; then
-    printf '%s\n' "${DYBATPHO_AI_API_KEY}"
+    __dybatpho_ai_key_ref="${DYBATPHO_AI_API_KEY}"
     return 0
   fi
-  case "${provider}" in
+  case "${__dybatpho_ai_key_provider}" in
     anthropic)
       dybatpho::is set "${ANTHROPIC_API_KEY-}" \
         || dybatpho::die "ai: ANTHROPIC_API_KEY or DYBATPHO_AI_API_KEY must be set for the anthropic backend"
-      printf '%s\n' "${ANTHROPIC_API_KEY}"
+      __dybatpho_ai_key_ref="${ANTHROPIC_API_KEY}"
       ;;
     openai)
       dybatpho::is set "${OPENAI_API_KEY-}" \
         || dybatpho::die "ai: OPENAI_API_KEY or DYBATPHO_AI_API_KEY must be set for the openai backend"
-      printf '%s\n' "${OPENAI_API_KEY}"
+      __dybatpho_ai_key_ref="${OPENAI_API_KEY}"
       ;;
-    ollama) printf '\n' ;;
-    *) dybatpho::die "ai: Backend '${provider}' has no API key concept" ;;
+    ollama) __dybatpho_ai_key_ref="" ;;
+    *) dybatpho::die "ai: Backend '${__dybatpho_ai_key_provider}' has no API key concept" ;;
   esac
 }
 
@@ -534,7 +539,8 @@ function dybatpho::ai_check {
   case "${provider}" in
     anthropic | openai | ollama)
       hash curl > /dev/null 2>&1 || dybatpho::die "ai: curl is required by the ${provider} backend" 127
-      __dybatpho_ai_api_key "${provider}" > /dev/null
+      local key
+      __dybatpho_ai_api_key_into key "${provider}"
       ;;
     cli)
       __dybatpho_ai_cli_command > /dev/null
@@ -941,17 +947,22 @@ function __dybatpho_ai_http {
 function __dybatpho_ai_endpoint_into {
   local __dybatpho_ai_ep_provider="$1"
   local -n __dybatpho_ai_ep_url="$2" __dybatpho_ai_ep_headers="$3"
-  local __dybatpho_ai_ep_base
+  local __dybatpho_ai_ep_base __dybatpho_ai_ep_key=""
   __dybatpho_ai_ep_base=$(__dybatpho_ai_base_url "${__dybatpho_ai_ep_provider}")
+  # A rehearsal sends nothing, so it needs no key; a real request is refused
+  # here, in the shell that would send it, rather than sent without one.
+  if ! dybatpho::is true "${DRY_RUN-}"; then
+    __dybatpho_ai_api_key_into __dybatpho_ai_ep_key "${__dybatpho_ai_ep_provider}"
+  fi
   case "${__dybatpho_ai_ep_provider}" in
     anthropic)
       __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/v1/messages"
-      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: $(__dybatpho_ai_api_key anthropic)")
+      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: ${__dybatpho_ai_ep_key}")
       __dybatpho_ai_ep_headers+=(--header "anthropic-version: ${DYBATPHO_AI_ANTHROPIC_VERSION}")
       ;;
     openai)
       __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/chat/completions"
-      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer $(__dybatpho_ai_api_key openai)")
+      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer ${__dybatpho_ai_ep_key}")
       ;;
     ollama)
       __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/api/chat"

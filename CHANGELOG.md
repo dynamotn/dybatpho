@@ -136,6 +136,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as written. They are now read before the output is opened, and a missing one
   stops the run without leaving a bundle behind.
 
+- **`ai` — a missing API key stops the call before anything is sent.** The key
+  was read inside a command substitution, so its refusal ended only that
+  substitution: the request still went to the provider, with an empty key
+  header, and the call failed only on the provider's `401`. It now stops before
+  the request; a `DRY_RUN` rehearsal still needs no key.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

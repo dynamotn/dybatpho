@@ -386,6 +386,23 @@ EOF
   assert_equal "$(dybatpho::json_get "$(cat "${chat}")" '[.messages[] | select(.role == "assistant")] | length')" "0"
 }
 
+@test "a missing API key stops the call before the request is sent" {
+  # The key was read inside a command substitution, so its refusal ended only
+  # that substitution: the request went out with an empty key header, and the
+  # call only failed on the provider's 401.
+  DYBATPHO_AI_API_KEY=""
+  ANTHROPIC_API_KEY=""
+  local sent="${BATS_TEST_TMPDIR}/request-sent"
+  stub_repeated curl ": touch '${sent}'; echo 401"
+  run --separate-stderr dybatpho::ai_ask "q"
+  assert_failure
+  assert_stderr --partial "ANTHROPIC_API_KEY or DYBATPHO_AI_API_KEY must be set"
+  assert_file_not_exist "${sent}"
+
+  # A rehearsal sends nothing, so it needs no key.
+  DRY_RUN=true run_traced -0 dybatpho::ai_ask "q"
+}
+
 @test "dybatpho::ai_chat rejects a missing conversation file" {
   run --separate-stderr dybatpho::ai_chat "${BATS_TEST_TMPDIR}/absent.json" "q"
   assert_failure

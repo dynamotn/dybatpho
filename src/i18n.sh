@@ -1393,7 +1393,7 @@ function __dybatpho_i18n_round {
     digit=$((${combined:index:1} + carry))
     carry=$((digit / 10))
     result="$((digit % 10))${result}"
-    ((index--))
+    index=$((index - 1))
   done
   combined="${combined:0:index+1}${result}"
   ((carry)) && combined="1${combined}"

@@ -664,6 +664,23 @@ PO
   assert_equal "$(dybatpho::i18n_number 1234567.891 2 de)" "1.234.567,89"
 }
 
+@test "a value that rounds up through every digit is printed under errexit" {
+  # The rounding loop counted its index down with `((index--))`, which fails
+  # when the index reaches 0, so under `set -e` a direct call stopped the
+  # script with no output. Inside `$(...)` errexit is off, which hid it.
+  local script="${BATS_TEST_TMPDIR}/round.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules i18n" \
+    'dybatpho::i18n_number 9.996 2 en' \
+    'dybatpho::i18n_number 99.996 2 en' > "${script}"
+  run_traced bash "${script}"
+  assert_success
+  assert_output - << 'EOF'
+10.00
+100.00
+EOF
+}
+
 @test "French groups with a narrow no-break space" {
   assert_equal "$(dybatpho::i18n_number 1234567 0 fr)" "1 234 567"
 }

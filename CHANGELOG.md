@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`i18n` — a number that rounds up through every digit no longer stops the
+  script.** `dybatpho::i18n_number 9.996 2 en`, and every value that carries
+  all the way up such as `99.996`, ended the calling script with no output
+  when called directly under `set -e`; inside `$(...)` it worked. It now prints
+  `10.00`.
+
 ## [6.0.1] - 2026-10-04
 
 ### Fixed

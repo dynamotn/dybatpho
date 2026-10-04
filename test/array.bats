@@ -189,6 +189,16 @@ EOF
   assert_failure 7
 }
 
+@test "dybatpho::array_map maps an array named like its own locals" {
+  # The mapped values are written back through the caller's name, so an array
+  # sharing a name with one of the function's locals came back unmapped.
+  # shellcheck disable=SC2329
+  upper() { printf '%s' "${1^^}"; }
+  local -a status=(a b)
+  dybatpho::array_map status upper
+  assert_equal "${status[*]}" "A B"
+}
+
 @test "dybatpho::array_map fails for invalid mapper" {
   arr=("a" "b")
   run --separate-stderr dybatpho::array_map "arr" "not_a_real_function"

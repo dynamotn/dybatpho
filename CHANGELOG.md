@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`array` — `dybatpho::array_map` maps an array named `status`.** The
+  function kept the mapper's exit status in a local of that name, so a caller
+  whose array was called `status` got it back unmapped.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

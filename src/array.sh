@@ -189,13 +189,13 @@ function dybatpho::array_map {
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_mapper="${2-}"
   local -a __dybatpho_array_mapped=()
-  local __dybatpho_array_mapped_value __dybatpho_array_i status
+  local __dybatpho_array_mapped_value __dybatpho_array_i __dybatpho_array_status
   dybatpho::is function "${__dybatpho_array_mapper}" || dybatpho::die \
     "Invalid mapper function: ${__dybatpho_array_mapper}"
   for __dybatpho_array_i in "${!__dybatpho_array_ref[@]}"; do
     __dybatpho_array_mapped_value=$("${__dybatpho_array_mapper}" "${__dybatpho_array_ref[${__dybatpho_array_i}]}")
-    status=$?
-    ((status == 0)) || return "${status}"
+    __dybatpho_array_status=$?
+    ((__dybatpho_array_status == 0)) || return "${__dybatpho_array_status}"
     __dybatpho_array_mapped+=("${__dybatpho_array_mapped_value}")
   done
   __dybatpho_array_ref=(${__dybatpho_array_mapped[@]+"${__dybatpho_array_mapped[@]}"})

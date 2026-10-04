@@ -189,6 +189,7 @@ fi
 - **FR-028**: The module MUST collect the entries reachable from some roots, the roots included, as a sorted set, and MUST reject a call with no root.
 - **FR-029**: `array_join` MUST join the elements a sparse array holds, in index order, and every helper MUST accept and produce an empty array under `nounset` on Bash 4.3, where `"${empty[@]}"` counts as unset.
 - **FR-030**: Union, intersection and difference MUST drop empty elements, as deduplication does, rather than fail on them.
+- **FR-031**: Every function that takes an array by name MUST read and write the array the caller named whatever that name is, including a name the function uses for a local of its own.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -236,6 +237,7 @@ fi
 - **IT-021**: Collect the reachable set from a root, walk a cycle without looping, and reject a call with no root.
 - **IT-022**: Join a sparse array with indexes 2, 5 and 9 and verify only its three elements are joined; on Bash 4.3 run each helper on an empty array, and each filter down to an empty result, under `nounset`.
 - **IT-023**: Verify union, intersection, and difference drop empty elements from either array instead of stopping.
+- **IT-024**: Map an array named `status`, the name of a local `dybatpho::array_map` used, and get the mapped values back.
 
 ## Acceptance Criteria *(mandatory)*
 

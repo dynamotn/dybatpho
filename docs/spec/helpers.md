@@ -185,12 +185,12 @@ _deploy prod "${DEPLOY_TOKEN:-}"
   apply the check before binding, and MUST name its own locals inside the
   reserved namespace so that the check covers them.
 
-- **FR-016**: The module MUST report which module defines a loaded function, accepting the name with or without the `dybatpho::` prefix, and MUST report `init` for a function the bootstrap defines.
+- **FR-021**: The module MUST report which module defines a loaded function, accepting the name with or without the `dybatpho::` prefix, and MUST report `init` for a function the bootstrap defines.
 - **FR-016a**: The lookup MUST use what Bash knows about the running shell rather than the contents of a directory, so the answer describes the code that is actually loaded.
 - **FR-016b**: The lookup MUST switch `extdebug` on only for the one call it needs and MUST restore the option exactly as it found it, because that option also changes how `DEBUG` and `RETURN` traps behave.
 - **FR-016c**: The module MUST also be able to report the file and line a function was defined at, and that line MUST be the line holding the definition.
 - **FR-016d**: A function whose defining file is not a module source MUST NOT be attributed to a module. A bundle holds every module in one file, and naming that file as the module would be a wrong answer rather than a missing one.
-- **FR-017**: The module MUST print the documentation comment of a loaded function, read out of the source the shell loaded, so it is available whether or not the generated documentation was ever produced or shipped.
+- **FR-022**: The module MUST print the documentation comment of a loaded function, read out of the source the shell loaded, so it is available whether or not the generated documentation was ever produced or shipped.
 - **FR-017a**: Rendering MUST drop the banner rules and any `shellcheck` directive standing between the comment and the definition, MUST remove one comment marker and the space after it from each line, and MUST remove the `@description` marker from the prose it introduces, leaving every other tag as written.
 - **FR-017b**: The output MUST open with a heading naming the function and where it came from, including the module when one can be named.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.

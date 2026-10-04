@@ -320,9 +320,9 @@ dybatpho::circuit_breaker api.example.test \
 - **FR-026**: A request body given through `DYBATPHO_CURL_SECRET_DATA` MUST
   reach `curl` on standard input rather than as an argument, for the same
   reason.
-- **FR-027**: An HTTP error response MUST keep its body. `curl`'s `--fail`
+- **FR-037**: An HTTP error response MUST keep its body. `curl`'s `--fail`
   discards it, so the reason a request was refused never reached the caller.
-- **FR-028**: The exit code MUST reflect the class of the HTTP status that
+- **FR-038**: The exit code MUST reflect the class of the HTTP status that
   came back — 3, 4 or 5 — and MUST be reserved for a transport failure, where no
   response was received at all.
 
@@ -451,7 +451,7 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-024**: Verify a request carrying `DYBATPHO_CURL_SECRET_HEADERS` and
   `DYBATPHO_CURL_SECRET_DATA` sends both, while neither appears among the
   arguments the mocked `curl` was called with.
-- **IT-025**: Verify a 422 and a 503 both return their status class and leave
+- **IT-035**: Verify a 422 and a 503 both return their status class and leave
   their body in the output file, and that a transport failure is reported
   separately.
 

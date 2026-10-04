@@ -172,6 +172,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - A timed or background command started processes of its own, which must not be
   orphaned when it is ended.
 - A timed or background command ignores SIGTERM and has to be sent SIGKILL.
+- A background job exits while a process it started, which ignores SIGTERM,
+  is still running in its group.
 - A time limit of `0` means no limit.
 - A background job name is started again after its previous job was reaped, or
   while that job is still running.
@@ -217,7 +219,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   under its name and MUST fail when any job failed.
 - **FR-017**: Ending the background jobs MUST also end the processes those jobs
   started, MUST reap them, and MUST empty the registry so the names can be
-  reused.
+  reused. It MUST wait on the job's whole process group, not on the job alone,
+  so a process that outlives the job and ignores SIGTERM is still sent SIGKILL.
 - **FR-018**: PID file writes MUST be atomic, MUST default to the current
   script's `$$`, and MUST create the directory the file lives in.
 - **FR-019**: A PID file check MUST report "not running" for a missing,
@@ -298,6 +301,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-016**: Run a function under a time limit that reads variables named like the runner's locals, and see the caller's values.
 - **IT-017**: Start a background job that reads variables named like the starter's locals, and see the caller's values.
 - **IT-018**: Fail with status 7 three functions deep after `register_err_handler`, and exit 7 with all three frames printed.
+- **IT-019**: Start a background job that leaves behind a child ignoring SIGTERM and exits, end the jobs, and see that child killed.
 
 ## Acceptance Criteria *(mandatory)*
 

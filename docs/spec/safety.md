@@ -152,6 +152,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - The target path doesn't exist, so a removal has nothing to do.
 - The target is a dangling symlink, which must be removable without following
   it.
+- A directory of the target path is a symlink that points outside every safe
+  root, or at a protected path, while the path as written looks safe.
 - The target is a directory and the caller didn't pass `--recursive`.
 - A path begins with `-` and must be passed after a `--` separator.
 - The destination of a copy or move is an existing directory, or its parent
@@ -188,6 +190,10 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   directories, `${HOME}`, and every entry of `DYBATPHO_PROTECTED_PATHS`.
 - **FR-006**: When `DYBATPHO_SAFE_ROOTS` is set, `assert_safe_path` MUST reject
   any path that doesn't resolve inside one of its colon-separated roots.
+- **FR-006a**: `assert_safe_path` MUST resolve the directories of the path, and
+  of each root and protected path, through their symbolic links before it
+  compares them, MUST NOT follow the last component, which the operation acts
+  on as a link, and MUST keep printing the path as written.
 - **FR-007**: Every guarded operation MUST validate its target through
   `assert_safe_path` before touching the filesystem.
 - **FR-008**: `safe_rm` MUST accept `--force`/`-f`, `--recursive`/`-r`, and a
@@ -301,6 +307,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **IT-013**: Verify `safe_extract` refuses a corrupt archive with an error
   naming it.
 - **IT-014**: Run an approved command through `safe_system` that reads variables named like the guard's locals, and see the caller's values.
+- **IT-015**: Refuse a path that leaves a safe root through a linked directory, and one that reaches a protected path through it, while accepting the link itself and a root given as a link.
+- **IT-016**: Accept a path beneath a safe root that does not exist yet, compared as written.
 
 ## Acceptance Criteria *(mandatory)*
 

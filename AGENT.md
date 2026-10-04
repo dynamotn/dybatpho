@@ -141,7 +141,7 @@ module calls `command curl` on purpose, which bypasses functions.
 | `helpers.sh` | Argument validation, command lookup, retry, and common helpers | `test/helpers.bats`, `docs/helpers.md`, `docs/spec/helpers.md` |
 | `i18n.sh` | Message catalogs, plural rules, and locale-aware numbers, money, sizes, dates, and text direction | `test/i18n.bats`, `docs/i18n.md`, `docs/spec/i18n.md` |
 | `json.sh` | Query, validate, pretty-print, and convert JSON/YAML | `test/json.bats`, `docs/json.md`, `docs/spec/json.md` |
-| `lock.sh` | Portable `mkdir`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `docs/lock.md`, `docs/spec/lock.md` |
+| `lock.sh` | Portable `ln -s`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `docs/lock.md`, `docs/spec/lock.md` |
 | `logging.sh` | Log levels, text/JSON logging, banners, and Bash tracing | `test/logging.bats`, `docs/logging.md`, `docs/spec/logging.md` |
 | `csv.sh` | RFC 4180 CSV: parsing quoted fields, reading columns, filtering rows, writing back, and converting to and from JSON | `test/csv.bats`, `docs/csv.md`, `docs/spec/csv.md` |
 | `markdown.sh` | Markdown builders for headings, lists, task lists, links, badges, code blocks, tables and collapsible sections, escaping every interpolated value | `test/markdown.bats`, `docs/markdown.md`, `docs/spec/markdown.md` |

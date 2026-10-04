@@ -192,13 +192,15 @@ dybatpho::lock_semaphore_holders downloads 4
 
 - **FR-001**: The module MUST implement locking without depending on `flock`,
   and MUST work the same way on Linux and macOS.
-- **FR-002**: Lock creation MUST be atomic, using `mkdir` on the lock directory
-  rather than a check-then-create sequence.
+- **FR-002**: Lock creation MUST be atomic, using one `ln -s` whose target
+  already names the holder, rather than a check-then-create sequence or a
+  claim followed by a separate write of the owner.
 - **FR-003**: `lock_path` MUST resolve a bare name under `DYBATPHO_LOCK_DIR` as
   `dybatpho-<name>`, MUST keep an explicit path containing `/` unchanged, and
   MUST ensure exactly one `.lock` suffix.
-- **FR-004**: An acquired lock MUST record the holder's `pid`, `host`,
-  `acquired_at` timestamp, and `command` as fields inside the lock directory.
+- **FR-004**: An acquired lock MUST record the holder's `pid`, `host`, and
+  `acquired_at` timestamp in the target of the lock link, and its `command` in
+  a `.command` file beside it.
 - **FR-005**: `lock_acquire` MUST default to a `0` second timeout, failing on
   the first attempt instead of waiting.
 - **FR-006**: With a positive timeout, `lock_acquire` MUST retry until the

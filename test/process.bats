@@ -596,6 +596,36 @@ SCRIPT
   assert_process_dead "$(< "${pid_file}")"
 }
 
+@test "dybatpho::kill_children kills a child that ignores SIGTERM after its job has exited" {
+  local pid_file="${BATS_TEST_TMPDIR}/stubborn.pid"
+  __dybatpho_test_stubborn() {
+    (
+      trap '' TERM
+      printf '%s\n' "${BASHPID}" > "${pid_file}"
+      sleep 30
+    ) &
+  }
+  dybatpho::background_run stubborn __dybatpho_test_stubborn
+  local waited=0
+  while [[ ! -s "${pid_file}" ]] && ((waited < 5)); do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  # The job itself is gone; only the child that ignores SIGTERM is left.
+  local leader
+  leader="$(dybatpho::background_pid stubborn)"
+  waited=0
+  while kill -0 "${leader}" 2> /dev/null && ((waited < 5)); do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  assert_process_dead "${leader}"
+
+  DYBATPHO_TIMEOUT_KILL_AFTER=1 dybatpho::kill_children
+  sleep 1
+  assert_process_dead "$(< "${pid_file}")"
+}
+
 @test "dybatpho::kill_children is safe to call when no job was ever started" {
   run_traced dybatpho::kill_children
   assert_success

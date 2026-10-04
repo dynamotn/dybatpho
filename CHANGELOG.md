@@ -45,6 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   return. A group holding only zombies now counts as ended wherever `/proc`
   exists.
 
+- **`process` — `dybatpho::kill_children` and `dybatpho::run_with_timeout` end
+  a child that outlives its job.** Both sent SIGTERM to the job's process
+  group, but then watched the job alone: once it had exited they stopped, and
+  a child it had started that ignores SIGTERM kept running, never sent SIGKILL.
+  They now wait on the whole group, and send SIGKILL to it when anything in it
+  is still there after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds.
+
+- **`date` — a GNU-compatible `date` without `--version` is driven with `-d`.**
+  The module told GNU `date` apart by whether `date --version` succeeded, so a
+  `date` that reads `-d @<seconds>` but has no `--version` was taken for BSD
+  and handed `-j -f`, which it does not know. Every `dybatpho::date_*` helper
+  now asks for the flag it is going to use: `-D` for BusyBox, then `-d` for
+  GNU, and BSD otherwise.
+
 - **`cli` — a parser leaves no file behind when the action ends in `exec`.**
   `dybatpho::generate_from_spec` wrote the generated parser to a temporary
   file that only the EXIT trap removed, and a script whose action hands over
@@ -76,6 +90,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all the way up such as `99.996`, ended the calling script with no output
   when called directly under `set -e`; inside `$(...)` it worked. It now prints
   `10.00`.
+
+### Security
+
+- **`safety` — a symbolic link in a directory of a path no longer carries a
+  guarded operation out of `DYBATPHO_SAFE_ROOTS`.** `dybatpho::assert_safe_path`
+  compared the path only as written, so with `DYBATPHO_SAFE_ROOTS=/work`,
+  `dybatpho::safe_rm -r /work/link/data` passed the check and removed
+  `/etc/data` when `/work/link` pointed at `/etc`. The directories of the path,
+  of each root and of each protected path are now resolved before they are
+  compared, and the error names where the path resolves to. The last component
+  is still not followed, so removing or replacing a link inside a root acts on
+  the link, and the printed path is the one written.
 
 ## [6.0.1] - 2026-10-04
 

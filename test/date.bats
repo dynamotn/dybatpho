@@ -52,6 +52,22 @@ setup() {
   assert_equal "$(dybatpho::date_add_days "2024-02-29 12:34:56" 1)" "2024-02-29"
 }
 
+@test "date flavour is probed by the flags the module uses, not --version" {
+  # A GNU-compatible date that has no --version still reads `-d @<seconds>`.
+  stub_repeated date ": case \"\$1\" in -d) echo 0 ;; *) exit 1 ;; esac"
+  local flavor
+  __dybatpho_date_flavor_into flavor
+  assert_equal "${flavor}" "gnu"
+  unstub date
+
+  # BusyBox alone takes the input format through -D.
+  __dybatpho_date_flavor_cache=""
+  stub_repeated date ": case \"\$1\" in -D) echo 0 ;; *) exit 1 ;; esac"
+  __dybatpho_date_flavor_into flavor
+  assert_equal "${flavor}" "busybox"
+  unstub date
+}
+
 @test "BSD date parsing rejects dates that roll over" {
   # BSD `date -j -f` accepts 2024-02-30 and answers with 2024-03-01, which must
   # not be reported as a valid date.

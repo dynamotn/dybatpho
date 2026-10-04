@@ -406,6 +406,25 @@ function __dybatpho_process_has_timeout {
 }
 
 #######################################
+# @description Report whether a background job, or anything in its process
+#   group, is still running.
+#   The leader alone is not the answer for a job that leads its own group: it
+#   may exit on SIGTERM while a child it started ignores the signal, and that
+#   child keeps the group alive. Asking only about the leader ended the wait
+#   there and never sent the SIGKILL that child needed.
+# @arg $1 number Process ID of the job, which is also its process group ID
+# @arg $2 bool Whether the job leads its own process group
+# @exitcode 0 The job or a member of its group is running
+# @exitcode 1 Nothing of the job is left
+# @internal
+#######################################
+function __dybatpho_process_job_alive {
+  kill -0 "$1" 2> /dev/null && return 0
+  [[ "$2" == true ]] || return 1
+  kill -0 -- "-$1" 2> /dev/null
+}
+
+#######################################
 # @description End a background job, and whatever it started, with SIGTERM and
 #   then SIGKILL.
 #   A job launched under job control leads its own process group, so the group
@@ -424,7 +443,7 @@ function __dybatpho_process_end_job {
   local pid own_group kill_after
   dybatpho::expect_args pid own_group kill_after -- "$@"
 
-  kill -0 "${pid}" 2> /dev/null || return 0
+  __dybatpho_process_job_alive "${pid}" "${own_group}" || return 0
   if [[ "${own_group}" == true ]]; then
     kill -TERM -- "-${pid}" 2> /dev/null || kill -TERM "${pid}" 2> /dev/null || true
   else
@@ -433,12 +452,12 @@ function __dybatpho_process_end_job {
 
   local waited=0
   while ((waited < kill_after)); do
-    kill -0 "${pid}" 2> /dev/null || return 0
+    __dybatpho_process_job_alive "${pid}" "${own_group}" || return 0
     sleep 1
     waited=$((waited + 1))
   done
 
-  kill -0 "${pid}" 2> /dev/null || return 0
+  __dybatpho_process_job_alive "${pid}" "${own_group}" || return 0
   if [[ "${own_group}" == true ]]; then
     kill -KILL -- "-${pid}" 2> /dev/null || kill -KILL "${pid}" 2> /dev/null || true
   else

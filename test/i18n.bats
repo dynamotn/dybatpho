@@ -911,6 +911,15 @@ PO
   assert_output "Feb 29, 2024, 9:34:56 PM"
 }
 
+@test "dybatpho::i18n_datetime stops on a timestamp it cannot read" {
+  # Each half was formatted inside a command substitution, so a timestamp that
+  # is not a number ended only those substitutions and the call printed `, `.
+  run --separate-stderr dybatpho::i18n_datetime "not-a-time" medium en
+  assert_failure
+  assert_output ""
+  assert_stderr --partial "dybatpho::i18n_datetime: Timestamp must be an integer, got 'not-a-time'"
+}
+
 @test "month and weekday names come from the module rather than from the host" {
   # A machine almost never has every locale generated, and `date` answers in
   # English when the one it was asked for is missing. This must not happen here.

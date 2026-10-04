@@ -119,6 +119,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assistant's turn. Both now fail with the request's status, and a failed turn
   is left out of the conversation.
 
+- **`i18n` — `dybatpho::i18n_datetime` stops on a timestamp it cannot read.**
+  The date and the time were each formatted inside a command substitution, so
+  a timestamp that was not a number ended only those substitutions: the call
+  printed `, ` and succeeded. It now stops, naming `dybatpho::i18n_datetime`.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

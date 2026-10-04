@@ -2279,6 +2279,10 @@ function dybatpho::i18n_datetime {
   local style="${2:-medium}"
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
+  # Read the timestamp here first: each half is formatted inside a command
+  # substitution, where a refusal would end only that half and leave `, `.
+  local -a fields=()
+  __dybatpho_i18n_date_fields "${timestamp}" fields
   local combined date_part time_part
   combined="$(__dybatpho_i18n_pattern "${locale}" datetime "${style}")" || combined="{date}, {time}"
   date_part="$(dybatpho::i18n_date "${timestamp}" "${style}" "${locale}")"

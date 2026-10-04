@@ -164,6 +164,16 @@ _catalog() {
 # dybatpho::i18n_t
 # ---------------------------------------------------------------------------
 
+@test "an unstorable catalog key is reported under the loader the script called" {
+  # The key check sits below the store, which the catalog parsers call, so the
+  # frame above it is internal; the message has to name `i18n_load`.
+  local catalog="${BATS_TEST_TMPDIR}/empty-key.catalog"
+  printf '"" = "x"\n' > "${catalog}"
+  run --separate-stderr dybatpho::i18n_load en "${catalog}"
+  assert_stderr --partial "dybatpho::i18n_load: Message key must not be empty"
+  refute_stderr --partial "__dybatpho_i18n_store"
+}
+
 @test "a message is translated for the active locale" {
   local file
   file="$(_catalog vi.msg 'app.greeting = Xin chào')"

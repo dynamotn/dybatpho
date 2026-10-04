@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   array the caller had given one of those names came back empty or was written
   as nothing.
 
+- **`i18n` — a bad catalog key names the function you called.** A catalog
+  entry with an empty key, or one holding the unit separator, was reported
+  under an internal helper's name; it now names `dybatpho::i18n_load` or the
+  registration function that was called.
+
 ## [6.0.0] - 2026-10-04
 
 ### Added

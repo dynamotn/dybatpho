@@ -315,13 +315,23 @@ function dybatpho::i18n_chain {
 # @internal
 #######################################
 function __dybatpho_i18n_check_key {
-  local key="${1-}"
+  local key="${1-}" caller="" frame
+  # Keys arrive through the store, which catalog loaders and registration
+  # helpers call in turn, so the frame above is an internal one; the message
+  # names the nearest public function, which is the call the script made.
+  for ((frame = 1; frame < ${#FUNCNAME[@]}; frame++)); do
+    if [[ "${FUNCNAME[frame]}" == dybatpho::* ]]; then
+      caller="${FUNCNAME[frame]}"
+      break
+    fi
+  done
+  : "${caller:=${FUNCNAME[1]}}"
   if [[ -z "${key}" ]]; then
-    dybatpho::error "${FUNCNAME[1]}: Message key must not be empty"
+    dybatpho::error "${caller}: Message key must not be empty"
     return 1
   fi
   if [[ "${key}" == *"${__DYBATPHO_I18N_US}"* ]]; then
-    dybatpho::error "${FUNCNAME[1]}: Message key must not contain a unit separator"
+    dybatpho::error "${caller}: Message key must not contain a unit separator"
     return 1
   fi
   return 0

@@ -421,3 +421,19 @@ note() {
   assert_equal "$(sort -u "${LOG}")" "caller caller caller caller caller caller"
   assert_equal "$(wc -l < "${LOG}" | tr -d ' ')" "3"
 }
+
+@test "dybatpho::schedule_once_per does not write its marker through a planted link" {
+  # The marker was staged at `<marker>.<pid>.partial` with a plain redirection,
+  # a name anyone able to write to the directory could guess and plant a link
+  # at, so the period stamp landed in whatever file the link pointed to.
+  mkdir -p "${DYBATPHO_SCHEDULE_DIR}"
+  local victim="${BATS_TEST_TMPDIR}/victim"
+  printf 'untouched\n' > "${victim}"
+  ln -s "${victim}" "${DYBATPHO_SCHEDULE_DIR}/planted.last.$$.partial"
+
+  run_traced dybatpho::schedule_once_per day planted -- note ran
+  assert_success
+  assert_equal "$(cat "${victim}")" "untouched"
+  assert_equal "$(cat "${LOG}")" "ran"
+  [[ -f "${DYBATPHO_SCHEDULE_DIR}/planted.last" && ! -L "${DYBATPHO_SCHEDULE_DIR}/planted.last" ]]
+}

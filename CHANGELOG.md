@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`schedule` — `dybatpho::schedule_once_per` no longer writes through a
+  planted link.** Its marker was staged at `<marker>.<pid>.partial` with a
+  plain redirection, a name anyone able to write to the schedule directory
+  could guess and plant a link at. The staging file is now created exclusively
+  under an unpredictable name.
+
 - **`init.sh` can be sourced twice in one shell.** The read-only constants of
   `cache`, `cli`, `lock` and `screen` were declared unconditionally, so a
   second source of `init.sh` -- such as a script that sources a helper which

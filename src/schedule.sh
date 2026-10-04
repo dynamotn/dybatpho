@@ -292,9 +292,16 @@ function dybatpho::schedule_once_per {
   # otherwise run again on the next invocation, which is the opposite of what
   # "at most once per period" promises; a caller that wants a retry on failure
   # wants `dybatpho::retry`, not this. It is written aside and renamed into
-  # place, so a reader never sees it half written.
-  printf '%s\n' "${__dybatpho_schedule_once_bucket}" > "${__dybatpho_schedule_once_marker}.$$.partial"
-  mv -f -- "${__dybatpho_schedule_once_marker}.$$.partial" "${__dybatpho_schedule_once_marker}"
+  # place, so a reader never sees it half written. The staging file is created
+  # exclusively under an unguessable name: a name built from the pid alone could
+  # carry a planted link, and the stamp would land wherever it pointed.
+  local __dybatpho_schedule_once_staging
+  if ! __dybatpho_file_staging_into __dybatpho_schedule_once_staging "${__dybatpho_schedule_once_marker}"; then
+    rm -f -- "${__dybatpho_schedule_once_claim}"
+    dybatpho::die "${FUNCNAME[0]}: Cannot write the marker for ${__dybatpho_schedule_once_key}"
+  fi
+  printf '%s\n' "${__dybatpho_schedule_once_bucket}" > "${__dybatpho_schedule_once_staging}"
+  mv -f -- "${__dybatpho_schedule_once_staging}" "${__dybatpho_schedule_once_marker}"
   rm -f -- "${__dybatpho_schedule_once_claim}"
   "${__dybatpho_schedule_once_command[@]}"
 }

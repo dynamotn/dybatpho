@@ -985,3 +985,18 @@ EOF
   assert_failure
   assert_stderr --partial "caller: unknown option: --"
 }
+
+@test "code evaluated by assert or the breakpoint debugger sees the caller's variables" {
+  # Both evaluate the caller's code in their own scope, where their locals hid
+  # the caller's variables of the same names, and the debugger read each line
+  # into a global `line`.
+  local condition="caller" message="caller" source_file="caller" line="caller"
+  dybatpho::assert '[[ "${condition} ${message}" == "caller caller" ]]'
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  export DYBATPHO_REPL_HISTORY_FILE="${BATS_TEST_TMPDIR}/history"
+  # The debugger restores strict mode on the way out.
+  dybatpho::breakpoint 2> /dev/null <<< "d"'printf "%s %s" "${source_file}" "${line}" > '"${seen}"$'\nexit\nq'
+  set +eu
+  assert_equal "$(cat "${seen}")" "caller caller"
+  assert_equal "${line}" "caller"
+}

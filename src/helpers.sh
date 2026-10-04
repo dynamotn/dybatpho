@@ -1015,10 +1015,10 @@ function dybatpho::require_envs_any {
 # @tip The assertion command is executed with `eval`
 #######################################
 function dybatpho::assert {
-  local condition
-  dybatpho::expect_args condition -- "$@"
-  local message="${2:-Assertion failed: ${condition}}"
-  eval "${condition}" || dybatpho::die "${message}"
+  local __dybatpho_helpers_assert_condition
+  dybatpho::expect_args __dybatpho_helpers_assert_condition -- "$@"
+  local __dybatpho_helpers_assert_message="${2:-Assertion failed: ${__dybatpho_helpers_assert_condition}}"
+  eval "${__dybatpho_helpers_assert_condition}" || dybatpho::die "${__dybatpho_helpers_assert_message}"
 }
 
 #######################################
@@ -1154,20 +1154,22 @@ function dybatpho::retry_until {
 # @tip This helper is intended for interactive local debugging, not unattended CI or production runs
 #######################################
 function dybatpho::breakpoint {
-  local dybatpho_key_pressed
-  local dybatpho_section="--------------------------------------------------------------------------------"
-  local dybatpho_help
-  local dybatpho_help_format='%s\n    d: run debugger\n    c: display source file\n    o: list options\n'
-  dybatpho_help_format+='    p: list parameters\n    a: list indexed array\n    A: list associative array\n'
-  dybatpho_help_format+='    q: quit'
+  local __dybatpho_helpers_bp_key
+  local __dybatpho_helpers_bp_section="--------------------------------------------------------------------------------"
+  local __dybatpho_helpers_bp_help
+  local __dybatpho_helpers_bp_format='%s\n    d: run debugger\n    c: display source file\n    o: list options\n'
+  __dybatpho_helpers_bp_format+='    p: list parameters\n    a: list indexed array\n    A: list associative array\n'
+  __dybatpho_helpers_bp_format+='    q: quit'
   # shellcheck disable=SC2059 # the format is built above, not taken from input
-  printf -v dybatpho_help "${dybatpho_help_format}" "${dybatpho_section}"
-  local source_file="${BASH_SOURCE[1]:-bash}"
-  __dybatpho_log fatal "Breakpoint hit. Current line: ${source_file}:${BASH_LINENO[0]}" stderr "1;36"
+  printf -v __dybatpho_helpers_bp_help "${__dybatpho_helpers_bp_format}" \
+    "${__dybatpho_helpers_bp_section}"
+  local __dybatpho_helpers_bp_source_file="${BASH_SOURCE[1]:-bash}"
+  __dybatpho_log fatal "Breakpoint hit. Current line: ${__dybatpho_helpers_bp_source_file}:${BASH_LINENO[0]}" stderr \
+    "1;36"
   while true; do
-    printf "%s\n" "${dybatpho_help}" >&2
-    read -n1 -s -r dybatpho_key_pressed
-    case "${dybatpho_key_pressed}" in
+    printf "%s\n" "${__dybatpho_helpers_bp_help}" >&2
+    read -n1 -s -r __dybatpho_helpers_bp_key
+    case "${__dybatpho_helpers_bp_key}" in
       o) # kcov(skip)
         shopt -s >&2
         set -o >&2
@@ -1176,7 +1178,7 @@ function dybatpho::breakpoint {
       a) declare -a >&2 ;;
       A) declare -A >&2 ;;
       q) # kcov(skip)
-        echo "${dybatpho_section}" >&2
+        echo "${__dybatpho_helpers_bp_section}" >&2
         return
         ;;
       # kcov(disabled)
@@ -1187,16 +1189,17 @@ function dybatpho::breakpoint {
         if [[ -f ${DYBATPHO_REPL_HISTORY_FILE} ]]; then
           history -r "${DYBATPHO_REPL_HISTORY_FILE}"
         fi
+        local __dybatpho_helpers_bp_line
         # shellcheck disable=SC2162
-        while read -e -p "Debugger (Ctrl-d to exit)> " line; do
-          [[ "${line}" == "exit" ]] && break
-          if [[ "${line}" =~ ^[[:space:]]*(rm|dd)([[:space:]]|$) ]]; then
+        while read -e -p "Debugger (Ctrl-d to exit)> " __dybatpho_helpers_bp_line; do
+          [[ "${__dybatpho_helpers_bp_line}" == "exit" ]] && break
+          if [[ "${__dybatpho_helpers_bp_line}" =~ ^[[:space:]]*(rm|dd)([[:space:]]|$) ]]; then
             dybatpho::error "Ignore dangerous command."
             continue
           fi
-          echo "${line}" >> "${DYBATPHO_REPL_HISTORY_FILE}"
-          history -s "${line}"
-          eval "${line} >&2"
+          echo "${__dybatpho_helpers_bp_line}" >> "${DYBATPHO_REPL_HISTORY_FILE}"
+          history -s "${__dybatpho_helpers_bp_line}"
+          eval "${__dybatpho_helpers_bp_line} >&2"
         done
         echo >&2
         set -eou pipefail # Enable strict mode
@@ -1208,8 +1211,8 @@ function dybatpho::breakpoint {
         [[ "${LOG_LEVEL}" == "trace" ]] && set -xv # Re-enable tracing if needed
         ;;
       c)
-        if [[ "${source_file}" != "bash" ]]; then
-          echo "${dybatpho_section}" >&2
+        if [[ "${__dybatpho_helpers_bp_source_file}" != "bash" ]]; then
+          echo "${__dybatpho_helpers_bp_section}" >&2
           dybatpho::show_file "${BASH_SOURCE[1]}"
         fi
         ;;

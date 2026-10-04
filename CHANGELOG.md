@@ -196,6 +196,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `name`, `status`, `handler`, `prompt`, `step` and `messages` hid the caller's
   variables of the same names. They are now prefixed.
 
+- **`helpers` — code evaluated by `dybatpho::assert` or the breakpoint
+  debugger sees the caller's variables.** Both evaluated it in their own
+  scope, where `condition`, `message` and `source_file` hid the caller's
+  variables of the same names, and the debugger read every line into a global
+  `line`, overwriting the script's. They now use prefixed locals.
+
 ### Security
 
 - **`secret` — `dybatpho::secret_write_file` leaves no stray copy of the

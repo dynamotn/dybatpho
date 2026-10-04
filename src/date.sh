@@ -618,24 +618,27 @@ function dybatpho::date_parse_duration {
 }
 
 #######################################
-# @description Parse both dates a comparison is asked about, stopping the
-#   script when either one cannot be read. A comparison that answered "no" for a
-#   date it could not parse would be indistinguishable from a real answer.
-# @arg $1 string Name of the function asking, for the message
-# @arg $2 string First date string
-# @arg $3 string Second date string
-# @stdout The two timestamps, separated by a space
+# @description Parse both dates a comparison is asked about into two named
+#   variables, stopping the script when either one cannot be read. A
+#   comparison that answered "no" for a date it could not parse would be
+#   indistinguishable from a real answer. It runs in the caller's shell, so the
+#   refusal stops the script there rather than only ending a substitution.
+# @arg $1 string Name of the variable receiving the first timestamp
+# @arg $2 string Name of the variable receiving the second timestamp
+# @arg $3 string Name of the function asking, for the message
+# @arg $4 string First date string
+# @arg $5 string Second date string
+# @set The two named variables
 # @exitcode 1 Stop the script when either date cannot be parsed
 # @internal
 #######################################
-function __dybatpho_date_compare_pair {
-  local caller="$1" first="$2" second="$3"
-  local first_ts second_ts
-  first_ts=$(__dybatpho_date_parse "${first}" 2> /dev/null) \
-    || dybatpho::die "${caller}: '${first}' is not a valid date"
-  second_ts=$(__dybatpho_date_parse "${second}" 2> /dev/null) \
-    || dybatpho::die "${caller}: '${second}' is not a valid date"
-  printf '%s %s\n' "${first_ts}" "${second_ts}"
+function __dybatpho_date_compare_pair_into {
+  local -n __dybatpho_date_pair_first="$1" __dybatpho_date_pair_second="$2"
+  local __dybatpho_date_pair_caller="$3"
+  __dybatpho_date_pair_first=$(__dybatpho_date_parse "$4" 2> /dev/null) \
+    || dybatpho::die "${__dybatpho_date_pair_caller}: '$4' is not a valid date"
+  __dybatpho_date_pair_second=$(__dybatpho_date_parse "$5" 2> /dev/null) \
+    || dybatpho::die "${__dybatpho_date_pair_caller}: '$5' is not a valid date"
 }
 
 #######################################
@@ -658,11 +661,9 @@ function __dybatpho_date_compare_pair {
 function dybatpho::date_is_before {
   local first second
   dybatpho::expect_args first second -- "$@"
-  local pair
-  # The status is checked here: a refusal inside the substitution only ends
-  # that subshell.
-  pair="$(__dybatpho_date_compare_pair "${FUNCNAME[0]}" "${first}" "${second}")" || exit 1
-  (("${pair% *}" < "${pair#* }"))
+  local first_ts second_ts
+  __dybatpho_date_compare_pair_into first_ts second_ts "${FUNCNAME[0]}" "${first}" "${second}"
+  ((first_ts < second_ts))
 }
 
 #######################################
@@ -684,9 +685,9 @@ function dybatpho::date_is_before {
 function dybatpho::date_is_after {
   local first second
   dybatpho::expect_args first second -- "$@"
-  local pair
-  pair="$(__dybatpho_date_compare_pair "${FUNCNAME[0]}" "${first}" "${second}")" || exit 1
-  (("${pair% *}" > "${pair#* }"))
+  local first_ts second_ts
+  __dybatpho_date_compare_pair_into first_ts second_ts "${FUNCNAME[0]}" "${first}" "${second}"
+  ((first_ts > second_ts))
 }
 
 #######################################

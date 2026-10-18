@@ -741,3 +741,18 @@ SCRIPT
   dybatpho::wait_all
   assert_equal "$(cat "${seen}")" "caller caller caller"
 }
+
+@test "dybatpho::dry_run -- runs a single argument as a command, never as shell" {
+  export DRY_RUN=false
+  run_traced dybatpho::dry_run -- 'echo first; echo INJECTED'
+  assert_failure 127
+  refute_output --partial "INJECTED"
+  run_traced dybatpho::dry_run -- printf 'plain %s\n' 'a b'
+  assert_output "plain a b"
+  export DRY_RUN=true
+  run_traced dybatpho::dry_run -- rm -rf -- "/tmp/x y"
+  assert_output "🧪 DRY RUN: rm -rf -- /tmp/x\ y"
+  run -1 dybatpho::dry_run --
+  export DRY_RUN=false
+  run -1 dybatpho::dry_run
+}

@@ -368,7 +368,12 @@ function __dybatpho_lock_holder_alive {
     __dybatpho_lock_host_into local_host
     [[ "${host}" == "${local_host}" ]] || return 0
   fi
-  kill -0 "${pid}" > /dev/null 2>&1
+  # `kill -0` is refused for a process of another user, which is not the same
+  # as the process being gone: a lock in a shared directory held by another
+  # account was reclaimed as stale while its holder was still running.
+  kill -0 "${pid}" > /dev/null 2>&1 && return 0
+  [[ -d "/proc/${pid}" ]] && return 0
+  ps -p "${pid}" > /dev/null 2>&1
 }
 
 #######################################
@@ -410,8 +415,17 @@ function __dybatpho_lock_try {
   local lock_target
   __dybatpho_lock_target_into lock_target
   ln -s "${lock_target}" "${lock_path}" 2> /dev/null || return 1
-  printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" \
-    > "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" 2> /dev/null || true
+  # The sidecar has a predictable name in a directory that may be shared, so
+  # whatever already sits there is not trusted: a link planted under that name
+  # would turn the write into one over the file it points at. Anything there
+  # goes first, and the write itself refuses to open an existing path.
+  local sidecar="${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}"
+  rm -f -- "${sidecar}" 2> /dev/null || true
+  {
+    set -o noclobber
+    printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" > "${sidecar}" || true
+    set +o noclobber
+  } 2> /dev/null
 }
 
 #######################################

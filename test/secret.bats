@@ -559,3 +559,35 @@ teardown() {
   dybatpho::secret_mask_run look
   assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
 }
+
+@test "secret values stay out of a set -x trace" {
+  local file="${BATS_TEST_TMPDIR}/token"
+  (umask 077 && printf 'hunter2secret\n' > "${file}")
+  export TRACED_SECRET="envhunter2"
+  run_traced --separate-stderr bash -c '
+    . "'"${DYBATPHO_DIR}"'/init.sh"
+    set -x
+    dybatpho::secret_from_file TOKEN "'"${file}"'"
+    dybatpho::secret_from_env OTHER TRACED_SECRET
+    dybatpho::secret_with_file TOKEN cat {}
+    dybatpho::info "hello"
+    set +x
+    printf "%s\n" "${TOKEN}" "${OTHER}"
+  '
+  assert_success
+  assert_line "hunter2secret"
+  assert_line "envhunter2"
+  refute_stderr --partial "hunter2secret"
+  refute_stderr --partial "envhunter2"
+  # The trace is back on after each call: the log line that follows is traced.
+  assert_stderr --partial "dybatpho::info"
+}
+
+@test "secret_shred removes a link without writing through it" {
+  local target="${BATS_TEST_TMPDIR}/keep" link="${BATS_TEST_TMPDIR}/link"
+  printf 'keep this\n' > "${target}"
+  ln -s "${target}" "${link}"
+  dybatpho::secret_shred "${link}"
+  assert_file_not_exist "${link}"
+  assert_equal "$(< "${target}")" "keep this"
+}

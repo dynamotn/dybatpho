@@ -93,11 +93,43 @@ function __dybatpho_secret_mask_var {
   local __dybatpho_mask_name
   dybatpho::expect_args __dybatpho_mask_name -- "$@"
   ((DYBATPHO_SECRET_COUNT > 0)) || return 0
+  local __dybatpho_mask_trace
+  __dybatpho_secret_trace_off __dybatpho_mask_trace
   local -n __dybatpho_mask_target="${__dybatpho_mask_name}"
   local __dybatpho_mask_value
   for __dybatpho_mask_value in ${DYBATPHO_SECRET_VALUES[@]+"${DYBATPHO_SECRET_VALUES[@]}"}; do
     __dybatpho_mask_target="${__dybatpho_mask_target//"${__dybatpho_mask_value}"/${DYBATPHO_SECRET_PLACEHOLDER}}"
   done
+  __dybatpho_secret_trace_on "${__dybatpho_mask_trace}"
+}
+
+#######################################
+# @description Suspend `set -x` for the lines that hold a secret value, and
+#   remember whether it was on. A trace prints every assignment and every loop
+#   value, so a script run under `dybatpho::start_trace` wrote each secret it
+#   read, and each one it masked, to the trace on every log line.
+# @arg $1 string Name of the variable receiving the state to hand back
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_secret_trace_off {
+  local -n __dybatpho_secret_trace_state="$1"
+  __dybatpho_secret_trace_state=false
+  if [[ "$-" == *x* ]]; then
+    __dybatpho_secret_trace_state=true
+    { set +x; } 2> /dev/null
+  fi
+}
+
+#######################################
+# @description Resume the trace `__dybatpho_secret_trace_off` suspended.
+# @arg $1 string The state it handed back
+# @internal
+#######################################
+function __dybatpho_secret_trace_on {
+  # dyshellint disable=BSG034 # this resumes the trace the caller already had on
+  [[ "${1-}" == true ]] && set -x
+  return 0
 }
 
 #######################################
@@ -304,10 +336,13 @@ function dybatpho::secret_from_file {
   dybatpho::expect_ref "${__dybatpho_secret_var}"
   dybatpho::secret_check_permission "${__dybatpho_secret_path}"
 
+  local __dybatpho_secret_trace
+  __dybatpho_secret_trace_off __dybatpho_secret_trace
   local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
   __dybatpho_secret_dest="$(< "${__dybatpho_secret_path}")"
   [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "Secret file is empty: ${__dybatpho_secret_path}"
   dybatpho::secret_register "${__dybatpho_secret_dest}"
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"
 }
 
 #######################################
@@ -335,12 +370,15 @@ function dybatpho::secret_from_env {
     *) dybatpho::die "${FUNCNAME[0]}: Expected \`keep\` or \`unset\`, got: ${__dybatpho_secret_mode}" ;; # kcov(skip)
   esac
 
+  local __dybatpho_secret_trace
+  __dybatpho_secret_trace_off __dybatpho_secret_trace
   [[ -n "${!__dybatpho_secret_name:-}" ]] \
     || dybatpho::die "Environment variable \`${__dybatpho_secret_name}\` isn't set or is empty"
   local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
   __dybatpho_secret_dest="${!__dybatpho_secret_name}"
   dybatpho::secret_register "${__dybatpho_secret_dest}"
   [[ "${__dybatpho_secret_mode}" == unset ]] && unset -v "${__dybatpho_secret_name}"
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"
   return 0
 }
 
@@ -363,6 +401,8 @@ function dybatpho::secret_from_stdin {
   __dybatpho_secret_prompt="${2-}"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
 
+  local __dybatpho_secret_trace
+  __dybatpho_secret_trace_off __dybatpho_secret_trace
   local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
   __dybatpho_secret_dest=""
   if [[ -t 0 ]]; then
@@ -376,6 +416,7 @@ function dybatpho::secret_from_stdin {
   fi
   [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "No secret was read from stdin"
   dybatpho::secret_register "${__dybatpho_secret_dest}"
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"
 }
 
 #######################################
@@ -468,6 +509,8 @@ function dybatpho::secret_with_file {
   shift
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
+  local __dybatpho_secret_wf_trace
+  __dybatpho_secret_trace_off __dybatpho_secret_wf_trace
   local -n __dybatpho_secret_source="${__dybatpho_secret_var}"
   [[ -n "${__dybatpho_secret_source:-}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty"
@@ -508,6 +551,7 @@ function dybatpho::secret_with_file {
   else
     exec {__dybatpho_secret_wf_descriptor}<&-
   fi
+  __dybatpho_secret_trace_on "${__dybatpho_secret_wf_trace}"
   return "${__dybatpho_secret_wf_status}"
 }
 
@@ -537,7 +581,7 @@ function dybatpho::secret_wipe {
   local __dybatpho_secret_name
   for __dybatpho_secret_name in "$@"; do
     dybatpho::expect_ref "${__dybatpho_secret_name}"
-    [[ -v "${__dybatpho_secret_name}" ]] || continue
+    [[ -n "${!__dybatpho_secret_name+set}" ]] || continue
     local -n __dybatpho_secret_target="${__dybatpho_secret_name}"
     if [[ -n "${__dybatpho_secret_target}" ]]; then
       printf -v __dybatpho_secret_target '%*s' "${#__dybatpho_secret_target}" ''
@@ -557,6 +601,12 @@ function dybatpho::secret_shred {
   local path
   for path in "$@"; do
     dybatpho::is file "${path}" || continue
+    # A link is removed, never written through: overwriting would zero the
+    # file it points at, which is not the one the caller asked to destroy.
+    if [[ -L "${path}" ]]; then
+      rm -f -- "${path}"
+      continue
+    fi
     if dybatpho::is command shred; then
       shred -u -- "${path}" 2> /dev/null && continue
     fi

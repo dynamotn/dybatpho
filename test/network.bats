@@ -1198,3 +1198,104 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::rate_limit scoped 5/60 -- look
   assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
 }
+
+@test "dybatpho::curl_do follows a same-origin redirect with its secret headers and drops them elsewhere" {
+  # A stand-in for curl: the first argument names the redirect to answer with,
+  # the second where to record the call. `-D` names the header file curl_do
+  # reads the `Location:` from.
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+location="$1"; record="$2"; shift 2
+printf '%s\n' "$@" > "${record}"
+while (($#)); do
+  if [[ "$1" == "-D" ]]; then
+    printf 'HTTP/1.1 302 Found\r\nLocation: %s\r\n\r\n' "${location}" > "$2"
+  fi
+  if [[ "$1" == "--config" ]]; then
+    cat "$2" >> "${record}"
+  fi
+  shift
+done
+if [[ -n "${location}" ]]; then echo 302; else echo 200; fi
+HELPER
+  local first="${BATS_TEST_TMPDIR}/first" second="${BATS_TEST_TMPDIR}/second" third="${BATS_TEST_TMPDIR}/third"
+  stub curl \
+    ": bash ${helper} /next ${first} \"\$@\"" \
+    ": bash ${helper} https://other.example/asset ${second} \"\$@\"" \
+    ": bash ${helper} '' ${third} \"\$@\""
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("PRIVATE-TOKEN: glpat-LEAKME")
+  run_traced dybatpho::curl_do https://api.example/start
+  unstub curl
+  assert_success
+  # With secret headers the library follows redirects itself, so curl is never
+  # handed `-L` while the headers are in play.
+  run grep -c -x -- '-L' "${first}"
+  assert_output "0"
+  # The hop within the origin keeps the token and goes to the resolved URL.
+  run grep -c 'PRIVATE-TOKEN: glpat-LEAKME' "${second}"
+  assert_output "1"
+  run grep -c -x 'https://api.example/next' "${second}"
+  assert_output "1"
+  # The hop to another origin loses the token, and curl follows from there.
+  run grep -c 'LEAKME' "${third}"
+  assert_output "0"
+  run grep -c -x -- '--config' "${third}"
+  assert_output "0"
+  run grep -c -x -- '-L' "${third}"
+  assert_output "1"
+  run grep -c -x 'https://other.example/asset' "${third}"
+  assert_output "1"
+}
+
+@test "dybatpho::curl_do refuses a cross-origin redirect when the body is a secret" {
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 307 Temporary Redirect\r\nLocation: https://other.example/\r\n\r\n' > "$2"
+  shift
+done
+echo 307
+HELPER
+  stub curl ": bash ${helper} \"\$@\""
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk-LEAKME")
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  DYBATPHO_CURL_SECRET_DATA='{"secret":true}' run_traced --separate-stderr -3 \
+    dybatpho::curl_do https://api.example/v1
+  unstub curl
+  assert_stderr --partial "Not following the redirect to https://other.example"
+}
+
+@test "dybatpho::curl_do stops after DYBATPHO_CURL_MAX_REDIRECTS hops" {
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 301 Moved\r\nLocation: /loop\r\n\r\n' > "$2"
+  shift
+done
+echo 301
+HELPER
+  stub curl ": bash ${helper} \"\$@\"" ": bash ${helper} \"\$@\"" ": bash ${helper} \"\$@\""
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+  export DYBATPHO_CURL_MAX_RETRIES=0 DYBATPHO_CURL_MAX_REDIRECTS=2
+  run_traced --separate-stderr -3 dybatpho::curl_do https://api.example/loop
+  unstub curl
+  assert_stderr --partial "Stopped after 2 redirects"
+}
+
+@test "__dybatpho_network_resolve_location_into resolves every reference form" {
+  local out
+  __dybatpho_network_resolve_location_into out "https://a.example/x/y?q=1" "z"
+  assert_equal "${out}" "https://a.example/x/z"
+  __dybatpho_network_resolve_location_into out "https://a.example" "next"
+  assert_equal "${out}" "https://a.example/next"
+  __dybatpho_network_resolve_location_into out "http://a.example:8080/x" "/root"
+  assert_equal "${out}" "http://a.example:8080/root"
+  __dybatpho_network_resolve_location_into out "https://a.example/x" "//b.example/p"
+  assert_equal "${out}" "https://b.example/p"
+  __dybatpho_network_resolve_location_into out "https://a.example/x" "HTTP://C.example/q"
+  assert_equal "${out}" "HTTP://C.example/q"
+  __dybatpho_network_origin_into out "HTTPS://A.Example:443/p?x#y"
+  assert_equal "${out}" "https://a.example:443"
+  __dybatpho_network_origin_into out "no scheme"
+  assert_equal "${out}" ""
+}

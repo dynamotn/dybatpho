@@ -122,6 +122,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-017**: Every builder that takes a text block MUST accept stdin when the input argument is `-`.
 - **FR-018**: `md_badge` MUST percent-encode every character of the label, value and color outside the unreserved URL set, after the shields.io doubling of `-` and `_` and the space-to-`_` rule.
 - **FR-019**: Text passed as an argument MUST split into the same lines as the same text on stdin; one trailing newline MUST NOT add an empty item.
+- **FR-020**: `dybatpho::md_list` MUST read an ordered marker with a leading zero, such as `08.`, in base ten.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -154,6 +155,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **IT-012**: Render a mention and an emoji shortcode, and reject invalid values of each.
 - **IT-013**: Render a badge whose label, value and color hold `/`, `?`, `#`, `%`, a space and parentheses, and find each percent-encoded in the URL.
 - **IT-014**: Render a list from text ending in a newline, as an argument and on stdin, and get the same items with no empty one at the end.
+- **IT-015**: Render two items with marker `08.` and get `8.` and `9.`.
 
 ## Acceptance Criteria *(mandatory)*
 

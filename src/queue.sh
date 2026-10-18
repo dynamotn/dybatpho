@@ -280,7 +280,8 @@ function __dybatpho_queue_options_into {
     '--priority|--delay|--at=__dybatpho_queue_events++:' leading,attached '--?*' \
     "${__dybatpho_queue_caller}: Unknown option: {option}" \
     "${__dybatpho_queue_caller}: {option} needs a value" -- "$@"
-  set -- "${__dybatpho_queue_events[@]}"
+  # Expanded with a guard: an empty array under `nounset` is an error on Bash 4.3.
+  set -- ${__dybatpho_queue_events[@]+"${__dybatpho_queue_events[@]}"}
   while (($# > 0)); do
     __dybatpho_queue_option="$1" __dybatpho_queue_value="$2"
     shift 2
@@ -765,7 +766,7 @@ function __dybatpho_queue_work_options {
     '--retries|--backoff|--max-backoff|--max-jobs|--poll|--idle=events++:' leading,attached '--?*' \
     'dybatpho::queue_work: Unknown option: {option}' \
     'dybatpho::queue_work: {option} needs a value' -- "$@"
-  set -- "${events[@]}"
+  set -- ${events[@]+"${events[@]}"}
   while (($# > 0)); do
     option="$1" value="$2"
     shift 2

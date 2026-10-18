@@ -320,6 +320,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **FR-024**: `math_compare`, `math_gt`, `math_lt` and `math_eq` MUST validate their values in the caller's shell, so a value that is not a number stops the script even when the comparison is a condition.
 - **FR-025**: Values read from standard input MUST be split on whitespace without pathname expansion, so a `*` or `?` is read as itself.
 - **FR-026**: A function reading values from standard input MUST count the values on a last line that has no trailing newline.
+- **FR-027**: `dybatpho::math_sum` of no values MUST print `0` on Bash 4.3; `dybatpho::math_random` MUST read a bound with a leading zero in base ten, with its sign.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -389,6 +390,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **IT-016**: From a script file, have `math_gt`, `math_lt` and `math_eq` used as a condition stop the script on `abc`, before the next command runs.
 - **IT-017**: Feed `1 * 3` to `math_sum` in a directory holding files and verify `*` is refused as not a number rather than expanded.
 - **IT-018**: Sum and take the maximum of standard input whose last line has no newline, and find the last value counted.
+- **IT-019**: Sum nothing and get `0`; draw from `08..08` and `-08..-08` and get `8` and `-8`.
 
 ## Acceptance Criteria *(mandatory)*
 

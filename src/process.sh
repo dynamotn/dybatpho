@@ -339,19 +339,31 @@ function dybatpho::cleanup_file_on_exit {
 # @example
 #   dybatpho::dry_run "ssh ${host} 'systemctl restart app'"
 #
-# @arg $@ string Shell command string to run
+# @example
+#   dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
+#
+# @arg $@ string Shell command string to run, or `--` followed by a command and its arguments
 # @env DRY_RUN string Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them
 # @stdout Show the command instead of executing it when `DRY_RUN` is true
-# @tip Pass a single shell command string because this helper executes the command with `eval`
+# @tip A single argument is a shell command string and runs through `eval`.
+#   Lead with `--` when the command and its arguments come from elsewhere --
+#   a path, a user's input -- so that a single argument is run as a command
+#   name rather than parsed as shell.
 #######################################
 function dybatpho::dry_run {
+  local __dybatpho_dry_run_argv=false
+  if [[ "${1-}" == "--" ]]; then
+    __dybatpho_dry_run_argv=true
+    shift
+  fi
+  (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command"
   if dybatpho::is true "${DRY_RUN}"; then
     printf '🧪 DRY RUN:'
     printf ' %q' "$@"
     printf '\n'
   else
     # shellcheck disable=2294
-    if (($# == 1)); then
+    if [[ "${__dybatpho_dry_run_argv}" == false ]] && (($# == 1)); then
       eval "$1"
     else
       "$@"

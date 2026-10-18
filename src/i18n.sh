@@ -864,8 +864,9 @@ function __dybatpho_i18n_plural_category {
   [[ "${count}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[1]}: Count must be an integer, got '${count}'"
   # Every CLDR rule is defined on the absolute value: minus one takes the same
-  # form as one in every language the tables cover.
-  ((count < 0)) && count=$((-count))
+  # form as one in every language the tables cover. Base ten, so that a count
+  # such as `08` from a padded field is eight rather than an invalid octal.
+  count=$((10#${count#-}))
   local family="${__dybatpho_i18n_plural_family[${language}]-one}"
   # The family name comes from a table this module owns, but the indirect call
   # is guarded anyway so that a typo in the table fails loudly rather than
@@ -1975,9 +1976,11 @@ function dybatpho::i18n_month_name {
   local width="${2:-wide}"
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
-  if ! [[ "${month}" =~ ^[0-9]+$ ]] || ((month < 1 || month > 12)); then
+  if ! [[ "${month}" =~ ^[0-9]+$ ]] || ((10#${month} < 1 || 10#${month} > 12)); then
     dybatpho::die "${FUNCNAME[0]}: Month must be between 1 and 12, got '${month}'"
   fi
+  # `date +%m` gives `08`, which arithmetic would otherwise read as octal.
+  month=$((10#${month}))
   local name=""
   if [[ "${width}" == "abbr" ]]; then
     # A locale that writes its months the same way at both widths simply has no
@@ -2403,7 +2406,6 @@ function __dybatpho_i18n_span {
     __span_unit="year"
     __span_count=$(((__span_seconds + 15778800) / 31557600))
   fi
-  ((__span_count >= 1 || __span_unit == "now")) || __span_count=1
   [[ "${__span_unit}" == "now" ]] || ((__span_count >= 1)) || __span_count=1
 }
 

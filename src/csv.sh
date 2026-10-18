@@ -419,7 +419,7 @@ function __dybatpho_csv_write_with {
   local __dybatpho_csv_record __dybatpho_csv_quoted __dybatpho_csv_line __dybatpho_csv_at
   local -a __dybatpho_csv_parts=()
 
-  for __dybatpho_csv_record in "${__dybatpho_csv_out_ref[@]}"; do
+  for __dybatpho_csv_record in ${__dybatpho_csv_out_ref[@]+"${__dybatpho_csv_out_ref[@]}"}; do
     __dybatpho_csv_split_fields_into __dybatpho_csv_parts "${__dybatpho_csv_record}"
     __dybatpho_csv_line=""
     for __dybatpho_csv_at in "${!__dybatpho_csv_parts[@]}"; do
@@ -639,7 +639,7 @@ function dybatpho::csv_sort {
   __dybatpho_helpers_sort order_of __dybatpho_csv_row_before keys "${order}"
 
   sorted=("${records[0]}")
-  for at in "${order_of[@]}"; do
+  for at in ${order_of[@]+"${order_of[@]}"}; do
     sorted+=("${records[${at}]}")
   done
   __dybatpho_csv_write_with sorted "${delimiter}"
@@ -925,6 +925,9 @@ function dybatpho::csv_filter {
 function __dybatpho_csv_matches {
   local field="$1" operator="$2" value="$3"
 
+  # Text orders in ASCII, the same on every platform; `sort` in this module
+  # already does.
+  local LC_ALL=C
   case "${operator}" in
     eq) [[ "${field}" == "${value}" ]] ;;
     ne) [[ "${field}" != "${value}" ]] ;;

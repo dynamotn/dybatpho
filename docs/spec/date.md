@@ -198,6 +198,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **FR-016**: The module MUST provide predicates reporting whether one date comes strictly before, or strictly after, another, both parsed in the configured timezone, and MUST stop the script when either date cannot be parsed.
 - **FR-017**: The module MUST print the ISO 8601 week a date falls in together with its week-year, default `%G-W%V`, accepting `%G`, `%V`, `%u`, and `%%` in the format and copying anything else, and computing the week from the day of the year and the day of the week so that the answer does not depend on the platform's `date`.
 - **FR-018**: The module MUST print a date, parsed in the configured timezone, as it reads in a named target timezone, default format `%F %T %z`. It MUST accept `UTC`, `GMT`, and any path-shaped name that exists under `TZDIR` or `/usr/share/zoneinfo`, and MUST stop the script for any other zone rather than letting `date` fall back to UTC.
+- **FR-019**: `dybatpho::date_parse` MUST refuse an empty or blank string on every platform.
+- **FR-020**: On BusyBox, `dybatpho::date_parse` MUST read an ISO 8601 timestamp ending in `Z`, `+hhmm` or `+hh:mm` by applying the offset itself.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -243,6 +245,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **IT-023**: Convert a date into another zone, into UTC, and across a daylight-saving offset from a non-UTC source zone.
 - **IT-024**: Refuse an unknown zone, a path, an absolute zone file, and a POSIX rule string, and follow a zone database moved through `TZDIR`.
 - **IT-025**: Detect a `date` that accepts `-d` but has no `--version` as GNU, and one that takes `-D` as BusyBox.
+- **IT-026**: Parse `""` and `"   "` and get status 1.
+- **IT-027**: On BusyBox, parse `2024-02-29T12:34:56Z`, `+02:00` and `-0130` and get `1709210096`, `1709202896` and `1709215496`.
 
 ## Acceptance Criteria *(mandatory)*
 

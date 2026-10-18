@@ -1071,6 +1071,24 @@ function dybatpho::math_max {
 }
 
 #######################################
+# @description Store a signed whole number as Bash arithmetic reads it in base
+#   ten, whatever zeros it leads with: `08` is eight, not an invalid octal.
+# @arg $1 string Name of the variable receiving the number
+# @arg $2 string Whole number, optionally signed
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_math_decimal_into {
+  local -n __dybatpho_math_decimal_out="$1"
+  local __dybatpho_math_decimal_digits="${2#[+-]}"
+  if [[ "$2" == -* ]]; then
+    __dybatpho_math_decimal_out=$((-10#${__dybatpho_math_decimal_digits}))
+  else
+    __dybatpho_math_decimal_out=$((10#${__dybatpho_math_decimal_digits}))
+  fi
+}
+
+#######################################
 # @description Add up a list of numbers exactly.
 # @example
 #   dybatpho::math_sum 19.99 5.01 0.5           # 25.5
@@ -1085,7 +1103,7 @@ function dybatpho::math_sum {
   local -a values=()
   __dybatpho_math_collect values "$@"
   local total="0" number
-  for number in "${values[@]}"; do
+  for number in ${values[@]+"${values[@]}"}; do
     __dybatpho_math_add2 total "${total}" "${number}"
   done
   printf '%s\n' "${total}"
@@ -1691,6 +1709,9 @@ function dybatpho::math_random {
     ((${#bound} <= 18)) \
       || dybatpho::die "${FUNCNAME[0]}: Bound '${bound}' is outside the range Bash can draw from"
   done
+  # A leading zero would make the arithmetic below read the bound as octal.
+  __dybatpho_math_decimal_into lower "${lower}"
+  __dybatpho_math_decimal_into upper "${upper}"
   ((lower <= upper)) \
     || dybatpho::die "${FUNCNAME[0]}: Lower bound '${lower}' is above upper bound '${upper}'"
 

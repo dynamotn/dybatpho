@@ -34,6 +34,8 @@
 # @env DYBATPHO_CURL_RETRY_JITTER bool Add up to one base delay of random jitter
 # @env DYBATPHO_CURL_CONNECT_TIMEOUT number Optional curl connection timeout in seconds
 # @env DYBATPHO_CURL_TIMEOUT number Optional curl total timeout in seconds
+# @env DYBATPHO_CURL_MAX_REDIRECTS number Redirects `dybatpho::curl_do` follows itself when secret headers
+#   are set (default `20`)
 # @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before `dybatpho::circuit_breaker` opens a circuit
 #   (default
 #   `5`)
@@ -55,6 +57,7 @@ DYBATPHO_CURL_RETRY_MAX_DELAY=${DYBATPHO_CURL_RETRY_MAX_DELAY:-30}
 DYBATPHO_CURL_RETRY_JITTER=${DYBATPHO_CURL_RETRY_JITTER:-false}
 DYBATPHO_CURL_CONNECT_TIMEOUT=${DYBATPHO_CURL_CONNECT_TIMEOUT:-}
 DYBATPHO_CURL_TIMEOUT=${DYBATPHO_CURL_TIMEOUT:-}
+DYBATPHO_CURL_MAX_REDIRECTS=${DYBATPHO_CURL_MAX_REDIRECTS:-20}
 DYBATPHO_CIRCUIT_THRESHOLD=${DYBATPHO_CIRCUIT_THRESHOLD:-5}
 DYBATPHO_CIRCUIT_COOLDOWN=${DYBATPHO_CIRCUIT_COOLDOWN:-30}
 DYBATPHO_RATE_LIMIT_WAIT=${DYBATPHO_RATE_LIMIT_WAIT:-true}
@@ -356,6 +359,8 @@ function dybatpho::curl_do {
     || dybatpho::die "DYBATPHO_CURL_RETRY_BASE_DELAY must be a non-negative integer"
   [[ "${DYBATPHO_CURL_RETRY_MAX_DELAY}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "DYBATPHO_CURL_RETRY_MAX_DELAY must be a non-negative integer"
+  [[ "${DYBATPHO_CURL_MAX_REDIRECTS}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "DYBATPHO_CURL_MAX_REDIRECTS must be a non-negative integer"
 
   local code="" retry_after delay attempt=0
   local header_file
@@ -370,7 +375,17 @@ function dybatpho::curl_do {
   # The config file carries the URL when it is a secret; otherwise it is the
   # last argument as usual.
   local -a url_args=("${url}")
-  dybatpho::is true "${DYBATPHO_CURL_SECRET_URL}" && url_args=()
+  local secret_url=false
+  dybatpho::is true "${DYBATPHO_CURL_SECRET_URL}" && secret_url=true && url_args=()
+  # curl's `-L` resends every custom header to wherever a redirect points and
+  # only drops `Authorization:` when the host changes, so a token carried in
+  # any other header -- `PRIVATE-TOKEN`, `x-api-key` -- used to follow a
+  # redirect to a third party. With secret headers set, redirects are followed
+  # here instead: a hop within the same origin keeps them, a hop elsewhere
+  # drops them first and then leaves the rest to curl, which is what it does
+  # for `Authorization:` on its own.
+  local follow_here=false redirects=0 current_url="${url}" location next_url
+  ((${#DYBATPHO_CURL_SECRET_HEADERS[@]})) && follow_here=true
   local body_on_stdin=false
   if [[ -n "${DYBATPHO_CURL_SECRET_DATA}" ]]; then
     secret_args+=(--data-binary @-)
@@ -394,7 +409,8 @@ function dybatpho::curl_do {
     #
     # Without it, curl exits 0 for any response it received, so a non-zero exit
     # now means what it should: nothing came back at all.
-    local -a curl_args=(-sSL -D "${header_file}" -w '%{http_code}' -o "${output}")
+    local -a curl_args=(-sS -D "${header_file}" -w '%{http_code}' -o "${output}")
+    [[ "${follow_here}" == true ]] || curl_args+=(-L)
     [[ -n "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ]] && curl_args+=(--connect-timeout "${DYBATPHO_CURL_CONNECT_TIMEOUT}")
     [[ -n "${DYBATPHO_CURL_TIMEOUT}" ]] && curl_args+=(--max-time "${DYBATPHO_CURL_TIMEOUT}")
     curl_args+=(${secret_args[@]+"${secret_args[@]}"})
@@ -415,6 +431,46 @@ function dybatpho::curl_do {
     # A response that is not three digits is not a response: curl printed
     # nothing because it never got one.
     [[ "${code}" =~ ^[0-9]{3}$ ]] || code="000"
+
+    if [[ "${follow_here}" == true && "${code}" =~ ^30[12378]$ ]]; then
+      location=$(awk '
+        tolower($1) == "location:" { sub("\r$", "", $2); print $2; exit }
+      ' "${header_file}")
+      if [[ -n "${location}" ]]; then
+        if ((redirects >= DYBATPHO_CURL_MAX_REDIRECTS)); then
+          dybatpho::warn "Stopped after ${redirects} redirects from ${shown_url}"
+          rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+          break
+        fi
+        redirects=$((redirects + 1))
+        __dybatpho_network_resolve_location_into next_url "${current_url}" "${location}"
+        local origin next_origin
+        __dybatpho_network_origin_into origin "${current_url}"
+        __dybatpho_network_origin_into next_origin "${next_url}"
+        current_url="${next_url}"
+        if [[ "${origin}" == "${next_origin}" ]]; then
+          if [[ "${secret_url}" == true ]]; then
+            rm -f ${secret_config:+"${secret_config}"}
+            __dybatpho_network_secret_config secret_config "${current_url}"
+            secret_args=(--config "${secret_config}")
+            [[ "${body_on_stdin}" == true ]] && secret_args+=(--data-binary @-)
+          else
+            url_args=("${current_url}")
+          fi
+          continue
+        fi
+        if [[ "${body_on_stdin}" == true ]]; then
+          dybatpho::warn "Not following the redirect to ${next_origin}: the request body is a secret"
+          rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+          break
+        fi
+        dybatpho::debug "Dropping secret headers for the redirect to ${next_origin}"
+        rm -f ${secret_config:+"${secret_config}"}
+        secret_config="" secret_args=() follow_here=false
+        url_args=("${current_url}")
+        continue
+      fi
+    fi
 
     local code_description
     code_description=$(__dybatpho_network_get_http_code "${code}")
@@ -468,6 +524,52 @@ function dybatpho::curl_do {
     '5'*) return 5 ;;
     *) return 1 ;;
   esac
+}
+
+#######################################
+# @description Resolve the target of a `Location:` header against the URL
+#   the response came from, the way RFC 3986 says a reference is resolved.
+# @arg $1 string Name of the variable receiving the absolute URL
+# @arg $2 string URL of the request that was redirected
+# @arg $3 string Value of the `Location:` header
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_network_resolve_location_into {
+  local -n __dybatpho_network_resolve_out="$1"
+  local __dybatpho_network_resolve_base="$2" __dybatpho_network_resolve_ref="$3"
+  local __dybatpho_network_resolve_origin
+  __dybatpho_network_origin_into __dybatpho_network_resolve_origin "${__dybatpho_network_resolve_base}"
+  if [[ "${__dybatpho_network_resolve_ref}" =~ ^[A-Za-z][A-Za-z0-9+.-]*:// ]]; then
+    __dybatpho_network_resolve_out="${__dybatpho_network_resolve_ref}"
+  elif [[ "${__dybatpho_network_resolve_ref}" == //* ]]; then
+    __dybatpho_network_resolve_out="${__dybatpho_network_resolve_base%%://*}:${__dybatpho_network_resolve_ref}"
+  elif [[ "${__dybatpho_network_resolve_ref}" == /* ]]; then
+    __dybatpho_network_resolve_out="${__dybatpho_network_resolve_origin}${__dybatpho_network_resolve_ref}"
+  else
+    local __dybatpho_network_resolve_path="${__dybatpho_network_resolve_base%%\#*}"
+    __dybatpho_network_resolve_path="${__dybatpho_network_resolve_path%%\?*}"
+    [[ "${__dybatpho_network_resolve_path}" == "${__dybatpho_network_resolve_origin}" ]] \
+      && __dybatpho_network_resolve_path+="/"
+    __dybatpho_network_resolve_out="${__dybatpho_network_resolve_path%/*}/${__dybatpho_network_resolve_ref}"
+  fi
+}
+
+#######################################
+# @description Store the origin of a URL -- scheme, host and port, lower-cased
+#   -- which is what decides whether a redirect may keep the request's secret
+#   headers. A URL with no scheme has no origin, so the variable is left empty.
+# @arg $1 string Name of the variable receiving the origin
+# @arg $2 string URL
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_network_origin_into {
+  local -n __dybatpho_network_origin_out="$1"
+  __dybatpho_network_origin_out=""
+  if [[ "$2" =~ ^([A-Za-z][A-Za-z0-9+.-]*://[^/?#]*) ]]; then
+    __dybatpho_network_origin_out="${BASH_REMATCH[1],,}"
+  fi
 }
 
 #######################################
@@ -705,7 +807,7 @@ function dybatpho::curl_response_header {
   local name
   dybatpho::expect_args name -- "$@"
   local name_lower="${name,,}"
-  if [[ -v "DYBATPHO_HTTP_HEADERS[${name_lower}]" ]]; then
+  if [[ -n "${DYBATPHO_HTTP_HEADERS[${name_lower}]+set}" ]]; then
     printf '%s\n' "${DYBATPHO_HTTP_HEADERS[${name_lower}]}"
   elif (($# > 1)); then
     printf '%s\n' "$2"
@@ -1168,7 +1270,7 @@ function dybatpho::curl_paginate {
   local -A visited=()
   local page=0 next exit_code=0 shown_url
   while [[ -n "${url}" ]]; do
-    if [[ -v "visited[${url}]" ]]; then
+    if [[ -n "${visited[${url}]+set}" ]]; then
       __dybatpho_network_redact_url_into shown_url "${url}"
       dybatpho::warn "Pagination came back to ${shown_url}; stopping"
       break
@@ -1499,7 +1601,7 @@ function dybatpho::url_parse {
 function dybatpho::url_part {
   local name
   dybatpho::expect_args name -- "$@"
-  [[ -v "DYBATPHO_URL[${name}]" ]] \
+  [[ -n "${DYBATPHO_URL[${name}]+set}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${name}' is not a component of a URL"
   if [[ -n "${DYBATPHO_URL[${name}]}" ]]; then
     printf '%s\n' "${DYBATPHO_URL[${name}]}"

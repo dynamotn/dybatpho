@@ -215,11 +215,43 @@ function __dybatpho_log_timestamp {
 }
 
 #######################################
+# @description Tell whether the `date` or `busybox` first on `PATH` is a
+#   stand-in rather than the system's: a shell function of that name, or a
+#   command under the mock directory of `dybatpho::mock_time`, under a Bats
+#   test directory, or under the temporary directory, which is where every
+#   mock this library knows of is written.
+# @noargs
+# @exitcode 0 A stand-in is on `PATH`
+# @exitcode 1 Both commands are the system's, or missing
+# @internal
+#######################################
+function __dybatpho_log_date_is_stand_in {
+  # A shell function named like the command is the oldest way to stand in.
+  if declare -F date > /dev/null || declare -F busybox > /dev/null; then
+    return 0
+  fi
+  local __dybatpho_log_ts_cmd __dybatpho_log_ts_dir
+  for __dybatpho_log_ts_cmd in "${BASH_CMDS[date]-}" "${BASH_CMDS[busybox]-}"; do
+    [[ -n "${__dybatpho_log_ts_cmd}" ]] || continue
+    for __dybatpho_log_ts_dir in "${DYBATPHO_TEST_MOCK_DIR-}" "${BATS_MOCK_BINDIR-}" \
+      "${BATS_TEST_TMPDIR-}" "${TMPDIR:-/tmp}"; do
+      [[ -n "${__dybatpho_log_ts_dir}" ]] || continue
+      [[ "${__dybatpho_log_ts_cmd}" == "${__dybatpho_log_ts_dir%/}/"* ]] && return 0
+    done
+  done
+  return 1
+}
+
+#######################################
 # @description Store an RFC 3339 timestamp for a log event in a variable.
-#   The stamp still comes from `date`, not `printf '%(...)T'`: the three
-#   platforms write it differently (GNU separates the date with a space), and
-#   `dybatpho::mock_time` freezes the clock by standing in for `date`, which a
-#   builtin would not see. What is remembered is which `date` this is, keyed by
+#   The stamp comes from `printf '%(...)T'`, which reads the clock without
+#   starting a process; that is the difference between a log line costing
+#   microseconds and one costing several milliseconds, which on a chatty
+#   script is most of its run time. A `date` that lives under a temporary
+#   directory is a stand-in a caller put first on `PATH` on purpose --
+#   `dybatpho::mock_time` freezes the clock that way, and a test may stub
+#   `date` or `busybox` -- so that one keeps being asked, through the flags
+#   its flavour accepts. What is remembered is which `date` this is, keyed by
 #   where `busybox` and `date` resolve, so the `date --version` probe runs once
 #   rather than on every line.
 # @arg $1 string Name of the variable receiving the timestamp
@@ -234,16 +266,26 @@ function __dybatpho_log_timestamp_into {
   hash date 2> /dev/null || true
   local __dybatpho_log_ts_key="${PATH}|${BASH_CMDS[busybox]-}|${BASH_CMDS[date]-}"
   if [[ "${__dybatpho_log_ts_key}" != "${__DYBATPHO_LOG_TS_KEY-}" ]]; then
-    if [[ -n "${BASH_CMDS[busybox]-}" ]]; then
-      __DYBATPHO_LOG_TS_FLAVOR=busybox
-    elif date --version > /dev/null 2>&1; then
-      __DYBATPHO_LOG_TS_FLAVOR=gnu
+    if __dybatpho_log_date_is_stand_in; then
+      if [[ -n "${BASH_CMDS[busybox]-}" ]]; then
+        __DYBATPHO_LOG_TS_FLAVOR=busybox
+      elif date --version > /dev/null 2>&1; then
+        __DYBATPHO_LOG_TS_FLAVOR=gnu
+      else
+        __DYBATPHO_LOG_TS_FLAVOR=portable
+      fi
     else
-      __DYBATPHO_LOG_TS_FLAVOR=portable
+      __DYBATPHO_LOG_TS_FLAVOR=builtin
     fi
     __DYBATPHO_LOG_TS_KEY="${__dybatpho_log_ts_key}"
   fi
   case "${__DYBATPHO_LOG_TS_FLAVOR}" in
+    builtin)
+      # `%z` has no colon form in strftime; the offset is the last five
+      # characters and the colon goes in front of its minutes.
+      printf -v __dybatpho_log_ts_out '%(%Y-%m-%dT%H:%M:%S%z)T' -1
+      __dybatpho_log_ts_out="${__dybatpho_log_ts_out:0:22}:${__dybatpho_log_ts_out:22}"
+      ;;
     busybox) __dybatpho_log_ts_out="$(busybox date +%Y-%m-%dT%H:%M:%S%:z)" ;;
     gnu) __dybatpho_log_ts_out="$(date --rfc-3339="seconds")" ;;
     *) __dybatpho_log_ts_out="$(date +%Y-%m-%dT%H:%M:%S%z)" ;;
@@ -273,7 +315,9 @@ function __dybatpho_log_now_ms {
 function __dybatpho_log_now_ms_into {
   local -n __dybatpho_log_now_out="$1"
   if [[ -n "${EPOCHREALTIME:-}" ]]; then
-    local __dybatpho_log_now_whole="${EPOCHREALTIME%%.*}" __dybatpho_log_now_frac="${EPOCHREALTIME#*.}"
+    # Bash writes the fraction with the locale's decimal separator, so under
+    # `de_DE` the value reads `1792325856,140977`; either separator splits it.
+    local __dybatpho_log_now_whole="${EPOCHREALTIME%%[.,]*}" __dybatpho_log_now_frac="${EPOCHREALTIME#*[.,]}"
     __dybatpho_log_now_out=$((__dybatpho_log_now_whole * 1000 + 10#${__dybatpho_log_now_frac:0:3}))
     return 0
   fi
@@ -552,11 +596,34 @@ function dybatpho::compare_log_level {
 # @internal
 #######################################
 function __dybatpho_log_translate {
-  if declare -F __dybatpho_i18n_lookup > /dev/null; then
-    dybatpho::i18n_library_message "${1-}"
-    return 0
+  local translated
+  __dybatpho_log_translate_into translated "${1-}"
+  printf '%s' "${translated}"
+}
+
+#######################################
+# @description Translate a diagnostic into a variable: what
+#   `__dybatpho_log_translate` does, without the subshell a `$(...)` costs on
+#   every log line. Trailing newlines go, as the substitution dropped them.
+# @arg $1 string Name of the variable receiving the text
+# @arg $2 string English text of the diagnostic
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_translate_into {
+  local -n __dybatpho_log_translate_out="$1"
+  local __dybatpho_log_translate_text="${2-}"
+  while [[ "${__dybatpho_log_translate_text}" == *$'\n' ]]; do
+    __dybatpho_log_translate_text="${__dybatpho_log_translate_text%$'\n'}"
+  done
+  __dybatpho_log_translate_out="${__dybatpho_log_translate_text}"
+  if declare -F __dybatpho_i18n_lookup > /dev/null \
+    && dybatpho::is true "${DYBATPHO_I18N_TRANSLATE_LIBRARY:-false}"; then
+    local __dybatpho_log_translate_found
+    if __dybatpho_i18n_lookup __dybatpho_log_translate_found "${__dybatpho_log_translate_text}"; then
+      __dybatpho_log_translate_out="${__dybatpho_log_translate_found}"
+    fi
   fi
-  printf '%s' "${1-}"
 }
 
 #######################################
@@ -644,15 +711,7 @@ function __dybatpho_log_inspect {
   local color="${5:-}"
   # Only the message is translated here: the level label beside it is padded to
   # a fixed width for the column separators and must not change.
-  if declare -F __dybatpho_i18n_lookup > /dev/null; then
-    message="$(__dybatpho_log_translate "${message}")"
-  else
-    # What the substitution above did to an untranslated message, without a
-    # subshell: trailing newlines go.
-    while [[ "${message}" == *$'\n' ]]; do
-      message="${message%$'\n'}"
-    done
-  fi
+  __dybatpho_log_translate_into message "${message}"
   __dybatpho_log_write_file "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   if [[ "${LOG_FORMAT}" == "json" ]]; then
     __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${extra_fields}"
@@ -1288,7 +1347,7 @@ function dybatpho::progress {
   # The banner helpers compose their text before boxing it, so they never reach
   # the hook in `__dybatpho_log_inspect` and have to translate their own message.
   local message
-  message="$(__dybatpho_log_translate "$*")"
+  __dybatpho_log_translate_into message "$*"
   __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "🚀 ${message}..." stdout "${color}"
 }
 
@@ -1317,7 +1376,7 @@ function dybatpho::progress_bar {
 function dybatpho::header {
   local color="1;5;30;47"
   local message
-  message="$(__dybatpho_log_translate "$*")"
+  __dybatpho_log_translate_into message "$*"
   __dybatpho_log_box "╔" "═" "╗" "║" "║" "╚" "╝" "${message}" stdout "${color}"
 }
 
@@ -1331,7 +1390,7 @@ function dybatpho::success {
   # The message is the caller's and is keyed by its English text; the `DONE:`
   # beside it is the library's own label and gets a stable key of its own.
   local message label
-  message="$(__dybatpho_log_translate "$1")"
+  __dybatpho_log_translate_into message "$1"
   label="$(__dybatpho_log_text logging.done "DONE:")"
   __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "✅ ${label} ${message}" stdout "${color}"
 }
@@ -1528,8 +1587,15 @@ function __dybatpho_log_spin_loop {
   local -a frames=()
   read -r -a frames <<< "$1"
   ((${#frames[@]} > 0)) || frames=('-' "\\" '|' '/')
-  local index=0
+  local index=0 parent="$$"
   while true; do
+    # The animation is a background job of the script; when the script ends
+    # without stopping it -- `die`, `set -e`, a plain `exit` -- it would be
+    # orphaned to PID 1 and keep drawing over the shell prompt.
+    if ! kill -0 "${parent}" 2> /dev/null; then
+      printf '\r\033[K\033[?25h' >&2
+      exit 0
+    fi
     if [[ -n "${file}" ]]; then
       message=""
       { IFS= read -r -d '' message < "${file}"; } 2> /dev/null || true
@@ -1676,7 +1742,7 @@ function dybatpho::log_context {
     get)
       local name
       dybatpho::expect_args name -- "$@"
-      [[ -v "__dybatpho_log_context_values[${name}]" ]] || return 1
+      [[ -n "${__dybatpho_log_context_values[${name}]+set}" ]] || return 1
       printf '%s\n' "${__dybatpho_log_context_values[${name}]}"
       ;;
     *)

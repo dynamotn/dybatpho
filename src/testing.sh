@@ -889,8 +889,8 @@ function dybatpho::mock_env {
       || dybatpho::die "${FUNCNAME[0]}: Invalid assignment: ${assignment}"
     name="${BASH_REMATCH[1]}"
     value="${BASH_REMATCH[2]}"
-    if [[ ! -v "DYBATPHO_TEST_ENV_BACKUP[${name}]" ]]; then
-      if [[ -v "${name}" ]]; then
+    if [[ -z "${DYBATPHO_TEST_ENV_BACKUP[${name}]+set}" ]]; then
+      if [[ -n "${!name+set}" ]]; then
         DYBATPHO_TEST_ENV_BACKUP["${name}"]="set:${!name}"
       else
         DYBATPHO_TEST_ENV_BACKUP["${name}"]="unset:"

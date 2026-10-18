@@ -485,3 +485,9 @@ function _create_traversal_archive {
   dybatpho::safe_system --force "scoped change" -- look 2> /dev/null
   assert_equal "$(cat "${seen}")" "caller caller caller caller"
 }
+
+@test "dybatpho::safe_system never evaluates a single command argument as shell" {
+  export DRY_RUN=false
+  run_traced --separate-stderr dybatpho::safe_system --force demo -- 'echo first; echo INJECTED-via-eval'
+  refute_output --partial "INJECTED"
+}

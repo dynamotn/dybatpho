@@ -1075,3 +1075,24 @@ SCRIPT
   chmod 600 "${path}"
   assert_equal "$(cat "${path}")" "keep me"
 }
+
+@test "dybatpho::path_normalize handles a path that normalizes to nothing" {
+  # An empty part list is expanded on bash 4.3 too, where an empty array under
+  # nounset used to be an error.
+  run_traced dybatpho::path_normalize "a/.."
+  assert_output "."
+  run_traced dybatpho::path_normalize "/"
+  assert_output "/"
+  run_traced dybatpho::path_normalize "."
+  assert_output "."
+}
+
+@test "__dybatpho_file_stat mode keeps the setgid, setuid and sticky bits" {
+  local dir="${BATS_TEST_TMPDIR}/shared" file="${BATS_TEST_TMPDIR}/plain"
+  mkdir "${dir}"
+  chmod 2755 "${dir}"
+  : > "${file}"
+  chmod 644 "${file}"
+  assert_equal "$(__dybatpho_file_stat mode "${dir}")" "2755"
+  assert_equal "$(__dybatpho_file_stat mode "${file}")" "644"
+}

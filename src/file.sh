@@ -217,8 +217,8 @@ function dybatpho::path_normalize {
     esac
   done
 
-  local normalized_path
-  normalized_path=$(IFS=/ && printf '%s' "${normalized_parts[*]}")
+  local normalized_path IFS='/'
+  normalized_path="${normalized_parts[*]-}"
   if [[ "${is_absolute}" == true ]]; then
     printf '%s\n' "/${normalized_path}"
   elif [[ -n "${normalized_path}" ]]; then
@@ -451,8 +451,12 @@ function __dybatpho_file_stat {
   dybatpho::expect_args field path -- "$@"
   case "${field}" in
     mode)
+      # `%Lp` is the low three digits only: a setuid, setgid or sticky bit was
+      # dropped on the way to the `chmod` that reapplies the mode. `%Mp` is the
+      # digit carrying those bits, and reads `0` when none is set; that zero
+      # goes, so the answer matches the GNU form.
       gnu_format='%a'
-      bsd_format='%Lp'
+      bsd_format='%Mp%Lp'
       ;;
     size)
       gnu_format='%s'
@@ -470,8 +474,15 @@ function __dybatpho_file_stat {
   esac
   # `-L` makes both flavours report the file a symlink points at, rather than
   # the link itself, which is what every caller of this helper means.
-  stat -L -c "${gnu_format}" -- "${path}" 2> /dev/null \
-    || stat -L -f "${bsd_format}" -- "${path}" 2> /dev/null
+  local answer
+  if answer="$(stat -L -c "${gnu_format}" -- "${path}" 2> /dev/null)"; then
+    printf '%s\n' "${answer}"
+    return 0
+  fi
+  answer="$(stat -L -f "${bsd_format}" -- "${path}" 2> /dev/null)" || return 1
+  # The BSD mode carries a leading `0` when no special bit is set.
+  [[ "${field}" == mode && "${answer}" == 0??? ]] && answer="${answer#0}"
+  printf '%s\n' "${answer}"
 }
 
 #######################################

@@ -453,3 +453,14 @@ setup() {
   assert_success
   assert_output "$(printf '%s\n' 0.9.0 1.0.0+b v1.0.0 1.0.0+a 2.0.0)"
 }
+
+@test "dybatpho::semver_compare orders pre-release identifiers in ASCII whatever the locale" {
+  # SemVer compares identifiers byte by byte: an upper-case letter comes before
+  # a lower-case one. A locale's collation said the opposite on macOS.
+  run_traced dybatpho::semver_compare 1.0.0-Beta 1.0.0-alpha
+  assert_output "-1"
+  LC_ALL=en_US.UTF-8 run_traced dybatpho::semver_compare 1.0.0-Beta 1.0.0-alpha
+  assert_output "-1"
+  LC_ALL=C run_traced dybatpho::semver_compare 1.0.0-Beta 1.0.0-alpha
+  assert_output "-1"
+}

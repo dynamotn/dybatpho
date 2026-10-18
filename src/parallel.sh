@@ -450,7 +450,11 @@ function __dybatpho_parallel_pool {
     # unstarted job records as empty rather than as a failure.
     [[ "${__dybatpho_parallel_stop}" != true && -z "${__dybatpho_parallel_interrupted}" ]] || break
 
-    "${__dybatpho_parallel_pool_launcher}" "${__dybatpho_parallel_pool_index}" "${__dybatpho_parallel_pool_directory}" &
+    # A job that read the terminal was stopped by the kernel for doing so from
+    # the background (`SIGTTIN`), looked alive to `kill -0`, and the pool waited
+    # on it for ever. The jobs run with no terminal to read from instead.
+    "${__dybatpho_parallel_pool_launcher}" "${__dybatpho_parallel_pool_index}" \
+      "${__dybatpho_parallel_pool_directory}" < /dev/null &
     __dybatpho_parallel_pids+=("$!")
     __dybatpho_parallel_index_of[$!]="${__dybatpho_parallel_pool_index}"
     if ((__dybatpho_parallel_limit > 0)); then

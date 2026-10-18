@@ -119,8 +119,11 @@ function dybatpho::schedule_every {
   # The flag is a local, not a module global: a signal is handled inside this
   # function, so the handler sees this frame's variables and nothing leaks out
   # to the next caller.
-  local __dybatpho_schedule_every_stopped=0
-  dybatpho::trap "__dybatpho_schedule_every_stopped=1" HUP INT TERM
+  # A signal ends the loop after the run in progress, and the function returns
+  # so the script can finish on its own terms; that is the documented way to
+  # end an unbounded loop.
+  local __dybatpho_schedule_every_stopped=""
+  dybatpho::trap "__dybatpho_schedule_every_stopped=yes" HUP INT TERM
 
   local __dybatpho_schedule_every_due __dybatpho_schedule_every_now __dybatpho_schedule_every_ran=0 \
     __dybatpho_schedule_every_waited
@@ -130,7 +133,7 @@ function dybatpho::schedule_every {
     __dybatpho_schedule_every_ran=$((__dybatpho_schedule_every_ran + 1))
 
     ((__dybatpho_schedule_every_times > 0 && __dybatpho_schedule_every_ran >= __dybatpho_schedule_every_times)) && break
-    ((__dybatpho_schedule_every_stopped)) && break
+    [[ -z "${__dybatpho_schedule_every_stopped}" ]] || break
 
     __dybatpho_schedule_every_due=$((__dybatpho_schedule_every_due + __dybatpho_schedule_every_interval))
     __dybatpho_schedule_every_now="$(dybatpho::date_now "%s")"
@@ -141,8 +144,16 @@ function dybatpho::schedule_every {
     done
 
     __dybatpho_schedule_every_waited=$((__dybatpho_schedule_every_due - __dybatpho_schedule_every_now))
-    sleep "${__dybatpho_schedule_every_waited}"
-    ((__dybatpho_schedule_every_stopped)) && break
+    # The wait is a background `sleep` so that a signal interrupts it at once
+    # rather than being noticed when the whole interval is over.
+    local __dybatpho_schedule_every_sleeper
+    sleep "${__dybatpho_schedule_every_waited}" &
+    __dybatpho_schedule_every_sleeper=$!
+    wait "${__dybatpho_schedule_every_sleeper}" || {
+      kill "${__dybatpho_schedule_every_sleeper}" 2> /dev/null || true
+      wait "${__dybatpho_schedule_every_sleeper}" 2> /dev/null || true
+    }
+    [[ -z "${__dybatpho_schedule_every_stopped}" ]] || break
   done
 
   __dybatpho_process_traps_restore "${__dybatpho_schedule_every_previous_traps}" HUP INT TERM
@@ -226,7 +237,11 @@ function dybatpho::schedule_debounce {
   sleep "${__dybatpho_schedule_debounce_window}"
 
   local __dybatpho_schedule_debounce_latest=0
-  read -r __dybatpho_schedule_debounce_latest < "${__dybatpho_schedule_debounce_ticket}"
+  # The ticket is gone when `dybatpho::schedule_reset` ran during the window;
+  # the redirection failing used to end the script under `errexit`.
+  if [[ -f "${__dybatpho_schedule_debounce_ticket}" ]]; then
+    read -r __dybatpho_schedule_debounce_latest < "${__dybatpho_schedule_debounce_ticket}" || true
+  fi
   [[ "${__dybatpho_schedule_debounce_latest}" =~ ^[0-9]+$ ]] || __dybatpho_schedule_debounce_latest=0
   if ((__dybatpho_schedule_debounce_latest != __dybatpho_schedule_debounce_counter)); then
     return 9

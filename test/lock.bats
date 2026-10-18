@@ -674,3 +674,14 @@ SCRIPT
   run_traced -3 dybatpho::with_lock "scoped" 1 -- clobber
   run_traced ! dybatpho::lock_is_held "scoped"
 }
+
+@test "dybatpho::lock_acquire never writes the command sidecar through a planted link" {
+  local lock_path="${BATS_TEST_TMPDIR}/planted.lock"
+  local victim="${BATS_TEST_TMPDIR}/victim.txt"
+  printf 'untouched\n' > "${victim}"
+  ln -s "${victim}" "${lock_path}.command"
+  dybatpho::lock_acquire "${lock_path}" 0
+  assert_equal "$(< "${victim}")" "untouched"
+  [[ ! -L "${lock_path}.command" ]]
+  dybatpho::lock_release "${lock_path}"
+}

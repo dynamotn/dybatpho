@@ -224,6 +224,8 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **FR-026a**: The closest-candidate helper MUST return 1 and empty the array when no candidate is close enough, and MUST stop the script when the maximum distance is not a non-negative integer.
 - **FR-027**: `dybatpho::cli_levenshtein` MUST keep answering exactly as the distance helper.
 - **FR-028**: `string_pad`, `string_truncate`, `string_repeat` and `string_wrap` MUST stop with a message naming the function and the value when the width or count is not a whole number; a negative number keeps its existing meaning.
+- **FR-029**: `dybatpho::string_slugify` MUST treat `@` and `*` as separators rather than as subscripts of its table.
+- **FR-030**: `dybatpho::url_decode` MUST decode only a `%` followed by two hex digits, keep any other `%`, and keep a backslash as a backslash.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -267,6 +269,8 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **IT-015**: Verify edit distances for known pairs, empty strings, case differences, and multibyte characters, and that `dybatpho::cli_levenshtein` agrees with the distance helper.
 - **IT-016**: Rank candidate lists with ties, duplicates, empty entries, a zero maximum, and nothing close, and verify an invalid maximum or array name is refused.
 - **IT-017**: Pass `abc` and `08` as the width or count to each helper and find a clear refusal; pass `-3` to `string_truncate` and find an empty line.
+- **IT-018**: Slugify `mail@example*com` and get `mail-example-com`.
+- **IT-019**: Decode `100%25%20done%2C%zz` to `100% done,%zz` and `a\nb+c` to `a\nb c`.
 
 ## Acceptance Criteria *(mandatory)*
 

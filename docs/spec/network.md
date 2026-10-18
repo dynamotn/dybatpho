@@ -326,6 +326,8 @@ dybatpho::circuit_breaker api.example.test \
   came back — 3, 4 or 5 — and MUST be reserved for a transport failure, where no
   response was received at all.
 - **FR-039**: A command run by `circuit_breaker` or `rate_limit` MUST see the caller's variables: both MUST keep their state in prefixed locals, so a command cannot change the recorded failures or the spent budget.
+- **FR-040**: `dybatpho::curl_do` MUST NOT hand `-L` to curl while `DYBATPHO_CURL_SECRET_HEADERS` is set; it MUST follow a redirect within the same origin with the headers, drop them before following one to another origin, and refuse one to another origin when `DYBATPHO_CURL_SECRET_DATA` is set.
+- **FR-041**: `DYBATPHO_CURL_MAX_REDIRECTS` (default `20`) MUST bound the redirects `dybatpho::curl_do` follows itself; past it the last 3xx status is returned as exit code 3.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -456,6 +458,9 @@ dybatpho::circuit_breaker api.example.test \
   their body in the output file, and that a transport failure is reported
   separately.
 - **IT-036**: Run a command behind a circuit and behind a rate limit that reads variables named like their locals, and see the caller's values.
+- **IT-037**: Answer a same-origin 302 then a cross-origin 302 with a secret header set: the second request carries the header and the resolved URL, the third carries neither the header nor `--config` and is given `-L`.
+- **IT-038**: Answer a 307 to another origin while the body is a secret, and get exit code 3 with a warning naming the origin.
+- **IT-039**: Loop a 301 with `DYBATPHO_CURL_MAX_REDIRECTS=2`, and stop after two hops with a warning.
 
 ## Acceptance Criteria *(mandatory)*
 

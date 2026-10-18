@@ -289,7 +289,7 @@ function dybatpho::config_env {
     key="${variable#"${prefix}"}"
     # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
     [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] || continue
-    [[ -v "${variable}" ]] || continue
+    [[ -n "${!variable+set}" ]] || continue
     __dybatpho_config_set "${key}" "${!variable}"
   done < <(printf '%s' "${compgen_output}")
 }
@@ -325,7 +325,7 @@ function dybatpho::config_get {
   local key
   dybatpho::expect_args key -- "$@"
   __dybatpho_config_require_key "${key}"
-  if [[ -v "DYBATPHO_CONFIG[${key}]" ]]; then
+  if [[ -n "${DYBATPHO_CONFIG[${key}]+set}" ]]; then
     printf '%s\n' "${DYBATPHO_CONFIG[${key}]}"
   elif (($# > 1)); then
     printf '%s\n' "$2"
@@ -344,7 +344,7 @@ function dybatpho::config_require {
   local key
   for key in "$@"; do
     __dybatpho_config_require_key "${key}"
-    [[ -v "DYBATPHO_CONFIG[${key}]" ]] \
+    [[ -n "${DYBATPHO_CONFIG[${key}]+set}" ]] \
       || dybatpho::die "Required configuration is missing: ${key}"
   done
 }
@@ -581,7 +581,7 @@ function dybatpho::config_save {
 
   for key in "${keys[@]}"; do
     __dybatpho_config_require_key "${key}"
-    [[ -v "DYBATPHO_CONFIG[${key}]" ]] \
+    [[ -n "${DYBATPHO_CONFIG[${key}]+set}" ]] \
       || dybatpho::die "Cannot save a configuration key that is not set: ${key}"
   done
 
@@ -848,8 +848,9 @@ function dybatpho::config_validate {
   local key required
   DYBATPHO_CONFIG_ERRORS=()
   for key in ${DYBATPHO_CONFIG_SCHEMA_KEYS[@]+"${DYBATPHO_CONFIG_SCHEMA_KEYS[@]}"}; do
-    if [[ ! -v "DYBATPHO_CONFIG[${key}]" ]]; then
-      if [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]]; then
+    if [[ -z "${DYBATPHO_CONFIG[${key}]+set}" ]]; then
+      local default_key="${key}.default"
+      if [[ -n "${DYBATPHO_CONFIG_SCHEMA[${default_key}]+set}" ]]; then
         DYBATPHO_CONFIG["${key}"]="${DYBATPHO_CONFIG_SCHEMA["${key}.default"]}"
       else
         __dybatpho_config_schema_attr_into required "${key}" required false
@@ -970,7 +971,8 @@ function dybatpho::config_doc {
         ;;
       json)
         declared=""
-        [[ -v "DYBATPHO_CONFIG_SCHEMA[${key}.default]" ]] && declared="declared" || true
+        default_key="${key}.default"
+    [[ -n "${DYBATPHO_CONFIG_SCHEMA[${default_key}]+set}" ]] && declared="declared" || true
         __dybatpho_log_json_escape_into key_cell "${key}"
         __dybatpho_config_doc_json_value_into default_cell "${default}" "${declared}"
         __dybatpho_config_doc_json_value_into constraints_cell "${constraints}"

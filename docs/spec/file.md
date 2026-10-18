@@ -339,6 +339,8 @@ dybatpho::show_file "${report_file}"
 - **FR-046**: A rewrite whose destination is a symlink chain too deep to resolve MUST stop before it stages anything, also where errexit is suspended, and MUST report the refusal under the public function that was called.
 - **FR-047**: The four file writers MUST refuse a destination that is a directory before staging anything.
 - **FR-048**: `dir_size` MUST return 1 and report when part of the tree cannot be read, printing the size of what could, and MUST walk the tree once; `file_is_binary` MUST stop on a file it cannot read rather than call it text.
+- **FR-049**: `dybatpho::path_normalize` MUST handle a path whose parts all cancel on Bash 4.3, where an empty array under `nounset` is an error.
+- **FR-050**: `__dybatpho_file_stat mode` MUST include the setuid, setgid and sticky bits on BSD `stat`, and answer in the same form as GNU (`2755`, `644`).
 
 ### Key Entities *(include if feature involves data)*
 
@@ -405,6 +407,8 @@ dybatpho::show_file "${report_file}"
 - **IT-032**: Rewrite through a symlink loop under `if !` from a script in its own directory, and leave that directory exactly as it was.
 - **IT-033**: Write and add a line to a directory, refuse both under the function that was called, and leave the directory empty.
 - **IT-034**: Size a tree with an unreadable subdirectory and get the readable part with exit 1, and refuse to classify an unreadable file.
+- **IT-035**: Normalize `a/..`, `/` and `.` and get `.`, `/` and `.`.
+- **IT-036**: Read the mode of a `2755` directory and a `644` file and get those strings.
 
 ## Acceptance Criteria *(mandatory)*
 

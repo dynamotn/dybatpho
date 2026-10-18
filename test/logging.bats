@@ -1168,3 +1168,26 @@ assert event["duration_ms"] >= 0
   DYBATPHO_SPINNER=never dybatpho::spinner "working" -- look 2> /dev/null
   assert_equal "$(cat "${seen}")" "caller caller caller caller caller"
 }
+
+@test "__dybatpho_log_now_ms_into reads EPOCHREALTIME under a comma locale" {
+  locale -a 2> /dev/null | grep -qi '^de_DE.UTF-\?8$' || skip "no de_DE locale installed"
+  run_traced bash -c "export LC_ALL=de_DE.UTF-8; . '${DYBATPHO_DIR}/init.sh'; now=; __dybatpho_log_now_ms_into now; [[ \${EPOCHREALTIME} == *,* ]] || echo no-comma; printf '%s' \"\${now}\""
+  refute_output "no-comma"
+  [[ "${output}" =~ ^[0-9]{13}$ ]]
+  ((output / 1000 > 1700000000))
+}
+
+@test "the log timestamp needs no process when date is the system's" {
+  # The clock is read with a `printf` builtin unless something stands in for
+  # `date`, which is what makes a log line cheap.
+  local calls="${BATS_TEST_TMPDIR}/clock-calls"
+  local shim="${BATS_TEST_TMPDIR}/shim"
+  mkdir -p "${shim}"
+  printf '#!/bin/sh\nprintf "called\\n" >> "%s"\nexec /bin/date "$@"\n' "${calls}" > "${shim}/date"
+  chmod +x "${shim}/date"
+  run_traced bash -c ". '${DYBATPHO_DIR}/init.sh'; x=; __dybatpho_log_timestamp_into x; printf '%s' \"\${x}\""
+  [[ "${output}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$ ]]
+  # A shim under the temporary directory stands in for the clock and is used.
+  PATH="${shim}:${PATH}" run_traced bash -c ". '${DYBATPHO_DIR}/init.sh'; x=; __dybatpho_log_timestamp_into x; printf '%s' \"\${x}\""
+  assert_file_exist "${calls}"
+}

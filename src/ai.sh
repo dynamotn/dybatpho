@@ -929,7 +929,9 @@ function __dybatpho_ai_http {
 
   # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
   local DYBATPHO_CURL_SECRET_DATA="${payload}"
-  dybatpho::debug "ai: POST ${url}"
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
+  dybatpho::debug "ai: POST ${shown_url}"
   dybatpho::curl_json "${url}" "${response_file}" \
     --request POST \
     --max-time "${DYBATPHO_AI_TIMEOUT}" \

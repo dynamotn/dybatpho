@@ -766,3 +766,9 @@ EOF
   dybatpho::array_difference left right
   assert_equal "${left[*]}" "x"
 }
+
+@test "dybatpho::array_sort --numeric reads a leading zero in base ten" {
+  local numbers=(10 08 9 -3 -08 7)
+  dybatpho::array_sort numbers --numeric
+  assert_equal "${numbers[*]}" "-08 -3 7 08 9 10"
+}

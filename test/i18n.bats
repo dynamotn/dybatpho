@@ -1665,3 +1665,22 @@ _i18n_spec_abbr() {
   assert_failure
   assert_stderr --partial "dybatpho::i18n_number: Precision must be a non-negative integer, got 'x'"
 }
+
+@test "dybatpho::i18n_month_name takes the zero-padded month date prints" {
+  run_traced dybatpho::i18n_month_name 08 wide en
+  assert_output "August"
+  run_traced dybatpho::i18n_month_name 09 abbr en
+  assert_output "Sep"
+}
+
+@test "a plural count with a leading zero is read in base ten" {
+  local file
+  file="$(_catalog en.msg \
+    'app.files[one] = {count} file' \
+    'app.files[other] = {count} files')"
+  dybatpho::i18n_load en "${file}"
+  run_traced -0 dybatpho::i18n_tn app.files 08
+  assert_output "8 files"
+  run_traced -0 dybatpho::i18n_tn app.files 01
+  assert_output "1 file"
+}

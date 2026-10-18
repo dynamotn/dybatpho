@@ -66,7 +66,7 @@ writes PID files.
 
 ### `dybatpho::dry_run`
 
-- Pass a single shell command string because this helper executes the command with `eval`
+- A single argument is a shell command string and runs through `eval`. Lead with `--` when the command and its arguments come from elsewhere -- a path, a user's input -- so that a single argument is run as a command name rather than parsed as shell.
 
 ### `dybatpho::run_with_timeout`
 
@@ -212,11 +212,16 @@ dybatpho::dry_run "ssh ${host} 'systemctl restart app'"
 
 ```
 
+```bash
+dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
+
+```
+
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$@` | string | Shell command string to run |
+| `$@` | string | Shell command string to run, or `--` followed by a command and its arguments |
 
 **🌍 Environment variables**
 

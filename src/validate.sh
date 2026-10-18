@@ -190,21 +190,62 @@ function __dybatpho_validate_numeric_type {
 function __dybatpho_validate_number_cmp {
   local __cmp_left="$1" __cmp_right="$2"
   local -n __cmp_out="$3"
-  local __cmp_l __cmp_r
-  if [[ "${__cmp_left}" =~ ^[+-]?[0-9]+$ && "${__cmp_right}" =~ ^[+-]?[0-9]+$ ]]; then
-    __dybatpho_validate_plain_int __cmp_l "${__cmp_left}"
-    __dybatpho_validate_plain_int __cmp_r "${__cmp_right}"
-  else
-    __dybatpho_validate_scaled __cmp_l "${__cmp_left}" || return 1
-    __dybatpho_validate_scaled __cmp_r "${__cmp_right}" || return 1
+  # The two sides are compared as digit strings rather than as shell integers:
+  # a value scaled to six decimals overflowed 64 bits above about 9.2e12 and
+  # a bound of ten trillion was then reported as below one.
+  local __cmp_ls __cmp_li __cmp_lf __cmp_rs __cmp_ri __cmp_rf
+  __dybatpho_validate_decimal_into __cmp_ls __cmp_li __cmp_lf "${__cmp_left}" || return 1
+  __dybatpho_validate_decimal_into __cmp_rs __cmp_ri __cmp_rf "${__cmp_right}" || return 1
+  local __cmp_magnitude=0
+  if ((${#__cmp_li} != ${#__cmp_ri})); then
+    ((${#__cmp_li} < ${#__cmp_ri})) && __cmp_magnitude=-1 || __cmp_magnitude=1
+  elif [[ "${__cmp_li}${__cmp_lf}" != "${__cmp_ri}${__cmp_rf}" ]]; then
+    local LC_ALL=C
+    [[ "${__cmp_li}${__cmp_lf}" < "${__cmp_ri}${__cmp_rf}" ]] && __cmp_magnitude=-1 || __cmp_magnitude=1
   fi
-  if ((__cmp_l < __cmp_r)); then
+  if [[ "${__cmp_ls}" == "${__cmp_rs}" ]]; then
+    __cmp_out=$((__cmp_magnitude))
+    [[ "${__cmp_ls}" == "-" ]] && __cmp_out=$((-__cmp_out))
+  elif [[ "${__cmp_ls}" == "-" ]]; then
     __cmp_out=-1
-  elif ((__cmp_l > __cmp_r)); then
-    __cmp_out=1
   else
-    __cmp_out=0
+    __cmp_out=1
   fi
+  return 0
+}
+
+#######################################
+# @description Take a number apart into a sign, its whole digits without
+#   leading zeros, and exactly six fraction digits, so that two numbers of any
+#   size compare as strings. A negative zero is a plain zero.
+# @arg $1 string Name of the variable receiving the sign, `-` or `+`
+# @arg $2 string Name of the variable receiving the whole digits
+# @arg $3 string Name of the variable receiving the six fraction digits
+# @arg $4 string Number text
+# @set The three named variables
+# @exitcode 1 The text is not a number `printf` can read
+# @internal
+#######################################
+function __dybatpho_validate_decimal_into {
+  local -n __dec_sign="$1" __dec_whole="$2" __dec_frac="$3"
+  local __dec_text="$4"
+  local LC_ALL=C
+  if [[ "${__dec_text}" =~ ^([+-]?)([0-9]+)$ ]]; then
+    __dec_sign="${BASH_REMATCH[1]}"
+    __dec_whole="${BASH_REMATCH[2]}"
+    __dec_frac="000000"
+  else
+    local __dec_formatted
+    printf -v __dec_formatted '%.6f' "${__dec_text}" 2> /dev/null || return 1
+    __dec_sign=""
+    [[ "${__dec_formatted}" == -* ]] && __dec_sign="-" && __dec_formatted="${__dec_formatted#-}"
+    __dec_whole="${__dec_formatted%.*}"
+    __dec_frac="${__dec_formatted#*.}"
+  fi
+  [[ "${__dec_sign}" == "-" ]] || __dec_sign="+"
+  while [[ "${__dec_whole}" == 0?* ]]; do __dec_whole="${__dec_whole#0}"; done
+  [[ "${__dec_whole}${__dec_frac}" =~ ^0+$ ]] && __dec_sign="+"
+  return 0
 }
 
 #######################################
@@ -485,7 +526,7 @@ function dybatpho::validate_value {
 
   local measured subject order
   if [[ -n "${min}" || -n "${max}" ]]; then
-    if [[ -v "__DYBATPHO_VALIDATE_NUMERIC[${canonical}]" ]]; then
+    if [[ -n "${__DYBATPHO_VALIDATE_NUMERIC[${canonical}]+set}" ]]; then
       measured="${value}"
       subject=""
     else
@@ -502,9 +543,9 @@ function dybatpho::validate_value {
     fi
   fi
 
-  [[ -z "${minlen}" ]] || ((${#value} >= minlen)) \
+  [[ -z "${minlen}" ]] || ((${#value} >= 10#${minlen})) \
     || __dybatpho_validate_error "must be at least ${minlen} characters"
-  [[ -z "${maxlen}" ]] || ((${#value} <= maxlen)) \
+  [[ -z "${maxlen}" ]] || ((${#value} <= 10#${maxlen})) \
     || __dybatpho_validate_error "must be at most ${maxlen} characters"
 
   ((${#DYBATPHO_VALIDATE_ERRORS[@]} == 0))

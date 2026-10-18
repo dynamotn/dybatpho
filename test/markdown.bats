@@ -307,3 +307,8 @@ EOF
   assert_failure
   assert_stderr --partial "Invalid emoji shortcode"
 }
+
+@test "dybatpho::md_list numbers from a marker with a leading zero" {
+  run_traced dybatpho::md_list $'a\nb' "08."
+  assert_output $'8. a\n9. b'
+}

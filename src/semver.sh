@@ -103,6 +103,10 @@ function __dybatpho_semver_cmp_into {
   local __sv_var __sv_v1 __sv_v2
   dybatpho::expect_args __sv_var __sv_v1 __sv_v2 -- "$@"
   local -n __sv_out="${__sv_var}"
+  # Pre-release identifiers compare in ASCII order, as the specification says;
+  # the locale's collation put `Beta` after `alpha` on one platform and before
+  # it on another.
+  local LC_ALL=C
 
   local -a __sv_p1 __sv_p2
   __dybatpho_semver_parse_into __sv_p1 "${__sv_v1}" \

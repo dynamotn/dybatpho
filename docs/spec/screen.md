@@ -303,6 +303,9 @@ dybatpho::screen_end
   the right of the span painted before it, not every run on the row, when it
   starts after that span.
 - **FR-033**: `screen_rect_inner`, `screen_rect_center` and `screen_layout` MUST fill the variable the caller named, and the widgets MUST read the arrays the caller named, whatever those names are, including names the functions use for their own locals.
+- **FR-034**: `dybatpho::screen_event` MUST report a carriage return as `enter`, as it does a newline.
+- **FR-035**: `dybatpho::screen_text` MUST split its text on blanks without globbing, so `*` is drawn as `*`.
+- **FR-036**: `__dybatpho_screen_braille_table` MUST hold the 256 Braille glyphs under any locale, built from their UTF-8 bytes.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -384,6 +387,9 @@ dybatpho::screen_end
 - **IT-030**: Paint spans between the borders of a row, out of order and
   overlapping, and verify every run ends up in place.
 - **IT-031**: Shrink, centre and lay out into variables, and draw a table, tabs, a sparkline, a chart and a bar chart with labels from arrays, named `x`, `width`, `rect`, `options`, `rows_var`, `sizes` and others the functions use, and get the same result as under a neutral name.
+- **IT-032**: Feed `\r` and `\n` and get `enter` for both.
+- **IT-033**: Draw `press * or *.sh to go` from a directory holding `a.sh` and `b.sh`, and read the text back unchanged.
+- **IT-034**: Build the table under `LC_ALL=C` and count 256 entries ending in `⣿`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -462,7 +462,7 @@ function dybatpho::tui_spinner_stop {
 #######################################
 function __dybatpho_tui_banner {
   local message label
-  message="$(__dybatpho_log_translate "$2")"
+  __dybatpho_log_translate_into message "$2"
   if (($1 == 0)); then
     label="$(__dybatpho_log_text logging.done "DONE:")"
     __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "✅ ${label} ${message}" stderr "1;3;32"

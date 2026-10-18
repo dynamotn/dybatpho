@@ -292,7 +292,7 @@ function dybatpho::privilege_run {
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command after \`--\`"
 
   if ! dybatpho::privilege_needed; then
-    dybatpho::dry_run "$@"
+    dybatpho::dry_run -- "$@"
     return
   fi
 

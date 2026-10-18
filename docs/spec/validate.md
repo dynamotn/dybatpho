@@ -276,6 +276,8 @@ dybatpho::opts::param "Port" PORT --port type:port
 - **FR-025**: The `ipv4`, `ipv6` and `cidr` types MUST read addresses through
   the same core parser as the `network` module, and MUST refuse a CIDR prefix
   length written with a leading zero.
+- **FR-026**: `__dybatpho_validate_number_cmp` MUST compare two numbers of any size, as sign, whole digits and six fraction digits, without 64-bit arithmetic.
+- **FR-027**: `minlen:` and `maxlen:` MUST be read in base ten whatever zeros they lead with.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -356,6 +358,8 @@ dybatpho::opts::param "Port" PORT --port type:port
   a script that asked only for `cli`.
 - **IT-024**: Refuse `10.0.0.0/08` and `2001:db8::/032`, accept `10.0.0.0/0`,
   and answer every IPv4, IPv6 and CIDR sample the way `network` does.
+- **IT-025**: Validate `10000000000000.5` against `min:1` with no error, `-10000000000000.5` with `must be at least 1`, and a 20-digit value against a smaller 20-digit `max:`.
+- **IT-026**: Validate a nine-character value against `minlen:08 maxlen:09` with no error.
 
 ## Acceptance Criteria *(mandatory)*
 

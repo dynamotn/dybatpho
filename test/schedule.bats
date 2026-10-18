@@ -437,3 +437,16 @@ note() {
   assert_equal "$(cat "${LOG}")" "ran"
   [[ -f "${DYBATPHO_SCHEDULE_DIR}/planted.last" && ! -L "${DYBATPHO_SCHEDULE_DIR}/planted.last" ]]
 }
+
+@test "dybatpho::schedule_debounce survives a reset during its window" {
+  local key="race-${BATS_TEST_NUMBER}"
+  (
+    sleep 0.3
+    dybatpho::schedule_reset "${key}"
+  ) &
+  # The ticket is gone, so the trigger counts as superseded: nothing runs,
+  # and nothing stops the script either.
+  run_traced -9 dybatpho::schedule_debounce 1 "${key}" -- echo ran
+  wait
+  assert_output ""
+}

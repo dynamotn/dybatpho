@@ -239,6 +239,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-026**: A function run by `run_with_timeout` MUST see the caller's variables: the timeout and its fallback MUST keep their state in prefixed locals.
 - **FR-027**: A command started by `background_run` MUST see the caller's variables: the starter MUST keep its state in prefixed locals.
 - **FR-028**: The error handler MUST print every frame of the stack and exit with the status of the command that failed.
+- **FR-029**: `dybatpho::dry_run` MUST run its arguments as a command when the first one is `--`, never through `eval`, whatever their number; without `--` a single argument remains a shell string.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -302,6 +303,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-017**: Start a background job that reads variables named like the starter's locals, and see the caller's values.
 - **IT-018**: Fail with status 7 three functions deep after `register_err_handler`, and exit 7 with all three frames printed.
 - **IT-019**: Start a background job that leaves behind a child ignoring SIGTERM and exits, end the jobs, and see that child killed.
+- **IT-020**: Run `dybatpho::dry_run -- 'echo first; echo INJECTED'` and get status 127 with nothing injected; `dry_run -- printf 'plain %s\n' 'a b'` prints `plain a b`.
 
 ## Acceptance Criteria *(mandatory)*
 

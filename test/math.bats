@@ -672,3 +672,10 @@ setup() {
     refute_output --partial "carried on"
   done
 }
+
+@test "dybatpho::math_random reads a bound with a leading zero in base ten" {
+  run_traced dybatpho::math_random 08 08
+  assert_output "8"
+  run_traced dybatpho::math_random -08 -08
+  assert_output "-8"
+}

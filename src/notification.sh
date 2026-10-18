@@ -482,7 +482,7 @@ function dybatpho::notify_desktop {
   fi
 
   dybatpho::debug "Sending desktop notification through ${command[0]}"
-  dybatpho::dry_run "${command[@]}"
+  dybatpho::dry_run -- "${command[@]}"
 }
 
 #######################################
@@ -784,7 +784,7 @@ function dybatpho::notify_email {
   local -a command=("${sendmail:-sendmail}" -i -- "${addresses[@]}")
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
-    dybatpho::dry_run "${command[@]}"
+    dybatpho::dry_run -- "${command[@]}"
     return 0
   fi
   local missing="No sendmail command found: install an MTA or set DYBATPHO_SENDMAIL"

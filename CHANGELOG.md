@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`logging` — a log line reads the clock without starting a process.** The
+  timestamp on every `dybatpho::info`, `warn`, `error` and friends now comes
+  from Bash's own `printf '%(...)T'` rather than from a `date` process, which
+  takes a log line from several milliseconds to well under one. The stamp is
+  the same RFC 3339 form on every platform, `2026-10-18T19:16:51+07:00`; on
+  GNU systems it used to carry a space instead of the `T`. A `date` that
+  stands in for the real one — a shell function, or a command under the
+  temporary directory, which is where `dybatpho::mock_time` and the test mocks
+  put theirs — is still asked, so a frozen clock is still seen.
+
+- **`process` — `dybatpho::dry_run -- command [args...]` never evaluates.** A
+  leading `--` runs the command as an argument vector whatever its length;
+  without it a single argument is still a shell string run through `eval`, as
+  before. `dybatpho::safe_system`, `dybatpho::privilege_run`, the package
+  installers and the desktop and mail notifications use the new form.
+
 - **`init.sh` — a failing command stops the command substitution it runs in.**
   On Bash 4.4 or newer the bootstrap now turns on `inherit_errexit` next to
   `set -euo pipefail`. Bash turns errexit off inside `$(...)` otherwise, so
@@ -34,6 +50,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modules, so the check works inside a bundle too.
 
 ### Fixed
+
+- **`network` — a token in a custom header no longer follows a redirect to
+  another host.** `dybatpho::curl_do` passed `-L` to curl, which resends every
+  custom header to wherever a redirect points and strips only `Authorization:`
+  when the host changes; so a GitLab `PRIVATE-TOKEN`, an Anthropic `x-api-key`
+  or a Gotify key set through `DYBATPHO_CURL_SECRET_HEADERS` was sent to any
+  third party the first server redirected to. With secret headers set the
+  redirects are followed by the library: a hop within the same origin keeps
+  the headers, a hop elsewhere drops them before curl is let loose again, and
+  a hop elsewhere while the request body is itself a secret is refused with
+  exit code 3. `DYBATPHO_CURL_MAX_REDIRECTS` (default `20`) bounds the hops.
+
+- **`secret` — secret values stay out of a `set -x` trace.**
+  `dybatpho::secret_from_file`, `secret_from_env`, `secret_read`,
+  `secret_with_file` and the masking every log line runs suspend the trace for
+  the lines that hold the value and resume it afterwards. Under
+  `dybatpho::start_trace` each secret used to be printed as it was read and
+  again, every one of them, on every log line. `dybatpho::secret_shred` removes
+  a symbolic link instead of overwriting the file it points at.
+
+- **`lock` — the command sidecar is never written through a planted link.**
+  `dybatpho::lock_acquire` removes whatever sits at `<lock>.command` and
+  creates the file with `noclobber`, so a link planted under that predictable
+  name in a shared lock directory no longer turns the write into one over the
+  file it points at. A lock held by another user's live process is no longer
+  reclaimed as stale: `kill -0` is refused for it, which is not the same as
+  the process being gone, so `/proc` and `ps` are asked next.
+
+- **`safety`, `privilege` — a command handed to `dybatpho::safe_system` or
+  `dybatpho::privilege_run` is never parsed as shell.** A single argument used
+  to reach `eval`, so `safe_system --force x -- "${path}"` ran whatever a path
+  carrying `;` said. `dybatpho::assert_safe_path` accepts a root that does not
+  exist yet under a linked directory, such as anything under `/var` on macOS,
+  where it refused every path inside it.
+
+- **Exported functions load in macOS `/bin/sh`.** Every `dybatpho::` function
+  is exported, and a `#!/bin/sh` script started from a dybatpho script on
+  macOS printed `conditional binary operator expected` for each one that used
+  `[[ -v ... ]]`, which that Bash 3.2 cannot parse; fifteen functions across
+  `config`, `network`, `secret`, `logging`, `string`, `screen`, `testing` and
+  `validate` now test for a set variable in a form every Bash reads.
+
+- **Bash 4.3 — functions no longer stop on an empty array.**
+  `dybatpho::path_normalize` of `.`, `/` or `a/..`, `dybatpho::string_slugify`
+  of a text with `@` or `*`, `dybatpho::csv_from_json '[]'`,
+  `dybatpho::csv_convert` of an empty table, `dybatpho::csv_sort` of a
+  header-only table, `dybatpho::math_sum` of nothing, every `queue` function
+  called without options, and the `cli` generators -- parser, help, schema,
+  completion -- for a spec with no options, commands, aliases or persistent
+  definitions all failed under `nounset` on the oldest Bash the library
+  supports.
+
+- **A number with a leading zero is read in base ten.** `dybatpho::array_sort
+  --numeric` of `08`, `dybatpho::i18n_month_name 08` and a plural count of
+  `08` (what `date +%m` and padded fields produce), `dybatpho::md_list` with a
+  `08.` marker, `dybatpho::math_random 08 10` and `minlen:08` in
+  `dybatpho::validate_value` either stopped with `value too great for base` or
+  gave a wrong answer; `08` was being read as octal.
+
+- **`validate` — numbers compare at any size.** `dybatpho::validate_value`
+  with `min:` or `max:` scaled both sides to six decimals in 64-bit arithmetic,
+  which overflowed above about 9.2e12 and reported ten trillion as below one;
+  the two sides are now compared as digit strings.
+
+- **`semver` — pre-release identifiers compare in ASCII.**
+  `dybatpho::semver_compare 1.0.0-Beta 1.0.0-alpha` answered `1` under a
+  macOS locale and `-1` under `C`, because the comparison followed the locale's
+  collation; it now follows the specification on every platform, and so do
+  `semver_sort` and `semver_satisfies`.
+
+- **`csv` — `gt` and `lt` on text compare in ASCII** in `dybatpho::csv_filter`,
+  the same order `dybatpho::csv_sort` already used, instead of differing
+  between macOS and glibc.
+
+- **`date` — an ISO 8601 timestamp with an offset parses on BusyBox.**
+  `dybatpho::date_parse '2024-02-29T12:34:56+02:00'` (and `Z`, `+0200`)
+  failed on Alpine, whose `date -D` has no `%z`; the offset is now taken off
+  and applied by the library. An empty string is refused everywhere: GNU
+  `date -d ''` answered today at midnight.
+
+- **`screen` — Enter is reported as `enter`.** Raw mode delivers the key as a
+  carriage return, which `dybatpho::screen_event` reported as `char:` with the
+  return in it; only the newline a pipe feeds was recognised.
+  `dybatpho::screen_text` no longer globs the words of its text, so `*` is
+  drawn as `*` rather than as the files in the current directory, and the
+  Braille table behind `dybatpho::screen_chart` is built from UTF-8 bytes so
+  it holds the 256 glyphs under the `C` locale too.
+
+- **`tui` — a spinner left running does not outlive its script.** The
+  animation behind `dybatpho::tui_spinner_start` and `dybatpho::spinner` ends
+  itself, restoring the cursor, when the shell that started it is gone, instead
+  of being orphaned to PID 1 and drawing over the prompt after a `die`.
+
+- **`parallel` — a job that reads the terminal no longer hangs the pool.**
+  Jobs run with their input from `/dev/null`: one that read the terminal was
+  stopped by the kernel for doing so from the background, looked alive, and
+  `dybatpho::parallel_run` waited on it for ever.
+
+- **`schedule` — `dybatpho::schedule_debounce` survives a reset during its
+  window.** The trigger counts as superseded (exit code 9) instead of ending
+  the script when the ticket it reads is gone. A signal sent to
+  `dybatpho::schedule_every` ends the wait between runs at once rather than at
+  the end of the interval.
+
+- **`logging` — elapsed times are right under a comma locale.** Bash writes
+  `EPOCHREALTIME` with the locale's decimal separator, so under `de_DE` or
+  `vi_VN` the `metrics` timers and `dybatpho::assert_duration_under` read
+  `1792325856,140977` as a comma expression and reported nonsense.
+
+- **`file` — a setuid, setgid or sticky bit survives on macOS.** The BSD
+  `stat` format read only the low three digits of a mode, so
+  `dybatpho::file_write_atomic` and `dybatpho::file_replace` reapplied `755`
+  to a `2755` directory.
+
+- **`string` — `dybatpho::url_decode` keeps a lone `%` and a backslash.**
+  `100%` came out as `\x` with a printf error, and `a\nb` as a line break.
+
+- **`ai` — the request URL is redacted in the debug line** of a non-streaming
+  call, as it already was for a streaming one.
+
+- **`scripts/test.sh` — a machine without GNU parallel runs the suite with one
+  worker** and says so, instead of reporting every test as never run; when
+  Bats produces no report, what it said before giving up is shown.
 
 - **`parallel` — ending a pool no longer stalls in a container without an
   init.** When a job or its watchdog was ended, its orphaned children went to

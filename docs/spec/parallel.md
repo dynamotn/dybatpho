@@ -184,6 +184,7 @@ done
 - **FR-026**: An interrupted pool MUST end its jobs before any handler of the caller runs, including one that exits.
 - **FR-027**: A job run by `parallel_map` or `parallel_run` MUST see the caller's variables: the pool and its launchers MUST keep their state in prefixed locals.
 - **FR-028**: Ending jobs MUST signal each job's process group again until it is empty, and MUST end what remains with `KILL` once `DYBATPHO_TIMEOUT_KILL_AFTER` seconds have passed, so that no process a job started outlives the pool.
+- **FR-029**: Every job of a pool MUST run with its standard input from `/dev/null`, so one that reads the terminal is never stopped by `SIGTTIN`.
 
 ### Key Entities *(include if feature involves data)*
 

@@ -761,3 +761,31 @@ _end_then_write_stderr() {
   assert_failure
   assert_equal "${DYBATPHO_SCREEN_STYLE_OK}" "32"
 }
+
+@test "dybatpho::screen_event reads the carriage return raw mode delivers as enter" {
+  local event
+  dybatpho::screen_event event < <(printf '\r')
+  assert_equal "${event}" "enter"
+  dybatpho::screen_event event < <(printf '\n')
+  assert_equal "${event}" "enter"
+}
+
+@test "dybatpho::screen_text never globs a word of the text" {
+  local dir="${BATS_TEST_TMPDIR}/globbed"
+  mkdir "${dir}"
+  : > "${dir}/a.sh"
+  : > "${dir}/b.sh"
+  cd "${dir}"
+  dybatpho::screen_text "0 0 12 3" 'press * or *.sh to go'
+  cd - > /dev/null
+  local row
+  row="$(screen_row 0)"
+  assert_equal "${row:0:12}" "press * or  "
+  row="$(screen_row 1)"
+  assert_equal "${row:0:12}" "*.sh to go  "
+}
+
+@test "__dybatpho_screen_braille_table has 256 glyphs in the C locale too" {
+  run_traced bash -c "LC_ALL=C; . '${DYBATPHO_DIR}/init.sh' --modules screen; __dybatpho_screen_braille_table; printf '%s %s' \"\${#__dybatpho_screen_braille[@]}\" \"\${__dybatpho_screen_braille[255]}\""
+  assert_output "256 ⣿"
+}

@@ -167,6 +167,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **FR-010**: Release classification MUST reject invalid input versions.
 - **FR-011**: The module MUST expose `DYBATPHO_SEMVER_REGEX` for the active
   validation grammar.
+- **FR-012**: `__dybatpho_semver_cmp_into` MUST compare alphanumeric pre-release identifiers in ASCII order under every locale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -211,6 +212,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **IT-004**: Bump major, minor, and patch versions with optional metadata.
 - **IT-005**: Classify major, minor, patch, pre-release, build, and equal pairs.
 - **IT-006**: Reject invalid versions and unsupported bump parts.
+- **IT-007**: Compare `1.0.0-Beta` with `1.0.0-alpha` under the default, `en_US.UTF-8` and `C` locales and get `-1` each time.
 
 ## Acceptance Criteria *(mandatory)*
 

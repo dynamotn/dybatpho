@@ -401,8 +401,12 @@ function __dybatpho_test_summary {
         | sort
     )
   else
-    printf '  %s✘ Bats produced no report — see the output above%s\n' \
-      "${_red}" "${_reset}"
+    printf '  %s✘ Bats produced no report%s\n' "${_red}" "${_reset}"
+    # Whatever Bats said before giving up is in the TAP capture, where the
+    # progress filter dropped it as not being a test line.
+    if [[ -s "${_tap}" ]]; then
+      sed 's/^/    /' "${_tap}" | tail -n 20
+    fi
     _failed_count=1
   fi
 
@@ -497,6 +501,15 @@ function __dybatpho_test_run {
     _expected_in["$(basename "${_file}")"]="${_count}"
     _expected=$((_expected + _count))
   done
+
+  # Bats needs GNU parallel for more than one worker, and without it exits
+  # before running anything. A machine without `parallel` used to get a run
+  # that reported every test as never run and nothing about why.
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if ((JOBS > 1)) && ! command -v parallel > /dev/null 2>&1; then
+    dybatpho::warn "GNU parallel is not installed; running with one worker"
+    JOBS=1
+  fi
 
   local _run_dir
   # `create_temp` registers the directory for cleanup on exit.

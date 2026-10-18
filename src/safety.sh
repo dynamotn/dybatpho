@@ -130,10 +130,12 @@ function __dybatpho_safety_physical_path {
 }
 
 #######################################
-# @description Resolve a directory through its symbolic links, or keep the
-#   path as it is when it is not a directory that can be entered.
+# @description Resolve a directory through its symbolic links. One that does
+#   not exist yet is resolved through the directories above it, the way the
+#   paths compared against it are: a root under `/var` on macOS, where `/var`
+#   is a link to `/private/var`, otherwise rejected every path inside it.
 # @arg $1 string Normalized absolute path
-# @stdout The resolved directory, or the path unchanged
+# @stdout The resolved directory
 # @internal
 #######################################
 function __dybatpho_safety_physical_dir {
@@ -142,7 +144,7 @@ function __dybatpho_safety_physical_dir {
   if resolved="$(CDPATH='' cd -P -- "${path}" 2> /dev/null && pwd)"; then
     printf '%s\n' "${resolved}"
   else
-    printf '%s\n' "${path}"
+    __dybatpho_safety_physical_path "${path}"
   fi
 }
 
@@ -583,5 +585,5 @@ function dybatpho::safe_system {
     return 1
   fi
   dybatpho::info "Applying system change: ${__dybatpho_safety_system_description}"
-  dybatpho::dry_run "${__dybatpho_safety_system_command_args[@]}"
+  dybatpho::dry_run -- "${__dybatpho_safety_system_command_args[@]}"
 }

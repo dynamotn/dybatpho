@@ -93,6 +93,9 @@ function __dybatpho_date_is_gnu {
 function __dybatpho_date_parse {
   local input
   dybatpho::expect_args input -- "$@"
+  # GNU `date -d ""` is today at midnight; the other two refuse it. Empty is
+  # not a date anywhere.
+  [[ -n "${input//[[:space:]]/}" ]] || return 1
   local flavor
   __dybatpho_date_flavor_into flavor
   if [[ "${flavor}" == "gnu" ]]; then
@@ -113,6 +116,23 @@ function __dybatpho_date_parse {
     fi
   done
   # Offset-aware timestamps cannot round-trip literally, so a plain parse wins.
+  if [[ "${flavor}" == "busybox" ]]; then
+    # BusyBox `date -D` has no `%z`, so the offset is taken off here: the
+    # local part is read as UTC and the offset subtracted from it.
+    if [[ "${input}" =~ ^(.+T[0-9]{2}:[0-9]{2}:[0-9]{2})(Z|[+-][0-9]{2}:?[0-9]{2})$ ]]; then
+      local local_part="${BASH_REMATCH[1]}" offset="${BASH_REMATCH[2]}" offset_seconds=0
+      if [[ "${offset}" != "Z" ]]; then
+        local offset_digits="${offset:1}"
+        offset_digits="${offset_digits/:/}"
+        offset_seconds=$((10#${offset_digits:0:2} * 3600 + 10#${offset_digits:2:2} * 60))
+        [[ "${offset}" == -* ]] && offset_seconds=$((-offset_seconds))
+      fi
+      timestamp="$(DYBATPHO_DATE_TIMEZONE=UTC __dybatpho_date_parse_with busybox "%Y-%m-%dT%H:%M:%S" "${local_part}")" \
+        || return 1
+      printf '%s\n' "$((timestamp - offset_seconds))"
+      return 0
+    fi
+  fi
   __dybatpho_date_parse_with "${flavor}" "%Y-%m-%dT%H:%M:%S%z" "${input}"
 }
 

@@ -255,3 +255,9 @@ teardown() {
   dybatpho::privilege_run -- look
   assert_equal "$(cat "${seen}")" "caller caller"
 }
+
+@test "dybatpho::privilege_run never evaluates a single command argument as shell" {
+  export DRY_RUN=false
+  DYBATPHO_PRIVILEGE=false run_traced --separate-stderr dybatpho::privilege_run -- 'echo first; echo INJECTED-via-eval'
+  refute_output --partial "INJECTED"
+}

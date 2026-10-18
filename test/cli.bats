@@ -228,7 +228,7 @@ setup() {
   # whatever an argument value asked it to.
   # shellcheck disable=2329
   _spec() {
-    dybatpho::opts::setup "" ARGS action:"printf '%s\n' \"\${NAME}\" \"\${ARGS[@]}\""
+    dybatpho::opts::setup "" ARGS action:"printf '%s\n' \"\${NAME}\" \${ARGS[@]+\"\${ARGS[@]}\"}"
     dybatpho::opts::param "name" NAME --name
   }
 
@@ -498,7 +498,7 @@ setup() {
 @test "dybatpho::opts::param optional:true with separated value" {
   # shellcheck disable=2329
   _spec() {
-    dybatpho::opts::setup "" PREST action:"printf '%s|%s\n' \"\$POPT3\" \"\${PREST[*]}\""
+    dybatpho::opts::setup "" PREST action:"printf '%s|%s\n' \"\$POPT3\" \"\${PREST[*]-}\""
     dybatpho::opts::param "Optional" POPT3 --opt3 optional:true
   }
 

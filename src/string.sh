@@ -374,7 +374,8 @@ function dybatpho::string_slugify {
         last_was_separator=false
         ;;
       *)
-        if [[ -v "__DYBATPHO_STRING_ASCII[${char}]" ]]; then
+        # `@` and `*` are subscripts that name the whole table, not a key.
+        if [[ "${char}" != '@' && "${char}" != '*' && -n "${__DYBATPHO_STRING_ASCII[${char}]+set}" ]]; then
           mapped="${__DYBATPHO_STRING_ASCII[${char}]}"
           # A combining mark maps to nothing: it leaves the letter before it
           # alone rather than standing in for a separator.
@@ -604,7 +605,22 @@ function dybatpho::url_encode {
 #######################################
 function dybatpho::url_decode {
   local value="${1//+/ }"
-  printf '%b\n' "${value//%/\\x}"
+  # `%b` reads backslash escapes, so a backslash in the input is doubled to
+  # survive, and only a `%` followed by two hex digits becomes an escape: a
+  # lone one, as in `100%`, used to come out as `\x` and a printf error.
+  value="${value//\\/\\\\}"
+  local decoded="" rest="${value}"
+  while [[ "${rest}" == *%* ]]; do
+    if [[ "${rest}" =~ ^([^%]*)%([0-9A-Fa-f]{2})(.*)$ ]]; then
+      decoded+="${BASH_REMATCH[1]}\\x${BASH_REMATCH[2]}"
+      rest="${BASH_REMATCH[3]}"
+    else
+      decoded+="${rest%%%*}%"
+      rest="${rest#*%}"
+    fi
+  done
+  decoded+="${rest}"
+  printf '%b\n' "${decoded}"
 }
 
 #######################################

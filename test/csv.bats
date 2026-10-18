@@ -799,3 +799,23 @@ EOF
   run_traced dybatpho::csv_col $'2,1\nx,y\n' 1
   assert_output "y"
 }
+
+@test "dybatpho::csv_from_json and csv_convert accept input with no rows" {
+  run_traced dybatpho::csv_from_json '[]'
+  assert_success
+  run_traced dybatpho::csv_convert "" tab
+  assert_success
+}
+
+@test "dybatpho::csv_sort accepts a header-only table" {
+  run_traced dybatpho::csv_sort "n,v" v
+  assert_success
+  assert_output "n,v"
+}
+
+@test "dybatpho::csv_filter orders text in ASCII whatever the locale" {
+  local csv
+  csv="$(printf 'n\nZed\napple\n')"
+  LC_ALL=en_US.UTF-8 run_traced dybatpho::csv_filter "${csv}" n gt "Zed"
+  assert_output $'n\napple'
+}

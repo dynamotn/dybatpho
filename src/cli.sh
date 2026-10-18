@@ -600,7 +600,7 @@ function dybatpho::select {
     local -a answers=()
     IFS=',' read -r -a answers <<< "${answer}"
     local token range_start range_end range_index
-    for token in "${answers[@]}"; do
+    for token in ${answers[@]+"${answers[@]}"}; do
       if [[ "${token}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
         range_start="${BASH_REMATCH[1]}"
         range_end="${BASH_REMATCH[2]}"
@@ -616,7 +616,7 @@ function dybatpho::select {
       elif [[ "${token}" =~ ^[0-9]+$ ]] && [[ "${token}" -ge 1 ]] && [[ "${token}" -le "${#items[@]}" ]]; then
         selected+=("${items[$((token - 1))]}")
       else
-        for entry in "${items[@]}"; do
+        for entry in ${items[@]+"${items[@]}"}; do
           [[ "${token}" = "${entry}" ]] && selected+=("${entry}") && break
         done
       fi
@@ -645,7 +645,7 @@ function dybatpho::select {
 function dybatpho::opts::validate_choice {
   local value="${1-}" choices="${2-}" choice
   IFS=',' read -r -a __choice_items <<< "${choices}"
-  for choice in "${__choice_items[@]}"; do
+  for choice in ${__choice_items[@]+"${__choice_items[@]}"}; do
     [[ "${value}" = "${choice}" ]] && return 0
   done
   return 1
@@ -715,7 +715,7 @@ function dybatpho::cli_suggest {
     scored+=("${distance} ${candidate}")
   done
   ((best < 0)) && return 1
-  for entry in "${scored[@]}"; do
+  for entry in ${scored[@]+"${scored[@]}"}; do
     entry_distance="${entry%% *}"
     ((entry_distance == best)) || continue
     printf '%s\n' "${entry#* }"
@@ -913,7 +913,7 @@ function __dybatpho_cli_parse_opt {
           local -a __opt_aliases=()
           local __opt_alias
           __dybatpho_cli_parse_alias_list __opt_aliases "${1#aliases:}"
-          for __opt_alias in "${__opt_aliases[@]}"; do
+          for __opt_alias in ${__opt_aliases[@]+"${__opt_aliases[@]}"}; do
             __dybatpho_cli_label_switch "${need_argument}" "${__opt_alias}"
           done
           ;;
@@ -936,7 +936,7 @@ function __dybatpho_cli_parse_opt {
           local -a __opt_aliases=()
           local __opt_alias
           __dybatpho_cli_parse_alias_list __opt_aliases "${1#aliases:}"
-          for __opt_alias in "${__opt_aliases[@]}"; do
+          for __opt_alias in ${__opt_aliases[@]+"${__opt_aliases[@]}"}; do
             __dybatpho_cli_case_switch "${__opt_alias}"
           done
           ;;
@@ -1054,7 +1054,7 @@ function __dybatpho_cli_expand_abbr {
       # `, ` is the separator an `error:` handler reads the candidate list by,
       # so it stays fixed rather than following the locale.
       local __joined="" __match
-      for __match in "${__matches[@]}"; do
+      for __match in ${__matches[@]+"${__matches[@]}"}; do
         __joined="${__joined}${__joined:+, }${__match}"
       done
       printf '%s' "${__joined}"
@@ -1354,7 +1354,7 @@ function __dybatpho_cli_generate_logic {
     __dybatpho_cli_collect_long_switches __abbr_long "${__dybatpho_cli_logic_spec}"
     if ((${#__abbr_long[@]})); then
       local __abbr_list="" __abbr_switch
-      for __abbr_switch in "${__abbr_long[@]}"; do
+      for __abbr_switch in ${__abbr_long[@]+"${__abbr_long[@]}"}; do
         __abbr_list="${__abbr_list}${__abbr_list:+ }$(printf '%q' "${__abbr_switch}")"
       done
       __dybatpho_cli_print_indent 2 'case $1 in'
@@ -1398,7 +1398,7 @@ function __dybatpho_cli_generate_logic {
     __dybatpho_cli_print_rest
   else
     __dybatpho_cli_print_indent 4 "case \$1 in"
-    for __dybatpho_cli_logic_sub_spec in "${__sub_specs[@]}"; do
+    for __dybatpho_cli_logic_sub_spec in ${__sub_specs[@]+"${__sub_specs[@]}"}; do
       local __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name
       local __dybatpho_cli_logic__cmd_deprecated
       IFS=$'\t' read -r __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name \
@@ -1431,7 +1431,7 @@ function __dybatpho_cli_generate_logic {
   # Show error messages if invalid, otherwise run action command
   __dybatpho_cli_print_indent 1 '[ $# -eq 0 ] && {'
   __dybatpho_cli_print_indent 2 'unset OPTARG'
-  for __required_check in "${__required_checks[@]}"; do
+  for __required_check in ${__required_checks[@]+"${__required_checks[@]}"}; do
     __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
     __dybatpho_cli_print_indent 3 "${__required_check}"
     __dybatpho_cli_print_indent 2 '}'
@@ -1441,7 +1441,7 @@ function __dybatpho_cli_generate_logic {
   # read once the command is known to have been called correctly.
   __dybatpho_cli_print_arg_bindings "${__rest}" ${__declared_args[@]+"${__declared_args[@]}"}
   local __prompt_def __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export
-  for __prompt_def in "${__prompt_defs[@]}"; do
+  for __prompt_def in ${__prompt_defs[@]+"${__prompt_defs[@]}"}; do
     IFS=$'\x1f' read -r __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export <<< \
       "${__prompt_def}"
     __dybatpho_cli_assign_quoted __prompt_text "${__prompt_text}"
@@ -1498,7 +1498,7 @@ function __dybatpho_cli_generate_logic {
   __dybatpho_cli_print_indent 0 "} # End of dybatpho::opts::parse::${__dybatpho_cli_logic_spec}"
 
   # Generate sub-command logics
-  for __dybatpho_cli_logic_sub_spec in "${__sub_specs[@]}"; do
+  for __dybatpho_cli_logic_sub_spec in ${__sub_specs[@]+"${__sub_specs[@]}"}; do
     local __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name
     local __dybatpho_cli_logic__cmd_deprecated
     IFS=$'\t' read -r __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name \
@@ -1538,7 +1538,7 @@ function __dybatpho_cli_generate_help {
   local __persistent_def
   local __persistent_replay=true
   # shellcheck disable=SC2154 # populated by __dybatpho_cli_replay_persistent_defs
-  for __persistent_def in "${__persistent_help_defs[@]}"; do
+  for __persistent_def in ${__persistent_help_defs[@]+"${__persistent_help_defs[@]}"}; do
     eval "${__persistent_def}"
   done
   "${__dybatpho_cli_help_spec}"
@@ -1575,14 +1575,14 @@ function __dybatpho_cli_generate_help {
     local __heading
     __heading=$(__dybatpho_log_text cli.heading_arguments "Arguments:")
     dybatpho::print "${__heading}"
-    __dybatpho_cli_help_render_rows "${__width}" "${__help_arg_rows[@]}"
+    __dybatpho_cli_help_render_rows "${__width}" ${__help_arg_rows[@]+"${__help_arg_rows[@]}"}
   fi
   if ((${#__help_cmd_rows[@]})); then
     dybatpho::print ""
     local __heading
     __heading=$(__dybatpho_log_text cli.heading_commands "Commands:")
     dybatpho::print "${__heading}"
-    __dybatpho_cli_help_render_rows "${__width}" "${__help_cmd_rows[@]}"
+    __dybatpho_cli_help_render_rows "${__width}" ${__help_cmd_rows[@]+"${__help_cmd_rows[@]}"}
   fi
   dybatpho::print ""
   local __dybatpho_cli_help_log_text
@@ -1673,7 +1673,7 @@ function __dybatpho_cli_generate_schema_command {
     printf "%s" "${__dybatpho_cli_gsc_alias}"
   done
   printf '],"options":['
-  for __dybatpho_cli_gsc_option in "${__dybatpho_cli_gsc_options[@]}"; do
+  for __dybatpho_cli_gsc_option in ${__dybatpho_cli_gsc_options[@]+"${__dybatpho_cli_gsc_options[@]}"}; do
     local __dybatpho_cli_gsc_type __dybatpho_cli_gsc_var __dybatpho_cli_gsc_desc __dybatpho_cli_gsc_switches
     local __dybatpho_cli_gsc_env __dybatpho_cli_gsc_multiple __dybatpho_cli_gsc_choices __dybatpho_cli_gsc_prompt
     local __dybatpho_cli_gsc_hidden __dybatpho_cli_gsc_required __dybatpho_cli_gsc_deprecated __dybatpho_cli_gsc_label
@@ -1747,7 +1747,7 @@ function __dybatpho_cli_generate_schema_command {
   done
   printf '],"commands":['
   __dybatpho_cli_gsc_first=true
-  for __dybatpho_cli_gsc_command in "${__dybatpho_cli_gsc_commands[@]}"; do
+  for __dybatpho_cli_gsc_command in ${__dybatpho_cli_gsc_commands[@]+"${__dybatpho_cli_gsc_commands[@]}"}; do
     local __dybatpho_cli_gsc_cmd __dybatpho_cli_gsc_child __dybatpho_cli_gsc_aliases __dybatpho_cli_gsc_child_hidden
     local __dybatpho_cli_gsc_child_deprecated
     IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gsc_cmd __dybatpho_cli_gsc_child \
@@ -1810,7 +1810,7 @@ function __dybatpho_cli_generate_man_command {
     printf '.SH SYNOPSIS\n.B %s\n' "${__dybatpho_cli_gmc_synopsis}"
     if ((${#__dybatpho_cli_gmc_arguments[@]})); then
       printf '.SH ARGUMENTS\n'
-      for __dybatpho_cli_gmc_arg_item in "${__dybatpho_cli_gmc_arguments[@]}"; do
+      for __dybatpho_cli_gmc_arg_item in ${__dybatpho_cli_gmc_arguments[@]+"${__dybatpho_cli_gmc_arguments[@]}"}; do
         IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_arg_name __dybatpho_cli_gmc_arg_desc \
           __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic <<< "${__dybatpho_cli_gmc_arg_item}"
         __dybatpho_cli_gmc_arg_placeholder="$(__dybatpho_cli_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}")"
@@ -1821,7 +1821,7 @@ function __dybatpho_cli_generate_man_command {
   else
     printf '.SS %s\n%s\n' "${__dybatpho_cli_gmc_escaped}" "${__dybatpho_cli_gmc_description}"
   fi
-  for __dybatpho_cli_gmc_option in "${__dybatpho_cli_gmc_options[@]}"; do
+  for __dybatpho_cli_gmc_option in ${__dybatpho_cli_gmc_options[@]+"${__dybatpho_cli_gmc_options[@]}"}; do
     local __dybatpho_cli_gmc_type __dybatpho_cli_gmc_var __dybatpho_cli_gmc_desc __dybatpho_cli_gmc_switches
     local __dybatpho_cli_gmc_env __dybatpho_cli_gmc_multiple __dybatpho_cli_gmc_choices __dybatpho_cli_gmc_prompt
     local __dybatpho_cli_gmc_hidden __dybatpho_cli_gmc_required __dybatpho_cli_gmc_deprecated __dybatpho_cli_gmc_label
@@ -1855,7 +1855,7 @@ function __dybatpho_cli_generate_man_command {
   done
   if [[ "${#__dybatpho_cli_gmc_commands[@]}" -gt 0 ]]; then
     printf '.SH COMMANDS\n'
-    for __dybatpho_cli_gmc_command in "${__dybatpho_cli_gmc_commands[@]}"; do
+    for __dybatpho_cli_gmc_command in ${__dybatpho_cli_gmc_commands[@]+"${__dybatpho_cli_gmc_commands[@]}"}; do
       local __dybatpho_cli_gmc_cmd __dybatpho_cli_gmc_child __dybatpho_cli_gmc_aliases __dybatpho_cli_gmc_child_hidden
       local __dybatpho_cli_gmc_child_deprecated
       # shellcheck disable=SC2034 # child_deprecated fills a field slot this loop doesn't read
@@ -1953,7 +1953,7 @@ function __dybatpho_cli_cache_file {
 function __dybatpho_cli_completion_words {
   local -n __completion_out="$1"
   local -a options=("${@:2}") option switches switch
-  for option in "${options[@]}"; do
+  for option in ${options[@]+"${options[@]}"}; do
     IFS="${__DYBATPHO_CLI_META_SEP}" read -r _ _ _ switches _ _ _ _ hidden _ _ _ _ _ _ <<< "${option}"
     [[ "${hidden:-false}" = true ]] && continue
     for switch in ${switches}; do __completion_out+=("${switch}"); done
@@ -1977,11 +1977,11 @@ function __dybatpho_cli_generate_completion_command {
   local -a __dybatpho_cli_gcc_options=() __dybatpho_cli_gcc_commands=() __dybatpho_cli_gcc_words=()
   __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gcc_spec}" __dybatpho_cli_gcc_options \
     __dybatpho_cli_gcc_commands __dybatpho_cli_gcc_description
-  __dybatpho_cli_completion_words __dybatpho_cli_gcc_words "${__dybatpho_cli_gcc_options[@]}"
-  local __dybatpho_cli_gcc_word_list="${__dybatpho_cli_gcc_words[*]}" __dybatpho_cli_gcc_cmd_list="" \
+  __dybatpho_cli_completion_words __dybatpho_cli_gcc_words ${__dybatpho_cli_gcc_options[@]+"${__dybatpho_cli_gcc_options[@]}"}
+  local __dybatpho_cli_gcc_word_list="${__dybatpho_cli_gcc_words[*]-}" __dybatpho_cli_gcc_cmd_list="" \
     __dybatpho_cli_gcc_command __dybatpho_cli_gcc_cmd __dybatpho_cli_gcc_child __dybatpho_cli_gcc_aliases \
     __dybatpho_cli_gcc_hidden __dybatpho_cli_gcc_deprecated
-  for __dybatpho_cli_gcc_command in "${__dybatpho_cli_gcc_commands[@]}"; do
+  for __dybatpho_cli_gcc_command in ${__dybatpho_cli_gcc_commands[@]+"${__dybatpho_cli_gcc_commands[@]}"}; do
     IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gcc_cmd __dybatpho_cli_gcc_child \
       __dybatpho_cli_gcc_aliases __dybatpho_cli_gcc_hidden __dybatpho_cli_gcc_deprecated <<< \
       "${__dybatpho_cli_gcc_command}"
@@ -1996,10 +1996,10 @@ function __dybatpho_cli_generate_completion_command {
       local __dybatpho_cli_gcc_child_description
       __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gcc_child}" __dybatpho_cli_gcc_child_options \
         __dybatpho_cli_gcc_child_commands __dybatpho_cli_gcc_child_description
-      __dybatpho_cli_completion_words __dybatpho_cli_gcc_words "${__dybatpho_cli_gcc_child_options[@]}"
+      __dybatpho_cli_completion_words __dybatpho_cli_gcc_words ${__dybatpho_cli_gcc_child_options[@]+"${__dybatpho_cli_gcc_child_options[@]}"}
     fi
   done
-  __dybatpho_cli_gcc_word_list="${__dybatpho_cli_gcc_words[*]}"
+  __dybatpho_cli_gcc_word_list="${__dybatpho_cli_gcc_words[*]-}"
   case "${__dybatpho_cli_gcc_shell}" in
     bash)
       # shellcheck disable=SC2016 # this is generated shell source, expanded by the caller's shell
@@ -2020,14 +2020,14 @@ function __dybatpho_cli_generate_completion_command {
       ;;
     fish)
       local __dybatpho_cli_gcc_switch
-      for __dybatpho_cli_gcc_switch in "${__dybatpho_cli_gcc_words[@]}"; do
+      for __dybatpho_cli_gcc_switch in ${__dybatpho_cli_gcc_words[@]+"${__dybatpho_cli_gcc_words[@]}"}; do
         case "${__dybatpho_cli_gcc_switch}" in
           --*) printf "complete -c %s -l %s\n" "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_switch#--}" ;;
           -?) printf "complete -c %s -s %s\n" "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_switch#-}" ;;
           *) ;;
         esac
       done
-      for __dybatpho_cli_gcc_command in "${__dybatpho_cli_gcc_commands[@]}"; do
+      for __dybatpho_cli_gcc_command in ${__dybatpho_cli_gcc_commands[@]+"${__dybatpho_cli_gcc_commands[@]}"}; do
         IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gcc_cmd __dybatpho_cli_gcc_child \
           __dybatpho_cli_gcc_aliases __dybatpho_cli_gcc_hidden __dybatpho_cli_gcc_deprecated <<< \
           "${__dybatpho_cli_gcc_command}"
@@ -2101,7 +2101,7 @@ function __dybatpho_cli_help_row {
         local -a _aliases=()
         local _alias_item
         __dybatpho_cli_parse_alias_list _aliases "${_spec_part#aliases:}"
-        for _alias_item in "${_aliases[@]}"; do
+        for _alias_item in ${_aliases[@]+"${_aliases[@]}"}; do
           __dybatpho_cli_help_add_switch "${_alias_item}" "${_negatable}"
         done
         ;;
@@ -2301,7 +2301,7 @@ function __dybatpho_cli_help_dedupe {
   local -a _unique=()
   local -A _seen=()
   local _row _label
-  for _row in "${_rows[@]}"; do
+  for _row in ${_rows[@]+"${_rows[@]}"}; do
     [[ -n "${_row}" ]] || continue
     _label="${_row%%$'\t'*}"
     # Message rows all carry the same sentinel label; deduping by label would
@@ -2384,7 +2384,7 @@ function __dybatpho_cli_suggest_suffix {
       "suggestion=${matches[0]}"
   else
     local joined="" match
-    for match in "${matches[@]}"; do joined="${joined}${joined:+, }'${match}'"; done
+    for match in ${matches[@]+"${matches[@]}"}; do joined="${joined}${joined:+, }'${match}'"; done
     __dybatpho_log_text cli.did_you_mean_one_of \
       "$(printf ". Did you mean one of %s?" "${joined}")" \
       "suggestions=${joined}"
@@ -2514,7 +2514,7 @@ function __dybatpho_cli_parse_alias_list {
   local __alias_raw="${2:-}" __alias_item
   local -a __alias_items=()
   IFS=',' read -r -a __alias_items <<< "${__alias_raw}"
-  for __alias_item in "${__alias_items[@]}"; do
+  for __alias_item in ${__alias_items[@]+"${__alias_items[@]}"}; do
     [[ -n "${__alias_item}" ]] && __alias_out+=("${__alias_item}")
   done
 }
@@ -2545,7 +2545,7 @@ function __dybatpho_cli_record_persistent_def {
 function __dybatpho_cli_replay_persistent_defs {
   local __persistent_def
   local __persistent_replay=true
-  for __persistent_def in "${__persistent_inherited_defs[@]}"; do
+  for __persistent_def in ${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"}; do
     eval "${__persistent_def}"
   done
 }
@@ -2558,7 +2558,8 @@ function __dybatpho_cli_replay_persistent_defs {
 #######################################
 function __dybatpho_cli_print_persistent_help_defs {
   local __persistent_def __quoted_def __has_defs=false
-  for __persistent_def in "${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}"; do
+  for __persistent_def in ${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"} \
+    ${__persistent_defs[@]+"${__persistent_defs[@]}"}; do
     [[ -n "${__persistent_def}" ]] || continue
     if dybatpho::is false "${__has_defs}"; then
       __dybatpho_cli_print_indent 1 'local -a __persistent_help_defs=()'
@@ -2624,7 +2625,7 @@ function __dybatpho_cli_print_deprecated_warning {
 function __dybatpho_cli_generate_child_logic {
   local __child_spec="$1"
   shift
-  local -a __persistent_inherited_defs=("${__persistent_inherited_defs[@]}" "${__persistent_defs[@]}")
+  local -a __persistent_inherited_defs=(${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"} ${__persistent_defs[@]+"${__persistent_defs[@]}"})
   __dybatpho_cli_generate_logic "${__child_spec}" "$@"
 }
 
@@ -2656,7 +2657,8 @@ function __dybatpho_cli_print_arg_bindings {
     }
     __dybatpho_cli_require_shell_name "${__entry_var}"
     if dybatpho::is true "${__entry_variadic}"; then
-      __dybatpho_cli_print_indent 2 "${__entry_var}=(\"\${${__rest_name}[@]:${__index}}\")"
+      # Guarded, so that an empty rest array is not an error on Bash 4.3.
+      __dybatpho_cli_print_indent 2 "${__entry_var}=(\${${__rest_name}[@]+\"\${${__rest_name}[@]:${__index}}\"})"
     else
       # `-` as the fallback keeps an omitted optional argument as the empty
       # string rather than tripping `set -u`.
@@ -2778,7 +2780,7 @@ function __dybatpho_cli_collect_switches {
       aliases:*)
         local -a __aliases=()
         __dybatpho_cli_parse_alias_list __aliases "${__spec_part#aliases:}"
-        for __alias in "${__aliases[@]}"; do
+        for __alias in ${__aliases[@]+"${__aliases[@]}"}; do
           __dybatpho_cli_expand_switch "${__target}" "${__alias}" "${__collect_negatable}"
         done
         ;;
@@ -2831,8 +2833,8 @@ function __dybatpho_cli_collect_spec_metadata {
   local -a __meta_options=() __meta_commands=() __meta_args=()
   local __done_initial=false __flags="" __params=""
   "${__meta_spec}"
-  __meta_options_out=("${__meta_options[@]}")
-  __meta_commands_out=("${__meta_commands[@]}")
+  __meta_options_out=(${__meta_options[@]+"${__meta_options[@]}"})
+  __meta_commands_out=(${__meta_commands[@]+"${__meta_commands[@]}"})
   __meta_description_out="${__meta_description}"
   # The arguments array is optional so existing three-output callers keep
   # working; only the schema and man generators ask for it.
@@ -3207,7 +3209,7 @@ function dybatpho::opts::cmd {
     local __cmd_desc="" __cmd_desc_mode=true
     "${__dybatpho_cli_cmd_sub_spec}"
     local __cmd_label="${__dybatpho_cli_cmd_sub_cmd}"
-    for __cmd_alias in "${__cmd_aliases[@]}"; do
+    for __cmd_alias in ${__cmd_aliases[@]+"${__cmd_aliases[@]}"}; do
       __cmd_label="${__cmd_label}, ${__cmd_alias}"
     done
     local __dybatpho_cli_cmd__line
@@ -3222,7 +3224,7 @@ function dybatpho::opts::cmd {
     local __dybatpho_cli_cmd_spec="${__dybatpho_cli_cmd_sub_spec}" \
       __dybatpho_cli_cmd_name="${__dybatpho_cli_cmd_sub_cmd}"
     __sub_specs+=("${__dybatpho_cli_cmd_spec}"$'\t'"${__dybatpho_cli_cmd_name}"$'\t'"${__dybatpho_cli_cmd_name}"$'\t'"${__cmd_deprecated}")
-    for __cmd_alias in "${__cmd_aliases[@]}"; do
+    for __cmd_alias in ${__cmd_aliases[@]+"${__cmd_aliases[@]}"}; do
       __sub_specs+=("${__dybatpho_cli_cmd_spec}"$'\t'"${__cmd_alias}"$'\t'"${__dybatpho_cli_cmd_name}"$'\t'"${__cmd_deprecated}")
     done
   fi

@@ -38,6 +38,7 @@ the resolver does.
 | **`DYBATPHO_CURL_RETRY_JITTER`** | bool | Add up to one base delay of random jitter |
 | **`DYBATPHO_CURL_CONNECT_TIMEOUT`** | number | Optional curl connection timeout in seconds |
 | **`DYBATPHO_CURL_TIMEOUT`** | number | Optional curl total timeout in seconds |
+| **`DYBATPHO_CURL_MAX_REDIRECTS`** | number | Redirects `dybatpho::curl_do` follows itself when secret headers are set (default `20`) |
 | **`DYBATPHO_CIRCUIT_THRESHOLD`** | number | Consecutive failures before `dybatpho::circuit_breaker` opens a circuit (default `5`) |
 | **`DYBATPHO_CIRCUIT_COOLDOWN`** | number | Seconds an open circuit waits before allowing a trial request (default `30`) |
 | **`DYBATPHO_RATE_LIMIT_WAIT`** | bool | Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call (default `true`) |

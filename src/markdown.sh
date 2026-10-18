@@ -240,7 +240,7 @@ function dybatpho::md_list {
   local line escaped number="" suffix=""
 
   if [[ "${marker}" =~ ^([0-9]+)([.\)])$ ]]; then
-    number="${BASH_REMATCH[1]}"
+    number=$((10#${BASH_REMATCH[1]}))
     suffix="${BASH_REMATCH[2]}"
   fi
 

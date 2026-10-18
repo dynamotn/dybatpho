@@ -544,3 +544,17 @@ teardown() {
   dybatpho::validate_is int "42"
   assert_equal "$(dybatpho::validate_describe int)" "an integer"
 }
+
+@test "dybatpho::validate_value reads minlen and maxlen in base ten" {
+  dybatpho::validate_value "abcdefghi" minlen:08 maxlen:09 || true
+  assert_equal "$(dybatpho::validate_errors)" ""
+}
+
+@test "dybatpho::validate_value compares numbers beyond 64-bit scaling" {
+  dybatpho::validate_value 10000000000000.5 type:number min:1 || true
+  assert_equal "$(dybatpho::validate_errors)" ""
+  dybatpho::validate_value -10000000000000.5 type:number min:1 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at least 1"
+  dybatpho::validate_value 99999999999999999999 type:number max:99999999999999999998 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at most 99999999999999999998"
+}

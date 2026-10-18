@@ -342,3 +342,20 @@ setup() {
   assert_success
   assert_output "2024-02-29"
 }
+
+@test "dybatpho::date_parse refuses an empty string on every platform" {
+  run -1 dybatpho::date_parse ""
+  run -1 dybatpho::date_parse "   "
+}
+
+@test "dybatpho::date_parse reads an ISO 8601 offset on BusyBox" {
+  local flavor
+  __dybatpho_date_flavor_into flavor
+  [[ "${flavor}" == busybox ]] || skip "only BusyBox date lacks %z"
+  run_traced dybatpho::date_parse "2024-02-29T12:34:56Z"
+  assert_output "1709210096"
+  run_traced dybatpho::date_parse "2024-02-29T12:34:56+02:00"
+  assert_output "1709202896"
+  run_traced dybatpho::date_parse "2024-02-29T12:34:56-0130"
+  assert_output "1709215496"
+}

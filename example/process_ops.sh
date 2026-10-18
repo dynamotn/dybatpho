@@ -49,6 +49,9 @@ function _deploy {
   dybatpho::expect_args _target -- "$@"
   dybatpho::dry_run "rsync -avz ./dist/ ${_target}:/var/www/app/"
   dybatpho::dry_run "ssh ${_target} 'systemctl restart app'"
+  # The argument-vector form: `--` runs what follows as a command and its
+  # arguments, never as shell, so a path with a `;` in it stays a path.
+  dybatpho::dry_run -- printf 'Deployed to %s\n' "${_target}"
 }
 
 # @description Run the `DRY RUN` section of this example.

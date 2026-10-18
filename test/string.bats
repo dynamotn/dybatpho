@@ -569,3 +569,18 @@ EOF
   __dybatpho_string_input_into text "plain text" files
   assert_equal "${text}" "plain text"
 }
+
+@test "dybatpho::string_slugify treats @ and * as separators" {
+  # Both are array subscripts that name the whole transliteration table.
+  run_traced dybatpho::string_slugify "mail@example*com"
+  assert_output "mail-example-com"
+}
+
+@test "dybatpho::url_decode keeps a lone percent and a backslash as they are" {
+  run_traced dybatpho::url_decode '100%25%20done%2C%zz'
+  assert_output "100% done,%zz"
+  run_traced dybatpho::url_decode 'a\nb+c'
+  assert_output 'a\nb c'
+  run_traced dybatpho::url_decode '%41%62'
+  assert_output "Ab"
+}

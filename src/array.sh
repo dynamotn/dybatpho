@@ -440,10 +440,19 @@ function __dybatpho_array_set_op_into {
 #######################################
 function __dybatpho_array_before {
   if [[ "$3" == true ]]; then
+    # Read in base ten whatever zeros a value leads with: `08` is eight, and
+    # as an octal literal it ended the sort with the array in its old order.
+    local __dybatpho_array_before_a __dybatpho_array_before_b
+    __dybatpho_array_before_a="${1#[+-]}"
+    __dybatpho_array_before_b="${2#[+-]}"
+    __dybatpho_array_before_a=$((10#${__dybatpho_array_before_a}))
+    __dybatpho_array_before_b=$((10#${__dybatpho_array_before_b}))
+    [[ "$1" == -* ]] && __dybatpho_array_before_a=$((-__dybatpho_array_before_a))
+    [[ "$2" == -* ]] && __dybatpho_array_before_b=$((-__dybatpho_array_before_b))
     if [[ "$4" == true ]]; then
-      (($1 > $2))
+      ((__dybatpho_array_before_a > __dybatpho_array_before_b))
     else
-      (($1 < $2))
+      ((__dybatpho_array_before_a < __dybatpho_array_before_b))
     fi
   elif [[ "$4" == true ]]; then
     [[ "$1" > "$2" ]]

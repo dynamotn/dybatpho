@@ -1073,7 +1073,9 @@ function dybatpho::screen_event {
   fi
 
   case "${__dybatpho_screen_e_char}" in
-    '') __dybatpho_screen_e_out="enter" ;;
+    # Raw mode turns off `icrnl`, so Enter arrives as a carriage return; a
+    # newline is what a pipe or a test feeds.
+    '' | $'\r') __dybatpho_screen_e_out="enter" ;;
     ' ') __dybatpho_screen_e_out="space" ;;
     $'\t') __dybatpho_screen_e_out="tab" ;;
     $'\177' | $'\b') __dybatpho_screen_e_out="backspace" ;;
@@ -1460,7 +1462,11 @@ function dybatpho::screen_text {
     fi
     current=""
     current_width=0
-    for word in ${line}; do
+    # Split on blanks only: an unquoted expansion would also glob, and a `*`
+    # in the text came out as the names of the files in the current directory.
+    local -a words=()
+    read -r -a words <<< "${line}"
+    for word in ${words[@]+"${words[@]}"}; do
       __dybatpho_log_width_into word_width "${word}"
       if ((current_width > 0 && current_width + 1 + word_width > width)); then
         lines+=("${current}")
@@ -1711,7 +1717,7 @@ function dybatpho::screen_gauge {
   local filled=$((value * width / total))
 
   local label
-  if [[ -v options[label] ]]; then
+  if [[ -n "${options[label]+set}" ]]; then
     label="${options[label]}"
   else
     label="$((value * 100 / total))%"
@@ -1984,18 +1990,17 @@ declare -ga __dybatpho_screen_braille=()
 # @internal
 function __dybatpho_screen_braille_table {
   ((${#__dybatpho_screen_braille[@]} == 0)) || return 0
-  local format="" index piece
+  local index piece
+  # Each glyph is written as its three UTF-8 bytes rather than as a `\U`
+  # escape, which `printf` only renders in a UTF-8 locale -- under `C` the
+  # table came out as the escapes themselves, spelled out. The block starts at
+  # U+2800, so the lead byte is always `E2` and the second runs `A0` to `A3`.
   for ((index = 0; index < 256; index++)); do
-    printf -v piece '\\U%08x' "$((0x2800 + index))"
-    format+="${piece}"
+    printf -v piece '\\xe2\\x%02x\\x%02x' "$((0xa0 + index / 64))" "$((0x80 + index % 64))"
+    # shellcheck disable=SC2059 # the format is the escape built just above
+    printf -v piece "${piece}"
+    __dybatpho_screen_braille+=("${piece}")
   done
-  local all
-  # The format string is the point: it is 256 `\Uxxxxxxxx` escapes built above,
-  # and one `printf` expands all of them at once instead of calling out per
-  # character.
-  # shellcheck disable=SC2059
-  printf -v all "${format}"
-  __dybatpho_log_chars_into __dybatpho_screen_braille "${all}"
   return 0
 }
 

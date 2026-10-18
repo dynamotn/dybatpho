@@ -319,7 +319,7 @@ function __dybatpho_pkg_run {
   local previous_dry_run="${DRY_RUN}"
   local status=0
   DRY_RUN="${dry_run}"
-  dybatpho::dry_run "$@" || status=$?
+  dybatpho::dry_run -- "$@" || status=$?
   DRY_RUN="${previous_dry_run}"
   return "${status}"
 }

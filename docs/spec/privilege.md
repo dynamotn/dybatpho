@@ -116,6 +116,7 @@ dybatpho::privilege_release
 - **FR-015**: An unknown option MUST stop the script.
 - **FR-016**: A second `privilege_acquire` while the escalation is held MUST NOT authenticate again, start a second refresher, put a second wrapper on `PATH`, or register the release again, and MUST add a wrapper the first call left out when `--shield` is now given.
 - **FR-017**: A command run by `privilege_run` MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
+- **FR-018**: `dybatpho::privilege_run` MUST run the command after `--` as an argument vector, never through `eval`, whether or not elevation is needed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -148,6 +149,7 @@ dybatpho::privilege_release
 - **IT-011**: Remove the shield from `PATH` on release, and release twice harmlessly.
 - **IT-012**: Acquire twice with `--shield` and verify one refresher, one wrapper and unchanged traps, and that release restores `PATH` and stops the refresher.
 - **IT-013**: Run a command through `privilege_run` with no escalation needed that reads variables named like the runner's locals, and see the caller's values.
+- **IT-014**: Run `privilege_run -- 'echo first; echo INJECTED'` without elevation and see nothing injected.
 
 ## Acceptance Criteria *(mandatory)*
 

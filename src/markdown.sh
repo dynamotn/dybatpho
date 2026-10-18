@@ -225,7 +225,7 @@ function dybatpho::md_heading {
 #   marker is used literally on every item. Blank input lines stay blank, so a
 #   list can be split into visual groups.
 # @arg $1 string List items, one per line, or `-` for stdin
-# @arg $2 string Optional marker, default is `-`
+# @arg $2 string [default: -] Marker
 # @stdout The rendered list
 # @example
 #   dybatpho::md_list $'first\nsecond' "1."
@@ -266,7 +266,7 @@ function dybatpho::md_list {
 #   unchecked item whose text is the whole line. The state is checked for
 #   `x`, `X`, and anything `dybatpho::is true` accepts.
 # @arg $1 string Task lines, or `-` for stdin
-# @arg $2 string Optional delimiter between state and text, default is `|`
+# @arg $2 string [default: |] Delimiter between state and text
 # @stdout The rendered task list
 # @example
 #   dybatpho::md_task_list $'x|Write the spec\n|Ship it'
@@ -309,7 +309,7 @@ function dybatpho::md_task_list {
 # @description Render an inline link.
 # @arg $1 string Link text
 # @arg $2 string URL
-# @arg $3 string Optional title shown on hover
+# @arg $3 string? Title shown on hover
 # @stdout The rendered link
 # @example
 #   dybatpho::md_link "the docs" "https://example.com/a b"
@@ -340,8 +340,8 @@ function dybatpho::md_link {
 #   is not safe in a URL path, the color's included, is percent-encoded.
 # @arg $1 string Badge label, the left half
 # @arg $2 string Badge value, the right half
-# @arg $3 string Optional color, default is `blue`
-# @arg $4 string Optional URL the badge links to
+# @arg $3 string [default: blue] Color
+# @arg $4 string? URL the badge links to
 # @stdout The rendered badge
 # @example
 #   dybatpho::md_badge "build" "passing" "green"
@@ -470,7 +470,7 @@ function dybatpho::md_code_block {
 #   `dybatpho::md_escape` and assemble the rows with a delimiter of your own,
 #   such as `::`, which the escape leaves alone.
 # @arg $1 string Rows, one per line, cells split on the delimiter, or `-` for stdin
-# @arg $2 string Optional delimiter, default is `|`
+# @arg $2 string [default: |] Delimiter
 # @stdout The rendered table
 # @exitcode 0 The table is rendered
 # @exitcode 1 Stop the script when the `table` module is not loaded

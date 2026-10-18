@@ -75,46 +75,46 @@
 #   - `src/tui.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_SCREEN_MOUSE bool Report mouse clicks as events. Default `true`
+# @env DYBATPHO_SCREEN_MOUSE bool [default: true] Report mouse clicks as events
 DYBATPHO_SCREEN_MOUSE="${DYBATPHO_SCREEN_MOUSE:-true}"
 export DYBATPHO_SCREEN_MOUSE
-# @env DYBATPHO_SCREEN_POINTER string Marker drawn beside the selected list or table row. Default `❯`
+# @env DYBATPHO_SCREEN_POINTER string [default: ❯] Marker drawn beside the selected list or table row
 DYBATPHO_SCREEN_POINTER="${DYBATPHO_SCREEN_POINTER:-❯}"
 export DYBATPHO_SCREEN_POINTER
-# @env DYBATPHO_SCREEN_STYLE_SELECTED string SGR parameters for a selected row. Default `1;7`
+# @env DYBATPHO_SCREEN_STYLE_SELECTED string [default: 1;7] SGR parameters for a selected row
 DYBATPHO_SCREEN_STYLE_SELECTED="${DYBATPHO_SCREEN_STYLE_SELECTED:-1;7}"
 export DYBATPHO_SCREEN_STYLE_SELECTED
-# @env DYBATPHO_SCREEN_STYLE_BORDER string SGR parameters for a block border. Default `2`
+# @env DYBATPHO_SCREEN_STYLE_BORDER string [default: 2] SGR parameters for a block border
 DYBATPHO_SCREEN_STYLE_BORDER="${DYBATPHO_SCREEN_STYLE_BORDER:-2}"
 export DYBATPHO_SCREEN_STYLE_BORDER
-# @env DYBATPHO_SCREEN_STYLE_TITLE string SGR parameters for a block title. Default `1`
+# @env DYBATPHO_SCREEN_STYLE_TITLE string [default: 1] SGR parameters for a block title
 DYBATPHO_SCREEN_STYLE_TITLE="${DYBATPHO_SCREEN_STYLE_TITLE:-1}"
 export DYBATPHO_SCREEN_STYLE_TITLE
-# @env DYBATPHO_SCREEN_STYLE_FOCUS string SGR parameters for the border of a block drawn with `focus:true`. Default `1`
+# @env DYBATPHO_SCREEN_STYLE_FOCUS string [default: 1] SGR parameters for the border of a block drawn with `focus:true`
 DYBATPHO_SCREEN_STYLE_FOCUS="${DYBATPHO_SCREEN_STYLE_FOCUS:-1}"
 export DYBATPHO_SCREEN_STYLE_FOCUS
-# @env DYBATPHO_SCREEN_STYLE_TAB_ACTIVE string SGR parameters for the active tab. Default `1;7`
+# @env DYBATPHO_SCREEN_STYLE_TAB_ACTIVE string [default: 1;7] SGR parameters for the active tab
 DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="${DYBATPHO_SCREEN_STYLE_TAB_ACTIVE:-1;7}"
 export DYBATPHO_SCREEN_STYLE_TAB_ACTIVE
-# @env DYBATPHO_SCREEN_STYLE_KEYBAR string SGR parameters for the background of a key bar. Default `7`
+# @env DYBATPHO_SCREEN_STYLE_KEYBAR string [default: 7] SGR parameters for the background of a key bar
 DYBATPHO_SCREEN_STYLE_KEYBAR="${DYBATPHO_SCREEN_STYLE_KEYBAR:-7}"
 export DYBATPHO_SCREEN_STYLE_KEYBAR
-# @env DYBATPHO_SCREEN_STYLE_KEY string SGR parameters for a key named in a key bar. Default `1`
+# @env DYBATPHO_SCREEN_STYLE_KEY string [default: 1] SGR parameters for a key named in a key bar
 DYBATPHO_SCREEN_STYLE_KEY="${DYBATPHO_SCREEN_STYLE_KEY:-1}"
 export DYBATPHO_SCREEN_STYLE_KEY
-# @env DYBATPHO_SCREEN_STYLE_ACCENT string SGR parameters an application uses for what should stand out. Default `1`
+# @env DYBATPHO_SCREEN_STYLE_ACCENT string [default: 1] SGR parameters an application uses for what should stand out
 DYBATPHO_SCREEN_STYLE_ACCENT="${DYBATPHO_SCREEN_STYLE_ACCENT:-1}"
 export DYBATPHO_SCREEN_STYLE_ACCENT
-# @env DYBATPHO_SCREEN_STYLE_DIM string SGR parameters for secondary text, and for the divider between tabs. Default `2`
+# @env DYBATPHO_SCREEN_STYLE_DIM string [default: 2] SGR parameters for secondary text, and for the divider between tabs
 DYBATPHO_SCREEN_STYLE_DIM="${DYBATPHO_SCREEN_STYLE_DIM:-2}"
 export DYBATPHO_SCREEN_STYLE_DIM
-# @env DYBATPHO_SCREEN_STYLE_OK string SGR parameters for success. Default `32`
+# @env DYBATPHO_SCREEN_STYLE_OK string [default: 32] SGR parameters for success
 DYBATPHO_SCREEN_STYLE_OK="${DYBATPHO_SCREEN_STYLE_OK:-32}"
 export DYBATPHO_SCREEN_STYLE_OK
-# @env DYBATPHO_SCREEN_STYLE_WARN string SGR parameters for a warning. Default `33`
+# @env DYBATPHO_SCREEN_STYLE_WARN string [default: 33] SGR parameters for a warning
 DYBATPHO_SCREEN_STYLE_WARN="${DYBATPHO_SCREEN_STYLE_WARN:-33}"
 export DYBATPHO_SCREEN_STYLE_WARN
-# @env DYBATPHO_SCREEN_STYLE_ERROR string SGR parameters for an error. Default `31`
+# @env DYBATPHO_SCREEN_STYLE_ERROR string [default: 31] SGR parameters for an error
 DYBATPHO_SCREEN_STYLE_ERROR="${DYBATPHO_SCREEN_STYLE_ERROR:-31}"
 export DYBATPHO_SCREEN_STYLE_ERROR
 
@@ -397,7 +397,7 @@ function __dybatpho_screen_style_set {
 # @arg $1 number Row, zero-based
 # @arg $2 number Column, zero-based
 # @arg $3 string Text to draw, without escape sequences
-# @arg $4 string Optional SGR parameters, default is `0`
+# @arg $4 string [default: 0] SGR parameters
 # @exitcode 0 Always, including when the position is off screen
 # @tip Pass the text without escape sequences and give the style separately; a style passed inside the text would break
 #   the
@@ -833,7 +833,7 @@ function __dybatpho_screen_layout_into {
 #
 # @arg $1 string Name of the variable receiving the rectangle
 # @arg $2 string Rectangle to shrink
-# @arg $3 number Optional margin in cells, default is `1`
+# @arg $3 number [default: 1] Margin in cells
 # @set The named variable
 #######################################
 function dybatpho::screen_rect_inner {
@@ -1025,7 +1025,7 @@ function dybatpho::screen_end {
 #   esac
 #
 # @arg $1 string Name of the variable receiving the event
-# @arg $2 string Optional timeout in seconds; without one the call waits
+# @arg $2 string? Timeout in seconds; without one the call waits
 # @set The named variable
 # @set DYBATPHO_SCREEN_MOUSE_COLUMN number Zero-based column of a mouse event
 # @set DYBATPHO_SCREEN_MOUSE_ROW number Zero-based row of a mouse event

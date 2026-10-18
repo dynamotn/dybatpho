@@ -26,12 +26,12 @@
 #   into the low tens of thousands of rows; past that, reach for a real CSV tool
 # @tip Values are read and written as text, because CSV carries no types; cast
 #   in `jq` after `dybatpho::csv_to_json` when a consumer needs numbers
-# @env DYBATPHO_CSV_DELIMITER string Field delimiter, default is `,`; set it to `;`, or to `tab` for TSV
+# @env DYBATPHO_CSV_DELIMITER string [default: ,] Field delimiter; set it to `;`, or to `tab` for TSV
 # @see
 #   - `example/csv_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_CSV_DELIMITER string Field delimiter every function reads, default is `,`; `tab` or `\t` names a tab
+# @env DYBATPHO_CSV_DELIMITER string [default: ,] Field delimiter every function reads; `tab` or `\t` names a tab
 DYBATPHO_CSV_DELIMITER="${DYBATPHO_CSV_DELIMITER:-,}"
 
 # The byte that joins the fields of one record. A record is exchanged as a
@@ -95,7 +95,7 @@ function __dybatpho_csv_delimiter_into {
 #   choosing a different function for each.
 # @arg $1 string Name of the variable receiving the text
 # @arg $2 string File path, `-`, or CSV text
-# @arg $3 string Name the unit-separator refusal is reported under, default is the calling function
+# @arg $3 string? Name the unit-separator refusal is reported under, default is the calling function
 # @set The named variable
 # @internal
 #######################################
@@ -576,8 +576,8 @@ function dybatpho::csv_select {
 #   direction, so blanks never push the rows that matter off the top.
 # @arg $1 string CSV file path, `-` for stdin, or CSV text
 # @arg $2 string Column: header name, or 1-based position
-# @arg $3 string Order: `asc` (default) or `desc`
-# @arg $4 string Comparison: `auto` (default), `text`, or `number`
+# @arg $3 string [default: asc] Order: `asc` or `desc`
+# @arg $4 string [default: auto] Comparison: `auto`, `text`, or `number`
 # @stdout CSV text: the header, then the sorted rows
 # @exitcode 0 The rows were sorted, or the input was empty
 # @exitcode 1 An unknown column, order or comparison, a non-number under `number`, or a row wider than the header
@@ -665,8 +665,8 @@ function dybatpho::csv_sort {
 # @arg $1 string Left CSV: file path, `-` for stdin, or CSV text
 # @arg $2 string Right CSV: file path, `-` for stdin, or CSV text
 # @arg $3 string Key column in the left input: header name, or 1-based position
-# @arg $4 string Join type: `inner` (default) or `left`
-# @arg $5 string Key column in the right input, the same way, default is the left one
+# @arg $4 string [default: inner] Join type: `inner` or `left`
+# @arg $5 string? Key column in the right input, the same way, default is the left one
 # @stdout CSV text: the joined header, then the joined rows
 # @exitcode 0 The inputs were joined
 # @exitcode 1 An unknown join type or key column, both inputs read from stdin, or a row wider than its header

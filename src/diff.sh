@@ -40,12 +40,12 @@
 # @tip `dybatpho::diff_text` needs no external command; the structured diffs
 #   need `jq`, and `dybatpho::diff_yaml` needs `yq` to reach JSON first
 # @env DYBATPHO_DIFF_COLOR string Force color on or off; the default follows `NO_COLOR` and whether stdout is a terminal
-# @env DYBATPHO_DIFF_CONTEXT number Lines of context in a text diff, default is `3`
+# @env DYBATPHO_DIFF_CONTEXT number [default: 3] Lines of context in a text diff
 # @see
 #   - `example/diff_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_DIFF_CONTEXT number Lines of context around each change, default is `3`
+# @env DYBATPHO_DIFF_CONTEXT number [default: 3] Lines of context around each change
 DYBATPHO_DIFF_CONTEXT="${DYBATPHO_DIFF_CONTEXT:-3}"
 # @env DYBATPHO_DIFF_COLOR string `true` or `false` to decide coloring, empty to detect it
 DYBATPHO_DIFF_COLOR="${DYBATPHO_DIFF_COLOR-}"
@@ -130,8 +130,8 @@ function __dybatpho_diff_paint {
 #   conditional: zero when the two are identical, one when they are not.
 # @arg $1 string File path, `-` for stdin, or text
 # @arg $2 string File path, `-` for stdin, or text
-# @arg $3 string Optional label for the first side, default is its path
-# @arg $4 string Optional label for the second side, default is its path
+# @arg $3 string? Label for the first side, default is its path
+# @arg $4 string? Label for the second side, default is its path
 # @stdout A unified diff, empty when the two are identical
 # @exitcode 0 The two are identical
 # @exitcode 1 They differ
@@ -480,7 +480,7 @@ function __dybatpho_diff_escape_path {
 # @arg $1 string Output mode: `color`, `plain`, or `null`
 # @arg $2 string Marker: `+`, `-`, `~`, or `!`
 # @arg $3 string Path, relative to the roots
-# @arg $4 string Optional detail printed after the path, such as the two kinds
+# @arg $4 string? Detail printed after the path, such as the two kinds
 # @stdout The formatted record
 # @internal
 #######################################
@@ -533,8 +533,8 @@ function __dybatpho_diff_dir_report {
 #   name.
 # @arg $1 string Options, then the first directory
 # @arg $2 string Second directory
-# @opt --summary, -s Print one `+A -R ~M` line instead, the `diff_summary` shape; a change of kind counts in `~`
-# @opt --null, -z Terminate each record with NUL instead of a newline, uncolored and unescaped
+# @option -s | --summary Print one `+A -R ~M` line instead, the `diff_summary` shape; a change of kind counts in `~`
+# @option -z | --null Terminate each record with NUL instead of a newline, uncolored and unescaped
 # @stdout One record per difference, or the summary line
 # @exitcode 0 The two trees hold the same entries with the same content
 # @exitcode 1 They differ

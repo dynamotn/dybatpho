@@ -133,10 +133,10 @@ Ask a yes/no question and return the answer as an exit code.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Question to ask |
-| `$2` | string | Optional default answer used on an empty reply, default is `no` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Question to ask |
+| `$2` | string | no | `no` | Default answer used on an empty reply |
 
 **🌍 Environment variables**
 
@@ -165,10 +165,10 @@ component is not followed, as `rm` and `mv` act on a link itself.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to validate |
-| `$2` | string | Optional wording used in error messages, default is `path` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to validate |
+| `$2` | string | no | `path` | Wording used in error messages |
 
 **🌍 Environment variables**
 
@@ -291,12 +291,12 @@ Extract an archive after rejecting entries that escape the destination.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Option `--force`/`-f` to skip confirmation |
-| `$2` | string | Archive file path |
-| `$3` | string | Optional destination directory, default is `.` |
-| `$4` | number | Optional strip-components count, default is `0` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Option `--force`/`-f` to skip confirmation |
+| `$2` | string | yes |  | Archive file path |
+| `$3` | string | no | `.` | Destination directory |
+| `$4` | number | no | `0` | Strip-components count |
 
 **📤 Output on stdout**
 

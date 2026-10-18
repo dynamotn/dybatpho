@@ -45,9 +45,9 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_CACHE_DIR string Directory holding cache entries, default is the XDG cache directory for `dybatpho`
-# @env DYBATPHO_CACHE_NAMESPACE string Subdirectory grouping related entries, default is `default`; empty puts entries
+# @env DYBATPHO_CACHE_NAMESPACE string [default: default] Subdirectory grouping related entries; empty puts entries
 #   directly in the cache directory
-# @env DYBATPHO_CACHE_TTL number Seconds an entry stays fresh when a call does not say, default is `3600`
+# @env DYBATPHO_CACHE_TTL number [default: 3600] Seconds an entry stays fresh when a call does not say
 # @env DYBATPHO_CACHE_STALE number Seconds `dybatpho::cache_run` may serve an expired entry while it refreshes in the
 #   background, default is `0` (never)
 DYBATPHO_CACHE_DIR="${DYBATPHO_CACHE_DIR:-$(dybatpho::xdg_cache_dir dybatpho)}"
@@ -204,7 +204,7 @@ function __dybatpho_cache_path_into {
 #   if dybatpho::cache_has releases 3600; then ... ; fi
 #
 # @arg $1 string Entry key
-# @arg $2 number Seconds the entry stays fresh, default is `DYBATPHO_CACHE_TTL`
+# @arg $2 number [default: ${DYBATPHO_CACHE_TTL}] Seconds the entry stays fresh
 # @env DYBATPHO_CACHE_TTL number Default time to live
 # @exitcode 0 The entry exists and is fresh
 # @exitcode 1 There is no entry, or it is older than the time to live
@@ -229,13 +229,12 @@ function dybatpho::cache_has {
 #   fi
 #
 # @arg $1 string Entry key
-# @arg $2 number Seconds the entry stays fresh, default is `DYBATPHO_CACHE_TTL`
+# @arg $2 number [default: ${DYBATPHO_CACHE_TTL}] Seconds the entry stays fresh
 # @env DYBATPHO_CACHE_TTL number Default time to live
 # @stdout The stored entry
 # @exitcode 0 A fresh entry was printed
 # @exitcode 1 There is no entry, or it is older than the time to live
-# @see
-#   - `dybatpho::cache_run`
+# @see dybatpho::cache_run
 #######################################
 function dybatpho::cache_get {
   local key
@@ -472,7 +471,7 @@ function __dybatpho_cache_need_lock {
 #   dybatpho::cache_wait status 30 || dybatpho::warn "status refresh still running"
 #
 # @arg $1 string Entry key
-# @arg $2 number Seconds to wait at most, default is `60`
+# @arg $2 number [default: 60] Seconds to wait at most
 # @env DYBATPHO_LOCK_POLL_INTERVAL number Seconds to sleep between checks
 # @exitcode 0 No refresh of the entry is running
 # @exitcode 1 A refresh was still running when the time ran out
@@ -528,8 +527,8 @@ function dybatpho::cache_wait {
 #   dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
 #
 # @arg $1 string Entry key
-# @arg $2 number Optional seconds the entry stays fresh, before `--`
-# @arg $@ string Optional `--stale <seconds>`, then `--` followed by the command and its arguments
+# @arg $2 number? Seconds the entry stays fresh, before `--`
+# @arg $@ string? `--stale <seconds>`, then `--` followed by the command and its arguments
 # @env DYBATPHO_CACHE_TTL number Default time to live
 # @env DYBATPHO_CACHE_STALE number Default grace window in seconds, `0` (none) unless set
 # @stdout The command's output, from the entry or from running it
@@ -537,9 +536,8 @@ function dybatpho::cache_wait {
 # @exitcode other The command failed, with its own exit status, and nothing was stored
 # @exitcode 1 Stop the script when no command is given after `--`, a time is not a number of seconds, or a
 #   grace window is asked for without the `lock` module loaded
-# @see
-#   - `dybatpho::cache_get`
-#   - `dybatpho::cache_wait`
+# @see dybatpho::cache_get
+# @see dybatpho::cache_wait
 #######################################
 function dybatpho::cache_run {
   local __dybatpho_cache_run_key
@@ -688,8 +686,7 @@ function __dybatpho_cache_bytes {
 # @env DRY_RUN string When true-like, report each removal instead of performing it
 # @exitcode 0 The namespace fits the limits, whether or not anything was removed
 # @exitcode 1 Stop the script when no limit is given, an option is unknown, or a limit is malformed
-# @see
-#   - `dybatpho::cache_stats`
+# @see dybatpho::cache_stats
 #######################################
 # dyshellint disable=BSG050 every argument is an option, parsed in the loop below
 function dybatpho::cache_prune {
@@ -806,16 +803,15 @@ function __dybatpho_cache_prune_remove {
 # @example
 #   dybatpho::cache_stats 600 --json | jq .stale
 #
-# @arg $1 number Optional seconds an entry stays fresh, default is `DYBATPHO_CACHE_TTL`
-# @arg $@ string Optional `--json`, for one JSON object of the counts instead of aligned lines
+# @arg $1 number [default: ${DYBATPHO_CACHE_TTL}] Seconds an entry stays fresh
+# @arg $@ string? `--json`, for one JSON object of the counts instead of aligned lines
 # @env DYBATPHO_CACHE_DIR string Directory holding cache entries
 # @env DYBATPHO_CACHE_NAMESPACE string Namespace to describe
 # @env DYBATPHO_CACHE_TTL number Default time to live
 # @stdout The report; the JSON form holds `entries`, `bytes`, `fresh`, `stale`, `oldest_age` and `newest_age`
 # @exitcode 0 The report was printed
 # @exitcode 1 Stop the script when the time to live is not a number of seconds or an option is unknown
-# @see
-#   - `dybatpho::cache_prune`
+# @see dybatpho::cache_prune
 #######################################
 # dyshellint disable=BSG050 the time to live and `--json` may come in either order
 function dybatpho::cache_stats {

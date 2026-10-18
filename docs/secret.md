@@ -18,13 +18,13 @@ temporary file unless explicitly requested.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_SECRET_PLACEHOLDER`** | string | Text substituted for registered secrets. Default is `***` |
-| **`DYBATPHO_SECRET_MIN_LENGTH`** | number | Shortest value that may be registered for masking. Default is `4` |
-| **`DYBATPHO_SECRET_MAX_MODE`** | string | Most permissive octal mode allowed for a secret file. Default is `600` |
-| **`DYBATPHO_SECRET_STRICT_PERMS`** | string | When true-like, permission problems fail instead of warning. Default is `true` |
-| **`DYBATPHO_SECRET_COUNT`** | number | Number of registered secrets; logging masks output only when above zero |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_SECRET_PLACEHOLDER`** | string | no | `***` | Text substituted for registered secrets |
+| **`DYBATPHO_SECRET_MIN_LENGTH`** | number | no | `4` | Shortest value that may be registered for masking |
+| **`DYBATPHO_SECRET_MAX_MODE`** | string | no | `600` | Most permissive octal mode allowed for a secret file |
+| **`DYBATPHO_SECRET_STRICT_PERMS`** | string | no | `true` | When true-like, permission problems fail instead of warning |
+| **`DYBATPHO_SECRET_COUNT`** | number | yes |  | Number of registered secrets; logging masks output only when above zero |
 
 ### 🚀 Highlights
 
@@ -155,9 +155,9 @@ dybatpho::secret_mask "authorization: ${TOKEN}"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$@` | string | Optional text to mask; stdin is read when no argument is given |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$@` | string | no |  | Text to mask; stdin is read when no argument is given |
 
 **📤 Output on stdout**
 
@@ -198,10 +198,10 @@ Print a non-reversible hint for a secret, revealing only its last characters.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Secret value |
-| `$2` | number | Characters to reveal, default is 4 |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Secret value |
+| `$2` | number | no | `4` | Characters to reveal |
 
 **📤 Output on stdout**
 
@@ -222,10 +222,10 @@ dybatpho::secret_check_permission ~/.config/app/token 600
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | File path |
-| `$2` | string | Most permissive octal mode allowed, default is `DYBATPHO_SECRET_MAX_MODE` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | File path |
+| `$2` | string | no | `${DYBATPHO_SECRET_MAX_MODE}` | Most permissive octal mode allowed |
 
 **🌍 Environment variables**
 
@@ -313,10 +313,10 @@ dybatpho::secret_from_stdin TOKEN "API token: "
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Variable name that receives the secret |
-| `$2` | string | Optional prompt written to stderr when stdin is a terminal |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Variable name that receives the secret |
+| `$2` | string | no |  | Prompt written to stderr when stdin is a terminal |
 
 **🧩 Variable sets**
 
@@ -348,11 +348,11 @@ dybatpho::secret_read TOKEN - "API token: "
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Variable name that receives the secret |
-| `$2` | string | Source: `file:PATH`, `env:NAME`, `stdin`, or `-` |
-| `$3` | string | Optional prompt used by the stdin source |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Variable name that receives the secret |
+| `$2` | string | yes |  | Source: `file:PATH`, `env:NAME`, `stdin`, or `-` |
+| `$3` | string | no |  | Prompt used by the stdin source |
 
 **🧩 Variable sets**
 

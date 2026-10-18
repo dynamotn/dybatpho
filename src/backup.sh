@@ -45,15 +45,15 @@
 #   network share stays with the caller
 # @tip A snapshot shares its unchanged files with other snapshots, so read and
 #   restore it, never edit inside it
-# @env DYBATPHO_BACKUP_EXTENSION string Archive extension, default is `tar.gz`; `archive.sh` reads the format from it
-# @env DYBATPHO_BACKUP_CHECKSUM_ALGORITHM string Algorithm for the sidecar, default is `sha256`
+# @env DYBATPHO_BACKUP_EXTENSION string [default: tar.gz] Archive extension; `archive.sh` reads the format from it
+# @env DYBATPHO_BACKUP_CHECKSUM_ALGORITHM string [default: sha256] Algorithm for the sidecar
 # @see
 #   - `example/backup_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_BACKUP_EXTENSION string Extension every backup is written with, default is `tar.gz`
+# @env DYBATPHO_BACKUP_EXTENSION string [default: tar.gz] Extension every backup is written with
 DYBATPHO_BACKUP_EXTENSION="${DYBATPHO_BACKUP_EXTENSION:-tar.gz}"
-# @env DYBATPHO_BACKUP_CHECKSUM_ALGORITHM string Checksum algorithm for the sidecar, default is `sha256`
+# @env DYBATPHO_BACKUP_CHECKSUM_ALGORITHM string [default: sha256] Checksum algorithm for the sidecar
 DYBATPHO_BACKUP_CHECKSUM_ALGORITHM="${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM:-sha256}"
 
 #######################################
@@ -492,7 +492,7 @@ function __dybatpho_backup_snapshot {
 # @arg $1 string Option `--incremental`/`-i` to take a hard-linked snapshot directory
 # @arg $2 string File or directory to back up
 # @arg $3 string Destination directory, created when missing
-# @arg $4 string Optional name for the backup, default is the source's base name
+# @arg $4 string? Name for the backup, default is the source's base name
 # @stdout Path of the archive or snapshot that was created
 # @exitcode 0 The backup was taken
 # @exitcode 1 The source does not exist, or the backup could not be written
@@ -558,7 +558,7 @@ function dybatpho::backup_create {
 #   Archives and incremental snapshots are listed together, in the order they
 #   were taken.
 # @arg $1 string Directory holding the backups
-# @arg $2 string Optional backup name to match, default is every name
+# @arg $2 string? Backup name to match, default is every name
 # @stdout One archive or snapshot path per line, newest first
 # @exitcode 0 The listing was printed, empty when there is nothing to list
 # @example
@@ -578,7 +578,7 @@ function dybatpho::backup_list {
 #######################################
 # @description Print the most recent backup in a directory.
 # @arg $1 string Directory holding the backups
-# @arg $2 string Optional backup name to match, default is every name
+# @arg $2 string? Backup name to match, default is every name
 # @stdout Path of the newest archive or snapshot
 # @exitcode 0 A backup was found
 # @exitcode 1 The directory holds no backup
@@ -763,10 +763,10 @@ function dybatpho::backup_restore {
 #   backup copied in from elsewhere is as old as the copy.
 # @arg $1 string Options, in any order
 # @arg $@ string Directory holding the backups, after the options
-# @opt --keep-count <n> Keep the newest `n` backups
-# @opt --keep-days <n> Keep the backups younger than `n` days
-# @opt --name <name> Only consider the backups of this name
-# @opt --force, -f Delete without confirming
+# @option --keep-count <n> Keep the newest `n` backups
+# @option --keep-days <n> Keep the backups younger than `n` days
+# @option --name <name> Only consider the backups of this name
+# @option -f | --force Delete without confirming
 # @stdout Nothing; the paths it would remove are reported by `safe_rm` under `DRY_RUN`
 # @exitcode 0 The pruning finished, or nothing needed removing
 # @exitcode 1 No retention policy was given, an option is malformed, or the removal was declined
@@ -918,8 +918,8 @@ function __dybatpho_backup_root_into {
 #   restored somewhere else.
 # @arg $1 string Options, then the older side
 # @arg $2 string The newer side
-# @opt --summary, -s Print one `+A -R ~M` line instead of the records
-# @opt --null, -z Terminate each record with NUL instead of a newline
+# @option -s | --summary Print one `+A -R ~M` line instead of the records
+# @option -z | --null Terminate each record with NUL instead of a newline
 # @stdout The records or the summary `dybatpho::diff_dir` prints
 # @exitcode 0 The two sides hold the same entries with the same content
 # @exitcode 1 They differ

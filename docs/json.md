@@ -113,10 +113,10 @@ Pretty-print a JSON document.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | JSON file path or `-` for stdin |
-| `$2` | string | Optional output file path |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | JSON file path or `-` for stdin |
+| `$2` | string | no |  | Output file path |
 
 **📤 Output on stdout**
 
@@ -135,10 +135,10 @@ Convert a JSON document to YAML.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | JSON file path or `-` for stdin |
-| `$2` | string | Optional output file path |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | JSON file path or `-` for stdin |
+| `$2` | string | no |  | Output file path |
 
 **📤 Output on stdout**
 
@@ -199,10 +199,10 @@ Pretty-print a YAML document.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | YAML file path or `-` for stdin |
-| `$2` | string | Optional output file path |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | YAML file path or `-` for stdin |
+| `$2` | string | no |  | Output file path |
 
 **📤 Output on stdout**
 
@@ -221,10 +221,10 @@ Convert a YAML document to JSON.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | YAML file path or `-` for stdin |
-| `$2` | string | Optional output file path |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | YAML file path or `-` for stdin |
+| `$2` | string | no |  | Output file path |
 
 **📤 Output on stdout**
 
@@ -434,13 +434,13 @@ dybatpho::json_set --json config.json server.ports '[80,443]'
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional `--json`: parse the value as JSON instead of storing a string |
-| `$2` | string | JSON file path or `-` for stdin |
-| `$3` | string | Path to set; `\.` is a dot inside a key, and `\0` the key `0` |
-| `$4` | string | Value to store |
-| `$5` | string | Optional output file path, which may be the input file |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--json`: parse the value as JSON instead of storing a string |
+| `$2` | string | yes |  | JSON file path or `-` for stdin |
+| `$3` | string | yes |  | Path to set; `\.` is a dot inside a key, and `\0` the key `0` |
+| `$4` | string | yes |  | Value to store |
+| `$5` | string | no |  | Output file path, which may be the input file |
 
 **📝 Notes**
 
@@ -475,11 +475,11 @@ dybatpho::json_del package.json scripts.prepublish package.json
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | JSON file path or `-` for stdin |
-| `$2` | string | Path to remove |
-| `$3` | string | Optional output file path, which may be the input file |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | JSON file path or `-` for stdin |
+| `$2` | string | yes |  | Path to remove |
+| `$3` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -509,11 +509,11 @@ dybatpho::json_merge defaults.json local.json > effective.json
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Base JSON file path, or `-` for stdin |
-| `$2` | string | Overlay JSON file path, or `-` for stdin |
-| `$3` | string | Optional output file path, which may be either input |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base JSON file path, or `-` for stdin |
+| `$2` | string | yes |  | Overlay JSON file path, or `-` for stdin |
+| `$3` | string | no |  | Output file path, which may be either input |
 
 **📤 Output on stdout**
 
@@ -548,13 +548,13 @@ dybatpho::yaml_set --json values.yaml replicas 3
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional `--json`: parse the value as JSON instead of storing a string |
-| `$2` | string | YAML file path or `-` for stdin |
-| `$3` | string | Path to set |
-| `$4` | string | Value to store |
-| `$5` | string | Optional output file path, which may be the input file |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--json`: parse the value as JSON instead of storing a string |
+| `$2` | string | yes |  | YAML file path or `-` for stdin |
+| `$3` | string | yes |  | Path to set |
+| `$4` | string | yes |  | Value to store |
+| `$5` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -583,11 +583,11 @@ dybatpho::yaml_del compose.yaml services.debug compose.yaml
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | YAML file path or `-` for stdin |
-| `$2` | string | Path to remove |
-| `$3` | string | Optional output file path, which may be the input file |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | YAML file path or `-` for stdin |
+| `$2` | string | yes |  | Path to remove |
+| `$3` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -617,11 +617,11 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Base YAML file path, or `-` for stdin |
-| `$2` | string | Overlay YAML file path, or `-` for stdin |
-| `$3` | string | Optional output file path, which may be either input |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base YAML file path, or `-` for stdin |
+| `$2` | string | yes |  | Overlay YAML file path, or `-` for stdin |
+| `$3` | string | no |  | Output file path, which may be either input |
 
 **📤 Output on stdout**
 

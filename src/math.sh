@@ -48,7 +48,7 @@
 #   a person, and for this module when it is about to be computed with
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_MATH_SCALE number Fraction digits kept by division, averaging and percentages (default `10`)
+# @env DYBATPHO_MATH_SCALE number [default: 10] Fraction digits kept by division, averaging and percentages
 DYBATPHO_MATH_SCALE="${DYBATPHO_MATH_SCALE:-10}"
 
 # Plain decimal notation, with an optional sign: `12`, `-0.5`, `+.25`, `7.`
@@ -723,7 +723,7 @@ function dybatpho::math_mul {
 #
 # @arg $1 string Dividend
 # @arg $2 string Divisor
-# @arg $3 number Fraction digits to keep, default `DYBATPHO_MATH_SCALE`
+# @arg $3 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
 # @stdout The quotient
 # @exitcode 1 Stop the script on a non-number, a bad scale, or a zero divisor
@@ -776,7 +776,7 @@ function dybatpho::math_mod {
 #
 # @arg $1 string Base
 # @arg $2 string Exponent, a whole number
-# @arg $3 number Fraction digits for a negative exponent, default `DYBATPHO_MATH_SCALE`
+# @arg $3 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits for a negative exponent
 # @env DYBATPHO_MATH_SCALE number Default fraction digits for a negative exponent
 # @env DYBATPHO_MATH_MAX_EXPONENT number Largest exponent magnitude accepted
 # @stdout The power
@@ -1011,7 +1011,7 @@ function dybatpho::math_ceil {
 #   dybatpho::math_round 1.005 2    # 1.01
 #
 # @arg $1 string Value
-# @arg $2 number Fraction digits to keep, default `0`
+# @arg $2 number [default: 0] Fraction digits to keep
 # @stdout The rounded value, with trailing zeros dropped
 # @exitcode 1 Stop the script when the value is not a number or the scale is not a non-negative integer
 # @tip This rounds for computation. Use `dybatpho::i18n_number` when the result
@@ -1486,7 +1486,7 @@ function dybatpho::math_percentile {
 #   dybatpho::math_sqrt 0.25        # 0.5
 #
 # @arg $1 string Value, not negative
-# @arg $2 number Fraction digits to keep, default `DYBATPHO_MATH_SCALE`
+# @arg $2 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
 # @stdout The square root
 # @exitcode 1 Stop the script on a non-number, a negative value, or a bad scale
@@ -1608,7 +1608,7 @@ function dybatpho::math_clamp {
 #
 # @arg $1 string Part
 # @arg $2 string Whole
-# @arg $3 number Fraction digits to keep, default `DYBATPHO_MATH_SCALE`
+# @arg $3 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
 # @stdout The percentage, without a `%` sign
 # @exitcode 1 Stop the script on a non-number, a bad scale, or a whole of zero

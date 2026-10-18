@@ -44,9 +44,9 @@ money, sizes, counters, percentages — not for cryptographic bignums.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_MATH_SCALE`** | number | Fraction digits kept by division, averaging and percentages (default `10`) |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_MATH_SCALE`** | number | no | `10` | Fraction digits kept by division, averaging and percentages |
 
 ### 🚀 Highlights
 
@@ -266,11 +266,11 @@ dybatpho::math_div 1 3 0       # 0
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Dividend |
-| `$2` | string | Divisor |
-| `$3` | number | Fraction digits to keep, default `DYBATPHO_MATH_SCALE` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Dividend |
+| `$2` | string | yes |  | Divisor |
+| `$3` | number | no | `${DYBATPHO_MATH_SCALE}` | Fraction digits to keep |
 
 **🌍 Environment variables**
 
@@ -333,11 +333,11 @@ dybatpho::math_pow 2 -3        # 0.125
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Base |
-| `$2` | string | Exponent, a whole number |
-| `$3` | number | Fraction digits for a negative exponent, default `DYBATPHO_MATH_SCALE` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base |
+| `$2` | string | yes |  | Exponent, a whole number |
+| `$3` | number | no | `${DYBATPHO_MATH_SCALE}` | Fraction digits for a negative exponent |
 
 **🌍 Environment variables**
 
@@ -624,10 +624,10 @@ dybatpho::math_round 1.005 2    # 1.01
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Value |
-| `$2` | number | Fraction digits to keep, default `0` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Value |
+| `$2` | number | no | `0` | Fraction digits to keep |
 
 **📤 Output on stdout**
 
@@ -873,10 +873,10 @@ dybatpho::math_sqrt 0.25        # 0.5
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Value, not negative |
-| `$2` | number | Fraction digits to keep, default `DYBATPHO_MATH_SCALE` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Value, not negative |
+| `$2` | number | no | `${DYBATPHO_MATH_SCALE}` | Fraction digits to keep |
 
 **🌍 Environment variables**
 
@@ -990,11 +990,11 @@ dybatpho::math_percent 1 3 2        # 33.33
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Part |
-| `$2` | string | Whole |
-| `$3` | number | Fraction digits to keep, default `DYBATPHO_MATH_SCALE` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Part |
+| `$2` | string | yes |  | Whole |
+| `$3` | number | no | `${DYBATPHO_MATH_SCALE}` | Fraction digits to keep |
 
 **🌍 Environment variables**
 

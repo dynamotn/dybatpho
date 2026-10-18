@@ -93,10 +93,10 @@ Log a fatal message and stop the current script or process.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message |
-| `$2` | number | Exit code, default is 1 |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Message |
+| `$2` | number | no | `1` | Exit code |
 
 **🚦 Exit codes**
 
@@ -273,9 +273,9 @@ dybatpho::run_with_timeout 30 ./deploy.sh || {
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds between SIGTERM and SIGKILL, default is `5` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | no | `5` | Seconds between SIGTERM and SIGKILL |
 
 **🚦 Exit codes**
 
@@ -400,9 +400,9 @@ _Function has no arguments._
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds between SIGTERM and SIGKILL, default is `5` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | no | `5` | Seconds between SIGTERM and SIGKILL |
 
 **🧩 Variable sets**
 
@@ -432,10 +432,10 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path of the PID file |
-| `$2` | number | Process ID to record, default is the current script's `$$` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path of the PID file |
+| `$2` | number | no |  | Process ID to record, default is the current script's `$$` |
 
 **📝 Notes**
 
@@ -491,10 +491,10 @@ and the supervisor would then start a second copy.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path of the PID file |
-| `$2` | number | Process ID the file must record, default is the current script's `$$` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path of the PID file |
+| `$2` | number | no |  | Process ID the file must record, default is the current script's `$$` |
 
 **🚦 Exit codes**
 

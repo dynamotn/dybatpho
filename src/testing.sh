@@ -56,8 +56,7 @@
 #   - `example/testing_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_TEST_SNAPSHOT_DIR string Directory holding `.snap` files, default is `test/snapshots` under the current
-#   directory
+# @env DYBATPHO_TEST_SNAPSHOT_DIR string [default: ${PWD}/test/snapshots] Directory holding `.snap` files
 DYBATPHO_TEST_SNAPSHOT_DIR="${DYBATPHO_TEST_SNAPSHOT_DIR:-${PWD}/test/snapshots}"
 # @env DYBATPHO_TEST_UPDATE_SNAPSHOTS string Set to `1`, `true`, `yes`, or `on` to rewrite snapshots instead of
 #   comparing
@@ -171,7 +170,7 @@ function __dybatpho_test_mock_init {
 #######################################
 # @description Assert that a path exists and is a regular file.
 # @arg $1 string Path to check
-# @arg $2 string Optional message replacing the default diagnostic
+# @arg $2 string? Message replacing the default diagnostic
 # @exitcode 0 The path is a regular file
 # @exitcode 1 The path is missing or is not a regular file
 #######################################
@@ -188,7 +187,7 @@ function dybatpho::assert_file {
 #######################################
 # @description Assert that a path exists and is a directory.
 # @arg $1 string Path to check
-# @arg $2 string Optional message replacing the default diagnostic
+# @arg $2 string? Message replacing the default diagnostic
 # @exitcode 0 The path is a directory
 # @exitcode 1 The path is missing or is not a directory
 #######################################
@@ -205,7 +204,7 @@ function dybatpho::assert_dir {
 #######################################
 # @description Assert that a path is a symbolic link, optionally pointing at an expected target.
 # @arg $1 string Path to check
-# @arg $2 string Optional expected link target, compared literally
+# @arg $2 string? Expected link target, compared literally
 # @exitcode 0 The path is a symlink and matches the expected target when one is given
 # @exitcode 1 The path is not a symlink, or points somewhere else
 #######################################
@@ -983,8 +982,8 @@ function __dybatpho_test_mock_script_write {
 #   dybatpho::mock_command git 0 "main"
 #
 # @arg $1 string Command name to mock
-# @arg $2 number Exit code the mock returns, default is `0`
-# @arg $3 string Text the mock prints on stdout, default is empty
+# @arg $2 number [default: 0] Exit code the mock returns
+# @arg $3 string? Text the mock prints on stdout
 # @see dybatpho::mock_command_script
 #######################################
 function dybatpho::mock_command {
@@ -1044,7 +1043,7 @@ function dybatpho::mock_call_count {
 #   dybatpho::assert_mock_called kubectl get pods
 #
 # @arg $1 string Mocked command name
-# @arg $@ string Optional arguments that must appear together in one recorded call
+# @arg $@ string? Arguments that must appear together in one recorded call
 # @exitcode 0 A matching call was recorded
 # @tip Arguments are matched on whole-argument boundaries, so a fragment of an
 #      argument never counts as a match.
@@ -1102,8 +1101,8 @@ function dybatpho::unmock_command {
 #
 # @arg $1 string Substring matched against the requested URL
 # @arg $2 number HTTP status code the mock reports
-# @arg $3 string Optional response body written to the caller's output file
-# @arg $@ string Optional extra response headers in `Name: value` form
+# @arg $3 string? Response body written to the caller's output file
+# @arg $@ string? Extra response headers in `Name: value` form
 # @set PATH Prefixed with the mock directory on first use
 # @exitcode 1 The status code is not a three-digit number
 # @tip The mock replaces `curl` itself, so it also covers `command curl` calls made by
@@ -1286,9 +1285,8 @@ function dybatpho::mock_http_calls {
 # @stdout One line per recorded request
 # @exitcode 0 Requests were recorded
 # @exitcode 1 No mocked request has been made yet
-# @see
-#   - `dybatpho::mock_http`
-#   - `dybatpho::mock_http_calls`
+# @see dybatpho::mock_http
+# @see dybatpho::mock_http_calls
 #######################################
 function dybatpho::mock_http_payloads {
   local payloads="${DYBATPHO_TEST_MOCK_DIR}/http-payloads"
@@ -1387,9 +1385,8 @@ function __dybatpho_test_real_date {
 #      to move waits forever. Move the clock with `dybatpho::mock_time_advance`,
 #      or unfreeze it around such a call. Lock waits are not affected: they are
 #      timed by Bash's own clock.
-# @see
-#   - `dybatpho::mock_time_advance`
-#   - `dybatpho::unmock_time`
+# @see dybatpho::mock_time_advance
+# @see dybatpho::unmock_time
 #######################################
 function dybatpho::mock_time {
   local epoch
@@ -1479,7 +1476,7 @@ function dybatpho::unmock_time {
 #######################################
 # @description Answer `dybatpho::is_tty` from the mocked streams, and from the
 #   real file descriptors for the streams that are not mocked.
-# @arg $1 string Stream name, default is `stdout`
+# @arg $1 string [default: stdout] Stream name
 # @exitcode 0 The stream is, or is mocked as, a terminal
 # @exitcode 1 The stream is not, or is mocked as not, a terminal
 # @internal
@@ -1613,7 +1610,7 @@ function dybatpho::fixture_dir {
 #
 # @arg $1 string Variable name that receives the file path
 # @arg $2 string File content, or `-` to read the content from stdin
-# @arg $3 string Optional file extension, default is `.txt`
+# @arg $3 string [default: .txt] File extension
 # @see dybatpho::create_temp
 # @tip When reading content from stdin, redirect into the call (`< file` or `<<<`)
 #      instead of piping into it. A pipeline runs the helper in a subshell, so the

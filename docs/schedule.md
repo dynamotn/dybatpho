@@ -133,6 +133,12 @@ and the handlers in place before the call are put back afterwards.
 dybatpho::schedule_every 60 --times 5 -- dybatpho::info "tick"
 ```
 
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--times \<n\>** | Stop after `n` runs instead of running until interrupted |
+
 **🧾 Arguments**
 
 | Name | Type | Description |
@@ -279,10 +285,10 @@ dybatpho::schedule_cron_due "*/15 * * * *" && run_the_job
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Cron expression, five fields |
-| `$2` | number | Optional Unix timestamp to test, default is now |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Cron expression, five fields |
+| `$2` | number | no |  | Unix timestamp to test, default is now |
 
 **🚦 Exit codes**
 

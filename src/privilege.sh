@@ -32,7 +32,7 @@
 # @env DYBATPHO_PRIVILEGE_COMMAND string Escalation command, `auto` to detect `sudo` then `doas`
 # @env DYBATPHO_PRIVILEGE string `auto` elevates when not root, `true`/`false` override the detection
 # @env DYBATPHO_PRIVILEGE_SUSPEND_HOOK string Function called with `suspend` before prompting and `resume` after
-# @env DYBATPHO_PRIVILEGE_REFRESH number Seconds between ticket refreshes, default is `60`
+# @env DYBATPHO_PRIVILEGE_REFRESH number [default: 60] Seconds between ticket refreshes
 # @see
 #   - `example/privilege_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -181,8 +181,8 @@ function __dybatpho_privilege_shield {
 #   one, this fails rather than blocking on a password nothing will type --
 #   which is what a script run from cron needs.
 # @arg $1 string Options, in any order
-# @opt --shield Put a non-interactive escalation command first on `PATH`, so no child can prompt
-# @opt --no-keepalive Skip the background refresh, for a run short enough not to need it
+# @option --shield Put a non-interactive escalation command first on `PATH`, so no child can prompt
+# @option --no-keepalive Skip the background refresh, for a run short enough not to need it
 # @exitcode 0 The escalation is held, or was not needed
 # @exitcode 1 Authentication failed, or a prompt was needed and could not be answered
 # @env DRY_RUN string When true-like, report what would be acquired and change nothing

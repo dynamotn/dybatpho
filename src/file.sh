@@ -27,7 +27,7 @@
 #   - `example/file_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, helpers that rewrite a file write through a
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, helpers that rewrite a file write through a
 #   symlink instead of replacing it
 DYBATPHO_FILE_FOLLOW_SYMLINKS="${DYBATPHO_FILE_FOLLOW_SYMLINKS:-true}"
 
@@ -72,7 +72,7 @@ function dybatpho::path_dirname {
 #######################################
 # @description Return the basename component of a path.
 # @arg $1 string Path to inspect
-# @arg $2 string Optional suffix to strip from the basename
+# @arg $2 string? Suffix to strip from the basename
 # @stdout Basename component of the path
 #######################################
 function dybatpho::path_basename {
@@ -250,7 +250,7 @@ function dybatpho::path_is_abs {
 #######################################
 # @description Return success when a path has any extension or a matching exact extension.
 # @arg $1 string Path to inspect
-# @arg $2 string Optional extension to compare against
+# @arg $2 string? Extension to compare against
 # @exitcode 0 The path has an extension or matches the requested one
 # @exitcode 1 The path does not have an extension or does not match the requested one
 #######################################
@@ -353,8 +353,8 @@ function dybatpho::path_relative {
 #
 # @arg $1 string Variable name that receives the created path
 # @arg $2 string File extension to append, or `/`/empty to create a directory
-# @arg $3 string Name prefix, default is `temp`
-# @arg $4 string Parent directory, default is `${TMPDIR:-/tmp}`
+# @arg $3 string [default: temp] Name prefix
+# @arg $4 string [default: ${TMPDIR:-/tmp}] Parent directory
 # @tip Pass `/` or an empty extension to create a directory instead of a file
 # @tip The created path is automatically registered for cleanup on script exit
 # @note With no explicit parent directory, the path is created under
@@ -763,8 +763,8 @@ function __dybatpho_file_rewrite {
 #
 # @arg $1 string Destination file path
 # @env DRY_RUN string When true-like, report the write instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
-#   it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
+#   replacing it
 # @exitcode 1 The destination directory is missing or the write fails
 # @tip The destination keeps its mode, and its owner when the process may set it
 #######################################
@@ -833,8 +833,8 @@ function __dybatpho_file_sed_delimiter {
 # @arg $2 string POSIX basic regular expression to match
 # @arg $3 string Replacement text, where `&` and `\1` refer to the match
 # @env DRY_RUN string When true-like, report the rewrite instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
-#   it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
+#   replacing it
 # @exitcode 1 The file is missing, `sed` fails, or no delimiter can be chosen
 # @tip This avoids `sed -i`, whose argument differs between GNU and BSD, by
 #   rewriting through a staging file instead
@@ -883,8 +883,8 @@ function __dybatpho_file_produce_sed {
 # @arg $1 string File path, created when it does not exist
 # @arg $2 string Exact line to guarantee
 # @env DRY_RUN string When true-like, report the change instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
-#   it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
+#   replacing it
 # @exitcode 1 The parent directory is missing or the write fails
 # @tip The comparison is an exact whole-line match, not a substring or pattern
 #######################################
@@ -940,8 +940,8 @@ function __dybatpho_file_produce_appended {
 # @arg $1 string File path
 # @arg $2 string Exact line to remove
 # @env DRY_RUN string When true-like, report the change instead of performing it
-# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string When true-like, the default, write through a symlink rather than replacing
-#   it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
+#   replacing it
 # @exitcode 1 The write fails
 # @tip The comparison is an exact whole-line match, not a substring or pattern
 #######################################
@@ -989,7 +989,7 @@ function __dybatpho_file_produce_without {
 #   dybatpho::file_hash "./release.tar.gz" sha512
 #
 # @arg $1 string File path
-# @arg $2 string Algorithm, one of `md5`, `sha1`, `sha256` (default), or `sha512`
+# @arg $2 string [default: sha256] Algorithm, one of `md5`, `sha1`, `sha256`, or `sha512`
 # @stdout Checksum in lowercase hexadecimal, without the file name
 # @exitcode 1 The file is missing, the algorithm is unknown, or no checksum tool is installed
 # @tip Falls back from the GNU `*sum` tools to `shasum`/`md5` and then `openssl`
@@ -1127,7 +1127,7 @@ function dybatpho::file_backup {
 #   manifest="$(dybatpho::find_up "package.json" "${source_dir}")"
 #
 # @arg $1 string Entry name to look for in each directory
-# @arg $2 string Directory to start from, default is the current directory
+# @arg $2 string? Directory to start from, default is the current directory
 # @stdout Absolute path of the first matching entry
 # @exitcode 0 A matching entry was found
 # @exitcode 1 The filesystem root was reached without a match
@@ -1166,7 +1166,7 @@ function dybatpho::find_up {
 #   dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
 #
 # @arg $1 string Directory path
-# @arg $2 string Optional mode applied to the directory, such as `755`
+# @arg $2 string? Mode applied to the directory, such as `755`
 # @stdout The directory path
 # @env DRY_RUN string When true-like, print the path without creating anything
 # @exitcode 1 The path exists as something other than a directory, or cannot be created
@@ -1208,7 +1208,7 @@ function dybatpho::ensure_dir {
 #   holds a relative path, which it requires to be ignored.
 # @arg $1 string Variable name, such as `XDG_CONFIG_HOME`
 # @arg $2 string Default path relative to the home directory
-# @arg $3 string Optional application name appended to the directory
+# @arg $3 string? Application name appended to the directory
 # @stdout The resolved directory
 # @exitcode 1 Neither the variable nor `HOME` is usable
 # @internal
@@ -1243,7 +1243,7 @@ function __dybatpho_xdg_dir {
 # @arg $2 string Name to report a refusal under
 # @arg $3 string XDG variable, such as `XDG_STATE_HOME`
 # @arg $4 string Fallback below HOME, such as `.local/state`
-# @arg $5 string Optional application subdirectory
+# @arg $5 string? Application subdirectory
 # @set The named variable
 # @internal
 #######################################
@@ -1263,8 +1263,8 @@ function __dybatpho_xdg_dir_into {
 #   config="$(dybatpho::ensure_dir "$(dybatpho::xdg_config_dir myapp)")"
 #   printf 'theme = dark\n' | dybatpho::file_write_atomic "${config}/settings.ini"
 #
-# @arg $1 string Optional application name appended to the directory
-# @env XDG_CONFIG_HOME string Base configuration directory, default is `~/.config`
+# @arg $1 string? Application name appended to the directory
+# @env XDG_CONFIG_HOME string [default: ~/.config] Base configuration directory
 # @stdout The configuration directory
 # @exitcode 1 Neither `XDG_CONFIG_HOME` nor `HOME` is set
 # @tip These helpers only build a path; pair them with `dybatpho::ensure_dir`
@@ -1279,8 +1279,8 @@ function dybatpho::xdg_config_dir {
 # @example
 #   cache="$(dybatpho::xdg_cache_dir myapp)"
 #
-# @arg $1 string Optional application name appended to the directory
-# @env XDG_CACHE_HOME string Base cache directory, default is `~/.cache`
+# @arg $1 string? Application name appended to the directory
+# @env XDG_CACHE_HOME string [default: ~/.cache] Base cache directory
 # @stdout The cache directory
 # @exitcode 1 Neither `XDG_CACHE_HOME` nor `HOME` is set
 #######################################
@@ -1293,8 +1293,8 @@ function dybatpho::xdg_cache_dir {
 # @example
 #   data="$(dybatpho::xdg_data_dir myapp)"
 #
-# @arg $1 string Optional application name appended to the directory
-# @env XDG_DATA_HOME string Base data directory, default is `~/.local/share`
+# @arg $1 string? Application name appended to the directory
+# @env XDG_DATA_HOME string [default: ~/.local/share] Base data directory
 # @stdout The data directory
 # @exitcode 1 Neither `XDG_DATA_HOME` nor `HOME` is set
 #######################################
@@ -1310,8 +1310,8 @@ function dybatpho::xdg_data_dir {
 #   state="$(dybatpho::ensure_dir "$(dybatpho::xdg_state_dir myapp)")"
 #   printf '%s\n' "${run_id}" | dybatpho::file_write_atomic "${state}/last-run"
 #
-# @arg $1 string Optional application name appended to the directory
-# @env XDG_STATE_HOME string Base state directory, default is `~/.local/state`
+# @arg $1 string? Application name appended to the directory
+# @env XDG_STATE_HOME string [default: ~/.local/state] Base state directory
 # @stdout The state directory
 # @exitcode 1 Neither `XDG_STATE_HOME` nor `HOME` is set
 #######################################
@@ -1419,8 +1419,8 @@ function dybatpho::file_is_binary {
 #   printf 'artifact\n' > "${workdir}/out"
 #
 # @arg $1 string Variable name that receives the created path
-# @arg $2 string Name prefix, default is `temp`
-# @arg $3 string Parent directory, default is `${TMPDIR:-/tmp}`
+# @arg $2 string [default: temp] Name prefix
+# @arg $3 string [default: ${TMPDIR:-/tmp}] Parent directory
 # @set The named variable, to the created directory
 # @tip The directory is removed with its contents when the shell exits
 #######################################

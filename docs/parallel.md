@@ -124,14 +124,14 @@ dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_PARALLEL_JOBS`** | number | Job count used when `0` is requested |
-| **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop at the first failure |
-| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Per-job limit used when `--timeout` is not given |
-| **`DYBATPHO_PARALLEL_PROGRESS`** | string | When true-like, report progress as `--progress` does |
-| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds a timed-out job has to stop before it is killed, default is `5` |
-| **`DRY_RUN`** | string | When true-like, report the jobs instead of running them |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_PARALLEL_JOBS`** | number | yes |  | Job count used when `0` is requested |
+| **`DYBATPHO_PARALLEL_FAILFAST`** | string | yes |  | When true-like, stop at the first failure |
+| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | yes |  | Per-job limit used when `--timeout` is not given |
+| **`DYBATPHO_PARALLEL_PROGRESS`** | string | yes |  | When true-like, report progress as `--progress` does |
+| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | no | `5` | Seconds a timed-out job has to stop before it is killed |
+| **`DRY_RUN`** | string | yes |  | When true-like, report the jobs instead of running them |
 
 **🧩 Variable sets**
 
@@ -186,13 +186,13 @@ dybatpho::parallel_run 3 \
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_PARALLEL_FAILFAST`** | string | When true-like, stop at the first failure |
-| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | Per-job limit used when `--timeout` is not given |
-| **`DYBATPHO_PARALLEL_PROGRESS`** | string | When true-like, report progress as `--progress` does |
-| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds a timed-out job has to stop before it is killed, default is `5` |
-| **`DRY_RUN`** | string | When true-like, report the commands instead of running them |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_PARALLEL_FAILFAST`** | string | yes |  | When true-like, stop at the first failure |
+| **`DYBATPHO_PARALLEL_TIMEOUT`** | string | yes |  | Per-job limit used when `--timeout` is not given |
+| **`DYBATPHO_PARALLEL_PROGRESS`** | string | yes |  | When true-like, report progress as `--progress` does |
+| **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | no | `5` | Seconds a timed-out job has to stop before it is killed |
+| **`DRY_RUN`** | string | yes |  | When true-like, report the commands instead of running them |
 
 **🧩 Variable sets**
 

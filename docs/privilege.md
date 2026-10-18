@@ -29,16 +29,16 @@ own work needs no privilege at all.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_PRIVILEGE_COMMAND`** | string | Escalation command, `auto` to detect `sudo` then `doas` |
-| **`DYBATPHO_PRIVILEGE`** | string | `auto` elevates when not root, `true`/`false` override the detection |
-| **`DYBATPHO_PRIVILEGE_SUSPEND_HOOK`** | string | Function called with `suspend` before prompting and `resume` after |
-| **`DYBATPHO_PRIVILEGE_REFRESH`** | number | Seconds between ticket refreshes, default is `60` |
-| **`DYBATPHO_PRIVILEGE`** | string | Whether to elevate at all: `auto`, `true`, or `false` |
-| **`DYBATPHO_PRIVILEGE_COMMAND`** | string | Escalation command to use, or `auto` to detect one |
-| **`DYBATPHO_PRIVILEGE_SUSPEND_HOOK`** | string | Function handing the terminal over around a prompt |
-| **`DYBATPHO_PRIVILEGE_REFRESH`** | number | Seconds between ticket refreshes |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_PRIVILEGE_COMMAND`** | string | yes |  | Escalation command, `auto` to detect `sudo` then `doas` |
+| **`DYBATPHO_PRIVILEGE`** | string | yes |  | `auto` elevates when not root, `true`/`false` override the detection |
+| **`DYBATPHO_PRIVILEGE_SUSPEND_HOOK`** | string | yes |  | Function called with `suspend` before prompting and `resume` after |
+| **`DYBATPHO_PRIVILEGE_REFRESH`** | number | no | `60` | Seconds between ticket refreshes |
+| **`DYBATPHO_PRIVILEGE`** | string | yes |  | Whether to elevate at all: `auto`, `true`, or `false` |
+| **`DYBATPHO_PRIVILEGE_COMMAND`** | string | yes |  | Escalation command to use, or `auto` to detect one |
+| **`DYBATPHO_PRIVILEGE_SUSPEND_HOOK`** | string | yes |  | Function handing the terminal over around a prompt |
+| **`DYBATPHO_PRIVILEGE_REFRESH`** | number | yes |  | Seconds between ticket refreshes |
 
 ### 🚀 Highlights
 
@@ -192,6 +192,13 @@ which is what a script run from cron needs.
 ```bash
 dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
 ```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--shield** | Put a non-interactive escalation command first on `PATH`, so no child can prompt |
+| **--no-keepalive** | Skip the background refresh, for a run short enough not to need it |
 
 **🧾 Arguments**
 

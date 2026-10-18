@@ -26,17 +26,17 @@ Only programming mistakes, such as a missing argument, are fatal.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_TEST_SNAPSHOT_DIR`** | string | Directory holding `.snap` files, default is `test/snapshots` under the current directory |
-| **`DYBATPHO_TEST_UPDATE_SNAPSHOTS`** | string | Set to `1`, `true`, `yes`, or `on` to rewrite snapshots instead of comparing them |
-| **`UPDATE_SNAPSHOTS`** | string | Unprefixed alias for `DYBATPHO_TEST_UPDATE_SNAPSHOTS`, so a whole suite regenerates with `UPDATE_SNAPSHOTS=1 <test runner>` |
-| **`DYBATPHO_TEST_DURATION_RUNS`** | number | How many times `dybatpho::assert_duration_under` runs a command, keeping the fastest, default is `1` |
-| **`DYBATPHO_TEST_LAST_DURATION_MS`** | number | Milliseconds measured by the last duration assertion or benchmark |
-| **`DYBATPHO_TEST_BENCH_MIN_MS`** | number | Fastest run of the last benchmark, in milliseconds |
-| **`DYBATPHO_TEST_BENCH_MEDIAN_MS`** | number | Median run of the last benchmark, in milliseconds |
-| **`DYBATPHO_TEST_BENCH_MAX_MS`** | number | Slowest run of the last benchmark, in milliseconds |
-| **`DYBATPHO_TEST_FAILURES`** | number | Count of assertion failures recorded in this shell |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_TEST_SNAPSHOT_DIR`** | string | no | `${PWD}/test/snapshots` | Directory holding `.snap` files |
+| **`DYBATPHO_TEST_UPDATE_SNAPSHOTS`** | string | yes |  | Set to `1`, `true`, `yes`, or `on` to rewrite snapshots instead of comparing them |
+| **`UPDATE_SNAPSHOTS`** | string | yes |  | Unprefixed alias for `DYBATPHO_TEST_UPDATE_SNAPSHOTS`, so a whole suite regenerates with `UPDATE_SNAPSHOTS=1 <test runner>` |
+| **`DYBATPHO_TEST_DURATION_RUNS`** | number | yes |  | How many times `dybatpho::assert_duration_under` runs a command, keeping the fastest, default is `1` |
+| **`DYBATPHO_TEST_LAST_DURATION_MS`** | number | yes |  | Milliseconds measured by the last duration assertion or benchmark |
+| **`DYBATPHO_TEST_BENCH_MIN_MS`** | number | yes |  | Fastest run of the last benchmark, in milliseconds |
+| **`DYBATPHO_TEST_BENCH_MEDIAN_MS`** | number | yes |  | Median run of the last benchmark, in milliseconds |
+| **`DYBATPHO_TEST_BENCH_MAX_MS`** | number | yes |  | Slowest run of the last benchmark, in milliseconds |
+| **`DYBATPHO_TEST_FAILURES`** | number | yes |  | Count of assertion failures recorded in this shell |
 
 ### 🚀 Highlights
 
@@ -214,10 +214,10 @@ Assert that a path exists and is a regular file.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to check |
-| `$2` | string | Optional message replacing the default diagnostic |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to check |
+| `$2` | string | no |  | Message replacing the default diagnostic |
 
 **🚦 Exit codes**
 
@@ -232,10 +232,10 @@ Assert that a path exists and is a directory.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to check |
-| `$2` | string | Optional message replacing the default diagnostic |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to check |
+| `$2` | string | no |  | Message replacing the default diagnostic |
 
 **🚦 Exit codes**
 
@@ -250,10 +250,10 @@ Assert that a path is a symbolic link, optionally pointing at an expected target
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to check |
-| `$2` | string | Optional expected link target, compared literally |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to check |
+| `$2` | string | no |  | Expected link target, compared literally |
 
 **🚦 Exit codes**
 
@@ -802,11 +802,11 @@ dybatpho::mock_command git 0 "main"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Command name to mock |
-| `$2` | number | Exit code the mock returns, default is `0` |
-| `$3` | string | Text the mock prints on stdout, default is empty |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Command name to mock |
+| `$2` | number | no | `0` | Exit code the mock returns |
+| `$3` | string | no |  | Text the mock prints on stdout |
 
 **🔗 See also**
 
@@ -863,10 +863,10 @@ dybatpho::assert_mock_called kubectl get pods
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Mocked command name |
-| `$@` | string | Optional arguments that must appear together in one recorded call |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Mocked command name |
+| `$@` | string | no |  | Arguments that must appear together in one recorded call |
 
 **🚦 Exit codes**
 
@@ -900,12 +900,12 @@ dybatpho::mock_http 'api.example.test/status' 200 '{"ok":true}'
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Substring matched against the requested URL |
-| `$2` | number | HTTP status code the mock reports |
-| `$3` | string | Optional response body written to the caller's output file |
-| `$@` | string | Optional extra response headers in `Name: value` form |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Substring matched against the requested URL |
+| `$2` | number | yes |  | HTTP status code the mock reports |
+| `$3` | string | no |  | Response body written to the caller's output file |
+| `$@` | string | no |  | Extra response headers in `Name: value` form |
 
 **🧩 Variable sets**
 
@@ -973,7 +973,8 @@ _Function has no arguments._
 
 **🔗 See also**
 
-- [- `dybatpho::mock_http` - `dybatpho::mock_http_calls](#dybatphomock_http-dybatphomock_http_calls)
+- [dybatpho::mock_http](#dybatphomock_http)
+- [dybatpho::mock_http_calls](#dybatphomock_http_calls)
 
 ---
 
@@ -1045,7 +1046,8 @@ dybatpho::unmock_time
 
 **🔗 See also**
 
-- [- `dybatpho::mock_time_advance` - `dybatpho::unmock_time](#dybatphomock_time_advance-dybatphounmock_time)
+- [dybatpho::mock_time_advance](#dybatphomock_time_advance)
+- [dybatpho::unmock_time](#dybatphounmock_time)
 
 ---
 
@@ -1192,11 +1194,11 @@ dybatpho::assert_json_query "${settings}" '.mode' dev
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Variable name that receives the file path |
-| `$2` | string | File content, or `-` to read the content from stdin |
-| `$3` | string | Optional file extension, default is `.txt` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Variable name that receives the file path |
+| `$2` | string | yes |  | File content, or `-` to read the content from stdin |
+| `$3` | string | no | `.txt` | File extension |
 
 **🔗 See also**
 

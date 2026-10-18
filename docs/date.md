@@ -22,9 +22,9 @@ implementations this module supports shift by them differently.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_DATE_TIMEZONE`** | string | Timezone used by date helpers, default is `UTC` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_DATE_TIMEZONE`** | string | no | `${UTC}` | Timezone used by date helpers |
 
 ### 🚀 Highlights
 
@@ -64,9 +64,9 @@ Print the current time using a `date` format string.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional output format, default is `%s` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `%s` | Output format |
 
 **🌍 Environment variables**
 
@@ -86,9 +86,9 @@ Print today's date using a `date` format string.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional output format, default is `%F` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `%F` | Output format |
 
 **🌍 Environment variables**
 
@@ -158,10 +158,10 @@ Format a Unix timestamp with a `date` format string.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Unix timestamp |
-| `$2` | string | Optional output format, default is `%F %T` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Unix timestamp |
+| `$2` | string | no | `%F %T` | Output format |
 
 **🌍 Environment variables**
 
@@ -181,11 +181,11 @@ Add or subtract days from a date string and print the result.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Base date string |
-| `$2` | number | Day offset, may be negative |
-| `$3` | string | Optional output format, default is `%F` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base date string |
+| `$2` | number | yes |  | Day offset, may be negative |
+| `$3` | string | no | `%F` | Output format |
 
 **🌍 Environment variables**
 
@@ -294,10 +294,10 @@ dybatpho::date_month_start 2024-02-17 '%F %T'  # 2024-02-01 00:00:00
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Date string |
-| `$2` | string | Optional output format, default is `%F` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Date string |
+| `$2` | string | no | `%F` | Output format |
 
 **🌍 Environment variables**
 
@@ -332,10 +332,10 @@ dybatpho::date_month_end 2023-02-17   # 2023-02-28
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Date string |
-| `$2` | string | Optional output format, default is `%F` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Date string |
+| `$2` | string | no | `%F` | Output format |
 
 **🌍 Environment variables**
 
@@ -372,12 +372,12 @@ dybatpho::date_add 2024-03-01 -1 weeks               # 2024-02-23
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Base date string |
-| `$2` | number | Amount, may be negative |
-| `$3` | string | Unit: seconds, minutes, hours, days, or weeks |
-| `$4` | string | Optional output format, default is `%F %T` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base date string |
+| `$2` | number | yes |  | Amount, may be negative |
+| `$3` | string | yes |  | Unit: seconds, minutes, hours, days, or weeks |
+| `$4` | string | no | `%F %T` | Output format |
 
 **🌍 Environment variables**
 
@@ -395,7 +395,7 @@ dybatpho::date_add 2024-03-01 -1 weeks               # 2024-02-23
 
 **🔗 See also**
 
-- [- `dybatpho::date_add_days](#dybatphodate_add_days)
+- [dybatpho::date_add_days](#dybatphodate_add_days)
 
 ---
 
@@ -415,11 +415,11 @@ dybatpho::date_diff "2024-01-01 00:00:00" "2024-01-01 01:30:00" minutes
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Start date string |
-| `$2` | string | End date string |
-| `$3` | string | Optional unit: seconds (default), minutes, hours, days, or weeks |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Start date string |
+| `$2` | string | yes |  | End date string |
+| `$3` | string | no |  | Unit: seconds (default), minutes, hours, days, or weeks |
 
 **🌍 Environment variables**
 
@@ -437,7 +437,7 @@ dybatpho::date_diff "2024-01-01 00:00:00" "2024-01-01 01:30:00" minutes
 
 **🔗 See also**
 
-- [- `dybatpho::date_diff_days](#dybatphodate_diff_days)
+- [dybatpho::date_diff_days](#dybatphodate_diff_days)
 
 ---
 
@@ -476,7 +476,7 @@ dybatpho::date_seconds_to_hms -61     # -0:01:01
 
 **🔗 See also**
 
-- [- `dybatpho::i18n_duration](#dybatphoi18n_duration)
+- [dybatpho::i18n_duration](#dybatphoi18n_duration)
 
 ---
 
@@ -535,7 +535,7 @@ dybatpho::date_parse_duration seconds "${TIMEOUT}" || dybatpho::die "Bad timeout
 
 **🔗 See also**
 
-- [- `dybatpho::date_seconds_to_hms](#dybatphodate_seconds_to_hms)
+- [dybatpho::date_seconds_to_hms](#dybatphodate_seconds_to_hms)
 
 ---
 
@@ -574,7 +574,7 @@ dybatpho::date_is_before "2024-02-29 12:00:00" 2024-02-29 # no
 
 **🔗 See also**
 
-- [- `dybatpho::date_is_after](#dybatphodate_is_after)
+- [dybatpho::date_is_after](#dybatphodate_is_after)
 
 ---
 
@@ -612,7 +612,7 @@ dybatpho::date_is_after 2024-02-29 2024-02-29   # no
 
 **🔗 See also**
 
-- [- `dybatpho::date_is_before](#dybatphodate_is_before)
+- [dybatpho::date_is_before](#dybatphodate_is_before)
 
 ---
 
@@ -644,10 +644,10 @@ dybatpho::date_iso_week 2024-02-29 '%G-W%V-%u'   # 2024-W09-4
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Date string |
-| `$2` | string | Optional format, default is `%G-W%V` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Date string |
+| `$2` | string | no | `%G-W%V` | Format |
 
 **🌍 Environment variables**
 
@@ -686,18 +686,18 @@ DYBATPHO_DATE_TIMEZONE=Europe/Paris dybatpho::date_in_tz "2024-07-01 09:00:00" A
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Date string |
-| `$2` | string | Target timezone, such as `Asia/Ho_Chi_Minh` or `UTC` |
-| `$3` | string | Optional output format, default is `%F %T %z` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Date string |
+| `$2` | string | yes |  | Target timezone, such as `Asia/Ho_Chi_Minh` or `UTC` |
+| `$3` | string | no | `%F %T %z` | Output format |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_DATE_TIMEZONE`** | string | Timezone the date is read in |
-| **`TZDIR`** | string | Zone database directory, default is `/usr/share/zoneinfo` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_DATE_TIMEZONE`** | string | yes |  | Timezone the date is read in |
+| **`TZDIR`** | string | no | `/usr/share/zoneinfo` | Zone database directory |
 
 **📤 Output on stdout**
 

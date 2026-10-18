@@ -199,7 +199,7 @@ function dybatpho::metrics_help {
 #   dybatpho::metrics_counter_inc http_requests_total 1 method=GET status=200
 #
 # @arg $1 string Metric name, conventionally ending in `_total`
-# @arg $2 number Amount to add, default `1`
+# @arg $2 number [default: 1] Amount to add
 # @arg $@ string Label assignments such as `status=200`
 # @exitcode 1 The name, a label, or the amount is not valid
 #######################################
@@ -524,7 +524,7 @@ function __dybatpho_metrics_seconds {
 #   `http_duration{host="a"}` becomes `http_duration_bucket{host="a",le="0.5"}`.
 # @arg $1 string Series key
 # @arg $2 string Suffix appended to the metric name
-# @arg $3 string Optional extra label, already rendered as `key="value"`
+# @arg $3 string? Extra label, already rendered as `key="value"`
 # @stdout Rewritten series key
 # @internal
 #######################################

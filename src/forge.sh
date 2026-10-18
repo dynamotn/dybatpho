@@ -94,7 +94,7 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_FORGE string Force the forge kind, `github` or `gitlab`, instead of detecting it
-# @env DYBATPHO_FORGE_REMOTE string Git remote the forge is detected from, default `origin`
+# @env DYBATPHO_FORGE_REMOTE string [default: origin] Git remote the forge is detected from
 # @env DYBATPHO_FORGE_API string Override the API base URL, for a forge on a path detection cannot guess
 # @env DYBATPHO_FORGE_REPO string Override the detected `owner/repo`
 # @env DYBATPHO_FORGE_TOKEN string Token to authenticate with, preferred over the per-forge variables
@@ -136,8 +136,8 @@ function __dybatpho_forge_normalize_url {
 
 #######################################
 # @description Print the host of the configured remote.
-# @arg $1 string Optional remote name, default `DYBATPHO_FORGE_REMOTE`
-# @arg $2 string Optional repository path, default `.`
+# @arg $1 string [default: ${DYBATPHO_FORGE_REMOTE}] Remote name
+# @arg $2 string [default: .] Repository path
 # @stdout Host name
 # @exitcode 1 The remote has no URL
 #######################################
@@ -160,8 +160,8 @@ function dybatpho::forge_host {
 #     gitlab) ... ;;
 #   esac
 #
-# @arg $1 string Optional remote name, default `DYBATPHO_FORGE_REMOTE`
-# @arg $2 string Optional repository path, default `.`
+# @arg $1 string [default: ${DYBATPHO_FORGE_REMOTE}] Remote name
+# @arg $2 string [default: .] Repository path
 # @env DYBATPHO_FORGE string Forced forge kind
 # @stdout `github` or `gitlab`
 # @exitcode 1 The host matches neither forge and `DYBATPHO_FORGE` is unset
@@ -192,8 +192,8 @@ function dybatpho::forge_kind {
 # @description Print the `owner/repo` the remote points at.
 #   A GitLab project may be nested in subgroups, so everything after the host is
 #   kept rather than only the last two segments.
-# @arg $1 string Optional remote name, default `DYBATPHO_FORGE_REMOTE`
-# @arg $2 string Optional repository path, default `.`
+# @arg $1 string [default: ${DYBATPHO_FORGE_REMOTE}] Remote name
+# @arg $2 string [default: .] Repository path
 # @env DYBATPHO_FORGE_REPO string Override the detected value
 # @stdout `owner/repo`, or `group/subgroup/repo` on GitLab
 # @exitcode 1 The remote URL carries no path
@@ -221,8 +221,8 @@ function dybatpho::forge_repo {
 #   `github.com` answers on a separate API host; every other GitHub is an
 #   Enterprise install serving `/api/v3` from the same host. GitLab always
 #   serves `/api/v4` from its own host.
-# @arg $1 string Optional remote name, default `DYBATPHO_FORGE_REMOTE`
-# @arg $2 string Optional repository path, default `.`
+# @arg $1 string [default: ${DYBATPHO_FORGE_REMOTE}] Remote name
+# @arg $2 string [default: .] Repository path
 # @env DYBATPHO_FORGE_API string Override the computed value
 # @stdout API base URL, without a trailing slash
 #######################################
@@ -259,7 +259,7 @@ function dybatpho::forge_api {
 #
 #   The module never logs the token, so this matters for what the calling
 #   script does with it rather than for the requests made here.
-# @arg $1 string Optional forge kind, detected when omitted
+# @arg $1 string? Forge kind, detected when omitted
 # @env DYBATPHO_FORGE_TOKEN string Checked first, whatever the forge
 # @env GITHUB_TOKEN string GitHub token, with `GH_TOKEN` as a fallback
 # @env GITLAB_TOKEN string GitLab token, with `CI_JOB_TOKEN` as a fallback
@@ -508,8 +508,8 @@ function __dybatpho_forge_auth_header {
 #
 # @arg $1 string HTTP method
 # @arg $2 string Path relative to the project, or an absolute URL
-# @arg $3 string Optional JSON request body
-# @arg $4 string Optional file the response body is written to, default `/dev/null`
+# @arg $3 string? JSON request body
+# @arg $4 string [default: /dev/null] File the response body is written to
 # @arg $@ string Additional curl options
 # @set DYBATPHO_HTTP_STATUS The response status code
 # @exitcode 0 The forge answered with a 2xx status
@@ -582,7 +582,7 @@ function dybatpho::forge_request {
 #   dybatpho::forge_request POST "issues" "${payload}" "${response}" \
 #     || dybatpho::die "Could not create issue: $(dybatpho::forge_error "${response}")"
 #
-# @arg $1 string Response body file, defaulting to the last one parsed
+# @arg $1 string? Response body file, defaulting to the last one parsed
 # @env DYBATPHO_HTTP_STATUS string Status of the last request
 # @env DYBATPHO_HTTP_BODY_FILE string Body file of the last request
 # @stdout The forge's own message when there is one, prefixed with the status
@@ -700,7 +700,7 @@ function dybatpho::forge_issue_find {
 # @description Open an issue and print its number.
 # @arg $1 string Issue title
 # @arg $2 string Issue body
-# @arg $3 string Optional comma-separated labels
+# @arg $3 string? Comma-separated labels
 # @stdout Number of the created issue
 # @exitcode 1 The forge rejected the request
 #######################################
@@ -779,7 +779,7 @@ function dybatpho::forge_issue_comment {
 #
 # @arg $1 string Issue title, also the identity used to find an existing issue
 # @arg $2 string Body of the issue or of the comment
-# @arg $3 string Optional comma-separated labels, applied only when creating
+# @arg $3 string? Comma-separated labels, applied only when creating
 # @stdout JSON object with `action`, `number` and `url`
 # @exitcode 1 The forge rejected the request
 #######################################
@@ -881,9 +881,9 @@ function dybatpho::forge_release_find {
 #   dybatpho::forge_release_create "v1.2.0" "v1.2.0" "$(dybatpho::release_changelog)"
 #
 # @arg $1 string Tag name
-# @arg $2 string Optional release title, default is the tag
-# @arg $3 string Optional release notes
-# @arg $4 string Optional `true` to create the release as a draft
+# @arg $2 string? Release title, default is the tag
+# @arg $3 string? Release notes
+# @arg $4 string? `true` to create the release as a draft
 # @stdout Release id on GitHub, tag name on GitLab
 # @exitcode 1 The forge rejected the request, or a draft was asked of GitLab
 # @note GitLab has no draft release, so asking for one there is an error rather

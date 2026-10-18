@@ -33,12 +33,12 @@ followed into whatever it points at.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_DIFF_COLOR`** | string | Force color on or off; the default follows `NO_COLOR` and whether stdout is a terminal |
-| **`DYBATPHO_DIFF_CONTEXT`** | number | Lines of context in a text diff, default is `3` |
-| **`DYBATPHO_DIFF_CONTEXT`** | number | Lines of context around each change, default is `3` |
-| **`DYBATPHO_DIFF_COLOR`** | string | `true` or `false` to decide coloring, empty to detect it |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_DIFF_COLOR`** | string | yes |  | Force color on or off; the default follows `NO_COLOR` and whether stdout is a terminal |
+| **`DYBATPHO_DIFF_CONTEXT`** | number | no | `3` | Lines of context in a text diff |
+| **`DYBATPHO_DIFF_CONTEXT`** | number | no | `3` | Lines of context around each change |
+| **`DYBATPHO_DIFF_COLOR`** | string | yes |  | `true` or `false` to decide coloring, empty to detect it |
 
 ### 🚀 Highlights
 
@@ -81,12 +81,12 @@ dybatpho::diff_text /etc/nginx/nginx.conf "${rendered}" current proposed
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | File path, `-` for stdin, or text |
-| `$2` | string | File path, `-` for stdin, or text |
-| `$3` | string | Optional label for the first side, default is its path |
-| `$4` | string | Optional label for the second side, default is its path |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | File path, `-` for stdin, or text |
+| `$2` | string | yes |  | File path, `-` for stdin, or text |
+| `$3` | string | no |  | Label for the first side, default is its path |
+| `$4` | string | no |  | Label for the second side, default is its path |
 
 **📤 Output on stdout**
 
@@ -235,6 +235,13 @@ dybatpho::diff_dir ./release-1.2 ./release-1.3
 # ! lib/plugins: file -> directory
 dybatpho::diff_dir --summary ./release-1.2 ./release-1.3   # +1 -1 ~2
 ```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **-s \| --summary** | Print one `+A -R ~M` line instead, the `diff_summary` shape; a change of kind counts in `~` |
+| **-z \| --null** | Terminate each record with NUL instead of a newline, uncolored and unescaped |
 
 **🧾 Arguments**
 

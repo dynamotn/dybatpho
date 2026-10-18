@@ -27,7 +27,7 @@
 #######################################
 # @description Prefix every line in a text block with the given indent string.
 # @arg $1 string Input text or `-` for stdin
-# @arg $2 string Optional indent prefix, default is two spaces
+# @arg $2 string? Indent prefix, default is two spaces
 # @stdout Indented text block
 #######################################
 function dybatpho::text_indent {
@@ -104,7 +104,7 @@ function dybatpho::text_strip_ansi {
 #######################################
 # @description Prefix each non-empty line in a text block as a bullet item.
 # @arg $1 string Input text or `-` for stdin
-# @arg $2 string Optional bullet marker, default is `-`
+# @arg $2 string [default: -] Bullet marker
 # @stdout Bullet-formatted text block
 #######################################
 function dybatpho::text_bullet_list {
@@ -133,8 +133,8 @@ function dybatpho::text_bullet_list {
 #   dybatpho::text_columns $'name|version\ndybatpho|6.0.0'
 #
 # @arg $1 string Input text or `-` for stdin
-# @arg $2 string Optional exact delimiter, default is `|`
-# @arg $3 number Optional gap width between columns, default is 2
+# @arg $2 string [default: |] Exact delimiter
+# @arg $3 number [default: 2] Gap width between columns
 # @stdout Plain aligned columns
 # @exitcode 1 Stop the script when the `table` module is not loaded
 #######################################
@@ -226,8 +226,8 @@ function __dybatpho_text_width_into {
 #   # | plain |
 #   # +-------+
 # @arg $1 string Input text or `-` for stdin
-# @arg $2 string Optional title shown in the top border, default is none
-# @arg $3 string Optional border style: `single` (default), `double`, `rounded`, `heavy`, or `ascii`
+# @arg $2 string? Title shown in the top border, default is none
+# @arg $3 string? Border style: `single` (default), `double`, `rounded`, `heavy`, or `ascii`
 # @stdout The boxed text block
 # @exitcode 1 The border style is unknown
 #######################################
@@ -295,7 +295,7 @@ function dybatpho::text_box {
 #   #        title
 #   #    subtitle here
 # @arg $1 string Input text or `-` for stdin
-# @arg $2 number Optional width to center within, default is the terminal width
+# @arg $2 number? Width to center within, default is the terminal width
 # @stdout The centered text block
 # @exitcode 1 The width is not a positive integer
 #######################################
@@ -338,8 +338,8 @@ function dybatpho::text_center {
 #   #  9: alpha
 #   # 10: beta
 # @arg $1 string Input text or `-` for stdin
-# @arg $2 number Optional number of the first line, default is `1`
-# @arg $3 string Optional separator between number and text, default is two spaces
+# @arg $2 number [default: 1] Number of the first line
+# @arg $3 string? Separator between number and text, default is two spaces
 # @stdout The numbered text block
 # @exitcode 1 The first line number is not a non-negative integer
 #######################################
@@ -378,7 +378,7 @@ function dybatpho::text_number_lines {
 #   git log --oneline | dybatpho::text_truncate_lines - 5 "(+{count} commits)"
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 number Number of lines to keep
-# @arg $3 string Optional marker template, `{count}` is replaced by the number of lines left out
+# @arg $3 string? Marker template, `{count}` is replaced by the number of lines left out
 # @stdout The kept lines and, when lines were left out, the marker
 # @exitcode 1 The count is not a non-negative integer
 #######################################

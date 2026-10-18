@@ -133,7 +133,8 @@ dybatpho::validate_is ipv4 "192.0.2.256"         # no
 
 **🔗 See also**
 
-- [- `dybatpho::validate_types` - `dybatpho::validate_register](#dybatphovalidate_types-dybatphovalidate_register)
+- [dybatpho::validate_types](#dybatphovalidate_types)
+- [dybatpho::validate_register](#dybatphovalidate_register)
 
 ---
 
@@ -203,12 +204,12 @@ dybatpho::validate_is branch "release/2.0"     # yes
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Type name, lowercase letters, digits and underscores |
-| `$2` | string | Predicate function name |
-| `$3` | string | Description used in messages, such as `a release branch` |
-| `$4` | string | Optional `numeric` to make `min:`/`max:` bound the value rather than its length |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Type name, lowercase letters, digits and underscores |
+| `$2` | string | yes |  | Predicate function name |
+| `$3` | string | yes |  | Description used in messages, such as `a release branch` |
+| `$4` | string | no |  | `numeric` to make `min:`/`max:` bound the value rather than its length |
 
 **🧩 Variable sets**
 
@@ -222,7 +223,7 @@ dybatpho::validate_is branch "release/2.0"     # yes
 
 **🔗 See also**
 
-- [- `dybatpho::validate_reset](#dybatphovalidate_reset)
+- [dybatpho::validate_reset](#dybatphovalidate_reset)
 
 ---
 
@@ -277,7 +278,8 @@ fi
 
 **🔗 See also**
 
-- [- `dybatpho::validate_errors` - `dybatpho::validate_or_die](#dybatphovalidate_errors-dybatphovalidate_or_die)
+- [dybatpho::validate_errors](#dybatphovalidate_errors)
+- [dybatpho::validate_or_die](#dybatphovalidate_or_die)
 
 ---
 
@@ -298,7 +300,7 @@ _Function has no arguments._
 
 **🔗 See also**
 
-- [- `dybatpho::validate_value](#dybatphovalidate_value)
+- [dybatpho::validate_value](#dybatphovalidate_value)
 
 ---
 
@@ -334,7 +336,7 @@ dybatpho::validate_or_die "--port" "${PORT}" type:int min:1 max:65535
 
 **🔗 See also**
 
-- [- `dybatpho::validate_value](#dybatphovalidate_value)
+- [dybatpho::validate_value](#dybatphovalidate_value)
 
 ---
 

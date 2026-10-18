@@ -205,10 +205,10 @@ dybatpho::notify_telegram "*Build* passed" "Markdown"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message text (supports HTML or Markdown when parse mode is set) |
-| `$2` | string | Parse mode: `HTML`, `Markdown`, or `MarkdownV2`. Default is empty (plain text) |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Message text (supports HTML or Markdown when parse mode is set) |
+| `$2` | string | no |  | Parse mode: `HTML`, `Markdown`, or `MarkdownV2`; empty sends plain text |
 
 **🌍 Environment variables**
 
@@ -248,10 +248,10 @@ dybatpho::notify_teams "All checks passed" "Deploy v2.0"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message body text |
-| `$2` | string | Optional card title shown above the message body |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Message body text |
+| `$2` | string | no |  | Card title shown above the message body |
 
 **🌍 Environment variables**
 
@@ -328,10 +328,10 @@ dybatpho::notify_discord "Deploy done" "CI Bot"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message content (supports Discord Markdown) |
-| `$2` | string | Optional display name override for the webhook bot |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Message content (supports Discord Markdown) |
+| `$2` | string | no |  | Display name override for the webhook bot |
 
 **🌍 Environment variables**
 
@@ -411,11 +411,11 @@ dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Title |
-| `$2` | string | Body, default is empty |
-| `$3` | string | Urgency: `low`, `normal` or `critical`, default is `normal` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Title |
+| `$2` | string | no |  | Body |
+| `$3` | string | no | `normal` | Urgency: `low`, `normal` or `critical` |
 
 **🌍 Environment variables**
 
@@ -452,20 +452,20 @@ dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,flop
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message text |
-| `$2` | string | Optional title |
-| `$3` | string | Optional priority: `1`-`5`, or `min`, `low`, `default`, `high`, `max` or `urgent` |
-| `$4` | string | Optional comma-separated tags; a tag that names an emoji is shown as one |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Message text |
+| `$2` | string | no |  | Title |
+| `$3` | string | no |  | Priority: `1`-`5`, or `min`, `low`, `default`, `high`, `max` or `urgent` |
+| `$4` | string | no |  | Comma-separated tags; a tag that names an emoji is shown as one |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_NTFY_TOPIC`** | string | Topic to publish to: letters, digits, `-` and `_`, at most 64 characters |
-| **`DYBATPHO_NTFY_URL`** | string | Server URL, default is `https://ntfy.sh` |
-| **`DYBATPHO_NTFY_TOKEN`** | string | Optional access token for a protected topic |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_NTFY_TOPIC`** | string | yes |  | Topic to publish to: letters, digits, `-` and `_`, at most 64 characters |
+| **`DYBATPHO_NTFY_URL`** | string | no | `https://ntfy.sh` | Server URL |
+| **`DYBATPHO_NTFY_TOKEN`** | string | no |  | Access token for a protected topic |
 
 **🚦 Exit codes**
 
@@ -501,11 +501,11 @@ dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Message text |
-| `$2` | string | Optional title; Gotify shows the application name without one |
-| `$3` | string | Optional priority from `0` to `10` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Message text |
+| `$2` | string | no |  | Title; Gotify shows the application name without one |
+| `$3` | string | no |  | Priority from `0` to `10` |
 
 **🌍 Environment variables**
 
@@ -554,20 +554,20 @@ dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${re
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Recipients, comma-separated |
-| `$2` | string | Subject |
-| `$3` | string | Body |
-| `$4` | string | Sender address, default is `DYBATPHO_EMAIL_FROM`, or the MTA's own default when neither is set |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Recipients, comma-separated |
+| `$2` | string | yes |  | Subject |
+| `$3` | string | yes |  | Body |
+| `$4` | string | no |  | Sender address; `DYBATPHO_EMAIL_FROM` when omitted, or the MTA's own default when neither is set |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_EMAIL_FROM`** | string | Default sender address |
-| **`DYBATPHO_SENDMAIL`** | string | The sendmail command, default is `sendmail` on PATH, then `/usr/sbin/sendmail` and `/usr/lib/sendmail` |
-| **`DRY_RUN`** | string | Print the sendmail command instead of sending anything |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_EMAIL_FROM`** | string | yes |  | Default sender address |
+| **`DYBATPHO_SENDMAIL`** | string | no |  | The sendmail command; without it, `sendmail` on PATH, then `/usr/sbin/sendmail` and `/usr/lib/sendmail` |
+| **`DRY_RUN`** | string | yes |  | Print the sendmail command instead of sending anything |
 
 **🚦 Exit codes**
 

@@ -55,11 +55,11 @@
 
 # @env DYBATPHO_I18N_LOCALE string Locale to use, overriding the environment
 DYBATPHO_I18N_LOCALE="${DYBATPHO_I18N_LOCALE:-}"
-# @env DYBATPHO_I18N_FALLBACK string Locale consulted when the active one has no translation, default is `en`
+# @env DYBATPHO_I18N_FALLBACK string [default: en] Locale consulted when the active one has no translation
 DYBATPHO_I18N_FALLBACK="${DYBATPHO_I18N_FALLBACK:-en}"
 # @env DYBATPHO_I18N_PATH string Colon-separated catalog directories, searched before the XDG and system ones
 DYBATPHO_I18N_PATH="${DYBATPHO_I18N_PATH:-}"
-# @env DYBATPHO_I18N_DOMAIN string Default catalog domain, default is `messages`
+# @env DYBATPHO_I18N_DOMAIN string [default: messages] Default catalog domain
 DYBATPHO_I18N_DOMAIN="${DYBATPHO_I18N_DOMAIN:-messages}"
 # @env DYBATPHO_I18N_STRICT string When true-like, a missing translation or catalog stops the script
 DYBATPHO_I18N_STRICT="${DYBATPHO_I18N_STRICT:-false}"
@@ -67,7 +67,7 @@ DYBATPHO_I18N_STRICT="${DYBATPHO_I18N_STRICT:-false}"
 DYBATPHO_I18N_MISSING_MARK="${DYBATPHO_I18N_MISSING_MARK:-}"
 # @env DYBATPHO_I18N_TRANSLATE_LIBRARY string When true-like, dybatpho's own diagnostics are translated too
 DYBATPHO_I18N_TRANSLATE_LIBRARY="${DYBATPHO_I18N_TRANSLATE_LIBRARY:-false}"
-# @env DYBATPHO_I18N_BYTE_STANDARD string `iec` for 1024-based KiB/MiB, `si` for 1000-based kB/MB, default is `iec`
+# @env DYBATPHO_I18N_BYTE_STANDARD string [default: iec] `iec` for 1024-based KiB/MiB, `si` for 1000-based kB/MB
 DYBATPHO_I18N_BYTE_STANDARD="${DYBATPHO_I18N_BYTE_STANDARD:-iec}"
 # @env DYBATPHO_I18N_CURRENCY_NEGATIVE string `sign` for `-$1.00` or `parens` for accounting style `($1.00)`
 DYBATPHO_I18N_CURRENCY_NEGATIVE="${DYBATPHO_I18N_CURRENCY_NEGATIVE:-sign}"
@@ -251,7 +251,7 @@ function dybatpho::i18n_set_locale {
 # @example
 #   dybatpho::i18n_chain zh_Hant_TW
 #
-# @arg $1 string Optional locale tag, default is the active locale
+# @arg $1 string? Locale tag, default is the active locale
 # @stdout One locale tag per line
 #######################################
 function dybatpho::i18n_chain {
@@ -352,7 +352,7 @@ function __dybatpho_i18n_check_key {
 # @arg $1 string Locale tag
 # @arg $2 string Message key
 # @arg $3 string Translation
-# @arg $4 string Optional plural category
+# @arg $4 string? Plural category
 # @set __dybatpho_i18n_msg __dybatpho_i18n_plural
 # @exitcode 1 The key is not storable
 # @internal
@@ -376,7 +376,7 @@ function __dybatpho_i18n_store {
 # @description Look a key up along the fallback chain of the active locale.
 # @arg $1 string Name of the variable that receives the translation
 # @arg $2 string Message key
-# @arg $3 string Optional count; when given, plural forms are consulted first
+# @arg $3 string? Count; when given, plural forms are consulted first
 # @set The named variable
 # @exitcode 1 No locale in the chain carries the key
 # @internal
@@ -847,7 +847,7 @@ function __dybatpho_i18n_plural_gd {
 #   dybatpho::i18n_plural_form 5 ru   # many
 #
 # @arg $1 number Count, which may be negative
-# @arg $2 string Optional locale or language, default is the active locale
+# @arg $2 string? Locale or language, default is the active locale
 # @stdout One of `zero`, `one`, `two`, `few`, `many`, `other`
 # @exitcode 1 The count is not an integer
 #######################################
@@ -1334,7 +1334,7 @@ function __dybatpho_i18n_data_into {
 # @arg $2 string Name of the variable that receives the sign
 # @arg $3 string Name of the variable that receives the integer digits
 # @arg $4 string Name of the variable that receives the fraction digits
-# @arg $5 string Optional function name to report a bad value against, default is the caller
+# @arg $5 string? Function name to report a bad value against, default is the caller
 # @set The three named variables
 # @internal
 #######################################
@@ -1462,8 +1462,8 @@ function __dybatpho_i18n_group {
 #   dybatpho::i18n_number 12345678 0 hi      # 1,23,45,678
 #
 # @arg $1 string Value, in plain decimal notation
-# @arg $2 number Optional fraction digits, default keeps what the input had
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 number? Fraction digits, default keeps what the input had
+# @arg $3 string? Locale, default is the active locale
 # @stdout The formatted number
 # @exitcode 1 The value is not a number or the precision is not an integer
 # @tip Formatted output is for display. Never parse it back: several locales
@@ -1485,8 +1485,8 @@ function dybatpho::i18n_number {
 #   would end only the subshell while the caller printed what was left.
 # @arg $1 string Name of the variable receiving the formatted number
 # @arg $2 string Value, in plain decimal notation
-# @arg $3 number Optional fraction digits, default keeps what the input had
-# @arg $4 string Optional locale, default is the active locale
+# @arg $3 number? Fraction digits, default keeps what the input had
+# @arg $4 string? Locale, default is the active locale
 # @set The named variable
 # @exitcode 1 Stop the script when the value is not a number or the precision is not an integer
 # @internal
@@ -1537,7 +1537,7 @@ function __dybatpho_i18n_number_into {
 #   output, and exists so that nothing in a script has to reach for
 #   `printf '%f'`, which follows `LC_NUMERIC` and would vary by machine.
 # @arg $1 string Value
-# @arg $2 number Optional fraction digits
+# @arg $2 number? Fraction digits
 # @stdout The formatted number
 #######################################
 function dybatpho::i18n_number_plain {
@@ -1570,8 +1570,8 @@ function dybatpho::i18n_number_plain {
 #   dybatpho::i18n_percent 42.5 1 tr   # %42,5
 #
 # @arg $1 string Value, already expressed in percent
-# @arg $2 number Optional fraction digits, default is none
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 number? Fraction digits, default is none
+# @arg $3 string? Locale, default is the active locale
 # @stdout The formatted percentage
 #######################################
 function dybatpho::i18n_percent {
@@ -1624,7 +1624,7 @@ function __dybatpho_i18n_negative {
 #
 # @arg $1 string Amount
 # @arg $2 string ISO 4217 currency code
-# @arg $3 string Optional locale, default is the active locale
+# @arg $3 string? Locale, default is the active locale
 # @stdout The formatted amount
 # @stderr A warning when the currency is not in the table
 # @exitcode 1 The amount is not a number
@@ -1671,8 +1671,8 @@ function dybatpho::i18n_currency {
 #   dybatpho::i18n_bytes 1500 si en          # 1.5 kB
 #
 # @arg $1 number Byte count
-# @arg $2 string Optional standard, `iec` for 1024 or `si` for 1000
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 string? Standard, `iec` for 1024 or `si` for 1000
+# @arg $3 string? Locale, default is the active locale
 # @stdout The formatted size
 # @exitcode 1 The count is not a non-negative integer, or the standard is unknown
 # @tip `dybatpho::file_size` and `dybatpho::dir_size` return the raw byte count
@@ -1972,8 +1972,8 @@ function __dybatpho_i18n_name {
 #   dybatpho::i18n_month_name 2 wide de   # Februar
 #
 # @arg $1 number Month, 1 through 12
-# @arg $2 string Optional width, `wide` or `abbr`, default is `wide`
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 string [default: wide] Width, `wide` or `abbr`
+# @arg $3 string? Locale, default is the active locale
 # @stdout The month name
 # @exitcode 1 The month is outside 1 through 12
 #######################################
@@ -2005,8 +2005,8 @@ function dybatpho::i18n_month_name {
 #   dybatpho::i18n_weekday_name 4 wide en   # Thursday
 #
 # @arg $1 number Weekday, 1 for Monday through 7 for Sunday
-# @arg $2 string Optional width, `wide` or `abbr`, default is `wide`
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 string [default: wide] Width, `wide` or `abbr`
+# @arg $3 string? Locale, default is the active locale
 # @stdout The weekday name
 # @exitcode 1 The weekday is outside 1 through 7
 #######################################
@@ -2220,8 +2220,8 @@ function __dybatpho_i18n_pattern {
 #   dybatpho::i18n_date 1709210096 long de   # 29. Februar 2024
 #
 # @arg $1 number Epoch seconds
-# @arg $2 string Optional style, `short`, `medium`, `long`, or `full`
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 string? Style, `short`, `medium`, `long`, or `full`
+# @arg $3 string? Locale, default is the active locale
 # @env DYBATPHO_DATE_TIMEZONE string Timezone the fields are read in
 # @stdout The formatted date
 # @tip This takes epoch seconds. Convert a date string first with
@@ -2254,8 +2254,8 @@ function dybatpho::i18n_date {
 #   dybatpho::i18n_time 1709210096 short en   # 12:34 PM
 #
 # @arg $1 number Epoch seconds
-# @arg $2 string Optional style, `short`, `medium`, `long`, or `full`
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 string? Style, `short`, `medium`, `long`, or `full`
+# @arg $3 string? Locale, default is the active locale
 # @stdout The formatted time
 #######################################
 function dybatpho::i18n_time {
@@ -2278,8 +2278,8 @@ function dybatpho::i18n_time {
 #######################################
 # @description Format a timestamp as a date and time together.
 # @arg $1 number Epoch seconds
-# @arg $2 string Optional style, `short`, `medium`, `long`, or `full`
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 string? Style, `short`, `medium`, `long`, or `full`
+# @arg $3 string? Locale, default is the active locale
 # @stdout The formatted date and time
 #######################################
 function dybatpho::i18n_datetime {
@@ -2329,7 +2329,7 @@ function dybatpho::i18n_datetime {
 #
 # @arg $1 number Epoch seconds
 # @arg $2 string CLDR-style pattern
-# @arg $3 string Optional locale, default is the active locale
+# @arg $3 string? Locale, default is the active locale
 # @stdout The rendered text
 #######################################
 function dybatpho::i18n_date_pattern {
@@ -2422,8 +2422,8 @@ function __dybatpho_i18n_span {
 #   dybatpho::i18n_relative 1709210096 1709469296   # 3 days ago
 #
 # @arg $1 number Epoch seconds being described
-# @arg $2 number Optional epoch seconds to compare against, default is now
-# @arg $3 string Optional locale, default is the active locale
+# @arg $2 number? Epoch seconds to compare against, default is now
+# @arg $3 string? Locale, default is the active locale
 # @env DYBATPHO_I18N_NOW number Epoch seconds used as now when none is given
 # @stdout The description
 # @exitcode 1 Either timestamp is not an integer
@@ -2475,7 +2475,7 @@ function dybatpho::i18n_relative {
 #   dybatpho::i18n_duration 259200   # 3 days
 #
 # @arg $1 number Seconds
-# @arg $2 string Optional locale, default is the active locale
+# @arg $2 string? Locale, default is the active locale
 # @stdout The description
 # @exitcode 1 The span is not an integer
 #######################################
@@ -2503,7 +2503,7 @@ function dybatpho::i18n_duration {
 # @example
 #   if dybatpho::i18n_is_rtl ar; then ...
 #
-# @arg $1 string Optional locale, default is the active locale
+# @arg $1 string? Locale, default is the active locale
 # @env DYBATPHO_I18N_RTL string Space-separated list of right-to-left languages
 # @exitcode 0 The locale reads right to left
 # @exitcode 1 The locale reads left to right
@@ -2521,7 +2521,7 @@ function dybatpho::i18n_is_rtl {
 
 #######################################
 # @description Print the direction a locale is written in.
-# @arg $1 string Optional locale, default is the active locale
+# @arg $1 string? Locale, default is the active locale
 # @stdout `rtl` or `ltr`
 #######################################
 function dybatpho::i18n_direction {
@@ -2557,7 +2557,7 @@ function dybatpho::i18n_bidi_mark {
 #   printf 'Package %s installed\n' "$(dybatpho::i18n_bidi_isolate "${name}")"
 #
 # @arg $1 string Text
-# @arg $2 string Optional direction, `ltr`, `rtl`, or `auto`, default is `auto`
+# @arg $2 string [default: auto] Direction, `ltr`, `rtl`, or `auto`
 # @stdout The wrapped text
 # @exitcode 1 The direction is not recognized
 # @tip Wrap for display only. These are invisible but real characters, so text
@@ -2611,7 +2611,7 @@ function dybatpho::i18n_bidi_strip {
 # @arg $2 string Group separator, or the empty string for none
 # @arg $3 string Decimal separator
 # @arg $4 string Grouping, such as `3` or `3;2`, or `0` for no grouping
-# @arg $5 string Optional minus sign, default is `-`
+# @arg $5 string [default: -] Minus sign
 # @set DYBATPHO_I18N_NUMBER
 # @exitcode 1 The grouping is malformed
 #######################################
@@ -3090,8 +3090,8 @@ function __dybatpho_i18n_discover {
 #   dybatpho::i18n_load vi_VN
 #
 # @arg $1 string Locale tag
-# @arg $2 string Optional catalog file; when omitted the search path is used
-# @arg $3 string Optional domain, default is `DYBATPHO_I18N_DOMAIN`
+# @arg $2 string? Catalog file; when omitted the search path is used
+# @arg $3 string [default: ${DYBATPHO_I18N_DOMAIN}] Domain
 # @env DYBATPHO_I18N_PATH string Colon separated catalog directories
 # @exitcode 1 A named file is missing, or no catalog was found in lenient mode
 #######################################
@@ -3139,8 +3139,8 @@ function dybatpho::i18n_load {
 #   dybatpho::i18n_init
 #   printf '%s\n' "$(dybatpho::i18n_t app.ready)"
 #
-# @arg $1 string Optional locale tag, default is resolved from the environment
-# @arg $2 string Optional domain, default is `DYBATPHO_I18N_DOMAIN`
+# @arg $1 string? Locale tag, default is resolved from the environment
+# @arg $2 string [default: ${DYBATPHO_I18N_DOMAIN}] Domain
 # @exitcode 0 Always in lenient mode, even when no catalog was found
 #######################################
 function dybatpho::i18n_init {
@@ -3159,7 +3159,7 @@ function dybatpho::i18n_init {
 #######################################
 # @description Print the locales that have a catalog somewhere on the search
 #   path.
-# @arg $1 string Optional domain, default is `DYBATPHO_I18N_DOMAIN`
+# @arg $1 string [default: ${DYBATPHO_I18N_DOMAIN}] Domain
 # @stdout One locale tag per line, sorted
 # @exitcode 1 No catalog was found anywhere
 #######################################
@@ -3598,7 +3598,7 @@ function dybatpho::i18n_lint {
 # @arg $2 string Locale
 # @arg $3 string Finding kind
 # @arg $4 string Message key
-# @arg $5 string Optional detail
+# @arg $5 string? Detail
 # @stdout The finding
 # @internal
 #######################################

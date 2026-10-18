@@ -210,7 +210,7 @@ function dybatpho::is_interactive {
 #######################################
 # @description Ask a yes/no question and return the answer as an exit code.
 # @arg $1 string Question to ask
-# @arg $2 string Optional default answer used on an empty reply, default is `no`
+# @arg $2 string [default: no] Default answer used on an empty reply
 # @exitcode 0 The answer is yes, or `DYBATPHO_FORCE` is enabled
 # @exitcode 1 The answer is no, or the script isn't interactive
 # @env DYBATPHO_FORCE bool Answer yes without prompting
@@ -252,7 +252,7 @@ function dybatpho::confirm {
 #   root that points elsewhere cannot carry the operation out of it. The last
 #   component is not followed, as `rm` and `mv` act on a link itself.
 # @arg $1 string Path to validate
-# @arg $2 string Optional wording used in error messages, default is `path`
+# @arg $2 string [default: path] Wording used in error messages
 # @stdout Normalized absolute path, as written
 # @exitcode 1 Stop the script when the path is empty, protected, or outside `DYBATPHO_SAFE_ROOTS`
 # @env DYBATPHO_SAFE_ROOTS string Colon-separated roots the path must stay inside when set
@@ -483,8 +483,8 @@ function __dybatpho_safety_transfer {
 # @description Extract an archive after rejecting entries that escape the destination.
 # @arg $1 string Option `--force`/`-f` to skip confirmation
 # @arg $2 string Archive file path
-# @arg $3 string Optional destination directory, default is `.`
-# @arg $4 number Optional strip-components count, default is `0`
+# @arg $3 string [default: .] Destination directory
+# @arg $4 number [default: 0] Strip-components count
 # @exitcode 0 The archive is extracted
 # @exitcode 1 Overwriting existing files is declined
 # @exitcode 1 Stop the script when an entry is absolute or traverses outside the destination

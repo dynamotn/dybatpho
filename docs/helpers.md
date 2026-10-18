@@ -35,12 +35,12 @@ reach for at a prompt.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_RETRY_BASE_DELAY`** | number | First retry delay in seconds (default `2`) |
-| **`DYBATPHO_RETRY_MAX_DELAY`** | number | Longest a single retry waits (default `30`) |
-| **`DYBATPHO_RETRY_JITTER`** | bool | Add up to one base delay of random jitter (default `false`) |
-| **`DYBATPHO_REPL_HISTORY_FILE`** | string | History file used by `dybatpho::breakpoint` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_RETRY_BASE_DELAY`** | number | no | `2` | First retry delay in seconds |
+| **`DYBATPHO_RETRY_MAX_DELAY`** | number | no | `30` | Longest a single retry waits |
+| **`DYBATPHO_RETRY_JITTER`** | bool | no | `false` | Add up to one base delay of random jitter |
+| **`DYBATPHO_REPL_HISTORY_FILE`** | string | yes |  | History file used by `dybatpho::breakpoint` |
 
 ### 🚀 Highlights
 
@@ -326,11 +326,11 @@ dybatpho::require yq '^4' 3
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Command that must be available |
-| `$2` | string | Version range opening with an operator, or the exit code |
-| `$3` | number | Exit code when a range was given (default 127) |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Command that must be available |
+| `$2` | string | yes |  | Version range opening with an operator, or the exit code |
+| `$3` | number | no | `127` | Exit code when a range was given |
 
 **🚦 Exit codes**
 
@@ -340,7 +340,9 @@ dybatpho::require yq '^4' 3
 
 **🔗 See also**
 
-- [- `dybatpho::command_version` - `dybatpho::semver_coerce` - `dybatpho::semver_satisfies](#dybatphocommand_version-dybatphosemver_coerce-dybatphosemver_satisfies)
+- [dybatpho::command_version](#dybatphocommand_version)
+- [dybatpho::semver_coerce](#dybatphosemver_coerce)
+- [dybatpho::semver_satisfies](#dybatphosemver_satisfies)
 
 ---
 
@@ -466,10 +468,10 @@ Evaluate a shell condition string and stop with a message when it fails.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Shell condition or command string to evaluate |
-| `$2` | string | Optional failure message |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Shell condition or command string to evaluate |
+| `$2` | string | no |  | Failure message |
 
 **🚦 Exit codes**
 
@@ -491,11 +493,11 @@ dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Number of retries |
-| `$2` | string | Shell command string to run |
-| `$3` | string | Optional short description for retry logs |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Number of retries |
+| `$2` | string | yes |  | Shell command string to run |
+| `$3` | string | no |  | Short description for retry logs |
 
 **🌍 Environment variables**
 
@@ -518,12 +520,12 @@ Retry a shell command until it succeeds or the retry budget is exhausted, using 
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Number of retries |
-| `$2` | number | Delay in seconds between attempts |
-| `$3` | string | Shell command string to run |
-| `$4` | string | Optional short description for retry logs |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Number of retries |
+| `$2` | number | yes |  | Delay in seconds between attempts |
+| `$3` | string | yes |  | Shell command string to run |
+| `$4` | string | no |  | Short description for retry logs |
 
 **🚦 Exit codes**
 
@@ -583,7 +585,8 @@ dybatpho::provides --path cache_run        # /path/to/src/cache.sh:245
 
 **🔗 See also**
 
-- [- `dybatpho::describe` - `dybatpho::function_list](#dybatphodescribe-dybatphofunction_list)
+- [dybatpho::describe](#dybatphodescribe)
+- [dybatpho::function_list](#dybatphofunction_list)
 
 ---
 
@@ -626,7 +629,7 @@ dybatpho::describe dybatpho::semver_satisfies
 
 **🔗 See also**
 
-- [- `dybatpho::provides](#dybatphoprovides)
+- [dybatpho::provides](#dybatphoprovides)
 
 ---
 
@@ -651,9 +654,9 @@ dybatpho::function_list | wc -l
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional module name to limit the list to |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Module name to limit the list to |
 
 **📤 Output on stdout**
 
@@ -665,4 +668,5 @@ dybatpho::function_list | wc -l
 
 **🔗 See also**
 
-- [- `dybatpho::module_list` - `dybatpho::provides](#dybatphomodule_list-dybatphoprovides)
+- [dybatpho::module_list](#dybatphomodule_list)
+- [dybatpho::provides](#dybatphoprovides)

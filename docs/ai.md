@@ -29,27 +29,27 @@ anything is sent, and a call budget that stops a runaway loop.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_AI_PROVIDER`** | string | Backend to use: `auto` (default), `anthropic`, `openai`, `ollama`, or `cli` |
-| **`DYBATPHO_AI_MODEL`** | string | Model identifier; defaults to the provider's recommended model |
-| **`DYBATPHO_AI_BASE_URL`** | string | Override the provider base URL, for proxies and compatible gateways |
-| **`DYBATPHO_AI_API_KEY`** | string | API key; `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are used as fallbacks |
-| **`DYBATPHO_AI_MAX_TOKENS`** | number | Output token ceiling for one response (default `16000`) |
-| **`DYBATPHO_AI_EFFORT`** | string | Reasoning effort for Anthropic models: `low`, `medium`, `high`, `xhigh`, or `max` |
-| **`DYBATPHO_AI_TEMPERATURE`** | string | Sampling temperature; only sent to the `openai` and `ollama` backends |
-| **`DYBATPHO_AI_SYSTEM`** | string | Default system prompt used when a call does not pass one |
-| **`DYBATPHO_AI_TIMEOUT`** | number | Total curl timeout in seconds for one model call (default `300`) |
-| **`DYBATPHO_AI_CACHE`** | bool | Cache responses on disk keyed by request content (default `false`) |
-| **`DYBATPHO_AI_CACHE_DIR`** | string | Cache directory (default `${XDG_CACHE_HOME:-${HOME}/.cache}/dybatpho/ai`) |
-| **`DYBATPHO_AI_CACHE_TTL`** | number | Seconds a cached response stays valid (default `86400`) |
-| **`DYBATPHO_AI_REDACT`** | bool | Mask registered secrets in every prompt before sending (default `true`) |
-| **`DYBATPHO_AI_MAX_CALLS`** | number | Stop after this many model calls in one script; `0` means no limit |
-| **`DYBATPHO_AI_MAX_STEPS`** | number | Maximum tool-use rounds in `dybatpho::ai_run` (default `10`) |
-| **`DYBATPHO_AI_JSON_RETRIES`** | number | Attempts `dybatpho::ai_json` makes before failing (default `2`) |
-| **`DYBATPHO_AI_CLI`** | string | Command used by the `cli` backend: `claude`, `llm`, or `ollama` |
-| **`DYBATPHO_AI_ANTHROPIC_VERSION`** | string | Value of the `anthropic-version` header (default `2023-06-01`) |
-| **`DYBATPHO_AI_STATE_FILE`** | string | File the call and token counters are kept in; resolved on first use |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_AI_PROVIDER`** | string | no | `auto` | Backend to use: `auto`, `anthropic`, `openai`, `ollama`, or `cli` |
+| **`DYBATPHO_AI_MODEL`** | string | yes |  | Model identifier; defaults to the provider's recommended model |
+| **`DYBATPHO_AI_BASE_URL`** | string | yes |  | Override the provider base URL, for proxies and compatible gateways |
+| **`DYBATPHO_AI_API_KEY`** | string | yes |  | API key; `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are used as fallbacks |
+| **`DYBATPHO_AI_MAX_TOKENS`** | number | no | `16000` | Output token ceiling for one response |
+| **`DYBATPHO_AI_EFFORT`** | string | yes |  | Reasoning effort for Anthropic models: `low`, `medium`, `high`, `xhigh`, or `max` |
+| **`DYBATPHO_AI_TEMPERATURE`** | string | yes |  | Sampling temperature; only sent to the `openai` and `ollama` backends |
+| **`DYBATPHO_AI_SYSTEM`** | string | yes |  | Default system prompt used when a call does not pass one |
+| **`DYBATPHO_AI_TIMEOUT`** | number | no | `300` | Total curl timeout in seconds for one model call |
+| **`DYBATPHO_AI_CACHE`** | bool | no | `false` | Cache responses on disk keyed by request content |
+| **`DYBATPHO_AI_CACHE_DIR`** | string | no | `${XDG_CACHE_HOME:-${HOME}/.cache}/dybatpho/ai` | Cache directory |
+| **`DYBATPHO_AI_CACHE_TTL`** | number | no | `86400` | Seconds a cached response stays valid |
+| **`DYBATPHO_AI_REDACT`** | bool | no | `true` | Mask registered secrets in every prompt before sending |
+| **`DYBATPHO_AI_MAX_CALLS`** | number | yes |  | Stop after this many model calls in one script; `0` means no limit |
+| **`DYBATPHO_AI_MAX_STEPS`** | number | no | `10` | Maximum tool-use rounds in `dybatpho::ai_run` |
+| **`DYBATPHO_AI_JSON_RETRIES`** | number | no | `2` | Attempts `dybatpho::ai_json` makes before failing |
+| **`DYBATPHO_AI_CLI`** | string | yes |  | Command used by the `cli` backend: `claude`, `llm`, or `ollama` |
+| **`DYBATPHO_AI_ANTHROPIC_VERSION`** | string | no | `2023-06-01` | Value of the `anthropic-version` header |
+| **`DYBATPHO_AI_STATE_FILE`** | string | yes |  | File the call and token counters are kept in; resolved on first use |
 
 ### 🚀 Highlights
 
@@ -137,6 +137,7 @@ dybatpho::ai_run "Are we about to run out of disk?"
 
 - Set `DYBATPHO_AI_PROVIDER` to pin a backend; the default `auto` picks the first one whose credentials or command are present
 - Every prompt is passed through `dybatpho::secret_mask` first, so values registered with `dybatpho::secret_register` never reach the provider
+- Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library; building them by string concatenation is too escaping-sensitive to be safe
 
 **[`dybatpho::ai_ask`](#dybatphoai_ask)**
 
@@ -210,9 +211,9 @@ dybatpho::info "Asking $(dybatpho::ai_model)"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional backend name; detected when omitted |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Backend name; detected when omitted |
 
 **🌍 Environment variables**
 
@@ -295,10 +296,10 @@ dybatpho::ai_ask "Is this config safe?" "You are a security reviewer"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Prompt |
-| `$2` | string | Optional system prompt; `DYBATPHO_AI_SYSTEM` is used when omitted |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Prompt |
+| `$2` | string | no |  | System prompt; `DYBATPHO_AI_SYSTEM` is used when omitted |
 
 **🌍 Environment variables**
 
@@ -334,10 +335,10 @@ dybatpho::ai_conversation_new CHAT "You are a release manager"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Variable name that receives the file path |
-| `$2` | string | Optional system prompt |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Variable name that receives the file path |
+| `$2` | string | no |  | System prompt |
 
 **🧩 Variable sets**
 
@@ -462,11 +463,11 @@ dybatpho::ai_json "Did this deploy succeed? ${log}" "${schema}"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Prompt |
-| `$2` | string | JSON schema describing the answer |
-| `$3` | string | Optional system prompt |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Prompt |
+| `$2` | string | yes |  | JSON schema describing the answer |
+| `$3` | string | no |  | System prompt |
 
 **🌍 Environment variables**
 
@@ -499,10 +500,10 @@ dybatpho::ai_stream "Explain this stack trace" | tee /tmp/answer.txt
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Prompt |
-| `$2` | string | Optional system prompt |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Prompt |
+| `$2` | string | no |  | System prompt |
 
 **📝 Notes**
 
@@ -613,10 +614,10 @@ dybatpho::ai_run "Do we need to clean up the build cache?"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Prompt |
-| `$2` | string | Optional system prompt |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Prompt |
+| `$2` | string | no |  | System prompt |
 
 **🌍 Environment variables**
 
@@ -689,9 +690,9 @@ dybatpho::ai_usage total
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Scope, `last` (default) or `total` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `last` | Scope, `last` or `total` |
 
 **📤 Output on stdout**
 

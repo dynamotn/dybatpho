@@ -159,10 +159,10 @@ dybatpho::md_list $'first\nsecond' "1."
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | List items, one per line, or `-` for stdin |
-| `$2` | string | Optional marker, default is `-` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | List items, one per line, or `-` for stdin |
+| `$2` | string | no | `-` | Marker |
 
 **📤 Output on stdout**
 
@@ -187,10 +187,10 @@ dybatpho::md_task_list $'x|Write the spec\n|Ship it'
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Task lines, or `-` for stdin |
-| `$2` | string | Optional delimiter between state and text, default is `\|` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Task lines, or `-` for stdin |
+| `$2` | string | no | `\|` | Delimiter between state and text |
 
 **📤 Output on stdout**
 
@@ -211,11 +211,11 @@ dybatpho::md_link "the docs" "https://example.com/a b"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Link text |
-| `$2` | string | URL |
-| `$3` | string | Optional title shown on hover |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Link text |
+| `$2` | string | yes |  | URL |
+| `$3` | string | no |  | Title shown on hover |
 
 **📤 Output on stdout**
 
@@ -239,12 +239,12 @@ dybatpho::md_badge "build" "passing" "green"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Badge label, the left half |
-| `$2` | string | Badge value, the right half |
-| `$3` | string | Optional color, default is `blue` |
-| `$4` | string | Optional URL the badge links to |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Badge label, the left half |
+| `$2` | string | yes |  | Badge value, the right half |
+| `$3` | string | no | `blue` | Color |
+| `$4` | string | no |  | URL the badge links to |
 
 **📤 Output on stdout**
 
@@ -298,10 +298,10 @@ dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Rows, one per line, cells split on the delimiter, or `-` for stdin |
-| `$2` | string | Optional delimiter, default is `\|` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Rows, one per line, cells split on the delimiter, or `-` for stdin |
+| `$2` | string | no | `\|` | Delimiter |
 
 **📤 Output on stdout**
 

@@ -41,12 +41,12 @@ is missing.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries, default is the XDG cache directory for `dybatpho` |
-| **`DYBATPHO_CACHE_NAMESPACE`** | string | Subdirectory grouping related entries, default is `default`; empty puts entries directly in the cache directory |
-| **`DYBATPHO_CACHE_TTL`** | number | Seconds an entry stays fresh when a call does not say, default is `3600` |
-| **`DYBATPHO_CACHE_STALE`** | number | Seconds `dybatpho::cache_run` may serve an expired entry while it refreshes in the background, default is `0` (never) |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_CACHE_DIR`** | string | yes |  | Directory holding cache entries, default is the XDG cache directory for `dybatpho` |
+| **`DYBATPHO_CACHE_NAMESPACE`** | string | no | `default` | Subdirectory grouping related entries; empty puts entries directly in the cache directory |
+| **`DYBATPHO_CACHE_TTL`** | number | no | `3600` | Seconds an entry stays fresh when a call does not say |
+| **`DYBATPHO_CACHE_STALE`** | number | yes |  | Seconds `dybatpho::cache_run` may serve an expired entry while it refreshes in the background, default is `0` (never) |
 
 ### 🚀 Highlights
 
@@ -190,10 +190,10 @@ if dybatpho::cache_has releases 3600; then ... ; fi
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Entry key |
-| `$2` | number | Seconds the entry stays fresh, default is `DYBATPHO_CACHE_TTL` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Entry key |
+| `$2` | number | no | `${DYBATPHO_CACHE_TTL}` | Seconds the entry stays fresh |
 
 **🌍 Environment variables**
 
@@ -223,10 +223,10 @@ fi
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Entry key |
-| `$2` | number | Seconds the entry stays fresh, default is `DYBATPHO_CACHE_TTL` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Entry key |
+| `$2` | number | no | `${DYBATPHO_CACHE_TTL}` | Seconds the entry stays fresh |
 
 **🌍 Environment variables**
 
@@ -245,7 +245,7 @@ fi
 
 **🔗 See also**
 
-- [- `dybatpho::cache_run](#dybatphocache_run)
+- [dybatpho::cache_run](#dybatphocache_run)
 
 ---
 
@@ -360,10 +360,10 @@ dybatpho::cache_wait status 30 || dybatpho::warn "status refresh still running"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Entry key |
-| `$2` | number | Seconds to wait at most, default is `60` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Entry key |
+| `$2` | number | no | `60` | Seconds to wait at most |
 
 **🌍 Environment variables**
 
@@ -422,11 +422,11 @@ dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Entry key |
-| `$2` | number | Optional seconds the entry stays fresh, before `--` |
-| `$@` | string | Optional `--stale <seconds>`, then `--` followed by the command and its arguments |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Entry key |
+| `$2` | number | no |  | Seconds the entry stays fresh, before `--` |
+| `$@` | string | no |  | `--stale <seconds>`, then `--` followed by the command and its arguments |
 
 **🌍 Environment variables**
 
@@ -447,7 +447,8 @@ dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
 
 **🔗 See also**
 
-- [- `dybatpho::cache_get` - `dybatpho::cache_wait](#dybatphocache_get-dybatphocache_wait)
+- [dybatpho::cache_get](#dybatphocache_get)
+- [dybatpho::cache_wait](#dybatphocache_wait)
 
 ---
 
@@ -493,7 +494,7 @@ dybatpho::cache_prune --max-entries 500 --max-size 50M
 
 **🔗 See also**
 
-- [- `dybatpho::cache_stats](#dybatphocache_stats)
+- [dybatpho::cache_stats](#dybatphocache_stats)
 
 ---
 
@@ -533,10 +534,10 @@ dybatpho::cache_stats 600 --json | jq .stale
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Optional seconds an entry stays fresh, default is `DYBATPHO_CACHE_TTL` |
-| `$@` | string | Optional `--json`, for one JSON object of the counts instead of aligned lines |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `${DYBATPHO_CACHE_TTL}` | Seconds an entry stays fresh |
+| `$@` | string | no |  | `--json`, for one JSON object of the counts instead of aligned lines |
 
 **🌍 Environment variables**
 
@@ -557,4 +558,4 @@ dybatpho::cache_stats 600 --json | jq .stale
 
 **🔗 See also**
 
-- [- `dybatpho::cache_prune](#dybatphocache_prune)
+- [dybatpho::cache_prune](#dybatphocache_prune)

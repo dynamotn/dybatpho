@@ -31,25 +31,25 @@ pipeline never lands in its own output.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_TUI`** | string | When widgets draw in place (`auto\|always\|never`). `auto` draws only when both stdin and stderr are terminals. Default `auto` |
-| **`DYBATPHO_TUI_INTERVAL`** | string | Seconds between spinner frames. Default is `DYBATPHO_SPINNER_INTERVAL` |
-| **`DYBATPHO_TUI_FRAMES`** | string | Space-separated frames the spinner cycles through. Default is `DYBATPHO_SPINNER_FRAMES` |
-| **`DYBATPHO_TUI_BAR_WIDTH`** | number | Width of a progress bar in columns when none is given. Default `30` |
-| **`DYBATPHO_TUI_BAR_FILLED`** | string | Character drawn for the completed part of a bar. Default `█` |
-| **`DYBATPHO_TUI_BAR_EMPTY`** | string | Character drawn for the remaining part of a bar. Default `░` |
-| **`DYBATPHO_TUI_PROGRESS_STEP`** | number | Percentage granularity of the progress lines logged when there is no terminal to draw on. `0` logs every update. Default `10` |
-| **`DYBATPHO_TUI_POINTER`** | string | Marker drawn beside the highlighted menu entry. Default `❯` |
-| **`DYBATPHO_TUI_CHECKED`** | string | Marker drawn beside a selected multi-select entry. Default `◉` |
-| **`DYBATPHO_TUI_UNCHECKED`** | string | Marker drawn beside an unselected multi-select entry. Default `◯` |
-| **`DYBATPHO_TUI_MENU_HEIGHT`** | number | Entries a drawn menu shows at once before it scrolls. Default `10` |
-| **`DYBATPHO_TUI_DEFAULT`** | string | Comma-separated 1-based entries a menu starts on, and the answer it uses when the script cannot ask at all. Empty means no default, and a menu that cannot ask then fails instead of choosing |
-| **`DYBATPHO_TUI_SPINNER_PID`** | number | PID of the running spinner, or empty when none is running |
-| **`DYBATPHO_TUI_INDEX`** | number | 1-based position the last `dybatpho::tui_menu` returned |
-| **`DYBATPHO_TUI_INDEXES`** | string | Space-separated 1-based positions the last `dybatpho::tui_multi_menu` returned |
-| **`DYBATPHO_TUI_PROGRESS_CURRENT`** | number | Units of work the running progress bar has recorded |
-| **`DYBATPHO_TUI_PROGRESS_TOTAL`** | number | Units of work the running progress bar expects in total |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_TUI`** | string | yes |  | When widgets draw in place (`auto\|always\|never`). `auto` draws only when both stdin and stderr are terminals. Default `auto` |
+| **`DYBATPHO_TUI_INTERVAL`** | string | no | `${DYBATPHO_SPINNER_INTERVAL}` | Seconds between spinner frames |
+| **`DYBATPHO_TUI_FRAMES`** | string | no | `${DYBATPHO_SPINNER_FRAMES}` | Space-separated frames the spinner cycles through |
+| **`DYBATPHO_TUI_BAR_WIDTH`** | number | no | `30` | Width of a progress bar in columns when none is given |
+| **`DYBATPHO_TUI_BAR_FILLED`** | string | no | `█` | Character drawn for the completed part of a bar |
+| **`DYBATPHO_TUI_BAR_EMPTY`** | string | no | `░` | Character drawn for the remaining part of a bar |
+| **`DYBATPHO_TUI_PROGRESS_STEP`** | number | yes |  | Percentage granularity of the progress lines logged when there is no terminal to draw on. `0` logs every update. Default `10` |
+| **`DYBATPHO_TUI_POINTER`** | string | no | `❯` | Marker drawn beside the highlighted menu entry |
+| **`DYBATPHO_TUI_CHECKED`** | string | no | `◉` | Marker drawn beside a selected multi-select entry |
+| **`DYBATPHO_TUI_UNCHECKED`** | string | no | `◯` | Marker drawn beside an unselected multi-select entry |
+| **`DYBATPHO_TUI_MENU_HEIGHT`** | number | no | `10` | Entries a drawn menu shows at once before it scrolls |
+| **`DYBATPHO_TUI_DEFAULT`** | string | yes |  | Comma-separated 1-based entries a menu starts on, and the answer it uses when the script cannot ask at all. Empty means no default, and a menu that cannot ask then fails instead of choosing |
+| **`DYBATPHO_TUI_SPINNER_PID`** | number | yes |  | PID of the running spinner, or empty when none is running |
+| **`DYBATPHO_TUI_INDEX`** | number | yes |  | 1-based position the last `dybatpho::tui_menu` returned |
+| **`DYBATPHO_TUI_INDEXES`** | string | yes |  | Space-separated 1-based positions the last `dybatpho::tui_multi_menu` returned |
+| **`DYBATPHO_TUI_PROGRESS_CURRENT`** | number | yes |  | Units of work the running progress bar has recorded |
+| **`DYBATPHO_TUI_PROGRESS_TOTAL`** | number | yes |  | Units of work the running progress bar expects in total |
 
 ### 🚀 Highlights
 
@@ -160,11 +160,11 @@ dybatpho::tui_bar 1 3 12    # [████░░░░░░░░]  33%
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Units of work completed, clamped to the total |
-| `$2` | number | Units of work in total, at least 1 |
-| `$3` | number | Optional bar width in characters, default is `DYBATPHO_TUI_BAR_WIDTH` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Units of work completed, clamped to the total |
+| `$2` | number | yes |  | Units of work in total, at least 1 |
+| `$3` | number | no | `${DYBATPHO_TUI_BAR_WIDTH}` | Bar width in characters |
 
 **🌍 Environment variables**
 
@@ -269,10 +269,10 @@ dybatpho::tui_spinner_stop 1 "Upload failed"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Optional exit status the work ended with, default is `0` |
-| `$2` | string | Optional closing message, default is none |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `0` | Exit status the work ended with |
+| `$2` | string | no |  | Closing message, default is none |
 
 **🧩 Variable sets**
 
@@ -332,10 +332,10 @@ Move the progress bar to an absolute position.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Units of work completed, clamped to the total |
-| `$2` | string | Optional new label |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Units of work completed, clamped to the total |
+| `$2` | string | no |  | New label |
 
 **🧩 Variable sets**
 
@@ -357,10 +357,10 @@ Advance the progress bar by a number of units.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Optional units to add, default is `1` |
-| `$2` | string | Optional new label |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `1` | Units to add |
+| `$2` | string | no |  | New label |
 
 **🧩 Variable sets**
 
@@ -383,9 +383,9 @@ as a hang rather than as a finish.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional closing message replacing the bar |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Closing message replacing the bar |
 
 **🧩 Variable sets**
 
@@ -524,10 +524,10 @@ dybatpho::tui_confirm "Delete the staging database?" no \
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Question to ask |
-| `$2` | string | Optional default answer used on `enter`, default is `no` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Question to ask |
+| `$2` | string | no | `no` | Default answer used on `enter` |
 
 **🌍 Environment variables**
 

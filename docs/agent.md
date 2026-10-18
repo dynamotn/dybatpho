@@ -31,12 +31,12 @@ The module provides five things:
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_AGENT_MODE`** | string | `auto` (default), `on`, or `off` |
-| **`DYBATPHO_AGENT_ALLOW`** | string | Space separated actions an agent may perform, or `all` |
-| **`DYBATPHO_AGENT_AUDIT_FILE`** | string | Path of the JSON Lines audit log |
-| **`DYBATPHO_AGENT_ENV`** | string | Extra environment variable names that mark an agent run |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_AGENT_MODE`** | string | no | `auto` | `auto`, `on`, or `off` |
+| **`DYBATPHO_AGENT_ALLOW`** | string | yes |  | Space separated actions an agent may perform, or `all` |
+| **`DYBATPHO_AGENT_AUDIT_FILE`** | string | yes |  | Path of the JSON Lines audit log |
+| **`DYBATPHO_AGENT_ENV`** | string | yes |  | Extra environment variable names that mark an agent run |
 
 ### 🚀 Highlights
 
@@ -102,6 +102,7 @@ dybatpho::agent_confirm restart "Restart the API service" \
 ## 💡 Tips
 
 - Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE`
+- Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a second edit
 
 **[`dybatpho::agent_result`](#dybatphoagent_result)**
 
@@ -231,11 +232,11 @@ dybatpho::agent_error missing_config "No config file at ${path}" \
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Stable error code, lowercase with underscores |
-| `$2` | string | Human readable message |
-| `$3` | string | Optional hint describing how to recover |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Stable error code, lowercase with underscores |
+| `$2` | string | yes |  | Human readable message |
+| `$3` | string | no |  | Hint describing how to recover |
 
 **📤 Output on stdout**
 
@@ -287,10 +288,10 @@ dybatpho::agent_confirm restart "Restart the API service" || exit 0
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Action name, matched against the allowlist |
-| `$2` | string | Optional description shown to a human |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Action name, matched against the allowlist |
+| `$2` | string | no |  | Description shown to a human |
 
 **🌍 Environment variables**
 
@@ -329,10 +330,10 @@ dybatpho::agent_audit deploy "version 1.4.2 to staging"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Action name |
-| `$2` | string | Optional detail |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Action name |
+| `$2` | string | no |  | Detail |
 
 **🌍 Environment variables**
 
@@ -394,11 +395,11 @@ dybatpho::agent_tools _spec_root mytool openai     # function-calling shape
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Spec function, the same one passed to `dybatpho::generate_from_spec` |
-| `$2` | string | Tool name prefix, default is the script name |
-| `$3` | string | Output shape, `anthropic` (default) or `openai` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Spec function, the same one passed to `dybatpho::generate_from_spec` |
+| `$2` | string | no |  | Tool name prefix, default is the script name |
+| `$3` | string | no | `anthropic` | Output shape, `anthropic` or `openai` |
 
 **📤 Output on stdout**
 
@@ -430,11 +431,11 @@ dybatpho::agent_mcp _spec_root mytool > mytool-mcp.json
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Spec function |
-| `$2` | string | Server and tool name prefix, default is the script name |
-| `$3` | string | Command an MCP server should execute, default is the script path |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Spec function |
+| `$2` | string | no |  | Server and tool name prefix, default is the script name |
+| `$3` | string | no |  | Command an MCP server should execute, default is the script path |
 
 **📝 Notes**
 

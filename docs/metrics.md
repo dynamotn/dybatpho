@@ -117,11 +117,11 @@ dybatpho::metrics_counter_inc http_requests_total 1 method=GET status=200
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Metric name, conventionally ending in `_total` |
-| `$2` | number | Amount to add, default `1` |
-| `$@` | string | Label assignments such as `status=200` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Metric name, conventionally ending in `_total` |
+| `$2` | number | no | `1` | Amount to add |
+| `$@` | string | yes |  | Label assignments such as `status=200` |
 
 **🚦 Exit codes**
 

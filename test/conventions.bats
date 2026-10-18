@@ -58,7 +58,7 @@ fail_with() {
     "${REPO_ROOT}/src/os.sh" "${stale_source}"
   assert_failure
   # Naming the second source proves the first did not end the listing.
-  assert_output --partial "docs/zzz_unpublished.md is stale"
+  assert_output --partial "docs/zzz_unpublished.md is missing"
 }
 
 @test "every module has a doc, a spec, a test file and an example" {

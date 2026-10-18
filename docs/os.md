@@ -165,7 +165,8 @@ dybatpho::command_version tar   # 1.35
 
 **🔗 See also**
 
-- [- `dybatpho::semver_satisfies` - `dybatpho::require](#dybatphosemver_satisfies-dybatphorequire)
+- [dybatpho::semver_satisfies](#dybatphosemver_satisfies)
+- [dybatpho::require](#dybatphorequire)
 
 ---
 
@@ -297,9 +298,9 @@ dybatpho::is_tty stdout && printf 'Colors are worth rendering\n'
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Stream to test, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`, default is `stdout` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `stdout` | Stream to test, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2` |
 
 **🚦 Exit codes**
 
@@ -333,9 +334,9 @@ dybatpho::color_supported stderr && printf '\033[31m%s\033[0m\n' "${msg}" >&2
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Stream to answer for, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`, default is `stdout` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `stdout` | Stream to answer for, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2` |
 
 **🌍 Environment variables**
 
@@ -361,9 +362,9 @@ attached.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Optional width to use when there is no terminal, default is `80` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `80` | Width to use when there is no terminal |
 
 **📤 Output on stdout**
 
@@ -381,9 +382,9 @@ Print the height of the terminal in lines.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Optional height to use when there is no terminal, default is `24` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `24` | Height to use when there is no terminal |
 
 **📤 Output on stdout**
 

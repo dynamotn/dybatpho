@@ -119,12 +119,12 @@ Bump a semver version by the specified part.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Version string to bump |
-| `$2` | string | Part to bump: major \| minor \| patch |
-| `$3` | string | Optional pre-release label to attach (e.g. "alpha.1") |
-| `$4` | string | Optional build-metadata to attach (e.g. "build.42") |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Version string to bump |
+| `$2` | string | yes |  | Part to bump: major \| minor \| patch |
+| `$3` | string | no |  | Pre-release label to attach (e.g. "alpha.1") |
+| `$4` | string | no |  | Build-metadata to attach (e.g. "build.42") |
 
 **📝 Notes**
 
@@ -324,4 +324,4 @@ dybatpho::semver_coerce v4                     # 4.0.0
 
 **🔗 See also**
 
-- [- `dybatpho::command_version](#dybatphocommand_version)
+- [dybatpho::command_version](#dybatphocommand_version)

@@ -52,10 +52,10 @@ Prefix every line in a text block with the given indent string.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | string | Optional indent prefix, default is two spaces |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | string | no |  | Indent prefix, default is two spaces |
 
 **📤 Output on stdout**
 
@@ -101,10 +101,10 @@ Prefix each non-empty line in a text block as a bullet item.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | string | Optional bullet marker, default is `-` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | string | no | `-` | Bullet marker |
 
 **📤 Output on stdout**
 
@@ -128,11 +128,11 @@ dybatpho::text_columns $'name|version\ndybatpho|6.0.0'
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | string | Optional exact delimiter, default is `\|` |
-| `$3` | number | Optional gap width between columns, default is 2 |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | string | no | `\|` | Exact delimiter |
+| `$3` | number | no | `2` | Gap width between columns |
 
 **📤 Output on stdout**
 
@@ -169,11 +169,11 @@ dybatpho::text_box "plain" "" ascii
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | string | Optional title shown in the top border, default is none |
-| `$3` | string | Optional border style: `single` (default), `double`, `rounded`, `heavy`, or `ascii` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | string | no |  | Title shown in the top border, default is none |
+| `$3` | string | no |  | Border style: `single` (default), `double`, `rounded`, `heavy`, or `ascii` |
 
 **📤 Output on stdout**
 
@@ -203,10 +203,10 @@ dybatpho::text_center $'title\nsubtitle here' 20
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | number | Optional width to center within, default is the terminal width |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | number | no |  | Width to center within, default is the terminal width |
 
 **📤 Output on stdout**
 
@@ -238,11 +238,11 @@ dybatpho::text_number_lines $'alpha\nbeta' 9 ": "
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | number | Optional number of the first line, default is `1` |
-| `$3` | string | Optional separator between number and text, default is two spaces |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | number | no | `1` | Number of the first line |
+| `$3` | string | no |  | Separator between number and text, default is two spaces |
 
 **📤 Output on stdout**
 
@@ -276,11 +276,11 @@ git log --oneline | dybatpho::text_truncate_lines - 5 "(+{count} commits)"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text or `-` for stdin |
-| `$2` | number | Number of lines to keep |
-| `$3` | string | Optional marker template, `{count}` is replaced by the number of lines left out |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | number | yes |  | Number of lines to keep |
+| `$3` | string | no |  | Marker template, `{count}` is replaced by the number of lines left out |
 
 **📤 Output on stdout**
 

@@ -48,20 +48,20 @@
 #   are terminals. Default `auto`
 DYBATPHO_TUI="${DYBATPHO_TUI:-auto}"
 export DYBATPHO_TUI
-# @env DYBATPHO_TUI_INTERVAL string Seconds between spinner frames. Default is `DYBATPHO_SPINNER_INTERVAL`
+# @env DYBATPHO_TUI_INTERVAL string [default: ${DYBATPHO_SPINNER_INTERVAL}] Seconds between spinner frames
 DYBATPHO_TUI_INTERVAL="${DYBATPHO_TUI_INTERVAL:-${DYBATPHO_SPINNER_INTERVAL:-0.1}}"
 export DYBATPHO_TUI_INTERVAL
-# @env DYBATPHO_TUI_FRAMES string Space-separated frames the spinner cycles through. Default is
-#   `DYBATPHO_SPINNER_FRAMES`
+# @env DYBATPHO_TUI_FRAMES string [default: ${DYBATPHO_SPINNER_FRAMES}] Space-separated frames the spinner cycles
+#   through
 DYBATPHO_TUI_FRAMES="${DYBATPHO_TUI_FRAMES:-${DYBATPHO_SPINNER_FRAMES:-⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏}}"
 export DYBATPHO_TUI_FRAMES
-# @env DYBATPHO_TUI_BAR_WIDTH number Width of a progress bar in columns when none is given. Default `30`
+# @env DYBATPHO_TUI_BAR_WIDTH number [default: 30] Width of a progress bar in columns when none is given
 DYBATPHO_TUI_BAR_WIDTH="${DYBATPHO_TUI_BAR_WIDTH:-30}"
 export DYBATPHO_TUI_BAR_WIDTH
-# @env DYBATPHO_TUI_BAR_FILLED string Character drawn for the completed part of a bar. Default `█`
+# @env DYBATPHO_TUI_BAR_FILLED string [default: █] Character drawn for the completed part of a bar
 DYBATPHO_TUI_BAR_FILLED="${DYBATPHO_TUI_BAR_FILLED:-█}"
 export DYBATPHO_TUI_BAR_FILLED
-# @env DYBATPHO_TUI_BAR_EMPTY string Character drawn for the remaining part of a bar. Default `░`
+# @env DYBATPHO_TUI_BAR_EMPTY string [default: ░] Character drawn for the remaining part of a bar
 DYBATPHO_TUI_BAR_EMPTY="${DYBATPHO_TUI_BAR_EMPTY:-░}"
 export DYBATPHO_TUI_BAR_EMPTY
 # @env DYBATPHO_TUI_PROGRESS_STEP number Percentage granularity of the progress lines logged when there is no terminal
@@ -69,16 +69,16 @@ export DYBATPHO_TUI_BAR_EMPTY
 #   draw on. `0` logs every update. Default `10`
 DYBATPHO_TUI_PROGRESS_STEP="${DYBATPHO_TUI_PROGRESS_STEP:-10}"
 export DYBATPHO_TUI_PROGRESS_STEP
-# @env DYBATPHO_TUI_POINTER string Marker drawn beside the highlighted menu entry. Default `❯`
+# @env DYBATPHO_TUI_POINTER string [default: ❯] Marker drawn beside the highlighted menu entry
 DYBATPHO_TUI_POINTER="${DYBATPHO_TUI_POINTER:-❯}"
 export DYBATPHO_TUI_POINTER
-# @env DYBATPHO_TUI_CHECKED string Marker drawn beside a selected multi-select entry. Default `◉`
+# @env DYBATPHO_TUI_CHECKED string [default: ◉] Marker drawn beside a selected multi-select entry
 DYBATPHO_TUI_CHECKED="${DYBATPHO_TUI_CHECKED:-◉}"
 export DYBATPHO_TUI_CHECKED
-# @env DYBATPHO_TUI_UNCHECKED string Marker drawn beside an unselected multi-select entry. Default `◯`
+# @env DYBATPHO_TUI_UNCHECKED string [default: ◯] Marker drawn beside an unselected multi-select entry
 DYBATPHO_TUI_UNCHECKED="${DYBATPHO_TUI_UNCHECKED:-◯}"
 export DYBATPHO_TUI_UNCHECKED
-# @env DYBATPHO_TUI_MENU_HEIGHT number Entries a drawn menu shows at once before it scrolls. Default `10`
+# @env DYBATPHO_TUI_MENU_HEIGHT number [default: 10] Entries a drawn menu shows at once before it scrolls
 DYBATPHO_TUI_MENU_HEIGHT="${DYBATPHO_TUI_MENU_HEIGHT:-10}"
 export DYBATPHO_TUI_MENU_HEIGHT
 # @env DYBATPHO_TUI_DEFAULT string Comma-separated 1-based entries a menu starts on, and the answer it uses when the
@@ -273,7 +273,7 @@ function __dybatpho_tui_expect_int {
 #
 # @arg $1 number Units of work completed, clamped to the total
 # @arg $2 number Units of work in total, at least 1
-# @arg $3 number Optional bar width in characters, default is `DYBATPHO_TUI_BAR_WIDTH`
+# @arg $3 number [default: ${DYBATPHO_TUI_BAR_WIDTH}] Bar width in characters
 # @stdout The bar and its percentage, with no trailing newline
 # @exitcode 1 An argument is not a whole number, or is out of range
 # @env DYBATPHO_TUI_BAR_FILLED string Character drawn for the completed part
@@ -424,8 +424,8 @@ function dybatpho::tui_spinner_message {
 #   dybatpho::tui_spinner_stop 0 "Uploaded"
 #   dybatpho::tui_spinner_stop 1 "Upload failed"
 #
-# @arg $1 number Optional exit status the work ended with, default is `0`
-# @arg $2 string Optional closing message, default is none
+# @arg $1 number [default: 0] Exit status the work ended with
+# @arg $2 string? Closing message, default is none
 # @set DYBATPHO_TUI_SPINNER_PID string Cleared
 # @stderr A success or failure banner, when a message is given
 # @exitcode The status passed in, so the call can both report and propagate an outcome
@@ -566,7 +566,7 @@ function dybatpho::tui_progress_start {
 #######################################
 # @description Move the progress bar to an absolute position.
 # @arg $1 number Units of work completed, clamped to the total
-# @arg $2 string Optional new label
+# @arg $2 string? New label
 # @set DYBATPHO_TUI_PROGRESS_CURRENT number Units recorded
 # @stderr The redrawn bar, or a log line when the percentage crosses a reporting step
 # @exitcode 1 No progress bar is running, or the position is not a whole number
@@ -588,8 +588,8 @@ function dybatpho::tui_progress_update {
 
 #######################################
 # @description Advance the progress bar by a number of units.
-# @arg $1 number Optional units to add, default is `1`
-# @arg $2 string Optional new label
+# @arg $1 number [default: 1] Units to add
+# @arg $2 string? New label
 # @set DYBATPHO_TUI_PROGRESS_CURRENT number Units recorded
 # @exitcode 1 No progress bar is running, or the increment is not a whole number
 #######################################
@@ -606,7 +606,7 @@ function dybatpho::tui_progress_step {
 #   The bar is filled to its total first: a loop that ended early would
 #   otherwise leave a terminal showing `80%` for work that is over, which reads
 #   as a hang rather than as a finish.
-# @arg $1 string Optional closing message replacing the bar
+# @arg $1 string? Closing message replacing the bar
 # @set DYBATPHO_TUI_PROGRESS_CURRENT number Set to the total
 # @stderr The final frame, then a newline, or a closing log line
 # @exitcode 0 Even when no progress bar was running, so it is safe to call from a trap
@@ -1159,7 +1159,7 @@ function dybatpho::tui_multi_menu {
 #     || dybatpho::die "Cancelled"
 #
 # @arg $1 string Question to ask
-# @arg $2 string Optional default answer used on `enter`, default is `no`
+# @arg $2 string [default: no] Default answer used on `enter`
 # @stderr The question; nothing reaches stdout
 # @exitcode 0 The answer is yes, or `DYBATPHO_FORCE` is enabled
 # @exitcode 1 The answer is no, the question was cancelled, or the script is not interactive

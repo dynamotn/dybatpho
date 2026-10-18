@@ -66,11 +66,11 @@ Extract an archive into a target directory.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Archive file path |
-| `$2` | string | Optional extraction directory, default is `.` |
-| `$3` | number | Optional strip-components count, default is `0` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Archive file path |
+| `$2` | string | no | `.` | Extraction directory |
+| `$3` | number | no | `0` | Strip-components count |
 
 **📤 Output on stdout**
 

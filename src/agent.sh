@@ -69,11 +69,11 @@
 #   - `example/agent_ops.sh`
 #   - `docs/cli.md` for the option spec these tool definitions are generated from
 # @tip Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE`
-# @note Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a
+# @tip Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a
 #   second edit
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_AGENT_MODE string `auto` (default), `on`, or `off`
+# @env DYBATPHO_AGENT_MODE string [default: auto] `auto`, `on`, or `off`
 # @env DYBATPHO_AGENT_ALLOW string Space separated actions an agent may perform, or `all`
 # @env DYBATPHO_AGENT_AUDIT_FILE string Path of the JSON Lines audit log
 # @env DYBATPHO_AGENT_ENV string Extra environment variable names that mark an agent run
@@ -224,7 +224,7 @@ function dybatpho::agent_result {
 #
 # @arg $1 string Stable error code, lowercase with underscores
 # @arg $2 string Human readable message
-# @arg $3 string Optional hint describing how to recover
+# @arg $3 string? Hint describing how to recover
 # @stdout A JSON object in agent mode; nothing otherwise
 # @exitcode 1 Always, so the call can be chained with `||`
 # @tip Error codes are a contract; keep them stable across releases so an agent can branch on them
@@ -317,7 +317,7 @@ function __dybatpho_agent_allowed {
 #   dybatpho::agent_confirm restart "Restart the API service" || exit 0
 #
 # @arg $1 string Action name, matched against the allowlist
-# @arg $2 string Optional description shown to a human
+# @arg $2 string? Description shown to a human
 # @env DYBATPHO_AGENT_ALLOW string Actions an agent may perform
 # @stdout A refusal object in agent mode when the action is not allowed
 # @exitcode 0 The action is approved
@@ -358,7 +358,7 @@ function dybatpho::agent_confirm {
 #   dybatpho::agent_audit deploy "version 1.4.2 to staging"
 #
 # @arg $1 string Action name
-# @arg $2 string Optional detail
+# @arg $2 string? Detail
 # @env DYBATPHO_AGENT_AUDIT_FILE string Destination path; nothing is written when empty
 # @exitcode 0 The record was appended, or auditing is disabled
 # @exitcode 1 Missing arguments
@@ -557,8 +557,8 @@ function __dybatpho_agent_each_tool_into {
 #   dybatpho::agent_tools _spec_root mytool openai     # function-calling shape
 #
 # @arg $1 string Spec function, the same one passed to `dybatpho::generate_from_spec`
-# @arg $2 string Tool name prefix, default is the script name
-# @arg $3 string Output shape, `anthropic` (default) or `openai`
+# @arg $2 string? Tool name prefix, default is the script name
+# @arg $3 string [default: anthropic] Output shape, `anthropic` or `openai`
 # @stdout JSON array of tool definitions
 # @exitcode 0 The definitions were printed
 # @exitcode 1 Missing arguments or an unknown output shape
@@ -627,8 +627,8 @@ function __dybatpho_agent_tool_name_into {
 #   dybatpho::agent_mcp _spec_root mytool > mytool-mcp.json
 #
 # @arg $1 string Spec function
-# @arg $2 string Server and tool name prefix, default is the script name
-# @arg $3 string Command an MCP server should execute, default is the script path
+# @arg $2 string? Server and tool name prefix, default is the script name
+# @arg $3 string? Command an MCP server should execute, default is the script path
 # @stdout JSON object with `name`, `version`, and a `tools` array
 # @exitcode 0 The payload was printed
 # @exitcode 1 Missing arguments

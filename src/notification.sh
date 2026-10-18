@@ -223,7 +223,7 @@ function dybatpho::notify_slack {
 #   dybatpho::notify_telegram "*Build* passed" "Markdown"
 #
 # @arg $1 string Message text (supports HTML or Markdown when parse mode is set)
-# @arg $2 string Parse mode: `HTML`, `Markdown`, or `MarkdownV2`. Default is empty (plain text)
+# @arg $2 string? Parse mode: `HTML`, `Markdown`, or `MarkdownV2`; empty sends plain text
 # @env DYBATPHO_TELEGRAM_BOT_TOKEN string Telegram Bot API token
 # @env DYBATPHO_TELEGRAM_CHAT_ID string Target chat, group, or channel ID
 # @exitcode 0 Message sent successfully
@@ -271,7 +271,7 @@ function dybatpho::notify_telegram {
 #   dybatpho::notify_teams "All checks passed" "Deploy v2.0"
 #
 # @arg $1 string Message body text
-# @arg $2 string Optional card title shown above the message body
+# @arg $2 string? Card title shown above the message body
 # @env DYBATPHO_TEAMS_WEBHOOK_URL string Microsoft Teams Incoming Webhook URL
 # @exitcode 0 Message sent successfully
 # @exitcode 1 Missing arguments or environment variables
@@ -358,7 +358,7 @@ function dybatpho::notify_google_chat {
 #   dybatpho::notify_discord "Deploy done" "CI Bot"
 #
 # @arg $1 string Message content (supports Discord Markdown)
-# @arg $2 string Optional display name override for the webhook bot
+# @arg $2 string? Display name override for the webhook bot
 # @env DYBATPHO_DISCORD_WEBHOOK_URL string Discord Incoming Webhook URL
 # @exitcode 0 Message sent successfully
 # @exitcode 1 Missing arguments or environment variables
@@ -438,8 +438,8 @@ function dybatpho::notify_webhook {
 #   dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 #
 # @arg $1 string Title
-# @arg $2 string Body, default is empty
-# @arg $3 string Urgency: `low`, `normal` or `critical`, default is `normal`
+# @arg $2 string? Body
+# @arg $3 string [default: normal] Urgency: `low`, `normal` or `critical`
 # @env DRY_RUN string Print the command instead of showing the notification; with no backend installed, the
 #   `notify-send` form is printed
 # @exitcode 0 The notification was handed to the desktop
@@ -502,12 +502,12 @@ function dybatpho::notify_desktop {
 #   dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,floppy_disk"
 #
 # @arg $1 string Message text
-# @arg $2 string Optional title
-# @arg $3 string Optional priority: `1`-`5`, or `min`, `low`, `default`, `high`, `max` or `urgent`
-# @arg $4 string Optional comma-separated tags; a tag that names an emoji is shown as one
+# @arg $2 string? Title
+# @arg $3 string? Priority: `1`-`5`, or `min`, `low`, `default`, `high`, `max` or `urgent`
+# @arg $4 string? Comma-separated tags; a tag that names an emoji is shown as one
 # @env DYBATPHO_NTFY_TOPIC string Topic to publish to: letters, digits, `-` and `_`, at most 64 characters
-# @env DYBATPHO_NTFY_URL string Server URL, default is `https://ntfy.sh`
-# @env DYBATPHO_NTFY_TOKEN string Optional access token for a protected topic
+# @env DYBATPHO_NTFY_URL string [default: https://ntfy.sh] Server URL
+# @env DYBATPHO_NTFY_TOKEN string? Access token for a protected topic
 # @exitcode 0 Message published
 # @exitcode 1 Missing arguments or environment variables, an invalid topic, server URL or priority, or tags
 #   holding a line break
@@ -593,8 +593,8 @@ function dybatpho::notify_ntfy {
 #   dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 #
 # @arg $1 string Message text
-# @arg $2 string Optional title; Gotify shows the application name without one
-# @arg $3 string Optional priority from `0` to `10`
+# @arg $2 string? Title; Gotify shows the application name without one
+# @arg $3 string? Priority from `0` to `10`
 # @env DYBATPHO_GOTIFY_URL string Server URL, such as `https://gotify.example.com`
 # @env DYBATPHO_GOTIFY_TOKEN string Application token the message is posted as
 # @exitcode 0 Message pushed
@@ -734,9 +734,9 @@ function __dybatpho_notification_is_address {
 # @arg $1 string Recipients, comma-separated
 # @arg $2 string Subject
 # @arg $3 string Body
-# @arg $4 string Sender address, default is `DYBATPHO_EMAIL_FROM`, or the MTA's own default when neither is set
+# @arg $4 string? Sender address; `DYBATPHO_EMAIL_FROM` when omitted, or the MTA's own default when neither is set
 # @env DYBATPHO_EMAIL_FROM string Default sender address
-# @env DYBATPHO_SENDMAIL string The sendmail command, default is `sendmail` on PATH, then `/usr/sbin/sendmail`
+# @env DYBATPHO_SENDMAIL string? The sendmail command; without it, `sendmail` on PATH, then `/usr/sbin/sendmail`
 #   and `/usr/lib/sendmail`
 # @env DRY_RUN string Print the sendmail command instead of sending anything
 # @exitcode 0 The message was handed to the MTA

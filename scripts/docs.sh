@@ -4,11 +4,12 @@
 # @description
 #   Writes `docs/<module>.md` from the shdoc comments in each source file.
 #
-#   `--check` generates into a temporary directory and compares instead of
-#   writing, which is what CI needs: the committed documentation is generated,
-#   so it can silently fall behind the source it describes. Locally the
-#   `gen-doc` pre-commit hook rewrites the files and a dirty tree makes the
-#   drift obvious; a pull request has no such signal without this flag.
+#   `--check` compares instead of writing, which is what CI needs: the
+#   committed documentation is generated, so it can silently fall behind the
+#   source it describes. Locally the `gen-doc` pre-commit hook rewrites the
+#   files and a dirty tree makes the drift obvious; a pull request has no such
+#   signal without this flag. Both modes run `sh-docs --strict`, so a comment
+#   it cannot document properly fails as well.
 #
 # @example
 #   scripts/docs.sh                 # regenerate every document
@@ -56,55 +57,36 @@ function __dybatpho_doc_sources {
   printf '%s\n' "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/src/"*.sh
 }
 
-# @description Write `docs/<module>.md` for every source.
-# @noargs
+# @description Write `docs/<module>.md` for every source, or compare instead.
+#   One `sh-docs --output-dir` run covers every source, and `--check` turns it
+#   into a comparison with the committed documents that prints a diff for a
+#   stale one. `--strict` runs either way, so a misspelt tag, a public function
+#   without a description or a positional argument without `@arg` fails here
+#   rather than silently missing from the document.
+# @arg $1 bool `true` to compare instead of writing
+# @exitcode 0 Every document was written, or matches its source
+# @exitcode 1 A document is stale, or `--strict` found a problem in a comment
 # @internal
-function __dybatpho_doc_generate {
-  local _src _module _written=0
+function __dybatpho_doc_sh_docs {
+  local _compare
+  dybatpho::expect_args _compare -- "$@"
+  local -a _sources=() _args=(--strict --output-dir "${DYBATPHO_DIR}/docs")
   local doc_sources_output
   doc_sources_output=$(__dybatpho_doc_sources)
-  while IFS= read -r _src || [[ -n "${_src}" ]]; do
-    _module="$(basename "${_src}" .sh)"
-    "${SH_DOCS}" "${_src}" \
-      --output "${DYBATPHO_DIR}/docs/${_module}.md"
-    _written=$((_written + 1))
-  done < <(printf '%s' "${doc_sources_output}")
-  ((_written > 0)) \
+  [[ -z "${doc_sources_output}" ]] || mapfile -t _sources <<< "${doc_sources_output}"
+  # A guard that documented or compared nothing has not shown anything, and
+  # reporting success for it is how a check quietly stops checking.
+  ((${#_sources[@]})) \
     || dybatpho::die "${FUNCNAME[0]}: No source file to document"
-}
+  [[ "${_compare}" == true ]] && _args+=(--check)
 
-# @description Compare the committed documents against freshly generated ones.
-# @noargs
-# @exitcode 0 Every document matches its source
-# @exitcode 1 At least one document is stale
-# @internal
-function __dybatpho_doc_check {
-  local _generated _src _module _stale="" _checked=0
-  dybatpho::create_temp_dir _generated "doc-check"
-
-  local doc_sources_output
-  doc_sources_output=$(__dybatpho_doc_sources)
-  while IFS= read -r _src || [[ -n "${_src}" ]]; do
-    _module="$(basename "${_src}" .sh)"
-    "${SH_DOCS}" "${_src}" \
-      --output "${_generated}/${_module}.md"
-    _checked=$((_checked + 1))
-    if ! diff -q "${DYBATPHO_DIR}/docs/${_module}.md" "${_generated}/${_module}.md" &> /dev/null; then
-      _stale+="docs/${_module}.md is stale relative to $(basename "${_src}")"$'\n'
-    fi
-  done < <(printf '%s' "${doc_sources_output}")
-
-  # A guard that compared nothing has not shown the documentation is current,
-  # and reporting success for it is how this check quietly stopped checking.
-  ((_checked > 0)) \
-    || dybatpho::die "${FUNCNAME[0]}: No source file to check"
-
-  if [[ -n "${_stale}" ]]; then
-    dybatpho::error "Generated documentation is out of date; run scripts/docs.sh"
-    printf '%s' "${_stale}" >&2
+  if ! "${SH_DOCS}" "${_args[@]}" ${_sources[@]+"${_sources[@]}"}; then
+    [[ "${_compare}" == true ]] \
+      && dybatpho::error "Generated documentation is out of date or a comment is wrong; run scripts/docs.sh"
     return 1
   fi
-  dybatpho::success "Generated documentation is up to date"
+  [[ "${_compare}" == true ]] && dybatpho::success "Generated documentation is up to date"
+  return 0
 }
 
 # @description Generate or check, depending on `--check`.
@@ -117,10 +99,10 @@ function __dybatpho_doc_run {
 
   # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${CHECK}"; then
-    __dybatpho_doc_check
+    __dybatpho_doc_sh_docs true
     return
   fi
-  __dybatpho_doc_generate
+  __dybatpho_doc_sh_docs false
 }
 
 # @description CLI specification for this script.

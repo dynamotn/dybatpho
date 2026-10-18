@@ -88,28 +88,28 @@
 # @tip Every prompt is passed through `dybatpho::secret_mask` first, so values registered with
 #   `dybatpho::secret_register`
 #   never reach the provider
-# @note Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library;
+# @tip Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library;
 #   building them by string concatenation is too escaping-sensitive to be safe
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_AI_PROVIDER string Backend to use: `auto` (default), `anthropic`, `openai`, `ollama`, or `cli`
+# @env DYBATPHO_AI_PROVIDER string [default: auto] Backend to use: `auto`, `anthropic`, `openai`, `ollama`, or `cli`
 # @env DYBATPHO_AI_MODEL string Model identifier; defaults to the provider's recommended model
 # @env DYBATPHO_AI_BASE_URL string Override the provider base URL, for proxies and compatible gateways
 # @env DYBATPHO_AI_API_KEY string API key; `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are used as fallbacks
-# @env DYBATPHO_AI_MAX_TOKENS number Output token ceiling for one response (default `16000`)
+# @env DYBATPHO_AI_MAX_TOKENS number [default: 16000] Output token ceiling for one response
 # @env DYBATPHO_AI_EFFORT string Reasoning effort for Anthropic models: `low`, `medium`, `high`, `xhigh`, or `max`
 # @env DYBATPHO_AI_TEMPERATURE string Sampling temperature; only sent to the `openai` and `ollama` backends
 # @env DYBATPHO_AI_SYSTEM string Default system prompt used when a call does not pass one
-# @env DYBATPHO_AI_TIMEOUT number Total curl timeout in seconds for one model call (default `300`)
-# @env DYBATPHO_AI_CACHE bool Cache responses on disk keyed by request content (default `false`)
-# @env DYBATPHO_AI_CACHE_DIR string Cache directory (default `${XDG_CACHE_HOME:-${HOME}/.cache}/dybatpho/ai`)
-# @env DYBATPHO_AI_CACHE_TTL number Seconds a cached response stays valid (default `86400`)
-# @env DYBATPHO_AI_REDACT bool Mask registered secrets in every prompt before sending (default `true`)
+# @env DYBATPHO_AI_TIMEOUT number [default: 300] Total curl timeout in seconds for one model call
+# @env DYBATPHO_AI_CACHE bool [default: false] Cache responses on disk keyed by request content
+# @env DYBATPHO_AI_CACHE_DIR string [default: ${XDG_CACHE_HOME:-${HOME}/.cache}/dybatpho/ai] Cache directory
+# @env DYBATPHO_AI_CACHE_TTL number [default: 86400] Seconds a cached response stays valid
+# @env DYBATPHO_AI_REDACT bool [default: true] Mask registered secrets in every prompt before sending
 # @env DYBATPHO_AI_MAX_CALLS number Stop after this many model calls in one script; `0` means no limit
-# @env DYBATPHO_AI_MAX_STEPS number Maximum tool-use rounds in `dybatpho::ai_run` (default `10`)
-# @env DYBATPHO_AI_JSON_RETRIES number Attempts `dybatpho::ai_json` makes before failing (default `2`)
+# @env DYBATPHO_AI_MAX_STEPS number [default: 10] Maximum tool-use rounds in `dybatpho::ai_run`
+# @env DYBATPHO_AI_JSON_RETRIES number [default: 2] Attempts `dybatpho::ai_json` makes before failing
 # @env DYBATPHO_AI_CLI string Command used by the `cli` backend: `claude`, `llm`, or `ollama`
-# @env DYBATPHO_AI_ANTHROPIC_VERSION string Value of the `anthropic-version` header (default `2023-06-01`)
+# @env DYBATPHO_AI_ANTHROPIC_VERSION string [default: 2023-06-01] Value of the `anthropic-version` header
 DYBATPHO_AI_PROVIDER=${DYBATPHO_AI_PROVIDER:-auto}
 DYBATPHO_AI_MODEL=${DYBATPHO_AI_MODEL:-}
 DYBATPHO_AI_BASE_URL=${DYBATPHO_AI_BASE_URL:-}
@@ -306,7 +306,7 @@ function __dybatpho_ai_state_write {
 # command substitution, where an `exit` would only leave that subshell, so the
 # refusal has to be raised by the public function the caller invoked.
 # @env DYBATPHO_AI_MAX_CALLS number Budget; `0` disables the check
-# @arg $1 number Calls this operation is about to make, default `1`
+# @arg $1 number [default: 1] Calls this operation is about to make
 # @exitcode 0 There is budget left
 # @exitcode 1 Stop the script when the budget is exhausted
 # @internal
@@ -450,7 +450,7 @@ function dybatpho::ai_provider {
 # @example
 #   dybatpho::info "Asking $(dybatpho::ai_model)"
 #
-# @arg $1 string Optional backend name; detected when omitted
+# @arg $1 string? Backend name; detected when omitted
 # @env DYBATPHO_AI_MODEL string Wins over every per-backend default
 # @stdout Model identifier
 # @exitcode 0 A model name was resolved
@@ -1242,7 +1242,7 @@ function __dybatpho_ai_complete {
 #   dybatpho::ai_ask "Is this config safe?" "You are a security reviewer"
 #
 # @arg $1 string Prompt
-# @arg $2 string Optional system prompt; `DYBATPHO_AI_SYSTEM` is used when omitted
+# @arg $2 string? System prompt; `DYBATPHO_AI_SYSTEM` is used when omitted
 # @env DYBATPHO_AI_SYSTEM string Default system prompt
 # @stdout Assistant answer
 # @exitcode 0 The provider answered
@@ -1270,7 +1270,7 @@ function dybatpho::ai_ask {
 #   dybatpho::ai_conversation_new CHAT "You are a release manager"
 #
 # @arg $1 string Variable name that receives the file path
-# @arg $2 string Optional system prompt
+# @arg $2 string? System prompt
 # @set The named variable
 # @exitcode 0 The conversation file exists
 # @exitcode 1 Missing arguments
@@ -1393,7 +1393,7 @@ function dybatpho::ai_chat {
 #
 # @arg $1 string Prompt
 # @arg $2 string JSON schema describing the answer
-# @arg $3 string Optional system prompt
+# @arg $3 string? System prompt
 # @env DYBATPHO_AI_JSON_RETRIES number Attempts before giving up
 # @stdout Compact JSON answer
 # @exitcode 0 A valid JSON answer was produced
@@ -1451,7 +1451,7 @@ ${schema}"
 #   dybatpho::ai_stream "Explain this stack trace" | tee /tmp/answer.txt
 #
 # @arg $1 string Prompt
-# @arg $2 string Optional system prompt
+# @arg $2 string? System prompt
 # @stdout Assistant answer, written incrementally
 # @exitcode 0 The stream completed
 # @exitcode 1 Missing arguments, or the request never reached the provider or broke off
@@ -1739,7 +1739,7 @@ function __dybatpho_ai_tool_invoke {
 #   dybatpho::ai_run "Do we need to clean up the build cache?"
 #
 # @arg $1 string Prompt
-# @arg $2 string Optional system prompt
+# @arg $2 string? System prompt
 # @env DYBATPHO_AI_MAX_STEPS number Maximum tool rounds before giving up
 # @stdout Final assistant answer
 # @exitcode 0 The model produced a final answer
@@ -1905,7 +1905,7 @@ function dybatpho::ai_tokens_estimate {
 #   dybatpho::ai_usage
 #   dybatpho::ai_usage total
 #
-# @arg $1 string Scope, `last` (default) or `total`
+# @arg $1 string [default: last] Scope, `last` or `total`
 # @stdout `calls=N input=N output=N`, plus the model and stop reason for `last`
 # @exitcode 0 The counters were printed
 # @exitcode 1 Stop the script when the scope is unknown

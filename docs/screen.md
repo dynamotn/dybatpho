@@ -18,30 +18,30 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_SCREEN_MOUSE`** | bool | Report mouse clicks as events. Default `true` |
-| **`DYBATPHO_SCREEN_POINTER`** | string | Marker drawn beside the selected list or table row. Default `❯` |
-| **`DYBATPHO_SCREEN_STYLE_SELECTED`** | string | SGR parameters for a selected row. Default `1;7` |
-| **`DYBATPHO_SCREEN_STYLE_BORDER`** | string | SGR parameters for a block border. Default `2` |
-| **`DYBATPHO_SCREEN_STYLE_TITLE`** | string | SGR parameters for a block title. Default `1` |
-| **`DYBATPHO_SCREEN_STYLE_FOCUS`** | string | SGR parameters for the border of a block drawn with `focus:true`. Default `1` |
-| **`DYBATPHO_SCREEN_STYLE_TAB_ACTIVE`** | string | SGR parameters for the active tab. Default `1;7` |
-| **`DYBATPHO_SCREEN_STYLE_KEYBAR`** | string | SGR parameters for the background of a key bar. Default `7` |
-| **`DYBATPHO_SCREEN_STYLE_KEY`** | string | SGR parameters for a key named in a key bar. Default `1` |
-| **`DYBATPHO_SCREEN_STYLE_ACCENT`** | string | SGR parameters an application uses for what should stand out. Default `1` |
-| **`DYBATPHO_SCREEN_STYLE_DIM`** | string | SGR parameters for secondary text, and for the divider between tabs. Default `2` |
-| **`DYBATPHO_SCREEN_STYLE_OK`** | string | SGR parameters for success. Default `32` |
-| **`DYBATPHO_SCREEN_STYLE_WARN`** | string | SGR parameters for a warning. Default `33` |
-| **`DYBATPHO_SCREEN_STYLE_ERROR`** | string | SGR parameters for an error. Default `31` |
-| **`DYBATPHO_SCREEN_WIDTH`** | number | Columns of the terminal the buffer is sized for |
-| **`DYBATPHO_SCREEN_HEIGHT`** | number | Rows of the terminal the buffer is sized for |
-| **`DYBATPHO_SCREEN_RECT`** | string | The whole terminal as a rectangle, `x y width height` |
-| **`DYBATPHO_SCREEN_ACTIVE`** | bool | `true` between `dybatpho::screen_begin` and `dybatpho::screen_end` |
-| **`DYBATPHO_SCREEN_MOUSE_COLUMN`** | number | Zero-based column of the last mouse event |
-| **`DYBATPHO_SCREEN_MOUSE_ROW`** | number | Zero-based row of the last mouse event |
-| **`DYBATPHO_SCREEN_INNER`** | string | Rectangle left inside the last block or popup |
-| **`DYBATPHO_SCREEN_OFFSET`** | number | Index of the first item the last list or table drew, after it scrolled to keep the selection visible |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_SCREEN_MOUSE`** | bool | no | `true` | Report mouse clicks as events |
+| **`DYBATPHO_SCREEN_POINTER`** | string | no | `❯` | Marker drawn beside the selected list or table row |
+| **`DYBATPHO_SCREEN_STYLE_SELECTED`** | string | no | `1;7` | SGR parameters for a selected row |
+| **`DYBATPHO_SCREEN_STYLE_BORDER`** | string | no | `2` | SGR parameters for a block border |
+| **`DYBATPHO_SCREEN_STYLE_TITLE`** | string | no | `1` | SGR parameters for a block title |
+| **`DYBATPHO_SCREEN_STYLE_FOCUS`** | string | no | `1` | SGR parameters for the border of a block drawn with `focus:true` |
+| **`DYBATPHO_SCREEN_STYLE_TAB_ACTIVE`** | string | no | `1;7` | SGR parameters for the active tab |
+| **`DYBATPHO_SCREEN_STYLE_KEYBAR`** | string | no | `7` | SGR parameters for the background of a key bar |
+| **`DYBATPHO_SCREEN_STYLE_KEY`** | string | no | `1` | SGR parameters for a key named in a key bar |
+| **`DYBATPHO_SCREEN_STYLE_ACCENT`** | string | no | `1` | SGR parameters an application uses for what should stand out |
+| **`DYBATPHO_SCREEN_STYLE_DIM`** | string | no | `2` | SGR parameters for secondary text, and for the divider between tabs |
+| **`DYBATPHO_SCREEN_STYLE_OK`** | string | no | `32` | SGR parameters for success |
+| **`DYBATPHO_SCREEN_STYLE_WARN`** | string | no | `33` | SGR parameters for a warning |
+| **`DYBATPHO_SCREEN_STYLE_ERROR`** | string | no | `31` | SGR parameters for an error |
+| **`DYBATPHO_SCREEN_WIDTH`** | number | yes |  | Columns of the terminal the buffer is sized for |
+| **`DYBATPHO_SCREEN_HEIGHT`** | number | yes |  | Rows of the terminal the buffer is sized for |
+| **`DYBATPHO_SCREEN_RECT`** | string | yes |  | The whole terminal as a rectangle, `x y width height` |
+| **`DYBATPHO_SCREEN_ACTIVE`** | bool | yes |  | `true` between `dybatpho::screen_begin` and `dybatpho::screen_end` |
+| **`DYBATPHO_SCREEN_MOUSE_COLUMN`** | number | yes |  | Zero-based column of the last mouse event |
+| **`DYBATPHO_SCREEN_MOUSE_ROW`** | number | yes |  | Zero-based row of the last mouse event |
+| **`DYBATPHO_SCREEN_INNER`** | string | yes |  | Rectangle left inside the last block or popup |
+| **`DYBATPHO_SCREEN_OFFSET`** | number | yes |  | Index of the first item the last list or table drew, after it scrolled to keep the selection visible |
 
 ### 🚀 Highlights
 
@@ -254,12 +254,12 @@ dybatpho::screen_put 2 4 "Ready" "1;32"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Row, zero-based |
-| `$2` | number | Column, zero-based |
-| `$3` | string | Text to draw, without escape sequences |
-| `$4` | string | Optional SGR parameters, default is `0` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Row, zero-based |
+| `$2` | number | yes |  | Column, zero-based |
+| `$3` | string | yes |  | Text to draw, without escape sequences |
+| `$4` | string | no | `0` | SGR parameters |
 
 **🚦 Exit codes**
 
@@ -406,11 +406,11 @@ dybatpho::screen_rect_inner inner "${box}" 1
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the rectangle |
-| `$2` | string | Rectangle to shrink |
-| `$3` | number | Optional margin in cells, default is `1` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the rectangle |
+| `$2` | string | yes |  | Rectangle to shrink |
+| `$3` | number | no | `1` | Margin in cells |
 
 **🧩 Variable sets**
 
@@ -524,10 +524,10 @@ esac
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the variable receiving the event |
-| `$2` | string | Optional timeout in seconds; without one the call waits |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the event |
+| `$2` | string | no |  | Timeout in seconds; without one the call waits |
 
 **🧩 Variable sets**
 

@@ -203,8 +203,8 @@ function __dybatpho_semver_cmp_into {
 # @description Bump a semver version by the specified part.
 # @arg $1 string Version string to bump
 # @arg $2 string Part to bump: major | minor | patch
-# @arg $3 string Optional pre-release label to attach (e.g. "alpha.1")
-# @arg $4 string Optional build-metadata to attach (e.g. "build.42")
+# @arg $3 string? Pre-release label to attach (e.g. "alpha.1")
+# @arg $4 string? Build-metadata to attach (e.g. "build.42")
 # @stdout Bumped version string (no leading v, no pre-release/build unless supplied)
 # @exitcode 0 Always succeeds
 # @exitcode 1 The version is invalid or the part is not one of major/minor/patch
@@ -650,8 +650,7 @@ __DYBATPHO_SEMVER_PRERELEASE_REGEX='^(alpha|beta|rc|pre|preview|dev|snapshot|nig
 # @stdout The version as `major.minor.patch`, with the pre-release kept
 # @exitcode 0 A version was found
 # @exitcode 1 Stop the script when the text holds no version
-# @see
-#   - `dybatpho::command_version`
+# @see dybatpho::command_version
 #######################################
 function dybatpho::semver_coerce {
   local text

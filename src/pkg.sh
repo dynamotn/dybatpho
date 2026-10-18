@@ -368,7 +368,7 @@ function dybatpho::pkg_manager {
 
 #######################################
 # @description Return success when a package manager is usable on this machine.
-# @arg $1 string Optional manager name, default is the detected one
+# @arg $1 string? Manager name, default is the detected one
 # @exitcode 0 The manager is installed
 # @exitcode 1 The manager is not installed, or nothing was detected
 #######################################
@@ -387,7 +387,7 @@ function dybatpho::pkg_manager_available {
 #   dybatpho::pkg_name fd apt:fd-find emerge:sys-apps/fd   # fd-find on Debian
 #
 # @arg $1 string Default package name, used when no override matches
-# @arg $@ string Optional `<manager>:<package>` overrides
+# @arg $@ string? `<manager>:<package>` overrides
 # @stdout The package name to install on this machine
 # @exitcode 0 A name is printed
 # @exitcode 1 No package manager was detected
@@ -647,7 +647,7 @@ function dybatpho::pkg_ensure {
 #
 # @arg $1 string The options of `dybatpho::pkg_install`, including `--arg`/`-a`
 # @arg $2 string Command that must be available, also the default package name
-# @arg $@ string Optional `<manager>:<package>` overrides
+# @arg $@ string? `<manager>:<package>` overrides
 # @exitcode 0 The command is available, or its package was installed
 # @exitcode 1 The install is declined, the command failed, or the command is still missing afterwards
 #######################################

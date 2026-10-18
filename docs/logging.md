@@ -17,20 +17,20 @@ appended to a rotating log file at an independent verbosity level.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`LOG_LEVEL`** | string | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`). Default is `info` |
-| **`LOG_FORMAT`** | string | Log output format (`text\|json`). Default is `text` |
-| **`NO_COLOR`** | string | Disable ANSI colors when set to a non-empty value |
-| **`LOG_REQUEST_ID`** | string | Correlation ID attached to every structured log event. Generated automatically when empty |
-| **`LOG_FILE`** | string | Optional path to append structured JSON log lines to, independent of `LOG_FORMAT` |
-| **`LOG_FILE_LEVEL`** | string | Verbosity threshold applied only to `LOG_FILE` output. Default is `LOG_LEVEL` |
-| **`LOG_FILE_MAX_BYTES`** | number | Rotate `LOG_FILE` once it reaches this size in bytes. `0` disables rotation. Default `10485760` (10 MiB) |
-| **`LOG_FILE_MAX_BACKUPS`** | number | Number of rotated `LOG_FILE` backups to keep. Default `5` |
-| **`DYBATPHO_SPINNER`** | string | When `dybatpho::spinner` animates (`auto\|always\|never`). `auto` animates only on a terminal. Default `auto` |
-| **`DYBATPHO_SPINNER_INTERVAL`** | string | Seconds between spinner frames. Default `0.1` |
-| **`DYBATPHO_SPINNER_FRAMES`** | string | Space-separated frames the spinner cycles through |
-| **`DYBATPHO_TIMER_LAST_MS`** | number | Elapsed milliseconds reported by the last `dybatpho::timer_end` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`LOG_LEVEL`** | string | no | `info` | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`) |
+| **`LOG_FORMAT`** | string | no | `text` | Log output format (`text\|json`) |
+| **`NO_COLOR`** | string | yes |  | Disable ANSI colors when set to a non-empty value |
+| **`LOG_REQUEST_ID`** | string | yes |  | Correlation ID attached to every structured log event. Generated automatically when empty |
+| **`LOG_FILE`** | string | no |  | Path to append structured JSON log lines to, independent of `LOG_FORMAT` |
+| **`LOG_FILE_LEVEL`** | string | no | `${LOG_LEVEL}` | Verbosity threshold applied only to `LOG_FILE` output |
+| **`LOG_FILE_MAX_BYTES`** | number | no | `10485760` | Rotate `LOG_FILE` once it reaches this size in bytes, 10 MiB by default. `0` disables rotation |
+| **`LOG_FILE_MAX_BACKUPS`** | number | no | `5` | Number of rotated `LOG_FILE` backups to keep |
+| **`DYBATPHO_SPINNER`** | string | yes |  | When `dybatpho::spinner` animates (`auto\|always\|never`). `auto` animates only on a terminal. Default `auto` |
+| **`DYBATPHO_SPINNER_INTERVAL`** | string | no | `0.1` | Seconds between spinner frames |
+| **`DYBATPHO_SPINNER_FRAMES`** | string | yes |  | Space-separated frames the spinner cycles through |
+| **`DYBATPHO_TIMER_LAST_MS`** | number | yes |  | Elapsed milliseconds reported by the last `dybatpho::timer_end` |
 
 ### 🚀 Highlights
 
@@ -97,10 +97,10 @@ Return success when a message level should be shown against a threshold.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input log level |
-| `$2` | string | Threshold level to compare against, default is `LOG_LEVEL` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input log level |
+| `$2` | string | no | `${LOG_LEVEL}` | Threshold level to compare against |
 
 **🌍 Environment variables**
 
@@ -225,10 +225,10 @@ Render a percentage-based progress bar on the current output line.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Progress percentage from 0 to 100 |
-| `$2` | number | Width of the progress bar in characters. Default is 50 |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | yes |  | Progress percentage from 0 to 100 |
+| `$2` | number | no | `50` | Width of the progress bar in characters |
 
 **📤 Output on stdout**
 
@@ -339,10 +339,10 @@ dybatpho::log_to_file off   # stop writing to a file
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path of the log file, or `off` to stop file logging |
-| `$@` | string | Optional `rotate:SIZE`, `keep:COUNT` and `level:LEVEL` settings |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path of the log file, or `off` to stop file logging |
+| `$@` | string | no |  | `rotate:SIZE`, `keep:COUNT` and `level:LEVEL` settings |
 
 **🧩 Variable sets**
 
@@ -429,10 +429,10 @@ so a log aggregator can chart a step without parsing the message.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Timer name |
-| `$2` | string | Level to log the duration at, default is `info` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Timer name |
+| `$2` | string | no | `info` | Level to log the duration at |
 
 **🧩 Variable sets**
 

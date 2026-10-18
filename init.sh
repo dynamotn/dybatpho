@@ -296,7 +296,7 @@ function dybatpho::module_loaded {
 
 #######################################
 # @description Print module names, one per line.
-# @arg $1 string Selection, one of `loaded` (default), `all`, `core`, or `optional`
+# @arg $1 string [default: loaded] Selection, one of `loaded`, `all`, `core`, or `optional`
 # @stdout Module names in registry order, or in load order for `loaded`
 # @exitcode 0 Print the requested list
 # @exitcode 1 Stop the script when the selection is unknown

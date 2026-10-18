@@ -452,7 +452,7 @@ function __dybatpho_string_expect_int {
 # @description Truncate a string to a maximum width and append a suffix when needed.
 # @arg $1 string Input string
 # @arg $2 number Maximum width
-# @arg $3 string Optional truncation suffix, default is `...`
+# @arg $3 string [default: ...] Truncation suffix
 # @stdout Truncated string
 #######################################
 function dybatpho::string_truncate {
@@ -496,7 +496,7 @@ function dybatpho::string_lines {
 # @description Wrap a string to a maximum width, normalizing whitespace between words.
 # @arg $1 string Input string
 # @arg $2 number Maximum width
-# @arg $3 string Optional indent prefix for wrapped continuation lines
+# @arg $3 string? Indent prefix for wrapped continuation lines
 # @stdout Wrapped lines
 #######################################
 function dybatpho::string_wrap {
@@ -556,7 +556,7 @@ function dybatpho::string_repeat {
 # @description Pad a string on the right to a minimum width.
 # @arg $1 string Input string
 # @arg $2 number Minimum width
-# @arg $3 string Optional padding token, default is a space
+# @arg $3 string? Padding token, default is a space
 # @stdout Padded string
 #######################################
 function dybatpho::string_pad {
@@ -706,9 +706,8 @@ function __dybatpho_string_words {
 #
 # @arg $1 string String to convert
 # @stdout The string in snake case, empty when it holds no letters or digits
-# @see
-#   - `dybatpho::string_to_kebab`
-#   - `dybatpho::string_slugify`
+# @see dybatpho::string_to_kebab
+# @see dybatpho::string_slugify
 #######################################
 function dybatpho::string_to_snake {
   local input
@@ -730,9 +729,8 @@ function dybatpho::string_to_snake {
 #
 # @arg $1 string String to convert
 # @stdout The string in kebab case, empty when it holds no letters or digits
-# @see
-#   - `dybatpho::string_to_snake`
-#   - `dybatpho::string_slugify`
+# @see dybatpho::string_to_snake
+# @see dybatpho::string_slugify
 #######################################
 function dybatpho::string_to_kebab {
   local input
@@ -751,8 +749,7 @@ function dybatpho::string_to_kebab {
 #
 # @arg $1 string String to convert
 # @stdout The string in camel case, empty when it holds no letters or digits
-# @see
-#   - `dybatpho::string_to_pascal`
+# @see dybatpho::string_to_pascal
 #######################################
 function dybatpho::string_to_camel {
   local input
@@ -777,8 +774,7 @@ function dybatpho::string_to_camel {
 #
 # @arg $1 string String to convert
 # @stdout The string in Pascal case, empty when it holds no letters or digits
-# @see
-#   - `dybatpho::string_to_camel`
+# @see dybatpho::string_to_camel
 #######################################
 function dybatpho::string_to_pascal {
   local input
@@ -828,8 +824,7 @@ function dybatpho::string_quote {
 # @arg $2 string Second string
 # @stdout Edit distance as a decimal number
 # @exitcode 0 Always
-# @see
-#   - `dybatpho::string_closest`
+# @see dybatpho::string_closest
 #######################################
 function dybatpho::string_distance {
   local distance
@@ -900,8 +895,7 @@ function __dybatpho_string_distance_into {
 # @exitcode 0 At least one candidate is within the maximum distance
 # @exitcode 1 No candidate is close enough
 # @exitcode 1 Stop the script when the maximum distance is not a non-negative integer
-# @see
-#   - `dybatpho::string_distance`
+# @see dybatpho::string_distance
 #######################################
 function dybatpho::string_closest {
   dybatpho::expect_ref "${1-}"

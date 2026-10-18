@@ -28,9 +28,9 @@
 #   - `example/release_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_RELEASE_TAG_PATTERN string Glob that release tags match, default is `v*`
+# @env DYBATPHO_RELEASE_TAG_PATTERN string [default: v*] Glob that release tags match
 DYBATPHO_RELEASE_TAG_PATTERN="${DYBATPHO_RELEASE_TAG_PATTERN:-v*}"
-# @env DYBATPHO_RELEASE_CHECKSUM_ALGORITHM string Checksum algorithm for the sums file, default is `sha256`
+# @env DYBATPHO_RELEASE_CHECKSUM_ALGORITHM string [default: sha256] Checksum algorithm for the sums file
 DYBATPHO_RELEASE_CHECKSUM_ALGORITHM="${DYBATPHO_RELEASE_CHECKSUM_ALGORITHM:-sha256}"
 # @env DYBATPHO_RELEASE_SIGN_CMD string Command that signs a file, receiving the signature path and the file path.
 #   Default
@@ -58,7 +58,7 @@ DYBATPHO_RELEASE_GPG_KEY="${DYBATPHO_RELEASE_GPG_KEY:-}"
 #   # handle empty input
 #
 # @arg $1 string Commit subject line
-# @arg $2 string Optional commit body, searched for a `BREAKING CHANGE:` footer
+# @arg $2 string? Commit body, searched for a `BREAKING CHANGE:` footer
 # @stdout Four lines: type, scope (empty if none), `true` or `false` for
 #   breaking, and the description with the type prefix removed
 # @tip A subject that follows no convention reports the type `other` and keeps
@@ -80,7 +80,7 @@ function dybatpho::release_commit_parse {
 # @arg $1 string Name of the array receiving type, scope, `true`/`false` for
 #   breaking, and description, in that order
 # @arg $2 string Commit subject line
-# @arg $3 string Optional commit body, searched for a `BREAKING CHANGE:` footer
+# @arg $3 string? Commit body, searched for a `BREAKING CHANGE:` footer
 # @set The named array
 # @internal
 #######################################
@@ -197,7 +197,7 @@ function dybatpho::release_commit_type {
 #
 # @arg $1 string Repository path
 # @arg $2 string Base ref, excluded from the range, or empty to read the whole history
-# @arg $3 string Optional head ref, default is `HEAD`
+# @arg $3 string [default: ${HEAD}] Head ref
 # @stdout One of `major`, `minor`, or `patch`
 # @exitcode 1 No commit in the range calls for a release
 #######################################
@@ -236,9 +236,9 @@ function dybatpho::release_bump_type {
 #     dybatpho::info "Nothing to release"
 #   fi
 #
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional base tag, default is the highest matching tag
-# @arg $3 string Optional head ref, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string? Base tag, default is the highest matching tag
+# @arg $3 string [default: ${HEAD}] Head ref
 # @env DYBATPHO_RELEASE_TAG_PATTERN string Glob that release tags match
 # @stdout Next version, without a leading `v`
 # @exitcode 1 No commit since the base tag calls for a release
@@ -277,8 +277,8 @@ function dybatpho::release_next_version {
 #
 # @arg $1 string Repository path
 # @arg $2 string Base ref, excluded from the range, or empty to read the whole history
-# @arg $3 string Optional head ref, default is `HEAD`
-# @arg $4 string Optional version for the heading, default is `Unreleased`
+# @arg $3 string [default: ${HEAD}] Head ref
+# @arg $4 string [default: Unreleased] Version for the heading
 # @stdout Markdown section for the release
 # @tip Commits of a type that does not move the version, such as `docs` or
 #   `chore`, are left out: they are part of the history, not of the release notes
@@ -332,8 +332,8 @@ function dybatpho::release_changelog {
 #
 # @arg $1 string Project name
 # @arg $2 string Version, without a leading `v`
-# @arg $3 string Optional operating system, default is the current one
-# @arg $4 string Optional architecture, default is the current one
+# @arg $3 string? Operating system, default is the current one
+# @arg $4 string? Architecture, default is the current one
 # @stdout Artifact file name, including the extension for that platform
 #######################################
 function dybatpho::release_artifact_name {
@@ -359,8 +359,8 @@ function dybatpho::release_artifact_name {
 # @arg $2 string Directory the artifact is written to, created when missing
 # @arg $3 string Project name
 # @arg $4 string Version
-# @arg $5 string Optional operating system, default is the current one
-# @arg $6 string Optional architecture, default is the current one
+# @arg $5 string? Operating system, default is the current one
+# @arg $6 string? Architecture, default is the current one
 # @stdout Path of the artifact that was created
 # @env DRY_RUN string When true-like, print the path without packaging anything
 # @exitcode 1 The source is missing or the archive cannot be created
@@ -407,7 +407,7 @@ function dybatpho::release_package {
 #   ( cd ./release && sha256sum -c "$(basename "${sums}")" )
 #
 # @arg $1 string Directory holding the artifacts
-# @arg $2 string Optional output file, default is `<dir>/SHA256SUMS`
+# @arg $2 string [default: <dir>/SHA256SUMS] Output file
 # @env DYBATPHO_RELEASE_CHECKSUM_ALGORITHM string Algorithm passed to the hash helper
 # @env DRY_RUN string When true-like, print the path without writing anything
 # @stdout Path of the checksum file
@@ -462,7 +462,7 @@ function dybatpho::release_checksums {
 #   DYBATPHO_RELEASE_SIGN_CMD="minisign -S -m" dybatpho::release_sign ./release/SHA256SUMS
 #
 # @arg $1 string File to sign
-# @arg $2 string Optional signature path, default is `<file>.asc`
+# @arg $2 string [default: <file>.asc] Signature path
 # @env DYBATPHO_RELEASE_SIGN_CMD string Command receiving the signature path and the file path, one argument each
 # @env DYBATPHO_RELEASE_GPG_KEY string Key `gpg` signs with
 # @env DRY_RUN string When true-like, print the path without signing

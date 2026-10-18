@@ -59,11 +59,11 @@ it; a cycle is only noted, because the loader allows one.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_BASH_MINIMUM`** | string | Lowest Bash version the library supports |
-| **`DYBATPHO_DOCTOR_REQUIRED`** | array | Required external commands per module |
-| **`DYBATPHO_DOCTOR_OPTIONAL`** | array | Optional external commands per module |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_BASH_MINIMUM`** | string | yes |  | Lowest Bash version the library supports |
+| **`DYBATPHO_DOCTOR_REQUIRED`** | array | yes |  | Required external commands per module |
+| **`DYBATPHO_DOCTOR_OPTIONAL`** | array | no |  | External commands per module |
 
 ### 🚀 Highlights
 
@@ -95,10 +95,10 @@ dybatpho::doctor_requirements archive required
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Module name |
-| `$2` | string | Kind, one of `all` (default), `required`, or `optional` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Module name |
+| `$2` | string | no | `all` | Kind, one of `all`, `required`, or `optional` |
 
 **📤 Output on stdout**
 

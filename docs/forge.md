@@ -28,13 +28,13 @@ token can never reach a log line even when a request is traced.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_FORGE`** | string | Force the forge kind, `github` or `gitlab`, instead of detecting it |
-| **`DYBATPHO_FORGE_REMOTE`** | string | Git remote the forge is detected from, default `origin` |
-| **`DYBATPHO_FORGE_API`** | string | Override the API base URL, for a forge on a path detection cannot guess |
-| **`DYBATPHO_FORGE_REPO`** | string | Override the detected `owner/repo` |
-| **`DYBATPHO_FORGE_TOKEN`** | string | Token to authenticate with, preferred over the per-forge variables |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_FORGE`** | string | yes |  | Force the forge kind, `github` or `gitlab`, instead of detecting it |
+| **`DYBATPHO_FORGE_REMOTE`** | string | no | `origin` | Git remote the forge is detected from |
+| **`DYBATPHO_FORGE_API`** | string | yes |  | Override the API base URL, for a forge on a path detection cannot guess |
+| **`DYBATPHO_FORGE_REPO`** | string | yes |  | Override the detected `owner/repo` |
+| **`DYBATPHO_FORGE_TOKEN`** | string | yes |  | Token to authenticate with, preferred over the per-forge variables |
 
 ### 🚀 Highlights
 
@@ -137,10 +137,10 @@ Print the host of the configured remote.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional remote name, default `DYBATPHO_FORGE_REMOTE` |
-| `$2` | string | Optional repository path, default `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `${DYBATPHO_FORGE_REMOTE}` | Remote name |
+| `$2` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -170,10 +170,10 @@ esac
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional remote name, default `DYBATPHO_FORGE_REMOTE` |
-| `$2` | string | Optional repository path, default `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `${DYBATPHO_FORGE_REMOTE}` | Remote name |
+| `$2` | string | no | `.` | Repository path |
 
 **🌍 Environment variables**
 
@@ -199,10 +199,10 @@ kept rather than only the last two segments.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional remote name, default `DYBATPHO_FORGE_REMOTE` |
-| `$2` | string | Optional repository path, default `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `${DYBATPHO_FORGE_REMOTE}` | Remote name |
+| `$2` | string | no | `.` | Repository path |
 
 **🌍 Environment variables**
 
@@ -229,10 +229,10 @@ serves `/api/v4` from its own host.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional remote name, default `DYBATPHO_FORGE_REMOTE` |
-| `$2` | string | Optional repository path, default `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `${DYBATPHO_FORGE_REMOTE}` | Remote name |
+| `$2` | string | no | `.` | Repository path |
 
 **🌍 Environment variables**
 
@@ -269,9 +269,9 @@ script does with it rather than for the requests made here.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional forge kind, detected when omitted |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Forge kind, detected when omitted |
 
 **🌍 Environment variables**
 
@@ -309,13 +309,13 @@ dybatpho::json_get "$(< "${body}")" '.[0].title'
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | HTTP method |
-| `$2` | string | Path relative to the project, or an absolute URL |
-| `$3` | string | Optional JSON request body |
-| `$4` | string | Optional file the response body is written to, default `/dev/null` |
-| `$@` | string | Additional curl options |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | HTTP method |
+| `$2` | string | yes |  | Path relative to the project, or an absolute URL |
+| `$3` | string | no |  | JSON request body |
+| `$4` | string | no | `/dev/null` | File the response body is written to |
+| `$@` | string | yes |  | Additional curl options |
 
 **🧩 Variable sets**
 
@@ -352,9 +352,9 @@ dybatpho::forge_request POST "issues" "${payload}" "${response}" \
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Response body file, defaulting to the last one parsed |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Response body file, defaulting to the last one parsed |
 
 **🌍 Environment variables**
 
@@ -404,11 +404,11 @@ Open an issue and print its number.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Issue title |
-| `$2` | string | Issue body |
-| `$3` | string | Optional comma-separated labels |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Issue title |
+| `$2` | string | yes |  | Issue body |
+| `$3` | string | no |  | Comma-separated labels |
 
 **📤 Output on stdout**
 
@@ -454,11 +454,11 @@ dybatpho::json_get "${result}" '.action'   # created | commented
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Issue title, also the identity used to find an existing issue |
-| `$2` | string | Body of the issue or of the comment |
-| `$3` | string | Optional comma-separated labels, applied only when creating |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Issue title, also the identity used to find an existing issue |
+| `$2` | string | yes |  | Body of the issue or of the comment |
+| `$3` | string | no |  | Comma-separated labels, applied only when creating |
 
 **📤 Output on stdout**
 
@@ -524,12 +524,12 @@ dybatpho::forge_release_create "v1.2.0" "v1.2.0" "$(dybatpho::release_changelog)
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Tag name |
-| `$2` | string | Optional release title, default is the tag |
-| `$3` | string | Optional release notes |
-| `$4` | string | Optional `true` to create the release as a draft |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Tag name |
+| `$2` | string | no |  | Release title, default is the tag |
+| `$3` | string | no |  | Release notes |
+| `$4` | string | no |  | `true` to create the release as a draft |
 
 **📝 Notes**
 

@@ -22,11 +22,11 @@ Utilities for building CLI parsers from shell specs.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_CLI_DEBUG`** | bool | Set to `true` to dump generated parser details while developing specs |
-| **`DYBATPHO_CLI_CACHE`** | bool | Set to `false` to regenerate completion output instead of reusing the cached copy. Default is `true` |
-| **`DYBATPHO_CLI_CACHE_DIR`** | string | Directory holding cached completion output. Default is `${XDG_CACHE_HOME:-$HOME/.cache}/dybatpho/cli` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_CLI_DEBUG`** | bool | yes |  | Set to `true` to dump generated parser details while developing specs |
+| **`DYBATPHO_CLI_CACHE`** | bool | yes |  | Set to `false` to regenerate completion output instead of reusing the cached copy. Default is `true` |
+| **`DYBATPHO_CLI_CACHE_DIR`** | string | no | `${XDG_CACHE_HOME:-$HOME/.cache}/dybatpho/cli` | Directory holding cached completion output |
 
 ### 🚀 Highlights
 
@@ -641,10 +641,10 @@ Read a line from the terminal (or stdin) with an optional default.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Prompt text |
-| `$2` | string | Optional default value |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Prompt text |
+| `$2` | string | no |  | Default value |
 
 **📤 Output on stdout**
 
@@ -725,7 +725,7 @@ distance="$(dybatpho::cli_levenshtein color colour)"
 
 **🔗 See also**
 
-- [- `dybatpho::string_distance](#dybatphostring_distance)
+- [dybatpho::string_distance](#dybatphostring_distance)
 
 ---
 
@@ -774,10 +774,10 @@ LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Repeat count, default `0` |
-| `$2` | string | Base level, default `LOG_LEVEL` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `0` | Repeat count |
+| `$2` | string | no | `${LOG_LEVEL}` | Base level |
 
 **📤 Output on stdout**
 
@@ -804,10 +804,10 @@ dybatpho::cli_apply_verbosity "${VERBOSITY}"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | number | Repeat count, default `0` |
-| `$2` | string | Base level, default `LOG_LEVEL` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | number | no | `0` | Repeat count |
+| `$2` | string | no | `${LOG_LEVEL}` | Base level |
 
 **🧩 Variable sets**
 
@@ -825,10 +825,10 @@ Generate a JSON CLI schema from the same option spec used by parsing.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Spec function |
-| `$2` | string | Optional command name |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Spec function |
+| `$2` | string | no |  | Command name |
 
 **📤 Output on stdout**
 
@@ -842,10 +842,10 @@ Generate a roff man page from a CLI option spec.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Spec function |
-| `$2` | string | Optional command name |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Spec function |
+| `$2` | string | no |  | Command name |
 
 **📤 Output on stdout**
 
@@ -859,11 +859,11 @@ Generate Bash, Zsh, or Fish completion from a CLI option spec.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Spec function |
-| `$2` | string | Shell (`bash`, `zsh`, or `fish`) |
-| `$3` | string | Optional command name |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Spec function |
+| `$2` | string | yes |  | Shell (`bash`, `zsh`, or `fish`) |
+| `$3` | string | no |  | Command name |
 
 **📝 Notes**
 
@@ -1010,11 +1010,11 @@ Define a sub-command in spec
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Command name |
-| `$2` | string | Name of function that has spec of sub-command |
-| `$@` | key:value | Optional metadata such as `alias:<name>` or `aliases:<a,b>` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Command name |
+| `$2` | string | yes |  | Name of function that has spec of sub-command |
+| `$@` | key:value | no |  | Metadata such as `alias:<name>` or `aliases:<a,b>` |
 
 ---
 
@@ -1037,11 +1037,11 @@ dybatpho::opts::arg "Extra files" EXTRA required:false variadic:true
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Description of the argument |
-| `$2` | string | Placeholder name, shown uppercase in usage and help |
-| `$@` | key:value | Settings: `required:<bool>` (default `true`) and `variadic:<bool>` (default `false`) |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Description of the argument |
+| `$2` | string | yes |  | Placeholder name, shown uppercase in usage and help |
+| `$@` | key:value | no | `false` | Settings: `required:<bool>` (default `true`) and `variadic:<bool>` |
 
 **📝 Notes**
 

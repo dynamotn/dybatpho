@@ -100,10 +100,10 @@ dybatpho::config_load --optional /etc/app.env "${HOME}/.config/app.env"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional `--optional`, to skip files that do not exist instead of failing |
-| `$@` | string | Files in dotenv, JSON, YAML, or TOML format, in increasing precedence order |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--optional`, to skip files that do not exist instead of failing |
+| `$@` | string | yes |  | Files in dotenv, JSON, YAML, or TOML format, in increasing precedence order |
 
 **🧩 Variable sets**
 
@@ -142,10 +142,10 @@ DYBATPHO_CONFIG_PROFILE=staging dybatpho::config_profile ./config.json
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Base configuration file, whose extension selects the format |
-| `$2` | string | Profile name, defaulting to `DYBATPHO_CONFIG_PROFILE` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base configuration file, whose extension selects the format |
+| `$2` | string | no | `${DYBATPHO_CONFIG_PROFILE}` | Profile name |
 
 **🌍 Environment variables**
 
@@ -169,9 +169,9 @@ Load environment variables after an optional prefix.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional prefix, such as `APP_` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Prefix, such as `APP_` |
 
 ---
 
@@ -213,10 +213,10 @@ Print a configuration value.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Configuration key |
-| `$2` | string | Optional default value |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Configuration key |
+| `$2` | string | no |  | Default value |
 
 **📤 Output on stdout**
 
@@ -250,9 +250,9 @@ Export loaded values as shell variables.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional prefix for exported variable names |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Prefix for exported variable names |
 
 **🚦 Exit codes**
 
@@ -367,10 +367,10 @@ Render documentation for every declared configuration key.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional format: `markdown` (default), `text`, or `json` |
-| `$2` | string | Optional title used by the `markdown` and `text` formats |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Format: `markdown` (default), `text`, or `json` |
+| `$2` | string | no |  | Title used by the `markdown` and `text` formats |
 
 **📤 Output on stdout**
 

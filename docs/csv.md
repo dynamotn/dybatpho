@@ -28,10 +28,10 @@ Data containing that byte is rejected rather than silently re-split.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_CSV_DELIMITER`** | string | Field delimiter, default is `,`; set it to `;`, or to `tab` for TSV |
-| **`DYBATPHO_CSV_DELIMITER`** | string | Field delimiter every function reads, default is `,`; `tab` or `\t` names a tab |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_CSV_DELIMITER`** | string | no | `,` | Field delimiter; set it to `;`, or to `tab` for TSV |
+| **`DYBATPHO_CSV_DELIMITER`** | string | no | `,` | Field delimiter every function reads; `tab` or `\t` names a tab |
 
 ### 🚀 Highlights
 
@@ -310,12 +310,12 @@ dybatpho::csv_sort billing.csv owner asc text
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | CSV file path, `-` for stdin, or CSV text |
-| `$2` | string | Column: header name, or 1-based position |
-| `$3` | string | Order: `asc` (default) or `desc` |
-| `$4` | string | Comparison: `auto` (default), `text`, or `number` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | CSV file path, `-` for stdin, or CSV text |
+| `$2` | string | yes |  | Column: header name, or 1-based position |
+| `$3` | string | no | `asc` | Order: `asc` or `desc` |
+| `$4` | string | no | `auto` | Comparison: `auto`, `text`, or `number` |
 
 **📤 Output on stdout**
 
@@ -350,13 +350,13 @@ dybatpho::csv_join services.csv costs.csv service left name
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Left CSV: file path, `-` for stdin, or CSV text |
-| `$2` | string | Right CSV: file path, `-` for stdin, or CSV text |
-| `$3` | string | Key column in the left input: header name, or 1-based position |
-| `$4` | string | Join type: `inner` (default) or `left` |
-| `$5` | string | Key column in the right input, the same way, default is the left one |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Left CSV: file path, `-` for stdin, or CSV text |
+| `$2` | string | yes |  | Right CSV: file path, `-` for stdin, or CSV text |
+| `$3` | string | yes |  | Key column in the left input: header name, or 1-based position |
+| `$4` | string | no | `inner` | Join type: `inner` or `left` |
+| `$5` | string | no |  | Key column in the right input, the same way, default is the left one |
 
 **📤 Output on stdout**
 

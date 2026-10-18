@@ -243,10 +243,10 @@ dybatpho::lock_acquire "deploy" 30
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Lock name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path |
-| `$2` | number | Seconds to wait for the lock before giving up, default 0 (try once, don't wait) |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Lock name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path |
+| `$2` | number | no | `0` | Seconds to wait for the lock before giving up; `0` tries once without waiting |
 
 **🌍 Environment variables**
 
@@ -332,12 +332,12 @@ dybatpho::lock_semaphore_release downloads 4 "${slot}"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Semaphore name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path |
-| `$2` | number | Number of slots, from 1 to 9999 |
-| `$3` | number | Seconds to wait for a free slot before giving up, default 0 (try once, don't wait) |
-| `$4` | string | Optional name of a variable receiving the slot number taken |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Semaphore name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path |
+| `$2` | number | yes |  | Number of slots, from 1 to 9999 |
+| `$3` | number | no | `0` | Seconds to wait for a free slot before giving up; `0` tries once without waiting |
+| `$4` | string | no |  | Name of a variable receiving the slot number taken |
 
 **🌍 Environment variables**
 
@@ -368,11 +368,11 @@ process holds is released, which is what an exit handler wants.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Semaphore name or path |
-| `$2` | number | Number of slots, as given when acquiring |
-| `$3` | number | Optional slot number to release |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Semaphore name or path |
+| `$2` | number | yes |  | Number of slots, as given when acquiring |
+| `$3` | number | no |  | Slot number to release |
 
 **🚦 Exit codes**
 

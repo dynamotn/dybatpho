@@ -314,9 +314,8 @@ function __dybatpho_validate_scaled {
 # @exitcode 0 The value is of that type
 # @exitcode 1 The value is not
 # @exitcode 1 Stop the script when the type is not registered
-# @see
-#   - `dybatpho::validate_types`
-#   - `dybatpho::validate_register`
+# @see dybatpho::validate_types
+# @see dybatpho::validate_register
 #######################################
 function dybatpho::validate_is {
   local type value canonical
@@ -378,13 +377,12 @@ function dybatpho::validate_types {
 # @arg $1 string Type name, lowercase letters, digits and underscores
 # @arg $2 string Predicate function name
 # @arg $3 string Description used in messages, such as `a release branch`
-# @arg $4 string Optional `numeric` to make `min:`/`max:` bound the value rather than its length
+# @arg $4 string? `numeric` to make `min:`/`max:` bound the value rather than its length
 # @set __DYBATPHO_VALIDATE_PREDICATES
 # @set __DYBATPHO_VALIDATE_DESCRIPTIONS
 # @exitcode 0 The type is registered
 # @exitcode 1 Stop the script when the name is malformed or the predicate is not a function
-# @see
-#   - `dybatpho::validate_reset`
+# @see dybatpho::validate_reset
 #######################################
 function dybatpho::validate_register {
   local name predicate description
@@ -462,9 +460,8 @@ function __dybatpho_validate_error {
 # @exitcode 0 The value satisfies every rule
 # @exitcode 1 At least one rule was violated
 # @exitcode 1 Stop the script when a rule name, a rule value, or a type is not supported
-# @see
-#   - `dybatpho::validate_errors`
-#   - `dybatpho::validate_or_die`
+# @see dybatpho::validate_errors
+# @see dybatpho::validate_or_die
 #######################################
 function dybatpho::validate_value {
   local value
@@ -557,8 +554,7 @@ function dybatpho::validate_value {
 # @noargs
 # @stdout One reason per line, nothing when the last call succeeded
 # @exitcode 0 Always
-# @see
-#   - `dybatpho::validate_value`
+# @see dybatpho::validate_value
 #######################################
 function dybatpho::validate_errors {
   ((${#DYBATPHO_VALIDATE_ERRORS[@]} > 0)) || return 0
@@ -578,8 +574,7 @@ function dybatpho::validate_errors {
 # @set DYBATPHO_VALIDATE_ERRORS Reset, then one entry per violation
 # @exitcode 0 The value satisfies every rule
 # @exitcode 1 Stop the script when the value is rejected
-# @see
-#   - `dybatpho::validate_value`
+# @see dybatpho::validate_value
 #######################################
 function dybatpho::validate_or_die {
   local label value
@@ -881,8 +876,7 @@ function __dybatpho_validate_is_alnum {
 # @arg $1 string Value to test
 # @exitcode 0 The value is a slug
 # @exitcode 1 The value is not
-# @see
-#   - `dybatpho::string_slugify`
+# @see dybatpho::string_slugify
 # @internal
 #######################################
 function __dybatpho_validate_is_slug {

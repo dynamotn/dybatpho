@@ -39,12 +39,12 @@ that compares backups loads `diff` as well.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_BACKUP_EXTENSION`** | string | Archive extension, default is `tar.gz`; `archive.sh` reads the format from it |
-| **`DYBATPHO_BACKUP_CHECKSUM_ALGORITHM`** | string | Algorithm for the sidecar, default is `sha256` |
-| **`DYBATPHO_BACKUP_EXTENSION`** | string | Extension every backup is written with, default is `tar.gz` |
-| **`DYBATPHO_BACKUP_CHECKSUM_ALGORITHM`** | string | Checksum algorithm for the sidecar, default is `sha256` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_BACKUP_EXTENSION`** | string | no | `tar.gz` | Archive extension; `archive.sh` reads the format from it |
+| **`DYBATPHO_BACKUP_CHECKSUM_ALGORITHM`** | string | no | `sha256` | Algorithm for the sidecar |
+| **`DYBATPHO_BACKUP_EXTENSION`** | string | no | `tar.gz` | Extension every backup is written with |
+| **`DYBATPHO_BACKUP_CHECKSUM_ALGORITHM`** | string | no | `sha256` | Checksum algorithm for the sidecar |
 
 ### 🚀 Highlights
 
@@ -101,12 +101,12 @@ snapshot="$(dybatpho::backup_create --incremental /srv/www /var/backups www)"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Option `--incremental`/`-i` to take a hard-linked snapshot directory |
-| `$2` | string | File or directory to back up |
-| `$3` | string | Destination directory, created when missing |
-| `$4` | string | Optional name for the backup, default is the source's base name |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Option `--incremental`/`-i` to take a hard-linked snapshot directory |
+| `$2` | string | yes |  | File or directory to back up |
+| `$3` | string | yes |  | Destination directory, created when missing |
+| `$4` | string | no |  | Name for the backup, default is the source's base name |
 
 **📤 Output on stdout**
 
@@ -133,10 +133,10 @@ dybatpho::backup_list /var/backups nginx
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory holding the backups |
-| `$2` | string | Optional backup name to match, default is every name |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Directory holding the backups |
+| `$2` | string | no |  | Backup name to match, default is every name |
 
 **📤 Output on stdout**
 
@@ -160,10 +160,10 @@ dybatpho::backup_restore "$(dybatpho::backup_latest /var/backups nginx)" /etc
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory holding the backups |
-| `$2` | string | Optional backup name to match, default is every name |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Directory holding the backups |
+| `$2` | string | no |  | Backup name to match, default is every name |
 
 **📤 Output on stdout**
 
@@ -260,6 +260,15 @@ backup copied in from elsewhere is as old as the copy.
 dybatpho::backup_prune --keep-count 7 --name nginx /var/backups
 ```
 
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--keep-count \<n\>** | Keep the newest `n` backups |
+| **--keep-days \<n\>** | Keep the backups younger than `n` days |
+| **--name \<name\>** | Only consider the backups of this name |
+| **-f \| --force** | Delete without confirming |
+
 **🧾 Arguments**
 
 | Name | Type | Description |
@@ -310,6 +319,13 @@ dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
 mapfile -t backups < <(dybatpho::backup_list /var/backups nginx)
 dybatpho::backup_diff --summary "${backups[1]}" "${backups[0]}"
 ```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **-s \| --summary** | Print one `+A -R ~M` line instead of the records |
+| **-z \| --null** | Terminate each record with NUL instead of a newline |
 
 **🧾 Arguments**
 

@@ -54,10 +54,10 @@ Render aligned columns without borders from delimited rows.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text block or `-` for stdin |
-| `$2` | string | Optional exact delimiter, default is `\|` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text block or `-` for stdin |
+| `$2` | string | no | `\|` | Exact delimiter |
 
 **📤 Output on stdout**
 
@@ -71,12 +71,12 @@ Render aligned columns with optional per-column alignment rules.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text block or `-` for stdin |
-| `$2` | string | Optional exact delimiter, default is `\|` |
-| `$3` | string | Optional comma-separated alignments (`left,right,center`) |
-| `$4` | number | Optional gap width between columns, default is 2 |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text block or `-` for stdin |
+| `$2` | string | no | `\|` | Exact delimiter |
+| `$3` | string | no |  | Comma-separated alignments (`left,right,center`) |
+| `$4` | number | no | `2` | Gap width between columns |
 
 **📤 Output on stdout**
 
@@ -90,10 +90,10 @@ Render a Unicode boxed table from delimited rows.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text block or `-` for stdin |
-| `$2` | string | Optional exact delimiter, default is `\|` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text block or `-` for stdin |
+| `$2` | string | no | `\|` | Exact delimiter |
 
 **📤 Output on stdout**
 
@@ -107,10 +107,10 @@ Render a Markdown table from delimited rows.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input text block or `-` for stdin |
-| `$2` | string | Optional exact delimiter, default is `\|` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text block or `-` for stdin |
+| `$2` | string | no | `\|` | Exact delimiter |
 
 **📤 Output on stdout**
 
@@ -124,11 +124,11 @@ Render lightweight comma-delimited table data using one of the supported styles.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input CSV-like text block or `-` for stdin |
-| `$2` | string | Optional style: `plain`, `box`, or `markdown`, default is `plain` |
-| `$3` | string | Optional comma-separated alignments for `plain` style |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input CSV-like text block or `-` for stdin |
+| `$2` | string | no | `plain` | Style: `plain`, `box`, or `markdown` |
+| `$3` | string | no |  | Comma-separated alignments for `plain` style |
 
 **📤 Output on stdout**
 
@@ -156,11 +156,11 @@ dybatpho::csv_sort billing.csv cost desc | dybatpho::table_from_csv - plain "lef
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | CSV file path, `-` for stdin, or CSV text |
-| `$2` | string | Optional style: `plain`, `box`, or `markdown`, default is `plain` |
-| `$3` | string | Optional comma-separated alignments for `plain` style |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | CSV file path, `-` for stdin, or CSV text |
+| `$2` | string | no | `plain` | Style: `plain`, `box`, or `markdown` |
+| `$3` | string | no |  | Comma-separated alignments for `plain` style |
 
 **📤 Output on stdout**
 
@@ -190,11 +190,11 @@ kubectl get pods -o json | jq '[.items[] | {name: .metadata.name, phase: .status
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | JSON file path, `-` for stdin, or JSON text |
-| `$2` | string | Optional style: `plain`, `box`, or `markdown`, default is `plain` |
-| `$3` | string | Optional comma-separated alignments for `plain` style |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | JSON file path, `-` for stdin, or JSON text |
+| `$2` | string | no | `plain` | Style: `plain`, `box`, or `markdown` |
+| `$3` | string | no |  | Comma-separated alignments for `plain` style |
 
 **📤 Output on stdout**
 

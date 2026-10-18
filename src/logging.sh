@@ -24,10 +24,10 @@
 #   - `example/logging_demo.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env LOG_LEVEL string Runtime log level for all messages (`trace|debug|info|warn|error|fatal`). Default is `info`
+# @env LOG_LEVEL string [default: info] Runtime log level for all messages (`trace|debug|info|warn|error|fatal`)
 LOG_LEVEL="${LOG_LEVEL:-info}"
 export LOG_LEVEL
-# @env LOG_FORMAT string Log output format (`text|json`). Default is `text`
+# @env LOG_FORMAT string [default: text] Log output format (`text|json`)
 LOG_FORMAT="${LOG_FORMAT:-text}"
 export LOG_FORMAT
 # @env NO_COLOR string Disable ANSI colors when set to a non-empty value
@@ -36,17 +36,17 @@ export NO_COLOR
 # @env LOG_REQUEST_ID string Correlation ID attached to every structured log event. Generated automatically when empty
 LOG_REQUEST_ID="${LOG_REQUEST_ID:-}"
 export LOG_REQUEST_ID
-# @env LOG_FILE string Optional path to append structured JSON log lines to, independent of `LOG_FORMAT`
+# @env LOG_FILE string? Path to append structured JSON log lines to, independent of `LOG_FORMAT`
 LOG_FILE="${LOG_FILE:-}"
 export LOG_FILE
-# @env LOG_FILE_LEVEL string Verbosity threshold applied only to `LOG_FILE` output. Default is `LOG_LEVEL`
+# @env LOG_FILE_LEVEL string [default: ${LOG_LEVEL}] Verbosity threshold applied only to `LOG_FILE` output
 LOG_FILE_LEVEL="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
 export LOG_FILE_LEVEL
-# @env LOG_FILE_MAX_BYTES number Rotate `LOG_FILE` once it reaches this size in bytes. `0` disables rotation. Default
-#   `10485760` (10 MiB)
+# @env LOG_FILE_MAX_BYTES number [default: 10485760] Rotate `LOG_FILE` once it reaches this size in bytes, 10 MiB by
+#   default. `0` disables rotation
 LOG_FILE_MAX_BYTES="${LOG_FILE_MAX_BYTES:-10485760}"
 export LOG_FILE_MAX_BYTES
-# @env LOG_FILE_MAX_BACKUPS number Number of rotated `LOG_FILE` backups to keep. Default `5`
+# @env LOG_FILE_MAX_BACKUPS number [default: 5] Number of rotated `LOG_FILE` backups to keep
 LOG_FILE_MAX_BACKUPS="${LOG_FILE_MAX_BACKUPS:-5}"
 export LOG_FILE_MAX_BACKUPS
 # @env DYBATPHO_SPINNER string When `dybatpho::spinner` animates (`auto|always|never`). `auto` animates only on a
@@ -54,7 +54,7 @@ export LOG_FILE_MAX_BACKUPS
 #   Default `auto`
 DYBATPHO_SPINNER="${DYBATPHO_SPINNER:-auto}"
 export DYBATPHO_SPINNER
-# @env DYBATPHO_SPINNER_INTERVAL string Seconds between spinner frames. Default `0.1`
+# @env DYBATPHO_SPINNER_INTERVAL string [default: 0.1] Seconds between spinner frames
 DYBATPHO_SPINNER_INTERVAL="${DYBATPHO_SPINNER_INTERVAL:-0.1}"
 export DYBATPHO_SPINNER_INTERVAL
 # @env DYBATPHO_SPINNER_FRAMES string Space-separated frames the spinner cycles through
@@ -565,7 +565,7 @@ function __dybatpho_log_wanted {
 #######################################
 # @description Return success when a message level should be shown against a threshold.
 # @arg $1 string Input log level
-# @arg $2 string Threshold level to compare against, default is `LOG_LEVEL`
+# @arg $2 string [default: ${LOG_LEVEL}] Threshold level to compare against
 # @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted, when no explicit threshold is
 #   given
 # @exitcode 0 The message level should be emitted
@@ -691,7 +691,7 @@ function __dybatpho_log_text_n {
 # @arg $4 number Additional stack frames to skip when resolving the source location
 # @arg $5 string ANSI escape color code
 # @arg $6 string Ready-made JSON fragment of extra fields, each one leading with its own comma
-# @env LOG_FILE string Optional file that receives a structured JSON event regardless of `LOG_FORMAT`
+# @env LOG_FILE string? File that receives a structured JSON event regardless of `LOG_FORMAT`
 # @internal
 #######################################
 function __dybatpho_log_inspect {
@@ -1362,7 +1362,7 @@ function dybatpho::progress {
 #######################################
 # @description Render a percentage-based progress bar on the current output line.
 # @arg $1 number Progress percentage from 0 to 100
-# @arg $2 number Width of the progress bar in characters. Default is 50
+# @arg $2 number [default: 50] Width of the progress bar in characters
 # @stdout Show the progress bar; print a newline in the caller when the task is done
 #######################################
 function dybatpho::progress_bar {
@@ -1594,7 +1594,7 @@ function __dybatpho_log_spin {
 # @arg $1 string Space-separated frames
 # @arg $2 string Seconds between frames
 # @arg $3 string Message shown beside the frame, already redacted
-# @arg $4 string Optional file the message is re-read from on every frame
+# @arg $4 string? File the message is re-read from on every frame
 # @stderr One frame per interval, redrawn over the same line
 # @internal
 #######################################
@@ -1642,7 +1642,7 @@ function __dybatpho_log_spin_loop {
 #   dybatpho::log_to_file off   # stop writing to a file
 #
 # @arg $1 string Path of the log file, or `off` to stop file logging
-# @arg $@ string Optional `rotate:SIZE`, `keep:COUNT` and `level:LEVEL` settings
+# @arg $@ string? `rotate:SIZE`, `keep:COUNT` and `level:LEVEL` settings
 # @set LOG_FILE string Path that receives the structured events
 # @set LOG_FILE_MAX_BYTES number Size threshold the file is rotated at
 # @set LOG_FILE_MAX_BACKUPS number Number of rotated backups kept
@@ -1792,7 +1792,7 @@ function dybatpho::timer_start {
 #   carries the timer name and its elapsed milliseconds as fields of their own,
 #   so a log aggregator can chart a step without parsing the message.
 # @arg $1 string Timer name
-# @arg $2 string Level to log the duration at, default is `info`
+# @arg $2 string [default: info] Level to log the duration at
 # @set DYBATPHO_TIMER_LAST_MS number Elapsed milliseconds of this timer
 # @set __dybatpho_log_timer
 # @stderr The duration message, at the requested level

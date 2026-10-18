@@ -443,7 +443,7 @@ function __dybatpho_lock_try {
 #   dybatpho::lock_acquire "deploy" 30
 #
 # @arg $1 string Lock name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path
-# @arg $2 number Seconds to wait for the lock before giving up, default 0 (try once, don't wait)
+# @arg $2 number [default: 0] Seconds to wait for the lock before giving up; `0` tries once without waiting
 # @env DYBATPHO_LOCK_DIR string Base directory used to resolve bare lock names
 # @env DYBATPHO_LOCK_POLL_INTERVAL number Seconds to sleep between acquire attempts while waiting
 # @stderr Info about the current holder when the lock can't be acquired
@@ -620,8 +620,8 @@ function __dybatpho_lock_expect_slots {
 #
 # @arg $1 string Semaphore name (bare word resolved under `DYBATPHO_LOCK_DIR`) or an explicit path
 # @arg $2 number Number of slots, from 1 to 9999
-# @arg $3 number Seconds to wait for a free slot before giving up, default 0 (try once, don't wait)
-# @arg $4 string Optional name of a variable receiving the slot number taken
+# @arg $3 number [default: 0] Seconds to wait for a free slot before giving up; `0` tries once without waiting
+# @arg $4 string? Name of a variable receiving the slot number taken
 # @set The named variable, when one is given
 # @env DYBATPHO_LOCK_POLL_INTERVAL number Seconds to sleep between attempts while waiting
 # @stderr Every holder when no slot could be taken
@@ -709,7 +709,7 @@ function __dybatpho_lock_try_slots {
 #   process holds is released, which is what an exit handler wants.
 # @arg $1 string Semaphore name or path
 # @arg $2 number Number of slots, as given when acquiring
-# @arg $3 number Optional slot number to release
+# @arg $3 number? Slot number to release
 # @exitcode 0 The slot was released, or was not held by the current process
 # @exitcode 1 The named slot is held by another live process and was left untouched
 #######################################

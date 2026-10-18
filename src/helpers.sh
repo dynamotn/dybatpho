@@ -112,9 +112,9 @@
 # shellcheck disable=SC2310
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_RETRY_BASE_DELAY number First retry delay in seconds (default `2`)
-# @env DYBATPHO_RETRY_MAX_DELAY number Longest a single retry waits (default `30`)
-# @env DYBATPHO_RETRY_JITTER bool Add up to one base delay of random jitter (default `false`)
+# @env DYBATPHO_RETRY_BASE_DELAY number [default: 2] First retry delay in seconds
+# @env DYBATPHO_RETRY_MAX_DELAY number [default: 30] Longest a single retry waits
+# @env DYBATPHO_RETRY_JITTER bool [default: false] Add up to one base delay of random jitter
 DYBATPHO_RETRY_BASE_DELAY=${DYBATPHO_RETRY_BASE_DELAY:-2}
 DYBATPHO_RETRY_MAX_DELAY=${DYBATPHO_RETRY_MAX_DELAY:-30}
 DYBATPHO_RETRY_JITTER=${DYBATPHO_RETRY_JITTER:-false}
@@ -256,7 +256,7 @@ function dybatpho::expect_envs {
 # @arg $1 string Module that is needed
 # @arg $2 string Internal helper of that module whose presence means it is loaded
 # @arg $3 string What needs the module, usually the public function's name
-# @arg $4 number Exit code to stop with, default is `1`
+# @arg $4 number [default: 1] Exit code to stop with
 # @exitcode 0 The module is loaded
 # @internal
 #######################################
@@ -595,15 +595,14 @@ __DYBATPHO_HELPERS_RANGE_REGEX='^[<>=^~]'
 #
 # @arg $1 string Command that must be available
 # @arg $2 string Version range opening with an operator, or the exit code
-# @arg $3 number Exit code when a range was given (default 127)
+# @arg $3 number [default: 127] Exit code when a range was given
 # @tip Prefer this over repeating inline `command -v ... || exit` checks throughout a script
 # @exitcode 127 Stop script if command isn't installed, or is outside the range
 # @exitcode 0 The command is available and satisfies the range
 # @exitcode other Exit code given as an argument, instead of 127
-# @see
-#   - `dybatpho::command_version`
-#   - `dybatpho::semver_coerce`
-#   - `dybatpho::semver_satisfies`
+# @see dybatpho::command_version
+# @see dybatpho::semver_coerce
+# @see dybatpho::semver_satisfies
 #######################################
 function dybatpho::require {
   local command_name
@@ -1019,7 +1018,7 @@ function dybatpho::require_envs_any {
 #######################################
 # @description Evaluate a shell condition string and stop with a message when it fails.
 # @arg $1 string Shell condition or command string to evaluate
-# @arg $2 string Optional failure message
+# @arg $2 string? Failure message
 # @exitcode 0 The assertion condition succeeds
 # @exitcode 1 The assertion condition fails
 # @tip The assertion command is executed with `eval`
@@ -1045,9 +1044,9 @@ function dybatpho::assert {
 #   capped and jittered.
 # @arg $1 string Name of the variable receiving the delay in seconds
 # @arg $2 number Attempt number, counting from 1
-# @arg $3 number Base delay, default is `DYBATPHO_RETRY_BASE_DELAY`
-# @arg $4 number Longest delay, default is `DYBATPHO_RETRY_MAX_DELAY`
-# @arg $5 bool Add up to one base delay of random jitter, default is `DYBATPHO_RETRY_JITTER`
+# @arg $3 number [default: ${DYBATPHO_RETRY_BASE_DELAY}] Base delay
+# @arg $4 number [default: ${DYBATPHO_RETRY_MAX_DELAY}] Longest delay
+# @arg $5 bool [default: ${DYBATPHO_RETRY_JITTER}] Add up to one base delay of random jitter
 # @arg $6 number Delay to use instead of the computed one, when not empty
 # @set The named variable
 # @internal
@@ -1084,7 +1083,7 @@ function __dybatpho_helpers_backoff_into {
 #
 # @arg $1 number Number of retries
 # @arg $2 string Shell command string to run
-# @arg $3 string Optional short description for retry logs
+# @arg $3 string? Short description for retry logs
 # @env DYBATPHO_RETRY_BASE_DELAY number First retry delay in seconds
 # @env DYBATPHO_RETRY_MAX_DELAY number Longest a single retry waits
 # @env DYBATPHO_RETRY_JITTER bool Add up to one base delay of random jitter
@@ -1136,7 +1135,7 @@ function dybatpho::retry {
 # @arg $1 number Number of retries
 # @arg $2 number Delay in seconds between attempts
 # @arg $3 string Shell command string to run
-# @arg $4 string Optional short description for retry logs
+# @arg $4 string? Short description for retry logs
 # @exitcode 0 The command eventually succeeds
 # @exitcode 1 The command never succeeds and returns its final exit code
 # @tip The command is executed with `eval`, so pass it as one shell command string
@@ -1341,9 +1340,8 @@ function __dybatpho_helpers_module_of_into {
 #   bundle, where there are no module sources to name
 # @note A bundle holds every module in one file, so only `--path` can answer
 #   there, and it still points at the right line
-# @see
-#   - `dybatpho::describe`
-#   - `dybatpho::function_list`
+# @see dybatpho::describe
+# @see dybatpho::function_list
 #######################################
 function dybatpho::provides {
   local want_path=false
@@ -1390,8 +1388,7 @@ function dybatpho::provides {
 # @stdout A heading naming the function and where it came from, then the comment
 # @exitcode 1 The function is not defined in this shell, or its source is no
 #   longer readable
-# @see
-#   - `dybatpho::provides`
+# @see dybatpho::provides
 #######################################
 function dybatpho::describe {
   local name
@@ -1461,13 +1458,12 @@ function dybatpho::describe {
 #   dybatpho::function_list cache        # just that module
 #   dybatpho::function_list | wc -l
 #
-# @arg $1 string Optional module name to limit the list to
+# @arg $1 string? Module name to limit the list to
 # @stdout One function name per line, in alphabetical order
 # @exitcode 1 Stop the script when the named module is not loaded, or when the
 #   library came from a bundle, where no function can be attributed to a module
-# @see
-#   - `dybatpho::module_list`
-#   - `dybatpho::provides`
+# @see dybatpho::module_list
+# @see dybatpho::provides
 #######################################
 function dybatpho::function_list {
   local module="${1-}"

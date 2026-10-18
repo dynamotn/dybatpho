@@ -86,7 +86,7 @@ function dybatpho::json_has {
 #######################################
 # @description Pretty-print a JSON document.
 # @arg $1 string JSON file path or `-` for stdin
-# @arg $2 string Optional output file path
+# @arg $2 string? Output file path
 # @stdout Pretty JSON when no output file is provided
 # @exitcode 0 Formatting succeeded
 # @exitcode 127 Neither `yq` nor `jq` is installed
@@ -115,7 +115,7 @@ function dybatpho::json_pretty {
 #######################################
 # @description Convert a JSON document to YAML.
 # @arg $1 string JSON file path or `-` for stdin
-# @arg $2 string Optional output file path
+# @arg $2 string? Output file path
 # @stdout YAML output when no output file is provided
 # @exitcode 0 Conversion succeeded
 # @exitcode 127 `yq` is not installed
@@ -167,7 +167,7 @@ function dybatpho::yaml_has {
 #######################################
 # @description Pretty-print a YAML document.
 # @arg $1 string YAML file path or `-` for stdin
-# @arg $2 string Optional output file path
+# @arg $2 string? Output file path
 # @stdout Pretty YAML when no output file is provided
 # @exitcode 0 Formatting succeeded
 # @exitcode 127 `yq` is not installed
@@ -187,7 +187,7 @@ function dybatpho::yaml_pretty {
 #######################################
 # @description Convert a YAML document to JSON.
 # @arg $1 string YAML file path or `-` for stdin
-# @arg $2 string Optional output file path
+# @arg $2 string? Output file path
 # @stdout JSON output when no output file is provided
 # @exitcode 0 Conversion succeeded
 # @exitcode 127 `yq` is not installed
@@ -744,11 +744,11 @@ function __dybatpho_json_merge {
 # @example
 #   dybatpho::json_set --json config.json server.ports '[80,443]'
 #
-# @arg $1 string Optional `--json`: parse the value as JSON instead of storing a string
+# @arg $1 string? `--json`: parse the value as JSON instead of storing a string
 # @arg $2 string JSON file path or `-` for stdin
 # @arg $3 string Path to set; `\.` is a dot inside a key, and `\0` the key `0`
 # @arg $4 string Value to store
-# @arg $5 string Optional output file path, which may be the input file
+# @arg $5 string? Output file path, which may be the input file
 # @stdout Pretty JSON when no output file is provided
 # @exitcode 0 The value was set
 # @exitcode 1 Invalid arguments, path, or `--json` value
@@ -772,7 +772,7 @@ function dybatpho::json_set {
 #
 # @arg $1 string JSON file path or `-` for stdin
 # @arg $2 string Path to remove
-# @arg $3 string Optional output file path, which may be the input file
+# @arg $3 string? Output file path, which may be the input file
 # @stdout Pretty JSON when no output file is provided
 # @exitcode 0 The path was removed or was already absent
 # @exitcode 1 Invalid arguments or path
@@ -792,7 +792,7 @@ function dybatpho::json_del {
 #
 # @arg $1 string Base JSON file path, or `-` for stdin
 # @arg $2 string Overlay JSON file path, or `-` for stdin
-# @arg $3 string Optional output file path, which may be either input
+# @arg $3 string? Output file path, which may be either input
 # @stdout Pretty JSON when no output file is provided
 # @exitcode 0 The documents were merged
 # @exitcode 1 Invalid arguments
@@ -813,11 +813,11 @@ function dybatpho::json_merge {
 # @example
 #   dybatpho::yaml_set --json values.yaml replicas 3
 #
-# @arg $1 string Optional `--json`: parse the value as JSON instead of storing a string
+# @arg $1 string? `--json`: parse the value as JSON instead of storing a string
 # @arg $2 string YAML file path or `-` for stdin
 # @arg $3 string Path to set
 # @arg $4 string Value to store
-# @arg $5 string Optional output file path, which may be the input file
+# @arg $5 string? Output file path, which may be the input file
 # @stdout YAML when no output file is provided
 # @exitcode 0 The value was set
 # @exitcode 1 Invalid arguments, path, or `--json` value
@@ -836,7 +836,7 @@ function dybatpho::yaml_set {
 #
 # @arg $1 string YAML file path or `-` for stdin
 # @arg $2 string Path to remove
-# @arg $3 string Optional output file path, which may be the input file
+# @arg $3 string? Output file path, which may be the input file
 # @stdout YAML when no output file is provided
 # @exitcode 0 The path was removed or was already absent
 # @exitcode 1 Invalid arguments or path
@@ -856,7 +856,7 @@ function dybatpho::yaml_del {
 #
 # @arg $1 string Base YAML file path, or `-` for stdin
 # @arg $2 string Overlay YAML file path, or `-` for stdin
-# @arg $3 string Optional output file path, which may be either input
+# @arg $3 string? Output file path, which may be either input
 # @stdout YAML when no output file is provided
 # @exitcode 0 The documents were merged
 # @exitcode 1 Invalid arguments

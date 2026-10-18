@@ -70,7 +70,7 @@ function __dybatpho_git_resolve_commit {
 
 #######################################
 # @description Return the top-level directory of a Git repository.
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @stdout Absolute path to the repository root
 #######################################
 function dybatpho::git_root {
@@ -82,7 +82,7 @@ function dybatpho::git_root {
 
 #######################################
 # @description Return the current branch name, or a short SHA in detached HEAD state.
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @stdout Current branch name or short SHA
 #######################################
 function dybatpho::git_branch {
@@ -99,7 +99,7 @@ function dybatpho::git_branch {
 
 #######################################
 # @description Return the default branch of a Git repository.
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @stdout Default branch name
 # @tip Prefers `origin/HEAD`, then local `main`/`master`, then current branch
 #######################################
@@ -132,8 +132,8 @@ function dybatpho::git_default_branch {
 
 #######################################
 # @description Return the full SHA of a commit.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional commit-ish, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Commit-ish
 # @stdout Full commit SHA
 #######################################
 function dybatpho::git_commit_hash {
@@ -145,8 +145,8 @@ function dybatpho::git_commit_hash {
 
 #######################################
 # @description Return the short SHA of a commit.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional commit-ish, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Commit-ish
 # @stdout Short commit SHA (7 chars)
 #######################################
 function dybatpho::git_commit_short_hash {
@@ -159,8 +159,8 @@ function dybatpho::git_commit_short_hash {
 
 #######################################
 # @description Return the subject line of a commit message.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional commit-ish, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Commit-ish
 # @stdout Commit subject line
 #######################################
 function dybatpho::git_commit_subject {
@@ -173,8 +173,8 @@ function dybatpho::git_commit_subject {
 
 #######################################
 # @description Return the author name of a commit.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional commit-ish, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Commit-ish
 # @stdout Commit author name
 #######################################
 function dybatpho::git_commit_author {
@@ -187,8 +187,8 @@ function dybatpho::git_commit_author {
 
 #######################################
 # @description Return success when a commit exists.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Commit-ish to verify, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Commit-ish to verify
 # @exitcode 0 Commit exists
 # @exitcode 1 Commit does not exist
 #######################################
@@ -203,7 +203,7 @@ function dybatpho::git_has_commit {
 # @description List commits reachable from a head ref but not from a base ref.
 # @arg $1 string Repository path
 # @arg $2 string Base ref (excluded)
-# @arg $3 string Optional head ref, default is `HEAD`
+# @arg $3 string [default: ${HEAD}] Head ref
 # @stdout One full SHA per line, oldest first
 #######################################
 function dybatpho::git_commits_between {
@@ -220,7 +220,7 @@ function dybatpho::git_commits_between {
 # @description Count commits in a range.
 # @arg $1 string Repository path
 # @arg $2 string Base ref (excluded)
-# @arg $3 string Optional head ref, default is `HEAD`
+# @arg $3 string [default: ${HEAD}] Head ref
 # @stdout Number of commits
 #######################################
 function dybatpho::git_commit_count {
@@ -235,7 +235,7 @@ function dybatpho::git_commit_count {
 
 #######################################
 # @description Return success when the worktree has no tracked or untracked changes.
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @exitcode 0 Worktree is clean
 # @exitcode 1 Worktree has changes
 #######################################
@@ -249,8 +249,8 @@ function dybatpho::git_is_clean {
 
 #######################################
 # @description Return the URL for a Git remote.
-# @arg $1 string Optional remote name, default is `origin`
-# @arg $2 string Optional repository path, default is `.`
+# @arg $1 string [default: origin] Remote name
+# @arg $2 string [default: .] Repository path
 # @stdout Remote URL
 #######################################
 function dybatpho::git_remote_url {
@@ -263,8 +263,8 @@ function dybatpho::git_remote_url {
 
 #######################################
 # @description Return success when a named remote exists.
-# @arg $1 string Optional remote name, default is `origin`
-# @arg $2 string Optional repository path, default is `.`
+# @arg $1 string [default: origin] Remote name
+# @arg $2 string [default: .] Repository path
 # @exitcode 0 Remote exists
 # @exitcode 1 Remote does not exist
 #######################################
@@ -278,8 +278,8 @@ function dybatpho::git_has_remote {
 
 #######################################
 # @description List changed files relative to a base ref, including untracked.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional base ref, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Base ref
 # @stdout One changed file path per line, sorted byte-wise and deduplicated,
 #   so the order does not depend on the caller's locale
 # @exitcode 1 Stop the script when the base names no commit, or a Git command fails
@@ -319,8 +319,8 @@ function dybatpho::git_changed_files {
 #     dybatpho::info "Releasing on top of ${previous}"
 #   fi
 #
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional tag glob to match, default is every tag
+# @arg $1 string [default: .] Repository path
+# @arg $2 string? Tag glob to match, default is every tag
 # @stdout The highest matching tag
 # @exitcode 0 A matching tag exists
 # @exitcode 1 The repository has no matching tag
@@ -339,8 +339,8 @@ function dybatpho::git_latest_tag {
 
 #######################################
 # @description List tags that contain a commit.
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional commit-ish, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string [default: ${HEAD}] Commit-ish
 # @stdout One tag per line, sorted
 #######################################
 function dybatpho::git_tags_containing {
@@ -389,8 +389,8 @@ function dybatpho::git_is_ancestor {
 #     dybatpho::info "main tracks ${upstream}"
 #   fi
 #
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional branch name, default is the current branch
+# @arg $1 string [default: .] Repository path
+# @arg $2 string? Branch name, default is the current branch
 # @stdout Short name of the upstream ref
 # @exitcode 0 The branch has an upstream
 # @exitcode 1 It has none, the branch does not exist, or HEAD is detached
@@ -413,9 +413,9 @@ function dybatpho::git_upstream {
 #   counts="$(dybatpho::git_ahead_behind ".")"
 #   read -r ahead behind <<< "${counts}"
 #
-# @arg $1 string Optional repository path, default is `.`
-# @arg $2 string Optional base ref, default is the upstream of the head ref
-# @arg $3 string Optional head ref, default is `HEAD`
+# @arg $1 string [default: .] Repository path
+# @arg $2 string? Base ref, default is the upstream of the head ref
+# @arg $3 string [default: ${HEAD}] Head ref
 # @stdout `<ahead> <behind>` on one line: commits only on the head ref, then
 #   commits only on the base ref
 # @exitcode 0 Both refs resolved
@@ -451,7 +451,7 @@ function dybatpho::git_ahead_behind {
 #   state="$(dybatpho::git_state ".")"
 #   [[ "${state}" == "none" ]] || dybatpho::die "Finish the ${state} first"
 #
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @stdout One of `rebase`, `am`, `merge`, `cherry-pick`, `revert`, `bisect`, or `none`
 # @tip A rebase is reported ahead of the cherry-pick it performs underneath,
 #   because the rebase is what has to be continued or aborted
@@ -508,7 +508,7 @@ function dybatpho::git_state {
 #     git fetch --unshallow
 #   fi
 #
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @exitcode 0 The repository is shallow
 # @exitcode 1 It has its full history
 #######################################
@@ -527,7 +527,7 @@ function dybatpho::git_is_shallow {
 #   stashed="$(dybatpho::git_stash_count ".")"
 #   ((stashed == 0)) || dybatpho::warn "${stashed} stash entries left behind"
 #
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @stdout Number of stash entries, `0` when there is no stash
 #######################################
 function dybatpho::git_stash_count {
@@ -551,7 +551,7 @@ function dybatpho::git_stash_count {
 #     dybatpho::print "${branch} -> ${path}"
 #   done <<< "$(dybatpho::git_worktree_list ".")"
 #
-# @arg $1 string Optional repository path, default is `.`
+# @arg $1 string [default: .] Repository path
 # @stdout One `<path>\t<branch>` line per worktree. The branch is its short
 #   name, `(detached)` when HEAD is detached, or `(bare)` for a bare repository
 # @tip The fields are separated by a tab so that a path with spaces reads back

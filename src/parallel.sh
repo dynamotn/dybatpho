@@ -110,7 +110,7 @@ function __dybatpho_parallel_group_alive {
 #   `DYBATPHO_TIMEOUT_KILL_AFTER` seconds have passed is ended with `KILL`, the
 #   grace a timed-out job is given.
 # @arg $@ number Process IDs to end, each the leader of its job's process group
-# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a group may outlive the first signal before `KILL`, default is `5`
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds a group may outlive the first signal before `KILL`
 # @internal
 #######################################
 function __dybatpho_parallel_terminate {
@@ -559,7 +559,7 @@ function __dybatpho_parallel_pool {
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop at the first failure
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
 # @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
-# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a timed-out job has to stop before it is killed, default is `5`
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds a timed-out job has to stop before it is killed
 # @env DRY_RUN string When true-like, report the jobs instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed
@@ -635,7 +635,7 @@ function dybatpho::parallel_map {
 # @env DYBATPHO_PARALLEL_FAILFAST string When true-like, stop at the first failure
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
 # @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
-# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds a timed-out job has to stop before it is killed, default is `5`
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds a timed-out job has to stop before it is killed
 # @env DRY_RUN string When true-like, report the commands instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed

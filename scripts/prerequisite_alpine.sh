@@ -10,7 +10,7 @@
 #   bash itself, curl and the CA bundle curl verifies against. The repository's
 #   `Dockerfile` runs it as its first layer, before anything else in `scripts/`
 #   can run at all.
-# @note This script is intended to be run in an fresh Alpine Linux environment,
+# @tip This script is intended to be run in an fresh Alpine Linux environment,
 # this mean you should run this script with Bourne shell, not Bash shell
 set -e
 

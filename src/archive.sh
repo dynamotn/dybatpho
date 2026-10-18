@@ -231,8 +231,8 @@ function dybatpho::archive_create {
 #######################################
 # @description Extract an archive into a target directory.
 # @arg $1 string Archive file path
-# @arg $2 string Optional extraction directory, default is `.`
-# @arg $3 number Optional strip-components count, default is `0`
+# @arg $2 string [default: .] Extraction directory
+# @arg $3 number [default: 0] Strip-components count
 # @stdout Command output from the selected extractor, if any
 #######################################
 function dybatpho::archive_extract {

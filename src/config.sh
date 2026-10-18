@@ -198,7 +198,7 @@ function __dybatpho_config_load_structured {
 #   # A machine-local override that may simply not be there.
 #   dybatpho::config_load --optional /etc/app.env "${HOME}/.config/app.env"
 #
-# @arg $1 string Optional `--optional`, to skip files that do not exist instead of failing
+# @arg $1 string? `--optional`, to skip files that do not exist instead of failing
 # @arg $@ string Files in dotenv, JSON, YAML, or TOML format, in increasing precedence order
 # @set DYBATPHO_CONFIG Merged values, where a later file replaces an earlier one
 # @note A nested JSON, YAML, or TOML mapping is stored under dotted keys, so
@@ -256,7 +256,7 @@ function dybatpho::config_load {
 #   DYBATPHO_CONFIG_PROFILE=staging dybatpho::config_profile ./config.json
 #
 # @arg $1 string Base configuration file, whose extension selects the format
-# @arg $2 string Profile name, defaulting to `DYBATPHO_CONFIG_PROFILE`
+# @arg $2 string [default: ${DYBATPHO_CONFIG_PROFILE}] Profile name
 # @env DYBATPHO_CONFIG_PROFILE string Profile used when none is passed
 # @set DYBATPHO_CONFIG Base values, overlaid by the profile file when it exists
 # @exitcode 1 No profile is given, the profile name is invalid, or the base file is missing or unreadable
@@ -280,7 +280,7 @@ function dybatpho::config_profile {
 
 #######################################
 # @description Load environment variables after an optional prefix.
-# @arg $1 string Optional prefix, such as `APP_`
+# @arg $1 string? Prefix, such as `APP_`
 # @tip Environment variables override values loaded from configuration files.
 #######################################
 function dybatpho::config_env {
@@ -320,7 +320,7 @@ function dybatpho::config_set {
 #######################################
 # @description Print a configuration value.
 # @arg $1 string Configuration key
-# @arg $2 string Optional default value
+# @arg $2 string? Default value
 # @stdout Configuration value
 # @exitcode 1 Key is missing and no default was supplied
 #######################################
@@ -354,7 +354,7 @@ function dybatpho::config_require {
 
 #######################################
 # @description Export loaded values as shell variables.
-# @arg $1 string Optional prefix for exported variable names
+# @arg $1 string? Prefix for exported variable names
 # @exitcode 1 A key cannot be represented as a shell variable
 #######################################
 function dybatpho::config_export {
@@ -630,8 +630,7 @@ function __dybatpho_config_format_into {
 # @arg $2 string Declared type
 # @set The named variable, when the type is supported
 # @exitcode 1 The type is not supported
-# @see
-#   - `dybatpho::validate_types`
+# @see dybatpho::validate_types
 # @internal
 #######################################
 function __dybatpho_config_schema_type {
@@ -668,7 +667,7 @@ function __dybatpho_config_schema_clear {
 # @arg $1 string Name of the variable receiving the value
 # @arg $2 string Configuration key
 # @arg $3 string Attribute name
-# @arg $4 string Optional fallback value
+# @arg $4 string? Fallback value
 # @set The named variable
 # @internal
 #######################################
@@ -877,7 +876,7 @@ function dybatpho::config_validate {
 # @description Render one Markdown table cell, escaping pipes and marking empties.
 # @arg $1 string Name of the variable receiving the cell
 # @arg $2 string Cell text
-# @arg $3 string Optional `code` to wrap a non-empty cell in backticks
+# @arg $3 string? `code` to wrap a non-empty cell in backticks
 # @set The named variable: Markdown cell text, or `-` when the value is empty
 # @internal
 #######################################
@@ -900,7 +899,7 @@ function __dybatpho_config_doc_cell_into {
 # @description Render one JSON value, emitting `null` for an undeclared attribute.
 # @arg $1 string Name of the variable receiving the value
 # @arg $2 string Attribute value
-# @arg $3 string Optional `declared` to emit an empty string instead of `null`
+# @arg $3 string? `declared` to emit an empty string instead of `null`
 # @set The named variable: quoted JSON string, or `null`
 # @internal
 #######################################
@@ -917,8 +916,8 @@ function __dybatpho_config_doc_json_value_into {
 
 #######################################
 # @description Render documentation for every declared configuration key.
-# @arg $1 string Optional format: `markdown` (default), `text`, or `json`
-# @arg $2 string Optional title used by the `markdown` and `text` formats
+# @arg $1 string? Format: `markdown` (default), `text`, or `json`
+# @arg $2 string? Title used by the `markdown` and `text` formats
 # @stdout Configuration reference in the requested format
 # @tip Pipe the Markdown output into a `CONFIGURATION.md` file to keep docs in sync with the schema.
 # @exitcode 1 The format is not supported

@@ -55,7 +55,7 @@ __dybatpho_process_timeout_probe=""
 #######################################
 # @description Log a fatal message and stop the current script or process.
 # @arg $1 string Message
-# @arg $2 number Exit code, default is 1
+# @arg $2 number [default: 1] Exit code
 # @exitcode $2 Exit the current shell with the requested code
 #######################################
 function dybatpho::die {
@@ -576,7 +576,7 @@ function __dybatpho_process_timeout_fallback {
 #
 # @arg $1 number Seconds to allow, or `0` to run without a limit
 # @arg $@ string Command and arguments
-# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds between SIGTERM and SIGKILL, default is `5`
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds between SIGTERM and SIGKILL
 # @exitcode 124 The command was still running when the limit elapsed
 # @exitcode * Exit code of the command
 # @tip Compare the exit code against 124 to tell a timeout apart from a command that failed on its own
@@ -725,7 +725,7 @@ function dybatpho::wait_all {
 #   and is waited for afterwards so it does not linger as a zombie. The registry
 #   is emptied, so the same names can be started again.
 # @noargs
-# @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds between SIGTERM and SIGKILL, default is `5`
+# @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds between SIGTERM and SIGKILL
 # @set DYBATPHO_BACKGROUND_PIDS
 # @set DYBATPHO_BACKGROUND_NAMES
 # @exitcode 0 Always, so a job that had already exited cannot fail the caller
@@ -761,7 +761,7 @@ function dybatpho::kill_children {
 #   dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 #
 # @arg $1 string Path of the PID file
-# @arg $2 number Process ID to record, default is the current script's `$$`
+# @arg $2 number? Process ID to record, default is the current script's `$$`
 # @exitcode 0 The PID file was written
 # @exitcode 1 Stop the script when the process ID is not a number or the file cannot be written
 # @note `$$` is the script's own process ID and stays the same inside a subshell, which is what a PID file is expected
@@ -835,7 +835,7 @@ function dybatpho::pid_file_is_running {
 #   written its own PID file would otherwise delete the live one on its way out,
 #   and the supervisor would then start a second copy.
 # @arg $1 string Path of the PID file
-# @arg $2 number Process ID the file must record, default is the current script's `$$`
+# @arg $2 number? Process ID the file must record, default is the current script's `$$`
 # @exitcode 0 The file was removed, or was already gone
 # @exitcode 1 The file records a different process and was left alone
 #######################################

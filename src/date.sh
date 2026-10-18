@@ -21,7 +21,7 @@
 #   - `example/date_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_DATE_TIMEZONE string Timezone used by date helpers, default is `UTC`
+# @env DYBATPHO_DATE_TIMEZONE string [default: ${UTC}] Timezone used by date helpers
 DYBATPHO_DATE_TIMEZONE="${DYBATPHO_DATE_TIMEZONE:-UTC}"
 
 # Which `date` this system has, filled in on first use by
@@ -163,7 +163,7 @@ function __dybatpho_date_parse_with {
 
 #######################################
 # @description Print the current time using a `date` format string.
-# @arg $1 string Optional output format, default is `%s`
+# @arg $1 string [default: %s] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used for formatting the current time
 # @stdout Current time formatted by `date`
 #######################################
@@ -174,7 +174,7 @@ function dybatpho::date_now {
 
 #######################################
 # @description Print today's date using a `date` format string.
-# @arg $1 string Optional output format, default is `%F`
+# @arg $1 string [default: %F] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used for formatting the current date
 # @stdout Current date formatted by `date`
 #######################################
@@ -213,7 +213,7 @@ function dybatpho::date_parse {
 #######################################
 # @description Format a Unix timestamp with a `date` format string.
 # @arg $1 number Unix timestamp
-# @arg $2 string Optional output format, default is `%F %T`
+# @arg $2 string [default: %F %T] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used for formatting the timestamp
 # @stdout Formatted date string
 #######################################
@@ -235,7 +235,7 @@ function dybatpho::date_format {
 # @description Add or subtract days from a date string and print the result.
 # @arg $1 string Base date string
 # @arg $2 number Day offset, may be negative
-# @arg $3 string Optional output format, default is `%F`
+# @arg $3 string [default: %F] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing and formatting
 # @stdout Shifted date string
 #######################################
@@ -342,7 +342,7 @@ function dybatpho::date_days_in_month {
 #   dybatpho::date_month_start 2024-02-17 '%F %T'  # 2024-02-01 00:00:00
 #
 # @arg $1 string Date string
-# @arg $2 string Optional output format, default is `%F`
+# @arg $2 string [default: %F] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing and formatting
 # @stdout The first day of that month
 # @exitcode 1 The date cannot be parsed
@@ -369,7 +369,7 @@ function dybatpho::date_month_start {
 #   dybatpho::date_month_end 2023-02-17   # 2023-02-28
 #
 # @arg $1 string Date string
-# @arg $2 string Optional output format, default is `%F`
+# @arg $2 string [default: %F] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing and formatting
 # @stdout The last day of that month
 # @exitcode 1 The date cannot be parsed
@@ -402,12 +402,11 @@ function dybatpho::date_month_end {
 # @arg $1 string Base date string
 # @arg $2 number Amount, may be negative
 # @arg $3 string Unit: seconds, minutes, hours, days, or weeks
-# @arg $4 string Optional output format, default is `%F %T`
+# @arg $4 string [default: %F %T] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing and formatting
 # @stdout The shifted date
 # @exitcode 1 The date cannot be parsed, the amount is not a whole number, or the unit is unknown
-# @see
-#   - `dybatpho::date_add_days`
+# @see dybatpho::date_add_days
 #######################################
 function dybatpho::date_add {
   local input amount unit
@@ -445,12 +444,11 @@ function dybatpho::date_add {
 #
 # @arg $1 string Start date string
 # @arg $2 string End date string
-# @arg $3 string Optional unit: seconds (default), minutes, hours, days, or weeks
+# @arg $3 string? Unit: seconds (default), minutes, hours, days, or weeks
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing both dates
 # @stdout Signed difference calculated as `end - start`
 # @exitcode 1 Either date cannot be parsed, or the unit is unknown
-# @see
-#   - `dybatpho::date_diff_days`
+# @see dybatpho::date_diff_days
 #######################################
 function dybatpho::date_diff {
   local start_date end_date
@@ -483,8 +481,7 @@ function dybatpho::date_diff {
 # @arg $1 number Whole number of seconds, may be negative
 # @stdout The span as `H:MM:SS`
 # @exitcode 1 Stop the script when the value is not a whole number
-# @see
-#   - `dybatpho::i18n_duration`
+# @see dybatpho::i18n_duration
 #######################################
 function dybatpho::date_seconds_to_hms {
   local total
@@ -569,8 +566,7 @@ function __dybatpho_date_duration_add {
 # @stderr Why the duration was refused
 # @exitcode 0 The duration is valid
 # @exitcode 1 The duration is empty, malformed, uses a calendar unit, or is too large to count
-# @see
-#   - `dybatpho::date_seconds_to_hms`
+# @see dybatpho::date_seconds_to_hms
 #######################################
 function dybatpho::date_parse_duration {
   dybatpho::expect_ref "${1-}"
@@ -677,8 +673,7 @@ function __dybatpho_date_compare_pair_into {
 # @exitcode 0 The first date is earlier
 # @exitcode 1 It is the same moment or later
 # @exitcode 1 Stop the script when either date cannot be parsed
-# @see
-#   - `dybatpho::date_is_after`
+# @see dybatpho::date_is_after
 #######################################
 function dybatpho::date_is_before {
   local first second
@@ -701,8 +696,7 @@ function dybatpho::date_is_before {
 # @exitcode 0 The first date is later
 # @exitcode 1 It is the same moment or earlier
 # @exitcode 1 Stop the script when either date cannot be parsed
-# @see
-#   - `dybatpho::date_is_before`
+# @see dybatpho::date_is_before
 #######################################
 function dybatpho::date_is_after {
   local first second
@@ -751,7 +745,7 @@ function __dybatpho_date_iso_weeks_in_year {
 #   dybatpho::date_iso_week 2024-02-29 '%G-W%V-%u'   # 2024-W09-4
 #
 # @arg $1 string Date string
-# @arg $2 string Optional format, default is `%G-W%V`
+# @arg $2 string [default: %G-W%V] Format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone used while parsing the date
 # @stdout The week, written with the format
 # @exitcode 1 The date cannot be parsed
@@ -835,9 +829,9 @@ function __dybatpho_date_zone_known {
 #
 # @arg $1 string Date string
 # @arg $2 string Target timezone, such as `Asia/Ho_Chi_Minh` or `UTC`
-# @arg $3 string Optional output format, default is `%F %T %z`
+# @arg $3 string [default: %F %T %z] Output format
 # @env DYBATPHO_DATE_TIMEZONE string Timezone the date is read in
-# @env TZDIR string Zone database directory, default is `/usr/share/zoneinfo`
+# @env TZDIR string [default: /usr/share/zoneinfo] Zone database directory
 # @stdout The date in the target timezone
 # @exitcode 1 The date cannot be parsed
 # @exitcode 1 Stop the script when the timezone is not in the zone database

@@ -20,14 +20,13 @@
 #   - `example/secret_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env DYBATPHO_SECRET_PLACEHOLDER string Text substituted for registered secrets. Default is `***`
+# @env DYBATPHO_SECRET_PLACEHOLDER string [default: ***] Text substituted for registered secrets
 DYBATPHO_SECRET_PLACEHOLDER="${DYBATPHO_SECRET_PLACEHOLDER:-***}"
-# @env DYBATPHO_SECRET_MIN_LENGTH number Shortest value that may be registered for masking. Default is `4`
+# @env DYBATPHO_SECRET_MIN_LENGTH number [default: 4] Shortest value that may be registered for masking
 DYBATPHO_SECRET_MIN_LENGTH="${DYBATPHO_SECRET_MIN_LENGTH:-4}"
-# @env DYBATPHO_SECRET_MAX_MODE string Most permissive octal mode allowed for a secret file. Default is `600`
+# @env DYBATPHO_SECRET_MAX_MODE string [default: 600] Most permissive octal mode allowed for a secret file
 DYBATPHO_SECRET_MAX_MODE="${DYBATPHO_SECRET_MAX_MODE:-600}"
-# @env DYBATPHO_SECRET_STRICT_PERMS string When true-like, permission problems fail instead of warning. Default is
-#   `true`
+# @env DYBATPHO_SECRET_STRICT_PERMS string [default: true] When true-like, permission problems fail instead of warning
 DYBATPHO_SECRET_STRICT_PERMS="${DYBATPHO_SECRET_STRICT_PERMS:-true}"
 
 # Registered secret values, longest first so overlapping values mask completely.
@@ -203,7 +202,7 @@ function dybatpho::secret_forget {
 #   printf 'token=%s\n' "${TOKEN}" | dybatpho::secret_mask
 #   dybatpho::secret_mask "authorization: ${TOKEN}"
 #
-# @arg $@ string Optional text to mask; stdin is read when no argument is given
+# @arg $@ string? Text to mask; stdin is read when no argument is given
 # @stdout Input text with every registered secret replaced by the placeholder
 # @tip Stdin is processed line by line, so register multiline secrets before streaming
 # @tip Registered secrets stay in the current process, so run this in the shell that registered them
@@ -256,7 +255,7 @@ function dybatpho::secret_mask_run {
 #######################################
 # @description Print a non-reversible hint for a secret, revealing only its last characters.
 # @arg $1 string Secret value
-# @arg $2 number Characters to reveal, default is 4
+# @arg $2 number [default: 4] Characters to reveal
 # @stdout Placeholder followed by the revealed suffix
 #######################################
 function dybatpho::secret_hint {
@@ -277,7 +276,7 @@ function dybatpho::secret_hint {
 #   dybatpho::secret_check_permission ~/.config/app/token 600
 #
 # @arg $1 string File path
-# @arg $2 string Most permissive octal mode allowed, default is `DYBATPHO_SECRET_MAX_MODE`
+# @arg $2 string [default: ${DYBATPHO_SECRET_MAX_MODE}] Most permissive octal mode allowed
 # @env DYBATPHO_SECRET_STRICT_PERMS string Set to a false-like value to warn instead of failing
 # @exitcode 0 The file exists and its permissions are acceptable
 # @exitcode 1 The file is missing, unreadable, or too permissive under strict mode
@@ -393,7 +392,7 @@ function dybatpho::secret_from_env {
 #   dybatpho::secret_from_stdin TOKEN "API token: "
 #
 # @arg $1 string Variable name that receives the secret
-# @arg $2 string Optional prompt written to stderr when stdin is a terminal
+# @arg $2 string? Prompt written to stderr when stdin is a terminal
 # @set $1 string Secret value without its trailing newline
 # @stderr Prompt text when stdin is a terminal
 # @exitcode 1 No secret is provided
@@ -433,7 +432,7 @@ function dybatpho::secret_from_stdin {
 #
 # @arg $1 string Variable name that receives the secret
 # @arg $2 string Source: `file:PATH`, `env:NAME`, `stdin`, or `-`
-# @arg $3 string Optional prompt used by the stdin source
+# @arg $3 string? Prompt used by the stdin source
 # @set $1 string Secret value
 # @exitcode 1 The source is unsupported or the secret can't be read
 #######################################

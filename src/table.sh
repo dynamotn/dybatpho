@@ -234,7 +234,7 @@ function __dybatpho_table_rule {
 #######################################
 # @description Render aligned columns without borders from delimited rows.
 # @arg $1 string Input text block or `-` for stdin
-# @arg $2 string Optional exact delimiter, default is `|`
+# @arg $2 string [default: |] Exact delimiter
 # @stdout Aligned plain-text table
 #######################################
 function dybatpho::table_print {
@@ -247,9 +247,9 @@ function dybatpho::table_print {
 #######################################
 # @description Render aligned columns with optional per-column alignment rules.
 # @arg $1 string Input text block or `-` for stdin
-# @arg $2 string Optional exact delimiter, default is `|`
-# @arg $3 string Optional comma-separated alignments (`left,right,center`)
-# @arg $4 number Optional gap width between columns, default is 2
+# @arg $2 string [default: |] Exact delimiter
+# @arg $3 string? Comma-separated alignments (`left,right,center`)
+# @arg $4 number [default: 2] Gap width between columns
 # @stdout Aligned plain-text table
 #######################################
 function dybatpho::table_align {
@@ -288,7 +288,7 @@ function dybatpho::table_align {
 #######################################
 # @description Render a Unicode boxed table from delimited rows.
 # @arg $1 string Input text block or `-` for stdin
-# @arg $2 string Optional exact delimiter, default is `|`
+# @arg $2 string [default: |] Exact delimiter
 # @stdout Boxed Unicode table
 #######################################
 function dybatpho::table_box {
@@ -321,7 +321,7 @@ function dybatpho::table_box {
 #######################################
 # @description Render a Markdown table from delimited rows.
 # @arg $1 string Input text block or `-` for stdin
-# @arg $2 string Optional exact delimiter, default is `|`
+# @arg $2 string [default: |] Exact delimiter
 # @stdout Markdown table using the first row as the header
 #######################################
 function dybatpho::table_markdown {
@@ -411,8 +411,8 @@ Set DYBATPHO_TABLE_CSV_STRICT=false to split anyway."
 #######################################
 # @description Render lightweight comma-delimited table data using one of the supported styles.
 # @arg $1 string Input CSV-like text block or `-` for stdin
-# @arg $2 string Optional style: `plain`, `box`, or `markdown`, default is `plain`
-# @arg $3 string Optional comma-separated alignments for `plain` style
+# @arg $2 string [default: plain] Style: `plain`, `box`, or `markdown`
+# @arg $3 string? Comma-separated alignments for `plain` style
 # @stdout Rendered table
 #######################################
 function dybatpho::table_csv {
@@ -453,8 +453,8 @@ function dybatpho::table_csv {
 #   cannot open a column of its own. Cells are trimmed, as in every renderer
 #   here.
 # @arg $1 string CSV file path, `-` for stdin, or CSV text
-# @arg $2 string Optional style: `plain`, `box`, or `markdown`, default is `plain`
-# @arg $3 string Optional comma-separated alignments for `plain` style
+# @arg $2 string [default: plain] Style: `plain`, `box`, or `markdown`
+# @arg $3 string? Comma-separated alignments for `plain` style
 # @stdout Rendered table, or nothing for an empty input
 # @exitcode 0 The table was rendered
 # @exitcode 1 The style is unknown, or the CSV cannot be read
@@ -503,8 +503,8 @@ function dybatpho::table_from_csv {
 #   `dybatpho::csv_from_json` performs, rendered through
 #   `dybatpho::table_from_csv`.
 # @arg $1 string JSON file path, `-` for stdin, or JSON text
-# @arg $2 string Optional style: `plain`, `box`, or `markdown`, default is `plain`
-# @arg $3 string Optional comma-separated alignments for `plain` style
+# @arg $2 string [default: plain] Style: `plain`, `box`, or `markdown`
+# @arg $3 string? Comma-separated alignments for `plain` style
 # @stdout Rendered table, or nothing for an empty array
 # @exitcode 0 The table was rendered
 # @exitcode 1 The style is unknown, or the document is not an array of objects

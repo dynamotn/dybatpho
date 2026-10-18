@@ -543,8 +543,8 @@ DYBATPHO_CLI_DEBUG="${DYBATPHO_CLI_DEBUG:-false}"
 #   Default
 #   is `true`
 DYBATPHO_CLI_CACHE="${DYBATPHO_CLI_CACHE:-true}"
-# @env DYBATPHO_CLI_CACHE_DIR string Directory holding cached completion output. Default is
-#   `${XDG_CACHE_HOME:-$HOME/.cache}/dybatpho/cli`
+# @env DYBATPHO_CLI_CACHE_DIR string [default: ${XDG_CACHE_HOME:-$HOME/.cache}/dybatpho/cli] Directory holding cached
+#   completion output
 DYBATPHO_CLI_CACHE_DIR="${DYBATPHO_CLI_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/dybatpho/cli}"
 
 # Label marking a help row as free text from `dybatpho::opts::msg`. `\x02` is a
@@ -562,7 +562,7 @@ DYBATPHO_CLI_CACHE_DIR="${DYBATPHO_CLI_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cac
 #######################################
 # @description Read a line from the terminal (or stdin) with an optional default.
 # @arg $1 string Prompt text
-# @arg $2 string Optional default value
+# @arg $2 string? Default value
 # @tip The prompt is written to stderr so the returned value remains clean on stdout.
 # @stdout Entered value
 # @exitcode 0
@@ -670,8 +670,7 @@ function dybatpho::opts::validate_choice {
 # @arg $2 string Second string
 # @stdout Edit distance as a decimal number
 # @exitcode 0
-# @see
-#   - `dybatpho::string_distance`
+# @see dybatpho::string_distance
 #######################################
 function dybatpho::cli_levenshtein {
   dybatpho::string_distance "${1-}" "${2-}"
@@ -738,8 +737,8 @@ function dybatpho::cli_suggest {
 # @example
 #   LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 #
-# @arg $1 number Repeat count, default `0`
-# @arg $2 string Base level, default `LOG_LEVEL`
+# @arg $1 number [default: 0] Repeat count
+# @arg $2 string [default: ${LOG_LEVEL}] Base level
 # @stdout Resulting log level, capped at `trace`
 # @exitcode 0
 #######################################
@@ -769,8 +768,8 @@ function dybatpho::cli_verbosity_level {
 #   # then, from the command action or a prerun hook:
 #   dybatpho::cli_apply_verbosity "${VERBOSITY}"
 #
-# @arg $1 number Repeat count, default `0`
-# @arg $2 string Base level, default `LOG_LEVEL`
+# @arg $1 number [default: 0] Repeat count
+# @arg $2 string [default: ${LOG_LEVEL}] Base level
 # @set LOG_LEVEL string Raised log level
 # @exitcode 0
 #######################################
@@ -1659,7 +1658,7 @@ function __dybatpho_cli_help_usage {
 #######################################
 # @description Generate a JSON CLI schema from the same option spec used by parsing.
 # @arg $1 string Spec function
-# @arg $2 string Optional command name
+# @arg $2 string? Command name
 # @tip Use the schema to drive external validation, form generation, tooling, or documentation from the same source of
 #   truth.
 # @stdout JSON schema
@@ -1676,7 +1675,7 @@ function dybatpho::generate_schema {
 #   the body it calls for the root and for every command under it.
 # @arg $1 string Spec function
 # @arg $2 string Command name, as it appears in the schema
-# @arg $3 string Optional aliases of the command, or `@none`
+# @arg $3 string? Aliases of the command, or `@none`
 # @stdout The command as a JSON object
 # @internal
 #######################################
@@ -1793,7 +1792,7 @@ function __dybatpho_cli_generate_schema_command {
 #######################################
 # @description Generate a roff man page from a CLI option spec.
 # @arg $1 string Spec function
-# @arg $2 string Optional command name
+# @arg $2 string? Command name
 # @tip Generate the page from the root spec to include the complete nested command tree.
 # @stdout Man page
 #######################################
@@ -1903,7 +1902,7 @@ function __dybatpho_cli_generate_man_command {
 # @description Generate Bash, Zsh, or Fish completion from a CLI option spec.
 # @arg $1 string Spec function
 # @arg $2 string Shell (`bash`, `zsh`, or `fish`)
-# @arg $3 string Optional command name
+# @arg $3 string? Command name
 # @tip Keep completion generation in a display option declared inside the spec when the CLI should complete itself.
 # @tip Generate completion from the root spec so subcommand options and aliases are included.
 # @note Output is cached under `DYBATPHO_CLI_CACHE_DIR`, keyed by the hash of the
@@ -2451,7 +2450,7 @@ function __dybatpho_cli_add_plain_switch {
 #              `negatable:true`. Results are appended to a caller-provided array.
 # @arg $1 string Name of destination array variable
 # @arg $2 switch Declared switch
-# @arg $3 bool Whether the owning option is `negatable:true`, default `false`
+# @arg $3 bool [default: false] Whether the owning option is `negatable:true`
 # @internal
 #######################################
 function __dybatpho_cli_expand_switch {
@@ -2859,7 +2858,7 @@ function __dybatpho_cli_meta_join {
 # @arg $2 string Name of the array to fill with the options
 # @arg $3 string Name of the array to fill with the commands
 # @arg $4 string Name of the variable to fill with the description
-# @arg $5 string Optional name of the array to fill with the arguments
+# @arg $5 string? Name of the array to fill with the arguments
 # @internal
 #######################################
 function __dybatpho_cli_collect_spec_metadata {
@@ -3208,7 +3207,7 @@ function dybatpho::opts::msg {
 # @description Define a sub-command in spec
 # @arg $1 string Command name
 # @arg $2 string Name of function that has spec of sub-command
-# @arg $@ key:value Optional metadata such as `alias:<name>` or `aliases:<a,b>`
+# @arg $@ key:value? Metadata such as `alias:<name>` or `aliases:<a,b>`
 # @tip Declare each subcommand with its own spec function so help, completion, schema, and man output stay consistent.
 # @tip Aliases are accepted during dispatch and are included in generated help and schema metadata.
 #######################################
@@ -3284,7 +3283,7 @@ function dybatpho::opts::cmd {
 #
 # @arg $1 string Description of the argument
 # @arg $2 string Placeholder name, shown uppercase in usage and help
-# @arg $@ key:value Settings: `required:<bool>` (default `true`) and `variadic:<bool>` (default `false`)
+# @arg $@ key:value [default: false] Settings: `required:<bool>` (default `true`) and `variadic:<bool>`
 # @note When `dybatpho::opts::setup` declares no `args:<rule>`, the rule is
 #       derived from the declared arguments, so the count is validated without
 #       stating it twice.

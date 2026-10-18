@@ -137,9 +137,8 @@ export DYBATPHO_VERSION_SCAN_REGEX='v?([0-9]+\.[0-9]+(\.[0-9]+)*)(-([0-9A-Za-z.-
 # @stdout The version as the command writes it, without a leading `v`
 # @exitcode 0 A version was found
 # @exitcode 1 The command is not installed, or none of the probes revealed a version
-# @see
-#   - `dybatpho::semver_satisfies`
-#   - `dybatpho::require`
+# @see dybatpho::semver_satisfies
+# @see dybatpho::require
 #######################################
 function dybatpho::command_version {
   local command_name
@@ -290,7 +289,7 @@ function dybatpho::cpu_count {
 # @example
 #   dybatpho::is_tty stdout && printf 'Colors are worth rendering\n'
 #
-# @arg $1 string Stream to test, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`, default is `stdout`
+# @arg $1 string [default: stdout] Stream to test, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`
 # @exitcode 0 The stream is a terminal
 # @exitcode 1 The stream is a file, a pipe, or anything else
 #######################################
@@ -338,7 +337,7 @@ function __dybatpho_os_assert_stream {
 # @example
 #   dybatpho::color_supported stderr && printf '\033[31m%s\033[0m\n' "${msg}" >&2
 #
-# @arg $1 string Stream to answer for, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`, default is `stdout`
+# @arg $1 string [default: stdout] Stream to answer for, `stdin`, `stdout`, `stderr`, or `0`/`1`/`2`
 # @env NO_COLOR string Any non-empty value turns colour off, whatever else is set
 # @env FORCE_COLOR string Any non-empty value turns colour on even when the stream is not a terminal
 # @env TERM string `dumb` turns colour off
@@ -364,7 +363,7 @@ function dybatpho::color_supported {
 #   `COLUMNS` is trusted first, because a caller that sets it is deliberately
 #   asking for a width, and `tput` is only asked when a terminal is actually
 #   attached.
-# @arg $1 number Optional width to use when there is no terminal, default is `80`
+# @arg $1 number [default: 80] Width to use when there is no terminal
 # @stdout Terminal width in columns
 # @exitcode 1 The fallback is not a positive integer
 #######################################
@@ -374,7 +373,7 @@ function dybatpho::terminal_width {
 
 #######################################
 # @description Print the height of the terminal in lines.
-# @arg $1 number Optional height to use when there is no terminal, default is `24`
+# @arg $1 number [default: 24] Height to use when there is no terminal
 # @stdout Terminal height in lines
 # @exitcode 1 The fallback is not a positive integer
 #######################################

@@ -88,7 +88,7 @@ function __dybatpho_schedule_command_into {
 #   and the handlers in place before the call are put back afterwards.
 # @arg $1 number Seconds between runs
 # @arg $2 string Options, then `--`, then the command
-# @opt --times <n> Stop after `n` runs instead of running until interrupted
+# @option --times <n> Stop after `n` runs instead of running until interrupted
 # @arg $@ string Command and arguments, after `--`
 # @exitcode 0 The loop finished its runs, or was interrupted
 # @exitcode 1 The interval or the run count is not a positive number
@@ -446,7 +446,7 @@ function dybatpho::schedule_reset {
 #   matches if **either** does, which is what cron itself does and what a
 #   hand-written check almost always gets wrong.
 # @arg $1 string Cron expression, five fields
-# @arg $2 number Optional Unix timestamp to test, default is now
+# @arg $2 number? Unix timestamp to test, default is now
 # @exitcode 0 The time matches
 # @exitcode 1 It does not
 # @exitcode 2 The expression is malformed

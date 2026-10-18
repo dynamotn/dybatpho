@@ -33,28 +33,28 @@
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_CURL_MAX_RETRIES number Max number of retry attempts when `dybatpho::curl_do` retries a request
-# @env DYBATPHO_CURL_RETRY_BASE_DELAY number Initial retry delay in seconds (default `2`)
-# @env DYBATPHO_CURL_RETRY_MAX_DELAY number Maximum retry delay in seconds (default `30`)
+# @env DYBATPHO_CURL_RETRY_BASE_DELAY number [default: 2] Initial retry delay in seconds
+# @env DYBATPHO_CURL_RETRY_MAX_DELAY number [default: 30] Maximum retry delay in seconds
 # @env DYBATPHO_CURL_RETRY_JITTER bool Add up to one base delay of random jitter
-# @env DYBATPHO_CURL_CONNECT_TIMEOUT number Optional curl connection timeout in seconds
-# @env DYBATPHO_CURL_TIMEOUT number Optional curl total timeout in seconds
+# @env DYBATPHO_CURL_CONNECT_TIMEOUT number? Curl connection timeout in seconds
+# @env DYBATPHO_CURL_TIMEOUT number? Curl total timeout in seconds
 # @env DYBATPHO_CURL_MAX_REDIRECTS number Redirects `dybatpho::curl_do` follows itself when secret headers
 #   are set (default `20`)
 # @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before `dybatpho::circuit_breaker` opens a circuit
 #   (default
 #   `5`)
-# @env DYBATPHO_CIRCUIT_COOLDOWN number Seconds an open circuit waits before allowing a trial request (default `30`)
+# @env DYBATPHO_CIRCUIT_COOLDOWN number [default: 30] Seconds an open circuit waits before allowing a trial request
 # @env DYBATPHO_RATE_LIMIT_WAIT bool Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call
 #   (default
 #   `true`)
 # @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit
 #   (default `0`)
-# @env DYBATPHO_PAGINATE_MAX_PAGES number Most pages `dybatpho::curl_paginate` fetches, `0` for no limit (default `100`)
-# @env DYBATPHO_PAGINATE_RATE string Optional rate limit spec applied per page by `dybatpho::curl_paginate`
-# @env DYBATPHO_GRAPHQL_TOKEN string Optional bearer token sent by `dybatpho::curl_graphql`
-# @env DYBATPHO_PORT_TIMEOUT number Seconds `dybatpho::port_open` waits for a connection (default `5`)
-# @env DYBATPHO_WAIT_PORT_TIMEOUT number Seconds `dybatpho::wait_port` keeps trying before giving up (default `30`)
-# @env DYBATPHO_WAIT_PORT_INTERVAL number Seconds `dybatpho::wait_port` sleeps between attempts (default `1`)
+# @env DYBATPHO_PAGINATE_MAX_PAGES number [default: 100] Most pages `dybatpho::curl_paginate` fetches, `0` for no limit
+# @env DYBATPHO_PAGINATE_RATE string? Rate limit spec applied per page by `dybatpho::curl_paginate`
+# @env DYBATPHO_GRAPHQL_TOKEN string? Bearer token sent by `dybatpho::curl_graphql`
+# @env DYBATPHO_PORT_TIMEOUT number [default: 5] Seconds `dybatpho::port_open` waits for a connection
+# @env DYBATPHO_WAIT_PORT_TIMEOUT number [default: 30] Seconds `dybatpho::wait_port` keeps trying before giving up
+# @env DYBATPHO_WAIT_PORT_INTERVAL number [default: 1] Seconds `dybatpho::wait_port` sleeps between attempts
 DYBATPHO_CURL_MAX_RETRIES=${DYBATPHO_CURL_MAX_RETRIES:-5}
 DYBATPHO_CURL_RETRY_BASE_DELAY=${DYBATPHO_CURL_RETRY_BASE_DELAY:-2}
 DYBATPHO_CURL_RETRY_MAX_DELAY=${DYBATPHO_CURL_RETRY_MAX_DELAY:-30}
@@ -95,7 +95,7 @@ DYBATPHO_CURL_SECRET_DATA=""
 # A webhook URL is often the credential itself, and a bot token can sit in the
 # path. With this set the URL goes into the same private config file, as
 # `url = "..."`, instead of onto the command line.
-# @env DYBATPHO_CURL_SECRET_URL bool Pass the URL out of band too (default `false`)
+# @env DYBATPHO_CURL_SECRET_URL bool [default: false] Pass the URL out of band too
 DYBATPHO_CURL_SECRET_URL=${DYBATPHO_CURL_SECRET_URL:-false}
 
 # Per-key in-memory state used by `dybatpho::circuit_breaker`.
@@ -326,7 +326,7 @@ function __dybatpho_network_get_http_code {
 #   dybatpho::curl_do https://example.com /tmp/1 --compressed
 #
 # @arg $1 string URL
-# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $2 string [default: /dev/null] Location of curl output
 # @arg $3 string Other options/arguments for curl
 # @env DYBATPHO_CURL_MAX_RETRIES number Override the retry budget used around curl requests
 # @exitcode 0 Transferred data
@@ -611,7 +611,7 @@ function dybatpho::curl_download {
 #######################################
 # @description Transfer JSON data with URL by curl.
 # @arg $1 string URL
-# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $2 string [default: /dev/null] Location of curl output
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
 # @exitcode 0 Transferred data
@@ -634,7 +634,7 @@ function dybatpho::curl_json {
 #######################################
 # @description Fetch only HTTP headers for a URL by curl.
 # @arg $1 string URL
-# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $2 string [default: /dev/null] Location of curl output
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
 # @exitcode 0 Transferred headers
@@ -658,7 +658,7 @@ function dybatpho::curl_head {
 #   dybatpho::curl_upload https://example.com/upload /tmp/resp.json report=@/tmp/report.csv --request PUT
 #
 # @arg $1 string URL
-# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $2 string [default: /dev/null] Location of curl output
 # @arg $@ string Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments
 # @see dybatpho::curl_do
 # @exitcode 2 A `name=@path` field references a file that does not exist
@@ -729,7 +729,7 @@ function dybatpho::verify_checksum {
 #
 # @arg $1 string URL
 # @arg $2 string Destination of file to download
-# @arg $3 string Optional checksum as `algorithm:hexdigest` (sha256, sha1, or md5)
+# @arg $3 string? Checksum as `algorithm:hexdigest` (sha256, sha1, or md5)
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_download
 # @see dybatpho::verify_checksum
@@ -768,7 +768,7 @@ function dybatpho::curl_resume_download {
 # @arg $1 string Path to a header file captured via `curl -D` (may contain multiple header blocks from redirects; the
 #   last
 #   block wins)
-# @arg $2 string Optional path to the response body file to record
+# @arg $2 string? Path to the response body file to record
 # @set DYBATPHO_HTTP_STATUS number Status code of the last received response block
 # @set DYBATPHO_HTTP_HEADERS map Lower-cased header name to value, from the last response block
 # @set DYBATPHO_HTTP_BODY_FILE string Path to the response body, or empty when omitted
@@ -810,7 +810,7 @@ function dybatpho::curl_parse_response {
 #######################################
 # @description Print a normalized response header captured by `dybatpho::curl_parse_response`.
 # @arg $1 string Header name, matched case-insensitively
-# @arg $2 string Optional default value
+# @arg $2 string? Default value
 # @stdout Header value
 # @exitcode 1 Header is missing and no default was supplied
 #######################################
@@ -836,7 +836,7 @@ function dybatpho::curl_response_header {
 #   dybatpho::curl_response_header content-type
 #
 # @arg $1 string URL
-# @arg $2 string Location of curl output, default is `/dev/null`
+# @arg $2 string [default: /dev/null] Location of curl output
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
 # @see dybatpho::curl_parse_response
@@ -873,9 +873,9 @@ function dybatpho::curl_request {
 #   dybatpho::curl_timeout https://example.com /tmp/out "" 5 --header "X-Test: 1"
 #
 # @arg $1 string URL
-# @arg $2 string Location of curl output, default is `/dev/null`
-# @arg $3 number Connect timeout in seconds for this request, empty keeps the global default
-# @arg $4 number Total timeout in seconds for this request, empty keeps the global default
+# @arg $2 string [default: /dev/null] Location of curl output
+# @arg $3 number? Connect timeout in seconds for this request; empty keeps the global default
+# @arg $4 number? Total timeout in seconds for this request; empty keeps the global default
 # @arg $@ string Other options/arguments for curl
 # @see dybatpho::curl_do
 # @tip Overrides apply only for the duration of this call; global `DYBATPHO_CURL_*` timeouts are unaffected
@@ -953,8 +953,8 @@ function dybatpho::circuit_reset {
 #
 # @arg $1 string Circuit key, typically a host or service name
 # @arg $2 string Shell command string to run
-# @env DYBATPHO_CIRCUIT_THRESHOLD number Consecutive failures before the circuit opens (default `5`)
-# @env DYBATPHO_CIRCUIT_COOLDOWN number Seconds the circuit stays open before a trial request is allowed (default `30`)
+# @env DYBATPHO_CIRCUIT_THRESHOLD number [default: 5] Consecutive failures before the circuit opens
+# @env DYBATPHO_CIRCUIT_COOLDOWN number [default: 30] Seconds the circuit stays open before a trial request is allowed
 # @exitcode 0 The command succeeded, or a trial request succeeded and closed the circuit
 # @exitcode 9 The circuit is open; the command was not attempted
 # @exitcode other The command's own exit code, while the circuit is closed or half-open
@@ -1119,9 +1119,9 @@ function dybatpho::rate_limit_reset {
 # @arg $2 string Spec as `count/window`, where the window is in seconds unless it carries an `ms`, `s`, `m`, or `h`
 #   suffix
 # @arg $@ string Command and arguments to run, optionally after a `--` separator
-# @env DYBATPHO_RATE_LIMIT_WAIT bool Wait for a free slot instead of refusing the call (default `true`)
-# @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds the limiter will accept, `0` for no limit (default
-#   `0`)
+# @env DYBATPHO_RATE_LIMIT_WAIT bool [default: true] Wait for a free slot instead of refusing the call
+# @env DYBATPHO_RATE_LIMIT_MAX_WAIT number [default: 0] Longest wait in seconds the limiter will accept, `0` for no
+#   limit
 # @set DYBATPHO_RATE_EVENTS The key's call timestamps
 # @exitcode 0 The command succeeded, or no command was given and a slot was taken
 # @exitcode 9 The budget is spent and the limiter was not allowed to wait for it; the command was not run
@@ -1250,16 +1250,15 @@ function dybatpho::curl_link {
 #
 # @arg $1 string URL of the first page
 # @arg $@ string Other options/arguments for curl, sent with every page
-# @env DYBATPHO_PAGINATE_MAX_PAGES number Most pages to fetch before stopping, `0` for no limit (default `100`)
-# @env DYBATPHO_PAGINATE_RATE string Optional rate limit spec, such as `10/60`, applied per page and keyed by host
+# @env DYBATPHO_PAGINATE_MAX_PAGES number [default: 100] Most pages to fetch before stopping, `0` for no limit
+# @env DYBATPHO_PAGINATE_RATE string? Rate limit spec, such as `10/60`, applied per page and keyed by host
 # @set DYBATPHO_HTTP_STATUS The status of the last page fetched
 # @set DYBATPHO_HTTP_HEADERS The headers of the last page fetched
 # @stdout The body of every page, in order
 # @exitcode 0 Every page was fetched
 # @exitcode other The exit code of `dybatpho::curl_do` for the page that failed
-# @see
-#   - `dybatpho::curl_link`
-#   - `dybatpho::rate_limit`
+# @see dybatpho::curl_link
+# @see dybatpho::rate_limit
 # @tip An authenticated API takes its token through `DYBATPHO_CURL_SECRET_HEADERS`, which keeps it off `curl`'s command
 #   line for every page
 # @note Under `DRY_RUN` only the first page is rehearsed, because no response comes back to say where the next one is
@@ -1341,7 +1340,7 @@ function dybatpho::curl_paginate {
 #
 # @arg $1 string URL
 # @arg $2 string Bearer token
-# @arg $3 string Location of curl output, default is `/dev/null`
+# @arg $3 string [default: /dev/null] Location of curl output
 # @arg $@ string Other options/arguments for curl
 # @set DYBATPHO_HTTP_STATUS The response status code
 # @set DYBATPHO_HTTP_HEADERS The response headers
@@ -1382,10 +1381,10 @@ function dybatpho::curl_auth_bearer {
 #
 # @arg $1 string GraphQL endpoint URL
 # @arg $2 string Query or mutation document
-# @arg $3 string Variables as a JSON object, default `{}`
-# @arg $4 string Location of curl output, default is `/dev/null`
+# @arg $3 string [default: {}] Variables as a JSON object
+# @arg $4 string [default: /dev/null] Location of curl output
 # @arg $@ string Other options/arguments for curl
-# @env DYBATPHO_GRAPHQL_TOKEN string Optional bearer token, sent out of band with the request
+# @env DYBATPHO_GRAPHQL_TOKEN string? Bearer token, sent out of band with the request
 # @set DYBATPHO_HTTP_STATUS The response status code
 # @set DYBATPHO_HTTP_HEADERS The response headers
 # @exitcode 0 The endpoint answered 2xx and the response carried no errors
@@ -1578,9 +1577,8 @@ function __dybatpho_network_is_port {
 # @set DYBATPHO_URL map The `scheme`, `user`, `password`, `host`, `port`, `path`, `query`, and `fragment` of the URL
 # @exitcode 0 The URL was split
 # @exitcode 1 The URL has no scheme, no host, or a port that is not a port
-# @see
-#   - `dybatpho::url_part`
-#   - `dybatpho::url_decode`
+# @see dybatpho::url_part
+# @see dybatpho::url_decode
 #######################################
 function dybatpho::url_parse {
   local url
@@ -1606,12 +1604,11 @@ function dybatpho::url_parse {
 #   dybatpho::url_part port 443        # 443, the default, since none was given
 #
 # @arg $1 string Component name: `scheme`, `user`, `password`, `host`, `port`, `path`, `query`, or `fragment`
-# @arg $2 string Optional value to print when the component is empty
+# @arg $2 string? Value to print when the component is empty
 # @stdout The component, or the default
 # @exitcode 1 The component is empty and no default was supplied
 # @exitcode 1 Stop the script when the name is not a component of a URL
-# @see
-#   - `dybatpho::url_parse`
+# @see dybatpho::url_parse
 #######################################
 function dybatpho::url_part {
   local name
@@ -1802,15 +1799,14 @@ function dybatpho::cidr_contains {
 #
 # @arg $1 string Host name or address
 # @arg $2 number Port
-# @arg $3 number Seconds to wait, defaulting to `DYBATPHO_PORT_TIMEOUT`
+# @arg $3 number [default: ${DYBATPHO_PORT_TIMEOUT}] Seconds to wait
 # @env DYBATPHO_PORT_TIMEOUT number Seconds to wait for the connection
 # @exitcode 0 The port accepted a connection
 # @exitcode 1 It did not, within the timeout
 # @exitcode 1 Stop the script when the port or the timeout is not a number
 # @note The timeout needs the `timeout` command; without it the connection waits
 #   as long as the system's own TCP timeout
-# @see
-#   - `dybatpho::wait_port`
+# @see dybatpho::wait_port
 #######################################
 function dybatpho::port_open {
   local host port
@@ -1844,15 +1840,14 @@ function dybatpho::port_open {
 #
 # @arg $1 string Host name or address
 # @arg $2 number Port
-# @arg $3 number Seconds to keep trying, defaulting to `DYBATPHO_WAIT_PORT_TIMEOUT`
-# @arg $4 number Seconds between attempts, defaulting to `DYBATPHO_WAIT_PORT_INTERVAL`
+# @arg $3 number [default: ${DYBATPHO_WAIT_PORT_TIMEOUT}] Seconds to keep trying
+# @arg $4 number [default: ${DYBATPHO_WAIT_PORT_INTERVAL}] Seconds between attempts
 # @env DYBATPHO_WAIT_PORT_TIMEOUT number Seconds to keep trying
 # @env DYBATPHO_WAIT_PORT_INTERVAL number Seconds between attempts
 # @exitcode 0 The port accepted a connection before the time ran out
 # @exitcode 1 It never did
 # @exitcode 1 Stop the script when an argument is not a number
-# @see
-#   - `dybatpho::port_open`
+# @see dybatpho::port_open
 #######################################
 function dybatpho::wait_port {
   local host port

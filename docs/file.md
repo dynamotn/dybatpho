@@ -23,9 +23,9 @@ the privilege to set it. These helpers honor `DRY_RUN`.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | When true-like, the default, helpers that rewrite a file write through a symlink instead of replacing it |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, helpers that rewrite a file write through a symlink instead of replacing it |
 
 ### 🚀 Highlights
 
@@ -173,10 +173,10 @@ Return the basename component of a path.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to inspect |
-| `$2` | string | Optional suffix to strip from the basename |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to inspect |
+| `$2` | string | no |  | Suffix to strip from the basename |
 
 **📤 Output on stdout**
 
@@ -271,10 +271,10 @@ Return success when a path has any extension or a matching exact extension.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to inspect |
-| `$2` | string | Optional extension to compare against |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to inspect |
+| `$2` | string | no |  | Extension to compare against |
 
 **🚦 Exit codes**
 
@@ -339,12 +339,12 @@ mkdir -p "${TMPDIR_VAR}/subdir"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Variable name that receives the created path |
-| `$2` | string | File extension to append, or `/`/empty to create a directory |
-| `$3` | string | Name prefix, default is `temp` |
-| `$4` | string | Parent directory, default is `${TMPDIR:-/tmp}` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Variable name that receives the created path |
+| `$2` | string | yes |  | File extension to append, or `/`/empty to create a directory |
+| `$3` | string | no | `temp` | Name prefix |
+| `$4` | string | no | `${TMPDIR:-/tmp}` | Parent directory |
 
 **📝 Notes**
 
@@ -379,10 +379,10 @@ EOF
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the write instead of performing it |
-| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | When true-like, the default, write through a symlink rather than replacing it |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DRY_RUN`** | string | yes |  | When true-like, report the write instead of performing it |
+| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
 
@@ -416,10 +416,10 @@ dybatpho::file_replace "./Makefile" "v[0-9]\+\.[0-9]\+" "v2.0"
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the rewrite instead of performing it |
-| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | When true-like, the default, write through a symlink rather than replacing it |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DRY_RUN`** | string | yes |  | When true-like, report the rewrite instead of performing it |
+| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
 
@@ -449,10 +449,10 @@ dybatpho::file_ensure_line "${HOME}/.bashrc" 'export EDITOR=nvim'
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the change instead of performing it |
-| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | When true-like, the default, write through a symlink rather than replacing it |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DRY_RUN`** | string | yes |  | When true-like, report the change instead of performing it |
+| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
 
@@ -482,10 +482,10 @@ dybatpho::file_remove_line "${HOME}/.bashrc" 'export EDITOR=nvim'
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the change instead of performing it |
-| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | When true-like, the default, write through a symlink rather than replacing it |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DRY_RUN`** | string | yes |  | When true-like, report the change instead of performing it |
+| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
 
@@ -507,10 +507,10 @@ dybatpho::file_hash "./release.tar.gz" sha512
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | File path |
-| `$2` | string | Algorithm, one of `md5`, `sha1`, `sha256` (default), or `sha512` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | File path |
+| `$2` | string | no | `sha256` | Algorithm, one of `md5`, `sha1`, `sha256`, or `sha512` |
 
 **📤 Output on stdout**
 
@@ -635,10 +635,10 @@ manifest="$(dybatpho::find_up "package.json" "${source_dir}")"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Entry name to look for in each directory |
-| `$2` | string | Directory to start from, default is the current directory |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Entry name to look for in each directory |
+| `$2` | string | no |  | Directory to start from, default is the current directory |
 
 **📤 Output on stdout**
 
@@ -672,10 +672,10 @@ dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory path |
-| `$2` | string | Optional mode applied to the directory, such as `755` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Directory path |
+| `$2` | string | no |  | Mode applied to the directory, such as `755` |
 
 **🌍 Environment variables**
 
@@ -707,15 +707,15 @@ printf 'theme = dark\n' | dybatpho::file_write_atomic "${config}/settings.ini"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional application name appended to the directory |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Application name appended to the directory |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`XDG_CONFIG_HOME`** | string | Base configuration directory, default is `~/.config` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`XDG_CONFIG_HOME`** | string | no | `~/.config` | Base configuration directory |
 
 **📤 Output on stdout**
 
@@ -740,15 +740,15 @@ cache="$(dybatpho::xdg_cache_dir myapp)"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional application name appended to the directory |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Application name appended to the directory |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`XDG_CACHE_HOME`** | string | Base cache directory, default is `~/.cache` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`XDG_CACHE_HOME`** | string | no | `~/.cache` | Base cache directory |
 
 **📤 Output on stdout**
 
@@ -773,15 +773,15 @@ data="$(dybatpho::xdg_data_dir myapp)"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional application name appended to the directory |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Application name appended to the directory |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`XDG_DATA_HOME`** | string | Base data directory, default is `~/.local/share` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`XDG_DATA_HOME`** | string | no | `~/.local/share` | Base data directory |
 
 **📤 Output on stdout**
 
@@ -809,15 +809,15 @@ printf '%s\n' "${run_id}" | dybatpho::file_write_atomic "${state}/last-run"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional application name appended to the directory |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Application name appended to the directory |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`XDG_STATE_HOME`** | string | Base state directory, default is `~/.local/state` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`XDG_STATE_HOME`** | string | no | `~/.local/state` | Base state directory |
 
 **📤 Output on stdout**
 
@@ -937,11 +937,11 @@ printf 'artifact\n' > "${workdir}/out"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Variable name that receives the created path |
-| `$2` | string | Name prefix, default is `temp` |
-| `$3` | string | Parent directory, default is `${TMPDIR:-/tmp}` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Variable name that receives the created path |
+| `$2` | string | no | `temp` | Name prefix |
+| `$3` | string | no | `${TMPDIR:-/tmp}` | Parent directory |
 
 **🧩 Variable sets**
 

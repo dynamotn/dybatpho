@@ -407,7 +407,7 @@ dybatpho::array_sort sizes --numeric --reverse
 
 **🔗 See also**
 
-- [- `dybatpho::semver_sort](#dybatphosemver_sort)
+- [dybatpho::semver_sort](#dybatphosemver_sort)
 
 ---
 
@@ -430,12 +430,12 @@ dybatpho::array_slice items -2 --    # the last two
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of array |
-| `$2` | number | Index to start at, negative to count back from the end |
-| `$3` | number | Optional count, defaulting to everything from the start on |
-| `$4` | string | Set `--` to print to stdout |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of array |
+| `$2` | number | yes |  | Index to start at, negative to count back from the end |
+| `$3` | number | no |  | Count, defaulting to everything from the start on |
+| `$4` | string | yes |  | Set `--` to print to stdout |
 
 **📤 Output on stdout**
 
@@ -607,11 +607,11 @@ printf '%s\n' "${order[@]}"  # validate, config, cli
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Name of the associative array of edges |
-| `$2` | string | Name of the array receiving the ordered entries |
-| `$@` | string | Optional roots; without them the whole graph is ordered |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the associative array of edges |
+| `$2` | string | yes |  | Name of the array receiving the ordered entries |
+| `$@` | string | no |  | Roots; without them the whole graph is ordered |
 
 **🧩 Variable sets**
 

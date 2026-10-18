@@ -328,11 +328,11 @@ Truncate a string to a maximum width and append a suffix when needed.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input string |
-| `$2` | number | Maximum width |
-| `$3` | string | Optional truncation suffix, default is `...` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input string |
+| `$2` | number | yes |  | Maximum width |
+| `$3` | string | no | `...` | Truncation suffix |
 
 **📤 Output on stdout**
 
@@ -362,11 +362,11 @@ Wrap a string to a maximum width, normalizing whitespace between words.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input string |
-| `$2` | number | Maximum width |
-| `$3` | string | Optional indent prefix for wrapped continuation lines |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input string |
+| `$2` | number | yes |  | Maximum width |
+| `$3` | string | no |  | Indent prefix for wrapped continuation lines |
 
 **📤 Output on stdout**
 
@@ -397,11 +397,11 @@ Pad a string on the right to a minimum width.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Input string |
-| `$2` | number | Minimum width |
-| `$3` | string | Optional padding token, default is a space |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input string |
+| `$2` | number | yes |  | Minimum width |
+| `$3` | string | no |  | Padding token, default is a space |
 
 **📤 Output on stdout**
 
@@ -497,7 +497,8 @@ dybatpho::string_to_snake "deploy-to-prod"   # deploy_to_prod
 
 **🔗 See also**
 
-- [- `dybatpho::string_to_kebab` - `dybatpho::string_slugify](#dybatphostring_to_kebab-dybatphostring_slugify)
+- [dybatpho::string_to_kebab](#dybatphostring_to_kebab)
+- [dybatpho::string_slugify](#dybatphostring_slugify)
 
 ---
 
@@ -528,7 +529,8 @@ dybatpho::string_to_kebab "deploy_to_prod"   # deploy-to-prod
 
 **🔗 See also**
 
-- [- `dybatpho::string_to_snake` - `dybatpho::string_slugify](#dybatphostring_to_snake-dybatphostring_slugify)
+- [dybatpho::string_to_snake](#dybatphostring_to_snake)
+- [dybatpho::string_slugify](#dybatphostring_slugify)
 
 ---
 
@@ -556,7 +558,7 @@ dybatpho::string_to_camel "XMLHttpRequest"   # xmlHttpRequest
 
 **🔗 See also**
 
-- [- `dybatpho::string_to_pascal](#dybatphostring_to_pascal)
+- [dybatpho::string_to_pascal](#dybatphostring_to_pascal)
 
 ---
 
@@ -583,7 +585,7 @@ dybatpho::string_to_pascal "deploy_to_prod"   # DeployToProd
 
 **🔗 See also**
 
-- [- `dybatpho::string_to_camel](#dybatphostring_to_camel)
+- [dybatpho::string_to_camel](#dybatphostring_to_camel)
 
 ---
 
@@ -653,7 +655,7 @@ dybatpho::string_distance color colour     # 1
 
 **🔗 See also**
 
-- [- `dybatpho::string_closest](#dybatphostring_closest)
+- [dybatpho::string_closest](#dybatphostring_closest)
 
 ---
 
@@ -700,4 +702,4 @@ fi
 
 **🔗 See also**
 
-- [- `dybatpho::string_distance](#dybatphostring_distance)
+- [dybatpho::string_distance](#dybatphostring_distance)

@@ -31,28 +31,28 @@ the resolver does.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_CURL_MAX_RETRIES`** | number | Max number of retry attempts when `dybatpho::curl_do` retries a request |
-| **`DYBATPHO_CURL_RETRY_BASE_DELAY`** | number | Initial retry delay in seconds (default `2`) |
-| **`DYBATPHO_CURL_RETRY_MAX_DELAY`** | number | Maximum retry delay in seconds (default `30`) |
-| **`DYBATPHO_CURL_RETRY_JITTER`** | bool | Add up to one base delay of random jitter |
-| **`DYBATPHO_CURL_CONNECT_TIMEOUT`** | number | Optional curl connection timeout in seconds |
-| **`DYBATPHO_CURL_TIMEOUT`** | number | Optional curl total timeout in seconds |
-| **`DYBATPHO_CURL_MAX_REDIRECTS`** | number | Redirects `dybatpho::curl_do` follows itself when secret headers are set (default `20`) |
-| **`DYBATPHO_CIRCUIT_THRESHOLD`** | number | Consecutive failures before `dybatpho::circuit_breaker` opens a circuit (default `5`) |
-| **`DYBATPHO_CIRCUIT_COOLDOWN`** | number | Seconds an open circuit waits before allowing a trial request (default `30`) |
-| **`DYBATPHO_RATE_LIMIT_WAIT`** | bool | Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call (default `true`) |
-| **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit (default `0`) |
-| **`DYBATPHO_PAGINATE_MAX_PAGES`** | number | Most pages `dybatpho::curl_paginate` fetches, `0` for no limit (default `100`) |
-| **`DYBATPHO_PAGINATE_RATE`** | string | Optional rate limit spec applied per page by `dybatpho::curl_paginate` |
-| **`DYBATPHO_GRAPHQL_TOKEN`** | string | Optional bearer token sent by `dybatpho::curl_graphql` |
-| **`DYBATPHO_PORT_TIMEOUT`** | number | Seconds `dybatpho::port_open` waits for a connection (default `5`) |
-| **`DYBATPHO_WAIT_PORT_TIMEOUT`** | number | Seconds `dybatpho::wait_port` keeps trying before giving up (default `30`) |
-| **`DYBATPHO_WAIT_PORT_INTERVAL`** | number | Seconds `dybatpho::wait_port` sleeps between attempts (default `1`) |
-| **`DYBATPHO_CURL_SECRET_HEADERS`** | array | Headers to pass out of band, as `Name: value` |
-| **`DYBATPHO_CURL_SECRET_DATA`** | string | Request body to pass on stdin instead of in an argument |
-| **`DYBATPHO_CURL_SECRET_URL`** | bool | Pass the URL out of band too (default `false`) |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_CURL_MAX_RETRIES`** | number | yes |  | Max number of retry attempts when `dybatpho::curl_do` retries a request |
+| **`DYBATPHO_CURL_RETRY_BASE_DELAY`** | number | no | `2` | Initial retry delay in seconds |
+| **`DYBATPHO_CURL_RETRY_MAX_DELAY`** | number | no | `30` | Maximum retry delay in seconds |
+| **`DYBATPHO_CURL_RETRY_JITTER`** | bool | yes |  | Add up to one base delay of random jitter |
+| **`DYBATPHO_CURL_CONNECT_TIMEOUT`** | number | no |  | Curl connection timeout in seconds |
+| **`DYBATPHO_CURL_TIMEOUT`** | number | no |  | Curl total timeout in seconds |
+| **`DYBATPHO_CURL_MAX_REDIRECTS`** | number | yes |  | Redirects `dybatpho::curl_do` follows itself when secret headers are set (default `20`) |
+| **`DYBATPHO_CIRCUIT_THRESHOLD`** | number | yes |  | Consecutive failures before `dybatpho::circuit_breaker` opens a circuit (default `5`) |
+| **`DYBATPHO_CIRCUIT_COOLDOWN`** | number | no | `30` | Seconds an open circuit waits before allowing a trial request |
+| **`DYBATPHO_RATE_LIMIT_WAIT`** | bool | yes |  | Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call (default `true`) |
+| **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | yes |  | Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit (default `0`) |
+| **`DYBATPHO_PAGINATE_MAX_PAGES`** | number | no | `100` | Most pages `dybatpho::curl_paginate` fetches, `0` for no limit |
+| **`DYBATPHO_PAGINATE_RATE`** | string | no |  | Rate limit spec applied per page by `dybatpho::curl_paginate` |
+| **`DYBATPHO_GRAPHQL_TOKEN`** | string | no |  | Bearer token sent by `dybatpho::curl_graphql` |
+| **`DYBATPHO_PORT_TIMEOUT`** | number | no | `5` | Seconds `dybatpho::port_open` waits for a connection |
+| **`DYBATPHO_WAIT_PORT_TIMEOUT`** | number | no | `30` | Seconds `dybatpho::wait_port` keeps trying before giving up |
+| **`DYBATPHO_WAIT_PORT_INTERVAL`** | number | no | `1` | Seconds `dybatpho::wait_port` sleeps between attempts |
+| **`DYBATPHO_CURL_SECRET_HEADERS`** | array | yes |  | Headers to pass out of band, as `Name: value` |
+| **`DYBATPHO_CURL_SECRET_DATA`** | string | yes |  | Request body to pass on stdin instead of in an argument |
+| **`DYBATPHO_CURL_SECRET_URL`** | bool | no | `false` | Pass the URL out of band too |
 
 ### 🚀 Highlights
 
@@ -142,11 +142,11 @@ dybatpho::curl_do https://example.com /tmp/1 --compressed
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Location of curl output, default is `/dev/null` |
-| `$3` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | no | `/dev/null` | Location of curl output |
+| `$3` | string | yes |  | Other options/arguments for curl |
 
 **🌍 Environment variables**
 
@@ -197,11 +197,11 @@ Transfer JSON data with URL by curl.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Location of curl output, default is `/dev/null` |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | no | `/dev/null` | Location of curl output |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🚦 Exit codes**
 
@@ -219,11 +219,11 @@ Fetch only HTTP headers for a URL by curl.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Location of curl output, default is `/dev/null` |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | no | `/dev/null` | Location of curl output |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🚦 Exit codes**
 
@@ -249,11 +249,11 @@ dybatpho::curl_upload https://example.com/upload /tmp/resp.json report=@/tmp/rep
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Location of curl output, default is `/dev/null` |
-| `$@` | string | Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | no | `/dev/null` | Location of curl output |
+| `$@` | string | yes |  | Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments |
 
 **🚦 Exit codes**
 
@@ -297,12 +297,12 @@ dybatpho::curl_resume_download https://example.com/big.iso /tmp/big.iso sha256:3
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Destination of file to download |
-| `$3` | string | Optional checksum as `algorithm:hexdigest` (sha256, sha1, or md5) |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | yes |  | Destination of file to download |
+| `$3` | string | no |  | Checksum as `algorithm:hexdigest` (sha256, sha1, or md5) |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🚦 Exit codes**
 
@@ -323,10 +323,10 @@ Parse a raw curl header dump (and optional body file) into normalized response s
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Path to a header file captured via `curl -D` (may contain multiple header blocks from redirects; the last block wins) |
-| `$2` | string | Optional path to the response body file to record |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Path to a header file captured via `curl -D` (may contain multiple header blocks from redirects; the last block wins) |
+| `$2` | string | no |  | Path to the response body file to record |
 
 **🧩 Variable sets**
 
@@ -346,10 +346,10 @@ Print a normalized response header captured by `dybatpho::curl_parse_response`.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Header name, matched case-insensitively |
-| `$2` | string | Optional default value |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Header name, matched case-insensitively |
+| `$2` | string | no |  | Default value |
 
 **📤 Output on stdout**
 
@@ -376,11 +376,11 @@ dybatpho::curl_response_header content-type
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Location of curl output, default is `/dev/null` |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | no | `/dev/null` | Location of curl output |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🧩 Variable sets**
 
@@ -409,13 +409,13 @@ dybatpho::curl_timeout https://example.com /tmp/out "" 5 --header "X-Test: 1"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Location of curl output, default is `/dev/null` |
-| `$3` | number | Connect timeout in seconds for this request, empty keeps the global default |
-| `$4` | number | Total timeout in seconds for this request, empty keeps the global default |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | no | `/dev/null` | Location of curl output |
+| `$3` | number | no |  | Connect timeout in seconds for this request; empty keeps the global default |
+| `$4` | number | no |  | Total timeout in seconds for this request; empty keeps the global default |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🔗 See also**
 
@@ -471,10 +471,10 @@ dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_CIRCUIT_THRESHOLD`** | number | Consecutive failures before the circuit opens (default `5`) |
-| **`DYBATPHO_CIRCUIT_COOLDOWN`** | number | Seconds the circuit stays open before a trial request is allowed (default `30`) |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_CIRCUIT_THRESHOLD`** | number | no | `5` | Consecutive failures before the circuit opens |
+| **`DYBATPHO_CIRCUIT_COOLDOWN`** | number | no | `30` | Seconds the circuit stays open before a trial request is allowed |
 
 **📝 Notes**
 
@@ -567,10 +567,10 @@ dybatpho::rate_limit api.example.com 10/60   # take a slot, run nothing
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_RATE_LIMIT_WAIT`** | bool | Wait for a free slot instead of refusing the call (default `true`) |
-| **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | Longest wait in seconds the limiter will accept, `0` for no limit (default `0`) |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_RATE_LIMIT_WAIT`** | bool | no | `true` | Wait for a free slot instead of refusing the call |
+| **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | no | `0` | Longest wait in seconds the limiter will accept, `0` for no limit |
 
 **🧩 Variable sets**
 
@@ -664,10 +664,10 @@ dybatpho::curl_paginate "https://api.example.com/items?per_page=100" --header "A
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_PAGINATE_MAX_PAGES`** | number | Most pages to fetch before stopping, `0` for no limit (default `100`) |
-| **`DYBATPHO_PAGINATE_RATE`** | string | Optional rate limit spec, such as `10/60`, applied per page and keyed by host |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_PAGINATE_MAX_PAGES`** | number | no | `100` | Most pages to fetch before stopping, `0` for no limit |
+| **`DYBATPHO_PAGINATE_RATE`** | string | no |  | Rate limit spec, such as `10/60`, applied per page and keyed by host |
 
 **🧩 Variable sets**
 
@@ -689,7 +689,8 @@ dybatpho::curl_paginate "https://api.example.com/items?per_page=100" --header "A
 
 **🔗 See also**
 
-- [- `dybatpho::curl_link` - `dybatpho::rate_limit](#dybatphocurl_link-dybatphorate_limit)
+- [dybatpho::curl_link](#dybatphocurl_link)
+- [dybatpho::rate_limit](#dybatphorate_limit)
 
 ---
 
@@ -713,12 +714,12 @@ dybatpho::curl_auth_bearer https://api.example.com/v1/me "${API_TOKEN}" /tmp/me.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | URL |
-| `$2` | string | Bearer token |
-| `$3` | string | Location of curl output, default is `/dev/null` |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | URL |
+| `$2` | string | yes |  | Bearer token |
+| `$3` | string | no | `/dev/null` | Location of curl output |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🧩 Variable sets**
 
@@ -761,19 +762,19 @@ dybatpho::curl_graphql https://api.github.com/graphql \
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | GraphQL endpoint URL |
-| `$2` | string | Query or mutation document |
-| `$3` | string | Variables as a JSON object, default `{}` |
-| `$4` | string | Location of curl output, default is `/dev/null` |
-| `$@` | string | Other options/arguments for curl |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | GraphQL endpoint URL |
+| `$2` | string | yes |  | Query or mutation document |
+| `$3` | string | no | `{}` | Variables as a JSON object |
+| `$4` | string | no | `/dev/null` | Location of curl output |
+| `$@` | string | yes |  | Other options/arguments for curl |
 
 **🌍 Environment variables**
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_GRAPHQL_TOKEN`** | string | Optional bearer token, sent out of band with the request |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_GRAPHQL_TOKEN`** | string | no |  | Bearer token, sent out of band with the request |
 
 **🧩 Variable sets**
 
@@ -846,7 +847,8 @@ printf '%s\n' "${DYBATPHO_URL[host]}"    # ::1
 
 **🔗 See also**
 
-- [- `dybatpho::url_part` - `dybatpho::url_decode](#dybatphourl_part-dybatphourl_decode)
+- [dybatpho::url_part](#dybatphourl_part)
+- [dybatpho::url_decode](#dybatphourl_decode)
 
 ---
 
@@ -865,10 +867,10 @@ dybatpho::url_part port 443        # 443, the default, since none was given
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Component name: `scheme`, `user`, `password`, `host`, `port`, `path`, `query`, or `fragment` |
-| `$2` | string | Optional value to print when the component is empty |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Component name: `scheme`, `user`, `password`, `host`, `port`, `path`, `query`, or `fragment` |
+| `$2` | string | no |  | Value to print when the component is empty |
 
 **📤 Output on stdout**
 
@@ -881,7 +883,7 @@ dybatpho::url_part port 443        # 443, the default, since none was given
 
 **🔗 See also**
 
-- [- `dybatpho::url_parse](#dybatphourl_parse)
+- [dybatpho::url_parse](#dybatphourl_parse)
 
 ---
 
@@ -1080,11 +1082,11 @@ dybatpho::port_open db.internal 5432 2
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Host name or address |
-| `$2` | number | Port |
-| `$3` | number | Seconds to wait, defaulting to `DYBATPHO_PORT_TIMEOUT` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Host name or address |
+| `$2` | number | yes |  | Port |
+| `$3` | number | no | `${DYBATPHO_PORT_TIMEOUT}` | Seconds to wait |
 
 **🌍 Environment variables**
 
@@ -1104,7 +1106,7 @@ dybatpho::port_open db.internal 5432 2
 
 **🔗 See also**
 
-- [- `dybatpho::wait_port](#dybatphowait_port)
+- [dybatpho::wait_port](#dybatphowait_port)
 
 ---
 
@@ -1127,12 +1129,12 @@ dybatpho::wait_port localhost 5432 60 \
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Host name or address |
-| `$2` | number | Port |
-| `$3` | number | Seconds to keep trying, defaulting to `DYBATPHO_WAIT_PORT_TIMEOUT` |
-| `$4` | number | Seconds between attempts, defaulting to `DYBATPHO_WAIT_PORT_INTERVAL` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Host name or address |
+| `$2` | number | yes |  | Port |
+| `$3` | number | no | `${DYBATPHO_WAIT_PORT_TIMEOUT}` | Seconds to keep trying |
+| `$4` | number | no | `${DYBATPHO_WAIT_PORT_INTERVAL}` | Seconds between attempts |
 
 **🌍 Environment variables**
 
@@ -1149,4 +1151,4 @@ dybatpho::wait_port localhost 5432 60 \
 
 **🔗 See also**
 
-- [- `dybatpho::port_open](#dybatphoport_open)
+- [dybatpho::port_open](#dybatphoport_open)

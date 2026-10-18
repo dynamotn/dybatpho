@@ -165,9 +165,9 @@ Return success when a package manager is usable on this machine.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional manager name, default is the detected one |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Manager name, default is the detected one |
 
 **🚦 Exit codes**
 
@@ -189,10 +189,10 @@ dybatpho::pkg_name fd apt:fd-find emerge:sys-apps/fd   # fd-find on Debian
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Default package name, used when no override matches |
-| `$@` | string | Optional `<manager>:<package>` overrides |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Default package name, used when no override matches |
+| `$@` | string | no |  | `<manager>:<package>` overrides |
 
 **📤 Output on stdout**
 
@@ -386,11 +386,11 @@ dybatpho::pkg_require --force fd apt:fd-find emerge:sys-apps/fd
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | The options of `dybatpho::pkg_install`, including `--arg`/`-a` |
-| `$2` | string | Command that must be available, also the default package name |
-| `$@` | string | Optional `<manager>:<package>` overrides |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | The options of `dybatpho::pkg_install`, including `--arg`/`-a` |
+| `$2` | string | yes |  | Command that must be available, also the default package name |
+| `$@` | string | no |  | `<manager>:<package>` overrides |
 
 **🚦 Exit codes**
 

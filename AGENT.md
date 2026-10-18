@@ -658,7 +658,11 @@ When adding CLI behavior, update these together:
    behavior.
 2. Find its tests in `test/<module>.bats`; extend tests near the changed behavior.
 3. Add API comments for new public functions so `scripts/docs.sh` can generate
-   the reference documentation.
+   the reference documentation. Mark an optional argument with a `?` after its
+   type, or give its default as `[default: value]`, rather than in prose; one
+   `@see` per reference in a function block. `scripts/docs.sh` runs
+   `sh-docs --strict`, so a misspelt tag or an undocumented public function
+   fails the documentation check.
 4. Create or update `docs/spec/<module>.md`. This step is mandatory for any
    contract or capability change, and for every new module; do not defer it.
 5. Add or update the module's complete example in `example/`; do not defer

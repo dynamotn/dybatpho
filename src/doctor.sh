@@ -89,7 +89,7 @@ declare -gA DYBATPHO_DOCTOR_REQUIRED=(
   # there is no way to ask for it from Bash alone.
   [screen]="stty"
 )
-# @env DYBATPHO_DOCTOR_OPTIONAL array Optional external commands per module
+# @env DYBATPHO_DOCTOR_OPTIONAL array? External commands per module
 declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   [agent]="git"
   [ai]="claude|llm|ollama"
@@ -234,7 +234,7 @@ function __dybatpho_doctor_resolve {
 #   dybatpho::doctor_requirements archive required
 #
 # @arg $1 string Module name
-# @arg $2 string Kind, one of `all` (default), `required`, or `optional`
+# @arg $2 string [default: all] Kind, one of `all`, `required`, or `optional`
 # @stdout One dependency spec per line, required specs first
 # @exitcode 0 Print the dependencies, including nothing for a module that has none
 # @exitcode 1 Stop the script when the module is unknown or the kind is invalid

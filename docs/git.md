@@ -71,9 +71,9 @@ Return the top-level directory of a Git repository.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -87,9 +87,9 @@ Return the current branch name, or a short SHA in detached HEAD state.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -103,9 +103,9 @@ Return the default branch of a Git repository.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -119,10 +119,10 @@ Return the full SHA of a commit.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional commit-ish, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Commit-ish |
 
 **📤 Output on stdout**
 
@@ -136,10 +136,10 @@ Return the short SHA of a commit.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional commit-ish, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Commit-ish |
 
 **📤 Output on stdout**
 
@@ -153,10 +153,10 @@ Return the subject line of a commit message.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional commit-ish, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Commit-ish |
 
 **📤 Output on stdout**
 
@@ -170,10 +170,10 @@ Return the author name of a commit.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional commit-ish, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Commit-ish |
 
 **📤 Output on stdout**
 
@@ -187,10 +187,10 @@ Return success when a commit exists.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Commit-ish to verify, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Commit-ish to verify |
 
 **🚦 Exit codes**
 
@@ -205,11 +205,11 @@ List commits reachable from a head ref but not from a base ref.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Repository path |
-| `$2` | string | Base ref (excluded) |
-| `$3` | string | Optional head ref, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Repository path |
+| `$2` | string | yes |  | Base ref (excluded) |
+| `$3` | string | no | `${HEAD}` | Head ref |
 
 **📤 Output on stdout**
 
@@ -223,11 +223,11 @@ Count commits in a range.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Repository path |
-| `$2` | string | Base ref (excluded) |
-| `$3` | string | Optional head ref, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Repository path |
+| `$2` | string | yes |  | Base ref (excluded) |
+| `$3` | string | no | `${HEAD}` | Head ref |
 
 **📤 Output on stdout**
 
@@ -241,9 +241,9 @@ Return success when the worktree has no tracked or untracked changes.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **🚦 Exit codes**
 
@@ -258,10 +258,10 @@ Return the URL for a Git remote.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional remote name, default is `origin` |
-| `$2` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `origin` | Remote name |
+| `$2` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -275,10 +275,10 @@ Return success when a named remote exists.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional remote name, default is `origin` |
-| `$2` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `origin` | Remote name |
+| `$2` | string | no | `.` | Repository path |
 
 **🚦 Exit codes**
 
@@ -293,10 +293,10 @@ List changed files relative to a base ref, including untracked.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional base ref, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Base ref |
 
 **📤 Output on stdout**
 
@@ -326,10 +326,10 @@ fi
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional tag glob to match, default is every tag |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no |  | Tag glob to match, default is every tag |
 
 **📤 Output on stdout**
 
@@ -348,10 +348,10 @@ List tags that contain a commit.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional commit-ish, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no | `${HEAD}` | Commit-ish |
 
 **📤 Output on stdout**
 
@@ -408,10 +408,10 @@ fi
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional branch name, default is the current branch |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no |  | Branch name, default is the current branch |
 
 **📤 Output on stdout**
 
@@ -441,11 +441,11 @@ read -r ahead behind <<< "${counts}"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional base ref, default is the upstream of the head ref |
-| `$3` | string | Optional head ref, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no |  | Base ref, default is the upstream of the head ref |
+| `$3` | string | no | `${HEAD}` | Head ref |
 
 **📤 Output on stdout**
 
@@ -478,9 +478,9 @@ state="$(dybatpho::git_state ".")"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -505,9 +505,9 @@ fi
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **🚦 Exit codes**
 
@@ -531,9 +531,9 @@ stashed="$(dybatpho::git_stash_count ".")"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 
@@ -559,9 +559,9 @@ done <<< "$(dybatpho::git_worktree_list ".")"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
 
 **📤 Output on stdout**
 

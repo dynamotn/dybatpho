@@ -36,17 +36,17 @@
 # @tip A bare queue name lives under `DYBATPHO_QUEUE_DIR`; a name containing a
 #   slash is used as the directory itself
 # @env DYBATPHO_QUEUE_DIR string Base directory for bare queue names, default is the XDG state directory
-# @env DYBATPHO_QUEUE_TIMEOUT number Seconds to wait for the queue lock, default is `10`
-# @env DYBATPHO_QUEUE_POLL_INTERVAL number Seconds between attempts at a busy queue lock, default is `0.05`
+# @env DYBATPHO_QUEUE_TIMEOUT number [default: 10] Seconds to wait for the queue lock
+# @env DYBATPHO_QUEUE_POLL_INTERVAL number [default: 0.05] Seconds between attempts at a busy queue lock
 # @see
 #   - `example/queue_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
 # @env DYBATPHO_QUEUE_DIR string Where a bare queue name resolves to
 DYBATPHO_QUEUE_DIR="${DYBATPHO_QUEUE_DIR:-}"
-# @env DYBATPHO_QUEUE_TIMEOUT number Seconds a queue operation waits for the lock, default is `10`
+# @env DYBATPHO_QUEUE_TIMEOUT number [default: 10] Seconds a queue operation waits for the lock
 DYBATPHO_QUEUE_TIMEOUT="${DYBATPHO_QUEUE_TIMEOUT:-10}"
-# @env DYBATPHO_QUEUE_POLL_INTERVAL number Seconds between attempts at a busy queue lock, default is `0.05`
+# @env DYBATPHO_QUEUE_POLL_INTERVAL number [default: 0.05] Seconds between attempts at a busy queue lock
 DYBATPHO_QUEUE_POLL_INTERVAL="${DYBATPHO_QUEUE_POLL_INTERVAL:-0.05}"
 
 #######################################
@@ -492,7 +492,7 @@ function __dybatpho_queue_pop {
 #######################################
 # @description Read the job a claim would take next, without claiming it.
 # @arg $1 string Queue name or path
-# @arg $2 string Optional name of a variable receiving the job id
+# @arg $2 string? Name of a variable receiving the job id
 # @set The named variable, when one is given
 # @stdout The payload of the next job
 # @exitcode 0 A job was read
@@ -524,7 +524,7 @@ function dybatpho::queue_peek {
 #######################################
 # @description Count the jobs in one of a queue's states.
 # @arg $1 string Queue name or path
-# @arg $2 string Optional state: `pending` (default), `claimed`, or `dead`
+# @arg $2 string? State: `pending` (default), `claimed`, or `dead`
 # @stdout The number of jobs
 # @exitcode 0 The count was printed
 # @exitcode 1 The state is not one this module keeps
@@ -556,7 +556,7 @@ function dybatpho::queue_len {
 #######################################
 # @description List a queue's job ids for one state, oldest first.
 # @arg $1 string Queue name or path
-# @arg $2 string Optional state: `pending` (default), `claimed`, or `dead`
+# @arg $2 string? State: `pending` (default), `claimed`, or `dead`
 # @stdout One job id per line
 # @exitcode 0 The listing was printed, empty when there is nothing to list
 # @exitcode 1 The state is not one this module keeps
@@ -625,7 +625,7 @@ function dybatpho::queue_complete {
 # @option --at <epoch> Unix timestamp before which the job cannot be claimed again
 # @arg $1 string Queue name or path
 # @arg $2 string Job id
-# @arg $3 number Optional retry budget; past it the job is dead-lettered instead
+# @arg $3 number? Retry budget; past it the job is dead-lettered instead
 # @stdout The job's new id when it is requeued
 # @exitcode 0 The job was requeued, or dead-lettered because its budget ran out
 # @exitcode 1 No such job is claimed, or the queue lock could not be taken
@@ -714,7 +714,7 @@ function dybatpho::queue_dead_letter {
 # @arg $1 string Queue name or path
 # @arg $2 string Job id
 # @arg $3 string Name of the variable receiving the payload
-# @arg $4 string Optional state: `pending`, `claimed`, or `dead`, default is to search all three
+# @arg $4 string? State: `pending`, `claimed`, or `dead`, default is to search all three
 # @set The named variable
 # @exitcode 0 The job was read
 # @exitcode 1 No job with that id is in the queue

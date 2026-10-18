@@ -34,14 +34,14 @@ of every waiting job of a lower priority, and one pushed with `--delay` or
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_QUEUE_DIR`** | string | Base directory for bare queue names, default is the XDG state directory |
-| **`DYBATPHO_QUEUE_TIMEOUT`** | number | Seconds to wait for the queue lock, default is `10` |
-| **`DYBATPHO_QUEUE_POLL_INTERVAL`** | number | Seconds between attempts at a busy queue lock, default is `0.05` |
-| **`DYBATPHO_QUEUE_DIR`** | string | Where a bare queue name resolves to |
-| **`DYBATPHO_QUEUE_TIMEOUT`** | number | Seconds a queue operation waits for the lock, default is `10` |
-| **`DYBATPHO_QUEUE_POLL_INTERVAL`** | number | Seconds between attempts at a busy queue lock, default is `0.05` |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_QUEUE_DIR`** | string | yes |  | Base directory for bare queue names, default is the XDG state directory |
+| **`DYBATPHO_QUEUE_TIMEOUT`** | number | no | `10` | Seconds to wait for the queue lock |
+| **`DYBATPHO_QUEUE_POLL_INTERVAL`** | number | no | `0.05` | Seconds between attempts at a busy queue lock |
+| **`DYBATPHO_QUEUE_DIR`** | string | yes |  | Where a bare queue name resolves to |
+| **`DYBATPHO_QUEUE_TIMEOUT`** | number | no | `10` | Seconds a queue operation waits for the lock |
+| **`DYBATPHO_QUEUE_POLL_INTERVAL`** | number | no | `0.05` | Seconds between attempts at a busy queue lock |
 
 ### 🚀 Highlights
 
@@ -169,10 +169,10 @@ dybatpho::queue_peek deploys
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Queue name or path |
-| `$2` | string | Optional name of a variable receiving the job id |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Queue name or path |
+| `$2` | string | no |  | Name of a variable receiving the job id |
 
 **🧩 Variable sets**
 
@@ -201,10 +201,10 @@ Count the jobs in one of a queue's states.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Queue name or path |
-| `$2` | string | Optional state: `pending` (default), `claimed`, or `dead` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Queue name or path |
+| `$2` | string | no |  | State: `pending` (default), `claimed`, or `dead` |
 
 **📤 Output on stdout**
 
@@ -229,10 +229,10 @@ dybatpho::queue_list deploys dead
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Queue name or path |
-| `$2` | string | Optional state: `pending` (default), `claimed`, or `dead` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Queue name or path |
+| `$2` | string | no |  | State: `pending` (default), `claimed`, or `dead` |
 
 **📤 Output on stdout**
 
@@ -294,11 +294,11 @@ dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Queue name or path |
-| `$2` | string | Job id |
-| `$3` | number | Optional retry budget; past it the job is dead-lettered instead |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Queue name or path |
+| `$2` | string | yes |  | Job id |
+| `$3` | number | no |  | Retry budget; past it the job is dead-lettered instead |
 
 **📤 Output on stdout**
 
@@ -349,12 +349,12 @@ dybatpho::queue_read deploys "${id}" payload dead
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Queue name or path |
-| `$2` | string | Job id |
-| `$3` | string | Name of the variable receiving the payload |
-| `$4` | string | Optional state: `pending`, `claimed`, or `dead`, default is to search all three |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Queue name or path |
+| `$2` | string | yes |  | Job id |
+| `$3` | string | yes |  | Name of the variable receiving the payload |
+| `$4` | string | no |  | State: `pending`, `claimed`, or `dead`, default is to search all three |
 
 **🧩 Variable sets**
 

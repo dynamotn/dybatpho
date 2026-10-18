@@ -498,8 +498,7 @@ function __dybatpho_array_before {
 # @arg $@ string Any of `--numeric`/`-n`, `--reverse`/`-r`, and `--` to print
 # @stdout Print the sorted array if `--` is given
 # @exitcode 1 Stop the script on an unknown option, or on a value that is not an integer under `--numeric`
-# @see
-#   - `dybatpho::semver_sort`
+# @see dybatpho::semver_sort
 #######################################
 function dybatpho::array_sort {
   dybatpho::expect_ref "$1"
@@ -552,7 +551,7 @@ function dybatpho::array_sort {
 #
 # @arg $1 string Name of array
 # @arg $2 number Index to start at, negative to count back from the end
-# @arg $3 number Optional count, defaulting to everything from the start on
+# @arg $3 number? Count, defaulting to everything from the start on
 # @arg $4 string Set `--` to print to stdout
 # @stdout Print the sliced array if `--` is given
 # @exitcode 1 Stop the script when the start or the count is not a whole number
@@ -787,7 +786,7 @@ function __dybatpho_array_graph_roots_into {
 #
 # @arg $1 string Name of the associative array of edges
 # @arg $2 string Name of the array receiving the ordered entries
-# @arg $@ string Optional roots; without them the whole graph is ordered
+# @arg $@ string? Roots; without them the whole graph is ordered
 # @set The named array
 # @exitcode 0 The graph was ordered and holds no cycle
 # @exitcode 1 The graph was ordered with a cycle broken

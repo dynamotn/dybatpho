@@ -149,9 +149,9 @@ Print module names, one per line.
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Selection, one of `loaded` (default), `all`, `core`, or `optional` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `loaded` | Selection, one of `loaded`, `all`, `core`, or `optional` |
 
 **📤 Output on stdout**
 

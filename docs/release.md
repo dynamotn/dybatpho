@@ -24,12 +24,12 @@ creating a GitHub release stays with the caller, who owns those credentials.
 
 ### 🌍 Environment
 
-| Variable | Type | Description |
-| --- | --- | --- |
-| **`DYBATPHO_RELEASE_TAG_PATTERN`** | string | Glob that release tags match, default is `v*` |
-| **`DYBATPHO_RELEASE_CHECKSUM_ALGORITHM`** | string | Checksum algorithm for the sums file, default is `sha256` |
-| **`DYBATPHO_RELEASE_SIGN_CMD`** | string | Command that signs a file, receiving the signature path and the file path. Default signs with `gpg` |
-| **`DYBATPHO_RELEASE_GPG_KEY`** | string | Key `gpg` signs with, default is its configured default key |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_RELEASE_TAG_PATTERN`** | string | no | `v*` | Glob that release tags match |
+| **`DYBATPHO_RELEASE_CHECKSUM_ALGORITHM`** | string | no | `sha256` | Checksum algorithm for the sums file |
+| **`DYBATPHO_RELEASE_SIGN_CMD`** | string | yes |  | Command that signs a file, receiving the signature path and the file path. Default signs with `gpg` |
+| **`DYBATPHO_RELEASE_GPG_KEY`** | string | yes |  | Key `gpg` signs with, default is its configured default key |
 
 ### 🚀 Highlights
 
@@ -108,10 +108,10 @@ dybatpho::release_commit_parse "fix: handle empty input"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Commit subject line |
-| `$2` | string | Optional commit body, searched for a `BREAKING CHANGE:` footer |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Commit subject line |
+| `$2` | string | no |  | Commit body, searched for a `BREAKING CHANGE:` footer |
 
 **📤 Output on stdout**
 
@@ -159,11 +159,11 @@ bump="$(dybatpho::release_bump_type "." "v1.2.3")"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Repository path |
-| `$2` | string | Base ref, excluded from the range, or empty to read the whole history |
-| `$3` | string | Optional head ref, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Repository path |
+| `$2` | string | yes |  | Base ref, excluded from the range, or empty to read the whole history |
+| `$3` | string | no | `${HEAD}` | Head ref |
 
 **📤 Output on stdout**
 
@@ -192,11 +192,11 @@ fi
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Optional repository path, default is `.` |
-| `$2` | string | Optional base tag, default is the highest matching tag |
-| `$3` | string | Optional head ref, default is `HEAD` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+| `$2` | string | no |  | Base tag, default is the highest matching tag |
+| `$3` | string | no | `${HEAD}` | Head ref |
 
 **🌍 Environment variables**
 
@@ -229,12 +229,12 @@ dybatpho::release_changelog "." "v1.2.3" "HEAD" "1.3.0" >> CHANGELOG.md
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Repository path |
-| `$2` | string | Base ref, excluded from the range, or empty to read the whole history |
-| `$3` | string | Optional head ref, default is `HEAD` |
-| `$4` | string | Optional version for the heading, default is `Unreleased` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Repository path |
+| `$2` | string | yes |  | Base ref, excluded from the range, or empty to read the whole history |
+| `$3` | string | no | `${HEAD}` | Head ref |
+| `$4` | string | no | `Unreleased` | Version for the heading |
 
 **📤 Output on stdout**
 
@@ -258,12 +258,12 @@ dybatpho::release_artifact_name mytool 1.3.0 windows amd64 # mytool_1.3.0_window
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Project name |
-| `$2` | string | Version, without a leading `v` |
-| `$3` | string | Optional operating system, default is the current one |
-| `$4` | string | Optional architecture, default is the current one |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Project name |
+| `$2` | string | yes |  | Version, without a leading `v` |
+| `$3` | string | no |  | Operating system, default is the current one |
+| `$4` | string | no |  | Architecture, default is the current one |
 
 **📤 Output on stdout**
 
@@ -284,14 +284,14 @@ dybatpho::release_package ./dist/linux_amd64 ./release mytool 1.3.0 linux amd64
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory or file to package |
-| `$2` | string | Directory the artifact is written to, created when missing |
-| `$3` | string | Project name |
-| `$4` | string | Version |
-| `$5` | string | Optional operating system, default is the current one |
-| `$6` | string | Optional architecture, default is the current one |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Directory or file to package |
+| `$2` | string | yes |  | Directory the artifact is written to, created when missing |
+| `$3` | string | yes |  | Project name |
+| `$4` | string | yes |  | Version |
+| `$5` | string | no |  | Operating system, default is the current one |
+| `$6` | string | no |  | Architecture, default is the current one |
 
 **🌍 Environment variables**
 
@@ -326,10 +326,10 @@ sums="$(dybatpho::release_checksums ./release)"
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | Directory holding the artifacts |
-| `$2` | string | Optional output file, default is `<dir>/SHA256SUMS` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Directory holding the artifacts |
+| `$2` | string | no | `<dir>/SHA256SUMS` | Output file |
 
 **🌍 Environment variables**
 
@@ -369,10 +369,10 @@ DYBATPHO_RELEASE_SIGN_CMD="minisign -S -m" dybatpho::release_sign ./release/SHA2
 
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | File to sign |
-| `$2` | string | Optional signature path, default is `<file>.asc` |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | File to sign |
+| `$2` | string | no | `<file>.asc` | Signature path |
 
 **🌍 Environment variables**
 

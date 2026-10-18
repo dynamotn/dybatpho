@@ -268,7 +268,7 @@ function __dybatpho_math_mul_abs {
     # whole and can never push it past a single digit.
     __mul_columns[__mul_ia]=$((__mul_columns[__mul_ia] + __mul_carry))
   done
-  printf -v __mul_out '%s' "${__mul_columns[@]}"
+  printf -v __mul_out '%s' ${__mul_columns[@]+"${__mul_columns[@]}"}
   __dybatpho_math_strip __mul_out
 }
 
@@ -1042,7 +1042,7 @@ function dybatpho::math_min {
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local smallest="${values[0]}" number
-  for number in "${values[@]}"; do
+  for number in ${values[@]+"${values[@]}"}; do
     dybatpho::math_lt "${number}" "${smallest}" && smallest="${number}"
   done
   printf '%s\n' "${smallest}"
@@ -1064,7 +1064,7 @@ function dybatpho::math_max {
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local largest="${values[0]}" number
-  for number in "${values[@]}"; do
+  for number in ${values[@]+"${values[@]}"}; do
     dybatpho::math_gt "${number}" "${largest}" && largest="${number}"
   done
   printf '%s\n' "${largest}"
@@ -1129,7 +1129,7 @@ function dybatpho::math_avg {
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local total="0" number mean
-  for number in "${values[@]}"; do
+  for number in ${values[@]+"${values[@]}"}; do
     __dybatpho_math_add2 total "${total}" "${number}"
   done
   __dybatpho_math_div2 mean "${total}" "${#values[@]}" "${DYBATPHO_MATH_SCALE}"
@@ -1280,7 +1280,11 @@ function __dybatpho_math_sort {
     local -a __sort_keys=() __sort_order=()
     local __sort_at
     for __sort_at in "${!__sort_from[@]}"; do
-      __dybatpho_math_sort_key_into "__sort_keys[${__sort_at}]" "${__sort_from[__sort_at]}"
+      # Through a scalar: Bash 4.3 drops an assignment made through a nameref
+      # that names an array element.
+      local __sort_key
+      __dybatpho_math_sort_key_into __sort_key "${__sort_from[__sort_at]}"
+      __sort_keys[__sort_at]="${__sort_key}"
       __sort_order+=("${__sort_at}")
     done
     __dybatpho_helpers_sort __sort_order @bytes-key __sort_keys
@@ -1400,7 +1404,7 @@ function dybatpho::math_median {
   local -a values=() sorted=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  __dybatpho_math_sort sorted "${values[@]}"
+  __dybatpho_math_sort sorted ${values[@]+"${values[@]}"}
   local count=${#sorted[@]} middle=$((${#sorted[@]} / 2))
   if ((count % 2)); then
     printf '%s\n' "${sorted[middle]}"
@@ -1447,7 +1451,7 @@ function dybatpho::math_percentile {
   local -a values=() sorted=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  __dybatpho_math_sort sorted "${values[@]}"
+  __dybatpho_math_sort sorted ${values[@]+"${values[@]}"}
 
   local rank sign whole part
   __dybatpho_math_mul2 rank "$((${#sorted[@]} - 1))" "${percentile}"
@@ -1529,7 +1533,7 @@ function dybatpho::math_stddev {
   # variance = (n * sum(x^2) - sum(x)^2) / (n * d), with d = n or n - 1. The
   # numerator is exact and never negative, so the only rounding is the root's.
   local total="0" squares="0" number square
-  for number in "${values[@]}"; do
+  for number in ${values[@]+"${values[@]}"}; do
     __dybatpho_math_add2 total "${total}" "${number}"
     __dybatpho_math_mul2 square "${number}" "${number}"
     __dybatpho_math_add2 squares "${squares}" "${square}"

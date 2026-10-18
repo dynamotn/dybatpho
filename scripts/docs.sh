@@ -89,7 +89,7 @@ function __dybatpho_doc_check {
     "${SH_DOCS}" "${_src}" \
       --output "${_generated}/${_module}.md"
     _checked=$((_checked + 1))
-    if ! diff -q "${DYBATPHO_DIR}/docs/${_module}.md" "${_generated}/${_module}.md" > /dev/null 2>&1; then
+    if ! diff -q "${DYBATPHO_DIR}/docs/${_module}.md" "${_generated}/${_module}.md" &> /dev/null; then
       _stale+="docs/${_module}.md is stale relative to $(basename "${_src}")"$'\n'
     fi
   done < <(printf '%s' "${doc_sources_output}")

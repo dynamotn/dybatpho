@@ -299,7 +299,7 @@ function dybatpho::notify_teams {
   fi
 
   local payload
-  # shellcheck disable=SC2016
+  # shellcheck disable=SC2016 # the `$` is for jq, which reads the text as a filter
   local payload_format='{"type":"message","attachments":[{"contentType":'
   # shellcheck disable=SC2016 # `$schema` is a key of the card, not an expansion
   payload_format+='"application/vnd.microsoft.card.adaptive","content":{"$schema":'
@@ -482,7 +482,7 @@ function dybatpho::notify_desktop {
   fi
 
   dybatpho::debug "Sending desktop notification through ${command[0]}"
-  dybatpho::dry_run -- "${command[@]}"
+  dybatpho::dry_run -- ${command[@]+"${command[@]}"}
 }
 
 #######################################
@@ -781,7 +781,7 @@ function dybatpho::notify_email {
       fi
     done
   fi
-  local -a command=("${sendmail:-sendmail}" -i -- "${addresses[@]}")
+  local -a command=("${sendmail:-sendmail}" -i -- ${addresses[@]+"${addresses[@]}"})
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
     dybatpho::dry_run -- "${command[@]}"
@@ -793,7 +793,7 @@ function dybatpho::notify_email {
 
   local encoded_subject to_header
   __dybatpho_notification_mime_header encoded_subject "${subject}"
-  printf -v to_header '%s, ' "${addresses[@]}"
+  printf -v to_header '%s, ' ${addresses[@]+"${addresses[@]}"}
   local message=""
   [[ -n "${from}" ]] && message+="From: ${from}"$'\n'
   message+="To: ${to_header%, }"$'\n'

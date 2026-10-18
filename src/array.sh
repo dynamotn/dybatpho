@@ -51,6 +51,7 @@ function dybatpho::array_reverse {
   [[ "${#__dybatpho_array_ref[@]}" -eq 0 ]] && return
   local -a __dybatpho_array_indices=("${!__dybatpho_array_ref[@]}")
 
+  local __dybatpho_array_i
   for ((__dybatpho_array_i = ${#__dybatpho_array_indices[@]} - 1; __dybatpho_array_i >= 0; __dybatpho_array_i--)); do
     # shellcheck disable=SC2190 # __dybatpho_array_result is indexed; the nameref misleads ShellCheck
     __dybatpho_array_result+=("${__dybatpho_array_ref[${__dybatpho_array_indices[${__dybatpho_array_i}]}]}")
@@ -97,7 +98,7 @@ function dybatpho::array_unique {
 #######################################
 function dybatpho::array_contains {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_needle="${2-}"
   local __dybatpho_array_i
@@ -117,7 +118,7 @@ function dybatpho::array_contains {
 #######################################
 function dybatpho::array_index_of {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_needle="${2-}"
   local __dybatpho_array_i
@@ -138,7 +139,7 @@ function dybatpho::array_index_of {
 #######################################
 function dybatpho::array_compact {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local -a __dybatpho_array_compacted=()
   local __dybatpho_array_i
@@ -161,7 +162,7 @@ function dybatpho::array_compact {
 #######################################
 function dybatpho::array_filter {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_predicate="${2-}"
   local -a __dybatpho_array_filtered=()
@@ -188,7 +189,7 @@ function dybatpho::array_filter {
 #######################################
 function dybatpho::array_map {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_mapper="${2-}"
   local -a __dybatpho_array_mapped=()
@@ -217,7 +218,7 @@ function dybatpho::array_map {
 #######################################
 function dybatpho::array_find {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_predicate="${2-}"
   local __dybatpho_array_i
@@ -241,7 +242,7 @@ function dybatpho::array_find {
 #######################################
 function dybatpho::array_every {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_predicate="${2-}"
   local __dybatpho_array_i
@@ -262,7 +263,7 @@ function dybatpho::array_every {
 #######################################
 function dybatpho::array_some {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_predicate="${2-}"
   local __dybatpho_array_i
@@ -285,7 +286,7 @@ function dybatpho::array_some {
 #######################################
 function dybatpho::array_reject {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_predicate="${2-}"
   local -a __dybatpho_array_rejected=()
@@ -312,7 +313,7 @@ function dybatpho::array_reject {
 #######################################
 function dybatpho::array_first {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local -a __dybatpho_array_indices=("${!__dybatpho_array_ref[@]}")
   ((${#__dybatpho_array_indices[@]} > 0)) || return 1
@@ -328,7 +329,7 @@ function dybatpho::array_first {
 #######################################
 function dybatpho::array_last {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local -a __dybatpho_array_indices=("${!__dybatpho_array_ref[@]}")
   local __dybatpho_array_last_index
@@ -345,7 +346,7 @@ function dybatpho::array_last {
 #######################################
 function dybatpho::array_join {
   dybatpho::expect_ref "$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_ref="$1"
   local __dybatpho_array_separator="$2"
   local __dybatpho_array_i
@@ -370,7 +371,7 @@ function dybatpho::array_join {
 #######################################
 function __dybatpho_array_copy {
   local -n __dybatpho_array_copy_out="$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_copy_in="$2"
   __dybatpho_array_copy_out=()
   ((${#__dybatpho_array_copy_in[@]} == 0)) || __dybatpho_array_copy_out=("${__dybatpho_array_copy_in[@]}")
@@ -692,7 +693,7 @@ function dybatpho::array_difference {
 #######################################
 function __dybatpho_array_graph_visit {
   local __dybatpho_array_graph_node="$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_edges="$2"
   local -n __dybatpho_array_graph_seen="$3"
   local -n __dybatpho_array_graph_built="$4"
@@ -733,7 +734,7 @@ function __dybatpho_array_graph_visit {
 #######################################
 function __dybatpho_array_graph_roots_into {
   local -n __dybatpho_array_graph_roots="$1"
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_all="$2"
   shift 2
 
@@ -804,7 +805,7 @@ function dybatpho::array_toposort {
       __dybatpho_array_graph_order __dybatpho_array_graph_cycle
   done
 
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_result="${__dybatpho_array_graph_out}"
   # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   __dybatpho_array_graph_result=(${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"})
@@ -852,10 +853,10 @@ function dybatpho::array_closure {
   local -a __dybatpho_array_graph_sorted=()
   mapfile -t __dybatpho_array_graph_sorted < <(
     ((${#__dybatpho_array_graph_order[@]})) \
-      && printf '%s\n' "${__dybatpho_array_graph_order[@]}" | LC_ALL=C sort -u
+      && printf '%s\n' ${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"} | LC_ALL=C sort -u
   )
 
-  # shellcheck disable=SC2178
+  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_reachable="${__dybatpho_array_graph_out}"
   # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   __dybatpho_array_graph_reachable=(${__dybatpho_array_graph_sorted[@]+"${__dybatpho_array_graph_sorted[@]}"})

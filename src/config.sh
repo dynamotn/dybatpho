@@ -157,7 +157,7 @@ function __dybatpho_config_load_structured {
     # branch it guards here, so the check cannot ride along with the query.
     # Reading the tag first also keeps a sequence root from being loaded under
     # the keys `0`, `1`, ... instead of being rejected.
-    root=$(yq "${parse[@]}" -r 'tag' "${file}" 2> /dev/null) \
+    root=$(yq ${parse[@]+"${parse[@]}"} -r 'tag' "${file}" 2> /dev/null) \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
     [[ "${root}" == "!!map" ]] \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
@@ -166,7 +166,7 @@ function __dybatpho_config_load_structured {
     # `${0}${0}` doubles a backslash; a replacement spelled with backslashes is
     # unescaped once more than it looks.
     # shellcheck disable=SC2016 # `${0}` is yq's match reference, not a shell expansion
-    entries=$(yq "${parse[@]}" -r '
+    entries=$(yq ${parse[@]+"${parse[@]}"} -r '
       ..
       | select(path | length > 0)
       | select(parents | all_c(tag != "!!seq"))
@@ -579,7 +579,7 @@ function dybatpho::config_save {
   ((${#keys[@]} > 0)) \
     || dybatpho::die "${FUNCNAME[0]}: Expected at least one configuration key"
 
-  for key in "${keys[@]}"; do
+  for key in ${keys[@]+"${keys[@]}"}; do
     __dybatpho_config_require_key "${key}"
     [[ -n "${DYBATPHO_CONFIG[${key}]+set}" ]] \
       || dybatpho::die "Cannot save a configuration key that is not set: ${key}"
@@ -588,9 +588,9 @@ function dybatpho::config_save {
   __dybatpho_config_format_into format "${file}" \
     || dybatpho::die "Unsupported configuration format: ${file}" # kcov(skip)
   if [[ "${format}" == dotenv ]]; then
-    __dybatpho_config_save_dotenv "${file}" "${keys[@]}"
+    __dybatpho_config_save_dotenv "${file}" ${keys[@]+"${keys[@]}"}
   else
-    __dybatpho_config_save_structured "${format}" "${file}" "${keys[@]}"
+    __dybatpho_config_save_structured "${format}" "${file}" ${keys[@]+"${keys[@]}"}
   fi
 }
 
@@ -827,7 +827,7 @@ function __dybatpho_config_schema_check {
   [[ -z "${min}" ]] || rules+=("min:${min}")
   [[ -z "${max}" ]] || rules+=("max:${max}")
 
-  dybatpho::validate_value "${value}" "${rules[@]}" && return 0
+  dybatpho::validate_value "${value}" ${rules[@]+"${rules[@]}"} && return 0
   # shellcheck disable=SC2154 # filled by `src/validate.sh`
   for reason in "${DYBATPHO_VALIDATE_ERRORS[@]}"; do
     __dybatpho_config_schema_error "${key}" "${reason}"
@@ -972,7 +972,7 @@ function dybatpho::config_doc {
       json)
         declared=""
         default_key="${key}.default"
-    [[ -n "${DYBATPHO_CONFIG_SCHEMA[${default_key}]+set}" ]] && declared="declared" || true
+        [[ -n "${DYBATPHO_CONFIG_SCHEMA[${default_key}]+set}" ]] && declared="declared" || true
         __dybatpho_log_json_escape_into key_cell "${key}"
         __dybatpho_config_doc_json_value_into default_cell "${default}" "${declared}"
         __dybatpho_config_doc_json_value_into constraints_cell "${constraints}"

@@ -157,6 +157,7 @@ function _worker_handler {
   local payload
   dybatpho::expect_args payload -- "$@"
   if [[ "${payload}" == *flaky* ]]; then
+    # dyshellint disable=BSG036 # the handler's stdout is the job's recorded output, failure included
     printf 'failed    %s\n' "${payload}"
     return 1
   fi

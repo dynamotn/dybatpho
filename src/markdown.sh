@@ -91,7 +91,7 @@ function __dybatpho_md_escape_plain {
   done
 
   local IFS=$'\n'
-  __dybatpho_md_plain_ref="${__dybatpho_md_lines[*]}"
+  __dybatpho_md_plain_ref="${__dybatpho_md_lines[*]-}"
 }
 
 #######################################
@@ -245,7 +245,7 @@ function dybatpho::md_list {
   fi
 
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
       printf '\n'
       continue
@@ -281,7 +281,7 @@ function dybatpho::md_task_list {
   local line state text escaped box
 
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
       printf '\n'
       continue
@@ -459,7 +459,7 @@ function dybatpho::md_code_block {
   fence="${fence// /\`}"
 
   printf '%s%s\n' "${fence}" "${language}"
-  printf '%s\n' "${lines[@]}"
+  printf '%s\n' ${lines[@]+"${lines[@]}"}
   printf '%s\n' "${fence}"
 }
 
@@ -513,7 +513,7 @@ function dybatpho::md_collapsible {
 
   printf '<details>\n'
   printf '<summary>%s</summary>\n\n' "${escaped}"
-  printf '%s\n' "${lines[@]}"
+  printf '%s\n' ${lines[@]+"${lines[@]}"}
   printf '\n</details>\n'
 }
 

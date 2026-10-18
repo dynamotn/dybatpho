@@ -756,3 +756,19 @@ SCRIPT
   export DRY_RUN=false
   run -1 dybatpho::dry_run
 }
+
+@test "a temporary file does not stop TERM from ending the script, and is still removed" {
+  # The cleanup used to trap INT and TERM themselves, which replaced what they
+  # do: the script carried on past the signal and exited 0.
+  local script="${BATS_TEST_TMPDIR}/signalled.sh" marker="${BATS_TEST_TMPDIR}/temp-path"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::create_temp temp ".txt" "signalled"
+printf '%s' "${temp}" > "${2}"
+kill -s TERM "$$"
+printf 'carried on\n'
+SCRIPT
+  run_traced -143 bash "${script}" "${DYBATPHO_DIR}" "${marker}"
+  refute_output --partial "carried on"
+  assert_file_not_exist "$(< "${marker}")"
+}

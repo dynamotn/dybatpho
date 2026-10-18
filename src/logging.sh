@@ -269,7 +269,7 @@ function __dybatpho_log_timestamp_into {
     if __dybatpho_log_date_is_stand_in; then
       if [[ -n "${BASH_CMDS[busybox]-}" ]]; then
         __DYBATPHO_LOG_TS_FLAVOR=busybox
-      elif date --version > /dev/null 2>&1; then
+      elif date --version &> /dev/null; then
         __DYBATPHO_LOG_TS_FLAVOR=gnu
       else
         __DYBATPHO_LOG_TS_FLAVOR=portable
@@ -463,7 +463,7 @@ function __dybatpho_log_rotate_file {
   for ((i = max_backups - 1; i >= 1; i--)); do
     [[ -f "${file}.${i}" ]] && mv -f "${file}.${i}" "${file}.$((i + 1))"
   done
-  mv -f "${file}" "${file}.1"
+  mv -f -- "${file}" "${file}.1"
 }
 
 #######################################
@@ -1594,6 +1594,7 @@ function __dybatpho_log_spin_loop {
     # orphaned to PID 1 and keep drawing over the shell prompt.
     if ! kill -0 "${parent}" 2> /dev/null; then
       printf '\r\033[K\033[?25h' >&2
+      # dyshellint disable=BSG090 # this is the background animation job, not the script
       exit 0
     fi
     if [[ -n "${file}" ]]; then

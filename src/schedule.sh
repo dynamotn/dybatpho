@@ -129,7 +129,7 @@ function dybatpho::schedule_every {
     __dybatpho_schedule_every_waited
   __dybatpho_schedule_every_due="$(dybatpho::date_now "%s")"
   while :; do
-    "${__dybatpho_schedule_every_command[@]}" || true
+    ${__dybatpho_schedule_every_command[@]+"${__dybatpho_schedule_every_command[@]}"} || true
     __dybatpho_schedule_every_ran=$((__dybatpho_schedule_every_ran + 1))
 
     ((__dybatpho_schedule_every_times > 0 && __dybatpho_schedule_every_ran >= __dybatpho_schedule_every_times)) && break
@@ -247,7 +247,7 @@ function dybatpho::schedule_debounce {
     return 9
   fi
 
-  "${__dybatpho_schedule_debounce_command[@]}"
+  ${__dybatpho_schedule_debounce_command[@]+"${__dybatpho_schedule_debounce_command[@]}"}
 }
 
 #######################################
@@ -318,7 +318,7 @@ function dybatpho::schedule_once_per {
   printf '%s\n' "${__dybatpho_schedule_once_bucket}" > "${__dybatpho_schedule_once_staging}"
   mv -f -- "${__dybatpho_schedule_once_staging}" "${__dybatpho_schedule_once_marker}"
   rm -f -- "${__dybatpho_schedule_once_claim}"
-  "${__dybatpho_schedule_once_command[@]}"
+  ${__dybatpho_schedule_once_command[@]+"${__dybatpho_schedule_once_command[@]}"}
 }
 
 #######################################
@@ -514,7 +514,7 @@ function __dybatpho_schedule_field_matches {
   IFS=',' read -r -a alternatives <<< "${specification}"
 
   local alternative step first last
-  for alternative in "${alternatives[@]}"; do
+  for alternative in ${alternatives[@]+"${alternatives[@]}"}; do
     step=1
     if [[ "${alternative}" == */* ]]; then
       step="${alternative##*/}"

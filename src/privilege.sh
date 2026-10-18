@@ -147,7 +147,7 @@ function __dybatpho_privilege_keepalive {
       "$1" -n -v 2> /dev/null || true
       sleep "$2"
     done
-  ) > /dev/null 2>&1 < /dev/null &
+  ) &> /dev/null < /dev/null &
   DYBATPHO_PRIVILEGE_KEEPALIVE_PID=$!
 }
 

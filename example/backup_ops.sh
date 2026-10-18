@@ -85,7 +85,7 @@ function _demo_verify {
 
   # A truncated or corrupted backup is what the sidecar is there to catch.
   local damaged="${archive}.damaged.tar.gz"
-  cp "${archive}" "${damaged}"
+  cp -- "${archive}" "${damaged}"
   cp "${archive}.sha256" "${damaged}.sha256"
   printf 'corruption' >> "${damaged}"
   if ! dybatpho::backup_verify "${damaged}" 2> /dev/null; then

@@ -335,6 +335,7 @@ function dybatpho::cache_clear {
     return 0
   fi
   dybatpho::debug "cache: clearing ${directory}"
+  # dyshellint disable=BSG089 # `dybatpho::is dir` above refuses an empty name
   find "${directory}" -maxdepth 1 -type f -name "*${__DYBATPHO_CACHE_SUFFIX}" -delete
 }
 
@@ -413,7 +414,7 @@ function __dybatpho_cache_refresh_background {
   shift 2
   local __dybatpho_cache_refresh_bg_lock
   __dybatpho_cache_refresh_bg_lock="$(__dybatpho_cache_refresh_lock "${__dybatpho_cache_refresh_bg_path}")"
-  if ! dybatpho::lock_acquire "${__dybatpho_cache_refresh_bg_lock}" 0 > /dev/null 2>&1; then
+  if ! dybatpho::lock_acquire "${__dybatpho_cache_refresh_bg_lock}" 0 &> /dev/null; then
     dybatpho::debug "cache: ${__dybatpho_cache_refresh_bg_key} is already being refreshed"
     return 0
   fi
@@ -427,7 +428,7 @@ function __dybatpho_cache_refresh_background {
     trap 'exit 143' TERM
     trap 'dybatpho::lock_release "${__dybatpho_cache_refresh_bg_lock}" > /dev/null 2>&1 || true' EXIT
     __dybatpho_cache_refresh "${__dybatpho_cache_refresh_bg_key}" "$@"
-  ) < /dev/null > /dev/null 2>&1 & # kcov(skip) - run by the --stale tests; kcov never records a subshell's closing line
+  ) < /dev/null &> /dev/null & # kcov(skip) - run by the --stale tests; kcov never records a subshell's closing line
 }
 
 #######################################
@@ -572,13 +573,13 @@ function dybatpho::cache_run {
   if __dybatpho_cache_age __dybatpho_cache_run_age "${__dybatpho_cache_run_path}"; then
     if ((__dybatpho_cache_run_age < __dybatpho_cache_run_ttl)); then
       dybatpho::debug "cache: hit ${__dybatpho_cache_run_key}"
-      __dybatpho_cache_run_cached="$(cat "${__dybatpho_cache_run_path}")"
+      __dybatpho_cache_run_cached="$(< "${__dybatpho_cache_run_path}")"
       printf '%s\n' "${__dybatpho_cache_run_cached}"
       return 0
     fi
     if ((__dybatpho_cache_run_stale > 0 && __dybatpho_cache_run_age < __dybatpho_cache_run_ttl + \
       __dybatpho_cache_run_stale)); then
-      __dybatpho_cache_run_cached="$(cat "${__dybatpho_cache_run_path}")"
+      __dybatpho_cache_run_cached="$(< "${__dybatpho_cache_run_path}")"
       __dybatpho_cache_refresh_background "${__dybatpho_cache_run_key}" "${__dybatpho_cache_run_path}" "$@"
       printf '%s\n' "${__dybatpho_cache_run_cached}"
       return 0
@@ -625,7 +626,9 @@ function __dybatpho_cache_scan {
   done
   ((${#__dybatpho_cache_scan_records[@]} > 0)) || return 0
   local __dybatpho_cache_scan_sorted
-  __dybatpho_cache_scan_sorted="$(printf '%s\n' "${__dybatpho_cache_scan_records[@]}" | sort -k1,1n -k3)"
+  __dybatpho_cache_scan_sorted="$(
+    printf '%s\n' ${__dybatpho_cache_scan_records[@]+"${__dybatpho_cache_scan_records[@]}"} | sort -k1,1n -k3
+  )"
   mapfile -t __dybatpho_cache_scan_out <<< "${__dybatpho_cache_scan_sorted}"
 }
 
@@ -725,7 +728,7 @@ function dybatpho::cache_prune {
 
   local now record mtime size path count=0 total=0
   now="$(date +%s)"
-  for record in "${records[@]}"; do
+  for record in ${records[@]+"${records[@]}"}; do
     read -r mtime size path <<< "${record}"
     if [[ -n "${older_than}" ]] && ((now - mtime > older_than)); then
       __dybatpho_cache_prune_remove "${path}"
@@ -736,7 +739,7 @@ function dybatpho::cache_prune {
     total=$((total + size))
   done
 
-  for record in "${kept[@]}"; do
+  for record in ${kept[@]+"${kept[@]}"}; do
     if ! { [[ -n "${max_entries}" ]] && ((count > max_entries)); } \
       && ! { [[ -n "${max_bytes}" ]] && ((total > max_bytes)); }; then
       break
@@ -822,7 +825,7 @@ function dybatpho::cache_stats {
   local now record mtime size path age
   local entries=0 bytes=0 fresh=0 stale=0 oldest=0 newest=0
   now="$(date +%s)"
-  for record in "${records[@]}"; do
+  for record in ${records[@]+"${records[@]}"}; do
     read -r mtime size path <<< "${record}"
     age=$((now - mtime))
     ((age >= 0)) || age=0

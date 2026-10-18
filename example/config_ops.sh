@@ -48,14 +48,14 @@ dybatpho::config_export APP_
 
 dybatpho::header "CONFIGURATION"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "host: ${APP_HOST}"
+dybatpho::print "host: ${APP_HOST:-}"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "port: ${APP_PORT}"
+dybatpho::print "port: ${APP_PORT:-}"
 dybatpho::print "mode: ${APP_MODE}"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "region (default): ${APP_REGION}"
+dybatpho::print "region (default): ${APP_REGION:-}"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "endpoint (default): ${APP_ENDPOINT}"
+dybatpho::print "endpoint (default): ${APP_ENDPOINT:-}"
 dybatpho::success "Configuration validated"
 
 dybatpho::header "CONFIGURATION REFERENCE"

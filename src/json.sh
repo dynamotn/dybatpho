@@ -292,9 +292,9 @@ function dybatpho::json_object {
   done
 
   if [[ "${json_cmd}" == "yq" ]]; then
-    env "${environment[@]}" yq -n -o=json -I=0 "${filter}"
+    env ${environment[@]+"${environment[@]}"} yq -n -o=json -I=0 "${filter}"
   else
-    jq -n -c "${arguments[@]}" "${filter}"
+    jq -n -c ${arguments[@]+"${arguments[@]}"} "${filter}"
   fi
 }
 
@@ -544,9 +544,9 @@ function __dybatpho_json_emit {
 function __dybatpho_json_parses {
   [[ "$2" == *[![:space:]]* ]] || return 1
   if [[ "$1" == yq ]]; then
-    yq -o=json -I=0 -p=json '.' <<< "$2" > /dev/null 2>&1
+    yq -o=json -I=0 -p=json '.' <<< "$2" &> /dev/null
   else
-    jq empty <<< "$2" > /dev/null 2>&1
+    jq empty <<< "$2" &> /dev/null
   fi
 }
 
@@ -588,7 +588,7 @@ function __dybatpho_json_set {
 
   if [[ "${backend}" == jq ]]; then
     local path_array
-    __dybatpho_json_path_array_into path_array "${segments[@]}"
+    __dybatpho_json_path_array_into path_array ${segments[@]+"${segments[@]}"}
     local value_flag=--arg
     [[ "${typed}" == true ]] && value_flag=--argjson
     # shellcheck disable=SC2016 # `$path`, `$value` and `$message` are jq variables
@@ -608,7 +608,7 @@ function __dybatpho_json_set {
   # regular expression: on a key that is missing, yq answers `!=`, `and` and
   # `or` wrongly, and a chained `.[a][b]` compares differently from a pipe.
   local filter="" parent="." target="" accessor kind index=0 segment
-  for segment in "${segments[@]}"; do
+  for segment in ${segments[@]+"${segments[@]}"}; do
     environment+=("__dybatpho_json_s${index}=${segment:1}")
     if [[ "${segment}" == "#"* ]]; then
       kind=seq
@@ -664,7 +664,7 @@ function __dybatpho_json_del {
 
   if [[ "${backend}" == jq ]]; then
     local path_array
-    __dybatpho_json_path_array_into path_array "${segments[@]}"
+    __dybatpho_json_path_array_into path_array ${segments[@]+"${segments[@]}"}
     # A path that runs through a scalar, or indexes the wrong kind of
     # container, names nothing, and deleting nothing is not an error.
     # shellcheck disable=SC2016 # `$path` and `$document` are jq variables
@@ -677,7 +677,7 @@ function __dybatpho_json_del {
   # padding an array with nulls up to an index that was never there.
   local -a environment=()
   local selector="" index=0 segment
-  for segment in "${segments[@]}"; do
+  for segment in ${segments[@]+"${segments[@]}"}; do
     environment+=("__dybatpho_json_s${index}=${segment:1}")
     [[ -n "${selector}" ]] && selector+=" | "
     if [[ "${segment}" == "#"* ]]; then
@@ -687,7 +687,7 @@ function __dybatpho_json_del {
     fi
     index=$((index + 1))
   done
-  __dybatpho_json_emit "${output}" env "${environment[@]}" \
+  __dybatpho_json_emit "${output}" env ${environment[@]+"${environment[@]}"} \
     yq eval "-o=${format}" "del(${selector})" "${input}"
 }
 

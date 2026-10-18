@@ -371,9 +371,9 @@ function __dybatpho_ai_record_usage {
 # @internal
 #######################################
 function __dybatpho_ai_ollama_alive {
-  hash curl > /dev/null 2>&1 || return 1
+  hash curl &> /dev/null || return 1
   local base="${DYBATPHO_AI_BASE_URL:-http://localhost:11434}"
-  curl --silent --fail --max-time 2 "${base}/api/tags" > /dev/null 2>&1
+  curl --silent --fail --max-time 2 "${base}/api/tags" &> /dev/null
 }
 
 #######################################
@@ -408,7 +408,7 @@ function __dybatpho_ai_provider_into {
     __dybatpho_ai_provider_ref=openai
   elif __dybatpho_ai_ollama_alive; then
     __dybatpho_ai_provider_ref=ollama
-  elif dybatpho::coalesce_cmd claude llm ollama > /dev/null 2>&1; then
+  elif dybatpho::coalesce_cmd claude llm ollama &> /dev/null; then
     __dybatpho_ai_provider_ref=cli
   else
     dybatpho::die \
@@ -487,12 +487,12 @@ function __dybatpho_ai_api_key_into {
     anthropic)
       dybatpho::is set "${ANTHROPIC_API_KEY-}" \
         || dybatpho::die "ai: ANTHROPIC_API_KEY or DYBATPHO_AI_API_KEY must be set for the anthropic backend"
-      __dybatpho_ai_key_ref="${ANTHROPIC_API_KEY}"
+      __dybatpho_ai_key_ref="${ANTHROPIC_API_KEY:-}"
       ;;
     openai)
       dybatpho::is set "${OPENAI_API_KEY-}" \
         || dybatpho::die "ai: OPENAI_API_KEY or DYBATPHO_AI_API_KEY must be set for the openai backend"
-      __dybatpho_ai_key_ref="${OPENAI_API_KEY}"
+      __dybatpho_ai_key_ref="${OPENAI_API_KEY:-}"
       ;;
     ollama) __dybatpho_ai_key_ref="" ;;
     *) dybatpho::die "ai: Backend '${__dybatpho_ai_key_provider}' has no API key concept" ;;
@@ -538,7 +538,7 @@ function dybatpho::ai_check {
   __dybatpho_ai_provider_into provider
   case "${provider}" in
     anthropic | openai | ollama)
-      hash curl > /dev/null 2>&1 || dybatpho::die "ai: curl is required by the ${provider} backend" 127
+      hash curl &> /dev/null || dybatpho::die "ai: curl is required by the ${provider} backend" 127
       local key
       __dybatpho_ai_api_key_into key "${provider}"
       ;;
@@ -568,7 +568,7 @@ function dybatpho::ai_check {
 function __dybatpho_ai_cli_command_into {
   local -n __dybatpho_ai_cli_ref="$1"
   if dybatpho::is set "${DYBATPHO_AI_CLI}"; then
-    hash "${DYBATPHO_AI_CLI}" > /dev/null 2>&1 \
+    hash "${DYBATPHO_AI_CLI}" &> /dev/null \
       || dybatpho::die "ai: DYBATPHO_AI_CLI is '${DYBATPHO_AI_CLI}' but that command is not installed" 127
     __dybatpho_ai_cli_ref="${DYBATPHO_AI_CLI}"
     return 0
@@ -623,7 +623,8 @@ function __dybatpho_ai_payload_anthropic {
   system=$(dybatpho::json_get "${conversation}" '.system')
   messages=$(dybatpho::json_eval "${conversation}" '.messages')
 
-  local -a fields=(
+  local -a fields
+  fields=(
     model "$(dybatpho::ai_model anthropic)"
     max_tokens:json "${DYBATPHO_AI_MAX_TOKENS}"
     messages:json "${messages}"
@@ -639,7 +640,7 @@ function __dybatpho_ai_payload_anthropic {
     output_config+=(format:json "$(dybatpho::json_object type json_schema schema:json "${schema}")")
   fi
   ((${#output_config[@]} > 0)) \
-    && fields+=(output_config:json "$(dybatpho::json_object "${output_config[@]}")")
+    && fields+=(output_config:json "$(dybatpho::json_object ${output_config[@]+"${output_config[@]}"})")
 
   dybatpho::json_object "${fields[@]}"
 }
@@ -661,7 +662,8 @@ function __dybatpho_ai_payload_openai {
   system=$(dybatpho::json_get "${conversation}" '.system')
   messages=$(__dybatpho_ai_messages_with_system "${conversation}")
 
-  local -a fields=(
+  local -a fields
+  fields=(
     model "$(dybatpho::ai_model openai)"
     max_tokens:json "${DYBATPHO_AI_MAX_TOKENS}"
     messages:json "${messages}"
@@ -732,7 +734,8 @@ function __dybatpho_ai_payload_ollama {
   dybatpho::expect_args conversation tools -- "$@"
   schema="${3:-}"
 
-  local -a fields=(
+  local -a fields
+  fields=(
     model "$(dybatpho::ai_model ollama)"
     stream:json false
     messages:json "$(__dybatpho_ai_messages_with_system "${conversation}")"
@@ -818,8 +821,9 @@ function dybatpho::ai_cache_clear {
   # Entries this module wrote before it used the `cache` module carry a `.json`
   # suffix, and nothing else would ever come back for them.
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  dybatpho::is true "${DRY_RUN}" \
-    || find "${DYBATPHO_AI_CACHE_DIR}" -maxdepth 1 -name '*.json' -type f -delete
+  dybatpho::is true "${DRY_RUN}" && return 0
+  [[ -n "${DYBATPHO_AI_CACHE_DIR}" ]] || return 0
+  find "${DYBATPHO_AI_CACHE_DIR}" -maxdepth 1 -name '*.json' -type f -delete
 }
 
 #######################################
@@ -937,7 +941,7 @@ function __dybatpho_ai_http {
     --max-time "${DYBATPHO_AI_TIMEOUT}" \
     ${headers[@]+"${headers[@]}"} || return $?
 
-  body=$(cat "${response_file}")
+  body=$(< "${response_file}")
   [[ -z "${cache_key}" ]] || __dybatpho_ai_cache_write "${cache_key}" "${body}"
   printf '%s\n' "${body}"
 }
@@ -1314,7 +1318,7 @@ function dybatpho::ai_conversation_add {
   local turn updated
   turn=$(dybatpho::json_object role "${role}" content "${content}")
   local cat
-  cat=$(cat "${file}")
+  cat=$(< "${file}")
   updated=$(dybatpho::json_eval "${cat}" ".messages += [${turn}]")
   printf '%s\n' "${updated}" > "${file}"
 }
@@ -1333,7 +1337,7 @@ function dybatpho::ai_conversation_show {
   local file
   dybatpho::expect_args file -- "$@"
   dybatpho::is file "${file}" || dybatpho::die "dybatpho::ai_conversation_show: '${file}' is not a conversation file"
-  dybatpho::json_get "$(cat "${file}")" \
+  dybatpho::json_get "$(< "${file}")" \
     '[(select((.system | length) > 0) | "system: " + .system),
       (.messages[] | .role + ": " + .content)] | join("\n")'
 }
@@ -1362,7 +1366,7 @@ function dybatpho::ai_chat {
   dybatpho::ai_conversation_add "${file}" user "${prompt}"
   local answer
   local cat
-  cat=$(cat "${file}")
+  cat=$(< "${file}")
   # A refused or failed call ends the substitution with its status; recording
   # its empty output as the assistant's turn would corrupt the conversation.
   answer=$(__dybatpho_ai_complete "${cat}") || return $?
@@ -1700,6 +1704,7 @@ function __dybatpho_ai_tool_invoke {
   dybatpho::expect_args __dybatpho_ai_tool_name __dybatpho_ai_tool_arguments -- "$@"
   local __dybatpho_ai_tool_handler="${DYBATPHO_AI_TOOL_HANDLER[${__dybatpho_ai_tool_name}]-}"
   if dybatpho::is empty "${__dybatpho_ai_tool_handler}"; then
+    # dyshellint disable=BSG036 # the text is the tool's result, handed back to the model on stdout
     printf 'Error: no tool named %s is registered\n' "${__dybatpho_ai_tool_name}"
     return 0
   fi
@@ -1708,6 +1713,7 @@ function __dybatpho_ai_tool_invoke {
   __dybatpho_ai_tool_output=$("${__dybatpho_ai_tool_handler}" "${__dybatpho_ai_tool_arguments}" 2>&1) \
     || __dybatpho_ai_tool_status=$?
   if ((__dybatpho_ai_tool_status != 0)); then
+    # dyshellint disable=BSG036 # the text is the tool's result, handed back to the model on stdout
     printf 'Error: tool %s exited with status %d\n%s\n' "${__dybatpho_ai_tool_name}" "${__dybatpho_ai_tool_status}" \
       "${__dybatpho_ai_tool_output}"
   else

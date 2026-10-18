@@ -338,7 +338,7 @@ function dybatpho::assert_json_valid {
   __dybatpho_test_need_json || return 1
   local file
   __dybatpho_test_input_file "${input}" file
-  if ! dybatpho::json_query "${file}" '.' > /dev/null 2>&1; then
+  if ! dybatpho::json_query "${file}" '.' &> /dev/null; then
     __dybatpho_test_fail "Expected valid JSON: ${input}"
     return 1
   fi
@@ -437,7 +437,7 @@ function dybatpho::assert_yaml_valid {
   __dybatpho_test_need_json || return 1
   local file
   __dybatpho_test_input_file "${input}" file
-  if ! dybatpho::yaml_query "${file}" '.' > /dev/null 2>&1; then
+  if ! dybatpho::yaml_query "${file}" '.' &> /dev/null; then
     __dybatpho_test_fail "Expected valid YAML: ${input}"
     return 1
   fi
@@ -518,7 +518,7 @@ function dybatpho::snapshot_scrub {
   expression="s${separator}${pattern}${separator}${replacement}${separator}g"
   # Tried once on empty input, so a broken expression is refused here rather
   # than blanking every snapshot it is later applied to.
-  if ! sed -e "${expression}" < /dev/null > /dev/null 2>&1; then
+  if ! sed -e "${expression}" < /dev/null &> /dev/null; then
     dybatpho::error "${FUNCNAME[0]}: '${pattern}' -> '${replacement}' is not a substitution sed can run"
     return 1
   fi
@@ -714,7 +714,7 @@ function dybatpho::assert_exit_code {
 
   local __dybatpho_test_exit_output_file __dybatpho_test_exit_status=0
   __dybatpho_create_temp_into __dybatpho_test_exit_output_file ".log" "exitcode"
-  "$@" > "${__dybatpho_test_exit_output_file}" 2>&1 || __dybatpho_test_exit_status=$?
+  "$@" &> "${__dybatpho_test_exit_output_file}" || __dybatpho_test_exit_status=$?
 
   ((__dybatpho_test_exit_status == 10#${__dybatpho_test_exit_expected})) && return 0
   __dybatpho_test_fail \
@@ -737,7 +737,7 @@ function __dybatpho_test_time_command {
   local -n __dybatpho_test_tc_out="${__dybatpho_test_tc_elapsed_var}"
   local __dybatpho_test_tc_started __dybatpho_test_tc_status=0
   __dybatpho_test_tc_started="$(__dybatpho_log_now_ms)"
-  "$@" >> "${__dybatpho_test_tc_output_file}" 2>&1 || __dybatpho_test_tc_status=$?
+  "$@" &>> "${__dybatpho_test_tc_output_file}" || __dybatpho_test_tc_status=$?
   __dybatpho_test_tc_out=$(($(__dybatpho_log_now_ms) - __dybatpho_test_tc_started))
   ((__dybatpho_test_tc_out < 0)) && __dybatpho_test_tc_out=0
   return "${__dybatpho_test_tc_status}"
@@ -860,7 +860,9 @@ function dybatpho::benchmark {
   done
 
   local -a __dybatpho_test_bench_sorted=()
-  mapfile -t __dybatpho_test_bench_sorted < <(printf '%s\n' "${__dybatpho_test_bench_samples[@]}" | sort -n)
+  mapfile -t __dybatpho_test_bench_sorted < <(
+    printf '%s\n' ${__dybatpho_test_bench_samples[@]+"${__dybatpho_test_bench_samples[@]}"} | sort -n
+  )
   DYBATPHO_TEST_BENCH_MIN_MS="${__dybatpho_test_bench_sorted[0]}"
   DYBATPHO_TEST_BENCH_MAX_MS="${__dybatpho_test_bench_sorted[-1]}"
   DYBATPHO_TEST_BENCH_MEDIAN_MS="${__dybatpho_test_bench_sorted[$((${#__dybatpho_test_bench_sorted[@]} / 2))]}"
@@ -1334,7 +1336,7 @@ function __dybatpho_test_real_date {
   local entry
   local -a entries=()
   IFS=: read -r -a entries <<< "${PATH}"
-  for entry in "${entries[@]}"; do
+  for entry in ${entries[@]+"${entries[@]}"}; do
     [[ -n "${entry}" && "${entry}" != "${DYBATPHO_TEST_MOCK_DIR}" ]] || continue
     if [[ -x "${entry}/date" && ! -d "${entry}/date" ]]; then
       __dybatpho_test_date_path="${entry}/date"
@@ -1561,7 +1563,7 @@ function dybatpho::mock_tty {
     # dyshellint disable=BSG040
     eval "function dybatpho::is_tty { __dybatpho_test_tty_answer \"\$@\"; }"
   fi
-  for stream in "${names[@]}"; do
+  for stream in ${names[@]+"${names[@]}"}; do
     DYBATPHO_TEST_TTY["${stream}"]="${state}"
   done
 }

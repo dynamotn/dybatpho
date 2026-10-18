@@ -72,7 +72,7 @@ function dybatpho::die {
 #######################################
 function dybatpho::register_err_handler {
   set -E
-  # shellcheck disable=SC2034
+  # shellcheck disable=SC2034 # read by the handlers that `dybatpho::breakpoint` re-installs
   DYBATPHO_USED_ERR_HANDLER=true
   dybatpho::trap 'dybatpho::run_err_handler $?' ERR
 }
@@ -83,7 +83,7 @@ function dybatpho::register_err_handler {
 # @noargs
 #######################################
 function dybatpho::register_killed_handler {
-  # shellcheck disable=SC2034
+  # shellcheck disable=SC2034 # read by the handlers that `dybatpho::breakpoint` re-installs
   DYBATPHO_USED_KILLED_HANDLER=true
   dybatpho::trap 'dybatpho::killed_process_handler SIGINT' SIGINT
   dybatpho::trap 'dybatpho::killed_process_handler SIGTERM' SIGTERM
@@ -228,7 +228,7 @@ function __dybatpho_process_traps_restore {
 function __dybatpho_process_trap_only {
   local __dybatpho_process_only_command="$1"
   shift
-  # shellcheck disable=SC2064
+  # shellcheck disable=SC2064 # the text is meant to expand now; the caller chose the quoting
   trap "${__dybatpho_process_only_command}" "$@"
 }
 
@@ -246,7 +246,7 @@ function dybatpho::trap {
   for signal in "$@"; do
     __dybatpho_process_trap_command_into finalize_command "${signal}"
     finalize_command="${finalize_command}${finalize_command:+; }${command}"
-    # shellcheck disable=SC2064
+    # shellcheck disable=SC2064 # the text is meant to expand now; the caller chose the quoting
     trap "${finalize_command}" "${signal}"
   done
 }
@@ -267,7 +267,7 @@ function __dybatpho_cleanup_run {
     pid="${entry%%:*}"
     path="${entry#*:}"
     if [[ "${pid}" == "${BASHPID}" ]]; then
-      [[ -e "${path}" ]] && rm -rf -- "${path}" > /dev/null 2>&1
+      [[ -e "${path}" ]] && rm -rf -- "${path}" &> /dev/null
     else
       remaining+=("${entry}")
     fi
@@ -293,6 +293,11 @@ function dybatpho::cleanup_file_on_exit {
 
   # One trap per shell. A subshell inherits the registry but not ownership of
   # the trap, so it installs its own and removes only what it registered.
+  #
+  # `EXIT` alone: Bash runs it when a HUP, INT or TERM ends the shell too, and
+  # the shell still ends with the signal's status. Trapping the signals
+  # themselves replaced what they do, so the script carried on after Ctrl-C or
+  # a `kill`, and a worker pool that raised its signal again kept running.
   [[ "${__dybatpho_cleanup_trap_pid}" == "${BASHPID}" ]] && return 0
   __dybatpho_cleanup_trap_pid="${BASHPID}"
 
@@ -324,10 +329,10 @@ function dybatpho::cleanup_file_on_exit {
     # than composing is deliberate — `trap -p` reports the inherited text even
     # though the trap will not fire here, so composing would append Bats'
     # teardown and report a test result once per subshell.
-    trap '__dybatpho_cleanup_run' EXIT HUP INT TERM
+    trap '__dybatpho_cleanup_run' EXIT
     return 0
   fi
-  dybatpho::trap '__dybatpho_cleanup_run' EXIT HUP INT TERM # kcov(skip) - tests always run under bats
+  dybatpho::trap '__dybatpho_cleanup_run' EXIT # kcov(skip) - tests always run under bats
 }
 
 #######################################
@@ -362,7 +367,7 @@ function dybatpho::dry_run {
     printf ' %q' "$@"
     printf '\n'
   else
-    # shellcheck disable=2294
+    # shellcheck disable=2294 # a single argument is a shell string by contract; see the @tip
     if [[ "${__dybatpho_dry_run_argv}" == false ]] && (($# == 1)); then
       eval "$1"
     else
@@ -406,9 +411,9 @@ function __dybatpho_process_forget_cleanup {
 #######################################
 function __dybatpho_process_has_timeout {
   if [[ -z "${__dybatpho_process_timeout_probe}" ]]; then
-    if command -v timeout > /dev/null 2>&1 \
+    if command -v timeout &> /dev/null \
       && [[ "$(timeout --version 2> /dev/null)" == *coreutils* ]] \
-      && timeout -k 1 1 true > /dev/null 2>&1; then
+      && timeout -k 1 1 true &> /dev/null; then
       __dybatpho_process_timeout_probe=yes
     else
       __dybatpho_process_timeout_probe=no
@@ -536,7 +541,7 @@ function __dybatpho_process_timeout_fallback {
 
   local timed_out=false
   [[ -s "${__dybatpho_process_fallback_marker}" ]] && timed_out=true
-  rm -f -- "${__dybatpho_process_fallback_marker}" > /dev/null 2>&1 || true
+  rm -f -- "${__dybatpho_process_fallback_marker}" &> /dev/null || true
   __dybatpho_process_forget_cleanup "${__dybatpho_process_fallback_marker}"
   [[ "${timed_out}" == true ]] && return 124
   return "${status}"
@@ -592,7 +597,7 @@ function dybatpho::run_with_timeout {
     return $?
   fi
 
-  if ! dybatpho::is function "$1" > /dev/null 2>&1 \
+  if ! dybatpho::is function "$1" &> /dev/null \
     && __dybatpho_process_has_timeout; then
     timeout -k "${__dybatpho_process_timeout_kill_after}" "${__dybatpho_process_timeout_seconds}" "$@"
     return $?

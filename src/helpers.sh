@@ -144,7 +144,7 @@ function dybatpho::expect_args {
     && dybatpho::die "${FUNCNAME[1]:--}: Expected variable names, \`--\`, and args:" 'arg1 .. argN -- "$@"' # kcov(skip)
 
   local __dybatpho_expect_name
-  for __dybatpho_expect_name in "${__dybatpho_expect_names[@]}"; do
+  for __dybatpho_expect_name in ${__dybatpho_expect_names[@]+"${__dybatpho_expect_names[@]}"}; do
     [[ "${__dybatpho_expect_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
       || dybatpho::die "${FUNCNAME[1]:--}: Invalid variable name: ${__dybatpho_expect_name}"
     if ! (($#)); then
@@ -379,7 +379,7 @@ function __dybatpho_helpers_sort {
         __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}")
       done
     done
-    __dybatpho_helpers_sort_from=("${__dybatpho_helpers_sort_into[@]}")
+    __dybatpho_helpers_sort_from=(${__dybatpho_helpers_sort_into[@]+"${__dybatpho_helpers_sort_into[@]}"})
     ((__dybatpho_helpers_sort_width *= 2))
   done
 
@@ -448,7 +448,7 @@ function __dybatpho_helpers_options_into {
   local -a __dybatpho_helpers_po_names=()
   for __dybatpho_helpers_po_entry in ${__dybatpho_helpers_po_spec}; do
     IFS='|' read -r -a __dybatpho_helpers_po_names <<< "${__dybatpho_helpers_po_entry%%=*}"
-    for __dybatpho_helpers_po_name in "${__dybatpho_helpers_po_names[@]}"; do
+    for __dybatpho_helpers_po_name in ${__dybatpho_helpers_po_names[@]+"${__dybatpho_helpers_po_names[@]}"}; do
       __dybatpho_helpers_po_targets["${__dybatpho_helpers_po_name}"]="${__dybatpho_helpers_po_entry#*=}"
     done
   done
@@ -517,7 +517,7 @@ function __dybatpho_helpers_options_into {
     shift
     __dybatpho_helpers_po_used+=1
 
-    for __dybatpho_helpers_po_target in "${__dybatpho_helpers_po_list[@]}"; do
+    for __dybatpho_helpers_po_target in ${__dybatpho_helpers_po_list[@]+"${__dybatpho_helpers_po_list[@]}"}; do
       case "${__dybatpho_helpers_po_target}" in
         *++:*) __dybatpho_helpers_options_append "${__dybatpho_helpers_po_target%%++:*}" \
           "${__dybatpho_helpers_po_arg}" "${__dybatpho_helpers_po_value}" ;;
@@ -614,7 +614,7 @@ function dybatpho::require {
     [[ -f "${command_name}" && -x "${command_name}" ]] \
       || dybatpho::die "${command_name} isn't installed" "${exit_code}"
   else
-    hash "${command_name}" > /dev/null 2>&1 \
+    hash "${command_name}" &> /dev/null \
       || dybatpho::die "${command_name} isn't installed" "${exit_code}"
   fi
   [[ -n "${range}" ]] || return 0
@@ -776,9 +776,9 @@ function __dybatpho_helpers_ipv6_groups {
   done
   if ((${#__ipv6_mapped[@]})); then
     if ((__ipv6_mapped_in_tail)); then
-      __ipv6_trail+=("${__ipv6_mapped[@]}")
+      __ipv6_trail+=(${__ipv6_mapped[@]+"${__ipv6_mapped[@]}"})
     else
-      __ipv6_lead+=("${__ipv6_mapped[@]}")
+      __ipv6_lead+=(${__ipv6_mapped[@]+"${__ipv6_mapped[@]}"})
     fi
   fi
 
@@ -794,7 +794,7 @@ function __dybatpho_helpers_ipv6_groups {
     ((__ipv6_have == 8)) || return 1
   fi
 
-  __ipv6_out=("${__ipv6_lead[@]}" ${__ipv6_trail[@]+"${__ipv6_trail[@]}"})
+  __ipv6_out=(${__ipv6_lead[@]+"${__ipv6_lead[@]}"} ${__ipv6_trail[@]+"${__ipv6_trail[@]}"})
 }
 
 #######################################
@@ -928,7 +928,7 @@ function dybatpho::is {
       esac
       ;;
     *) ;;
-  esac > /dev/null 2>&1 # kcov(skip)
+  esac &> /dev/null # kcov(skip)
   return 1
 }
 
@@ -1179,7 +1179,7 @@ function dybatpho::breakpoint {
       a) declare -a >&2 ;;
       A) declare -A >&2 ;;
       q) # kcov(skip)
-        echo "${__dybatpho_helpers_bp_section}" >&2
+        printf '%s\n' "${__dybatpho_helpers_bp_section}" >&2
         return
         ;;
       # kcov(disabled)
@@ -1191,14 +1191,14 @@ function dybatpho::breakpoint {
           history -r "${DYBATPHO_REPL_HISTORY_FILE}"
         fi
         local __dybatpho_helpers_bp_line
-        # shellcheck disable=SC2162
+        # shellcheck disable=SC2162 # the debugger reads with -e, and a backslash typed there is meant literally
         while read -e -p "Debugger (Ctrl-d to exit)> " __dybatpho_helpers_bp_line; do
           [[ "${__dybatpho_helpers_bp_line}" == "exit" ]] && break
           if [[ "${__dybatpho_helpers_bp_line}" =~ ^[[:space:]]*(rm|dd)([[:space:]]|$) ]]; then
             dybatpho::error "Ignore dangerous command."
             continue
           fi
-          echo "${__dybatpho_helpers_bp_line}" >> "${DYBATPHO_REPL_HISTORY_FILE}"
+          printf '%s\n' "${__dybatpho_helpers_bp_line}" >> "${DYBATPHO_REPL_HISTORY_FILE}"
           history -s "${__dybatpho_helpers_bp_line}"
           eval "${__dybatpho_helpers_bp_line} >&2"
         done
@@ -1213,7 +1213,7 @@ function dybatpho::breakpoint {
         ;;
       c)
         if [[ "${__dybatpho_helpers_bp_source_file}" != "bash" ]]; then
-          echo "${__dybatpho_helpers_bp_section}" >&2
+          printf '%s\n' "${__dybatpho_helpers_bp_section}" >&2
           dybatpho::show_file "${BASH_SOURCE[1]}"
         fi
         ;;
@@ -1413,7 +1413,7 @@ function dybatpho::describe {
   ((${#block[@]} > 0)) || return 0
 
   printf '\n'
-  for text in "${block[@]}"; do
+  for text in ${block[@]+"${block[@]}"}; do
     # The banner rules carry no text, and a directive addressed to ShellCheck
     # is not documentation.
     if [[ "${text}" =~ ^#+$ || "${text}" == '# shellcheck '* ]]; then
@@ -1468,7 +1468,7 @@ function dybatpho::function_list {
   ((${#names[@]} > 0)) || return 0
 
   if [[ -z "${module}" ]]; then
-    printf '%s\n' "${names[@]}"
+    printf '%s\n' ${names[@]+"${names[@]}"}
     return 0
   fi
 
@@ -1491,7 +1491,7 @@ function dybatpho::function_list {
     fi
   done < <(
     shopt -s extdebug
-    declare -F "${names[@]}" 2> /dev/null
+    declare -F ${names[@]+"${names[@]}"} 2> /dev/null
   )
   # An empty list would read as "that module exports nothing", which is not what
   # happened: a bundle holds every module in one file and none of them can be

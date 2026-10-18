@@ -288,7 +288,7 @@ function _demo_pid_file {
 
   dybatpho::pid_file_write "${pid_file}"
   local cat
-  cat=$(cat "${pid_file}")
+  cat=$(< "${pid_file}")
   dybatpho::info "Recorded pid ${cat} in ${pid_file}"
 
   if dybatpho::pid_file_is_running "${pid_file}"; then

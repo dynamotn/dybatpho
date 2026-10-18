@@ -2197,7 +2197,7 @@ function __dybatpho_i18n_pattern {
     *) dybatpho::die "${FUNCNAME[1]}: Unknown style '${style}', expected short, medium, long, or full" ;;
   esac
   local candidate pattern
-  for candidate in "${order[@]}"; do
+  for candidate in ${order[@]+"${order[@]}"}; do
     __dybatpho_i18n_data_into pattern DYBATPHO_I18N_DATE_PATTERN "${locale}" "${kind}_${candidate}" \
       && {
         printf '%s' "${pattern}"
@@ -2235,7 +2235,7 @@ function dybatpho::i18n_date {
   # The renderer stops the shell on a bad pattern, but it runs here inside a
   # command substitution, which is a subshell, so that only ends the subshell.
   # Its status has to be checked and passed on or the caller would see success.
-  rendered="$(__dybatpho_i18n_render_pattern "${pattern}" "${locale}" "${fields[@]}")" \
+  rendered="$(__dybatpho_i18n_render_pattern "${pattern}" "${locale}" ${fields[@]+"${fields[@]}"})" \
     || return 1
   printf '%s\n' "${rendered}"
 }
@@ -2263,7 +2263,7 @@ function dybatpho::i18n_time {
   local pattern rendered
   pattern="$(__dybatpho_i18n_pattern "${locale}" time "${style}")" \
     || dybatpho::die "${FUNCNAME[0]}: No time pattern for locale '${locale}'"
-  rendered="$(__dybatpho_i18n_render_pattern "${pattern}" "${locale}" "${fields[@]}")" \
+  rendered="$(__dybatpho_i18n_render_pattern "${pattern}" "${locale}" ${fields[@]+"${fields[@]}"})" \
     || return 1
   printf '%s\n' "${rendered}"
 }
@@ -2334,7 +2334,7 @@ function dybatpho::i18n_date_pattern {
   local -a fields=()
   __dybatpho_i18n_date_fields "${timestamp}" fields
   local rendered
-  rendered="$(__dybatpho_i18n_render_pattern "${pattern}" "${locale}" "${fields[@]}")" \
+  rendered="$(__dybatpho_i18n_render_pattern "${pattern}" "${locale}" ${fields[@]+"${fields[@]}"})" \
     || return 1
   printf '%s\n' "${rendered}"
 }
@@ -3366,7 +3366,7 @@ function dybatpho::i18n_extract {
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
 
   local -A found=()
-  __dybatpho_i18n_scan found "${sources[@]}"
+  __dybatpho_i18n_scan found ${sources[@]+"${sources[@]}"}
   ((${#found[@]} > 0)) || {
     dybatpho::warn "${FUNCNAME[0]}: No translation keys found"
     return 1
@@ -3421,7 +3421,7 @@ function dybatpho::i18n_extract {
         rendered+="${shown} ="$'\n'
       fi
       if [[ "${kind}" == "plural" || "${kind}" == "both" ]]; then
-        for category in "${categories[@]}"; do
+        for category in ${categories[@]+"${categories[@]}"}; do
           rendered+="${shown}[${category}] ="$'\n'
         done
       fi
@@ -3542,7 +3542,7 @@ function dybatpho::i18n_lint {
 
   local -i findings=0
   local detail reference_text target_text reference_marks target_marks category
-  for locale in "${targets[@]}"; do
+  for locale in ${targets[@]+"${targets[@]}"}; do
     local printf_output
     printf_output=$(printf '%s\n' "${!reference_keys[@]}" | LC_ALL=C sort)
     while IFS= read -r key || [[ -n "${key}" ]]; do

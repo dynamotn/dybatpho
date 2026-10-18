@@ -33,8 +33,8 @@ function _run_deploy {
   dybatpho::header "DEPLOY → ${_target}"
   [[ "${FORCE:-false}" == "true" ]] && dybatpho::warn "Force flag set — skipping pre-flight checks"
   [[ "${BUILD:-false}" == "true" ]] && dybatpho::progress "Building application..."
-  dybatpho::dry_run "echo 'Deploying to ${_target}...'"
-  dybatpho::dry_run "echo 'Running post-deploy hooks on ${_target}...'"
+  dybatpho::dry_run -- echo "Deploying to ${_target}..."
+  dybatpho::dry_run -- echo "Running post-deploy hooks on ${_target}..."
   dybatpho::success "Deploy to ${_target} complete" && exit 0
 }
 
@@ -58,7 +58,7 @@ function _spec_deploy {
 # @noargs
 function _run_db_migrate {
   dybatpho::header "DB MIGRATE (steps: ${STEPS:-all})"
-  dybatpho::dry_run "echo 'Running ${STEPS:-all} migration(s)...'"
+  dybatpho::dry_run -- echo "Running ${STEPS:-all} migration(s)..."
   dybatpho::success "Migrations complete" && exit 0
 }
 
@@ -75,7 +75,7 @@ function _spec_db_migrate {
 function _run_db_seed {
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::header "DB SEED (fixture: ${FIXTURE})"
-  dybatpho::dry_run "echo 'Seeding from ${FIXTURE}...'"
+  dybatpho::dry_run -- echo "Seeding from ${FIXTURE}..."
   dybatpho::success "Seeding complete" && exit 0
 }
 

@@ -95,7 +95,7 @@ STUB
 function _use_remote {
   local remote_url="$1"
   # shellcheck disable=SC2154 # set by the option spec of this script
-  git -C "${WORKDIR}" remote remove origin > /dev/null 2>&1 || true
+  git -C "${WORKDIR}" remote remove origin &> /dev/null || true
   git -C "${WORKDIR}" remote add origin "${remote_url}"
   cd "${WORKDIR}" || exit 1
 }

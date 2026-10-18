@@ -325,7 +325,7 @@ function dybatpho::lock_reclaim_stale {
     # free; `ln -s` refuses to replace an existing name, so a third holder is
     # never overwritten.
     if ln -s "${moved}" "${lock_path}" 2> /dev/null; then
-      rm -f -- "${aside}" > /dev/null 2>&1 || true
+      rm -f -- "${aside}" &> /dev/null || true
     else
       dybatpho::warn "Lock ${lock_path} changed hands while it was being reclaimed; the copy moved aside is at ${aside}"
     fi
@@ -334,7 +334,8 @@ function dybatpho::lock_reclaim_stale {
 
   dybatpho::warn "Reclaiming stale lock ${lock_path} (pid ${pid} is no longer running)"
   # `rm` on a symbolic link removes the link, never what it points at.
-  rm -rf -- "${aside}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" > /dev/null 2>&1 || true
+  [[ -n "${aside}" && -n "${lock_path}" ]] || return 0
+  rm -rf -- "${aside}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" &> /dev/null || true
 }
 
 #######################################
@@ -371,9 +372,9 @@ function __dybatpho_lock_holder_alive {
   # `kill -0` is refused for a process of another user, which is not the same
   # as the process being gone: a lock in a shared directory held by another
   # account was reclaimed as stale while its holder was still running.
-  kill -0 "${pid}" > /dev/null 2>&1 && return 0
+  kill -0 "${pid}" &> /dev/null && return 0
   [[ -d "/proc/${pid}" ]] && return 0
-  ps -p "${pid}" > /dev/null 2>&1
+  ps -p "${pid}" &> /dev/null
 }
 
 #######################################
@@ -485,7 +486,8 @@ function dybatpho::lock_release {
     return 1
   fi
 
-  rm -rf -- "${lock_path}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" > /dev/null 2>&1 || true
+  [[ -n "${lock_path}" ]] || return 0
+  rm -rf -- "${lock_path}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" &> /dev/null || true
 }
 
 #######################################

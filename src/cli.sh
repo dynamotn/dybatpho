@@ -631,7 +631,7 @@ function dybatpho::select {
         continue
       }
     fi
-    printf "%s" "${selected[*]}"
+    printf "%s" "${selected[*]-}"
     return 0
   done
 }
@@ -644,6 +644,7 @@ function dybatpho::select {
 #######################################
 function dybatpho::opts::validate_choice {
   local value="${1-}" choices="${2-}" choice
+  local -a __choice_items
   IFS=',' read -r -a __choice_items <<< "${choices}"
   for choice in ${__choice_items[@]+"${__choice_items[@]}"}; do
     [[ "${value}" = "${choice}" ]] && return 0
@@ -1119,7 +1120,7 @@ function __dybatpho_cli_prepend_export {
   if dybatpho::is true "${__export}"; then
     is="export "
   fi
-  echo "${is}$1"
+  printf '%s\n' "${is}$1"
 }
 
 #######################################
@@ -1220,7 +1221,7 @@ function __dybatpho_cli_parse_key_value {
   printf -v "${target}" '%s' "${1#*:}"
 }
 
-# shellcheck disable=2016
+# shellcheck disable=2016 # the `$` is for the generated parser, which is text here
 #######################################
 # @description Generate logic from spec of script/function to get options
 # @arg $1 string Name of function that has spec of parent function or script
@@ -1319,7 +1320,7 @@ function __dybatpho_cli_generate_logic {
   dybatpho::is true "${__abbr}" \
     && __dybatpho_cli_print_indent 1 'local __abbr_rc=0 __abbr_out=""'
   __dybatpho_cli_print_persistent_help_defs
-  # shellcheck disable=2016
+  # shellcheck disable=2016 # the `$` is for the generated parser, which is text here
   __dybatpho_cli_print_indent 1 \
     "while OPTARG= && [ \"\${__rest_end}\" != end ] && [ \$# -gt 0 ]; do"
   __dybatpho_cli_print_indent 2 "case \$1 in"
@@ -1954,6 +1955,7 @@ function __dybatpho_cli_completion_words {
   local -n __completion_out="$1"
   local -a options=("${@:2}") option switches switch
   for option in ${options[@]+"${options[@]}"}; do
+    local hidden
     IFS="${__DYBATPHO_CLI_META_SEP}" read -r _ _ _ switches _ _ _ _ hidden _ _ _ _ _ _ <<< "${option}"
     [[ "${hidden:-false}" = true ]] && continue
     for switch in ${switches}; do __completion_out+=("${switch}"); done
@@ -2625,7 +2627,13 @@ function __dybatpho_cli_print_deprecated_warning {
 function __dybatpho_cli_generate_child_logic {
   local __child_spec="$1"
   shift
-  local -a __persistent_inherited_defs=(${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"} ${__persistent_defs[@]+"${__persistent_defs[@]}"})
+  # Read before the local exists: Bash 4.3 declares it first and then expands
+  # the right-hand side, which read the new, empty array.
+  local -a __child_inherited=(
+    ${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"}
+    ${__persistent_defs[@]+"${__persistent_defs[@]}"}
+  )
+  local -a __persistent_inherited_defs=(${__child_inherited[@]+"${__child_inherited[@]}"})
   __dybatpho_cli_generate_logic "${__child_spec}" "$@"
 }
 
@@ -2923,7 +2931,7 @@ function dybatpho::opts::setup {
   fi
 }
 
-# shellcheck disable=2016
+# shellcheck disable=2016 # the `$` is for the generated parser, which is text here
 #######################################
 # @description Define an option that take no argument
 # @arg $1 string Description of option to display
@@ -2945,7 +2953,7 @@ function dybatpho::opts::flag {
     local -a __meta_switches=()
     __dybatpho_cli_collect_switches __meta_switches "${@:3}"
     local __meta_record
-    __dybatpho_cli_meta_join __meta_record flag "${var}" "${description}" "${__meta_switches[*]}" \
+    __dybatpho_cli_meta_join __meta_record flag "${var}" "${description}" "${__meta_switches[*]-}" \
       "${__env:-@none}" "${__multiple:-false}" "${__choices:-@none}" "${__prompt:-@none}" \
       "${__hidden:-false}" "${__required:-false}" "${__deprecated:-@none}" "${__label:-@none}" \
       "${__config:-@none}" "${__count:-false}" "${__negatable:-false}" "${__pattern:-@none}" \
@@ -2979,7 +2987,7 @@ function dybatpho::opts::flag {
   fi
 }
 
-# shellcheck disable=2016
+# shellcheck disable=2016 # the `$` is for the generated parser, which is text here
 #######################################
 # @description Define an option that take an argument
 # @arg $1 string Description of option to display
@@ -3006,7 +3014,7 @@ function dybatpho::opts::param {
     local -a __meta_switches=()
     __dybatpho_cli_collect_switches __meta_switches "${@:3}"
     local __meta_record
-    __dybatpho_cli_meta_join __meta_record param "${var}" "${description}" "${__meta_switches[*]}" \
+    __dybatpho_cli_meta_join __meta_record param "${var}" "${description}" "${__meta_switches[*]-}" \
       "${__env:-@none}" "${__multiple:-false}" "${__choices:-@none}" "${__prompt:-@none}" \
       "${__hidden:-false}" "${__required:-false}" "${__deprecated:-@none}" "${__label:-@none}" \
       "${__config:-@none}" "${__count:-false}" "${__negatable:-false}" "${__pattern:-@none}" \
@@ -3095,7 +3103,7 @@ function dybatpho::opts::disp {
     local -a __meta_switches=()
     __dybatpho_cli_collect_switches __meta_switches "${@:2}"
     local __meta_record
-    __dybatpho_cli_meta_join __meta_record disp - "${description}" "${__meta_switches[*]}" \
+    __dybatpho_cli_meta_join __meta_record disp - "${description}" "${__meta_switches[*]-}" \
       @none false @none @none "${__hidden:-false}" false "${__deprecated:-@none}" \
       "${__label:-@none}" @none false false @none
     __meta_options+=("${__meta_record}")
@@ -3230,7 +3238,7 @@ function dybatpho::opts::cmd {
   fi
 }
 
-# shellcheck disable=2016
+# shellcheck disable=2016 # the `$` is for the generated parser, which is text here
 #######################################
 # @description Declare a positional argument. Its value is assigned to the named
 #              variable once parsing succeeds, and it also gives the usage line a
@@ -3393,7 +3401,7 @@ function dybatpho::generate_from_spec {
     dybatpho::debug_command "Generate script of \"${__dybatpho_cli_spec}\" - \"$*\"" \
       "dybatpho::show_file '${__dybatpho_cli_gen_file}'"
   fi
-  # shellcheck disable=1090
+  # shellcheck disable=1090 # the generated parser is written at run time, so there is no path to follow
   . "${__dybatpho_cli_gen_file}"
   # Sourced, the file has done its job. It goes now rather than on the EXIT
   # trap, which an action ending in `exec` never reaches: such a script used to

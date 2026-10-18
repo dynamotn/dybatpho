@@ -837,9 +837,9 @@ function __dybatpho_tui_menu_fallback {
   # for any given caller.
   # shellcheck disable=SC2178,SC2128
   if dybatpho::is true "${__dybatpho_tui_fb_multiple}"; then
-    DYBATPHO_TUI_INDEXES="${__dybatpho_tui_fb_chosen[*]}"
+    DYBATPHO_TUI_INDEXES="${__dybatpho_tui_fb_chosen[*]-}"
     __dybatpho_tui_fb_out=()
-    for __dybatpho_tui_fb_index in "${__dybatpho_tui_fb_chosen[@]}"; do
+    for __dybatpho_tui_fb_index in ${__dybatpho_tui_fb_chosen[@]+"${__dybatpho_tui_fb_chosen[@]}"}; do
       __dybatpho_tui_fb_out+=("${__dybatpho_tui_fb_items[__dybatpho_tui_fb_index - 1]}")
     done
   else
@@ -889,7 +889,7 @@ function __dybatpho_tui_menu_interactive {
   if ((${#__dybatpho_tui_menu_defaults[@]} > 0)); then
     __dybatpho_tui_menu_cursor=$((__dybatpho_tui_menu_defaults[0] - 1))
     if dybatpho::is true "${__dybatpho_tui_menu_multiple}"; then
-      for __dybatpho_tui_menu_index in "${__dybatpho_tui_menu_defaults[@]}"; do
+      for __dybatpho_tui_menu_index in ${__dybatpho_tui_menu_defaults[@]+"${__dybatpho_tui_menu_defaults[@]}"}; do
         __dybatpho_tui_menu_checked[__dybatpho_tui_menu_index - 1]=1
       done
     fi
@@ -1037,7 +1037,7 @@ function __dybatpho_tui_menu_interactive {
       __dybatpho_tui_menu_positions+=("$((__dybatpho_tui_menu_index + 1))")
     done
     DYBATPHO_TUI_INDEXES="${__dybatpho_tui_menu_positions[*]-}"
-    # shellcheck disable=SC2034
+    # shellcheck disable=SC2034 # the nameref writes the caller's array
     __dybatpho_tui_menu_out=(${__dybatpho_tui_menu_selected[@]+"${__dybatpho_tui_menu_selected[@]}"})
     printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt}" \
       "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_selected[*]-}" >&2

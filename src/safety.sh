@@ -81,7 +81,7 @@ function __dybatpho_safety_protected_paths {
   local -a extra_paths=()
   local extra_path
   IFS=':' read -r -a extra_paths <<< "${DYBATPHO_PROTECTED_PATHS}"
-  for extra_path in "${extra_paths[@]}"; do
+  for extra_path in ${extra_paths[@]+"${extra_paths[@]}"}; do
     [[ -n "${extra_path}" ]] || continue
     printf '%s\n' "${extra_path%/}"
   done
@@ -293,7 +293,7 @@ function dybatpho::assert_safe_path {
     local -a roots=()
     local root root_absolute root_physical is_inside=false
     IFS=':' read -r -a roots <<< "${DYBATPHO_SAFE_ROOTS}"
-    for root in "${roots[@]}"; do
+    for root in ${roots[@]+"${roots[@]}"}; do
       [[ -n "${root}" ]] || continue
       root_absolute="$(__dybatpho_safety_absolute_path "${root}")"
       root_physical="$(__dybatpho_safety_physical_dir "${root_absolute}")"
@@ -332,7 +332,7 @@ function dybatpho::safe_rm {
 
   local -a removals=()
   local target absolute_path
-  for target in "${targets[@]}"; do
+  for target in ${targets[@]+"${targets[@]}"}; do
     absolute_path="$(dybatpho::assert_safe_path "${target}" "path")" || return $?
     if ! dybatpho::is exist "${absolute_path}" && ! dybatpho::is link "${absolute_path}"; then
       dybatpho::debug "Skipping missing path: ${absolute_path}"
@@ -346,12 +346,12 @@ function dybatpho::safe_rm {
   done
   ((${#removals[@]})) || return 0
 
-  if ! __dybatpho_safety_approve "${force}" "Remove ${#removals[@]} path(s): ${removals[*]}?"; then
+  if ! __dybatpho_safety_approve "${force}" "Remove ${#removals[@]} path(s): ${removals[*]-}?"; then
     dybatpho::warn "Aborted removal of ${#removals[@]} path(s)"
     return 1
   fi
 
-  for absolute_path in "${removals[@]}"; do
+  for absolute_path in ${removals[@]+"${removals[@]}"}; do
     if dybatpho::is dir "${absolute_path}" && ! dybatpho::is link "${absolute_path}"; then
       dybatpho::dry_run rm -rf -- "${absolute_path}"
     else

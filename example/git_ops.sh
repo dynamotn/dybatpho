@@ -94,6 +94,7 @@ function _main {
   dybatpho::info "Commits since v1.0.0:"
   local git_commits_between_output
   git_commits_between_output=$(dybatpho::git_commits_between "${repo_path}" v1.0.0 HEAD)
+  local sha
   while IFS= read -r sha || [[ -n "${sha}" ]]; do
     local git_commit_subject
     git_commit_subject=$(dybatpho::git_commit_subject "${repo_path}" "${sha}")
@@ -105,6 +106,7 @@ function _main {
   dybatpho::info "Tags for v1.0.0 commit:"
   local git_tags_containing_output
   git_tags_containing_output=$(dybatpho::git_tags_containing "${repo_path}" v1.0.0)
+  local tag
   while IFS= read -r tag || [[ -n "${tag}" ]]; do
     dybatpho::print "  ${tag}"
   done < <(printf '%s' "${git_tags_containing_output}")
@@ -116,6 +118,7 @@ function _main {
   dybatpho::info "Changed files:"
   local git_changed_files_output
   git_changed_files_output=$(dybatpho::git_changed_files "${repo_path}")
+  local f
   while IFS= read -r f || [[ -n "${f}" ]]; do
     dybatpho::print "  ${f}"
   done < <(printf '%s' "${git_changed_files_output}")

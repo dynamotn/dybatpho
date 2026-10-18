@@ -56,6 +56,7 @@ function _demo_temp_dir {
   else
     local find_output
     find_output=$(find "${TMPDIR_VAR}" -type f | sort)
+    local f
     while IFS= read -r f || [[ -n "${f}" ]]; do
       dybatpho::print "  ${f}"
     done < <(printf '%s' "${find_output}")
@@ -245,7 +246,7 @@ function _demo_dry_run {
   DRY_RUN=true dybatpho::file_replace "${config}" 'keep' 'gone'
   DRY_RUN=true dybatpho::file_ensure_line "${config}" 'added'
   local cat
-  cat=$(cat "${config}")
+  cat=$(< "${config}")
   dybatpho::info "File is untouched: ${cat}"
 }
 
@@ -289,7 +290,7 @@ function _demo_ensure_dir {
   stat=$(stat -c %a "${cache}" 2> /dev/null || stat -f %Lp "${cache}")
   dybatpho::info "Cache dir : ${cache} (mode ${stat})"
   local cat
-  cat=$(cat "${cache}/state")
+  cat=$(< "${cache}/state")
   dybatpho::info "State file: ${cat}"
 
   # Calling it again is a no-op, so scripts can call it before every write.
@@ -315,7 +316,7 @@ function _demo_symlinked_dotfile {
   # shellcheck disable=SC2088 # `~/.bashrc` is prose in a log line, not a path to expand
   dybatpho::info "~/.bashrc is still a symlink: ${value}"
   local cat
-  cat=$(cat "${WORKDIR}/dotfiles/bashrc")
+  cat=$(< "${WORKDIR}/dotfiles/bashrc")
   dybatpho::info "Repository copy now holds  : ${cat}"
 }
 
@@ -388,7 +389,7 @@ function _demo_inspect {
     else
       dybatpho::file_replace "${candidate}" 'some' 'edited'
       local cat
-      cat=$(cat "${candidate}")
+      cat=$(< "${candidate}")
       local path_basename_2
       path_basename_2=$(dybatpho::path_basename "${candidate}")
       dybatpho::print "  ${path_basename_2} rewritten: ${cat}"

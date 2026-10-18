@@ -69,7 +69,7 @@ function __dybatpho_string_trim_into {
 function dybatpho::split {
   local -a parts=()
   __dybatpho_string_split_into parts "${1-}" "${2-}"
-  printf '%s\n' "${parts[@]}"
+  printf '%s\n' ${parts[@]+"${parts[@]}"}
 }
 
 #######################################
@@ -517,7 +517,7 @@ function dybatpho::string_wrap {
     return 0
   fi
 
-  for word in "${words[@]}"; do
+  for word in ${words[@]+"${words[@]}"}; do
     if [[ -z "${current_line}" ]]; then
       current_line="${word}"
     elif ((${#current_line} + 1 + ${#word} <= width)); then
@@ -871,7 +871,7 @@ function __dybatpho_string_distance_into {
       if ((del < ins)); then cur[j]=${del}; else cur[j]=${ins}; fi
       ((sub < cur[j])) && cur[j]=${sub}
     done
-    prev=("${cur[@]}")
+    prev=(${cur[@]+"${cur[@]}"})
   done
   __dybatpho_string_dist_out=${prev[lb]}
 }

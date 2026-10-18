@@ -240,6 +240,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-027**: A command started by `background_run` MUST see the caller's variables: the starter MUST keep its state in prefixed locals.
 - **FR-028**: The error handler MUST print every frame of the stack and exit with the status of the command that failed.
 - **FR-029**: `dybatpho::dry_run` MUST run its arguments as a command when the first one is `--`, never through `eval`, whatever their number; without `--` a single argument remains a shell string.
+- **FR-030**: The cleanup that `dybatpho::cleanup_file_on_exit` and `dybatpho::create_temp` register MUST trap `EXIT` only, so HUP, INT and TERM still end the shell with their own status after the paths are removed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -304,6 +305,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-018**: Fail with status 7 three functions deep after `register_err_handler`, and exit 7 with all three frames printed.
 - **IT-019**: Start a background job that leaves behind a child ignoring SIGTERM and exits, end the jobs, and see that child killed.
 - **IT-020**: Run `dybatpho::dry_run -- 'echo first; echo INJECTED'` and get status 127 with nothing injected; `dry_run -- printf 'plain %s\n' 'a b'` prints `plain a b`.
+- **IT-021**: Create a temporary file, send the script TERM, and see it exit 143 without running the next line and with the file removed.
 
 ## Acceptance Criteria *(mandatory)*
 

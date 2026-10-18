@@ -154,7 +154,7 @@ function __dybatpho_test_related {
       scripts/*.sh)
         while read -r _name; do
           _tests["${_name}"]=1
-        done < <(grep -lF "${_file}" "${_test_dir}"/*.bats || true)
+        done < <(grep -lF -- "${_file}" "${_test_dir}"/*.bats || true)
         ;;
       *) ;;
     esac
@@ -305,6 +305,7 @@ function __dybatpho_test_bats {
 function __dybatpho_test_bats_coverage {
   local -n _chunk_parts="$1"
   dybatpho::require "kcov"
+  [[ -n "${_coverage_dir}" ]] || dybatpho::die "No coverage directory"
   rm -rf "${_coverage_dir}"
   mkdir -p "${_coverage_dir}"
   : > "${_tap}"
@@ -328,7 +329,7 @@ function __dybatpho_test_bats_coverage {
       "${_kcov_source_args[@]}" \
       "${_part}" \
       "${BATS_CMD}" "${_bats_args[@]/${_run_dir}/${_chunk_out}}" \
-      "${_chunk_files[@]}" \
+      ${_chunk_files[@]+"${_chunk_files[@]}"} \
       2>&1 | tee -a "${_tap}" | __dybatpho_test_progress "${_expected}" || true
     _chunk_parts+=("${_part}")
     _index=$((_index + 1))
@@ -455,6 +456,7 @@ function __dybatpho_test_summary {
 function __dybatpho_test_coverage_merge {
   local -a _parts=("$@")
   dybatpho::progress "Merging ${#_parts[@]} coverage part(s)"
+  [[ -n "${_coverage_dir}" ]] || dybatpho::die "No coverage directory"
   kcov --merge "${_kcov_source_args[@]}" \
     "${_coverage_dir}/merged" "${_parts[@]}" > /dev/null
   rm -rf "${_coverage_dir}/bats"
@@ -496,7 +498,7 @@ function __dybatpho_test_run {
 
   local -A _expected_in
   local _expected=0 _file _count
-  for _file in "${_files[@]}"; do
+  for _file in ${_files[@]+"${_files[@]}"}; do
     _count="${__DYBATPHO_TEST_COUNTS["${_file}"]}"
     _expected_in["$(basename "${_file}")"]="${_count}"
     _expected=$((_expected + _count))
@@ -506,7 +508,7 @@ function __dybatpho_test_run {
   # before running anything. A machine without `parallel` used to get a run
   # that reported every test as never run and nothing about why.
   # shellcheck disable=SC2154 # set by the option spec of this script
-  if ((JOBS > 1)) && ! command -v parallel > /dev/null 2>&1; then
+  if ((JOBS > 1)) && ! command -v parallel &> /dev/null; then
     dybatpho::warn "GNU parallel is not installed; running with one worker"
     JOBS=1
   fi
@@ -557,7 +559,7 @@ function __dybatpho_test_run {
   local _files_failed _missing
   __dybatpho_test_summary "$((SECONDS - _start))" _files_failed _missing
   if [[ "${COVERAGE}" == "true" ]]; then
-    __dybatpho_test_coverage_merge "${_parts[@]}"
+    __dybatpho_test_coverage_merge ${_parts[@]+"${_parts[@]}"}
   fi
 
   if ((_files_failed || _missing)); then

@@ -493,7 +493,7 @@ function __dybatpho_screen_render_into {
   # row per frame, and at 35 microseconds each that was most of the cost of
   # drawing a frame.
   local __dybatpho_screen_r_plain="${__dybatpho_screen_plain[__dybatpho_screen_r_row]}"
-  for __dybatpho_screen_r_entry in "${__dybatpho_screen_r_entries[@]}"; do
+  for __dybatpho_screen_r_entry in ${__dybatpho_screen_r_entries[@]+"${__dybatpho_screen_r_entries[@]}"}; do
     __dybatpho_screen_r_column="${__dybatpho_screen_r_entry%%"${__DYBATPHO_SCREEN_US}"*}"
     __dybatpho_screen_r_style="${__dybatpho_screen_r_entry#*"${__DYBATPHO_SCREEN_US}"}"
     if ((__dybatpho_screen_r_column > __dybatpho_screen_r_previous)); then
@@ -1941,7 +1941,7 @@ function dybatpho::screen_barchart {
   local label_width="${options[label_width]:-0}"
   if ((label_width == 0)) && ((${#__dybatpho_screen_bar_names[@]} > 0)); then
     local measured
-    for point in "${__dybatpho_screen_bar_names[@]}"; do
+    for point in ${__dybatpho_screen_bar_names[@]+"${__dybatpho_screen_bar_names[@]}"}; do
       __dybatpho_log_width_into measured "${point}"
       ((measured > label_width)) && label_width="${measured}"
     done
@@ -2048,7 +2048,7 @@ function dybatpho::screen_chart {
   if ((have_range == 0)); then
     maximum="${__dybatpho_screen_chart_data[0]}"
     minimum="${maximum}"
-    for point in "${__dybatpho_screen_chart_data[@]}"; do
+    for point in ${__dybatpho_screen_chart_data[@]+"${__dybatpho_screen_chart_data[@]}"}; do
       [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
       ((point > maximum)) && maximum="${point}"
       ((point < minimum)) && minimum="${point}"
@@ -2256,7 +2256,7 @@ function dybatpho::screen_ansi {
   done
   [[ -n "${rest}" ]] && spans+=("${rest}" "${style}")
   ((${#spans[@]} > 0)) || return 0
-  dybatpho::screen_spans "${row}" "${column}" "${width}" "" "${spans[@]}"
+  dybatpho::screen_spans "${row}" "${column}" "${width}" "" ${spans[@]+"${spans[@]}"}
 }
 
 #######################################
@@ -2281,7 +2281,7 @@ function dybatpho::screen_keybar {
     spans+=(" $1" "${DYBATPHO_SCREEN_STYLE_KEY}" " $2 " "")
     shift 2
   done
-  dybatpho::screen_spans "${y}" "${x}" "${width}" "${DYBATPHO_SCREEN_STYLE_KEYBAR}" "${spans[@]}"
+  dybatpho::screen_spans "${y}" "${x}" "${width}" "${DYBATPHO_SCREEN_STYLE_KEYBAR}" ${spans[@]+"${spans[@]}"}
 }
 
 #######################################
@@ -2352,7 +2352,7 @@ function dybatpho::screen_theme {
   if ((${#palette[@]})); then
     local -a rgb=()
     local hex
-    for hex in "${palette[@]}"; do
+    for hex in ${palette[@]+"${palette[@]}"}; do
       rgb+=("$((16#${hex:0:2}));$((16#${hex:2:2}));$((16#${hex:4:2}))")
     done
     # base mantle surface1 overlay0 subtext0 lavender mauve pink green yellow red

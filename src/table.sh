@@ -80,7 +80,7 @@ function __dybatpho_table_split_row {
     local -a __dybatpho_table_fields=()
     local __dybatpho_table_field
     __dybatpho_string_split_into __dybatpho_table_fields "${row}" "${delimiter}"
-    for __dybatpho_table_field in "${__dybatpho_table_fields[@]}"; do
+    for __dybatpho_table_field in ${__dybatpho_table_fields[@]+"${__dybatpho_table_fields[@]}"}; do
       __dybatpho_string_trim_into __dybatpho_table_field "${__dybatpho_table_field}"
       target_ref+=("${__dybatpho_table_field}")
     done
@@ -267,7 +267,7 @@ function dybatpho::table_align {
   __dybatpho_table_parse_alignments "${align_spec}" widths alignments
   __dybatpho_log_repeat_into gap_text " " "${gap}"
 
-  for row in "${rows[@]}"; do
+  for row in ${rows[@]+"${rows[@]}"}; do
     __dybatpho_table_split_row "${row}" "${delimiter}" cells
     line=""
     for ((index = 0; index < ${#widths[@]}; index++)); do
@@ -346,7 +346,7 @@ function dybatpho::table_markdown {
 
     if ((row_index == 0)); then
       separator="|"
-      for width in "${widths[@]}"; do
+      for width in ${widths[@]+"${widths[@]}"}; do
         if ((width < 3)); then
           width=3
         fi
@@ -391,7 +391,7 @@ function __dybatpho_table_reject_quoted {
   local row
   __dybatpho_string_read_lines_into rows "${1-}"
 
-  for row in "${rows[@]}"; do
+  for row in ${rows[@]+"${rows[@]}"}; do
     # A quote right after a field boundary -- the start of the row or a comma,
     # either of them possibly followed by spaces -- is the shape of a quoted
     # field. A quote anywhere else is just a character in the data, such as the
@@ -479,17 +479,17 @@ function dybatpho::table_from_csv {
   local unit=$'\037' record field text=""
   local -a cells=()
   local IFS
-  for record in "${records[@]}"; do
+  for record in ${records[@]+"${records[@]}"}; do
     dybatpho::csv_fields "${record}" fields
     cells=()
-    for field in "${fields[@]}"; do
+    for field in ${fields[@]+"${fields[@]}"}; do
       field="${field//$'\r\n'/ }"
       field="${field//[$'\r\n']/ }"
       [[ "${style}" != "markdown" ]] || field="${field//|/\\|}"
       cells+=("${field}")
     done
     IFS="${unit}"
-    text+="${cells[*]}"$'\n'
+    text+="${cells[*]-}"$'\n'
     unset IFS
   done
 

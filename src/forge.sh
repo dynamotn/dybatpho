@@ -541,7 +541,8 @@ function dybatpho::forge_request {
   # The token goes to curl out of band rather than as `--header`, which would
   # publish it in `/proc/<pid>/cmdline` for the life of the request. `local`
   # scoping means it is visible to `dybatpho::curl_do` and gone on return.
-  local -a DYBATPHO_CURL_SECRET_HEADERS=(
+  local -a DYBATPHO_CURL_SECRET_HEADERS
+  DYBATPHO_CURL_SECRET_HEADERS=(
     "$(__dybatpho_forge_auth_header "${kind}" "${token}")"
   )
   local DYBATPHO_CURL_SECRET_DATA=""
@@ -954,7 +955,8 @@ function dybatpho::forge_release_upload {
       upload_url="${upload_url}/repos/${repo}/releases/${release}/assets?name=$(dybatpho::url_encode "${name}")"
 
       # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
-      local -a DYBATPHO_CURL_SECRET_HEADERS=(
+      local -a DYBATPHO_CURL_SECRET_HEADERS
+      DYBATPHO_CURL_SECRET_HEADERS=(
         "$(__dybatpho_forge_auth_header github "${token}")"
       )
       __dybatpho_forge_or_die "Could not upload ${name}" "${response}" \
@@ -976,8 +978,9 @@ function dybatpho::forge_release_upload {
       package_url="${package_url}/${url_encode}/$(dybatpho::url_encode "${name}")"
 
       # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
+      local -a DYBATPHO_CURL_SECRET_HEADERS
       # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-      local -a DYBATPHO_CURL_SECRET_HEADERS=(
+      DYBATPHO_CURL_SECRET_HEADERS=(
         "$(__dybatpho_forge_auth_header gitlab "${token}")"
       )
       __dybatpho_forge_or_die "Could not upload ${name}" "${response}" \

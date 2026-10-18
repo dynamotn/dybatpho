@@ -55,10 +55,10 @@ function __dybatpho_date_flavor_into {
   dybatpho::expect_args __dybatpho_date_flavor_var -- "$@"
   local -n __dybatpho_date_flavor_out="${__dybatpho_date_flavor_var}"
   if [[ -z "${__dybatpho_date_flavor_cache}" || "${__dybatpho_date_flavor_path}" != "${PATH}" ]]; then
-    if date -D "%Y" -d "2024" +%s > /dev/null 2>&1; then
+    if date -D "%Y" -d "2024" +%s &> /dev/null; then
       # Only BusyBox takes the input format through `-D`.
       __dybatpho_date_flavor_cache="busybox"
-    elif date -d "@0" +%s > /dev/null 2>&1; then
+    elif date -d "@0" +%s &> /dev/null; then
       __dybatpho_date_flavor_cache="gnu"
     else
       __dybatpho_date_flavor_cache="bsd"
@@ -193,7 +193,7 @@ function dybatpho::date_today {
 function dybatpho::date_is_valid {
   local input
   dybatpho::expect_args input -- "$@"
-  __dybatpho_date_parse "${input}" > /dev/null 2>&1
+  __dybatpho_date_parse "${input}" &> /dev/null
 }
 
 #######################################
@@ -614,7 +614,7 @@ function dybatpho::date_parse_duration {
       local -a __dybatpho_date_pd_amounts=()
       local -a __dybatpho_date_pd_units=(604800 86400 3600 60 1)
       local __dybatpho_date_pd_i
-      for __dybatpho_date_pd_i in "${__dybatpho_date_pd_groups[@]}"; do
+      for __dybatpho_date_pd_i in ${__dybatpho_date_pd_groups[@]+"${__dybatpho_date_pd_groups[@]}"}; do
         __dybatpho_date_pd_amounts+=("${BASH_REMATCH[__dybatpho_date_pd_i]}")
       done
       __dybatpho_date_pd_ok=1

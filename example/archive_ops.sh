@@ -28,6 +28,7 @@ function _demo_archives {
   dybatpho::header "LIST ARCHIVE"
   local archive_list_output
   archive_list_output=$(dybatpho::archive_list "${archive_path}")
+  local line
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${archive_list_output}")
@@ -52,6 +53,7 @@ function _demo_single_file_formats {
   dybatpho::info "Created: ${archive_path}"
   local archive_list_output
   archive_list_output=$(dybatpho::archive_list "${archive_path}")
+  local line
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${archive_list_output}")

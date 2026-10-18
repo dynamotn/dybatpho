@@ -30,6 +30,7 @@ function _demo_split {
   dybatpho::info "Splitting '${csv}' on ','"
   local split_output
   split_output=$(dybatpho::split "${csv}" ",")
+  local item
   while IFS= read -r item || [[ -n "${item}" ]]; do
     dybatpho::print "  - ${item}"
   done < <(printf '%s' "${split_output}")
@@ -129,6 +130,7 @@ function _demo_truncate_lines_wrap {
   dybatpho::info "Wrapped paragraph:"
   local string_wrap_output
   string_wrap_output=$(dybatpho::string_wrap "${paragraph}" 24 "> ")
+  local line
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${string_wrap_output}")
@@ -238,7 +240,7 @@ function _demo_distance {
   local typed
   for typed in "staus" "dploy" "frobnicate"; do
     if dybatpho::string_closest guesses "${typed}" 2 "${commands[@]}"; then
-      dybatpho::print "  ${typed}: did you mean ${guesses[*]}?"
+      dybatpho::print "  ${typed}: did you mean ${guesses[*]-}?"
     else
       dybatpho::print "  ${typed}: no close command"
     fi

@@ -34,7 +34,7 @@ function dybatpho::text_indent {
   local line
 
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     printf '%s%s\n' "${prefix}" "${line}"
   done
 }
@@ -52,7 +52,7 @@ function dybatpho::text_dedent {
 
   __dybatpho_string_read_lines_into lines "${input}"
 
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
       continue
     fi
@@ -70,7 +70,7 @@ function dybatpho::text_dedent {
     min_indent=0
   fi
 
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     if [[ "${line}" =~ ^[[:space:]]*$ ]]; then
       printf '\n'
     else
@@ -91,7 +91,7 @@ function dybatpho::text_strip_ansi {
   local line
 
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     __dybatpho_text_strip_ansi_into line "${line}"
     printf '%s\n' "${line}"
   done
@@ -111,7 +111,7 @@ function dybatpho::text_bullet_list {
   local line
 
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     if dybatpho::string_is_blank "${line}"; then
       printf '\n'
     else
@@ -247,7 +247,7 @@ function dybatpho::text_box {
   local -a lines=() widths=()
   local line width inner=0 title_width=0 index
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     __dybatpho_text_width_into width "${line}"
     widths+=("${width}")
     ((width > inner)) && inner=${width}
@@ -307,7 +307,7 @@ function dybatpho::text_center {
   local -a lines=()
   local line line_width
   __dybatpho_string_read_lines_into lines "${input}"
-  for line in "${lines[@]}"; do
+  for line in ${lines[@]+"${lines[@]}"}; do
     if dybatpho::string_is_blank "${line}"; then
       printf '\n'
       continue
@@ -389,7 +389,7 @@ function dybatpho::text_truncate_lines {
   local index hidden
   __dybatpho_string_read_lines_into lines "${input}"
   if ((${#lines[@]} <= count)); then
-    printf '%s\n' "${lines[@]}"
+    printf '%s\n' ${lines[@]+"${lines[@]}"}
     return 0
   fi
 

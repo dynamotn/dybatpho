@@ -216,7 +216,7 @@ function __dybatpho_csv_parse_into {
   local -a __dybatpho_csv_row=()
   local IFS
 
-  for __dybatpho_csv_line in "${__dybatpho_csv_lines[@]}"; do
+  for __dybatpho_csv_line in ${__dybatpho_csv_lines[@]+"${__dybatpho_csv_lines[@]}"}; do
     # A CRLF file leaves the carriage return at the end of every line, and a
     # value compared against one would never match what the caller typed.
     __dybatpho_csv_line="${__dybatpho_csv_line%$'\r'}"
@@ -236,7 +236,7 @@ function __dybatpho_csv_parse_into {
 
     __dybatpho_csv_split_into __dybatpho_csv_row "${__dybatpho_csv_buffer}" "${__dybatpho_csv_delimiter}"
     IFS="${__dybatpho_csv_unit}"
-    __dybatpho_csv_records_ref+=("${__dybatpho_csv_row[*]}")
+    __dybatpho_csv_records_ref+=("${__dybatpho_csv_row[*]-}")
     unset IFS
   done
 
@@ -244,7 +244,7 @@ function __dybatpho_csv_parse_into {
   if ((__dybatpho_csv_pending)); then
     __dybatpho_csv_split_into __dybatpho_csv_row "${__dybatpho_csv_buffer}" "${__dybatpho_csv_delimiter}"
     IFS="${__dybatpho_csv_unit}"
-    __dybatpho_csv_records_ref+=("${__dybatpho_csv_row[*]}")
+    __dybatpho_csv_records_ref+=("${__dybatpho_csv_row[*]-}")
     unset IFS
   fi
 }
@@ -481,7 +481,7 @@ function dybatpho::csv_header {
   __dybatpho_csv_load_into records names delimiter "${input}"
   ((${#records[@]})) || return 0
 
-  printf '%s\n' "${names[@]}"
+  printf '%s\n' ${names[@]+"${names[@]}"}
 }
 
 #######################################
@@ -554,11 +554,11 @@ function dybatpho::csv_select {
     __dybatpho_csv_split_fields_into fields "${records[${at}]}"
     __dybatpho_csv_expect_width fields names "${at}"
     chosen=()
-    for pick in "${picks[@]}"; do
+    for pick in ${picks[@]+"${picks[@]}"}; do
       chosen+=("${fields[${pick}]-}")
     done
     IFS="${__dybatpho_csv_unit}"
-    kept+=("${chosen[*]}")
+    kept+=("${chosen[*]-}")
     unset IFS
   done
 
@@ -632,7 +632,13 @@ function dybatpho::csv_sort {
     # Encode each number once into a key that orders correctly as text, so
     # the merge compares strings instead of parsing two numbers every time.
     for at in "${!keys[@]}"; do
-      [[ -z "${keys[${at}]}" ]] || __dybatpho_math_sort_key_into "keys[${at}]" "${keys[${at}]}"
+      # Through a scalar: Bash 4.3 drops an assignment made through a nameref
+      # that names an array element.
+      if [[ -n "${keys[${at}]}" ]]; then
+        local sort_key
+        __dybatpho_math_sort_key_into sort_key "${keys[${at}]}"
+        keys[at]="${sort_key}"
+      fi
     done
   fi
 
@@ -709,7 +715,7 @@ function dybatpho::csv_join {
 
   __dybatpho_csv_without_into extra right_names "${right_index}"
   IFS="${__dybatpho_csv_unit}"
-  joined=("${left_names[*]}${__dybatpho_csv_unit}${extra[*]}")
+  joined=("${left_names[*]-}${__dybatpho_csv_unit}${extra[*]-}")
   unset IFS
 
   local -a empty_right=()
@@ -735,12 +741,12 @@ function dybatpho::csv_join {
         done
         __dybatpho_csv_without_into right_rest fields "${right_index}"
         IFS="${__dybatpho_csv_unit}"
-        joined+=("${left_fields[*]}${__dybatpho_csv_unit}${right_rest[*]}")
+        joined+=("${left_fields[*]-}${__dybatpho_csv_unit}${right_rest[*]-}")
         unset IFS
       done
     elif [[ "${type}" == "left" ]]; then
       IFS="${__dybatpho_csv_unit}"
-      joined+=("${left_fields[*]}${__dybatpho_csv_unit}${empty_right[*]}")
+      joined+=("${left_fields[*]-}${__dybatpho_csv_unit}${empty_right[*]-}")
       unset IFS
     fi
   done

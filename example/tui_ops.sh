@@ -48,13 +48,13 @@ function _main {
   dybatpho::tui_multi_menu components "Which components?" \
     api worker scheduler < <(printf '1,3\n') \
     || dybatpho::die "No component chosen"
-  dybatpho::info "Chose ${#components[@]} components: ${components[*]}"
+  dybatpho::info "Chose ${#components[@]} components: ${components[*]-}"
 
   dybatpho::header "CONFIRMING"
   # Off a terminal this is `dybatpho::confirm`, which refuses to guess unless
   # the shell is declared interactive or `DYBATPHO_FORCE` answers for it.
   if DYBATPHO_INTERACTIVE=true dybatpho::tui_confirm \
-    "Deploy ${components[*]} to ${environment}?" yes < <(printf '\n'); then
+    "Deploy ${components[*]-} to ${environment}?" yes < <(printf '\n'); then
     dybatpho::info "Confirmed"
   else
     dybatpho::die "Cancelled"
@@ -64,7 +64,7 @@ function _main {
   # A spinner brackets a region: the message changes as the work moves on.
   dybatpho::tui_spinner_start "Resolving ${environment} release"
   local component
-  for component in "${components[@]}"; do
+  for component in ${components[@]+"${components[@]}"}; do
     dybatpho::tui_spinner_message "Resolving ${component}"
   done
   dybatpho::tui_spinner_stop 0 "Resolved ${#components[@]} components"
@@ -72,7 +72,7 @@ function _main {
   dybatpho::header "MEASURING WORK"
   # A progress bar is for work whose size is known up front.
   dybatpho::tui_progress_start "Uploading" "${#components[@]}"
-  for component in "${components[@]}"; do
+  for component in ${components[@]+"${components[@]}"}; do
     dybatpho::tui_progress_step 1 "Uploading ${component}"
   done
   dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"

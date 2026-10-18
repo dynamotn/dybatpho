@@ -574,7 +574,7 @@ function dybatpho::doctor {
   local row spec kind status version
   local -a missing_required=() missing_optional=() unknown=()
   local -a outdated_required=() outdated_optional=()
-  for row in "${rows[@]}"; do
+  for row in ${rows[@]+"${rows[@]}"}; do
     IFS=$'\t' read -r _ spec kind status _ version <<< "${row}"
     case "${status}" in
       missing)
@@ -626,19 +626,19 @@ function dybatpho::doctor {
     ${modules[@]+"${modules[@]}"}
   printf '\n'
   if ((${#missing_optional[@]} > 0)); then
-    printf 'Optional, some functions are unavailable: %s\n' "${missing_optional[*]}"
+    printf 'Optional, some functions are unavailable: %s\n' "${missing_optional[*]-}"
   fi
   if ((${#outdated_optional[@]} > 0)); then
-    printf 'Optional, too old: %s\n' "${outdated_optional[*]}"
+    printf 'Optional, too old: %s\n' "${outdated_optional[*]-}"
   fi
   if ((${#unknown[@]} > 0)); then
-    printf 'Installed, version could not be read: %s\n' "${unknown[*]}"
+    printf 'Installed, version could not be read: %s\n' "${unknown[*]-}"
   fi
   if ((${#missing_required[@]} > 0)); then
-    printf 'Missing required: %s\n' "${missing_required[*]}"
+    printf 'Missing required: %s\n' "${missing_required[*]-}"
   fi
   if ((${#outdated_required[@]} > 0)); then
-    printf 'Required, too old: %s\n' "${outdated_required[*]}"
+    printf 'Required, too old: %s\n' "${outdated_required[*]-}"
   fi
   local edge
   for edge in ${graph_unknown[@]+"${graph_unknown[@]}"}; do

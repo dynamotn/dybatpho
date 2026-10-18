@@ -558,7 +558,7 @@ function dybatpho::is_ci {
   # sets `GITHUB_ACTIONS`, `CI=false` still detected CI, and the one way a
   # caller had to turn the detection off did nothing.
   if [[ -n "${CI:-}" ]]; then
-    case "$(dybatpho::lower "${CI}")" in
+    case "$(dybatpho::lower "${CI:-}")" in
       false | 0 | no) return 1 ;;
       *) return 0 ;;
     esac

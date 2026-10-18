@@ -362,7 +362,7 @@ function dybatpho::validate_types {
   local -a names=()
   names=(${__DYBATPHO_VALIDATE_PREDICATES[@]+"${!__DYBATPHO_VALIDATE_PREDICATES[@]}"})
   ((${#names[@]})) || return 0
-  printf '%s\n' "${names[@]}" | LC_ALL=C sort
+  printf '%s\n' ${names[@]+"${names[@]}"} | LC_ALL=C sort
 }
 
 #######################################

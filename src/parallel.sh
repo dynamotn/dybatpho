@@ -438,7 +438,7 @@ function __dybatpho_parallel_pool {
   __dybatpho_process_trap_only '__dybatpho_parallel_interrupted=INT; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGINT
-  # shellcheck disable=SC2016
+  # shellcheck disable=SC2016 # the `$` is for the trap, which runs the text later
   __dybatpho_process_trap_only '__dybatpho_parallel_interrupted=TERM; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGTERM
@@ -462,7 +462,7 @@ function __dybatpho_parallel_pool {
       # ends the watchdog, and it holds no output stream the caller is reading.
       __dybatpho_parallel_watch "$!" "${__dybatpho_parallel_pool_index}" "${__dybatpho_parallel_pool_directory}" \
         "${__dybatpho_parallel_limit}" \
-        < /dev/null > /dev/null 2>&1 &
+        < /dev/null &> /dev/null &
       __dybatpho_parallel_watchdog_of[${__dybatpho_parallel_pids[-1]}]="$!"
       __dybatpho_parallel_watchdogs+=("$!")
     fi

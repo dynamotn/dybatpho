@@ -28,6 +28,7 @@ EOF
   dybatpho::info "Pretty JSON:"
   local json_pretty_output
   json_pretty_output=$(dybatpho::json_pretty "${json_file}")
+  local line
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${json_pretty_output}")
@@ -54,6 +55,7 @@ EOF
   dybatpho::info "Pretty YAML:"
   local yaml_pretty_output
   yaml_pretty_output=$(dybatpho::yaml_pretty "${yaml_file}")
+  local line
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${yaml_pretty_output}")
@@ -82,6 +84,7 @@ EOF
   dybatpho::info "JSON -> YAML:"
   local json_to_yaml_output
   json_to_yaml_output=$(dybatpho::json_to_yaml "${json_file}")
+  local line
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${json_to_yaml_output}")
@@ -183,7 +186,7 @@ EOF
   merged=$(dybatpho::json_merge "${config}" "${overrides}")
   _print_document "${merged}"
 
-  if dybatpho::json_set "${config}" server.port.number 1 > /dev/null 2>&1; then
+  if dybatpho::json_set "${config}" server.port.number 1 &> /dev/null; then
     dybatpho::error "A path through a number should have been refused"
   else
     dybatpho::info "A path through a number is refused, and the file is left untouched"

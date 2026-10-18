@@ -62,7 +62,7 @@ function dybatpho::release_commit_parse {
   dybatpho::expect_args subject -- "$@"
   local -a parsed=()
   __dybatpho_release_parse_into parsed "${subject}" "${2-}"
-  printf '%s\n%s\n%s\n%s\n' "${parsed[@]}"
+  printf '%s\n%s\n%s\n%s\n' ${parsed[@]+"${parsed[@]}"}
 }
 
 #######################################
@@ -303,15 +303,15 @@ function dybatpho::release_changelog {
   printf '## [%s]\n' "${version}"
   if ((${#breaking[@]})); then
     printf '\n### Changed\n\n'
-    printf '%s\n' "${breaking[@]}"
+    printf '%s\n' ${breaking[@]+"${breaking[@]}"}
   fi
   if ((${#features[@]})); then
     printf '\n### Added\n\n'
-    printf '%s\n' "${features[@]}"
+    printf '%s\n' ${features[@]+"${features[@]}"}
   fi
   if ((${#fixes[@]})); then
     printf '\n### Fixed\n\n'
-    printf '%s\n' "${fixes[@]}"
+    printf '%s\n' ${fixes[@]+"${fixes[@]}"}
   fi
 }
 
@@ -382,7 +382,7 @@ function dybatpho::release_package {
     "${release_artifact_name}")"
   # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
   if dybatpho::is true "${DRY_RUN}"; then
-    dybatpho::dry_run "package ${source} into ${artifact}"
+    dybatpho::dry_run -- package "${source}" into "${artifact}"
     printf '%s\n' "${artifact}"
     return 0
   fi
@@ -430,12 +430,12 @@ function dybatpho::release_checksums {
     || dybatpho::die "${FUNCNAME[0]}: No artifact to checksum in ${directory}"
 
   if dybatpho::is true "${DRY_RUN}"; then
-    dybatpho::dry_run "checksum ${#artifacts[@]} artifacts into ${output}"
+    dybatpho::dry_run -- checksum "${#artifacts[@]}" artifacts into "${output}"
     printf '%s\n' "${output}"
     return 0
   fi
 
-  for entry in "${artifacts[@]}"; do
+  for entry in ${artifacts[@]+"${artifacts[@]}"}; do
     name="$(dybatpho::path_basename "${entry}")"
     sums+="$(dybatpho::file_hash "${entry}" "${DYBATPHO_RELEASE_CHECKSUM_ALGORITHM}")  ${name}"$'\n'
   done
@@ -472,7 +472,7 @@ function dybatpho::release_sign {
   signature="${2:-${path}.asc}"
 
   if dybatpho::is true "${DRY_RUN}"; then
-    dybatpho::dry_run "sign ${path} into ${signature}"
+    dybatpho::dry_run -- sign "${path}" into "${signature}"
     printf '%s\n' "${signature}"
     return 0
   fi

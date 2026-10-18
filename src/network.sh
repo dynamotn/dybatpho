@@ -227,9 +227,16 @@ function __dybatpho_network_with_secret_headers {
     shift
   done
   shift
-  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-  local -a DYBATPHO_CURL_SECRET_HEADERS=(
+  # The caller's headers are read before the local exists: Bash 4.3 declares
+  # the local first and then expands the right-hand side, so the copy saw an
+  # empty array and every header the caller had set was dropped.
+  local -a __dybatpho_network_wsh_inherited=(
     ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}
+  )
+  local -a DYBATPHO_CURL_SECRET_HEADERS
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  DYBATPHO_CURL_SECRET_HEADERS=(
+    ${__dybatpho_network_wsh_inherited[@]+"${__dybatpho_network_wsh_inherited[@]}"}
     ${__dybatpho_network_wsh_added[@]+"${__dybatpho_network_wsh_added[@]}"}
   )
   "$@"
@@ -303,7 +310,7 @@ function __dybatpho_network_get_http_code {
     '506') echo '506 (variant also negotiates)' ;;
     '510') echo '510 (not extended)' ;;
     '511') echo '511 (network authentication required)' ;;
-    *) echo "${code} (unknown)" ;;
+    *) printf '%s (unknown)\n' "${code}" ;;
       # kcov(enabled)
   esac
 }
@@ -679,7 +686,7 @@ function dybatpho::curl_upload {
     fi
   done
 
-  dybatpho::curl_do "${url}" "${output}" --request POST "${curl_args[@]}"
+  dybatpho::curl_do "${url}" "${output}" --request POST ${curl_args[@]+"${curl_args[@]}"}
 }
 
 #######################################
@@ -1261,7 +1268,7 @@ function dybatpho::curl_paginate {
   if [[ -n "${DYBATPHO_PAGINATE_RATE}" ]]; then
     # `url_parse` writes to a global, so its answer is read in a subshell here
     # rather than overwriting whatever the caller last parsed.
-    rate_key="$(dybatpho::url_parse "${url}" > /dev/null 2>&1 && printf '%s' "${DYBATPHO_URL[host]}")" || rate_key=""
+    rate_key="$(dybatpho::url_parse "${url}" &> /dev/null && printf '%s' "${DYBATPHO_URL[host]}")" || rate_key=""
     rate_key="${rate_key:-curl_paginate}"
   fi
 

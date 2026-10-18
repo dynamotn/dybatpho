@@ -37,7 +37,7 @@ function dybatpho::show_file {
   if dybatpho::is command "bat"; then
     bat "${file_path}" >&2
   else
-    cat -n "${file_path}" >&2 # kcov(skip)
+    cat -n -- "${file_path}" >&2 # kcov(skip)
   fi
 }
 
@@ -196,7 +196,7 @@ function dybatpho::path_normalize {
   local part last_index
   IFS='/' read -r -a parts <<< "${path}"
 
-  for part in "${parts[@]}"; do
+  for part in ${parts[@]+"${parts[@]}"}; do
     case "${part}" in
       '' | '.')
         continue
@@ -328,7 +328,7 @@ function dybatpho::path_relative {
   if ((${#relative_parts[@]} == 0)); then
     printf '.\n'
   else
-    printf '%s\n' "$(IFS=/ && printf '%s' "${relative_parts[*]}")"
+    printf '%s\n' "$(IFS=/ && printf '%s' "${relative_parts[*]-}")"
   fi
 }
 
@@ -388,7 +388,7 @@ function dybatpho::create_temp {
   local -n __dybatpho_tmp_path="${__dybatpho_tmp_var}"
   local __dybatpho_tmp_prefix="${1:-temp}"
   local __dybatpho_tmp_format="dybatpho_${__dybatpho_tmp_prefix}_${__dybatpho_tmp_pid}"
-  if hash "mktemp" > /dev/null 2>&1; then
+  if hash "mktemp" &> /dev/null; then
     local __dybatpho_tmp_template="${__dybatpho_tmp_parent%/}/${__dybatpho_tmp_format}_XXXXXXXX"
     # dyshellint disable=BSG046 # this is `dybatpho::create_temp` itself
     if dybatpho::is empty "${__dybatpho_tmp_ext}"; then
@@ -861,7 +861,7 @@ function dybatpho::file_replace {
 # @internal
 #######################################
 function __dybatpho_file_produce_sed {
-  sed "$2" "$3" > "$1"
+  sed -- "$2" "$3" > "$1"
 }
 
 #######################################
@@ -1356,7 +1356,7 @@ function dybatpho::dir_size {
   # asked once, up front: falling back after a failed `find` walked the tree a
   # second time whenever any part of it could not be read.
   local -a stat_size=(stat -L -c '%s')
-  stat -c '%s' -- "${directory}" > /dev/null 2>&1 || stat_size=(stat -L -f '%z')
+  stat -c '%s' -- "${directory}" &> /dev/null || stat_size=(stat -L -f '%z')
   local sizes status=0
   sizes="$(find "${directory}" -type f -exec "${stat_size[@]}" {} + 2> /dev/null)" || status=$?
   total="$(printf '%s\n' "${sizes}" | awk '{ total += $1 } END { printf "%d\n", total }')"

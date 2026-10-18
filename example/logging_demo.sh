@@ -126,12 +126,13 @@ function _demo_file_logging {
   )
   dybatpho::info "Log file content:"
   local cat
-  cat=$(cat "${log_file}")
+  cat=$(< "${log_file}")
   dybatpho::print "${cat}"
 
   dybatpho::info "Simulating rotation with a tiny LOG_FILE_MAX_BYTES..."
   (
     export LOG_FILE="${log_file}" LOG_FILE_MAX_BYTES=200 LOG_FILE_MAX_BACKUPS=2
+    local event
     for ((event = 1; event <= 5; event++)); do
       dybatpho::info "padding event number ${event} to exceed the rotation threshold"
     done
@@ -163,7 +164,7 @@ function _demo_log_to_file {
   )
   dybatpho::info "Log file content:"
   local cat
-  cat=$(cat "${log_file}")
+  cat=$(< "${log_file}")
   dybatpho::print "${cat}"
 }
 

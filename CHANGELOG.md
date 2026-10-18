@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leading `--` runs the command as an argument vector whatever its length;
   without it a single argument is still a shell string run through `eval`, as
   before. `dybatpho::safe_system`, `dybatpho::privilege_run`, the package
-  installers and the desktop and mail notifications use the new form.
+  installers, the desktop and mail notifications and the `release` rehearsals
+  use the new form, so a `DRY_RUN` line such as `package x into y` is now
+  printed word by word rather than as one quoted token.
 
 - **`init.sh` — a failing command stops the command substitution it runs in.**
   On Bash 4.4 or newer the bootstrap now turns on `inherit_errexit` next to
@@ -50,6 +52,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modules, so the check works inside a bundle too.
 
 ### Fixed
+
+- **`process` — a script with a temporary file ends on Ctrl-C or `kill`.**
+  The cleanup behind `dybatpho::create_temp` and
+  `dybatpho::cleanup_file_on_exit` trapped HUP, INT and TERM as well as `EXIT`,
+  which replaced what those signals do: the script removed its files and then
+  carried on, exiting 0. It now traps `EXIT` alone, which Bash runs on those
+  signals too, so the files are still removed and the script ends with the
+  signal's status. An interrupted `dybatpho::parallel_map` or
+  `dybatpho::parallel_run` inside a subshell now ends it with 130 or 143 as
+  documented.
+
+- **`network` — secret headers already set survive `dybatpho::curl_auth_bearer`
+  on Bash 4.3.** The helper that adds a header copied the caller's
+  `DYBATPHO_CURL_SECRET_HEADERS` into a local of the same name, and Bash 4.3
+  creates the local before reading the right-hand side, so the copy was empty.
+  The same pattern dropped persistent options from the help of a `cli` child
+  command.
+
+- **`math`, `csv` — `dybatpho::math_median`, `math_percentile` and a numeric
+  `dybatpho::csv_sort` of decimals work on Bash 4.3**, which drops an
+  assignment made through a nameref that names an array element.
 
 - **`network` — a token in a custom header no longer follows a redirect to
   another host.** `dybatpho::curl_do` passed `-L` to curl, which resends every
@@ -100,7 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   called without options, and the `cli` generators -- parser, help, schema,
   completion -- for a spec with no options, commands, aliases or persistent
   definitions all failed under `nounset` on the oldest Bash the library
-  supports.
+  supports. Every other expansion of an array that can be empty, across the
+  whole library, now carries the same guard.
 
 - **A number with a leading zero is read in base ten.** `dybatpho::array_sort
   --numeric` of `08`, `dybatpho::i18n_month_name 08` and a plural count of

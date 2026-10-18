@@ -15,7 +15,7 @@ dybatpho::register_common_handlers
 # named variable and registers the directory for cleanup when this script ends.
 dybatpho::create_temp_dir CACHE_ROOT "cache-example"
 # shellcheck disable=SC2154 # set by the option spec of this script
-export DYBATPHO_CACHE_DIR="${CACHE_ROOT}/cache"
+export DYBATPHO_CACHE_DIR="${CACHE_ROOT:-}/cache"
 export DYBATPHO_CACHE_NAMESPACE="example"
 
 CALLS_FILE="${CACHE_ROOT}/calls"
@@ -26,7 +26,7 @@ printf '0\n' > "${CALLS_FILE}"
 # @noargs
 function _expensive_listing {
   local cat
-  cat=$(cat "${CALLS_FILE}")
+  cat=$(< "${CALLS_FILE}")
   printf '%s\n' "$((cat + 1))" > "${CALLS_FILE}"
   printf 'release-1.0\nrelease-1.1\n'
 }
@@ -68,7 +68,7 @@ function _demo_run {
 function _demo_failure_is_not_remembered {
   dybatpho::header "A FAILURE IS NOT AN ANSWER"
   local status=0
-  dybatpho::cache_run flaky 3600 -- false > /dev/null 2>&1 || status=$?
+  dybatpho::cache_run flaky 3600 -- false &> /dev/null || status=$?
   dybatpho::print "  the command exited ${status}, and its own status came back"
   if dybatpho::cache_has flaky 3600; then
     dybatpho::warn "  it was stored, which it should not have been"
@@ -181,7 +181,7 @@ function _demo_prune {
   local -a left=()
   dybatpho::cache_has three 999999999 && left+=(three)
   dybatpho::cache_has four 999999999 && left+=(four)
-  dybatpho::print "  kept the two written last: ${left[*]}"
+  dybatpho::print "  kept the two written last: ${left[*]-}"
   dybatpho::cache_prune --older-than 0
   if dybatpho::cache_has four 999999999; then
     dybatpho::warn "  an entry survived --older-than 0"

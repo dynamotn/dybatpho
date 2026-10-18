@@ -91,6 +91,7 @@ function _demo_artifacts {
   # In a real build each platform has its own output directory; the same one is
   # reused here because the demo has no cross-compiler.
   for platform in "linux amd64" "linux arm64" "darwin arm64" "windows amd64"; do
+    local goarch goos
     read -r goos goarch <<< "${platform}"
     if [[ "${goos}" == "windows" ]] && ! dybatpho::is command zip; then
       dybatpho::warn "Skipping ${goos}/${goarch}: zip is not installed"

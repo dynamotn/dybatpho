@@ -565,7 +565,7 @@ function dybatpho::backup_list {
   local -a found=()
   __dybatpho_backup_collect_into found "${directory}" "${name}"
   ((${#found[@]})) || return 0
-  printf '%s\n' "${found[@]}"
+  printf '%s\n' ${found[@]+"${found[@]}"}
 }
 
 #######################################
@@ -820,10 +820,10 @@ function dybatpho::backup_prune {
   # reaches another: a file hard-linked between snapshots lives on until the
   # last snapshot naming it is gone.
   if [[ -n "${force}" ]]; then
-    dybatpho::safe_rm "${force}" --recursive -- "${doomed[@]}"
+    dybatpho::safe_rm "${force}" --recursive -- ${doomed[@]+"${doomed[@]}"}
     return
   fi
-  dybatpho::safe_rm --recursive -- "${doomed[@]}"
+  dybatpho::safe_rm --recursive -- ${doomed[@]+"${doomed[@]}"}
 }
 
 #######################################

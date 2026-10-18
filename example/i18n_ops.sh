@@ -300,7 +300,7 @@ SOURCE
   dybatpho::i18n_extract --locale en "${source}" 2> "${WORKDIR}/extract.err" \
     | dybatpho::text_indent - "  " || true
   dybatpho::print "  stderr said:"
-  dybatpho::text_indent "$(cat "${WORKDIR}/extract.err")" "    " || true
+  dybatpho::text_indent "$(< "${WORKDIR}/extract.err")" "    " || true
 
   dybatpho::info "Checking a translation against the reference locale"
   dybatpho::i18n_reset

@@ -242,7 +242,7 @@ function __dybatpho_release_preflight {
       || dybatpho::die "Release cancelled"
   fi
 
-  git -C "${DYBATPHO_DIR}" rev-parse -q --verify "refs/tags/${_tag}" > /dev/null 2>&1 \
+  git -C "${DYBATPHO_DIR}" rev-parse -q --verify "refs/tags/${_tag}" &> /dev/null \
     && dybatpho::die "Tag ${_tag} already exists"
   return 0
 }
@@ -461,10 +461,10 @@ function __dybatpho_release_run {
     if dybatpho::is true "${DRY_RUN}"; then
       local wc
       wc=$(wc -l < "${_notes}")
-      dybatpho::dry_run "forge_release_create ${_tag} with ${wc} lines of notes"
+      dybatpho::dry_run -- forge_release_create "${_tag}" with "${wc}" lines of notes
       local _artifact
       for _artifact in ${_artifacts[@]+"${_artifacts[@]}"}; do
-        dybatpho::dry_run "forge_release_upload ${_tag} ${_artifact}"
+        dybatpho::dry_run -- forge_release_upload "${_tag}" "${_artifact}"
       done
     else
       # shellcheck disable=SC2154 # set by the option spec of this script
@@ -510,13 +510,13 @@ function _spec {
   # shellcheck disable=SC1083 # `--{no-}name` is dybatpho's toggle-switch syntax
   dybatpho::opts::flag "Regenerate docs/ before committing" DOCS --{no-}docs \
     on:true off:false init:="true"
-  # shellcheck disable=SC1083
+  # shellcheck disable=SC1083 # `--{no-}` is the toggle-switch syntax of dybatpho::opts::flag
   dybatpho::opts::flag "Build the bundle and checksum artifacts" BUNDLE --{no-}bundle \
     on:true off:false init:="true"
-  # shellcheck disable=SC1083
+  # shellcheck disable=SC1083 # `--{no-}` is the toggle-switch syntax of dybatpho::opts::flag
   dybatpho::opts::flag "Push the branch and the tag" PUSH --{no-}push \
     on:true off:false init:="true"
-  # shellcheck disable=SC1083
+  # shellcheck disable=SC1083 # `--{no-}` is the toggle-switch syntax of dybatpho::opts::flag
   dybatpho::opts::flag "Create the release on the forge" PUBLISH --{no-}publish \
     on:true off:false init:="true"
   dybatpho::opts::flag "Report every step and change nothing" DRY_RUN -n --dry-run \

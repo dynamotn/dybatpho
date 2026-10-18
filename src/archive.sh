@@ -207,7 +207,7 @@ function dybatpho::archive_create {
     dybatpho::require "${tool}"
     dybatpho::is file "${source_path}" || dybatpho::die \
       "Single-file archive formats require a file source: ${source_path}"
-    "${tool}" "${pack[@]}" "${source_path}" > "${output_path}"
+    "${tool}" ${pack[@]+"${pack[@]}"} "${source_path}" > "${output_path}"
   else
     dybatpho::require zip
     if dybatpho::path_is_abs "${output_path}"; then
@@ -244,7 +244,7 @@ function dybatpho::archive_extract {
   if ((strip_components > 0)); then
     strip_args=(--strip-components "${strip_components}")
   fi
-  mkdir -p "${destination}"
+  mkdir -p -- "${destination}"
 
   local tool name letter
   local -a prefix=() pack=() unpack=()
@@ -256,7 +256,7 @@ function dybatpho::archive_extract {
     dybatpho::require "${tool}"
     ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
     name=$(__dybatpho_archive_output_name "${archive_path}")
-    "${tool}" "${unpack[@]}" "${archive_path}" \
+    "${tool}" ${unpack[@]+"${unpack[@]}"} "${archive_path}" \
       > "$(dybatpho::path_join "${destination}" "${name}")"
   else
     dybatpho::require unzip

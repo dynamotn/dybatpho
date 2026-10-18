@@ -116,7 +116,7 @@ function __dybatpho_metrics_labels {
   done
   __dybatpho_helpers_sort rendered __dybatpho_metrics_before
   local joined="" rendered_pair
-  for rendered_pair in "${rendered[@]}"; do
+  for rendered_pair in ${rendered[@]+"${rendered[@]}"}; do
     joined="${joined:+${joined},}${rendered_pair}"
   done
   __labels_out="{${joined}}"
@@ -306,7 +306,7 @@ function __dybatpho_metrics_validate_quantiles {
   IFS=, read -r -a quantiles <<< "${DYBATPHO_METRICS_QUANTILES}"
   ((${#quantiles[@]})) \
     || dybatpho::die "${FUNCNAME[1]}: DYBATPHO_METRICS_QUANTILES must list at least one quantile"
-  for quantile in "${quantiles[@]}"; do
+  for quantile in ${quantiles[@]+"${quantiles[@]}"}; do
     dybatpho::math_is_number "${quantile}" \
       || dybatpho::die "${FUNCNAME[1]}: Quantile must be a number from 0 to 1, got '${quantile}'"
     below="$(dybatpho::math_compare "${quantile}" 0)"
@@ -614,9 +614,9 @@ function dybatpho::metrics_render {
         IFS=, read -r -a quantiles <<< "${DYBATPHO_METRICS_QUANTILES}"
         for key in ${keys[@]+"${keys[@]}"}; do
           read -r -a samples <<< "${__dybatpho_metrics_samples[${key}]}"
-          for quantile in "${quantiles[@]}"; do
+          for quantile in ${quantiles[@]+"${quantiles[@]}"}; do
             percentile="$(dybatpho::math_mul "${quantile}" 100)"
-            value="$(dybatpho::math_percentile "${percentile}" "${samples[@]}")"
+            value="$(dybatpho::math_percentile "${percentile}" ${samples[@]+"${samples[@]}"})"
             # Milliseconds to seconds is a shift of the decimal point, so the
             # exported quantile is as exact as the interpolation.
             value="$(dybatpho::math_mul "${value}" 0.001)"
@@ -655,7 +655,7 @@ function __dybatpho_metrics_keys_of {
     fi
   done
   __dybatpho_helpers_sort matched __dybatpho_metrics_before
-  ((${#matched[@]})) && printf '%s\n' "${matched[@]}"
+  ((${#matched[@]})) && printf '%s\n' ${matched[@]+"${matched[@]}"}
   return 0
 }
 

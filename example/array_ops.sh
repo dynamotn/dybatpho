@@ -24,6 +24,7 @@ function _demo_print {
   dybatpho::info "Array elements:"
   local array_print_output
   array_print_output=$(dybatpho::array_print "fruits")
+  local item
   while IFS= read -r item || [[ -n "${item}" ]]; do
     dybatpho::print "  ${item}"
   done < <(printf '%s' "${array_print_output}")
@@ -178,6 +179,7 @@ function _demo_pipeline {
   local -a langs
   local split_output
   split_output=$(dybatpho::split "${raw}" ",")
+  local lang
   while IFS= read -r lang || [[ -n "${lang}" ]]; do
     langs+=("${lang}")
   done < <(printf '%s' "${split_output}")
@@ -260,19 +262,19 @@ function _demo_graph {
 
   local -a order=()
   dybatpho::array_toposort deps order
-  printf 'load order: %s\n' "${order[*]}"
+  printf 'load order: %s\n' "${order[*]-}"
 
   # Only what one entry reaches, for "what would installing this pull in".
   local -a needed=()
   dybatpho::array_closure deps needed tui
-  printf 'tui needs:  %s\n' "${needed[*]}"
+  printf 'tui needs:  %s\n' "${needed[*]-}"
 
   # A cycle is reported rather than refused: some graphs have one on purpose,
   # and an order is still useful.
   local -A cyclic=([text]="table" [table]="text")
   local -a broken=()
   if ! dybatpho::array_toposort cyclic broken; then
-    printf 'cycle found, order still usable: %s\n' "${broken[*]}"
+    printf 'cycle found, order still usable: %s\n' "${broken[*]-}"
   fi
 }
 

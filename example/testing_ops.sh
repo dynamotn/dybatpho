@@ -16,7 +16,7 @@ dybatpho::register_common_handlers
 # Keep snapshots beside this example instead of the repository's test tree.
 dybatpho::fixture_dir EXAMPLE_ROOT
 # shellcheck disable=SC2154 # set by the option spec of this script
-export DYBATPHO_TEST_SNAPSHOT_DIR="${EXAMPLE_ROOT}/snapshots"
+export DYBATPHO_TEST_SNAPSHOT_DIR="${EXAMPLE_ROOT:-}/snapshots"
 
 # --- the script under test ---------------------------------------------------
 
@@ -28,18 +28,18 @@ function _release_tool {
   local version="${RELEASE_VERSION:?RELEASE_VERSION must be set}"
   local out_dir="$1"
 
-  mkdir -p "${out_dir}"
+  mkdir -p -- "${out_dir}"
   dybatpho::curl_do "https://api.example.test/releases/${version}" "${out_dir}/release.json" \
     || return 1
 
   # shellcheck disable=SC2154 # set by the option spec of this script
-  printf '{"version":"%s","channel":"%s"}\n' "${version}" "${RELEASE_CHANNEL}" \
+  printf '{"version":"%s","channel":"%s"}\n' "${version}" "${RELEASE_CHANNEL:-}" \
     > "${out_dir}/manifest.json"
   ln -sfn "manifest.json" "${out_dir}/current.json"
   chmod 600 "${out_dir}/manifest.json"
 
   git tag "v${version}"
-  printf 'Released %s on %s\n' "${version}" "${RELEASE_CHANNEL}"
+  printf 'Released %s on %s\n' "${version}" "${RELEASE_CHANNEL:-}"
 }
 
 # --- fixtures ----------------------------------------------------------------
@@ -111,7 +111,7 @@ dybatpho::header "SNAPSHOT TESTING"
 dybatpho::snapshot_scrub "${workdir}" '<WORKDIR>'
 dybatpho::assert_cli_snapshot release-run -- _release_tool "${workdir}/dist2"
 dybatpho::info "Recorded snapshot:"
-cat_2=$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")
+cat_2=$(< "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")
 dybatpho::text_indent "${cat_2}" "  "
 # Running again compares against the snapshot recorded a moment ago.
 dybatpho::assert_cli_snapshot release-run -- _release_tool "${workdir}/dist2"
@@ -129,7 +129,7 @@ export UPDATE_SNAPSHOTS=1
 dybatpho::assert_cli_snapshot release-run -- _release_tool "${workdir}/dist3"
 export UPDATE_SNAPSHOTS=0
 dybatpho::info "Snapshot after the bulk update:"
-cat=$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")
+cat=$(< "${DYBATPHO_TEST_SNAPSHOT_DIR}/release-run.snap")
 dybatpho::text_indent "${cat}" "  "
 dybatpho::success "Baseline regenerated, then comparison resumed"
 

@@ -47,7 +47,7 @@ function __dybatpho_git_expect_repo {
   local repo_path
   dybatpho::expect_args repo_path -- "$@"
   dybatpho::require git
-  __dybatpho_git "${repo_path}" rev-parse --is-inside-work-tree > /dev/null 2>&1 \
+  __dybatpho_git "${repo_path}" rev-parse --is-inside-work-tree &> /dev/null \
     || dybatpho::die "Not a git repository: ${repo_path}"
 }
 
@@ -193,7 +193,7 @@ function dybatpho::git_has_commit {
   local repo_path
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
-  __dybatpho_git "${repo_path}" rev-parse --verify --quiet "${2:-HEAD}^{commit}" > /dev/null 2>&1
+  __dybatpho_git "${repo_path}" rev-parse --verify --quiet "${2:-HEAD}^{commit}" &> /dev/null
 }
 
 #######################################
@@ -270,7 +270,7 @@ function dybatpho::git_has_remote {
   local repo_path
   repo_path="${2:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
-  __dybatpho_git "${repo_path}" remote get-url "${remote_name}" > /dev/null 2>&1
+  __dybatpho_git "${repo_path}" remote get-url "${remote_name}" &> /dev/null
 }
 
 #######################################
@@ -290,7 +290,7 @@ function dybatpho::git_changed_files {
   # `diff` was hidden behind the `ls-files` that ran after it, and a base that
   # named nothing produced a short list rather than an error.
   if [[ "${base_ref}" == HEAD ]] \
-    && ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet HEAD > /dev/null 2>&1; then
+    && ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet HEAD &> /dev/null; then
     # Before the first commit there is no HEAD to compare with, so every file
     # in the index is new: the staged list plus anything changed since.
     tracked="$(__dybatpho_git "${repo_path}" diff --cached --name-only --)" \
@@ -530,7 +530,7 @@ function dybatpho::git_stash_count {
   local repo_path
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
-  if ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet refs/stash > /dev/null 2>&1; then
+  if ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet refs/stash &> /dev/null; then
     printf '0\n'
     return 0
   fi

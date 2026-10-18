@@ -143,7 +143,7 @@ function __dybatpho_pkg_manager_into {
   local -a __dybatpho_pkg_candidates=()
   __dybatpho_pkg_detection_order_into __dybatpho_pkg_candidates
   local __dybatpho_pkg_candidate
-  for __dybatpho_pkg_candidate in "${__dybatpho_pkg_candidates[@]}"; do
+  for __dybatpho_pkg_candidate in ${__dybatpho_pkg_candidates[@]+"${__dybatpho_pkg_candidates[@]}"}; do
     if dybatpho::is command "${__dybatpho_pkg_binary[${__dybatpho_pkg_candidate}]}"; then
       __dybatpho_pkg_manager_ref="${__dybatpho_pkg_candidate}"
       return 0
@@ -257,17 +257,24 @@ function __dybatpho_pkg_action_command_into {
         # the frontend is told that nobody is watching.
         apt)
           __dybatpho_pkg_cmd_ref+=(env DEBIAN_FRONTEND=noninteractive apt-get install
-            "${__dybatpho_pkg_cmd_yes[@]}")
+            ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"})
           ;;
         brew) __dybatpho_pkg_cmd_ref+=(brew install) ;;
         apk) __dybatpho_pkg_cmd_ref+=(apk add) ;;
-        dnf) __dybatpho_pkg_cmd_ref+=(dnf install "${__dybatpho_pkg_cmd_yes[@]}") ;;
+        dnf) __dybatpho_pkg_cmd_ref+=(dnf install ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"}) ;;
         # `--needed` keeps an already installed package from being reinstalled.
-        pacman) __dybatpho_pkg_cmd_ref+=(pacman -S --needed "${__dybatpho_pkg_cmd_yes[@]}") ;;
-        emerge) __dybatpho_pkg_cmd_ref+=(emerge --noreplace "${__dybatpho_pkg_cmd_yes[@]}") ;;
+        pacman)
+          __dybatpho_pkg_cmd_ref+=(pacman -S --needed ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"})
+          ;;
+        emerge)
+          __dybatpho_pkg_cmd_ref+=(emerge --noreplace ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"})
+          ;;
         *) ;;
       esac
-      __dybatpho_pkg_cmd_ref+=("${__dybatpho_pkg_cmd_extra[@]}" "${__dybatpho_pkg_cmd_packages[@]}")
+      __dybatpho_pkg_cmd_ref+=(
+        ${__dybatpho_pkg_cmd_extra[@]+"${__dybatpho_pkg_cmd_extra[@]}"}
+        ${__dybatpho_pkg_cmd_packages[@]+"${__dybatpho_pkg_cmd_packages[@]}"}
+      )
       ;;
     update)
       # Only `pacman -Sy` prompts while refreshing an index, so it is the one
@@ -277,11 +284,11 @@ function __dybatpho_pkg_action_command_into {
         brew) __dybatpho_pkg_cmd_ref+=(brew update) ;;
         apk) __dybatpho_pkg_cmd_ref+=(apk update) ;;
         dnf) __dybatpho_pkg_cmd_ref+=(dnf makecache) ;;
-        pacman) __dybatpho_pkg_cmd_ref+=(pacman -Sy "${__dybatpho_pkg_cmd_yes[@]}") ;;
+        pacman) __dybatpho_pkg_cmd_ref+=(pacman -Sy ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"}) ;;
         emerge) __dybatpho_pkg_cmd_ref+=(emerge --sync) ;;
         *) ;;
       esac
-      __dybatpho_pkg_cmd_ref+=("${__dybatpho_pkg_cmd_extra[@]}")
+      __dybatpho_pkg_cmd_ref+=(${__dybatpho_pkg_cmd_extra[@]+"${__dybatpho_pkg_cmd_extra[@]}"})
       ;;
     *) dybatpho::die "__dybatpho_pkg_action_command_into: unknown action '${__dybatpho_pkg_cmd_action}'" ;;
   esac
@@ -432,16 +439,16 @@ function __dybatpho_pkg_installed_with {
     # A cask is not a formula, and the default scope of `brew list` has not
     # always covered both, so each scope is asked in turn.
     brew)
-      brew list --formula --versions -- "${package}" > /dev/null 2>&1 \
-        || brew list --cask --versions -- "${package}" > /dev/null 2>&1
+      brew list --formula --versions -- "${package}" &> /dev/null \
+        || brew list --cask --versions -- "${package}" &> /dev/null
       ;;
     # `apk info -e` succeeds for a missing package and prints nothing instead.
     apk)
       query="$(apk info -e -- "${package}" 2> /dev/null)" || return 1
       [[ -n "${query}" ]]
       ;;
-    dnf) rpm -q -- "${package}" > /dev/null 2>&1 ;;
-    pacman) pacman -Q -- "${package}" > /dev/null 2>&1 ;;
+    dnf) rpm -q -- "${package}" &> /dev/null ;;
+    pacman) pacman -Q -- "${package}" &> /dev/null ;;
     emerge)
       if dybatpho::is command qlist; then
         query="$(qlist -I -C -- "${package}" 2> /dev/null)" || return 1
@@ -504,7 +511,8 @@ function dybatpho::pkg_install_command {
   local manager
   __dybatpho_pkg_manager_into manager || return 1
   local -a command_parts=()
-  __dybatpho_pkg_action_command_into command_parts "${manager}" install "${extra_args[@]}" -- "${packages[@]}"
+  __dybatpho_pkg_action_command_into command_parts "${manager}" install \
+    ${extra_args[@]+"${extra_args[@]}"} -- ${packages[@]+"${packages[@]}"}
   printf '%s' "${command_parts[0]}"
   printf ' %s' "${command_parts[@]:1}"
   printf '\n'
@@ -531,7 +539,7 @@ function dybatpho::pkg_update {
   __dybatpho_pkg_manager_into manager \
     || dybatpho::die "dybatpho::pkg_update: no supported package manager found"
   local -a command_parts=()
-  __dybatpho_pkg_action_command_into command_parts "${manager}" update "${extra_args[@]}"
+  __dybatpho_pkg_action_command_into command_parts "${manager}" update ${extra_args[@]+"${extra_args[@]}"}
 
   # A dry run changes nothing, so there is nothing to confirm.
   if ! dybatpho::is true "${dry_run}" \
@@ -540,7 +548,7 @@ function dybatpho::pkg_update {
     return 1
   fi
   dybatpho::info "Refreshing the ${manager} package index"
-  __dybatpho_pkg_run "${dry_run}" "${command_parts[@]}"
+  __dybatpho_pkg_run "${dry_run}" ${command_parts[@]+"${command_parts[@]}"}
 }
 
 #######################################
@@ -577,12 +585,13 @@ function dybatpho::pkg_install {
   __dybatpho_pkg_manager_into manager \
     || dybatpho::die "dybatpho::pkg_install: no supported package manager found"
   local -a command_parts=()
-  __dybatpho_pkg_action_command_into command_parts "${manager}" install "${extra_args[@]}" -- "${packages[@]}"
+  __dybatpho_pkg_action_command_into command_parts "${manager}" install \
+    ${extra_args[@]+"${extra_args[@]}"} -- ${packages[@]+"${packages[@]}"}
 
   # A dry run changes nothing, so there is nothing to confirm.
   if ! dybatpho::is true "${dry_run}" \
-    && ! __dybatpho_pkg_approve "${force}" "Install with ${manager}: ${packages[*]}?"; then
-    dybatpho::warn "Skipped install of: ${packages[*]}"
+    && ! __dybatpho_pkg_approve "${force}" "Install with ${manager}: ${packages[*]-}?"; then
+    dybatpho::warn "Skipped install of: ${packages[*]-}"
     return 1
   fi
   if dybatpho::is true "${refresh}"; then
@@ -590,8 +599,8 @@ function dybatpho::pkg_install {
     dybatpho::is true "${dry_run}" && update_args+=(--dry-run)
     dybatpho::pkg_update "${update_args[@]}" || return 1
   fi
-  dybatpho::info "Installing with ${manager}: ${packages[*]}"
-  __dybatpho_pkg_run "${dry_run}" "${command_parts[@]}"
+  dybatpho::info "Installing with ${manager}: ${packages[*]-}"
+  __dybatpho_pkg_run "${dry_run}" ${command_parts[@]+"${command_parts[@]}"}
 }
 
 #######################################
@@ -614,12 +623,12 @@ function dybatpho::pkg_ensure {
   dybatpho::pkg_manager > /dev/null \
     || dybatpho::die "dybatpho::pkg_ensure: no supported package manager found"
   local -a missing=()
-  mapfile -t missing < <(dybatpho::pkg_missing "${packages[@]}")
+  mapfile -t missing < <(dybatpho::pkg_missing ${packages[@]+"${packages[@]}"})
   if ((${#missing[@]} == 0)); then
-    dybatpho::debug "Already installed: ${packages[*]}"
+    dybatpho::debug "Already installed: ${packages[*]-}"
     return 0
   fi
-  dybatpho::pkg_install "${options[@]}" -- "${missing[@]}"
+  dybatpho::pkg_install ${options[@]+"${options[@]}"} -- ${missing[@]+"${missing[@]}"}
 }
 
 #######################################
@@ -647,9 +656,9 @@ function dybatpho::pkg_require {
     return 0
   fi
   local package
-  package="$(dybatpho::pkg_name "${arguments[@]}")" \
+  package="$(dybatpho::pkg_name ${arguments[@]+"${arguments[@]}"})" \
     || dybatpho::die "dybatpho::pkg_require: no supported package manager found for '${command_name}'"
-  dybatpho::pkg_install "${options[@]}" -- "${package}" || return 1
+  dybatpho::pkg_install ${options[@]+"${options[@]}"} -- "${package}" || return 1
   # A dry run installs nothing, so the command being missing is the expected
   # outcome rather than a failure.
   dybatpho::is true "${dry_run}" && return 0

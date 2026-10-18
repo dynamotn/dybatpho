@@ -511,7 +511,7 @@ function dybatpho::semver_satisfies {
     read -r -a tokens <<< "${alternative}"
     ((${#tokens[@]})) || tokens=("*")
 
-    for token in "${tokens[@]}"; do
+    for token in ${tokens[@]+"${tokens[@]}"}; do
       if [[ -n "${prerelease}" && "${token}" == *-* ]]; then
         local token_core="${token#[<>=^~]}"
         token_core="${token_core#[=]}"
@@ -575,7 +575,7 @@ function dybatpho::semver_sort {
   ((${#versions[@]})) || return 0
 
   local version
-  for version in "${versions[@]}"; do
+  for version in ${versions[@]+"${versions[@]}"}; do
     dybatpho::semver_valid "${version#v}" \
       || dybatpho::die "${FUNCNAME[0]}: Not a valid version: '${version}'"
   done
@@ -585,7 +585,7 @@ function dybatpho::semver_sort {
   # `sort`; the merge sort keeps versions that compare equal, such as `1.0.0`
   # and `v1.0.0`, in the order they were given.
   __dybatpho_helpers_sort versions __dybatpho_semver_before
-  printf '%s\n' "${versions[@]}"
+  printf '%s\n' ${versions[@]+"${versions[@]}"}
 }
 
 #######################################

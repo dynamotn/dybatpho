@@ -125,7 +125,7 @@ function __dybatpho_lint_dyshellint {
   fi
 
   local status=0
-  (cd "${DYBATPHO_DIR}" && dyshellint "${scripts[@]}") || status=$?
+  (cd "${DYBATPHO_DIR}" && dyshellint ${scripts[@]+"${scripts[@]}"}) || status=$?
   case "${status}" in
     0)
       dybatpho::success "dyshellint is clean over ${#scripts[@]} script(s)"
@@ -237,7 +237,7 @@ function __dybatpho_lint_run {
   if dybatpho::is true "${LIST}"; then
     local -a listed=()
     __dybatpho_lint_scripts_into listed
-    ((${#listed[@]} == 0)) || printf '%s\n' "${listed[@]}"
+    ((${#listed[@]} == 0)) || printf '%s\n' ${listed[@]+"${listed[@]}"}
     return 0
   fi
 

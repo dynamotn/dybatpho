@@ -80,10 +80,10 @@ function _demo_safe_overwrite {
   dybatpho::safe_overwrite --force --backup "${config}"
   printf 'mode=new\n' > "${config}"
   local cat_2
-  cat_2=$(cat "${config}")
+  cat_2=$(< "${config}")
   dybatpho::info "Current: ${cat_2}"
   local cat
-  cat=$(cat "${config}.bak")
+  cat=$(< "${config}.bak")
   dybatpho::info "Backup:  ${cat}"
 }
 
@@ -115,7 +115,7 @@ function _demo_safe_extract {
 
   dybatpho::safe_extract --force "${WORKDIR}/bundle.tar.gz" "${WORKDIR}/unpacked" 1
   local cat
-  cat=$(cat "${WORKDIR}/unpacked/nested/file.txt")
+  cat=$(< "${WORKDIR}/unpacked/nested/file.txt")
   dybatpho::info "Extracted: ${cat}"
 
   # Craft an archive whose entry escapes the destination, like a hostile release

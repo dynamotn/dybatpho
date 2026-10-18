@@ -81,4 +81,4 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
 done < <(printf '%s' "${describe_output}")
 
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::success "Helper demo complete for ${EXAMPLE_NAME}"
+dybatpho::success "Helper demo complete for ${EXAMPLE_NAME:-}"

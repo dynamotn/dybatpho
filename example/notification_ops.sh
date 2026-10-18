@@ -142,6 +142,7 @@ function _demo_delivery_policy {
     export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T000/B000/xxxx"
     export DYBATPHO_NOTIFY_MAX_RETRIES=0 DYBATPHO_NOTIFY_CIRCUIT=true
     export DYBATPHO_CIRCUIT_THRESHOLD=2
+    local attempt
     for attempt in 1 2 3; do
       status=0
       dybatpho::notify_slack "Attempt ${attempt}" 2> /dev/null || status=$?

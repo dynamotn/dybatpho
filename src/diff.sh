@@ -308,7 +308,7 @@ function dybatpho::diff_json {
         "${before[${path}]}" "${after[${path}]}"
       differed=1
     fi
-  done < <(((${#paths[@]})) && printf '%s\n' "${paths[@]}" | LC_ALL=C sort -u)
+  done < <(((${#paths[@]})) && printf '%s\n' ${paths[@]+"${paths[@]}"} | LC_ALL=C sort -u)
 
   ((differed == 0)) && return 0
   return 1
@@ -328,7 +328,7 @@ function dybatpho::diff_json {
 # @internal
 #######################################
 function __dybatpho_diff_expect_json {
-  jq -s -e 'length > 0' -- "$2" > /dev/null 2>&1 \
+  jq -s -e 'length > 0' -- "$2" &> /dev/null \
     || dybatpho::die "$1: Not valid JSON: the $3 document" 2
 }
 
@@ -606,7 +606,7 @@ function dybatpho::diff_dir {
       __dybatpho_diff_dir_report "${mode}" '~' "${path}"
     fi
     # kcov never records the redirection line of a loop; the body above it runs.
-  done < <(((${#paths[@]})) && printf '%s\0' "${paths[@]}" | LC_ALL=C sort -z -u) # kcov(skip)
+  done < <(((${#paths[@]})) && printf '%s\0' ${paths[@]+"${paths[@]}"} | LC_ALL=C sort -z -u) # kcov(skip)
 
   ((summary)) && printf '+%s -%s ~%s\n' "${added}" "${removed}" "${changed}"
   ((added + removed + changed == 0)) && return 0

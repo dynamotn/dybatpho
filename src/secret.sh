@@ -543,7 +543,7 @@ function dybatpho::secret_with_file {
   done
 
   local __dybatpho_secret_wf_status=0
-  "${__dybatpho_secret_wf_command[@]}" || __dybatpho_secret_wf_status=$?
+  ${__dybatpho_secret_wf_command[@]+"${__dybatpho_secret_wf_command[@]}"} || __dybatpho_secret_wf_status=$?
   if [[ "${__dybatpho_secret_wf_fallback}" == true ]]; then
     # kcov(disabled)
     dybatpho::secret_shred "${__dybatpho_secret_wf_path}"

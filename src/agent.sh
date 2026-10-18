@@ -252,7 +252,7 @@ function dybatpho::agent_error {
 #######################################
 function dybatpho::agent_context {
   local branch="" repository=false
-  if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  if git rev-parse --is-inside-work-tree &> /dev/null; then
     repository=true
     branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null || printf '')
   fi
@@ -417,7 +417,7 @@ function __dybatpho_agent_flatten_schema {
   local -a entries=()
   __dybatpho_agent_flatten_into entries "${schema}" '[]'
   local IFS=,
-  printf '[%s]\n' "${entries[*]}"
+  printf '[%s]\n' "${entries[*]-}"
 }
 
 #######################################
@@ -589,7 +589,7 @@ function dybatpho::agent_tools {
     "${__dybatpho_agent_tools_template}"
   (
     IFS=,
-    printf '[%s]\n' "${__dybatpho_agent_tools_definitions[*]}"
+    printf '[%s]\n' "${__dybatpho_agent_tools_definitions[*]-}"
   )
 }
 
@@ -651,7 +651,7 @@ function dybatpho::agent_mcp {
   local __dybatpho_agent_mcp_tools
   __dybatpho_agent_mcp_tools="[$(
     IFS=,
-    printf '%s' "${__dybatpho_agent_mcp_definitions[*]}"
+    printf '%s' "${__dybatpho_agent_mcp_definitions[*]-}"
   )]"
   dybatpho::json_object name "${__dybatpho_agent_mcp_name}" version 1.0.0 tools:json "${__dybatpho_agent_mcp_tools}"
 }

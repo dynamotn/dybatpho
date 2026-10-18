@@ -2,6 +2,12 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file test.sh
 # @brief Test all modules of dybatpho
 # @description
@@ -239,6 +245,9 @@ function __dybatpho_test_progress {
 function __dybatpho_test_pack {
   local _chunk="$1"
   shift
+  # The chunk size is checked by `__dybatpho_test_is_count` in the option spec, and the other counts are the plain
+  # digits of the junit report Bats writes.
+  # dyshellint disable=BSG087 # counts are checked or plain digits
   local _bins=$((($# + _chunk - 1) / _chunk)) _file _b _best
   local -a _load=() _held=() _names=()
   for ((_b = 0; _b < _bins; _b++)); do
@@ -363,7 +372,13 @@ function __dybatpho_test_summary {
   printf '\n'
   if [[ -s "${_run_dir}/report.xml" ]]; then
     while IFS=$'\t' read -r _name _tests _failures _errors _elapsed; do
+      # The chunk size is checked by `__dybatpho_test_is_count` in the option spec, and the other counts are the plain
+      # digits of the junit report Bats writes.
+      # dyshellint disable=BSG087 # counts are checked or plain digits
       _bad=$((_failures + _errors))
+      # The chunk size is checked by `__dybatpho_test_is_count` in the option spec, and the other counts are the plain
+      # digits of the junit report Bats writes.
+      # dyshellint disable=BSG087 # counts are checked or plain digits
       _passed=$((_tests - _bad))
       _tests_passed=$((_tests_passed + _passed))
       _tests_failed=$((_tests_failed + _bad))
@@ -463,6 +478,7 @@ function __dybatpho_test_coverage_merge {
   mv "${_coverage_dir}/merged/kcov-merged" "${_coverage_dir}/bats"
   # Leave only the merged report behind; the per-chunk parts are an
   # implementation detail and are several times its size.
+  # dyshellint disable=BSG089 # `_parts` holds the chunk directories this function created under the run directory
   rm -rf "${_coverage_dir}/merged" "${_parts[@]}"
   dybatpho::success "Coverage written to ${_coverage_dir}/bats"
 }
@@ -485,7 +501,12 @@ function __dybatpho_test_run {
   local -a _targets=(${TEST_ARGS[@]+"${TEST_ARGS[@]}"})
   # shellcheck disable=SC2154 # set by the option spec of this script
   if [[ "${RELATED}" == "true" ]]; then
-    mapfile -t _targets < <(__dybatpho_test_related ${_targets[@]+"${_targets[@]}"})
+    local _related
+    # shellcheck disable=SC2310 # the handler's status is the point of the `if`: a failing job is counted, not fatal
+    _related="$(__dybatpho_test_related ${_targets[@]+"${_targets[@]}"})" \
+      || dybatpho::die "Could not tell which tests cover the changed files"
+    _targets=()
+    [[ -z "${_related}" ]] || mapfile -t _targets <<< "${_related}"
     if ! ((${#_targets[@]})); then
       printf '%sNo test covers the changed files%s\n' "${_dim}" "${_reset}"
       exit 0
@@ -572,6 +593,7 @@ function __dybatpho_test_run {
 # @description CLI specification for this script.
 #######################################
 # @noargs
+# dyshellint disable=BSG052 # `dybatpho::generate_from_spec` adds `--help` to every spec, so the option already exists
 function _spec {
   dybatpho::opts::setup "Run the dybatpho test suite" TEST_ARGS \
     action:"__dybatpho_test_run"

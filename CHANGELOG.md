@@ -53,6 +53,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **More numbers with a leading zero are read in base ten.**
+  `dybatpho::array_slice items 02 03` and a rate limit of `5/08` in
+  `dybatpho::rate_limit` stopped with `value too great for base` or were
+  refused; `08` was being read as octal.
+
+- **`cli` — a spec function runs with the default IFS.** The generator split
+  its option lists on a single space and left that IFS in force while it ran
+  the caller's spec, so word splitting inside the spec ignored tabs and
+  newlines.
+
+- **`pkg` — `dybatpho::pkg_ensure` stops when it cannot tell what is
+  missing.** A failed check read as an empty list, and the function reported
+  every package as already installed.
+
 - **`process` — a script with a temporary file ends on Ctrl-C or `kill`.**
   The cleanup behind `dybatpho::create_temp` and
   `dybatpho::cleanup_file_on_exit` trapped HUP, INT and TERM as well as `EXIT`,
@@ -255,6 +269,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `10.00`.
 
 ### Security
+
+- **Arithmetic no longer runs a command passed as a number.**
+  `dybatpho::progress_bar`, `dybatpho::retry`, `dybatpho::retry_until` and
+  `dybatpho::cli_verbosity_level` handed their numeric arguments straight to
+  Bash arithmetic, which runs a command written as an array subscript, such as
+  `a[$(cmd)]`. A value read from a file or another program could therefore run
+  code. They now refuse anything that is not a whole number before doing any
+  arithmetic, and read a zero-padded number such as `08` in base ten.
 
 - **`safety` — a symbolic link in a directory of a path no longer carries a
   guarded operation out of `DYBATPHO_SAFE_ROOTS`.** `dybatpho::assert_safe_path`

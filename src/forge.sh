@@ -2,6 +2,17 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# `"$@"` in these functions is the argument list of the external `curl`, or of one of this module's own request
+# functions, never code the caller wrote. The `DYBATPHO_CURL_*` locals shadow the globals on purpose: that is how per-
+# call settings reach `dybatpho::curl_do`.
+# dyshellint disable=BSG015 # curl arguments, not caller code
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file forge.sh
 # @brief Utilities for talking to the forge a repository is hosted on
 # @namespace dybatpho

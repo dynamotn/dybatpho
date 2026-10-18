@@ -2,6 +2,9 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file git.sh
 # @brief Utilities for Git repositories
 # @namespace dybatpho
@@ -293,6 +296,7 @@ function dybatpho::git_changed_files {
     && ! __dybatpho_git "${repo_path}" rev-parse --verify --quiet HEAD &> /dev/null; then
     # Before the first commit there is no HEAD to compare with, so every file
     # in the index is new: the staged list plus anything changed since.
+    # shellcheck disable=SC2015 # the `die` is meant to run when either `git diff` fails
     tracked="$(__dybatpho_git "${repo_path}" diff --cached --name-only --)" \
       && tracked+=$'\n'"$(__dybatpho_git "${repo_path}" diff --name-only --)" \
       || dybatpho::die "${FUNCNAME[0]}: git diff failed in ${repo_path}"

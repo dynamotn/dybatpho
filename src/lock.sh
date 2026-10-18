@@ -3,6 +3,10 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # uses `eval`, which is how the spec engine builds a parser.
 # dyshellint disable=BSG050,BSG040
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file lock.sh
 # @brief Utilities for process locking and coordination
 # @namespace dybatpho
@@ -335,6 +339,7 @@ function dybatpho::lock_reclaim_stale {
   dybatpho::warn "Reclaiming stale lock ${lock_path} (pid ${pid} is no longer running)"
   # `rm` on a symbolic link removes the link, never what it points at.
   [[ -n "${aside}" && -n "${lock_path}" ]] || return 0
+  # dyshellint disable=BSG089 # the line above returns first when the path is empty
   rm -rf -- "${aside}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" &> /dev/null || true
 }
 
@@ -487,6 +492,7 @@ function dybatpho::lock_release {
   fi
 
   [[ -n "${lock_path}" ]] || return 0
+  # dyshellint disable=BSG089 # the line above returns first when the path is empty
   rm -rf -- "${lock_path}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" &> /dev/null || true
 }
 
@@ -715,6 +721,7 @@ function dybatpho::lock_semaphore_release {
 
   local slot_path
   if [[ -n "${wanted}" ]]; then
+    # dyshellint disable=BSG087 # `__dybatpho_lock_expect_slots` checked the slot count first
     if ! [[ "${wanted}" =~ ^[0-9]{1,4}$ ]] || ((10#${wanted} < 1 || 10#${wanted} > slots)); then
       # Tested under `run` ("refuse a bad slot count, slot or timeout"): it exits.
       dybatpho::die "${FUNCNAME[0]}: Not a slot of ${name}: ${wanted}" # kcov(skip)

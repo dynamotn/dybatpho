@@ -1,4 +1,8 @@
 # shellcheck shell=bash
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file text.sh
 # @brief Utilities for working with multi-line text blocks
 # @namespace dybatpho

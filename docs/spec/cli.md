@@ -230,6 +230,8 @@ dybatpho::generate_man _spec mytool
 - **FR-031**: The generated parser MUST assign the option and positional variables the spec names whatever those names are, including `spec` and `gen_file`.
 - **FR-032**: A spec function, and the actions and hooks it names, MUST see the caller's variables: the parser, help, schema, man and completion generators MUST keep their state in prefixed locals.
 - **FR-033**: `generate_from_spec` MUST remove the generated parser file once it has been sourced, so a script whose action ends with `exec` leaves no file behind.
+- **FR-034**: `dybatpho::cli_verbosity_level` MUST refuse a count that is not a whole number before it reaches arithmetic, and read a padded count in base ten.
+- **FR-035**: The caller's spec function MUST run with the default IFS, not the single space the generator joins its lists with.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -274,6 +276,8 @@ dybatpho::generate_man _spec mytool
 - **IT-015**: Parse an option into a variable named `spec` and positionals into an array named `gen_file`, and read both in the action.
 - **IT-016**: Generate help for, and run, a spec whose description and action read variables named like the generators' locals, and see the caller's values.
 - **IT-017**: Run a script whose action ends with `exec` outside bats, and find its temporary directory empty.
+- **IT-018**: Raise `info` by `02` and get `trace`; pass an array subscript holding a command and see it refused without running.
+- **IT-019**: Record IFS from inside a spec function and get space, tab and newline.
 
 ## Acceptance Criteria *(mandatory)*
 

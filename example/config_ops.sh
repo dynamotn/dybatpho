@@ -48,14 +48,22 @@ dybatpho::config_export APP_
 
 dybatpho::header "CONFIGURATION"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "host: ${APP_HOST:-}"
+# Set by `dybatpho::config_load` above from the file it reads, which the linter cannot follow.
+# dyshellint disable=BSG073 # set by `dybatpho
+dybatpho::print "host: ${APP_HOST}"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "port: ${APP_PORT:-}"
+# Set by `dybatpho::config_load` above from the file it reads, which the linter cannot follow.
+# dyshellint disable=BSG073 # set by `dybatpho
+dybatpho::print "port: ${APP_PORT}"
 dybatpho::print "mode: ${APP_MODE}"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "region (default): ${APP_REGION:-}"
+# Set by `dybatpho::config_load` above from the file it reads, which the linter cannot follow.
+# dyshellint disable=BSG073 # set by `dybatpho
+dybatpho::print "region (default): ${APP_REGION}"
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::print "endpoint (default): ${APP_ENDPOINT:-}"
+# Set by `dybatpho::config_load` above from the file it reads, which the linter cannot follow.
+# dyshellint disable=BSG073 # set by `dybatpho
+dybatpho::print "endpoint (default): ${APP_ENDPOINT}"
 dybatpho::success "Configuration validated"
 
 dybatpho::header "CONFIGURATION REFERENCE"

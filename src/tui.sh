@@ -4,6 +4,10 @@
 # shares some variables with the caller or across calls on purpose, which is
 # what `local` would break.
 # dyshellint disable=BSG050,BSG011
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file tui.sh
 # @brief Interactive terminal widgets: spinners, progress bars, menus, and confirmations
 # @namespace dybatpho

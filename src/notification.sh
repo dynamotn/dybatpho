@@ -1,4 +1,8 @@
 # shellcheck shell=bash
+# `"$@"` in these functions is the argument list of the external `curl`, or of one of this module's own request
+# functions, never code the caller wrote. The `DYBATPHO_CURL_*` locals shadow the globals on purpose: that is how per-
+# call settings reach `dybatpho::curl_do`.
+# dyshellint disable=BSG015 # curl arguments, not caller code
 # @file notification.sh
 # @brief Utilities for sending messages to chat and notification providers
 # @namespace dybatpho

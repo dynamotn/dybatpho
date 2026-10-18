@@ -320,10 +320,16 @@ function __dybatpho_pkg_approve {
 # @internal
 #######################################
 function __dybatpho_pkg_run {
+  # The command run is a package manager, an external program that sees no shell locals.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local dry_run
   dybatpho::expect_args dry_run -- "$@"
   shift
+  # The command run is a package manager, an external program that sees no shell locals.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local previous_dry_run="${DRY_RUN}"
+  # The command run is a package manager, an external program that sees no shell locals.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local status=0
   DRY_RUN="${dry_run}"
   dybatpho::dry_run -- "$@" || status=$?
@@ -623,7 +629,10 @@ function dybatpho::pkg_ensure {
   dybatpho::pkg_manager > /dev/null \
     || dybatpho::die "dybatpho::pkg_ensure: no supported package manager found"
   local -a missing=()
-  mapfile -t missing < <(dybatpho::pkg_missing ${packages[@]+"${packages[@]}"})
+  local missing_list
+  missing_list="$(dybatpho::pkg_missing ${packages[@]+"${packages[@]}"})" \
+    || dybatpho::die "dybatpho::pkg_ensure: could not tell which packages are missing"
+  [[ -z "${missing_list}" ]] || mapfile -t missing <<< "${missing_list}"
   if ((${#missing[@]} == 0)); then
     dybatpho::debug "Already installed: ${packages[*]-}"
     return 0

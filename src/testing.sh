@@ -1,4 +1,7 @@
 # shellcheck shell=bash
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file testing.sh
 # @brief Extended assertions, snapshots, mocks, and self-cleaning fixtures for shell tests
 # @namespace dybatpho

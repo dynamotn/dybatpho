@@ -107,3 +107,4 @@ src/metrics.sh	dybatpho::metrics_render	dybatpho::math_percentile	quantiles and 
 src/release.sh	dybatpho::release_checksums	dybatpho::file_hash	hashes artifacts this call just listed, with a validated algorithm
 src/schedule.sh	dybatpho::schedule_once_per	dybatpho::file_age_seconds	the marker was checked to exist first
 src/semver.sh	dybatpho::semver_max	dybatpho::semver_sort	an empty result is refused right after, so the call never carries on
+src/cli.sh	dybatpho::cli_apply_verbosity	dybatpho::cli_verbosity_level	the count is checked in the caller's shell first, and the base level only picks a rung

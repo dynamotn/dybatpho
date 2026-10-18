@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file secret_ops.sh
 # @brief Example showing how to read, mask, and store secrets safely.
 # @description
@@ -28,6 +34,9 @@ chmod 600 "${token_file}"
 declare API_TOKEN
 dybatpho::secret_from_file API_TOKEN "${token_file}"
 secret_hint_3=$(dybatpho::secret_hint "${API_TOKEN}")
+# The value is registered as a secret, so the log prints its placeholder or hint; showing that is the point of this
+# example.
+# dyshellint disable=BSG081 # the value is registered as a secret, so the log prints its placeholder or hint
 dybatpho::print "file token: ${secret_hint_3}"
 
 # 2. From the environment. The source variable is unset so child processes
@@ -36,6 +45,9 @@ export DEPLOY_KEY="dk_9a71e0c3f5"
 declare DEPLOY_TOKEN
 dybatpho::secret_from_env DEPLOY_TOKEN DEPLOY_KEY
 secret_hint_2=$(dybatpho::secret_hint "${DEPLOY_TOKEN}")
+# The value is registered as a secret, so the log prints its placeholder or hint; showing that is the point of this
+# example.
+# dyshellint disable=BSG081 # the value is registered as a secret, so the log prints its placeholder or hint
 dybatpho::print "env token: ${secret_hint_2}"
 dybatpho::print "DEPLOY_KEY after read: ${DEPLOY_KEY:-<unset>}"
 
@@ -45,6 +57,9 @@ declare DB_PASSWORD
 dybatpho::secret_from_stdin DB_PASSWORD "Database password: " \
   < <(printf 'pg_s3cret_pass\n')
 secret_hint=$(dybatpho::secret_hint "${DB_PASSWORD}")
+# The value is registered as a secret, so the log prints its placeholder or hint; showing that is the point of this
+# example.
+# dyshellint disable=BSG081 # the value is registered as a secret, so the log prints its placeholder or hint
 dybatpho::print "stdin password: ${secret_hint}"
 
 # A single entry point accepts any of the three sources.
@@ -55,7 +70,13 @@ dybatpho::secret_read WEBHOOK_SECRET "file:${token_file}"
 dybatpho::header "MASK SECRETS"
 
 # Logs and fatal errors redact every registered secret automatically.
+# The value is registered as a secret, so the log prints its placeholder or hint; showing that is the point of this
+# example.
+# dyshellint disable=BSG081 # the value is registered as a secret, so the log prints its placeholder or hint
 dybatpho::info "authenticating with ${API_TOKEN}"
+# The value is registered as a secret, so the log prints its placeholder or hint; showing that is the point of this
+# example.
+# dyshellint disable=BSG081 # the value is registered as a secret, so the log prints its placeholder or hint
 dybatpho::warn "retrying request for ${DEPLOY_TOKEN}"
 
 # Command output is masked too, even when the secret is on the command line.
@@ -70,6 +91,7 @@ dybatpho::header "STORE SECRETS"
 # Writing creates a 0600 file atomically instead of leaving a readable file.
 credential_file="${secret_dir}/credentials"
 dybatpho::secret_write_file "${credential_file}" WEBHOOK_SECRET
+# dyshellint disable=BSG083 # it falls back to the BSD form when GNU `stat` refuses `-c`
 dybatpho::print "credential mode: $(stat -L -c '%a' "${credential_file}" 2> /dev/null \
   || stat -L -f '%Lp' "${credential_file}")"
 dybatpho::secret_check_permission "${credential_file}"

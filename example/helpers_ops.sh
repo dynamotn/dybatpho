@@ -2,6 +2,9 @@
 # @file helpers_ops.sh
 # @brief Example showing dependency checks, conditions, defaults, and retry.
 # shellcheck disable=SC2034 # the DYBATPHO_RETRY_* values are read by the helpers module
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @description
 #   Walks the small guards a script reaches for before it does any work: is a
 #   command installed, is it new enough, is a value set, and what to do when a
@@ -66,7 +69,8 @@ dybatpho::print "the whole loaded API is ${function_count} functions across ${mo
 dybatpho::print "what the string module exports:"
 # The list is collected first rather than piped into `head`: closing the pipe
 # early would send SIGPIPE upstream, and `pipefail` would end the script.
-mapfile -t STRING_FUNCTIONS < <(dybatpho::function_list string)
+STRING_LIST="$(dybatpho::function_list string)"
+mapfile -t STRING_FUNCTIONS <<< "${STRING_LIST}"
 for fn in "${STRING_FUNCTIONS[@]:0:5}"; do
   dybatpho::print "  ${fn}"
 done
@@ -81,4 +85,5 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
 done < <(printf '%s' "${describe_output}")
 
 # shellcheck disable=SC2154 # set by the option spec of this script
-dybatpho::success "Helper demo complete for ${EXAMPLE_NAME:-}"
+# dyshellint disable=BSG073 # set by `dybatpho::default_env` above, which the linter cannot follow
+dybatpho::success "Helper demo complete for ${EXAMPLE_NAME}"

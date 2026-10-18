@@ -6,6 +6,16 @@
 # describe; it parses its own arguments, so the raw form is what the reader
 # sees.
 # dyshellint disable=BSG050,BSG011,BSG033,BSG051
+# `__dybatpho_i18n_state` only memoizes the resolved locale and its fallback chain; losing it with a subshell means
+# the same answer is worked out again.
+# dyshellint disable=BSG084 # the state is a memo
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file i18n.sh
 # @brief Utilities for translating messages and formatting values for a locale
 # @namespace dybatpho
@@ -1951,10 +1961,7 @@ function __dybatpho_i18n_name {
   local list
   __dybatpho_i18n_data_into list DYBATPHO_I18N_NAMES "${locale}" "${set}" || return 1
   local -a names=()
-  local old_ifs="${IFS}"
-  IFS=','
-  read -r -a names <<< "${list}"
-  IFS="${old_ifs}"
+  IFS=',' read -r -a names <<< "${list}"
   ((index >= 1 && index <= ${#names[@]})) || return 1
   printf '%s' "${names[index - 1]}"
 }
@@ -3021,11 +3028,8 @@ function __dybatpho_i18n_roots {
   local -a roots=()
   local entry
   roots+=("${DYBATPHO_DIR}/locale")
-  local old_ifs="${IFS}"
   local -a parts=()
-  IFS=':'
-  read -r -a parts <<< "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-  IFS="${old_ifs}"
+  IFS=':' read -r -a parts <<< "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
   for entry in ${parts[@]+"${parts[@]}"}; do
     [[ -n "${entry}" ]] && roots+=("${entry%/}/locale")
   done
@@ -3033,9 +3037,7 @@ function __dybatpho_i18n_roots {
     roots+=("$(dybatpho::xdg_data_dir)/locale")
   fi
   parts=()
-  IFS=':'
-  read -r -a parts <<< "${DYBATPHO_I18N_PATH}"
-  IFS="${old_ifs}"
+  IFS=':' read -r -a parts <<< "${DYBATPHO_I18N_PATH}"
   for entry in ${parts[@]+"${parts[@]}"}; do
     [[ -n "${entry}" ]] && roots+=("${entry%/}")
   done

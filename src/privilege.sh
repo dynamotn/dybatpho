@@ -141,6 +141,8 @@ function __dybatpho_privilege_cached {
 # @arg $2 number Seconds between refreshes
 #######################################
 function __dybatpho_privilege_keepalive {
+  # The loop only runs the escalation command, an external program that sees no shell locals.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local parent="$$"
   (
     while kill -0 "${parent}" 2> /dev/null; do

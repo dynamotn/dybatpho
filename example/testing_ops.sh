@@ -3,6 +3,9 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # keeps its declarations with the functions they describe.
 # dyshellint disable=BSG050,BSG033
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file testing_ops.sh
 # @brief Example showing the extended assertion, snapshot, mock, and fixture helpers
 # @description Verifies a small "release" script end to end without touching the
@@ -16,7 +19,9 @@ dybatpho::register_common_handlers
 # Keep snapshots beside this example instead of the repository's test tree.
 dybatpho::fixture_dir EXAMPLE_ROOT
 # shellcheck disable=SC2154 # set by the option spec of this script
-export DYBATPHO_TEST_SNAPSHOT_DIR="${EXAMPLE_ROOT:-}/snapshots"
+# Set through a nameref by `dybatpho::fixture_dir` above; with no default, a missing value stops the example.
+# dyshellint disable=BSG073 # set through a nameref by `dybatpho
+export DYBATPHO_TEST_SNAPSHOT_DIR="${EXAMPLE_ROOT}/snapshots"
 
 # --- the script under test ---------------------------------------------------
 
@@ -33,6 +38,8 @@ function _release_tool {
     || return 1
 
   # shellcheck disable=SC2154 # set by the option spec of this script
+  # The two values are fixed strings this example sets, with no quote, backslash or newline.
+  # dyshellint disable=BSG086 # fixed strings, nothing to escape
   printf '{"version":"%s","channel":"%s"}\n' "${version}" "${RELEASE_CHANNEL:-}" \
     > "${out_dir}/manifest.json"
   ln -sfn "manifest.json" "${out_dir}/current.json"

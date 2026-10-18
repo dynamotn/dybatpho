@@ -772,3 +772,15 @@ EOF
   dybatpho::array_sort numbers --numeric
   assert_equal "${numbers[*]}" "-08 -3 7 08 9 10"
 }
+
+@test "dybatpho::array_slice reads a zero-padded start and count in base ten" {
+  local items=(a b c d e f g h i j)
+  dybatpho::array_slice items 02 03
+  assert_equal "${items[*]}" "c d e"
+  items=(a b c d e f g h i j)
+  dybatpho::array_slice items -02
+  assert_equal "${items[*]}" "i j"
+  items=(a b c d e f g h i j)
+  dybatpho::array_slice items 00 08
+  assert_equal "${items[*]}" "a b c d e f g h"
+}

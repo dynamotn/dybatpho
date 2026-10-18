@@ -6,6 +6,13 @@
 # describe; it parses its own arguments, so the raw form is what the reader
 # sees.
 # dyshellint disable=BSG050,BSG011,BSG033,BSG051
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file metrics.sh
 # @brief Utilities for measuring a script and exporting the result to Prometheus
 # @namespace dybatpho
@@ -67,6 +74,8 @@ declare -gA __dybatpho_metrics_timer=()
 function __dybatpho_metrics_validate_name {
   local name kind
   dybatpho::expect_args name kind -- "$@"
+  # An internal check called only from this module's public functions, always two frames below them.
+  # dyshellint disable=BSG054 # a fixed depth below the public caller
   [[ "${name}" =~ ^[a-zA-Z_:][a-zA-Z0-9_:]*$ ]] \
     || dybatpho::die "${FUNCNAME[2]}: Invalid ${kind} name '${name}'"
 }
@@ -103,6 +112,8 @@ function __dybatpho_metrics_labels {
   local pair key value
   local -a rendered=()
   for pair in "$@"; do
+    # An internal check called only from this module's public functions, always two frames below them.
+    # dyshellint disable=BSG054 # a fixed depth below the public caller
     [[ "${pair}" == *=* ]] \
       || dybatpho::die "${FUNCNAME[2]}: Label must be given as key=value, got '${pair}'"
     key="${pair%%=*}"

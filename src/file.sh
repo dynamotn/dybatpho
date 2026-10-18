@@ -2,6 +2,13 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file file.sh
 # @brief Utilities for file handling
 # @namespace dybatpho
@@ -727,6 +734,8 @@ function __dybatpho_file_commit {
 # @internal
 #######################################
 function __dybatpho_file_rewrite {
+  # The producer is one of this file's own writers, which read none of these names.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local caller="$1" path="$2" failure="$3" producer="$4" staging
   shift 4
   # The rename that commits the rewrite would move the staging file inside a

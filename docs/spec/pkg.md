@@ -163,6 +163,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **FR-017**: `--arg` without a following value MUST stop the script with a message naming the option.
 - **FR-018**: The extra arguments of an install MUST NOT be passed to the index refresh that `--update` runs.
 - **FR-019**: The ensure and require helpers MUST forward `--arg`/`-a` and its value to the install they perform.
+- **FR-020**: `dybatpho::pkg_ensure` MUST stop when it cannot tell which packages are missing, rather than treating the failure as nothing missing.
 
 ### Key Entities
 

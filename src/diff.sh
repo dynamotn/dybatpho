@@ -3,6 +3,9 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # keeps its declarations with the functions they describe.
 # dyshellint disable=BSG050,BSG033
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file diff.sh
 # @brief Utilities for comparing text and structured documents
 # @namespace dybatpho
@@ -234,10 +237,14 @@ function __dybatpho_diff_flatten {
   # `a.0.b`: one syntax for both kinds of step, which keeps the comparison
   # below a plain string match.
   local filter='def leaf: if type == "object" or type == "array" then length == 0 else true end;'
+  # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
   filter+=' . as $doc'
   filter+=' | [ if leaf then [] else empty end ] + [ paths(leaf) ]'
+  # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
   filter+=' | .[] as $p'
+  # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
   filter+=' | [ (if ($p | length) == 0 then "." else ($p | map(tostring) | join(".")) end),'
+  # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
   filter+=' ($doc | getpath($p) | tojson) ]'
   filter+=' | @tsv'
   jq -r "${filter}" -- "$1" | LC_ALL=C sort

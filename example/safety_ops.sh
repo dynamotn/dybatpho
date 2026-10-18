@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file safety_ops.sh
 # @brief Example showing guards for destructive operations
 # @description Demonstrates dybatpho::confirm, assert_safe_path, safe_rm,

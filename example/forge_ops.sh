@@ -2,6 +2,9 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file forge_ops.sh
 # @brief Example showing how to talk to the forge a repository is hosted on
 # @description Demonstrates dybatpho::forge_host, forge_kind, forge_repo,
@@ -152,6 +155,8 @@ function _demo_raw_request {
   dybatpho::secret_register "${token}"
   local secret_mask
   secret_mask=$(dybatpho::secret_mask "${token}")
+  # The value is the masked form from `dybatpho::secret_mask`, which is meant to be printed.
+  # dyshellint disable=BSG081 # the value is the masked form from `dybatpho
   dybatpho::info "token in use: ${secret_mask}"
 
   local body

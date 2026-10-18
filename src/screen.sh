@@ -5,6 +5,13 @@
 # what `local` would break; it keeps its declarations with the functions they
 # describe.
 # dyshellint disable=BSG050,BSG011,BSG033
+# Coordinates and sizes come from the script's own layout and the constraint solver, not from outside input, and the
+# render loop does arithmetic on them for every cell; a regular expression per value would cost more than the frame.
+# dyshellint disable=BSG087 # geometry from the layout, not input
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file screen.sh
 # @brief Full-screen terminal applications: layout, widgets, and an event loop
 # @namespace dybatpho

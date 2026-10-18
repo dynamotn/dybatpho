@@ -9,6 +9,9 @@
 #   array_reject, array_find, array_every, array_some, array_first, array_last, array_contains, array_index_of,
 #   array_join
 # shellcheck disable=SC2034 # every array here is passed to the library by name,
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 #   which ShellCheck cannot follow through the nameref on the other side.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh

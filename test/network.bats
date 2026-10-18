@@ -1299,3 +1299,8 @@ HELPER
   __dybatpho_network_origin_into out "no scheme"
   assert_equal "${out}" ""
 }
+
+@test "__dybatpho_network_rate_spec reads zero-padded numbers in base ten" {
+  assert_equal "$(__dybatpho_network_rate_spec 5/08)" "5 8000"
+  assert_equal "$(__dybatpho_network_rate_spec 09/08ms)" "9 8"
+}

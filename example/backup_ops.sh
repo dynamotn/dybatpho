@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file backup_ops.sh
 # @brief Example snapshotting a config directory and applying a retention policy
 # @description Demonstrates dybatpho::backup_create, backup_list, backup_latest,
@@ -85,12 +91,18 @@ function _demo_verify {
 
   # A truncated or corrupted backup is what the sidecar is there to catch.
   local damaged="${archive}.damaged.tar.gz"
+  # This sets up or removes the example's own fixtures in its temporary directory, not the change a dry run rehearses.
+  # dyshellint disable=BSG095 # example fixture, not the rehearsed change
   cp -- "${archive}" "${damaged}"
+  # This sets up or removes the example's own fixtures in its temporary directory, not the change a dry run rehearses.
+  # dyshellint disable=BSG095 # example fixture, not the rehearsed change
   cp "${archive}.sha256" "${damaged}.sha256"
   printf 'corruption' >> "${damaged}"
   if ! dybatpho::backup_verify "${damaged}" 2> /dev/null; then
     dybatpho::warn "The damaged copy was rejected, as it should be"
   fi
+  # This sets up or removes the example's own fixtures in its temporary directory, not the change a dry run rehearses.
+  # dyshellint disable=BSG095 # example fixture, not the rehearsed change
   rm -f "${damaged}" "${damaged}.sha256"
 }
 
@@ -113,6 +125,8 @@ function _demo_diff {
   after="$(dybatpho::backup_create "${workspace}/config" "${workspace}/backups" config)"
   summary="$(dybatpho::backup_diff --summary "${archive}" "${after}")" || true
   dybatpho::info "Between the two snapshots: ${summary}"
+  # This sets up or removes the example's own fixtures in its temporary directory, not the change a dry run rehearses.
+  # dyshellint disable=BSG095 # example fixture, not the rehearsed change
   rm -f "${after}" "${after}.sha256"
 }
 

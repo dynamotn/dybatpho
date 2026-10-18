@@ -125,6 +125,7 @@ function __dybatpho_doc_run {
 
 # @description CLI specification for this script.
 # @noargs
+# dyshellint disable=BSG052 # `dybatpho::generate_from_spec` adds `--help` to every spec, so the option already exists
 function _spec {
   dybatpho::opts::setup \
     "Generate docs/<module>.md from the shdoc comments in each source file" \

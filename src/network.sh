@@ -4,6 +4,10 @@
 # uses `eval`, which is how the spec engine builds a parser; it parses its own
 # arguments, so the raw form is what the reader sees.
 # dyshellint disable=BSG050,BSG040,BSG051
+# `"$@"` in these functions is the argument list of the external `curl`, or of one of this module's own request
+# functions, never code the caller wrote. The `DYBATPHO_CURL_*` locals shadow the globals on purpose: that is how per-
+# call settings reach `dybatpho::curl_do`.
+# dyshellint disable=BSG015 # curl arguments, not caller code
 # @file network.sh
 # @brief Utilities for network
 # @namespace dybatpho
@@ -1010,7 +1014,8 @@ function dybatpho::circuit_breaker {
 function __dybatpho_network_rate_spec {
   local spec="${1-}"
   [[ "${spec}" =~ ^([0-9]+)/([0-9]+)(ms|s|m|h)?$ ]] || return 1
-  local count="${BASH_REMATCH[1]}" window="${BASH_REMATCH[2]}" unit="${BASH_REMATCH[3]:-s}"
+  # Base ten: `5/08` is a window of eight, not an invalid octal number.
+  local count=$((10#${BASH_REMATCH[1]})) window=$((10#${BASH_REMATCH[2]})) unit="${BASH_REMATCH[3]:-s}"
   local window_ms
   case "${unit}" in
     ms) window_ms="${window}" ;;
@@ -1157,6 +1162,8 @@ function dybatpho::rate_limit {
     # The window is full, so the next free slot opens one window after the
     # oldest call still inside it.
     __dybatpho_network_rl_oldest="${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]%% *}"
+    # The window comes from `__dybatpho_network_rate_spec`, which reads it in base ten and prints only digits.
+    # dyshellint disable=BSG087 # read in base ten by the spec parser
     __dybatpho_network_rl_wait_ms=$((__dybatpho_network_rl_oldest + __dybatpho_network_rl_window_ms - \
       __dybatpho_network_rl_now))
     ((__dybatpho_network_rl_wait_ms < 1)) && __dybatpho_network_rl_wait_ms=1
@@ -1268,6 +1275,7 @@ function dybatpho::curl_paginate {
   if [[ -n "${DYBATPHO_PAGINATE_RATE}" ]]; then
     # `url_parse` writes to a global, so its answer is read in a subshell here
     # rather than overwriting whatever the caller last parsed.
+    # dyshellint disable=BSG084 # `DYBATPHO_URL` is read inside the same subshell, by the `printf` that follows
     rate_key="$(dybatpho::url_parse "${url}" &> /dev/null && printf '%s' "${DYBATPHO_URL[host]}")" || rate_key=""
     rate_key="${rate_key:-curl_paginate}"
   fi

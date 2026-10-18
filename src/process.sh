@@ -6,6 +6,9 @@
 # what `local` would break; it uses `eval`, which is how the spec engine builds
 # a parser.
 # dyshellint disable=BSG050,BSG011,BSG040
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file process.sh
 # @brief Utilities for process handling
 # @namespace dybatpho
@@ -166,6 +169,7 @@ function __dybatpho_process_trap_command_into {
   __dybatpho_process_trap_ref=""
   [[ -n "${__dybatpho_process_trap_listing}" ]] || return 0
   # `trap -p` quotes everything it prints, so parsing it runs nothing.
+  # dyshellint disable=BSG080 # the text is `trap -p` output, which Bash quotes itself for `eval`
   eval "set -- ${__dybatpho_process_trap_listing}"
   __dybatpho_process_trap_ref="${3-}"
 }

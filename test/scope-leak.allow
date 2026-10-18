@@ -11,7 +11,7 @@
 init.sh	__dybatpho_export_functions	stop	evaluates the export list it builds itself from `declare -F`
 src/cli.sh	__dybatpho_cli_collect_spec_metadata	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	__dybatpho_cli_generate_help	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
-src/cli.sh	__dybatpho_cli_generate_logic	spread	its `__` locals are the spec DSL's context, and `IFS` is set on purpose for the DSL's word splitting
+src/cli.sh	__dybatpho_cli_generate_logic	spread	its `__` locals are the spec DSL's context; `IFS` joins the generator's own lists, and the spec runs with the default IFS
 src/cli.sh	__dybatpho_cli_replay_persistent_defs	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	dybatpho::opts::cmd	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/file.sh	__dybatpho_file_rewrite	stop	runs only the module's own producers, which keep prefixed locals

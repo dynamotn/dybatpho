@@ -11,6 +11,9 @@
 #              pid_file_write, pid_file_is_running, pid_file_remove,
 #              and error/signal handlers
 # shellcheck disable=SC2154 # `dybatpho::expect_args` assigns these names through a nameref
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"
@@ -47,7 +50,11 @@ function _demo_retry {
 # @arg $1 string target
 function _deploy {
   dybatpho::expect_args _target -- "$@"
+  # The example shows the shell-string form of `dybatpho::dry_run` on purpose, beside the `--` form below.
+  # dyshellint disable=BSG080 # the example shows the shell-string form of `dybatpho
   dybatpho::dry_run "rsync -avz ./dist/ ${_target}:/var/www/app/"
+  # The example shows the shell-string form of `dybatpho::dry_run` on purpose, beside the `--` form below.
+  # dyshellint disable=BSG080 # the example shows the shell-string form of `dybatpho
   dybatpho::dry_run "ssh ${_target} 'systemctl restart app'"
   # The argument-vector form: `--` runs what follows as a command and its
   # arguments, never as shell, so a path with a `;` in it stays a path.

@@ -28,6 +28,7 @@ function _demo_every {
   dybatpho::header "EVERY"
   # The first run is immediate; the cadence is measured from when each run was
   # due, so a slow run does not push the schedule later and later.
+  # shellcheck disable=SC2016 # the `$(...)` is for the child shell to run at each tick
   dybatpho::schedule_every 1 --times 3 -- \
     bash -c 'printf "tick at %s\n" "$(date +%H:%M:%S)"'
 }

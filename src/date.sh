@@ -769,6 +769,7 @@ function dybatpho::date_iso_week {
   day_of_year=$((10#${day_of_year}))
   weekday=$((10#${weekday}))
 
+  # dyshellint disable=BSG087 # both were read in base ten with `10#` just above
   local week=$(((day_of_year - weekday + 10) / 7))
   local weeks_in_year
   weeks_in_year="$(__dybatpho_date_iso_weeks_in_year "${year}")"

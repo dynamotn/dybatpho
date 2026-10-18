@@ -6,6 +6,13 @@
 # which is how the spec engine builds a parser; it parses its own arguments, so
 # the raw form is what the reader sees.
 # dyshellint disable=BSG050,BSG033,BSG040,BSG051
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file helpers.sh
 # @brief Utilities for common shell-script helper patterns.
 # @namespace dybatpho
@@ -271,6 +278,8 @@ function __dybatpho_helpers_need_module {
 function __dybatpho_helpers_public_caller_into {
   local -n __dybatpho_helpers_pc_ref="$1"
   local __dybatpho_helpers_pc_fn
+  # The walk starts two frames up and climbs to the nearest public function; two is where it starts, not a guess.
+  # dyshellint disable=BSG054 # the walk starts two frames up and climbs to the nearest public function
   __dybatpho_helpers_pc_ref="${FUNCNAME[2]-main}"
   for __dybatpho_helpers_pc_fn in "${FUNCNAME[@]:2}"; do
     if [[ "${__dybatpho_helpers_pc_fn}" == dybatpho::* ]]; then
@@ -862,11 +871,11 @@ function dybatpho::is {
   dybatpho::expect_args condition input -- "$@"
   case "${condition}" in
     command)
-      command -v "${input}"
+      command -v "${input}" &> /dev/null
       return "$?"
       ;;
     function)
-      declare -F "${input}"
+      declare -F "${input}" &> /dev/null
       return "$?"
       ;;
     file)
@@ -928,7 +937,7 @@ function dybatpho::is {
       esac
       ;;
     *) ;;
-  esac &> /dev/null # kcov(skip)
+  esac # kcov(skip)
   return 1
 }
 
@@ -1092,6 +1101,11 @@ function dybatpho::retry {
   local __dybatpho_retry_retries __dybatpho_retry_command
   dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_command -- "$@"
   shift 2
+  # The budget reaches arithmetic, which reads `08` as a bad octal number and
+  # runs a command written as an array subscript.
+  [[ "${__dybatpho_retry_retries}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Number of retries must be a whole number, got '${__dybatpho_retry_retries}'"
+  __dybatpho_retry_retries=$((10#${__dybatpho_retry_retries}))
   local __dybatpho_retry_exit_code __dybatpho_retry_count __dybatpho_retry_delay
 
   __dybatpho_retry_count=0
@@ -1134,6 +1148,9 @@ function dybatpho::retry_until {
   dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_delay_seconds \
     __dybatpho_retry_command -- "$@"
   shift 3
+  [[ "${__dybatpho_retry_retries}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Number of retries must be a whole number, got '${__dybatpho_retry_retries}'"
+  __dybatpho_retry_retries=$((10#${__dybatpho_retry_retries}))
   local __dybatpho_retry_exit_code=0 __dybatpho_retry_count=0
   until eval "${__dybatpho_retry_command}"; do
     __dybatpho_retry_exit_code=$?
@@ -1200,6 +1217,7 @@ function dybatpho::breakpoint {
           fi
           printf '%s\n' "${__dybatpho_helpers_bp_line}" >> "${DYBATPHO_REPL_HISTORY_FILE}"
           history -s "${__dybatpho_helpers_bp_line}"
+          # dyshellint disable=BSG080 # this is the debugger: running what the user typed as shell is the feature
           eval "${__dybatpho_helpers_bp_line} >&2"
         done
         echo >&2
@@ -1338,6 +1356,7 @@ function dybatpho::provides {
   __dybatpho_helpers_qualify_into name "${name}"
 
   local -a location=()
+  # dyshellint disable=BSG048 # a failure leaves fewer than two lines, which the next line turns into `return 1`
   mapfile -t location < <(__dybatpho_helpers_locate "${name}")
   ((${#location[@]} == 2)) || return 1
 
@@ -1380,6 +1399,7 @@ function dybatpho::describe {
   __dybatpho_helpers_qualify_into name "${name}"
 
   local -a location=()
+  # dyshellint disable=BSG048 # a failure leaves fewer than two lines, which the next line turns into `return 1`
   mapfile -t location < <(__dybatpho_helpers_locate "${name}")
   ((${#location[@]} == 2)) || return 1
   local file="${location[0]}" line="${location[1]}"
@@ -1389,7 +1409,7 @@ function dybatpho::describe {
   # be long, so reading stops there rather than slurping the whole file.
   local -a lines=()
   local text count=0
-  while IFS= read -r text; do
+  while IFS= read -r text || [[ -n "${text}" ]]; do
     ((count < line)) || break
     lines+=("${text}")
     count=$((count + 1))

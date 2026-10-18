@@ -5,6 +5,13 @@
 # what `local` would break; it keeps its declarations with the functions they
 # describe; it uses `eval`, which is how the spec engine builds a parser.
 # dyshellint disable=BSG050,BSG011,BSG033,BSG040
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file logging.sh
 # @brief Utilities for logging to stdout/stderr
 # @namespace dybatpho
@@ -379,6 +386,7 @@ function __dybatpho_log_request_id {
 #######################################
 function __dybatpho_log_hostname {
   if [[ -z "${DYBATPHO_LOG_HOSTNAME:-}" ]]; then
+    # dyshellint disable=BSG084 # the hostname is only memoized; losing it with the subshell costs a second lookup
     DYBATPHO_LOG_HOSTNAME="$(dybatpho::hostname)"
   fi
   printf '%s' "${DYBATPHO_LOG_HOSTNAME}"
@@ -1360,6 +1368,14 @@ function dybatpho::progress {
 function dybatpho::progress_bar {
   local percentage="$1"
   local length="${2:-50}"
+  # Both reach arithmetic, which reads `08` as a bad octal number and runs a
+  # command written as an array subscript.
+  [[ "${percentage}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Percentage must be a whole number, got '${percentage}'"
+  [[ "${length}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Width must be a whole number, got '${length}'"
+  percentage=$((10#${percentage}))
+  length=$((10#${length}))
   local elapsed=$((percentage * length / 100))
   local prog total
 

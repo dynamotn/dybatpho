@@ -505,7 +505,7 @@ function dybatpho::is_container {
   # word: in a container they name the runtime that created them.
   local line
   if [[ -r /proc/1/cgroup ]]; then
-    while IFS= read -r line; do
+    while IFS= read -r line || [[ -n "${line}" ]]; do
       case "${line}" in
         *docker* | *containerd* | *kubepods* | *libpod* | *lxc*) return 0 ;;
         *) ;;

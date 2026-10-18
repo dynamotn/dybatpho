@@ -205,6 +205,7 @@ function __dybatpho_parallel_timeout {
   local requested="${2:-${DYBATPHO_PARALLEL_TIMEOUT}}" seconds=0
   # Called from the pool, so the public function the script called is two
   # frames up; one frame up is the pool itself.
+  # dyshellint disable=BSG054 # called only from the pool, so the public function is always two frames up
   local caller="${FUNCNAME[2]}"
   if [[ "${requested}" =~ ^[0-9]{1,9}$ ]]; then
     seconds=$((10#${requested}))

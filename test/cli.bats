@@ -2393,3 +2393,26 @@ SCRIPT
   assert_output --partial "action caller caller caller caller"
   refute_output --partial "action _spec"
 }
+
+@test "dybatpho::cli_verbosity_level reads a padded count and refuses what is not a number" {
+  assert_equal "$(dybatpho::cli_verbosity_level 02 info)" "trace"
+  assert_equal "$(dybatpho::cli_verbosity_level -1 info)" "info"
+  run --separate-stderr dybatpho::cli_verbosity_level 'a[$(touch "${BATS_TEST_TMPDIR}/ran")]' info
+  assert_failure
+  assert_stderr --partial "Count must be a whole number"
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/ran"
+}
+
+@test "a spec function runs with the default IFS" {
+  # The generator joins its option lists with a single space, and that IFS
+  # used to be in force while the caller's own spec ran.
+  local seen="${BATS_TEST_TMPDIR}/ifs"
+  # shellcheck disable=2329
+  _spec() {
+    printf '%q\n' "${IFS}" > "${seen}"
+    dybatpho::opts::setup "" -
+  }
+  run_traced dybatpho::generate_from_spec _spec
+  assert_success
+  assert_equal "$(head -n 1 "${seen}")" "$(printf '%q' $' \t\n')"
+}

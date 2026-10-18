@@ -192,6 +192,7 @@ fi
 - **FR-031**: Every function that takes an array by name MUST read and write the array the caller named whatever that name is, including a name the function uses for a local of its own.
 - **FR-032**: The module MUST be a core module, loaded with every module set, and MUST therefore call only other core modules; `docs/spec/init.md` (FR-020, IT-019) pins it, and `doctor` builds its module-graph check on the graph helpers.
 - **FR-033**: `dybatpho::array_sort --numeric` MUST read a value with a leading zero in base ten, with its sign.
+- **FR-034**: `dybatpho::array_slice` MUST read a start or count with leading zeros in base ten.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -241,6 +242,7 @@ fi
 - **IT-023**: Verify union, intersection, and difference drop empty elements from either array instead of stopping.
 - **IT-024**: Map an array named `status`, the name of a local `dybatpho::array_map` used, and get the mapped values back.
 - **IT-025**: Sort `10 08 9 -3 -08 7` numerically and get `-08 -3 7 08 9 10`.
+- **IT-026**: Slice ten items from `02` for `03`, from `-02`, and from `00` for `08`, and get the matching runs.
 
 ## Acceptance Criteria *(mandatory)*
 

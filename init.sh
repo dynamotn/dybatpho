@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # dyshellint disable=BSG050,BSG043,BSG011,BSG033,BSG037,BSG053,BSG040
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file init.sh
 # @brief Initial script
 # @namespace dybatpho

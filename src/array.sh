@@ -2,6 +2,9 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file array.sh
 # @brief Utilities for working with array
 # @namespace dybatpho
@@ -559,6 +562,11 @@ function dybatpho::array_slice {
   local __dybatpho_array_slice_start="${2-}"
   [[ "${__dybatpho_array_slice_start}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "dybatpho::array_slice: '${__dybatpho_array_slice_start}' is not a whole number"
+  if [[ "${__dybatpho_array_slice_start}" == -* ]]; then
+    __dybatpho_array_slice_start=$((-10#${__dybatpho_array_slice_start#-}))
+  else
+    __dybatpho_array_slice_start=$((10#${__dybatpho_array_slice_start}))
+  fi
 
   local -a __dybatpho_array_slice_values=()
   __dybatpho_array_copy __dybatpho_array_slice_values "$1"
@@ -572,7 +580,8 @@ function dybatpho::array_slice {
   elif [[ -n "${3-}" ]]; then
     [[ "$3" =~ ^[0-9]+$ ]] \
       || dybatpho::die "dybatpho::array_slice: '$3' is not a count"
-    __dybatpho_array_slice_length="$3"
+    # Base ten: a count of `08` is eight, not an invalid octal number.
+    __dybatpho_array_slice_length=$((10#$3))
   fi
 
   if ((__dybatpho_array_slice_start < 0)); then

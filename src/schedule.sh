@@ -3,6 +3,10 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # parses its own options, so the raw form is what the reader sees.
 # dyshellint disable=BSG050,BSG051,BSG033
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file schedule.sh
 # @brief Deciding when a command should run, and running it on a cadence
 # @namespace dybatpho
@@ -103,9 +107,11 @@ function dybatpho::schedule_every {
     "${FUNCNAME[0]}: {option} needs a {noun}" -- "$@"
   shift "${__dybatpho_schedule_every_parsed[0]}"
 
+  # shellcheck disable=SC2015 # the `die` is meant to run when either test fails
   dybatpho::is int "${__dybatpho_schedule_every_interval}" && ((__dybatpho_schedule_every_interval > 0)) \
     || dybatpho::die \
       "${FUNCNAME[0]}: The interval must be a positive number of seconds, got: ${__dybatpho_schedule_every_interval}"
+  # shellcheck disable=SC2015 # the `die` is meant to run when either test fails
   dybatpho::is int "${__dybatpho_schedule_every_times}" && ((__dybatpho_schedule_every_times >= 0)) \
     || dybatpho::die "${FUNCNAME[0]}: --times must be a number, got: ${__dybatpho_schedule_every_times}"
 
@@ -206,6 +212,7 @@ function dybatpho::schedule_debounce {
   dybatpho::expect_args __dybatpho_schedule_debounce_window __dybatpho_schedule_debounce_key -- "$@"
   __dybatpho_schedule_need_lock
   shift 2
+  # shellcheck disable=SC2015 # the `die` is meant to run when either test fails
   dybatpho::is int "${__dybatpho_schedule_debounce_window}" && ((__dybatpho_schedule_debounce_window > 0)) \
     || dybatpho::die \
       "${FUNCNAME[0]}: The window must be a positive number of seconds, got: ${__dybatpho_schedule_debounce_window}"
@@ -398,6 +405,7 @@ function __dybatpho_schedule_bucket_into {
     day) __dybatpho_schedule_bucket_ref="$(dybatpho::date_now "%Y%m%d")" ;;
     month) __dybatpho_schedule_bucket_ref="$(dybatpho::date_now "%Y%m")" ;;
     *)
+      # shellcheck disable=SC2015 # the `die` is meant to run when either test fails
       [[ "$2" =~ ^[0-9]+$ ]] && (($2 > 0)) \
         || dybatpho::die "${FUNCNAME[1]}: Not a period: $2. Use hour, day, month, or a number of seconds"
       __dybatpho_schedule_bucket_ref="$(dybatpho::date_now "%s")"

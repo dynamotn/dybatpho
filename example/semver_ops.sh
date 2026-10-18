@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file semver_ops.sh
 # @brief Example showing semver utilities
 # @description Demonstrates dybatpho::semver_valid, semver_parse, semver_compare, semver_release_type, semver_bump
@@ -28,7 +31,9 @@ function _demo_parse {
   local version="1.4.2-beta.3+exp.sha.abc123"
   dybatpho::info "Input: ${version}"
   local -a parts
-  mapfile -t parts < <(dybatpho::semver_parse "${version}")
+  local parsed
+  parsed="$(dybatpho::semver_parse "${version}")"
+  mapfile -t parts <<< "${parsed}"
   dybatpho::print "  major         : ${parts[0]}"
   dybatpho::print "  minor         : ${parts[1]}"
   dybatpho::print "  patch         : ${parts[2]}"

@@ -2,6 +2,8 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# The coordinates come from `dybatpho::screen_size` and the layout solver, which only produce plain numbers.
+# dyshellint disable=BSG087 # geometry from the layout solver
 # @file screen_top.sh
 # @brief A complete process viewer built on the screen module
 # @description
@@ -153,7 +155,7 @@ function _measure_totals {
   MEM_PERCENT="${mem_sum}"
   if [[ -r /proc/meminfo ]]; then
     local total=0 available=0 field value
-    while read -r field value _; do
+    while read -r field value _ || [[ -n "${field}" ]]; do
       case "${field}" in
         MemTotal:) total="${value}" ;;
         MemAvailable:) available="${value}" ;;

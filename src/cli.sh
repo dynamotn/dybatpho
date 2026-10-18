@@ -12,6 +12,13 @@
 # error paths carry a `# kcov(skip)` marker that has to stay on the line it
 # marks.
 # dyshellint disable=BSG050,BSG011,BSG040,BSG051,BSG003,BSG070
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file cli.sh
 # @brief Utilities for building CLI parsers from shell specs.
 # @namespace dybatpho
@@ -737,7 +744,12 @@ function dybatpho::cli_suggest {
 # @exitcode 0
 #######################################
 function dybatpho::cli_verbosity_level {
-  local -i count="${1:-0}" index=3 position
+  # Checked before it reaches `local -i`, whose arithmetic reads `08` as a bad
+  # octal number and runs a command written as an array subscript.
+  [[ "${1:-0}" =~ ^-?[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Count must be a whole number, got '$1'"
+  local -i count index=3 position
+  if [[ "${1:-0}" == -* ]]; then count=$((-10#${1#-})); else count=$((10#${1:-0})); fi
   local base
   base="$(dybatpho::lower "${2:-${LOG_LEVEL:-info}}")"
   local -a ladder=(fatal error warn info debug trace)
@@ -763,6 +775,10 @@ function dybatpho::cli_verbosity_level {
 # @exitcode 0
 #######################################
 function dybatpho::cli_apply_verbosity {
+  # Checked here, in the caller's shell: a refusal inside the substitution
+  # below would end only the substitution.
+  [[ "${1:-0}" =~ ^-?[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Count must be a whole number, got '$1'"
   LOG_LEVEL="$(dybatpho::cli_verbosity_level "${1:-0}" "${2:-${LOG_LEVEL:-info}}")"
   export LOG_LEVEL
 }
@@ -1146,6 +1162,8 @@ function __dybatpho_cli_define_var {
     local __saved_env="${__env}"
     local __fallback
     __env=""
+    # The subshell is the point: the option being parsed must not change `__env` in the caller.
+    # dyshellint disable=BSG084 # the subshell is the point
     __fallback="$(__dybatpho_cli_define_var "$1")"
     __env="${__saved_env}"
     __dybatpho_cli_print_indent 1 "${__fallback}"
@@ -1167,6 +1185,8 @@ function __dybatpho_cli_define_var {
     local __saved_config="${__config}"
     local __config_fallback
     __config=""
+    # The subshell is the point: the option being parsed must not change `__env` in the caller.
+    # dyshellint disable=BSG084 # the subshell is the point
     __config_fallback="$(__dybatpho_cli_define_var "$1")"
     __config="${__saved_config}"
     __dybatpho_cli_print_indent 1 "${__config_fallback}"
@@ -1236,6 +1256,8 @@ function __dybatpho_cli_generate_logic {
   shift
 
   # For get list of options, separated by space
+  # IFS cannot be renamed, and the caller's spec is run with the default IFS put back around it.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local IFS=" "
   # For get all rest arguments
   local __rest=""
@@ -1302,7 +1324,10 @@ function __dybatpho_cli_generate_logic {
   # Initial all variables before get value of options
   local __done_initial=false
   __dybatpho_cli_replay_persistent_defs
-  "${__dybatpho_cli_logic_spec}" "$*"
+  # The spec is the caller's own function: it runs with the default IFS, not
+  # the single space this generator joins its option lists with. `"$*"` is
+  # expanded before the assignment takes effect, so it is still joined by it.
+  IFS=$' \t\n' "${__dybatpho_cli_logic_spec}" "$*"
   # An explicit `args:<rule>` always wins; otherwise the declared positional
   # arguments describe the count well enough to validate it.
   case "${__args}" in
@@ -1383,7 +1408,10 @@ function __dybatpho_cli_generate_logic {
     __dybatpho_cli_print_indent 4 "exit 0"
     __dybatpho_cli_print_indent 4 ";;"
   fi
-  "${__dybatpho_cli_logic_spec}" "$*"
+  # The spec is the caller's own function: it runs with the default IFS, not
+  # the single space this generator joins its option lists with. `"$*"` is
+  # expanded before the assignment takes effect, so it is still joined by it.
+  IFS=$' \t\n' "${__dybatpho_cli_logic_spec}" "$*"
   __dybatpho_cli_print_indent 3 "--)"
   __dybatpho_cli_print_indent 4 "shift"
   __dybatpho_cli_print_rest

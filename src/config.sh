@@ -5,6 +5,9 @@
 # what `local` would break; it parses its own arguments, so the raw form is
 # what the reader sees.
 # dyshellint disable=BSG050,BSG011,BSG051
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file config.sh
 # @brief Utilities for loading configuration from files and environment variables.
 # @namespace dybatpho
@@ -971,7 +974,7 @@ function dybatpho::config_doc {
         ;;
       json)
         declared=""
-        default_key="${key}.default"
+        local default_key="${key}.default"
         [[ -n "${DYBATPHO_CONFIG_SCHEMA[${default_key}]+set}" ]] && declared="declared" || true
         __dybatpho_log_json_escape_into key_cell "${key}"
         __dybatpho_config_doc_json_value_into default_cell "${default}" "${declared}"

@@ -3,6 +3,9 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # keeps its declarations with the functions they describe.
 # dyshellint disable=BSG050,BSG033
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file queue.sh
 # @brief A durable job queue backed by the filesystem
 # @namespace dybatpho

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file os_ops.sh
 # @brief Example showing platform, host, and environment detection.
 # @description
@@ -42,6 +45,7 @@ if family="$(dybatpho::os_release ID_LIKE)"; then
 fi
 
 dybatpho::header "HOST"
+# dyshellint disable=BSG084 # the hostname is only memoized; losing it with the subshell costs a second lookup
 hostname=$(dybatpho::hostname)
 dybatpho::print "host: ${hostname}"
 user=$(dybatpho::user)

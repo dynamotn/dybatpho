@@ -519,12 +519,16 @@ function __dybatpho_json_path_array_into {
 # @internal
 #######################################
 function __dybatpho_json_emit {
+  # The command run is `jq` or `env`, external programs that see no shell locals.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local output="$1"
   shift
   if [[ -z "${output}" ]]; then
     "$@"
     return
   fi
+  # The command run is `jq` or `env`, external programs that see no shell locals.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local result
   result=$("$@") || return
   printf '%s\n' "${result}" | dybatpho::file_write_atomic "${output}"

@@ -1191,3 +1191,17 @@ assert event["duration_ms"] >= 0
   PATH="${shim}:${PATH}" run_traced bash -c ". '${DYBATPHO_DIR}/init.sh'; x=; __dybatpho_log_timestamp_into x; printf '%s' \"\${x}\""
   assert_file_exist "${calls}"
 }
+
+@test "dybatpho::progress_bar reads a leading zero in base ten and refuses what is not a number" {
+  run_traced --separate-stderr dybatpho::progress_bar 08 50
+  assert_success
+  assert_output --partial "[####                                              ]"
+  # A value reaches arithmetic, where an array subscript would run a command.
+  run --separate-stderr dybatpho::progress_bar 'a[$(touch "${BATS_TEST_TMPDIR}/ran")]'
+  assert_failure
+  assert_stderr --partial "Percentage must be a whole number"
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/ran"
+  run --separate-stderr dybatpho::progress_bar 10 wide
+  assert_failure
+  assert_stderr --partial "Width must be a whole number"
+}

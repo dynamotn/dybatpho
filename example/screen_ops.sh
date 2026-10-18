@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# The coordinates come from `dybatpho::screen_size` and the layout solver, which only produce plain numbers.
+# dyshellint disable=BSG087 # geometry from the layout solver
 # @file screen_ops.sh
 # @brief Example showing the full-screen widgets and the layout solver
 # @description

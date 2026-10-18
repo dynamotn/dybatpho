@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file cache_ops.sh
 # @brief Remember a slow answer on disk until it goes stale
 # @description
@@ -15,7 +21,9 @@ dybatpho::register_common_handlers
 # named variable and registers the directory for cleanup when this script ends.
 dybatpho::create_temp_dir CACHE_ROOT "cache-example"
 # shellcheck disable=SC2154 # set by the option spec of this script
-export DYBATPHO_CACHE_DIR="${CACHE_ROOT:-}/cache"
+# Set through a nameref by `dybatpho::create_temp_dir` above; with no default, a missing value stops the example.
+# dyshellint disable=BSG073 # set through a nameref by `dybatpho
+export DYBATPHO_CACHE_DIR="${CACHE_ROOT}/cache"
 export DYBATPHO_CACHE_NAMESPACE="example"
 
 CALLS_FILE="${CACHE_ROOT}/calls"

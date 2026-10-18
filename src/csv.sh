@@ -1056,7 +1056,9 @@ function dybatpho::csv_from_json {
     # An empty array has no first object to take a header from, and is still
     # an array of objects: it converts to nothing, as it does through `yq`.
     local filter='if . == [] then empty else'
+    # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
     filter+=' (.[0] | keys_unsorted) as $k'
+    # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
     filter+=' | ([$k] + [.[] | [ $k[] as $key | (.[$key] // "") | tostring ]])'
     filter+=' | .[] | @csv end'
     converted="$(printf '%s' "${text}" | jq -r "${filter}")" \

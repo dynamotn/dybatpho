@@ -425,6 +425,7 @@ dybatpho::log_context clear
 - **FR-038**: The timestamp of a log line MUST come from the `printf '%(...)T'` builtin, in RFC 3339 form with a `T` and a colon in the offset, unless `date` or `busybox` is a shell function or resolves under the mock, Bats or temporary directory, in which case that stand-in MUST be asked.
 - **FR-039**: `__dybatpho_log_now_ms_into` MUST read `EPOCHREALTIME` whatever decimal separator the locale writes it with.
 - **FR-040**: A spinner animation MUST end itself and restore the cursor once the shell that started it is gone.
+- **FR-041**: `dybatpho::progress_bar` MUST refuse a percentage or width that is not made of digits, before any arithmetic, and read one with leading zeros in base ten.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -540,6 +541,7 @@ dybatpho::log_context clear
 - **IT-025**: Run a command under a spinner that reads variables named like the spinner's locals, and see the caller's values.
 - **IT-026**: Read the timestamp with the system `date` and match `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$`; put a `date` shim under the temporary directory first on `PATH` and see it called.
 - **IT-027**: Under `LC_ALL=de_DE.UTF-8`, read the time in milliseconds and get thirteen digits.
+- **IT-028**: Draw `08` of 50 and get four marks; pass an array subscript holding a command and see the call fail without running it; pass a width of `wide` and see it refused.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file queue_ops.sh
 # @brief Example draining a durable job queue with several workers
 # @description Demonstrates dybatpho::queue_push, queue_peek, queue_len, queue_pop,
@@ -67,6 +73,7 @@ function _demo_drain {
   dybatpho::header "DRAIN"
   local id payload outcome
   while dybatpho::queue_pop "${queue}" id payload; do
+    # shellcheck disable=SC2310 # the handler's status is the point of the `if`: a failing job is counted, not fatal
     if _handle "${payload}"; then
       dybatpho::queue_complete "${queue}" "${id}"
       printf 'done      %s\n' "${payload%%$'\n'*}"
@@ -98,11 +105,13 @@ function _demo_dead_letters {
     "$(dybatpho::queue_len "${queue}" dead)"
   dybatpho::info "${counts}"
 
-  local id payload
+  local id payload dead_ids
+  dead_ids="$(dybatpho::queue_list "${queue}" dead)"
+  [[ -n "${dead_ids}" ]] || return 0
   while read -r id; do
     dybatpho::queue_read "${queue}" "${id}" payload dead
     printf 'dead letter %s: %s\n' "${id}" "${payload}"
-  done < <(dybatpho::queue_list "${queue}" dead)
+  done <<< "${dead_ids}"
 }
 
 # @description Show that a claimed job outlives a worker that dies.

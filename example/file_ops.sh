@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
 # @file file_ops.sh
 # @brief Example showing file utilities
 # @description
@@ -287,6 +290,7 @@ function _demo_ensure_dir {
   cache="$(dybatpho::ensure_dir "${WORKDIR}/cache/myapp" 700)"
   printf 'last run: ok\n' | dybatpho::file_write_atomic "${cache}/state"
   local stat
+  # dyshellint disable=BSG083 # it falls back to the BSD form when GNU `stat` refuses `-c`
   stat=$(stat -c %a "${cache}" 2> /dev/null || stat -f %Lp "${cache}")
   dybatpho::info "Cache dir : ${cache} (mode ${stat})"
   local cat
@@ -306,6 +310,8 @@ function _demo_symlinked_dotfile {
   dybatpho::create_temp WORKDIR "/"
   mkdir -p "${WORKDIR}/dotfiles"
   printf 'export EDITOR=vi\n' > "${WORKDIR}/dotfiles/bashrc"
+  # This sets up the example's own fixture in its temporary directory, not the change a dry run rehearses.
+  # dyshellint disable=BSG095 # example fixture, not the rehearsed change
   ln -s "${WORKDIR}/dotfiles/bashrc" "${WORKDIR}/.bashrc"
 
   # The writers follow the link, so editing the dotfile edits the file in the
@@ -353,6 +359,7 @@ function _demo_xdg {
   date=$(date +%s)
   printf 'last-run=%s\n' "${date}" | dybatpho::file_write_atomic "${state}/run"
   local mode
+  # dyshellint disable=BSG083 # it falls back to the BSD form when GNU `stat` refuses `-c`
   mode=$(stat -c %a "${state}" 2> /dev/null || stat -f %Lp "${state}")
   dybatpho::info "Wrote ${state#"${WORKDIR}"/}/run with mode ${mode}"
 }

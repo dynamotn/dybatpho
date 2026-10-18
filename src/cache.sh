@@ -1,4 +1,11 @@
 # shellcheck shell=bash
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
 # @file cache.sh
 # @brief Utilities for remembering an answer on disk until it goes stale
 # @namespace dybatpho
@@ -419,6 +426,9 @@ function __dybatpho_cache_refresh_background {
     return 0
   fi
   dybatpho::debug "cache: stale ${__dybatpho_cache_refresh_bg_key}, refreshing in the background"
+  # A background refresh must hold none of the caller's streams, so
+  # everything it writes goes nowhere on purpose.
+  # dyshellint disable=BSG120 # a background job holds no caller stream
   (
     # The lock records the calling shell, which a subshell shares, so the
     # refresh is entitled to release it. A signal ends the subshell through
@@ -730,12 +740,14 @@ function dybatpho::cache_prune {
   now="$(date +%s)"
   for record in ${records[@]+"${records[@]}"}; do
     read -r mtime size path <<< "${record}"
+    # dyshellint disable=BSG087 # the value is read from `stat`, which prints plain digits
     if [[ -n "${older_than}" ]] && ((now - mtime > older_than)); then
       __dybatpho_cache_prune_remove "${path}"
       continue
     fi
     kept+=("${record}")
     count=$((count + 1))
+    # dyshellint disable=BSG087 # the value is read from `stat`, which prints plain digits
     total=$((total + size))
   done
 
@@ -827,9 +839,11 @@ function dybatpho::cache_stats {
   now="$(date +%s)"
   for record in ${records[@]+"${records[@]}"}; do
     read -r mtime size path <<< "${record}"
+    # dyshellint disable=BSG087 # the value is read from `stat`, which prints plain digits
     age=$((now - mtime))
     ((age >= 0)) || age=0
     entries=$((entries + 1))
+    # dyshellint disable=BSG087 # the value is read from `stat`, which prints plain digits
     bytes=$((bytes + size))
     if ((age < ttl)); then
       fresh=$((fresh + 1))

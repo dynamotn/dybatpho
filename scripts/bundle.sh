@@ -2,6 +2,16 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
+# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
+# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
+# dyshellint disable=BSG047 # values come back on stdout
+# The two `$(dybatpho::version)` calls sit in the text of the bundle prologue,
+# where no comment can go. `DYBATPHO_VERSION` only memoizes the version file,
+# so losing it with the subshell means the file is read again.
+# dyshellint disable=BSG084 # the version memo is lost with the subshell
 # @file bundle.sh
 # @brief Flatten the selected modules into one self-contained file
 # @description
@@ -306,6 +316,7 @@ function __dybatpho_bundle_smoke {
 # @description CLI specification for this script.
 #######################################
 # @noargs
+# dyshellint disable=BSG052 # `dybatpho::generate_from_spec` adds `--help` to every spec, so the option already exists
 function _spec {
   dybatpho::opts::setup "Flatten dybatpho modules into one self-contained file" \
     BUNDLE_ARGS action:"__dybatpho_bundle_run" args:none

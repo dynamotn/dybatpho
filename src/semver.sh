@@ -1,6 +1,10 @@
 # shellcheck shell=bash
 # This file keeps its declarations with the functions they describe.
 # dyshellint disable=BSG033
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file semver.sh
 # @brief Utilities for working with Semantic Versioning (semver)
 # @namespace dybatpho
@@ -397,11 +401,14 @@ function __dybatpho_semver_expand {
       # A caret allows changes that do not alter the leftmost non-zero part,
       # which is what "compatible" means once a project is below 1.0.
       __bounds_out+=(">= ${filled}")
+      # dyshellint disable=BSG087 # the version passed `dybatpho::semver_valid`, which rejects leading zeros
       if ((major > 0)) || ((parts == 1)); then
         __bounds_out+=("< $((major + 1)).0.0")
+      # dyshellint disable=BSG087 # the version passed `dybatpho::semver_valid`, which rejects leading zeros
       elif ((minor > 0)) || ((parts == 2)); then
         __bounds_out+=("< ${major}.$((minor + 1)).0")
       else
+        # dyshellint disable=BSG087 # the version passed `dybatpho::semver_valid`, which rejects leading zeros
         __bounds_out+=("< ${major}.${minor}.$((patch + 1))")
       fi
       ;;

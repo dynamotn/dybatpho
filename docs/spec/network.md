@@ -328,6 +328,7 @@ dybatpho::circuit_breaker api.example.test \
 - **FR-039**: A command run by `circuit_breaker` or `rate_limit` MUST see the caller's variables: both MUST keep their state in prefixed locals, so a command cannot change the recorded failures or the spent budget.
 - **FR-040**: `dybatpho::curl_do` MUST NOT hand `-L` to curl while `DYBATPHO_CURL_SECRET_HEADERS` is set; it MUST follow a redirect within the same origin with the headers, drop them before following one to another origin, and refuse one to another origin when `DYBATPHO_CURL_SECRET_DATA` is set.
 - **FR-041**: `DYBATPHO_CURL_MAX_REDIRECTS` (default `20`) MUST bound the redirects `dybatpho::curl_do` follows itself; past it the last 3xx status is returned as exit code 3.
+- **FR-042**: A rate limit spec MUST read its count and window in base ten, so `5/08` is five calls in eight seconds.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -461,6 +462,7 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-037**: Answer a same-origin 302 then a cross-origin 302 with a secret header set: the second request carries the header and the resolved URL, the third carries neither the header nor `--config` and is given `-L`.
 - **IT-038**: Answer a 307 to another origin while the body is a secret, and get exit code 3 with a warning naming the origin.
 - **IT-039**: Loop a 301 with `DYBATPHO_CURL_MAX_REDIRECTS=2`, and stop after two hops with a warning.
+- **IT-040**: Parse `5/08` and `09/08ms` and get `5 8000` and `9 8`.
 
 ## Acceptance Criteria *(mandatory)*
 

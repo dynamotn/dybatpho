@@ -4,6 +4,13 @@
 # keeps its declarations with the functions they describe; it parses its own
 # arguments, so the raw form is what the reader sees.
 # dyshellint disable=BSG050,BSG033,BSG051
+# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
+# own diagnostic when it fails, so a separate assignment for each would only add lines.
+# shellcheck disable=SC2312 # values are passed on through $(...)
+# The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
+# here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
+# which test/conventions.bats enforces.
+# dyshellint disable=BSG047 # reviewed in test/die-in-substitution.allow
 # @file doctor.sh
 # @brief Utilities for checking that the environment can run what a script loaded
 # @namespace dybatpho
@@ -402,6 +409,8 @@ function __dybatpho_doctor_report_text {
   local bash_status="ok"
   dybatpho::doctor_bash_supported || bash_status="unsupported"
   local version
+  # `DYBATPHO_VERSION` only memoizes the version file; losing it with the subshell means it is read again.
+  # dyshellint disable=BSG084 # `DYBATPHO_VERSION` only memoizes the version file
   version=$(dybatpho::version)
   printf 'dybatpho %s (%s)\n' "${version}" "${DYBATPHO_DIR}"
   printf 'bash     %s [%s, minimum %s]\n' \
@@ -471,6 +480,8 @@ function __dybatpho_doctor_report_json {
   local bash_ok="false"
   dybatpho::doctor_bash_supported && bash_ok="true"
   local version
+  # `DYBATPHO_VERSION` only memoizes the version file; losing it with the subshell means it is read again.
+  # dyshellint disable=BSG084 # `DYBATPHO_VERSION` only memoizes the version file
   version=$(dybatpho::version)
   local version_json directory_json bash_json system_json machine_json
   __dybatpho_log_json_escape_into version_json "${version}"

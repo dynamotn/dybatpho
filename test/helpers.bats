@@ -1024,3 +1024,24 @@ EOF
   assert_equal "$(cat "${seen}")" "caller caller"
   assert_equal "${line}" "caller"
 }
+
+@test "dybatpho::retry and retry_until refuse a budget that is not a number" {
+  run --separate-stderr dybatpho::retry many true
+  assert_failure
+  assert_stderr --partial "Number of retries must be a whole number, got 'many'"
+  run --separate-stderr dybatpho::retry_until 'a[$(touch "${BATS_TEST_TMPDIR}/ran")]' 0 true
+  assert_failure
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/ran"
+  # A zero-padded budget is read in base ten.
+  run_traced dybatpho::retry 08 true
+  assert_success
+}
+
+@test "dybatpho::is command and function print nothing, whatever the answer" {
+  run_traced dybatpho::is function dybatpho::is
+  assert_success
+  refute_output
+  run_traced dybatpho::is function no_such_function_here
+  assert_failure
+  refute_output
+}

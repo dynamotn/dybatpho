@@ -7,6 +7,7 @@ Utilities for calling large language models from shell scripts
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module turns an LLM into an ordinary shell dependency: one function
@@ -75,6 +76,7 @@ anything is sent, and a call budget that stops a runaway loop.
 - [`dybatpho::ai_redact`](#dybatphoai_redact) — Redact secrets and common personal identifiers in text. Registered secrets are masked first, then email addresses, IPv4 addresses, and long digit runs are replaced with placeholders.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### When to use this module
@@ -124,37 +126,40 @@ dybatpho::ai_run "Are we about to run out of disk?"
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/ai_ops.sh](../example/ai_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Set `DYBATPHO_AI_PROVIDER` to pin a backend; the default `auto` picks the first one whose credentials or command are present
-- Every prompt is passed through `dybatpho::secret_mask` first, so values registered with `dybatpho::secret_register` never reach the provider @note Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library; building them by string concatenation is too escaping-sensitive to be safe
+- Every prompt is passed through `dybatpho::secret_mask` first, so values registered with `dybatpho::secret_register` never reach the provider
 
-### `dybatpho::ai_ask`
+**[`dybatpho::ai_ask`](#dybatphoai_ask)**
 
 - Pipe long inputs into the prompt with a command substitution rather than as a second argument
 
-### `dybatpho::ai_json`
+**[`dybatpho::ai_json`](#dybatphoai_json)**
 
 - Keep schemas flat; `additionalProperties: false` plus a `required` list gives the most reliable results
 
-### `dybatpho::ai_tool_register`
+**[`dybatpho::ai_tool_register`](#dybatphoai_tool_register)**
 
 - Write the description prescriptively: say when to call the tool, not only what it does
 
-### `dybatpho::ai_run`
+**[`dybatpho::ai_run`](#dybatphoai_run)**
 
 - Handlers receive their arguments as one JSON string; parse it with `dybatpho::json_query`
 
-### `dybatpho::ai_redact`
+**[`dybatpho::ai_redact`](#dybatphoai_redact)**
 
 - This is a coarse net, not a compliance control; do not send regulated data to a third party provider on the strength of it
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::ai_provider`
@@ -190,7 +195,6 @@ _Function has no arguments._
 - `0`: A backend was resolved
 - `1`: Stop the script when the pinned name is unknown, or nothing is configured
 
-
 ---
 
 ### `dybatpho::ai_model`
@@ -224,7 +228,6 @@ dybatpho::info "Asking $(dybatpho::ai_model)"
 
 - `0`: A model name was resolved
 
-
 ---
 
 ### `dybatpho::ai_check`
@@ -251,7 +254,6 @@ _Function has no arguments._
 - `0`: The active backend is usable
 - `1`: Stop the script when a dependency or credential is missing
 
-
 ---
 
 ### `dybatpho::ai_cache_clear`
@@ -276,7 +278,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: The cache directory is empty or absent
-
 
 ---
 
@@ -316,7 +317,6 @@ dybatpho::ai_ask "Is this config safe?" "You are a security reviewer"
 - `4`: HTTP 4xx from the provider
 - `5`: HTTP 5xx from the provider
 
-
 ---
 
 ### `dybatpho::ai_conversation_new`
@@ -352,7 +352,6 @@ dybatpho::ai_conversation_new CHAT "You are a release manager"
 
 - [dybatpho::create_temp](#dybatphocreate_temp)
 
-
 ---
 
 ### `dybatpho::ai_conversation_add`
@@ -378,7 +377,6 @@ dybatpho::ai_conversation_add "${CHAT}" assistant "Noted."
 
 - `0`: The turn was appended
 - `1`: Missing arguments, unknown role, or unreadable file
-
 
 ---
 
@@ -407,7 +405,6 @@ dybatpho::ai_conversation_show "${CHAT}"
 
 - `0`: The transcript was printed
 - `1`: Missing argument or unreadable file
-
 
 ---
 
@@ -444,7 +441,6 @@ dybatpho::ai_chat "${CHAT}" "Now write it as release notes"
 **🔗 See also**
 
 - [dybatpho::ai_conversation_new](#dybatphoai_conversation_new)
-
 
 ---
 
@@ -487,7 +483,6 @@ dybatpho::ai_json "Did this deploy succeed? ${log}" "${schema}"
 - `0`: A valid JSON answer was produced
 - `1`: Missing arguments, an invalid schema, or no valid answer after every attempt
 
-
 ---
 
 ### `dybatpho::ai_stream`
@@ -525,7 +520,6 @@ dybatpho::ai_stream "Explain this stack trace" | tee /tmp/answer.txt
 - `4`: The provider answered with HTTP 4xx, such as a rejected key or a rate limit
 - `5`: The provider answered with HTTP 5xx
 
-
 ---
 
 ### `dybatpho::ai_tool_register`
@@ -560,7 +554,6 @@ dybatpho::ai_tool_register service_status "Check whether a systemd unit is activ
 - `0`: The tool is registered
 - `1`: Missing arguments, an invalid schema, or an undefined handler
 
-
 ---
 
 ### `dybatpho::ai_tool_list`
@@ -584,7 +577,6 @@ _Function has no arguments._
 
 - `0`: The list was printed, empty when nothing is registered
 
-
 ---
 
 ### `dybatpho::ai_tool_clear`
@@ -600,7 +592,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: The registry is empty
-
 
 ---
 
@@ -646,7 +637,6 @@ dybatpho::ai_run "Do we need to clean up the build cache?"
 - `0`: The model produced a final answer
 - `1`: Missing arguments, no tools registered, a provider error, or the step limit was hit
 
-
 ---
 
 ### `dybatpho::ai_tokens_estimate`
@@ -682,7 +672,6 @@ fi
 
 - `0`: An estimate was printed
 
-
 ---
 
 ### `dybatpho::ai_usage`
@@ -712,7 +701,6 @@ dybatpho::ai_usage total
 
 - `0`: The counters were printed
 - `1`: Stop the script when the scope is unknown
-
 
 ---
 
@@ -744,7 +732,6 @@ fi
 - `0`: The value was printed
 - `1`: Missing argument or an unknown field
 
-
 ---
 
 ### `dybatpho::ai_usage_reset`
@@ -756,7 +743,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: The counters are back to zero
-
 
 ---
 
@@ -785,7 +771,6 @@ dybatpho::ai_budget 5 # a runaway loop stops instead of billing forever
 
 - `0`: The budget is set
 - `1`: Missing or non-numeric argument
-
 
 ---
 

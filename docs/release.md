@@ -7,6 +7,7 @@ Utilities for cutting a release from a Git repository
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module turns the commits since the last tag into a release: it decides
@@ -43,38 +44,41 @@ creating a GitHub release stays with the caller, who owns those credentials.
 - [`dybatpho::release_sign`](#dybatphorelease_sign) — Sign a file and print the signature's path. Signing uses `gpg` unless `DYBATPHO_RELEASE_SIGN_CMD` names another command, which lets a project sign with `minisign`, `cosign`, or anything else without this module knowing about it.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/release_ops.sh](../example/release_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::release_commit_parse`
+**[`dybatpho::release_commit_parse`](#dybatphorelease_commit_parse)**
 
 - A subject that follows no convention reports the type `other` and keeps the whole subject as its description
 
-### `dybatpho::release_next_version`
+**[`dybatpho::release_next_version`](#dybatphorelease_next_version)**
 
 - With no tag in the repository yet, the range starts at the first commit and the result is the first version the commits call for
 
-### `dybatpho::release_changelog`
+**[`dybatpho::release_changelog`](#dybatphorelease_changelog)**
 
 - Commits of a type that does not move the version, such as `docs` or `chore`, are left out: they are part of the history, not of the release notes
 
-### `dybatpho::release_package`
+**[`dybatpho::release_package`](#dybatphorelease_package)**
 
 - The artifact is written by the `archive` module, which `release` does not load; load it alongside: `--modules release archive`
 
-### `dybatpho::release_checksums`
+**[`dybatpho::release_checksums`](#dybatphorelease_checksums)**
 
 - The file names are recorded without a directory component, so the file verifies from inside the directory it describes
 
-### `dybatpho::release_sign`
+**[`dybatpho::release_sign`](#dybatphorelease_sign)**
 
 - Sign the checksum file rather than every artifact: one signature then covers them all, because the checksums bind their contents
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::release_commit_parse`
@@ -114,7 +118,6 @@ dybatpho::release_commit_parse "fix: handle empty input"
 - Four lines: type, scope (empty if none), `true` or `false` for
   breaking, and the description with the type prefix removed
 
-
 ---
 
 ### `dybatpho::release_commit_type`
@@ -138,7 +141,6 @@ dybatpho::release_commit_type "fix: handle empty input"        # fix
 **📤 Output on stdout**
 
 - One of `breaking`, `feat`, `fix`, `perf`, the declared type, or `other`
-
 
 ---
 
@@ -170,7 +172,6 @@ bump="$(dybatpho::release_bump_type "." "v1.2.3")"
 **🚦 Exit codes**
 
 - `1`: No commit in the range calls for a release
-
 
 ---
 
@@ -211,7 +212,6 @@ fi
 
 - `1`: No commit since the base tag calls for a release
 
-
 ---
 
 ### `dybatpho::release_changelog`
@@ -239,7 +239,6 @@ dybatpho::release_changelog "." "v1.2.3" "HEAD" "1.3.0" >> CHANGELOG.md
 **📤 Output on stdout**
 
 - Markdown section for the release
-
 
 ---
 
@@ -269,7 +268,6 @@ dybatpho::release_artifact_name mytool 1.3.0 windows amd64 # mytool_1.3.0_window
 **📤 Output on stdout**
 
 - Artifact file name, including the extension for that platform
-
 
 ---
 
@@ -310,7 +308,6 @@ dybatpho::release_package ./dist/linux_amd64 ./release mytool 1.3.0 linux amd64
 - `1`: The source is missing or the archive cannot be created
 - `1`: Stop the script when the `archive` module is not loaded
 
-
 ---
 
 ### `dybatpho::release_checksums`
@@ -348,7 +345,6 @@ sums="$(dybatpho::release_checksums ./release)"
 **🚦 Exit codes**
 
 - `1`: The directory is missing or holds no file to checksum
-
 
 ---
 

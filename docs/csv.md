@@ -7,6 +7,7 @@ Utilities for reading, filtering and writing CSV data
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module reads the tabular format ops scripts keep receiving --
@@ -48,25 +49,28 @@ Data containing that byte is rejected rather than silently re-split.
 - [`dybatpho::csv_from_json`](#dybatphocsv_from_json) — Convert a JSON array of objects to CSV. The keys of the first object become the header, in their document order, and a later object missing one of them writes an empty value there.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/csv_ops.sh](../example/csv_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - The whole input is held in memory as a Bash array, which is comfortable into the low tens of thousands of rows; past that, reach for a real CSV tool
 - Values are read and written as text, because CSV carries no types; cast in `jq` after `dybatpho::csv_to_json` when a consumer needs numbers
 
-### `dybatpho::csv_col`
+**[`dybatpho::csv_col`](#dybatphocsv_col)**
 
 - A value containing a line break spans lines here; read through `dybatpho::csv_read` when every value has to stay one item
 
-### `dybatpho::csv_join`
+**[`dybatpho::csv_join`](#dybatphocsv_join)**
 
 - A column named the same on both sides appears twice in the output; `dybatpho::csv_col` and the other by-name helpers then read the left one
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::csv_read`
@@ -101,7 +105,6 @@ printf '%s\n' "${first[0]}"
 - `0`: The input was parsed
 - `1`: The input contains the ASCII unit separator, or the name is not bindable
 
-
 ---
 
 ### `dybatpho::csv_fields`
@@ -130,7 +133,6 @@ dybatpho::csv_fields "${rows[0]}" header
 
 - `0`: The record was split
 - `1`: The name is not bindable
-
 
 ---
 
@@ -161,7 +163,6 @@ dybatpho::csv_write rows > normalized.csv
 
 - `0`: The records were written
 - `1`: The name is not bindable
-
 
 ---
 
@@ -197,7 +198,6 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_convert report.tsv ","
 - `0`: The input was rewritten
 - `1`: Either delimiter is invalid, or the input contains the ASCII unit separator
 
-
 ---
 
 ### `dybatpho::csv_header`
@@ -223,7 +223,6 @@ dybatpho::csv_header report.csv
 **🚦 Exit codes**
 
 - `0`: The header was read, or the input was empty
-
 
 ---
 
@@ -255,7 +254,6 @@ dybatpho::csv_col report.csv "Region"
 
 - `0`: The column was printed
 - `1`: No column has that name or position, or a row has more fields than the header
-
 
 ---
 
@@ -289,7 +287,6 @@ dybatpho::csv_select billing.csv 4 1   # cost first, then service
 
 - `0`: The columns were printed, or the input was empty
 - `1`: A column matches neither a name nor a position, or a row is wider than the header
-
 
 ---
 
@@ -328,7 +325,6 @@ dybatpho::csv_sort billing.csv owner asc text
 
 - `0`: The rows were sorted, or the input was empty
 - `1`: An unknown column, order or comparison, a non-number under `number`, or a row wider than the header
-
 
 ---
 
@@ -371,7 +367,6 @@ dybatpho::csv_join services.csv costs.csv service left name
 - `0`: The inputs were joined
 - `1`: An unknown join type or key column, both inputs read from stdin, or a row wider than its header
 
-
 ---
 
 ### `dybatpho::csv_filter`
@@ -406,7 +401,6 @@ dybatpho::csv_filter billing.csv "Cost" gt 100
 - `0`: The rows were filtered
 - `1`: No column has that name, the operator is unknown, or a row is wider than the header
 
-
 ---
 
 ### `dybatpho::csv_to_json`
@@ -440,7 +434,6 @@ dybatpho::csv_to_json report.csv | dybatpho::json_pretty -
 
 - `0`: The conversion succeeded
 - `1`: A row has more fields than the header
-
 
 ---
 

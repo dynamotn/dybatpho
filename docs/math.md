@@ -7,6 +7,7 @@ Exact decimal arithmetic, comparison, rounding and aggregation
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Bash only does integer arithmetic, so a script that has to divide, average,
@@ -82,29 +83,32 @@ money, sizes, counters, percentages — not for cryptographic bignums.
 - [`dybatpho::math_random`](#dybatphomath_random) — Print a random whole number in an inclusive range. `$((RANDOM % n))` is biased whenever `n` does not divide the generator's range, which is most of the time: with `RANDOM % 10` the low digits come up noticeably more often. This draws sixty bits and rejects the tail that would cause the bias, so every value in the range is equally likely.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/math_ops.sh](../example/math_ops.sh)
 - [docs/spec/math.md](spec/math.md)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Reach for `dybatpho::i18n_number` when the number is about to be shown to a person, and for this module when it is about to be computed with
 
-### `dybatpho::math_div`
+**[`dybatpho::math_div`](#dybatphomath_div)**
 
 - Division is the one operation that cannot always be exact; every other operation in this module keeps all of its digits
 
-### `dybatpho::math_round`
+**[`dybatpho::math_round`](#dybatphomath_round)**
 
 - This rounds for computation. Use `dybatpho::i18n_number` when the result is going to be shown, since that one keeps the digits a person expects to see
 
-### `dybatpho::math_percent`
+**[`dybatpho::math_percent`](#dybatphomath_percent)**
 
 - Pair it with `dybatpho::i18n_percent` to print the result the way the reader's locale writes a percentage
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::math_is_number`
@@ -133,7 +137,6 @@ dybatpho::math_is_number "1e3" || echo no      # no
 - `0`: The value is a number
 - `1`: It is not
 
-
 ---
 
 ### `dybatpho::math_is_integer`
@@ -159,7 +162,6 @@ dybatpho::math_is_integer "2.01" || echo no    # no
 
 - `0`: The value is a whole number
 - `1`: It is not a number, or it has a fractional part
-
 
 ---
 
@@ -188,7 +190,6 @@ dybatpho::math_add 19.99 5.01 0.5    # 25.5
 **🚦 Exit codes**
 
 - `1`: Stop the script when a value is not a number
-
 
 ---
 
@@ -219,7 +220,6 @@ dybatpho::math_sub 100 10 5      # 85
 
 - `1`: Stop the script when a value is not a number
 
-
 ---
 
 ### `dybatpho::math_mul`
@@ -248,7 +248,6 @@ dybatpho::math_mul 99999999999 99999999999  # 9999999999800000000001
 **🚦 Exit codes**
 
 - `1`: Stop the script when a value is not a number
-
 
 ---
 
@@ -287,7 +286,6 @@ dybatpho::math_div 1 3 0       # 0
 
 - `1`: Stop the script on a non-number, a bad scale, or a zero divisor
 
-
 ---
 
 ### `dybatpho::math_mod`
@@ -317,7 +315,6 @@ dybatpho::math_mod -17 5    # -2
 **🚦 Exit codes**
 
 - `1`: Stop the script on a fractional operand or a zero divisor
-
 
 ---
 
@@ -361,7 +358,6 @@ dybatpho::math_pow 2 -3        # 0.125
 
 - `1`: Stop the script on a fractional or oversized exponent, or on `0` raised to a negative power
 
-
 ---
 
 ### `dybatpho::math_abs`
@@ -388,7 +384,6 @@ dybatpho::math_abs -12.5    # 12.5
 **🚦 Exit codes**
 
 - `1`: Stop the script when the value is not a number
-
 
 ---
 
@@ -418,7 +413,6 @@ dybatpho::math_neg 0       # 0
 **🚦 Exit codes**
 
 - `1`: Stop the script when the value is not a number
-
 
 ---
 
@@ -450,7 +444,6 @@ dybatpho::math_compare 2.50 2.5     # 0
 
 - `1`: Stop the script when a value is not a number
 
-
 ---
 
 ### `dybatpho::math_gt`
@@ -475,7 +468,6 @@ dybatpho::math_gt "${balance}" 0 || dybatpho::die "Account is empty"
 
 - `0`: The first value is greater
 - `1`: It is not
-
 
 ---
 
@@ -502,7 +494,6 @@ dybatpho::math_lt "${free_gb}" 1 && dybatpho::warn "Disk nearly full"
 - `0`: The first value is smaller
 - `1`: It is not
 
-
 ---
 
 ### `dybatpho::math_eq`
@@ -528,7 +519,6 @@ dybatpho::math_eq 2.50 2.5 && echo same
 
 - `0`: The values are equal
 - `1`: They are not
-
 
 ---
 
@@ -558,7 +548,6 @@ dybatpho::math_trunc -2.9    # -2
 
 - `1`: Stop the script when the value is not a number
 
-
 ---
 
 ### `dybatpho::math_floor`
@@ -587,7 +576,6 @@ dybatpho::math_floor -2.1    # -3
 
 - `1`: Stop the script when the value is not a number
 
-
 ---
 
 ### `dybatpho::math_ceil`
@@ -615,7 +603,6 @@ dybatpho::math_ceil -2.9     # -2
 **🚦 Exit codes**
 
 - `1`: Stop the script when the value is not a number
-
 
 ---
 
@@ -650,7 +637,6 @@ dybatpho::math_round 1.005 2    # 1.01
 
 - `1`: Stop the script when the value is not a number or the scale is not a non-negative integer
 
-
 ---
 
 ### `dybatpho::math_min`
@@ -682,7 +668,6 @@ dybatpho::math_min < durations.txt
 **🚦 Exit codes**
 
 - `1`: Stop the script when no value is given or one is not a number
-
 
 ---
 
@@ -716,7 +701,6 @@ dybatpho::math_max < durations.txt
 
 - `1`: Stop the script when no value is given or one is not a number
 
-
 ---
 
 ### `dybatpho::math_sum`
@@ -748,7 +732,6 @@ awk '{print $3}' sizes.txt | dybatpho::math_sum
 **🚦 Exit codes**
 
 - `1`: Stop the script when a value is not a number
-
 
 ---
 
@@ -792,7 +775,6 @@ DYBATPHO_MATH_SCALE=2 dybatpho::math_avg 10 20 25   # 18.33
 
 - `1`: Stop the script when no value is given or one is not a number
 
-
 ---
 
 ### `dybatpho::math_median`
@@ -829,7 +811,6 @@ dybatpho::math_median < durations.txt
 **🚦 Exit codes**
 
 - `1`: Stop the script when no value is given or one is not a number
-
 
 ---
 
@@ -872,7 +853,6 @@ dybatpho::math_percentile 99 < latencies.txt
 
 - `1`: Stop the script on a percentile outside `0`–`100`, an empty list, or a value that is not a number
 
-
 ---
 
 ### `dybatpho::math_sqrt`
@@ -911,7 +891,6 @@ dybatpho::math_sqrt 0.25        # 0.5
 **🚦 Exit codes**
 
 - `1`: Stop the script on a non-number, a negative value, or a bad scale
-
 
 ---
 
@@ -964,7 +943,6 @@ DYBATPHO_MATH_SCALE=3 dybatpho::math_stddev 1 2 3 4   # 1.118
 
 - `1`: Stop the script on an empty list, a single value with `--sample`, or a value that is not a number
 
-
 ---
 
 ### `dybatpho::math_clamp`
@@ -995,7 +973,6 @@ dybatpho::math_clamp 7.5 0 10     # 7.5
 **🚦 Exit codes**
 
 - `1`: Stop the script on a non-number or a lower bound above the upper one
-
 
 ---
 
@@ -1033,7 +1010,6 @@ dybatpho::math_percent 1 3 2        # 33.33
 
 - `1`: Stop the script on a non-number, a bad scale, or a whole of zero
 
-
 ---
 
 ### `dybatpho::math_gcd`
@@ -1062,7 +1038,6 @@ dybatpho::math_gcd 24 36 60     # 12
 
 - `1`: Stop the script on a fractional or non-numeric value
 
-
 ---
 
 ### `dybatpho::math_lcm`
@@ -1090,7 +1065,6 @@ dybatpho::math_lcm 2 3 5       # 30
 **🚦 Exit codes**
 
 - `1`: Stop the script on a fractional or non-numeric value
-
 
 ---
 

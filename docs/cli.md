@@ -9,6 +9,7 @@ Utilities for building CLI parsers from shell specs.
 > Reference sections: [Spec functions](#spec-functions)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `src/cli.sh` lets you describe a command with shell functions, then generate:
@@ -50,6 +51,7 @@ Utilities for building CLI parsers from shell specs.
 - [`dybatpho::generate_help`](#dybatphogenerate_help) — Show help description of root command/sub-command. Declares help state as locals so dybatpho::opts::* in the call chain can read/write them via bash dynamic scoping.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### Basic workflow
@@ -552,6 +554,7 @@ by itself and there is nothing to clear by hand. Set
 declared somewhere with no readable source file is never cached.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/cli_basic.sh](../example/cli_basic.sh)
@@ -559,43 +562,44 @@ declared somewhere with no readable source file is never cached.
 - [example/cli_ux.sh](../example/cli_ux.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Set `DYBATPHO_CLI_DEBUG=true` while developing a spec to inspect the generated parser and help logic.
 
-### `dybatpho::prompt`
+**[`dybatpho::prompt`](#dybatphoprompt)**
 
 - The prompt is written to stderr so the returned value remains clean on stdout.
 
-### `dybatpho::select`
+**[`dybatpho::select`](#dybatphoselect)**
 
 - Pass `true` for the third argument to accept comma-separated values and numeric ranges such as `1-3`.
 - Invalid or out-of-range selections are rejected and prompt again.
 
-### `dybatpho::generate_schema`
+**[`dybatpho::generate_schema`](#dybatphogenerate_schema)**
 
 - Use the schema to drive external validation, form generation, tooling, or documentation from the same source of truth.
 
-### `dybatpho::generate_man`
+**[`dybatpho::generate_man`](#dybatphogenerate_man)**
 
 - Generate the page from the root spec to include the complete nested command tree.
 
-### `dybatpho::generate_completion`
+**[`dybatpho::generate_completion`](#dybatphogenerate_completion)**
 
 - Keep completion generation in a display option declared inside the spec when the CLI should complete itself.
 - Generate completion from the root spec so subcommand options and aliases are included.
 
-### `dybatpho::opts::setup`
+**[`dybatpho::opts::setup`](#dybatphooptssetup)**
 
 - Call `setup` before declaring any flags, params, display options, or subcommands.
 - Keep the action focused on command behavior; validation and lifecycle hooks are applied by the generated parser.
 
-### `dybatpho::opts::flag`
+**[`dybatpho::opts::flag`](#dybatphooptsflag)**
 
 - Use `on:` and `off:` with a paired `--{no-}name` switch to model boolean toggles.
 - Use `persistent:true` for options that must be accepted by every descendant command.
 
-### `dybatpho::opts::param`
+**[`dybatpho::opts::param`](#dybatphooptsparam)**
 
 - Use `required:true` when the option itself must be present
 - Use `optional:true` when the option may appear without an explicit value
@@ -604,30 +608,31 @@ declared somewhere with no readable source file is never cached.
 - Use `env:NAME` for an environment fallback; an explicit command-line value always takes precedence.
 - Combine `prompt:` with `choices:` to interactively request a missing value from a constrained set.
 
-### `dybatpho::opts::disp`
+**[`dybatpho::opts::disp`](#dybatphooptsdisp)**
 
 - Use a display option for help, schema, man-page, completion, or other actions that should exit after running.
 - Define a custom help display option only when the default `--help` / `-h` behavior is not sufficient.
 
-### `dybatpho::opts::msg`
+**[`dybatpho::opts::msg`](#dybatphooptsmsg)**
 
 - Pass an empty string for a blank separator line.
 
-### `dybatpho::opts::cmd`
+**[`dybatpho::opts::cmd`](#dybatphooptscmd)**
 
 - Declare each subcommand with its own spec function so help, completion, schema, and man output stay consistent.
 - Aliases are accepted during dispatch and are included in generated help and schema metadata.
 
-### `dybatpho::opts::arg`
+**[`dybatpho::opts::arg`](#dybatphooptsarg)**
 
 - Declare arguments in the order they are typed; a variadic argument must come last.
 
-### `dybatpho::generate_help`
+**[`dybatpho::generate_help`](#dybatphogenerate_help)**
 
 - The current subcommand path is tracked automatically during parser dispatch
 - A command receives automatic `--help` and `-h` unless the spec declares its own help display option.
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::prompt`
@@ -648,7 +653,6 @@ Read a line from the terminal (or stdin) with an optional default.
 **🚦 Exit codes**
 
 - 0
-
 
 ---
 
@@ -672,7 +676,6 @@ Prompt for one or more values from a comma-separated list or numeric range.
 
 - 0
 
-
 ---
 
 ### `dybatpho::opts::validate_choice`
@@ -689,7 +692,6 @@ Check that a value belongs to a comma-separated choice list.
 **🚦 Exit codes**
 
 - `0`: Value is allowed
-
 
 ---
 
@@ -725,7 +727,6 @@ distance="$(dybatpho::cli_levenshtein color colour)"
 
 - [- `dybatpho::string_distance](#dybatphostring_distance)
 
-
 ---
 
 ### `dybatpho::cli_suggest`
@@ -758,7 +759,6 @@ dybatpho::cli_suggest --colr --color --cold --verbose
 - `0`: At least one close candidate was found
 - `1`: Nothing was close enough to suggest
 
-
 ---
 
 ### `dybatpho::cli_verbosity_level`
@@ -786,7 +786,6 @@ LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 **🚦 Exit codes**
 
 - 0
-
 
 ---
 
@@ -818,7 +817,6 @@ dybatpho::cli_apply_verbosity "${VERBOSITY}"
 
 - 0
 
-
 ---
 
 ### `dybatpho::generate_schema`
@@ -836,7 +834,6 @@ Generate a JSON CLI schema from the same option spec used by parsing.
 
 - JSON schema
 
-
 ---
 
 ### `dybatpho::generate_man`
@@ -853,7 +850,6 @@ Generate a roff man page from a CLI option spec.
 **📤 Output on stdout**
 
 - Man page
-
 
 ---
 
@@ -877,8 +873,8 @@ Generate Bash, Zsh, or Fish completion from a CLI option spec.
 
 - Completion script
 
-
 <a id="spec-functions"></a>
+
 ### 🧩 Spec functions
 
 #### `dybatpho::opts::setup`
@@ -886,6 +882,10 @@ Generate Bash, Zsh, or Fish completion from a CLI option spec.
 Functions work in spec of script or function via `dybatpho::generate_from_spec`.
 Setup global settings for getting options (mandatory) in spec
 of script or function
+
+> ⚠️ **Warning**
+>
+> Bash cannot export an array, so `export:` does not apply to it. Under `set -u` a scalar read such as `${REST}` fails on an empty array instead of yielding the empty string.
 
 **🧾 Arguments**
 
@@ -904,7 +904,6 @@ of script or function
 **🚦 Exit codes**
 
 - `0`: exit code
-
 
 ---
 
@@ -928,7 +927,6 @@ Define an option that take no argument
 
 - `0`: exit code
 
-
 ---
 
 ### `dybatpho::opts::param`
@@ -951,7 +949,6 @@ Define an option that take an argument
 
 - `0`: exit code
 
-
 ---
 
 ### `dybatpho::opts::disp`
@@ -972,7 +969,6 @@ Define an option that display only
 **🚦 Exit codes**
 
 - `0`: exit code
-
 
 ---
 
@@ -1006,7 +1002,6 @@ dybatpho::opts::flag "Colorize output" COLOR --color
 
 - `0`: exit code
 
-
 ---
 
 ### `dybatpho::opts::cmd`
@@ -1020,7 +1015,6 @@ Define a sub-command in spec
 | `$1` | string | Command name |
 | `$2` | string | Name of function that has spec of sub-command |
 | `$@` | key:value | Optional metadata such as `alias:<name>` or `aliases:<a,b>` |
-
 
 ---
 
@@ -1058,7 +1052,6 @@ dybatpho::opts::arg "Extra files" EXTRA required:false variadic:true
 
 - `0`: exit code
 
-
 ---
 
 ### `dybatpho::generate_from_spec`
@@ -1074,7 +1067,6 @@ Define spec of parent function or script, spec contains below commands
 **🚦 Exit codes**
 
 - `0`: exit code
-
 
 ---
 

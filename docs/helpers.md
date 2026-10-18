@@ -7,6 +7,7 @@ Utilities for common shell-script helper patterns.
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `src/helpers.sh` groups together the small building blocks that many other
@@ -63,6 +64,7 @@ reach for at a prompt.
 - [`dybatpho::function_list`](#dybatphofunction_list) — Print the public functions this shell has loaded. Without an argument this is the whole loaded API; with one it is what a single module exports, which is the list to skim when reaching for a module for the first time. Only `dybatpho::` names are listed. The `__dybatpho_` helpers are internal, and `declare -F` is right there for anyone debugging one.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### When to use this module
@@ -129,46 +131,49 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/process_ops.sh](../example/process_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Combine `dybatpho::expect_envs` and `dybatpho::require` near the top of entrypoint scripts to fail fast on missing configuration or dependencies. The `dybatpho::is` family and the lookups below are questions, not work: a caller tests them, so `set -e` is not meant to reach inside.
 
-### `dybatpho::expect_args`
+**[`dybatpho::expect_args`](#dybatphoexpect_args)**
 
 - Prefer calling this at the top of reusable functions instead of manually unpacking `$@`
 
-### `dybatpho::require`
+**[`dybatpho::require`](#dybatphorequire)**
 
 - Prefer this over repeating inline `command -v ... || exit` checks throughout a script
 
-### `dybatpho::is`
+**[`dybatpho::is`](#dybatphois)**
 
 - Use this helper to keep calling code readable instead of scattering shell test syntax across the script
 
-### `dybatpho::assert`
+**[`dybatpho::assert`](#dybatphoassert)**
 
 - The assertion command is executed with `eval`
 
-### `dybatpho::retry`
+**[`dybatpho::retry`](#dybatphoretry)**
 
 - The command is executed with `eval`, so pass it as one shell command string
 - Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same dependency, so they do not all come back at the same instant
 - Pass a short description when the raw command is noisy so retry logs stay readable
 
-### `dybatpho::retry_until`
+**[`dybatpho::retry_until`](#dybatphoretry_until)**
 
 - The command is executed with `eval`, so pass it as one shell command string
 
-### `dybatpho::breakpoint`
+**[`dybatpho::breakpoint`](#dybatphobreakpoint)**
 
 - This helper is intended for interactive local debugging, not unattended CI or production runs
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::expect_args`
@@ -193,7 +198,6 @@ dybatpho::expect_args arg1 arg2 .. argN -- "$@"
 
 - `1`: Stop the script if the specification is invalid or required arguments are missing
 - `0`: Assign arguments to the requested variable names and return successfully
-
 
 ---
 
@@ -242,7 +246,6 @@ function my_helper {
 - `0`: The name is safe to bind
 - `1`: Stop the script when the name is not an identifier, or is reserved
 
-
 ---
 
 ### `dybatpho::still_has_args`
@@ -265,7 +268,6 @@ _Function has no arguments._
 - `0`: Still has an argument
 - `1`: No additional arguments remain
 
-
 ---
 
 ### `dybatpho::expect_envs`
@@ -287,7 +289,6 @@ dybatpho::expect_envs ENV_VAR1 ENV_VAR2
 **🚦 Exit codes**
 
 - `1`: Stop the script if any variable is unset or empty
-
 
 ---
 
@@ -341,7 +342,6 @@ dybatpho::require yq '^4' 3
 
 - [- `dybatpho::command_version` - `dybatpho::semver_coerce` - `dybatpho::semver_satisfies](#dybatphocommand_version-dybatphosemver_coerce-dybatphosemver_satisfies)
 
-
 ---
 
 ### `dybatpho::command_exists_all`
@@ -358,7 +358,6 @@ Return success when all listed commands are available.
 
 - `0`: Every command exists
 - `1`: At least one command is missing
-
 
 ---
 
@@ -383,7 +382,6 @@ locale's decimal comma, or the quoted character codes `printf` takes.
 - `0`: If matched
 - `1`: If not matched
 
-
 ---
 
 ### `dybatpho::coalesce`
@@ -404,7 +402,6 @@ Print the first non-empty value from a list of fallbacks.
 
 - `0`: A non-empty value is found
 - `1`: No values are provided or all values are empty
-
 
 ---
 
@@ -427,7 +424,6 @@ Print the first available command from a list of candidates.
 - `0`: An available command is found
 - `1`: No commands are available
 
-
 ---
 
 ### `dybatpho::default_env`
@@ -444,7 +440,6 @@ Assign and export a default value for an environment variable when it is empty.
 **📤 Output on stdout**
 
 - Effective value after applying the default
-
 
 ---
 
@@ -463,7 +458,6 @@ Ensure that at least one of the listed environment variables is set.
 - `0`: At least one environment variable is set
 - `1`: None of the environment variables are set
 
-
 ---
 
 ### `dybatpho::assert`
@@ -481,7 +475,6 @@ Evaluate a shell condition string and stop with a message when it fails.
 
 - `0`: The assertion condition succeeds
 - `1`: The assertion condition fails
-
 
 ---
 
@@ -517,7 +510,6 @@ dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
 - `0`: The command eventually succeeds
 - `1`: The command never succeeds and returns 1 on the final attempt
 
-
 ---
 
 ### `dybatpho::retry_until`
@@ -538,7 +530,6 @@ Retry a shell command until it succeeds or the retry budget is exhausted, using 
 - `0`: The command eventually succeeds
 - `1`: The command never succeeds and returns its final exit code
 
-
 ---
 
 ### `dybatpho::breakpoint`
@@ -552,7 +543,6 @@ _Function has no arguments._
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_REPL_HISTORY_FILE`** | string | Override where REPL history is persisted between breakpoint sessions |
-
 
 ---
 
@@ -594,7 +584,6 @@ dybatpho::provides --path cache_run        # /path/to/src/cache.sh:245
 **🔗 See also**
 
 - [- `dybatpho::describe` - `dybatpho::function_list](#dybatphodescribe-dybatphofunction_list)
-
 
 ---
 
@@ -638,7 +627,6 @@ dybatpho::describe dybatpho::semver_satisfies
 **🔗 See also**
 
 - [- `dybatpho::provides](#dybatphoprovides)
-
 
 ---
 

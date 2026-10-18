@@ -7,6 +7,7 @@ Full-screen terminal applications: layout, widgets, and an event loop
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `tui.sh` draws widgets beside a script's ordinary output. This module takes
@@ -54,8 +55,6 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`dybatpho::screen_rect_inner`](#dybatphoscreen_rect_inner) — Shrink a rectangle by a margin on every side.
 - [`dybatpho::screen_rect_center`](#dybatphoscreen_rect_center) — Centre a rectangle of a given size inside another, which is what a popup needs.
 - [`dybatpho::screen_begin`](#dybatphoscreen_begin) — Take over the terminal: alternate screen, raw mode, hidden cursor, and mouse reporting. The terminal is opened directly rather than taken from stdin and stdout, so an application can still read a pipe and print a result that a caller captures while it is drawing.
-- [`exec`](#exec) — 
-- [`exec`](#exec) — 
 - [`dybatpho::screen_end`](#dybatphoscreen_end) — Give the terminal back: mouse reporting off, cursor shown, the alternate screen left, and the original line settings restored.
 - [`dybatpho::screen_event`](#dybatphoscreen_event) — Wait for the next event and report it under a stable name. Keys come back as `up`, `down`, `left`, `right`, `enter`, `space`, `tab`, `backspace`, `escape`, `home`, `end`, `pageup`, `pagedown`, `delete`, or `char:<c>`. A terminal that changed size reports `resize`, a mouse click reports `mouse:<button>`, and a closed input reports `eof`.
 - [`dybatpho::screen_pending`](#dybatphoscreen_pending) — Return success when an event is already waiting, so reading it with `dybatpho::screen_event` will not block. A frame drawn in Bash takes longer than a terminal takes to repeat a held key, so an application that draws once per event falls further behind for as long as the key is held, and keeps moving after it is released. Handling every event that is waiting before drawing the next frame keeps the screen in step with the keyboard instead.
@@ -120,87 +119,90 @@ A rectangle is the string `x y width height`, with `x` and `y` zero-based.
 `dybatpho::screen_layout` splits any rectangle into more of them.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/screen_ops.sh](../example/screen_ops.sh)
 - [src/tui.sh](../src/tui.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Everything is drawn on `/dev/tty` rather than on stdout, so an application can still print a result that a caller captures
 - Character widths come from the Unicode tables built into the core `logging` module, so CJK text and emoji line up without calling out to another program
 
-### `dybatpho::screen_put`
+**[`dybatpho::screen_put`](#dybatphoscreen_put)**
 
 - Pass the text without escape sequences and give the style separately; a style passed inside the text would break the column arithmetic
 
-### `dybatpho::screen_clear`
+**[`dybatpho::screen_clear`](#dybatphoscreen_clear)**
 
 - The front buffer is deliberately left alone, so a cleared frame still only sends the rows that actually changed
 
-### `dybatpho::screen_flush`
+**[`dybatpho::screen_flush`](#dybatphoscreen_flush)**
 
 - A frame costs what changed: redrawing a screen where one list row moved sends one or two rows, not the whole screen
 
-### `dybatpho::screen_layout`
+**[`dybatpho::screen_layout`](#dybatphoscreen_layout)**
 
 - A part can come out zero-sized when the rectangle is too small for its constraints; a widget drawn into it simply draws nothing
 
-### `dybatpho::screen_begin`
+**[`dybatpho::screen_begin`](#dybatphoscreen_begin)**
 
 - The restore is registered on `EXIT`, `INT` and `TERM`, so a killed application still gives the terminal back
 
-### `dybatpho::screen_event`
+**[`dybatpho::screen_event`](#dybatphoscreen_event)**
 
 - A resize is delivered as an event rather than acted on, so an application redraws at a moment of its choosing instead of in the middle of a frame
 
-### `dybatpho::screen_pending`
+**[`dybatpho::screen_pending`](#dybatphoscreen_pending)**
 
 - Nothing is consumed: the event is still there for the next `dybatpho::screen_event`
 
-### `dybatpho::screen_block`
+**[`dybatpho::screen_block`](#dybatphoscreen_block)**
 
 - `border:` takes `plain`, `rounded`, `double`, `thick`, or `none`; `none` still reserves no space, so the inner rectangle is the whole one
 - `focus:true` draws the border in `DYBATPHO_SCREEN_STYLE_FOCUS`, which is how the panel that takes the keys stands out from the others; an explicit `style:` still wins
 
-### `dybatpho::screen_text`
+**[`dybatpho::screen_text`](#dybatphoscreen_text)**
 
 - `wrap:false` keeps one source line on one row and cuts what does not fit, which is what a status line wants
 
-### `dybatpho::screen_list`
+**[`dybatpho::screen_list`](#dybatphoscreen_list)**
 
 - Pass `pointer:false` for a list that marks the selection by highlight alone, which reads better in a narrow column
 
-### `dybatpho::screen_table`
+**[`dybatpho::screen_table`](#dybatphoscreen_table)**
 
 - `widths:` takes a comma-separated list of column widths; without it the columns share the space evenly
 
-### `dybatpho::screen_gauge`
+**[`dybatpho::screen_gauge`](#dybatphoscreen_gauge)**
 
 - Leave `label:` out for the percentage, or pass an empty one for a bar with no text at all
 
-### `dybatpho::screen_sparkline`
+**[`dybatpho::screen_sparkline`](#dybatphoscreen_sparkline)**
 
 - Without `max:` the line scales to its own largest value, so a quiet series still fills the row
 
-### `dybatpho::screen_barchart`
+**[`dybatpho::screen_barchart`](#dybatphoscreen_barchart)**
 
 - Bars are drawn with eighth-width blocks, so a bar is accurate to an eighth of a column rather than rounded to a whole one
 
-### `dybatpho::screen_chart`
+**[`dybatpho::screen_chart`](#dybatphoscreen_chart)**
 
 - A rectangle of 40x10 is 400 cells and costs a few milliseconds; a full-screen chart is where this model stops being cheap
 
-### `dybatpho::screen_spans`
+**[`dybatpho::screen_spans`](#dybatphoscreen_spans)**
 
 - The background comes before each piece's own style, so a piece keeps its colours over it; a piece styled `""` or `0` is drawn in the background alone
 
-### `dybatpho::screen_ansi`
+**[`dybatpho::screen_ansi`](#dybatphoscreen_ansi)**
 
 - Strip `\r` and expand tabs before passing a line; they are control characters, not text with a width
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::screen_width`
@@ -236,7 +238,6 @@ dybatpho::screen_width columns "漢字ab"   # 6
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::screen_put`
@@ -264,7 +265,6 @@ dybatpho::screen_put 2 4 "Ready" "1;32"
 
 - `0`: Always, including when the position is off screen
 
-
 ---
 
 ### `dybatpho::screen_clear`
@@ -276,7 +276,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -297,7 +296,6 @@ _Function has no arguments._
 - `0`: The size changed and the buffer was rebuilt
 - `1`: The size is unchanged
 
-
 ---
 
 ### `dybatpho::screen_flush`
@@ -313,7 +311,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -342,7 +339,6 @@ dybatpho::screen_rect box 0 0 40 10
 **🧩 Variable sets**
 
 - **`The`** (named): variable to `x y width height`
-
 
 ---
 
@@ -394,7 +390,6 @@ dybatpho::screen_layout rows vertical "${DYBATPHO_SCREEN_RECT}" \
 
 - `1`: The direction is unknown, or a constraint is malformed
 
-
 ---
 
 ### `dybatpho::screen_rect_inner`
@@ -420,7 +415,6 @@ dybatpho::screen_rect_inner inner "${box}" 1
 **🧩 Variable sets**
 
 - **`The`** (named): variable
-
 
 ---
 
@@ -449,7 +443,6 @@ dybatpho::screen_rect_center popup "${DYBATPHO_SCREEN_RECT}" 40 10
 **🧩 Variable sets**
 
 - **`The`** (named): variable
-
 
 ---
 
@@ -489,19 +482,6 @@ _Function has no arguments._
 
 - `1`: There is no terminal to take over
 
-
----
-
-### `exec`
-
-
-
----
-
-### `exec`
-
-
-
 ---
 
 ### `dybatpho::screen_end`
@@ -518,7 +498,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always, so it is safe in a trap and safe to call twice
-
 
 ---
 
@@ -561,7 +540,6 @@ esac
 - `0`: An event was read
 - `1`: The timeout passed with no event, and the variable is set to `timeout`
 
-
 ---
 
 ### `dybatpho::screen_pending`
@@ -598,7 +576,6 @@ _Function has no arguments._
 - `0`: A key, or a resize, is waiting
 - `1`: Nothing is waiting
 
-
 ---
 
 ### `dybatpho::screen_block`
@@ -633,7 +610,6 @@ dybatpho::screen_list "${DYBATPHO_SCREEN_INNER}" items selected:2
 
 - `0`: Always, including when the rectangle is too small to draw
 
-
 ---
 
 ### `dybatpho::screen_text`
@@ -658,7 +634,6 @@ dybatpho::screen_text "${rect}" "${message}" align:center style:"1;33"
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -694,7 +669,6 @@ dybatpho::screen_list "${rect}" items selected:1
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::screen_table`
@@ -725,7 +699,6 @@ dybatpho::screen_table "${rect}" rows header:"NAME|STATE|COUNT" selected:0
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::screen_gauge`
@@ -753,7 +726,6 @@ dybatpho::screen_gauge "${rect}" 42 100 label:"42% used" style:"1;32"
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::screen_tabs`
@@ -779,7 +751,6 @@ dybatpho::screen_tabs "${rect}" names active:0
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -808,7 +779,6 @@ dybatpho::screen_scrollbar "${rect}" "${DYBATPHO_SCREEN_OFFSET}" "${#items[@]}"
 
 - `0`: Always, including when everything fits and no bar is needed
 
-
 ---
 
 ### `dybatpho::screen_sparkline`
@@ -835,7 +805,6 @@ dybatpho::screen_sparkline "${rect}" samples style:"36"
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::screen_barchart`
@@ -861,7 +830,6 @@ dybatpho::screen_barchart "${rect}" values labels:names
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -894,7 +862,6 @@ dybatpho::screen_chart "${rect}" series style:"32"
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -930,7 +897,6 @@ dybatpho::screen_text "${DYBATPHO_SCREEN_INNER}" "Delete the record?" align:cent
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -968,7 +934,6 @@ dybatpho::screen_spans 4 2 30 "48;5;237" "▌ " "1;35" "selected row" "1"
 
 - `0`: Always; a piece that does not fit is cut, and the pieces after it are dropped
 
-
 ---
 
 ### `dybatpho::screen_ansi`
@@ -1002,7 +967,6 @@ dybatpho::screen_ansi 5 1 60 $'\033[1;32mok\033[0m installed ripgrep'
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::screen_keybar`
@@ -1028,7 +992,6 @@ dybatpho::screen_keybar "${footer}" "↑↓" "move" "space" "pick" "q" "quit"
 **🚦 Exit codes**
 
 - `0`: Always; hints that do not fit are cut at the edge
-
 
 ---
 

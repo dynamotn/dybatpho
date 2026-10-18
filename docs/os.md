@@ -7,6 +7,7 @@ Utilities for getting information of OS/distro
 > Jump to: [Overview](#overview) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains functions to get information of OS/distro, such as platform, distribution and architecture,
@@ -47,13 +48,15 @@ and dependency installation live in `pkg.sh`.
 - [`dybatpho::is_ci`](#dybatphois_ci) — Return success when the script runs on a continuous integration service. `CI` decides whenever it is set, in either direction. Every service sets it, and it is also the one variable a caller can set themselves, so `CI=false` turns the detection off even on a runner that advertises itself by name. The service-specific variables are consulted only when `CI` is unset or empty, which is the case they are there for.
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::distro`
+**[`dybatpho::distro`](#dybatphodistro)**
 
 - Match on `ID_LIKE` through `dybatpho::os_release` when a whole family should be treated alike, because a derivative such as Linux Mint reports its own `ID`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::goos`
@@ -65,7 +68,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - Return $GOOS value https://go.dev/doc/install/source#environment
-
 
 ---
 
@@ -79,7 +81,6 @@ _Function has no arguments._
 
 - `linux`, `darwin`, `windows`, `android`, or the normalized uname name
 
-
 ---
 
 ### `dybatpho::is_macos`
@@ -87,7 +88,6 @@ _Function has no arguments._
 Return success when running on macOS.
 
 _Function has no arguments._
-
 
 ---
 
@@ -97,7 +97,6 @@ Return success when running on Linux.
 
 _Function has no arguments._
 
-
 ---
 
 ### `dybatpho::is_windows`
@@ -106,7 +105,6 @@ Return success when running on a Windows-compatible environment
 such as Cygwin, MSYS, or MinGW.
 
 _Function has no arguments._
-
 
 ---
 
@@ -127,7 +125,6 @@ Return the path of the first installed command.
 **🚦 Exit codes**
 
 - `1`: None of the commands is installed
-
 
 ---
 
@@ -170,7 +167,6 @@ dybatpho::command_version tar   # 1.35
 
 - [- `dybatpho::semver_satisfies` - `dybatpho::require](#dybatphosemver_satisfies-dybatphorequire)
 
-
 ---
 
 ### `dybatpho::goarch`
@@ -182,7 +178,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - Return $GOOS value https://go.dev/docs/install/source#environment
-
 
 ---
 
@@ -212,7 +207,6 @@ _Function has no arguments._
 
 - Host name, or `unknown` when nothing can answer
 
-
 ---
 
 ### `dybatpho::user`
@@ -226,7 +220,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - User name, or `unknown` when nothing can answer
-
 
 ---
 
@@ -248,7 +241,6 @@ _Function has no arguments._
 - `0`: The effective user is root
 - `1`: The effective user is anybody else
 
-
 ---
 
 ### `dybatpho::kernel_version`
@@ -264,7 +256,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `1`: The kernel release cannot be determined
-
 
 ---
 
@@ -291,7 +282,6 @@ _Function has no arguments._
 
 - `1`: No available command reports a usable count
 
-
 ---
 
 ### `dybatpho::is_tty`
@@ -315,7 +305,6 @@ dybatpho::is_tty stdout && printf 'Colors are worth rendering\n'
 
 - `0`: The stream is a terminal
 - `1`: The stream is a file, a pipe, or anything else
-
 
 ---
 
@@ -361,7 +350,6 @@ dybatpho::color_supported stderr && printf '\033[31m%s\033[0m\n' "${msg}" >&2
 - `0`: Colour should be emitted on that stream
 - `1`: It should not
 
-
 ---
 
 ### `dybatpho::terminal_width`
@@ -385,7 +373,6 @@ attached.
 
 - `1`: The fallback is not a positive integer
 
-
 ---
 
 ### `dybatpho::terminal_height`
@@ -405,7 +392,6 @@ Print the height of the terminal in lines.
 **🚦 Exit codes**
 
 - `1`: The fallback is not a positive integer
-
 
 ---
 
@@ -440,7 +426,6 @@ dybatpho::os_release PRETTY_NAME
 
 - `1`: There is no `os-release` file, or it has no such field
 
-
 ---
 
 ### `dybatpho::distro`
@@ -464,7 +449,6 @@ _Function has no arguments._
 
 - Distribution identifier, falling back to the normalized platform name
 
-
 ---
 
 ### `dybatpho::distro_version`
@@ -481,7 +465,6 @@ _Function has no arguments._
 
 - `1`: The version cannot be determined, as on a rolling release that publishes none
 
-
 ---
 
 ### `dybatpho::is_container`
@@ -494,7 +477,6 @@ _Function has no arguments._
 
 - `0`: Docker, Podman, Kubernetes, or LXC owns this process
 - `1`: The script runs on the host
-
 
 ---
 
@@ -509,7 +491,6 @@ _Function has no arguments._
 
 - `0`: The host is WSL
 - `1`: The host is anything else
-
 
 ---
 

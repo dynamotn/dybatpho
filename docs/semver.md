@@ -7,6 +7,7 @@ Utilities for working with Semantic Versioning (semver)
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for parsing, validating, comparing semver strings,
@@ -28,22 +29,25 @@ A leading `v` prefix (e.g. `v1.2.3`) is accepted and stripped automatically.
 - [`dybatpho::semver_coerce`](#dybatphosemver_coerce) — Normalize a version, as a real command reports it, into a semver string the rest of this module accepts. `dybatpho::semver_satisfies` insists on a complete version, and this is what turns what a command actually printed into one. `dybatpho::semver_compare` only looks at `major.minor.patch`, and almost nothing in the wild says its version that way: `tar` answers `1.35`, `yq` answers `v4.53.3` buried in a sentence, and `unzip` answers `6.00`. This fills the missing fields with zero, drops a leading `v`, and strips the leading zeros semver forbids. A version with more than three fields, as several Windows tools report, is cut down to the first three. A trailing `-something` is only kept as a pre-release when it opens with a word that names one. Distributions patch tools and say so in that same place: this host's `grep` answers `3.12-modified`, and Debian builds answer things like `1.2.3-1ubuntu2`. Read as semver, those rank *below* the plain release, so `>=3.12` would reject the very grep that satisfies it. A build marker is dropped; `1.7.1-rc1` keeps its pre-release and still ranks below `1.7.1`, which is what a pre-release is supposed to do.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [https://semver.org/](https://semver.org/)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::semver_satisfies`
+**[`dybatpho::semver_satisfies`](#dybatphosemver_satisfies)**
 
 - A pre-release only satisfies a range that names a pre-release of the same `major.minor.patch`, so `^1.0.0` does not quietly accept `2.0.0-alpha`
 
-### `dybatpho::semver_sort`
+**[`dybatpho::semver_sort`](#dybatphosemver_sort)**
 
 - A leading `v` is accepted and preserved, so a list of tags sorts as it is
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::semver_valid`
@@ -60,7 +64,6 @@ Return success when the string is a valid semver (with optional leading v).
 
 - `0`: Valid semver
 - `1`: Invalid semver
-
 
 ---
 
@@ -82,7 +85,6 @@ Parse a semver string and print its components, one per line.
 
 - `0`: Parsing succeeded
 - `1`: The string is not a valid semver
-
 
 ---
 
@@ -108,7 +110,6 @@ Compare two semver strings according to semver 2.0.0 precedence rules.
 **🚦 Exit codes**
 
 - `0`: Always succeeds (comparison result is on stdout)
-
 
 ---
 
@@ -138,7 +139,6 @@ Bump a semver version by the specified part.
 - `0`: Always succeeds
 - `1`: The version is invalid or the part is not one of major/minor/patch
 
-
 ---
 
 ### `dybatpho::semver_release_type`
@@ -167,7 +167,6 @@ Detect the release type between two semver versions.
 
 - `0`: Always succeeds
 - `1`: Either argument is not a valid semver
-
 
 ---
 
@@ -208,7 +207,6 @@ dybatpho::semver_satisfies "$(jq -r .version package.json)" ">=18" \
 - `0`: The version satisfies the range
 - `1`: It does not
 
-
 ---
 
 ### `dybatpho::semver_sort`
@@ -243,7 +241,6 @@ git tag --list 'v*' | dybatpho::semver_sort
 
 - `1`: One of the inputs is not a valid version
 
-
 ---
 
 ### `dybatpho::semver_max`
@@ -275,7 +272,6 @@ latest="$(git tag --list 'v*' | dybatpho::semver_max)"
 **🚦 Exit codes**
 
 - `1`: No version was given, or one of them is not valid
-
 
 ---
 

@@ -7,6 +7,7 @@ Utilities for remembering an answer on disk until it goes stale
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 A script that asks a slow question more than once -- an API listing, a
@@ -63,17 +64,20 @@ is missing.
 - [`dybatpho::cache_stats`](#dybatphocache_stats) — Describe the current namespace: how many entries it holds, how many bytes they take, how many are still fresh, and how old the oldest and newest are. Freshness is judged against the time to live given, or `DYBATPHO_CACHE_TTL`, the same way `dybatpho::cache_has` judges one entry. Ages are in seconds. A namespace that was never written reports zero everywhere rather than failing, so a report or a metric can always be made. Hits and misses are not counted. `dybatpho::cache_run` is usually called in a command substitution, whose subshell would take any count with it, and a count kept on disk would turn every read into a write.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/cache_ops.sh](../example/cache_ops.sh)
 - [dybatpho::file_age_seconds](#dybatphofile_age_seconds)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Load `lock` as well to serve stale entries: `--modules cache lock`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::cache_dir`
@@ -103,7 +107,6 @@ _Function has no arguments._
 
 - The directory entries live in
 
-
 ---
 
 ### `dybatpho::cache_key`
@@ -132,7 +135,6 @@ key="$(dybatpho::cache_key "${url}" "${token_owner}")"
 **🚦 Exit codes**
 
 - `1`: Stop the script when no value is given or no hashing command exists
-
 
 ---
 
@@ -167,7 +169,6 @@ dybatpho::cache_path releases
 **🚦 Exit codes**
 
 - `1`: Stop the script when the key cannot be a file name
-
 
 ---
 
@@ -204,7 +205,6 @@ if dybatpho::cache_has releases 3600; then ... ; fi
 
 - `0`: The entry exists and is fresh
 - `1`: There is no entry, or it is older than the time to live
-
 
 ---
 
@@ -247,7 +247,6 @@ fi
 
 - [- `dybatpho::cache_run](#dybatphocache_run)
 
-
 ---
 
 ### `dybatpho::cache_set`
@@ -285,7 +284,6 @@ printf '%s\n' "${body}" | dybatpho::cache_set releases
 - `0`: The entry was written
 - `1`: Stop the script when the key cannot be a file name or the write fails
 
-
 ---
 
 ### `dybatpho::cache_forget`
@@ -309,7 +307,6 @@ dybatpho::cache_forget releases
 
 - `0`: The entry is gone, whether or not it was there
 - `1`: Stop the script when the key cannot be a file name
-
 
 ---
 
@@ -341,7 +338,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: The namespace holds no entries, whether or not it did before
-
 
 ---
 
@@ -379,7 +375,6 @@ dybatpho::cache_wait status 30 || dybatpho::warn "status refresh still running"
 
 - `0`: No refresh of the entry is running
 - `1`: A refresh was still running when the time ran out
-
 
 ---
 
@@ -454,7 +449,6 @@ dybatpho::cache_run status 300 --stale 86400 -- curl -fsS "${status_url}"
 
 - [- `dybatpho::cache_get` - `dybatpho::cache_wait](#dybatphocache_get-dybatphocache_wait)
 
-
 ---
 
 ### `dybatpho::cache_prune`
@@ -500,7 +494,6 @@ dybatpho::cache_prune --max-entries 500 --max-size 50M
 **🔗 See also**
 
 - [- `dybatpho::cache_stats](#dybatphocache_stats)
-
 
 ---
 

@@ -7,6 +7,7 @@ Utilities for file handling
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for previewing files, splitting, joining,
@@ -60,75 +61,78 @@ the privilege to set it. These helpers honor `DRY_RUN`.
 - [`dybatpho::create_temp_dir`](#dybatphocreate_temp_dir) — Create a temporary directory and register it for cleanup on shell exit. This is `dybatpho::create_temp` with the argument that asks for a directory already supplied, because passing `/` as an extension reads like a mistake.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/file_ops.sh](../example/file_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::show_file`
+**[`dybatpho::show_file`](#dybatphoshow_file)**
 
 - Uses `bat` when available for richer output, otherwise falls back to `cat -n`
 
-### `dybatpho::create_temp`
+**[`dybatpho::create_temp`](#dybatphocreate_temp)**
 
 - Pass `/` or an empty extension to create a directory instead of a file
 - The created path is automatically registered for cleanup on script exit
 
-### `dybatpho::file_write_atomic`
+**[`dybatpho::file_write_atomic`](#dybatphofile_write_atomic)**
 
 - The destination keeps its mode, and its owner when the process may set it
 
-### `dybatpho::file_replace`
+**[`dybatpho::file_replace`](#dybatphofile_replace)**
 
 - This avoids `sed -i`, whose argument differs between GNU and BSD, by rewriting through a staging file instead
 
-### `dybatpho::file_ensure_line`
+**[`dybatpho::file_ensure_line`](#dybatphofile_ensure_line)**
 
 - The comparison is an exact whole-line match, not a substring or pattern
 
-### `dybatpho::file_remove_line`
+**[`dybatpho::file_remove_line`](#dybatphofile_remove_line)**
 
 - The comparison is an exact whole-line match, not a substring or pattern
 
-### `dybatpho::file_hash`
+**[`dybatpho::file_hash`](#dybatphofile_hash)**
 
 - Falls back from the GNU `*sum` tools to `shasum`/`md5` and then `openssl`
 
-### `dybatpho::file_backup`
+**[`dybatpho::file_backup`](#dybatphofile_backup)**
 
 - A second backup in the same second gets a numeric suffix, so an existing backup is never overwritten
 
-### `dybatpho::find_up`
+**[`dybatpho::find_up`](#dybatphofind_up)**
 
 - Matches files and directories alike, so `.git` is found in a worktree, where it is a file, as well as in a normal clone
 
-### `dybatpho::ensure_dir`
+**[`dybatpho::ensure_dir`](#dybatphoensure_dir)**
 
 - A mode is applied whether the directory was just created or already existed, so the result does not depend on whether the script ran before
 
-### `dybatpho::xdg_config_dir`
+**[`dybatpho::xdg_config_dir`](#dybatphoxdg_config_dir)**
 
 - These helpers only build a path; pair them with `dybatpho::ensure_dir` when the directory has to exist
 
-### `dybatpho::file_mtime`
+**[`dybatpho::file_mtime`](#dybatphofile_mtime)**
 
 - `dybatpho::file_age_seconds` answers the same question relative to now
 
-### `dybatpho::dir_size`
+**[`dybatpho::dir_size`](#dybatphodir_size)**
 
 - Symbolic links are not counted at all, the way `du` treats them, so a link to a file inside the same tree cannot count its target twice
 
-### `dybatpho::file_is_binary`
+**[`dybatpho::file_is_binary`](#dybatphofile_is_binary)**
 
 - Check this before a text rewrite, which would otherwise mangle a binary
 
-### `dybatpho::create_temp_dir`
+**[`dybatpho::create_temp_dir`](#dybatphocreate_temp_dir)**
 
 - The directory is removed with its contents when the shell exits
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::show_file`
@@ -145,7 +149,6 @@ Show the contents of a file with line numbers.
 
 - File contents
 
-
 ---
 
 ### `dybatpho::path_dirname`
@@ -161,7 +164,6 @@ Return the directory component of a path.
 **📤 Output on stdout**
 
 - Directory component of the path
-
 
 ---
 
@@ -180,7 +182,6 @@ Return the basename component of a path.
 
 - Basename component of the path
 
-
 ---
 
 ### `dybatpho::path_extname`
@@ -196,7 +197,6 @@ Return the final extension of a path, including the leading dot.
 **📤 Output on stdout**
 
 - Final extension of the basename, or empty when none exists
-
 
 ---
 
@@ -214,7 +214,6 @@ Return the basename of a path without its final extension.
 
 - Basename without the final extension
 
-
 ---
 
 ### `dybatpho::path_join`
@@ -230,7 +229,6 @@ Join path segments with single `/` separators.
 **📤 Output on stdout**
 
 - Joined path
-
 
 ---
 
@@ -248,7 +246,6 @@ Normalize a path by collapsing repeated separators and resolving `.` and `..` te
 
 - Normalized path
 
-
 ---
 
 ### `dybatpho::path_is_abs`
@@ -265,7 +262,6 @@ Return success when a path is absolute.
 
 - `0`: The path is absolute
 - `1`: The path is relative
-
 
 ---
 
@@ -285,7 +281,6 @@ Return success when a path has any extension or a matching exact extension.
 - `0`: The path has an extension or matches the requested one
 - `1`: The path does not have an extension or does not match the requested one
 
-
 ---
 
 ### `dybatpho::path_change_ext`
@@ -303,7 +298,6 @@ Return a path with its final extension replaced.
 
 - Path with updated extension
 
-
 ---
 
 ### `dybatpho::path_relative`
@@ -320,7 +314,6 @@ Return the relative path from a base path to a target path.
 **📤 Output on stdout**
 
 - Relative path from base to target
-
 
 ---
 
@@ -356,7 +349,6 @@ mkdir -p "${TMPDIR_VAR}/subdir"
 **📝 Notes**
 
 - With no explicit parent directory, the path is created under `TMPDIR`, or under the Bats temporary directory when running as a test. Bats re-arms its own `EXIT` trap after each test body, which discards the cleanup trap registered here, so a file left in `TMPDIR` would survive the run; Bats removes its own directory instead.
-
 
 ---
 
@@ -396,7 +388,6 @@ EOF
 
 - `1`: The destination directory is missing or the write fails
 
-
 ---
 
 ### `dybatpho::file_replace`
@@ -434,7 +425,6 @@ dybatpho::file_replace "./Makefile" "v[0-9]\+\.[0-9]\+" "v2.0"
 
 - `1`: The file is missing, `sed` fails, or no delimiter can be chosen
 
-
 ---
 
 ### `dybatpho::file_ensure_line`
@@ -467,7 +457,6 @@ dybatpho::file_ensure_line "${HOME}/.bashrc" 'export EDITOR=nvim'
 **🚦 Exit codes**
 
 - `1`: The parent directory is missing or the write fails
-
 
 ---
 
@@ -502,7 +491,6 @@ dybatpho::file_remove_line "${HOME}/.bashrc" 'export EDITOR=nvim'
 
 - `1`: The write fails
 
-
 ---
 
 ### `dybatpho::file_hash`
@@ -532,7 +520,6 @@ dybatpho::file_hash "./release.tar.gz" sha512
 
 - `1`: The file is missing, the algorithm is unknown, or no checksum tool is installed
 
-
 ---
 
 ### `dybatpho::file_size`
@@ -559,7 +546,6 @@ bytes="$(dybatpho::file_size "./release.tar.gz")"
 **🚦 Exit codes**
 
 - `1`: The file is missing
-
 
 ---
 
@@ -589,7 +575,6 @@ fi
 **🚦 Exit codes**
 
 - `1`: The file is missing or its modification time cannot be read
-
 
 ---
 
@@ -625,7 +610,6 @@ dybatpho::info "Previous version kept at ${backup}"
 **🚦 Exit codes**
 
 - `1`: The file is missing or the copy fails
-
 
 ---
 
@@ -664,7 +648,6 @@ manifest="$(dybatpho::find_up "package.json" "${source_dir}")"
 
 - `0`: A matching entry was found
 - `1`: The filesystem root was reached without a match
-
 
 ---
 
@@ -708,7 +691,6 @@ dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
 
 - `1`: The path exists as something other than a directory, or cannot be created
 
-
 ---
 
 ### `dybatpho::xdg_config_dir`
@@ -743,7 +725,6 @@ printf 'theme = dark\n' | dybatpho::file_write_atomic "${config}/settings.ini"
 
 - `1`: Neither `XDG_CONFIG_HOME` nor `HOME` is set
 
-
 ---
 
 ### `dybatpho::xdg_cache_dir`
@@ -777,7 +758,6 @@ cache="$(dybatpho::xdg_cache_dir myapp)"
 
 - `1`: Neither `XDG_CACHE_HOME` nor `HOME` is set
 
-
 ---
 
 ### `dybatpho::xdg_data_dir`
@@ -810,7 +790,6 @@ data="$(dybatpho::xdg_data_dir myapp)"
 **🚦 Exit codes**
 
 - `1`: Neither `XDG_DATA_HOME` nor `HOME` is set
-
 
 ---
 
@@ -848,7 +827,6 @@ printf '%s\n' "${run_id}" | dybatpho::file_write_atomic "${state}/last-run"
 
 - `1`: Neither `XDG_STATE_HOME` nor `HOME` is set
 
-
 ---
 
 ### `dybatpho::file_mtime`
@@ -875,7 +853,6 @@ modified="$(dybatpho::file_mtime "${cache}")"
 **🚦 Exit codes**
 
 - `1`: The file is missing or its modification time cannot be read
-
 
 ---
 
@@ -911,7 +888,6 @@ bytes="$(dybatpho::dir_size ./build)"
 
 - `1`: The directory is missing, or part of it could not be read; the size printed then counts only what could be read
 
-
 ---
 
 ### `dybatpho::file_is_binary`
@@ -941,7 +917,6 @@ fi
 
 - `0`: The file contains a NUL byte in its first block
 - `1`: The file looks like text, or is empty; stop the script when it cannot be read
-
 
 ---
 

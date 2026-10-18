@@ -7,6 +7,7 @@ Utilities for sending messages to chat and notification providers
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains functions to send messages to popular messaging and
@@ -44,6 +45,7 @@ notification platforms through their webhook or bot APIs:
 - [`dybatpho::notify_email`](#dybatphonotify_email) — Send a plain-text email through the local `sendmail`. Any MTA that installs a `sendmail` command will do — Postfix, Exim, OpenSMTPD, msmtp, nullmailer. The recipients are handed to it as arguments after `--`, never read back from the headers, and every address, the sender and the subject are checked for a line break first, so text from a variable cannot add a header or a recipient. A subject that is not plain ASCII is encoded for the header, and the body is sent as UTF-8; a line holding a single `.` does not end the message early. Addresses are checked by the `validate` module, which this one does not load: the webhook notifiers have no address to check, so only a script that sends email loads it.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### When to use this module
@@ -129,20 +131,23 @@ dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/notification_ops.sh](../example/notification_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Most providers require a webhook URL or API token set via environment variables. The functions validate these before making requests.
 
-### `dybatpho::notify_email`
+**[`dybatpho::notify_email`](#dybatphonotify_email)**
 
 - Load `validate` as well to send email: `--modules notification validate`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::notify_slack`
@@ -181,7 +186,6 @@ dybatpho::notify_slack "Hello from dybatpho"
 
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
-
 
 ---
 
@@ -226,7 +230,6 @@ dybatpho::notify_telegram "*Build* passed" "Markdown"
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
-
 ---
 
 ### `dybatpho::notify_teams`
@@ -269,7 +272,6 @@ dybatpho::notify_teams "All checks passed" "Deploy v2.0"
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
-
 ---
 
 ### `dybatpho::notify_google_chat`
@@ -308,7 +310,6 @@ dybatpho::notify_google_chat "Release v2.0 is live"
 
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
-
 
 ---
 
@@ -351,7 +352,6 @@ dybatpho::notify_discord "Deploy done" "CI Bot"
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
-
 ---
 
 ### `dybatpho::notify_webhook`
@@ -388,7 +388,6 @@ dybatpho::notify_webhook "https://my.service/hook" '{"text":"hi"}' \
 
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
-
 
 ---
 
@@ -430,7 +429,6 @@ dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 - `1`: Missing or empty title, or an unknown urgency
 - `127`: Neither `notify-send` nor `osascript` is installed
 - `other`: The backend's own exit code, such as `notify-send` finding no desktop session
-
 
 ---
 
@@ -482,7 +480,6 @@ dybatpho::notify_ntfy "Disk /var at 97%" "Disk almost full" urgent "warning,flop
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
-
 ---
 
 ### `dybatpho::notify_gotify`
@@ -529,7 +526,6 @@ dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
 
 - [dybatpho::curl_json](#dybatphocurl_json)
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
-
 
 ---
 

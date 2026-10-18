@@ -7,6 +7,7 @@ Deciding when a command should run, and running it on a cadence
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `helpers.sh` retries a call that failed. This module answers a different
@@ -43,20 +44,23 @@ case a variable cannot cover.
 - [`__dybatpho_schedule_field_matches`](#__dybatpho_schedule_field_matches) — Match one cron field against one value.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/schedule_ops.sh](../example/schedule_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - An interval is in whole seconds: `sleep` takes fractions on GNU but not everywhere, and this module keeps to what BusyBox also accepts
 
-### `dybatpho::schedule_debounce`
+**[`dybatpho::schedule_debounce`](#dybatphoschedule_debounce)**
 
 - Needs the `lock` module: load it with `--modules schedule lock`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `__dybatpho_schedule_dir_into`
@@ -73,7 +77,6 @@ variable, creating it if needed.
 **🧩 Variable sets**
 
 - **`The`** (named): variable
-
 
 ---
 
@@ -92,7 +95,6 @@ Stop when a key could name a file outside the marker directory.
 - `0`: The key is safe to use as a file name
 - `1`: Stop the script when it is not
 
-
 ---
 
 ### `__dybatpho_schedule_command_into`
@@ -110,7 +112,6 @@ array and checking there is one.
 **🧩 Variable sets**
 
 - **`The`** (named): array
-
 
 ---
 
@@ -144,7 +145,6 @@ dybatpho::schedule_every 60 --times 5 -- dybatpho::info "tick"
 
 - `0`: The loop finished its runs, or was interrupted
 - `1`: The interval or the run count is not a positive number
-
 
 ---
 
@@ -182,7 +182,6 @@ dybatpho::schedule_debounce 2 rebuild -- make
 - `1`: The window or the key is invalid, or the `lock` module is not loaded
 - `9`: A later trigger arrived, so this call did nothing
 
-
 ---
 
 ### `dybatpho::schedule_once_per`
@@ -214,7 +213,6 @@ dybatpho::schedule_once_per day warn-expiry -- dybatpho::warn "The token expires
 - `1`: The period or the key is invalid, or another caller held the claim for the whole wait
 - `9`: The command already ran in this period, so nothing was done
 
-
 ---
 
 ### `__dybatpho_schedule_bucket_into`
@@ -231,7 +229,6 @@ Work out the bucket a period puts the current time in.
 **🧩 Variable sets**
 
 - **`The`** (named): variable
-
 
 ---
 
@@ -255,7 +252,6 @@ dybatpho::schedule_reset warn-expiry
 
 - `0`: The key's markers are gone, whether or not there were any
 - `1`: The key is invalid
-
 
 ---
 
@@ -294,7 +290,6 @@ dybatpho::schedule_cron_due "*/15 * * * *" && run_the_job
 - `1`: It does not
 - `2`: The expression is malformed
 
-
 ---
 
 ### `__dybatpho_schedule_weekday_matches`
@@ -312,7 +307,6 @@ Match a day-of-week field, accepting `7` for Sunday.
 
 - `0`: The field matches
 - `1`: It does not
-
 
 ---
 

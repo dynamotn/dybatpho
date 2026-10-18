@@ -7,6 +7,7 @@ One validator for the whole library: named value types and declarative rules
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Before this module every caller wrote its own check. `config` matched an
@@ -59,6 +60,7 @@ everywhere a built-in type does, including in a `config` schema and in a
 - [`dybatpho::validate_reset`](#dybatphovalidate_reset) — Forget every type added with `dybatpho::validate_register` and restore the built-ins to their original predicates. A test or an example that registers a type of its own calls this to leave the registry the way it found it.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/validate_ops.sh](../example/validate_ops.sh)
@@ -66,6 +68,7 @@ everywhere a built-in type does, including in a `config` schema and in a
 - [dybatpho::opts::param](#dybatphooptsparam)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::validate_matches`
@@ -95,7 +98,6 @@ dybatpho::validate_matches "v1.2.3" '^v[0-9]'      # succeeds
 - `0`: The value matches
 - `1`: The value does not match
 - `1`: Stop the script when the expression is not a valid ERE
-
 
 ---
 
@@ -133,7 +135,6 @@ dybatpho::validate_is ipv4 "192.0.2.256"         # no
 
 - [- `dybatpho::validate_types` - `dybatpho::validate_register](#dybatphovalidate_types-dybatphovalidate_register)
 
-
 ---
 
 ### `dybatpho::validate_describe`
@@ -165,7 +166,6 @@ dybatpho::validate_describe url      # a URL
 - `0`: The description is printed
 - `1`: Stop the script when the type is not registered
 
-
 ---
 
 ### `dybatpho::validate_types`
@@ -182,7 +182,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always
-
 
 ---
 
@@ -224,7 +223,6 @@ dybatpho::validate_is branch "release/2.0"     # yes
 **🔗 See also**
 
 - [- `dybatpho::validate_reset](#dybatphovalidate_reset)
-
 
 ---
 
@@ -281,7 +279,6 @@ fi
 
 - [- `dybatpho::validate_errors` - `dybatpho::validate_or_die](#dybatphovalidate_errors-dybatphovalidate_or_die)
 
-
 ---
 
 ### `dybatpho::validate_errors`
@@ -302,7 +299,6 @@ _Function has no arguments._
 **🔗 See also**
 
 - [- `dybatpho::validate_value](#dybatphovalidate_value)
-
 
 ---
 
@@ -339,7 +335,6 @@ dybatpho::validate_or_die "--port" "${PORT}" type:int min:1 max:65535
 **🔗 See also**
 
 - [- `dybatpho::validate_value](#dybatphovalidate_value)
-
 
 ---
 

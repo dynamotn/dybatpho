@@ -7,6 +7,7 @@ Utilities for measuring a script and exporting the result to Prometheus
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module records how long a script spends in a command, how often it
@@ -57,26 +58,29 @@ are counted without the script asking for it.
 - [`dybatpho::metrics_push`](#dybatphometrics_push) — Push the recorded metrics to a Prometheus Pushgateway. A script that runs and exits is gone before Prometheus can scrape it; the Pushgateway holds what it pushed until the next scrape. The metrics are grouped under the job name and any further `key=value` labels, which become part of the URL: `/metrics/job/<job>/<key>/<value>`. A value that is empty or contains a `/` is sent base64url-encoded, the way the Pushgateway expects, and every other value is percent-encoded. The default is `PUT`, which replaces every metric in the group, so a metric the script stopped recording disappears. `--add` sends `POST` instead, which replaces only the metrics pushed again and keeps the others.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/metrics_ops.sh](../example/metrics_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::metrics_summary_ms`
+**[`dybatpho::metrics_summary_ms`](#dybatphometrics_summary_ms)**
 
 - `dybatpho::metrics_get sum` and `dybatpho::metrics_get count` read a summary's totals back in milliseconds, as they do for a histogram
 
-### `dybatpho::metrics_timer_stop`
+**[`dybatpho::metrics_timer_stop`](#dybatphometrics_timer_stop)**
 
 - The elapsed time is published in `DYBATPHO_METRICS_LAST_MS` rather than printed, because capturing output with `$(...)` would run the call in a subshell and throw away the measurement it just recorded
 
-### `dybatpho::metrics_render`
+**[`dybatpho::metrics_render`](#dybatphometrics_render)**
 
 - Durations are exported in seconds, so a metric name ending in `_seconds` reads correctly on a dashboard
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::metrics_help`
@@ -96,7 +100,6 @@ dybatpho::metrics_help deploy_duration_seconds "How long a deployment took"
 | --- | --- | --- |
 | `$1` | string | Metric name |
 | `$2` | string | Help text |
-
 
 ---
 
@@ -124,7 +127,6 @@ dybatpho::metrics_counter_inc http_requests_total 1 method=GET status=200
 
 - `1`: The name, a label, or the amount is not valid
 
-
 ---
 
 ### `dybatpho::metrics_gauge_set`
@@ -150,7 +152,6 @@ dybatpho::metrics_gauge_set build_info 1 version=2.0.0
 **🚦 Exit codes**
 
 - `1`: The name, a label, or the value is not valid
-
 
 ---
 
@@ -185,7 +186,6 @@ dybatpho::metrics_observe_ms http_request_duration_seconds 143 host=example.com
 **🚦 Exit codes**
 
 - `1`: The name, a label, or the duration is not valid
-
 
 ---
 
@@ -227,7 +227,6 @@ dybatpho::metrics_render
 
 - `1`: The name, a label, the duration or a quantile is not valid, or the metric is already a histogram
 
-
 ---
 
 ### `dybatpho::metrics_timer_start`
@@ -250,7 +249,6 @@ dybatpho::info "Build took ${DYBATPHO_METRICS_LAST_MS}ms"
 | --- | --- | --- |
 | `$1` | string | Timer name |
 
-
 ---
 
 ### `dybatpho::metrics_timer_stop`
@@ -271,7 +269,6 @@ Stop a timer, record its duration, and print the elapsed milliseconds.
 **🚦 Exit codes**
 
 - `1`: The timer was never started
-
 
 ---
 
@@ -305,7 +302,6 @@ dybatpho::metrics_time deploy_duration_seconds stage=upload -- rsync -a ./dist/ 
 
 - `*`: The exit code of the command
 
-
 ---
 
 ### `dybatpho::metrics_get`
@@ -338,7 +334,6 @@ fi
 
 - `1`: The kind is unknown
 
-
 ---
 
 ### `dybatpho::metrics_reset`
@@ -346,7 +341,6 @@ fi
 Forget every recorded metric.
 
 _Function has no arguments._
-
 
 ---
 
@@ -369,7 +363,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - Prometheus text exposition format, with metrics and series in a stable order
-
 
 ---
 
@@ -401,7 +394,6 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 **🚦 Exit codes**
 
 - `1`: The destination directory is missing or the write fails
-
 
 ---
 

@@ -7,6 +7,7 @@ Guards for destructive operations
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Wrappers that make irreversible operations explicit before they run:
@@ -50,6 +51,7 @@ Every wrapper applies the same three rules:
 - [`dybatpho::safe_system`](#dybatphosafe_system) — Run a command that changes system state, after confirming it.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### Remove a build directory, asking first
@@ -78,29 +80,32 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/safety_ops.sh](../example/safety_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Confine a whole script with `DYBATPHO_SAFE_ROOTS="${workdir}"` so a bad path can never reach the rest of the filesystem.
 
-### `dybatpho::safe_rm`
+**[`dybatpho::safe_rm`](#dybatphosafe_rm)**
 
 - Missing paths are skipped instead of failing, like `rm -f`
 
-### `dybatpho::safe_overwrite`
+**[`dybatpho::safe_overwrite`](#dybatphosafe_overwrite)**
 
 - Call it as a guard: `dybatpho::safe_overwrite "${file}" && printf '%s' "${data}" > "${file}"`
 
-### `dybatpho::safe_extract`
+**[`dybatpho::safe_extract`](#dybatphosafe_extract)**
 
 - Symlink targets stored inside an archive aren't inspected; extract untrusted archives into a scratch directory
 - The entries are listed and extracted by the `archive` module, which `safety` does not load; load it alongside: `--modules safety archive`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::is_interactive`
@@ -119,7 +124,6 @@ _Function has no arguments._
 
 - `0`: Input is attached to a terminal, or `DYBATPHO_INTERACTIVE` forces interactive mode
 - `1`: The script runs unattended
-
 
 ---
 
@@ -148,7 +152,6 @@ Ask a yes/no question and return the answer as an exit code.
 
 - `0`: The answer is yes, or `DYBATPHO_FORCE` is enabled
 - `1`: The answer is no, or the script isn't interactive
-
 
 ---
 
@@ -182,7 +185,6 @@ component is not followed, as `rm` and `mv` act on a link itself.
 
 - `1`: Stop the script when the path is empty, protected, or outside `DYBATPHO_SAFE_ROOTS`
 
-
 ---
 
 ### `dybatpho::safe_rm`
@@ -207,7 +209,6 @@ Remove files and directories after validating them and confirming the removal.
 - `0`: Every requested path is removed or already missing
 - `1`: The removal is declined, or the script stops on an invalid path
 
-
 ---
 
 ### `dybatpho::safe_overwrite`
@@ -231,7 +232,6 @@ Confirm that an existing file may be replaced, optionally keeping a backup.
 
 - `0`: The destination is free, or replacing it is approved
 - `1`: Replacing the destination is declined
-
 
 ---
 
@@ -258,7 +258,6 @@ Copy a file or directory, guarding the destination against an accidental overwri
 - `0`: The copy is done
 - `1`: The overwrite is declined, or the script stops when the source is missing
 
-
 ---
 
 ### `dybatpho::safe_move`
@@ -283,7 +282,6 @@ Move a file or directory, guarding the destination against an accidental overwri
 
 - `0`: The move is done
 - `1`: The overwrite is declined, or the script stops when the source is missing
-
 
 ---
 
@@ -310,7 +308,6 @@ Extract an archive after rejecting entries that escape the destination.
 - `1`: Overwriting existing files is declined
 - `1`: Stop the script when an entry is absolute or traverses outside the destination
 - `1`: Stop the script when the `archive` module is not loaded
-
 
 ---
 

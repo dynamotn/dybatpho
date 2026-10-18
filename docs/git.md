@@ -7,6 +7,7 @@ Utilities for Git repositories
 > Jump to: [Overview](#overview) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Helpers for common Git metadata and history lookups: locating the
@@ -41,25 +42,27 @@ information, listing changed files, and querying commit/tag relationships.
 - [`dybatpho::git_worktree_list`](#dybatphogit_worktree_list) — List the worktrees of a repository with the branch each has checked out. The main worktree comes first, then every linked one, in the order `git worktree list` reports them.
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::git_default_branch`
+**[`dybatpho::git_default_branch`](#dybatphogit_default_branch)**
 
 - Prefers `origin/HEAD`, then local `main`/`master`, then current branch
 
-### `dybatpho::git_is_ancestor`
+**[`dybatpho::git_is_ancestor`](#dybatphogit_is_ancestor)**
 
 - A commit counts as its own ancestor, which is what `git merge-base` reports and what makes "has this landed yet" answer yes for the commit itself
 
-### `dybatpho::git_state`
+**[`dybatpho::git_state`](#dybatphogit_state)**
 
 - A rebase is reported ahead of the cherry-pick it performs underneath, because the rebase is what has to be continued or aborted
 
-### `dybatpho::git_worktree_list`
+**[`dybatpho::git_worktree_list`](#dybatphogit_worktree_list)**
 
 - The fields are separated by a tab so that a path with spaces reads back whole with `IFS=$'\t' read -r`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::git_root`
@@ -75,7 +78,6 @@ Return the top-level directory of a Git repository.
 **📤 Output on stdout**
 
 - Absolute path to the repository root
-
 
 ---
 
@@ -93,7 +95,6 @@ Return the current branch name, or a short SHA in detached HEAD state.
 
 - Current branch name or short SHA
 
-
 ---
 
 ### `dybatpho::git_default_branch`
@@ -109,7 +110,6 @@ Return the default branch of a Git repository.
 **📤 Output on stdout**
 
 - Default branch name
-
 
 ---
 
@@ -128,7 +128,6 @@ Return the full SHA of a commit.
 
 - Full commit SHA
 
-
 ---
 
 ### `dybatpho::git_commit_short_hash`
@@ -145,7 +144,6 @@ Return the short SHA of a commit.
 **📤 Output on stdout**
 
 - Short commit SHA (7 chars)
-
 
 ---
 
@@ -164,7 +162,6 @@ Return the subject line of a commit message.
 
 - Commit subject line
 
-
 ---
 
 ### `dybatpho::git_commit_author`
@@ -181,7 +178,6 @@ Return the author name of a commit.
 **📤 Output on stdout**
 
 - Commit author name
-
 
 ---
 
@@ -201,7 +197,6 @@ Return success when a commit exists.
 - `0`: Commit exists
 - `1`: Commit does not exist
 
-
 ---
 
 ### `dybatpho::git_commits_between`
@@ -219,7 +214,6 @@ List commits reachable from a head ref but not from a base ref.
 **📤 Output on stdout**
 
 - One full SHA per line, oldest first
-
 
 ---
 
@@ -239,7 +233,6 @@ Count commits in a range.
 
 - Number of commits
 
-
 ---
 
 ### `dybatpho::git_is_clean`
@@ -256,7 +249,6 @@ Return success when the worktree has no tracked or untracked changes.
 
 - `0`: Worktree is clean
 - `1`: Worktree has changes
-
 
 ---
 
@@ -275,7 +267,6 @@ Return the URL for a Git remote.
 
 - Remote URL
 
-
 ---
 
 ### `dybatpho::git_has_remote`
@@ -293,7 +284,6 @@ Return success when a named remote exists.
 
 - `0`: Remote exists
 - `1`: Remote does not exist
-
 
 ---
 
@@ -316,7 +306,6 @@ List changed files relative to a base ref, including untracked.
 **🚦 Exit codes**
 
 - `1`: Stop the script when the base names no commit, or a Git command fails
-
 
 ---
 
@@ -351,7 +340,6 @@ fi
 - `0`: A matching tag exists
 - `1`: The repository has no matching tag
 
-
 ---
 
 ### `dybatpho::git_tags_containing`
@@ -368,7 +356,6 @@ List tags that contain a commit.
 **📤 Output on stdout**
 
 - One tag per line, sorted
-
 
 ---
 
@@ -400,7 +387,6 @@ fi
 
 - `0`: The first commit is an ancestor of the second, or they are the same commit
 - `1`: It is not, or either commit-ish cannot be resolved
-
 
 ---
 
@@ -435,7 +421,6 @@ fi
 
 - `0`: The branch has an upstream
 - `1`: It has none, the branch does not exist, or HEAD is detached
-
 
 ---
 
@@ -472,7 +457,6 @@ read -r ahead behind <<< "${counts}"
 - `0`: Both refs resolved
 - `1`: There is no base ref and the head has no upstream, or a ref is unknown
 
-
 ---
 
 ### `dybatpho::git_state`
@@ -502,7 +486,6 @@ state="$(dybatpho::git_state ".")"
 
 - One of `rebase`, `am`, `merge`, `cherry-pick`, `revert`, `bisect`, or `none`
 
-
 ---
 
 ### `dybatpho::git_is_shallow`
@@ -531,7 +514,6 @@ fi
 - `0`: The repository is shallow
 - `1`: It has its full history
 
-
 ---
 
 ### `dybatpho::git_stash_count`
@@ -556,7 +538,6 @@ stashed="$(dybatpho::git_stash_count ".")"
 **📤 Output on stdout**
 
 - Number of stash entries, `0` when there is no stash
-
 
 ---
 

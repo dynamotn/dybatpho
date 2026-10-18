@@ -7,6 +7,7 @@ Utilities for logging to stdout/stderr
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains functions to log messages to stdout/stderr. Every
@@ -55,36 +56,39 @@ appended to a rotating log file at an independent verbosity level.
 - [`dybatpho::end_trace`](#dybatphoend_trace) — Disable Bash tracing started by `dybatpho::start_trace`.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/logging_demo.sh](../example/logging_demo.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::log_to_file`
+**[`dybatpho::log_to_file`](#dybatpholog_to_file)**
 
 - `rotate:0` disables rotation, and a size may be given as bytes or with a `K`, `M`, `G` or `T` suffix
 - A log file this function creates gets mode `600`; one that already exists keeps the mode it has
 
-### `dybatpho::log_context`
+**[`dybatpho::log_context`](#dybatpholog_context)**
 
 - Fields are held in the current shell, so a child process starts with none of them; export `LOG_REQUEST_ID` to correlate across processes
 - Registered secrets are redacted in field values the same way they are in messages
 
-### `dybatpho::timer_start`
+**[`dybatpho::timer_start`](#dybatphotimer_start)**
 
 - This times a step so the log says how long it took; `dybatpho::metrics_timer_start` records the same measurement as a metric for a dashboard
 
-### `dybatpho::timer_end`
+**[`dybatpho::timer_end`](#dybatphotimer_end)**
 
 - The elapsed time is published in `DYBATPHO_TIMER_LAST_MS` rather than printed, because capturing output with `$(...)` would run the call in a subshell and throw the measurement away
 
-### `dybatpho::spinner`
+**[`dybatpho::spinner`](#dybatphospinner)**
 
 - Registered secrets are redacted in the message before it is drawn
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::compare_log_level`
@@ -109,7 +113,6 @@ Return success when a message level should be shown against a threshold.
 - `0`: The message level should be emitted
 - `1`: The message level is filtered out
 
-
 ---
 
 ### `dybatpho::validate_log_level`
@@ -127,7 +130,6 @@ Validate a candidate log level value.
 - `0`: The input is a supported log level
 - `1`: The input is invalid
 
-
 ---
 
 ### `dybatpho::debug`
@@ -143,7 +145,6 @@ Show debug message.
 **📤 Output on stderr**
 
 - Show message if log level of message is less than debug level
-
 
 ---
 
@@ -168,7 +169,6 @@ Log a debug message together with the output of a shell command.
 
 - Show message if log level of message is less than debug level
 
-
 ---
 
 ### `dybatpho::info`
@@ -184,7 +184,6 @@ Show info message.
 **📤 Output on stderr**
 
 - Show message if log level of message is less than info level
-
 
 ---
 
@@ -202,7 +201,6 @@ Show normal message.
 
 - Show message if log level of message is less than info level
 
-
 ---
 
 ### `dybatpho::progress`
@@ -218,7 +216,6 @@ Show a highlighted in-progress banner.
 **📤 Output on stdout**
 
 - Show message if log level of message is less than info level
-
 
 ---
 
@@ -237,7 +234,6 @@ Render a percentage-based progress bar on the current output line.
 
 - Show the progress bar; print a newline in the caller when the task is done
 
-
 ---
 
 ### `dybatpho::header`
@@ -253,7 +249,6 @@ Show a section header banner.
 **📤 Output on stdout**
 
 - Show message if log level of message is less than info level
-
 
 ---
 
@@ -271,7 +266,6 @@ Show success message.
 
 - Show message if log level of message is less than info level
 
-
 ---
 
 ### `dybatpho::warn`
@@ -287,7 +281,6 @@ Show warning message.
 **📤 Output on stderr**
 
 - Show message if log level of message is less than warn level
-
 
 ---
 
@@ -305,7 +298,6 @@ Show error message.
 
 - Show message if log level of message is less than error level
 
-
 ---
 
 ### `dybatpho::fatal`
@@ -322,7 +314,6 @@ Show fatal message.
 **📤 Output on stderr**
 
 - Show message if log level of message is less than fatal level
-
 
 ---
 
@@ -364,7 +355,6 @@ dybatpho::log_to_file off   # stop writing to a file
 
 - `1`: A setting is malformed, or the file cannot be written
 
-
 ---
 
 ### `dybatpho::log_context`
@@ -404,7 +394,6 @@ dybatpho::log_context clear
 
 - `1`: `get` was asked for a field that is not set
 
-
 ---
 
 ### `dybatpho::timer_start`
@@ -429,7 +418,6 @@ dybatpho::timer_end migration
 **🧩 Variable sets**
 
 - __dybatpho_log_timer
-
 
 ---
 
@@ -458,7 +446,6 @@ so a log aggregator can chart a step without parsing the message.
 **🚦 Exit codes**
 
 - `1`: The requested level is not a valid log level
-
 
 ---
 
@@ -508,7 +495,6 @@ dybatpho::spinner "Building" -- make -j4 || dybatpho::die "build failed"
 
 - `The`: exit code of the command
 
-
 ---
 
 ### `dybatpho::start_trace`
@@ -522,7 +508,6 @@ _Function has no arguments._
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`LOG_LEVEL`** | string | Set to `trace` to emit the trace start/end messages |
-
 
 ---
 

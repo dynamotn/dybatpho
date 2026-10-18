@@ -7,6 +7,7 @@ Utilities for making a script usable by an AI agent
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Where `ai.sh` lets a script call a model, this module points the other way:
@@ -51,6 +52,7 @@ The module provides five things:
 - [`dybatpho::agent_mcp`](#dybatphoagent_mcp) — Generate an MCP `tools/list` payload for a CLI option spec. Each tool carries the command line it maps to under `x-dybatpho-command`, so a thin MCP server can dispatch without a second source of truth.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### When to use this module
@@ -89,37 +91,40 @@ dybatpho::agent_confirm restart "Restart the API service" \
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/agent_ops.sh](../example/agent_ops.sh)
 - [docs/cli.md` for the option spec these tool definitions are generated from](cli.md` for the option spec these tool definitions are generated from)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-- Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE` @note Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a second edit
+- Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE`
 
-### `dybatpho::agent_result`
+**[`dybatpho::agent_result`](#dybatphoagent_result)**
 
 - Keep status words to a small fixed set so an agent can branch on them
 
-### `dybatpho::agent_error`
+**[`dybatpho::agent_error`](#dybatphoagent_error)**
 
 - Error codes are a contract; keep them stable across releases so an agent can branch on them
 
-### `dybatpho::agent_context`
+**[`dybatpho::agent_context`](#dybatphoagent_context)**
 
 - Call this first in an agent-facing subcommand so the model knows what it is working with before it acts
 
-### `dybatpho::agent_confirm`
+**[`dybatpho::agent_confirm`](#dybatphoagent_confirm)**
 
 - Never add `all` to the allowlist in a production runbook; list the actions you actually intend to delegate
 
-### `dybatpho::agent_tools`
+**[`dybatpho::agent_tools`](#dybatphoagent_tools)**
 
 - Feed the result straight into the tool registry of the `ai` module, or into an API request; it needs no hand editing
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::agent_mode`
@@ -155,7 +160,6 @@ _Function has no arguments._
 - `0`: The mode was printed
 - `1`: Stop the script when the configured mode is unknown
 
-
 ---
 
 ### `dybatpho::agent_detect`
@@ -179,7 +183,6 @@ _Function has no arguments._
 **🔗 See also**
 
 - [dybatpho::agent_mode](#dybatphoagent_mode)
-
 
 ---
 
@@ -212,7 +215,6 @@ dybatpho::agent_result skipped reason="already up to date"
 - `0`: The result was printed
 - `1`: Missing status, or a field that is not `key=value`
 
-
 ---
 
 ### `dybatpho::agent_error`
@@ -243,7 +245,6 @@ dybatpho::agent_error missing_config "No config file at ${path}" \
 
 - `1`: Always, so the call can be chained with `||`
 
-
 ---
 
 ### `dybatpho::agent_context`
@@ -266,7 +267,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: The context was printed
-
 
 ---
 
@@ -311,7 +311,6 @@ dybatpho::agent_confirm restart "Restart the API service" || exit 0
 
 - [dybatpho::confirm](#dybatphoconfirm)
 
-
 ---
 
 ### `dybatpho::agent_audit`
@@ -346,7 +345,6 @@ dybatpho::agent_audit deploy "version 1.4.2 to staging"
 - `0`: The record was appended, or auditing is disabled
 - `1`: Missing arguments
 
-
 ---
 
 ### `dybatpho::agent_audit_show`
@@ -375,7 +373,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: The log was printed, or there is nothing to print
-
 
 ---
 
@@ -415,7 +412,6 @@ dybatpho::agent_tools _spec_root mytool openai     # function-calling shape
 **🔗 See also**
 
 - [dybatpho::generate_schema](#dybatphogenerate_schema)
-
 
 ---
 

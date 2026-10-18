@@ -7,6 +7,7 @@ Utilities for process handling
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for script termination, signal handling, trap
@@ -49,38 +50,41 @@ writes PID files.
 - [`dybatpho::pid_file_remove`](#dybatphopid_file_remove) — Remove a PID file, but only when it records the given process. The guard is the point: a service that exits after a replacement has already written its own PID file would otherwise delete the live one on its way out, and the supervisor would then start a second copy.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/process_ops.sh](../example/process_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::register_common_handlers`
+**[`dybatpho::register_common_handlers`](#dybatphoregister_common_handlers)**
 
 - This is the usual one-line setup at the top of scripts that want both error and signal handling
 
-### `dybatpho::cleanup_file_on_exit`
+**[`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit)**
 
 - `dybatpho::create_temp` already uses this internally, so call it directly only for custom temporary paths
 
-### `dybatpho::dry_run`
+**[`dybatpho::dry_run`](#dybatphodry_run)**
 
 - A single argument is a shell command string and runs through `eval`. Lead with `--` when the command and its arguments come from elsewhere -- a path, a user's input -- so that a single argument is run as a command name rather than parsed as shell.
 
-### `dybatpho::run_with_timeout`
+**[`dybatpho::run_with_timeout`](#dybatphorun_with_timeout)**
 
 - Compare the exit code against 124 to tell a timeout apart from a command that failed on its own
 
-### `dybatpho::wait_all`
+**[`dybatpho::wait_all`](#dybatphowait_all)**
 
 - Call `dybatpho::background_status <name>` afterwards to see which job failed and how
 
-### `dybatpho::kill_children`
+**[`dybatpho::kill_children`](#dybatphokill_children)**
 
 - Register it on a trap (`dybatpho::trap dybatpho::kill_children EXIT INT TERM`) so an interrupted script leaves nothing behind
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::die`
@@ -98,7 +102,6 @@ Log a fatal message and stop the current script or process.
 
 - `$2`: Exit the current shell with the requested code
 
-
 ---
 
 ### `dybatpho::register_err_handler`
@@ -110,7 +113,6 @@ _Function has no arguments._
 **🧩 Variable sets**
 
 - DYBATPHO_USED_ERR_HANDLER
-
 
 ---
 
@@ -124,7 +126,6 @@ _Function has no arguments._
 
 - DYBATPHO_USED_KILLED_HANDLER
 
-
 ---
 
 ### `dybatpho::register_common_handlers`
@@ -132,7 +133,6 @@ _Function has no arguments._
 Register both error and signal handlers.
 
 _Function has no arguments._
-
 
 ---
 
@@ -145,7 +145,6 @@ Handle a command failure captured by `dybatpho::register_err_handler`.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | number | Exit code of last command |
-
 
 ---
 
@@ -161,7 +160,6 @@ It exits with 130 or 143, and the EXIT handlers registered through
 | --- | --- | --- |
 | `$1` | string | Signal |
 
-
 ---
 
 ### `dybatpho::trap`
@@ -174,7 +172,6 @@ Append a command to one or more trap handlers without discarding existing traps.
 | --- | --- | --- |
 | `$1` | string | Command to run when the signal is trapped |
 | `$@` | string | Signals to trap |
-
 
 ---
 
@@ -191,7 +188,6 @@ Register a file or directory to be removed when the current shell exits.
 **📝 Notes**
 
 - Paths are collected in `DYBATPHO_CLEANUP_PATHS` and removed by a single trap installed on first use, rather than one trap command per path: a script that creates many temporary files would otherwise build a trap string that grows with every one of them.
-
 
 ---
 
@@ -232,7 +228,6 @@ dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
 **📤 Output on stdout**
 
 - Show the command instead of executing it when `DRY_RUN` is true
-
 
 ---
 
@@ -287,7 +282,6 @@ dybatpho::run_with_timeout 30 ./deploy.sh || {
 - `124`: The command was still running when the limit elapsed
 - `*`: Exit code of the command
 
-
 ---
 
 ### `dybatpho::background_run`
@@ -328,7 +322,6 @@ dybatpho::wait_all || dybatpho::die "A background job failed"
 - `0`: The job was started
 - `1`: Stop the script when the name is invalid, already running, or no command was given
 
-
 ---
 
 ### `dybatpho::background_pid`
@@ -349,7 +342,6 @@ Print the process ID of a background job.
 
 - `0`: The job is known
 - `1`: No job was started under that name
-
 
 ---
 
@@ -374,7 +366,6 @@ The code is only known once the job has been waited for, which is what
 - `0`: The job has finished and its exit code was printed
 - `1`: The job is unknown, or has not been waited for yet
 
-
 ---
 
 ### `dybatpho::wait_all`
@@ -394,7 +385,6 @@ _Function has no arguments._
 
 - `0`: Every job succeeded, or there were none
 - `1`: At least one job failed
-
 
 ---
 
@@ -422,7 +412,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always, so a job that had already exited cannot fail the caller
-
 
 ---
 
@@ -457,7 +446,6 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - `0`: The PID file was written
 - `1`: Stop the script when the process ID is not a number or the file cannot be written
 
-
 ---
 
 ### `dybatpho::pid_file_is_running`
@@ -491,7 +479,6 @@ fi
 
 - `0`: The recorded process is running
 - `1`: There is no readable PID file, its contents are not a process ID, or that process has exited
-
 
 ---
 

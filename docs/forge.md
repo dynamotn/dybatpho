@@ -7,6 +7,7 @@ Utilities for talking to the forge a repository is hosted on
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `git.sh` reads the repository on disk and `release.sh` builds, checksums and
@@ -54,6 +55,7 @@ token can never reach a log line even when a request is traced.
 - [`dybatpho::forge_release_upload`](#dybatphoforge_release_upload) — Attach a file to an existing release and print its URL. The two forges do genuinely different things here. GitHub stores the asset itself, on a separate upload host. GitLab stores nothing on a release: the file goes to the project's generic package registry and the release gains a link pointing at it. Both end with the file reachable from the release page.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### When to use this module
@@ -110,6 +112,7 @@ export DYBATPHO_FORGE_TOKEN="glpat-..."
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/forge_ops.sh](../example/forge_ops.sh)
@@ -117,13 +120,15 @@ export DYBATPHO_FORGE_TOKEN="glpat-..."
 - [src/git.sh](../src/git.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::forge_request`
+**[`dybatpho::forge_request`](#dybatphoforge_request)**
 
 - Honors `DRY_RUN`, so a publishing script can be rehearsed safely
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::forge_host`
@@ -144,7 +149,6 @@ Print the host of the configured remote.
 **🚦 Exit codes**
 
 - `1`: The remote has no URL
-
 
 ---
 
@@ -185,7 +189,6 @@ esac
 
 - `1`: The host matches neither forge and `DYBATPHO_FORGE` is unset
 
-
 ---
 
 ### `dybatpho::forge_repo`
@@ -215,7 +218,6 @@ kept rather than only the last two segments.
 
 - `1`: The remote URL carries no path
 
-
 ---
 
 ### `dybatpho::forge_api`
@@ -242,7 +244,6 @@ serves `/api/v4` from its own host.
 
 - API base URL, without a trailing slash
   this module have no remote of their own to pass and rely on the defaults
-
 
 ---
 
@@ -288,7 +289,6 @@ script does with it rather than for the requests made here.
 
 - `1`: No token is set for this forge
 
-
 ---
 
 ### `dybatpho::forge_request`
@@ -326,7 +326,6 @@ dybatpho::json_get "$(< "${body}")" '.[0].title'
 - `0`: The forge answered with a 2xx status
 - `4`: The forge answered with a 4xx status
 - `5`: The forge answered with a 5xx status
-
 
 ---
 
@@ -372,7 +371,6 @@ dybatpho::forge_request POST "issues" "${payload}" "${response}" \
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::forge_issue_find`
@@ -398,7 +396,6 @@ endpoint, so the open issues are compared here. Both are exact matches, so
 - `1`: No open issue has that title
 - `2`: The lookup itself failed, so whether one is open is unknown
 
-
 ---
 
 ### `dybatpho::forge_issue_create`
@@ -421,7 +418,6 @@ Open an issue and print its number.
 
 - `1`: The forge rejected the request
 
-
 ---
 
 ### `dybatpho::forge_issue_comment`
@@ -438,7 +434,6 @@ Add a comment to an existing issue.
 **🚦 Exit codes**
 
 - `1`: The forge rejected the request
-
 
 ---
 
@@ -473,7 +468,6 @@ dybatpho::json_get "${result}" '.action'   # created | commented
 
 - `1`: The forge rejected the request
 
-
 ---
 
 ### `dybatpho::forge_issue_url`
@@ -489,7 +483,6 @@ Print the browser URL of an issue.
 **📤 Output on stdout**
 
 - Issue URL
-
 
 ---
 
@@ -513,7 +506,6 @@ by its tag. Each forge returns the identifier its own upload step needs.
 
 - `0`: A release exists for the tag
 - `1`: No release exists for the tag
-
 
 ---
 
@@ -550,7 +542,6 @@ dybatpho::forge_release_create "v1.2.0" "v1.2.0" "$(dybatpho::release_changelog)
 **🚦 Exit codes**
 
 - `1`: The forge rejected the request, or a draft was asked of GitLab
-
 
 ---
 

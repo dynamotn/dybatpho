@@ -7,6 +7,7 @@ Utilities for checking that the environment can run what a script loaded
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module answers the question a user asks after a script fails with
@@ -71,12 +72,14 @@ it; a cycle is only noted, because the loader allows one.
 - [`dybatpho::doctor`](#dybatphodoctor) — Report the environment the loaded modules need, and what is missing.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/doctor_ops.sh](../example/doctor_ops.sh)
 - [scripts/bundle.sh](../scripts/bundle.sh)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::doctor_requirements`
@@ -106,7 +109,6 @@ dybatpho::doctor_requirements archive required
 - `0`: Print the dependencies, including nothing for a module that has none
 - `1`: Stop the script when the module is unknown or the kind is invalid
 
-
 ---
 
 ### `dybatpho::doctor_bash_supported`
@@ -119,7 +121,6 @@ _Function has no arguments._
 
 - `0`: Bash is at least `DYBATPHO_BASH_MINIMUM`
 - `1`: Bash is older than the supported minimum
-
 
 ---
 

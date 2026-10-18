@@ -7,6 +7,7 @@ Initial script
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This script should be sourced before any of
@@ -42,11 +43,13 @@ make use of ${DYBATPHO_DIR} to find each other.
 - [`dybatpho::module_list`](#dybatphomodule_list) — Print module names, one per line.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/init_modules.sh](../example/init_modules.sh)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::version`
@@ -92,7 +95,6 @@ _Function has no arguments._
 
 - `0`: Always
 
-
 ---
 
 ### `dybatpho::load`
@@ -122,7 +124,6 @@ dybatpho::load json config
 - `0`: Every requested module is loaded
 - `1`: Stop the script when no module is given or a module is unknown
 
-
 ---
 
 ### `dybatpho::module_loaded`
@@ -139,7 +140,6 @@ Return success when a module is already loaded.
 
 - `0`: The module is loaded
 - `1`: The module is not loaded
-
 
 ---
 

@@ -7,6 +7,7 @@ Utilities for working with multi-line text blocks
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for formatting larger text blocks: indenting
@@ -36,11 +37,13 @@ helpers use.
 - [`dybatpho::text_truncate_lines`](#dybatphotext_truncate_lines) — Keep the first lines of a text block and say how many were left out. A block that already fits is printed unchanged, with no marker. Otherwise the first `count` lines are printed, followed by a marker line. The default marker reads `… 1 more line` or `… N more lines`; a custom marker has every `{count}` replaced by the number of lines left out.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/text_ops.sh](../example/text_ops.sh)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::text_indent`
@@ -58,7 +61,6 @@ Prefix every line in a text block with the given indent string.
 
 - Indented text block
 
-
 ---
 
 ### `dybatpho::text_dedent`
@@ -74,7 +76,6 @@ Remove the shared leading indentation from a text block.
 **📤 Output on stdout**
 
 - Dedented text block
-
 
 ---
 
@@ -92,7 +93,6 @@ Strip ANSI escape sequences from a text block.
 
 - Text without ANSI color/control sequences
 
-
 ---
 
 ### `dybatpho::text_bullet_list`
@@ -109,7 +109,6 @@ Prefix each non-empty line in a text block as a bullet item.
 **📤 Output on stdout**
 
 - Bullet-formatted text block
-
 
 ---
 
@@ -142,7 +141,6 @@ dybatpho::text_columns $'name|version\ndybatpho|6.0.0'
 **🚦 Exit codes**
 
 - `1`: Stop the script when the `table` module is not loaded
-
 
 ---
 
@@ -185,7 +183,6 @@ dybatpho::text_box "plain" "" ascii
 
 - `1`: The border style is unknown
 
-
 ---
 
 ### `dybatpho::text_center`
@@ -218,7 +215,6 @@ dybatpho::text_center $'title\nsubtitle here' 20
 **🚦 Exit codes**
 
 - `1`: The width is not a positive integer
-
 
 ---
 
@@ -255,7 +251,6 @@ dybatpho::text_number_lines $'alpha\nbeta' 9 ": "
 **🚦 Exit codes**
 
 - `1`: The first line number is not a non-negative integer
-
 
 ---
 

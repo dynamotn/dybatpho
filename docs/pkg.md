@@ -7,6 +7,7 @@ Package manager detection and guarded dependency installation
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module answers three questions a portable installer script keeps
@@ -62,6 +63,7 @@ command instead of running it under `--dry-run` or `DRY_RUN`.
 - [`dybatpho::pkg_require`](#dybatphopkg_require) — Make sure a command is available, installing the package that provides it on this machine.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### Report the machine's package manager
@@ -96,20 +98,23 @@ dybatpho::pkg_install --force --arg --no-cache --arg --no-interactive -- curl
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/pkg_ops.sh](../example/pkg_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Run an installer with `--dry-run` first, then with `--force` from CI, and the same script covers both the review and the unattended run.
 
-### `dybatpho::pkg_install`
+**[`dybatpho::pkg_install`](#dybatphopkg_install)**
 
 - An `--arg` belongs to the install command alone: the `--update` refresh that may run before it is never given the extra arguments.
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::pkg_supported`
@@ -121,7 +126,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - One manager name per line, alphabetically
-
 
 ---
 
@@ -153,7 +157,6 @@ _Function has no arguments._
 - `0`: A supported manager is installed
 - `1`: None of the supported managers is installed
 
-
 ---
 
 ### `dybatpho::pkg_manager_available`
@@ -170,7 +173,6 @@ Return success when a package manager is usable on this machine.
 
 - `0`: The manager is installed
 - `1`: The manager is not installed, or nothing was detected
-
 
 ---
 
@@ -201,7 +203,6 @@ dybatpho::pkg_name fd apt:fd-find emerge:sys-apps/fd   # fd-find on Debian
 - `0`: A name is printed
 - `1`: No package manager was detected
 
-
 ---
 
 ### `dybatpho::pkg_installed`
@@ -218,7 +219,6 @@ Return success when a package is installed, according to the detected manager.
 
 - `0`: The package is installed
 - `1`: The package is missing, or no package manager was detected
-
 
 ---
 
@@ -247,7 +247,6 @@ mapfile -t missing < <(dybatpho::pkg_missing curl jq)
 
 - `0`: The check ran; empty output means nothing is missing
 - `1`: No package manager was detected
-
 
 ---
 
@@ -282,7 +281,6 @@ dybatpho::pkg_install_command --arg --cask -- firefox   # brew install --cask fi
 
 - `1`: No package manager was detected
 
-
 ---
 
 ### `dybatpho::pkg_update`
@@ -305,7 +303,6 @@ Refresh the package index, after confirming the change.
 
 - `0`: The index was refreshed, or the command was printed
 - `1`: The refresh is declined, the command failed, or no manager was detected
-
 
 ---
 
@@ -349,7 +346,6 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - `0`: The packages were installed, or the command was printed
 - `1`: The install is declined, the command failed, or no manager was detected
 
-
 ---
 
 ### `dybatpho::pkg_ensure`
@@ -374,7 +370,6 @@ dybatpho::pkg_ensure --force curl jq
 
 - `0`: Every package is installed, was already installed, or the command was printed
 - `1`: The install is declined, the command failed, or no manager was detected
-
 
 ---
 

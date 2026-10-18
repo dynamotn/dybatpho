@@ -7,6 +7,7 @@ Acquiring and holding a privilege escalation for a run
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `pkg.sh` can put `sudo` in front of one command. A script that runs twenty
@@ -52,16 +53,19 @@ own work needs no privilege at all.
 - [`dybatpho::privilege_run`](#dybatphoprivilege_run) — Run one command elevated, for a caller that needs that and no session. When elevation is not needed the command runs as it is, so the call reads the same either way.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/privilege_ops.sh](../example/privilege_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - A full-screen application has to give the terminal back before the password prompt is drawn, which is what `DYBATPHO_PRIVILEGE_SUSPEND_HOOK` is for
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::privilege_command`
@@ -81,7 +85,6 @@ _Function has no arguments._
 
 - `0`: A command was printed
 - `1`: Neither is installed
-
 
 ---
 
@@ -104,7 +107,6 @@ _Function has no arguments._
 - `0`: Elevation is needed
 - `1`: It is not
 
-
 ---
 
 ### `__dybatpho_privilege_hand_over`
@@ -119,7 +121,6 @@ without this module knowing anything about `screen` or `tui`.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | `suspend` or `resume` |
-
 
 ---
 
@@ -139,7 +140,6 @@ valid ticket, so no prompt would appear.
 - `0`: A ticket is cached
 - `1`: There is none, or this command has no cache to ask about
 
-
 ---
 
 ### `__dybatpho_privilege_keepalive`
@@ -155,7 +155,6 @@ left behind would hold a ticket for a process that no longer exists.
 | --- | --- | --- |
 | `$1` | string | Escalation command |
 | `$2` | number | Seconds between refreshes |
-
 
 ---
 
@@ -175,7 +174,6 @@ makes that failure loud and immediate instead of a run that hangs.
 **🚦 Exit codes**
 
 - `0`: The wrapper is in place and `PATH` points at it
-
 
 ---
 
@@ -212,7 +210,6 @@ dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
 - `0`: The escalation is held, or was not needed
 - `1`: Authentication failed, or a prompt was needed and could not be answered
 
-
 ---
 
 ### `dybatpho::privilege_release`
@@ -231,7 +228,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Anything that was held is released
-
 
 ---
 

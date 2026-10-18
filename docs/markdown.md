@@ -7,6 +7,7 @@ Utilities for building structured Markdown content
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains builders for the pieces a generated document is made
@@ -45,16 +46,19 @@ document object.
 - [`dybatpho::md_emoji`](#dybatphomd_emoji) — Render an emoji shortcode. Surrounding colons are accepted and not doubled.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/markdown_ops.sh](../example/markdown_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - `dybatpho::md_table` renders through `table.sh`, so that module must be loaded for it; `markdown` does not load it, and every other builder needs only the core modules
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::md_raw`
@@ -82,7 +86,6 @@ dybatpho::md_list "$(dybatpho::md_raw "$(dybatpho::md_link 'docs' 'https://examp
 
 - The fragment, marked as raw
 
-
 ---
 
 ### `dybatpho::md_escape`
@@ -108,7 +111,6 @@ dybatpho::md_escape 'release v2 [beta]'
 **📤 Output on stdout**
 
 - Escaped text
-
 
 ---
 
@@ -138,7 +140,6 @@ dybatpho::md_heading 2 "Release notes"
 
 - `0`: The heading is rendered
 
-
 ---
 
 ### `dybatpho::md_list`
@@ -166,7 +167,6 @@ dybatpho::md_list $'first\nsecond' "1."
 **📤 Output on stdout**
 
 - The rendered list
-
 
 ---
 
@@ -196,7 +196,6 @@ dybatpho::md_task_list $'x|Write the spec\n|Ship it'
 
 - The rendered task list
 
-
 ---
 
 ### `dybatpho::md_link`
@@ -221,7 +220,6 @@ dybatpho::md_link "the docs" "https://example.com/a b"
 **📤 Output on stdout**
 
 - The rendered link
-
 
 ---
 
@@ -252,7 +250,6 @@ dybatpho::md_badge "build" "passing" "green"
 
 - The rendered badge
 
-
 ---
 
 ### `dybatpho::md_code_block`
@@ -281,7 +278,6 @@ dybatpho::md_code_block bash 'ls -la'
 **📤 Output on stdout**
 
 - The rendered code block
-
 
 ---
 
@@ -316,7 +312,6 @@ dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 - `0`: The table is rendered
 - `1`: Stop the script when the `table` module is not loaded
 
-
 ---
 
 ### `dybatpho::md_collapsible`
@@ -343,7 +338,6 @@ dybatpho::md_collapsible "Full log" "$(dybatpho::md_code_block '' "${log}")"
 
 - The rendered section
 
-
 ---
 
 ### `dybatpho::md_mention`
@@ -367,7 +361,6 @@ dybatpho::md_mention dynamotn
 **📤 Output on stdout**
 
 - The rendered mention
-
 
 ---
 

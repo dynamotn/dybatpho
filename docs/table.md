@@ -7,6 +7,7 @@ Utilities for rendering aligned plain-text tables
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for rendering delimited row data as aligned
@@ -32,16 +33,19 @@ strict CSV parsing.
 - [`dybatpho::table_from_json`](#dybatphotable_from_json) — Render a JSON array of objects as a table. The keys of the first object become the header, in document order, and a later object missing one of them leaves that cell empty -- the conversion `dybatpho::csv_from_json` performs, rendered through `dybatpho::table_from_csv`.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/table_ops.sh](../example/table_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Rows are provided as a single multi-line string (or stdin with `-`), and cells are split on an exact delimiter such as `|`, `,`, or `::`
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::table_print`
@@ -58,7 +62,6 @@ Render aligned columns without borders from delimited rows.
 **📤 Output on stdout**
 
 - Aligned plain-text table
-
 
 ---
 
@@ -79,7 +82,6 @@ Render aligned columns with optional per-column alignment rules.
 
 - Aligned plain-text table
 
-
 ---
 
 ### `dybatpho::table_box`
@@ -96,7 +98,6 @@ Render a Unicode boxed table from delimited rows.
 **📤 Output on stdout**
 
 - Boxed Unicode table
-
 
 ---
 
@@ -115,7 +116,6 @@ Render a Markdown table from delimited rows.
 
 - Markdown table using the first row as the header
 
-
 ---
 
 ### `dybatpho::table_csv`
@@ -133,7 +133,6 @@ Render lightweight comma-delimited table data using one of the supported styles.
 **📤 Output on stdout**
 
 - Rendered table
-
 
 ---
 
@@ -171,7 +170,6 @@ dybatpho::csv_sort billing.csv cost desc | dybatpho::table_from_csv - plain "lef
 
 - `0`: The table was rendered
 - `1`: The style is unknown, or the CSV cannot be read
-
 
 ---
 

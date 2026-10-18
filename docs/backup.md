@@ -7,6 +7,7 @@ Utilities for taking backups and applying a retention policy
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `archive.sh` creates and extracts archives; this module adds the policy
@@ -56,11 +57,13 @@ that compares backups loads `diff` as well.
 - [`dybatpho::backup_diff`](#dybatphobackup_diff) — Show what changed between two backups, or between a backup and the live data it was taken from. Each side is a backup archive, an incremental snapshot, or a live file or directory. A backup is checked against its sidecar before anything is read from it, and an archive is extracted into a temporary directory that is removed when the shell exits; nothing in the destination or the source is written. The two sides are then compared with `dybatpho::diff_dir`, so the records, the summary and the exit code are the ones it prints: `+` for what the second side added, `-` for what it no longer has, `~` for a rewritten file, `!` for a change of kind. A backup holds its source under the source's own name, and that name is not compared: a directory backup is compared from inside it, so the older backup of `/etc/nginx` lines up with the live `/etc/nginx` or with a copy restored somewhere else.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/backup_ops.sh](../example/backup_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Load `diff` as well to compare backups: `--modules backup diff`
@@ -68,6 +71,7 @@ that compares backups loads `diff` as well.
 - A snapshot shares its unchanged files with other snapshots, so read and restore it, never edit inside it
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::backup_create`
@@ -113,7 +117,6 @@ snapshot="$(dybatpho::backup_create --incremental /srv/www /var/backups www)"
 - `0`: The backup was taken
 - `1`: The source does not exist, or the backup could not be written
 
-
 ---
 
 ### `dybatpho::backup_list`
@@ -143,7 +146,6 @@ dybatpho::backup_list /var/backups nginx
 
 - `0`: The listing was printed, empty when there is nothing to list
 
-
 ---
 
 ### `dybatpho::backup_latest`
@@ -172,7 +174,6 @@ dybatpho::backup_restore "$(dybatpho::backup_latest /var/backups nginx)" /etc
 - `0`: A backup was found
 - `1`: The directory holds no backup
 
-
 ---
 
 ### `dybatpho::backup_verify`
@@ -199,7 +200,6 @@ dybatpho::backup_verify "${archive}" || dybatpho::die "Corrupted backup"
 
 - `0`: The archive matches its sidecar
 - `1`: The backup is missing, has no sidecar, or does not match it
-
 
 ---
 
@@ -239,7 +239,6 @@ dybatpho::backup_restore --force "${archive}" /etc/nginx
 
 - `0`: The backup was restored
 - `1`: The backup fails its checksum, the overwrite is declined, or an entry escapes the target
-
 
 ---
 
@@ -282,7 +281,6 @@ dybatpho::backup_prune --keep-count 7 --name nginx /var/backups
 
 - `0`: The pruning finished, or nothing needed removing
 - `1`: No retention policy was given, an option is malformed, or the removal was declined
-
 
 ---
 

@@ -7,6 +7,7 @@ Utilities for comparing text and structured documents
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Showing a user what changed is something scripts keep doing and keep doing
@@ -48,11 +49,13 @@ followed into whatever it points at.
 - [`dybatpho::diff_dir`](#dybatphodiff_dir) — Compare two directory trees entry by entry. Every path under either root is reported once, sorted bytewise so the output is the same on every machine: - `+ path` exists only in the second tree; - `- path` exists only in the first; - `~ path` is a file whose content differs, or a symbolic link whose target differs; - `! path: file -> directory` changed kind between the two trees. A directory's path carries a trailing `/` when it is added or removed, and the entries inside it are reported too, so a removed directory reads as the whole of what went with it. Files are compared by content with `cmp`, so a copy with a new modification time is no change; permissions and ownership are not compared. Symbolic links are compared by target and never followed, so a link into a large tree does not drag that tree in. A path holding a backslash, newline, tab, or carriage return is written with C escapes so each record stays on one line; `--null` prints each record raw and NUL-terminated instead, for a reader that needs the exact name.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/diff_ops.sh](../example/diff_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - Every text and document comparison takes a file path, `-` for stdin, or the text itself, and only one side can be stdin
@@ -61,6 +64,7 @@ followed into whatever it points at.
 - `dybatpho::diff_text` needs no external command; the structured diffs need `jq`, and `dybatpho::diff_yaml` needs `yq` to reach JSON first
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::diff_text`
@@ -93,7 +97,6 @@ dybatpho::diff_text /etc/nginx/nginx.conf "${rendered}" current proposed
 - `0`: The two are identical
 - `1`: They differ
 
-
 ---
 
 ### `dybatpho::diff_summary`
@@ -125,7 +128,6 @@ dybatpho::diff_summary "${before}" "${after}" || true
 
 - `0`: The two are identical
 - `1`: They differ
-
 
 ---
 
@@ -160,7 +162,6 @@ dybatpho::diff_json old-state.json new-state.json
 - `1`: They differ
 - `2`: Either document is not valid JSON
 - `127`: `jq` is not installed
-
 
 ---
 
@@ -197,7 +198,6 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - `1`: They differ
 - `2`: Either document is not valid YAML
 - `127`: `jq` or `yq` is not installed
-
 
 ---
 

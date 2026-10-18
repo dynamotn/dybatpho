@@ -7,6 +7,7 @@ Utilities for working with dates and timestamps
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for reading the current time, validating date
@@ -48,11 +49,13 @@ implementations this module supports shift by them differently.
 - [`dybatpho::date_in_tz`](#dybatphodate_in_tz) — Print a date as it reads in another timezone. The date is parsed in `DYBATPHO_DATE_TIMEZONE`, as everywhere else in this module, and written in the zone asked for. The zone has to be in the system's zone database: `date` itself answers in UTC for a name it cannot find, on every platform this module supports, so an unknown zone is refused rather than passed on.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/date_ops.sh](../example/date_ops.sh)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::date_now`
@@ -74,7 +77,6 @@ Print the current time using a `date` format string.
 **📤 Output on stdout**
 
 - Current time formatted by `date`
-
 
 ---
 
@@ -98,7 +100,6 @@ Print today's date using a `date` format string.
 
 - Current date formatted by `date`
 
-
 ---
 
 ### `dybatpho::date_is_valid`
@@ -121,7 +122,6 @@ Return success when a date string can be parsed by `date`.
 
 - `0`: The input is a valid date string
 - `1`: The input cannot be parsed
-
 
 ---
 
@@ -150,7 +150,6 @@ Parse a date string and print its Unix timestamp.
 - `0`: The input is parsed successfully
 - `1`: The input cannot be parsed
 
-
 ---
 
 ### `dybatpho::date_format`
@@ -173,7 +172,6 @@ Format a Unix timestamp with a `date` format string.
 **📤 Output on stdout**
 
 - Formatted date string
-
 
 ---
 
@@ -199,7 +197,6 @@ Add or subtract days from a date string and print the result.
 
 - Shifted date string
 
-
 ---
 
 ### `dybatpho::date_diff_days`
@@ -222,7 +219,6 @@ Print the whole-day difference between two date strings.
 **📤 Output on stdout**
 
 - Signed whole-day difference calculated as `end - start`
-
 
 ---
 
@@ -253,7 +249,6 @@ dybatpho::date_is_leap_year 2000   # yes
 - `1`: It is not
 - `1`: Stop the script when the year is not a number
 
-
 ---
 
 ### `dybatpho::date_days_in_month`
@@ -282,7 +277,6 @@ dybatpho::date_days_in_month 2023 2   # 28
 **🚦 Exit codes**
 
 - `1`: Stop the script when the year or the month is out of range
-
 
 ---
 
@@ -318,7 +312,6 @@ dybatpho::date_month_start 2024-02-17 '%F %T'  # 2024-02-01 00:00:00
 **🚦 Exit codes**
 
 - `1`: The date cannot be parsed
-
 
 ---
 
@@ -357,7 +350,6 @@ dybatpho::date_month_end 2023-02-17   # 2023-02-28
 **🚦 Exit codes**
 
 - `1`: The date cannot be parsed
-
 
 ---
 
@@ -405,7 +397,6 @@ dybatpho::date_add 2024-03-01 -1 weeks               # 2024-02-23
 
 - [- `dybatpho::date_add_days](#dybatphodate_add_days)
 
-
 ---
 
 ### `dybatpho::date_diff`
@@ -448,7 +439,6 @@ dybatpho::date_diff "2024-01-01 00:00:00" "2024-01-01 01:30:00" minutes
 
 - [- `dybatpho::date_diff_days](#dybatphodate_diff_days)
 
-
 ---
 
 ### `dybatpho::date_seconds_to_hms`
@@ -487,7 +477,6 @@ dybatpho::date_seconds_to_hms -61     # -0:01:01
 **🔗 See also**
 
 - [- `dybatpho::i18n_duration](#dybatphoi18n_duration)
-
 
 ---
 
@@ -548,7 +537,6 @@ dybatpho::date_parse_duration seconds "${TIMEOUT}" || dybatpho::die "Bad timeout
 
 - [- `dybatpho::date_seconds_to_hms](#dybatphodate_seconds_to_hms)
 
-
 ---
 
 ### `dybatpho::date_is_before`
@@ -588,7 +576,6 @@ dybatpho::date_is_before "2024-02-29 12:00:00" 2024-02-29 # no
 
 - [- `dybatpho::date_is_after](#dybatphodate_is_after)
 
-
 ---
 
 ### `dybatpho::date_is_after`
@@ -626,7 +613,6 @@ dybatpho::date_is_after 2024-02-29 2024-02-29   # no
 **🔗 See also**
 
 - [- `dybatpho::date_is_before](#dybatphodate_is_before)
-
 
 ---
 
@@ -676,7 +662,6 @@ dybatpho::date_iso_week 2024-02-29 '%G-W%V-%u'   # 2024-W09-4
 **🚦 Exit codes**
 
 - `1`: The date cannot be parsed
-
 
 ---
 

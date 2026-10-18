@@ -7,6 +7,7 @@ Utilities for working with JSON and YAML data
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for querying, validating, formatting, and
@@ -36,29 +37,32 @@ fallback where practical.
 - [`dybatpho::yaml_merge`](#dybatphoyaml_merge) — Deep-merge two YAML mappings, the overlay winning. Merging follows `dybatpho::json_merge`: mappings merge key by key, and every other value is replaced by the overlay's.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/json_ops.sh](../example/json_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - The YAML helpers target the Mike Farah `yq` command line (`yq eval ...`)
 - JSON helpers prefer `yq` because it can read JSON directly, and fall back to `jq` when needed
 
-### `dybatpho::json_object`
+**[`dybatpho::json_object`](#dybatphojson_object)**
 
 - Build nested structures from the inside out, passing each finished document through a `:json` name
 
-### `dybatpho::json_eval`
+**[`dybatpho::json_eval`](#dybatphojson_eval)**
 
 - Write filters in the subset both backends share: `yq` has no `def`, and spells `ascii_downcase` as `downcase`
 
-### `dybatpho::json_set`
+**[`dybatpho::json_set`](#dybatphojson_set)**
 
 - The output file is written atomically after the whole result is known, so a failure leaves it untouched
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::json_query`
@@ -82,7 +86,6 @@ Query a JSON document with `yq`, or `jq` as a fallback.
 - `0`: Query succeeded
 - `127`: Neither `yq` nor `jq` is installed
 
-
 ---
 
 ### `dybatpho::json_has`
@@ -101,7 +104,6 @@ Return success when a JSON document satisfies a filter.
 - `0`: The filter succeeds
 - `1`: The filter fails
 - `127`: Neither `yq` nor `jq` is installed
-
 
 ---
 
@@ -125,7 +127,6 @@ Pretty-print a JSON document.
 - `0`: Formatting succeeded
 - `127`: Neither `yq` nor `jq` is installed
 
-
 ---
 
 ### `dybatpho::json_to_yaml`
@@ -147,7 +148,6 @@ Convert a JSON document to YAML.
 
 - `0`: Conversion succeeded
 - `127`: `yq` is not installed
-
 
 ---
 
@@ -172,7 +172,6 @@ Query a YAML document with `yq`.
 - `0`: Query succeeded
 - `127`: `yq` is not installed
 
-
 ---
 
 ### `dybatpho::yaml_has`
@@ -191,7 +190,6 @@ Return success when a YAML document satisfies a `yq` expression.
 - `0`: The expression succeeds
 - `1`: The expression fails
 - `127`: `yq` is not installed
-
 
 ---
 
@@ -215,7 +213,6 @@ Pretty-print a YAML document.
 - `0`: Formatting succeeded
 - `127`: `yq` is not installed
 
-
 ---
 
 ### `dybatpho::yaml_to_json`
@@ -237,7 +234,6 @@ Convert a YAML document to JSON.
 
 - `0`: Conversion succeeded
 - `127`: `yq` is not installed
-
 
 ---
 
@@ -273,7 +269,6 @@ dybatpho::json_string 'he said "hi"' # "he said \"hi\""
 
 - `0`: The value was encoded
 - `1`: Missing argument
-
 
 ---
 
@@ -314,7 +309,6 @@ dybatpho::json_object name api ports:json '[80,443]'
 - `1`: An odd number of arguments, or an invalid nested document
 - `127`: Neither `yq` nor `jq` is installed
 
-
 ---
 
 ### `dybatpho::json_eval`
@@ -353,7 +347,6 @@ messages=$(dybatpho::json_eval "${messages}" \
 
 - [dybatpho::json_get](#dybatphojson_get)
 
-
 ---
 
 ### `dybatpho::json_get`
@@ -391,7 +384,6 @@ text=$(dybatpho::json_get "${response}" '.choices[0].message.content // ""')
 
 - [dybatpho::json_eval](#dybatphojson_eval)
 
-
 ---
 
 ### `dybatpho::json_valid`
@@ -416,7 +408,6 @@ dybatpho::json_valid "${answer}" || dybatpho::warn "The model did not return JSO
 - `0`: The document parses as JSON
 - `1`: The document is not valid JSON
 - `127`: Neither `yq` nor `jq` is installed
-
 
 ---
 
@@ -466,7 +457,6 @@ dybatpho::json_set --json config.json server.ports '[80,443]'
 - `other`: The backend's exit code when the input is invalid or the path runs through a scalar
 - `127`: Neither `yq` nor `jq` is installed
 
-
 ---
 
 ### `dybatpho::json_del`
@@ -502,7 +492,6 @@ dybatpho::json_del package.json scripts.prepublish package.json
 - `other`: The backend's exit code when the input is invalid
 - `127`: Neither `yq` nor `jq` is installed
 
-
 ---
 
 ### `dybatpho::json_merge`
@@ -536,7 +525,6 @@ dybatpho::json_merge defaults.json local.json > effective.json
 - `1`: Invalid arguments
 - `other`: The backend's exit code when a document is not an object or is invalid
 - `127`: Neither `yq` nor `jq` is installed
-
 
 ---
 
@@ -579,7 +567,6 @@ dybatpho::yaml_set --json values.yaml replicas 3
 - `other`: The backend's exit code when the input is invalid or the path runs through a scalar
 - `127`: `yq` is not installed
 
-
 ---
 
 ### `dybatpho::yaml_del`
@@ -612,7 +599,6 @@ dybatpho::yaml_del compose.yaml services.debug compose.yaml
 - `1`: Invalid arguments or path
 - `other`: The backend's exit code when the input is invalid
 - `127`: `yq` is not installed
-
 
 ---
 

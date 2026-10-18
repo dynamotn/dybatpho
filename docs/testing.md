@@ -7,6 +7,7 @@ Extended assertions, snapshots, mocks, and self-cleaning fixtures for shell test
 > Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module extends the plain `dybatpho::assert` guard from `helpers.sh`
@@ -81,6 +82,7 @@ Only programming mistakes, such as a missing argument, are fatal.
 - [`dybatpho::unmock_all`](#dybatphounmock_all) — Remove every mock created in this shell and restore the environment, the clock, and the terminal detection.
 
 <a id="usage"></a>
+
 ## 🚀 Usage
 
 ### Assert on a generated file
@@ -117,90 +119,93 @@ dybatpho::assert_mock_called kubectl get pods
 ```
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/testing_ops.sh](../example/testing_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::assert_file_mode`
+**[`dybatpho::assert_file_mode`](#dybatphoassert_file_mode)**
 
 - Useful for verifying that secret files are not group- or world-readable
 
-### `dybatpho::assert_json_query`
+**[`dybatpho::assert_json_query`](#dybatphoassert_json_query)**
 
 - String scalars are compared without their JSON quoting, so an expected value of `1.4.2` matches a backend result of `"1.4.2"`.
 
-### `dybatpho::assert_yaml_query`
+**[`dybatpho::assert_yaml_query`](#dybatphoassert_yaml_query)**
 
 - String scalars are compared without their JSON quoting, so an expected value of `1.4.2` matches a backend result of `"1.4.2"`.
 
-### `dybatpho::snapshot_scrub`
+**[`dybatpho::snapshot_scrub`](#dybatphosnapshot_scrub)**
 
 - Use this to remove timestamps, temporary paths, and process ids that would otherwise make a snapshot fail on every run.
 
-### `dybatpho::assert_snapshot`
+**[`dybatpho::assert_snapshot`](#dybatphoassert_snapshot)**
 
 - A missing snapshot is written and passes, so the first run records the baseline.
 - Trailing blank lines are not preserved, because the text passes through a command substitution; a snapshot cannot assert on them.
 
-### `dybatpho::assert_cli_snapshot`
+**[`dybatpho::assert_cli_snapshot`](#dybatphoassert_cli_snapshot)**
 
 - The command's own exit code is recorded inside the snapshot rather than propagated, so a CLI that exits non-zero can still be snapshotted.
 
-### `dybatpho::assert_exit_code`
+**[`dybatpho::assert_exit_code`](#dybatphoassert_exit_code)**
 
 - A command that calls `exit` ends the shell running it. Wrap a script's function in `bash -c` or call the script itself when it exits rather than returns.
 
-### `dybatpho::assert_duration_under`
+**[`dybatpho::assert_duration_under`](#dybatphoassert_duration_under)**
 
 - A machine under load makes a tight budget flaky. Set `DYBATPHO_TEST_DURATION_RUNS` above `1` so a single descheduled run does not fail the suite: the fastest run is the one that measures the code rather than the machine.
 - Budget for the shape of the cost, not the current number. A regression worth catching is a loop that became quadratic, not a run that drifted by five milliseconds.
 
-### `dybatpho::benchmark`
+**[`dybatpho::benchmark`](#dybatphobenchmark)**
 
 - This measures and reports; it asserts nothing. Compare the median against a budget with `dybatpho::assert_duration_under`, or record the line in a log to watch the number move between releases.
 - The median, not the mean, because one descheduled run drags a mean and leaves a median where it was.
 
-### `dybatpho::mock_env`
+**[`dybatpho::mock_env`](#dybatphomock_env)**
 
 - Variables that were unset before the mock are unset again on restore, rather than being left behind as empty strings.
 
-### `dybatpho::mock_command_script`
+**[`dybatpho::mock_command_script`](#dybatphomock_command_script)**
 
 - The mock is a real executable on `PATH`, so it also intercepts `command <name>`, which is how the network module invokes `curl`.
 
-### `dybatpho::assert_mock_called`
+**[`dybatpho::assert_mock_called`](#dybatphoassert_mock_called)**
 
 - Arguments are matched on whole-argument boundaries, so a fragment of an argument never counts as a match.
 
-### `dybatpho::mock_http`
+**[`dybatpho::mock_http`](#dybatphomock_http)**
 
 - The mock replaces `curl` itself, so it also covers `command curl` calls made by `dybatpho::curl_do` and every helper built on it.
 - Following the repository's curl-stubbing convention, the mock always exits `0` and reports the status through `-w '%{http_code}'`, which is what the network module reads to decide success, retry, and its own exit code.
 
-### `dybatpho::mock_time`
+**[`dybatpho::mock_time`](#dybatphomock_time)**
 
 - The clock stays still until it is moved, so code that waits for `date` to move waits forever. Move the clock with `dybatpho::mock_time_advance`, or unfreeze it around such a call. Lock waits are not affected: they are timed by Bash's own clock.
 
-### `dybatpho::mock_time_advance`
+**[`dybatpho::mock_time_advance`](#dybatphomock_time_advance)**
 
 - The new moment is seen by every process at once, including one already running in the background, because the mock reads it on every call.
 
-### `dybatpho::fixture_dir`
+**[`dybatpho::fixture_dir`](#dybatphofixture_dir)**
 
 - Cleanup is registered through `dybatpho::cleanup_file_on_exit`, so the fixture is removed by an `EXIT`/`HUP`/`INT`/`TERM` trap even when the script fails.
 
-### `dybatpho::fixture_file`
+**[`dybatpho::fixture_file`](#dybatphofixture_file)**
 
 - When reading content from stdin, redirect into the call (`< file` or `<<<`) instead of piping into it. A pipeline runs the helper in a subshell, so the assigned variable would not survive in the caller.
 
-### `dybatpho::unmock_all`
+**[`dybatpho::unmock_all`](#dybatphounmock_all)**
 
 - Fixtures and mocks are already removed by their exit traps; call this to reset state between test cases that share one shell.
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::assert_file`
@@ -218,7 +223,6 @@ Assert that a path exists and is a regular file.
 
 - `0`: The path is a regular file
 - `1`: The path is missing or is not a regular file
-
 
 ---
 
@@ -238,7 +242,6 @@ Assert that a path exists and is a directory.
 - `0`: The path is a directory
 - `1`: The path is missing or is not a directory
 
-
 ---
 
 ### `dybatpho::assert_symlink`
@@ -257,7 +260,6 @@ Assert that a path is a symbolic link, optionally pointing at an expected target
 - `0`: The path is a symlink and matches the expected target when one is given
 - `1`: The path is not a symlink, or points somewhere else
 
-
 ---
 
 ### `dybatpho::assert_path_absent`
@@ -274,7 +276,6 @@ Assert that nothing exists at a path.
 
 - `0`: Nothing exists at the path
 - `1`: A file, directory, or link exists at the path
-
 
 ---
 
@@ -294,7 +295,6 @@ Assert that a file contains an exact substring.
 - `0`: The substring was found
 - `1`: The file is unreadable or the substring is absent
 
-
 ---
 
 ### `dybatpho::assert_file_empty`
@@ -311,7 +311,6 @@ Assert that a file exists and holds no content.
 
 - `0`: The file exists and is empty
 - `1`: The file is missing or has content
-
 
 ---
 
@@ -340,7 +339,6 @@ dybatpho::assert_file_mode "${HOME}/.netrc" 600
 - `0`: The permissions match
 - `1`: The path is missing or its permissions differ
 
-
 ---
 
 ### `dybatpho::assert_json_valid`
@@ -361,7 +359,6 @@ Assert that a document is parsable JSON.
 
 - `0`: The document parses as JSON
 - `1`: The document is missing or malformed
-
 
 ---
 
@@ -393,7 +390,6 @@ dybatpho::assert_json_query package.json '.version' "1.4.2"
 - `0`: The query result matches
 - `1`: The query failed or returned a different value
 
-
 ---
 
 ### `dybatpho::assert_json_has`
@@ -416,7 +412,6 @@ Assert that a JSON filter matches something in the document.
 - `0`: The filter matched
 - `1`: The filter did not match
 
-
 ---
 
 ### `dybatpho::assert_yaml_valid`
@@ -437,7 +432,6 @@ Assert that a document is parsable YAML.
 
 - `0`: The document parses as YAML
 - `1`: The document is missing or malformed
-
 
 ---
 
@@ -462,7 +456,6 @@ Assert that a YAML expression prints an expected value.
 - `0`: The expression result matches
 - `1`: The expression failed or returned a different value
 
-
 ---
 
 ### `dybatpho::assert_yaml_has`
@@ -484,7 +477,6 @@ Assert that a YAML expression matches something in the document.
 
 - `0`: The expression matched
 - `1`: The expression did not match
-
 
 ---
 
@@ -518,7 +510,6 @@ dybatpho::snapshot_scrub '/tmp/[A-Za-z0-9_]*' '<TMPDIR>'
 
 - `1`: The substitution is not one `sed` can run; nothing is registered
 
-
 ---
 
 ### `dybatpho::snapshot_scrub_reset`
@@ -530,7 +521,6 @@ _Function has no arguments._
 **🧩 Variable sets**
 
 - **`DYBATPHO_TEST_SNAPSHOT_SCRUBS`**: Emptied
-
 
 ---
 
@@ -573,7 +563,6 @@ dybatpho::assert_snapshot version-output "$(./mytool --version)"
 - `0`: The text matches, or the snapshot was created or updated
 - `1`: The text differs from the stored snapshot
 
-
 ---
 
 ### `dybatpho::assert_cli_snapshot`
@@ -609,7 +598,6 @@ dybatpho::assert_cli_snapshot deploy-help -- ./mytool deploy --help
 
 - `0`: The captured output matches the snapshot
 - `1`: The captured output differs
-
 
 ---
 
@@ -651,7 +639,6 @@ dybatpho::assert_exit_code 0 -- dybatpho::semver_valid 1.2.3
 
 - `0`: The command exited with the expected status
 - `1`: The command exited with any other status
-
 
 ---
 
@@ -695,7 +682,6 @@ dybatpho::assert_duration_under 200 -- ./mytool completions bash
 - `0`: The command succeeded and stayed under the budget
 - `1`: The command failed, or took at least the budget
 
-
 ---
 
 ### `dybatpho::benchmark`
@@ -734,7 +720,6 @@ dybatpho::benchmark parse-config 20 -- ./mytool config show
 - `0`: Every run succeeded
 - `1`: A run failed, with its output on stderr
 
-
 ---
 
 ### `dybatpho::mock_env`
@@ -762,7 +747,6 @@ dybatpho::mock_env DEPLOY_ENV=prod LOG_LEVEL=debug
 
 - `1`: An argument is not a valid `NAME=value` assignment
 
-
 ---
 
 ### `dybatpho::unmock_env`
@@ -774,7 +758,6 @@ _Function has no arguments._
 **🧩 Variable sets**
 
 - **`DYBATPHO_TEST_ENV_BACKUP`**: Emptied
-
 
 ---
 
@@ -804,7 +787,6 @@ dybatpho::mock_command_script kubectl 'printf "pod/api Running\n"; exit 0'
 
 - `1`: The command name is not a valid executable name
 
-
 ---
 
 ### `dybatpho::mock_command`
@@ -830,7 +812,6 @@ dybatpho::mock_command git 0 "main"
 
 - [dybatpho::mock_command_script](#dybatphomock_command_script)
 
-
 ---
 
 ### `dybatpho::mock_calls`
@@ -851,7 +832,6 @@ Print one line per recorded invocation of a mocked command.
 
 - `1`: The command was never mocked
 
-
 ---
 
 ### `dybatpho::mock_call_count`
@@ -867,7 +847,6 @@ Print how many times a mocked command was called.
 **📤 Output on stdout**
 
 - Call count, `0` when the mock was never invoked
-
 
 ---
 
@@ -894,7 +873,6 @@ dybatpho::assert_mock_called kubectl get pods
 - `0`: A matching call was recorded
 - `1`: The command was never called, or never with those arguments
 
-
 ---
 
 ### `dybatpho::unmock_command`
@@ -906,7 +884,6 @@ Remove one mocked command so the real command is used again.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Mocked command name |
-
 
 ---
 
@@ -938,7 +915,6 @@ dybatpho::mock_http 'api.example.test/status' 200 '{"ok":true}'
 
 - `1`: The status code is not a three-digit number
 
-
 ---
 
 ### `dybatpho::mock_http_calls`
@@ -954,7 +930,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `1`: No HTTP request was made through the mock
-
 
 ---
 
@@ -1000,7 +975,6 @@ _Function has no arguments._
 
 - [- `dybatpho::mock_http` - `dybatpho::mock_http_calls](#dybatphomock_http-dybatphomock_http_calls)
 
-
 ---
 
 ### `dybatpho::assert_http_called`
@@ -1017,7 +991,6 @@ Assert that a URL matching a pattern was requested through the HTTP mock.
 
 - `0`: A matching request was recorded
 - `1`: No matching request was recorded
-
 
 ---
 
@@ -1074,7 +1047,6 @@ dybatpho::unmock_time
 
 - [- `dybatpho::mock_time_advance` - `dybatpho::unmock_time](#dybatphomock_time_advance-dybatphounmock_time)
 
-
 ---
 
 ### `dybatpho::mock_time_advance`
@@ -1101,7 +1073,6 @@ dybatpho::mock_time_advance -60    # one minute back
 - `0`: The clock moved
 - `1`: The amount is not a whole number, or the clock is not frozen
 
-
 ---
 
 ### `dybatpho::unmock_time`
@@ -1113,7 +1084,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always, including when the clock was not frozen
-
 
 ---
 
@@ -1166,7 +1136,6 @@ dybatpho::unmock_tty
 
 - [dybatpho::unmock_tty](#dybatphounmock_tty)
 
-
 ---
 
 ### `dybatpho::unmock_tty`
@@ -1182,7 +1151,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always, including when no stream was mocked
-
 
 ---
 
@@ -1207,7 +1175,6 @@ printf 'data\n' > "${workdir}/input.txt"
 **🔗 See also**
 
 - [dybatpho::create_temp](#dybatphocreate_temp)
-
 
 ---
 
@@ -1234,7 +1201,6 @@ dybatpho::assert_json_query "${settings}" '.mode' dev
 **🔗 See also**
 
 - [dybatpho::create_temp](#dybatphocreate_temp)
-
 
 ---
 

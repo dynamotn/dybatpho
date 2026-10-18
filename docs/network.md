@@ -7,6 +7,7 @@ Utilities for network
 > Jump to: [Overview](#overview) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains functions to work with network connection, downloads,
@@ -88,41 +89,43 @@ the resolver does.
 - [`dybatpho::wait_port`](#dybatphowait_port) — Wait until a TCP port accepts a connection. This is the wait a script does after starting a service and before using it, written once. Each attempt is given no more time than the wait has left, so the whole call keeps to its budget rather than overrunning it by the length of one connection attempt.
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::curl_do`
+**[`dybatpho::curl_do`](#dybatphocurl_do)**
 
 - The request body is written to the provided output file, or `/dev/null` when omitted
 
-### `dybatpho::curl_download`
+**[`dybatpho::curl_download`](#dybatphocurl_download)**
 
 - The destination directory is created automatically before downloading
 
-### `dybatpho::curl_upload`
+**[`dybatpho::curl_upload`](#dybatphocurl_upload)**
 
 - The request method defaults to `POST`; pass `--request PUT` (or similar) afterwards to override it
 
-### `dybatpho::curl_resume_download`
+**[`dybatpho::curl_resume_download`](#dybatphocurl_resume_download)**
 
 - A partially downloaded destination file is resumed instead of restarted
 
-### `dybatpho::curl_request`
+**[`dybatpho::curl_request`](#dybatphocurl_request)**
 
 - Response headers aren't captured while `DRY_RUN` is enabled
 
-### `dybatpho::curl_timeout`
+**[`dybatpho::curl_timeout`](#dybatphocurl_timeout)**
 
 - Overrides apply only for the duration of this call; global `DYBATPHO_CURL_*` timeouts are unaffected
 
-### `dybatpho::circuit_breaker`
+**[`dybatpho::circuit_breaker`](#dybatphocircuit_breaker)**
 
 - The command is executed with `eval`, so pass it as one shell command string
 
-### `dybatpho::curl_paginate`
+**[`dybatpho::curl_paginate`](#dybatphocurl_paginate)**
 
 - An authenticated API takes its token through `DYBATPHO_CURL_SECRET_HEADERS`, which keeps it off `curl`'s command line for every page
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::curl_do`
@@ -164,7 +167,6 @@ dybatpho::curl_do https://example.com /tmp/1 --compressed
 - `5`: First digit of HTTP error code 5xx
 - `127`: Curl isn't installed
 
-
 ---
 
 ### `dybatpho::curl_download`
@@ -186,7 +188,6 @@ Download file
 **🔗 See also**
 
 - [dybatpho::curl_do](#dybatphocurl_do)
-
 
 ---
 
@@ -210,7 +211,6 @@ Transfer JSON data with URL by curl.
 
 - [dybatpho::curl_do](#dybatphocurl_do)
 
-
 ---
 
 ### `dybatpho::curl_head`
@@ -232,7 +232,6 @@ Fetch only HTTP headers for a URL by curl.
 **🔗 See also**
 
 - [dybatpho::curl_do](#dybatphocurl_do)
-
 
 ---
 
@@ -264,7 +263,6 @@ dybatpho::curl_upload https://example.com/upload /tmp/resp.json report=@/tmp/rep
 
 - [dybatpho::curl_do](#dybatphocurl_do)
 
-
 ---
 
 ### `dybatpho::verify_checksum`
@@ -282,7 +280,6 @@ Verify a downloaded file against an expected checksum.
 
 - `7`: Checksum mismatch
 - `8`: Unsupported algorithm, invalid spec, or the checksum tool isn't installed
-
 
 ---
 
@@ -318,7 +315,6 @@ dybatpho::curl_resume_download https://example.com/big.iso /tmp/big.iso sha256:3
 - [dybatpho::curl_download](#dybatphocurl_download)
 - [dybatpho::verify_checksum](#dybatphoverify_checksum)
 
-
 ---
 
 ### `dybatpho::curl_parse_response`
@@ -342,7 +338,6 @@ Parse a raw curl header dump (and optional body file) into normalized response s
 
 - `1`: No status line was found in the header file
 
-
 ---
 
 ### `dybatpho::curl_response_header`
@@ -363,7 +358,6 @@ Print a normalized response header captured by `dybatpho::curl_parse_response`.
 **🚦 Exit codes**
 
 - `1`: Header is missing and no default was supplied
-
 
 ---
 
@@ -399,7 +393,6 @@ dybatpho::curl_response_header content-type
 - [dybatpho::curl_do](#dybatphocurl_do)
 - [dybatpho::curl_parse_response](#dybatphocurl_parse_response)
 
-
 ---
 
 ### `dybatpho::curl_timeout`
@@ -428,7 +421,6 @@ dybatpho::curl_timeout https://example.com /tmp/out "" 5 --header "X-Test: 1"
 
 - [dybatpho::curl_do](#dybatphocurl_do)
 
-
 ---
 
 ### `dybatpho::circuit_state`
@@ -445,7 +437,6 @@ Report whether a circuit breaker key is currently open, half-open, or closed.
 
 - `open`, `half-open`, or `closed`
 
-
 ---
 
 ### `dybatpho::circuit_reset`
@@ -457,7 +448,6 @@ Reset a circuit breaker key back to the closed state.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Circuit key |
-
 
 ---
 
@@ -496,7 +486,6 @@ dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example
 - `9`: The circuit is open; the command was not attempted
 - `other`: The command's own exit code, while the circuit is closed or half-open
 
-
 ---
 
 ### `dybatpho::rate_limit_remaining`
@@ -525,7 +514,6 @@ dybatpho::rate_limit_remaining api.example.com 10/60
 
 - [dybatpho::rate_limit](#dybatphorate_limit)
 
-
 ---
 
 ### `dybatpho::rate_limit_reset`
@@ -541,7 +529,6 @@ Forget every call recorded against a rate limit key.
 **🔗 See also**
 
 - [dybatpho::rate_limit](#dybatphorate_limit)
-
 
 ---
 
@@ -604,7 +591,6 @@ dybatpho::rate_limit api.example.com 10/60   # take a slot, run nothing
 
 - [dybatpho::circuit_breaker](#dybatphocircuit_breaker)
 
-
 ---
 
 ### `dybatpho::curl_link`
@@ -647,7 +633,6 @@ next="$(dybatpho::curl_link next)" || echo "that was the last page"
 **🔗 See also**
 
 - [dybatpho::curl_paginate](#dybatphocurl_paginate)
-
 
 ---
 
@@ -706,7 +691,6 @@ dybatpho::curl_paginate "https://api.example.com/items?per_page=100" --header "A
 
 - [- `dybatpho::curl_link` - `dybatpho::rate_limit](#dybatphocurl_link-dybatphorate_limit)
 
-
 ---
 
 ### `dybatpho::curl_auth_bearer`
@@ -752,7 +736,6 @@ dybatpho::curl_auth_bearer https://api.example.com/v1/me "${API_TOKEN}" /tmp/me.
 **🔗 See also**
 
 - [dybatpho::curl_request](#dybatphocurl_request)
-
 
 ---
 
@@ -811,7 +794,6 @@ dybatpho::curl_graphql https://api.github.com/graphql \
 
 - [dybatpho::curl_request](#dybatphocurl_request)
 
-
 ---
 
 ### `dybatpho::url_parse`
@@ -866,7 +848,6 @@ printf '%s\n' "${DYBATPHO_URL[host]}"    # ::1
 
 - [- `dybatpho::url_part` - `dybatpho::url_decode](#dybatphourl_part-dybatphourl_decode)
 
-
 ---
 
 ### `dybatpho::url_part`
@@ -902,7 +883,6 @@ dybatpho::url_part port 443        # 443, the default, since none was given
 
 - [- `dybatpho::url_parse](#dybatphourl_parse)
 
-
 ---
 
 ### `dybatpho::is_ipv4`
@@ -928,7 +908,6 @@ dybatpho::is_ipv4 127.0.0.010     # no, a leading zero is ambiguous
 
 - `0`: The value is an IPv4 address
 - `1`: It is not
-
 
 ---
 
@@ -961,7 +940,6 @@ dybatpho::is_ipv6 2001:db8::1::2         # no, one `::` is all there is
 - `0`: The value is an IPv6 address
 - `1`: It is not
 
-
 ---
 
 ### `dybatpho::ip_version`
@@ -990,7 +968,6 @@ dybatpho::ip_version ::1           # 6
 
 - `1`: The value is not an IP address of either version
 
-
 ---
 
 ### `dybatpho::is_cidr`
@@ -1016,7 +993,6 @@ dybatpho::is_cidr 10.0.0.0/33       # no
 
 - `0`: The value is a CIDR block of either IP version
 - `1`: It is not
-
 
 ---
 
@@ -1048,7 +1024,6 @@ dybatpho::cidr_netmask 0     # 0.0.0.0
 **🚦 Exit codes**
 
 - `1`: Stop the script when the value is not an IPv4 prefix length
-
 
 ---
 
@@ -1082,7 +1057,6 @@ dybatpho::cidr_contains 0.0.0.0/0 203.0.113.1          # yes
 - `0`: The address is inside the block
 - `1`: It is not
 - `1`: Stop the script when the block or the address is malformed
-
 
 ---
 
@@ -1131,7 +1105,6 @@ dybatpho::port_open db.internal 5432 2
 **🔗 See also**
 
 - [- `dybatpho::wait_port](#dybatphowait_port)
-
 
 ---
 

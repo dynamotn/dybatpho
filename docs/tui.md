@@ -7,6 +7,7 @@ Interactive terminal widgets: spinners, progress bars, menus, and confirmations
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `cli.sh` turns a declarative spec into a parser, a help screen, and
@@ -66,6 +67,7 @@ pipeline never lands in its own output.
 - [`dybatpho::tui_confirm`](#dybatphotui_confirm) — Ask a yes/no question with the answer shown as a choice rather than as a `[y/N]` hint. Off a terminal this is `dybatpho::confirm`: the same `DYBATPHO_FORCE` override, the same refusal to guess in an unattended shell, the same exit codes. On a terminal the two answers are drawn side by side with the default highlighted, `←`/`→` move between them, and `y`/`n` still answer directly.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/tui_ops.sh](../example/tui_ops.sh)
@@ -73,36 +75,38 @@ pipeline never lands in its own output.
 - [src/safety.sh](../src/safety.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - `DYBATPHO_TUI=never` forces the fallback rendering everywhere, which is what a CI job wants; `DYBATPHO_TUI=always` forces the drawn one, which is what a demo recording wants
 - A menu asks through `dybatpho::prompt` when it cannot draw, so feeding `2` to the script answers it the same way pressing `enter` on the second entry does -- with a redirect rather than a pipe, which would run the call in a subshell and lose the answer with it
 
-### `dybatpho::tui_bar`
+**[`dybatpho::tui_bar`](#dybatphotui_bar)**
 
 - The bar carries no carriage return of its own, so it composes with a label and can be written to a file as readily as to a terminal
 
-### `dybatpho::tui_spinner_start`
+**[`dybatpho::tui_spinner_start`](#dybatphotui_spinner_start)**
 
 - Registered secrets are masked before the message is drawn, exactly as the logging helpers mask them
 
-### `dybatpho::tui_spinner_stop`
+**[`dybatpho::tui_spinner_stop`](#dybatphotui_spinner_stop)**
 
 - `dybatpho::tui_spinner_stop "$?" "Done"` reports the work and keeps its exit status
 
-### `dybatpho::tui_menu`
+**[`dybatpho::tui_menu`](#dybatphotui_menu)**
 
 - Arrow keys and `j`/`k` both move, `enter` selects, and `esc` or `q` cancels
 
-### `dybatpho::tui_multi_menu`
+**[`dybatpho::tui_multi_menu`](#dybatphotui_multi_menu)**
 
 - `space` toggles an entry, `a` selects every entry and `n` clears them all; the numbered fallback takes the same list as `1,3`
 
-### `dybatpho::tui_confirm`
+**[`dybatpho::tui_confirm`](#dybatphotui_confirm)**
 
 - The question is the whole contract: a `--force` flag bound to `DYBATPHO_FORCE` makes every one of them answer yes at once
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::tui_supported`
@@ -134,7 +138,6 @@ _Function has no arguments._
 
 - `0`: Widgets draw in place
 - `1`: Widgets fall back to prompts and log lines
-
 
 ---
 
@@ -177,7 +180,6 @@ dybatpho::tui_bar 1 3 12    # [████░░░░░░░░]  33%
 **🚦 Exit codes**
 
 - `1`: An argument is not a whole number, or is out of range
-
 
 ---
 
@@ -224,7 +226,6 @@ dybatpho::tui_spinner_stop 0 "Resolved ${#modules[@]} modules"
 
 - `1`: A spinner is already running
 
-
 ---
 
 ### `dybatpho::tui_spinner_message`
@@ -251,7 +252,6 @@ dybatpho::tui_spinner_message "Uploading layer 3 of 7"
 **🚦 Exit codes**
 
 - `1`: A terminal is attached but no spinner is running
-
 
 ---
 
@@ -285,7 +285,6 @@ dybatpho::tui_spinner_stop 1 "Upload failed"
 **🚦 Exit codes**
 
 - `The`: status passed in, so the call can both report and propagate an outcome
-
 
 ---
 
@@ -325,7 +324,6 @@ dybatpho::tui_progress_stop "Uploaded ${#files[@]} files"
 
 - `1`: The total is not a whole number of at least 1
 
-
 ---
 
 ### `dybatpho::tui_progress_update`
@@ -351,7 +349,6 @@ Move the progress bar to an absolute position.
 
 - `1`: No progress bar is running, or the position is not a whole number
 
-
 ---
 
 ### `dybatpho::tui_progress_step`
@@ -372,7 +369,6 @@ Advance the progress bar by a number of units.
 **🚦 Exit codes**
 
 - `1`: No progress bar is running, or the increment is not a whole number
-
 
 ---
 
@@ -402,7 +398,6 @@ as a hang rather than as a finish.
 **🚦 Exit codes**
 
 - `0`: Even when no progress bar was running, so it is safe to call from a trap
-
 
 ---
 
@@ -456,7 +451,6 @@ dybatpho::info "Deploying to ${environment} (entry ${DYBATPHO_TUI_INDEX})"
 
 - `1`: The menu was cancelled, or nothing could be read and no default was set
 
-
 ---
 
 ### `dybatpho::tui_multi_menu`
@@ -507,7 +501,6 @@ dybatpho::info "Deploying ${#components[@]} components"
 **🚦 Exit codes**
 
 - `1`: The menu was cancelled, or nothing could be read and no default was set
-
 
 ---
 

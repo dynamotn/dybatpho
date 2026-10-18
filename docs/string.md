@@ -7,6 +7,7 @@ Utilities for working with string
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for trimming, splitting, matching, replacing,
@@ -56,11 +57,13 @@ to be written into shell code that will be evaluated later.
 - [`dybatpho::string_closest`](#dybatphostring_closest) — Find the candidates closest to a string by edit distance. Every candidate within the maximum distance is scored, and the named array receives those that share the smallest score, in the order they were given and without duplicates. An exact match is distance `0`, so it wins on its own. Empty candidates are skipped. The comparison is case-sensitive, as `dybatpho::string_distance` is. This is the building block behind "did you mean" messages: pass the word a user typed and the words that would have been accepted.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/string_ops.sh](../example/string_ops.sh)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::trim`
@@ -76,7 +79,6 @@ Trim leading and trailing whitespace from a string.
 **📤 Output on stdout**
 
 - Trimmed string
-
 
 ---
 
@@ -103,7 +105,6 @@ themselves, because only the caller knows whether an empty field is data.
 
 - Print each split part on its own line
 
-
 ---
 
 ### `dybatpho::string_starts_with`
@@ -121,7 +122,6 @@ Return success when a string starts with the given prefix.
 
 - `0`: The input starts with the prefix
 - `1`: The input does not start with the prefix
-
 
 ---
 
@@ -141,7 +141,6 @@ Return success when a string ends with the given suffix.
 - `0`: The input ends with the suffix
 - `1`: The input does not end with the suffix
 
-
 ---
 
 ### `dybatpho::string_contains`
@@ -159,7 +158,6 @@ Return success when a string contains the given substring.
 
 - `0`: The input contains the substring
 - `1`: The input does not contain the substring
-
 
 ---
 
@@ -204,7 +202,6 @@ fi
 - `1`: The string does not match
 - `2`: The pattern is not a valid regular expression
 
-
 ---
 
 ### `dybatpho::string_replace`
@@ -223,7 +220,6 @@ Replace all exact substring matches in a string.
 
 - String with all matches replaced
 
-
 ---
 
 ### `dybatpho::string_trim_prefix`
@@ -241,7 +237,6 @@ Remove an exact prefix from a string when it matches.
 
 - String without the matching prefix, or the original string
 
-
 ---
 
 ### `dybatpho::string_trim_suffix`
@@ -258,7 +253,6 @@ Remove an exact suffix from a string when it matches.
 **📤 Output on stdout**
 
 - String without the matching suffix, or the original string
-
 
 ---
 
@@ -292,7 +286,6 @@ dybatpho::string_slugify "Crème brûlée 2024" # creme-brulee-2024
 
 - Slugified string
 
-
 ---
 
 ### `dybatpho::string_is_blank`
@@ -310,7 +303,6 @@ Return success when a string is empty or contains only whitespace.
 - `0`: The input is blank
 - `1`: The input contains non-whitespace characters
 
-
 ---
 
 ### `dybatpho::string_trim_chars`
@@ -327,7 +319,6 @@ Trim a set of exact characters from both ends of a string.
 **📤 Output on stdout**
 
 - Trimmed string
-
 
 ---
 
@@ -347,7 +338,6 @@ Truncate a string to a maximum width and append a suffix when needed.
 
 - Truncated string
 
-
 ---
 
 ### `dybatpho::string_lines`
@@ -363,7 +353,6 @@ Count the number of logical lines in a string.
 **📤 Output on stdout**
 
 - Number of lines
-
 
 ---
 
@@ -383,7 +372,6 @@ Wrap a string to a maximum width, normalizing whitespace between words.
 
 - Wrapped lines
 
-
 ---
 
 ### `dybatpho::string_repeat`
@@ -400,7 +388,6 @@ Repeat a string a fixed number of times.
 **📤 Output on stdout**
 
 - Repeated string
-
 
 ---
 
@@ -420,7 +407,6 @@ Pad a string on the right to a minimum width.
 
 - Padded string
 
-
 ---
 
 ### `dybatpho::url_encode`
@@ -436,7 +422,6 @@ URL-encode a string.
 **📤 Output on stdout**
 
 - Encoded string
-
 
 ---
 
@@ -454,7 +439,6 @@ URL-decode a string.
 
 - Decoded string
 
-
 ---
 
 ### `dybatpho::lower`
@@ -471,7 +455,6 @@ Convert a string to lowercase.
 
 - Converted string
 
-
 ---
 
 ### `dybatpho::upper`
@@ -487,7 +470,6 @@ Convert a string to uppercase.
 **📤 Output on stdout**
 
 - Converted string
-
 
 ---
 
@@ -516,7 +498,6 @@ dybatpho::string_to_snake "deploy-to-prod"   # deploy_to_prod
 **🔗 See also**
 
 - [- `dybatpho::string_to_kebab` - `dybatpho::string_slugify](#dybatphostring_to_kebab-dybatphostring_slugify)
-
 
 ---
 
@@ -549,7 +530,6 @@ dybatpho::string_to_kebab "deploy_to_prod"   # deploy-to-prod
 
 - [- `dybatpho::string_to_snake` - `dybatpho::string_slugify](#dybatphostring_to_snake-dybatphostring_slugify)
 
-
 ---
 
 ### `dybatpho::string_to_camel`
@@ -578,7 +558,6 @@ dybatpho::string_to_camel "XMLHttpRequest"   # xmlHttpRequest
 
 - [- `dybatpho::string_to_pascal](#dybatphostring_to_pascal)
 
-
 ---
 
 ### `dybatpho::string_to_pascal`
@@ -605,7 +584,6 @@ dybatpho::string_to_pascal "deploy_to_prod"   # DeployToProd
 **🔗 See also**
 
 - [- `dybatpho::string_to_camel](#dybatphostring_to_camel)
-
 
 ---
 
@@ -638,7 +616,6 @@ printf 'ssh host %s\n' "$(dybatpho::string_quote "${remote_command}")"
 **📤 Output on stdout**
 
 - The value quoted for the shell
-
 
 ---
 
@@ -677,7 +654,6 @@ dybatpho::string_distance color colour     # 1
 **🔗 See also**
 
 - [- `dybatpho::string_closest](#dybatphostring_closest)
-
 
 ---
 

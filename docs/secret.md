@@ -7,6 +7,7 @@ Utilities for handling secrets safely
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module reads secrets from files, environment variables, or stdin,
@@ -39,71 +40,71 @@ temporary file unless explicitly requested.
 - [`dybatpho::secret_read`](#dybatphosecret_read) — Read a secret from a source specification.
 - [`dybatpho::secret_write_file`](#dybatphosecret_write_file) — Write a secret to a file that only its owner can read.
 - [`dybatpho::secret_with_file`](#dybatphosecret_with_file) — Run a command that needs the secret as a file, without writing it to disk.
-- [`exec`](#exec) — 
-- [`exec`](#exec) — 
-- [`exec`](#exec) — 
 - [`dybatpho::secret_no_history`](#dybatphosecret_no_history) — Stop the current shell from recording commands into a history file.
 - [`dybatpho::secret_wipe`](#dybatphosecret_wipe) — Overwrite and unset variables that hold secrets.
 - [`dybatpho::secret_shred`](#dybatphosecret_shred) — Remove files containing secrets, overwriting their content when possible.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/secret_ops.sh](../example/secret_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::secret_register`
+**[`dybatpho::secret_register`](#dybatphosecret_register)**
 
 - Multiline secrets also register each of their lines so line-based streams stay masked
 
-### `dybatpho::secret_forget`
+**[`dybatpho::secret_forget`](#dybatphosecret_forget)**
 
 - Registered values are process-local; this only clears the current shell
 
-### `dybatpho::secret_mask`
+**[`dybatpho::secret_mask`](#dybatphosecret_mask)**
 
 - Stdin is processed line by line, so register multiline secrets before streaming
 - Registered secrets stay in the current process, so run this in the shell that registered them
 
-### `dybatpho::secret_mask_run`
+**[`dybatpho::secret_mask_run`](#dybatphosecret_mask_run)**
 
 - Output streams are merged so a secret split across both streams can't leak unmasked
 
-### `dybatpho::secret_from_file`
+**[`dybatpho::secret_from_file`](#dybatphosecret_from_file)**
 
 - Permissions are validated with `dybatpho::secret_check_permission` before the file is read
 
-### `dybatpho::secret_from_env`
+**[`dybatpho::secret_from_env`](#dybatphosecret_from_env)**
 
 - The source variable is unset by default so the secret isn't inherited by child processes
 
-### `dybatpho::secret_from_stdin`
+**[`dybatpho::secret_from_stdin`](#dybatphosecret_from_stdin)**
 
 - Reads a single line; use `dybatpho::secret_from_file` for multiline material such as private keys
 
-### `dybatpho::secret_write_file`
+**[`dybatpho::secret_write_file`](#dybatphosecret_write_file)**
 
 - The file is created with mode 600 through a private temporary file and moved into place atomically
 
-### `dybatpho::secret_with_file`
+**[`dybatpho::secret_with_file`](#dybatphosecret_with_file)**
 
 - The secret is exposed through `/dev/fd`, so it never reaches the filesystem on supported systems
 
-### `dybatpho::secret_no_history`
+**[`dybatpho::secret_no_history`](#dybatphosecret_no_history)**
 
 - Call this before any command that receives a secret on its command line
 
-### `dybatpho::secret_wipe`
+**[`dybatpho::secret_wipe`](#dybatphosecret_wipe)**
 
 - Overwriting is best effort because Bash may keep copies of a string; masking stays active after a wipe
 
-### `dybatpho::secret_shred`
+**[`dybatpho::secret_shred`](#dybatphosecret_shred)**
 
 - Overwriting is skipped on copy-on-write or journaling filesystems that keep old blocks
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::secret_register`
@@ -130,7 +131,6 @@ dybatpho::error "request failed with ${TOKEN}" # logs `request failed with ***`
 | --- | --- | --- |
 | **`DYBATPHO_SECRET_MIN_LENGTH`** | number | Values shorter than this are skipped to avoid redacting unrelated text |
 
-
 ---
 
 ### `dybatpho::secret_forget`
@@ -138,7 +138,6 @@ dybatpho::error "request failed with ${TOKEN}" # logs `request failed with ***`
 Forget every registered secret so masking stops.
 
 _Function has no arguments._
-
 
 ---
 
@@ -163,7 +162,6 @@ dybatpho::secret_mask "authorization: ${TOKEN}"
 **📤 Output on stdout**
 
 - Input text with every registered secret replaced by the placeholder
-
 
 ---
 
@@ -192,7 +190,6 @@ dybatpho::secret_mask_run curl -H "Authorization: Bearer ${TOKEN}" "${url}"
 
 - `*`: Exit code of the command
 
-
 ---
 
 ### `dybatpho::secret_hint`
@@ -209,7 +206,6 @@ Print a non-reversible hint for a secret, revealing only its last characters.
 **📤 Output on stdout**
 
 - Placeholder followed by the revealed suffix
-
 
 ---
 
@@ -242,7 +238,6 @@ dybatpho::secret_check_permission ~/.config/app/token 600
 - `0`: The file exists and its permissions are acceptable
 - `1`: The file is missing, unreadable, or too permissive under strict mode
 
-
 ---
 
 ### `dybatpho::secret_from_file`
@@ -271,7 +266,6 @@ dybatpho::secret_from_file TOKEN ~/.config/app/token
 **🚦 Exit codes**
 
 - `1`: The file is missing, empty, or has unsafe permissions
-
 
 ---
 
@@ -302,7 +296,6 @@ dybatpho::secret_from_env TOKEN APP_TOKEN
 **🚦 Exit codes**
 
 - `1`: The environment variable is unset or empty
-
 
 ---
 
@@ -337,7 +330,6 @@ dybatpho::secret_from_stdin TOKEN "API token: "
 
 - `1`: No secret is provided
 
-
 ---
 
 ### `dybatpho::secret_read`
@@ -370,7 +362,6 @@ dybatpho::secret_read TOKEN - "API token: "
 
 - `1`: The source is unsupported or the secret can't be read
 
-
 ---
 
 ### `dybatpho::secret_write_file`
@@ -394,7 +385,6 @@ dybatpho::secret_write_file "${HOME}/.config/app/token" TOKEN
 **🚦 Exit codes**
 
 - `1`: The destination directory is missing or the write fails
-
 
 ---
 
@@ -420,25 +410,6 @@ dybatpho::secret_with_file TOKEN gpg --passphrase-file '{}' --decrypt archive.gp
 
 - `*`: Exit code of the command
 
-
----
-
-### `exec`
-
-
-
----
-
-### `exec`
-
-
-
----
-
-### `exec`
-
-
-
 ---
 
 ### `dybatpho::secret_no_history`
@@ -453,7 +424,6 @@ _Function has no arguments._
 | --- | --- | --- |
 | **`DYBATPHO_REPL_HISTORY_FILE`** | string | Redirected to `/dev/null` so breakpoints don't persist secrets |
 
-
 ---
 
 ### `dybatpho::secret_wipe`
@@ -465,7 +435,6 @@ Overwrite and unset variables that hold secrets.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$@` | string | Variable names |
-
 
 ---
 

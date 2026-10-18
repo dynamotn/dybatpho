@@ -7,6 +7,7 @@ Utilities for running work concurrently with a bounded worker pool
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module runs a list of jobs several at a time and reports what each one
@@ -42,24 +43,27 @@ the caller has defined without exporting anything.
 - [`dybatpho::parallel_failed`](#dybatphoparallel_failed) — Print how many jobs of the last run failed. A job that fail-fast prevented from starting, or ended while it ran, is not counted: it was stopped because another job failed, not because it did.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/parallel_ops.sh](../example/parallel_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::parallel_map`
+**[`dybatpho::parallel_map`](#dybatphoparallel_map)**
 
 - A function defined by the caller works as the command, because each job runs in a subshell of the calling shell
 - The per-job exit codes are kept in the calling shell, so a call made inside `$(...)` or a pipeline reports its own output but leaves `dybatpho::parallel_status` unchanged
 
-### `dybatpho::parallel_run`
+**[`dybatpho::parallel_run`](#dybatphoparallel_run)**
 
 - Each string is evaluated as a shell command, so quote anything inside it that must survive that second round of parsing
 - The per-job exit codes are kept in the calling shell, so a call made inside `$(...)` or a pipeline reports its own output but leaves `dybatpho::parallel_status` unchanged
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::parallel_map`
@@ -146,7 +150,6 @@ dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
 - `0`: Every job succeeded
 - `1`: At least one job failed
 
-
 ---
 
 ### `dybatpho::parallel_run`
@@ -208,7 +211,6 @@ dybatpho::parallel_run 3 \
 - `0`: Every job succeeded
 - `1`: At least one job failed
 
-
 ---
 
 ### `dybatpho::parallel_status`
@@ -240,7 +242,6 @@ done
 
 - `1`: There is no job with that index
 
-
 ---
 
 ### `dybatpho::parallel_count`
@@ -252,7 +253,6 @@ _Function has no arguments._
 **📤 Output on stdout**
 
 - Job count
-
 
 ---
 

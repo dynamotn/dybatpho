@@ -7,6 +7,7 @@ A durable job queue backed by the filesystem
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 `parallel.sh` runs a bounded worker pool over a job list that has to be
@@ -56,17 +57,20 @@ of every waiting job of a lower priority, and one pushed with `--delay` or
 - [`dybatpho::queue_work`](#dybatphoqueue_work) — Run a worker over a queue: claim each job that is due, hand its payload to a handler, and settle the job by how the handler exited. A handler that succeeds completes its job. One that fails has the job requeued, held back by a backoff that doubles with every attempt, until the retry budget is spent and the job is filed under dead letters instead. The handler runs in a subshell, so one that calls `exit` or `dybatpho::die` fails its own job rather than ending the worker. Without `--poll` the worker returns as soon as no job is due, which drains a queue and stops. With it, the worker sleeps that long whenever nothing is due and looks again, for as long as `--idle` allows or, without it, until `--max-jobs` is reached. Several workers may run over one queue at once: each claim is made under the queue's lock. A worker killed in the middle of a job leaves that job in `claimed`, where `dybatpho::queue_list` shows it and `dybatpho::queue_requeue` puts it back.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/queue_ops.sh](../example/queue_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
 - A payload is text, and may be anything including newlines; encode a structured payload with `json.sh` before pushing it and decode it after
 - A bare queue name lives under `DYBATPHO_QUEUE_DIR`; a name containing a slash is used as the directory itself
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::queue_push`
@@ -112,7 +116,6 @@ dybatpho::queue_push --delay 15m deploys "warm caches"
 - `0`: The job was added
 - `1`: The queue lock could not be taken; stop the script on an invalid option
 
-
 ---
 
 ### `dybatpho::queue_pop`
@@ -152,7 +155,6 @@ done
 - `0`: A job was claimed
 - `1`: No job is due, or the queue lock could not be taken
 
-
 ---
 
 ### `dybatpho::queue_peek`
@@ -185,7 +187,6 @@ dybatpho::queue_peek deploys
 - `0`: A job was read
 - `1`: No job is due
 
-
 ---
 
 ### `dybatpho::queue_len`
@@ -213,7 +214,6 @@ Count the jobs in one of a queue's states.
 
 - `0`: The count was printed
 - `1`: The state is not one this module keeps
-
 
 ---
 
@@ -243,7 +243,6 @@ dybatpho::queue_list deploys dead
 - `0`: The listing was printed, empty when there is nothing to list
 - `1`: The state is not one this module keeps
 
-
 ---
 
 ### `dybatpho::queue_complete`
@@ -267,7 +266,6 @@ dybatpho::queue_complete deploys "${id}"
 
 - `0`: The job was removed
 - `1`: No such job is claimed
-
 
 ---
 
@@ -311,7 +309,6 @@ dybatpho::queue_requeue --delay 30s deploys "${id}" 3
 - `0`: The job was requeued, or dead-lettered because its budget ran out
 - `1`: No such job is claimed, or the queue lock could not be taken
 
-
 ---
 
 ### `dybatpho::queue_dead_letter`
@@ -337,7 +334,6 @@ dybatpho::queue_dead_letter deploys "${id}"
 
 - `0`: The job was filed under dead letters
 - `1`: No such job is claimed
-
 
 ---
 
@@ -368,7 +364,6 @@ dybatpho::queue_read deploys "${id}" payload dead
 
 - `0`: The job was read
 - `1`: No job with that id is in the queue
-
 
 ---
 

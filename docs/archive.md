@@ -7,6 +7,7 @@ Utilities for creating, extracting, and listing archives
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for common archive workflows in shell scripts:
@@ -25,18 +26,21 @@ and `.zst`. Extraction also supports optional strip-components behavior.
 - [`dybatpho::archive_is_safe`](#dybatphoarchive_is_safe) — Return success when no archive entry escapes the extraction directory.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/archive_ops.sh](../example/archive_ops.sh)
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::archive_unsafe_entries`
+**[`dybatpho::archive_unsafe_entries`](#dybatphoarchive_unsafe_entries)**
 
 - Use `dybatpho::safe_extract` to validate and extract in one step; it lives in the `safety` module, which `archive` does not load
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::archive_create`
@@ -53,7 +57,6 @@ Create an archive from a file or directory.
 **📤 Output on stdout**
 
 - Command output from the selected archiver, if any
-
 
 ---
 
@@ -73,7 +76,6 @@ Extract an archive into a target directory.
 
 - Command output from the selected extractor, if any
 
-
 ---
 
 ### `dybatpho::archive_list`
@@ -89,7 +91,6 @@ List the contents of an archive without extracting it.
 **📤 Output on stdout**
 
 - One listed entry per line
-
 
 ---
 
@@ -118,7 +119,6 @@ so none can be vouched for.
 
 - `0`: The archive was listed; the unsafe entries, if any, are on stdout
 - `other`: The archive could not be listed
-
 
 ---
 

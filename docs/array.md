@@ -7,6 +7,7 @@ Utilities for working with array
 > Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 This module contains helpers for printing, reversing, deduplicating,
@@ -55,11 +56,13 @@ other core modules. `doctor` walks the module graph with the graph helpers.
 - [`dybatpho::array_closure`](#dybatphoarray_closure) — Collect everything reachable from some roots in a dependency graph, the roots included. This answers "what does this pull in", where `dybatpho::array_toposort` answers "in what order". The result is sorted, so it is a set rather than a walk: a caller that wants the order asks for the order.
 
 <a id="see-also"></a>
+
 ## 🔗 See also
 
 - [example/array_ops.sh](../example/array_ops.sh)
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::array_print`
@@ -75,7 +78,6 @@ Print each element of an array on its own line.
 **📤 Output on stdout**
 
 - Print array with each element separated by newline
-
 
 ---
 
@@ -93,7 +95,6 @@ Reverse an array in place.
 **📤 Output on stdout**
 
 - Print the reversed array if $2 is `--`
-
 
 ---
 
@@ -122,7 +123,6 @@ Empty elements are dropped, as before.
 
 - Print the deduplicated array if $2 is `--`
 
-
 ---
 
 ### `dybatpho::array_contains`
@@ -140,7 +140,6 @@ Return success when an array contains the given element.
 
 - `0`: The element exists in the array
 - `1`: The element does not exist in the array
-
 
 ---
 
@@ -164,7 +163,6 @@ Print the first index of an array element that matches exactly.
 - `0`: A matching element is found
 - `1`: No matching element is found
 
-
 ---
 
 ### `dybatpho::array_compact`
@@ -181,7 +179,6 @@ Remove empty-string elements from an array in place.
 **📤 Output on stdout**
 
 - Print the compacted array if $2 is `--`
-
 
 ---
 
@@ -201,7 +198,6 @@ Keep only array elements accepted by a predicate function.
 
 - Print the filtered array if $3 is `--`
 
-
 ---
 
 ### `dybatpho::array_map`
@@ -219,7 +215,6 @@ Transform each array element with a mapper function.
 **📤 Output on stdout**
 
 - Print the mapped array if $3 is `--`
-
 
 ---
 
@@ -243,7 +238,6 @@ Print the first array element accepted by a predicate function.
 - `0`: A matching element is found
 - `1`: No matching element is found
 
-
 ---
 
 ### `dybatpho::array_every`
@@ -261,7 +255,6 @@ Return success when every array element is accepted by a predicate function.
 
 - `0`: Every element matches, or the array is empty
 - `1`: At least one element does not match
-
 
 ---
 
@@ -281,7 +274,6 @@ Return success when at least one array element is accepted by a predicate functi
 - `0`: At least one element matches
 - `1`: No elements match
 
-
 ---
 
 ### `dybatpho::array_reject`
@@ -299,7 +291,6 @@ Keep only array elements rejected by a predicate function.
 **📤 Output on stdout**
 
 - Print the rejected array if $3 is `--`
-
 
 ---
 
@@ -322,7 +313,6 @@ Print the first element of an array.
 - `0`: The array contains at least one element
 - `1`: The array is empty
 
-
 ---
 
 ### `dybatpho::array_last`
@@ -344,7 +334,6 @@ Print the last element of an array.
 - `0`: The array contains at least one element
 - `1`: The array is empty
 
-
 ---
 
 ### `dybatpho::array_join`
@@ -361,7 +350,6 @@ Join array elements with a separator into one string.
 **📤 Output on stdout**
 
 - Print outputted string
-
 
 ---
 
@@ -421,7 +409,6 @@ dybatpho::array_sort sizes --numeric --reverse
 
 - [- `dybatpho::semver_sort](#dybatphosemver_sort)
 
-
 ---
 
 ### `dybatpho::array_slice`
@@ -458,7 +445,6 @@ dybatpho::array_slice items -2 --    # the last two
 
 - `1`: Stop the script when the start or the count is not a whole number
 
-
 ---
 
 ### `dybatpho::array_union`
@@ -491,7 +477,6 @@ dybatpho::array_union allowed extra --   # read write admin
 
 - Print the union if $3 is `--`
 
-
 ---
 
 ### `dybatpho::array_intersect`
@@ -520,7 +505,6 @@ dybatpho::array_intersect requested granted --   # read write
 **📤 Output on stdout**
 
 - Print the intersection if $3 is `--`
-
 
 ---
 
@@ -552,7 +536,6 @@ dybatpho::array_difference wanted granted --   # read admin
 
 - Print the difference if $3 is `--`
 
-
 ---
 
 ### `__dybatpho_array_graph_visit`
@@ -577,7 +560,6 @@ stays a local of the public function that owns it.
 
 - **`The`** (named): state, result and flag
 
-
 ---
 
 ### `__dybatpho_array_graph_roots_into`
@@ -592,7 +574,6 @@ array: the roots given, or every key of the graph in a stable order.
 | `$1` | string | Name of the array receiving the starting entries |
 | `$2` | string | Name of the associative array of edges |
 | `$@` | string | Roots, if any |
-
 
 ---
 
@@ -640,7 +621,6 @@ printf '%s\n' "${order[@]}"  # validate, config, cli
 
 - `0`: The graph was ordered and holds no cycle
 - `1`: The graph was ordered with a cycle broken
-
 
 ---
 

@@ -7,6 +7,7 @@ Utilities for loading configuration from files and environment variables.
 > Jump to: [Overview](#overview) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
+
 ## ✨ Overview
 
 Configuration files are loaded in the order provided, so later files
@@ -52,30 +53,32 @@ rather than as strings.
 - [`dybatpho::config_doc`](#dybatphoconfig_doc) — Render documentation for every declared configuration key.
 
 <a id="tips"></a>
+
 ## 💡 Tips
 
-### `dybatpho::config_load`
+**[`dybatpho::config_load`](#dybatphoconfig_load)**
 
 - Pass `--` before a file whose own name starts with `--`.
 
-### `dybatpho::config_env`
+**[`dybatpho::config_env`](#dybatphoconfig_env)**
 
 - Environment variables override values loaded from configuration files.
 
-### `dybatpho::config_save`
+**[`dybatpho::config_save`](#dybatphoconfig_save)**
 
 - Name the keys explicitly when `dybatpho::config_env` was used, so an unrelated environment variable is not persisted along with them.
 
-### `dybatpho::config_schema`
+**[`dybatpho::config_schema`](#dybatphoconfig_schema)**
 
 - Call `dybatpho::config_validate` after all files and environment overlays are loaded.
 - Declaring the same key twice replaces its previous rules instead of merging them.
 
-### `dybatpho::config_doc`
+**[`dybatpho::config_doc`](#dybatphoconfig_doc)**
 
 - Pipe the Markdown output into a `CONFIGURATION.md` file to keep docs in sync with the schema.
 
 <a id="reference"></a>
+
 ## 📚 Reference
 
 ### `dybatpho::config_load`
@@ -113,7 +116,6 @@ dybatpho::config_load --optional /etc/app.env "${HOME}/.config/app.env"
 **🚦 Exit codes**
 
 - `1`: A required file is missing, or a file has an unsupported format or invalid configuration
-
 
 ---
 
@@ -159,7 +161,6 @@ DYBATPHO_CONFIG_PROFILE=staging dybatpho::config_profile ./config.json
 
 - `1`: No profile is given, the profile name is invalid, or the base file is missing or unreadable
 
-
 ---
 
 ### `dybatpho::config_env`
@@ -171,7 +172,6 @@ Load environment variables after an optional prefix.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Optional prefix, such as `APP_` |
-
 
 ---
 
@@ -205,7 +205,6 @@ dybatpho::config_save ./config.yaml PORT
 
 - `1`: The key is invalid
 
-
 ---
 
 ### `dybatpho::config_get`
@@ -227,7 +226,6 @@ Print a configuration value.
 
 - `1`: Key is missing and no default was supplied
 
-
 ---
 
 ### `dybatpho::config_require`
@@ -244,7 +242,6 @@ Require configuration keys to be present.
 
 - `1`: At least one key is missing
 
-
 ---
 
 ### `dybatpho::config_export`
@@ -260,7 +257,6 @@ Export loaded values as shell variables.
 **🚦 Exit codes**
 
 - `1`: A key cannot be represented as a shell variable
-
 
 ---
 
@@ -308,7 +304,6 @@ dybatpho::config_save "${HOME}/.config/app.env"
 
 - `1`: A key is invalid or unset, the format is unsupported, or the write fails
 
-
 ---
 
 ### `dybatpho::config_schema`
@@ -332,7 +327,6 @@ Declare validation rules for a configuration key.
 
 - `1`: The key, type, or a rule is invalid
 
-
 ---
 
 ### `dybatpho::config_schema_reset`
@@ -345,7 +339,6 @@ _Function has no arguments._
 
 - **`DYBATPHO_CONFIG_SCHEMA`**: Emptied
 - **`DYBATPHO_CONFIG_SCHEMA_KEYS`**: Emptied
-
 
 ---
 
@@ -365,7 +358,6 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `1`: A required key is missing or a value violates its schema
-
 
 ---
 

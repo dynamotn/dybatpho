@@ -191,16 +191,18 @@ function dybatpho::agent_result {
   dybatpho::expect_args status -- "$@"
   shift
 
+  # Expanded with `+`: a bare `"${pairs[@]}"` of an empty array is an unbound
+  # variable to Bash 4.3 under `set -u`, so a result with no fields stopped it.
   local -a pairs=("$@")
   local field key value
-  for field in "${pairs[@]}"; do
+  for field in ${pairs[@]+"${pairs[@]}"}; do
     [[ "${field}" == *=* ]] \
       || dybatpho::die "dybatpho::agent_result: Expected key=value, got '${field}'"
   done
 
   if ! dybatpho::agent_detect; then
     printf 'status=%s' "${status}"
-    for field in "${pairs[@]}"; do
+    for field in ${pairs[@]+"${pairs[@]}"}; do
       printf ' %s' "${field}"
     done
     printf '\n'
@@ -208,7 +210,7 @@ function dybatpho::agent_result {
   fi
 
   local -a fields=(status "${status}")
-  for field in "${pairs[@]}"; do
+  for field in ${pairs[@]+"${pairs[@]}"}; do
     key="${field%%=*}"
     value="${field#*=}"
     fields+=("${key}" "${value}")

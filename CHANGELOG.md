@@ -389,6 +389,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::curl_paginate` follows a relative `next` link, and a GitLab
   `CI_JOB_TOKEN` is sent as `JOB-TOKEN` instead of `PRIVATE-TOKEN`.
 
+- **`agent` — `dybatpho::agent_result` with no fields works on Bash 4.3.**
+
 - **`process` — `$(dybatpho::run_with_timeout N fn)` returns when `fn` does.**
   The watchdog held the caller's output open, so a substitution or pipe could
   wait out the whole limit. A process that ignores SIGTERM after a timeout is

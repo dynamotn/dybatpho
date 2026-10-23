@@ -491,3 +491,16 @@ function _create_traversal_archive {
   run_traced --separate-stderr dybatpho::safe_system --force demo -- 'echo first; echo INJECTED-via-eval'
   refute_output --partial "INJECTED"
 }
+
+@test "dybatpho::safe_rm removes the path holding a newline, not the shorter one before it" {
+  # The path was cut at its first newline while being made absolute, so the
+  # removal went to a different file: here, the one named `keep`.
+  local root="${BATS_TEST_TMPDIR}/newline"
+  mkdir -p "${root}"
+  printf 'keep\n' > "${root}/keep"
+  printf 'doomed\n' > "${root}/keep"$'\n'"doomed"
+  DYBATPHO_SAFE_ROOTS="${root}" run_traced dybatpho::safe_rm --force "${root}/keep"$'\n'"doomed"
+  assert_success
+  assert_file_exist "${root}/keep"
+  assert_file_not_exist "${root}/keep"$'\n'"doomed"
+}

@@ -295,6 +295,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when called directly under `set -e`; inside `$(...)` it worked. It now prints
   `10.00`.
 
+- **`file`, `safety` — a path holding a newline is acted on whole.**
+  `dybatpho::path_normalize` and `dybatpho::path_relative` cut a path at its
+  first newline, so `dybatpho::safe_rm` given `dir/keep<newline>old` deleted
+  `dir/keep`. The file writers' symlink resolution had the same flaw.
+
 - **`file` — `dybatpho::dir_size` measures a directory named like an option,
   and counts past 2 GiB** under mawk and BusyBox awk.
 

@@ -170,6 +170,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   through is not loaded.
 - `safe_extract` is given an archive that cannot be listed, so its entries
   cannot be checked.
+- A guarded path holds a newline.
 
 ## Requirements *(mandatory)*
 
@@ -245,6 +246,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **FR-025**: A command run by `safe_system` MUST see the caller's variables: the guard MUST keep its state in prefixed locals.
 - **FR-026**: `dybatpho::safe_system` MUST run the command after `--` as an argument vector, never through `eval`, even when it is a single argument.
 - **FR-027**: `dybatpho::assert_safe_path` MUST resolve a root that does not exist yet through the directories above it, so a root under a linked directory accepts the paths inside it.
+- **FR-028**: Every guard MUST act on the whole path it is given, including one holding a newline, never on a shorter path that precedes the newline.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -312,6 +314,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **IT-015**: Refuse a path that leaves a safe root through a linked directory, and one that reaches a protected path through it, while accepting the link itself and a root given as a link.
 - **IT-016**: Accept a path beneath a safe root that does not exist yet, compared as written.
 - **IT-017**: Run `safe_system --force demo -- 'echo first; echo INJECTED'` and see nothing injected.
+- **IT-018**: Remove `keep<newline>doomed` with `safe_rm` and find `keep` still there.
 
 ## Acceptance Criteria *(mandatory)*
 

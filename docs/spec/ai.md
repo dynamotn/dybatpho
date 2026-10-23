@@ -155,7 +155,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 
 - The server keeps the connection open for a moment after sending `[DONE]`.
 - No backend configured, or a pinned backend whose credentials are missing.
-- Neither `yq` nor `jq` is installed.
+- `jq` is not installed (installing only `yq` is not enough).
 - Prompts containing quotes, backslashes, newlines, or non-ASCII text.
 - A provider answering with an error object rather than an HTTP error status.
 - A model returning prose where a JSON document was required, or wrapping the
@@ -214,7 +214,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-017**: Provider errors MUST be surfaced with the provider's own message.
 - **FR-018**: HTTP requests MUST go through the network module, inheriting its
   retry behavior and status exit codes.
-- **FR-019**: The module MUST fail with a clear message when neither `yq` nor `jq` is installed.
+- **FR-019**: The module MUST fail with a clear message naming `jq` when `jq` is not installed.
 - **FR-020**: Payloads and responses MUST be built and read through the `json`
   module, so the module works on whichever backend the rest of the library
   found rather than requiring a specific one.
@@ -301,8 +301,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   yields a parseable answer for schema-constrained calls.
 - **IT-011**: Verify payload construction for each backend: system prompt
   placement, effort, tools, and output schema.
-- **IT-012**: Verify the module behaves identically under both the `yq` and the
-  `jq` backend.
+- **IT-012**: Verify the module behaves identically whether or not `yq` is
+  installed, since every filter runs through `jq`.
 - **IT-013**: Verify the counter file defaults under the XDG state home, that
   its directory is `0700`, and that a symbolic link in its place is refused
   rather than written through.

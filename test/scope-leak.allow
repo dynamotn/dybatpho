@@ -21,6 +21,7 @@ src/helpers.sh	__dybatpho_helpers_locate	stop	evaluates only the `shopt -p` line
 src/helpers.sh	__dybatpho_helpers_sort	stop	`LC_ALL=C` is local on purpose so a comparator compares bytes
 src/helpers.sh	dybatpho::expect_ref	stop	only checks the name it is given; it binds nothing to it
 src/json.sh	__dybatpho_json_emit	stop	runs only the module's own producers
+src/json.sh	__dybatpho_json_test	stop	runs only the module's own `jq -e` command lines
 src/logging.sh	dybatpho::start_trace	stop	the trap command runs at exit, after this function has returned
 src/network.sh	__dybatpho_network_with_secret_headers	stop	scopes `DYBATPHO_CURL_SECRET_HEADERS` to the call on purpose, so the command sees the added header
 src/notification.sh	dybatpho::notify_email	stop	runs the sendmail program, which cannot see shell variables

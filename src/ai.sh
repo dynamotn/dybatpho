@@ -88,7 +88,7 @@
 # @tip Every prompt is passed through `dybatpho::secret_mask` first, so values registered with
 #   `dybatpho::secret_register`
 #   never reach the provider
-# @tip Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library;
+# @tip Payloads and responses go through the `json` module, so this needs `jq` like the rest of the library;
 #   building them by string concatenation is too escaping-sensitive to be safe
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
@@ -158,18 +158,15 @@ declare -gA DYBATPHO_AI_TOOL_SCHEMA=()
 declare -gA DYBATPHO_AI_TOOL_HANDLER=()
 
 #######################################
-# @description Fail loudly when no JSON backend is installed.
+# @description Fail loudly when `jq` is not installed.
 # @noargs
-# @exitcode 0 `yq` or `jq` is available
-# @exitcode 127 Stop the script because neither is installed
+# @exitcode 0 `jq` is available
+# @exitcode 127 Stop the script because it is not
 # @see dybatpho::json_object
 # @internal
 #######################################
 function __dybatpho_ai_require_json {
-  # Only the refusal matters here: which backend answered does not.
-  # shellcheck disable=SC2034 # out-param of the resolver; nothing reads it
-  local backend
-  __dybatpho_json_cmd_into backend
+  __dybatpho_json_need_jq
 }
 
 #######################################
@@ -604,7 +601,7 @@ function __dybatpho_ai_conversation_build {
   dybatpho::expect_args system -- "$@"
   shift
   # Every value is a plain string, so the document is spelled here with the
-  # library's one escaper: building it through a JSON backend cost two
+  # library's one escaper: building it through `jq` cost two
   # processes per turn and one more for the envelope.
   local messages="" escaped_role escaped_content escaped_system
   while (($# >= 2)); do
@@ -1090,7 +1087,7 @@ function __dybatpho_ai_usage_from_response {
 # @description Check a provider response, record its usage and take its text,
 #   reading the document once.
 #   Asking for the error, the four usage fields and the text separately started
-#   a JSON backend six times per response. One filter answers all of them as
+#   `jq` six times per response. One filter answers all of them as
 #   lines, the text last because it is the only field that can hold a newline,
 #   and a trailing marker keeps the text's own trailing newlines from being
 #   eaten by the command substitution. A body the filter cannot read falls back
@@ -1609,7 +1606,7 @@ function dybatpho::ai_stream {
 
 #######################################
 # @description Print one streamed delta without adding a line break.
-# The JSON backends both terminate their output with a newline, which would
+# `jq` terminates its output with a newline, which would
 # turn a stream of fragments into a column of them, so exactly one trailing
 # newline is removed while any the model actually produced are kept.
 # @arg $1 string One event payload
@@ -1795,8 +1792,8 @@ function dybatpho::ai_run {
     local __dybatpho_ai_run_text
     __dybatpho_ai_response_into __dybatpho_ai_run_text "${__dybatpho_ai_run_provider}" "${__dybatpho_ai_run_body}"
 
-    # `@json` renders the tool arguments as text both backends spell the same
-    # way, so a handler always receives one JSON string.
+    # `@json` renders the tool arguments as text, so a handler always receives
+    # one JSON string.
     local __dybatpho_ai_run_calls
     case "${__dybatpho_ai_run_provider}" in
       anthropic)

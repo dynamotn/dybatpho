@@ -110,101 +110,83 @@ setup() {
   run_traced -0 dybatpho::assert_file_mode "${link}" 600
 }
 
-@test "dybatpho::assert_json_valid and assert_json_query use the JSON backend" {
-  local file="${BATS_TEST_TMPDIR}/package.json"
-  printf '{"version":"1.4.2"}' > "${file}"
+@test "dybatpho::assert_json_valid and assert_json_query run through jq" {
+  local file="${BATS_TEST_TMPDIR}/package.json" broken="${BATS_TEST_TMPDIR}/broken.json"
+  printf '{"version":"1.4.2","keys":{"b":1,"a":2}}' > "${file}"
+  printf '{"version":' > "${broken}"
 
-  stub yq ": echo '1.4.2'"
+  dybatpho::assert_json_valid "${file}"
   dybatpho::assert_json_query "${file}" '.version' "1.4.2"
-  unstub yq
+  # The filter is `jq`'s, so `keys` is sorted and `add` works.
+  dybatpho::assert_json_query "${file}" 'keys | join(",")' "keys,version"
+  dybatpho::assert_json_query "${file}" '.keys | add' "3"
 
-  stub yq ": echo '1.4.2'"
   run_traced --separate-stderr dybatpho::assert_json_query "${file}" '.version' "9.9.9"
   assert_failure
   assert_stderr --partial "returned an unexpected value"
-  unstub yq
 
-  stub yq ": exit 1"
-  run_traced --separate-stderr dybatpho::assert_json_valid "${file}"
+  run_traced --separate-stderr dybatpho::assert_json_query "${file}" '.version | nope' "x"
+  assert_failure
+  assert_stderr --partial "JSON query failed"
+
+  run_traced --separate-stderr dybatpho::assert_json_valid "${broken}"
   assert_failure
   assert_stderr --partial "Expected valid JSON"
-  unstub yq
 }
 
 @test "JSON and YAML query assertions tolerate quoted string scalars" {
   local file="${BATS_TEST_TMPDIR}/quoted.json"
   printf '{"version":"1.4.2"}' > "${file}"
 
-  # Backends print string scalars as `"1.4.2"`; both forms must be accepted.
-  stub yq ": echo '\"1.4.2\"'"
+  # `jq` prints a string scalar as `"1.4.2"`; both forms must be accepted.
   dybatpho::assert_json_query "${file}" '.version' "1.4.2"
-  unstub yq
-
-  stub yq ": echo '\"1.4.2\"'"
   dybatpho::assert_json_query "${file}" '.version' '"1.4.2"'
-  unstub yq
 
-  stub yq ": echo '\"1.4.2\"'"
   run_traced --separate-stderr dybatpho::assert_json_query "${file}" '.version' "2.0.0"
   assert_failure
   assert_stderr --partial "returned an unexpected value"
-  unstub yq
 }
 
 @test "dybatpho::assert_json_has reports a filter that does not match" {
   local file="${BATS_TEST_TMPDIR}/config.json"
   printf '{"a":1}' > "${file}"
 
-  stub yq ": exit 0"
   dybatpho::assert_json_has "${file}" '.a'
-  unstub yq
 
-  stub yq ": exit 1"
   run_traced --separate-stderr dybatpho::assert_json_has "${file}" '.missing'
   assert_failure
   assert_stderr --partial "JSON filter did not match"
-  unstub yq
 }
 
-@test "dybatpho::assert_yaml_* mirror the JSON assertions" {
-  local file="${BATS_TEST_TMPDIR}/settings.yaml"
-  printf 'mode: dev\n' > "${file}"
+@test "dybatpho::assert_yaml_* mirror the JSON assertions with jq filters" {
+  command -v yq > /dev/null || skip "yq is not installed"
+  local file="${BATS_TEST_TMPDIR}/settings.yaml" broken="${BATS_TEST_TMPDIR}/broken.yaml"
+  printf 'mode: dev
+ports: [80, 443]
+' > "${file}"
+  printf 'mode: [dev
+' > "${broken}"
 
-  stub yq ": echo 'dev'"
   dybatpho::assert_yaml_query "${file}" '.mode' "dev"
-  unstub yq
-
-  stub yq ": echo 'dev'"
+  dybatpho::assert_yaml_query "${file}" '.ports | add' "523"
   dybatpho::assert_yaml_valid "${file}"
-  unstub yq
-
-  stub yq ": exit 0"
   dybatpho::assert_yaml_has "${file}" '.mode'
-  unstub yq
 
-  stub yq ": exit 1"
-  run_traced --separate-stderr dybatpho::assert_yaml_query "${file}" '.missing' "x"
+  run_traced --separate-stderr dybatpho::assert_yaml_query "${file}" '.mode | nope' "x"
   assert_failure
   assert_stderr --partial "YAML query failed"
-  unstub yq
 
-  stub yq ": exit 1"
   run_traced --separate-stderr dybatpho::assert_yaml_has "${file}" '.missing'
   assert_failure
-  assert_stderr --partial "YAML expression did not match"
-  unstub yq
+  assert_stderr --partial "YAML filter did not match"
 
-  stub yq ": exit 1"
-  run_traced --separate-stderr dybatpho::assert_yaml_valid "${file}"
+  run_traced --separate-stderr dybatpho::assert_yaml_valid "${broken}"
   assert_failure
   assert_stderr --partial "Expected valid YAML"
-  unstub yq
 }
 
 @test "JSON assertions accept a document on stdin" {
-  stub yq ": echo 'dev'"
   printf '{"mode":"dev"}' | dybatpho::assert_json_query - '.mode' "dev"
-  unstub yq
 }
 
 @test "dybatpho::assert_snapshot records a baseline then compares against it" {

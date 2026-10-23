@@ -16,12 +16,12 @@
 # with `#` are ignored.
 
 # Callees whose only possible refusal is not caller input
-*	*	__dybatpho_agent_flatten_schema	reaches dybatpho::die only through the yq/jq check
-*	*	__dybatpho_ai_extract_text	reaches dybatpho::die only through the yq/jq check
-*	*	__dybatpho_ai_messages_with_system	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_agent_flatten_schema	reaches dybatpho::die only through the jq check
+*	*	__dybatpho_ai_extract_text	reaches dybatpho::die only through the jq check
+*	*	__dybatpho_ai_messages_with_system	reaches dybatpho::die only through the jq check
 *	*	__dybatpho_ai_tool_invoke	reaches dybatpho::die only through metric-label and stream checks on library literals
-*	*	__dybatpho_ai_tools_as_functions	reaches dybatpho::die only through the yq/jq check
-*	*	__dybatpho_ai_tools_json	reaches dybatpho::die only through the yq/jq check
+*	*	__dybatpho_ai_tools_as_functions	reaches dybatpho::die only through the jq check
+*	*	__dybatpho_ai_tools_json	reaches dybatpho::die only through the jq check
 *	*	__dybatpho_cli_help_row	refuses only a malformed option spec, the script author's error at definition time
 *	*	__dybatpho_cli_help_usage	reaches dybatpho::die only through metric-label and stream checks on library literals
 *	*	__dybatpho_cli_suggest_suffix	reaches dybatpho::die only through metric-label and stream checks on library literals
@@ -32,10 +32,11 @@
 *	*	__dybatpho_log_translate	library message templates only; refuses a defect in the library's own constants, not caller input
 *	*	__dybatpho_secret_file_mode	reaches dybatpho::die only through the stat field check
 *	*	__dybatpho_secret_file_size	reaches dybatpho::die only through the stat field check
-*	*	dybatpho::json_eval	refuses only a missing yq/jq (reported by doctor and the module guards), never caller input
-*	*	dybatpho::json_get	refuses only a missing yq/jq (reported by doctor and the module guards), never caller input
-*	*	dybatpho::json_object	refuses only a missing yq/jq or an odd field count written in the library, never caller input
-*	*	dybatpho::json_query	refuses only a missing yq/jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::json_eval	refuses only a missing jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::json_get	refuses only a missing jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::json_object	refuses only a missing jq or an odd field count written in the library, never caller input
+*	*	dybatpho::json_query	refuses only a missing jq (reported by doctor and the module guards), never caller input
+*	*	dybatpho::yaml_query	refuses only a missing jq or Go yq v4 (reported by doctor and the module guards), never caller input
 *	*	dybatpho::path_join	refuses only an empty segment list; every caller passes segments
 *	*	dybatpho::string_repeat	count is a literal
 *	*	dybatpho::string_truncate	width is a literal

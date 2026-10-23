@@ -35,23 +35,38 @@ EOF
   while IFS= read -r line || [[ -n "${line}" ]]; do
     dybatpho::print "  ${line}"
   done < <(printf '%s' "${json_pretty_output}")
-  dybatpho::info "JSON helpers prefer yq when it is available"
+  local features
+  features=$(dybatpho::json_query "${json_file}" '.features | map(ascii_upcase) | join(",")' -r)
+  dybatpho::info "Every filter is a jq filter, on every machine: ${features}"
+  local picked
+  # `$key` is a jq variable, bound by `--arg`.
+  # shellcheck disable=SC2016
+  picked=$(dybatpho::json_query "${json_file}" '.[$key]' --arg key name -r)
+  dybatpho::info "Extra arguments reach jq, such as --arg: ${picked}"
 }
 
 # @description Run the `YAML HELPERS` section of this example.
 # @noargs
 function _demo_yaml_helpers {
   dybatpho::header "YAML HELPERS"
+  if ! dybatpho::is command yq; then
+    dybatpho::warn "The Go yq v4 is required to read YAML"
+    return 0
+  fi
   local yaml_file
   dybatpho::create_temp yaml_file ".yaml"
   cat > "${yaml_file}" << 'EOF'
 service:
   name: dybatpho
   enabled: true
+  ports: [80, 443]
 EOF
   local yaml_query
   yaml_query=$(dybatpho::yaml_query "${yaml_file}" ".service.name")
   dybatpho::info "Service name: ${yaml_query}"
+  local yaml_keys
+  yaml_keys=$(dybatpho::yaml_query "${yaml_file}" '.service | keys | join(", ")')
+  dybatpho::info "The filter is jq's here too, so keys are sorted: ${yaml_keys}"
   local yaml_has
   yaml_has=$(dybatpho::yaml_has "${yaml_file}" ".service" && echo yes || echo no)
   dybatpho::info "Has service?  ${yaml_has}"
@@ -69,7 +84,7 @@ EOF
 function _demo_conversion {
   dybatpho::header "CONVERSION"
   if ! dybatpho::is command yq; then
-    dybatpho::warn "yq is required to run the JSON/YAML conversion demo"
+    dybatpho::warn "The Go yq v4 is required to run the JSON/YAML conversion demo"
     return 0
   fi
 
@@ -161,8 +176,8 @@ function _print_document {
 # @noargs
 function _demo_editing {
   dybatpho::header "EDITING DOCUMENTS"
-  if ! dybatpho::is command yq && ! dybatpho::is command jq; then
-    dybatpho::warn "yq or jq is required to run the editing demo"
+  if ! dybatpho::is command jq; then
+    dybatpho::warn "jq is required to run the editing demo"
     return 0
   fi
 
@@ -196,7 +211,7 @@ EOF
   fi
 
   if ! dybatpho::is command yq; then
-    dybatpho::warn "yq is required for the YAML editing demo"
+    dybatpho::warn "The Go yq v4 is required for the YAML editing demo"
     return 0
   fi
   local values

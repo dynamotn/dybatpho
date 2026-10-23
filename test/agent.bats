@@ -172,8 +172,8 @@ _spec_test_deploy() {
   assert_equal "$(dybatpho::json_get "${output}" '.os')" "$(uname -s)"
   assert_equal "$(dybatpho::json_get "${output}" '.cwd')" "${PWD}"
   assert_equal "$(dybatpho::json_get "${output}" '.agent_mode')" "true"
-  # `type` names differ between the two JSON backends, so the shape is checked
-  # by what the array contains instead.
+  # The shape is checked by what the array contains rather than by its exact
+  # contents, which depend on the modules this suite loads.
   assert_equal "$(dybatpho::json_get "${output}" '.modules[0]')" "string"
   assert_equal "$(dybatpho::json_get "${output}" '[.modules[] | select(. == "agent")] | length')" "1"
 }
@@ -428,20 +428,16 @@ _spec_test_deploy() {
   assert_equal "${schema}" '{"type":"object","properties":{},"required":[],"additionalProperties":false}'
 }
 
-@test "__dybatpho_agent_flatten_schema reads each command once" {
-  # Walking the tree took around eight backend processes per command, plus a
-  # rewrite of the growing list for each one.
-  local schema real_yq real_jq count="${BATS_TEST_TMPDIR}/backend-calls"
+@test "__dybatpho_agent_flatten_schema walks the whole tree in one jq call" {
+  # Walking the tree took around eight processes per command, plus a rewrite of
+  # the growing list for each one, and later one read per command.
+  local schema real_jq count="${BATS_TEST_TMPDIR}/jq-calls"
   schema="$(dybatpho::generate_schema _spec_test_root mytool)"
-  real_yq="$(command -v yq || true)"
-  real_jq="$(command -v jq || true)"
-  [[ -z "${real_yq}" ]] \
-    || dybatpho::mock_command_script yq "printf x >> '${count}'; exec '${real_yq}' \"\$@\""
-  [[ -z "${real_jq}" ]] \
-    || dybatpho::mock_command_script jq "printf x >> '${count}'; exec '${real_jq}' \"\$@\""
+  real_jq="$(command -v jq)"
+  dybatpho::mock_command_script jq "printf x >> '${count}'; exec '${real_jq}' \"\$@\""
   : > "${count}"
   __dybatpho_agent_flatten_schema "${schema}" > /dev/null
-  assert_equal "$(< "${count}")" "xx"
+  assert_equal "$(< "${count}")" "x"
   dybatpho::unmock_all
 }
 

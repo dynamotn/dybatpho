@@ -154,6 +154,21 @@ EOF
   assert_line --index 4 '````'
 }
 
+@test "dybatpho::md_code_block fences a long body past its longest backtick run" {
+  # The body is large on purpose: finding the run used to walk it a character
+  # at a time, which took seconds on a log of this size.
+  local body="" index
+  for ((index = 0; index < 2000; index++)); do
+    body+="line ${index} with \`code\` in it"$'\n'
+  done
+  body+='a ````` run'
+  run_traced dybatpho::md_code_block log "${body}"
+  assert_success
+  assert_line --index 0 '``````log'
+  assert_line --index 2001 'a ````` run'
+  assert_line --index 2002 '``````'
+}
+
 @test "dybatpho::md_code_block reads stdin and takes an empty language" {
   run_traced dybatpho::md_code_block "" - <<< $'line one\nline two\n'
   assert_success

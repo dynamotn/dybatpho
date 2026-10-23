@@ -440,23 +440,14 @@ function dybatpho::md_code_block {
   local text
   __dybatpho_md_join_into text lines
 
-  # The fence has to be longer than every backtick run inside it.
-  local longest=0 current=0 index char
-  for ((index = 0; index < ${#text}; index++)); do
-    char="${text:index:1}"
-    if [[ "${char}" == '`' ]]; then
-      current=$((current + 1))
-      ((current > longest)) && longest=${current}
-    else
-      current=0
-    fi
+  # The fence has to be longer than every backtick run inside it, so it grows
+  # until the body no longer contains it. Walking the body a character at a
+  # time instead cost quadratic time, since Bash finds `${text:index:1}` by
+  # counting from the start: a 70 KB log took 18 seconds.
+  local fence='```'
+  while [[ "${text}" == *"${fence}"* ]]; do
+    fence+='`'
   done
-
-  local width=3
-  ((longest >= width)) && width=$((longest + 1))
-  local fence
-  printf -v fence '%*s' "${width}" ''
-  fence="${fence// /\`}"
 
   printf '%s%s\n' "${fence}" "${language}"
   printf '%s\n' ${lines[@]+"${lines[@]}"}

@@ -131,6 +131,56 @@ declare -gA __dybatpho_module_deps=(
   [doctor]="semver"
 )
 
+# Soft dependencies: a module that calls another one from only a few of its
+# functions does not load it up front. The first call that needs it loads it on
+# demand, through `__dybatpho_helpers_need_module`, so a script that never takes
+# that path never pays for the other module or the tools it needs. Every module
+# named here must also be in the registry; `test/init.bats` checks that each
+# call site that asks for a module is listed. A load that happens inside
+# `$(...)` lives only as long as that subshell, so the next substitution loads
+# the module again; a script on a hot path names the module up front instead.
+declare -gA __dybatpho_module_soft_deps=(
+  [helpers]="semver"
+  [network]="json"
+  [safety]="archive"
+  [text]="table"
+  [table]="csv"
+  [csv]="json"
+  [markdown]="table"
+  [diff]="json"
+  [backup]="diff"
+  [cache]="lock"
+  [schedule]="lock"
+  [notification]="validate"
+  [release]="archive"
+  [i18n]="date"
+  [parallel]="date"
+  [metrics]="math network"
+  [testing]="json diff"
+)
+
+# Stability tier of every registered module. A `stable` module keeps its public
+# contract across minor releases: a function is deprecated for at least one
+# minor release before it is removed. An `experimental` module may change in any
+# minor release. A stable module depends only on stable modules, which
+# `test/init.bats` checks, so a script that keeps to stable modules is never
+# broken by an experimental one underneath it.
+declare -gA __dybatpho_module_tiers=(
+  [string]="stable" [os]="stable" [logging]="stable" [helpers]="stable"
+  [process]="stable" [file]="stable" [secret]="stable" [array]="stable"
+  [math]="stable" [lock]="stable" [network]="stable" [date]="stable"
+  [json]="stable" [validate]="stable" [config]="stable" [archive]="stable"
+  [git]="stable" [cli]="stable" [semver]="stable" [safety]="stable"
+  [text]="experimental" [table]="experimental" [tui]="experimental"
+  [screen]="experimental" [notification]="experimental"
+  [testing]="experimental" [metrics]="experimental" [ai]="experimental"
+  [agent]="experimental" [pkg]="experimental" [release]="experimental"
+  [parallel]="experimental" [doctor]="experimental" [i18n]="experimental"
+  [forge]="experimental" [cache]="experimental" [markdown]="experimental"
+  [csv]="experimental" [backup]="experimental" [diff]="experimental"
+  [queue]="experimental" [schedule]="experimental" [privilege]="experimental"
+)
+
 #######################################
 # @description Source one module file. Every module lives at
 #   `src/<name>.sh`, so the name is all the map that is needed.
@@ -311,26 +361,60 @@ function dybatpho::module_loaded {
 
 #######################################
 # @description Print module names, one per line.
-# @arg $1 string [default: loaded] Selection, one of `loaded`, `all`, `core`, or `optional`
+#   `stable` and `experimental` select by stability tier across the whole
+#   registry; see `dybatpho::module_tier`.
+# @example
+#   dybatpho::module_list experimental   # modules that may change in a minor release
+#
+# @arg $1 string [default: loaded] Selection, one of `loaded`, `all`, `core`, `optional`, `stable`, or `experimental`
 # @stdout Module names in registry order, or in load order for `loaded`
 # @exitcode 0 Print the requested list
 # @exitcode 1 Stop the script when the selection is unknown
 #######################################
 function dybatpho::module_list {
   local selection="${1:-loaded}"
-  local modules
+  local modules tier=""
   case "${selection}" in
     loaded) modules="${DYBATPHO_LOADED_MODULES}" ;;
     all) modules="${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES}" ;;
     core) modules="${DYBATPHO_CORE_MODULES}" ;;
     optional) modules="${DYBATPHO_OPTIONAL_MODULES}" ;;
-    *) dybatpho::die \
-      "dybatpho::module_list: Unknown selection '${selection}', expected loaded, all, core or optional" ;;
+    stable | experimental)
+      modules="${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES}"
+      tier="${selection}"
+      ;;
+    *)
+      local expected="loaded, all, core, optional, stable or experimental"
+      dybatpho::die "dybatpho::module_list: Unknown selection '${selection}', expected ${expected}"
+      ;;
   esac
   local module
   for module in ${modules}; do
+    [[ -z "${tier}" || "${__dybatpho_module_tiers[${module}]-experimental}" == "${tier}" ]] || continue
     printf '%s\n' "${module}"
   done
+}
+
+#######################################
+# @description Print the stability tier of a module.
+#   A `stable` module keeps its public contract across minor releases, and a
+#   function is deprecated for at least one minor release before it is
+#   removed. An `experimental` module may change in any minor release.
+# @example
+#   dybatpho::module_tier json   # stable
+#   dybatpho::module_tier tui    # experimental
+#
+# @arg $1 string Module name
+# @stdout `stable` or `experimental`
+# @exitcode 0 The module is known
+# @exitcode 1 Stop the script when the module is unknown
+#######################################
+function dybatpho::module_tier {
+  local module
+  dybatpho::expect_args module -- "$@"
+  __dybatpho_module_exists "${module}" \
+    || dybatpho::die "dybatpho::module_tier: Unknown module '${module}'"
+  printf '%s\n' "${__dybatpho_module_tiers[${module}]-experimental}"
 }
 
 # Resolve the requested module set. `--modules` has to be the first argument

@@ -40,7 +40,8 @@ make use of ${DYBATPHO_DIR} to find each other.
 - [`dybatpho::version`](#dybatphoversion) — Print the version of the library this shell loaded, including the commit it is at. The release version is read from the `VERSION` file next to `init.sh`, which is what a release stamps and what a vendored or bundled copy carries. When the copy is a Git working tree, the short commit is appended as SemVer build metadata — `2.0.0+af745ff`, and `+af745ff.dirty` when the tree has uncommitted changes — so a bug report names the exact code that ran rather than the last tag before it. A checkout without a `VERSION` file falls back to `git describe`, which carries the commit of its own. Only the library's own repository is consulted: a copy vendored inside another project reports its stamped version alone, because that project's commits say nothing about which dybatpho is installed.
 - [`dybatpho::load`](#dybatphoload) — Load one or more modules after `init.sh` has already been sourced.
 - [`dybatpho::module_loaded`](#dybatphomodule_loaded) — Return success when a module is already loaded.
-- [`dybatpho::module_list`](#dybatphomodule_list) — Print module names, one per line.
+- [`dybatpho::module_list`](#dybatphomodule_list) — Print module names, one per line. `stable` and `experimental` select by stability tier across the whole registry; see `dybatpho::module_tier`.
+- [`dybatpho::module_tier`](#dybatphomodule_tier) — Print the stability tier of a module. A `stable` module keeps its public contract across minor releases, and a function is deprecated for at least one minor release before it is removed. An `experimental` module may change in any minor release.
 
 <a id="see-also"></a>
 
@@ -146,12 +147,21 @@ Return success when a module is already loaded.
 ### `dybatpho::module_list`
 
 Print module names, one per line.
+`stable` and `experimental` select by stability tier across the whole
+registry; see `dybatpho::module_tier`.
+
+**🧪 Example**
+
+```bash
+dybatpho::module_list experimental   # modules that may change in a minor release
+
+```
 
 **🧾 Arguments**
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | string | no | `loaded` | Selection, one of `loaded`, `all`, `core`, or `optional` |
+| `$1` | string | no | `loaded` | Selection, one of `loaded`, `all`, `core`, `optional`, `stable`, or `experimental` |
 
 **📤 Output on stdout**
 
@@ -161,3 +171,35 @@ Print module names, one per line.
 
 - `0`: Print the requested list
 - `1`: Stop the script when the selection is unknown
+
+---
+
+### `dybatpho::module_tier`
+
+Print the stability tier of a module.
+A `stable` module keeps its public contract across minor releases, and a
+function is deprecated for at least one minor release before it is
+removed. An `experimental` module may change in any minor release.
+
+**🧪 Example**
+
+```bash
+dybatpho::module_tier json   # stable
+dybatpho::module_tier tui    # experimental
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Module name |
+
+**📤 Output on stdout**
+
+- `stable` or `experimental`
+
+**🚦 Exit codes**
+
+- `0`: The module is known
+- `1`: Stop the script when the module is unknown

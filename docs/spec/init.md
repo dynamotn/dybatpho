@@ -85,6 +85,38 @@ As a script author, I want to load an extra module after bootstrap so that a rar
 
 ---
 
+### User Story 5 - Know which modules are stable (Priority: P2)
+
+As a script author, I want to know which modules keep their contract across minor releases so that a long-lived script can stay on modules that will not change under it.
+
+**Why this priority**: A script works without this knowledge, but upgrading the library is safe only when the author knows which parts may move.
+
+**Independent Test**: List the modules of each tier, ask the tier of one module, and check that no stable module depends on an experimental one.
+
+**Acceptance Scenarios**:
+
+1. **Given** a script wants only modules with a stable contract, **When** it calls `dybatpho::module_list stable`, **Then** it gets every stable module, and `experimental` gives the rest
+2. **Given** a script uses one module, **When** it calls `dybatpho::module_tier <module>`, **Then** it learns whether the module is `stable` or `experimental`
+3. **Given** a stable module, **When** it is loaded, **Then** every module it loads up front is stable too
+
+---
+
+### User Story 6 - Load a rarely needed module only when a function needs it (Priority: P2)
+
+As a script author, I want a module that only a few functions of another module need to arrive when one of those functions runs, so that I neither pay for it up front nor see my script stop asking me to load it.
+
+**Why this priority**: Stopping with a "load it with" message is correct but turns an avoidable detail into a failed run.
+
+**Independent Test**: Load `csv` alone, convert to JSON, and see `json` loaded on demand.
+
+**Acceptance Scenarios**:
+
+1. **Given** a script loaded `csv` alone, **When** it converts to JSON, **Then** `json` is loaded on demand and the conversion succeeds
+2. **Given** the conversion runs inside `$(...)`, **When** the substitution ends, **Then** the module loaded there is gone with it, and the next call loads it again
+3. **Given** the module needed cannot be loaded, **When** the function runs, **Then** it stops naming itself and the module
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -124,6 +156,9 @@ fi
 - A module is added to the registry but not to the module-to-file map.
 - `init.sh` is sourced by a relative path while `CDPATH` names a directory holding a
   directory of the same name, or by a bare `init.sh` with no directory part.
+- A soft dependency is loaded on demand inside a command substitution, where it
+  lives only as long as that subshell.
+- A soft dependency's file is missing, so loading it on demand fails.
 
 ## Requirements *(mandatory)*
 
@@ -180,6 +215,11 @@ fi
 - **FR-022**: `DYBATPHO_DIR` MUST be the directory `init.sh` was sourced from, resolved against the working directory alone: `CDPATH` MUST NOT redirect it or add output to it.
 - **FR-023**: `dybatpho::load` MUST export the public functions of the modules it adds, and MUST NOT export any internal `__dybatpho_` helper.
 
+- **FR-024**: Every registered module MUST carry a stability tier, `stable` or `experimental`. A stable module MUST keep its public contract across minor releases, deprecating a function for at least one minor release before removing it; an experimental module MAY change in any minor release. The core modules MUST be stable, and a stable module MUST NOT depend on an experimental one.
+- **FR-025**: `dybatpho::module_list` MUST accept the `stable` and `experimental` selections, which together list the whole registry, and `dybatpho::module_tier` MUST print the tier of a module and stop the script for an unknown one.
+- **FR-026**: The registry MUST record every soft dependency -- a module that another module loads on demand from only some of its functions -- and every module it names MUST be registered. Each call site that asks for a module on demand MUST be recorded, and each record MUST have a call site.
+- **FR-027**: A function that needs a soft dependency MUST load it on demand, with its own dependencies, and export its public functions, and MUST stop naming itself and the module only when the module cannot be loaded.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Bootstrap Session**: The runtime state created by sourcing `init.sh`.
@@ -189,6 +229,8 @@ fi
 - **Module Dependency**: An edge from one module to another module it calls, resolved before the dependent module is sourced.
 - **Module Source Map**: The mapping from a module name to its file, derived from the name as `src/<name>.sh`.
 - **Library Version**: The version of this copy of the library, stamped in `VERSION` and reported by `dybatpho::version`.
+- **Stability Tier**: `stable` or `experimental`, recorded for every module and reported by `dybatpho::module_tier`.
+- **Soft Dependency**: An edge from a module to another module it loads on demand rather than up front.
 
 ## Success Criteria *(mandatory)*
 
@@ -253,6 +295,11 @@ fi
 - **IT-020**: Source `init.sh` from inside a function, call `dybatpho::load forge` after it returns, and verify `network`, `json` and `git` are loaded ahead of `forge`.
 - **IT-021**: Source `lib/dybatpho/init.sh` with `CDPATH` naming a directory that also holds `lib/dybatpho`, and source a bare `init.sh` from the library directory; verify `DYBATPHO_DIR` is the real library each time.
 - **IT-022**: Call `dybatpho::load semver`, then verify a child shell sees `dybatpho::semver_valid` and no internal helper.
+
+- **IT-023**: Verify every registered module has a tier, the core modules are stable, no stable module depends on an experimental one, `dybatpho::module_list stable` and `experimental` split the registry, and `dybatpho::module_tier` answers and rejects an unknown module.
+- **IT-024**: Verify every soft dependency names a registered module, every call site asking for a module on demand is recorded, and every record has a call site.
+- **IT-025**: For every soft dependency, load only the module that declares it in a child shell and see the soft dependency loaded on demand.
+- **IT-026**: Convert to JSON inside `$(...)` in a shell that loaded `csv` alone, and see the result while `json` stays unloaded in the parent.
 
 ## Acceptance Criteria *(mandatory)*
 

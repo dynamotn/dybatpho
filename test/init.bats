@@ -473,3 +473,123 @@ bash $(printf '%q' "${child}")"
   assert_line --index 0 "dybatpho::semver_valid"
   assert_line --index 1 "internal-absent"
 }
+
+@test "every registered module has a stability tier" {
+  local module tier bad=""
+  for module in $(dybatpho::module_list all); do
+    tier="${__dybatpho_module_tiers[${module}]-}"
+    [[ "${tier}" == "stable" || "${tier}" == "experimental" ]] || bad="${bad} ${module}=${tier:-none}"
+  done
+  for module in "${!__dybatpho_module_tiers[@]}"; do
+    __dybatpho_module_exists "${module}" || bad="${bad} unregistered:${module}"
+  done
+  assert_equal "${bad}" ""
+}
+
+@test "the core modules are stable" {
+  local module
+  for module in ${DYBATPHO_CORE_MODULES}; do
+    assert_equal "${module}=$(dybatpho::module_tier "${module}")" "${module}=stable"
+  done
+}
+
+@test "a stable module depends only on stable modules" {
+  # A script that keeps to stable modules must not be broken by an experimental
+  # one loaded underneath it, so no hard edge may lead from one to the other.
+  local module dep bad=""
+  for module in $(dybatpho::module_list stable); do
+    for dep in ${__dybatpho_module_deps[${module}]-}; do
+      [[ "${__dybatpho_module_tiers[${dep}]}" == "stable" ]] || bad="${bad} ${module}->${dep}"
+    done
+  done
+  assert_equal "${bad}" ""
+}
+
+@test "dybatpho::module_list selects by tier" {
+  local stable experimental
+  stable="$(dybatpho::module_list stable | tr '\n' ' ')"
+  experimental="$(dybatpho::module_list experimental | tr '\n' ' ')"
+  assert_regex " ${stable}" " json "
+  assert_regex " ${experimental}" " tui "
+  refute_regex " ${stable}" " tui "
+  # The two tiers split the registry between them.
+  assert_equal "$(printf '%s\n' ${stable} ${experimental} | sort | tr '\n' ' ')" \
+    "$(dybatpho::module_list all | sort | tr '\n' ' ')"
+}
+
+@test "dybatpho::module_tier names the tier of a module" {
+  run_traced -0 dybatpho::module_tier json
+  assert_output "stable"
+  run_traced -0 dybatpho::module_tier screen
+  assert_output "experimental"
+}
+
+@test "dybatpho::module_tier rejects an unknown module" {
+  run -1 dybatpho::module_tier nosuch
+  assert_output --partial "Unknown module 'nosuch'"
+}
+
+@test "every soft dependency names a registered module" {
+  local module dep bad=""
+  for module in "${!__dybatpho_module_soft_deps[@]}"; do
+    __dybatpho_module_exists "${module}" || bad="${bad} ${module}"
+    for dep in ${__dybatpho_module_soft_deps[${module}]}; do
+      __dybatpho_module_exists "${dep}" || bad="${bad} ${module}~>${dep}"
+    done
+  done
+  assert_equal "${bad}" ""
+}
+
+@test "every module asked for on demand is a recorded soft dependency, and back" {
+  # The registry is what doctor and the bundle read, so a call site that loads
+  # a module on demand without an entry there would be invisible to both.
+  local file module dep found="" bad=""
+  local site_re='(__dybatpho_helpers_need_module|__dybatpho_helpers_load_soft|__dybatpho_metrics_need) ([a-z]+) '
+  for file in "${DYBATPHO_DIR}"/src/*.sh; do
+    module="$(basename "${file}" .sh)"
+    while IFS= read -r dep; do
+      [[ -n "${dep}" ]] || continue
+      found="${found} ${module}~>${dep}"
+      [[ " ${__dybatpho_module_soft_deps[${module}]-} " == *" ${dep} "* ]] \
+        || bad="${bad} unrecorded:${module}~>${dep}"
+    done < <(grep -oE "${site_re}" "${file}" | awk '{print $2}' | sort -u)
+  done
+  for module in "${!__dybatpho_module_soft_deps[@]}"; do
+    for dep in ${__dybatpho_module_soft_deps[${module}]}; do
+      [[ "${found} " == *" ${module}~>${dep} "* ]] || bad="${bad} unused:${module}~>${dep}"
+    done
+  done
+  assert_equal "${bad}" ""
+}
+
+@test "each soft dependency loads on demand in a shell that loaded only its module" {
+  # One child per module with soft dependencies, loading that module alone and
+  # asking for each soft dependency the way its call sites do. The module
+  # arrives, and its public functions reach a grandchild shell.
+  local module dep marker script
+  for module in "${!__dybatpho_module_soft_deps[@]}"; do
+    for dep in ${__dybatpho_module_soft_deps[${module}]}; do
+      marker="$(sed -nE 's/^function (__dybatpho_[a-z_0-9]+) .*/\1/p' "${DYBATPHO_DIR}/src/${dep}.sh" | head -n 1)"
+      script="${BATS_TEST_TMPDIR}/soft-${module}-${dep}.sh"
+      {
+        printf '%s\n' "${PRISTINE}"
+        printf '. %q --modules %s\n' "${DYBATPHO_DIR}/init.sh" "${module}"
+        printf 'dybatpho::module_loaded %s && echo "already loaded"\n' "${dep}"
+        printf '__dybatpho_helpers_need_module %s %s caller\n' "${dep}" "${marker}"
+        printf 'dybatpho::module_loaded %s && echo "loaded on demand"\n' "${dep}"
+      } > "${script}"
+      run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+      assert_success
+      refute_output --partial "already loaded"
+      assert_output --partial "loaded on demand"
+    done
+  done
+}
+
+@test "a soft dependency loaded inside a command substitution lives only there" {
+  run_traced -0 init_sh "--modules csv" 'out="$(dybatpho::csv_to_json $'"'"'a\n1'"'"')"
+printf "%s\n" "${out}"
+dybatpho::module_loaded json || echo "json not loaded here"'
+  assert_line --index 0 '[{"a":"1"}]'
+  assert_line --index 1 "json not loaded here"
+}

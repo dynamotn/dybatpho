@@ -57,6 +57,13 @@ the tools a dependency needs are reported too. An edge naming a module the
 registry does not know fails the report, because the loader would stop on
 it; a cycle is only noted, because the loader allows one.
 
+Every module is listed with its stability tier, `stable` or `experimental`
+(see `dybatpho::module_tier`), and with its soft dependencies: the modules
+it loads on demand the first time a function that needs one runs. Those are
+not widened into the report, since a script that never takes that path
+never loads them; a soft dependency naming an unknown module fails the
+report like any other edge.
+
 ### 🌍 Environment
 
 | Variable | Type | Required | Default | Description |

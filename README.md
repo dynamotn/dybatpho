@@ -101,7 +101,25 @@ Every module set includes the core modules, and can be widened at any point:
 dybatpho::load notification  # brings in its network dependency too
 dybatpho::module_loaded json # branch on what is loaded
 dybatpho::module_list all    # core + optional module names
+dybatpho::module_list stable # modules whose contract holds across minor releases
 ```
+
+A few modules call another one from only some of their functions —
+`dybatpho::csv_to_json` needs `json`, `dybatpho::safe_extract` needs `archive`.
+Those *soft dependencies* are loaded on demand the first time such a function
+runs, so `--modules csv` is enough; name the other module up front when the call
+sits inside `$(...)` on a hot path, since a module loaded in a subshell is gone
+with it. `dybatpho::doctor` lists each module's soft dependencies.
+
+Every module has a **stability tier**, shown in the tables below and by
+`dybatpho::module_tier`:
+
+- **stable** — the public contract holds across minor releases; a function is
+  deprecated for at least one minor release before it is removed.
+- **experimental** — may change in any minor release.
+
+The core modules are stable, and a stable module never depends on an
+experimental one.
 
 An unknown module name stops the script at bootstrap instead of failing later
 with a missing function. See [init.sh reference](docs/init.md) and
@@ -130,7 +148,9 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 
 The bundle carries no dependency on a `src/` directory: copy the one file, source
 it, and the bundled functions work. Inside it, `dybatpho::load` succeeds for a
-bundled module and names the regeneration command for anything else.
+bundled module and names the regeneration command for anything else. A bundle
+cannot load a soft dependency on demand, so the bundler names the ones it left
+out; `--with-soft-deps` carries them too.
 
 ## 🚀 Releasing
 
@@ -150,85 +170,86 @@ scripts/release.sh --version 3.0.0 --sign
 
 ### 🧱 Core scripting
 
-| Module                            | What you get                                                       |
-| --------------------------------- | ------------------------------------------------------------------ |
-| [helpers.sh](docs/helpers.md)      | Argument expectation, dry-run, retries and other everyday patterns  |
-| [logging.sh](docs/logging.md)      | Levelled logs, boxed output, structured JSON logging                |
-| [process.sh](docs/process.md)      | Process management, traps, timeouts, background jobs, PID files     |
-| [lock.sh](docs/lock.md)            | Portable file locking to serialize concurrent script runs           |
-| [parallel.sh](docs/parallel.md)  | Bounded worker pool: ordered output, per-job exit codes, fail-fast |
-| [queue.sh](docs/queue.md)        | Durable job queue on disk: atomic claim, retries, dead letters      |
-| [schedule.sh](docs/schedule.md)  | Intervals, debounce, once-per-period markers, and a cron predicate  |
+| Module                            | Tier | What you get                                                       |
+| --------------------------------- | --- | ------------------------------------------------------------------ |
+| [helpers.sh](docs/helpers.md)      | stable | Argument expectation, dry-run, retries and other everyday patterns  |
+| [logging.sh](docs/logging.md)      | stable | Levelled logs, boxed output, structured JSON logging                |
+| [process.sh](docs/process.md)      | stable | Process management, traps, timeouts, background jobs, PID files     |
+| [cache.sh](docs/cache.md)          | experimental | Command output cache with TTLs, stale-while-revalidate, and pruning |
+| [lock.sh](docs/lock.md)            | stable | Portable file locking to serialize concurrent script runs           |
+| [parallel.sh](docs/parallel.md)  | experimental | Bounded worker pool: ordered output, per-job exit codes, fail-fast |
+| [queue.sh](docs/queue.md)        | experimental | Durable job queue on disk: atomic claim, retries, dead letters      |
+| [schedule.sh](docs/schedule.md)  | experimental | Intervals, debounce, once-per-period markers, and a cron predicate  |
 
 ### 🔤 Data & text
 
-| Module                        | What you get                                       |
-| ----------------------------- | -------------------------------------------------- |
-| [array.sh](docs/array.md)      | Array manipulation                                  |
-| [math.sh](docs/math.md)        | Exact decimal arithmetic, rounding, aggregates — no `bc`, no float drift |
-| [string.sh](docs/string.md)    | String operations                                   |
-| [text.sh](docs/text.md)        | Multi-line text blocks and formatting               |
-| [json.sh](docs/json.md)        | JSON and YAML reading/writing                       |
-| [table.sh](docs/table.md)      | Aligned plain-text and Markdown tables, from CSV or JSON too |
-| [markdown.sh](docs/markdown.md) | Headings, lists, links, badges and code blocks, with every value escaped |
-| [csv.sh](docs/csv.md)          | Real CSV: quoted fields, embedded commas and newlines, filtering, JSON bridge |
-| [diff.sh](docs/diff.md)        | Colored unified diffs, and JSON/YAML compared by key rather than by line |
-| [date.sh](docs/date.md)        | Dates, timestamps, day arithmetic — GNU and BSD     |
-| [i18n.sh](docs/i18n.md)        | Translations, plural rules, locale-aware numbers, money, sizes and dates |
+| Module                        | Tier | What you get                                       |
+| ----------------------------- | --- | -------------------------------------------------- |
+| [array.sh](docs/array.md)      | stable | Array manipulation                                  |
+| [math.sh](docs/math.md)        | stable | Exact decimal arithmetic, rounding, aggregates — no `bc`, no float drift |
+| [string.sh](docs/string.md)    | stable | String operations                                   |
+| [text.sh](docs/text.md)        | experimental | Multi-line text blocks and formatting               |
+| [json.sh](docs/json.md)        | stable | JSON and YAML reading/writing                       |
+| [table.sh](docs/table.md)      | experimental | Aligned plain-text and Markdown tables, from CSV or JSON too |
+| [markdown.sh](docs/markdown.md) | experimental | Headings, lists, links, badges and code blocks, with every value escaped |
+| [csv.sh](docs/csv.md)          | experimental | Real CSV: quoted fields, embedded commas and newlines, filtering, JSON bridge |
+| [diff.sh](docs/diff.md)        | experimental | Colored unified diffs, and JSON/YAML compared by key rather than by line |
+| [date.sh](docs/date.md)        | stable | Dates, timestamps, day arithmetic — GNU and BSD     |
+| [i18n.sh](docs/i18n.md)        | experimental | Translations, plural rules, locale-aware numbers, money, sizes and dates |
 
 ### 🖥️ CLI building
 
-| Module               | What you get                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [cli.sh](docs/cli.md) | Declarative option parser with "did you mean" suggestions, generated `--no-` switches, counting `-vv` flags, options bound to config keys, prompts for missing values, env fallbacks, automatic `--help`, and generated JSON schema / shell completion / man pages |
-| [tui.sh](docs/tui.md) | Spinners, progress bars, arrow-key single and multi select menus, and confirmations — each one falling back to a numbered prompt or a log line when there is no terminal, so the same script runs unattended |
-| [screen.sh](docs/screen.md) | Full-screen applications: a constraint layout solver, blocks, lists, tables, gauges, tabs, scrollbars, sparklines, bar and Braille line charts, popups, and an event loop with keys, mouse and resize |
+| Module               | Tier | What you get                                                                                                 |
+| -------------------- | --- | ------------------------------------------------------------------------------------------------------------ |
+| [cli.sh](docs/cli.md) | stable | Declarative option parser with "did you mean" suggestions, generated `--no-` switches, counting `-vv` flags, options bound to config keys, prompts for missing values, env fallbacks, automatic `--help`, and generated JSON schema / shell completion / man pages |
+| [tui.sh](docs/tui.md) | experimental | Spinners, progress bars, arrow-key single and multi select menus, and confirmations — each one falling back to a numbered prompt or a log line when there is no terminal, so the same script runs unattended |
+| [screen.sh](docs/screen.md) | experimental | Full-screen applications: a constraint layout solver, blocks, lists, tables, gauges, tabs, scrollbars, sparklines, bar and Braille line charts, popups, and an event loop with keys, mouse and resize |
 
 ### 📁 Files & system
 
-| Module                          | What you get                                     |
-| ------------------------------- | ------------------------------------------------ |
-| [file.sh](docs/file.md)          | Paths, XDG dirs, temp files, atomic rewrites, idempotent lines, checksums, upward search |
-| [archive.sh](docs/archive.md)    | Create, extract and list archives                 |
-| [backup.sh](docs/backup.md)      | Timestamped snapshots, checksum sidecars, retention pruning |
-| [os.sh](docs/os.md)              | Platform/distro and architecture detection        |
-| [pkg.sh](docs/pkg.md)            | Detect the package manager and install dependencies, with confirmation and dry-run |
-| [privilege.sh](docs/privilege.md) | Ask for sudo once, hold it for the whole run, and stop children prompting |
+| Module                          | Tier | What you get                                     |
+| ------------------------------- | --- | ------------------------------------------------ |
+| [file.sh](docs/file.md)          | stable | Paths, XDG dirs, temp files, atomic rewrites, idempotent lines, checksums, upward search |
+| [archive.sh](docs/archive.md)    | stable | Create, extract and list archives                 |
+| [backup.sh](docs/backup.md)      | experimental | Timestamped snapshots, checksum sidecars, retention pruning |
+| [os.sh](docs/os.md)              | stable | Platform/distro and architecture detection        |
+| [pkg.sh](docs/pkg.md)            | experimental | Detect the package manager and install dependencies, with confirmation and dry-run |
+| [privilege.sh](docs/privilege.md) | experimental | Ask for sudo once, hold it for the whole run, and stop children prompting |
 
 ### 🌐 Network & notifications
 
-| Module                                    | What you get                                                    |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| [network.sh](docs/network.md)              | `curl` wrapper with retry, rate limiting, pagination and auth     |
-| [notification.sh](docs/notification.md)    | Slack, Telegram, Teams, Google Chat, Discord, generic webhooks     |
+| Module                                    | Tier | What you get                                                    |
+| ----------------------------------------- | --- | ---------------------------------------------------------------- |
+| [network.sh](docs/network.md)              | stable | `curl` wrapper with retry, rate limiting, pagination and auth     |
+| [notification.sh](docs/notification.md)    | experimental | Slack, Telegram, Teams, Google Chat, Discord, generic webhooks     |
 
 ### 🔐 Configuration & secrets
 
-| Module                          | What you get                                                     |
-| ------------------------------- | ----------------------------------------------------------------- |
-| [validate.sh](docs/validate.md)  | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
-| [config.sh](docs/config.md)      | Config files + env vars with precedence and schema validation      |
-| [secret.sh](docs/secret.md)      | Read secrets safely, mask them in output, shred and wipe them      |
-| [safety.sh](docs/safety.md)      | Confirm-or-refuse guards for rm, overwrite, extract, system changes |
+| Module                          | Tier | What you get                                                     |
+| ------------------------------- | --- | ----------------------------------------------------------------- |
+| [validate.sh](docs/validate.md)  | stable | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
+| [config.sh](docs/config.md)      | stable | Config files + env vars with precedence and schema validation      |
+| [secret.sh](docs/secret.md)      | stable | Read secrets safely, mask them in output, shred and wipe them      |
+| [safety.sh](docs/safety.md)      | stable | Confirm-or-refuse guards for rm, overwrite, extract, system changes |
 
 ### 🤖 AI
 
-| Module                      | What you get                                                                           |
-| --------------------------- | ---------------------------------------------------------------------------------------- |
-| [ai.sh](docs/ai.md)          | Call Claude, OpenAI-compatible APIs, Ollama or a local CLI — conversations, JSON output, streaming, tool use, budgets |
-| [agent.sh](docs/agent.md)    | Make your script agent-safe — JSON results, tool/MCP definitions generated from your CLI spec, an allowlist gate, an audit log |
+| Module                      | Tier | What you get                                                                           |
+| --------------------------- | --- | ---------------------------------------------------------------------------------------- |
+| [ai.sh](docs/ai.md)          | experimental | Call Claude, OpenAI-compatible APIs, Ollama or a local CLI — conversations, JSON output, streaming, tool use, budgets |
+| [agent.sh](docs/agent.md)    | experimental | Make your script agent-safe — JSON results, tool/MCP definitions generated from your CLI spec, an allowlist gate, an audit log |
 
 ### 🛠 Dev workflow
 
-| Module                        | What you get                                            |
-| ----------------------------- | -------------------------------------------------------- |
-| [git.sh](docs/git.md)          | Repo metadata, branches, tags, commits, remotes, reachability |
-| [semver.sh](docs/semver.md)    | Parse, validate, compare, bump, sort and range-match semantic versions |
-| [release.sh](docs/release.md)  | Version from commits, changelog, per-platform artifacts, checksums, signing |
-| [forge.sh](docs/forge.md)      | Publish to GitHub or GitLab: releases, assets, and issues that comment instead of duplicating |
-| [testing.sh](docs/testing.md)  | File/JSON/YAML assertions, CLI snapshots, mocks, fixtures |
-| [metrics.sh](docs/metrics.md)  | Command timing, counters, retry/HTTP/error stats, Prometheus export |
-| [doctor.sh](docs/doctor.md)    | Report the Bash version, the library version and every external tool the loaded modules need |
+| Module                        | Tier | What you get                                            |
+| ----------------------------- | --- | -------------------------------------------------------- |
+| [git.sh](docs/git.md)          | stable | Repo metadata, branches, tags, commits, remotes, reachability |
+| [semver.sh](docs/semver.md)    | stable | Parse, validate, compare, bump, sort and range-match semantic versions |
+| [release.sh](docs/release.md)  | experimental | Version from commits, changelog, per-platform artifacts, checksums, signing |
+| [forge.sh](docs/forge.md)      | experimental | Publish to GitHub or GitLab: releases, assets, and issues that comment instead of duplicating |
+| [testing.sh](docs/testing.md)  | experimental | File/JSON/YAML assertions, CLI snapshots, mocks, fixtures |
+| [metrics.sh](docs/metrics.md)  | experimental | Command timing, counters, retry/HTTP/error stats, Prometheus export |
+| [doctor.sh](docs/doctor.md)    | experimental | Report the Bash version, the library version and every external tool the loaded modules need |
 
 ## 🗂 Directory Structure
 

@@ -406,3 +406,26 @@ fake_versioned_command() {
   assert_output --partial "Optional, too old: oldtool>=2 (found 1.0.0)"
   unset 'DYBATPHO_DOCTOR_OPTIONAL[string]'
 }
+
+@test "dybatpho::doctor lists the tier and the soft dependencies of each module" {
+  run_traced -0 dybatpho::doctor --modules "string math csv"
+  assert_output --partial "MODULE  TIER          LOADS ON DEMAND"
+  assert_output --regexp $'\n''string +stable +-'$'\n'
+  assert_output --regexp $'\n''csv +experimental +json'$'\n'
+  # A soft dependency is not widened into the scope: it loads only when needed.
+  assert_output --partial "modules  string math csv"
+}
+
+@test "dybatpho::doctor --json carries the tier and the soft dependencies of each module" {
+  run_traced -0 dybatpho::doctor --modules "math csv" --json
+  assert_output --partial '"tiers":{"math":"stable","csv":"experimental"}'
+  assert_output --partial '"soft_dependencies":{"math":[],"csv":["json"]}'
+  printf '%s' "${output}" | jq -e '.tiers.csv == "experimental" and .soft_dependencies.csv == ["json"]'
+}
+
+@test "dybatpho::doctor fails on a soft dependency the registry does not know" {
+  __dybatpho_module_soft_deps[array]="nosuch"
+  run_traced -1 dybatpho::doctor --modules array
+  assert_output --partial "Unknown module dependency: array ~> nosuch"
+  unset '__dybatpho_module_soft_deps[array]'
+}

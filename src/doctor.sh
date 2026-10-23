@@ -61,6 +61,13 @@
 #   the tools a dependency needs are reported too. An edge naming a module the
 #   registry does not know fails the report, because the loader would stop on
 #   it; a cycle is only noted, because the loader allows one.
+#
+#   Every module is listed with its stability tier, `stable` or `experimental`
+#   (see `dybatpho::module_tier`), and with its soft dependencies: the modules
+#   it loads on demand the first time a function that needs one runs. Those are
+#   not widened into the report, since a script that never takes that path
+#   never loads them; a soft dependency naming an unknown module fails the
+#   report like any other edge.
 # @see
 #   - `example/doctor_ops.sh`
 #   - `scripts/bundle.sh`
@@ -362,6 +369,16 @@ function __dybatpho_doctor_graph {
     done
   done
 
+  # A soft dependency is loaded on demand rather than up front, so it does not
+  # widen the scope, but an unknown name would still fail at the call site.
+  for module in ${known[@]+"${known[@]}"}; do
+    # shellcheck disable=SC2154 # the soft dependency map is declared by `init.sh`
+    for dep in ${__dybatpho_module_soft_deps[${module}]-}; do
+      __dybatpho_module_exists "${dep}" \
+        || __graph_unknown+=("${module} ~> ${dep}")
+    done
+  done
+
   if [[ "${expand}" == "expand" ]]; then
     __graph_modules=(${known[@]+"${known[@]}"})
   fi
@@ -436,6 +453,19 @@ function __dybatpho_doctor_report_text {
   fi
   printf 'graph    %s\n' "${graph:-ok}"
 
+  # One row per module: its stability tier, and the modules it loads on demand.
+  local module_width=6 module
+  for module in "$@"; do
+    ((${#module} <= module_width)) || module_width=${#module}
+  done
+  printf '\n%-*s  %-12s  %s\n' "${module_width}" "MODULE" "TIER" "LOADS ON DEMAND"
+  for module in "$@"; do
+    # shellcheck disable=SC2154 # the registry maps are declared by `init.sh`
+    printf '%-*s  %-12s  %s\n' "${module_width}" "${module}" \
+      "${__dybatpho_module_tiers[${module}]-experimental}" \
+      "${__dybatpho_module_soft_deps[${module}]:--}"
+  done
+
   if ((${#__rows_in[@]} == 0)); then
     printf '\nNo external dependency is needed by these modules.\n'
     return 0
@@ -443,7 +473,8 @@ function __dybatpho_doctor_report_text {
 
   # Width of the two variable columns, so the table stays readable whatever the
   # module and command names are.
-  local module_width=6 spec_width=10 row module spec
+  local spec_width=10 row spec
+  module_width=6
   for row in "${__rows_in[@]}"; do
     IFS=$'\t' read -r module spec _ _ _ _ <<< "${row}"
     ((${#module} <= module_width)) || module_width=${#module}
@@ -514,6 +545,34 @@ function __dybatpho_doctor_report_json {
     printf '"%s"' "${module_json}"
   done
   printf ']'
+  # Tiers and soft dependencies are keyed by module, so a consumer reads
+  # `.tiers.csv` rather than searching a list.
+  local dep dep_json dep_first
+  printf ',"tiers":{'
+  first=1
+  for module in "$@"; do
+    ((first)) || printf ','
+    first=0
+    __dybatpho_log_json_escape_into module_json "${module}"
+    printf '"%s":"%s"' "${module_json}" "${__dybatpho_module_tiers[${module}]-experimental}"
+  done
+  printf '},"soft_dependencies":{'
+  first=1
+  for module in "$@"; do
+    ((first)) || printf ','
+    first=0
+    __dybatpho_log_json_escape_into module_json "${module}"
+    printf '"%s":[' "${module_json}"
+    dep_first=1
+    for dep in ${__dybatpho_module_soft_deps[${module}]-}; do
+      ((dep_first)) || printf ','
+      dep_first=0
+      __dybatpho_log_json_escape_into dep_json "${dep}"
+      printf '"%s"' "${dep_json}"
+    done
+    printf ']'
+  done
+  printf '}'
   local cycle_json="false" edge edge_json
   ((cycle == 0)) || cycle_json="true"
   printf ',"graph":{"cycle":%s,"unknown":[' "${cycle_json}"

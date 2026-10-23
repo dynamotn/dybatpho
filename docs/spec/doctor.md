@@ -136,6 +136,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - A dependency's path, a version or the library directory holds a control character, such as an ANSI escape.
 - A module asked for explicitly loads other modules, whose own external dependencies a check on that module alone would miss.
 - A registry edge points at a name that is not a module, or the edges form a cycle, which the loader allows.
+- A module has soft dependencies, which it loads on demand and which a bundle cannot load on demand.
 
 ## Requirements *(mandatory)*
 
@@ -170,6 +171,9 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **FR-018**: The JSON report MUST escape every control character in the strings it writes, so it parses whatever a path or version holds, and MUST do so without `jq`.
 - **FR-019**: `scripts/bundle.sh` MUST read every bootstrap function it copies from `init.sh` before it opens the output, and MUST stop without writing a bundle when one cannot be found.
 - **FR-020**: A generated bundle MUST carry the registry's dependency edges between the modules it holds, so the report walks the same graph inside the bundle as outside it.
+
+- **FR-021**: The report MUST list every module it covers with its stability tier and its soft dependencies, as a table in the text report and as `tiers` and `soft_dependencies` objects keyed by module in the JSON one, MUST NOT widen its scope along a soft dependency, and MUST fail on a soft dependency naming an unknown module.
+- **FR-022**: A generated bundle MUST carry the stability tier of each module it holds and the soft dependencies between them. The bundler MUST name, in its output and in the bundle's header, every soft dependency it leaves out, and `--with-soft-deps` MUST widen the selection until every soft dependency is carried. Inside a bundle, a function needing a soft dependency it does not carry MUST stop with the command that regenerates it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -221,6 +225,8 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **IT-016**: Verify the bundler rejects an unknown module and keeps the module source verbatim apart from the shebang.
 - **IT-017**: Verify a dependency found under a directory whose name holds an ANSI escape and a `\x01` is reported with `\u001b` and `\u0001`, and that the report parses.
 - **IT-018**: Bundle from a copy of the library whose `init.sh` misspells a bootstrap function header, and fail with no output file.
+- **IT-019**: Verify the text report lists each module with its tier and soft dependencies without widening the scope along them, the JSON report carries `tiers` and `soft_dependencies`, and an unknown soft dependency fails the report.
+- **IT-020**: Verify a bundle answers `dybatpho::module_tier` and the tier selections, names the soft dependencies it leaves out in its output and header, stops a call needing one with the regeneration hint, and with `--with-soft-deps` carries them and converts.
 
 ## Acceptance Criteria *(mandatory)*
 

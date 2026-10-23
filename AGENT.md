@@ -123,49 +123,74 @@ the pattern: it writes a `curl` executable into a temporary directory and puts
 that directory first on `PATH`. A shell function is not enough — the network
 module calls `command curl` on purpose, which bypasses functions.
 
-| Module | Primary responsibility | Tests / documentation |
-| --- | --- | --- |
-| `agent.sh` | Agent detection, structured results and errors, allowlist gate, audit log, and tool/MCP definitions generated from a CLI spec | `test/agent.bats`, `docs/agent.md`, `docs/spec/agent.md` |
-| `ai.sh` | Language model calls across Claude, OpenAI-compatible, Ollama, and CLI backends, with conversations, JSON output, streaming, tool use, caching, and budgets | `test/ai.bats`, `docs/ai.md`, `docs/spec/ai.md` |
-| `array.sh` | Create, read, join, filter, and manipulate Bash arrays | `test/array.bats`, `docs/array.md`, `docs/spec/array.md` |
-| `archive.sh` | Create, extract, and inspect archives | `test/archive.bats`, `docs/archive.md`, `docs/spec/archive.md` |
-| `backup.sh` | Timestamped snapshots written atomically, checksum sidecars, newest-first listing, guarded restore, and retention pruning | `test/backup.bats`, `docs/backup.md`, `docs/spec/backup.md` |
-| `cli.sh` | Declarative parser, help, subcommands, typo suggestions, config-bound options, completions, and CLI artifacts | `test/cli.bats`, `docs/cli.md`, `docs/spec/cli.md` |
-| `config.sh` | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `docs/config.md`, `docs/spec/config.md` |
-| `date.sh` | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `docs/date.md`, `docs/spec/date.md` |
-| `diff.sh` | Colored unified text diffs, structural JSON/YAML comparison by key, and a one-line change summary | `test/diff.bats`, `docs/diff.md`, `docs/spec/diff.md` |
-| `doctor.sh` | Environment report: Bash version, library version, the module dependency graph, and the external commands the loaded modules declare | `test/doctor.bats`, `docs/doctor.md`, `docs/spec/doctor.md` |
-| `file.sh` | Path and XDG helpers, upward search, directory creation, temporary files, atomic content rewrites, checksums, and metadata | `test/file.bats`, `docs/file.md`, `docs/spec/file.md` |
-| `forge.sh` | GitHub and GitLab detection from the remote, authenticated requests, issues, and releases | `test/forge.bats`, `docs/forge.md`, `docs/spec/forge.md` |
-| `git.sh` | Safe repository, branch, commit, reachability, and Git operations | `test/git.bats`, `docs/git.md`, `docs/spec/git.md` |
-| `helpers.sh` | Argument validation, command lookup, retry, and common helpers | `test/helpers.bats`, `docs/helpers.md`, `docs/spec/helpers.md` |
-| `i18n.sh` | Message catalogs, plural rules, and locale-aware numbers, money, sizes, dates, and text direction | `test/i18n.bats`, `docs/i18n.md`, `docs/spec/i18n.md` |
-| `json.sh` | Query, validate, pretty-print, and convert JSON/YAML | `test/json.bats`, `docs/json.md`, `docs/spec/json.md` |
-| `lock.sh` | Portable `ln -s`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `docs/lock.md`, `docs/spec/lock.md` |
-| `logging.sh` | Log levels, text/JSON logging, banners, and Bash tracing | `test/logging.bats`, `docs/logging.md`, `docs/spec/logging.md` |
-| `csv.sh` | RFC 4180 CSV: parsing quoted fields, reading columns, filtering rows, writing back, and converting to and from JSON | `test/csv.bats`, `docs/csv.md`, `docs/spec/csv.md` |
-| `markdown.sh` | Markdown builders for headings, lists, task lists, links, badges, code blocks, tables and collapsible sections, escaping every interpolated value | `test/markdown.bats`, `docs/markdown.md`, `docs/spec/markdown.md` |
-| `metrics.sh` | Timing, counters, and Prometheus text export, plus the retry/HTTP/error instrumentation | `test/metrics.bats`, `docs/metrics.md`, `docs/spec/metrics.md` |
-| `network.sh` | Curl wrappers, retries, JSON requests, and HTTP metadata | `test/network.bats`, `docs/network.md`, `docs/spec/network.md` |
-| `notification.sh` | Webhook notifications and JSON payloads | `test/notification.bats`, `docs/notification.md`, `docs/spec/notification.md` |
-| `os.sh` | OS, architecture, distribution, and host facts: name, user, processors, terminal size, root/container/WSL/CI detection | `test/os.bats`, `docs/os.md`, `docs/spec/os.md` |
-| `privilege.sh` | Acquiring an escalation once, holding its ticket for the run, shielding children from prompting, and tearing it all down | `test/privilege.bats`, `docs/privilege.md`, `docs/spec/privilege.md` |
-| `process.sh` | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `docs/process.md`, `docs/spec/process.md` |
-| `parallel.sh` | Bounded worker pool with ordered output and per-job exit codes | `test/parallel.bats`, `docs/parallel.md`, `docs/spec/parallel.md` |
-| `pkg.sh` | Package manager detection and guarded dependency installation | `test/pkg.bats`, `docs/pkg.md`, `docs/spec/pkg.md` |
-| `queue.sh` | Durable filesystem job queue: locked atomic claim, claimed-not-consumed jobs, retry budgets, and dead letters | `test/queue.bats`, `docs/queue.md`, `docs/spec/queue.md` |
-| `release.sh` | Version bumping from commits, changelog generation, per-platform packaging, checksums, and signing | `test/release.bats`, `docs/release.md`, `docs/spec/release.md` |
-| `safety.sh` | Guards for destructive operations: removal, overwrite, extraction, and system changes | `test/safety.bats`, `docs/safety.md`, `docs/spec/safety.md` |
-| `secret.sh` | Read, mask, and store secrets safely | `test/secret.bats`, `docs/secret.md`, `docs/spec/secret.md` |
-| `semver.sh` | Semantic version parsing, comparison, ranges, ordering, and validation | `test/semver.bats`, `docs/semver.md`, `docs/spec/semver.md` |
-| `string.sh` | Case conversion, matching, splitting, trimming, and predicates | `test/string.bats`, `docs/string.md`, `docs/spec/string.md` |
-| `table.sh` | Plain-text, boxed and Markdown table rendering, from delimited rows, parsed CSV, or JSON records | `test/table.bats`, `docs/table.md`, `docs/spec/table.md` |
-| `text.sh` | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `docs/text.md`, `docs/spec/text.md` |
-| `tui.sh` | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `docs/tui.md`, `docs/spec/tui.md` |
-| `schedule.sh` | Fixed-cadence loops, burst debounce, once-per-period markers that outlive the process, and a cron due-predicate | `test/schedule.bats`, `docs/schedule.md`, `docs/spec/schedule.md` |
-| `screen.sh` | Full-screen applications: alternate screen and raw mode, a constraint layout solver, a widget set, Unicode-correct column measurement, and an event loop over keys, mouse and resize | `test/screen.bats`, `docs/screen.md`, `docs/spec/screen.md` |
-| `testing.sh` | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `docs/testing.md`, `docs/spec/testing.md` |
-| `validate.sh` | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `docs/validate.md`, `docs/spec/validate.md` |
+| Module | Tier | Primary responsibility | Tests / documentation |
+| --- | --- | --- | --- |
+| `agent.sh` | experimental | Agent detection, structured results and errors, allowlist gate, audit log, and tool/MCP definitions generated from a CLI spec | `test/agent.bats`, `docs/agent.md`, `docs/spec/agent.md` |
+| `ai.sh` | experimental | Language model calls across Claude, OpenAI-compatible, Ollama, and CLI backends, with conversations, JSON output, streaming, tool use, caching, and budgets | `test/ai.bats`, `docs/ai.md`, `docs/spec/ai.md` |
+| `array.sh` | stable | Create, read, join, filter, and manipulate Bash arrays | `test/array.bats`, `docs/array.md`, `docs/spec/array.md` |
+| `archive.sh` | stable | Create, extract, and inspect archives | `test/archive.bats`, `docs/archive.md`, `docs/spec/archive.md` |
+| `backup.sh` | experimental | Timestamped snapshots written atomically, checksum sidecars, newest-first listing, guarded restore, and retention pruning | `test/backup.bats`, `docs/backup.md`, `docs/spec/backup.md` |
+| `cache.sh` | experimental | Command output cached on disk with a TTL, stale-while-revalidate refreshes, waiting, pruning, and statistics | `test/cache.bats`, `docs/cache.md`, `docs/spec/cache.md` |
+| `cli.sh` | stable | Declarative parser, help, subcommands, typo suggestions, config-bound options, completions, and CLI artifacts | `test/cli.bats`, `docs/cli.md`, `docs/spec/cli.md` |
+| `config.sh` | stable | Load dotenv, JSON/YAML configuration, precedence, typed schema validation, and configuration docs | `test/config.bats`, `docs/config.md`, `docs/spec/config.md` |
+| `date.sh` | stable | Portable date/time parsing, formatting, and calculations | `test/date.bats`, `docs/date.md`, `docs/spec/date.md` |
+| `diff.sh` | experimental | Colored unified text diffs, structural JSON/YAML comparison by key, and a one-line change summary | `test/diff.bats`, `docs/diff.md`, `docs/spec/diff.md` |
+| `doctor.sh` | experimental | Environment report: Bash version, library version, the module dependency graph, and the external commands the loaded modules declare | `test/doctor.bats`, `docs/doctor.md`, `docs/spec/doctor.md` |
+| `file.sh` | stable | Path and XDG helpers, upward search, directory creation, temporary files, atomic content rewrites, checksums, and metadata | `test/file.bats`, `docs/file.md`, `docs/spec/file.md` |
+| `forge.sh` | experimental | GitHub and GitLab detection from the remote, authenticated requests, issues, and releases | `test/forge.bats`, `docs/forge.md`, `docs/spec/forge.md` |
+| `git.sh` | stable | Safe repository, branch, commit, reachability, and Git operations | `test/git.bats`, `docs/git.md`, `docs/spec/git.md` |
+| `helpers.sh` | stable | Argument validation, command lookup, retry, and common helpers | `test/helpers.bats`, `docs/helpers.md`, `docs/spec/helpers.md` |
+| `i18n.sh` | experimental | Message catalogs, plural rules, and locale-aware numbers, money, sizes, dates, and text direction | `test/i18n.bats`, `docs/i18n.md`, `docs/spec/i18n.md` |
+| `json.sh` | stable | Query, validate, pretty-print, and convert JSON/YAML | `test/json.bats`, `docs/json.md`, `docs/spec/json.md` |
+| `lock.sh` | stable | Portable `ln -s`-based process locks, waiting, stale reclaim, and `with_lock` | `test/lock.bats`, `docs/lock.md`, `docs/spec/lock.md` |
+| `logging.sh` | stable | Log levels, text/JSON logging, banners, and Bash tracing | `test/logging.bats`, `docs/logging.md`, `docs/spec/logging.md` |
+| `csv.sh` | experimental | RFC 4180 CSV: parsing quoted fields, reading columns, filtering rows, writing back, and converting to and from JSON | `test/csv.bats`, `docs/csv.md`, `docs/spec/csv.md` |
+| `markdown.sh` | experimental | Markdown builders for headings, lists, task lists, links, badges, code blocks, tables and collapsible sections, escaping every interpolated value | `test/markdown.bats`, `docs/markdown.md`, `docs/spec/markdown.md` |
+| `math.sh` | stable | Exact decimal arithmetic, comparison, rounding, and aggregation without `bc` | `test/math.bats`, `docs/math.md`, `docs/spec/math.md` |
+| `metrics.sh` | experimental | Timing, counters, and Prometheus text export, plus the retry/HTTP/error instrumentation | `test/metrics.bats`, `docs/metrics.md`, `docs/spec/metrics.md` |
+| `network.sh` | stable | Curl wrappers, retries, JSON requests, and HTTP metadata | `test/network.bats`, `docs/network.md`, `docs/spec/network.md` |
+| `notification.sh` | experimental | Webhook notifications and JSON payloads | `test/notification.bats`, `docs/notification.md`, `docs/spec/notification.md` |
+| `os.sh` | stable | OS, architecture, distribution, and host facts: name, user, processors, terminal size, root/container/WSL/CI detection | `test/os.bats`, `docs/os.md`, `docs/spec/os.md` |
+| `privilege.sh` | experimental | Acquiring an escalation once, holding its ticket for the run, shielding children from prompting, and tearing it all down | `test/privilege.bats`, `docs/privilege.md`, `docs/spec/privilege.md` |
+| `process.sh` | stable | Traps, cleanup, dry-run, and process lifecycle | `test/process.bats`, `docs/process.md`, `docs/spec/process.md` |
+| `parallel.sh` | experimental | Bounded worker pool with ordered output and per-job exit codes | `test/parallel.bats`, `docs/parallel.md`, `docs/spec/parallel.md` |
+| `pkg.sh` | experimental | Package manager detection and guarded dependency installation | `test/pkg.bats`, `docs/pkg.md`, `docs/spec/pkg.md` |
+| `queue.sh` | experimental | Durable filesystem job queue: locked atomic claim, claimed-not-consumed jobs, retry budgets, and dead letters | `test/queue.bats`, `docs/queue.md`, `docs/spec/queue.md` |
+| `release.sh` | experimental | Version bumping from commits, changelog generation, per-platform packaging, checksums, and signing | `test/release.bats`, `docs/release.md`, `docs/spec/release.md` |
+| `safety.sh` | stable | Guards for destructive operations: removal, overwrite, extraction, and system changes | `test/safety.bats`, `docs/safety.md`, `docs/spec/safety.md` |
+| `secret.sh` | stable | Read, mask, and store secrets safely | `test/secret.bats`, `docs/secret.md`, `docs/spec/secret.md` |
+| `semver.sh` | stable | Semantic version parsing, comparison, ranges, ordering, and validation | `test/semver.bats`, `docs/semver.md`, `docs/spec/semver.md` |
+| `string.sh` | stable | Case conversion, matching, splitting, trimming, and predicates | `test/string.bats`, `docs/string.md`, `docs/spec/string.md` |
+| `table.sh` | experimental | Plain-text, boxed and Markdown table rendering, from delimited rows, parsed CSV, or JSON records | `test/table.bats`, `docs/table.md`, `docs/spec/table.md` |
+| `text.sh` | experimental | Multiline text processing, indentation, wrapping, and formatting | `test/text.bats`, `docs/text.md`, `docs/spec/text.md` |
+| `tui.sh` | experimental | Interactive widgets for a running script: spinners, progress bars, arrow-key single and multi select menus, and confirmations, each with a rendering for when there is no terminal | `test/tui.bats`, `docs/tui.md`, `docs/spec/tui.md` |
+| `schedule.sh` | experimental | Fixed-cadence loops, burst debounce, once-per-period markers that outlive the process, and a cron due-predicate | `test/schedule.bats`, `docs/schedule.md`, `docs/spec/schedule.md` |
+| `screen.sh` | experimental | Full-screen applications: alternate screen and raw mode, a constraint layout solver, a widget set, Unicode-correct column measurement, and an event loop over keys, mouse and resize | `test/screen.bats`, `docs/screen.md`, `docs/spec/screen.md` |
+| `testing.sh` | experimental | Extended assertions, CLI snapshots, env/command/HTTP mocks, and self-cleaning fixtures | `test/testing.bats`, `docs/testing.md`, `docs/spec/testing.md` |
+| `validate.sh` | stable | One validator for the library: named value types (`email`, `port`, `ipv4`, `semver`, existing paths), declarative rules, and a registration point for types of your own | `test/validate.bats`, `docs/validate.md`, `docs/spec/validate.md` |
+
+### Stability tiers
+
+Every module carries a tier in `__dybatpho_module_tiers` in `init.sh`, shown in
+the table above, in `README.md`, by `dybatpho::module_tier`, by
+`dybatpho::module_list stable|experimental`, by `dybatpho::doctor`, and inside a
+bundle:
+
+- **stable** — the public contract holds across minor releases. Removing or
+  changing a public function, argument, output, or exit code needs a
+  deprecation first: mark it (`deprecated:` for a CLI option, a `@deprecated`
+  note and a `dybatpho::warn` for a function), ship that in at least one minor
+  release, and remove it no earlier than the next major. The core modules are
+  always stable.
+- **experimental** — may change in any minor release, with a changelog entry
+  but without a deprecation window.
+
+A stable module MUST NOT depend, through `__dybatpho_module_deps`, on an
+experimental one; a soft dependency on one is allowed, since it loads only when
+a caller reaches the function that needs it. `test/init.bats` enforces both the
+coverage of the map and this rule. A new module starts as `experimental`;
+promoting it to `stable` is a deliberate, changelogged decision, and demoting a
+stable module is a breaking change.
 
 ### Module registry
 
@@ -196,10 +221,13 @@ A new module in `src/` is not reachable until it is registered in `init.sh`:
    turns out to be undefined. An edge naming a module the registry does not
    know makes `dybatpho::doctor` fail, since it walks the same map with
    `dybatpho::array_toposort`.
-3. Extend `test/init.bats` when the module adds a dependency edge worth pinning.
+3. Give the module a tier in `__dybatpho_module_tiers` — `experimental` for a
+   new module, see Stability tiers above — and record in
+   `__dybatpho_module_soft_deps` every module it loads on demand.
+4. Extend `test/init.bats` when the module adds a dependency edge worth pinning.
    The suite already fails when a registered module has no file under `src/`,
    and when the registry and `src/` drift apart.
-4. Give the module's example an explicit `--modules` line, and add the module to
+5. Give the module's example an explicit `--modules` line, and add the module to
    any other script that needs it. Nothing loads implicitly any more.
 
 The registry and `src/` must list the same modules. The check is:
@@ -236,8 +264,9 @@ for s in src/*.sh; do
 done
 ```
 
-Every line it prints must appear in `__dybatpho_module_deps`, **except a call
-guarded by `declare -F`**. Such a call is an optional hook, not a dependency: it
+Every line it prints must appear in `__dybatpho_module_deps` or, for a module
+loaded on demand, in `__dybatpho_module_soft_deps`, **except a call guarded by
+`declare -F`**. Such a call is an optional hook, not a dependency: it
 does nothing unless the other module happens to be loaded, so recording it as an
 edge would drag that module in and, for a core module, create a forbidden
 dependency on an optional one. Today this applies to the `metrics` hooks in
@@ -257,6 +286,23 @@ deliberate: it keeps a second module out of the scan and leaves one place where
 the guard has to be right.
 
 Use the same `declare -F` guard for any future hook of this kind.
+
+A **soft dependency** is different from a hook: the function cannot do its job
+without the other module, but only a few functions need it, so recording a hard
+edge would load it -- and the tools it needs -- into every script. Such a
+function calls `__dybatpho_helpers_need_module <module> <internal marker>
+"${FUNCNAME[0]}"` (or `__dybatpho_helpers_load_soft` when it must fail softly,
+like an assertion), which loads the module on demand and stops, naming the
+caller and the module, only when it cannot be loaded. Record the edge in
+`__dybatpho_module_soft_deps`; `test/init.bats` fails when a call site and the
+map disagree, and loads each module alone to prove every soft dependency
+arrives. Two consequences to keep in mind:
+
+- A load inside `$(...)` lives only in that subshell, so a function on a hot
+  path that is usually called through a substitution should say so in its doc
+  and suggest naming the module up front.
+- A bundle has no loader: `scripts/bundle.sh` names the soft dependencies it
+  leaves out, and `--with-soft-deps` carries them.
 
 **The guard must name an internal `__dybatpho_` helper of the other module, never
 a public `dybatpho::` function.** Public functions are exported and a child shell

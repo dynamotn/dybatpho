@@ -534,11 +534,11 @@ declare -gA __dybatpho_i18n_plural_family=(
   [en]=one [de]=one [nl]=one [sv]=one [da]=one [no]=one [nb]=one [nn]=one
   [fi]=one [et]=one [el]=one [es]=one [it]=one [bg]=one [ca]=one [eu]=one
   [gl]=one [hu]=one [tr]=one [az]=one [kk]=one [ky]=one [uz]=one [sq]=one
-  [sw]=one [af]=one [zu]=one [ta]=one [te]=one [kn]=one [ml]=one [mr]=one
-  [pa]=one [gu]=one [ur]=one [ne]=one [si]=one [ka]=one [hy]=one [eo]=one
-  [ast]=one [nso]=one
+  [sw]=one [af]=one [ta]=one [te]=one [ml]=one [mr]=one
+  [ur]=one [ne]=one [ka]=one [eo]=one [ast]=one
   [pt]=pt [fr]=fr [hi]=hi [fa]=hi [bn]=hi [am]=hi [as]=hi
-  [ru]=ru [uk]=ru [be]=ru [sr]=ru [hr]=ru [bs]=ru [sh]=ru
+  [zu]=hi [kn]=hi [gu]=hi [pa]=hi [si]=hi [hy]=hi [nso]=hi
+  [ru]=ru [uk]=ru [be]=ru [sr]=sr [hr]=sr [bs]=sr [sh]=sr
   [pl]=pl [cs]=cs [sk]=cs
   [ar]=ar [he]=he [iw]=he [lt]=lt [lv]=lv [ro]=ro [mo]=ro [sl]=sl
   [is]=is [mk]=mk [fil]=fil [tl]=fil [cy]=cy [mt]=mt [ga]=ga [gd]=gd
@@ -611,6 +611,25 @@ function __dybatpho_i18n_plural_ru {
     printf 'few'
   else
     printf 'many'
+  fi
+}
+
+#######################################
+# @description Print the plural category for Serbian, Croatian and Bosnian.
+#   The `one` and `few` tests are the Russian ones, but every other count is
+#   `other` rather than `many`, so a catalog written to CLDR is read as written.
+# @arg $1 number Count
+# @stdout Plural category
+# @internal
+#######################################
+function __dybatpho_i18n_plural_sr {
+  local last=$(($1 % 10)) pair=$(($1 % 100))
+  if ((last == 1 && pair != 11)); then
+    printf 'one'
+  elif ((last >= 2 && last <= 4 && (pair < 12 || pair > 14))); then
+    printf 'few'
+  else
+    printf 'other'
   fi
 }
 
@@ -825,7 +844,9 @@ function __dybatpho_i18n_plural_mt {
   local pair=$(($1 % 100))
   if (($1 == 1)); then
     printf 'one'
-  elif (($1 == 0 || (pair >= 2 && pair <= 10))); then
+  elif (($1 == 2)); then
+    printf 'two'
+  elif (($1 == 0 || (pair >= 3 && pair <= 10))); then
     printf 'few'
   elif ((pair >= 11 && pair <= 19)); then
     printf 'many'
@@ -1221,7 +1242,7 @@ declare -gA DYBATPHO_I18N_NUMBER=(
   ["tr.group"]="." ["tr.decimal"]="," ["tr.grouping"]="3" ["tr.minus"]="-" ["tr.percent"]="%#"
   ["vi.group"]="." ["vi.decimal"]="," ["vi.grouping"]="3" ["vi.minus"]="-" ["vi.percent"]="#%"
   ["id.group"]="." ["id.decimal"]="," ["id.grouping"]="3" ["id.minus"]="-" ["id.percent"]="#%"
-  ["pl.decimal"]="," ["pl.grouping"]="3" ["pl.minus"]="-" ["pl.percent"]="# %"
+  ["pl.decimal"]="," ["pl.grouping"]="3" ["pl.minus"]="-" ["pl.percent"]="#%"
   ["ru.decimal"]="," ["ru.grouping"]="3" ["ru.minus"]="-" ["ru.percent"]="# %"
   ["fr.decimal"]="," ["fr.grouping"]="3" ["fr.minus"]="-" ["fr.percent"]="# %"
   ["ja.group"]="," ["ja.decimal"]="." ["ja.grouping"]="3" ["ja.minus"]="-" ["ja.percent"]="#%"
@@ -1253,7 +1274,7 @@ declare -gA DYBATPHO_I18N_CURRENCY=(
   ["TWD.symbol"]='NT$' ["TWD.digits"]=2
   ["THB.symbol"]='฿' ["THB.digits"]=2
   ["ILS.symbol"]='₪' ["ILS.digits"]=2
-  ["AED.symbol"]='د.إ' ["AED.digits"]=2
+  ["AED.symbol"]='د.إ.' ["AED.digits"]=2
   ["AUD.symbol"]='A$' ["AUD.digits"]=2
   ["CAD.symbol"]='CA$' ["CAD.digits"]=2
   ["SEK.symbol"]='kr' ["SEK.digits"]=2
@@ -1263,9 +1284,9 @@ declare -gA DYBATPHO_I18N_CURRENCY=(
   ["CLP.symbol"]='$' ["CLP.digits"]=0
   ["ISK.symbol"]='kr' ["ISK.digits"]=0
   ["IDR.symbol"]='Rp' ["IDR.digits"]=0
-  ["BHD.symbol"]='.د.ب' ["BHD.digits"]=3
-  ["KWD.symbol"]='د.ك' ["KWD.digits"]=3
-  ["TND.symbol"]='د.ت' ["TND.digits"]=3
+  ["BHD.symbol"]='د.ب.' ["BHD.digits"]=3
+  ["KWD.symbol"]='د.ك.' ["KWD.digits"]=3
+  ["TND.symbol"]='د.ت.' ["TND.digits"]=3
 )
 
 # Where the symbol sits relative to the amount, per locale. `¤` is the symbol
@@ -1274,7 +1295,7 @@ declare -gA DYBATPHO_I18N_CURRENCY=(
 declare -gA DYBATPHO_I18N_CURRENCY_LAYOUT=(
   ["en.layout"]='¤#' ["en_GB.layout"]='¤#' ["ja.layout"]='¤#' ["ko.layout"]='¤#'
   ["zh.layout"]='¤#' ["zh_CN.layout"]='¤#' ["zh_TW.layout"]='¤#' ["th.layout"]='¤#'
-  ["hi.layout"]='¤#' ["bn.layout"]='¤#' ["he.layout"]='¤ #' ["ar.layout"]='¤ #'
+  ["hi.layout"]='¤#' ["bn.layout"]='#¤' ["he.layout"]='# ¤' ["ar.layout"]='# ¤'
   ["nl.layout"]='¤ #' ["tr.layout"]='¤#' ["id.layout"]='¤#'
   ["de.layout"]='# ¤' ["fr.layout"]='# ¤' ["es.layout"]='# ¤' ["it.layout"]='# ¤'
   ["pt.layout"]='¤ #' ["pt_BR.layout"]='¤ #' ["ru.layout"]='# ¤' ["pl.layout"]='# ¤'
@@ -1288,7 +1309,8 @@ DYBATPHO_I18N_RTL="${DYBATPHO_I18N_RTL:-ar he fa ur yi dv ps sd ug ckb arc syr n
 
 #######################################
 # @description Seed the locale data that cannot be written as ASCII source.
-#   French and Russian group digits with a narrow no-break space, and the
+#   French groups digits with a narrow no-break space, Russian and Polish with
+#   a no-break space, and the
 #   currency layouts separate symbol from amount with a non-breaking space, so
 #   that neither a terminal nor a text wrapper can split an amount. Older or
 #   reduced `printf` builds do not understand `\u`, so the escape is probed once
@@ -1311,9 +1333,11 @@ function __dybatpho_i18n_seed_symbols {
     narrow=" "
     nbsp=" "
   fi
+  # French groups with the narrow form, Russian and Polish with the full one,
+  # as CLDR has them; `scripts/i18n_cldr.sh` checks which is which.
   DYBATPHO_I18N_NUMBER["fr.group"]="${narrow}"
-  DYBATPHO_I18N_NUMBER["ru.group"]="${narrow}"
-  DYBATPHO_I18N_NUMBER["pl.group"]="${narrow}"
+  DYBATPHO_I18N_NUMBER["ru.group"]="${nbsp}"
+  DYBATPHO_I18N_NUMBER["pl.group"]="${nbsp}"
   local locale layout
   for locale in "${!DYBATPHO_I18N_CURRENCY_LAYOUT[@]}"; do
     layout="${DYBATPHO_I18N_CURRENCY_LAYOUT[${locale}]}"

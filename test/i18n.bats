@@ -337,6 +337,24 @@ _catalog() {
   assert_equal "$(dybatpho::i18n_plural_form 1 pl)" "one"
 }
 
+@test "Serbian and Croatian use other where Russian uses many" {
+  # CLDR gives these languages one, few and other; reading them as Russian
+  # asked a catalog for a many form it has no reason to carry.
+  assert_equal "$(dybatpho::i18n_plural_form 1 sr)" "one"
+  assert_equal "$(dybatpho::i18n_plural_form 3 hr)" "few"
+  assert_equal "$(dybatpho::i18n_plural_form 5 sr)" "other"
+  assert_equal "$(dybatpho::i18n_plural_form 11 bs)" "other"
+}
+
+@test "Maltese has a dual, and Zulu and Armenian count zero as singular" {
+  assert_equal "$(dybatpho::i18n_plural_form 2 mt)" "two"
+  assert_equal "$(dybatpho::i18n_plural_form 3 mt)" "few"
+  assert_equal "$(dybatpho::i18n_plural_form 102 mt)" "other"
+  assert_equal "$(dybatpho::i18n_plural_form 0 zu)" "one"
+  assert_equal "$(dybatpho::i18n_plural_form 0 hy)" "one"
+  assert_equal "$(dybatpho::i18n_plural_form 2 gu)" "other"
+}
+
 @test "Arabic uses all six categories" {
   assert_equal "$(dybatpho::i18n_plural_form 0 ar)" "zero"
   assert_equal "$(dybatpho::i18n_plural_form 1 ar)" "one"
@@ -685,6 +703,10 @@ EOF
   assert_equal "$(dybatpho::i18n_number 1234567 0 fr)" "1 234 567"
 }
 
+@test "Polish writes no space before the percent sign, unlike French" {
+  assert_equal "$(dybatpho::i18n_percent 42 0 pl)" "42%"
+}
+
 @test "Indian locales group by lakh rather than by thousand" {
   assert_equal "$(dybatpho::i18n_number 12345678 0 hi)" "1,23,45,678"
   # Bengali proves the secondary group size is read from the table rather than
@@ -798,7 +820,12 @@ EOF
 }
 
 @test "a currency with three decimal places shows all of them" {
-  assert_equal "$(dybatpho::i18n_currency 1234.5678 BHD en)" ".د.ب1,234.568"
+  assert_equal "$(dybatpho::i18n_currency 1234.5678 BHD en)" "د.ب.1,234.568"
+}
+
+@test "Hebrew, Arabic and Bengali write the symbol after the amount" {
+  assert_equal "$(dybatpho::i18n_currency 1234.5 ILS he)" "1,234.50 ₪"
+  assert_equal "$(dybatpho::i18n_currency 12345 INR bn)" "12,345.00₹"
 }
 
 @test "a lowercase currency code is accepted" {

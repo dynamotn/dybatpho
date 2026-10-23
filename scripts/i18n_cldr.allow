@@ -1,0 +1,52 @@
+# Deliberate deviations of the src/i18n.sh tables from CLDR, as compared by
+# `scripts/i18n_cldr.sh --check`. One entry per line: `TABLE[key] reason`.
+# Checked against cldr-json 49.0.0; `--check` reports an entry that has come to
+# match CLDR so it can be removed, and `--allow ''` shows every difference.
+#
+# The regenerated tables keep the current value of every entry listed here.
+
+# CLDR 49 made Vietnamese count 0 and 1 as `one`; through 48 it had `other`
+# only. Changing it alters every Vietnamese catalog lookup, so it waits for a
+# deliberate decision rather than a data refresh.
+__dybatpho_i18n_plural_family[vi] CLDR 49 added a `one` category for Vietnamese; adopting it changes existing catalogs
+
+# The currency table is not per locale. CLDR's English symbol disambiguates
+# against the yen; the bare sign is what a Chinese reader expects.
+DYBATPHO_I18N_CURRENCY[CNY.symbol] English CLDR writes CN¥ to tell it from the yen; the table keeps the sign readers use
+DYBATPHO_I18N_CURRENCY[ISK.symbol] English CLDR's narrow `kr` is shared with SEK and reads as a word, not an abbreviation, without the Icelandic period
+
+# Abbreviated names: the table uses CLDR's stand-alone or short forms here,
+# without the trailing period, so a name fits a fixed-width column.
+DYBATPHO_I18N_NAMES[de.months_abbr] stand-alone abbreviations, without the period of the format context
+DYBATPHO_I18N_NAMES[de.weekdays_abbr] stand-alone abbreviations, without the period of the format context
+DYBATPHO_I18N_NAMES[pt.months_abbr] abbreviations without the trailing period
+DYBATPHO_I18N_NAMES[pt.weekdays_abbr] abbreviations without the trailing period
+DYBATPHO_I18N_NAMES[pl.weekdays_abbr] abbreviations without the trailing period
+DYBATPHO_I18N_NAMES[th.weekdays] the names without the วัน ("day") prefix CLDR's wide form carries
+
+# CLDR 49 changes not adopted yet; the table follows CLDR 44 to 48 here.
+DYBATPHO_I18N_NAMES[vi.weekdays_abbr] CLDR 49 spells Thứ out; 44 to 48 had Th
+DYBATPHO_I18N_NAMES[hi.months] CLDR 49 spells October अक्टूबर; 44 to 48 had अक्तूबर
+DYBATPHO_I18N_NAMES[hi.dayperiods] CLDR has only the Latin am/pm in Hindi; the table keeps the Hindi words
+DYBATPHO_I18N_DATE_PATTERN[en_GB.date_full] CLDR 49 added a comma after the weekday; 44 to 48 had none
+DYBATPHO_I18N_DATE_PATTERN[id.date_short] CLDR 49 dropped the zero padding; 44 to 48 had dd/MM/yy
+DYBATPHO_I18N_DATE_PATTERN[th.time_short] CLDR 49 added the น. suffix; 44 to 48 had none
+
+# Date patterns simplified on purpose.
+DYBATPHO_I18N_DATE_PATTERN[ru.date_medium] without the year abbreviation г.
+DYBATPHO_I18N_DATE_PATTERN[ru.date_long] without the year abbreviation г.
+DYBATPHO_I18N_DATE_PATTERN[ru.date_full] without the year abbreviation г.
+DYBATPHO_I18N_DATE_PATTERN[vi.date_short] the zero-padded four-digit form Vietnamese forms and documents use
+DYBATPHO_I18N_DATE_PATTERN[vi.date_long] the traditional ngày ... tháng ... năm form rather than CLDR's month name
+DYBATPHO_I18N_DATE_PATTERN[vi.date_full] the traditional ngày ... tháng ... năm form rather than CLDR's month name
+DYBATPHO_I18N_DATE_PATTERN[ja.date_full] a space before the weekday
+DYBATPHO_I18N_DATE_PATTERN[zh.date_full] a space before the weekday
+DYBATPHO_I18N_DATE_PATTERN[ko.date_long] the numeric month with 월, which is what CLDR's month name renders as
+DYBATPHO_I18N_DATE_PATTERN[ko.date_full] the numeric month with 월, which is what CLDR's month name renders as
+DYBATPHO_I18N_DATE_PATTERN[he.date_medium] without the ב ("in") prefix before the month
+DYBATPHO_I18N_DATE_PATTERN[he.date_long] without the ב ("in") prefix before the month
+DYBATPHO_I18N_DATE_PATTERN[he.date_full] without the ב ("in") prefix before the month
+DYBATPHO_I18N_DATE_PATTERN[he.time_short] a zero-padded hour
+DYBATPHO_I18N_DATE_PATTERN[he.time_medium] a zero-padded hour
+DYBATPHO_I18N_DATE_PATTERN[th.date_long] without the Gregorian era name, which the module does not render
+DYBATPHO_I18N_DATE_PATTERN[th.date_full] without the Gregorian era name, which the module does not render

@@ -36,6 +36,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   locale French now groups with U+202F and Russian and Polish with U+00A0, and
   the currency layouts put U+00A0 between amount and symbol; the C locale and
   `DYBATPHO_I18N_ASCII=true` keep plain spaces.
+- **`init` — sourcing `init.sh` where it cannot find its own path stops.** Run
+  from the top level of `bash -c` or of a script read from standard input,
+  `init.sh` printed that it could not resolve its source path and then carried
+  on with the working directory as its own, loading modules from there. The
+  shell now exits with status 1, as it already does on a Bash older than 4.3.
+  An interactive shell that evaluates the text of `init.sh` at its prompt exits
+  too. Sourcing `init.sh` from a file is unaffected.
 
 ## [7.0.0] - 2026-10-23
 

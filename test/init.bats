@@ -830,3 +830,17 @@ dybatpho::module_loaded json || echo "json not loaded here"'
   assert_equal "${stderr_lines[0]}" "dybatpho: module 'string' is registered but ${bare}/src/string.sh does not exist."
 }
 
+@test "a bootstrap with no source path stops" {
+  # Only code read at the top level of standard input or `bash -c` has an
+  # empty `BASH_SOURCE`, which the bootstrap cannot work from. `return` fails
+  # there, and the bootstrap used to carry on with the working directory as
+  # the library; it ends the shell instead, before anything after it runs.
+  local feed="${BATS_TEST_TMPDIR}/feed.sh" work="${BATS_TEST_TMPDIR}/elsewhere"
+  mkdir -p "${work}"
+  printf 'eval "$(< %q)"\necho "reached $?"\n' "${DYBATPHO_DIR}/init.sh" > "${feed}"
+  run_from_elsewhere() { cd "${work}" && env -u DYBATPHO_MODULES bash -s < "${feed}"; }
+  run_traced -1 --separate-stderr run_from_elsewhere
+  assert_output ""
+  assert_equal "${stderr}" \
+    "dybatpho couldn't resolve its source path. Please source init.sh from a file-backed shell context."
+}

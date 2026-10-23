@@ -70,10 +70,16 @@ if [[ -n "${__dybatpho_init_source}" && "${__dybatpho_init_source}" == "${0}" ]]
   # kcov(enabled)
 fi
 
+# Only code run at the top level of `bash -c` or of a script read from standard
+# input has no source path, and `return` fails there, so `exit` stops it rather
+# than letting the bootstrap carry on from the working directory.
 if [[ -z "${__dybatpho_init_source}" ]]; then
+  # kcov(disabled) - "a bootstrap with no source path stops" runs this with no BASH_SOURCE to file it under
   echo "dybatpho couldn't resolve its source path. Please source init.sh from a file-backed shell context." >&2
   unset __dybatpho_init_source
-  return 1
+  # shellcheck disable=SC2317 # reached at the top level of `bash -c` or standard input
+  return 1 2> /dev/null || exit 1
+  # kcov(enabled)
 fi
 
 # A child process of a script that called `dybatpho::export_functions` reaches

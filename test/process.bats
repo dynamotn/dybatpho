@@ -396,6 +396,7 @@ SCRIPT
   # `timeout` executes a program, so it can never see a function the caller
   # defined; the Bash watchdog is what makes this work.
   __dybatpho_test_slow() { sleep 30; }
+  # shellcheck disable=SC2329 # run by name
   __dybatpho_test_quick() { printf 'called with %s\n' "$1"; }
 
   local status=0
@@ -467,6 +468,36 @@ SCRIPT
   # The kill is asynchronous, so give it a moment before asking.
   sleep 1
   assert_process_dead "${grandchild}"
+}
+
+@test "dybatpho::run_with_timeout kills a grandchild that ignores SIGTERM" {
+  # The watchdog was cut off as soon as the command itself had gone, so a
+  # process it started that ignored SIGTERM never got the SIGKILL.
+  __dybatpho_process_timeout_probe=no
+  local pid_file="${BATS_TEST_TMPDIR}/stubborn-grandchild.pid"
+  # shellcheck disable=SC2329 # run by name
+  __dybatpho_test_stubborn_nest() {
+    bash -c "trap '' TERM; printf '%s\n' \"\$\$\" > '${pid_file}'; sleep 30" &
+    wait
+  }
+
+  local status=0
+  DYBATPHO_TIMEOUT_KILL_AFTER=1 dybatpho::run_with_timeout 1 __dybatpho_test_stubborn_nest || status=$?
+  assert_equal "${status}" 124
+  sleep 1
+  assert_process_dead "$(< "${pid_file}")"
+}
+
+@test "dybatpho::run_with_timeout returns at once inside a command substitution" {
+  # The watchdog's `sleep` outlived the watchdog and held the substitution's
+  # pipe open, so a function that returned at once still took the whole limit.
+  __dybatpho_process_timeout_probe=no
+  __dybatpho_test_quick() { printf 'quick\n'; }
+  local answer
+  SECONDS=0
+  answer="$(dybatpho::run_with_timeout 20 __dybatpho_test_quick)"
+  assert_equal "${answer}" "quick"
+  ((SECONDS < 10)) || fail "the substitution took ${SECONDS}s"
 }
 
 @test "dybatpho::run_with_timeout with a limit of 0 runs without a limit" {
@@ -575,6 +606,18 @@ SCRIPT
   assert_equal "${#DYBATPHO_BACKGROUND_PIDS[@]}" 0
 
   assert_process_dead "${pid}"
+}
+
+@test "dybatpho::kill_children does not wait a second for every job that ends at once" {
+  # Each job was looked at again only after a whole second, so four jobs that
+  # all ended on SIGTERM still took four seconds to clear.
+  local name
+  for name in one two three four; do
+    dybatpho::background_run "${name}" sleep 30
+  done
+  SECONDS=0
+  dybatpho::kill_children
+  ((SECONDS < 3)) || fail "kill_children took ${SECONDS}s for four jobs"
 }
 
 @test "dybatpho::kill_children ends the processes a background job started" {
@@ -693,6 +736,23 @@ SCRIPT
 
   run_traced dybatpho::pid_file_is_running "${BATS_TEST_TMPDIR}/absent.pid"
   assert_failure
+}
+
+@test "dybatpho::pid_file_is_running sees a process it is not allowed to signal" {
+  # `kill -0` fails with EPERM for another user's process. PID 1 belongs to
+  # root on every host, and a `kill` that refuses everything stands in for the
+  # case when the suite itself runs as root.
+  local pid_file="${BATS_TEST_TMPDIR}/daemon.pid"
+  printf '1\n' > "${pid_file}"
+  run_traced -0 dybatpho::pid_file_is_running "${pid_file}"
+
+  printf '%s\n' "$$" > "${pid_file}"
+  # shellcheck disable=SC2329 # called by the library, which it overrides
+  kill() { return 1; }
+  run_traced -0 dybatpho::pid_file_is_running "${pid_file}"
+  printf '%s\n' "99999999" > "${pid_file}"
+  run_traced -1 dybatpho::pid_file_is_running "${pid_file}"
+  unset -f kill
 }
 
 @test "dybatpho::pid_file_is_running tolerates the padding a foreign PID file may carry" {

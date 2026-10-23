@@ -182,6 +182,12 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - A PID file is missing, unreadable, empty, malformed, padded with whitespace by
   another tool, or records a process that has exited.
 - A PID file is removed by a process other than the one it records.
+- A PID file records a live process owned by another user, which `kill -0`
+  refuses to signal.
+- Several background jobs that all end on SIGTERM are ended together.
+- A timed command is called inside `$(...)` or a pipeline and returns long before its limit.
+- A timed command started a process that ignores SIGTERM and outlives the command.
+- An ended job leaves orphans that a container's PID 1 never reaps, so its process group holds only zombies.
 - An existing trap handler contains a quote, which `trap -p` prints escaped.
 - A script with EXIT handlers composed through `dybatpho::trap` (temporary-file
   cleanup, terminal restore, privilege release) is ended by SIGINT or SIGTERM.
@@ -241,6 +247,11 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-028**: The error handler MUST print every frame of the stack and exit with the status of the command that failed.
 - **FR-029**: `dybatpho::dry_run` MUST run its arguments as a command when the first one is `--`, never through `eval`, whatever their number; without `--` a single argument remains a shell string.
 - **FR-030**: The cleanup that `dybatpho::cleanup_file_on_exit` and `dybatpho::create_temp` register MUST trap `EXIT` only, so HUP, INT and TERM still end the shell with their own status after the paths are removed.
+- **FR-031**: A PID file check MUST report a live process as running even when it belongs to another user and `kill -0` is refused, falling back to `/proc` or `ps -p`.
+- **FR-032**: Ending a job MUST look again for it at least every tenth of a second after SIGTERM, so a job that ends at once does not hold `dybatpho::kill_children` or a timeout for a whole second.
+- **FR-033**: The timeout watchdog MUST hold none of the caller's standard streams, and MUST be ended with its own process group when the command finishes in time, so `$(dybatpho::run_with_timeout <n> fn)` and a pipe out of it return as soon as `fn` does.
+- **FR-034**: Once the watchdog has fired it MUST be left to finish, so a process the command started that ignores SIGTERM is still sent SIGKILL after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds.
+- **FR-035**: A process group holding nothing but zombies MUST count as ended where `/proc` can tell them apart, so a job ended in a container whose PID 1 never reaps does not cost the whole grace period.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -306,6 +317,10 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-019**: Start a background job that leaves behind a child ignoring SIGTERM and exits, end the jobs, and see that child killed.
 - **IT-020**: Run `dybatpho::dry_run -- 'echo first; echo INJECTED'` and get status 127 with nothing injected; `dry_run -- printf 'plain %s\n' 'a b'` prints `plain a b`.
 - **IT-021**: Create a temporary file, send the script TERM, and see it exit 143 without running the next line and with the file removed.
+- **IT-022**: Check a PID file recording PID 1, and one recording a live process with `kill` refusing every signal, and see both reported as running while a dead process is not.
+- **IT-023**: Start four background jobs that end on SIGTERM and see `dybatpho::kill_children` clear them in under three seconds.
+- **IT-024**: Time out a function whose child ignores SIGTERM and see that child killed.
+- **IT-025**: Run a function that returns at once under a 20-second limit inside `$(...)` and get its output well before the limit.
 
 ## Acceptance Criteria *(mandatory)*
 

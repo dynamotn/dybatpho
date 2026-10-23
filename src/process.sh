@@ -442,7 +442,39 @@ function __dybatpho_process_has_timeout {
 function __dybatpho_process_job_alive {
   kill -0 "$1" 2> /dev/null && return 0
   [[ "$2" == true ]] || return 1
-  kill -0 -- "-$1" 2> /dev/null
+  __dybatpho_process_group_alive "$1"
+}
+
+#######################################
+# @description Tell whether a process group still has a process that runs.
+#   `kill -0` on a group succeeds as long as any member is left, and that
+#   includes a zombie. A member whose parent died first is handed to PID 1, and
+#   in a container whose PID 1 never reaps -- a CI job's `tail -f /dev/null`, or
+#   any `docker run` without `--init` -- it stays a zombie for good, so a group
+#   that was ended long ago would still answer, and every job ended there cost
+#   the whole `DYBATPHO_TIMEOUT_KILL_AFTER`. Where `/proc` exists, a group with
+#   nothing but zombies left counts as ended.
+#
+#   The process table is read with one `cat` and matched once, rather than
+#   walked a process at a time: the callers ask every tenth of a second, and a
+#   loop over hundreds of entries under a tracing shell -- kcov, or a Bats
+#   `DEBUG` trap -- took a second per question.
+# @arg $1 number Process group ID
+# @exitcode 0 A member of the group is still running
+# @exitcode 1 The group is empty, or holds only zombies
+# @internal
+#######################################
+function __dybatpho_process_group_alive {
+  local group="$1" table
+  kill -0 -- -"${group}" 2> /dev/null || return 1
+  [[ -r /proc/self/stat ]] || return 0 # kcov(skip) - needs a host without /proc
+  # A process that ends between the listing and the read is skipped by `cat`.
+  table="$(cat /proc/[0-9]*/stat 2> /dev/null)" || true
+  [[ -n "${table}" ]] || return 0 # kcov(skip) - needs a /proc that lists nothing
+  # Each entry reads `pid (command) state parent group ...`, so a member that
+  # runs is a state other than zombie or dead, two fields before the group.
+  local member="\) [^ZX] [0-9]+ ${group} "
+  [[ "${table}" =~ ${member} ]]
 }
 
 #######################################
@@ -471,11 +503,14 @@ function __dybatpho_process_end_job {
     kill -TERM "${pid}" 2> /dev/null || true
   fi
 
-  local waited=0
-  while ((waited < kill_after)); do
+  # Looked at every tenth of a second: a job nearly always ends within moments
+  # of SIGTERM, and a whole second per look made `dybatpho::kill_children`
+  # take a second for every job it ended.
+  local tick=0
+  while ((tick < kill_after * 10)); do
     __dybatpho_process_job_alive "${pid}" "${own_group}" || return 0
-    sleep 1
-    waited=$((waited + 1))
+    sleep 0.1
+    tick=$((tick + 1))
   done
 
   __dybatpho_process_job_alive "${pid}" "${own_group}" || return 0
@@ -485,6 +520,25 @@ function __dybatpho_process_end_job {
     kill -KILL "${pid}" 2> /dev/null || true
   fi
   return 0
+}
+
+#######################################
+# @description End a timed command once its limit has elapsed, recording that
+#   it did. `__dybatpho_process_timeout_fallback` runs it in the background
+#   beside the command.
+# @arg $1 number Process ID of the command, the leader of its process group
+# @arg $2 number Seconds to allow
+# @arg $3 number Seconds between SIGTERM and SIGKILL
+# @arg $4 string Marker file, written when the limit elapses
+# @internal
+#######################################
+function __dybatpho_process_timeout_watch {
+  # Ending the watchdog's group can end its `sleep` before the watchdog itself,
+  # and that failure must not set off an `errexit` or an ERR handler here.
+  sleep "$2" || return 0
+  kill -0 "$1" 2> /dev/null || return 0
+  printf 'timeout\n' > "$4"
+  __dybatpho_process_end_job "$1" true "$3"
 }
 
 #######################################
@@ -525,21 +579,30 @@ function __dybatpho_process_timeout_fallback {
   "$@" &
   local command_pid=$!
 
-  (
-    sleep "${__dybatpho_process_fallback_seconds}"
-    kill -0 "${command_pid}" 2> /dev/null || exit 0
-    printf 'timeout\n' > "${__dybatpho_process_fallback_marker}"
-    __dybatpho_process_end_job "${command_pid}" true "${__dybatpho_process_fallback_kill_after}"
-  ) &
+  # The watchdog writes nothing, and holds none of the caller's streams: its
+  # `sleep` can outlive it, and one holding the caller's output open kept
+  # `$(dybatpho::run_with_timeout 30 fn)`, or a pipe out of it, waiting for the
+  # whole limit however soon `fn` returned.
+  __dybatpho_process_timeout_watch "${command_pid}" "${__dybatpho_process_fallback_seconds}" \
+    "${__dybatpho_process_fallback_kill_after}" "${__dybatpho_process_fallback_marker}" < /dev/null &> /dev/null &
   local watchdog_pid=$!
 
   local status=0
   wait "${command_pid}" || status=$?
 
-  # The watchdog is still sleeping on every run that did not time out, and
-  # leaving it behind would hold the script open for the whole limit.
-  kill -TERM "${watchdog_pid}" 2> /dev/null || true
-  wait "${watchdog_pid}" 2> /dev/null || true
+  if [[ -s "${__dybatpho_process_fallback_marker}" ]]; then
+    # The watchdog fired and is ending the command's group; it is left to
+    # finish, SIGKILL included, rather than cut off half way.
+    wait "${watchdog_pid}" 2> /dev/null || true
+  else
+    # The watchdog is still sleeping on every run that did not time out. It
+    # leads its own process group where job control gives it one, and the
+    # whole group is ended, so its `sleep` does not linger for the rest of the
+    # limit; inside `$(...)` there is no group of its own, and the subshell
+    # alone is signalled.
+    kill -TERM -- "-${watchdog_pid}" 2> /dev/null || kill -TERM "${watchdog_pid}" 2> /dev/null || true
+    wait "${watchdog_pid}" 2> /dev/null || true
+  fi
 
   [[ "${__dybatpho_process_fallback_monitor}" == "on" ]] || set +m
 
@@ -826,7 +889,12 @@ function dybatpho::pid_file_is_running {
   # A PID file written by another tool can carry surrounding whitespace.
   pid="${pid//[[:space:]]/}"
   [[ "${pid}" =~ ^[1-9][0-9]*$ ]] || return 1
-  kill -0 "${pid}" 2> /dev/null
+  # `kill -0` is refused for a process of another user, which is not the same
+  # as the process being gone: a daemon running as root, checked by its
+  # unprivileged status script, was reported as not running.
+  kill -0 "${pid}" 2> /dev/null && return 0
+  [[ -d "/proc/${pid}" ]] && return 0
+  ps -p "${pid}" &> /dev/null
 }
 
 #######################################

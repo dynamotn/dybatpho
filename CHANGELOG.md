@@ -360,6 +360,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::mock_time` or a test had put its own `date` first on `PATH`, so
   the frozen clock was ignored on Alpine.
 
+- **`process` — `$(dybatpho::run_with_timeout N fn)` returns when `fn` does.**
+  The watchdog held the caller's output open, so a substitution or pipe could
+  wait out the whole limit. A process that ignores SIGTERM after a timeout is
+  now sent SIGKILL, and a job whose group holds only zombies, as in a container
+  whose PID 1 never reaps, counts as ended.
+  `dybatpho::pid_file_is_running` sees a live process owned by another user.
+
 - **`validate` — `min`, `max`, `minlen` and `maxlen` compare exactly.**
   `-0.0000001` passed `min:0`, twenty-digit decimals compared wrongly, `1e400`
   stopped the script, and `minlen:+3` failed every value.

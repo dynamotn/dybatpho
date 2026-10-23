@@ -14,7 +14,9 @@
 # @namespace dybatpho
 # @description
 #   This module contains helpers for script termination, signal handling, trap
-#   composition, deferred cleanup, and dry-run execution. It also bounds how
+#   composition, deferred cleanup, and dry-run execution, and
+#   `dybatpho::try` catches a command's failure -- a `dybatpho::die` or an
+#   `exit` included -- so the script can recover from it. It also bounds how
 #   long a command may run, supervises named background jobs, and reads and
 #   writes PID files.
 #
@@ -378,6 +380,76 @@ function dybatpho::dry_run {
       "$@"
     fi
   fi
+}
+
+#######################################
+# @description Run a command and catch its failure, including a
+#   `dybatpho::die` or an `exit`, instead of letting it end the script.
+#   The command runs in a subshell of the calling shell, so it can call any
+#   function the caller has defined, read its variables and its standard input,
+#   and nothing it changes -- variables, the working directory, traps -- leaks
+#   back. Its standard output and standard error are captured into the two named
+#   variables, with trailing newlines removed as `$(...)` would, so the message a
+#   `dybatpho::die` printed is in the error variable rather than on the
+#   terminal. The status of the command is the status of this call.
+#
+#   Give an empty name to discard one of the streams.
+#
+#   As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit`
+#   for the command, and calling `dybatpho::try` outside such a condition under
+#   `set -e` ends the script when the command fails. Test its status, or
+#   collect it with `|| status=$?`.
+# @example
+#   if dybatpho::try version error -- dybatpho::semver_bump "${input}" minor; then
+#     dybatpho::info "Next version: ${version}"
+#   else
+#     dybatpho::warn "Can't bump '${input}': ${error}"
+#   fi
+#
+# @example
+#   status=0
+#   dybatpho::try '' log -- ./deploy.sh --dry-run || status=$?
+#
+# @arg $1 string Name of the variable receiving the standard output, or empty to discard it
+# @arg $2 string Name of the variable receiving the standard error, or empty to discard it
+# @arg $3 string Literal `--` separating the variable names from the command
+# @arg $@ string Command and arguments to run
+# @set The two named variables
+# @exitcode 0 The command succeeded
+# @exitcode * The command's own exit status, including the one `dybatpho::die` or `exit` gave
+# @exitcode 1 Stop the script when the arguments are malformed or a variable name is invalid
+# @tip A die inside `$(...)` ends only that subshell and leaves the caller with an empty value and no error; this is
+#   the way to call a function that may die and still learn that it did.
+#######################################
+function dybatpho::try {
+  local __dybatpho_try_out_name __dybatpho_try_err_name __dybatpho_try_separator
+  dybatpho::expect_args __dybatpho_try_out_name __dybatpho_try_err_name __dybatpho_try_separator -- "$@"
+  shift 3
+  [[ "${__dybatpho_try_separator}" == "--" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected: out_var err_var -- command [args...]"
+  (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+  [[ -z "${__dybatpho_try_out_name}" ]] || dybatpho::expect_ref "${__dybatpho_try_out_name}"
+  [[ -z "${__dybatpho_try_err_name}" ]] || dybatpho::expect_ref "${__dybatpho_try_err_name}"
+
+  local __dybatpho_try_out_file __dybatpho_try_err_file __dybatpho_try_status=0
+  __dybatpho_create_temp_into __dybatpho_try_out_file ".out" "try"
+  __dybatpho_create_temp_into __dybatpho_try_err_file ".err" "try"
+  # The subshell is what absorbs an `exit`; the `||` keeps a failure from
+  # setting off the caller's `errexit` or ERR handler here.
+  ("$@") > "${__dybatpho_try_out_file}" 2> "${__dybatpho_try_err_file}" || __dybatpho_try_status=$?
+
+  if [[ -n "${__dybatpho_try_out_name}" ]]; then
+    local -n __dybatpho_try_out_ref="${__dybatpho_try_out_name}"
+    __dybatpho_try_out_ref="$(< "${__dybatpho_try_out_file}")"
+  fi
+  if [[ -n "${__dybatpho_try_err_name}" ]]; then
+    local -n __dybatpho_try_err_ref="${__dybatpho_try_err_name}"
+    __dybatpho_try_err_ref="$(< "${__dybatpho_try_err_file}")"
+  fi
+  rm -f -- "${__dybatpho_try_out_file}" "${__dybatpho_try_err_file}" &> /dev/null || true
+  __dybatpho_process_forget_cleanup "${__dybatpho_try_out_file}"
+  __dybatpho_process_forget_cleanup "${__dybatpho_try_err_file}"
+  return "${__dybatpho_try_status}"
 }
 
 #######################################

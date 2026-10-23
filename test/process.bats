@@ -832,3 +832,103 @@ SCRIPT
   refute_output --partial "carried on"
   assert_file_not_exist "$(< "${marker}")"
 }
+
+@test 'dybatpho::try captures the message of a die and returns its status' {
+  _dies() {
+    printf 'partial\n'
+    dybatpho::die "cannot go on" 3
+  }
+  local out="" err="" status=0
+  dybatpho::try out err -- _dies || status=$?
+  assert_equal "${status}" "3"
+  assert_equal "${out}" "partial"
+  [[ "${err}" == *"cannot go on"* ]]
+}
+
+@test 'dybatpho::try returns 0 and both streams for a command that succeeds' {
+  _speaks() {
+    printf 'to stdout\n\n'
+    printf 'to stderr\n' >&2
+  }
+  local out="" err=""
+  run_traced -0 dybatpho::try out err -- _speaks
+  # Trailing newlines go, as they would from `$(...)`.
+  assert_equal "${out}" "to stdout"
+  assert_equal "${err}" "to stderr"
+}
+
+@test 'dybatpho::try catches an exit and keeps the caller running' {
+  local out="" err="" status=0
+  dybatpho::try out err -- exit 5 || status=$?
+  assert_equal "${status}" "5"
+  assert_equal "${out}" ""
+  assert_equal "${err}" ""
+}
+
+@test 'dybatpho::try discards a stream given an empty name' {
+  local err=""
+  run_traced -0 dybatpho::try '' err -- printf 'dropped\n'
+  refute_output
+  assert_equal "${err}" ""
+}
+
+@test 'dybatpho::try passes standard input to the command' {
+  local out="" err=""
+  dybatpho::try out err -- cat <<< "piped in"
+  assert_equal "${out}" "piped in"
+}
+
+@test 'dybatpho::try runs the command in a subshell' {
+  local changed="before" out="" err=""
+  _changes() { changed="after"; }
+  dybatpho::try out err -- _changes
+  assert_equal "${changed}" "before"
+}
+
+@test 'dybatpho::try does not fire the caller ERR handler or errexit' {
+  # In a script of its own: an ERR handler and `set -e` in the test shell would
+  # take Bats down with them.
+  local script="${BATS_TEST_TMPDIR}/try_handlers.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::register_common_handlers
+_fails() { dybatpho::die "boom" 4; }
+if ! dybatpho::try out err -- _fails; then
+  [[ "${err}" == *boom* ]] && printf 'recovered\n'
+fi
+status=0
+dybatpho::try out err -- false || status=$?
+printf 'status %s\n' "${status}"
+SCRIPT
+  run_traced -0 bash "${script}" "${DYBATPHO_DIR}"
+  assert_line --index 0 "recovered"
+  assert_line --index 1 "status 1"
+}
+
+@test 'dybatpho::try leaves no temporary file behind' {
+  local out="" err="" before after
+  before="$(find "${BATS_TEST_TMPDIR}" -name 'dybatpho_try_*' | wc -l)"
+  dybatpho::try out err -- printf 'x'
+  after="$(find "${BATS_TEST_TMPDIR}" -name 'dybatpho_try_*' | wc -l)"
+  assert_equal "${after}" "${before}"
+}
+
+@test 'dybatpho::try rejects a call without the separator or the command' {
+  run --separate-stderr dybatpho::try out err printf 'x'
+  assert_failure
+  assert_stderr --partial "Expected: out_var err_var -- command"
+
+  run --separate-stderr dybatpho::try out err --
+  assert_failure
+  assert_stderr --partial "Expected a command to run after --"
+}
+
+@test 'dybatpho::try rejects a reserved or invalid variable name' {
+  run --separate-stderr dybatpho::try __dybatpho_try_x err -- true
+  assert_failure
+  assert_stderr --partial "is reserved"
+
+  run --separate-stderr dybatpho::try out 'bad name' -- true
+  assert_failure
+  assert_stderr --partial "Invalid variable name"
+}

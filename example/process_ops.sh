@@ -7,7 +7,7 @@
 # @description Demonstrates dybatpho::retry, retry_until, dry_run, breakpoint,
 #              expect_args, expect_envs, require, command_exists_all, is,
 #              coalesce, coalesce_cmd, default_env, require_envs_any, assert,
-#              run_with_timeout, background_run, wait_all, kill_children,
+#              try, run_with_timeout, background_run, wait_all, kill_children,
 #              pid_file_write, pid_file_is_running, pid_file_remove,
 #              and error/signal handlers
 # shellcheck disable=SC2154 # `dybatpho::expect_args` assigns these names through a nameref
@@ -203,6 +203,35 @@ function _demo_retry_until {
   dybatpho::success "Fixed-delay retry succeeded"
 }
 
+# --- try ------------------------------------------------------------------
+
+# @description Run the `TRY` section of this example.
+# @noargs
+function _demo_try {
+  dybatpho::header "TRY — RECOVER FROM A DIE"
+
+  # @description Parse a port, dying on anything that is not one.
+  # @arg $1 string Candidate port
+  function _parse_port {
+    local candidate
+    dybatpho::expect_args candidate -- "$@"
+    if [[ ! "${candidate}" =~ ^[0-9]+$ ]] || ((candidate < 1 || candidate > 65535)); then
+      dybatpho::die "not a port: ${candidate}" 2
+    fi
+    printf '%s\n' "${candidate}"
+  }
+
+  local port="" error="" status=0
+  if dybatpho::try port error -- _parse_port 8080; then
+    dybatpho::success "Parsed port ${port}"
+  fi
+
+  # The die would end the script; caught, it is just a status and a message.
+  dybatpho::try port error -- _parse_port eighty || status=$?
+  dybatpho::warn "Rejected with status ${status}: ${error#*: }"
+  dybatpho::info "The script is still running after the die"
+}
+
 # --- run_with_timeout -----------------------------------------------------
 
 # @description Run the `RUN WITH TIMEOUT` section of this example.
@@ -336,6 +365,7 @@ function _main {
   _demo_env_defaults
   _demo_assert
   _demo_retry_until
+  _demo_try
   _demo_run_with_timeout
   _demo_background_jobs
   _demo_kill_children

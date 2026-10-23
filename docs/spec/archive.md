@@ -81,6 +81,9 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
   guarded `safe_extract`.
 - An archive cannot be listed: it is corrupt or truncated, or it is a zip and
   `unzip` is not installed.
+- The source or the archive has a name beginning with a dash.
+- A `.zip` output already exists, or the zip source is relative and `CDPATH` is set.
+- A single-file archive is corrupt and its output name already exists in the destination.
 
 ## Requirements *(mandatory)*
 
@@ -106,6 +109,9 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **FR-011**: `archive_unsafe_entries` and `archive_is_safe` MUST fail, with an
   error on stderr and a non-zero status other than `0`, when the archive cannot
   be listed; an unlistable archive MUST NOT be reported as safe.
+- **FR-012**: Creating, extracting and listing MUST treat a source or archive whose name begins with a dash as a name, never as an option of the underlying tool.
+- **FR-013**: Creating a `.zip` MUST replace an existing output rather than add to it, and MUST archive the source relative to its own directory whatever `CDPATH` holds.
+- **FR-014**: Extracting a single-file archive MUST write its output through a staging file, so a failed decompression leaves an existing file of that name untouched and no partial output behind.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -140,6 +146,9 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
   extract an archive while `safety` stays unloaded.
 - **IT-011**: Refuse a corrupt archive in both `archive_unsafe_entries` and
   `archive_is_safe`, with an error naming it.
+- **IT-012**: Create, list and extract gzip, tar and zip archives of `-file`, `-tree` and `-copy.gz`.
+- **IT-013**: Re-create a zip after removing a source file and see the stale entry gone; zip a relative source with `CDPATH` set to a decoy.
+- **IT-014**: Extract a corrupt `.gz` over an existing file and find the file unchanged and nothing else written.
 
 ## Acceptance Criteria *(mandatory)*
 

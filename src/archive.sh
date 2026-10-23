@@ -176,14 +176,41 @@ function __dybatpho_archive_move_stripped {
       printf -v stripped '%s/' "${parts[@]:strip_components}"
       stripped="${stripped%/}"
       if [[ "${kind}" == directories ]]; then
-        mkdir -p "${destination}/${stripped}"
+        mkdir -p -- "${destination}/${stripped}"
       else
         dir_path=$(dybatpho::path_dirname "${destination}/${stripped}")
-        mkdir -p "${dir_path}"
-        mv "${source_root}/${rel}" "${destination}/${stripped}"
+        mkdir -p -- "${dir_path}"
+        mv -- "${source_root}/${rel}" "${destination}/${stripped}"
       fi
     done < <(printf '%s' "${find_output}")
   done
+}
+
+#######################################
+# @description Decompress a single-file archive onto its output through a
+#   staging file beside it, so a corrupt or truncated archive leaves the file
+#   that was there untouched rather than emptied or cut short.
+# @arg $1 string Archive file path
+# @arg $2 string Output file path
+# @arg $3 string Decompressing command
+# @arg $@ string Its arguments, ahead of `--` and the archive
+# @exitcode 0 The output was written
+# @exitcode other The command failed, with its status, and nothing was written
+# @internal
+#######################################
+function __dybatpho_archive_decompress {
+  local archive_path output tool staging status=0
+  dybatpho::expect_args archive_path output tool -- "$@"
+  shift 3
+  [[ ! -d "${output}" ]] || dybatpho::die "Cannot extract ${archive_path}: ${output} is a directory"
+  __dybatpho_file_staging_into staging "${output}" \
+    || dybatpho::die "Cannot extract ${archive_path}: ${output} cannot be written"
+  "${tool}" "$@" -- "${archive_path}" > "${staging}" || status=$?
+  if ((status != 0)); then
+    rm -f -- "${staging}"
+    return "${status}"
+  fi
+  mv -f -- "${staging}" "${output}"
 }
 
 #######################################
@@ -202,16 +229,19 @@ function dybatpho::archive_create {
   source_dir=$(dybatpho::path_dirname "${source_path}")
   source_name=$(dybatpho::path_basename "${source_path}")
 
+  # A member named like an option would be read as one by `tar` and `zip`,
+  # neither of which takes `--` the same way everywhere; `./` keeps it a name.
+  local member="${source_name/#-/./-}"
   local tool letter
   local -a prefix=() pack=() unpack=()
   if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
     dybatpho::require tar
-    tar ${prefix[@]+"${prefix[@]}"} -C "${source_dir}" "-c${letter}f" "${output_path}" "${source_name}"
+    tar ${prefix[@]+"${prefix[@]}"} -C "${source_dir}" "-c${letter}f" "${output_path}" "${member}"
   elif __dybatpho_archive_codec_into tool pack unpack "${format}"; then
     dybatpho::require "${tool}"
     dybatpho::is file "${source_path}" || dybatpho::die \
       "Single-file archive formats require a file source: ${source_path}"
-    "${tool}" ${pack[@]+"${pack[@]}"} "${source_path}" > "${output_path}"
+    "${tool}" ${pack[@]+"${pack[@]}"} -- "${source_path}" > "${output_path}"
   else
     dybatpho::require zip
     if dybatpho::path_is_abs "${output_path}"; then
@@ -221,9 +251,15 @@ function dybatpho::archive_create {
       pwd=$(pwd)
       output_abs="$(dybatpho::path_join "${pwd}" "${output_path}")"
     fi
+    # `zip` adds to an archive that is already there, so entries removed from
+    # the source since the last run lived on in the new one. It starts empty,
+    # the way `tar -c` truncates its output.
+    rm -f -- "${output_abs}"
     ( # kcov(skip) - subshell keeps the caller's working directory
-      cd "${source_dir}" || exit
-      zip -rq "${output_abs}" "${source_name}"
+      # `CDPATH` would archive a directory of the same name elsewhere, and print
+      # its path into the caller's output.
+      CDPATH='' cd -- "${source_dir/#-/./-}" || exit
+      zip -rq "${output_abs}" "${member}"
     )
   fi
 }
@@ -260,16 +296,17 @@ function dybatpho::archive_extract {
     dybatpho::require "${tool}"
     ((strip_components == 0)) || dybatpho::die "strip-components is only supported for multi-entry archives"
     name=$(__dybatpho_archive_output_name "${archive_path}")
-    "${tool}" ${unpack[@]+"${unpack[@]}"} "${archive_path}" \
-      > "$(dybatpho::path_join "${destination}" "${name}")"
+    name=$(dybatpho::path_join "${destination}" "${name}")
+    __dybatpho_archive_decompress "${archive_path}" "${name}" "${tool}" ${unpack[@]+"${unpack[@]}"}
   else
     dybatpho::require unzip
+    # `unzip` takes no `--`, so an archive named like an option keeps `./`.
     if ((strip_components == 0)); then
-      unzip -q "${archive_path}" -d "${destination}"
+      unzip -q "${archive_path/#-/./-}" -d "${destination}"
     else
       local temp_dir
       dybatpho::create_temp temp_dir ""
-      unzip -q "${archive_path}" -d "${temp_dir}"
+      unzip -q "${archive_path/#-/./-}" -d "${temp_dir}"
       __dybatpho_archive_move_stripped "${temp_dir}" "${destination}" "${strip_components}"
     fi
   fi
@@ -295,7 +332,7 @@ function dybatpho::archive_list {
     __dybatpho_archive_output_name "${archive_path}"
   else
     dybatpho::require unzip
-    unzip -Z1 "${archive_path}"
+    unzip -Z1 "${archive_path/#-/./-}"
   fi
 }
 

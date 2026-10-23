@@ -300,9 +300,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first newline, so `dybatpho::safe_rm` given `dir/keep<newline>old` deleted
   `dir/keep`. The file writers' symlink resolution had the same flaw.
 
+- **`init`, `file`, `backup`, `archive` — `CDPATH` no longer redirects a
+  relative directory.** Sourcing `lib/dybatpho/init.sh` by a relative path
+  could load another copy found through `CDPATH`, and `dybatpho::find_up`,
+  snapshot checksums, `diff_dir`, incremental snapshots and zip creation could
+  enter a same-named directory elsewhere and print its path into their output.
+  A directory named `-` is no longer read as the previous one.
+
 - **`backup` — `--keep-days` prunes incremental snapshots.** Their age was
   read with a helper that only takes files, which stopped the script or kept
   every snapshot.
+
+- **`archive` — names beginning with a dash, existing zips and corrupt
+  inputs.** gzip, xz, bzip2, zstd, tar, zip and unzip read `-name` as an
+  option. Creating a `.zip` over an existing one added to it; it now starts
+  empty, as tar does. A corrupt `.gz`, `.xz`, `.bz2` or `.zst` no longer
+  empties the file it would replace.
 
 - **`file` — `dybatpho::dir_size` measures a directory named like an option,
   and counts past 2 GiB** under mawk and BusyBox awk.

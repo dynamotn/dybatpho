@@ -42,25 +42,25 @@ setup() {
   stub xz ": echo \"\$*\" > ${xz_args}; printf 'xz-data'"
   dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.xz"
   assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.xz")" "xz-data"
-  assert_equal "$(cat "${xz_args}")" "-c ${source_file}"
+  assert_equal "$(cat "${xz_args}")" "-c -- ${source_file}"
   unstub xz
 
   stub gzip ": echo \"\$*\" > ${gz_args}; printf 'gz-data'"
   dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.gz"
   assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.gz")" "gz-data"
-  assert_equal "$(cat "${gz_args}")" "-c ${source_file}"
+  assert_equal "$(cat "${gz_args}")" "-c -- ${source_file}"
   unstub gzip
 
   stub bzip2 ": echo \"\$*\" > ${bz2_args}; printf 'bz2-data'"
   dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.bz2"
   assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.bz2")" "bz2-data"
-  assert_equal "$(cat "${bz2_args}")" "-c ${source_file}"
+  assert_equal "$(cat "${bz2_args}")" "-c -- ${source_file}"
   unstub bzip2
 
   stub zstd ": echo \"\$*\" > ${zst_args}; printf 'zst-data'"
   dybatpho::archive_create "${source_file}" "${BATS_TEST_TMPDIR}/bundle.txt.zst"
   assert_equal "$(cat "${BATS_TEST_TMPDIR}/bundle.txt.zst")" "zst-data"
-  assert_equal "$(cat "${zst_args}")" "-q -c ${source_file}"
+  assert_equal "$(cat "${zst_args}")" "-q -c -- ${source_file}"
   unstub zstd
 }
 
@@ -338,7 +338,7 @@ setup() {
 
   stub zstd ": echo \"\$*\" > ${zstd_args}; printf 'plain-data'"
   dybatpho::archive_extract "${zst_archive}" "${destination}"
-  assert_equal "$(cat "${zstd_args}")" "-d -q -c ${zst_archive}"
+  assert_equal "$(cat "${zstd_args}")" "-d -q -c -- ${zst_archive}"
   assert_equal "$(cat "${destination}/bundle.txt")" "plain-data"
   unstub zstd
 }
@@ -428,4 +428,70 @@ function _create_traversal_test_archive {
   assert_line --index 0 "safety absent"
   assert_line --index 1 "safe"
   assert_equal "$(cat "${destination}/bundle/file.txt")" "hello"
+}
+
+@test "the archive helpers take a source or archive whose name begins with a dash" {
+  # Each tool read such a name as one of its options: gzip and its kin refused
+  # it, tar and zip took it for a mode or a flag.
+  local work="${BATS_TEST_TMPDIR}/dashed"
+  mkdir -p "${work}/-tree" "${work}/out"
+  printf 'data\n' > "${work}/-file"
+  printf 'inside\n' > "${work}/-tree/f"
+  cd "${work}"
+
+  dybatpho::archive_create -file single.gz
+  dybatpho::archive_create -tree tree.tar.gz
+  assert_equal "$(dybatpho::archive_list tree.tar.gz | head -n 1)" "./-tree/"
+  cp single.gz ./-copy.gz
+  dybatpho::archive_extract -copy.gz out
+  assert_equal "$(cat out/-copy)" "data"
+  assert_equal "$(dybatpho::archive_list -copy.gz)" "-copy"
+
+  if dybatpho::is command zip && dybatpho::is command unzip; then
+    dybatpho::archive_create -tree tree.zip
+    cp tree.zip ./-tree.zip
+    assert_equal "$(dybatpho::archive_list -tree.zip | sort | tr '\n' ' ')" "-tree/ -tree/f "
+    dybatpho::archive_extract -tree.zip out
+    assert_equal "$(cat out/-tree/f)" "inside"
+  fi
+}
+
+@test "dybatpho::archive_create replaces a zip archive rather than adding to it" {
+  dybatpho::is command zip && dybatpho::is command unzip || skip "needs zip and unzip"
+  # `zip` updates an archive that exists, so a file removed from the source was
+  # still in the next archive.
+  local source_dir="${BATS_TEST_TMPDIR}/bundle" archive_path="${BATS_TEST_TMPDIR}/bundle.zip"
+  mkdir -p "${source_dir}"
+  printf 'one\n' > "${source_dir}/old.txt"
+  dybatpho::archive_create "${source_dir}" "${archive_path}"
+  rm "${source_dir}/old.txt"
+  printf 'two\n' > "${source_dir}/new.txt"
+  dybatpho::archive_create "${source_dir}" "${archive_path}"
+  assert_equal "$(dybatpho::archive_list "${archive_path}" | sort | tr '\n' ' ')" "bundle/ bundle/new.txt "
+}
+
+@test "dybatpho::archive_create zips a relative source despite CDPATH" {
+  dybatpho::is command zip && dybatpho::is command unzip || skip "needs zip and unzip"
+  mkdir -p "${BATS_TEST_TMPDIR}/cdp/here/src/tree" "${BATS_TEST_TMPDIR}/cdp/decoy/src/tree"
+  printf 'mine\n' > "${BATS_TEST_TMPDIR}/cdp/here/src/tree/own.txt"
+  printf 'decoy\n' > "${BATS_TEST_TMPDIR}/cdp/decoy/src/tree/decoy.txt"
+  cd "${BATS_TEST_TMPDIR}/cdp/here"
+  CDPATH="${BATS_TEST_TMPDIR}/cdp/decoy" run_traced dybatpho::archive_create src/tree tree.zip
+  assert_success
+  assert_output ""
+  assert_equal "$(dybatpho::archive_list tree.zip | sort | tr '\n' ' ')" "tree/ tree/own.txt "
+}
+
+@test "dybatpho::archive_extract leaves the existing file alone when decompressing fails" {
+  # The output was opened for writing before the archive was read, so a corrupt
+  # archive emptied the file it was meant to replace.
+  local destination="${BATS_TEST_TMPDIR}/out"
+  mkdir -p "${destination}"
+  printf 'keep me\n' > "${destination}/notes.txt"
+  printf 'not gzip data\n' > "${BATS_TEST_TMPDIR}/notes.txt.gz"
+
+  run dybatpho::archive_extract "${BATS_TEST_TMPDIR}/notes.txt.gz" "${destination}"
+  assert_failure
+  assert_equal "$(cat "${destination}/notes.txt")" "keep me"
+  assert_equal "$(find "${destination}" -mindepth 1 | wc -l | tr -d ' ')" "1"
 }

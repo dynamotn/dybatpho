@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Without `shred`, as on stock macOS, it wrote one byte per call; a 1 MiB file
   now takes about 30 ms instead of two seconds.
 
+- **`queue` — claiming a job no longer slows down with every job waiting.**
+  `dybatpho::queue_pop`, `queue_peek` and `queue_work` read the priority and
+  due-time sidecars in one pass. On a queue of 1000 jobs, choosing the next
+  one drops from about half a second to about 15 ms.
+
 - **`csv`, `metrics`, `testing` — data paths fork far less.**
   `dybatpho::csv_to_json` is about fifteen times faster and
   `dybatpho::metrics_render` about ten times faster. Snapshot scrubs run in a

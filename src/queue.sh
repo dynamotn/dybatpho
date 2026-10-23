@@ -143,7 +143,10 @@ function __dybatpho_queue_expect_id {
 # @internal
 #######################################
 function __dybatpho_queue_ids {
-  local path
+  # Sorting the glob under the caller's locale collates every name through the
+  # locale's rules, which on a big queue took several times as long as
+  # comparing the bytes; the ids are digits, so the order is the same.
+  local path LC_ALL=C
   # The id starts with a zero-padded sequence number, so the glob's own
   # ascending order is the order the jobs were pushed in.
   for path in "$1/$2"/*.job; do
@@ -234,24 +237,54 @@ function __dybatpho_queue_next_into {
   local __dybatpho_queue_directory="$2"
   __dybatpho_queue_next_ref=""
 
-  local __dybatpho_queue_now __dybatpho_queue_best="" __dybatpho_queue_best_priority=0
-  local __dybatpho_queue_id __dybatpho_queue_priority __dybatpho_queue_due
-  __dybatpho_queue_now="$(dybatpho::date_now "%s")"
+  # Byte order for the globs below, as in `__dybatpho_queue_ids`.
+  local __dybatpho_queue_pending="${__dybatpho_queue_directory}/pending" LC_ALL=C
+  local __dybatpho_queue_best="" __dybatpho_queue_best_priority=0 __dybatpho_queue_now=""
+  local __dybatpho_queue_path __dybatpho_queue_id __dybatpho_queue_priority __dybatpho_queue_due
+  # The jobs are listed before the sidecars: a job's sidecars are written
+  # before the job itself, so every job in this listing has its sidecars in
+  # place by the time they are read below.
+  # Each path is only looked at, and cut down to its id, when it is considered.
+  local -a __dybatpho_queue_jobs=("${__dybatpho_queue_pending}"/*.job)
+
+  # Few jobs carry a priority or a due time, so their sidecars are read in one
+  # pass rather than looked for beside every job: draining a queue looked for
+  # two files per waiting job on every claim, which made it quadratic.
+  local -A __dybatpho_queue_due_of=() __dybatpho_queue_priority_of=()
+  local __dybatpho_queue_scheduled=false
+  for __dybatpho_queue_path in "${__dybatpho_queue_pending}"/*.due "${__dybatpho_queue_pending}"/*.priority; do
+    [[ -f "${__dybatpho_queue_path}" ]] || continue
+    __dybatpho_queue_id="${__dybatpho_queue_path##*/}"
+    __dybatpho_queue_scheduled=true
+    if [[ "${__dybatpho_queue_id}" == *.due ]]; then
+      __dybatpho_queue_sidecar_number_into __dybatpho_queue_due "${__dybatpho_queue_path}" 0
+      __dybatpho_queue_due_of["${__dybatpho_queue_id%.due}"]="${__dybatpho_queue_due}"
+      # The clock is only read when some job is waiting for a moment.
+      [[ -n "${__dybatpho_queue_now}" ]] || __dybatpho_queue_now="$(dybatpho::date_now "%s")"
+    else
+      __dybatpho_queue_sidecar_number_into __dybatpho_queue_priority "${__dybatpho_queue_path}" 0
+      __dybatpho_queue_priority_of["${__dybatpho_queue_id%.priority}"]="${__dybatpho_queue_priority}"
+    fi
+  done
   # The listing is oldest first, so a later job only replaces the choice when
   # it outranks it; within one priority the first one seen, the oldest, stays.
-  while IFS= read -r __dybatpho_queue_id; do
-    [[ -n "${__dybatpho_queue_id}" ]] || continue
-    __dybatpho_queue_sidecar_number_into __dybatpho_queue_due \
-      "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_id}.due" 0
-    ((__dybatpho_queue_due <= __dybatpho_queue_now)) || continue
-    __dybatpho_queue_sidecar_number_into __dybatpho_queue_priority \
-      "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_id}.priority" 0
+  # With no sidecar at all, nothing can outrank the oldest job.
+  for __dybatpho_queue_path in ${__dybatpho_queue_jobs[@]+"${__dybatpho_queue_jobs[@]}"}; do
+    [[ -f "${__dybatpho_queue_path}" ]] || continue
+    __dybatpho_queue_id="${__dybatpho_queue_path##*/}"
+    __dybatpho_queue_id="${__dybatpho_queue_id%.job}"
+    if [[ "${__dybatpho_queue_scheduled}" == false ]]; then
+      __dybatpho_queue_best="${__dybatpho_queue_id}"
+      break
+    fi
+    __dybatpho_queue_due="${__dybatpho_queue_due_of[${__dybatpho_queue_id}]-0}"
+    ((__dybatpho_queue_due <= ${__dybatpho_queue_now:-0})) || continue
+    __dybatpho_queue_priority="${__dybatpho_queue_priority_of[${__dybatpho_queue_id}]-0}"
     if [[ -z "${__dybatpho_queue_best}" ]] || ((__dybatpho_queue_priority > __dybatpho_queue_best_priority)); then
       __dybatpho_queue_best="${__dybatpho_queue_id}"
       __dybatpho_queue_best_priority="${__dybatpho_queue_priority}"
     fi
-    # kcov never marks a loop's redirected `done` as run; every claim test runs it.
-  done < <(__dybatpho_queue_ids "${__dybatpho_queue_directory}" pending) # kcov(skip)
+  done
 
   [[ -n "${__dybatpho_queue_best}" ]] || return 1
   __dybatpho_queue_next_ref="${__dybatpho_queue_best}"

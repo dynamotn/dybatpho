@@ -192,21 +192,28 @@ EOF
 }
 
 @test "changelog_archive.sh splits the real changelog without losing a line" {
+  # The real changelog is archived already, so the run starts from it and its
+  # archives and moves the next release out as well.
   cp "${DYBATPHO_DIR}/CHANGELOG.md" "${REPO}/CHANGELOG.md"
-  local cut="6.0.0"
+  mkdir -p "${REPO}/docs/changelog"
+  cp "${DYBATPHO_DIR}"/docs/changelog/CHANGELOG-*.md "${REPO}/docs/changelog/"
+  local cut="6.0.1"
+  # Every non-blank line of the inputs is in exactly one of the outputs; the
+  # boilerplate each archive file and the index carry is set aside.
+  content_lines() {
+    grep -hv '^[[:space:]]*$' "$@" \
+      | grep -v -e '^<!-- ' -e '^Older releases are archived' -e '^# Changelog: ' \
+        -e '^Releases [0-9]*\.x of dybatpho' -e '^`scripts/changelog_archive.sh`' \
+        -e '^\[Keep a Changelog\](https://keepachangelog.com/en/1.1.0/), and this project$' \
+        -e '^adheres to \[Semantic Versioning\]' \
+      | sort
+  }
+  local original moved
+  original="$(content_lines "${REPO}/CHANGELOG.md" "${REPO}"/docs/changelog/CHANGELOG-*.md)"
   run --separate-stderr repo_script changelog_archive.sh --before "${cut}"
   assert_success
-
-  # Every non-blank line of the original is in exactly one of the outputs.
-  local original moved
-  original="$(grep -v '^[[:space:]]*$' "${DYBATPHO_DIR}/CHANGELOG.md" | sort)"
-  moved="$(cat "${REPO}/CHANGELOG.md" "${REPO}"/docs/changelog/CHANGELOG-*.md \
-    | grep -v '^[[:space:]]*$' \
-    | grep -v -e '^<!-- ' -e '^Older releases are archived' -e '^# Changelog: ' \
-      -e '^Releases [0-9]*\.x of dybatpho' -e '^`scripts/changelog_archive.sh`' \
-      -e '^\[Keep a Changelog\](https://keepachangelog.com/en/1.1.0/), and this project$' \
-      -e '^adheres to \[Semantic Versioning\]' \
-    | sort)"
+  assert_file_exist "${REPO}/docs/changelog/CHANGELOG-6.x.md"
+  moved="$(content_lines "${REPO}/CHANGELOG.md" "${REPO}"/docs/changelog/CHANGELOG-*.md)"
   assert_equal "${moved}" "${original}"
   run --separate-stderr repo_script lint.sh --stage changelog
   assert_success

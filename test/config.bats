@@ -63,10 +63,10 @@ setup() {
   local yaml_file="${BATS_TEST_TMPDIR}/settings.yaml"
   printf '{}' > "${json_file}"
   printf '{}' > "${yaml_file}"
-  stub jq ": printf 'PORT\\t8080\\nSHARED\\tfrom-json\\n'"
-  # `yq` is asked for the root tag before the entries, so a sequence or a
-  # scalar is rejected instead of being loaded under positional keys.
-  stub yq ": printf '!!map\\n'" ": printf 'SHARED\\tfrom-yaml\\nHOST\\tlocalhost\\n'"
+  # `yq` only turns the YAML into JSON; `jq` flattens both files.
+  stub jq ": printf 'PORT\\t8080\\nSHARED\\tfrom-json\\n'" \
+    ": printf 'SHARED\\tfrom-yaml\\nHOST\\tlocalhost\\n'"
+  stub yq ": printf '{}\\n'"
 
   DYBATPHO_CONFIG=()
   dybatpho::config_load "${json_file}" "${yaml_file}"

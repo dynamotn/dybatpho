@@ -11,6 +11,17 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Changed
+
+- **`math` — long values add, subtract, multiply, divide and take roots
+  several times faster.** The exact arithmetic now works through native
+  integers 9 or 17 digits at a time instead of one digit at a time, division by
+  a divisor of up to 17 digits runs in native blocks, and each digit of a
+  quotient or a square root is estimated rather than searched for from 9
+  down. The square root of a 45-digit value runs a fourteenth of the commands
+  it did, and `dybatpho::math_avg` and `dybatpho::math_stddev` over long values
+  a third to a fifth, with the same exact results.
+
 ## [7.0.0] - 2026-10-23
 
 ### Added

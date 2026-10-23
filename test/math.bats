@@ -858,9 +858,20 @@ math_engine_run_all() {
   math_engine_values | DYBATPHO_MATH_ENGINE="$1" dybatpho::math_sum
 }
 
+# Print every aggregate under the engine named in $1, with the trace off.
+# Under kcov, coverage is read from the trace, and kcov keeps what it reads
+# until it exits; a reference answer, or the same Bash run again for another
+# awk, adds no coverage but took gigabytes, and the runner killed the run.
+math_engine_run_all_untraced() {
+  (
+    set +x
+    math_engine_run_all "$1"
+  )
+}
+
 @test "DYBATPHO_MATH_ENGINE=awk prints what the Bash engine prints" {
   local expected
-  expected="$(math_engine_run_all bash)"
+  expected="$(math_engine_run_all_untraced bash)"
   run_traced math_engine_run_all awk
   assert_success
   assert_output "${expected}"
@@ -869,7 +880,7 @@ math_engine_run_all() {
 
 @test "the math awk engine agrees with the Bash engine under every awk installed" {
   local expected flavor found=0 bin
-  expected="$(math_engine_run_all bash)"
+  expected="$(math_engine_run_all_untraced bash)"
   for flavor in awk gawk mawk original-awk nawk /usr/bin/awk busybox; do
     command -v "${flavor}" > /dev/null || continue
     if [[ "${flavor}" == "busybox" ]]; then
@@ -883,7 +894,8 @@ math_engine_run_all() {
       printf '#!/bin/sh\nexec %s "$@"\n' "$(command -v "${flavor}")" > "${bin}/awk"
     fi
     chmod +x "${bin}/awk"
-    PATH="${bin}:${PATH}" run_traced math_engine_run_all awk
+    # The Bash side is the same for every flavor, and the test above traces it.
+    PATH="${bin}:${PATH}" run_traced math_engine_run_all_untraced awk
     assert_success
     assert_output "${expected}"
     found=$((found + 1))

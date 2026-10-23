@@ -522,7 +522,28 @@ function __dybatpho_math_cmp_abs {
 }
 
 #######################################
+# @description Left-pad a digit string with zeros to a whole number of limbs,
+#   and to at least a given width, so it can be walked a limb at a time.
+# @arg $1 string Name of the variable holding the digit string
+# @arg $2 number Digits per limb
+# @arg $3 number Width to reach at least, default none
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_math_limbs {
+  local -n __limbs_digits="$1"
+  local __limbs_size="$2" __limbs_width="${3:-0}" __limbs_zeros
+  ((${#__limbs_digits} <= __limbs_width)) || __limbs_width=${#__limbs_digits}
+  __limbs_width=$(((__limbs_width + __limbs_size - 1) / __limbs_size * __limbs_size))
+  printf -v __limbs_zeros '%0*d' "${__limbs_width}" 0
+  __limbs_digits="${__limbs_zeros:${#__limbs_digits}}${__limbs_digits}"
+}
+
+#######################################
 # @description Add two unsigned digit strings.
+#   The digits are taken 17 at a time, as many as two of them and a carry can
+#   hold in native arithmetic, rather than one at a time: every step costs a
+#   command, and a sum of a few long values ran thousands of them.
 # @arg $1 string Name of the variable receiving the sum
 # @arg $2 string First digit string
 # @arg $3 string Second digit string
@@ -533,24 +554,22 @@ function __dybatpho_math_add_abs {
   local __add_out_name __add_a __add_b
   dybatpho::expect_args __add_out_name __add_a __add_b -- "$@"
   local -n __add_out="${__add_out_name}"
-  local __add_ia=$((${#__add_a} - 1))
-  local __add_ib=$((${#__add_b} - 1))
-  local __add_carry=0 __add_sum __add_result=""
-  while ((__add_ia >= 0 || __add_ib >= 0 || __add_carry)); do
-    __add_sum="${__add_carry}"
-    ((__add_ia >= 0)) && __add_sum=$((__add_sum + 10#${__add_a:__add_ia:1}))
-    ((__add_ib >= 0)) && __add_sum=$((__add_sum + 10#${__add_b:__add_ib:1}))
-    __add_result="$((__add_sum % 10))${__add_result}"
-    __add_carry=$((__add_sum / 10))
-    __add_ia=$((__add_ia - 1))
-    __add_ib=$((__add_ib - 1))
+  __dybatpho_math_limbs __add_a 17 "${#__add_b}"
+  __dybatpho_math_limbs __add_b 17 "${#__add_a}"
+  local __add_index __add_carry=0 __add_sum __add_chunk __add_result=""
+  for ((__add_index = ${#__add_a} - 17; __add_index >= 0; __add_index -= 17)); do
+    __add_sum=$((10#${__add_a:__add_index:17} + 10#${__add_b:__add_index:17} + __add_carry))
+    __add_carry=$((__add_sum / 10 ** 17))
+    printf -v __add_chunk '%017d' "$((__add_sum % 10 ** 17))"
+    __add_result="${__add_chunk}${__add_result}"
   done
-  __add_out="${__add_result:-0}"
+  __add_out="${__add_carry}${__add_result}"
   __dybatpho_math_strip __add_out
 }
 
 #######################################
 # @description Subtract one unsigned digit string from a larger one.
+#   Taken 17 digits at a time, like `__dybatpho_math_add_abs`.
 # @arg $1 string Name of the variable receiving the difference
 # @arg $2 string Digit string to subtract from, never smaller than `$3`
 # @arg $3 string Digit string to subtract
@@ -561,28 +580,28 @@ function __dybatpho_math_sub_abs {
   local __sub_out_name __sub_a __sub_b
   dybatpho::expect_args __sub_out_name __sub_a __sub_b -- "$@"
   local -n __sub_out="${__sub_out_name}"
-  local __sub_ia=$((${#__sub_a} - 1))
-  local __sub_ib=$((${#__sub_b} - 1))
-  local __sub_borrow=0 __sub_digit __sub_result=""
-  while ((__sub_ia >= 0)); do
-    __sub_digit=$((10#${__sub_a:__sub_ia:1} - __sub_borrow))
-    ((__sub_ib >= 0)) && __sub_digit=$((__sub_digit - 10#${__sub_b:__sub_ib:1}))
-    if ((__sub_digit < 0)); then
-      __sub_digit=$((__sub_digit + 10))
+  __dybatpho_math_limbs __sub_a 17 "${#__sub_b}"
+  __dybatpho_math_limbs __sub_b 17 "${#__sub_a}"
+  local __sub_index __sub_borrow=0 __sub_difference __sub_chunk __sub_result=""
+  for ((__sub_index = ${#__sub_a} - 17; __sub_index >= 0; __sub_index -= 17)); do
+    __sub_difference=$((10#${__sub_a:__sub_index:17} - 10#${__sub_b:__sub_index:17} - __sub_borrow))
+    __sub_borrow=0
+    if ((__sub_difference < 0)); then
+      __sub_difference=$((__sub_difference + 10 ** 17))
       __sub_borrow=1
-    else
-      __sub_borrow=0
     fi
-    __sub_result="${__sub_digit}${__sub_result}"
-    __sub_ia=$((__sub_ia - 1))
-    __sub_ib=$((__sub_ib - 1))
+    printf -v __sub_chunk '%017d' "${__sub_difference}"
+    __sub_result="${__sub_chunk}${__sub_result}"
   done
-  __sub_out="${__sub_result:-0}"
+  __sub_out="${__sub_result}"
   __dybatpho_math_strip __sub_out
 }
 
 #######################################
 # @description Multiply two unsigned digit strings, the long way.
+#   The long way in base 10^9: a product of two nine-digit limbs, plus a
+#   column and a carry, still fits in 64 bits, so a step multiplies nine digits
+#   by nine rather than one by one.
 # @arg $1 string Name of the variable receiving the product
 # @arg $2 string First digit string
 # @arg $3 string Second digit string
@@ -593,31 +612,40 @@ function __dybatpho_math_mul_abs {
   local __mul_out_name __mul_a __mul_b
   dybatpho::expect_args __mul_out_name __mul_a __mul_b -- "$@"
   local -n __mul_out="${__mul_out_name}"
+  __dybatpho_math_limbs __mul_a 9
+  __dybatpho_math_limbs __mul_b 9
   local -a __mul_columns=()
-  local __mul_width=$((${#__mul_a} + ${#__mul_b}))
-  local __mul_ia __mul_ib __mul_index __mul_digit __mul_carry __mul_product
-  for ((__mul_index = 0; __mul_index < __mul_width; __mul_index++)); do
+  local __mul_na=$((${#__mul_a} / 9)) __mul_nb=$((${#__mul_b} / 9))
+  local __mul_ia __mul_ib __mul_index __mul_limb __mul_carry __mul_product
+  for ((__mul_index = 0; __mul_index < __mul_na + __mul_nb; __mul_index++)); do
     __mul_columns[__mul_index]=0
   done
-  for ((__mul_ia = ${#__mul_a} - 1; __mul_ia >= 0; __mul_ia--)); do
-    __mul_digit=$((10#${__mul_a:__mul_ia:1}))
+  for ((__mul_ia = __mul_na - 1; __mul_ia >= 0; __mul_ia--)); do
+    __mul_limb=$((10#${__mul_a:__mul_ia*9:9}))
+    ((__mul_limb)) || continue
     __mul_carry=0
-    for ((__mul_ib = ${#__mul_b} - 1; __mul_ib >= 0; __mul_ib--)); do
+    for ((__mul_ib = __mul_nb - 1; __mul_ib >= 0; __mul_ib--)); do
       __mul_index=$((__mul_ia + __mul_ib + 1))
-      __mul_product=$((__mul_columns[__mul_index] + __mul_digit * 10#${__mul_b:__mul_ib:1} + __mul_carry))
-      __mul_columns[__mul_index]=$((__mul_product % 10))
-      __mul_carry=$((__mul_product / 10))
+      __mul_product=$((__mul_columns[__mul_index] + __mul_limb * 10#${__mul_b:__mul_ib*9:9} + __mul_carry))
+      __mul_columns[__mul_index]=$((__mul_product % 1000000000))
+      __mul_carry=$((__mul_product / 1000000000))
     done
     # Column `__mul_ia` is untouched until this point, so the carry lands in it
-    # whole and can never push it past a single digit.
-    __mul_columns[__mul_ia]=$((__mul_columns[__mul_ia] + __mul_carry))
+    # whole and can never push it past a single limb.
+    __mul_columns[__mul_ia]=${__mul_carry}
   done
-  printf -v __mul_out '%s' ${__mul_columns[@]+"${__mul_columns[@]}"}
+  printf -v __mul_out '%09d' ${__mul_columns[@]+"${__mul_columns[@]}"}
   __dybatpho_math_strip __mul_out
 }
 
 #######################################
 # @description Divide one unsigned digit string by another, long division.
+#   A divisor of up to 17 digits, the usual case of a count or a scale, keeps
+#   every partial remainder inside 64 bits, so the dividend is taken a block of
+#   digits at a time in native arithmetic. A longer divisor goes a digit at a
+#   time: the leading digits of the remainder and the divisor bound the next
+#   quotient digit from above, and the exact check corrects it downwards, so
+#   a digit costs one product rather than up to nine subtractions.
 # @arg $1 string Name of the variable receiving the quotient digits
 # @arg $2 string Name of the variable receiving the remainder digits
 # @arg $3 string Digit string to divide
@@ -630,21 +658,50 @@ function __dybatpho_math_divmod_abs {
   dybatpho::expect_args __div_quot_name __div_rem_name __div_a __div_b -- "$@"
   local -n __div_quot="${__div_quot_name}"
   local -n __div_rem="${__div_rem_name}"
+  __dybatpho_math_strip __div_a
+  __dybatpho_math_strip __div_b
   local __div_index __div_digit __div_cmp __div_remainder="0" __div_result=""
-  for ((__div_index = 0; __div_index < ${#__div_a}; __div_index++)); do
-    __div_remainder="${__div_remainder}${__div_a:__div_index:1}"
-    __dybatpho_math_strip __div_remainder
-    __div_digit=0
-    # A decimal digit is at most nine subtractions away, which keeps the inner
-    # step to the same borrow arithmetic the rest of the module uses.
-    while :; do
-      __dybatpho_math_cmp_abs __div_cmp "${__div_remainder}" "${__div_b}"
-      ((__div_cmp >= 0)) || break
-      __dybatpho_math_sub_abs __div_remainder "${__div_remainder}" "${__div_b}"
-      __div_digit=$((__div_digit + 1))
+  local __div_block __div_width __div_gap __div_trial
+  if ((${#__div_b} <= 17)); then
+    # A remainder below the divisor, followed by a block of digits, stays
+    # under 10^18.
+    __div_block=$((18 - ${#__div_b}))
+    while ((${#__div_a} % __div_block)); do
+      __div_a="0${__div_a}"
     done
-    __div_result="${__div_result}${__div_digit}"
-  done
+    local __div_divisor=$((10#${__div_b})) __div_current
+    __div_remainder=0
+    for ((__div_index = 0; __div_index < ${#__div_a}; __div_index += __div_block)); do
+      __div_current=$((__div_remainder * 10 ** __div_block + 10#${__div_a:__div_index:__div_block}))
+      printf -v __div_digit '%0*d' "${__div_block}" "$((__div_current / __div_divisor))"
+      __div_result="${__div_result}${__div_digit}"
+      __div_remainder=$((__div_current % __div_divisor))
+    done
+  else
+    for ((__div_index = 0; __div_index < ${#__div_a}; __div_index++)); do
+      __div_remainder="${__div_remainder}${__div_a:__div_index:1}"
+      __dybatpho_math_strip __div_remainder
+      # The remainder is below ten divisors, so it is at most one digit longer.
+      __div_gap=$((${#__div_remainder} - ${#__div_b}))
+      if ((__div_gap < 0)); then
+        __div_result="${__div_result}0"
+        continue
+      fi
+      __div_width=${#__div_remainder}
+      ((__div_width <= 18)) || __div_width=18
+      __div_digit=$(((10#${__div_remainder:0:__div_width} + 1) / 10#${__div_b:0:__div_width-__div_gap}))
+      ((__div_digit <= 9)) || __div_digit=9
+      __dybatpho_math_mul_abs __div_trial "${__div_b}" "${__div_digit}"
+      __dybatpho_math_cmp_abs __div_cmp "${__div_trial}" "${__div_remainder}"
+      while ((__div_cmp > 0)); do
+        __div_digit=$((__div_digit - 1))
+        __dybatpho_math_sub_abs __div_trial "${__div_trial}" "${__div_b}"
+        __dybatpho_math_cmp_abs __div_cmp "${__div_trial}" "${__div_remainder}"
+      done
+      __dybatpho_math_sub_abs __div_remainder "${__div_remainder}" "${__div_trial}"
+      __div_result="${__div_result}${__div_digit}"
+    done
+  fi
   __div_quot="${__div_result}"
   __dybatpho_math_strip __div_quot
   __div_rem="${__div_remainder}"
@@ -1999,6 +2056,13 @@ function __dybatpho_math_sort {
 #   The pencil-and-paper method: digits are brought down two at a time, and
 #   each step finds the largest next digit whose trial product still fits in the
 #   remainder. Every step is exact, so the result is the true floor.
+#
+#   The digit is not searched for from 9 down: the leading digits of the
+#   remainder and of `20 * root`, divided in native arithmetic, give a bound it
+#   can only fall short of, and the exact check then moves down from there,
+#   nearly always at once. Each trial costs three digit-string operations, and
+#   trying up to nine of them per digit made a root of a few dozen digits run
+#   hundreds of thousands of commands.
 # @arg $1 string Name of the variable receiving the root digits
 # @arg $2 string Digit string
 # @set The named variable
@@ -2010,22 +2074,47 @@ function __dybatpho_math_isqrt {
   local -n __isqrt_out="${__isqrt_out_name}"
   __dybatpho_math_strip __isqrt_digits
   ((${#__isqrt_digits} % 2)) && __isqrt_digits="0${__isqrt_digits}"
-  local __isqrt_root="0" __isqrt_rem="0" __isqrt_index
-  local __isqrt_base __isqrt_digit __isqrt_trial __isqrt_cmp
+  # `base` is always `20 * root`, kept up to date rather than multiplied out
+  # again for every digit.
+  local __isqrt_root="0" __isqrt_rem="0" __isqrt_base="0" __isqrt_index
+  local __isqrt_digit __isqrt_factor __isqrt_trial __isqrt_cmp __isqrt_width __isqrt_gap
   for ((__isqrt_index = 0; __isqrt_index < ${#__isqrt_digits}; __isqrt_index += 2)); do # kcov(skip) every root runs it
     __isqrt_rem="${__isqrt_rem}${__isqrt_digits:__isqrt_index:2}"
     __dybatpho_math_strip __isqrt_rem
-    # The next digit d is the largest with (20 * root + d) * d <= remainder.
-    __dybatpho_math_mul_abs __isqrt_base "${__isqrt_root}" "20"
-    for ((__isqrt_digit = 9; __isqrt_digit > 0; __isqrt_digit--)); do
-      __dybatpho_math_add_abs __isqrt_trial "${__isqrt_base}" "${__isqrt_digit}"
-      __dybatpho_math_mul_abs __isqrt_trial "${__isqrt_trial}" "${__isqrt_digit}"
+    # The next digit d is the largest with (base + d) * d <= remainder, so it
+    # is at most remainder / base. Both are cut to the same number of leading
+    # digits, and one is added to the cut remainder, so the quotient of the
+    # two can only overestimate it.
+    if [[ "${__isqrt_base}" == "0" ]]; then
+      __isqrt_digit=9
+    else
+      __isqrt_gap=$((${#__isqrt_rem} - ${#__isqrt_base}))
+      if ((__isqrt_gap < 0)); then
+        __isqrt_digit=0
+      elif ((__isqrt_gap > 1)); then
+        __isqrt_digit=9
+      else
+        __isqrt_width=${#__isqrt_rem}
+        ((__isqrt_width <= 18)) || __isqrt_width=18
+        __isqrt_digit=$(((10#${__isqrt_rem:0:__isqrt_width} + 1) / 10#${__isqrt_base:0:__isqrt_width-__isqrt_gap}))
+        ((__isqrt_digit <= 9)) || __isqrt_digit=9
+      fi
+    fi
+    for (( ; __isqrt_digit > 0; __isqrt_digit--)); do
+      # `base` ends in a zero, so adding a digit only replaces it.
+      __isqrt_factor="${__isqrt_base%0}${__isqrt_digit}"
+      __dybatpho_math_strip __isqrt_factor
+      __dybatpho_math_mul_abs __isqrt_trial "${__isqrt_factor}" "${__isqrt_digit}"
       __dybatpho_math_cmp_abs __isqrt_cmp "${__isqrt_trial}" "${__isqrt_rem}"
       ((__isqrt_cmp <= 0)) && break
     done
     if ((__isqrt_digit > 0)); then
       __dybatpho_math_sub_abs __isqrt_rem "${__isqrt_rem}" "${__isqrt_trial}"
+      # 20 * (10 * root + d) = 10 * (base + 2 * d), and base + d is the factor.
+      __dybatpho_math_add_abs __isqrt_base "${__isqrt_factor}" "${__isqrt_digit}"
     fi
+    __isqrt_base="${__isqrt_base}0"
+    __dybatpho_math_strip __isqrt_base
     __isqrt_root="${__isqrt_root}${__isqrt_digit}"
     __dybatpho_math_strip __isqrt_root
   done

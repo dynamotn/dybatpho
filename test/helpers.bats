@@ -64,7 +64,8 @@ setup() {
   assert_success
   refute_output
   opts=()
-  run_traced dybatpho::still_has_args "${opts[@]}"
+  # Guarded: Bash 4.3 treats an empty array as unset under `set -u`.
+  run_traced dybatpho::still_has_args ${opts[@]+"${opts[@]}"}
   assert_failure
   refute_output
 }
@@ -106,6 +107,18 @@ setup() {
 
 @test "dybatpho::require installed tool" {
   dybatpho::require "bash"
+}
+
+@test "dybatpho::require finds an installed tool with hashing turned off" {
+  # `hash` refuses every name under `set +h`, which made every tool look
+  # missing; a missing one must still be refused.
+  require_without_hashing() { (
+    set +h
+    dybatpho::require "$@"
+  ); }
+  run_traced -0 require_without_hashing bash
+  run --separate-stderr -127 require_without_hashing "dyfoooo"
+  assert_stderr --partial "dyfoooo isn't installed"
 }
 
 @test "dybatpho::require not installed tool" {
@@ -216,6 +229,19 @@ require_fake_tool() {
 
 @test "dybatpho::is with empty" {
   run dybatpho::is
+  assert_failure
+}
+
+@test "dybatpho::is without a value still stops with the argument message" {
+  # The argument check only runs when a value is missing; it must still name
+  # this function and the arguments it expected.
+  run --separate-stderr dybatpho::is true
+  assert_failure
+  assert_stderr --partial "dybatpho::is: Expected args: condition input"
+  # An empty value is a value, not a missing one.
+  run_traced dybatpho::is empty ""
+  assert_success
+  run_traced dybatpho::is set ""
   assert_failure
 }
 
@@ -1035,6 +1061,26 @@ EOF
   # A zero-padded budget is read in base ten.
   run_traced dybatpho::retry 08 true
   assert_success
+}
+
+@test "dybatpho::retry refuses a delay setting that is not a whole number" {
+  # These reached `local -i`, so `0.5` ended the script with a bare arithmetic
+  # error and an array subscript ran the command inside it.
+  DYBATPHO_RETRY_BASE_DELAY=0.5 run --separate-stderr dybatpho::retry 1 false
+  assert_failure
+  assert_stderr --partial "DYBATPHO_RETRY_BASE_DELAY must be a whole number of seconds, got '0.5'"
+  DYBATPHO_RETRY_MAX_DELAY='a[$(touch "${BATS_TEST_TMPDIR}/ran")]' run --separate-stderr dybatpho::retry 1 false
+  assert_failure
+  assert_stderr --partial "DYBATPHO_RETRY_MAX_DELAY must be a whole number of seconds"
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/ran"
+  # A zero-padded delay is read in base ten.
+  local sleep_args_file="${BATS_TEST_TMPDIR}/sleep-args"
+  count=0
+  stub_repeated sleep ": echo \"\$*\" >> ${sleep_args_file}"
+  DYBATPHO_RETRY_BASE_DELAY=08 DYBATPHO_RETRY_MAX_DELAY=09 run_traced dybatpho::retry 2 _test_retry
+  unstub sleep
+  assert_success
+  assert_equal "$(tr '\n' ' ' < "${sleep_args_file}")" '8 9 '
 }
 
 @test "dybatpho::is command and function print nothing, whatever the answer" {

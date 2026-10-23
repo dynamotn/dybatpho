@@ -268,6 +268,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when called directly under `set -e`; inside `$(...)` it worked. It now prints
   `10.00`.
 
+- **`helpers` — `dybatpho::require` finds tools under `set +h`, and
+  `dybatpho::retry` checks its delay variables.** With hashing off every tool
+  was reported missing. A `DYBATPHO_RETRY_BASE_DELAY` or
+  `DYBATPHO_RETRY_MAX_DELAY` of `0.5` or `08` ended the script with a bare
+  arithmetic error; such values are now refused by name and padded ones read
+  in base ten.
+
 ### Security
 
 - **Arithmetic no longer runs a command passed as a number.**

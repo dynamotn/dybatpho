@@ -133,6 +133,9 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - `is number` or `is int` receives a non-numeric value.
 - A command or environment list is empty.
 - A required command is given as a path that is missing, is a directory, or is a file without the executable bit.
+- A required command is checked in a shell that turned command hashing off with `set +h`.
+- `dybatpho::is` is called with a condition but no value.
+- A retry delay setting is fractional, zero-padded, or holds an arithmetic expression.
 - Coalesce receives no candidate values or only empty values.
 - Retry is used with a noisy shell command string that needs a shorter description.
 - The retried command keeps state in a variable whose name matches one the retry loop uses, such as `count` or `delay`.
@@ -155,6 +158,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-003e**: When a range is given and the installed version cannot be read, the command check MUST stop the script, because a requirement that cannot be verified has not been met.
 - **FR-003f**: The command check MUST normalize the reported version before matching it, so that a command answering `1.35` or `3.12-modified` is judged on the release it is.
 - **FR-003g**: A command given as a path (a name holding `/`) MUST count as installed only when it is an existing executable file, not merely because the shell's command table accepts the name.
+- **FR-003h**: The command check MUST find a command on `PATH` whether or not command hashing is turned on.
 - **FR-004**: The module MUST provide `is` conditions for command, function,
   file, directory, link, existence, readable, writable, executable, set,
   empty, number, integer, true, and false values.
@@ -197,6 +201,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-024**: `expect_args` MUST fill the caller's variables whatever their names, including `variable_name`, `variable_names` and `is_error`.
 - **FR-025**: `default_env` MUST set and export the named variable whatever its name, including `env_name` and `default_value`.
 - **FR-026**: `dybatpho::retry` and `dybatpho::retry_until` MUST refuse a retry budget that is not made of digits, before any arithmetic, and read one with leading zeros in base ten.
+- **FR-026a**: `dybatpho::retry` MUST refuse a `DYBATPHO_RETRY_BASE_DELAY` or `DYBATPHO_RETRY_MAX_DELAY` that is not made of digits, naming the setting, before any arithmetic, and MUST read a padded delay in base ten.
 - **FR-027**: `dybatpho::is command` and `dybatpho::is function` MUST print nothing, whatever the answer.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.
 - **FR-019**: `dybatpho::is number` MUST accept exactly what `validate_is number` accepts, and `dybatpho::is int` MUST accept only optionally signed decimal integers without a leading zero, a subset of what `validate_is int` accepts; neither MUST depend on `printf` or `LC_NUMERIC`.
@@ -256,6 +261,9 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-023**: Default variables named `env_name` and `default_value`, and find each set.
 - **IT-024**: Retry with a budget of `many`, and with an array subscript holding a command, and see both refused without the command running; retry with `08` and succeed.
 - **IT-025**: Ask whether a function exists and whether a missing one does, and get no output either way.
+- **IT-026**: Require `bash` and a missing tool under `set +h`, and see the first pass and the second refused.
+- **IT-027**: Call `dybatpho::is true` with no value and see the script stop with the expected-arguments message, while an empty value is still tested.
+- **IT-028**: Retry with a base delay of `0.5` and with a maximum holding an array subscript that runs a command, and see both refused by name without running it; retry with `08` and `09` and see the sleeps read in base ten.
 
 ## Acceptance Criteria *(mandatory)*
 

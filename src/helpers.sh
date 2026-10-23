@@ -618,11 +618,13 @@ function dybatpho::require {
   # `hash` looks a bare name up on `PATH`, but takes a name holding a `/` on
   # trust and succeeds without checking that anything is there, so a path has
   # to be an executable file in its own right.
+  # `hash` also fails for every name once hashing is off (`set +h`), so a
+  # failure is checked again with `type -P`, which searches `PATH` either way.
   if [[ "${command_name}" == */* ]]; then
     [[ -f "${command_name}" && -x "${command_name}" ]] \
       || dybatpho::die "${command_name} isn't installed" "${exit_code}"
   else
-    hash "${command_name}" &> /dev/null \
+    hash "${command_name}" &> /dev/null || type -P "${command_name}" &> /dev/null \
       || dybatpho::die "${command_name} isn't installed" "${exit_code}"
   fi
   [[ -n "${range}" ]] || return 0
@@ -866,8 +868,11 @@ function __dybatpho_helpers_parse_cidr {
 # @exitcode 1 If not matched
 #######################################
 function dybatpho::is {
-  local condition input
-  dybatpho::expect_args condition input -- "$@"
+  # The library asks this hundreds of times while building one CLI parser, and
+  # `dybatpho::expect_args` costs several times what the test itself does, so
+  # it only runs to report a call that is missing its value.
+  local condition="${1-}" input="${2-}"
+  (($# >= 2)) || dybatpho::expect_args condition input -- "$@"
   case "${condition}" in
     command)
       command -v "${input}" &> /dev/null
@@ -1105,6 +1110,18 @@ function dybatpho::retry {
   [[ "${__dybatpho_retry_retries}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Number of retries must be a whole number, got '${__dybatpho_retry_retries}'"
   __dybatpho_retry_retries=$((10#${__dybatpho_retry_retries}))
+  # The delays reach arithmetic too: `0.5` or `08` used to end the script with
+  # a bare arithmetic error on the first retry, so they are checked here and
+  # read in base ten.
+  local __dybatpho_retry_base="${DYBATPHO_RETRY_BASE_DELAY:-2}" __dybatpho_retry_max="${DYBATPHO_RETRY_MAX_DELAY:-30}"
+  local __dybatpho_retry_setting __dybatpho_retry_value
+  for __dybatpho_retry_setting in "BASE:${__dybatpho_retry_base}" "MAX:${__dybatpho_retry_max}"; do
+    __dybatpho_retry_value="${__dybatpho_retry_setting#*:}"
+    [[ "${__dybatpho_retry_value}" =~ ^[0-9]+$ ]] && continue
+    __dybatpho_retry_setting="DYBATPHO_RETRY_${__dybatpho_retry_setting%%:*}_DELAY"
+    __dybatpho_retry_setting+=" must be a whole number of seconds, got '${__dybatpho_retry_value}'"
+    dybatpho::die "${FUNCNAME[0]}: ${__dybatpho_retry_setting}"
+  done
   local __dybatpho_retry_exit_code __dybatpho_retry_count __dybatpho_retry_delay
 
   __dybatpho_retry_count=0
@@ -1112,7 +1129,8 @@ function dybatpho::retry {
     __dybatpho_retry_exit_code="$?"
     __dybatpho_retry_count="$((__dybatpho_retry_count + 1))"
     if [[ "${__dybatpho_retry_count}" -le "${__dybatpho_retry_retries}" ]]; then
-      __dybatpho_helpers_backoff_into __dybatpho_retry_delay "${__dybatpho_retry_count}"
+      __dybatpho_helpers_backoff_into __dybatpho_retry_delay "${__dybatpho_retry_count}" \
+        "$((10#${__dybatpho_retry_base}))" "$((10#${__dybatpho_retry_max}))"
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_attempts_total
       fi
@@ -1243,22 +1261,22 @@ function dybatpho::breakpoint {
 #######################################
 # @description Print the file and line a function was defined at.
 #   `declare -F` names the file only while `extdebug` is on, and that option
-#   also changes how `DEBUG` and `RETURN` traps behave, so it is switched on for
-#   the one call and put back exactly as it was found. `shopt -p` reports a
-#   non-zero status when the option is off, which under `errexit` would end the
-#   caller before anything was looked up.
+#   also changes how `DEBUG` and `RETURN` traps behave, so it is switched on in
+#   the subshell that asks and never in the caller's shell.
 # @arg $1 string Function name, in full
 # @stdout Two lines: the file, then the line number
 # @exitcode 1 No such function, or Bash could not say where it came from
 # @internal
 #######################################
 function __dybatpho_helpers_locate {
-  local restore
-  restore="$(shopt -p extdebug || true)"
-  shopt -s extdebug
+  # The option is switched on inside the substitution the answer is read from,
+  # so the caller's shell never has it on, not even for a moment, and the
+  # lookup costs that one subshell instead of a second one to save the option.
   local spec
-  spec="$(declare -F "$1" 2> /dev/null || true)"
-  eval "${restore}"
+  spec="$(
+    shopt -s extdebug
+    declare -F "$1" 2> /dev/null || true
+  )"
 
   # `declare -F` answers `name line file`, and the path may hold spaces while
   # the first two fields cannot.
@@ -1269,7 +1287,10 @@ function __dybatpho_helpers_locate {
   # Bash reports the path as it was written when the file was sourced, so a
   # module loaded as `test/../init.sh` is named that way here. Tidying it up
   # makes the answer readable and keeps `..` out of a path a caller may print.
-  file="$(dybatpho::path_normalize "${file}" 2> /dev/null || printf '%s' "${file}")"
+  # A path with nothing to tidy skips the subshell.
+  if [[ "${file}" == ./* || "${file}" == *'//'* || "${file}" == *'/./'* || "${file}" == *'/../'* ]]; then
+    file="$(dybatpho::path_normalize "${file}" 2> /dev/null || printf '%s' "${file}")"
+  fi
   printf '%s\n%s\n' "${file}" "${line}"
 }
 

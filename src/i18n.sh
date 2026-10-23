@@ -1321,26 +1321,20 @@ DYBATPHO_I18N_RTL="${DYBATPHO_I18N_RTL:-ar he fa ur yi dv ps sd ug ckb arc syr n
 #   French groups digits with a narrow no-break space, Russian and Polish with
 #   a no-break space, and the
 #   currency layouts separate symbol from amount with a non-breaking space, so
-#   that neither a terminal nor a text wrapper can split an amount. Older or
-#   reduced `printf` builds do not understand `\u`, so the escape is probed once
-#   and degraded rather than assumed.
+#   that neither a terminal nor a text wrapper can split an amount. Outside a
+#   UTF-8 locale they cannot be written, and a plain space stands in.
 # @noargs
 # @set DYBATPHO_I18N_NUMBER DYBATPHO_I18N_CURRENCY_LAYOUT
 # @internal
 #######################################
 function __dybatpho_i18n_seed_symbols {
-  local narrow nbsp probe
-  # The escape, not the character: written as the character, the probe always
-  # matched itself and every locale got a plain space.
-  probe="$(printf '\u202f' 2> /dev/null)" || probe=""
-  # A `printf` without `\u`, or a locale that cannot encode the character,
-  # hands the escape back as written.
-  if [[ "${probe}" == \\* || -z "${probe}" ]]; then
-    narrow=" "
-    nbsp=" "
-  else
-    narrow="${probe}"
-    nbsp="$(printf '\u00a0')"
+  local narrow=" " nbsp=" "
+  # Only a UTF-8 locale can carry them, and the test is whether Bash counts
+  # characters there: asking `printf` for `\u202f` instead gave a `*` under
+  # musl's C locale, and the UTF-8 bytes anyway under macOS's.
+  if ! __dybatpho_log_indexes_bytes; then
+    narrow=$'\342\200\257'
+    nbsp=$'\302\240'
   fi
   if dybatpho::is true "${DYBATPHO_I18N_ASCII}"; then
     narrow=" "

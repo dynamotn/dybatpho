@@ -16,7 +16,7 @@
 #   helpers the suite needs beyond what bats-assert offers: a `run` that keeps
 #   coverage instrumentation working, and an assertion about a killed process
 #   that holds on a container whose PID 1 never reaps.
-DYBATPHO_DIR="$(dirname "${BASH_SOURCE[0]}")/.."
+DYBATPHO_DIR="${BASH_SOURCE[0]%/*}/.."
 
 # Bats keeps a DEBUG trap and `set -T -E` armed so it can print a stack trace for
 # the failing line. That trap fires once per executed command, and sourcing the
@@ -28,9 +28,34 @@ __dybatpho_helper_saved_trap="$(trap -p DEBUG)"
 trap - DEBUG
 set +T +E
 
-. "${DYBATPHO_DIR}/test/lib/support/load.bash"
-. "${DYBATPHO_DIR}/test/lib/assert/load.bash"
-. "${DYBATPHO_DIR}/test/lib/file/load.bash"
+# Each bats library is sourced the way its `load.bash` would, without the
+# `$(dirname ...)` that file runs once per source file: those are a fork each,
+# and bats-support, bats-assert and bats-file together ran seventeen of them in
+# every test, about as long as sourcing the whole of dybatpho. bats-support's
+# one other statement, its `BATS_SAVED_PATH` assignment, is made here; a
+# `load.bash` holding anything else is sourced as it is.
+BATS_SAVED_PATH="${BATS_SAVED_PATH-${PATH}}"
+__dybatpho_helper_pattern='^source "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)/([^"]+)"$'
+for __dybatpho_helper_lib in support assert file; do
+  __dybatpho_helper_lib="${DYBATPHO_DIR}/test/lib/${__dybatpho_helper_lib}"
+  mapfile -t __dybatpho_helper_lines < "${__dybatpho_helper_lib}/load.bash"
+  __dybatpho_helper_parts=()
+  for __dybatpho_helper_line in ${__dybatpho_helper_lines[@]+"${__dybatpho_helper_lines[@]}"}; do
+    if [[ "${__dybatpho_helper_line}" =~ ${__dybatpho_helper_pattern} ]]; then
+      __dybatpho_helper_parts+=("${__dybatpho_helper_lib}/${BASH_REMATCH[1]}")
+    elif [[ ! "${__dybatpho_helper_line}" =~ ^[[:space:]]*(#.*)?$ &&
+      "${__dybatpho_helper_line}" != BATS_SAVED_PATH=* ]]; then
+      __dybatpho_helper_parts=("${__dybatpho_helper_lib}/load.bash")
+      break
+    fi
+  done
+  for __dybatpho_helper_line in ${__dybatpho_helper_parts[@]+"${__dybatpho_helper_parts[@]}"}; do
+    # shellcheck source=/dev/null
+    . "${__dybatpho_helper_line}"
+  done
+done
+unset -v __dybatpho_helper_pattern __dybatpho_helper_lib __dybatpho_helper_lines \
+  __dybatpho_helper_parts __dybatpho_helper_line
 . "${DYBATPHO_DIR}/test/lib/mock/stub.bash"
 # Caches go to the test's own directory, read when `init.sh` is sourced: under
 # the real home, generated completions survived from one run to the next, and
@@ -40,6 +65,40 @@ export XDG_CACHE_HOME="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR
 # module. A script under test that cares about a narrower module set sources
 # `init.sh` itself in a fresh shell, the way `test/init.bats` does.
 . "${DYBATPHO_DIR}/init.sh" --modules all
+
+# The same trap stays armed in the test body, where it captures a stack trace
+# for every command, the library's own included: a test driving the Bash math
+# engine over twenty-digit values spent 28s in the trap and 0.1s in the code.
+# The trap Bats installs is therefore put back behind a test of where the
+# command comes from, so a command of `src/` or of a bats library never calls
+# the handler, and a failure is reported at the line of the `.bats` file that
+# called into it. Telling Bats to exclude those paths is not enough: a skipped
+# call into the handler still costs some fifty microseconds. A trap of any
+# other shape, from another Bats version, is put back as it was.
+#
+# `$_` is saved first, since the assignments clear it before it reaches the
+# handler. And skipping the library shifts the trace Bats reports when the
+# library ends the test itself, as `dybatpho::die` does: no ERR trap runs for
+# an `exit`, so Bats takes the trace before last, assuming the last one was
+# taken for the `exit`, and pointed at the line above the call. A library
+# command therefore marks the last trace -- the line of the test that called
+# in -- as the one to report, as Bats does around its own `load`, and a
+# command of the test clears the mark again.
+__DYBATPHO_HELPER_QUIET_SRC="${DYBATPHO_DIR}/src/"
+__DYBATPHO_HELPER_QUIET_LIB="${DYBATPHO_DIR}/test/lib/"
+# The expansions are the trap's own, made each time it fires.
+# shellcheck disable=SC2016
+if [[ "${__dybatpho_helper_saved_trap}" == "trap -- 'bats_debug_trap \"\$BASH_SOURCE\" \"\$_\"' DEBUG" ]]; then
+  # One line: Bash counts the lines of a trap into the line numbers Bats
+  # reads, so a trap spread over several would shift every reported line.
+  __dybatpho_helper_saved_trap='__DYBATPHO_HELPER_LAST_ARG=$_; '
+  __dybatpho_helper_saved_trap+='if [[ "${BASH_SOURCE}" == "${__DYBATPHO_HELPER_QUIET_SRC}"* || '
+  __dybatpho_helper_saved_trap+='"${BASH_SOURCE}" == "${__DYBATPHO_HELPER_QUIET_LIB}"* ]]; '
+  __dybatpho_helper_saved_trap+='then BATS_DEBUG_LAST_STACK_TRACE_IS_VALID=1; '
+  __dybatpho_helper_saved_trap+='else BATS_DEBUG_LAST_STACK_TRACE_IS_VALID=; '
+  __dybatpho_helper_saved_trap+='bats_debug_trap "$BASH_SOURCE" "${__DYBATPHO_HELPER_LAST_ARG}"; fi'
+  printf -v __dybatpho_helper_saved_trap 'trap -- %q DEBUG' "${__dybatpho_helper_saved_trap}"
+fi
 
 set -T -E
 # `trap -p` prints the command to restore the trap, so running it is how the
@@ -212,10 +271,15 @@ function assert_process_dead {
 #   absent rather than shadowed.
 # @arg $1 string Name of the command to hide
 # @stdout A `PATH` whose entries hold everything but that command
+#
+#   A directory such as `/usr/bin` holds around a thousand commands, and one
+#   `ln` per command made a single call cost seconds; a test hiding the same
+#   tool several times paid that again each time. Each directory is mirrored by
+#   one `ln` over all of its entries instead.
 function path_without {
   local tool="$1" bin="${BATS_TEST_TMPDIR}/path-without-$1"
-  local kept="" entry name target
-  local -a entries=()
+  local kept="" entry target
+  local -a entries=() targets=()
   mkdir -p "${bin}"
   IFS=':' read -r -a entries <<< "${PATH}"
   for entry in ${entries[@]+"${entries[@]}"}; do
@@ -224,14 +288,17 @@ function path_without {
       kept+="${entry}:"
       continue
     fi
+    targets=()
     for target in "${entry}"/*; do
       [[ -e "${target}" || -L "${target}" ]] || continue
-      name="${target##*/}"
-      [[ "${name}" != "${tool}" ]] || continue
-      # A link already made for a dangling target fails `-e`, so `-L` stops a
-      # second `ln` that would fail under errexit.
-      [[ -e "${bin}/${name}" || -L "${bin}/${name}" ]] || ln -s "${target}" "${bin}/${name}"
+      [[ "${target##*/}" != "${tool}" ]] || continue
+      targets+=("${target}")
     done
+    ((${#targets[@]})) || continue
+    # A name an earlier directory, or an earlier call, already linked keeps
+    # that link, the way `PATH` lookup would: `ln` refuses it and carries on
+    # with the rest, so its status and complaint are expected.
+    ln -s ${targets[@]+"${targets[@]}"} "${bin}/" 2> /dev/null || true
   done
   printf '%s\n' "${bin}:${kept%:}"
 }

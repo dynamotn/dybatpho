@@ -137,55 +137,106 @@ function __dybatpho_lint_dyshellint {
   return 1
 }
 
-# @description Check `CHANGELOG.md` against the Keep a Changelog format the file
-#   claims to follow: an `## [Unreleased]` section, released sections dated
-#   `YYYY-MM-DD`, only the six defined change groups, and a link reference for
-#   every version.
-# @noargs
-# @exitcode 0 The changelog is well formed
-# @exitcode 1 The changelog has at least one format violation
+# @description Check one changelog file against the Keep a Changelog rules:
+#   released sections dated `YYYY-MM-DD`, only the six defined change groups,
+#   and a well-formed link reference for every version. The main file must
+#   also open an `## [Unreleased]` section; an archive must not carry one.
+# @arg $1 path Changelog file to check
+# @arg $2 string `main` for `CHANGELOG.md`, `archive` for a file under
+#   `docs/changelog/`
+# @arg $3 string Name of the variable the violations are appended to
+# @set The named variable
 # @internal
-function __dybatpho_lint_changelog {
-  local changelog="${DYBATPHO_DIR}/CHANGELOG.md"
-  local violations="" line version
+function __dybatpho_lint_changelog_file {
+  local changelog="$1" kind="$2"
+  local -n __dybatpho_lint_violations="$3"
+  local label="${changelog#"${DYBATPHO_DIR}/"}" line version
 
-  dybatpho::is file "${changelog}" || dybatpho::die "Missing CHANGELOG.md"
-
-  grep -qE '^## \[Unreleased\]' "${changelog}" \
-    || violations+="No '## [Unreleased]' section"$'\n'
+  if [[ "${kind}" == main ]]; then
+    grep -qE '^## \[Unreleased\]' "${changelog}" \
+      || __dybatpho_lint_violations+="${label}: no '## [Unreleased]' section"$'\n'
+  elif grep -qE '^## \[Unreleased\]' "${changelog}"; then
+    __dybatpho_lint_violations+="${label}: an archive has no '## [Unreleased]' section"$'\n'
+  fi
 
   local grep_output
-  grep_output=$(grep -E '^## ' "${changelog}")
+  grep_output=$(grep -E '^## ' "${changelog}") || true
   while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ -n "${line}" ]] || continue
     [[ "${line}" =~ ^##\ \[Unreleased\] ]] && continue
     [[ "${line}" =~ ^##\ \[[0-9]+\.[0-9]+\.[0-9]+\]\ -\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
-      || violations+="Malformed release heading: ${line}"$'\n'
+      || __dybatpho_lint_violations+="${label}: malformed release heading: ${line}"$'\n'
   done < <(printf '%s' "${grep_output}")
 
-  local grep_output
-  grep_output=$(grep -E '^### ' "${changelog}")
+  grep_output=$(grep -E '^### ' "${changelog}") || true
   while IFS= read -r line || [[ -n "${line}" ]]; do
     case "${line}" in
-      '### Added' | '### Changed' | '### Deprecated') ;;
+      '' | '### Added' | '### Changed' | '### Deprecated') ;;
       '### Removed' | '### Fixed' | '### Security') ;;
-      *) violations+="Unknown change group: ${line}"$'\n' ;;
+      *) __dybatpho_lint_violations+="${label}: unknown change group: ${line}"$'\n' ;;
     esac
   done < <(printf '%s' "${grep_output}")
 
   local reference
-  local grep_output
-  grep_output=$(grep -oE '^## \[[^]]+\]' "${changelog}" | sed 's/^## \[//; s/\]$//')
+  grep_output=$(grep -oE '^## \[[^]]+\]' "${changelog}" | sed 's/^## \[//; s/\]$//') || true
   while IFS= read -r version || [[ -n "${version}" ]]; do
+    [[ -n "${version}" ]] || continue
     reference="$(grep -E "^\[${version}\]: " "${changelog}")" || {
-      violations+="Version ${version} has no link reference at the bottom"$'\n'
+      __dybatpho_lint_violations+="${label}: version ${version} has no link reference at the bottom"$'\n'
       continue
     }
     # A reference that exists but is not a URL is worse than a missing one: it
     # renders as a dead link. `scripts/release.sh` builds these, so a bug there
     # lands here silently.
     [[ "${reference}" =~ ^\[[^]]+\]:\ https://[a-zA-Z0-9.-]+/[^[:space:]]+$ ]] \
-      || violations+="Malformed link reference: ${reference}"$'\n'
+      || __dybatpho_lint_violations+="${label}: malformed link reference: ${reference}"$'\n'
   done < <(printf '%s' "${grep_output}")
+}
+
+# @description Check `CHANGELOG.md` against the Keep a Changelog format the file
+#   claims to follow, together with the per-major archives that
+#   `scripts/changelog_archive.sh` moves old releases into. Each archive is held
+#   to the same rules, every archive the index in `CHANGELOG.md` links to must
+#   exist, and no release may be described in two files at once.
+# @noargs
+# @exitcode 0 The changelog is well formed
+# @exitcode 1 The changelog has at least one format violation
+# @internal
+function __dybatpho_lint_changelog {
+  local changelog="${DYBATPHO_DIR}/CHANGELOG.md"
+  local violations="" archive link version
+
+  dybatpho::is file "${changelog}" || dybatpho::die "Missing CHANGELOG.md"
+  __dybatpho_lint_changelog_file "${changelog}" main violations
+
+  local -a archives=()
+  local archive_listing
+  archive_listing=$(find "${DYBATPHO_DIR}/docs/changelog" -maxdepth 1 -name 'CHANGELOG-*.md' \
+    2> /dev/null | sort) || true
+  while IFS= read -r archive || [[ -n "${archive}" ]]; do
+    [[ -n "${archive}" ]] && archives+=("${archive}")
+  done < <(printf '%s' "${archive_listing}")
+  for archive in ${archives[@]+"${archives[@]}"}; do
+    __dybatpho_lint_changelog_file "${archive}" archive violations
+  done
+
+  # The index is generated, but a hand edit or a deleted archive can still
+  # leave it pointing at nothing.
+  local links
+  links=$(grep -oE '\]\(docs/changelog/[^)]+\)' "${changelog}" | sed 's/^](//; s/)$//') || true
+  while IFS= read -r link || [[ -n "${link}" ]]; do
+    [[ -n "${link}" ]] || continue
+    [[ -f "${DYBATPHO_DIR}/${link}" ]] \
+      || violations+="CHANGELOG.md: the archive index links to a missing ${link}"$'\n'
+  done < <(printf '%s' "${links}")
+
+  local versions
+  versions=$(grep -hoE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' "${changelog}" \
+    ${archives[@]+"${archives[@]}"} | sort | uniq -d) || true
+  while IFS= read -r version || [[ -n "${version}" ]]; do
+    [[ -n "${version}" ]] || continue
+    violations+="${version#'## '} is described in more than one changelog file"$'\n'
+  done < <(printf '%s' "${versions}")
 
   if [[ -n "${violations}" ]]; then
     dybatpho::error "CHANGELOG.md does not follow Keep a Changelog:"

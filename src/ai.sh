@@ -407,11 +407,11 @@ function __dybatpho_ai_provider_into {
       ;;
   esac
 
-  if dybatpho::is set "${DYBATPHO_AI_API_KEY}"; then
+  if [[ -n "${DYBATPHO_AI_API_KEY:+set}" ]]; then
     __dybatpho_ai_provider_ref=anthropic
-  elif dybatpho::is set "${ANTHROPIC_API_KEY-}"; then
+  elif [[ -n "${ANTHROPIC_API_KEY:+set}" ]]; then
     __dybatpho_ai_provider_ref=anthropic
-  elif dybatpho::is set "${OPENAI_API_KEY-}"; then
+  elif [[ -n "${OPENAI_API_KEY:+set}" ]]; then
     __dybatpho_ai_provider_ref=openai
   elif __dybatpho_ai_ollama_alive; then
     __dybatpho_ai_provider_ref=ollama
@@ -485,25 +485,30 @@ function dybatpho::ai_model {
 #######################################
 function __dybatpho_ai_api_key_into {
   local -n __dybatpho_ai_key_ref="$1"
-  local __dybatpho_ai_key_provider="$2"
-  if dybatpho::is set "${DYBATPHO_AI_API_KEY}"; then
+  local __dybatpho_ai_key_provider="$2" __dybatpho_ai_key_trace
+  # A trace prints the key with every assignment of it; the tests above only
+  # ever expand to `set`.
+  __dybatpho_network_trace_off __dybatpho_ai_key_trace
+  if [[ -n "${DYBATPHO_AI_API_KEY:+set}" ]]; then
     __dybatpho_ai_key_ref="${DYBATPHO_AI_API_KEY}"
+    __dybatpho_network_trace_on "${__dybatpho_ai_key_trace}"
     return 0
   fi
   case "${__dybatpho_ai_key_provider}" in
     anthropic)
-      dybatpho::is set "${ANTHROPIC_API_KEY-}" \
+      [[ -n "${ANTHROPIC_API_KEY:+set}" ]] \
         || dybatpho::die "ai: ANTHROPIC_API_KEY or DYBATPHO_AI_API_KEY must be set for the anthropic backend"
       __dybatpho_ai_key_ref="${ANTHROPIC_API_KEY:-}"
       ;;
     openai)
-      dybatpho::is set "${OPENAI_API_KEY-}" \
+      [[ -n "${OPENAI_API_KEY:+set}" ]] \
         || dybatpho::die "ai: OPENAI_API_KEY or DYBATPHO_AI_API_KEY must be set for the openai backend"
       __dybatpho_ai_key_ref="${OPENAI_API_KEY:-}"
       ;;
     ollama) __dybatpho_ai_key_ref="" ;;
     *) dybatpho::die "ai: Backend '${__dybatpho_ai_key_provider}' has no API key concept" ;;
   esac
+  __dybatpho_network_trace_on "${__dybatpho_ai_key_trace}"
 }
 
 #######################################
@@ -967,8 +972,11 @@ function __dybatpho_ai_http {
 function __dybatpho_ai_endpoint_into {
   local __dybatpho_ai_ep_provider="$1"
   local -n __dybatpho_ai_ep_url="$2" __dybatpho_ai_ep_headers="$3"
-  local __dybatpho_ai_ep_base __dybatpho_ai_ep_key=""
+  local __dybatpho_ai_ep_base __dybatpho_ai_ep_key="" __dybatpho_ai_ep_trace
   __dybatpho_ai_ep_base=$(__dybatpho_ai_base_url "${__dybatpho_ai_ep_provider}")
+  # A trace prints every expansion of the key below, so it is suspended until
+  # the key is in the out-of-band header list.
+  __dybatpho_network_trace_off __dybatpho_ai_ep_trace
   # A rehearsal sends nothing, so it needs no key; a real request is refused
   # here, in the shell that would send it, rather than sent without one.
   if ! dybatpho::is true "${DRY_RUN-}"; then
@@ -989,6 +997,8 @@ function __dybatpho_ai_endpoint_into {
       ;;
     *) ;;
   esac
+  __dybatpho_ai_ep_key=""
+  __dybatpho_network_trace_on "${__dybatpho_ai_ep_trace}"
 }
 
 #######################################

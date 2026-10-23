@@ -460,6 +460,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `type:` rule could do the same. `DYBATPHO_RETRY_*_DELAY` holding an array
   subscript ran its command too.
 
+- **`network`, `forge`, `ai` — tokens stay out of `set -x` traces.** Secret
+  headers, forge tokens and AI API keys were printed many times per request
+  while a script was traced; tracing is suspended while they are handled.
+
 ## [6.0.1] - 2026-10-04
 
 ### Fixed

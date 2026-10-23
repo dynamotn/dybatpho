@@ -53,7 +53,7 @@ pipeline never lands in its own output.
 
 ### 🚀 Highlights
 
-- [`dybatpho::tui_supported`](#dybatphotui_supported) — Return success when the widgets may draw in place and read raw keys, which is what separates the interactive rendering from the fallback. `auto` requires a terminal on both ends: stdin is where the keys come from, and stderr is where the frames go. A script whose diagnostics are piped still has a terminal on stdin, and drawing a menu into that pipe would corrupt it.
+- [`dybatpho::tui_supported`](#dybatphotui_supported) — Return success when the widgets may draw in place and read raw keys, which is what separates the interactive rendering from the fallback. `auto` requires a terminal on both ends: stdin is where the keys come from, and stderr is where the frames go. A script whose diagnostics are piped still has a terminal on stdin, and drawing a menu into that pipe would corrupt it. A terminal that declares itself `TERM=dumb`, such as an Emacs shell buffer, is a terminal that cannot move the cursor or erase a line, so it gets the fallback too rather than a screen full of escape codes.
 - [`dybatpho::tui_bar`](#dybatphotui_bar) — Render a progress bar as text. This is the whole of the bar drawing, kept apart from the state the `dybatpho::tui_progress_*` helpers carry, so that a script with a progress model of its own can reuse the rendering and so that the rendering can be asserted without a terminal.
 - [`dybatpho::tui_spinner_start`](#dybatphotui_spinner_start) — Start a spinner that runs until `dybatpho::tui_spinner_stop` stops it. `dybatpho::spinner` wraps one command and is the right tool when the work is one command. This one brackets a region instead, which is what a script needs when the work is a loop, a pipeline, or a sequence whose steps deserve to be named as they happen. Without a terminal to draw on the message is logged once at `info`, so a CI log keeps the same narration without the frames.
 - [`dybatpho::tui_spinner_message`](#dybatphotui_spinner_message) — Replace the message of the running spinner without restarting it.
@@ -117,7 +117,9 @@ keys, which is what separates the interactive rendering from the fallback.
 `auto` requires a terminal on both ends: stdin is where the keys come from,
 and stderr is where the frames go. A script whose diagnostics are piped
 still has a terminal on stdin, and drawing a menu into that pipe would
-corrupt it.
+corrupt it. A terminal that declares itself `TERM=dumb`, such as an Emacs
+shell buffer, is a terminal that cannot move the cursor or erase a line,
+so it gets the fallback too rather than a screen full of escape codes.
 
 **🧪 Example**
 
@@ -133,6 +135,7 @@ _Function has no arguments._
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_TUI`** | string | `auto` detects the terminals, `always` and `never` override the detection |
+| **`TERM`** | string | `dumb` makes `auto` fall back, since such a terminal cannot redraw a line |
 
 **🚦 Exit codes**
 

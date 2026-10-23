@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
+- **`tui` — `TERM=dumb` counts as no terminal.** Spinners, progress bars,
+  menus and `dybatpho::tui_confirm` use their plain fallback in an Emacs shell
+  buffer or another dumb terminal instead of printing raw escape sequences.
+
 - **`network` — a final 3xx response is not retried.** `dybatpho::curl_do`
   returns exit code 3 at once for a `304 Not Modified`, a redirect without
   `Location:`, or one past `DYBATPHO_CURL_MAX_REDIRECTS`, instead of sleeping

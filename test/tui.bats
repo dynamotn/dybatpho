@@ -29,6 +29,30 @@ setup() {
   assert_failure
 }
 
+@test "dybatpho::tui_supported falls back on a dumb terminal" {
+  # Only a pseudo-terminal shows the difference, so the check runs under
+  # `script`, in its BSD form or its util-linux and BusyBox one.
+  local probe="${BATS_TEST_TMPDIR}/probe.sh" out=""
+  cat > "${probe}" << EOF
+. "${DYBATPHO_DIR}/init.sh" --modules tui
+DYBATPHO_TUI=auto
+for term in xterm dumb; do
+  if TERM="\${term}" dybatpho::tui_supported; then
+    echo "\${term}=draw"
+  else
+    echo "\${term}=fallback"
+  fi
+done
+EOF
+  if script -q /dev/null true < /dev/null > /dev/null 2>&1; then
+    out="$(script -q /dev/null bash "${probe}" < /dev/null 2>&1)" || true
+  elif script -qc true /dev/null < /dev/null > /dev/null 2>&1; then
+    out="$(script -qc "bash '${probe}'" /dev/null < /dev/null 2>&1)" || true
+  fi
+  [[ "${out}" == *"xterm=draw"* ]] || skip "no pseudo-terminal to test with"
+  [[ "${out}" == *"dumb=fallback"* ]] || fail "TERM=dumb drew in place: ${out}"
+}
+
 # =============================================================================
 # dybatpho::tui_bar
 # =============================================================================

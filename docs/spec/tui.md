@@ -171,6 +171,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 ## Edge Cases
 
 - Streams are captured, piped, or redirected, in any combination.
+- The terminal is `TERM=dumb`, which cannot move the cursor or erase a line.
 - The terminal sends arrows in application cursor mode (`ESC O A`), or a key
   whose sequence is longer than three bytes, such as Delete (`ESC [ 3 ~`).
 - `DYBATPHO_TUI` forces the drawn rendering where there is no terminal, or the
@@ -196,6 +197,8 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **FR-002**: Detection MUST require a terminal on both stdin and stderr. Keys
   are read from the first and frames are written to the second, and drawing into
   a redirected stderr would corrupt whatever captured it.
+  A terminal declaring `TERM=dumb` MUST be treated as no terminal, because it
+  cannot redraw a line in place.
 - **FR-003**: Every widget MUST write to stderr only. Nothing a widget draws may
   reach stdout, including its closing banner.
 - **FR-004**: Every widget MUST have a rendering that works with no terminal:
@@ -308,6 +311,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **IT-013**: Arrows in both cursor modes, Delete, Page Up, a modified arrow,
   and a lone escape each decode to one key name, with no character left over.
 - **IT-014**: Choose from both menus into variables named `prompt` and `result_var`, and get the choice back.
+- **IT-015**: Under a pseudo-terminal, detection draws for `TERM=xterm` and falls back for `TERM=dumb`.
 
 ## Acceptance Criteria *(mandatory)*
 

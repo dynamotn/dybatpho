@@ -119,7 +119,9 @@ __dybatpho_tui_cursor_trapped=false
 #   `auto` requires a terminal on both ends: stdin is where the keys come from,
 #   and stderr is where the frames go. A script whose diagnostics are piped
 #   still has a terminal on stdin, and drawing a menu into that pipe would
-#   corrupt it.
+#   corrupt it. A terminal that declares itself `TERM=dumb`, such as an Emacs
+#   shell buffer, is a terminal that cannot move the cursor or erase a line,
+#   so it gets the fallback too rather than a screen full of escape codes.
 # @example
 #   dybatpho::tui_supported || dybatpho::info "No terminal; answering from flags"
 #
@@ -127,12 +129,13 @@ __dybatpho_tui_cursor_trapped=false
 # @exitcode 0 Widgets draw in place
 # @exitcode 1 Widgets fall back to prompts and log lines
 # @env DYBATPHO_TUI string `auto` detects the terminals, `always` and `never` override the detection
+# @env TERM string `dumb` makes `auto` fall back, since such a terminal cannot redraw a line
 #######################################
 function dybatpho::tui_supported {
   case "${DYBATPHO_TUI}" in
     never) return 1 ;;
     always) return 0 ;;
-    *) [[ -t 0 && -t 2 ]] ;;
+    *) [[ "${TERM:-}" != dumb && -t 0 && -t 2 ]] ;;
   esac
 }
 

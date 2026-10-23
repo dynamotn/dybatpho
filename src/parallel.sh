@@ -64,33 +64,16 @@ function __dybatpho_parallel_jobs {
 
 #######################################
 # @description Tell whether a process group still has a process that runs.
-#   `kill -0` on a group succeeds as long as any member is left, and that
-#   includes a zombie. A member whose parent died first is handed to PID 1, and
-#   in a container whose PID 1 never reaps -- a CI job's `tail -f /dev/null`, or
-#   any `docker run` without `--init` -- it stays a zombie for good, so a group
-#   that was ended long ago would still answer. Where `/proc` exists, a group
-#   with nothing but zombies left counts as ended.
-#
-#   The process table is read with one `cat` and matched once, rather than
-#   walked a process at a time: the pool asks every tenth of a second, and a
-#   loop over hundreds of entries under a tracing shell -- kcov, or a Bats
-#   `DEBUG` trap -- took a second per question.
+#   The answer is `__dybatpho_process_group_alive`, which `process.sh` shares
+#   with the timeout and background-job helpers: a group holding nothing but
+#   zombies counts as ended.
 # @arg $1 number Process group ID
 # @exitcode 0 A member of the group is still running
 # @exitcode 1 The group is empty, or holds only zombies
 # @internal
 #######################################
 function __dybatpho_parallel_group_alive {
-  local group="$1" table
-  kill -0 -- -"${group}" 2> /dev/null || return 1
-  [[ -r /proc/self/stat ]] || return 0 # kcov(skip) - needs a host without /proc
-  # A process that ends between the listing and the read is skipped by `cat`.
-  table="$(cat /proc/[0-9]*/stat 2> /dev/null)" || true
-  [[ -n "${table}" ]] || return 0 # kcov(skip) - needs a /proc that lists nothing
-  # Each entry reads `pid (command) state parent group ...`, so a member that
-  # runs is a state other than zombie or dead, two fields before the group.
-  local member="\) [^ZX] [0-9]+ ${group} "
-  [[ "${table}" =~ ${member} ]]
+  __dybatpho_process_group_alive "$1"
 }
 
 #######################################

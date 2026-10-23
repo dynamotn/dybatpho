@@ -32,6 +32,10 @@ set +T +E
 . "${DYBATPHO_DIR}/test/lib/assert/load.bash"
 . "${DYBATPHO_DIR}/test/lib/file/load.bash"
 . "${DYBATPHO_DIR}/test/lib/mock/stub.bash"
+# Caches go to the test's own directory, read when `init.sh` is sourced: under
+# the real home, generated completions survived from one run to the next, and
+# a later run answered from them without running the code under test.
+export XDG_CACHE_HOME="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR:-${TMPDIR:-/tmp}}}}/cache"
 # The module tests reach across the whole library, so the helper asks for every
 # module. A script under test that cares about a narrower module set sources
 # `init.sh` itself in a fresh shell, the way `test/init.bats` does.

@@ -1286,10 +1286,12 @@ assert event["duration_ms"] >= 0
   mkdir -p "${shim}"
   printf '#!/bin/sh\nprintf "called\\n" >> "%s"\nexec /bin/date "$@"\n' "${calls}" > "${shim}/date"
   chmod +x "${shim}/date"
-  run_traced bash -c ". '${DYBATPHO_DIR}/init.sh'; x=; __dybatpho_log_timestamp_into x; printf '%s' \"\${x}\""
+  # shellcheck disable=SC2016 # expanded by the child shell
+  run_traced _logging_child "${BASH}" 'x=' '__dybatpho_log_timestamp_into x' 'printf "%s" "${x}"'
   [[ "${output}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$ ]]
   # A shim under the temporary directory stands in for the clock and is used.
-  PATH="${shim}:${PATH}" run_traced bash -c ". '${DYBATPHO_DIR}/init.sh'; x=; __dybatpho_log_timestamp_into x; printf '%s' \"\${x}\""
+  # shellcheck disable=SC2016 # expanded by the child shell
+  PATH="${shim}:${PATH}" run_traced _logging_child "${BASH}" 'x=' '__dybatpho_log_timestamp_into x' 'printf "%s" "${x}"'
   assert_file_exist "${calls}"
 }
 

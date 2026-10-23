@@ -808,6 +808,13 @@ _end_then_write_stderr() {
 }
 
 @test "__dybatpho_screen_braille_table has 256 glyphs in the C locale too" {
-  run_traced bash -c "LC_ALL=C; . '${DYBATPHO_DIR}/init.sh' --modules screen; __dybatpho_screen_braille_table; printf '%s %s' \"\${#__dybatpho_screen_braille[@]}\" \"\${__dybatpho_screen_braille[255]}\""
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/braille.sh"
+  # shellcheck disable=SC2016 # expanded by the child shell
+  printf '%s\n' 'LC_ALL=C' ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules screen" \
+    '__dybatpho_screen_braille_table' \
+    'printf "%s %s" "${#__dybatpho_screen_braille[@]}" "${__dybatpho_screen_braille[255]}"' > "${script}"
+  run_traced bash "${script}"
   assert_output "256 ⣿"
 }

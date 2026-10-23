@@ -190,24 +190,29 @@ function __dybatpho_cldr_current {
   seeded="$(sed -n 's/^ *DYBATPHO_I18N_NUMBER\["\([A-Za-z_]*\)\.group"\]="\${\([a-z]*\)}".*/\1 \2/p' \
     "${source}")"
 
-  bash -c '
-    set -eu
-    . "$1"
-    while IFS=$'\''\t'\'' read -r table key; do
-      declare -n map="${table}"
-      printf "%s\t%s\t%s\n" "${table}" "${key}" "${map[${key}]}"
-      unset -n map
-    done < "$2"
-    while read -r locale kind; do
-      [ -n "${locale}" ] || continue
-      case "${kind}" in
-        narrow) value=$'\''\xe2\x80\xaf'\'' ;;
-        nbsp) value=$'\''\xc2\xa0'\'' ;;
-        *) value=" " ;;
-      esac
-      printf "DYBATPHO_I18N_NUMBER\t%s.group\t%s\n" "${locale}" "${value}"
-    done <<< "$3"
-  ' bash "${blocks}" "${order}" "${seeded}" > "${output}"
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `set -u` is on.
+  local reader
+  dybatpho::create_temp reader ".sh" "cldr_reader"
+  cat > "${reader}" << 'READER'
+set -eu
+. "$1"
+while IFS=$'\t' read -r table key; do
+  declare -n map="${table}"
+  printf "%s\t%s\t%s\n" "${table}" "${key}" "${map[${key}]}"
+  unset -n map
+done < "$2"
+while read -r locale kind; do
+  [ -n "${locale}" ] || continue
+  case "${kind}" in
+    narrow) value=$'\xe2\x80\xaf' ;;
+    nbsp) value=$'\xc2\xa0' ;;
+    *) value=" " ;;
+  esac
+  printf "DYBATPHO_I18N_NUMBER\t%s.group\t%s\n" "${locale}" "${value}"
+done <<< "$3"
+READER
+  bash "${reader}" "${blocks}" "${order}" "${seeded}" > "${output}"
 }
 
 # @description Find the CLDR locale directory for a module locale tag. The tag

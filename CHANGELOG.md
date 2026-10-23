@@ -381,6 +381,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::mock_time` or a test had put its own `date` first on `PATH`, so
   the frozen clock was ignored on Alpine.
 
+- **`network`, `forge` — authenticated requests follow redirects again.**
+  `dybatpho::curl_request` handed curl a second `-D`, which left the header
+  file the library reads empty, so same-origin redirects with secret headers
+  were retried as failures and `Retry-After` was ignored.
+  `DYBATPHO_CURL_SECRET_DATA` is sent without an added newline,
+  `dybatpho::curl_paginate` follows a relative `next` link, and a GitLab
+  `CI_JOB_TOKEN` is sent as `JOB-TOKEN` instead of `PRIVATE-TOKEN`.
+
 - **`process` — `$(dybatpho::run_with_timeout N fn)` returns when `fn` does.**
   The watchdog held the caller's output open, so a substitution or pipe could
   wait out the whole limit. A process that ignores SIGTERM after a timeout is

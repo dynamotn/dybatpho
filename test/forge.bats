@@ -586,9 +586,48 @@ curl_payload() {
   assert_equal "$(__dybatpho_forge_project_path gitlab "g/s/r")" "projects/g%2Fs%2Fr"
 }
 
-@test "__dybatpho_forge_auth_header uses the scheme each forge expects" {
-  assert_equal "$(__dybatpho_forge_auth_header github "t")" "Authorization: Bearer t"
-  assert_equal "$(__dybatpho_forge_auth_header gitlab "t")" "PRIVATE-TOKEN: t"
+@test "__dybatpho_forge_auth_header_into uses the scheme each forge expects" {
+  local header
+  __dybatpho_forge_auth_header_into header github "t"
+  assert_equal "${header}" "Authorization: Bearer t"
+  __dybatpho_forge_auth_header_into header gitlab "t"
+  assert_equal "${header}" "PRIVATE-TOKEN: t"
+  # GitLab refuses a CI job token sent as a private token.
+  CI_JOB_TOKEN="gl-ci"
+  __dybatpho_forge_auth_header_into header gitlab "gl-ci"
+  assert_equal "${header}" "JOB-TOKEN: gl-ci"
+  __dybatpho_forge_auth_header_into header gitlab "t"
+  assert_equal "${header}" "PRIVATE-TOKEN: t"
+}
+
+@test "dybatpho::forge_request sends the CI job token as JOB-TOKEN on GitLab" {
+  use_gitlab
+  DYBATPHO_FORGE_TOKEN=""
+  CI_JOB_TOKEN="gl-ci-job"
+  dybatpho::mock_http "gitlab.com" 200 '{"ok":true}'
+
+  run_traced dybatpho::forge_request GET "releases"
+  assert_success
+  assert_regex "$(curl_payload 1)" "JOB-TOKEN: gl-ci-job"
+  refute_regex "$(curl_payload 1)" "PRIVATE-TOKEN"
+}
+
+@test "the forge token stays out of a set -x trace" {
+  dybatpho::mock_http "api.github.com" 200 '{"ok":true}'
+  DYBATPHO_FORGE_TOKEN=""
+  export GITHUB_TOKEN="ghp-traced-secret"
+  local trace="${BATS_TEST_TMPDIR}/trace"
+  # In a subshell, so the trace switched on here ends with it.
+  (
+    set -x
+    dybatpho::forge_request GET "issues"
+  ) 2> "${trace}"
+  assert_regex "$(curl_payload 1)" "Authorization: Bearer ghp-traced-secret"
+  run grep -c "ghp-traced-secret" "${trace}"
+  assert_output "0"
+  # The trace was back on for the request itself.
+  run grep -c "dybatpho::curl_request" "${trace}"
+  refute_output "0"
 }
 
 @test "__dybatpho_forge_token_vars names the variables for each forge" {

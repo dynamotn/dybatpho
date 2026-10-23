@@ -104,6 +104,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 
 - A remote URL carrying `user@host` must not leak the credential into the host.
 - A remote URL with a trailing slash or `.git` suffix must normalize identically.
+- A GitLab pipeline authenticates with the `CI_JOB_TOKEN` fallback, which GitLab accepts only as `JOB-TOKEN`.
+- The script runs under `set -x` while a request carries the token.
 - A GitLab project path must be URL-encoded when it appears in an API path, and
   must not be encoded when it appears in a browser URL.
 - `DYBATPHO_FORGE` set to anything other than `github` or `gitlab` is an error
@@ -172,6 +174,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   a remote, forge or token that can't be resolved MUST stop the script.
 - **FR-017**: `forge_issue_report` MUST fail when the forge refuses to open the issue, instead of reporting an issue with no number.
 - **FR-018**: `forge_issue_find` MUST exit 1 only when the lookup succeeded and no open issue matches, and 2 when the lookup itself failed; `forge_issue_report` MUST create nothing and fail when the lookup failed.
+- **FR-019**: A GitLab request MUST send a token that is the CI job token (`CI_JOB_TOKEN`) as `JOB-TOKEN`, and any other token as `PRIVATE-TOKEN`.
+- **FR-020**: The token MUST NOT appear in a `set -x` trace of a forge request, and the trace MUST be back on for the request itself.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -230,6 +234,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   is overridden, and stops on a remote, a host or an override it can't use.
 - **IT-026**: Report an issue whose creation the forge refuses with HTTP 403, and fail without printing a created report.
 - **IT-027**: Answer the issue search with a 502, and see `forge_issue_find` exit 2 and `forge_issue_report` fail without sending a POST.
+- **IT-028**: The GitLab auth header is `JOB-TOKEN` for the CI job token and `PRIVATE-TOKEN` otherwise, and a request made with only `CI_JOB_TOKEN` set carries `JOB-TOKEN`.
+- **IT-029**: Trace a GitHub request with `set -x`, and find the token sent but absent from the trace, which still shows the request.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -292,7 +292,9 @@ function dybatpho::forge_token {
 #######################################
 function __dybatpho_forge_token_into {
   local -n __dybatpho_forge_token_out="$1"
-  local __dybatpho_forge_token_kind="$2"
+  local __dybatpho_forge_token_kind="$2" __dybatpho_forge_token_trace
+  # A trace prints every expansion below with the token in it.
+  __dybatpho_network_trace_off __dybatpho_forge_token_trace
   local __dybatpho_forge_token_value="${DYBATPHO_FORGE_TOKEN}"
   if [[ -z "${__dybatpho_forge_token_value}" ]]; then
     case "${__dybatpho_forge_token_kind}" in
@@ -310,6 +312,7 @@ function __dybatpho_forge_token_into {
 
   dybatpho::secret_register "${__dybatpho_forge_token_value}"
   __dybatpho_forge_token_out="${__dybatpho_forge_token_value}"
+  __dybatpho_network_trace_on "${__dybatpho_forge_token_trace}"
 }
 
 #######################################
@@ -480,19 +483,29 @@ function __dybatpho_forge_labels_json {
 }
 
 #######################################
-# @description Print the authentication header this forge expects.
-# @arg $1 string Forge kind
-# @arg $2 string Token
-# @stdout Header in `Name: value` form
+# @description Store the authentication header this forge expects.
+#   GitLab takes a personal, project or group token as `PRIVATE-TOKEN`, but a
+#   CI job token only as `JOB-TOKEN`: sent the other way it is refused with a
+#   401, so a pipeline that relied on the `CI_JOB_TOKEN` fallback could never
+#   authenticate.
+# @arg $1 string Name of the variable receiving the header in `Name: value` form
+# @arg $2 string Forge kind
+# @arg $3 string Token
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_forge_auth_header {
-  local kind token
-  dybatpho::expect_args kind token -- "$@"
-  case "${kind}" in
-    github) printf 'Authorization: Bearer %s\n' "${token}" ;;
-    gitlab) printf 'PRIVATE-TOKEN: %s\n' "${token}" ;;
-    *) ;;
+function __dybatpho_forge_auth_header_into {
+  local -n __dybatpho_forge_auth_out="$1"
+  case "$2" in
+    github) __dybatpho_forge_auth_out="Authorization: Bearer $3" ;;
+    gitlab)
+      if [[ -n "${CI_JOB_TOKEN:+set}" && "$3" == "${CI_JOB_TOKEN-}" ]]; then
+        __dybatpho_forge_auth_out="JOB-TOKEN: $3"
+      else
+        __dybatpho_forge_auth_out="PRIVATE-TOKEN: $3"
+      fi
+      ;;
+    *) __dybatpho_forge_auth_out="" ;;
   esac
 }
 
@@ -529,9 +542,11 @@ function dybatpho::forge_request {
 
   # The forge, its token and -- for a relative path -- the project are
   # resolved here, in the caller's shell, so the token stays registered for
-  # masking and a remote that can't be read stops the script.
+  # masking and a remote that can't be read stops the script. A trace is
+  # suspended while the token is in play: it prints every assignment it makes.
   local -A context=()
-  local url
+  local url trace
+  __dybatpho_network_trace_off trace
   case "${path}" in
     http://* | https://*)
       __dybatpho_forge_context_into context token
@@ -542,19 +557,18 @@ function dybatpho::forge_request {
       url="${context[api]}/$(__dybatpho_forge_project_path "${context[kind]}" "${context[repo]}")/${path#/}"
       ;;
   esac
-  local kind="${context[kind]}" token="${context[token]}"
+  # The token goes to curl out of band rather than as `--header`, which would
+  # publish it in `/proc/<pid>/cmdline` for the life of the request. `local`
+  # scoping means it is visible to `dybatpho::curl_do` and gone on return.
+  local authorization
+  __dybatpho_forge_auth_header_into authorization "${context[kind]}" "${context[token]}"
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("${authorization}")
+  authorization="" context[token]=""
+  __dybatpho_network_trace_on "${trace}"
 
   local -a args=(
     --request "${method}"
     --header "Accept: application/json"
-  )
-
-  # The token goes to curl out of band rather than as `--header`, which would
-  # publish it in `/proc/<pid>/cmdline` for the life of the request. `local`
-  # scoping means it is visible to `dybatpho::curl_do` and gone on return.
-  local -a DYBATPHO_CURL_SECRET_HEADERS
-  DYBATPHO_CURL_SECRET_HEADERS=(
-    "$(__dybatpho_forge_auth_header "${kind}" "${token}")"
   )
   local DYBATPHO_CURL_SECRET_DATA=""
   if [[ -n "${body}" ]]; then
@@ -943,8 +957,18 @@ function dybatpho::forge_release_upload {
   dybatpho::is file "${file}" || dybatpho::die "No such file to upload: ${file}"
 
   local -A context=()
+  local trace authorization
+  __dybatpho_network_trace_off trace
   __dybatpho_forge_context_into context token repo
-  local kind="${context[kind]}" token="${context[token]}" repo="${context[repo]}"
+  local kind="${context[kind]}" repo="${context[repo]}"
+  # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
+  # Both forges send it to the upload, and the trace stays off while it is
+  # being put there.
+  __dybatpho_forge_auth_header_into authorization "${kind}" "${context[token]}"
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("${authorization}")
+  authorization="" context[token]=""
+  __dybatpho_network_trace_on "${trace}"
   local release name response
   release="$(dybatpho::forge_release_find "${tag}")" \
     || dybatpho::die "No release for tag '${tag}'; create it before uploading assets"
@@ -965,11 +989,6 @@ function dybatpho::forge_release_upload {
       fi
       upload_url="${upload_url}/repos/${repo}/releases/${release}/assets?name=$(dybatpho::url_encode "${name}")"
 
-      # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
-      local -a DYBATPHO_CURL_SECRET_HEADERS
-      DYBATPHO_CURL_SECRET_HEADERS=(
-        "$(__dybatpho_forge_auth_header github "${token}")"
-      )
       __dybatpho_forge_or_die "Could not upload ${name}" "${response}" \
         dybatpho::curl_request "${upload_url}" "${response}" \
         --request POST \
@@ -988,12 +1007,6 @@ function dybatpho::forge_release_upload {
       url_encode=$(dybatpho::url_encode "${tag}")
       package_url="${package_url}/${url_encode}/$(dybatpho::url_encode "${name}")"
 
-      # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
-      local -a DYBATPHO_CURL_SECRET_HEADERS
-      # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-      DYBATPHO_CURL_SECRET_HEADERS=(
-        "$(__dybatpho_forge_auth_header gitlab "${token}")"
-      )
       __dybatpho_forge_or_die "Could not upload ${name}" "${response}" \
         dybatpho::curl_request "${package_url}" "${response}" \
         --request PUT \

@@ -32,9 +32,8 @@ FIXED_EPOCH=1709210096
 _child() {
   local script="${BATS_TEST_TMPDIR}/child.sh"
   {
-    # The whole set, because only `dybatpho::` functions are exported into a
-    # child while the internal helpers they call are not. Loading a narrower set
-    # would leave an inherited function half defined.
+    # The whole set, so that every module a statement reaches is defined in
+    # the child, whatever the parent happened to load.
     printf '. "%s/init.sh" --modules all\n' "${DYBATPHO_DIR}"
     printf '%s\n' "$@"
   } > "${script}"
@@ -1380,10 +1379,11 @@ SOURCE
 }
 
 @test "the library hook survives a shell that never sourced the module" {
-  # Only `dybatpho::` functions are exported, so a child shell inherits the hook
-  # while the module's own variables and internal helpers stay behind. Reading
-  # its settings without a default would abort the caller under `set -u`, which
-  # is what a bundled copy and any `bash` child of a script both look like.
+  # A hook handed down with `export -f` reaches a child shell while the
+  # module's own variables and internal helpers stay behind. Reading its
+  # settings without a default would abort the caller under `set -u`, which is
+  # what a bundled copy and a `bash` child of such a script both look like.
+  export -f dybatpho::i18n_library_message
   local script="${BATS_TEST_TMPDIR}/detached.sh"
   {
     printf 'set -euo pipefail\n'
@@ -1467,6 +1467,7 @@ SOURCE
 }
 
 @test "the keyed hooks survive a shell that never sourced the module" {
+  export -f dybatpho::i18n_library_text dybatpho::i18n_library_plural
   local script="${BATS_TEST_TMPDIR}/detached_keyed.sh"
   {
     printf 'set -euo pipefail\n'

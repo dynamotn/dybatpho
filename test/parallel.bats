@@ -395,8 +395,10 @@ _failing_job() {
 }
 
 @test "progress without the tui module prints one line per finished job" {
-  # The child inherits the exported `dybatpho::tui_progress_*` names but not the
-  # internals behind them, which is exactly the shell the guard has to detect.
+  # The child inherits `dybatpho::tui_progress_*` names handed down with
+  # `export -f` but not the internals behind them, which is exactly the shell
+  # the guard has to detect.
+  export -f dybatpho::tui_progress_start dybatpho::tui_progress_step dybatpho::tui_progress_stop
   # Spawned from a script file, not `bash -c`, for the kcov hook's sake.
   local script="${BATS_TEST_TMPDIR}/child_progress.sh"
   cat > "${script}" << 'SCRIPT'

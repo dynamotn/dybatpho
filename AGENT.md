@@ -259,13 +259,14 @@ the guard has to be right.
 Use the same `declare -F` guard for any future hook of this kind.
 
 **The guard must name an internal `__dybatpho_` helper of the other module, never
-a public `dybatpho::` function.** Public functions are exported and a child shell
-inherits them without the internal helpers they call, so a guard on a public name
-takes the active branch in a child that never loaded the module and then fails on
-the first internal call. That is why the metrics hooks test
+a public `dybatpho::` function.** A consumer may hand single public functions to
+a child with `export -f`, and the child then has them without the internal
+helpers they call, so a guard on a public name takes the active branch in a child
+that never loaded the module and then fails on the first internal call. That is why the metrics hooks test
 `declare -F __dybatpho_metrics_key` and the masking hook tests
 `declare -F __dybatpho_secret_mask_var`. `test/metrics.bats` pins it with child
-shells that log and retry without having loaded `metrics`. Loading each module
+shells that log and retry without having loaded `metrics`, given the public
+hook through `export -f`. Loading each module
 on its own is the behavioral version of the same check:
 
 ```bash
@@ -274,10 +275,21 @@ for m in $(bash -c '. ./init.sh; dybatpho::module_list optional'); do
 done
 ```
 
-The loaded set is deliberately process-local: only `dybatpho::` functions are
-exported, so a child shell that sources `init.sh` again has to source the module
-files itself. Never export `DYBATPHO_LOADED_MODULES` or seed it from the
-environment.
+The loaded set is deliberately process-local: nothing is exported by default, so
+a child shell that sources `init.sh` again has to source the module files
+itself. Never export `DYBATPHO_LOADED_MODULES` or seed it from the environment,
+and never `export -f` library functions from library code.
+
+Exporting is the consumer's opt-in (`DYBATPHO_EXPORT_FUNCTIONS=true` before
+sourcing, or `dybatpho::export_functions`), and it does not export functions at
+all: it points `BASH_ENV` at `init.sh` (or the bundle) and records the module
+set in `DYBATPHO_EXPORT_MODULES`, so each non-interactive Bash child re-sources
+the whole library -- internal helpers and module state included -- with
+`--no-strict` semantics. `init.sh` recognizes that entry by an empty call stack
+below it, a calling line of 0, and `BASH_ENV` naming itself; in that mode it
+ignores its positional arguments and `DYBATPHO_MODULES`, and sources the
+previous `BASH_ENV` (`DYBATPHO_EXPORT_BASH_ENV`) first so kcov's hook keeps
+working. `dybatpho::load` keeps `DYBATPHO_EXPORT_MODULES` current.
 
 Editor support depends entirely on two bash-language-server settings, both
 recorded in `.vscode/settings.json`. `init.sh` resolves module paths at run time
@@ -436,7 +448,18 @@ entry missing from the published notes.
   negotiable: modules across the library return values through nameref
   parameters (`local -n`), and the worker pool waits with `wait -n`, both of
   which arrived in 4.3.
-- Keep compatibility with strict mode: `set -euo pipefail`.
+- Keep compatibility with strict mode (`set -euo pipefail`) **and** with no
+  strict mode at all: `init.sh --no-strict` leaves the caller's options alone,
+  so library code must not depend on errexit, nounset, pipefail, `extglob`,
+  `nullglob`, or `globstar` being on. `init.sh` no longer turns on `nullglob` or
+  `globstar`; an unmatched glob stays literal, so guard every glob loop with
+  `[[ -e "${path}" ]] || continue` (or a stricter kind check), and save and
+  restore an option with `shopt -p` around a glob that needs one (`local -` does
+  not exist on Bash 4.3).
+- Never `exit` from `init.sh` or a bundle prologue while sourced: report on
+  stderr and `return 1`, so the caller decides; a function that must stop the
+  script still uses `dybatpho::die`, and a caller that wants to survive one uses
+  `dybatpho::try`.
 - Use two-space indentation, LF line endings, and a final newline.
 - Put public functions under the `dybatpho::` namespace.
 - Name every internal function `__dybatpho_<module>_<action>` (for example

@@ -125,6 +125,34 @@ with a process ID that has exited, and verify it reads as not running.
 
 ---
 
+### User Story 6 - Recover from a failing command (Priority: P2)
+
+As a script author, I want to call a function that may `dybatpho::die` or
+`exit` and get its status and its message back, so that one failed step can be
+reported or retried without ending the whole script.
+
+**Why this priority**: `dybatpho::die` ends the shell it runs in, and the
+substitution `$(...)` that would contain it hides the failure, so without a
+helper a script cannot both survive a die and learn that it happened.
+
+**Independent Test**: Run a function that prints and then dies through the
+helper, and verify the caller keeps running with the output, the message, and
+the status.
+
+**Acceptance Scenarios**:
+
+1. **Given** a function that dies with status 3, **When** it runs through
+   `dybatpho::try out err --`, **Then** the call returns 3, `out` holds what it
+   printed, `err` holds the die message, and the caller carries on
+2. **Given** a command that succeeds, **When** it runs through the helper,
+   **Then** the call returns 0 and both streams are captured without their
+   trailing newlines
+3. **Given** a script with the ERR handler and `set -e`, **When** the captured
+   command fails inside a condition, **Then** neither the handler nor errexit
+   ends the script
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -150,6 +178,11 @@ dybatpho::background_run api ./serve.sh --port 8080
 dybatpho::background_run worker ./worker.sh
 dybatpho::wait_all \
   || dybatpho::die "worker exited $(dybatpho::background_status worker)"
+
+# A step that may die is caught, reported, and the run goes on.
+if ! dybatpho::try notes error -- ./generate-notes.sh; then
+  dybatpho::warn "No release notes: ${error}"
+fi
 
 # One copy at a time.
 dybatpho::pid_file_is_running /var/run/app.pid && dybatpho::die "Already running"
@@ -191,6 +224,10 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - An existing trap handler contains a quote, which `trap -p` prints escaped.
 - A script with EXIT handlers composed through `dybatpho::trap` (temporary-file
   cleanup, terminal restore, privilege release) is ended by SIGINT or SIGTERM.
+- A command run through `dybatpho::try` calls `exit` or `dybatpho::die`, reads
+  standard input, changes a caller variable, or fails under the caller's ERR
+  handler.
+- `dybatpho::try` is given an empty name for a stream the caller does not want.
 
 ## Requirements *(mandatory)*
 
@@ -252,6 +289,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-033**: The timeout watchdog MUST hold none of the caller's standard streams, and MUST be ended with its own process group when the command finishes in time, so `$(dybatpho::run_with_timeout <n> fn)` and a pipe out of it return as soon as `fn` does.
 - **FR-034**: Once the watchdog has fired it MUST be left to finish, so a process the command started that ignores SIGTERM is still sent SIGKILL after `DYBATPHO_TIMEOUT_KILL_AFTER` seconds.
 - **FR-035**: A process group holding nothing but zombies MUST count as ended where `/proc` can tell them apart, so a job ended in a container whose PID 1 never reaps does not cost the whole grace period.
+- **FR-036**: `dybatpho::try <out> <err> -- <command>` MUST run the command in a subshell of the caller with the caller's standard input, MUST capture its standard output and standard error into the named variables with trailing newlines removed, and MUST return the command's status, including the status of an `exit` or `dybatpho::die` inside it, without ending the caller.
+- **FR-037**: `dybatpho::try` MUST NOT set off the caller's ERR handler or `errexit` when the command fails, MUST discard a stream whose variable name is empty, MUST remove its temporary files, and MUST stop the script when the `--` separator or the command is missing or a variable name is invalid or reserved.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -261,6 +300,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   vector and optionally printed instead of run.
 - **Timed Command**: A command with a limit in seconds, ended with SIGTERM and
   then SIGKILL once the limit elapses.
+- **Caught Command**: A command run by `dybatpho::try`, whose status, standard
+  output, and standard error come back to the caller instead of ending it.
 - **Background Job**: A named command running in a subshell of the caller, with
   a process ID while it runs and an exit code once it has been reaped.
 - **PID File**: A file holding the process ID of the script that owns a
@@ -321,6 +362,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-023**: Start four background jobs that end on SIGTERM and see `dybatpho::kill_children` clear them in under three seconds.
 - **IT-024**: Time out a function whose child ignores SIGTERM and see that child killed.
 - **IT-025**: Run a function that returns at once under a 20-second limit inside `$(...)` and get its output well before the limit.
+- **IT-026**: Run a function that prints and dies with 3 through `dybatpho::try`, and a command that calls `exit 5`, and get each status with the output and the die message captured while the test carries on.
+- **IT-027**: Capture a succeeding command's two streams, discard one through an empty name, feed standard input through, and see a caller variable the command changed left alone and no temporary file left behind.
+- **IT-028**: Fail a command through `dybatpho::try` in a script with the common handlers registered and see the script recover; call it without `--`, without a command, and with a reserved or invalid name and see each refused.
 
 ## Acceptance Criteria *(mandatory)*
 

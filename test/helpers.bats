@@ -950,8 +950,9 @@ EOF
 }
 
 @test "the exported checks run in a shell that never sourced the library" {
-  # Only `dybatpho::` functions are exported, so a child inherits them without
-  # the module's variables; a check reading one would stop under `set -u`.
+  # A function handed down with `export -f` reaches the child without the
+  # module's variables; a check reading one would stop under `set -u`.
+  export -f dybatpho::is dybatpho::expect_ref
   local script="${BATS_TEST_TMPDIR}/detached.sh"
   {
     printf 'set -euo pipefail\n'

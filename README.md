@@ -14,7 +14,7 @@
 
 ```sh
 . dybatpho/init.sh --modules release # git, semver and archive come with it
-dybatpho::register_common_handlers   # strict mode, error trap, signal cleanup
+dybatpho::register_common_handlers   # error trap and signal cleanup
 
 dybatpho::git_is_clean "." || dybatpho::die "Commit your changes first"
 
@@ -34,7 +34,7 @@ No dependency manager, no runtime, no build step — just Bash ≥ 4.3 and the f
 
 - **Batteries included** — modules covering the things every script ends up rewriting: logs, arguments, retries, temp files, traps — and now talking to language models.
 - **Load what you need** — the core modules by default, anything else by name, with dependencies resolved for you.
-- **Safe by default** — strict mode, error handlers, signal cleanup and secret masking are wired in from `init.sh`.
+- **Safe by default** — `init.sh` turns on strict mode (`set -euo pipefail`, `inherit_errexit`), and error handlers, signal cleanup and secret masking are one call away. It leaves your globbing alone, exports nothing to child processes unless asked, and never `exit`s the shell that sources it; `--no-strict` keeps your shell options exactly as they were.
 - **Portable** — works on GNU/Linux and macOS/BSD, with the flag differences handled for you.
 - **Tested** — full unit-test suite with coverage tracking on every commit.
 - **Drop-in** — submodule, subtree or plain clone; pin a tag and forget about it.
@@ -73,7 +73,7 @@ and use handy Bash functions freely and flexibly.
 
 ```sh
 # Loads the core modules and enables strict mode
-. < path-to-dybatpho > /init.sh
+. < path-to-dybatpho > /init.sh || exit 1
 dybatpho::register_err_handler
 dybatpho::info "Greetings from dybatpho!"
 ```
@@ -103,9 +103,36 @@ dybatpho::module_loaded json # branch on what is loaded
 dybatpho::module_list all    # core + optional module names
 ```
 
-An unknown module name stops the script at bootstrap instead of failing later
-with a missing function. See [init.sh reference](docs/init.md) and
+An unknown module name fails the bootstrap instead of failing later with a
+missing function: the `.` returns 1, which stops a script under `set -e` and
+lets any other caller decide for itself. See [init.sh reference](docs/init.md) and
 [example/init_modules.sh](example/init_modules.sh).
+
+**4. Choose what changes in your shell:**
+
+By default `init.sh` turns on `set -euo pipefail`, `extglob` and, on Bash 4.4+,
+`inherit_errexit`. It does not turn on `nullglob` or `globstar`, so an
+unmatched glob in your script stays literal, as Bash has it. To keep every
+`set` and `shopt` option of your own, pass `--no-strict`:
+
+```sh
+. < path > /init.sh --no-strict --modules git
+```
+
+Child processes inherit nothing from the library by default. A script whose
+`bash -c`, `xargs` or `find -exec bash` children call dybatpho opts in, and
+each non-interactive Bash child then sources the library with the same modules,
+through `BASH_ENV`, without its own options being touched:
+
+```sh
+DYBATPHO_EXPORT_FUNCTIONS=true . < path > /init.sh --modules semver
+# or, at any point after sourcing:
+dybatpho::export_functions
+find . -name VERSION -exec bash -c 'dybatpho::semver_valid "$(cat "$1")"' _ {} \;
+```
+
+To survive a `dybatpho::die` in one step rather than end the script, run it
+through `dybatpho::try out err -- command args...`.
 
 `dybatpho::version` reports which copy of the library is loaded, and the
 `doctor` module turns the module set into an environment check:

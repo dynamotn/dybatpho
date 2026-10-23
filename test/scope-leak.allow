@@ -8,7 +8,6 @@
 # functions handing code on to it are flagged in turn: `spread` when it does
 # (its plain locals are deliberate), `stop` when it runs only code it trusts.
 
-init.sh	__dybatpho_export_functions	stop	evaluates the export list it builds itself from `declare -F`
 src/cli.sh	__dybatpho_cli_collect_spec_metadata	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	__dybatpho_cli_generate_help	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	__dybatpho_cli_generate_logic	spread	its `__` locals are the spec DSL's context; `IFS` joins the generator's own lists, and the spec runs with the default IFS

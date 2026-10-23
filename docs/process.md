@@ -11,7 +11,9 @@ Utilities for process handling
 ## ✨ Overview
 
 This module contains helpers for script termination, signal handling, trap
-composition, deferred cleanup, and dry-run execution. It also bounds how
+composition, deferred cleanup, and dry-run execution, and
+`dybatpho::try` catches a command's failure -- a `dybatpho::die` or an
+`exit` included -- so the script can recover from it. It also bounds how
 long a command may run, supervises named background jobs, and reads and
 writes PID files.
 
@@ -39,6 +41,7 @@ writes PID files.
 - [`dybatpho::trap`](#dybatphotrap) — Append a command to one or more trap handlers without discarding existing traps.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
+- [`dybatpho::try`](#dybatphotry) — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script. The command runs in a subshell of the calling shell, so it can call any function the caller has defined, read its variables and its standard input, and nothing it changes -- variables, the working directory, traps -- leaks back. Its standard output and standard error are captured into the two named variables, with trailing newlines removed as `$(...)` would, so the message a `dybatpho::die` printed is in the error variable rather than on the terminal. The status of the command is the status of this call. Give an empty name to discard one of the streams. As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit` for the command, and calling `dybatpho::try` outside such a condition under `set -e` ends the script when the command fails. Test its status, or collect it with `|| status=$?`.
 - [`dybatpho::run_with_timeout`](#dybatphorun_with_timeout) — Run a command and end it if it takes too long. The system `timeout` is used when it is available and usable, and a pure-Bash watchdog takes over when it is not, which is the common case on macOS, where coreutils is not installed by default. A shell function always takes the Bash path, because `timeout` executes a program and cannot see the caller's functions. The command is ended with SIGTERM first and SIGKILL afterwards, so a job that traps SIGTERM still gets to clean up before it is removed, and one that ignores it is still removed.
 - [`dybatpho::background_run`](#dybatphobackground_run) — Start a command in the background under a name. The name is how every other helper in this group refers to the job, because a process ID is both unreadable in a script and unusable once the job has been reaped. Starting a second job under a name whose job is still running is refused rather than silently forgetting the first one. The job runs in a subshell of the calling shell, so it can call any function the caller has defined, and it leads its own process group, so `dybatpho::kill_children` can end its children along with it.
 - [`dybatpho::background_pid`](#dybatphobackground_pid) — Print the process ID of a background job.
@@ -70,6 +73,10 @@ writes PID files.
 **[`dybatpho::dry_run`](#dybatphodry_run)**
 
 - A single argument is a shell command string and runs through `eval`. Lead with `--` when the command and its arguments come from elsewhere -- a path, a user's input -- so that a single argument is run as a command name rather than parsed as shell.
+
+**[`dybatpho::try`](#dybatphotry)**
+
+- A die inside `$(...)` ends only that subshell and leaves the caller with an empty value and no error; this is the way to call a function that may die and still learn that it did.
 
 **[`dybatpho::run_with_timeout`](#dybatphorun_with_timeout)**
 
@@ -228,6 +235,63 @@ dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
 **📤 Output on stdout**
 
 - Show the command instead of executing it when `DRY_RUN` is true
+
+---
+
+### `dybatpho::try`
+
+Run a command and catch its failure, including a
+`dybatpho::die` or an `exit`, instead of letting it end the script.
+The command runs in a subshell of the calling shell, so it can call any
+function the caller has defined, read its variables and its standard input,
+and nothing it changes -- variables, the working directory, traps -- leaks
+back. Its standard output and standard error are captured into the two named
+variables, with trailing newlines removed as `$(...)` would, so the message a
+`dybatpho::die` printed is in the error variable rather than on the
+terminal. The status of the command is the status of this call.
+
+Give an empty name to discard one of the streams.
+
+As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit`
+for the command, and calling `dybatpho::try` outside such a condition under
+`set -e` ends the script when the command fails. Test its status, or
+collect it with `|| status=$?`.
+
+**🧪 Examples**
+
+```bash
+if dybatpho::try version error -- dybatpho::semver_bump "${input}" minor; then
+  dybatpho::info "Next version: ${version}"
+else
+  dybatpho::warn "Can't bump '${input}': ${error}"
+fi
+
+```
+
+```bash
+status=0
+dybatpho::try '' log -- ./deploy.sh --dry-run || status=$?
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the standard output, or empty to discard it |
+| `$2` | string | Name of the variable receiving the standard error, or empty to discard it |
+| `$3` | string | Literal `--` separating the variable names from the command |
+| `$@` | string | Command and arguments to run |
+
+**🧩 Variable sets**
+
+- **`The`** (two): named variables
+
+**🚦 Exit codes**
+
+- `0`: The command succeeded
+- `*`: The command's own exit status, including the one `dybatpho::die` or `exit` gave
+- `1`: Stop the script when the arguments are malformed or a variable name is invalid
 
 ---
 

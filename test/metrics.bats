@@ -412,12 +412,13 @@ SCRIPT
 }
 
 @test "a child shell that never loaded metrics logs without failing" {
-  # The parent exports every `dybatpho::` function, so the child inherits
-  # `dybatpho::metrics_counter_inc` without the internal helpers it calls. A
+  # A parent that hands `dybatpho::metrics_counter_inc` down with `export -f`
+  # leaves the child without the internal helpers it calls. A
   # hook guarded on that public name took the recording branch here and died
   # with `__dybatpho_metrics_key: command not found` on the first log line.
   # Spawn from a script file, not `bash -c`: a `-c` shell has an empty
   # `BASH_SOURCE`, which the kcov hook expands on every command.
+  export -f dybatpho::metrics_counter_inc
   local script="${BATS_TEST_TMPDIR}/child_logging.sh"
   cat > "${script}" << 'SCRIPT'
 . "${1}/init.sh" --modules logging

@@ -306,6 +306,8 @@ dybatpho::screen_end
 - **FR-034**: `dybatpho::screen_event` MUST report a carriage return as `enter`, as it does a newline.
 - **FR-035**: `dybatpho::screen_text` MUST split its text on blanks without globbing, so `*` is drawn as `*`.
 - **FR-036**: `__dybatpho_screen_braille_table` MUST hold the 256 Braille glyphs under any locale, built from their UTF-8 bytes.
+- **FR-037**: `dybatpho::screen_gauge` MUST draw whole glyphs under any locale, including `C`, where Bash indexes a string by byte.
+- **FR-038**: Locating a column on a row that holds wide glyphs or combining marks MUST cost the number of non-ASCII characters on the row, not its width, so a full frame of such rows stays interactive.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -390,6 +392,8 @@ dybatpho::screen_end
 - **IT-032**: Feed `\r` and `\n` and get `enter` for both.
 - **IT-033**: Draw `press * or *.sh to go` from a directory holding `a.sh` and `b.sh`, and read the text back unchanged.
 - **IT-034**: Build the table under `LC_ALL=C` and count 256 entries ending in `⣿`.
+- **IT-035**: Draw a half-full gauge under `LC_ALL=C` and read back five `█` and five `░`.
+- **IT-036**: Paint runs after two wide glyphs, a combining mark and an emoji, and find every style starting at the right character.
 
 ## Acceptance Criteria *(mandatory)*
 

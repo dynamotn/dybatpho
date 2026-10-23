@@ -260,6 +260,45 @@ function __dybatpho_screen_truncate_into {
   return 0
 }
 
+# The non-ASCII characters of the row `__dybatpho_screen_index_into` looked up
+# last: the row, the text the list was built from, each character's index, and
+# the columns it adds beyond one -- `1` for a wide glyph, `-1` for a combining
+# mark. Painting a row looks it up twice and rendering it once per run, against
+# the same text, so one entry is all the cache needs.
+__dybatpho_screen_map_row=-1
+__dybatpho_screen_map_text=""
+declare -ga __dybatpho_screen_map_index=() __dybatpho_screen_map_extra=()
+
+#######################################
+# @description Record where the non-ASCII characters of a row sit and how many
+#   columns each adds beyond one, for `__dybatpho_screen_index_into`.
+#   Each step jumps over a run of ASCII with one pattern removal, so the cost is
+#   the number of non-ASCII characters rather than the width of the row.
+# @arg $1 number Row
+# @arg $2 string Text of the row
+# @set __dybatpho_screen_map_row, __dybatpho_screen_map_text,
+#   __dybatpho_screen_map_index, __dybatpho_screen_map_extra
+# @internal
+#######################################
+function __dybatpho_screen_map_build {
+  local __dybatpho_screen_mb_rest="$2" __dybatpho_screen_mb_head
+  local __dybatpho_screen_mb_base=0 __dybatpho_screen_mb_width
+  __dybatpho_screen_map_index=()
+  __dybatpho_screen_map_extra=()
+  while [[ "${__dybatpho_screen_mb_rest}" == *[![:ascii:]]* ]]; do
+    __dybatpho_screen_mb_head="${__dybatpho_screen_mb_rest%%[![:ascii:]]*}"
+    __dybatpho_screen_mb_base=$((__dybatpho_screen_mb_base + ${#__dybatpho_screen_mb_head}))
+    __dybatpho_log_char_width_into __dybatpho_screen_mb_width \
+      "${__dybatpho_screen_mb_rest:${#__dybatpho_screen_mb_head}:1}"
+    __dybatpho_screen_map_index+=("${__dybatpho_screen_mb_base}")
+    __dybatpho_screen_map_extra+=("$((__dybatpho_screen_mb_width - 1))")
+    __dybatpho_screen_mb_rest="${__dybatpho_screen_mb_rest:${#__dybatpho_screen_mb_head}+1}"
+    __dybatpho_screen_mb_base=$((__dybatpho_screen_mb_base + 1))
+  done
+  __dybatpho_screen_map_row="$1"
+  __dybatpho_screen_map_text="$2"
+}
+
 #######################################
 # @description Return the string index that a display column falls at in a row.
 #   A row of plain ASCII answers immediately; any other row is walked once.
@@ -275,6 +314,43 @@ function __dybatpho_screen_index_into {
 
   if ((__dybatpho_screen_plain[__dybatpho_screen_i_row])); then
     __dybatpho_screen_i_out="${__dybatpho_screen_i_column}"
+    return 0
+  fi
+
+  # Under a UTF-8 locale one index is one character, and every ASCII character
+  # is also one column, so only the other characters move a column away from
+  # its index. Where they sit and how wide they are is found once per row
+  # content, by jumping from one to the next, and each lookup is then
+  # arithmetic over that short list. Walking the row a character at a time
+  # instead cost about 2 ms a lookup on a 200-column row, and a row holding one
+  # wide glyph is looked up twice for every run it renders.
+  if ! __dybatpho_log_indexes_bytes; then
+    local __dybatpho_screen_i_text="${__dybatpho_screen_text[__dybatpho_screen_i_row]}"
+    if [[ "${__dybatpho_screen_i_row}" != "${__dybatpho_screen_map_row}" ||
+      "${__dybatpho_screen_i_text}" != "${__dybatpho_screen_map_text}" ]]; then
+      __dybatpho_screen_map_build "${__dybatpho_screen_i_row}" "${__dybatpho_screen_i_text}"
+    fi
+    # Before the k-th non-ASCII character, a prefix of `index` characters spans
+    # `index + extra` columns, where `extra` is what the earlier ones added
+    # beyond one column each. The first stretch that reaches the column holds
+    # the answer.
+    local __dybatpho_screen_i_k __dybatpho_screen_i_start=0 __dybatpho_screen_i_extra=0
+    local __dybatpho_screen_i_count="${#__dybatpho_screen_map_index[@]}"
+    for ((__dybatpho_screen_i_k = 0;  \
+    __dybatpho_screen_i_k < __dybatpho_screen_i_count;  \
+    __dybatpho_screen_i_k++)); do
+      __dybatpho_screen_i_out=$((__dybatpho_screen_i_column - __dybatpho_screen_i_extra))
+      ((__dybatpho_screen_i_out >= __dybatpho_screen_i_start)) \
+        || __dybatpho_screen_i_out="${__dybatpho_screen_i_start}"
+      ((__dybatpho_screen_i_out <= __dybatpho_screen_map_index[__dybatpho_screen_i_k])) && return 0
+      __dybatpho_screen_i_extra=$((__dybatpho_screen_i_extra + __dybatpho_screen_map_extra[__dybatpho_screen_i_k]))
+      __dybatpho_screen_i_start=$((__dybatpho_screen_map_index[__dybatpho_screen_i_k] + 1))
+    done
+    __dybatpho_screen_i_out=$((__dybatpho_screen_i_column - __dybatpho_screen_i_extra))
+    ((__dybatpho_screen_i_out >= __dybatpho_screen_i_start)) \
+      || __dybatpho_screen_i_out="${__dybatpho_screen_i_start}"
+    ((__dybatpho_screen_i_out <= ${#__dybatpho_screen_i_text})) \
+      || __dybatpho_screen_i_out="${#__dybatpho_screen_i_text}"
     return 0
   fi
 
@@ -1730,14 +1806,13 @@ function dybatpho::screen_gauge {
     label="$((value * 100 / total))%"
   fi
 
-  local bar="" index
-  for ((index = 0; index < width; index++)); do
-    if ((index < filled)); then bar+="${filled_char}"; else bar+="${empty_char}"; fi
-  done
-
   # The two halves are drawn separately so the filled part carries its own
-  # colour, and the label is drawn over the top of both.
-  local left="${bar:0:filled}" right="${bar:filled}"
+  # colour, and the label is drawn over the top of both. Each is built on its
+  # own rather than cut out of one bar: under the `C` locale Bash slices by
+  # byte, and the cut landed inside the three bytes of `█`.
+  local left right
+  __dybatpho_log_repeat_into left "${filled_char}" "${filled}"
+  __dybatpho_log_repeat_into right "${empty_char}" "$((width - filled))"
   [[ -n "${left}" ]] && dybatpho::screen_put "${y}" "${x}" "${left}" "${style}"
   [[ -n "${right}" ]] && dybatpho::screen_put "${y}" "$((x + filled))" "${right}" "${empty_style}"
 

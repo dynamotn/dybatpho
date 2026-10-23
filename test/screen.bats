@@ -203,6 +203,20 @@ screen_raw() {
   assert_equal "${columns}" 40
 }
 
+@test "dybatpho::screen_put places runs by column on a row of wide glyphs and marks" {
+  # Each wide glyph pushes the columns after it one index to the left, and a
+  # combining mark pulls them one back; the styles have to follow both.
+  dybatpho::screen_put 0 0 "世界" "31"
+  dybatpho::screen_put 0 4 $'e\u0301x' "32"
+  dybatpho::screen_put 0 6 "ok" "33"
+  dybatpho::screen_put 0 8 "🎉x" "34"
+  dybatpho::screen_put 0 39 "|" "2"
+  local blank
+  printf -v blank '%*s' 28 ""
+  assert_equal "$(screen_raw 0)" \
+    $'\033[31m世界\033[32me\u0301x\033[33mok\033[34m🎉x\033[0m'"${blank}"$'\033[2m|\033[0m'
+}
+
 @test "dybatpho::screen_put clips at the edges and ignores off-screen writes" {
   dybatpho::screen_put 0 38 "abcdef" "0"
   local row columns
@@ -371,6 +385,14 @@ screen_raw() {
   dybatpho::screen_gauge "0 0 10 1" 10 10 label:""
   row="$(screen_row 0)"
   assert_equal "${row:0:10}" "██████████"
+}
+
+@test "dybatpho::screen_gauge keeps its glyphs whole under the C locale" {
+  # Under `C` Bash slices by byte, and a bar cut into halves split `█` apart.
+  LC_ALL=C dybatpho::screen_gauge "0 0 10 1" 5 10 label:""
+  local row
+  row="$(screen_row 0)"
+  assert_equal "${row}" "█████░░░░░                              "
 }
 
 @test "dybatpho::screen_gauge labels itself with a percentage by default" {

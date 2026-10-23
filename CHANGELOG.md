@@ -381,6 +381,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::mock_time` or a test had put its own `date` first on `PATH`, so
   the frozen clock was ignored on Alpine.
 
+- **`screen` — `dybatpho::screen_gauge` draws whole glyphs under the `C`
+  locale** instead of cutting `█` into invalid UTF-8.
+
 - **`network`, `forge` — authenticated requests follow redirects again.**
   `dybatpho::curl_request` handed curl a second `-D`, which left the header
   file the library reads empty, so same-origin redirects with secret headers

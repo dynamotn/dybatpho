@@ -414,13 +414,14 @@ dybatpho::unmock_all
   a traced command, so a coverage tool reading `xtrace` keeps recording the
   rest of the test.
 - **FR-039**: Loading the module MUST load `text` only, not `json`, `diff` or
-  `network`. A JSON or YAML assertion run without `json` MUST fail as an
-  assertion -- counted, reported as `<function> needs the json module, load it
-  with: dybatpho::load json`, and returning `1` without ending the shell or
-  reading its input.
+  `network`. A JSON or YAML assertion run without `json` MUST load it on demand,
+  and when it cannot be loaded MUST fail as an assertion -- counted, reported as
+  `<function> needs the json module, load it with: dybatpho::load json`, and
+  returning `1` without ending the shell or reading its input.
 - **FR-040**: A snapshot comparison MUST create, update and match snapshots
-  without `diff`. On a mismatch without it, the assertion MUST still fail, and
-  MUST say the difference needs `diff` to be shown instead of drawing it.
+  without `diff`. On a mismatch it MUST load `diff` on demand to draw the
+  difference; when it cannot be loaded, the assertion MUST still fail, and MUST
+  say the difference needs `diff` to be shown instead of drawing it.
 - **FR-041**: `fixture_dir` and `fixture_file` MUST fill the caller's named variable whatever the name is, short of the reserved `__dybatpho` prefix.
 - **FR-042**: `assert_file_mode` MUST follow a symbolic link and compare the mode of the file it points at.
 - **FR-043**: `snapshot_scrub` MUST accept a pattern or replacement holding `|`, MUST refuse an expression `sed` cannot run without registering it, and `assert_snapshot` MUST fail rather than compare or record text a failed substitution left empty.
@@ -538,9 +539,8 @@ dybatpho::unmock_all
 - **IT-028**: Trace `mock_http` with `xtrace` and verify the trace never holds
   the mock script, while the installed script does.
 - **IT-029**: In a suite that loads `testing` alone, verify a JSON assertion
-  fails with the message naming `json` and returns, and a snapshot mismatch
-  fails with the message naming `diff`; once both are loaded, verify the JSON
-  assertion passes and the mismatch is drawn as a diff.
+  loads `json` on demand and passes, and a snapshot mismatch loads `diff` on
+  demand and is drawn as a diff; verify the same when both are named up front.
 - **IT-030**: Create a fixture file into a variable called `content` and find it filled with the fixture's path.
 - **IT-031**: Create a fixture directory into a variable called `path_var` and find it filled with the fixture's path.
 - **IT-032**: Assert `600` on a link to a `600` file and see it pass.

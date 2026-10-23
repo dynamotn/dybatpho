@@ -244,9 +244,9 @@ EOF
   assert_stderr --partial "not an array of objects"
 }
 
-@test "dybatpho::table_from_csv and table_from_json ask for the csv module when it is not loaded" {
-  # `table` does not load `csv`, so a script that only drew plain tables does
-  # not pay for the parser. A child shell started from a file, without the
+@test "dybatpho::table_from_csv and table_from_json load the csv module on demand" {
+  # `table` does not load `csv` up front, so a script that only draws plain
+  # tables does not pay for the parser. A child shell started from a file, without the
   # functions this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
@@ -257,15 +257,17 @@ EOF
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_csv
-  assert_failure
+  assert_success
   assert_line --index 0 "a  b"
-  assert_output --partial "dybatpho::table_from_csv needs the csv module, load it with: dybatpho::load csv"
+  assert_output --partial "│ a │ b │"
 
+  # `a,b` is no JSON document, so the conversion fails -- after loading the
+  # parser, which is what turns it away.
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_json
   assert_failure
-  assert_output --partial "dybatpho::table_from_json needs the csv module, load it with: dybatpho::load csv"
+  refute_output --partial "needs the csv module"
 
-  # Once the script loads it, the same call renders.
+  # A script that names it up front renders the same table.
   sed_in_place 's/--modules table/--modules table csv/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" table_from_csv
   assert_success

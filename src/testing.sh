@@ -104,13 +104,15 @@ function __dybatpho_test_fail {
 }
 
 #######################################
-# @description Fail the calling assertion unless the `json` module is loaded.
+# @description Fail the calling assertion unless the `json` module is loaded,
+#   loading it on demand first when it is not.
 #   Querying a document is the `json` module's work, and only the JSON and YAML
 #   assertions do it. Registering it as a dependency would load it into every
-#   test suite that only checks files and mocks, so those assertions ask for it
-#   instead. Like every assertion here, the check reports and returns rather
-#   than ending the test shell, so a suite sees an ordinary failing assertion
-#   that names the module to load.
+#   test suite that only checks files and mocks, so it is a soft dependency that
+#   those assertions load when they first run. Like every assertion here, the
+#   check reports and returns rather than ending the test shell when the module
+#   cannot be loaded, so a suite sees an ordinary failing assertion that names
+#   the module.
 #
 #   The guard names an internal helper on purpose: `dybatpho::` functions are
 #   exported and a child shell inherits them without the internals they call,
@@ -124,7 +126,8 @@ function __dybatpho_test_fail {
 # @internal
 #######################################
 function __dybatpho_test_need_json {
-  declare -F __dybatpho_json_cmd_into > /dev/null && return 0
+  # shellcheck disable=SC2310 # a module that cannot be loaded fails the assertion instead
+  __dybatpho_helpers_load_soft json __dybatpho_json_cmd_into "${FUNCNAME[1]}" && return 0
   __dybatpho_test_fail "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
 
@@ -332,7 +335,7 @@ function dybatpho::assert_file_mode {
 # @arg $1 string JSON file path, or `-` for stdin
 # @exitcode 0 The document parses as JSON
 # @exitcode 1 The document is missing or malformed
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+# @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_json_valid {
   local input
@@ -383,7 +386,7 @@ function __dybatpho_test_scalar_matches {
 # @exitcode 1 The query failed or returned a different value
 # @tip String scalars are compared without their JSON quoting, so an expected
 #      value of `1.4.2` matches a backend result of `"1.4.2"`.
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+# @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_json_query {
   local input filter expected
@@ -411,7 +414,7 @@ function dybatpho::assert_json_query {
 # @arg $2 string Query filter that must succeed
 # @exitcode 0 The filter matched
 # @exitcode 1 The filter did not match
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+# @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_json_has {
   local input filter
@@ -431,7 +434,7 @@ function dybatpho::assert_json_has {
 # @arg $1 string YAML file path, or `-` for stdin
 # @exitcode 0 The document parses as YAML
 # @exitcode 1 The document is missing or malformed
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+# @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_yaml_valid {
   local input
@@ -455,7 +458,7 @@ function dybatpho::assert_yaml_valid {
 # @exitcode 1 The expression failed or returned a different value
 # @tip String scalars are compared without their JSON quoting, so an expected
 #      value of `1.4.2` matches a backend result of `"1.4.2"`.
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+# @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_yaml_query {
   local input expression expected
@@ -483,7 +486,7 @@ function dybatpho::assert_yaml_query {
 # @arg $2 string `yq` expression that must succeed
 # @exitcode 0 The expression matched
 # @exitcode 1 The expression did not match
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+# @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_yaml_has {
   local input expression
@@ -601,7 +604,7 @@ function __dybatpho_test_updating_snapshots {
 # @tip A missing snapshot is written and passes, so the first run records the baseline.
 # @tip Trailing blank lines are not preserved, because the text passes through a
 #      command substitution; a snapshot cannot assert on them.
-# @note Showing the difference on a mismatch needs the `diff` module: `dybatpho::load diff`
+# @note Showing the difference on a mismatch needs the `diff` module, which is loaded on demand
 #######################################
 function dybatpho::assert_snapshot {
   local name actual
@@ -632,9 +635,10 @@ function dybatpho::assert_snapshot {
     return 0
   fi
   __dybatpho_test_fail "Snapshot ${name} does not match ${snapshot_file}"
-  # The difference is drawn by `diff`, which `testing` does not load: the
+  # The difference is drawn by `diff`, which `testing` loads only now: the
   # mismatch is reported either way, and only its rendering needs the module.
-  if ! declare -F __dybatpho_diff_paint > /dev/null; then
+  # shellcheck disable=SC2310 # a module that cannot be loaded only loses the rendering
+  if ! __dybatpho_helpers_load_soft diff __dybatpho_diff_paint "${FUNCNAME[0]}"; then
     dybatpho::error "${FUNCNAME[0]} needs the diff module to show the difference, load it with: dybatpho::load diff"
     return 1
   fi

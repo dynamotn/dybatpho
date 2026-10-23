@@ -408,9 +408,9 @@ EOF
   assert_output "+2 -1 ~3"
 }
 
-@test "dybatpho::diff_yaml asks for the json module when it is not loaded" {
-  # `diff` does not load `json`, so a script that only compares text does not
-  # pay for it. A child shell started from a file, without the functions this
+@test "dybatpho::diff_yaml loads the json module on demand when it is not loaded" {
+  # `diff` does not load `json` up front, so a script that only compares text
+  # does not pay for it. A child shell started from a file, without the functions this
   # process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
@@ -421,11 +421,12 @@ EOF
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
-  assert_failure
+  assert_failure 1
   assert_line --index 0 "+0 -0 ~0"
-  assert_output --partial "dybatpho::diff_yaml needs the json module, load it with: dybatpho::load json"
+  assert_output --partial "~ a: 1 -> 2"
+  refute_output --partial "needs the json module"
 
-  # Once the script loads it, the same call reports the change.
+  # A script that names it up front reports the same change.
   sed_in_place 's/--modules diff/--modules diff json/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure 1

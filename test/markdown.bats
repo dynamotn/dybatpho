@@ -192,9 +192,9 @@ EOF
 EOF
 }
 
-@test "dybatpho::md_table asks for the table module when it is not loaded" {
-  # `markdown` does not load `table`, so a script that only builds headings and
-  # lists does not pay for the renderer. A child shell started from a file --
+@test "dybatpho::md_table loads the table module on demand when it is not loaded" {
+  # `markdown` does not load `table` up front, so a script that only builds
+  # headings and lists does not pay for the renderer. A child shell started from a file --
   # not \`bash -c\`, whose empty \`BASH_SOURCE\` the kcov hook trips over --
   # and without the functions this process exports, shows what such a script
   # sees.
@@ -207,11 +207,11 @@ EOF
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
-  assert_failure
+  assert_success
   assert_line --index 0 "## Report"
-  assert_output --partial "dybatpho::md_table needs the table module, load it with: dybatpho::load table"
+  assert_output --partial "| a | b |"
 
-  # Once the script loads it, the same call renders.
+  # A script that names it up front gets the same table.
   sed_in_place 's/--modules markdown/--modules markdown table/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success

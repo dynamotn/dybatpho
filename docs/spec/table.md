@@ -140,7 +140,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **FR-014**: A line break inside a CSV value MUST be drawn as a space, and the Markdown style MUST escape `|` inside a value.
 - **FR-015**: The module MUST render a JSON array of objects, taking the header from the keys of the first object and leaving a missing key's cell empty, and MUST report a document that is not an array of objects through its exit status.
 - **FR-016**: An empty CSV input or an empty JSON array MUST render nothing, and an unknown style MUST stop the script.
-- **FR-017**: Loading `table` MUST NOT load `csv`. The CSV and JSON renderers MUST stop the script, naming the `csv` module and how to load it, when it is not loaded, before reading any input; the other renderers MUST work without it.
+- **FR-017**: Loading `table` MUST NOT load `csv` up front. The CSV and JSON renderers MUST load it on demand when it is not loaded, and MUST stop the script, naming the `csv` module, only when it cannot be loaded, before reading any input; the other renderers MUST work without it.
 - **FR-018**: Cells MUST be measured without their ANSI escape sequences and with wide characters counted as the columns they occupy, using the same measurement as `text`.
 - **FR-019**: A plain aligned row MUST NOT end in whitespace: the last column is not padded to its width.
 
@@ -176,7 +176,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **IT-011**: Render JSON from text, a file and stdin under a caller's delimiter, and an empty array.
 - **IT-012**: Reject an unknown style for both renderers.
 - **IT-013**: Report a JSON document that is not an array of objects without ending the caller.
-- **IT-014**: In a shell that loaded `table` alone, draw a plain table, stop both CSV and JSON renderers with the message naming `dybatpho::load csv`, and render once `csv` is loaded.
+- **IT-014**: In a shell that loaded `table` alone, draw a plain table, have the CSV renderer load `csv` on demand and render, have the JSON renderer load it too before turning away input that is not JSON, and render the same way when `csv` is named up front.
 - **IT-015**: Draw a box table with a coloured cell and verify it is padded by its visible width, keeping the right border in line.
 - **IT-016**: Render a plain table whose last column varies in width and compare the whole output exactly, so no row ends in padding.
 

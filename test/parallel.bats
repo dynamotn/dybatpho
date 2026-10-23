@@ -517,8 +517,8 @@ SCRIPT
   assert_equal "$(dybatpho::parallel_failed)" "1"
 }
 
-@test "dybatpho::parallel_run --timeout asks for the date module only for a duration it cannot read itself" {
-  # `parallel` does not load `date`, so a pool without a limit, or with one in
+@test "dybatpho::parallel_run --timeout loads the date module only for a duration it cannot read itself" {
+  # `parallel` does not load `date` up front, so a pool without a limit, or with one in
   # plain seconds, does not pay for it. A child shell started from a file,
   # without the functions this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
@@ -533,11 +533,11 @@ SCRIPT
   assert_output --partial "ran"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" 5m
-  assert_failure
-  assert_output --partial "dybatpho::parallel_run --timeout 5m needs the date module, load it with: dybatpho::load date"
-  refute_output --partial "ran"
+  assert_success
+  assert_output --partial "ran"
+  refute_output --partial "needs the date module"
 
-  # Once the script loads it, the same duration is read.
+  # A script that names it up front reads the same duration.
   sed_in_place 's/--modules parallel$/--modules parallel date/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" 5m
   assert_success

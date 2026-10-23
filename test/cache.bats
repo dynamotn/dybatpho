@@ -437,9 +437,9 @@ remaining_entries() {
   assert_stderr --partial "Unknown option '--yaml'"
 }
 
-@test "dybatpho::cache_run --stale and dybatpho::cache_wait ask for the lock module when it is not loaded" {
-  # `cache` does not load `lock`, so a script that only caches, `ai` among
-  # them, does not pay for it. A child shell started from a file, without the
+@test "dybatpho::cache_run --stale and dybatpho::cache_wait load the lock module on demand" {
+  # `cache` does not load `lock` up front, so a script that only caches, `ai`
+  # among them, does not pay for it. A child shell started from a file, without the
   # functions this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
@@ -454,15 +454,16 @@ remaining_entries() {
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" run
-  assert_failure
+  assert_success
   assert_line --index 0 "plain"
-  assert_output --partial "dybatpho::cache_run needs the lock module, load it with: dybatpho::load lock"
+  assert_line "swr"
+  refute_output --partial "needs the lock module"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" wait
-  assert_failure
-  assert_output --partial "dybatpho::cache_wait needs the lock module, load it with: dybatpho::load lock"
+  assert_success
+  refute_output --partial "needs the lock module"
 
-  # Once the script loads it, both run.
+  # A script that names it up front runs both the same way.
   sed_in_place 's/--modules cache$/--modules cache lock/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" run
   assert_success

@@ -380,8 +380,8 @@ note() {
   dybatpho::unmock_time
 }
 
-@test "dybatpho::schedule_debounce asks for the lock module when it is not loaded" {
-  # `schedule` does not load `lock`, so a script that only runs on a cadence
+@test "dybatpho::schedule_debounce loads the lock module on demand when it is not loaded" {
+  # `schedule` does not load `lock` up front, so a script that only runs on a cadence
   # does not pay for it. A child shell started from a file, without the
   # functions this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
@@ -395,11 +395,12 @@ note() {
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
-  assert_failure
+  assert_success
   assert_line --index 0 "once"
-  assert_output --partial "dybatpho::schedule_debounce needs the lock module, load it with: dybatpho::load lock"
+  assert_line "settled"
+  refute_output --partial "needs the lock module"
 
-  # Once the script loads it, the same call runs.
+  # A script that names it up front runs the same call.
   sed_in_place 's/--modules schedule$/--modules schedule lock/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success

@@ -35,9 +35,9 @@ progress.
 The `lock` module guards the background refresh `dybatpho::cache_run
 --stale` starts, so that a burst of callers finding the same stale entry
 runs the command once. Plain caching needs no lock, so the module does not
-load it: a script that serves stale entries loads `lock` as well, and
-`--stale` and `dybatpho::cache_wait` stop with a message naming it when it
-is missing.
+load it up front: `--stale` and `dybatpho::cache_wait` load `lock` on demand
+the first time they run, and stop with a message naming it when it cannot
+be loaded.
 
 ### 🌍 Environment
 
@@ -74,7 +74,7 @@ is missing.
 
 ## 💡 Tips
 
-- Load `lock` as well to serve stale entries: `--modules cache lock`
+- `lock` is loaded on demand when a stale entry is first served; name it up front with `--modules cache lock`
 
 <a id="reference"></a>
 

@@ -987,7 +987,7 @@ function __dybatpho_csv_matches {
 # @exitcode 1 A row has more fields than the header
 # @example
 #   dybatpho::csv_to_json report.csv | dybatpho::json_pretty -
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules csv json`
+# @note Loads the `json` module on demand; name it up front with `--modules csv json` to load it once
 #######################################
 function dybatpho::csv_to_json {
   local input
@@ -1024,7 +1024,7 @@ function dybatpho::csv_to_json {
 }
 
 #######################################
-# @description Stop unless the `json` module is loaded.
+# @description Stop unless the `json` module is loaded or can be loaded on demand.
 #   Encoding each value as a JSON string is the `json` module's work, and only
 #   the conversion to JSON does it: reading, filtering, sorting, joining and
 #   the conversion from JSON, which runs `jq` or `yq` itself, need nothing from
@@ -1037,7 +1037,7 @@ function dybatpho::csv_to_json {
 #   so testing the public name would pass in a child that never loaded `json`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `json` module is not loaded
+# @exitcode 1 The `json` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_csv_need_json {

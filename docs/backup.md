@@ -66,7 +66,7 @@ that compares backups loads `diff` as well.
 
 ## 💡 Tips
 
-- Load `diff` as well to compare backups: `--modules backup diff`
+- `diff` is loaded on demand when backups are first compared; name it up front with `--modules backup diff`
 - Destinations are local paths; pushing a backup to object storage or a network share stays with the caller
 - A snapshot shares its unchanged files with other snapshots, so read and restore it, never edit inside it
 
@@ -343,4 +343,4 @@ dybatpho::backup_diff --summary "${backups[1]}" "${backups[0]}"
 - `0`: The two sides hold the same entries with the same content
 - `1`: They differ
 - `2`: A side is missing, fails its checksum, or holds an entry that escapes
-- `1`: Stop the script when the `diff` module is not loaded
+- `1`: Stop the script when the `diff` module cannot be loaded on demand

@@ -738,9 +738,9 @@ EOF
   assert [ "${first}/source/a.txt" -ef "${second}/source/a.txt" ]
 }
 
-@test "dybatpho::backup_diff asks for the diff module when it is not loaded" {
-  # `backup` does not load `diff`, so a script that only takes and restores
-  # backups does not pay for it. A child shell started from a file, without
+@test "dybatpho::backup_diff loads the diff module on demand when it is not loaded" {
+  # `backup` does not load `diff` up front, so a script that only takes and
+  # restores backups does not pay for it. A child shell started from a file, without
   # the functions this process exports, shows what such a script sees.
   local archive
   archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
@@ -753,11 +753,11 @@ EOF
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
-  assert_failure
+  assert_success
   assert_line --index 0 "verified"
-  assert_output --partial "dybatpho::backup_diff needs the diff module, load it with: dybatpho::load diff"
+  assert_line "+0 -0 ~0"
 
-  # Once the script loads it, the same comparison runs and finds nothing.
+  # A script that names it up front finds the same nothing.
   sed_in_place 's/--modules backup$/--modules backup diff/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success

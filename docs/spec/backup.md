@@ -195,7 +195,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-031**: Pruning a snapshot MUST remove its directory and sidecar without affecting a file another snapshot links.
 - **FR-032**: A comparison MUST accept a snapshot on either side, verified before it is read.
 - **FR-033**: Listing, resolving the latest and pruning MUST order backups by name, then UTC stamp, then same-second suffix compared as a number, archives and snapshots together, independently of the caller's collation.
-- **FR-034**: Loading the module MUST NOT load `diff`. A comparison MUST stop the script, naming the `diff` module and how to load it, when that module is not loaded, before any backup is verified or extracted; every other operation MUST work without it.
+- **FR-034**: Loading the module MUST NOT load `diff` up front. A comparison MUST load it on demand when it is not loaded, and MUST stop the script, naming the `diff` module, only when it cannot be loaded, before any backup is verified or extracted; every other operation MUST work without it.
 - **FR-035**: A backup MUST appear under its final name only once its complete sidecar is beside it, the sidecar MUST be written under a hidden name and renamed into place, and the name MUST be claimed through its sidecar so that a name taken meanwhile -- by a file, a directory or another run -- is skipped for the next suffix rather than overwritten or entered.
 - **FR-036**: A snapshot, and the checksum of one, MUST be refused when part of the source tree cannot be read, leaving no partial snapshot behind.
 - **FR-037**: `--keep-days` MUST age incremental snapshots by their modification time, as it ages archives.
@@ -259,7 +259,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-037**: Compare snapshots with each other, with the live source and with an archive, and refuse a tampered one or one without a sidecar.
 - **IT-038**: Take two snapshots in the same second under distinct names.
 - **IT-039**: List archives and a snapshot taken in the same second newest first by suffix, `-10` before `-2` and `-1` before the unsuffixed name, under C collation and the session's own.
-- **IT-040**: In a script that loaded `backup` alone, verify an archive, have a comparison stop and name the `diff` module, and compare once `diff` is loaded.
+- **IT-040**: In a script that loaded `backup` alone, verify an archive and have a comparison load `diff` on demand and find nothing, and compare the same way when `diff` is named up front.
 - **IT-041**: With the clock frozen, take a backup while the unsuffixed sidecar name is held, and while a directory appears at the chosen archive or snapshot name before the move, verifying the backup lands under the next suffix, verifies, and leaves the squatting directory empty.
 - **IT-042**: Take an incremental snapshot without `rsync` of a source with an unreadable subdirectory, and fail without leaving a snapshot.
 - **IT-043**: Prune with `--keep-days` a backdated snapshot beside a fresh archive, and find the snapshot and its sidecar gone.

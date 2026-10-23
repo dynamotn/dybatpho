@@ -158,7 +158,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 - **FR-023**: `--summary` MUST print one `+A -R ~M` line in place of the records, counting a change of kind in `~`.
 - **FR-024**: A tree comparison MUST return zero when the trees match, one when they differ, and MUST stop with two when either side is not a directory.
 - **FR-025**: Tree records MUST follow the same coloring decision as the other comparisons, with additions, removals, modifications and changes of kind colored distinctly.
-- **FR-026**: Loading the module MUST NOT load `json`. The YAML comparison MUST stop before reading its input with `<function> needs the json module, load it with: dybatpho::load json` when `json` is not loaded; the text, JSON and tree comparisons MUST work without it.
+- **FR-026**: Loading the module MUST NOT load `json` up front. The YAML comparison MUST load it on demand when it is not loaded, and MUST stop before reading its input with `<function> needs the json module, ...` only when it cannot be loaded; the text, JSON and tree comparisons MUST work without it.
 - **FR-027**: A JSON or YAML comparison MUST stop with exit code `2` and `<function>: Not valid JSON: the <first|second> document` (or `Not valid YAML`) when either side does not parse or holds no value, and MUST NOT print a difference or report the documents as identical.
 - **FR-028**: `diff_dir` MUST stop with exit 2 when either tree cannot be read in full, rather than compare the part it could list.
 - **FR-029**: Only the header before the first hunk MUST be relabelled and colored as a file header; inside a hunk a line reading `--- ...` or `+++ ...` MUST be printed and colored as the removal or addition it is, and the summary MUST count it.
@@ -211,7 +211,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 - **IT-027**: Color each kind of tree change distinctly.
 - **IT-028**: Stop with exit code 2 when a side is not a directory.
 - **IT-029**: Take the directories after an end-of-options marker.
-- **IT-030**: Verify a script that loads `diff` alone can summarize text, that its YAML comparison stops with the message naming `json`, and that once it loads `json` the same call reports the changed key.
+- **IT-030**: Verify a script that loads `diff` alone can summarize text, that its YAML comparison loads `json` on demand and reports the changed key, and that naming `json` up front reports the same.
 - **IT-031**: Verify two broken JSON documents, a broken second document, an empty document, and broken YAML on either side all stop with exit code `2` and name the side, printing nothing on stdout.
 - **IT-032**: Compare two trees whose differing subdirectories cannot be entered, and stop with exit 2.
 - **IT-033**: Remove the line `-- note` and add the line `++ added`, and get both printed and colored as a removal and an addition under the caller's labels, and counted as `+1 -1 ~1`.

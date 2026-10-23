@@ -102,7 +102,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 **[`dybatpho::safe_extract`](#dybatphosafe_extract)**
 
 - Symlink targets stored inside an archive aren't inspected; extract untrusted archives into a scratch directory
-- The entries are listed and extracted by the `archive` module, which `safety` does not load; load it alongside: `--modules safety archive`
+- The entries are listed and extracted by the `archive` module, which `safety` loads on demand; name it up front with `--modules safety archive`
 
 <a id="reference"></a>
 
@@ -307,7 +307,7 @@ Extract an archive after rejecting entries that escape the destination.
 - `0`: The archive is extracted
 - `1`: Overwriting existing files is declined
 - `1`: Stop the script when an entry is absolute or traverses outside the destination
-- `1`: Stop the script when the `archive` module is not loaded
+- `1`: Stop the script when the `archive` module cannot be loaded on demand
 
 ---
 

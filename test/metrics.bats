@@ -455,8 +455,9 @@ SCRIPT
   assert_output "1"
 }
 
-@test "summaries ask for math and a push asks for network when they are not loaded" {
-  # `metrics` loads neither, so counting and timing never pull in `curl`. The
+@test "summaries load math and a push loads network on demand when they are not loaded" {
+  # `metrics` loads neither up front, so counting and timing never pull in
+  # `curl`. The
   # child inherits the public `math` and `network` functions this process
   # exports, which is why the guards test internal helpers instead.
   local script="${BATS_TEST_TMPDIR}/child_narrow.sh"
@@ -471,14 +472,15 @@ esac
 SCRIPT
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
     bash "${script}" "${DYBATPHO_DIR}" metrics summary
-  assert_failure
+  assert_success
   assert_line --index 0 "jobs_total 1"
-  assert_output --partial "dybatpho::metrics_summary_ms needs the math module, load it with: dybatpho::load math"
+  assert_output --partial 'fetch_seconds{quantile="0.5"} 0.01'
+  refute_output --partial "needs the math module"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
     bash "${script}" "${DYBATPHO_DIR}" metrics push
-  assert_failure
-  assert_output --partial "dybatpho::metrics_push needs the network module, load it with: dybatpho::load network"
+  assert_success
+  refute_output --partial "needs the network module"
 
   run -0 env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
     bash "${script}" "${DYBATPHO_DIR}" "metrics math" summary

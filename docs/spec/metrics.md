@@ -178,7 +178,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-022**: The push helper MUST refuse a URL without an `http://` or `https://` scheme, an empty job name, a grouping label that is not a `key=value` pair with a valid label name, and a grouping label named `job`.
 - **FR-023**: The push helper MUST return the network module's exit code for the request and MUST log the gateway's error text when it refuses the push, rather than hiding the failure.
 - **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DRY_RUN` by printing the request instead of sending it, with the gateway URL shown as its scheme and host only, like every URL the network module logs.
-- **FR-025**: Loading `metrics` MUST NOT load `math` or `network`. Recording a summary MUST stop the script, naming the `math` module and how to load it, when `math` is not loaded, and a push MUST do the same for `network`, each before recording or sending anything; counters, gauges, histograms and timers MUST work without either.
+- **FR-025**: Loading `metrics` MUST NOT load `math` or `network` up front. Recording a summary MUST load `math` on demand when it is not loaded, and a push MUST do the same for `network`, each stopping the script, naming the module, only when it cannot be loaded, before recording or sending anything; counters, gauges, histograms and timers MUST work without either.
 - **FR-026**: `metrics_time`, `metrics_timer_start` and `metrics_timer_stop` MUST refuse an invalid metric name or label under their own name, and `metrics_time` MUST do so before running the command.
 - **FR-027**: `metrics_push` MUST check the quantile list in the caller's shell before rendering, so that a list made invalid after a summary was recorded stops the push instead of reporting success.
 - **FR-028**: A command timed by `metrics_time` MUST see the caller's variables and MUST NOT change what is recorded by assigning to one: the timer MUST keep its state in prefixed locals.
@@ -228,7 +228,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-018**: Reject a non-integer duration, a malformed label, and an empty, non-numeric or out-of-range quantile list, and verify nothing is recorded.
 - **IT-019**: Verify a histogram name cannot take a summary observation and a summary name cannot take a histogram observation.
 - **IT-020**: Reset the metrics and verify a summary's earlier observations no longer affect its quantiles.
-- **IT-021**: Load the module on its own and verify nothing optional is loaded ahead of it; in such a shell count and render, verify a summary stops naming `dybatpho::load math` and a push stops naming `dybatpho::load network`, and verify a summary renders once `math` is loaded.
+- **IT-021**: Load the module on its own and verify nothing optional is loaded ahead of it; in such a shell count and render, verify a summary loads `math` and a push loads `network` on demand, and verify a summary renders the same way when `math` is named up front.
 - **IT-022**: Render a summary that has been declared but has no sample, and a type the renderer does not expand, and verify each prints its `# HELP` and `# TYPE` lines and no series.
 - **IT-023**: Push recorded metrics to a mocked Pushgateway and verify the URL with grouping labels, the `PUT` method, the content type, and the exposition body.
 - **IT-024**: Push with `--add` and verify `POST` is used.

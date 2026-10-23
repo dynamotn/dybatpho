@@ -40,7 +40,7 @@
 #   extracting each verified backup into a scratch directory first. That
 #   comparison is the `diff` module's, which this one does not load: a script
 #   that compares backups loads `diff` as well.
-# @tip Load `diff` as well to compare backups: `--modules backup diff`
+# @tip `diff` is loaded on demand when backups are first compared; name it up front with `--modules backup diff`
 # @tip Destinations are local paths; pushing a backup to object storage or a
 #   network share stays with the caller
 # @tip A snapshot shares its unchanged files with other snapshots, so read and
@@ -936,7 +936,7 @@ function __dybatpho_backup_root_into {
 # @exitcode 0 The two sides hold the same entries with the same content
 # @exitcode 1 They differ
 # @exitcode 2 A side is missing, fails its checksum, or holds an entry that escapes
-# @exitcode 1 Stop the script when the `diff` module is not loaded
+# @exitcode 1 Stop the script when the `diff` module cannot be loaded on demand
 # @example
 #   dybatpho::backup_diff "$(dybatpho::backup_latest /var/backups nginx)" /etc/nginx
 #   mapfile -t backups < <(dybatpho::backup_list /var/backups nginx)

@@ -2064,7 +2064,7 @@ function dybatpho::i18n_weekday_name {
 }
 
 #######################################
-# @description Stop unless the `date` module is loaded.
+# @description Stop unless the `date` module is loaded or can be loaded on demand.
 #   Formatting a timestamp reads its calendar fields through `date`, and so
 #   does reading the clock. Message catalogs, plurals, numbers and text
 #   direction need neither, so `date` is not a dependency of the module and
@@ -2075,7 +2075,7 @@ function dybatpho::i18n_weekday_name {
 #   so testing the public name would pass in a child that never loaded `date`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `date` module is not loaded
+# @exitcode 1 The `date` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_i18n_need_date {

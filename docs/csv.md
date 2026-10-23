@@ -424,7 +424,7 @@ dybatpho::csv_to_json report.csv | dybatpho::json_pretty -
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules csv json`
+- Loads the `json` module on demand; name it up front with `--modules csv json` to load it once
 
 **📤 Output on stdout**
 

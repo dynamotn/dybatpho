@@ -783,7 +783,7 @@ dybatpho::curl_graphql https://api.github.com/graphql \
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules network json`
+- Loads the `json` module on demand; name it up front with `--modules network json` to load it once
 
 **🚦 Exit codes**
 

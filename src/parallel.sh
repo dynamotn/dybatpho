@@ -173,14 +173,13 @@ function __dybatpho_parallel_options {
 #
 #   A bare number of seconds is read here. Any other form, such as `5m` or
 #   `1h30m`, is read by `dybatpho::date_parse_duration`, and the `date` module
-#   is not a dependency of this one: a pool without a limit, or with a limit in
-#   seconds, should not load it. The guard names an internal helper, since a
-#   child shell inherits the exported `dybatpho::` functions without the
-#   internals they call.
+#   is a soft dependency of this one: a pool without a limit, or with a limit in
+#   seconds, does not load it, and the first duration that needs it loads it on
+#   demand.
 # @arg $1 string Name of the variable that receives the seconds, `0` for no limit
 # @arg $2 string Duration from `--timeout`, or empty to read the configuration
 # @exitcode 1 Stop the script when the duration cannot be read, is negative, or
-#   needs the `date` module and it is not loaded
+#   needs the `date` module and it cannot be loaded
 # @internal
 #######################################
 function __dybatpho_parallel_timeout {
@@ -193,11 +192,10 @@ function __dybatpho_parallel_timeout {
   if [[ "${requested}" =~ ^[0-9]{1,9}$ ]]; then
     seconds=$((10#${requested}))
   elif [[ -n "${requested}" ]]; then
-    # The refusal is exercised by "--timeout asks for the date module" in a
-    # child shell, which kcov does not follow.
-    local needs_date="${caller} --timeout ${requested} needs the date module"
-    declare -F __dybatpho_date_parse > /dev/null \
-      || dybatpho::die "${needs_date}, load it with: dybatpho::load date" # kcov(skip)
+    # `date` is a soft dependency, loaded here on the first duration that
+    # needs it.
+    __dybatpho_helpers_need_module date __dybatpho_date_parse \
+      "${caller} --timeout ${requested}"
     # Exercised under `run` by "an invalid timeout is refused", which kcov
     # cannot see because `dybatpho::die` ends the shell.
     local invalid="Timeout must be a duration such as 90, 5m or 1h30m, got '${requested}'"

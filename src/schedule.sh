@@ -167,7 +167,7 @@ function dybatpho::schedule_every {
 }
 
 #######################################
-# @description Stop unless the `lock` module is loaded.
+# @description Stop unless the `lock` module is loaded or can be loaded on demand.
 #   Only the debounce takes a lock, to read and bump its counter in one step.
 #   Registering `lock` as a dependency would load it into every script that
 #   only runs on a cadence or once a day, so the one function that needs it
@@ -178,7 +178,7 @@ function dybatpho::schedule_every {
 #   so testing the public name would pass in a child that never loaded `lock`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `lock` module is not loaded
+# @exitcode 1 The `lock` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_schedule_need_lock {
@@ -201,9 +201,9 @@ function __dybatpho_schedule_need_lock {
 # @arg $3 string Literal `--` separating the key from the command
 # @arg $@ string Command and arguments to run
 # @exitcode 0 The command ran, and its own exit code is returned
-# @exitcode 1 The window or the key is invalid, or the `lock` module is not loaded
+# @exitcode 1 The window or the key is invalid, or the `lock` module cannot be loaded on demand
 # @exitcode 9 A later trigger arrived, so this call did nothing
-# @tip Needs the `lock` module: load it with `--modules schedule lock`
+# @tip Loads the `lock` module on demand; name it up front with `--modules schedule lock`
 # @example
 #   dybatpho::schedule_debounce 2 rebuild -- make
 #######################################

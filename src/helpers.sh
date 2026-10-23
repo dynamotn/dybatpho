@@ -244,10 +244,17 @@ function dybatpho::expect_envs {
 }
 
 #######################################
-# @description Stop the script unless an optional module is loaded, saying who
-#   needs it and how to load it. A module that calls another one only from a
-#   few of its functions guards those functions with this rather than loading
-#   the other module for every script.
+# @description Make sure an optional module is loaded, loading it on demand
+#   when it is not, and report whether that worked. A module that calls another
+#   one only from a few of its functions guards those functions with this, or
+#   with `__dybatpho_helpers_need_module`, rather than loading the other module
+#   for every script. Such a soft dependency is recorded in
+#   `__dybatpho_module_soft_deps` in `init.sh`.
+#
+#   The module is loaded only when the registry knows it and the loader is
+#   there: a bundle carries no loader and no `src/` directory, so a module it
+#   does not carry cannot arrive on demand. A load that happens inside `$(...)`
+#   lasts only as long as that subshell.
 #
 #   The marker has to be an internal `__dybatpho_` helper of the needed module,
 #   never a public function: public functions are exported, so a child shell
@@ -256,13 +263,43 @@ function dybatpho::expect_envs {
 # @arg $1 string Module that is needed
 # @arg $2 string Internal helper of that module whose presence means it is loaded
 # @arg $3 string What needs the module, usually the public function's name
+# @stderr The loader's own diagnostic when loading fails
+# @exitcode 0 The module is loaded, now or before
+# @exitcode 1 It is not loaded and could not be loaded on demand
+# @internal
+#######################################
+function __dybatpho_helpers_load_soft {
+  declare -F "$2" > /dev/null && return 0
+  declare -F __dybatpho_load_module > /dev/null || return 1
+  __dybatpho_module_exists "$1" || return 1
+  dybatpho::debug "$3 needs the $1 module, loading it on demand"
+  # shellcheck disable=SC2310 # a failed load is reported by the caller, with what needed it
+  __dybatpho_load_module "$1" || return 1
+  __dybatpho_export_functions
+  declare -F "$2" > /dev/null
+}
+
+#######################################
+# @description Make sure an optional module is loaded, loading it on demand when
+#   it is not, and stop the script when that fails, saying who needs it. See
+#   `__dybatpho_helpers_load_soft` for when a module can be loaded on demand.
+# @arg $1 string Module that is needed
+# @arg $2 string Internal helper of that module whose presence means it is loaded
+# @arg $3 string What needs the module, usually the public function's name
 # @arg $4 number [default: 1] Exit code to stop with
-# @exitcode 0 The module is loaded
+# @exitcode 0 The module is loaded, now or before
 # @internal
 #######################################
 function __dybatpho_helpers_need_module {
-  declare -F "$2" > /dev/null \
-    || dybatpho::die "$3 needs the $1 module, load it with: dybatpho::load $1" "${4:-1}"
+  # shellcheck disable=SC2310 # the failure is the point: it is reported right here
+  __dybatpho_helpers_load_soft "$1" "$2" "$3" && return 0
+  local hint="load it with: dybatpho::load $1"
+  if ! declare -F __dybatpho_load_module > /dev/null; then
+    hint="this bundle does not carry it; regenerate it with scripts/bundle.sh --with-soft-deps"
+  elif __dybatpho_module_exists "$1"; then
+    hint="loading it on demand failed"
+  fi
+  dybatpho::die "$3 needs the $1 module, ${hint}" "${4:-1}"
 }
 
 #######################################
@@ -580,10 +617,11 @@ __DYBATPHO_HELPERS_RANGE_REGEX='^[<>=^~]'
 #   code since before ranges existed here, and no amount of cleverness makes
 #   `require jq 3` mean both things at once.
 #
-#   Matching a version needs the optional `semver` module. Rather than let a
-#   range pass unchecked in a script that did not load it, this stops with a
-#   message naming what to load: a requirement that is silently not enforced is
-#   worse than one that was never written.
+#   Matching a version needs the optional `semver` module, which is loaded on
+#   demand the first time a range is given. Rather than let a range pass
+#   unchecked when it cannot be loaded, this stops with a message naming it: a
+#   requirement that is silently not enforced is worse than one that was never
+#   written.
 #
 #   A command whose version cannot be read is also a failure, for the same
 #   reason. `dybatpho::doctor` treats that case as a report rather than a

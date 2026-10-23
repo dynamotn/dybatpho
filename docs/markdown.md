@@ -310,7 +310,7 @@ dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 **🚦 Exit codes**
 
 - `0`: The table is rendered
-- `1`: Stop the script when the `table` module is not loaded
+- `1`: Stop the script when the `table` module cannot be loaded on demand
 
 ---
 

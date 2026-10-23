@@ -155,6 +155,8 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - A file's content is unchanged but its mode is not.
 - A snapshot is tampered with after it was taken, or holds more than one entry.
 - A file with the snapshot suffix, or a link to a snapshot, sits among the backups.
+- `--keep-days` prunes a directory that holds incremental snapshots.
+- An incremental source or destination is relative and `CDPATH` is set, or a snapshot path begins with a dash.
 
 ## Requirements *(mandatory)*
 
@@ -196,6 +198,8 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-034**: Loading the module MUST NOT load `diff`. A comparison MUST stop the script, naming the `diff` module and how to load it, when that module is not loaded, before any backup is verified or extracted; every other operation MUST work without it.
 - **FR-035**: A backup MUST appear under its final name only once its complete sidecar is beside it, the sidecar MUST be written under a hidden name and renamed into place, and the name MUST be claimed through its sidecar so that a name taken meanwhile -- by a file, a directory or another run -- is skipped for the next suffix rather than overwritten or entered.
 - **FR-036**: A snapshot, and the checksum of one, MUST be refused when part of the source tree cannot be read, leaving no partial snapshot behind.
+- **FR-037**: `--keep-days` MUST age incremental snapshots by their modification time, as it ages archives.
+- **FR-038**: Snapshot creation and restore MUST resolve relative paths against the working directory whatever `CDPATH` holds, and MUST accept a path beginning with a dash.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -258,6 +262,8 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-040**: In a script that loaded `backup` alone, verify an archive, have a comparison stop and name the `diff` module, and compare once `diff` is loaded.
 - **IT-041**: With the clock frozen, take a backup while the unsuffixed sidecar name is held, and while a directory appears at the chosen archive or snapshot name before the move, verifying the backup lands under the next suffix, verifies, and leaves the squatting directory empty.
 - **IT-042**: Take an incremental snapshot without `rsync` of a source with an unreadable subdirectory, and fail without leaving a snapshot.
+- **IT-043**: Prune with `--keep-days` a backdated snapshot beside a fresh archive, and find the snapshot and its sidecar gone.
+- **IT-044**: Snapshot a relative source with `CDPATH` pointing at a decoy of the same name, and restore a snapshot from a directory named `-bk`.
 
 ## Acceptance Criteria *(mandatory)*
 

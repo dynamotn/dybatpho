@@ -72,7 +72,6 @@ src/ai.sh	dybatpho::ai_check	dybatpho::ai_model	provider was already resolved in
 src/archive.sh	dybatpho::archive_extract	__dybatpho_archive_output_name	the format was checked in the caller's shell first
 src/backup.sh	__dybatpho_backup_tree_hash_into	dybatpho::file_hash	hashes files this function just walked, with a validated algorithm
 src/backup.sh	dybatpho::backup_create	dybatpho::file_hash	hashes the archive this call just wrote
-src/backup.sh	dybatpho::backup_prune	dybatpho::file_age_seconds	ages backups this call just listed
 src/backup.sh	dybatpho::backup_verify	dybatpho::file_hash	an unreadable archive leaves the checksum empty, which verify then reports as a mismatch
 src/cache.sh	__dybatpho_cache_scan	dybatpho::file_mtime	reads entries this call just listed
 src/cache.sh	__dybatpho_cache_scan	dybatpho::file_size	reads entries this call just listed
@@ -102,8 +101,6 @@ src/i18n.sh	dybatpho::i18n_relative	dybatpho::i18n_tn	library keys and a count t
 src/lock.sh	__dybatpho_lock_semaphore_acquire	dybatpho::lock_semaphore_holders	the slot count was checked in the caller's shell first
 src/math.sh	dybatpho::math_lcm	dybatpho::math_gcd	operands were checked to be whole numbers first
 src/metrics.sh	__dybatpho_metrics_validate_quantiles	dybatpho::math_compare	the quantile was checked to be a number first
-src/metrics.sh	dybatpho::metrics_render	dybatpho::math_mul	quantiles and samples were checked when recorded and rendered
-src/metrics.sh	dybatpho::metrics_render	dybatpho::math_percentile	quantiles and samples were checked when recorded and rendered
 src/release.sh	dybatpho::release_checksums	dybatpho::file_hash	hashes artifacts this call just listed, with a validated algorithm
 src/schedule.sh	dybatpho::schedule_once_per	dybatpho::file_age_seconds	the marker was checked to exist first
 src/semver.sh	dybatpho::semver_max	dybatpho::semver_sort	an empty result is refused right after, so the call never carries on

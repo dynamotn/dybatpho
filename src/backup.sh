@@ -440,10 +440,13 @@ function __dybatpho_backup_snapshot {
   # remote location, and an absolute path is never read that way.
   local source_dir base
   source_dir="$(dybatpho::path_dirname "${source}")"
-  source_dir="$(cd -- "${source_dir}" && pwd -P)"
+  # `CDPATH` would resolve a relative directory to one of the same name
+  # elsewhere, and make `cd` print it into the answer; a directory named `-`
+  # would be read as the previous one.
+  source_dir="$(CDPATH='' cd -- "${source_dir/#-/./-}" && pwd -P)"
   base="$(dybatpho::path_basename "${source}")"
   source="${source_dir%/}/${base}"
-  destination="$(cd -- "${destination}" && pwd -P)"
+  destination="$(CDPATH='' cd -- "${destination/#-/./-}" && pwd -P)"
 
   local -a previous=()
   __dybatpho_backup_collect_into previous "${destination}" "${name}" snapshot
@@ -654,7 +657,7 @@ function __dybatpho_backup_entry_root_into {
 
   while IFS= read -r -d '' __dybatpho_backup_item; do
     __dybatpho_backup_items+=("${__dybatpho_backup_item}")
-  done < <(find "${__dybatpho_backup_holder}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
+  done < <(find "${__dybatpho_backup_holder/#-/./-}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
 
   if ((${#__dybatpho_backup_items[@]} == 1)) \
     && [[ -d "${__dybatpho_backup_items[0]}" && ! -L "${__dybatpho_backup_items[0]}" ]]; then
@@ -686,7 +689,7 @@ function __dybatpho_backup_restore_snapshot {
   local -a entries=()
   while IFS= read -r -d '' entry; do
     entries+=("${entry}")
-  done < <(find "${snapshot}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
+  done < <(find "${snapshot/#-/./-}" -mindepth 1 -maxdepth 1 -print0) # kcov(skip)
   ((${#entries[@]} == 1)) \
     || dybatpho::die "dybatpho::backup_restore: Expected one entry in snapshot: ${snapshot}"
   entry="${entries[0]}"
@@ -804,15 +807,24 @@ function dybatpho::backup_prune {
   __dybatpho_backup_collect_into found "${directory}" "${name}"
   ((${#found[@]})) || return 0
 
-  local at age cutoff=0
-  [[ -z "${keep_days}" ]] || cutoff=$((keep_days * 86400))
+  local at age mtime now cutoff=0
+  if [[ -n "${keep_days}" ]]; then
+    cutoff=$((keep_days * 86400))
+    now="$(date +%s)"
+  fi
 
   for at in "${!found[@]}"; do
     if [[ -n "${keep_count}" ]] && ((at < keep_count)); then
       continue
     fi
     if [[ -n "${keep_days}" ]]; then
-      age="$(dybatpho::file_age_seconds "${found[${at}]}")"
+      # Read here rather than through `dybatpho::file_age_seconds`, which takes
+      # regular files only: an incremental snapshot is a directory, and asking
+      # it for one stopped the script, or, where errexit was off, kept every
+      # snapshot whatever its age.
+      mtime="$(__dybatpho_file_stat mtime "${found[${at}]}")" \
+        || dybatpho::die "${FUNCNAME[0]}: Cannot read the age of ${found[${at}]}"
+      age=$((now - mtime))
       ((age > cutoff)) || continue
     fi
     doomed+=("${found[${at}]}")

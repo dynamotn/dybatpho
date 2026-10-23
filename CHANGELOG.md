@@ -300,6 +300,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first newline, so `dybatpho::safe_rm` given `dir/keep<newline>old` deleted
   `dir/keep`. The file writers' symlink resolution had the same flaw.
 
+- **`backup` — `--keep-days` prunes incremental snapshots.** Their age was
+  read with a helper that only takes files, which stopped the script or kept
+  every snapshot.
+
 - **`file` — `dybatpho::dir_size` measures a directory named like an option,
   and counts past 2 GiB** under mawk and BusyBox awk.
 

@@ -763,3 +763,43 @@ EOF
   assert_success
   assert_line "+0 -0 ~0"
 }
+
+@test "dybatpho::backup_prune --keep-days ages an incremental snapshot as well" {
+  # The age was read with `dybatpho::file_age_seconds`, which takes regular
+  # files only, so a snapshot directory stopped the prune or, with errexit off,
+  # was kept whatever its age.
+  local old
+  old="$(snapshot "${SOURCE}" "${DEST}" site)"
+  touch -t 202601010000 "${old}"
+  plant "site-20991231T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_prune --keep-days 1 --name site --force "${DEST}"
+  assert_success
+  assert_file_not_exist "${old}"
+  assert_file_not_exist "${old}.sha256"
+  assert_file_exist "${DEST}/site-20991231T000000Z.tar.gz"
+}
+
+@test "dybatpho::backup_create --incremental resolves a relative source despite CDPATH" {
+  # `cd` followed CDPATH into a directory of the same name elsewhere, and
+  # printed its path into the source it then snapshotted.
+  mkdir -p "${BATS_TEST_TMPDIR}/cdp/work/tree" "${BATS_TEST_TMPDIR}/cdp/decoy/work/tree"
+  printf 'mine\n' > "${BATS_TEST_TMPDIR}/cdp/work/tree/own.txt"
+  printf 'decoy\n' > "${BATS_TEST_TMPDIR}/cdp/decoy/work/tree/decoy.txt"
+  cd "${BATS_TEST_TMPDIR}/cdp"
+  local snap
+  snap="$(CDPATH="${BATS_TEST_TMPDIR}/cdp/decoy" snapshot work/tree "${DEST}" rel)"
+  assert_file_exist "${snap}/tree/own.txt"
+  assert_file_not_exist "${snap}/tree/decoy.txt"
+}
+
+@test "dybatpho::backup_restore reads a snapshot under a directory named like an option" {
+  mkdir -p "${BATS_TEST_TMPDIR}/dashed"
+  cd "${BATS_TEST_TMPDIR}/dashed"
+  local snap
+  snap="$(snapshot "${SOURCE}" -bk site)"
+  snap="-bk/${snap##*/}"
+  run_traced dybatpho::backup_restore --force "${snap}" restored
+  assert_success
+  assert_equal "$(cat restored/source/a.txt)" "first"
+}

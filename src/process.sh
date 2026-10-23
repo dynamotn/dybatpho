@@ -339,24 +339,25 @@ function dybatpho::cleanup_file_on_exit {
 }
 
 #######################################
-# @description Print a shell command instead of executing it when `DRY_RUN` is enabled.
+# @description Print a command instead of executing it when dry-run mode is enabled.
 # @example
-#   DRY_RUN=true
-#   dybatpho::dry_run "rm -rf ./build"
+#   DYBATPHO_DRY_RUN=true
+#   dybatpho::dry_run -- rm -rf -- ./build
 #
 # @example
-#   dybatpho::dry_run "ssh ${host} 'systemctl restart app'"
+#   dybatpho::dry_run -- ssh "${host}" 'systemctl restart app'
 #
 # @example
-#   dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
+#   dybatpho::dry_run "rm -rf ./build"   # deprecated: a single shell string runs through `eval`
 #
-# @arg $@ string Shell command string to run, or `--` followed by a command and its arguments
-# @env DRY_RUN string Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them
-# @stdout Show the command instead of executing it when `DRY_RUN` is true
-# @tip A single argument is a shell command string and runs through `eval`.
-#   Lead with `--` when the command and its arguments come from elsewhere --
-#   a path, a user's input -- so that a single argument is run as a command
-#   name rather than parsed as shell.
+# @arg $@ string `--` followed by a command and its arguments; or (deprecated) a single shell command string
+# @env DYBATPHO_DRY_RUN string Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them; falls
+#   back to `DRY_RUN`
+# @stdout Show the command instead of executing it when dry-run mode is on
+# @tip Lead with `--`. Without it, a single argument is a shell command string
+#   and runs through `eval`, which parses any value interpolated into it as
+#   code; that form is deprecated and kept only for compatibility. Several
+#   arguments without `--` already run as a command and its arguments.
 #######################################
 function dybatpho::dry_run {
   local __dybatpho_dry_run_argv=false

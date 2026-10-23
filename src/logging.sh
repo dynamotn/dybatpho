@@ -102,19 +102,41 @@ function __dybatpho_log_redact {
 # @internal
 #######################################
 function __dybatpho_log {
-  declare -A log_colors=([trace]="0;37" [debug]="0;36" [info]="0;34" [warn]="0;33" [error]="1;31" [fatal]="0;31")
   local show_log_level="$1"
   local msg="$2"
   local out="${3:-stdout}"
-  local color="${4:-${log_colors[${show_log_level}]}}"
+  local color="${4-}"
+  # A `case` rather than a table built on every line, and one that cannot trip
+  # `set -u` on a level it does not know: `INFO` used to abort the script here
+  # before the validation below could say what was wrong with it.
+  if [[ -z "${color}" ]]; then
+    case "${show_log_level,,}" in
+      trace) color="0;37" ;;
+      debug) color="0;36" ;;
+      info) color="0;34" ;;
+      warn) color="0;33" ;;
+      error) color="1;31" ;;
+      *) color="0;31" ;;
+    esac
+  fi
 
   # Redact registered secrets before anything reaches stdout or stderr.
   __dybatpho_log_redact msg
 
-  dybatpho::validate_log_level "${LOG_LEVEL}" || return 1
-  dybatpho::validate_log_level "${show_log_level}" || return 1
-
-  dybatpho::compare_log_level "${show_log_level}" || return 0
+  # A bad level, the threshold checked first, is reported and fails (1); a
+  # level that is merely filtered out returns quietly (0).
+  local __dybatpho_log_rank __dybatpho_log_threshold
+  __dybatpho_log_rank_into __dybatpho_log_threshold "${LOG_LEVEL,,}" \
+    || {
+      dybatpho::validate_log_level "${LOG_LEVEL}"
+      return 1
+    }
+  __dybatpho_log_rank_into __dybatpho_log_rank "${show_log_level,,}" \
+    || {
+      dybatpho::validate_log_level "${show_log_level}"
+      return 1
+    }
+  ((__dybatpho_log_rank <= __dybatpho_log_threshold)) || return 0
 
   # Counting logged messages is how the metrics module reports the error rate of
   # a run. The hook stays silent unless that optional module is loaded here.
@@ -227,18 +249,21 @@ function __dybatpho_log_timestamp {
 #   command under the mock directory of `dybatpho::mock_time`, under a Bats
 #   test directory, or under the temporary directory, which is where every
 #   mock this library knows of is written.
-# @noargs
+# @arg $1 string Optional: `date` or `busybox` to ask about that command alone
 # @exitcode 0 A stand-in is on `PATH`
 # @exitcode 1 Both commands are the system's, or missing
 # @internal
 #######################################
 function __dybatpho_log_date_is_stand_in {
-  # A shell function named like the command is the oldest way to stand in.
-  if declare -F date > /dev/null || declare -F busybox > /dev/null; then
-    return 0
-  fi
+  local -a __dybatpho_log_ts_names=(date busybox)
+  [[ -z "${1-}" ]] || __dybatpho_log_ts_names=("$1")
   local __dybatpho_log_ts_cmd __dybatpho_log_ts_dir
-  for __dybatpho_log_ts_cmd in "${BASH_CMDS[date]-}" "${BASH_CMDS[busybox]-}"; do
+  # A shell function named like the command is the oldest way to stand in.
+  for __dybatpho_log_ts_cmd in "${__dybatpho_log_ts_names[@]}"; do
+    declare -F "${__dybatpho_log_ts_cmd}" > /dev/null && return 0
+  done
+  for __dybatpho_log_ts_cmd in "${__dybatpho_log_ts_names[@]}"; do
+    __dybatpho_log_ts_cmd="${BASH_CMDS[${__dybatpho_log_ts_cmd}]-}"
     [[ -n "${__dybatpho_log_ts_cmd}" ]] || continue
     for __dybatpho_log_ts_dir in "${DYBATPHO_TEST_MOCK_DIR-}" "${BATS_MOCK_BINDIR-}" \
       "${BATS_TEST_TMPDIR-}" "${TMPDIR:-/tmp}"; do
@@ -247,6 +272,39 @@ function __dybatpho_log_date_is_stand_in {
     done
   done
   return 1
+}
+
+#######################################
+# @description Store the builtin clock's RFC 3339 stamp in a variable.
+#   `printf '%(...)T'` costs more the more the shell exports: every exported
+#   function and variable is walked on each call, so with the whole library
+#   loaded one stamp took about a millisecond. A stamp only changes once a
+#   second, so where Bash has `EPOCHSECONDS` (5.0 and later) the rendered one
+#   is kept, keyed by that second and by `TZ`, and reused until either moves.
+# @arg $1 string Name of the variable receiving the timestamp
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_builtin_stamp_into {
+  local -n __dybatpho_log_bs_out="$1"
+  local __dybatpho_log_bs_now="${EPOCHSECONDS-}"
+  if [[ -n "${__dybatpho_log_bs_now}" ]]; then
+    local __dybatpho_log_bs_key="${__dybatpho_log_bs_now}|${TZ+set}|${TZ-}"
+    if [[ "${__dybatpho_log_bs_key}" == "${__DYBATPHO_LOG_STAMP_KEY-}" ]]; then
+      __dybatpho_log_bs_out="${__DYBATPHO_LOG_STAMP}"
+      return 0
+    fi
+  else
+    __dybatpho_log_bs_now=-1
+  fi
+  # `%z` has no colon form in strftime; the offset is the last five
+  # characters and the colon goes in front of its minutes.
+  printf -v __dybatpho_log_bs_out '%(%Y-%m-%dT%H:%M:%S%z)T' "${__dybatpho_log_bs_now}"
+  __dybatpho_log_bs_out="${__dybatpho_log_bs_out:0:22}:${__dybatpho_log_bs_out:22}"
+  if [[ "${__dybatpho_log_bs_now}" != "-1" ]]; then
+    __DYBATPHO_LOG_STAMP_KEY="${__dybatpho_log_bs_key}"
+    __DYBATPHO_LOG_STAMP="${__dybatpho_log_bs_out}"
+  fi
 }
 
 #######################################
@@ -267,6 +325,39 @@ function __dybatpho_log_date_is_stand_in {
 #######################################
 function __dybatpho_log_timestamp_into {
   local -n __dybatpho_log_ts_out="$1"
+  # A stand-in resolves to a file under one of the directories
+  # `__dybatpho_log_date_is_stand_in` knows, so one can only be found when a
+  # `PATH` entry lies under one of them. That is worked out once per `PATH`;
+  # without such an entry, and without a function of either name, the clock is
+  # the builtin's and no `PATH` search runs at all -- `hash busybox` searches
+  # every entry on each call where busybox is missing, which cost more than the
+  # stamp itself. Comparing the whole `PATH` on every line costs tens of
+  # microseconds of its own, so a change is noticed the way Bash notices it:
+  # assigning `PATH` empties the command hash table, and with it the marker
+  # entry left there after the last look.
+  local __dybatpho_log_ts_dirs="${DYBATPHO_TEST_MOCK_DIR-}|${BATS_MOCK_BINDIR-}|${BATS_TEST_TMPDIR-}|${TMPDIR:-/tmp}"
+  if [[ -z "${BASH_CMDS[__dybatpho_log_ts_path]-}" ]] \
+    || [[ "${__dybatpho_log_ts_dirs}" != "${__DYBATPHO_LOG_TS_DIRS-}" ]]; then
+    __DYBATPHO_LOG_TS_WATCH=0
+    local __dybatpho_log_ts_entry __dybatpho_log_ts_dir
+    local -a __dybatpho_log_ts_entries=()
+    IFS=':' read -r -a __dybatpho_log_ts_entries <<< "${PATH}"
+    for __dybatpho_log_ts_entry in ${__dybatpho_log_ts_entries[@]+"${__dybatpho_log_ts_entries[@]}"}; do
+      for __dybatpho_log_ts_dir in "${DYBATPHO_TEST_MOCK_DIR-}" "${BATS_MOCK_BINDIR-}" \
+        "${BATS_TEST_TMPDIR-}" "${TMPDIR:-/tmp}"; do
+        [[ -n "${__dybatpho_log_ts_dir}" ]] || continue
+        [[ "${__dybatpho_log_ts_entry%/}/" == "${__dybatpho_log_ts_dir%/}/"* ]] && __DYBATPHO_LOG_TS_WATCH=1
+      done
+    done
+    __DYBATPHO_LOG_TS_DIRS="${__dybatpho_log_ts_dirs}"
+    # Without `hashall` the entry does not stick, and every line looks again.
+    BASH_CMDS[__dybatpho_log_ts_path]=/dev/null
+  fi
+  if ((__DYBATPHO_LOG_TS_WATCH == 0)) \
+    && ! { declare -F date || declare -F busybox; } > /dev/null; then
+    __dybatpho_log_builtin_stamp_into __dybatpho_log_ts_out
+    return 0
+  fi
   # `hash` fills BASH_CMDS without starting a process, and an empty entry is
   # what a command missing from PATH leaves.
   hash busybox 2> /dev/null || true
@@ -274,7 +365,9 @@ function __dybatpho_log_timestamp_into {
   local __dybatpho_log_ts_key="${PATH}|${BASH_CMDS[busybox]-}|${BASH_CMDS[date]-}"
   if [[ "${__dybatpho_log_ts_key}" != "${__DYBATPHO_LOG_TS_KEY-}" ]]; then
     if __dybatpho_log_date_is_stand_in; then
-      if [[ -n "${BASH_CMDS[busybox]-}" ]]; then
+      # A `date` stand-in is asked itself even where busybox is installed:
+      # it is what `dybatpho::mock_time` and the test mocks put on `PATH`.
+      if [[ -n "${BASH_CMDS[busybox]-}" ]] && ! __dybatpho_log_date_is_stand_in date; then
         __DYBATPHO_LOG_TS_FLAVOR=busybox
       elif date --version &> /dev/null; then
         __DYBATPHO_LOG_TS_FLAVOR=gnu
@@ -287,12 +380,7 @@ function __dybatpho_log_timestamp_into {
     __DYBATPHO_LOG_TS_KEY="${__dybatpho_log_ts_key}"
   fi
   case "${__DYBATPHO_LOG_TS_FLAVOR}" in
-    builtin)
-      # `%z` has no colon form in strftime; the offset is the last five
-      # characters and the colon goes in front of its minutes.
-      printf -v __dybatpho_log_ts_out '%(%Y-%m-%dT%H:%M:%S%z)T' -1
-      __dybatpho_log_ts_out="${__dybatpho_log_ts_out:0:22}:${__dybatpho_log_ts_out:22}"
-      ;;
+    builtin) __dybatpho_log_builtin_stamp_into __dybatpho_log_ts_out ;;
     busybox) __dybatpho_log_ts_out="$(busybox date +%Y-%m-%dT%H:%M:%S%:z)" ;;
     gnu) __dybatpho_log_ts_out="$(date --rfc-3339="seconds")" ;;
     *) __dybatpho_log_ts_out="$(date +%Y-%m-%dT%H:%M:%S%z)" ;;
@@ -550,16 +638,39 @@ function __dybatpho_log_structured {
 # @internal
 #######################################
 function __dybatpho_log_wanted {
-  local -A ranks=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
-  local level="${1,,}" threshold="${LOG_LEVEL,,}"
-  [[ -n "${level}" && -n "${ranks[${level}]+set}" ]] || return 0
-  [[ -n "${threshold}" && -n "${ranks[${threshold}]+set}" ]] || return 0
-  ((ranks[${level}] <= ranks[${threshold}])) && return 0
+  local level threshold
+  __dybatpho_log_rank_into level "${1,,}" || return 0
+  __dybatpho_log_rank_into threshold "${LOG_LEVEL,,}" || return 0
+  ((level <= threshold)) && return 0
   [[ -n "${LOG_FILE:-}" ]] || return 1
-  threshold="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
-  threshold="${threshold,,}"
-  [[ -n "${ranks[${threshold}]+set}" ]] || return 0
-  ((ranks[${level}] <= ranks[${threshold}]))
+  local file_threshold="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
+  __dybatpho_log_rank_into threshold "${file_threshold,,}" || return 0
+  ((level <= threshold))
+}
+
+#######################################
+# @description Store the rank of a lowercase log level, `fatal` 0 up to
+#   `trace` 5, so that a level is shown when its rank is at most the
+#   threshold's. A `case` costs a fraction of the table it replaces, which was
+#   built afresh on every log line.
+# @arg $1 string Name of the variable receiving the rank
+# @arg $2 string Lowercase log level
+# @set The named variable
+# @exitcode 0 The level is known
+# @exitcode 1 It is not; the variable is left alone
+# @internal
+#######################################
+function __dybatpho_log_rank_into {
+  local -n __dybatpho_log_rank_out="$1"
+  case "${2-}" in
+    trace) __dybatpho_log_rank_out=5 ;;
+    debug) __dybatpho_log_rank_out=4 ;;
+    info) __dybatpho_log_rank_out=3 ;;
+    warn) __dybatpho_log_rank_out=2 ;;
+    error) __dybatpho_log_rank_out=1 ;;
+    fatal) __dybatpho_log_rank_out=0 ;;
+    *) return 1 ;;
+  esac
 }
 
 #######################################
@@ -572,18 +683,40 @@ function __dybatpho_log_wanted {
 # @exitcode 1 The message level is filtered out
 #######################################
 function dybatpho::compare_log_level {
-  declare -A log_levels=([trace]=5 [debug]=4 [info]=3 [warn]=2 [error]=1 [fatal]=0)
   local level="$1"
   local runtime_level="${2:-${LOG_LEVEL}}"
   level="${level,,}"
   runtime_level="${runtime_level,,}"
 
-  dybatpho::validate_log_level "${runtime_level}" || return 1
-  dybatpho::validate_log_level "${level}" || return 1
-  local runtime_level_num="${log_levels[${runtime_level}]}"
-  local write_level_num="${log_levels[${level}]}"
+  # Spelled out rather than through `__dybatpho_log_rank_into`: this function is
+  # exported, and a child shell inherits it without the module's internals.
+  local runtime_level_num write_level_num
+  case "${runtime_level}" in
+    trace) runtime_level_num=5 ;;
+    debug) runtime_level_num=4 ;;
+    info) runtime_level_num=3 ;;
+    warn) runtime_level_num=2 ;;
+    error) runtime_level_num=1 ;;
+    fatal) runtime_level_num=0 ;;
+    *)
+      dybatpho::validate_log_level "${runtime_level}"
+      return 1
+      ;;
+  esac
+  case "${level}" in
+    trace) write_level_num=5 ;;
+    debug) write_level_num=4 ;;
+    info) write_level_num=3 ;;
+    warn) write_level_num=2 ;;
+    error) write_level_num=1 ;;
+    fatal) write_level_num=0 ;;
+    *)
+      dybatpho::validate_log_level "${level}"
+      return 1
+      ;;
+  esac
 
-  [[ "${write_level_num}" -le "${runtime_level_num}" ]]
+  ((write_level_num <= runtime_level_num))
 }
 
 #######################################
@@ -1297,12 +1430,13 @@ function __dybatpho_log_box {
 #######################################
 function dybatpho::validate_log_level {
   local level="${1,,}"
-  if [[ "${level}" =~ ^(trace|debug|info|warn|error|fatal)$ ]]; then
-    return 0
-  else
-    printf '%s is not a valid LOG_LEVEL, it should be trace|debug|info|warn|error|fatal\n' "${level}" >&2
-    return 1
-  fi
+  case "${level}" in
+    trace | debug | info | warn | error | fatal) return 0 ;;
+    *)
+      printf '%s is not a valid LOG_LEVEL, it should be trace|debug|info|warn|error|fatal\n' "${level}" >&2
+      return 1
+      ;;
+  esac
 }
 
 #######################################

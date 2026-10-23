@@ -168,11 +168,8 @@ SCRIPT
 }
 
 @test "__dybatpho_log_timestamp falls back to portable date flags" {
-  # This branch is only reachable where neither busybox nor GNU date exists.
-  # On a BusyBox system the first branch is the right one and wins, so the
-  # premise of this test cannot hold there — it used to read the real clock and
-  # fail rather than say so.
-  hash busybox 2> /dev/null && skip "busybox is installed, so this branch is unreachable"
+  # A `date` stand-in that is not GNU's is asked with portable flags, even on
+  # a BusyBox system: the stand-in, not busybox, is the clock being mocked.
   stub_repeated date ": case \"\$1\" in --version) exit 1 ;; *) echo '2024-02-29T12:34:56+0700' ;; esac"
   assert_equal "$(__dybatpho_log_timestamp)" "2024-02-29T12:34:56+0700"
 }
@@ -1204,4 +1201,68 @@ assert event["duration_ms"] >= 0
   run --separate-stderr dybatpho::progress_bar 10 wide
   assert_failure
   assert_stderr --partial "Width must be a whole number"
+}
+
+# Run a script in a fresh shell, from a file rather than `bash -c`: a `-c`
+# shell has an empty BASH_SOURCE, which the coverage hook trips over. The
+# first argument is the Bash to run it with.
+_logging_child() {
+  local shell="$1" script="${BATS_TEST_TMPDIR}/logging-child.sh"
+  shift
+  printf '%s\n' ". '${DYBATPHO_DIR}/init.sh'" "$@" > "${script}"
+  "${shell}" "${script}"
+}
+
+@test "the log timestamp follows a TZ change within the same second" {
+  # The builtin stamp is kept for the rest of its second, keyed by `TZ` too, so
+  # switching zones between two lines must not hand back the old offset.
+  [[ -n "${EPOCHSECONDS-}" ]] || skip "Bash ${BASH_VERSION} has no EPOCHSECONDS, so nothing is kept"
+  # shellcheck disable=SC2016 # expanded by the child shell
+  run_traced _logging_child "${BASH}" "a= b= c=" \
+    "export TZ=UTC0" "__dybatpho_log_builtin_stamp_into a" \
+    "TZ=XXX-7" "__dybatpho_log_builtin_stamp_into b" "__dybatpho_log_builtin_stamp_into c" \
+    'printf "%s|%s|%s" "${a}" "${b}" "${c}"'
+  assert_success
+  local stamp='[0-9-]{10}T[0-9:]{8}'
+  [[ "${output}" =~ ^${stamp}\+00:00\|${stamp}\+07:00\|${stamp}\+07:00$ ]]
+}
+
+@test "the log timestamp skips the PATH search when no stand-in can be on PATH" {
+  # Without a PATH entry under a temporary or mock directory nothing there can
+  # stand in for `date`, so `busybox` is never looked for -- a missing one used
+  # to cost a search of every PATH entry on every line.
+  # shellcheck disable=SC2016 # expanded by the child shell
+  run_traced _logging_child "${BASH}" "unset BATS_MOCK_BINDIR BATS_TEST_TMPDIR DYBATPHO_TEST_MOCK_DIR" \
+    "TMPDIR=/nonexistent-tmp PATH=/usr/bin:/bin" "x=" "__dybatpho_log_timestamp_into x" \
+    'printf "%s|%s|%s" "${__DYBATPHO_LOG_TS_WATCH}" "${BASH_CMDS[busybox]-unsearched}" "${x}"'
+  assert_success
+  [[ "${output}" =~ ^0\|unsearched\|[0-9-]{10}T[0-9:]{8}[+-][0-9]{2}:[0-9]{2}$ ]]
+}
+
+@test "the log timestamp still finds a stand-in added to PATH after a line was logged" {
+  local shim="${BATS_TEST_TMPDIR}/later"
+  mkdir -p "${shim}"
+  printf '#!/bin/sh\necho 2024-02-29T12:34:56+0700\n' > "${shim}/date"
+  chmod +x "${shim}/date"
+  # shellcheck disable=SC2016 # expanded by the child shell
+  run_traced _logging_child "${BASH}" "x=" "__dybatpho_log_timestamp_into x" \
+    "PATH='${shim}':\"\${PATH}\"" "__dybatpho_log_timestamp_into x" 'printf "%s" "${x}"'
+  assert_success
+  assert_output "2024-02-29T12:34:56+0700"
+}
+
+@test "__dybatpho_log reports an unknown or uppercase level instead of aborting under nounset" {
+  # The colour table used to be indexed by the raw level before it was
+  # validated, so `set -u` stopped the script with "unbound variable".
+  # shellcheck disable=SC2016 # expanded by the child shell
+  run_traced --separate-stderr _logging_child "${BASH}" "set -u" \
+    'NO_COLOR=1 __dybatpho_log INFO shown stdout; echo "rc=$?"' \
+    '__dybatpho_log bogus hidden stdout || echo "rc=$?"'
+  assert_success
+  assert_output --partial "shown"
+  assert_output --partial "rc=0"
+  assert_output --partial "rc=1"
+  refute_output --partial "hidden"
+  assert_stderr --partial "bogus is not a valid LOG_LEVEL"
+  refute_stderr --partial "unbound variable"
 }

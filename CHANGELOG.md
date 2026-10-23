@@ -60,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--help` of a typical multi-command CLI drops from about 350 ms to about
   150 ms. The generated parser and every artifact are byte-identical.
 
+- **`logging` — a log line costs a third of what it did.** The timestamp is
+  rendered at most once per second, no `PATH` search runs when nothing stands
+  in for `date`, and level checks no longer build tables per line.
+  `dybatpho::info` drops from about 1.4 ms to 0.5 ms with every module loaded.
+
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
@@ -293,6 +298,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Héllo` slugified to `hssullo`. `dybatpho::string_wrap` keeps text after the
   first newline whatever `IFS` holds, and `dybatpho::url_encode` writes `é` as
   `%C3%A9` on Alpine/musl.
+
+- **`logging` — an internal log call with an uppercase or unknown level no
+  longer aborts under `set -u`.**
+
+- **`logging` — a `date` stand-in is asked on a BusyBox system.** With
+  busybox installed, the log timestamp came from `busybox date` even when
+  `dybatpho::mock_time` or a test had put its own `date` first on `PATH`, so
+  the frozen clock was ignored on Alpine.
 
 ### Security
 

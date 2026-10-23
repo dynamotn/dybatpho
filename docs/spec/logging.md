@@ -422,10 +422,12 @@ dybatpho::log_context clear
 - **FR-036**: The display-width string cache MUST be bounded, so a long run
   measuring endless distinct strings does not grow without limit.
 - **FR-037**: A command run by `spinner` MUST see the caller's variables: the spinner MUST keep its state in prefixed locals.
-- **FR-038**: The timestamp of a log line MUST come from the `printf '%(...)T'` builtin, in RFC 3339 form with a `T` and a colon in the offset, unless `date` or `busybox` is a shell function or resolves under the mock, Bats or temporary directory, in which case that stand-in MUST be asked.
+- **FR-038**: The timestamp of a log line MUST come from the `printf '%(...)T'` builtin, in RFC 3339 form with a `T` and a colon in the offset, unless `date` or `busybox` is a shell function or resolves under the mock, Bats or temporary directory, in which case that stand-in MUST be asked; a `date` stand-in MUST be asked even where `busybox` is installed.
 - **FR-039**: `__dybatpho_log_now_ms_into` MUST read `EPOCHREALTIME` whatever decimal separator the locale writes it with.
 - **FR-040**: A spinner animation MUST end itself and restore the cursor once the shell that started it is gone.
 - **FR-041**: `dybatpho::progress_bar` MUST refuse a percentage or width that is not made of digits, before any arithmetic, and read one with leading zeros in base ten.
+- **FR-042**: Where Bash has `EPOCHSECONDS`, the builtin timestamp MUST be rendered at most once per second and `TZ` value, and MUST follow a change of either. When no `PATH` entry lies under the mock, Bats or temporary directory and neither `date` nor `busybox` is a shell function, taking a timestamp MUST NOT search `PATH`; a stand-in put on `PATH` later MUST still be found.
+- **FR-043**: An internal log call with a level outside the six known ones MUST report it as invalid and fail, and one with an uppercase level MUST be read case-insensitively, rather than stopping the script on an unbound variable under `set -u`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -542,6 +544,9 @@ dybatpho::log_context clear
 - **IT-026**: Read the timestamp with the system `date` and match `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$`; put a `date` shim under the temporary directory first on `PATH` and see it called.
 - **IT-027**: Under `LC_ALL=de_DE.UTF-8`, read the time in milliseconds and get thirteen digits.
 - **IT-028**: Draw `08` of 50 and get four marks; pass an array subscript holding a command and see the call fail without running it; pass a width of `wide` and see it refused.
+- **IT-029**: Take two builtin stamps in the same second under `TZ=UTC0` and then `TZ=XXX-7`, and get `+00:00` then `+07:00`.
+- **IT-030**: With a `PATH` free of temporary and mock directories, take a timestamp and see `busybox` never searched; take one, put a `date` shim first on `PATH`, and see the next stamp come from it.
+- **IT-031**: Under `set -u`, log at `INFO` and see the line; log at `bogus` and see the invalid-level message and status 1, not an unbound-variable abort.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -417,10 +417,13 @@ function __dybatpho_array_set_op_into {
   __dybatpho_array_set_out=()
   for __dybatpho_array_set_value in ${__dybatpho_array_set_values[@]+"${__dybatpho_array_set_values[@]}"}; do
     [[ -n "${__dybatpho_array_set_value}" ]] || continue
-    [[ -v "__dybatpho_array_set_seen[${__dybatpho_array_set_value}]" ]] && continue
+    # `${name[key]+set}` rather than `-v "name[key]"`: before Bash 5.2, `-v`
+    # expands the subscript again, so a value holding `$(...)` ran as a command
+    # and one holding `]` was never found.
+    [[ -n "${__dybatpho_array_set_seen[${__dybatpho_array_set_value}]+set}" ]] && continue
     case "${__dybatpho_array_set_mode}" in
-      intersect) [[ -v "__dybatpho_array_set_other[${__dybatpho_array_set_value}]" ]] || continue ;;
-      difference) [[ -v "__dybatpho_array_set_other[${__dybatpho_array_set_value}]" ]] && continue ;;
+      intersect) [[ -n "${__dybatpho_array_set_other[${__dybatpho_array_set_value}]+set}" ]] || continue ;;
+      difference) [[ -n "${__dybatpho_array_set_other[${__dybatpho_array_set_value}]+set}" ]] && continue ;;
       *) ;;
     esac
     __dybatpho_array_set_seen["${__dybatpho_array_set_value}"]=1

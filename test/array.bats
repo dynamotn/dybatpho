@@ -784,3 +784,28 @@ EOF
   dybatpho::array_slice items 00 08
   assert_equal "${items[*]}" "a b c d e f g h"
 }
+
+@test "the set operations treat any value as data, never as code" {
+  # Before Bash 5.2, `[[ -v "seen[$value]" ]]` expanded the value again: a
+  # value holding `$(...)` ran it, and one holding `]` was never found, so it
+  # stayed duplicated and was never subtracted.
+  local marker="${BATS_TEST_TMPDIR}/ran"
+  local -a values=("x\$(touch ${marker})" 'a]b' 'a]b' 'q' 'q')
+  local -a other=('a]b')
+  local -a copy=("${values[@]}")
+
+  dybatpho::array_unique values
+  assert_equal "${#values[@]}" 3
+  assert_equal "${values[1]}" 'a]b'
+
+  dybatpho::array_difference copy other
+  assert_equal "${#copy[@]}" 2
+  assert_equal "${copy[1]}" 'q'
+
+  copy=("x\$(touch ${marker})" 'a]b' 'q')
+  dybatpho::array_intersect copy other
+  assert_equal "${#copy[@]}" 1
+  assert_equal "${copy[0]}" 'a]b'
+
+  [[ ! -e "${marker}" ]]
+}

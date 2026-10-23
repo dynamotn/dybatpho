@@ -57,6 +57,8 @@ function add_locals(text,   rest, count, i, word, toks) {
   gsub(/"[^"]*"/, "", rest)
   gsub(/'[^']*'/, "", rest)
   gsub(/\([^()]*\)/, "", rest)
+  # A trailing comment, such as `# kcov(skip)`, names nothing.
+  sub(/[ \t]+#.*$/, "", rest)
   count = split(rest, toks, /[ \t]+/)
   for (i = 1; i <= count; i++) {
     word = toks[i]

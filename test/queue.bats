@@ -715,7 +715,10 @@ SCRIPT
     printf '%s\n' "$1" >> "${pauses}"
     command sleep 0.01
   }
-  DYBATPHO_QUEUE_TIMEOUT=1 run --separate-stderr dybatpho::queue_push "${QUEUE}" blocked
+  # Two seconds, not one: the wait reads whole seconds, so a one-second wait
+  # ends at the next tick, and a first attempt that straddled it gave up
+  # without a single pause on a slow runner.
+  DYBATPHO_QUEUE_TIMEOUT=2 run --separate-stderr dybatpho::queue_push "${QUEUE}" blocked
   unset -f sleep
   kill "${holder}" 2> /dev/null || true
   rm -f "${QUEUE}/.lock"

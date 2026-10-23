@@ -20,27 +20,101 @@ the script's own tests after each step.
 
 ### Module tiers
 
-<!-- 7.0: tiers -->
+Nothing breaks. Every module now reports a tier: `stable` modules keep their
+public contract across minor releases, `experimental` ones may change in any
+minor release. Check what a script depends on with
+`dybatpho::module_list experimental` or `dybatpho::doctor`, and pin the library
+version more tightly if it leans on experimental modules.
+
+Functions that used to stop with `… needs the X module, load it with:
+dybatpho::load X` now load `X` on demand and succeed. A test that matched the
+old message must change. A module loaded on demand inside `$(...)` is gone with
+that subshell, so name it in `--modules` when such a call sits on a hot path. A
+bundle that does not carry the module still stops; regenerate it with
+`scripts/bundle.sh --with-soft-deps`.
 
 ### Exported functions
 
-<!-- 7.0: export -->
+Child processes no longer see dybatpho functions. A script whose `bash -c`,
+`xargs bash -c`, `find -exec bash -c` or `timeout bash -c` children call the
+library opts in, before or after sourcing:
+
+```sh
+DYBATPHO_EXPORT_FUNCTIONS=true . lib/dybatpho/init.sh --modules semver
+# or, after sourcing:
+dybatpho::export_functions
+```
+
+Each non-interactive Bash child then sources the whole library, internal
+helpers included, so calls that used to fail or answer wrongly in a child now
+work. A `BASH_ENV` the script already set is still sourced first.
 
 ### Strict mode
 
-<!-- 7.0: strict -->
+| 6.x | 7.0 | Fix |
+| --- | --- | --- |
+| `nullglob` and `globstar` on after sourcing | both left as the caller had them | add `shopt -s nullglob globstar` after sourcing, or guard glob loops with `[[ -e "${f}" ]] \|\| continue` |
+| a failed bootstrap ran `exit 1` | it returns 1 | under `set -e` nothing changes; otherwise write `. init.sh --modules … \|\| exit 1` |
+| no way to keep your own options | `--no-strict` leaves every `set` and `shopt` option alone | `. init.sh --no-strict --modules …` (the option goes first, like `--modules`) |
+
+Bundles behave the same way.
 
 ### JSON and YAML
 
-<!-- 7.0: json -->
+Every filter passed to `json_query`, `json_has`, `json_eval`, `json_get`,
+`yaml_query`, `yaml_has` and the `testing` JSON/YAML assertions is now a `jq`
+filter, run by `jq` even when `yq` is installed. `jq` is required for every
+JSON helper but `dybatpho::json_string`; the Go `yq` v4 only for YAML, and the
+Python `yq` is refused by name.
+
+| yq syntax | jq |
+| --- | --- |
+| `strenv(X)`, `env(X)` | `$ENV.X`, or `--arg x "${X}"` and `$x` (extra arguments go to `jq`) |
+| `downcase`, `upcase` | `ascii_downcase`, `ascii_upcase` |
+| `.[] as $x ireduce (init; f)` | `reduce .[] as $x (init; f)` |
+| `tag == "!!map"` (`!!seq`, `!!str`, `!!int`, `!!null`) | `type == "object"` (`array`, `string`, `number`, `null`) |
+| `to_json`, `from_json` | `tojson`, `fromjson` |
+| `with(path; f)` | `path \|= f` |
+| `keys` in document order | `keys_unsorted` (`keys` is sorted now) |
+| `eval`, `-o=json`, `-P`, `-I=0` passed as extra arguments | drop them; use `dybatpho::json_to_yaml` for YAML output |
+
+`json_get` prints objects and arrays as JSON, `json_has`/`yaml_has` return 1 for
+`false`, `null` or no output, and `csv_from_json`, `table_from_json` and the
+YAML/TOML paths of `config_load` need `jq` too (YAML hexadecimal integers load
+as their decimal value).
 
 ### Environment variables
 
-<!-- 7.0: env -->
+| 6.x name | 7.0 name | Notes |
+| --- | --- | --- |
+| `LOG_LEVEL`, `LOG_FORMAT`, `LOG_FILE`, `LOG_FILE_LEVEL`, `LOG_FILE_MAX_BYTES`, `LOG_FILE_MAX_BACKUPS`, `LOG_REQUEST_ID` | `DYBATPHO_LOG_*` | the bare name is still read when the prefixed one is unset or empty |
+| `DRY_RUN` | `DYBATPHO_DRY_RUN` | `DYBATPHO_DRY_RUN=false` overrides an inherited `DRY_RUN=true` |
+| `UPDATE_SNAPSHOTS` | `DYBATPHO_TEST_UPDATE_SNAPSHOTS` | the prefixed switch wins |
+
+The library no longer assigns or exports any of these, nor `NO_COLOR`, nor its
+own defaults and state (`DYBATPHO_SPINNER*`, `DYBATPHO_TUI_*`, …). Children no
+longer inherit the log level, the request ID or the results of
+`dybatpho::log_to_file` and `dybatpho::cli_apply_verbosity`: export the
+`DYBATPHO_` names yourself where a child should share them, and read
+`$DYBATPHO_LOG_LEVEL` / `$DYBATPHO_LOG_FILE` after those helpers instead of the
+bare names. With no file level set, the file threshold follows the current log
+level.
 
 ### Evaluated arguments
 
-<!-- 7.0: eval -->
+The single shell-string forms still work in 7.0 but are deprecated and go in
+the next major. Each one runs its string through `eval`, so data interpolated
+into it is code:
+
+| Deprecated | Use |
+| --- | --- |
+| `dybatpho::retry 3 "curl -fsSL '${url}'" desc` | `dybatpho::retry 3 desc -- curl -fsSL "${url}"` |
+| `dybatpho::retry_until 5 2 "test -S ${s}"` | `dybatpho::retry_until 5 2 -- test -S "${s}"` |
+| `dybatpho::assert '[[ -f $f ]]' msg` | `dybatpho::assert msg -- test -f "${f}"` |
+| `dybatpho::circuit_breaker k "cmd"` | `dybatpho::circuit_breaker k -- cmd` |
+| `dybatpho::debug_command m "cmd"` | `dybatpho::debug_command m -- cmd` |
+| `dybatpho::parallel_run 3 "a b" "c"` | `local -a j1=(a b) j2=(c); dybatpho::parallel_run --argv 3 j1 j2` |
+| `dybatpho::dry_run "rm -rf ${p}"` | `dybatpho::dry_run -- rm -rf -- "${p}"` |
 
 ### Plural categories
 

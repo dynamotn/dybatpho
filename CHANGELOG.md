@@ -11,7 +11,181 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Added
+
+- **`init` — `dybatpho::export_functions` and `DYBATPHO_EXPORT_FUNCTIONS=true`
+  hand the whole library to child Bash processes.** Every non-interactive Bash
+  child (`bash -c`, `xargs`, `find -exec bash`) sources the library through
+  `BASH_ENV`, with the parent's module set, internal helpers and module state,
+  and its own `set`/`shopt` options left alone. A previous `BASH_ENV` is still
+  sourced first, and `dybatpho::load` keeps the exported module set current.
+
+- **`init` — `--no-strict` sources the library without touching the caller's
+  `set` or `shopt` options.** Write `. init.sh --no-strict --modules git`; the
+  core modules work without errexit, nounset, pipefail, `extglob` or
+  `nullglob`.
+
+- **`process` — `dybatpho::try` survives a failing command, a
+  `dybatpho::die` or an `exit` included.** `dybatpho::try out err -- cmd
+  args...` runs the command in a subshell, captures its standard output and
+  error into the two named variables and returns its status:
+  `if dybatpho::try version error -- dybatpho::semver_bump "${v}" minor; then`.
+
+- **`init`, `doctor` — every module has a stability tier.** A `stable` module
+  keeps its public contract across minor releases and deprecates a function for
+  at least one minor release before removing it; an `experimental` module may
+  change in any minor release. `dybatpho::module_tier json` prints a tier,
+  `dybatpho::module_list stable|experimental` lists one, `dybatpho::doctor`
+  shows the tier and each module's on-demand dependencies (`tiers` and
+  `soft_dependencies` in `--json`), and the README tables carry it.
+
+- **`math` — exact arithmetic into a variable, without a subshell.**
+  `dybatpho::math_add_into`, `math_sub_into`, `math_mul_into`, `math_div_into`,
+  `math_compare_into` and `math_round_into` set the named variable to exactly
+  what the printing form would print, so a loop no longer pays for a `$(...)`
+  per step.
+
+- **`csv`, `math` — `DYBATPHO_CSV_ENGINE` and `DYBATPHO_MATH_ENGINE` pick the
+  engine.** `auto` (the default) runs large inputs through `awk` when it is
+  installed, `awk` uses it for any input, and `bash` never does. The output is
+  the same byte for byte either way.
+
+- **`helpers`, `logging`, `network`, `parallel` — argument-vector forms for
+  the APIs that took a shell string.** `dybatpho::retry 3 "health check" --
+  curl -fsSL "${url}"`, `dybatpho::retry_until 5 2 -- test -S "${socket}"`,
+  `dybatpho::assert "config must exist" -- test -f "${config}"`,
+  `dybatpho::debug_command MESSAGE -- cmd`, `dybatpho::circuit_breaker KEY --
+  cmd` and `dybatpho::parallel_run --argv N job1 job2` (each job an array) run
+  the command exactly as given, never through `eval`.
+
+- **`scripts/bundle.sh --with-soft-deps` — bundle the modules a selection
+  loads on demand.** Without it the bundler names the ones it left out, and a
+  bundle answers `dybatpho::module_tier` too.
+
+- **`scripts/test.sh` — parallel runs without GNU parallel.** The suite is
+  shared out to `--jobs` background Bats workers and merged into the same
+  table and totals; `--shards` forces it. The suite went from about 33 minutes
+  to about 4 on a 14-core Mac.
+
+- **`scripts/i18n_cldr.sh` — regenerate and audit the locale tables against
+  Unicode CLDR.** Given an unpacked
+  [cldr-json](https://github.com/unicode-org/cldr-json) release, it prints the
+  plural, number, currency, layout, name and date tables of `src/i18n.sh`, or
+  with `--check` lists every value that differs; deliberate deviations live in
+  `scripts/i18n_cldr.allow`.
+
+- **`scripts/changelog_archive.sh` — old releases move out of
+  `CHANGELOG.md`.** `--before <version>` moves every older release into
+  `docs/changelog/CHANGELOG-<major>.x.md` and indexes them at the top of this
+  file; releases before 6.0.0 now live there, and `scripts/lint.sh` checks the
+  archives by the same rules.
+
+- **`docs/MIGRATING.md` and a versioning policy.** Each major version's
+  breaking changes and the edit that fixes each one are in one place, and the
+  README states what the public API is, how deprecations are announced and that
+  breaking changes wait for a planned major.
+
+- **CI runs the suite on Bash 4.3, 4.4, 5.0 and 5.1.** The `bash-versions` job
+  uses the official `bash:` images, so the supported floor is tested rather
+  than claimed.
+
 ### Changed
+
+- **BREAKING: `init` — functions are no longer exported to child
+  processes.** Exporting every `dybatpho::` function made each child about four
+  times slower to start, could overflow the environment of `find -exec … +`,
+  and left children with public functions whose helpers were missing, some of
+  which then answered wrongly with status 0. Set
+  `DYBATPHO_EXPORT_FUNCTIONS=true` before sourcing, or call
+  `dybatpho::export_functions`, where a child needs the library.
+
+- **BREAKING: `init` — `nullglob` and `globstar` are no longer turned on in
+  the sourcing shell.** Strict mode (`set -euo pipefail`, `inherit_errexit`)
+  and `extglob` stay on by default. An unmatched glob in your script now stays
+  literal; add `shopt -s nullglob globstar` after sourcing if it relied on
+  them.
+
+- **BREAKING: `init` — a failed bootstrap returns 1 instead of exiting the
+  sourcing shell.** An unsupported Bash, an unknown module or an unresolvable
+  path no longer closes an interactive shell. A script under `set -e` still
+  stops; otherwise write `. init.sh --modules … || exit 1`.
+
+- **BREAKING: `json` — every filter is a `jq` filter, run by `jq`.**
+  `dybatpho::json_query`, `json_has`, `json_eval`, `json_get`, `yaml_query`,
+  `yaml_has` and the `testing` JSON and YAML assertions no longer hand the
+  filter to whichever of `yq` or `jq` is found first, so the same call prints
+  the same result on every machine: `keys` is sorted, `add`, `?` and `def`
+  work, and numbers are not reformatted. Rewrite yq-only syntax (`downcase` is
+  `ascii_downcase`, `strenv(NAME)` is `$ENV.NAME`).
+
+- **BREAKING: `json`, `csv` — `jq` is required, `yq` only for YAML.** The JSON
+  helpers stop with exit code 127 naming `jq` when it is missing, even with
+  `yq` installed, and `dybatpho::csv_from_json` lost its `yq` fallback. The Go
+  `yq` v4 is needed only to read and edit YAML, and the Python `yq` or a Go
+  `yq` older than v4 is refused by name.
+
+- **BREAKING: `logging` — settings are `DYBATPHO_LOG_*` and are no longer
+  exported.** `DYBATPHO_LOG_LEVEL`, `DYBATPHO_LOG_FORMAT`, `DYBATPHO_LOG_FILE`,
+  `DYBATPHO_LOG_FILE_LEVEL`, `DYBATPHO_LOG_FILE_MAX_BYTES`,
+  `DYBATPHO_LOG_FILE_MAX_BACKUPS` and `DYBATPHO_LOG_REQUEST_ID` are the
+  canonical names; the bare `LOG_*` names are still read when the prefixed one
+  is unset or empty. Loading the library no longer assigns or exports any of
+  them, nor `NO_COLOR`, which it used to export empty and so turned colour off
+  in child tools. Export them yourself to share them with child processes.
+
+- **BREAKING: `process` — dry-run mode is `DYBATPHO_DRY_RUN`, and `DRY_RUN`
+  is no longer exported.** Every module that honours dry-run mode reads
+  `DYBATPHO_DRY_RUN` first and `DRY_RUN` as a fallback, so
+  `DYBATPHO_DRY_RUN=false` turns off an inherited `DRY_RUN=true`.
+
+- **BREAKING: `testing` — `DYBATPHO_TEST_UPDATE_SNAPSHOTS` wins over
+  `UPDATE_SNAPSHOTS`**, and neither is assigned or exported by the library.
+
+- **BREAKING: library-wide — configuration defaults and state are no longer
+  exported.** `DYBATPHO_SPINNER*`, `DYBATPHO_TIMER_LAST_MS`,
+  `DYBATPHO_TIMEOUT_KILL_AFTER`, `DYBATPHO_TUI_*`, `DYBATPHO_SCREEN_*`, the
+  semver, version-scan and math regexes and `DYBATPHO_MATH_MAX_EXPONENT` are
+  plain shell variables; a value you exported yourself stays exported.
+
+- **BREAKING: `i18n` — plural rules follow CLDR for more languages.**
+  `dybatpho::i18n_plural_form` counts zero as singular in Zulu, Kannada,
+  Gujarati, Punjabi, Sinhala, Armenian and Northern Sotho, answers `other`
+  instead of `many` in Serbian, Croatian and Bosnian, and gives Maltese its
+  dual (`two`). A catalog that supplied `many` for Serbian or `few` for Maltese
+  two must use `other` and `two`.
+
+- **Soft dependencies load on demand instead of stopping the script.** A
+  function that needs a module its own module does not load now loads it the
+  first time it runs — `dybatpho::csv_to_json` loads `json`,
+  `dybatpho::safe_extract` loads `archive`, `dybatpho::require cmd '>=1.2'`
+  loads `semver`, and so on for every on-demand dependency `dybatpho::doctor`
+  lists. The script stops, naming the function and the module, only when the
+  module cannot be loaded. A module loaded inside `$(...)` lasts only as long
+  as that subshell.
+
+- **`csv` — bulk operations run as one `awk` program on large inputs.** From
+  about 2 KB of input, reading, `csv_header`, `csv_col`, `csv_select`,
+  `csv_filter`, `csv_sort`, `csv_convert` and `csv_to_json` run through POSIX
+  `awk` (gawk, mawk, BusyBox and BSD all work) with output identical to the
+  Bash engine's: 5,000 rows convert to JSON in about 0.06 s instead of 8 s.
+
+- **`math` — the list aggregates and short operands are fast and still
+  exact.** `math_sum`, `math_avg`, `math_min`, `math_max`, `math_median`,
+  `math_percentile` and `math_stddev` run through `awk` from 32 values up, on
+  integer limbs and never binary floats: 5,000 decimals sum in about 0.03 s
+  instead of 4 s with the same digits. Operands up to 17 significant digits
+  use Bash's own arithmetic.
+
+- **`json` — `yaml_query` prints each result as YAML, one scalar per line**,
+  `yaml_to_json` lays its JSON out exactly as `dybatpho::json_pretty` does, and
+  `json_has` and `yaml_has` return 1 for a filter with no output.
+
+- **`config` — YAML and TOML files are flattened by the same `jq` filter as
+  JSON**, so `dybatpho::config_load` reads the same keys and values from all
+  three.
+
+- **`logging` — `dybatpho::validate_log_level` says "is not a valid log
+  level"** instead of naming `LOG_LEVEL`.
 
 - **`logging` — a log line reads the clock without starting a process.** The
   timestamp on every `dybatpho::info`, `warn`, `error` and friends now comes
@@ -121,6 +295,17 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `dybatpho::csv_to_json` is about fifteen times faster and
   `dybatpho::metrics_render` about ten times faster. Snapshot scrubs run in a
   single `sed`, about three times faster with several scrubs registered.
+
+### Deprecated
+
+- **`helpers`, `logging`, `network`, `parallel`, `process` — single
+  shell-string command forms.** `dybatpho::retry N "cmd"`,
+  `dybatpho::retry_until N D "cmd"`, `dybatpho::assert "cond"`,
+  `dybatpho::debug_command MSG "cmd"`, `dybatpho::circuit_breaker KEY "cmd"`,
+  `dybatpho::parallel_run N "cmd"...` and `dybatpho::dry_run "cmd"` still work
+  but run through `eval`, so any value interpolated into the string is parsed as
+  code. Use the `--` forms (`--argv` for `parallel_run`); the string forms go in
+  the next major release.
 
 ### Fixed
 
@@ -453,6 +638,22 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   with both jq and yq. `dybatpho::config_save` no longer writes `port = 0080`,
   which it could not load back.
 
+- **`csv` — a value holding invalid UTF-8 is no longer lost under a UTF-8
+  locale.** Bash's pattern matching returned an empty string for it, so
+  `dybatpho::csv_read` and every reader built on it gave back an empty row.
+
+- **`i18n` — locale data that disagreed with CLDR.** Polish percent is `42%`;
+  Hebrew, Arabic and Bengali put the currency symbol after the amount; the
+  Bahraini dinar is no longer reversed, and the UAE dirham, Kuwaiti dinar and
+  Tunisian dinar get their closing period; Russian and Polish digit groups use
+  a no-break space.
+
+- **`diff` — `dybatpho::diff_yaml` says that `yq` is missing** instead of
+  ending the script silently.
+
+- **`bundle` — `dybatpho::load` with no module name stops the script inside a
+  bundle**, as it does outside one.
+
 ### Security
 
 - **Arithmetic no longer runs a command passed as a number.**
@@ -488,6 +689,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`network`, `forge`, `ai` — tokens stay out of `set -x` traces.** Secret
   headers, forge tokens and AI API keys were printed many times per request
   while a script was traced; tracing is suspended while they are handled.
+
+- **`notification`, `cli` — no caller data is interpolated into evaluated
+  strings.** The circuit-breaker path of the notifiers and the generator's
+  debug dump pass their command as an argument vector.
 
 ## [6.0.1] - 2026-10-04
 

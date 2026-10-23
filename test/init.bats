@@ -569,7 +569,9 @@ bash $(printf '%q' "${child}")"
   local module dep marker script
   for module in "${!__dybatpho_module_soft_deps[@]}"; do
     for dep in ${__dybatpho_module_soft_deps[${module}]}; do
-      marker="$(sed -nE 's/^function (__dybatpho_[a-z_0-9]+) .*/\1/p' "${DYBATPHO_DIR}/src/${dep}.sh" | head -n 1)"
+      # `sed` quits at the first match itself: `| head` would end it with
+      # SIGPIPE, which `pipefail` turns into a failure on a slow host.
+      marker="$(sed -nE '/^function __dybatpho_/{s/^function (__dybatpho_[a-z_0-9]+) .*/\1/p;q;}' "${DYBATPHO_DIR}/src/${dep}.sh")"
       script="${BATS_TEST_TMPDIR}/soft-${module}-${dep}.sh"
       {
         printf '%s\n' "${PRISTINE}"

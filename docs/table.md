@@ -204,4 +204,4 @@ kubectl get pods -o json | jq '[.items[] | {name: .metadata.name, phase: .status
 
 - `0`: The table was rendered
 - `1`: The style is unknown, or the document is not an array of objects
-- `127`: Neither `jq` nor `yq` is installed
+- `127`: `jq` is not installed

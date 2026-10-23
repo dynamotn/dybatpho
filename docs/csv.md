@@ -463,4 +463,4 @@ dybatpho::csv_from_json pods.json > pods.csv
 
 - `0`: The conversion succeeded
 - `1`: The document is not an array of objects
-- `127`: Neither `yq` nor `jq` is installed
+- `127`: `jq` is not installed

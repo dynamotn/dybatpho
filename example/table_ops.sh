@@ -36,10 +36,10 @@ function _main {
   dybatpho::table_from_csv $'owner,cost\n"Doe, John",120\n"O""Brien, Pat",45' box
 
   dybatpho::header "JSON TABLE"
-  if dybatpho::command_exists_all jq || dybatpho::command_exists_all yq; then
+  if dybatpho::command_exists_all jq; then
     dybatpho::table_from_json '[{"service":"api","replicas":3},{"service":"worker"}]' markdown
   else
-    dybatpho::warn "Neither jq nor yq is installed; skipping the JSON table"
+    dybatpho::warn "jq is not installed; skipping the JSON table"
   fi
 
   dybatpho::success "Table operations demo complete"

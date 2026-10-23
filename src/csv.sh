@@ -1027,7 +1027,7 @@ function dybatpho::csv_to_json {
 # @description Stop unless the `json` module is loaded.
 #   Encoding each value as a JSON string is the `json` module's work, and only
 #   the conversion to JSON does it: reading, filtering, sorting, joining and
-#   the conversion from JSON, which runs `jq` or `yq` itself, need nothing from
+#   the conversion from JSON, which runs `jq` itself, need nothing from
 #   it. Registering it as a dependency would load it into every script that
 #   only reads a spreadsheet -- and into every `table` that renders one -- so
 #   the conversion asks for it instead.
@@ -1052,7 +1052,7 @@ function __dybatpho_csv_need_json {
 # @stdout CSV text
 # @exitcode 0 The conversion succeeded
 # @exitcode 1 The document is not an array of objects
-# @exitcode 127 Neither `yq` nor `jq` is installed
+# @exitcode 127 `jq` is not installed
 # @example
 #   dybatpho::csv_from_json pods.json > pods.csv
 #######################################
@@ -1063,34 +1063,27 @@ function dybatpho::csv_from_json {
   local delimiter
   __dybatpho_csv_delimiter_into delimiter "${DYBATPHO_CSV_DELIMITER}"
 
-  local command_name
-  command_name=$(dybatpho::coalesce_cmd jq yq) \
-    || dybatpho::die "${FUNCNAME[0]}: Neither jq nor yq is installed" 127
+  dybatpho::is command jq \
+    || dybatpho::die "${FUNCNAME[0]}: jq is not installed" 127
 
   local text
   __dybatpho_string_input_into text "${input}" files
 
-  # Both backends are asked for CSV and the result is then read back and
-  # written out by this module, so the quoting a caller sees comes from one
-  # place no matter which command was available.
+  # `jq` is asked for CSV and the result is then read back and written out by
+  # this module, so the quoting a caller sees comes from one place.
+  #
+  # An empty array has no first object to take a header from, and is still an
+  # array of objects: it converts to nothing.
+  local filter='if . == [] then empty else'
+  # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
+  filter+=' (.[0] | keys_unsorted) as $k'
+  # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
+  # Only a missing value or `null` is empty: `// ""` blanked `false` too.
+  filter+=' | ([$k] + [.[] | [ $k[] as $key | .[$key] | if . == null then "" else tostring end ]])'
+  filter+=' | .[] | @csv end'
   local converted
-  if [[ "${command_name}" == "jq" ]]; then
-    # An empty array has no first object to take a header from, and is still
-    # an array of objects: it converts to nothing, as it does through `yq`.
-    local filter='if . == [] then empty else'
-    # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
-    filter+=' (.[0] | keys_unsorted) as $k'
-    # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
-    # Only a missing value or `null` is empty: `// ""` blanked `false` too.
-    filter+=' | ([$k] + [.[] | [ $k[] as $key | .[$key] | if . == null then "" else tostring end ]])'
-    filter+=' | .[] | @csv end'
-    converted="$(printf '%s' "${text}" | jq -r "${filter}")" \
-      || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
-  else
-    # `yq` writes `null` as the word; `jq` above writes it as an empty value.
-    converted="$(printf '%s' "${text}" | yq eval -p=json -o=csv '(.[][] | select(tag == "!!null")) |= ""')" \
-      || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
-  fi
+  converted="$(printf '%s' "${text}" | jq -r "${filter}")" \
+    || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
 
   local -a records=()
   # `jq` uses `,` whatever the caller set, so the conversion is read back with

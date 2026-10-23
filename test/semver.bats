@@ -464,3 +464,30 @@ setup() {
   LC_ALL=C run_traced dybatpho::semver_compare 1.0.0-Beta 1.0.0-alpha
   assert_output "-1"
 }
+
+# ---------------------------------------------------------------------------
+# Numeric identifiers: leading zeros and values past 64 bits
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::semver_compare orders numeric identifiers past 64 bits by value" {
+  # 2^64 + 1 wrapped to 1 in shell arithmetic and sorted below 2.
+  run_traced dybatpho::semver_compare 18446744073709551617.0.0 2.0.0
+  assert_output "1"
+  run_traced dybatpho::semver_compare 1.0.0-18446744073709551617 1.0.0-2
+  assert_output "1"
+  run_traced dybatpho::semver_compare 1.0.0-alpha.010 1.0.0-alpha.9
+  assert_output "1"
+  run_traced dybatpho::semver_compare 1.02.0 1.2.0
+  assert_output "0"
+}
+
+@test "dybatpho::semver_satisfies reads a range part with a leading zero in base ten" {
+  run_traced dybatpho::semver_satisfies 8.5.0 "^08.1"
+  assert_success
+  run_traced dybatpho::semver_satisfies 9.0.0 "^08.1"
+  assert_failure
+  run_traced dybatpho::semver_satisfies 8.9.3 "~8.09"
+  assert_success
+  run_traced dybatpho::semver_satisfies 8.0.0 "08"
+  assert_success
+}

@@ -91,6 +91,32 @@ function dybatpho::semver_compare {
 }
 
 #######################################
+# @description Compare two runs of digits by value, whatever their length.
+#   Semver puts no bound on a numeric identifier, and `$(( ))` wraps past 64
+#   bits, so `18446744073709551617` read as `1`. Leading zeros are dropped, then
+#   the longer run is the larger and runs of one length compare as text.
+# @arg $1 string Name of the variable receiving `-1`, `0` or `1`
+# @arg $2 string First run of digits
+# @arg $3 string Second run of digits
+# @set The named variable
+# @internal
+#######################################
+# dyshellint disable=BSG050 a sort compares through this up to three times per comparison, so it skips the argument loop
+function __dybatpho_semver_num_cmp_into {
+  local -n __sv_num_out="$1"
+  local __sv_num_a="${2#"${2%%[!0]*}"}" __sv_num_b="${3#"${3%%[!0]*}"}"
+  if ((${#__sv_num_a} != ${#__sv_num_b})); then
+    ((${#__sv_num_a} > ${#__sv_num_b})) && __sv_num_out=1 || __sv_num_out=-1
+  elif [[ "${__sv_num_a}" == "${__sv_num_b}" ]]; then
+    __sv_num_out=0
+  else
+    local LC_ALL=C
+    [[ "${__sv_num_a}" > "${__sv_num_b}" ]] && __sv_num_out=1 || __sv_num_out=-1
+  fi
+  return 0
+}
+
+#######################################
 # @description Compare two semver strings into a variable, with the precedence
 #   rules of `dybatpho::semver_compare`. Sorting and range checks compare many
 #   times, and each `$(dybatpho::semver_compare …)` cost a fork and two more to
@@ -119,13 +145,11 @@ function __dybatpho_semver_cmp_into {
     || dybatpho::die "semver_compare: '${__sv_v2}' is not a valid semver"
 
   # Compare the numeric core: major.minor.patch.
-  local __sv_i
+  local __sv_i __sv_num_order
   for __sv_i in 0 1 2; do
-    if ((10#${__sv_p1[__sv_i]} > 10#${__sv_p2[__sv_i]})); then
-      __sv_out=1
-      return 0
-    elif ((10#${__sv_p1[__sv_i]} < 10#${__sv_p2[__sv_i]})); then
-      __sv_out=-1
+    __dybatpho_semver_num_cmp_into __sv_num_order "${__sv_p1[__sv_i]}" "${__sv_p2[__sv_i]}"
+    if ((__sv_num_order != 0)); then
+      __sv_out="${__sv_num_order}"
       return 0
     fi
   done
@@ -172,11 +196,9 @@ function __dybatpho_semver_cmp_into {
     [[ "${__sv_id2}" =~ ^[0-9]+$ ]] && __sv_num2=true
 
     if [[ "${__sv_num1}" == true && "${__sv_num2}" == true ]]; then
-      if ((10#${__sv_id1} > 10#${__sv_id2})); then
-        __sv_out=1
-        return 0
-      elif ((10#${__sv_id1} < 10#${__sv_id2})); then
-        __sv_out=-1
+      __dybatpho_semver_num_cmp_into __sv_num_order "${__sv_id1}" "${__sv_id2}"
+      if ((__sv_num_order != 0)); then
+        __sv_out="${__sv_num_order}"
         return 0
       fi
     elif [[ "${__sv_num1}" == true ]]; then
@@ -389,6 +411,8 @@ function __dybatpho_semver_expand {
   dybatpho::semver_valid "${filled}" \
     || dybatpho::die "${FUNCNAME[1]-${FUNCNAME[0]}}: Not a usable version in range: '${token}'"
   IFS='.' read -r major minor patch <<< "${filled%%[-+]*}"
+  # Read in base ten: `^08.1` stopped on an invalid octal `08`.
+  major=$((10#${major})) minor=$((10#${minor})) patch=$((10#${patch}))
 
   case "${operator}" in
     '>' | '>=' | '<' | '<=')

@@ -99,6 +99,7 @@ fi
 - A version is missing, malformed, or has invalid components.
 - An unsupported bump part is supplied.
 - Bumping drops source pre-release/build metadata unless replacements are given.
+- A numeric identifier has more digits than a 64-bit integer holds, or a range part leads with a zero.
 
 ### User Story - Check a version against a range (Priority: P1)
 
@@ -168,6 +169,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **FR-011**: The module MUST expose `DYBATPHO_SEMVER_REGEX` for the active
   validation grammar.
 - **FR-012**: `__dybatpho_semver_cmp_into` MUST compare alphanumeric pre-release identifiers in ASCII order under every locale.
+- **FR-013**: Numeric identifiers MUST compare by value whatever their length, and a range part written with a leading zero, such as `^08.1`, MUST be read in base ten.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -213,6 +215,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **IT-005**: Classify major, minor, patch, pre-release, build, and equal pairs.
 - **IT-006**: Reject invalid versions and unsupported bump parts.
 - **IT-007**: Compare `1.0.0-Beta` with `1.0.0-alpha` under the default, `en_US.UTF-8` and `C` locales and get `-1` each time.
+- **IT-008**: Compare `18446744073709551617.0.0` with `2.0.0` and the same numbers as pre-release identifiers; check `8.5.0` and `9.0.0` against `^08.1`, `8.9.3` against `~8.09`, and `8.0.0` against `08`.
 
 ## Acceptance Criteria *(mandatory)*
 

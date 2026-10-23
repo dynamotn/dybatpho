@@ -59,12 +59,9 @@
 # @env DYBATPHO_TEST_SNAPSHOT_DIR string [default: ${PWD}/test/snapshots] Directory holding `.snap` files
 DYBATPHO_TEST_SNAPSHOT_DIR="${DYBATPHO_TEST_SNAPSHOT_DIR:-${PWD}/test/snapshots}"
 # @env DYBATPHO_TEST_UPDATE_SNAPSHOTS string Set to `1`, `true`, `yes`, or `on` to rewrite snapshots instead of
-#   comparing
-#   them
-DYBATPHO_TEST_UPDATE_SNAPSHOTS="${DYBATPHO_TEST_UPDATE_SNAPSHOTS:-false}"
-# @env UPDATE_SNAPSHOTS string Unprefixed alias for `DYBATPHO_TEST_UPDATE_SNAPSHOTS`, so a whole suite regenerates with
-#   `UPDATE_SNAPSHOTS=1 <test runner>`
-UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}"
+#   comparing them. Unset by default, and never assigned or exported by the library
+# @env UPDATE_SNAPSHOTS string Unprefixed fallback for `DYBATPHO_TEST_UPDATE_SNAPSHOTS`, read only when the prefixed
+#   switch is unset or empty, so a whole suite regenerates with `UPDATE_SNAPSHOTS=1 <test runner>`
 # @env DYBATPHO_TEST_DURATION_RUNS number How many times `dybatpho::assert_duration_under` runs a command, keeping the
 #   fastest, default is `1`
 DYBATPHO_TEST_DURATION_RUNS="${DYBATPHO_TEST_DURATION_RUNS:-1}"
@@ -566,7 +563,7 @@ function __dybatpho_test_normalize {
 # @description Answer whether snapshots are being regenerated rather than compared.
 # @noargs
 # @env DYBATPHO_TEST_UPDATE_SNAPSHOTS string Prefixed switch
-# @env UPDATE_SNAPSHOTS string Unprefixed alias, consulted when the prefixed switch is not truthy
+# @env UPDATE_SNAPSHOTS string Unprefixed fallback, consulted only when the prefixed switch is unset or empty
 # @exitcode 0 Snapshots are to be rewritten
 # @exitcode 1 Snapshots are to be compared
 # @tip `dybatpho::is true` reads `0` as true, because it speaks in exit codes.
@@ -575,14 +572,12 @@ function __dybatpho_test_normalize {
 # @internal
 #######################################
 function __dybatpho_test_updating_snapshots {
-  local setting
-  for setting in "${DYBATPHO_TEST_UPDATE_SNAPSHOTS:-}" "${UPDATE_SNAPSHOTS:-}"; do
-    case "${setting}" in
-      1 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
-      *) ;;
-    esac
-  done
-  return 1
+  # The prefixed switch decides whenever it is set, so `false` there overrides
+  # an inherited `UPDATE_SNAPSHOTS=1`.
+  case "${DYBATPHO_TEST_UPDATE_SNAPSHOTS:-${UPDATE_SNAPSHOTS:-}}" in
+    1 | [tT][rR][uU][eE] | [yY][eE][sS] | [oO][nN]) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 #######################################
@@ -594,7 +589,7 @@ function __dybatpho_test_updating_snapshots {
 # @arg $2 string Text to compare; omit to read the text from stdin
 # @env DYBATPHO_TEST_SNAPSHOT_DIR string Directory holding the `.snap` files
 # @env DYBATPHO_TEST_UPDATE_SNAPSHOTS string Set to `1`, `true`, `yes`, or `on` to rewrite the snapshot
-# @env UPDATE_SNAPSHOTS string Unprefixed alias for the same switch
+# @env UPDATE_SNAPSHOTS string Unprefixed fallback for the same switch
 # @stderr A unified diff when the text and the snapshot differ
 # @exitcode 0 The text matches, or the snapshot was created or updated
 # @exitcode 1 The text differs from the stored snapshot

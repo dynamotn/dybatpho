@@ -361,7 +361,9 @@ dybatpho::unmock_all
   environment, and clear registered snapshot substitutions.
 - **FR-023**: Snapshot rewriting MUST also be switchable through the unprefixed
   `UPDATE_SNAPSHOTS` variable, so a whole suite regenerates with
-  `UPDATE_SNAPSHOTS=1 <test runner>`.
+  `UPDATE_SNAPSHOTS=1 <test runner>`. The bare name MUST be read only when
+  `DYBATPHO_TEST_UPDATE_SNAPSHOTS` is unset or empty, so the prefixed switch
+  wins in both directions, and the library MUST NOT assign or export either.
 - **FR-024**: Both snapshot switches MUST read `1`, `true`, `yes`, and `on` as
   on, and every other value, including `0` and an empty value, as off, so a
   baseline is never rewritten by accident.
@@ -500,6 +502,9 @@ dybatpho::unmock_all
 - **IT-013**: Verify `DYBATPHO_TEST_FAILURES` counts failures and ignores passes.
 - **IT-014**: Record a snapshot, rewrite it with `UPDATE_SNAPSHOTS=1`, and verify
   that `UPDATE_SNAPSHOTS=0` compares instead of rewriting.
+- **IT-014a**: Set `UPDATE_SNAPSHOTS=1` beside `DYBATPHO_TEST_UPDATE_SNAPSHOTS=false`
+  and verify a drifted value is compared, not written; set the reverse and verify
+  it is written.
 - **IT-015**: Verify `assert_duration_under` passes under a generous budget,
   reports an overrun against a zero budget, fails on a command that exits
   non-zero, and rejects a malformed budget, separator, or empty command.

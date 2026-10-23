@@ -1,8 +1,7 @@
 setup() {
   load test_helper
   export DYBATPHO_TEST_SNAPSHOT_DIR="${BATS_TEST_TMPDIR}/snapshots"
-  export DYBATPHO_TEST_UPDATE_SNAPSHOTS=false
-  export UPDATE_SNAPSHOTS=""
+  unset DYBATPHO_TEST_UPDATE_SNAPSHOTS UPDATE_SNAPSHOTS
   export DYBATPHO_TEST_DURATION_RUNS=1
   DYBATPHO_TEST_FAILURES=0
   dybatpho::snapshot_scrub_reset
@@ -313,6 +312,19 @@ setup() {
   assert_failure
   assert_stderr --partial "does not match"
   assert_equal "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/golden.snap")" "regenerated"
+}
+
+@test "DYBATPHO_TEST_UPDATE_SNAPSHOTS wins over UPDATE_SNAPSHOTS" {
+  dybatpho::assert_snapshot pinned "recorded"
+  UPDATE_SNAPSHOTS=1
+  DYBATPHO_TEST_UPDATE_SNAPSHOTS=false
+  run_traced --separate-stderr dybatpho::assert_snapshot pinned "drifted"
+  assert_failure
+  assert_equal "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/pinned.snap")" "recorded"
+  UPDATE_SNAPSHOTS=0
+  DYBATPHO_TEST_UPDATE_SNAPSHOTS=true
+  dybatpho::assert_snapshot pinned "regenerated"
+  assert_equal "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/pinned.snap")" "regenerated"
 }
 
 @test "dybatpho::assert_duration_under passes under its budget and reports an overrun" {

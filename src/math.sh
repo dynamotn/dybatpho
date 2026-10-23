@@ -41,6 +41,22 @@
 #   Long multiplication and division are quadratic in the number of digits and
 #   run in the shell, so they are meant for the sizes a script deals with —
 #   money, sizes, counters, percentages — not for cryptographic bignums.
+#   Operands of up to seventeen significant digits are added, multiplied and
+#   compared in Bash's own arithmetic, which is exact at that size.
+#
+#   A loop that accumulates should use the `_into` variants —
+#   `dybatpho::math_add_into total "${total}" "${x}"` — which fill a variable
+#   instead of printing, so no step pays for a `$(...)` subshell.
+#
+#   The list aggregates — sum, mean, minimum, maximum, median, percentile and
+#   standard deviation — run through `awk` from 32 values up when it is
+#   installed. `awk` is used only for exact work: sums are carried as integer
+#   limbs well below 2^53 and comparisons are made on the digit strings, so the
+#   answer is the Bash engine's to the last digit. `DYBATPHO_MATH_ENGINE` pins
+#   either engine.
+# @tip With `awk`, an aggregate over 5,000 values takes a few hundredths of a
+#   second; the Bash engine takes about a millisecond a value, so it is
+#   comfortable into the low thousands
 # @see
 #   - `example/math_ops.sh`
 #   - `docs/spec/math.md`
@@ -57,6 +73,330 @@ export DYBATPHO_MATH_NUMBER_REGEX='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)$'
 # multiplication, so an unbounded exponent is an unbounded wait rather than an
 # answer.
 export DYBATPHO_MATH_MAX_EXPONENT=4096
+
+# @env DYBATPHO_MATH_ENGINE string [default: auto] `auto`, `awk` or `bash`: the engine of the list aggregates
+DYBATPHO_MATH_ENGINE="${DYBATPHO_MATH_ENGINE:-auto}"
+
+# The number of values from which `auto` starts `awk`. Below it the Bash engine
+# finishes before an `awk` process would have started.
+__dybatpho_math_awk_threshold=32
+
+# Decimal helpers shared by every `awk` program in the library: the number
+# test, an exact comparison, the sort key `__dybatpho_math_sort_key_into`
+# builds, and a stable merge sort. Each one reproduces its Bash counterpart on
+# the digit strings, so no value is ever read as a binary float.
+# shellcheck disable=SC2016 # an awk program: its `$` are awk's, not the shell's
+__dybatpho_math_awk_lib='
+  # @internal
+  function math_init(   i, digits) {
+    NUMRE = "^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$"
+    split("j i h g f e d c b a", digits, " ")
+    for (i = 0; i < 10; i++) NEG[i ""] = digits[i + 1]
+    NEG["."] = "."
+  }
+
+  # Split a plain decimal into CS (sign), CI (integer digits) and CF (fraction
+  # digits), canonical the way the Bash engine parses one.
+  # @internal
+  function canon(v,   c, p) {
+    CS = ""
+    c = substr(v, 1, 1)
+    if (c == "-") {
+      CS = "-"
+      v = substr(v, 2)
+    } else if (c == "+") v = substr(v, 2)
+    p = index(v, ".")
+    if (p) {
+      CI = substr(v, 1, p - 1)
+      CF = substr(v, p + 1)
+    } else {
+      CI = v ""
+      CF = ""
+    }
+    sub(/^0+/, "", CI)
+    if (CI == "") CI = "0"
+    sub(/0+$/, "", CF)
+    if (CI == "0" && CF == "") CS = ""
+  }
+
+  # Compare two decimals by value: -1, 0 or 1.
+  # @internal
+  function ncmp(a, b,   sa, ia, fa, r) {
+    canon(a)
+    sa = CS
+    ia = CI
+    fa = CF
+    canon(b)
+    if (sa != CS) return (sa == "" ? 1 : -1)
+    if (length(ia) != length(CI)) r = (length(ia) > length(CI) ? 1 : -1)
+    else if (ia != CI) r = (ia > CI ? 1 : -1)
+    else {
+      while (length(fa) < length(CF)) fa = fa "0"
+      while (length(CF) < length(fa)) CF = CF "0"
+      r = (fa == CF ? 0 : (fa > CF ? 1 : -1))
+    }
+    return (sa == "-" ? -r : r)
+  }
+
+  # The key whose byte order is the number order, as `__dybatpho_math_sort_key_into`
+  # builds it.
+  # @internal
+  function numkey(v,   neg, c, p, ip, fp, d, out, j) {
+    neg = 0
+    c = substr(v, 1, 1)
+    if (c == "-") {
+      neg = 1
+      v = substr(v, 2)
+    } else if (c == "+") v = substr(v, 2)
+    p = index(v, ".")
+    if (p) {
+      ip = substr(v, 1, p - 1)
+      fp = substr(v, p + 1)
+    } else {
+      ip = v ""
+      fp = ""
+    }
+    sub(/^0+/, "", ip)
+    sub(/0+$/, "", fp)
+    if ((ip fp) == "") neg = 0
+    if (!neg) return "1" sprintf("%05d", length(ip)) ip "." fp
+    d = ip "." fp
+    out = ""
+    for (j = 1; j <= length(d); j++) out = out NEG[substr(d, j, 1)]
+    return "0" sprintf("%05d", 99999 - length(ip)) out "~"
+  }
+
+  # Return 1 when position a strictly comes before position b: by the keys in
+  # K, an empty key last, descending when DESC is set.
+  # @internal
+  function before(a, b,   ka, kb) {
+    ka = K[a] ""
+    kb = K[b] ""
+    if (ka == "") return 0
+    if (kb == "") return 1
+    if (DESC) return (kb < ka)
+    return (ka < kb)
+  }
+
+  # Stable bottom-up merge sort of O[1..m] by `before`.
+  # @internal
+  function msort(m,   width, lo, mid, hi, i, j, k) {
+    for (width = 1; width < m; width *= 2) {
+      for (lo = 1; lo <= m; lo += 2 * width) {
+        mid = lo + width - 1
+        hi = lo + 2 * width - 1
+        if (hi > m) hi = m
+        if (mid >= hi) {
+          for (k = lo; k <= hi; k++) T[k] = O[k]
+          continue
+        }
+        i = lo
+        j = mid + 1
+        k = lo
+        while (i <= mid && j <= hi) {
+          if (before(O[j], O[i])) T[k++] = O[j++]
+          else T[k++] = O[i++]
+        }
+        while (i <= mid) T[k++] = O[i++]
+        while (j <= hi) T[k++] = O[j++]
+      }
+      for (k = 1; k <= m; k++) O[k] = T[k]
+    }
+  }
+'
+
+# The `awk` engine for the list aggregates, chosen by its first argument:
+# `sum`, `sumsq` (the sum, then the sum of squares), `min`, `max`, or `sort`.
+# It reads one value a line and exits 3 at the first one that is not a number,
+# leaving the Bash engine to report it.
+# shellcheck disable=SC2016 # an awk program: its `$` are awk's, not the shell's
+__dybatpho_math_awk_program='
+  BEGIN {
+    MODE = ARGV[1] ""
+    ARGV[1] = ""
+    math_init()
+    bad = 0
+    n = 0
+    # Sums are kept as base-10^7 limbs, squares as base-10^4 limbs, each an
+    # integer, so every addition is exact: a limb only loses precision past
+    # 2^53, which takes hundreds of millions of values.
+    B = 10000000
+    LO = 0
+    HI = 0
+    ACC[0] = 0
+    B2 = 10000
+    LO2 = 0
+    HI2 = 0
+    SQ[0] = 0
+  }
+  {
+    v = $0 ""
+    if (v !~ NUMRE || NR > 100000000) {
+      bad = 1
+      exit
+    }
+    n++
+    if (MODE == "sum" || MODE == "sumsq") add(v)
+    if (MODE == "sumsq") square(v)
+    if (MODE == "min" && (n == 1 || ncmp(v, best) < 0)) best = v
+    if (MODE == "max" && (n == 1 || ncmp(v, best) > 0)) best = v
+    if (MODE == "sort") {
+      V[n] = v
+      K[n] = numkey(v)
+      O[n] = n
+    }
+  }
+  END {
+    if (bad) exit 3
+    if (MODE == "sum") print total()
+    else if (MODE == "sumsq") {
+      print total()
+      print squares()
+    } else if (MODE == "min" || MODE == "max") {
+      if (n == 0) exit 3
+      print best
+    } else if (MODE == "sort") {
+      msort(n)
+      for (i = 1; i <= n; i++) print V[O[i]]
+    } else exit 3
+  }
+
+  # Split v into SG (1 or -1), IP (integer digits) and FP (fraction digits).
+  # @internal
+  function parts(v,   c, p) {
+    SG = 1
+    c = substr(v, 1, 1)
+    if (c == "-") {
+      SG = -1
+      v = substr(v, 2)
+    } else if (c == "+") v = substr(v, 2)
+    p = index(v, ".")
+    if (p) {
+      IP = substr(v, 1, p - 1)
+      FP = substr(v, p + 1)
+    } else {
+      IP = v
+      FP = ""
+    }
+  }
+
+  # @internal
+  function add(v,   k, e, s, limb) {
+    parts(v)
+    k = 0
+    for (e = length(IP); e > 0; e -= 7) {
+      s = (e > 7 ? e - 6 : 1)
+      ACC[k] += SG * (substr(IP, s, e - s + 1) + 0)
+      if (k > HI) HI = k
+      k++
+    }
+    k = -1
+    for (s = 1; s <= length(FP); s += 7) {
+      limb = substr(FP, s, 7)
+      while (length(limb) < 7) limb = limb "0"
+      ACC[k] += SG * (limb + 0)
+      if (k < LO) LO = k
+      k--
+    }
+  }
+
+  # Add v * v: every pair of its base-10^4 limbs lands on the sum of their places.
+  # @internal
+  function square(v,   k, e, s, limb, m, i, j) {
+    parts(v)
+    m = 0
+    for (e = length(IP); e > 0; e -= 4) {
+      s = (e > 4 ? e - 3 : 1)
+      L[m] = substr(IP, s, e - s + 1) + 0
+      P[m] = m
+      m++
+    }
+    k = -1
+    for (s = 1; s <= length(FP); s += 4) {
+      limb = substr(FP, s, 4)
+      while (length(limb) < 4) limb = limb "0"
+      L[m] = limb + 0
+      P[m] = k
+      m++
+      k--
+    }
+    for (i = 0; i < m; i++) {
+      if (L[i] == 0) continue
+      for (j = 0; j < m; j++) {
+        k = P[i] + P[j]
+        SQ[k] += L[i] * L[j]
+        if (k > HI2) HI2 = k
+        if (k < LO2) LO2 = k
+      }
+    }
+  }
+
+  # Carry every limb of A (LO..HI, base b) into [0, b). Returns the carry out
+  # of the top limb, which is negative when the total is.
+  # @internal
+  function settle(acc, b, lo,   k, v, c) {
+    c = 0
+    for (k = lo; k <= TOP; k++) {
+      v = acc[k] + c
+      c = int(v / b)
+      v -= c * b
+      if (v < 0) {
+        v += b
+        c--
+      }
+      if (v >= b) {
+        v -= b
+        c++
+      }
+      acc[k] = v
+    }
+    while (c > 0) {
+      TOP++
+      acc[TOP] = c % b
+      c = int(c / b)
+    }
+    return c
+  }
+
+  # Print a settled number: limbs of `width` digits from TOP down to lo.
+  # @internal
+  function render(acc, lo, width, sign,   k, ip, fp, fmt) {
+    fmt = "%0" width "d"
+    ip = ""
+    for (k = TOP; k >= 0; k--) ip = ip sprintf(fmt, acc[k])
+    fp = ""
+    for (k = -1; k >= lo; k--) fp = fp sprintf(fmt, acc[k])
+    sub(/^0+/, "", ip)
+    if (ip == "") ip = "0"
+    sub(/0+$/, "", fp)
+    if (ip == "0" && fp == "") sign = ""
+    return sign ip (fp == "" ? "" : "." fp)
+  }
+
+  # @internal
+  function total(   c, k, sign) {
+    TOP = HI
+    c = settle(ACC, B, LO)
+    sign = ""
+    if (c < 0) {
+      # The limbs hold total + |c| * B^(TOP+1); negating every limb and the
+      # carry gives the magnitude, which settles without a carry out.
+      for (k = LO; k <= TOP; k++) ACC[k] = -ACC[k]
+      TOP++
+      ACC[TOP] = -c
+      settle(ACC, B, LO)
+      sign = "-"
+    }
+    return render(ACC, LO, 7, sign)
+  }
+
+  # @internal
+  function squares() {
+    TOP = HI2
+    settle(SQ, B2, LO2)
+    return render(SQ, LO2, 4, "")
+  }
+'
 
 #######################################
 # @description Name the public function a failure should be reported against.
@@ -433,6 +773,112 @@ function __dybatpho_math_align {
 }
 
 #######################################
+# @description Read a short decimal as a Bash integer of all its digits, into
+#   named variables, so a sum, product or comparison of two short values can
+#   run in `$(( ))` instead of digit by digit. A value is short when it has at
+#   most seventeen significant digits, which keeps every intermediate result
+#   below the 2^63 Bash arithmetic holds, so the answer stays exact.
+# @arg $1 string Name of the variable receiving the signed integer of the digits
+# @arg $2 string Name of the variable receiving the number of fraction digits
+# @arg $3 string Name of the variable receiving the number of integer digits
+# @arg $4 string Value
+# @set The three named variables
+# @exitcode 0 The value is a short decimal
+# @exitcode 1 It is long, or not a number; the caller takes the digit path, which reports the latter
+# @internal
+#######################################
+function __dybatpho_math_short_into {
+  local -n __dybatpho_math_short_digits="$1" __dybatpho_math_short_scale="$2" __dybatpho_math_short_width="$3"
+  local __dybatpho_math_short_value="$4" __dybatpho_math_short_sign=""
+  [[ "${__dybatpho_math_short_value}" =~ ${DYBATPHO_MATH_NUMBER_REGEX} ]] || return 1
+  case "${__dybatpho_math_short_value}" in
+    -*) __dybatpho_math_short_sign="-" __dybatpho_math_short_value="${__dybatpho_math_short_value:1}" ;;
+    +*) __dybatpho_math_short_value="${__dybatpho_math_short_value:1}" ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac
+  local __dybatpho_math_short_int="${__dybatpho_math_short_value%%.*}" __dybatpho_math_short_frac=""
+  [[ "${__dybatpho_math_short_value}" != *.* ]] || __dybatpho_math_short_frac="${__dybatpho_math_short_value#*.}"
+  __dybatpho_math_short_int="${__dybatpho_math_short_int#"${__dybatpho_math_short_int%%[!0]*}"}"
+  __dybatpho_math_short_frac="${__dybatpho_math_short_frac%"${__dybatpho_math_short_frac##*[!0]}"}"
+  ((${#__dybatpho_math_short_int} + ${#__dybatpho_math_short_frac} <= 17)) || return 1
+  __dybatpho_math_short_width=${#__dybatpho_math_short_int}
+  # The leading `0` keeps an empty digit string valid, and `10#` keeps a
+  # leading zero of the fraction from reading as octal.
+  __dybatpho_math_short_int+="${__dybatpho_math_short_frac}"
+  __dybatpho_math_short_digits=$((${__dybatpho_math_short_sign}10#0${__dybatpho_math_short_int}))
+  __dybatpho_math_short_scale=${#__dybatpho_math_short_frac}
+}
+
+#######################################
+# @description Write a Bash integer carrying an implied decimal point as a
+#   canonical number, into a named variable.
+# @arg $1 string Name of the variable receiving the number
+# @arg $2 number Integer of all the digits, signed
+# @arg $3 number Number of those digits that belong to the fraction
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_math_unshort_into {
+  local -n __dybatpho_math_unshort_out="$1"
+  local __dybatpho_math_unshort_digits="${2#-}" __dybatpho_math_unshort_sign=""
+  [[ "$2" != -* ]] || __dybatpho_math_unshort_sign="-"
+  local __dybatpho_math_unshort_scale="$3" __dybatpho_math_unshort_frac="" __dybatpho_math_unshort_cut
+  while ((${#__dybatpho_math_unshort_digits} <= __dybatpho_math_unshort_scale)); do
+    __dybatpho_math_unshort_digits="0${__dybatpho_math_unshort_digits}"
+  done
+  if ((__dybatpho_math_unshort_scale > 0)); then
+    __dybatpho_math_unshort_cut=$((${#__dybatpho_math_unshort_digits} - __dybatpho_math_unshort_scale))
+    __dybatpho_math_unshort_frac="${__dybatpho_math_unshort_digits:__dybatpho_math_unshort_cut}"
+    __dybatpho_math_unshort_digits="${__dybatpho_math_unshort_digits:0:__dybatpho_math_unshort_cut}"
+    __dybatpho_math_unshort_frac="${__dybatpho_math_unshort_frac%"${__dybatpho_math_unshort_frac##*[!0]}"}"
+  fi
+  # `$(( ))` printed the digits without leading zeros, so only the padding
+  # above can leave one, and then the integer part is exactly `0`.
+  if [[ -n "${__dybatpho_math_unshort_frac}" ]]; then
+    __dybatpho_math_unshort_out="${__dybatpho_math_unshort_sign}${__dybatpho_math_unshort_digits}"
+    __dybatpho_math_unshort_out+=".${__dybatpho_math_unshort_frac}"
+  elif [[ "${__dybatpho_math_unshort_digits}" == "0" ]]; then
+    __dybatpho_math_unshort_out="0"
+  else
+    __dybatpho_math_unshort_out="${__dybatpho_math_unshort_sign}${__dybatpho_math_unshort_digits}"
+  fi
+}
+
+#######################################
+# @description Line two short values up on one scale, into named variables,
+#   when both still fit in Bash arithmetic once aligned.
+# @arg $1 string Name of the variable receiving the first aligned integer
+# @arg $2 string Name of the variable receiving the second aligned integer
+# @arg $3 string Name of the variable receiving the shared scale
+# @arg $4 string First value
+# @arg $5 string Second value
+# @set The three named variables
+# @exitcode 0 Both are short and aligned
+# @exitcode 1 Either is long or not a number
+# @internal
+#######################################
+function __dybatpho_math_short_pair_into {
+  local -n __dybatpho_math_pair_a="$1" __dybatpho_math_pair_b="$2" __dybatpho_math_pair_scale="$3"
+  local __dybatpho_math_pair_sa __dybatpho_math_pair_sb __dybatpho_math_pair_wa __dybatpho_math_pair_wb
+  __dybatpho_math_short_into __dybatpho_math_pair_a __dybatpho_math_pair_sa __dybatpho_math_pair_wa "$4" || return 1
+  __dybatpho_math_short_into __dybatpho_math_pair_b __dybatpho_math_pair_sb __dybatpho_math_pair_wb "$5" || return 1
+  __dybatpho_math_pair_scale=${__dybatpho_math_pair_sa}
+  ((__dybatpho_math_pair_sb <= __dybatpho_math_pair_scale)) || __dybatpho_math_pair_scale=${__dybatpho_math_pair_sb}
+  # Seventeen digits either side of the point keeps both below 10^17 and their
+  # sum below 2^63.
+  ((__dybatpho_math_pair_wa + __dybatpho_math_pair_scale <= 17)) || return 1
+  ((__dybatpho_math_pair_wb + __dybatpho_math_pair_scale <= 17)) || return 1
+  while ((__dybatpho_math_pair_sa < __dybatpho_math_pair_scale)); do
+    __dybatpho_math_pair_a=$((__dybatpho_math_pair_a * 10))
+    __dybatpho_math_pair_sa=$((__dybatpho_math_pair_sa + 1))
+  done
+  while ((__dybatpho_math_pair_sb < __dybatpho_math_pair_scale)); do
+    __dybatpho_math_pair_b=$((__dybatpho_math_pair_b * 10))
+    __dybatpho_math_pair_sb=$((__dybatpho_math_pair_sb + 1))
+  done
+}
+
+#######################################
 # @description Flip the sign of a number.
 # @arg $1 string Name of the variable receiving the negated value
 # @arg $2 string Value
@@ -467,6 +913,11 @@ function __dybatpho_math_add2 {
   local __add2_out_name __add2_a __add2_b
   dybatpho::expect_args __add2_out_name __add2_a __add2_b -- "$@"
   local -n __add2_out="${__add2_out_name}"
+  local __add2_short_a __add2_short_b __add2_short_scale
+  if __dybatpho_math_short_pair_into __add2_short_a __add2_short_b __add2_short_scale "${__add2_a}" "${__add2_b}"; then
+    __dybatpho_math_unshort_into __add2_out "$((__add2_short_a + __add2_short_b))" "${__add2_short_scale}"
+    return 0
+  fi
   local __add2_sign_a __add2_int_a __add2_frac_a
   local __add2_sign_b __add2_int_b __add2_frac_b
   __dybatpho_math_parse "${__add2_a}" __add2_sign_a __add2_int_a __add2_frac_a
@@ -508,6 +959,16 @@ function __dybatpho_math_mul2 {
   local __mul2_out_name __mul2_a __mul2_b
   dybatpho::expect_args __mul2_out_name __mul2_a __mul2_b -- "$@"
   local -n __mul2_out="${__mul2_out_name}"
+  local __mul2_short_a __mul2_short_b __mul2_scale_a __mul2_scale_b __mul2_width_a __mul2_width_b
+  # Two values of at most eighteen significant digits between them multiply
+  # below 10^18, inside Bash arithmetic.
+  if __dybatpho_math_short_into __mul2_short_a __mul2_scale_a __mul2_width_a "${__mul2_a}" \
+    && __dybatpho_math_short_into __mul2_short_b __mul2_scale_b __mul2_width_b "${__mul2_b}" \
+    && ((__mul2_width_a + __mul2_scale_a + __mul2_width_b + __mul2_scale_b <= 18)); then
+    __dybatpho_math_unshort_into __mul2_out "$((__mul2_short_a * __mul2_short_b))" \
+      "$((__mul2_scale_a + __mul2_scale_b))"
+    return 0
+  fi
   local __mul2_sign_a __mul2_int_a __mul2_frac_a
   local __mul2_sign_b __mul2_int_b __mul2_frac_b
   __dybatpho_math_parse "${__mul2_a}" __mul2_sign_a __mul2_int_a __mul2_frac_a
@@ -605,6 +1066,47 @@ function __dybatpho_math_collect {
   while read -r -a __collect_fields || ((${#__collect_fields[@]})); do
     __collect_out+=(${__collect_fields[@]+"${__collect_fields[@]}"})
   done
+}
+
+#######################################
+# @description Run a list aggregate through the `awk` engine, into a named
+#   variable, when `DYBATPHO_MATH_ENGINE` allows it, the list is long enough
+#   under `auto` to repay starting a process, and `awk` is installed.
+#   Anything the engine cannot answer exactly as the Bash engine would -- a
+#   value that is not a number, or one holding a line break -- returns failure
+#   instead, and the caller runs the Bash engine, which reports it.
+# @arg $1 string Name of the variable receiving the output
+# @arg $2 string Aggregate: `sum`, `sumsq`, `min`, `max`, or `sort`
+# @arg $@ string Values
+# @set The named variable: one line, two for `sumsq`, one value a line for `sort`
+# @exitcode 0 The engine answered
+# @exitcode 1 Use the Bash engine
+# @internal
+#######################################
+function __dybatpho_math_awk_into {
+  local -n __dybatpho_math_awk_out="$1"
+  local __dybatpho_math_awk_mode="$2"
+  shift 2
+  case "${DYBATPHO_MATH_ENGINE}" in
+    bash) return 1 ;;
+    awk) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+    auto) (($# >= __dybatpho_math_awk_threshold)) || return 1 ;;
+    # "DYBATPHO_MATH_ENGINE picks the engine and refuses one it does not know"
+    # covers this; `dybatpho::die` exits, so that test uses `run`.
+    *)
+      local __dybatpho_math_awk_caller                                                      # kcov(skip)
+      __dybatpho_math_awk_caller="$(__dybatpho_math_caller)"                                # kcov(skip)
+      __dybatpho_math_awk_caller+=": Unknown DYBATPHO_MATH_ENGINE: ${DYBATPHO_MATH_ENGINE}" # kcov(skip)
+      dybatpho::die "${__dybatpho_math_awk_caller}. Use auto, awk, or bash"                 # kcov(skip)
+      ;;
+  esac
+  (($#)) || return 1
+  command -v awk &> /dev/null || return 1
+  # One value a line: a value holding a line break would read as two.
+  local IFS=' '
+  [[ "$*" != *$'\n'* ]] || return 1
+  __dybatpho_math_awk_out="$(printf '%s\n' "$@" \
+    | LC_ALL=C command awk "${__dybatpho_math_awk_program}${__dybatpho_math_awk_lib}" "${__dybatpho_math_awk_mode}")"
 }
 
 #######################################
@@ -1038,6 +1540,173 @@ function dybatpho::math_round {
 }
 
 #######################################
+# @description Add numbers exactly, into a named variable.
+#   This is `dybatpho::math_add` without the `$(...)`: a loop that accumulates
+#   with `total=$(dybatpho::math_add …)` starts a subshell every time round,
+#   which costs more than the addition, and a value that is not a number stops
+#   only that subshell. Every `_into` variant takes the variable name first
+#   and the operands after it, the way the printing form takes them.
+# @example
+#   local total=0 price
+#   for price in 19.99 5.01 0.5; do
+#     dybatpho::math_add_into total "${total}" "${price}"
+#   done
+#   printf '%s\n' "${total}"   # 25.5
+#
+# @arg $1 string Name of the variable receiving the sum
+# @arg $@ string Two or more values
+# @set The named variable
+# @exitcode 1 Stop the script when a value is not a number, or the name cannot be bound
+#######################################
+function dybatpho::math_add_into {
+  local __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b
+  dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b -- "$@"
+  dybatpho::expect_ref "${__dybatpho_math_into_name}"
+  shift 3
+  local __dybatpho_math_into_total __dybatpho_math_into_operand
+  __dybatpho_math_add2 __dybatpho_math_into_total "${__dybatpho_math_into_a}" "${__dybatpho_math_into_b}"
+  for __dybatpho_math_into_operand in "$@"; do
+    __dybatpho_math_add2 __dybatpho_math_into_total \
+      "${__dybatpho_math_into_total}" "${__dybatpho_math_into_operand}"
+  done
+  local -n __dybatpho_math_into_ref="${__dybatpho_math_into_name}"
+  __dybatpho_math_into_ref="${__dybatpho_math_into_total}"
+}
+
+#######################################
+# @description Subtract numbers exactly, into a named variable: the second from
+#   the first, and any further ones from the running result, as
+#   `dybatpho::math_sub` does.
+# @example
+#   dybatpho::math_sub_into left 100 10 5   # left=85
+#
+# @arg $1 string Name of the variable receiving the difference
+# @arg $@ string Two or more values
+# @set The named variable
+# @exitcode 1 Stop the script when a value is not a number, or the name cannot be bound
+#######################################
+function dybatpho::math_sub_into {
+  local __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b
+  dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b -- "$@"
+  dybatpho::expect_ref "${__dybatpho_math_into_name}"
+  shift 3
+  local __dybatpho_math_into_total __dybatpho_math_into_operand __dybatpho_math_into_negated
+  __dybatpho_math_negate __dybatpho_math_into_negated "${__dybatpho_math_into_b}"
+  __dybatpho_math_add2 __dybatpho_math_into_total "${__dybatpho_math_into_a}" "${__dybatpho_math_into_negated}"
+  for __dybatpho_math_into_operand in "$@"; do
+    __dybatpho_math_negate __dybatpho_math_into_negated "${__dybatpho_math_into_operand}"
+    __dybatpho_math_add2 __dybatpho_math_into_total \
+      "${__dybatpho_math_into_total}" "${__dybatpho_math_into_negated}"
+  done
+  local -n __dybatpho_math_into_ref="${__dybatpho_math_into_name}"
+  __dybatpho_math_into_ref="${__dybatpho_math_into_total}"
+}
+
+#######################################
+# @description Multiply numbers exactly, into a named variable, as
+#   `dybatpho::math_mul` does.
+# @example
+#   dybatpho::math_mul_into line_total 19.99 3   # line_total=59.97
+#
+# @arg $1 string Name of the variable receiving the product
+# @arg $@ string Two or more values
+# @set The named variable
+# @exitcode 1 Stop the script when a value is not a number, or the name cannot be bound
+#######################################
+function dybatpho::math_mul_into {
+  local __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b
+  dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b -- "$@"
+  dybatpho::expect_ref "${__dybatpho_math_into_name}"
+  shift 3
+  local __dybatpho_math_into_total __dybatpho_math_into_operand
+  __dybatpho_math_mul2 __dybatpho_math_into_total "${__dybatpho_math_into_a}" "${__dybatpho_math_into_b}"
+  for __dybatpho_math_into_operand in "$@"; do
+    __dybatpho_math_mul2 __dybatpho_math_into_total \
+      "${__dybatpho_math_into_total}" "${__dybatpho_math_into_operand}"
+  done
+  local -n __dybatpho_math_into_ref="${__dybatpho_math_into_name}"
+  __dybatpho_math_into_ref="${__dybatpho_math_into_total}"
+}
+
+#######################################
+# @description Divide one number by another into a named variable, rounding
+#   half away from zero, as `dybatpho::math_div` does.
+# @example
+#   dybatpho::math_div_into share 2 3 5   # share=0.66667
+#
+# @arg $1 string Name of the variable receiving the quotient
+# @arg $2 string Dividend
+# @arg $3 string Divisor
+# @arg $4 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
+# @env DYBATPHO_MATH_SCALE number Default fraction digits
+# @set The named variable
+# @exitcode 1 Stop the script on a non-number, a bad scale, a zero divisor, or a name that cannot be bound
+#######################################
+function dybatpho::math_div_into {
+  local __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b
+  dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b -- "$@"
+  dybatpho::expect_ref "${__dybatpho_math_into_name}"
+  local __dybatpho_math_into_total
+  __dybatpho_math_div2 __dybatpho_math_into_total "${__dybatpho_math_into_a}" "${__dybatpho_math_into_b}" \
+    "${4-${DYBATPHO_MATH_SCALE}}"
+  local -n __dybatpho_math_into_ref="${__dybatpho_math_into_name}"
+  __dybatpho_math_into_ref="${__dybatpho_math_into_total}"
+}
+
+#######################################
+# @description Compare two numbers by value into a named variable, as
+#   `dybatpho::math_compare` does: `-1`, `0` or `1`.
+# @example
+#   dybatpho::math_compare_into order "${used}" "${quota}"
+#   ((order > 0)) && dybatpho::warn "Over quota"
+#
+# @arg $1 string Name of the variable receiving `-1`, `0` or `1`
+# @arg $2 string First value
+# @arg $3 string Second value
+# @set The named variable
+# @exitcode 1 Stop the script when a value is not a number, or the name cannot be bound
+#######################################
+function dybatpho::math_compare_into {
+  local __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b
+  dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a __dybatpho_math_into_b -- "$@"
+  dybatpho::expect_ref "${__dybatpho_math_into_name}"
+  local __dybatpho_math_into_total
+  __dybatpho_math_cmp2 __dybatpho_math_into_total "${__dybatpho_math_into_a}" "${__dybatpho_math_into_b}"
+  local -n __dybatpho_math_into_ref="${__dybatpho_math_into_name}"
+  __dybatpho_math_into_ref="${__dybatpho_math_into_total}"
+}
+
+#######################################
+# @description Round to a number of fraction digits into a named variable,
+#   halves away from zero, as `dybatpho::math_round` does.
+# @example
+#   dybatpho::math_round_into price 2.665 2   # price=2.67
+#
+# @arg $1 string Name of the variable receiving the rounded value
+# @arg $2 string Value
+# @arg $3 number [default: 0] Fraction digits to keep
+# @set The named variable
+# @exitcode 1 Stop the script on a value that is not a number, a bad scale, or a name that cannot be bound
+#######################################
+function dybatpho::math_round_into {
+  local __dybatpho_math_into_name __dybatpho_math_into_a
+  dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a -- "$@"
+  dybatpho::expect_ref "${__dybatpho_math_into_name}"
+  local __dybatpho_math_into_scale="${3-0}"
+  [[ "${__dybatpho_math_into_scale}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${__dybatpho_math_into_scale}'"
+  __dybatpho_math_into_scale=$((10#${__dybatpho_math_into_scale}))
+  local __dybatpho_math_into_sign __dybatpho_math_into_int __dybatpho_math_into_frac __dybatpho_math_into_total
+  __dybatpho_math_parse "${__dybatpho_math_into_a}" \
+    __dybatpho_math_into_sign __dybatpho_math_into_int __dybatpho_math_into_frac
+  __dybatpho_math_round_digits __dybatpho_math_into_int __dybatpho_math_into_frac "${__dybatpho_math_into_scale}"
+  __dybatpho_math_compose __dybatpho_math_into_total \
+    "${__dybatpho_math_into_sign}" "${__dybatpho_math_into_int}" "${__dybatpho_math_into_frac}"
+  local -n __dybatpho_math_into_ref="${__dybatpho_math_into_name}"
+  __dybatpho_math_into_ref="${__dybatpho_math_into_total}"
+}
+
+#######################################
 # @description Print the smallest of a list of numbers.
 # @example
 #   dybatpho::math_min 3 1.5 2          # 1.5
@@ -1053,9 +1722,12 @@ function dybatpho::math_min {
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local smallest="${values[0]}" number
-  for number in ${values[@]+"${values[@]}"}; do
-    dybatpho::math_lt "${number}" "${smallest}" && smallest="${number}"
-  done
+  if ! __dybatpho_math_awk_into smallest min ${values[@]+"${values[@]}"}; then
+    smallest="${values[0]}"
+    for number in ${values[@]+"${values[@]}"}; do
+      dybatpho::math_lt "${number}" "${smallest}" && smallest="${number}"
+    done
+  fi
   printf '%s\n' "${smallest}"
 }
 
@@ -1075,9 +1747,12 @@ function dybatpho::math_max {
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local largest="${values[0]}" number
-  for number in ${values[@]+"${values[@]}"}; do
-    dybatpho::math_gt "${number}" "${largest}" && largest="${number}"
-  done
+  if ! __dybatpho_math_awk_into largest max ${values[@]+"${values[@]}"}; then
+    largest="${values[0]}"
+    for number in ${values[@]+"${values[@]}"}; do
+      dybatpho::math_gt "${number}" "${largest}" && largest="${number}"
+    done
+  fi
   printf '%s\n' "${largest}"
 }
 
@@ -1114,9 +1789,12 @@ function dybatpho::math_sum {
   local -a values=()
   __dybatpho_math_collect values "$@"
   local total="0" number
-  for number in ${values[@]+"${values[@]}"}; do
-    __dybatpho_math_add2 total "${total}" "${number}"
-  done
+  if ! __dybatpho_math_awk_into total sum ${values[@]+"${values[@]}"}; then
+    total="0"
+    for number in ${values[@]+"${values[@]}"}; do
+      __dybatpho_math_add2 total "${total}" "${number}"
+    done
+  fi
   printf '%s\n' "${total}"
 }
 
@@ -1140,9 +1818,12 @@ function dybatpho::math_avg {
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local total="0" number mean
-  for number in ${values[@]+"${values[@]}"}; do
-    __dybatpho_math_add2 total "${total}" "${number}"
-  done
+  if ! __dybatpho_math_awk_into total sum ${values[@]+"${values[@]}"}; then
+    total="0"
+    for number in ${values[@]+"${values[@]}"}; do
+      __dybatpho_math_add2 total "${total}" "${number}"
+    done
+  fi
   __dybatpho_math_div2 mean "${total}" "${#values[@]}" "${DYBATPHO_MATH_SCALE}"
   printf '%s\n' "${mean}"
 }
@@ -1160,6 +1841,11 @@ function __dybatpho_math_cmp2 {
   local __cmp2_out_name __cmp2_a __cmp2_b
   dybatpho::expect_args __cmp2_out_name __cmp2_a __cmp2_b -- "$@"
   local -n __cmp2_out="${__cmp2_out_name}"
+  local __cmp2_short_a __cmp2_short_b __cmp2_short_scale
+  if __dybatpho_math_short_pair_into __cmp2_short_a __cmp2_short_b __cmp2_short_scale "${__cmp2_a}" "${__cmp2_b}"; then
+    __cmp2_out=$(((__cmp2_short_a > __cmp2_short_b) - (__cmp2_short_a < __cmp2_short_b)))
+    return 0
+  fi
   local __cmp2_sign_a __cmp2_int_a __cmp2_frac_a
   local __cmp2_sign_b __cmp2_int_b __cmp2_frac_b
   __dybatpho_math_parse "${__cmp2_a}" __cmp2_sign_a __cmp2_int_a __cmp2_frac_a
@@ -1397,6 +2083,29 @@ function __dybatpho_math_sqrt2 {
 }
 
 #######################################
+# @description Sort numbers by value into an array, through the `awk` engine
+#   when it applies and `__dybatpho_math_sort` otherwise. Both are stable, so
+#   the two agree on the order of equal values written differently.
+# @arg $1 string Name of the array receiving the sorted values, as written
+# @arg $@ string Values
+# @set The named array
+# @exitcode 1 Stop the script when a value is not a number
+# @internal
+#######################################
+function __dybatpho_math_sorted_into {
+  local -n __dybatpho_math_sorted_out="$1"
+  shift
+  local __dybatpho_math_sorted_lines
+  local -a __dybatpho_math_sorted_values=()
+  if __dybatpho_math_awk_into __dybatpho_math_sorted_lines sort "$@"; then
+    mapfile -t __dybatpho_math_sorted_values <<< "${__dybatpho_math_sorted_lines}"
+  else
+    __dybatpho_math_sort __dybatpho_math_sorted_values "$@"
+  fi
+  __dybatpho_math_sorted_out=(${__dybatpho_math_sorted_values[@]+"${__dybatpho_math_sorted_values[@]}"})
+}
+
+#######################################
 # @description Print the median of a list of numbers.
 #   The values are ordered by value; an odd count answers with the middle one
 #   as it was written, an even count with the exact mean of the two middle
@@ -1416,7 +2125,7 @@ function dybatpho::math_median {
   local -a values=() sorted=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  __dybatpho_math_sort sorted ${values[@]+"${values[@]}"}
+  __dybatpho_math_sorted_into sorted ${values[@]+"${values[@]}"}
   local count=${#sorted[@]} middle=$((${#sorted[@]} / 2))
   if ((count % 2)); then
     printf '%s\n' "${sorted[middle]}"
@@ -1463,7 +2172,7 @@ function dybatpho::math_percentile {
   local -a values=() sorted=()
   __dybatpho_math_collect values "$@"
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
-  __dybatpho_math_sort sorted ${values[@]+"${values[@]}"}
+  __dybatpho_math_sorted_into sorted ${values[@]+"${values[@]}"}
 
   local result
   __dybatpho_math_percentile_sorted_into result "${percentile}" ${sorted[@]+"${sorted[@]}"}
@@ -1563,12 +2272,17 @@ function dybatpho::math_stddev {
 
   # variance = (n * sum(x^2) - sum(x)^2) / (n * d), with d = n or n - 1. The
   # numerator is exact and never negative, so the only rounding is the root's.
-  local total="0" squares="0" number square
-  for number in ${values[@]+"${values[@]}"}; do
-    __dybatpho_math_add2 total "${total}" "${number}"
-    __dybatpho_math_mul2 square "${number}" "${number}"
-    __dybatpho_math_add2 squares "${squares}" "${square}"
-  done
+  local total="0" squares="0" number square sums
+  if __dybatpho_math_awk_into sums sumsq ${values[@]+"${values[@]}"}; then
+    total="${sums%%$'\n'*}"
+    squares="${sums#*$'\n'}"
+  else
+    for number in ${values[@]+"${values[@]}"}; do
+      __dybatpho_math_add2 total "${total}" "${number}"
+      __dybatpho_math_mul2 square "${number}" "${number}"
+      __dybatpho_math_add2 squares "${squares}" "${square}"
+    done
+  fi
   local spread total_squared divisor=${count}
   [[ "${sample}" == true ]] && divisor=$((count - 1))
   __dybatpho_math_mul2 spread "${squares}" "${count}"

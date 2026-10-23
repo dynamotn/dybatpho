@@ -114,6 +114,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # needs no escalation at all.
   [privilege]="sudo|doas"
   [json]="jq"
+  # The list aggregates run through `awk` on a long list when it is there, and
+  # in Bash, with the same digits, when it is not.
+  [math]="awk"
   # `timeout` bounds the connection `dybatpho::port_open` makes. Without it the
   # probe still works and waits as long as the system's own TCP timeout.
   [network]="sha256sum md5sum timeout"

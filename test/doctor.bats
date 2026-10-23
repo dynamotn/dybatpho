@@ -67,6 +67,14 @@ fake_versioned_command() {
   assert_output ""
 }
 
+@test "dybatpho::doctor_requirements lists awk as optional for the math module" {
+  # The aggregates run in Bash without it, with the same digits.
+  run_traced -0 dybatpho::doctor_requirements math optional
+  assert_output "awk"
+  run_traced -0 dybatpho::doctor_requirements math required
+  assert_output ""
+}
+
 @test "dybatpho::doctor_requirements lists what the diff module needs" {
   # `dybatpho::diff_text` needs nothing beyond `diff` itself, so both entries
   # are optional: they belong to comparing documents by key.

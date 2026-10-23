@@ -41,12 +41,26 @@ ask for.
 Long multiplication and division are quadratic in the number of digits and
 run in the shell, so they are meant for the sizes a script deals with —
 money, sizes, counters, percentages — not for cryptographic bignums.
+Operands of up to seventeen significant digits are added, multiplied and
+compared in Bash's own arithmetic, which is exact at that size.
+
+A loop that accumulates should use the `_into` variants —
+`dybatpho::math_add_into total "${total}" "${x}"` — which fill a variable
+instead of printing, so no step pays for a `$(...)` subshell.
+
+The list aggregates — sum, mean, minimum, maximum, median, percentile and
+standard deviation — run through `awk` from 32 values up when it is
+installed. `awk` is used only for exact work: sums are carried as integer
+limbs well below 2^53 and comparisons are made on the digit strings, so the
+answer is the Bash engine's to the last digit. `DYBATPHO_MATH_ENGINE` pins
+either engine.
 
 ### 🌍 Environment
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | no | `10` | Fraction digits kept by division, averaging and percentages |
+| **`DYBATPHO_MATH_ENGINE`** | string | no | `auto` | `auto`, `awk` or `bash`: the engine of the list aggregates |
 
 ### 🚀 Highlights
 
@@ -68,6 +82,12 @@ money, sizes, counters, percentages — not for cryptographic bignums.
 - [`dybatpho::math_floor`](#dybatphomath_floor) — Round down, toward negative infinity.
 - [`dybatpho::math_ceil`](#dybatphomath_ceil) — Round up, toward positive infinity.
 - [`dybatpho::math_round`](#dybatphomath_round) — Round to a number of fraction digits, halves away from zero. `printf '%.2f'` rounds binary floats to even and follows `LC_NUMERIC`, so it answers `2.66` for `2.665` on one machine and `2,67` on another; this rounds the decimal digits themselves and always answers `2.67`.
+- [`dybatpho::math_add_into`](#dybatphomath_add_into) — Add numbers exactly, into a named variable. This is `dybatpho::math_add` without the `$(...)`: a loop that accumulates with `total=$(dybatpho::math_add …)` starts a subshell every time round, which costs more than the addition, and a value that is not a number stops only that subshell. Every `_into` variant takes the variable name first and the operands after it, the way the printing form takes them.
+- [`dybatpho::math_sub_into`](#dybatphomath_sub_into) — Subtract numbers exactly, into a named variable: the second from the first, and any further ones from the running result, as `dybatpho::math_sub` does.
+- [`dybatpho::math_mul_into`](#dybatphomath_mul_into) — Multiply numbers exactly, into a named variable, as `dybatpho::math_mul` does.
+- [`dybatpho::math_div_into`](#dybatphomath_div_into) — Divide one number by another into a named variable, rounding half away from zero, as `dybatpho::math_div` does.
+- [`dybatpho::math_compare_into`](#dybatphomath_compare_into) — Compare two numbers by value into a named variable, as `dybatpho::math_compare` does: `-1`, `0` or `1`.
+- [`dybatpho::math_round_into`](#dybatphomath_round_into) — Round to a number of fraction digits into a named variable, halves away from zero, as `dybatpho::math_round` does.
 - [`dybatpho::math_min`](#dybatphomath_min) — Print the smallest of a list of numbers.
 - [`dybatpho::math_max`](#dybatphomath_max) — Print the largest of a list of numbers.
 - [`dybatpho::math_sum`](#dybatphomath_sum) — Add up a list of numbers exactly.
@@ -93,6 +113,7 @@ money, sizes, counters, percentages — not for cryptographic bignums.
 
 ## 💡 Tips
 
+- With `awk`, an aggregate over 5,000 values takes a few hundredths of a second; the Bash engine takes about a millisecond a value, so it is comfortable into the low thousands
 - Reach for `dybatpho::i18n_number` when the number is about to be shown to a person, and for this module when it is about to be computed with
 
 **[`dybatpho::math_div`](#dybatphomath_div)**
@@ -636,6 +657,200 @@ dybatpho::math_round 1.005 2    # 1.01
 **🚦 Exit codes**
 
 - `1`: Stop the script when the value is not a number or the scale is not a non-negative integer
+
+---
+
+### `dybatpho::math_add_into`
+
+Add numbers exactly, into a named variable.
+This is `dybatpho::math_add` without the `$(...)`: a loop that accumulates
+with `total=$(dybatpho::math_add …)` starts a subshell every time round,
+which costs more than the addition, and a value that is not a number stops
+only that subshell. Every `_into` variant takes the variable name first
+and the operands after it, the way the printing form takes them.
+
+**🧪 Example**
+
+```bash
+local total=0 price
+for price in 19.99 5.01 0.5; do
+  dybatpho::math_add_into total "${total}" "${price}"
+done
+printf '%s\n' "${total}"   # 25.5
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the sum |
+| `$@` | string | Two or more values |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when a value is not a number, or the name cannot be bound
+
+---
+
+### `dybatpho::math_sub_into`
+
+Subtract numbers exactly, into a named variable: the second from
+the first, and any further ones from the running result, as
+`dybatpho::math_sub` does.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_sub_into left 100 10 5   # left=85
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the difference |
+| `$@` | string | Two or more values |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when a value is not a number, or the name cannot be bound
+
+---
+
+### `dybatpho::math_mul_into`
+
+Multiply numbers exactly, into a named variable, as
+`dybatpho::math_mul` does.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_mul_into line_total 19.99 3   # line_total=59.97
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the product |
+| `$@` | string | Two or more values |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when a value is not a number, or the name cannot be bound
+
+---
+
+### `dybatpho::math_div_into`
+
+Divide one number by another into a named variable, rounding
+half away from zero, as `dybatpho::math_div` does.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_div_into share 2 3 5   # share=0.66667
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the quotient |
+| `$2` | string | yes |  | Dividend |
+| `$3` | string | yes |  | Divisor |
+| `$4` | number | no | `${DYBATPHO_MATH_SCALE}` | Fraction digits to keep |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `1`: Stop the script on a non-number, a bad scale, a zero divisor, or a name that cannot be bound
+
+---
+
+### `dybatpho::math_compare_into`
+
+Compare two numbers by value into a named variable, as
+`dybatpho::math_compare` does: `-1`, `0` or `1`.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_compare_into order "${used}" "${quota}"
+((order > 0)) && dybatpho::warn "Over quota"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving `-1`, `0` or `1` |
+| `$2` | string | First value |
+| `$3` | string | Second value |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when a value is not a number, or the name cannot be bound
+
+---
+
+### `dybatpho::math_round_into`
+
+Round to a number of fraction digits into a named variable,
+halves away from zero, as `dybatpho::math_round` does.
+
+**🧪 Example**
+
+```bash
+dybatpho::math_round_into price 2.665 2   # price=2.67
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the rounded value |
+| `$2` | string | yes |  | Value |
+| `$3` | number | no | `0` | Fraction digits to keep |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `1`: Stop the script on a value that is not a number, a bad scale, or a name that cannot be bound
 
 ---
 

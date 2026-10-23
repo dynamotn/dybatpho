@@ -719,3 +719,215 @@ setup() {
   __dybatpho_math_percentile_sorted_into value 50 7
   assert_equal "${value}" "7"
 }
+
+# ---------------------------------------------------------------------------
+# The `_into` variants
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::math_add_into and dybatpho::math_sub_into fill the named variable" {
+  local total=0 price scratch
+  for price in 19.99 5.01 0.5; do
+    dybatpho::math_add_into total "${total}" "${price}"
+  done
+  assert_equal "${total}" "25.5"
+  run_traced dybatpho::math_add_into scratch 1 2
+  assert_success
+  assert_output ""
+  dybatpho::math_add_into total 0.1 0.2 0.3
+  assert_equal "${total}" "0.6"
+  local left
+  dybatpho::math_sub_into left 100 10 5
+  assert_equal "${left}" "85"
+  dybatpho::math_sub_into left 1 0.9
+  assert_equal "${left}" "0.1"
+}
+
+@test "dybatpho::math_mul_into, dybatpho::math_div_into and dybatpho::math_round_into fill the named variable" {
+  local result
+  dybatpho::math_mul_into result 19.99 3
+  assert_equal "${result}" "59.97"
+  dybatpho::math_mul_into result 99999999999 99999999999 -1
+  assert_equal "${result}" "-9999999999800000000001"
+  dybatpho::math_div_into result 2 3 5
+  assert_equal "${result}" "0.66667"
+  DYBATPHO_MATH_SCALE=2 dybatpho::math_div_into result 10 4
+  assert_equal "${result}" "2.5"
+  dybatpho::math_round_into result 2.665 2
+  assert_equal "${result}" "2.67"
+  dybatpho::math_round_into result -0.5
+  assert_equal "${result}" "-1"
+  run_traced dybatpho::math_round_into result 1.005 2
+  assert_success
+}
+
+@test "dybatpho::math_compare_into fills the named variable with -1, 0 or 1" {
+  local order
+  dybatpho::math_compare_into order 1.10 1.9
+  assert_equal "${order}" "-1"
+  dybatpho::math_compare_into order 2.50 +2.5
+  assert_equal "${order}" "0"
+  dybatpho::math_compare_into order -0 0.000
+  assert_equal "${order}" "0"
+  dybatpho::math_compare_into order 100000000000000000000 99999999999999999999.9
+  assert_equal "${order}" "1"
+  run_traced dybatpho::math_compare_into order 1 2
+  assert_success
+}
+
+@test "the math _into variants stop on a bad value, scale or name" {
+  run dybatpho::math_add_into total 1 abc
+  assert_failure
+  assert_output --partial "dybatpho::math_add_into: Not a number: 'abc'"
+  run dybatpho::math_div_into total 1 0
+  assert_failure
+  assert_output --partial "Division by zero"
+  run dybatpho::math_round_into total 1.5 x
+  assert_failure
+  assert_output --partial "dybatpho::math_round_into: Scale must be a non-negative integer, got 'x'"
+  run dybatpho::math_sub_into "bad name" 1 2
+  assert_failure
+  assert_output --partial "Invalid variable name"
+  run dybatpho::math_mul_into __dybatpho_x 1 2
+  assert_failure
+  assert_output --partial "is reserved"
+}
+
+@test "the math _into variants fill a caller variable named like their own locals" {
+  # Every local carries the library prefix, so a caller's `total` or `value`
+  # is the variable that gets the result.
+  local a="" b="" name="" total="" operand=""
+  dybatpho::math_add_into a 1 2
+  dybatpho::math_sub_into b 5 2
+  dybatpho::math_mul_into name 2 3
+  dybatpho::math_compare_into total 2 1
+  dybatpho::math_div_into operand 1 4
+  assert_equal "${a}|${b}|${name}|${total}|${operand}" "3|3|6|1|0.25"
+}
+
+@test "the short-decimal arithmetic stays exact at the edge of 64 bits" {
+  # Short operands add, multiply and compare in `$(( ))`; past seventeen
+  # significant digits the digit path takes over, with the same answers.
+  run_traced dybatpho::math_add 99999999999999999 1
+  assert_output "100000000000000000"
+  run_traced dybatpho::math_add 0.00000000000000001 99999999999999999
+  assert_output "99999999999999999.00000000000000001"
+  run_traced dybatpho::math_mul 999999999 999999999
+  assert_output "999999998000000001"
+  run_traced dybatpho::math_mul 9999999999 9999999999
+  assert_output "99999999980000000001"
+  run_traced dybatpho::math_sub 0.30 0.1 0.2
+  assert_output "0"
+  run_traced dybatpho::math_add -007.50 +2.25
+  assert_output "-5.25"
+  run_traced dybatpho::math_mul -0.5 0
+  assert_output "0"
+  run_traced dybatpho::math_compare 0.1 0.10000000000000000001
+  assert_output "-1"
+  run_traced dybatpho::math_compare -.5 -0.50
+  assert_output "0"
+}
+
+# ---------------------------------------------------------------------------
+# The awk engine for the list aggregates
+# ---------------------------------------------------------------------------
+
+# Values whose aggregates the two engines have to agree on, spelled the ways a
+# script receives them.
+math_engine_values() {
+  printf '%s\n' 1.5 -2.25 +007 .5 7. -0 0.000 99999999999999999999.99999999 \
+    -99999999999999999999.5 12345678901234567890.123456789012345 2.50 2.5 +2.5 \
+    0.1 0.2 0.3 -.75 1000000 0.0000001 42
+}
+
+# Print every aggregate under the engine named in $1.
+math_engine_run_all() {
+  local -a values=()
+  mapfile -t values < <(math_engine_values)
+  local op
+  for op in sum avg min max median "percentile 0" "percentile 33.3" "percentile 90" "percentile 100"; do
+    # shellcheck disable=SC2086 # the operation's own words are split on purpose
+    DYBATPHO_MATH_ENGINE="$1" dybatpho::math_${op} "${values[@]}"
+  done
+  # The root at the end of a deviation runs in Bash on either engine, and a
+  # twenty-digit spread makes it slow under the coverage trace; the sums the
+  # two engines feed it are what differ, and short values exercise them.
+  DYBATPHO_MATH_ENGINE="$1" dybatpho::math_stddev 1.5 -2.25 +007 .5 7. -0 2.50 2.5 0.1 0.3 42 -.75
+  DYBATPHO_MATH_ENGINE="$1" dybatpho::math_stddev --sample 1.5 -2.25 +007 .5 7. -0 2.50 2.5 0.1 0.3 42 -.75
+  # Equal values written differently: the median is the middle one as written.
+  DYBATPHO_MATH_ENGINE="$1" dybatpho::math_median 2.50 2.5 +2.5 2.500 1
+  math_engine_values | DYBATPHO_MATH_ENGINE="$1" dybatpho::math_sum
+}
+
+@test "DYBATPHO_MATH_ENGINE=awk prints what the Bash engine prints" {
+  local expected
+  expected="$(math_engine_run_all bash)"
+  run_traced math_engine_run_all awk
+  assert_success
+  assert_output "${expected}"
+  assert_line --index 0 "12345678901235567953.723456879012345"
+}
+
+@test "the math awk engine agrees with the Bash engine under every awk installed" {
+  local expected flavor found=0 bin
+  expected="$(math_engine_run_all bash)"
+  for flavor in awk gawk mawk original-awk nawk /usr/bin/awk busybox; do
+    command -v "${flavor}" > /dev/null || continue
+    if [[ "${flavor}" == "busybox" ]]; then
+      busybox awk 'BEGIN { }' 2> /dev/null || continue
+    fi
+    bin="${BATS_TEST_TMPDIR}/awk-${flavor//\//_}"
+    mkdir -p "${bin}"
+    if [[ "${flavor}" == "busybox" ]]; then
+      printf '#!/bin/sh\nexec busybox awk "$@"\n' > "${bin}/awk"
+    else
+      printf '#!/bin/sh\nexec %s "$@"\n' "$(command -v "${flavor}")" > "${bin}/awk"
+    fi
+    chmod +x "${bin}/awk"
+    PATH="${bin}:${PATH}" run_traced math_engine_run_all awk
+    assert_success
+    assert_output "${expected}"
+    found=$((found + 1))
+  done
+  ((found > 0))
+}
+
+@test "the math awk engine hands a value that is not a number to the Bash engine" {
+  local engine
+  for engine in bash awk; do
+    DYBATPHO_MATH_ENGINE="${engine}" run dybatpho::math_sum 1 2 abc 3
+    assert_failure
+    assert_output --partial "dybatpho::math_sum: Not a number: 'abc'"
+    DYBATPHO_MATH_ENGINE="${engine}" run dybatpho::math_median 1 1e3
+    assert_failure
+    assert_output --partial "dybatpho::math_median: Not a number: '1e3'"
+    DYBATPHO_MATH_ENGINE="${engine}" run dybatpho::math_max 1 $'2\n3'
+    assert_failure
+    assert_output --partial "Not a number"
+  done
+}
+
+@test "DYBATPHO_MATH_ENGINE picks the engine and refuses one it does not know" {
+  local bin="${BATS_TEST_TMPDIR}/awk-log"
+  local -a many=()
+  mkdir -p "${bin}"
+  printf '#!/bin/sh\necho run >> "%s/log"\nexec %s "$@"\n' "${bin}" "$(command -v awk)" > "${bin}/awk"
+  chmod +x "${bin}/awk"
+  mapfile -t many < <(seq 1 40)
+
+  PATH="${bin}:${PATH}" run_traced dybatpho::math_sum 1 2 3
+  assert_output "6"
+  assert_file_not_exists "${bin}/log"
+  PATH="${bin}:${PATH}" run_traced dybatpho::math_sum "${many[@]}"
+  assert_output "820"
+  assert_file_exists "${bin}/log"
+  rm "${bin}/log"
+  PATH="${bin}:${PATH}" DYBATPHO_MATH_ENGINE=bash run_traced dybatpho::math_sum "${many[@]}"
+  assert_output "820"
+  assert_file_not_exists "${bin}/log"
+  PATH="$(path_without awk)" DYBATPHO_MATH_ENGINE=awk run_traced dybatpho::math_avg "${many[@]}"
+  assert_output "20.5"
+
+  DYBATPHO_MATH_ENGINE=fast run dybatpho::math_sum "${many[@]}"
+  assert_failure
+  assert_output --partial "dybatpho::math_sum: Unknown DYBATPHO_MATH_ENGINE: fast. Use auto, awk, or bash"
+}

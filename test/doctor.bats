@@ -58,11 +58,20 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor_requirements lists what the csv module needs" {
   # Parsing and writing CSV is Bash alone; only `dybatpho::csv_from_json` needs
-  # `jq`, so it is optional rather than required.
+  # `jq`, so it is optional rather than required. `awk` only makes a large
+  # input faster.
   run_traced -0 dybatpho::doctor_requirements csv optional
-  assert_output "jq"
+  assert_output "$(printf 'jq\nawk')"
 
   run_traced -0 dybatpho::doctor_requirements csv required
+  assert_output ""
+}
+
+@test "dybatpho::doctor_requirements lists awk as optional for the math module" {
+  # The aggregates run in Bash without it, with the same digits.
+  run_traced -0 dybatpho::doctor_requirements math optional
+  assert_output "awk"
+  run_traced -0 dybatpho::doctor_requirements math required
   assert_output ""
 }
 

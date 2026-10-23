@@ -22,8 +22,19 @@
 #   fields joined by the ASCII unit separator. Splitting a record is then a
 #   single unambiguous operation, which is what `dybatpho::csv_fields` does.
 #   Data containing that byte is rejected rather than silently re-split.
-# @tip The whole input is held in memory as a Bash array, which is comfortable
-#   into the low tens of thousands of rows; past that, reach for a real CSV tool
+#
+#   Parsing and the bulk operations -- `dybatpho::csv_read`, `csv_header`,
+#   `csv_col`, `csv_select`, `csv_filter`, `csv_sort`, `csv_convert` and
+#   `csv_to_json` -- run as one POSIX `awk` program once the input reaches a
+#   few kilobytes, and in Bash below that or when no `awk` is installed. Both
+#   engines print byte for byte the same output; any input the `awk` program
+#   would have to refuse -- an unknown column, a row wider than its header, a
+#   non-number under `number` -- is handed back to the Bash engine, so the
+#   error a script sees is the same too. `DYBATPHO_CSV_ENGINE` pins either one.
+# @tip With `awk`, 5,000 rows convert, filter or sort in a few hundredths of a
+#   second, and the input is limited by memory rather than time. The Bash
+#   engine takes about a millisecond a row, which is comfortable into the low
+#   thousands of rows; past the tens of thousands, reach for a real CSV tool
 # @tip Values are read and written as text, because CSV carries no types; cast
 #   in `jq` after `dybatpho::csv_to_json` when a consumer needs numbers
 # @env DYBATPHO_CSV_DELIMITER string [default: ,] Field delimiter; set it to `;`, or to `tab` for TSV
@@ -34,11 +45,347 @@
 # @env DYBATPHO_CSV_DELIMITER string [default: ,] Field delimiter every function reads; `tab` or `\t` names a tab
 DYBATPHO_CSV_DELIMITER="${DYBATPHO_CSV_DELIMITER:-,}"
 
+# @env DYBATPHO_CSV_ENGINE string [default: auto] `auto`, `awk` or `bash`: the engine of parsing and the bulk operations
+DYBATPHO_CSV_ENGINE="${DYBATPHO_CSV_ENGINE:-auto}"
+
+# The input size, in characters, from which `auto` starts `awk`. Below it the
+# Bash engine finishes before an `awk` process would have started.
+__dybatpho_csv_awk_threshold=2048
+
 # The byte that joins the fields of one record. A record is exchanged as a
 # single string so that an array of records stays a flat Bash array; the unit
 # separator is what makes splitting it back apart unambiguous, because unlike
 # the delimiter it can never be part of a value.
 __dybatpho_csv_unit=$'\037'
+
+# The `awk` engine: one program for every bulk operation, chosen by its first
+# argument. It reads the text on stdin, reproduces the Bash parser below rule for
+# rule -- quoted fields, doubled quotes, stray text after a closing quote, line
+# breaks inside a field, a carriage return dropped from each line -- and prints
+# exactly what the Bash engine prints. It exits 3, before printing anything, for
+# any input the Bash engine would refuse, which then runs and reports it.
+# Only POSIX `awk` is used, so gawk, mawk, BusyBox and BSD `awk` agree, and it
+# runs under `LC_ALL=C`, where a string is bytes the way the Bash engine
+# compares them.
+# shellcheck disable=SC2016 # an awk program: its `$` are awk's, not the shell's
+__dybatpho_csv_awk_program='
+  BEGIN {
+    MODE = ARGV[1] ""
+    D = ARGV[2] ""
+    NA = 0
+    for (i = 3; i < ARGC; i++) A[++NA] = ARGV[i] ""
+    for (i = 1; i < ARGC; i++) ARGV[i] = ""
+    FS = "\n"
+    U = sprintf("%c", 31)
+    QQ = "\""
+    for (i = 1; i < 32; i++) {
+      c = sprintf("%c", i)
+      ESC[c] = sprintf("\\u%04x", i)
+      CTL = CTL c
+    }
+    c = sprintf("%c", 127)
+    ESC[c] = "\\u007f"
+    CTLRE = "[" CTL c "]"
+    ESC["\n"] = "\\n"
+    ESC["\r"] = "\\r"
+    ESC["\t"] = "\\t"
+    ESC[sprintf("%c", 8)] = "\\b"
+    ESC[sprintf("%c", 12)] = "\\f"
+    ESC["\\"] = "\\\\"
+    ESC[QQ] = "\\" QQ
+    math_init()
+    n = 0
+    pending = 0
+  }
+  {
+    # Concatenated, so a line that looks like a number stays a string: `$0` is
+    # a "strnum", and two of those compare as numbers.
+    line = $0 ""
+    if (substr(line, length(line)) == "\r") line = substr(line, 1, length(line) - 1)
+    if (pending) buf = buf "\n" line
+    else buf = line
+    if (is_open(buf, D)) {
+      pending = 1
+      next
+    }
+    pending = 0
+    record(buf)
+  }
+  END {
+    if (pending) record(buf)
+    if (MODE == "read") exit 0
+    if (n == 0) exit 0
+    NH = W[1]
+    if (MODE == "header") {
+      for (i = 1; i <= NH; i++) printf "%s\n", F[1, i]
+      exit 0
+    }
+    if (MODE == "convert") {
+      for (r = 1; r <= n; r++) emit(r, A[1])
+      exit 0
+    }
+    # Every mode below reads the rows against the header, so a row wider than
+    # the header is refused here, before anything is printed.
+    for (r = 2; r <= n; r++) if (W[r] > NH) exit 3
+    if (MODE == "json") json()
+    else if (MODE == "col") {
+      c = pick(A[1])
+      for (r = 2; r <= n; r++) printf "%s\n", (c <= W[r] ? F[r, c] : "")
+    } else if (MODE == "select") {
+      for (i = 1; i <= NA; i++) P[i] = pick(A[i])
+      for (r = 1; r <= n; r++) {
+        out = ""
+        for (i = 1; i <= NA; i++) {
+          v = (P[i] <= W[r] ? F[r, P[i]] : "")
+          out = out (i > 1 ? D : "") quote(v, D)
+        }
+        printf "%s\n", out
+      }
+    } else if (MODE == "filter") filter(pick(A[1]), A[2], A[3])
+    else if (MODE == "sort") sort(pick(A[1]), A[2], A[3])
+    else exit 3
+  }
+
+  # Return 1 when the text so far ends inside a quoted field.
+  # @internal
+  function is_open(rest, d,   p) {
+    if (!index(rest, QQ)) return 0
+    while (1) {
+      if (substr(rest, 1, 1) == QQ) {
+        rest = substr(rest, 2)
+        while (1) {
+          p = index(rest, QQ)
+          if (!p) return 1
+          rest = substr(rest, p + 1)
+          if (substr(rest, 1, 1) != QQ) break
+          rest = substr(rest, 2)
+        }
+      }
+      p = index(rest, d)
+      if (!p) return 0
+      rest = substr(rest, p + length(d))
+    }
+  }
+
+  # Split one record into F[n + 1, *] and W[n + 1], the way the Bash splitter does.
+  # @internal
+  function record(rest,   k, field, p, out, i) {
+    n++
+    k = 0
+    while (1) {
+      if (substr(rest, 1, 1) == QQ) {
+        rest = substr(rest, 2)
+        field = ""
+        while (1) {
+          p = index(rest, QQ)
+          if (!p) {
+            field = field rest
+            rest = ""
+            break
+          }
+          field = field substr(rest, 1, p - 1)
+          rest = substr(rest, p + 1)
+          if (substr(rest, 1, 1) == QQ) {
+            field = field QQ
+            rest = substr(rest, 2)
+          } else break
+        }
+        if (rest != "" && substr(rest, 1, length(D)) != D) {
+          p = index(rest, D)
+          if (!p) {
+            F[n, ++k] = field rest
+            break
+          }
+          F[n, ++k] = field substr(rest, 1, p - 1)
+          rest = substr(rest, p + length(D))
+          continue
+        }
+        F[n, ++k] = field
+        if (rest == "") break
+        rest = substr(rest, length(D) + 1)
+        continue
+      }
+      p = index(rest, D)
+      if (p) {
+        F[n, ++k] = substr(rest, 1, p - 1)
+        rest = substr(rest, p + length(D))
+      } else {
+        F[n, ++k] = rest
+        break
+      }
+    }
+    W[n] = k
+    if (MODE == "read") {
+      out = ""
+      for (i = 1; i <= k; i++) {
+        field = F[n, i]
+        gsub(/\n/, U "1", field)
+        out = out (i > 1 ? U "0" : "") field
+        delete F[n, i]
+      }
+      printf "%s\n", out
+    }
+  }
+
+  # Resolve a column by header name, then by 1-based position.
+  # @internal
+  function pick(want,   i) {
+    for (i = 1; i <= NH; i++) if (F[1, i] == want) return i
+    if (want ~ /^[1-9][0-9]*$/ && want + 0 <= NH) return want + 0
+    exit 3
+  }
+
+  # @internal
+  function quote(v, d) {
+    if (index(v, QQ) || index(v, "\n") || index(v, "\r") || index(v, d)) {
+      gsub(/"/, QQ QQ, v)
+      return QQ v QQ
+    }
+    return v
+  }
+
+  # @internal
+  function emit(r, d,   i, out) {
+    out = ""
+    for (i = 1; i <= W[r]; i++) out = out (i > 1 ? d : "") quote(F[r, i], d)
+    printf "%s\n", out
+  }
+
+  # @internal
+  function jesc(s,   out, i, c, len) {
+    if (!index(s, "\\") && !index(s, QQ) && s !~ CTLRE) return QQ s QQ
+    out = ""
+    len = length(s)
+    for (i = 1; i <= len; i++) {
+      c = substr(s, i, 1)
+      out = out ((c in ESC) ? ESC[c] : c)
+    }
+    return QQ out QQ
+  }
+
+  # @internal
+  function json(   r, i, obj) {
+    for (i = 1; i <= NH; i++) NAME[i] = jesc(F[1, i])
+    printf "["
+    for (r = 2; r <= n; r++) {
+      obj = ""
+      for (i = 1; i <= NH; i++) {
+        obj = obj (i > 1 ? "," : "") NAME[i] ":" jesc(i <= W[r] ? F[r, i] : "")
+      }
+      printf "%s{%s}", (r > 2 ? "," : ""), obj
+    }
+    printf "]\n"
+  }
+
+  # @internal
+  function filter(c, op, val,   r, v, keep, numval) {
+    numval = (val ~ NUMRE)
+    emit(1, D)
+    for (r = 2; r <= n; r++) {
+      v = (c <= W[r] ? F[r, c] : "")
+      if (op == "eq") keep = (v == val)
+      else if (op == "ne") keep = (v != val)
+      else if (op == "contains") keep = (val == "" || index(v, val) > 0)
+      else if (op == "gt") keep = ((numval && v ~ NUMRE) ? ncmp(v, val) > 0 : v > val)
+      else if (op == "lt") keep = ((numval && v ~ NUMRE) ? ncmp(v, val) < 0 : v < val)
+      else exit 3
+      if (keep) emit(r, D)
+    }
+  }
+
+  # @internal
+  function sort(c, order, type,   r, m, allnum, k) {
+    if (order != "asc" && order != "desc") exit 3
+    DESC = (order == "desc")
+    allnum = 1
+    m = 0
+    for (r = 2; r <= n; r++) {
+      K[r] = (c <= W[r] ? F[r, c] : "")
+      O[++m] = r
+      if (K[r] != "" && K[r] !~ NUMRE) {
+        if (type == "number") exit 3
+        allnum = 0
+      }
+    }
+    if (type == "auto") type = (allnum ? "number" : "text")
+    if (type == "number") for (r = 2; r <= n; r++) if (K[r] != "") K[r] = numkey(K[r])
+    msort(m)
+    emit(1, D)
+    for (k = 1; k <= m; k++) emit(O[k], D)
+  }
+'
+
+#######################################
+# @description Return success when a bulk operation should run through the
+#   `awk` engine: `DYBATPHO_CSV_ENGINE` allows it, the input is not empty and,
+#   under `auto`, large enough to repay starting a process, `awk` is installed,
+#   and every delimiter involved is a single byte, which is what the program
+#   splits on.
+# @arg $1 number Length of the input text
+# @arg $@ string Every delimiter the operation reads or writes
+# @exitcode 0 Use `awk`
+# @exitcode 1 Use the Bash engine
+# @internal
+#######################################
+function __dybatpho_csv_use_awk {
+  local __dybatpho_csv_size="$1" __dybatpho_csv_one
+  shift
+  case "${DYBATPHO_CSV_ENGINE}" in
+    bash) return 1 ;;
+    awk) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+    auto) ((__dybatpho_csv_size >= __dybatpho_csv_awk_threshold)) || return 1 ;;
+    # "DYBATPHO_CSV_ENGINE picks the engine and refuses one it does not know"
+    # covers this; `dybatpho::die` exits, so that test uses `run`.
+    *)
+      local __dybatpho_csv_engine_bad="Unknown DYBATPHO_CSV_ENGINE: ${DYBATPHO_CSV_ENGINE}" # kcov(skip)
+      dybatpho::die "${FUNCNAME[1]}: ${__dybatpho_csv_engine_bad}. Use auto, awk, or bash"  # kcov(skip)
+      ;;
+  esac
+  ((__dybatpho_csv_size > 0)) || return 1
+  command -v awk &> /dev/null || return 1
+  local LC_ALL=C
+  for __dybatpho_csv_one in "$@"; do
+    ((${#__dybatpho_csv_one} == 1)) || return 1
+  done
+}
+
+#######################################
+# @description Run the `awk` engine on stdin, recording its exit status in a
+#   named variable rather than returning it, so a caller under `set -e` reads
+#   `3` -- run the Bash engine instead -- without stopping.
+# @arg $1 string Name of the variable receiving the exit status
+# @arg $2 string Operation: `read`, `header`, `convert`, `col`, `select`, `filter`, `sort`, or `json`
+# @arg $3 string Field delimiter
+# @arg $@ string The operation's own arguments
+# @stdin The CSV text, ending in a newline
+# @stdout What the operation prints
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_csv_awk_into {
+  local -n __dybatpho_csv_awk_status="$1"
+  shift
+  __dybatpho_csv_awk_status=0
+  # shellcheck disable=SC2154 # `math.sh`, which this module depends on, defines the shared awk helpers
+  LC_ALL=C command awk "${__dybatpho_csv_awk_program}${__dybatpho_math_awk_lib}" "$@" || __dybatpho_csv_awk_status=$?
+}
+
+#######################################
+# @description Read a public function's input the way every reader in this
+#   module starts: resolve the delimiter, then read the input. Errors are
+#   reported under the public function that called this.
+# @arg $1 string Name of the variable receiving the text
+# @arg $2 string Name of the variable receiving the delimiter
+# @arg $3 string File path, `-` for stdin, or CSV text
+# @arg $4 string? Name the errors are reported under, default is the calling function
+# @set The two named variables
+# @internal
+#######################################
+function __dybatpho_csv_source_into {
+  local __dybatpho_csv_source_who="${4:-${FUNCNAME[1]}}"
+  __dybatpho_csv_delimiter_into "$2" "${DYBATPHO_CSV_DELIMITER}" "${__dybatpho_csv_source_who}"
+  __dybatpho_csv_input_into "$1" "$3" "${__dybatpho_csv_source_who}"
+}
 
 #######################################
 # @description Resolve a delimiter to the character it names, into a named
@@ -228,6 +575,32 @@ function __dybatpho_csv_parse_into {
   __dybatpho_csv_records_ref=()
 
   [[ -n "${__dybatpho_csv_text}" ]] || return 0
+  # Bytes, not characters: in a UTF-8 locale Bash's pattern operators drop a
+  # value that holds an invalid sequence, and the delimiter, the quote and the
+  # unit separator are single bytes whatever the locale.
+  local LC_ALL=C
+
+  if __dybatpho_csv_use_awk "${#__dybatpho_csv_text}" "${__dybatpho_csv_delimiter}"; then
+    # One record a line, with the two bytes a record cannot carry on a line
+    # spelled as the unit separator and a digit: the separator itself as `0`,
+    # a line break inside a field as `1`. The input never holds the unit
+    # separator, so every one in the output starts such a pair. The `.` keeps
+    # the trailing newlines that `$(...)` would strip.
+    local __dybatpho_csv_encoded __dybatpho_csv_parsed_ok=0
+    # shellcheck disable=SC2154 # `math.sh`, which this module depends on, defines the shared awk helpers
+    __dybatpho_csv_encoded="$(LC_ALL=C command awk "${__dybatpho_csv_awk_program}${__dybatpho_math_awk_lib}" read \
+      "${__dybatpho_csv_delimiter}" <<< "${__dybatpho_csv_text}" && printf '.')" \
+      || __dybatpho_csv_parsed_ok=$?
+    if ((__dybatpho_csv_parsed_ok == 0)); then
+      __dybatpho_csv_encoded="${__dybatpho_csv_encoded%.}"
+      local -a __dybatpho_csv_decoded=()
+      local __dybatpho_csv_newline=$'\n'
+      mapfile -t __dybatpho_csv_decoded <<< "${__dybatpho_csv_encoded%"${__dybatpho_csv_newline}"}"
+      __dybatpho_csv_decoded=("${__dybatpho_csv_decoded[@]//"${__dybatpho_csv_unit}1"/${__dybatpho_csv_newline}}")
+      __dybatpho_csv_records_ref=("${__dybatpho_csv_decoded[@]//"${__dybatpho_csv_unit}0"/${__dybatpho_csv_unit}}")
+      return 0
+    fi
+  fi
 
   local -a __dybatpho_csv_lines=()
   mapfile -t __dybatpho_csv_lines <<< "${__dybatpho_csv_text}"
@@ -281,6 +654,10 @@ function __dybatpho_csv_quote_into {
   local -n __dybatpho_csv_quoted_ref="$1"
   local __dybatpho_csv_value="$2"
   local __dybatpho_csv_delimiter="$3"
+  # Bytes, not characters: in a UTF-8 locale Bash's pattern operators drop a
+  # value that holds an invalid sequence, and the delimiter, the quote and the
+  # unit separator are single bytes whatever the locale.
+  local LC_ALL=C
 
   local __dybatpho_csv_special=0
   case "${__dybatpho_csv_value}" in
@@ -335,6 +712,22 @@ function __dybatpho_csv_load_into {
 }
 
 #######################################
+# @description Parse text a public function has already read into records,
+#   and split the header into column names -- the Bash engine's half of
+#   `__dybatpho_csv_load_into`, for a caller that tried `awk` first.
+# @arg $1 string Name of the array receiving the records
+# @arg $2 string Name of the array receiving the header's column names, empty for empty input
+# @arg $3 string CSV text
+# @arg $4 string Field delimiter
+# @set The two named arrays
+# @internal
+#######################################
+function __dybatpho_csv_records_into {
+  __dybatpho_csv_parse_into "$1" "$3" "$4"
+  __dybatpho_csv_header_into "$2" "$1"
+}
+
+#######################################
 # @description Split a record on the unit separator into a named array.
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string One record
@@ -345,6 +738,10 @@ function __dybatpho_csv_split_fields_into {
   local -n __dybatpho_csv_parts_ref="$1"
   local __dybatpho_csv_remaining="$2"
   __dybatpho_csv_parts_ref=()
+  # Bytes, not characters: in a UTF-8 locale Bash's pattern operators drop a
+  # value that holds an invalid sequence, and the delimiter, the quote and the
+  # unit separator are single bytes whatever the locale.
+  local LC_ALL=C
 
   # Not word splitting on `IFS`: it drops a trailing empty field, so a row
   # ending in the delimiter would come back one column short of its header.
@@ -480,6 +877,11 @@ function dybatpho::csv_convert {
   __dybatpho_csv_delimiter_into from "${DYBATPHO_CSV_DELIMITER}"
   __dybatpho_csv_delimiter_into to "${target}"
   __dybatpho_csv_input_into text "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${from}" "${to}"; then
+    local status
+    __dybatpho_csv_awk_into status convert "${from}" "${to}" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
   __dybatpho_csv_parse_into records "${text}" "${from}"
   __dybatpho_csv_write_with records "${to}"
 }
@@ -498,7 +900,13 @@ function dybatpho::csv_header {
 
   local -a records=() names=()
   local delimiter
-  __dybatpho_csv_load_into records names delimiter "${input}"
+  local text status
+  __dybatpho_csv_source_into text delimiter "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${delimiter}"; then
+    __dybatpho_csv_awk_into status header "${delimiter}" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
+  __dybatpho_csv_records_into records names "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   printf '%s\n' ${names[@]+"${names[@]}"}
@@ -526,7 +934,13 @@ function dybatpho::csv_col {
   local -a records=() names=() fields=()
   local index at
   local delimiter
-  __dybatpho_csv_load_into records names delimiter "${input}"
+  local text status
+  __dybatpho_csv_source_into text delimiter "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${delimiter}"; then
+    __dybatpho_csv_awk_into status col "${delimiter}" "${column}" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
+  __dybatpho_csv_records_into records names "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   __dybatpho_csv_pick_into index names "${column}"
@@ -562,7 +976,13 @@ function dybatpho::csv_select {
   local -a records=() names=() fields=() picks=() chosen=() kept=()
   local delimiter column index at pick
   local IFS
-  __dybatpho_csv_load_into records names delimiter "${input}"
+  local text status
+  __dybatpho_csv_source_into text delimiter "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${delimiter}"; then
+    __dybatpho_csv_awk_into status select "${delimiter}" "$@" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
+  __dybatpho_csv_records_into records names "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   for column in "$@"; do
@@ -625,7 +1045,13 @@ function dybatpho::csv_sort {
 
   local -a records=() names=() fields=() keys=() order_of=() sorted=()
   local delimiter index at key
-  __dybatpho_csv_load_into records names delimiter "${input}"
+  local text status
+  __dybatpho_csv_source_into text delimiter "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${delimiter}"; then
+    __dybatpho_csv_awk_into status sort "${delimiter}" "${column}" "${order}" "${type}" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
+  __dybatpho_csv_records_into records names "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   __dybatpho_csv_pick_into index names "${column}"
@@ -922,7 +1348,13 @@ function dybatpho::csv_filter {
   local -a records=() names=() fields=() kept=()
   local index at
   local delimiter
-  __dybatpho_csv_load_into records names delimiter "${input}"
+  local text status
+  __dybatpho_csv_source_into text delimiter "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${delimiter}"; then
+    __dybatpho_csv_awk_into status filter "${delimiter}" "${column}" "${operator}" "${value}" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
+  __dybatpho_csv_records_into records names "${text}" "${delimiter}"
   ((${#records[@]})) || return 0
 
   __dybatpho_csv_pick_into index names "${column}"
@@ -997,7 +1429,13 @@ function dybatpho::csv_to_json {
   local -a records=() names=() fields=()
   local at index object document="" name_json value_json
   local delimiter
-  __dybatpho_csv_load_into records names delimiter "${input}"
+  local text status
+  __dybatpho_csv_source_into text delimiter "${input}"
+  if __dybatpho_csv_use_awk "${#text}" "${delimiter}"; then
+    __dybatpho_csv_awk_into status json "${delimiter}" <<< "${text}"
+    ((status == 3)) || return "${status}"
+  fi
+  __dybatpho_csv_records_into records names "${text}" "${delimiter}"
 
   if ((${#records[@]} == 0)); then
     printf '[]\n'

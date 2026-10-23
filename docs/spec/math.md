@@ -204,6 +204,36 @@ verify each exact or rounded result and each refusal.
 
 ---
 
+### User Story 8 - Compute in a loop and over long lists without waiting (Priority: P2)
+
+As a script author, I want to accumulate a total in a loop without a subshell
+per step, and to aggregate thousands of values in a fraction of a second, so
+that exact arithmetic is not the slow part of a report.
+
+**Why this priority**: `x=$(dybatpho::math_add "${x}" 1.5)` forks once per
+step, and a digit-by-digit sum of 5,000 values took seconds; scripts went back
+to `awk` floats to avoid both.
+
+**Independent Test**: Accumulate with the `_into` variants and compare against
+the printing forms; aggregate the same list with `DYBATPHO_MATH_ENGINE=awk`
+and `=bash` under every `awk` installed and compare the output.
+
+**Acceptance Scenarios**:
+
+1. **Given** a variable name and operands, **When** an `_into` variant runs,
+   **Then** the variable holds exactly what the printing form would print, and
+   a bad value or name stops the script in the caller's shell
+2. **Given** 32 values or more and `awk` installed, **When** a sum, mean,
+   minimum, maximum, median, percentile or standard deviation is asked for,
+   **Then** the `awk` engine computes it with the same digits as the Bash engine
+3. **Given** a value that is not a number, **When** the `awk` engine meets it,
+   **Then** the Bash engine reruns the aggregate and stops with its message
+4. **Given** two short operands, **When** they are added, subtracted,
+   multiplied or compared, **Then** the result comes from Bash arithmetic and is
+   identical to the digit-by-digit answer
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -254,13 +284,21 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - A value read from standard input is a glob character such as `*` or `?`.
 - Standard input ends without a newline after its last value.
 - A scale is written with a leading zero, such as `08`, or an exponent is longer than 64 bits.
+- An aggregate is long enough for the `awk` engine, `awk` is gawk, mawk,
+  BusyBox or BSD `awk`, or no `awk` is installed.
+- Operands sit at the edge of what Bash arithmetic holds: seventeen or eighteen
+  significant digits, or a product of two nine-digit values.
+- An `_into` variant is handed a variable named like one of its own locals, a
+  reserved `__dybatpho` name, or an invalid name.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The module MUST perform its arithmetic without `bc`, `awk`, or
-  any other external command.
+- **FR-001**: The module MUST perform its arithmetic without requiring `bc`,
+  `awk`, or any other external command. When `awk` is installed it MAY run the
+  list aggregates, using its numbers only as integers below 2^53, so that no
+  result is ever a binary approximation.
 - **FR-002**: Addition, subtraction and multiplication MUST be exact and MUST
   NOT be limited to the range of Bash integer arithmetic.
 - **FR-003**: The module MUST accept plain decimal notation with an optional
@@ -324,6 +362,25 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **FR-027**: `dybatpho::math_sum` of no values MUST print `0` on Bash 4.3; `dybatpho::math_random` MUST read a bound with a leading zero in base ten, with its sign.
 - **FR-028**: A scale given to `dybatpho::math_div`, `math_round`, `math_sqrt`, `math_percent`, `math_pow`, or through `DYBATPHO_MATH_SCALE`, MUST be read in base ten whatever zeros it leads with; `dybatpho::math_pow` MUST refuse an exponent whose magnitude exceeds `DYBATPHO_MATH_MAX_EXPONENT` however many digits it has, rather than wrapping it.
 
+- **FR-029**: `math_add_into`, `math_sub_into`, `math_mul_into`,
+  `math_div_into`, `math_compare_into` and `math_round_into` MUST set the named
+  variable to exactly what `math_add`, `math_sub`, `math_mul`, `math_div`,
+  `math_compare` and `math_round` print for the same operands, MUST validate in
+  the caller's shell, and MUST refuse a name `dybatpho::expect_ref` refuses.
+- **FR-030**: `math_sum`, `math_avg`, `math_min`, `math_max`, `math_median`,
+  `math_percentile` and `math_stddev` MUST run through `awk` when it is
+  installed, the list has at least 32 values, and `DYBATPHO_MATH_ENGINE` is
+  `auto`, the default; `awk` MUST use it for any list and `bash` never. The
+  output MUST be identical to the Bash engine's under gawk, mawk, BusyBox and
+  BSD `awk`.
+- **FR-031**: A value the `awk` engine cannot answer for exactly — not a
+  number, or holding a line break — MUST hand the aggregate to the Bash
+  engine, which reports it; an unknown `DYBATPHO_MATH_ENGINE` MUST stop the
+  script naming the accepted values.
+- **FR-032**: Addition, subtraction, multiplication and comparison of operands
+  short enough for Bash arithmetic MUST give the same canonical result as the
+  digit-by-digit path.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Value**: A decimal written as an optional sign, digits, an optional `.`,
@@ -352,6 +409,9 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **SC-007**: A script reports the median, the 90th or 99th percentile, and the
   standard deviation of a list of timings with no external command, and gets
   the same answer on every machine.
+- **SC-008**: With `awk` installed, every aggregate over 5,000 values finishes
+  in about a tenth of a second, and 1,000 `_into` additions in under half a
+  second.
 
 ## Integration Tests *(mandatory)*
 
@@ -395,12 +455,27 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **IT-019**: Sum nothing and get `0`; draw from `08..08` and `-08..-08` and get `8` and `-8`.
 - **IT-020**: Round, divide, take a root, average and spread with a scale of `08`, `09` or `03`; raise `2` to `18446744073709551617` and see it refused, and to `0010` and get `1024`; interpolate a percentile from an already sorted list.
 
+- **IT-021**: Fill variables through `math_add_into`, `math_sub_into`,
+  `math_mul_into`, `math_div_into`, `math_compare_into` and `math_round_into`,
+  including names the functions use for their own locals, and see a bad value,
+  scale, invalid name and reserved name refused.
+- **IT-022**: Add, multiply and compare at seventeen and eighteen significant
+  digits and across the edge into the digit path.
+- **IT-023**: Run every aggregate over one list of long, signed, zero-padded
+  and differently spelled values with `DYBATPHO_MATH_ENGINE=awk` and get the
+  Bash engine's output, under every `awk` on `PATH`.
+- **IT-024**: Feed a non-number and a value with a line break to both engines
+  and get the same failure.
+- **IT-025**: Observe through a logging `awk` that `auto` starts it from 32
+  values only and `bash` never; average without `awk` on `PATH`; refuse
+  `DYBATPHO_MATH_ENGINE=fast`.
+
 ## Acceptance Criteria *(mandatory)*
 
 1. Every arithmetic, comparison, rounding, aggregation and whole-number helper
    advertised in the library README, docs and example is available and behaves
    as specified.
 2. No operation depends on an external command, on binary floating point, or on
-   the host locale.
+   the host locale; `awk`, when installed, only makes the aggregates faster.
 3. Every failure mode listed in the requirements stops the script with a
    message naming the public function and the offending value.

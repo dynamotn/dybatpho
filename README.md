@@ -264,6 +264,19 @@ in any release.
 | [date.sh](docs/date.md)        | stable | Dates, timestamps, day arithmetic — GNU and BSD     |
 | [i18n.sh](docs/i18n.md)        | experimental | Translations, plural rules, locale-aware numbers, money, sizes and dates |
 
+> **How much data is comfortable?** `csv.sh` and the list aggregates of
+> `math.sh` run through one POSIX `awk` program once the input is large enough
+> to repay starting it — a few kilobytes of CSV, or 32 values — when `awk` is
+> installed (gawk, mawk, BusyBox and BSD `awk` all qualify). That engine prints
+> exactly what the Bash engine prints and never rounds through a float:
+> 5,000 rows convert to JSON, filter or sort in about a tenth of a second, and
+> 5,000 decimals sum in a few hundredths. Without `awk`, or with
+> `DYBATPHO_CSV_ENGINE=bash` / `DYBATPHO_MATH_ENGINE=bash`, the same work runs
+> in Bash at roughly a millisecond a row or value — fine into the low
+> thousands. In a loop, use the `_into` variants such as
+> `dybatpho::math_add_into total "${total}" "${x}"` instead of
+> `total=$(dybatpho::math_add …)`, which pays for a subshell every step.
+
 ### 🖥️ CLI building
 
 | Module               | Tier | What you get                                                                                                 |

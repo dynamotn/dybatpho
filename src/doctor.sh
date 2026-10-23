@@ -109,8 +109,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # Go one understands, and flattens every format with `jq`.
   [config]="jq yq>=4"
   # Only `dybatpho::csv_from_json` needs it: the module parses and writes CSV in
-  # Bash alone.
-  [csv]="jq"
+  # Bash alone. `awk` runs the bulk operations faster on a large input, with
+  # the same output.
+  [csv]="jq awk"
   # `dybatpho::diff_text` needs nothing external beyond `diff`; comparing by
   # key is built on one `jq` filter, and YAML reaches JSON through `yq`.
   [diff]="jq yq>=4"
@@ -123,6 +124,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # one before v4 take a different command line, so a plain presence check
   # would pass on a host where every YAML call then fails.
   [json]="yq>=4"
+  # The list aggregates run through `awk` on a long list when it is there, and
+  # in Bash, with the same digits, when it is not.
+  [math]="awk"
   # `timeout` bounds the connection `dybatpho::port_open` makes. Without it the
   # probe still works and waits as long as the system's own TCP timeout.
   [network]="sha256sum md5sum timeout"

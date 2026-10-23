@@ -12,7 +12,9 @@
 #   math_eq, math_round, math_floor, math_ceil, math_trunc, math_min, math_max,
 #   math_sum, math_avg, math_median, math_percentile, math_stddev, math_sqrt,
 #   math_clamp, math_percent, math_gcd, math_lcm,
-#   math_random, math_is_number and math_is_integer, by pricing an invoice and
+#   math_random, math_is_number and math_is_integer, and the `_into` variants
+#   math_add_into, math_sub_into, math_mul_into, math_div_into,
+#   math_compare_into and math_round_into, by pricing an invoice and
 #   summarizing a batch of timings.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
@@ -257,6 +259,38 @@ function _demo_validation {
   dybatpho::success "Ranked by value: ${math_compare} means ${reported} < 12.8"
 }
 
+# @description Run the `A LOOP WITHOUT A SUBSHELL A STEP` section of this example.
+# @noargs
+function _demo_loops {
+  dybatpho::header "A LOOP WITHOUT A SUBSHELL A STEP"
+  # `total=$(dybatpho::math_add ...)` forks once a step; the `_into` variants
+  # fill the variable in this shell instead, with the same exact digits.
+  local -a readings=()
+  local index total=0 largest_seen=0 order
+  for ((index = 1; index <= 500; index++)); do
+    readings+=("$((index % 97)).$((index % 10))5")
+  done
+  for index in "${!readings[@]}"; do
+    dybatpho::math_add_into total "${total}" "${readings[index]}"
+    dybatpho::math_compare_into order "${readings[index]}" "${largest_seen}"
+    ((order <= 0)) || largest_seen="${readings[index]}"
+  done
+  dybatpho::info "500 readings add up to ${total}, the largest is ${largest_seen}"
+
+  local mean rounded spare doubled
+  dybatpho::math_div_into mean "${total}" "${#readings[@]}" 4
+  dybatpho::math_round_into rounded "${mean}" 1
+  dybatpho::math_sub_into spare 100 "${rounded}"
+  dybatpho::math_mul_into doubled "${rounded}" 2
+  dybatpho::info "Mean ${mean}, rounded ${rounded}, ${spare} below 100, doubled ${doubled}"
+
+  # From 32 values up the aggregates run through `awk` when it is installed,
+  # and give the same answer as the loop above to the last digit.
+  local summed
+  summed="$(dybatpho::math_sum ${readings[@]+"${readings[@]}"})"
+  dybatpho::info "dybatpho::math_sum over the same list: ${summed}"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -267,6 +301,7 @@ function _main {
   _demo_progress
   _demo_whole_numbers
   _demo_validation
+  _demo_loops
   dybatpho::success "Math operations demo complete"
 }
 

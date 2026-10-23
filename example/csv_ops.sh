@@ -5,7 +5,8 @@
 # @file csv_ops.sh
 # @brief Example reading a billing export that quotes its fields
 # @description Demonstrates dybatpho::csv_read, csv_fields, csv_write, csv_header, csv_col,
-#   csv_filter, csv_to_json, csv_from_json, csv_convert, csv_select, csv_sort, and csv_join
+#   csv_filter, csv_to_json, csv_from_json, csv_convert, csv_select, csv_sort, and csv_join,
+#   and DYBATPHO_CSV_ENGINE choosing between the awk and Bash engines
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules csv json
@@ -149,6 +150,33 @@ function _demo_tsv {
   DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col "${tsv}" "owner"
 }
 
+# @description Filter and sort a few hundred rows, the size where the `awk`
+#   engine takes over, and show the Bash engine prints the same bytes.
+# @noargs
+function _demo_large {
+  dybatpho::header "A LARGE EXPORT"
+  local large index
+  large="$(
+    printf 'service,owner,cost\n'
+    for ((index = 1; index <= 600; index++)); do
+      printf 'svc-%d,"team %d, ops",%d.%02d\n' "${index}" "$((index % 7))" "$((index % 300))" "$((index % 100))"
+    done
+  )"
+  local fast careful
+  # From a few kilobytes of input `auto` runs one `awk` program when `awk` is
+  # installed; `bash` pins the shell engine, which is the fallback anyway.
+  fast="$(dybatpho::csv_filter "${large}" cost gt 290)"
+  careful="$(DYBATPHO_CSV_ENGINE=bash dybatpho::csv_filter "${large}" cost gt 290)"
+  [[ "${fast}" == "${careful}" ]] || dybatpho::die "The two engines disagree" # kcov(skip)
+  local -a kept=() ranked=()
+  mapfile -t kept <<< "${fast}"
+  dybatpho::info "Both engines kept the same $((${#kept[@]} - 1)) rows; the top three:"
+  local sorted
+  sorted="$(dybatpho::csv_sort "${fast}" cost desc)"
+  mapfile -t ranked <<< "${sorted}"
+  printf '%s\n' "${ranked[@]:0:4}"
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -163,6 +191,7 @@ function _main {
   _demo_json "${fixture}"
   _demo_normalize "${fixture}"
   _demo_tsv "${fixture}"
+  _demo_large
   dybatpho::success "CSV operations demo complete"
 }
 

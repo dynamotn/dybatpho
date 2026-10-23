@@ -158,6 +158,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - A date in the first days of January belongs to the previous ISO week-year, or one in the last days of December to the next.
 - A year has 53 ISO weeks.
 - A timezone name is misspelled, is a path, or is a POSIX rule string, any of which `date` would quietly treat as UTC.
+- The date given to `dybatpho::date_add` carries a time of day and the amount is negative, or the amount is written with a leading zero.
+- An ISO 8601 timestamp ends in `Z` or in an offset with a colon, which BSD `date -j -f %z` does not read.
 
 ## Requirements *(mandatory)*
 
@@ -200,6 +202,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **FR-018**: The module MUST print a date, parsed in the configured timezone, as it reads in a named target timezone, default format `%F %T %z`. It MUST accept `UTC`, `GMT`, and any path-shaped name that exists under `TZDIR` or `/usr/share/zoneinfo`, and MUST stop the script for any other zone rather than letting `date` fall back to UTC.
 - **FR-019**: `dybatpho::date_parse` MUST refuse an empty or blank string on every platform.
 - **FR-020**: On BusyBox, `dybatpho::date_parse` MUST read an ISO 8601 timestamp ending in `Z`, `+hhmm` or `+hh:mm` by applying the offset itself.
+- **FR-021**: `dybatpho::date_add` MUST shift a date that carries a time of day by a signed amount on every `date` flavor, and MUST read an amount with a leading zero in base ten; `dybatpho::date_seconds_to_hms` MUST read its argument in base ten and never print `-0:00:00`.
+- **FR-022**: Parsing MUST read an ISO 8601 date and time with a `Z`, `+HH:MM` or `+HHMM` offset on GNU, BSD and BusyBox `date`, and MUST reject one whose day the platform would roll over.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -247,6 +251,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **IT-025**: Detect a `date` that accepts `-d` but has no `--version` as GNU, and one that takes `-D` as BusyBox.
 - **IT-026**: Parse `""` and `"   "` and get status 1.
 - **IT-027**: On BusyBox, parse `2024-02-29T12:34:56Z`, `+02:00` and `-0130` and get `1709210096`, `1709202896` and `1709215496`.
+- **IT-028**: Shift `2024-01-01 10:00:00` by `-5 hours`, `-5 days` and `5 hours`; shift a date by `08` and `-08` days; write `08`, `-0090` and `-0` seconds as a length of time; refuse an empty date.
+- **IT-029**: Parse `2024-02-29T12:34:56` with `Z`, `+02:00` and `-0130` on every platform and with BSD `date` forced; refuse `2024-02-30T12:34:56Z`.
 
 ## Acceptance Criteria *(mandatory)*
 

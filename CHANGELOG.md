@@ -319,6 +319,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `-0.0000001` passed `min:0`, twenty-digit decimals compared wrongly, `1e400`
   stopped the script, and `minlen:+3` failed every value.
 
+- **`date` — `dybatpho::date_add` and `dybatpho::date_parse` across date
+  flavors.** With GNU `date`, `2024-01-01 10:00:00` minus 5 hours gave 16:00.
+  With BSD `date`, `…Z` and `…+02:00` were not read and Feb 30 rolled into
+  March. Amounts such as `08` are read in base ten.
+
 ### Security
 
 - **Arithmetic no longer runs a command passed as a number.**

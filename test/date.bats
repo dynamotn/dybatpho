@@ -348,14 +348,44 @@ setup() {
   run -1 dybatpho::date_parse "   "
 }
 
-@test "dybatpho::date_parse reads an ISO 8601 offset on BusyBox" {
-  local flavor
-  __dybatpho_date_flavor_into flavor
-  [[ "${flavor}" == busybox ]] || skip "only BusyBox date lacks %z"
+@test "dybatpho::date_parse reads an ISO 8601 offset on every platform" {
+  # BusyBox `date -D` has no `%z`, and BSD's reads neither `Z` nor `+02:00`.
   run_traced dybatpho::date_parse "2024-02-29T12:34:56Z"
   assert_output "1709210096"
   run_traced dybatpho::date_parse "2024-02-29T12:34:56+02:00"
   assert_output "1709202896"
   run_traced dybatpho::date_parse "2024-02-29T12:34:56-0130"
   assert_output "1709215496"
+}
+
+@test "dybatpho::date_add shifts back from a time of day rather than reading the amount as a zone" {
+  # GNU `date -d "10:00:00 -5 hours"` reads `-5` as a UTC offset and answered
+  # 16:00; the offset now goes before the date.
+  assert_equal "$(dybatpho::date_add '2024-01-01 10:00:00' -5 hours '%F %T')" "2024-01-01 05:00:00"
+  assert_equal "$(dybatpho::date_add '2024-01-01 10:00:00' -5 days '%F %T')" "2023-12-27 10:00:00"
+  assert_equal "$(dybatpho::date_add '2024-01-01 10:00:00' 5 hours '%F %T')" "2024-01-01 15:00:00"
+}
+
+@test "dybatpho::date_add and date_seconds_to_hms read a leading zero in base ten" {
+  assert_equal "$(dybatpho::date_add 2024-01-01 08 days '%F')" "2024-01-09"
+  assert_equal "$(dybatpho::date_add 2024-01-01 -08 days '%F')" "2023-12-24"
+  assert_equal "$(dybatpho::date_seconds_to_hms 08)" "0:00:08"
+  assert_equal "$(dybatpho::date_seconds_to_hms -0090)" "-0:01:30"
+  assert_equal "$(dybatpho::date_seconds_to_hms -0)" "0:00:00"
+}
+
+@test "dybatpho::date_add refuses an empty date" {
+  run --separate-stderr dybatpho::date_add "" 1 days
+  assert_failure
+}
+
+@test "dybatpho::date_parse reads an ISO 8601 offset with BSD date and refuses a day past the month" {
+  /bin/date -j -f %s 0 +%s &> /dev/null || skip "no BSD date at /bin/date"
+  # `date -j` rolls `02-30` over into March rather than refusing it.
+  PATH="/usr/bin:/bin" run_traced dybatpho::date_parse "2024-02-29T12:34:56Z"
+  assert_output "1709210096"
+  PATH="/usr/bin:/bin" run_traced dybatpho::date_parse "2024-02-29T12:34:56+02:00"
+  assert_output "1709202896"
+  PATH="/usr/bin:/bin" run_traced -1 dybatpho::date_parse "2024-02-30T12:34:56Z"
+  run_traced -1 dybatpho::date_parse "2024-02-30T12:34:56Z"
 }

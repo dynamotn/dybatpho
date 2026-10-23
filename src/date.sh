@@ -116,9 +116,10 @@ function __dybatpho_date_parse {
     fi
   done
   # Offset-aware timestamps cannot round-trip literally, so a plain parse wins.
-  if [[ "${flavor}" == "busybox" ]]; then
-    # BusyBox `date -D` has no `%z`, so the offset is taken off here: the
-    # local part is read as UTC and the offset subtracted from it.
+  # BusyBox `date -D` has no `%z`, and BSD's `%z` reads neither `Z` nor
+  # `+02:00`, so the offset is taken off here: the local part is read as UTC
+  # and the offset subtracted from it.
+  if [[ "${flavor}" == "busybox" || "${flavor}" == "bsd" ]]; then
     if [[ "${input}" =~ ^(.+T[0-9]{2}:[0-9]{2}:[0-9]{2})(Z|[+-][0-9]{2}:?[0-9]{2})$ ]]; then
       local local_part="${BASH_REMATCH[1]}" offset="${BASH_REMATCH[2]}" offset_seconds=0
       if [[ "${offset}" != "Z" ]]; then
@@ -127,8 +128,14 @@ function __dybatpho_date_parse {
         offset_seconds=$((10#${offset_digits:0:2} * 3600 + 10#${offset_digits:2:2} * 60))
         [[ "${offset}" == -* ]] && offset_seconds=$((-offset_seconds))
       fi
-      timestamp="$(DYBATPHO_DATE_TIMEZONE=UTC __dybatpho_date_parse_with busybox "%Y-%m-%dT%H:%M:%S" "${local_part}")" \
+      local local_fmt="%Y-%m-%dT%H:%M:%S"
+      timestamp="$(DYBATPHO_DATE_TIMEZONE=UTC __dybatpho_date_parse_with "${flavor}" "${local_fmt}" "${local_part}")" \
         || return 1
+      # Read back, as the plain forms above are: BSD `date -j` rolls
+      # `02-30` over into March rather than refusing it.
+      local round_trip
+      round_trip=$(DYBATPHO_DATE_TIMEZONE=UTC dybatpho::date_format "${timestamp}" "${local_fmt}" 2> /dev/null)
+      [[ "${round_trip}" == "${local_part}" ]] || return 1
       printf '%s\n' "$((timestamp - offset_seconds))"
       return 0
     fi
@@ -420,10 +427,15 @@ function dybatpho::date_add {
   # the whole call, so the status is checked here rather than assumed.
   unit_seconds="$(__dybatpho_date_unit_seconds "${unit}")" || return 1
 
+  # Empty is not a date on any system; GNU would read it as now.
+  [[ -n "${input//[[:space:]]/}" ]] || return 1
+
   if __dybatpho_date_is_gnu; then
     # GNU's relative syntax walks the calendar itself, which keeps the answer
-    # right across a daylight-saving change in a non-UTC timezone.
-    TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input} ${amount} ${unit}" +"${format}"
+    # right across a daylight-saving change in a non-UTC timezone. The offset
+    # goes first: after a time of day GNU reads a signed amount as a zone, so
+    # `10:00:00 -5 hours` came out as 16:00 and `10:00 -5 days` as the next day.
+    TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${amount} ${unit} ${input}" +"${format}"
     return
   fi
   # No other `date` understands a relative offset, so the shift is arithmetic
@@ -431,7 +443,10 @@ function dybatpho::date_add {
   # system formats a timestamp — BusyBox reads `-r` as a file, not a time.
   local timestamp
   timestamp=$(__dybatpho_date_parse "${input}") || return $?
-  dybatpho::date_format "$((timestamp + amount * unit_seconds))" "${format}"
+  # Read in base ten: a leading zero would make `08` an invalid octal number.
+  local magnitude=$((10#${amount#-}))
+  [[ "${amount}" == -* ]] && magnitude=$((-magnitude))
+  dybatpho::date_format "$((timestamp + magnitude * unit_seconds))" "${format}"
 }
 
 #######################################
@@ -489,10 +504,13 @@ function dybatpho::date_seconds_to_hms {
   [[ "${total}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${total}' is not a whole number of seconds"
   local sign=""
-  if ((total < 0)); then
+  if [[ "${total}" == -* ]]; then
     sign="-"
-    total=$((-total))
+    total="${total#-}"
   fi
+  # Read in base ten: a leading zero would make `08` an invalid octal number.
+  total=$((10#${total}))
+  ((total > 0)) || sign=""
   printf '%s%d:%02d:%02d\n' \
     "${sign}" "$((total / 3600))" "$(((total % 3600) / 60))" "$((total % 60))"
 }

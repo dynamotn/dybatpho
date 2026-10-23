@@ -155,7 +155,7 @@ dybatpho::assert_mock_called kubectl get pods
 
 **[`dybatpho::assert_exit_code`](#dybatphoassert_exit_code)**
 
-- A command that calls `exit` ends the shell running it. Wrap a script's function in `bash -c` or call the script itself when it exits rather than returns.
+- A command that calls `exit` ends the shell running it. Run a function that exits rather than returns through `dybatpho::try '' '' -- fn`, or call the script itself.
 
 **[`dybatpho::assert_duration_under`](#dybatphoassert_duration_under)**
 

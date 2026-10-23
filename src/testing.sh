@@ -705,9 +705,9 @@ function dybatpho::assert_cli_snapshot {
 #         command's own output
 # @exitcode 0 The command exited with the expected status
 # @exitcode 1 The command exited with any other status
-# @tip A command that calls `exit` ends the shell running it. Wrap a script's
-#      function in `bash -c` or call the script itself when it exits rather than
-#      returns.
+# @tip A command that calls `exit` ends the shell running it. Run a function
+#      that exits rather than returns through `dybatpho::try '' '' -- fn`, or
+#      call the script itself.
 #######################################
 function dybatpho::assert_exit_code {
   local __dybatpho_test_exit_expected __dybatpho_test_exit_separator

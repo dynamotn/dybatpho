@@ -221,6 +221,26 @@ function dybatpho::i18n_locale {
 }
 
 #######################################
+# @description Store the locale in effect in a variable: what
+#   `dybatpho::i18n_locale` prints, without the subshell a `$(...)` costs. Like
+#   a call inside `$(...)`, it remembers nothing, so a locale that was never
+#   pinned still follows the environment from one call to the next.
+# @arg $1 string Name of the variable receiving the locale tag
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_i18n_locale_into {
+  local -n __locale_into_out="$1"
+  if [[ -n "${__dybatpho_i18n_state[locale]-}" ]]; then
+    __locale_into_out="${__dybatpho_i18n_state[locale]}"
+    return 0
+  fi
+  local __locale_into_resolved
+  __dybatpho_i18n_resolve __locale_into_resolved
+  __locale_into_out="${__locale_into_resolved}"
+}
+
+#######################################
 # @description Use a locale for every later translation and formatting call.
 # @example
 #   dybatpho::i18n_set_locale vi_VN
@@ -389,7 +409,17 @@ function __dybatpho_i18n_lookup {
   local -n __lookup_out="${__lookup_target}"
   __lookup_out=""
   local locale chain hit category language
-  chain="$(dybatpho::i18n_chain)"
+  # The chain is worked out in this shell and kept per locale and fallback:
+  # asked through `$(...)`, its cache died with the subshell, and every lookup
+  # paid for two subshells and the whole computation again.
+  __dybatpho_i18n_locale_into locale
+  local chain_key="lookup-chain:${locale}${__DYBATPHO_I18N_US}${DYBATPHO_I18N_FALLBACK-}"
+  if [[ -n "${__dybatpho_i18n_state[${chain_key}]+set}" ]]; then
+    chain="${__dybatpho_i18n_state[${chain_key}]}"
+  else
+    chain="$(dybatpho::i18n_chain "${locale}")"
+    __dybatpho_i18n_state["${chain_key}"]="${chain}"
+  fi
   while IFS= read -r locale; do
     [[ -n "${locale}" ]] || continue
     if [[ -n "${count}" ]]; then
@@ -397,7 +427,8 @@ function __dybatpho_i18n_lookup {
       # not the one that was asked for. Falling back from Russian to English has
       # to switch rules too, or a Russian `few` would be looked for in an
       # English catalog that has no such category.
-      language="$(__dybatpho_i18n_language "${locale}")"
+      language="${locale%%@*}"
+      language="${language%%[_-]*}"
       category="$(__dybatpho_i18n_plural_category "${language}" "${count}")"
       local plural_key="${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}${category}"
       hit="${__dybatpho_i18n_plural[${plural_key}]-${__DYBATPHO_I18N_NONE}}"
@@ -949,7 +980,7 @@ function dybatpho::i18n_t {
   dybatpho::expect_args key -- "$@"
   shift
   local locale template rendered
-  locale="$(dybatpho::i18n_locale)"
+  __dybatpho_i18n_locale_into locale
   if __dybatpho_i18n_lookup template "${key}"; then
     __dybatpho_i18n_interpolate rendered "${template}" "$@"
     printf '%s' "${rendered}"
@@ -1583,7 +1614,9 @@ function dybatpho::i18n_percent {
   local number pattern
   __dybatpho_i18n_number_into number "${value}" "${precision}" "${locale}"
   __dybatpho_i18n_data_into pattern DYBATPHO_I18N_NUMBER "${locale}" percent || pattern="#%"
-  local rendered="${pattern//\#/${number}}"
+  # The replacement is quoted: from Bash 5.2 an unquoted one reads `&` as the
+  # matched text, and a registered separator or symbol may hold one.
+  local rendered="${pattern//\#/"${number}"}"
   printf '%s\n' "${rendered}"
 }
 
@@ -1654,8 +1687,10 @@ function dybatpho::i18n_currency {
   __dybatpho_i18n_number_into number "${amount}" "${digits}" "${locale}"
   __dybatpho_i18n_data_into layout DYBATPHO_I18N_CURRENCY_LAYOUT "${locale}" layout || layout='¤#'
   __dybatpho_i18n_data_into minus DYBATPHO_I18N_NUMBER "${locale}" minus || minus="-"
-  rendered="${layout/¤/${symbol}}"
-  rendered="${rendered/\#/${number}}"
+  # Quoted replacements: from Bash 5.2 an unquoted `&` stands for the matched
+  # placeholder, so a currency registered as `R&D` rendered as `R¤D`.
+  rendered="${layout/¤/"${symbol}"}"
+  rendered="${rendered/\#/"${number}"}"
   local i18n_negative
   i18n_negative=$(__dybatpho_i18n_negative "${rendered}" "${minus}")
   printf '%s\n' "${i18n_negative}"

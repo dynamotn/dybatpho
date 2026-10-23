@@ -1684,3 +1684,35 @@ _i18n_spec_abbr() {
   run_traced -0 dybatpho::i18n_tn app.files 01
   assert_output "1 file"
 }
+
+@test "i18n_currency and i18n_percent keep an ampersand or backslash in what they insert" {
+  # From Bash 5.2 an unquoted replacement reads `&` as the matched text, so a
+  # currency registered as `R&D` rendered as `R¤D`.
+  dybatpho::i18n_register_currency XRD "R&D\\" 2
+  run_traced dybatpho::i18n_currency 5 XRD en
+  assert_output "R&D\\5.00"
+  dybatpho::i18n_register_number xx '&' '.' 3
+  run_traced dybatpho::i18n_percent 1234 0 xx
+  assert_output '1&234%'
+}
+
+@test "a lookup follows the environment and the fallback when no locale is pinned" {
+  # The chain is now kept in this shell; it must still follow a locale that
+  # changes with the environment and a fallback changed between calls.
+  unset DYBATPHO_I18N_LOCALE
+  __dybatpho_i18n_store vi greet "Xin chào"
+  __dybatpho_i18n_store fr greet "Bonjour"
+  LC_ALL=vi_VN.UTF-8
+  run_traced dybatpho::i18n_t greet
+  assert_output "Xin chào"
+  LC_ALL=fr_FR.UTF-8
+  run_traced dybatpho::i18n_t greet
+  assert_output "Bonjour"
+  LC_ALL=de_DE.UTF-8
+  DYBATPHO_I18N_FALLBACK="vi"
+  run_traced dybatpho::i18n_t greet
+  assert_output "Xin chào"
+  DYBATPHO_I18N_FALLBACK=fr
+  run_traced dybatpho::i18n_t greet
+  assert_output "Bonjour"
+}

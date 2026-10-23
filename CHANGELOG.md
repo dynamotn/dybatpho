@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in for `date`, and level checks no longer build tables per line.
   `dybatpho::info` drops from about 1.4 ms to 0.5 ms with every module loaded.
 
+- **`i18n` — `dybatpho::i18n_t` is about nine times faster.** The locale and
+  its fallback chain are resolved in the calling shell and kept per locale,
+  rather than rebuilt in subshells on every lookup. An unpinned locale still
+  follows the environment.
+
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
@@ -298,6 +303,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Héllo` slugified to `hssullo`. `dybatpho::string_wrap` keeps text after the
   first newline whatever `IFS` holds, and `dybatpho::url_encode` writes `é` as
   `%C3%A9` on Alpine/musl.
+
+- **`i18n` — an `&` in a registered currency symbol or separator survives on
+  Bash 5.2+.** `R&D` rendered as `R¤D`.
 
 - **`logging` — an internal log call with an uppercase or unknown level no
   longer aborts under `set -u`.**

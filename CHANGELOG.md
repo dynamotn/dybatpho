@@ -86,6 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   due-time sidecars in one pass. On a queue of 1000 jobs, choosing the next
   one drops from about half a second to about 15 ms.
 
+- **`process` — `dybatpho::kill_children` no longer waits a second per job.**
+  A job that ends on SIGTERM is noticed within a tenth of a second; four jobs
+  clear in under half a second instead of four. `dybatpho::is_root` no longer
+  starts `id`.
+
 - **`csv`, `metrics`, `testing` — data paths fork far less.**
   `dybatpho::csv_to_json` is about fifteen times faster and
   `dybatpho::metrics_render` about ten times faster. Snapshot scrubs run in a

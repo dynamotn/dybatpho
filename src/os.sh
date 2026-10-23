@@ -235,9 +235,9 @@ function dybatpho::user {
 # @exitcode 1 The effective user is anybody else
 #######################################
 function dybatpho::is_root {
-  local id
-  id=$(id -u)
-  [[ "${EUID:-${id}}" -eq 0 ]]
+  # Bash always sets `EUID`, so asking `id -u` cost a process on every call
+  # for an answer that was never used.
+  ((EUID == 0))
 }
 
 #######################################

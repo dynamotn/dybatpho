@@ -18,6 +18,10 @@ This document describes the repository workflow and conventions to preserve.
   `docs/init.md` for the bootstrap's own public functions.
 - `docs/spec/` — Spec Kit-style feature specifications.
 - `CHANGELOG.md` — user-visible history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+  Releases before the current major are moved to `docs/changelog/CHANGELOG-<major>.x.md`
+  by `scripts/changelog_archive.sh`.
+- `docs/MIGRATING.md` — what each major version breaks and how to move a script
+  across it; see *Versioning and stability* below.
 - `scripts/test.sh` — test runner; `--coverage` adds the kcov report, and
   `--related <changed files>` runs only the tests covering them (the
   pre-commit hook uses it). Without GNU `parallel` (or with `--shards`) it
@@ -29,6 +33,12 @@ This document describes the repository workflow and conventions to preserve.
   regenerate `docs/`, commit, tag, and publish the GitHub release. Run it with
   `--dry-run` first. Its option checks are covered by `test/release_script.bats`
   and specified in `docs/spec/release.md`.
+- `scripts/changelog_archive.sh` — move released sections older than a cut-off
+  version out of `CHANGELOG.md` into per-major archives; covered by
+  `test/changelog_archive_script.bats`.
+- `scripts/i18n_cldr.sh` — regenerate or check the locale tables of
+  `src/i18n.sh` against Unicode CLDR; covered by `test/i18n_cldr_script.bats`,
+  with deliberate deviations in `scripts/i18n_cldr.allow`.
 - `VERSION` — the version this copy reports through `dybatpho::version`;
   `scripts/release.sh` stamps it in the same commit that tags the release.
 - `.mise.toml` — standard tasks such as `mise run test` and `mise run doc`.
@@ -414,7 +424,9 @@ affect editor navigation.
   a stable `cli.*` or `logging.*` key, with the English the call site already
   built kept as the fallback. Text that counts something goes through the plural
   hook, so the target language picks the form rather than the English test for
-  one.
+  one. The locale tables -- plural families, number and currency symbols,
+  currency layouts, names and date patterns -- are CLDR data copied into
+  `declare -gA` tables; see *Locale data from CLDR* below before editing one.
 - **Observability module** (`metrics`): recording must never change what a
   script does, so a timing helper returns the command's exit code unchanged and
   the hooks in `helpers`, `logging`, and `network` stay inert unless the module
@@ -498,12 +510,120 @@ changelog entry, never a generated commit list — which is the other reason the
 changelog rule above is not negotiable: an entry missing at release time is an
 entry missing from the published notes.
 
+## Versioning and stability
+
+The policy users rely on is in the README's *Versioning and stability* section:
+semantic versioning, stable and experimental module tiers, a deprecation window
+of at least one minor release for a stable API, and breaking changes batched
+into planned majors. These are the mechanics behind it.
+
+### Adding a deprecation
+
+A stable function, option or variable is never removed in the release that
+replaces it. In a minor release:
+
+1. Add the replacement, with its tests, docs, spec and example as usual.
+2. Keep the old name working as a thin wrapper over the new one. Tag its comment
+   block `# @deprecated Use dybatpho::<new> instead; removed in <next major>.`,
+   which `sh-docs` renders as a callout, and have it warn once per process with
+   `dybatpho::warn` behind a non-exported guard variable named
+   `__dybatpho_<module>_deprecated_<name>`, so a loop does not flood stderr. A
+   renamed variable is read under both names, the old one with the same
+   one-time warning; a CLI option or command uses the `deprecated:` attribute.
+3. Keep the old name in `test/<module>.bats`: one test that it still behaves
+   like the new one and warns once.
+4. Add a `### Deprecated` changelog entry naming the old and the new call.
+
+An experimental module may change or drop an API in a minor release without
+this window, but the change still gets a changelog entry that says the module
+is experimental.
+
+### Recording a breaking change
+
+Removing a deprecated API, or changing a stable contract in a way a working
+script would notice, is a breaking change. It lands only on the branch for the
+next planned major, and in the same change:
+
+- the changelog entry under `## [Unreleased]` is marked **BREAKING** and shows
+  the old call and the new one (see *Changelog requirements*);
+  `scripts/release.sh` reads that marker and refuses to cut anything but a
+  major release;
+- `docs/MIGRATING.md` gains the migration under the `N.x to N+1.0` section of
+  that major, created with the first breaking change it receives. Each entry
+  says what stops working, how a script notices (an error message, a changed
+  output), and the edit that fixes it, with a before-and-after snippet when the
+  call changes. Order the subsections the way a user should apply them.
+
+`docs/MIGRATING.md` is written for people upgrading, so it holds only what can
+break a working script; a new feature or a fix belongs in the changelog alone.
+Once a major is released, its section is final.
+
+### Archiving the changelog
+
+When a major is released, move the releases before the previous major out of
+`CHANGELOG.md`, so the file a contributor edits stays short:
+
+```bash
+scripts/changelog_archive.sh --before 6.0.0 --dry-run   # list what would move
+scripts/changelog_archive.sh --before 6.0.0
+```
+
+It writes `docs/changelog/CHANGELOG-<major>.x.md` per major with the sections
+and their link references, keeps an index of the archives in the preamble of
+`CHANGELOG.md`, and is idempotent. `scripts/lint.sh --stage changelog` checks
+the archives by the same Keep a Changelog rules, and fails when a release is in
+two files or the index links to a missing archive.
+
+## Locale data from CLDR
+
+The tables in `src/i18n.sh` -- `__dybatpho_i18n_plural_family`,
+`DYBATPHO_I18N_NUMBER`, `DYBATPHO_I18N_CURRENCY`,
+`DYBATPHO_I18N_CURRENCY_LAYOUT`, `DYBATPHO_I18N_NAMES` and
+`DYBATPHO_I18N_DATE_PATTERN` -- are derived from Unicode CLDR, and
+`scripts/i18n_cldr.sh` is the way to change or audit them. It reads an unpacked
+[cldr-json](https://github.com/unicode-org/cldr-json) release (the directory that
+holds `cldr-core/`) and never downloads anything itself:
+
+```bash
+curl -fsSLO https://github.com/unicode-org/cldr-json/releases/download/49.0.0/cldr-49.0.0-json-full.zip
+unzip -q cldr-49.0.0-json-full.zip -d /tmp/cldr
+scripts/i18n_cldr.sh --cldr /tmp/cldr --check   # list every difference, exit 1 on drift
+scripts/i18n_cldr.sh --cldr /tmp/cldr           # print the regenerated tables
+```
+
+- The key set comes from the tables themselves. To add a locale, a currency or
+  a language, add its keys with placeholder values, regenerate, and paste the
+  printed `declare -gA` block over the old one.
+- The script brings CLDR into the module's conventions before comparing (plain
+  spaces for the no-break ones the module seeds at load time, `latn` digits,
+  `yyyy` for a lone `y`, `{date}`/`{time}` placeholders, plural rules evaluated
+  for the integers 0 to 1099); its header lists every rule. A group separator
+  that is a space is seeded by `__dybatpho_i18n_seed_symbols`, not tabled, and
+  `--check` compares the exact character the seed writes.
+- A plural family is matched by behaviour, not by name. When no
+  `__dybatpho_i18n_plural_<family>` function reproduces a language's rule,
+  `--check` says so and a new family function is needed.
+- A deliberate deviation goes in `scripts/i18n_cldr.allow` as
+  `TABLE[key] reason`. Regeneration keeps the current value of an allowed
+  entry, and `--check` reports an entry that has come to match CLDR so it can
+  be removed. Never allowlist a difference to make the check pass without a
+  reason a reviewer can weigh.
+- `test/i18n_cldr_script.bats` runs the check against the release pinned in it
+  (`CLDR_TAG`) whenever it can download the files, or against a local copy named
+  by `DYBATPHO_CLDR_JSON`. Moving to a newer release means bumping that tag,
+  running the check, and fixing or allowlisting each new difference in the same
+  change.
+
 ## Bash conventions
 
 - Use Bash 4.3 or newer and always source `init.sh`. That floor is not
   negotiable: modules across the library return values through nameref
   parameters (`local -n`), and the worker pool waits with `wait -n`, both of
-  which arrived in 4.3.
+  which arrived in 4.3. The `bash-versions` CI job runs the suite in the
+  official `bash:4.3`, `4.4`, `5.0` and `5.1` images, so a construct that only
+  a newer Bash accepts fails there; reproduce one locally with
+  `docker run --rm -it bash:4.3`. Only the documentation generator, `sh-docs`,
+  needs 4.4, and the one test that drives it skips on 4.3.
 - Keep compatibility with strict mode (`set -euo pipefail`) **and** with no
   strict mode at all: `init.sh --no-strict` leaves the caller's options alone,
   so library code must not depend on errexit, nounset, pipefail, `extglob`,
@@ -775,7 +895,9 @@ to the module convention.
 | New public function | `test/conventions.bats` — it must appear in `docs/<module>.md` and be named directly in `test/<module>.bats` |
 | New or changed example | `test/examples.bats` — it must run non-interactively, offline, and leave the working tree untouched |
 | Any shell script | `scripts/lint.sh --stage shell` — `dyshellint` (the style guide rules, ShellCheck and shfmt) and `bash -n` over every tracked script |
-| `CHANGELOG.md` | `scripts/lint.sh --stage changelog` — Keep a Changelog headings, dates, and well-formed link reference URLs |
+| `CHANGELOG.md` | `scripts/lint.sh --stage changelog` — Keep a Changelog headings, dates, and well-formed link reference URLs, in the main file and the `docs/changelog/` archives |
+| Breaking change | **BREAKING** changelog entry with old and new call, and its migration in `docs/MIGRATING.md` |
+| Locale table in `src/i18n.sh` | `scripts/i18n_cldr.sh --cldr <cldr-json> --check`, and `test/i18n_cldr_script.bats` |
 | Any public behavior | `CHANGELOG.md` entry under `## [Unreleased]`, in the same change |
 | Any new or rewritten line of a module | `mise run coverage` — the line is covered, or carries a `# kcov(skip)` naming the test that exercises it; the overall figure has not fallen. Invoke the code with `run_traced`, since `run` clears the trap kcov instruments through and hides every line it executes |
 

@@ -176,6 +176,59 @@ jobs:
           chown -R runner .
           su runner -s /bin/bash -c "test/lib/core/bin/bats --jobs 4 test/*.bats"
 
+  bash-versions:
+    name: "Bash ${{ matrix.bash }}"
+    # Every other job runs whatever Bash its image ships, which is 5.2 or newer,
+    # while `AGENT.md` promises 4.3. Nameref quirks, `wait -n`, empty-array
+    # expansion under `set -u` and `${var@Q}` all changed across 4.3-5.1, so the
+    # floor is only a promise while a job runs it. The official `bash` images
+    # build each release from source on Alpine, with the interpreter in
+    # `/usr/local/bin`, ahead of anything `apk` might add to `/bin`.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        bash: ["4.3", "4.4", "5.0", "5.1"]
+    container:
+      image: bash:${{ matrix.bash }}
+    steps:
+      - name: "Install dependencies"
+        env:
+          YQ_VERSION: v4.53.3
+        # GNU coreutils on purpose: the `busybox` job already covers the
+        # BusyBox userland, so this job isolates the Bash version.
+        # git comes first so the checkout below is a real clone: the version
+        # and example tests read the repository's history and working tree.
+        run: |
+          apk add --no-cache git curl gawk jq parallel tar xz zip unzip gzip bzip2 zstd openssl ca-certificates tzdata python3 shadow coreutils findutils sed grep
+          curl -fsSL -o /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          chmod +x /usr/local/bin/yq
+
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: "Run the suite"
+        # As a user permissions apply to: several tests assert that a write is
+        # refused, and root is refused nothing. The version check guards the
+        # point of the job: a `bash` pulled in by a package would shadow
+        # nothing, but one that did would make every run here a 5.2 run.
+        env:
+          WANT: ${{ matrix.bash }}
+        run: |
+          git config --system --add safe.directory "$(pwd)"
+          adduser -D runner
+          chown -R runner .
+          # `su` may hand the user a default PATH, so it is set explicitly.
+          as_runner() { su runner -s /usr/local/bin/bash -c "export PATH=/usr/local/bin:\${PATH}; $1"; }
+          have="$(as_runner 'bash -c "printf %s.%s \${BASH_VERSINFO[0]} \${BASH_VERSINFO[1]}"')"
+          [ "${have}" = "${WANT}" ] || { echo "bash is ${have}, expected ${WANT}"; exit 1; }
+          as_runner 'bash --version | head -n 1 && test/lib/core/bin/bats --jobs 4 test/*.bats'
+
   portable:
     name: "Portable smoke tests (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}

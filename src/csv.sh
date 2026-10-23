@@ -181,16 +181,36 @@ function __dybatpho_csv_split_into {
 }
 
 #######################################
-# @description Return success when a string holds an odd number of quotes,
-#   which is how a record that continues on the next line is recognized.
+# @description Return success when a record is still inside a quoted field at
+#   its end, which is how a record that continues on the next line is
+#   recognized.
+#   Only a quote that begins a field opens one, the way the field splitter reads
+#   it: counting every quote took the inch mark in `55"` for an opening quote and
+#   swallowed every following line into that one record.
 # @arg $1 string Text so far
-# @exitcode 0 The quotes are unbalanced, so the record is not finished
-# @exitcode 1 The quotes are balanced
+# @arg $2 string Delimiter
+# @exitcode 0 A quoted field is still open, so the record is not finished
+# @exitcode 1 Every quoted field is closed
 # @internal
 #######################################
-function __dybatpho_csv_quotes_unbalanced {
-  local quotes="${1//[^\"]/}"
-  ((${#quotes} % 2 == 1))
+function __dybatpho_csv_record_open {
+  local __dybatpho_csv_open_rest="$1" __dybatpho_csv_open_delimiter="$2"
+  # No quote at all is the common line, and it cannot open a field.
+  [[ "${__dybatpho_csv_open_rest}" == *'"'* ]] || return 1
+  while true; do
+    if [[ "${__dybatpho_csv_open_rest}" == '"'* ]]; then
+      __dybatpho_csv_open_rest="${__dybatpho_csv_open_rest:1}"
+      while true; do
+        [[ "${__dybatpho_csv_open_rest}" == *'"'* ]] || return 0
+        __dybatpho_csv_open_rest="${__dybatpho_csv_open_rest#*\"}"
+        # A doubled quote is an escaped one; any other quote closes the field.
+        [[ "${__dybatpho_csv_open_rest}" == '"'* ]] || break
+        __dybatpho_csv_open_rest="${__dybatpho_csv_open_rest:1}"
+      done
+    fi
+    [[ "${__dybatpho_csv_open_rest}" == *"${__dybatpho_csv_open_delimiter}"* ]] || return 1
+    __dybatpho_csv_open_rest="${__dybatpho_csv_open_rest#*"${__dybatpho_csv_open_delimiter}"}"
+  done
 }
 
 #######################################
@@ -227,7 +247,7 @@ function __dybatpho_csv_parse_into {
       __dybatpho_csv_buffer="${__dybatpho_csv_line}"
     fi
 
-    if __dybatpho_csv_quotes_unbalanced "${__dybatpho_csv_buffer}"; then
+    if __dybatpho_csv_record_open "${__dybatpho_csv_buffer}" "${__dybatpho_csv_delimiter}"; then
       # An open quote means the value runs on into the next line.
       __dybatpho_csv_pending=1
       continue
@@ -989,8 +1009,10 @@ function dybatpho::csv_to_json {
     __dybatpho_csv_expect_width fields names "${at}"
     object=""
     for index in "${!names[@]}"; do
-      name_json="$(dybatpho::json_string "${names[${index}]}")"
-      value_json="$(dybatpho::json_string "${fields[${index}]-}")"
+      # Escaped in this shell: a `$(dybatpho::json_string …)` per cell cost two
+      # forks a cell, ten times the time of the rest of the conversion.
+      __dybatpho_json_escape_into name_json "${names[${index}]}"
+      __dybatpho_json_escape_into value_json "${fields[${index}]-}"
       [[ -z "${object}" ]] || object+=","
       object+="${name_json}:${value_json}"
     done
@@ -1059,12 +1081,14 @@ function dybatpho::csv_from_json {
     # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
     filter+=' (.[0] | keys_unsorted) as $k'
     # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
-    filter+=' | ([$k] + [.[] | [ $k[] as $key | (.[$key] // "") | tostring ]])'
+    # Only a missing value or `null` is empty: `// ""` blanked `false` too.
+    filter+=' | ([$k] + [.[] | [ $k[] as $key | .[$key] | if . == null then "" else tostring end ]])'
     filter+=' | .[] | @csv end'
     converted="$(printf '%s' "${text}" | jq -r "${filter}")" \
       || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
   else
-    converted="$(printf '%s' "${text}" | yq eval -p=json -o=csv '.')" \
+    # `yq` writes `null` as the word; `jq` above writes it as an empty value.
+    converted="$(printf '%s' "${text}" | yq eval -p=json -o=csv '(.[][] | select(tag == "!!null")) |= ""')" \
       || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
   fi
 

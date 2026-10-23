@@ -819,3 +819,58 @@ EOF
   LC_ALL=en_US.UTF-8 run_traced dybatpho::csv_filter "${csv}" n gt "Zed"
   assert_output $'n\napple'
 }
+
+@test "dybatpho::csv_read ends a record at a stray quote inside an unquoted field" {
+  # Counting every quote took the inch mark in `55"` for an opening quote and
+  # swallowed every following line into that one record.
+  local -a records=() fields=()
+  dybatpho::csv_read "$(printf 'name,size\nTV,55"\nRadio,1\n"a ""b"" c",2')" records
+  assert_equal "${#records[@]}" 4
+  dybatpho::csv_fields "${records[1]}" fields
+  assert_equal "${fields[1]}" '55"'
+  dybatpho::csv_fields "${records[2]}" fields
+  assert_equal "${fields[0]}" "Radio"
+  dybatpho::csv_fields "${records[3]}" fields
+  assert_equal "${fields[0]}" 'a "b" c'
+
+  # A quoted field that is still open at the line end continues on the next.
+  dybatpho::csv_read "$(printf 'a,b\n"x""\ny",2\n3,4')" records
+  assert_equal "${#records[@]}" 3
+  dybatpho::csv_fields "${records[1]}" fields
+  assert_equal "${fields[0]}" "$(printf 'x"\ny')"
+}
+
+@test "dybatpho::csv_from_json keeps false and blanks only null or a missing value" {
+  # `.[$key] // ""` treats `false` as missing too.
+  run_traced dybatpho::csv_from_json '[{"a":false,"b":0,"c":null,"d":"x"},{"a":true,"b":1}]'
+  assert_success
+  assert_output - << EOF
+a,b,c,d
+false,0,,x
+true,1,,
+EOF
+}
+
+@test "dybatpho::csv_from_json writes null as an empty value when only yq is installed" {
+  command -v yq > /dev/null || skip "yq is not installed"
+  local script="${BATS_TEST_TMPDIR}/yq_only_null.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
+command -v jq > /dev/null && exit 3
+dybatpho::csv_from_json '[{"a":false,"b":0,"c":null,"d":"x"},{"a":true,"b":1}]'
+SCRIPT
+  PATH="$(path_without jq)" run_traced bash "${script}"
+  assert_success
+  assert_output - << EOF
+a,b,c,d
+false,0,,x
+true,1,,
+EOF
+}
+
+@test "dybatpho::csv_to_json escapes every cell without a subshell" {
+  # Each cell went through `$(dybatpho::json_string ...)`: two forks a cell.
+  run_traced dybatpho::csv_to_json "$(printf 'k,v\na\\b,x\ty\n')"
+  assert_success
+  assert_output '[{"k":"a\\b","v":"x\ty"}]'
+}

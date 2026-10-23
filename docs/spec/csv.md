@@ -145,6 +145,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - The delimiter is empty, longer than one character, a quote, a line break, or the unit separator.
 - A value holds the target delimiter of a conversion, or holds the source delimiter that no longer needs quoting.
 - Conversion to JSON is asked for by a script that loaded `csv` without `json`.
+- An unquoted field ends in a quote, such as `55"`, and more records follow it.
+- A JSON value converted to CSV is `false`, `null`, or missing.
 
 ## Requirements *(mandatory)*
 
@@ -189,6 +191,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-037**: `csv_read`, `csv_fields` and `csv_write` MUST read and fill the array the caller named whatever that name is, including names the functions use for their own locals.
 - **FR-038**: `dybatpho::csv_from_json '[]'`, `dybatpho::csv_convert` of an empty table and `dybatpho::csv_sort` of a header-only table MUST succeed on Bash 4.3.
 - **FR-039**: `gt` and `lt` on text in `dybatpho::csv_filter` MUST compare in ASCII order, independent of the locale.
+- **FR-040**: A record MUST continue on the next line only while a field that began with a quote is still open; a quote inside an unquoted field MUST NOT join the following lines to it.
+- **FR-041**: `dybatpho::csv_from_json` MUST write `false` as `false` and only a `null` or missing value as an empty field, with either backend.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -254,6 +258,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-044**: Read, write and split records through arrays named `input`, `target`, `text`, `delimiter`, `record` and `source`.
 - **IT-045**: Convert `[]` and an empty table, sort `n,v`, and get status 0.
 - **IT-046**: Filter `n gt Zed` over `Zed` and `apple` under `en_US.UTF-8` and keep `apple` only.
+- **IT-047**: Read `TV,55"` followed by more records and get each record on its own; read a quoted field still open at the line end and get it joined with the next line.
+- **IT-048**: Convert `false`, `0`, `null` and a missing key to CSV with `jq` and with only `yq`; convert CSV to JSON with a backslash and a tab in a cell.
 
 ## Acceptance Criteria *(mandatory)*
 

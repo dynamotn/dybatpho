@@ -142,7 +142,7 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_do with retries success" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   stub curl \
-    ": echo '300'" \
+    ": echo '502'" \
     ": echo '500'" \
     ": echo '200'; echo 'hahaa' > ${temp_file}"
   run_traced dybatpho::curl_do https://this "${temp_file}"
@@ -171,8 +171,8 @@ c.close()' > "${portfile}" 2> /dev/null &
 @test "dybatpho::curl_do with retries failed" {
   local temp_file="${BATS_TEST_TMPDIR}/curl_do"
   export DYBATPHO_CURL_MAX_RETRIES=1
+  # A 3xx is final and asked for once; a 5xx is retried.
   stub curl \
-    ": echo '300'" \
     ": echo '300'" \
     ": echo '500'" \
     ": echo '500'" \
@@ -379,9 +379,20 @@ c.close()' > "${portfile}" 2> /dev/null &
   stub curl ": echo \"\$*\" > ${temp_file}; echo '200'"
   dybatpho::curl_upload https://this "${temp_file}" note="nightly run" "report=@${upload_file}"
   grep -- "--request POST" "${temp_file}"
-  grep -- "F note=nightly run" "${temp_file}"
+  grep -- "--form-string note=nightly run" "${temp_file}"
   grep -- "F report=@${upload_file}" "${temp_file}"
   unstub curl
+}
+
+@test "dybatpho::curl_upload sends a value starting with < as text, not as a file" {
+  local temp_file="${BATS_TEST_TMPDIR}/curl_upload_text"
+  stub curl ": printf '%s\\n' \"\$@\" > ${temp_file}; echo '200'"
+  dybatpho::curl_upload https://this /dev/null "note=<1 day;type=text/html"
+  unstub curl
+  run grep -c -x -- "--form-string" "${temp_file}"
+  assert_output "1"
+  run grep -c -x -- "-F" "${temp_file}"
+  assert_output "0"
 }
 
 @test "dybatpho::curl_upload allows overriding the request method" {
@@ -747,6 +758,17 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_line --index 0 "page-one"
   assert_line --index 1 "page-two"
   dybatpho::assert_http_called "items?page=2"
+}
+
+@test "dybatpho::curl_paginate resolves a relative next link against the page" {
+  dybatpho::mock_http "items?page=1" 200 'page-one' \
+    'Link: </v1/items?page=2>; rel="next"'
+  dybatpho::mock_http "items?page=2" 200 'page-two'
+
+  run_traced dybatpho::curl_paginate "https://api.example.test/v1/items?page=1"
+  assert_success
+  assert_line --index 1 "page-two"
+  dybatpho::assert_http_called "https://api.example.test/v1/items?page=2"
 }
 
 @test "dybatpho::curl_paginate stops at the page budget" {
@@ -1303,4 +1325,51 @@ HELPER
 @test "__dybatpho_network_rate_spec reads zero-padded numbers in base ten" {
   assert_equal "$(__dybatpho_network_rate_spec 5/08)" "5 8000"
   assert_equal "$(__dybatpho_network_rate_spec 09/08ms)" "9 8"
+}
+
+@test "dybatpho::curl_request follows a same-origin redirect while secret headers are set" {
+  # `curl_request` hands curl a `-D` of its own, and curl keeps only the last
+  # one: the redirect has to be read from that file, not from an empty one.
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  dybatpho::mock_http "api.example.test/start" 302 '' "Location: /final"
+  dybatpho::mock_http "api.example.test/final" 200 'arrived'
+  local body="${BATS_TEST_TMPDIR}/final.txt"
+  run_traced dybatpho::curl_auth_bearer "https://api.example.test/start" "s3cr3t" "${body}"
+  assert_success
+  assert_equal "$(cat "${body}")" "arrived"
+  run_traced dybatpho::mock_http_calls
+  assert_line "https://api.example.test/final"
+}
+
+@test "dybatpho::curl_do sends a secret body byte for byte" {
+  local seen="${BATS_TEST_TMPDIR}/seen-body"
+  stub curl ": cat > ${seen}; echo 200"
+  local DYBATPHO_CURL_SECRET_DATA='a=1&b=2'
+  dybatpho::curl_do "https://example.test/form"
+  unstub curl
+  # No newline is added after the body.
+  assert_equal "$(wc -c < "${seen}" | tr -d ' ')" "7"
+}
+
+@test "dybatpho::curl_do does not retry a final 3xx" {
+  export DYBATPHO_CURL_MAX_RETRIES=2 DYBATPHO_CURL_RETRY_BASE_DELAY=0
+  dybatpho::mock_http "example.test/cached" 304 ''
+  run_traced -3 dybatpho::curl_do "https://example.test/cached"
+  run_traced dybatpho::mock_http_calls
+  assert_output "https://example.test/cached"
+}
+
+@test "secret headers stay out of a set -x trace" {
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  dybatpho::mock_http "api.example.test/me" 200 '{}'
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: traced-key-value")
+  local trace="${BATS_TEST_TMPDIR}/trace"
+  # In a subshell, so the trace switched on here ends with it.
+  (
+    set -x
+    dybatpho::curl_do "https://api.example.test/me"
+  ) 2> "${trace}"
+  grep -q 'x-api-key: traced-key-value' <<< "$(dybatpho::mock_http_payloads)"
+  run grep -c "traced-key-value" "${trace}"
+  assert_output "0"
 }

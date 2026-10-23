@@ -182,7 +182,11 @@ dybatpho::circuit_breaker api.example.test \
 - Retry configuration is overridden through base/max delay, jitter, connect
   timeout, or total timeout environment variables.
 - A response includes a numeric `Retry-After` header.
+- The caller passes its own `-D`, which curl prefers to the library's.
+- A `304 Not Modified`, or a redirect with no `Location:`, comes back.
+- The script runs under `set -x` while a request carries a credential.
 - An upload field references a file path that does not exist.
+- An upload field's value starts with `<` or holds `;type=`, which `-F` would read as a file or an option.
 - A checksum spec uses an unsupported algorithm or the checksum tool isn't installed.
 - A header dump contains multiple response blocks from one or more redirects.
 - A header dump has no status line at all.
@@ -329,6 +333,12 @@ dybatpho::circuit_breaker api.example.test \
 - **FR-040**: `dybatpho::curl_do` MUST NOT hand `-L` to curl while `DYBATPHO_CURL_SECRET_HEADERS` is set; it MUST follow a redirect within the same origin with the headers, drop them before following one to another origin, and refuse one to another origin when `DYBATPHO_CURL_SECRET_DATA` is set.
 - **FR-041**: `DYBATPHO_CURL_MAX_REDIRECTS` (default `20`) MUST bound the redirects `dybatpho::curl_do` follows itself; past it the last 3xx status is returned as exit code 3.
 - **FR-042**: A rate limit spec MUST read its count and window in base ten, so `5/08` is five calls in eight seconds.
+- **FR-043**: `dybatpho::curl_do` MUST read redirects and `Retry-After` from the file a caller's own `-D` (or `--dump-header`) names, since curl keeps only the last one; that file MUST be left in place afterwards.
+- **FR-044**: A body given through `DYBATPHO_CURL_SECRET_DATA` MUST reach curl byte for byte, with no newline added.
+- **FR-045**: A 3xx status that is still the answer once redirects are handled MUST be returned as exit code 3 without being retried.
+- **FR-046**: Secret headers MUST NOT appear in a `set -x` trace of the request helpers; the trace MUST be back on once they are written.
+- **FR-047**: A `name=value` upload field MUST be sent as literal text (`--form-string`), so a value starting with `<` or holding `;type=` is not read as a file or an option.
+- **FR-048**: Pagination MUST resolve a relative `next` link against the URL of the page that carried it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -463,6 +473,12 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-038**: Answer a 307 to another origin while the body is a secret, and get exit code 3 with a warning naming the origin.
 - **IT-039**: Loop a 301 with `DYBATPHO_CURL_MAX_REDIRECTS=2`, and stop after two hops with a warning.
 - **IT-040**: Parse `5/08` and `09/08ms` and get `5 8000` and `9 8`.
+- **IT-041**: Answer a bearer-token request through `curl_request` with a same-origin 302, and get the body of the page it points to.
+- **IT-042**: Send `a=1&b=2` as `DYBATPHO_CURL_SECRET_DATA` and find exactly seven bytes on curl's standard input.
+- **IT-043**: Answer 304 with two retries allowed, and see one request and exit code 3.
+- **IT-044**: Trace a request carrying a secret header with `set -x`, and find the header sent but absent from the trace.
+- **IT-045**: Upload `note=<1 day;type=text/html` and see it passed with `--form-string` and never with `-F`.
+- **IT-046**: Answer the first page with a relative `next` link, and see the second page fetched at the resolved absolute URL.
 
 ## Acceptance Criteria *(mandatory)*
 

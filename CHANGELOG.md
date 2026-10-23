@@ -73,6 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
+- **`network` — a final 3xx response is not retried.** `dybatpho::curl_do`
+  returns exit code 3 at once for a `304 Not Modified`, a redirect without
+  `Location:`, or one past `DYBATPHO_CURL_MAX_REDIRECTS`, instead of sleeping
+  through the retry budget. `dybatpho::circuit_breaker` and
+  `dybatpho::circuit_state` read the clock without starting `date`, about
+  twenty times faster.
+
+- **`network` — `dybatpho::curl_upload` sends `name=value` fields as literal
+  text.** They go through `--form-string`, so a value starting with `<` or
+  holding `;type=` is sent as written instead of read as a file.
+
 - **`cache` — `dybatpho::cache_stats` and `dybatpho::cache_prune` list a
   namespace with one `stat`.** 300 entries take about 50 ms instead of 10 s on
   macOS.

@@ -149,19 +149,52 @@ function __dybatpho_network_redact_url_into {
 # @description Escape a value for a double-quoted `curl` config parameter.
 #   `curl` reads a config file as `name = "value"`, where the value takes
 #   backslash escapes, so a backslash or a quote inside a header has to be
-#   escaped or it ends the value early.
-# @arg $1 string Raw value
-# @stdout The escaped value, without its surrounding quotes
+#   escaped or it ends the value early. The answer goes into a variable rather
+#   than through a command substitution: every secret header of every request
+#   is escaped here.
+# @arg $1 string Name of the variable receiving the escaped value
+# @arg $2 string Raw value
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_network_config_escape {
-  local value="${1-}"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\t'/\\t}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\n'/\\n}"
-  printf '%s' "${value}"
+function __dybatpho_network_config_escape_into {
+  local -n __dybatpho_network_escape_out="$1"
+  local __dybatpho_network_escape_value="${2-}"
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//\\/\\\\}"
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//\"/\\\"}"
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//$'\t'/\\t}"
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//$'\r'/\\r}"
+  __dybatpho_network_escape_out="${__dybatpho_network_escape_value//$'\n'/\\n}"
+}
+
+#######################################
+# @description Suspend `set -x` for the lines that handle a credential, and
+#   remember whether it was on. A trace prints every assignment, every test and
+#   every loop value with its expansion, so a script traced with
+#   `dybatpho::start_trace` wrote each secret header to the trace several times
+#   per request.
+# @arg $1 string Name of the variable receiving the state to hand back
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_network_trace_off {
+  local -n __dybatpho_network_trace_state="$1"
+  __dybatpho_network_trace_state=false
+  if [[ "$-" == *x* ]]; then
+    __dybatpho_network_trace_state=true
+    { set +x; } 2> /dev/null
+  fi
+}
+
+#######################################
+# @description Resume the trace `__dybatpho_network_trace_off` suspended.
+# @arg $1 string The state it handed back
+# @internal
+#######################################
+function __dybatpho_network_trace_on {
+  # dyshellint disable=BSG034 # this resumes the trace the caller already had on
+  [[ "${1-}" == true ]] && set -x
+  return 0
 }
 
 #######################################
@@ -200,16 +233,20 @@ function __dybatpho_network_secret_config {
   }
   umask "${previous_umask}"
 
-  local network_config_escape
-  for header in ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}; do
-    [[ -n "${header}" ]] || continue
-    network_config_escape=$(__dybatpho_network_config_escape "${header}")
-    printf 'header = "%s"\n' "${network_config_escape}" >> "${path}"
-  done
-  if [[ "${__config_secret_url}" == true ]]; then
-    network_config_escape=$(__dybatpho_network_config_escape "${__config_url}")
-    printf 'url = "%s"\n' "${network_config_escape}" >> "${path}"
-  fi
+  local network_config_escape trace
+  __dybatpho_network_trace_off trace
+  {
+    for header in ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}; do
+      [[ -n "${header}" ]] || continue
+      __dybatpho_network_config_escape_into network_config_escape "${header}"
+      printf 'header = "%s"\n' "${network_config_escape}"
+    done
+    if [[ "${__config_secret_url}" == true ]]; then
+      __dybatpho_network_config_escape_into network_config_escape "${__config_url}"
+      printf 'url = "%s"\n' "${network_config_escape}"
+    fi
+  } >> "${path}"
+  __dybatpho_network_trace_on "${trace}"
 
   __config_out="${path}"
 }
@@ -225,6 +262,8 @@ function __dybatpho_network_secret_config {
 # @internal
 #######################################
 function __dybatpho_network_with_secret_headers {
+  local __dybatpho_network_wsh_trace
+  __dybatpho_network_trace_off __dybatpho_network_wsh_trace
   local -a __dybatpho_network_wsh_added=()
   while (($#)) && [[ "$1" != "--" ]]; do
     [[ -z "$1" ]] || __dybatpho_network_wsh_added+=("$1")
@@ -243,6 +282,7 @@ function __dybatpho_network_with_secret_headers {
     ${__dybatpho_network_wsh_inherited[@]+"${__dybatpho_network_wsh_inherited[@]}"}
     ${__dybatpho_network_wsh_added[@]+"${__dybatpho_network_wsh_added[@]}"}
   )
+  __dybatpho_network_trace_on "${__dybatpho_network_wsh_trace}"
   "$@"
 }
 
@@ -374,8 +414,24 @@ function dybatpho::curl_do {
     || dybatpho::die "DYBATPHO_CURL_MAX_REDIRECTS must be a non-negative integer"
 
   local code="" retry_after delay attempt=0
-  local header_file
-  dybatpho::create_temp header_file ".headers" "curl"
+  # The response headers are where a redirect's `Location:` and a throttled
+  # answer's `Retry-After:` are read from. curl keeps only the last `-D` it is
+  # given, so a caller's own `-D` -- `dybatpho::curl_request` passes one --
+  # used to leave the file read here empty: a secret-header request then never
+  # followed a redirect and retried it as a failure instead. The caller's file
+  # is read instead of a temporary one, and is left in place afterwards.
+  local header_file="" header_cleanup="" scanned
+  local -a scan=("$@")
+  for ((scanned = 0; scanned + 1 < ${#scan[@]}; scanned++)); do
+    case "${scan[scanned]}" in
+      -D | --dump-header) [[ "${scan[scanned + 1]}" == "-" ]] || header_file="${scan[scanned + 1]}" ;;
+      *) ;;
+    esac
+  done
+  if [[ -z "${header_file}" ]]; then
+    dybatpho::create_temp header_file ".headers" "curl"
+    header_cleanup="${header_file}"
+  fi
 
   # Credentials and request bodies stay out of the argument vector; see
   # DYBATPHO_CURL_SECRET_HEADERS above for why.
@@ -429,7 +485,14 @@ function dybatpho::curl_do {
 
     : > "${header_file}"
     if [[ "${body_on_stdin}" == true ]]; then
-      code=$(command curl "${curl_args[@]}" ${url_args[@]+"${url_args[@]}"} <<< "${DYBATPHO_CURL_SECRET_DATA}") || {
+      # Not a here-string: it appends a newline, so the body sent was not the
+      # body given -- `a=1&b=2` arrived as `b=2\n`, and a signed payload no
+      # longer matched its signature. The trace is off for the `printf`, which
+      # would otherwise print the body it was given.
+      code=$(command curl "${curl_args[@]}" ${url_args[@]+"${url_args[@]}"} < <(
+        { set +x; } 2> /dev/null
+        printf '%s' "${DYBATPHO_CURL_SECRET_DATA}"
+      )) || {
         code="000"
         dybatpho::error "Error when access ${shown_url}"
       }
@@ -450,7 +513,7 @@ function dybatpho::curl_do {
       if [[ -n "${location}" ]]; then
         if ((redirects >= DYBATPHO_CURL_MAX_REDIRECTS)); then
           dybatpho::warn "Stopped after ${redirects} redirects from ${shown_url}"
-          rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+          rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
           break
         fi
         redirects=$((redirects + 1))
@@ -472,7 +535,7 @@ function dybatpho::curl_do {
         fi
         if [[ "${body_on_stdin}" == true ]]; then
           dybatpho::warn "Not following the redirect to ${next_origin}: the request body is a secret"
-          rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+          rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
           break
         fi
         dybatpho::debug "Dropping secret headers for the redirect to ${next_origin}"
@@ -486,21 +549,24 @@ function dybatpho::curl_do {
     local code_description
     code_description=$(__dybatpho_network_get_http_code "${code}")
     dybatpho::debug "Received HTTP status: ${code_description}"
-    if [[ "${code}" =~ ^2[0-9][0-9]$ ]]; then
-      rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+    # A 3xx that is still here is final -- a `304 Not Modified`, a redirect
+    # with no `Location:`, or the end of the redirect budget -- and asking
+    # again gets the same answer, so it is not retried like a failure.
+    if [[ "${code}" =~ ^[23][0-9][0-9]$ ]]; then
+      rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
       break
     elif [[ "${code}" =~ ^4[0-9][0-9]$ ]]; then
       case "${code}" in
         408 | 425 | 429) ;; # kcov(skip)
         *)
-          rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+          rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
           break
           ;;
       esac
     fi
     if ((attempt >= DYBATPHO_CURL_MAX_RETRIES)); then
       dybatpho::warn "No more retries left to run curl ${shown_url}."
-      rm -f "${header_file}" ${secret_config:+"${secret_config}"}
+      rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
       break
     fi
 
@@ -684,7 +750,10 @@ function dybatpho::curl_upload {
       dybatpho::is file "${path}" || dybatpho::die "Upload file not found: ${path}" 2
       curl_args+=(-F "${field}")
     elif [[ "${field}" == *=* ]]; then
-      curl_args+=(-F "${field}")
+      # `--form-string`, not `-F`: `-F` reads a value that starts with `<` as
+      # a file to send, and `;type=` inside one as an option, so a note such
+      # as `<1 day` failed with curl's exit code 26.
+      curl_args+=(--form-string "${field}")
     else
       curl_args+=("${field}")
     fi
@@ -926,7 +995,8 @@ function dybatpho::circuit_state {
     return 0
   fi
   local now elapsed
-  now=$(date +%s)
+  # The clock is read by `printf` itself rather than by a `date` process.
+  printf -v now '%(%s)T' -1
   elapsed=$((now - opened_at))
   if ((elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
     echo open
@@ -969,7 +1039,7 @@ function dybatpho::circuit_breaker {
   local __dybatpho_network_cb_failures="${DYBATPHO_CIRCUIT_FAILURES[${__dybatpho_network_cb_key}]:-0}"
   local __dybatpho_network_cb_opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${__dybatpho_network_cb_key}]:-0}"
   local __dybatpho_network_cb_now
-  __dybatpho_network_cb_now=$(date +%s)
+  printf -v __dybatpho_network_cb_now '%(%s)T' -1
 
   if ((__dybatpho_network_cb_opened_at > 0)); then
     local __dybatpho_network_cb_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cb_opened_at))
@@ -1320,6 +1390,9 @@ function dybatpho::curl_paginate {
       break
     fi
     next="$(dybatpho::curl_link next)" || next=""
+    # A `Link` target may be relative (RFC 8288), and curl has nothing to
+    # resolve `/items?page=2` against; it is resolved against this page.
+    [[ -z "${next}" ]] || __dybatpho_network_resolve_location_into next "${url}" "${next}"
     url="${next}"
   done
   rm -f "${body}"

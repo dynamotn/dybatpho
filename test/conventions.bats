@@ -51,6 +51,14 @@ fail_with() {
   # runs its files in parallel: `test/examples.bats` compares the working tree
   # before and after every example, so it would fail on whichever example
   # happened to overlap this window.
+  #
+  # The library supports Bash 4.3, but the vendored `sh-docs` generator needs
+  # 4.4 and refuses to start on anything older, so on 4.3 there is no listing
+  # to inspect. The documentation check itself runs in the lint job, on a
+  # current Bash.
+  if ((BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4)); then
+    skip "sh-docs needs Bash 4.4 or newer; this is Bash ${BASH_VERSION}"
+  fi
   local stale_source="${BATS_TEST_TMPDIR}/zzz_unpublished.sh"
   cp "${REPO_ROOT}/src/semver.sh" "${stale_source}"
 

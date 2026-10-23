@@ -293,6 +293,7 @@ dybatpho::unmock_all
 - A JSON or YAML assertion runs in a suite that loaded `testing` without
   `json`, or a snapshot mismatches in a suite that did not load `diff`.
 - The variable a caller names for a fixture matches a name the helper uses internally, such as `content`.
+- Several scrubs are registered, one rewriting what another produced, or a duration budget leads with a zero.
 
 ## Requirements *(mandatory)*
 
@@ -425,6 +426,7 @@ dybatpho::unmock_all
 - **FR-043**: `snapshot_scrub` MUST accept a pattern or replacement holding `|`, MUST refuse an expression `sed` cannot run without registering it, and `assert_snapshot` MUST fail rather than compare or record text a failed substitution left empty.
 - **FR-044**: A command run by `assert_exit_code`, `benchmark` or `assert_duration_under` MUST see the caller's variables and MUST NOT change the verdict by assigning to one: they MUST keep their state in prefixed locals.
 - **FR-045**: A command run by `assert_cli_snapshot` MUST see the caller's variables: the assertion MUST keep its state in prefixed locals.
+- **FR-046**: Registered scrubs MUST apply in the order they were registered, each to the output of the one before, and `dybatpho::assert_duration_under` MUST read its budget in base ten.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -545,6 +547,7 @@ dybatpho::unmock_all
 - **IT-033**: Scrub a pattern holding `|`, refuse a broken expression, and fail a snapshot whose substitution fails without writing a baseline.
 - **IT-034**: Run a command through each assertion that reads variables named like their locals, and see the caller's values; a command assigning the expected status still fails the assertion.
 - **IT-035**: Snapshot a command that reads variables named like the assertion's locals, and see the caller's values in the snapshot.
+- **IT-036**: Register three scrubs where the second rewrites the first's replacement and snapshot two lines; time `true` against `090000` and `000`.
 
 ## Acceptance Criteria *(mandatory)*
 

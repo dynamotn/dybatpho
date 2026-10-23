@@ -547,12 +547,18 @@ function __dybatpho_test_normalize {
   local text
   dybatpho::expect_args text -- "$@"
   text="$(dybatpho::text_strip_ansi "${text}")"
+  # Every scrub goes to one `sed`, which applies them in order to each line
+  # just as a chain of them did, without a fork and a `sed` per scrub.
   local script
+  local -a arguments=()
   for script in ${DYBATPHO_TEST_SNAPSHOT_SCRUBS[@]+"${DYBATPHO_TEST_SNAPSHOT_SCRUBS[@]}"}; do
+    arguments+=(-e "${script}")
+  done
+  if ((${#arguments[@]})); then
     # `sed` ends the pipeline, so its status is the substitution's: a failure
     # must not pass on the empty text it leaves behind.
-    text="$(printf '%s\n' "${text}" | sed -e "${script}")" || return 1
-  done
+    text="$(printf '%s\n' "${text}" | sed ${arguments[@]+"${arguments[@]}"})" || return 1
+  fi
   printf '%s' "${text}"
 }
 
@@ -774,6 +780,8 @@ function dybatpho::assert_duration_under {
   shift 2
   [[ "${__dybatpho_test_dur_budget}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected a budget in milliseconds: ${__dybatpho_test_dur_budget}"
+  # Read in base ten: a leading zero made `0100` an octal 64 and `090` an error.
+  __dybatpho_test_dur_budget=$((10#${__dybatpho_test_dur_budget}))
   [[ "${__dybatpho_test_dur_separator}" == "--" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected: milliseconds -- command [args...]"
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"

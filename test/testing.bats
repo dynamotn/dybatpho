@@ -1010,3 +1010,20 @@ BSD
   run_traced cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/scoped-cli.snap"
   assert_output --partial "caller caller caller caller"
 }
+
+@test "dybatpho::snapshot_scrub applies several scrubs in the order they were registered" {
+  # They now share one `sed`; each still sees what the one before it left.
+  dybatpho::snapshot_scrub 'id=[0-9]*' 'id=<N>'
+  dybatpho::snapshot_scrub '<N>' '<ID>'
+  dybatpho::snapshot_scrub '/tmp/[a-z]*' '<TMP>'
+  dybatpho::assert_snapshot chained "$(printf 'row id=42 in /tmp/abc\nsecond id=7')"
+  assert_equal "$(cat "${DYBATPHO_TEST_SNAPSHOT_DIR}/chained.snap")" "$(printf 'row id=<ID> in <TMP>\nsecond id=<ID>')"
+}
+
+@test "dybatpho::assert_duration_under reads a budget with a leading zero in base ten" {
+  # `090` was an invalid octal number and `0100` an octal 64.
+  dybatpho::assert_duration_under 090000 -- true
+  run_traced --separate-stderr dybatpho::assert_duration_under 000 -- true
+  assert_failure
+  assert_stderr --partial "Expected to finish in under 0ms"
+}

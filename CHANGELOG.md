@@ -73,6 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
+- **`csv`, `metrics`, `testing` — data paths fork far less.**
+  `dybatpho::csv_to_json` is about fifteen times faster and
+  `dybatpho::metrics_render` about ten times faster. Snapshot scrubs run in a
+  single `sed`, about three times faster with several scrubs registered.
+
 ### Fixed
 
 - **More numbers with a leading zero are read in base ten.**
@@ -323,6 +328,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flavors.** With GNU `date`, `2024-01-01 10:00:00` minus 5 hours gave 16:00.
   With BSD `date`, `…Z` and `…+02:00` were not read and Feb 30 rolled into
   March. Amounts such as `08` are read in base ten.
+
+- **`semver`, `math`, `metrics`, `testing` — zero-padded and large numbers.**
+  Semver parts past 64 bits order by value and ranges like `^08.1` are read in
+  base ten. Math scales such as `08` no longer stop the script, and
+  `dybatpho::math_pow 2 18446744073709551617` is refused instead of answering
+  `2`. A metrics bucket bound of `010` counted as eight, and names and labels
+  render in byte order on every host.
 
 - **`csv`, `config` — round trips keep their data.** A stray quote such as
   `55"` no longer swallows the rest of the file in `dybatpho::csv_read`.

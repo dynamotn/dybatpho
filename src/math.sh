@@ -543,6 +543,8 @@ function __dybatpho_math_div2 {
       math_caller_detail=$(__dybatpho_math_caller)
       dybatpho::die "${math_caller_detail}: Scale must be a non-negative integer, got '${__div2_scale}'"
     }
+  # Read in base ten: `08` would otherwise be an invalid octal literal.
+  __div2_scale=$((10#${__div2_scale}))
   local __div2_sign_a __div2_int_a __div2_frac_a
   local __div2_sign_b __div2_int_b __div2_frac_b
   __dybatpho_math_parse "${__div2_a}" __div2_sign_a __div2_int_a __div2_frac_a
@@ -791,7 +793,11 @@ function dybatpho::math_pow {
   [[ "${exponent}" =~ ^[+-]?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Exponent must be a whole number, got '${exponent}'"
   local magnitude="${exponent#[+-]}"
-  magnitude=$((10#${magnitude}))
+  # Measured as text first: past 64 bits `$(( ))` wraps, and an exponent of
+  # 2^64 + 1 read as 1.
+  magnitude="${magnitude#"${magnitude%%[!0]*}"}"
+  ((${#magnitude} <= ${#DYBATPHO_MATH_MAX_EXPONENT})) || magnitude="${DYBATPHO_MATH_MAX_EXPONENT}0"
+  magnitude=$((10#${magnitude:-0}))
   ((magnitude <= DYBATPHO_MATH_MAX_EXPONENT)) \
     || dybatpho::die \
       "${FUNCNAME[0]}: Exponent magnitude must be at most ${DYBATPHO_MATH_MAX_EXPONENT}, got '${exponent}'"
@@ -1023,6 +1029,7 @@ function dybatpho::math_round {
   local scale="${2-0}"
   [[ "${scale}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${scale}'"
+  scale=$((10#${scale}))
   local sign integer fraction result
   __dybatpho_math_parse "${value}" sign integer fraction
   __dybatpho_math_round_digits integer fraction "${scale}"
@@ -1360,6 +1367,7 @@ function __dybatpho_math_sqrt2 {
       # kcov cannot see a die under `run`; 'math_sqrt dies on a bad scale or a non-number' covers it.
       dybatpho::die "${math_caller_detail}: Scale must be a non-negative integer, got '${__sqrt2_scale}'" # kcov(skip)
     }
+  __sqrt2_scale=$((10#${__sqrt2_scale}))
   local __sqrt2_sign __sqrt2_int __sqrt2_frac
   __dybatpho_math_parse "${__sqrt2_value}" __sqrt2_sign __sqrt2_int __sqrt2_frac
   [[ -z "${__sqrt2_sign}" ]] \
@@ -1457,22 +1465,41 @@ function dybatpho::math_percentile {
   ((${#values[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   __dybatpho_math_sort sorted ${values[@]+"${values[@]}"}
 
-  local rank sign whole part
-  __dybatpho_math_mul2 rank "$((${#sorted[@]} - 1))" "${percentile}"
-  __dybatpho_math_mul2 rank "${rank}" "0.01"
-  __dybatpho_math_parse "${rank}" sign whole part
-  if [[ -z "${part}" ]]; then
-    printf '%s\n' "${sorted[10#${whole}]}"
+  local result
+  __dybatpho_math_percentile_sorted_into result "${percentile}" ${sorted[@]+"${sorted[@]}"}
+  printf '%s\n' "${result}"
+}
+
+#######################################
+# @description Interpolate a percentile of values that are already sorted, into
+#   a named variable, the way `dybatpho::math_percentile` defines it. A caller
+#   asking for several percentiles of one list sorts it once.
+# @arg $1 string Name of the variable receiving the percentile
+# @arg $2 string Percentile, a number from `0` to `100`
+# @arg $@ string Values, sorted by value, at least one
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_math_percentile_sorted_into {
+  local -n __pct_out="$1"
+  local __pct_percentile="$2"
+  shift 2
+  local -a __pct_sorted=("$@")
+  local __pct_rank __pct_sign __pct_whole __pct_part
+  __dybatpho_math_mul2 __pct_rank "$((${#__pct_sorted[@]} - 1))" "${__pct_percentile}"
+  __dybatpho_math_mul2 __pct_rank "${__pct_rank}" "0.01"
+  __dybatpho_math_parse "${__pct_rank}" __pct_sign __pct_whole __pct_part
+  if [[ -z "${__pct_part}" ]]; then
+    __pct_out="${__pct_sorted[10#${__pct_whole}]}"
     return 0
   fi
   # A fractional rank is below the last index, so its upper neighbour exists.
-  local lower="${sorted[10#${whole}]}" upper="${sorted[10#${whole} + 1]}"
-  local gap step result
-  __dybatpho_math_negate gap "${lower}"
-  __dybatpho_math_add2 gap "${upper}" "${gap}"
-  __dybatpho_math_mul2 step "${gap}" "0.${part}"
-  __dybatpho_math_add2 result "${lower}" "${step}"
-  printf '%s\n' "${result}"
+  local __pct_lower="${__pct_sorted[10#${__pct_whole}]}" __pct_upper="${__pct_sorted[10#${__pct_whole} + 1]}"
+  local __pct_gap __pct_step
+  __dybatpho_math_negate __pct_gap "${__pct_lower}"
+  __dybatpho_math_add2 __pct_gap "${__pct_upper}" "${__pct_gap}"
+  __dybatpho_math_mul2 __pct_step "${__pct_gap}" "0.${__pct_part}"
+  __dybatpho_math_add2 __pct_out "${__pct_lower}" "${__pct_step}"
 }
 
 #######################################
@@ -1555,6 +1582,7 @@ function dybatpho::math_stddev {
   local scale="${DYBATPHO_MATH_SCALE}" variance quotient remainder sign integer fraction
   [[ "${scale}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${scale}'"
+  scale=$((10#${scale}))
   __dybatpho_math_parse "${spread}" sign integer fraction
   local numerator="${integer}${fraction}" index
   for ((index = 0; index < 2 * (scale + 1); index++)); do

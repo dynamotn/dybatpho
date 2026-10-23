@@ -253,6 +253,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - A comparison is asked about a value that is not a number from inside an `if`, where `set -e` does not apply.
 - A value read from standard input is a glob character such as `*` or `?`.
 - Standard input ends without a newline after its last value.
+- A scale is written with a leading zero, such as `08`, or an exponent is longer than 64 bits.
 
 ## Requirements *(mandatory)*
 
@@ -321,6 +322,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **FR-025**: Values read from standard input MUST be split on whitespace without pathname expansion, so a `*` or `?` is read as itself.
 - **FR-026**: A function reading values from standard input MUST count the values on a last line that has no trailing newline.
 - **FR-027**: `dybatpho::math_sum` of no values MUST print `0` on Bash 4.3; `dybatpho::math_random` MUST read a bound with a leading zero in base ten, with its sign.
+- **FR-028**: A scale given to `dybatpho::math_div`, `math_round`, `math_sqrt`, `math_percent`, `math_pow`, or through `DYBATPHO_MATH_SCALE`, MUST be read in base ten whatever zeros it leads with; `dybatpho::math_pow` MUST refuse an exponent whose magnitude exceeds `DYBATPHO_MATH_MAX_EXPONENT` however many digits it has, rather than wrapping it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -391,6 +393,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **IT-017**: Feed `1 * 3` to `math_sum` in a directory holding files and verify `*` is refused as not a number rather than expanded.
 - **IT-018**: Sum and take the maximum of standard input whose last line has no newline, and find the last value counted.
 - **IT-019**: Sum nothing and get `0`; draw from `08..08` and `-08..-08` and get `8` and `-8`.
+- **IT-020**: Round, divide, take a root, average and spread with a scale of `08`, `09` or `03`; raise `2` to `18446744073709551617` and see it refused, and to `0010` and get `1024`; interpolate a percentile from an already sorted list.
 
 ## Acceptance Criteria *(mandatory)*
 

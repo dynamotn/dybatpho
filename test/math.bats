@@ -679,3 +679,43 @@ setup() {
   run_traced dybatpho::math_random -08 -08
   assert_output "-8"
 }
+
+# ---------------------------------------------------------------------------
+# Leading zeros and 64-bit wrap in the scale and the exponent
+# ---------------------------------------------------------------------------
+
+@test "a scale written with a leading zero is read in base ten" {
+  run_traced dybatpho::math_round 2.665 08
+  assert_success
+  assert_output "2.665"
+  run_traced dybatpho::math_div 2 3 08
+  assert_success
+  assert_output "0.66666667"
+  run_traced dybatpho::math_sqrt 2 09
+  assert_success
+  assert_output "1.414213562"
+  DYBATPHO_MATH_SCALE=08 run_traced dybatpho::math_avg 1 2 4
+  assert_success
+  assert_output "2.33333333"
+  DYBATPHO_MATH_SCALE=03 run_traced dybatpho::math_stddev 1 2 3 4
+  assert_success
+  assert_output "1.118"
+}
+
+@test "dybatpho::math_pow refuses an exponent past 64 bits instead of wrapping it" {
+  # 2^64 + 1 wrapped to 1 and answered 2.
+  run dybatpho::math_pow 2 18446744073709551617
+  assert_failure
+  assert_output --partial "Exponent magnitude must be at most"
+  run_traced dybatpho::math_pow 2 0010
+  assert_success
+  assert_output "1024"
+}
+
+@test "dybatpho::math_percentile still interpolates through the shared sorted-list helper" {
+  local value
+  __dybatpho_math_percentile_sorted_into value 90 1 2 3 4 5 6 7 8 9 10
+  assert_equal "${value}" "9.1"
+  __dybatpho_math_percentile_sorted_into value 50 7
+  assert_equal "${value}" "7"
+}

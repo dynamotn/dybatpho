@@ -20,7 +20,9 @@ This document describes the repository workflow and conventions to preserve.
 - `CHANGELOG.md` — user-visible history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 - `scripts/test.sh` — test runner; `--coverage` adds the kcov report, and
   `--related <changed files>` runs only the tests covering them (the
-  pre-commit hook uses it).
+  pre-commit hook uses it). Without GNU `parallel` (or with `--shards`) it
+  shares the files out to `--jobs` background Bats workers, one file at a time
+  each, and merges their reports into the same table and totals.
 - `scripts/bundle.sh` — flatten a module selection into one vendorable file;
   covered by `test/bundle.bats` and specified in `docs/spec/doctor.md`.
 - `scripts/release.sh` — cut a release: stamp `VERSION` and `CHANGELOG.md`,
@@ -200,7 +202,10 @@ Sourcing it with no argument loads the core modules only; `--modules` or
 library, and every module set is widened at run time by `dybatpho::load`.
 Because the default is narrow, a script that uses an optional module has to say
 so: every `example/*.sh` declares its own module set, and `test/test_helper.bash`
-asks for `all` on behalf of the module tests. Do not source a module in isolation when it uses
+asks for `all` on behalf of the module tests -- which is why
+`test/modules_isolated.bats` loads every module alone in a fresh shell and
+fails when a module calls a function that loading it alone does not define,
+outside its soft dependencies and `declare -F` hooks. Do not source a module in isolation when it uses
 helpers from another module unless the source header documents the dependency
 and isolated tests provide the required setup.
 

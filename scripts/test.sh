@@ -21,6 +21,13 @@
 #   parking the Bats `DEBUG` trap while it sources the library, which is what
 #   makes a test cost ~150ms instead of ~800ms.
 #
+#   Bats needs GNU `parallel` for `--jobs`. Without it -- or with `--shards` --
+#   the files are shared out to `--jobs` background Bats processes instead, each
+#   running one file at a time: a worker claims the next unclaimed file, the
+#   heaviest first, with an atomic `mkdir`, so a slow file never holds up a
+#   queue of others behind it. The slowest file sets the floor of the run. Their TAP and JUnit output is merged into the
+#   same report, so the table and totals read the same either way.
+#
 #   Coverage is opt-in, because kcov roughly triples the wall clock. kcov also
 #   accumulates trace state for every process it follows and never releases it,
 #   so a single invocation over the whole suite grows until the OOM killer takes
@@ -40,6 +47,7 @@
 #
 # @env DYBATPHO_TEST_JOBS number Initial value of `--jobs`.
 # @env DYBATPHO_TEST_CHUNK number Initial value of `--chunk`.
+# @env DYBATPHO_TEST_SHARDS string Initial value of `--shards`, `true` to always run the Bash workers.
 #
 # @see
 #   - `test/test_helper.bash`
@@ -154,6 +162,7 @@ function __dybatpho_test_related {
         fi
         _modules["${_name}"]=1
         _tests["${_test_dir}/conventions.bats"]=1
+        _tests["${_test_dir}/modules_isolated.bats"]=1
         ;;
       test/*.bats) _tests["${DYBATPHO_DIR}/${_file}"]=1 ;;
       example/*.sh) _tests["${_test_dir}/examples.bats"]=1 ;;
@@ -303,6 +312,82 @@ function __dybatpho_test_bats {
   # shellcheck disable=SC2310 # a failing suite has to reach the summary below
   "${BATS_CMD}" "${_bats_args[@]}" "${_files[@]}" 2>&1 \
     | tee "${_tap}" | __dybatpho_test_progress "${_expected}" || true
+}
+
+# @description One worker of `__dybatpho_test_bats_shards`: walk the file list,
+#   heaviest first, and run every file it manages to claim. A claim is a
+#   `mkdir`, which exactly one process can win, so files are handed out as
+#   workers come free. It reads the run's state through dynamic scope, like the
+#   other steps, and writes each file's TAP to a capture of its own as well as to
+#   the shared live view.
+# @noargs
+# @stdout The TAP of every file it ran, one whole line at a time
+# @internal
+function __dybatpho_test_shard_worker {
+  local _i _out
+  for ((_i = 0; _i < ${#_files[@]}; _i++)); do
+    mkdir "${_claims}/${_i}" 2> /dev/null || continue
+    _out="${_run_dir}/file${_i}"
+    mkdir -p "${_out}"
+    # `awk` writes each line whole, so the workers' lines interleave in the
+    # live view without tearing one another apart. `|| true`: a failing file
+    # has to reach the summary.
+    "${BATS_CMD}" "${_worker_args[@]/${_run_dir}/${_out}}" "${_files[_i]}" 2>&1 \
+      | tee "${_out}/run.tap" | awk '{ print; fflush() }' || true
+  done
+}
+
+# @description Run the collected files on `JOBS` background Bats workers, for a
+#   machine without GNU `parallel`, which Bats needs to spread files over
+#   `--jobs`.
+#   Files are handed out by `__dybatpho_test_shard_worker` as workers come free
+#   rather than split up front by a guess at their cost, and each one runs its
+#   tests one after another: Bats can run the tests of a file side by side
+#   without `parallel`, but its semaphore waits forever for a slot whose test
+#   was killed, and a run hung on it. The slowest file therefore sets the
+#   floor of the run's wall clock. Every file gets its own Bats run, writing its own TAP capture and JUnit report,
+#   and those are merged afterwards into the ones a single run would have
+#   written: the TAP file by file, so a failure's detail stays with it, and the
+#   JUnit reports into one, whose `<testsuite>` elements the summary reads.
+# @noargs
+# @internal
+function __dybatpho_test_bats_shards {
+  local _claims="${_run_dir}/claims" _workers="${JOBS}" _w _i
+  mkdir -p "${_claims}"
+  ((_workers <= ${#_files[@]})) || _workers="${#_files[@]}"
+  # Each worker's Bats runs with `--jobs 1`: the width comes from the workers.
+  local -a _worker_args=()
+  local _arg _after_jobs=0
+  for _arg in "${_bats_args[@]}"; do
+    ((_after_jobs)) && _arg=1
+    _after_jobs=0
+    [[ "${_arg}" == "--jobs" ]] && _after_jobs=1
+    _worker_args+=("${_arg}")
+  done
+
+  # Each worker swallows its files' failures itself, and a failing file has to
+  # reach the summary below rather than stop the run.
+  # shellcheck disable=SC2310 # a failing file has to reach the summary below
+  {
+    for ((_w = 0; _w < _workers; _w++)); do
+      __dybatpho_test_shard_worker &
+    done
+    wait
+  } | __dybatpho_test_progress "${_expected}" || true
+
+  # Merge in collection order, so the replayed failures come out grouped by
+  # file and in the same order on every run.
+  : > "${_tap}"
+  : > "${_run_dir}/report.xml"
+  for ((_i = 0; _i < ${#_files[@]}; _i++)); do
+    if [[ -f "${_run_dir}/file${_i}/run.tap" ]]; then
+      cat "${_run_dir}/file${_i}/run.tap" >> "${_tap}"
+    fi
+    if [[ -f "${_run_dir}/file${_i}/report.xml" ]]; then
+      cat "${_run_dir}/file${_i}/report.xml" >> "${_run_dir}/report.xml"
+    fi
+  done
+  return 0
 }
 
 # @description Run Bats under kcov once per chunk of files, so no single kcov
@@ -527,11 +612,20 @@ function __dybatpho_test_run {
 
   # Bats needs GNU parallel for more than one worker, and without it exits
   # before running anything. A machine without `parallel` used to get a run
-  # that reported every test as never run and nothing about why.
-  # shellcheck disable=SC2154 # set by the option spec of this script
-  if ((JOBS > 1)) && ! command -v parallel &> /dev/null; then
-    dybatpho::warn "GNU parallel is not installed; running with one worker"
-    JOBS=1
+  # that reported every test as never run and nothing about why; it now gets
+  # the Bash workers instead. kcov follows one process tree at a time, so a
+  # coverage run without `parallel` still has one worker.
+  local _runner="bats"
+  # shellcheck disable=SC2154 # SHARDS and COVERAGE are set by the option spec of this script
+  if ((JOBS > 1)); then
+    if [[ "${SHARDS}" == "true" ]] || ! command -v parallel &> /dev/null; then
+      _runner="shards"
+    fi
+    if [[ "${_runner}" == "shards" && "${COVERAGE}" == "true" ]]; then
+      dybatpho::warn "GNU parallel is not installed; coverage runs with one worker"
+      JOBS=1
+      _runner="bats"
+    fi
   fi
 
   local _run_dir
@@ -557,6 +651,7 @@ function __dybatpho_test_run {
   if [[ "${COVERAGE}" == "true" ]]; then
     printf -v value ' · coverage in chunks of %s' "${CHUNK}"
   fi
+  [[ "${_runner}" == "shards" ]] && value="${value} · bash workers"
   printf '%s%d files · %d tests · %s jobs%s%s\n\n' \
     "${_dim}" "${#_files[@]}" "${_expected}" "${JOBS}" \
     "${value}" \
@@ -573,6 +668,8 @@ function __dybatpho_test_run {
   local _start="${SECONDS}"
   if [[ "${COVERAGE}" == "true" ]]; then
     __dybatpho_test_bats_coverage _parts
+  elif [[ "${_runner}" == "shards" ]]; then
+    __dybatpho_test_bats_shards
   else
     __dybatpho_test_bats
   fi
@@ -620,6 +717,8 @@ function _spec {
     validate:"__dybatpho_test_is_count \$OPTARG"
   dybatpho::opts::param "Only run tests whose name matches" FILTER -f --filter \
     init:@empty
+  dybatpho::opts::flag "Run the files on Bash workers even when GNU parallel is installed" \
+    SHARDS --shards on:true off:false env:DYBATPHO_TEST_SHARDS init:="false"
 }
 
 dybatpho::generate_from_spec _spec "$@"

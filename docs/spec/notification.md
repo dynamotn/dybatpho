@@ -88,7 +88,7 @@ that holds nothing else and verify which one runs and the arguments it gets.
    text
 3. **Given** neither backend is installed, **When** `notify_desktop` runs,
    **Then** it fails with exit code `127` and names both backends
-4. **Given** `DRY_RUN` is enabled, **When** `notify_desktop` runs, **Then** it
+4. **Given** `DYBATPHO_DRY_RUN` is enabled, **When** `notify_desktop` runs, **Then** it
    prints the command it would run and shows nothing
 
 ### User Story 5 - Push to a phone through ntfy (Priority: P2)
@@ -248,7 +248,7 @@ fi
   before running a backend.
 - **FR-013**: `notify_desktop` MUST fail with exit code `127` when no backend is
   installed, MUST return a backend's own non-zero exit code, and under
-  `DRY_RUN` MUST print the command instead of running it.
+  `DYBATPHO_DRY_RUN` MUST print the command instead of running it.
 - **FR-014**: `notify_ntfy` MUST publish a JSON body holding the topic from
   `DYBATPHO_NTFY_TOPIC`, the message, and the optional title, priority and tags
   to `DYBATPHO_NTFY_URL` (default `https://ntfy.sh`, trailing slashes removed).
@@ -278,7 +278,7 @@ fi
 - **FR-022**: `notify_email` MUST use `DYBATPHO_SENDMAIL` when it is set, and
   otherwise the first of `sendmail` on PATH, `/usr/sbin/sendmail` and
   `/usr/lib/sendmail`; it MUST fail with exit code `127` when none exists,
-  return `sendmail`'s own exit code, and under `DRY_RUN` print the command
+  return `sendmail`'s own exit code, and under `DYBATPHO_DRY_RUN` print the command
   instead of sending.
 - **FR-023**: Every HTTP notifier MUST use `DYBATPHO_NOTIFY_MAX_RETRIES`, when
   it is set, as the retry budget of its request only, and MUST reject a value
@@ -336,7 +336,7 @@ fi
 - **IT-005**: Verify missing configuration and HTTP 4xx/5xx failures.
 - **IT-006**: Verify `notify_desktop` arguments for `notify-send` and the
   `osascript` fallback, verbatim titles that look like flags, the urgency
-  rules, the missing-backend exit code, a backend's exit code, and `DRY_RUN`.
+  rules, the missing-backend exit code, a backend's exit code, and `DYBATPHO_DRY_RUN`.
 - **IT-007**: Verify the `notify_ntfy` body, default and custom server URLs,
   every priority name, tag trimming, the out-of-band token, rejection of a bad
   topic, URL or priority, and HTTP status exit codes.
@@ -344,7 +344,7 @@ fi
   token, rejection of a bad priority or URL, and HTTP status exit codes.
 - **IT-009**: Verify `notify_email` arguments and message, the sender sources,
   subject encoding and splitting, every refusal, the sendmail lookup, exit
-  code `127`, the sendmail exit code, and `DRY_RUN`.
+  code `127`, the sendmail exit code, and `DYBATPHO_DRY_RUN`.
 - **IT-010**: Verify the notification retry budget and that it does not leak,
   its validation, a circuit opening and returning `9`, one circuit per
   provider, a webhook circuit named by host without credentials, the token

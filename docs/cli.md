@@ -36,7 +36,7 @@ Utilities for building CLI parsers from shell specs.
 - [`dybatpho::cli_levenshtein`](#dybatphocli_levenshtein) — Compute the Levenshtein edit distance between two strings. Kept for existing callers; it answers exactly as `dybatpho::string_distance`, which it delegates to.
 - [`dybatpho::cli_suggest`](#dybatphocli_suggest) — Print the candidates closest to a mistyped switch or command name. Leading dashes are ignored while comparing, so `--colr` still matches `--color`, and a candidate that shares a prefix with the input always wins over a pure edit-distance match.
 - [`dybatpho::cli_verbosity_level`](#dybatphocli_verbosity_level) — Raise a log level by the number of times a counting `-v` flag was repeated.
-- [`dybatpho::cli_apply_verbosity`](#dybatphocli_apply_verbosity) — Apply a repeat count from a counting `-v` flag to `LOG_LEVEL`.
+- [`dybatpho::cli_apply_verbosity`](#dybatphocli_apply_verbosity) — Apply a repeat count from a counting `-v` flag to `DYBATPHO_LOG_LEVEL`.
 - [`dybatpho::generate_schema`](#dybatphogenerate_schema) — Generate a JSON CLI schema from the same option spec used by parsing.
 - [`dybatpho::generate_man`](#dybatphogenerate_man) — Generate a roff man page from a CLI option spec.
 - [`dybatpho::generate_completion`](#dybatphogenerate_completion) — Generate Bash, Zsh, or Fish completion from a CLI option spec.
@@ -768,7 +768,7 @@ Raise a log level by the number of times a counting `-v` flag was repeated.
 **🧪 Example**
 
 ```bash
-LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
+DYBATPHO_LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 
 ```
 
@@ -777,7 +777,7 @@ LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | number | no | `0` | Repeat count |
-| `$2` | string | no | `${LOG_LEVEL}` | Base level |
+| `$2` | string | no | `${DYBATPHO_LOG_LEVEL}` | Base level; `LOG_LEVEL` when the prefixed one is unset, then `info` |
 
 **📤 Output on stdout**
 
@@ -791,7 +791,7 @@ LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 
 ### `dybatpho::cli_apply_verbosity`
 
-Apply a repeat count from a counting `-v` flag to `LOG_LEVEL`.
+Apply a repeat count from a counting `-v` flag to `DYBATPHO_LOG_LEVEL`.
 
 **🧪 Example**
 
@@ -807,11 +807,11 @@ dybatpho::cli_apply_verbosity "${VERBOSITY}"
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | number | no | `0` | Repeat count |
-| `$2` | string | no | `${LOG_LEVEL}` | Base level |
+| `$2` | string | no | `${DYBATPHO_LOG_LEVEL}` | Base level; `LOG_LEVEL` when the prefixed one is unset, then `info` |
 
 **🧩 Variable sets**
 
-- **`LOG_LEVEL`** (string): Raised log level
+- **`DYBATPHO_LOG_LEVEL`** (string): Raised log level, in the current shell; it is not exported
 
 **🚦 Exit codes**
 

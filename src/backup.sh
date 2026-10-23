@@ -725,7 +725,7 @@ function __dybatpho_backup_restore_snapshot {
 # @arg $3 string Target directory, created when missing
 # @exitcode 0 The backup was restored
 # @exitcode 1 The backup fails its checksum, the overwrite is declined, or an entry escapes the target
-# @env DRY_RUN string When true-like, report the extraction or copy instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the extraction or copy instead of performing it
 # @example
 #   dybatpho::backup_restore --force "${archive}" /etc/nginx
 #######################################
@@ -770,10 +770,10 @@ function dybatpho::backup_restore {
 # @option --keep-days <n> Keep the backups younger than `n` days
 # @option --name <name> Only consider the backups of this name
 # @option -f | --force Delete without confirming
-# @stdout Nothing; the paths it would remove are reported by `safe_rm` under `DRY_RUN`
+# @stdout Nothing; the paths it would remove are reported by `safe_rm` under `DYBATPHO_DRY_RUN`
 # @exitcode 0 The pruning finished, or nothing needed removing
 # @exitcode 1 No retention policy was given, an option is malformed, or the removal was declined
-# @env DRY_RUN string When true-like, report what would be removed instead of removing it
+# @env DYBATPHO_DRY_RUN string When true-like, report what would be removed instead of removing it
 # @example
 #   dybatpho::backup_prune --keep-count 7 --name nginx /var/backups
 #######################################

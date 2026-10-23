@@ -166,8 +166,8 @@ if ((DYBATPHO_HTTP_STATUS == 200)); then
 fi
 
 # Download with resume plus integrity check, guarded by a circuit breaker.
-dybatpho::circuit_breaker api.example.test \
-  "dybatpho::curl_resume_download https://api.example.test/app.tgz /tmp/app.tgz sha256:${EXPECTED_SHA256}"
+dybatpho::circuit_breaker api.example.test -- \
+  dybatpho::curl_resume_download https://api.example.test/app.tgz /tmp/app.tgz "sha256:${EXPECTED_SHA256}"
 ```
 
 ## Edge Cases
@@ -175,7 +175,7 @@ dybatpho::circuit_breaker api.example.test \
 - Curl is not installed.
 - The URL is itself a credential: a webhook whose path is the secret, a signed
   download with a token in its query, or a password in the authority. That
-  holds for a `DRY_RUN` rehearsal too, which is logged like a real run.
+  holds for a `DYBATPHO_DRY_RUN` rehearsal too, which is logged like a real run.
 - The request returns a 3xx, 4xx, or 5xx status.
 - The request output is omitted, in which case it is discarded to `/dev/null`.
 - The caller wants JSON headers or HEAD-only metadata without rebuilding curl flags manually.
@@ -265,7 +265,7 @@ dybatpho::circuit_breaker api.example.test \
 - **FR-032**: Every URL the module writes to a log, an error, a warning or a
   progress line MUST be reduced to its scheme, host and port, with any user
   information, path, query or fragment replaced by `/[redacted]`, and a value
-  that is not a URL replaced by `[redacted URL]`. The `DRY_RUN` rehearsal of a
+  that is not a URL replaced by `[redacted URL]`. The `DYBATPHO_DRY_RUN` rehearsal of a
   request MUST show its URL the same way.
 - **FR-033**: Loading the module MUST NOT load `json` up front. The GraphQL
   helper, which builds and reads JSON, MUST load it on demand when it is not
@@ -331,6 +331,10 @@ dybatpho::circuit_breaker api.example.test \
   came back — 3, 4 or 5 — and MUST be reserved for a transport failure, where no
   response was received at all.
 - **FR-039**: A command run by `circuit_breaker` or `rate_limit` MUST see the caller's variables: both MUST keep their state in prefixed locals, so a command cannot change the recorded failures or the spent budget.
+- **FR-049**: `dybatpho::circuit_breaker KEY -- COMMAND [ARGS...]` MUST run the
+  command with its arguments as given, never through `eval`, and MUST stop the
+  script when no command follows `--`; the single shell-string form MUST keep
+  working and is deprecated.
 - **FR-040**: `dybatpho::curl_do` MUST NOT hand `-L` to curl while `DYBATPHO_CURL_SECRET_HEADERS` is set; it MUST follow a redirect within the same origin with the headers, drop them before following one to another origin, and refuse one to another origin when `DYBATPHO_CURL_SECRET_DATA` is set.
 - **FR-041**: `DYBATPHO_CURL_MAX_REDIRECTS` (default `20`) MUST bound the redirects `dybatpho::curl_do` follows itself; past it the last 3xx status is returned as exit code 3.
 - **FR-042**: A rate limit spec MUST read its count and window in base ten, so `5/08` is five calls in eight seconds.
@@ -456,7 +460,7 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-031**: Verify a script that loads `network` alone can use the address
   helpers, that its GraphQL call loads `json` on demand and gets as far as
   validating its variables, and that naming `json` up front gets as far.
-- **IT-032**: Verify the `DRY_RUN` rehearsal of a request to a URL carrying
+- **IT-032**: Verify the `DYBATPHO_DRY_RUN` rehearsal of a request to a URL carrying
   credentials, a secret path and a query token prints only
   `scheme://host/[redacted]`.
 - **IT-033**: Verify a request made through `dybatpho::curl_timeout` is counted
@@ -480,6 +484,10 @@ dybatpho::circuit_breaker api.example.test \
 - **IT-044**: Trace a request carrying a secret header with `set -x`, and find the header sent but absent from the trace.
 - **IT-045**: Upload `note=<1 day;type=text/html` and see it passed with `--form-string` and never with `-F`.
 - **IT-046**: Answer the first page with a relative `next` link, and see the second page fetched at the resolved absolute URL.
+- **IT-047**: Run a recorder behind `dybatpho::circuit_breaker --` with
+  arguments holding quotes, `$(...)` and a newline and verify they arrive
+  intact with nothing executed; verify `-- false` counts towards opening the
+  circuit and that `--` with no command fails.
 
 ## Acceptance Criteria *(mandatory)*
 

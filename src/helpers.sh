@@ -82,7 +82,7 @@
 #   #### Retry transient network operations
 #
 #   ```bash
-#   dybatpho::retry 4 "curl -fsSL '${health_url}'" "service health check"
+#   dybatpho::retry 4 "service health check" -- curl -fsSL "${health_url}"
 #   ```
 #
 #   #### Pick the first configured value
@@ -1062,18 +1062,64 @@ function dybatpho::require_envs_any {
 }
 
 #######################################
-# @description Evaluate a shell condition string and stop with a message when it fails.
-# @arg $1 string Shell condition or command string to evaluate
-# @arg $2 string? Failure message
-# @exitcode 0 The assertion condition succeeds
-# @exitcode 1 The assertion condition fails
-# @tip The assertion command is executed with `eval`
+# @description Run a check and stop with a message when it fails.
+#   The check is given after `--` as a command and its arguments, which run as
+#   they are, never parsed as shell. The older form, a single shell condition
+#   string, still works but is deprecated: it runs through `eval`, so a value
+#   interpolated into it is parsed as code.
+# @example
+#   dybatpho::assert "config must exist" -- test -f "${config}"
+#   dybatpho::assert -- dybatpho::is command git
+#
+# @example
+#   dybatpho::assert '[[ -f "${config}" ]]' "config must exist"   # deprecated string form
+#
+# @arg $1 string? Failure message, before `--`; or (deprecated) a shell condition string to evaluate
+# @arg $2 string? `--` followed by the command and its arguments; or (deprecated) the failure message
+# @exitcode 0 The check succeeds
+# @exitcode 1 The check fails, and the script stops with the message
+# @tip `[[ ... ]]` is shell syntax, not a command; the `--` form takes `test` or `[` instead
 #######################################
 function dybatpho::assert {
   local __dybatpho_helpers_assert_condition
   dybatpho::expect_args __dybatpho_helpers_assert_condition -- "$@"
-  local __dybatpho_helpers_assert_message="${2:-Assertion failed: ${__dybatpho_helpers_assert_condition}}"
-  eval "${__dybatpho_helpers_assert_condition}" || dybatpho::die "${__dybatpho_helpers_assert_message}"
+  local -a __dybatpho_helpers_assert_argv=()
+  local __dybatpho_helpers_assert_message=""
+  if [[ "$1" == "--" ]]; then
+    __dybatpho_helpers_assert_argv=("${@:2}")
+  elif [[ "${2-}" == "--" ]]; then
+    __dybatpho_helpers_assert_message="$1"
+    __dybatpho_helpers_assert_argv=("${@:3}")
+  else
+    __dybatpho_helpers_assert_message="${2:-Assertion failed: ${__dybatpho_helpers_assert_condition}}"
+    # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
+    eval "${__dybatpho_helpers_assert_condition}" || dybatpho::die "${__dybatpho_helpers_assert_message}"
+    return 0
+  fi
+  ((${#__dybatpho_helpers_assert_argv[@]})) || dybatpho::die "${FUNCNAME[0]}: Expected a command after --"
+  if [[ -z "${__dybatpho_helpers_assert_message}" ]]; then
+    __dybatpho_helpers_quote_argv_into __dybatpho_helpers_assert_message \
+      ${__dybatpho_helpers_assert_argv[@]+"${__dybatpho_helpers_assert_argv[@]}"}
+    __dybatpho_helpers_assert_message="Assertion failed: ${__dybatpho_helpers_assert_message}"
+  fi
+  ${__dybatpho_helpers_assert_argv[@]+"${__dybatpho_helpers_assert_argv[@]}"} \
+    || dybatpho::die "${__dybatpho_helpers_assert_message}"
+}
+
+#######################################
+# @description Join a command and its arguments into one line that reads back
+#   as the same words, for a message that names the command.
+# @arg $1 string Name of the variable receiving the line
+# @arg $@ string Command and its arguments
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_helpers_quote_argv_into {
+  local -n __dybatpho_helpers_quote_out="$1"
+  shift
+  local __dybatpho_helpers_quote_line
+  printf -v __dybatpho_helpers_quote_line '%q ' "$@"
+  __dybatpho_helpers_quote_out="${__dybatpho_helpers_quote_line% }"
 }
 
 #######################################
@@ -1123,19 +1169,28 @@ function __dybatpho_helpers_backoff_into {
 }
 
 #######################################
-# @description Retry a shell command with escalating delays until it succeeds or retries are exhausted.
+# @description Retry a command with escalating delays until it succeeds or retries are exhausted.
+#   The command is given after `--` as a command and its arguments, which run
+#   as they are, never parsed as shell; an optional description goes before the
+#   `--`. The older form, a single shell command string followed by an optional
+#   description, still works but is deprecated: it runs through `eval`, so a
+#   value interpolated into it is parsed as code.
 # @example
-#   dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
+#   dybatpho::retry 3 "health check" -- curl -fsSL "${url}"
+#   dybatpho::retry 3 -- _flaky_step "${host}"
+#
+# @example
+#   dybatpho::retry 3 "curl -fsSL https://example.com/health" "health check"   # deprecated string form
 #
 # @arg $1 number Number of retries
-# @arg $2 string Shell command string to run
-# @arg $3 string? Short description for retry logs
+# @arg $2 string? Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string
+# @arg $@ string `--` followed by the command and its arguments; or (deprecated) the description
 # @env DYBATPHO_RETRY_BASE_DELAY number First retry delay in seconds
 # @env DYBATPHO_RETRY_MAX_DELAY number Longest a single retry waits
 # @env DYBATPHO_RETRY_JITTER bool Add up to one base delay of random jitter
 # @exitcode 0 The command eventually succeeds
 # @exitcode 1 The command never succeeds and returns 1 on the final attempt
-# @tip The command is executed with `eval`, so pass it as one shell command string
+# @tip A shell function defined by the caller works as the command, and sees the caller's variables
 # @tip Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same
 #   dependency, so they do not all come back at the same instant
 # @tip Pass a short description when the raw command is noisy so retry logs stay readable
@@ -1143,9 +1198,11 @@ function __dybatpho_helpers_backoff_into {
 function dybatpho::retry {
   # Prefixed: the command is evaluated in this function's scope, so a plain
   # `count` or `delay` here would shadow the caller's own variable of that name.
-  local __dybatpho_retry_retries __dybatpho_retry_command
+  local __dybatpho_retry_retries __dybatpho_retry_command __dybatpho_retry_label
+  local -a __dybatpho_retry_argv=()
   dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_command -- "$@"
   shift 2
+  __dybatpho_helpers_retry_form __dybatpho_retry_argv __dybatpho_retry_label "${__dybatpho_retry_command}" "$@"
   # The budget reaches arithmetic, which reads `08` as a bad octal number and
   # runs a command written as an array subscript.
   [[ "${__dybatpho_retry_retries}" =~ ^[0-9]+$ ]] \
@@ -1166,7 +1223,14 @@ function dybatpho::retry {
   local __dybatpho_retry_exit_code __dybatpho_retry_count __dybatpho_retry_delay
 
   __dybatpho_retry_count=0
-  until eval "${__dybatpho_retry_command}"; do
+  # The command runs as the condition of `until` in both forms, so `set -e`
+  # does not end the script on a failed attempt.
+  until if ((${#__dybatpho_retry_argv[@]})); then
+    ${__dybatpho_retry_argv[@]+"${__dybatpho_retry_argv[@]}"}
+  else
+    # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
+    eval "${__dybatpho_retry_command}"
+  fi; do
     __dybatpho_retry_exit_code="$?"
     __dybatpho_retry_count="$((__dybatpho_retry_count + 1))"
     if [[ "${__dybatpho_retry_count}" -le "${__dybatpho_retry_retries}" ]]; then
@@ -1183,38 +1247,83 @@ function dybatpho::retry {
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_exhausted_total
       fi
-      dybatpho::warn "No more retries left to run ${1:-${__dybatpho_retry_command}}."
+      dybatpho::warn "No more retries left to run ${__dybatpho_retry_label}."
       return "${__dybatpho_retry_exit_code}"
     fi
   done
 }
 
 #######################################
-# @description Retry a shell command until it succeeds or the retry budget is exhausted, using a fixed delay.
+# @description Tell the two calling forms of the retry helpers apart, and set
+#   the command and the description for the caller.
+#   `-- command args...` and `description -- command args...` are the argument
+#   vector form; anything else is the deprecated `"command string" [description]`.
+# @arg $1 string Name of the array receiving the command and its arguments, left empty for the string form
+# @arg $2 string Name of the variable receiving the description used in the final warning
+# @arg $3 string The argument after the counts: `--`, a description, or a command string
+# @arg $@ string The arguments after it
+# @set The named array and variable
+# @exitcode 1 Stop the script when the `--` form names no command
+# @internal
+#######################################
+function __dybatpho_helpers_retry_form {
+  local -n __dybatpho_helpers_rf_argv="$1"
+  local -n __dybatpho_helpers_rf_label="$2"
+  shift 2
+  if [[ "$1" == "--" ]]; then
+    __dybatpho_helpers_rf_argv=("${@:2}")
+    __dybatpho_helpers_rf_label=""
+  elif [[ "${2-}" == "--" ]]; then
+    __dybatpho_helpers_rf_argv=("${@:3}")
+    __dybatpho_helpers_rf_label="$1"
+  else
+    __dybatpho_helpers_rf_label="${2:-$1}"
+    return 0
+  fi
+  ((${#__dybatpho_helpers_rf_argv[@]})) || dybatpho::die "${FUNCNAME[1]}: Expected a command after --"
+  [[ -n "${__dybatpho_helpers_rf_label}" ]] && return 0
+  __dybatpho_helpers_quote_argv_into __dybatpho_helpers_rf_label "${__dybatpho_helpers_rf_argv[@]}"
+}
+
+#######################################
+# @description Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay.
+#   The calling forms are those of `dybatpho::retry`: an optional description,
+#   then `--` and the command with its arguments. The single shell command
+#   string form still works but is deprecated, because it runs through `eval`.
+# @example
+#   dybatpho::retry_until 5 2 "wait for the socket" -- test -S "${socket}"
+#
 # @arg $1 number Number of retries
 # @arg $2 number Delay in seconds between attempts
-# @arg $3 string Shell command string to run
-# @arg $4 string? Short description for retry logs
+# @arg $3 string? Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string
+# @arg $@ string `--` followed by the command and its arguments; or (deprecated) the description
 # @exitcode 0 The command eventually succeeds
 # @exitcode 1 The command never succeeds and returns its final exit code
-# @tip The command is executed with `eval`, so pass it as one shell command string
+# @see dybatpho::retry
 #######################################
 function dybatpho::retry_until {
   # Prefixed for the same reason as `dybatpho::retry`: the command runs in this
   # function's scope and must see the caller's variables, not these.
-  local __dybatpho_retry_retries __dybatpho_retry_delay_seconds __dybatpho_retry_command
+  local __dybatpho_retry_retries __dybatpho_retry_delay_seconds __dybatpho_retry_command __dybatpho_retry_label
+  local -a __dybatpho_retry_argv=()
   dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_delay_seconds \
     __dybatpho_retry_command -- "$@"
   shift 3
+  __dybatpho_helpers_retry_form __dybatpho_retry_argv __dybatpho_retry_label "${__dybatpho_retry_command}" "$@"
   [[ "${__dybatpho_retry_retries}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Number of retries must be a whole number, got '${__dybatpho_retry_retries}'"
   __dybatpho_retry_retries=$((10#${__dybatpho_retry_retries}))
   local __dybatpho_retry_exit_code=0 __dybatpho_retry_count=0
-  until eval "${__dybatpho_retry_command}"; do
+  until if ((${#__dybatpho_retry_argv[@]})); then
+    ${__dybatpho_retry_argv[@]+"${__dybatpho_retry_argv[@]}"}
+  else
+    # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
+    eval "${__dybatpho_retry_command}"
+  fi; do
     __dybatpho_retry_exit_code=$?
     __dybatpho_retry_count=$((__dybatpho_retry_count + 1))
     if ((__dybatpho_retry_count > __dybatpho_retry_retries)); then
-      dybatpho::warn "No more retries left to run ${1:-${__dybatpho_retry_command}}."
+      dybatpho::warn "No more retries left to run ${__dybatpho_retry_label}."
       return "${__dybatpho_retry_exit_code}"
     fi
     dybatpho::progress "Retrying in ${__dybatpho_retry_delay_seconds} seconds" \
@@ -1284,8 +1393,7 @@ function dybatpho::breakpoint {
         dybatpho::is true "${DYBATPHO_USED_ERR_HANDLER}" \
           && dybatpho::register_err_handler # Rerun register_err_handler
         # dyshellint disable=BSG034 # the debugger restores the tracing it suspended
-        # shellcheck disable=SC2154 # declared by `src/logging.sh`, a core module
-        [[ "${LOG_LEVEL}" == "trace" ]] && set -xv # Re-enable tracing if needed
+        [[ "${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}" == "trace" ]] && set -xv # Re-enable tracing if needed
         ;;
       c)
         if [[ "${__dybatpho_helpers_bp_source_file}" != "bash" ]]; then

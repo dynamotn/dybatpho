@@ -389,7 +389,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the write instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report the write instead of performing it |
 
 **🚦 Exit codes**
 
@@ -437,7 +437,7 @@ dybatpho::metrics_push --add http://localhost:9091 nightly stage=upload
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the request instead of sending it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the request instead of sending it |
 
 **📤 Output on stderr**
 

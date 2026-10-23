@@ -28,9 +28,9 @@
 DYBATPHO_USED_ERR_HANDLER=false
 # @env DYBATPHO_USED_KILLED_HANDLER bool Internal flag set after `dybatpho::register_killed_handler`
 DYBATPHO_USED_KILLED_HANDLER=false
-# @env DRY_RUN string When true-like, `dybatpho::dry_run` prints commands instead of executing them
-DRY_RUN="${DRY_RUN:-}"
-export DRY_RUN
+# @env DYBATPHO_DRY_RUN string When true-like, `dybatpho::dry_run` and every module that honors dry-run mode print
+#   commands instead of executing them. Falls back to `DRY_RUN` when unset or empty; neither is assigned or exported
+#   by the library
 # @env DYBATPHO_CLEANUP_PATHS array Paths registered by `dybatpho::cleanup_file_on_exit`, each as `<pid>:<path>`
 declare -ga DYBATPHO_CLEANUP_PATHS=()
 # Shell that already owns the cleanup trap, so it is installed exactly once.
@@ -38,7 +38,6 @@ __dybatpho_cleanup_trap_pid=""
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds between SIGTERM and SIGKILL when a timed or background job is ended,
 #   default is `5`
 DYBATPHO_TIMEOUT_KILL_AFTER="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
-export DYBATPHO_TIMEOUT_KILL_AFTER
 # @env DYBATPHO_BACKGROUND_NAMES array Names of the background jobs started by `dybatpho::background_run`, in submission
 #   order
 declare -ga DYBATPHO_BACKGROUND_NAMES=()
@@ -342,24 +341,25 @@ function dybatpho::cleanup_file_on_exit {
 }
 
 #######################################
-# @description Print a shell command instead of executing it when `DRY_RUN` is enabled.
+# @description Print a command instead of executing it when dry-run mode is enabled.
 # @example
-#   DRY_RUN=true
-#   dybatpho::dry_run "rm -rf ./build"
+#   DYBATPHO_DRY_RUN=true
+#   dybatpho::dry_run -- rm -rf -- ./build
 #
 # @example
-#   dybatpho::dry_run "ssh ${host} 'systemctl restart app'"
+#   dybatpho::dry_run -- ssh "${host}" 'systemctl restart app'
 #
 # @example
-#   dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
+#   dybatpho::dry_run "rm -rf ./build"   # deprecated: a single shell string runs through `eval`
 #
-# @arg $@ string Shell command string to run, or `--` followed by a command and its arguments
-# @env DRY_RUN string Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them
-# @stdout Show the command instead of executing it when `DRY_RUN` is true
-# @tip A single argument is a shell command string and runs through `eval`.
-#   Lead with `--` when the command and its arguments come from elsewhere --
-#   a path, a user's input -- so that a single argument is run as a command
-#   name rather than parsed as shell.
+# @arg $@ string `--` followed by a command and its arguments; or (deprecated) a single shell command string
+# @env DYBATPHO_DRY_RUN string Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them; falls
+#   back to `DRY_RUN`
+# @stdout Show the command instead of executing it when dry-run mode is on
+# @tip Lead with `--`. Without it, a single argument is a shell command string
+#   and runs through `eval`, which parses any value interpolated into it as
+#   code; that form is deprecated and kept only for compatibility. Several
+#   arguments without `--` already run as a command and its arguments.
 #######################################
 function dybatpho::dry_run {
   local __dybatpho_dry_run_argv=false
@@ -368,7 +368,7 @@ function dybatpho::dry_run {
     shift
   fi
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command"
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     printf '🧪 DRY RUN:'
     printf ' %q' "$@"
     printf '\n'

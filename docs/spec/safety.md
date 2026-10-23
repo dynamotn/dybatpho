@@ -21,7 +21,7 @@ checks in every script, forget them, or rely on the operator noticing in time.
   `rm`, `cp`, or `mv`.
 - Confine a whole script to a working directory with one environment variable.
 - Refuse hostile archives that write outside the extraction directory.
-- Give every guarded operation the same `DRY_RUN` rehearsal path.
+- Give every guarded operation the same `DYBATPHO_DRY_RUN` rehearsal path.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -95,7 +95,7 @@ As an operator, I want a described confirmation step before a script restarts a
 service, installs a package, or edits machine state.
 
 **Independent Test**: Run `safe_system` with and without `--force` and verify the
-command runs only when approved, and only prints under `DRY_RUN`.
+command runs only when approved, and only prints under `DYBATPHO_DRY_RUN`.
 
 **Acceptance Scenarios**:
 
@@ -104,7 +104,7 @@ command runs only when approved, and only prints under `DRY_RUN`.
    reported
 2. **Given** `--force`, **When** it runs, **Then** the change is logged and the
    command runs with its exit code propagated
-3. **Given** `DRY_RUN=true`, **When** it runs, **Then** the command is printed
+3. **Given** `DYBATPHO_DRY_RUN=true`, **When** it runs, **Then** the command is printed
    instead of executed
 
 ### User Story 5 - Confine a script to a working directory (Priority: P2)
@@ -165,7 +165,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - Symlink targets stored inside an archive aren't inspected, so untrusted
   archives should be extracted into a scratch directory.
 - The shell has no terminal, so a confirmation can't be asked.
-- `DRY_RUN` is enabled, so no operation may change the filesystem.
+- `DYBATPHO_DRY_RUN` is enabled, so no operation may change the filesystem.
 - `safe_extract` is called while the `archive` module it lists and extracts
   through is not loaded yet, so it is loaded on demand.
 - `safe_extract` is given an archive that cannot be listed, so its entries
@@ -229,7 +229,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   after a `--` separator, MUST confirm the change before running it, and MUST
   report a skipped change.
 - **FR-019**: Every guarded operation MUST run its filesystem or system command
-  through `dybatpho::dry_run`, so `DRY_RUN` prints the command instead of
+  through `dybatpho::dry_run`, so `DYBATPHO_DRY_RUN` prints the command instead of
   executing it.
 - **FR-020**: `DYBATPHO_FORCE` MUST default to `false`, `DYBATPHO_INTERACTIVE`
   to `auto`, and `DYBATPHO_SAFE_ROOTS` and `DYBATPHO_PROTECTED_PATHS` to empty.
@@ -274,7 +274,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   writes to disk.
 - **SC-004**: Setting `DYBATPHO_SAFE_ROOTS` confines every guarded operation in
   a script to those roots.
-- **SC-005**: `DRY_RUN=true` produces a full rehearsal with no filesystem or
+- **SC-005**: `DYBATPHO_DRY_RUN=true` produces a full rehearsal with no filesystem or
   system changes.
 
 ## Integration Tests *(mandatory)*
@@ -303,8 +303,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **IT-009**: Verify `safe_extract` confirms before replacing existing files and
   validates its archive, strip-components, and option arguments.
 - **IT-010**: Verify `safe_system` runs an approved command, skips a declined
-  one, honors `DRY_RUN`, and validates its description, separator, and options.
-- **IT-011**: Verify `safe_rm` under `DRY_RUN` prints the `rm` command and keeps
+  one, honors `DYBATPHO_DRY_RUN`, and validates its description, separator, and options.
+- **IT-011**: Verify `safe_rm` under `DYBATPHO_DRY_RUN` prints the `rm` command and keeps
   the file.
 - **IT-012**: In a child shell that loaded only `safety`, verify `safe_extract`
   loads `archive` on demand, then reports a missing archive and extracts a
@@ -325,4 +325,4 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
    before any filesystem change.
 3. The module's defaults are safe: unattended runs refuse, directories need
    `--recursive`, and archives are validated before extraction.
-4. `DRY_RUN` never changes the filesystem or system state.
+4. `DYBATPHO_DRY_RUN` never changes the filesystem or system state.

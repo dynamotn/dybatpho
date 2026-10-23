@@ -37,7 +37,7 @@ the caller has defined without exporting anything.
 ### 🚀 Highlights
 
 - [`dybatpho::parallel_map`](#dybatphoparallel_map) — Run one command once per item, several items at a time. The command and each item are passed as separate arguments, so an item containing a space or a quote is handled as one value rather than re-parsed as shell syntax.
-- [`dybatpho::parallel_run`](#dybatphoparallel_run) — Run several shell commands at once, each given as one string. Use this when the jobs differ from one another; use `dybatpho::parallel_map` when the same command runs over a list, because that form needs no quoting.
+- [`dybatpho::parallel_run`](#dybatphoparallel_run) — Run several commands at once. Use this when the jobs differ from one another; use `dybatpho::parallel_map` when the same command runs over a list. With `--argv`, each argument names an indexed array that holds one job's command and its arguments, which run as they are, never parsed as shell. Without it, each argument is a shell command string run through `eval`; that form is deprecated, because a value interpolated into a string is parsed as code.
 - [`dybatpho::parallel_status`](#dybatphoparallel_status) — Print the exit code of one job of the last run.
 - [`dybatpho::parallel_count`](#dybatphoparallel_count) — Print how many jobs the last run had.
 - [`dybatpho::parallel_failed`](#dybatphoparallel_failed) — Print how many jobs of the last run failed. A job that fail-fast prevented from starting, or ended while it ran, is not counted: it was stopped because another job failed, not because it did.
@@ -59,7 +59,7 @@ the caller has defined without exporting anything.
 
 **[`dybatpho::parallel_run`](#dybatphoparallel_run)**
 
-- Each string is evaluated as a shell command, so quote anything inside it that must survive that second round of parsing
+- A job array may name a shell function the caller defined, because each job runs in a subshell of the calling shell
 - The per-job exit codes are kept in the calling shell, so a call made inside `$(...)` or a pipeline reports its own output but leaves `dybatpho::parallel_status` unchanged
 
 <a id="reference"></a>
@@ -131,7 +131,7 @@ dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
 | **`DYBATPHO_PARALLEL_TIMEOUT`** | string | yes |  | Per-job limit used when `--timeout` is not given |
 | **`DYBATPHO_PARALLEL_PROGRESS`** | string | yes |  | When true-like, report progress as `--progress` does |
 | **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | no | `5` | Seconds a timed-out job has to stop before it is killed |
-| **`DRY_RUN`** | string | yes |  | When true-like, report the jobs instead of running them |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the jobs instead of running them |
 
 **🧩 Variable sets**
 
@@ -154,17 +154,26 @@ dybatpho::parallel_map --progress 4 _convert ./images/*.png > converted.log
 
 ### `dybatpho::parallel_run`
 
-Run several shell commands at once, each given as one string.
+Run several commands at once.
 Use this when the jobs differ from one another; use `dybatpho::parallel_map`
-when the same command runs over a list, because that form needs no quoting.
+when the same command runs over a list.
 
-**🧪 Example**
+With `--argv`, each argument names an indexed array that holds one job's
+command and its arguments, which run as they are, never parsed as shell.
+Without it, each argument is a shell command string run through `eval`; that
+form is deprecated, because a value interpolated into a string is parsed as
+code.
+
+**🧪 Examples**
 
 ```bash
-dybatpho::parallel_run 3 \
-  "npm run build" \
-  "cargo build --release" \
-  "go build ./..."
+local -a build=(npm run build) compile=(cargo build --release) check=(go vet "${package}")
+dybatpho::parallel_run --argv 3 build compile check
+
+```
+
+```bash
+dybatpho::parallel_run 3 "npm run build" "go build ./..."   # deprecated string form
 
 ```
 
@@ -172,6 +181,7 @@ dybatpho::parallel_run 3 \
 
 | Option | Description |
 | --- | --- |
+| **--argv** | Read each argument as the name of an array holding a command and its arguments |
 | **--fail-fast** | Stop starting jobs and end the running ones once a job fails |
 | **--timeout \<duration\>** | End a job that runs longer than this, recording exit `124` |
 | **--progress** | Report on standard error how many jobs have finished |
@@ -182,7 +192,7 @@ dybatpho::parallel_run 3 \
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | number | Jobs to run at once, or `0` to use the CPU count |
-| `$@` | string | Shell command strings, one job each |
+| `$@` | string | Names of arrays with `--argv`, one job each; or (deprecated) shell command strings |
 
 **🌍 Environment variables**
 
@@ -192,7 +202,7 @@ dybatpho::parallel_run 3 \
 | **`DYBATPHO_PARALLEL_TIMEOUT`** | string | yes |  | Per-job limit used when `--timeout` is not given |
 | **`DYBATPHO_PARALLEL_PROGRESS`** | string | yes |  | When true-like, report progress as `--progress` does |
 | **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | no | `5` | Seconds a timed-out job has to stop before it is killed |
-| **`DRY_RUN`** | string | yes |  | When true-like, report the commands instead of running them |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the commands instead of running them |
 
 **🧩 Variable sets**
 

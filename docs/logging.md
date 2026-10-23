@@ -19,14 +19,14 @@ appended to a rotating log file at an independent verbosity level.
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **`LOG_LEVEL`** | string | no | `info` | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`) |
-| **`LOG_FORMAT`** | string | no | `text` | Log output format (`text\|json`) |
-| **`NO_COLOR`** | string | yes |  | Disable ANSI colors when set to a non-empty value |
-| **`LOG_REQUEST_ID`** | string | yes |  | Correlation ID attached to every structured log event. Generated automatically when empty |
-| **`LOG_FILE`** | string | no |  | Path to append structured JSON log lines to, independent of `LOG_FORMAT` |
-| **`LOG_FILE_LEVEL`** | string | no | `${LOG_LEVEL}` | Verbosity threshold applied only to `LOG_FILE` output |
-| **`LOG_FILE_MAX_BYTES`** | number | no | `10485760` | Rotate `LOG_FILE` once it reaches this size in bytes, 10 MiB by default. `0` disables rotation |
-| **`LOG_FILE_MAX_BACKUPS`** | number | no | `5` | Number of rotated `LOG_FILE` backups to keep |
+| **`DYBATPHO_LOG_LEVEL`** | string | no | `info` | Runtime log level for all messages (`trace\|debug\|info\|warn\|error\|fatal`); falls back to `LOG_LEVEL` |
+| **`DYBATPHO_LOG_FORMAT`** | string | no | `text` | Log output format (`text\|json`); falls back to `LOG_FORMAT` |
+| **`NO_COLOR`** | string | yes |  | Disable ANSI colors when set to a non-empty value. Read, never written |
+| **`DYBATPHO_LOG_REQUEST_ID`** | string | yes |  | Correlation ID attached to every structured log event; falls back to `LOG_REQUEST_ID`. Generated automatically, and kept unexported, when both are empty |
+| **`DYBATPHO_LOG_FILE`** | string | no |  | Path to append structured JSON log lines to, independent of the log format; falls back to `LOG_FILE` |
+| **`DYBATPHO_LOG_FILE_LEVEL`** | string | no | `${DYBATPHO_LOG_LEVEL}` | Verbosity threshold applied only to the log file; falls back to `LOG_FILE_LEVEL` |
+| **`DYBATPHO_LOG_FILE_MAX_BYTES`** | number | no | `10485760` | Rotate the log file once it reaches this size in bytes, 10 MiB by default. `0` disables rotation; falls back to `LOG_FILE_MAX_BYTES` |
+| **`DYBATPHO_LOG_FILE_MAX_BACKUPS`** | number | no | `5` | Number of rotated log file backups to keep; falls back to `LOG_FILE_MAX_BACKUPS` |
 | **`DYBATPHO_SPINNER`** | string | yes |  | When `dybatpho::spinner` animates (`auto\|always\|never`). `auto` animates only on a terminal. Default `auto` |
 | **`DYBATPHO_SPINNER_INTERVAL`** | string | no | `0.1` | Seconds between spinner frames |
 | **`DYBATPHO_SPINNER_FRAMES`** | string | yes |  | Space-separated frames the spinner cycles through |
@@ -37,7 +37,7 @@ appended to a rotating log file at an independent verbosity level.
 - [`dybatpho::compare_log_level`](#dybatphocompare_log_level) — Return success when a message level should be shown against a threshold.
 - [`dybatpho::validate_log_level`](#dybatphovalidate_log_level) — Validate a candidate log level value.
 - [`dybatpho::debug`](#dybatphodebug) — Show debug message.
-- [`dybatpho::debug_command`](#dybatphodebug_command) — Log a debug message together with the output of a shell command.
+- [`dybatpho::debug_command`](#dybatphodebug_command) — Log a debug message together with the output of a command. The command is given after `--` as a command and its arguments, which run as they are, never parsed as shell. The older form, a single shell command string in place of `--`, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
 - [`dybatpho::info`](#dybatphoinfo) — Show info message.
 - [`dybatpho::print`](#dybatphoprint) — Show normal message.
 - [`dybatpho::progress`](#dybatphoprogress) — Show a highlighted in-progress banner.
@@ -47,7 +47,7 @@ appended to a rotating log file at an independent verbosity level.
 - [`dybatpho::warn`](#dybatphowarn) — Show warning message.
 - [`dybatpho::error`](#dybatphoerror) — Show error message.
 - [`dybatpho::fatal`](#dybatphofatal) — Show fatal message.
-- [`dybatpho::log_to_file`](#dybatpholog_to_file) — Send structured JSON events to a file alongside the human-readable output on stderr, and keep that file bounded by rotating it. This is the front end to the `LOG_FILE*` variables: a script names the path once instead of exporting four of them, and gets the argument checking, the parent directory and a private mode along with it. Every registered secret is redacted before a line reaches the file, exactly as it is on stderr, so turning on a durable log never turns it into a place a token leaks to.
+- [`dybatpho::log_to_file`](#dybatpholog_to_file) — Send structured JSON events to a file alongside the human-readable output on stderr, and keep that file bounded by rotating it. This is the front end to the `DYBATPHO_LOG_FILE*` variables: a script names the path once instead of setting four of them, and gets the argument checking, the parent directory and a private mode along with it. Every registered secret is redacted before a line reaches the file, exactly as it is on stderr, so turning on a durable log never turns it into a place a token leaks to.
 - [`dybatpho::log_context`](#dybatpholog_context) — Attach fields to every structured log event that follows, so a run identifier or a stage name rides along with each JSON line instead of being spelled out in every message. Text output carries the same fields after the message.
 - [`dybatpho::timer_start`](#dybatphotimer_start) — Start a named timer whose elapsed time `dybatpho::timer_end` logs.
 - [`dybatpho::timer_end`](#dybatphotimer_end) — Stop a named timer and log how long it ran. The structured event carries the timer name and its elapsed milliseconds as fields of their own, so a log aggregator can chart a step without parsing the message.
@@ -69,10 +69,11 @@ appended to a rotating log file at an independent verbosity level.
 
 - `rotate:0` disables rotation, and a size may be given as bytes or with a `K`, `M`, `G` or `T` suffix
 - A log file this function creates gets mode `600`; one that already exists keeps the mode it has
+- The settings are not exported; export `DYBATPHO_LOG_FILE` and its siblings yourself when a child process should write to the same file. `off` also clears an unprefixed `LOG_FILE`
 
 **[`dybatpho::log_context`](#dybatpholog_context)**
 
-- Fields are held in the current shell, so a child process starts with none of them; export `LOG_REQUEST_ID` to correlate across processes
+- Fields are held in the current shell, so a child process starts with none of them; export `DYBATPHO_LOG_REQUEST_ID` to correlate across processes
 - Registered secrets are redacted in field values the same way they are in messages
 
 **[`dybatpho::timer_start`](#dybatphotimer_start)**
@@ -100,13 +101,13 @@ Return success when a message level should be shown against a threshold.
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | Input log level |
-| `$2` | string | no | `${LOG_LEVEL}` | Threshold level to compare against |
+| `$2` | string | no | `${DYBATPHO_LOG_LEVEL}` | Threshold level to compare against |
 
 **🌍 Environment variables**
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`LOG_LEVEL`** | string | Runtime threshold used to decide whether the message is emitted, when no explicit threshold is given |
+| **`DYBATPHO_LOG_LEVEL`** | string | Runtime threshold used to decide whether the message is emitted, when no explicit threshold is given; falls back to `LOG_LEVEL`, then `info` |
 
 **🚦 Exit codes**
 
@@ -150,20 +151,37 @@ Show debug message.
 
 ### `dybatpho::debug_command`
 
-Log a debug message together with the output of a shell command.
+Log a debug message together with the output of a command.
+The command is given after `--` as a command and its arguments, which run
+as they are, never parsed as shell. The older form, a single shell command
+string in place of `--`, still works but is deprecated: it runs through
+`eval`, so a value interpolated into it is parsed as code.
+
+**🧪 Examples**
+
+```bash
+dybatpho::debug_command "Generated file" -- cat -- "${path}"
+
+```
+
+```bash
+dybatpho::debug_command "Generated file" "cat ./generated.sh"   # deprecated string form
+
+```
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Introductory message |
-| `$2` | string | Shell command string to evaluate |
+| `$2` | string | `--`, or (deprecated) a shell command string to evaluate |
+| `$@` | string | Command and its arguments, after `--` |
 
 **🌍 Environment variables**
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`LOG_LEVEL`** | string | Set to `debug` or `trace` to see this output |
+| **`DYBATPHO_LOG_LEVEL`** | string | Set to `debug` or `trace` to see this output; falls back to `LOG_LEVEL` |
 
 **📤 Output on stderr**
 
@@ -322,8 +340,8 @@ Show fatal message.
 Send structured JSON events to a file alongside the
 human-readable output on stderr, and keep that file bounded by rotating it.
 
-This is the front end to the `LOG_FILE*` variables: a script names the path
-once instead of exporting four of them, and gets the argument checking, the
+This is the front end to the `DYBATPHO_LOG_FILE*` variables: a script names
+the path once instead of setting four of them, and gets the argument checking, the
 parent directory and a private mode along with it. Every registered secret
 is redacted before a line reaches the file, exactly as it is on stderr, so
 turning on a durable log never turns it into a place a token leaks to.
@@ -346,10 +364,10 @@ dybatpho::log_to_file off   # stop writing to a file
 
 **🧩 Variable sets**
 
-- **`LOG_FILE`** (string): Path that receives the structured events
-- **`LOG_FILE_MAX_BYTES`** (number): Size threshold the file is rotated at
-- **`LOG_FILE_MAX_BACKUPS`** (number): Number of rotated backups kept
-- **`LOG_FILE_LEVEL`** (string): Verbosity threshold applied to the file alone
+- **`DYBATPHO_LOG_FILE`** (string): Path that receives the structured events
+- **`DYBATPHO_LOG_FILE_MAX_BYTES`** (number): Size threshold the file is rotated at
+- **`DYBATPHO_LOG_FILE_MAX_BACKUPS`** (number): Number of rotated backups kept
+- **`DYBATPHO_LOG_FILE_LEVEL`** (string): Verbosity threshold applied to the file alone
 
 **🚦 Exit codes**
 
@@ -507,7 +525,7 @@ _Function has no arguments._
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`LOG_LEVEL`** | string | Set to `trace` to emit the trace start/end messages |
+| **`DYBATPHO_LOG_LEVEL`** | string | Set to `trace` to emit the trace start/end messages; falls back to `LOG_LEVEL` |
 
 ---
 

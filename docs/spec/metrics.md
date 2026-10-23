@@ -107,7 +107,7 @@ As an operator, I want a cron job or CI step to push its metrics to a Prometheus
 
 **Why this priority**: The textfile collector needs a node exporter on the same host; a job in a container or on a CI runner has neither, and the Pushgateway is the standard answer.
 
-**Independent Test**: Record metrics, push them to a mocked Pushgateway, and verify the URL, method, content type, body, encoded grouping labels, and the handling of a refusal, of nothing recorded, and of `DRY_RUN`.
+**Independent Test**: Record metrics, push them to a mocked Pushgateway, and verify the URL, method, content type, body, encoded grouping labels, and the handling of a refusal, of nothing recorded, and of `DYBATPHO_DRY_RUN`.
 
 **Acceptance Scenarios**:
 
@@ -143,7 +143,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - A quantile list that is empty, not numeric, or outside `0`–`1`.
 - One metric name used for both a histogram and a summary.
 - A script loads `metrics` alone and then records a summary or pushes.
-- A push with nothing recorded, or under `DRY_RUN`.
+- A push with nothing recorded, or under `DYBATPHO_DRY_RUN`.
 - A grouping value that is empty, contains a `/`, a space, or non-ASCII text.
 - A Pushgateway that refuses the push with a 4xx or 5xx status and an explanation.
 - An amount, a duration, or a bucket bound is written with a leading zero.
@@ -177,7 +177,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-021**: A job name or grouping value that is empty or contains `/` MUST be sent as `<label>@base64/<value>` in the URL-safe base64 alphabet, an empty value as `=`, and every other value MUST be percent-encoded.
 - **FR-022**: The push helper MUST refuse a URL without an `http://` or `https://` scheme, an empty job name, a grouping label that is not a `key=value` pair with a valid label name, and a grouping label named `job`.
 - **FR-023**: The push helper MUST return the network module's exit code for the request and MUST log the gateway's error text when it refuses the push, rather than hiding the failure.
-- **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DRY_RUN` by printing the request instead of sending it, with the gateway URL shown as its scheme and host only, like every URL the network module logs.
+- **FR-024**: The push helper MUST send no request and succeed with a warning when nothing has been recorded, and MUST honor `DYBATPHO_DRY_RUN` by printing the request instead of sending it, with the gateway URL shown as its scheme and host only, like every URL the network module logs.
 - **FR-025**: Loading `metrics` MUST NOT load `math` or `network` up front. Recording a summary MUST load `math` on demand when it is not loaded, and a push MUST do the same for `network`, each stopping the script, naming the module, only when it cannot be loaded, before recording or sending anything; counters, gauges, histograms and timers MUST work without either.
 - **FR-026**: `metrics_time`, `metrics_timer_start` and `metrics_timer_stop` MUST refuse an invalid metric name or label under their own name, and `metrics_time` MUST do so before running the command.
 - **FR-027**: `metrics_push` MUST check the quantile list in the caller's shell before rendering, so that a list made invalid after a summary was recorded stops the push instead of reporting success.
@@ -234,7 +234,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-024**: Push with `--add` and verify `POST` is used.
 - **IT-025**: Push with a job and grouping values that are empty, contain a `/`, a space, and non-ASCII text, and verify the base64url and percent encodings in the URL.
 - **IT-026**: Push to a mocked Pushgateway that answers 400 with an explanation and verify the exit code `4` and the logged error text.
-- **IT-027**: Push with nothing recorded and under `DRY_RUN`, and verify no request reaches the gateway.
+- **IT-027**: Push with nothing recorded and under `DYBATPHO_DRY_RUN`, and verify no request reaches the gateway.
 - **IT-028**: Reject a URL without a scheme, an empty job, a malformed grouping label, an invalid label name, and a grouping label named `job`.
 - **IT-029**: Refuse a bad name and a bad label in `metrics_time` without running the command, a bad name in `metrics_timer_start`, and a bad label in `metrics_timer_stop`, each under its own name.
 - **IT-030**: Record a summary, make `DYBATPHO_METRICS_QUANTILES` invalid, push, and fail under the name of `metrics_push` without sending a request.

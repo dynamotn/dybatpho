@@ -7,7 +7,7 @@
 # @description Demonstrates dybatpho::parallel_map, parallel_run,
 #   parallel_status, parallel_count, parallel_failed, fail-fast (the variable
 #   and `--fail-fast`), per-job time limits with `--timeout`, `--progress`,
-#   and DRY_RUN
+#   and DYBATPHO_DRY_RUN
 # shellcheck disable=SC2034 # DYBATPHO_PARALLEL_FAILFAST is read by the parallel module
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
 # its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
@@ -74,11 +74,20 @@ function _demo_ordering {
 # @noargs
 function _demo_run {
   dybatpho::header "DIFFERENT COMMANDS AT ONCE"
-  # `parallel_run` suits jobs that are not the same command over a list.
-  dybatpho::parallel_run 3 \
-    "printf '  linting...\n'; sleep 0.1; printf '  lint done\n'" \
-    "printf '  testing...\n'; sleep 0.2; printf '  tests done\n'" \
-    "printf '  building...\n'; sleep 0.1; printf '  build done\n'"
+  # `parallel_run` suits jobs that are not the same command over a list. With
+  # `--argv`, each job is an array holding a command and its arguments, so
+  # nothing in them is parsed as shell.
+
+  # @description Pretend to run one stage of a build, taking a while.
+  # @arg $1 string Stage name
+  # @arg $2 string Seconds the stage takes
+  function _stage {
+    printf '  %s...\n' "$1"
+    sleep "$2"
+    printf '  %s done\n' "$1"
+  }
+  local -a lint=(_stage linting 0.1) test=(_stage testing 0.2) build=(_stage building 0.1)
+  dybatpho::parallel_run --argv 3 lint test build
 }
 
 # @description Run the `FAIL FAST` section of this example.
@@ -164,7 +173,7 @@ function _demo_progress {
 # @noargs
 function _demo_dry_run {
   dybatpho::header "DRY RUN"
-  DRY_RUN=true dybatpho::parallel_map 2 _check_host web-01 db-01
+  DYBATPHO_DRY_RUN=true dybatpho::parallel_map 2 _check_host web-01 db-01
   dybatpho::info "Nothing was contacted"
 }
 

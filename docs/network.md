@@ -69,7 +69,7 @@ the resolver does.
 - [`dybatpho::curl_timeout`](#dybatphocurl_timeout) — Perform a request via `dybatpho::curl_do` with connect/total timeouts scoped to this call only.
 - [`dybatpho::circuit_state`](#dybatphocircuit_state) — Report whether a circuit breaker key is currently open, half-open, or closed.
 - [`dybatpho::circuit_reset`](#dybatphocircuit_reset) — Reset a circuit breaker key back to the closed state.
-- [`dybatpho::circuit_breaker`](#dybatphocircuit_breaker) — Run a shell command guarded by a circuit breaker keyed by name.
+- [`dybatpho::circuit_breaker`](#dybatphocircuit_breaker) — Run a command guarded by a circuit breaker keyed by name. The command is given after `--` as a command and its arguments, which run as they are, never parsed as shell. The older form, a single shell command string in place of `--`, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
 - [`dybatpho::rate_limit_remaining`](#dybatphorate_limit_remaining) — Report how many calls a rate limit key has left in its window.
 - [`dybatpho::rate_limit_reset`](#dybatphorate_limit_reset) — Forget every call recorded against a rate limit key.
 - [`dybatpho::rate_limit`](#dybatphorate_limit) — Run a command under a sliding window rate limit keyed by name. The limiter is the other half of `dybatpho::circuit_breaker`: the breaker stops calling a service that is already failing, and this stops calling one that is working faster than it agreed to be called. An API that answers `429` for the rest of the hour once a script has spent its budget is not made better by retrying -- it is made better by not spending the budget in the first place. A window holds the timestamps of the calls made inside it. While the budget has room the command runs immediately; when it is full the limiter waits exactly until the oldest call leaves the window, and then runs. Nothing is dropped, so a loop over five hundred items still finishes -- it finishes at the rate the spec allows.
@@ -110,15 +110,11 @@ the resolver does.
 
 **[`dybatpho::curl_request`](#dybatphocurl_request)**
 
-- Response headers aren't captured while `DRY_RUN` is enabled
+- Response headers aren't captured while `DYBATPHO_DRY_RUN` is enabled
 
 **[`dybatpho::curl_timeout`](#dybatphocurl_timeout)**
 
 - Overrides apply only for the duration of this call; global `DYBATPHO_CURL_*` timeouts are unaffected
-
-**[`dybatpho::circuit_breaker`](#dybatphocircuit_breaker)**
-
-- The command is executed with `eval`, so pass it as one shell command string
 
 **[`dybatpho::curl_paginate`](#dybatphocurl_paginate)**
 
@@ -453,12 +449,21 @@ Reset a circuit breaker key back to the closed state.
 
 ### `dybatpho::circuit_breaker`
 
-Run a shell command guarded by a circuit breaker keyed by name.
+Run a command guarded by a circuit breaker keyed by name.
+The command is given after `--` as a command and its arguments, which run
+as they are, never parsed as shell. The older form, a single shell command
+string in place of `--`, still works but is deprecated: it runs through
+`eval`, so a value interpolated into it is parsed as code.
 
-**🧪 Example**
+**🧪 Examples**
 
 ```bash
-dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example.com/health"
+dybatpho::circuit_breaker api.example.com -- dybatpho::curl_do "${health_url}"
+
+```
+
+```bash
+dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example.com/health"   # deprecated
 
 ```
 
@@ -467,7 +472,8 @@ dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | Circuit key, typically a host or service name |
-| `$2` | string | Shell command string to run |
+| `$2` | string | `--`, or (deprecated) a shell command string to run |
+| `$@` | string | Command and its arguments, after `--` |
 
 **🌍 Environment variables**
 
@@ -578,7 +584,7 @@ dybatpho::rate_limit api.example.com 10/60   # take a slot, run nothing
 
 **📝 Notes**
 
-- The command runs as an argument vector rather than through `eval`, unlike `dybatpho::circuit_breaker`; wrap a shell string in `bash -c` when one is really wanted
+- The command runs as an argument vector rather than through `eval`, like the `--` form of `dybatpho::circuit_breaker`; wrap a shell string in `bash -c` when one is really wanted
 - The window is in-memory and process-local, like the circuit breaker's state; it does not persist across script invocations, nor out of a subshell
 
 **🚦 Exit codes**
@@ -676,7 +682,7 @@ dybatpho::curl_paginate "https://api.example.com/items?per_page=100" --header "A
 
 **📝 Notes**
 
-- Under `DRY_RUN` only the first page is rehearsed, because no response comes back to say where the next one is
+- Under `DYBATPHO_DRY_RUN` only the first page is rehearsed, because no response comes back to say where the next one is
 
 **📤 Output on stdout**
 

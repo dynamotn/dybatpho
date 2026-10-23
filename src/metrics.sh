@@ -697,7 +697,7 @@ function __dybatpho_metrics_keys_of {
 #   dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 #
 # @arg $1 string Destination file path, conventionally ending in `.prom`
-# @env DRY_RUN string When true-like, report the write instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
 # @exitcode 1 The destination directory is missing or the write fails
 #######################################
 function dybatpho::metrics_write {
@@ -791,7 +791,7 @@ function __dybatpho_metrics_push_segment {
 # @arg $1 string Pushgateway base URL
 # @arg $2 string Job name
 # @arg $@ string Grouping labels as `key=value`
-# @env DRY_RUN string When true-like, print the request instead of sending it
+# @env DYBATPHO_DRY_RUN string When true-like, print the request instead of sending it
 # @stderr The Pushgateway's own error text when it refuses the push
 # @exitcode 0 The metrics were pushed, or nothing was recorded and nothing was sent
 # @exitcode 1 The URL, job or a label is not valid, or the request failed without a response

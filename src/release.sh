@@ -362,7 +362,7 @@ function dybatpho::release_artifact_name {
 # @arg $5 string? Operating system, default is the current one
 # @arg $6 string? Architecture, default is the current one
 # @stdout Path of the artifact that was created
-# @env DRY_RUN string When true-like, print the path without packaging anything
+# @env DYBATPHO_DRY_RUN string When true-like, print the path without packaging anything
 # @exitcode 1 The source is missing or the archive cannot be created
 # @exitcode 1 Stop the script when the `archive` module cannot be loaded on demand
 # @tip The artifact is written by the `archive` module, which `release` does
@@ -387,8 +387,7 @@ function dybatpho::release_package {
   release_artifact_name=$(dybatpho::release_artifact_name "${name}" "${version}" "${goos}" "${goarch}")
   artifact="$(dybatpho::path_join "${output_dir}" \
     "${release_artifact_name}")"
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run -- package "${source}" into "${artifact}"
     printf '%s\n' "${artifact}"
     return 0
@@ -409,7 +408,7 @@ function dybatpho::release_package {
 # @arg $1 string Directory holding the artifacts
 # @arg $2 string [default: <dir>/SHA256SUMS] Output file
 # @env DYBATPHO_RELEASE_CHECKSUM_ALGORITHM string Algorithm passed to the hash helper
-# @env DRY_RUN string When true-like, print the path without writing anything
+# @env DYBATPHO_DRY_RUN string When true-like, print the path without writing anything
 # @stdout Path of the checksum file
 # @exitcode 1 The directory is missing or holds no file to checksum
 # @tip The file names are recorded without a directory component, so the file
@@ -436,7 +435,7 @@ function dybatpho::release_checksums {
   ((${#artifacts[@]})) \
     || dybatpho::die "${FUNCNAME[0]}: No artifact to checksum in ${directory}"
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run -- checksum "${#artifacts[@]}" artifacts into "${output}"
     printf '%s\n' "${output}"
     return 0
@@ -465,7 +464,7 @@ function dybatpho::release_checksums {
 # @arg $2 string [default: <file>.asc] Signature path
 # @env DYBATPHO_RELEASE_SIGN_CMD string Command receiving the signature path and the file path, one argument each
 # @env DYBATPHO_RELEASE_GPG_KEY string Key `gpg` signs with
-# @env DRY_RUN string When true-like, print the path without signing
+# @env DYBATPHO_DRY_RUN string When true-like, print the path without signing
 # @stdout Path of the signature
 # @exitcode 1 The file is missing, no signing tool is available, or signing fails
 # @tip Sign the checksum file rather than every artifact: one signature then
@@ -478,7 +477,7 @@ function dybatpho::release_sign {
     || dybatpho::die "${FUNCNAME[0]}: File doesn't exist: ${path}"
   signature="${2:-${path}.asc}"
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run -- sign "${path}" into "${signature}"
     printf '%s\n' "${signature}"
     return 0

@@ -234,6 +234,9 @@ dybatpho::generate_man _spec mytool
 - **FR-034**: `dybatpho::cli_verbosity_level` MUST refuse a count that is not a whole number before it reaches arithmetic, and read a padded count in base ten.
 - **FR-035**: The caller's spec function MUST run with the default IFS, not the single space the generator joins its lists with.
 - **FR-036**: The generated parser MUST match a command or alias name literally: a space or quote in it MUST NOT break the parser, and a glob character MUST NOT match any other word.
+- **FR-037**: `dybatpho::cli_apply_verbosity` MUST raise `DYBATPHO_LOG_LEVEL`,
+  starting from it or, when it is empty, from the bare `LOG_LEVEL`, and MUST NOT
+  export it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -281,6 +284,9 @@ dybatpho::generate_man _spec mytool
 - **IT-018**: Raise `info` by `02` and get `trace`; pass an array subscript holding a command and see it refused without running.
 - **IT-019**: Record IFS from inside a spec function and get space, tab and newline.
 - **IT-020**: Declare commands named `say hi`, `a"b` and `build*` (with the alias `b x`), dispatch each by its exact name, and see `buildx` refused as an invalid command.
+- **IT-021**: Apply a verbosity count with only `LOG_LEVEL=warn` set and get
+  `DYBATPHO_LOG_LEVEL=info`, apply two from there and get `trace`, and find the
+  bare name unchanged and the prefixed one not exported.
 
 ## Acceptance Criteria *(mandatory)*
 

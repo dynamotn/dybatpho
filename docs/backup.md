@@ -233,7 +233,7 @@ dybatpho::backup_restore --force "${archive}" /etc/nginx
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the extraction or copy instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report the extraction or copy instead of performing it |
 
 **🚦 Exit codes**
 
@@ -280,11 +280,11 @@ dybatpho::backup_prune --keep-count 7 --name nginx /var/backups
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report what would be removed instead of removing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report what would be removed instead of removing it |
 
 **📤 Output on stdout**
 
-- Nothing; the paths it would remove are reported by `safe_rm` under `DRY_RUN`
+- Nothing; the paths it would remove are reported by `safe_rm` under `DYBATPHO_DRY_RUN`
 
 **🚦 Exit codes**
 

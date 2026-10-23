@@ -297,7 +297,7 @@ dybatpho::release_package ./dist/linux_amd64 ./release mytool 1.3.0 linux amd64
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the path without packaging anything |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the path without packaging anything |
 
 **📤 Output on stdout**
 
@@ -336,7 +336,7 @@ sums="$(dybatpho::release_checksums ./release)"
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_RELEASE_CHECKSUM_ALGORITHM`** | string | Algorithm passed to the hash helper |
-| **`DRY_RUN`** | string | When true-like, print the path without writing anything |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the path without writing anything |
 
 **📤 Output on stdout**
 
@@ -380,7 +380,7 @@ DYBATPHO_RELEASE_SIGN_CMD="minisign -S -m" dybatpho::release_sign ./release/SHA2
 | --- | --- | --- |
 | **`DYBATPHO_RELEASE_SIGN_CMD`** | string | Command receiving the signature path and the file path, one argument each |
 | **`DYBATPHO_RELEASE_GPG_KEY`** | string | Key `gpg` signs with |
-| **`DRY_RUN`** | string | When true-like, print the path without signing |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the path without signing |
 
 **📤 Output on stdout**
 

@@ -128,7 +128,7 @@ call is refused.
    fails before a request is made
 3. **Given** completed calls, **When** usage is read, **Then** the call count
    and token totals for the run are reported
-4. **Given** `DRY_RUN` is enabled, **When** any call is made, **Then** no
+4. **Given** `DYBATPHO_DRY_RUN` is enabled, **When** any call is made, **Then** no
    request is sent, no budget is consumed, and a placeholder of the right shape
    is returned
 
@@ -165,11 +165,11 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - Counters updated inside a command substitution, where a subshell cannot
   write back to its parent.
 - A cached entry that has outlived its time to live.
-- `DRY_RUN` enabled for a rehearsal.
+- `DYBATPHO_DRY_RUN` enabled for a rehearsal.
 - A streamed request refused with an HTTP error, whose error object matches no
   delta, or one that never reaches the provider.
 - A base URL that carries credentials or a key in its path, rehearsed under
-  `DRY_RUN` or logged at debug level.
+  `DYBATPHO_DRY_RUN` or logged at debug level.
 
 ## Requirements *(mandatory)*
 
@@ -209,7 +209,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   reached, raising the refusal from the public function the caller invoked.
 - **FR-015**: The module MUST optionally cache responses on disk keyed by the
   request content, and MUST ignore entries older than the configured lifetime.
-- **FR-016**: The module MUST make no request when `DRY_RUN` is enabled, and
+- **FR-016**: The module MUST make no request when `DYBATPHO_DRY_RUN` is enabled, and
   MUST return a placeholder in the provider's own response shape.
 - **FR-017**: Provider errors MUST be surfaced with the provider's own message.
 - **FR-018**: HTTP requests MUST go through the network module, inheriting its
@@ -235,7 +235,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   arrived or curl failed. It MUST honour `DYBATPHO_CURL_CONNECT_TIMEOUT` and
   `DYBATPHO_CURL_TIMEOUT`, with `DYBATPHO_AI_TIMEOUT` as the overall limit.
 - **FR-024**: A streamed request MUST show its URL redacted to the scheme and
-  host in a `DRY_RUN` rehearsal and in its debug line, never the credentials or
+  host in a `DYBATPHO_DRY_RUN` rehearsal and in its debug line, never the credentials or
   path of the base URL.
 - **FR-025**: `ai_conversation_new` MUST write the conversation path into the variable the caller named, whatever that name is.
 - **FR-026**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
@@ -243,10 +243,10 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-028**: The backend MUST be resolved in the caller's shell, and a call MUST fail with the request's status when the provider refuses or cannot be reached, so that neither an unknown backend nor a failed request is reported as an empty answer; `ai_chat` MUST NOT record a failed call's output as the assistant's turn.
 - **FR-029**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
 - **FR-030**: The backend MUST be resolved in the caller's shell, and a call MUST fail with the request's status when the provider refuses or cannot be reached, so that neither an unknown backend nor a failed request is reported as an empty answer; `ai_chat` MUST NOT record a failed call's output as the assistant's turn.
-- **FR-031**: A request MUST NOT be sent when the backend needs an API key and none is set; the call MUST stop before the request, while a `DRY_RUN` rehearsal MUST still work without a key.
+- **FR-031**: A request MUST NOT be sent when the backend needs an API key and none is set; the call MUST stop before the request, while a `DYBATPHO_DRY_RUN` rehearsal MUST still work without a key.
 - **FR-032**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
 - **FR-033**: The backend MUST be resolved in the caller's shell, and a call MUST fail with the request's status when the provider refuses or cannot be reached, so that neither an unknown backend nor a failed request is reported as an empty answer; `ai_chat` MUST NOT record a failed call's output as the assistant's turn.
-- **FR-034**: A request MUST NOT be sent when the backend needs an API key and none is set; the call MUST stop before the request, while a `DRY_RUN` rehearsal MUST still work without a key.
+- **FR-034**: A request MUST NOT be sent when the backend needs an API key and none is set; the call MUST stop before the request, while a `DYBATPHO_DRY_RUN` rehearsal MUST still work without a key.
 - **FR-035**: The `cli` backend MUST look up its command in the caller's shell, so that a configured or detected client that is not installed stops the call with status 127 instead of answering with nothing.
 - **FR-036**: `ai_stream` MUST read the stream to its end before judging curl's exit status, so a server that closes the connection after `[DONE]` is not reported as a failed request.
 - **FR-037**: A tool run by `ai_run` MUST see the caller's variables: the loop and the tool invoker MUST keep their state in prefixed locals.
@@ -274,7 +274,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   calling script.
 - **SC-003**: A value registered as a secret never appears in a request.
 - **SC-004**: A run cannot exceed its configured call budget.
-- **SC-005**: A rehearsal with `DRY_RUN` exercises the whole path without
+- **SC-005**: A rehearsal with `DYBATPHO_DRY_RUN` exercises the whole path without
   sending anything or consuming budget.
 
 ## Integration Tests *(mandatory)*
@@ -297,7 +297,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   reset.
 - **IT-009**: Verify caching serves a repeated request without a second call,
   and that the cache can be cleared.
-- **IT-010**: Verify `DRY_RUN` makes no request, consumes no budget, and still
+- **IT-010**: Verify `DYBATPHO_DRY_RUN` makes no request, consumes no budget, and still
   yields a parseable answer for schema-constrained calls.
 - **IT-011**: Verify payload construction for each backend: system prompt
   placement, effort, tools, and output schema.
@@ -309,7 +309,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-014**: Verify a streamed 401 returns `4` with the status and the
   provider's message on stderr and nothing on stdout, a 529 returns `5`, and a
   request that never reached the server returns `1`.
-- **IT-015**: Verify a `DRY_RUN` stream against a base URL holding
+- **IT-015**: Verify a `DYBATPHO_DRY_RUN` stream against a base URL holding
   credentials and a secret path prints the host only.
 - **IT-016**: Start conversations into variables named `file`, `system`, `path_var` and `conversation_path`, and find the file with its system prompt.
 - **IT-017**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
@@ -317,14 +317,14 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-019**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
 - **IT-020**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
 - **IT-021**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
-- **IT-022**: Ask with no API key set and fail without sending a request; rehearse the same call under `DRY_RUN` and succeed.
+- **IT-022**: Ask with no API key set and fail without sending a request; rehearse the same call under `DYBATPHO_DRY_RUN` and succeed.
 - **IT-023**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
 - **IT-024**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
-- **IT-025**: Ask with no API key set and fail without sending a request; rehearse the same call under `DRY_RUN` and succeed.
+- **IT-025**: Ask with no API key set and fail without sending a request; rehearse the same call under `DYBATPHO_DRY_RUN` and succeed.
 - **IT-026**: Ask through the `cli` backend with `DYBATPHO_AI_CLI` naming a command that does not exist, and fail with 127 and no answer.
 - **IT-027**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
 - **IT-028**: Ask with an unknown provider under `if !` and stop before any request; answer an HTTP 500 to `ai_ask` and `ai_chat`, and fail both without recording an assistant turn.
-- **IT-029**: Ask with no API key set and fail without sending a request; rehearse the same call under `DRY_RUN` and succeed.
+- **IT-029**: Ask with no API key set and fail without sending a request; rehearse the same call under `DYBATPHO_DRY_RUN` and succeed.
 - **IT-030**: Ask through the `cli` backend with `DYBATPHO_AI_CLI` naming a command that does not exist, and fail with 127 and no answer.
 - **IT-031**: Answer an HTTP 500 to `ai_json` with retries left, and fail after one request without reporting invalid JSON.
 - **IT-032**: Stream a response whose server lingers after `[DONE]`, and return the answer with exit 0.

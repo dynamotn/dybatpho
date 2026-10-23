@@ -60,9 +60,9 @@ function _demo_run {
   dybatpho::header "ONE COMMAND"
   dybatpho::privilege_run -- printf 'this ran through the escalation command\n'
 
-  # Nothing is executed while DRY_RUN is set, which is how a change gets
+  # Nothing is executed while DYBATPHO_DRY_RUN is set, which is how a change gets
   # reviewed before it runs unattended.
-  DRY_RUN=true dybatpho::privilege_run -- printf 'this one does not run\n'
+  DYBATPHO_DRY_RUN=true dybatpho::privilege_run -- printf 'this one does not run\n'
 }
 
 # @description Hand the terminal over around a password prompt, and take it

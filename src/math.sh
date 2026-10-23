@@ -68,11 +68,11 @@
 DYBATPHO_MATH_SCALE="${DYBATPHO_MATH_SCALE:-10}"
 
 # Plain decimal notation, with an optional sign: `12`, `-0.5`, `+.25`, `7.`
-export DYBATPHO_MATH_NUMBER_REGEX='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)$'
+DYBATPHO_MATH_NUMBER_REGEX='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)$'
 # The largest exponent `dybatpho::math_pow` accepts. Each step is a full long
 # multiplication, so an unbounded exponent is an unbounded wait rather than an
 # answer.
-export DYBATPHO_MATH_MAX_EXPONENT=4096
+DYBATPHO_MATH_MAX_EXPONENT=4096
 
 # @env DYBATPHO_MATH_ENGINE string [default: auto] `auto`, `awk` or `bash`: the engine of the list aggregates
 DYBATPHO_MATH_ENGINE="${DYBATPHO_MATH_ENGINE:-auto}"

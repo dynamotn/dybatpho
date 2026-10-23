@@ -151,6 +151,7 @@ function __dybatpho_parallel_flush {
 # @set __dybatpho_parallel_opt_failfast `true` when `--fail-fast` was given
 # @set __dybatpho_parallel_opt_timeout The duration given to `--timeout`
 # @set __dybatpho_parallel_opt_progress `true` when `--progress` was given
+# @set __dybatpho_parallel_opt_argv `true` when `--argv` was given, which only `dybatpho::parallel_run` accepts
 # @exitcode 1 Stop the script on an unknown option, or `--timeout` without a duration
 # @internal
 #######################################
@@ -161,6 +162,9 @@ function __dybatpho_parallel_options {
   local __dybatpho_parallel_spec="--fail-fast=__dybatpho_parallel_opt_failfast"
   __dybatpho_parallel_spec+=" --progress=__dybatpho_parallel_opt_progress"
   __dybatpho_parallel_spec+=" --timeout=__dybatpho_parallel_opt_timeout:duration"
+  if [[ "${FUNCNAME[1]}" == "dybatpho::parallel_run" ]]; then
+    __dybatpho_parallel_spec+=" --argv=__dybatpho_parallel_opt_argv"
+  fi
   __dybatpho_helpers_options_into - __dybatpho_parallel_parsed "${__dybatpho_parallel_spec}" leading,attached '--*' \
     "${FUNCNAME[1]}: Unknown option '{option}'" "${FUNCNAME[1]}: {option} needs a {noun}" -- "$@"
   __dybatpho_parallel_consumed="${__dybatpho_parallel_parsed[0]}"
@@ -541,7 +545,7 @@ function __dybatpho_parallel_pool {
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
 # @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds a timed-out job has to stop before it is killed
-# @env DRY_RUN string When true-like, report the jobs instead of running them
+# @env DYBATPHO_DRY_RUN string When true-like, report the jobs instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed
 # @tip A function defined by the caller works as the command, because each job
@@ -562,8 +566,7 @@ function dybatpho::parallel_map {
   (($#)) || return 0
 
   local -a __dybatpho_parallel_items=("$@")
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     local __dybatpho_parallel_map_job
     for __dybatpho_parallel_map_job in "${__dybatpho_parallel_items[@]}"; do
       dybatpho::dry_run "${__dybatpho_parallel_map_command}" "${__dybatpho_parallel_map_job}"
@@ -595,21 +598,29 @@ function dybatpho::parallel_map {
 }
 
 #######################################
-# @description Run several shell commands at once, each given as one string.
+# @description Run several commands at once.
 #   Use this when the jobs differ from one another; use `dybatpho::parallel_map`
-#   when the same command runs over a list, because that form needs no quoting.
-# @example
-#   dybatpho::parallel_run 3 \
-#     "npm run build" \
-#     "cargo build --release" \
-#     "go build ./..."
+#   when the same command runs over a list.
 #
+#   With `--argv`, each argument names an indexed array that holds one job's
+#   command and its arguments, which run as they are, never parsed as shell.
+#   Without it, each argument is a shell command string run through `eval`; that
+#   form is deprecated, because a value interpolated into a string is parsed as
+#   code.
+# @example
+#   local -a build=(npm run build) compile=(cargo build --release) check=(go vet "${package}")
+#   dybatpho::parallel_run --argv 3 build compile check
+#
+# @example
+#   dybatpho::parallel_run 3 "npm run build" "go build ./..."   # deprecated string form
+#
+# @option --argv Read each argument as the name of an array holding a command and its arguments
 # @option --fail-fast Stop starting jobs and end the running ones once a job fails
 # @option --timeout <duration> End a job that runs longer than this, recording exit `124`
 # @option --progress Report on standard error how many jobs have finished
 # @option -- End of options
 # @arg $1 number Jobs to run at once, or `0` to use the CPU count
-# @arg $@ string Shell command strings, one job each
+# @arg $@ string Names of arrays with `--argv`, one job each; or (deprecated) shell command strings
 # @set DYBATPHO_PARALLEL_STATUS
 # @stdout Standard output of every job, replayed in submission order
 # @stderr Standard error of every job, replayed in submission order
@@ -617,11 +628,11 @@ function dybatpho::parallel_map {
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
 # @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds a timed-out job has to stop before it is killed
-# @env DRY_RUN string When true-like, report the commands instead of running them
+# @env DYBATPHO_DRY_RUN string When true-like, report the commands instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed
-# @tip Each string is evaluated as a shell command, so quote anything inside it
-#   that must survive that second round of parsing
+# @tip A job array may name a shell function the caller defined, because each
+#   job runs in a subshell of the calling shell
 # @tip The per-job exit codes are kept in the calling shell, so a call made
 #   inside `$(...)` or a pipeline reports its own output but leaves
 #   `dybatpho::parallel_status` unchanged
@@ -629,6 +640,7 @@ function dybatpho::parallel_map {
 function dybatpho::parallel_run {
   local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
   local __dybatpho_parallel_opt_progress=false __dybatpho_parallel_run_consumed
+  local __dybatpho_parallel_opt_argv=false
   __dybatpho_parallel_options __dybatpho_parallel_run_consumed "$@"
   shift "${__dybatpho_parallel_run_consumed}"
   local __dybatpho_parallel_run_concurrency
@@ -637,11 +649,36 @@ function dybatpho::parallel_run {
   __dybatpho_parallel_jobs __dybatpho_parallel_run_concurrency "${__dybatpho_parallel_run_concurrency}"
   (($#)) || return 0
 
-  local -a __dybatpho_parallel_commands=("$@")
-  if dybatpho::is true "${DRY_RUN}"; then
-    local __dybatpho_parallel_run_command
-    for __dybatpho_parallel_run_command in "${__dybatpho_parallel_commands[@]}"; do
-      dybatpho::dry_run "${__dybatpho_parallel_run_command}"
+  local -a __dybatpho_parallel_commands=()
+  local __dybatpho_parallel_run_command
+  if dybatpho::is true "${__dybatpho_parallel_opt_argv}"; then
+    # Each job is turned into a line `printf %q` quoted word by word, so the
+    # evaluation below reads back exactly the words of the array and runs no
+    # code that came inside them.
+    local __dybatpho_parallel_run_name __dybatpho_parallel_run_words
+    for __dybatpho_parallel_run_name in "$@"; do
+      [[ "${__dybatpho_parallel_run_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] \
+        && [[ "$(declare -p "${__dybatpho_parallel_run_name}" 2> /dev/null)" == "declare -a"* ]] \
+        || dybatpho::die "${FUNCNAME[0]}: --argv expects names of indexed arrays, got '${__dybatpho_parallel_run_name}'"
+      __dybatpho_parallel_run_words="${__dybatpho_parallel_run_name}[@]"
+      local -a __dybatpho_parallel_run_argv=(${!__dybatpho_parallel_run_words+"${!__dybatpho_parallel_run_words}"})
+      ((${#__dybatpho_parallel_run_argv[@]})) \
+        || dybatpho::die "${FUNCNAME[0]}: Job array '${__dybatpho_parallel_run_name}' is empty"
+      printf -v __dybatpho_parallel_run_command '%q ' "${__dybatpho_parallel_run_argv[@]}"
+      __dybatpho_parallel_commands+=("${__dybatpho_parallel_run_command% }")
+    done
+  else
+    __dybatpho_parallel_commands=("$@")
+  fi
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
+    for __dybatpho_parallel_run_command in ${__dybatpho_parallel_commands[@]+"${__dybatpho_parallel_commands[@]}"}; do
+      if dybatpho::is true "${__dybatpho_parallel_opt_argv}"; then
+        # The line is the quoted job, so it is shown as it is rather than
+        # quoted once more.
+        printf '🧪 DRY RUN: %s\n' "${__dybatpho_parallel_run_command}"
+      else
+        dybatpho::dry_run "${__dybatpho_parallel_run_command}"
+      fi
     done
     return 0
   fi
@@ -655,9 +692,11 @@ function dybatpho::parallel_run {
   # shellcheck disable=SC2329 # run by the pool through its name
   function __dybatpho_parallel_launch_command {
     local __dybatpho_parallel_run_index="$1" __dybatpho_parallel_run_directory="$2" __dybatpho_parallel_run_code=0
-    # `exit` is ordinary inside a command string, so the evaluation runs one
-    # subshell deeper: otherwise the exit would skip the line below and the job
-    # would be reported as never having run.
+    # A job string is the caller's shell code under the deprecated form, and a
+    # line quoted word by word under `--argv`. `exit` is ordinary inside a
+    # command string, so the evaluation runs one subshell deeper: otherwise
+    # the exit would skip the line below and the job would be reported as
+    # never having run.
     (eval "${__dybatpho_parallel_commands[__dybatpho_parallel_run_index]}") \
       > "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.out" 2> \
       "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.err" || __dybatpho_parallel_run_code=$?

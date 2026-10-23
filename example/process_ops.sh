@@ -40,7 +40,7 @@ function _flaky_command {
 # @noargs
 function _demo_retry {
   dybatpho::header "RETRY WITH BACKOFF"
-  dybatpho::retry 5 _flaky_command
+  dybatpho::retry 5 "flaky command" -- _flaky_command
   dybatpho::success "Flaky command eventually succeeded"
 }
 
@@ -50,14 +50,10 @@ function _demo_retry {
 # @arg $1 string target
 function _deploy {
   dybatpho::expect_args _target -- "$@"
-  # The example shows the shell-string form of `dybatpho::dry_run` on purpose, beside the `--` form below.
-  # dyshellint disable=BSG080 # the example shows the shell-string form of `dybatpho
-  dybatpho::dry_run "rsync -avz ./dist/ ${_target}:/var/www/app/"
-  # The example shows the shell-string form of `dybatpho::dry_run` on purpose, beside the `--` form below.
-  # dyshellint disable=BSG080 # the example shows the shell-string form of `dybatpho
-  dybatpho::dry_run "ssh ${_target} 'systemctl restart app'"
-  # The argument-vector form: `--` runs what follows as a command and its
-  # arguments, never as shell, so a path with a `;` in it stays a path.
+  # `--` runs what follows as a command and its arguments, never as shell, so
+  # a host name with a `;` in it stays a host name.
+  dybatpho::dry_run -- rsync -avz ./dist/ "${_target}:/var/www/app/"
+  dybatpho::dry_run -- ssh "${_target}" 'systemctl restart app'
   dybatpho::dry_run -- printf 'Deployed to %s\n' "${_target}"
 }
 
@@ -65,12 +61,11 @@ function _deploy {
 # @noargs
 function _demo_dry_run {
   dybatpho::header "DRY RUN"
-  dybatpho::info "With DRY_RUN=true, commands are printed but NOT executed"
-  DRY_RUN=true _deploy "my-server.example.com"
-  dybatpho::info "With DRY_RUN unset, commands execute normally"
-  # shellcheck disable=SC1007 # clearing DRY_RUN for one command, not assigning a value
+  dybatpho::info "With DYBATPHO_DRY_RUN=true, commands are printed but NOT executed"
+  DYBATPHO_DRY_RUN=true _deploy "my-server.example.com"
+  dybatpho::info "With DYBATPHO_DRY_RUN=false, commands execute normally"
   # shellcheck disable=SC2310 # the demo keeps going so the next section can run
-  DRY_RUN= _deploy "my-server.example.com" || true
+  DYBATPHO_DRY_RUN=false _deploy "my-server.example.com" || true
 }
 
 # --- expect_args ----------------------------------------------------------
@@ -184,7 +179,7 @@ function _demo_env_defaults {
 # @noargs
 function _demo_assert {
   dybatpho::header "ASSERT"
-  dybatpho::assert '[[ 2 -gt 1 ]]' "math should still work"
+  dybatpho::assert "math should still work" -- test 2 -gt 1
   dybatpho::success "Assertion passed"
 }
 
@@ -199,7 +194,7 @@ function _demo_retry_until {
     fixed_attempts=$((fixed_attempts + 1))
     [[ "${fixed_attempts}" -ge 2 ]]
   }
-  dybatpho::retry_until 2 1 _fixed_delay_flaky fixed-delay-demo
+  dybatpho::retry_until 2 1 fixed-delay-demo -- _fixed_delay_flaky
   dybatpho::success "Fixed-delay retry succeeded"
 }
 

@@ -58,12 +58,11 @@ function _run_deploy {
   dybatpho::info "Selected components: ${COMPONENTS}"
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Colorized output: ${COLOR}"
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  dybatpho::info "Dry run: ${DRY_RUN}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  dybatpho::info "Dry run: ${DYBATPHO_DRY_RUN}"
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Replicas: ${REPLICAS}"
-  # shellcheck disable=SC2154 # declared by `src/logging.sh`, a core module
-  dybatpho::debug "Verbosity requested ${VERBOSITY} time(s), log level is ${LOG_LEVEL}"
+  dybatpho::debug "Verbosity requested ${VERBOSITY} time(s), log level is ${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}"
   dybatpho::success "Deployment plan is ready"
   exit 0
 }
@@ -118,7 +117,7 @@ function _spec_deploy {
   # does not have to be spelled out as `--{no-}color`.
   dybatpho::opts::flag "Colorize the deployment report" COLOR --color \
     negatable:true config:deploy.color
-  dybatpho::opts::flag "Preview without applying changes" DRY_RUN --dry-run on:true off:false init:="false"
+  dybatpho::opts::flag "Preview without applying changes" DYBATPHO_DRY_RUN --dry-run on:true off:false init:="false"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_deploy"
 }
 

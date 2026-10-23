@@ -19,7 +19,7 @@ Every helper that changes a file writes through a staging file in the
 destination directory and renames it into place, so a reader never observes
 a half-written file and an interrupted run leaves the original intact. The
 destination's mode is carried over, and its owner too when the process has
-the privilege to set it. These helpers honor `DRY_RUN`.
+the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 
 ### 🌍 Environment
 
@@ -381,7 +381,7 @@ EOF
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **`DRY_RUN`** | string | yes |  | When true-like, report the write instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the write instead of performing it |
 | **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
@@ -418,7 +418,7 @@ dybatpho::file_replace "./Makefile" "v[0-9]\+\.[0-9]\+" "v2.0"
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **`DRY_RUN`** | string | yes |  | When true-like, report the rewrite instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the rewrite instead of performing it |
 | **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
@@ -451,7 +451,7 @@ dybatpho::file_ensure_line "${HOME}/.bashrc" 'export EDITOR=nvim'
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **`DRY_RUN`** | string | yes |  | When true-like, report the change instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the change instead of performing it |
 | **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
@@ -484,7 +484,7 @@ dybatpho::file_remove_line "${HOME}/.bashrc" 'export EDITOR=nvim'
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| **`DRY_RUN`** | string | yes |  | When true-like, report the change instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the change instead of performing it |
 | **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
 
 **🚦 Exit codes**
@@ -601,7 +601,7 @@ dybatpho::info "Previous version kept at ${backup}"
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the path without copying anything |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the path without copying anything |
 
 **📤 Output on stdout**
 
@@ -681,7 +681,7 @@ dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the path without creating anything |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the path without creating anything |
 
 **📤 Output on stdout**
 

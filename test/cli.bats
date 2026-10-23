@@ -1655,10 +1655,15 @@ setup() {
   assert_equal "$(dybatpho::cli_verbosity_level 1 warn)" "info"
 }
 
-@test "dybatpho::cli_apply_verbosity updates LOG_LEVEL" {
-  local LOG_LEVEL=info
+@test "dybatpho::cli_apply_verbosity raises DYBATPHO_LOG_LEVEL without exporting it" {
+  local LOG_LEVEL=warn DYBATPHO_LOG_LEVEL=""
+  # The bare name is the base while the prefixed one is empty.
+  dybatpho::cli_apply_verbosity 1
+  assert_equal "${DYBATPHO_LOG_LEVEL}" "info"
+  assert_equal "${LOG_LEVEL}" "warn"
   dybatpho::cli_apply_verbosity 2
-  assert_equal "${LOG_LEVEL}" "trace"
+  assert_equal "${DYBATPHO_LOG_LEVEL}" "trace"
+  refute [ -n "$(declare -p DYBATPHO_LOG_LEVEL | grep -- '-x')" ]
 }
 
 # =============================================================================

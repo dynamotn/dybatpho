@@ -746,6 +746,79 @@ _test_retry() {
 EOF
 }
 
+@test "dybatpho::retry and retry_until run a command after -- as words, never as shell" {
+  local marker="${BATS_TEST_TMPDIR}/pwned" seen="${BATS_TEST_TMPDIR}/seen"
+  # Kept apart: a value with both a single quote and a line break in a traced
+  # command's arguments ends kcov's recording.
+  local quoted="it's \"quoted\" \$(touch ${marker}) \`touch ${marker}\` a  b"
+  local multiline="first line"$'\n'"second line"
+  _record_words() { printf '<%s>' "$@" > "${seen}"; }
+
+  run_traced dybatpho::retry 0 -- _record_words "${quoted}" "${multiline}" ""
+  assert_success
+  assert_equal "$(cat "${seen}")" "<${quoted}><${multiline}><>"
+  refute [ -e "${marker}" ]
+
+  rm -f -- "${seen}"
+  run_traced dybatpho::retry 0 "described" -- _record_words "${quoted}" ";" "|"
+  assert_success
+  assert_equal "$(cat "${seen}")" "<${quoted}><;><|>"
+
+  rm -f -- "${seen}"
+  run_traced dybatpho::retry_until 0 0 -- _record_words "${multiline}" '$(id)'
+  assert_success
+  assert_equal "$(cat "${seen}")" "<${multiline}><\$(id)>"
+  run_traced dybatpho::retry_until 0 0 "described" -- _record_words "${quoted}"
+  assert_success
+  refute [ -e "${marker}" ]
+}
+
+@test "dybatpho::retry -- names the description, or else the quoted command, when it gives up" {
+  run dybatpho::retry 0 "probe" -- false
+  assert_failure
+  assert_output --partial "No more retries left to run probe."
+  run dybatpho::retry 0 -- test "a b" = "c"
+  assert_failure
+  assert_output --partial 'No more retries left to run test a\ b = c.'
+  stub sleep ":"
+  run dybatpho::retry_until 1 1 "fixed probe" -- false
+  unstub sleep
+  assert_failure
+  assert_output --partial "No more retries left to run fixed probe."
+  run dybatpho::retry 1 --
+  assert_failure
+  assert_output --partial "Expected a command after --"
+  run dybatpho::retry_until 1 1 "described" --
+  assert_failure
+}
+
+@test "dybatpho::assert -- runs a check as words and stops with its message" {
+  local marker="${BATS_TEST_TMPDIR}/pwned"
+  dybatpho::assert -- test -n "\$(touch ${marker})"
+  dybatpho::assert "has spaces" -- test "a b" = "a b"
+  refute [ -e "${marker}" ]
+
+  run --separate-stderr dybatpho::assert "numbers mismatch" -- test 1 -eq 2
+  assert_failure
+  assert_stderr --partial "numbers mismatch"
+  run --separate-stderr dybatpho::assert -- test "x y" = z
+  assert_failure
+  assert_stderr --partial 'Assertion failed: test x\ y = z'
+  run --separate-stderr dybatpho::assert "nothing to run" --
+  assert_failure
+  assert_stderr --partial "Expected a command after --"
+}
+
+@test "a command run by assert or retry after -- sees the caller's variables" {
+  local argv="caller" label="caller" message="caller" condition="caller"
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  _look() { printf '%s %s %s %s' "${argv}" "${label}" "${message}" "${condition}" > "${seen}"; }
+  dybatpho::assert -- _look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller"
+  dybatpho::retry 0 -- _look
+  assert_equal "$(cat "${seen}")" "caller caller caller caller"
+}
+
 @test "dybatpho::retry_until returns the final failure code" {
   _retry_until_fail() {
     return 9

@@ -125,7 +125,7 @@ export DYBATPHO_FORGE_TOKEN="glpat-..."
 
 **[`dybatpho::forge_request`](#dybatphoforge_request)**
 
-- Honors `DRY_RUN`, so a publishing script can be rehearsed safely
+- Honors `DYBATPHO_DRY_RUN`, so a publishing script can be rehearsed safely
 
 <a id="reference"></a>
 

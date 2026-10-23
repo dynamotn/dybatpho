@@ -81,7 +81,7 @@ As an operator, I want to see the exact command first and be asked before it run
 
 **Acceptance Scenarios**:
 
-1. **Given** dry-run mode is on through `--dry-run` or `DRY_RUN`, **When** an install runs, **Then** the command is printed and the package manager is not executed
+1. **Given** dry-run mode is on through `--dry-run` or `DYBATPHO_DRY_RUN`, **When** an install runs, **Then** the command is printed and the package manager is not executed
 2. **Given** dry-run mode is on, **When** an install runs, **Then** no confirmation is requested, because nothing changes
 3. **Given** a non-interactive shell without `--force`, **When** an install runs, **Then** the install is refused and reported as skipped
 4. **Given** `--force` or `DYBATPHO_FORCE`, **When** an install runs, **Then** the package manager runs without a prompt
@@ -153,7 +153,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **FR-007**: The rendered install command MUST include the manager's non-interactive flags unless `DYBATPHO_PKG_ASSUME_YES` is false.
 - **FR-008**: The rendered command MUST be prefixed with `sudo` when elevation is needed, MUST never prefix `brew`, and MUST honor `DYBATPHO_PKG_SUDO`.
 - **FR-009**: Every mutating function MUST ask for confirmation unless `--force` or `DYBATPHO_FORCE` approves it, and MUST refuse rather than guess in a non-interactive shell.
-- **FR-010**: Every mutating function MUST print the command instead of running it under `--dry-run` or `DRY_RUN`, and MUST NOT ask for confirmation in that mode.
+- **FR-010**: Every mutating function MUST print the command instead of running it under `--dry-run` or `DYBATPHO_DRY_RUN`, and MUST NOT ask for confirmation in that mode.
 - **FR-011**: A declined change MUST report what was skipped and fail, without running the package manager.
 - **FR-012**: The exit code of the package manager MUST reach the caller unchanged.
 - **FR-013**: The ensure helper MUST install only the packages that are missing, and MUST succeed without installing anything when they are all present.
@@ -194,7 +194,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **IT-008**: Stub each manager's query command to verify installed and missing verdicts, including `apt` config-files status and empty `apk` output.
 - **IT-008a**: Stub `brew` so that only the cask scope knows the package, and verify it counts as installed; verify it counts as missing when neither scope knows it.
 - **IT-009**: Verify the missing check prints only the absent packages.
-- **IT-010**: Verify that `--dry-run` and `DRY_RUN` print the command and never execute the stubbed manager.
+- **IT-010**: Verify that `--dry-run` and `DYBATPHO_DRY_RUN` print the command and never execute the stubbed manager.
 - **IT-011**: Verify a non-interactive run without `--force` is skipped, and that `--force` or `DYBATPHO_FORCE` runs the manager.
 - **IT-012**: Verify `--update` refreshes the index before installing, and that the index refresh asks for confirmation on its own.
 - **IT-013**: Verify a non-zero exit code from the package manager reaches the caller.

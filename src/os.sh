@@ -117,7 +117,7 @@ function dybatpho::command_path {
 # a bare run of digits would answer `64`. The leftmost dotted run is the version
 # in every tool output this was checked against.
 # @env DYBATPHO_VERSION_SCAN_REGEX string Pattern matching a version inside arbitrary text
-export DYBATPHO_VERSION_SCAN_REGEX='v?([0-9]+\.[0-9]+(\.[0-9]+)*)(-([0-9A-Za-z.-]+))?'
+DYBATPHO_VERSION_SCAN_REGEX='v?([0-9]+\.[0-9]+(\.[0-9]+)*)(-([0-9A-Za-z.-]+))?'
 
 #######################################
 # @description Print the version a command reports.

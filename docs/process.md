@@ -23,7 +23,7 @@ writes PID files.
 | --- | --- | --- |
 | **`DYBATPHO_USED_ERR_HANDLER`** | bool | Internal flag set after `dybatpho::register_err_handler` |
 | **`DYBATPHO_USED_KILLED_HANDLER`** | bool | Internal flag set after `dybatpho::register_killed_handler` |
-| **`DRY_RUN`** | string | When true-like, `dybatpho::dry_run` prints commands instead of executing them |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, `dybatpho::dry_run` and every module that honors dry-run mode print commands instead of executing them. Falls back to `DRY_RUN` when unset or empty; neither is assigned or exported by the library |
 | **`DYBATPHO_CLEANUP_PATHS`** | array | Paths registered by `dybatpho::cleanup_file_on_exit`, each as `<pid>:<path>` |
 | **`DYBATPHO_TIMEOUT_KILL_AFTER`** | number | Seconds between SIGTERM and SIGKILL when a timed or background job is ended, default is `5` |
 | **`DYBATPHO_BACKGROUND_NAMES`** | array | Names of the background jobs started by `dybatpho::background_run`, in submission order |
@@ -40,7 +40,7 @@ writes PID files.
 - [`dybatpho::killed_process_handler`](#dybatphokilled_process_handler) — Handle SIGINT or SIGTERM received by the current process. It exits with 130 or 143, and the EXIT handlers registered through `dybatpho::trap` still run on the way out.
 - [`dybatpho::trap`](#dybatphotrap) — Append a command to one or more trap handlers without discarding existing traps.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
-- [`dybatpho::dry_run`](#dybatphodry_run) — Print a shell command instead of executing it when `DRY_RUN` is enabled.
+- [`dybatpho::dry_run`](#dybatphodry_run) — Print a command instead of executing it when dry-run mode is enabled.
 - [`dybatpho::try`](#dybatphotry) — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script. The command runs in a subshell of the calling shell, so it can call any function the caller has defined, read its variables and its standard input, and nothing it changes -- variables, the working directory, traps -- leaks back. Its standard output and standard error are captured into the two named variables, with trailing newlines removed as `$(...)` would, so the message a `dybatpho::die` printed is in the error variable rather than on the terminal. The status of the command is the status of this call. Give an empty name to discard one of the streams. As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit` for the command, and calling `dybatpho::try` outside such a condition under `set -e` ends the script when the command fails. Test its status, or collect it with `|| status=$?`.
 - [`dybatpho::run_with_timeout`](#dybatphorun_with_timeout) — Run a command and end it if it takes too long. The system `timeout` is used when it is available and usable, and a pure-Bash watchdog takes over when it is not, which is the common case on macOS, where coreutils is not installed by default. A shell function always takes the Bash path, because `timeout` executes a program and cannot see the caller's functions. The command is ended with SIGTERM first and SIGKILL afterwards, so a job that traps SIGTERM still gets to clean up before it is removed, and one that ignores it is still removed.
 - [`dybatpho::background_run`](#dybatphobackground_run) — Start a command in the background under a name. The name is how every other helper in this group refers to the job, because a process ID is both unreadable in a script and unusable once the job has been reaped. Starting a second job under a name whose job is still running is refused rather than silently forgetting the first one. The job runs in a subshell of the calling shell, so it can call any function the caller has defined, and it leads its own process group, so `dybatpho::kill_children` can end its children along with it.
@@ -72,7 +72,7 @@ writes PID files.
 
 **[`dybatpho::dry_run`](#dybatphodry_run)**
 
-- A single argument is a shell command string and runs through `eval`. Lead with `--` when the command and its arguments come from elsewhere -- a path, a user's input -- so that a single argument is run as a command name rather than parsed as shell.
+- Lead with `--`. Without it, a single argument is a shell command string and runs through `eval`, which parses any value interpolated into it as code; that form is deprecated and kept only for compatibility. Several arguments without `--` already run as a command and its arguments.
 
 **[`dybatpho::try`](#dybatphotry)**
 
@@ -200,23 +200,23 @@ Register a file or directory to be removed when the current shell exits.
 
 ### `dybatpho::dry_run`
 
-Print a shell command instead of executing it when `DRY_RUN` is enabled.
+Print a command instead of executing it when dry-run mode is enabled.
 
 **🧪 Examples**
 
 ```bash
-DRY_RUN=true
-dybatpho::dry_run "rm -rf ./build"
+DYBATPHO_DRY_RUN=true
+dybatpho::dry_run -- rm -rf -- ./build
 
 ```
 
 ```bash
-dybatpho::dry_run "ssh ${host} 'systemctl restart app'"
+dybatpho::dry_run -- ssh "${host}" 'systemctl restart app'
 
 ```
 
 ```bash
-dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
+dybatpho::dry_run "rm -rf ./build"   # deprecated: a single shell string runs through `eval`
 
 ```
 
@@ -224,17 +224,17 @@ dybatpho::dry_run -- rm -rf -- "${path}"   # argv form: never `eval`
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$@` | string | Shell command string to run, or `--` followed by a command and its arguments |
+| `$@` | string | `--` followed by a command and its arguments; or (deprecated) a single shell command string |
 
 **🌍 Environment variables**
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them |
+| **`DYBATPHO_DRY_RUN`** | string | Set to `true`, `yes`, `on`, or `0` to print commands instead of executing them; falls back to `DRY_RUN` |
 
 **📤 Output on stdout**
 
-- Show the command instead of executing it when `DRY_RUN` is true
+- Show the command instead of executing it when dry-run mode is on
 
 ---
 

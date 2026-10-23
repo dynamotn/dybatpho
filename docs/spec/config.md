@@ -254,7 +254,7 @@ dybatpho::config_save ./config.yaml PORT
   newline, and must survive the round trip.
 - A structured root is a sequence or a scalar rather than a mapping, which must
   be rejected instead of loaded under positional keys.
-- `DRY_RUN` is set, so a save reports the write instead of performing it.
+- `DYBATPHO_DRY_RUN` is set, so a save reports the write instead of performing it.
 - A numeric value saved to a structured file is written with leading zeros, such as `0080`.
 
 ## Requirements *(mandatory)*
@@ -311,7 +311,7 @@ dybatpho::config_save ./config.yaml PORT
   configuration map.
 - **FR-024**: `config_save` MUST write the named keys, or every loaded key when
   none are named, to a file whose extension selects the format, MUST create the
-  file when it is absent, MUST write atomically, and MUST honor `DRY_RUN`.
+  file when it is absent, MUST write atomically, and MUST honor `DYBATPHO_DRY_RUN`.
 - **FR-025**: Saving to a dotenv file MUST rewrite every assignment of a named
   key in place, preserve every other line verbatim, append keys the file does
   not mention, and quote and escape values the loader could not otherwise read
@@ -403,7 +403,7 @@ dybatpho::config_save ./config.yaml PORT
   repeated key.
 - **IT-016**: Round-trip values holding whitespace, a `#`, a backslash, a
   quote, a tab, and a newline, and create a file that did not exist.
-- **IT-017**: Save every loaded key when none are named, and verify `DRY_RUN`
+- **IT-017**: Save every loaded key when none are named, and verify `DYBATPHO_DRY_RUN`
   leaves the file untouched.
 - **IT-018**: Reject an unset key, an invalid key, an unsupported format, and a
   key a dotenv file cannot spell.

@@ -421,7 +421,7 @@ dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | Print the command instead of showing the notification; with no backend installed, the `notify-send` form is printed |
+| **`DYBATPHO_DRY_RUN`** | string | Print the command instead of showing the notification; with no backend installed, the `notify-send` form is printed |
 
 **🚦 Exit codes**
 
@@ -567,7 +567,7 @@ dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${re
 | --- | --- | --- | --- | --- |
 | **`DYBATPHO_EMAIL_FROM`** | string | yes |  | Default sender address |
 | **`DYBATPHO_SENDMAIL`** | string | no |  | The sendmail command; without it, `sendmail` on PATH, then `/usr/sbin/sendmail` and `/usr/lib/sendmail` |
-| **`DRY_RUN`** | string | yes |  | Print the sendmail command instead of sending anything |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | Print the sendmail command instead of sending anything |
 
 **🚦 Exit codes**
 

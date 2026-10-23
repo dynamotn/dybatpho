@@ -56,7 +56,8 @@
 #   dybatpho::info "ready, running dybatpho $(dybatpho::version)"
 #
 # @env DYBATPHO_FORCE string When true-like, overwrite an existing output file without asking
-# @env DRY_RUN string When true-like, report what would be written and write nothing
+# @env DYBATPHO_DRY_RUN string When true-like, report what would be written and write nothing; falls back to
+#   `DRY_RUN`
 #
 # @see
 #   - `init.sh`
@@ -357,7 +358,7 @@ function __dybatpho_bundle_run {
   [[ -z "${_soft_missing}" ]] \
     || dybatpho::info "Soft dependencies not carried, add them with --with-soft-deps: ${_soft_missing}"
 
-  if dybatpho::is true "${DRY_RUN:-false}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-false}}"; then
     dybatpho::info "DRY_RUN: would write ${_count} module(s) to ${OUTPUT}"
     return 0
   fi

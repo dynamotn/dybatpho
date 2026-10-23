@@ -273,7 +273,7 @@ printf '%s\n' "${body}" | dybatpho::cache_set releases
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries |
-| **`DRY_RUN`** | string | When true-like, report the write instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report the write instead of performing it |
 
 **📥 Input on stdin**
 
@@ -333,7 +333,7 @@ _Function has no arguments._
 | --- | --- | --- |
 | **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries |
 | **`DYBATPHO_CACHE_NAMESPACE`** | string | Namespace to empty |
-| **`DRY_RUN`** | string | When true-like, report the removal instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report the removal instead of performing it |
 
 **🚦 Exit codes**
 
@@ -485,7 +485,7 @@ dybatpho::cache_prune --max-entries 500 --max-size 50M
 | --- | --- | --- |
 | **`DYBATPHO_CACHE_DIR`** | string | Directory holding cache entries |
 | **`DYBATPHO_CACHE_NAMESPACE`** | string | Namespace to prune |
-| **`DRY_RUN`** | string | When true-like, report each removal instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report each removal instead of performing it |
 
 **🚦 Exit codes**
 

@@ -324,7 +324,7 @@ dybatpho::show_file "${report_file}"
 - **FR-028**: The module MUST report the size, modification age in seconds, and checksum of a file, selecting an available tool per platform.
 - **FR-029**: The checksum helper MUST support `md5`, `sha1`, `sha256`, and `sha512`, default to `sha256`, and reject any other algorithm.
 - **FR-030**: The backup helper MUST copy a file under a timestamped name, MUST NOT overwrite an existing backup, and MUST print the path it created.
-- **FR-031**: Every helper that changes a file MUST honor `DRY_RUN` by reporting the intended change and leaving the filesystem untouched.
+- **FR-031**: Every helper that changes a file MUST honor `DYBATPHO_DRY_RUN` by reporting the intended change and leaving the filesystem untouched.
 - **FR-032**: Every helper that changes a file MUST resolve a symlink destination to the file it points at, so that the link is preserved rather than replaced, and MUST follow chains and relative links.
 - **FR-033**: Symlink resolution MUST stop with an error on a loop rather than following it indefinitely, and MUST be disableable so that a caller can replace the link instead.
 - **FR-034**: Metadata helpers MUST report the file a symlink points at rather than the link itself.
@@ -394,7 +394,7 @@ dybatpho::show_file "${report_file}"
 - **IT-013**: Compare hash output against reference checksums for each supported algorithm, and reject an unknown algorithm.
 - **IT-014**: Verify size and age for known files, including an empty file and a modification time in the future.
 - **IT-015**: Back up a file twice and verify both copies exist under distinct names with the original mode.
-- **IT-016**: Run every writing helper under `DRY_RUN` and verify the file, its backups, and the staging directory are untouched.
+- **IT-016**: Run every writing helper under `DYBATPHO_DRY_RUN` and verify the file, its backups, and the staging directory are untouched.
 - **IT-017**: Rewrite through a symlink, a chain of symlinks, and a relative symlink, verifying the link survives and the target changes.
 - **IT-018**: Rewrite a symlink with following disabled and verify the link is replaced by a regular file while its former target is untouched.
 - **IT-019**: Run a writing helper on a symlink loop and verify it reports the loop.

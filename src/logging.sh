@@ -24,45 +24,37 @@
 #   - `example/logging_demo.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
 
-# @env LOG_LEVEL string [default: info] Runtime log level for all messages (`trace|debug|info|warn|error|fatal`)
-LOG_LEVEL="${LOG_LEVEL:-info}"
-export LOG_LEVEL
-# @env LOG_FORMAT string [default: text] Log output format (`text|json`)
-LOG_FORMAT="${LOG_FORMAT:-text}"
-export LOG_FORMAT
-# @env NO_COLOR string Disable ANSI colors when set to a non-empty value
-NO_COLOR="${NO_COLOR:-}"
-export NO_COLOR
-# @env LOG_REQUEST_ID string Correlation ID attached to every structured log event. Generated automatically when empty
-LOG_REQUEST_ID="${LOG_REQUEST_ID:-}"
-export LOG_REQUEST_ID
-# @env LOG_FILE string? Path to append structured JSON log lines to, independent of `LOG_FORMAT`
-LOG_FILE="${LOG_FILE:-}"
-export LOG_FILE
-# @env LOG_FILE_LEVEL string [default: ${LOG_LEVEL}] Verbosity threshold applied only to `LOG_FILE` output
-LOG_FILE_LEVEL="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
-export LOG_FILE_LEVEL
-# @env LOG_FILE_MAX_BYTES number [default: 10485760] Rotate `LOG_FILE` once it reaches this size in bytes, 10 MiB by
-#   default. `0` disables rotation
-LOG_FILE_MAX_BYTES="${LOG_FILE_MAX_BYTES:-10485760}"
-export LOG_FILE_MAX_BYTES
-# @env LOG_FILE_MAX_BACKUPS number [default: 5] Number of rotated `LOG_FILE` backups to keep
-LOG_FILE_MAX_BACKUPS="${LOG_FILE_MAX_BACKUPS:-5}"
-export LOG_FILE_MAX_BACKUPS
+# Logging is configured through `DYBATPHO_LOG_*` variables. Each one falls back
+# to its unprefixed name (`LOG_LEVEL`, `LOG_FORMAT`, ...) when the prefixed one is
+# unset or empty, so scripts written for earlier releases keep working, and the
+# prefixed name wins when both are set. None of them is assigned or exported
+# here: a value is read where it is used, so a variable the script sets after
+# sourcing the library still counts, and a child process inherits only what the
+# caller chose to export.
+# @env DYBATPHO_LOG_LEVEL string [default: info] Runtime log level for all messages
+#   (`trace|debug|info|warn|error|fatal`); falls back to `LOG_LEVEL`
+# @env DYBATPHO_LOG_FORMAT string [default: text] Log output format (`text|json`); falls back to `LOG_FORMAT`
+# @env NO_COLOR string Disable ANSI colors when set to a non-empty value. Read, never written
+# @env DYBATPHO_LOG_REQUEST_ID string Correlation ID attached to every structured log event; falls back to
+#   `LOG_REQUEST_ID`. Generated automatically, and kept unexported, when both are empty
+# @env DYBATPHO_LOG_FILE string? Path to append structured JSON log lines to, independent of the log format; falls
+#   back to `LOG_FILE`
+# @env DYBATPHO_LOG_FILE_LEVEL string [default: ${DYBATPHO_LOG_LEVEL}] Verbosity threshold applied only to the log
+#   file; falls back to `LOG_FILE_LEVEL`
+# @env DYBATPHO_LOG_FILE_MAX_BYTES number [default: 10485760] Rotate the log file once it reaches this size in bytes,
+#   10 MiB by default. `0` disables rotation; falls back to `LOG_FILE_MAX_BYTES`
+# @env DYBATPHO_LOG_FILE_MAX_BACKUPS number [default: 5] Number of rotated log file backups to keep; falls back to
+#   `LOG_FILE_MAX_BACKUPS`
 # @env DYBATPHO_SPINNER string When `dybatpho::spinner` animates (`auto|always|never`). `auto` animates only on a
 #   terminal.
 #   Default `auto`
 DYBATPHO_SPINNER="${DYBATPHO_SPINNER:-auto}"
-export DYBATPHO_SPINNER
 # @env DYBATPHO_SPINNER_INTERVAL string [default: 0.1] Seconds between spinner frames
 DYBATPHO_SPINNER_INTERVAL="${DYBATPHO_SPINNER_INTERVAL:-0.1}"
-export DYBATPHO_SPINNER_INTERVAL
 # @env DYBATPHO_SPINNER_FRAMES string Space-separated frames the spinner cycles through
 DYBATPHO_SPINNER_FRAMES="${DYBATPHO_SPINNER_FRAMES:-⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏}"
-export DYBATPHO_SPINNER_FRAMES
 # @env DYBATPHO_TIMER_LAST_MS number Elapsed milliseconds reported by the last `dybatpho::timer_end`
 DYBATPHO_TIMER_LAST_MS="${DYBATPHO_TIMER_LAST_MS:-0}"
-export DYBATPHO_TIMER_LAST_MS
 
 # Fields attached to every structured log event, keyed by field name.
 declare -gA __dybatpho_log_context_values=()
@@ -92,7 +84,7 @@ function __dybatpho_log_redact {
 
 #######################################
 # @description Log a message to stdout or stderr, optionally with ANSI color.
-# @set LOG_LEVEL string Runtime log level of the current script
+# @env DYBATPHO_LOG_LEVEL string Runtime log level of the current script, or `LOG_LEVEL`
 # @arg $1 string Log level of message
 # @arg $2 string Message
 # @arg $3 string `stderr` to write to stderr, otherwise stdout
@@ -126,9 +118,10 @@ function __dybatpho_log {
   # A bad level, the threshold checked first, is reported and fails (1); a
   # level that is merely filtered out returns quietly (0).
   local __dybatpho_log_rank __dybatpho_log_threshold
-  __dybatpho_log_rank_into __dybatpho_log_threshold "${LOG_LEVEL,,}" \
+  local __dybatpho_log_runtime="${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}"
+  __dybatpho_log_rank_into __dybatpho_log_threshold "${__dybatpho_log_runtime,,}" \
     || {
-      dybatpho::validate_log_level "${LOG_LEVEL}"
+      dybatpho::validate_log_level "${__dybatpho_log_runtime}"
       return 1
     }
   __dybatpho_log_rank_into __dybatpho_log_rank "${show_log_level,,}" \
@@ -443,25 +436,26 @@ function __dybatpho_log_duration_ms {
 
 #######################################
 # @description
-#   Return the correlation ID attached to every structured log event, generating and caching one when `LOG_REQUEST_ID`
-#   is empty.
+#   Return the correlation ID attached to every structured log event, generating and caching one when both
+#   `DYBATPHO_LOG_REQUEST_ID` and `LOG_REQUEST_ID` are empty.
+#   The generated ID is kept in the current shell and not exported: a child
+#   process shares it only when the caller exports `DYBATPHO_LOG_REQUEST_ID`.
 # @noargs
-# @set LOG_REQUEST_ID string Generated correlation ID, when it was previously empty
+# @set DYBATPHO_LOG_REQUEST_ID string Generated correlation ID, when none was set
 # @stdout Correlation ID
 # @internal
 #######################################
 function __dybatpho_log_request_id {
-  if [[ -z "${LOG_REQUEST_ID:-}" ]]; then
+  if [[ -z "${DYBATPHO_LOG_REQUEST_ID:-${LOG_REQUEST_ID:-}}" ]]; then
     if dybatpho::is command uuidgen; then
-      LOG_REQUEST_ID="$(uuidgen)" # kcov(skip)
+      DYBATPHO_LOG_REQUEST_ID="$(uuidgen)" # kcov(skip)
     else
       local log_now_ms
       log_now_ms=$(__dybatpho_log_now_ms)
-      LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "${log_now_ms}" "${RANDOM}${RANDOM}")"
+      DYBATPHO_LOG_REQUEST_ID="$(printf '%s-%s-%s' "$$" "${log_now_ms}" "${RANDOM}${RANDOM}")"
     fi
-    export LOG_REQUEST_ID
   fi
-  printf '%s' "${LOG_REQUEST_ID}"
+  printf '%s' "${DYBATPHO_LOG_REQUEST_ID:-${LOG_REQUEST_ID:-}}"
 }
 
 #######################################
@@ -516,7 +510,7 @@ function __dybatpho_log_json_event {
   local log_json_escape_4
   __dybatpho_log_json_escape_into log_json_escape_4 "${source}"
   local log_json_escape_5
-  __dybatpho_log_json_escape_into log_json_escape_5 "${LOG_REQUEST_ID}"
+  __dybatpho_log_json_escape_into log_json_escape_5 "${DYBATPHO_LOG_REQUEST_ID:-${LOG_REQUEST_ID:-}}"
   local log_json_escape_6
   __dybatpho_log_json_escape_into log_json_escape_6 "${level}"
   # shellcheck disable=SC2059 # the format is built above, not taken from input
@@ -564,15 +558,15 @@ function __dybatpho_log_rotate_file {
 
 #######################################
 # @description
-#   Append a structured JSON log event to `LOG_FILE` when it passes `LOG_FILE_LEVEL` filtering, rotating the file first
-#   when needed.
+#   Append a structured JSON log event to `DYBATPHO_LOG_FILE` when it passes `DYBATPHO_LOG_FILE_LEVEL` filtering,
+#   rotating the file first when needed. Each setting falls back to its unprefixed name.
 # @arg $1 string Log level
 # @arg $2 string Source location
 # @arg $3 string Message
-# @env LOG_FILE string Destination file; no-op when empty
-# @env LOG_FILE_LEVEL string Verbosity threshold applied independently of `LOG_LEVEL`
-# @env LOG_FILE_MAX_BYTES number Rotation size threshold
-# @env LOG_FILE_MAX_BACKUPS number Number of rotated backups to keep
+# @env DYBATPHO_LOG_FILE string Destination file; no-op when empty
+# @env DYBATPHO_LOG_FILE_LEVEL string Verbosity threshold applied independently of the log level
+# @env DYBATPHO_LOG_FILE_MAX_BYTES number Rotation size threshold
+# @env DYBATPHO_LOG_FILE_MAX_BACKUPS number Number of rotated backups to keep
 # @internal
 #######################################
 function __dybatpho_log_write_file {
@@ -580,30 +574,33 @@ function __dybatpho_log_write_file {
   local source="$2"
   local message="$3"
   local extra_fields="${4:-}"
-  [[ -n "${LOG_FILE:-}" ]] || return 0
-  dybatpho::compare_log_level "${log_level}" "${LOG_FILE_LEVEL:-${LOG_LEVEL}}" || return 0
+  local log_file="${DYBATPHO_LOG_FILE:-${LOG_FILE:-}}"
+  [[ -n "${log_file}" ]] || return 0
+  local file_level="${DYBATPHO_LOG_FILE_LEVEL:-${LOG_FILE_LEVEL:-${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}}}"
+  dybatpho::compare_log_level "${log_level}" "${file_level}" || return 0
 
   __dybatpho_log_redact message
 
   # What `dirname` answers, without starting it: a name with no slash lives in
   # the current directory, and one directly under `/` in the root.
   local log_dir="."
-  if [[ "${LOG_FILE}" == */* ]]; then
-    log_dir="${LOG_FILE%/*}"
+  if [[ "${log_file}" == */* ]]; then
+    log_dir="${log_file%/*}"
     log_dir="${log_dir:-/}"
   fi
   [[ -d "${log_dir}" ]] || mkdir -p "${log_dir}" 2> /dev/null || return 0
 
-  __dybatpho_log_rotate_file "${LOG_FILE}" "${LOG_FILE_MAX_BYTES}" "${LOG_FILE_MAX_BACKUPS}"
+  __dybatpho_log_rotate_file "${log_file}" "${DYBATPHO_LOG_FILE_MAX_BYTES:-${LOG_FILE_MAX_BYTES:-10485760}}" \
+    "${DYBATPHO_LOG_FILE_MAX_BACKUPS:-${LOG_FILE_MAX_BACKUPS:-5}}"
   local log_now_ms log_timestamp
   __dybatpho_log_now_ms_into log_now_ms
   __dybatpho_log_timestamp_into log_timestamp
   __dybatpho_log_json_event "${log_timestamp}" "${log_level}" "${source}" \
-    "${message}" "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}" >> "${LOG_FILE}"
+    "${message}" "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}" >> "${log_file}"
 }
 
 #######################################
-# @description Log a diagnostic event as JSON when `LOG_FORMAT=json`.
+# @description Log a diagnostic event as JSON when the log format is `json`.
 # @arg $1 string Log level
 # @arg $2 string Source location
 # @arg $3 string Message
@@ -629,7 +626,7 @@ function __dybatpho_log_structured {
 
 #######################################
 # @description Return success unless a line at this level is certain to be
-#   dropped by both the terminal threshold and `LOG_FILE`. It prints nothing and
+#   dropped by both the terminal threshold and the log file. It prints nothing and
 #   answers "wanted" whenever a level it reads is not valid, so the full path
 #   still reports the bad value exactly as before.
 # @arg $1 string Level of the line
@@ -638,12 +635,12 @@ function __dybatpho_log_structured {
 # @internal
 #######################################
 function __dybatpho_log_wanted {
-  local level threshold
+  local level threshold runtime_level="${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}"
   __dybatpho_log_rank_into level "${1,,}" || return 0
-  __dybatpho_log_rank_into threshold "${LOG_LEVEL,,}" || return 0
+  __dybatpho_log_rank_into threshold "${runtime_level,,}" || return 0
   ((level <= threshold)) && return 0
-  [[ -n "${LOG_FILE:-}" ]] || return 1
-  local file_threshold="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
+  [[ -n "${DYBATPHO_LOG_FILE:-${LOG_FILE:-}}" ]] || return 1
+  local file_threshold="${DYBATPHO_LOG_FILE_LEVEL:-${LOG_FILE_LEVEL:-${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}}}"
   __dybatpho_log_rank_into threshold "${file_threshold,,}" || return 0
   ((level <= threshold))
 }
@@ -676,15 +673,15 @@ function __dybatpho_log_rank_into {
 #######################################
 # @description Return success when a message level should be shown against a threshold.
 # @arg $1 string Input log level
-# @arg $2 string [default: ${LOG_LEVEL}] Threshold level to compare against
-# @env LOG_LEVEL string Runtime threshold used to decide whether the message is emitted, when no explicit threshold is
-#   given
+# @arg $2 string [default: ${DYBATPHO_LOG_LEVEL}] Threshold level to compare against
+# @env DYBATPHO_LOG_LEVEL string Runtime threshold used to decide whether the message is emitted, when no explicit
+#   threshold is given; falls back to `LOG_LEVEL`, then `info`
 # @exitcode 0 The message level should be emitted
 # @exitcode 1 The message level is filtered out
 #######################################
 function dybatpho::compare_log_level {
   local level="$1"
-  local runtime_level="${2:-${LOG_LEVEL}}"
+  local runtime_level="${2:-${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}}"
   level="${level,,}"
   runtime_level="${runtime_level,,}"
 
@@ -817,19 +814,19 @@ function __dybatpho_log_text_n {
 #######################################
 # @description
 #   Log a structured diagnostic message with timestamp and call-site information. Also appends a JSON event to
-#   `LOG_FILE` when configured, independently of `LOG_FORMAT`.
+#   `DYBATPHO_LOG_FILE` when configured, independently of `DYBATPHO_LOG_FORMAT`.
 # @arg $1 string Log level
 # @arg $2 string Rendered label for the log level
 # @arg $3 string Message
 # @arg $4 number Additional stack frames to skip when resolving the source location
 # @arg $5 string ANSI escape color code
 # @arg $6 string Ready-made JSON fragment of extra fields, each one leading with its own comma
-# @env LOG_FILE string? File that receives a structured JSON event regardless of `LOG_FORMAT`
+# @env DYBATPHO_LOG_FILE string? File that receives a structured JSON event regardless of `DYBATPHO_LOG_FORMAT`
 # @internal
 #######################################
 function __dybatpho_log_inspect {
   local log_level=$1
-  # A line neither the terminal nor `LOG_FILE` will take stops here, before the
+  # A line neither the terminal nor the log file will take stops here, before the
   # source lookup, the translation, the context and the timestamp, each of
   # which used to start a process for a line that was then thrown away.
   __dybatpho_log_wanted "${log_level}" || return 0
@@ -854,7 +851,7 @@ function __dybatpho_log_inspect {
   # a fixed width for the column separators and must not change.
   __dybatpho_log_translate_into message "${message}"
   __dybatpho_log_write_file "${log_level}" "${indicator}" "${message}" "${extra_fields}"
-  if [[ "${LOG_FORMAT}" == "json" ]]; then
+  if [[ "${DYBATPHO_LOG_FORMAT:-${LOG_FORMAT:-text}}" == "json" ]]; then
     __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   else
     local log_context_text="" log_timestamp
@@ -1433,7 +1430,7 @@ function dybatpho::validate_log_level {
   case "${level}" in
     trace | debug | info | warn | error | fatal) return 0 ;;
     *)
-      printf '%s is not a valid LOG_LEVEL, it should be trace|debug|info|warn|error|fatal\n' "${level}" >&2
+      printf '%s is not a valid log level, it should be trace|debug|info|warn|error|fatal\n' "${level}" >&2
       return 1
       ;;
   esac
@@ -1449,14 +1446,34 @@ function dybatpho::debug {
 }
 
 #######################################
-# @description Log a debug message together with the output of a shell command.
+# @description Log a debug message together with the output of a command.
+#   The command is given after `--` as a command and its arguments, which run
+#   as they are, never parsed as shell. The older form, a single shell command
+#   string in place of `--`, still works but is deprecated: it runs through
+#   `eval`, so a value interpolated into it is parsed as code.
+# @example
+#   dybatpho::debug_command "Generated file" -- cat -- "${path}"
+#
+# @example
+#   dybatpho::debug_command "Generated file" "cat ./generated.sh"   # deprecated string form
+#
 # @arg $1 string Introductory message
-# @arg $2 string Shell command string to evaluate
-# @env LOG_LEVEL string Set to `debug` or `trace` to see this output
+# @arg $2 string `--`, or (deprecated) a shell command string to evaluate
+# @arg $@ string Command and its arguments, after `--`
+# @env DYBATPHO_LOG_LEVEL string Set to `debug` or `trace` to see this output; falls back to `LOG_LEVEL`
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug_command {
+  (($# >= 2)) || dybatpho::die "${FUNCNAME[0]}: Expected: message -- command [args...]"
+  if [[ "$2" == "--" ]]; then
+    (($# >= 3)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+    dybatpho::compare_log_level debug || return 0
+    __dybatpho_log_inspect debug "COMMAND 💻    " "$1
+$("${@:3}")"
+    return 0
+  fi
   dybatpho::compare_log_level debug || return 0
+  # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form above runs no `eval`
   __dybatpho_log_inspect debug "COMMAND 💻    " "$1
 $(eval "$2")"
 }
@@ -1765,8 +1782,8 @@ function __dybatpho_log_spin_loop {
 # @description Send structured JSON events to a file alongside the
 #   human-readable output on stderr, and keep that file bounded by rotating it.
 #
-#   This is the front end to the `LOG_FILE*` variables: a script names the path
-#   once instead of exporting four of them, and gets the argument checking, the
+#   This is the front end to the `DYBATPHO_LOG_FILE*` variables: a script names
+#   the path once instead of setting four of them, and gets the argument checking, the
 #   parent directory and a private mode along with it. Every registered secret
 #   is redacted before a line reaches the file, exactly as it is on stderr, so
 #   turning on a durable log never turns it into a place a token leaks to.
@@ -1777,22 +1794,24 @@ function __dybatpho_log_spin_loop {
 #
 # @arg $1 string Path of the log file, or `off` to stop file logging
 # @arg $@ string? `rotate:SIZE`, `keep:COUNT` and `level:LEVEL` settings
-# @set LOG_FILE string Path that receives the structured events
-# @set LOG_FILE_MAX_BYTES number Size threshold the file is rotated at
-# @set LOG_FILE_MAX_BACKUPS number Number of rotated backups kept
-# @set LOG_FILE_LEVEL string Verbosity threshold applied to the file alone
+# @set DYBATPHO_LOG_FILE string Path that receives the structured events
+# @set DYBATPHO_LOG_FILE_MAX_BYTES number Size threshold the file is rotated at
+# @set DYBATPHO_LOG_FILE_MAX_BACKUPS number Number of rotated backups kept
+# @set DYBATPHO_LOG_FILE_LEVEL string Verbosity threshold applied to the file alone
 # @exitcode 1 A setting is malformed, or the file cannot be written
 # @tip `rotate:0` disables rotation, and a size may be given as bytes or with a `K`, `M`, `G` or `T` suffix
 # @tip A log file this function creates gets mode `600`; one that already exists keeps the mode it has
+# @tip The settings are not exported; export `DYBATPHO_LOG_FILE` and its siblings yourself when a child process
+#   should write to the same file. `off` also clears an unprefixed `LOG_FILE`
 #######################################
 function dybatpho::log_to_file {
   local path
   dybatpho::expect_args path -- "$@"
   shift
 
-  local rotate="${LOG_FILE_MAX_BYTES}"
-  local keep="${LOG_FILE_MAX_BACKUPS}"
-  local level="${LOG_FILE_LEVEL:-${LOG_LEVEL}}"
+  local rotate="${DYBATPHO_LOG_FILE_MAX_BYTES:-${LOG_FILE_MAX_BYTES:-10485760}}"
+  local keep="${DYBATPHO_LOG_FILE_MAX_BACKUPS:-${LOG_FILE_MAX_BACKUPS:-5}}"
+  local level="${DYBATPHO_LOG_FILE_LEVEL:-${LOG_FILE_LEVEL:-${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}}}"
   local setting value parsed
   for setting in "$@"; do
     value="${setting#*:}"
@@ -1820,6 +1839,9 @@ function dybatpho::log_to_file {
   done
 
   if [[ "${path}" == "off" ]]; then
+    # The unprefixed name is the fallback for an empty prefixed one, so both
+    # are cleared, or an inherited `LOG_FILE` would keep the sink open.
+    DYBATPHO_LOG_FILE=""
     LOG_FILE=""
   else
     local directory
@@ -1839,13 +1861,12 @@ function dybatpho::log_to_file {
     fi
     [[ -w "${path}" ]] \
       || dybatpho::die "${FUNCNAME[0]}: Log file '${path}' is not writable"
-    LOG_FILE="${path}"
+    DYBATPHO_LOG_FILE="${path}"
   fi
 
-  LOG_FILE_MAX_BYTES="${rotate}"
-  LOG_FILE_MAX_BACKUPS="${keep}"
-  LOG_FILE_LEVEL="${level}"
-  export LOG_FILE LOG_FILE_MAX_BYTES LOG_FILE_MAX_BACKUPS LOG_FILE_LEVEL
+  DYBATPHO_LOG_FILE_MAX_BYTES="${rotate}"
+  DYBATPHO_LOG_FILE_MAX_BACKUPS="${keep}"
+  DYBATPHO_LOG_FILE_LEVEL="${level}"
 }
 
 #######################################
@@ -1865,8 +1886,8 @@ function dybatpho::log_to_file {
 # @exitcode 1 `get` was asked for a field that is not set
 # @set __dybatpho_log_context_values
 # @set __dybatpho_log_context_keys
-# @tip Fields are held in the current shell, so a child process starts with none of them; export `LOG_REQUEST_ID` to
-#   correlate across processes
+# @tip Fields are held in the current shell, so a child process starts with none of them; export
+#   `DYBATPHO_LOG_REQUEST_ID` to correlate across processes
 # @tip Registered secrets are redacted in field values the same way they are in messages
 #######################################
 function dybatpho::log_context {
@@ -1951,7 +1972,6 @@ function dybatpho::timer_end {
   fi
   unset "__dybatpho_log_timer[${name}]"
   DYBATPHO_TIMER_LAST_MS="${elapsed}"
-  export DYBATPHO_TIMER_LAST_MS
 
   local extra_fields
   local log_json_escape
@@ -2052,7 +2072,7 @@ function dybatpho::spinner {
 #######################################
 # @description Enable Bash tracing with dybatpho formatting.
 # @noargs
-# @env LOG_LEVEL string Set to `trace` to emit the trace start/end messages
+# @env DYBATPHO_LOG_LEVEL string Set to `trace` to emit the trace start/end messages; falls back to `LOG_LEVEL`
 #######################################
 function dybatpho::start_trace {
   # kcov(disabled) - replacing PS4 stops the coverage tracer

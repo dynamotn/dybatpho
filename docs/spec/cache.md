@@ -125,7 +125,7 @@ removed.
 3. **Given** entries totalling more than `--max-size`, **When** the namespace
    is pruned, **Then** the least recently written are removed until the rest
    fit, and a size may carry a binary `K`, `M`, or `G` suffix.
-4. **Given** `DRY_RUN`, **When** the namespace is pruned, **Then** each
+4. **Given** `DYBATPHO_DRY_RUN`, **When** the namespace is pruned, **Then** each
    removal is reported and nothing is removed.
 
 ### User Story 7 - See what a cache holds (Priority: P3)
@@ -175,7 +175,7 @@ fi
 - An entry written moments ago against a time to live of zero.
 - A namespace that has never been written being cleared.
 - A file in the cache directory that this module did not write.
-- `DRY_RUN` set, with no cache directory in existence yet.
+- `DYBATPHO_DRY_RUN` set, with no cache directory in existence yet.
 - A command that prints to standard error as well as standard output.
 - Several calls finding the same stale entry at once, from one shell or many.
 - A background refresh that fails, or is interrupted while it runs.
@@ -206,7 +206,7 @@ fi
 - **FR-009b**: The command's standard error MUST NOT be captured, so a warning it prints is seen on every call rather than once.
 - **FR-010**: The module MUST remove a single entry, and MUST remove every entry of a namespace while leaving files it did not write alone.
 - **FR-011**: Removing an entry or a namespace that is not there MUST succeed.
-- **FR-012**: `DRY_RUN` MUST report a write, a removal, and a clear instead of performing them, and MUST work when the cache directory does not yet exist.
+- **FR-012**: `DYBATPHO_DRY_RUN` MUST report a write, a removal, and a clear instead of performing them, and MUST work when the cache directory does not yet exist.
 - **FR-013**: The `ai` module MUST use this module rather than its own copy, keeping `DYBATPHO_AI_CACHE_DIR`, `DYBATPHO_AI_CACHE_TTL`, and `DYBATPHO_AI_CACHE` working as documented.
 - **FR-014**: A cache entry MUST be written `0600` inside a directory created
   `0700`. An entry holds whatever the caller found expensive to obtain -- an API
@@ -221,7 +221,7 @@ fi
 - **FR-019**: `dybatpho::cache_run` MUST stop the script when the time to live or the grace window is not a number of seconds, or when more than one time to live is given.
 - **FR-020**: The module MUST prune the current namespace by any combination of `--older-than <seconds>`, `--max-entries <count>`, and `--max-size <size>`, each also accepted in `--option=value` form, removing entries past the age first and then the least recently written until the rest fit every limit.
 - **FR-021**: Entries written within the same second MUST be pruned in the order of their keys, so the result never depends on the file system.
-- **FR-022**: Pruning MUST consider only entries this module wrote in the current namespace, MUST succeed when the namespace does not exist, and MUST report each removal instead of performing it under `DRY_RUN`.
+- **FR-022**: Pruning MUST consider only entries this module wrote in the current namespace, MUST succeed when the namespace does not exist, and MUST report each removal instead of performing it under `DYBATPHO_DRY_RUN`.
 - **FR-023**: Pruning MUST stop the script when no limit is given, an option is unknown or lacks its value, or a limit is malformed; a size MUST be a number of bytes with an optional binary `K`, `M`, or `G` suffix.
 - **FR-024**: The module MUST describe the current namespace with its entry count, total bytes, counts of fresh and stale entries against a given or default time to live, and the ages of its oldest and newest entries, as aligned text or, with `--json`, as one JSON object with `entries`, `bytes`, `fresh`, `stale`, `oldest_age`, and `newest_age`.
 - **FR-025**: Describing a namespace MUST count only entries this module wrote, MUST report zero everywhere for a namespace never written, and MUST stop the script on a malformed time to live or an unknown option. It MUST NOT count hits and misses.
@@ -268,7 +268,7 @@ fi
 - **IT-011**: Verify removing one entry leaves the others, and that removing an absent one succeeds.
 - **IT-012**: Verify clearing a namespace removes this module's entries, leaves a foreign file alone, and succeeds on a namespace never written.
 - **IT-013**: Store the same key in two namespaces and verify each reads back its own value and that clearing one leaves the other.
-- **IT-014**: Verify `DRY_RUN` stores nothing when no directory exists, and leaves an existing entry in place for a removal and a clear.
+- **IT-014**: Verify `DYBATPHO_DRY_RUN` stores nothing when no directory exists, and leaves an existing entry in place for a removal and a clear.
 - **IT-015**: Verify the `ai` module still answers from its cache and still clears it, through its own documented environment variables.
 - **IT-016**: Verify a stored entry is `0600` and its directory `0700`, under a
   permissive `umask`.
@@ -281,7 +281,7 @@ fi
 - **IT-023**: Verify `--max-entries` removes the least recently written first, leaves a namespace already within the limit alone, and that zero empties it.
 - **IT-024**: Verify `--max-size` with a `k` suffix, an exact byte limit, and a limit below one entry.
 - **IT-025**: Verify entries of the same second are pruned by key when limits are combined.
-- **IT-026**: Verify `DRY_RUN` reports the removal of the oldest entry only and removes nothing.
+- **IT-026**: Verify `DYBATPHO_DRY_RUN` reports the removal of the oldest entry only and removes nothing.
 - **IT-027**: Verify pruning a namespace that does not exist, and one that is empty, succeeds.
 - **IT-028**: Verify no limit, an unknown option, a missing value, and malformed age, count, and size limits stop the script.
 - **IT-029**: With the clock frozen, verify the JSON and text reports of two entries against several times to live, with the option before and after the time to live, and that a foreign file is not counted.

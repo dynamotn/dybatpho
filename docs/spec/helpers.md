@@ -88,8 +88,11 @@ conditions.
 2. **Given** all listed commands or at least one listed environment variable
    is available, **When** the corresponding helper runs, **Then** it succeeds;
    otherwise it fails clearly
-3. **Given** a false shell condition, **When** `assert` runs, **Then** it
+3. **Given** a failing check after `--`, **When** `assert` runs, **Then** it
    stops with the supplied or generated assertion message
+4. **Given** a command and arguments holding quotes, `$(...)` or newlines after
+   `--`, **When** `assert`, `retry` or `retry_until` runs it, **Then** each
+   argument arrives intact and nothing in it is executed
 
 ---
 
@@ -113,10 +116,10 @@ function _deploy {
 
   dybatpho::require curl
   dybatpho::expect_envs DEPLOY_HOST
-  dybatpho::assert "[[ -n '${token}' ]]" "A deploy token is required"
+  dybatpho::assert "A deploy token is required" -- test -n "${token}"
 
   # Try three times, two seconds apart, before giving up.
-  dybatpho::retry_until 3 2 "curl -sSf https://${DEPLOY_HOST}/health" "health check"
+  dybatpho::retry_until 3 2 "health check" -- curl -sSf "https://${DEPLOY_HOST}/health"
 }
 
 editor="$(dybatpho::coalesce "${VISUAL:-}" "${EDITOR:-}" "vi")"
@@ -140,7 +143,9 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - Retry is used with a noisy shell command string that needs a shorter description.
 - The retried command keeps state in a variable whose name matches one the retry loop uses, such as `count` or `delay`.
 - The caller wants fixed-delay retries instead of escalating delays.
-- An assertion condition contains shell syntax evaluated through `eval`.
+- An assertion condition contains shell syntax evaluated through `eval` (the
+  deprecated string form), or a value interpolated into it holds shell syntax.
+- The `--` form is given with no command after it.
 - Breakpoint is invoked in unattended CI rather than an interactive terminal.
 - `dybatpho::is int` or `dybatpho::is number` is given a quoted character such as `'a`, a hexadecimal `0x1F`, surrounding blanks, a decimal comma, or an integer with a leading zero.
 
@@ -165,7 +170,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
   empty, number, integer, true, and false values.
 - **FR-005**: The module MUST provide a coalesce helper that prints the first non-empty value from a prioritized list of candidates.
 - **FR-006**: The coalesce helper MUST fail when no candidate values are provided or all candidates are empty.
-- **FR-007**: The module MUST provide a retry helper that retries shell command strings with delays and user-visible progress messages.
+- **FR-007**: The module MUST provide a retry helper that retries a command with delays and user-visible progress messages.
 - **FR-007a**: Retry delays MUST grow exponentially from `DYBATPHO_RETRY_BASE_DELAY`, MUST never exceed `DYBATPHO_RETRY_MAX_DELAY`, and MUST add up to one base delay of random jitter when `DYBATPHO_RETRY_JITTER` is enabled. This is the policy `network.sh` already applies to HTTP retries; the generic helper grew its delay linearly and without a bound, so the same library answered the same question two different ways.
 - **FR-008**: The module MUST provide an interactive breakpoint helper suitable for optional debugging workflows.
 - **FR-009**: The module MUST provide a helper that verifies all listed commands exist.
@@ -204,6 +209,15 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-026**: `dybatpho::retry` and `dybatpho::retry_until` MUST refuse a retry budget that is not made of digits, before any arithmetic, and read one with leading zeros in base ten.
 - **FR-026a**: `dybatpho::retry` MUST refuse a `DYBATPHO_RETRY_BASE_DELAY` or `DYBATPHO_RETRY_MAX_DELAY` that is not made of digits, naming the setting, before any arithmetic, and MUST read a padded delay in base ten.
 - **FR-027**: `dybatpho::is command` and `dybatpho::is function` MUST print nothing, whatever the answer.
+- **FR-028**: `dybatpho::retry`, `dybatpho::retry_until` and `dybatpho::assert`
+  MUST accept `[description|message] -- command [args...]` and run the command
+  with its arguments as given, never through `eval`; a `--` with no command
+  MUST stop the script.
+- **FR-029**: The single shell-string forms of `retry`, `retry_until` and
+  `assert` MUST keep working and are deprecated.
+- **FR-030**: When it gives up, `retry` and `retry_until` MUST name the
+  description, or else the command quoted word by word; a failed `assert`
+  without a message MUST name the quoted command.
 - **FR-018**: The module MUST list the public functions the shell has loaded, in order, excluding the internal helpers, and MUST be able to limit that list to one module.
 - **FR-019**: `dybatpho::is number` MUST accept exactly what `validate_is number` accepts, and `dybatpho::is int` MUST accept only optionally signed decimal integers without a leading zero, a subset of what `validate_is int` accepts; neither MUST depend on `printf` or `LC_NUMERIC`.
 - **FR-020**: `dybatpho::retry` and `dybatpho::retry_until` MUST NOT shadow the caller's variables in the command they evaluate: their own bookkeeping uses names in the `__dybatpho_` namespace.
@@ -268,6 +282,15 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-029**: In a shell that loaded only the core, require a command with a range and see `semver` loaded on demand.
 - **IT-030**: Load a registered module on demand in-process; see a module that cannot be provided, or a marker that loading does not define, answered with no, and the stop name the caller and the module, with a custom exit code.
 - **IT-031**: In a copy of the library that lost a module file, see the call needing that soft dependency stop naming the module and the missing file.
+- **IT-032**: Run a recorder through `retry`, `retry` with a description and
+  `retry_until` with arguments holding quotes, `$(...)`, backticks, double
+  spaces, an empty string and a newline, and verify each arrives intact and no
+  file was created by the embedded command.
+- **IT-033**: Verify the give-up warning names the description, or the quoted
+  command, and that `--` with no command stops the script.
+- **IT-034**: Verify `assert --` passes and fails with a supplied and with a
+  generated message, runs nothing embedded in an argument, and stops on a
+  missing command; and that a command after `--` sees the caller's variables.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -55,9 +55,9 @@ reach for at a prompt.
 - [`dybatpho::coalesce_cmd`](#dybatphocoalesce_cmd) — Print the first available command from a list of candidates.
 - [`dybatpho::default_env`](#dybatphodefault_env) — Assign and export a default value for an environment variable when it is empty.
 - [`dybatpho::require_envs_any`](#dybatphorequire_envs_any) — Ensure that at least one of the listed environment variables is set.
-- [`dybatpho::assert`](#dybatphoassert) — Evaluate a shell condition string and stop with a message when it fails.
-- [`dybatpho::retry`](#dybatphoretry) — Retry a shell command with escalating delays until it succeeds or retries are exhausted.
-- [`dybatpho::retry_until`](#dybatphoretry_until) — Retry a shell command until it succeeds or the retry budget is exhausted, using a fixed delay.
+- [`dybatpho::assert`](#dybatphoassert) — Run a check and stop with a message when it fails. The check is given after `--` as a command and its arguments, which run as they are, never parsed as shell. The older form, a single shell condition string, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
+- [`dybatpho::retry`](#dybatphoretry) — Retry a command with escalating delays until it succeeds or retries are exhausted. The command is given after `--` as a command and its arguments, which run as they are, never parsed as shell; an optional description goes before the `--`. The older form, a single shell command string followed by an optional description, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
+- [`dybatpho::retry_until`](#dybatphoretry_until) — Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay. The calling forms are those of `dybatpho::retry`: an optional description, then `--` and the command with its arguments. The single shell command string form still works but is deprecated, because it runs through `eval`.
 - [`dybatpho::breakpoint`](#dybatphobreakpoint) — Open an interactive breakpoint for debugging a running script.
 - [`dybatpho::provides`](#dybatphoprovides) — Print the module that defines a function. The answer comes from where Bash says the function was defined, so it describes the code that is actually loaded rather than what a directory listing suggests. Functions the bootstrap defines report `init`.
 - [`dybatpho::describe`](#dybatphodescribe) — Print the documentation comment of a function. The library documents itself in `docs/`, which answers the question when you are reading it. At a prompt, mid-script, the question is what a function takes and what it returns, and the answer is in a browser tab. This reads it out of the source the shell actually loaded, so it describes the code that will run, and it is there whether or not `docs/` was ever generated. The banner rules and any `shellcheck` directive between the comment and the function are dropped, one `#` and the space after it are taken off each line, and the `@description` marker is removed from the prose it introduces. Everything else, `@arg` and `@exitcode` tags included, is printed as the source wrote it.
@@ -109,7 +109,7 @@ fi
 #### Retry transient network operations
 
 ```bash
-dybatpho::retry 4 "curl -fsSL '${health_url}'" "service health check"
+dybatpho::retry 4 "service health check" -- curl -fsSL "${health_url}"
 ```
 
 #### Pick the first configured value
@@ -156,17 +156,13 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 
 **[`dybatpho::assert`](#dybatphoassert)**
 
-- The assertion command is executed with `eval`
+- `[[ ... ]]` is shell syntax, not a command; the `--` form takes `test` or `[` instead
 
 **[`dybatpho::retry`](#dybatphoretry)**
 
-- The command is executed with `eval`, so pass it as one shell command string
+- A shell function defined by the caller works as the command, and sees the caller's variables
 - Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same dependency, so they do not all come back at the same instant
 - Pass a short description when the raw command is noisy so retry logs stay readable
-
-**[`dybatpho::retry_until`](#dybatphoretry_until)**
-
-- The command is executed with `eval`, so pass it as one shell command string
 
 **[`dybatpho::breakpoint`](#dybatphobreakpoint)**
 
@@ -465,30 +461,58 @@ Ensure that at least one of the listed environment variables is set.
 
 ### `dybatpho::assert`
 
-Evaluate a shell condition string and stop with a message when it fails.
+Run a check and stop with a message when it fails.
+The check is given after `--` as a command and its arguments, which run as
+they are, never parsed as shell. The older form, a single shell condition
+string, still works but is deprecated: it runs through `eval`, so a value
+interpolated into it is parsed as code.
+
+**🧪 Examples**
+
+```bash
+dybatpho::assert "config must exist" -- test -f "${config}"
+dybatpho::assert -- dybatpho::is command git
+
+```
+
+```bash
+dybatpho::assert '[[ -f "${config}" ]]' "config must exist"   # deprecated string form
+
+```
 
 **🧾 Arguments**
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | string | yes |  | Shell condition or command string to evaluate |
-| `$2` | string | no |  | Failure message |
+| `$1` | string | no |  | Failure message, before `--`; or (deprecated) a shell condition string to evaluate |
+| `$2` | string | no |  | `--` followed by the command and its arguments; or (deprecated) the failure message |
 
 **🚦 Exit codes**
 
-- `0`: The assertion condition succeeds
-- `1`: The assertion condition fails
+- `0`: The check succeeds
+- `1`: The check fails, and the script stops with the message
 
 ---
 
 ### `dybatpho::retry`
 
-Retry a shell command with escalating delays until it succeeds or retries are exhausted.
+Retry a command with escalating delays until it succeeds or retries are exhausted.
+The command is given after `--` as a command and its arguments, which run
+as they are, never parsed as shell; an optional description goes before the
+`--`. The older form, a single shell command string followed by an optional
+description, still works but is deprecated: it runs through `eval`, so a
+value interpolated into it is parsed as code.
 
-**🧪 Example**
+**🧪 Examples**
 
 ```bash
-dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
+dybatpho::retry 3 "health check" -- curl -fsSL "${url}"
+dybatpho::retry 3 -- _flaky_step "${host}"
+
+```
+
+```bash
+dybatpho::retry 3 "curl -fsSL https://example.com/health" "health check"   # deprecated string form
 
 ```
 
@@ -497,8 +521,8 @@ dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | number | yes |  | Number of retries |
-| `$2` | string | yes |  | Shell command string to run |
-| `$3` | string | no |  | Short description for retry logs |
+| `$2` | string | no |  | Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string |
+| `$@` | string | yes |  | `--` followed by the command and its arguments; or (deprecated) the description |
 
 **🌍 Environment variables**
 
@@ -517,7 +541,17 @@ dybatpho::retry 3 "curl -fsSL '${url}'" "health check"
 
 ### `dybatpho::retry_until`
 
-Retry a shell command until it succeeds or the retry budget is exhausted, using a fixed delay.
+Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay.
+The calling forms are those of `dybatpho::retry`: an optional description,
+then `--` and the command with its arguments. The single shell command
+string form still works but is deprecated, because it runs through `eval`.
+
+**🧪 Example**
+
+```bash
+dybatpho::retry_until 5 2 "wait for the socket" -- test -S "${socket}"
+
+```
 
 **🧾 Arguments**
 
@@ -525,13 +559,17 @@ Retry a shell command until it succeeds or the retry budget is exhausted, using 
 | --- | --- | --- | --- | --- |
 | `$1` | number | yes |  | Number of retries |
 | `$2` | number | yes |  | Delay in seconds between attempts |
-| `$3` | string | yes |  | Shell command string to run |
-| `$4` | string | no |  | Short description for retry logs |
+| `$3` | string | no |  | Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string |
+| `$@` | string | yes |  | `--` followed by the command and its arguments; or (deprecated) the description |
 
 **🚦 Exit codes**
 
 - `0`: The command eventually succeeds
 - `1`: The command never succeeds and returns its final exit code
+
+**🔗 See also**
+
+- [dybatpho::retry](#dybatphoretry)
 
 ---
 

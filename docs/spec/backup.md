@@ -74,7 +74,7 @@ As an operator, I want a retention policy applied to a backup directory so that 
 2. **Given** `--keep-days N`, **When** the directory is pruned, **Then** the backups younger than N days survive
 3. **Given** both policies, **When** the directory is pruned, **Then** a backup survives when either policy keeps it
 4. **Given** no policy, **When** a prune is attempted, **Then** it is refused and nothing is deleted
-5. **Given** `DRY_RUN`, **When** the directory is pruned, **Then** what would be removed is reported and nothing is deleted
+5. **Given** `DYBATPHO_DRY_RUN`, **When** the directory is pruned, **Then** what would be removed is reported and nothing is deleted
 6. **Given** a pruned backup, **When** it is removed, **Then** its checksum sidecar goes with it
 
 ---
@@ -109,7 +109,7 @@ As an operator, I want nightly snapshots that store only what changed since the 
 3. **Given** `rsync` is not installed, **When** a snapshot is taken, **Then** the source is walked in Bash with the same result, keeping links, file modes and directory modes and skipping special files
 4. **Given** a snapshot, **When** a file inside it is added, removed or changed, **Then** verification reports it
 5. **Given** a directory holding archives and snapshots, **When** it is listed, **Then** both appear together, newest first
-6. **Given** a snapshot, **When** it is restored, **Then** its entry is copied into the target as plain files, after confirming an overwrite unless forced, and `DRY_RUN` reports the copy
+6. **Given** a snapshot, **When** it is restored, **Then** its entry is copied into the target as plain files, after confirming an overwrite unless forced, and `DYBATPHO_DRY_RUN` reports the copy
 7. **Given** two snapshots sharing files, **When** one is pruned, **Then** the other still verifies and holds every file
 8. **Given** a file that cannot be read, **When** a snapshot is taken, **Then** the script stops and nothing is left in the destination
 
@@ -179,7 +179,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-015**: A backup MUST survive pruning when any given policy keeps it.
 - **FR-016**: `--keep-count` MUST count from the newest by name; `--keep-days` MUST read the age of the file on disk.
 - **FR-017**: Pruning MUST remove a pruned backup's sidecar with it.
-- **FR-018**: Pruning MUST honor `DRY_RUN` and MUST delete through the guarded removal helper.
+- **FR-018**: Pruning MUST honor `DYBATPHO_DRY_RUN` and MUST delete through the guarded removal helper.
 - **FR-019**: The archive extension and the checksum algorithm MUST be configurable.
 - **FR-020**: A comparison MUST accept a backup, a live directory or a live file on either side, treating a path that ends in the backup extension as a backup.
 - **FR-021**: A backup MUST be verified against its sidecar, and checked for entries that escape, before it is extracted for a comparison, and a failure MUST stop with exit code 2.
@@ -191,7 +191,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-027**: A snapshot MUST use `rsync --link-dest` when it is installed and MUST produce the same tree without it.
 - **FR-028**: A snapshot's sidecar MUST record a checksum over every entry's path, kind, and content checksum or link target, and verification MUST recompute it.
 - **FR-029**: Listing, resolving the latest backup, and pruning MUST treat archives and snapshot directories alike, in the order they were taken, and MUST NOT count a file or a link that carries the snapshot suffix.
-- **FR-030**: Restoring a snapshot MUST verify it, MUST copy its one entry into the target as plain files, MUST confirm an overwrite unless forced, MUST honor `DRY_RUN`, and MUST stop when the snapshot does not hold exactly one entry.
+- **FR-030**: Restoring a snapshot MUST verify it, MUST copy its one entry into the target as plain files, MUST confirm an overwrite unless forced, MUST honor `DYBATPHO_DRY_RUN`, and MUST stop when the snapshot does not hold exactly one entry.
 - **FR-031**: Pruning a snapshot MUST remove its directory and sidecar without affecting a file another snapshot links.
 - **FR-032**: A comparison MUST accept a snapshot on either side, verified before it is read.
 - **FR-033**: Listing, resolving the latest and pruning MUST order backups by name, then UTC stamp, then same-second suffix compared as a number, archives and snapshots together, independently of the caller's collation.
@@ -215,7 +215,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **SC-001**: A script keeps a bounded history of snapshots without writing a retention loop.
 - **SC-002**: An interrupted backup run never leaves a file that a later restore would trust.
 - **SC-003**: A corrupted archive is caught before it overwrites anything.
-- **SC-004**: A retention policy can be reviewed with `DRY_RUN` before it runs unattended.
+- **SC-004**: A retention policy can be reviewed with `DYBATPHO_DRY_RUN` before it runs unattended.
 - **SC-005**: A history of snapshots of a tree costs the disk one copy plus what changed between them.
 
 ## Integration Tests *(mandatory)*
@@ -233,7 +233,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-011**: Confirm an overwrite on an unforced restore.
 - **IT-012**: Prune by `--keep-count`, by `--keep-days`, and by both together.
 - **IT-013**: Remove a pruned backup's sidecar with it.
-- **IT-014**: Report under `DRY_RUN` without deleting.
+- **IT-014**: Report under `DYBATPHO_DRY_RUN` without deleting.
 - **IT-015**: Refuse a prune with no policy, a malformed option, and a missing directory.
 - **IT-016**: Accept the directory after an end-of-options marker.
 - **IT-017**: Prune a directory with nothing to remove.
@@ -253,7 +253,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-031**: Verify a snapshot's tree, and report a file added, a file changed, and a missing sidecar.
 - **IT-032**: List archives and snapshots together, ignoring a file and a link with the suffix, and resolve the latest.
 - **IT-033**: Restore a snapshot as plain files, refuse an unconfirmed overwrite, and overwrite when forced.
-- **IT-034**: Restore a single-file snapshot, and report it under `DRY_RUN`.
+- **IT-034**: Restore a single-file snapshot, and report it under `DYBATPHO_DRY_RUN`.
 - **IT-035**: Refuse a tampered snapshot, and one holding more than one entry.
 - **IT-036**: Prune a snapshot while the one sharing its files still verifies.
 - **IT-037**: Compare snapshots with each other, with the live source and with an archive, and refuse a tampered one or one without a sidecar.
@@ -268,7 +268,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 ## Acceptance Criteria *(mandatory)*
 
 1. Destinations are local paths; pushing a backup elsewhere stays with the caller.
-2. Every deletion goes through the guarded removal helper, so confirmation and `DRY_RUN` behave as they do everywhere else in the library.
+2. Every deletion goes through the guarded removal helper, so confirmation and `DYBATPHO_DRY_RUN` behave as they do everywhere else in the library.
 3. Integrity is checked with a checksum sidecar rather than a test extraction, which would double the disk and time a large backup costs; the atomic rename is what rules out the half-written file the test extraction would be looking for.
 4. A comparison never extracts a backup it has not verified, and never extracts outside a scratch directory of its own.
 5. A snapshot is a plain directory tree, readable without this library; the hard links are what make it cheap, and nothing but the sidecar is needed to trust it.

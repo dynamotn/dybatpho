@@ -393,8 +393,7 @@ function dybatpho::curl_do {
     shift
   fi
 
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     # A rehearsal is logged like any real run, so it shows the URL the way the
     # log lines below do: a webhook path or credentials are the secret itself.
     local rehearsed_url
@@ -912,7 +911,7 @@ function dybatpho::curl_response_header {
 # @set DYBATPHO_HTTP_STATUS number Status code of the last received response block
 # @set DYBATPHO_HTTP_HEADERS map Lower-cased header name to value, from the last response block
 # @set DYBATPHO_HTTP_BODY_FILE string Path holding the response body
-# @tip Response headers aren't captured while `DRY_RUN` is enabled
+# @tip Response headers aren't captured while `DYBATPHO_DRY_RUN` is enabled
 #######################################
 function dybatpho::curl_request {
   local url
@@ -929,7 +928,7 @@ function dybatpho::curl_request {
   local exit_code=0
   dybatpho::curl_do "${url}" "${output}" "$@" -D "${header_file}" || exit_code=$?
 
-  if ! dybatpho::is true "${DRY_RUN}"; then
+  if ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::curl_parse_response "${header_file}" "${output}"
   fi
   return "${exit_code}"
@@ -1331,7 +1330,8 @@ function dybatpho::curl_link {
 # @see dybatpho::rate_limit
 # @tip An authenticated API takes its token through `DYBATPHO_CURL_SECRET_HEADERS`, which keeps it off `curl`'s command
 #   line for every page
-# @note Under `DRY_RUN` only the first page is rehearsed, because no response comes back to say where the next one is
+# @note Under `DYBATPHO_DRY_RUN` only the first page is rehearsed, because no response comes back to say where the
+#   next one is
 #######################################
 function dybatpho::curl_paginate {
   local url
@@ -1386,7 +1386,7 @@ function dybatpho::curl_paginate {
       ((ends_in_newline == 1)) || echo
     fi
 
-    if dybatpho::is true "${DRY_RUN}"; then
+    if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
       break
     fi
     next="$(dybatpho::curl_link next)" || next=""
@@ -1516,7 +1516,7 @@ function dybatpho::curl_graphql {
   __dybatpho_network_with_secret_headers "${authorization}" -- \
     dybatpho::curl_request "${url}" "${response}" "${args[@]}" "$@" || exit_code=$?
 
-  if ((exit_code == 0)) && ! dybatpho::is true "${DRY_RUN}"; then
+  if ((exit_code == 0)) && ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     local message=""
     message="$(dybatpho::json_get "$(< "${response}")" '.errors[0].message // ""' 2> /dev/null)" || message=""
     if [[ -n "${message}" && "${message}" != "null" ]]; then

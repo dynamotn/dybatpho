@@ -236,7 +236,7 @@ function __dybatpho_ai_state_path_into {
     __dybatpho_xdg_dir_into __dybatpho_ai_state_dir ai XDG_STATE_HOME ".local/state" dybatpho
     # The counters are bookkeeping, not an effect the caller asked for, so a dry
     # run still needs the directory: without it the first count aborts.
-    DRY_RUN=false dybatpho::ensure_dir "${__dybatpho_ai_state_dir}" 700 > /dev/null
+    DYBATPHO_DRY_RUN=false dybatpho::ensure_dir "${__dybatpho_ai_state_dir}" 700 > /dev/null
     DYBATPHO_AI_STATE_FILE="${__dybatpho_ai_state_dir}/ai_state_$$"
   fi
   __dybatpho_ai_state_out="${DYBATPHO_AI_STATE_FILE}"
@@ -832,14 +832,13 @@ function dybatpho::ai_cache_clear {
   __dybatpho_ai_cache dybatpho::cache_clear
   # Entries this module wrote before it used the `cache` module carry a `.json`
   # suffix, and nothing else would ever come back for them.
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  dybatpho::is true "${DRY_RUN}" && return 0
+  dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}" && return 0
   [[ -n "${DYBATPHO_AI_CACHE_DIR}" ]] || return 0
   find "${DYBATPHO_AI_CACHE_DIR}" -maxdepth 1 -name '*.json' -type f -delete
 }
 
 #######################################
-# @description Produce a provider-shaped placeholder response for `DRY_RUN`.
+# @description Produce a provider-shaped placeholder response for dry-run mode.
 # Keeping the shape lets the rest of the pipeline run unchanged, so an example
 # or a rehearsal exercises the real extraction and accounting code.
 # @arg $1 string Backend name
@@ -933,7 +932,7 @@ function __dybatpho_ai_http {
   local -a DYBATPHO_CURL_SECRET_HEADERS=()
   __dybatpho_ai_endpoint_into "${provider}" url headers
 
-  if dybatpho::is true "${DRY_RUN-}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::info "🧪 DRY RUN: POST ${url} as ${provider}"
     __dybatpho_ai_dry_run_body "${provider}" "${payload}"
     return 0
@@ -979,7 +978,7 @@ function __dybatpho_ai_endpoint_into {
   __dybatpho_network_trace_off __dybatpho_ai_ep_trace
   # A rehearsal sends nothing, so it needs no key; a real request is refused
   # here, in the shell that would send it, rather than sent without one.
-  if ! dybatpho::is true "${DRY_RUN-}"; then
+  if ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     __dybatpho_ai_api_key_into __dybatpho_ai_ep_key "${__dybatpho_ai_ep_provider}"
   fi
   case "${__dybatpho_ai_ep_provider}" in
@@ -1183,7 +1182,7 @@ function __dybatpho_ai_cli_complete {
     index=$((index + 1))
   done
 
-  if dybatpho::is true "${DRY_RUN-}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::info "🧪 DRY RUN: ${command} would answer this prompt"
     printf '[dry run] no request was sent\n'
     return 0
@@ -1506,7 +1505,7 @@ function dybatpho::ai_stream {
   # rehearsal and the debug line show it redacted, like every network log line.
   local shown_url
   __dybatpho_network_redact_url_into shown_url "${url}"
-  if dybatpho::is true "${DRY_RUN-}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run curl --no-buffer "${shown_url}"
     return 0
   fi

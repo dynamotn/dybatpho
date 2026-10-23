@@ -543,7 +543,7 @@ function __dybatpho_parallel_pool {
 # @env DYBATPHO_PARALLEL_TIMEOUT string Per-job limit used when `--timeout` is not given
 # @env DYBATPHO_PARALLEL_PROGRESS string When true-like, report progress as `--progress` does
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number [default: 5] Seconds a timed-out job has to stop before it is killed
-# @env DRY_RUN string When true-like, report the jobs instead of running them
+# @env DYBATPHO_DRY_RUN string When true-like, report the jobs instead of running them
 # @exitcode 0 Every job succeeded
 # @exitcode 1 At least one job failed
 # @tip A function defined by the caller works as the command, because each job
@@ -564,8 +564,7 @@ function dybatpho::parallel_map {
   (($#)) || return 0
 
   local -a __dybatpho_parallel_items=("$@")
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     local __dybatpho_parallel_map_job
     for __dybatpho_parallel_map_job in "${__dybatpho_parallel_items[@]}"; do
       dybatpho::dry_run "${__dybatpho_parallel_map_command}" "${__dybatpho_parallel_map_job}"

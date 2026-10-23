@@ -113,9 +113,9 @@ function _demo_export {
   dybatpho::info "In production this would live in the textfile collector directory"
 
   # A job that exits before anything scrapes it pushes to a Pushgateway instead.
-  # `DRY_RUN` prints the request rather than sending it, which keeps this
+  # `DYBATPHO_DRY_RUN` prints the request rather than sending it, which keeps this
   # example offline; a grouping value with a `/` goes base64url-encoded.
-  DRY_RUN=true dybatpho::metrics_push http://pushgateway.example.test:9091 nightly-backup \
+  DYBATPHO_DRY_RUN=true dybatpho::metrics_push http://pushgateway.example.test:9091 nightly-backup \
     target=db path=/var/backups
 }
 

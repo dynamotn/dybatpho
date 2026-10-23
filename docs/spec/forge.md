@@ -113,7 +113,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - An issue title that is a prefix of another open issue's title must not match.
 - A token registered inside a command substitution does not survive it; this is
   a property of Bash subshells and is documented rather than worked around.
-- Every request honors `DRY_RUN`, so a publishing script can be rehearsed.
+- Every request honors `DYBATPHO_DRY_RUN`, so a publishing script can be rehearsed.
 - A GitLab asset uploads but linking it to the release is refused.
 - A request made by the module resolves its own token: that registration must
   stay in the calling shell, so the script's later log lines mask the token.

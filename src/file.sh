@@ -22,7 +22,7 @@
 #   destination directory and renames it into place, so a reader never observes
 #   a half-written file and an interrupted run leaves the original intact. The
 #   destination's mode is carried over, and its owner too when the process has
-#   the privilege to set it. These helpers honor `DRY_RUN`.
+#   the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 # @see
 #   - `example/file_ops.sh`
 : "${DYBATPHO_DIR:?DYBATPHO_DIR must be set. Please source dybatpho/init.sh before other scripts from dybatpho.}"
@@ -814,7 +814,7 @@ function __dybatpho_file_rewrite {
 #   EOF
 #
 # @arg $1 string Destination file path
-# @env DRY_RUN string When true-like, report the write instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
 # @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
 #   replacing it
 # @exitcode 1 The destination directory is missing or the write fails
@@ -829,8 +829,7 @@ function dybatpho::file_write_atomic {
   dybatpho::is dir "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
 
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     # Drain standard input so that the process feeding this helper is not
     # interrupted by a closed pipe.
     cat > /dev/null
@@ -884,7 +883,7 @@ function __dybatpho_file_sed_delimiter {
 # @arg $1 string File path to rewrite
 # @arg $2 string POSIX basic regular expression to match
 # @arg $3 string Replacement text, where `&` and `\1` refer to the match
-# @env DRY_RUN string When true-like, report the rewrite instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the rewrite instead of performing it
 # @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
 #   replacing it
 # @exitcode 1 The file is missing, `sed` fails, or no delimiter can be chosen
@@ -901,7 +900,7 @@ function dybatpho::file_replace {
   delimiter="$(__dybatpho_file_sed_delimiter "${pattern}" "${replacement}")" \
     || dybatpho::die "${FUNCNAME[0]}: Cannot find a usable sed delimiter for '${pattern}'"
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run replace "${pattern}" "${replacement}" "${path}"
     return 0
   fi
@@ -934,7 +933,7 @@ function __dybatpho_file_produce_sed {
 #
 # @arg $1 string File path, created when it does not exist
 # @arg $2 string Exact line to guarantee
-# @env DRY_RUN string When true-like, report the change instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the change instead of performing it
 # @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
 #   replacing it
 # @exitcode 1 The parent directory is missing or the write fails
@@ -954,7 +953,7 @@ function dybatpho::file_ensure_line {
     return 0
   fi
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run append "${line}" "${path}"
     return 0
   fi
@@ -991,7 +990,7 @@ function __dybatpho_file_produce_appended {
 #
 # @arg $1 string File path
 # @arg $2 string Exact line to remove
-# @env DRY_RUN string When true-like, report the change instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the change instead of performing it
 # @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
 #   replacing it
 # @exitcode 1 The write fails
@@ -1007,7 +1006,7 @@ function dybatpho::file_remove_line {
     return 0
   fi
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run remove "${line}" "${path}"
     return 0
   fi
@@ -1139,7 +1138,7 @@ function dybatpho::file_age_seconds {
 #
 # @arg $1 string File path to back up
 # @stdout Path of the backup copy
-# @env DRY_RUN string When true-like, print the path without copying anything
+# @env DYBATPHO_DRY_RUN string When true-like, print the path without copying anything
 # @exitcode 1 The file is missing or the copy fails
 # @tip A second backup in the same second gets a numeric suffix, so an existing
 #   backup is never overwritten
@@ -1157,7 +1156,7 @@ function dybatpho::file_backup {
     counter=$((counter + 1))
   done
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run cp -p -- "${path}" "${backup}"
   else
     cp -p -- "${path}" "${backup}" \
@@ -1223,7 +1222,7 @@ function dybatpho::find_up {
 # @arg $1 string Directory path
 # @arg $2 string? Mode applied to the directory, such as `755`
 # @stdout The directory path
-# @env DRY_RUN string When true-like, print the path without creating anything
+# @env DYBATPHO_DRY_RUN string When true-like, print the path without creating anything
 # @exitcode 1 The path exists as something other than a directory, or cannot be created
 # @tip A mode is applied whether the directory was just created or already
 #   existed, so the result does not depend on whether the script ran before
@@ -1237,7 +1236,7 @@ function dybatpho::ensure_dir {
     dybatpho::die "${FUNCNAME[0]}: Path exists and is not a directory: ${path}"
   fi
 
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::is dir "${path}" || dybatpho::dry_run mkdir -p -- "${path}"
     [[ -n "${mode}" ]] && dybatpho::dry_run chmod "${mode}" "$(__dybatpho_file_operand "${path}")"
     printf '%s\n' "${path}"

@@ -184,7 +184,7 @@ function _demo_prune {
     touch -t "${year}01010000" "${entry}"
     year=$((year + 1))
   done
-  DRY_RUN=true dybatpho::cache_prune --max-entries 2
+  DYBATPHO_DRY_RUN=true dybatpho::cache_prune --max-entries 2
   dybatpho::cache_prune --max-entries 2
   local -a left=()
   dybatpho::cache_has three 999999999 && left+=(three)

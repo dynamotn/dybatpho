@@ -92,7 +92,7 @@ dybatpho::privilege_release
 - `doas` rather than `sudo`, which has no way to be asked about a cached ticket.
 - No terminal, with and without a cached ticket.
 - Release called twice, or without an acquire.
-- `DRY_RUN` set.
+- `DYBATPHO_DRY_RUN` set.
 - `dybatpho::privilege_acquire` is called again while the escalation is already held, with or without `--shield`.
 - `DYBATPHO_PRIVILEGE` is a false-like value in another case, such as `FALSE` or `Off`.
 
@@ -113,7 +113,7 @@ dybatpho::privilege_release
 - **FR-011**: Releasing MUST stop the refresher and remove the shield from `PATH`, and MUST be safe to call when nothing was acquired.
 - **FR-012**: Teardown MUST also run on exit and on `HUP`, `INT` and `TERM`, registered only after the escalation was actually taken.
 - **FR-013**: Running one command MUST read the same whether or not elevation is needed.
-- **FR-014**: `DRY_RUN` MUST report what would happen and change nothing.
+- **FR-014**: `DYBATPHO_DRY_RUN` MUST report what would happen and change nothing.
 - **FR-015**: An unknown option MUST stop the script.
 - **FR-016**: A second `privilege_acquire` while the escalation is held MUST NOT authenticate again, start a second refresher, put a second wrapper on `PATH`, or register the release again, and MUST add a wrapper the first call left out when `--shield` is now given.
 - **FR-017**: A command run by `privilege_run` MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
@@ -141,7 +141,7 @@ dybatpho::privilege_release
 - **IT-001**: Detect `sudo`, fall back to `doas`, honour an override, and report when neither exists.
 - **IT-002**: Report no elevation needed when root, when turned off, and when no command exists.
 - **IT-003**: Run one command elevated, and plainly when elevation is not needed.
-- **IT-004**: Report under `DRY_RUN` without running, for both a command and an acquire.
+- **IT-004**: Report under `DYBATPHO_DRY_RUN` without running, for both a command and an acquire.
 - **IT-005**: Reject a missing separator, a missing command, and an unknown option.
 - **IT-006**: Do nothing on acquire when elevation is not needed.
 - **IT-007**: Fail on acquire with no ticket and no terminal; succeed with a ticket and no terminal.

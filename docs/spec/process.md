@@ -135,8 +135,8 @@ dybatpho::create_temp workdir "/" "build"
 dybatpho::cleanup_file_on_exit "${workdir}"
 dybatpho::trap 'dybatpho::warn "Interrupted, rolling back"; ./rollback.sh' INT TERM
 
-# DRY_RUN=true prints the command instead of running it.
-dybatpho::dry_run "rsync -a ${workdir}/ /srv/app/"
+# DYBATPHO_DRY_RUN=true prints the command instead of running it.
+dybatpho::dry_run -- rsync -a "${workdir}/" /srv/app/
 
 [[ -f "${workdir}/manifest" ]] || dybatpho::die "Build produced no manifest" 2
 
@@ -160,9 +160,10 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 ## Edge Cases
 
 - A script already has an EXIT or signal trap when dybatpho trap composition is requested.
-- `DRY_RUN` is unset, true-like, or false-like.
-- A dry-run command is supplied as one shell string (evaluated) or multiple
-  arguments (executed directly).
+- `DYBATPHO_DRY_RUN` is unset, true-like, or false-like, alone or beside a
+  bare `DRY_RUN` that says the opposite.
+- A dry-run command is supplied after `--`, as one shell string (evaluated,
+  deprecated) or as multiple arguments (executed directly).
 - Cleanup registration runs under normal scripts and Bats test environments.
 - An existing trap must be preserved when cleanup or another handler is added.
 - The `timeout` binary is absent, or present but rejects `-k`.
@@ -202,10 +203,13 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-004**: The module MUST provide deferred cleanup registration for files and directories on shell exit.
 - **FR-005**: The module MUST provide a dry-run helper that prints commands instead of executing them when dry-run mode is enabled.
 - **FR-006**: Cleanup registration MUST be suitable for temporary resources created during script execution.
-- **FR-007**: `DRY_RUN` MUST treat `0`, `true`, `yes`, and `on` as enabled
-  values and execute commands otherwise.
+- **FR-007**: Dry-run mode MUST be read from `DYBATPHO_DRY_RUN` and, when that
+  is unset or empty, from the bare `DRY_RUN`; it MUST treat `0`, `true`, `yes`,
+  and `on` as enabled values and execute commands otherwise, including when
+  neither is set. The library MUST NOT assign or export either name.
 - **FR-008**: `dry_run` MUST evaluate a single command string and execute
-  multiple arguments directly when dry-run mode is disabled.
+  multiple arguments directly when dry-run mode is disabled; the single-string
+  form is deprecated in favour of `--`.
 - **FR-009**: Signal handlers MUST return 130 for SIGINT and 143 for SIGTERM.
 - **FR-010**: Cleanup registration MUST append to existing traps and remove
   registered files or directories on EXIT, HUP, INT, or TERM.
@@ -246,6 +250,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-027**: A command started by `background_run` MUST see the caller's variables: the starter MUST keep its state in prefixed locals.
 - **FR-028**: The error handler MUST print every frame of the stack and exit with the status of the command that failed.
 - **FR-029**: `dybatpho::dry_run` MUST run its arguments as a command when the first one is `--`, never through `eval`, whatever their number; without `--` a single argument remains a shell string.
+- **FR-036**: Every module that honors dry-run mode MUST read it the same way
+  as `dybatpho::dry_run`, so `DYBATPHO_DRY_RUN=false` turns off an inherited
+  `DRY_RUN=true` for the whole library.
 - **FR-030**: The cleanup that `dybatpho::cleanup_file_on_exit` and `dybatpho::create_temp` register MUST trap `EXIT` only, so HUP, INT and TERM still end the shell with their own status after the paths are removed.
 - **FR-031**: A PID file check MUST report a live process as running even when it belongs to another user and `kill -0` is refused, falling back to `/proc` or `ps -p`.
 - **FR-032**: Ending a job MUST look again for it at least every tenth of a second after SIGTERM, so a job that ends at once does not hold `dybatpho::kill_children` or a timeout for a whole second.
@@ -286,7 +293,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 
 - **IT-001**: Register common handlers and verify command failures trigger the shared error path.
 - **IT-002**: Register cleanup for a file and directory, exit the shell, and verify both are removed.
-- **IT-003**: Set `DRY_RUN=true` and verify the dry-run helper prints the command without executing it.
+- **IT-003**: Set `DYBATPHO_DRY_RUN=true` and verify the dry-run helper prints the command without executing it.
 - **IT-004**: Verify false-like dry-run execution, signal-specific statuses,
   and trap composition with pre-existing handlers.
 - **IT-005**: Run a command past its limit and verify exit code 124, both with
@@ -316,6 +323,10 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-018**: Fail with status 7 three functions deep after `register_err_handler`, and exit 7 with all three frames printed.
 - **IT-019**: Start a background job that leaves behind a child ignoring SIGTERM and exits, end the jobs, and see that child killed.
 - **IT-020**: Run `dybatpho::dry_run -- 'echo first; echo INJECTED'` and get status 127 with nothing injected; `dry_run -- printf 'plain %s\n' 'a b'` prints `plain a b`.
+- **IT-026**: With both names unset run a command through `dry_run` and see it
+  executed; set only `DRY_RUN=true` and see it reported; set
+  `DYBATPHO_DRY_RUN=true` beside `DRY_RUN=false`, and `DYBATPHO_DRY_RUN=false`
+  beside `DRY_RUN=true`, and see the prefixed name decide.
 - **IT-021**: Create a temporary file, send the script TERM, and see it exit 143 without running the next line and with the file removed.
 - **IT-022**: Check a PID file recording PID 1, and one recording a live process with `kill` refusing every signal, and see both reported as running while a dead process is not.
 - **IT-023**: Start four background jobs that end on SIGTERM and see `dybatpho::kill_children` clear them in under three seconds.

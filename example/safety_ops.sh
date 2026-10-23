@@ -58,10 +58,10 @@ function _demo_safe_rm {
     dybatpho::warn "Removing a directory without --recursive was refused (expected)"
   fi
 
-  DRY_RUN=true dybatpho::safe_rm --force --recursive "${WORKDIR}/cache"
+  DYBATPHO_DRY_RUN=true dybatpho::safe_rm --force --recursive "${WORKDIR}/cache"
   local is
   is=$(dybatpho::is dir "${WORKDIR}/cache" && echo yes || echo no)
-  dybatpho::info "DRY_RUN kept the directory: ${is}"
+  dybatpho::info "DYBATPHO_DRY_RUN kept the directory: ${is}"
 
   dybatpho::safe_rm --force --recursive "${WORKDIR}/cache"
   dybatpho::success "Cache directory removed"
@@ -146,7 +146,7 @@ function _demo_safe_system {
     dybatpho::warn "Unattended system change without --force was skipped (expected)"
   fi
 
-  DRY_RUN=true dybatpho::safe_system --force "Restart the app service" -- touch "${WORKDIR}/restarted"
+  DYBATPHO_DRY_RUN=true dybatpho::safe_system --force "Restart the app service" -- touch "${WORKDIR}/restarted"
   dybatpho::safe_system --force "Restart the app service" -- touch "${WORKDIR}/restarted"
   local is
   is=$(dybatpho::is file "${WORKDIR}/restarted" && echo yes || echo no)

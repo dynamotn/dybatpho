@@ -167,7 +167,7 @@ done
 - **FR-009**: A job MUST run in a subshell of the caller, so that a function the caller defined can be used as the command without being exported.
 - **FR-010**: The pool MUST end its jobs, together with any children they started, when the shell is interrupted or terminated.
 - **FR-011**: The pool MUST restore the caller's job-control setting, which it changes in order to give each job its own process group.
-- **FR-012**: The module MUST honor `DRY_RUN` by reporting the jobs and running none of them.
+- **FR-012**: The module MUST honor `DYBATPHO_DRY_RUN` by reporting the jobs and running none of them.
 - **FR-013**: The pool MUST keep itself full by waiting for the next job to finish, rather than draining and refilling in batches.
 - **FR-014**: `dybatpho::parallel_map` and `dybatpho::parallel_run` MUST accept leading options before the job count, MUST treat everything from the job count on as positional, MUST accept `--` to end the options, and MUST stop the caller on an unknown option.
 - **FR-015**: `--fail-fast` MUST enable fail-fast for that call regardless of `DYBATPHO_PARALLEL_FAILFAST`.
@@ -215,7 +215,7 @@ done
 - **IT-010**: Verify an empty work list succeeds and records no jobs.
 - **IT-011**: Verify a job count of zero follows configuration and then the machine, and that an invalid count is rejected.
 - **IT-012**: Verify a status read for a missing or malformed index is rejected.
-- **IT-013**: Verify `DRY_RUN` runs nothing and has no side effect.
+- **IT-013**: Verify `DYBATPHO_DRY_RUN` runs nothing and has no side effect.
 - **IT-014**: Verify the caller's job-control setting is the same after a run as before it.
 - **IT-015**: Verify a job can call a function defined by the caller.
 - **IT-016**: Verify that capturing a run in a command substitution leaves the recorded statuses untouched.

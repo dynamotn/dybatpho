@@ -7,7 +7,7 @@
 # @description Demonstrates dybatpho::parallel_map, parallel_run,
 #   parallel_status, parallel_count, parallel_failed, fail-fast (the variable
 #   and `--fail-fast`), per-job time limits with `--timeout`, `--progress`,
-#   and DRY_RUN
+#   and DYBATPHO_DRY_RUN
 # shellcheck disable=SC2034 # DYBATPHO_PARALLEL_FAILFAST is read by the parallel module
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
 # its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
@@ -164,7 +164,7 @@ function _demo_progress {
 # @noargs
 function _demo_dry_run {
   dybatpho::header "DRY RUN"
-  DRY_RUN=true dybatpho::parallel_map 2 _check_host web-01 db-01
+  DYBATPHO_DRY_RUN=true dybatpho::parallel_map 2 _check_host web-01 db-01
   dybatpho::info "Nothing was contacted"
 }
 

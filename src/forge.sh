@@ -528,7 +528,7 @@ function __dybatpho_forge_auth_header_into {
 # @exitcode 0 The forge answered with a 2xx status
 # @exitcode 4 The forge answered with a 4xx status
 # @exitcode 5 The forge answered with a 5xx status
-# @tip Honors `DRY_RUN`, so a publishing script can be rehearsed safely
+# @tip Honors `DYBATPHO_DRY_RUN`, so a publishing script can be rehearsed safely
 #######################################
 function dybatpho::forge_request {
   local method path

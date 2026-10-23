@@ -183,7 +183,7 @@ function __dybatpho_privilege_shield {
 # @option --no-keepalive Skip the background refresh, for a run short enough not to need it
 # @exitcode 0 The escalation is held, or was not needed
 # @exitcode 1 Authentication failed, or a prompt was needed and could not be answered
-# @env DRY_RUN string When true-like, report what would be acquired and change nothing
+# @env DYBATPHO_DRY_RUN string When true-like, report what would be acquired and change nothing
 # @example
 #   dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
 #######################################
@@ -203,9 +203,9 @@ function dybatpho::privilege_acquire {
   local command_name
   command_name="$(dybatpho::privilege_command)"
 
-  # Nothing to execute here, only a decision to report, so `DRY_RUN` is read
+  # Nothing to execute here, only a decision to report, so `DYBATPHO_DRY_RUN` is read
   # rather than handed a command: `dybatpho::dry_run` runs what it is given.
-  if dybatpho::is true "${DRY_RUN:-}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::info "${FUNCNAME[0]}: would acquire ${command_name} for this run"
     return 0
   fi
@@ -279,7 +279,7 @@ function dybatpho::privilege_release {
 # @arg $@ string Command and arguments to run
 # @exitcode 0 The command ran
 # @exitcode other The command's own exit code
-# @env DRY_RUN string When true-like, print the command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the command instead of running it
 # @example
 #   dybatpho::privilege_run -- systemctl restart nginx
 #######################################
@@ -298,5 +298,5 @@ function dybatpho::privilege_run {
 
   local __dybatpho_privilege_run_command_name
   __dybatpho_privilege_run_command_name="$(dybatpho::privilege_command)"
-  dybatpho::dry_run "${__dybatpho_privilege_run_command_name}" "$@"
+  dybatpho::dry_run -- "${__dybatpho_privilege_run_command_name}" "$@"
 }

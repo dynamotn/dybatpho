@@ -255,7 +255,7 @@ function dybatpho::cache_get {
 # @arg $1 string Entry key
 # @stdin The content to store
 # @env DYBATPHO_CACHE_DIR string Directory holding cache entries
-# @env DRY_RUN string When true-like, report the write instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
 # @exitcode 0 The entry was written
 # @exitcode 1 Stop the script when the key cannot be a file name or the write fails
 #######################################
@@ -265,9 +265,8 @@ function dybatpho::cache_set {
   local path
   __dybatpho_cache_path_into path "${key}"
   # A dry run creates no directory, and `dybatpho::file_write_atomic` requires
-  # one before it looks at `DRY_RUN`, so the report is made here instead.
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  # one before it looks at `DYBATPHO_DRY_RUN`, so the report is made here instead.
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     # Drain standard input, so that whatever is feeding this is not cut off by
     # a closed pipe.
     cat > /dev/null
@@ -310,7 +309,7 @@ function dybatpho::cache_forget {
   dybatpho::expect_args key -- "$@"
   local path
   __dybatpho_cache_path_into path "${key}"
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run remove "${path}"
     return 0
   fi
@@ -329,14 +328,14 @@ function dybatpho::cache_forget {
 # @noargs
 # @env DYBATPHO_CACHE_DIR string Directory holding cache entries
 # @env DYBATPHO_CACHE_NAMESPACE string Namespace to empty
-# @env DRY_RUN string When true-like, report the removal instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the removal instead of performing it
 # @exitcode 0 The namespace holds no entries, whether or not it did before
 #######################################
 function dybatpho::cache_clear {
   local directory
   __dybatpho_cache_dir_into directory
   dybatpho::is dir "${directory}" || return 0
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run clear "${directory}"
     return 0
   fi
@@ -686,7 +685,7 @@ function __dybatpho_cache_bytes {
 #   a size takes an optional binary `K`, `M` or `G` suffix
 # @env DYBATPHO_CACHE_DIR string Directory holding cache entries
 # @env DYBATPHO_CACHE_NAMESPACE string Namespace to prune
-# @env DRY_RUN string When true-like, report each removal instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report each removal instead of performing it
 # @exitcode 0 The namespace fits the limits, whether or not anything was removed
 # @exitcode 1 Stop the script when no limit is given, an option is unknown, or a limit is malformed
 # @see dybatpho::cache_stats
@@ -765,14 +764,14 @@ function dybatpho::cache_prune {
 
 #######################################
 # @description Remove one entry on behalf of `dybatpho::cache_prune`, or report
-#   the removal under `DRY_RUN`.
+#   the removal under `DYBATPHO_DRY_RUN`.
 # @arg $1 string Path of the entry
 # @internal
 #######################################
 function __dybatpho_cache_prune_remove {
   local path
   dybatpho::expect_args path -- "$@"
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run remove "${path}"
     return 0
   fi

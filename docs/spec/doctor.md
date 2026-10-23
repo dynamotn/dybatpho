@@ -166,7 +166,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **FR-014**: A generated bundle MUST be a single file that carries the bootstrap guards, the module sources verbatim, and no dependency on a `src/` directory.
 - **FR-015**: A generated bundle MUST report the version it was generated from, and MUST report only the modules it carries as its registry.
 - **FR-016**: Inside a bundle, loading a carried module MUST succeed, and loading any other module MUST fail with the command that regenerates the bundle with it.
-- **FR-017**: The bundler MUST refuse to overwrite an existing output file without approval, MUST honor `DRY_RUN`, and MUST verify that the file it wrote parses and can be sourced.
+- **FR-017**: The bundler MUST refuse to overwrite an existing output file without approval, MUST honor `DYBATPHO_DRY_RUN`, and MUST verify that the file it wrote parses and can be sourced.
 - **FR-018**: The JSON report MUST escape every control character in the strings it writes, so it parses whatever a path or version holds, and MUST do so without `jq`.
 - **FR-019**: `scripts/bundle.sh` MUST read every bootstrap function it copies from `init.sh` before it opens the output, and MUST stop without writing a bundle when one cannot be found.
 - **FR-020**: A generated bundle MUST carry the registry's dependency edges between the modules it holds, so the report walks the same graph inside the bundle as outside it.
@@ -217,7 +217,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **IT-012**: Verify a bundle carries the resolved dependency closure of its selection, in load order.
 - **IT-013**: Verify a bundle works when sourced with no library directory in reach, and refuses direct execution.
 - **IT-014**: Verify loading a carried module inside a bundle succeeds and loading an absent one names the regeneration command.
-- **IT-015**: Verify the bundler refuses to overwrite without approval, overwrites when forced, and writes nothing under `DRY_RUN`.
+- **IT-015**: Verify the bundler refuses to overwrite without approval, overwrites when forced, and writes nothing under `DYBATPHO_DRY_RUN`.
 - **IT-016**: Verify the bundler rejects an unknown module and keeps the module source verbatim apart from the shebang.
 - **IT-017**: Verify a dependency found under a directory whose name holds an ANSI escape and a `\x01` is reported with `\u001b` and `\u0001`, and that the report parses.
 - **IT-018**: Bundle from a copy of the library whose `init.sh` misspells a bootstrap function header, and fail with no output file.

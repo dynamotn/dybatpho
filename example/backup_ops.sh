@@ -179,9 +179,9 @@ function _demo_prune {
   dybatpho::expect_args workspace -- "$@"
 
   dybatpho::header "PRUNE"
-  # Nothing is deleted while DRY_RUN is set, which is how a retention policy
+  # Nothing is deleted while DYBATPHO_DRY_RUN is set, which is how a retention policy
   # gets reviewed before it runs unattended.
-  DRY_RUN=true dybatpho::backup_prune --keep-count 2 --name config --force "${workspace}/backups"
+  DYBATPHO_DRY_RUN=true dybatpho::backup_prune --keep-count 2 --name config --force "${workspace}/backups"
 
   dybatpho::backup_prune --keep-count 2 --name config --force "${workspace}/backups"
   dybatpho::info "Kept:"

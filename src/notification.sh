@@ -440,7 +440,7 @@ function dybatpho::notify_webhook {
 # @arg $1 string Title
 # @arg $2 string? Body
 # @arg $3 string [default: normal] Urgency: `low`, `normal` or `critical`
-# @env DRY_RUN string Print the command instead of showing the notification; with no backend installed, the
+# @env DYBATPHO_DRY_RUN string Print the command instead of showing the notification; with no backend installed, the
 #   `notify-send` form is printed
 # @exitcode 0 The notification was handed to the desktop
 # @exitcode 1 Missing or empty title, or an unknown urgency
@@ -459,12 +459,11 @@ function dybatpho::notify_desktop {
   esac
 
   local backend
-  # shellcheck disable=SC2154 # `DRY_RUN` is declared by `src/process.sh`, a core module
   if dybatpho::is command notify-send; then
     backend="notify-send"
   elif dybatpho::is command osascript; then
     backend="osascript"
-  elif dybatpho::is true "${DRY_RUN}"; then
+  elif dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     # Nothing would run anyway, so show the command most hosts would use.
     backend="notify-send"
   else
@@ -738,7 +737,7 @@ function __dybatpho_notification_is_address {
 # @env DYBATPHO_EMAIL_FROM string Default sender address
 # @env DYBATPHO_SENDMAIL string? The sendmail command; without it, `sendmail` on PATH, then `/usr/sbin/sendmail`
 #   and `/usr/lib/sendmail`
-# @env DRY_RUN string Print the sendmail command instead of sending anything
+# @env DYBATPHO_DRY_RUN string Print the sendmail command instead of sending anything
 # @exitcode 0 The message was handed to the MTA
 # @exitcode 1 Missing arguments, an invalid address, a line break in the subject, or the `validate` module not loaded
 # @exitcode 127 No sendmail command was found
@@ -786,8 +785,7 @@ function dybatpho::notify_email {
     done
   fi
   local -a command=("${sendmail:-sendmail}" -i -- ${addresses[@]+"${addresses[@]}"})
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run -- "${command[@]}"
     return 0
   fi

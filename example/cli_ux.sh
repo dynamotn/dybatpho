@@ -118,7 +118,7 @@ function _spec_deploy {
   # does not have to be spelled out as `--{no-}color`.
   dybatpho::opts::flag "Colorize the deployment report" COLOR --color \
     negatable:true config:deploy.color
-  dybatpho::opts::flag "Preview without applying changes" DRY_RUN --dry-run on:true off:false init:="false"
+  dybatpho::opts::flag "Preview without applying changes" DYBATPHO_DRY_RUN --dry-run on:true off:false init:="false"
   dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_deploy"
 }
 

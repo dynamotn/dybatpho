@@ -365,12 +365,31 @@ SCRIPT
   unset DRY_RUN
 }
 
-@test "dybatpho::dry_run with DRY_RUN unset should error" {
-  unset DRY_RUN
-  local test_file="unset_dry_run_test_file.tmp"
-  rm -f "${test_file}"
-  run dybatpho::dry_run touch "${test_file}"
-  assert_failure
+@test "dybatpho::dry_run with DRY_RUN unset runs the command" {
+  # Nothing is assigned when the library loads, so an unset switch is simply
+  # off rather than an unbound variable under `set -u`.
+  unset DRY_RUN DYBATPHO_DRY_RUN
+  local test_file="${BATS_TEST_TMPDIR}/unset_dry_run_test_file.tmp"
+  run_traced dybatpho::dry_run touch "${test_file}"
+  assert_success
+  refute_output --partial "DRY RUN"
+  assert_file_exist "${test_file}"
+}
+
+@test "dry-run mode reads DYBATPHO_DRY_RUN first and DRY_RUN as a fallback" {
+  unset DRY_RUN DYBATPHO_DRY_RUN
+  local test_file="${BATS_TEST_TMPDIR}/fallback.tmp"
+  DRY_RUN=true run_traced dybatpho::dry_run -- touch "${test_file}"
+  assert_output --partial "DRY RUN"
+  assert_file_not_exist "${test_file}"
+
+  DYBATPHO_DRY_RUN=true DRY_RUN=false run_traced dybatpho::dry_run -- touch "${test_file}"
+  assert_output --partial "DRY RUN"
+  assert_file_not_exist "${test_file}"
+
+  DYBATPHO_DRY_RUN=false DRY_RUN=true run_traced dybatpho::dry_run -- touch "${test_file}"
+  refute_output --partial "DRY RUN"
+  assert_file_exist "${test_file}"
 }
 
 # --- dybatpho::run_with_timeout -------------------------------------------

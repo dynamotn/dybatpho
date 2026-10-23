@@ -10,7 +10,7 @@
 # @description Demonstrates dybatpho::ai_provider, ai_model, ai_check, ai_ask,
 #   ai_conversation_new/add/show, ai_chat, ai_json, ai_stream, the tool registry
 #   with ai_run, plus ai_tokens_estimate, ai_budget, ai_usage and ai_redact.
-#   DRY_RUN is on, so no request leaves the machine and no API key is needed.
+#   DYBATPHO_DRY_RUN is on, so no request leaves the machine and no API key is needed.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules ai
@@ -18,7 +18,7 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 dybatpho::register_common_handlers
 
 # Nothing is sent anywhere; every call returns a placeholder response.
-export DRY_RUN=true
+export DYBATPHO_DRY_RUN=true
 export DYBATPHO_AI_PROVIDER=anthropic
 export DYBATPHO_AI_API_KEY="example-key-not-used-in-dry-run"
 

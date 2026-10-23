@@ -35,7 +35,7 @@
 #   Nothing here changes the system without saying so first. Every mutating
 #   function asks for confirmation unless `--force`/`DYBATPHO_FORCE` is set,
 #   refuses rather than guessing in a non-interactive shell, and prints the
-#   command instead of running it under `--dry-run` or `DRY_RUN`.
+#   command instead of running it under `--dry-run` or `DYBATPHO_DRY_RUN`.
 # @usage
 #   ### Report the machine's package manager
 #
@@ -313,7 +313,7 @@ function __dybatpho_pkg_approve {
 }
 
 #######################################
-# @description Run a command through `dybatpho::dry_run` with `DRY_RUN` overridden for this call only.
+# @description Run a command through `dybatpho::dry_run` with dry-run mode overridden for this call only.
 # @arg $1 string Dry-run flag value
 # @arg $@ string The command and its arguments
 # @exitcode The exit code of the command, or 0 when it is only printed
@@ -327,13 +327,12 @@ function __dybatpho_pkg_run {
   shift
   # The command run is a package manager, an external program that sees no shell locals.
   # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
-  local previous_dry_run="${DRY_RUN}"
-  # The command run is a package manager, an external program that sees no shell locals.
-  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
   local status=0
-  DRY_RUN="${dry_run}"
+  # The prefixed name wins over `DRY_RUN`, and a local one goes away with this
+  # call, so the override neither leaks nor loses to an inherited setting.
+  # dyshellint disable=BSG015 # reviewed in test/scope-leak.allow
+  local DYBATPHO_DRY_RUN="${dry_run:-false}"
   dybatpho::dry_run -- "$@" || status=$?
-  DRY_RUN="${previous_dry_run}"
   return "${status}"
 }
 
@@ -531,11 +530,11 @@ function dybatpho::pkg_install_command {
 #   pass one extra argument to the manager, repeatable
 # @exitcode 0 The index was refreshed, or the command was printed
 # @exitcode 1 The refresh is declined, the command failed, or no manager was detected
-# @env DRY_RUN string When true-like, print the command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the command instead of running it
 #######################################
 function dybatpho::pkg_update {
   # shellcheck disable=SC2154 # declared by `src/safety.sh`
-  local force="${DYBATPHO_FORCE}" dry_run="${DRY_RUN}"
+  local force="${DYBATPHO_FORCE}" dry_run="${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"
   local -a extra_args=()
   __dybatpho_helpers_options_into - - \
     '-f|--force=force -n|--dry-run=dry_run -a|--arg=extra_args+:' strict '' \
@@ -574,13 +573,13 @@ function dybatpho::pkg_update {
 # @arg $@ string Packages, optionally after a `--` separator
 # @exitcode 0 The packages were installed, or the command was printed
 # @exitcode 1 The install is declined, the command failed, or no manager was detected
-# @env DRY_RUN string When true-like, print the command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the command instead of running it
 # @env DYBATPHO_FORCE bool Approve the change without prompting
 # @tip An `--arg` belongs to the install command alone: the `--update` refresh that may run before it is never given the
 #   extra arguments.
 #######################################
 function dybatpho::pkg_install {
-  local force="${DYBATPHO_FORCE}" dry_run="${DRY_RUN}" refresh=false
+  local force="${DYBATPHO_FORCE}" dry_run="${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}" refresh=false
   local -a extra_args=() packages=()
   __dybatpho_helpers_options_into packages - \
     '-f|--force=force -n|--dry-run=dry_run -u|--update=refresh -a|--arg=extra_args+:' '' '-*' \
@@ -652,7 +651,7 @@ function dybatpho::pkg_ensure {
 # @exitcode 1 The install is declined, the command failed, or the command is still missing afterwards
 #######################################
 function dybatpho::pkg_require {
-  local dry_run="${DRY_RUN}"
+  local dry_run="${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"
   local -a options=() arguments=()
   __dybatpho_helpers_options_into arguments - \
     '-n|--dry-run=dry_run,options+ -f|--force|-u|--update=options+ -a|--arg=options++:' '' '-*' \

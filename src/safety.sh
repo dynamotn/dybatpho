@@ -24,7 +24,7 @@
 #   2. the operation runs unattended only with `--force` (or `DYBATPHO_FORCE`),
 #      otherwise it asks for confirmation on an interactive terminal;
 #   3. a non-interactive run without `--force` refuses instead of guessing, and
-#      `DRY_RUN` prints the command instead of executing it.
+#      `DYBATPHO_DRY_RUN` prints the command instead of executing it.
 # @usage
 #   ### Remove a build directory, asking first
 #
@@ -320,7 +320,7 @@ function dybatpho::assert_safe_path {
 # @arg $@ string Paths to remove, optionally after a `--` separator
 # @exitcode 0 Every requested path is removed or already missing
 # @exitcode 1 The removal is declined, or the script stops on an invalid path
-# @env DRY_RUN string When true-like, print the `rm` commands instead of running them
+# @env DYBATPHO_DRY_RUN string When true-like, print the `rm` commands instead of running them
 # @tip Missing paths are skipped instead of failing, like `rm -f`
 #######################################
 function dybatpho::safe_rm {
@@ -366,7 +366,7 @@ function dybatpho::safe_rm {
 # @arg $2 string Destination path to overwrite
 # @exitcode 0 The destination is free, or replacing it is approved
 # @exitcode 1 Replacing the destination is declined
-# @env DRY_RUN string When true-like, print the backup command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the backup command instead of running it
 # @tip Call it as a guard: `dybatpho::safe_overwrite "${file}" && printf '%s' "${data}" > "${file}"`
 #######################################
 function dybatpho::safe_overwrite {
@@ -419,7 +419,7 @@ function __dybatpho_safety_transfer_target {
 # @arg $3 string Destination path or directory
 # @exitcode 0 The copy is done
 # @exitcode 1 The overwrite is declined, or the script stops when the source is missing
-# @env DRY_RUN string When true-like, print the `cp` command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the `cp` command instead of running it
 #######################################
 function dybatpho::safe_copy {
   __dybatpho_safety_transfer copy "$@"
@@ -432,7 +432,7 @@ function dybatpho::safe_copy {
 # @arg $3 string Destination path or directory
 # @exitcode 0 The move is done
 # @exitcode 1 The overwrite is declined, or the script stops when the source is missing
-# @env DRY_RUN string When true-like, print the `mv` command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the `mv` command instead of running it
 #######################################
 function dybatpho::safe_move {
   __dybatpho_safety_transfer move "$@"
@@ -556,7 +556,7 @@ function dybatpho::safe_extract {
 # @arg $@ string A `--` separator followed by the command and its arguments
 # @exitcode 0 The command ran successfully
 # @exitcode 1 The change is declined, or the command failed
-# @env DRY_RUN string When true-like, print the command instead of running it
+# @env DYBATPHO_DRY_RUN string When true-like, print the command instead of running it
 # @example
 #   dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 #######################################

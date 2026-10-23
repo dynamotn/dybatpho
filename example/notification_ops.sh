@@ -3,7 +3,7 @@
 # @brief Example showing notification utilities
 # @description Demonstrates dybatpho::notify_slack, notify_telegram, notify_teams,
 #   notify_google_chat, notify_discord, notify_webhook, notify_ntfy,
-#   notify_gotify, notify_desktop, and notify_email using DRY_RUN mode so no real
+#   notify_gotify, notify_desktop, and notify_email using DYBATPHO_DRY_RUN mode so no real
 #   HTTP request is made, no notification is shown, and no email is sent when
 #   running this example.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -13,7 +13,7 @@ SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 dybatpho::register_common_handlers
 
 # Run in dry-run mode so no actual requests are sent
-export DRY_RUN=true
+export DYBATPHO_DRY_RUN=true
 
 # @description Run the `SLACK` section of this example.
 # @noargs
@@ -90,7 +90,7 @@ function _demo_gotify {
   dybatpho::header "GOTIFY"
   export DYBATPHO_GOTIFY_URL="https://gotify.example.test"
   export DYBATPHO_GOTIFY_TOKEN="AbCdEf123456"
-  # The token goes in a header outside the command line, so DRY_RUN does not
+  # The token goes in a header outside the command line, so DYBATPHO_DRY_RUN does not
   # print it either.
   dybatpho::notify_gotify "Disk /var at 97%" "Disk almost full" 8
   dybatpho::info "Gotify notification dispatched"
@@ -100,7 +100,7 @@ function _demo_gotify {
 # @noargs
 function _demo_desktop {
   dybatpho::header "DESKTOP"
-  # notify-send on Linux, osascript on macOS; DRY_RUN prints the command.
+  # notify-send on Linux, osascript on macOS; DYBATPHO_DRY_RUN prints the command.
   dybatpho::notify_desktop "Backup finished" "42 files, 3.1 GiB"
   dybatpho::notify_desktop "Disk almost full" "/var is at 97%" critical
   # An unknown urgency is refused before anything runs.
@@ -125,7 +125,7 @@ function _demo_email {
 }
 
 # @description Run the `DELIVERY POLICY` section of this example.
-#   DRY_RUN is turned off here, and `curl` is replaced by a stub on PATH that
+#   DYBATPHO_DRY_RUN is turned off here, and `curl` is replaced by a stub on PATH that
 #   answers 503, so the circuit breaker can be seen opening without any request
 #   leaving the machine.
 # @noargs
@@ -138,7 +138,7 @@ function _demo_delivery_policy {
 
   local status
   (
-    export PATH="${bin}:${PATH}" DRY_RUN=false
+    export PATH="${bin}:${PATH}" DYBATPHO_DRY_RUN=false
     export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T000/B000/xxxx"
     export DYBATPHO_NOTIFY_MAX_RETRIES=0 DYBATPHO_NOTIFY_CIRCUIT=true
     export DYBATPHO_CIRCUIT_THRESHOLD=2

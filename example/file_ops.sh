@@ -245,9 +245,9 @@ function _demo_dry_run {
   local config="${WORKDIR}/guarded.conf"
   printf 'keep = 1\n' > "${config}"
 
-  # Every writer honors DRY_RUN, so a script can be rehearsed before it runs.
-  DRY_RUN=true dybatpho::file_replace "${config}" 'keep' 'gone'
-  DRY_RUN=true dybatpho::file_ensure_line "${config}" 'added'
+  # Every writer honors DYBATPHO_DRY_RUN, so a script can be rehearsed before it runs.
+  DYBATPHO_DRY_RUN=true dybatpho::file_replace "${config}" 'keep' 'gone'
+  DYBATPHO_DRY_RUN=true dybatpho::file_ensure_line "${config}" 'added'
   local cat
   cat=$(< "${config}")
   dybatpho::info "File is untouched: ${cat}"

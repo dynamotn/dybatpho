@@ -322,11 +322,11 @@ affect editor navigation.
 - **Dependency modules** (`pkg`): detect before acting, resolve package names
   per manager rather than assuming one distribution, and never change system
   state without `--force`/`DYBATPHO_FORCE` or an answered confirmation; honor
-  `DRY_RUN`.
+  `DYBATPHO_DRY_RUN`.
 - **Security primitives** (`secret`, `safety`): never log or export secret
   values, keep the masking registry process-local, and validate file
   permissions before use. Guarded operations must validate the target path
-  first, require `--force` or a confirmation before acting, and honor `DRY_RUN`.
+  first, require `--force` or a confirmation before acting, and honor `DYBATPHO_DRY_RUN`.
 - **Integration modules** (`git`, `network`, `notification`, `archive`, `config`,
   `json`): validate dependencies, quote paths/URLs/payloads, and do not hide
   external command failures.
@@ -686,7 +686,7 @@ to the module convention.
 | Logging/CLI | Separate stdout/stderr, filtering, strict mode, and machine-readable output |
 | JSON/YAML/notification | Escaping, malformed input, and unavailable dependencies |
 | Locking/coordination | Atomic acquire, stale reclaim, release on failure paths, and `DYBATPHO_LOCK_DIR` isolation in tests |
-| Destructive guards (`safety`) | Protected paths, `DYBATPHO_SAFE_ROOTS` confinement, declined and forced paths, `DRY_RUN`, short options, and `--` end-of-options |
+| Destructive guards (`safety`) | Protected paths, `DYBATPHO_SAFE_ROOTS` confinement, declined and forced paths, `DYBATPHO_DRY_RUN`, short options, and `--` end-of-options |
 | Testing helpers | Passing and failing direction of every assertion, mock restore, snapshot create/match/diff, and fixture cleanup |
 | New module | `init.sh` registry entry and dependency edges, `docs/spec/<module>.md`, `docs/spec/README.md` entries, `test/<module>.bats`, and `example/<module>_ops.sh` |
 | Bootstrap/module loading | `test/init.bats`, a fresh shell per assertion, dependency order, cycle termination, and unknown-module failure. Spawn child shells from a script **file**, never `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which the kcov hook expands on every command and `set -u` then turns into a failure that only appears under `scripts/test.sh` |

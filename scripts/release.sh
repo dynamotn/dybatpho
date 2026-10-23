@@ -57,7 +57,7 @@
 #   scripts/release.sh --no-publish         # tag and push, publish by hand later
 #
 # @env DYBATPHO_FORCE string When true-like, answer every confirmation with yes
-# @env DRY_RUN string When true-like, report every step and change nothing
+# @env DYBATPHO_DRY_RUN string When true-like, report every step and change nothing; falls back to `DRY_RUN`
 # @env DYBATPHO_RELEASE_GPG_KEY string Key `--sign` signs the checksum file with
 #
 # @env GITHUB_TOKEN string Token the release is published with, see `src/forge.sh`
@@ -347,10 +347,10 @@ function __dybatpho_release_artifacts {
   dybatpho::progress "Building ${_bundle}" >&2
   DYBATPHO_FORCE=true "${SCRIPT_DIR}/bundle.sh" --modules all --output "${_bundle}" >&2
 
-  # DRY_RUN leaves nothing on disk for the checksum step to read, and a checksum
+  # A dry run leaves nothing on disk for the checksum step to read, and a checksum
   # over files that weren't built would be a lie rather than a rehearsal.
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  if dybatpho::is true "${DRY_RUN}"; then
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  if dybatpho::is true "${DYBATPHO_DRY_RUN}"; then
     printf '%s\n' "${_bundle}"
     return 0
   fi
@@ -378,7 +378,7 @@ function __dybatpho_release_run {
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::is true "${DOCS}" && dybatpho::require "gawk"
   # shellcheck disable=SC2154 # set by the option spec of this script
-  if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${DRY_RUN}"; then
+  if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${DYBATPHO_DRY_RUN}"; then
     # Resolved before any local step runs: a missing token should not be found
     # out after the tree is stamped, committed and tagged.
     dybatpho::require "curl"
@@ -464,7 +464,7 @@ function __dybatpho_release_run {
     local forge_kind
     forge_kind=$(dybatpho::forge_kind)
     dybatpho::progress "Creating the ${forge_kind} release"
-    if dybatpho::is true "${DRY_RUN}"; then
+    if dybatpho::is true "${DYBATPHO_DRY_RUN}"; then
       local wc
       wc=$(wc -l < "${_notes}")
       dybatpho::dry_run -- forge_release_create "${_tag}" with "${wc}" lines of notes
@@ -526,8 +526,8 @@ function _spec {
   # shellcheck disable=SC1083 # `--{no-}` is the toggle-switch syntax of dybatpho::opts::flag
   dybatpho::opts::flag "Create the release on the forge" PUBLISH --{no-}publish \
     on:true off:false init:="true"
-  dybatpho::opts::flag "Report every step and change nothing" DRY_RUN -n --dry-run \
-    on:true off:false init:="${DRY_RUN:-false}" export:true
+  dybatpho::opts::flag "Report every step and change nothing" DYBATPHO_DRY_RUN -n --dry-run \
+    on:true off:false init:="${DYBATPHO_DRY_RUN:-${DRY_RUN:-false}}" export:true
   dybatpho::opts::flag "Answer every confirmation with yes" DYBATPHO_FORCE -y --yes \
     on:true off:false init:="${DYBATPHO_FORCE:-false}" export:true
 }

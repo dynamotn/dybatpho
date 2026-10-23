@@ -159,7 +159,7 @@ function __dybatpho_agent_mode_into {
 #######################################
 # @description Return success when an agent is driving this run.
 # @example
-#   dybatpho::agent_detect && export DRY_RUN=true
+#   dybatpho::agent_detect && DYBATPHO_DRY_RUN=true
 #
 # @noargs
 # @exitcode 0 An agent is driving
@@ -268,7 +268,7 @@ function dybatpho::agent_context {
   local interactive=false
   dybatpho::is_interactive && interactive=true
   local dry_run=false
-  dybatpho::is true "${DRY_RUN-}" && dry_run=true
+  dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}" && dry_run=true
 
   local agent=false
   dybatpho::agent_detect && agent=true

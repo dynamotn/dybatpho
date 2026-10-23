@@ -95,8 +95,8 @@ function _run_db_reset {
     exit 0
   fi
   dybatpho::header "DB RESET"
-  dybatpho::dry_run "echo 'Dropping database...'"
-  dybatpho::dry_run "echo 'Recreating database...'"
+  dybatpho::dry_run -- echo 'Dropping database...'
+  dybatpho::dry_run -- echo 'Recreating database...'
   dybatpho::success "Database reset complete" && exit 0
 }
 

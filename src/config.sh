@@ -562,7 +562,7 @@ function __dybatpho_config_save_structured {
 #
 # @arg $1 string Destination file in dotenv, JSON, YAML, or TOML format
 # @arg $@ string Configuration keys to write, defaulting to every loaded key in name order
-# @env DRY_RUN string When true-like, report the write instead of performing it
+# @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
 # @exitcode 1 A key is invalid or unset, the format is unsupported, or the write fails
 # @tip Name the keys explicitly when `dybatpho::config_env` was used, so an unrelated environment variable is not
 #   persisted

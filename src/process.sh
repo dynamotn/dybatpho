@@ -26,9 +26,9 @@
 DYBATPHO_USED_ERR_HANDLER=false
 # @env DYBATPHO_USED_KILLED_HANDLER bool Internal flag set after `dybatpho::register_killed_handler`
 DYBATPHO_USED_KILLED_HANDLER=false
-# @env DRY_RUN string When true-like, `dybatpho::dry_run` prints commands instead of executing them
-DRY_RUN="${DRY_RUN:-}"
-export DRY_RUN
+# @env DYBATPHO_DRY_RUN string When true-like, `dybatpho::dry_run` and every module that honors dry-run mode print
+#   commands instead of executing them. Falls back to `DRY_RUN` when unset or empty; neither is assigned or exported
+#   by the library
 # @env DYBATPHO_CLEANUP_PATHS array Paths registered by `dybatpho::cleanup_file_on_exit`, each as `<pid>:<path>`
 declare -ga DYBATPHO_CLEANUP_PATHS=()
 # Shell that already owns the cleanup trap, so it is installed exactly once.
@@ -366,7 +366,7 @@ function dybatpho::dry_run {
     shift
   fi
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command"
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     printf '🧪 DRY RUN:'
     printf ' %q' "$@"
     printf '\n'

@@ -1388,8 +1388,14 @@ HELPER
   dybatpho::mock_http "api.example.test/me" 200 '{}'
   local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: traced-key-value")
   local trace="${BATS_TEST_TMPDIR}/trace"
-  # In a subshell, so the trace switched on here ends with it.
+  # In a subshell, so the trace switched on here ends with it. kcov owns the
+  # trace through `BASH_XTRACEFD`, so it is pointed back at stderr explicitly;
+  # that closes kcov's descriptor, and the mock `curl`, a Bash script that
+  # records the headers it is sent, would then trace them to stderr through
+  # kcov's `BASH_ENV` hook.
   (
+    unset BASH_ENV
+    BASH_XTRACEFD=2
     set -x
     dybatpho::curl_do "https://api.example.test/me"
   ) 2> "${trace}"

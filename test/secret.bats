@@ -564,16 +564,23 @@ teardown() {
   local file="${BATS_TEST_TMPDIR}/token"
   (umask 077 && printf 'hunter2secret\n' > "${file}")
   export TRACED_SECRET="envhunter2"
-  run_traced --separate-stderr bash -c '
-    . "'"${DYBATPHO_DIR}"'/init.sh"
-    set -x
-    dybatpho::secret_from_file TOKEN "'"${file}"'"
-    dybatpho::secret_from_env OTHER TRACED_SECRET
-    dybatpho::secret_with_file TOKEN cat {}
-    dybatpho::info "hello"
-    set +x
-    printf "%s\n" "${TOKEN}" "${OTHER}"
-  '
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  # kcov also owns the trace through `BASH_XTRACEFD`, so the child points it
+  # back at stderr, where the assertions read it.
+  local script="${BATS_TEST_TMPDIR}/traced.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh
+BASH_XTRACEFD=2
+set -x
+dybatpho::secret_from_file TOKEN $(printf '%q' "${file}")
+dybatpho::secret_from_env OTHER TRACED_SECRET
+dybatpho::secret_with_file TOKEN cat {}
+dybatpho::info "hello"
+set +x
+printf "%s\n" "\${TOKEN}" "\${OTHER}"
+SCRIPT
+  run_traced --separate-stderr bash "${script}"
   assert_success
   assert_line "hunter2secret"
   assert_line "envhunter2"

@@ -863,6 +863,35 @@ setup() {
   assert_equal "$(dybatpho::generate_from_spec _spec_alias_parent settings world)" "alias:world"
 }
 
+@test "dybatpho::opts::cmd matches a command name literally, whatever it holds" {
+  # The name used to reach the generated `case` unquoted: a space or a quote
+  # left the parser unparseable, and a `*` matched any word with that prefix.
+  # shellcheck disable=2329
+  _spec_literal_child() {
+    dybatpho::opts::setup "" - action:"printf 'path=%s\n' \"\${__current_cmd_path}\""
+  }
+  # shellcheck disable=2329
+  _spec_literal_parent() {
+    dybatpho::opts::setup "" -
+    dybatpho::opts::cmd "say hi" _spec_literal_child
+    dybatpho::opts::cmd 'a"b' _spec_literal_child
+    dybatpho::opts::cmd "build*" _spec_literal_child alias:"b x"
+  }
+
+  run_traced dybatpho::generate_from_spec _spec_literal_parent "say hi"
+  assert_success
+  assert_output "path=say hi"
+  run_traced dybatpho::generate_from_spec _spec_literal_parent 'a"b'
+  assert_success
+  assert_output 'path=a"b'
+  run_traced dybatpho::generate_from_spec _spec_literal_parent "b x"
+  assert_success
+  assert_output "path=build*"
+  run --separate-stderr dybatpho::generate_from_spec _spec_literal_parent buildx
+  assert_failure
+  assert_stderr --partial "Invalid command: buildx"
+}
+
 # =============================================================================
 # Error handling
 # =============================================================================

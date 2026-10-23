@@ -166,6 +166,7 @@ dybatpho::generate_man _spec mytool
 - Completion generation is requested for an unsupported shell.
 - Schema or man-page metadata contains quotes, backslashes, or newlines.
 - A standalone prompt or selection helper receives EOF or an invalid choice.
+- A command or alias name holds a space, a quote, or a glob character such as `*`.
 
 ## Requirements *(mandatory)*
 
@@ -232,6 +233,7 @@ dybatpho::generate_man _spec mytool
 - **FR-033**: `generate_from_spec` MUST remove the generated parser file once it has been sourced, so a script whose action ends with `exec` leaves no file behind.
 - **FR-034**: `dybatpho::cli_verbosity_level` MUST refuse a count that is not a whole number before it reaches arithmetic, and read a padded count in base ten.
 - **FR-035**: The caller's spec function MUST run with the default IFS, not the single space the generator joins its lists with.
+- **FR-036**: The generated parser MUST match a command or alias name literally: a space or quote in it MUST NOT break the parser, and a glob character MUST NOT match any other word.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -278,6 +280,7 @@ dybatpho::generate_man _spec mytool
 - **IT-017**: Run a script whose action ends with `exec` outside bats, and find its temporary directory empty.
 - **IT-018**: Raise `info` by `02` and get `trace`; pass an array subscript holding a command and see it refused without running.
 - **IT-019**: Record IFS from inside a spec function and get space, tab and newline.
+- **IT-020**: Declare commands named `say hi`, `a"b` and `build*` (with the alias `b x`), dispatch each by its exact name, and see `buildx` refused as an invalid command.
 
 ## Acceptance Criteria *(mandatory)*
 

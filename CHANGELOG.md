@@ -51,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failing. Bundles made by `scripts/bundle.sh` carry the edges between their
   modules, so the check works inside a bundle too.
 
+- **`init`, `cli`, `helpers` — scripts start and parse their options
+  faster.** `init.sh` no longer starts `dirname`, `sed` or `grep` while it
+  bootstraps. `dybatpho::is` checks its arguments only when one is missing. The
+  parser, help, man page and placeholders built by
+  `dybatpho::generate_from_spec` no longer start a subshell per option, and
+  `dybatpho::cli_suggest` no longer starts a process per candidate.
+  `--help` of a typical multi-command CLI drops from about 350 ms to about
+  150 ms. The generated parser and every artifact are byte-identical.
+
 ### Fixed
 
 - **More numbers with a leading zero are read in base ten.**
@@ -294,6 +303,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compared, and the error names where the path resolves to. The last component
   is still not followed, so removing or replacing a link inside a root acts on
   the link, and the printed path is the one written.
+
+- **`cli` — `dybatpho::opts::cmd` matches command names literally.** Names
+  went into the generated `case` unquoted: a space or quote made the parser
+  unparseable, `build*` matched every word sharing its prefix, and a crafted
+  name could inject code.
 
 ## [6.0.1] - 2026-10-04
 

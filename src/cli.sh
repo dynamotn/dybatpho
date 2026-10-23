@@ -699,7 +699,10 @@ function dybatpho::cli_suggest {
   stripped="${stripped#-}"
   ((${#stripped} < 2)) && return 1
   ((${#stripped} > 5)) && threshold=3
-  lowered_input="$(dybatpho::lower "${stripped}")"
+  # Lowered in place rather than through `dybatpho::lower`, which is the same
+  # expansion behind a substitution: one subshell per candidate added up on a
+  # command with many switches.
+  lowered_input="${stripped,,}"
   local -a seen=() scored=()
   for candidate in "$@"; do
     [[ -n "${candidate}" ]] || continue
@@ -708,13 +711,18 @@ function dybatpho::cli_suggest {
     seen+=("${candidate}")
     plain="${candidate#--}"
     plain="${plain#-}"
-    lowered_candidate="$(dybatpho::lower "${plain}")"
+    lowered_candidate="${plain,,}"
     # Typing a prefix of a longer switch is an abbreviation, not a typo, so it
     # outranks every edit-distance match. The reverse is not true: `-e` is a
     # prefix of `--enviroment` without being a plausible correction for it.
     if [[ "${lowered_candidate}" == "${lowered_input}"* ]]; then
       distance=0
     else
+      # The distance is at least the difference in length, so a candidate
+      # already too long or too short skips the quadratic comparison.
+      distance=$((${#lowered_input} - ${#lowered_candidate}))
+      ((distance < 0)) && distance=$((-distance))
+      ((distance > threshold)) && continue
       __dybatpho_string_distance_into distance "${lowered_input}" "${lowered_candidate}"
     fi
     ((distance > threshold)) && continue
@@ -1123,9 +1131,13 @@ function __dybatpho_cli_assign_quoted {
 }
 
 #######################################
-# @description Prepend export of before string of command,
-#              based on `export:<bool>` switch
-# @arg $1 string String of command
+# @description Write a generated line, with `export ` in front of it when the
+#              option's `export:<bool>` setting asks for it. It prints the line
+#              itself rather than handing it back through a substitution, which
+#              cost a subshell for every option of every parser generated.
+# @arg $1 number Indentation level
+# @arg $2 string String of command
+# @stdout Generated code
 # @internal
 #######################################
 function __dybatpho_cli_prepend_export {
@@ -1135,7 +1147,7 @@ function __dybatpho_cli_prepend_export {
   if dybatpho::is true "${__export}"; then
     is="export "
   fi
-  printf '%s\n' "${is}$1"
+  __dybatpho_cli_print_indent "$1" "${is}$2"
 }
 
 #######################################
@@ -1154,9 +1166,7 @@ function __dybatpho_cli_define_var {
   local __config_key="${__config:-}"
   if [[ -n "${__env_name}" ]] && [[ "${__init}" != "@unset" ]]; then
     __dybatpho_cli_print_indent 0 "if [ \"\${${__env_name}+x}\" ]; then"
-    local __env_line
-    __env_line=$(__dybatpho_cli_prepend_export "$1=\${${__env_name}}")
-    __dybatpho_cli_print_indent 1 "${__env_line}"
+    __dybatpho_cli_prepend_export 1 "$1=\${${__env_name}}"
     __dybatpho_cli_print_indent 0 "else"
     local __saved_env="${__env}"
     local __fallback
@@ -1194,19 +1204,13 @@ function __dybatpho_cli_define_var {
   fi
   case ${__init} in
     @keep) : ;;
-    @empty)
-      local __empty_export
-      __empty_export=$(__dybatpho_cli_prepend_export "$1=''")
-      __dybatpho_cli_print_indent 0 "${__empty_export}"
-      ;;
+    @empty) __dybatpho_cli_prepend_export 0 "$1=''" ;;
     @unset) __dybatpho_cli_print_indent 0 "unset $1 ||:" ;;
     *)
       case ${__init} in @on) __init=${__on} ;; *) ;; esac
       case ${__init} in @off) __init=${__off} ;; *) ;; esac
       case ${__init} in =*)
-        local __init_line
-        __init_line=$(__dybatpho_cli_prepend_export "$1${__init}")
-        __dybatpho_cli_print_indent 0 "${__init_line}"
+        __dybatpho_cli_prepend_export 0 "$1${__init}"
         return 0
         ;;
       *) ;;
@@ -1220,9 +1224,7 @@ function __dybatpho_cli_define_var {
       *) ;;
       esac
       __dybatpho_cli_assign_quoted __init "${__init#=}"
-      local cli_prepend_export
-      cli_prepend_export=$(__dybatpho_cli_prepend_export "$1=${__init}")
-      __dybatpho_cli_print_indent 0 "${cli_prepend_export}"
+      __dybatpho_cli_prepend_export 0 "$1=${__init}"
       ;;
   esac
 }
@@ -1431,11 +1433,17 @@ function __dybatpho_cli_generate_logic {
       local __dybatpho_cli_logic__cmd_deprecated
       IFS=$'\t' read -r __dybatpho_cli_logic__sub_spec __dybatpho_cli_logic__cmd_match __dybatpho_cli_logic__cmd_name \
         __dybatpho_cli_logic__cmd_deprecated <<< "${__dybatpho_cli_logic_sub_spec}"
-      __dybatpho_cli_print_indent 5 "${__dybatpho_cli_logic__cmd_match})"
+      # A command name is the spec author's text, so it is quoted on its way
+      # into the parser: a space or a quote in it left the generated file
+      # unparseable, and a `*` matched every word that began the same way.
+      local __dybatpho_cli_logic__q_match __dybatpho_cli_logic__q_name
+      printf -v __dybatpho_cli_logic__q_match '%q' "${__dybatpho_cli_logic__cmd_match}"
+      printf -v __dybatpho_cli_logic__q_name '%q' "${__dybatpho_cli_logic__cmd_name}"
+      __dybatpho_cli_print_indent 5 "${__dybatpho_cli_logic__q_match})"
       [[ -n "${__dybatpho_cli_logic__cmd_deprecated}" ]] && __dybatpho_cli_print_deprecated_warning "command" \
         "${__dybatpho_cli_logic__cmd_name}" "${__dybatpho_cli_logic__cmd_deprecated}"
       __dybatpho_cli_print_indent 6 \
-        "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }${__dybatpho_cli_logic__cmd_name}\""
+        "__current_cmd_path=\"\${__current_cmd_path:+\${__current_cmd_path} }\"${__dybatpho_cli_logic__q_name}"
       __dybatpho_cli_print_indent 6 "shift"
       __dybatpho_cli_print_indent 6 "dybatpho::opts::parse::${__dybatpho_cli_logic__sub_spec} \"\$@\""
       __dybatpho_cli_print_indent 6 ";;"
@@ -1557,9 +1565,8 @@ function __dybatpho_cli_generate_logic {
 function __dybatpho_cli_generate_help {
   local __dybatpho_cli_help_spec
   dybatpho::expect_args __dybatpho_cli_help_spec -- "$@"
-  local __dybatpho_cli_help_type
-  __dybatpho_cli_help_type=$(type -t "${__dybatpho_cli_help_spec}")
-  [[ "${__dybatpho_cli_help_type}" != 'function' ]] && return
+  # `declare -F` answers the same question as `type -t` without a subshell.
+  declare -F "${__dybatpho_cli_help_spec}" > /dev/null || return 0
 
   __help_mode=true
   __dybatpho_cli_replay_persistent_defs
@@ -1573,9 +1580,10 @@ function __dybatpho_cli_generate_help {
   # A command that declares no help option of its own is still given `--help`
   # and `-h` by the parser, so the generated help lists them too.
   if dybatpho::is false "${__has_help}"; then
-    __help_opt_rows+=(
-      "$(__dybatpho_cli_help_row disp "-" "$(__dybatpho_log_text cli.show_help "Show this help")" -h alias:--help)"
-    )
+    local __dybatpho_cli_help_row_auto
+    __dybatpho_cli_help_row __dybatpho_cli_help_row_auto disp "-" \
+      "$(__dybatpho_log_text cli.show_help "Show this help")" -h alias:--help
+    __help_opt_rows+=("${__dybatpho_cli_help_row_auto}")
   fi
   __help_mode=false
   # A command that declares a persistent option sees it twice: once replayed as
@@ -1829,7 +1837,8 @@ function __dybatpho_cli_generate_man_command {
   for __dybatpho_cli_gmc_arg_item in ${__dybatpho_cli_gmc_arguments[@]+"${__dybatpho_cli_gmc_arguments[@]}"}; do
     IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_arg_name __dybatpho_cli_gmc_arg_desc \
       __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic <<< "${__dybatpho_cli_gmc_arg_item}"
-    __dybatpho_cli_gmc_arg_placeholder="$(__dybatpho_cli_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}")"
+    __dybatpho_cli_arg_placeholder __dybatpho_cli_gmc_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" \
+      "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}"
     __dybatpho_cli_gmc_synopsis="${__dybatpho_cli_gmc_synopsis} ${__dybatpho_cli_gmc_arg_placeholder}"
   done
   if [[ "${__dybatpho_cli_gmc_nested}" = false ]]; then
@@ -1841,7 +1850,8 @@ function __dybatpho_cli_generate_man_command {
       for __dybatpho_cli_gmc_arg_item in ${__dybatpho_cli_gmc_arguments[@]+"${__dybatpho_cli_gmc_arguments[@]}"}; do
         IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_arg_name __dybatpho_cli_gmc_arg_desc \
           __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic <<< "${__dybatpho_cli_gmc_arg_item}"
-        __dybatpho_cli_gmc_arg_placeholder="$(__dybatpho_cli_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}")"
+        __dybatpho_cli_arg_placeholder __dybatpho_cli_gmc_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" \
+          "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}"
         printf '.TP\n.B %s\n%s\n' "${__dybatpho_cli_gmc_arg_placeholder}" "${__dybatpho_cli_gmc_arg_desc}"
       done
     fi
@@ -2096,20 +2106,25 @@ function __dybatpho_cli_help_sw {
 }
 
 #######################################
-# @description Build one help row and print it as a record for later rendering.
+# @description Build one help row as a record for later rendering.
 #              Rendering is deferred because the column width is only known once
-#              every row of every section has been collected.
-# @arg $1 string Type: flag | param | disp | cmd
-# @arg $2 string Variable name (or command name for cmd type)
-# @arg $3 string Description
+#              every row of every section has been collected. The record is
+#              handed back through a variable rather than printed for a
+#              substitution, which cost a subshell for every row of every help.
+# @arg $1 string Name of the variable receiving the record
+# @arg $2 string Type: flag | param | disp | cmd
+# @arg $3 string Variable name (or command name for cmd type)
+# @arg $4 string Description
 # @arg $@ switch|key:value Switches and settings of this option
-# @stdout Record of `label<TAB>description<TAB>annotations`, where annotations
-#         are separated by a unit separator. Nothing for a hidden row.
+# @set The named variable, to `label<TAB>description<TAB>annotations`, where
+#      annotations are separated by a unit separator. Empty for a hidden row.
 # @internal
 #######################################
 function __dybatpho_cli_help_row {
-  local _type=$1 _var=$2 _desc=$3
-  shift 3
+  __dybatpho_cli_require_shell_name "$1"
+  local __dybatpho_cli_hr_out="$1" _type=$2 _var=$3 _desc=$4
+  shift 4
+  printf -v "${__dybatpho_cli_hr_out}" '%s' ""
   local sw="" label="" hidden="" required="false" deprecated=""
   local _env="" _config="" _choices="" _default="" _multiple="false" _count="false" _pattern="" _vtype=""
   local _negatable=false _spec_part
@@ -2188,14 +2203,14 @@ function __dybatpho_cli_help_row {
   __dybatpho_cli_help_annotate _annotations "pattern" "${_pattern}"
   __dybatpho_cli_help_annotate _annotations "type" "${_vtype}"
   local cli_help_default
-  cli_help_default=$(__dybatpho_cli_help_default "${_default}")
+  __dybatpho_cli_help_default cli_help_default "${_default}"
   __dybatpho_cli_help_annotate _annotations "default" "${cli_help_default}"
   dybatpho::is true "${_multiple}" \
     && _annotations="${_annotations}${_annotations:+$'\x1f'}[repeatable]"
   dybatpho::is true "${_count}" \
     && _annotations="${_annotations}${_annotations:+$'\x1f'}[repeat to increase]"
 
-  printf '%s\t%s\t%s\n' "${label}" "${_desc}" "${_annotations}"
+  printf -v "${__dybatpho_cli_hr_out}" '%s\t%s\t%s' "${label}" "${_desc}" "${_annotations}"
 }
 
 #######################################
@@ -2239,12 +2254,14 @@ function __dybatpho_cli_help_annotate {
 # @description Render the literal default of an `init:` form, or nothing when
 #              the default is empty, dynamic, or an `init:@...` directive that
 #              has no value to show.
-# @arg $1 string Raw `init:` value
-# @stdout Literal default value
+# @arg $1 string Name of the variable receiving the literal default
+# @arg $2 string Raw `init:` value
+# @set The named variable, empty when there is nothing to show
 # @internal
 #######################################
 function __dybatpho_cli_help_default {
-  local _raw="${1-}"
+  printf -v "$1" '%s' ""
+  local _raw="${2-}"
   case "${_raw}" in
     "" | @*) return 0 ;;
     action:*) return 0 ;;
@@ -2263,7 +2280,7 @@ function __dybatpho_cli_help_default {
     *) ;;
   esac
   [[ -n "${_raw}" ]] || return 0
-  printf '%s' "${_raw}"
+  printf -v "$1" '%s' "${_raw}"
 }
 
 #######################################
@@ -2523,9 +2540,7 @@ function __dybatpho_cli_print_validate {
       __dybatpho_cli_print_indent 4 "[ -n \"\${$2:-}\" ] && $2=\"\${$2} \$OPTARG\" || $2=\"\$OPTARG\""
       [[ "${__export}" = "true" ]] && __dybatpho_cli_print_indent 4 "export $2"
     else
-      local cli_prepend_export
-      cli_prepend_export=$(__dybatpho_cli_prepend_export "$2=\$OPTARG")
-      __dybatpho_cli_print_indent 4 "${cli_prepend_export}"
+      __dybatpho_cli_prepend_export 4 "$2=\$OPTARG"
     fi
   fi
 }
@@ -2993,7 +3008,7 @@ function dybatpho::opts::flag {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
-    _line=$(__dybatpho_cli_help_row flag "${var}" "${description}" "${@:3}")
+    __dybatpho_cli_help_row _line flag "${var}" "${description}" "${@:3}"
     [[ -n "${_line}" ]] && __help_opt_rows+=("${_line}")
     return 0
   fi
@@ -3054,7 +3069,7 @@ function dybatpho::opts::param {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
-    _line=$(__dybatpho_cli_help_row param "${var}" "${description}" "${@:3}")
+    __dybatpho_cli_help_row _line param "${var}" "${description}" "${@:3}"
     [[ -n "${_line}" ]] && __help_opt_rows+=("${_line}")
     return 0
   fi
@@ -3152,7 +3167,7 @@ function dybatpho::opts::disp {
 
   if dybatpho::is true "${__help_mode:-false}"; then
     local _line
-    _line=$(__dybatpho_cli_help_row disp "-" "${description}" "${@:2}")
+    __dybatpho_cli_help_row _line disp "-" "${description}" "${@:2}"
     [[ -n "${_line}" ]] && __help_opt_rows+=("${_line}")
     return 0
   fi
@@ -3248,8 +3263,8 @@ function dybatpho::opts::cmd {
       __cmd_label="${__cmd_label}, ${__cmd_alias}"
     done
     local __dybatpho_cli_cmd__line
-    __dybatpho_cli_cmd__line=$(__dybatpho_cli_help_row cmd "${__cmd_label}" "${__cmd_desc}" \
-      "hidden:${__cmd_hidden}" "deprecated:${__cmd_deprecated}")
+    __dybatpho_cli_help_row __dybatpho_cli_cmd__line cmd "${__cmd_label}" "${__cmd_desc}" \
+      "hidden:${__cmd_hidden}" "deprecated:${__cmd_deprecated}"
     [[ -n "${__dybatpho_cli_cmd__line}" ]] && __help_cmd_rows+=("${__dybatpho_cli_cmd__line}")
     return 0
   fi
@@ -3314,10 +3329,9 @@ function dybatpho::opts::arg {
 
   dybatpho::is true "${__cmd_desc_mode:-false}" && return 0
 
-  local __arg_placeholder
-  __arg_placeholder="$(__dybatpho_cli_arg_placeholder "${var}" "${__arg_required}" "${__arg_variadic}")"
-
   if dybatpho::is true "${__help_mode:-false}"; then
+    local __arg_placeholder
+    __dybatpho_cli_arg_placeholder __arg_placeholder "${var}" "${__arg_required}" "${__arg_variadic}"
     __help_arg_rows+=("${__arg_placeholder}"$'\t'"${description}"$'\t')
     __help_arg_usage="${__help_arg_usage:+${__help_arg_usage} }${__arg_placeholder}"
     return 0
@@ -3335,21 +3349,26 @@ function dybatpho::opts::arg {
 # @description Render a positional argument the way usage lines conventionally
 #              do: angle brackets when it is required, square brackets when it
 #              is optional, and a trailing ellipsis when it is variadic.
-# @arg $1 string Placeholder name
-# @arg $2 bool Whether the argument is required
-# @arg $3 bool Whether the argument is variadic
-# @stdout Rendered placeholder
+# @arg $1 string Name of the variable receiving the placeholder
+# @arg $2 string Placeholder name
+# @arg $3 bool Whether the argument is required
+# @arg $4 bool Whether the argument is variadic
+# @set The named variable
 # @internal
 #######################################
 function __dybatpho_cli_arg_placeholder {
-  local name="${1^^}" required="${2:-true}" variadic="${3:-false}" rendered
-  if dybatpho::is true "${required}"; then
-    rendered="<${name}>"
+  # Handed back through a variable: every declared argument is rendered on each
+  # walk of the spec, and a substitution cost a subshell each time.
+  local __dybatpho_cli_ap_name="${2^^}" __dybatpho_cli_ap_rendered
+  if dybatpho::is true "${3:-true}"; then
+    __dybatpho_cli_ap_rendered="<${__dybatpho_cli_ap_name}>"
   else
-    rendered="[${name}]"
+    __dybatpho_cli_ap_rendered="[${__dybatpho_cli_ap_name}]"
   fi
-  dybatpho::is true "${variadic}" && rendered="${rendered}..."
-  printf '%s' "${rendered}"
+  if dybatpho::is true "${4:-false}"; then
+    __dybatpho_cli_ap_rendered="${__dybatpho_cli_ap_rendered}..."
+  fi
+  printf -v "$1" '%s' "${__dybatpho_cli_ap_rendered}"
 }
 
 #######################################

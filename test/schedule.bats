@@ -485,9 +485,16 @@ SCRIPT
 }
 
 @test "dybatpho::schedule_debounce survives a reset during its window" {
-  local key="race-${BATS_TEST_NUMBER}"
+  local key="race-${BATS_TEST_NUMBER}" directory
+  __dybatpho_schedule_dir_into directory
+  # The reset waits for the ticket rather than a fixed delay: on a loaded runner
+  # the debounce had not written it yet after 0.3s, the reset found nothing to
+  # remove, and the command ran.
   (
-    sleep 0.3
+    for _ in $(seq 1 100); do
+      [[ -e "${directory}/${key}.trigger" ]] && break
+      sleep 0.05
+    done
     dybatpho::schedule_reset "${key}"
   ) &
   # The ticket is gone, so the trigger counts as superseded: nothing runs,

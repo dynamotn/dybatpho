@@ -519,6 +519,29 @@ SCRIPT
   ((SECONDS < 10)) || fail "the substitution took ${SECONDS}s"
 }
 
+@test "dybatpho::run_with_timeout leaves the caller's EXIT trap to the caller" {
+  # A command that returns at once has its watchdog ended moments after the
+  # fork, and a subshell that SIGTERM reaches that early still runs the EXIT
+  # trap it inherited: the caller's cleanup ran again in the watchdog.
+  #
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
+  # the kcov hook expands on every command once `init.sh` turns on `set -u`.
+  local script="${BATS_TEST_TMPDIR}/exit-trap.sh" log="${BATS_TEST_TMPDIR}/exit-trap.log"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules process
+__dybatpho_process_timeout_probe=no
+trap 'printf "%s\n" "\${BASHPID}" >> $(printf '%q' "${log}")' EXIT
+quick() { :; }
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  dybatpho::run_with_timeout 20 quick
+done
+printf '%s\n' "\${BASHPID}"
+SCRIPT
+  run_traced bash "${script}"
+  assert_success
+  assert_equal "$(cat "${log}")" "${output}"
+}
+
 @test "dybatpho::run_with_timeout with a limit of 0 runs without a limit" {
   run_traced dybatpho::run_with_timeout 0 bash -c 'printf "unbounded\n"'
   assert_success

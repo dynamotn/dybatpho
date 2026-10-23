@@ -22,6 +22,14 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   it did, and `dybatpho::math_avg` and `dybatpho::math_stddev` over long values
   a third to a fifth, with the same exact results.
 
+### Fixed
+
+- **`process` — `dybatpho::run_with_timeout` no longer runs the caller's EXIT
+  trap a second time.** Without the `timeout` binary, or for a shell function,
+  a command that returned at once had its watchdog ended moments after it was
+  started, and a subshell signalled that early still ran the EXIT trap it had
+  inherited: the caller's cleanup ran in the watchdog while the caller went on.
+
 ## [7.0.0] - 2026-10-23
 
 ### Added

@@ -672,7 +672,13 @@ function __dybatpho_process_timeout_fallback {
     # whole group is ended, so its `sleep` does not linger for the rest of the
     # limit; inside `$(...)` there is no group of its own, and the subshell
     # alone is signalled.
-    kill -TERM -- "-${watchdog_pid}" 2> /dev/null || kill -TERM "${watchdog_pid}" 2> /dev/null || true
+    #
+    # With SIGKILL, not SIGTERM: a command that returns at once has the
+    # watchdog ended moments after it was forked, and a Bash subshell that
+    # SIGTERM reaches that early still runs the EXIT trap it inherited, so the
+    # caller's own cleanup ran a second time, in the watchdog, while the caller
+    # went on. The watchdog has nothing to clean up, and SIGKILL runs no trap.
+    kill -KILL -- "-${watchdog_pid}" 2> /dev/null || kill -KILL "${watchdog_pid}" 2> /dev/null || true
     wait "${watchdog_pid}" 2> /dev/null || true
   fi
 

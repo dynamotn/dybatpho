@@ -623,6 +623,20 @@ EOF
   assert_line --index 0 "c"
   assert_line --index 1 "a"
   assert_line --index 2 "b"
+
+  local requested=(admin read write) granted=(write read)
+  run_traced -0 dybatpho::array_intersect requested granted --
+  assert_equal "${#lines[@]}" "2"
+  assert_line --index 0 "read"
+  assert_line --index 1 "write"
+  assert_equal "${granted[*]}" "write read"
+
+  local wanted=(write admin read) denied=(read)
+  run_traced -0 dybatpho::array_difference wanted denied --
+  assert_equal "${#lines[@]}" "2"
+  assert_line --index 0 "write"
+  assert_line --index 1 "admin"
+  assert_equal "${denied[*]}" "read"
 }
 
 @test "dybatpho::array_toposort puts a dependency before what needs it" {

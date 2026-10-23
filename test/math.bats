@@ -943,3 +943,36 @@ math_engine_run_all_untraced() {
   assert_failure
   assert_output --partial "dybatpho::math_sum: Unknown DYBATPHO_MATH_ENGINE: fast. Use auto, awk, or bash"
 }
+
+# ---------------------------------------------------------------------------
+# The digit path, past what native arithmetic holds
+# ---------------------------------------------------------------------------
+
+@test "the digit path reads a leading plus and leading zeros" {
+  run_traced dybatpho::math_add +0012345678901234567890 1
+  assert_output "12345678901234567891"
+  run_traced dybatpho::math_add -1 123456789012345678901
+  assert_output "123456789012345678900"
+}
+
+@test "dybatpho::math_compare orders long values of opposite signs" {
+  run_traced dybatpho::math_compare 123456789012345678901 -1
+  assert_output "1"
+  run_traced dybatpho::math_compare -123456789012345678901 1
+  assert_output "-1"
+}
+
+@test "dybatpho::math_mod divides by a divisor longer than seventeen digits" {
+  # Twice the divisor less one: the estimated quotient digit comes out one too
+  # high and the exact check corrects it.
+  run_traced dybatpho::math_mod 200000000000000017 100000000000000009
+  assert_output "100000000000000008"
+  # A nineteen-digit remainder estimates from its leading eighteen digits.
+  run_traced dybatpho::math_mod 3000000000000000002 1000000000000000001
+  assert_output "1000000000000000000"
+}
+
+@test "the Bash engine sorts a value written with a plus sign by value" {
+  DYBATPHO_MATH_ENGINE=bash run_traced dybatpho::math_median +2.5 1.5 -0.5
+  assert_output "1.5"
+}

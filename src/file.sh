@@ -1052,7 +1052,7 @@ function dybatpho::file_hash {
   dybatpho::is file "${path}" \
     || dybatpho::die "${FUNCNAME[0]}: File doesn't exist: ${path}"
   case "${algorithm}" in
-    md5 | sha1 | sha256 | sha512) ;;
+    md5 | sha1 | sha256 | sha512) ;; # kcov(skip) - a case arm has no command to fire on
     *) dybatpho::die "${FUNCNAME[0]}: Unknown algorithm '${algorithm}', expected md5, sha1, sha256 or sha512" ;;
   esac
 

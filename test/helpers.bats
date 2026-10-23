@@ -1231,3 +1231,100 @@ EOF
   assert_output --partial "module 'json' is registered but"
   assert_output --partial "dybatpho::csv_to_json needs the json module, loading it on demand failed"
 }
+
+@test "__dybatpho_helpers_sort orders indexes by string keys in byte order" {
+  local -a keys=(beta Alpha alpha "" beta) order=(0 1 2 3 4)
+  __dybatpho_helpers_sort order @bytes-key keys
+  assert_equal "${order[*]}" "3 1 2 0 4"
+}
+
+@test "a module loaded on demand is exported again once the script opted in" {
+  # A child process loads what this shell has loaded, so a module that came in
+  # on demand has to reach the exported set as well.
+  local __dybatpho_export_enabled=true
+  DYBATPHO_EXPORT_MODULES=""
+  # The module is loaded already, so the load succeeds; the marker is missing,
+  # which is what the answer reports.
+  run_traced -1 __dybatpho_helpers_load_soft semver __dybatpho_semver_no_such_marker my_caller
+  assert_equal "${BASH_ENV}" "${DYBATPHO_DIR}/init.sh"
+  assert_equal "${DYBATPHO_EXPORT_MODULES}" "${DYBATPHO_LOADED_MODULES}"
+}
+
+@test "a bundle without the module loader is pointed at --with-soft-deps" {
+  # A bundle carries no module loader, so nothing can be loaded on demand.
+  unset -f __dybatpho_load_module
+  run -1 __dybatpho_helpers_need_module json __dybatpho_json_no_such_marker my_caller
+  assert_output --partial "my_caller needs the json module, this bundle does not carry it"
+  assert_output --partial "scripts/bundle.sh --with-soft-deps"
+}
+
+@test "__dybatpho_helpers_public_caller_into names the nearest public function" {
+  local who=""
+  # shellcheck disable=SC2329 # called through the functions below
+  __helper() { __dybatpho_helpers_public_caller_into who; }
+  # shellcheck disable=SC2329
+  __inner() { __helper; }
+  # shellcheck disable=SC2329
+  dybatpho::outer_for_test() { __inner; }
+  dybatpho::outer_for_test
+  assert_equal "${who}" "dybatpho::outer_for_test"
+  # With no public frame above, the helper's caller is reported.
+  __inner
+  assert_equal "${who}" "__inner"
+}
+
+@test "__dybatpho_helpers_ipv4_octets splits an address and rejects a bad one" {
+  local -a octets=()
+  __dybatpho_helpers_ipv4_octets 192.168.0.10 octets
+  assert_equal "${octets[*]}" "192 168 0 10"
+  __dybatpho_helpers_ipv4_octets 10.0.0.1 -
+  run_traced -1 __dybatpho_helpers_ipv4_octets 10.0.0 -
+  run_traced -1 __dybatpho_helpers_ipv4_octets 10.01.0.1 -
+  run_traced -1 __dybatpho_helpers_ipv4_octets 10.0.0.256 -
+}
+
+@test "__dybatpho_helpers_ipv6_groups writes out every form of an address" {
+  local -a groups=()
+  __dybatpho_helpers_ipv6_groups 2001:db8:0:0:0:0:0:1 groups
+  assert_equal "${groups[*]}" "8193 3512 0 0 0 0 0 1"
+  __dybatpho_helpers_ipv6_groups 2001:db8::1 groups
+  assert_equal "${groups[*]}" "8193 3512 0 0 0 0 0 1"
+  __dybatpho_helpers_ipv6_groups :: groups
+  assert_equal "${groups[*]}" "0 0 0 0 0 0 0 0"
+  # A dotted tail after `::`, and one ending an address written in full.
+  __dybatpho_helpers_ipv6_groups ::ffff:192.0.2.1 groups
+  assert_equal "${groups[*]}" "0 0 0 0 0 65535 49152 513"
+  __dybatpho_helpers_ipv6_groups 0:0:0:0:0:ffff:192.0.2.1 groups
+  assert_equal "${groups[*]}" "0 0 0 0 0 65535 49152 513"
+}
+
+@test "__dybatpho_helpers_ipv6_groups rejects what is not an IPv6 address" {
+  local bad
+  for bad in fe80::1%eth0 192.0.2.1 1:2:3:4:5:6:7:8: :1:2:3:4:5:6:7:8 1::2::3 \
+    ::ffff:192.0.2.256 1:2:3:4:5:6:1.2.3.999 12345::1 1::xyz 1:2:3:4:5:6:7:8::9 1:2:3; do
+    run_traced -1 __dybatpho_helpers_ipv6_groups "${bad}" -
+  done
+}
+
+@test "__dybatpho_helpers_parse_cidr splits a block and checks its prefix length" {
+  local address prefix version
+  __dybatpho_helpers_parse_cidr 10.0.0.0/8 address prefix version
+  assert_equal "${address}|${prefix}|${version}" "10.0.0.0|8|4"
+  __dybatpho_helpers_parse_cidr 2001:db8::/32 address prefix version
+  assert_equal "${address}|${prefix}|${version}" "2001:db8::|32|6"
+  __dybatpho_helpers_parse_cidr 0.0.0.0/0 - - -
+  local bad
+  for bad in 10.0.0.0 10.0.0.0/x 10.0.0.0/08 nothing/8 10.0.0.0/33 ::/129; do
+    run_traced -1 __dybatpho_helpers_parse_cidr "${bad}" - - -
+  done
+}
+
+@test "dybatpho::describe names a function defined outside the library by its file" {
+  local file="${BATS_TEST_TMPDIR}/own.sh"
+  printf '%s\n' '# Says hello.' 'function dybatpho::own_hello { :; }' > "${file}"
+  # shellcheck source=/dev/null
+  . "${file}"
+  run_traced -0 dybatpho::describe own_hello
+  assert_line --index 0 "dybatpho::own_hello  (${file}:2)"
+  assert_line --index 2 "Says hello."
+}

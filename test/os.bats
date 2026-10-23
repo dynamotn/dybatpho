@@ -223,6 +223,12 @@ _child() {
   assert_equal "$(dybatpho::cpu_count)" 7
 }
 
+@test "dybatpho::cpu_count moves on from a probe that reports no usable count" {
+  stub_repeated nproc ": echo 0"
+  run_traced -0 dybatpho::cpu_count
+  [[ "${output}" =~ ^[1-9][0-9]*$ ]]
+}
+
 @test "dybatpho::cpu_count fails when no probe can answer" {
   PATH="" run ! dybatpho::cpu_count
   assert_output ""
@@ -362,6 +368,16 @@ _os_release() {
 @test "dybatpho::is_container detects a runtime that exports its name" {
   container=podman run -0 dybatpho::is_container
   KUBERNETES_SERVICE_HOST=10.0.0.1 run -0 dybatpho::is_container
+}
+
+@test "dybatpho::is_container answers no on a plain host" {
+  # Nothing can take the marker files away, so this runs on a host only: the
+  # portable jobs, not the coverage job, which runs in a container.
+  [[ ! -f /.dockerenv && ! -f /run/.containerenv ]] || skip "runs inside a container"
+  if [[ -r /proc/1/cgroup ]] && grep -Eq 'docker|containerd|kubepods|libpod|lxc' /proc/1/cgroup; then
+    skip "PID 1 belongs to a container runtime"
+  fi
+  container="" KUBERNETES_SERVICE_HOST="" run_traced -1 dybatpho::is_container
 }
 
 @test "dybatpho::is_wsl reads the interop variables of the subsystem" {

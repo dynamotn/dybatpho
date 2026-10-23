@@ -391,7 +391,7 @@ function __dybatpho_parallel_pool {
   local __dybatpho_parallel_monitor="off"
   case "$-" in
     *m*) __dybatpho_parallel_monitor="on" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   set -m
   for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total;  \
@@ -420,6 +420,7 @@ function __dybatpho_parallel_pool {
   # The lists of process IDs have to expand when the signal arrives, not now,
   # which is why these are single-quoted strings; the escaped newline inside
   # them continues the command when the trap runs.
+  # kcov(disabled) - each handler is a shell program held in a string, traced where kcov counts nothing
   # shellcheck disable=SC2016
   __dybatpho_process_trap_only '__dybatpho_parallel_interrupted=INT; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
@@ -428,6 +429,7 @@ function __dybatpho_parallel_pool {
   __dybatpho_process_trap_only '__dybatpho_parallel_interrupted=TERM; __dybatpho_parallel_terminate \
     ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
     ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}' SIGTERM
+  # kcov(enabled)
 
   __dybatpho_parallel_progress start "${__dybatpho_parallel_pool_total}"
   for ((__dybatpho_parallel_pool_index = 0; __dybatpho_parallel_pool_index < __dybatpho_parallel_pool_total;  \
@@ -465,8 +467,8 @@ function __dybatpho_parallel_pool {
   if [[ -n "${__dybatpho_parallel_interrupted}" ]]; then
     # Whatever started between the signal and here is ended too; nothing is
     # waited out.
-    __dybatpho_parallel_terminate \
-      ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
+    # Two lines, not three: Bash traces a longer call on a line kcov does not count.
+    __dybatpho_parallel_terminate ${__dybatpho_parallel_pids[@]+"${__dybatpho_parallel_pids[@]}"} \
       ${__dybatpho_parallel_watchdogs[@]+"${__dybatpho_parallel_watchdogs[@]}"}
     __dybatpho_parallel_pids=()
   fi

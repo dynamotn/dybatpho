@@ -982,3 +982,310 @@ _test_tool() { printf 'tool output\n'; }
   unstub curl
   assert_equal "$(cat "${seen}")" "caller caller caller caller caller caller"
 }
+
+# ---------------------------------------------------------------------------
+# Backend detection without a key
+# ---------------------------------------------------------------------------
+
+# @description Put a command on `PATH` that only has to be found, never run.
+# @arg $1 string Command name
+fake_command() {
+  local bin="${BATS_TEST_TMPDIR}/fake-bin"
+  mkdir -p "${bin}"
+  printf '#!/usr/bin/env bash\necho "fake $0"\n' > "${bin}/$1"
+  chmod +x "${bin}/$1"
+  PATH="${bin}:${PATH}"
+}
+
+# @description Print a `PATH` on which none of the named commands is found.
+# @arg $@ string Commands to hide
+path_without_all() {
+  local tool
+  for tool in "$@"; do
+    PATH="$(path_without "${tool}")"
+  done
+  printf '%s\n' "${PATH}"
+}
+
+@test "dybatpho::ai_provider detects a running Ollama daemon" {
+  DYBATPHO_AI_PROVIDER=auto
+  DYBATPHO_AI_API_KEY=""
+  unset ANTHROPIC_API_KEY OPENAI_API_KEY
+  stub_repeated curl ': exit 0'
+  run_traced dybatpho::ai_provider
+  unstub curl
+  assert_output "ollama"
+}
+
+@test "dybatpho::ai_provider falls back to a command line client" {
+  DYBATPHO_AI_PROVIDER=auto
+  DYBATPHO_AI_API_KEY=""
+  unset ANTHROPIC_API_KEY OPENAI_API_KEY
+  # No daemon answers, and without curl nothing is even asked.
+  stub_repeated curl ': exit 7'
+  fake_command claude
+  run_traced dybatpho::ai_provider
+  assert_output "cli"
+  PATH="$(path_without curl)" run_traced dybatpho::ai_provider
+  assert_output "cli"
+  unstub curl
+}
+
+@test "dybatpho::ai_provider stops when no backend is configured" {
+  DYBATPHO_AI_PROVIDER=auto
+  DYBATPHO_AI_API_KEY=""
+  unset ANTHROPIC_API_KEY OPENAI_API_KEY
+  PATH="$(path_without_all curl claude llm ollama)" run --separate-stderr dybatpho::ai_provider
+  assert_failure
+  assert_stderr --partial "No AI backend"
+}
+
+# ---------------------------------------------------------------------------
+# Keys and endpoints
+# ---------------------------------------------------------------------------
+
+# @description Stub curl so it answers with a canned body and records the
+#   private config file it was handed, where the key travels.
+# @arg $1 string Response body
+# @arg $2 string File the config file contents are appended to
+stub_curl_recording_config() {
+  local body_file="${BATS_TEST_TMPDIR}/curl-body.json"
+  printf '%s' "$1" > "${body_file}"
+  stub_repeated curl ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; if [ \"\${prev}\" = --config ]; then cat \"\${a}\" >> '$2'; fi; prev=\"\${a}\"; done; cat '${body_file}' > \"\${out}\"; echo 200"
+}
+
+@test "the anthropic backend reads its key from ANTHROPIC_API_KEY" {
+  local sent="${BATS_TEST_TMPDIR}/config"
+  DYBATPHO_AI_API_KEY=""
+  ANTHROPIC_API_KEY="anthropic-env-key"
+  stub_curl_recording_config "$(anthropic_body 'keyed')" "${sent}"
+  run_traced dybatpho::ai_ask "q"
+  unstub curl
+  assert_output "keyed"
+  assert_file_contains "${sent}" "x-api-key: anthropic-env-key"
+}
+
+@test "the openai backend reads its key from OPENAI_API_KEY" {
+  local sent="${BATS_TEST_TMPDIR}/config"
+  DYBATPHO_AI_PROVIDER=openai
+  DYBATPHO_AI_API_KEY=""
+  OPENAI_API_KEY="openai-env-key"
+  stub_curl_recording_config '{"choices":[{"message":{"content":"keyed"}}]}' "${sent}"
+  run_traced dybatpho::ai_ask "q"
+  unstub curl
+  assert_output "keyed"
+  assert_file_contains "${sent}" "Authorization: Bearer openai-env-key"
+}
+
+@test "the openai backend stops without a key" {
+  DYBATPHO_AI_PROVIDER=openai
+  DYBATPHO_AI_API_KEY=""
+  OPENAI_API_KEY=""
+  run --separate-stderr dybatpho::ai_ask "q"
+  assert_failure
+  assert_stderr --partial "OPENAI_API_KEY or DYBATPHO_AI_API_KEY must be set for the openai backend"
+}
+
+@test "an internal lookup refuses a backend it does not know" {
+  DYBATPHO_AI_API_KEY=""
+  run --separate-stderr __dybatpho_ai_api_key_into key bogus
+  assert_failure
+  assert_stderr --partial "Backend 'bogus' has no API key concept"
+
+  run --separate-stderr __dybatpho_ai_base_url bogus
+  assert_failure
+  assert_stderr --partial "Backend 'bogus' has no base URL"
+}
+
+# ---------------------------------------------------------------------------
+# The command line backend
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::ai_check finds a command line client on its own" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=""
+  fake_command claude
+  run_traced dybatpho::ai_check
+  assert_success
+}
+
+@test "dybatpho::ai_check stops when no command line client is installed" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=""
+  PATH="$(path_without_all claude llm ollama)" run -127 --separate-stderr dybatpho::ai_check
+  assert_stderr --partial "no supported CLI found"
+}
+
+@test "the cli backend rehearses without running the client under DRY_RUN" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=claude
+  DRY_RUN=true
+  fake_command claude
+  run_traced dybatpho::ai_ask "q"
+  assert_success
+  assert_output --partial "[dry run] no request was sent"
+  refute_output --partial "fake"
+}
+
+@test "the cli backend hands the system prompt to claude" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=claude
+  stub_repeated claude ': printf "%s|" "$@"; cat'
+  run_traced dybatpho::ai_ask "the question" "be brief"
+  unstub claude
+  assert_line --index 0 "--print|--append-system-prompt|be brief|USER: the question"
+}
+
+@test "the cli backend hands the model and system prompt to llm" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=llm
+  DYBATPHO_AI_MODEL="some-model"
+  stub_repeated llm ': printf "%s|" "$@"; cat'
+  run_traced dybatpho::ai_ask "the question" "be brief"
+  assert_line --index 0 "--model|some-model|--system|be brief|USER: the question"
+  run_traced dybatpho::ai_ask "the question"
+  assert_line --index 0 "--model|some-model|USER: the question"
+  unstub llm
+}
+
+@test "the cli backend puts the system prompt ahead of the prompt for ollama" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=ollama
+  DYBATPHO_AI_MODEL="local-model"
+  stub_repeated ollama ': printf "%s|" "$@"; cat'
+  run_traced dybatpho::ai_ask "the question" "be brief"
+  assert_output "$(printf 'run|local-model|be brief\n\nUSER: the question')"
+  run_traced dybatpho::ai_ask "the question"
+  assert_output "run|local-model|USER: the question"
+  unstub ollama
+}
+
+@test "dybatpho::ai_json asks a command line client for the schema in the prompt" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=claude
+  local prompt="${BATS_TEST_TMPDIR}/prompt"
+  stub_repeated claude ": cat > '${prompt}'; printf '%s\n' '{\"ok\":true}'"
+  run_traced dybatpho::ai_json "did it work" '{"type":"object"}'
+  unstub claude
+  assert_output '{"ok":true}'
+  assert_file_contains "${prompt}" "It must validate against this JSON schema:"
+}
+
+@test "dybatpho::ai_stream answers in one piece on a backend that cannot stream" {
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=claude
+  stub_repeated claude ': echo whole answer'
+  run_traced dybatpho::ai_stream "q"
+  unstub claude
+  assert_output "whole answer"
+}
+
+# ---------------------------------------------------------------------------
+# Responses
+# ---------------------------------------------------------------------------
+
+@test "an error the provider gives as a bare string is reported" {
+  stub_curl_body '{"error":"rate limited"}'
+  run --separate-stderr dybatpho::ai_ask "q"
+  unstub curl
+  assert_failure
+  assert_stderr --partial "anthropic returned an error: rate limited"
+}
+
+@test "a body that is not JSON reads as an empty answer on every backend" {
+  DYBATPHO_AI_PROVIDER=openai
+  stub_curl_body 'not json at all'
+  run_traced dybatpho::ai_ask "q"
+  assert_success
+  assert_output ""
+  DYBATPHO_AI_PROVIDER=ollama
+  run_traced dybatpho::ai_ask "q"
+  unstub curl
+  assert_success
+  assert_output ""
+}
+
+@test "__dybatpho_ai_payload_openai adds a strict json schema contract" {
+  local payload
+  payload=$(__dybatpho_ai_payload_openai "$(__dybatpho_ai_conversation_build "" user "hi")" '[]' '{"type":"object"}')
+  assert_equal "$(dybatpho::json_get "${payload}" '.response_format.type')" "json_schema"
+  assert_equal "$(dybatpho::json_get "${payload}" '.response_format.json_schema.strict')" "true"
+  assert_equal "$(dybatpho::json_get "${payload}" '.response_format.json_schema.schema.type')" "object"
+}
+
+@test "__dybatpho_ai_payload_ollama passes the temperature as an option" {
+  DYBATPHO_AI_TEMPERATURE=0.2
+  local payload
+  payload=$(__dybatpho_ai_payload_ollama "$(__dybatpho_ai_conversation_build "" user "hi")" '[]')
+  assert_equal "$(dybatpho::json_get "${payload}" '.options.temperature')" "0.2"
+}
+
+@test "openai and ollama rehearse in their own response shape under DRY_RUN" {
+  DRY_RUN=true
+  DYBATPHO_AI_PROVIDER=openai
+  run_traced dybatpho::ai_ask "q"
+  assert_output "[dry run] no request was sent"
+  run_traced dybatpho::ai_json "q" '{"type":"object"}'
+  assert_output "{}"
+  DYBATPHO_AI_PROVIDER=ollama
+  run_traced dybatpho::ai_ask "q"
+  assert_output "[dry run] no request was sent"
+  assert_equal "$(dybatpho::ai_usage_field calls)" "0"
+}
+
+@test "dybatpho::ai_usage_field rejects an unknown field" {
+  run --separate-stderr dybatpho::ai_usage_field nonsense
+  assert_failure
+  assert_stderr --partial "Unknown field 'nonsense'"
+}
+
+# ---------------------------------------------------------------------------
+# Streaming and tools on openai
+# ---------------------------------------------------------------------------
+
+@test "dybatpho::ai_stream concatenates OpenAI deltas" {
+  DYBATPHO_AI_PROVIDER=openai
+  local sse_file="${BATS_TEST_TMPDIR}/stream-openai.sse"
+  {
+    printf 'data: {"choices":[{"delta":{"content":"Hello"}}]}\n'
+    printf 'data: {"choices":[{"delta":{"content":" there"}}]}\n'
+    printf 'data: [DONE]\n'
+  } > "${sse_file}"
+  stub_curl_stream 200 "${sse_file}"
+
+  run_traced dybatpho::ai_stream "hi"
+  assert_success
+  assert_output "Hello there"
+}
+
+@test "dybatpho::ai_stream returns 3 when the provider redirects" {
+  local body_file="${BATS_TEST_TMPDIR}/stream-301.json"
+  printf '%s\n' '{}' > "${body_file}"
+  stub_curl_stream 301 "${body_file}"
+
+  run_traced -3 --separate-stderr dybatpho::ai_stream "hi"
+  assert_output ""
+  assert_stderr --partial "301"
+}
+
+@test "dybatpho::ai_run runs an OpenAI tool call and feeds its output back" {
+  DYBATPHO_AI_PROVIDER=openai
+  local first="${BATS_TEST_TMPDIR}/round-1.json"
+  local second="${BATS_TEST_TMPDIR}/round-2.json"
+  local args_file="${BATS_TEST_TMPDIR}/round-args"
+  local call message
+  call=$(dybatpho::json_object id call_1 type function function:json '{"name":"t","arguments":"{}"}')
+  message=$(dybatpho::json_object role assistant content:json null tool_calls:json "[${call}]")
+  dybatpho::json_object choices:json "[{\"finish_reason\":\"tool_calls\",\"message\":${message}}]" > "${first}"
+  printf '%s' '{"choices":[{"finish_reason":"stop","message":{"content":"the tool said tool output"}}]}' > "${second}"
+  dybatpho::ai_tool_register t "desc" '{"type":"object"}' _test_tool
+  stub curl \
+    ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; cat >> ${args_file}; cat ${first} > \"\${out}\"; echo 200" \
+    ": out=\"\"; prev=\"\"; for a in \"\$@\"; do if [ \"\${prev}\" = -o ]; then out=\"\${a}\"; fi; prev=\"\${a}\"; done; cat >> ${args_file}; cat ${second} > \"\${out}\"; echo 200"
+  run_traced dybatpho::ai_run "question"
+  unstub curl
+  assert_success
+  assert_output "the tool said tool output"
+  # The second request carries the result as a `tool` message for the call.
+  assert_file_contains "${args_file}" '"role":"tool","tool_call_id":"call_1","content":"tool output"'
+}

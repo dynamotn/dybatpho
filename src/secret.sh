@@ -97,13 +97,16 @@ function __dybatpho_secret_mask_var {
   dybatpho::expect_args __dybatpho_mask_name -- "$@"
   ((DYBATPHO_SECRET_COUNT > 0)) || return 0
   local __dybatpho_mask_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+  # the masking tests run these lines, unseen.
   __dybatpho_secret_trace_off __dybatpho_mask_trace
-  local -n __dybatpho_mask_target="${__dybatpho_mask_name}"
-  local __dybatpho_mask_value
-  for __dybatpho_mask_value in ${DYBATPHO_SECRET_VALUES[@]+"${DYBATPHO_SECRET_VALUES[@]}"}; do
-    __dybatpho_mask_target="${__dybatpho_mask_target//"${__dybatpho_mask_value}"/${DYBATPHO_SECRET_PLACEHOLDER}}"
+  local -n __dybatpho_mask_target="${__dybatpho_mask_name}"                                                # kcov(skip)
+  local __dybatpho_mask_value                                                                              # kcov(skip)
+  local __dybatpho_mask_with="${DYBATPHO_SECRET_PLACEHOLDER}"                                              # kcov(skip)
+  for __dybatpho_mask_value in ${DYBATPHO_SECRET_VALUES[@]+"${DYBATPHO_SECRET_VALUES[@]}"}; do             # kcov(skip)
+    __dybatpho_mask_target="${__dybatpho_mask_target//"${__dybatpho_mask_value}"/${__dybatpho_mask_with}}" # kcov(skip)
   done
-  __dybatpho_secret_trace_on "${__dybatpho_mask_trace}"
+  __dybatpho_secret_trace_on "${__dybatpho_mask_trace}" # kcov(skip)
 }
 
 #######################################
@@ -130,8 +133,9 @@ function __dybatpho_secret_trace_off {
 # @internal
 #######################################
 function __dybatpho_secret_trace_on {
+  # The test runs while the trace is still off, so kcov cannot see it.
   # dyshellint disable=BSG034 # this resumes the trace the caller already had on
-  [[ "${1-}" == true ]] && set -x
+  [[ "${1-}" == true ]] && set -x # kcov(skip)
   return 0
 }
 
@@ -340,12 +344,14 @@ function dybatpho::secret_from_file {
   dybatpho::secret_check_permission "${__dybatpho_secret_path}"
 
   local __dybatpho_secret_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+  # the `dybatpho::secret_from_file` tests run these lines, unseen.
   __dybatpho_secret_trace_off __dybatpho_secret_trace
-  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
-  __dybatpho_secret_dest="$(< "${__dybatpho_secret_path}")"
-  [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "Secret file is empty: ${__dybatpho_secret_path}"
-  dybatpho::secret_register "${__dybatpho_secret_dest}"
-  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"
+  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"                                              # kcov(skip)
+  __dybatpho_secret_dest="$(< "${__dybatpho_secret_path}")"                                               # kcov(skip)
+  [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "Secret file is empty: ${__dybatpho_secret_path}" # kcov(skip)
+  dybatpho::secret_register "${__dybatpho_secret_dest}"                                                   # kcov(skip)
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"                                                 # kcov(skip)
 }
 
 #######################################
@@ -374,14 +380,17 @@ function dybatpho::secret_from_env {
   esac
 
   local __dybatpho_secret_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+  # the `dybatpho::secret_from_env` tests run these lines, unseen.
   __dybatpho_secret_trace_off __dybatpho_secret_trace
-  [[ -n "${!__dybatpho_secret_name:-}" ]] \
-    || dybatpho::die "Environment variable \`${__dybatpho_secret_name}\` isn't set or is empty"
-  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
-  __dybatpho_secret_dest="${!__dybatpho_secret_name}"
-  dybatpho::secret_register "${__dybatpho_secret_dest}"
-  [[ "${__dybatpho_secret_mode}" == unset ]] && unset -v "${__dybatpho_secret_name}"
-  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"
+  if [[ -z "${!__dybatpho_secret_name:-}" ]]; then                                           # kcov(skip)
+    dybatpho::die "Environment variable \`${__dybatpho_secret_name}\` isn't set or is empty" # kcov(skip)
+  fi
+  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"                         # kcov(skip)
+  __dybatpho_secret_dest="${!__dybatpho_secret_name}"                                # kcov(skip)
+  dybatpho::secret_register "${__dybatpho_secret_dest}"                              # kcov(skip)
+  [[ "${__dybatpho_secret_mode}" == unset ]] && unset -v "${__dybatpho_secret_name}" # kcov(skip)
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"                            # kcov(skip)
   return 0
 }
 
@@ -405,21 +414,23 @@ function dybatpho::secret_from_stdin {
   dybatpho::expect_ref "${__dybatpho_secret_var}"
 
   local __dybatpho_secret_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+  # the `dybatpho::secret_from_stdin` tests run these lines, unseen.
   __dybatpho_secret_trace_off __dybatpho_secret_trace
-  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"
-  __dybatpho_secret_dest=""
-  if [[ -t 0 ]]; then
+  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}" # kcov(skip)
+  __dybatpho_secret_dest=""                                  # kcov(skip)
+  if [[ -t 0 ]]; then                                        # kcov(skip)
     # kcov(disabled)
     [[ -n "${__dybatpho_secret_prompt}" ]] && printf '%s' "${__dybatpho_secret_prompt}" >&2
     IFS= read -rs __dybatpho_secret_dest || true
     printf '\n' >&2
     # kcov(enabled)
   else
-    IFS= read -r __dybatpho_secret_dest || true
+    IFS= read -r __dybatpho_secret_dest || true # kcov(skip)
   fi
-  [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "No secret was read from stdin"
-  dybatpho::secret_register "${__dybatpho_secret_dest}"
-  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"
+  [[ -n "${__dybatpho_secret_dest}" ]] || dybatpho::die "No secret was read from stdin" # kcov(skip)
+  dybatpho::secret_register "${__dybatpho_secret_dest}"                                 # kcov(skip)
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"                               # kcov(skip)
 }
 
 #######################################
@@ -468,8 +479,7 @@ function dybatpho::secret_write_file {
   # An empty path, or one naming a directory, has no file to write; staging for
   # it would leave a plain-text copy of the secret in the working directory,
   # or inside that directory, once the move failed.
-  [[ -n "${__dybatpho_secret_path}" && "${__dybatpho_secret_path}" != */ &&
-    ! -d "${__dybatpho_secret_path}" ]] \
+  [[ -n "${__dybatpho_secret_path}" && "${__dybatpho_secret_path}" != */ && ! -d "${__dybatpho_secret_path}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Not a file path: '${__dybatpho_secret_path}'"
 
   local __dybatpho_secret_directory
@@ -516,18 +526,21 @@ function dybatpho::secret_with_file {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
   local __dybatpho_secret_wf_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+  # the `dybatpho::secret_with_file` tests run these lines, unseen.
   __dybatpho_secret_trace_off __dybatpho_secret_wf_trace
-  local -n __dybatpho_secret_source="${__dybatpho_secret_var}"
-  [[ -n "${__dybatpho_secret_source:-}" ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty"
+  local -n __dybatpho_secret_source="${__dybatpho_secret_var}"                     # kcov(skip)
+  if [[ -z "${__dybatpho_secret_source:-}" ]]; then                                # kcov(skip)
+    dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty" # kcov(skip)
+  fi
   # Read before any other local exists: the nameref resolves at each use, and a
   # caller variable named `path` or `descriptor` would otherwise be shadowed.
-  local __dybatpho_secret_value="${__dybatpho_secret_source}"
+  local __dybatpho_secret_value="${__dybatpho_secret_source}" # kcov(skip)
 
-  local __dybatpho_secret_wf_descriptor __dybatpho_secret_wf_path __dybatpho_secret_wf_fallback=false
-  exec {__dybatpho_secret_wf_descriptor}< <(printf '%s\n' "${__dybatpho_secret_value}")
-  __dybatpho_secret_wf_path="/dev/fd/${__dybatpho_secret_wf_descriptor}"
-  if ! dybatpho::is readable "${__dybatpho_secret_wf_path}"; then
+  local __dybatpho_secret_wf_descriptor __dybatpho_secret_wf_path __dybatpho_secret_wf_fallback=false # kcov(skip)
+  exec {__dybatpho_secret_wf_descriptor}< <(printf '%s\n' "${__dybatpho_secret_value}")               # kcov(skip)
+  __dybatpho_secret_wf_path="/dev/fd/${__dybatpho_secret_wf_descriptor}"                              # kcov(skip)
+  if ! dybatpho::is readable "${__dybatpho_secret_wf_path}"; then                                     # kcov(skip)
     # kcov(disabled)
     exec {__dybatpho_secret_wf_descriptor}<&-
     __dybatpho_secret_wf_fallback=true
@@ -542,22 +555,22 @@ function dybatpho::secret_with_file {
     # kcov(enabled)
   fi
 
-  local -a __dybatpho_secret_wf_command=()
-  local __dybatpho_secret_wf_argument
-  for __dybatpho_secret_wf_argument in "$@"; do
-    __dybatpho_secret_wf_command+=("${__dybatpho_secret_wf_argument//\{\}/${__dybatpho_secret_wf_path}}")
+  local -a __dybatpho_secret_wf_command=()                                                                # kcov(skip)
+  local __dybatpho_secret_wf_argument                                                                     # kcov(skip)
+  for __dybatpho_secret_wf_argument in "$@"; do                                                           # kcov(skip)
+    __dybatpho_secret_wf_command+=("${__dybatpho_secret_wf_argument//\{\}/${__dybatpho_secret_wf_path}}") # kcov(skip)
   done
 
-  local __dybatpho_secret_wf_status=0
-  ${__dybatpho_secret_wf_command[@]+"${__dybatpho_secret_wf_command[@]}"} || __dybatpho_secret_wf_status=$?
-  if [[ "${__dybatpho_secret_wf_fallback}" == true ]]; then
+  local __dybatpho_secret_wf_status=0                                                                       # kcov(skip)
+  ${__dybatpho_secret_wf_command[@]+"${__dybatpho_secret_wf_command[@]}"} || __dybatpho_secret_wf_status=$? # kcov(skip)
+  if [[ "${__dybatpho_secret_wf_fallback}" == true ]]; then                                                 # kcov(skip)
     # kcov(disabled)
     dybatpho::secret_shred "${__dybatpho_secret_wf_path}"
     # kcov(enabled)
   else
-    exec {__dybatpho_secret_wf_descriptor}<&-
+    exec {__dybatpho_secret_wf_descriptor}<&- # kcov(skip)
   fi
-  __dybatpho_secret_trace_on "${__dybatpho_secret_wf_trace}"
+  __dybatpho_secret_trace_on "${__dybatpho_secret_wf_trace}" # kcov(skip)
   return "${__dybatpho_secret_wf_status}"
 }
 

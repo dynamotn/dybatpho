@@ -424,7 +424,7 @@ function __dybatpho_array_set_op_into {
     case "${__dybatpho_array_set_mode}" in
       intersect) [[ -n "${__dybatpho_array_set_other[${__dybatpho_array_set_value}]+set}" ]] || continue ;;
       difference) [[ -n "${__dybatpho_array_set_other[${__dybatpho_array_set_value}]+set}" ]] && continue ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
     __dybatpho_array_set_seen["${__dybatpho_array_set_value}"]=1
     __dybatpho_array_set_out+=("${__dybatpho_array_set_value}")
@@ -758,10 +758,10 @@ function __dybatpho_array_graph_roots_into {
   # over the same graph have to produce the same order, or a loader built on
   # this would shuffle occasionally and only occasionally be wrong.
   local -a __dybatpho_array_graph_keys=()
-  mapfile -t __dybatpho_array_graph_keys < <(
-    ((${#__dybatpho_array_graph_all[@]})) \
-      && printf '%s\n' "${!__dybatpho_array_graph_all[@]}" | LC_ALL=C sort
-  )
+  if ((${#__dybatpho_array_graph_all[@]})); then
+    mapfile -t __dybatpho_array_graph_keys \
+      < <(printf '%s\n' "${!__dybatpho_array_graph_all[@]}" | LC_ALL=C sort)
+  fi
   __dybatpho_array_graph_roots=(${__dybatpho_array_graph_keys[@]+"${__dybatpho_array_graph_keys[@]}"})
 }
 
@@ -862,10 +862,10 @@ function dybatpho::array_closure {
   done
 
   local -a __dybatpho_array_graph_sorted=()
-  mapfile -t __dybatpho_array_graph_sorted < <(
-    ((${#__dybatpho_array_graph_order[@]})) \
-      && printf '%s\n' ${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"} | LC_ALL=C sort -u
-  )
+  if ((${#__dybatpho_array_graph_order[@]})); then
+    mapfile -t __dybatpho_array_graph_sorted \
+      < <(printf '%s\n' ${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"} | LC_ALL=C sort -u)
+  fi
 
   # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_reachable="${__dybatpho_array_graph_out}"

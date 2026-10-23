@@ -144,6 +144,7 @@ function __dybatpho_config_load_structured {
     document=$(yq -p "${format}" -o json -I 0 '.' "${file}" 2> /dev/null) \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
   fi
+  # kcov(disabled) - a jq program held in a string, whose lines are not commands
   # shellcheck disable=SC2016 # `$prefix` and `$path` are jq variables
   local filter='
     def flat($prefix):
@@ -154,6 +155,7 @@ function __dybatpho_config_load_structured {
         else [($path | join(".")), (.value | tostring)] | @tsv
         end;
     if type != "object" then error("root must be an object") else flat([]) end'
+  # kcov(enabled)
   if [[ "${format}" == json ]]; then
     entries=$(jq -r "${filter}" "${file}") \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
@@ -274,7 +276,9 @@ function dybatpho::config_env {
     [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] || continue
     [[ -n "${!variable+set}" ]] || continue
     __dybatpho_config_set "${key}" "${!variable}"
-  done < <(printf '%s' "${compgen_output}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "config_env applies prefixed environment variables" runs it.
+  done < <(printf '%s' "${compgen_output}") # kcov(skip)
 }
 
 #######################################

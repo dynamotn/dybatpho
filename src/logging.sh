@@ -881,6 +881,7 @@ function __dybatpho_log_get_terminal_width {
 # which terminals draw), and the Hangul medial and final jamo. Generated from
 # Unicode 16.0 general categories; this is the `wcwidth` convention terminals
 # follow.
+# kcov(disabled) - a range table: its lines are data, not commands
 declare -ga __DYBATPHO_LOG_WIDTH_ZERO=(
   0x300 0x36F 0x483 0x489 0x591 0x5BD 0x5BF 0x5BF 0x5C1 0x5C2 0x5C4 0x5C5
   0x5C7 0x5C7 0x600 0x605 0x610 0x61A 0x61C 0x61C 0x64B 0x65F 0x670 0x670
@@ -961,11 +962,13 @@ declare -ga __DYBATPHO_LOG_WIDTH_ZERO=(
   0x1E5EE 0x1E5EF 0x1E8D0 0x1E8D6 0x1E944 0x1E94A 0xE0001 0xE0001
   0xE0020 0xE007F 0xE0100 0xE01EF
 )
+# kcov(enabled)
 
 # Codepoint ranges that occupy two terminal columns, as `start end` pairs in
 # ascending order: every character Unicode 16.0 gives an East Asian Width of
 # Wide or Fullwidth -- the CJK blocks, Hangul syllables, fullwidth forms and the
 # emoji terminals draw double width.
+# kcov(disabled) - a range table: its lines are data, not commands
 declare -ga __DYBATPHO_LOG_WIDTH_WIDE=(
   0x1100 0x115F 0x231A 0x231B 0x2329 0x232A 0x23E9 0x23EC 0x23F0 0x23F0
   0x23F3 0x23F3 0x25FD 0x25FE 0x2614 0x2615 0x2630 0x2637 0x2648 0x2653
@@ -996,6 +999,7 @@ declare -ga __DYBATPHO_LOG_WIDTH_WIDE=(
   0x1FA80 0x1FA89 0x1FA8F 0x1FAC6 0x1FACE 0x1FADC 0x1FADF 0x1FAE9
   0x1FAF0 0x1FAF8 0x20000 0x2FFFD 0x30000 0x3FFFD
 )
+# kcov(enabled)
 
 # Width of every non-ASCII character measured so far, keyed by the character.
 declare -gA __dybatpho_log_char_width=()
@@ -1087,9 +1091,7 @@ function __dybatpho_log_chars_into {
         __dybatpho_log_chars_length=2
       fi
     fi
-    __dybatpho_log_chars_out+=(
-      "${__dybatpho_log_chars_text:__dybatpho_log_chars_index:__dybatpho_log_chars_length}"
-    )
+    __dybatpho_log_chars_out+=("${__dybatpho_log_chars_text:__dybatpho_log_chars_index:__dybatpho_log_chars_length}")
     __dybatpho_log_chars_index=$((__dybatpho_log_chars_index + __dybatpho_log_chars_length))
   done
 }
@@ -1394,7 +1396,7 @@ function __dybatpho_log_box {
       if ((wrapped_width > content_width)); then
         content_width=${wrapped_width}
       fi
-    done < <(printf '%s' "${log_wrap_line_output}")
+    done < <(printf '%s' "${log_wrap_line_output}") # kcov(skip) - the boxed logging tests run it; kcov records no hit
   done
 
   if ((${#wrapped_lines[@]} == 0)); then
@@ -1468,14 +1470,18 @@ function dybatpho::debug_command {
   if [[ "$2" == "--" ]]; then
     (($# >= 3)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
     dybatpho::compare_log_level debug || return 0
+    # kcov records no hit for the continuation line of the message, which
+    # "dybatpho::debug_command -- runs a command and its arguments as words,
+    # never as shell" runs.
     __dybatpho_log_inspect debug "COMMAND 💻    " "$1
-$("${@:3}")"
+$("${@:3}")" # kcov(skip)
     return 0
   fi
   dybatpho::compare_log_level debug || return 0
   # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form above runs no `eval`
+  # Likewise run by "dybatpho::debug_command output".
   __dybatpho_log_inspect debug "COMMAND 💻    " "$1
-$(eval "$2")"
+$(eval "$2")" # kcov(skip)
 }
 
 #######################################
@@ -1711,7 +1717,7 @@ function __dybatpho_log_parse_size {
     [Mm]) number=$((number * 1024 * 1024)) ;;
     [Gg]) number=$((number * 1024 * 1024 * 1024)) ;;
     [Tt]) number=$((number * 1024 * 1024 * 1024 * 1024)) ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   printf '%s' "${number}"
 }
@@ -1854,10 +1860,12 @@ function dybatpho::log_to_file {
       # A log file holds whatever the script logged, which is the last place a
       # value should become world-readable. The mode is chosen at creation
       # only, so an operator who widened it deliberately keeps their choice.
+      # The closing line dies, so "dybatpho::log_to_file stops when it cannot
+      # create the log file" runs it under `run`, where kcov cannot see it.
       (
         umask 077
         : > "${path}"
-      ) || dybatpho::die "${FUNCNAME[0]}: Cannot create log file '${path}'"
+      ) || dybatpho::die "${FUNCNAME[0]}: Cannot create log file '${path}'" # kcov(skip)
     fi
     [[ -w "${path}" ]] \
       || dybatpho::die "${FUNCNAME[0]}: Log file '${path}' is not writable"
@@ -1979,8 +1987,7 @@ function dybatpho::timer_end {
   printf -v extra_fields ',"timer":"%s","elapsed_ms":%s' \
     "${log_json_escape}" "${elapsed}"
   local message
-  message="$(__dybatpho_log_text logging.timer_end "${name} took ${elapsed}ms" \
-    name="${name}" elapsed_ms="${elapsed}")"
+  message="$(__dybatpho_log_text logging.timer_end "${name} took ${elapsed}ms" name="${name}" elapsed_ms="${elapsed}")"
   __dybatpho_log_inspect "${level}" "TIMER ⏳      " "${message}" 0 "" "${extra_fields}"
 }
 
@@ -2024,7 +2031,7 @@ function dybatpho::spinner {
 
   local __dybatpho_log_spinner_animate=false
   case "${DYBATPHO_SPINNER}" in
-    never) ;;
+    never) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
     always) __dybatpho_log_spinner_animate=true ;;
     *)
       if [[ -t 2 ]] && dybatpho::compare_log_level info; then

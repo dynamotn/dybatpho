@@ -81,6 +81,7 @@ DYBATPHO_BASH_MINIMUM="4.3"
 # here on the module that runs the command itself: a module pulls its own
 # dependencies in through the registry, and `dybatpho::doctor` reports those
 # modules on their own rows.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 # @env DYBATPHO_DOCTOR_REQUIRED array Required external commands per module
 declare -gA DYBATPHO_DOCTOR_REQUIRED=(
   [ai]="curl"
@@ -95,6 +96,8 @@ declare -gA DYBATPHO_DOCTOR_REQUIRED=(
   # there is no way to ask for it from Bash alone.
   [screen]="stty"
 )
+# kcov(enabled)
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 # @env DYBATPHO_DOCTOR_OPTIONAL array? External commands per module
 declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   [agent]="git"
@@ -138,6 +141,7 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   [os]="hostname nproc|sysctl|getconf tput"
   [release]="gpg"
 )
+# kcov(enabled)
 
 #######################################
 # @description Rank a status, so that the least satisfying alternative of a spec
@@ -410,7 +414,7 @@ function __dybatpho_doctor_rows {
       case "${kind}" in
         required) specs="${DYBATPHO_DOCTOR_REQUIRED[${module}]-}" ;;
         optional) specs="${DYBATPHO_DOCTOR_OPTIONAL[${module}]-}" ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
       for spec in ${specs}; do
         # The exit code only repeats what the status says, and a non-zero one
@@ -647,7 +651,7 @@ function dybatpho::doctor {
   local expand="expand"
   case "${scope}" in
     loaded | all) expand="" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   local -a graph_unknown=()
   local graph_cycle=0
@@ -678,7 +682,7 @@ function dybatpho::doctor {
         fi
         ;;
       unknown) unknown+=("${spec}") ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 
@@ -730,9 +734,9 @@ function dybatpho::doctor {
   for edge in ${graph_unknown[@]+"${graph_unknown[@]}"}; do
     printf 'Unknown module dependency: %s\n' "${edge}"
   done
-  dybatpho::doctor_bash_supported \
-    || printf 'Bash %s is older than the supported minimum %s\n' \
-      "${BASH_VERSION}" "${DYBATPHO_BASH_MINIMUM}"
+  if ! dybatpho::doctor_bash_supported; then
+    printf 'Bash %s is older than the supported minimum %s\n' "${BASH_VERSION}" "${DYBATPHO_BASH_MINIMUM}"
+  fi
   ((healthy)) || printf 'No required dependency is missing.\n'
   return "${healthy}"
 }

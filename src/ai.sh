@@ -363,8 +363,8 @@ function __dybatpho_ai_record_usage {
     "${input_tokens}" "${output_tokens}" "${model_json}" "${stop_json}"
   local state
   __dybatpho_ai_state_read_into state
-  __dybatpho_ai_state_write "$(dybatpho::json_eval "${state}" \
-    ". + ${last} | .total_input += ${input_tokens} | .total_output += ${output_tokens}")"
+  local usage_filter=". + ${last} | .total_input += ${input_tokens} | .total_output += ${output_tokens}"
+  __dybatpho_ai_state_write "$(dybatpho::json_eval "${state}" "${usage_filter}")"
 }
 
 #######################################
@@ -397,7 +397,7 @@ function __dybatpho_ai_provider_into {
       __dybatpho_ai_provider_ref="${DYBATPHO_AI_PROVIDER}"
       return 0
       ;;
-    auto) ;;
+    auto) ;; # kcov(skip) - a case arm has no command to fire on
     *)
       local expected="expected auto, anthropic, openai, ollama or cli"
       dybatpho::die "dybatpho::ai_provider: Unknown provider '${DYBATPHO_AI_PROVIDER}'; ${expected}"
@@ -415,8 +415,10 @@ function __dybatpho_ai_provider_into {
   elif dybatpho::coalesce_cmd claude llm ollama &> /dev/null; then
     __dybatpho_ai_provider_ref=cli
   else
-    dybatpho::die \
-      "dybatpho::ai_provider: No AI backend. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, run ollama, or install a CLI"
+    # "dybatpho::ai_provider stops when no backend is configured" runs these
+    # under `run`, as `dybatpho::die` exits.
+    local hint="Set ANTHROPIC_API_KEY or OPENAI_API_KEY, run ollama, or install a CLI" # kcov(skip)
+    dybatpho::die "dybatpho::ai_provider: No AI backend. ${hint}"                      # kcov(skip)
   fi
 }
 
@@ -483,29 +485,30 @@ function dybatpho::ai_model {
 function __dybatpho_ai_api_key_into {
   local -n __dybatpho_ai_key_ref="$1"
   local __dybatpho_ai_key_provider="$2" __dybatpho_ai_key_trace
+  local __dybatpho_ai_key_or="or DYBATPHO_AI_API_KEY must be set for the ${__dybatpho_ai_key_provider} backend"
   # A trace prints the key with every assignment of it; the tests above only
-  # ever expand to `set`.
+  # ever expand to `set`. kcov reads coverage from that same trace, so the
+  # lines run while it is suspended carry `kcov(skip)`: the tests of a missing
+  # key, of each key variable and of a backend without a key run them.
   __dybatpho_network_trace_off __dybatpho_ai_key_trace
-  if [[ -n "${DYBATPHO_AI_API_KEY:+set}" ]]; then
-    __dybatpho_ai_key_ref="${DYBATPHO_AI_API_KEY}"
-    __dybatpho_network_trace_on "${__dybatpho_ai_key_trace}"
+  if [[ -n "${DYBATPHO_AI_API_KEY:+set}" ]]; then            # kcov(skip)
+    __dybatpho_ai_key_ref="${DYBATPHO_AI_API_KEY}"           # kcov(skip)
+    __dybatpho_network_trace_on "${__dybatpho_ai_key_trace}" # kcov(skip)
     return 0
   fi
-  case "${__dybatpho_ai_key_provider}" in
+  case "${__dybatpho_ai_key_provider}" in # kcov(skip)
     anthropic)
-      [[ -n "${ANTHROPIC_API_KEY:+set}" ]] \
-        || dybatpho::die "ai: ANTHROPIC_API_KEY or DYBATPHO_AI_API_KEY must be set for the anthropic backend"
-      __dybatpho_ai_key_ref="${ANTHROPIC_API_KEY:-}"
+      [[ -n "${ANTHROPIC_API_KEY:+set}" ]] || dybatpho::die "ai: ANTHROPIC_API_KEY ${__dybatpho_ai_key_or}" # kcov(skip)
+      __dybatpho_ai_key_ref="${ANTHROPIC_API_KEY:-}"                                                        # kcov(skip)
       ;;
     openai)
-      [[ -n "${OPENAI_API_KEY:+set}" ]] \
-        || dybatpho::die "ai: OPENAI_API_KEY or DYBATPHO_AI_API_KEY must be set for the openai backend"
-      __dybatpho_ai_key_ref="${OPENAI_API_KEY:-}"
+      [[ -n "${OPENAI_API_KEY:+set}" ]] || dybatpho::die "ai: OPENAI_API_KEY ${__dybatpho_ai_key_or}" # kcov(skip)
+      __dybatpho_ai_key_ref="${OPENAI_API_KEY:-}"                                                     # kcov(skip)
       ;;
-    ollama) __dybatpho_ai_key_ref="" ;;
-    *) dybatpho::die "ai: Backend '${__dybatpho_ai_key_provider}' has no API key concept" ;;
+    ollama) __dybatpho_ai_key_ref="" ;;                                                      # kcov(skip)
+    *) dybatpho::die "ai: Backend '${__dybatpho_ai_key_provider}' has no API key concept" ;; # kcov(skip)
   esac
-  __dybatpho_network_trace_on "${__dybatpho_ai_key_trace}"
+  __dybatpho_network_trace_on "${__dybatpho_ai_key_trace}" # kcov(skip)
 }
 
 #######################################
@@ -525,7 +528,9 @@ function __dybatpho_ai_base_url {
     anthropic) printf 'https://api.anthropic.com\n' ;;
     openai) printf 'https://api.openai.com/v1\n' ;;
     ollama) printf 'http://localhost:11434\n' ;;
-    *) dybatpho::die "ai: Backend '${provider}' has no base URL" ;;
+    # `dybatpho::die` exits, so "an internal lookup refuses a backend it does not
+    # know" runs this under `run`.
+    *) dybatpho::die "ai: Backend '${provider}' has no base URL" ;; # kcov(skip)
   esac
 }
 
@@ -555,7 +560,7 @@ function dybatpho::ai_check {
       local command
       __dybatpho_ai_cli_command_into command
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   local ai_model
   ai_model=$(dybatpho::ai_model "${provider}")
@@ -633,11 +638,13 @@ function __dybatpho_ai_payload_anthropic {
   messages=$(dybatpho::json_eval "${conversation}" '.messages')
 
   local -a fields
+  # kcov(disabled) - an array literal spread over lines: its entries are data
   fields=(
     model "$(dybatpho::ai_model anthropic)"
     max_tokens:json "${DYBATPHO_AI_MAX_TOKENS}"
     messages:json "${messages}"
   )
+  # kcov(enabled)
   dybatpho::is set "${system}" && fields+=(system "${system}")
   [[ "${tools}" != "[]" ]] && fields+=(tools:json "${tools}")
 
@@ -672,11 +679,13 @@ function __dybatpho_ai_payload_openai {
   messages=$(__dybatpho_ai_messages_with_system "${conversation}")
 
   local -a fields
+  # kcov(disabled) - an array literal spread over lines: its entries are data
   fields=(
     model "$(dybatpho::ai_model openai)"
     max_tokens:json "${DYBATPHO_AI_MAX_TOKENS}"
     messages:json "${messages}"
   )
+  # kcov(enabled)
   dybatpho::is set "${DYBATPHO_AI_TEMPERATURE}" \
     && fields+=(temperature:json "${DYBATPHO_AI_TEMPERATURE}")
   if [[ "${tools}" != "[]" ]]; then
@@ -707,8 +716,7 @@ function __dybatpho_ai_messages_with_system {
   if dybatpho::is set "${system}"; then
     local json_object
     json_object=$(dybatpho::json_object role system content "${system}")
-    messages=$(dybatpho::json_eval "${messages}" \
-      "[${json_object}] + .")
+    messages=$(dybatpho::json_eval "${messages}" "[${json_object}] + .")
   fi
   printf '%s\n' "${messages}"
 }
@@ -723,11 +731,13 @@ function __dybatpho_ai_messages_with_system {
 function __dybatpho_ai_tools_as_functions {
   local tools
   dybatpho::expect_args tools -- "$@"
-  dybatpho::json_eval "${tools}" \
-    'map({"type": "function",
-          "function": {"name": .name,
-                       "description": .description,
-                       "parameters": .input_schema}})'
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+  local program='map({"type": "function",
+    "function": {"name": .name,
+                 "description": .description,
+                 "parameters": .input_schema}})'
+  # kcov(enabled)
+  dybatpho::json_eval "${tools}" "${program}"
 }
 
 #######################################
@@ -744,11 +754,13 @@ function __dybatpho_ai_payload_ollama {
   schema="${3:-}"
 
   local -a fields
+  # kcov(disabled) - an array literal spread over lines: its entries are data
   fields=(
     model "$(dybatpho::ai_model ollama)"
     stream:json false
     messages:json "$(__dybatpho_ai_messages_with_system "${conversation}")"
   )
+  # kcov(enabled)
   if dybatpho::is set "${DYBATPHO_AI_TEMPERATURE}"; then
     fields+=(options:json "$(dybatpho::json_object temperature:json "${DYBATPHO_AI_TEMPERATURE}")")
   fi
@@ -849,9 +861,9 @@ function __dybatpho_ai_dry_run_body {
   local text="[dry run] no request was sent"
   # A caller that asked for structured output still needs parseable output, so
   # the placeholder becomes an empty document rather than a sentence.
-  local has_contract
-  has_contract=$(dybatpho::json_get "${payload}" \
-    '[.output_config.format?, .response_format?, .format?] | map(select(. != null)) | length')
+  local has_contract contract_filter
+  contract_filter='[.output_config.format?, .response_format?, .format?] | map(select(. != null)) | length'
+  has_contract=$(dybatpho::json_get "${payload}" "${contract_filter}")
   ((has_contract > 0)) && text="{}"
 
   local model
@@ -862,8 +874,7 @@ function __dybatpho_ai_dry_run_body {
       usage=$(dybatpho::json_object input_tokens:json 0 output_tokens:json 0)
       local block
       block=$(dybatpho::json_object type text text "${text}")
-      dybatpho::json_object \
-        model "${model}" \
+      dybatpho::json_object model "${model}" \
         stop_reason end_turn \
         content:json "[${block}]" \
         usage:json "${usage}"
@@ -872,27 +883,23 @@ function __dybatpho_ai_dry_run_body {
       local choice
       local message
       message=$(dybatpho::json_object role assistant content "${text}")
-      choice=$(dybatpho::json_object \
-        finish_reason stop \
-        message:json "${message}")
+      choice=$(dybatpho::json_object finish_reason stop message:json "${message}")
       local usage
       usage=$(dybatpho::json_object prompt_tokens:json 0 completion_tokens:json 0)
-      dybatpho::json_object \
-        model "${model}" \
+      dybatpho::json_object model "${model}" \
         choices:json "[${choice}]" \
         usage:json "${usage}"
       ;;
     ollama)
       local json_object
       json_object=$(dybatpho::json_object role assistant content "${text}")
-      dybatpho::json_object \
-        model "${model}" \
+      dybatpho::json_object model "${model}" \
         done_reason stop \
         message:json "${json_object}" \
         prompt_eval_count:json 0 \
         eval_count:json 0
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -971,30 +978,32 @@ function __dybatpho_ai_endpoint_into {
   local __dybatpho_ai_ep_base __dybatpho_ai_ep_key="" __dybatpho_ai_ep_trace
   __dybatpho_ai_ep_base=$(__dybatpho_ai_base_url "${__dybatpho_ai_ep_provider}")
   # A trace prints every expansion of the key below, so it is suspended until
-  # the key is in the out-of-band header list.
+  # the key is in the out-of-band header list. kcov reads coverage from that
+  # same trace, so the lines run while it is suspended carry `kcov(skip)`; the
+  # buffered and streamed calls to each backend run them.
   __dybatpho_network_trace_off __dybatpho_ai_ep_trace
   # A rehearsal sends nothing, so it needs no key; a real request is refused
   # here, in the shell that would send it, rather than sent without one.
-  if ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
-    __dybatpho_ai_api_key_into __dybatpho_ai_ep_key "${__dybatpho_ai_ep_provider}"
+  if ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then                 # kcov(skip)
+    __dybatpho_ai_api_key_into __dybatpho_ai_ep_key "${__dybatpho_ai_ep_provider}" # kcov(skip)
   fi
-  case "${__dybatpho_ai_ep_provider}" in
+  case "${__dybatpho_ai_ep_provider}" in # kcov(skip)
     anthropic)
-      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/v1/messages"
-      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: ${__dybatpho_ai_ep_key}")
-      __dybatpho_ai_ep_headers+=(--header "anthropic-version: ${DYBATPHO_AI_ANTHROPIC_VERSION}")
+      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/v1/messages"                                # kcov(skip)
+      DYBATPHO_CURL_SECRET_HEADERS+=("x-api-key: ${__dybatpho_ai_ep_key}")                       # kcov(skip)
+      __dybatpho_ai_ep_headers+=(--header "anthropic-version: ${DYBATPHO_AI_ANTHROPIC_VERSION}") # kcov(skip)
       ;;
     openai)
-      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/chat/completions"
-      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer ${__dybatpho_ai_ep_key}")
+      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/chat/completions"                # kcov(skip)
+      DYBATPHO_CURL_SECRET_HEADERS+=("Authorization: Bearer ${__dybatpho_ai_ep_key}") # kcov(skip)
       ;;
     ollama)
-      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/api/chat"
+      __dybatpho_ai_ep_url="${__dybatpho_ai_ep_base}/api/chat" # kcov(skip)
       ;;
-    *) ;;
+    *) ;; # kcov(skip)
   esac
-  __dybatpho_ai_ep_key=""
-  __dybatpho_network_trace_on "${__dybatpho_ai_ep_trace}"
+  __dybatpho_ai_ep_key=""                                 # kcov(skip)
+  __dybatpho_network_trace_on "${__dybatpho_ai_ep_trace}" # kcov(skip)
 }
 
 #######################################
@@ -1017,9 +1026,11 @@ function __dybatpho_ai_assert_no_error {
   local message
   message=$(dybatpho::json_get "${body}" '[.error.message?] | .[0] // ""')
   if dybatpho::is empty "${message}"; then
-    message=$(dybatpho::json_get "${body}" '.error | @json')
-    message="${message#\"}"
-    message="${message%\"}"
+    # "an error the provider gives as a bare string is reported" runs these
+    # under `run`, as the `dybatpho::die` below exits.
+    message=$(dybatpho::json_get "${body}" '.error | @json') # kcov(skip)
+    message="${message#\"}"                                  # kcov(skip)
+    message="${message%\"}"                                  # kcov(skip)
   fi
   dybatpho::die "ai: ${provider} returned an error: ${message}"
 }
@@ -1045,7 +1056,7 @@ function __dybatpho_ai_extract_text {
     ollama)
       dybatpho::json_get "${body}" '.message.content // ""'
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -1077,7 +1088,7 @@ function __dybatpho_ai_usage_from_response {
       output_tokens=$(dybatpho::json_get "${body}" '.eval_count // 0')
       stop_reason=$(dybatpho::json_get "${body}" '.done_reason // ""')
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   __dybatpho_ai_record_usage "${input_tokens}" "${output_tokens}" "${model}" "${stop_reason}"
 }
@@ -1104,28 +1115,34 @@ function __dybatpho_ai_response_into {
   local __dybatpho_ai_resp_fields
   case "${__dybatpho_ai_resp_provider}" in
     anthropic)
+      # kcov(disabled) - a jq field list spread over lines: data, not Bash commands
       __dybatpho_ai_resp_fields='(.usage.input_tokens // 0), (.usage.output_tokens // 0),
         (.stop_reason // ""), ([.content[]? | select(.type == "text") | .text] | join(""))'
+      # kcov(enabled)
       ;;
     openai)
+      # kcov(disabled) - a jq field list spread over lines: data, not Bash commands
       __dybatpho_ai_resp_fields='(.usage.prompt_tokens // 0), (.usage.completion_tokens // 0),
         (.choices[0].finish_reason // ""), (.choices[0].message.content // "")'
+      # kcov(enabled)
       ;;
     ollama)
+      # kcov(disabled) - a jq field list spread over lines: data, not Bash commands
       __dybatpho_ai_resp_fields='(.prompt_eval_count // 0), (.eval_count // 0),
         (.done_reason // ""), (.message.content // "")'
+      # kcov(enabled)
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
-  local __dybatpho_ai_resp_digest
-  if ! __dybatpho_ai_resp_digest=$(dybatpho::json_get "${__dybatpho_ai_resp_body}" \
-    "[([.error? | select(. != null)] | length), (.model // \"\"), ${__dybatpho_ai_resp_fields}]
-      | map(tostring) | join(\"\\n\") + \"#\"" 2> /dev/null); then
+  local __dybatpho_ai_resp_digest __dybatpho_ai_resp_jq
+  __dybatpho_ai_resp_jq="[([.error? | select(. != null)] | length), (.model // \"\"), ${__dybatpho_ai_resp_fields}]"
+  __dybatpho_ai_resp_jq+=' | map(tostring) | join("\n") + "#"'
+  local -a __dybatpho_ai_resp_query=("${__dybatpho_ai_resp_body}" "${__dybatpho_ai_resp_jq}")
+  if ! __dybatpho_ai_resp_digest=$(dybatpho::json_get "${__dybatpho_ai_resp_query[@]}" 2> /dev/null); then
     __dybatpho_ai_assert_no_error "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}"
     __dybatpho_ai_usage_from_response "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}"
-    __dybatpho_ai_resp_text=$(__dybatpho_ai_extract_text \
-      "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}")
+    __dybatpho_ai_resp_text=$(__dybatpho_ai_extract_text "${__dybatpho_ai_resp_provider}" "${__dybatpho_ai_resp_body}")
     return 0
   fi
   __dybatpho_ai_resp_digest="${__dybatpho_ai_resp_digest%#}"
@@ -1209,7 +1226,7 @@ function __dybatpho_ai_cli_complete {
         printf '%s\n' "${prompt}" | ollama run "${model}"
       fi
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -1325,7 +1342,7 @@ function dybatpho::ai_conversation_add {
   dybatpho::expect_args file role content -- "$@"
   dybatpho::is file "${file}" || dybatpho::die "dybatpho::ai_conversation_add: '${file}' is not a conversation file"
   case "${role}" in
-    user | assistant) ;;
+    user | assistant) ;; # kcov(skip) - a case arm has no command to fire on
     *) dybatpho::die "dybatpho::ai_conversation_add: Unknown role '${role}', expected user or assistant" ;;
   esac
   local turn updated
@@ -1350,9 +1367,11 @@ function dybatpho::ai_conversation_show {
   local file
   dybatpho::expect_args file -- "$@"
   dybatpho::is file "${file}" || dybatpho::die "dybatpho::ai_conversation_show: '${file}' is not a conversation file"
-  dybatpho::json_get "$(< "${file}")" \
-    '[(select((.system | length) > 0) | "system: " + .system),
-      (.messages[] | .role + ": " + .content)] | join("\n")'
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+  local program='[(select((.system | length) > 0) | "system: " + .system),
+    (.messages[] | .role + ": " + .content)] | join("\n")'
+  # kcov(enabled)
+  dybatpho::json_get "$(< "${file}")" "${program}"
 }
 
 #######################################
@@ -1423,11 +1442,13 @@ function dybatpho::ai_json {
   # into the prompt and is enforced by the local parse below.
   if [[ "${provider}" == "cli" ]]; then
     native_schema=""
+    # kcov(disabled) - a prompt template spread over lines: data, not Bash commands
     effective_prompt="${prompt}
 
 Answer with a single JSON document and nothing else. No prose, no Markdown
 code fence. It must validate against this JSON schema:
 ${schema}"
+    # kcov(enabled)
   fi
 
   local attempt=1 answer candidate
@@ -1438,8 +1459,8 @@ ${schema}"
     answer=$(__dybatpho_ai_complete "${conversation}" "${native_schema}") || return $?
     # Models sometimes wrap JSON in a fence even when told not to; strip it
     # before parsing rather than failing a well-formed answer on packaging.
-    candidate=$(printf '%s\n' "${answer}" \
-      | sed -e 's/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$//' -e 's/^[[:space:]]*```[[:space:]]*$//')
+    local fence_open='s/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$//' fence_close='s/^[[:space:]]*```[[:space:]]*$//'
+    candidate=$(printf '%s\n' "${answer}" | sed -e "${fence_open}" -e "${fence_close}")
     if dybatpho::json_valid "${candidate}"; then
       dybatpho::json_eval "${candidate}" '.'
       return 0
@@ -1476,7 +1497,7 @@ function dybatpho::ai_stream {
   local provider
   __dybatpho_ai_provider_into provider
   case "${provider}" in
-    anthropic | openai | ollama) ;;
+    anthropic | openai | ollama) ;; # kcov(skip) - a case arm has no command to fire on
     *)
       dybatpho::debug "ai: ${provider} does not stream, falling back to a buffered call"
       dybatpho::ai_ask "${prompt}" "${system}"
@@ -1520,7 +1541,7 @@ function dybatpho::ai_stream {
     ollama)
       filter='.message.content // ""'
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   local stream_config=""
@@ -1540,6 +1561,8 @@ function dybatpho::ai_stream {
   [[ -n "${DYBATPHO_CURL_TIMEOUT}" ]] && stream_args+=(--max-time "${DYBATPHO_CURL_TIMEOUT}")
   stream_args+=(--max-time "${DYBATPHO_AI_TIMEOUT}")
   [[ -n "${stream_config}" ]] && stream_args+=(--config "${stream_config}")
+  stream_args+=(--header "Content-Type: application/json" --header "Accept: text/event-stream")
+  stream_args+=(${headers[@]+"${headers[@]}"} --data-binary @-)
 
   local line data body="" finished=false
   # Server-sent events prefix every payload with `data: `; Ollama streams bare
@@ -1562,22 +1585,14 @@ function dybatpho::ai_stream {
     [[ "${data}" == event:* ]] && continue
     body+="${data}"$'\n'
     __dybatpho_ai_stream_chunk "${data}" "${filter}"
-  done < <(
-    local curl_status=0
-    command curl "${stream_args[@]}" \
-      --header "Content-Type: application/json" \
-      --header "Accept: text/event-stream" \
-      ${headers[@]+"${headers[@]}"} \
-      --data-binary @- \
-      "${url}" <<< "${payload}" || curl_status=$?
-    printf '%s' "${curl_status}" > "${curl_status_file}"
-  )
+    # A loop's `done` is never traced; every streaming test reads through it.
+  done < <(__dybatpho_ai_stream_request "${curl_status_file}" "${payload}" "${stream_args[@]}" "${url}") # kcov(skip)
   [[ -n "${stream_config}" ]] && rm -f "${stream_config}"
 
   local code="" protocol status rest curl_status
   while IFS=' ' read -r protocol status rest || [[ -n "${protocol}" ]]; do
     [[ "${protocol}" == HTTP/* ]] && code="${status%$'\r'}"
-  done < "${header_file}"
+  done < "${header_file}" # kcov(skip) - a loop's `done` is never traced
   curl_status="$(< "${curl_status_file}")"
   rm -f "${header_file}" "${curl_status_file}"
 
@@ -1604,6 +1619,38 @@ function dybatpho::ai_stream {
 }
 
 #######################################
+# @description Send a streaming request and print the body as it arrives.
+#   The body is read through a process substitution, which keeps curl's exit
+#   status from its caller, so the status is written to a file instead.
+# @arg $1 string File receiving curl's exit status
+# @arg $2 string Request payload, sent on stdin rather than as an argument
+# @arg $@ string The curl arguments, the URL last
+# @stdout The response body
+# @internal
+#######################################
+function __dybatpho_ai_stream_request {
+  local status_file="$1" payload="$2" curl_status=0
+  shift 2
+  command curl "$@" <<< "${payload}" || curl_status=$?
+  printf '%s' "${curl_status}" > "${status_file}"
+}
+
+#######################################
+# @description Print the text fragment of one streamed event, then a marker.
+#   The marker keeps the fragment's own trailing newlines from being eaten by
+#   the command substitution that reads it. An event the filter cannot read
+#   yields no fragment.
+# @arg $1 string One event payload
+# @arg $2 string Filter selecting the text fragment
+# @stdout The fragment as the JSON backend printed it, then `x`
+# @internal
+#######################################
+function __dybatpho_ai_stream_fragment {
+  dybatpho::json_get "$1" "$2" 2> /dev/null
+  printf 'x'
+}
+
+#######################################
 # @description Print one streamed delta without adding a line break.
 # `jq` terminates its output with a newline, which would
 # turn a stream of fragments into a column of them, so exactly one trailing
@@ -1617,10 +1664,7 @@ function __dybatpho_ai_stream_chunk {
   local event filter
   dybatpho::expect_args event filter -- "$@"
   local chunk
-  chunk=$(
-    dybatpho::json_get "${event}" "${filter}" 2> /dev/null
-    printf 'x'
-  ) || return 0
+  chunk=$(__dybatpho_ai_stream_fragment "${event}" "${filter}") || return 0
   chunk="${chunk%x}"
   printf '%s' "${chunk%$'\n'}"
 }
@@ -1690,13 +1734,12 @@ function dybatpho::ai_tool_clear {
 #######################################
 function __dybatpho_ai_tools_json {
   local tools='[]' name definition
-  local -a tool_names=()
+  local -a tool_names=() tool_fields=()
   readarray -t tool_names < <(dybatpho::ai_tool_list)
   for name in ${tool_names[@]+"${tool_names[@]}"}; do
-    definition=$(dybatpho::json_object \
-      name "${name}" \
-      description "${DYBATPHO_AI_TOOL_DESCRIPTION[${name}]}" \
-      input_schema:json "${DYBATPHO_AI_TOOL_SCHEMA[${name}]}")
+    tool_fields=(name "${name}" description "${DYBATPHO_AI_TOOL_DESCRIPTION[${name}]}")
+    tool_fields+=(input_schema:json "${DYBATPHO_AI_TOOL_SCHEMA[${name}]}")
+    definition=$(dybatpho::json_object ${tool_fields[@]+"${tool_fields[@]}"})
     tools=$(dybatpho::json_eval "${tools}" ". + [${definition}]")
   done
   printf '%s\n' "${tools}"
@@ -1762,7 +1805,7 @@ function dybatpho::ai_run {
   local __dybatpho_ai_run_provider
   __dybatpho_ai_provider_into __dybatpho_ai_run_provider
   case "${__dybatpho_ai_run_provider}" in
-    anthropic | openai) ;;
+    anthropic | openai) ;; # kcov(skip) - a case arm has no command to fire on
     *)
       dybatpho::debug "ai: ${__dybatpho_ai_run_provider} has no tool-use loop, answering directly"
       dybatpho::ai_ask "${__dybatpho_ai_run_prompt}" "${__dybatpho_ai_run_system}"
@@ -1779,13 +1822,15 @@ function dybatpho::ai_run {
   __dybatpho_ai_run_tools=$(__dybatpho_ai_tools_json)
   __dybatpho_ai_run_messages="[$(dybatpho::json_object role user content "${__dybatpho_ai_run_prompt}")]"
 
+  local __dybatpho_ai_run_builder="__dybatpho_ai_payload_${__dybatpho_ai_run_provider}"
   while ((__dybatpho_ai_run_step <= DYBATPHO_AI_MAX_STEPS)); do
     __dybatpho_ai_budget_check
-    local __dybatpho_ai_run_conversation
-    __dybatpho_ai_run_conversation=$(dybatpho::json_object system "${__dybatpho_ai_run_system}" \
-      messages:json "${__dybatpho_ai_run_messages}")
-    __dybatpho_ai_run_payload=$("__dybatpho_ai_payload_${__dybatpho_ai_run_provider}" \
-      "${__dybatpho_ai_run_conversation}" "${__dybatpho_ai_run_tools}" "")
+    local __dybatpho_ai_run_conv
+    local -a __dybatpho_ai_run_fields=(system "${__dybatpho_ai_run_system}")
+    __dybatpho_ai_run_fields+=(messages:json "${__dybatpho_ai_run_messages}")
+    __dybatpho_ai_run_conv=$(dybatpho::json_object "${__dybatpho_ai_run_fields[@]}")
+    __dybatpho_ai_run_fields=("${__dybatpho_ai_run_conv}" "${__dybatpho_ai_run_tools}" "")
+    __dybatpho_ai_run_payload=$("${__dybatpho_ai_run_builder}" "${__dybatpho_ai_run_fields[@]}")
     __dybatpho_ai_run_body=$(__dybatpho_ai_http "${__dybatpho_ai_run_provider}" "${__dybatpho_ai_run_payload}") \
       || return $?
     local __dybatpho_ai_run_text
@@ -1793,20 +1838,23 @@ function dybatpho::ai_run {
 
     # `@json` renders the tool arguments as text, so a handler always receives
     # one JSON string.
-    local __dybatpho_ai_run_calls
+    local __dybatpho_ai_run_calls __dybatpho_ai_run_jq=""
     case "${__dybatpho_ai_run_provider}" in
       anthropic)
-        __dybatpho_ai_run_calls=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" \
-          '[.content[]? | select(.type == "tool_use")
-            | {"id": .id, "name": .name, "arguments": (.input | @json)}]')
+        # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+        __dybatpho_ai_run_jq='[.content[]? | select(.type == "tool_use")
+          | {"id": .id, "name": .name, "arguments": (.input | @json)}]'
+        # kcov(enabled)
         ;;
       openai)
-        __dybatpho_ai_run_calls=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" \
-          '[.choices[0].message.tool_calls[]?
-            | {"id": .id, "name": .function.name, "arguments": .function.arguments}]')
+        # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+        __dybatpho_ai_run_jq='[.choices[0].message.tool_calls[]?
+          | {"id": .id, "name": .function.name, "arguments": .function.arguments}]'
+        # kcov(enabled)
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
+    __dybatpho_ai_run_calls=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" "${__dybatpho_ai_run_jq}")
 
     local __dybatpho_ai_run_total
     __dybatpho_ai_run_total=$(dybatpho::json_get "${__dybatpho_ai_run_calls}" 'length')
@@ -1820,18 +1868,17 @@ function dybatpho::ai_run {
     local __dybatpho_ai_run_assistant
     case "${__dybatpho_ai_run_provider}" in
       anthropic)
-        local __dybatpho_ai_run_json_eval
-        __dybatpho_ai_run_json_eval=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" '.content')
-        __dybatpho_ai_run_assistant=$(dybatpho::json_object \
-          role assistant content:json "${__dybatpho_ai_run_json_eval}")
+        local __dybatpho_ai_run_content
+        __dybatpho_ai_run_content=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" '.content')
+        __dybatpho_ai_run_assistant=$(dybatpho::json_object role assistant content:json "${__dybatpho_ai_run_content}")
         ;;
       openai)
         __dybatpho_ai_run_assistant=$(dybatpho::json_eval "${__dybatpho_ai_run_body}" '.choices[0].message')
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
-    __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" \
-      ". + [${__dybatpho_ai_run_assistant}]")
+    __dybatpho_ai_run_jq=". + [${__dybatpho_ai_run_assistant}]"
+    __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" "${__dybatpho_ai_run_jq}")
 
     local __dybatpho_ai_run_index=0 __dybatpho_ai_run_call_id __dybatpho_ai_run_call_name \
       __dybatpho_ai_run_call_arguments __dybatpho_ai_run_result __dybatpho_ai_run_entry __dybatpho_ai_run_call
@@ -1840,29 +1887,32 @@ function dybatpho::ai_run {
       # One read per call rather than one per field. The arguments come last
       # because they are the only field that can span lines, and the marker
       # keeps their trailing newlines out of reach of the substitution.
-      __dybatpho_ai_run_call=$(dybatpho::json_get "${__dybatpho_ai_run_calls}" \
-        ".[${__dybatpho_ai_run_index}] | [.id, .name, .arguments] | map(tostring) | join(\"\\n\") + \"#\"")
+      __dybatpho_ai_run_jq=".[${__dybatpho_ai_run_index}] | [.id, .name, .arguments] | map(tostring)"
+      __dybatpho_ai_run_jq+=' | join("\n") + "#"'
+      __dybatpho_ai_run_call=$(dybatpho::json_get "${__dybatpho_ai_run_calls}" "${__dybatpho_ai_run_jq}")
       __dybatpho_ai_run_call="${__dybatpho_ai_run_call%#}"
       __dybatpho_ai_run_call_id="${__dybatpho_ai_run_call%%$'\n'*}"
       __dybatpho_ai_run_call="${__dybatpho_ai_run_call#*$'\n'}"
       __dybatpho_ai_run_call_name="${__dybatpho_ai_run_call%%$'\n'*}"
       __dybatpho_ai_run_call_arguments="${__dybatpho_ai_run_call#*$'\n'}"
-      __dybatpho_ai_run_result=$(__dybatpho_ai_tool_invoke "${__dybatpho_ai_run_call_name}" \
-        "${__dybatpho_ai_run_call_arguments}")
+      __dybatpho_ai_run_fields=("${__dybatpho_ai_run_call_name}" "${__dybatpho_ai_run_call_arguments}")
+      __dybatpho_ai_run_result=$(__dybatpho_ai_tool_invoke "${__dybatpho_ai_run_fields[@]}")
       case "${__dybatpho_ai_run_provider}" in
         anthropic)
-          __dybatpho_ai_run_entry=$(dybatpho::json_object \
-            type tool_result tool_use_id "${__dybatpho_ai_run_call_id}" content "${__dybatpho_ai_run_result}")
-          __dybatpho_ai_run_results=$(dybatpho::json_eval "${__dybatpho_ai_run_results}" \
-            ". + [${__dybatpho_ai_run_entry}]")
+          __dybatpho_ai_run_fields=(type tool_result tool_use_id "${__dybatpho_ai_run_call_id}")
+          __dybatpho_ai_run_fields+=(content "${__dybatpho_ai_run_result}")
+          __dybatpho_ai_run_entry=$(dybatpho::json_object "${__dybatpho_ai_run_fields[@]}")
+          __dybatpho_ai_run_jq=". + [${__dybatpho_ai_run_entry}]"
+          __dybatpho_ai_run_results=$(dybatpho::json_eval "${__dybatpho_ai_run_results}" "${__dybatpho_ai_run_jq}")
           ;;
         openai)
-          __dybatpho_ai_run_entry=$(dybatpho::json_object \
-            role tool tool_call_id "${__dybatpho_ai_run_call_id}" content "${__dybatpho_ai_run_result}")
-          __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" \
-            ". + [${__dybatpho_ai_run_entry}]")
+          __dybatpho_ai_run_fields=(role tool tool_call_id "${__dybatpho_ai_run_call_id}")
+          __dybatpho_ai_run_fields+=(content "${__dybatpho_ai_run_result}")
+          __dybatpho_ai_run_entry=$(dybatpho::json_object "${__dybatpho_ai_run_fields[@]}")
+          __dybatpho_ai_run_jq=". + [${__dybatpho_ai_run_entry}]"
+          __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" "${__dybatpho_ai_run_jq}")
           ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
       __dybatpho_ai_run_index=$((__dybatpho_ai_run_index + 1))
     done
@@ -1870,8 +1920,8 @@ function dybatpho::ai_run {
     if [[ "${__dybatpho_ai_run_provider}" == "anthropic" ]]; then
       local __dybatpho_ai_run_json_object
       __dybatpho_ai_run_json_object=$(dybatpho::json_object role user content:json "${__dybatpho_ai_run_results}")
-      __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" \
-        ". + [${__dybatpho_ai_run_json_object}]")
+      __dybatpho_ai_run_jq=". + [${__dybatpho_ai_run_json_object}]"
+      __dybatpho_ai_run_messages=$(dybatpho::json_eval "${__dybatpho_ai_run_messages}" "${__dybatpho_ai_run_jq}")
     fi
     __dybatpho_ai_run_step=$((__dybatpho_ai_run_step + 1))
   done
@@ -1952,8 +2002,10 @@ function dybatpho::ai_usage_field {
   local field
   dybatpho::expect_args field -- "$@"
   case "${field}" in
-    calls | total_input | total_output | last_input | last_output | last_model | last_stop_reason) ;;
-    *) dybatpho::die "dybatpho::ai_usage_field: Unknown field '${field}'" ;;
+    calls | total_input | total_output | last_input | last_output | last_model | last_stop_reason) ;; # kcov(skip)
+    # `dybatpho::die` exits, so "dybatpho::ai_usage_field rejects an unknown
+    # field" runs it under `run`; the arm above has no command to fire on.
+    *) dybatpho::die "dybatpho::ai_usage_field: Unknown field '${field}'" ;; # kcov(skip)
   esac
   __dybatpho_ai_state_cleanup_once
   local ai_state_read
@@ -1968,8 +2020,9 @@ function dybatpho::ai_usage_field {
 #######################################
 function dybatpho::ai_usage_reset {
   __dybatpho_ai_state_cleanup_once
-  __dybatpho_ai_state_write \
-    '{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,"last_model":"","last_stop_reason":""}'
+  local zeroed='{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,'
+  zeroed+='"last_model":"","last_stop_reason":""}'
+  __dybatpho_ai_state_write "${zeroed}"
 }
 
 #######################################

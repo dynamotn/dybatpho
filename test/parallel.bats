@@ -624,3 +624,35 @@ SCRIPT
   assert_equal "$(dybatpho::parallel_map 1 look item)" "caller caller caller caller caller caller"
   assert_equal "$(dybatpho::parallel_run 1 look)" "caller caller caller caller caller caller"
 }
+
+@test "a pool leaves job control on when the caller had it on" {
+  set -m
+  run_traced -0 dybatpho::parallel_map 1 _echo_job a
+  local options="$-"
+  set +m
+  [[ "${options}" == *m* ]]
+}
+
+@test "an interrupted pool whose caller handles the signal and carries on returns 143" {
+  # The pool raises the signal again once the caller's handlers are back; a
+  # handler that returns leaves the pool to report the signal as its status.
+  _signals_pool() {
+    while [[ ! -s "${BATS_TEST_TMPDIR}/pool" ]]; do sleep 0.05; done
+    kill -TERM "$(< "${BATS_TEST_TMPDIR}/pool")"
+    sleep 30 &
+    wait
+  }
+  local out="${BATS_TEST_TMPDIR}/out" pool
+  (
+    trap 'echo caught' TERM
+    status=0
+    dybatpho::parallel_map --timeout 1m 1 _signals_pool first 2> /dev/null || status=$?
+    echo "status ${status}"
+  ) > "${out}" &
+  pool=$!
+  printf '%s' "${pool}" > "${BATS_TEST_TMPDIR}/pool"
+  wait "${pool}"
+  run_traced -0 cat "${out}"
+  assert_line "caught"
+  assert_line "status 143"
+}

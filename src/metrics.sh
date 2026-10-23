@@ -657,7 +657,7 @@ function dybatpho::metrics_render {
           printf '%s %s\n' "${series}" "${__dybatpho_metrics_count[${key}]}"
         done
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 }

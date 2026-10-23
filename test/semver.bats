@@ -304,6 +304,13 @@ setup() {
   run_traced ! dybatpho::semver_satisfies "1.0.1" "<=1.0.0"
   dybatpho::semver_satisfies "1.2.3" "=1.2.3"
   run_traced ! dybatpho::semver_satisfies "1.2.4" "=1.2.3"
+  dybatpho::semver_satisfies "1.2.4" ">1.2.3"
+  run_traced ! dybatpho::semver_satisfies "1.2.3" ">1.2.3"
+}
+
+@test "dybatpho::semver_satisfies reads an operator with no version as any version" {
+  dybatpho::semver_satisfies "0.0.1" ">="
+  dybatpho::semver_satisfies "9.9.9" "^v"
 }
 
 @test "dybatpho::semver_satisfies treats several comparators as all of them" {

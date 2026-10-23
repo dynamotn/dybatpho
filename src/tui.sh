@@ -783,8 +783,7 @@ function __dybatpho_tui_menu_fallback {
   fi
 
   while true; do
-    if ! __dybatpho_tui_fb_answer="$(dybatpho::prompt "${__dybatpho_tui_fb_label}" \
-      "${DYBATPHO_TUI_DEFAULT}")"; then
+    if ! __dybatpho_tui_fb_answer="$(dybatpho::prompt "${__dybatpho_tui_fb_label}" "${DYBATPHO_TUI_DEFAULT}")"; then
       __dybatpho_tui_fb_answer=""
     fi
     if [[ -z "${__dybatpho_tui_fb_answer}" ]]; then

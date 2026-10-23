@@ -175,6 +175,10 @@ ports: [80, 443]
   assert_failure
   assert_stderr --partial "YAML query failed"
 
+  run_traced --separate-stderr dybatpho::assert_yaml_query "${file}" '.mode' "prod"
+  assert_failure
+  assert_stderr --partial "returned an unexpected value"
+
   run_traced --separate-stderr dybatpho::assert_yaml_has "${file}" '.missing'
   assert_failure
   assert_stderr --partial "YAML filter did not match"
@@ -202,6 +206,23 @@ ports: [80, 443]
   assert_stderr --partial "does not match"
   assert_stderr --partial "-hello world"
   assert_stderr --partial "+hello there"
+}
+
+@test "the json assertions and a snapshot diff report a module that cannot be loaded" {
+  # Neither module is loaded, and the loader finds neither on disk.
+  unset -f __dybatpho_json_need_jq __dybatpho_diff_paint
+  # shellcheck disable=SC2329 # invoked by the on-demand loader
+  __dybatpho_module_exists() { return 1; }
+  local file="${BATS_TEST_TMPDIR}/doc.json"
+  printf '{"a":1}\n' > "${file}"
+
+  run_traced -1 --separate-stderr dybatpho::assert_json_valid "${file}"
+  assert_stderr --partial "needs the json module, load it with: dybatpho::load json"
+
+  dybatpho::assert_snapshot pinned "old"
+  run_traced -1 --separate-stderr dybatpho::assert_snapshot pinned "new"
+  assert_stderr --partial "Snapshot pinned does not match"
+  assert_stderr --partial "needs the diff module to show the difference"
 }
 
 @test "dybatpho::assert_snapshot reads stdin, strips colors, and can be updated" {
@@ -368,8 +389,8 @@ ports: [80, 443]
   assert_failure
   assert_stderr --partial "Expected a command to run after --"
 
-  run --separate-stderr dybatpho::benchmark startup 2 -- bash -c 'exit 5'
-  assert_failure
+  _exit_five() { return 5; }
+  run_traced -1 --separate-stderr dybatpho::benchmark startup 2 -- _exit_five
   assert_stderr --partial "exited 5 on run 1 of 2"
 }
 

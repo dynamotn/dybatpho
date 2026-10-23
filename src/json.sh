@@ -158,9 +158,8 @@ function dybatpho::yaml_query {
   # way a query printed them before: `yq` would separate a stream of documents
   # with `---`. The line breaks keep a trailing `#` comment in the filter from
   # swallowing the closing brackets.
-  results=$(jq -c -n "[inputs | (
-${filter}
-)]" "$@" <<< "${document}") || return
+  local program=$'[inputs | (\n'"${filter}"$'\n)]'
+  results=$(jq -c -n "${program}" "$@" <<< "${document}") || return
   yq -p=json -o=yaml -P '.[]' <<< "${results}"
 }
 
@@ -761,17 +760,21 @@ function __dybatpho_json_merge {
   fi
 
   if [[ "${backend}" == jq ]]; then
+    # kcov(disabled) - a jq program spread over two lines: data, not Bash commands
     # shellcheck disable=SC2016 # `$message` is a jq variable
-    __dybatpho_json_emit "${output}" jq -s --arg message "${message}" \
-      'if length == 2 and (.[0] | type) == "object" and (.[1] | type) == "object"
-       then .[0] * .[1] else error($message) end' "${base}" "${overlay}"
+    local program='if length == 2 and (.[0] | type) == "object" and (.[1] | type) == "object"
+       then .[0] * .[1] else error($message) end'
+    # kcov(enabled)
+    __dybatpho_json_emit "${output}" jq -s --arg message "${message}" "${program}" "${base}" "${overlay}"
     return
   fi
 
+  # kcov(disabled) - a yq program spread over two lines: data, not Bash commands
+  local program='[.] | with(select((length == 2 and (.[0] | tag) == "!!map" and (.[1] | tag) == "!!map") | not);
+     error(strenv(__dybatpho_json_error))) | .[0] * .[1]'
+  # kcov(enabled)
   __dybatpho_json_emit "${output}" env "__dybatpho_json_error=${message}" \
-    yq eval-all "-o=${format}" \
-    '[.] | with(select((length == 2 and (.[0] | tag) == "!!map" and (.[1] | tag) == "!!map") | not);
-     error(strenv(__dybatpho_json_error))) | .[0] * .[1]' "${base}" "${overlay}"
+    yq eval-all "-o=${format}" "${program}" "${base}" "${overlay}"
 }
 
 #######################################

@@ -58,6 +58,23 @@ curl_payload() {
   assert_equal "$(dybatpho::forge_host)" "git.example.net"
 }
 
+@test "a remote URL keeps only its host and path whatever its scheme" {
+  assert_equal "$(__dybatpho_forge_normalize_url "ssh://code.example.org/a/b.git")" "code.example.org/a/b"
+  assert_equal "$(__dybatpho_forge_normalize_url "http://code.example.org/a/b/")" "code.example.org/a/b"
+}
+
+@test "the forge context takes the forge, project and API from their overrides" {
+  DYBATPHO_FORGE=gitlab
+  DYBATPHO_FORGE_REPO="other/thing"
+  DYBATPHO_FORGE_API="https://git.internal/api/v4/"
+  local -A context=()
+  run_traced __dybatpho_forge_context_into context repo api
+  assert_success
+  assert_equal "${context[kind]}" "gitlab"
+  assert_equal "${context[repo]}" "other/thing"
+  assert_equal "${context[api]}" "https://git.internal/api/v4"
+}
+
 @test "dybatpho::forge_host fails when the remote does not exist" {
   run dybatpho::forge_host "nope"
   assert_failure
@@ -268,6 +285,14 @@ curl_payload() {
   run dybatpho::forge_request GET "issues"
   assert_failure
   assert_output --partial "No github token"
+}
+
+@test "dybatpho::forge_request hands extra curl options to curl" {
+  dybatpho::mock_http "api.github.com" 200 '{}'
+
+  run_traced dybatpho::forge_request GET "issues" "" /dev/null --max-time 7
+  assert_success
+  assert_regex "$(curl_call 1)" "--max-time 7"
 }
 
 @test "dybatpho::forge_request reports a failing status to the caller" {
@@ -518,6 +543,22 @@ curl_payload() {
   dybatpho::assert_http_called "uploads.github.com/repos/acme/widget/releases/9001/assets?name=app-v1.2.0.tar.gz"
 }
 
+@test "dybatpho::forge_release_upload sends the asset to a GitHub Enterprise upload path" {
+  git -C "${REPO}" remote set-url origin "https://github.acme.dev/acme/widget.git"
+  local artifact="${BATS_TEST_TMPDIR}/app-v1.2.0.tar.gz"
+  printf 'payload' > "${artifact}"
+
+  dybatpho::mock_http "releases/tags/v1.2.0" 200 '{"id":9001}'
+  dybatpho::mock_http "github.acme.dev/api/uploads" 201 \
+    '{"browser_download_url":"https://github.acme.dev/acme/widget/releases/download/v1.2.0/app-v1.2.0.tar.gz"}'
+
+  run_traced dybatpho::forge_release_upload "v1.2.0" "${artifact}"
+  assert_success
+  assert_output "https://github.acme.dev/acme/widget/releases/download/v1.2.0/app-v1.2.0.tar.gz"
+  local upload="github.acme.dev/api/uploads/repos/acme/widget/releases/9001"
+  dybatpho::assert_http_called "${upload}/assets?name=app-v1.2.0.tar.gz"
+}
+
 @test "dybatpho::forge_release_upload puts the file in the GitLab package registry and links it" {
   use_gitlab
   local artifact="${BATS_TEST_TMPDIR}/app-v1.2.0.tar.gz"
@@ -598,6 +639,9 @@ curl_payload() {
   assert_equal "${header}" "JOB-TOKEN: gl-ci"
   __dybatpho_forge_auth_header_into header gitlab "t"
   assert_equal "${header}" "PRIVATE-TOKEN: t"
+  # A forge with no known scheme gets no header rather than a wrong one.
+  __dybatpho_forge_auth_header_into header bitbucket "t"
+  assert_equal "${header}" ""
 }
 
 @test "dybatpho::forge_request sends the CI job token as JOB-TOKEN on GitLab" {

@@ -136,7 +136,8 @@ function __dybatpho_i18n_normalize {
       __norm_out="C"
       return 0
       ;;
-    *) ;;
+    # A case arm has no command to fire on.
+    *) ;; # kcov(skip)
   esac
   local language script region modifier
   if [[ "${raw}" =~ ^([a-zA-Z]{2,8})([_-]([a-zA-Z]{4}))?([_-]([a-zA-Z]{2}|[0-9]{3}))?(\.([^@]+))?(@(.+))?$ ]]; then
@@ -527,6 +528,7 @@ function __dybatpho_i18n_interpolate {
 # is not listed uses the `one` family, which is right for most languages and
 # wrong in a way that is visible rather than silent. Only integer counts are
 # supported, which collapses the rules that distinguish fractional forms.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA __dybatpho_i18n_plural_family=(
   [ja]=other [ko]=other [zh]=other [th]=other [vi]=other [id]=other [ms]=other
   [my]=other [km]=other [lo]=other [bo]=other [yo]=other [ig]=other [jv]=other
@@ -543,6 +545,7 @@ declare -gA __dybatpho_i18n_plural_family=(
   [ar]=ar [he]=he [iw]=he [lt]=lt [lv]=lv [ro]=ro [mo]=ro [sl]=sl
   [is]=is [mk]=mk [fil]=fil [tl]=fil [cy]=cy [mt]=mt [ga]=ga [gd]=gd
 )
+# kcov(enabled)
 
 #######################################
 # @description Print `other` for a language with a single cardinal form.
@@ -1230,6 +1233,7 @@ function dybatpho::i18n_library_plural {
 # group size, optionally followed by `;` and the size of every further group:
 # `3;2` is the Indian lakh system, where 12345678 reads 1,23,45,678. Holding it
 # as data rather than assuming three is the whole reason this is a table.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA DYBATPHO_I18N_NUMBER=(
   ["en.group"]="," ["en.decimal"]="." ["en.grouping"]="3" ["en.minus"]="-" ["en.percent"]="#%"
   ["en_GB.group"]="," ["en_GB.decimal"]="." ["en_GB.grouping"]="3" ["en_GB.minus"]="-" ["en_GB.percent"]="#%"
@@ -1256,10 +1260,12 @@ declare -gA DYBATPHO_I18N_NUMBER=(
   ["hi.group"]="," ["hi.decimal"]="." ["hi.grouping"]="3;2" ["hi.minus"]="-" ["hi.percent"]="#%"
   ["bn.group"]="," ["bn.decimal"]="." ["bn.grouping"]="3;2" ["bn.minus"]="-" ["bn.percent"]="#%"
 )
+# kcov(enabled)
 
 # Currency metadata, keyed `<code>.symbol` and `<code>.digits`. The digit count
 # is a property of the currency and not of the locale, which is why yen and dong
 # have none and dinars have three.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA DYBATPHO_I18N_CURRENCY=(
   ["USD.symbol"]='$' ["USD.digits"]=2
   ["EUR.symbol"]='€' ["EUR.digits"]=2
@@ -1288,10 +1294,12 @@ declare -gA DYBATPHO_I18N_CURRENCY=(
   ["KWD.symbol"]='د.ك.' ["KWD.digits"]=3
   ["TND.symbol"]='د.ت.' ["TND.digits"]=3
 )
+# kcov(enabled)
 
 # Where the symbol sits relative to the amount, per locale. `¤` is the symbol
 # and `#` the number. Dutch and German are neighbours with opposite conventions,
 # which is why this cannot be derived and has to be looked up.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA DYBATPHO_I18N_CURRENCY_LAYOUT=(
   ["en.layout"]='¤#' ["en_GB.layout"]='¤#' ["ja.layout"]='¤#' ["ko.layout"]='¤#'
   ["zh.layout"]='¤#' ["zh_CN.layout"]='¤#' ["zh_TW.layout"]='¤#' ["th.layout"]='¤#'
@@ -1301,6 +1309,7 @@ declare -gA DYBATPHO_I18N_CURRENCY_LAYOUT=(
   ["pt.layout"]='¤ #' ["pt_BR.layout"]='¤ #' ["ru.layout"]='# ¤' ["pl.layout"]='# ¤'
   ["vi.layout"]='# ¤'
 )
+# kcov(enabled)
 
 # Languages written right to left, matched on the language subtag. Held as a
 # string because the only question ever asked of it is membership, which is the
@@ -1327,7 +1336,7 @@ function __dybatpho_i18n_seed_symbols {
     nbsp=" "
   else
     narrow="${probe}"
-    nbsp="$(printf ' ')"
+    nbsp="$(printf '\u00a0')"
   fi
   if dybatpho::is true "${DYBATPHO_I18N_ASCII}"; then
     narrow=" "
@@ -1801,6 +1810,7 @@ function dybatpho::i18n_bytes {
 # their index is the one `date +%u` already reports; storing them Sunday first
 # would put an off-by-one conversion at every use site. Values are comma
 # separated because no name in any shipped locale contains a comma.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA DYBATPHO_I18N_NAMES=(
   ["en.months"]="January,February,March,April,May,June,July,August,September,October,November,December"
   ["en.months_abbr"]="Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec"
@@ -1906,6 +1916,7 @@ declare -gA DYBATPHO_I18N_NAMES=(
   ["th.weekdays"]="จันทร์,อังคาร,พุธ,พฤหัสบดี,ศุกร์,เสาร์,อาทิตย์"
   ["th.dayperiods"]="ก่อนเที่ยง,หลังเที่ยง"
 )
+# kcov(enabled)
 
 # Date and time patterns per locale. The letters follow the CLDR convention and
 # are interpreted by this module rather than handed to `date`, which is what
@@ -1914,6 +1925,7 @@ declare -gA DYBATPHO_I18N_NAMES=(
 # bearing: without it the `d` in the Vietnamese word `ngày` would expand to the
 # day number. Whether a locale shows a 12-hour or a 24-hour clock is carried by
 # its pattern rather than by a separate flag.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA DYBATPHO_I18N_DATE_PATTERN=(
   ["en.date_short"]="M/d/yy" ["en.date_medium"]="MMM d, yyyy"
   ["en.date_long"]="MMMM d, yyyy" ["en.date_full"]="EEEE, MMMM d, yyyy"
@@ -2002,6 +2014,7 @@ declare -gA DYBATPHO_I18N_DATE_PATTERN=(
   ["th.date_long"]="d MMMM yyyy" ["th.date_full"]="EEEEที่ d MMMM yyyy"
   ["th.time_short"]="HH:mm" ["th.time_medium"]="HH:mm:ss"
 )
+# kcov(enabled)
 
 #######################################
 # @description Read one name out of a comma separated list of them.
@@ -2854,7 +2867,9 @@ function __dybatpho_i18n_read_msg {
     fi
     __dybatpho_i18n_store "${locale}" "${key}" "${value}" "${category}" \
       || dybatpho::die "Invalid catalog entry in ${file}:${number}: ${line}"
-  done < "${file}"
+    # kcov never records the redirection line of a loop, which "a message is
+    # translated for the active locale" runs.
+  done < "${file}" # kcov(skip)
   return 0
 }
 
@@ -3011,11 +3026,15 @@ function __dybatpho_i18n_read_po {
         msgid_plural) msgid_plural+="${piece}" ;;
         msgstr) single+="${piece}" ;;
         msgstr_n) forms["${index}"]+="${piece}" ;;
-        *) ;;
+        # A case arm has no command to fire on; "a po string outside any entry
+        # is ignored".
+        *) ;; # kcov(skip)
       esac
       continue
     fi
-  done < "${file}"
+    # kcov never records the redirection line of a loop, which "a po entry is
+    # loaded" runs.
+  done < "${file}" # kcov(skip)
   __dybatpho_i18n_po_flush
   unset -f __dybatpho_i18n_po_flush
   return 0
@@ -3024,6 +3043,7 @@ function __dybatpho_i18n_read_po {
 # The order in which gettext's conventional plural expression for each rule
 # family emits its forms. This is what lets a positional `msgstr[N]` be mapped
 # onto a named category without evaluating the expression that produced it.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA __dybatpho_i18n_po_order=(
   [other]="other"
   [one]="one other"
@@ -3047,6 +3067,7 @@ declare -gA __dybatpho_i18n_po_order=(
   [ga]="one two few many other"
   [gd]="one two few other"
 )
+# kcov(enabled)
 
 #######################################
 # @description Load a catalog file, at most once per shell.
@@ -3135,7 +3156,9 @@ function __dybatpho_i18n_discover {
         found+=1
       fi
     done
-  done < <(printf '%s' "${i18n_roots_output}")
+    # kcov never records the redirection line of a loop, which "a catalog is found
+    # in the flat layout" runs.
+  done < <(printf '%s' "${i18n_roots_output}") # kcov(skip)
   ((found > 0))
 }
 
@@ -3165,7 +3188,9 @@ function dybatpho::i18n_load {
   if [[ -n "${file}" ]]; then
     if ! dybatpho::is file "${file}"; then
       if dybatpho::is true "${DYBATPHO_I18N_STRICT}"; then
-        dybatpho::die "${FUNCNAME[0]}: No such catalog: ${file}"
+        # "a missing catalog stops the script in strict mode" runs this under `run`,
+        # which clears the trap kcov records through.
+        dybatpho::die "${FUNCNAME[0]}: No such catalog: ${file}" # kcov(skip)
       fi
       dybatpho::error "${FUNCNAME[0]}: No such catalog: ${file}"
       return 1
@@ -3181,7 +3206,9 @@ function dybatpho::i18n_load {
   done <<< "$(dybatpho::i18n_chain "${canonical}")"
   if ((found == 0)); then
     if dybatpho::is true "${DYBATPHO_I18N_STRICT}"; then
-      dybatpho::die "${FUNCNAME[0]}: No catalog found for locale '${canonical}' in domain '${domain}'"
+      # "a locale without any catalog stops the script in strict mode" runs this
+      # under `run`, which clears the trap kcov records through.
+      dybatpho::die "${FUNCNAME[0]}: No catalog found for locale '${canonical}' in domain '${domain}'" # kcov(skip)
     fi
     dybatpho::debug "No catalog found for locale '${canonical}' in domain '${domain}'"
     return 1
@@ -3248,10 +3275,14 @@ function dybatpho::i18n_locales {
           seen["${name%.*}"]=1
           ;;
         *.po | *.msg) seen["${base%.*}"]=1 ;;
-        *) ;;
+        # A case arm has no command to fire on; "every catalog layout counts
+        # towards the listed locales".
+        *) ;; # kcov(skip)
       esac
     done
-  done < <(printf '%s' "${i18n_roots_output}")
+    # kcov never records the redirection line of a loop, which "the locales with a
+    # catalog are listed" runs.
+  done < <(printf '%s' "${i18n_roots_output}") # kcov(skip)
   ((${#seen[@]} > 0)) || return 1
   # The sort runs under the C locale so that the list is identical on every
   # machine rather than following whatever collation the user happens to have.
@@ -3333,7 +3364,9 @@ function __dybatpho_i18n_scan {
       find_output=$(printf '%s\n' "${find_scripts}" | LC_ALL=C sort)
       while IFS= read -r file || [[ -n "${file}" ]]; do
         files+=("${file}")
-      done < <(printf '%s' "${find_output}")
+        # kcov never records the redirection line of a loop, which "extraction
+        # from a directory walks it" runs.
+      done < <(printf '%s' "${find_output}") # kcov(skip)
     elif dybatpho::is file "${path}"; then
       files+=("${path}")
     else
@@ -3375,7 +3408,9 @@ function __dybatpho_i18n_scan {
         kind="both"
       fi
       __scan_out["${key}"]="${kind}"
-    done < "${file}"
+      # kcov never records the redirection line of a loop, which "keys are
+      # extracted from a source file" runs.
+    done < "${file}" # kcov(skip)
   done
 }
 
@@ -3499,7 +3534,9 @@ function dybatpho::i18n_extract {
       fi
     fi
     rendered+=$'\n'
-  done < <(printf '%s' "${printf_output}")
+    # kcov never records the redirection line of a loop, which "keys are extracted
+    # from a source file" runs.
+  done < <(printf '%s' "${printf_output}") # kcov(skip)
 
   if [[ -n "${output}" ]]; then
     printf '%s' "${rendered}" | dybatpho::file_write_atomic "${output}"
@@ -3582,7 +3619,9 @@ function dybatpho::i18n_lint {
   if ((${#targets[@]} == 0)); then
     while IFS= read -r line; do
       [[ -n "${line}" && "${line}" != "${reference}" ]] && targets+=("${line}")
-    done < <(dybatpho::i18n_locales || true)
+      # kcov never records the redirection line of a loop, which "lint checks
+      # every locale on the search path when none is named" runs.
+    done < <(dybatpho::i18n_locales || true) # kcov(skip)
   fi
   ((${#targets[@]} > 0)) || {
     dybatpho::warn "${FUNCNAME[0]}: No locales to check"
@@ -3632,8 +3671,8 @@ function dybatpho::i18n_lint {
         findings+=1
         continue
       fi
-      if [[ "${reference_text}" != "${__DYBATPHO_I18N_NONE}" &&
-        "${target_text}" != "${__DYBATPHO_I18N_NONE}" ]]; then
+      if [[ "${reference_text}" != "${__DYBATPHO_I18N_NONE}" ]] \
+        && [[ "${target_text}" != "${__DYBATPHO_I18N_NONE}" ]]; then
         local i18n_placeholders_2
         i18n_placeholders_2=$(__dybatpho_i18n_placeholders "${reference_text}" | tr '\n' ' ')
         reference_marks="${i18n_placeholders_2}"
@@ -3646,7 +3685,9 @@ function dybatpho::i18n_lint {
           findings+=1
         fi
       fi
-    done < <(printf '%s' "${printf_output}")
+      # kcov never records the redirection line of a loop, which "a key the
+      # translation lacks is reported as missing" runs.
+    done < <(printf '%s' "${printf_output}") # kcov(skip)
   done
   ((findings == 0))
 }

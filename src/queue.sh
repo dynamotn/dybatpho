@@ -582,7 +582,9 @@ function dybatpho::queue_len {
   while IFS= read -r identifier; do
     [[ -n "${identifier}" ]] || continue
     found+=("${identifier}")
-  done < <(__dybatpho_queue_ids "${directory}" "${state}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "queue_len counts each state" runs it.
+  done < <(__dybatpho_queue_ids "${directory}" "${state}") # kcov(skip)
   printf '%s\n' "${#found[@]}"
 }
 

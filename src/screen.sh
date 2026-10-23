@@ -168,6 +168,9 @@ __dybatpho_screen_trapped=false
 
 [[ -n "${__DYBATPHO_SCREEN_US-}" ]] || readonly __DYBATPHO_SCREEN_US=$'\x1f'
 [[ -n "${__DYBATPHO_SCREEN_RS-}" ]] || readonly __DYBATPHO_SCREEN_RS=$'\x1e'
+# The terminal device the screen is drawn on, named once so that a test can
+# stand in a path that does not exist.
+__DYBATPHO_SCREEN_TTY="${__DYBATPHO_SCREEN_TTY:-/dev/tty}"
 
 #######################################
 # @description Validate a whole number, or end the script naming what was wrong.
@@ -308,8 +311,8 @@ function __dybatpho_screen_index_into {
   # wide glyph is looked up twice for every run it renders.
   if ! __dybatpho_log_indexes_bytes; then
     local __dybatpho_screen_i_text="${__dybatpho_screen_text[__dybatpho_screen_i_row]}"
-    if [[ "${__dybatpho_screen_i_row}" != "${__dybatpho_screen_map_row}" ||
-      "${__dybatpho_screen_i_text}" != "${__dybatpho_screen_map_text}" ]]; then
+    if [[ "${__dybatpho_screen_i_row}" != "${__dybatpho_screen_map_row}" ]] \
+      || [[ "${__dybatpho_screen_i_text}" != "${__dybatpho_screen_map_text}" ]]; then
       __dybatpho_screen_map_build "${__dybatpho_screen_i_row}" "${__dybatpho_screen_i_text}"
     fi
     # Before the k-th non-ASCII character, a prefix of `index` characters spans
@@ -532,13 +535,14 @@ function __dybatpho_screen_render_into {
   local __dybatpho_screen_r_start __dybatpho_screen_r_stop
 
   __dybatpho_screen_r_rest="${__dybatpho_screen_style[__dybatpho_screen_r_row]}"
+  # Every entry is written with a separator after it. The row is made to end
+  # in exactly one all the same, so that each pass below consumes an entry and
+  # the loop cannot spin on a last one written without it.
+  local __dybatpho_screen_r_rs="${__DYBATPHO_SCREEN_RS}"
+  __dybatpho_screen_r_rest="${__dybatpho_screen_r_rest%"${__dybatpho_screen_r_rs}"}${__dybatpho_screen_r_rs}"
   while [[ -n "${__dybatpho_screen_r_rest}" ]]; do
     __dybatpho_screen_r_entry="${__dybatpho_screen_r_rest%%"${__DYBATPHO_SCREEN_RS}"*}"
-    if [[ "${__dybatpho_screen_r_entry}" == "${__dybatpho_screen_r_rest}" ]]; then
-      __dybatpho_screen_r_rest=""
-    else
-      __dybatpho_screen_r_rest="${__dybatpho_screen_r_rest#*"${__DYBATPHO_SCREEN_RS}"}"
-    fi
+    __dybatpho_screen_r_rest="${__dybatpho_screen_r_rest#*"${__DYBATPHO_SCREEN_RS}"}"
     [[ -n "${__dybatpho_screen_r_entry}" ]] && __dybatpho_screen_r_entries+=("${__dybatpho_screen_r_entry}")
   done
 
@@ -817,8 +821,8 @@ function __dybatpho_screen_layout_into {
         weights[index]="${value}"
         ;;
       *)
-        dybatpho::die \
-          "${FUNCNAME[1]}: Unknown constraint '${constraint}', expected length:, percent:, ratio:, min:, max: or fill:"
+        local unknown="${FUNCNAME[1]}: Unknown constraint '${constraint}'"
+        dybatpho::die "${unknown}, expected length:, percent:, ratio:, min:, max: or fill:"
         ;;
     esac
     fixed=$((fixed + sizes[index]))
@@ -1004,12 +1008,12 @@ function __dybatpho_screen_on_resize {
 #######################################
 function dybatpho::screen_begin {
   [[ "${DYBATPHO_SCREEN_ACTIVE}" == true ]] && return 0
-  if [[ ! -e /dev/tty ]]; then
+  if [[ ! -e "${__DYBATPHO_SCREEN_TTY}" ]]; then
     dybatpho::error "${FUNCNAME[0]}: No terminal to draw on"
     return 1
   fi
   # kcov(disabled)
-  exec {__dybatpho_screen_fd}<> /dev/tty || {
+  exec {__dybatpho_screen_fd}<> "${__DYBATPHO_SCREEN_TTY}" || {
     dybatpho::error "${FUNCNAME[0]}: Cannot open the terminal"
     return 1
   }
@@ -1326,7 +1330,7 @@ function __dybatpho_screen_options {
       *:*)
         __dybatpho_screen_o_out["${__dybatpho_screen_o_item%%:*}"]="${__dybatpho_screen_o_item#*:}"
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 }
@@ -1347,9 +1351,7 @@ function __dybatpho_screen_options {
 function __dybatpho_screen_copy_array {
   local -n __dybatpho_screen_ca_destination="$1"
   local -n __dybatpho_screen_ca_source="$2"
-  __dybatpho_screen_ca_destination=(
-    ${__dybatpho_screen_ca_source[@]+"${__dybatpho_screen_ca_source[@]}"}
-  )
+  __dybatpho_screen_ca_destination=(${__dybatpho_screen_ca_source[@]+"${__dybatpho_screen_ca_source[@]}"})
 }
 
 #######################################
@@ -1610,8 +1612,8 @@ function dybatpho::screen_list {
       && __dybatpho_screen_l_offset=$((__dybatpho_screen_l_selected - __dybatpho_screen_l_height + 1))
   fi
   ((__dybatpho_screen_l_offset >= 0)) || __dybatpho_screen_l_offset=0
-  ((__dybatpho_screen_l_count > __dybatpho_screen_l_height && \
-  __dybatpho_screen_l_offset > __dybatpho_screen_l_count - __dybatpho_screen_l_height)) \
+  ((__dybatpho_screen_l_count > __dybatpho_screen_l_height)) \
+    && ((__dybatpho_screen_l_offset > __dybatpho_screen_l_count - __dybatpho_screen_l_height)) \
     && __dybatpho_screen_l_offset=$((__dybatpho_screen_l_count - __dybatpho_screen_l_height))
   ((__dybatpho_screen_l_offset >= 0)) || __dybatpho_screen_l_offset=0
   DYBATPHO_SCREEN_OFFSET="${__dybatpho_screen_l_offset}"
@@ -2024,7 +2026,9 @@ function dybatpho::screen_barchart {
   ((bar_width > 0)) || return 0
 
   local index padded filled remainder bar cell
-  for ((index = 0; index < height && index < ${#__dybatpho_screen_bar_data[@]}; index++)); do
+  # kcov never records the header of an arithmetic loop that holds another one;
+  # "screen_barchart draws labelled bars with partial blocks" runs it.
+  for ((index = 0; index < height && index < ${#__dybatpho_screen_bar_data[@]}; index++)); do # kcov(skip)
     point="${__dybatpho_screen_bar_data[index]}"
     [[ "${point}" =~ ^-?[0-9]+$ ]] || point=0
     ((point >= 0)) || point=0
@@ -2136,7 +2140,9 @@ function dybatpho::screen_chart {
   # of eight values across fifty columns would otherwise be eight specks with
   # nothing between them, which reads as noise instead of as a line.
   local previous_x=-1 previous_y=0 step_x step_y span
-  for ((index = 0; index < count; index++)); do
+  # kcov never records the header of an arithmetic loop that holds another one;
+  # "screen_chart plots a continuous line in Braille" runs it.
+  for ((index = 0; index < count; index++)); do # kcov(skip)
     point="${__dybatpho_screen_chart_data[index]}"
     [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
     dot_x=$((count > 1 ? index * (dots_x - 1) / (count - 1) : 0))
@@ -2168,7 +2174,9 @@ function dybatpho::screen_chart {
   done
 
   local key row column pattern line
-  for ((row = 0; row < height; row++)); do
+  # kcov never records the header of an arithmetic loop that holds another one;
+  # "screen_chart plots a continuous line in Braille" runs it.
+  for ((row = 0; row < height; row++)); do # kcov(skip)
     line=""
     local drawn=0
     for ((column = 0; column < width; column++)); do
@@ -2406,7 +2414,7 @@ function dybatpho::screen_theme {
     default | dusk | catppuccin-latte | catppuccin-frappe | catppuccin-macchiato | catppuccin-mocha)
       dybatpho::color_supported stdout || name="mono"
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   # Catppuccin publishes its palette in hex; keeping the hex here makes each
   # flavour checkable against https://catppuccin.com/palette at a glance.
@@ -2416,7 +2424,7 @@ function dybatpho::screen_theme {
     catppuccin-frappe) palette=(303446 292c3c 51576d 737994 a5adce babbf1 ca9ee6 f4b8e4 a6d189 e5c890 e78284) ;;
     catppuccin-macchiato) palette=(24273a 1e2030 494d64 6e738d a5adcb b7bdf8 c6a0f6 f5bde6 a6da95 eed49f ed8796) ;;
     catppuccin-mocha) palette=(1e1e2e 181825 45475a 6c7086 a6adc8 b4befe cba6f7 f5c2e7 a6e3a1 f9e2af f38ba8) ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   if ((${#palette[@]})); then
     local -a rgb=()

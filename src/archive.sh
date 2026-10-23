@@ -88,7 +88,7 @@ function __dybatpho_archive_tar_mode_into {
     tar.xz) __dybatpho_archive_letter_ref=J ;;
     tar.bz2) __dybatpho_archive_letter_ref=j ;;
     tar.zst) __dybatpho_archive_prefix_ref=(--zstd) ;;
-    tar) ;;
+    tar) ;; # kcov(skip) - a case arm has no command to fire on
     *) return 1 ;;
   esac
 }
@@ -182,7 +182,9 @@ function __dybatpho_archive_move_stripped {
         mkdir -p -- "${dir_path}"
         mv -- "${source_root}/${rel}" "${destination}/${stripped}"
       fi
-    done < <(printf '%s' "${find_output}")
+      # kcov never records the `done` of a loop fed by a process substitution;
+      # "archive_extract supports strip-components for zip archives" runs it.
+    done < <(printf '%s' "${find_output}") # kcov(skip)
   done
 }
 
@@ -378,7 +380,7 @@ function __dybatpho_archive_entry_is_safe {
   case "${normalized}" in
     /* | '~/'* | [a-zA-Z]:/*) return 1 ;;
     .. | ../* | */../* | */..) return 1 ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   return 0
 }
@@ -407,7 +409,9 @@ function dybatpho::archive_unsafe_entries {
     if ! __dybatpho_archive_entry_is_safe "${entry}"; then
       printf '%s\n' "${entry}"
     fi
-  done < <(printf '%s' "${archive_list_output}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "archive_unsafe_entries and archive_is_safe detect traversal entries" runs it.
+  done < <(printf '%s' "${archive_list_output}") # kcov(skip)
 }
 
 #######################################

@@ -74,17 +74,13 @@ function __dybatpho_table_split_row {
   # ...)` is a process substitution and `$(dybatpho::trim ...)` is another
   # process per cell, and a table pays both for every cell of every row --
   # which was most of what drawing one cost.
-  if [[ -z "${delimiter}" ]]; then
-    target_ref=("${row}")
-  else
-    local -a __dybatpho_table_fields=()
-    local __dybatpho_table_field
-    __dybatpho_string_split_into __dybatpho_table_fields "${row}" "${delimiter}"
-    for __dybatpho_table_field in ${__dybatpho_table_fields[@]+"${__dybatpho_table_fields[@]}"}; do
-      __dybatpho_string_trim_into __dybatpho_table_field "${__dybatpho_table_field}"
-      target_ref+=("${__dybatpho_table_field}")
-    done
-  fi
+  local -a __dybatpho_table_fields=()
+  local __dybatpho_table_field
+  __dybatpho_string_split_into __dybatpho_table_fields "${row}" "${delimiter}"
+  for __dybatpho_table_field in ${__dybatpho_table_fields[@]+"${__dybatpho_table_fields[@]}"}; do
+    __dybatpho_string_trim_into __dybatpho_table_field "${__dybatpho_table_field}"
+    target_ref+=("${__dybatpho_table_field}")
+  done
 
   if ((${#target_ref[@]} == 0)); then
     target_ref=("") # kcov(skip) - defensive; splitting always yields one field
@@ -397,11 +393,14 @@ function __dybatpho_table_reject_quoted {
     # field. A quote anywhere else is just a character in the data, such as the
     # inches in `5" pipe`, and is left alone.
     if [[ "${row}" =~ (^|,)[[:space:]]*\" ]]; then
+      # kcov(disabled) - `dybatpho::die` exits, so the test running this uses `run`:
+      # "dybatpho::table_csv refuses a quoted field instead of splitting through it"
       dybatpho::die "${FUNCNAME[1]}: This row has a quoted field, which this module does not parse: ${row}
 It splits on every comma, so a comma inside a quoted field would silently become a column separator.
 Parse it with the csv module first: dybatpho::csv_read reads the quoting,
 and dybatpho::csv_write hands back text this renders.
 Set DYBATPHO_TABLE_CSV_STRICT=false to split anyway."
+      # kcov(enabled)
     fi
   done
 

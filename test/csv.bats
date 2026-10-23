@@ -364,8 +364,7 @@ command -v jq > /dev/null && exit 3
 dybatpho::csv_from_json '[{"name":"x"}]'
 SCRIPT
 
-  PATH="$(path_without jq)" run --separate-stderr bash "${script}"
-  assert_failure 127
+  PATH="$(path_without jq)" run -127 --separate-stderr bash "${script}"
   assert_stderr --partial "dybatpho::csv_from_json: jq is not installed"
 }
 

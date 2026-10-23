@@ -624,6 +624,9 @@ _string_child() {
     "dybatpho::string_slugify 'Héllo Wörld Nẵng'"
   assert_success
   assert_output "hello-world-nang"
+  # A four-byte character is one separator, not four bytes of noise.
+  run_traced _string_child "export LC_ALL=C" "dybatpho::string_slugify 'Go🚀Now'"
+  assert_output "go-now"
   # A table filled under C still serves a UTF-8 run.
   run_traced _string_child "export LC_ALL=C" "LC_ALL=en_US.UTF-8" \
     "dybatpho::string_slugify 'Crème brûlée'"

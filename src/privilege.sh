@@ -147,7 +147,9 @@ function __dybatpho_privilege_keepalive {
       "$1" -n -v 2> /dev/null || true
       sleep "$2"
     done
-  ) &> /dev/null < /dev/null &
+    # kcov never records a subshell's closing line;
+    # "privilege_acquire keeps the ticket alive" runs it.
+  ) &> /dev/null < /dev/null & # kcov(skip)
   DYBATPHO_PRIVILEGE_KEEPALIVE_PID=$!
 }
 

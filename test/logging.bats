@@ -1372,3 +1372,185 @@ _logging_child() {
   assert_stderr --partial "bogus is not a valid log level"
   refute_stderr --partial "unbound variable"
 }
+
+@test "a log call under an invalid runtime level reports the level and fails" {
+  export DYBATPHO_LOG_LEVEL=loud
+  run_traced -1 --separate-stderr dybatpho::info "never shown"
+  assert_stderr "loud is not a valid log level, it should be trace|debug|info|warn|error|fatal"
+}
+
+@test "dybatpho::compare_log_level ranks every level and rejects an unknown one" {
+  dybatpho::compare_log_level fatal fatal
+  run_traced -1 dybatpho::compare_log_level error fatal
+  dybatpho::compare_log_level trace trace
+  run_traced -1 dybatpho::compare_log_level trace debug
+  run_traced -1 --separate-stderr dybatpho::compare_log_level info loud
+  assert_stderr --partial "loud is not a valid log level"
+  run_traced -1 --separate-stderr dybatpho::compare_log_level loud info
+  assert_stderr --partial "loud is not a valid log level"
+}
+
+@test "the timestamp is read from the clock itself where Bash has no EPOCHSECONDS" {
+  # Bash 4.x has no EPOCHSECONDS, so nothing can be cached by the second. The
+  # variable goes in a subshell: once unset it is an ordinary name, and Bats
+  # itself reads the clock after the test.
+  stamp_without_epochseconds() (
+    unset EPOCHSECONDS
+    local stamp
+    __dybatpho_log_builtin_stamp_into stamp
+    printf '%s\n' "${stamp}"
+  )
+  run_traced -0 stamp_without_epochseconds
+  assert_output --regexp '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$'
+}
+
+@test "the millisecond clock falls back to date where Bash has no EPOCHREALTIME" {
+  # In a subshell, for the reason given above: Bats times the test with it.
+  now_without_epochrealtime() (
+    unset EPOCHREALTIME
+    local now
+    __dybatpho_log_now_ms_into now
+    printf '%s\n' "${now}"
+  )
+  run_traced -0 now_without_epochrealtime
+  assert_output --regexp '^[0-9]+$'
+}
+
+@test "__dybatpho_log_duration_ms counts from the start of the process" {
+  run_traced -0 __dybatpho_log_duration_ms
+  [[ "${output}" =~ ^[0-9]+$ ]]
+}
+
+@test "a log file that keeps no backups is emptied once it reaches its size" {
+  local log_file="${BATS_TEST_TMPDIR}/nobackup.log"
+  printf 'old entry\n' > "${log_file}"
+  __dybatpho_log_rotate_file "${log_file}" 1 0
+  assert_file_exist "${log_file}"
+  assert_file_empty "${log_file}"
+  assert_file_not_exist "${log_file}.1"
+}
+
+@test "a library diagnostic is translated once translation of library messages is on" {
+  # A catalog that knows one message, standing in for the i18n module's.
+  # shellcheck disable=SC2329 # called by the hook
+  __dybatpho_i18n_lookup() {
+    local -n __test_out="$1"
+    [[ "$2" == "Disk full" ]] || return 1
+    __test_out="Đĩa đầy"
+  }
+  export DYBATPHO_I18N_TRANSLATE_LIBRARY=true
+  run_traced -0 __dybatpho_log_translate "Disk full"$'\n\n'
+  assert_output "Đĩa đầy"
+  run_traced -0 __dybatpho_log_translate "Unknown message"
+  assert_output "Unknown message"
+  # Off by default, which keeps the output byte for byte the same.
+  export DYBATPHO_I18N_TRANSLATE_LIBRARY=false
+  run_traced -0 __dybatpho_log_translate "Disk full"
+  assert_output "Disk full"
+}
+
+@test "library text with a value keeps its English without a translation" {
+  export DYBATPHO_I18N_TRANSLATE_LIBRARY=false
+  run_traced -0 __dybatpho_log_text_n cli.args_exact 2 "Expected exactly 2 arguments" expected=2
+  assert_output "Expected exactly 2 arguments"
+  # A child shell that inherited the hook without the i18n module.
+  unset -f __dybatpho_i18n_lookup
+  run_traced -0 __dybatpho_log_text cli.usage "Usage: tool"
+  assert_output "Usage: tool"
+  run_traced -0 __dybatpho_log_text_n cli.args_exact 1 "Expected exactly 1 argument"
+  assert_output "Expected exactly 1 argument"
+}
+
+@test "a character of four bytes stays whole and decodes outside a UTF-8 locale" {
+  local LC_ALL=C
+  local -a chars=()
+  __dybatpho_log_chars_into chars $'a\360\237\230\200b'
+  assert_equal "${#chars[@]}" 3
+  assert_equal "${chars[1]}" $'\360\237\230\200'
+  local codepoint
+  __dybatpho_log_codepoint_into codepoint "${chars[1]}"
+  assert_equal "${codepoint}" 128512
+}
+
+@test "dybatpho::timer_end never reports a negative duration" {
+  # The clock can step backwards between start and end, under NTP for one.
+  dybatpho::timer_start ahead
+  __dybatpho_log_timer["ahead"]=$((${__dybatpho_log_timer["ahead"]} + 600000))
+  run_traced -0 --separate-stderr dybatpho::timer_end ahead
+  assert_equal "${DYBATPHO_TIMER_LAST_MS}" 0
+  assert_stderr --partial "ahead took 0ms"
+}
+
+@test "dybatpho::spinner never reports a negative duration" {
+  local counter="${BATS_TEST_TMPDIR}/clock"
+  printf '10\n' > "${counter}"
+  # A clock that steps back by 50ms on every reading.
+  # shellcheck disable=SC2329 # called by dybatpho::spinner
+  __dybatpho_log_now_ms() {
+    local tick
+    tick="$(< "${counter}")"
+    printf '%s\n' "$((tick - 1))" > "${counter}"
+    printf '%s' "$((1000 + tick * 50))"
+  }
+  export DYBATPHO_SPINNER=never LOG_LEVEL=debug
+  run_traced -0 --separate-stderr dybatpho::spinner "Backwards" -- true
+  assert_stderr --partial "Backwards finished in 0ms with exit code 0"
+}
+
+@test "dybatpho::spinner without a terminal only logs, whatever the default decides" {
+  export DYBATPHO_SPINNER=auto
+  run_traced -0 --separate-stderr dybatpho::spinner "No terminal" -- true
+  assert_stderr --partial "No terminal"
+  [[ "${stderr}" != *$'\r'* ]]
+}
+
+@test "dybatpho::spinner animates by default when stderr is a terminal" {
+  command -v script > /dev/null || skip "script(1) is not installed"
+  local child="${BATS_TEST_TMPDIR}/tty.sh"
+  {
+    printf '. %q\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'DYBATPHO_SPINNER=auto DYBATPHO_SPINNER_INTERVAL=0.02 dybatpho::spinner "On a terminal" -- sleep 0.3'
+    printf '%s\n' 'echo "status $?"'
+  } > "${child}"
+  # util-linux and BSD spell the command to run differently.
+  on_terminal() {
+    if script --version > /dev/null 2>&1; then
+      script -qec "bash $(printf '%q' "${child}")" /dev/null < /dev/null
+    else
+      script -q /dev/null bash "${child}" < /dev/null
+    fi
+  }
+  run_traced -0 on_terminal
+  assert_output --partial "On a terminal"
+  assert_output --partial "status 0"
+  # The frame is drawn over and erased on the same line.
+  [[ "${output}" == *$'\r'*$'\033[K'* ]]
+}
+
+@test "the spinner animation stops and restores the cursor once its script is gone" {
+  # A script that ends without stopping its spinner -- `die`, `set -e`, a
+  # plain `exit` -- must not leave it drawing over the prompt.
+  local child="${BATS_TEST_TMPDIR}/orphan.sh" err="${BATS_TEST_TMPDIR}/orphan.err"
+  {
+    printf '. %q\n' "${DYBATPHO_DIR}/init.sh"
+    printf '__dybatpho_log_spin_loop x 0.02 orphaned 2> %q > /dev/null &\n' "${err}"
+    printf '%s\n' 'sleep 0.1'
+  } > "${child}"
+  run_traced -0 bash "${child}"
+  local tries=0
+  until [[ -s "${err}" && "$(< "${err}")" == *$'\033[?25h' ]]; do
+    ((tries += 1)) && ((tries < 100)) || fail "the spinner kept drawing: $(cat -v "${err}")"
+    sleep 0.05
+  done
+}
+
+@test "dybatpho::log_to_file stops when it cannot create the log file" {
+  ((EUID != 0)) || skip "root writes into a read-only directory"
+  local directory="${BATS_TEST_TMPDIR}/readonly"
+  mkdir -p "${directory}"
+  chmod 500 "${directory}"
+  run dybatpho::log_to_file "${directory}/app.log"
+  chmod 700 "${directory}"
+  assert_failure
+  assert_output --partial "Cannot create log file '${directory}/app.log'"
+}

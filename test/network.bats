@@ -1403,3 +1403,76 @@ HELPER
   run grep -c "traced-key-value" "${trace}"
   assert_output "0"
 }
+
+@test "dybatpho::curl_do stops when it cannot create its private curl config" {
+  # The caller's own `-D` keeps the header file out of the missing directory,
+  # so the private config file is the first thing that cannot be created.
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+  TMPDIR="${BATS_TEST_TMPDIR}/missing" run ! dybatpho::curl_do https://api.example/v1 /dev/null \
+    -D "${BATS_TEST_TMPDIR}/headers"
+  assert_output --partial "Unable to create a private curl config file"
+}
+
+@test "dybatpho::curl_do keeps a secret URL out of band across a same-origin redirect" {
+  # The next hop is a secret as well, so it goes into a fresh config file
+  # rather than onto curl's command line.
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  dybatpho::mock_http "hooks.example.test/T0/Start" 302 '' "Location: /T0/Final"
+  dybatpho::mock_http "hooks.example.test/T0/Final" 200 'arrived'
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+  local DYBATPHO_CURL_SECRET_URL=true
+  local body="${BATS_TEST_TMPDIR}/final.txt"
+  run_traced -0 dybatpho::curl_do "https://hooks.example.test/T0/Start" "${body}"
+  assert_equal "$(cat "${body}")" "arrived"
+  run_traced dybatpho::mock_http_calls
+  assert_line "https://hooks.example.test/T0/Final"
+  run_traced dybatpho::mock_calls curl
+  refute_output --partial "T0/"
+}
+
+@test "dybatpho::circuit_breaker lets a trial request through once the cooldown is over" {
+  export DYBATPHO_CIRCUIT_THRESHOLD=1
+  export DYBATPHO_CIRCUIT_COOLDOWN=0
+  dybatpho::circuit_reset trial-service
+  dybatpho::circuit_breaker trial-service -- false || true
+  assert_equal "$(dybatpho::circuit_state trial-service)" "half-open"
+  DYBATPHO_LOG_LEVEL=debug run_traced -0 --separate-stderr dybatpho::circuit_breaker trial-service -- true
+  assert_stderr --partial "Circuit 'trial-service' cooldown elapsed; allowing a trial request"
+  assert_equal "$(dybatpho::circuit_state trial-service)" "closed"
+  unset DYBATPHO_CIRCUIT_THRESHOLD DYBATPHO_CIRCUIT_COOLDOWN
+}
+
+@test "dybatpho::curl_paginate spends a rate limit keyed by the host on every page" {
+  dybatpho::mock_http "items?page=1" 200 'page-one' \
+    'Link: <https://api.example.test/items?page=2>; rel="next"'
+  dybatpho::mock_http "items?page=2" 200 'page-two'
+  dybatpho::rate_limit_reset api.example.test
+  DYBATPHO_PAGINATE_RATE=5/60
+  run_traced -0 dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  DYBATPHO_PAGINATE_RATE=""
+  assert_equal "$(dybatpho::rate_limit_remaining api.example.test 5/60)" "3"
+}
+
+@test "dybatpho::curl_paginate keys the rate limit by name when the URL has no host" {
+  # `curl_paginate` reads the page through `curl_request`, which the stand-in
+  # below replaces: a URL `url_parse` cannot split still gets a budget.
+  dybatpho::curl_request() { printf 'only\n' > "$2"; }
+  dybatpho::rate_limit_reset curl_paginate
+  DYBATPHO_PAGINATE_RATE=5/60
+  run_traced -0 dybatpho::curl_paginate "not a url"
+  DYBATPHO_PAGINATE_RATE=""
+  assert_output "only"
+  assert_equal "$(dybatpho::rate_limit_remaining curl_paginate 5/60)" "4"
+}
+
+@test "dybatpho::curl_paginate fetches only the first page under DRY_RUN" {
+  dybatpho::curl_request() { :; }
+  DRY_RUN=true
+  run_traced -0 dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  DRY_RUN=""
+  assert_output ""
+}
+
+@test "dybatpho::port_open probes through /dev/tcp when there is no timeout command" {
+  PATH="$(path_without timeout)" run_traced ! dybatpho::port_open 127.0.0.1 1 1
+}

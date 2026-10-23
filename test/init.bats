@@ -758,3 +758,75 @@ dybatpho::module_loaded json || echo "json not loaded here"'
   assert_line --index 0 '[{"a":"1"}]'
   assert_line --index 1 "json not loaded here"
 }
+
+@test "dybatpho::export_functions points BASH_ENV at the library and keeps the hook it replaced" {
+  # Called in this shell, so the previous `BASH_ENV` is whatever the runner
+  # set, coverage hook included, and a second call must not record the
+  # library as its own previous hook.
+  local previous="${BASH_ENV-}"
+  run_traced -0 dybatpho::export_functions
+  assert_equal "${BASH_ENV}" "${__dybatpho_entry_file}"
+  assert_equal "${DYBATPHO_EXPORT_BASH_ENV-}" "${previous}"
+  assert_equal "${DYBATPHO_EXPORT_MODULES-}" "${DYBATPHO_LOADED_MODULES-}"
+  run_traced -0 dybatpho::export_functions
+  assert_equal "${DYBATPHO_EXPORT_BASH_ENV-}" "${previous}"
+}
+
+@test "a child of an exporting shell gets the parent's modules and runs the previous hook first" {
+  local hook="${BATS_TEST_TMPDIR}/hook.sh" child="${BATS_TEST_TMPDIR}/child.sh"
+  # The hook stands in for whatever `BASH_ENV` held, and sources that in turn
+  # so a coverage hook keeps working in the child.
+  printf '%s\n' "[[ -z \"${BASH_ENV-}\" ]] || . $(printf '%q' "${BASH_ENV-}")" 'echo previous-hook' > "${hook}"
+  printf '%s\n' 'dybatpho::module_loaded semver && echo semver-loaded' \
+    'case "$-" in *u*) echo strict ;; *) echo relaxed ;; esac' > "${child}"
+  BASH_ENV="${hook}"
+  run_traced -0 dybatpho::export_functions
+  run_traced -0 env -u DYBATPHO_MODULES bash "${child}"
+  assert_line --index 0 "previous-hook"
+  assert_line --index 1 "semver-loaded"
+  # The child did not ask for strict mode, so it does not get it.
+  assert_line --index 2 "relaxed"
+}
+
+@test "dybatpho::load exports the wider module set once the script opted in" {
+  local __dybatpho_export_enabled=true
+  DYBATPHO_EXPORT_MODULES=""
+  run_traced -0 dybatpho::load semver
+  assert_equal "${BASH_ENV}" "${__dybatpho_entry_file}"
+  assert_equal "${DYBATPHO_EXPORT_MODULES}" "${DYBATPHO_LOADED_MODULES}"
+}
+
+@test "dybatpho::export_functions refuses an entry file that BASH_ENV would expand" {
+  local __dybatpho_entry_file="${BATS_TEST_TMPDIR}/lib\$HOME/init.sh"
+  run -1 dybatpho::export_functions
+  assert_output --partial "Can't export through BASH_ENV"
+}
+
+@test "dybatpho::version asks git describe in its own repository without a VERSION file" {
+  local repo="${BATS_TEST_TMPDIR}/repo"
+  mkdir -p "${repo}"
+  git -C "${repo}" init -q
+  git -C "${repo}" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m init
+  DYBATPHO_DIR="${repo}" DYBATPHO_VERSION="" run_traced -0 dybatpho::version
+  assert_output "$(git -C "${repo}" describe --tags --always --dirty)"
+}
+
+@test "a library whose module files are missing fails the bootstrap without ending the caller" {
+  # The bootstrap is reached through a directory that has no `src`, so the
+  # first core module cannot be found.
+  local bare="${BATS_TEST_TMPDIR}/bare"
+  mkdir -p "${bare}"
+  ln -s "${DYBATPHO_DIR}/init.sh" "${bare}/init.sh"
+  local script="${BATS_TEST_TMPDIR}/missing.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf '. %q || echo "bootstrap failed"\n' "${bare}/init.sh"
+    printf '%s\n' 'echo "still running $-"'
+  } > "${script}"
+  run_traced -0 --separate-stderr env -u DYBATPHO_MODULES bash "${script}"
+  assert_line --index 0 "bootstrap failed"
+  # Strict mode came on before the modules were loaded.
+  assert_line --index 1 --partial "still running"
+  assert_equal "${stderr_lines[0]}" "dybatpho: module 'string' is registered but ${bare}/src/string.sh does not exist."
+}
+

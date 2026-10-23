@@ -107,8 +107,7 @@ function dybatpho::git_default_branch {
   local repo_path remote_head
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
-  remote_head="$(__dybatpho_git "${repo_path}" symbolic-ref --quiet --short \
-    refs/remotes/origin/HEAD 2> /dev/null || true)"
+  remote_head="$(__dybatpho_git "${repo_path}" symbolic-ref -q --short refs/remotes/origin/HEAD 2> /dev/null || true)"
   if [[ -n "${remote_head}" ]]; then
     printf '%s\n' "${remote_head#origin/}"
     return 0
@@ -443,8 +442,7 @@ function dybatpho::git_ahead_behind {
   fi
   __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
   __dybatpho_git_resolve_commit "${repo_path}" "${head_ref}" > /dev/null
-  counts="$(__dybatpho_git "${repo_path}" rev-list --left-right --count \
-    "${head_ref}...${base_ref}")"
+  counts="$(__dybatpho_git "${repo_path}" rev-list --left-right --count "${head_ref}...${base_ref}")"
   printf '%s %s\n' "${counts%%[[:space:]]*}" "${counts##*[[:space:]]}"
 }
 

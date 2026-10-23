@@ -1746,3 +1746,337 @@ _i18n_spec_abbr() {
   run_traced dybatpho::i18n_t greet
   assert_output "Bonjour"
 }
+
+# ---------------------------------------------------------------------------
+# the remaining branches of resolution, rendering, and the catalog tools
+# ---------------------------------------------------------------------------
+
+@test "LANGUAGE is the last resort, and its first entry is the one used" {
+  local out=""
+  DYBATPHO_I18N_LOCALE="" LC_ALL="" LC_MESSAGES="" LANG="" LANGUAGE="vi_VN:fr" \
+    __dybatpho_i18n_resolve out
+  assert_equal "${out}" "vi_VN"
+}
+
+@test "an unusable LANGUAGE leaves the locale to the configured fallback" {
+  local out=""
+  DYBATPHO_I18N_LOCALE="" LC_ALL="" LC_MESSAGES="" LANG="" LANGUAGE=":fr" \
+    DYBATPHO_I18N_FALLBACK=de_AT __dybatpho_i18n_resolve out
+  assert_equal "${out}" "de_AT"
+}
+
+@test "a fallback that is not a locale resolves to English" {
+  local out=""
+  DYBATPHO_I18N_LOCALE="" LC_ALL="" LC_MESSAGES="" LANG="" LANGUAGE="" \
+    DYBATPHO_I18N_FALLBACK="not a locale!" __dybatpho_i18n_resolve out
+  assert_equal "${out}" "en"
+}
+
+@test "the fallback chain of a locale is worked out once per shell" {
+  run_traced -0 dybatpho::i18n_chain de_AT
+  local first="${output}"
+  # The second call is served from the memo, so it agrees even after the
+  # fallback that went into the first one changed.
+  DYBATPHO_I18N_FALLBACK=fr
+  run_traced -0 dybatpho::i18n_chain de_AT
+  assert_equal "${output}" "${first}"
+  assert_line --index 2 "en"
+}
+
+@test "a key holding the unit separator cannot be stored" {
+  run_traced --separate-stderr -1 __dybatpho_i18n_store en "app"$'\x1f'"key" "value"
+  assert_stderr --partial "Message key must not contain a unit separator"
+}
+
+@test "a brace that never closes, or encloses no name, is kept as written" {
+  local out=""
+  __dybatpho_i18n_interpolate out "Hello {name" name=Nam
+  assert_equal "${out}" "Hello {name"
+  __dybatpho_i18n_interpolate out "Set {a b} to {name}" name=Nam
+  assert_equal "${out}" "Set {a b} to Nam"
+}
+
+@test "an untranslated plural message renders its key and records the miss" {
+  run_traced -0 dybatpho::i18n_tn app.files 3
+  assert_output "app.files"
+  run_traced -0 dybatpho::i18n_missing
+  assert_output "$(printf 'en\tapp.files\t1')"
+}
+
+@test "an untranslated plural message in the C locale is not a miss" {
+  dybatpho::i18n_set_locale C
+  run_traced -0 dybatpho::i18n_tn app.files 3
+  assert_output "app.files"
+  run_traced -1 dybatpho::i18n_missing
+}
+
+@test "an untranslated library message is passed through when the hook is on" {
+  DYBATPHO_I18N_TRANSLATE_LIBRARY=true run_traced -0 \
+    dybatpho::i18n_library_message "some other message"
+  assert_output "some other message"
+}
+
+@test "the library hooks print English when the lookup they need is missing" {
+  # A child shell that inherited the exported hooks without the module's
+  # internals looks like this: the switch is on and the helper is not there.
+  unset -f __dybatpho_i18n_lookup
+  export DYBATPHO_I18N_TRANSLATE_LIBRARY=true
+  run_traced -0 dybatpho::i18n_library_message "a message"
+  assert_output "a message"
+  run_traced -0 dybatpho::i18n_library_text a.key "in English"
+  assert_output "in English"
+  run_traced -0 dybatpho::i18n_library_plural a.key 2 "two of them"
+  assert_output "two of them"
+}
+
+@test "an untranslated counted library string keeps the English" {
+  DYBATPHO_I18N_TRANSLATE_LIBRARY=true run_traced -0 \
+    dybatpho::i18n_library_plural cli.no_such_key 2 "Expected exactly 2 arguments"
+  assert_output "Expected exactly 2 arguments"
+}
+
+@test "ASCII mode seeds plain spaces into the number and currency data" {
+  DYBATPHO_I18N_ASCII=true __dybatpho_i18n_seed_symbols
+  run_traced -0 dybatpho::i18n_number 1234567 0 fr
+  assert_output "1 234 567"
+  run_traced -0 dybatpho::i18n_number 1234567 0 ru
+  assert_output "1 234 567"
+  run_traced -0 dybatpho::i18n_currency 5 EUR de
+  assert_output "5,00 €"
+}
+
+@test "a locale registered without grouping writes its digits ungrouped" {
+  dybatpho::i18n_register_number xx "," "." 0
+  run_traced -0 dybatpho::i18n_number 1234567 0 xx
+  assert_output "1234567"
+  dybatpho::i18n_register_number yy "" "." 3
+  run_traced -0 dybatpho::i18n_number 1234567 0 yy
+  assert_output "1234567"
+}
+
+@test "the plain form keeps the natural precision, drops negative zero, and rounds to whole numbers" {
+  run_traced -0 dybatpho::i18n_number_plain 3.14159
+  assert_output "3.14159"
+  run_traced -0 dybatpho::i18n_number_plain -0.004 2
+  assert_output "0.00"
+  run_traced -0 dybatpho::i18n_number_plain 2.5 0
+  assert_output "3"
+}
+
+@test "a size rounds up into the next whole or tenth of a unit" {
+  # 10.5 KiB has no decimal above ten and rounds half up to 11.
+  run_traced -0 dybatpho::i18n_bytes 10752 iec en
+  assert_output "11 KiB"
+  # 9.995 KiB rounds its tenths up to ten, which carries into the whole part.
+  run_traced -0 dybatpho::i18n_bytes 10235 iec en
+  assert_output "10.0 KiB"
+}
+
+@test "an abbreviated weekday is rendered from the pattern" {
+  run_traced -0 dybatpho::i18n_weekday_name 4 abbr de
+  assert_output "Do"
+  run_traced -0 dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "EEE d MMM" en
+  assert_output "Thu 29 Feb"
+}
+
+@test "a pattern renders a doubled quote, a padded twelve hour clock, and an empty era" {
+  # One hour after the fixture is 13:34, which a padded twelve hour clock
+  # writes as 01.
+  run_traced -0 dybatpho::i18n_date_pattern "$((FIXED_EPOCH + 3600))" "hh:mm a" en
+  assert_output "01:34 PM"
+  run_traced -0 dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "yyyy G" en
+  assert_output "2024 "
+  # Last, because kcov loses the trace lines that follow a traced value with a
+  # quote in it until the next quote resynchronizes its parser.
+  run_traced -0 dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "H''mm" en
+  assert_output "12'34"
+}
+
+@test "a pattern kind no locale defines is reported as absent" {
+  run_traced -1 __dybatpho_i18n_pattern en calendar short
+  assert_output ""
+}
+
+@test "a duration under a minute is zero minutes" {
+  dybatpho::i18n_init en
+  run_traced -0 dybatpho::i18n_duration 30
+  assert_output "0 minutes"
+}
+
+@test "a left-to-right mark is U+200E" {
+  run_traced -0 dybatpho::i18n_bidi_mark ltr
+  assert_equal "${output}" "$(printf '\342\200\216')"
+}
+
+@test "day period names can be registered and are then used" {
+  dybatpho::i18n_register_names xx dayperiods "vorm.,nachm."
+  run_traced -0 dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "h a" xx
+  assert_output "12 nachm."
+}
+
+@test "every po field may be continued over several lines" {
+  local dir="${BATS_TEST_TMPDIR}/locale"
+  mkdir -p "${dir}"
+  cat > "${dir}/en.po" << 'PO'
+"a string outside any entry is ignored"
+
+msgctxt "me"
+"nu"
+msgid "open"
+msgstr "Open the menu"
+
+msgid "app.file"
+msgid_plural "app."
+"files"
+msgstr[0] "one "
+"file"
+msgstr[1] "{count} "
+"files"
+PO
+  dybatpho::i18n_load en "${dir}/en.po"
+  run_traced -0 dybatpho::i18n_tc menu open
+  assert_output "Open the menu"
+  run_traced -0 dybatpho::i18n_tn app.file 1
+  assert_output "one file"
+  run_traced -0 dybatpho::i18n_tn app.file 4
+  assert_output "4 files"
+}
+
+@test "a missing catalog stops the script in strict mode" {
+  DYBATPHO_I18N_STRICT=true run --separate-stderr \
+    dybatpho::i18n_load en "${BATS_TEST_TMPDIR}/absent.msg"
+  assert_failure
+  assert_stderr --partial "No such catalog"
+}
+
+@test "a locale without any catalog stops the script in strict mode" {
+  local empty="${BATS_TEST_TMPDIR}/empty"
+  DYBATPHO_I18N_STRICT=true DYBATPHO_I18N_PATH="${empty}" XDG_DATA_DIRS="${empty}" \
+    XDG_DATA_HOME="${empty}" run --separate-stderr dybatpho::i18n_load vi
+  assert_failure
+  assert_stderr --partial "No catalog found for locale 'vi' in domain 'messages'"
+}
+
+@test "every catalog layout counts towards the listed locales" {
+  local dir="${BATS_TEST_TMPDIR}/locale"
+  mkdir -p "${dir}/vi_VN/LC_MESSAGES" "${dir}/de" "${dir}/fr"
+  printf 'a = 1\n' > "${dir}/vi_VN/LC_MESSAGES/messages.po"
+  printf 'a = 1\n' > "${dir}/de/messages.msg"
+  printf 'a = 1\n' > "${dir}/messages.ja.po"
+  printf 'not a catalog\n' > "${dir}/README"
+  local empty="${BATS_TEST_TMPDIR}/empty"
+  DYBATPHO_I18N_PATH="${dir}" XDG_DATA_DIRS="${empty}" XDG_DATA_HOME="${empty}" \
+    run_traced -0 dybatpho::i18n_locales
+  # `fr` is a directory without a catalog, and README is not one either.
+  assert_output "$(printf 'de\nja\nvi_VN')"
+}
+
+@test "extraction warns about a path it cannot read and a context it cannot resolve" {
+  local source="${BATS_TEST_TMPDIR}/app.sh"
+  # shellcheck disable=2016 # the context must stay unexpanded in the generated file
+  printf 'dybatpho::i18n_tc "${area}" open\ndybatpho::i18n_t app.key\n' > "${source}"
+  run_traced --separate-stderr -0 dybatpho::i18n_extract --locale en \
+    "${BATS_TEST_TMPDIR}/absent" "${source}"
+  assert_stderr --partial "Cannot read '${BATS_TEST_TMPDIR}/absent'"
+  assert_stderr --partial "context is not a literal, not extracted"
+  assert_output --partial "app.key ="
+}
+
+@test "a key used both plainly and as a plural is extracted in both shapes" {
+  local source="${BATS_TEST_TMPDIR}/app.sh"
+  printf 'dybatpho::i18n_t app.files\ndybatpho::i18n_tn app.files 2\n' > "${source}"
+  run_traced -0 dybatpho::i18n_extract --locale en -- "${source}"
+  assert_output --partial "app.files ="
+  assert_output --partial "app.files[one] ="
+  assert_output --partial "app.files[other] ="
+}
+
+@test "a sentence key is quoted in the template, and a po template carries plural slots" {
+  local source="${BATS_TEST_TMPDIR}/app.sh"
+  printf 'dybatpho::i18n_t "curl is not installed"\ndybatpho::i18n_tn app.files 2\n' > "${source}"
+  run_traced -0 dybatpho::i18n_extract --locale en "${source}"
+  assert_output --partial '"curl is not installed" ='
+  run_traced -0 dybatpho::i18n_extract --format po --locale en "${source}"
+  assert_output --partial 'msgid_plural "app.files"'
+  assert_output --partial 'msgstr[0] ""'
+  assert_output --partial 'msgstr[1] ""'
+}
+
+@test "lint reports an empty translation and ignores escaped braces" {
+  local dir="${BATS_TEST_TMPDIR}/locale"
+  mkdir -p "${dir}"
+  printf 'app.a = A\napp.b = {{literal}} {name}\n' > "${dir}/en.msg"
+  printf 'app.a =\napp.b = {name} {{literal}}\n' > "${dir}/vi_VN.msg"
+  dybatpho::i18n_load en "${dir}/en.msg"
+  dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
+  run_traced -1 dybatpho::i18n_lint --reference en -- vi_VN
+  assert_output --partial "empty"
+  assert_output --partial "app.a"
+  refute_output --partial "placeholder"
+}
+
+@test "lint checks every locale on the search path when none is named" {
+  local dir="${BATS_TEST_TMPDIR}/locale"
+  mkdir -p "${dir}"
+  printf 'app.a = A\napp.b = B\n' > "${dir}/en.msg"
+  printf 'app.a = A\n' > "${dir}/vi_VN.msg"
+  local empty="${BATS_TEST_TMPDIR}/empty"
+  dybatpho::i18n_load en "${dir}/en.msg"
+  dybatpho::i18n_load vi_VN "${dir}/vi_VN.msg"
+  DYBATPHO_I18N_PATH="${dir}" XDG_DATA_DIRS="${empty}" XDG_DATA_HOME="${empty}" \
+    run_traced -1 dybatpho::i18n_lint --reference en
+  assert_output --partial "vi_VN"
+  assert_output --partial "app.b"
+}
+
+@test "lint with no locale to check warns and passes" {
+  local empty="${BATS_TEST_TMPDIR}/empty"
+  XDG_DATA_DIRS="${empty}" XDG_DATA_HOME="${empty}" \
+    run_traced --separate-stderr -0 dybatpho::i18n_lint --reference en
+  assert_stderr --partial "No locales to check"
+}
+
+@test "every plural rule family picks each of its categories" {
+  local -a cases=(
+    "pt 0 one" "pt 1 one" "pt 2 other"
+    "cs 1 one" "cs 3 few" "cs 5 other"
+    "he 1 one" "he 2 two" "he 3 other"
+    "lt 1 one" "lt 21 one" "lt 2 few" "lt 11 other" "lt 12 other"
+    "lv 0 zero" "lv 11 zero" "lv 1 one" "lv 2 other"
+    "ro 1 one" "ro 0 few" "ro 19 few" "ro 20 other"
+    "sl 1 one" "sl 102 two" "sl 3 few" "sl 5 other"
+    "is 1 one" "is 11 other" "mk 21 one" "mk 11 other"
+    "fil 1 one" "fil 5 one" "fil 4 other"
+    "cy 0 zero" "cy 1 one" "cy 2 two" "cy 3 few" "cy 6 many" "cy 7 other"
+    "mt 1 one" "mt 2 two" "mt 0 few" "mt 11 many" "mt 20 other"
+    "ga 1 one" "ga 2 two" "ga 3 few" "ga 7 many" "ga 11 other"
+    "gd 11 one" "gd 12 two" "gd 3 few" "gd 20 other"
+  )
+  local case language count expected
+  for case in "${cases[@]}"; do
+    read -r language count expected <<< "${case}"
+    run_traced -0 dybatpho::i18n_plural_form "${count}" "${language}"
+    # The case is part of both sides so a failure names the one that broke.
+    assert_equal "${case}: ${output}" "${case}: ${expected}"
+  done
+}
+
+@test "a translated library message is printed in place of the English" {
+  __dybatpho_i18n_store en "curl is not installed" "curl is missing"
+  DYBATPHO_I18N_TRANSLATE_LIBRARY=true run_traced -0 \
+    dybatpho::i18n_library_message "curl is not installed"
+  assert_output "curl is missing"
+}
+
+@test "an unpadded twenty four hour clock and a span of months are rendered" {
+  run_traced -0 dybatpho::i18n_time "$((FIXED_EPOCH - 3600 * 3))" short es
+  assert_output "9:34"
+  dybatpho::i18n_init en
+  run_traced -0 dybatpho::i18n_duration $((86400 * 60))
+  assert_output "2 months"
+}
+
+@test "a counted library string is left in English by default" {
+  run_traced -0 dybatpho::i18n_library_plural cli.args_exact 2 "Expected exactly 2 arguments"
+  assert_output "Expected exactly 2 arguments"
+}

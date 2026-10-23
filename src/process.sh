@@ -644,7 +644,7 @@ function __dybatpho_process_timeout_fallback {
   local __dybatpho_process_fallback_monitor="off"
   case "$-" in
     *m*) __dybatpho_process_fallback_monitor="on" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   set -m
 
@@ -788,7 +788,7 @@ function dybatpho::background_run {
   local __dybatpho_process_bg_monitor="off"
   case "$-" in
     *m*) __dybatpho_process_bg_monitor="on" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   set -m
   "$@" &
@@ -933,8 +933,10 @@ function dybatpho::pid_file_write {
   (set -C && printf '%s\n' "${pid}" > "${staged}") 2> /dev/null \
     || dybatpho::die "${FUNCNAME[0]}: Cannot write ${path}"
   if ! mv -f -- "${staged}" "${path}"; then
-    rm -f -- "${staged}"
-    dybatpho::die "${FUNCNAME[0]}: Cannot move ${staged} to ${path}"
+    # The branch dies, so "dybatpho::pid_file_write stops and cleans up when the
+    # file cannot be moved into place" runs it under `run`, unseen by kcov.
+    rm -f -- "${staged}"                                             # kcov(skip)
+    dybatpho::die "${FUNCNAME[0]}: Cannot move ${staged} to ${path}" # kcov(skip)
   fi
   dybatpho::debug "Wrote pid ${pid} to ${path}"
 }

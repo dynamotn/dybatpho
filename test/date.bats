@@ -358,6 +358,23 @@ setup() {
   assert_output "1709215496"
 }
 
+@test "dybatpho::date_parse reads an ISO 8601 offset with BusyBox date" {
+  # BusyBox takes the input format through -D and has no %z, so the local
+  # part is parsed on its own and the offset subtracted afterwards.
+  local answers="\"-D %Y\") echo 0 ;; \"-D %Y-%m-%dT%H:%M:%S\") echo 1709210096 ;;"
+  answers+=" -d*) echo 2024-02-29T12:34:56 ;; *) exit 1 ;;"
+  stub_repeated date ": case \"\$1 \$2\" in ${answers} esac"
+  __dybatpho_date_flavor_cache=""
+
+  run_traced -0 dybatpho::date_parse "2024-02-29T12:34:56Z"
+  assert_output "1709210096"
+  run_traced -0 dybatpho::date_parse "2024-02-29T12:34:56+02:00"
+  assert_output "1709202896"
+  run_traced -0 dybatpho::date_parse "2024-02-29T12:34:56-0130"
+  assert_output "1709215496"
+  unstub date
+}
+
 @test "dybatpho::date_add shifts back from a time of day rather than reading the amount as a zone" {
   # GNU `date -d "10:00:00 -5 hours"` reads `-5` as a UTC offset and answered
   # 16:00; the offset now goes before the date.

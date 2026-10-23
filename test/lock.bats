@@ -685,3 +685,51 @@ SCRIPT
   [[ ! -L "${lock_path}.command" ]]
   dybatpho::lock_release "${lock_path}"
 }
+
+# Replays a reclaim race: the first two reads see the dead holder, and the read
+# of the copy moved aside sees a fresh holder that took the lock in between.
+# With a third holder, that holder claims the name again before it is put back.
+# The stub outlives this function, so what it reads is global.
+_replay_reclaim_race() {
+  RACE_LOCK="$1" RACE_FRESH="$2" RACE_THIRD="${3-}" RACE_READS="${BATS_TEST_TMPDIR}/reads"
+  : > "${RACE_READS}"
+  # shellcheck disable=SC2329 # called by dybatpho::lock_reclaim_stale
+  __dybatpho_lock_identity() {
+    printf '.' >> "${RACE_READS}"
+    if [[ "$(< "${RACE_READS}")" == "..." ]]; then
+      [[ -z "${RACE_THIRD}" ]] || ln -s "${RACE_THIRD}" "${RACE_LOCK}"
+      printf '%s\n' "${RACE_FRESH}"
+      return 0
+    fi
+    readlink "$1"
+  }
+}
+
+@test "dybatpho::lock_reclaim_stale puts back a lock that changed hands while it was moved aside" {
+  local lock_path dead fresh
+  lock_path="$(dybatpho::lock_path "changed-hands")"
+  dead="${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z"
+  fresh="$$:$(dybatpho::lock_hostname):2026-01-02T00:00:00Z"
+  ln -s "${dead}" "${lock_path}"
+  _replay_reclaim_race "${lock_path}" "${fresh}"
+  run_traced -0 --separate-stderr dybatpho::lock_reclaim_stale "${lock_path}"
+  assert_equal "$(readlink "${lock_path}")" "${fresh}"
+  assert_equal "${stderr}" ""
+  run_traced -1 compgen -G "${lock_path}.stale.*"
+  assert_output ""
+  rm -f -- "${lock_path}"
+}
+
+@test "dybatpho::lock_reclaim_stale leaves a third holder alone and says where the moved copy is" {
+  local lock_path dead fresh third
+  lock_path="$(dybatpho::lock_path "third-holder")"
+  dead="${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z"
+  fresh="$$:$(dybatpho::lock_hostname):2026-01-02T00:00:00Z"
+  third="$$:$(dybatpho::lock_hostname):2026-01-03T00:00:00Z"
+  ln -s "${dead}" "${lock_path}"
+  _replay_reclaim_race "${lock_path}" "${fresh}" "${third}"
+  run_traced -0 --separate-stderr dybatpho::lock_reclaim_stale "${lock_path}"
+  assert_equal "$(readlink "${lock_path}")" "${third}"
+  assert_stderr --partial "Lock ${lock_path} changed hands while it was being reclaimed"
+  rm -f -- "${lock_path}" "${lock_path}".stale.*
+}

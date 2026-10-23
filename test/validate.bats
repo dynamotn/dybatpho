@@ -364,6 +364,9 @@ teardown() {
 
   dybatpho::validate_value "-3" type:int min:-2 || true
   assert_equal "$(dybatpho::validate_errors)" "must be at least -2"
+
+  dybatpho::validate_value "3" type:int min:-2 max:5 || true
+  assert_equal "$(dybatpho::validate_errors)" ""
 }
 
 @test "dybatpho::validate_value applies minlen and maxlen whatever the type" {
@@ -505,6 +508,17 @@ teardown() {
 
   dybatpho::validate_value "500" type:weight max:100 || true
   assert_equal "$(dybatpho::validate_errors)" "must be at most 100"
+}
+
+@test "dybatpho::validate_value bounds a custom numeric notation through printf" {
+  # Hexadecimal is not decimal text, so it is read the way `printf` reads it.
+  function _test_is_hex { [[ "$1" =~ ^-?0x[0-9a-fA-F]+$ ]]; }
+  dybatpho::validate_register hex _test_is_hex "a hexadecimal number" numeric
+
+  dybatpho::validate_value "0x10" type:hex min:8 max:32 || true
+  assert_equal "$(dybatpho::validate_errors)" ""
+  dybatpho::validate_value "-0x10" type:hex min:-8 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at least -8"
 }
 
 @test "dybatpho::validate_register replaces a type that was already registered" {

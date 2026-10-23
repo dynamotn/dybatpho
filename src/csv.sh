@@ -67,6 +67,7 @@ __dybatpho_csv_unit=$'\037'
 # Only POSIX `awk` is used, so gawk, mawk, BusyBox and BSD `awk` agree, and it
 # runs under `LC_ALL=C`, where a string is bytes the way the Bash engine
 # compares them.
+# kcov(disabled) - an awk program held in a string: data, not Bash commands
 # shellcheck disable=SC2016 # an awk program: its `$` are awk's, not the shell's
 __dybatpho_csv_awk_program='
   BEGIN {
@@ -314,6 +315,7 @@ __dybatpho_csv_awk_program='
     for (k = 1; k <= m; k++) emit(O[k], D)
   }
 '
+# kcov(enabled)
 
 #######################################
 # @description Return success when a bulk operation should run through the
@@ -368,6 +370,21 @@ function __dybatpho_csv_awk_into {
   __dybatpho_csv_awk_status=0
   # shellcheck disable=SC2154 # `math.sh`, which this module depends on, defines the shared awk helpers
   LC_ALL=C command awk "${__dybatpho_csv_awk_program}${__dybatpho_math_awk_lib}" "$@" || __dybatpho_csv_awk_status=$?
+}
+
+#######################################
+# @description Run the `awk` engine's `read` operation on stdin and print a
+#   `.` after its output when it succeeds, so that a command substitution
+#   keeps the trailing newlines it would otherwise strip.
+# @arg $1 string Field delimiter
+# @stdin The CSV text, ending in a newline
+# @stdout One encoded record a line, then `.`
+# @exitcode 0 The text was read
+# @exitcode 3 The Bash engine has to read it instead
+# @internal
+#######################################
+function __dybatpho_csv_awk_read {
+  LC_ALL=C command awk "${__dybatpho_csv_awk_program}${__dybatpho_math_awk_lib}" read "$1" && printf '.'
 }
 
 #######################################
@@ -587,9 +604,7 @@ function __dybatpho_csv_parse_into {
     # separator, so every one in the output starts such a pair. The `.` keeps
     # the trailing newlines that `$(...)` would strip.
     local __dybatpho_csv_encoded __dybatpho_csv_parsed_ok=0
-    # shellcheck disable=SC2154 # `math.sh`, which this module depends on, defines the shared awk helpers
-    __dybatpho_csv_encoded="$(LC_ALL=C command awk "${__dybatpho_csv_awk_program}${__dybatpho_math_awk_lib}" read \
-      "${__dybatpho_csv_delimiter}" <<< "${__dybatpho_csv_text}" && printf '.')" \
+    __dybatpho_csv_encoded="$(__dybatpho_csv_awk_read "${__dybatpho_csv_delimiter}" <<< "${__dybatpho_csv_text}")" \
       || __dybatpho_csv_parsed_ok=$?
     if ((__dybatpho_csv_parsed_ok == 0)); then
       __dybatpho_csv_encoded="${__dybatpho_csv_encoded%.}"

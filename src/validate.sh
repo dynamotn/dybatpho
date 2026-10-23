@@ -482,8 +482,7 @@ function dybatpho::validate_value {
     || dybatpho::die "${FUNCNAME[0]}: '${type}' is not a known type"
 
   if ! "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"; then
-    __dybatpho_validate_error \
-      "expected ${__DYBATPHO_VALIDATE_DESCRIPTIONS[${canonical}]}, got \`${value}\`"
+    __dybatpho_validate_error "expected ${__DYBATPHO_VALIDATE_DESCRIPTIONS[${canonical}]}, got \`${value}\`"
     return 1
   fi
 

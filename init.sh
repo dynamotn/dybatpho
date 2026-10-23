@@ -82,10 +82,15 @@ fi
 # no calling line, and with `BASH_ENV` naming this very file. In that case the
 # child gets the parent's module set, and its own options are left alone: the
 # child did not ask for strict mode, and its arguments are not meant for here.
+# A child reached that way runs this before the coverage hook it inherited is
+# sourced again below, so kcov sees none of the hook-only lines up to there; the
+# export tests in `test/init.bats` run them.
 __dybatpho_init_hook=false
-if [[ -n "${DYBATPHO_EXPORT_MODULES+set}" && ${#BASH_SOURCE[@]} -eq 1 && "${BASH_LINENO[0]-}" == 0 &&
-  "${__dybatpho_init_source}" == "${BASH_ENV-}" ]]; then
-  __dybatpho_init_hook=true
+# Two tests rather than one broken over two lines, which Bash traces where kcov
+# counts nothing.
+if [[ -n "${DYBATPHO_EXPORT_MODULES+set}" && ${#BASH_SOURCE[@]} -eq 1 && "${BASH_LINENO[0]-}" == 0 ]] \
+  && [[ "${__dybatpho_init_source}" == "${BASH_ENV-}" ]]; then
+  __dybatpho_init_hook=true # kcov(skip)
 fi
 
 # Read the options. `--modules` and `--no-strict` have to start the argument
@@ -95,8 +100,8 @@ fi
 __dybatpho_init_strict=true
 __dybatpho_requested="${DYBATPHO_MODULES-}"
 if [[ "${__dybatpho_init_hook}" == true ]]; then
-  __dybatpho_init_strict=false
-  __dybatpho_requested="${DYBATPHO_EXPORT_MODULES}"
+  __dybatpho_init_strict=false                      # kcov(skip) - a child reached through BASH_ENV, see above
+  __dybatpho_requested="${DYBATPHO_EXPORT_MODULES}" # kcov(skip)
 elif [[ "${1-}" == "--modules" || "${1-}" == "--no-strict" ]]; then
   __dybatpho_init_modules_given=false
   __dybatpho_init_list=""
@@ -143,22 +148,23 @@ DYBATPHO_LOADED_MODULES=""
 # The version is a property of this copy of the library rather than of the
 # shell, so a value already in the environment is honored as an override.
 # @env DYBATPHO_VERSION string Cached library version, see `dybatpho::version`
-DYBATPHO_VERSION="${DYBATPHO_VERSION-}"
-# Modules whose dependencies are still being resolved, used to stop a
-# dependency cycle from recursing forever.
-__dybatpho_loading_modules=""
 # @env DYBATPHO_EXPORT_FUNCTIONS bool When true-like before sourcing, call `dybatpho::export_functions` once the modules
 #   are loaded, default is `false`
 # @env DYBATPHO_EXPORT_MODULES string Module set a child process loads through `BASH_ENV`, set by
 #   `dybatpho::export_functions` and kept current by `dybatpho::load`
 # @env DYBATPHO_EXPORT_BASH_ENV string The `BASH_ENV` in place before `dybatpho::export_functions`, sourced first by
 #   every child
+DYBATPHO_VERSION="${DYBATPHO_VERSION-}"
+# Modules whose dependencies are still being resolved, used to stop a
+# dependency cycle from recursing forever.
+__dybatpho_loading_modules=""
 
 # Dependencies between optional modules. Core modules are implicit, so only the
 # optional-to-optional edges are listed here. Cycles are allowed: function calls
 # resolve at run time, so modules may reference each other. The map is global
 # even when `init.sh` is sourced from inside a function: `dybatpho::load` and
 # `dybatpho::doctor` read it long after that function has returned.
+# kcov(disabled) - a table literal: its lines are data, not commands
 declare -gA __dybatpho_module_deps=(
   [table]="text"
   [csv]="math"
@@ -182,6 +188,7 @@ declare -gA __dybatpho_module_deps=(
   # whose own `yq` call would drag `semver` into every script loading `config`.
   [doctor]="semver"
 )
+# kcov(enabled)
 
 # Soft dependencies: a module that calls another one from only a few of its
 # functions does not load it up front. The first call that needs it loads it on
@@ -191,6 +198,7 @@ declare -gA __dybatpho_module_deps=(
 # call site that asks for a module is listed. A load that happens inside
 # `$(...)` lives only as long as that subshell, so the next substitution loads
 # the module again; a script on a hot path names the module up front instead.
+# kcov(disabled) - a table literal: its lines are data, not commands
 declare -gA __dybatpho_module_soft_deps=(
   [helpers]="semver"
   [network]="json"
@@ -210,6 +218,7 @@ declare -gA __dybatpho_module_soft_deps=(
   [metrics]="math network"
   [testing]="json diff"
 )
+# kcov(enabled)
 
 # Stability tier of every registered module. A `stable` module keeps its public
 # contract across minor releases: a function is deprecated for at least one
@@ -217,6 +226,7 @@ declare -gA __dybatpho_module_soft_deps=(
 # minor release. A stable module depends only on stable modules, which
 # `test/init.bats` checks, so a script that keeps to stable modules is never
 # broken by an experimental one underneath it.
+# kcov(disabled) - a table literal: its lines are data, not commands
 declare -gA __dybatpho_module_tiers=(
   [string]="stable" [os]="stable" [logging]="stable" [helpers]="stable"
   [process]="stable" [file]="stable" [secret]="stable" [array]="stable"
@@ -232,6 +242,7 @@ declare -gA __dybatpho_module_tiers=(
   [csv]="experimental" [backup]="experimental" [diff]="experimental"
   [queue]="experimental" [schedule]="experimental" [privilege]="experimental"
 )
+# kcov(enabled)
 
 #######################################
 # @description Source one module file. Every module lives at
@@ -338,10 +349,12 @@ function dybatpho::export_functions {
   # an expansion character would name another file, or run a command.
   case "${entry}" in
     *'$'* | *'`'* | *\\*)
-      local why="Can't export through BASH_ENV from a path holding \$, \` or \\"
-      dybatpho::die "dybatpho::export_functions: ${why}: ${entry}"
+      # This dies, so "dybatpho::export_functions refuses an entry file that
+      # BASH_ENV would expand" runs it under `run`, where kcov cannot see it.
+      local why="Can't export through BASH_ENV from a path holding \$, \` or \\" # kcov(skip)
+      dybatpho::die "dybatpho::export_functions: ${why}: ${entry}"               # kcov(skip)
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   if [[ "${BASH_ENV-}" != "${entry}" ]]; then
     DYBATPHO_EXPORT_BASH_ENV="${BASH_ENV-}"
@@ -522,7 +535,7 @@ __dybatpho_selection=""
 for __dybatpho_module in ${__dybatpho_requested}; do
   case "${__dybatpho_module}" in
     all) __dybatpho_selection="${__dybatpho_selection} ${DYBATPHO_CORE_MODULES} ${DYBATPHO_OPTIONAL_MODULES}" ;;
-    core) ;; # Always loaded below
+    core) ;; # Always loaded below # kcov(skip) - a case arm with no command has nothing to fire on
     *)
       # A wrong name is reported before anything changes in the caller's shell,
       # so a bootstrap that fails leaves its options as they were.
@@ -553,10 +566,11 @@ fi
 
 # A child reached through `BASH_ENV` first sources whatever `BASH_ENV` named
 # before `dybatpho::export_functions` replaced it.
-if [[ "${__dybatpho_init_hook}" == true && -n "${DYBATPHO_EXPORT_BASH_ENV-}" &&
-  "${DYBATPHO_EXPORT_BASH_ENV}" != "${BASH_ENV-}" && -r "${DYBATPHO_EXPORT_BASH_ENV}" ]]; then
+# The coverage hook is one such file, so kcov starts seeing the child after it.
+if [[ "${__dybatpho_init_hook}" == true && -n "${DYBATPHO_EXPORT_BASH_ENV-}" ]] \
+  && [[ "${DYBATPHO_EXPORT_BASH_ENV}" != "${BASH_ENV-}" && -r "${DYBATPHO_EXPORT_BASH_ENV}" ]]; then
   # shellcheck source=/dev/null
-  . "${DYBATPHO_EXPORT_BASH_ENV}"
+  . "${DYBATPHO_EXPORT_BASH_ENV}" # kcov(skip) - runs before the hook it sources is in place
 fi
 
 for __dybatpho_module in ${DYBATPHO_CORE_MODULES} ${__dybatpho_selection}; do

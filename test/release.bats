@@ -358,6 +358,19 @@ SIGNER
   assert [ ! -e "${BATS_TEST_TMPDIR}/pwned" ]
 }
 
+@test "dybatpho::release_sign falls back to gpg with the configured key" {
+  local target="${BATS_TEST_TMPDIR}/SUMS"
+  printf 'sums\n' > "${target}"
+  dybatpho::mock_command_script gpg 'while (($#)); do [[ "$1" == --output ]] && printf sig > "$2"; shift; done'
+
+  DYBATPHO_RELEASE_SIGN_CMD="" DYBATPHO_RELEASE_GPG_KEY="release@example.org" \
+    run_traced -0 dybatpho::release_sign "${target}"
+  assert_output "${target}.asc"
+  assert_equal "$(cat "${target}.asc")" "sig"
+  assert_equal "$(dybatpho::mock_calls gpg)" \
+    "--batch --yes --armor --detach-sign --output ${target}.asc --local-user release@example.org ${target}"
+}
+
 @test "dybatpho::release_sign accepts an explicit signature path and rejects a missing file" {
   local target="${BATS_TEST_TMPDIR}/artifact"
   printf 'x\n' > "${target}"

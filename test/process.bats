@@ -974,3 +974,44 @@ SCRIPT
   assert_failure
   assert_stderr --partial "Invalid variable name"
 }
+
+@test "a job outside a process group of its own is ended with SIGKILL when it ignores SIGTERM" {
+  (
+    trap '' TERM
+    exec sleep 30
+  ) &
+  local pid=$!
+  run_traced -0 __dybatpho_process_end_job "${pid}" false 1
+  wait "${pid}" 2> /dev/null || true
+  assert_process_dead "${pid}"
+}
+
+@test "the timeout fallback leaves job control on when the caller had it on" {
+  __dybatpho_process_timeout_probe=no
+  set -m
+  run_traced -0 dybatpho::run_with_timeout 60 true
+  local options="$-"
+  set +m
+  [[ "${options}" == *m* ]]
+}
+
+@test "dybatpho::background_run leaves job control on when the caller had it on" {
+  set -m
+  run_traced -0 dybatpho::background_run monitor_on sleep 0
+  local options="$-"
+  set +m
+  dybatpho::wait_all > /dev/null 2>&1 || true
+  [[ "${options}" == *m* ]]
+}
+
+@test "dybatpho::pid_file_write stops and cleans up when the file cannot be moved into place" {
+  local path="${BATS_TEST_TMPDIR}/run/app.pid"
+  # shellcheck disable=SC2329 # called by dybatpho::pid_file_write
+  mv() { return 1; }
+  run -1 dybatpho::pid_file_write "${path}" 4242
+  unset -f mv
+  assert_output --partial "Cannot move"
+  assert_file_not_exist "${path}"
+  run_traced -1 compgen -G "${path}.*.tmp"
+  assert_output ""
+}

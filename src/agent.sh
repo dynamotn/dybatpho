@@ -273,17 +273,16 @@ function dybatpho::agent_context {
   local agent=false
   dybatpho::agent_detect && agent=true
 
-  local modules git
+  local modules git loaded
   # shellcheck disable=SC2154 # declared by `init.sh`
-  modules=$(dybatpho::json_eval "$(dybatpho::json_string "${DYBATPHO_LOADED_MODULES}")" \
-    'split(" ") | map(select(length > 0))')
+  loaded=$(dybatpho::json_string "${DYBATPHO_LOADED_MODULES}")
+  modules=$(dybatpho::json_eval "${loaded}" 'split(" ") | map(select(length > 0))')
   git=$(dybatpho::json_object repository:json "${repository}" branch "${branch}")
 
   local os arch
   os=$(uname -s)
   arch=$(uname -m)
-  dybatpho::json_object \
-    os "${os}" \
+  dybatpho::json_object os "${os}" \
     arch "${arch}" \
     bash "${BASH_VERSION}" \
     cwd "${PWD}" \
@@ -342,8 +341,7 @@ function dybatpho::agent_confirm {
     return 0
   fi
   dybatpho::agent_audit "${action}" "refused: not in DYBATPHO_AGENT_ALLOW"
-  dybatpho::json_object \
-    status refused \
+  dybatpho::json_object status refused \
     code action_not_allowed \
     action "${action}" \
     message "Action ${action} is not permitted for an agent" \
@@ -378,8 +376,7 @@ function dybatpho::agent_audit {
   __dybatpho_agent_mode_into agent_mode
   local timestamp
   timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  dybatpho::json_object \
-    timestamp "${timestamp}" \
+  dybatpho::json_object timestamp "${timestamp}" \
     script "${0##*/}" \
     mode "${agent_mode}" \
     action "${action}" \
@@ -408,7 +405,7 @@ function dybatpho::agent_audit_show {
   while IFS= read -r record || [[ -n "${record}" ]]; do
     dybatpho::is empty "${record}" && continue
     dybatpho::json_get "${record}" '[.timestamp, .action, .detail] | join(" ")'
-  done < "${DYBATPHO_AGENT_AUDIT_FILE}"
+  done < "${DYBATPHO_AGENT_AUDIT_FILE}" # kcov(skip) - a loop's `done` is never traced
 }
 
 #######################################
@@ -424,14 +421,17 @@ function __dybatpho_agent_flatten_schema {
   local schema
   dybatpho::expect_args schema -- "$@"
   # `$parent` and `$path` are variables of the filter, not of the shell.
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
   # shellcheck disable=SC2016
-  dybatpho::json_eval "${schema}" '
+  local program='
     def flat($parent):
       ($parent + [(.name | tostring)]) as $path
       | {"path": $path, "description": (.description | tostring),
          "options": [.options[]? | select(.hidden != true)]},
         (.commands[]? | flat($path));
     [flat([])]'
+  # kcov(enabled)
+  dybatpho::json_eval "${schema}" "${program}"
 }
 
 #######################################
@@ -450,6 +450,7 @@ function __dybatpho_agent_options_filter_into {
   local -n __dybatpho_agent_opts_out="${__dybatpho_agent_opts_var}"
   local enum='((select(((.choices // "") | tostring) != "") | {"enum": (.choices | split(","))}) // {})'
   local description='"description": (.description | tostring)'
+  # kcov(disabled) - jq filters spread over lines: data, not Bash commands
   local property="(\$opt | (select(.type == \"flag\") | {\"type\": \"boolean\", ${description}})
     // (select(.multiple == true)
       | {\"type\": \"array\", ${description}, \"items\": ({\"type\": \"string\"} + ${enum})})
@@ -460,6 +461,7 @@ function __dybatpho_agent_options_filter_into {
     \"required\": [.options[] | select(.required == true)
       | (.name | tostring | ascii_downcase)],
     \"additionalProperties\": false}"
+  # kcov(enabled)
 }
 
 #######################################
@@ -482,19 +484,20 @@ function __dybatpho_agent_each_tool_into {
   __dybatpho_agent_options_filter_into __dybatpho_agent_each_schema
 
   local __dybatpho_agent_each_names
-  __dybatpho_agent_each_names=$(dybatpho::json_get "${__dybatpho_agent_each_commands}" \
-    '.[] | .path | join("_")')
+  __dybatpho_agent_each_names=$(dybatpho::json_get "${__dybatpho_agent_each_commands}" '.[] | .path | join("_")')
   local -a __dybatpho_agent_each_list=()
   [[ -z "${__dybatpho_agent_each_names}" ]] \
     || mapfile -t __dybatpho_agent_each_list <<< "${__dybatpho_agent_each_names}"
 
   local __dybatpho_agent_each_index=0 __dybatpho_agent_each_name __dybatpho_agent_each_filter
+  local __dybatpho_agent_each_jq __dybatpho_agent_each_def
   for __dybatpho_agent_each_name in ${__dybatpho_agent_each_list[@]+"${__dybatpho_agent_each_list[@]}"}; do
     __dybatpho_agent_tool_name_into __dybatpho_agent_each_name "${__dybatpho_agent_each_name}"
     __dybatpho_agent_each_filter="${__dybatpho_agent_each_template//@NAME@/\"${__dybatpho_agent_each_name}\"}"
     __dybatpho_agent_each_filter="${__dybatpho_agent_each_filter//@SCHEMA@/${__dybatpho_agent_each_schema}}"
-    __dybatpho_agent_each_out+=("$(dybatpho::json_get "${__dybatpho_agent_each_commands}" \
-      ".[${__dybatpho_agent_each_index}] | (${__dybatpho_agent_each_filter}) | @json")")
+    __dybatpho_agent_each_jq=".[${__dybatpho_agent_each_index}] | (${__dybatpho_agent_each_filter}) | @json"
+    __dybatpho_agent_each_def=$(dybatpho::json_get "${__dybatpho_agent_each_commands}" "${__dybatpho_agent_each_jq}")
+    __dybatpho_agent_each_out+=("${__dybatpho_agent_each_def}")
     __dybatpho_agent_each_index=$((__dybatpho_agent_each_index + 1))
   done
 }
@@ -525,24 +528,30 @@ function dybatpho::agent_tools {
   __dybatpho_agent_tools_name="${2:-${0##*/}}"
   __dybatpho_agent_tools_format="${3:-anthropic}"
   case "${__dybatpho_agent_tools_format}" in
-    anthropic | openai) ;;
+    anthropic | openai) ;; # kcov(skip) - a case arm has no command to fire on
     *)
-      dybatpho::die \
-        "dybatpho::agent_tools: Unknown format '${__dybatpho_agent_tools_format}', expected anthropic or openai"
+      # `dybatpho::die` exits, so "dybatpho::agent_tools rejects an unknown
+      # format" runs these under `run`.
+      local expected="expected anthropic or openai"                                                         # kcov(skip)
+      dybatpho::die "dybatpho::agent_tools: Unknown format '${__dybatpho_agent_tools_format}', ${expected}" # kcov(skip)
       ;;
   esac
   local __dybatpho_agent_tools_schema __dybatpho_agent_tools_commands
-  __dybatpho_agent_tools_schema=$(dybatpho::generate_schema "${__dybatpho_agent_tools_spec}" \
-    "${__dybatpho_agent_tools_name}")
+  local -a __dybatpho_agent_tools_args=("${__dybatpho_agent_tools_spec}" "${__dybatpho_agent_tools_name}")
+  __dybatpho_agent_tools_schema=$(dybatpho::generate_schema "${__dybatpho_agent_tools_args[@]}")
   __dybatpho_agent_tools_commands=$(__dybatpho_agent_flatten_schema "${__dybatpho_agent_tools_schema}")
 
   local __dybatpho_agent_tools_template
   if [[ "${__dybatpho_agent_tools_format}" == "anthropic" ]]; then
+    # kcov(disabled) - a jq template spread over lines: data, not Bash commands
     __dybatpho_agent_tools_template='{"name": @NAME@, "description": (.description | tostring),
       "input_schema": (@SCHEMA@)}'
+    # kcov(enabled)
   else
+    # kcov(disabled) - a jq template spread over lines: data, not Bash commands
     __dybatpho_agent_tools_template='{"type": "function", "function": {"name": @NAME@,
       "description": (.description | tostring), "parameters": (@SCHEMA@)}}'
+    # kcov(enabled)
   fi
   local -a __dybatpho_agent_tools_definitions=()
   __dybatpho_agent_each_tool_into __dybatpho_agent_tools_definitions "${__dybatpho_agent_tools_commands}" \
@@ -601,8 +610,10 @@ function dybatpho::agent_mcp {
   # The first path element is the root name, which the command already names.
   local __dybatpho_agent_mcp_command_json
   __dybatpho_agent_mcp_command_json=$(dybatpho::json_string "${__dybatpho_agent_mcp_command}")
+  # kcov(disabled) - a jq template spread over lines: data, not Bash commands
   local __dybatpho_agent_mcp_template='{"name": @NAME@, "description": (.description | tostring),
     "inputSchema": (@SCHEMA@), "x-dybatpho-command": (['"${__dybatpho_agent_mcp_command_json}"'] + (.path | .[1:]))}'
+  # kcov(enabled)
   local -a __dybatpho_agent_mcp_definitions=()
   __dybatpho_agent_each_tool_into __dybatpho_agent_mcp_definitions "${__dybatpho_agent_mcp_commands}" \
     "${__dybatpho_agent_mcp_template}"

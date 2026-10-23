@@ -192,6 +192,46 @@ EOF
   [[ "${recorded}" == *"Copied"* ]] || fail "closing message missing: ${recorded}"
 }
 
+@test "the drawn progress bar redraws one line with its colour and timing" {
+  local log="${BATS_TEST_TMPDIR}/drawn.log" recorded
+  local DYBATPHO_TUI=always NO_COLOR="" FORCE_COLOR=1
+  {
+    dybatpho::tui_progress_start "Copying" 4
+    dybatpho::tui_progress_update 2
+    dybatpho::tui_progress_stop
+  } 2> "${log}"
+  recorded="$(< "${log}")"
+
+  # Each frame returns to the start of the line and erases what it leaves.
+  [[ "${recorded}" == *$'\r\033[1mCopying\033[0m'* ]] || fail "missing styled label: ${recorded}"
+  [[ "${recorded}" == *"(2/4) ETA 0s"$'\033[K'* ]] || fail "missing estimate: ${recorded}"
+  [[ "${recorded}" == *"(4/4) in 0s"$'\033[K'* ]] || fail "missing total time: ${recorded}"
+}
+
+@test "the drawn progress bar draws no colour when colour is off" {
+  local log="${BATS_TEST_TMPDIR}/plain.log" recorded
+  local DYBATPHO_TUI=always
+  {
+    dybatpho::tui_progress_start "Copying" 2
+    dybatpho::tui_progress_stop "Copied"
+  } 2> "${log}"
+  recorded="$(< "${log}")"
+  [[ "${recorded}" == *$'\rCopying ['* ]] || fail "unexpected frame: ${recorded}"
+  [[ "${recorded}" == *$'\r\033[K'* ]] || fail "line not erased: ${recorded}"
+}
+
+@test "__dybatpho_tui_duration_into reads seconds as seconds, minutes or hours" {
+  local text
+  __dybatpho_tui_duration_into text 59
+  assert_equal "${text}" "59s"
+  __dybatpho_tui_duration_into text 61
+  assert_equal "${text}" "1m01s"
+  __dybatpho_tui_duration_into text 3720
+  assert_equal "${text}" "1h02m"
+  __dybatpho_tui_duration_into text -5
+  assert_equal "${text}" "0s"
+}
+
 @test "dybatpho::tui_progress_update refuses when no progress bar is running" {
   run dybatpho::tui_progress_update 1
   assert_failure
@@ -262,6 +302,15 @@ EOF
     assert_equal "${chosen[*]}" "alpha gamma"
     unset -n chosen
   done
+}
+
+@test "the drawn menus take their keys from standard input" {
+  local DYBATPHO_TUI=always chosen=""
+  local -a picked=()
+  dybatpho::tui_menu chosen "Environment?" dev staging prod < <(printf 'j\n') 2> /dev/null
+  assert_equal "${chosen}" "staging"
+  dybatpho::tui_multi_menu picked "Components?" api worker < <(printf ' j \n') 2> /dev/null
+  assert_equal "${picked[*]}" "api worker"
 }
 
 @test "dybatpho::tui_menu asks again after an answer that names no entry" {

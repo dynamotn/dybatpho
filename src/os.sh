@@ -266,6 +266,7 @@ function dybatpho::kernel_version {
 #######################################
 function dybatpho::cpu_count {
   local count=""
+  # kcov(disabled) - a table of probe commands, whose lines are data
   local -a probes=(
     "nproc"
     # BSD and macOS.
@@ -273,6 +274,7 @@ function dybatpho::cpu_count {
     # The POSIX spelling, which BusyBox and Solaris answer.
     "getconf _NPROCESSORS_ONLN"
   )
+  # kcov(enabled)
   local probe
   for probe in "${probes[@]}"; do
     dybatpho::is command "${probe%% *}" || continue
@@ -315,7 +317,7 @@ function dybatpho::is_tty {
 #######################################
 function __dybatpho_os_assert_stream {
   case "$1" in
-    stdin | stdout | stderr | 0 | 1 | 2) ;;
+    stdin | stdout | stderr | 0 | 1 | 2) ;; # kcov(skip) - a case arm has no command to fire on
     *) dybatpho::die "${FUNCNAME[1]}: Stream must be stdin, stdout, or stderr, got '$1'" ;;
   esac
 }
@@ -432,7 +434,9 @@ function dybatpho::os_release {
       value="${value#\'}"
       printf '%s\n' "${value}"
       return 0
-    done < "${file}"
+      # kcov never records the `done` of a redirected loop;
+      # "os_release fails for a field the file does not carry" runs it.
+    done < "${file}" # kcov(skip)
   done
   return 1
 }
@@ -499,19 +503,21 @@ function dybatpho::is_container {
   # Docker and Podman both drop a marker file, and a runtime started by systemd
   # exports `container`. Kubernetes injects its service host into every pod.
   [[ -f /.dockerenv || -f /run/.containerenv ]] && return 0
-  [[ -n "${container:-}" || -n "${KUBERNETES_SERVICE_HOST:-}" ]] && return 0
+  # The rest is only reached outside a container, and the coverage job runs in
+  # one: "is_container answers no on a plain host" runs it on the portable jobs.
+  [[ -n "${container:-}" || -n "${KUBERNETES_SERVICE_HOST:-}" ]] && return 0 # kcov(skip)
   # Nothing above is guaranteed, so the control groups of PID 1 are the last
   # word: in a container they name the runtime that created them.
-  local line
-  if [[ -r /proc/1/cgroup ]]; then
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-      case "${line}" in
-        *docker* | *containerd* | *kubepods* | *libpod* | *lxc*) return 0 ;;
-        *) ;;
+  local line                                                                 # kcov(skip)
+  if [[ -r /proc/1/cgroup ]]; then                                           # kcov(skip)
+    while IFS= read -r line || [[ -n "${line}" ]]; do                        # kcov(skip)
+      case "${line}" in                                                      # kcov(skip)
+        *docker* | *containerd* | *kubepods* | *libpod* | *lxc*) return 0 ;; # kcov(skip)
+        *) ;;                                                                # kcov(skip)
       esac
-    done < /proc/1/cgroup
+    done < /proc/1/cgroup # kcov(skip)
   fi
-  return 1
+  return 1 # kcov(skip)
 }
 
 #######################################

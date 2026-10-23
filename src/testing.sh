@@ -220,10 +220,7 @@ function dybatpho::assert_symlink {
   local target
   target="$(readlink "${path}")"
   if [[ "${target}" != "$2" ]]; then
-    __dybatpho_test_fail \
-      "Symbolic link ${path} points at the wrong target" \
-      "  expected: $2" \
-      "  actual:   ${target}"
+    __dybatpho_test_fail "Symbolic link ${path} points at the wrong target" "  expected: $2" "  actual:   ${target}"
     return 1
   fi
   return 0
@@ -318,10 +315,7 @@ function dybatpho::assert_file_mode {
   fi
   # Compare numerically so `600` and `0600` describe the same mode.
   if ((10#${actual} != 10#${expected})); then
-    __dybatpho_test_fail \
-      "Wrong permissions on ${path}" \
-      "  expected: ${expected}" \
-      "  actual:   ${actual}"
+    __dybatpho_test_fail "Wrong permissions on ${path}" "  expected: ${expected}" "  actual:   ${actual}"
     return 1
   fi
   return 0
@@ -396,10 +390,8 @@ function dybatpho::assert_json_query {
     return 1
   fi
   if ! __dybatpho_test_scalar_matches "${actual}" "${expected}"; then
-    __dybatpho_test_fail \
-      "JSON query ${filter} returned an unexpected value" \
-      "  expected: ${expected}" \
-      "  actual:   ${actual}"
+    local mismatch="JSON query ${filter} returned an unexpected value"
+    __dybatpho_test_fail "${mismatch}" "  expected: ${expected}" "  actual:   ${actual}"
     return 1
   fi
   return 0
@@ -468,10 +460,8 @@ function dybatpho::assert_yaml_query {
     return 1
   fi
   if ! __dybatpho_test_scalar_matches "${actual}" "${expected}"; then
-    __dybatpho_test_fail \
-      "YAML query ${expression} returned an unexpected value" \
-      "  expected: ${expected}" \
-      "  actual:   ${actual}"
+    local mismatch="YAML query ${expression} returned an unexpected value"
+    __dybatpho_test_fail "${mismatch}" "  expected: ${expected}" "  actual:   ${actual}"
     return 1
   fi
   return 0
@@ -724,9 +714,9 @@ function dybatpho::assert_exit_code {
   "$@" &> "${__dybatpho_test_exit_output_file}" || __dybatpho_test_exit_status=$?
 
   ((__dybatpho_test_exit_status == 10#${__dybatpho_test_exit_expected})) && return 0
-  __dybatpho_test_fail \
-    "Expected exit ${__dybatpho_test_exit_expected}, got ${__dybatpho_test_exit_status}: $*" \
-    "$(< "${__dybatpho_test_exit_output_file}")"
+  local __dybatpho_test_exit_message="Expected exit ${__dybatpho_test_exit_expected}"
+  __dybatpho_test_exit_message+=", got ${__dybatpho_test_exit_status}: $*"
+  __dybatpho_test_fail "${__dybatpho_test_exit_message}" "$(< "${__dybatpho_test_exit_output_file}")"
 }
 
 #######################################
@@ -798,9 +788,8 @@ function dybatpho::assert_duration_under {
     __dybatpho_test_time_command "${__dybatpho_test_dur_output_file}" __dybatpho_test_dur_elapsed "$@" \
       || __dybatpho_test_dur_status=$?
     if ((__dybatpho_test_dur_status != 0)); then
-      __dybatpho_test_fail \
-        "Command exited ${__dybatpho_test_dur_status} while timing it: $*" \
-        "$(< "${__dybatpho_test_dur_output_file}")"
+      local __dybatpho_test_dur_message="Command exited ${__dybatpho_test_dur_status} while timing it: $*"
+      __dybatpho_test_fail "${__dybatpho_test_dur_message}" "$(< "${__dybatpho_test_dur_output_file}")"
       return 1
     fi
     if [[ -z "${__dybatpho_test_dur_fastest}" ]] || ((__dybatpho_test_dur_elapsed < __dybatpho_test_dur_fastest)); then
@@ -860,18 +849,19 @@ function dybatpho::benchmark {
       || __dybatpho_test_bench_status=$?
     if ((__dybatpho_test_bench_status != 0)); then
       local __dybatpho_test_bench_which="run $((__dybatpho_test_bench_run + 1)) of ${__dybatpho_test_bench_runs}"
-      __dybatpho_test_fail \
-        "Command exited ${__dybatpho_test_bench_status} on ${__dybatpho_test_bench_which}: $*" \
-        "$(< "${__dybatpho_test_bench_output_file}")"
+      local __dybatpho_test_bench_message="Command exited ${__dybatpho_test_bench_status}"
+      __dybatpho_test_bench_message+=" on ${__dybatpho_test_bench_which}: $*"
+      __dybatpho_test_fail "${__dybatpho_test_bench_message}" "$(< "${__dybatpho_test_bench_output_file}")"
       return 1
     fi
     __dybatpho_test_bench_samples+=("${__dybatpho_test_bench_elapsed}")
   done
 
   local -a __dybatpho_test_bench_sorted=()
-  mapfile -t __dybatpho_test_bench_sorted < <(
-    printf '%s\n' ${__dybatpho_test_bench_samples[@]+"${__dybatpho_test_bench_samples[@]}"} | sort -n
-  )
+  local __dybatpho_test_bench_list
+  printf -v __dybatpho_test_bench_list '%s\n' \
+    ${__dybatpho_test_bench_samples[@]+"${__dybatpho_test_bench_samples[@]}"}
+  mapfile -t __dybatpho_test_bench_sorted < <(sort -n <<< "${__dybatpho_test_bench_list%$'\n'}")
   DYBATPHO_TEST_BENCH_MIN_MS="${__dybatpho_test_bench_sorted[0]}"
   DYBATPHO_TEST_BENCH_MAX_MS="${__dybatpho_test_bench_sorted[-1]}"
   DYBATPHO_TEST_BENCH_MEDIAN_MS="${__dybatpho_test_bench_sorted[$((${#__dybatpho_test_bench_sorted[@]} / 2))]}"
@@ -975,7 +965,8 @@ function __dybatpho_test_mock_script_write {
     printf '#!/usr/bin/env bash\n'
     printf 'printf "%%s\\n" "$*" >> %q\n' "${mock_dir}/calls/${name}"
     cat
-  } > "${script}"
+    # kcov never records the closing line of a redirected group; every mock runs it.
+  } > "${script}" # kcov(skip)
   chmod +x "${script}"
   : > "${mock_dir}/calls/${name}"
   # Bash remembers where it last found a command, so a command that already ran
@@ -1082,10 +1073,7 @@ function dybatpho::assert_mock_called {
   done <<< "${calls}"
   local text_indent
   text_indent=$(dybatpho::text_indent "${calls}" '    ')
-  __dybatpho_test_fail \
-    "Mocked command ${name} was never called with: ${expected}" \
-    "  recorded calls:" \
-    "${text_indent}"
+  __dybatpho_test_fail "Mocked command ${name} was never called with: ${expected}" "  recorded calls:" "${text_indent}"
   return 1
 }
 
@@ -1152,7 +1140,9 @@ function dybatpho::mock_http {
       printf '%s\r\n' "${header}"
     done
     printf '\r\n'
-  } > "${route_dir}/${route_id}.headers"
+    # kcov never records the closing line of a redirected group;
+    # "mock_http serves a canned response to the network module" runs it.
+  } > "${route_dir}/${route_id}.headers" # kcov(skip)
   printf '%s\t%s\t%s\n' "${pattern}" "${status}" "${route_id}" >> "${routes}"
 
   local routes_q route_dir_q calls_q payloads_q
@@ -1323,10 +1313,7 @@ function dybatpho::assert_http_called {
   done <<< "${calls}"
   local text_indent
   text_indent=$(dybatpho::text_indent "${calls}" '    ')
-  __dybatpho_test_fail \
-    "No HTTP request matched: ${pattern}" \
-    "  requested URLs:" \
-    "${text_indent}"
+  __dybatpho_test_fail "No HTTP request matched: ${pattern}" "  requested URLs:" "${text_indent}"
   return 1
 }
 

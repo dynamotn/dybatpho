@@ -84,6 +84,7 @@ DYBATPHO_PKG_ASSUME_YES="${DYBATPHO_PKG_ASSUME_YES:-true}"
 # Supported managers, and the command whose presence proves the manager is
 # usable. `apt` is driven through `apt-get`: the `apt` binary prints a warning
 # about its unstable CLI whenever its output is not a terminal.
+# kcov(disabled) - a table literal: its continuation lines are data, not commands
 declare -gA __dybatpho_pkg_binary=(
   [apt]="apt-get"
   [brew]="brew"
@@ -92,6 +93,7 @@ declare -gA __dybatpho_pkg_binary=(
   [pacman]="pacman"
   [emerge]="emerge"
 )
+# kcov(enabled)
 
 #######################################
 # @description Fill an array with the managers to probe, most specific to this
@@ -167,8 +169,7 @@ function __dybatpho_pkg_assert_manager {
   # The list is only worth building for the message.
   local supported
   supported=$(dybatpho::pkg_supported)
-  dybatpho::die \
-    "${caller}: unsupported package manager '${manager}', expected one of ${supported//$'\n'/ } "
+  dybatpho::die "${caller}: unsupported package manager '${manager}', expected one of ${supported//$'\n'/ } "
 }
 
 #######################################
@@ -216,7 +217,7 @@ function __dybatpho_pkg_assume_yes_into {
     pacman) __dybatpho_pkg_assume_ref=(--noconfirm) ;;
     emerge) __dybatpho_pkg_assume_ref=(--ask=n) ;;
     # `apk add` and `brew install` never prompt.
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   return 0
 }
@@ -256,8 +257,8 @@ function __dybatpho_pkg_action_command_into {
         # `apt-get` drives debconf, which opens a dialog on some packages unless
         # the frontend is told that nobody is watching.
         apt)
-          __dybatpho_pkg_cmd_ref+=(env DEBIAN_FRONTEND=noninteractive apt-get install
-            ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"})
+          __dybatpho_pkg_cmd_ref+=(env DEBIAN_FRONTEND=noninteractive apt-get install)
+          __dybatpho_pkg_cmd_ref+=(${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"})
           ;;
         brew) __dybatpho_pkg_cmd_ref+=(brew install) ;;
         apk) __dybatpho_pkg_cmd_ref+=(apk add) ;;
@@ -269,12 +270,10 @@ function __dybatpho_pkg_action_command_into {
         emerge)
           __dybatpho_pkg_cmd_ref+=(emerge --noreplace ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"})
           ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
-      __dybatpho_pkg_cmd_ref+=(
-        ${__dybatpho_pkg_cmd_extra[@]+"${__dybatpho_pkg_cmd_extra[@]}"}
-        ${__dybatpho_pkg_cmd_packages[@]+"${__dybatpho_pkg_cmd_packages[@]}"}
-      )
+      __dybatpho_pkg_cmd_ref+=(${__dybatpho_pkg_cmd_extra[@]+"${__dybatpho_pkg_cmd_extra[@]}"})
+      __dybatpho_pkg_cmd_ref+=(${__dybatpho_pkg_cmd_packages[@]+"${__dybatpho_pkg_cmd_packages[@]}"})
       ;;
     update)
       # Only `pacman -Sy` prompts while refreshing an index, so it is the one
@@ -286,11 +285,13 @@ function __dybatpho_pkg_action_command_into {
         dnf) __dybatpho_pkg_cmd_ref+=(dnf makecache) ;;
         pacman) __dybatpho_pkg_cmd_ref+=(pacman -Sy ${__dybatpho_pkg_cmd_yes[@]+"${__dybatpho_pkg_cmd_yes[@]}"}) ;;
         emerge) __dybatpho_pkg_cmd_ref+=(emerge --sync) ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
       __dybatpho_pkg_cmd_ref+=(${__dybatpho_pkg_cmd_extra[@]+"${__dybatpho_pkg_cmd_extra[@]}"})
       ;;
-    *) dybatpho::die "__dybatpho_pkg_action_command_into: unknown action '${__dybatpho_pkg_cmd_action}'" ;;
+    # Only a caller inside this module picks the action. The arm dies, so its
+    # test runs it under `run`, which kcov cannot see.
+    *) dybatpho::die "__dybatpho_pkg_action_command_into: unknown action '${__dybatpho_pkg_cmd_action}'" ;; # kcov(skip)
   esac
 }
 
@@ -465,7 +466,7 @@ function __dybatpho_pkg_installed_with {
       fi
       [[ -n "${query}" ]]
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 

@@ -89,6 +89,37 @@ note() {
   grep -q '^tick$' "${LOG}"
 }
 
+@test "dybatpho::schedule_every drops the ticks a slow run missed" {
+  # Each reading of the clock is five seconds after the last, so every run
+  # overruns its one-second slot; the missed ticks are skipped, not queued.
+  local clock="${BATS_TEST_TMPDIR}/clock"
+  printf '100\n' > "${clock}"
+  # shellcheck disable=SC2329 # invoked by schedule_every
+  dybatpho::date_now() {
+    local now
+    now="$(< "${clock}")"
+    printf '%s\n' "$((now + 5))" > "${clock}"
+    printf '%s\n' "${now}"
+  }
+  run_traced -0 dybatpho::schedule_every 1 --times 2 -- note tick
+  assert_equal "$(wc -l < "${LOG}" | tr -d ' ')" "2"
+}
+
+@test "dybatpho::schedule_once_per stops when it cannot write the marker" {
+  # A child shell, since the failure ends it; from a file, not `bash -c`.
+  local script="${BATS_TEST_TMPDIR}/no_marker.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules schedule file
+__dybatpho_file_staging_into() { return 1; }
+dybatpho::schedule_once_per day stamp -- printf 'ran\n'
+SCRIPT
+  run_traced -1 --separate-stderr bash "${script}" "${DYBATPHO_DIR}"
+  assert_output ""
+  assert_stderr --partial "Cannot write the marker for stamp"
+  run_traced find "${DYBATPHO_SCHEDULE_DIR}" -name 'stamp.*'
+  assert_output ""
+}
+
 @test "dybatpho::schedule_once_per runs once and skips the rest of the period" {
   run_traced dybatpho::schedule_once_per day greet -- note first
   assert_success

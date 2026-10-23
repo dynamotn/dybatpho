@@ -51,7 +51,7 @@ make use of ${DYBATPHO_DIR} to find each other.
 | **`DYBATPHO_VERSION`** | string | Cached library version, see `dybatpho::version` |
 | **`DYBATPHO_EXPORT_FUNCTIONS`** | bool | When true-like before sourcing, call `dybatpho::export_functions` once the modules are loaded, default is `false` |
 | **`DYBATPHO_EXPORT_MODULES`** | string | Module set a child process loads through `BASH_ENV`, set by `dybatpho::export_functions` and kept current by `dybatpho::load` |
-| **`DYBATPHO_EXPORT_BASH_ENV`** | string | The `BASH_ENV` in place before `dybatpho::export_functions`, sourced first by every child Dependencies between optional modules. Core modules are implicit, so only the optional-to-optional edges are listed here. Cycles are allowed: function calls resolve at run time, so modules may reference each other. The map is global even when `init.sh` is sourced from inside a function: `dybatpho::load` and `dybatpho::doctor` read it long after that function has returned. |
+| **`DYBATPHO_EXPORT_BASH_ENV`** | string | The `BASH_ENV` in place before `dybatpho::export_functions`, sourced first by every child |
 
 ### 🚀 Highlights
 

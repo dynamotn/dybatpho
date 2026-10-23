@@ -172,6 +172,71 @@ plant() {
   assert_stderr --partial "No such backup"
 }
 
+@test "dybatpho::backup_create takes another name when its own appears just before the link" {
+  # Another process can take the free name between the check and the hard
+  # link that publishes the archive; the link then fails on the taken name.
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+  # shellcheck disable=SC2329 # invoked by backup_create in place of ln(1)
+  ln() {
+    if [[ "${3-}" == "${DEST}/snap-20260101T000000Z.tar.gz" ]]; then
+      printf 'taken\n' > "$3"
+      return 1
+    fi
+    command ln "$@"
+  }
+
+  run_traced -0 dybatpho::backup_create "${SOURCE}" "${DEST}" snap
+  assert_output "${DEST}/snap-20260101T000000Z-1.tar.gz"
+  assert_equal "$(cat "${DEST}/snap-20260101T000000Z.tar.gz")" "taken"
+  assert_file_not_exist "${DEST}/snap-20260101T000000Z.tar.gz.sha256"
+}
+
+@test "dybatpho::backup_create publishes with a rename where hard links are refused" {
+  # shellcheck disable=SC2329 # invoked by backup_create in place of ln(1)
+  ln() { return 1; }
+
+  run_traced -0 dybatpho::backup_create "${SOURCE}" "${DEST}" snap
+  assert_output --regexp "${DEST}/snap-[0-9]{8}T[0-9]{6}Z\.tar\.gz$"
+  assert_file_exist "${output}"
+  run_traced dybatpho::backup_verify "${output}"
+  assert_success
+  run_traced find "${DEST}" -name '.*partial*'
+  assert_output ""
+}
+
+@test "dybatpho::backup_create --incremental takes another name when its own appears just before the move" {
+  # A directory that appears between the check and the rename swallows the
+  # snapshot, which is taken back out and published under the next name.
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+  # shellcheck disable=SC2329 # invoked by backup_create in place of mv(1)
+  mv() {
+    if [[ "${3-}" == "${DEST}/snap-20260101T000000Z.snapshot" && ! -e "$3" ]]; then
+      command mkdir -p "$3"
+    fi
+    command mv "$@"
+  }
+
+  run_traced -0 dybatpho::backup_create --incremental "${SOURCE}" "${DEST}" snap
+  assert_output "${DEST}/snap-20260101T000000Z-1.snapshot"
+  assert_file_exist "${output}/source/a.txt"
+  run_traced find "${DEST}/snap-20260101T000000Z.snapshot" -mindepth 1
+  assert_output ""
+}
+
+@test "dybatpho::backup_create --incremental hands the copy to rsync, linked to the last snapshot" {
+  dybatpho::mock_command_script rsync 'eval "dst=\${$#}"; cp -R "${@: -2:1}" "${dst}"'
+  local older newer
+  run_traced -0 dybatpho::backup_create -i "${SOURCE}" "${DEST}" site
+  older="${output}"
+  run_traced -0 dybatpho::backup_create -i "${SOURCE}" "${DEST}" site
+  newer="${output}"
+
+  assert_equal "$(cat "${newer}/source/a.txt")" "first"
+  run_traced dybatpho::mock_calls rsync
+  assert_line --index 0 --regexp '^-a --no-D -- .*/source .*/\.site-.*\.partial\.snapshot/$'
+  assert_line --index 1 --regexp "^-a --no-D --link-dest=${older} -- "
+}
+
 @test "dybatpho::backup_list prints the backups newest first" {
   plant "snap-20260101T000000Z.tar.gz"
   plant "snap-20260301T000000Z.tar.gz"
@@ -223,6 +288,15 @@ plant() {
   run_traced dybatpho::backup_list "${BATS_TEST_TMPDIR}/nowhere"
   assert_success
   assert_output ""
+}
+
+@test "dybatpho::backup_list keeps a backup whose name carries no stamp" {
+  plant "snap-20260101T000000Z.tar.gz"
+  plant "snap-manual.tar.gz"
+
+  run_traced -0 dybatpho::backup_list "${DEST}" snap
+  assert_equal "${#lines[@]}" 2
+  assert_line "${DEST}/snap-manual.tar.gz"
 }
 
 @test "dybatpho::backup_list leaves a half-written archive out" {

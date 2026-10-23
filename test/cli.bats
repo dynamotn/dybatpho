@@ -1,6 +1,10 @@
 setup() {
   load test_helper
   unset CLI_NAME API_TOKEN
+  # Completion output is cached under the user's cache directory by default,
+  # keyed by the script that runs the spec. Shared across runs, a hit from an
+  # earlier run answered in place of the generator these tests exercise.
+  DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache"
 }
 
 # =============================================================================
@@ -2449,4 +2453,105 @@ SCRIPT
   run_traced dybatpho::generate_from_spec _spec
   assert_success
   assert_equal "$(head -n 1 "${seen}")" "$(printf '%q' $' \t\n')"
+}
+
+# =============================================================================
+# Malformed specs and the less travelled help paths
+# =============================================================================
+
+@test "an option switch that is neither -x nor --name stops the script" {
+  # shellcheck disable=2329
+  _spec_bad_alias() {
+    dybatpho::opts::setup "Bad alias" -
+    dybatpho::opts::flag "Verbose" BAD_ALIAS_VERBOSE --verbose alias:verbose
+  }
+  run dybatpho::generate_from_spec _spec_bad_alias
+  assert_failure
+  assert_output --partial "Invalid switch alias: verbose"
+
+  # The parser pass only meets a switch the labelling pass has accepted, so its
+  # own guard is reached directly.
+  run __dybatpho_cli_case_switch verbose
+  assert_failure
+  assert_output --partial "Invalid switch alias: verbose"
+}
+
+@test "dybatpho::generate_completion rejects a shell it cannot complete for" {
+  _spec_tcsh() { dybatpho::opts::setup "Completion" -; }
+  run dybatpho::generate_completion _spec_tcsh tcsh demo
+  assert_failure
+  assert_output --partial "Unsupported completion shell: tcsh"
+}
+
+@test "an args rule that cannot be read stops the script" {
+  local rule
+  for rule in exact:one min:one max:one range:3:1 sometimes; do
+    # shellcheck disable=2329
+    eval "_spec_bad_rule() { dybatpho::opts::setup 'Bad rule' BAD_RULE_ARGS args:${rule}; }"
+    run dybatpho::generate_from_spec _spec_bad_rule
+    assert_failure
+    assert_output --partial "Invalid args rule: ${rule}"
+  done
+}
+
+@test "a mistyped input close to several candidates lists all of them" {
+  run_traced -0 __dybatpho_cli_suggest_suffix --colx --cola --colb
+  assert_output ". Did you mean one of '--cola', '--colb'?"
+}
+
+@test "config:<key> keeps a value bound with export:false out of the environment" {
+  DYBATPHO_CONFIG=([server.port]=9999)
+  # shellcheck disable=2329
+  _spec_config_private() {
+    dybatpho::opts::setup "Config private" CONFIG_PRIV_ARGS \
+      action:'printf "%s|%s" "${CONFIG_PRIV_PORT}" "$(printenv CONFIG_PRIV_PORT || true)"'
+    dybatpho::opts::param "Port" CONFIG_PRIV_PORT --port config:server.port init:="8080" export:false
+  }
+  run_traced -0 dybatpho::generate_from_spec _spec_config_private
+  DYBATPHO_CONFIG=()
+  assert_output "9999|"
+}
+
+@test "help names the environment variable env:true binds and the literal defaults" {
+  # shellcheck disable=2329
+  _spec_help_details() {
+    dybatpho::opts::setup "Help details" -
+    dybatpho::opts::param "Region" HELP_REGION --region env:true
+    dybatpho::opts::param "Stamp" HELP_STAMP --stamp init:action:'HELP_STAMP=now'
+    dybatpho::opts::param "Double" HELP_DOUBLE --double init:='"two words"'
+    dybatpho::opts::param "Single" HELP_SINGLE --single init:="'one'"
+    dybatpho::opts::flag "Skip the cache" HELP_NO_CACHE --no-cache
+  }
+  __current_cmd_path=""
+  run_traced -0 dybatpho::generate_help _spec_help_details
+  assert_output --partial "[env: HELP_REGION]"
+  assert_output --partial "[default: two words]"
+  assert_output --partial "[default: one]"
+  assert_output --partial "--no-cache"
+  # Code run at start-up has no value to show.
+  refute_output --partial "HELP_STAMP=now"
+}
+
+@test "negatable:true leaves a switch that is already negative as it is" {
+  # shellcheck disable=2329
+  _spec_negative() {
+    dybatpho::opts::setup "Negative" NEGATIVE_ARGS action:'printf "%s" "${NEGATIVE_CACHE}"'
+    dybatpho::opts::flag "Skip the cache" NEGATIVE_CACHE --no-cache negatable:true
+  }
+  # A `--no-` switch sets the off value, and gets no `--no-no-` twin.
+  run_traced -0 dybatpho::generate_from_spec _spec_negative --no-cache
+  assert_output "false"
+  run ! dybatpho::generate_from_spec _spec_negative --no-no-cache
+  assert_output --partial "Unrecognized option: --no-no-cache"
+}
+
+@test "help marks a counting flag as one to repeat" {
+  # shellcheck disable=2329
+  _spec_help_count() {
+    dybatpho::opts::setup "Help count" -
+    dybatpho::opts::flag "Verbosity" HELP_VERBOSITY -v count:true
+  }
+  __current_cmd_path=""
+  run_traced -0 dybatpho::generate_help _spec_help_count
+  assert_output --partial "[repeat to increase]"
 }

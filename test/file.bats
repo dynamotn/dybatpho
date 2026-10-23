@@ -16,6 +16,14 @@ setup() {
   assert_output --partial "${content}"
 }
 
+@test "dybatpho::show_file hands the file to bat when it is installed" {
+  local shown="${BATS_TEST_TMPDIR}/shown"
+  : > "${shown}"
+  dybatpho::mock_command_script bat 'printf "bat:%s\n" "$2"'
+  run_traced -0 --separate-stderr dybatpho::show_file "${shown}"
+  assert_stderr "bat:${shown}"
+}
+
 @test "dybatpho::show_file with non-existent file" {
   run_traced --separate-stderr dybatpho::show_file "/non/existent/file.txt"
   assert_failure
@@ -489,6 +497,32 @@ EOF
   run ! dybatpho::file_hash "${BATS_TEST_TMPDIR}/absent"
 }
 
+@test "dybatpho::file_hash falls back to md5, shasum and then openssl" {
+  local target="${BATS_TEST_TMPDIR}/payload3"
+  printf 'hello\n' > "${target}"
+  dybatpho::mock_command md5 0 "md5-digest"
+  dybatpho::mock_command shasum 0 "shasum-digest  -"
+  # The mocks go first: the directories `path_without` mirrors may hold the
+  # real tools, such as macOS's own `md5` beside an `md5sum`.
+  local mocks="${DYBATPHO_TEST_MOCK_DIR}" openssl_dir="${BATS_TEST_TMPDIR}/openssl-only"
+
+  PATH="${mocks}:$(path_without md5sum)" run_traced -0 dybatpho::file_hash "${target}" md5
+  assert_output "md5-digest"
+  PATH="${mocks}:$(path_without sha1sum)" run_traced -0 dybatpho::file_hash "${target}" sha1
+  assert_output "shasum-digest"
+  assert_equal "$(dybatpho::mock_calls shasum)" "-a 1"
+  # The `shasum` mock is hidden with the real one, so `openssl` gets its own
+  # directory in front.
+  mkdir -p "${openssl_dir}"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > "${0}.args"\necho "SHA2-256(stdin)= openssl-digest"\n' \
+    > "${openssl_dir}/openssl"
+  chmod +x "${openssl_dir}/openssl"
+  PATH="${openssl_dir}:$(PATH="$(path_without sha256sum)" path_without shasum)" \
+    run_traced -0 dybatpho::file_hash "${target}" sha256
+  assert_output "openssl-digest"
+  assert_equal "$(cat "${openssl_dir}/openssl.args")" "dgst -sha256"
+}
+
 @test "dybatpho::file_hash reads a name the checksum tools would quote" {
   # `sha256sum -- <path>` quotes a name holding a newline or a backslash: the
   # line comes back as `\\<digest>  <escaped name>`, so taking the first field
@@ -794,6 +828,50 @@ EOF
   assert_equal "$(cat "${dir}/app.conf")" "replaced"
   # Nothing but the planted links is left over.
   run_traced find "${dir}" -name '.dybatpho_staging_*' ! -type l
+  assert_output ""
+}
+
+@test "__dybatpho_file_stat reads the BSD form when stat has no -c" {
+  local inspected="${BATS_TEST_TMPDIR}/bsd"
+  : > "${inspected}"
+  dybatpho::mock_command_script stat 'case "$2" in -c) exit 1 ;; *) echo 0644 ;; esac'
+  run_traced -0 __dybatpho_file_stat mode "${inspected}"
+  assert_output "644"
+}
+
+@test "__dybatpho_file_staging_into gives up when every name it draws is taken by a link" {
+  # `noclobber` still opens an existing link to a device, so each such name is
+  # created "successfully" and has to be passed over. The names are drawn from
+  # `RANDOM`, which a seed makes repeatable.
+  local dir="${BATS_TEST_TMPDIR}/staging" staged="" index
+  mkdir -p "${dir}"
+  RANDOM=42
+  for ((index = 0; index < 20; index++)); do
+    ln -s /dev/null "${dir}/.dybatpho_staging_f.${BASHPID}.${RANDOM}${RANDOM}"
+  done
+  RANDOM=42
+  run_traced -1 __dybatpho_file_staging_into staged "${dir}/f"
+  assert_equal "${staged}" ""
+}
+
+@test "a rewrite whose rename fails reports it and leaves no staging file behind" {
+  local target="${BATS_TEST_TMPDIR}/kept" script="${BATS_TEST_TMPDIR}/failing_mv.sh"
+  printf 'original\n' > "${target}"
+  # A child shell, since the failure ends it; from a file, not `bash -c`.
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules file
+mv() { return 1; }
+printf 'new\n' | dybatpho::file_write_atomic "${2}"
+SCRIPT
+  run_traced -1 --separate-stderr bash "${script}" "${DYBATPHO_DIR}" "${target}"
+  assert_stderr --partial "Cannot write ${target}"
+  assert_equal "$(cat "${target}")" "original"
+  run_traced find "${BATS_TEST_TMPDIR}" -name '.dybatpho_staging_*'
+  assert_output ""
+}
+
+@test "__dybatpho_file_sed_delimiter fails when every candidate is taken" {
+  run_traced -1 __dybatpho_file_sed_delimiter '/|,#%^!@+=:;~' 'x'
   assert_output ""
 }
 

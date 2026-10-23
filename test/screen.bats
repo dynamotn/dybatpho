@@ -546,6 +546,15 @@ draw_named() {
   assert_failure
 }
 
+@test "dybatpho::screen_begin says so when the system has no terminal device" {
+  # A container started without one has no `/dev/tty` at all.
+  local __DYBATPHO_SCREEN_TTY="${BATS_TEST_TMPDIR}/no-such-tty"
+  run_traced --separate-stderr dybatpho::screen_begin
+  assert_failure
+  assert_stderr --partial "dybatpho::screen_begin: No terminal to draw on"
+  assert_equal "${DYBATPHO_SCREEN_ACTIVE}" "false"
+}
+
 @test "dybatpho::screen_event reports a resize before it reports a key" {
   # A resize seen while the last frame was drawing must not sit behind a
   # keystroke that has not been typed yet.
@@ -817,4 +826,115 @@ _end_then_write_stderr() {
     'printf "%s %s" "${#__dybatpho_screen_braille[@]}" "${__dybatpho_screen_braille[255]}"' > "${script}"
   run_traced bash "${script}"
   assert_output "256 ⣿"
+}
+
+# =============================================================================
+# edge paths of the drawing helpers
+# =============================================================================
+
+@test "__dybatpho_screen_truncate_into cuts by column and never halves a wide glyph" {
+  local cut
+  __dybatpho_screen_truncate_into cut "abc" 0
+  assert_equal "${cut}" ""
+  __dybatpho_screen_truncate_into cut "日本語" 3
+  assert_equal "${cut}" "日"
+  __dybatpho_screen_truncate_into cut "日本語" 4
+  assert_equal "${cut}" "日本"
+}
+
+@test "__dybatpho_screen_index_into answers a plain row with the column itself" {
+  dybatpho::screen_put 0 0 "plain" "0"
+  local index
+  __dybatpho_screen_index_into index 0 3
+  assert_equal "${index}" 3
+}
+
+@test "dybatpho::screen_put drops the part of the text left of the screen" {
+  dybatpho::screen_put 0 -2 "abcdef" "0"
+  local row
+  row="$(screen_row 0)"
+  assert_equal "${row:0:4}" "cdef"
+}
+
+@test "dybatpho::screen_flush writes to stderr when no terminal was opened" {
+  __dybatpho_screen_fd=""
+  dybatpho::screen_put 0 0 "frame" "0"
+  run_traced -0 --separate-stderr dybatpho::screen_flush
+  assert_output ""
+  [[ "${stderr}" == *frame* ]] || fail "frame not on stderr: ${stderr}"
+}
+
+@test "dybatpho::screen_layout takes a deficit from several parts at the end" {
+  local -a parts=()
+  dybatpho::screen_layout parts vertical "0 0 100 3" length:4 length:1
+  assert_equal "${parts[0]}" "0 0 100 3"
+  assert_equal "${parts[1]}" "0 3 100 0"
+}
+
+@test "dybatpho::screen_layout names an unknown constraint and stops" {
+  # A child shell, since the refusal ends it; from a file, not `bash -c`.
+  local script="${BATS_TEST_TMPDIR}/layout.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules screen
+declare -a parts=()
+dybatpho::screen_layout parts vertical "0 0 10 10" wider:2
+SCRIPT
+  run_traced -1 --separate-stderr bash "${script}" "${DYBATPHO_DIR}"
+  assert_stderr --partial "Unknown constraint 'wider:2', expected length:"
+}
+
+@test "dybatpho::screen_event reports a resize the window signal noted" {
+  __dybatpho_screen_resized=false
+  __dybatpho_screen_on_resize
+  local event
+  dybatpho::screen_event event < /dev/null
+  assert_equal "${event}" "resize"
+}
+
+@test "dybatpho::screen_event names every mouse button and a release" {
+  local event
+  dybatpho::screen_event event < <(printf '\033[<0;3;4m')
+  assert_equal "${event}" "mouse:release"
+  dybatpho::screen_event event < <(printf '\033[<1;3;4M')
+  assert_equal "${event}" "mouse:middle"
+  dybatpho::screen_event event < <(printf '\033[<2;3;4M')
+  assert_equal "${event}" "mouse:right"
+  dybatpho::screen_event event < <(printf '\033[<64;3;4M')
+  assert_equal "${event}" "mouse:scrollup"
+  dybatpho::screen_event event < <(printf '\033[<65;3;4M')
+  assert_equal "${event}" "mouse:scrolldown"
+  dybatpho::screen_event event < <(printf '\033[<35;3;4M')
+  assert_equal "${event}" "mouse:other"
+}
+
+@test "dybatpho::screen_block draws double and thick borders and centres a title" {
+  local row
+  dybatpho::screen_block "0 0 10 3" border:double
+  row="$(screen_row 0)"
+  assert_equal "${row:0:10}" "╔════════╗"
+  dybatpho::screen_block "0 3 10 3" border:thick title:"Hi" align:center
+  row="$(screen_row 3)"
+  assert_equal "${row:0:10}" "┏━━ Hi ━━┓"
+  row="$(screen_row 5)"
+  assert_equal "${row:0:10}" "┗━━━━━━━━┛"
+}
+
+@test "dybatpho::screen_list keeps a scrolled offset inside the list" {
+  local -a items=(a b c d e)
+  dybatpho::screen_list "0 0 10 2" items offset:9
+  assert_equal "${DYBATPHO_SCREEN_OFFSET}" 3
+}
+
+@test "dybatpho::screen_chart draws samples that share a column" {
+  local -a series=(0 5 9)
+  dybatpho::screen_chart "0 0 1 2" series
+  local row
+  row="$(screen_row 0)"
+  [[ "${row:0:1}" != " " ]] || fail "nothing plotted: ${row}"
+}
+
+@test "dybatpho::screen_ansi reads a reset that carries a colour and skips a broken sequence" {
+  dybatpho::screen_ansi 0 0 40 $'\033[0;31mred\033[~x'
+  assert_equal "$(screen_row 0 | sed -E 's/ +$//')" "red~x"
+  [[ "$(screen_raw 0)" == *$'\033[31mred'* ]] || fail "colour lost: $(screen_raw 0)"
 }

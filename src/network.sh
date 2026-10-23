@@ -152,19 +152,22 @@ function __dybatpho_network_redact_url_into {
 #   escaped or it ends the value early. The answer goes into a variable rather
 #   than through a command substitution: every secret header of every request
 #   is escaped here.
+#   It only ever runs while `__dybatpho_network_trace_off` has suspended the
+#   trace, and kcov reads the trace, so its lines carry `kcov(skip)`; the secret
+#   header tests run them.
 # @arg $1 string Name of the variable receiving the escaped value
 # @arg $2 string Raw value
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_network_config_escape_into {
-  local -n __dybatpho_network_escape_out="$1"
-  local __dybatpho_network_escape_value="${2-}"
-  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//\\/\\\\}"
-  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//\"/\\\"}"
-  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//$'\t'/\\t}"
-  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//$'\r'/\\r}"
-  __dybatpho_network_escape_out="${__dybatpho_network_escape_value//$'\n'/\\n}"
+  local -n __dybatpho_network_escape_out="$1"                                     # kcov(skip)
+  local __dybatpho_network_escape_value="${2-}"                                   # kcov(skip)
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//\\/\\\\}"   # kcov(skip)
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//\"/\\\"}"   # kcov(skip)
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//$'\t'/\\t}" # kcov(skip)
+  __dybatpho_network_escape_value="${__dybatpho_network_escape_value//$'\r'/\\r}" # kcov(skip)
+  __dybatpho_network_escape_out="${__dybatpho_network_escape_value//$'\n'/\\n}"   # kcov(skip)
 }
 
 #######################################
@@ -192,8 +195,9 @@ function __dybatpho_network_trace_off {
 # @internal
 #######################################
 function __dybatpho_network_trace_on {
+  # The test runs while the trace is still off, so kcov cannot see it.
   # dyshellint disable=BSG034 # this resumes the trace the caller already had on
-  [[ "${1-}" == true ]] && set -x
+  [[ "${1-}" == true ]] && set -x # kcov(skip)
   return 0
 }
 
@@ -227,26 +231,30 @@ function __dybatpho_network_secret_config {
   previous_umask="$(umask)"
   umask 077
   # dyshellint disable=BSG046 # created under the umask set above, which `create_temp` does not take
+  # The block dies, so "dybatpho::curl_do stops when it cannot create its
+  # private curl config" runs it under `run`, which kcov cannot see.
   path="$(mktemp "${TMPDIR:-/tmp}/dybatpho_curl_XXXXXXXX")" || {
-    umask "${previous_umask}"
-    dybatpho::die "${FUNCNAME[1]}: Unable to create a private curl config file"
+    umask "${previous_umask}"                                                   # kcov(skip)
+    dybatpho::die "${FUNCNAME[1]}: Unable to create a private curl config file" # kcov(skip)
   }
   umask "${previous_umask}"
 
   local network_config_escape trace
+  # kcov reads the trace, which is off from here to `__dybatpho_network_trace_on`:
+  # the secret header and secret URL tests run these lines, unseen.
   __dybatpho_network_trace_off trace
   {
-    for header in ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}; do
-      [[ -n "${header}" ]] || continue
-      __dybatpho_network_config_escape_into network_config_escape "${header}"
-      printf 'header = "%s"\n' "${network_config_escape}"
+    for header in ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}; do # kcov(skip)
+      [[ -n "${header}" ]] || continue                                                        # kcov(skip)
+      __dybatpho_network_config_escape_into network_config_escape "${header}"                 # kcov(skip)
+      printf 'header = "%s"\n' "${network_config_escape}"                                     # kcov(skip)
     done
-    if [[ "${__config_secret_url}" == true ]]; then
-      __dybatpho_network_config_escape_into network_config_escape "${__config_url}"
-      printf 'url = "%s"\n' "${network_config_escape}"
+    if [[ "${__config_secret_url}" == true ]]; then                                 # kcov(skip)
+      __dybatpho_network_config_escape_into network_config_escape "${__config_url}" # kcov(skip)
+      printf 'url = "%s"\n' "${network_config_escape}"                              # kcov(skip)
     fi
-  } >> "${path}"
-  __dybatpho_network_trace_on "${trace}"
+  } >> "${path}"                         # kcov(skip)
+  __dybatpho_network_trace_on "${trace}" # kcov(skip)
 
   __config_out="${path}"
 }
@@ -263,16 +271,19 @@ function __dybatpho_network_secret_config {
 #######################################
 function __dybatpho_network_with_secret_headers {
   local __dybatpho_network_wsh_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_network_trace_on`:
+  # the `dybatpho::curl_auth_bearer` tests run these lines, unseen.
   __dybatpho_network_trace_off __dybatpho_network_wsh_trace
-  local -a __dybatpho_network_wsh_added=()
-  while (($#)) && [[ "$1" != "--" ]]; do
-    [[ -z "$1" ]] || __dybatpho_network_wsh_added+=("$1")
-    shift
+  local -a __dybatpho_network_wsh_added=()                # kcov(skip)
+  while (($#)) && [[ "$1" != "--" ]]; do                  # kcov(skip)
+    [[ -z "$1" ]] || __dybatpho_network_wsh_added+=("$1") # kcov(skip)
+    shift                                                 # kcov(skip)
   done
-  shift
+  shift # kcov(skip)
   # The caller's headers are read before the local exists: Bash 4.3 declares
   # the local first and then expands the right-hand side, so the copy saw an
   # empty array and every header the caller had set was dropped.
+  # kcov(disabled) - list literals, run with the trace off as above
   local -a __dybatpho_network_wsh_inherited=(
     ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}
   )
@@ -282,7 +293,8 @@ function __dybatpho_network_with_secret_headers {
     ${__dybatpho_network_wsh_inherited[@]+"${__dybatpho_network_wsh_inherited[@]}"}
     ${__dybatpho_network_wsh_added[@]+"${__dybatpho_network_wsh_added[@]}"}
   )
-  __dybatpho_network_trace_on "${__dybatpho_network_wsh_trace}"
+  # kcov(enabled)
+  __dybatpho_network_trace_on "${__dybatpho_network_wsh_trace}" # kcov(skip)
   "$@"
 }
 
@@ -424,7 +436,7 @@ function dybatpho::curl_do {
   for ((scanned = 0; scanned + 1 < ${#scan[@]}; scanned++)); do
     case "${scan[scanned]}" in
       -D | --dump-header) [[ "${scan[scanned + 1]}" == "-" ]] || header_file="${scan[scanned + 1]}" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
   if [[ -z "${header_file}" ]]; then
@@ -488,9 +500,13 @@ function dybatpho::curl_do {
       # body given -- `a=1&b=2` arrived as `b=2\n`, and a signed payload no
       # longer matched its signature. The trace is off for the `printf`, which
       # would otherwise print the body it was given.
-      code=$(command curl "${curl_args[@]}" ${url_args[@]+"${url_args[@]}"} < <(
-        { set +x; } 2> /dev/null
-        printf '%s' "${DYBATPHO_CURL_SECRET_DATA}"
+      #
+      # Bash traces a command substitution that spans lines at its closing line,
+      # where kcov does not look, and the `printf` runs untraced; "dybatpho::curl_do
+      # sends a secret body byte for byte" runs all three lines.
+      code=$(command curl "${curl_args[@]}" ${url_args[@]+"${url_args[@]}"} < <(# kcov(skip)
+        { set +x; } 2> /dev/null                   # kcov(skip)
+        printf '%s' "${DYBATPHO_CURL_SECRET_DATA}" # kcov(skip)
       )) || {
         code="000"
         dybatpho::error "Error when access ${shown_url}"
@@ -506,9 +522,7 @@ function dybatpho::curl_do {
     [[ "${code}" =~ ^[0-9]{3}$ ]] || code="000"
 
     if [[ "${follow_here}" == true && "${code}" =~ ^30[12378]$ ]]; then
-      location=$(awk '
-        tolower($1) == "location:" { sub("\r$", "", $2); print $2; exit }
-      ' "${header_file}")
+      location=$(awk 'tolower($1) == "location:" { sub("\r$", "", $2); print $2; exit }' "${header_file}")
       if [[ -n "${location}" ]]; then
         if ((redirects >= DYBATPHO_CURL_MAX_REDIRECTS)); then
           dybatpho::warn "Stopped after ${redirects} redirects from ${shown_url}"
@@ -570,9 +584,8 @@ function dybatpho::curl_do {
     fi
 
     attempt=$((attempt + 1))
-    retry_after=$(awk '
-      tolower($1) == "retry-after:" { gsub("\r", "", $2); if ($2 ~ /^[0-9]+$/) print $2; exit }
-    ' "${header_file}")
+    retry_after=$(awk 'tolower($1) == "retry-after:" { gsub("\r", "", $2); print $2; exit }' "${header_file}")
+    [[ "${retry_after}" =~ ^[0-9]+$ ]] || retry_after=""
     __dybatpho_helpers_backoff_into delay "${attempt}" "${DYBATPHO_CURL_RETRY_BASE_DELAY}" \
       "${DYBATPHO_CURL_RETRY_MAX_DELAY}" "${DYBATPHO_CURL_RETRY_JITTER}" "${retry_after}"
     if declare -F __dybatpho_metrics_key > /dev/null; then
@@ -870,7 +883,7 @@ function dybatpho::curl_parse_response {
       value="${BASH_REMATCH[2]}"
       DYBATPHO_HTTP_HEADERS["${key}"]="${value}"
     fi
-  done < "${header_file}"
+  done < "${header_file}" # kcov(skip) - run by every curl_parse_response test; kcov never records the `done` of a loop
 
   [[ -n "${DYBATPHO_HTTP_STATUS}" ]]
 }
@@ -1049,16 +1062,16 @@ function dybatpho::circuit_breaker {
   local __dybatpho_network_cb_opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${__dybatpho_network_cb_key}]:-0}"
   local __dybatpho_network_cb_now
   printf -v __dybatpho_network_cb_now '%(%s)T' -1
+  local __dybatpho_network_cb_name="Circuit '${__dybatpho_network_cb_key}'"
 
   if ((__dybatpho_network_cb_opened_at > 0)); then
     local __dybatpho_network_cb_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cb_opened_at))
     if ((__dybatpho_network_cb_elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
       local __dybatpho_network_cb_left=$((DYBATPHO_CIRCUIT_COOLDOWN - __dybatpho_network_cb_elapsed))
-      dybatpho::warn \
-        "Circuit '${__dybatpho_network_cb_key}' is open; skipping request (retry in ${__dybatpho_network_cb_left}s)"
+      dybatpho::warn "${__dybatpho_network_cb_name} is open; skipping request (retry in ${__dybatpho_network_cb_left}s)"
       return 9
     fi
-    dybatpho::debug "Circuit '${__dybatpho_network_cb_key}' cooldown elapsed; allowing a trial request"
+    dybatpho::debug "${__dybatpho_network_cb_name} cooldown elapsed; allowing a trial request"
   fi
 
   local __dybatpho_network_cb_exit_code=0
@@ -1077,8 +1090,7 @@ function dybatpho::circuit_breaker {
     DYBATPHO_CIRCUIT_FAILURES["${__dybatpho_network_cb_key}"]="${__dybatpho_network_cb_failures}"
     if ((__dybatpho_network_cb_failures >= DYBATPHO_CIRCUIT_THRESHOLD)); then
       DYBATPHO_CIRCUIT_OPENED_AT["${__dybatpho_network_cb_key}"]="${__dybatpho_network_cb_now}"
-      dybatpho::warn \
-        "Circuit '${__dybatpho_network_cb_key}' opened after ${__dybatpho_network_cb_failures} consecutive failures"
+      dybatpho::warn "${__dybatpho_network_cb_name} opened after ${__dybatpho_network_cb_failures} consecutive failures"
     fi
   fi
   return "${__dybatpho_network_cb_exit_code}"
@@ -1106,7 +1118,7 @@ function __dybatpho_network_rate_spec {
     s) window_ms=$((window * 1000)) ;;
     m) window_ms=$((window * 60000)) ;;
     h) window_ms=$((window * 3600000)) ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   ((count > 0 && window_ms > 0)) || return 1
   printf '%s %s\n' "${count}" "${window_ms}"
@@ -1252,8 +1264,8 @@ function dybatpho::rate_limit {
     ((__dybatpho_network_rl_wait_ms < 1)) && __dybatpho_network_rl_wait_ms=1
 
     if ! dybatpho::is true "${DYBATPHO_RATE_LIMIT_WAIT}"; then
-      dybatpho::warn \
-        "Rate limit '${__dybatpho_network_rl_key}' is spent; skipping call (free in ${__dybatpho_network_rl_wait_ms}ms)"
+      local __dybatpho_network_rl_free="free in ${__dybatpho_network_rl_wait_ms}ms"
+      dybatpho::warn "Rate limit '${__dybatpho_network_rl_key}' is spent; skipping call (${__dybatpho_network_rl_free})"
       return 9
     fi
     if ((DYBATPHO_RATE_LIMIT_MAX_WAIT > 0 && __dybatpho_network_rl_wait_ms > DYBATPHO_RATE_LIMIT_MAX_WAIT * 1000)); then
@@ -1266,8 +1278,8 @@ function dybatpho::rate_limit {
     if declare -F __dybatpho_metrics_key > /dev/null; then
       dybatpho::metrics_counter_inc dybatpho_rate_limit_waits_total 1 "key=${__dybatpho_network_rl_key}"
     fi
-    dybatpho::debug \
-      "Rate limit '${__dybatpho_network_rl_key}': waiting ${__dybatpho_network_rl_wait_ms}ms for a free slot"
+    local __dybatpho_network_rl_waiting="waiting ${__dybatpho_network_rl_wait_ms}ms for a free slot"
+    dybatpho::debug "Rate limit '${__dybatpho_network_rl_key}': ${__dybatpho_network_rl_waiting}"
     sleep "$(printf '%d.%03d' $((__dybatpho_network_rl_wait_ms / 1000)) $((__dybatpho_network_rl_wait_ms % 1000)))" \
       || true
   done
@@ -1517,11 +1529,13 @@ function dybatpho::curl_graphql {
     response="${scratch}"
   fi
 
+  # kcov(disabled) - a list literal: its continuation lines are data, not commands
   local -a args=(
     --request POST
     --header "Accept: application/json"
     --header "Content-Type: application/json"
   )
+  # kcov(enabled)
   local authorization=""
   [[ -z "${DYBATPHO_GRAPHQL_TOKEN}" ]] || authorization="Authorization: Bearer ${DYBATPHO_GRAPHQL_TOKEN}"
   # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
@@ -1671,10 +1685,7 @@ function __dybatpho_network_is_port {
 function dybatpho::url_parse {
   local url
   dybatpho::expect_args url -- "$@"
-  DYBATPHO_URL=(
-    [scheme]="" [user]="" [password]="" [host]=""
-    [port]="" [path]="" [query]="" [fragment]=""
-  )
+  DYBATPHO_URL=([scheme]="" [user]="" [password]="" [host]="" [port]="" [path]="" [query]="" [fragment]="")
   [[ "${url}" =~ ${__DYBATPHO_URL_REGEX} ]] || return 1
 
   DYBATPHO_URL[scheme]="${BASH_REMATCH[1],,}"

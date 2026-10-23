@@ -584,8 +584,8 @@ function dybatpho::cache_run {
       printf '%s\n' "${__dybatpho_cache_run_cached}"
       return 0
     fi
-    if ((__dybatpho_cache_run_stale > 0 && __dybatpho_cache_run_age < __dybatpho_cache_run_ttl + \
-      __dybatpho_cache_run_stale)); then
+    if ((__dybatpho_cache_run_stale > 0)) \
+      && ((__dybatpho_cache_run_age < __dybatpho_cache_run_ttl + __dybatpho_cache_run_stale)); then
       __dybatpho_cache_run_cached="$(< "${__dybatpho_cache_run_path}")"
       __dybatpho_cache_refresh_background "${__dybatpho_cache_run_key}" "${__dybatpho_cache_run_path}" "$@"
       printf '%s\n' "${__dybatpho_cache_run_cached}"

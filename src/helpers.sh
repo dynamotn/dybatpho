@@ -298,7 +298,9 @@ function __dybatpho_helpers_need_module {
   __dybatpho_helpers_load_soft "$1" "$2" "$3" && return 0
   local hint="load it with: dybatpho::load $1"
   if ! declare -F __dybatpho_load_module > /dev/null; then
-    hint="this bundle does not carry it; regenerate it with scripts/bundle.sh --with-soft-deps"
+    # This dies, so "a bundle without the module loader is pointed at
+    # --with-soft-deps" runs it under `run`, where kcov cannot see it.
+    hint="this bundle does not carry it; regenerate it with scripts/bundle.sh --with-soft-deps" # kcov(skip)
   elif __dybatpho_module_exists "$1"; then
     hint="loading it on demand failed"
   fi
@@ -359,7 +361,7 @@ function __dybatpho_helpers_public_caller_into {
 #######################################
 function __dybatpho_helpers_sort {
   local -n __dybatpho_helpers_sort_ref="$1"
-  local __dybatpho_helpers_sort_before="$2"
+  local __dybatpho_helpers_sort_cmp="$2"
   shift 2
   local -a __dybatpho_helpers_sort_from=(${__dybatpho_helpers_sort_ref[@]+"${__dybatpho_helpers_sort_ref[@]}"})
   local -a __dybatpho_helpers_sort_into=()
@@ -368,9 +370,9 @@ function __dybatpho_helpers_sort {
   local __dybatpho_helpers_sort_hi __dybatpho_helpers_sort_l __dybatpho_helpers_sort_r
   local __dybatpho_helpers_sort_left __dybatpho_helpers_sort_right __dybatpho_helpers_sort_key
   local __dybatpho_helpers_sort_mode=call
-  case "${__dybatpho_helpers_sort_before}" in
+  case "${__dybatpho_helpers_sort_cmp}" in
     @int-key | @bytes-key)
-      __dybatpho_helpers_sort_mode="${__dybatpho_helpers_sort_before}"
+      __dybatpho_helpers_sort_mode="${__dybatpho_helpers_sort_cmp}"
       local -n __dybatpho_helpers_sort_keys="$1"
       # Byte order whatever the caller's collation; it only reaches the
       # inline comparison, since no comparator is called in a key mode.
@@ -381,8 +383,10 @@ function __dybatpho_helpers_sort {
 
   while ((__dybatpho_helpers_sort_width < __dybatpho_helpers_sort_n)); do
     __dybatpho_helpers_sort_into=()
-    for ((__dybatpho_helpers_sort_lo = 0; __dybatpho_helpers_sort_lo < __dybatpho_helpers_sort_n;  \
-    __dybatpho_helpers_sort_lo += 2 * __dybatpho_helpers_sort_width)); do
+    # A `while` rather than an arithmetic `for`, whose header does not fit one
+    # line: Bash traces a header broken over lines where kcov counts nothing.
+    __dybatpho_helpers_sort_lo=0
+    while ((__dybatpho_helpers_sort_lo < __dybatpho_helpers_sort_n)); do
       __dybatpho_helpers_sort_mid=$((__dybatpho_helpers_sort_lo + __dybatpho_helpers_sort_width))
       ((__dybatpho_helpers_sort_mid <= __dybatpho_helpers_sort_n)) \
         || __dybatpho_helpers_sort_mid="${__dybatpho_helpers_sort_n}"
@@ -391,14 +395,17 @@ function __dybatpho_helpers_sort {
         || __dybatpho_helpers_sort_hi="${__dybatpho_helpers_sort_n}"
       __dybatpho_helpers_sort_l="${__dybatpho_helpers_sort_lo}"
       __dybatpho_helpers_sort_r="${__dybatpho_helpers_sort_mid}"
-      while ((__dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid && \
-        __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi)); do
+      # Two tests rather than one broken over two lines, which Bash traces where
+      # kcov counts nothing.
+      while ((__dybatpho_helpers_sort_l < __dybatpho_helpers_sort_mid)) \
+        && ((__dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi)); do
         __dybatpho_helpers_sort_right="${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}"
         __dybatpho_helpers_sort_left="${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_l]}"
         if case "${__dybatpho_helpers_sort_mode}" in
           @int-key)
-            ((__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_right] < \
-            __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_left]))
+            # One side is read first, as below, to keep the comparison on one line.
+            __dybatpho_helpers_sort_key="${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_right]}"
+            ((__dybatpho_helpers_sort_key < __dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_left]))
             ;;
           @bytes-key)
             # shfmt joins a `[[ ]]` test onto one line, so one side is read
@@ -407,10 +414,9 @@ function __dybatpho_helpers_sort {
             [[ "${__dybatpho_helpers_sort_key}" < "${__dybatpho_helpers_sort_keys[__dybatpho_helpers_sort_left]}" ]]
             ;;
           *)
-            "${__dybatpho_helpers_sort_before}" \
-              "${__dybatpho_helpers_sort_right}" "${__dybatpho_helpers_sort_left}" "$@"
+            "${__dybatpho_helpers_sort_cmp}" "${__dybatpho_helpers_sort_right}" "${__dybatpho_helpers_sort_left}" "$@"
             ;;
-        esac then
+        esac then # kcov(skip) - a closing keyword has no command to fire on; the sort tests run it
           __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_right}")
           ((__dybatpho_helpers_sort_r += 1))
         else
@@ -427,6 +433,7 @@ function __dybatpho_helpers_sort {
       for (( ; __dybatpho_helpers_sort_r < __dybatpho_helpers_sort_hi; __dybatpho_helpers_sort_r++)); do
         __dybatpho_helpers_sort_into+=("${__dybatpho_helpers_sort_from[__dybatpho_helpers_sort_r]}")
       done
+      ((__dybatpho_helpers_sort_lo += 2 * __dybatpho_helpers_sort_width))
     done
     __dybatpho_helpers_sort_from=(${__dybatpho_helpers_sort_into[@]+"${__dybatpho_helpers_sort_into[@]}"})
     ((__dybatpho_helpers_sort_width *= 2))
@@ -802,10 +809,7 @@ function __dybatpho_helpers_ipv6_groups {
   if [[ "${__ipv6_last}" == *.* ]]; then
     local -a __ipv6_octets=()
     __dybatpho_helpers_ipv4_octets "${__ipv6_last}" __ipv6_octets || return 1
-    __ipv6_mapped=(
-      "$(((__ipv6_octets[0] << 8) | __ipv6_octets[1]))"
-      "$(((__ipv6_octets[2] << 8) | __ipv6_octets[3]))"
-    )
+    __ipv6_mapped=("$(((__ipv6_octets[0] << 8) | __ipv6_octets[1]))" "$(((__ipv6_octets[2] << 8) | __ipv6_octets[3]))")
     if ((__ipv6_mapped_in_tail)); then
       unset '__ipv6_tail_parts[-1]'
     else
@@ -981,8 +985,8 @@ function dybatpho::is {
         '' | *) return 1 ;;
       esac
       ;;
-    *) ;;
-  esac # kcov(skip)
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+  esac    # kcov(skip)
   return 1
 }
 
@@ -1102,8 +1106,11 @@ function dybatpho::assert {
       ${__dybatpho_helpers_assert_argv[@]+"${__dybatpho_helpers_assert_argv[@]}"}
     __dybatpho_helpers_assert_message="Assertion failed: ${__dybatpho_helpers_assert_message}"
   fi
-  ${__dybatpho_helpers_assert_argv[@]+"${__dybatpho_helpers_assert_argv[@]}"} \
-    || dybatpho::die "${__dybatpho_helpers_assert_message}"
+  if ! ${__dybatpho_helpers_assert_argv[@]+"${__dybatpho_helpers_assert_argv[@]}"}; then
+    # This dies, so "dybatpho::assert -- runs a check as words and stops with
+    # its message" runs it under `run`, where kcov cannot see it.
+    dybatpho::die "${__dybatpho_helpers_assert_message}" # kcov(skip)
+  fi
 }
 
 #######################################
@@ -1230,7 +1237,7 @@ function dybatpho::retry {
   else
     # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
     eval "${__dybatpho_retry_command}"
-  fi; do
+  fi; do # kcov(skip) - a closing keyword has no command to fire on; the dybatpho::retry tests run it
     __dybatpho_retry_exit_code="$?"
     __dybatpho_retry_count="$((__dybatpho_retry_count + 1))"
     if [[ "${__dybatpho_retry_count}" -le "${__dybatpho_retry_retries}" ]]; then
@@ -1319,7 +1326,7 @@ function dybatpho::retry_until {
   else
     # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
     eval "${__dybatpho_retry_command}"
-  fi; do
+  fi; do # kcov(skip) - a closing keyword has no command to fire on; the dybatpho::retry tests run it
     __dybatpho_retry_exit_code=$?
     __dybatpho_retry_count=$((__dybatpho_retry_count + 1))
     if ((__dybatpho_retry_count > __dybatpho_retry_retries)); then
@@ -1454,12 +1461,10 @@ function __dybatpho_helpers_locate {
 function __dybatpho_helpers_qualify_into {
   local -n __dybatpho_helpers_qualify_out="$1"
   local __dybatpho_helpers_qualify_name="${2-}"
-  if [[ "${__dybatpho_helpers_qualify_name}" == dybatpho::* ||
-    "${__dybatpho_helpers_qualify_name}" == __dybatpho_* ]]; then
-    __dybatpho_helpers_qualify_out="${__dybatpho_helpers_qualify_name}"
-  else
-    __dybatpho_helpers_qualify_out="dybatpho::${__dybatpho_helpers_qualify_name}"
-  fi
+  case "${__dybatpho_helpers_qualify_name}" in
+    dybatpho::* | __dybatpho_*) __dybatpho_helpers_qualify_out="${__dybatpho_helpers_qualify_name}" ;;
+    *) __dybatpho_helpers_qualify_out="dybatpho::${__dybatpho_helpers_qualify_name}" ;;
+  esac
 }
 
 #######################################
@@ -1580,7 +1585,7 @@ function dybatpho::describe {
     ((count < line)) || break
     lines+=("${text}")
     count=$((count + 1))
-  done < "${file}"
+  done < "${file}" # kcov(skip) - a redirection has no command to fire on; the dybatpho::describe tests run it
 
   # The comment block is the run of comment lines directly above the definition.
   local -a block=()
@@ -1647,10 +1652,12 @@ function dybatpho::function_list {
   # answer when nothing else is at hand.
   local -a names=()
   local candidate
+  # The dybatpho::function_list tests run both process substitutions below,
+  # which kcov records no hit for.
   while read -r _ _ candidate; do
     [[ "${candidate}" == dybatpho::* ]] || continue
     names+=("${candidate}")
-  done < <(declare -F)
+  done < <(declare -F) # kcov(skip)
   ((${#names[@]} > 0)) || return 0
 
   if [[ -z "${module}" ]]; then
@@ -1675,9 +1682,9 @@ function dybatpho::function_list {
         printf '%s\n' "${name}"
       fi
     fi
-  done < <(
-    shopt -s extdebug
-    declare -F ${names[@]+"${names[@]}"} 2> /dev/null
+  done < <(# kcov(skip)
+    shopt -s extdebug                                 # kcov(skip)
+    declare -F ${names[@]+"${names[@]}"} 2> /dev/null # kcov(skip)
   )
   # An empty list would read as "that module exports nothing", which is not what
   # happened: a bundle holds every module in one file and none of them can be

@@ -287,7 +287,9 @@ function dybatpho::assert_safe_path {
         dybatpho::die "Refusing to touch protected ${description}: ${shown}" # kcov(skip)
       fi
     done
-  done < <(printf '%s' "${safety_protected_paths_output}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "assert_safe_path normalizes relative paths" runs it.
+  done < <(printf '%s' "${safety_protected_paths_output}") # kcov(skip)
 
   if [[ -n "${DYBATPHO_SAFE_ROOTS}" ]]; then
     local -a roots=()
@@ -537,7 +539,9 @@ function dybatpho::safe_extract {
     if dybatpho::is exist "${target_path}" && ! dybatpho::is dir "${target_path}"; then
       collisions+=("${stripped_entry}")
     fi
-  done < <(printf '%s' "${archive_list_output}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "safe_extract extracts a safe archive" runs it.
+  done < <(printf '%s' "${archive_list_output}") # kcov(skip)
 
   if ((${#collisions[@]})); then
     if ! __dybatpho_safety_approve "${force}" \

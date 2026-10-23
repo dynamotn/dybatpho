@@ -107,12 +107,8 @@ function __dybatpho_release_parse_into {
     __dybatpho_release_breaking="true"
   fi
 
-  __dybatpho_release_parsed_ref=(
-    "${__dybatpho_release_type}"
-    "${__dybatpho_release_scope}"
-    "${__dybatpho_release_breaking}"
-    "${__dybatpho_release_description}"
-  )
+  __dybatpho_release_parsed_ref=("${__dybatpho_release_type}" "${__dybatpho_release_scope}")
+  __dybatpho_release_parsed_ref+=("${__dybatpho_release_breaking}" "${__dybatpho_release_description}")
 }
 
 #######################################
@@ -144,6 +140,13 @@ function __dybatpho_release_commits_into {
   fi
   __dybatpho_git_resolve_commit "${__dybatpho_release_repo}" "${__dybatpho_release_head}" > /dev/null
 
+  # An empty base means nothing has been released yet. A `base..head` range
+  # excludes its base, which would drop the repository's first commit, so
+  # that case reads the whole history instead.
+  local __dybatpho_release_range="${__dybatpho_release_head}"
+  [[ -z "${__dybatpho_release_base}" ]] \
+    || __dybatpho_release_range="${__dybatpho_release_base}..${__dybatpho_release_head}"
+  local -a __dybatpho_release_log=(log --reverse --format='%H%x1f%B%x1e' "${__dybatpho_release_range}")
   while IFS= read -r -d $'\x1e' __dybatpho_release_record; do
     # `git log` ends every record with a newline, which lands in front of the
     # next one.
@@ -153,18 +156,9 @@ function __dybatpho_release_commits_into {
       __dybatpho_release_record="${__dybatpho_release_record%$'\n'}"
     done
     __dybatpho_release_messages_ref+=("${__dybatpho_release_record}")
-  done < <(
-    # An empty base means nothing has been released yet. A `base..head` range
-    # excludes its base, which would drop the repository's first commit, so
-    # that case reads the whole history instead.
-    if [[ -n "${__dybatpho_release_base}" ]]; then
-      __dybatpho_git "${__dybatpho_release_repo}" log --reverse \
-        --format='%H%x1f%B%x1e' "${__dybatpho_release_base}..${__dybatpho_release_head}"
-    else
-      __dybatpho_git "${__dybatpho_release_repo}" log --reverse \
-        --format='%H%x1f%B%x1e' "${__dybatpho_release_head}"
-    fi
-  )
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "release_bump_type takes the strongest change in the range" runs it.
+  done < <(__dybatpho_git "${__dybatpho_release_repo}" "${__dybatpho_release_log[@]}") # kcov(skip)
 }
 
 #######################################
@@ -219,7 +213,7 @@ function dybatpho::release_bump_type {
     case "${parsed[0]}" in
       feat) bump="minor" ;;
       fix | perf) [[ "${bump}" == "minor" ]] || bump="patch" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 
@@ -303,7 +297,7 @@ function dybatpho::release_changelog {
     case "${parsed[0]}" in
       feat) features+=("${entry}") ;;
       fix | perf) fixes+=("${entry}") ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 
@@ -385,8 +379,7 @@ function dybatpho::release_package {
 
   local release_artifact_name
   release_artifact_name=$(dybatpho::release_artifact_name "${name}" "${version}" "${goos}" "${goarch}")
-  artifact="$(dybatpho::path_join "${output_dir}" \
-    "${release_artifact_name}")"
+  artifact="$(dybatpho::path_join "${output_dir}" "${release_artifact_name}")"
   if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::dry_run -- package "${source}" into "${artifact}"
     printf '%s\n' "${artifact}"
@@ -428,7 +421,7 @@ function dybatpho::release_checksums {
     [[ "${entry}" == "${output}" ]] && continue
     case "${entry}" in
       *.asc | *.sig | *SHA256SUMS*) continue ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
     artifacts+=("${entry}")
   done

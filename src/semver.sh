@@ -70,8 +70,7 @@ function __dybatpho_semver_parse_into {
   local -n __svp_out="${__svp_var}"
   [[ "${__svp_version}" =~ ${DYBATPHO_SEMVER_REGEX} ]] || return 1
   # Group 4 and 6 carry the leading `-` and `+`; 5 and 7 are the parts.
-  __svp_out=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
-    "${BASH_REMATCH[5]}" "${BASH_REMATCH[7]}")
+  __svp_out=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[5]}" "${BASH_REMATCH[7]}")
 }
 
 #######################################
@@ -377,7 +376,7 @@ function __dybatpho_semver_expand {
       __bounds_out+=(">= 0.0.0")
       return 0
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   # Trailing wildcards say "any value here", which is exactly what leaving the

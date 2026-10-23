@@ -456,3 +456,12 @@ fake_versioned_command() {
   assert_output --partial "Unknown module dependency: array ~> nosuch"
   unset '__dybatpho_module_soft_deps[array]'
 }
+
+@test "dybatpho::doctor fails and says so when the running Bash is too old" {
+  # The running shell is always new enough, so the check itself stands in for
+  # an older one.
+  dybatpho::doctor_bash_supported() { return 1; }
+  run_traced -1 dybatpho::doctor --modules string
+  assert_output --partial "Bash ${BASH_VERSION} is older than the supported minimum ${DYBATPHO_BASH_MINIMUM}"
+  refute_output --partial "No required dependency is missing."
+}

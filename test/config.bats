@@ -688,6 +688,23 @@ require_tool() {
   assert_line "note: 'a: literal string'"
 }
 
+@test "config_save writes a false boolean as a scalar and an unreadable one as a string" {
+  require_tool jq
+  local file="${BATS_TEST_TMPDIR}/flags.json"
+  printf '{}\n' > "${file}"
+
+  DYBATPHO_CONFIG=()
+  dybatpho::config_schema_reset
+  dybatpho::config_schema quiet bool
+  dybatpho::config_schema verbose bool
+  dybatpho::config_set quiet off
+  dybatpho::config_set verbose maybe
+  run_traced -0 dybatpho::config_save "${file}" quiet verbose
+
+  run_traced jq -c . "${file}"
+  assert_output '{"quiet":false,"verbose":"maybe"}'
+}
+
 @test "config_save rewrites JSON and TOML without disturbing other keys" {
   require_tool jq
   require_tool yq

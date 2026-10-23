@@ -85,6 +85,7 @@ __dybatpho_math_awk_threshold=32
 # test, an exact comparison, the sort key `__dybatpho_math_sort_key_into`
 # builds, and a stable merge sort. Each one reproduces its Bash counterpart on
 # the digit strings, so no value is ever read as a binary float.
+# kcov(disabled) - an awk program held in a string: its lines are data, not commands
 # shellcheck disable=SC2016 # an awk program: its `$` are awk's, not the shell's
 __dybatpho_math_awk_lib='
   # @internal
@@ -204,11 +205,13 @@ __dybatpho_math_awk_lib='
     }
   }
 '
+# kcov(enabled)
 
 # The `awk` engine for the list aggregates, chosen by its first argument:
 # `sum`, `sumsq` (the sum, then the sum of squares), `min`, `max`, or `sort`.
 # It reads one value a line and exits 3 at the first one that is not a number,
 # leaving the Bash engine to report it.
+# kcov(disabled) - an awk program held in a string: its lines are data, not commands
 # shellcheck disable=SC2016 # an awk program: its `$` are awk's, not the shell's
 __dybatpho_math_awk_program='
   BEGIN {
@@ -397,6 +400,7 @@ __dybatpho_math_awk_program='
     return render(SQ, LO2, 4, "")
   }
 '
+# kcov(enabled)
 
 #######################################
 # @description Name the public function a failure should be reported against.
@@ -452,7 +456,7 @@ function __dybatpho_math_parse {
       __parse_rest="${__parse_rest#-}"
       ;;
     +*) __parse_rest="${__parse_rest#+}" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
 
   if [[ "${__parse_rest}" == *.* ]]; then
@@ -620,7 +624,9 @@ function __dybatpho_math_mul_abs {
   for ((__mul_index = 0; __mul_index < __mul_na + __mul_nb; __mul_index++)); do
     __mul_columns[__mul_index]=0
   done
-  for ((__mul_ia = __mul_na - 1; __mul_ia >= 0; __mul_ia--)); do
+  # "dybatpho::math_mul keeps every digit of both operands" runs the loop below;
+  # kcov does not record its header.
+  for ((__mul_ia = __mul_na - 1; __mul_ia >= 0; __mul_ia--)); do # kcov(skip)
     __mul_limb=$((10#${__mul_a:__mul_ia*9:9}))
     ((__mul_limb)) || continue
     __mul_carry=0
@@ -1162,8 +1168,10 @@ function __dybatpho_math_awk_into {
   # One value a line: a value holding a line break would read as two.
   local IFS=' '
   [[ "$*" != *$'\n'* ]] || return 1
-  __dybatpho_math_awk_out="$(printf '%s\n' "$@" \
-    | LC_ALL=C command awk "${__dybatpho_math_awk_program}${__dybatpho_math_awk_lib}" "${__dybatpho_math_awk_mode}")"
+  # The program and its mode, as `awk` takes them.
+  local -a __dybatpho_math_awk_argv=("${__dybatpho_math_awk_program}${__dybatpho_math_awk_lib}")
+  __dybatpho_math_awk_argv+=("${__dybatpho_math_awk_mode}")
+  __dybatpho_math_awk_out="$(printf '%s\n' "$@" | LC_ALL=C command awk "${__dybatpho_math_awk_argv[@]}")"
 }
 
 #######################################
@@ -2088,11 +2096,11 @@ function __dybatpho_math_isqrt {
     if [[ "${__isqrt_base}" == "0" ]]; then
       __isqrt_digit=9
     else
+      # The remainder is at most 2 * root before two digits come down, so at
+      # most 10 * base + 99 after, and never more than one digit longer.
       __isqrt_gap=$((${#__isqrt_rem} - ${#__isqrt_base}))
       if ((__isqrt_gap < 0)); then
         __isqrt_digit=0
-      elif ((__isqrt_gap > 1)); then
-        __isqrt_digit=9
       else
         __isqrt_width=${#__isqrt_rem}
         ((__isqrt_width <= 18)) || __isqrt_width=18

@@ -706,6 +706,23 @@ EOF2
   assert_stderr --partial "Cannot set 'name.x'"
 }
 
+@test "dybatpho::yaml_set reads a numeric segment as a list index" {
+  local file="${BATS_TEST_TMPDIR}/values.yaml"
+  printf 'ports: # exposed\n  - 80\n  - 443\n' > "${file}"
+  run_traced dybatpho::yaml_set "${file}" ports.1 8443
+  assert_success
+  assert_output - << 'EOF2'
+ports: # exposed
+  - 80
+  - "8443"
+EOF2
+  # A list index is refused on a mapping, the way json_set refuses it.
+  printf 'image:\n  tag: x\n' > "${file}"
+  run_traced --separate-stderr dybatpho::yaml_set "${file}" image.0 y
+  assert_failure
+  assert_stderr --partial "Cannot set 'image.0'"
+}
+
 @test "dybatpho::yaml_del removes a path and ignores an absent one" {
   local file="${BATS_TEST_TMPDIR}/values.yaml"
   printf 'a: 1 # one\nb:\n  - x\n  - y\n' > "${file}"

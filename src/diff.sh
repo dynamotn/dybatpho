@@ -294,10 +294,14 @@ function dybatpho::diff_json {
   local path value
   while IFS=$'\t' read -r path value; do
     before["${path}"]="${value}"
-  done < <(__dybatpho_diff_flatten "${first_file}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "diff_json reports keys added, removed and changed" runs it.
+  done < <(__dybatpho_diff_flatten "${first_file}") # kcov(skip)
   while IFS=$'\t' read -r path value; do
     after["${path}"]="${value}"
-  done < <(__dybatpho_diff_flatten "${second_file}")
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "diff_json reports keys added, removed and changed" runs it.
+  done < <(__dybatpho_diff_flatten "${second_file}") # kcov(skip)
 
   local color=0
   __dybatpho_diff_wants_color && color=1
@@ -326,7 +330,9 @@ function dybatpho::diff_json {
         "${before[${path}]}" "${after[${path}]}"
       differed=1
     fi
-  done < <(((${#paths[@]})) && printf '%s\n' ${paths[@]+"${paths[@]}"} | LC_ALL=C sort -u)
+    # kcov never records the `done` of a loop fed by a process substitution;
+    # "diff_json reports keys added, removed and changed" runs it.
+  done < <(((${#paths[@]})) && printf '%s\n' ${paths[@]+"${paths[@]}"} | LC_ALL=C sort -u) # kcov(skip)
 
   ((differed == 0)) && return 0
   return 1

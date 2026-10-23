@@ -848,10 +848,11 @@ function __dybatpho_cli_label_switch {
       fi
       ;;
     *)
-      local __switch_error # kcov(skip)
-      __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias \
-        "Invalid switch alias: $2" "alias=$2") # kcov(skip)
-      dybatpho::die "${__switch_error}"        # kcov(skip)
+      # Dies, so "an option switch that is neither -x nor --name stops the
+      # script" runs it under `run`, which kcov cannot see.
+      local __switch_error                                                                                 # kcov(skip)
+      __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias "Invalid switch alias: $2" "alias=$2") # kcov(skip)
+      dybatpho::die "${__switch_error}"                                                                    # kcov(skip)
       ;;
   esac
 }
@@ -880,10 +881,11 @@ function __dybatpho_cli_case_switch {
       ;;
     -? | --*) __dybatpho_cli_add_plain_switch "$1" ;;
     *)
-      local __switch_error # kcov(skip)
-      __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias \
-        "Invalid switch alias: $1" "alias=$1") # kcov(skip)
-      dybatpho::die "${__switch_error}"        # kcov(skip)
+      # Dies, so "an option switch that is neither -x nor --name stops the
+      # script" runs it under `run`, which kcov cannot see.
+      local __switch_error                                                                                 # kcov(skip)
+      __switch_error=$(__dybatpho_log_text cli.invalid_switch_alias "Invalid switch alias: $1" "alias=$1") # kcov(skip)
+      dybatpho::die "${__switch_error}"                                                                    # kcov(skip)
       ;;
   esac
 }
@@ -911,7 +913,7 @@ function __dybatpho_cli_parse_opt {
       negatable:*) __negatable="${__scan#negatable:}" ;;
       count:*) __count="${__scan#count:}" ;;
       off:*) __has_explicit_off=true ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
   # A generated `--no-x` is only useful if it lands on a falsy value, so a
@@ -942,7 +944,7 @@ function __dybatpho_cli_parse_opt {
           ;;
         [!-]*) __dybatpho_cli_parse_key_value "$1" "__" ;;
         --* | -?) __dybatpho_cli_label_switch "${need_argument}" "$1" ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
       shift
     done
@@ -1028,7 +1030,7 @@ function __dybatpho_cli_collect_long_switches {
     for __long_switch in ${__long_switches}; do
       case "${__long_switch}" in
         --?*) __long_out+=("${__long_switch}") ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
     done
   done
@@ -1064,7 +1066,7 @@ function __dybatpho_cli_expand_abbr {
     fi
     case "${__candidate}" in
       "${__typed}"*) __matches+=("${__candidate}") ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
   case "${#__matches[@]}" in
@@ -1212,7 +1214,7 @@ function __dybatpho_cli_define_var {
         __dybatpho_cli_prepend_export 0 "$1${__init}"
         return 0
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
       case ${__init} in action:*)
         local action=""
@@ -1220,7 +1222,7 @@ function __dybatpho_cli_define_var {
         __dybatpho_cli_print_indent 0 "${action}"
         return 0
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
       __dybatpho_cli_assign_quoted __init "${__init#=}"
       __dybatpho_cli_prepend_export 0 "$1=${__init}"
@@ -1334,7 +1336,7 @@ function __dybatpho_cli_generate_logic {
     "" | any | arbitrary)
       __dybatpho_cli_derive_args_rule __args ${__declared_args[@]+"${__declared_args[@]}"}
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   __dybatpho_cli_print_indent 0 "dybatpho::opts::parse::${__dybatpho_cli_logic_spec}() {"
   __dybatpho_cli_print_indent 1 'local __rest_argc=0'
@@ -1627,9 +1629,8 @@ function __dybatpho_cli_generate_help {
   if ((${#__help_cmd_rows[@]})); then
     local __invocation="${0##*/}${__help_subcmd:+ ${__help_subcmd}}"
     dybatpho::print ""
-    dybatpho::print "$(__dybatpho_log_text cli.more_info \
-      "Run '${__invocation} COMMAND --help' for more information on a command." \
-      "command=${__invocation}")"
+    local __more_info="Run '${__invocation} COMMAND --help' for more information on a command."
+    dybatpho::print "$(__dybatpho_log_text cli.more_info "${__more_info}" "command=${__invocation}")"
   fi
 }
 
@@ -1655,7 +1656,7 @@ function __dybatpho_cli_help_usage {
     usage="${usage} ${__help_arg_usage}"
   else
     case "${__help_args_rule,,}" in
-      none | noargs) ;;
+      none | noargs) ;; # kcov(skip) - a case arm has no command to fire on
       *) usage="${usage} $(__dybatpho_log_text cli.placeholder_args "[ARGS]...")" ;;
     esac
   fi
@@ -1754,9 +1755,9 @@ function __dybatpho_cli_generate_schema_command {
       __dybatpho_cli_gsc_switch_first=false
       printf "%s" "${__dybatpho_cli_gsc_switch}"
     done
-    local \
-      __dybatpho_cli_gsc_option_format='],"env":%s,"config":%s,"multiple":%s,"count":%s,"negatable":%s,"choices":%s,'
-    __dybatpho_cli_gsc_option_format+='"pattern":%s,"valueType":%s,"prompt":%s,"hidden":%s,"required":%s,"deprecated":%s,"label":%s}'
+    local __dybatpho_cli_gsc_option_format='],"env":%s,"config":%s,"multiple":%s,"count":%s,'
+    __dybatpho_cli_gsc_option_format+='"negatable":%s,"choices":%s,"pattern":%s,"valueType":%s,"prompt":%s,'
+    __dybatpho_cli_gsc_option_format+='"hidden":%s,"required":%s,"deprecated":%s,"label":%s}'
     # shellcheck disable=SC2059 # the format is built above, not taken from input
     printf "${__dybatpho_cli_gsc_option_format}" \
       "${__dybatpho_cli_gsc_q_env}" "${__dybatpho_cli_gsc_q_config}" "${__dybatpho_cli_gsc_multiple:-false}" \
@@ -1924,8 +1925,13 @@ function dybatpho::generate_completion {
   dybatpho::expect_args __dybatpho_cli_gc_spec __dybatpho_cli_gc_shell -- "$@"
   case "${__dybatpho_cli_gc_shell}" in
     bash | zsh | fish) ;; # kcov(skip)
-    *) dybatpho::die "$(__dybatpho_log_text cli.unsupported_shell \
-      "Unsupported completion shell: ${__dybatpho_cli_gc_shell}" "shell=${__dybatpho_cli_gc_shell}")" 1 ;; # kcov(skip)
+    # Dies, so "dybatpho::generate_completion rejects a shell it cannot
+    # complete for" runs it under `run`, which kcov cannot see.
+    *)
+      local -a __dybatpho_cli_gc_text=("Unsupported completion shell: ${__dybatpho_cli_gc_shell}")  # kcov(skip)
+      __dybatpho_cli_gc_text+=("shell=${__dybatpho_cli_gc_shell}")                                  # kcov(skip)
+      dybatpho::die "$(__dybatpho_log_text cli.unsupported_shell "${__dybatpho_cli_gc_text[@]}")" 1 # kcov(skip)
+      ;;
   esac
 
   local __dybatpho_cli_gc_cache_file=""
@@ -2062,7 +2068,7 @@ function __dybatpho_cli_generate_completion_command {
         case "${__dybatpho_cli_gcc_switch}" in
           --*) printf "complete -c %s -l %s\n" "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_switch#--}" ;;
           -?) printf "complete -c %s -s %s\n" "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_switch#-}" ;;
-          *) ;;
+          *) ;; # kcov(skip) - a case arm has no command to fire on
         esac
       done
       for __dybatpho_cli_gcc_command in ${__dybatpho_cli_gcc_commands[@]+"${__dybatpho_cli_gcc_commands[@]}"}; do
@@ -2073,7 +2079,7 @@ function __dybatpho_cli_generate_completion_command {
           "${__dybatpho_cli_gcc_name}" "${__dybatpho_cli_gcc_cmd}"
       done
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -2133,7 +2139,7 @@ function __dybatpho_cli_help_row {
   for _spec_part in "$@"; do
     case ${_spec_part} in
       negatable:*) _negatable="${_spec_part#negatable:}" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
   while [[ $# -gt 0 ]]; do
@@ -2185,14 +2191,14 @@ function __dybatpho_cli_help_row {
     flag | disp) label="${sw}" ;;
     param) label="${sw} <${_var}>" ;;
     cmd) label="${_var}" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   # `env:true` reuses the variable name, and `env:false` disables the fallback.
   case "${_env}" in
     true) _env="${_var}" ;;
     false | "") _env="" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   local _annotations=""
@@ -2264,19 +2270,19 @@ function __dybatpho_cli_help_default {
   case "${_raw}" in
     "" | @*) return 0 ;;
     action:*) return 0 ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   _raw="${_raw#=}"
   case "${_raw}" in
     \"*\") _raw="${_raw:1:${#_raw}-2}" ;;
     \'*\') _raw="${_raw:1:${#_raw}-2}" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   # A command substitution or variable reference is resolved at run time, so
   # printing the expression itself would mislead more than it helps.
   case "${_raw}" in
     *'$'* | *'`'*) return 0 ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   [[ -n "${_raw}" ]] || return 0
   printf -v "$1" '%s' "${_raw}"
@@ -2449,12 +2455,12 @@ function __dybatpho_cli_add_plain_switch {
   local __plain="$1"
   if dybatpho::is true "${__negatable:-false}"; then
     case ${__plain} in
-      --no-* | --without-*) ;;
+      --no-* | --without-*) ;; # kcov(skip) - a case arm has no command to fire on
       --*)
         __dybatpho_cli_add_switch "'${__plain}'|'--no-${__plain#--}'"
         return 0
         ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   fi
   __dybatpho_cli_add_switch "'${__plain}'"
@@ -2487,7 +2493,7 @@ function __dybatpho_cli_expand_switch {
         && __expand_out+=("--no-${__declared#--}")
       ;;
     -?) __expand_out+=("${__declared}") ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   return 0
 }
@@ -2651,9 +2657,8 @@ function __dybatpho_cli_print_known_candidates {
 function __dybatpho_cli_print_deprecated_warning {
   local __item_type="$1" __item_label="$2" __message="$3"
   local __warning __english
-  __english="$(__dybatpho_log_text "cli.deprecated_${__item_type}" \
-    "Deprecated ${__item_type}: ${__item_label}. ${__message}" \
-    "item=${__item_label}" "message=${__message}")"
+  local __default="Deprecated ${__item_type}: ${__item_label}. ${__message}"
+  __english="$(__dybatpho_log_text "cli.deprecated_${__item_type}" "${__default}" "item=${__item_label}" "message=${__message}")"
   __dybatpho_cli_assign_quoted __warning "${__english}"
   __dybatpho_cli_print_indent 4 "dybatpho::warn ${__warning}"
 }
@@ -2670,10 +2675,8 @@ function __dybatpho_cli_generate_child_logic {
   shift
   # Read before the local exists: Bash 4.3 declares it first and then expands
   # the right-hand side, which read the new, empty array.
-  local -a __child_inherited=(
-    ${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"}
-    ${__persistent_defs[@]+"${__persistent_defs[@]}"}
-  )
+  local -a __child_inherited=(${__persistent_inherited_defs[@]+"${__persistent_inherited_defs[@]}"})
+  __child_inherited+=(${__persistent_defs[@]+"${__persistent_defs[@]}"})
   local -a __persistent_inherited_defs=(${__child_inherited[@]+"${__child_inherited[@]}"})
   __dybatpho_cli_generate_logic "${__child_spec}" "$@"
 }
@@ -2732,6 +2735,8 @@ function __dybatpho_cli_print_args_check {
   local rule="${1:-any}"
   local expected min max noun
 
+  # A rule it cannot read stops the script, so "an args rule that cannot be
+  # read stops the script" runs those arms under `run`, which kcov cannot see.
   case "${rule}" in
     "" | any | arbitrary) return 0 ;;
     none | noargs)
@@ -2743,9 +2748,9 @@ function __dybatpho_cli_print_args_check {
       expected="${rule#exact:}"
       dybatpho::validate_is uint "${expected}" \
         || {
-          local log_text_detail
-          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}")
-          dybatpho::die "${log_text_detail}"
+          local log_text_detail                                                                                    # kcov(skip)
+          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
+          dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
       noun="arguments"
       [[ "${expected}" -eq 1 ]] && noun="argument"
@@ -2757,9 +2762,9 @@ function __dybatpho_cli_print_args_check {
       min="${rule#min:}"
       dybatpho::validate_is uint "${min}" \
         || {
-          local log_text_detail
-          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}")
-          dybatpho::die "${log_text_detail}"
+          local log_text_detail                                                                                    # kcov(skip)
+          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
+          dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
       noun="arguments"
       [[ "${min}" -eq 1 ]] && noun="argument"
@@ -2771,9 +2776,9 @@ function __dybatpho_cli_print_args_check {
       max="${rule#max:}"
       dybatpho::validate_is uint "${max}" \
         || {
-          local log_text_detail
-          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}")
-          dybatpho::die "${log_text_detail}"
+          local log_text_detail                                                                                    # kcov(skip)
+          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
+          dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
       noun="arguments"
       [[ "${max}" -eq 1 ]] && noun="argument"
@@ -2788,18 +2793,18 @@ function __dybatpho_cli_print_args_check {
       dybatpho::validate_is uint "${min}" && dybatpho::validate_is uint "${max}" \
         && [[ "${min}" -le "${max}" ]] \
         || {
-          local log_text_detail
-          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}")
-          dybatpho::die "${log_text_detail}"
+          local log_text_detail                                                                                    # kcov(skip)
+          log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
+          dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
       __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
       __dybatpho_cli_print_indent 3 "[ \"\${__rest_argc}\" -ge ${min} ] && [ \"\${__rest_argc}\" -le ${max} ] || set \"argcount\" \"\$(__dybatpho_log_text cli.args_range \"Expected between ${min} and ${max} arguments, got \${__rest_argc}\" \"min=${min}\" \"max=${max}\" \"got=\${__rest_argc}\")\""
       __dybatpho_cli_print_indent 2 '}'
       ;;
     *)
-      local log_text
-      log_text=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}")
-      dybatpho::die "${log_text}" # kcov(skip)
+      local log_text                                                                                    # kcov(skip)
+      log_text=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
+      dybatpho::die "${log_text}"                                                                       # kcov(skip)
       ;;
   esac
 }
@@ -2818,7 +2823,7 @@ function __dybatpho_cli_collect_switches {
   for __spec_part in "$@"; do
     case "${__spec_part}" in
       negatable:*) __collect_negatable="${__spec_part#negatable:}" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
   for __spec_part in "$@"; do
@@ -2940,7 +2945,7 @@ function dybatpho::opts::setup {
     for __setup_item in "$@"; do
       case "${__setup_item}" in
         args:*) __help_args_rule="${__setup_item#args:}" ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
     done
     return 0
@@ -3159,7 +3164,7 @@ function dybatpho::opts::disp {
           __has_help=true
           break
           ;;
-        *) ;;
+        *) ;; # kcov(skip) - a case arm has no command to fire on
       esac
     done
   fi
@@ -3205,7 +3210,7 @@ function dybatpho::opts::msg {
   for __msg_item in "${@:2}"; do
     case "${__msg_item}" in
       hidden:*) __msg_hidden="${__msg_item#hidden:}" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 
@@ -3238,7 +3243,7 @@ function dybatpho::opts::cmd {
       aliases:*) __dybatpho_cli_parse_alias_list __cmd_aliases "${1#aliases:}" ;;
       hidden:*) __cmd_hidden="${1#hidden:}" ;;
       deprecated:*) __cmd_deprecated="${1#deprecated:}" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
     shift
   done
@@ -3315,7 +3320,7 @@ function dybatpho::opts::arg {
     case "${__arg_item}" in
       required:*) __arg_required="${__arg_item#required:}" ;;
       variadic:*) __arg_variadic="${__arg_item#variadic:}" ;;
-      *) ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
     esac
   done
 

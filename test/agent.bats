@@ -236,6 +236,21 @@ _spec_test_deploy() {
   assert_failure
 }
 
+@test "dybatpho::agent_confirm asks a person instead of reading the allowlist" {
+  DYBATPHO_AGENT_MODE=off
+  DYBATPHO_AGENT_ALLOW="all"
+  DYBATPHO_FORCE=true
+  run_traced dybatpho::agent_confirm deploy "Ship it"
+  assert_success
+  # Nobody is there to answer, and the allowlist is not consulted for a person.
+  DYBATPHO_FORCE=false
+  DYBATPHO_INTERACTIVE=false
+  run_traced --separate-stderr dybatpho::agent_confirm deploy "Ship it"
+  assert_failure
+  assert_stderr --partial "Ship it?"
+  assert_output ""
+}
+
 @test "dybatpho::agent_confirm records both decisions in the audit log" {
   DYBATPHO_AGENT_MODE=on
   DYBATPHO_AGENT_ALLOW="deploy"

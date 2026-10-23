@@ -127,7 +127,7 @@ function __dybatpho_forge_normalize_url {
     ssh://*) url="${url#ssh://}" ;;
     https://*) url="${url#https://}" ;;
     http://*) url="${url#http://}" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
   # A URL may carry `user@host`; the credential is not part of the identity.
   url="${url#*@}"
@@ -293,26 +293,29 @@ function dybatpho::forge_token {
 function __dybatpho_forge_token_into {
   local -n __dybatpho_forge_token_out="$1"
   local __dybatpho_forge_token_kind="$2" __dybatpho_forge_token_trace
-  # A trace prints every expansion below with the token in it.
+  # A trace prints every expansion below with the token in it. kcov reads
+  # coverage from that same trace, so the lines run while it is suspended carry
+  # `kcov(skip)`; the `dybatpho::forge_token` tests run each of them.
   __dybatpho_network_trace_off __dybatpho_forge_token_trace
-  local __dybatpho_forge_token_value="${DYBATPHO_FORGE_TOKEN}"
-  if [[ -z "${__dybatpho_forge_token_value}" ]]; then
-    case "${__dybatpho_forge_token_kind}" in
-      github) __dybatpho_forge_token_value="${GITHUB_TOKEN:-${GH_TOKEN:-}}" ;;
-      gitlab) __dybatpho_forge_token_value="${GITLAB_TOKEN:-${CI_JOB_TOKEN:-}}" ;;
-      *) ;;
+  local __dybatpho_forge_token_value="${DYBATPHO_FORGE_TOKEN}"                     # kcov(skip)
+  if [[ -z "${__dybatpho_forge_token_value}" ]]; then                              # kcov(skip)
+    case "${__dybatpho_forge_token_kind}" in                                       # kcov(skip)
+      github) __dybatpho_forge_token_value="${GITHUB_TOKEN:-${GH_TOKEN:-}}" ;;     # kcov(skip)
+      gitlab) __dybatpho_forge_token_value="${GITLAB_TOKEN:-${CI_JOB_TOKEN:-}}" ;; # kcov(skip)
+      *) ;;                                                                        # kcov(skip)
     esac
   fi
 
-  if [[ -z "${__dybatpho_forge_token_value}" ]]; then
-    local __dybatpho_forge_token_vars
-    __dybatpho_forge_token_vars=$(__dybatpho_forge_token_vars "${__dybatpho_forge_token_kind}")
-    dybatpho::die "No ${__dybatpho_forge_token_kind} token. Set DYBATPHO_FORGE_TOKEN, or ${__dybatpho_forge_token_vars}"
+  if [[ -z "${__dybatpho_forge_token_value}" ]]; then                                           # kcov(skip)
+    local __dybatpho_forge_token_vars                                                           # kcov(skip)
+    __dybatpho_forge_token_vars=$(__dybatpho_forge_token_vars "${__dybatpho_forge_token_kind}") # kcov(skip)
+    __dybatpho_forge_token_vars="Set DYBATPHO_FORGE_TOKEN, or ${__dybatpho_forge_token_vars}"   # kcov(skip)
+    dybatpho::die "No ${__dybatpho_forge_token_kind} token. ${__dybatpho_forge_token_vars}"     # kcov(skip)
   fi
 
-  dybatpho::secret_register "${__dybatpho_forge_token_value}"
-  __dybatpho_forge_token_out="${__dybatpho_forge_token_value}"
-  __dybatpho_network_trace_on "${__dybatpho_forge_token_trace}"
+  dybatpho::secret_register "${__dybatpho_forge_token_value}"   # kcov(skip)
+  __dybatpho_forge_token_out="${__dybatpho_forge_token_value}"  # kcov(skip)
+  __dybatpho_network_trace_on "${__dybatpho_forge_token_trace}" # kcov(skip)
 }
 
 #######################################
@@ -335,8 +338,10 @@ function __dybatpho_forge_context_into {
   local __dybatpho_forge_ctx_remote="${DYBATPHO_FORGE_REMOTE}"
 
   case "${DYBATPHO_FORGE}" in
-    "" | github | gitlab) ;;
-    *) dybatpho::die "DYBATPHO_FORGE must be 'github' or 'gitlab', got '${DYBATPHO_FORGE}'" ;;
+    "" | github | gitlab) ;; # kcov(skip) - a case arm has no command to fire on
+    # `dybatpho::die` exits, so "dybatpho::forge_request stops on a remote, a
+    # host or an override it can't use" runs this under `run`.
+    *) dybatpho::die "DYBATPHO_FORGE must be 'github' or 'gitlab', got '${DYBATPHO_FORGE}'" ;; # kcov(skip)
   esac
 
   # The remote is read only when something it answers is not overridden.
@@ -357,8 +362,10 @@ function __dybatpho_forge_context_into {
       github.com | github.*) __dybatpho_forge_ctx[kind]=github ;;
       gitlab.com | gitlab.*) __dybatpho_forge_ctx[kind]=gitlab ;;
       *)
-        local __dybatpho_forge_ctx_hint="set DYBATPHO_FORGE to 'github' or 'gitlab'"
-        dybatpho::die "Cannot tell which forge '${__dybatpho_forge_ctx[host]}' is; ${__dybatpho_forge_ctx_hint}"
+        # `dybatpho::die` exits, so "dybatpho::forge_request stops on a remote,
+        # a host or an override it can't use" runs these under `run`.
+        local hint="set DYBATPHO_FORGE to 'github' or 'gitlab'"                             # kcov(skip)
+        dybatpho::die "Cannot tell which forge '${__dybatpho_forge_ctx[host]}' is; ${hint}" # kcov(skip)
         ;;
     esac
   fi
@@ -368,8 +375,8 @@ function __dybatpho_forge_context_into {
       __dybatpho_forge_ctx[repo]="${DYBATPHO_FORGE_REPO}"
     else
       local __dybatpho_forge_ctx_project="${__dybatpho_forge_ctx_url#*/}"
-      [[ "${__dybatpho_forge_ctx_project}" != "${__dybatpho_forge_ctx_url}" &&
-        -n "${__dybatpho_forge_ctx_project}" ]] \
+      [[ "${__dybatpho_forge_ctx_project}" != "${__dybatpho_forge_ctx_url}" ]] || __dybatpho_forge_ctx_project=""
+      [[ -n "${__dybatpho_forge_ctx_project}" ]] \
         || dybatpho::die "Remote '${__dybatpho_forge_ctx_remote}' has no owner/repo path: ${__dybatpho_forge_ctx_url}"
       __dybatpho_forge_ctx[repo]="${__dybatpho_forge_ctx_project}"
     fi
@@ -387,9 +394,11 @@ function __dybatpho_forge_context_into {
   fi
 
   if [[ "${__dybatpho_forge_ctx_want}" == *" token "* ]]; then
-    local __dybatpho_forge_ctx_token
-    __dybatpho_forge_token_into __dybatpho_forge_ctx_token "${__dybatpho_forge_ctx[kind]}"
-    __dybatpho_forge_ctx[token]="${__dybatpho_forge_ctx_token}"
+    # Only a request asks for the token, and it has suspended the trace kcov
+    # reads by then; every `dybatpho::forge_request` test runs these.
+    local __dybatpho_forge_ctx_token                                                       # kcov(skip)
+    __dybatpho_forge_token_into __dybatpho_forge_ctx_token "${__dybatpho_forge_ctx[kind]}" # kcov(skip)
+    __dybatpho_forge_ctx[token]="${__dybatpho_forge_ctx_token}"                            # kcov(skip)
   fi
 }
 
@@ -415,7 +424,7 @@ function __dybatpho_forge_api_for_into {
       fi
       ;;
     gitlab) __dybatpho_forge_api_out="https://$3/api/v4" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -431,7 +440,7 @@ function __dybatpho_forge_token_vars {
   case "${kind}" in
     github) printf 'GITHUB_TOKEN or GH_TOKEN\n' ;;
     gitlab) printf 'GITLAB_TOKEN or CI_JOB_TOKEN\n' ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -454,7 +463,7 @@ function __dybatpho_forge_project_path {
       encoded=$(dybatpho::url_encode "${repo}")
       printf 'projects/%s\n' "${encoded}"
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -478,7 +487,7 @@ function __dybatpho_forge_labels_json {
     [[ -n "${label}" ]] || continue
     array+="${separator}$(dybatpho::json_string "${label}")"
     separator=","
-  done < <(printf '%s' "${split_output}")
+  done < <(printf '%s' "${split_output}") # kcov(skip) - a loop's `done` is never traced
   printf '%s]\n' "${array}"
 }
 
@@ -544,32 +553,33 @@ function dybatpho::forge_request {
   # resolved here, in the caller's shell, so the token stays registered for
   # masking and a remote that can't be read stops the script. A trace is
   # suspended while the token is in play: it prints every assignment it makes.
+  # kcov reads coverage from that same trace, so the lines run while it is
+  # suspended carry `kcov(skip)`; every `dybatpho::forge_request` test runs them.
   local -A context=()
   local url trace
   __dybatpho_network_trace_off trace
-  case "${path}" in
+  case "${path}" in # kcov(skip)
     http://* | https://*)
-      __dybatpho_forge_context_into context token
-      url="${path}"
+      __dybatpho_forge_context_into context token # kcov(skip)
+      url="${path}"                               # kcov(skip)
       ;;
     *)
-      __dybatpho_forge_context_into context token repo api
-      url="${context[api]}/$(__dybatpho_forge_project_path "${context[kind]}" "${context[repo]}")/${path#/}"
+      __dybatpho_forge_context_into context token repo api                           # kcov(skip)
+      local project                                                                  # kcov(skip)
+      project=$(__dybatpho_forge_project_path "${context[kind]}" "${context[repo]}") # kcov(skip)
+      url="${context[api]}/${project}/${path#/}"                                     # kcov(skip)
       ;;
   esac
   # The token goes to curl out of band rather than as `--header`, which would
   # publish it in `/proc/<pid>/cmdline` for the life of the request. `local`
   # scoping means it is visible to `dybatpho::curl_do` and gone on return.
-  local authorization
-  __dybatpho_forge_auth_header_into authorization "${context[kind]}" "${context[token]}"
-  local -a DYBATPHO_CURL_SECRET_HEADERS=("${authorization}")
-  authorization="" context[token]=""
-  __dybatpho_network_trace_on "${trace}"
+  local authorization                                                                    # kcov(skip)
+  __dybatpho_forge_auth_header_into authorization "${context[kind]}" "${context[token]}" # kcov(skip)
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("${authorization}")                             # kcov(skip)
+  authorization="" context[token]=""                                                     # kcov(skip)
+  __dybatpho_network_trace_on "${trace}"                                                 # kcov(skip)
 
-  local -a args=(
-    --request "${method}"
-    --header "Accept: application/json"
-  )
+  local -a args=(--request "${method}" --header "Accept: application/json")
   local DYBATPHO_CURL_SECRET_DATA=""
   if [[ -n "${body}" ]]; then
     args+=(--header "Content-Type: application/json")
@@ -621,11 +631,11 @@ function dybatpho::forge_error {
   local message="" detail=""
   if dybatpho::json_valid "${body}"; then
     # GitHub uses `message`, GitLab uses `message` or `error`.
-    message="$(dybatpho::json_get "${body}" \
-      '[.message?, .error?, .error_description?] | map(select(. != null and . != "")) | .[0] // ""')"
+    local message_jq='[.message?, .error?, .error_description?] | map(select(. != null and . != "")) | .[0] // ""'
+    message="$(dybatpho::json_get "${body}" "${message_jq}")"
     # GitHub says which field it did not like in a separate array.
-    detail="$(dybatpho::json_get "${body}" \
-      '[.errors[]? | [.field?, .code?] | map(select(. != null)) | join(" ")] | join(", ")' 2> /dev/null || true)"
+    local detail_jq='[.errors[]? | [.field?, .code?] | map(select(. != null)) | join(" ")] | join(", ")'
+    detail="$(dybatpho::json_get "${body}" "${detail_jq}" 2> /dev/null || true)"
   fi
 
   if [[ -z "${message}" && -z "${detail}" ]]; then
@@ -688,8 +698,9 @@ function dybatpho::forge_issue_find {
       dybatpho::forge_request GET "issues?state=open&per_page=100" "" "${body}" || return 2
       local title_json
       title_json=$(dybatpho::json_string "${title}")
-      number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == ${title_json}) | .number")" || return 2
+      local issues
+      issues=$(< "${body}")
+      number="$(dybatpho::json_get "${issues}" ".[] | select(.title == ${title_json}) | .number")" || return 2
       ;;
     gitlab)
       local url_encode
@@ -698,10 +709,11 @@ function dybatpho::forge_issue_find {
         "issues?state=opened&search=${url_encode}&in=title" "" "${body}" || return 2
       local json_string
       json_string=$(dybatpho::json_string "${title}")
-      number="$(dybatpho::json_get "$(< "${body}")" \
-        ".[] | select(.title == ${json_string}) | .iid")" || return 2
+      local issues
+      issues=$(< "${body}")
+      number="$(dybatpho::json_get "${issues}" ".[] | select(.title == ${json_string}) | .iid")" || return 2
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   # The first match wins, as the list comes back newest first.
@@ -749,7 +761,7 @@ function dybatpho::forge_issue_create {
         dybatpho::forge_request POST "issues" "${payload}" "${response}"
       number="$(dybatpho::json_get "$(< "${response}")" '.iid')"
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   printf '%s\n' "${number}"
@@ -773,7 +785,7 @@ function dybatpho::forge_issue_comment {
   case "${kind}" in
     github) path="issues/${number}/comments" ;;
     gitlab) path="issues/${number}/notes" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   local response
@@ -825,8 +837,7 @@ function dybatpho::forge_issue_report {
 
   local forge_issue_url
   forge_issue_url=$(dybatpho::forge_issue_url "${number}")
-  dybatpho::json_object \
-    action "${action}" \
+  dybatpho::json_object action "${action}" \
     number "${number}" \
     url "${forge_issue_url}"
 }
@@ -846,7 +857,7 @@ function dybatpho::forge_issue_url {
   case "${kind}" in
     github) printf 'https://%s/%s/issues/%s\n' "${host}" "${repo}" "${number}" ;;
     gitlab) printf 'https://%s/%s/-/issues/%s\n' "${host}" "${repo}" "${number}" ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }
 
@@ -880,7 +891,7 @@ function dybatpho::forge_release_find {
       dybatpho::forge_request GET "releases/${url_encode}" "" "${body}" || return 1
       value="$(dybatpho::json_get "$(< "${body}")" '.tag_name')"
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   [[ -n "${value}" && "${value}" != "null" ]] || return 1
@@ -931,7 +942,7 @@ function dybatpho::forge_release_create {
         dybatpho::forge_request POST "releases" "${payload}" "${response}"
       value="$(dybatpho::json_get "$(< "${response}")" '.tag_name')"
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
   printf '%s\n' "${value}"
@@ -958,17 +969,19 @@ function dybatpho::forge_release_upload {
 
   local -A context=()
   local trace authorization
+  # kcov reads coverage from the trace suspended here, so the lines run while
+  # it is off carry `kcov(skip)`; every upload test runs them.
   __dybatpho_network_trace_off trace
-  __dybatpho_forge_context_into context token repo
-  local kind="${context[kind]}" repo="${context[repo]}"
+  __dybatpho_forge_context_into context token repo      # kcov(skip)
+  local kind="${context[kind]}" repo="${context[repo]}" # kcov(skip)
   # The token is handed over out of band; see DYBATPHO_CURL_SECRET_HEADERS.
   # Both forges send it to the upload, and the trace stays off while it is
   # being put there.
-  __dybatpho_forge_auth_header_into authorization "${kind}" "${context[token]}"
+  __dybatpho_forge_auth_header_into authorization "${kind}" "${context[token]}" # kcov(skip)
   # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
-  local -a DYBATPHO_CURL_SECRET_HEADERS=("${authorization}")
-  authorization="" context[token]=""
-  __dybatpho_network_trace_on "${trace}"
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("${authorization}") # kcov(skip)
+  authorization="" context[token]=""                         # kcov(skip)
+  __dybatpho_network_trace_on "${trace}"                     # kcov(skip)
   local release name response
   release="$(dybatpho::forge_release_find "${tag}")" \
     || dybatpho::die "No release for tag '${tag}'; create it before uploading assets"
@@ -1022,6 +1035,6 @@ function dybatpho::forge_release_upload {
         "releases/${url_encode}/assets/links" "${link_payload}" "${response}"
       printf '%s\n' "${package_url}"
       ;;
-    *) ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 }

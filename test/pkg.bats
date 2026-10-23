@@ -334,3 +334,77 @@ setup() {
   run ! dybatpho::pkg_require --force
   assert_output --partial "expected a command name"
 }
+
+@test "dybatpho::pkg_installed fails on an unsupported override without stopping the script" {
+  # Unlike `dybatpho::pkg_manager`, the per-package checks report the bad
+  # override and let the caller decide what a failure means.
+  DYBATPHO_PKG_MANAGER=yum
+  run_traced --separate-stderr -1 dybatpho::pkg_installed curl
+  assert_stderr --partial "unsupported package manager 'yum'"
+}
+
+@test "dybatpho::pkg_manager_available fails when nothing is detected" {
+  stub_repeated uname ": echo 'Linux'"
+  PATH="${BATS_MOCK_BINDIR}" run_traced -1 dybatpho::pkg_manager_available
+}
+
+@test "dybatpho::pkg_install_command elevates with sudo in auto mode when not root" {
+  DYBATPHO_PKG_SUDO=auto
+  DYBATPHO_PKG_MANAGER=apk
+  dybatpho::is_root() { return 1; }
+  local bin="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${bin}"
+  printf '#!/bin/sh\nexit 0\n' > "${bin}/sudo"
+  chmod +x "${bin}/sudo"
+  PATH="${bin}:${PATH}" run_traced -0 dybatpho::pkg_install_command curl
+  assert_output "sudo apk add curl"
+}
+
+@test "dybatpho::pkg_install_command does not elevate in auto mode as root or without sudo" {
+  DYBATPHO_PKG_SUDO=auto
+  DYBATPHO_PKG_MANAGER=apk
+  dybatpho::is_root() { return 0; }
+  run_traced -0 dybatpho::pkg_install_command curl
+  assert_output "apk add curl"
+
+  dybatpho::is_root() { return 1; }
+  PATH="$(path_without sudo)" run_traced -0 dybatpho::pkg_install_command curl
+  assert_output "apk add curl"
+}
+
+@test "dybatpho::pkg_update renders the refresh of every supported manager" {
+  local manager
+  local -A expected=(
+    [apt]="apt-get update"
+    [brew]="brew update"
+    [apk]="apk update"
+    [dnf]="dnf makecache"
+    [pacman]="pacman -Sy --noconfirm"
+    [emerge]="emerge --sync"
+  )
+  for manager in "${!expected[@]}"; do
+    DYBATPHO_PKG_MANAGER="${manager}"
+    run_traced -0 dybatpho::pkg_update --dry-run
+    assert_output --partial "DRY RUN: ${expected[${manager}]}"
+  done
+}
+
+@test "__dybatpho_pkg_action_command_into rejects an unknown action" {
+  local -a parts=()
+  run ! __dybatpho_pkg_action_command_into parts apk remove -- curl
+  assert_output --partial "unknown action 'remove'"
+}
+
+@test "dybatpho::pkg_installed falls back to equery on emerge" {
+  DYBATPHO_PKG_MANAGER=emerge
+  PATH="$(path_without qlist)"
+  stub_repeated equery ": echo 'net-misc/curl-8.5.0'"
+  run_traced -0 dybatpho::pkg_installed net-misc/curl
+}
+
+@test "dybatpho::pkg_installed warns on emerge without qlist or equery" {
+  DYBATPHO_PKG_MANAGER=emerge
+  PATH="${BATS_MOCK_BINDIR}:$(path_without qlist)"
+  run_traced --separate-stderr -1 dybatpho::pkg_installed net-misc/curl
+  assert_stderr --partial "without qlist or equery"
+}

@@ -431,7 +431,7 @@ function __dybatpho_lock_try {
     set -o noclobber
     printf '%s' "${DYBATPHO_LOCK_COMMAND:-$0}" > "${sidecar}" || true
     set +o noclobber
-  } 2> /dev/null
+  } 2> /dev/null # kcov(skip) - a closing brace has no command to fire on; every lock taken runs it
 }
 
 #######################################
@@ -558,13 +558,13 @@ function __dybatpho_lock_run_holding {
   # once the lock is released and the caller's handlers are back the signal is
   # raised again, so they run once, after the release -- or the shell ends, as
   # it would have without a lock.
-  local __dybatpho_lock_caught="" __dybatpho_lock_signal
+  local __dybatpho_lock_caught="" __dybatpho_lock_signal __dybatpho_lock_handler
   for __dybatpho_lock_signal in HUP INT TERM; do
-    # kcov records no hit here, though "with_lock installs a release handler"
-    # runs it and asserts the handler it installs.
-    __dybatpho_process_trap_only \
-      "${__dybatpho_lock_hold_release} > /dev/null 2>&1 || true; __dybatpho_lock_caught=${__dybatpho_lock_signal}" \
-      "${__dybatpho_lock_signal}" # kcov(skip)
+    # The handler is built first so the call fits one line: Bash traces a
+    # command broken over three lines on a line kcov does not count.
+    __dybatpho_lock_handler="${__dybatpho_lock_hold_release} > /dev/null 2>&1 || true"
+    __dybatpho_lock_handler+="; __dybatpho_lock_caught=${__dybatpho_lock_signal}"
+    __dybatpho_process_trap_only "${__dybatpho_lock_handler}" "${__dybatpho_lock_signal}"
   done
 
   local __dybatpho_lock_hold_exit_code=0
@@ -671,9 +671,11 @@ function __dybatpho_lock_semaphore_acquire {
     return 0
   fi
 
+  # The arguments go in an array so the substitution fits one line: Bash
+  # traces one broken over lines on its last line, which kcov does not count.
   local __dybatpho_lock_holders
-  __dybatpho_lock_holders="$(dybatpho::lock_semaphore_holders \
-    "${__dybatpho_lock_name}" "${__dybatpho_lock_slots}" 2> /dev/null || true)"
+  local -a __dybatpho_lock_args=("${__dybatpho_lock_name}" "${__dybatpho_lock_slots}")
+  __dybatpho_lock_holders="$(dybatpho::lock_semaphore_holders "${__dybatpho_lock_args[@]}" 2> /dev/null || true)"
   local __dybatpho_lock_message="Could not acquire a slot of semaphore ${__dybatpho_lock_name}:"
   __dybatpho_lock_message+=" all ${__dybatpho_lock_slots} are held"$'\n'"${__dybatpho_lock_holders}"
   dybatpho::error "${__dybatpho_lock_message}"

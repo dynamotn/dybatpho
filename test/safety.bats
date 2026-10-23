@@ -24,6 +24,7 @@ setup() {
 
   run_traced -1 dybatpho::confirm "Continue?" <<< "n"
   run_traced -1 dybatpho::confirm "Continue?" <<< ""
+  DYBATPHO_INTERACTIVE=true run_traced -1 dybatpho::confirm "Continue?" yes <<< "nope"
   DYBATPHO_INTERACTIVE=true dybatpho::confirm "Continue?" yes <<< ""
 }
 
@@ -77,6 +78,14 @@ setup() {
   DYBATPHO_SAFE_ROOTS="${guarded}" run dybatpho::assert_safe_path "${guarded}/../escape.txt"
   assert_failure
   assert_output --partial "outside DYBATPHO_SAFE_ROOTS"
+}
+
+@test "dybatpho::assert_safe_path accepts a safe root itself" {
+  local root="${BATS_TEST_TMPDIR}/root"
+  mkdir -p "${root}"
+
+  DYBATPHO_SAFE_ROOTS="${root}" run_traced -0 dybatpho::assert_safe_path "${root}"
+  assert_output "${root}"
 }
 
 @test "dybatpho::assert_safe_path compares a root that does not exist yet as written" {
@@ -342,6 +351,19 @@ function _create_traversal_archive {
 
   dybatpho::safe_extract "${archive_path}" "${destination}/stripped" 1
   assert_equal "$(cat "${destination}/stripped/nested/file.txt")" "hello"
+}
+
+@test "dybatpho::safe_extract drops a top-level file that strip-components strips away" {
+  local source_dir="${BATS_TEST_TMPDIR}/flat" archive_path="${BATS_TEST_TMPDIR}/flat.tar"
+  local destination="${BATS_TEST_TMPDIR}/out"
+  mkdir -p "${source_dir}/dir"
+  printf 'top\n' > "${source_dir}/top.txt"
+  printf 'inner\n' > "${source_dir}/dir/inner.txt"
+  tar -cf "${archive_path}" -C "${source_dir}" top.txt dir
+
+  run_traced -0 dybatpho::safe_extract "${archive_path}" "${destination}" 1
+  assert_equal "$(cat "${destination}/inner.txt")" "inner"
+  [[ ! -e "${destination}/top.txt" ]]
 }
 
 @test "dybatpho::safe_extract loads the archive module on demand when it is not loaded" {

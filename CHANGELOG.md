@@ -384,6 +384,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`git` — `dybatpho::git_changed_files` prints non-ASCII paths unquoted,**
   and `dybatpho::git_tags_containing` sorts the same in every locale.
 
+- **`doctor` — `dybatpho::doctor --json` works on Bash 4.3** for modules with
+  no external tool.
+
 - **`validate` — `min`, `max`, `minlen` and `maxlen` compare exactly.**
   `-0.0000001` passed `min:0`, twenty-digit decimals compared wrongly, `1e400`
   stopped the script, and `minlen:+3` failed every value.

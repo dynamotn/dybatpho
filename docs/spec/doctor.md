@@ -126,6 +126,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 ## Edge Cases
 
 - A module set that needs nothing external is reported as such rather than as an empty table.
+- A module set that needs nothing external is reported as JSON on Bash 4.3, where an empty array under `nounset` is an error.
 - Every alternative of an any-of dependency is missing, which makes the dependency missing.
 - A dependency is present but not on the narrowed `PATH` a subshell uses.
 - The report runs on a Bash older than the supported minimum, which the bootstrap would already have refused.
@@ -155,7 +156,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **FR-006a**: The report MUST fail when a required dependency is installed but outdated, and MUST NOT fail for an outdated optional dependency.
 - **FR-006b**: The report MUST NOT fail for a dependency whose version could not be read, because a probe that could not tell has not shown that anything is wrong.
 - **FR-007**: The report MUST offer a quiet mode that prints nothing and answers through the exit code.
-- **FR-008**: The report MUST offer a JSON mode that emits one object, and MUST build it without depending on an external JSON tool.
+- **FR-008**: The report MUST offer a JSON mode that emits one object, and MUST build it without depending on an external JSON tool; a scope with no external dependency MUST yield an empty `dependencies` list on every supported Bash, 4.3 included.
 - **FR-009**: The module MUST stop the script with a clear message for an unknown module name, an unknown dependency kind, or an unknown option.
 - **FR-010**: The module MUST expose the declared dependencies of a single module for programmatic use.
 - **FR-011**: The bootstrap MUST report the library version, read from the version file beside it, falling back to the repository tags and then to `unknown`, with any leading `v` removed.

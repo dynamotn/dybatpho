@@ -156,15 +156,25 @@ __DYBATPHO_DOCTOR_SPEC_REGEX='^([^<>=^~]+)([<>=^~].*)$'
 # @description Split a dependency alternative into its command and version range.
 #   A range here cannot contain a space, because the maps separate one spec from
 #   the next with one. `^4` says what `>=4 <5` would have said.
-# @arg $1 string One alternative, such as `yq` or `yq>=4`
-# @stdout Two lines: the command name, and the range or an empty line
+#
+#   The two parts come back through named variables rather than as printed
+#   lines: read through `mapfile` and a process substitution, every alternative
+#   of every spec cost a process.
+# @arg $1 string Name of the variable receiving the command name
+# @arg $2 string Name of the variable receiving the range, empty when there is none
+# @arg $3 string One alternative, such as `yq` or `yq>=4`
+# @set Both named variables
 # @internal
 #######################################
-function __dybatpho_doctor_split {
-  if [[ "$1" =~ ${__DYBATPHO_DOCTOR_SPEC_REGEX} ]]; then
-    printf '%s\n%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+function __dybatpho_doctor_split_into {
+  local -n __dybatpho_doctor_split_name="$1"
+  local -n __dybatpho_doctor_split_range="$2"
+  if [[ "$3" =~ ${__DYBATPHO_DOCTOR_SPEC_REGEX} ]]; then
+    __dybatpho_doctor_split_name="${BASH_REMATCH[1]}"
+    __dybatpho_doctor_split_range="${BASH_REMATCH[2]}"
   else
-    printf '%s\n\n' "$1"
+    __dybatpho_doctor_split_name="$3"
+    __dybatpho_doctor_split_range=""
   fi
 }
 
@@ -188,11 +198,8 @@ function __dybatpho_doctor_resolve {
   local spec="$1"
   local alternative command_name constraint path version
   local status="missing" best_status="missing" best_path="" best_version=""
-  local -a parts
   for alternative in ${spec//|/ }; do
-    mapfile -t -n 2 parts < <(__dybatpho_doctor_split "${alternative}")
-    command_name="${parts[0]}"
-    constraint="${parts[1]-}"
+    __dybatpho_doctor_split_into command_name constraint "${alternative}"
 
     path="$(command -v "${command_name}" 2> /dev/null || true)"
     [[ -n "${path}" ]] || continue
@@ -521,7 +528,9 @@ function __dybatpho_doctor_report_json {
   local row spec kind status path version spec_json path_json
   first=1
   printf ',"dependencies":['
-  for row in "${__rows_in[@]}"; do
+  # Guarded: a scope with no external dependency leaves the rows empty, and an
+  # empty array under `nounset` is an error on Bash 4.3.
+  for row in ${__rows_in[@]+"${__rows_in[@]}"}; do
     IFS=$'\t' read -r module spec kind status path version <<< "${row}"
     ((first)) || printf ','
     first=0

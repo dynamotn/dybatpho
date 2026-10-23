@@ -104,8 +104,9 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # pre-v4 Go one understands.
   [config]="jq yq>=4"
   # Only `dybatpho::csv_from_json` needs one, and either will do: the module
-  # parses and writes CSV in Bash alone.
-  [csv]="jq|yq>=4"
+  # parses and writes CSV in Bash alone. `awk` runs the bulk operations faster
+  # on a large input, with the same output.
+  [csv]="jq|yq>=4 awk"
   # `dybatpho::diff_text` needs nothing external beyond `diff`; comparing by
   # key is built on one `jq` filter, and YAML reaches JSON through `yq`.
   [diff]="jq yq>=4"

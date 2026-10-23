@@ -875,14 +875,182 @@ EOF
   assert_output '[{"k":"a\\b","v":"x\ty"}]'
 }
 
+# The awk engine has to print, byte for byte, what the Bash engine prints. This
+# fixture carries what either could get wrong: quoted delimiters and doubled
+# quotes, a line break and a CRLF inside a value, stray text after a closing
+# quote, an unclosed quote at the end, Unicode, control bytes that JSON spells
+# as `\u00XX`, a backslash, long decimals, signs, leading zeros, a value that
+# is not plain decimal, and short rows.
+csv_engine_fixture() {
+  printf 'name,note,qty,code\r\n'
+  printf '"Doe, John","He said ""hi""",10,007\n'
+  printf 'plain,"line one\r\nline two",-3.50,+1\n'
+  printf '\303\251\346\274\242\360\237\230\200,"tab\tand \\ backslash",99999999999999999999.01,.5\n'
+  printf '"5"" pipe",ctl\001\b\f\177,0,-0\n'
+  printf '"open"stray,"",7.,1e3\n'
+  printf 'x,,,\n'
+  printf 'short,1\n'
+  printf '10,-99999999999999999999.5,-10,"unclosed\n'
+}
+
+# Every operation the awk engine runs, one per line, with its arguments.
+csv_engine_ops() {
+  cat << 'OPS'
+dybatpho::csv_header
+dybatpho::csv_col qty
+dybatpho::csv_col 4
+dybatpho::csv_select code name 2
+dybatpho::csv_filter qty gt 5
+dybatpho::csv_filter qty lt 0
+dybatpho::csv_filter code gt a
+dybatpho::csv_filter note contains line
+dybatpho::csv_filter name eq plain
+dybatpho::csv_filter name ne x
+dybatpho::csv_sort qty
+dybatpho::csv_sort qty desc number
+dybatpho::csv_sort name desc text
+dybatpho::csv_sort code
+dybatpho::csv_convert tab
+dybatpho::csv_to_json
+csv_engine_read
+OPS
+}
+
+csv_engine_read() {
+  local -a records=()
+  dybatpho::csv_read "$1" records
+  printf '%q\n' ${records[@]+"${records[@]}"}
+}
+
+# Print every operation's output under the engine named in $1.
+csv_engine_run_all() {
+  local text op
+  text="$(csv_engine_fixture)"
+  local -a words=()
+  while read -r -a words; do
+    printf '== %s\n' "${words[*]}"
+    DYBATPHO_CSV_ENGINE="$1" "${words[0]}" "${text}" "${words[@]:1}"
+  done < <(csv_engine_ops)
+}
+
+@test "DYBATPHO_CSV_ENGINE=awk prints byte for byte what the Bash engine prints" {
+  local expected
+  expected="$(csv_engine_run_all bash)"
+  run_traced csv_engine_run_all awk
+  assert_success
+  assert_output "${expected}"
+}
+
+@test "the csv awk engine agrees with the Bash engine under every awk installed" {
+  # gawk, mawk, BusyBox and BSD awk each have their own idea of a number-looking
+  # string and of regular expressions; whichever one `awk` names has to agree.
+  local expected flavor found=0 bin
+  expected="$(csv_engine_run_all bash)"
+  for flavor in awk gawk mawk original-awk nawk /usr/bin/awk busybox; do
+    command -v "${flavor}" > /dev/null || continue
+    if [[ "${flavor}" == "busybox" ]]; then
+      busybox awk 'BEGIN { }' 2> /dev/null || continue
+    fi
+    bin="${BATS_TEST_TMPDIR}/awk-${flavor//\//_}"
+    mkdir -p "${bin}"
+    if [[ "${flavor}" == "busybox" ]]; then
+      printf '#!/bin/sh\nexec busybox awk "$@"\n' > "${bin}/awk"
+    else
+      printf '#!/bin/sh\nexec %s "$@"\n' "$(command -v "${flavor}")" > "${bin}/awk"
+    fi
+    chmod +x "${bin}/awk"
+    PATH="${bin}:${PATH}" run_traced csv_engine_run_all awk
+    assert_success
+    assert_output "${expected}"
+    found=$((found + 1))
+  done
+  ((found > 0))
+}
+
+@test "the csv awk engine hands an input it would refuse to the Bash engine" {
+  # A wider row, an unknown column and a non-number under `number` stop the
+  # script with the Bash engine's message, whichever engine was asked for.
+  local text engine
+  text="$(printf 'a,b\n1,2\n3,4,5\n')"
+  for engine in bash awk; do
+    DYBATPHO_CSV_ENGINE="${engine}" run --separate-stderr dybatpho::csv_to_json "${text}"
+    assert_failure
+    assert_output ""
+    assert_stderr --partial "dybatpho::csv_to_json: Row 2 has 3 fields but the header names 2: 3 4 5"
+    DYBATPHO_CSV_ENGINE="${engine}" run --separate-stderr dybatpho::csv_col "a,b" nope
+    assert_failure
+    assert_stderr --partial "dybatpho::csv_col: No such column: nope."
+    DYBATPHO_CSV_ENGINE="${engine}" run --separate-stderr dybatpho::csv_sort "$(printf 'a\nx\n')" a asc number
+    assert_failure
+    assert_stderr --partial "dybatpho::csv_sort: Row 1 has a=x, which is not a number"
+  done
+}
+
+@test "DYBATPHO_CSV_ENGINE picks the engine and refuses one it does not know" {
+  # `auto` starts awk only for an input large enough to repay the process; a
+  # logging stand-in for awk shows which engine ran.
+  local bin="${BATS_TEST_TMPDIR}/awk-log" small large
+  mkdir -p "${bin}"
+  printf '#!/bin/sh\necho run >> "%s/log"\nexec %s "$@"\n' "${bin}" "$(command -v awk)" > "${bin}/awk"
+  chmod +x "${bin}/awk"
+  small="$(printf 'a,b\n1,2\n')"
+  large="$(printf 'a,b\n'; for ((i = 0; i < 400; i++)); do printf '%d,x\n' "${i}"; done)"
+
+  PATH="${bin}:${PATH}" run_traced dybatpho::csv_col "${small}" b
+  assert_output "2"
+  assert_file_not_exists "${bin}/log"
+  PATH="${bin}:${PATH}" DYBATPHO_CSV_ENGINE=awk run_traced dybatpho::csv_col "${small}" b
+  assert_output "2"
+  assert_file_exists "${bin}/log"
+  rm "${bin}/log"
+  PATH="${bin}:${PATH}" run_traced dybatpho::csv_col "${large}" a
+  assert_line --index 399 "399"
+  assert_file_exists "${bin}/log"
+  rm "${bin}/log"
+  PATH="${bin}:${PATH}" DYBATPHO_CSV_ENGINE=bash run_traced dybatpho::csv_col "${large}" a
+  assert_line --index 399 "399"
+  assert_file_not_exists "${bin}/log"
+
+  DYBATPHO_CSV_ENGINE=fast run --separate-stderr dybatpho::csv_col "${small}" b
+  assert_failure
+  assert_stderr --partial "dybatpho::csv_col: Unknown DYBATPHO_CSV_ENGINE: fast. Use auto, awk, or bash"
+}
+
+@test "the csv Bash engine runs alone when no awk is installed" {
+  local expected
+  expected="$(csv_engine_run_all bash)"
+  PATH="$(path_without awk)" run_traced csv_engine_run_all awk
+  assert_success
+  assert_output "${expected}"
+}
+
+@test "dybatpho::csv_read through awk keeps a line break and the field joints apart" {
+  # The awk engine hands records back one a line, so a line break inside a
+  # value and the separator between fields are spelled out and restored.
+  local -a records=() fields=()
+  DYBATPHO_CSV_ENGINE=awk dybatpho::csv_read "$(printf 'a,b\n"x\ny",\n,\n')" records
+  [ "${#records[@]}" -eq 3 ]
+  dybatpho::csv_fields "${records[1]}" fields
+  [ "${#fields[@]}" -eq 2 ]
+  [ "${fields[0]}" = "$(printf 'x\ny')" ]
+  [ "${fields[1]}" = "" ]
+  dybatpho::csv_fields "${records[2]}" fields
+  [ "${#fields[@]}" -eq 2 ]
+  run_traced dybatpho::csv_read "$(printf 'a,b\n1,2\n')" records
+  assert_success
+}
+
 @test "dybatpho::csv_col keeps a value holding invalid UTF-8 under a UTF-8 locale" {
   # Bash's pattern operators dropped such a value whole, so the row came back
-  # empty.
-  local utf8 text
+  # empty from the Bash engine while the awk engine, reading bytes, kept it.
+  local utf8 text engine
   utf8="$(locale -a 2> /dev/null | grep -iE '^(C|en_US)\.utf-?8$' | head -n 1)"
   [[ -n "${utf8}" ]] || skip "no UTF-8 locale is installed"
   text="$(printf 'a;b\n\303\\-;x\n')"
-  LC_ALL="${utf8}" DYBATPHO_CSV_DELIMITER=";" run_traced dybatpho::csv_col "${text}" a
-  assert_success
-  assert_output "$(printf '\303\\-')"
+  for engine in bash awk; do
+    LC_ALL="${utf8}" DYBATPHO_CSV_DELIMITER=";" DYBATPHO_CSV_ENGINE="${engine}" \
+      run_traced dybatpho::csv_col "${text}" a
+    assert_success
+    assert_output "$(printf '\303\\-')"
+  done
 }

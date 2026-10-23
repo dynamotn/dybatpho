@@ -59,9 +59,9 @@ fake_versioned_command() {
 @test "dybatpho::doctor_requirements lists what the csv module needs" {
   # Parsing and writing CSV is Bash alone; only `dybatpho::csv_from_json` needs
   # a JSON command, and either of the two will do, so it is optional rather
-  # than required.
+  # than required. `awk` only makes a large input faster.
   run_traced -0 dybatpho::doctor_requirements csv optional
-  assert_output "jq|yq>=4"
+  assert_output "$(printf 'jq|yq>=4\nawk')"
 
   run_traced -0 dybatpho::doctor_requirements csv required
   assert_output ""

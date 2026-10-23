@@ -26,12 +26,22 @@ fields joined by the ASCII unit separator. Splitting a record is then a
 single unambiguous operation, which is what `dybatpho::csv_fields` does.
 Data containing that byte is rejected rather than silently re-split.
 
+Parsing and the bulk operations -- `dybatpho::csv_read`, `csv_header`,
+`csv_col`, `csv_select`, `csv_filter`, `csv_sort`, `csv_convert` and
+`csv_to_json` -- run as one POSIX `awk` program once the input reaches a
+few kilobytes, and in Bash below that or when no `awk` is installed. Both
+engines print byte for byte the same output; any input the `awk` program
+would have to refuse -- an unknown column, a row wider than its header, a
+non-number under `number` -- is handed back to the Bash engine, so the
+error a script sees is the same too. `DYBATPHO_CSV_ENGINE` pins either one.
+
 ### 🌍 Environment
 
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **`DYBATPHO_CSV_DELIMITER`** | string | no | `,` | Field delimiter; set it to `;`, or to `tab` for TSV |
 | **`DYBATPHO_CSV_DELIMITER`** | string | no | `,` | Field delimiter every function reads; `tab` or `\t` names a tab |
+| **`DYBATPHO_CSV_ENGINE`** | string | no | `auto` | `auto`, `awk` or `bash`: the engine of parsing and the bulk operations |
 
 ### 🚀 Highlights
 
@@ -58,7 +68,7 @@ Data containing that byte is rejected rather than silently re-split.
 
 ## 💡 Tips
 
-- The whole input is held in memory as a Bash array, which is comfortable into the low tens of thousands of rows; past that, reach for a real CSV tool
+- With `awk`, 5,000 rows convert, filter or sort in a few hundredths of a second, and the input is limited by memory rather than time. The Bash engine takes about a millisecond a row, which is comfortable into the low thousands of rows; past the tens of thousands, reach for a real CSV tool
 - Values are read and written as text, because CSV carries no types; cast in `jq` after `dybatpho::csv_to_json` when a consumer needs numbers
 
 **[`dybatpho::csv_col`](#dybatphocsv_col)**

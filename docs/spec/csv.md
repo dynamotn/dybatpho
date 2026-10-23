@@ -104,6 +104,21 @@ As a script author, I want to read a tab- or semicolon-separated export with the
 2. **Given** CSV and a target delimiter, **When** it is converted, **Then** every record is written with the new delimiter and each field is quoted for the delimiter it is written with
 3. **Given** an empty delimiter, one longer than a character, a quote, a line break, or the unit separator, **When** any function runs, **Then** the script stops with a message naming the delimiter instead of misreading the input
 
+---
+
+### User Story 7 - Process a real export in seconds, not minutes (Priority: P2)
+
+As a script author, I want a billing export of thousands of rows converted, filtered or sorted fast enough to run in a pipeline, without installing anything and without the output depending on which tools the machine has.
+
+**Independent Test**: Run every bulk operation over the same input with `DYBATPHO_CSV_ENGINE=awk` and `=bash`, under each `awk` installed, and compare the bytes; time 5,000 rows.
+
+**Acceptance Scenarios**:
+
+1. **Given** an input of a few kilobytes or more and `awk` installed, **When** a bulk operation runs, **Then** it runs as one `awk` program and prints exactly what the Bash engine prints
+2. **Given** an input the operation must refuse — an unknown column, a row wider than its header, a non-number under `number` — **When** it runs through `awk`, **Then** the Bash engine reruns it and the script stops with the Bash engine's message, having printed nothing
+3. **Given** no `awk`, a multi-byte delimiter, or `DYBATPHO_CSV_ENGINE=bash`, **When** a bulk operation runs, **Then** the Bash engine runs it with the same output
+4. **Given** `DYBATPHO_CSV_ENGINE` set to anything but `auto`, `awk` or `bash`, **When** a bulk operation runs, **Then** the script stops naming the values it accepts
+
 ### Example Workflow
 
 ```bash
@@ -147,6 +162,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - Conversion to JSON is asked for by a script that loaded `csv` without `json`.
 - An unquoted field ends in a quote, such as `55"`, and more records follow it.
 - A value holds an invalid UTF-8 sequence while the locale is UTF-8.
+- The input is large enough for the `awk` engine; `awk` is gawk, mawk, BusyBox or BSD `awk`, or is not installed at all.
+- A value looks like a number to `awk` (`007`, `7.`, `1e3`) while it has to compare as text, or holds control bytes, invalid UTF-8, or a backslash on its way to JSON.
 - A JSON value converted to CSV is `false`, `null`, or missing.
 
 ## Requirements *(mandatory)*
@@ -195,6 +212,10 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-040**: A record MUST continue on the next line only while a field that began with a quote is still open; a quote inside an unquoted field MUST NOT join the following lines to it.
 - **FR-041**: `dybatpho::csv_from_json` MUST write `false` as `false` and only a `null` or missing value as an empty field, with either backend.
 - **FR-042**: Parsing, splitting and quoting MUST work on bytes, so a value holding an invalid UTF-8 sequence survives under a UTF-8 locale.
+- **FR-043**: Parsing (`csv_read` and every reader built on it), `csv_header`, `csv_col`, `csv_select`, `csv_filter`, `csv_sort`, `csv_convert` and `csv_to_json` MUST run as one POSIX `awk` program when `awk` is installed, every delimiter involved is a single byte, and `DYBATPHO_CSV_ENGINE` allows it, and MUST print byte for byte what the Bash engine prints, under gawk, mawk, BusyBox and BSD `awk` alike.
+- **FR-044**: Under `DYBATPHO_CSV_ENGINE=auto`, the default, the `awk` engine MUST be used only from 2,048 characters of input up; `awk` MUST use it for any non-empty input, and `bash` never.
+- **FR-045**: An input the `awk` engine would have to refuse MUST be handed to the Bash engine before anything is printed, so the error, the exit status and the empty output are the Bash engine's.
+- **FR-046**: An unknown `DYBATPHO_CSV_ENGINE` MUST stop the script, naming the function and the accepted values.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -211,6 +232,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **SC-002**: A script needs no `awk -F,` or `cut -d,` parser of its own.
 - **SC-003**: Data converts between CSV and JSON without a hand-written escape loop.
 - **SC-004**: A row that does not fit its header stops the script instead of losing a field quietly.
+- **SC-005**: With `awk` installed, 5,000 rows convert to JSON, filter, select or sort in about a tenth of a second; the Bash engine needs a millisecond or more a row.
 
 ## Integration Tests *(mandatory)*
 
@@ -262,10 +284,16 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-046**: Filter `n gt Zed` over `Zed` and `apple` under `en_US.UTF-8` and keep `apple` only.
 - **IT-047**: Read `TV,55"` followed by more records and get each record on its own; read a quoted field still open at the line end and get it joined with the next line.
 - **IT-048**: Convert `false`, `0`, `null` and a missing key to CSV with `jq` and with only `yq`; convert CSV to JSON with a backslash and a tab in a cell.
-- **IT-049**: Read a column whose value starts with an invalid UTF-8 byte under a UTF-8 locale and get the bytes back.
+- **IT-049**: Read a column whose value starts with an invalid UTF-8 byte under a UTF-8 locale, through both engines, and get the bytes back.
+- **IT-050**: Run header, col, select, filter, sort, convert, to_json and read over one fixture of quoted, multi-line, CRLF, Unicode, control-byte and numeric values with `DYBATPHO_CSV_ENGINE=awk` and get the Bash engine's bytes.
+- **IT-051**: Repeat IT-050 under every `awk` on `PATH` — `awk`, gawk, mawk, BusyBox and BSD `awk` where installed.
+- **IT-052**: Feed a wider row, an unknown column and a non-number under `number` to both engines and get the same failure with no output.
+- **IT-053**: Observe through a logging `awk` that `auto` starts it for a large input only, `awk` for a small one too and `bash` never; refuse `DYBATPHO_CSV_ENGINE=fast`.
+- **IT-054**: Remove `awk` from `PATH` and get the Bash engine's output for every operation.
+- **IT-055**: Read a value holding a line break and a trailing empty field through the `awk` engine into records that split back correctly.
 
 ## Acceptance Criteria *(mandatory)*
 
-1. Reading and writing CSV needs no external command; only the JSON conversion asks for `jq` or `yq`.
+1. Reading and writing CSV needs no external command: `awk` runs the bulk operations faster when it is installed, and without it the Bash engine prints the same output; only the JSON conversion asks for `jq` or `yq`.
 2. Text output goes to stdout so the helpers compose in pipelines and command substitution.
 3. Input that cannot be represented faithfully stops the script with a message naming the row or the value, rather than producing a file that is quietly wrong.

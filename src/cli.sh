@@ -743,10 +743,10 @@ function dybatpho::cli_suggest {
 #######################################
 # @description Raise a log level by the number of times a counting `-v` flag was repeated.
 # @example
-#   LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
+#   DYBATPHO_LOG_LEVEL="$(dybatpho::cli_verbosity_level 2)" # info -> trace
 #
 # @arg $1 number [default: 0] Repeat count
-# @arg $2 string [default: ${LOG_LEVEL}] Base level
+# @arg $2 string [default: ${DYBATPHO_LOG_LEVEL}] Base level; `LOG_LEVEL` when the prefixed one is unset, then `info`
 # @stdout Resulting log level, capped at `trace`
 # @exitcode 0
 #######################################
@@ -758,7 +758,7 @@ function dybatpho::cli_verbosity_level {
   local -i count index=3 position
   if [[ "${1:-0}" == -* ]]; then count=$((-10#${1#-})); else count=$((10#${1:-0})); fi
   local base
-  base="$(dybatpho::lower "${2:-${LOG_LEVEL:-info}}")"
+  base="$(dybatpho::lower "${2:-${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}}")"
   local -a ladder=(fatal error warn info debug trace)
   for position in "${!ladder[@]}"; do
     [[ "${ladder[position]}" = "${base}" ]] && index=${position} && break
@@ -770,15 +770,15 @@ function dybatpho::cli_verbosity_level {
 }
 
 #######################################
-# @description Apply a repeat count from a counting `-v` flag to `LOG_LEVEL`.
+# @description Apply a repeat count from a counting `-v` flag to `DYBATPHO_LOG_LEVEL`.
 # @example
 #   dybatpho::opts::flag "Increase verbosity" VERBOSITY -v alias:--verbose count:true
 #   # then, from the command action or a prerun hook:
 #   dybatpho::cli_apply_verbosity "${VERBOSITY}"
 #
 # @arg $1 number [default: 0] Repeat count
-# @arg $2 string [default: ${LOG_LEVEL}] Base level
-# @set LOG_LEVEL string Raised log level
+# @arg $2 string [default: ${DYBATPHO_LOG_LEVEL}] Base level; `LOG_LEVEL` when the prefixed one is unset, then `info`
+# @set DYBATPHO_LOG_LEVEL string Raised log level, in the current shell; it is not exported
 # @exitcode 0
 #######################################
 function dybatpho::cli_apply_verbosity {
@@ -786,8 +786,7 @@ function dybatpho::cli_apply_verbosity {
   # below would end only the substitution.
   [[ "${1:-0}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Count must be a whole number, got '$1'"
-  LOG_LEVEL="$(dybatpho::cli_verbosity_level "${1:-0}" "${2:-${LOG_LEVEL:-info}}")"
-  export LOG_LEVEL
+  DYBATPHO_LOG_LEVEL="$(dybatpho::cli_verbosity_level "${1:-0}" "${2:-${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}}")"
 }
 
 # @section Internal functions

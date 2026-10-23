@@ -51,6 +51,12 @@ unset -v __dybatpho_helper_saved_trap
 # that cares about the decision sets the variables for the call it makes.
 unset FORCE_COLOR
 
+# The library reads its settings under a `DYBATPHO_` prefix first and the bare
+# names second, so a developer's exported `DYBATPHO_LOG_LEVEL` or
+# `DYBATPHO_DRY_RUN` would win over what a test sets. The tests start from none.
+unset DYBATPHO_LOG_LEVEL DYBATPHO_LOG_FORMAT DYBATPHO_LOG_FILE DYBATPHO_LOG_FILE_LEVEL \
+  DYBATPHO_LOG_FILE_MAX_BYTES DYBATPHO_LOG_FILE_MAX_BACKUPS DYBATPHO_LOG_REQUEST_ID DYBATPHO_DRY_RUN
+
 # A git hook runs with the repository it fires in exported as `GIT_DIR`,
 # `GIT_INDEX_FILE` and friends, and the pre-commit hook runs this suite. Left in
 # place, every `git init`, `config`, `commit` and `tag` a test aims at its own

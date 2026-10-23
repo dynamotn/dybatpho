@@ -22,7 +22,7 @@ As a script author, I want level-aware logging so that users can see concise out
 
 **Why this priority**: Log filtering determines day-to-day usability for every script built on the library.
 
-**Independent Test**: Set different `LOG_LEVEL` values and verify only messages at or above the configured threshold are emitted.
+**Independent Test**: Set different `DYBATPHO_LOG_LEVEL` values and verify only messages at or above the configured threshold are emitted.
 
 **Acceptance Scenarios**:
 
@@ -53,12 +53,12 @@ As an operator, I want progress, success, warning, and error messages rendered c
 As a CI operator, I want structured JSON logging so that automated systems can
 parse timestamps, levels, source locations, and messages without ANSI cleanup.
 
-**Independent Test**: Set `LOG_FORMAT=json`, emit a diagnostic containing
+**Independent Test**: Set `DYBATPHO_LOG_FORMAT=json`, emit a diagnostic containing
 quotes and newlines, and parse the resulting JSON record.
 
 **Acceptance Scenarios**:
 
-1. **Given** `LOG_FORMAT=json`, **When** a diagnostic helper emits a message,
+1. **Given** `DYBATPHO_LOG_FORMAT=json`, **When** a diagnostic helper emits a message,
    **Then** stderr contains one JSON object with timestamp, level, source, and
    escaped message fields
 2. **Given** the default text format, **When** a diagnostic helper emits a
@@ -79,15 +79,15 @@ concurrently; without a correlation ID and process context, log lines from
 different runs are indistinguishable once aggregated.
 
 **Independent Test**: Emit two diagnostics from the same process with
-`LOG_REQUEST_ID` unset and verify both events carry the same generated
+`DYBATPHO_LOG_REQUEST_ID` unset and verify both events carry the same generated
 `request_id`, plus non-empty `hostname`, `pid`, and `duration_ms` fields.
 
 **Acceptance Scenarios**:
 
-1. **Given** `LOG_REQUEST_ID` is unset, **When** the first structured event is
+1. **Given** `DYBATPHO_LOG_REQUEST_ID` is unset, **When** the first structured event is
    emitted, **Then** a correlation ID is generated once and reused for every
    later event in the same process
-2. **Given** `LOG_REQUEST_ID` is exported by the caller (for example a CI
+2. **Given** `DYBATPHO_LOG_REQUEST_ID` is exported by the caller (for example a CI
    pipeline), **When** structured events are emitted, **Then** that ID is used
    verbatim instead of generating a new one
 3. **Given** any structured event is emitted, **Then** it includes the current
@@ -106,25 +106,25 @@ disk growth or duplicating console noise.
 different concerns; forcing them to share one threshold either floods the
 terminal or under-populates the audit log.
 
-**Independent Test**: Set `LOG_FILE` to a path and `LOG_FILE_LEVEL` to a level
-more verbose than `LOG_LEVEL`, emit events at multiple levels, and verify the
+**Independent Test**: Set `DYBATPHO_LOG_FILE` to a path and `DYBATPHO_LOG_FILE_LEVEL` to a level
+more verbose than `DYBATPHO_LOG_LEVEL`, emit events at multiple levels, and verify the
 file captures more events than stdout while every file line is valid JSON.
 
 **Acceptance Scenarios**:
 
-1. **Given** `LOG_FILE` points to a path whose parent directory does not
+1. **Given** `DYBATPHO_LOG_FILE` points to a path whose parent directory does not
    exist, **When** a log event is emitted, **Then** the directory is created
    and the event is appended as a JSON line
-2. **Given** `LOG_FILE_LEVEL` is more permissive than `LOG_LEVEL`, **When**
+2. **Given** `DYBATPHO_LOG_FILE_LEVEL` is more permissive than `DYBATPHO_LOG_LEVEL`, **When**
    events at an intermediate severity are emitted, **Then** they appear in the
    file but not on stdout
-3. **Given** the log file reaches `LOG_FILE_MAX_BYTES`, **When** another event
+3. **Given** the log file reaches `DYBATPHO_LOG_FILE_MAX_BYTES`, **When** another event
    is appended, **Then** the file is rotated into a numbered backup before the
-   new event is written, and backups beyond `LOG_FILE_MAX_BACKUPS` are pruned
-4. **Given** `LOG_FILE_MAX_BYTES=0`, **When** the file grows past what would
+   new event is written, and backups beyond `DYBATPHO_LOG_FILE_MAX_BACKUPS` are pruned
+4. **Given** `DYBATPHO_LOG_FILE_MAX_BYTES=0`, **When** the file grows past what would
    normally trigger rotation, **Then** rotation is disabled and the file keeps
    growing
-5. **Given** `LOG_FILE` is unset, **When** any log event is emitted, **Then**
+5. **Given** `DYBATPHO_LOG_FILE` is unset, **When** any log event is emitted, **Then**
    no file is created and no error is raised
 
 ---
@@ -148,7 +148,7 @@ threshold is the byte count that size stands for.
 
 1. **Given** a path whose parent directory does not exist, **When** the helper
    is called, **Then** the directory and the file are created up front and the
-   `LOG_FILE*` variables are set accordingly
+   `DYBATPHO_LOG_FILE*` variables are set accordingly
 2. **Given** a rotation size written as `10M`, **When** the helper is called,
    **Then** the threshold is stored as the equivalent number of bytes
 3. **Given** a setting that cannot be honored -- an unparseable size, a
@@ -214,7 +214,7 @@ carries both as fields.
    naming the timer and its elapsed milliseconds is logged at `info` by
    default, and the structured event carries `timer` and `elapsed_ms` fields
 2. **Given** a timer is ended with an explicit level, **When** that level is
-   filtered out by `LOG_LEVEL`, **Then** nothing is shown
+   filtered out by `DYBATPHO_LOG_LEVEL`, **Then** nothing is shown
 3. **Given** a timer was never started, **When** it is ended, **Then** the
    call fails rather than reporting a meaningless duration
 4. **Given** a timer has been ended, **Then** its elapsed milliseconds remain
@@ -251,17 +251,47 @@ exit code is passed through unchanged and the command's output is untouched.
 
 ---
 
+### User Story 10 - Configure logging without leaking settings to children (Priority: P1)
+
+As a script author, I want the library's settings to carry its own prefix and
+stay out of the environment of the programs my script starts, so that loading
+dybatpho does not switch colour off in, or hand a log level to, unrelated
+tools, while a script written for the unprefixed names keeps working.
+
+**Why this priority**: An exported `NO_COLOR=` or `LOG_LEVEL=info` reached every
+child process, and tools that only test whether `NO_COLOR` exists lost their
+colour because a Bash library had been sourced.
+
+**Independent Test**: Load the library with every module in a clean
+environment, use the helpers that used to export, and list the child
+environment; set both a prefixed and a bare name and see which one wins.
+
+**Acceptance Scenarios**:
+
+1. **Given** a clean environment, **When** the library is loaded and logs,
+   generates a request ID, configures a file sink and raises the verbosity,
+   **Then** a child process sees none of `LOG_*`, `NO_COLOR`, `DRY_RUN` or
+   `UPDATE_SNAPSHOTS`, and no `DYBATPHO_*` name other than the bootstrap's own
+2. **Given** only `LOG_LEVEL=debug` is set, **When** a debug message is logged,
+   **Then** it is shown
+3. **Given** `DYBATPHO_LOG_LEVEL=error` and `LOG_LEVEL=debug`, **When** a warning
+   is logged, **Then** it is filtered out
+4. **Given** the caller exported a setting, **When** a child process starts,
+   **Then** it still inherits that setting
+
+---
+
 ### Example Workflow
 
 ```bash
 # Text on the terminal, JSON in a rotating file, at independent verbosity.
-export LOG_LEVEL="info"
-export LOG_FORMAT="text"
-export LOG_FILE="/var/log/deploy.log"
-export LOG_FILE_LEVEL="debug"
-export LOG_FILE_MAX_BYTES=$((1024 * 1024))
-export LOG_FILE_MAX_BACKUPS=5
-export LOG_REQUEST_ID="deploy-42"
+export DYBATPHO_LOG_LEVEL="info"
+export DYBATPHO_LOG_FORMAT="text"
+export DYBATPHO_LOG_FILE="/var/log/deploy.log"
+export DYBATPHO_LOG_FILE_LEVEL="debug"
+export DYBATPHO_LOG_FILE_MAX_BYTES=$((1024 * 1024))
+export DYBATPHO_LOG_FILE_MAX_BACKUPS=5
+export DYBATPHO_LOG_REQUEST_ID="deploy-42"
 
 dybatpho::header "DEPLOY"
 dybatpho::info "Starting deployment"
@@ -287,11 +317,15 @@ dybatpho::log_context clear
 ## Edge Cases
 
 - `NO_COLOR` is set and ANSI color must be suppressed.
+- Both `DYBATPHO_LOG_LEVEL` and the bare `LOG_LEVEL` are set, or only the bare
+  one is, or neither; the same for every other `DYBATPHO_LOG_*` setting.
+- A setting is assigned after the library is sourced rather than exported
+  before it.
 - `NO_COLOR` is unset after the library loads, in a script running under `set -u`.
 - A boxed line holds CJK text or emoji and the locale is C, so Bash indexes it
   by byte.
-- `LOG_LEVEL` is invalid.
-- `LOG_FORMAT` is set to a value other than `json` (the implementation uses
+- `DYBATPHO_LOG_LEVEL` is invalid.
+- `DYBATPHO_LOG_FORMAT` is set to a value other than `json` (the implementation uses
   text output).
 - A message contains quotes, backslashes, or control characters in JSON mode.
 - `COLUMNS` or terminal detection is unavailable while rendering a box.
@@ -299,12 +333,12 @@ dybatpho::log_context clear
 - Trace helpers run in environments that use traps or child shells.
 - `hostname` and `uuidgen` binaries are unavailable on the host; hostname and
   correlation ID generation must fall back gracefully.
-- `LOG_FILE`'s parent directory does not exist or is not writable.
-- `LOG_FILE_MAX_BYTES` is `0` (rotation disabled) or `LOG_FILE_MAX_BACKUPS` is
+- `DYBATPHO_LOG_FILE`'s parent directory does not exist or is not writable.
+- `DYBATPHO_LOG_FILE_MAX_BYTES` is `0` (rotation disabled) or `DYBATPHO_LOG_FILE_MAX_BACKUPS` is
   `0` or negative (truncate-only, no numbered backups retained).
-- `LOG_FILE_LEVEL` is unset (defaults to `LOG_LEVEL`) or set independently
+- `DYBATPHO_LOG_FILE_LEVEL` is unset (defaults to `DYBATPHO_LOG_LEVEL`) or set independently
   more/less verbose than the stdout level.
-- Concurrent processes append to the same `LOG_FILE` simultaneously.
+- Concurrent processes append to the same `DYBATPHO_LOG_FILE` simultaneously.
 - A rotation size is given in a form the parser does not accept (`1.5M`,
   `ten megabytes`, a negative number), or as `0` to disable rotation.
 - The configured log path exists but is not writable, or its parent directory
@@ -333,7 +367,7 @@ dybatpho::log_context clear
 - **FR-004**: The module MUST include banner-style helpers for progress, headers, and success states.
 - **FR-005**: The module MUST support trace start/end helpers for shell debugging workflows.
 - **FR-006**: Diagnostic log output MUST include enough call-site context to help locate the emitting code.
-- **FR-007**: The module MUST support `LOG_FORMAT=json` records containing
+- **FR-007**: The module MUST support `DYBATPHO_LOG_FORMAT=json` records containing
   timestamp, level, source, and message fields.
 - **FR-008**: JSON log messages MUST escape backslashes, quotes, newlines,
   carriage returns, and tabs.
@@ -347,8 +381,9 @@ dybatpho::log_context clear
   on that module being loaded.
 - **FR-012**: Every structured (JSON) log event MUST include a correlation ID
   (`request_id`), generating and caching one for the process lifetime when
-  `LOG_REQUEST_ID` is empty, and reusing a caller-supplied `LOG_REQUEST_ID`
-  verbatim otherwise.
+  `DYBATPHO_LOG_REQUEST_ID` is empty, and reusing a caller-supplied `DYBATPHO_LOG_REQUEST_ID`
+  verbatim otherwise. A generated ID MUST stay in the current shell and MUST NOT
+  be exported.
 - **FR-013**: Every structured log event MUST include the current `hostname`,
   falling back through `hostname`, `/proc/sys/kernel/hostname`, `$HOSTNAME`,
   and finally the literal `unknown` when no source is available.
@@ -356,14 +391,14 @@ dybatpho::log_context clear
   PID and the number of milliseconds elapsed since the process started
   (`duration_ms`).
 - **FR-015**: The module MUST support writing structured JSON log events to a
-  file when `LOG_FILE` is set, independent of the stdout `LOG_FORMAT`.
+  file when `DYBATPHO_LOG_FILE` is set, independent of the stdout `DYBATPHO_LOG_FORMAT`.
 - **FR-016**: File logging MUST support an independent verbosity threshold via
-  `LOG_FILE_LEVEL`, defaulting to `LOG_LEVEL` when unset.
+  `DYBATPHO_LOG_FILE_LEVEL`, defaulting to `DYBATPHO_LOG_LEVEL` when unset.
 - **FR-017**: File logging MUST create missing parent directories before
   writing.
-- **FR-018**: The module MUST rotate `LOG_FILE` once it reaches
-  `LOG_FILE_MAX_BYTES`, keeping up to `LOG_FILE_MAX_BACKUPS` numbered backups
-  and pruning older ones; `LOG_FILE_MAX_BYTES=0` MUST disable rotation.
+- **FR-018**: The module MUST rotate `DYBATPHO_LOG_FILE` once it reaches
+  `DYBATPHO_LOG_FILE_MAX_BYTES`, keeping up to `DYBATPHO_LOG_FILE_MAX_BACKUPS` numbered backups
+  and pruning older ones; `DYBATPHO_LOG_FILE_MAX_BYTES=0` MUST disable rotation.
 - **FR-019**: File log lines MUST be redacted using the same masking registry
   as stdout/stderr output.
 - **FR-020**: The module MUST provide `dybatpho::log_to_file`, configuring the
@@ -428,6 +463,18 @@ dybatpho::log_context clear
 - **FR-041**: `dybatpho::progress_bar` MUST refuse a percentage or width that is not made of digits, before any arithmetic, and read one with leading zeros in base ten.
 - **FR-042**: Where Bash has `EPOCHSECONDS`, the builtin timestamp MUST be rendered at most once per second and `TZ` value, and MUST follow a change of either. When no `PATH` entry lies under the mock, Bats or temporary directory and neither `date` nor `busybox` is a shell function, taking a timestamp MUST NOT search `PATH`; a stand-in put on `PATH` later MUST still be found.
 - **FR-043**: An internal log call with a level outside the six known ones MUST report it as invalid and fail, and one with an uppercase level MUST be read case-insensitively, rather than stopping the script on an unbound variable under `set -u`.
+- **FR-044**: Every logging setting MUST be read where it is used, from its
+  `DYBATPHO_LOG_*` name first and, when that is unset or empty, from the bare
+  name (`LOG_LEVEL`, `LOG_FORMAT`, `LOG_FILE`, `LOG_FILE_LEVEL`,
+  `LOG_FILE_MAX_BYTES`, `LOG_FILE_MAX_BACKUPS`, `LOG_REQUEST_ID`), then from its
+  default.
+- **FR-045**: Loading the library and using the logging helpers MUST NOT assign
+  or export `NO_COLOR`, any bare `LOG_*` name, or any `DYBATPHO_*` setting the
+  caller did not set; a setting the caller exported MUST stay exported.
+- **FR-046**: `dybatpho::log_to_file` and `dybatpho::cli_apply_verbosity` MUST
+  write the `DYBATPHO_LOG_*` names without exporting them, and
+  `dybatpho::log_to_file off` MUST clear both the prefixed and the bare file
+  name.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -441,11 +488,11 @@ dybatpho::log_context clear
 - **Correlation ID**: A per-process identifier (`request_id`) attached to
   every structured event so related log lines can be grouped across
   aggregation systems.
-- **Log File**: The optional durable destination (`LOG_FILE`) that receives
+- **Log File**: The optional durable destination (`DYBATPHO_LOG_FILE`) that receives
   JSON events independent of stdout, subject to its own verbosity threshold
   and rotation policy.
-- **Rotation Policy**: The size threshold (`LOG_FILE_MAX_BYTES`) and backup
-  count (`LOG_FILE_MAX_BACKUPS`) governing when and how the log file is
+- **Rotation Policy**: The size threshold (`DYBATPHO_LOG_FILE_MAX_BYTES`) and backup
+  count (`DYBATPHO_LOG_FILE_MAX_BACKUPS`) governing when and how the log file is
   rotated.
 - **Context Field**: A `name=value` pair registered once and attached to every
   later log event, held in the current shell.
@@ -469,7 +516,7 @@ dybatpho::log_context clear
   aggregation systems using a stable `request_id`, `hostname`, and `pid`
   without any extra caller bookkeeping.
 - **SC-007**: Long-running or scheduled scripts can persist an audit trail via
-  `LOG_FILE` without unbounded disk growth, thanks to automatic rotation.
+  `DYBATPHO_LOG_FILE` without unbounded disk growth, thanks to automatic rotation.
 - **SC-008**: File and stdout verbosity can be tuned independently so
   operators get concise console output while retaining a fuller file record.
 - **SC-009**: A durable, rotating, secret-masked log is turned on with one
@@ -481,29 +528,32 @@ dybatpho::log_context clear
 - **SC-011**: A script can report how long each step took, and show that a
   slow step is still alive, without hand-rolled timing or output handling and
   without changing the exit code that reaches the caller.
+- **SC-012**: Sourcing the library adds nothing to the environment of the
+  programs a script starts, and a script written for the bare `LOG_*` names
+  behaves the same without edits.
 
 ## Integration Tests *(mandatory)*
 
-- **IT-001**: Set `LOG_LEVEL=debug` and verify debug-command output includes both message and command result.
+- **IT-001**: Set `DYBATPHO_LOG_LEVEL=debug` and verify debug-command output includes both message and command result.
 - **IT-002**: Set `NO_COLOR` and verify messages are still readable without ANSI escapes.
 - **IT-003**: Start and end trace mode around a command sequence and verify trace lifecycle output occurs at trace level.
-- **IT-004**: Set `LOG_FORMAT=json` and verify a diagnostic with escaped
+- **IT-004**: Set `DYBATPHO_LOG_FORMAT=json` and verify a diagnostic with escaped
   characters parses as one JSON object.
 - **IT-005**: Render progress, header, success, and progress-bar output with
   `NO_COLOR` and constrained `COLUMNS`.
-- **IT-006**: Emit two events in the same process with `LOG_REQUEST_ID` unset
+- **IT-006**: Emit two events in the same process with `DYBATPHO_LOG_REQUEST_ID` unset
   and verify both carry an identical, non-empty `request_id`.
-- **IT-007**: Export `LOG_REQUEST_ID` before emitting events and verify the
+- **IT-007**: Export `DYBATPHO_LOG_REQUEST_ID` before emitting events and verify the
   supplied value is reused verbatim rather than regenerated.
 - **IT-008**: Verify every structured event includes non-empty `hostname` and
   `pid` fields and a numeric, non-decreasing `duration_ms`.
-- **IT-009**: Set `LOG_FILE` to a nested path that does not yet exist and
+- **IT-009**: Set `DYBATPHO_LOG_FILE` to a nested path that does not yet exist and
   verify the directory is created and the event is appended as JSON.
-- **IT-010**: Set `LOG_FILE_LEVEL` more permissive than `LOG_LEVEL` and verify
+- **IT-010**: Set `DYBATPHO_LOG_FILE_LEVEL` more permissive than `DYBATPHO_LOG_LEVEL` and verify
   the file captures events suppressed on stdout.
-- **IT-011**: Force `LOG_FILE` past `LOG_FILE_MAX_BYTES` and verify rotation
+- **IT-011**: Force `DYBATPHO_LOG_FILE` past `DYBATPHO_LOG_FILE_MAX_BYTES` and verify rotation
   creates a numbered backup while pruning backups beyond
-  `LOG_FILE_MAX_BACKUPS`; verify `LOG_FILE_MAX_BYTES=0` disables rotation.
+  `DYBATPHO_LOG_FILE_MAX_BACKUPS`; verify `DYBATPHO_LOG_FILE_MAX_BYTES=0` disables rotation.
 - **IT-012**: Call `dybatpho::log_to_file` with a nested path and
   `rotate:10M keep:3 level:debug`, and verify the file is created with mode
   `600`, the threshold is `10485760`, and a debug event reaches the file while
@@ -547,6 +597,17 @@ dybatpho::log_context clear
 - **IT-029**: Take two builtin stamps in the same second under `TZ=UTC0` and then `TZ=XXX-7`, and get `+00:00` then `+07:00`.
 - **IT-030**: With a `PATH` free of temporary and mock directories, take a timestamp and see `busybox` never searched; take one, put a `date` shim first on `PATH`, and see the next stamp come from it.
 - **IT-031**: Under `set -u`, log at `INFO` and see the line; log at `bogus` and see the invalid-level message and status 1, not an unbound-variable abort.
+- **IT-032**: Load every module in a clean environment, exercise the helpers
+  that used to export, and verify the child environment holds no `LOG_*`,
+  `NO_COLOR`, `DRY_RUN` or `UPDATE_SNAPSHOTS`, and no `DYBATPHO_*` name other
+  than the bootstrap's; verify a caller-exported `LOG_LEVEL` and
+  `DYBATPHO_SPINNER` still reach the child.
+- **IT-033**: Verify the bare `LOG_LEVEL` alone controls filtering, that
+  `DYBATPHO_LOG_LEVEL` wins over it in both directions, that `info` applies when
+  neither is set, and that `DYBATPHO_LOG_FORMAT=json` wins over `LOG_FORMAT=text`.
+- **IT-034**: Send events to a bare `LOG_FILE`, then set `DYBATPHO_LOG_FILE` and
+  `DYBATPHO_LOG_FILE_LEVEL` and verify only the prefixed file and threshold
+  apply; turn the sink off and verify neither file receives later events.
 
 ## Acceptance Criteria *(mandatory)*
 

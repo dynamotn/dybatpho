@@ -18,9 +18,9 @@ dybatpho::register_common_handlers
 # @noargs
 function _demo_log_levels {
   dybatpho::header "LOG LEVELS"
-  dybatpho::info "Set LOG_LEVEL=debug to see debug messages (current: ${LOG_LEVEL:-info})"
+  dybatpho::info "Set DYBATPHO_LOG_LEVEL=debug to see debug messages (current: ${DYBATPHO_LOG_LEVEL:-info})"
 
-  dybatpho::debug "This debug message is hidden unless LOG_LEVEL=debug"
+  dybatpho::debug "This debug message is hidden unless DYBATPHO_LOG_LEVEL=debug"
   dybatpho::info "This is an informational message"
   dybatpho::warn "This is a warning — something looks off"
   dybatpho::error "This is an error — something went wrong (non-fatal)"
@@ -91,17 +91,17 @@ function _demo_trace {
 # @noargs
 function _demo_json_context {
   dybatpho::header "STRUCTURED JSON CONTEXT"
-  dybatpho::info "Set LOG_FORMAT=json to emit machine-readable events enriched"
+  dybatpho::info "Set DYBATPHO_LOG_FORMAT=json to emit machine-readable events enriched"
   dybatpho::info "with request_id, hostname, pid, and duration_ms:"
   (
-    export LOG_FORMAT=json
+    export DYBATPHO_LOG_FORMAT=json
     dybatpho::info "first structured event"
     dybatpho::warn "second structured event, same request_id"
   )
-  dybatpho::info "Set LOG_REQUEST_ID to correlate logs across multiple processes,"
+  dybatpho::info "Set DYBATPHO_LOG_REQUEST_ID to correlate logs across multiple processes,"
   dybatpho::info "for example a CI/CD pipeline propagating one ID per run:"
   (
-    export LOG_FORMAT=json LOG_REQUEST_ID="ci-pipeline-42"
+    export DYBATPHO_LOG_FORMAT=json DYBATPHO_LOG_REQUEST_ID="ci-pipeline-42"
     dybatpho::info "event tagged with a caller-supplied request_id"
   )
 }
@@ -114,12 +114,12 @@ function _demo_file_logging {
   dybatpho::create_temp demo_dir "/"
   local log_file="${demo_dir}/app.log"
 
-  dybatpho::info "Writing JSON events to ${log_file} independent of LOG_FORMAT..."
+  dybatpho::info "Writing JSON events to ${log_file} independent of DYBATPHO_LOG_FORMAT..."
   (
-    export LOG_FILE="${log_file}"
+    export DYBATPHO_LOG_FILE="${log_file}"
     # Keep the file more verbose than stdout: capture debug events on disk
-    # while stdout (LOG_LEVEL=info by default) stays concise.
-    export LOG_FILE_LEVEL=debug
+    # while stdout (DYBATPHO_LOG_LEVEL=info by default) stays concise.
+    export DYBATPHO_LOG_FILE_LEVEL=debug
     dybatpho::debug "captured on disk only"
     dybatpho::info "captured on disk and stdout"
     dybatpho::warn "captured on disk and stdout"
@@ -129,9 +129,9 @@ function _demo_file_logging {
   cat=$(< "${log_file}")
   dybatpho::print "${cat}"
 
-  dybatpho::info "Simulating rotation with a tiny LOG_FILE_MAX_BYTES..."
+  dybatpho::info "Simulating rotation with a tiny DYBATPHO_LOG_FILE_MAX_BYTES..."
   (
-    export LOG_FILE="${log_file}" LOG_FILE_MAX_BYTES=200 LOG_FILE_MAX_BACKUPS=2
+    export DYBATPHO_LOG_FILE="${log_file}" DYBATPHO_LOG_FILE_MAX_BYTES=200 DYBATPHO_LOG_FILE_MAX_BACKUPS=2
     local event
     for ((event = 1; event <= 5; event++)); do
       dybatpho::info "padding event number ${event} to exceed the rotation threshold"
@@ -157,7 +157,7 @@ function _demo_log_to_file {
     # The same sink as above, named once instead of through four variables,
     # with the rotation threshold written the way an operator would say it.
     dybatpho::log_to_file "${log_file}" rotate:10M keep:3 level:debug
-    dybatpho::info "Sink configured: ${LOG_FILE} (rotate at ${LOG_FILE_MAX_BYTES} bytes)"
+    dybatpho::info "Sink configured: ${DYBATPHO_LOG_FILE} (rotate at ${DYBATPHO_LOG_FILE_MAX_BYTES} bytes)"
     dybatpho::debug "this debug event reaches the file only"
     dybatpho::log_to_file off
     dybatpho::info "file logging is off again, so this event stays on stderr"
@@ -174,7 +174,7 @@ function _demo_log_context {
   dybatpho::header "CONTEXT FIELDS"
   dybatpho::info "Fields registered once ride along with every later event:"
   (
-    export LOG_FORMAT=json
+    export DYBATPHO_LOG_FORMAT=json
     dybatpho::log_context add run_id=demo-42 stage=build
     dybatpho::info "compiling"
     dybatpho::log_context add stage=test

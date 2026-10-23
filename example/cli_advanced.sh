@@ -17,9 +17,9 @@ dybatpho::register_common_handlers
 # @noargs
 function _spec_global {
   dybatpho::opts::flag "Enable verbose output" VERBOSE --verbose alias:-v persistent:true
-  dybatpho::opts::flag "Print commands without executing" DRY_RUN --dry-run -n \
+  dybatpho::opts::flag "Print commands without executing" DYBATPHO_DRY_RUN --dry-run -n \
     on:true off:false init:="false" persistent:true
-  dybatpho::opts::param "Log level" LOG_LEVEL --log-level -l init:="info" persistent:true
+  dybatpho::opts::param "Log level" DYBATPHO_LOG_LEVEL --log-level -l init:="info" persistent:true
 }
 
 # ===========================================================================
@@ -128,8 +128,8 @@ function _run_config {
   dybatpho::header "CONFIG"
   if [[ "${LIST:-false}" == "true" ]]; then
     dybatpho::info "APP_ENV   = ${APP_ENV:-<unset>}"
-    dybatpho::info "LOG_LEVEL = ${LOG_LEVEL:-info}"
-    dybatpho::info "DRY_RUN   = ${DRY_RUN:-false}"
+    dybatpho::info "DYBATPHO_LOG_LEVEL = ${DYBATPHO_LOG_LEVEL:-info}"
+    dybatpho::info "DYBATPHO_DRY_RUN   = ${DYBATPHO_DRY_RUN:-false}"
     exit 0
   fi
   if [[ -z "${KEY:-}" ]]; then

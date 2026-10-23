@@ -7,6 +7,8 @@ teardown() {
   export LOG_FORMAT=text
   unset COLUMNS
   unset LOG_FILE LOG_FILE_LEVEL LOG_FILE_MAX_BYTES LOG_FILE_MAX_BACKUPS LOG_REQUEST_ID
+  unset DYBATPHO_LOG_LEVEL DYBATPHO_LOG_FORMAT DYBATPHO_LOG_FILE DYBATPHO_LOG_FILE_LEVEL \
+    DYBATPHO_LOG_FILE_MAX_BYTES DYBATPHO_LOG_FILE_MAX_BACKUPS DYBATPHO_LOG_REQUEST_ID
   # Context fields and timers live in this shell, and Bats runs every test in
   # the same one: a field left registered would ride along on the next test's
   # log events.
@@ -272,6 +274,85 @@ SCRIPT
   assert_success
   refute_output
   assert_stderr --partial "${USER}"
+}
+
+@test "the log settings read the DYBATPHO_ name first and the bare name as a fallback" {
+  unset DYBATPHO_LOG_LEVEL DYBATPHO_LOG_FORMAT LOG_FORMAT
+  # The bare name alone still works, so scripts written for earlier releases do.
+  export LOG_LEVEL=debug
+  run_traced --separate-stderr dybatpho::debug "bare level"
+  assert_stderr --partial "bare level"
+  # The prefixed name wins when both are set.
+  DYBATPHO_LOG_LEVEL=error
+  run_traced --separate-stderr dybatpho::warn "hidden by the prefixed level"
+  assert_equal "${stderr}" ""
+  DYBATPHO_LOG_LEVEL=debug LOG_LEVEL=error
+  run_traced --separate-stderr dybatpho::debug "shown by the prefixed level"
+  assert_stderr --partial "shown by the prefixed level"
+  # Neither set: `info`.
+  unset DYBATPHO_LOG_LEVEL LOG_LEVEL
+  run_traced --separate-stderr dybatpho::debug "below the default"
+  assert_equal "${stderr}" ""
+  run_traced --separate-stderr dybatpho::info "at the default"
+  assert_stderr --partial "at the default"
+
+  export NO_COLOR=true LOG_FORMAT=text DYBATPHO_LOG_FORMAT=json
+  run_traced --separate-stderr dybatpho::info "structured"
+  assert_stderr --partial '"message":"structured"'
+}
+
+@test "the log file settings read the DYBATPHO_ name first and the bare name as a fallback" {
+  local bare="${BATS_TEST_TMPDIR}/bare.log" prefixed="${BATS_TEST_TMPDIR}/prefixed.log"
+  export LOG_FILE="${bare}" LOG_FILE_LEVEL=debug
+  dybatpho::debug "to the bare file" 2> /dev/null
+  grep -q '"message":"to the bare file"' "${bare}"
+
+  DYBATPHO_LOG_FILE="${prefixed}" DYBATPHO_LOG_FILE_LEVEL=error
+  dybatpho::warn "to neither file" 2> /dev/null
+  dybatpho::error "to the prefixed file" 2> /dev/null
+  grep -q '"message":"to the prefixed file"' "${prefixed}"
+  run ! grep -q 'to neither file' "${bare}" "${prefixed}"
+  run ! grep -q 'to the prefixed file' "${bare}"
+
+  # Turning the sink off clears both names, or the bare one would reopen it.
+  dybatpho::log_to_file off
+  assert_equal "${LOG_FILE}" ""
+  dybatpho::error "after off" 2> /dev/null
+  run ! grep -q 'after off' "${bare}" "${prefixed}"
+}
+
+@test "loading the library exports none of its settings to a child process" {
+  local script="${BATS_TEST_TMPDIR}/child-env.sh"
+  # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`.
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules all
+# Exercise what used to export on the way: a generated request ID, the file
+# sink, the verbosity helper and a timer.
+DYBATPHO_LOG_FORMAT=json dybatpho::info "structured" 2> /dev/null
+dybatpho::log_to_file $(printf '%q' "${BATS_TEST_TMPDIR}/child.log") level:debug
+dybatpho::cli_apply_verbosity 1
+dybatpho::timer_start child
+dybatpho::timer_end child 2> /dev/null
+env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' | LC_ALL=C sort
+SCRIPT
+  run env -i PATH="${PATH}" HOME="${HOME}" bash "${script}"
+  assert_success
+  refute_line --regexp '^(LOG_[A-Z_]+|NO_COLOR|DRY_RUN|UPDATE_SNAPSHOTS)$'
+  # The bootstrap's own registry is the only thing allowed through.
+  local name
+  for name in "${lines[@]}"; do
+    [[ "${name}" != DYBATPHO_* ]] && continue
+    case "${name}" in
+      DYBATPHO_DIR | DYBATPHO_CORE_MODULES | DYBATPHO_OPTIONAL_MODULES) ;;
+      *) fail "the library exported ${name}" ;;
+    esac
+  done
+
+  # A variable the caller exported stays exported, whatever its prefix.
+  run env -i PATH="${PATH}" HOME="${HOME}" LOG_LEVEL=debug DYBATPHO_SPINNER=never bash "${script}"
+  assert_success
+  assert_line LOG_LEVEL
+  assert_line DYBATPHO_SPINNER
 }
 
 @test "structured logging emits valid JSON" {
@@ -779,10 +860,10 @@ assert event["duration_ms"] >= 0
   local log_file="${BATS_TEST_TMPDIR}/configured/app.log"
   dybatpho::log_to_file "${log_file}" rotate:10M keep:3 level:debug
 
-  assert_equal "${LOG_FILE}" "${log_file}"
-  assert_equal "${LOG_FILE_MAX_BYTES}" "10485760"
-  assert_equal "${LOG_FILE_MAX_BACKUPS}" "3"
-  assert_equal "${LOG_FILE_LEVEL}" "debug"
+  assert_equal "${DYBATPHO_LOG_FILE}" "${log_file}"
+  assert_equal "${DYBATPHO_LOG_FILE_MAX_BYTES}" "10485760"
+  assert_equal "${DYBATPHO_LOG_FILE_MAX_BACKUPS}" "3"
+  assert_equal "${DYBATPHO_LOG_FILE_LEVEL}" "debug"
   # The parent directory is created up front rather than on the first event,
   # so a misconfigured path fails where it is configured.
   assert_file_exist "${log_file}"
@@ -811,7 +892,7 @@ assert event["duration_ms"] >= 0
   dybatpho::log_to_file "${log_file}"
   dybatpho::info "before"
   dybatpho::log_to_file off
-  assert_equal "${LOG_FILE}" ""
+  assert_equal "${DYBATPHO_LOG_FILE}" ""
   dybatpho::info "after"
 
   grep -q '"message":"before"' "${log_file}"
@@ -1263,6 +1344,6 @@ _logging_child() {
   assert_output --partial "rc=0"
   assert_output --partial "rc=1"
   refute_output --partial "hidden"
-  assert_stderr --partial "bogus is not a valid LOG_LEVEL"
+  assert_stderr --partial "bogus is not a valid log level"
   refute_stderr --partial "unbound variable"
 }

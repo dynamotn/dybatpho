@@ -36,7 +36,6 @@ __dybatpho_cleanup_trap_pid=""
 # @env DYBATPHO_TIMEOUT_KILL_AFTER number Seconds between SIGTERM and SIGKILL when a timed or background job is ended,
 #   default is `5`
 DYBATPHO_TIMEOUT_KILL_AFTER="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
-export DYBATPHO_TIMEOUT_KILL_AFTER
 # @env DYBATPHO_BACKGROUND_NAMES array Names of the background jobs started by `dybatpho::background_run`, in submission
 #   order
 declare -ga DYBATPHO_BACKGROUND_NAMES=()

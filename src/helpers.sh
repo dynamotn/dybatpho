@@ -1243,8 +1243,7 @@ function dybatpho::breakpoint {
         dybatpho::is true "${DYBATPHO_USED_ERR_HANDLER}" \
           && dybatpho::register_err_handler # Rerun register_err_handler
         # dyshellint disable=BSG034 # the debugger restores the tracing it suspended
-        # shellcheck disable=SC2154 # declared by `src/logging.sh`, a core module
-        [[ "${LOG_LEVEL}" == "trace" ]] && set -xv # Re-enable tracing if needed
+        [[ "${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}" == "trace" ]] && set -xv # Re-enable tracing if needed
         ;;
       c)
         if [[ "${__dybatpho_helpers_bp_source_file}" != "bash" ]]; then

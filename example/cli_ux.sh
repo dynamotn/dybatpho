@@ -58,12 +58,11 @@ function _run_deploy {
   dybatpho::info "Selected components: ${COMPONENTS}"
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Colorized output: ${COLOR}"
-  # shellcheck disable=SC2154 # declared by `src/process.sh`, a core module
-  dybatpho::info "Dry run: ${DRY_RUN}"
+  # shellcheck disable=SC2154 # set by the option spec of this script
+  dybatpho::info "Dry run: ${DYBATPHO_DRY_RUN}"
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Replicas: ${REPLICAS}"
-  # shellcheck disable=SC2154 # declared by `src/logging.sh`, a core module
-  dybatpho::debug "Verbosity requested ${VERBOSITY} time(s), log level is ${LOG_LEVEL}"
+  dybatpho::debug "Verbosity requested ${VERBOSITY} time(s), log level is ${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}"
   dybatpho::success "Deployment plan is ready"
   exit 0
 }

@@ -315,6 +315,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dybatpho::mock_time` or a test had put its own `date` first on `PATH`, so
   the frozen clock was ignored on Alpine.
 
+- **`validate` — `min`, `max`, `minlen` and `maxlen` compare exactly.**
+  `-0.0000001` passed `min:0`, twenty-digit decimals compared wrongly, `1e400`
+  stopped the script, and `minlen:+3` failed every value.
+
 ### Security
 
 - **Arithmetic no longer runs a command passed as a number.**
@@ -339,6 +343,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   went into the generated `case` unquoted: a space or quote made the parser
   unparseable, `build*` matched every word sharing its prefix, and a crafted
   name could inject code.
+
+- **`array`, `validate` — values are never evaluated as array subscripts.**
+  On Bash before 5.2, `dybatpho::array_unique`, `array_union`,
+  `array_intersect` and `array_difference` ran a value holding `$(...)`, and
+  missed one holding `]`. A type name passed to `dybatpho::validate_is` or a
+  `type:` rule could do the same. `DYBATPHO_RETRY_*_DELAY` holding an array
+  subscript ran its command too.
 
 ## [6.0.1] - 2026-10-04
 

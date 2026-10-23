@@ -200,6 +200,9 @@ dybatpho::opts::param "Port" PORT --port type:port
   with exit status 2 and a diagnostic of its own.
 - `min:` and `max:` are declared on a type that is not numeric.
 - A caller registers a type that already exists.
+- A bounded value is a fraction smaller than a millionth, has more than fifteen significant digits, or carries an exponent too large for a double.
+- A `minlen` or `maxlen` bound carries a sign or leading zeros.
+- A type name holds `$(...)` or `]`.
 
 ## Requirements *(mandatory)*
 
@@ -278,6 +281,8 @@ dybatpho::opts::param "Port" PORT --port type:port
   length written with a leading zero.
 - **FR-026**: `__dybatpho_validate_number_cmp` MUST compare two numbers of any size, as sign, whole digits and six fraction digits, without 64-bit arithmetic.
 - **FR-027**: `minlen:` and `maxlen:` MUST be read in base ten whatever zeros they lead with.
+- **FR-028**: `min`, `max`, `minlen` and `maxlen` MUST compare the exact decimal value, whatever its number of digits, fraction digits, exponent, sign or leading zeros; a value that cannot be measured MUST be reported as out of bounds.
+- **FR-029**: A type name MUST be looked up as data and never evaluated, on every supported Bash.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -360,6 +365,7 @@ dybatpho::opts::param "Port" PORT --port type:port
   and answer every IPv4, IPv6 and CIDR sample the way `network` does.
 - **IT-025**: Validate `10000000000000.5` against `min:1` with no error, `-10000000000000.5` with `must be at least 1`, and a 20-digit value against a smaller 20-digit `max:`.
 - **IT-026**: Validate a nine-character value against `minlen:08 maxlen:09` with no error.
+- **IT-027**: Bound `-0.0000001` by `min:0`, a twenty-digit decimal and integer by `max`, `1.5e1` and `-1e-400`, and `1e400` by `max:5`; bound a length by `minlen:+3` and `minlen:0004`; ask for a type named `x$(touch ...)` and `a]b` and see neither run nor match.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -558,3 +558,51 @@ teardown() {
   dybatpho::validate_value 99999999999999999999 type:number max:99999999999999999998 || true
   assert_equal "$(dybatpho::validate_errors)" "must be at most 99999999999999999998"
 }
+
+@test "dybatpho::validate_value compares a fraction or a large value without rounding it" {
+  # `printf '%.6f'` rounded `-0.0000001` to zero, which then passed `min:0`, and
+  # went through a binary double, which moved a twenty-digit value.
+  dybatpho::validate_value "-0.0000001" type:number min:0 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at least 0"
+
+  dybatpho::validate_value "12345678901234567890.5" type:number max:12345678901234567890 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at most 12345678901234567890"
+
+  dybatpho::validate_value "99999999999999999999" type:int max:99999999999999999998 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at most 99999999999999999998"
+
+  dybatpho::validate_value "1.5e1" type:number min:15 max:15 || true
+  assert_equal "$(dybatpho::validate_errors)" ""
+
+  dybatpho::validate_value "-1e-400" type:number min:0 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at least 0"
+}
+
+@test "dybatpho::validate_value reports an exponent too large to measure as out of bounds" {
+  # `printf` overflowed on `1e400` and left the comparison unset, which ended
+  # the script on an unbound variable.
+  dybatpho::validate_value "1e400" type:number max:5 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at most 5"
+}
+
+@test "dybatpho::validate_value reads a signed or zero-padded minlen and maxlen" {
+  # `10#+3` is an arithmetic error, so `minlen:+3` failed every value.
+  dybatpho::validate_value "abc" minlen:+3 maxlen:+3 || true
+  assert_equal "$(dybatpho::validate_errors)" ""
+
+  dybatpho::validate_value "abc" minlen:0004 || true
+  assert_equal "$(dybatpho::validate_errors)" "must be at least 0004 characters"
+}
+
+@test "dybatpho::validate_is never runs a type name as code" {
+  # Before Bash 5.2, `[[ -v "array[$name]" ]]` expanded the name again.
+  local marker="${BATS_TEST_TMPDIR}/ran"
+  run dybatpho::validate_is "x\$(touch ${marker})" 1
+  assert_failure
+  assert_output --partial "is not a known type"
+  [[ ! -e "${marker}" ]]
+
+  run dybatpho::validate_is "a]b" 1
+  assert_failure
+  assert_output --partial "is not a known type"
+}

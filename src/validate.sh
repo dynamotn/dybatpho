@@ -149,7 +149,9 @@ function __dybatpho_validate_canonical {
   local -n __dybatpho_validate_canonical_out="${__dybatpho_validate_canonical_var}"
   local __canon_key="${__dybatpho_validate_canonical_name,,}"
   __canon_key="${__DYBATPHO_VALIDATE_ALIASES[${__canon_key}]-${__canon_key}}"
-  [[ -v "__DYBATPHO_VALIDATE_PREDICATES[${__canon_key}]" ]] || return 1
+  # Not `-v "name[key]"`: before Bash 5.2 it expands the key again, and a type
+  # name holding `$(...)` ran as a command.
+  [[ -n "${__canon_key}" && -n "${__DYBATPHO_VALIDATE_PREDICATES[${__canon_key}]+set}" ]] || return 1
   __dybatpho_validate_canonical_out="${__canon_key}"
 }
 
@@ -164,7 +166,7 @@ function __dybatpho_validate_canonical {
 function __dybatpho_validate_numeric_type {
   local canonical
   __dybatpho_validate_canonical canonical "${1-}" || return 1
-  [[ -v "__DYBATPHO_VALIDATE_NUMERIC[${canonical}]" ]]
+  [[ -n "${__DYBATPHO_VALIDATE_NUMERIC[${canonical}]+set}" ]]
 }
 
 #######################################
@@ -174,11 +176,9 @@ function __dybatpho_validate_numeric_type {
 #   fractional arithmetic at all. Both forms reach here from a configuration
 #   file, so both have to compare rather than abort.
 #
-#   Two plain integers are compared as integers, which is the case that matters
-#   for a port, a timeout, or a count and is the one that must not lose
-#   precision. Anything else — a fraction, an exponent — is scaled to a fixed
-#   six decimal places first, under `LC_ALL=C` so the radix character is a dot
-#   whatever the host's locale says.
+#   Both sides are taken apart into digit strings and compared as text, so no
+#   value loses precision or overflows, whatever its size or its number of
+#   fraction digits.
 # @arg $1 string Left value
 # @arg $2 string Right value
 # @arg $3 string Name of the variable receiving `-1`, `0`, or `1`
@@ -190,12 +190,13 @@ function __dybatpho_validate_numeric_type {
 function __dybatpho_validate_number_cmp {
   local __cmp_left="$1" __cmp_right="$2"
   local -n __cmp_out="$3"
-  # The two sides are compared as digit strings rather than as shell integers:
-  # a value scaled to six decimals overflowed 64 bits above about 9.2e12 and
-  # a bound of ten trillion was then reported as below one.
   local __cmp_ls __cmp_li __cmp_lf __cmp_rs __cmp_ri __cmp_rf
   __dybatpho_validate_decimal_into __cmp_ls __cmp_li __cmp_lf "${__cmp_left}" || return 1
   __dybatpho_validate_decimal_into __cmp_rs __cmp_ri __cmp_rf "${__cmp_right}" || return 1
+  # Fractions are padded to one width, so that equal integer parts fall through
+  # to a digit-by-digit comparison of what follows the point.
+  while ((${#__cmp_lf} < ${#__cmp_rf})); do __cmp_lf+="0"; done
+  while ((${#__cmp_rf} < ${#__cmp_lf})); do __cmp_rf+="0"; done
   local __cmp_magnitude=0
   if ((${#__cmp_li} != ${#__cmp_ri})); then
     ((${#__cmp_li} < ${#__cmp_ri})) && __cmp_magnitude=-1 || __cmp_magnitude=1
@@ -216,11 +217,17 @@ function __dybatpho_validate_number_cmp {
 
 #######################################
 # @description Take a number apart into a sign, its whole digits without
-#   leading zeros, and exactly six fraction digits, so that two numbers of any
-#   size compare as strings. A negative zero is a plain zero.
+#   leading zeros, and its fraction digits without trailing zeros, so that two
+#   numbers of any size compare as strings. A negative zero is a plain zero.
+#
+#   Decimal and exponent notation are read from the text itself: `printf '%f'`
+#   rounded to six places, so `-0.0000001` passed `min:0`, and went through a
+#   binary double, so a twenty-digit value compared as a different number.
+#   Other notations a custom numeric type may accept, such as hexadecimal,
+#   still go through `printf`.
 # @arg $1 string Name of the variable receiving the sign, `-` or `+`
 # @arg $2 string Name of the variable receiving the whole digits
-# @arg $3 string Name of the variable receiving the six fraction digits
+# @arg $3 string Name of the variable receiving the fraction digits
 # @arg $4 string Number text
 # @set The three named variables
 # @exitcode 1 The text is not a number `printf` can read
@@ -230,71 +237,48 @@ function __dybatpho_validate_decimal_into {
   local -n __dec_sign="$1" __dec_whole="$2" __dec_frac="$3"
   local __dec_text="$4"
   local LC_ALL=C
-  if [[ "${__dec_text}" =~ ^([+-]?)([0-9]+)$ ]]; then
+  if [[ "${__dec_text}" =~ ^([+-]?)([0-9]*)(\.([0-9]*))?([eE]([+-]?)([0-9]+))?$ ]] \
+    && [[ -n "${BASH_REMATCH[2]}${BASH_REMATCH[4]}" ]]; then
     __dec_sign="${BASH_REMATCH[1]}"
     __dec_whole="${BASH_REMATCH[2]}"
-    __dec_frac="000000"
+    __dec_frac="${BASH_REMATCH[4]}"
+    local __dec_exp_sign="${BASH_REMATCH[6]}" __dec_exp="${BASH_REMATCH[7]}" __dec_zeros
+    if [[ -n "${__dec_exp}" ]]; then
+      __dec_exp="${__dec_exp#"${__dec_exp%%[!0]*}"}"
+      # Past a few thousand places no bound a rule can spell is in reach, and
+      # the padding below stays small.
+      ((${#__dec_exp} <= 4)) || __dec_exp=9999
+      __dec_exp=$((10#${__dec_exp:-0}))
+      if ((__dec_exp > 0)) && [[ "${__dec_exp_sign}" == "-" ]]; then
+        if ((__dec_exp > ${#__dec_whole})); then
+          printf -v __dec_zeros '%0*d' "$((__dec_exp - ${#__dec_whole}))" 0
+          __dec_whole="${__dec_zeros}${__dec_whole}"
+        fi
+        __dec_frac="${__dec_whole:${#__dec_whole}-__dec_exp}${__dec_frac}"
+        __dec_whole="${__dec_whole:0:${#__dec_whole}-__dec_exp}"
+      elif ((__dec_exp > 0)); then
+        if ((__dec_exp > ${#__dec_frac})); then
+          printf -v __dec_zeros '%0*d' "$((__dec_exp - ${#__dec_frac}))" 0
+          __dec_frac="${__dec_frac}${__dec_zeros}"
+        fi
+        __dec_whole="${__dec_whole}${__dec_frac:0:__dec_exp}"
+        __dec_frac="${__dec_frac:__dec_exp}"
+      fi
+    fi
   else
     local __dec_formatted
     printf -v __dec_formatted '%.6f' "${__dec_text}" 2> /dev/null || return 1
+    [[ "${__dec_formatted}" =~ ^-?[0-9]+\.[0-9]+$ ]] || return 1
     __dec_sign=""
     [[ "${__dec_formatted}" == -* ]] && __dec_sign="-" && __dec_formatted="${__dec_formatted#-}"
     __dec_whole="${__dec_formatted%.*}"
     __dec_frac="${__dec_formatted#*.}"
   fi
   [[ "${__dec_sign}" == "-" ]] || __dec_sign="+"
-  while [[ "${__dec_whole}" == 0?* ]]; do __dec_whole="${__dec_whole#0}"; done
-  [[ "${__dec_whole}${__dec_frac}" =~ ^0+$ ]] && __dec_sign="+"
-  return 0
-}
-
-#######################################
-# @description Read a signed decimal integer written with any number of leading
-#   zeros, as a number the shell's arithmetic accepts.
-# @arg $1 string Name of the variable receiving the number
-# @arg $2 string Integer text, such as `007` or `-42`
-# @set The named variable
-# @internal
-#######################################
-function __dybatpho_validate_plain_int {
-  local -n __int_out="$1"
-  local __int_text="$2" __int_sign=""
-  case "${__int_text}" in
-    -*)
-      __int_sign="-"
-      __int_text="${__int_text#-}"
-      ;;
-    +*) __int_text="${__int_text#+}" ;;
-    *) ;;
-  esac
-  __int_out=$((10#${__int_text:-0}))
-  [[ "${__int_sign}" == "-" ]] && __int_out=$((-__int_out))
-  return 0
-}
-
-#######################################
-# @description Read a decimal number, in any notation `printf` accepts, as an
-#   integer scaled by one million, so two of them compare with shell arithmetic.
-# @arg $1 string Name of the variable receiving the scaled integer
-# @arg $2 string Number text, such as `1.5` or `1e3`
-# @set The named variable
-# @exitcode 1 The text is not a number `printf` can read
-# @internal
-#######################################
-function __dybatpho_validate_scaled {
-  local -n __scaled_out="$1"
-  local __scaled_text="$2" __scaled_formatted __scaled_sign=""
-  local LC_ALL=C
-  printf -v __scaled_formatted '%.6f' "${__scaled_text}" 2> /dev/null || return 1
-  if [[ "${__scaled_formatted}" == -* ]]; then
-    __scaled_sign="-"
-    __scaled_formatted="${__scaled_formatted#-}"
-  fi
-  # The parts are combined by arithmetic rather than by concatenation: a
-  # fraction such as `.5` formats to `0.500000`, and the string `0500000` would
-  # then be read as octal by the comparison that follows.
-  __scaled_out=$((10#${__scaled_formatted%.*} * 1000000 + 10#${__scaled_formatted#*.}))
-  [[ "${__scaled_sign}" == "-" ]] && __scaled_out=$((-__scaled_out))
+  __dec_whole="${__dec_whole#"${__dec_whole%%[!0]*}"}"
+  __dec_whole="${__dec_whole:-0}"
+  __dec_frac="${__dec_frac%"${__dec_frac##*[!0]}"}"
+  [[ "${__dec_whole}" == "0" && -z "${__dec_frac}" ]] && __dec_sign="+"
   return 0
 }
 
@@ -413,7 +397,7 @@ function dybatpho::validate_register {
 #######################################
 function __dybatpho_validate_alias {
   local alias="$1" canonical="$2"
-  [[ -v "__DYBATPHO_VALIDATE_PREDICATES[${canonical}]" ]] \
+  [[ -n "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]+set}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${canonical}' is not a known type" # kcov(skip)
   __DYBATPHO_VALIDATE_ALIASES["${alias}"]="${canonical}"
 }
@@ -531,19 +515,26 @@ function dybatpho::validate_value {
       subject=" characters"
     fi
     if [[ -n "${min}" ]]; then
-      __dybatpho_validate_number_cmp "${measured}" "${min}" order
+      # A value the comparison cannot read is not shown to be in bounds.
+      __dybatpho_validate_number_cmp "${measured}" "${min}" order || order=-1
       ((order >= 0)) || __dybatpho_validate_error "must be at least ${min}${subject}"
     fi
     if [[ -n "${max}" ]]; then
-      __dybatpho_validate_number_cmp "${measured}" "${max}" order
+      __dybatpho_validate_number_cmp "${measured}" "${max}" order || order=1
       ((order <= 0)) || __dybatpho_validate_error "must be at most ${max}${subject}"
     fi
   fi
 
-  [[ -z "${minlen}" ]] || ((${#value} >= 10#${minlen})) \
-    || __dybatpho_validate_error "must be at least ${minlen} characters"
-  [[ -z "${maxlen}" ]] || ((${#value} <= 10#${maxlen})) \
-    || __dybatpho_validate_error "must be at most ${maxlen} characters"
+  # Through the same comparison as `min`/`max`: `10#` refuses a signed
+  # bound such as `+3`, and a bound past 64 bits wrapped.
+  if [[ -n "${minlen}" ]]; then
+    __dybatpho_validate_number_cmp "${#value}" "${minlen}" order
+    ((order >= 0)) || __dybatpho_validate_error "must be at least ${minlen} characters"
+  fi
+  if [[ -n "${maxlen}" ]]; then
+    __dybatpho_validate_number_cmp "${#value}" "${maxlen}" order
+    ((order <= 0)) || __dybatpho_validate_error "must be at most ${maxlen} characters"
+  fi
 
   ((${#DYBATPHO_VALIDATE_ERRORS[@]} == 0))
 }

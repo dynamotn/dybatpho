@@ -261,3 +261,15 @@ teardown() {
   DYBATPHO_PRIVILEGE=false run_traced --separate-stderr dybatpho::privilege_run -- 'echo first; echo INJECTED-via-eval'
   refute_output --partial "INJECTED"
 }
+
+@test "dybatpho::privilege_needed takes off in any spelling the library reads as false" {
+  # The list was case-sensitive, so `FALSE` or `Off` elevated anyway.
+  # Not root, with a command pinned, so only the setting can say no.
+  dybatpho::is_root() { return 1; }
+  local DYBATPHO_PRIVILEGE_COMMAND=sudo value
+  DYBATPHO_PRIVILEGE=auto run_traced -0 dybatpho::privilege_needed
+  for value in false FALSE False no NO off Off 1; do
+    DYBATPHO_PRIVILEGE="${value}" run_traced -1 dybatpho::privilege_needed
+  done
+  unset -f dybatpho::is_root
+}

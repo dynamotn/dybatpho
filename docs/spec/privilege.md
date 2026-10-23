@@ -94,6 +94,7 @@ dybatpho::privilege_release
 - Release called twice, or without an acquire.
 - `DRY_RUN` set.
 - `dybatpho::privilege_acquire` is called again while the escalation is already held, with or without `--shield`.
+- `DYBATPHO_PRIVILEGE` is a false-like value in another case, such as `FALSE` or `Off`.
 
 ## Requirements *(mandatory)*
 
@@ -117,6 +118,7 @@ dybatpho::privilege_release
 - **FR-016**: A second `privilege_acquire` while the escalation is held MUST NOT authenticate again, start a second refresher, put a second wrapper on `PATH`, or register the release again, and MUST add a wrapper the first call left out when `--shield` is now given.
 - **FR-017**: A command run by `privilege_run` MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
 - **FR-018**: `dybatpho::privilege_run` MUST run the command after `--` as an argument vector, never through `eval`, whether or not elevation is needed.
+- **FR-019**: `DYBATPHO_PRIVILEGE` MUST turn elevation off for every value `dybatpho::is false` accepts, in any case.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -150,6 +152,7 @@ dybatpho::privilege_release
 - **IT-012**: Acquire twice with `--shield` and verify one refresher, one wrapper and unchanged traps, and that release restores `PATH` and stops the refresher.
 - **IT-013**: Run a command through `privilege_run` with no escalation needed that reads variables named like the runner's locals, and see the caller's values.
 - **IT-014**: Run `privilege_run -- 'echo first; echo INJECTED'` without elevation and see nothing injected.
+- **IT-015**: Report no elevation needed for `false`, `FALSE`, `False`, `no`, `NO`, `off`, `Off` and `1`, with a command pinned and not root.
 
 ## Acceptance Criteria *(mandatory)*
 

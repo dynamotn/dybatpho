@@ -94,11 +94,9 @@ function dybatpho::privilege_command {
 #   dybatpho::privilege_needed && dybatpho::privilege_acquire
 #######################################
 function dybatpho::privilege_needed {
-  case "${DYBATPHO_PRIVILEGE}" in
-    false | no | off | 1) return 1 ;;
-    *) ;; # kcov(skip) - a case arm has no command to fire on
-  esac
-
+  # Any spelling `dybatpho::is false` takes, as everywhere else in the
+  # library: a case-sensitive list let `FALSE` or `Off` elevate anyway.
+  ! dybatpho::is false "${DYBATPHO_PRIVILEGE}" || return 1
   ! dybatpho::is_root || return 1
   dybatpho::privilege_command > /dev/null || return 1
   return 0

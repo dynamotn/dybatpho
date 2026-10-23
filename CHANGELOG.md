@@ -332,6 +332,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dash.** BSD `chmod` read the staging name as a mode, and the plaintext
   staging copy was left on disk.
 
+- **`privilege` — `DYBATPHO_PRIVILEGE` reads false in any case.** `FALSE`,
+  `Off` and `No` still elevated.
+
 - **`helpers` — `dybatpho::require` finds tools under `set +h`, and
   `dybatpho::retry` checks its delay variables.** With hashing off every tool
   was reported missing. A `DYBATPHO_RETRY_BASE_DELAY` or

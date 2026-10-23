@@ -29,6 +29,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   a command that returned at once had its watchdog ended moments after it was
   started, and a subshell signalled that early still ran the EXIT trap it had
   inherited: the caller's cleanup ran in the watchdog while the caller went on.
+- **`i18n` — French, Russian and Polish numbers, and currency amounts, use the
+  no-break spaces CLDR gives them.** The check for a `printf` that can write
+  them compared the character with itself and always fell back to a plain
+  space, so `1 234 567` in French could break across lines. Under a UTF-8
+  locale French now groups with U+202F and Russian and Polish with U+00A0, and
+  the currency layouts put U+00A0 between amount and symbol; the C locale and
+  `DYBATPHO_I18N_ASCII=true` keep plain spaces.
 
 ## [7.0.0] - 2026-10-23
 

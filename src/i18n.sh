@@ -1330,8 +1330,12 @@ DYBATPHO_I18N_RTL="${DYBATPHO_I18N_RTL:-ar he fa ur yi dv ps sd ug ckb arc syr n
 #######################################
 function __dybatpho_i18n_seed_symbols {
   local narrow nbsp probe
-  probe="$(printf ' ' 2> /dev/null)" || probe=""
-  if [[ "${probe}" == ' ' || -z "${probe}" ]]; then
+  # The escape, not the character: written as the character, the probe always
+  # matched itself and every locale got a plain space.
+  probe="$(printf '\u202f' 2> /dev/null)" || probe=""
+  # A `printf` without `\u`, or a locale that cannot encode the character,
+  # hands the escape back as written.
+  if [[ "${probe}" == \\* || -z "${probe}" ]]; then
     narrow=" "
     nbsp=" "
   else

@@ -15,6 +15,12 @@ setup() {
   export DYBATPHO_I18N_CURRENCY_NEGATIVE=sign
   export DYBATPHO_I18N_ASCII=false
   export DYBATPHO_I18N_NOW=""
+  # The separators the library seeded when it was sourced: the no-break spaces
+  # under a UTF-8 locale, plain spaces where they cannot be written. Which ones
+  # they are is checked by "the no-break spaces are seeded only where they can
+  # be written"; the other tests check where they go.
+  NBSP="${DYBATPHO_I18N_NUMBER[ru.group]}"
+  NNBSP="${DYBATPHO_I18N_NUMBER[fr.group]}"
 }
 
 teardown() {
@@ -699,7 +705,22 @@ EOF
 }
 
 @test "French groups with a narrow no-break space" {
-  assert_equal "$(dybatpho::i18n_number 1234567 0 fr)" "1 234 567"
+  assert_equal "$(dybatpho::i18n_number 1234567 0 fr)" "1${NNBSP}234${NNBSP}567"
+}
+
+@test "the no-break spaces are seeded only where they can be written" {
+  # Seeded once, as the library is sourced, from the locale in force then.
+  local utf8="C.UTF-8" seeded
+  if command -v locale > /dev/null; then
+    utf8="$(locale -a 2> /dev/null | grep -iE '^(C|en_US)\.utf-?8$' | head -n 1 || true)"
+  fi
+  [[ -n "${utf8}" ]] || skip "no UTF-8 locale is installed"
+  seeded='printf "%s|%s|%s" "${DYBATPHO_I18N_NUMBER[fr.group]}" "${DYBATPHO_I18N_NUMBER[ru.group]}" "${DYBATPHO_I18N_CURRENCY_LAYOUT[de.layout]}"'
+  LC_ALL="${utf8}" run_traced -0 _child "${seeded}"
+  # U+202F, U+00A0, and U+00A0 again between amount and symbol, in octal bytes.
+  assert_output "$(printf '\342\200\257|\302\240|#\302\240\302\244')"
+  LC_ALL=C run_traced -0 _child "${seeded}"
+  assert_output "$(printf ' | |# \302\244')"
 }
 
 @test "Polish writes no space before the percent sign, unlike French" {
@@ -810,12 +831,12 @@ EOF
 
 @test "the same amount is written differently in two locales" {
   assert_equal "$(dybatpho::i18n_currency 1234.5 EUR en)" "€1,234.50"
-  assert_equal "$(dybatpho::i18n_currency 1234.5 EUR de)" "1.234,50 €"
+  assert_equal "$(dybatpho::i18n_currency 1234.5 EUR de)" "1.234,50${NBSP}€"
 }
 
 @test "a currency without decimal places shows none" {
   assert_equal "$(dybatpho::i18n_currency 1234.5 JPY en)" "¥1,235"
-  assert_equal "$(dybatpho::i18n_currency 1234567 VND vi)" "1.234.567 ₫"
+  assert_equal "$(dybatpho::i18n_currency 1234567 VND vi)" "1.234.567${NBSP}₫"
 }
 
 @test "a currency with three decimal places shows all of them" {
@@ -823,7 +844,7 @@ EOF
 }
 
 @test "Hebrew, Arabic and Bengali write the symbol after the amount" {
-  assert_equal "$(dybatpho::i18n_currency 1234.5 ILS he)" "1,234.50 ₪"
+  assert_equal "$(dybatpho::i18n_currency 1234.5 ILS he)" "1,234.50${NBSP}₪"
   assert_equal "$(dybatpho::i18n_currency 12345 INR bn)" "12,345.00₹"
 }
 
@@ -1836,13 +1857,14 @@ _i18n_spec_abbr() {
 }
 
 @test "ASCII mode seeds plain spaces into the number and currency data" {
-  DYBATPHO_I18N_ASCII=true __dybatpho_i18n_seed_symbols
-  run_traced -0 dybatpho::i18n_number 1234567 0 fr
-  assert_output "1 234 567"
-  run_traced -0 dybatpho::i18n_number 1234567 0 ru
-  assert_output "1 234 567"
-  run_traced -0 dybatpho::i18n_currency 5 EUR de
-  assert_output "5,00 €"
+  # Seeded as the library is sourced, so the setting has to be there first.
+  DYBATPHO_I18N_ASCII=true run_traced -0 _child "dybatpho::i18n_number 1234567 0 fr" \
+    "dybatpho::i18n_number 1234567 0 ru" "dybatpho::i18n_currency 5 EUR de"
+  assert_equal "${lines[0]}" "1 234 567"
+  assert_equal "${lines[1]}" "1 234 567"
+  # The layout's space is a plain one too, around the code that ASCII mode
+  # writes for the symbol.
+  assert_equal "${lines[2]}" "5,00 EUR"
 }
 
 @test "a locale registered without grouping writes its digits ungrouped" {

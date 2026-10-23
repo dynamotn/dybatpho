@@ -67,8 +67,15 @@ if [[ -z "${__dybatpho_init_source}" ]]; then
   echo "dybatpho couldn't resolve its source path. Please source init.sh from a file-backed shell context."
   exit 1
 fi
-DYBATPHO_DIR="$(cd -- "$(dirname "${__dybatpho_init_source}")" && pwd)"
-unset __dybatpho_init_source
+# The directory is cut from the path rather than asked of `dirname`, which is a
+# process of its own on every script start. `CDPATH` is cleared for the `cd`:
+# with it set, a relative path such as `lib/dybatpho` is looked up there first,
+# so the library resolved to whatever directory of that name `CDPATH` held, and
+# `cd` printed that path into the value as well.
+__dybatpho_init_dir="."
+[[ "${__dybatpho_init_source}" == */* ]] && __dybatpho_init_dir="${__dybatpho_init_source%/*}"
+DYBATPHO_DIR="$(CDPATH='' cd -- "${__dybatpho_init_dir:-/}" && pwd)"
+unset __dybatpho_init_source __dybatpho_init_dir
 export DYBATPHO_DIR
 
 # Module registry
@@ -192,9 +199,17 @@ function __dybatpho_load_module {
 # @internal
 #######################################
 function __dybatpho_export_functions {
-  local exports
-  exports=$(declare -F | sed -e 's/-f /-fx /' | grep 'x dybatpho::')
-  eval "${exports}"
+  # `compgen` is a builtin, so listing the names costs one subshell, where
+  # filtering `declare -F` also started `sed` and `grep` on every script start
+  # and every `dybatpho::load`. A Bash built without programmable completion has no
+  # `compgen`, and only that one falls back to the filter. Collecting the names
+  # into an array keeps each one a single word whatever `IFS` or globbing say.
+  local -a names=()
+  mapfile -t names < <(
+    compgen -A function -- dybatpho:: 2> /dev/null \
+      || declare -F | sed -n 's/^declare -f[a-z]* \(dybatpho::.*\)$/\1/p'
+  )
+  ((${#names[@]} == 0)) || export -f ${names[@]+"${names[@]}"}
 }
 
 #######################################

@@ -433,3 +433,43 @@ printf "%s\n" "${DYBATPHO_VERSION}"'
   assert_output "loaded twice"
   refute_stderr --partial "readonly variable"
 }
+
+@test "a relative source path resolves the library whatever CDPATH holds" {
+  # `cd` looks a relative directory up in `CDPATH` first, so a directory of the
+  # same name there used to become `DYBATPHO_DIR`, and `cd` printed it too.
+  local work="${BATS_TEST_TMPDIR}/work" decoy="${BATS_TEST_TMPDIR}/decoy"
+  mkdir -p "${work}/lib" "${decoy}/lib/dybatpho"
+  ln -s "${DYBATPHO_DIR}" "${work}/lib/dybatpho"
+  local script="${work}/use.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf '. lib/dybatpho/init.sh\n'
+    printf 'printf "%%s\\n" "${DYBATPHO_DIR}"\n'
+  } > "${script}"
+  # A function rather than `bash -c`, for the reason `bootstrap_script` gives.
+  run_from_work() { cd "${work}" && env -u DYBATPHO_MODULES CDPATH="${decoy}" bash use.sh; }
+  run_traced -0 run_from_work
+  assert_output "${work}/lib/dybatpho"
+}
+
+@test "a source path without a directory resolves to the working directory" {
+  local script="${BATS_TEST_TMPDIR}/here.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf '. init.sh\n'
+    printf 'printf "%%s\\n" "${DYBATPHO_DIR}"\n'
+  } > "${script}"
+  run_from_library() { cd "${DYBATPHO_DIR}" && env -u DYBATPHO_MODULES bash "${script}"; }
+  run_traced -0 run_from_library
+  assert_output "$(cd "${DYBATPHO_DIR}" && pwd)"
+}
+
+@test "dybatpho::load exports the public functions it adds, and no internal one" {
+  local child="${BATS_TEST_TMPDIR}/exported.sh"
+  printf '%s\n' 'declare -F dybatpho::semver_valid' \
+    'declare -F __dybatpho_load_module || echo internal-absent' > "${child}"
+  run_traced -0 init_sh "" "dybatpho::load semver
+bash $(printf '%q' "${child}")"
+  assert_line --index 0 "dybatpho::semver_valid"
+  assert_line --index 1 "internal-absent"
+}

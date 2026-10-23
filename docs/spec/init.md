@@ -122,6 +122,8 @@ fi
 - The bootstrap is sourced from a `bash -c` shell, where `BASH_SOURCE` is empty,
   so anything that expands it under the strict mode `init.sh` enables fails.
 - A module is added to the registry but not to the module-to-file map.
+- `init.sh` is sourced by a relative path while `CDPATH` names a directory holding a
+  directory of the same name, or by a bare `init.sh` with no directory part.
 
 ## Requirements *(mandatory)*
 
@@ -175,6 +177,8 @@ fi
 - **FR-019**: Sourcing `init.sh` again in a shell that already loaded the library, or loading an already-loaded module, MUST NOT fail on a constant a module declares read-only.
 - **FR-020**: The core modules MUST include `array`, so the dependency-graph helpers `dybatpho::array_toposort` and `dybatpho::array_closure` are available in every module set, which is what lets `doctor` walk the module graph with them.
 - **FR-021**: The module dependency map MUST stay global when `init.sh` is sourced from inside a function, so that `dybatpho::load` and `dybatpho::doctor` still resolve dependencies after that function returns.
+- **FR-022**: `DYBATPHO_DIR` MUST be the directory `init.sh` was sourced from, resolved against the working directory alone: `CDPATH` MUST NOT redirect it or add output to it.
+- **FR-023**: `dybatpho::load` MUST export the public functions of the modules it adds, and MUST NOT export any internal `__dybatpho_` helper.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -247,6 +251,8 @@ fi
 - **IT-018**: Source `init.sh` twice with `--modules all` from one script, then load four modules again, and see no `readonly variable` error.
 - **IT-019**: Source `init.sh` with no module set and verify `dybatpho::array_toposort` and `dybatpho::array_closure` are defined.
 - **IT-020**: Source `init.sh` from inside a function, call `dybatpho::load forge` after it returns, and verify `network`, `json` and `git` are loaded ahead of `forge`.
+- **IT-021**: Source `lib/dybatpho/init.sh` with `CDPATH` naming a directory that also holds `lib/dybatpho`, and source a bare `init.sh` from the library directory; verify `DYBATPHO_DIR` is the real library each time.
+- **IT-022**: Call `dybatpho::load semver`, then verify a child shell sees `dybatpho::semver_valid` and no internal helper.
 
 ## Acceptance Criteria *(mandatory)*
 

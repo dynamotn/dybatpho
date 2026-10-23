@@ -1016,24 +1016,34 @@ function dybatpho::circuit_reset {
 }
 
 #######################################
-# @description Run a shell command guarded by a circuit breaker keyed by name.
+# @description Run a command guarded by a circuit breaker keyed by name.
+#   The command is given after `--` as a command and its arguments, which run
+#   as they are, never parsed as shell. The older form, a single shell command
+#   string in place of `--`, still works but is deprecated: it runs through
+#   `eval`, so a value interpolated into it is parsed as code.
 # @example
-#   dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example.com/health"
+#   dybatpho::circuit_breaker api.example.com -- dybatpho::curl_do "${health_url}"
+#
+# @example
+#   dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example.com/health"   # deprecated
 #
 # @arg $1 string Circuit key, typically a host or service name
-# @arg $2 string Shell command string to run
+# @arg $2 string `--`, or (deprecated) a shell command string to run
+# @arg $@ string Command and its arguments, after `--`
 # @env DYBATPHO_CIRCUIT_THRESHOLD number [default: 5] Consecutive failures before the circuit opens
 # @env DYBATPHO_CIRCUIT_COOLDOWN number [default: 30] Seconds the circuit stays open before a trial request is allowed
 # @exitcode 0 The command succeeded, or a trial request succeeded and closed the circuit
 # @exitcode 9 The circuit is open; the command was not attempted
 # @exitcode other The command's own exit code, while the circuit is closed or half-open
-# @tip The command is executed with `eval`, so pass it as one shell command string
 # @note Circuit breaker state is in-memory and process-local; it does not persist across script invocations
 #######################################
 function dybatpho::circuit_breaker {
   local __dybatpho_network_cb_key __dybatpho_network_cb_command
   dybatpho::expect_args __dybatpho_network_cb_key __dybatpho_network_cb_command -- "$@"
   shift 2
+  if [[ "${__dybatpho_network_cb_command}" == "--" ]]; then
+    (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a command after --"
+  fi
 
   local __dybatpho_network_cb_failures="${DYBATPHO_CIRCUIT_FAILURES[${__dybatpho_network_cb_key}]:-0}"
   local __dybatpho_network_cb_opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${__dybatpho_network_cb_key}]:-0}"
@@ -1052,7 +1062,12 @@ function dybatpho::circuit_breaker {
   fi
 
   local __dybatpho_network_cb_exit_code=0
-  eval "${__dybatpho_network_cb_command}" || __dybatpho_network_cb_exit_code=$?
+  if [[ "${__dybatpho_network_cb_command}" == "--" ]]; then
+    "$@" || __dybatpho_network_cb_exit_code=$?
+  else
+    # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
+    eval "${__dybatpho_network_cb_command}" || __dybatpho_network_cb_exit_code=$?
+  fi
 
   if ((__dybatpho_network_cb_exit_code == 0)); then
     DYBATPHO_CIRCUIT_FAILURES["${__dybatpho_network_cb_key}"]=0
@@ -1196,9 +1211,8 @@ function dybatpho::rate_limit_reset {
 # @exitcode 9 The budget is spent and the limiter was not allowed to wait for it; the command was not run
 # @exitcode other The command's own exit code
 # @see dybatpho::circuit_breaker
-# @note The command runs as an argument vector rather than through `eval`, unlike `dybatpho::circuit_breaker`; wrap a
-#   shell
-#   string in `bash -c` when one is really wanted
+# @note The command runs as an argument vector rather than through `eval`, like the `--` form of
+#   `dybatpho::circuit_breaker`; wrap a shell string in `bash -c` when one is really wanted
 # @note The window is in-memory and process-local, like the circuit breaker's state; it does not persist across script
 #   invocations, nor out of a subshell
 #######################################

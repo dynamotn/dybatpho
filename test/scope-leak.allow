@@ -33,3 +33,4 @@ src/release.sh	dybatpho::release_sign	stop	runs the configured signing program o
 src/cli.sh	__dybatpho_cli_collect_long_switches	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	__dybatpho_cli_generate_child_logic	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	dybatpho::generate_help	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
+src/notification.sh	__dybatpho_notification_post	stop	runs only `dybatpho::curl_json`, whose `DYBATPHO_CURL_*` settings these locals scope to the request on purpose

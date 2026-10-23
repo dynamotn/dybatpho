@@ -177,9 +177,7 @@ function __dybatpho_notification_post {
     host="${host%%[/?#]*}"
     key+=":${host##*@}"
   fi
-  local command
-  printf -v command '%q ' dybatpho::curl_json "${url}" /dev/null "$@"
-  dybatpho::circuit_breaker "${key}" "${command}"
+  dybatpho::circuit_breaker "${key}" -- dybatpho::curl_json "${url}" /dev/null "$@"
 }
 
 #######################################

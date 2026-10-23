@@ -193,9 +193,9 @@ function _demo_circuit_breaker {
   dybatpho::circuit_reset "${service}"
   # Simulate two consecutive failures to open the circuit, then show that a
   # third attempt is short-circuited without contacting the service.
-  dybatpho::circuit_breaker "${service}" "false" || true
-  dybatpho::circuit_breaker "${service}" "false" || true
-  if dybatpho::circuit_breaker "${service}" "true"; then
+  dybatpho::circuit_breaker "${service}" -- false || true
+  dybatpho::circuit_breaker "${service}" -- false || true
+  if dybatpho::circuit_breaker "${service}" -- true; then
     dybatpho::info "Call succeeded"
   else
     local circuit_state

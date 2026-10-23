@@ -1208,6 +1208,28 @@ c.close()' > "${portfile}" 2> /dev/null &
   refute_output --partial "needs the json module"
 }
 
+@test "dybatpho::circuit_breaker -- runs a command and its arguments as words, never as shell" {
+  local marker="${BATS_TEST_TMPDIR}/pwned" seen="${BATS_TEST_TMPDIR}/seen"
+  local quoted="it's \"quoted\" \$(touch ${marker}) a  b"
+  local multiline="first line"$'\n'"second line"
+  _record_words() { printf '<%s>' "$@" > "${seen}"; }
+  dybatpho::circuit_reset argv-key
+  dybatpho::circuit_breaker argv-key -- _record_words "${quoted}" "${multiline}"
+  assert_equal "$(cat "${seen}")" "<${quoted}><${multiline}>"
+  refute [ -e "${marker}" ]
+
+  export DYBATPHO_CIRCUIT_THRESHOLD=2
+  run_traced dybatpho::circuit_breaker argv-key -- false
+  assert_failure 1
+  dybatpho::circuit_breaker argv-key -- false || true
+  assert_equal "$(dybatpho::circuit_state argv-key)" "open"
+  dybatpho::circuit_reset argv-key
+
+  run dybatpho::circuit_breaker argv-key --
+  assert_failure
+  assert_output --partial "Expected a command after --"
+}
+
 @test "a command run behind a circuit or a rate limit sees the caller's variables" {
   # The command runs in the library's scope, where its locals hid the caller's
   # variables of the same names, and assigning to one changed the recorded

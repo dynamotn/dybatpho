@@ -193,7 +193,7 @@ ${_bootstrap_module_list}
 # A bundle has nothing to source: every module it carries is already loaded, and
 # a module it doesn't carry can only come from regenerating it.
 function dybatpho::load {
-  (($#)) || dybatpho::die "dybatpho::load: Expected at least one module name"
+  ((\$#)) || dybatpho::die "dybatpho::load: Expected at least one module name"
   local module
   for module in "\$@"; do
     dybatpho::module_loaded "\${module}" && continue

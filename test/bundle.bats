@@ -66,6 +66,13 @@ bundle() {
   assert_output "loaded"
 }
 
+@test "dybatpho::load in a bundle requires a module name" {
+  run_traced -0 bundle --modules git
+  run -1 use_bundle 'dybatpho::load; echo reached'
+  refute_output --partial "reached"
+  assert_output --partial "Expected at least one module name"
+}
+
 @test "dybatpho::load names the regeneration command for an absent module" {
   run -0 bundle --modules git
   run -1 use_bundle 'dybatpho::load ai'

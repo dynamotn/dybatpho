@@ -144,8 +144,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **BREAKING: library-wide — configuration defaults and state are no longer
   exported.** `DYBATPHO_SPINNER*`, `DYBATPHO_TIMER_LAST_MS`,
   `DYBATPHO_TIMEOUT_KILL_AFTER`, `DYBATPHO_TUI_*`, `DYBATPHO_SCREEN_*`, the
-  semver, version-scan and math regexes and `DYBATPHO_MATH_MAX_EXPONENT` are
-  plain shell variables; a value you exported yourself stays exported.
+  semver, version-scan and math regexes, `DYBATPHO_MATH_MAX_EXPONENT`,
+  `DYBATPHO_DIR` and the module lists are plain shell variables; a value you exported yourself stays exported.
 
 - **BREAKING: `i18n` — plural rules follow CLDR for more languages.**
   `dybatpho::i18n_plural_form` counts zero as singular in Zulu, Kannada,

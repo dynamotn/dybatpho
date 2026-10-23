@@ -934,9 +934,10 @@ BSD
   assert_equal "$(printenv)" "mocked"
   printenv > /dev/null
   dybatpho::unmock_command printenv
-  run_traced printenv DYBATPHO_DIR
+  export DYBATPHO_TEST_PRINTENV_MARK="real printenv"
+  run_traced printenv DYBATPHO_TEST_PRINTENV_MARK
   assert_success
-  assert_output "${DYBATPHO_DIR}"
+  assert_output "real printenv"
 }
 
 @test "the json assertions and a snapshot diff load their modules on demand when they are not loaded" {

@@ -249,7 +249,6 @@ DYBATPHO_VERSION="\${DYBATPHO_VERSION:-$(dybatpho::version)}"
 DYBATPHO_CORE_MODULES="${_core}"
 DYBATPHO_OPTIONAL_MODULES="${_optional}"
 DYBATPHO_LOADED_MODULES="${_modules}"
-export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 declare -gA __dybatpho_module_deps=(
 ${_deps})
 declare -gA __dybatpho_module_soft_deps=(

@@ -121,7 +121,6 @@ __dybatpho_init_dir="."
 [[ "${__dybatpho_init_source}" == */* ]] && __dybatpho_init_dir="${__dybatpho_init_source%/*}"
 DYBATPHO_DIR="$(CDPATH='' cd -- "${__dybatpho_init_dir:-/}" && pwd)"
 unset __dybatpho_init_source __dybatpho_init_dir
-export DYBATPHO_DIR
 # The file a child process sources through `BASH_ENV` once the functions are
 # exported; a bundle points it at itself.
 __dybatpho_entry_file="${DYBATPHO_DIR}/init.sh"
@@ -154,7 +153,6 @@ __dybatpho_loading_modules=""
 #   `dybatpho::export_functions` and kept current by `dybatpho::load`
 # @env DYBATPHO_EXPORT_BASH_ENV string The `BASH_ENV` in place before `dybatpho::export_functions`, sourced first by
 #   every child
-export DYBATPHO_CORE_MODULES DYBATPHO_OPTIONAL_MODULES
 
 # Dependencies between optional modules. Core modules are implicit, so only the
 # optional-to-optional edges are listed here. Cycles are allowed: function calls

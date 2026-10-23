@@ -43,7 +43,11 @@ release() {
   local repo="${BATS_TEST_TMPDIR}/re lease"
   mkdir -p "${repo}/scripts" "${repo}/docs"
   cp -R "${DYBATPHO_DIR}/src" "${repo}/src"
-  cp "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${DYBATPHO_DIR}/CHANGELOG.md" "${repo}/"
+  cp "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${repo}/"
+  # A changelog of its own: the repository's is empty under `Unreleased` right
+  # after every release, and the script rightly refuses to release nothing.
+  printf '%s\n' '# Changelog' '' '## [Unreleased]' '' '### Fixed' '' '- Something.' \
+    > "${repo}/CHANGELOG.md"
   cp "${RELEASE_SH}" "${repo}/scripts/release.sh"
   printf '%s\n' '#!/usr/bin/env bash' \
     'printf "regenerated\n" > "$(cd "$(dirname "$0")/.." && pwd)/docs/marker"' > "${repo}/scripts/docs.sh"

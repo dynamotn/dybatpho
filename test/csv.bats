@@ -1044,7 +1044,11 @@ csv_engine_run_all() {
   # Bash's pattern operators dropped such a value whole, so the row came back
   # empty from the Bash engine while the awk engine, reading bytes, kept it.
   local utf8 text engine
-  utf8="$(locale -a 2> /dev/null | grep -iE '^(C|en_US)\.utf-?8$' | head -n 1)"
+  # musl ships no `locale` command and understands `C.UTF-8` without one.
+  utf8="C.UTF-8"
+  if command -v locale > /dev/null; then
+    utf8="$(locale -a 2> /dev/null | grep -iE '^(C|en_US)\.utf-?8$' | head -n 1 || true)"
+  fi
   [[ -n "${utf8}" ]] || skip "no UTF-8 locale is installed"
   text="$(printf 'a;b\n\303\\-;x\n')"
   for engine in bash awk; do

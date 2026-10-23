@@ -215,8 +215,8 @@ function __dybatpho_changelog_archive_run {
   versions="$(__dybatpho_changelog_versions "${changelog}")"
   while IFS= read -r version || [[ -n "${version}" ]]; do
     [[ -n "${version}" ]] || continue
-    # Both sides are validated release versions, so the comparison cannot fail.
-    order="$(dybatpho::semver_compare "${version}" "${before}")"
+    # Both sides are validated release versions; the check is for form.
+    order="$(dybatpho::semver_compare "${version}" "${before}")" || return 1
     [[ "${order}" == "-1" ]] && moved+=("${version}")
   done <<< "${versions}"
 

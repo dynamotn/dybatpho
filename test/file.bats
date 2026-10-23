@@ -1096,3 +1096,64 @@ SCRIPT
   assert_equal "$(__dybatpho_file_stat mode "${dir}")" "2755"
   assert_equal "$(__dybatpho_file_stat mode "${file}")" "644"
 }
+
+@test "dybatpho::path_normalize and path_relative keep a name holding a newline whole" {
+  # The split stopped at the first newline, so everything after it was lost and
+  # the path came back as a shorter one that names something else.
+  assert_equal "$(dybatpho::path_normalize "/a/b"$'\n'"c/./d")" "/a/b"$'\n'"c/d"
+  assert_equal "$(dybatpho::path_normalize "x/"$'\n'"/..")" "x"
+  # A newline that ends a name is kept; `$(...)` would drop it, hence the dot.
+  assert_equal "$(dybatpho::path_normalize "a"$'\n'"/" && printf .)" "a"$'\n'$'\n'"."
+  assert_equal "$(dybatpho::path_relative "/r/one"$'\n'"two/f" "/r/one"$'\n'"two")" "f"
+  assert_equal "$(dybatpho::path_relative "/r/x" "/r/one"$'\n'"two/y")" "../../x"
+}
+
+@test "dybatpho::file_write_atomic writes through a link to a name holding a newline" {
+  local target="${BATS_TEST_TMPDIR}/real"$'\n'"name"
+  printf 'old\n' > "${target}"
+  printf 'old\n' > "${BATS_TEST_TMPDIR}/real"
+  ln -s "${target}" "${BATS_TEST_TMPDIR}/link"
+  printf 'new\n' | dybatpho::file_write_atomic "${BATS_TEST_TMPDIR}/link"
+  assert_equal "$(cat "${target}")" "new"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/real")" "old"
+  [[ -L "${BATS_TEST_TMPDIR}/link" ]]
+}
+
+@test "dybatpho::find_up and the tree walk ignore CDPATH and a directory named -" {
+  # With CDPATH set, `cd sub` entered a directory of the same name elsewhere and
+  # printed it, and `cd -- -` went back to the previous directory.
+  mkdir -p "${BATS_TEST_TMPDIR}/cdp/elsewhere/sub" "${BATS_TEST_TMPDIR}/cdp/here/sub" \
+    "${BATS_TEST_TMPDIR}/cdp/here/-"
+  : > "${BATS_TEST_TMPDIR}/cdp/elsewhere/sub/.marker"
+  : > "${BATS_TEST_TMPDIR}/cdp/here/sub/own"
+  : > "${BATS_TEST_TMPDIR}/cdp/here/-/dashed"
+  cd "${BATS_TEST_TMPDIR}/cdp/here"
+  CDPATH="${BATS_TEST_TMPDIR}/cdp/elsewhere" run_traced -1 dybatpho::find_up ".marker" sub
+  assert_output ""
+
+  local -a paths=()
+  CDPATH="${BATS_TEST_TMPDIR}/cdp/elsewhere" __dybatpho_file_walk_into paths - sub
+  assert_equal "${paths[*]}" "own"
+  __dybatpho_file_walk_into paths - -
+  assert_equal "${paths[*]}" "dashed"
+  assert_equal "$(dybatpho::find_up dashed -)" "${BATS_TEST_TMPDIR}/cdp/here/-/dashed"
+}
+
+@test "dybatpho::dir_size measures a directory whose name begins with a dash" {
+  # `find -d` read the name as an option and measured the working directory.
+  mkdir -p "${BATS_TEST_TMPDIR}/dashcwd/-d"
+  printf '123' > "${BATS_TEST_TMPDIR}/dashcwd/-d/f"
+  head -c 5000 /dev/zero > "${BATS_TEST_TMPDIR}/dashcwd/outside"
+  cd "${BATS_TEST_TMPDIR}/dashcwd"
+  assert_equal "$(dybatpho::dir_size -d)" "3"
+}
+
+@test "dybatpho::dir_size totals a tree past 2 GiB exactly" {
+  # mawk and BusyBox awk cap `%d` at 2147483647. Sparse files keep this cheap
+  # where the filesystem supports them.
+  local tree="${BATS_TEST_TMPDIR}/big"
+  mkdir -p "${tree}"
+  dd if=/dev/zero of="${tree}/a" bs=1 count=1 seek=2147483647 2> /dev/null || skip "cannot create a sparse file"
+  dd if=/dev/zero of="${tree}/b" bs=1 count=1 seek=2147483647 2> /dev/null || skip "cannot create a sparse file"
+  assert_equal "$(dybatpho::dir_size "${tree}")" "4294967296"
+}

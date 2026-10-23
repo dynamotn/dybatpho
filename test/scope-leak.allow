@@ -15,6 +15,7 @@ src/cli.sh	__dybatpho_cli_generate_logic	spread	its `__` locals are the spec DSL
 src/cli.sh	__dybatpho_cli_replay_persistent_defs	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/cli.sh	dybatpho::opts::cmd	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/file.sh	__dybatpho_file_rewrite	stop	runs only the module's own producers, which keep prefixed locals
+src/file.sh	__dybatpho_file_stat_each	stop	runs only the `stat` command it builds itself
 src/forge.sh	__dybatpho_forge_or_die	stop	runs only the module's own requests
 src/helpers.sh	__dybatpho_helpers_locate	stop	evaluates only the `shopt -p` line it saved itself
 src/helpers.sh	__dybatpho_helpers_sort	stop	`LC_ALL=C` is local on purpose so a comparator compares bytes

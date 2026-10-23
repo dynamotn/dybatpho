@@ -42,7 +42,7 @@ function dybatpho::show_file {
   dybatpho::expect_args file_path -- "$@"
 
   if dybatpho::is command "bat"; then
-    bat "${file_path}" >&2
+    bat -- "${file_path}" >&2
   else
     cat -n -- "${file_path}" >&2 # kcov(skip)
   fi
@@ -179,6 +179,28 @@ function dybatpho::path_join {
 }
 
 #######################################
+# @description Split a path on `/` into an array, keeping a name that holds a
+#   newline in one piece.
+#   A plain `read` stops at the first newline, so `a/b<newline>c/d` came back
+#   as `a` and `b`: a write through a link to such a name, or a guarded removal
+#   of one, then acted on a different, shorter path. Reading up to a NUL takes
+#   the whole string; the here-string still adds one newline of its own at the
+#   end, which comes off the last part.
+# @arg $1 string Name of the array receiving the parts
+# @arg $2 string Path to split
+# @set The named array
+# @internal
+#######################################
+function __dybatpho_file_split_into {
+  local -n __dybatpho_file_split_ref="$1"
+  __dybatpho_file_split_ref=()
+  IFS='/' read -r -d '' -a __dybatpho_file_split_ref <<< "$2" || true
+  local __dybatpho_file_split_last=$((${#__dybatpho_file_split_ref[@]} - 1))
+  ((__dybatpho_file_split_last >= 0)) || return 0
+  __dybatpho_file_split_ref[__dybatpho_file_split_last]="${__dybatpho_file_split_ref[__dybatpho_file_split_last]%$'\n'}"
+}
+
+#######################################
 # @description Normalize a path by collapsing repeated separators and resolving `.` and `..` textually.
 # @arg $1 string Path to normalize
 # @stdout Normalized path
@@ -201,7 +223,7 @@ function dybatpho::path_normalize {
 
   local -a parts=() normalized_parts=()
   local part last_index
-  IFS='/' read -r -a parts <<< "${path}"
+  __dybatpho_file_split_into parts "${path}"
 
   for part in ${parts[@]+"${parts[@]}"}; do
     case "${part}" in
@@ -314,10 +336,10 @@ function dybatpho::path_relative {
   local -a target_parts=() base_parts=() relative_parts=()
   local i common=0
   if [[ "${target}" != "." ]]; then
-    IFS='/' read -r -a target_parts <<< "${target#/}"
+    __dybatpho_file_split_into target_parts "${target#/}"
   fi
   if [[ "${base}" != "." ]]; then
-    IFS='/' read -r -a base_parts <<< "${base#/}"
+    __dybatpho_file_split_into base_parts "${base#/}"
   fi
 
   while ((common < ${#target_parts[@]} && common < ${#base_parts[@]})); do
@@ -335,7 +357,8 @@ function dybatpho::path_relative {
   if ((${#relative_parts[@]} == 0)); then
     printf '.\n'
   else
-    printf '%s\n' "$(IFS=/ && printf '%s' "${relative_parts[*]-}")"
+    local IFS='/'
+    printf '%s\n' "${relative_parts[*]-}"
   fi
 }
 
@@ -493,6 +516,32 @@ function __dybatpho_file_stat {
 }
 
 #######################################
+# @description Print one `stat` line for each of many paths, in a few calls
+#   rather than one per path, following symbolic links as
+#   `__dybatpho_file_stat` does. The flavour is asked once, and the paths go
+#   in batches small enough for any argument list.
+# @arg $1 string GNU format, such as `%s`
+# @arg $2 string The same in BSD format, such as `%z`
+# @arg $@ string Paths
+# @stdout One line per path that could be read
+# @exitcode 1 A path could not be read
+# @internal
+#######################################
+function __dybatpho_file_stat_each {
+  local gnu_format="$1" bsd_format="$2" count status=0
+  shift 2
+  (($#)) || return 0
+  local -a command=(stat -L -c "${gnu_format}")
+  stat -c '%s' -- / &> /dev/null || command=(stat -L -f "${bsd_format}")
+  while (($#)); do
+    count=$(($# < 256 ? $# : 256))
+    "${command[@]}" -- "${@:1:count}" || status=1
+    shift "${count}"
+  done
+  return "${status}"
+}
+
+#######################################
 # @description Walk a directory tree into two parallel arrays: each entry's
 #   path relative to the root, and its kind, one of `file`, `directory`,
 #   `symlink` or `other`.
@@ -527,7 +576,10 @@ function __dybatpho_file_walk_into {
   # variable. Not a `__dybatpho`-prefixed name: `dybatpho::create_temp` refuses one.
   local dybatpho_file_walk_list __dybatpho_file_walk_status=0
   dybatpho::create_temp dybatpho_file_walk_list ".walk" "walk"
-  (cd -- "${__dybatpho_file_walk_root}" && find . -mindepth 1 -print0) \
+  # `CDPATH` would walk a directory of the same name elsewhere, and put the one
+  # `cd` prints at the head of the list; a root named `-` would be read as the
+  # previous directory.
+  (CDPATH='' cd -- "${__dybatpho_file_walk_root/#-/./-}" && find . -mindepth 1 -print0) \
     > "${dybatpho_file_walk_list}" || __dybatpho_file_walk_status=1
   LC_ALL=C sort -z -o "${dybatpho_file_walk_list}" -- "${dybatpho_file_walk_list}" \
     || __dybatpho_file_walk_status=1
@@ -1140,7 +1192,10 @@ function dybatpho::find_up {
   start="${2:-${PWD}}"
   dybatpho::is dir "${start}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${start}"
-  current="$(cd -- "${start}" && pwd)"
+  # `CDPATH` would send a relative start into a directory of the same name
+  # elsewhere, and make `cd` print it ahead of `pwd`; a start named `-` would be
+  # read as the previous directory. Neither is the directory asked about.
+  current="$(CDPATH='' cd -- "${start/#-/./-}" && pwd)"
 
   while :; do
     candidate="${current%/}/${name}"
@@ -1361,14 +1416,24 @@ function dybatpho::dir_size {
   dybatpho::expect_args directory -- "$@"
   dybatpho::is dir "${directory}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
-  # One `stat` call for the whole tree rather than one per file. The flavour is
-  # asked once, up front: falling back after a failed `find` walked the tree a
-  # second time whenever any part of it could not be read.
-  local -a stat_size=(stat -L -c '%s')
-  stat -c '%s' -- "${directory}" &> /dev/null || stat_size=(stat -L -f '%z')
-  local sizes status=0
-  sizes="$(find "${directory}" -type f -exec "${stat_size[@]}" {} + 2> /dev/null)" || status=$?
-  total="$(printf '%s\n' "${sizes}" | awk '{ total += $1 } END { printf "%d\n", total }')"
+  # The tree is listed first and measured with a few `stat` calls rather than
+  # one per file. Not through `find -exec ... +`: GNU `find` refuses to run
+  # anything once the environment is large, and the functions this library
+  # exports made it so on Bash 4.3, where every size came back as `0`. The list
+  # goes through a file so that `find`'s status survives, and a directory
+  # named like `-d` gets `./` so `find` does not read it as an expression.
+  local dybatpho_file_size_list sizes status=0 entry
+  local -a files=()
+  dybatpho::create_temp dybatpho_file_size_list ".list" "size"
+  find "${directory/#-/./-}" -type f -print0 > "${dybatpho_file_size_list}" 2> /dev/null || status=$?
+  while IFS= read -r -d '' entry; do
+    files+=("${entry}")
+  done < "${dybatpho_file_size_list}" # kcov(skip)
+  __dybatpho_file_discard "${dybatpho_file_size_list}"
+  sizes="$(__dybatpho_file_stat_each '%s' '%z' ${files[@]+"${files[@]}"} 2> /dev/null)" || status=1
+  # `%d` is capped at 2147483647 by mawk and BusyBox awk, so a tree past 2 GiB
+  # reported exactly that on Debian, Ubuntu and Alpine; `%.0f` is exact to 2^53.
+  total="$(printf '%s\n' "${sizes}" | awk '{ total += $1 } END { printf "%.0f\n", total }')"
   printf '%s\n' "${total:-0}"
   if ((status != 0)); then
     dybatpho::error "${FUNCNAME[0]}: Part of ${directory} could not be read; the size counts only the rest"

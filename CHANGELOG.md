@@ -295,6 +295,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when called directly under `set -e`; inside `$(...)` it worked. It now prints
   `10.00`.
 
+- **`file` — `dybatpho::dir_size` measures a directory named like an option,
+  and counts past 2 GiB** under mawk and BusyBox awk.
+
 - **`helpers` — `dybatpho::require` finds tools under `set +h`, and
   `dybatpho::retry` checks its delay variables.** With hashing off every tool
   was reported missing. A `DYBATPHO_RETRY_BASE_DELAY` or

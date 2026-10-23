@@ -286,6 +286,9 @@ dybatpho::show_file "${report_file}"
 - Relative-path calculation may compare absolute paths, relative paths, or mixed path styles.
 - Someone able to write to the destination's directory plants a symbolic link at the name a rewrite would stage under.
 - `file_ensure_line` targets an existing file the process cannot read.
+- A path, or the target of a link a writer follows, holds a newline.
+- A directory handed to `find_up`, `dir_size` or the tree walk is relative and `CDPATH` is set, or its name is `-` or begins with a dash.
+- The regular files under a directory add up to more than 2 GiB.
 
 ## Requirements *(mandatory)*
 
@@ -341,6 +344,9 @@ dybatpho::show_file "${report_file}"
 - **FR-048**: `dir_size` MUST return 1 and report when part of the tree cannot be read, printing the size of what could, and MUST walk the tree once; `file_is_binary` MUST stop on a file it cannot read rather than call it text.
 - **FR-049**: `dybatpho::path_normalize` MUST handle a path whose parts all cancel on Bash 4.3, where an empty array under `nounset` is an error.
 - **FR-050**: `__dybatpho_file_stat mode` MUST include the setuid, setgid and sticky bits on BSD `stat`, and answer in the same form as GNU (`2755`, `644`).
+- **FR-051**: `path_normalize` and `path_relative` MUST keep a path component that holds a newline whole, so a writer following a link and a guard checking a path act on the path given.
+- **FR-052**: `find_up`, `dir_size` and the tree walk MUST resolve a relative directory against the working directory whatever `CDPATH` holds, and MUST treat a directory named `-` or beginning with a dash as a directory.
+- **FR-053**: `dir_size` MUST report totals past 2 GiB exactly, whichever `awk` is installed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -409,6 +415,9 @@ dybatpho::show_file "${report_file}"
 - **IT-034**: Size a tree with an unreadable subdirectory and get the readable part with exit 1, and refuse to classify an unreadable file.
 - **IT-035**: Normalize `a/..`, `/` and `.` and get `.`, `/` and `.`.
 - **IT-036**: Read the mode of a `2755` directory and a `644` file and get those strings.
+- **IT-037**: Normalize and relate paths holding a newline, and write through a link to such a name without touching the shorter name.
+- **IT-038**: Search up from, and walk, a relative directory with `CDPATH` pointing at a decoy, and a directory named `-`.
+- **IT-039**: Measure a directory named `-d`, and a sparse tree of 4 GiB.
 
 ## Acceptance Criteria *(mandatory)*
 

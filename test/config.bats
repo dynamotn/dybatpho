@@ -718,3 +718,27 @@ require_tool() {
   dybatpho::config_save "${created}" mode
   assert_equal "$(jq -r '.mode' "${created}")" "prod"
 }
+
+@test "config_save writes a numeric value without its leading zeros" {
+  require_tool yq
+  require_tool jq
+  # TOML refuses `0080`, so the file could not be loaded back; YAML 1.1 reads
+  # `010` as octal eight.
+  dybatpho::config_schema port int
+  dybatpho::config_schema ratio number
+  dybatpho::config_set port 0080
+  dybatpho::config_set ratio 00.50
+  local file
+  for file in app.toml app.json app.yaml; do
+    file="${BATS_TEST_TMPDIR}/${file}"
+    dybatpho::config_save "${file}" port ratio
+    DYBATPHO_CONFIG=()
+    dybatpho::config_load "${file}"
+    assert_equal "$(dybatpho::config_get port)" "80"
+    assert_equal "$(dybatpho::config_get ratio)" "0.50"
+    dybatpho::config_set port 0080
+    dybatpho::config_set ratio 00.50
+  done
+  run grep -c '0080' "${BATS_TEST_TMPDIR}/app.toml"
+  assert_output "0"
+}

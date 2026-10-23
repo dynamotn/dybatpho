@@ -473,8 +473,11 @@ function __dybatpho_config_save_structured {
     setting="${DYBATPHO_CONFIG[${key}]}"
     __dybatpho_config_schema_attr_into type "${key}" type string
     literal=""
-    if __dybatpho_validate_numeric_type "${type}" && [[ "${setting}" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
-      literal="${setting}"
+    if __dybatpho_validate_numeric_type "${type}" && [[ "${setting}" =~ ^(-?)([0-9]+)(\.[0-9]+)?$ ]]; then
+      # Without its leading zeros: TOML refuses `0080`, so the file could not
+      # be loaded back, and YAML 1.1 reads `010` as octal eight.
+      literal="${BASH_REMATCH[2]#"${BASH_REMATCH[2]%%[!0]*}"}"
+      literal="${BASH_REMATCH[1]}${literal:-0}${BASH_REMATCH[3]}"
     elif [[ "${type}" == bool ]]; then
       # `dybatpho::is true` follows the shell's exit-code convention, where `0`
       # is success. A configuration file means the opposite by `1` and `0`, so

@@ -324,6 +324,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   With BSD `date`, `…Z` and `…+02:00` were not read and Feb 30 rolled into
   March. Amounts such as `08` are read in base ten.
 
+- **`csv`, `config` — round trips keep their data.** A stray quote such as
+  `55"` no longer swallows the rest of the file in `dybatpho::csv_read`.
+  `dybatpho::csv_from_json` keeps `false` and writes `null` as an empty field
+  with both jq and yq. `dybatpho::config_save` no longer writes `port = 0080`,
+  which it could not load back.
+
 ### Security
 
 - **Arithmetic no longer runs a command passed as a number.**

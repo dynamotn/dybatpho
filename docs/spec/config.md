@@ -255,6 +255,7 @@ dybatpho::config_save ./config.yaml PORT
 - A structured root is a sequence or a scalar rather than a mapping, which must
   be rejected instead of loaded under positional keys.
 - `DRY_RUN` is set, so a save reports the write instead of performing it.
+- A numeric value saved to a structured file is written with leading zeros, such as `0080`.
 
 ## Requirements *(mandatory)*
 
@@ -329,6 +330,7 @@ dybatpho::config_save ./config.yaml PORT
   empty mapping under its own key as compact JSON without walking into it, and
   MUST keep tabs, line breaks, and backslashes in values; the `jq` and `yq`
   backends MUST produce the same keys and values.
+- **FR-030**: `dybatpho::config_save` MUST write a numeric value of a numeric schema type without leading zeros, so the file it writes loads back.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -413,6 +415,7 @@ dybatpho::config_save ./config.yaml PORT
   each dotted key, the sequence kept as JSON, the empty mapping, and a value
   holding a tab and a backslash; then verify a `config:server.port` binding
   reads the nested value.
+- **IT-022**: Save `0080` and `00.50` to TOML, JSON and YAML, load each file back, and get `80` and `0.50`.
 
 ## Acceptance Criteria *(mandatory)*
 

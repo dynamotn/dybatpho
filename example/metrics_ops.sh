@@ -83,7 +83,7 @@ function _demo_automatic {
   dybatpho::info "Loading the metrics module is enough; these need no extra calls"
 
   # Retries and logged errors are counted by the library itself.
-  dybatpho::retry 2 "false" &> /dev/null || true
+  dybatpho::retry 2 -- false &> /dev/null || true
   dybatpho::error "a failure worth counting" 2> /dev/null
 
   local metrics_get_3

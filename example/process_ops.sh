@@ -40,7 +40,7 @@ function _flaky_command {
 # @noargs
 function _demo_retry {
   dybatpho::header "RETRY WITH BACKOFF"
-  dybatpho::retry 5 _flaky_command
+  dybatpho::retry 5 "flaky command" -- _flaky_command
   dybatpho::success "Flaky command eventually succeeded"
 }
 
@@ -179,7 +179,7 @@ function _demo_env_defaults {
 # @noargs
 function _demo_assert {
   dybatpho::header "ASSERT"
-  dybatpho::assert '[[ 2 -gt 1 ]]' "math should still work"
+  dybatpho::assert "math should still work" -- test 2 -gt 1
   dybatpho::success "Assertion passed"
 }
 
@@ -194,7 +194,7 @@ function _demo_retry_until {
     fixed_attempts=$((fixed_attempts + 1))
     [[ "${fixed_attempts}" -ge 2 ]]
   }
-  dybatpho::retry_until 2 1 _fixed_delay_flaky fixed-delay-demo
+  dybatpho::retry_until 2 1 fixed-delay-demo -- _fixed_delay_flaky
   dybatpho::success "Fixed-delay retry succeeded"
 }
 

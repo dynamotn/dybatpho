@@ -33,7 +33,7 @@ dybatpho::print "target: ${api_url}"
 attempt_file="${TMPDIR:-/tmp}/dybatpho-helper-example-${BASHPID}"
 trap 'rm -f -- "${attempt_file}"' EXIT
 printf 'ready\n' > "${attempt_file}"
-dybatpho::retry 2 "grep -q ready '${attempt_file}'" "readiness check"
+dybatpho::retry 2 "readiness check" -- grep -q ready "${attempt_file}"
 
 # How long a retry waits is configurable, and the delay grows exponentially from
 # the base up to the cap: 2, 4, 8, 16, then 30 with these defaults.

@@ -735,7 +735,12 @@ require_tool() {
     DYBATPHO_CONFIG=()
     dybatpho::config_load "${file}"
     assert_equal "$(dybatpho::config_get port)" "80"
-    assert_equal "$(dybatpho::config_get ratio)" "0.50"
+    # `jq` 1.6 reads numbers as doubles, so it keeps the value but not its form.
+    if [[ "$(jq --version)" == jq-1.[0-6]* ]]; then
+      assert_equal "$(dybatpho::config_get ratio)" "0.5"
+    else
+      assert_equal "$(dybatpho::config_get ratio)" "0.50"
+    fi
     dybatpho::config_set port 0080
     dybatpho::config_set ratio 00.50
   done

@@ -61,7 +61,7 @@ fake_versioned_command() {
   # `jq`, so it is optional rather than required. `awk` only makes a large
   # input faster.
   run_traced -0 dybatpho::doctor_requirements csv optional
-  assert_output "$(printf 'jq\nawk')"
+  assert_output "$(printf 'jq>=1.7\nawk')"
 
   run_traced -0 dybatpho::doctor_requirements csv required
   assert_output ""
@@ -122,7 +122,7 @@ fake_versioned_command() {
   run_traced -0 dybatpho::doctor_requirements json optional
   assert_output "yq>=4"
   run_traced -0 dybatpho::doctor_requirements json required
-  assert_output "jq"
+  assert_output "jq>=1.7"
 }
 
 @test "dybatpho::doctor_requirements lists the host probes of the os module" {
@@ -134,7 +134,7 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor_requirements defaults to every kind" {
   run_traced -0 dybatpho::doctor_requirements json
-  assert_line --index 0 "jq"
+  assert_line --index 0 "jq>=1.7"
   assert_line --index 1 "yq>=4"
 }
 
@@ -369,7 +369,7 @@ fake_versioned_command() {
   fake_command yq
   run_traced -0 dybatpho::doctor --modules json
   assert_output --partial "unknown"
-  assert_output --partial "Installed, version could not be read: yq>=4"
+  assert_output --partial "Installed, version could not be read: jq>=1.7 yq>=4"
   refute_output --partial "Required, too old"
 }
 

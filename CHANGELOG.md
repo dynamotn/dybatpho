@@ -115,7 +115,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `yaml_has` and the `testing` JSON and YAML assertions no longer hand the
   filter to whichever of `yq` or `jq` is found first, so the same call prints
   the same result on every machine: `keys` is sorted, `add`, `?` and `def`
-  work, and numbers are not reformatted. Rewrite yq-only syntax (`downcase` is
+  work, and with `jq` 1.7 or newer numbers are kept as written (`jq` 1.6, as
+  packaged on Debian 12 and Ubuntu 22.04, reads them as doubles, so
+  `dybatpho::doctor` now asks for `jq>=1.7`). Rewrite yq-only syntax (`downcase` is
   `ascii_downcase`, `strenv(NAME)` is `$ENV.NAME`).
 
 - **BREAKING: `json`, `csv` — `jq` is required, `yq` only for YAML.** The JSON

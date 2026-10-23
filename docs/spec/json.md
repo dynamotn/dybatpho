@@ -239,6 +239,7 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **FR-026**: Every filter a caller passes MUST run through `jq`, whatever else is installed; no helper MAY choose its filter engine by what it finds on `PATH`.
 - **FR-027**: Every helper but `json_string` MUST stop with exit code 127 and a message naming `jq` when `jq` is not installed.
 - **FR-028**: Every helper that reads or writes YAML MUST stop with exit code 127 when `yq` is missing, and MUST refuse the Python `yq` and a Go `yq` older than v4 by name; the check MUST run once for as long as `PATH` is unchanged.
+- **FR-029**: The module MUST declare `jq` 1.7 or newer to `dybatpho::doctor`, because `jq` 1.6 reads every number as a binary double and so does not keep a number as written; with `jq` 1.6 the helpers MUST still work.
 
 ### Key Entities *(include if feature involves data)*
 

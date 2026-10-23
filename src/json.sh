@@ -18,6 +18,12 @@
 #   file's comments and layout survive. A YAML helper refuses the unrelated
 #   Python `yq` by name rather than misreading its output.
 #
+#   Use `jq` 1.7 or newer. `jq` 1.6, still the packaged one on Debian 12 and
+#   Ubuntu 22.04, reads every number as a binary double: `0.50` comes back as
+#   `0.5`, and an integer past 2^53 loses its last digits. The module works with
+#   it, but numbers are then not kept as written, and `dybatpho::doctor` reports
+#   it as outdated.
+#
 # @tip Write filters in `jq`'s language: `keys` is sorted, `?`, `add`, `def`, `@json` and `ascii_downcase` all work
 # @tip A filter written for `yq` (`eval`, `strenv(...)`, `tag`, `downcase`, `ireduce`) no longer works and must be
 #   rewritten for `jq`

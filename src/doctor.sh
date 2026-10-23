@@ -87,8 +87,9 @@ declare -gA DYBATPHO_DOCTOR_REQUIRED=(
   [archive]="tar"
   [forge]="curl git"
   [git]="git"
-  # Every filter the module runs, the caller's included, goes through `jq`.
-  [json]="jq"
+  # Every filter the module runs, the caller's included, goes through `jq`;
+  # 1.6 rewrites numbers as binary doubles, 1.7 keeps them as written.
+  [json]="jq>=1.7"
   [network]="curl"
   # Raw mode is what makes a key reach the application before Return does, and
   # there is no way to ask for it from Bash alone.
@@ -107,11 +108,11 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # Same Go `yq` v4 the `json` module reads YAML with: `config` turns YAML and
   # TOML into JSON with `-p toml`, which neither the Python `yq` nor the pre-v4
   # Go one understands, and flattens every format with `jq`.
-  [config]="jq yq>=4"
+  [config]="jq>=1.7 yq>=4"
   # Only `dybatpho::csv_from_json` needs it: the module parses and writes CSV in
   # Bash alone. `awk` runs the bulk operations faster on a large input, with
   # the same output.
-  [csv]="jq awk"
+  [csv]="jq>=1.7 awk"
   # `dybatpho::diff_text` needs nothing external beyond `diff`; comparing by
   # key is built on one `jq` filter, and YAML reaches JSON through `yq`.
   [diff]="jq yq>=4"

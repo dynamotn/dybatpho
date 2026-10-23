@@ -21,6 +21,12 @@ write YAML back out, and to edit a YAML file in place, which it does so the
 file's comments and layout survive. A YAML helper refuses the unrelated
 Python `yq` by name rather than misreading its output.
 
+Use `jq` 1.7 or newer. `jq` 1.6, still the packaged one on Debian 12 and
+Ubuntu 22.04, reads every number as a binary double: `0.50` comes back as
+`0.5`, and an integer past 2^53 loses its last digits. The module works with
+it, but numbers are then not kept as written, and `dybatpho::doctor` reports
+it as outdated.
+
 ### 🚀 Highlights
 
 - [`dybatpho::json_query`](#dybatphojson_query) — Query a JSON document with a `jq` filter.

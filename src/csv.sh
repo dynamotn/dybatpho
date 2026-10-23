@@ -228,6 +228,10 @@ function __dybatpho_csv_parse_into {
   __dybatpho_csv_records_ref=()
 
   [[ -n "${__dybatpho_csv_text}" ]] || return 0
+  # Bytes, not characters: in a UTF-8 locale Bash's pattern operators drop a
+  # value that holds an invalid sequence, and the delimiter, the quote and the
+  # unit separator are single bytes whatever the locale.
+  local LC_ALL=C
 
   local -a __dybatpho_csv_lines=()
   mapfile -t __dybatpho_csv_lines <<< "${__dybatpho_csv_text}"
@@ -281,6 +285,10 @@ function __dybatpho_csv_quote_into {
   local -n __dybatpho_csv_quoted_ref="$1"
   local __dybatpho_csv_value="$2"
   local __dybatpho_csv_delimiter="$3"
+  # Bytes, not characters: in a UTF-8 locale Bash's pattern operators drop a
+  # value that holds an invalid sequence, and the delimiter, the quote and the
+  # unit separator are single bytes whatever the locale.
+  local LC_ALL=C
 
   local __dybatpho_csv_special=0
   case "${__dybatpho_csv_value}" in
@@ -345,6 +353,10 @@ function __dybatpho_csv_split_fields_into {
   local -n __dybatpho_csv_parts_ref="$1"
   local __dybatpho_csv_remaining="$2"
   __dybatpho_csv_parts_ref=()
+  # Bytes, not characters: in a UTF-8 locale Bash's pattern operators drop a
+  # value that holds an invalid sequence, and the delimiter, the quote and the
+  # unit separator are single bytes whatever the locale.
+  local LC_ALL=C
 
   # Not word splitting on `IFS`: it drops a trailing empty field, so a row
   # ending in the delimiter would come back one column short of its header.

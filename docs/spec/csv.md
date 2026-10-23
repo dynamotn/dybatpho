@@ -146,6 +146,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - A value holds the target delimiter of a conversion, or holds the source delimiter that no longer needs quoting.
 - Conversion to JSON is asked for by a script that loaded `csv` without `json`.
 - An unquoted field ends in a quote, such as `55"`, and more records follow it.
+- A value holds an invalid UTF-8 sequence while the locale is UTF-8.
 - A JSON value converted to CSV is `false`, `null`, or missing.
 
 ## Requirements *(mandatory)*
@@ -193,6 +194,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-039**: `gt` and `lt` on text in `dybatpho::csv_filter` MUST compare in ASCII order, independent of the locale.
 - **FR-040**: A record MUST continue on the next line only while a field that began with a quote is still open; a quote inside an unquoted field MUST NOT join the following lines to it.
 - **FR-041**: `dybatpho::csv_from_json` MUST write `false` as `false` and only a `null` or missing value as an empty field, with either backend.
+- **FR-042**: Parsing, splitting and quoting MUST work on bytes, so a value holding an invalid UTF-8 sequence survives under a UTF-8 locale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -260,6 +262,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-046**: Filter `n gt Zed` over `Zed` and `apple` under `en_US.UTF-8` and keep `apple` only.
 - **IT-047**: Read `TV,55"` followed by more records and get each record on its own; read a quoted field still open at the line end and get it joined with the next line.
 - **IT-048**: Convert `false`, `0`, `null` and a missing key to CSV with `jq` and with only `yq`; convert CSV to JSON with a backslash and a tab in a cell.
+- **IT-049**: Read a column whose value starts with an invalid UTF-8 byte under a UTF-8 locale and get the bytes back.
 
 ## Acceptance Criteria *(mandatory)*
 

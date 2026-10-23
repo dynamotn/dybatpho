@@ -874,3 +874,15 @@ EOF
   assert_success
   assert_output '[{"k":"a\\b","v":"x\ty"}]'
 }
+
+@test "dybatpho::csv_col keeps a value holding invalid UTF-8 under a UTF-8 locale" {
+  # Bash's pattern operators dropped such a value whole, so the row came back
+  # empty.
+  local utf8 text
+  utf8="$(locale -a 2> /dev/null | grep -iE '^(C|en_US)\.utf-?8$' | head -n 1)"
+  [[ -n "${utf8}" ]] || skip "no UTF-8 locale is installed"
+  text="$(printf 'a;b\n\303\\-;x\n')"
+  LC_ALL="${utf8}" DYBATPHO_CSV_DELIMITER=";" run_traced dybatpho::csv_col "${text}" a
+  assert_success
+  assert_output "$(printf '\303\\-')"
+}

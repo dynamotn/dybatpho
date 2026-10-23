@@ -74,6 +74,34 @@ EOF
   assert_output "+2 -1 ~2"
 }
 
+@test "dybatpho::diff_text keeps a removed -- line and an added ++ line inside a hunk" {
+  # Inside a hunk these read `--- note` and `+++ added`, the shape of the file
+  # header; only the two lines before the first hunk may be renamed.
+  printf -- '-- note\nselect 1;\n' > "${FIRST}"
+  printf -- '++ added\nselect 1;\n' > "${SECOND}"
+  run_traced -1 dybatpho::diff_text "${FIRST}" "${SECOND}" old new
+  assert_output - << EOF
+--- old
++++ new
+@@ -1,2 +1,2 @@
+--- note
++++ added
+ select 1;
+EOF
+
+  DYBATPHO_DIFF_COLOR=true run_traced -1 dybatpho::diff_text "${FIRST}" "${SECOND}" old new
+  assert_line --index 0 $'\033[1m--- old\033[0m'
+  assert_line --index 3 $'\033[31m--- note\033[0m'
+  assert_line --index 4 $'\033[32m+++ added\033[0m'
+}
+
+@test "dybatpho::diff_summary counts a removed -- line and an added ++ line" {
+  printf -- '-- note\nselect 1;\n' > "${FIRST}"
+  printf -- '++ added\nselect 1;\n' > "${SECOND}"
+  run_traced -1 dybatpho::diff_summary "${FIRST}" "${SECOND}"
+  assert_output "+1 -1 ~1"
+}
+
 @test "dybatpho::diff_summary reports no change for identical input" {
   run_traced -0 dybatpho::diff_summary "${FIRST}" "${FIRST}"
   assert_output "+0 -0 ~0"

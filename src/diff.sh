@@ -105,6 +105,7 @@ function __dybatpho_diff_side_into {
 # @description Print a unified diff line with the color its prefix calls for.
 # @arg $1 string One line of unified diff output
 # @arg $2 string `1` to color, `0` to print plain
+# @arg $3 string [default: 0] `1` when the line is part of the file header
 # @stdout The line
 # @internal
 #######################################
@@ -115,8 +116,11 @@ function __dybatpho_diff_paint {
     return 0
   fi
 
+  if ((${3:-0})); then
+    printf '\033[1m%s\033[0m\n' "${line}"
+    return 0
+  fi
   case "${line}" in
-    '+++'* | '---'*) printf '\033[1m%s\033[0m\n' "${line}" ;;
     '@@'*) printf '\033[36m%s\033[0m\n' "${line}" ;;
     '+'*) printf '\033[32m%s\033[0m\n' "${line}" ;;
     '-'*) printf '\033[31m%s\033[0m\n' "${line}" ;;
@@ -163,14 +167,19 @@ function dybatpho::diff_text {
   raw="$(diff -U "${DYBATPHO_DIFF_CONTEXT}" -- "${first_file}" "${second_file}")" || status=$?
   ((status == 0)) && return 0
 
-  local line
+  # Only the two lines before the first hunk are the file header. Inside a
+  # hunk, removing the line `-- note` reads `--- note` and adding `++ x` reads
+  # `+++ x`; matching those by prefix renamed them to the labels.
+  local line in_header=1
   while IFS= read -r line; do
-    case "${line}" in
-      '--- '*) [[ -z "${first_label}" ]] || line="--- ${first_label}" ;;
-      '+++ '*) [[ -z "${second_label}" ]] || line="+++ ${second_label}" ;;
-      *) ;; # kcov(skip) - a case arm has no command to fire on
-    esac
-    __dybatpho_diff_paint "${line}" "${color}"
+    if ((in_header)); then
+      case "${line}" in
+        '--- '*) [[ -z "${first_label}" ]] || line="--- ${first_label}" ;;
+        '+++ '*) [[ -z "${second_label}" ]] || line="+++ ${second_label}" ;;
+        *) in_header=0 ;;
+      esac
+    fi
+    __dybatpho_diff_paint "${line}" "${color}" "${in_header}"
   done <<< "${raw}"
 
   return 1
@@ -204,8 +213,10 @@ function dybatpho::diff_summary {
   local added=0 removed=0 hunks=0 line
   if ((status != 0)); then
     while IFS= read -r line; do
+      # The file header comes before the first hunk; after it, `---` and `+++`
+      # are a removed `--...` line and an added `++...` line, and they count.
+      ((hunks > 0)) || [[ "${line}" == '@@'* ]] || continue
       case "${line}" in
-        '+++'* | '---'*) ;; # kcov(skip) - a case arm has no command to fire on
         '@@'*) hunks=$((hunks + 1)) ;;
         '+'*) added=$((added + 1)) ;;
         '-'*) removed=$((removed + 1)) ;;
@@ -462,17 +473,23 @@ function __dybatpho_diff_tree_into {
 #   A backslash, newline, tab, or carriage return is written as its C escape,
 #   so every record stays on one line and a reader can still tell `a\nb` the
 #   name from `a` and `b` the two names.
-# @arg $1 string Path
-# @stdout The escaped path, without a trailing newline
+#
+#   Written into a named variable rather than printed, because it runs once
+#   per reported entry and a `$(...)` around it forked for every one -- most of
+#   what reporting a large tree cost.
+# @arg $1 string Name of the variable receiving the escaped path
+# @arg $2 string Path
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_diff_escape_path {
-  local path="$1"
-  path="${path//\\/\\\\}"
-  path="${path//$'\n'/\\n}"
-  path="${path//$'\t'/\\t}"
-  path="${path//$'\r'/\\r}"
-  printf '%s' "${path}"
+function __dybatpho_diff_escape_path_into {
+  local -n __dybatpho_diff_escaped_ref="$1"
+  local __dybatpho_diff_escaped="$2"
+  __dybatpho_diff_escaped="${__dybatpho_diff_escaped//\\/\\\\}"
+  __dybatpho_diff_escaped="${__dybatpho_diff_escaped//$'\n'/\\n}"
+  __dybatpho_diff_escaped="${__dybatpho_diff_escaped//$'\t'/\\t}"
+  __dybatpho_diff_escaped="${__dybatpho_diff_escaped//$'\r'/\\r}"
+  __dybatpho_diff_escaped_ref="${__dybatpho_diff_escaped}"
 }
 
 #######################################
@@ -493,7 +510,7 @@ function __dybatpho_diff_dir_report {
   fi
 
   local body tint escaped
-  escaped="$(__dybatpho_diff_escape_path "${path}")"
+  __dybatpho_diff_escape_path_into escaped "${path}"
   printf -v body '%s %s%s' "${marker}" "${escaped}" "${detail}"
   if [[ "${mode}" == plain ]]; then
     printf '%s\n' "${body}"

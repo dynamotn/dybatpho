@@ -73,6 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
+- **`screen`, `markdown`, `diff` — large output is drawn in linear time.**
+  Rows holding CJK text, emoji or combining marks render about fifteen times
+  faster, a full 200×50 frame dropping from 7 s to 0.5 s.
+  `dybatpho::md_code_block` picks the fence of a 70 KB body in under a second
+  instead of 18 s. `dybatpho::diff_dir` lists 2000 added files in 0.2 s
+  instead of 7 s.
+
 - **`tui` — `TERM=dumb` counts as no terminal.** Spinners, progress bars,
   menus and `dybatpho::tui_confirm` use their plain fallback in an Emacs shell
   buffer or another dumb terminal instead of printing raw escape sequences.
@@ -384,6 +391,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   busybox installed, the log timestamp came from `busybox date` even when
   `dybatpho::mock_time` or a test had put its own `date` first on `PATH`, so
   the frozen clock was ignored on Alpine.
+
+- **`diff` — a changed `--` or `++` line is not taken for the file header.**
+  `dybatpho::diff_text` drew it as the side's label and
+  `dybatpho::diff_summary` did not count it; `dybatpho::assert_snapshot`
+  mismatches shared the bug.
 
 - **`screen` — `dybatpho::screen_gauge` draws whole glyphs under the `C`
   locale** instead of cutting `█` into invalid UTF-8.

@@ -47,45 +47,33 @@
 #   stderr
 #   are terminals. Default `auto`
 DYBATPHO_TUI="${DYBATPHO_TUI:-auto}"
-export DYBATPHO_TUI
 # @env DYBATPHO_TUI_INTERVAL string [default: ${DYBATPHO_SPINNER_INTERVAL}] Seconds between spinner frames
 DYBATPHO_TUI_INTERVAL="${DYBATPHO_TUI_INTERVAL:-${DYBATPHO_SPINNER_INTERVAL:-0.1}}"
-export DYBATPHO_TUI_INTERVAL
 # @env DYBATPHO_TUI_FRAMES string [default: ${DYBATPHO_SPINNER_FRAMES}] Space-separated frames the spinner cycles
 #   through
 DYBATPHO_TUI_FRAMES="${DYBATPHO_TUI_FRAMES:-${DYBATPHO_SPINNER_FRAMES:-⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏}}"
-export DYBATPHO_TUI_FRAMES
 # @env DYBATPHO_TUI_BAR_WIDTH number [default: 30] Width of a progress bar in columns when none is given
 DYBATPHO_TUI_BAR_WIDTH="${DYBATPHO_TUI_BAR_WIDTH:-30}"
-export DYBATPHO_TUI_BAR_WIDTH
 # @env DYBATPHO_TUI_BAR_FILLED string [default: █] Character drawn for the completed part of a bar
 DYBATPHO_TUI_BAR_FILLED="${DYBATPHO_TUI_BAR_FILLED:-█}"
-export DYBATPHO_TUI_BAR_FILLED
 # @env DYBATPHO_TUI_BAR_EMPTY string [default: ░] Character drawn for the remaining part of a bar
 DYBATPHO_TUI_BAR_EMPTY="${DYBATPHO_TUI_BAR_EMPTY:-░}"
-export DYBATPHO_TUI_BAR_EMPTY
 # @env DYBATPHO_TUI_PROGRESS_STEP number Percentage granularity of the progress lines logged when there is no terminal
 #   to
 #   draw on. `0` logs every update. Default `10`
 DYBATPHO_TUI_PROGRESS_STEP="${DYBATPHO_TUI_PROGRESS_STEP:-10}"
-export DYBATPHO_TUI_PROGRESS_STEP
 # @env DYBATPHO_TUI_POINTER string [default: ❯] Marker drawn beside the highlighted menu entry
 DYBATPHO_TUI_POINTER="${DYBATPHO_TUI_POINTER:-❯}"
-export DYBATPHO_TUI_POINTER
 # @env DYBATPHO_TUI_CHECKED string [default: ◉] Marker drawn beside a selected multi-select entry
 DYBATPHO_TUI_CHECKED="${DYBATPHO_TUI_CHECKED:-◉}"
-export DYBATPHO_TUI_CHECKED
 # @env DYBATPHO_TUI_UNCHECKED string [default: ◯] Marker drawn beside an unselected multi-select entry
 DYBATPHO_TUI_UNCHECKED="${DYBATPHO_TUI_UNCHECKED:-◯}"
-export DYBATPHO_TUI_UNCHECKED
 # @env DYBATPHO_TUI_MENU_HEIGHT number [default: 10] Entries a drawn menu shows at once before it scrolls
 DYBATPHO_TUI_MENU_HEIGHT="${DYBATPHO_TUI_MENU_HEIGHT:-10}"
-export DYBATPHO_TUI_MENU_HEIGHT
 # @env DYBATPHO_TUI_DEFAULT string Comma-separated 1-based entries a menu starts on, and the answer it uses when the
 #   script
 #   cannot ask at all. Empty means no default, and a menu that cannot ask then fails instead of choosing
 DYBATPHO_TUI_DEFAULT="${DYBATPHO_TUI_DEFAULT:-}"
-export DYBATPHO_TUI_DEFAULT
 
 # @env DYBATPHO_TUI_SPINNER_PID number PID of the running spinner, or empty when none is running
 DYBATPHO_TUI_SPINNER_PID=""

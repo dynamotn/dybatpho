@@ -77,52 +77,37 @@
 
 # @env DYBATPHO_SCREEN_MOUSE bool [default: true] Report mouse clicks as events
 DYBATPHO_SCREEN_MOUSE="${DYBATPHO_SCREEN_MOUSE:-true}"
-export DYBATPHO_SCREEN_MOUSE
 # @env DYBATPHO_SCREEN_POINTER string [default: ❯] Marker drawn beside the selected list or table row
 DYBATPHO_SCREEN_POINTER="${DYBATPHO_SCREEN_POINTER:-❯}"
-export DYBATPHO_SCREEN_POINTER
 # @env DYBATPHO_SCREEN_STYLE_SELECTED string [default: 1;7] SGR parameters for a selected row
 DYBATPHO_SCREEN_STYLE_SELECTED="${DYBATPHO_SCREEN_STYLE_SELECTED:-1;7}"
-export DYBATPHO_SCREEN_STYLE_SELECTED
 # @env DYBATPHO_SCREEN_STYLE_BORDER string [default: 2] SGR parameters for a block border
 DYBATPHO_SCREEN_STYLE_BORDER="${DYBATPHO_SCREEN_STYLE_BORDER:-2}"
-export DYBATPHO_SCREEN_STYLE_BORDER
 # @env DYBATPHO_SCREEN_STYLE_TITLE string [default: 1] SGR parameters for a block title
 DYBATPHO_SCREEN_STYLE_TITLE="${DYBATPHO_SCREEN_STYLE_TITLE:-1}"
-export DYBATPHO_SCREEN_STYLE_TITLE
 # @env DYBATPHO_SCREEN_STYLE_FOCUS string [default: 1] SGR parameters for the border of a block drawn with `focus:true`
 DYBATPHO_SCREEN_STYLE_FOCUS="${DYBATPHO_SCREEN_STYLE_FOCUS:-1}"
-export DYBATPHO_SCREEN_STYLE_FOCUS
 # @env DYBATPHO_SCREEN_STYLE_TAB_ACTIVE string [default: 1;7] SGR parameters for the active tab
 DYBATPHO_SCREEN_STYLE_TAB_ACTIVE="${DYBATPHO_SCREEN_STYLE_TAB_ACTIVE:-1;7}"
-export DYBATPHO_SCREEN_STYLE_TAB_ACTIVE
 # @env DYBATPHO_SCREEN_STYLE_KEYBAR string [default: 7] SGR parameters for the background of a key bar
 DYBATPHO_SCREEN_STYLE_KEYBAR="${DYBATPHO_SCREEN_STYLE_KEYBAR:-7}"
-export DYBATPHO_SCREEN_STYLE_KEYBAR
 # @env DYBATPHO_SCREEN_STYLE_KEY string [default: 1] SGR parameters for a key named in a key bar
 DYBATPHO_SCREEN_STYLE_KEY="${DYBATPHO_SCREEN_STYLE_KEY:-1}"
-export DYBATPHO_SCREEN_STYLE_KEY
 # @env DYBATPHO_SCREEN_STYLE_ACCENT string [default: 1] SGR parameters an application uses for what should stand out
 DYBATPHO_SCREEN_STYLE_ACCENT="${DYBATPHO_SCREEN_STYLE_ACCENT:-1}"
-export DYBATPHO_SCREEN_STYLE_ACCENT
 # @env DYBATPHO_SCREEN_STYLE_DIM string [default: 2] SGR parameters for secondary text, and for the divider between tabs
 DYBATPHO_SCREEN_STYLE_DIM="${DYBATPHO_SCREEN_STYLE_DIM:-2}"
-export DYBATPHO_SCREEN_STYLE_DIM
 # @env DYBATPHO_SCREEN_STYLE_OK string [default: 32] SGR parameters for success
 DYBATPHO_SCREEN_STYLE_OK="${DYBATPHO_SCREEN_STYLE_OK:-32}"
-export DYBATPHO_SCREEN_STYLE_OK
 # @env DYBATPHO_SCREEN_STYLE_WARN string [default: 33] SGR parameters for a warning
 DYBATPHO_SCREEN_STYLE_WARN="${DYBATPHO_SCREEN_STYLE_WARN:-33}"
-export DYBATPHO_SCREEN_STYLE_WARN
 # @env DYBATPHO_SCREEN_STYLE_ERROR string [default: 31] SGR parameters for an error
 DYBATPHO_SCREEN_STYLE_ERROR="${DYBATPHO_SCREEN_STYLE_ERROR:-31}"
-export DYBATPHO_SCREEN_STYLE_ERROR
 
 # The state below is written for the application to read: the rectangle a block
 # left inside itself, the offset a list scrolled to, where a mouse event landed.
-# Nothing in this module reads them back, so they are exported rather than
-# merely assigned -- which is also what stops a static check reading a variable
-# only ever written as one that is never used.
+# They are plain globals of the calling shell, not exported: they describe this
+# process's screen, which no child process shares.
 # @env DYBATPHO_SCREEN_WIDTH number Columns of the terminal the buffer is sized for
 DYBATPHO_SCREEN_WIDTH=0
 # @env DYBATPHO_SCREEN_HEIGHT number Rows of the terminal the buffer is sized for
@@ -140,9 +125,6 @@ DYBATPHO_SCREEN_INNER="0 0 0 0"
 # @env DYBATPHO_SCREEN_OFFSET number Index of the first item the last list or table drew, after it scrolled to keep the
 #   selection visible
 DYBATPHO_SCREEN_OFFSET=0
-export DYBATPHO_SCREEN_WIDTH DYBATPHO_SCREEN_HEIGHT DYBATPHO_SCREEN_RECT
-export DYBATPHO_SCREEN_ACTIVE DYBATPHO_SCREEN_INNER DYBATPHO_SCREEN_OFFSET
-export DYBATPHO_SCREEN_MOUSE_COLUMN DYBATPHO_SCREEN_MOUSE_ROW
 
 # Plain text of each row, padded to exactly `DYBATPHO_SCREEN_WIDTH` columns.
 declare -ga __dybatpho_screen_text=()
@@ -651,6 +633,7 @@ function dybatpho::screen_size {
 
   DYBATPHO_SCREEN_WIDTH="${width}"
   DYBATPHO_SCREEN_HEIGHT="${height}"
+  # shellcheck disable=SC2034 # an output for the application, which this module never reads back
   DYBATPHO_SCREEN_RECT="0 0 ${width} ${height}"
   __dybatpho_screen_text=()
   __dybatpho_screen_style=()
@@ -1306,7 +1289,9 @@ function __dybatpho_screen_parse_mouse {
 
   local button="${BASH_REMATCH[1]}"
   # The report is one-based, and every rectangle in this module is zero-based.
+  # shellcheck disable=SC2034 # outputs for the application, which this module never reads back
   DYBATPHO_SCREEN_MOUSE_COLUMN=$((BASH_REMATCH[2] - 1))
+  # shellcheck disable=SC2034 # outputs for the application, which this module never reads back
   DYBATPHO_SCREEN_MOUSE_ROW=$((BASH_REMATCH[3] - 1))
   if [[ "${BASH_REMATCH[4]}" == "m" ]]; then
     __dybatpho_screen_m_out="mouse:release"
@@ -1500,6 +1485,7 @@ function dybatpho::screen_block {
 
   local inner_height=$((height - 2))
   ((inner_height > 0)) || inner_height=0
+  # shellcheck disable=SC2034 # an output for the application, which this module never reads back
   DYBATPHO_SCREEN_INNER="$((x + 1)) $((y + 1)) ${inner_width} ${inner_height}"
   return 0
 }
@@ -1752,6 +1738,7 @@ function dybatpho::screen_table {
     ((selected >= offset + body_height)) && offset=$((selected - body_height + 1))
   fi
   ((offset >= 0)) || offset=0
+  # shellcheck disable=SC2034 # an output for the application, which this module never reads back
   DYBATPHO_SCREEN_OFFSET="${offset}"
 
   local index source row_style

@@ -276,6 +276,29 @@ SCRIPT
   assert_stderr --partial "${USER}"
 }
 
+@test "dybatpho::debug_command -- runs a command and its arguments as words, never as shell" {
+  # shellcheck disable=2030,2031
+  export LOG_LEVEL=debug
+  local marker="${BATS_TEST_TMPDIR}/pwned"
+  local quoted="it's \"quoted\" \$(touch ${marker}) \`touch ${marker}\` a  b"
+  local multiline="first line"$'\n'"second line"
+  run_traced --separate-stderr dybatpho::debug_command "Echo" -- printf '[%s]\n' "${quoted}" "${multiline}"
+  assert_success
+  assert_stderr --partial "[${quoted}]"
+  assert_stderr --partial "[first line"
+  assert_stderr --partial "second line]"
+  refute [ -e "${marker}" ]
+
+  # Below the debug level nothing runs at all.
+  export LOG_LEVEL=info
+  run_traced --separate-stderr dybatpho::debug_command "Hidden" -- touch "${marker}"
+  assert_success
+  refute [ -e "${marker}" ]
+
+  run dybatpho::debug_command "No command" --
+  assert_failure
+}
+
 @test "the log settings read the DYBATPHO_ name first and the bare name as a fallback" {
   unset DYBATPHO_LOG_LEVEL DYBATPHO_LOG_FORMAT LOG_FORMAT
   # The bare name alone still works, so scripts written for earlier releases do.

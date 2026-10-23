@@ -3444,7 +3444,7 @@ function dybatpho::generate_from_spec {
   __dybatpho_cli_generate_logic "${__dybatpho_cli_spec}" "$@" >> "${__dybatpho_cli_gen_file}"
   if dybatpho::is true "${DYBATPHO_CLI_DEBUG}"; then
     dybatpho::debug_command "Generate script of \"${__dybatpho_cli_spec}\" - \"$*\"" \
-      "dybatpho::show_file '${__dybatpho_cli_gen_file}'"
+      -- dybatpho::show_file "${__dybatpho_cli_gen_file}"
   fi
   # shellcheck disable=1090 # the generated parser is written at run time, so there is no path to follow
   . "${__dybatpho_cli_gen_file}"

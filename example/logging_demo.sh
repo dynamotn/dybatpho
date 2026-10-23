@@ -69,9 +69,7 @@ function _demo_progress_bar {
 function _demo_debug_command {
   dybatpho::header "DEBUG COMMAND"
   dybatpho::info "Capturing output of 'ls example/' as debug:"
-  dybatpho::debug_command \
-    "Listing example directory" \
-    "ls '$(dirname "${BASH_SOURCE[0]}")'"
+  dybatpho::debug_command "Listing example directory" -- ls "$(dirname "${BASH_SOURCE[0]}")"
 }
 
 # @description Run the `TRACE (start/end)` section of this example.

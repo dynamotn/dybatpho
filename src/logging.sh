@@ -1446,14 +1446,34 @@ function dybatpho::debug {
 }
 
 #######################################
-# @description Log a debug message together with the output of a shell command.
+# @description Log a debug message together with the output of a command.
+#   The command is given after `--` as a command and its arguments, which run
+#   as they are, never parsed as shell. The older form, a single shell command
+#   string in place of `--`, still works but is deprecated: it runs through
+#   `eval`, so a value interpolated into it is parsed as code.
+# @example
+#   dybatpho::debug_command "Generated file" -- cat -- "${path}"
+#
+# @example
+#   dybatpho::debug_command "Generated file" "cat ./generated.sh"   # deprecated string form
+#
 # @arg $1 string Introductory message
-# @arg $2 string Shell command string to evaluate
-# @env LOG_LEVEL string Set to `debug` or `trace` to see this output
+# @arg $2 string `--`, or (deprecated) a shell command string to evaluate
+# @arg $@ string Command and its arguments, after `--`
+# @env DYBATPHO_LOG_LEVEL string Set to `debug` or `trace` to see this output; falls back to `LOG_LEVEL`
 # @stderr Show message if log level of message is less than debug level
 #######################################
 function dybatpho::debug_command {
+  (($# >= 2)) || dybatpho::die "${FUNCNAME[0]}: Expected: message -- command [args...]"
+  if [[ "$2" == "--" ]]; then
+    (($# >= 3)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+    dybatpho::compare_log_level debug || return 0
+    __dybatpho_log_inspect debug "COMMAND 💻    " "$1
+$("${@:3}")"
+    return 0
+  fi
   dybatpho::compare_log_level debug || return 0
+  # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form above runs no `eval`
   __dybatpho_log_inspect debug "COMMAND 💻    " "$1
 $(eval "$2")"
 }

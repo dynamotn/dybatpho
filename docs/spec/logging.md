@@ -475,6 +475,9 @@ dybatpho::log_context clear
   write the `DYBATPHO_LOG_*` names without exporting them, and
   `dybatpho::log_to_file off` MUST clear both the prefixed and the bare file
   name.
+- **FR-047**: `dybatpho::debug_command MESSAGE -- COMMAND [ARGS...]` MUST run
+  the command with its arguments as given, never through `eval`; the single
+  shell-string form MUST keep working and is deprecated.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -608,6 +611,10 @@ dybatpho::log_context clear
 - **IT-034**: Send events to a bare `LOG_FILE`, then set `DYBATPHO_LOG_FILE` and
   `DYBATPHO_LOG_FILE_LEVEL` and verify only the prefixed file and threshold
   apply; turn the sink off and verify neither file receives later events.
+- **IT-035**: Run `dybatpho::debug_command -- printf` with arguments holding
+  quotes, `$(...)`, backticks, double spaces and a newline, and verify they are
+  printed intact and nothing was executed; verify nothing runs below the debug
+  level and that a missing command fails.
 
 ## Acceptance Criteria *(mandatory)*
 

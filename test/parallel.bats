@@ -417,6 +417,50 @@ SCRIPT
   assert_line --index 1 "two"
 }
 
+@test "dybatpho::parallel_run --argv runs each named array as words, never as shell" {
+  local marker="${BATS_TEST_TMPDIR}/pwned"
+  local -a quoted=(printf '[%s]\n' "it's \"quoted\" \$(touch ${marker}) a  b")
+  local -a multiline=(printf '[%s]\n' "first line"$'\n'"second line")
+  local -a failing=(sh -c 'exit 3')
+  run_traced dybatpho::parallel_run --argv 2 quoted multiline failing
+  assert_failure
+  assert_line --index 0 "[it's \"quoted\" \$(touch ${marker}) a  b]"
+  assert_line --index 1 "[first line"
+  assert_line --index 2 "second line]"
+  refute [ -e "${marker}" ]
+  dybatpho::parallel_run --argv 2 quoted failing > /dev/null || true
+  assert_equal "$(dybatpho::parallel_status 1)" "3"
+}
+
+@test "dybatpho::parallel_run --argv accepts only names of indexed arrays" {
+  local scalar="echo hi"
+  local -a empty=()
+  local -A table=([a]=1)
+  run dybatpho::parallel_run --argv 1 'echo; touch x'
+  assert_failure
+  assert_output --partial "--argv expects names of indexed arrays"
+  run dybatpho::parallel_run --argv 1 scalar
+  assert_failure
+  run dybatpho::parallel_run --argv 1 table
+  assert_failure
+  run dybatpho::parallel_run --argv 1 empty
+  assert_failure
+  assert_output --partial "is empty"
+  # The option belongs to parallel_run alone.
+  run dybatpho::parallel_map --argv 1 echo a
+  assert_failure
+  assert_output --partial "Unknown option '--argv'"
+}
+
+@test "dybatpho::parallel_run --argv runs nothing under dry-run mode" {
+  local -a job=(touch "${BATS_TEST_TMPDIR}/side effect")
+  DYBATPHO_DRY_RUN=true run_traced -0 dybatpho::parallel_run --argv 1 job
+  local expected
+  printf -v expected '🧪 DRY RUN: touch %q' "${BATS_TEST_TMPDIR}/side effect"
+  assert_output "${expected}"
+  refute [ -e "${BATS_TEST_TMPDIR}/side effect" ]
+}
+
 @test "dybatpho::parallel_run reports the exit code of each command" {
   ! dybatpho::parallel_run 2 "true" "exit 7" "true" > /dev/null
   assert_equal "$(dybatpho::parallel_status 1)" "7"

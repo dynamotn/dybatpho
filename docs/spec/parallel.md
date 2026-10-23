@@ -183,6 +183,11 @@ done
 - **FR-025**: An interrupt (SIGINT or SIGTERM) MUST stop the pool from starting further jobs, end every job and watchdog it started -- including any started around the signal -- restore the caller's handlers, and then raise the same signal again, so the shell ends or the caller's handler runs as without a pool.
 - **FR-026**: An interrupted pool MUST end its jobs before any handler of the caller runs, including one that exits.
 - **FR-027**: A job run by `parallel_map` or `parallel_run` MUST see the caller's variables: the pool and its launchers MUST keep their state in prefixed locals.
+- **FR-030**: `dybatpho::parallel_run --argv` MUST read each argument as the
+  name of an indexed array holding one job's command and arguments, run them as
+  given without parsing any of them as shell, and stop the script on a name that
+  is not a non-empty indexed array; `parallel_map` MUST refuse `--argv`. The
+  shell-string form without `--argv` MUST keep working and is deprecated.
 - **FR-028**: Ending jobs MUST signal each job's process group again until it is empty, and MUST end what remains with `KILL` once `DYBATPHO_TIMEOUT_KILL_AFTER` seconds have passed, so that no process a job started outlives the pool.
 - **FR-029**: Every job of a pool MUST run with its standard input from `/dev/null`, so one that reads the terminal is never stopped by `SIGTTIN`.
 
@@ -241,6 +246,13 @@ done
 - **IT-036**: Have the first of two jobs send SIGTERM to the pool under a one-minute timeout; the pool ends within seconds with status 143, the second job never starts, and the first job's child is gone.
 - **IT-037**: TERM a pool under `killed_process_handler` and see the job receive the pool's TERM before the shell exits with 143.
 - **IT-038**: Run a function as a parallel job through `parallel_map` and `parallel_run` that reads variables named like the pool's locals, and see the caller's values.
+- **IT-040**: Run `parallel_run --argv` over arrays whose arguments hold quotes,
+  `$(...)`, double spaces and a newline, and verify the output is each argument
+  intact, nothing embedded ran, and exit codes are recorded per job.
+- **IT-041**: Verify `--argv` refuses a word that is not a name, a scalar, an
+  associative array and an empty array, and that `parallel_map` rejects it.
+- **IT-042**: Under dry-run mode, verify `parallel_run --argv` prints each job
+  quoted word by word and runs nothing.
 - **IT-039**: Interrupt a pool whose job started a child that ignores TERM, and find the child dead within the grace period.
 
 ## Acceptance Criteria *(mandatory)*

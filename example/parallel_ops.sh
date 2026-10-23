@@ -74,11 +74,20 @@ function _demo_ordering {
 # @noargs
 function _demo_run {
   dybatpho::header "DIFFERENT COMMANDS AT ONCE"
-  # `parallel_run` suits jobs that are not the same command over a list.
-  dybatpho::parallel_run 3 \
-    "printf '  linting...\n'; sleep 0.1; printf '  lint done\n'" \
-    "printf '  testing...\n'; sleep 0.2; printf '  tests done\n'" \
-    "printf '  building...\n'; sleep 0.1; printf '  build done\n'"
+  # `parallel_run` suits jobs that are not the same command over a list. With
+  # `--argv`, each job is an array holding a command and its arguments, so
+  # nothing in them is parsed as shell.
+
+  # @description Pretend to run one stage of a build, taking a while.
+  # @arg $1 string Stage name
+  # @arg $2 string Seconds the stage takes
+  function _stage {
+    printf '  %s...\n' "$1"
+    sleep "$2"
+    printf '  %s done\n' "$1"
+  }
+  local -a lint=(_stage linting 0.1) test=(_stage testing 0.2) build=(_stage building 0.1)
+  dybatpho::parallel_run --argv 3 lint test build
 }
 
 # @description Run the `FAIL FAST` section of this example.

@@ -42,6 +42,21 @@ the script's own tests after each step.
 
 <!-- 7.0: eval -->
 
+### Plural categories
+
+`dybatpho::i18n_plural_form` follows CLDR for more languages, so a catalog that
+was written against the old answers picks a different form:
+
+| Language | Count | 6.x | 7.0 |
+| --- | --- | --- | --- |
+| Serbian, Croatian, Bosnian (`sr`, `hr`, `bs`, `sh`) | 0, 5-20, 25-30, ... | `many` | `other` |
+| Maltese (`mt`) | 2 | `few` | `two` |
+| Maltese (`mt`) | 102, 202, ... | `few` | `other` |
+| Zulu, Kannada, Gujarati, Punjabi, Sinhala, Armenian, Northern Sotho | 0 | `other` | `one` |
+
+A catalog that already follows CLDR needs nothing. One that supplied `many` for
+Serbian-family languages renames it to `other`; a Maltese catalog adds `two`.
+
 ## 5.x to 6.0
 
 6.0 narrowed the module dependency graph: a module now loads only the modules it

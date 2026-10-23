@@ -591,3 +591,29 @@ teardown() {
   assert_file_not_exist "${link}"
   assert_equal "$(< "${target}")" "keep this"
 }
+
+@test "secret_shred zeroes every byte without shred, in whole blocks and the rest" {
+  # A second name for the same file shows what was written before the first
+  # one was removed.
+  local file="${BATS_TEST_TMPDIR}/blocks" witness="${BATS_TEST_TMPDIR}/witness"
+  head -c 8197 /dev/urandom > "${file}"
+  ln "${file}" "${witness}"
+  stub shred "* : exit 1"
+  dybatpho::secret_shred "${file}"
+  unstub shred
+  assert_file_not_exist "${file}"
+  assert_equal "$(wc -c < "${witness}" | tr -d ' ')" "8197"
+  assert_equal "$(LC_ALL=C tr -d '\000' < "${witness}" | wc -c | tr -d ' ')" "0"
+}
+
+@test "secret_write_file writes a relative path that begins with a dash" {
+  # The staging file was handed to `chmod` as is, which read it as a mode and
+  # failed, leaving the secret behind in the staging file.
+  local TOKEN="dashed-secret-value"
+  mkdir -p "${BATS_TEST_TMPDIR}/dashed"
+  cd "${BATS_TEST_TMPDIR}/dashed"
+  run_traced dybatpho::secret_write_file -token TOKEN
+  assert_success
+  assert_equal "$(cat ./-token)" "dashed-secret-value"
+  assert_equal "$(find . -name '*dybatpho_secret*' | wc -l | tr -d ' ')" "0"
+}

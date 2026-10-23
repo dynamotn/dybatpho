@@ -77,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   namespace with one `stat`.** 300 entries take about 50 ms instead of 10 s on
   macOS.
 
+- **`secret` — the `dybatpho::secret_shred` fallback writes whole blocks.**
+  Without `shred`, as on stock macOS, it wrote one byte per call; a 1 MiB file
+  now takes about 30 ms instead of two seconds.
+
 - **`csv`, `metrics`, `testing` — data paths fork far less.**
   `dybatpho::csv_to_json` is about fifteen times faster and
   `dybatpho::metrics_render` about ten times faster. Snapshot scrubs run in a
@@ -323,6 +327,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`file` — `dybatpho::dir_size` measures a directory named like an option,
   and counts past 2 GiB** under mawk and BusyBox awk.
+
+- **`secret` — `dybatpho::secret_write_file` accepts a path beginning with a
+  dash.** BSD `chmod` read the staging name as a mode, and the plaintext
+  staging copy was left on disk.
 
 - **`helpers` — `dybatpho::require` finds tools under `set +h`, and
   `dybatpho::retry` checks its delay variables.** With hashing off every tool

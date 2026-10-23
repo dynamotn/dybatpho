@@ -489,7 +489,10 @@ function dybatpho::secret_write_file {
     dybatpho::die "Cannot create secret file: ${__dybatpho_secret_staging}"
   fi
   umask "${__dybatpho_secret_previous_umask}"
-  chmod 600 "${__dybatpho_secret_staging}"
+  # BSD `chmod` takes no `--`, and a path such as `-token` read as a mode
+  # failed here: errexit then stopped the script with the secret left behind
+  # in the staging file.
+  chmod 600 "${__dybatpho_secret_staging/#-/./-}"
   if ! mv -f -- "${__dybatpho_secret_staging}" "${__dybatpho_secret_path}"; then
     dybatpho::secret_shred "${__dybatpho_secret_staging}"
     dybatpho::die "Cannot write secret file: ${__dybatpho_secret_path}"
@@ -613,10 +616,17 @@ function dybatpho::secret_shred {
     if dybatpho::is command shred; then
       shred -u -- "${path}" 2> /dev/null && continue
     fi
-    local size
+    local size blocks
     size=$(__dybatpho_secret_file_size "${path}")
-    if ((size > 0)); then
-      dd if=/dev/zero of="${path}" bs=1 count="${size}" conv=notrunc 2> /dev/null || true
+    # Whole blocks first, then the bytes after them: one byte per write took
+    # about two seconds a megabyte.
+    blocks=$((size / 4096))
+    if ((blocks > 0)); then
+      dd if=/dev/zero of="${path}" bs=4096 count="${blocks}" conv=notrunc 2> /dev/null || true
+    fi
+    if ((size % 4096 > 0)); then
+      dd if=/dev/zero of="${path}" bs=1 seek="$((blocks * 4096))" count="$((size % 4096))" conv=notrunc \
+        2> /dev/null || true
     fi
     rm -f -- "${path}"
   done

@@ -141,6 +141,8 @@ dybatpho::secret_wipe TOKEN
 - Masking is requested from a child shell where the registry doesn't exist.
 - A variable passed to `secret_wipe` is already unset.
 - A command fails while `pipefail` is off, so the pipeline would report the masker's status.
+- `secret_write_file` is given a relative path beginning with a dash.
+- `secret_shred` overwrites a large file without `shred` installed.
 
 ## Requirements *(mandatory)*
 
@@ -195,6 +197,8 @@ dybatpho::secret_wipe TOKEN
 - **FR-023**: A command run by `secret_with_file` or `secret_mask_run` MUST see the caller's variables: both MUST keep their state in prefixed locals.
 - **FR-024**: Reading a secret, masking one, and handing one to a command through `secret_with_file` MUST suspend `set -x` for the lines that hold the value and resume it afterwards.
 - **FR-025**: `dybatpho::secret_shred` MUST remove a symbolic link without writing through it.
+- **FR-026**: `secret_write_file` MUST write a relative path beginning with a dash, and MUST NOT leave the staging copy behind.
+- **FR-027**: `secret_shred` MUST overwrite every byte when it falls back from `shred`, in whole blocks followed by the remaining bytes.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -255,6 +259,8 @@ dybatpho::secret_wipe TOKEN
 - **IT-018**: Run a command with a secret file and under masking that reads variables named like the runners' locals, and see the caller's values.
 - **IT-019**: Under `set -x`, read a secret from a file and from the environment, run `secret_with_file`, and log a line: the values appear on stdout only, never on stderr, and the log call is still traced.
 - **IT-020**: Shred a link to a file and find the link gone and the file intact.
+- **IT-021**: Write a secret to `-token` and find it written with no staging copy left.
+- **IT-022**: Shred an 8197-byte file without `shred` and see a second link to it hold only zero bytes of the same length.
 
 ## Acceptance Criteria *(mandatory)*
 

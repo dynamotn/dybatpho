@@ -372,6 +372,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whose PID 1 never reaps, counts as ended.
   `dybatpho::pid_file_is_running` sees a live process owned by another user.
 
+- **`schedule` — a key no longer locks up after a caller dies mid-reclaim.**
+  Every later `dybatpho::schedule_once_per` on it waited about 20 seconds and
+  failed.
+
 - **`validate` — `min`, `max`, `minlen` and `maxlen` compare exactly.**
   `-0.0000001` passed `min:0`, twenty-digit decimals compared wrongly, `1e400`
   stopped the script, and `minlen:+3` failed every value.

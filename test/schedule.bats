@@ -172,6 +172,20 @@ note() {
   assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/stale.claim"
 }
 
+@test "dybatpho::schedule_once_per clears a reclaim left by a caller that died" {
+  # The reclaim is a directory, whose age the file helper refused to read, so
+  # one left behind was never stale and the key could never run again.
+  mkdir -p "${DYBATPHO_SCHEDULE_DIR}/orphan.claim.reclaim"
+  touch -t 202001010000 "${DYBATPHO_SCHEDULE_DIR}/orphan.claim.reclaim"
+  printf '99999\n' > "${DYBATPHO_SCHEDULE_DIR}/orphan.claim"
+  touch -t 202001010000 "${DYBATPHO_SCHEDULE_DIR}/orphan.claim"
+
+  run_traced -0 dybatpho::schedule_once_per day orphan -- note ran
+  assert_equal "$(< "${LOG}")" "ran"
+  assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/orphan.claim"
+  assert_file_not_exist "${DYBATPHO_SCHEDULE_DIR}/orphan.claim.reclaim"
+}
+
 @test "dybatpho::schedule_once_per runs once when many callers find the same stale claim" {
   # Every waiter that judged the claim stale removed it, so one could remove
   # the fresh claim another had just taken in its place, and two callers then

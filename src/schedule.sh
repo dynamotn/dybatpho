@@ -386,9 +386,20 @@ function __dybatpho_schedule_claim {
 #######################################
 function __dybatpho_schedule_claim_stale {
   [[ -e "$1" ]] || return 1
-  local age
-  # The path can vanish between the test and the read; that is age 0.
-  age="$(dybatpho::file_age_seconds "$1" 2> /dev/null)" || age=0
+  local age modified now
+  if [[ -d "$1" ]]; then
+    # The reclaim is a directory, which `dybatpho::file_age_seconds` refuses:
+    # one left by a caller that died was never judged stale, and every later
+    # call on its key waited out the claim and failed. Its modification time
+    # is read directly instead; vanishing on the way is not stale.
+    modified="$(__dybatpho_file_stat mtime "$1")" || return 1
+    [[ "${modified}" =~ ^[0-9]+$ ]] || return 1
+    now="$(dybatpho::date_now "%s")"
+    age=$((now - modified))
+  else
+    # The path can vanish between the test and the read; that is age 0.
+    age="$(dybatpho::file_age_seconds "$1" 2> /dev/null)" || age=0
+  fi
   ((age > 5))
 }
 

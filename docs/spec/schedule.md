@@ -105,6 +105,7 @@ dybatpho::schedule_every 60 -- check_health
 - A script debounces without having loaded the `lock` module.
 - Several callers start `schedule_once_per` for the same key at the same moment, or one dies while holding the short claim around the marker.
 - Several callers find the same stale claim at once.
+- A caller died while holding the reclaim, the directory that guards removing a stale claim.
 
 ## Requirements *(mandatory)*
 
@@ -138,6 +139,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-026**: `schedule_once_per` MUST stage its marker in a file created exclusively under an unpredictable name, so a link planted at a guessable name is never written through.
 - **FR-027**: `dybatpho::schedule_debounce` MUST treat a ticket removed during its window as a superseded trigger (exit code 9) rather than failing.
 - **FR-028**: `dybatpho::schedule_every` MUST end its wait between runs as soon as a HUP, INT or TERM arrives, then return once the run in progress is over.
+- **FR-029**: A reclaim older than a few seconds MUST be removed as left by a caller that died, so it never blocks its key for good.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -187,6 +189,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-028**: Schedule a command with each scheduler that reads variables named like their locals, and see the caller's values on every run.
 - **IT-029**: Plant a link at the old pid-based staging name of a marker, run once, and find the link target untouched and a real marker in place.
 - **IT-030**: Reset the key from a background job while a debounce window is open, and get exit code 9 with no output.
+- **IT-031**: Plant a stale claim and a stale reclaim directory, run once, and find the command ran and neither is left behind.
 
 ## Acceptance Criteria *(mandatory)*
 

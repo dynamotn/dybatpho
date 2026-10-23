@@ -4,9 +4,9 @@ setup() {
   OUTPUT="${BATS_TEST_TMPDIR}/dybatpho.bundle.sh"
 }
 
-# Source a generated bundle in a pristine shell. The bats process exports every
-# `dybatpho::` function, so a child has to drop them first to prove the bundle
-# defines what it claims to define.
+# Source a generated bundle in a pristine shell. Nothing is exported by default,
+# but a parent that exported the library would hand it down, so a child drops
+# any `dybatpho::` function first to prove the bundle defines what it claims.
 use_bundle() {
   local script="${BATS_TEST_TMPDIR}/use.sh"
   {
@@ -18,9 +18,8 @@ use_bundle() {
     bash "${script}"
 }
 
-# The bats process exports every `dybatpho::` function and the generator is a
-# dybatpho script of its own, so this also covers running one from a shell that
-# already loaded the library.
+# The generator is a dybatpho script of its own, so this also covers running one
+# from a shell that already loaded the library.
 bundle() {
   env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
     "${BUNDLE_SH}" --output "${OUTPUT}" "$@"
@@ -56,8 +55,8 @@ bundle() {
 
 @test "a bundle refuses to be executed directly" {
   run_traced -0 bundle
-  run_traced -1 bash "${OUTPUT}"
-  assert_output --partial "can't be executed directly"
+  run_traced -1 --separate-stderr bash "${OUTPUT}"
+  assert_stderr --partial "can't be executed directly"
 }
 
 @test "dybatpho::load is a no-op for a module the bundle carries" {

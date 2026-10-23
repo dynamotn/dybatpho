@@ -72,7 +72,7 @@ function __dybatpho_bundle_resolve {
   local _script
   dybatpho::create_temp _script ".sh" "bundle-resolve"
   {
-    printf '. %q --modules %q\n' "${DYBATPHO_DIR}/init.sh" "${_selection}"
+    printf '. %q --modules %q || exit 1\n' "${DYBATPHO_DIR}/init.sh" "${_selection}"
     printf 'dybatpho::module_list loaded\n'
   } > "${_script}"
   env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${_script}" \
@@ -147,25 +147,52 @@ function __dybatpho_bundle_prologue {
 __dybatpho_bundle_source="\${BASH_SOURCE[0]-}"
 
 if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3))); then
-  echo "dybatpho requires bash v4.3 or greater"
-  echo "Current Bash Version: \${BASH_VERSION}"
-  exit 1
+  echo "dybatpho requires bash v4.3 or greater" >&2
+  echo "Current Bash Version: \${BASH_VERSION}" >&2
+  return 1 2> /dev/null || exit 1
 fi
 
 if [[ -n "\${__dybatpho_bundle_source}" && "\${__dybatpho_bundle_source}" == "\${0}" ]]; then
-  echo "dybatpho can't be executed directly. Please source dybatpho."
+  echo "dybatpho can't be executed directly. Please source dybatpho." >&2
   exit 1
 fi
-
-set -euo pipefail
-shopt -s nullglob globstar
-shopt -s extglob
 
 if [[ -z "\${__dybatpho_bundle_source}" ]]; then
-  echo "dybatpho couldn't resolve its source path. Please source the bundle from a file-backed shell context."
-  exit 1
+  echo "dybatpho couldn't resolve its source path. Please source the bundle from a file-backed shell context." >&2
+  unset __dybatpho_bundle_source
+  return 1
 fi
+
+# Reached through BASH_ENV in a child of a script that exported the library:
+# leave the child's options alone, as init.sh does.
+__dybatpho_bundle_hook=false
+if [[ -n "\${DYBATPHO_EXPORT_MODULES+set}" && \${#BASH_SOURCE[@]} -eq 1 && "\${BASH_LINENO[0]-}" == 0 \\
+  && "\${__dybatpho_bundle_source}" == "\${BASH_ENV-}" ]]; then
+  __dybatpho_bundle_hook=true
+fi
+__dybatpho_bundle_strict=true
+if [[ "\${__dybatpho_bundle_hook}" == true ]]; then
+  __dybatpho_bundle_strict=false
+elif [[ "\${1-}" == "--no-strict" ]]; then
+  __dybatpho_bundle_strict=false
+fi
+
+if [[ "\${__dybatpho_bundle_strict}" == true ]]; then
+  set -euo pipefail
+  shopt -s extglob
+  if ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[1] >= 4)); then
+    shopt -s inherit_errexit
+  fi
+fi
+unset __dybatpho_bundle_strict
+
+if [[ "\${__dybatpho_bundle_hook}" == true && -n "\${DYBATPHO_EXPORT_BASH_ENV-}" \\
+  && "\${DYBATPHO_EXPORT_BASH_ENV}" != "\${BASH_ENV-}" && -r "\${DYBATPHO_EXPORT_BASH_ENV}" ]]; then
+  . "\${DYBATPHO_EXPORT_BASH_ENV}"
+fi
+
 DYBATPHO_DIR="\$(cd -- "\$(dirname "\${__dybatpho_bundle_source}")" && pwd)"
+__dybatpho_entry_file="\${DYBATPHO_DIR}/\${__dybatpho_bundle_source##*/}"
 unset __dybatpho_bundle_source
 export DYBATPHO_DIR
 
@@ -202,6 +229,24 @@ function dybatpho::load {
   done
 }
 PROLOGUE
+}
+
+#######################################
+# @description Write the bundle epilogue: export the library to child
+#   processes when the consumer asked for it, as `init.sh` does.
+# @noargs
+# @stdout The epilogue
+# @internal
+#######################################
+function __dybatpho_bundle_epilogue {
+  cat << 'EPILOGUE'
+
+if [[ "${__dybatpho_bundle_hook}" == true || "${__dybatpho_export_enabled:-false}" == true ]] \
+  || dybatpho::is true "${DYBATPHO_EXPORT_FUNCTIONS:-false}"; then
+  dybatpho::export_functions
+fi
+unset __dybatpho_bundle_hook
+EPILOGUE
 }
 
 #######################################
@@ -257,7 +302,7 @@ function __dybatpho_bundle_run {
   local _bootstrap_module_loaded _bootstrap_module_list
   local _init="${DYBATPHO_DIR}/init.sh"
   __dybatpho_bundle_extract_into _bootstrap_module_exists "${_init}" __dybatpho_module_exists
-  __dybatpho_bundle_extract_into _bootstrap_export_functions "${_init}" __dybatpho_export_functions
+  __dybatpho_bundle_extract_into _bootstrap_export_functions "${_init}" dybatpho::export_functions
   __dybatpho_bundle_extract_into _bootstrap_version "${_init}" dybatpho::version
   __dybatpho_bundle_extract_into _bootstrap_module_loaded "${_init}" dybatpho::module_loaded
   __dybatpho_bundle_extract_into _bootstrap_module_list "${_init}" dybatpho::module_list
@@ -272,7 +317,7 @@ function __dybatpho_bundle_run {
     for _module in ${_modules}; do
       __dybatpho_bundle_module "${_module}"
     done
-    printf '\n__dybatpho_export_functions\n'
+    __dybatpho_bundle_epilogue
   } > "${OUTPUT}"
   chmod +r "${OUTPUT}"
 

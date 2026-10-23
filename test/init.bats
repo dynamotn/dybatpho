@@ -2,9 +2,9 @@ setup() {
   load test_helper
 }
 
-# The bats process exports every `dybatpho::` function, and a child shell
-# inherits them all. Drop them first so that a child only sees what its own
-# bootstrap loaded.
+# Nothing is exported by default, but a parent that called
+# `dybatpho::export_functions` hands the library down. Drop any `dybatpho::`
+# function first so that a child only sees what its own bootstrap loaded.
 PRISTINE='while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
 
 # Write the child bootstrap to a real file rather than passing it to `bash -c`.
@@ -235,11 +235,36 @@ dybatpho::load semver
   assert_output "  body"
 }
 
-@test "an unknown module set stops the bootstrap" {
-  run -1 init_sh "--modules nonexistent" 'echo reached'
-  refute_output --partial "reached"
+@test "an unknown module set fails the bootstrap without ending the caller" {
+  # The bootstrap returns rather than exits, so the sourcing script decides
+  # what a failure means, and it fails before strict mode is turned on.
+  local script="${BATS_TEST_TMPDIR}/unknown.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf 'before="$-"\n'
+    printf '. %q --modules nonexistent || printf "returned %%s\\n" "$?"\n' "${DYBATPHO_DIR}/init.sh"
+    printf '[[ "$-" == "${before}" ]] && echo options-untouched\n'
+    printf 'echo reached\n'
+  } > "${script}"
+  run_traced -0 --separate-stderr env -u DYBATPHO_MODULES bash "${script}"
+  assert_line --index 0 "returned 1"
+  assert_line --index 1 "options-untouched"
+  assert_line --index 2 "reached"
+  assert_stderr --partial "unknown module 'nonexistent'"
+  assert_stderr --partial "known modules are"
+}
+
+@test "an unknown module set stops a strict script that does not check" {
+  local script="${BATS_TEST_TMPDIR}/unknown_strict.sh"
+  printf 'set -e\n. %q --modules nonexistent\necho reached\n' "${DYBATPHO_DIR}/init.sh" > "${script}"
+  run -1 env -u DYBATPHO_MODULES bash "${script}"
   assert_output --partial "unknown module 'nonexistent'"
-  assert_output --partial "known modules are"
+  refute_output --partial "reached"
+}
+
+@test "executing init.sh directly is refused" {
+  run_traced -1 --separate-stderr bash "${DYBATPHO_DIR}/init.sh"
+  assert_stderr --partial "can't be executed directly"
 }
 
 @test "dybatpho::load adds a module after the bootstrap" {
@@ -302,9 +327,8 @@ echo reached'
 }
 
 @test "the loaded module set is not inherited by a child shell" {
-  # Internal `__` helpers are never exported, so a child shell that sources
-  # `init.sh` has to source the module files again instead of trusting the
-  # parent's module set.
+  # A child shell that sources `init.sh` has to source the module files again
+  # instead of trusting the parent's module set.
   # The grandchild is a script file for the same reason as `bootstrap_script`:
   # a `bash -c` shell has no `BASH_SOURCE` for the coverage hook to expand.
   local child="${BATS_TEST_TMPDIR}/child.sh"
@@ -464,12 +488,151 @@ printf "%s\n" "${DYBATPHO_VERSION}"'
   assert_output "$(cd "${DYBATPHO_DIR}" && pwd)"
 }
 
-@test "dybatpho::load exports the public functions it adds, and no internal one" {
-  local child="${BATS_TEST_TMPDIR}/exported.sh"
-  printf '%s\n' 'declare -F dybatpho::semver_valid' \
-    'declare -F __dybatpho_load_module || echo internal-absent' > "${child}"
-  run_traced -0 init_sh "" "dybatpho::load semver
-bash $(printf '%q' "${child}")"
-  assert_line --index 0 "dybatpho::semver_valid"
-  assert_line --index 1 "internal-absent"
+@test "nothing is exported to a child process by default" {
+  # A child sees no dybatpho function, and the environment grows by a few
+  # variables rather than by every function body: exporting them all made each
+  # child several times slower and could overflow what `execve` accepts.
+  local script="${BATS_TEST_TMPDIR}/default_export.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf 'before="$(env | wc -c)"\n'
+    printf '. %q --modules all\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'after="$(env | wc -c)"\n'
+    printf '%s\n' 'echo "growth $((after - before))"'
+    printf '%s\n' "bash -c 'compgen -A function | grep -c dybatpho || true'"
+    printf '%s\n' 'echo "bash_env ${BASH_ENV-unset}"'
+  } > "${script}"
+  run_traced -0 env -u DYBATPHO_MODULES -u DYBATPHO_EXPORT_FUNCTIONS -u DYBATPHO_EXPORT_MODULES \
+    -u BASH_ENV bash "${script}"
+  local growth="${lines[0]#growth }"
+  ((growth < 4096)) || fail "the environment grew by ${growth} bytes"
+  assert_line --index 1 "0"
+  assert_line --index 2 "bash_env unset"
+}
+
+# Run a script that opts in to exporting, with a clean environment.
+export_sh() {
+  env -u DYBATPHO_MODULES -u DYBATPHO_EXPORT_MODULES -u DYBATPHO_EXPORT_BASH_ENV \
+    bash "$(bootstrap_script "${1}" "${2}")"
+}
+
+@test "DYBATPHO_EXPORT_FUNCTIONS hands the whole library to a bash -c child" {
+  # The module state and the internal helpers come along, not just the public
+  # names: each of these failed, or answered wrongly, with exported functions.
+  DYBATPHO_EXPORT_FUNCTIONS=true BASH_ENV="" run_traced -0 export_sh "--modules semver csv" \
+    'bash -c "dybatpho::info hello 2>&1; dybatpho::semver_compare 1.2.0 1.10.0; printf \"name,size\\n\" | dybatpho::csv_header -"'
+  assert_line --index 0 --partial "hello"
+  assert_line --index 1 "-1"
+  assert_line --index 2 "name"
+  assert_line --index 3 "size"
+}
+
+@test "dybatpho::export_functions hands the library to a child and dybatpho::load re-exports" {
+  BASH_ENV="" run_traced -0 export_sh "" 'bash -c "declare -F dybatpho::info || echo none"
+dybatpho::export_functions
+bash -c "declare -F __dybatpho_load_module"
+dybatpho::load semver
+bash -c "dybatpho::semver_compare 2.0.0 1.0.0; dybatpho::module_loaded semver && echo semver-loaded"'
+  assert_line --index 0 "none"
+  assert_line --index 1 "__dybatpho_load_module"
+  assert_line --index 2 "1"
+  assert_line --index 3 "semver-loaded"
+}
+
+@test "an exported library leaves the child's options and arguments alone" {
+  local child="${BATS_TEST_TMPDIR}/child.sh"
+  printf '%s\n' 'printf "%s|%s|%s\n" "$-" "$(shopt -p extglob)" "$*"' 'dybatpho::module_loaded semver && echo ok' \
+    > "${child}"
+  BASH_ENV="" run_traced -0 export_sh "--modules semver" "dybatpho::export_functions
+bash $(printf '%q' "${child}") --modules nonexistent"
+  # `--modules nonexistent` is the child's own argument, not a module request.
+  assert_line --index 0 "hB|shopt -u extglob|--modules nonexistent"
+  assert_line --index 1 "ok"
+}
+
+@test "an exported library still sources the BASH_ENV that was there before" {
+  # Coverage tools and the caller's own hook live in `BASH_ENV` too.
+  local hook="${BATS_TEST_TMPDIR}/previous_hook.sh"
+  printf 'echo previous-hook\n' > "${hook}"
+  local script
+  script="$(bootstrap_script "" "dybatpho::export_functions
+bash -c 'dybatpho::module_loaded string && echo library'")"
+  # The parent is a non-interactive shell of its own, so it runs the hook first.
+  BASH_ENV="${hook}" run_traced -0 env -u DYBATPHO_MODULES bash "${script}"
+  assert_output "previous-hook
+previous-hook
+library"
+}
+
+@test "dybatpho::export_functions refuses a library path that BASH_ENV would expand" {
+  local copy="${BATS_TEST_TMPDIR}/lib\$HOME"
+  mkdir -p "${copy}/src"
+  cp "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${copy}/"
+  cp "${DYBATPHO_DIR}/src/"*.sh "${copy}/src/"
+  local script="${BATS_TEST_TMPDIR}/dollar.sh"
+  printf '. %q\ndybatpho::export_functions\necho reached\n' "${copy}/init.sh" > "${script}"
+  run -1 env -u DYBATPHO_MODULES -u BASH_ENV bash "${script}"
+  assert_output --partial "Can't export through BASH_ENV"
+  refute_output --partial "reached"
+}
+
+@test "sourcing leaves nullglob and globstar alone" {
+  run_traced -0 init_sh "" 'shopt -q nullglob || echo nullglob-off
+shopt -q globstar || echo globstar-off
+shopt -q extglob && echo extglob-on
+for f in /nonexistent-dir/*.none; do echo "literal ${f}"; done'
+  assert_line --index 0 "nullglob-off"
+  assert_line --index 1 "globstar-off"
+  assert_line --index 2 "extglob-on"
+  assert_line --index 3 "literal /nonexistent-dir/*.none"
+}
+
+@test "--no-strict leaves every set and shopt option of the caller as it was" {
+  local script="${BATS_TEST_TMPDIR}/no_strict.sh"
+  {
+    printf '%s\n' "${PRISTINE}"
+    printf 'shopt -s nullglob\n'
+    printf 'before="$- $(set +o) $(shopt -p)"\n'
+    printf '. %q --no-strict --modules semver\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'after="$- $(set +o) $(shopt -p)"\n'
+    printf '[[ "${before}" == "${after}" ]] && echo untouched\n'
+    printf 'dybatpho::module_loaded semver && echo semver\n'
+    printf '. %q --modules json --no-strict\n' "${DYBATPHO_DIR}/init.sh"
+    printf 'dybatpho::module_loaded json && echo json\n'
+    printf '[[ "$-" != *e* ]] && echo still-no-errexit\n'
+  } > "${script}"
+  run_traced -0 env -u DYBATPHO_MODULES bash "${script}"
+  assert_output "untouched
+semver
+json
+still-no-errexit"
+}
+
+@test "the core modules work without strict mode" {
+  # Neither errexit, nounset, pipefail, extglob nor nullglob: the library must
+  # not lean on an option it no longer sets.
+  run_traced -0 init_sh "--no-strict" 'set +euo pipefail; shopt -u extglob nullglob
+[[ "$-" != *e* && "$-" != *u* ]] && echo plain-shell
+dybatpho::trim "  padded  "
+dybatpho::goos > /dev/null && echo goos
+dybatpho::is int 42 && echo is-int
+dybatpho::path_join a b
+arr=(b a b); dybatpho::array_unique arr; echo "${arr[*]}"
+dybatpho::secret_register TOKEN_VALUE_123; dybatpho::secret_mask "use TOKEN_VALUE_123"
+dybatpho::create_temp tmp ".txt"; [[ -f "${tmp}" ]] && echo temp
+dybatpho::info logged 2>&1 | grep -c logged
+dybatpho::try out err -- dybatpho::die "caught" 2 || echo "try $?"
+dybatpho::dry_run -- printf "%s\n" ran'
+  assert_line --index 0 "plain-shell"
+  assert_line --index 1 "padded"
+  assert_line --index 2 "goos"
+  assert_line --index 3 "is-int"
+  assert_line --index 4 "a/b"
+  assert_line --index 5 "b a"
+  assert_line --index 6 --partial "use "
+  refute_line --index 6 --partial "TOKEN_VALUE_123"
+  assert_line --index 7 "temp"
+  assert_line --index 8 "1"
+  assert_line --index 9 "try 2"
+  assert_line --index 10 "ran"
 }

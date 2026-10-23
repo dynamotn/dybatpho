@@ -314,7 +314,7 @@ function dybatpho::cache_forget {
     dybatpho::dry_run remove "${path}"
     return 0
   fi
-  rm -f "${path}"
+  rm -f -- "${path}"
 }
 
 #######################################
@@ -342,7 +342,7 @@ function dybatpho::cache_clear {
   fi
   dybatpho::debug "cache: clearing ${directory}"
   # dyshellint disable=BSG089 # `dybatpho::is dir` above refuses an empty name
-  find "${directory}" -maxdepth 1 -type f -name "*${__DYBATPHO_CACHE_SUFFIX}" -delete
+  find "${directory/#-/./-}" -maxdepth 1 -type f -name "*${__DYBATPHO_CACHE_SUFFIX}" -delete
 }
 
 #######################################
@@ -620,23 +620,26 @@ function __dybatpho_cache_scan {
   local __dybatpho_cache_scan_dir
   __dybatpho_cache_dir_into __dybatpho_cache_scan_dir
   dybatpho::is dir "${__dybatpho_cache_scan_dir}" || return 0
-  local -a __dybatpho_cache_scan_records=()
-  local __dybatpho_cache_scan_path __dybatpho_cache_scan_mtime __dybatpho_cache_scan_size
-  local __dybatpho_cache_scan_line
+  # The entries are measured with a few `stat` calls for the whole namespace:
+  # two per entry, each in a subshell, took about ten seconds for three
+  # hundred entries on macOS. A symbolic link or a directory with the suffix is
+  # not something this module wrote, and an unmatched glob stays as the
+  # pattern; neither passes the check.
+  local -a __dybatpho_cache_scan_files=()
+  local __dybatpho_cache_scan_path __dybatpho_cache_scan_sorted
   for __dybatpho_cache_scan_path in "${__dybatpho_cache_scan_dir}"/*"${__DYBATPHO_CACHE_SUFFIX}"; do
-    # An unmatched glob stays as the pattern, and a symbolic link or a
-    # directory with the suffix is not something this module wrote.
     [[ -f "${__dybatpho_cache_scan_path}" && ! -L "${__dybatpho_cache_scan_path}" ]] || continue
-    __dybatpho_cache_scan_mtime="$(dybatpho::file_mtime "${__dybatpho_cache_scan_path}")"
-    __dybatpho_cache_scan_size="$(dybatpho::file_size "${__dybatpho_cache_scan_path}")"
-    __dybatpho_cache_scan_line="${__dybatpho_cache_scan_mtime} ${__dybatpho_cache_scan_size}"
-    __dybatpho_cache_scan_records+=("${__dybatpho_cache_scan_line} ${__dybatpho_cache_scan_path}")
+    __dybatpho_cache_scan_files+=("${__dybatpho_cache_scan_path}")
   done
-  ((${#__dybatpho_cache_scan_records[@]} > 0)) || return 0
-  local __dybatpho_cache_scan_sorted
+  ((${#__dybatpho_cache_scan_files[@]} > 0)) || return 0
+  # An entry pruned by another process between the listing and its `stat` is
+  # simply not reported.
   __dybatpho_cache_scan_sorted="$(
-    printf '%s\n' ${__dybatpho_cache_scan_records[@]+"${__dybatpho_cache_scan_records[@]}"} | sort -k1,1n -k3
-  )"
+    __dybatpho_file_stat_each '%Y %s %n' '%m %z %N' \
+      ${__dybatpho_cache_scan_files[@]+"${__dybatpho_cache_scan_files[@]}"} 2> /dev/null \
+      | LC_ALL=C sort -k1,1n -k3
+  )" || true
+  [[ -n "${__dybatpho_cache_scan_sorted}" ]] || return 0
   mapfile -t __dybatpho_cache_scan_out <<< "${__dybatpho_cache_scan_sorted}"
 }
 

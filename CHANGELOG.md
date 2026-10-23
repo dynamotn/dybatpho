@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
   substitutions** rather than one pass per character.
 
+- **`cache` — `dybatpho::cache_stats` and `dybatpho::cache_prune` list a
+  namespace with one `stat`.** 300 entries take about 50 ms instead of 10 s on
+  macOS.
+
 - **`csv`, `metrics`, `testing` — data paths fork far less.**
   `dybatpho::csv_to_json` is about fifteen times faster and
   `dybatpho::metrics_render` about ten times faster. Snapshot scrubs run in a

@@ -187,6 +187,7 @@ fi
 - Pruning a namespace that was never written, or is empty.
 - Describing a namespace that was never written, or with the time to live after `--json`.
 - An accessor is given a key that cannot be a file name from inside a condition.
+- The cache directory is relative and begins with a dash, or holds links, directories or hidden files with the entry suffix.
 
 ## Requirements *(mandatory)*
 
@@ -229,6 +230,7 @@ fi
 - **FR-028**: The cache directory MUST fall back to the user cache when `DYBATPHO_CACHE_DIR` is empty, never resolve to the root of the filesystem.
 - **FR-029**: Falling back from an empty `DYBATPHO_CACHE_DIR` MUST happen in the caller's shell, so that with neither `XDG_CACHE_HOME` nor `HOME` set the public function stops instead of writing from `/`.
 - **FR-030**: A command run by `cache_run`, including its background refresh, MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
+- **FR-031**: `cache_stats` and `cache_prune` MUST read the namespace in one listing, counting only regular, non-hidden files with the entry suffix, and every accessor MUST accept a cache directory beginning with a dash.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -290,6 +292,7 @@ fi
 - **IT-034**: Resolve the cache directory with `DYBATPHO_CACHE_DIR` emptied and a namespace set, and get a path under `XDG_CACHE_HOME`.
 - **IT-035**: Store an entry with the cache directory emptied and no home, under `if !`, and stop naming `dybatpho::cache_set`.
 - **IT-036**: Run a command through `cache_run` that reads variables named like the runner's locals, and see the caller's values.
+- **IT-037**: Count and prune a namespace that also holds a link, a directory and a hidden file with the suffix; set, describe, forget and clear in a cache directory named `-cache`.
 
 ## Acceptance Criteria *(mandatory)*
 

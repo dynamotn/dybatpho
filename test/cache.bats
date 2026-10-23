@@ -493,3 +493,37 @@ remaining_entries() {
   look() { printf '%s %s %s %s %s %s\n' "${key}" "${path}" "${ttl}" "${status}" "${usage}" "${output}"; }
   assert_equal "$(dybatpho::cache_run scoped 0 -- look)" "caller caller caller caller caller caller"
 }
+
+@test "dybatpho::cache_stats counts only this module's entries, in one listing" {
+  # The namespace is listed with a single `stat` now; what it counts must not
+  # change: no link, no directory and no hidden staging file with the suffix.
+  printf 'one\n' | dybatpho::cache_set alpha
+  printf 'three\n' | dybatpho::cache_set beta
+  local dir
+  dir="$(dybatpho::cache_dir)"
+  ln -s "${dir}/alpha.cache" "${dir}/linked.cache"
+  mkdir "${dir}/folder.cache"
+  printf 'partial' > "${dir}/.staging.cache"
+  printf 'other' > "${dir}/notes.txt"
+
+  run_traced dybatpho::cache_stats --json
+  assert_output --partial '"entries":2,"bytes":10,'
+  run_traced dybatpho::cache_prune --max-entries 1
+  assert_file_not_exist "${dir}/alpha.cache"
+  assert_file_exist "${dir}/beta.cache"
+  assert_file_exist "${dir}/.staging.cache"
+}
+
+@test "the cache works in a relative directory that begins with a dash" {
+  mkdir -p "${BATS_TEST_TMPDIR}/dashed"
+  cd "${BATS_TEST_TMPDIR}/dashed"
+  DYBATPHO_CACHE_DIR="-cache"
+  printf 'value\n' | dybatpho::cache_set entry
+  run_traced dybatpho::cache_stats --json
+  assert_output --partial '"entries":1,'
+  dybatpho::cache_forget entry
+  assert_file_not_exist "-cache/default/entry.cache"
+  printf 'value\n' | dybatpho::cache_set again
+  dybatpho::cache_clear
+  assert_file_not_exist "-cache/default/again.cache"
+}

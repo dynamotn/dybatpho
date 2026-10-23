@@ -226,7 +226,7 @@ function __dybatpho_changelog_archive_run {
     dybatpho::info "Archiving ${#moved[@]} release(s) older than ${before}: ${moved[*]-}"
   fi
   # shellcheck disable=SC2154 # set by the option spec of this script
-  if dybatpho::is true "${DRY_RUN}"; then
+  if dybatpho::is true "${DYBATPHO_DRY_RUN}"; then
     return 0
   fi
 
@@ -298,7 +298,7 @@ function _spec {
     init:="${DYBATPHO_DIR}/CHANGELOG.md"
   dybatpho::opts::param "Directory of the archive files [default: docs/changelog next to the changelog]" \
     ARCHIVE_TARGET --archive-dir init:@empty
-  dybatpho::opts::flag "Report what would move and change nothing" DRY_RUN -n --dry-run \
+  dybatpho::opts::flag "Report what would move and change nothing" DYBATPHO_DRY_RUN -n --dry-run \
     on:true off:false init:="false"
 }
 

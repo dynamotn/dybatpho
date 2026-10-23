@@ -1481,9 +1481,10 @@ function dybatpho::curl_graphql {
     shift
   fi
 
-  # `yq`'s `from_json` reads an unparseable value as the string it was given, so
-  # bad variables would otherwise be sent as a string field the server rejects
-  # with a message about the query rather than about the caller.
+  # Checked here rather than left to `jq --argjson`, so a bad value is reported
+  # as the caller's variables, and an array or a scalar, which `jq` would embed
+  # happily, is refused before the server rejects it with a message about the
+  # query instead.
   variables="$(dybatpho::trim "${variables}")"
   [[ -n "${variables}" ]] || variables="{}"
   if [[ "${variables}" != "{"*"}" ]] || ! dybatpho::json_valid "${variables}"; then
@@ -1548,7 +1549,7 @@ function dybatpho::curl_graphql {
 # @internal
 #######################################
 function __dybatpho_network_need_json {
-  __dybatpho_helpers_need_module json __dybatpho_json_cmd_into "${FUNCNAME[1]}"
+  __dybatpho_helpers_need_module json __dybatpho_json_need_jq "${FUNCNAME[1]}"
 }
 
 #######################################

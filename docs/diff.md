@@ -197,7 +197,7 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 - `0`: The two documents hold the same values
 - `1`: They differ
 - `2`: Either document is not valid YAML
-- `127`: `jq` or `yq` is not installed
+- `127`: `jq` or the Go `yq` v4 is not installed
 
 ---
 

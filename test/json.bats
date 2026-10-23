@@ -2,166 +2,292 @@ setup() {
   load test_helper
 }
 
-# @description Print a PATH that has the stubs and the few tools they need, but
-#   no real `yq`. Dropping to `/usr/bin:/bin` is not enough: a stock Ubuntu
-#   runner ships `yq` in `/usr/bin`.
+# @description Skip the test when the Go `yq` v4 is not installed.
+__json_need_yq() {
+  command -v yq > /dev/null || skip "yq is not installed"
+  [[ "$(yq --version 2>&1)" =~ version\ v?[4-9] ]] || skip "the yq on PATH is not the Go yq v4"
+}
+
+# @description Put a fake `yq` that answers `--version` with the given line
+#   first on `PATH`, and print that `PATH`.
+# @arg $1 string Version line
 # @stdout PATH value
-__json_path_without_yq() {
-  local bin="${BATS_TEST_TMPDIR}/no-yq-bin" tool
+__json_path_with_fake_yq() {
+  local bin="${BATS_TEST_TMPDIR}/fake-yq-bin"
   mkdir -p "${bin}"
-  for tool in bash cat rm sed tr; do
-    ln -sf "$(command -v "${tool}")" "${bin}/${tool}"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" %q\n' "$1" > "${bin}/yq"
+  chmod +x "${bin}/yq"
+  printf '%s\n' "${bin}:${PATH}"
+}
+
+__json_query_fixture() {
+  local file="${BATS_TEST_TMPDIR}/query.json"
+  printf '%s\n' '{"b":2,"a":1.5,"list":[3,1,2],"name":"api","flag":false}' > "${file}"
+  printf '%s\n' "${file}"
+}
+
+__yaml_query_fixture() {
+  local file="${BATS_TEST_TMPDIR}/query.yaml"
+  printf '%s\n' '# the service' 'name: api' 'version: "1.0"' 'replicas: 3' \
+    'tags: [web, edge]' 'image:' '  repo: example/api' '  tag: "2.0"' > "${file}"
+  printf '%s\n' "${file}"
+}
+
+@test "dybatpho::json_query runs a jq filter and forwards jq options" {
+  local file
+  file="$(__json_query_fixture)"
+  run_traced dybatpho::json_query "${file}" '.name'
+  assert_success
+  assert_output '"api"'
+  run_traced dybatpho::json_query "${file}" '.[$k]' --arg k name
+  assert_success
+  assert_output '"api"'
+  run_traced dybatpho::json_query "${file}" '.list' -c
+  assert_success
+  assert_output '[3,1,2]'
+  run_traced dybatpho::json_query - '.list[0]' < "${file}"
+  assert_success
+  assert_output '3'
+}
+
+@test "dybatpho::json_query speaks jq: sorted keys, add, the ? operator, and def" {
+  local file
+  file="$(__json_query_fixture)"
+  assert_equal "$(dybatpho::json_query "${file}" 'keys' -c)" '["a","b","flag","list","name"]'
+  assert_equal "$(dybatpho::json_query "${file}" '.list | add')" '6'
+  assert_equal "$(dybatpho::json_query "${file}" '[.name[]?] | length')" '0'
+  assert_equal "$(dybatpho::json_query "${file}" 'def twice: . * 2; .b | twice')" '4'
+  assert_equal "$(dybatpho::json_query "${file}" '.name | ascii_upcase' -r)" 'API'
+}
+
+@test "the JSON helpers print the same thing with or without yq installed" {
+  # The filter language used to follow whichever program was found first, so
+  # `keys` came back in another order, `add` and `?` failed, and numbers were
+  # reformatted from one machine to the next. Hiding `yq` must change nothing.
+  local file with without saved_path="${PATH}" filter document
+  file="$(__json_query_fixture)"
+  document="$(cat "${file}")"
+  for filter in 'keys' '.a' '.list | sort' 'to_entries | map(.key)' '.list | add' '.flag' \
+    '[.name[]?]' '{z: 1, a: 2}'; do
+    with="$(dybatpho::json_query "${file}" "${filter}" -c)"
+    PATH="$(path_without yq)"
+    without="$(dybatpho::json_query "${file}" "${filter}" -c)"
+    PATH="${saved_path}"
+    assert_equal "${without}" "${with}"
   done
-  printf '%s\n' "${BATS_MOCK_BINDIR}:${bin}"
+  with="$(dybatpho::json_get "${document}" '.a, .name, .list')$(dybatpho::json_eval "${document}" 'keys')"
+  with+="$(dybatpho::json_object b 1 a:json '[1.5]')"
+  PATH="$(path_without yq)"
+  without="$(dybatpho::json_get "${document}" '.a, .name, .list')$(dybatpho::json_eval "${document}" 'keys')"
+  without+="$(dybatpho::json_object b 1 a:json '[1.5]')"
+  PATH="${saved_path}"
+  assert_equal "${without}" "${with}"
 }
 
-@test "dybatpho::json_query prefers yq for JSON queries" {
-  local args_file="${BATS_TEST_TMPDIR}/yq-json-args"
-  stub yq ": echo \"\$*\" > ${args_file}; echo '\"1.0.0\"'"
-  assert_equal "$(dybatpho::json_query "package.json" ".version")" '"1.0.0"'
-  assert_equal "$(cat "${args_file}")" "eval -o=json .version package.json"
-  unstub yq
-}
-
-@test "dybatpho::json_has prefers yq -e semantics" {
-  local args_file="${BATS_TEST_TMPDIR}/yq-json-has-args"
-  stub yq ": echo \"\$*\" > ${args_file}; exit 0"
-  dybatpho::json_has "package.json" ".name"
-  assert_equal "$(cat "${args_file}")" "eval -e .name package.json"
-  unstub yq
-
-  stub yq ": exit 1"
-  run_traced dybatpho::json_has "package.json" ".missing"
-  assert_failure
-  unstub yq
-}
-
-@test "dybatpho::json_pretty prints or writes formatted JSON through yq" {
-  local output_file="${BATS_TEST_TMPDIR}/pretty.json"
-  stub yq \
-    ": printf '{\n  \"name\": \"dybatpho\"\n}\n'" \
-    ": printf '{\n  \"name\": \"dybatpho\"\n}\n'"
-  run_traced dybatpho::json_pretty "package.json"
+@test "dybatpho::json_has follows jq -e and folds no output into a plain failure" {
+  local file
+  file="$(__json_query_fixture)"
+  run_traced dybatpho::json_has "${file}" '.name'
   assert_success
-  assert_output - << EOF
-{
-  "name": "dybatpho"
-}
-EOF
-
-  dybatpho::json_pretty "package.json" "${output_file}"
-  run_traced cat "${output_file}"
-  assert_success
-  assert_output - << EOF
-{
-  "name": "dybatpho"
-}
-EOF
-  unstub yq
-}
-
-@test "dybatpho::json_to_yaml delegates to yq" {
-  local args_file="${BATS_TEST_TMPDIR}/json-to-yaml-args"
-  local output_file="${BATS_TEST_TMPDIR}/converted.yaml"
-  stub yq \
-    ": echo \"\$*\" > ${args_file}; printf 'name: dybatpho\n'" \
-    ": echo \"\$*\" > ${args_file}; printf 'name: dybatpho\n'"
-  assert_equal "$(dybatpho::json_to_yaml "package.json")" "name: dybatpho"
-  assert_equal "$(cat "${args_file}")" "eval -P . package.json"
-
-  dybatpho::json_to_yaml "package.json" "${output_file}"
-  assert_equal "$(cat "${output_file}")" "name: dybatpho"
-  unstub yq
-}
-
-@test "dybatpho::yaml_query delegates to yq eval" {
-  local args_file="${BATS_TEST_TMPDIR}/yq-args"
-  stub yq ": echo \"\$*\" > ${args_file}; echo 'dybatpho'"
-  assert_equal "$(dybatpho::yaml_query "compose.yaml" ".services.app.image")" "dybatpho"
-  assert_equal "$(cat "${args_file}")" "eval .services.app.image compose.yaml"
-  unstub yq
-}
-
-@test "dybatpho::yaml_has uses yq eval -e semantics" {
-  local args_file="${BATS_TEST_TMPDIR}/yq-has-args"
-  stub yq ": echo \"\$*\" > ${args_file}; exit 0"
-  dybatpho::yaml_has "compose.yaml" ".services.app"
-  assert_equal "$(cat "${args_file}")" "eval -e .services.app compose.yaml"
-  unstub yq
-
-  stub yq ": exit 1"
-  run_traced dybatpho::yaml_has "compose.yaml" ".missing"
+  run_traced dybatpho::json_has "${file}" '.missing'
+  assert_failure 1
+  run_traced dybatpho::json_has "${file}" '.flag'
+  assert_failure 1
+  run_traced dybatpho::json_has "${file}" 'empty'
+  assert_failure 1
+  run_traced dybatpho::json_has "${file}" '.list | not_a_function'
   assert_failure
-  unstub yq
+  assert [ "${status}" -ne 1 ]
+}
+
+@test "dybatpho::json_pretty prints or writes formatted JSON through jq" {
+  local output_file="${BATS_TEST_TMPDIR}/pretty.json" input="${BATS_TEST_TMPDIR}/in.json"
+  printf '%s\n' '{"name":"dybatpho","tags":["a"]}' > "${input}"
+  run_traced dybatpho::json_pretty "${input}"
+  assert_success
+  assert_output "$(printf '{\n  "name": "dybatpho",\n  "tags": [\n    "a"\n  ]\n}')"
+  dybatpho::json_pretty "${input}" "${output_file}"
+  assert_equal "$(cat "${output_file}")" "${output}"
+  dybatpho::json_pretty "${input}" "${input}"
+  assert_equal "$(cat "${input}")" "${output}"
+}
+
+@test "dybatpho::json_to_yaml converts through yq" {
+  __json_need_yq
+  local input="${BATS_TEST_TMPDIR}/in.json" output_file="${BATS_TEST_TMPDIR}/converted.yaml"
+  printf '%s\n' '{"name":"dybatpho","tags":["a","b"]}' > "${input}"
+  run_traced dybatpho::json_to_yaml "${input}"
+  assert_success
+  assert_output "$(printf 'name: dybatpho\ntags:\n  - a\n  - b')"
+  dybatpho::json_to_yaml "${input}" "${output_file}"
+  assert_equal "$(cat "${output_file}")" "${output}"
+}
+
+@test "dybatpho::yaml_query runs a jq filter over a YAML document" {
+  __json_need_yq
+  local file
+  file="$(__yaml_query_fixture)"
+  run_traced dybatpho::yaml_query "${file}" '.image.repo'
+  assert_success
+  assert_output 'example/api'
+  # Filters `yq` rejected or answered differently now behave as in `jq`.
+  run_traced dybatpho::yaml_query "${file}" 'keys | join(",")'
+  assert_output 'image,name,replicas,tags,version'
+  run_traced dybatpho::yaml_query "${file}" '.tags | add'
+  assert_output 'webedge'
+  run_traced dybatpho::yaml_query "${file}" '[.name[]?] | length'
+  assert_output '0'
+  run_traced dybatpho::yaml_query "${file}" '.[$key]' --arg key version
+  assert_output '1.0'
+  run_traced dybatpho::yaml_query - '.replicas + 1' < "${file}"
+  assert_output '4'
+}
+
+@test "dybatpho::yaml_query prints each result as YAML, one scalar per line" {
+  __json_need_yq
+  local file
+  file="$(__yaml_query_fixture)"
+  run_traced dybatpho::yaml_query "${file}" '.tags[]'
+  assert_success
+  assert_output "$(printf 'web\nedge')"
+  run_traced dybatpho::yaml_query "${file}" '.image'
+  assert_output "$(printf 'repo: example/api\ntag: "2.0"')"
+  run_traced dybatpho::yaml_query "${file}" '.missing[]?'
+  assert_success
+  assert_output ''
+  # A trailing comment in the filter must not swallow what wraps it.
+  run_traced dybatpho::yaml_query "${file}" '.name # the name'
+  assert_output 'api'
+}
+
+@test "dybatpho::yaml_has follows jq -e semantics" {
+  __json_need_yq
+  local file
+  file="$(__yaml_query_fixture)"
+  run_traced dybatpho::yaml_has "${file}" '.image.tag'
+  assert_success
+  run_traced dybatpho::yaml_has "${file}" '.missing'
+  assert_failure 1
+  run_traced dybatpho::yaml_has "${file}" '.tags | index("edge")'
+  assert_success
+  run_traced dybatpho::yaml_has "${file}" '.tags[] | select(. == "none")'
+  assert_failure 1
 }
 
 @test "dybatpho::yaml_pretty prints or writes formatted YAML" {
-  local output_file="${BATS_TEST_TMPDIR}/pretty.yaml"
-  stub yq \
-    ": printf 'name: dybatpho\nenabled: true\n'" \
-    ": printf 'name: dybatpho\nenabled: true\n'"
-  run_traced dybatpho::yaml_pretty "compose.yaml"
+  __json_need_yq
+  local input="${BATS_TEST_TMPDIR}/in.yaml" output_file="${BATS_TEST_TMPDIR}/pretty.yaml"
+  printf '{name: dybatpho, enabled: true}\n' > "${input}"
+  run_traced dybatpho::yaml_pretty "${input}"
   assert_success
-  assert_output - << EOF
-name: dybatpho
-enabled: true
-EOF
+  assert_output "$(printf 'name: dybatpho\nenabled: true')"
+  dybatpho::yaml_pretty "${input}" "${output_file}"
+  assert_equal "$(cat "${output_file}")" "${output}"
+}
 
-  dybatpho::yaml_pretty "compose.yaml" "${output_file}"
-  run_traced cat "${output_file}"
+@test "dybatpho::yaml_to_json prints JSON laid out by jq" {
+  __json_need_yq
+  local file output_file="${BATS_TEST_TMPDIR}/converted.json"
+  file="$(__yaml_query_fixture)"
+  run_traced dybatpho::yaml_to_json "${file}"
   assert_success
-  assert_output - << EOF
-name: dybatpho
-enabled: true
-EOF
-  unstub yq
+  assert_output "$(jq . <<< '{"name":"api","version":"1.0","replicas":3,"tags":["web","edge"],"image":{"repo":"example/api","tag":"2.0"}}')"
+  dybatpho::yaml_to_json "${file}" "${output_file}"
+  assert_equal "$(cat "${output_file}")" "${output}"
 }
 
-@test "dybatpho::yaml_to_json delegates to yq json output" {
-  local args_file="${BATS_TEST_TMPDIR}/yaml-to-json-args"
-  local output_file="${BATS_TEST_TMPDIR}/converted.json"
-  stub yq \
-    ": echo \"\$*\" > ${args_file}; printf '{\"name\":\"dybatpho\"}\n'" \
-    ": echo \"\$*\" > ${args_file}; printf '{\"name\":\"dybatpho\"}\n'"
-  assert_equal "$(dybatpho::yaml_to_json "compose.yaml")" '{"name":"dybatpho"}'
-  assert_equal "$(cat "${args_file}")" "eval -o=json . compose.yaml"
-
-  dybatpho::yaml_to_json "compose.yaml" "${output_file}"
-  assert_equal "$(cat "${output_file}")" '{"name":"dybatpho"}'
-  unstub yq
+@test "dybatpho::yaml_query reads a TOML file by its extension" {
+  __json_need_yq
+  local file="${BATS_TEST_TMPDIR}/conf.toml"
+  printf 'name = "api"\n[server]\nport = 8080\n' > "${file}"
+  run_traced dybatpho::yaml_query "${file}" '.server.port'
+  assert_success
+  assert_output '8080'
 }
 
-@test "JSON helpers fall back to jq when yq is unavailable" {
-  local args_file="${BATS_TEST_TMPDIR}/jq-json-args"
-  local old_path="${PATH}"
-  stub jq ": echo \"\$*\" > ${args_file}; printf '42\n'"
-  PATH="$(__json_path_without_yq)"
-
-  assert_equal "$(dybatpho::json_query "data.json" ".answer" --arg name value)" "42"
-  assert_equal "$(cat "${args_file}")" '.answer data.json --arg name value'
-
-  unstub jq
-  PATH="${old_path}"
+@test "the JSON helpers need jq and say so, even with yq installed" {
+  local file
+  file="$(__json_query_fixture)"
+  PATH="$(path_without jq)" run -127 dybatpho::json_query "${file}" '.'
+  assert_output --partial "dybatpho::json_query: jq is not installed"
+  PATH="$(path_without jq)" run -127 dybatpho::json_eval '{}' '.'
+  assert_output --partial "jq is not installed"
+  PATH="$(path_without jq)" run -127 dybatpho::json_object a b
+  assert_output --partial "jq is not installed"
+  PATH="$(path_without jq)" run -127 dybatpho::json_set "${file}" a 1
+  assert_output --partial "jq is not installed"
 }
 
-@test "JSON helpers fail clearly when neither backend is installed" {
-  local empty_path="${BATS_TEST_TMPDIR}/empty-bin"
-  local old_path="${PATH}"
-  mkdir -p "${empty_path}"
-  PATH="${empty_path}"
-  run -127 dybatpho::json_query "data.json" "."
-  PATH="${old_path}"
-  assert_failure 127
-  assert_output --partial "Neither yq nor jq is installed"
+@test "the YAML helpers need yq and say so, while the JSON ones keep working" {
+  local yaml file saved_path="${PATH}" function
+  yaml="$(__yaml_query_fixture)"
+  file="$(__json_query_fixture)"
+  PATH="$(path_without yq)"
+  run_traced dybatpho::json_query "${file}" '.name'
+  PATH="${saved_path}"
+  assert_success
+  assert_output '"api"'
+  for function in dybatpho::yaml_query dybatpho::yaml_has; do
+    PATH="$(path_without yq)" run -127 "${function}" "${yaml}" '.name'
+    assert_output --partial "${function}: yq is not installed; YAML support needs the Go yq v4"
+  done
+  PATH="$(path_without yq)" run -127 dybatpho::yaml_to_json "${yaml}"
+  assert_output --partial "yq is not installed"
+  PATH="$(path_without yq)" run -127 dybatpho::json_to_yaml "${file}"
+  assert_output --partial "yq is not installed"
+  PATH="$(path_without yq)" run -127 dybatpho::yaml_set "${yaml}" a 1
+  assert_output --partial "dybatpho::yaml_set: yq is not installed"
 }
 
-@test "JSON and YAML helpers propagate backend failures" {
-  stub_repeated yq ": exit 9"
-  run_traced dybatpho::json_query "data.json" ".value"
-  assert_failure 9
-  run_traced dybatpho::yaml_query "data.yaml" ".value"
-  assert_failure 9
-  unstub yq
+@test "the YAML helpers refuse the Python yq and a Go yq older than v4 by name" {
+  local yaml
+  yaml="$(__yaml_query_fixture)"
+  PATH="$(__json_path_with_fake_yq 'yq 3.4.3')" run -127 dybatpho::yaml_query "${yaml}" '.name'
+  assert_output --partial "the yq on PATH is the Python yq (yq 3.4.3), not the Go one"
+  PATH="$(__json_path_with_fake_yq 'yq version 3.4.1')" run -127 dybatpho::yaml_pretty "${yaml}"
+  assert_output --partial "the yq on PATH is too old (yq version 3.4.1)"
+  PATH="$(__json_path_with_fake_yq 'something else')" run -127 dybatpho::yaml_has "${yaml}" '.name'
+  assert_output --partial "cannot tell which yq is on PATH (something else)"
+}
+
+@test "the yq check runs once for as long as PATH is unchanged" {
+  __json_need_yq
+  local yaml count="${BATS_TEST_TMPDIR}/yq-version-calls" real_yq bin="${BATS_TEST_TMPDIR}/counting-yq"
+  local saved_path="${PATH}"
+  yaml="$(__yaml_query_fixture)"
+  real_yq="$(command -v yq)"
+  mkdir -p "${bin}"
+  printf '#!/usr/bin/env bash\n[[ "$1" != --version ]] || printf x >> %q\nexec %q "$@"\n' \
+    "${count}" "${real_yq}" > "${bin}/yq"
+  chmod +x "${bin}/yq"
+  PATH="${bin}:${PATH}"
+  dybatpho::yaml_query "${yaml}" '.name' > /dev/null
+  dybatpho::yaml_query "${yaml}" '.name' > /dev/null
+  dybatpho::yaml_has "${yaml}" '.name'
+  PATH="${saved_path}"
+  assert_equal "$(cat "${count}")" "x"
+}
+
+@test "JSON and YAML helpers propagate a malformed document or filter" {
+  local broken="${BATS_TEST_TMPDIR}/broken.json"
+  printf '%s\n' '{"a":' > "${broken}"
+  run_traced dybatpho::json_query "${broken}" '.a'
+  assert_failure
+  run_traced dybatpho::json_pretty "${broken}"
+  assert_failure
+  run_traced dybatpho::json_eval '{"a":' '.a'
+  assert_failure
+  __json_need_yq
+  local yaml="${BATS_TEST_TMPDIR}/broken.yaml"
+  printf 'a: [1,\n' > "${yaml}"
+  run_traced dybatpho::yaml_query "${yaml}" '.a'
+  assert_failure
+  run_traced dybatpho::yaml_has "${yaml}" '.a'
+  assert_failure
+  run_traced dybatpho::yaml_to_json "${yaml}"
+  assert_failure
+  run_traced dybatpho::yaml_query "$(__yaml_query_fixture)" '.name | not_a_function'
+  assert_failure
 }
 
 # ---------------------------------------------------------------------------
@@ -202,7 +328,7 @@ EOF
     '"héllo 日本語 đường"'
 }
 
-@test "dybatpho::json_string needs neither yq nor jq" {
+@test "dybatpho::json_string needs no jq" {
   # It is the one JSON helper that is pure shell, so a script that only builds
   # values keeps working on a host with no JSON tool installed.
   local saved_path="${PATH}"
@@ -294,27 +420,18 @@ EOF
   assert_failure
 }
 
-@test "dybatpho::json_valid accepts null and false and refuses blank text on both backends" {
+@test "dybatpho::json_valid accepts null and false and refuses blank text" {
   # `jq -e` fails on a document whose value is `null` or `false`, which is a
   # statement about the value, not about whether the text is JSON.
-  command -v yq > /dev/null || skip "yq is not installed"
-  local saved_path="${PATH}" backend document
-  for backend in yq jq; do
-    if [[ "${backend}" == jq ]]; then
-      PATH="$(__json_path_jq_only)"
-      hash -r
-    fi
-    for document in null false 0 '"text"' '{"a":null}'; do
-      dybatpho::json_valid "${document}" \
-        || { PATH="${saved_path}"; printf '%s refused %s\n' "${backend}" "${document}" >&2; return 1; }
-    done
-    for document in ' ' '{' 'not json'; do
-      ! dybatpho::json_valid "${document}" \
-        || { PATH="${saved_path}"; printf '%s accepted [%s]\n' "${backend}" "${document}" >&2; return 1; }
-    done
+  local document
+  for document in null false 0 '"text"' '{"a":null}'; do
+    run_traced dybatpho::json_valid "${document}"
+    assert_success
   done
-  PATH="${saved_path}"
-  hash -r
+  for document in ' ' '{' 'not json'; do
+    run_traced dybatpho::json_valid "${document}"
+    assert_failure
+  done
 }
 
 @test "the in-memory helpers round-trip a document through both directions" {
@@ -324,32 +441,12 @@ EOF
   assert_equal "$(dybatpho::json_get "${document}" '.text')" "$(printf 'quote " and\nnewline')"
 }
 
-@test "JSON has and pretty helpers also fall back to jq" {
-  local output_file="${BATS_TEST_TMPDIR}/jq-pretty.json"
-  local old_path="${PATH}"
-  stub jq \
-    ": exit 0" \
-    ": printf '{\"ok\":true}\n'" \
-    ": printf '{\"ok\":true}\n'"
-  PATH="$(__json_path_without_yq)"
-
-  dybatpho::json_has "data.json" ".ok"
-
-  assert_equal "$(dybatpho::json_pretty "data.json")" '{"ok":true}'
-
-  dybatpho::json_pretty "data.json" "${output_file}"
-  assert_equal "$(cat "${output_file}")" '{"ok":true}'
-
-  unstub jq
-  PATH="${old_path}"
-}
-
 # ---------------------------------------------------------------------------
 # Editing documents
 # ---------------------------------------------------------------------------
 
 # @description Print a PATH holding the real `jq` and the tools the editing
-#   helpers reach for, but no `yq`, so the fallback runs for real.
+#   helpers reach for, but no `yq`, to prove nothing JSON needs it.
 # @stdout PATH value
 __json_path_jq_only() {
   local bin="${BATS_TEST_TMPDIR}/jq-only-bin" tool
@@ -360,8 +457,8 @@ __json_path_jq_only() {
   printf '%s\n' "${bin}"
 }
 
-# @description Run a command once with `yq` and once with only `jq`, and fail
-#   unless both print the same thing.
+# @description Run a command once with `yq` on PATH and once with only `jq`,
+#   and fail unless both print the same thing.
 # @arg $@ string Command to run
 # @stdout The shared output
 __json_both_backends() {
@@ -575,18 +672,18 @@ __json_fixture() {
   assert_failure
 }
 
-@test "the editing helpers fail clearly without a backend" {
+@test "the editing helpers fail clearly without their command" {
   local empty_path="${BATS_TEST_TMPDIR}/empty-bin" saved_path="${PATH}"
   mkdir -p "${empty_path}"
   PATH="${empty_path}"
   run -127 dybatpho::json_set data.json a 1
   PATH="${saved_path}"
-  assert_output --partial "Neither yq nor jq is installed"
+  assert_output --partial "dybatpho::json_set: jq is not installed"
 
   PATH="$(__json_path_jq_only)"
   run -127 dybatpho::yaml_set data.yaml a 1
   PATH="${saved_path}"
-  assert_output --partial "yq"
+  assert_output --partial "dybatpho::yaml_set: yq is not installed"
 }
 
 @test "dybatpho::yaml_set edits a YAML document and keeps its comments" {

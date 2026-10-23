@@ -22,8 +22,8 @@ tolerance for any other list of files.
 `dybatpho::config_set` changes a value in memory and
 `dybatpho::config_save` writes chosen keys back to a file in the format
 that file already uses: a dotenv rewrite keeps its comments, its blank
-lines, and the order of its assignments, while JSON, YAML, and TOML are
-rewritten through `jq` and `yq` so the rest of the document survives.
+lines, and the order of its assignments, while JSON is rewritten through
+`jq`, and YAML and TOML through `yq`, so the rest of the document survives.
 
 Keys can also be given a typed schema with `dybatpho::config_schema`.
 `dybatpho::config_validate` then applies declared defaults, enforces

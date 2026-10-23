@@ -141,7 +141,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - A file uses CRLF line endings, or another delimiter such as `;`.
 - A field is empty, a row ends with the delimiter, or the input is empty.
 - The input contains the ASCII unit separator the module joins fields with.
-- Neither `jq` nor `yq` is installed and a JSON conversion is asked for.
+- `jq` is not installed and a JSON conversion is asked for, even when `yq` is.
 - The delimiter is empty, longer than one character, a quote, a line break, or the unit separator.
 - A value holds the target delimiter of a conversion, or holds the source delimiter that no longer needs quoting.
 - Conversion to JSON is asked for by a script that loaded `csv` without `json`.
@@ -168,7 +168,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-014**: Filtering MUST print the header followed by the matching rows.
 - **FR-015**: Conversion to JSON MUST produce an array of objects keyed by the header, with every value a JSON string, and an empty array for input with no data rows.
 - **FR-016**: Conversion from JSON MUST take the header from the keys of the first object and write an empty value where a later object lacks a key.
-- **FR-017**: Conversion from JSON MUST produce the same quoting whichever of `jq` or `yq` is available, and MUST report a document that is not an array of objects.
+- **FR-017**: Conversion from JSON MUST run through `jq`, produce the same CSV whether or not `yq` is installed, MUST report a document that is not an array of objects, and MUST stop with exit code 127 naming `jq` when it is missing.
 - **FR-018**: The delimiter MUST be configurable through `DYBATPHO_CSV_DELIMITER` for reading and writing alike.
 - **FR-019**: A CRLF line ending MUST NOT become part of the last field of a row.
 - **FR-020**: `tab` and `\t` MUST name a tab wherever a delimiter is accepted.
@@ -185,7 +185,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-031**: An empty key MUST match nothing, and the right key column MUST default to the left one's name.
 - **FR-032**: Joining MUST reject an unknown join type, a key column a side lacks, and reading both inputs from stdin.
 - **FR-033**: Text between a closing quote and the next delimiter, or the end of the record, MUST be kept in that one field and MUST NOT be read again as a field of its own.
-- **FR-034**: Conversion from JSON MUST write nothing and succeed for an empty array, the same on the `jq` and `yq` backends.
+- **FR-034**: Conversion from JSON MUST write nothing and succeed for an empty array.
 - **FR-035**: Loading the module MUST NOT load `json` up front. Conversion to JSON MUST load it on demand when it is not loaded, and MUST stop before reading its input with `<function> needs the json module, ...` only when it cannot be loaded; every other function, including conversion from JSON, MUST work without it.
 - **FR-036**: Refusing input that contains the ASCII unit separator MUST name the public function that was called, whether it reads its input directly or through the shared loader.
 - **FR-037**: `csv_read`, `csv_fields` and `csv_write` MUST read and fill the array the caller named whatever that name is, including names the functions use for their own locals.
@@ -251,7 +251,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-037**: Join with one side on stdin and a configured delimiter, an empty left, an empty right, and a right side holding only its key.
 - **IT-038**: Reject an unknown join type, a missing key column, two stdins, and a row wider than its header.
 - **IT-039**: Read stray text after a closing quote as part of that field, in the middle of a record, at its end, and before a trailing delimiter.
-- **IT-040**: Convert an empty JSON array to no output and no error, through `jq` and through `yq` alone.
+- **IT-040**: Convert an empty JSON array to no output and no error; stop with 127 naming `jq` when only `yq` is installed.
 - **IT-041**: Verify a script that loads `csv` alone can read a column, that its conversion to JSON loads `json` on demand and converts, and that naming `json` up front converts the same way.
 - **IT-042**: Choose a column by position in `csv_col`, `csv_filter` and `csv_join`, and prefer a header literally named like the position.
 - **IT-043**: Refuse a unit separator in `csv_read` and in `csv_col`, and report each under its own name.
@@ -259,10 +259,10 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-045**: Convert `[]` and an empty table, sort `n,v`, and get status 0.
 - **IT-046**: Filter `n gt Zed` over `Zed` and `apple` under `en_US.UTF-8` and keep `apple` only.
 - **IT-047**: Read `TV,55"` followed by more records and get each record on its own; read a quoted field still open at the line end and get it joined with the next line.
-- **IT-048**: Convert `false`, `0`, `null` and a missing key to CSV with `jq` and with only `yq`; convert CSV to JSON with a backslash and a tab in a cell.
+- **IT-048**: Convert `false`, `0`, `null` and a missing key to CSV, with and without `yq` on `PATH`, to the same output; convert CSV to JSON with a backslash and a tab in a cell.
 
 ## Acceptance Criteria *(mandatory)*
 
-1. Reading and writing CSV needs no external command; only the JSON conversion asks for `jq` or `yq`.
+1. Reading and writing CSV needs no external command; only the JSON conversion asks for `jq`.
 2. Text output goes to stdout so the helpers compose in pipelines and command substitution.
 3. Input that cannot be represented faithfully stops the script with a message naming the row or the value, rather than producing a file that is quietly wrong.

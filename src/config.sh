@@ -24,8 +24,8 @@
 #   `dybatpho::config_set` changes a value in memory and
 #   `dybatpho::config_save` writes chosen keys back to a file in the format
 #   that file already uses: a dotenv rewrite keeps its comments, its blank
-#   lines, and the order of its assignments, while JSON, YAML, and TOML are
-#   rewritten through `jq` and `yq` so the rest of the document survives.
+#   lines, and the order of its assignments, while JSON is rewritten through
+#   `jq`, and YAML and TOML through `yq`, so the rest of the document survives.
 #
 #   Keys can also be given a typed schema with `dybatpho::config_schema`.
 #   `dybatpho::config_validate` then applies declared defaults, enforces
@@ -118,10 +118,11 @@ function __dybatpho_config_load_dotenv {
 #   dotted key as the nested form; when a file spells it both ways, the one read
 #   later wins.
 #
-#   Both backends print a key, a tab and the value with tabs, line breaks,
-#   carriage returns and backslashes escaped, the way `jq`'s `@tsv` does; the
+#   YAML and TOML are read into JSON by `yq` first, so every format is
+#   flattened by the same `jq` filter and a value reads back the same whichever
+#   file it came from. The filter prints a key, a tab and the value with tabs,
+#   line breaks, carriage returns and backslashes escaped, as `@tsv` does; the
 #   value is unescaped once it is read, so a line break inside a value survives.
-#   `yq`'s own `@tsv` is not used for this: it quotes the way CSV does.
 # @arg $1 string Format: `json`, `yaml` or `toml`
 # @arg $2 path File to read
 # @set DYBATPHO_CONFIG
@@ -129,56 +130,35 @@ function __dybatpho_config_load_dotenv {
 # @internal
 #######################################
 function __dybatpho_config_load_structured {
-  local file format key value entries label root
+  local file format key value entries label document=""
   format="$1"
   file="$2"
-  if [[ "${format}" == json ]]; then
-    dybatpho::require jq
-    entries=$(jq -r '
-      def flat($prefix):
-        to_entries[]
-        | ($prefix + [.key]) as $path
-        | if (.value | type) == "object" and (.value | length) > 0
-          then .value | flat($path)
-          else [($path | join(".")), (.value | tostring)] | @tsv
-          end;
-      if type != "object" then error("root must be an object") else flat([]) end
-    ' "${file}") \
-      || dybatpho::die "Invalid JSON configuration: ${file}"
-  else
+  dybatpho::require jq
+  case "${format}" in
+    json) label=JSON ;;
+    toml) label=TOML ;;
+    *) label=YAML ;;
+  esac
+  if [[ "${format}" != json ]]; then
     dybatpho::require yq
-    local -a parse=()
-    if [[ "${format}" == toml ]]; then
-      label=TOML
-      parse=(-p toml -o yaml)
-    else
-      label=YAML
-      parse=(-p yaml -o yaml)
-    fi
-    # The root check is its own call on purpose. `yq` is not `jq`: it has no
-    # `if ... then ... else ... end`, and its `select` does not hold back the
-    # branch it guards here, so the check cannot ride along with the query.
-    # Reading the tag first also keeps a sequence root from being loaded under
-    # the keys `0`, `1`, ... instead of being rejected.
-    root=$(yq ${parse[@]+"${parse[@]}"} -r 'tag' "${file}" 2> /dev/null) \
+    document=$(yq -p "${format}" -o json -I 0 '.' "${file}" 2> /dev/null) \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
-    [[ "${root}" == "!!map" ]] \
+  fi
+  # shellcheck disable=SC2016 # `$prefix` and `$path` are jq variables
+  local filter='
+    def flat($prefix):
+      to_entries[]
+      | ($prefix + [.key]) as $path
+      | if (.value | type) == "object" and (.value | length) > 0
+        then .value | flat($path)
+        else [($path | join(".")), (.value | tostring)] | @tsv
+        end;
+    if type != "object" then error("root must be an object") else flat([]) end'
+  if [[ "${format}" == json ]]; then
+    entries=$(jq -r "${filter}" "${file}") \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
-    # `yq` has no recursive definitions, so the walk visits every node and keeps
-    # the leaves no sequence encloses: values, sequences and empty mappings.
-    # `${0}${0}` doubles a backslash; a replacement spelled with backslashes is
-    # unescaped once more than it looks.
-    # shellcheck disable=SC2016 # `${0}` is yq's match reference, not a shell expansion
-    entries=$(yq ${parse[@]+"${parse[@]}"} -r '
-      ..
-      | select(path | length > 0)
-      | select(parents | all_c(tag != "!!seq"))
-      | select(tag != "!!map" or length == 0)
-      | (path | join(".")) + "\t" + (
-          ((select(tag == "!!seq" or tag == "!!map") | to_json(0)) // tostring)
-          | sub("\\x5c"; "${0}${0}") | sub("\t"; "\\\\t") | sub("\n"; "\\\\n") | sub("\r"; "\\\\r")
-        )
-    ' "${file}") \
+  else
+    entries=$(jq -r "${filter}" <<< "${document}") \
       || dybatpho::die "Invalid ${label} configuration: ${file}"
   fi
   if [[ -n "${entries}" ]]; then

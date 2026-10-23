@@ -51,8 +51,8 @@ Only programming mistakes, such as a missing argument, are fatal.
 - [`dybatpho::assert_json_query`](#dybatphoassert_json_query) — Assert that a JSON query prints an expected value.
 - [`dybatpho::assert_json_has`](#dybatphoassert_json_has) — Assert that a JSON filter matches something in the document.
 - [`dybatpho::assert_yaml_valid`](#dybatphoassert_yaml_valid) — Assert that a document is parsable YAML.
-- [`dybatpho::assert_yaml_query`](#dybatphoassert_yaml_query) — Assert that a YAML expression prints an expected value.
-- [`dybatpho::assert_yaml_has`](#dybatphoassert_yaml_has) — Assert that a YAML expression matches something in the document.
+- [`dybatpho::assert_yaml_query`](#dybatphoassert_yaml_query) — Assert that a `jq` filter over a YAML document prints an expected value.
+- [`dybatpho::assert_yaml_has`](#dybatphoassert_yaml_has) — Assert that a `jq` filter matches something in a YAML document.
 - [`dybatpho::snapshot_scrub`](#dybatphosnapshot_scrub) — Register a substitution applied to text before it is snapshotted.
 - [`dybatpho::snapshot_scrub_reset`](#dybatphosnapshot_scrub_reset) — Forget every registered snapshot substitution.
 - [`dybatpho::assert_snapshot`](#dybatphoassert_snapshot) — Compare text against a stored snapshot, creating it when missing.
@@ -134,11 +134,11 @@ dybatpho::assert_mock_called kubectl get pods
 
 **[`dybatpho::assert_json_query`](#dybatphoassert_json_query)**
 
-- String scalars are compared without their JSON quoting, so an expected value of `1.4.2` matches a backend result of `"1.4.2"`.
+- String scalars are compared without their JSON quoting, so an expected value of `1.4.2` matches a `jq` result of `"1.4.2"`.
 
 **[`dybatpho::assert_yaml_query`](#dybatphoassert_yaml_query)**
 
-- String scalars are compared without their JSON quoting, so an expected value of `1.4.2` matches a backend result of `"1.4.2"`.
+- String scalars are compared without their JSON quoting, so an expected value of `1.4.2` matches a quoted result of `"1.4.2"`.
 
 **[`dybatpho::snapshot_scrub`](#dybatphosnapshot_scrub)**
 
@@ -378,7 +378,7 @@ dybatpho::assert_json_query package.json '.version' "1.4.2"
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | JSON file path, or `-` for stdin |
-| `$2` | string | Query filter understood by the JSON backend |
+| `$2` | string | `jq` filter |
 | `$3` | string | Expected query result |
 
 **📝 Notes**
@@ -401,7 +401,7 @@ Assert that a JSON filter matches something in the document.
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | JSON file path, or `-` for stdin |
-| `$2` | string | Query filter that must succeed |
+| `$2` | string | `jq` filter that must succeed |
 
 **📝 Notes**
 
@@ -437,14 +437,14 @@ Assert that a document is parsable YAML.
 
 ### `dybatpho::assert_yaml_query`
 
-Assert that a YAML expression prints an expected value.
+Assert that a `jq` filter over a YAML document prints an expected value.
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | YAML file path, or `-` for stdin |
-| `$2` | string | `yq` expression |
+| `$2` | string | `jq` filter, run by `dybatpho::yaml_query` |
 | `$3` | string | Expected result |
 
 **📝 Notes**
@@ -453,21 +453,21 @@ Assert that a YAML expression prints an expected value.
 
 **🚦 Exit codes**
 
-- `0`: The expression result matches
-- `1`: The expression failed or returned a different value
+- `0`: The filter result matches
+- `1`: The filter failed or returned a different value
 
 ---
 
 ### `dybatpho::assert_yaml_has`
 
-Assert that a YAML expression matches something in the document.
+Assert that a `jq` filter matches something in a YAML document.
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | YAML file path, or `-` for stdin |
-| `$2` | string | `yq` expression that must succeed |
+| `$2` | string | `jq` filter that must succeed |
 
 **📝 Notes**
 
@@ -475,8 +475,8 @@ Assert that a YAML expression matches something in the document.
 
 **🚦 Exit codes**
 
-- `0`: The expression matched
-- `1`: The expression did not match
+- `0`: The filter matched
+- `1`: The filter did not match
 
 ---
 

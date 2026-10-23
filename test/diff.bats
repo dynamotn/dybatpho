@@ -220,6 +220,20 @@ SCRIPT
   assert_stderr --partial "jq is required"
 }
 
+@test "dybatpho::diff_yaml says so when yq is not installed" {
+  # The conversions silence their own errors, so a missing `yq` used to end
+  # the script with no message at all.
+  local script="${BATS_TEST_TMPDIR}/no_yq.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules diff json
+dybatpho::diff_yaml 'a: 1' 'a: 2'
+SCRIPT
+
+  PATH="$(path_without yq)" run --separate-stderr bash "${script}"
+  assert_failure 127
+  assert_stderr --partial "dybatpho::diff_yaml: yq is not installed"
+}
+
 @test "dybatpho::assert_snapshot renders its mismatch through the diff module" {
   # The snapshot assertion used to dump a raw `diff -u`; the point of wiring it
   # here is that a failure reads like every other comparison the library shows.

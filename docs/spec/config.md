@@ -270,9 +270,9 @@ dybatpho::config_save ./config.yaml PORT
   double quotes, and escaped double-quoted values without sourcing the file.
 - **FR-005**: JSON loading MUST use `jq`, require an object root, and reject
   malformed data or invalid keys.
-- **FR-006**: YAML and TOML loading MUST use the supported `yq` interface,
-  determine the root's tag before reading entries, require a mapping root, and
-  reject malformed data or invalid keys.
+- **FR-006**: YAML and TOML loading MUST read the document into JSON with the
+  Go `yq` v4 and flatten it with the same `jq` filter JSON uses, require a
+  mapping root, and reject malformed data or invalid keys.
 - **FR-007**: Configuration keys MUST match
   `[a-zA-Z_][a-zA-Z0-9_.-]*`.
 - **FR-008**: `config_env` MUST import all variables matching an optional
@@ -328,8 +328,8 @@ dybatpho::config_save ./config.yaml PORT
 - **FR-029**: Loading JSON, YAML, or TOML MUST store every value of a nested
   mapping under its dotted path (`server.port`), MUST store a sequence or an
   empty mapping under its own key as compact JSON without walking into it, and
-  MUST keep tabs, line breaks, and backslashes in values; the `jq` and `yq`
-  backends MUST produce the same keys and values.
+  MUST keep tabs, line breaks, and backslashes in values; the same data in
+  JSON, YAML, and TOML MUST produce the same keys and values.
 - **FR-030**: `dybatpho::config_save` MUST write a numeric value of a numeric schema type without leading zeros, so the file it writes loads back.
 
 ### Key Entities *(include if feature involves data)*

@@ -352,52 +352,30 @@ EOF
   assert_line --index 1 "1"
 }
 
-@test "dybatpho::csv_from_json writes the same CSV when only yq is installed" {
-  # The two backends quote differently on their own, so the conversion is read
-  # back and written out by this module either way. Nothing proved the yq half
-  # of that: `jq` is installed here, so the other branch always won.
-  command -v yq > /dev/null || skip "yq is not installed"
-
+@test "dybatpho::csv_from_json needs jq and says so, even with yq installed" {
   # From a file, not `bash -c`: a `-c` shell has an empty `BASH_SOURCE`, which
   # the kcov hook expands on every command once `init.sh` turns on `set -u`.
-  local script="${BATS_TEST_TMPDIR}/yq_only.sh"
+  local script="${BATS_TEST_TMPDIR}/no_jq.sh"
   cat > "${script}" << SCRIPT
 . $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
-# \`dybatpho::coalesce_cmd\` asks \`command -v\`, so jq has to be missing from
+# \`dybatpho::is command\` asks \`command -v\`, so jq has to be missing from
 # the path; shadowing the name is not enough.
 command -v jq > /dev/null && exit 3
-dybatpho::csv_from_json '[{"name":"Doe, John","note":"line one\nline two","qty":"3"},{"name":"x","note":"ok","qty":"10"}]'
+dybatpho::csv_from_json '[{"name":"x"}]'
 SCRIPT
 
-  PATH="$(path_without jq)" run_traced bash "${script}"
-  assert_success
-  assert_output - << EOF
-name,note,qty
-"Doe, John","line one
-line two",3
-x,ok,10
-EOF
+  PATH="$(path_without jq)" run --separate-stderr bash "${script}"
+  assert_failure 127
+  assert_stderr --partial "dybatpho::csv_from_json: jq is not installed"
 }
 
-@test "dybatpho::csv_from_json writes nothing for an empty array on either backend" {
+@test "dybatpho::csv_from_json writes nothing for an empty array" {
   # An empty array is an array of objects with none in it. `jq` used to stop
   # on it, reading the header from a first object that is not there.
   run_traced --separate-stderr dybatpho::csv_from_json '[]'
   assert_success
   assert_output ""
   assert_equal "${stderr}" ""
-
-  command -v yq > /dev/null || skip "yq is not installed"
-  local script="${BATS_TEST_TMPDIR}/yq_only_empty.sh"
-  cat > "${script}" << SCRIPT
-. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
-command -v jq > /dev/null && exit 3
-dybatpho::csv_from_json '[]'
-SCRIPT
-
-  PATH="$(path_without jq)" run_traced bash "${script}"
-  assert_success
-  assert_output ""
 }
 
 @test "dybatpho::csv_from_json reports a document that is not an array of objects" {
@@ -852,20 +830,16 @@ true,1,,
 EOF
 }
 
-@test "dybatpho::csv_from_json writes null as an empty value when only yq is installed" {
-  command -v yq > /dev/null || skip "yq is not installed"
-  local script="${BATS_TEST_TMPDIR}/yq_only_null.sh"
-  cat > "${script}" << SCRIPT
-. $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules csv
-command -v jq > /dev/null && exit 3
-dybatpho::csv_from_json '[{"a":false,"b":0,"c":null,"d":"x"},{"a":true,"b":1}]'
-SCRIPT
-  PATH="$(path_without jq)" run_traced bash "${script}"
+@test "dybatpho::csv_from_json writes the same CSV with or without yq installed" {
+  local document='[{"name":"Doe, John","note":"line one\nline two","n":null,"f":false}]' with
+  with="$(dybatpho::csv_from_json "${document}")"
+  PATH="$(path_without yq)" run_traced dybatpho::csv_from_json "${document}"
   assert_success
+  assert_output "${with}"
   assert_output - << EOF
-a,b,c,d
-false,0,,x
-true,1,,
+name,note,n,f
+"Doe, John","line one
+line two",,false
 EOF
 }
 

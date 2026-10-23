@@ -10,29 +10,36 @@ Utilities for working with JSON and YAML data
 
 ## ✨ Overview
 
-This module contains helpers for querying, validating, formatting, and
-converting JSON and YAML documents through `yq`, with `jq` kept as a JSON
-fallback where practical.
+This module contains helpers for querying, validating, formatting, editing,
+and converting JSON and YAML documents. Every filter a caller writes is a
+`jq` filter and runs through `jq`, whatever else is installed, so a script
+prints the same result on every machine.
+
+`jq` is required by the module. The Go `yq` v4 is needed only to read YAML
+(or TOML, chosen by the file extension) into JSON before `jq` sees it, to
+write YAML back out, and to edit a YAML file in place, which it does so the
+file's comments and layout survive. A YAML helper refuses the unrelated
+Python `yq` by name rather than misreading its output.
 
 ### 🚀 Highlights
 
-- [`dybatpho::json_query`](#dybatphojson_query) — Query a JSON document with `yq`, or `jq` as a fallback.
-- [`dybatpho::json_has`](#dybatphojson_has) — Return success when a JSON document satisfies a filter.
+- [`dybatpho::json_query`](#dybatphojson_query) — Query a JSON document with a `jq` filter.
+- [`dybatpho::json_has`](#dybatphojson_has) — Return success when a JSON document satisfies a `jq` filter. The filter succeeds when its last output is neither `false` nor `null`; a filter that produces nothing at all fails the same way.
 - [`dybatpho::json_pretty`](#dybatphojson_pretty) — Pretty-print a JSON document.
 - [`dybatpho::json_to_yaml`](#dybatphojson_to_yaml) — Convert a JSON document to YAML.
-- [`dybatpho::yaml_query`](#dybatphoyaml_query) — Query a YAML document with `yq`.
-- [`dybatpho::yaml_has`](#dybatphoyaml_has) — Return success when a YAML document satisfies a `yq` expression.
+- [`dybatpho::yaml_query`](#dybatphoyaml_query) — Query a YAML document with a `jq` filter. The document is read into JSON by `yq` and the filter runs in `jq`, so it is written exactly as it would be for `dybatpho::json_query`. Each result is printed back as YAML: a scalar on its own line without quotes, a mapping or a sequence in block style.
+- [`dybatpho::yaml_has`](#dybatphoyaml_has) — Return success when a YAML document satisfies a `jq` filter.
 - [`dybatpho::yaml_pretty`](#dybatphoyaml_pretty) — Pretty-print a YAML document.
-- [`dybatpho::yaml_to_json`](#dybatphoyaml_to_json) — Convert a YAML document to JSON.
+- [`dybatpho::yaml_to_json`](#dybatphoyaml_to_json) — Convert a YAML document to JSON. The JSON is printed by `jq`, so it is laid out exactly as `dybatpho::json_pretty` lays out the same data.
 - [`dybatpho::json_string`](#dybatphojson_string) — Encode a string as a JSON string value, surrounding quotes included. Use this instead of wrapping text in quotes by hand: a value containing a quotation mark, a backslash, or a newline breaks hand-built JSON and this does not.
 - [`dybatpho::json_object`](#dybatphojson_object) — Build a JSON object from name and value pairs. Every value is escaped, so no caller has to think about quoting. A name ending in `:json` marks a value that is already a JSON document and is inserted as-is, which is how you nest an object or an array.
-- [`dybatpho::json_eval`](#dybatphojson_eval) — Evaluate a filter against a JSON document held in a variable. Unlike `dybatpho::json_query`, which reads a file, this works on a document a script is still assembling.
-- [`dybatpho::json_get`](#dybatphojson_get) — Evaluate a filter and print the result as a bare scalar. Strings come back without surrounding quotes, so the result drops straight into a shell variable.
+- [`dybatpho::json_eval`](#dybatphojson_eval) — Evaluate a `jq` filter against a JSON document held in a variable. Unlike `dybatpho::json_query`, which reads a file, this works on a document a script is still assembling.
+- [`dybatpho::json_get`](#dybatphojson_get) — Evaluate a `jq` filter and print the result as a bare scalar. Strings come back without surrounding quotes, so the result drops straight into a shell variable; an object or an array is printed as pretty JSON.
 - [`dybatpho::json_valid`](#dybatphojson_valid) — Return success when a JSON document held in a variable is valid.
 - [`dybatpho::json_set`](#dybatphojson_set) — Set the value at a path in a JSON document. The path is a list of keys separated by `.`, such as `spec.ports.0.name`, where a segment of digits indexes an array. Missing objects and arrays on the way are created. The value is stored as a string unless `--json` says it is a JSON document, which is how a number, a boolean, `null`, an array, or an object is written.
 - [`dybatpho::json_del`](#dybatphojson_del) — Remove the value at a path from a JSON document. Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does not exist leaves the document unchanged, and deleting an array element shifts the ones after it.
 - [`dybatpho::json_merge`](#dybatphojson_merge) — Deep-merge two JSON objects, the overlay winning. Objects present in both are merged key by key; any other value, arrays included, is replaced by the overlay's. Both documents must be objects.
-- [`dybatpho::yaml_set`](#dybatphoyaml_set) — Set the value at a path in a YAML document. Paths and `--json` work as in `dybatpho::json_set`. Comments and the rest of the document's layout are kept as `yq` keeps them.
+- [`dybatpho::yaml_set`](#dybatphoyaml_set) — Set the value at a path in a YAML document. Paths and `--json` work as in `dybatpho::json_set`. The edit is made by `yq` itself, not through JSON, so comments and the rest of the document's layout are kept as `yq` keeps them; this needs `yq` but not `jq`.
 - [`dybatpho::yaml_del`](#dybatphoyaml_del) — Remove the value at a path from a YAML document. Paths work as in `dybatpho::json_set`, and an absent path is not an error.
 - [`dybatpho::yaml_merge`](#dybatphoyaml_merge) — Deep-merge two YAML mappings, the overlay winning. Merging follows `dybatpho::json_merge`: mappings merge key by key, and every other value is replaced by the overlay's.
 
@@ -46,16 +53,12 @@ fallback where practical.
 
 ## 💡 Tips
 
-- The YAML helpers target the Mike Farah `yq` command line (`yq eval ...`)
-- JSON helpers prefer `yq` because it can read JSON directly, and fall back to `jq` when needed
+- Write filters in `jq`'s language: `keys` is sorted, `?`, `add`, `def`, `@json` and `ascii_downcase` all work
+- A filter written for `yq` (`eval`, `strenv(...)`, `tag`, `downcase`, `ireduce`) no longer works and must be rewritten for `jq`
 
 **[`dybatpho::json_object`](#dybatphojson_object)**
 
 - Build nested structures from the inside out, passing each finished document through a `:json` name
-
-**[`dybatpho::json_eval`](#dybatphojson_eval)**
-
-- Write filters in the subset both backends share: `yq` has no `def`, and spells `ascii_downcase` as `downcase`
 
 **[`dybatpho::json_set`](#dybatphojson_set)**
 
@@ -67,43 +70,59 @@ fallback where practical.
 
 ### `dybatpho::json_query`
 
-Query a JSON document with `yq`, or `jq` as a fallback.
+Query a JSON document with a `jq` filter.
+
+**🧪 Examples**
+
+```bash
+dybatpho::json_query package.json '.version'
+
+```
+
+```bash
+dybatpho::json_query data.json '.items[] | select(.name == $n)' --arg n api
+
+```
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | JSON file path or `-` for stdin |
-| `$2` | string | Query filter |
-| `$@` | string | Extra arguments forwarded to the selected backend |
+| `$2` | string | `jq` filter |
+| `$@` | string | Extra arguments forwarded to `jq`, such as `--arg name value` |
 
 **📤 Output on stdout**
 
-- Result of the JSON query
+- Result of the query, as `jq` prints it
 
 **🚦 Exit codes**
 
 - `0`: Query succeeded
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s own exit code when the document or the filter is invalid
+- `127`: `jq` is not installed
 
 ---
 
 ### `dybatpho::json_has`
 
-Return success when a JSON document satisfies a filter.
+Return success when a JSON document satisfies a `jq` filter.
+The filter succeeds when its last output is neither `false` nor `null`;
+a filter that produces nothing at all fails the same way.
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | JSON file path or `-` for stdin |
-| `$2` | string | Query filter |
+| `$2` | string | `jq` filter |
 
 **🚦 Exit codes**
 
 - `0`: The filter succeeds
-- `1`: The filter fails
-- `127`: Neither `yq` nor `jq` is installed
+- `1`: The filter's last output is `false` or `null`, or it has none
+- `other`: `jq`'s own exit code when the document or the filter is invalid
+- `127`: `jq` is not installed
 
 ---
 
@@ -116,7 +135,7 @@ Pretty-print a JSON document.
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | JSON file path or `-` for stdin |
-| `$2` | string | no |  | Output file path |
+| `$2` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -125,7 +144,8 @@ Pretty-print a JSON document.
 **🚦 Exit codes**
 
 - `0`: Formatting succeeded
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s own exit code when the document is invalid
+- `127`: `jq` is not installed
 
 ---
 
@@ -138,7 +158,7 @@ Convert a JSON document to YAML.
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | JSON file path or `-` for stdin |
-| `$2` | string | no |  | Output file path |
+| `$2` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -147,49 +167,63 @@ Convert a JSON document to YAML.
 **🚦 Exit codes**
 
 - `0`: Conversion succeeded
-- `127`: `yq` is not installed
+- `other`: `yq`'s own exit code when the document is invalid
+- `127`: The Go `yq` v4 is not installed
 
 ---
 
 ### `dybatpho::yaml_query`
 
-Query a YAML document with `yq`.
+Query a YAML document with a `jq` filter.
+The document is read into JSON by `yq` and the filter runs in `jq`, so it is
+written exactly as it would be for `dybatpho::json_query`. Each result is
+printed back as YAML: a scalar on its own line without quotes, a mapping or
+a sequence in block style.
+
+**🧪 Example**
+
+```bash
+dybatpho::yaml_query compose.yaml '.services | keys[]'
+
+```
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$1` | string | YAML file path or `-` for stdin |
-| `$2` | string | yq expression |
-| `$@` | string | Extra arguments forwarded to `yq eval` |
+| `$1` | string | YAML file path or `-` for stdin; a `.toml` or `.json` file is read in its own format |
+| `$2` | string | `jq` filter |
+| `$@` | string | Extra arguments forwarded to `jq`, such as `--arg name value` |
 
 **📤 Output on stdout**
 
-- Result of the yq query
+- Every result of the filter, as YAML
 
 **🚦 Exit codes**
 
 - `0`: Query succeeded
-- `127`: `yq` is not installed
+- `other`: The exit code of `yq` or `jq` when the document or the filter is invalid
+- `127`: `jq` or the Go `yq` v4 is not installed
 
 ---
 
 ### `dybatpho::yaml_has`
 
-Return success when a YAML document satisfies a `yq` expression.
+Return success when a YAML document satisfies a `jq` filter.
 
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | YAML file path or `-` for stdin |
-| `$2` | string | yq expression |
+| `$2` | string | `jq` filter |
 
 **🚦 Exit codes**
 
-- `0`: The expression succeeds
-- `1`: The expression fails
-- `127`: `yq` is not installed
+- `0`: The filter succeeds
+- `1`: The filter's last output is `false` or `null`, or it has none
+- `other`: The exit code of `yq` or `jq` when the document or the filter is invalid
+- `127`: `jq` or the Go `yq` v4 is not installed
 
 ---
 
@@ -202,7 +236,7 @@ Pretty-print a YAML document.
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | YAML file path or `-` for stdin |
-| `$2` | string | no |  | Output file path |
+| `$2` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -211,20 +245,23 @@ Pretty-print a YAML document.
 **🚦 Exit codes**
 
 - `0`: Formatting succeeded
-- `127`: `yq` is not installed
+- `other`: `yq`'s own exit code when the document is invalid
+- `127`: The Go `yq` v4 is not installed
 
 ---
 
 ### `dybatpho::yaml_to_json`
 
 Convert a YAML document to JSON.
+The JSON is printed by `jq`, so it is laid out exactly as
+`dybatpho::json_pretty` lays out the same data.
 
 **🧾 Arguments**
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | YAML file path or `-` for stdin |
-| `$2` | string | no |  | Output file path |
+| `$2` | string | no |  | Output file path, which may be the input file |
 
 **📤 Output on stdout**
 
@@ -233,7 +270,8 @@ Convert a YAML document to JSON.
 **🚦 Exit codes**
 
 - `0`: Conversion succeeded
-- `127`: `yq` is not installed
+- `other`: `yq`'s own exit code when the document is invalid
+- `127`: `jq` or the Go `yq` v4 is not installed
 
 ---
 
@@ -259,7 +297,7 @@ dybatpho::json_string 'he said "hi"' # "he said \"hi\""
 
 **📝 Notes**
 
-- Quoting is done in the shell, so this is the one JSON helper that needs neither `yq` nor `jq`
+- Quoting is done in the shell, so this is the one JSON helper that does not need `jq`
 
 **📤 Output on stdout**
 
@@ -306,14 +344,15 @@ dybatpho::json_object name api ports:json '[80,443]'
 **🚦 Exit codes**
 
 - `0`: The object was built
-- `1`: An odd number of arguments, or an invalid nested document
-- `127`: Neither `yq` nor `jq` is installed
+- `1`: An odd number of arguments
+- `other`: `jq`'s own exit code when a nested document is invalid
+- `127`: `jq` is not installed
 
 ---
 
 ### `dybatpho::json_eval`
 
-Evaluate a filter against a JSON document held in a variable.
+Evaluate a `jq` filter against a JSON document held in a variable.
 Unlike `dybatpho::json_query`, which reads a file, this works on a document a
 script is still assembling.
 
@@ -331,7 +370,7 @@ messages=$(dybatpho::json_eval "${messages}" \
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | JSON document |
-| `$2` | string | Filter |
+| `$2` | string | `jq` filter |
 
 **📤 Output on stdout**
 
@@ -340,8 +379,8 @@ messages=$(dybatpho::json_eval "${messages}" \
 **🚦 Exit codes**
 
 - `0`: The filter succeeded
-- `1`: Invalid input or filter
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s own exit code for an invalid document or filter
+- `127`: `jq` is not installed
 
 **🔗 See also**
 
@@ -351,9 +390,9 @@ messages=$(dybatpho::json_eval "${messages}" \
 
 ### `dybatpho::json_get`
 
-Evaluate a filter and print the result as a bare scalar.
+Evaluate a `jq` filter and print the result as a bare scalar.
 Strings come back without surrounding quotes, so the result drops straight
-into a shell variable.
+into a shell variable; an object or an array is printed as pretty JSON.
 
 **🧪 Example**
 
@@ -368,17 +407,17 @@ text=$(dybatpho::json_get "${response}" '.choices[0].message.content // ""')
 | Name | Type | Description |
 | --- | --- | --- |
 | `$1` | string | JSON document |
-| `$2` | string | Filter |
+| `$2` | string | `jq` filter |
 
 **📤 Output on stdout**
 
-- Filter result, unquoted for scalars
+- Filter result, unquoted for strings
 
 **🚦 Exit codes**
 
 - `0`: The filter succeeded
-- `1`: Invalid input or filter
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s own exit code for an invalid document or filter
+- `127`: `jq` is not installed
 
 **🔗 See also**
 
@@ -407,7 +446,7 @@ dybatpho::json_valid "${answer}" || dybatpho::warn "The model did not return JSO
 
 - `0`: The document parses as JSON
 - `1`: The document is not valid JSON
-- `127`: Neither `yq` nor `jq` is installed
+- `127`: `jq` is not installed
 
 ---
 
@@ -444,7 +483,7 @@ dybatpho::json_set --json config.json server.ports '[80,443]'
 
 **📝 Notes**
 
-- The path and the value reach the backend as arguments, never as part of the expression, so neither needs escaping
+- The path and the value reach `jq` as arguments, never as part of the expression, so neither needs escaping
 
 **📤 Output on stdout**
 
@@ -454,8 +493,8 @@ dybatpho::json_set --json config.json server.ports '[80,443]'
 
 - `0`: The value was set
 - `1`: Invalid arguments, path, or `--json` value
-- `other`: The backend's exit code when the input is invalid or the path runs through a scalar
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s exit code when the input is invalid or the path runs through a scalar
+- `127`: `jq` is not installed
 
 ---
 
@@ -489,8 +528,8 @@ dybatpho::json_del package.json scripts.prepublish package.json
 
 - `0`: The path was removed or was already absent
 - `1`: Invalid arguments or path
-- `other`: The backend's exit code when the input is invalid
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s exit code when the input is invalid
+- `127`: `jq` is not installed
 
 ---
 
@@ -523,16 +562,17 @@ dybatpho::json_merge defaults.json local.json > effective.json
 
 - `0`: The documents were merged
 - `1`: Invalid arguments
-- `other`: The backend's exit code when a document is not an object or is invalid
-- `127`: Neither `yq` nor `jq` is installed
+- `other`: `jq`'s exit code when a document is not an object or is invalid
+- `127`: `jq` is not installed
 
 ---
 
 ### `dybatpho::yaml_set`
 
 Set the value at a path in a YAML document.
-Paths and `--json` work as in `dybatpho::json_set`. Comments and the rest of
-the document's layout are kept as `yq` keeps them.
+Paths and `--json` work as in `dybatpho::json_set`. The edit is made by
+`yq` itself, not through JSON, so comments and the rest of the document's
+layout are kept as `yq` keeps them; this needs `yq` but not `jq`.
 
 **🧪 Examples**
 
@@ -564,8 +604,8 @@ dybatpho::yaml_set --json values.yaml replicas 3
 
 - `0`: The value was set
 - `1`: Invalid arguments, path, or `--json` value
-- `other`: The backend's exit code when the input is invalid or the path runs through a scalar
-- `127`: `yq` is not installed
+- `other`: `yq`'s exit code when the input is invalid or the path runs through a scalar
+- `127`: The Go `yq` v4 is not installed
 
 ---
 
@@ -597,8 +637,8 @@ dybatpho::yaml_del compose.yaml services.debug compose.yaml
 
 - `0`: The path was removed or was already absent
 - `1`: Invalid arguments or path
-- `other`: The backend's exit code when the input is invalid
-- `127`: `yq` is not installed
+- `other`: `yq`'s exit code when the input is invalid
+- `127`: The Go `yq` v4 is not installed
 
 ---
 
@@ -631,5 +671,5 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 
 - `0`: The documents were merged
 - `1`: Invalid arguments
-- `other`: The backend's exit code when a document is not a mapping or is invalid
-- `127`: `yq` is not installed
+- `other`: `yq`'s exit code when a document is not a mapping or is invalid
+- `127`: The Go `yq` v4 is not installed

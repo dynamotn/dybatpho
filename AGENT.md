@@ -393,6 +393,11 @@ affect editor navigation.
 - **Integration modules** (`git`, `network`, `notification`, `archive`, `config`,
   `json`): validate dependencies, quote paths/URLs/payloads, and do not hide
   external command failures.
+- **Structured data** (`json` and every module that filters JSON): every filter
+  is written in `jq`'s language and run by `jq`, never by whichever tool happens
+  to be on `PATH`, so a result does not change from one machine to the next.
+  The Go `yq` v4 only reads YAML or TOML into JSON, writes YAML back, and edits
+  a YAML file in place to keep its comments; it never runs a caller's filter.
 - **Presentation modules** (`logging`, `cli`): reserve stdout for pipeable or
   capturable data and stderr for diagnostics; preserve text output when adding
   machine-readable output.

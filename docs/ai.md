@@ -137,7 +137,7 @@ dybatpho::ai_run "Are we about to run out of disk?"
 
 - Set `DYBATPHO_AI_PROVIDER` to pin a backend; the default `auto` picks the first one whose credentials or command are present
 - Every prompt is passed through `dybatpho::secret_mask` first, so values registered with `dybatpho::secret_register` never reach the provider
-- Payloads and responses go through the `json` module, so this needs `yq` or `jq` like the rest of the library; building them by string concatenation is too escaping-sensitive to be safe
+- Payloads and responses go through the `json` module, so this needs `jq` like the rest of the library; building them by string concatenation is too escaping-sensitive to be safe
 
 **[`dybatpho::ai_ask`](#dybatphoai_ask)**
 

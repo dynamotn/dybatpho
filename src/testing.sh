@@ -127,7 +127,7 @@ function __dybatpho_test_fail {
 #######################################
 function __dybatpho_test_need_json {
   # shellcheck disable=SC2310 # a module that cannot be loaded fails the assertion instead
-  __dybatpho_helpers_load_soft json __dybatpho_json_cmd_into "${FUNCNAME[1]}" && return 0
+  __dybatpho_helpers_load_soft json __dybatpho_json_need_jq "${FUNCNAME[1]}" && return 0
   __dybatpho_test_fail "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
 
@@ -352,11 +352,11 @@ function dybatpho::assert_json_valid {
 
 #######################################
 # @description Compare a query result with an expected scalar, tolerating JSON quoting.
-# @arg $1 string Value printed by the JSON/YAML backend
+# @arg $1 string Value printed by `dybatpho::json_query` or `dybatpho::yaml_query`
 # @arg $2 string Expected value
 # @exitcode 0 The values match, either literally or after unquoting the result
 # @exitcode 1 The values differ
-# @tip Backends print string scalars as `"value"`, so both `value` and `"value"`
+# @tip `jq` prints string scalars as `"value"`, so both `value` and `"value"`
 #      are accepted as the expected form.
 # @internal
 #######################################
@@ -380,12 +380,12 @@ function __dybatpho_test_scalar_matches {
 #   dybatpho::assert_json_query package.json '.version' "1.4.2"
 #
 # @arg $1 string JSON file path, or `-` for stdin
-# @arg $2 string Query filter understood by the JSON backend
+# @arg $2 string `jq` filter
 # @arg $3 string Expected query result
 # @exitcode 0 The query result matches
 # @exitcode 1 The query failed or returned a different value
 # @tip String scalars are compared without their JSON quoting, so an expected
-#      value of `1.4.2` matches a backend result of `"1.4.2"`.
+#      value of `1.4.2` matches a `jq` result of `"1.4.2"`.
 # @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_json_query {
@@ -411,7 +411,7 @@ function dybatpho::assert_json_query {
 #######################################
 # @description Assert that a JSON filter matches something in the document.
 # @arg $1 string JSON file path, or `-` for stdin
-# @arg $2 string Query filter that must succeed
+# @arg $2 string `jq` filter that must succeed
 # @exitcode 0 The filter matched
 # @exitcode 1 The filter did not match
 # @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
@@ -450,14 +450,14 @@ function dybatpho::assert_yaml_valid {
 }
 
 #######################################
-# @description Assert that a YAML expression prints an expected value.
+# @description Assert that a `jq` filter over a YAML document prints an expected value.
 # @arg $1 string YAML file path, or `-` for stdin
-# @arg $2 string `yq` expression
+# @arg $2 string `jq` filter, run by `dybatpho::yaml_query`
 # @arg $3 string Expected result
-# @exitcode 0 The expression result matches
-# @exitcode 1 The expression failed or returned a different value
+# @exitcode 0 The filter result matches
+# @exitcode 1 The filter failed or returned a different value
 # @tip String scalars are compared without their JSON quoting, so an expected
-#      value of `1.4.2` matches a backend result of `"1.4.2"`.
+#      value of `1.4.2` matches a quoted result of `"1.4.2"`.
 # @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_yaml_query {
@@ -481,11 +481,11 @@ function dybatpho::assert_yaml_query {
 }
 
 #######################################
-# @description Assert that a YAML expression matches something in the document.
+# @description Assert that a `jq` filter matches something in a YAML document.
 # @arg $1 string YAML file path, or `-` for stdin
-# @arg $2 string `yq` expression that must succeed
-# @exitcode 0 The expression matched
-# @exitcode 1 The expression did not match
+# @arg $2 string `jq` filter that must succeed
+# @exitcode 0 The filter matched
+# @exitcode 1 The filter did not match
 # @note Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 #######################################
 function dybatpho::assert_yaml_has {
@@ -495,7 +495,7 @@ function dybatpho::assert_yaml_has {
   local file
   __dybatpho_test_input_file "${input}" file
   if ! dybatpho::yaml_has "${file}" "${expression}"; then
-    __dybatpho_test_fail "YAML expression did not match in ${input}: ${expression}"
+    __dybatpho_test_fail "YAML filter did not match in ${input}: ${expression}"
     return 1
   fi
   return 0

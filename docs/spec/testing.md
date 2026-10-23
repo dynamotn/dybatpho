@@ -315,7 +315,8 @@ dybatpho::unmock_all
 - **FR-007**: The module MUST assert JSON and YAML validity
   (`assert_json_valid`, `assert_yaml_valid`), a queried value
   (`assert_json_query`, `assert_yaml_query`), and a matching filter
-  (`assert_json_has`, `assert_yaml_has`), reusing the JSON module's backends.
+  (`assert_json_has`, `assert_yaml_has`), reusing the JSON module, so every
+  filter is a `jq` filter, YAML included.
 - **FR-008**: Query assertions MUST accept an expected scalar with or without
   the backend's surrounding JSON quotes.
 - **FR-009**: Document assertions MUST accept a file path or `-` for stdin, and

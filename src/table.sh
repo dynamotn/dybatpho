@@ -508,7 +508,7 @@ function dybatpho::table_from_csv {
 # @stdout Rendered table, or nothing for an empty array
 # @exitcode 0 The table was rendered
 # @exitcode 1 The style is unknown, or the document is not an array of objects
-# @exitcode 127 Neither `jq` nor `yq` is installed
+# @exitcode 127 `jq` is not installed
 # @example
 #   kubectl get pods -o json | jq '[.items[] | {name: .metadata.name, phase: .status.phase}]' \
 #     | dybatpho::table_from_json - box

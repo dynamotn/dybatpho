@@ -162,6 +162,21 @@ dybatpho::doctor  # every external tool these modules can call
 dybatpho::doctor --modules git --quiet || echo "git is missing here"
 ```
 
+### 🔧 External tools
+
+The core modules need nothing beyond Bash and the POSIX tools every system
+ships. An optional module calls an external program only when you reach the
+function that needs it, and `dybatpho::doctor` lists them all up front. Two are
+worth knowing before you start:
+
+- **`jq`** — every JSON filter in the library runs through it, whatever else is
+  installed, so `json`, and the modules built on it (`ai`, `agent`, `forge`,
+  `config`, `csv`, `diff`, ...), need it. Filters are written in `jq`'s
+  language, YAML included.
+- **The Go `yq` v4** ([mikefarah/yq](https://github.com/mikefarah/yq)) — needed
+  only to read or write YAML and TOML. The unrelated Python `yq` is refused by
+  name rather than misread.
+
 ## 📦 Vendoring as one file
 
 `scripts/bundle.sh` flattens the modules a project uses into a single
@@ -216,7 +231,7 @@ scripts/release.sh --version 3.0.0 --sign
 | [math.sh](docs/math.md)        | stable | Exact decimal arithmetic, rounding, aggregates — no `bc`, no float drift |
 | [string.sh](docs/string.md)    | stable | String operations                                   |
 | [text.sh](docs/text.md)        | experimental | Multi-line text blocks and formatting               |
-| [json.sh](docs/json.md)        | stable | JSON and YAML reading/writing                       |
+| [json.sh](docs/json.md)        | stable | JSON and YAML reading/writing, one `jq` filter language for both |
 | [table.sh](docs/table.md)      | experimental | Aligned plain-text and Markdown tables, from CSV or JSON too |
 | [markdown.sh](docs/markdown.md) | experimental | Headings, lists, links, badges and code blocks, with every value escaped |
 | [csv.sh](docs/csv.md)          | experimental | Real CSV: quoted fields, embedded commas and newlines, filtering, JSON bridge |

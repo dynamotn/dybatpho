@@ -402,7 +402,7 @@ function dybatpho::agent_audit_show {
   dybatpho::is file "${DYBATPHO_AGENT_AUDIT_FILE}" || return 0
   local record
   # The log is JSON Lines, so each record is rendered on its own rather than
-  # handing the whole file to a backend that expects one document.
+  # handing the whole file to a filter that expects one document.
   # A log trimmed or written by another tool can end without a newline, and
   # `read` fails on that last line even though it filled the variable.
   while IFS= read -r record || [[ -n "${record}" ]]; do
@@ -414,8 +414,8 @@ function dybatpho::agent_audit_show {
 #######################################
 # @description Turn a CLI schema into a flat list of callable commands.
 # Each command carries the options it accepts, with hidden entries dropped.
-# The tree is walked here rather than in a filter because only one of the two
-# JSON backends supports user-defined functions, and a schema can nest.
+# The whole tree is walked by one recursive `jq` filter, depth first, so a
+# command is listed before its subcommands.
 # @arg $1 string CLI schema JSON from `dybatpho::generate_schema`
 # @stdout JSON array of `{path, description, options}` objects
 # @internal
@@ -423,61 +423,23 @@ function dybatpho::agent_audit_show {
 function __dybatpho_agent_flatten_schema {
   local schema
   dybatpho::expect_args schema -- "$@"
-  local -a entries=()
-  __dybatpho_agent_flatten_into entries "${schema}" '[]'
-  local IFS=,
-  printf '[%s]\n' "${entries[*]-}"
-}
-
-#######################################
-# @description Append one command and its subcommands to a list of entries.
-#   One read per command answers the entry, its name and its subcommands, each
-#   as a line of compact JSON, where reading them field by field and appending
-#   to a growing document took around eight processes per command.
-# @arg $1 string Name of the array the compact entries are appended to
-# @arg $2 string Command node JSON
-# @arg $3 string Path of the parent command, as a JSON array
-# @set The named array
-# @internal
-#######################################
-function __dybatpho_agent_flatten_into {
-  local __dybatpho_agent_flat_var __dybatpho_agent_flat_node __dybatpho_agent_flat_parent
-  dybatpho::expect_args __dybatpho_agent_flat_var __dybatpho_agent_flat_node \
-    __dybatpho_agent_flat_parent -- "$@"
-  local -n __dybatpho_agent_flat_out="${__dybatpho_agent_flat_var}"
-  local __dybatpho_agent_flat_lines
-  __dybatpho_agent_flat_lines=$(dybatpho::json_get "${__dybatpho_agent_flat_node}" \
-    "(${__dybatpho_agent_flat_parent} + [(.name | tostring)]) as \$path
-      | ({\"path\": \$path, \"description\": (.description | tostring),
-          \"options\": [.options[]? | select(.hidden != true)]} | @json),
-        (.name | tostring | @json),
-        (.commands[]? | @json)")
-  local -a __dybatpho_agent_flat_parts=()
-  mapfile -t __dybatpho_agent_flat_parts <<< "${__dybatpho_agent_flat_lines}"
-  __dybatpho_agent_flat_out+=("${__dybatpho_agent_flat_parts[0]}")
-  # The children's parent path is this one with the name appended, spelled
-  # here from the backend's own rendering of the name: `yq` drops an output
-  # that depends only on a variable, so the path can't come back as a line.
-  local __dybatpho_agent_flat_path="${__dybatpho_agent_flat_parent%]}"
-  [[ "${__dybatpho_agent_flat_path}" == "[" ]] || __dybatpho_agent_flat_path+=","
-  __dybatpho_agent_flat_path+="${__dybatpho_agent_flat_parts[1]}]"
-  local __dybatpho_agent_flat_index
-  for ((__dybatpho_agent_flat_index = 2; __dybatpho_agent_flat_index < ${#__dybatpho_agent_flat_parts[@]};  \
-  __dybatpho_agent_flat_index++)); do
-    __dybatpho_agent_flatten_into "${__dybatpho_agent_flat_var}" \
-      "${__dybatpho_agent_flat_parts[__dybatpho_agent_flat_index]}" "${__dybatpho_agent_flat_path}"
-  done
+  # `$parent` and `$path` are variables of the filter, not of the shell.
+  # shellcheck disable=SC2016
+  dybatpho::json_eval "${schema}" '
+    def flat($parent):
+      ($parent + [(.name | tostring)]) as $path
+      | {"path": $path, "description": (.description | tostring),
+         "options": [.options[]? | select(.hidden != true)]},
+        (.commands[]? | flat($path));
+    [flat([])]'
 }
 
 #######################################
 # @description Build the filter that renders a command entry's options as a
 #   JSON Schema object, in one pass over the entry.
 #   Each option became a property through several reads and a growing document
-#   rewritten per option, around ten processes each. A filter does it in the
-#   one read that renders the whole tool. The two backends differ in exactly
-#   two words, the reduction and the lower-casing, so those are chosen here;
-#   and every branch reads its own input, because a `yq` literal ignores an
-#   empty input and would answer even where `select` matched nothing.
+#   rewritten per option, around ten processes each. A `jq` filter does it in
+#   the one read that renders the whole tool.
 # @arg $1 string Name of the variable receiving the filter
 # @set The named variable, an expression over one entry
 # @internal
@@ -486,17 +448,6 @@ function __dybatpho_agent_options_filter_into {
   local __dybatpho_agent_opts_var
   dybatpho::expect_args __dybatpho_agent_opts_var -- "$@"
   local -n __dybatpho_agent_opts_out="${__dybatpho_agent_opts_var}"
-  local __dybatpho_agent_opts_cmd __dybatpho_agent_opts_down __dybatpho_agent_opts_reduce
-  __dybatpho_json_cmd_into __dybatpho_agent_opts_cmd
-  # `$opt` is a variable of the filter, not of the shell.
-  # shellcheck disable=SC2016
-  if [[ "${__dybatpho_agent_opts_cmd}" == "yq" ]]; then
-    __dybatpho_agent_opts_down=downcase
-    __dybatpho_agent_opts_reduce='.options[] as $opt ireduce'
-  else
-    __dybatpho_agent_opts_down=ascii_downcase
-    __dybatpho_agent_opts_reduce='reduce .options[] as $opt'
-  fi
   local enum='((select(((.choices // "") | tostring) != "") | {"enum": (.choices | split(","))}) // {})'
   local description='"description": (.description | tostring)'
   local property="(\$opt | (select(.type == \"flag\") | {\"type\": \"boolean\", ${description}})
@@ -504,10 +455,10 @@ function __dybatpho_agent_options_filter_into {
       | {\"type\": \"array\", ${description}, \"items\": ({\"type\": \"string\"} + ${enum})})
     // ({\"type\": \"string\", ${description}} + ${enum}))"
   __dybatpho_agent_opts_out="{\"type\": \"object\",
-    \"properties\": (${__dybatpho_agent_opts_reduce} ({};
-      . + {((\$opt | .name | tostring) | ${__dybatpho_agent_opts_down}): ${property}})),
+    \"properties\": (reduce .options[] as \$opt ({};
+      . + {((\$opt | .name | tostring) | ascii_downcase): ${property}})),
     \"required\": [.options[] | select(.required == true)
-      | (.name | tostring | ${__dybatpho_agent_opts_down})],
+      | (.name | tostring | ascii_downcase)],
     \"additionalProperties\": false}"
 }
 
@@ -648,8 +599,6 @@ function dybatpho::agent_mcp {
   __dybatpho_agent_mcp_commands=$(__dybatpho_agent_flatten_schema "${__dybatpho_agent_mcp_schema}")
 
   # The first path element is the root name, which the command already names.
-  # `.path | .[1:]` rather than `.path[1:]`: yq 4.52 applies the latter slice to
-  # the enclosing object, not to `.path`.
   local __dybatpho_agent_mcp_command_json
   __dybatpho_agent_mcp_command_json=$(dybatpho::json_string "${__dybatpho_agent_mcp_command}")
   local __dybatpho_agent_mcp_template='{"name": @NAME@, "description": (.description | tostring),

@@ -170,7 +170,7 @@ fi
 - An option spec containing hidden options, repeatable options, choice lists,
   and nested subcommands.
 - A tool name prefix containing characters that are not valid in a tool name.
-- Neither `yq` nor `jq` is installed.
+- `jq` is not installed (installing only `yq` is not enough).
 - `DYBATPHO_AGENT_MODE` holds a value other than `auto`, `on` or `off` while a script asks whether an agent is driving.
 
 ## Requirements *(mandatory)*
@@ -211,7 +211,7 @@ fi
   `inputSchema` key and MUST record the command line each tool maps to.
 - **FR-015**: Tool definitions MUST be derived from `dybatpho::generate_schema`
   rather than from a separate list.
-- **FR-016**: The module MUST fail with a clear message when neither `yq` nor `jq` is installed.
+- **FR-016**: The module MUST fail with a clear message naming `jq` when `jq` is not installed.
 - **FR-017**: Documents MUST be built and read through the `json` module, so the
   module works on whichever backend the rest of the library found rather than
   requiring a specific one.
@@ -260,8 +260,8 @@ fi
   repeatable options, required options, hidden options, and subcommands.
 - **IT-008**: Verify the Anthropic, OpenAI, and MCP output shapes, tool name
   sanitisation, and the recorded command line.
-- **IT-009**: Verify the module behaves identically under both the `yq` and the
-  `jq` backend.
+- **IT-009**: Verify the module behaves identically whether or not `yq` is
+  installed, and that the command tree is flattened by one `jq` call.
 - **IT-010**: From a script file with `DYBATPHO_AGENT_MODE=sometimes`, have `agent_detect` used as a condition stop the script before the branch for a person runs.
 - **IT-011**: Generate tool and MCP definitions from a spec whose description reads variables named like their locals, and see the caller's values.
 - **IT-012**: Append a record without a trailing newline to the audit log and find it printed.

@@ -398,7 +398,7 @@ function __dybatpho_diff_report {
 # @exitcode 0 The two documents hold the same values
 # @exitcode 1 They differ
 # @exitcode 2 Either document is not valid YAML
-# @exitcode 127 `jq` or `yq` is not installed
+# @exitcode 127 `jq` or the Go `yq` v4 is not installed
 # @example
 #   dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 # @note Loads the `json` module on demand; name it up front with `--modules diff json` to load it once
@@ -411,6 +411,11 @@ function dybatpho::diff_yaml {
   local first_file second_file
   __dybatpho_diff_side_into first_file "${first}" "a"
   __dybatpho_diff_side_into second_file "${second}" "b"
+
+  # Checked out here, where the refusal is seen: the conversions below silence
+  # their own diagnostics, which would hide a missing `jq` or `yq` as well.
+  __dybatpho_json_need_jq
+  __dybatpho_json_need_yq
 
   local first_json second_json
   dybatpho::create_temp first_json ".json" "diff-a"
@@ -443,7 +448,7 @@ function dybatpho::diff_yaml {
 # @internal
 #######################################
 function __dybatpho_diff_need_json {
-  __dybatpho_helpers_need_module json __dybatpho_json_cmd_into "${FUNCNAME[1]}"
+  __dybatpho_helpers_need_module json __dybatpho_json_need_jq "${FUNCNAME[1]}"
 }
 
 #######################################

@@ -204,8 +204,9 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **IT-006d**: Verify an outdated optional dependency is named in the summary without failing the run.
 - **IT-006e**: Verify an any-of dependency prefers an alternative inside its range, and reports `outdated` rather than `missing` when only an out-of-range alternative is installed.
 - **IT-006f**: Verify a dependency that names no range is never executed by the report.
+- **IT-006g**: Verify `json` declares `jq` as required and the Go `yq>=4` as optional, and that the Python `yq` (`yq 3.x`) is reported `outdated` against it.
 - **IT-007**: Verify the default scope, an explicit list, a comma separated list, and the whole registry.
-- **IT-007a**: Verify an explicit `forge` is widened to `network json git forge`, and that the `yq` of `json` is reported.
+- **IT-007a**: Verify an explicit `forge` is widened to `network json git forge`, and that the `jq` of `json` is reported.
 - **IT-007b**: Verify a sound graph is reported `ok`, an edge to an unknown module is named and fails the run in both the text and the JSON report, and a cycle is noted without failing.
 - **IT-007c**: Verify the report inside a bundle widens an explicit list along the bundled edges.
 - **IT-008**: Verify quiet mode prints nothing and reports through the exit code in both directions.

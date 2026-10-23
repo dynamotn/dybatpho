@@ -118,14 +118,16 @@ function _demo_bash {
 }
 
 # @description Show what a dependency that names a version looks like in the
-#   report. `json` needs the Go `yq` from v4 on, so being installed is not the
-#   whole question.
+#   report. `json` reads YAML with the Go `yq` from v4 on, so being installed is
+#   not the whole question.
 # @noargs
 function _demo_versioned_dependency {
   dybatpho::header "A DEPENDENCY THAT NAMES A VERSION"
   local doctor_requirements
   doctor_requirements=$(dybatpho::doctor_requirements json required)
   dybatpho::print "json requires: ${doctor_requirements}"
+  doctor_requirements=$(dybatpho::doctor_requirements json optional)
+  dybatpho::print "json reads YAML with: ${doctor_requirements}"
   # `ok` means installed and new enough, `outdated` means installed and not,
   # and `unknown` means the version could not be read, which is reported but
   # never treated as a failure.

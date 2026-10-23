@@ -80,10 +80,8 @@ declare -gA DYBATPHO_DOCTOR_REQUIRED=(
   [archive]="tar"
   [forge]="curl git"
   [git]="git"
-  # The YAML helpers call `yq eval`, which is the Go `yq`. The unrelated Python
-  # `yq` and the Go one before v4 both take a different expression syntax, so a
-  # plain presence check would pass on a host where every YAML call then fails.
-  [json]="yq>=4"
+  # Every filter the module runs, the caller's included, goes through `jq`.
+  [json]="jq"
   [network]="curl"
   # Raw mode is what makes a key reach the application before Return does, and
   # there is no way to ask for it from Bash alone.
@@ -99,13 +97,13 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # An incremental snapshot links unchanged files with `rsync --link-dest`
   # when it is there, and walks the source in Bash when it is not.
   [backup]="rsync"
-  # Same Go `yq` v4 the `json` module needs: `config` reads a document's tag
-  # and parses TOML with `-p toml`, neither of which the Python `yq` or the
-  # pre-v4 Go one understands.
+  # Same Go `yq` v4 the `json` module reads YAML with: `config` turns YAML and
+  # TOML into JSON with `-p toml`, which neither the Python `yq` nor the pre-v4
+  # Go one understands, and flattens every format with `jq`.
   [config]="jq yq>=4"
-  # Only `dybatpho::csv_from_json` needs one, and either will do: the module
-  # parses and writes CSV in Bash alone.
-  [csv]="jq|yq>=4"
+  # Only `dybatpho::csv_from_json` needs it: the module parses and writes CSV in
+  # Bash alone.
+  [csv]="jq"
   # `dybatpho::diff_text` needs nothing external beyond `diff`; comparing by
   # key is built on one `jq` filter, and YAML reaches JSON through `yq`.
   [diff]="jq yq>=4"
@@ -113,7 +111,11 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   # Either will do, and neither is required: a script already running as root
   # needs no escalation at all.
   [privilege]="sudo|doas"
-  [json]="jq"
+  # Only the YAML helpers need it, to turn YAML into JSON and back and to edit a
+  # YAML file in place. It is the Go `yq`: the unrelated Python `yq` and the Go
+  # one before v4 take a different command line, so a plain presence check
+  # would pass on a host where every YAML call then fails.
+  [json]="yq>=4"
   # `timeout` bounds the connection `dybatpho::port_open` makes. Without it the
   # probe still works and waits as long as the system's own TCP timeout.
   [network]="sha256sum md5sum timeout"
@@ -313,7 +315,7 @@ function __dybatpho_doctor_scope {
 #
 #   Widening a list matters for an explicit `--modules`. A script asking for
 #   `forge` also loads `json`, and a check on `forge` alone would leave the
-#   `yq` that `json` needs for the script to discover halfway through.
+#   `jq` that `json` needs for the script to discover halfway through.
 # @arg $1 string Name of the array holding the modules; widened in place with `expand`
 # @arg $2 string Name of the array receiving `module -> dependency` for each unknown edge
 # @arg $3 string Name of the variable set to 1 when the graph holds a cycle, else 0

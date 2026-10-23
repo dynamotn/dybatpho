@@ -58,10 +58,9 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor_requirements lists what the csv module needs" {
   # Parsing and writing CSV is Bash alone; only `dybatpho::csv_from_json` needs
-  # a JSON command, and either of the two will do, so it is optional rather
-  # than required.
+  # `jq`, so it is optional rather than required.
   run_traced -0 dybatpho::doctor_requirements csv optional
-  assert_output "jq|yq>=4"
+  assert_output "jq"
 
   run_traced -0 dybatpho::doctor_requirements csv required
   assert_output ""
@@ -110,7 +109,10 @@ fake_versioned_command() {
 }
 
 @test "dybatpho::doctor_requirements lists optional dependencies" {
+  # `jq` runs every filter; the Go `yq` only reads and writes YAML.
   run_traced -0 dybatpho::doctor_requirements json optional
+  assert_output "yq>=4"
+  run_traced -0 dybatpho::doctor_requirements json required
   assert_output "jq"
 }
 
@@ -123,8 +125,8 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor_requirements defaults to every kind" {
   run_traced -0 dybatpho::doctor_requirements json
-  assert_line --index 0 "yq>=4"
-  assert_line --index 1 "jq"
+  assert_line --index 0 "jq"
+  assert_line --index 1 "yq>=4"
 }
 
 @test "dybatpho::doctor_requirements prints nothing for a module without dependencies" {
@@ -202,10 +204,10 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor widens an explicit module list to what it loads, in load order" {
   # `forge` loads `network`, `json` and `git`, so a check on `forge` alone
-  # would miss the `yq` that `json` needs.
+  # would miss the `jq` that `json` needs.
   run_traced dybatpho::doctor --modules forge
   assert_output --partial "modules  network json git forge"
-  assert_output --partial "json     yq>=4"
+  assert_output --partial "json     jq"
 }
 
 @test "dybatpho::doctor reports a sound module graph as ok" {
@@ -264,7 +266,7 @@ fake_versioned_command() {
 @test "dybatpho::doctor --json prints one object with every dependency" {
   only_fakes
   fake_command curl
-  fake_command yq
+  fake_command jq
   run_traced -0 dybatpho::doctor --modules "network,json" --json
   assert_output --partial '"version":"'
   assert_output --partial '"bash":{"version":'
@@ -322,6 +324,7 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor marks a dependency ok and names the version when it satisfies the constraint" {
   only_fakes
+  fake_command jq
   fake_versioned_command yq "yq (https://github.com/mikefarah/yq/) version v4.53.3"
   run_traced -0 dybatpho::doctor --modules json
   assert_output --partial "yq>=4"
@@ -331,17 +334,29 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor fails a required dependency that is installed but too old" {
   only_fakes
+  DYBATPHO_DOCTOR_REQUIRED[string]="yq>=4"
   fake_versioned_command yq "yq version 3.4.3"
-  run_traced -1 dybatpho::doctor --modules json
+  run_traced -1 dybatpho::doctor --modules string
+  unset 'DYBATPHO_DOCTOR_REQUIRED[string]'
   assert_output --partial "outdated (3.4.3,"
   assert_output --partial "Required, too old: yq>=4 (found 3.4.3)"
   refute_output --partial "No required dependency is missing."
+}
+
+@test "dybatpho::doctor flags the Python yq as too old for the json module" {
+  # The Python `yq` answers `yq 3.x`; the module reads YAML with the Go one.
+  only_fakes
+  fake_command jq
+  fake_versioned_command yq "yq 3.4.3"
+  run_traced -0 dybatpho::doctor --modules json
+  assert_output --partial "outdated (3.4.3,"
 }
 
 @test "dybatpho::doctor reports a version it cannot read without failing on it" {
   only_fakes
   # Installed, but silent on every probe: the report may not claim that this is
   # the wrong version, only that it could not tell.
+  fake_command jq
   fake_command yq
   run_traced -0 dybatpho::doctor --modules json
   assert_output --partial "unknown"
@@ -382,6 +397,7 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor --json carries the detected version" {
   only_fakes
+  fake_command jq
   fake_versioned_command yq "yq version v4.53.3"
   run_traced -0 dybatpho::doctor --modules json --json
   assert_output --partial '"dependency":"yq>=4"'
@@ -391,8 +407,10 @@ fake_versioned_command() {
 
 @test "dybatpho::doctor --json reports an outdated required dependency as not ok" {
   only_fakes
+  DYBATPHO_DOCTOR_REQUIRED[string]="yq>=4"
   fake_versioned_command yq "yq version 3.4.3"
-  run_traced -1 dybatpho::doctor --modules json --json
+  run_traced -1 dybatpho::doctor --modules string --json
+  unset 'DYBATPHO_DOCTOR_REQUIRED[string]'
   assert_output --partial '"status":"outdated"'
   assert_output --partial '"version":"3.4.3"'
   assert_output --partial '"ok":false'

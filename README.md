@@ -146,6 +146,31 @@ scripts/release.sh           # version derived from the commits
 scripts/release.sh --version 3.0.0 --sign
 ```
 
+## 🧭 Versioning and stability
+
+dybatpho follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The
+public API is every `dybatpho::` function, its arguments, output and exit codes,
+every documented `DYBATPHO_*` variable, the `init.sh` options, and the modules a
+module loads for you. Anything named `__dybatpho_*` is internal and can change
+in any release.
+
+- **Stable and experimental modules.** Each module declares a tier. A
+  *stable* module follows the rules below. An *experimental* module is new or
+  still finding its shape: it can change in a minor release, and its changelog
+  entries say so. A module graduates to stable in a minor release, never the
+  other way round.
+- **Deprecation before removal.** A stable function, option or variable that is
+  going away is marked deprecated first, keeps working, and warns once per run
+  naming its replacement. It stays for at least one minor release before the
+  next major removes it, and `### Deprecated` in the changelog lists it.
+- **Breaking changes are batched.** Changes that break a stable API wait for a
+  planned major release rather than leaking out one at a time. Each is marked
+  **BREAKING** in the changelog with the old call and the new one, and
+  [docs/MIGRATING.md](docs/MIGRATING.md) collects them per major version.
+- **Bash floor.** The oldest supported Bash (4.3) is part of the contract:
+  raising it is a breaking change, and CI runs the suite on 4.3, 4.4, 5.0 and
+  5.1 as well as on the current release.
+
 ## 📚 Modules
 
 ### 🧱 Core scripting

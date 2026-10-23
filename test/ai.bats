@@ -1057,24 +1057,24 @@ stub_curl_recording_config() {
 @test "the anthropic backend reads its key from ANTHROPIC_API_KEY" {
   local sent="${BATS_TEST_TMPDIR}/config"
   DYBATPHO_AI_API_KEY=""
-  ANTHROPIC_API_KEY="anthropic-env-key"
+  ANTHROPIC_API_KEY="from-anthropic-env"
   stub_curl_recording_config "$(anthropic_body 'keyed')" "${sent}"
   run_traced dybatpho::ai_ask "q"
   unstub curl
   assert_output "keyed"
-  assert_file_contains "${sent}" "x-api-key: anthropic-env-key"
+  assert_file_contains "${sent}" "x-api-key: from-anthropic-env"
 }
 
 @test "the openai backend reads its key from OPENAI_API_KEY" {
   local sent="${BATS_TEST_TMPDIR}/config"
   DYBATPHO_AI_PROVIDER=openai
   DYBATPHO_AI_API_KEY=""
-  OPENAI_API_KEY="openai-env-key"
+  OPENAI_API_KEY="from-openai-env"
   stub_curl_recording_config '{"choices":[{"message":{"content":"keyed"}}]}' "${sent}"
   run_traced dybatpho::ai_ask "q"
   unstub curl
   assert_output "keyed"
-  assert_file_contains "${sent}" "Authorization: Bearer openai-env-key"
+  assert_file_contains "${sent}" "Authorization: Bearer from-openai-env"
 }
 
 @test "the openai backend stops without a key" {

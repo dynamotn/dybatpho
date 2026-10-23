@@ -281,7 +281,9 @@ function dybatpho::git_has_remote {
 # @arg $1 string [default: .] Repository path
 # @arg $2 string [default: ${HEAD}] Base ref
 # @stdout One changed file path per line, sorted byte-wise and deduplicated,
-#   so the order does not depend on the caller's locale
+#   so the order does not depend on the caller's locale; a non-ASCII name is
+#   printed as it is on disk, while one holding a control character, a double
+#   quote or a backslash is still C-quoted by Git
 # @exitcode 1 Stop the script when the base names no commit, or a Git command fails
 #######################################
 function dybatpho::git_changed_files {
@@ -289,6 +291,10 @@ function dybatpho::git_changed_files {
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
   base_ref="${2:-HEAD}"
+  # Paths come back as they are spelt on disk: by default Git writes a name
+  # holding a non-ASCII byte as a C-quoted string, such as `"caf\303\251.txt"`,
+  # which names no file, and whether it does depends on the user's config.
+  local -a quote_raw=(-c core.quotePath=false)
   # Each half is collected on its own and checked: piped together, a failing
   # `diff` was hidden behind the `ls-files` that ran after it, and a base that
   # named nothing produced a short list rather than an error.
@@ -297,15 +303,15 @@ function dybatpho::git_changed_files {
     # Before the first commit there is no HEAD to compare with, so every file
     # in the index is new: the staged list plus anything changed since.
     # shellcheck disable=SC2015 # the `die` is meant to run when either `git diff` fails
-    tracked="$(__dybatpho_git "${repo_path}" diff --cached --name-only --)" \
-      && tracked+=$'\n'"$(__dybatpho_git "${repo_path}" diff --name-only --)" \
+    tracked="$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" diff --cached --name-only --)" \
+      && tracked+=$'\n'"$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" diff --name-only --)" \
       || dybatpho::die "${FUNCNAME[0]}: git diff failed in ${repo_path}"
   else
     __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
-    tracked="$(__dybatpho_git "${repo_path}" diff --name-only "${base_ref}" --)" \
+    tracked="$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" diff --name-only "${base_ref}" --)" \
       || dybatpho::die "${FUNCNAME[0]}: git diff failed in ${repo_path}"
   fi
-  untracked="$(__dybatpho_git "${repo_path}" ls-files --others --exclude-standard)" \
+  untracked="$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" ls-files --others --exclude-standard)" \
     || dybatpho::die "${FUNCNAME[0]}: git ls-files failed in ${repo_path}"
   printf '%s\n%s\n' "${tracked}" "${untracked}" | awk 'NF' | LC_ALL=C sort -u
 }
@@ -341,14 +347,16 @@ function dybatpho::git_latest_tag {
 # @description List tags that contain a commit.
 # @arg $1 string [default: .] Repository path
 # @arg $2 string [default: ${HEAD}] Commit-ish
-# @stdout One tag per line, sorted
+# @stdout One tag per line, sorted byte-wise so the order does not depend on the caller's locale
 #######################################
 function dybatpho::git_tags_containing {
   local repo_path resolved
   repo_path="${1:-.}"
   __dybatpho_git_expect_repo "${repo_path}"
   resolved="$(__dybatpho_git_resolve_commit "${repo_path}" "${2:-HEAD}")" || return $?
-  __dybatpho_git "${repo_path}" tag --contains "${resolved}" | sort
+  # Byte order, as `dybatpho::git_changed_files` uses: a locale-aware `sort`
+  # put the same tags in a different order on macOS and on glibc.
+  __dybatpho_git "${repo_path}" tag --contains "${resolved}" | LC_ALL=C sort
 }
 
 #######################################

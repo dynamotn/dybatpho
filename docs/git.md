@@ -301,7 +301,9 @@ List changed files relative to a base ref, including untracked.
 **📤 Output on stdout**
 
 - One changed file path per line, sorted byte-wise and deduplicated,
-  so the order does not depend on the caller's locale
+  so the order does not depend on the caller's locale; a non-ASCII name is
+  printed as it is on disk, while one holding a control character, a double
+  quote or a backslash is still C-quoted by Git
 
 **🚦 Exit codes**
 
@@ -355,7 +357,7 @@ List tags that contain a commit.
 
 **📤 Output on stdout**
 
-- One tag per line, sorted
+- One tag per line, sorted byte-wise so the order does not depend on the caller's locale
 
 ---
 

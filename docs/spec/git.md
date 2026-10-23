@@ -103,6 +103,8 @@ dybatpho::git_changed_files "${root}" "${base}"
 - A remote is missing or has no configured URL.
 - The worktree contains both tracked and untracked changes.
 - A range is empty.
+- A changed path holds a non-ASCII character, which Git C-quotes by default.
+- The caller's locale collates tag names differently from byte order.
 
 ### User Story - Ask whether a commit has landed (Priority: P2)
 
@@ -206,6 +208,8 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
   Git environment variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, and
   related) are exported by a surrounding Git hook.
 - **FR-013**: `git_changed_files` MUST stop when the base names no commit or a Git command fails, and before the first commit MUST list staged files together with untracked ones.
+- **FR-014**: `git_changed_files` MUST print a non-ASCII path as it is spelt on disk, whatever the user's `core.quotePath` setting.
+- **FR-015**: `git_tags_containing` MUST sort byte-wise, so the order does not depend on the caller's locale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -259,6 +263,8 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
 - **IT-008**: Verify helpers work when run with `GIT_DIR`/`GIT_INDEX_FILE` set,
   as happens inside a `pre-commit` hook.
 - **IT-009**: Refuse a base that names no commit, and list staged and untracked files in a repository with no commit.
+- **IT-010**: List a staged and an untracked non-ASCII path in a repository that sets `core.quotePath`, and see both unquoted.
+- **IT-011**: List tags that a UTF-8 locale collates differently under `LC_ALL=en_US.UTF-8`, and see them in byte order.
 
 ## Acceptance Criteria *(mandatory)*
 

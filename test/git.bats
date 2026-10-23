@@ -308,6 +308,45 @@ function _append_git_commit {
   assert_stderr ""
 }
 
+@test "dybatpho::git_changed_files names a non-ASCII path as it is on disk" {
+  # Git C-quotes such a name by default, `"caf\303\251.txt"`, which names no
+  # file; the repository asks for that explicitly here, so the user's own
+  # config cannot hide the difference.
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    git -C "${repo_path}" config core.quotePath true
+    printf 'a\n' > "${repo_path}/café.txt"
+    git -C "${repo_path}" add café.txt
+  )
+  printf 'b\n' > "${repo_path}/naïve notes.txt"
+
+  run_traced -0 dybatpho::git_changed_files "${repo_path}"
+  assert_output $'café.txt\nnaïve notes.txt'
+}
+
+@test "dybatpho::git_tags_containing lists tags in byte order whatever the locale" {
+  # A locale-aware `sort` ignores case and punctuation at first, so the same
+  # tags came back in another order on another machine.
+  local repo_path head tag
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    head="$(git -C "${repo_path}" rev-parse HEAD)"
+    # Names that differ in more than case: a case-insensitive filesystem
+    # stores `b` and `B` as one loose ref.
+    for tag in b Zeta a-c ab; do
+      git -C "${repo_path}" update-ref "refs/tags/${tag}" "${head}"
+    done
+  )
+
+  LC_ALL=en_US.UTF-8 run_traced -0 --separate-stderr dybatpho::git_tags_containing "${repo_path}"
+  assert_output $'Zeta\na-c\nab\nb'
+}
+
 @test "dybatpho::git_tags_containing lists tags containing a commit" {
   local repo_path
   repo_path="$(_new_git_repo_path)"

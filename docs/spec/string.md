@@ -181,6 +181,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - Encoding input contains reserved or unreserved URL characters.
 - A regular expression is invalid, has groups that do not participate, or is matched against empty or special-character text.
 - The receiving array already holds an earlier result.
+- Input holds multibyte letters under `LC_ALL=C`, or a range such as `[A-Z]` would collate over lowercase letters (Bash before 5.0).
 - Edit distance is measured against an empty string, between strings differing only in case, or on multibyte characters.
 - A candidate list is empty, contains duplicates or empty entries, or has several candidates tied at the best distance.
 - The maximum distance is zero, negative, or not a number.
@@ -226,6 +227,10 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **FR-028**: `string_pad`, `string_truncate`, `string_repeat` and `string_wrap` MUST stop with a message naming the function and the value when the width or count is not a whole number; a negative number keeps its existing meaning.
 - **FR-029**: `dybatpho::string_slugify` MUST treat `@` and `*` as separators rather than as subscripts of its table.
 - **FR-030**: `dybatpho::url_decode` MUST decode only a `%` followed by two hex digits, keep any other `%`, and keep a backslash as a backslash.
+- **FR-031**: The case helpers and `dybatpho::string_slugify` MUST treat only the ASCII letters `A-Z`/`a-z` and digits as word characters, whatever the locale's collation and whether `globasciiranges` is on.
+- **FR-032**: `dybatpho::string_slugify` MUST transliterate a lowercase accented letter under a locale that counts bytes as it does under UTF-8, whichever locale the module was loaded under.
+- **FR-033**: `dybatpho::string_wrap` MUST read words from every line of its input and split them on blanks whatever `IFS` the caller has set.
+- **FR-034**: `dybatpho::url_encode` MUST write each byte of a multibyte character as one `%XX` under every C locale, musl's included.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -271,6 +276,10 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **IT-017**: Pass `abc` and `08` as the width or count to each helper and find a clear refusal; pass `-3` to `string_truncate` and find an empty line.
 - **IT-018**: Slugify `mail@example*com` and get `mail-example-com`.
 - **IT-019**: Decode `100%25%20done%2C%zz` to `100% done,%zz` and `a\nb+c` to `a\nb c`.
+- **IT-020**: With `globasciiranges` off under a collating locale, get `foo_bar_baz`, `http-server-error`, `helloWorld` and `hello-world` from the case helpers and slugify.
+- **IT-021**: Under `LC_ALL=C`, slugify `Héllo Wörld Nẵng` to `hello-world-nang`; load under C and slugify `Crème brûlée` under UTF-8 to `creme-brulee`; slugify punctuation-heavy ASCII through the shortcut.
+- **IT-022**: Wrap `one two\nthree four` at 100 into one line, and wrap `a b c d` at 3 with `IFS=,`.
+- **IT-023**: Encode `é ü/a~` to `%C3%A9%20%C3%BC%2Fa~`.
 
 ## Acceptance Criteria *(mandatory)*
 

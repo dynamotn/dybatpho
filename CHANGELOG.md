@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--help` of a typical multi-command CLI drops from about 350 ms to about
   150 ms. The generated parser and every artifact are byte-identical.
 
+- **`string` — `dybatpho::string_slugify` handles plain ASCII text in a few
+  substitutions** rather than one pass per character.
+
 ### Fixed
 
 - **More numbers with a leading zero are read in base ten.**
@@ -283,6 +286,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DYBATPHO_RETRY_MAX_DELAY` of `0.5` or `08` ended the script with a bare
   arithmetic error; such values are now refused by name and padded ones read
   in base ten.
+
+- **`string` — the case helpers and `dybatpho::string_slugify` read only
+  ASCII letters as letters.** On Bash 4.3 and 4.4 under `en_US.UTF-8`,
+  `string_to_snake fooBarBaz` gave `f_o_o_ba_r_ba_z`. Under `LC_ALL=C`,
+  `Héllo` slugified to `hssullo`. `dybatpho::string_wrap` keeps text after the
+  first newline whatever `IFS` holds, and `dybatpho::url_encode` writes `é` as
+  `%C3%A9` on Alpine/musl.
 
 ### Security
 

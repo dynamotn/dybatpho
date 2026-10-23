@@ -280,7 +280,7 @@ dybatpho::string_slugify "Crème brûlée 2024" # creme-brulee-2024
 
 **📝 Notes**
 
-- The input is walked character by character, so a locale that reports UTF-8 text as single bytes (`LC_ALL=C`) transliterates nothing
+- Under a locale that counts bytes (`LC_ALL=C`) the input is still read one UTF-8 character at a time, so a lowercase accented letter is transliterated there too; an uppercase one is not, since such a locale does not lowercase it, and becomes a separator
 
 **📤 Output on stdout**
 

@@ -584,3 +584,72 @@ EOF
   run_traced dybatpho::url_decode '%41%62'
   assert_output "Ab"
 }
+
+# Run a script in a fresh shell, from a file rather than `bash -c`: a `-c`
+# shell has an empty BASH_SOURCE, which the coverage hook trips over.
+# Run after the given setup lines: the library is loaded after them.
+_string_child() {
+  local script="${BATS_TEST_TMPDIR}/string-child.sh"
+  local setup="$1"
+  shift
+  # shellcheck disable=SC2154 # DYBATPHO_DIR is set by test_helper
+  printf '%s\n' "${setup}" ". '${DYBATPHO_DIR}/init.sh'" "$@" > "${script}"
+  bash "${script}"
+}
+
+@test "case helpers and slugify read ASCII letters whatever the locale collates" {
+  # Before Bash 5.0 `globasciiranges` is off, and a range such as `[A-Z]` then
+  # follows the locale's collation: under en_US.UTF-8 it matches `b`, and
+  # `fooBarBaz` came out as `f_o_o_ba_r_ba_z`.
+  local locale
+  for locale in en_US.UTF-8 en_US.utf8 ""; do
+    [[ -n "${locale}" ]] || skip "no locale here collates [A-Z] over lowercase letters"
+    LC_ALL="${locale}" bash -c 'shopt -u globasciiranges; case b in [A-Z]) exit 0 ;; esac; exit 1' 2> /dev/null \
+      && break
+  done
+  run_traced _string_child "shopt -u globasciiranges; export LC_ALL='${locale}'" \
+    "dybatpho::string_to_snake fooBarBaz" "dybatpho::string_to_kebab HTTPServerError" \
+    "dybatpho::string_to_camel hello_world" "dybatpho::string_slugify 'Héllo Wörld'"
+  assert_success
+  assert_line --index 0 "foo_bar_baz"
+  assert_line --index 1 "http-server-error"
+  assert_line --index 2 "helloWorld"
+  assert_line --index 3 "hello-world"
+}
+
+@test "dybatpho::string_slugify transliterates under a locale that counts bytes" {
+  # The table used to be filled by indexing, which under LC_ALL=C tore each
+  # letter into its UTF-8 bytes: `Héllo` slugified to `hssullo`.
+  run_traced _string_child "export LC_ALL=C" \
+    "dybatpho::string_slugify 'Héllo Wörld Nẵng'"
+  assert_success
+  assert_output "hello-world-nang"
+  # A table filled under C still serves a UTF-8 run.
+  run_traced _string_child "export LC_ALL=C" "LC_ALL=en_US.UTF-8" \
+    "dybatpho::string_slugify 'Crème brûlée'"
+  assert_output "creme-brulee"
+}
+
+@test "dybatpho::string_slugify takes the ASCII shortcut with the same result" {
+  run_traced dybatpho::string_slugify "  --Release__Notes  v2.4 -- Final!!  "
+  assert_output "release-notes-v2-4-final"
+  run_traced dybatpho::string_slugify "!!!"
+  assert_output ""
+}
+
+@test "dybatpho::string_wrap reads every line and ignores the caller's IFS" {
+  run_traced dybatpho::string_wrap $'one two\nthree four' 100
+  assert_output "one two three four"
+  local IFS=,
+  run_traced dybatpho::string_wrap "a b c d" 3
+  assert_output $'a b\nc d'
+}
+
+@test "dybatpho::url_encode writes each byte once under any C locale" {
+  # musl's C locale reports a high byte as 0xDF00 plus the byte, which wrote
+  # `é` as `%DFC3%DFA9`.
+  run_traced dybatpho::url_encode "é ü/a~"
+  assert_output "%C3%A9%20%C3%BC%2Fa~"
+  run_traced dybatpho::url_encode ""
+  assert_output ""
+}

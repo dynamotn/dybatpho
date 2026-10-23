@@ -291,6 +291,15 @@ function dybatpho::string_trim_suffix {
   fi
 }
 
+# The ASCII letters and digits, spelled out for bracket expressions. A range
+# such as `[a-z]` follows the locale's collation wherever `globasciiranges` is
+# off, which is the default before Bash 5.0: under `en_US.UTF-8` on glibc it
+# matches `B` and `é`, and `fooBar` came out of `string_to_snake` as
+# `f_o_o_ba_r`.
+declare -g __DYBATPHO_STRING_UPPER="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+declare -g __DYBATPHO_STRING_LOWER="abcdefghijklmnopqrstuvwxyz"
+declare -g __DYBATPHO_STRING_DIGIT="0123456789"
+
 # Latin letters carrying a diacritic, and the ASCII they stand in for. Slugs
 # are ASCII by definition, and dropping the letter outright turned `Thế Giới`
 # into `th-gi-i` -- a slug that names nothing. Only lowercase forms are listed,
@@ -308,35 +317,39 @@ declare -gA __DYBATPHO_STRING_ASCII=()
 # @internal
 #######################################
 function __dybatpho_string_build_ascii {
-  local spec target chars index
+  local spec target rest
   for spec in \
-    "a:àáâãäåāăąạảấầẩẫậắằẳẵặ" \
-    "e:èéêëēĕėęěẹẻẽếềểễệ" \
-    "i:ìíîïĩīĭįıỉị" \
-    "o:òóôõöøōŏőơọỏốồổỗộớờởỡợ" \
-    "u:ùúûüũūŭůűųưụủứừửữự" \
-    "y:ýÿŷỳỷỹỵ" \
-    "d:đďð" \
-    "c:çćĉċč" \
-    "n:ñńņňŋ" \
-    "s:śŝşš" \
-    "z:źżž" \
-    "g:ĝğġģ" \
-    "l:ĺļľŀł" \
-    "r:ŕŗř" \
-    "t:ţťŧþ" \
-    "h:ĥħ" \
+    "a:à á â ã ä å ā ă ą ạ ả ấ ầ ẩ ẫ ậ ắ ằ ẳ ẵ ặ" \
+    "e:è é ê ë ē ĕ ė ę ě ẹ ẻ ẽ ế ề ể ễ ệ" \
+    "i:ì í î ï ĩ ī ĭ į ı ỉ ị" \
+    "o:ò ó ô õ ö ø ō ŏ ő ơ ọ ỏ ố ồ ổ ỗ ộ ớ ờ ở ỡ ợ" \
+    "u:ù ú û ü ũ ū ŭ ů ű ų ư ụ ủ ứ ừ ử ữ ự" \
+    "y:ý ÿ ŷ ỳ ỷ ỹ ỵ" \
+    "d:đ ď ð" \
+    "c:ç ć ĉ ċ č" \
+    "n:ñ ń ņ ň ŋ" \
+    "s:ś ŝ ş š" \
+    "z:ź ż ž" \
+    "g:ĝ ğ ġ ģ" \
+    "l:ĺ ļ ľ ŀ ł" \
+    "r:ŕ ŗ ř" \
+    "t:ţ ť ŧ þ" \
+    "h:ĥ ħ" \
     "j:ĵ" \
     "k:ķ" \
     "w:ŵ" \
     "ae:æ" \
     "oe:œ" \
     "ss:ß" \
-    ":̧̨̣̀́̂̃̈̉̌̄̆̇̊̋"; do
+    ":̀ ́ ̂ ̃ ̈ ̉ ̌ ̄ ̆ ̇ ̊ ̋ ̧ ̨ ̣"; do
     target="${spec%%:*}"
-    chars="${spec#*:}"
-    for ((index = 0; index < ${#chars}; index++)); do
-      __DYBATPHO_STRING_ASCII["${chars:index:1}"]="${target}"
+    # The characters are spaced apart rather than indexed one by one: under a
+    # locale that counts bytes, indexing tore each one into its UTF-8 bytes
+    # and the table mapped those, so `é` slugified to `ssu`.
+    rest="${spec#*:} "
+    while [[ -n "${rest}" ]]; do
+      __DYBATPHO_STRING_ASCII["${rest%% *}"]="${target}"
+      rest="${rest#* }"
     done
   done
 }
@@ -355,21 +368,56 @@ unset -f __dybatpho_string_build_ascii
 #
 # @arg $1 string Input string
 # @stdout Slugified string
-# @note The input is walked character by character, so a locale that reports
-#   UTF-8 text as single bytes (`LC_ALL=C`) transliterates nothing
+# @note Under a locale that counts bytes (`LC_ALL=C`) the input is still read
+#   one UTF-8 character at a time, so a lowercase accented letter is
+#   transliterated there too; an uppercase one is not, since such a locale does
+#   not lowercase it, and becomes a separator
 #######################################
 function dybatpho::string_slugify {
   local input slug char mapped
   dybatpho::expect_args input -- "$@"
   input="${input,,}"
+  local alnum="${__DYBATPHO_STRING_LOWER}${__DYBATPHO_STRING_DIGIT}"
+
+  # Plain ASCII needs no table: every other character is a separator, runs of
+  # them collapse, and none is left at either end. This is the common case and
+  # takes a few substitutions rather than a pass per character.
+  if [[ "${input}" != *[![:ascii:]]* ]]; then
+    slug="${input//[!${alnum}]/-}"
+    while [[ "${slug}" == *--* ]]; do
+      slug="${slug//--/-}"
+    done
+    slug="${slug#-}"
+    printf '%s\n' "${slug%-}"
+    return 0
+  fi
+
   slug=""
   local last_was_separator=false
-  local i
+  local i=0 length lead byte_indexed=0
+  # Under a locale that counts bytes a character spans several indexes; its
+  # lead byte says how many, so it is looked up whole rather than byte by byte.
+  __dybatpho_log_indexes_bytes && byte_indexed=1
 
-  for ((i = 0; i < ${#input}; i++)); do
-    char="${input:i:1}"
+  while ((i < ${#input})); do
+    length=1
+    if ((byte_indexed)); then
+      printf -v lead '%d' "'${input:i:1}"
+      # glibc can report a high byte as negative and musl's C locale as
+      # `0xDF00` plus the byte; only the byte itself matters.
+      lead=$((lead & 0xFF))
+      if ((lead >= 240)); then
+        length=4
+      elif ((lead >= 224)); then
+        length=3
+      elif ((lead >= 192)); then
+        length=2
+      fi
+    fi
+    char="${input:i:length}"
+    i=$((i + length))
     case "${char}" in
-      [a-z0-9])
+      [${alnum}])
         slug+="${char}"
         last_was_separator=false
         ;;
@@ -511,7 +559,9 @@ function dybatpho::string_wrap {
 
   local -a words=()
   local word current_line=""
-  read -r -a words <<< "${input}"
+  # Every line is read, not only the first, and on blanks whatever `IFS` the
+  # caller left set: text after a newline used to vanish without a word.
+  IFS=$' \t\n' read -r -d '' -a words <<< "${input}" || true
   if ((${#words[@]} == 0)); then
     printf '\n'
     return 0
@@ -582,20 +632,25 @@ function dybatpho::string_pad {
 #######################################
 function dybatpho::url_encode {
   local LC_ALL=C
-  local i character
-  for ((i = 0; i < ${#1}; i++)); do
-    character="${1:i:1}"
+  local input="${1-}" encoded="" i character code
+  for ((i = 0; i < ${#input}; i++)); do
+    character="${input:i:1}"
     case "${character}" in
       [a-zA-Z0-9.~_-])
-        printf '%s' "${character}"
+        encoded+="${character}"
         ;;
 
       *)
-        printf '%%%02X' "'${character}"
+        # Only the byte itself: musl's C locale reports a high byte as the
+        # codepoint `0xDF00` plus the byte, which wrote `é` as `%DFC3%DFA9`,
+        # and glibc can report one as negative.
+        printf -v code '%d' "'${character}"
+        printf -v character '%%%02X' "$((code & 0xFF))"
+        encoded+="${character}"
         ;;
     esac
   done
-  printf '\n'
+  printf '%s\n' "${encoded}"
 }
 
 #######################################
@@ -673,9 +728,10 @@ function __dybatpho_string_words {
     __words_char="${__words_input:__words_index:1}"
     __words_next="${__words_input:__words_index+1:1}"
     case "${__words_char}" in
-      [A-Z])
-        if [[ "${__words_previous}" == [a-z0-9] ]] \
-          || { [[ "${__words_previous}" == [A-Z] ]] && [[ "${__words_next}" == [a-z] ]]; }; then
+      [${__DYBATPHO_STRING_UPPER}])
+        if [[ "${__words_previous}" == [${__DYBATPHO_STRING_LOWER}${__DYBATPHO_STRING_DIGIT}] ]] \
+          || { [[ "${__words_previous}" == [${__DYBATPHO_STRING_UPPER}] ]] \
+            && [[ "${__words_next}" == [${__DYBATPHO_STRING_LOWER}] ]]; }; then
           [[ -z "${__words_current}" ]] || {
             __words_out+=("${__words_current}")
             __words_current=""
@@ -683,7 +739,7 @@ function __dybatpho_string_words {
         fi
         __words_current+="${__words_char,,}"
         ;;
-      [a-z0-9])
+      [${__DYBATPHO_STRING_LOWER}${__DYBATPHO_STRING_DIGIT}])
         __words_current+="${__words_char}"
         ;;
       *)

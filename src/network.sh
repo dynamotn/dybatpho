@@ -1464,7 +1464,7 @@ function dybatpho::curl_auth_bearer {
 # @exitcode 4 The endpoint answered 4xx, or answered with a non-empty `errors` array
 # @exitcode 5 The endpoint answered 5xx
 # @see dybatpho::curl_request
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules network json`
+# @note Loads the `json` module on demand; name it up front with `--modules network json` to load it once
 #######################################
 function dybatpho::curl_graphql {
   local url query
@@ -1532,7 +1532,7 @@ function dybatpho::curl_graphql {
 }
 
 #######################################
-# @description Stop unless the `json` module is loaded.
+# @description Stop unless the `json` module is loaded or can be loaded on demand.
 #   Building the GraphQL envelope and reading its `errors` array is the `json`
 #   module's work. Every request helper lives in `network`, and `notification`,
 #   `forge`, `ai` and `metrics_push` all build on it, so registering `json` as a
@@ -1544,7 +1544,7 @@ function dybatpho::curl_graphql {
 #   so testing the public name would pass in a child that never loaded `json`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `json` module is not loaded
+# @exitcode 1 The `json` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_network_need_json {

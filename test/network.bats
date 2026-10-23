@@ -1182,9 +1182,9 @@ c.close()' > "${portfile}" 2> /dev/null &
   run_traced -1 dybatpho::curl_do "https://api.example.test/unreachable" "${BATS_TEST_TMPDIR}/none"
 }
 
-@test "dybatpho::curl_graphql asks for the json module when it is not loaded" {
-  # `network` does not load `json`, so a script that only downloads files does
-  # not pay for it. A child shell started from a file, without the functions
+@test "dybatpho::curl_graphql loads the json module on demand when it is not loaded" {
+  # `network` does not load `json` up front, so a script that only downloads
+  # files does not pay for it; the first GraphQL call loads it. A child shell started from a file, without the functions
   # this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
@@ -1194,13 +1194,15 @@ c.close()' > "${portfile}" 2> /dev/null &
     printf '%s\n' "dybatpho::curl_graphql https://api.example.test/graphql '{ viewer { login } }' '[1]'"
   } > "${script}"
 
+  # The call gets as far as checking its variables, which is where the bad
+  # ones above are turned away: that check is the json module's.
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure
   assert_line --index 0 "ipv4"
-  assert_output --partial "dybatpho::curl_graphql needs the json module, load it with: dybatpho::load json"
+  assert_output --partial "Variables must be a JSON object: [1]"
+  refute_output --partial "needs the json module"
 
-  # Once the script loads it, the call gets as far as checking its variables,
-  # which is where the bad ones above are turned away.
+  # A script that names it up front gets the same answer.
   sed_in_place 's/--modules network/--modules network json/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_failure

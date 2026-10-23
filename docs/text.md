@@ -30,7 +30,7 @@ helpers use.
 - [`dybatpho::text_dedent`](#dybatphotext_dedent) — Remove the shared leading indentation from a text block.
 - [`dybatpho::text_strip_ansi`](#dybatphotext_strip_ansi) — Strip ANSI escape sequences from a text block.
 - [`dybatpho::text_bullet_list`](#dybatphotext_bullet_list) — Prefix each non-empty line in a text block as a bullet item.
-- [`dybatpho::text_columns`](#dybatphotext_columns) — Align a delimited text block into plain columns. The columns are laid out by `dybatpho::table_align`, so the `table` module has to be loaded; `text` does not load it on its own.
+- [`dybatpho::text_columns`](#dybatphotext_columns) — Align a delimited text block into plain columns. The columns are laid out by `dybatpho::table_align`, so the `table` module is loaded on demand the first time this runs; name it up front to load it once.
 - [`dybatpho::text_box`](#dybatphotext_box) — Draw a border around a text block, with an optional title set into the top edge. The box is as wide as the widest line or the title, whichever is wider, with one space of padding on each side. Lines are padded by their visible width, so colored text and wide characters keep the right edge straight.
 - [`dybatpho::text_center`](#dybatphotext_center) — Center each line of a text block within a width. Lines are padded on the left only, so no trailing whitespace is added. When the padding cannot be split evenly, the extra column goes to the right. A line at least as wide as the width is printed unchanged, and a blank line stays blank. Widths are measured as `dybatpho::text_box` measures them.
 - [`dybatpho::text_number_lines`](#dybatphotext_number_lines) — Prefix each line of a text block with its line number. Numbers are right-aligned to the width of the last one, so a block of ten or more lines keeps its text in one column. Blank lines are numbered too.
@@ -116,7 +116,8 @@ Prefix each non-empty line in a text block as a bullet item.
 
 Align a delimited text block into plain columns.
 The columns are laid out by `dybatpho::table_align`, so the `table` module
-has to be loaded; `text` does not load it on its own.
+is loaded on demand the first time this runs; name it up front to load it
+once.
 
 **🧪 Example**
 
@@ -140,7 +141,7 @@ dybatpho::text_columns $'name|version\ndybatpho|6.0.0'
 
 **🚦 Exit codes**
 
-- `1`: Stop the script when the `table` module is not loaded
+- `1`: Stop the script when the `table` module cannot be loaded on demand
 
 ---
 

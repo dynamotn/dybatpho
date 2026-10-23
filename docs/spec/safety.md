@@ -167,7 +167,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - The shell has no terminal, so a confirmation can't be asked.
 - `DRY_RUN` is enabled, so no operation may change the filesystem.
 - `safe_extract` is called while the `archive` module it lists and extracts
-  through is not loaded.
+  through is not loaded yet, so it is loaded on demand.
 - `safe_extract` is given an archive that cannot be listed, so its entries
   cannot be checked.
 - A guarded path holds a newline.
@@ -238,9 +238,10 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   path, so a file whose name begins with a dash can still be operated on.
 - **FR-022**: `safe_copy` and `safe_move` MUST forward `--backup` to the
   overwrite guard, and MUST reject unknown options like the other wrappers.
-- **FR-023**: Loading `safety` MUST NOT load `archive`; `safe_extract` MUST
-  stop with a message naming the `archive` module and how to load it when that
-  module is not loaded, before it inspects the archive or the destination.
+- **FR-023**: Loading `safety` MUST NOT load `archive` up front; `safe_extract`
+  MUST load it on demand when it is not loaded, and MUST stop with a message
+  naming the `archive` module only when it cannot be loaded, before it inspects
+  the archive or the destination.
 - **FR-024**: `safe_extract` MUST stop before writing anything when the archive
   cannot be listed, since its entries cannot be checked.
 - **FR-025**: A command run by `safe_system` MUST see the caller's variables: the guard MUST keep its state in prefixed locals.
@@ -306,8 +307,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **IT-011**: Verify `safe_rm` under `DRY_RUN` prints the `rm` command and keeps
   the file.
 - **IT-012**: In a child shell that loaded only `safety`, verify `safe_extract`
-  stops with the message naming `archive` before looking at the archive, and
-  extracts once `archive` is loaded.
+  loads `archive` on demand, then reports a missing archive and extracts a
+  present one, and extracts the same way when `archive` is named up front.
 - **IT-013**: Verify `safe_extract` refuses a corrupt archive with an error
   naming it.
 - **IT-014**: Run an approved command through `safe_system` that reads variables named like the guard's locals, and see the caller's values.

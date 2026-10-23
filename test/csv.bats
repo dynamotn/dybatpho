@@ -755,9 +755,9 @@ EOF
   assert_stderr --partial "dybatpho::csv_read"
 }
 
-@test "dybatpho::csv_to_json asks for the json module when it is not loaded" {
-  # `csv` does not load `json`, so a script that only reads a spreadsheet does
-  # not pay for it. A child shell started from a file, without the functions
+@test "dybatpho::csv_to_json loads the json module on demand when it is not loaded" {
+  # `csv` does not load `json` up front, so a script that only reads a
+  # spreadsheet does not pay for it; the first conversion loads it. A child shell started from a file, without the functions
   # this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
@@ -768,11 +768,12 @@ EOF
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
-  assert_failure
+  assert_success
   assert_line --index 0 "ada"
-  assert_output --partial "dybatpho::csv_to_json needs the json module, load it with: dybatpho::load json"
+  assert_line --index 1 '[{"name":"ada"}]'
+  refute_output --partial "needs the json module"
 
-  # Once the script loads it, the same call converts.
+  # A script that names it up front gets the same result.
   sed_in_place 's/--modules csv/--modules csv json/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success

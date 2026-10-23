@@ -464,7 +464,7 @@ function dybatpho::md_code_block {
 # @arg $2 string [default: |] Delimiter
 # @stdout The rendered table
 # @exitcode 0 The table is rendered
-# @exitcode 1 Stop the script when the `table` module is not loaded
+# @exitcode 1 Stop the script when the `table` module cannot be loaded on demand
 # @example
 #   . dybatpho/init.sh --modules markdown table
 #   dybatpho::md_table $'Name::Role\nAlice::Dev' "::"

@@ -232,11 +232,11 @@ tag() {
   assert [ -f "${out}/mytool_1.3.0_darwin_arm64.tar.gz" ]
 }
 
-@test "dybatpho::release_package asks for the archive module when it is not loaded" {
-  # `release` does not load `archive`, so a script that only versions and
-  # writes the changelog does not pay for it. A child shell started from a
+@test "dybatpho::release_package loads the archive module on demand when it is not loaded" {
+  # `release` does not load `archive` up front, so a script that only versions
+  # and writes the changelog does not pay for it. A child shell started from a
   # file, without the functions this process exports, shows what such a script
-  # sees: the guard fires before the source is looked at or anything is made.
+  # sees.
   local source="${BATS_TEST_TMPDIR}/build"
   mkdir -p "${source}"
   printf 'binary\n' > "${source}/mytool"
@@ -251,12 +251,13 @@ tag() {
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${source}" "${out}"
-  assert_failure
+  assert_success
   assert_line --index 0 "mytool_1.3.0_linux_amd64.tar.gz"
-  assert_output --partial "dybatpho::release_package needs the archive module, load it with: dybatpho::load archive"
-  assert [ ! -e "${out}" ]
+  assert_line --index 1 "${out}/mytool_1.3.0_linux_amd64.tar.gz"
+  refute_output --partial "needs the archive module"
+  rm -rf "${out}"
 
-  # Once the script loads it, the same call packages.
+  # A script that names it up front packages the same way.
   sed_in_place 's/--modules release/--modules release archive/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}" "${source}" "${out}"
   assert_success

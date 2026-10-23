@@ -945,10 +945,10 @@ BSD
   assert_output "${DYBATPHO_DIR}"
 }
 
-@test "the json assertions and a snapshot diff ask for their modules when they are not loaded" {
-  # `testing` does not load `json` or `diff`, so a suite that only checks files
-  # and mocks does not pay for them. The assertions that need one report it as
-  # an ordinary failure and return, rather than ending the test shell. A child
+@test "the json assertions and a snapshot diff load their modules on demand when they are not loaded" {
+  # `testing` does not load `json` or `diff` up front, so a suite that only
+  # checks files and mocks does not pay for them. The assertions that need one
+  # load it the first time they run. A child
   # shell started from a file, without the functions this process exports,
   # shows what such a suite sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh" json="${BATS_TEST_TMPDIR}/doc.json"
@@ -964,13 +964,13 @@ BSD
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success
-  assert_output --partial "dybatpho::assert_json_valid needs the json module, load it with: dybatpho::load json"
-  assert_output --partial "json rc=1"
+  assert_output --partial "json rc=0"
   assert_output --partial "Snapshot pinned does not match"
-  assert_output --partial "dybatpho::assert_snapshot needs the diff module to show the difference, load it with: dybatpho::load diff"
+  assert_output --partial "+new"
   assert_output --partial "snapshot rc=1"
+  refute_output --partial "needs the"
 
-  # Once the suite loads them, the JSON assertion passes and the mismatch is drawn.
+  # A suite that names them up front gets the same results.
   rm -rf "${BATS_TEST_TMPDIR}/snaps"
   sed_in_place 's/--modules testing/--modules testing json diff/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"

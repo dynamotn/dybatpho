@@ -177,3 +177,38 @@ bundle() {
   assert_stderr --partial "Can't find function 'dybatpho::module_loaded'"
   assert_file_not_exist "${OUTPUT}"
 }
+
+@test "a bundle carries the stability tier of each module" {
+  run_traced -0 bundle --modules "json tui"
+  run_traced -0 use_bundle 'dybatpho::module_tier json; dybatpho::module_tier tui
+dybatpho::module_list experimental | tr "\n" " "'
+  assert_line --index 0 "stable"
+  assert_line --index 1 "experimental"
+  assert_line --index 2 --partial "tui"
+  refute_line --index 2 --partial "json"
+}
+
+@test "bundle.sh names the soft dependencies it leaves out" {
+  # The note is logged, and the log goes to stderr on its own descriptor.
+  bundle_noted() { bundle "$@" 2>&1; }
+  run_traced -0 bundle_noted --modules csv
+  assert_output --partial "Soft dependencies not carried, add them with --with-soft-deps: helpers~>semver csv~>json"
+  assert_file_contains "${OUTPUT}" "^# Soft dependencies not carried: helpers~>semver csv~>json$"
+  # Inside the bundle nothing can be loaded on demand, so the call that needs
+  # one stops with the way to regenerate it.
+  run use_bundle "dybatpho::csv_to_json \$'a\\n1'"
+  assert_failure
+  assert_output --partial "dybatpho::csv_to_json needs the json module, this bundle does not carry it"
+  assert_output --partial "--with-soft-deps"
+}
+
+@test "bundle.sh --with-soft-deps carries the soft dependencies and theirs" {
+  run_traced -0 bundle --modules "doctor csv" --with-soft-deps
+  assert_file_contains "${OUTPUT}" "^# Soft dependencies not carried: none$"
+  run_traced -0 use_bundle "dybatpho::module_list loaded | tr '\\n' ' '; echo
+dybatpho::csv_to_json \$'a\\n1'
+dybatpho::doctor --modules csv --json | grep -o '\"soft_dependencies\":{[^}]*}'"
+  assert_line --index 0 --regexp " semver .* json"
+  assert_line --index 1 '[{"a":"1"}]'
+  assert_line --index 2 '"soft_dependencies":{"math":[],"csv":["json"]}'
+}

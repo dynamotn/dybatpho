@@ -144,7 +144,7 @@ dybatpho::notify_slack "Job finished" || [[ $? -eq 9 ]]
 
 **[`dybatpho::notify_email`](#dybatphonotify_email)**
 
-- Load `validate` as well to send email: `--modules notification validate`
+- `validate` is loaded on demand when email is first sent; name it up front with `--modules notification validate`
 
 <a id="reference"></a>
 

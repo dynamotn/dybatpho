@@ -127,7 +127,8 @@ function dybatpho::text_bullet_list {
 #######################################
 # @description Align a delimited text block into plain columns.
 #   The columns are laid out by `dybatpho::table_align`, so the `table` module
-#   has to be loaded; `text` does not load it on its own.
+#   is loaded on demand the first time this runs; name it up front to load it
+#   once.
 # @example
 #   . dybatpho/init.sh --modules text table
 #   dybatpho::text_columns $'name|version\ndybatpho|6.0.0'
@@ -136,7 +137,7 @@ function dybatpho::text_bullet_list {
 # @arg $2 string [default: |] Exact delimiter
 # @arg $3 number [default: 2] Gap width between columns
 # @stdout Plain aligned columns
-# @exitcode 1 Stop the script when the `table` module is not loaded
+# @exitcode 1 Stop the script when the `table` module cannot be loaded on demand
 #######################################
 function dybatpho::text_columns {
   local input
@@ -148,7 +149,7 @@ function dybatpho::text_columns {
 }
 
 #######################################
-# @description Stop unless the `table` module is loaded.
+# @description Stop unless the `table` module is loaded or can be loaded on demand.
 #   Only `dybatpho::text_columns` draws through `table`, and registering it as
 #   a dependency would load it into every script that only indents or strips
 #   text -- including, through `testing`, every test suite -- so the one
@@ -159,7 +160,7 @@ function dybatpho::text_columns {
 #   so testing the public name would pass in a child that never loaded `table`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `table` module is not loaded
+# @exitcode 1 The `table` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_text_need_table {

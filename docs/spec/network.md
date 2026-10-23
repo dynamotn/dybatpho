@@ -267,10 +267,11 @@ dybatpho::circuit_breaker api.example.test \
   information, path, query or fragment replaced by `/[redacted]`, and a value
   that is not a URL replaced by `[redacted URL]`. The `DRY_RUN` rehearsal of a
   request MUST show its URL the same way.
-- **FR-033**: Loading the module MUST NOT load `json`. The GraphQL helper, which
-  builds and reads JSON, MUST stop before sending anything with `<function> needs
-  the json module, load it with: dybatpho::load json` when `json` is not loaded;
-  every other helper MUST work without it.
+- **FR-033**: Loading the module MUST NOT load `json` up front. The GraphQL
+  helper, which builds and reads JSON, MUST load it on demand when it is not
+  loaded, and MUST stop before sending anything with `<function> needs the json
+  module, ...` only when it cannot be loaded; every other helper MUST work
+  without it.
 - **FR-034**: `dybatpho::curl_timeout` MUST run its request in the caller's
   shell, scoping the overrides to the call, so what the request records there --
   its HTTP metrics among them -- is kept, and the global timeouts are unchanged
@@ -453,8 +454,8 @@ dybatpho::circuit_breaker api.example.test \
   and that the redaction keeps the scheme, host and port of plain, IPv6 and
   path-less URLs.
 - **IT-031**: Verify a script that loads `network` alone can use the address
-  helpers, that its GraphQL call stops with the message naming `json`, and that
-  once it loads `json` the same call gets as far as validating its variables.
+  helpers, that its GraphQL call loads `json` on demand and gets as far as
+  validating its variables, and that naming `json` up front gets as far.
 - **IT-032**: Verify the `DRY_RUN` rehearsal of a request to a URL carrying
   credentials, a secret path and a query token prints only
   `scheme://host/[redacted]`.

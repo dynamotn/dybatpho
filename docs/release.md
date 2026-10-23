@@ -67,7 +67,7 @@ creating a GitHub release stays with the caller, who owns those credentials.
 
 **[`dybatpho::release_package`](#dybatphorelease_package)**
 
-- The artifact is written by the `archive` module, which `release` does not load; load it alongside: `--modules release archive`
+- The artifact is written by the `archive` module, which `release` does loads on demand; name it up front with `--modules release archive`
 
 **[`dybatpho::release_checksums`](#dybatphorelease_checksums)**
 
@@ -306,7 +306,7 @@ dybatpho::release_package ./dist/linux_amd64 ./release mytool 1.3.0 linux amd64
 **🚦 Exit codes**
 
 - `1`: The source is missing or the archive cannot be created
-- `1`: Stop the script when the `archive` module is not loaded
+- `1`: Stop the script when the `archive` module cannot be loaded on demand
 
 ---
 

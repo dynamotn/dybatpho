@@ -57,7 +57,7 @@ case a variable cannot cover.
 
 **[`dybatpho::schedule_debounce`](#dybatphoschedule_debounce)**
 
-- Needs the `lock` module: load it with `--modules schedule lock`
+- Loads the `lock` module on demand; name it up front with `--modules schedule lock`
 
 <a id="reference"></a>
 
@@ -185,7 +185,7 @@ dybatpho::schedule_debounce 2 rebuild -- make
 **🚦 Exit codes**
 
 - `0`: The command ran, and its own exit code is returned
-- `1`: The window or the key is invalid, or the `lock` module is not loaded
+- `1`: The window or the key is invalid, or the `lock` module cannot be loaded on demand
 - `9`: A later trigger arrived, so this call did nothing
 
 ---

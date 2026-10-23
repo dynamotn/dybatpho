@@ -122,9 +122,9 @@ ccc  d
 EOF
 }
 
-@test "dybatpho::text_columns asks for the table module when it is not loaded" {
-  # `text` does not load `table`, so a script that only indents or strips text
-  # does not pay for the renderer. A child shell started from a file, without
+@test "dybatpho::text_columns loads the table module on demand when it is not loaded" {
+  # `text` does not load `table` up front, so a script that only indents or
+  # strips text does not pay for the renderer. A child shell started from a file, without
   # the functions this process exports, shows what such a script sees.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
@@ -135,11 +135,11 @@ EOF
   } > "${script}"
 
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
-  assert_failure
+  assert_success
   assert_line --index 0 "  body"
-  assert_output --partial "dybatpho::text_columns needs the table module, load it with: dybatpho::load table"
+  assert_line --index 1 "a  bb"
 
-  # Once the script loads it, the same call aligns.
+  # A script that names it up front gets the same columns.
   sed_in_place 's/--modules text/--modules text table/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
   assert_success

@@ -154,11 +154,12 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-003a**: The command check MUST accept an optional version range, written in the range syntax of `dybatpho::semver_satisfies`, and MUST stop the script when the installed version falls outside it.
 - **FR-003b**: A range MUST be recognised only by its leading operator, one of `>`, `<`, `=`, `^`, or `~`, so that the same argument keeps its older meaning as an exit code and a bare number is never read as a range.
 - **FR-003c**: The command check MUST verify that the command exists before it asks for a version, so the message names the real problem.
-- **FR-003d**: When a range is given and the optional `semver` module is not loaded, the command check MUST stop the script with a message naming what to load, rather than let the range pass unchecked.
+- **FR-003d**: When a range is given and the optional `semver` module is not loaded, the command check MUST load it on demand, and MUST stop the script with a message naming it when it cannot be loaded, rather than let the range pass unchecked.
 - **FR-003e**: When a range is given and the installed version cannot be read, the command check MUST stop the script, because a requirement that cannot be verified has not been met.
 - **FR-003f**: The command check MUST normalize the reported version before matching it, so that a command answering `1.35` or `3.12-modified` is judged on the release it is.
 - **FR-003g**: A command given as a path (a name holding `/`) MUST count as installed only when it is an existing executable file, not merely because the shell's command table accepts the name.
 - **FR-003h**: The command check MUST find a command on `PATH` whether or not command hashing is turned on.
+- **FR-003i**: A module that calls another one from only a few of its functions MUST be able to load that soft dependency on demand: when the module is registered and the loader is present, it MUST be loaded and its public functions exported; otherwise, or when loading fails, the caller MUST be stopped with a message naming the caller and the module -- in a bundle, with the command that regenerates it with its soft dependencies. A load inside a command substitution lasts only as long as that subshell.
 - **FR-004**: The module MUST provide `is` conditions for command, function,
   file, directory, link, existence, readable, writable, executable, set,
   empty, number, integer, true, and false values.
@@ -264,6 +265,9 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-026**: Require `bash` and a missing tool under `set +h`, and see the first pass and the second refused.
 - **IT-027**: Call `dybatpho::is true` with no value and see the script stop with the expected-arguments message, while an empty value is still tested.
 - **IT-028**: Retry with a base delay of `0.5` and with a maximum holding an array subscript that runs a command, and see both refused by name without running it; retry with `08` and `09` and see the sleeps read in base ten.
+- **IT-029**: In a shell that loaded only the core, require a command with a range and see `semver` loaded on demand.
+- **IT-030**: Load a registered module on demand in-process; see a module that cannot be provided, or a marker that loading does not define, answered with no, and the stop name the caller and the module, with a custom exit code.
+- **IT-031**: In a copy of the library that lost a module file, see the call needing that soft dependency stop naming the module and the missing file.
 
 ## Acceptance Criteria *(mandatory)*
 

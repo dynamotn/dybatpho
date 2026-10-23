@@ -35,10 +35,10 @@
 #   The `lock` module guards the background refresh `dybatpho::cache_run
 #   --stale` starts, so that a burst of callers finding the same stale entry
 #   runs the command once. Plain caching needs no lock, so the module does not
-#   load it: a script that serves stale entries loads `lock` as well, and
-#   `--stale` and `dybatpho::cache_wait` stop with a message naming it when it
-#   is missing.
-# @tip Load `lock` as well to serve stale entries: `--modules cache lock`
+#   load it up front: `--stale` and `dybatpho::cache_wait` load `lock` on demand
+#   the first time they run, and stop with a message naming it when it cannot
+#   be loaded.
+# @tip `lock` is loaded on demand when a stale entry is first served; name it up front with `--modules cache lock`
 # @see
 #   - `example/cache_ops.sh`
 #   - `dybatpho::file_age_seconds`
@@ -441,7 +441,7 @@ function __dybatpho_cache_refresh_background {
 }
 
 #######################################
-# @description Stop unless the `lock` module is loaded.
+# @description Stop unless the `lock` module is loaded or can be loaded on demand.
 #   Only serving a stale entry takes a lock, to start one background refresh
 #   per entry and to let `dybatpho::cache_wait` see it. Registering `lock` as a
 #   dependency would load it into every script that only caches, `ai` among
@@ -452,7 +452,7 @@ function __dybatpho_cache_refresh_background {
 #   so testing the public name would pass in a child that never loaded `lock`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `lock` module is not loaded
+# @exitcode 1 The `lock` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_cache_need_lock {

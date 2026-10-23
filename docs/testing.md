@@ -353,7 +353,7 @@ Assert that a document is parsable JSON.
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+- Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 
 **🚦 Exit codes**
 
@@ -383,7 +383,7 @@ dybatpho::assert_json_query package.json '.version' "1.4.2"
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+- Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 
 **🚦 Exit codes**
 
@@ -405,7 +405,7 @@ Assert that a JSON filter matches something in the document.
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+- Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 
 **🚦 Exit codes**
 
@@ -426,7 +426,7 @@ Assert that a document is parsable YAML.
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+- Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 
 **🚦 Exit codes**
 
@@ -449,7 +449,7 @@ Assert that a YAML expression prints an expected value.
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+- Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 
 **🚦 Exit codes**
 
@@ -471,7 +471,7 @@ Assert that a YAML expression matches something in the document.
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules testing json`
+- Loads the `json` module on demand; name it up front with `--modules testing json` to load it once
 
 **🚦 Exit codes**
 
@@ -552,7 +552,7 @@ dybatpho::assert_snapshot version-output "$(./mytool --version)"
 
 **📝 Notes**
 
-- Showing the difference on a mismatch needs the `diff` module: `dybatpho::load diff`
+- Showing the difference on a mismatch needs the `diff` module, which is loaded on demand
 
 **📤 Output on stderr**
 

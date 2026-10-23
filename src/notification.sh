@@ -726,7 +726,7 @@ function __dybatpho_notification_is_address {
 #   Addresses are checked by the `validate` module, which this one does not
 #   load: the webhook notifiers have no address to check, so only a script that
 #   sends email loads it.
-# @tip Load `validate` as well to send email: `--modules notification validate`
+# @tip `validate` is loaded on demand when email is first sent; name it up front with `--modules notification validate`
 # @example
 #   dybatpho::notify_email ops@example.com "Backup failed" "$(tail -n 20 backup.log)"
 #   dybatpho::notify_email "ops@example.com,lead@example.com" "Nightly report" "${report}" bot@example.com

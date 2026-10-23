@@ -364,9 +364,9 @@ function dybatpho::release_artifact_name {
 # @stdout Path of the artifact that was created
 # @env DRY_RUN string When true-like, print the path without packaging anything
 # @exitcode 1 The source is missing or the archive cannot be created
-# @exitcode 1 Stop the script when the `archive` module is not loaded
+# @exitcode 1 Stop the script when the `archive` module cannot be loaded on demand
 # @tip The artifact is written by the `archive` module, which `release` does
-#   not load; load it alongside: `--modules release archive`
+#   loads on demand; name it up front with `--modules release archive`
 #######################################
 function dybatpho::release_package {
   local source output_dir name version goos goarch artifact

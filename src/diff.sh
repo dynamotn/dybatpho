@@ -401,7 +401,7 @@ function __dybatpho_diff_report {
 # @exitcode 127 `jq` or `yq` is not installed
 # @example
 #   dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
-# @note Needs the `json` module: `dybatpho::load json`, or `--modules diff json`
+# @note Loads the `json` module on demand; name it up front with `--modules diff json` to load it once
 #######################################
 function dybatpho::diff_yaml {
   local first second
@@ -427,7 +427,7 @@ function dybatpho::diff_yaml {
 }
 
 #######################################
-# @description Stop unless the `json` module is loaded.
+# @description Stop unless the `json` module is loaded or can be loaded on demand.
 #   Converting YAML to JSON is the `json` module's work. Text, JSON and
 #   directory comparisons need nothing from it -- `diff_json` reads its input
 #   with `jq` directly -- and `backup` and `testing` compare through this
@@ -439,7 +439,7 @@ function dybatpho::diff_yaml {
 #   so testing the public name would pass in a child that never loaded `json`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `json` module is not loaded
+# @exitcode 1 The `json` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_diff_need_json {

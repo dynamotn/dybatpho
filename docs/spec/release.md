@@ -122,7 +122,7 @@ dybatpho::release_sign "${sums}"
 - A signing tool that is not `gpg`.
 - A file to sign, or its signature, whose path holds a space or shell syntax
   such as `$(...)` or `;`.
-- An artifact is packaged while the `archive` module is not loaded.
+- An artifact is packaged while the `archive` module is not loaded yet, so it is loaded on demand.
 
 ## Requirements *(mandatory)*
 
@@ -144,7 +144,7 @@ dybatpho::release_sign "${sums}"
 - **FR-013**: Every helper that writes MUST honor `DRY_RUN` by reporting the intended path and leaving the filesystem untouched.
 - **FR-014**: The module MUST NOT contact any forge: producing files is its whole job, and publishing them stays with the caller.
 - **FR-015**: `dybatpho::git_latest_tag` MUST order tags as versions rather than as strings, MUST accept a pattern, and MUST report failure when nothing matches.
-- **FR-016**: Loading `release` MUST NOT load `archive`; packaging MUST stop with a message naming the `archive` module and how to load it when that module is not loaded, before it inspects the source or creates anything.
+- **FR-016**: Loading `release` MUST NOT load `archive` up front; packaging MUST load it on demand when it is not loaded, and MUST stop with a message naming the `archive` module only when it cannot be loaded, before it inspects the source or creates anything.
 - **FR-017**: A configured signing command MUST receive the signature path and the file path as one argument each, and neither path MUST ever be read as shell syntax; the command itself is run as the project wrote it.
 - **FR-018**: `scripts/release.sh` MUST refuse contradicting options -- `--version` with `--bump`, publishing with `--no-push`, `--sign` with `--no-bundle`, and `--draft` with `--no-publish` -- before it reads the commits or changes the tree, and MUST accept every documented `--bump` value.
 - **FR-019**: A base or head ref that does not name a commit MUST stop `release_bump_type` and `release_changelog` with an error naming the ref, rather than being read as a range with nothing to release.
@@ -186,7 +186,7 @@ dybatpho::release_sign "${sums}"
 - **IT-013**: Sign with a configured command, with an explicit signature path, and reject a missing file.
 - **IT-014**: Run every writing helper under `DRY_RUN` and verify nothing is created.
 - **IT-015**: Verify that the latest-tag lookup orders by version, honors a pattern, and fails when nothing matches.
-- **IT-016**: In a child shell that loaded only `release`, verify packaging stops with the message naming `archive` and creates nothing, and packages once `archive` is loaded.
+- **IT-016**: In a child shell that loaded only `release`, verify packaging loads `archive` on demand and packages, and packages the same way when `archive` is named up front.
 - **IT-017**: Sign a file whose path holds a space and a command substitution with a configured command that takes an option of its own, and verify the command receives the option and the two paths as three arguments and the substitution never runs.
 - **IT-018**: Run `scripts/release.sh --dry-run` with each contradicting pair of options and verify each is refused with its own message before the release header, and that `--bump minor` parses.
 - **IT-019**: From a script, call `release_bump_type` and `release_changelog` with an unknown base, an unknown head, and an unknown head without a base, and verify the script stops with `Unknown git commit` each time.

@@ -186,7 +186,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-032**: Joining MUST reject an unknown join type, a key column a side lacks, and reading both inputs from stdin.
 - **FR-033**: Text between a closing quote and the next delimiter, or the end of the record, MUST be kept in that one field and MUST NOT be read again as a field of its own.
 - **FR-034**: Conversion from JSON MUST write nothing and succeed for an empty array, the same on the `jq` and `yq` backends.
-- **FR-035**: Loading the module MUST NOT load `json`. Conversion to JSON MUST stop before reading its input with `<function> needs the json module, load it with: dybatpho::load json` when `json` is not loaded; every other function, including conversion from JSON, MUST work without it.
+- **FR-035**: Loading the module MUST NOT load `json` up front. Conversion to JSON MUST load it on demand when it is not loaded, and MUST stop before reading its input with `<function> needs the json module, ...` only when it cannot be loaded; every other function, including conversion from JSON, MUST work without it.
 - **FR-036**: Refusing input that contains the ASCII unit separator MUST name the public function that was called, whether it reads its input directly or through the shared loader.
 - **FR-037**: `csv_read`, `csv_fields` and `csv_write` MUST read and fill the array the caller named whatever that name is, including names the functions use for their own locals.
 - **FR-038**: `dybatpho::csv_from_json '[]'`, `dybatpho::csv_convert` of an empty table and `dybatpho::csv_sort` of a header-only table MUST succeed on Bash 4.3.
@@ -252,7 +252,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-038**: Reject an unknown join type, a missing key column, two stdins, and a row wider than its header.
 - **IT-039**: Read stray text after a closing quote as part of that field, in the middle of a record, at its end, and before a trailing delimiter.
 - **IT-040**: Convert an empty JSON array to no output and no error, through `jq` and through `yq` alone.
-- **IT-041**: Verify a script that loads `csv` alone can read a column, that its conversion to JSON stops with the message naming `json`, and that once it loads `json` the same call converts.
+- **IT-041**: Verify a script that loads `csv` alone can read a column, that its conversion to JSON loads `json` on demand and converts, and that naming `json` up front converts the same way.
 - **IT-042**: Choose a column by position in `csv_col`, `csv_filter` and `csv_join`, and prefer a header literally named like the position.
 - **IT-043**: Refuse a unit separator in `csv_read` and in `csv_col`, and report each under its own name.
 - **IT-044**: Read, write and split records through arrays named `input`, `target`, `text`, `delimiter`, `record` and `source`.

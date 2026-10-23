@@ -186,7 +186,7 @@ dybatpho::diff_yaml deploy-old.yaml deploy-new.yaml
 
 **📝 Notes**
 
-- Needs the `json` module: `dybatpho::load json`, or `--modules diff json`
+- Loads the `json` module on demand; name it up front with `--modules diff json` to load it once
 
 **📤 Output on stdout**
 

@@ -1092,3 +1092,69 @@ EOF
   assert_failure
   refute_output
 }
+
+@test "dybatpho::require loads the semver module on demand for a version range" {
+  # `semver` is a soft dependency of the core: a script that loaded nothing
+  # else still has its range checked rather than stopped.
+  local script="${BATS_TEST_TMPDIR}/narrow.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q\n' "${DYBATPHO_DIR}/init.sh"
+    printf '%s\n' 'dybatpho::module_loaded semver || echo "semver not loaded"'
+    printf '%s\n' 'dybatpho::require bash ">=4.3" && echo "bash is new enough"'
+    printf '%s\n' 'dybatpho::module_loaded semver && echo "semver loaded on demand"'
+  } > "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES bash "${script}"
+  assert_success
+  assert_line --index 0 "semver not loaded"
+  assert_line --index 1 "bash is new enough"
+  assert_line --index 2 "semver loaded on demand"
+}
+
+@test "__dybatpho_helpers_load_soft loads a registered module that is not loaded" {
+  # Forget `lock` in this shell, so the call has something to load. Its
+  # read-only constants survive, which is what re-sourcing has to tolerate.
+  local saved="${DYBATPHO_LOADED_MODULES}"
+  DYBATPHO_LOADED_MODULES=" ${DYBATPHO_LOADED_MODULES} "
+  DYBATPHO_LOADED_MODULES="${DYBATPHO_LOADED_MODULES/ lock / }"
+  unset -f __dybatpho_lock_try
+  run_traced -0 __dybatpho_helpers_load_soft lock __dybatpho_lock_try caller
+  declare -F __dybatpho_lock_try > /dev/null
+  assert_regex " ${DYBATPHO_LOADED_MODULES} " " lock "
+  DYBATPHO_LOADED_MODULES="${saved}"
+}
+
+@test "__dybatpho_helpers_load_soft answers no for a module it cannot provide" {
+  run_traced -1 __dybatpho_helpers_load_soft nosuch __dybatpho_nosuch_marker caller
+  # Loaded, yet the marker is not there: a wrong marker is not papered over.
+  run_traced -1 __dybatpho_helpers_load_soft json __dybatpho_json_no_such_marker caller
+}
+
+@test "__dybatpho_helpers_need_module names the caller and the module it could not load" {
+  run -1 __dybatpho_helpers_need_module nosuch __dybatpho_nosuch_marker my_caller
+  assert_output --partial "my_caller needs the nosuch module, load it with: dybatpho::load nosuch"
+  run -1 __dybatpho_helpers_need_module json __dybatpho_json_no_such_marker my_caller
+  assert_output --partial "my_caller needs the json module, loading it on demand failed"
+  run -4 __dybatpho_helpers_need_module json __dybatpho_json_no_such_marker my_caller 4
+}
+
+@test "a soft dependency whose file is missing stops with a clear error" {
+  # A copy of the library that lost `src/json.sh`: `csv` still loads, and the
+  # first conversion stops naming both the module and the missing file.
+  local copy="${BATS_TEST_TMPDIR}/lib"
+  mkdir -p "${copy}"
+  cp -R "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${DYBATPHO_DIR}/src" "${copy}/"
+  rm "${copy}/src/json.sh"
+  local script="${BATS_TEST_TMPDIR}/broken.sh"
+  {
+    printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
+    printf '. %q --modules csv\n' "${copy}/init.sh"
+    printf '%s\n' 'echo "csv loaded"'
+    printf '%s\n' "dybatpho::csv_to_json \$'a\\n1'"
+  } > "${script}"
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES -u DYBATPHO_DIR bash "${script}"
+  assert_failure
+  assert_line --index 0 "csv loaded"
+  assert_output --partial "module 'json' is registered but"
+  assert_output --partial "dybatpho::csv_to_json needs the json module, loading it on demand failed"
+}

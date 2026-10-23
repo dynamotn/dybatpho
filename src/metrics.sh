@@ -292,7 +292,7 @@ function dybatpho::metrics_observe_ms {
 
 #######################################
 # @description Stop unless an optional module the caller is about to use is
-#   loaded. Summaries take their quantiles from `math` and a push goes out
+#   loaded or can be loaded on demand. Summaries take their quantiles from `math` and a push goes out
 #   through `network`; registering either as a dependency would load it, and
 #   with `network` require `curl`, in every script that only counts or times
 #   things -- which, through the hooks in `helpers`, `logging` and `network`,
@@ -304,7 +304,7 @@ function dybatpho::metrics_observe_ms {
 #   module and then fail on the first internal call.
 # @arg $1 string Module name, `math` or `network`
 # @arg $2 string Internal helper of that module whose presence proves it loaded
-# @exitcode 1 The module is not loaded
+# @exitcode 1 The module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_metrics_need {

@@ -36,16 +36,35 @@ if ! dybatpho::module_loaded network; then
 fi
 
 dybatpho::header "LOADING A MODULE ON DEMAND"
-# The release notes turn out to need a table, and text depends on table, so
-# asking for `text` brings both in.
-dybatpho::load text
+# The release notes turn out to need a table, and table depends on text, so
+# asking for `table` brings both in.
+dybatpho::load table
 module_list_6=$(dybatpho::module_list loaded | tr '\n' ' ')
 module_list_5=${module_list_6}
 dybatpho::print "loaded now: ${module_list_5}"
-dybatpho::info "text pulled in its table dependency automatically"
+dybatpho::info "table pulled in its text dependency automatically"
 
 text_indent=$(dybatpho::text_indent "release notes are indented by two spaces")
 dybatpho::print "${text_indent}"
+
+dybatpho::header "SOFT DEPENDENCIES"
+# Rendering CSV is `table`'s job, but parsing it is `csv`'s, which `table` does
+# not load up front. The first call that needs it loads it in this shell -- not
+# inside `$(...)`, where the module would be gone with the subshell.
+dybatpho::table_from_csv $'module,tier\njson,stable\ntui,experimental' markdown
+# shellcheck disable=SC2310 # `module_loaded` is a question; the example asks it
+if dybatpho::module_loaded csv; then
+  dybatpho::info "csv was loaded on demand by dybatpho::table_from_csv"
+fi
+
+dybatpho::header "STABILITY TIERS"
+for module in semver table; do
+  # Both names are registered, so `module_tier` cannot stop inside `$(...)`.
+  tier=$(dybatpho::module_tier "${module}")
+  dybatpho::print "${module}: ${tier}"
+done
+module_list_9=$(dybatpho::module_list experimental | wc -l)
+dybatpho::print "experimental modules: ${module_list_9// /}"
 
 dybatpho::header "AVAILABLE MODULES"
 module_list_4=$(dybatpho::module_list core | tr '\n' ' ')

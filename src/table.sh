@@ -532,7 +532,7 @@ function dybatpho::table_from_json {
 }
 
 #######################################
-# @description Stop unless the `csv` module is loaded.
+# @description Stop unless the `csv` module is loaded or can be loaded on demand.
 #   Reading CSV and turning JSON records into rows is the `csv` module's work,
 #   and it brings `json` and `math` with it. Registering it as a dependency
 #   would load all three into every script that draws a plain table -- and
@@ -544,7 +544,7 @@ function dybatpho::table_from_json {
 #   so testing the public name would pass in a child that never loaded `csv`
 #   and then fail on the first internal call.
 # @noargs
-# @exitcode 1 The `csv` module is not loaded
+# @exitcode 1 The `csv` module is not loaded and cannot be loaded on demand
 # @internal
 #######################################
 function __dybatpho_table_need_csv {

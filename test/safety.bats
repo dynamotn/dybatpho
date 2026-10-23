@@ -344,11 +344,11 @@ function _create_traversal_archive {
   assert_equal "$(cat "${destination}/stripped/nested/file.txt")" "hello"
 }
 
-@test "dybatpho::safe_extract asks for the archive module when it is not loaded" {
-  # `safety` does not load `archive`, so a script that only confirms or removes
-  # does not pay for it. A child shell started from a file, without the
-  # functions this process exports, shows what such a script sees: the guard
-  # fires before the archive path is even looked at.
+@test "dybatpho::safe_extract loads the archive module on demand when it is not loaded" {
+  # `safety` does not load `archive` up front, so a script that only confirms
+  # or removes does not pay for it. A child shell started from a file, without
+  # the functions this process exports, shows what such a script sees: the
+  # module arrives before the archive path is looked at.
   local script="${BATS_TEST_TMPDIR}/narrow.sh"
   {
     printf '%s\n' 'while read -r __fn; do unset -f "${__fn}"; done < <(compgen -A function "dybatpho::" || true)'
@@ -365,10 +365,17 @@ function _create_traversal_archive {
     bash "${script}" "${BATS_TEST_TMPDIR}/absent.tar.gz" "${destination}"
   assert_failure
   assert_line --index 0 "not interactive"
-  assert_output --partial "dybatpho::safe_extract needs the archive module, load it with: dybatpho::load archive"
-  refute_output --partial "Archive doesn't exist"
+  assert_output --partial "Archive doesn't exist"
+  refute_output --partial "needs the archive module"
 
-  # Once the script loads it, the same call extracts.
+  # With the archive in place, the same narrow script extracts.
+  run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    bash "${script}" "${archive_path}" "${destination}"
+  assert_success
+  assert_equal "$(cat "${destination}/bundle/nested/file.txt")" "hello"
+  rm -rf "${destination}"
+
+  # A script that names it up front extracts the same way.
   sed_in_place 's/--modules safety/--modules safety archive/' "${script}"
   run env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
     bash "${script}" "${archive_path}" "${destination}"

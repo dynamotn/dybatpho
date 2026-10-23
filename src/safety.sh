@@ -488,11 +488,11 @@ function __dybatpho_safety_transfer {
 # @exitcode 0 The archive is extracted
 # @exitcode 1 Overwriting existing files is declined
 # @exitcode 1 Stop the script when an entry is absolute or traverses outside the destination
-# @exitcode 1 Stop the script when the `archive` module is not loaded
+# @exitcode 1 Stop the script when the `archive` module cannot be loaded on demand
 # @stdout Command output from the selected extractor, if any
 # @tip Symlink targets stored inside an archive aren't inspected; extract untrusted archives into a scratch directory
 # @tip The entries are listed and extracted by the `archive` module, which
-#   `safety` does not load; load it alongside: `--modules safety archive`
+#   `safety` loads on demand; name it up front with `--modules safety archive`
 #######################################
 function dybatpho::safe_extract {
   # Only this guard needs `archive`, and registering it as a dependency would

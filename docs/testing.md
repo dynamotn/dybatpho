@@ -29,8 +29,8 @@ Only programming mistakes, such as a missing argument, are fatal.
 | Variable | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | **`DYBATPHO_TEST_SNAPSHOT_DIR`** | string | no | `${PWD}/test/snapshots` | Directory holding `.snap` files |
-| **`DYBATPHO_TEST_UPDATE_SNAPSHOTS`** | string | yes |  | Set to `1`, `true`, `yes`, or `on` to rewrite snapshots instead of comparing them |
-| **`UPDATE_SNAPSHOTS`** | string | yes |  | Unprefixed alias for `DYBATPHO_TEST_UPDATE_SNAPSHOTS`, so a whole suite regenerates with `UPDATE_SNAPSHOTS=1 <test runner>` |
+| **`DYBATPHO_TEST_UPDATE_SNAPSHOTS`** | string | yes |  | Set to `1`, `true`, `yes`, or `on` to rewrite snapshots instead of comparing them. Unset by default, and never assigned or exported by the library |
+| **`UPDATE_SNAPSHOTS`** | string | yes |  | Unprefixed fallback for `DYBATPHO_TEST_UPDATE_SNAPSHOTS`, read only when the prefixed switch is unset or empty, so a whole suite regenerates with `UPDATE_SNAPSHOTS=1 <test runner>` |
 | **`DYBATPHO_TEST_DURATION_RUNS`** | number | yes |  | How many times `dybatpho::assert_duration_under` runs a command, keeping the fastest, default is `1` |
 | **`DYBATPHO_TEST_LAST_DURATION_MS`** | number | yes |  | Milliseconds measured by the last duration assertion or benchmark |
 | **`DYBATPHO_TEST_BENCH_MIN_MS`** | number | yes |  | Fastest run of the last benchmark, in milliseconds |
@@ -548,7 +548,7 @@ dybatpho::assert_snapshot version-output "$(./mytool --version)"
 | --- | --- | --- |
 | **`DYBATPHO_TEST_SNAPSHOT_DIR`** | string | Directory holding the `.snap` files |
 | **`DYBATPHO_TEST_UPDATE_SNAPSHOTS`** | string | Set to `1`, `true`, `yes`, or `on` to rewrite the snapshot |
-| **`UPDATE_SNAPSHOTS`** | string | Unprefixed alias for the same switch |
+| **`UPDATE_SNAPSHOTS`** | string | Unprefixed fallback for the same switch |
 
 **📝 Notes**
 

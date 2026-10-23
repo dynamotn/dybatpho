@@ -27,7 +27,7 @@ Every wrapper applies the same three rules:
 2. the operation runs unattended only with `--force` (or `DYBATPHO_FORCE`),
    otherwise it asks for confirmation on an interactive terminal;
 3. a non-interactive run without `--force` refuses instead of guessing, and
-   `DRY_RUN` prints the command instead of executing it.
+   `DYBATPHO_DRY_RUN` prints the command instead of executing it.
 
 ### 🌍 Environment
 
@@ -202,7 +202,7 @@ Remove files and directories after validating them and confirming the removal.
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the `rm` commands instead of running them |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the `rm` commands instead of running them |
 
 **🚦 Exit codes**
 
@@ -226,7 +226,7 @@ Confirm that an existing file may be replaced, optionally keeping a backup.
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the backup command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the backup command instead of running it |
 
 **🚦 Exit codes**
 
@@ -251,7 +251,7 @@ Copy a file or directory, guarding the destination against an accidental overwri
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the `cp` command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the `cp` command instead of running it |
 
 **🚦 Exit codes**
 
@@ -276,7 +276,7 @@ Move a file or directory, guarding the destination against an accidental overwri
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the `mv` command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the `mv` command instead of running it |
 
 **🚦 Exit codes**
 
@@ -333,7 +333,7 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the command instead of running it |
 
 **🚦 Exit codes**
 

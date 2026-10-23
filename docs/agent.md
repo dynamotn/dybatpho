@@ -170,7 +170,7 @@ Return success when an agent is driving this run.
 **🧪 Example**
 
 ```bash
-dybatpho::agent_detect && export DRY_RUN=true
+dybatpho::agent_detect && DYBATPHO_DRY_RUN=true
 
 ```
 

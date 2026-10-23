@@ -298,7 +298,7 @@ dybatpho::config_save "${HOME}/.config/app.env"
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report the write instead of performing it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report the write instead of performing it |
 
 **🚦 Exit codes**
 

@@ -210,7 +210,7 @@ dybatpho::privilege_acquire --shield || dybatpho::die "Cannot elevate"
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, report what would be acquired and change nothing |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, report what would be acquired and change nothing |
 
 **🚦 Exit codes**
 
@@ -261,7 +261,7 @@ dybatpho::privilege_run -- systemctl restart nginx
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the command instead of running it |
 
 **🚦 Exit codes**
 

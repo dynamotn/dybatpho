@@ -38,7 +38,7 @@ names.
 Nothing here changes the system without saying so first. Every mutating
 function asks for confirmation unless `--force`/`DYBATPHO_FORCE` is set,
 refuses rather than guessing in a non-interactive shell, and prints the
-command instead of running it under `--dry-run` or `DRY_RUN`.
+command instead of running it under `--dry-run` or `DYBATPHO_DRY_RUN`.
 
 ### 🌍 Environment
 
@@ -297,7 +297,7 @@ Refresh the package index, after confirming the change.
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the command instead of running it |
 
 **🚦 Exit codes**
 
@@ -338,7 +338,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 
 | Variable | Type | Description |
 | --- | --- | --- |
-| **`DRY_RUN`** | string | When true-like, print the command instead of running it |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the command instead of running it |
 | **`DYBATPHO_FORCE`** | bool | Approve the change without prompting |
 
 **🚦 Exit codes**

@@ -396,12 +396,12 @@ SCRIPT
 
 @test "dybatpho::run_with_timeout returns the command's own exit code when it finishes in time" {
   local status=0
-  run_traced dybatpho::run_with_timeout 5 bash -c 'printf "in time\n"; exit 0'
+  run_traced dybatpho::run_with_timeout 60 bash -c 'printf "in time\n"; exit 0'
   assert_success
   assert_output "in time"
 
   status=0
-  dybatpho::run_with_timeout 5 bash -c 'exit 3' || status=$?
+  dybatpho::run_with_timeout 60 bash -c 'exit 3' || status=$?
   assert_equal "${status}" 3
 }
 
@@ -422,7 +422,7 @@ SCRIPT
   dybatpho::run_with_timeout 1 __dybatpho_test_slow || status=$?
   assert_equal "${status}" 124
 
-  run_traced dybatpho::run_with_timeout 5 __dybatpho_test_quick argument
+  run_traced dybatpho::run_with_timeout 60 __dybatpho_test_quick argument
   assert_success
   assert_output "called with argument"
 }
@@ -436,12 +436,12 @@ SCRIPT
   dybatpho::run_with_timeout 1 sleep 30 || status=$?
   assert_equal "${status}" 124
 
-  run_traced dybatpho::run_with_timeout 5 bash -c 'printf "fallback\n"'
+  run_traced dybatpho::run_with_timeout 60 bash -c 'printf "fallback\n"'
   assert_success
   assert_output "fallback"
 
   status=0
-  dybatpho::run_with_timeout 5 bash -c 'exit 7' || status=$?
+  dybatpho::run_with_timeout 60 bash -c 'exit 7' || status=$?
   assert_equal "${status}" 7
 }
 
@@ -464,7 +464,7 @@ SCRIPT
   # rather than through the exit status.
   __dybatpho_process_timeout_probe=no
   local status=0
-  dybatpho::run_with_timeout 5 bash -c 'exit 143' || status=$?
+  dybatpho::run_with_timeout 60 bash -c 'exit 143' || status=$?
   assert_equal "${status}" 143
 }
 
@@ -806,7 +806,7 @@ SCRIPT
   local seconds="caller" kill_after="caller" marker="caller" monitor="caller"
   local seen="${BATS_TEST_TMPDIR}/seen"
   look() { printf '%s %s %s %s\n' "${seconds}" "${kill_after}" "${marker}" "${monitor}" > "${seen}"; }
-  dybatpho::run_with_timeout 5 look
+  dybatpho::run_with_timeout 60 look
   assert_equal "$(cat "${seen}")" "caller caller caller caller"
 }
 

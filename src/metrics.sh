@@ -125,6 +125,9 @@ function __dybatpho_metrics_labels {
     value="${value//$'\n'/\\n}"
     rendered+=("${key}=\"${value}\"")
   done
+  # In byte order, the same on every host: a glibc locale's collation skips
+  # punctuation and folds case, so `a_z` and `ab` swapped places there.
+  local LC_ALL=C
   __dybatpho_helpers_sort rendered __dybatpho_metrics_before
   local joined="" rendered_pair
   for rendered_pair in ${rendered[@]+"${rendered[@]}"}; do
@@ -211,6 +214,8 @@ function dybatpho::metrics_counter_inc {
   (($#)) && shift
   [[ "${amount}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Amount must be a non-negative integer, got '${amount}'"
+  # Read in base ten: a leading zero made `08` an invalid octal number.
+  amount=$((10#${amount}))
   __dybatpho_metrics_key key "${name}" "$@"
   __dybatpho_metrics_declare "${name}" counter
   __dybatpho_metrics_counter["${key}"]=$((${__dybatpho_metrics_counter[${key}]-0} + amount))
@@ -258,6 +263,7 @@ function dybatpho::metrics_observe_ms {
   shift 2
   [[ "${milliseconds}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Duration must be a non-negative integer of milliseconds, got '${milliseconds}'"
+  milliseconds=$((10#${milliseconds}))
   __dybatpho_metrics_key key "${name}" "$@"
   [[ "${__dybatpho_metrics_type[${name}]-}" != summary ]] \
     || dybatpho::die "${FUNCNAME[0]}: Metric '${name}' is already recorded as a summary"
@@ -271,6 +277,8 @@ function dybatpho::metrics_observe_ms {
   for bound in ${DYBATPHO_METRICS_BUCKETS_MS}; do
     [[ "${bound}" =~ ^[0-9]+$ ]] \
       || dybatpho::die "${FUNCNAME[0]}: Bucket bound must be a whole number of milliseconds, got '${bound}'"
+    # Read in base ten: `010` counted as an octal eight while it rendered as ten.
+    bound=$((10#${bound}))
     # The subscript is built first: inside `$(( ))` an unquoted `|` reads as
     # bitwise or, and `shfmt` spaces it out, which changes the key.
     local bucket_key="${key}|${bound}"
@@ -356,6 +364,7 @@ function dybatpho::metrics_summary_ms {
   __dybatpho_metrics_need math __dybatpho_math_parse
   [[ "${milliseconds}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Duration must be a non-negative integer of milliseconds, got '${milliseconds}'"
+  milliseconds=$((10#${milliseconds}))
   __dybatpho_metrics_validate_quantiles
   __dybatpho_metrics_key key "${name}" "$@"
   [[ "${__dybatpho_metrics_type[${name}]-summary}" == summary ]] \
@@ -508,43 +517,50 @@ function dybatpho::metrics_reset {
 }
 
 #######################################
-# @description Render whole milliseconds as the seconds value Prometheus expects.
-# @arg $1 number Milliseconds
-# @stdout Seconds with three decimal places
+# @description Render whole milliseconds as the seconds value Prometheus expects,
+#   into a named variable.
+# @arg $1 string Name of the variable receiving the seconds
+# @arg $2 number Milliseconds
+# @set The named variable, with three decimal places
 # @internal
 #######################################
-function __dybatpho_metrics_seconds {
-  local milliseconds
-  dybatpho::expect_args milliseconds -- "$@"
-  printf '%d.%03d\n' $((milliseconds / 1000)) $((milliseconds % 1000))
+function __dybatpho_metrics_seconds_into {
+  local -n __dybatpho_metrics_seconds_out="$1"
+  local __dybatpho_metrics_seconds_ms="$2"
+  printf -v __dybatpho_metrics_seconds_out '%d.%03d' \
+    $((__dybatpho_metrics_seconds_ms / 1000)) $((__dybatpho_metrics_seconds_ms % 1000))
 }
 
 #######################################
-# @description Rewrite a series key with a name suffix and an optional extra label.
+# @description Rewrite a series key with a name suffix and an optional extra
+#   label, into a named variable.
 #   `http_duration{host="a"}` becomes `http_duration_bucket{host="a",le="0.5"}`.
-# @arg $1 string Series key
-# @arg $2 string Suffix appended to the metric name
-# @arg $3 string? Extra label, already rendered as `key="value"`
-# @stdout Rewritten series key
+#   Rendering calls this for every bucket of every series, so it runs in the
+#   caller's shell rather than in a `$(...)` that forks each time.
+# @arg $1 string Name of the variable receiving the rewritten key
+# @arg $2 string Series key
+# @arg $3 string Suffix appended to the metric name
+# @arg $4 string? Extra label, already rendered as `key="value"`
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_metrics_series {
-  local key suffix extra name labels
-  dybatpho::expect_args key suffix -- "$@"
-  extra="${3-}"
-  name="${key%%\{*}"
-  labels=""
-  if [[ "${key}" == *"{"* ]]; then
-    labels="${key#*\{}"
-    labels="${labels%\}}"
+function __dybatpho_metrics_series_into {
+  local -n __dybatpho_metrics_series_out="$1"
+  local __dybatpho_metrics_series_key="$2" __dybatpho_metrics_series_extra="${4-}"
+  local __dybatpho_metrics_series_name="${__dybatpho_metrics_series_key%%\{*}"
+  local __dybatpho_metrics_series_labels=""
+  if [[ "${__dybatpho_metrics_series_key}" == *"{"* ]]; then
+    __dybatpho_metrics_series_labels="${__dybatpho_metrics_series_key#*\{}"
+    __dybatpho_metrics_series_labels="${__dybatpho_metrics_series_labels%\}}"
   fi
-  if [[ -n "${extra}" ]]; then
-    labels="${labels:+${labels},}${extra}"
+  if [[ -n "${__dybatpho_metrics_series_extra}" ]]; then
+    __dybatpho_metrics_series_labels="${__dybatpho_metrics_series_labels:+${__dybatpho_metrics_series_labels},}"
+    __dybatpho_metrics_series_labels+="${__dybatpho_metrics_series_extra}"
   fi
-  if [[ -n "${labels}" ]]; then
-    printf '%s%s{%s}\n' "${name}" "${suffix}" "${labels}"
+  if [[ -n "${__dybatpho_metrics_series_labels}" ]]; then
+    __dybatpho_metrics_series_out="${__dybatpho_metrics_series_name}$3{${__dybatpho_metrics_series_labels}}"
   else
-    printf '%s%s\n' "${name}" "${suffix}"
+    __dybatpho_metrics_series_out="${__dybatpho_metrics_series_name}$3"
   fi
 }
 
@@ -564,6 +580,9 @@ function __dybatpho_metrics_series {
 function dybatpho::metrics_render {
   local name key bound total
   local -a names=("${!__dybatpho_metrics_type[@]}") keys=()
+  # In byte order, the same on every host: a glibc locale's collation skips
+  # punctuation and folds case, so `a_z` and `ab` swapped places there.
+  local LC_ALL=C
   __dybatpho_helpers_sort names __dybatpho_metrics_before
   for name in ${names[@]+"${names[@]}"}; do
     printf '# HELP %s %s\n' "${name}" "${__dybatpho_metrics_help[${name}]}"
@@ -583,33 +602,25 @@ function dybatpho::metrics_render {
         ;;
       histogram)
         readarray -t keys < <(__dybatpho_metrics_keys_of "${name}" __dybatpho_metrics_count)
+        local series seconds
         for key in ${keys[@]+"${keys[@]}"}; do
           local IFS=,
           for bound in ${DYBATPHO_METRICS_BUCKETS_MS}; do
-            local metrics_seconds_2
-            metrics_seconds_2=$(__dybatpho_metrics_seconds "${bound}")
-            local metrics_series_4
-            metrics_series_4=$(__dybatpho_metrics_series "${key}" "_bucket" "le=\"${metrics_seconds_2}\"")
-            printf '%s %s\n' \
-              "${metrics_series_4}" \
-              "${__dybatpho_metrics_bucket["${key}|${bound}"]-0}"
+            # Read in base ten, as `dybatpho::metrics_observe_ms` counted it.
+            [[ "${bound}" =~ ^[0-9]+$ ]] && bound=$((10#${bound}))
+            __dybatpho_metrics_seconds_into seconds "${bound}"
+            __dybatpho_metrics_series_into series "${key}" "_bucket" "le=\"${seconds}\""
+            printf '%s %s\n' "${series}" "${__dybatpho_metrics_bucket["${key}|${bound}"]-0}"
           done
           unset IFS
           total="${__dybatpho_metrics_count[${key}]}"
-          local metrics_series_2
-          metrics_series_2=$(__dybatpho_metrics_series "${key}" "_bucket" 'le="+Inf"')
-          printf '%s %s\n' \
-            "${metrics_series_2}" "${total}"
-          local metrics_seconds
-          metrics_seconds=$(__dybatpho_metrics_seconds "${__dybatpho_metrics_sum[${key}]}")
-          local metrics_series_3
-          metrics_series_3=$(__dybatpho_metrics_series "${key}" "_sum")
-          printf '%s %s\n' \
-            "${metrics_series_3}" \
-            "${metrics_seconds}"
-          local metrics_series
-          metrics_series=$(__dybatpho_metrics_series "${key}" "_count")
-          printf '%s %s\n' "${metrics_series}" "${total}"
+          __dybatpho_metrics_series_into series "${key}" "_bucket" 'le="+Inf"'
+          printf '%s %s\n' "${series}" "${total}"
+          __dybatpho_metrics_seconds_into seconds "${__dybatpho_metrics_sum[${key}]}"
+          __dybatpho_metrics_series_into series "${key}" "_sum"
+          printf '%s %s\n' "${series}" "${seconds}"
+          __dybatpho_metrics_series_into series "${key}" "_count"
+          printf '%s %s\n' "${series}" "${total}"
         done
         ;;
       summary)
@@ -620,24 +631,29 @@ function dybatpho::metrics_render {
           readarray -t keys <<< "${listed}"
         fi
         __dybatpho_metrics_validate_quantiles
-        local -a quantiles=() samples=()
+        local -a quantiles=() samples=() sorted=()
         local quantile percentile value series
         IFS=, read -r -a quantiles <<< "${DYBATPHO_METRICS_QUANTILES}"
         for key in ${keys[@]+"${keys[@]}"}; do
           read -r -a samples <<< "${__dybatpho_metrics_samples[${key}]}"
+          # Sorted once per series and computed in this shell: a
+          # `$(dybatpho::math_percentile …)` per quantile sorted the samples
+          # again each time, and three `$(...)` forks per line made rendering
+          # take seconds.
+          __dybatpho_math_sort sorted ${samples[@]+"${samples[@]}"}
           for quantile in ${quantiles[@]+"${quantiles[@]}"}; do
-            percentile="$(dybatpho::math_mul "${quantile}" 100)"
-            value="$(dybatpho::math_percentile "${percentile}" ${samples[@]+"${samples[@]}"})"
+            __dybatpho_math_mul2 percentile "${quantile}" 100
+            __dybatpho_math_percentile_sorted_into value "${percentile}" ${sorted[@]+"${sorted[@]}"}
             # Milliseconds to seconds is a shift of the decimal point, so the
             # exported quantile is as exact as the interpolation.
-            value="$(dybatpho::math_mul "${value}" 0.001)"
-            series="$(__dybatpho_metrics_series "${key}" "" "quantile=\"${quantile}\"")"
+            __dybatpho_math_mul2 value "${value}" 0.001
+            __dybatpho_metrics_series_into series "${key}" "" "quantile=\"${quantile}\""
             printf '%s %s\n' "${series}" "${value}"
           done
-          value="$(__dybatpho_metrics_seconds "${__dybatpho_metrics_sum[${key}]}")"
-          series="$(__dybatpho_metrics_series "${key}" "_sum")"
+          __dybatpho_metrics_seconds_into value "${__dybatpho_metrics_sum[${key}]}"
+          __dybatpho_metrics_series_into series "${key}" "_sum"
           printf '%s %s\n' "${series}" "${value}"
-          series="$(__dybatpho_metrics_series "${key}" "_count")"
+          __dybatpho_metrics_series_into series "${key}" "_count"
           printf '%s %s\n' "${series}" "${__dybatpho_metrics_count[${key}]}"
         done
         ;;
@@ -665,6 +681,9 @@ function __dybatpho_metrics_keys_of {
       matched+=("${key}")
     fi
   done
+  # In byte order, the same on every host: a glibc locale's collation skips
+  # punctuation and folds case, so `a_z` and `ab` swapped places there.
+  local LC_ALL=C
   __dybatpho_helpers_sort matched __dybatpho_metrics_before
   ((${#matched[@]})) && printf '%s\n' ${matched[@]+"${matched[@]}"}
   return 0

@@ -146,6 +146,8 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - A push with nothing recorded, or under `DRY_RUN`.
 - A grouping value that is empty, contains a `/`, a space, or non-ASCII text.
 - A Pushgateway that refuses the push with a 4xx or 5xx status and an explanation.
+- An amount, a duration, or a bucket bound is written with a leading zero.
+- Metric names or label keys differ only in punctuation or case, on a host whose locale collates them differently.
 
 ## Requirements *(mandatory)*
 
@@ -180,6 +182,8 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-026**: `metrics_time`, `metrics_timer_start` and `metrics_timer_stop` MUST refuse an invalid metric name or label under their own name, and `metrics_time` MUST do so before running the command.
 - **FR-027**: `metrics_push` MUST check the quantile list in the caller's shell before rendering, so that a list made invalid after a summary was recorded stops the push instead of reporting success.
 - **FR-028**: A command timed by `metrics_time` MUST see the caller's variables and MUST NOT change what is recorded by assigning to one: the timer MUST keep its state in prefixed locals.
+- **FR-029**: Counter amounts, durations, and the bounds in `DYBATPHO_METRICS_BUCKETS_MS` MUST be read in base ten whatever zeros they lead with, and a bucket MUST count against the bound it renders.
+- **FR-030**: `dybatpho::metrics_render` MUST order metric names, series and labels in byte order, whatever the locale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -235,6 +239,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-029**: Refuse a bad name and a bad label in `metrics_time` without running the command, a bad name in `metrics_timer_start`, and a bad label in `metrics_timer_stop`, each under its own name.
 - **IT-030**: Record a summary, make `DYBATPHO_METRICS_QUANTILES` invalid, push, and fail under the name of `metrics_push` without sending a request.
 - **IT-031**: Time a command that reads variables named like the timer's locals and assigns to one, and see the caller's values and the metric recorded under its own name.
+- **IT-032**: Count `08`, observe `09` against the buckets `05,010`, and record a summary sample of `010`; render names and labels that collate differently by locale under `en_US.UTF-8`; render summary quantiles `0`, `0.5` and `1` of unsorted samples.
 
 ## Acceptance Criteria *(mandatory)*
 

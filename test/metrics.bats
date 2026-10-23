@@ -522,3 +522,42 @@ SCRIPT
   assert_output --partial "scoped_ms"
   refute_output --partial "clobbered"
 }
+
+@test "metrics read amounts, durations and bucket bounds with a leading zero in base ten" {
+  # `08` stopped the script as an invalid octal number, and a bound of `010`
+  # counted as eight while it rendered as ten.
+  dybatpho::metrics_counter_inc zeros_total 08
+  assert_equal "$(dybatpho::metrics_get counter zeros_total)" "8"
+  DYBATPHO_METRICS_BUCKETS_MS="05,010"
+  dybatpho::metrics_observe_ms padded_ms 09
+  assert_equal "$(dybatpho::metrics_get sum padded_ms)" "9"
+  run_traced dybatpho::metrics_render
+  assert_line 'padded_ms_bucket{le="0.005"} 0'
+  assert_line 'padded_ms_bucket{le="0.010"} 1'
+  dybatpho::metrics_summary_ms padded_summary_ms 010
+  assert_equal "$(dybatpho::metrics_get sum padded_summary_ms)" "10"
+}
+
+@test "metrics_render orders names and labels in byte order whatever the locale" {
+  # A glibc locale's collation skips punctuation, so `a_z` sorted after `ab`
+  # there and before it everywhere else.
+  dybatpho::metrics_counter_inc ab_total
+  dybatpho::metrics_counter_inc a_z_total
+  dybatpho::metrics_counter_inc mixed_total 1 b=1 a_z=2 ab=3
+  LC_ALL=en_US.UTF-8 run_traced dybatpho::metrics_render
+  assert_success
+  assert_line --index 0 '# HELP a_z_total a_z_total'
+  assert_line 'mixed_total{a_z="2",ab="3",b="1"} 1'
+}
+
+@test "metrics_render computes summary quantiles from the samples sorted once" {
+  DYBATPHO_METRICS_QUANTILES="0,0.5,1"
+  local sample
+  for sample in 30 10 20 40; do
+    dybatpho::metrics_summary_ms sorted_ms "${sample}"
+  done
+  run_traced dybatpho::metrics_render
+  assert_line 'sorted_ms{quantile="0"} 0.01'
+  assert_line 'sorted_ms{quantile="0.5"} 0.025'
+  assert_line 'sorted_ms{quantile="1"} 0.04'
+}

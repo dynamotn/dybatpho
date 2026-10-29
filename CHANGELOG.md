@@ -24,6 +24,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`network` — `dybatpho::port_open` no longer gets killed on macOS when
+  given a host name.** Resolving the name could leave a guarded descriptor at
+  3, the one the probe redirected its socket onto, and macOS killed the shell
+  with `EXC_GUARD`: the probe exited 137, and a caller under `errexit` died
+  with it. The socket now goes to a descriptor Bash picks.
+
 - **`process` — `dybatpho::run_with_timeout` no longer runs the caller's EXIT
   trap a second time.** Without the `timeout` binary, or for a shell function,
   a command that returned at once had its watchdog ended moments after it was

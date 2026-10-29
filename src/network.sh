@@ -1892,6 +1892,10 @@ function dybatpho::cidr_contains {
 #
 #   The host and the port are passed to the timed-out shell as arguments rather
 #   than spliced into the script it runs, so a host name is never read as code.
+#
+#   The socket goes to a descriptor Bash picks, never a fixed one: resolving a
+#   name on macOS can leave a guarded descriptor at 3, and redirecting onto it
+#   gets the shell killed with EXC_GUARD.
 # @example
 #   dybatpho::port_open localhost 5432
 #   dybatpho::port_open db.internal 5432 2
@@ -1919,11 +1923,12 @@ function dybatpho::port_open {
   if dybatpho::is command timeout; then
     # shellcheck disable=SC2016 # `$1` and `$2` are the inner shell's arguments, and
     # keeping them unexpanded here is the point: the host never becomes code.
-    timeout "${seconds}" "${BASH}" -c 'exec 3<>/dev/tcp/"$1"/"$2"' \
+    timeout "${seconds}" "${BASH}" -c 'exec {socket}<>/dev/tcp/"$1"/"$2"' \
       dybatpho-port-open "${host}" "${port}" 2> /dev/null
     return
   fi
-  (exec 3<> "/dev/tcp/${host}/${port}") 2> /dev/null
+  # shellcheck disable=SC2034 # only whether the socket opens matters
+  (exec {socket}<> "/dev/tcp/${host}/${port}") 2> /dev/null
 }
 
 #######################################

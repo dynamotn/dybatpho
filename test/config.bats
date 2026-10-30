@@ -752,12 +752,9 @@ require_tool() {
     DYBATPHO_CONFIG=()
     dybatpho::config_load "${file}"
     assert_equal "$(dybatpho::config_get port)" "80"
-    # `jq` 1.6 reads numbers as doubles, so it keeps the value but not its form.
-    if [[ "$(jq --version)" == jq-1.[0-6]* ]]; then
-      assert_equal "$(dybatpho::config_get ratio)" "0.5"
-    else
-      assert_equal "$(dybatpho::config_get ratio)" "0.50"
-    fi
+    # `jq` 1.6, and `yq` reading TOML or YAML (v4.52 at least), keep the value
+    # but not its form: either spelling has lost the leading zeros.
+    assert_regex "$(dybatpho::config_get ratio)" '^0\.50?$'
     dybatpho::config_set port 0080
     dybatpho::config_set ratio 00.50
   done

@@ -86,6 +86,28 @@ function __dybatpho_string_split_into {
   local -n __dybatpho_string_split_out="$1"
   local __dybatpho_string_split_rest="${2-}" __dybatpho_string_split_delimiter="${3-}"
   __dybatpho_string_split_out=()
+  # One ASCII delimiter is split by `mapfile` in a single pass: the loop below
+  # copies the rest of the text for every field, which is quadratic. The
+  # appended delimiter keeps a trailing empty field, and the last element, the
+  # here-string's own newline, is dropped. `mapfile -d` arrived in Bash 4.4.
+  if [[ "${__dybatpho_string_split_delimiter}" == [[:ascii:]] ]]; then
+    if ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[1] >= 4)); then
+      mapfile -t -d "${__dybatpho_string_split_delimiter}" __dybatpho_string_split_out \
+        <<< "${__dybatpho_string_split_rest}${__dybatpho_string_split_delimiter}"
+      unset -v '__dybatpho_string_split_out[-1]'
+      return 0
+    fi
+    # Bash 4.3: `read -d` takes one field at a time, still in a single pass.
+    # The here-string's own newline ends the last field when the delimiter is
+    # a newline; any other delimiter is appended, and the newline left after
+    # it is never read as a field.
+    local __dybatpho_string_split_field __dybatpho_string_split_tail="${__dybatpho_string_split_delimiter}"
+    [[ "${__dybatpho_string_split_delimiter}" != $'\n' ]] || __dybatpho_string_split_tail=""
+    while IFS= read -r -d "${__dybatpho_string_split_delimiter}" __dybatpho_string_split_field; do
+      __dybatpho_string_split_out+=("${__dybatpho_string_split_field}")
+    done <<< "${__dybatpho_string_split_rest}${__dybatpho_string_split_tail}"
+    return 0
+  fi
   if [[ -n "${__dybatpho_string_split_delimiter}" ]]; then
     while [[ "${__dybatpho_string_split_rest}" == *"${__dybatpho_string_split_delimiter}"* ]]; do
       __dybatpho_string_split_out+=("${__dybatpho_string_split_rest%%"${__dybatpho_string_split_delimiter}"*}")
@@ -664,17 +686,19 @@ function dybatpho::url_decode {
   # survive, and only a `%` followed by two hex digits becomes an escape: a
   # lone one, as in `100%`, used to come out as `\x` and a printf error.
   value="${value//\\/\\\\}"
-  local decoded="" rest="${value}"
-  while [[ "${rest}" == *%* ]]; do
-    if [[ "${rest}" =~ ^([^%]*)%([0-9A-Fa-f]{2})(.*)$ ]]; then
-      decoded+="${BASH_REMATCH[1]}\\x${BASH_REMATCH[2]}"
-      rest="${BASH_REMATCH[3]}"
+  # Split on `%` in one pass rather than matching the rest of the text after
+  # every escape, which made decoding quadratic in its length.
+  local -a parts=()
+  __dybatpho_string_split_into parts "${value}" "%"
+  local decoded="${parts[0]}" part index
+  for ((index = 1; index < ${#parts[@]}; index++)); do
+    part="${parts[index]}"
+    if [[ "${part}" =~ ^[0-9A-Fa-f]{2} ]]; then
+      decoded+="\\x${part}"
     else
-      decoded+="${rest%%%*}%"
-      rest="${rest#*%}"
+      decoded+="%${part}"
     fi
   done
-  decoded+="${rest}"
   printf '%b\n' "${decoded}"
 }
 

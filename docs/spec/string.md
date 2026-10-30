@@ -231,6 +231,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **FR-032**: `dybatpho::string_slugify` MUST transliterate a lowercase accented letter under a locale that counts bytes as it does under UTF-8, whichever locale the module was loaded under.
 - **FR-033**: `dybatpho::string_wrap` MUST read words from every line of its input and split them on blanks whatever `IFS` the caller has set.
 - **FR-034**: `dybatpho::url_encode` MUST write each byte of a multibyte character as one `%XX` under every C locale, musl's included.
+- **FR-035**: `dybatpho::split` and `dybatpho::url_decode` MUST take time in proportion to the length of their input, not to its square.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -280,6 +281,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **IT-021**: Under `LC_ALL=C`, slugify `Héllo Wörld Nẵng` to `hello-world-nang`; load under C and slugify `Crème brûlée` under UTF-8 to `creme-brulee`; slugify punctuation-heavy ASCII through the shortcut.
 - **IT-022**: Wrap `one two\nthree four` at 100 into one line, and wrap `a b c d` at 3 with `IFS=,`.
 - **IT-023**: Encode `é ü/a~` to `%C3%A9%20%C3%BC%2Fa~`.
+- **IT-024**: Split 20000 fields and decode 10000 escapes, each within five seconds, keeping the trailing empty field and a lone `%`.
 
 ## Acceptance Criteria *(mandatory)*
 

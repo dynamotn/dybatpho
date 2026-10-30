@@ -284,7 +284,7 @@ dybatpho::expect_envs ENV_VAR1 ENV_VAR2
 
 **🚦 Exit codes**
 
-- `1`: Stop the script if any variable is unset or empty
+- `1`: Stop the script if any variable is unset or empty, or a name is not a variable name
 
 ---
 
@@ -535,7 +535,7 @@ dybatpho::retry 3 "curl -fsSL https://example.com/health" "health check"   # dep
 **🚦 Exit codes**
 
 - `0`: The command eventually succeeds
-- `1`: The command never succeeds and returns 1 on the final attempt
+- `other`: The command never succeeds; its exit code from the final attempt
 
 ---
 

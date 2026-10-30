@@ -223,6 +223,10 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-020**: `dybatpho::retry` and `dybatpho::retry_until` MUST NOT shadow the caller's variables in the command they evaluate: their own bookkeeping uses names in the `__dybatpho_` namespace.
 - **FR-018a**: Listing MUST NOT depend on an external command, since its purpose is to answer when nothing else is at hand.
 - **FR-018b**: Listing for a module MUST stop the script when that module is not loaded, and when no function can be attributed to a module at all, rather than returning an empty list that would read as "this module exports nothing".
+- **FR-031**: `dybatpho::retry` and `dybatpho::retry_until` MUST show their retry banner on stderr, so a caller capturing the command's output gets that output alone.
+- **FR-032**: `dybatpho::expect_envs` and `dybatpho::require_envs_any` MUST stop the script on an argument that is not a variable name, before expanding it.
+- **FR-033**: The retry delay computation MUST read a delay, a cap or an override with leading zeros in base ten, so a `Retry-After: 08` waits eight seconds.
+- **FR-034**: The IPv6 parser behind `is_ipv6` and `validate_is ipv6` MUST refuse a dotted IPv4 part that is not the last 32 bits of the address, such as `1.2.3.4::`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -291,6 +295,10 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-034**: Verify `assert --` passes and fails with a supplied and with a
   generated message, runs nothing embedded in an argument, and stops on a
   missing command; and that a command after `--` sees the caller's variables.
+- **IT-035**: Capture `retry` and `retry_until` around a command that prints after one failure, and verify the capture holds only its output and the banner carries one ellipsis.
+- **IT-036**: Pass `a[$(touch file)]` to `expect_envs` and `require_envs_any`, and verify both stop the script and no file was created.
+- **IT-037**: Compute a delay with an override of `08`, a base of `09` and a cap of `09`, and verify each is read in base ten.
+- **IT-038**: Verify `1.2.3.4::`, `1:2:1.2.3.4::` and `1.2.3.4::1` are refused and `::1.2.3.4` is accepted.
 
 ## Acceptance Criteria *(mandatory)*
 

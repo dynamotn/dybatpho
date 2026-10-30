@@ -88,6 +88,18 @@ dybatpho
 EOF
 }
 
+@test "dybatpho::split takes time in proportion to its input" {
+  # Each field used to copy the rest of the text: 20000 fields took ~20s.
+  local text
+  printf -v text 'f%s,' {1..20000}
+  local -a parts=()
+  local started="${SECONDS}"
+  __dybatpho_string_split_into parts "${text}" ","
+  assert_equal "${#parts[@]}" "20001"
+  assert_equal "${parts[19999]}|${parts[20000]}" "f20000|"
+  assert [ "$((SECONDS - started))" -le 5 ]
+}
+
 @test "dybatpho::string_starts_with matches exact prefix" {
   dybatpho::string_starts_with "dybatpho-utils" "dybatpho"
 
@@ -583,6 +595,17 @@ EOF
   assert_output 'a\nb c'
   run_traced dybatpho::url_decode '%41%62'
   assert_output "Ab"
+}
+
+@test "dybatpho::url_decode takes time in proportion to its input" {
+  # Every escape used to re-match the rest of the text: 10000 took ~16s.
+  local text
+  printf -v text '%%41%.0s' {1..10000}
+  local started="${SECONDS}"
+  run_traced dybatpho::url_decode "${text}%2x%"
+  assert [ "$((SECONDS - started))" -le 5 ]
+  assert_equal "${#output}" "10004"
+  assert_equal "${output: -5}" "A%2x%"
 }
 
 # Run a script in a fresh shell, from a file rather than `bash -c`: a `-c`

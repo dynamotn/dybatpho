@@ -105,6 +105,18 @@ setup() {
   assert_stderr --partial "Environment variable \`EMPTY_ENV\` isn't set"
 }
 
+@test "dybatpho::expect_envs and require_envs_any refuse a name that is not a variable name" {
+  # An indirect expansion of `a[$(...)]` ran the command in the subscript.
+  local marker="${BATS_TEST_TMPDIR}/ran"
+  run --separate-stderr dybatpho::expect_envs "a[\$(touch ${marker})]"
+  assert_failure
+  assert_stderr --partial "Invalid environment variable name"
+  run --separate-stderr dybatpho::require_envs_any "a[\$(touch ${marker})]"
+  assert_failure
+  assert_stderr --partial "Invalid environment variable name"
+  assert_file_not_exist "${marker}"
+}
+
 @test "dybatpho::require installed tool" {
   dybatpho::require "bash"
 }
@@ -586,17 +598,17 @@ _test_retry() {
 
 @test "dybatpho::retry success in max retries" {
   count=0
-  run_traced dybatpho::retry 2 _test_retry
+  run_traced --separate-stderr dybatpho::retry 2 _test_retry
   assert_success
-  assert_output --partial "Retrying in 4 seconds (2/2)"
+  assert_stderr --partial "Retrying in 4 seconds (2/2)"
 }
 
 @test "dybatpho::retry success before max retries" {
   count=0
-  run_traced dybatpho::retry 3 _test_retry
+  run_traced --separate-stderr dybatpho::retry 3 _test_retry
   assert_success
-  assert_output --partial "Retrying in 4 seconds (2/3)"
-  refute_output --partial "Retrying in 8 seconds (3/3)"
+  assert_stderr --partial "Retrying in 4 seconds (2/3)"
+  refute_stderr --partial "Retrying in 8 seconds (3/3)"
 }
 
 @test "dybatpho::retry with immediate success" {
@@ -615,11 +627,11 @@ _test_retry() {
   # attempts with, or the second failure is never retried.
   count=0
   stub_repeated sleep ": echo \"\$*\" >> ${sleep_args_file}"
-  run_traced dybatpho::retry 2 _test_retry retry-target
+  run_traced --separate-stderr dybatpho::retry 2 _test_retry retry-target
   unstub sleep
   assert_success
-  assert_output --partial "Retrying in 2 seconds (1/2)"
-  assert_output --partial "Retrying in 4 seconds (2/2)"
+  assert_stderr --partial "Retrying in 2 seconds (1/2)"
+  assert_stderr --partial "Retrying in 4 seconds (2/2)"
   assert_equal "$(tr '\n' ' ' < "${sleep_args_file}")" '2 4 '
 }
 
@@ -699,6 +711,17 @@ _test_retry() {
   assert_equal "${delay}" "3600"
 }
 
+@test "__dybatpho_helpers_backoff_into reads a leading zero in base ten" {
+  # `Retry-After: 08` is legal HTTP; as an octal literal it stopped the script.
+  local delay
+  __dybatpho_helpers_backoff_into delay 1 2 30 false 08
+  assert_equal "${delay}" "8"
+  __dybatpho_helpers_backoff_into delay 2 09 30 false
+  assert_equal "${delay}" "18"
+  __dybatpho_helpers_backoff_into delay 1 2 09 false 30
+  assert_equal "${delay}" "9"
+}
+
 @test "dybatpho::retry waits longer each time and never past the cap" {
   local sleep_args_file="${BATS_TEST_TMPDIR}/sleep-args"
   DYBATPHO_RETRY_BASE_DELAY=2
@@ -734,16 +757,37 @@ _test_retry() {
   }
   count=0
   stub_repeated sleep ": echo \"\$*\" >> ${sleep_args_file}"
-  run_traced dybatpho::retry_until 3 1 _retry_until_flaky retry-until-target
+  run_traced --separate-stderr dybatpho::retry_until 3 1 _retry_until_flaky retry-until-target
   unstub sleep
   assert_success
-  assert_output --partial "Retrying in 1 seconds (2/3)"
+  assert_stderr --partial "Retrying in 1 seconds (2/3)"
   run_traced cat "${sleep_args_file}"
   assert_success
   assert_output - << EOF
 1
 1
 EOF
+}
+
+@test "dybatpho::retry and retry_until keep their banner out of the command's output" {
+  _retry_prints_late() {
+    count=$((count + 1))
+    ((count > 1)) && printf 'payload\n'
+    ((count > 1))
+  }
+  stub_repeated sleep ": true"
+  local captured
+  count=0
+  captured="$(dybatpho::retry 2 -- _retry_prints_late 2> /dev/null)"
+  assert_equal "${captured}" "payload"
+  count=0
+  captured="$(dybatpho::retry_until 2 0 -- _retry_prints_late 2> "${BATS_TEST_TMPDIR}/stderr")"
+  unstub sleep
+  assert_equal "${captured}" "payload"
+  # The banner adds its own ellipsis; the message used to carry a second one.
+  run_traced cat "${BATS_TEST_TMPDIR}/stderr"
+  assert_output --partial "(1/2)... "
+  refute_output --partial "......"
 }
 
 @test "dybatpho::retry and retry_until run a command after -- as words, never as shell" {
@@ -1304,6 +1348,15 @@ EOF
     ::ffff:192.0.2.256 1:2:3:4:5:6:1.2.3.999 12345::1 1::xyz 1:2:3:4:5:6:7:8::9 1:2:3; do
     run_traced -1 __dybatpho_helpers_ipv6_groups "${bad}" -
   done
+}
+
+@test "__dybatpho_helpers_ipv6_groups refuses a dotted part that is not the last" {
+  # The embedded IPv4 is the last 32 bits; a `::` after it used to be accepted.
+  local bad
+  for bad in 1.2.3.4:: 1:2:1.2.3.4:: 1.2.3.4::1; do
+    run_traced -1 __dybatpho_helpers_ipv6_groups "${bad}" -
+  done
+  __dybatpho_helpers_ipv6_groups ::1.2.3.4 -
 }
 
 @test "__dybatpho_helpers_parse_cidr splits a block and checks its prefix length" {

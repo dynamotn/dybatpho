@@ -232,11 +232,13 @@ function dybatpho::still_has_args {
 # @example
 #   dybatpho::expect_envs ENV_VAR1 ENV_VAR2
 # @arg $@ string Environment variables to check
-# @exitcode 1 Stop the script if any variable is unset or empty
+# @exitcode 1 Stop the script if any variable is unset or empty, or a name is not a variable name
 #######################################
 function dybatpho::expect_envs {
   local arg
   for arg in "$@"; do
+    # Checked first: an indirect expansion runs a `$(...)` written in a subscript.
+    [[ "${arg}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || dybatpho::die "Invalid environment variable name: ${arg}"
     if [[ -z "${!arg:-}" ]]; then
       dybatpho::die "Environment variable \`${arg}\` isn't set." # kcov(skip)
     fi
@@ -807,6 +809,8 @@ function __dybatpho_helpers_ipv6_groups {
     __ipv6_last="${__ipv6_head_parts[-1]}"
   fi
   if [[ "${__ipv6_last}" == *.* ]]; then
+    # The dotted part is the last 32 bits, so nothing may follow it, not even a `::`.
+    ((__ipv6_has_double && ! __ipv6_mapped_in_tail)) && return 1
     local -a __ipv6_octets=()
     __dybatpho_helpers_ipv4_octets "${__ipv6_last}" __ipv6_octets || return 1
     __ipv6_mapped=("$(((__ipv6_octets[0] << 8) | __ipv6_octets[1]))" "$(((__ipv6_octets[2] << 8) | __ipv6_octets[3]))")
@@ -1060,6 +1064,8 @@ function dybatpho::require_envs_any {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one environment variable"
   local env_name
   for env_name in "$@"; do
+    # Checked first: an indirect expansion runs a `$(...)` written in a subscript.
+    [[ "${env_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || dybatpho::die "Invalid environment variable name: ${env_name}"
     [[ -n "${!env_name:-}" ]] && return 0
   done
   dybatpho::die "Expected at least one environment variable to be set: $*" # kcov(skip)
@@ -1152,9 +1158,11 @@ function __dybatpho_helpers_quote_argv_into {
 #######################################
 function __dybatpho_helpers_backoff_into {
   local -n __dybatpho_helpers_bo_ref="$1"
-  local -i __dybatpho_helpers_bo_attempt="$2"
-  local -i __dybatpho_helpers_bo_base="${3:-${DYBATPHO_RETRY_BASE_DELAY}}"
-  local -i __dybatpho_helpers_bo_max="${4:-${DYBATPHO_RETRY_MAX_DELAY}}"
+  # Read in base ten: a `Retry-After: 08` is eight seconds, where an integer
+  # variable takes it for a bad octal number and stops the script.
+  local -i __dybatpho_helpers_bo_attempt="$((10#$2))"
+  local -i __dybatpho_helpers_bo_base="$((10#${3:-${DYBATPHO_RETRY_BASE_DELAY}}))"
+  local -i __dybatpho_helpers_bo_max="$((10#${4:-${DYBATPHO_RETRY_MAX_DELAY}}))"
   local __dybatpho_helpers_bo_jitter="${5:-${DYBATPHO_RETRY_JITTER}}"
   local __dybatpho_helpers_bo_override="${6-}"
 
@@ -1164,7 +1172,7 @@ function __dybatpho_helpers_backoff_into {
     __dybatpho_helpers_bo_attempt=$((__dybatpho_helpers_bo_attempt - 1))
   done
   [[ -z "${__dybatpho_helpers_bo_override}" ]] \
-    || __dybatpho_helpers_bo_delay="${__dybatpho_helpers_bo_override}"
+    || __dybatpho_helpers_bo_delay="$((10#${__dybatpho_helpers_bo_override}))"
   ((__dybatpho_helpers_bo_delay <= __dybatpho_helpers_bo_max)) \
     || __dybatpho_helpers_bo_delay="${__dybatpho_helpers_bo_max}"
   if dybatpho::is true "${__dybatpho_helpers_bo_jitter}"; then
@@ -1196,7 +1204,7 @@ function __dybatpho_helpers_backoff_into {
 # @env DYBATPHO_RETRY_MAX_DELAY number Longest a single retry waits
 # @env DYBATPHO_RETRY_JITTER bool Add up to one base delay of random jitter
 # @exitcode 0 The command eventually succeeds
-# @exitcode 1 The command never succeeds and returns 1 on the final attempt
+# @exitcode other The command never succeeds; its exit code from the final attempt
 # @tip A shell function defined by the caller works as the command, and sees the caller's variables
 # @tip Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same
 #   dependency, so they do not all come back at the same instant
@@ -1246,8 +1254,9 @@ function dybatpho::retry {
       if declare -F __dybatpho_metrics_key > /dev/null; then
         dybatpho::metrics_counter_inc dybatpho_retry_attempts_total
       fi
-      dybatpho::progress "Retrying in ${__dybatpho_retry_delay} seconds" \
-        "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})..."
+      # On stderr: the caller may be capturing the command's own output.
+      __dybatpho_log_progress_to stderr "Retrying in ${__dybatpho_retry_delay} seconds" \
+        "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})"
       sleep "${__dybatpho_retry_delay}" || true
     else
       # Out of retries :(
@@ -1333,8 +1342,9 @@ function dybatpho::retry_until {
       dybatpho::warn "No more retries left to run ${__dybatpho_retry_label}."
       return "${__dybatpho_retry_exit_code}"
     fi
-    dybatpho::progress "Retrying in ${__dybatpho_retry_delay_seconds} seconds" \
-      "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})..."
+    # On stderr: the caller may be capturing the command's own output.
+    __dybatpho_log_progress_to stderr "Retrying in ${__dybatpho_retry_delay_seconds} seconds" \
+      "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})"
     sleep "${__dybatpho_retry_delay_seconds}" || true
   done
 }

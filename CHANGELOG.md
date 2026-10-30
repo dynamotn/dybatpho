@@ -73,16 +73,30 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   An interactive shell that evaluates the text of `init.sh` at its prompt exits
   too. Sourcing `init.sh` from a file is unaffected.
 
+- **`helpers` — `dybatpho::retry` and `dybatpho::retry_until` show their
+  "Retrying" banner on stderr, so `out=$(dybatpho::retry …)` captures only the
+  command's output.** The banner no longer ends in a doubled ellipsis.
+- **`helpers` — hTTP and queue retries no longer stop the script on a delay
+  written with a leading zero, such as `Retry-After: 08` or
+  `DYBATPHO_CURL_RETRY_BASE_DELAY=08`.**
+- **`helpers` — `dybatpho::is_ipv6` and `dybatpho::validate_is ipv6` refuse an
+  address whose dotted IPv4 part is not at the end, such as `1.2.3.4::`.**
 - **`logging` — `dybatpho::log_to_file` and `DYBATPHO_LOG_FILE` accept a path
   starting with `-`.** Rotating such a file used to stop the script.
 - **`logging` — logging to a file no longer starts a `wc` process for every
   line, which made file logging about ten times slower.**
+- **`string` — `dybatpho::split` and `dybatpho::url_decode` take time in
+  proportion to their input.** Splitting 8000 fields took 3.6 s and decoding
+  8000 escapes took 10 s.
 
 ### Security
 
 - **`logging` — `dybatpho::timer_end` and `dybatpho::log_context remove` no
   longer run a `$(...)` written in a timer or field name, and they remove names
   holding `]`.**
+- **`helpers` — `dybatpho::expect_envs` and `dybatpho::require_envs_any` stop on
+  an argument that is not a variable name instead of running a `$(...)` written
+  in its subscript.**
 
 ## [7.0.0] - 2026-10-23
 

@@ -334,9 +334,11 @@
 #   The configuration has to be loaded before `dybatpho::generate_from_spec`,
 #   because that is when the parser resolves an option's initial value. A key
 #   that is absent, or a CLI that never loaded any configuration at all, simply
-#   falls through to `init:`. `cli` does not load the `config` module itself,
-#   so a script that binds options this way asks for it:
-#   `--modules cli config`.
+#   falls through to `init:`. A value taken from `env:` or `config:` is held to
+#   the option's `choices:`, `type:` and `pattern:` once parsing is done, as a
+#   typed one is, unless the command line overrode it. `cli` does not load the
+#   `config` module itself, so a script that binds options this way asks for
+#   it: `--modules cli config`.
 #
 #   #### Named positional arguments
 #
@@ -525,8 +527,9 @@
 #   `dybatpho::generate_completion` caches its output under
 #   `DYBATPHO_CLI_CACHE_DIR`, so a shell startup that sources a generated
 #   completion does not walk the whole spec tree again. The cache key hashes the
-#   script that declares the spec, so editing that script invalidates the entry
-#   by itself and there is nothing to clear by hand. Set
+#   script and the file that declares the root spec, and names the library
+#   version, so editing either file or upgrading invalidates the entry by itself
+#   and there is nothing to clear by hand. Set
 #   `DYBATPHO_CLI_CACHE=false` to regenerate every time, and note that a spec
 #   declared somewhere with no readable source file is never cached.
 #
@@ -609,8 +612,9 @@ function dybatpho::select {
     local token range_start range_end range_index
     for token in ${answers[@]+"${answers[@]}"}; do
       if [[ "${token}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
-        range_start="${BASH_REMATCH[1]}"
-        range_end="${BASH_REMATCH[2]}"
+        # `10#`: a leading zero would otherwise be read as octal, and `08` fail.
+        range_start=$((10#${BASH_REMATCH[1]}))
+        range_end=$((10#${BASH_REMATCH[2]}))
         if dybatpho::is false "${multiple}"; then
           continue
         fi
@@ -620,8 +624,8 @@ function dybatpho::select {
         for ((range_index = range_start; range_index <= range_end; range_index++)); do
           selected+=("${items[$((range_index - 1))]}")
         done
-      elif [[ "${token}" =~ ^[0-9]+$ ]] && [[ "${token}" -ge 1 ]] && [[ "${token}" -le "${#items[@]}" ]]; then
-        selected+=("${items[$((token - 1))]}")
+      elif [[ "${token}" =~ ^[0-9]+$ ]] && ((10#${token} >= 1 && 10#${token} <= ${#items[@]})); then
+        selected+=("${items[10#${token} - 1]}")
       else
         for entry in ${items[@]+"${items[@]}"}; do
           [[ "${token}" = "${entry}" ]] && selected+=("${entry}") && break
@@ -1827,6 +1831,7 @@ function __dybatpho_cli_generate_man_command {
   local -a __dybatpho_cli_gmc_options=() __dybatpho_cli_gmc_commands=() __dybatpho_cli_gmc_arguments=()
   __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gmc_spec}" __dybatpho_cli_gmc_options \
     __dybatpho_cli_gmc_commands __dybatpho_cli_gmc_description __dybatpho_cli_gmc_arguments
+  __dybatpho_cli_roff_escape_into __dybatpho_cli_gmc_description "${__dybatpho_cli_gmc_description}"
   local __dybatpho_cli_gmc_escaped
   __dybatpho_cli_gmc_escaped="${__dybatpho_cli_gmc_name//\\/\\\\}"
   __dybatpho_cli_gmc_escaped="${__dybatpho_cli_gmc_escaped//\"/\\\"}"
@@ -1852,6 +1857,7 @@ function __dybatpho_cli_generate_man_command {
           __dybatpho_cli_gmc_arg_required __dybatpho_cli_gmc_arg_variadic <<< "${__dybatpho_cli_gmc_arg_item}"
         __dybatpho_cli_arg_placeholder __dybatpho_cli_gmc_arg_placeholder "${__dybatpho_cli_gmc_arg_name}" \
           "${__dybatpho_cli_gmc_arg_required}" "${__dybatpho_cli_gmc_arg_variadic}"
+        __dybatpho_cli_roff_escape_into __dybatpho_cli_gmc_arg_desc "${__dybatpho_cli_gmc_arg_desc}"
         printf '.TP\n.B %s\n%s\n' "${__dybatpho_cli_gmc_arg_placeholder}" "${__dybatpho_cli_gmc_arg_desc}"
       done
     fi
@@ -1882,6 +1888,8 @@ function __dybatpho_cli_generate_man_command {
     local __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_switches// /, }"
     [[ "${__dybatpho_cli_gmc_type}" = param ]] \
       && __dybatpho_cli_gmc_option_label="${__dybatpho_cli_gmc_option_label} <${__dybatpho_cli_gmc_var}>"
+    __dybatpho_cli_roff_escape_into __dybatpho_cli_gmc_desc "${__dybatpho_cli_gmc_desc}"
+    __dybatpho_cli_roff_escape_into __dybatpho_cli_gmc_choices "${__dybatpho_cli_gmc_choices}"
     printf '.TP\n.B %s\n%s' "${__dybatpho_cli_gmc_option_label}" "${__dybatpho_cli_gmc_desc}"
     [[ "${__dybatpho_cli_gmc_required:-false}" = true ]] && printf ' (required)'
     [[ -n "${__dybatpho_cli_gmc_choices}" ]] && printf ' [choices: %s]' "${__dybatpho_cli_gmc_choices//,/, }"
@@ -1909,6 +1917,26 @@ function __dybatpho_cli_generate_man_command {
 }
 
 #######################################
+# @description Make spec text safe to print as roff body text: a backslash
+#   starts an escape there, and a line beginning with `.` or `'` is a request,
+#   which `man` swallows rather than shows.
+# @arg $1 string Name of the variable receiving the escaped text
+# @arg $2 string Text to escape
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_cli_roff_escape_into {
+  local -n __dybatpho_cli_roff_out="$1"
+  local __dybatpho_cli_roff_text="${2-}"
+  __dybatpho_cli_roff_text="${__dybatpho_cli_roff_text//\\/\\e}"
+  # `\&` is a zero-width character, so the line no longer starts with the dot.
+  __dybatpho_cli_roff_text="${__dybatpho_cli_roff_text//$'\n.'/$'\n\\&.'}"
+  __dybatpho_cli_roff_text="${__dybatpho_cli_roff_text//$'\n\''/$'\n\\&\''}"
+  [[ "${__dybatpho_cli_roff_text}" == [.\']* ]] && __dybatpho_cli_roff_text="\\&${__dybatpho_cli_roff_text}"
+  __dybatpho_cli_roff_out="${__dybatpho_cli_roff_text}"
+}
+
+#######################################
 # @description Generate Bash, Zsh, or Fish completion from a CLI option spec.
 # @arg $1 string Spec function
 # @arg $2 string Shell (`bash`, `zsh`, or `fish`)
@@ -1916,8 +1944,8 @@ function __dybatpho_cli_generate_man_command {
 # @tip Keep completion generation in a display option declared inside the spec when the CLI should complete itself.
 # @tip Generate completion from the root spec so subcommand options and aliases are included.
 # @note Output is cached under `DYBATPHO_CLI_CACHE_DIR`, keyed by the hash of the
-#       script that declares the spec, so editing the script invalidates the
-#       entry on its own. Set `DYBATPHO_CLI_CACHE=false` to bypass the cache.
+#       script and of the file declaring the root spec, and by the library
+#       version, so editing either file invalidates the entry on its own. Set `DYBATPHO_CLI_CACHE=false` to bypass the cache.
 # @stdout Completion script
 #######################################
 function dybatpho::generate_completion {
@@ -1977,8 +2005,25 @@ function __dybatpho_cli_cache_file {
   local digest
   digest="$(dybatpho::file_hash "${source}" 2> /dev/null)" || return 1
   [[ -n "${digest}" ]] || return 1
+  # The spec may be declared in a file the script sources rather than in the
+  # script itself, so that file is hashed too: an edit to it changed nothing in
+  # `$0`, and the stale completion was served on. `extdebug` is what makes
+  # `declare -F` name the file a function came from.
+  local spec_line="" spec_file="" spec_digest="" extdebug_on=false
+  shopt -q extdebug && extdebug_on=true
+  shopt -s extdebug
+  spec_line="$(declare -F "${2-}")" || true
+  dybatpho::is true "${extdebug_on}" || shopt -u extdebug
+  spec_file="${spec_line#* * }"
+  if [[ -n "${spec_line}" && "${spec_file}" != "${source}" && -f "${spec_file}" ]]; then
+    spec_digest="$(dybatpho::file_hash "${spec_file}" 2> /dev/null)" || return 1
+  fi
 
-  local key="${digest:0:32}-$*"
+  # The library version is part of the key, so an upgrade that changes the
+  # generated completion does not keep serving the old one.
+  local key version
+  version="$(dybatpho::version)"
+  key="${digest:0:32}-${spec_digest:0:16}-${version}-$*"
   key="${key//[^a-zA-Z0-9._-]/_}"
   mkdir -p -- "${DYBATPHO_CLI_CACHE_DIR}" 2> /dev/null || return 1
   printf -v "${target}" '%s' "${DYBATPHO_CLI_CACHE_DIR}/${key}"
@@ -2539,7 +2584,10 @@ function __dybatpho_cli_print_validate {
     if dybatpho::is true "${__count:-false}"; then
       # A counting flag ignores the on/off value and records how often it was
       # repeated, so `-vv` and `-v -v` both land on 2.
-      __dybatpho_cli_print_indent 4 "$2=\$(( \${$2:-0} + 1 ))"
+      # The seed can come from `env:` or `config:`; arithmetic would evaluate
+      # it, running any `$(...)` in a subscript, so a non-count starts at 0.
+      __dybatpho_cli_print_indent 4 "case \${$2:-} in '' | *[!0-9]*) $2=0 ;; esac"
+      __dybatpho_cli_print_indent 4 "$2=\$(( 10#\$$2 + 1 ))"
       [[ "${__export}" = "true" ]] && __dybatpho_cli_print_indent 4 "export $2"
     elif dybatpho::is true "${__multiple:-false}"; then
       __dybatpho_cli_print_indent 4 "[ -n \"\${$2:-}\" ] && $2=\"\${$2} \$OPTARG\" || $2=\"\$OPTARG\""
@@ -2548,6 +2596,49 @@ function __dybatpho_cli_print_validate {
       __dybatpho_cli_prepend_export 4 "$2=\$OPTARG"
     fi
   fi
+}
+
+#######################################
+# @description Queue checks that hold a value seeded by `env:` or `config:` to
+#   the option's `choices:`, `type:` and `pattern:`, as a typed value is held.
+#   They run once parsing is done, so a value given on the command line, which
+#   was checked as it was read, still overrides a bad seed. A `multiple:` value
+#   is a space-joined list and a `count:` value a number, so neither is checked.
+# @arg $1 string Destination variable name, or `-`
+# @set __required_checks Appends one generated check per rule
+# @internal
+#######################################
+function __dybatpho_cli_add_seed_checks {
+  local __seed_var="$1" __seed_env="${__env:-}"
+  [[ "${__seed_var}" != "-" ]] || return 0
+  [[ "${__seed_env}" != "false" ]] || __seed_env=""
+  [[ -n "${__seed_env}" || -n "${__config:-}" ]] || return 0
+  if dybatpho::is true "${__count:-false}"; then
+    # Without the flag on the line, the seed reaches the script untouched, and
+    # its own `(( V > 1 ))` would run any `$(...)` in a subscript.
+    __required_checks+=("case \"\${${__seed_var}:-}\" in '' | *[!0-9]*) ${__seed_var}=0 ;; *) ${__seed_var}=\$((10#\$${__seed_var})) ;; esac")
+    return 0
+  fi
+  dybatpho::is false "${__multiple:-false}" || return 0
+  local __seed_guard="[ -z \"\${${__seed_var}:-}\" ] ||"
+  if [[ -n "${__choices:-}" ]]; then
+    local __seed_choices
+    __dybatpho_cli_assign_quoted __seed_choices "${__choices}"
+    __required_checks+=("${__seed_guard} dybatpho::opts::validate_choice \"\$${__seed_var}\" ${__seed_choices} || set \"choice\" \"\$${__seed_var}\"")
+  fi
+  if [[ -n "${__type:-}" ]]; then
+    local __seed_type
+    __dybatpho_validate_canonical __seed_type "${__type}" \
+      || dybatpho::die "$(__dybatpho_log_text cli.unknown_type "Unknown type: ${__type}" "type=${__type}")"
+    __required_checks+=("${__seed_guard} dybatpho::validate_is ${__seed_type} \"\$${__seed_var}\" || set \"type:${__seed_type}\" \"\$${__seed_var}\"")
+  fi
+  if [[ -n "${__pattern:-}" ]]; then
+    __dybatpho_cli_require_case_pattern "${__pattern}"
+    local __seed_message
+    __dybatpho_cli_assign_quoted __seed_message "pattern:${__pattern}"
+    __required_checks+=("${__seed_guard} case \"\$${__seed_var}\" in ${__pattern}) ;; *) set ${__seed_message} \"\$${__seed_var}\" ;; esac")
+  fi
+  return 0
 }
 
 #######################################
@@ -2752,6 +2843,8 @@ function __dybatpho_cli_print_args_check {
           log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
           dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
+      # Without its leading zeros: `[[ 08 -eq 1 ]]` reads `08` as bad octal.
+      expected=$((10#${expected}))
       noun="arguments"
       [[ "${expected}" -eq 1 ]] && noun="argument"
       __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
@@ -2766,6 +2859,8 @@ function __dybatpho_cli_print_args_check {
           log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
           dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
+      # Without its leading zeros: `[[ 08 -eq 1 ]]` reads `08` as bad octal.
+      min=$((10#${min}))
       noun="arguments"
       [[ "${min}" -eq 1 ]] && noun="argument"
       __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
@@ -2780,6 +2875,8 @@ function __dybatpho_cli_print_args_check {
           log_text_detail=$(__dybatpho_log_text cli.invalid_args_rule "Invalid args rule: ${rule}" "rule=${rule}") # kcov(skip)
           dybatpho::die "${log_text_detail}"                                                                       # kcov(skip)
         }
+      # Without its leading zeros: `[[ 08 -eq 1 ]]` reads `08` as bad octal.
+      max=$((10#${max}))
       noun="arguments"
       [[ "${max}" -eq 1 ]] && noun="argument"
       __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
@@ -2791,6 +2888,7 @@ function __dybatpho_cli_print_args_check {
       max="${min#*:}"
       min="${min%%:*}"
       dybatpho::validate_is uint "${min}" && dybatpho::validate_is uint "${max}" \
+        && min=$((10#${min})) && max=$((10#${max})) \
         && [[ "${min}" -le "${max}" ]] \
         || {
           local log_text_detail                                                                                    # kcov(skip)
@@ -3023,6 +3121,7 @@ function dybatpho::opts::flag {
       __dybatpho_cli_record_persistent_def flag "$@"
     fi
     __dybatpho_cli_define_var "${var}"
+    __dybatpho_cli_add_seed_checks "${var}"
   else
     __dybatpho_cli_print_indent 3 "${__switch})"
     [[ -n "${__deprecated}" ]] && __dybatpho_cli_print_deprecated_warning "option" "${__label:-${var}}" "${__deprecated}"
@@ -3084,6 +3183,7 @@ function dybatpho::opts::param {
       __dybatpho_cli_record_persistent_def param "$@"
     fi
     __dybatpho_cli_define_var "${var}"
+    __dybatpho_cli_add_seed_checks "${var}"
     if [[ -n "${__prompt}" ]]; then
       # A unit separator keeps empty fields, which tabs would collapse on read.
       __prompt_defs+=("${var}"$'\x1f'"${__prompt}"$'\x1f'"${__choices}"$'\x1f'"${__multiple}"$'\x1f'"${__export}")

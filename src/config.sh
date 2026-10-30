@@ -85,18 +85,26 @@ function __dybatpho_config_set {
 function __dybatpho_config_load_dotenv {
   local file line key value
   dybatpho::expect_args file -- "$@"
+  # A quoted value followed by a comment: the value cannot hold its own quote.
+  local double_commented='^"(([^"\\]|\\.)*)"[[:space:]]+#' single_commented="^'([^']*)'[[:space:]]+#"
   while IFS= read -r line || [[ -n "${line}" ]]; do
+    # A file saved with CRLF endings would otherwise leave `\r` after a closing quote.
+    line="${line%$'\r'}"
     line="${line#"${line%%[![:space:]]*}"}"
     [[ -z "${line}" || "${line:0:1}" == "#" ]] && continue
-    [[ "${line}" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]] \
+    [[ "${line}" =~ ^(export[[:space:]]+)?([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]] \
       || dybatpho::die "Invalid dotenv entry in ${file}: ${line}"
-    key="${BASH_REMATCH[1]}"
-    value="${BASH_REMATCH[2]}"
+    key="${BASH_REMATCH[2]}"
+    value="${BASH_REMATCH[3]}"
     if [[ "${value}" == \"*\" && "${value: -1}" == '"' ]]; then
       value="${value:1:${#value}-2}"
       printf -v value '%b' "${value}"
     elif [[ "${value}" == \'*\' && "${value: -1}" == "'" ]]; then
       value="${value:1:${#value}-2}"
+    elif [[ "${value}" =~ ${double_commented} ]]; then
+      printf -v value '%b' "${BASH_REMATCH[1]}"
+    elif [[ "${value}" =~ ${single_commented} ]]; then
+      value="${BASH_REMATCH[1]}"
     else
       value="${value%%[[:space:]]#*}"
       value="${value%"${value##*[![:space:]]}"}"
@@ -458,7 +466,7 @@ function __dybatpho_config_dotenv_value_into {
 # @internal
 #######################################
 function __dybatpho_config_save_dotenv {
-  local file key line name value rendered=""
+  local file key line name prefix value rendered=""
   local -A wanted=() seen=()
   file="$1"
   shift
@@ -471,16 +479,17 @@ function __dybatpho_config_save_dotenv {
 
   if dybatpho::is file "${file}"; then
     while IFS= read -r line || [[ -n "${line}" ]]; do
-      name=""
-      if [[ "${line}" =~ ^[[:space:]]*([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*= ]]; then
-        name="${BASH_REMATCH[1]}"
+      name="" prefix=""
+      if [[ "${line}" =~ ^[[:space:]]*(export[[:space:]]+)?([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*= ]]; then
+        prefix="${BASH_REMATCH[1]}"
+        name="${BASH_REMATCH[2]}"
       fi
       # Every occurrence is rewritten, not just the first: a repeated key means
       # the last assignment is the one the loader keeps, so leaving a stale
       # copy behind would quietly undo the save.
       if [[ -n "${name}" && -v "wanted[${name}]" ]]; then
         __dybatpho_config_dotenv_value_into value "${DYBATPHO_CONFIG[${name}]}"
-        rendered+="${name}=${value}"$'\n'
+        rendered+="${prefix}${name}=${value}"$'\n'
         seen["${name}"]=1
       else
         rendered+="${line}"$'\n'
@@ -514,7 +523,7 @@ function __dybatpho_config_save_dotenv {
 # @internal
 #######################################
 function __dybatpho_config_save_structured {
-  local format file key setting type expression="" separator="" literal rendered
+  local format file key setting type expression="" separator="" literal rendered path status=0
   local -a values=()
   format="$1"
   file="$2"
@@ -539,13 +548,16 @@ function __dybatpho_config_save_structured {
         *) literal="" ;;
       esac
     fi
+    # A dotted key is the nested path loading flattened it from, so it is
+    # written back there rather than as a sibling key with a dot in its name.
+    path=".[\"${key//./\"][\"}\"]"
     if [[ -n "${literal}" ]]; then
-      expression+="${separator}.[\"${key}\"] = ${literal}"
+      expression+="${separator}${path} = ${literal}"
     elif [[ "${format}" == json ]]; then
-      expression+="${separator}.[\"${key}\"] = \$ENV.__DYBATPHO_CONFIG_SAVE_${#values[@]}"
+      expression+="${separator}${path} = \$ENV.__DYBATPHO_CONFIG_SAVE_${#values[@]}"
       values+=("${setting}")
     else
-      expression+="${separator}.[\"${key}\"] = strenv(__DYBATPHO_CONFIG_SAVE_${#values[@]})"
+      expression+="${separator}${path} = strenv(__DYBATPHO_CONFIG_SAVE_${#values[@]})"
       values+=("${setting}")
     fi
     separator=" | "
@@ -574,11 +586,19 @@ function __dybatpho_config_save_structured {
         fi
         ;;
       toml)
+        local toml_in='{}' toml_format=yaml toml_out toml_want toml_got
         if dybatpho::is file "${file}"; then
-          yq -p toml -o toml "${expression}" "${file}"
-        else
-          printf '{}\n' | yq -p yaml -o toml "${expression}"
+          toml_in="$(cat -- "${file}")" || exit 1
+          toml_format=toml
         fi
+        toml_out="$(yq -p "${toml_format}" -o toml "${expression}" <<< "${toml_in}")" || exit 1
+        # yq writes a new top-level key or inline table after the file's last
+        # `[table]`, where TOML reads it as part of that table. The result is
+        # read back and compared, so such a save is refused instead of written.
+        toml_want="$(yq -p "${toml_format}" -o json -I 0 "${expression} | sort_keys(..)" <<< "${toml_in}")" || exit 1
+        toml_got="$(yq -p toml -o json -I 0 'sort_keys(..)' <<< "${toml_out}")" || exit 1
+        [[ "${toml_got}" == "${toml_want}" ]] || exit 3
+        printf '%s\n' "${toml_out}"
         ;;
       *)
         if dybatpho::is file "${file}"; then
@@ -588,7 +608,10 @@ function __dybatpho_config_save_structured {
         fi
         ;;
     esac
-  )" || dybatpho::die "Cannot rewrite ${format} configuration: ${file}"
+  )" || status=$?
+  ((status != 3)) || dybatpho::die "Cannot save ${file}: the TOML writer would put a new key inside the last table, \
+so the file would read back differently; add the key to the file by hand first"
+  ((status == 0)) || dybatpho::die "Cannot rewrite ${format} configuration: ${file}"
   printf '%s\n' "${rendered}" | dybatpho::file_write_atomic "${file}"
 }
 
@@ -614,7 +637,12 @@ function __dybatpho_config_save_structured {
 # @arg $1 string Destination file in dotenv, JSON, YAML, or TOML format
 # @arg $@ string Configuration keys to write, defaulting to every loaded key in name order
 # @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
-# @exitcode 1 A key is invalid or unset, the format is unsupported, or the write fails
+# @note A dotted key such as `server.port` is written to the nested path it was
+#   loaded from. A TOML file that already has a `[table]` cannot take a new
+#   top-level key or table, since it would land inside the last table: that
+#   save is refused rather than written.
+# @exitcode 1 A key is invalid or unset, the format is unsupported, a TOML save would read back differently, or the
+#   write fails
 # @tip Name the keys explicitly when `dybatpho::config_env` was used, so an unrelated environment variable is not
 #   persisted
 #   along with them.

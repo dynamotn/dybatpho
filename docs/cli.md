@@ -357,9 +357,11 @@ function _spec {
 The configuration has to be loaded before `dybatpho::generate_from_spec`,
 because that is when the parser resolves an option's initial value. A key
 that is absent, or a CLI that never loaded any configuration at all, simply
-falls through to `init:`. `cli` does not load the `config` module itself,
-so a script that binds options this way asks for it:
-`--modules cli config`.
+falls through to `init:`. A value taken from `env:` or `config:` is held to
+the option's `choices:`, `type:` and `pattern:` once parsing is done, as a
+typed one is, unless the command line overrode it. `cli` does not load the
+`config` module itself, so a script that binds options this way asks for
+it: `--modules cli config`.
 
 #### Named positional arguments
 
@@ -548,8 +550,9 @@ bash example/cli_ux.sh man
 `dybatpho::generate_completion` caches its output under
 `DYBATPHO_CLI_CACHE_DIR`, so a shell startup that sources a generated
 completion does not walk the whole spec tree again. The cache key hashes the
-script that declares the spec, so editing that script invalidates the entry
-by itself and there is nothing to clear by hand. Set
+script and the file that declares the root spec, and names the library
+version, so editing either file or upgrading invalidates the entry by itself
+and there is nothing to clear by hand. Set
 `DYBATPHO_CLI_CACHE=false` to regenerate every time, and note that a spec
 declared somewhere with no readable source file is never cached.
 
@@ -867,7 +870,7 @@ Generate Bash, Zsh, or Fish completion from a CLI option spec.
 
 **📝 Notes**
 
-- Output is cached under `DYBATPHO_CLI_CACHE_DIR`, keyed by the hash of the script that declares the spec, so editing the script invalidates the entry on its own. Set `DYBATPHO_CLI_CACHE=false` to bypass the cache.
+- Output is cached under `DYBATPHO_CLI_CACHE_DIR`, keyed by the hash of the script and of the file declaring the root spec, and by the library version, so editing either file invalidates the entry on its own. Set `DYBATPHO_CLI_CACHE=false` to bypass the cache.
 
 **📤 Output on stdout**
 

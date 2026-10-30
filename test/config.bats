@@ -58,6 +58,30 @@ setup() {
   assert_equal "$(dybatpho::config_get SPACED)" "trimmed"
 }
 
+@test "config_load strips quotes before a comment, CRLF endings, and export prefixes" {
+  local config="${BATS_TEST_TMPDIR}/edge.env"
+  printf '%s\n' \
+    'DOUBLE="quoted value" # note' \
+    "SINGLE='literal' # note" \
+    'export EXPORTED=plain' > "${config}"
+  printf 'CRLF="windows"\r\n' >> "${config}"
+
+  DYBATPHO_CONFIG=()
+  dybatpho::config_load "${config}"
+  assert_equal "${DYBATPHO_CONFIG[DOUBLE]}" "quoted value"
+  assert_equal "${DYBATPHO_CONFIG[SINGLE]}" "literal"
+  assert_equal "${DYBATPHO_CONFIG[EXPORTED]}" "plain"
+  assert_equal "${DYBATPHO_CONFIG[CRLF]}" "windows"
+
+  # A save rewrites the exported line in place rather than appending a copy.
+  dybatpho::config_set EXPORTED changed
+  dybatpho::config_save "${config}" EXPORTED
+  run_traced grep -c 'EXPORTED=' "${config}"
+  assert_output "1"
+  run_traced grep -c '^export EXPORTED=changed$' "${config}"
+  assert_output "1"
+}
+
 @test "config_load supports JSON and YAML files with precedence" {
   local json_file="${BATS_TEST_TMPDIR}/settings.json"
   local yaml_file="${BATS_TEST_TMPDIR}/settings.yaml"
@@ -124,6 +148,20 @@ setup() {
   run_traced dybatpho::generate_from_spec _spec_nested_binding
   assert_success
   assert_output "9090"
+}
+
+@test "a config: binding holds the loaded value to the option's type:" {
+  DYBATPHO_CONFIG=()
+  dybatpho::config_set server.port not-a-port
+
+  # shellcheck disable=2329
+  _spec_typed_binding() {
+    dybatpho::opts::setup "Typed binding" - action:"echo ran"
+    dybatpho::opts::param "Port" PORT --port type:port config:server.port
+  }
+  run --separate-stderr dybatpho::generate_from_spec _spec_typed_binding
+  assert_failure
+  assert_stderr --partial "Expected a port number: not-a-port"
 }
 
 @test "config_load reports invalid dotenv and structured configuration" {
@@ -760,6 +798,44 @@ require_tool() {
   done
   run grep -c '0080' "${BATS_TEST_TMPDIR}/app.toml"
   assert_output "0"
+}
+
+@test "config_save writes a dotted key back to its nested path" {
+  require_tool yq
+  require_tool jq
+  local file
+  for file in app.yaml app.json app.toml; do
+    file="${BATS_TEST_TMPDIR}/${file}"
+    case "${file}" in
+      *.yaml) printf 'server:\n  port: 8080\n' > "${file}" ;;
+      *.json) printf '{"server":{"port":8080}}\n' > "${file}" ;;
+      *) printf '[server]\nport = 8080\n' > "${file}" ;;
+    esac
+    DYBATPHO_CONFIG=()
+    dybatpho::config_load "${file}"
+    dybatpho::config_set server.port 9090
+    dybatpho::config_save "${file}" server.port
+    run_traced grep -c 'server\.port' "${file}"
+    assert_output "0"
+    DYBATPHO_CONFIG=()
+    dybatpho::config_load "${file}"
+    assert_equal "${!DYBATPHO_CONFIG[*]}" "server.port"
+    run_traced dybatpho::config_get server.port
+    assert_output "9090"
+  done
+}
+
+@test "config_save refuses a TOML save that would land inside the last table" {
+  require_tool yq
+  local file="${BATS_TEST_TMPDIR}/tables.toml"
+  printf '[server]\nport = 8080\n' > "${file}"
+  dybatpho::config_set NAME app
+  run --separate-stderr dybatpho::config_save "${file}" NAME
+  assert_failure
+  assert_stderr --partial "would put a new key inside the last table"
+  # The file is left as it was.
+  run_traced cat "${file}"
+  assert_output $'[server]\nport = 8080'
 }
 
 @test "config_ini_get reads exact keys from sections, skipping comments" {

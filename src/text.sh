@@ -170,6 +170,9 @@ function __dybatpho_text_need_table {
 #######################################
 # @description Remove ANSI escape sequences from one line, writing the result
 #   into a named variable without a subshell.
+#   Three kinds are removed: CSI sequences such as colors (`\e[31m`), OSC
+#   sequences such as hyperlinks (`\e]8;;url\e\\`), and character-set
+#   designations such as the `\e(B` that `tput sgr0` prints before `\e[m`.
 #   The match runs in the C locale: the sequence is defined by byte ranges, and
 #   a range such as `[ -/]` is not well defined under a UTF-8 collation.
 # @arg $1 string Name of the variable receiving the stripped line
@@ -183,7 +186,7 @@ function __dybatpho_text_strip_ansi_into {
   local -n __dybatpho_text_strip_out="${__dybatpho_text_strip_target}"
   if [[ "${__dybatpho_text_strip_line}" == *$'\e'* ]]; then
     local LC_ALL=C
-    local __dybatpho_text_strip_re=$'\e''\[[0-?]*[ -/]*[@-~]'
+    local __dybatpho_text_strip_re=$'\e''(\[[0-?]*[ -/]*[@-~]|\][^'$'\a\e'']*('$'\a''|'$'\e''\\)|[ -/]+[0-~])'
     while [[ "${__dybatpho_text_strip_line}" =~ ${__dybatpho_text_strip_re} ]]; do
       __dybatpho_text_strip_line="${__dybatpho_text_strip_line/"${BASH_REMATCH[0]}"/}"
     done

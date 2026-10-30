@@ -40,6 +40,19 @@ beta
 EOF
 }
 
+@test "dybatpho::text_strip_ansi removes hyperlinks and the reset tput sgr0 prints" {
+  # `tput sgr0` on xterm is `\e(B\e[m`; a hyperlink is an OSC 8 pair, ended by
+  # either a string terminator or a bell.
+  run_traced dybatpho::text_strip_ansi \
+    $'\e[31malert\e(B\e[m\n\e]8;;https://x.org\e\\site\e]8;;\e\\\n\e]8;;u\alink\e]8;;\a'
+  assert_success
+  assert_output $'alert\nsite\nlink'
+
+  run_traced dybatpho::text_box $'plain\n\e[31malert\e(B\e[m' "" ascii
+  assert_line --index 1 '| plain |'
+  assert_line --index 2 $'| \e[31malert\e(B\e[m |'
+}
+
 @test "dybatpho::text_bullet_list prefixes non-empty lines and preserves blanks" {
   run_traced dybatpho::text_bullet_list $'alpha\n\nbeta' "*"
   assert_success

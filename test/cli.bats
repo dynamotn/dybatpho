@@ -1651,6 +1651,66 @@ setup() {
   assert_equal "$(dybatpho::generate_from_spec _spec_count --verbose --verbose)" "2"
 }
 
+@test "count:true never evaluates its env seed as arithmetic" {
+  # shellcheck disable=2329
+  _spec_count_env() {
+    dybatpho::opts::setup "Counting" COUNT_ARGS action:'printf "%s" "${COUNT_ENV}"'
+    dybatpho::opts::flag "Verbosity" COUNT_ENV -v count:true env:COUNT_ENV_SEED
+  }
+
+  local marker="${BATS_TEST_TMPDIR}/ran"
+  assert_equal "$(COUNT_ENV_SEED="BASH_VERSINFO[\$(touch ${marker})0]" dybatpho::generate_from_spec _spec_count_env -v)" "1"
+  refute [ -e "${marker}" ]
+  assert_equal "$(COUNT_ENV_SEED=08 dybatpho::generate_from_spec _spec_count_env -v)" "9"
+  # Without the flag the seed must still reach the action as a plain number.
+  assert_equal "$(COUNT_ENV_SEED="BASH_VERSINFO[\$(touch ${marker})0]" dybatpho::generate_from_spec _spec_count_env)" "0"
+  refute [ -e "${marker}" ]
+  assert_equal "$(COUNT_ENV_SEED=08 dybatpho::generate_from_spec _spec_count_env)" "8"
+}
+
+@test "a value seeded by env: is held to choices:, type: and pattern:" {
+  # shellcheck disable=2016,2329
+  _spec_seed_env() {
+    dybatpho::opts::setup "Seeded" - action:'printf "%s/%s/%s" "${SEED_PORT}" "${SEED_MODE}" "${SEED_NAME}"'
+    dybatpho::opts::param "Port" SEED_PORT --port type:port env:SEED_PORT_ENV
+    dybatpho::opts::param "Mode" SEED_MODE --mode choices:fast,slow env:SEED_MODE_ENV
+    dybatpho::opts::param "Name" SEED_NAME --name pattern:'[a-z]*' env:SEED_NAME_ENV
+  }
+
+  SEED_PORT_ENV=abc run --separate-stderr dybatpho::generate_from_spec _spec_seed_env
+  assert_failure
+  assert_stderr --partial "Expected a port number: abc"
+  SEED_MODE_ENV=bogus run --separate-stderr dybatpho::generate_from_spec _spec_seed_env
+  assert_failure
+  assert_stderr --partial "Validation error (choice): bogus"
+  SEED_NAME_ENV=Upper run --separate-stderr dybatpho::generate_from_spec _spec_seed_env
+  assert_failure
+  assert_stderr --partial "Does not match the pattern ([a-z]*): Upper"
+
+  # A valid seed passes, and a value typed on the command line still overrides a bad one.
+  SEED_PORT_ENV=8080 SEED_MODE_ENV=fast SEED_NAME_ENV=web run_traced dybatpho::generate_from_spec _spec_seed_env
+  assert_success
+  assert_output "8080/fast/web"
+  SEED_PORT_ENV=abc run_traced dybatpho::generate_from_spec _spec_seed_env --port 80
+  assert_success
+  assert_output "80//"
+}
+
+@test "dybatpho::select and args: rules read a leading zero as decimal" {
+  run_traced dybatpho::select "Pick" "a,b,c,d,e,f,g,h,i" true <<< "08,01-02"
+  assert_success
+  assert_output "h a b"
+
+  # shellcheck disable=2016,2329
+  _spec_octal_rules() {
+    dybatpho::opts::setup "Octal" OCTAL_ARGS args:range:08:09 action:'printf "%s" "${#OCTAL_ARGS[@]}"'
+  }
+  run --separate-stderr dybatpho::generate_from_spec _spec_octal_rules 1 2 3 4 5 6 7 8
+  assert_success
+  assert_output "8"
+  assert_equal "${stderr}" ""
+}
+
 @test "dybatpho::cli_verbosity_level raises the level and stops at trace" {
   assert_equal "$(dybatpho::cli_verbosity_level 0 info)" "info"
   assert_equal "$(dybatpho::cli_verbosity_level 1 info)" "debug"
@@ -2208,6 +2268,22 @@ setup() {
   assert_output --regexp $'--token <TOKEN> *\n +\\[env: API_TOKEN\\]'
 }
 
+@test "dybatpho::generate_man escapes descriptions roff would read as requests" {
+  # shellcheck disable=2329
+  _spec_roff_text() {
+    dybatpho::opts::setup ".dotted tool" ROFF_ARGS action:"echo ran"
+    dybatpho::opts::flag ".gitignore entries are honoured" VCS --vcs
+    dybatpho::opts::param 'Path like C:\temp' WHERE --path
+    dybatpho::opts::arg "'quoted' file" FILE
+  }
+
+  run_traced dybatpho::generate_man _spec_roff_text tool
+  assert_line 'tool \- \&.dotted tool'
+  assert_line '\&.gitignore entries are honoured'
+  assert_line 'Path like C:\etemp'
+  assert_line "\\&'quoted' file"
+}
+
 @test "generated help lists the automatic --help option" {
   # shellcheck disable=2329
   _spec_auto_help_row() {
@@ -2308,6 +2384,26 @@ setup() {
 
   run_traced dybatpho::generate_completion _spec_cache bash cachetool
   assert_equal "${output}" "${first}"
+}
+
+@test "dybatpho::generate_completion regenerates when a sourced spec file changes" {
+  local DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache-sourced"
+  local DYBATPHO_CLI_CACHE=true
+  local spec_file="${BATS_TEST_TMPDIR}/spec_sourced.sh"
+  printf '%s\n' '_spec_sourced() { dybatpho::opts::setup "Sourced" -; dybatpho::opts::flag "A" SOURCED_A --alpha; }' \
+    > "${spec_file}"
+  # shellcheck disable=1090
+  source "${spec_file}"
+  run_traced dybatpho::generate_completion _spec_sourced bash sourcedtool
+  assert_output --partial "--alpha"
+
+  printf '%s\n' '_spec_sourced() { dybatpho::opts::setup "Sourced" -; dybatpho::opts::flag "B" SOURCED_B --beta; }' \
+    > "${spec_file}"
+  # shellcheck disable=1090
+  source "${spec_file}"
+  run_traced dybatpho::generate_completion _spec_sourced bash sourcedtool
+  assert_output --partial "--beta"
+  refute_output --partial "--alpha"
 }
 
 @test "DYBATPHO_CLI_CACHE=false skips the completion cache" {

@@ -237,6 +237,10 @@ dybatpho::generate_man _spec mytool
 - **FR-037**: `dybatpho::cli_apply_verbosity` MUST raise `DYBATPHO_LOG_LEVEL`,
   starting from it or, when it is empty, from the bare `LOG_LEVEL`, and MUST NOT
   export it.
+- **FR-038**: A value seeded by `env:` or `config:` MUST be held to the option's `choices:`, `type:` and `pattern:` once parsing is done, unless a value given on the command line replaced it.
+- **FR-039**: The man page MUST escape descriptions for roff, so a backslash prints as itself and a line starting with `.` or `'` is shown rather than read as a request.
+- **FR-040**: The completion cache key MUST change when the file declaring the root spec changes, even when the script only sources it, and when the library version changes.
+- **FR-041**: `dybatpho::select` and the `args:` rules MUST read a number with a leading zero, such as `08`, as decimal.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -287,6 +291,10 @@ dybatpho::generate_man _spec mytool
 - **IT-021**: Apply a verbosity count with only `LOG_LEVEL=warn` set and get
   `DYBATPHO_LOG_LEVEL=info`, apply two from there and get `trace`, and find the
   bare name unchanged and the prefixed one not exported.
+- **IT-022**: Seed a typed, a choice and a pattern parameter from `env:` with bad values and see each refused, a valid seed accepted, and a command-line value override a bad seed.
+- **IT-023**: Generate the man page for descriptions starting with `.` and `'` or holding a backslash, and verify each is escaped.
+- **IT-024**: Generate completion from a spec declared in a sourced file, change that file, and get the new switches.
+- **IT-025**: Select `08` and the range `01-02`, and run `args:range:08:09` with eight arguments without an error.
 
 ## Acceptance Criteria *(mandatory)*
 

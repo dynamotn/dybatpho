@@ -88,6 +88,25 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`string` — `dybatpho::split` and `dybatpho::url_decode` take time in
   proportion to their input.** Splitting 8000 fields took 3.6 s and decoding
   8000 escapes took 10 s.
+- **`cli` — a value given to `dybatpho::opts::param`/`flag` through `env:` or
+  `config:` is now held to the option's `choices:`, `type:` and `pattern:`, as a
+  typed value is.**
+- **`cli` — `dybatpho::generate_man` escapes descriptions, so a backslash or a
+  line starting with `.` or `'` no longer vanishes from the man page.**
+- **`cli` — `dybatpho::generate_completion` no longer serves a stale cached
+  completion after the sourced file declaring the spec changes, or after a
+  library upgrade.**
+- **`cli` — `dybatpho::select` and the `args:` rules accept numbers with a
+  leading zero such as `08`.**
+- **`config` — dotenv files: a quoted value followed by `# comment` or a CRLF
+  line ending no longer keeps its quotes, and `export KEY=value` lines load
+  instead of stopping the script.**
+- **`config` — `dybatpho::config_save` writes a dotted key such as `server.port`
+  back to its nested path in JSON, YAML and TOML, and refuses a TOML save that
+  would put a new key inside the last table.**
+- **`text` — `dybatpho::text_strip_ansi`, `text_box` and `text_center` remove
+  hyperlinks (OSC 8) and the `\e(B` that `tput sgr0` prints, so colored lines
+  measure and align correctly.**
 
 ### Security
 
@@ -97,6 +116,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`helpers` — `dybatpho::expect_envs` and `dybatpho::require_envs_any` stop on
   an argument that is not a variable name instead of running a `$(...)` written
   in its subscript.**
+- **`cli` — a `count:true` flag no longer evaluates its `env:` or `config:` seed
+  as arithmetic, which ran any `$(...)` inside it, and reads `08` as eight.**
+- **`cli` — a `count:true` flag seeded from `env:` or `config:` reaches the
+  script as a plain number even when the flag is not given.**
 
 ## [7.0.0] - 2026-10-23
 

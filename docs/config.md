@@ -354,9 +354,13 @@ dybatpho::config_save "${HOME}/.config/app.env"
 | --- | --- | --- |
 | **`DYBATPHO_DRY_RUN`** | string | When true-like, report the write instead of performing it |
 
+**📝 Notes**
+
+- A dotted key such as `server.port` is written to the nested path it was loaded from. A TOML file that already has a `[table]` cannot take a new top-level key or table, since it would land inside the last table: that save is refused rather than written.
+
 **🚦 Exit codes**
 
-- `1`: A key is invalid or unset, the format is unsupported, or the write fails
+- `1`: A key is invalid or unset, the format is unsupported, a TOML save would read back differently, or the write fails
 
 ---
 

@@ -137,6 +137,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **FR-012**: Every helper MUST accept stdin when the input argument is `-`.
 - **FR-013**: Loading `text` MUST NOT load `table` up front; the column helper MUST load it on demand when it is not loaded, and MUST stop with a message naming the `table` module only when it cannot be loaded, before reading its input.
 - **FR-014**: Text passed as an argument MUST split into the same lines as the same text on stdin: one trailing newline ends the last line rather than adding an empty one.
+- **FR-015**: Stripping and measuring MUST remove OSC sequences such as hyperlinks and character-set designations such as the `\e(B` from `tput sgr0`, not only CSI sequences.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -174,6 +175,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **IT-013**: Truncate a block with the default singular and plural markers, print a fitting block unchanged, fill a custom marker with a zero count, and reject an invalid count.
 - **IT-014**: In a child shell that loaded only `text`, have the column helper load `table` on demand and align a block, then align the same block when `table` is named up front.
 - **IT-015**: Indent a block ending in a newline given as an argument and on stdin, and get the same lines; keep a blank line that comes before the final newline.
+- **IT-016**: Strip a `tput sgr0` reset and hyperlinks ended by a string terminator or a bell, and box a line colored that way with straight edges.
 
 ## Acceptance Criteria *(mandatory)*
 

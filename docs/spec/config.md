@@ -366,6 +366,9 @@ dybatpho::config_save ./config.yaml PORT
 - **FR-031**: `config_ini_get` MUST print the value of a key from an INI file, matching the key whole, splitting the entry at its first `=`, and trimming the whitespace around key, value and section name, without touching the shared configuration map.
 - **FR-032**: `config_ini_get` MUST skip blank lines and lines starting with `;` or `#`, MUST restrict the lookup to the named section when one is given (an empty name meaning the entries above the first header), and MUST print the last match when the key appears more than once in scope.
 - **FR-033**: `config_ini_get` MUST return 1 with no output when the key is not found, and MUST report an error and return 2, rather than stop the script, when the file cannot be read.
+- **FR-034**: The dotenv loader MUST remove the quotes of a quoted value followed by a comment, a trailing carriage return, and an `export` prefix; a save MUST rewrite an `export` line in place and keep its prefix.
+- **FR-035**: `config_save` MUST write a dotted key to the nested path it names in JSON, YAML and TOML, and MUST refuse a TOML save whose result would read back differently, leaving the file untouched.
+- **FR-036**: A value an option binding reads with `config:` MUST be held to the option's `choices:`, `type:` and `pattern:`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -453,6 +456,10 @@ dybatpho::config_save ./config.yaml PORT
 - **IT-022**: Save `0080` and `00.50` to TOML, JSON and YAML, load each file back, and get `80` and `0.50`.
 - **IT-023**: Read spaced, unspaced, prefix-sharing, sectioned, top-level, repeated and CRLF entries from an INI file with comments, and verify a `#` inside a value survives.
 - **IT-024**: Read a missing key, a key from the wrong section, and a missing file, and verify the exit codes 1, 1 and 2 and that the configuration map is untouched.
+- **IT-025**: Load a double- and a single-quoted value with a trailing comment, an `export` line and a CRLF line, and save the exported key back in place.
+- **IT-026**: Load a nested port from YAML, JSON and TOML, save `server.port`, and reload only the nested key with the new value.
+- **IT-027**: Save a new top-level key into a TOML file that has a table, and see the save refused and the file unchanged.
+- **IT-028**: Bind a typed parameter to a configuration key holding an invalid value and see the parser refuse it.
 
 ## Acceptance Criteria *(mandatory)*
 

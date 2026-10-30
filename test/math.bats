@@ -976,3 +976,34 @@ math_engine_run_all_untraced() {
   DYBATPHO_MATH_ENGINE=bash run_traced dybatpho::math_median +2.5 1.5 -0.5
   assert_output "1.5"
 }
+
+@test "values on standard input split on blanks whatever IFS the caller set" {
+  # The strict-mode IFS read `1 2 3` as one value that is not a number.
+  local IFS=$'\n\t'
+  run_traced dybatpho::math_sum <<< $'1 2 3\n4'
+  assert_success
+  assert_output "10"
+}
+
+@test "a scale past 64 bits is refused rather than wrapped" {
+  # 2^64 wrapped to 0, so math_round answered 2 and math_div 0.
+  run dybatpho::math_round 1.5 18446744073709551616
+  assert_failure
+  assert_output --partial "dybatpho::math_round: Scale must be at most 18 digits long"
+  run dybatpho::math_round_into total 1.5 18446744073709551616
+  assert_failure
+  assert_output --partial "dybatpho::math_round_into: Scale must be at most 18 digits long"
+  run dybatpho::math_div 1 3 18446744073709551617
+  assert_failure
+  assert_output --partial "dybatpho::math_div: Scale must be at most 18 digits long"
+  run dybatpho::math_sqrt 2 18446744073709551617
+  assert_failure
+  assert_output --partial "dybatpho::math_sqrt: Scale must be at most 18 digits long"
+  DYBATPHO_MATH_SCALE=18446744073709551617 run dybatpho::math_stddev 1 2
+  assert_failure
+  assert_output --partial "dybatpho::math_stddev: Scale must be at most 18 digits long"
+  # Leading zeros do not count towards the length.
+  run_traced dybatpho::math_round 2.665 0000000000000000000002
+  assert_success
+  assert_output "2.67"
+}

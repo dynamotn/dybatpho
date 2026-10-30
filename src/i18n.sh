@@ -418,7 +418,13 @@ function __dybatpho_i18n_lookup {
   if [[ -n "${__dybatpho_i18n_state[${chain_key}]+set}" ]]; then
     chain="${__dybatpho_i18n_state[${chain_key}]}"
   else
-    chain="$(dybatpho::i18n_chain "${locale}")"
+    # Worked out afresh: the per-locale memo of `dybatpho::i18n_chain` keeps the
+    # fallback it was first asked with, and this cache is kept per fallback. The
+    # memo is cleared only in the subshell.
+    chain="$(
+      __dybatpho_i18n_state=()
+      dybatpho::i18n_chain "${locale}"
+    )"
     __dybatpho_i18n_state["${chain_key}"]="${chain}"
   fi
   while IFS= read -r locale; do
@@ -1572,6 +1578,8 @@ function __dybatpho_i18n_number_into {
   fi
   [[ "${__num_precision}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[1]}: Precision must be a non-negative integer, got '${__num_precision}'"
+  # Base ten: `010` is ten digits, not the eight an octal reading gives.
+  __num_precision=$((10#${__num_precision}))
   __dybatpho_i18n_round __num_integer __num_fraction "${__num_precision}"
 
   local __num_group_sep __num_decimal_sep __num_grouping
@@ -1614,6 +1622,7 @@ function dybatpho::i18n_number_plain {
   fi
   [[ "${precision}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Precision must be a non-negative integer, got '${precision}'"
+  precision=$((10#${precision}))
   __dybatpho_i18n_round integer fraction "${precision}"
   if [[ "${integer}" == "0" && "${fraction}" != *[1-9]* ]]; then
     sign=""
@@ -1753,6 +1762,14 @@ function dybatpho::i18n_bytes {
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
   [[ "${bytes}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Byte count must be a non-negative integer, got '${bytes}'"
+  # Read in base ten, and refuse what Bash arithmetic cannot hold rather than
+  # wrap it: `010` is ten bytes, not eight, and 10^20 is not 7 EiB. Nineteen
+  # digits stay below 2^64, so one past 2^63 - 1 wraps to a negative number.
+  local digits="${bytes#"${bytes%%[!0]*}"}"
+  if ((${#digits} > 19 || 10#0${digits} < 0)); then
+    dybatpho::die "${FUNCNAME[0]}: Byte count must be at most 9223372036854775807, got '${bytes}'"
+  fi
+  bytes=$((10#${digits:-0}))
   local base
   local -a units
   case "${standard}" in
@@ -1788,7 +1805,13 @@ function dybatpho::i18n_bytes {
     if ((index > 0 && remainder * 2 >= divisor)); then
       whole=$((whole + 1))
     fi
-    __dybatpho_i18n_number_into formatted "${whole}" 0 "${locale}"
+    if ((whole == base && index < ${#units[@]} - 1)); then
+      # 1023.5 KiB rounds up into the next unit: 1.0 MiB, not 1,024 KiB.
+      index=$((index + 1))
+      __dybatpho_i18n_number_into formatted "1.0" 1 "${locale}"
+    else
+      __dybatpho_i18n_number_into formatted "${whole}" 0 "${locale}"
+    fi
   else
     local tenths=$(((remainder * 10 + divisor / 2) / divisor))
     if ((tenths >= 10)); then
@@ -2086,9 +2109,10 @@ function dybatpho::i18n_weekday_name {
   local width="${2:-wide}"
   local locale="${3-}"
   [[ -n "${locale}" ]] || locale="$(dybatpho::i18n_locale)"
-  if ! [[ "${weekday}" =~ ^[0-9]+$ ]] || ((weekday < 1 || weekday > 7)); then
+  if ! [[ "${weekday}" =~ ^[0-9]+$ ]] || ((10#${weekday} < 1 || 10#${weekday} > 7)); then
     dybatpho::die "${FUNCNAME[0]}: Weekday must be between 1 and 7, got '${weekday}'"
   fi
+  weekday=$((10#${weekday}))
   local name=""
   if [[ "${width}" == "abbr" ]]; then
     name="$(__dybatpho_i18n_name "${locale}" weekdays_abbr "${weekday}")" || name=""
@@ -2367,29 +2391,31 @@ function dybatpho::i18n_datetime {
   combined="$(__dybatpho_i18n_pattern "${locale}" datetime "${style}")" || combined="{date}, {time}"
   date_part="$(dybatpho::i18n_date "${timestamp}" "${style}" "${locale}")"
   time_part="$(dybatpho::i18n_time "${timestamp}" "${style}" "${locale}")"
-  local rendered
   # The combining pattern may itself carry quoted literals, such as the English
-  # "at", so it is rendered rather than merely substituted into.
-  rendered="${combined//\{date\}/${date_part}}"
-  rendered="${rendered//\{time\}/${time_part}}"
-  local out="" index=0 length=${#rendered}
+  # "at", so its quotes are rendered first; the halves go in afterwards, so a
+  # quote they print stays put. The replacements are quoted: from Bash 5.2 an
+  # unquoted `&` stands for the matched placeholder.
+  local out="" index=0 length=${#combined}
   while ((index < length)); do
-    if [[ "${rendered:index:1}" == "'" ]]; then
+    if [[ "${combined:index:1}" == "'" ]]; then
       index=$((index + 1))
       while ((index < length)); do
-        if [[ "${rendered:index:1}" == "'" ]]; then
+        if [[ "${combined:index:1}" == "'" ]]; then
           index=$((index + 1))
           break
         fi
-        out+="${rendered:index:1}"
+        out+="${combined:index:1}"
         index=$((index + 1))
       done
       continue
     fi
-    out+="${rendered:index:1}"
+    out+="${combined:index:1}"
     index=$((index + 1))
   done
-  printf '%s\n' "${out}"
+  local rendered
+  rendered="${out//\{date\}/"${date_part}"}"
+  rendered="${rendered//\{time\}/"${time_part}"}"
+  printf '%s\n' "${rendered}"
 }
 
 #######################################
@@ -2519,7 +2545,8 @@ function dybatpho::i18n_relative {
   [[ "${now}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Reference time must be an integer, got '${now}'"
 
-  local delta=$((now - timestamp))
+  # Each one in base ten with its sign outside the `10#`, so `0100` is a hundred.
+  local delta=$(((${now%%[0-9]*}10#${now#-}) - (${timestamp%%[0-9]*}10#${timestamp#-})))
   local direction="past"
   ((delta < 0)) && {
     direction="future"
@@ -2554,7 +2581,8 @@ function dybatpho::i18n_duration {
   dybatpho::expect_args seconds -- "$@"
   [[ "${seconds}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Seconds must be an integer, got '${seconds}'"
-  ((seconds < 0)) && seconds=$((-seconds))
+  # The magnitude, in base ten: `0100` is a hundred seconds, not sixty-four.
+  seconds=$((10#${seconds#-}))
   local unit count
   __dybatpho_i18n_span "${seconds}" unit count
   if [[ "${unit}" == "now" ]]; then
@@ -2872,20 +2900,39 @@ function __dybatpho_i18n_read_msg {
 }
 
 #######################################
-# @description Turn the body of a `.po` string into its text.
+# @description Turn the body of a `.po` string into its text, in a named
+#   variable: the reader runs it on every string line, and a `$(...)` there made
+#   loading a catalog of a few thousand entries take seconds.
 #   `printf '%b'` does not know about `\"`, so the escaped quotes are lifted out
 #   before it runs and put back afterwards.
-# @arg $1 string Text between the quotes
-# @stdout The unescaped text
+# @arg $1 string Name of the variable receiving the unescaped text
+# @arg $2 string Text between the quotes
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_i18n_po_unescape {
-  local text="$1"
-  local sentinel=$'\x01'
-  text="${text//\\\"/${sentinel}}"
-  printf -v text '%b' "${text}"
-  text="${text//${sentinel}/\"}"
-  printf '%s' "${text}"
+function __dybatpho_i18n_po_unescape_into {
+  local -n __po_unescape_out="$1"
+  local __po_unescape_text="$2" __po_unescape_sentinel=$'\x01'
+  __po_unescape_text="${__po_unescape_text//\\\"/${__po_unescape_sentinel}}"
+  printf -v __po_unescape_text '%b' "${__po_unescape_text}"
+  __po_unescape_out="${__po_unescape_text//${__po_unescape_sentinel}/\"}"
+}
+
+#######################################
+# @description Write text as the body of a `.po` string, in a named variable:
+#   the reverse of `__dybatpho_i18n_po_unescape_into`, so a key holding a quote
+#   or a backslash reads back as itself. The replacements are quoted, which is
+#   literal on every Bash this library supports.
+# @arg $1 string Name of the variable receiving the escaped text
+# @arg $2 string Text
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_i18n_po_escape_into {
+  local -n __po_escape_out="$1"
+  local __po_escape_text="$2" __po_escape_backslash=$'\\' __po_escape_quote='"'
+  __po_escape_text="${__po_escape_text//"${__po_escape_backslash}"/"${__po_escape_backslash}${__po_escape_backslash}"}"
+  __po_escape_out="${__po_escape_text//"${__po_escape_quote}"/"${__po_escape_backslash}${__po_escape_quote}"}"
 }
 
 #######################################
@@ -2923,7 +2970,7 @@ function __dybatpho_i18n_read_po {
   # when the `msgid` line arrives would discard the very flag just read.
   local line mode="" context="" msgid="" msgid_plural="" fuzzy=0 next_fuzzy=0 index=0
   local -A forms=()
-  local single=""
+  local single="" piece=""
 
   # Flush whatever entry has been accumulated so far.
   local flush_key
@@ -2981,7 +3028,7 @@ function __dybatpho_i18n_read_po {
       forms=()
       fuzzy="${next_fuzzy}"
       next_fuzzy=0
-      context="$(__dybatpho_i18n_po_unescape "${BASH_REMATCH[1]}")"
+      __dybatpho_i18n_po_unescape_into context "${BASH_REMATCH[1]}"
       mode="msgctxt"
       continue
     fi
@@ -2995,29 +3042,31 @@ function __dybatpho_i18n_read_po {
         fuzzy="${next_fuzzy}"
         next_fuzzy=0
       fi
-      msgid="$(__dybatpho_i18n_po_unescape "${BASH_REMATCH[1]}")"
+      __dybatpho_i18n_po_unescape_into msgid "${BASH_REMATCH[1]}"
       mode="msgid"
       continue
     fi
     if [[ "${line}" =~ ^msgid_plural[[:space:]]+\"(.*)\"$ ]]; then
-      msgid_plural="$(__dybatpho_i18n_po_unescape "${BASH_REMATCH[1]}")"
+      __dybatpho_i18n_po_unescape_into msgid_plural "${BASH_REMATCH[1]}"
       mode="msgid_plural"
       continue
     fi
     if [[ "${line}" =~ ^msgstr\[([0-9]+)\][[:space:]]+\"(.*)\"$ ]]; then
       index="${BASH_REMATCH[1]}"
-      forms["${index}"]="$(__dybatpho_i18n_po_unescape "${BASH_REMATCH[2]}")"
+      # Through a scalar: Bash 4.3 drops an assignment made through a nameref
+      # that names an array element.
+      __dybatpho_i18n_po_unescape_into piece "${BASH_REMATCH[2]}"
+      forms["${index}"]="${piece}"
       mode="msgstr_n"
       continue
     fi
     if [[ "${line}" =~ ^msgstr[[:space:]]+\"(.*)\"$ ]]; then
-      single="$(__dybatpho_i18n_po_unescape "${BASH_REMATCH[1]}")"
+      __dybatpho_i18n_po_unescape_into single "${BASH_REMATCH[1]}"
       mode="msgstr"
       continue
     fi
     if [[ "${line}" =~ ^\"(.*)\"$ ]]; then
-      local piece
-      piece="$(__dybatpho_i18n_po_unescape "${BASH_REMATCH[1]}")"
+      __dybatpho_i18n_po_unescape_into piece "${BASH_REMATCH[1]}"
       case "${mode}" in
         msgctxt) context+="${piece}" ;;
         msgid) msgid+="${piece}" ;;
@@ -3498,6 +3547,13 @@ function dybatpho::i18n_extract {
       context="${key%%"${__DYBATPHO_I18N_CTX}"*}"
       bare="${key#*"${__DYBATPHO_I18N_CTX}"}"
     fi
+    if [[ "${format}" == "msg" && "${bare}" == *'"'* ]]; then
+      # A `.msg` key cannot hold a double quote, bare or quoted, so writing one
+      # would only give a template that stops the script that loads it.
+      dybatpho::warn \
+        "${FUNCNAME[0]}: Key '${bare}' holds a double quote, which a msg catalog cannot express; use --format po"
+      continue
+    fi
     if [[ "${format}" == "msg" ]]; then
       # Entries are already sorted, so keys sharing a context are adjacent and
       # one directive covers the run of them.
@@ -3505,10 +3561,10 @@ function dybatpho::i18n_extract {
         rendered+="@context = ${context}"$'\n'
         written_context="${context}"
       fi
-      # A key that is a whole sentence, or that would otherwise be read as a
-      # directive, is written quoted.
-      local shown="${bare}"
-      if [[ "${bare}" =~ [[:space:]=\"] || "${bare}" == @* || "${bare}" == \#* ]]; then
+      # A key that is a whole sentence, that holds a character a bare key
+      # cannot, or that would otherwise be read as a directive, is written quoted.
+      local shown="${bare}" quote_re='[][\[:space:]=]'
+      if [[ "${bare}" =~ ${quote_re} || "${bare}" == @* || "${bare}" == \#* ]]; then
         shown="\"${bare}\""
       fi
       if [[ "${kind}" == "plain" || "${kind}" == "both" ]]; then
@@ -3520,6 +3576,8 @@ function dybatpho::i18n_extract {
         done
       fi
     else
+      __dybatpho_i18n_po_escape_into context "${context}"
+      __dybatpho_i18n_po_escape_into bare "${bare}"
       [[ -n "${context}" ]] && rendered+="msgctxt \"${context}\""$'\n'
       rendered+="msgid \"${bare}\""$'\n'
       if [[ "${kind}" == "plain" ]]; then
@@ -3545,30 +3603,39 @@ function dybatpho::i18n_extract {
 }
 
 #######################################
-# @description Print the placeholders a template uses, one per line, sorted.
-# @arg $1 string Template
-# @stdout Placeholder names
+# @description Store the placeholders a template uses in a variable, sorted
+#   byte-wise, each followed by a space. Lint runs it twice per key, and two
+#   `sort` pipelines per key made a catalog of a few thousand keys take seconds.
+# @arg $1 string Name of the variable receiving the placeholder names
+# @arg $2 string Template
+# @set The named variable
 # @internal
 #######################################
-function __dybatpho_i18n_placeholders {
-  local template="$1"
-  local -A seen=()
-  local rest="${template}" name
-  while [[ "${rest}" == *'{'* ]]; do
-    rest="${rest#*\{}"
-    if [[ "${rest}" == '{'* ]]; then
-      rest="${rest#\{}"
+function __dybatpho_i18n_placeholders_into {
+  local -n __marks_out="$1"
+  local __marks_rest="$2" __marks_name __marks_at
+  local -A __marks_seen=()
+  local -a __marks_names=() __marks_order=()
+  while [[ "${__marks_rest}" == *'{'* ]]; do
+    __marks_rest="${__marks_rest#*\{}"
+    if [[ "${__marks_rest}" == '{'* ]]; then
+      __marks_rest="${__marks_rest#\{}"
       continue
     fi
-    [[ "${rest}" == *'}'* ]] || break
-    name="${rest%%\}*}"
-    if [[ "${name}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-      seen["${name}"]=1
+    [[ "${__marks_rest}" == *'}'* ]] || break
+    __marks_name="${__marks_rest%%\}*}"
+    if [[ "${__marks_name}" =~ ^[A-Za-z0-9_.-]+$ && -z "${__marks_seen[${__marks_name}]-}" ]]; then
+      __marks_seen["${__marks_name}"]=1
+      __marks_order+=("${#__marks_names[@]}")
+      __marks_names+=("${__marks_name}")
     fi
-    rest="${rest#*\}}"
+    __marks_rest="${__marks_rest#*\}}"
   done
-  ((${#seen[@]} > 0)) || return 0
-  printf '%s\n' "${!seen[@]}" | LC_ALL=C sort
+  __dybatpho_helpers_sort __marks_order @bytes-key __marks_names
+  __marks_out=""
+  for __marks_at in ${__marks_order[@]+"${__marks_order[@]}"}; do
+    __marks_out+="${__marks_names[__marks_at]} "
+  done
 }
 
 #######################################
@@ -3671,12 +3738,8 @@ function dybatpho::i18n_lint {
       fi
       if [[ "${reference_text}" != "${__DYBATPHO_I18N_NONE}" ]] \
         && [[ "${target_text}" != "${__DYBATPHO_I18N_NONE}" ]]; then
-        local i18n_placeholders_2
-        i18n_placeholders_2=$(__dybatpho_i18n_placeholders "${reference_text}" | tr '\n' ' ')
-        reference_marks="${i18n_placeholders_2}"
-        local i18n_placeholders
-        i18n_placeholders=$(__dybatpho_i18n_placeholders "${target_text}" | tr '\n' ' ')
-        target_marks="${i18n_placeholders}"
+        __dybatpho_i18n_placeholders_into reference_marks "${reference_text}"
+        __dybatpho_i18n_placeholders_into target_marks "${target_text}"
         if [[ "${reference_marks}" != "${target_marks}" ]]; then
           detail="reference={${reference_marks% }} target={${target_marks% }}"
           __dybatpho_i18n_finding "${format}" "${locale}" placeholder "${key}" "${detail}"

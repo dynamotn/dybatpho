@@ -284,6 +284,8 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - A value read from standard input is a glob character such as `*` or `?`.
 - Standard input ends without a newline after its last value.
 - A scale is written with a leading zero, such as `08`, or an exponent is longer than 64 bits.
+- A scale is longer than 64 bits, such as `18446744073709551616`.
+- A script that sets `IFS=$'\n\t'` pipes several values on one line into an aggregate.
 - An aggregate is long enough for the `awk` engine, `awk` is gawk, mawk,
   BusyBox or BSD `awk`, or no `awk` is installed.
 - Operands sit at the edge of what Bash arithmetic holds: seventeen or eighteen
@@ -380,6 +382,9 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **FR-032**: Addition, subtraction, multiplication and comparison of operands
   short enough for Bash arithmetic MUST give the same canonical result as the
   digit-by-digit path.
+- **FR-033**: A scale of more than 18 significant digits MUST stop the script
+  rather than wrap, and values read from standard input MUST split on blanks
+  whatever `IFS` the caller set.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -469,6 +474,9 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **IT-025**: Observe through a logging `awk` that `auto` starts it from 32
   values only and `bash` never; average without `awk` on `PATH`; refuse
   `DYBATPHO_MATH_ENGINE=fast`.
+- **IT-026**: Refuse scale `18446744073709551616` in round, round-into, div,
+  sqrt and stddev, accept `0000000000000000000002`, and sum `1 2 3` and `4`
+  piped in under `IFS=$'\n\t'` to `10`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -1047,6 +1047,35 @@ function __dybatpho_math_mul2 {
 }
 
 #######################################
+# @description Read a scale, a count of fraction digits, in base ten into a
+#   named variable. `08` would otherwise be an invalid octal literal, and a scale
+#   past 64 bits would wrap: 2^64 read back as 0 and rounded to a whole number
+#   nobody asked for, so it is refused the way `dybatpho::math_pow` refuses its
+#   exponent.
+# @arg $1 string Name of the variable receiving the scale
+# @arg $2 string Scale as written
+# @set The named variable
+# @exitcode 1 Stop the script when the scale is not a non-negative integer, or is longer than 18 digits
+# @internal
+#######################################
+function __dybatpho_math_scale_into {
+  local -n __dybatpho_math_scale_out="$1"
+  local __dybatpho_math_scale_value="$2" __dybatpho_math_scale_problem=""
+  local __dybatpho_math_scale_digits="${2#"${2%%[!0]*}"}"
+  if [[ ! "${__dybatpho_math_scale_value}" =~ ^[0-9]+$ ]]; then
+    __dybatpho_math_scale_problem="must be a non-negative integer"
+  elif ((${#__dybatpho_math_scale_digits} > 18)); then
+    __dybatpho_math_scale_problem="must be at most 18 digits long"
+  fi
+  if [[ -n "${__dybatpho_math_scale_problem}" ]]; then
+    local math_caller_detail
+    math_caller_detail=$(__dybatpho_math_caller)
+    dybatpho::die "${math_caller_detail}: Scale ${__dybatpho_math_scale_problem}, got '${__dybatpho_math_scale_value}'"
+  fi
+  __dybatpho_math_scale_out=$((10#${__dybatpho_math_scale_digits:-0}))
+}
+
+#######################################
 # @description Divide two numbers to a requested number of fraction digits,
 #   rounding half away from zero.
 # @arg $1 string Name of the variable receiving the quotient
@@ -1061,14 +1090,7 @@ function __dybatpho_math_div2 {
   local __div2_out_name __div2_a __div2_b __div2_scale
   dybatpho::expect_args __div2_out_name __div2_a __div2_b __div2_scale -- "$@"
   local -n __div2_out="${__div2_out_name}"
-  [[ "${__div2_scale}" =~ ^[0-9]+$ ]] \
-    || {
-      local math_caller_detail
-      math_caller_detail=$(__dybatpho_math_caller)
-      dybatpho::die "${math_caller_detail}: Scale must be a non-negative integer, got '${__div2_scale}'"
-    }
-  # Read in base ten: `08` would otherwise be an invalid octal literal.
-  __div2_scale=$((10#${__div2_scale}))
+  __dybatpho_math_scale_into __div2_scale "${__div2_scale}"
   local __div2_sign_a __div2_int_a __div2_frac_a
   local __div2_sign_b __div2_int_b __div2_frac_b
   __dybatpho_math_parse "${__div2_a}" __div2_sign_a __div2_int_a __div2_frac_a
@@ -1126,7 +1148,9 @@ function __dybatpho_math_collect {
   # expansion would add, so a `*` is a value rather than the file names here.
   # A last line without a newline makes `read` fail after filling the fields,
   # so a non-empty array still counts.
-  while read -r -a __collect_fields || ((${#__collect_fields[@]})); do
+  # The separators are pinned: a caller's strict-mode `IFS=$'\n\t'` would read
+  # `1 2 3` as one value.
+  while IFS=$' \t' read -r -a __collect_fields || ((${#__collect_fields[@]})); do
     __collect_out+=(${__collect_fields[@]+"${__collect_fields[@]}"})
   done
 }
@@ -1594,9 +1618,7 @@ function dybatpho::math_round {
   local value
   dybatpho::expect_args value -- "$@"
   local scale="${2-0}"
-  [[ "${scale}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${scale}'"
-  scale=$((10#${scale}))
+  __dybatpho_math_scale_into scale "${scale}"
   local sign integer fraction result
   __dybatpho_math_parse "${value}" sign integer fraction
   __dybatpho_math_round_digits integer fraction "${scale}"
@@ -1757,10 +1779,8 @@ function dybatpho::math_round_into {
   local __dybatpho_math_into_name __dybatpho_math_into_a
   dybatpho::expect_args __dybatpho_math_into_name __dybatpho_math_into_a -- "$@"
   dybatpho::expect_ref "${__dybatpho_math_into_name}"
-  local __dybatpho_math_into_scale="${3-0}"
-  [[ "${__dybatpho_math_into_scale}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${__dybatpho_math_into_scale}'"
-  __dybatpho_math_into_scale=$((10#${__dybatpho_math_into_scale}))
+  local __dybatpho_math_into_scale
+  __dybatpho_math_scale_into __dybatpho_math_into_scale "${3-0}"
   local __dybatpho_math_into_sign __dybatpho_math_into_int __dybatpho_math_into_frac __dybatpho_math_into_total
   __dybatpho_math_parse "${__dybatpho_math_into_a}" \
     __dybatpho_math_into_sign __dybatpho_math_into_int __dybatpho_math_into_frac
@@ -2144,13 +2164,7 @@ function __dybatpho_math_sqrt2 {
   dybatpho::expect_args __sqrt2_out_name __sqrt2_value __sqrt2_scale -- "$@"
   local -n __sqrt2_out="${__sqrt2_out_name}"
   local math_caller_detail
-  [[ "${__sqrt2_scale}" =~ ^[0-9]+$ ]] \
-    || {
-      math_caller_detail=$(__dybatpho_math_caller) # kcov(skip)
-      # kcov cannot see a die under `run`; 'math_sqrt dies on a bad scale or a non-number' covers it.
-      dybatpho::die "${math_caller_detail}: Scale must be a non-negative integer, got '${__sqrt2_scale}'" # kcov(skip)
-    }
-  __sqrt2_scale=$((10#${__sqrt2_scale}))
+  __dybatpho_math_scale_into __sqrt2_scale "${__sqrt2_scale}"
   local __sqrt2_sign __sqrt2_int __sqrt2_frac
   __dybatpho_math_parse "${__sqrt2_value}" __sqrt2_sign __sqrt2_int __sqrt2_frac
   [[ -z "${__sqrt2_sign}" ]] \
@@ -2390,10 +2404,8 @@ function dybatpho::math_stddev {
   # Divide with enough digits that the root keeps its own guard digit, then
   # take the root: flooring the radicand cannot change the floor of its root,
   # so the division is truncated rather than rounded.
-  local scale="${DYBATPHO_MATH_SCALE}" variance quotient remainder sign integer fraction
-  [[ "${scale}" =~ ^[0-9]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Scale must be a non-negative integer, got '${scale}'"
-  scale=$((10#${scale}))
+  local scale variance quotient remainder sign integer fraction
+  __dybatpho_math_scale_into scale "${DYBATPHO_MATH_SCALE}"
   __dybatpho_math_parse "${spread}" sign integer fraction
   local numerator="${integer}${fraction}" index
   for ((index = 0; index < 2 * (scale + 1); index++)); do

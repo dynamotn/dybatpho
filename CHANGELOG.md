@@ -107,6 +107,27 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`text` — `dybatpho::text_strip_ansi`, `text_box` and `text_center` remove
   hyperlinks (OSC 8) and the `\e(B` that `tput sgr0` prints, so colored lines
   measure and align correctly.**
+- **`math` — `dybatpho::math_sum` and the other list aggregates read several
+  values per line from standard input even when the script sets `IFS=$'\n\t'`.**
+- **`math` — `dybatpho::math_round`, `math_round_into`, `math_div`, `math_sqrt`
+  and `math_stddev` refuse a scale longer than 18 digits instead of silently
+  wrapping it, e.g. to 0.**
+- **`i18n` — `dybatpho::i18n_number`, `i18n_number_plain`, `i18n_bytes`,
+  `i18n_duration`, `i18n_relative` and `i18n_weekday_name` read values with
+  leading zeros in base ten: `010` is ten, and `08` no longer fails.**
+- **`i18n` — `dybatpho::i18n_bytes` refuses a count above 2^63-1 instead of
+  printing a wrong size, and shows a size that rounds up to a whole next unit in
+  that unit (`1.0 MiB`, not `1,024 KiB`).**
+- **`i18n` — translations follow a `DYBATPHO_I18N_FALLBACK` changed after
+  `dybatpho::i18n_chain` was called.**
+- **`i18n` — `dybatpho::i18n_datetime` keeps an `&` or a quote printed by its
+  date or time half.**
+- **`i18n` — `dybatpho::i18n_extract` writes templates that load back: `.msg`
+  keys with brackets, backslashes, spaces or `=` are quoted, keys with a double
+  quote are skipped with a warning, and `.po` keys are escaped.**
+- **`i18n` — loading a `.po` catalog and running `dybatpho::i18n_lint` on large
+  catalogs are about ten times faster, and a `.po` translation ending in `\n`
+  keeps that newline.**
 
 ### Security
 

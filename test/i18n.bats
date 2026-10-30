@@ -2102,3 +2102,117 @@ PO
   run_traced -0 dybatpho::i18n_library_plural cli.args_exact 2 "Expected exactly 2 arguments"
   assert_output "Expected exactly 2 arguments"
 }
+
+# ---------------------------------------------------------------------------
+# Leading zeros, 64-bit limits and inserted text
+# ---------------------------------------------------------------------------
+
+@test "a precision with a leading zero is read in base ten" {
+  # `010` was read as octal eight, and `08` stopped on an invalid octal literal.
+  run_traced -0 dybatpho::i18n_number 1.123456789012 010 en
+  assert_output "1.1234567890"
+  run_traced -0 dybatpho::i18n_number 1.5 08 en
+  assert_output "1.50000000"
+  run_traced -0 dybatpho::i18n_number_plain 1.123456789012 010
+  assert_output "1.1234567890"
+}
+
+@test "a byte count with a leading zero is read in base ten" {
+  run_traced -0 dybatpho::i18n_bytes 010 iec en
+  assert_output "10 B"
+  run_traced -0 dybatpho::i18n_bytes 08 iec en
+  assert_output "8 B"
+}
+
+@test "a byte count past 2^63 - 1 is refused rather than wrapped" {
+  run_traced -0 dybatpho::i18n_bytes 9223372036854775807 iec en
+  assert_output "8 EiB"
+  # 10^20 wrapped and was shown as 7 EiB.
+  run --separate-stderr dybatpho::i18n_bytes 99999999999999999999 iec en
+  assert_failure
+  assert_stderr --partial "dybatpho::i18n_bytes: Byte count must be at most 9223372036854775807"
+  run --separate-stderr dybatpho::i18n_bytes 9223372036854775808 iec en
+  assert_failure
+}
+
+@test "a size that rounds up to a whole next unit is shown in that unit" {
+  run_traced -0 dybatpho::i18n_bytes 1048575 iec en
+  assert_output "1.0 MiB"
+  run_traced -0 dybatpho::i18n_bytes 999500 si en
+  assert_output "1.0 MB"
+}
+
+@test "a span or a timestamp with a leading zero is read in base ten" {
+  dybatpho::i18n_init en
+  # `0100` was read as sixty-four seconds.
+  run_traced -0 dybatpho::i18n_duration 0100
+  assert_output "2 minutes"
+  run_traced -0 dybatpho::i18n_relative 0100 0300
+  assert_output "3 minutes ago"
+  run_traced -0 dybatpho::i18n_relative -0100 0300
+  assert_output "7 minutes ago"
+}
+
+@test "a weekday with a leading zero is read in base ten" {
+  run_traced -0 dybatpho::i18n_weekday_name 07 wide en
+  assert_output "Sunday"
+  run --separate-stderr dybatpho::i18n_weekday_name 08 wide en
+  assert_failure
+  assert_stderr --partial "Weekday must be between 1 and 7, got '08'"
+}
+
+@test "a lookup follows a fallback changed after the chain was asked for" {
+  local file
+  file="$(_catalog fr.msg 'app.greet = Bonjour')"
+  dybatpho::i18n_load fr "${file}"
+  dybatpho::i18n_set_locale de
+  # This memoizes the chain `de en`, which the lookup below used to reuse.
+  dybatpho::i18n_chain de > /dev/null
+  DYBATPHO_I18N_FALLBACK=fr
+  run_traced -0 dybatpho::i18n_t app.greet
+  assert_output "Bonjour"
+}
+
+@test "i18n_datetime keeps an ampersand and a quote its halves print" {
+  dybatpho::i18n_register_date xx time_medium "HH:mm"
+  # From Bash 5.2 the `&` turned into `{date}`.
+  dybatpho::i18n_register_date xx date_medium "d MMM yyyy 'R&D'"
+  run_traced -0 dybatpho::i18n_datetime "${FIXED_EPOCH}" medium xx
+  assert_output "29 Feb 2024 R&D, 12:34"
+  # The quote `''` renders was read again as the start of a literal.
+  dybatpho::i18n_register_date xx date_medium "MMM ''yy"
+  run_traced -0 dybatpho::i18n_datetime "${FIXED_EPOCH}" medium xx
+  assert_output "Feb '24, 12:34"
+}
+
+@test "a msg template extracted from awkward keys loads back" {
+  local source="${BATS_TEST_TMPDIR}/app.sh" template="${BATS_TEST_TMPDIR}/vi.msg"
+  cat > "${source}" << 'SOURCE'
+dybatpho::i18n_t 'items[x]'
+dybatpho::i18n_t 'C:\new'
+dybatpho::i18n_t 'Press "q" to quit'
+SOURCE
+  run_traced --separate-stderr -0 dybatpho::i18n_extract --locale vi --output "${template}" "${source}"
+  assert_stderr --partial "Key 'Press \"q\" to quit' holds a double quote"
+  run_traced -0 dybatpho::i18n_load vi "${template}"
+  dybatpho::i18n_set_locale vi
+  run_traced -0 dybatpho::i18n_has 'items[x]'
+  run_traced -0 dybatpho::i18n_has 'C:\new'
+}
+
+@test "a po template escapes its keys so they read back as themselves" {
+  local source="${BATS_TEST_TMPDIR}/app.sh" template="${BATS_TEST_TMPDIR}/vi.po"
+  cat > "${source}" << 'SOURCE'
+dybatpho::i18n_t 'C:\new'
+dybatpho::i18n_t 'Press "q" to quit'
+SOURCE
+  dybatpho::i18n_extract --locale vi --format po --output "${template}" "${source}"
+  sed 's/^msgstr ""$/msgstr "X"/' "${template}" > "${template}.filled"
+  mv "${template}.filled" "${template}"
+  dybatpho::i18n_load vi "${template}"
+  dybatpho::i18n_set_locale vi
+  run_traced -0 dybatpho::i18n_t 'C:\new'
+  assert_output "X"
+  run_traced -0 dybatpho::i18n_t 'Press "q" to quit'
+  assert_output "X"
+}

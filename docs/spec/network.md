@@ -344,6 +344,11 @@ dybatpho::circuit_breaker api.example.test -- \
 - **FR-046**: Secret headers MUST NOT appear in a `set -x` trace of the request helpers; the trace MUST be back on once they are written.
 - **FR-047**: A `name=value` upload field MUST be sent as literal text (`--form-string`), so a value starting with `<` or holding `;type=` is not read as a file or an option.
 - **FR-048**: Pagination MUST resolve a relative `next` link against the URL of the page that carried it.
+- **FR-050**: An upload argument MUST be read as a form field only when it starts with a name holding no whitespace, `:` or `;` and not starting with `-`; anything else, such as the value of `--header`, MUST reach curl unchanged.
+- **FR-051**: A redirect or `next` link that is only a query or a fragment MUST keep the path of the URL it is resolved against.
+- **FR-052**: The private curl config holding secret headers MUST be removed when the script exits, including on a signal during a retry.
+- **FR-053**: `dybatpho::curl_do` MUST report a retry on stderr, so a caller capturing the response does not capture the banner.
+- **FR-054**: A URL written to a log MUST hide everything between `scheme://` and the last `@` before the host, so a password holding `/` is not shown in part.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -488,6 +493,9 @@ dybatpho::circuit_breaker api.example.test -- \
   arguments holding quotes, `$(...)` and a newline and verify they arrive
   intact with nothing executed; verify `-- false` counts towards opening the
   circuit and that `--` with no command fails.
+- **IT-048**: Upload with `--header "X-Sig: k=v"` and see the header passed whole; resolve `?page=2` and `#end` against a URL with a path.
+- **IT-049**: Kill a script during a retry with a secret header and find no private curl config left; retry once and find the banner on stderr only.
+- **IT-050**: Redact `http://alice:pa/ss@gw/x` and see only `http://gw/[redacted]`.
 
 ## Acceptance Criteria *(mandatory)*
 

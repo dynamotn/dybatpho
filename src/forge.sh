@@ -108,7 +108,8 @@ DYBATPHO_FORGE_TOKEN="${DYBATPHO_FORGE_TOKEN:-}"
 # @description Normalize a Git remote URL into `host/owner/repo`.
 #   Handles the three forms a remote takes — `git@host:owner/repo.git`,
 #   `ssh://git@host/owner/repo.git` and `https://host/owner/repo.git` — so the
-#   rest of the module never has to care which one a checkout uses.
+#   rest of the module never has to care which one a checkout uses. The scp-like
+#   form may name any user, and the port of an `ssh://` URL is dropped.
 # @arg $1 string Remote URL
 # @stdout `host/owner/repo`
 # @internal
@@ -117,21 +118,27 @@ function __dybatpho_forge_normalize_url {
   local url
   dybatpho::expect_args url -- "$@"
 
-  url="${url%.git}"
+  # The slash first: `repo.git/` kept its `.git` the other way round.
   url="${url%/}"
-  case "${url}" in
-    # The `host:owner/repo` separator becomes a `/` before the scheme is
-    # stripped, otherwise the colon of `https:` is the one that matches first.
-    git@*) url="${url#git@}" && url="${url/://}" ;;
-    ssh://git@*) url="${url#ssh://git@}" ;;
-    ssh://*) url="${url#ssh://}" ;;
-    https://*) url="${url#https://}" ;;
-    http://*) url="${url#http://}" ;;
-    *) ;; # kcov(skip) - a case arm has no command to fire on
-  esac
+  url="${url%.git}"
+  local scheme="" authority rest
+  if [[ "${url}" == *://* ]]; then
+    scheme="${url%%://*}"
+    url="${url#*://}"
+  fi
+  authority="${url%%/*}"
+  rest="${url:${#authority}}"
+  # Without a scheme, `[user@]host:owner/repo` is the scp-like form, whatever
+  # the user is called: its colon separates the path, not a port.
+  if [[ -z "${scheme}" && "${authority}" == *:* ]]; then
+    rest="/${authority#*:}${rest}"
+    authority="${authority%%:*}"
+  fi
   # A URL may carry `user@host`; the credential is not part of the identity.
-  url="${url#*@}"
-  printf '%s\n' "${url}"
+  authority="${authority##*@}"
+  # An SSH port says where `git` connects, not where the web or the API answer.
+  [[ "${scheme}" != *ssh* ]] || authority="${authority%:*}"
+  printf '%s%s\n' "${authority}" "${rest}"
 }
 
 #######################################

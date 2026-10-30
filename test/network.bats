@@ -245,6 +245,15 @@ c.close()' > "${portfile}" 2> /dev/null &
   assert_equal "${shown}" "[redacted URL]"
 }
 
+@test "__dybatpho_network_redact_url_into hides a password that holds a slash" {
+  # The authority was cut at the first `/`, so `alice:pa` reached the log.
+  local shown
+  __dybatpho_network_redact_url_into shown "http://alice:pa/ss@gw"
+  assert_equal "${shown}" "http://gw/[redacted]"
+  __dybatpho_network_redact_url_into shown "https://alice:p/w?x#y@gw:8443/path"
+  assert_equal "${shown}" "https://gw:8443/[redacted]"
+}
+
 @test "dybatpho::curl_download not have right spec" {
   run dybatpho::curl_download
   assert_failure
@@ -401,6 +410,19 @@ c.close()' > "${portfile}" 2> /dev/null &
   dybatpho::curl_upload https://this "${temp_file}" note=1 --request PUT
   grep -- "--request PUT" "${temp_file}"
   unstub curl
+}
+
+@test "dybatpho::curl_upload passes an option's value through even when it holds =" {
+  # `X-Sig: k=v` was read as a form field, and `--header` was left without
+  # its value.
+  local temp_file="${BATS_TEST_TMPDIR}/curl_upload_option"
+  stub curl ": printf '%s\\n' \"\$@\" > ${temp_file}; echo '200'"
+  dybatpho::curl_upload https://this /dev/null note=hi --header "X-Sig: k=v"
+  unstub curl
+  run grep -A1 -x -- "--header" "${temp_file}"
+  assert_line --index 1 "X-Sig: k=v"
+  run grep -c -x -- "--form-string" "${temp_file}"
+  assert_output "1"
 }
 
 @test "dybatpho::curl_upload fails when referenced file is missing" {
@@ -1411,6 +1433,63 @@ HELPER
   TMPDIR="${BATS_TEST_TMPDIR}/missing" run ! dybatpho::curl_do https://api.example/v1 /dev/null \
     -D "${BATS_TEST_TMPDIR}/headers"
   assert_output --partial "Unable to create a private curl config file"
+}
+
+@test "dybatpho::curl_do removes its private curl config when a signal ends the script" {
+  # The config holds the secret headers and was removed only when the request
+  # finished, so a `kill` during a retry's sleep left the token on disk.
+  local work="${BATS_TEST_TMPDIR}/signal"
+  mkdir -p "${work}/bin" "${work}/tmp"
+  printf '#!/bin/sh\n: > "%s/called"\nprintf 503\n' "${work}" > "${work}/bin/curl"
+  chmod +x "${work}/bin/curl"
+  cat > "${work}/run.sh" << SCRIPT
+. "${DYBATPHO_DIR}/init.sh" --modules network
+DYBATPHO_CURL_RETRY_BASE_DELAY=5
+DYBATPHO_CURL_RETRY_MAX_DELAY=5
+DYBATPHO_CURL_SECRET_HEADERS=("Authorization: Bearer not-a-real-token")
+dybatpho::curl_do https://api.example.test/v1
+SCRIPT
+
+  PATH="${work}/bin:${PATH}" TMPDIR="${work}/tmp" bash "${work}/run.sh" > /dev/null 2>&1 3>&- &
+  local pid=$! tries
+  for ((tries = 0; tries < 100; tries++)); do
+    [[ -e "${work}/called" ]] && break
+    sleep 0.1
+  done
+  assert_file_exist "${work}/called"
+  run_traced find "${work}/tmp" -name 'dybatpho_curl_*'
+  refute_output ""
+  kill -TERM "${pid}"
+  wait "${pid}" || true
+
+  run_traced find "${work}/tmp" -name 'dybatpho_curl_*'
+  assert_output ""
+}
+
+@test "dybatpho::curl_do reports its retries on stderr" {
+  # `dybatpho::progress` writes to stdout, so `body="$(dybatpho::curl_do ...)"`
+  # captured the banner along with the response.
+  export DYBATPHO_CURL_MAX_RETRIES=1
+  stub curl ": echo '500'" ": echo '200'"
+  stub sleep ": :"
+  run --separate-stderr dybatpho::curl_do https://this
+  assert_success
+  refute_output --partial "Retrying"
+  assert_stderr --partial "Retrying in 2 seconds (1/1)..."
+  refute_stderr --partial "(1/1)...."
+  unstub sleep
+  unstub curl
+  unset DYBATPHO_CURL_MAX_RETRIES
+}
+
+@test "__dybatpho_network_resolve_location_into keeps the path for a query or fragment alone" {
+  local resolved
+  __dybatpho_network_resolve_location_into resolved "https://h/a/b?page=1" "?page=2"
+  assert_equal "${resolved}" "https://h/a/b?page=2"
+  __dybatpho_network_resolve_location_into resolved "https://h/a/b?page=1#top" "#end"
+  assert_equal "${resolved}" "https://h/a/b?page=1#end"
+  __dybatpho_network_resolve_location_into resolved "https://h/a/b?page=1" "c"
+  assert_equal "${resolved}" "https://h/a/c"
 }
 
 @test "dybatpho::curl_do keeps a secret URL out of band across a same-origin redirect" {

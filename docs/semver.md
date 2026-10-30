@@ -18,7 +18,7 @@ A leading `v` prefix (e.g. `v1.2.3`) is accepted and stripped automatically.
 
 ### 🚀 Highlights
 
-- [`dybatpho::semver_valid`](#dybatphosemver_valid) — Return success when the string is a valid semver (with optional leading v).
+- [`dybatpho::semver_valid`](#dybatphosemver_valid) — Return success when the string is a valid semver (with optional leading v). A number with a leading zero, such as `01.2.3` or `1.0.0-01`, and an empty identifier, such as `1.0.0-a..b`, are not, as the specification says.
 - [`dybatpho::semver_parse`](#dybatphosemver_parse) — Parse a semver string and print its components, one per line.
 - [`dybatpho::semver_compare`](#dybatphosemver_compare) — Compare two semver strings according to semver 2.0.0 precedence rules.
 - [`dybatpho::semver_bump`](#dybatphosemver_bump) — Bump a semver version by the specified part.
@@ -53,6 +53,8 @@ A leading `v` prefix (e.g. `v1.2.3`) is accepted and stripped automatically.
 ### `dybatpho::semver_valid`
 
 Return success when the string is a valid semver (with optional leading v).
+A number with a leading zero, such as `01.2.3` or `1.0.0-01`, and an empty
+identifier, such as `1.0.0-a..b`, are not, as the specification says.
 
 **🧾 Arguments**
 

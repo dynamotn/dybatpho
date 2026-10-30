@@ -21,9 +21,19 @@
 # Regex for a valid semver string (with optional leading v)
 # Groups: 1=major 2=minor 3=patch 4=pre-release 5=build-metadata
 DYBATPHO_SEMVER_REGEX='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z0-9._-]+))?(\+([a-zA-Z0-9._-]+))?$'
+# The grammar of semver.org itself, which the expression above only shapes:
+# no leading zero in a number, no empty identifier. Its groups are not the
+# parts, so a match against it is followed by one against the shape above.
+__DYBATPHO_SEMVER_STRICT_NUM='(0|[1-9][0-9]*)'
+__DYBATPHO_SEMVER_STRICT_ID='(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)'
+__DYBATPHO_SEMVER_STRICT_REGEX="^v?${__DYBATPHO_SEMVER_STRICT_NUM}\\.${__DYBATPHO_SEMVER_STRICT_NUM}\\."
+__DYBATPHO_SEMVER_STRICT_REGEX+="${__DYBATPHO_SEMVER_STRICT_NUM}(-${__DYBATPHO_SEMVER_STRICT_ID}"
+__DYBATPHO_SEMVER_STRICT_REGEX+="(\\.${__DYBATPHO_SEMVER_STRICT_ID})*)?(\\+[0-9a-zA-Z-]+(\\.[0-9a-zA-Z-]+)*)?$"
 
 #######################################
 # @description Return success when the string is a valid semver (with optional leading v).
+#   A number with a leading zero, such as `01.2.3` or `1.0.0-01`, and an empty
+#   identifier, such as `1.0.0-a..b`, are not, as the specification says.
 # @arg $1 string Version string to validate
 # @exitcode 0 Valid semver
 # @exitcode 1 Invalid semver
@@ -31,7 +41,9 @@ DYBATPHO_SEMVER_REGEX='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z0-9._-]+))?(\+([
 function dybatpho::semver_valid {
   local version
   dybatpho::expect_args version -- "$@"
-  [[ "${version}" =~ ${DYBATPHO_SEMVER_REGEX} ]]
+  # The shape is matched last: callers read its groups from `BASH_REMATCH`.
+  [[ "${version}" =~ ${__DYBATPHO_SEMVER_STRICT_REGEX} ]] \
+    && [[ "${version}" =~ ${DYBATPHO_SEMVER_REGEX} ]]
 }
 
 #######################################
@@ -44,7 +56,7 @@ function dybatpho::semver_valid {
 function dybatpho::semver_parse {
   local version
   dybatpho::expect_args version -- "$@"
-  if ! [[ "${version}" =~ ${DYBATPHO_SEMVER_REGEX} ]]; then
+  if ! dybatpho::semver_valid "${version}"; then
     dybatpho::die "semver_parse: '${version}' is not a valid semver string" # kcov(skip)
   fi
   printf '%s\n' "${BASH_REMATCH[1]}" # major
@@ -69,6 +81,12 @@ function __dybatpho_semver_parse_into {
   dybatpho::expect_args __svp_var __svp_version -- "$@"
   local -n __svp_out="${__svp_var}"
   [[ "${__svp_version}" =~ ${DYBATPHO_SEMVER_REGEX} ]] || return 1
+  # Comparing tolerates a leading zero, but an empty identifier has no place in
+  # the order: `a..b` read the gap as the end of the list.
+  local __svp_ids
+  for __svp_ids in "${BASH_REMATCH[5]}" "${BASH_REMATCH[7]}"; do
+    [[ -z "${__svp_ids}" || ".${__svp_ids}." != *..* ]] || return 1
+  done
   # Group 4 and 6 carry the leading `-` and `+`; 5 and 7 are the parts.
   __svp_out=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[5]}" "${BASH_REMATCH[7]}")
 }
@@ -301,11 +319,17 @@ function dybatpho::semver_release_type {
   local new_major="${new_parts[0]}" new_minor="${new_parts[1]}" new_patch="${new_parts[2]}"
   local new_pre="${new_parts[3]}" new_build="${new_parts[4]}"
 
-  if ((10#${new_major} != 10#${old_major})); then
+  # Compared as runs of digits: `$(( ))` wraps past 64 bits and read
+  # `18446744073709551617` as `1`.
+  local major_order minor_order patch_order
+  __dybatpho_semver_num_cmp_into major_order "${new_major}" "${old_major}"
+  __dybatpho_semver_num_cmp_into minor_order "${new_minor}" "${old_minor}"
+  __dybatpho_semver_num_cmp_into patch_order "${new_patch}" "${old_patch}"
+  if ((major_order != 0)); then
     printf 'major\n'
-  elif ((10#${new_minor} != 10#${old_minor})); then
+  elif ((minor_order != 0)); then
     printf 'minor\n'
-  elif ((10#${new_patch} != 10#${old_patch})); then
+  elif ((patch_order != 0)); then
     printf 'patch\n'
   elif [[ "${new_pre}" != "${old_pre}" ]]; then
     printf 'pre-release\n'
@@ -328,6 +352,12 @@ function __dybatpho_semver_fill {
   local version major minor patch
   dybatpho::expect_args version -- "$@"
   IFS='.' read -r major minor patch <<< "${version}"
+  # A range may write `^08.1`, which is read in base ten; the filled version
+  # has to pass `dybatpho::semver_valid`, which refuses the leading zero.
+  local part
+  for part in major minor patch; do
+    [[ "${!part}" =~ ^0+([0-9].*)$ ]] && printf -v "${part}" '%s' "${BASH_REMATCH[1]}"
+  done
   printf '%s.%s.%s\n' "${major:-0}" "${minor:-0}" "${patch:-0}"
 }
 
@@ -536,7 +566,12 @@ function dybatpho::semver_satisfies {
       prerelease_allowed=false
     fi
 
-    # Whitespace separates comparators that must all hold.
+    # Whitespace separates comparators that must all hold, but not an operator
+    # from its version: `>= 1.2.3` is one comparator, as npm reads it, not a
+    # bare `>=` and an exact `1.2.3`.
+    while [[ "${alternative}" =~ ^(.*(^|[[:space:]])(>=|<=|[<>=^~]))[[:space:]]+(.*)$ ]]; do
+      alternative="${BASH_REMATCH[1]}${BASH_REMATCH[4]}"
+    done
     local -a tokens=()
     read -r -a tokens <<< "${alternative}"
     ((${#tokens[@]})) || tokens=("*")

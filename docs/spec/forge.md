@@ -176,6 +176,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **FR-018**: `forge_issue_find` MUST exit 1 only when the lookup succeeded and no open issue matches, and 2 when the lookup itself failed; `forge_issue_report` MUST create nothing and fail when the lookup failed.
 - **FR-019**: A GitLab request MUST send a token that is the CI job token (`CI_JOB_TOKEN`) as `JOB-TOKEN`, and any other token as `PRIVATE-TOKEN`.
 - **FR-020**: The token MUST NOT appear in a `set -x` trace of a forge request, and the trace MUST be back on for the request itself.
+- **FR-021**: Remote detection MUST drop the port of an `ssh://` URL, accept the scp-like form with any user, and drop `.git` before a trailing slash.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -236,6 +237,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **IT-027**: Answer the issue search with a 502, and see `forge_issue_find` exit 2 and `forge_issue_report` fail without sending a POST.
 - **IT-028**: The GitLab auth header is `JOB-TOKEN` for the CI job token and `PRIVATE-TOKEN` otherwise, and a request made with only `CI_JOB_TOKEN` set carries `JOB-TOKEN`.
 - **IT-029**: Trace a GitHub request with `set -x`, and find the token sent but absent from the trace, which still shows the request.
+- **IT-030**: Normalize `ssh://git@host:2222/g/r.git`, `deploy@host:g/r.git` and `https://github.com/o/r.git/`, and read the API base and project of the second as a remote.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -275,6 +275,24 @@ function _append_git_commit {
   assert_equal "$(dybatpho::git_changed_files "${repo_path}")" $'README.md\nnotes.txt'
 }
 
+@test "dybatpho::git_changed_files names every path from the top when asked from a subdirectory" {
+  # `ls-files` answered from, and only for, the directory it ran in, so the
+  # untracked half came back as `untracked` beside `sub/a`, and an untracked
+  # file elsewhere in the repository was missing.
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  mkdir -p "${repo_path}/sub"
+  printf 'a\n' > "${repo_path}/sub/a"
+  git -C "${repo_path}" add sub/a
+  git -C "${repo_path}" commit -q -m "add sub/a"
+  printf 'b\n' >> "${repo_path}/sub/a"
+  printf 'new\n' > "${repo_path}/sub/untracked"
+  printf 'new\n' > "${repo_path}/rootnew"
+
+  assert_equal "$(dybatpho::git_changed_files "${repo_path}/sub")" $'rootnew\nsub/a\nsub/untracked'
+}
+
 @test "dybatpho::git_changed_files refuses a base that names no commit" {
   # The tracked half failed on the bad ref while the untracked half still
   # listed its files, and the group answered with the last command's success:
@@ -476,6 +494,17 @@ function _append_git_commit {
   done
   # A string sort would put v9.0.0 on top; a version sort puts v10.0.0 there.
   assert_equal "$(dybatpho::git_latest_tag "${repo_path}")" "v10.0.0"
+}
+
+@test "dybatpho::git_latest_tag ranks a release above its pre-releases" {
+  # `-v:refname` alone puts `v1.0.0-rc.1` above `v1.0.0`.
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  git -C "${repo_path}" tag v1.0.0-rc.1
+  git -C "${repo_path}" tag v1.0.0-beta
+  git -C "${repo_path}" tag v1.0.0
+  assert_equal "$(dybatpho::git_latest_tag "${repo_path}" 'v*')" "v1.0.0"
 }
 
 @test "dybatpho::git_latest_tag honors a tag pattern" {

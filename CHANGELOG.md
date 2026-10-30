@@ -222,6 +222,27 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   script in the same second no longer fails on a shared temporary file.**
 - **`archive` — `dybatpho::archive_extract` reads a strip-components count such
   as `08` in base ten instead of silently extracting unstripped paths.**
+- **`semver` — `dybatpho::semver_satisfies` reads `>= 1.2.3`, with a space after
+  the operator, as one comparator instead of an exact match.**
+- **`semver` — `dybatpho::semver_valid` rejects leading zeros and empty
+  identifiers, as the SemVer grammar requires, and comparison refuses an empty
+  identifier.**
+- **`semver` — `dybatpho::semver_release_type` compares numbers past 64 bits by
+  value.**
+- **`git` — `dybatpho::git_latest_tag` ranks a release above its pre-releases,
+  so `dybatpho::release_next_version` starts from `v1.0.0`, not `v1.0.0-rc.1`.**
+- **`git` — `dybatpho::git_changed_files` given a subdirectory names every path
+  from the top of the repository and lists untracked files from the whole
+  repository.**
+- **`forge` — forge detection handles an `ssh://` remote with a port, an
+  scp-like remote with any user, and a URL ending in `.git/`.**
+- **`network` — `dybatpho::curl_upload` passes an option value containing `=`,
+  such as `--header "X-Sig: k=v"`, to curl unchanged instead of turning it into
+  a form field.**
+- **`network` — a redirect or pagination link that is only a query or a fragment
+  keeps the current page's path.**
+- **`network` — `dybatpho::curl_do` reports retries on stderr, so capturing a
+  response no longer captures the retry banner.**
 
 ### Security
 
@@ -277,6 +298,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`archive` — `dybatpho::archive_is_safe` and
   `dybatpho::archive_unsafe_entries` report a symbolic link entry that points
   outside the extraction directory.**
+- **`network` — the private curl config holding secret headers is removed when
+  the script exits, including on a signal during a retry.**
+- **`network` — log lines no longer show part of the user name and password of a
+  URL whose password contains `/`.**
 - **`safety` — `dybatpho::safe_extract`, and `dybatpho::backup_restore` through
   it, refuse an archive holding a symbolic link that points outside the
   destination.**

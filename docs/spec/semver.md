@@ -170,6 +170,9 @@ As a release script, I want a list of versions ordered as versions so that the n
   validation grammar.
 - **FR-012**: `__dybatpho_semver_cmp_into` MUST compare alphanumeric pre-release identifiers in ASCII order under every locale.
 - **FR-013**: Numeric identifiers MUST compare by value whatever their length, and a range part written with a leading zero, such as `^08.1`, MUST be read in base ten.
+- **FR-014**: `semver_valid`, and every function that validates through it, MUST refuse a leading zero in a numeric part or identifier and an empty identifier, as the SemVer grammar does, while keeping the optional leading `v`; comparison MUST refuse an empty identifier.
+- **FR-015**: A range MUST read an operator followed by whitespace, such as `>= 1.2.3`, as one comparator.
+- **FR-016**: `semver_release_type` MUST compare numbers by value whatever their length.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -216,6 +219,8 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **IT-006**: Reject invalid versions and unsupported bump parts.
 - **IT-007**: Compare `1.0.0-Beta` with `1.0.0-alpha` under the default, `en_US.UTF-8` and `C` locales and get `-1` each time.
 - **IT-008**: Compare `18446744073709551617.0.0` with `2.0.0` and the same numbers as pre-release identifiers; check `8.5.0` and `9.0.0` against `^08.1`, `8.9.3` against `~8.09`, and `8.0.0` against `08`.
+- **IT-009**: Refuse `01.2.3`, `1.0.0-01`, `1.0.0-a..b` and `1.0.0+b..c`, accept `v1.0.0-0.a-1.10+001.x`, and refuse to compare `1.0.0-a..b`.
+- **IT-010**: Check `1.5.0` against `>= 1.2.3` and `3.1.4` against `^ 1.2 || ~ 3.1`, and classify `1.0.0` to `18446744073709551617.0.0` as `major`.
 
 ## Acceptance Criteria *(mandatory)*
 

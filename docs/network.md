@@ -249,7 +249,7 @@ dybatpho::curl_upload https://example.com/upload /tmp/resp.json report=@/tmp/rep
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | URL |
 | `$2` | string | no | `/dev/null` | Location of curl output |
-| `$@` | string | yes |  | Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments |
+| `$@` | string | yes |  | Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments; a field's name does not start with `-` and holds no whitespace, `:` or `;`, so an option's value such as the `X-Sig: k=v` of `--header` is passed on as it is |
 
 **🚦 Exit codes**
 

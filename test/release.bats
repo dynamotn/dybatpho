@@ -142,6 +142,17 @@ tag() {
   assert_equal "$(dybatpho::release_next_version "${REPO}")" "0.1.0"
 }
 
+@test "dybatpho::release_next_version starts from a release, not its release candidate" {
+  # The candidate was taken as the latest tag, so the feature released in
+  # `v1.0.0` was counted again and a fix asked for `1.1.0`.
+  commit "feat: one"
+  tag v1.0.0-rc.1
+  commit "feat: two"
+  tag v1.0.0
+  commit "fix: three"
+  assert_equal "$(dybatpho::release_next_version "${REPO}")" "1.0.1"
+}
+
 @test "dybatpho::release_next_version accepts an explicit base tag" {
   commit "feat: one"
   tag v1.0.0

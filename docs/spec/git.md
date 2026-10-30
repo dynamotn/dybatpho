@@ -249,6 +249,8 @@ from a subdirectory.
 - **FR-013**: `git_changed_files` MUST stop when the base names no commit or a Git command fails, and before the first commit MUST list staged files together with untracked ones.
 - **FR-014**: `git_changed_files` MUST print a non-ASCII path as it is spelt on disk, whatever the user's `core.quotePath` setting.
 - **FR-015**: `git_tags_containing` MUST sort byte-wise, so the order does not depend on the caller's locale.
+- **FR-016**: `git_changed_files` MUST name every path from the top of the repository, and list untracked files from the whole repository, when given a subdirectory.
+- **FR-017**: `git_latest_tag` MUST rank a release above its pre-releases, such as `v1.0.0` above `v1.0.0-rc.1`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -311,6 +313,7 @@ from a subdirectory.
 - **IT-009**: Refuse a base that names no commit, and list staged and untracked files in a repository with no commit.
 - **IT-010**: List a staged and an untracked non-ASCII path in a repository that sets `core.quotePath`, and see both unquoted.
 - **IT-011**: List tags that a UTF-8 locale collates differently under `LC_ALL=en_US.UTF-8`, and see them in byte order.
+- **IT-012**: Ask a subdirectory for its changed files and find `rootnew`, `sub/a` and `sub/untracked`; tag `v1.0.0`, `v1.0.0-rc.1` and `v1.0.0-beta` and find `v1.0.0` the latest.
 
 ## Acceptance Criteria *(mandatory)*
 

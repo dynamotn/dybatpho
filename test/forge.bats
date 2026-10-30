@@ -617,6 +617,20 @@ curl_payload() {
   assert_equal "$(__dybatpho_forge_normalize_url "https://github.com/o/r/")" "github.com/o/r"
 }
 
+@test "__dybatpho_forge_normalize_url reads an SSH port, any scp user and a trailing slash" {
+  # The SSH port reached the API URL, an scp-like remote with a user other than
+  # `git` kept its colon in the host, and `.git/` kept its `.git`.
+  assert_equal "$(__dybatpho_forge_normalize_url "ssh://git@gitlab.example.com:2222/g/r.git")" \
+    "gitlab.example.com/g/r"
+  assert_equal "$(__dybatpho_forge_normalize_url "deploy@gitlab.example.com:g/r.git")" "gitlab.example.com/g/r"
+  assert_equal "$(__dybatpho_forge_normalize_url "https://github.com/o/r.git/")" "github.com/o/r"
+  assert_equal "$(__dybatpho_forge_normalize_url "https://user:pw@host:8443/o/r.git")" "host:8443/o/r"
+
+  git -C "${REPO}" remote set-url origin "deploy@gitlab.example.com:grp/repo.git"
+  assert_equal "$(dybatpho::forge_api)" "https://gitlab.example.com/api/v4"
+  assert_equal "$(dybatpho::forge_repo)" "grp/repo"
+}
+
 @test "__dybatpho_forge_labels_json drops blanks and quotes each label" {
   assert_equal "$(__dybatpho_forge_labels_json "ci, bug ,")" '["ci","bug"]'
   assert_equal "$(__dybatpho_forge_labels_json "")" '[]'

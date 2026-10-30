@@ -366,7 +366,10 @@ function dybatpho::git_changed_files {
     tracked="$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" diff --name-only "${base_ref}" --)" \
       || dybatpho::die "${FUNCNAME[0]}: git diff failed in ${repo_path}"
   fi
-  untracked="$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" ls-files --others --exclude-standard)" \
+  # `diff` names paths from the top of the repository wherever it runs, while
+  # `ls-files` names them from, and limits them to, the directory it runs in.
+  untracked="$(__dybatpho_git "${repo_path}" "${quote_raw[@]}" ls-files --others --exclude-standard \
+    --full-name -- ':/')" \
     || dybatpho::die "${FUNCNAME[0]}: git ls-files failed in ${repo_path}"
   printf '%s\n%s\n' "${tracked}" "${untracked}" | awk 'NF' | LC_ALL=C sort -u
 }
@@ -392,7 +395,9 @@ function dybatpho::git_latest_tag {
   __dybatpho_git_expect_repo "${repo_path}"
   pattern="${2:-*}"
   local git_tags
-  git_tags=$(__dybatpho_git "${repo_path}" tag --list "${pattern}" --sort=-v:refname)
+  # Without a `versionsort.suffix`, `v:refname` ranks `v1.0.0-rc.1` above
+  # `v1.0.0`; with `-` as one, a pre-release sorts below its release.
+  git_tags=$(__dybatpho_git "${repo_path}" -c versionsort.suffix=- tag --list "${pattern}" --sort=-v:refname)
   tag="${git_tags%%$'\n'*}"
   [[ -n "${tag}" ]] || return 1
   printf '%s\n' "${tag}"

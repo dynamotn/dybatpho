@@ -43,6 +43,20 @@ setup() {
   assert_failure
 }
 
+@test "dybatpho::semver_valid rejects a leading zero and an empty identifier" {
+  # The shape alone accepted all of these, though the specification forbids
+  # them, and `a..b` then compared below `a.0.b` as if the gap ended the list.
+  local version
+  for version in 01.2.3 1.02.3 1.2.03 1.0.0-01 1.0.0-a..b 1.0.0-. 1.0.0-a. 1.0.0+b..c; do
+    run_traced -1 dybatpho::semver_valid "${version}"
+  done
+  dybatpho::semver_valid 0.0.0
+  dybatpho::semver_valid v1.0.0-0.a-1.10+001.x
+  run --separate-stderr dybatpho::semver_compare 1.0.0-a..b 1.0.0-a.0.b
+  assert_failure
+  assert_stderr --partial "is not a valid semver"
+}
+
 @test "dybatpho::semver_valid rejects garbage input" {
   run_traced dybatpho::semver_valid "not-a-version"
   assert_failure
@@ -486,6 +500,26 @@ setup() {
   assert_output "1"
   run_traced dybatpho::semver_compare 1.02.0 1.2.0
   assert_output "0"
+}
+
+@test "dybatpho::semver_satisfies reads an operator followed by a space as one comparator" {
+  # `>= 1.2.3` was split into a bare `>=` and an exact `1.2.3`.
+  run_traced dybatpho::semver_satisfies 1.5.0 ">= 1.2.3"
+  assert_success
+  run_traced dybatpho::semver_satisfies 1.5.0 ">= 1.2.0 <  1.9.0"
+  assert_success
+  run_traced dybatpho::semver_satisfies 2.0.0 "^ 1.2 || ~ 3.1"
+  assert_failure
+  run_traced dybatpho::semver_satisfies 3.1.4 "^ 1.2 || ~ 3.1"
+  assert_success
+}
+
+@test "dybatpho::semver_release_type compares numbers past 64 bits by value" {
+  # `$(( ))` wrapped `18446744073709551617` to `1`, so this read as equal.
+  run_traced dybatpho::semver_release_type 1.0.0 18446744073709551617.0.0
+  assert_output "major"
+  run_traced dybatpho::semver_release_type 1.1.0 1.18446744073709551617.0
+  assert_output "minor"
 }
 
 @test "dybatpho::semver_satisfies reads a range part with a leading zero in base ten" {

@@ -149,6 +149,7 @@ dybatpho::release_sign "${sums}"
 - **FR-018**: `scripts/release.sh` MUST refuse contradicting options -- `--version` with `--bump`, publishing with `--no-push`, `--sign` with `--no-bundle`, and `--draft` with `--no-publish` -- before it reads the commits or changes the tree, and MUST accept every documented `--bump` value.
 - **FR-019**: A base or head ref that does not name a commit MUST stop `release_bump_type` and `release_changelog` with an error naming the ref, rather than being read as a range with nothing to release.
 - **FR-020**: `scripts/release.sh` MUST run the documentation step from a checkout whose path contains spaces.
+- **FR-021**: `release_next_version` MUST start from the highest release tag, not from a pre-release of it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -191,6 +192,7 @@ dybatpho::release_sign "${sums}"
 - **IT-018**: Run `scripts/release.sh --dry-run` with each contradicting pair of options and verify each is refused with its own message before the release header, and that `--bump minor` parses.
 - **IT-019**: From a script, call `release_bump_type` and `release_changelog` with an unknown base, an unknown head, and an unknown head without a base, and verify the script stops with `Unknown git commit` each time.
 - **IT-020**: Release from a copy of the repository under a directory with a space in its name, and find the docs regenerated and the release committed.
+- **IT-021**: Tag `v1.0.0-rc.1`, then a feature as `v1.0.0`, then commit a fix, and get `1.0.1`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -133,14 +133,22 @@ __DYBATPHO_URL_REGEX='^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*)(\?([^#]*))?
 function __dybatpho_network_redact_url_into {
   local -n __dybatpho_network_redacted_ref="$1"
   local __dybatpho_network_raw_url="${2-}"
-  if ! [[ "${__dybatpho_network_raw_url}" =~ ^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)(.*)$ ]]; then
+  if ! [[ "${__dybatpho_network_raw_url}" =~ ^([A-Za-z][A-Za-z0-9+.-]*)://(.*)$ ]]; then
     __dybatpho_network_redacted_ref="[redacted URL]"
     return 0
   fi
-  local scheme="${BASH_REMATCH[1]}" authority="${BASH_REMATCH[2]}" rest="${BASH_REMATCH[3]}"
-  # The host cannot hold an `@`, so the last one ends any `user:password`.
-  __dybatpho_network_redacted_ref="${scheme}://${authority##*@}"
-  if [[ "${authority}" == *@* || (-n "${rest}" && "${rest}" != "/") ]]; then
+  local scheme="${BASH_REMATCH[1]}" remainder="${BASH_REMATCH[2]}" credentials=false
+  # The host cannot hold an `@`, so the last one ends any `user:password`. It is
+  # looked for before the authority is cut at a `/`: a password may hold one,
+  # and `alice:pa/ss@gw` was shown as `alice:pa`.
+  if [[ "${remainder}" == *@* ]]; then
+    credentials=true
+    remainder="${remainder##*@}"
+  fi
+  local authority="${remainder%%[/?#]*}"
+  local rest="${remainder:${#authority}}"
+  __dybatpho_network_redacted_ref="${scheme}://${authority}"
+  if [[ "${credentials}" == true || (-n "${rest}" && "${rest}" != "/") ]]; then
     __dybatpho_network_redacted_ref+="/[redacted]"
   fi
 }
@@ -238,6 +246,9 @@ function __dybatpho_network_secret_config {
     dybatpho::die "${FUNCNAME[1]}: Unable to create a private curl config file" # kcov(skip)
   }
   umask "${previous_umask}"
+  # Removed on exit too: a signal during a retry's sleep ended the script before
+  # the request's own `rm`, and left the credential on disk.
+  dybatpho::cleanup_file_on_exit "${path}"
 
   local network_config_escape trace
   # kcov reads the trace, which is off from here to `__dybatpho_network_trace_on`:
@@ -591,7 +602,8 @@ function dybatpho::curl_do {
     if declare -F __dybatpho_metrics_key > /dev/null; then
       dybatpho::metrics_counter_inc dybatpho_http_retries_total
     fi
-    dybatpho::progress "Retrying in ${delay} seconds (${attempt}/${DYBATPHO_CURL_MAX_RETRIES})..."
+    # On stderr: the caller may be capturing the request's own output.
+    __dybatpho_log_progress_to stderr "Retrying in ${delay} seconds" "(${attempt}/${DYBATPHO_CURL_MAX_RETRIES})"
     sleep "${delay}" || true
   done
 
@@ -635,6 +647,13 @@ function __dybatpho_network_resolve_location_into {
     __dybatpho_network_resolve_out="${__dybatpho_network_resolve_base%%://*}:${__dybatpho_network_resolve_ref}"
   elif [[ "${__dybatpho_network_resolve_ref}" == /* ]]; then
     __dybatpho_network_resolve_out="${__dybatpho_network_resolve_origin}${__dybatpho_network_resolve_ref}"
+  elif [[ "${__dybatpho_network_resolve_ref}" == [?#]* ]]; then
+    # A query or a fragment alone keeps the whole path: `?page=2` against
+    # `/a/b?page=1` is `/a/b?page=2`, not `/a/?page=2`.
+    local __dybatpho_network_resolve_keep="${__dybatpho_network_resolve_base%%#*}"
+    [[ "${__dybatpho_network_resolve_ref}" == \#* ]] \
+      || __dybatpho_network_resolve_keep="${__dybatpho_network_resolve_keep%%\?*}"
+    __dybatpho_network_resolve_out="${__dybatpho_network_resolve_keep}${__dybatpho_network_resolve_ref}"
   else
     local __dybatpho_network_resolve_path="${__dybatpho_network_resolve_base%%\#*}"
     __dybatpho_network_resolve_path="${__dybatpho_network_resolve_path%%\?*}"
@@ -737,7 +756,9 @@ function dybatpho::curl_head {
 #
 # @arg $1 string URL
 # @arg $2 string [default: /dev/null] Location of curl output
-# @arg $@ string Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments
+# @arg $@ string Form fields as `name=value` or `name=@path` pairs, plus any other curl options/arguments;
+#   a field's name does not start with `-` and holds no whitespace, `:` or `;`, so an option's value such as
+#   the `X-Sig: k=v` of `--header` is passed on as it is
 # @see dybatpho::curl_do
 # @exitcode 2 A `name=@path` field references a file that does not exist
 # @tip The request method defaults to `POST`; pass `--request PUT` (or similar) afterwards to override it
@@ -757,17 +778,19 @@ function dybatpho::curl_upload {
   while (($#)); do
     field="$1"
     shift
-    if [[ "${field}" =~ ^[^=]+=@(.+)$ ]]; then
+    # Only a word shaped like a form field is one: `--header "X-Sig: k=v"`
+    # turned its value into a field and left `--header` without one.
+    if ! [[ "${field}" =~ ^[^-=[:space:]:\;][^=[:space:]:\;]*= ]]; then
+      curl_args+=("${field}")
+    elif [[ "${field}" =~ ^[^=]+=@(.+)$ ]]; then
       path="${BASH_REMATCH[1]}"
       dybatpho::is file "${path}" || dybatpho::die "Upload file not found: ${path}" 2
       curl_args+=(-F "${field}")
-    elif [[ "${field}" == *=* ]]; then
+    else
       # `--form-string`, not `-F`: `-F` reads a value that starts with `<` as
       # a file to send, and `;type=` inside one as an option, so a note such
       # as `<1 day` failed with curl's exit code 26.
       curl_args+=(--form-string "${field}")
-    else
-      curl_args+=("${field}")
     fi
   done
 

@@ -165,6 +165,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - The input is large enough for the `awk` engine; `awk` is gawk, mawk, BusyBox or BSD `awk`, or is not installed at all.
 - A value looks like a number to `awk` (`007`, `7.`, `1e3`) while it has to compare as text, or holds control bytes, invalid UTF-8, or a backslash on its way to JSON.
 - A JSON value converted to CSV is `false`, `null`, or missing.
+- The text ends in one or more line breaks, or a CRLF file ends in a blank line.
 
 ## Requirements *(mandatory)*
 
@@ -216,6 +217,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-044**: Under `DYBATPHO_CSV_ENGINE=auto`, the default, the `awk` engine MUST be used only from 2,048 characters of input up; `awk` MUST use it for any non-empty input, and `bash` never.
 - **FR-045**: An input the `awk` engine would have to refuse MUST be handed to the Bash engine before anything is printed, so the error, the exit status and the empty output are the Bash engine's.
 - **FR-046**: An unknown `DYBATPHO_CSV_ENGINE` MUST stop the script, naming the function and the accepted values.
+- **FR-047**: Line breaks at the end of the input MUST end its last record rather than add empty records, whichever source the input came from.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -291,6 +293,7 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-053**: Observe through a logging `awk` that `auto` starts it for a large input only, `awk` for a small one too and `bash` never; refuse `DYBATPHO_CSV_ENGINE=fast`.
 - **IT-054**: Remove `awk` from `PATH` and get the Bash engine's output for every operation.
 - **IT-055**: Read a value holding a line break and a trailing empty field through the `awk` engine into records that split back correctly.
+- **IT-056**: Read text with a final newline, and a CRLF file ending in a blank line, through both engines, and get only the records the data holds.
 
 ## Acceptance Criteria *(mandatory)*
 

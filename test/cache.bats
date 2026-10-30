@@ -100,6 +100,20 @@ age_entry() {
   assert_stderr --partial "is not a number of seconds"
 }
 
+@test "a time with a leading zero is read in base 10, not octal" {
+  # Arithmetic read `08` as a bad octal number: `cache_has` stopped the script
+  # and `cache_run` reported an error and never hit.
+  printf 'new\n' | dybatpho::cache_set padded
+  run_traced -0 dybatpho::cache_has padded 08
+  run_traced -0 dybatpho::cache_get padded 09
+  run --separate-stderr -0 dybatpho::cache_run padded 08 --stale 09 -- false
+  assert_output "new"
+  assert_stderr ""
+  run_traced -0 dybatpho::cache_prune --older-than 09 --max-entries 08
+  run_traced -0 dybatpho::cache_stats 08 --json
+  assert_output --partial '"fresh":1'
+}
+
 @test "dybatpho::cache_run runs the command once and reuses its output" {
   local counter="${BATS_TEST_TMPDIR}/runs"
   printf '0\n' > "${counter}"
@@ -116,6 +130,26 @@ age_entry() {
   # A zero time to live runs it again.
   assert_equal "$(dybatpho::cache_run memo 0 -- slow)" "computed"
   assert_equal "$(cat "${counter}")" "2"
+}
+
+@test "dybatpho::cache_run passes the output through byte for byte" {
+  # `$(...)` dropped the trailing blank lines and `printf '%s\n'` added a
+  # newline the command never printed, on a miss and on a hit alike.
+  blank_tail() { printf 'line\n\n\n'; }
+  no_newline() { printf 'bare'; }
+  local seen
+  seen="$(dybatpho::cache_run tail 3600 -- blank_tail | od -An -c | tr -s ' ')"
+  assert_equal "${seen}" " l i n e \n \n \n"
+  seen="$(dybatpho::cache_run tail 3600 -- blank_tail | od -An -c | tr -s ' ')"
+  assert_equal "${seen}" " l i n e \n \n \n"
+  seen="$(dybatpho::cache_run bare 3600 -- no_newline | od -An -c | tr -s ' ')"
+  assert_equal "${seen}" " b a r e"
+  seen="$(dybatpho::cache_run bare 3600 -- no_newline | od -An -c | tr -s ' ')"
+  assert_equal "${seen}" " b a r e"
+  age_entry tail '2 hours ago'
+  seen="$(dybatpho::cache_run tail 60 --stale 999999 -- blank_tail | od -An -c | tr -s ' ')"
+  assert_equal "${seen}" " l i n e \n \n \n"
+  dybatpho::cache_wait tail 10
 }
 
 @test "dybatpho::cache_run never stores a command that failed" {

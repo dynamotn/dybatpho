@@ -8,7 +8,8 @@ setup() {
 
   # A `sudo` that behaves like the real one in the ways this module depends
   # on: `-v` authenticates and caches a ticket, `-n` refuses rather than
-  # prompting when there is none, and anything else runs the command.
+  # prompting when there is none, `--` ends its options, an option it does
+  # not know is refused, and anything else runs the command.
   cat > "${STUB_DIR}/sudo" << 'STUB'
 #!/usr/bin/env bash
 ticket="${SUDO_STUB_TICKET:?}"
@@ -17,10 +18,13 @@ case "$1" in
     shift
     [[ -f "${ticket}" ]] || { printf 'sudo: a password is required\n' >&2; exit 1; }
     [[ "$1" == "-v" ]] && exit 0
-    exec "$@"
+    [[ "$1" == "--" ]] && shift
+    exec -- "$@"
     ;;
   -v) : > "${ticket}"; exit 0 ;;
-  *) printf 'STUB_PROMPTED\n' >&2; : > "${ticket}"; exec "$@" ;;
+  --) shift; printf 'STUB_PROMPTED\n' >&2; : > "${ticket}"; exec -- "$@" ;;
+  -*) printf 'sudo: invalid option -- %s\n' "$1" >&2; exit 1 ;;
+  *) printf 'STUB_PROMPTED\n' >&2; : > "${ticket}"; exec -- "$@" ;;
 esac
 STUB
   chmod +x "${STUB_DIR}/sudo"
@@ -85,6 +89,18 @@ teardown() {
   : > "${TICKET}"
   run_traced -0 dybatpho::privilege_run -- printf 'elevated\n'
   assert_output "elevated"
+  unset -f dybatpho::is_root
+}
+
+@test "dybatpho::privilege_run runs a command whose name starts with a dash" {
+  # Without `--`, `sudo -u root id` read the command word as its own option
+  # and ran `id` as root instead.
+  dybatpho::is_root() { return 1; }
+  : > "${TICKET}"
+  printf '#!/usr/bin/env bash\nprintf "dash command ran: %%s\\n" "$*"\n' > "${STUB_DIR}/-dash"
+  chmod +x "${STUB_DIR}/-dash"
+  run_traced -0 dybatpho::privilege_run -- -dash root id
+  assert_output "dash command ran: root id"
   unset -f dybatpho::is_root
 }
 
@@ -155,6 +171,25 @@ teardown() {
     dybatpho::privilege_acquire --no-keepalive
   assert_equal "${SEEN}" "suspend resume "
   unset -f dybatpho::is_root dybatpho::is_tty record_hook
+}
+
+@test "dybatpho::privilege_acquire authenticates doas by running true" {
+  # `doas` has no `-v`; asking for it failed every acquire with a usage error.
+  cat > "${STUB_DIR}/doas" << 'STUB'
+#!/usr/bin/env bash
+while getopts "a:C:Lnsu:" option; do
+  [[ "${option}" != "?" ]] || exit 1
+done
+shift $((OPTIND - 1))
+printf '%s\n' "$*" >> "${SUDO_STUB_TICKET:?}.doas"
+exec -- "$@"
+STUB
+  chmod +x "${STUB_DIR}/doas"
+  dybatpho::is_root() { return 1; }
+  dybatpho::is_tty() { return 0; }
+  DYBATPHO_PRIVILEGE_COMMAND=doas run_traced -0 dybatpho::privilege_acquire --no-keepalive
+  assert_equal "$(cat "${TICKET}.doas")" "true"
+  unset -f dybatpho::is_root dybatpho::is_tty
 }
 
 @test "dybatpho::privilege_acquire --shield stops a child from prompting" {

@@ -293,6 +293,8 @@ dybatpho::show_file "${report_file}"
 - A directory handed to `find_up`, `dir_size` or the tree walk is relative and `CDPATH` is set, or its name is `-` or begins with a dash.
 - The regular files under a directory add up to more than 2 GiB.
 - `XDG_RUNTIME_DIR` is unset, relative, or `/`, with or without a fallback, and the runtime directory is read inside a command substitution.
+- A symlink reached through a symlinked directory points at its target with `..`.
+- The destination name is close to the 255-byte limit of a file name.
 
 ## Requirements *(mandatory)*
 
@@ -353,6 +355,8 @@ dybatpho::show_file "${report_file}"
 - **FR-053**: `dir_size` MUST report totals past 2 GiB exactly, whichever `awk` is installed.
 - **FR-054**: `xdg_runtime_dir` MUST print `XDG_RUNTIME_DIR`, joined with the application name when one is given, and MUST ignore the variable when it is relative.
 - **FR-055**: Without a usable `XDG_RUNTIME_DIR`, `xdg_runtime_dir` MUST use the absolute fallback passed as its second argument, and MUST otherwise report an error on stderr and return 1 rather than stop the script, so the failure survives a command substitution; a relative fallback MUST be refused the same way.
+- **FR-056**: A relative symlink target MUST be resolved against the link's directory as the kernel resolves it, never by folding `..` away as text.
+- **FR-057**: The staging file name MUST fit the file name limit whatever the length of the destination name.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -426,6 +430,8 @@ dybatpho::show_file "${report_file}"
 - **IT-039**: Measure a directory named `-d`, and a sparse tree of 4 GiB.
 - **IT-040**: Read the runtime directory from an absolute `XDG_RUNTIME_DIR` with and without an application name and with a trailing slash, and fail with an error when it is unset or relative.
 - **IT-041**: Read the runtime directory through an absolute fallback, with and without an application name and for `/`, and refuse a relative fallback.
+- **IT-042**: Write through `alias/link`, where `alias -> deep/b` and `link -> ../t`, and see `deep/t` change and no `t` created beside `alias`.
+- **IT-043**: Rewrite a file whose name is 230 bytes long.
 
 ## Acceptance Criteria *(mandatory)*
 

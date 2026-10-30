@@ -181,6 +181,21 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   as unrestricted, as cron does.**
 - **`agent` — `dybatpho::agent_mode` ignores `DYBATPHO_AGENT_ENV` entries that
   are not variable names, and no longer expands `*` to file names.**
+- **`file` — `dybatpho::file_write_atomic` and the other file writers write
+  through a relative symlink reached via a symlinked directory to the file it
+  really points at, instead of creating a new file elsewhere.**
+- **`file` — the file writers can rewrite a file whose name is close to the
+  255-byte limit.**
+- **`cache` — `cache_has`, `cache_get`, `cache_run`, `cache_wait`, `cache_prune`
+  and `cache_stats` read times and counts written with a leading zero, such as
+  `08`, in base 10 instead of failing as octal.**
+- **`cache` — `dybatpho::cache_run` prints and stores a command's output byte
+  for byte, keeping trailing blank lines and adding no newline the command did
+  not print.**
+- **`privilege` — `dybatpho::privilege_acquire` works with `doas`, which it
+  authenticates by running `true`, since `doas` has no `-v`.**
+- **`csv` — cSV functions no longer read trailing line breaks (text ending in a
+  newline, or a CRLF file ending in a blank line) as extra empty rows.**
 - **`process` — `dybatpho::trap` no longer runs the parent's EXIT handler inside
   a command substitution when the shell started with SIGSYS, XCPU, XFSZ, VTALRM
   and PROF all ignored, and fails loudly if no spare signal is left.**
@@ -205,6 +220,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   files the script still needed.
 - **`ai` — the AI helpers mask registered secrets in the system prompt and in
   tool output before sending them to the provider.**
+- **`lock` — `dybatpho::lock_acquire` no longer takes a lock that a live process
+  holds in the older directory form.** It used to report success while both
+  processes ran.
+- **`privilege` — `dybatpho::privilege_run` passes `--` to `sudo`/`doas`, so a
+  command name starting with a dash can no longer be read as an escalation
+  option such as `-u`.**
+- **`lock` — a symbolic link to a directory planted at a lock's name no longer
+  lets every caller of `dybatpho::lock_acquire` take the lock, nor makes a
+  reclaim drop a live lock.** Acquisition fails and leaves no stray link behind.
 - **`cli` — a `count:true` flag seeded from `env:` or `config:` reaches the
   script as a plain number even when the flag is not given.**
 - **`ai` — `dybatpho::ai_conversation_add` masks registered secrets before

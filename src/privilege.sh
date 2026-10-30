@@ -29,7 +29,9 @@
 # @tip A full-screen application has to give the terminal back before the
 #   password prompt is drawn, which is what `DYBATPHO_PRIVILEGE_SUSPEND_HOOK`
 #   is for
-# @env DYBATPHO_PRIVILEGE_COMMAND string Escalation command, `auto` to detect `sudo` then `doas`
+# @env DYBATPHO_PRIVILEGE_COMMAND string Escalation command, `auto` to detect `sudo` then `doas`;
+#   a command named here must take `--` before the command it runs, so
+#   `pkexec` does not fit
 # @env DYBATPHO_PRIVILEGE string `auto` elevates when not root, `true`/`false` override the detection
 # @env DYBATPHO_PRIVILEGE_SUSPEND_HOOK string Function called with `suspend` before prompting and `resume` after
 # @env DYBATPHO_PRIVILEGE_REFRESH number [default: 60] Seconds between ticket refreshes
@@ -179,7 +181,8 @@ function __dybatpho_privilege_shield {
 #   was not there yet, such as the wrapper a first call without `--shield`
 #   left out; it never starts a second refresher or wrapper. When a prompt is required and the session cannot answer
 #   one, this fails rather than blocking on a password nothing will type --
-#   which is what a script run from cron needs.
+#   which is what a script run from cron needs. `sudo` authenticates with
+#   `sudo -v`; `doas` has no such option, so it authenticates by running `true`.
 # @arg $1 string Options, in any order
 # @option --shield Put a non-interactive escalation command first on `PATH`, so no child can prompt
 # @option --no-keepalive Skip the background refresh, for a run short enough not to need it
@@ -225,7 +228,11 @@ function dybatpho::privilege_acquire {
 
     __dybatpho_privilege_hand_over suspend
     local status=0
-    "${command_name}" -v || status=$?
+    if [[ "${command_name}" == "sudo" ]]; then
+      "${command_name}" -v || status=$?
+    else
+      "${command_name}" true || status=$?
+    fi
     __dybatpho_privilege_hand_over resume
     ((status == 0)) || return 1
   fi
@@ -300,5 +307,7 @@ function dybatpho::privilege_run {
 
   local __dybatpho_privilege_run_command_name
   __dybatpho_privilege_run_command_name="$(dybatpho::privilege_command)"
-  dybatpho::dry_run -- "${__dybatpho_privilege_run_command_name}" "$@"
+  # `--` ends the escalation command's own options, so a command word that
+  # starts with a dash is run rather than read as one of them.
+  dybatpho::dry_run -- "${__dybatpho_privilege_run_command_name}" -- "$@"
 }

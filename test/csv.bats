@@ -80,6 +80,22 @@ setup() {
   [ "${#records[@]}" -eq 0 ]
 }
 
+@test "trailing line breaks end the last record instead of adding empty ones" {
+  # Text passed with its final newline, or a CRLF file ending in a blank line,
+  # read as extra empty rows that the same data from stdin did not have.
+  local file="${BATS_TEST_TMPDIR}/blank-tail.csv" engine
+  printf 'a,b\r\n1,2\r\n\r\n' > "${file}"
+  local -a records=()
+  dybatpho::csv_read $'a,b\n1,2\n' records
+  assert_equal "${#records[@]}" "2"
+  for engine in bash awk; do
+    DYBATPHO_CSV_ENGINE="${engine}" run_traced dybatpho::csv_to_json $'a,b\n1,2\n\n'
+    assert_output '[{"a":"1","b":"2"}]'
+    DYBATPHO_CSV_ENGINE="${engine}" run_traced dybatpho::csv_to_json "${file}"
+    assert_output '[{"a":"1","b":"2"}]'
+  done
+}
+
 @test "dybatpho::csv_read reads a file, stdin, and strips a CRLF line ending" {
   local file="${BATS_TEST_TMPDIR}/in.csv"
   printf 'name,qty\r\napi,3\r\n' > "${file}"

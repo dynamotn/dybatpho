@@ -468,6 +468,13 @@ function __dybatpho_csv_input_into {
   local __dybatpho_csv_source="$2" __dybatpho_csv_who="${3:-${FUNCNAME[1]:-${FUNCNAME[0]}}}"
 
   __dybatpho_string_input_into __dybatpho_csv_input_ref "${__dybatpho_csv_source}" files
+  # The line breaks closing the text end its last record rather than add empty
+  # ones. A file and stdin lost only their trailing newlines, so a CRLF file
+  # ending in a blank line, or text passed with a final newline, read as more
+  # rows than the same data from elsewhere.
+  while [[ "${__dybatpho_csv_input_ref}" == *[$'\r\n'] ]]; do
+    __dybatpho_csv_input_ref="${__dybatpho_csv_input_ref%?}"
+  done
 
   local __dybatpho_csv_reason="The input contains the ASCII unit separator,"
   __dybatpho_csv_reason+=" which this module uses to join a record's fields"

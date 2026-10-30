@@ -328,9 +328,13 @@ function dybatpho::lock_reclaim_stale {
     # what was moved aside is a live lock. Put it back if the name is still
     # free; `ln -s` refuses to replace an existing name, so a third holder is
     # never overwritten.
-    if ln -s "${moved}" "${lock_path}" 2> /dev/null; then
+    # As in the claim, a directory planted at the name would swallow the link,
+    # so it counts as put back only when the name itself reads back as it.
+    if ln -sn "${moved}" "${lock_path}" 2> /dev/null \
+      && [[ "$(readlink -- "${lock_path}" 2> /dev/null || true)" == "${moved}" ]]; then
       rm -f -- "${aside}" &> /dev/null || true
     else
+      rm -f -- "${lock_path}/${moved}" 2> /dev/null || true
       dybatpho::warn "Lock ${lock_path} changed hands while it was being reclaimed; the copy moved aside is at ${aside}"
     fi
     return 0
@@ -420,7 +424,15 @@ function __dybatpho_lock_try {
   # the lock and took it.
   local lock_target
   __dybatpho_lock_target_into lock_target
-  ln -s "${lock_target}" "${lock_path}" 2> /dev/null || return 1
+  # A directory at the name is a lock in the older form, and `ln -s` would
+  # put the link inside it and report success; `-n` (GNU, BSD and busybox)
+  # stops it following a link to a directory planted there. Claimed only when
+  # the name itself became this process's link.
+  ln -sn "${lock_target}" "${lock_path}" 2> /dev/null || return 1
+  if [[ "$(readlink -- "${lock_path}" 2> /dev/null || true)" != "${lock_target}" ]]; then
+    rm -f -- "${lock_path}/${lock_target}" 2> /dev/null || true
+    return 1
+  fi
   # The sidecar has a predictable name in a directory that may be shared, so
   # whatever already sits there is not trusted: a link planted under that name
   # would turn the write into one over the file it points at. Anything there

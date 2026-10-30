@@ -119,6 +119,8 @@ dybatpho::privilege_release
 - **FR-017**: A command run by `privilege_run` MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
 - **FR-018**: `dybatpho::privilege_run` MUST run the command after `--` as an argument vector, never through `eval`, whether or not elevation is needed.
 - **FR-019**: `DYBATPHO_PRIVILEGE` MUST turn elevation off for every value `dybatpho::is false` accepts, in any case.
+- **FR-020**: `doas` MUST be authenticated by running `true` through it, since it has no `-v`.
+- **FR-021**: `dybatpho::privilege_run` MUST pass `--` before the command, so a command word starting with a dash is never read as an option of the escalation command.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -153,6 +155,8 @@ dybatpho::privilege_release
 - **IT-013**: Run a command through `privilege_run` with no escalation needed that reads variables named like the runner's locals, and see the caller's values.
 - **IT-014**: Run `privilege_run -- 'echo first; echo INJECTED'` without elevation and see nothing injected.
 - **IT-015**: Report no elevation needed for `false`, `FALSE`, `False`, `no`, `NO`, `off`, `Off` and `1`, with a command pinned and not root.
+- **IT-016**: Acquire through a `doas` stub that refuses `-v`, and see it run `true`.
+- **IT-017**: Run a command named `-dash` through `privilege_run` with elevation, and see the command run rather than refused as an option.
 
 ## Acceptance Criteria *(mandatory)*
 

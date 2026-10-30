@@ -215,10 +215,27 @@ function dybatpho::cache_has {
   local ttl="${2:-${DYBATPHO_CACHE_TTL}}"
   [[ "${ttl}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
+  __dybatpho_cache_decimal_into ttl
   local path age
   __dybatpho_cache_path_into path "${key}"
   __dybatpho_cache_age age "${path}" || return 1
   ((age < ttl))
+}
+
+#######################################
+# @description Rewrite variables holding whole numbers in base 10, leaving an
+#   empty one empty. Arithmetic reads a leading zero as octal, so a time to
+#   live of `08` was an error and `010` meant eight seconds.
+# @arg $@ string Names of the variables, each already checked to hold digits
+# @set The named variables, without leading zeros
+# @internal
+#######################################
+function __dybatpho_cache_decimal_into {
+  local __dybatpho_cache_decimal_name
+  for __dybatpho_cache_decimal_name in "$@"; do
+    [[ -z "${!__dybatpho_cache_decimal_name}" ]] \
+      || printf -v "${__dybatpho_cache_decimal_name}" '%d' "$((10#${!__dybatpho_cache_decimal_name}))"
+  done
 }
 
 #######################################
@@ -392,9 +409,9 @@ function __dybatpho_cache_refresh {
   dybatpho::expect_args __dybatpho_cache_refresh_key -- "$@"
   shift
   local __dybatpho_cache_refresh_output __dybatpho_cache_refresh_status=0
-  __dybatpho_cache_refresh_output="$("$@")" || __dybatpho_cache_refresh_status=$?
+  __dybatpho_cache_refresh_output="$("$@" && printf '.')" || __dybatpho_cache_refresh_status=$?
   ((__dybatpho_cache_refresh_status == 0)) || return "${__dybatpho_cache_refresh_status}"
-  printf '%s\n' "${__dybatpho_cache_refresh_output}" | dybatpho::cache_set "${__dybatpho_cache_refresh_key}"
+  printf '%s' "${__dybatpho_cache_refresh_output%.}" | dybatpho::cache_set "${__dybatpho_cache_refresh_key}"
 }
 
 #######################################
@@ -482,6 +499,7 @@ function dybatpho::cache_wait {
   local timeout="${2:-60}"
   [[ "${timeout}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${timeout}' is not a number of seconds"
+  __dybatpho_cache_decimal_into timeout
   local path lock start
   __dybatpho_cache_path_into path "${key}"
   lock="$(__dybatpho_cache_refresh_lock "${path}")"
@@ -573,6 +591,7 @@ function dybatpho::cache_run {
     || dybatpho::die "${FUNCNAME[0]}: '${__dybatpho_cache_run_ttl}' is not a number of seconds"
   [[ "${__dybatpho_cache_run_stale}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${__dybatpho_cache_run_stale}' is not a number of seconds for --stale"
+  __dybatpho_cache_decimal_into __dybatpho_cache_run_ttl __dybatpho_cache_run_stale
   ((__dybatpho_cache_run_stale == 0)) || __dybatpho_cache_need_lock
 
   local __dybatpho_cache_run_path __dybatpho_cache_run_age __dybatpho_cache_run_cached
@@ -580,27 +599,31 @@ function dybatpho::cache_run {
   if __dybatpho_cache_age __dybatpho_cache_run_age "${__dybatpho_cache_run_path}"; then
     if ((__dybatpho_cache_run_age < __dybatpho_cache_run_ttl)); then
       dybatpho::debug "cache: hit ${__dybatpho_cache_run_key}"
-      __dybatpho_cache_run_cached="$(< "${__dybatpho_cache_run_path}")"
-      printf '%s\n' "${__dybatpho_cache_run_cached}"
+      cat -- "${__dybatpho_cache_run_path}"
       return 0
     fi
     if ((__dybatpho_cache_run_stale > 0)) \
       && ((__dybatpho_cache_run_age < __dybatpho_cache_run_ttl + __dybatpho_cache_run_stale)); then
-      __dybatpho_cache_run_cached="$(< "${__dybatpho_cache_run_path}")"
+      # Read before the refresh starts, and with a `.` after it so `$(...)`
+      # keeps the entry's trailing newlines.
+      __dybatpho_cache_run_cached="$(cat -- "${__dybatpho_cache_run_path}" && printf '.')"
       __dybatpho_cache_refresh_background "${__dybatpho_cache_run_key}" "${__dybatpho_cache_run_path}" "$@"
-      printf '%s\n' "${__dybatpho_cache_run_cached}"
+      printf '%s' "${__dybatpho_cache_run_cached%.}"
       return 0
     fi
   fi
 
   dybatpho::debug "cache: miss ${__dybatpho_cache_run_key}, running $1"
+  # The `.` keeps the trailing newlines `$(...)` would strip, so the output is
+  # stored and printed exactly as the command wrote it.
   local __dybatpho_cache_run_output __dybatpho_cache_run_status=0
-  __dybatpho_cache_run_output="$("$@")" || __dybatpho_cache_run_status=$?
+  __dybatpho_cache_run_output="$("$@" && printf '.')" || __dybatpho_cache_run_status=$?
   if ((__dybatpho_cache_run_status != 0)); then
     return "${__dybatpho_cache_run_status}"
   fi
-  printf '%s\n' "${__dybatpho_cache_run_output}" | dybatpho::cache_set "${__dybatpho_cache_run_key}"
-  printf '%s\n' "${__dybatpho_cache_run_output}"
+  __dybatpho_cache_run_output="${__dybatpho_cache_run_output%.}"
+  printf '%s' "${__dybatpho_cache_run_output}" | dybatpho::cache_set "${__dybatpho_cache_run_key}"
+  printf '%s' "${__dybatpho_cache_run_output}"
 }
 
 #######################################
@@ -726,6 +749,7 @@ function dybatpho::cache_prune {
     || dybatpho::die "${FUNCNAME[0]}: '${older_than}' is not a number of seconds"
   [[ -z "${max_entries}" || "${max_entries}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${max_entries}' is not a number of entries"
+  __dybatpho_cache_decimal_into older_than max_entries
   if [[ -n "${max_size}" ]]; then
     __dybatpho_cache_bytes max_bytes "${max_size}" \
       || dybatpho::die "${FUNCNAME[0]}: '${max_size}' is not a size; use bytes or a K, M, or G suffix"
@@ -829,6 +853,7 @@ function dybatpho::cache_stats {
   done
   [[ "${ttl}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${ttl}' is not a number of seconds"
+  __dybatpho_cache_decimal_into ttl
 
   local -a records=()
   __dybatpho_cache_scan records

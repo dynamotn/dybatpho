@@ -494,6 +494,39 @@ teardown() {
   rm -rf "${legacy_path}"
 }
 
+@test "a live lock in the older directory form is not acquired over" {
+  # `ln -s` onto a directory puts the link inside it and succeeds, which read
+  # as a claim while the older holder was still running.
+  sleep 120 &
+  local holder_pid=$!
+  local legacy_path
+  legacy_path="$(dybatpho::lock_path "legacy-live")"
+  mkdir "${legacy_path}"
+  printf '%s' "${holder_pid}" > "${legacy_path}/pid"
+  printf '%s' "$(dybatpho::lock_hostname)" > "${legacy_path}/host"
+
+  run_traced --separate-stderr dybatpho::lock_acquire "legacy-live"
+  assert_failure
+  assert_equal "$(find "${legacy_path}" -type l | wc -l)" "0"
+
+  kill "${holder_pid}" 2> /dev/null || true
+  rm -rf "${legacy_path}"
+}
+
+@test "a link to a directory planted at the lock name is not acquired through" {
+  # `ln -s` follows the planted link and makes its own inside the directory,
+  # and the name still reads as a link, so every caller took the lock.
+  local elsewhere="${BATS_TEST_TMPDIR}/elsewhere"
+  mkdir "${elsewhere}"
+  ln -s "${elsewhere}" "${BATS_TEST_TMPDIR}/planted.lock"
+
+  run_traced --separate-stderr dybatpho::lock_acquire "${BATS_TEST_TMPDIR}/planted.lock"
+  assert_failure
+  assert_stderr --partial "Could not acquire lock"
+  run find "${elsewhere}" -mindepth 1
+  assert_output ""
+}
+
 @test "dybatpho::lock_semaphore_acquire hands out each slot once, then refuses" {
   local first second
   run_traced dybatpho::lock_semaphore_acquire "pool" 2 0 first
@@ -697,7 +730,11 @@ _replay_reclaim_race() {
   __dybatpho_lock_identity() {
     printf '.' >> "${RACE_READS}"
     if [[ "$(< "${RACE_READS}")" == "..." ]]; then
-      [[ -z "${RACE_THIRD}" ]] || ln -s "${RACE_THIRD}" "${RACE_LOCK}"
+      case ${RACE_THIRD} in
+        '') ;;
+        @dir) mkdir "${RACE_LOCK}" ;;
+        *) ln -s "${RACE_THIRD}" "${RACE_LOCK}" ;;
+      esac
       printf '%s\n' "${RACE_FRESH}"
       return 0
     fi
@@ -732,4 +769,20 @@ _replay_reclaim_race() {
   assert_equal "$(readlink "${lock_path}")" "${third}"
   assert_stderr --partial "Lock ${lock_path} changed hands while it was being reclaimed"
   rm -f -- "${lock_path}" "${lock_path}".stale.*
+}
+
+@test "dybatpho::lock_reclaim_stale keeps a live lock when a directory is planted before it is put back" {
+  # `ln -s` put the link inside the directory and reported success, so the live
+  # lock moved aside was deleted and its holder no longer held anything.
+  local lock_path dead fresh
+  lock_path="$(dybatpho::lock_path "planted-dir")"
+  dead="${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z"
+  fresh="$$:$(dybatpho::lock_hostname):2026-01-02T00:00:00Z"
+  ln -s "${dead}" "${lock_path}"
+  _replay_reclaim_race "${lock_path}" "${fresh}" "@dir"
+  run_traced -0 --separate-stderr dybatpho::lock_reclaim_stale "${lock_path}"
+  assert_stderr --partial "Lock ${lock_path} changed hands while it was being reclaimed"
+  run_traced -0 compgen -G "${lock_path}.stale.*"
+  run_traced -1 compgen -G "${lock_path}/*"
+  rm -rf -- "${lock_path}" "${lock_path}".stale.*
 }

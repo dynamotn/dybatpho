@@ -188,6 +188,8 @@ fi
 - Describing a namespace that was never written, or with the time to live after `--json`.
 - An accessor is given a key that cannot be a file name from inside a condition.
 - The cache directory is relative and begins with a dash, or holds links, directories or hidden files with the entry suffix.
+- A time to live, grace window, wait, age or entry count is written with a leading zero, such as `08`.
+- A command prints trailing blank lines, or no final newline.
 
 ## Requirements *(mandatory)*
 
@@ -231,6 +233,8 @@ fi
 - **FR-029**: Falling back from an empty `DYBATPHO_CACHE_DIR` MUST happen in the caller's shell, so that with neither `XDG_CACHE_HOME` nor `HOME` set the public function stops instead of writing from `/`.
 - **FR-030**: A command run by `cache_run`, including its background refresh, MUST see the caller's variables: the runner MUST keep its state in prefixed locals.
 - **FR-031**: `cache_stats` and `cache_prune` MUST read the namespace in one listing, counting only regular, non-hidden files with the entry suffix, and every accessor MUST accept a cache directory beginning with a dash.
+- **FR-032**: Every number of seconds or entries MUST be read in base 10, so a leading zero never makes it octal.
+- **FR-033**: `dybatpho::cache_run` MUST print and store the command's output byte for byte, trailing newlines included, on a miss, a hit and a stale hit.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -293,6 +297,8 @@ fi
 - **IT-035**: Store an entry with the cache directory emptied and no home, under `if !`, and stop naming `dybatpho::cache_set`.
 - **IT-036**: Run a command through `cache_run` that reads variables named like the runner's locals, and see the caller's values.
 - **IT-037**: Count and prune a namespace that also holds a link, a directory and a hidden file with the suffix; set, describe, forget and clear in a cache directory named `-cache`.
+- **IT-038**: Read an entry with a time to live of `08` and `09`, run, prune and describe with leading-zero values, and see no arithmetic error.
+- **IT-039**: Run a command printing trailing blank lines and one printing no final newline, and get the same bytes back on a miss, a hit and a stale hit.
 
 ## Acceptance Criteria *(mandatory)*
 

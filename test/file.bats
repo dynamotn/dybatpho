@@ -648,6 +648,30 @@ EOF
   assert_equal "$(cat "${BATS_TEST_TMPDIR}/nested/real")" "through"
 }
 
+@test "the file writers rewrite a file whose name is near the length limit" {
+  # The staging name carried the whole name plus about 34 bytes, past the
+  # 255-byte limit, so such a file could not be written at all.
+  local name
+  printf -v name 'x%.0s' {1..230}
+  printf 'old\n' > "${BATS_TEST_TMPDIR}/${name}"
+  printf 'new\n' | dybatpho::file_write_atomic "${BATS_TEST_TMPDIR}/${name}"
+  assert_equal "$(cat "${BATS_TEST_TMPDIR}/${name}")" "new"
+}
+
+@test "the file writers resolve a relative symlink below a symlinked directory" {
+  # `../t` from a link reached through `alias -> deep/b` is `deep/t`; folding
+  # `alias/..` away as text wrote a new `t` beside `alias` instead.
+  local work="${BATS_TEST_TMPDIR}/physical"
+  mkdir -p "${work}/deep/b"
+  printf 'original\n' > "${work}/deep/t"
+  ln -s "deep/b" "${work}/alias"
+  ln -s "../t" "${work}/deep/b/link"
+  printf 'through\n' | dybatpho::file_write_atomic "${work}/alias/link"
+  assert_equal "$(cat "${work}/deep/t")" "through"
+  refute [ -e "${work}/t" ]
+  assert [ -L "${work}/deep/b/link" ]
+}
+
 @test "DYBATPHO_FILE_FOLLOW_SYMLINKS=false replaces the symlink instead" {
   local repo="${BATS_TEST_TMPDIR}/repo2"
   mkdir -p "${repo}"

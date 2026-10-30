@@ -644,7 +644,9 @@ function __dybatpho_file_resolve_into {
       __dybatpho_file_resolve_dir="$(dybatpho::path_dirname "${__dybatpho_file_resolve_path}")"
       __dybatpho_file_resolve_target="${__dybatpho_file_resolve_dir}/${__dybatpho_file_resolve_target}"
     fi
-    __dybatpho_file_resolve_path="$(dybatpho::path_normalize "${__dybatpho_file_resolve_target}")"
+    # Not normalised: `dir/..` folded away as text is wrong when `dir` is itself
+    # a symlink, and the write landed in another file. The kernel resolves it.
+    __dybatpho_file_resolve_path="${__dybatpho_file_resolve_target}"
   done
   __dybatpho_file_resolve_ref="${__dybatpho_file_resolve_path}"
 }
@@ -694,6 +696,10 @@ function __dybatpho_file_staging_into {
   [[ "${__dybatpho_file_staging_path}" == */* ]] || __dybatpho_file_staging_dir="."
   [[ -n "${__dybatpho_file_staging_dir}" ]] || __dybatpho_file_staging_dir="/"
   __dybatpho_file_staging_base="${__dybatpho_file_staging_path##*/}"
+  # Cut in bytes, so the staging name still fits the 255-byte limit of a name
+  # the destination itself may already fill.
+  local LC_ALL=C
+  __dybatpho_file_staging_base="${__dybatpho_file_staging_base:0:100}"
 
   while ((__dybatpho_file_staging_try++ < 20)); do
     __dybatpho_file_staging_name="${__dybatpho_file_staging_dir%/}/.dybatpho_staging_${__dybatpho_file_staging_base}"

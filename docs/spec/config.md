@@ -188,9 +188,38 @@ and verify the comments, blank lines, order, and untouched keys all survive.
 6. **Given** the destination does not exist, **When** `config_save` runs,
    **Then** the file is created in the format its extension names
 
+### User Story 9 - Read one value from an INI file (Priority: P2)
+
+As a script author, I want one value out of an INI file another program owns,
+such as GTK's `settings.ini`, so that I can follow its settings without loading
+the file into my own configuration or hand-rolling a parser.
+
+**Independent Test**: Write an INI file with comments, sections, spaced and
+unspaced assignments, and two keys where one name is a prefix of the other,
+then read each value and a missing key.
+
+**Acceptance Scenarios**:
+
+1. **Given** `key = value` or `key=value`, **When** `config_ini_get` reads the
+   key, **Then** it prints the value with the whitespace around it removed
+2. **Given** `gtk-cursor-theme-name` and `gtk-cursor-theme-size`, **When**
+   either is read, **Then** only the exact key answers
+3. **Given** a section name, **When** a key is read, **Then** only entries in
+   that section count; with no section every section counts, and an empty name
+   reads only the entries above the first header
+4. **Given** comment lines starting with `;` or `#`, **When** a key is read,
+   **Then** they are skipped, while a `#` inside a value is kept
+5. **Given** a key that is absent, **When** it is read, **Then** nothing is
+   printed and the call returns 1; **Given** a file that cannot be read,
+   **Then** it reports an error and returns 2
+
 ### Example Workflow
 
 ```bash
+# Read one setting from a file another program owns.
+cursor="$(dybatpho::config_ini_get ~/.config/gtk-3.0/settings.ini \
+  gtk-cursor-theme-name Settings)" || cursor="Adwaita"
+
 # Layer files, then overlay the environment.
 dybatpho::config_load defaults.env production.yaml
 dybatpho::config_load --optional /etc/app.local.env
@@ -256,6 +285,9 @@ dybatpho::config_save ./config.yaml PORT
   be rejected instead of loaded under positional keys.
 - `DYBATPHO_DRY_RUN` is set, so a save reports the write instead of performing it.
 - A numeric value saved to a structured file is written with leading zeros, such as `0080`.
+- An INI key is a prefix of another key, appears in several sections or twice
+  in one, sits above the first header, or has a value holding `#`, `;` or
+  surrounding whitespace; the file ends without a newline or with CRLF lines.
 
 ## Requirements *(mandatory)*
 
@@ -331,6 +363,9 @@ dybatpho::config_save ./config.yaml PORT
   MUST keep tabs, line breaks, and backslashes in values; the same data in
   JSON, YAML, and TOML MUST produce the same keys and values.
 - **FR-030**: `dybatpho::config_save` MUST write a numeric value of a numeric schema type without leading zeros, so the file it writes loads back.
+- **FR-031**: `config_ini_get` MUST print the value of a key from an INI file, matching the key whole, splitting the entry at its first `=`, and trimming the whitespace around key, value and section name, without touching the shared configuration map.
+- **FR-032**: `config_ini_get` MUST skip blank lines and lines starting with `;` or `#`, MUST restrict the lookup to the named section when one is given (an empty name meaning the entries above the first header), and MUST print the last match when the key appears more than once in scope.
+- **FR-033**: `config_ini_get` MUST return 1 with no output when the key is not found, and MUST report an error and return 2, rather than stop the script, when the file cannot be read.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -416,6 +451,8 @@ dybatpho::config_save ./config.yaml PORT
   holding a tab and a backslash; then verify a `config:server.port` binding
   reads the nested value.
 - **IT-022**: Save `0080` and `00.50` to TOML, JSON and YAML, load each file back, and get `80` and `0.50`.
+- **IT-023**: Read spaced, unspaced, prefix-sharing, sectioned, top-level, repeated and CRLF entries from an INI file with comments, and verify a `#` inside a value survives.
+- **IT-024**: Read a missing key, a key from the wrong section, and a missing file, and verify the exit codes 1, 1 and 2 and that the configuration map is untouched.
 
 ## Acceptance Criteria *(mandatory)*
 

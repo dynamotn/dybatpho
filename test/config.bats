@@ -761,3 +761,54 @@ require_tool() {
   run grep -c '0080' "${BATS_TEST_TMPDIR}/app.toml"
   assert_output "0"
 }
+
+@test "config_ini_get reads exact keys from sections, skipping comments" {
+  local ini="${BATS_TEST_TMPDIR}/settings.ini"
+  # The CRLF line and the missing final newline go through printf, which a
+  # here-document could not carry.
+  printf '%s\n' \
+    '; GTK settings' \
+    '# written by hand' \
+    'top=level' \
+    '' \
+    '[Settings]' \
+    'gtk-cursor-theme-name = Breeze' \
+    'gtk-cursor-theme-size=24' \
+    '  gtk-color = #ffffff ; kept  ' \
+    'gtk-cursor-theme-size = 32' \
+    'not an entry' \
+    '[ Other ]' > "${ini}"
+  printf 'gtk-cursor-theme-name=Other\r\nlast = no newline' >> "${ini}"
+
+  run_traced dybatpho::config_ini_get "${ini}" gtk-cursor-theme-name Settings
+  assert_success
+  assert_output "Breeze"
+  run_traced dybatpho::config_ini_get "${ini}" gtk-cursor-theme-size Settings
+  assert_output "32"
+  run_traced dybatpho::config_ini_get "${ini}" gtk-color Settings
+  assert_output "#ffffff ; kept"
+  run_traced dybatpho::config_ini_get "${ini}" gtk-cursor-theme-name Other
+  assert_output "Other"
+  run_traced dybatpho::config_ini_get "${ini}" last
+  assert_output "no newline"
+  run_traced dybatpho::config_ini_get "${ini}" gtk-cursor-theme-name
+  assert_output "Other"
+  run_traced dybatpho::config_ini_get "${ini}" top ""
+  assert_output "level"
+}
+
+@test "config_ini_get reports a missing key and an unreadable file" {
+  local ini="${BATS_TEST_TMPDIR}/settings.ini"
+  printf '[Settings]\ngtk-cursor-theme-name=Breeze\n# hidden=yes\n' > "${ini}"
+
+  run_traced -1 dybatpho::config_ini_get "${ini}" gtk-cursor-theme Settings
+  assert_output ""
+  run_traced -1 dybatpho::config_ini_get "${ini}" gtk-cursor-theme-name Other
+  assert_output ""
+  run_traced -1 dybatpho::config_ini_get "${ini}" gtk-cursor-theme-name ""
+  run_traced -1 dybatpho::config_ini_get "${ini}" hidden
+  run_traced -2 --separate-stderr dybatpho::config_ini_get "${BATS_TEST_TMPDIR}/missing.ini" key
+  assert_output ""
+  assert_stderr --partial "Cannot read INI file"
+  assert_equal "${#DYBATPHO_CONFIG[@]}" 0
+}

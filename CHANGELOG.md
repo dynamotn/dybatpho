@@ -11,6 +11,29 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Added
+
+- **`file` — `dybatpho::xdg_runtime_dir` prints the directory for sockets,
+  locks and other per-session files.** It reads `XDG_RUNTIME_DIR`, ignores a
+  relative value as the other XDG helpers do, and appends an application name
+  when given one. The specification gives this directory no default, so the
+  call fails with an error, returning 1 rather than stopping the script, unless
+  the caller passes an absolute fallback as the second argument:
+  `dybatpho::xdg_runtime_dir myapp "/tmp/myapp-${UID}"`.
+- **`git` — `dybatpho::git_common_dir` and `dybatpho::git_branch_exists`.**
+  `dybatpho::git_common_dir [repo]` prints the absolute path of the Git
+  directory every worktree shares, so a script inside a linked worktree can
+  find the main checkout's `.git`. `dybatpho::git_branch_exists <branch>
+  [repo]` answers, without output, whether `refs/heads/<branch>` exists; a tag
+  or a remote-tracking branch of that name does not count.
+- **`config` — `dybatpho::config_ini_get <file> <key> [section]` reads one
+  value from an INI file**, such as GTK's `settings.ini`, without loading it
+  into the configuration. It handles `key = value` and `key=value`, `[section]`
+  headers, and `;` and `#` comment lines, matches keys whole so
+  `gtk-cursor-theme-name` never answers for `gtk-cursor-theme-size`, trims the
+  value, and returns 1 when the key is missing and 2 when the file cannot be
+  read.
+
 ### Changed
 
 - **`math` — long values add, subtract, multiply, divide and take roots

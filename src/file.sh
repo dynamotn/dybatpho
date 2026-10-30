@@ -1374,6 +1374,57 @@ function dybatpho::xdg_state_dir {
 }
 
 #######################################
+# @description Print the directory a program's runtime files belong in: its
+#   sockets, named pipes, lock files and markers that must not outlive the
+#   login session.
+#   Unlike the other XDG directories, the specification gives this one no
+#   default below HOME, so with `XDG_RUNTIME_DIR` unset or relative the
+#   function fails rather than guess, unless the caller names a fallback.
+# @example
+#   local runtime
+#   runtime="$(dybatpho::xdg_runtime_dir myapp)" || exit 1
+#   lock="${runtime}/myapp.lock"
+#
+# @example
+#   # A per-user directory under /tmp when there is no session to speak of.
+#   marks="$(dybatpho::xdg_runtime_dir myapp "${TMPDIR:-/tmp}/myapp-$(id -u)")"
+#
+# @arg $1 string? Application name appended to the directory
+# @arg $2 string? Absolute base directory used when `XDG_RUNTIME_DIR` is unset
+#   or relative; the application name is appended to it as well
+# @env XDG_RUNTIME_DIR string Base runtime directory, ignored when relative
+# @stdout The runtime directory
+# @stderr An error naming the cause when there is no directory to print
+# @exitcode 0 The directory was printed
+# @exitcode 1 `XDG_RUNTIME_DIR` is unset or relative and no fallback was given,
+#   or the fallback is not an absolute path
+# @tip It returns instead of stopping the script, so the failure survives a
+#   command substitution; check the status, as the first example does
+#######################################
+function dybatpho::xdg_runtime_dir {
+  local application="${1-}" fallback="${2-}" base="${XDG_RUNTIME_DIR-}"
+  # The specification says a relative value must be treated as unset.
+  if [[ "${base}" != /* ]]; then
+    if [[ -z "${fallback}" ]]; then
+      dybatpho::error "${FUNCNAME[0]}: XDG_RUNTIME_DIR is not set to an absolute path, and no fallback was given"
+      return 1
+    fi
+    if [[ "${fallback}" != /* ]]; then
+      dybatpho::error "${FUNCNAME[0]}: Fallback must be an absolute path: ${fallback}"
+      return 1
+    fi
+    base="${fallback}"
+  fi
+  if [[ -n "${application}" ]]; then
+    dybatpho::path_join "${base}" "${application}"
+  elif [[ "${base}" == / ]]; then
+    printf '/\n'
+  else
+    printf '%s\n' "${base%/}"
+  fi
+}
+
+#######################################
 # @description Print when a file was last modified, as a Unix timestamp.
 # @example
 #   modified="$(dybatpho::file_mtime "${cache}")"

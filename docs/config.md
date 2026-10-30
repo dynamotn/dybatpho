@@ -44,6 +44,7 @@ rather than as strings.
 - [`dybatpho::config_env`](#dybatphoconfig_env) — Load environment variables after an optional prefix.
 - [`dybatpho::config_set`](#dybatphoconfig_set) — Set a configuration value in memory. The value joins the ones loaded from files and the environment, so a later `dybatpho::config_validate` checks it like any other, and `dybatpho::config_save` can write it back to a file.
 - [`dybatpho::config_get`](#dybatphoconfig_get) — Print a configuration value.
+- [`dybatpho::config_ini_get`](#dybatphoconfig_ini_get) — Print one value from an INI file, without loading the file into the configuration. Each line is read on its own: blank lines and lines whose first non-blank character is `;` or `#` are skipped, `[name]` opens a section, and `key = value` or `key=value` is an entry, split at the first `=`. The key must match whole, so `gtk-cursor-theme-name` never answers for `gtk-cursor-theme-size`. Keys and section names are compared as they are written, case included.
 - [`dybatpho::config_require`](#dybatphoconfig_require) — Require configuration keys to be present.
 - [`dybatpho::config_export`](#dybatphoconfig_export) — Export loaded values as shell variables.
 - [`dybatpho::config_save`](#dybatphoconfig_save) — Write configuration values back to a file, in the format that file already uses. The extension selects the format, the file is created when it does not exist, and the rewrite is atomic, so a reader sees either the previous file or the complete new one. A dotenv file keeps its comments, blank lines, and assignment order; JSON, YAML, and TOML are rewritten with `jq` and `yq`, which leaves the keys this call does not name untouched. A value is written as a number or a boolean only when `dybatpho::config_schema` declared it as `int` or `bool`; otherwise it is written as a string.
@@ -225,6 +226,59 @@ Print a configuration value.
 **🚦 Exit codes**
 
 - `1`: Key is missing and no default was supplied
+
+---
+
+### `dybatpho::config_ini_get`
+
+Print one value from an INI file, without loading the file into
+the configuration.
+Each line is read on its own: blank lines and lines whose first non-blank
+character is `;` or `#` are skipped, `[name]` opens a section, and
+`key = value` or `key=value` is an entry, split at the first `=`. The key
+must match whole, so `gtk-cursor-theme-name` never answers for
+`gtk-cursor-theme-size`. Keys and section names are compared as they are
+written, case included.
+
+**🧪 Examples**
+
+```bash
+theme="$(dybatpho::config_ini_get ~/.config/gtk-3.0/settings.ini \
+  gtk-cursor-theme-name Settings)" || theme="Adwaita"
+
+```
+
+```bash
+# An empty section name reads only the entries above the first header.
+dybatpho::config_ini_get ./tool.ini verbose ""
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | INI file |
+| `$2` | string | yes |  | Key |
+| `$3` | string | no |  | Section; when omitted the key is looked up in every section, and an empty name means the entries above the first header |
+
+**📝 Notes**
+
+- The value is taken as written after the `=`: quotes are kept and a `;` or `#` inside it is part of the value, not a comment, so a colour such as `#ffffff` survives. When the key appears more than once in scope, the last one wins, as a later file does in `dybatpho::config_load`.
+
+**📤 Output on stdout**
+
+- The value, with the whitespace around it removed
+
+**📤 Output on stderr**
+
+- An error when the file cannot be read
+
+**🚦 Exit codes**
+
+- `0`: The key was found
+- `1`: The key is not in the file, or not in the section asked for
+- `2`: The file does not exist or cannot be read
 
 ---
 

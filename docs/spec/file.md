@@ -236,6 +236,9 @@ As a tool author, I want the directories the XDG Base Directory specification de
 3. **Given** a variable holds a relative path, **When** the directory is read, **Then** it is ignored and the default is used, as the specification requires
 4. **Given** an application name, **When** a directory is read, **Then** the name is appended
 5. **Given** the directory does not exist, **When** it is read, **Then** nothing is created, because building a path and creating one are separate decisions
+6. **Given** `XDG_RUNTIME_DIR` holds an absolute path, **When** the runtime directory is read, **Then** that path is used, scoped to the application name when one is given
+7. **Given** `XDG_RUNTIME_DIR` is unset or relative and no fallback is given, **When** the runtime directory is read, **Then** an error is reported and the call returns 1, because the specification gives that directory no default
+8. **Given** `XDG_RUNTIME_DIR` is unset or relative and an absolute fallback is given, **When** the runtime directory is read, **Then** the fallback is used in its place; a relative fallback is refused like the variable
 
 ---
 
@@ -289,6 +292,7 @@ dybatpho::show_file "${report_file}"
 - A path, or the target of a link a writer follows, holds a newline.
 - A directory handed to `find_up`, `dir_size` or the tree walk is relative and `CDPATH` is set, or its name is `-` or begins with a dash.
 - The regular files under a directory add up to more than 2 GiB.
+- `XDG_RUNTIME_DIR` is unset, relative, or `/`, with or without a fallback, and the runtime directory is read inside a command substitution.
 
 ## Requirements *(mandatory)*
 
@@ -347,6 +351,8 @@ dybatpho::show_file "${report_file}"
 - **FR-051**: `path_normalize` and `path_relative` MUST keep a path component that holds a newline whole, so a writer following a link and a guard checking a path act on the path given.
 - **FR-052**: `find_up`, `dir_size` and the tree walk MUST resolve a relative directory against the working directory whatever `CDPATH` holds, and MUST treat a directory named `-` or beginning with a dash as a directory.
 - **FR-053**: `dir_size` MUST report totals past 2 GiB exactly, whichever `awk` is installed.
+- **FR-054**: `xdg_runtime_dir` MUST print `XDG_RUNTIME_DIR`, joined with the application name when one is given, and MUST ignore the variable when it is relative.
+- **FR-055**: Without a usable `XDG_RUNTIME_DIR`, `xdg_runtime_dir` MUST use the absolute fallback passed as its second argument, and MUST otherwise report an error on stderr and return 1 rather than stop the script, so the failure survives a command substitution; a relative fallback MUST be refused the same way.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -418,6 +424,8 @@ dybatpho::show_file "${report_file}"
 - **IT-037**: Normalize and relate paths holding a newline, and write through a link to such a name without touching the shorter name.
 - **IT-038**: Search up from, and walk, a relative directory with `CDPATH` pointing at a decoy, and a directory named `-`.
 - **IT-039**: Measure a directory named `-d`, and a sparse tree of 4 GiB.
+- **IT-040**: Read the runtime directory from an absolute `XDG_RUNTIME_DIR` with and without an application name and with a trailing slash, and fail with an error when it is unset or relative.
+- **IT-041**: Read the runtime directory through an absolute fallback, with and without an application name and for `/`, and refuse a relative fallback.
 
 ## Acceptance Criteria *(mandatory)*
 

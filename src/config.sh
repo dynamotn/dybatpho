@@ -322,6 +322,73 @@ function dybatpho::config_get {
 }
 
 #######################################
+# @description Print one value from an INI file, without loading the file into
+#   the configuration.
+#   Each line is read on its own: blank lines and lines whose first non-blank
+#   character is `;` or `#` are skipped, `[name]` opens a section, and
+#   `key = value` or `key=value` is an entry, split at the first `=`. The key
+#   must match whole, so `gtk-cursor-theme-name` never answers for
+#   `gtk-cursor-theme-size`. Keys and section names are compared as they are
+#   written, case included.
+# @example
+#   theme="$(dybatpho::config_ini_get ~/.config/gtk-3.0/settings.ini \
+#     gtk-cursor-theme-name Settings)" || theme="Adwaita"
+#
+# @example
+#   # An empty section name reads only the entries above the first header.
+#   dybatpho::config_ini_get ./tool.ini verbose ""
+#
+# @arg $1 string INI file
+# @arg $2 string Key
+# @arg $3 string? Section; when omitted the key is looked up in every section,
+#   and an empty name means the entries above the first header
+# @stdout The value, with the whitespace around it removed
+# @stderr An error when the file cannot be read
+# @exitcode 0 The key was found
+# @exitcode 1 The key is not in the file, or not in the section asked for
+# @exitcode 2 The file does not exist or cannot be read
+# @note The value is taken as written after the `=`: quotes are kept and a
+#   `;` or `#` inside it is part of the value, not a comment, so a colour such
+#   as `#ffffff` survives. When the key appears more than once in scope, the
+#   last one wins, as a later file does in `dybatpho::config_load`.
+#######################################
+function dybatpho::config_ini_get {
+  local file key
+  dybatpho::expect_args file key -- "$@"
+  local any_section=true section=""
+  if (($# > 2)); then
+    any_section=false
+    section="$3"
+  fi
+  if [[ ! -f "${file}" || ! -r "${file}" ]]; then
+    dybatpho::error "${FUNCNAME[0]}: Cannot read INI file: ${file}"
+    return 2
+  fi
+  local line current="" entry_key value found=false
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "${line}" || "${line}" == [\;#]* ]] && continue
+    if [[ "${line}" == "["*"]" ]]; then
+      current="${line:1:${#line}-2}"
+      current="${current#"${current%%[![:space:]]*}"}"
+      current="${current%"${current##*[![:space:]]}"}"
+      continue
+    fi
+    [[ "${line}" == *=* ]] || continue
+    [[ "${any_section}" == true || "${current}" == "${section}" ]] || continue
+    entry_key="${line%%=*}"
+    entry_key="${entry_key%"${entry_key##*[![:space:]]}"}"
+    [[ "${entry_key}" == "${key}" ]] || continue
+    value="${line#*=}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    found=true
+  done < "${file}" # kcov(skip)
+  [[ "${found}" == true ]] || return 1
+  printf '%s\n' "${value}"
+}
+
+#######################################
 # @description Require configuration keys to be present.
 # @arg $@ string Configuration keys
 # @exitcode 1 At least one key is missing

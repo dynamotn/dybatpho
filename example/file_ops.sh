@@ -7,9 +7,9 @@
 # @description
 #   Demonstrates dybatpho::create_temp, show_file, path_basename, path_dirname, path_extname, path_stem, path_join,
 #   path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, xdg_config_dir, xdg_cache_dir,
-#   xdg_data_dir, xdg_state_dir, create_temp_dir, file_mtime, dir_size, file_is_binary, file_write_atomic, file_replace,
-#   file_ensure_line, file_remove_line, file_hash, file_size, file_age_seconds, file_backup, find_up, ensure_dir, and
-#   temp cleanup behavior
+#   xdg_data_dir, xdg_state_dir, xdg_runtime_dir, create_temp_dir, file_mtime, dir_size, file_is_binary,
+#   file_write_atomic, file_replace, file_ensure_line, file_remove_line, file_hash, file_size, file_age_seconds,
+#   file_backup, find_up, ensure_dir, and temp cleanup behavior
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"
@@ -362,6 +362,19 @@ function _demo_xdg {
   # dyshellint disable=BSG083 # it falls back to the BSD form when GNU `stat` refuses `-c`
   mode=$(stat -c %a "${state}" 2> /dev/null || stat -f %Lp "${state}")
   dybatpho::info "Wrote ${state#"${WORKDIR}"/}/run with mode ${mode}"
+
+  # The runtime directory has no default in the specification: without
+  # XDG_RUNTIME_DIR it fails, unless the caller names a fallback of its own.
+  local runtime
+  runtime="$(XDG_RUNTIME_DIR="${WORKDIR}/run" dybatpho::xdg_runtime_dir myapp)"
+  dybatpho::info "runtime: ${runtime#"${WORKDIR}"/}"
+  if runtime="$(XDG_RUNTIME_DIR="" dybatpho::xdg_runtime_dir myapp 2> /dev/null)"; then
+    dybatpho::error "Expected xdg_runtime_dir to fail without XDG_RUNTIME_DIR"
+  else
+    dybatpho::warn "No XDG_RUNTIME_DIR and no fallback: xdg_runtime_dir refused"
+  fi
+  runtime="$(XDG_RUNTIME_DIR="" dybatpho::xdg_runtime_dir myapp "${WORKDIR}/fallback")"
+  dybatpho::info "runtime with a fallback: ${runtime#"${WORKDIR}"/}/myapp.lock"
 }
 
 # @description Run the `INSPECTING FILES AND TREES` section of this example.

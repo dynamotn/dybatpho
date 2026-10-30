@@ -4,7 +4,8 @@
 # @description
 #   Builds a three-layer configuration — a base dotenv file, a per-environment
 #   override and the process environment — then declares a schema and shows
-#   what validation catches. Every file it reads is written into a temporary
+#   what validation catches, then reads single values from an INI file with
+#   dybatpho::config_ini_get. Every file it reads is written into a temporary
 #   directory it removes on exit.
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 . "${SCRIPTDIR}/../init.sh" --modules config
@@ -92,3 +93,22 @@ dybatpho::config_set NOTE 'rewritten by config_save'
 dybatpho::config_save "${config_dir}/saved.env" PORT NOTE
 dybatpho::show_file "${config_dir}/saved.env"
 dybatpho::success "Rewrote saved.env in place"
+
+# An INI file another program owns is read one value at a time, without loading
+# it into the configuration. Keys match whole, so the `-size` key never answers
+# for `-name`, and a `#` inside a value is part of it.
+dybatpho::header "READING AN INI FILE"
+printf '%s\n' '; written by the GTK settings dialog' '[Settings]' \
+  'gtk-cursor-theme-name = Breeze' 'gtk-cursor-theme-size=24' \
+  'gtk-color = #3daee9' > "${config_dir}/settings.ini"
+cursor_name="$(dybatpho::config_ini_get "${config_dir}/settings.ini" gtk-cursor-theme-name Settings)" \
+  || cursor_name="Adwaita"
+cursor_size="$(dybatpho::config_ini_get "${config_dir}/settings.ini" gtk-cursor-theme-size Settings)" \
+  || cursor_size=24
+accent="$(dybatpho::config_ini_get "${config_dir}/settings.ini" gtk-color)" || accent="none"
+dybatpho::print "cursor: ${cursor_name} at ${cursor_size}px, accent ${accent}"
+if dybatpho::config_ini_get "${config_dir}/settings.ini" gtk-font-name Settings > /dev/null; then
+  dybatpho::error "Expected gtk-font-name to be missing"
+else
+  dybatpho::warn "gtk-font-name is not set; a caller falls back to its own default"
+fi

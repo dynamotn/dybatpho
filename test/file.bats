@@ -940,6 +940,39 @@ SCRIPT
   run_traced ! env -u XDG_CONFIG_HOME -u HOME bash "${script}" "${DYBATPHO_DIR}"
 }
 
+@test "dybatpho::xdg_runtime_dir reads XDG_RUNTIME_DIR and fails without it" {
+  # shellcheck disable=2030
+  local XDG_RUNTIME_DIR="${BATS_TEST_TMPDIR}/run/"
+  run_traced dybatpho::xdg_runtime_dir
+  assert_success
+  assert_output "${BATS_TEST_TMPDIR}/run"
+  run_traced dybatpho::xdg_runtime_dir myapp "/unused"
+  assert_output "${BATS_TEST_TMPDIR}/run/myapp"
+
+  XDG_RUNTIME_DIR="relative/run"
+  run_traced -1 --separate-stderr dybatpho::xdg_runtime_dir myapp
+  assert_output ""
+  assert_stderr --partial "XDG_RUNTIME_DIR is not set to an absolute path"
+  unset XDG_RUNTIME_DIR
+  run_traced -1 --separate-stderr dybatpho::xdg_runtime_dir
+  assert_stderr --partial "no fallback was given"
+}
+
+@test "dybatpho::xdg_runtime_dir falls back to an absolute directory the caller names" {
+  local XDG_RUNTIME_DIR=""
+  run_traced dybatpho::xdg_runtime_dir myapp "${BATS_TEST_TMPDIR}/fallback dir"
+  assert_success
+  assert_output "${BATS_TEST_TMPDIR}/fallback dir/myapp"
+  run_traced dybatpho::xdg_runtime_dir "" "${BATS_TEST_TMPDIR}/fallback/"
+  assert_output "${BATS_TEST_TMPDIR}/fallback"
+  run_traced dybatpho::xdg_runtime_dir "" /
+  assert_output "/"
+  run_traced -1 --separate-stderr dybatpho::xdg_runtime_dir myapp "relative"
+  assert_output ""
+  assert_stderr --partial "Fallback must be an absolute path: relative"
+  refute [ -e "${BATS_TEST_TMPDIR}/fallback dir" ]
+}
+
 @test "the XDG helpers only build a path, leaving creation to the caller" {
   local target
   local XDG_STATE_HOME="${BATS_TEST_TMPDIR}/xdg-state"

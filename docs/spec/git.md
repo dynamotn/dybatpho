@@ -105,6 +105,10 @@ dybatpho::git_changed_files "${root}" "${base}"
 - A range is empty.
 - A changed path holds a non-ASCII character, which Git C-quotes by default.
 - The caller's locale collates tag names differently from byte order.
+- The caller runs inside a linked worktree, whose own Git directory is not the
+  one the main checkout uses.
+- A tag or a remote-tracking branch has the name of a local branch that does
+  not exist.
 
 ### User Story - Ask whether a commit has landed (Priority: P2)
 
@@ -157,6 +161,33 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
    prints one tab-separated path and branch per worktree, the main one first,
    with `(detached)` and `(bare)` for those cases
 
+### User Story - Find the main checkout and the local branches (Priority: P2)
+
+As a hook or a helper script that may run inside a linked worktree, I want the
+absolute path of the Git directory every worktree shares, and a quiet yes or no
+on whether a local branch exists, so that I can reach the main checkout and
+decide between creating and switching to a branch without parsing `git`
+output myself.
+
+**Why this priority**: A worktree's own `.git` is a file, and its private Git
+directory holds none of the shared configuration, so a script that guesses the
+location writes to the wrong place.
+
+**Independent Test**: Build a temporary repository with a linked worktree, a
+tag and a remote-tracking branch, and ask both helpers from each checkout and
+from a subdirectory.
+
+**Acceptance Scenarios**:
+
+1. **Given** the main checkout or one of its subdirectories, **When**
+   `git_common_dir` runs, **Then** it prints the absolute path of its `.git`
+2. **Given** a linked worktree, **When** `git_common_dir` runs, **Then** it
+   prints the main checkout's `.git`, not the worktree's private directory
+3. **Given** a local branch, **When** `git_branch_exists` runs, **Then** it
+   succeeds without output; **Given** an unknown branch, an empty name, or a
+   name only a tag or a remote-tracking branch carries, **Then** it exits 1
+   without output
+
 ---
 
 ## Requirements *(mandatory)*
@@ -183,6 +214,14 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
 - **FR-B06**: `git_worktree_list` MUST print one `<path>\t<branch>` line per
   worktree, the main worktree first, with `(detached)` for a detached HEAD and
   `(bare)` for a bare repository, keeping paths with spaces whole.
+
+- **FR-C01**: `git_common_dir` MUST print the absolute path of the Git
+  directory shared by every worktree of the repository, the main checkout's
+  `.git` from inside a linked worktree, whatever subdirectory it is asked
+  from and without requiring Git 2.31.
+- **FR-C02**: `git_branch_exists` MUST take the branch first and the optional
+  repository path second, MUST exit 0 only when `refs/heads/<branch>` exists,
+  and MUST print nothing either way.
 
 - **FR-001**: All repository helpers MUST accept an optional repository path,
   defaulting to `.` where applicable.
@@ -252,6 +291,13 @@ shallow clone, stash entries, and linked worktrees whose paths contain spaces.
 - **IT-B04**: Tell a shallow clone from a full repository, count stash entries,
   and list worktrees with spaces, detached HEAD, and a bare main repository.
 - **IT-B05**: Verify every new helper fails clearly outside a worktree.
+
+- **IT-C01**: Print the common Git directory from the main checkout, a
+  subdirectory with a space in its name, a relative path, and a linked
+  worktree, and fail outside a worktree.
+- **IT-C02**: Tell an existing local branch from an unknown one, an empty
+  name, a tag, and a remote-tracking branch, with no output, from the
+  repository and from a linked worktree.
 
 - **IT-001**: Resolve root, branch, detached HEAD, and default branch fallbacks.
 - **IT-002**: Read commit hash, short hash, subject, and author.

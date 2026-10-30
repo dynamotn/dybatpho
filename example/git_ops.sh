@@ -9,8 +9,8 @@
 #              git_remote_url, git_has_remote, git_changed_files,
 #              git_has_commit, git_commits_between, git_commit_count,
 #              git_tags_containing, git_upstream, git_ahead_behind,
-#              git_state, git_is_shallow, git_stash_count, and
-#              git_worktree_list
+#              git_state, git_is_shallow, git_stash_count,
+#              git_worktree_list, git_common_dir, and git_branch_exists
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules git
@@ -158,6 +158,19 @@ function _main {
   while IFS=$'\t' read -r worktree_path worktree_branch; do
     dybatpho::print "  ${worktree_branch}  ${worktree_path#"${workspace}"/}"
   done <<< "${worktrees}"
+  # From inside the linked worktree, the shared Git directory still leads back
+  # to the main checkout, and a branch check needs no output parsing.
+  local common_dir
+  common_dir=$(dybatpho::git_common_dir "${workspace}/review tree")
+  dybatpho::info "Shared Git dir:    ${common_dir#"${workspace}"/}"
+  local branch_name
+  for branch_name in review release/2.0; do
+    if dybatpho::git_branch_exists "${branch_name}" "${workspace}/review tree"; then
+      dybatpho::info "Branch ${branch_name}: exists"
+    else
+      dybatpho::info "Branch ${branch_name}: missing, would be created"
+    fi
+  done
   dybatpho::success "Git operations demo complete"
 }
 

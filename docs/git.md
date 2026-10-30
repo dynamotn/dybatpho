@@ -18,6 +18,8 @@ information, listing changed files, and querying commit/tag relationships.
 ### 🚀 Highlights
 
 - [`dybatpho::git_root`](#dybatphogit_root) — Return the top-level directory of a Git repository.
+- [`dybatpho::git_common_dir`](#dybatphogit_common_dir) — Print the absolute path of the Git directory a repository shares between its worktrees. In the main checkout this is its own `.git`; inside a linked worktree it is still the main checkout's `.git`, not the worktree's private directory under `.git/worktrees/`, which is what a script needs to find the main checkout, its hooks, or its shared configuration from anywhere.
+- [`dybatpho::git_branch_exists`](#dybatphogit_branch_exists) — Return success when a local branch exists. Only `refs/heads/<branch>` is consulted, so a tag or a remote-tracking branch of the same name does not count, and nothing is printed.
 - [`dybatpho::git_branch`](#dybatphogit_branch) — Return the current branch name, or a short SHA in detached HEAD state.
 - [`dybatpho::git_default_branch`](#dybatphogit_default_branch) — Return the default branch of a Git repository.
 - [`dybatpho::git_commit_hash`](#dybatphogit_commit_hash) — Return the full SHA of a commit.
@@ -44,6 +46,14 @@ information, listing changed files, and querying commit/tag relationships.
 <a id="tips"></a>
 
 ## 💡 Tips
+
+**[`dybatpho::git_common_dir`](#dybatphogit_common_dir)**
+
+- For a worktree of a bare repository the common directory is the bare repository itself, so its parent is not a checkout there
+
+**[`dybatpho::git_branch_exists`](#dybatphogit_branch_exists)**
+
+- The branch comes first and the repository second, as in `dybatpho::git_has_remote`, so the repository can be left out
 
 **[`dybatpho::git_default_branch`](#dybatphogit_default_branch)**
 
@@ -78,6 +88,69 @@ Return the top-level directory of a Git repository.
 **📤 Output on stdout**
 
 - Absolute path to the repository root
+
+---
+
+### `dybatpho::git_common_dir`
+
+Print the absolute path of the Git directory a repository
+shares between its worktrees.
+In the main checkout this is its own `.git`; inside a linked worktree it is
+still the main checkout's `.git`, not the worktree's private directory under
+`.git/worktrees/`, which is what a script needs to find the main checkout,
+its hooks, or its shared configuration from anywhere.
+
+**🧪 Example**
+
+```bash
+local common main_checkout
+common="$(dybatpho::git_common_dir ".")"
+main_checkout="$(dybatpho::path_dirname "${common}")"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `.` | Repository path |
+
+**📤 Output on stdout**
+
+- Absolute path of the common Git directory
+
+**🚦 Exit codes**
+
+- `1`: Stop the script when the path is not inside a Git worktree
+
+---
+
+### `dybatpho::git_branch_exists`
+
+Return success when a local branch exists.
+Only `refs/heads/<branch>` is consulted, so a tag or a remote-tracking
+branch of the same name does not count, and nothing is printed.
+
+**🧪 Example**
+
+```bash
+if ! dybatpho::git_branch_exists "feature/login" "."; then
+  git switch -c "feature/login"
+fi
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Branch name, without `refs/heads/` |
+| `$2` | string | no | `.` | Repository path |
+
+**🚦 Exit codes**
+
+- `0`: The local branch exists
+- `1`: It does not
 
 ---
 

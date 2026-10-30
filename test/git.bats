@@ -802,3 +802,69 @@ function _track_git_remote {
     assert_output --partial 'Not a git repository'
   done
 }
+
+@test "dybatpho::git_common_dir finds the shared Git directory from any checkout" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  mkdir -p "${repo_path}/sub dir"
+  local worktree_path="${repo_path}.linked tree"
+  git -C "${repo_path}" worktree add -q "${worktree_path}" -b linked
+
+  run_traced dybatpho::git_common_dir "${repo_path}"
+  assert_success
+  assert_output "${repo_path}/.git"
+  run_traced dybatpho::git_common_dir "${repo_path}/sub dir"
+  assert_output "${repo_path}/.git"
+  run_traced dybatpho::git_common_dir "${worktree_path}"
+  assert_output "${repo_path}/.git"
+  cd "${worktree_path}"
+  run_traced dybatpho::git_common_dir
+  assert_output "${repo_path}/.git"
+  cd "${repo_path}"
+  run_traced dybatpho::git_common_dir "sub dir"
+  assert_output "${repo_path}/.git"
+  # From the top level Git answers `.git`, relative to the path it was given.
+  cd "${repo_path%/*}"
+  run_traced dybatpho::git_common_dir "${repo_path##*/}"
+  assert_output "${repo_path}/.git"
+}
+
+@test "dybatpho::git_branch_exists only counts local branches" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  git -C "${repo_path}" tag only-a-tag
+  git -C "${repo_path}" update-ref refs/remotes/origin/only-remote HEAD
+  git -C "${repo_path}" branch feature/login
+  local worktree_path="${repo_path}.linked"
+  git -C "${repo_path}" worktree add -q "${worktree_path}" -b linked
+
+  run_traced dybatpho::git_branch_exists main "${repo_path}"
+  assert_success
+  assert_output ""
+  run_traced dybatpho::git_branch_exists feature/login "${worktree_path}"
+  assert_success
+  run_traced dybatpho::git_branch_exists linked "${repo_path}"
+  assert_success
+  run_traced -1 dybatpho::git_branch_exists missing "${repo_path}"
+  assert_output ""
+  run_traced -1 dybatpho::git_branch_exists only-a-tag "${repo_path}"
+  run_traced -1 dybatpho::git_branch_exists only-remote "${repo_path}"
+  run_traced -1 dybatpho::git_branch_exists "" "${repo_path}"
+  cd "${repo_path}"
+  run_traced dybatpho::git_branch_exists main
+}
+
+@test "dybatpho::git_common_dir and git_branch_exists fail outside a repository" {
+  local outside_path
+  outside_path="$(_safe_git_test_root)/outside"
+  mkdir -p "${outside_path}"
+  # `run`, not `run_traced`: the refusal goes through `dybatpho::die`.
+  run dybatpho::git_common_dir "${outside_path}"
+  assert_failure
+  assert_output --partial "Not a git repository"
+  run dybatpho::git_branch_exists main "${outside_path}"
+  assert_failure
+  assert_output --partial "Not a git repository"
+}

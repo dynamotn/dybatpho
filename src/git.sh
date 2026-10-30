@@ -81,6 +81,62 @@ function dybatpho::git_root {
 }
 
 #######################################
+# @description Print the absolute path of the Git directory a repository
+#   shares between its worktrees.
+#   In the main checkout this is its own `.git`; inside a linked worktree it is
+#   still the main checkout's `.git`, not the worktree's private directory under
+#   `.git/worktrees/`, which is what a script needs to find the main checkout,
+#   its hooks, or its shared configuration from anywhere.
+# @example
+#   local common main_checkout
+#   common="$(dybatpho::git_common_dir ".")"
+#   main_checkout="$(dybatpho::path_dirname "${common}")"
+#
+# @arg $1 string [default: .] Repository path
+# @stdout Absolute path of the common Git directory
+# @exitcode 1 Stop the script when the path is not inside a Git worktree
+# @tip For a worktree of a bare repository the common directory is the bare
+#   repository itself, so its parent is not a checkout there
+#######################################
+function dybatpho::git_common_dir {
+  local repo_path common_dir
+  repo_path="${1:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
+  common_dir="$(__dybatpho_git "${repo_path}" rev-parse --git-common-dir)"
+  # Git answers relative to the directory it ran in when it can, and
+  # `--path-format=absolute` needs Git 2.31, so resolve it here instead.
+  if [[ "${common_dir}" != /* ]]; then
+    common_dir="$(CDPATH='' cd -- "${repo_path/#-/./-}" && CDPATH='' cd -- "${common_dir}" && pwd)"
+  fi
+  printf '%s\n' "${common_dir}"
+}
+
+#######################################
+# @description Return success when a local branch exists.
+#   Only `refs/heads/<branch>` is consulted, so a tag or a remote-tracking
+#   branch of the same name does not count, and nothing is printed.
+# @example
+#   if ! dybatpho::git_branch_exists "feature/login" "."; then
+#     git switch -c "feature/login"
+#   fi
+#
+# @arg $1 string Branch name, without `refs/heads/`
+# @arg $2 string [default: .] Repository path
+# @exitcode 0 The local branch exists
+# @exitcode 1 It does not
+# @tip The branch comes first and the repository second, as in
+#   `dybatpho::git_has_remote`, so the repository can be left out
+#######################################
+function dybatpho::git_branch_exists {
+  local branch_name repo_path
+  dybatpho::expect_args branch_name -- "$@"
+  repo_path="${2:-.}"
+  __dybatpho_git_expect_repo "${repo_path}"
+  [[ -n "${branch_name}" ]] || return 1
+  __dybatpho_git "${repo_path}" show-ref --verify --quiet "refs/heads/${branch_name}"
+}
+
+#######################################
 # @description Return the current branch name, or a short SHA in detached HEAD state.
 # @arg $1 string [default: .] Repository path
 # @stdout Current branch name or short SHA

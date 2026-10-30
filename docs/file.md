@@ -55,6 +55,7 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 - [`dybatpho::xdg_cache_dir`](#dybatphoxdg_cache_dir) — Print the directory a program's cache belongs in.
 - [`dybatpho::xdg_data_dir`](#dybatphoxdg_data_dir) — Print the directory a program's data belongs in.
 - [`dybatpho::xdg_state_dir`](#dybatphoxdg_state_dir) — Print the directory a program's state belongs in. State is what a program wants back on the next run but should not be backed up, such as logs and history, which is what separates it from data.
+- [`dybatpho::xdg_runtime_dir`](#dybatphoxdg_runtime_dir) — Print the directory a program's runtime files belong in: its sockets, named pipes, lock files and markers that must not outlive the login session. Unlike the other XDG directories, the specification gives this one no default below HOME, so with `XDG_RUNTIME_DIR` unset or relative the function fails rather than guess, unless the caller names a fallback.
 - [`dybatpho::file_mtime`](#dybatphofile_mtime) — Print when a file was last modified, as a Unix timestamp.
 - [`dybatpho::dir_size`](#dybatphodir_size) — Print the total size of the regular files in a directory tree. The result is the sum of the files' sizes rather than the disk space they occupy, so it matches `dybatpho::file_size` instead of `du`, whose block accounting and flags differ between platforms.
 - [`dybatpho::file_is_binary`](#dybatphofile_is_binary) — Return success when a file looks like binary rather than text. A NUL byte in the first block is the signal `grep` and `git` use, and it is what makes a file unsafe to pass through line-oriented tools.
@@ -114,6 +115,10 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 **[`dybatpho::xdg_config_dir`](#dybatphoxdg_config_dir)**
 
 - These helpers only build a path; pair them with `dybatpho::ensure_dir` when the directory has to exist
+
+**[`dybatpho::xdg_runtime_dir`](#dybatphoxdg_runtime_dir)**
+
+- It returns instead of stopping the script, so the failure survives a command substitution; check the status, as the first example does
 
 **[`dybatpho::file_mtime`](#dybatphofile_mtime)**
 
@@ -826,6 +831,58 @@ printf '%s\n' "${run_id}" | dybatpho::file_write_atomic "${state}/last-run"
 **🚦 Exit codes**
 
 - `1`: Neither `XDG_STATE_HOME` nor `HOME` is set
+
+---
+
+### `dybatpho::xdg_runtime_dir`
+
+Print the directory a program's runtime files belong in: its
+sockets, named pipes, lock files and markers that must not outlive the
+login session.
+Unlike the other XDG directories, the specification gives this one no
+default below HOME, so with `XDG_RUNTIME_DIR` unset or relative the
+function fails rather than guess, unless the caller names a fallback.
+
+**🧪 Examples**
+
+```bash
+local runtime
+runtime="$(dybatpho::xdg_runtime_dir myapp)" || exit 1
+lock="${runtime}/myapp.lock"
+
+```
+
+```bash
+# A per-user directory under /tmp when there is no session to speak of.
+marks="$(dybatpho::xdg_runtime_dir myapp "${TMPDIR:-/tmp}/myapp-$(id -u)")"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | Application name appended to the directory |
+| `$2` | string | no |  | Absolute base directory used when `XDG_RUNTIME_DIR` is unset or relative; the application name is appended to it as well |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`XDG_RUNTIME_DIR`** | string | Base runtime directory, ignored when relative |
+
+**📤 Output on stdout**
+
+- The runtime directory
+
+**📤 Output on stderr**
+
+- An error naming the cause when there is no directory to print
+
+**🚦 Exit codes**
+
+- `0`: The directory was printed
+- `1`: `XDG_RUNTIME_DIR` is unset or relative and no fallback was given, or the fallback is not an absolute path
 
 ---
 

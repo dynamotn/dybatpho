@@ -169,7 +169,11 @@ function __dybatpho_tui_hide_cursor {
   # kcov(disabled)
   dybatpho::tui_supported || return 0
   if [[ "${__dybatpho_tui_cursor_trapped}" != true ]]; then
-    dybatpho::trap "__dybatpho_tui_show_cursor" EXIT INT TERM
+    # A handler on INT or TERM replaces the signal's default, so it raises the
+    # signal again once the cursor is back: the script still ends with 128+n.
+    dybatpho::trap "__dybatpho_tui_show_cursor" EXIT
+    dybatpho::trap "__dybatpho_tui_on_signal INT" INT
+    dybatpho::trap "__dybatpho_tui_on_signal TERM" TERM
     __dybatpho_tui_cursor_trapped=true
   fi
   __dybatpho_tui_cursor_hidden=true
@@ -190,6 +194,18 @@ function __dybatpho_tui_show_cursor {
   printf '\033[?25h' >&2
   return 0
   # kcov(enabled)
+}
+
+#######################################
+# @description Show the cursor, then end the shell with the signal that
+#   interrupted it, as it would have ended without a handler.
+# @arg $1 string Signal name, `INT` or `TERM`
+# @internal
+#######################################
+function __dybatpho_tui_on_signal {
+  __dybatpho_tui_show_cursor
+  trap - "$1"
+  kill -s "$1" "${BASHPID}"
 }
 
 #######################################
@@ -791,7 +807,12 @@ function __dybatpho_tui_menu_fallback {
         dybatpho::error "${__dybatpho_tui_fb_prompt}: no answer, and no DYBATPHO_TUI_DEFAULT to fall back on"
         return 1
       fi
+      # A single choice starts on the first default, as the drawn menu does:
+      # the whole list would be refused as "one number only" and asked again
+      # from an input that has nothing left, forever.
       __dybatpho_tui_fb_answer="${DYBATPHO_TUI_DEFAULT}"
+      dybatpho::is true "${__dybatpho_tui_fb_multiple}" \
+        || __dybatpho_tui_fb_answer="${__dybatpho_tui_fb_defaults[0]}"
     fi
 
     # The positions are collected by walking the menu rather than the answer,

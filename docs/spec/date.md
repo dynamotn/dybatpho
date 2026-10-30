@@ -204,6 +204,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **FR-020**: On BusyBox, `dybatpho::date_parse` MUST read an ISO 8601 timestamp ending in `Z`, `+hhmm` or `+hh:mm` by applying the offset itself.
 - **FR-021**: `dybatpho::date_add` MUST shift a date that carries a time of day by a signed amount on every `date` flavor, and MUST read an amount with a leading zero in base ten; `dybatpho::date_seconds_to_hms` MUST read its argument in base ten and never print `-0:00:00`.
 - **FR-022**: Parsing MUST read an ISO 8601 date and time with a `Z`, `+HH:MM` or `+HHMM` offset on GNU, BSD and BusyBox `date`, and MUST reject one whose day the platform would roll over.
+- **FR-023**: `dybatpho::date_diff` MUST count days and weeks on the wall clock of `DYBATPHO_DATE_TIMEZONE`, so a span across a daylight-saving change counts its calendar days, while seconds, minutes and hours stay the time that elapsed.
+- **FR-024**: With GNU `date`, a bare `YYYY-MM-DD` whose midnight a clock change skips MUST parse as the moment the skipped hour ends, 01:00, rather than be refused.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -253,6 +255,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **IT-027**: On BusyBox, parse `2024-02-29T12:34:56Z`, `+02:00` and `-0130` and get `1709210096`, `1709202896` and `1709215496`.
 - **IT-028**: Shift `2024-01-01 10:00:00` by `-5 hours`, `-5 days` and `5 hours`; shift a date by `08` and `-08` days; write `08`, `-0090` and `-0` seconds as a length of time; refuse an empty date.
 - **IT-029**: Parse `2024-02-29T12:34:56` with `Z`, `+02:00` and `-0130` on every platform and with BSD `date` forced; refuse `2024-02-30T12:34:56Z`.
+- **IT-030**: In `America/New_York`, count 31 days from 2024-03-01 to 2024-04-01, 1 day across 2024-03-10 and -1 back across 2024-11-03, and 4 hours from midnight to 05:00 on 2024-03-10.
+- **IT-031**: In `America/Sao_Paulo` with GNU `date`, accept 2018-11-04, read it as 01:00, and end its month on 2018-11-30.
 
 ## Acceptance Criteria *(mandatory)*
 

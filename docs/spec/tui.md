@@ -256,6 +256,8 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   than a lone escape as the cancel key or leave part of it to be read as the
   next key.
 - **FR-027**: `tui_menu` and `tui_multi_menu` MUST write the choice into the variable the caller named, whatever that name is, including `prompt` and `result_var`.
+- **FR-028**: A widget that hid the cursor MUST, on INT or TERM, show it again and then end the script with the signal, status 128+n.
+- **FR-029**: A single-choice menu that cannot ask MUST take the first entry `DYBATPHO_TUI_DEFAULT` names when it names several, rather than ask again.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -312,6 +314,8 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   and a lone escape each decode to one key name, with no character left over.
 - **IT-014**: Choose from both menus into variables named `prompt` and `result_var`, and get the choice back.
 - **IT-015**: Under a pseudo-terminal, detection draws for `TERM=xterm` and falls back for `TERM=dumb`.
+- **IT-016**: Send TERM to a script while its progress bar is drawn, and get status 143 with the cursor shown again.
+- **IT-017**: With `DYBATPHO_TUI_DEFAULT=1,3` and nothing to read, get the first entry from a single-choice menu.
 
 ## Acceptance Criteria *(mandatory)*
 

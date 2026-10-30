@@ -495,16 +495,33 @@ function dybatpho::screen_put {
 
   # The indices are resolved against the row as it stands, so the flag is
   # updated only once the new text is in place.
-  local start_index end_index
+  local start_index end_index head tail
   if ((__dybatpho_screen_plain[row])); then
     start_index="${column}"
     end_index=$((column + width))
+    head="${__dybatpho_screen_text[row]:0:start_index}"
+    tail="${__dybatpho_screen_text[row]:end_index}"
   else
     __dybatpho_screen_index_into start_index "${row}" "${column}"
     __dybatpho_screen_index_into end_index "${row}" "$((column + width))"
+    head="${__dybatpho_screen_text[row]:0:start_index}"
+    tail="${__dybatpho_screen_text[row]:end_index}"
+    # A wide glyph the new text covers only half of cannot be half drawn: what
+    # is left of it becomes blanks, so the row keeps exactly its width.
+    local measured gap
+    __dybatpho_log_width_into measured "${head}"
+    if ((measured > column)); then
+      head="${head:0:${#head}-1}"
+      __dybatpho_log_width_into measured "${head}"
+      __dybatpho_log_repeat_into gap " " "$((column - measured))"
+      head+="${gap}"
+    fi
+    __dybatpho_log_width_into measured "${__dybatpho_screen_text[row]:0:end_index}"
+    if ((measured > column + width)); then
+      __dybatpho_log_repeat_into gap " " "$((measured - column - width))"
+      tail="${gap}${tail}"
+    fi
   fi
-  local head="${__dybatpho_screen_text[row]:0:start_index}"
-  local tail="${__dybatpho_screen_text[row]:end_index}"
   __dybatpho_screen_text[row]="${head}${drawn}${tail}"
 
   # A row keeps the fast column-to-index path as long as every character it
@@ -628,9 +645,14 @@ function dybatpho::screen_clear {
 # @exitcode 1 The size is unchanged
 #######################################
 function dybatpho::screen_size {
-  local width height
-  width="$(dybatpho::terminal_width 80)"
-  height="$(dybatpho::terminal_height 24)"
+  local width="" height=""
+  # The frame is drawn on the terminal the screen opened, so that is the one to
+  # measure: stdout and stderr may both be redirected while it draws.
+  if [[ -n "${__dybatpho_screen_fd}" ]]; then
+    read -r height width < <(stty size <&"${__dybatpho_screen_fd}" 2> /dev/null) || true
+  fi
+  [[ "${width}" =~ ^[1-9][0-9]*$ ]] || width="$(dybatpho::terminal_width 80)"
+  [[ "${height}" =~ ^[1-9][0-9]*$ ]] || height="$(dybatpho::terminal_height 24)"
   if ((width == DYBATPHO_SCREEN_WIDTH && height == DYBATPHO_SCREEN_HEIGHT)); then
     return 1
   fi
@@ -858,21 +880,25 @@ function __dybatpho_screen_layout_into {
     done
   fi
 
-  # Rounding loses a column or a row at a time; the last part that can take it
-  # absorbs the difference so the pieces tile the rectangle exactly.
+  # Rounding loses a column or a row at a time; the last flexible part that can
+  # take it without passing its `max:` absorbs the difference -- failing that
+  # the last part of any kind that can, then the last part -- so the pieces
+  # tile the rectangle exactly.
   local assigned=0
   for ((index = 0; index < count; index++)); do
     assigned=$((assigned + sizes[index]))
   done
   if ((assigned != total && count > 0)); then
-    local correction=$((total - assigned))
-    for ((index = count - 1; index >= 0; index--)); do
-      if ((weights[index] > 0 || count == 1)); then
-        sizes[index]=$((sizes[index] + correction))
-        ((sizes[index] >= 0)) || sizes[index]=0
-        break
-      fi
+    local correction=$((total - assigned)) absorber=-1 pass
+    for pass in flexible any; do
+      for ((index = count - 1; index >= 0 && absorber < 0; index--)); do
+        [[ "${pass}" == any ]] || ((weights[index] > 0)) || continue
+        ((caps[index] < 0 || sizes[index] + correction <= caps[index])) && absorber="${index}"
+      done
     done
+    ((absorber >= 0)) || absorber=$((count - 1))
+    sizes[absorber]=$((sizes[absorber] + correction))
+    ((sizes[absorber] >= 0)) || sizes[absorber]=0
   fi
 
   __dybatpho_screen_l_out=()
@@ -987,6 +1013,18 @@ function __dybatpho_screen_on_resize {
 }
 
 #######################################
+# @description Give the terminal back, then end the shell with the signal that
+#   interrupted it, as it would have ended without a handler.
+# @arg $1 string Signal name, `INT` or `TERM`
+# @internal
+#######################################
+function __dybatpho_screen_on_signal {
+  dybatpho::screen_end
+  trap - "$1"
+  kill -s "$1" "${BASHPID}"
+}
+
+#######################################
 # @description Take over the terminal: alternate screen, raw mode, hidden
 #   cursor, and mouse reporting.
 #
@@ -1027,7 +1065,11 @@ function dybatpho::screen_begin {
   stty raw -echo <&"${__dybatpho_screen_fd}" 2> /dev/null || true
 
   if [[ "${__dybatpho_screen_trapped}" != true ]]; then
-    dybatpho::trap "dybatpho::screen_end" EXIT INT TERM
+    # A handler on INT or TERM replaces the signal's default, so it raises the
+    # signal again once the terminal is back: the script still ends with 128+n.
+    dybatpho::trap "dybatpho::screen_end" EXIT
+    dybatpho::trap "__dybatpho_screen_on_signal INT" INT
+    dybatpho::trap "__dybatpho_screen_on_signal TERM" TERM
     dybatpho::trap "__dybatpho_screen_on_resize" WINCH
     __dybatpho_screen_trapped=true
   fi
@@ -1688,7 +1730,9 @@ function dybatpho::screen_table {
   local -a widths=()
   local sample="${header:-${__dybatpho_screen_table_rows[0]-}}"
   local -a sample_cells=()
-  IFS="${delimiter}" read -r -a sample_cells <<< "${sample}"
+  # Split on the delimiter as a whole string, as `table.sh` does: as `IFS` it
+  # was a set of characters, and `::` made every cell two.
+  __dybatpho_string_split_into sample_cells "${sample}" "${delimiter}"
   local column_count=${#sample_cells[@]}
   ((column_count > 0)) || return 0
 
@@ -1715,7 +1759,7 @@ function dybatpho::screen_table {
     local __dybatpho_screen_tr_line="$2"
     local -a __dybatpho_screen_tr_cells=()
     local __dybatpho_screen_tr_index __dybatpho_screen_tr_piece
-    IFS="${delimiter}" read -r -a __dybatpho_screen_tr_cells <<< "${__dybatpho_screen_tr_line}"
+    __dybatpho_string_split_into __dybatpho_screen_tr_cells "${__dybatpho_screen_tr_line}" "${delimiter}"
     __dybatpho_screen_tr_out=""
     for ((__dybatpho_screen_tr_index = 0;  \
     __dybatpho_screen_tr_index < column_count;  \
@@ -1844,21 +1888,22 @@ function dybatpho::screen_tabs {
   local divider="${options[divider]:- │ }"
   local divider_style="${options[divider_style]:-${DYBATPHO_SCREEN_STYLE_DIM}}"
 
-  local index column=0 piece piece_width
+  # Each piece is cut to what is left of the rectangle, so the tab that reaches
+  # the edge stops there rather than drawing over the panel beside it.
+  local index column=0 piece piece_width piece_style
   for index in "${!__dybatpho_screen_tabs_items[@]}"; do
     ((column < width)) || break
     if ((index > 0)); then
-      dybatpho::screen_put "${y}" "$((x + column))" "${divider}" "${divider_style}"
-      __dybatpho_log_width_into piece_width "${divider}"
+      __dybatpho_screen_truncate_into piece "${divider}" "$((width - column))"
+      dybatpho::screen_put "${y}" "$((x + column))" "${piece}" "${divider_style}"
+      __dybatpho_log_width_into piece_width "${piece}"
       column=$((column + piece_width))
     fi
-    piece=" ${__dybatpho_screen_tabs_items[index]} "
+    __dybatpho_screen_truncate_into piece " ${__dybatpho_screen_tabs_items[index]} " "$((width - column))"
     __dybatpho_log_width_into piece_width "${piece}"
-    if ((index == active)); then
-      dybatpho::screen_put "${y}" "$((x + column))" "${piece}" "${active_style}"
-    else
-      dybatpho::screen_put "${y}" "$((x + column))" "${piece}" "${style}"
-    fi
+    piece_style="${style}"
+    ((index == active)) && piece_style="${active_style}"
+    dybatpho::screen_put "${y}" "$((x + column))" "${piece}" "${piece_style}"
     column=$((column + piece_width))
   done
   return 0
@@ -2032,6 +2077,8 @@ function dybatpho::screen_barchart {
     point="${__dybatpho_screen_bar_data[index]}"
     [[ "${point}" =~ ^-?[0-9]+$ ]] || point=0
     ((point >= 0)) || point=0
+    # A value past `max:` fills its bar rather than running out of the rectangle.
+    ((point <= maximum)) || point="${maximum}"
     if ((label_width > 0)); then
       __dybatpho_screen_align_into padded "${__dybatpho_screen_bar_names[index]-}" "$((label_width - 1))" left
       dybatpho::screen_put "$((y + index))" "${x}" "${padded} " "0"

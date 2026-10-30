@@ -332,6 +332,21 @@ EOF
   assert_equal "${DYBATPHO_TUI_INDEX}" "3"
 }
 
+@test "dybatpho::tui_menu takes the first of several defaults when it cannot ask" {
+  # A single choice given `1,3` used to refuse it as "one number only" and ask
+  # again from an input with nothing left, forever; a child with a deadline
+  # keeps that from hanging the suite.
+  local script="${BATS_TEST_TMPDIR}/defaults.sh"
+  # shellcheck disable=SC2016 # expanded by the child shell
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules tui" \
+    'chosen=""' \
+    'DYBATPHO_TUI=never DYBATPHO_TUI_DEFAULT=1,3 dybatpho::tui_menu chosen "Environment?" dev staging prod' \
+    'printf "%s %s\n" "${chosen}" "${DYBATPHO_TUI_INDEX}"' > "${script}"
+  run_traced -0 --separate-stderr dybatpho::run_with_timeout 10 bash "${script}" < /dev/null
+  assert_output "dev 1"
+}
+
 @test "dybatpho::tui_menu fails rather than guessing when it can neither ask nor default" {
   local chosen=""
   run dybatpho::tui_menu chosen "Environment?" dev staging prod < /dev/null
@@ -346,6 +361,23 @@ EOF
   run dybatpho::tui_menu chosen "Environment?"
   assert_failure
   assert_output --partial "Expected at least one menu entry"
+}
+
+@test "the cursor handler restores the cursor and still lets TERM end the script" {
+  # A handler on a signal replaces what the signal does, so restoring the
+  # cursor alone left the script running after a `kill`. It restores, then
+  # raises the signal again: the script ends with 128+n, the cursor back.
+  local script="${BATS_TEST_TMPDIR}/signal.sh"
+  # shellcheck disable=SC2016 # expanded by the child shell
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules tui" \
+    'DYBATPHO_TUI=always' \
+    'dybatpho::tui_progress_start "Working" 2' \
+    'kill -s TERM "${BASHPID}"' \
+    'echo "still running"' > "${script}"
+  run_traced -143 --separate-stderr bash "${script}"
+  assert_output ""
+  [[ "${stderr}" == *$'\033[?25h'* ]] || fail "cursor not shown again: ${stderr}"
 }
 
 # =============================================================================

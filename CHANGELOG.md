@@ -128,6 +128,35 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`i18n` — loading a `.po` catalog and running `dybatpho::i18n_lint` on large
   catalogs are about ten times faster, and a `.po` translation ending in `\n`
   keeps that newline.**
+- **`tui`, `screen` — interrupting a script with Ctrl-C or `kill` while a widget
+  or full-screen app was running restores the terminal and ends the script with
+  status 128+n, instead of letting it carry on.**
+- **`tui` — `dybatpho::tui_menu` no longer loops forever when it cannot ask and
+  `DYBATPHO_TUI_DEFAULT` names several entries.** It takes the first one.
+- **`screen` — `dybatpho::screen_begin` sizes the screen from the terminal it
+  draws on, so an app whose stdout and stderr are redirected no longer falls
+  back to 80x24.**
+- **`screen` — `dybatpho::screen_put` blanks the rest of a wide character it
+  draws over, so the row no longer shifts by a column.**
+- **`screen` — `dybatpho::screen_barchart` keeps a value above `max:` inside its
+  rectangle, and `dybatpho::screen_tabs` cuts the tab that reaches the edge.**
+- **`screen` — `dybatpho::screen_layout` no longer grows a `max:` part past its
+  maximum, and percent-only layouts fill the whole rectangle.**
+- **`screen` — `dybatpho::screen_table` splits cells on a delimiter of several
+  characters, such as `::`.**
+- **`diff` — `dybatpho::diff_json` reports a difference between a dotted key and
+  a nested one, and between an array index and a key `"0"`.** It prints
+  backslashes once and compares a key named `""` correctly.
+- **`diff` — `dybatpho::diff_text` and `dybatpho::diff_summary` exit 2 when
+  `diff` cannot compare the inputs, such as an unreadable file, instead of
+  reporting a difference.**
+- **`markdown` — `dybatpho::md_escape` and the Markdown builders escape an
+  ordered-list marker as `1\.` instead of `\1.`, which rendered with a visible
+  backslash.**
+- **`date` — `dybatpho::date_diff` and `dybatpho::date_diff_days` count calendar
+  days and weeks correctly across a daylight-saving change.**
+- **`date` — with GNU `date`, `dybatpho::date_parse` accepts a date whose
+  midnight a clock change skips, reading it as 01:00.**
 
 ### Security
 

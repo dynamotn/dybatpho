@@ -85,7 +85,11 @@ function __dybatpho_md_escape_plain {
   mapfile -t __dybatpho_md_lines <<< "${__dybatpho_md_value}"
   local __dybatpho_md_index
   for __dybatpho_md_index in "${!__dybatpho_md_lines[@]}"; do
-    if [[ "${__dybatpho_md_lines[${__dybatpho_md_index}]}" =~ ^([[:space:]]*)([#=+-]|[0-9]+[.\)])(.*)$ ]]; then
+    # A backslash escapes punctuation only, so an ordered-list marker is escaped
+    # on its `.` or `)`: `\1.` would render the backslash and still read `1.`.
+    if [[ "${__dybatpho_md_lines[${__dybatpho_md_index}]}" =~ ^([[:space:]]*)([#=+-])(.*)$ ]]; then
+      __dybatpho_md_lines[__dybatpho_md_index]="${BASH_REMATCH[1]}\\${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+    elif [[ "${__dybatpho_md_lines[${__dybatpho_md_index}]}" =~ ^([[:space:]]*[0-9]+)([.\)])(.*)$ ]]; then
       __dybatpho_md_lines[__dybatpho_md_index]="${BASH_REMATCH[1]}\\${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
     fi
   done

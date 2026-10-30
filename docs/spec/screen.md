@@ -308,6 +308,12 @@ dybatpho::screen_end
 - **FR-036**: `__dybatpho_screen_braille_table` MUST hold the 256 Braille glyphs under any locale, built from their UTF-8 bytes.
 - **FR-037**: `dybatpho::screen_gauge` MUST draw whole glyphs under any locale, including `C`, where Bash indexes a string by byte.
 - **FR-038**: Locating a column on a row that holds wide glyphs or combining marks MUST cost the number of non-ASCII characters on the row, not its width, so a full frame of such rows stays interactive.
+- **FR-039**: A layout MUST NOT grow a `max:N` part past `N` to absorb rounding; the last flexible part that can take it does, then the last part of any kind that can, then the last part.
+- **FR-040**: Interrupting the screen with INT or TERM MUST give the terminal back and then end the script with the signal, status 128+n, rather than let it carry on.
+- **FR-041**: `dybatpho::screen_begin` MUST size the buffer from the terminal it opened, so redirected stdout and stderr do not fall back to 80x24.
+- **FR-042**: Drawing over one column of a wide glyph MUST turn what is left of the glyph into blanks, so a row keeps exactly the width of the screen.
+- **FR-043**: `dybatpho::screen_barchart` MUST draw a value above `max:` as a full bar, and `dybatpho::screen_tabs` MUST cut the tab that reaches the edge, so neither draws outside its rectangle.
+- **FR-044**: `dybatpho::screen_table` MUST split cells on its delimiter as a whole string, as `table.sh` does.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -394,6 +400,11 @@ dybatpho::screen_end
 - **IT-034**: Build the table under `LC_ALL=C` and count 256 entries ending in `⣿`.
 - **IT-035**: Draw a half-full gauge under `LC_ALL=C` and read back five `█` and five `░`.
 - **IT-036**: Paint runs after two wide glyphs, a combining mark and an emoji, and find every style starting at the right character.
+- **IT-037**: Split ten columns as `length:3 max:2` and get 8 and 2; split five as `percent:50 percent:50` and get 2 and 3.
+- **IT-038**: Under a pseudo-terminal, send TERM to an application that began the screen and get status 143.
+- **IT-039**: Under a pseudo-terminal of 123x41, begin the screen with stdout and stderr redirected and get a 123x41 buffer.
+- **IT-040**: Draw `x` over the right half and `y` over the left half of `世`, and keep a 40-column row with the rest blanked.
+- **IT-041**: Draw a bar of 20 with `max:10` in six columns and get six full blocks; draw tabs in eight columns and get ` Overvie`; draw `a::b` with `delimiter:::` and get two cells.
 
 ## Acceptance Criteria *(mandatory)*
 

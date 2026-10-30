@@ -169,6 +169,36 @@ setup() {
   assert_equal "$(dybatpho::date_diff '2024-01-02 23:00:00' '2024-01-01 00:00:00' days)" "-1"
 }
 
+@test "dybatpho::date_diff counts calendar days across a daylight-saving change" {
+  # Spring forward makes one day 23 hours long, and counting elapsed seconds
+  # came out a day short; hours are still the time that actually elapsed.
+  [[ -f "${TZDIR:-/usr/share/zoneinfo}/America/New_York" ]] || skip "no zone database"
+  local DYBATPHO_DATE_TIMEZONE=America/New_York
+  run_traced -0 dybatpho::date_diff_days 2024-03-01 2024-04-01
+  assert_output 31
+  run_traced -0 dybatpho::date_diff 2024-03-10 2024-03-11 days
+  assert_output 1
+  run_traced -0 dybatpho::date_diff 2024-11-04 2024-11-03 days
+  assert_output -1
+  run_traced -0 dybatpho::date_diff "2024-03-10 00:00:00" "2024-03-10 05:00:00" hours
+  assert_output 4
+}
+
+@test "dybatpho::date_parse reads a day whose midnight a clock change skips" {
+  # America/Sao_Paulo moved its clocks forward at midnight, so 2018-11-04
+  # 00:00 never happened there; the day starts when the skipped hour ends.
+  [[ -f "${TZDIR:-/usr/share/zoneinfo}/America/Sao_Paulo" ]] || skip "no zone database"
+  # The other `date` implementations normalise a skipped time on their own.
+  __dybatpho_date_is_gnu || skip "the retry is on the GNU path"
+  # shellcheck disable=SC2034 # read by the date functions
+  local DYBATPHO_DATE_TIMEZONE=America/Sao_Paulo timestamp
+  run_traced -0 dybatpho::date_is_valid 2018-11-04
+  timestamp="$(dybatpho::date_parse 2018-11-04)"
+  assert_equal "$(dybatpho::date_format "${timestamp}" '%F %T')" "2018-11-04 01:00:00"
+  run_traced -0 dybatpho::date_month_end 2018-11-04
+  assert_output 2018-11-30
+}
+
 @test "dybatpho::date_add_days and date_diff_days keep answering as they did" {
   # Both now delegate to the general helpers rather than repeating them.
   assert_equal "$(dybatpho::date_add_days 2024-02-28 1)" "2024-02-29"

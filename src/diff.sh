@@ -139,6 +139,7 @@ function __dybatpho_diff_paint {
 # @stdout A unified diff, empty when the two are identical
 # @exitcode 0 The two are identical
 # @exitcode 1 They differ
+# @exitcode 2 They could not be compared, such as when a file cannot be read
 # @example
 #   dybatpho::diff_text /etc/nginx/nginx.conf "${rendered}" current proposed
 #######################################
@@ -166,6 +167,9 @@ function dybatpho::diff_text {
   # rather than by the tool.
   raw="$(diff -U "${DYBATPHO_DIFF_CONTEXT}" -- "${first_file}" "${second_file}")" || status=$?
   ((status == 0)) && return 0
+  # `diff` answers 2 when it could not compare at all, such as for an unreadable
+  # file; passing that on keeps it apart from the 1 that means "they differ".
+  ((status == 1)) || return "${status}"
 
   # Only the two lines before the first hunk are the file header. Inside a
   # hunk, removing the line `-- note` reads `--- note` and adding `++ x` reads
@@ -195,6 +199,7 @@ function dybatpho::diff_text {
 # @stdout `+N -M ~K`: lines added, lines removed, and hunks touched
 # @exitcode 0 The two are identical
 # @exitcode 1 They differ
+# @exitcode 2 They could not be compared, and nothing is printed
 # @example
 #   dybatpho::diff_summary "${before}" "${after}" || true
 #   # +12 -3 ~4
@@ -209,6 +214,8 @@ function dybatpho::diff_summary {
 
   local raw status=0
   raw="$(diff -U0 -- "${first_file}" "${second_file}")" || status=$?
+  # Trouble is not a difference, so no summary is printed for it.
+  ((status <= 1)) || return "${status}"
 
   local added=0 removed=0 hunks=0 line
   if ((status != 0)); then
@@ -231,9 +238,11 @@ function dybatpho::diff_summary {
 }
 
 #######################################
-# @description Flatten a JSON document to sorted `path<TAB>value` lines.
+# @description Flatten a JSON document to sorted `label<US>key<US>value` lines.
 # @arg $1 string JSON file path
-# @stdout One line per scalar, sorted by path
+# @stdout One line per scalar, sorted by label: the dotted path shown to the
+#   reader, the path as JSON that the comparison matches on, and the value as
+#   JSON, separated by the unit separator
 # @exitcode 0 The document was flattened
 # @exitcode 1 The document is not valid JSON
 # @internal
@@ -244,9 +253,13 @@ function __dybatpho_diff_flatten {
   # be reported as no change at all. An empty object or array is a leaf too,
   # so replacing one with a value is reported rather than passed over.
   #
-  # Array indices join the path as plain numbers, so `.a[0].b` reads as
-  # `a.0.b`: one syntax for both kinds of step, which keeps the comparison
-  # below a plain string match.
+  # Array indices join the label as plain numbers, so `.a[0].b` reads as
+  # `a.0.b`: one syntax for both kinds of step. The label is only shown; the
+  # comparison matches on the path written as JSON, where the key `a.b` and the
+  # step `a` then `b`, or an index and a key `0`, stay apart. Only the label is
+  # escaped (`@tsv` writes a control character as its C escape); the key and
+  # the value are JSON, which never holds a raw control character, so they are
+  # passed through as they are rather than with every backslash doubled.
   local filter='def leaf: if type == "object" or type == "array" then length == 0 else true end;'
   # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
   filter+=' . as $doc'
@@ -254,10 +267,10 @@ function __dybatpho_diff_flatten {
   # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
   filter+=' | .[] as $p'
   # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
-  filter+=' | [ (if ($p | length) == 0 then "." else ($p | map(tostring) | join(".")) end),'
+  filter+=' | [ ([if ($p | length) == 0 then "." else ($p | map(tostring) | join(".")) end] | @tsv),'
   # shellcheck disable=SC2016 # the `$` names a jq variable inside the filter, not a shell one
-  filter+=' ($doc | getpath($p) | tojson) ]'
-  filter+=' | @tsv'
+  filter+=' ($p | tojson), ($doc | getpath($p) | tojson) ]'
+  filter+=' | join("\u001f")'
   jq -r "${filter}" -- "$1" | LC_ALL=C sort
 }
 
@@ -290,15 +303,20 @@ function dybatpho::diff_json {
   __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${first_file}" first
   __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${second_file}" second
 
-  local -A before=() after=()
-  local path value
-  while IFS=$'\t' read -r path value; do
+  # Keyed by the path written as JSON, which is never empty: the label of the
+  # key `""` is, and as a key it neither reads back through a whitespace `IFS`
+  # nor goes into an associative array.
+  local -A before=() after=() labels=()
+  local label path value us=$'\x1f'
+  while IFS="${us}" read -r label path value; do
     before["${path}"]="${value}"
+    labels["${path}"]="${label}"
     # kcov never records the `done` of a loop fed by a process substitution;
     # "diff_json reports keys added, removed and changed" runs it.
   done < <(__dybatpho_diff_flatten "${first_file}") # kcov(skip)
-  while IFS=$'\t' read -r path value; do
+  while IFS="${us}" read -r label path value; do
     after["${path}"]="${value}"
+    labels["${path}"]="${label}"
     # kcov never records the `done` of a loop fed by a process substitution;
     # "diff_json reports keys added, removed and changed" runs it.
   done < <(__dybatpho_diff_flatten "${second_file}") # kcov(skip)
@@ -307,32 +325,27 @@ function dybatpho::diff_json {
   __dybatpho_diff_wants_color && color=1
 
   local -a paths=()
-  for path in "${!before[@]}" "${!after[@]}"; do
-    paths+=("${path}")
+  for path in "${!labels[@]}"; do
+    paths+=("${labels[${path}]}${us}${path}")
   done
 
-  local differed=0 seen
-  local -A reported=()
-  while IFS= read -r path; do
+  local differed=0
+  while IFS="${us}" read -r label path; do
     [[ -n "${path}" ]] || continue
-    seen="${reported[${path}]-}"
-    [[ -z "${seen}" ]] || continue
-    reported["${path}"]=1
-
     if [[ -z "${before[${path}]+set}" ]]; then
-      __dybatpho_diff_report "${color}" added "${path}" "${after[${path}]}"
+      __dybatpho_diff_report "${color}" added "${label}" "${after[${path}]}"
       differed=1
     elif [[ -z "${after[${path}]+set}" ]]; then
-      __dybatpho_diff_report "${color}" removed "${path}" "${before[${path}]}"
+      __dybatpho_diff_report "${color}" removed "${label}" "${before[${path}]}"
       differed=1
     elif [[ "${before[${path}]}" != "${after[${path}]}" ]]; then
-      __dybatpho_diff_report "${color}" changed "${path}" \
+      __dybatpho_diff_report "${color}" changed "${label}" \
         "${before[${path}]}" "${after[${path}]}"
       differed=1
     fi
     # kcov never records the `done` of a loop fed by a process substitution;
     # "diff_json reports keys added, removed and changed" runs it.
-  done < <(((${#paths[@]})) && printf '%s\n' ${paths[@]+"${paths[@]}"} | LC_ALL=C sort -u) # kcov(skip)
+  done < <(((${#paths[@]})) && printf '%s\n' ${paths[@]+"${paths[@]}"} | LC_ALL=C sort) # kcov(skip)
 
   ((differed == 0)) && return 0
   return 1

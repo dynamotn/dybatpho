@@ -99,6 +99,19 @@ function __dybatpho_date_parse {
   local flavor
   __dybatpho_date_flavor_into flavor
   if [[ "${flavor}" == "gnu" ]]; then
+    # A bare date is its midnight, which a zone that moves its clocks forward
+    # at midnight (America/Sao_Paulo until 2019) skips: the day then starts at
+    # 01:00, when the skipped hour ends, rather than not being a date at all.
+    local parsed
+    if parsed="$(TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s 2> /dev/null)"; then
+      printf '%s\n' "${parsed}"
+      return 0
+    fi
+    if [[ "${input}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+      && TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input} 01:00" +%s 2> /dev/null; then
+      return 0
+    fi
+    # Asked again, unsilenced, so the refusal says why.
     TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s
     return
   fi
@@ -453,6 +466,9 @@ function dybatpho::date_add {
 # @description Print the difference between two dates in a chosen unit.
 #   The result is truncated toward zero, so a span of 47 hours is one day
 #   rather than two, and it is signed: an end before the start is negative.
+#   Days and weeks follow the wall clock of `DYBATPHO_DATE_TIMEZONE`, so a span
+#   across a daylight-saving change still counts its calendar days; seconds,
+#   minutes and hours are the time that actually elapsed.
 # @example
 #   dybatpho::date_diff 2024-01-01 2024-03-01 days          # 60
 #   dybatpho::date_diff "2024-01-01 00:00:00" "2024-01-01 01:30:00" minutes
@@ -477,7 +493,35 @@ function dybatpho::date_diff {
   local start_ts end_ts
   start_ts=$(dybatpho::date_parse "${start_date}") || return $?
   end_ts=$(dybatpho::date_parse "${end_date}") || return $?
+  # Days and weeks are counted on the calendar, so each moment is read as the
+  # wall clock shows it: across a daylight-saving change a day is 23 or 25
+  # hours long, and the elapsed seconds came out a day short.
+  if ((unit_seconds >= 86400)); then
+    local offset
+    __dybatpho_date_offset_into offset "${start_ts}"
+    start_ts=$((start_ts + offset))
+    __dybatpho_date_offset_into offset "${end_ts}"
+    end_ts=$((end_ts + offset))
+  fi
   printf '%s\n' "$(((end_ts - start_ts) / unit_seconds))"
+}
+
+#######################################
+# @description Work out the UTC offset in force at a moment, in seconds.
+# @arg $1 string Name of the variable receiving the offset
+# @arg $2 number Unix timestamp
+# @env DYBATPHO_DATE_TIMEZONE string Timezone whose offset is read
+# @set The named variable, east of UTC positive
+# @internal
+#######################################
+function __dybatpho_date_offset_into {
+  local -n __dybatpho_date_offset_out="$1"
+  local __dybatpho_date_offset_z
+  __dybatpho_date_offset_z="$(dybatpho::date_format "$2" '%z')"
+  __dybatpho_date_offset_out=0
+  [[ "${__dybatpho_date_offset_z}" =~ ^([+-])([0-9]{2})([0-9]{2})$ ]] || return 0
+  __dybatpho_date_offset_out=$((10#${BASH_REMATCH[2]} * 3600 + 10#${BASH_REMATCH[3]} * 60))
+  [[ "${BASH_REMATCH[1]}" == + ]] || __dybatpho_date_offset_out=$((-__dybatpho_date_offset_out))
 }
 
 #######################################

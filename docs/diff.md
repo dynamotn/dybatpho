@@ -96,6 +96,7 @@ dybatpho::diff_text /etc/nginx/nginx.conf "${rendered}" current proposed
 
 - `0`: The two are identical
 - `1`: They differ
+- `2`: They could not be compared, such as when a file cannot be read
 
 ---
 
@@ -128,6 +129,7 @@ dybatpho::diff_summary "${before}" "${after}" || true
 
 - `0`: The two are identical
 - `1`: They differ
+- `2`: They could not be compared, and nothing is printed
 
 ---
 

@@ -938,3 +938,122 @@ SCRIPT
   assert_equal "$(screen_row 0 | sed -E 's/ +$//')" "red~x"
   [[ "$(screen_raw 0)" == *$'\033[31mred'* ]] || fail "colour lost: $(screen_raw 0)"
 }
+
+# =============================================================================
+# regressions
+# =============================================================================
+
+@test "dybatpho::screen_put blanks what is left of a wide glyph it half covers" {
+  # Drawing over one column of `世` kept the glyph whole, so the row grew a
+  # column and everything right of it shifted off the edge.
+  local row columns
+  dybatpho::screen_put 0 4 "世界" "0"
+  dybatpho::screen_put 0 5 "x" "0"
+  row="$(screen_row 0)"
+  dybatpho::screen_width columns "${row}"
+  assert_equal "${columns}" 40
+  assert_equal "${row:0:7}" "     x界"
+
+  dybatpho::screen_put 1 4 "世界" "0"
+  dybatpho::screen_put 1 4 "y" "0"
+  row="$(screen_row 1)"
+  dybatpho::screen_width columns "${row}"
+  assert_equal "${columns}" 40
+  assert_equal "${row:0:7}" "    y 界"
+}
+
+@test "dybatpho::screen_barchart keeps a value above max: inside its rectangle" {
+  # shellcheck disable=SC2034 # read by name by the widget
+  local -a values=(20)
+  dybatpho::screen_barchart "0 0 6 1" values max:10
+  local row
+  row="$(screen_row 0)"
+  assert_equal "${row:0:7}" "██████ "
+}
+
+@test "dybatpho::screen_layout never grows a max: part to absorb rounding" {
+  local -a parts=()
+  dybatpho::screen_layout parts horizontal "0 0 10 1" length:3 max:2
+  assert_equal "${parts[0]}" "0 0 8 1"
+  assert_equal "${parts[1]}" "8 0 2 1"
+  # With nothing flexible the last part still takes the rounding, so the parts
+  # tile the rectangle.
+  dybatpho::screen_layout parts horizontal "0 0 5 1" percent:50 percent:50
+  assert_equal "${parts[1]}" "2 0 3 1"
+}
+
+@test "dybatpho::screen_tabs cuts the tab that reaches the edge of its rectangle" {
+  # shellcheck disable=SC2034 # read by name by the widget
+  local -a names=(Overview Logs)
+  dybatpho::screen_tabs "0 0 8 1" names active:0
+  local row
+  row="$(screen_row 0)"
+  assert_equal "${row:0:10}" " Overvie  "
+}
+
+@test "dybatpho::screen_table splits on a delimiter of several characters" {
+  # shellcheck disable=SC2034 # read by name by the widget
+  local -a rows=("a::b")
+  dybatpho::screen_table "0 0 20 1" rows delimiter:"::"
+  local row
+  row="$(screen_row 0)"
+  assert_equal "${row:0:20}" "a         b         "
+}
+
+# @description Run a script on a pseudo-terminal, in the BSD form of `script` or
+#   in the util-linux and BusyBox one, skipping the test when there is none.
+screen_on_pty() {
+  if script -q /dev/null true < /dev/null > /dev/null 2>&1; then
+    script -q /dev/null bash "$1" < /dev/null > /dev/null 2>&1 || true
+  elif script -qc true /dev/null < /dev/null > /dev/null 2>&1; then
+    script -qc "bash '$1'" /dev/null < /dev/null > /dev/null 2>&1 || true
+  else
+    skip "no pseudo-terminal to test with"
+  fi
+}
+
+@test "dybatpho::screen_begin measures the terminal it draws on, not stdout" {
+  # With stdout and stderr both redirected, the size fell back to 80x24 while
+  # the frame was still drawn on a terminal of another size.
+  # The application runs with both streams redirected, the way a caller that
+  # captures its output runs it; only the terminal is left to measure.
+  local app="${BATS_TEST_TMPDIR}/size-app.sh" script="${BATS_TEST_TMPDIR}/size.sh"
+  local result="${BATS_TEST_TMPDIR}/size.out"
+  cat > "${app}" << SCRIPT
+unset COLUMNS LINES
+. "${DYBATPHO_DIR}/init.sh" --modules screen
+dybatpho::screen_begin || exit 0
+size="\${DYBATPHO_SCREEN_WIDTH}x\${DYBATPHO_SCREEN_HEIGHT}"
+dybatpho::screen_end
+printf '%s\n' "\${size}" > "${result}"
+SCRIPT
+  cat > "${script}" << SCRIPT
+stty cols 123 rows 41 2> /dev/null || exit 0
+bash "${app}" > /dev/null 2>&1
+SCRIPT
+  screen_on_pty "${script}"
+  [[ -s "${result}" ]] || skip "no pseudo-terminal to test with"
+  assert_equal "$(< "${result}")" "123x41"
+}
+
+@test "dybatpho::screen_begin gives the terminal back and still dies on TERM" {
+  # Its handler on TERM replaced the signal's default, so the screen was
+  # restored and the script then carried on as if nothing had happened.
+  # The application is a child of the script on the terminal, so its status can
+  # be recorded; both are files, not `bash -c`, for the kcov hook.
+  local app="${BATS_TEST_TMPDIR}/app.sh" script="${BATS_TEST_TMPDIR}/signal.sh"
+  local result="${BATS_TEST_TMPDIR}/signal.out"
+  cat > "${app}" << SCRIPT
+. "${DYBATPHO_DIR}/init.sh" --modules screen
+dybatpho::screen_begin || exit 0
+kill -s TERM "\${BASHPID}"
+echo "still running" >> "${result}"
+SCRIPT
+  cat > "${script}" << SCRIPT
+bash "${app}" 2> /dev/null
+printf 'status=%s\n' "\$?" >> "${result}"
+SCRIPT
+  screen_on_pty "${script}"
+  [[ -s "${result}" ]] || skip "no pseudo-terminal to test with"
+  assert_equal "$(< "${result}")" "status=143"
+}

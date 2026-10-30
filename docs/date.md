@@ -40,7 +40,7 @@ implementations this module supports shift by them differently.
 - [`dybatpho::date_month_start`](#dybatphodate_month_start) — Print the first day of the month a date falls in.
 - [`dybatpho::date_month_end`](#dybatphodate_month_end) — Print the last day of the month a date falls in. This is the date a billing period or a report window ends on, worked out from the calendar rather than by adding a month and stepping back a day, which lands in the wrong place whenever the two months differ in length.
 - [`dybatpho::date_add`](#dybatphodate_add) — Add or subtract a span of time from a date string. The units are the ones that are a fixed number of seconds: seconds, minutes, hours, days, and weeks. Months and years are left out on purpose, since their length depends on the calendar and the two `date` implementations this module supports shift by them differently.
-- [`dybatpho::date_diff`](#dybatphodate_diff) — Print the difference between two dates in a chosen unit. The result is truncated toward zero, so a span of 47 hours is one day rather than two, and it is signed: an end before the start is negative.
+- [`dybatpho::date_diff`](#dybatphodate_diff) — Print the difference between two dates in a chosen unit. The result is truncated toward zero, so a span of 47 hours is one day rather than two, and it is signed: an end before the start is negative. Days and weeks follow the wall clock of `DYBATPHO_DATE_TIMEZONE`, so a span across a daylight-saving change still counts its calendar days; seconds, minutes and hours are the time that actually elapsed.
 - [`dybatpho::date_seconds_to_hms`](#dybatphodate_seconds_to_hms) — Print a number of seconds as `H:MM:SS`. The hours are not wrapped at a day, so a span of 90000 seconds reads as `25:00:00`: this is a length of time rather than a time of day. A negative span keeps its sign. For a duration written the way a sentence would put it, in the reader's own language, `dybatpho::i18n_duration` is the one to call.
 - [`dybatpho::date_parse_duration`](#dybatphodate_parse_duration) — Parse a written length of time into a number of seconds. Three spellings are understood, so a value can come from a person, from a clock, or from a machine: - a bare number of seconds, or parts with a unit, largest first, each used at most once: `w`, `d`, `h`, `m` and `s`, optionally separated by spaces, as in `90s`, `5m`, `1h30m`, `2d`, `1w 2d`; - the `H:MM:SS` clock that `dybatpho::date_seconds_to_hms` writes, so the two helpers undo each other; - an ISO 8601 duration made of weeks, days, hours, minutes and seconds: `PT1H30M`, `P1DT2H`, `P2W`. Months and years are refused in every spelling, for the same reason `dybatpho::date_add` refuses them: their length depends on where in the calendar they fall. A leading `-` makes the span negative. The result is returned through a variable rather than printed, because the function validates its input, and a refusal inside a command substitution would not reach the caller.
 - [`dybatpho::date_is_before`](#dybatphodate_is_before) — Return success when the first date comes strictly before the second. Both are parsed in `DYBATPHO_DATE_TIMEZONE`, so a bare date means midnight there and two spellings of the same moment are equal, not ordered.
@@ -404,6 +404,9 @@ dybatpho::date_add 2024-03-01 -1 weeks               # 2024-02-23
 Print the difference between two dates in a chosen unit.
 The result is truncated toward zero, so a span of 47 hours is one day
 rather than two, and it is signed: an end before the start is negative.
+Days and weeks follow the wall clock of `DYBATPHO_DATE_TIMEZONE`, so a span
+across a daylight-saving change still counts its calendar days; seconds,
+minutes and hours are the time that actually elapsed.
 
 **🧪 Example**
 

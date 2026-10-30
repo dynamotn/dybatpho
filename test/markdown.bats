@@ -256,11 +256,14 @@ EOF
   assert_success
   assert_output 'a\_b\|c \<x\> \[y\] \`z\` \~w\~'
 
-  run_traced dybatpho::md_escape $'# heading\n1. item\n+ plus\nmid - dash'
+  # An ordered-list marker is escaped on its punctuation: CommonMark escapes
+  # nothing but punctuation, so `\1.` would render its backslash.
+  run_traced dybatpho::md_escape $'# heading\n1. item\n  12) step\n+ plus\nmid - dash'
   assert_success
-  assert_output - << EOF
+  assert_output - << 'EOF'
 \# heading
-\1. item
+1\. item
+  12\) step
 \+ plus
 mid - dash
 EOF

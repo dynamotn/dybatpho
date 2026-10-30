@@ -102,6 +102,20 @@ EOF
   assert_output "+1 -1 ~1"
 }
 
+@test "dybatpho::diff_text and diff_summary answer 2 when they cannot compare" {
+  # A file `diff` cannot read used to come back as 1, "they differ", with an
+  # empty diff and a `+0 -0 ~0` summary.
+  [[ "${EUID}" -ne 0 ]] || skip "root reads a file whatever its mode"
+  local unreadable="${BATS_TEST_TMPDIR}/unreadable.txt"
+  printf 'hi\n' > "${unreadable}"
+  chmod 000 "${unreadable}"
+  run_traced -2 --separate-stderr dybatpho::diff_text "${unreadable}" "hi"
+  assert_output ""
+  run_traced -2 --separate-stderr dybatpho::diff_summary "${unreadable}" "hi"
+  assert_output ""
+  chmod 600 "${unreadable}"
+}
+
 @test "dybatpho::diff_summary reports no change for identical input" {
   run_traced -0 dybatpho::diff_summary "${FIRST}" "${FIRST}"
   assert_output "+0 -0 ~0"
@@ -158,6 +172,23 @@ EOF
 - a = {}
 + a.b = 1
 EOF
+}
+
+@test "dybatpho::diff_json tells a dotted key from a nested one, and an index from a key" {
+  # Paths used to be compared as their dotted labels, so these read as equal.
+  run_traced -1 dybatpho::diff_json '{"a.b":1}' '{"a":{"b":1}}'
+  assert_output - << EOF
++ a.b = 1
+- a.b = 1
+EOF
+  run_traced -1 dybatpho::diff_json '{"a":["x"]}' '{"a":{"0":"x"}}'
+}
+
+@test "dybatpho::diff_json prints a backslash once and keeps an empty key" {
+  run_traced -1 dybatpho::diff_json '{"k":"a\\b"}' '{"k":"c"}'
+  assert_output '~ k: "a\\b" -> "c"'
+  run_traced -1 dybatpho::diff_json '{"":1}' '{"":2}'
+  assert_output "~ : 1 -> 2"
 }
 
 @test "dybatpho::diff_json compares two scalar documents" {

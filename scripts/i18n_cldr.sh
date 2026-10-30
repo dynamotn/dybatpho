@@ -488,6 +488,7 @@ function __dybatpho_cldr_render {
 # @description Regenerate or check the tables.
 # @noargs
 # @internal
+# dyshellint disable=BSG050 # the `$1` and `$2` it holds are fields of an awk program, not its arguments
 function __dybatpho_cldr_run {
   dybatpho::require jq
   # shellcheck disable=SC2154 # set by the option spec of this script

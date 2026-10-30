@@ -85,7 +85,7 @@ the resolver does.
 - [`dybatpho::is_cidr`](#dybatphois_cidr) — Return success when a value is a CIDR block.
 - [`dybatpho::cidr_netmask`](#dybatphocidr_netmask) — Print the dotted-decimal subnet mask of an IPv4 prefix length. There is no dotted form of an IPv6 prefix, so this is IPv4 only: the notation itself does not exist for the other version rather than being left out here.
 - [`dybatpho::cidr_contains`](#dybatphocidr_contains) — Return success when an address falls inside a CIDR block. Both versions are supported, and an address is never inside a block of the other version: `::ffff:10.0.0.1` and `10.0.0.1` name the same host to some software, but they are not the same address and this does not pretend otherwise.
-- [`dybatpho::port_open`](#dybatphoport_open) — Return success when a TCP port accepts a connection. The connection is made with Bash's own `/dev/tcp`, so nothing has to be installed for this to work. A build of Bash compiled without network redirections cannot do it, and reports the port as closed. The host and the port are passed to the timed-out shell as arguments rather than spliced into the script it runs, so a host name is never read as code.
+- [`dybatpho::port_open`](#dybatphoport_open) — Return success when a TCP port accepts a connection. The connection is made with Bash's own `/dev/tcp`, so nothing has to be installed for this to work. A build of Bash compiled without network redirections cannot do it, and reports the port as closed. The host and the port are passed to the timed-out shell as arguments rather than spliced into the script it runs, so a host name is never read as code. The socket goes to a descriptor Bash picks, never a fixed one: resolving a name on macOS can leave a guarded descriptor at 3, and redirecting onto it gets the shell killed with EXC_GUARD.
 - [`dybatpho::wait_port`](#dybatphowait_port) — Wait until a TCP port accepts a connection. This is the wait a script does after starting a service and before using it, written once. Each attempt is given no more time than the wait has left, so the whole call keeps to its budget rather than overrunning it by the length of one connection attempt.
 
 <a id="tips"></a>
@@ -1077,6 +1077,10 @@ redirections cannot do it, and reports the port as closed.
 
 The host and the port are passed to the timed-out shell as arguments rather
 than spliced into the script it runs, so a host name is never read as code.
+
+The socket goes to a descriptor Bash picks, never a fixed one: resolving a
+name on macOS can leave a guarded descriptor at 3, and redirecting onto it
+gets the shell killed with EXC_GUARD.
 
 **🧪 Example**
 

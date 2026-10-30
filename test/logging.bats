@@ -798,6 +798,54 @@ assert event["duration_ms"] >= 0
   [ ! -e "${log_file}.2" ]
 }
 
+@test "LOG_FILE rotates a file whose name starts with a dash" {
+  # `mv` read `-run.log.1` as its options and the failure ended the script.
+  cd "${BATS_TEST_TMPDIR}"
+  export LOG_FILE=-run.log LOG_FILE_MAX_BYTES=1 LOG_FILE_MAX_BACKUPS=3
+  dybatpho::info "one" 2> /dev/null
+  dybatpho::info "two" 2> /dev/null
+  dybatpho::info "three" 2> /dev/null
+  assert_file_exist ./-run.log.2
+  grep -q '"message":"three"' ./-run.log
+}
+
+@test "LOG_FILE does not start a process per line to check the size" {
+  local count_file="${BATS_TEST_TMPDIR}/wc-calls"
+  # A function stands in for `wc` and counts how often the size is measured.
+  # shellcheck disable=SC2329 # called by the library, through `wc -c`
+  wc() {
+    printf 'x' >> "${count_file}"
+    command wc "$@"
+  }
+  export LOG_FILE="${BATS_TEST_TMPDIR}/counted.log" LOG_FILE_MAX_BYTES=1000000
+  local i
+  for ((i = 0; i < 20; i++)); do
+    dybatpho::info "line ${i}" 2> /dev/null
+  done
+  unset -f wc
+  local -a lines=()
+  local calls
+  mapfile -t lines < "${LOG_FILE}"
+  assert_equal "${#lines[@]}" "20"
+  calls="$(< "${count_file}")"
+  assert [ "${#calls}" -le 2 ]
+}
+
+@test "LOG_FILE rotation counts the bytes it appends" {
+  # The size is kept as lines are written rather than measured on each one, so
+  # the rotation must still come at the threshold.
+  local log_file="${BATS_TEST_TMPDIR}/counted-rotate.log"
+  export LOG_FILE="${log_file}"
+  dybatpho::info "seed" 2> /dev/null
+  export LOG_FILE_MAX_BYTES="$(($(wc -c < "${log_file}") * 3))" LOG_FILE_MAX_BACKUPS=1
+  dybatpho::info "two" 2> /dev/null
+  dybatpho::info "three" 2> /dev/null
+  assert_file_not_exist "${log_file}.1"
+  dybatpho::info "four" 2> /dev/null
+  dybatpho::info "five" 2> /dev/null
+  assert_file_exist "${log_file}.1"
+}
+
 @test "LOG_FILE_MAX_BYTES=0 disables rotation" {
   local log_file="${BATS_TEST_TMPDIR}/no_rotate.log"
   export LOG_FILE="${log_file}"
@@ -943,6 +991,15 @@ assert event["duration_ms"] >= 0
   assert_failure
 }
 
+@test "dybatpho::log_to_file takes a path that starts with a dash" {
+  cd "${BATS_TEST_TMPDIR}"
+  dybatpho::log_to_file -run.log
+  assert_equal "${DYBATPHO_LOG_FILE}" "-run.log"
+  dybatpho::info "kept" 2> /dev/null
+  grep -q '"message":"kept"' ./-run.log
+  dybatpho::log_to_file off
+}
+
 @test "dybatpho::log_context adds fields to every structured event" {
   local log_file="${BATS_TEST_TMPDIR}/context.log"
   dybatpho::log_to_file "${log_file}"
@@ -1067,6 +1124,21 @@ assert event["duration_ms"] >= 0
   run ! dybatpho::timer_end started shouty
   # The failed call left the timer running, so the name is still usable.
   dybatpho::timer_end started
+}
+
+@test "dybatpho::timer_end and log_context remove treat a name as data, never as code" {
+  # `unset "map[${name}]"` expanded the key a second time: a `$(...)` in it ran,
+  # and the entry under the real key was never removed.
+  local marker="${BATS_TEST_TMPDIR}/ran" name
+  for name in "job \$(touch ${marker})" 'a]b'; do
+    dybatpho::timer_start "${name}"
+    dybatpho::timer_end "${name}" 2> /dev/null
+    assert_equal "${#__dybatpho_log_timer[@]}" "0"
+  done
+  __dybatpho_log_context_values["x\$(touch ${marker})"]=1
+  dybatpho::log_context remove "x\$(touch ${marker})"
+  assert_equal "${#__dybatpho_log_context_values[@]}" "0"
+  assert_file_not_exist "${marker}"
 }
 
 @test "dybatpho::spinner runs the command and passes its exit code through" {

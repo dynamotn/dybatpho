@@ -478,6 +478,14 @@ dybatpho::log_context clear
 - **FR-047**: `dybatpho::debug_command MESSAGE -- COMMAND [ARGS...]` MUST run
   the command with its arguments as given, never through `eval`; the single
   shell-string form MUST keep working and is deprecated.
+- **FR-048**: `dybatpho::timer_end` and `dybatpho::log_context remove` MUST
+  treat a name as data: a `$(...)` or `]` in it MUST NOT run or leave the entry
+  behind.
+- **FR-049**: The log file sink and `dybatpho::log_to_file` MUST accept a path
+  that starts with `-`, and rotation MUST work on such a file.
+- **FR-050**: The log file sink MUST NOT start a process per line to check the
+  file size; it MUST keep the count of bytes it appends and measure the file
+  only when the path changes or the count reaches the threshold.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -615,6 +623,14 @@ dybatpho::log_context clear
   quotes, `$(...)`, backticks, double spaces and a newline, and verify they are
   printed intact and nothing was executed; verify nothing runs below the debug
   level and that a missing command fails.
+- **IT-036**: Start and end timers named `job $(touch file)` and `a]b`, and
+  remove such a context field, and verify every entry is gone and no file was
+  created.
+- **IT-037**: Log to `-run.log` through `LOG_FILE` with a one-byte threshold
+  and through `dybatpho::log_to_file`, and verify it rotates and receives events.
+- **IT-038**: Log twenty lines with `wc` replaced by a counting function and
+  verify it ran at most twice; set a threshold of three seed lines and verify
+  the file rotates only once it is crossed.
 
 ## Acceptance Criteria *(mandatory)*
 

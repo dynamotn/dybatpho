@@ -488,6 +488,22 @@ function __dybatpho_log_hostname {
 # @internal
 #######################################
 function __dybatpho_log_json_event {
+  local __dybatpho_log_event_line
+  __dybatpho_log_json_event_into __dybatpho_log_event_line "$@"
+  printf '%s' "${__dybatpho_log_event_line}"
+}
+
+#######################################
+# @description Build one structured JSON log event, as `__dybatpho_log_json_event`
+#   does, into a variable, so the file sink can count the bytes it appends.
+# @arg $1 string Name of the variable receiving the event and its newline
+# @arg $@ string The arguments of `__dybatpho_log_json_event`
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_json_event_into {
+  local -n __dybatpho_log_event_out="$1"
+  shift
   local timestamp="$1" level="$2" source="$3" message="$4" duration_ms="$5"
   local extra_fields="${6:-}"
   # Call these directly (not inside `$(...)`) so the caches they populate
@@ -514,7 +530,7 @@ function __dybatpho_log_json_event {
   local log_json_escape_6
   __dybatpho_log_json_escape_into log_json_escape_6 "${level}"
   # shellcheck disable=SC2059 # the format is built above, not taken from input
-  printf "${event_format}" \
+  printf -v __dybatpho_log_event_out "${event_format}" \
     "${log_json_escape_2}" \
     "${log_json_escape_6}" \
     "${log_json_escape_4}" \
@@ -540,9 +556,15 @@ function __dybatpho_log_rotate_file {
   [[ -f "${file}" ]] || return 0
   ((max_bytes > 0)) || return 0
 
-  local size
-  size=$(wc -c < "${file}" 2> /dev/null || echo 0)
-  ((size >= max_bytes)) || return 0
+  # The size is counted as the file sink appends, rather than asked of `wc` on
+  # every line, which started a process per log line. It is measured for real
+  # when the file changes and before rotating, so a stale count never rotates.
+  if [[ "${__DYBATPHO_LOG_FILE_SIZE_OF-}" != "${file}" ]] || ((__DYBATPHO_LOG_FILE_SIZE >= max_bytes)); then
+    __DYBATPHO_LOG_FILE_SIZE=$(wc -c < "${file}" 2> /dev/null || echo 0)
+    __DYBATPHO_LOG_FILE_SIZE_OF="${file}"
+  fi
+  ((__DYBATPHO_LOG_FILE_SIZE >= max_bytes)) || return 0
+  __DYBATPHO_LOG_FILE_SIZE=0
 
   if ((max_backups <= 0)); then
     : > "${file}"
@@ -551,7 +573,7 @@ function __dybatpho_log_rotate_file {
 
   local i
   for ((i = max_backups - 1; i >= 1; i--)); do
-    [[ -f "${file}.${i}" ]] && mv -f "${file}.${i}" "${file}.$((i + 1))"
+    [[ -f "${file}.${i}" ]] && mv -f -- "${file}.${i}" "${file}.$((i + 1))"
   done
   mv -f -- "${file}" "${file}.1"
 }
@@ -588,15 +610,33 @@ function __dybatpho_log_write_file {
     log_dir="${log_file%/*}"
     log_dir="${log_dir:-/}"
   fi
-  [[ -d "${log_dir}" ]] || mkdir -p "${log_dir}" 2> /dev/null || return 0
+  [[ -d "${log_dir}" ]] || mkdir -p -- "${log_dir}" 2> /dev/null || return 0
 
   __dybatpho_log_rotate_file "${log_file}" "${DYBATPHO_LOG_FILE_MAX_BYTES:-${LOG_FILE_MAX_BYTES:-10485760}}" \
     "${DYBATPHO_LOG_FILE_MAX_BACKUPS:-${LOG_FILE_MAX_BACKUPS:-5}}"
   local log_now_ms log_timestamp
   __dybatpho_log_now_ms_into log_now_ms
   __dybatpho_log_timestamp_into log_timestamp
-  __dybatpho_log_json_event "${log_timestamp}" "${log_level}" "${source}" \
-    "${message}" "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}" >> "${log_file}"
+  local log_event
+  __dybatpho_log_json_event_into log_event "${log_timestamp}" "${log_level}" "${source}" \
+    "${message}" "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}"
+  printf '%s' "${log_event}" >> "${log_file}"
+  __dybatpho_log_count_bytes "${log_file}" "${log_event}"
+}
+
+#######################################
+# @description Add the bytes just appended to a log file to the size the
+#   rotation check keeps for it. The count is in bytes whatever the locale, as
+#   the threshold is.
+# @arg $1 string Log file path
+# @arg $2 string Text appended to it
+# @set __DYBATPHO_LOG_FILE_SIZE
+# @internal
+#######################################
+function __dybatpho_log_count_bytes {
+  [[ "${__DYBATPHO_LOG_FILE_SIZE_OF-}" == "$1" ]] || return 0
+  local LC_ALL=C
+  __DYBATPHO_LOG_FILE_SIZE=$((__DYBATPHO_LOG_FILE_SIZE + ${#2}))
 }
 
 #######################################
@@ -1508,12 +1548,24 @@ function dybatpho::print {
 # @stdout Show message if log level of message is less than info level
 #######################################
 function dybatpho::progress {
+  __dybatpho_log_progress_to stdout "$@"
+}
+
+#######################################
+# @description Show the in-progress banner of `dybatpho::progress` on a chosen
+#   stream. The retry helpers report on stderr, where their caller's `$(...)`
+#   does not capture the banner along with the command's own output.
+# @arg $1 string `stdout` or `stderr`
+# @arg $@ string Message, its words joined by spaces as `dybatpho::progress` joins them
+# @internal
+#######################################
+function __dybatpho_log_progress_to {
   local color="0;3;34"
   # The banner helpers compose their text before boxing it, so they never reach
   # the hook in `__dybatpho_log_inspect` and have to translate their own message.
   local message
-  __dybatpho_log_translate_into message "$*"
-  __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "🚀 ${message}..." stdout "${color}"
+  __dybatpho_log_translate_into message "${*:2}"
+  __dybatpho_log_box "╭" "─" "╮" "│" "│" "╰" "╯" "🚀 ${message}..." "$1" "${color}"
 }
 
 #######################################
@@ -1690,7 +1742,9 @@ function __dybatpho_log_context_remove {
   local name key
   local -a kept=()
   for name in "$@"; do
-    unset "__dybatpho_log_context_values[${name}]"
+    # Single quotes: `unset` expands the subscript itself, and a key it saw already
+    # expanded was expanded twice, running a `$(...)` in a field name.
+    unset -v '__dybatpho_log_context_values[$name]'
     kept=()
     for key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
       if [[ "${key}" != "${name}" ]]; then
@@ -1851,9 +1905,9 @@ function dybatpho::log_to_file {
     LOG_FILE=""
   else
     local directory
-    directory="$(dirname "${path}")"
+    directory="$(dirname -- "${path}")"
     if [[ ! -d "${directory}" ]]; then
-      mkdir -p "${directory}" \
+      mkdir -p -- "${directory}" \
         || dybatpho::die "${FUNCNAME[0]}: Cannot create log directory '${directory}'"
     fi
     if [[ ! -e "${path}" ]]; then
@@ -1978,7 +2032,8 @@ function dybatpho::timer_end {
   if ((elapsed < 0)); then
     elapsed=0
   fi
-  unset "__dybatpho_log_timer[${name}]"
+  # Single quotes, so the timer name is expanded once, by `unset` itself.
+  unset -v '__dybatpho_log_timer[$name]'
   DYBATPHO_TIMER_LAST_MS="${elapsed}"
 
   local extra_fields

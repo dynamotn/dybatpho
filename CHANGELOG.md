@@ -73,6 +73,17 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   An interactive shell that evaluates the text of `init.sh` at its prompt exits
   too. Sourcing `init.sh` from a file is unaffected.
 
+- **`logging` — `dybatpho::log_to_file` and `DYBATPHO_LOG_FILE` accept a path
+  starting with `-`.** Rotating such a file used to stop the script.
+- **`logging` — logging to a file no longer starts a `wc` process for every
+  line, which made file logging about ten times slower.**
+
+### Security
+
+- **`logging` — `dybatpho::timer_end` and `dybatpho::log_context remove` no
+  longer run a `$(...)` written in a timer or field name, and they remove names
+  holding `]`.**
+
 ## [7.0.0] - 2026-10-23
 
 ### Added

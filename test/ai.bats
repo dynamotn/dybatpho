@@ -182,6 +182,18 @@ anthropic_body() {
   assert_equal "$(dybatpho::json_get "$(cat "${chat}")" '.messages[1].role')" "assistant"
 }
 
+@test "dybatpho::ai_conversation_add masks registered secrets" {
+  # The file is what `dybatpho::ai_chat` sends, and a turn added here went out
+  # with the secret in clear.
+  local chat
+  dybatpho::secret_register "swordfish-token"
+  dybatpho::ai_conversation_new chat ""
+  dybatpho::ai_conversation_add "${chat}" user "my key is swordfish-token"
+  run grep -c "swordfish-token" "${chat}"
+  assert_failure
+  assert_equal "$(dybatpho::json_get "$(cat "${chat}")" '.messages | length')" "1"
+}
+
 @test "dybatpho::ai_conversation_add rejects an unknown role" {
   local chat
   dybatpho::ai_conversation_new chat ""
@@ -288,6 +300,23 @@ USER: second
 EOF
 }
 
+@test "the cli backend reports a client that fails" {
+  # Its status was dropped, so the call succeeded with no answer, and a chat
+  # recorded that empty answer as the assistant's turn.
+  DYBATPHO_AI_PROVIDER=cli
+  DYBATPHO_AI_CLI=claude
+  stub_repeated claude ': cat > /dev/null; exit 3'
+  run --separate-stderr dybatpho::ai_ask "question"
+  assert_failure 3
+  local chat status=0
+  dybatpho::ai_conversation_new chat ""
+  dybatpho::ai_chat "${chat}" "hello" > /dev/null 2>&1 || status=$?
+  unstub claude
+  assert_equal "${status}" 3
+  run_traced dybatpho::ai_conversation_show "${chat}"
+  refute_output --partial "assistant:"
+}
+
 @test "dybatpho::ai_ask extracts text from an openai response" {
   DYBATPHO_AI_PROVIDER=openai
   OPENAI_API_KEY="k"
@@ -316,6 +345,78 @@ EOF
   unstub curl
   assert_success
   run_traced grep -c "swordfish-token" "${args_file}"
+  assert_failure
+}
+
+# Stub curl to answer one request per body file, in turn, and append each
+# request body, which arrives on stdin, to a file.
+stub_curl_recording() {
+  local record="$1" body
+  shift
+  # shellcheck disable=SC2016 # the text is the stub's own shell code
+  local pick=': out=""; prev=""; for a in "$@"; do [ "${prev}" = -o ] && out="${a}"; prev="${a}"; done;'
+  local -a plan=()
+  for body in "$@"; do
+    plan+=("${pick} cat >> '${record}'; cat '${body}' > \"\${out}\"; echo 200")
+  done
+  stub curl "${plan[@]}"
+}
+
+@test "dybatpho::ai_ask masks registered secrets in the system prompt too" {
+  # Only the question was masked; the system prompt went out as it was.
+  local record="${BATS_TEST_TMPDIR}/requests" answer="${BATS_TEST_TMPDIR}/answer.json"
+  anthropic_body > "${answer}"
+  dybatpho::secret_register "swordfish-token"
+  stub_curl_recording "${record}" "${answer}"
+  run_traced dybatpho::ai_ask "question" "the key is swordfish-token"
+  unstub curl
+  assert_success
+  run grep -c "swordfish-token" "${record}"
+  assert_failure
+}
+
+@test "the call budget holds for jobs running at once" {
+  # Each job passed the budget check before any had counted its call, and the
+  # counts they wrote back overwrote one another, so every job got through.
+  # The stub takes exactly three requests.
+  local record="${BATS_TEST_TMPDIR}/requests" answer="${BATS_TEST_TMPDIR}/answer.json"
+  anthropic_body > "${answer}"
+  dybatpho::ai_budget 3
+  stub_curl_recording "${record}" "${answer}" "${answer}" "${answer}"
+  dybatpho::parallel_map 6 dybatpho::ai_ask q1 q2 q3 q4 q5 q6 > /dev/null 2>&1 || true
+  unstub curl
+  run_traced dybatpho::ai_usage_field calls
+  assert_output "3"
+}
+
+@test "a waiter on the counter lock leaves a lock taken since it started waiting" {
+  # Waiters giving up together each removed the lock, so the second removed the
+  # one the first had just taken, and both held it. Here another waiter swaps
+  # in its fresh lock once this one waits; the takeover must leave it alone.
+  local lock="${DYBATPHO_AI_STATE_FILE}.lock"
+  mkdir "${lock}"
+  touch -t 197001020000 "${lock}"
+  # shellcheck disable=SC2329 # stands in for the waiter's pause
+  sleep() {
+    naps=$((${naps:-0} + 1))
+    ((naps != 10)) || { rmdir "${lock}" && mkdir "${lock}"; }
+    ((naps < 1100)) || exit 3
+  }
+  run __dybatpho_ai_state_lock "${DYBATPHO_AI_STATE_FILE}"
+  assert_failure 3
+  assert_dir_exist "${lock}"
+}
+
+@test "a waiter on the counter lock takes one left over from a dead run" {
+  local lock="${DYBATPHO_AI_STATE_FILE}.lock"
+  mkdir "${lock}"
+  touch -t 197001020000 "${lock}"
+  # shellcheck disable=SC2329 # stands in for the waiter's pause
+  sleep() { :; }
+  run __dybatpho_ai_state_lock "${DYBATPHO_AI_STATE_FILE}"
+  assert_success
+  assert_dir_exist "${lock}"
+  run compgen -G "${lock}.*"
   assert_failure
 }
 
@@ -464,6 +565,25 @@ EOF
   assert_output '{"ok":true}'
 }
 
+@test "dybatpho::ai_json retries an answer that does not fit the schema" {
+  # Any JSON was accepted, so a number or an object missing a required key came
+  # back as the answer.
+  local schema='{"type":"object","required":["severity"]}' answer body
+  for answer in 42 '{"other":1}'; do
+    body="$(anthropic_body "${answer}")"
+    stub_curl_body "${body}"
+    run --separate-stderr dybatpho::ai_json "q" "${schema}"
+    unstub curl
+    assert_failure
+    assert_stderr --partial "No valid JSON"
+  done
+  body="$(anthropic_body '3')"
+  stub_curl_body "${body}"
+  run_traced dybatpho::ai_json "q" '{"type":["integer","null"]}'
+  unstub curl
+  assert_output '3'
+}
+
 @test "dybatpho::ai_json fails after exhausting its retries" {
   DYBATPHO_AI_JSON_RETRIES=2
   stub_curl_body "$(anthropic_body 'definitely not json')"
@@ -588,6 +708,28 @@ _test_tool() { printf 'tool output\n'; }
   # The second request must carry the tool result the handler produced.
   run_traced grep -c "tool output" "${args_file}"
   assert_success
+}
+
+_secret_tool() { printf 'token=swordfish-token\n'; }
+
+@test "dybatpho::ai_run masks registered secrets in a tool's output" {
+  # What a tool printed went back to the provider unmasked.
+  local first="${BATS_TEST_TMPDIR}/round-1.json" second="${BATS_TEST_TMPDIR}/round-2.json"
+  local record="${BATS_TEST_TMPDIR}/requests" call usage
+  call=$(dybatpho::json_object type tool_use id toolu_1 name t input:json '{}')
+  usage=$(dybatpho::json_object input_tokens:json 1 output_tokens:json 1)
+  dybatpho::json_object content:json "[${call}]" stop_reason tool_use usage:json "${usage}" > "${first}"
+  anthropic_body 'done' > "${second}"
+  dybatpho::secret_register "swordfish-token"
+  dybatpho::ai_tool_register t "desc" '{"type":"object"}' _secret_tool
+  stub_curl_recording "${record}" "${first}" "${second}"
+  run_traced dybatpho::ai_run "question"
+  unstub curl
+  assert_success
+  run grep -c "token=\*\*\*" "${record}"
+  assert_success
+  run grep -c "swordfish-token" "${record}"
+  assert_failure
 }
 
 @test "dybatpho::ai_run gives up after the step limit" {

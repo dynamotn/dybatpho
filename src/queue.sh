@@ -223,6 +223,23 @@ function __dybatpho_queue_sidecar_number_into {
 }
 
 #######################################
+# @description Read a job's payload into a named variable.
+#   A job file is the payload and one newline, so exactly that newline is
+#   dropped: `$(< file)` dropped every trailing newline, and a payload ending in
+#   blank lines came back shorter than it was pushed.
+# @arg $1 string Name of the variable receiving the payload
+# @arg $2 string Job file
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_queue_payload_into {
+  local -n __dybatpho_queue_payload_out="$1"
+  # `read -d ''` stops at the end of the file, which it reports as a failure.
+  IFS= read -r -d '' __dybatpho_queue_payload_out < "$2" || true
+  __dybatpho_queue_payload_out="${__dybatpho_queue_payload_out%$'\n'}"
+}
+
+#######################################
 # @description Choose the job a claim takes next, into a named variable: the
 #   highest priority among the jobs that are due, and the oldest of those.
 # @arg $1 string Name of the variable receiving the job id
@@ -515,11 +532,10 @@ function __dybatpho_queue_pop {
   dybatpho::lock_release "${__dybatpho_queue_lock_path}"
 
   local -n __dybatpho_queue_id_ref="${__dybatpho_queue_id_target}"
-  local -n __dybatpho_queue_payload_ref="${__dybatpho_queue_payload_target}"
   # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   __dybatpho_queue_id_ref="${__dybatpho_queue_identifier}"
-  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-  __dybatpho_queue_payload_ref="$(< "${__dybatpho_queue_directory}/claimed/${__dybatpho_queue_identifier}.job")"
+  __dybatpho_queue_payload_into "${__dybatpho_queue_payload_target}" \
+    "${__dybatpho_queue_directory}/claimed/${__dybatpho_queue_identifier}.job"
 }
 
 #######################################
@@ -551,7 +567,10 @@ function dybatpho::queue_peek {
     # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
     __dybatpho_queue_peek_ref="${__dybatpho_queue_identifier}"
   fi
-  printf '%s\n' "$(< "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_identifier}.job")"
+  local __dybatpho_queue_peek_payload
+  __dybatpho_queue_payload_into __dybatpho_queue_peek_payload \
+    "${__dybatpho_queue_directory}/pending/${__dybatpho_queue_identifier}.job"
+  printf '%s\n' "${__dybatpho_queue_peek_payload}"
 }
 
 #######################################
@@ -702,7 +721,7 @@ function dybatpho::queue_requeue {
   # would put a failing job back at the head of its priority, where it would
   # be retried before everything pushed since.
   local payload fresh priority
-  payload="$(< "${job}")"
+  __dybatpho_queue_payload_into payload "${job}"
   __dybatpho_queue_sidecar_number_into priority "${directory}/claimed/${identifier}.priority" 0
 
   # The new job, its retry count included, is written under the queue lock in
@@ -770,13 +789,11 @@ function dybatpho::queue_read {
   local -a __dybatpho_queue_states=(pending claimed dead)
   [[ -z "${__dybatpho_queue_wanted}" ]] || __dybatpho_queue_states=("${__dybatpho_queue_wanted}")
 
-  local -n __dybatpho_queue_read_ref="${__dybatpho_queue_target}"
   local __dybatpho_queue_state __dybatpho_queue_file
   for __dybatpho_queue_state in "${__dybatpho_queue_states[@]}"; do
     __dybatpho_queue_file="${__dybatpho_queue_directory}/${__dybatpho_queue_state}/${__dybatpho_queue_identifier}.job"
     if dybatpho::is file "${__dybatpho_queue_file}"; then
-      # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
-      __dybatpho_queue_read_ref="$(< "${__dybatpho_queue_file}")"
+      __dybatpho_queue_payload_into "${__dybatpho_queue_target}" "${__dybatpho_queue_file}"
       return 0
     fi
   done
@@ -865,6 +882,8 @@ function __dybatpho_queue_work_options {
 # @example
 #   # A long-running worker that gives up after ten quiet minutes.
 #   dybatpho::queue_work --poll 5s --idle 10m deploys ./handle.sh --verbose
+# @tip The handler keeps the worker's `set -e`, unless the call itself is a condition (`if`, `||`, `&&`), where Bash
+#   turns `errexit` off for everything it runs
 #######################################
 function dybatpho::queue_work {
   local -A __dybatpho_queue_work_settings=([retries]=3 [backoff]=0 ["max-backoff"]=3600 ["max-jobs"]=0 [poll]=""
@@ -889,7 +908,7 @@ function dybatpho::queue_work {
 
   local __dybatpho_queue_work_handled=0 __dybatpho_queue_work_waited=0 __dybatpho_queue_work_id \
     __dybatpho_queue_work_payload __dybatpho_queue_work_attempts __dybatpho_queue_work_delay \
-    __dybatpho_queue_work_outcome
+    __dybatpho_queue_work_outcome __dybatpho_queue_work_status
   while ((__dybatpho_queue_work_max_jobs == 0 || __dybatpho_queue_work_handled < __dybatpho_queue_work_max_jobs)); do
     if ! __dybatpho_queue_pop "${__dybatpho_queue_work_queue}" \
       __dybatpho_queue_work_id __dybatpho_queue_work_payload; then
@@ -907,8 +926,14 @@ function dybatpho::queue_work {
     __dybatpho_queue_work_waited=0
     __dybatpho_queue_work_handled=$((__dybatpho_queue_work_handled + 1))
 
-    if (DYBATPHO_QUEUE_JOB_ID="${__dybatpho_queue_work_id}" "${__dybatpho_queue_work_handler}" "$@" \
-      "${__dybatpho_queue_work_payload}"); then
+    # Waited for rather than tested with `if`, under which Bash turns `errexit`
+    # off: a handler under `set -e` carried on past its failure and completed
+    # the job. Standard input stays the worker's.
+    __dybatpho_queue_work_status=0
+    (DYBATPHO_QUEUE_JOB_ID="${__dybatpho_queue_work_id}" "${__dybatpho_queue_work_handler}" "$@" \
+      "${__dybatpho_queue_work_payload}") <&0 &
+    wait "$!" || __dybatpho_queue_work_status=$?
+    if ((__dybatpho_queue_work_status == 0)); then
       dybatpho::queue_complete "${__dybatpho_queue_work_queue}" "${__dybatpho_queue_work_id}"
       continue
     fi
@@ -924,7 +949,13 @@ function dybatpho::queue_work {
     local -a __dybatpho_queue_work_requeue=(dybatpho::queue_requeue)
     ((__dybatpho_queue_work_delay == 0)) || __dybatpho_queue_work_requeue+=(--delay "${__dybatpho_queue_work_delay}")
     __dybatpho_queue_work_requeue+=(-- "${__dybatpho_queue_work_queue}" "${__dybatpho_queue_work_id}")
-    __dybatpho_queue_work_outcome="$("${__dybatpho_queue_work_requeue[@]}" "${__dybatpho_queue_work_retries}")"
+    # A requeue that could not take the lock leaves the job claimed and prints
+    # nothing, which read as a dead letter, or ended the worker under `errexit`.
+    __dybatpho_queue_work_requeue+=("${__dybatpho_queue_work_retries}")
+    if ! __dybatpho_queue_work_outcome="$("${__dybatpho_queue_work_requeue[@]}")"; then
+      dybatpho::error "Job ${__dybatpho_queue_work_id} in ${__dybatpho_queue_work_queue} stays claimed: no requeue"
+      continue
+    fi
     local __dybatpho_queue_work_dead="Job ${__dybatpho_queue_work_id} in ${__dybatpho_queue_work_queue} failed"
     __dybatpho_queue_work_dead+=" $((__dybatpho_queue_work_retries + 1)) times; moved to dead letters"
     [[ -n "${__dybatpho_queue_work_outcome}" ]] || dybatpho::warn "${__dybatpho_queue_work_dead}"

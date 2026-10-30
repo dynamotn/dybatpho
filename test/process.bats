@@ -157,6 +157,66 @@ SCRIPT
   assert_line --index 1 second
 }
 
+@test 'dybatpho::trap leaves the parent EXIT handler out of a subshell' {
+  # A subshell lists its parent's handlers without running them, and appending
+  # to that text made the parent's cleanup run when `$(...)` created a
+  # temporary file: the work directory was gone before the parent used it.
+  # Run as a plain script, because Bats replaces the subshell trap itself.
+  local script="${BATS_TEST_TMPDIR}/inherited.sh" work="${BATS_TEST_TMPDIR}/work"
+  mkdir "${work}"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::trap "rm -rf -- '${2}'" EXIT
+function make_scratch {
+  local scratch
+  dybatpho::create_temp scratch ".txt"
+  printf 'made'
+}
+captured="$(make_scratch)"
+[[ -d "${2}" ]] && printf '%s, kept\n' "${captured}"
+SCRIPT
+  run bash "${script}" "${DYBATPHO_DIR}" "${work}"
+  assert_success
+  assert_output "made, kept"
+  assert_file_not_exist "${work}"
+}
+
+@test 'dybatpho::trap drops the parent EXIT handler when the spare signals start ignored' {
+  # A signal ignored at start is listed in a subshell, so no spare was free,
+  # nothing was reset and the parent's cleanup ran in `$(...)` again.
+  local script="${BATS_TEST_TMPDIR}/ignored.sh" work="${BATS_TEST_TMPDIR}/work"
+  mkdir "${work}"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+dybatpho::trap "rm -rf -- '${2}'" EXIT
+captured="$(dybatpho::trap ':' USR1 && printf 'made')"
+[[ -d "${2}" ]] && printf '%s, kept\n' "${captured}"
+SCRIPT
+  run bash -c 'trap "" SYS XCPU XFSZ VTALRM PROF; exec bash "$@"' _ "${script}" "${DYBATPHO_DIR}" "${work}"
+  assert_success
+  assert_output "made, kept"
+}
+
+@test '__dybatpho_process_traps_save_into skips the handlers a subshell inherited' {
+  # Saved inside `$(...)` and run back, the parent's listed TERM handler came
+  # alive there: the subshell survived a TERM by running the parent's handler.
+  local script="${BATS_TEST_TMPDIR}/saved.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+trap 'printf "parent handler "' TERM
+captured="$(
+  __dybatpho_process_traps_save_into saved INT TERM
+  __dybatpho_process_traps_restore "${saved}" INT TERM
+  kill -TERM "${BASHPID}"
+  printf 'survived'
+)" || true
+printf '[%s]\n' "${captured}"
+SCRIPT
+  run bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+  assert_output "[]"
+}
+
 @test 'dybatpho::trap does not leak its loop variable' {
   local signal=kept
   dybatpho::trap ':' USR1
@@ -505,6 +565,18 @@ SCRIPT
   assert_equal "${status}" 124
   sleep 1
   assert_process_dead "$(< "${pid_file}")"
+}
+
+@test "dybatpho::run_with_timeout with no grace kills a stubborn program at once" {
+  # `timeout -k 0` turns SIGKILL off, so a program ignoring SIGTERM ran to its
+  # end on the `timeout` path, while the Bash path killed it at once.
+  __dybatpho_process_has_timeout || skip "no coreutils timeout"
+  local status=0
+  SECONDS=0
+  DYBATPHO_TIMEOUT_KILL_AFTER=0 dybatpho::run_with_timeout 1 bash -c "trap '' TERM; sleep 8" || status=$?
+  # `timeout` reports the SIGKILL it had to send as 137.
+  [[ "${status}" == 124 || "${status}" == 137 ]] || fail "unexpected status ${status}"
+  ((SECONDS < 5)) || fail "the program ran for ${SECONDS}s"
 }
 
 @test "dybatpho::run_with_timeout returns at once inside a command substitution" {

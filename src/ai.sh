@@ -280,7 +280,9 @@ function __dybatpho_ai_state_read_into {
   if [[ ! -f "${__dybatpho_ai_read_path}" ]]; then
     local __dybatpho_ai_read_empty='{"calls":0,"total_input":0,"total_output":0,"last_input":0,"last_output":0,'
     __dybatpho_ai_read_empty+='"last_model":"","last_stop_reason":""}'
-    printf '%s\n' "${__dybatpho_ai_read_empty}" > "${__dybatpho_ai_read_path}"
+    # Created exclusively: a second job creating it too wiped the counts the
+    # first had already written.
+    (set -C && printf '%s\n' "${__dybatpho_ai_read_empty}" > "${__dybatpho_ai_read_path}") 2> /dev/null || true
   fi
   __dybatpho_ai_read_ref="$(< "${__dybatpho_ai_read_path}")"
 }
@@ -294,7 +296,43 @@ function __dybatpho_ai_state_write {
   local document path
   dybatpho::expect_args document -- "$@"
   __dybatpho_ai_state_prepare_into path
-  printf '%s\n' "${document}" > "${path}"
+  # Written aside, exclusively, and renamed into place, so a job reading the
+  # counters never sees the file truncated half way through a write.
+  local staged="${path}.${BASHPID}.tmp"
+  rm -f -- "${staged}"
+  (set -C && printf '%s\n' "${document}" > "${staged}") 2> /dev/null \
+    || dybatpho::die "ai: cannot write the counters next to ${path}"
+  mv -f -- "${staged}" "${path}"
+}
+
+#######################################
+# @description Hold the counter file for one read and one write.
+#   Jobs running at once each read the counters and wrote them back, so all but
+#   one increment was lost and a call budget let every job through. A lock is a
+#   directory, created by one holder at a time; one held for seconds was left by
+#   a run that died, as a holder keeps it for two file operations, and is taken.
+#   Waiters giving up together removed one another's fresh lock, so only a lock
+#   older than the wait is taken, renamed aside first so one waiter alone owns
+#   it, and put back when what was renamed turns out to be a fresh one.
+# @arg $1 string Counter file
+# @internal
+#######################################
+function __dybatpho_ai_state_lock {
+  local lock="$1.lock" since="$1.lock.${BASHPID}.since" stale attempt=0
+  until mkdir -- "${lock}" 2> /dev/null; do
+    ((attempt++)) || : > "${since}"
+    stale="${lock}.${BASHPID}.${attempt}"
+    if ((attempt % 500 == 0)) && [[ "${lock}" -ot "${since}" ]] \
+      && mv -- "${lock}" "${stale}" 2> /dev/null; then
+      if [[ "${stale}" -ot "${since}" ]]; then
+        rmdir -- "${stale}" 2> /dev/null || true
+      else
+        [[ -e "${lock}" ]] || mv -- "${stale}" "${lock}"
+      fi
+    fi
+    sleep 0.01
+  done
+  rm -f -- "${since}"
 }
 
 #######################################
@@ -330,14 +368,27 @@ function __dybatpho_ai_budget_check {
 # @description Count one model call in the shared counter file.
 # @noargs
 # @exitcode 0 The counter was incremented
+# @exitcode 1 The call budget is used up, and nothing was counted
 # @internal
 #######################################
 function __dybatpho_ai_count_call {
-  local ai_state_read
+  local ai_state_path ai_state_read json_eval calls status=0
+  __dybatpho_ai_state_prepare_into ai_state_path
+  __dybatpho_ai_state_lock "${ai_state_path}"
   __dybatpho_ai_state_read_into ai_state_read
-  local json_eval
-  json_eval=$(dybatpho::json_eval "${ai_state_read}" '.calls += 1')
-  __dybatpho_ai_state_write "${json_eval}"
+  # The budget is checked again here, under the lock: jobs running at once all
+  # passed the caller's check before any of them had counted its call.
+  if ((DYBATPHO_AI_MAX_CALLS > 0)); then
+    calls=$(dybatpho::json_get "${ai_state_read}" '.calls')
+    ((calls < DYBATPHO_AI_MAX_CALLS)) || status=1
+  fi
+  if ((status == 0)); then
+    json_eval=$(dybatpho::json_eval "${ai_state_read}" '.calls += 1')
+    __dybatpho_ai_state_write "${json_eval}"
+  fi
+  rmdir -- "${ai_state_path}.lock" 2> /dev/null || true
+  ((status == 0)) || dybatpho::error "ai: call budget of ${DYBATPHO_AI_MAX_CALLS} calls is exhausted"
+  return "${status}"
 }
 
 #######################################
@@ -361,10 +412,13 @@ function __dybatpho_ai_record_usage {
   local last
   printf -v last '{"last_input":%s,"last_output":%s,"last_model":"%s","last_stop_reason":"%s"}' \
     "${input_tokens}" "${output_tokens}" "${model_json}" "${stop_json}"
-  local state
+  local state state_path
+  __dybatpho_ai_state_prepare_into state_path
+  __dybatpho_ai_state_lock "${state_path}"
   __dybatpho_ai_state_read_into state
   local usage_filter=". + ${last} | .total_input += ${input_tokens} | .total_output += ${output_tokens}"
   __dybatpho_ai_state_write "$(dybatpho::json_eval "${state}" "${usage_filter}")"
+  rmdir -- "${state_path}.lock" 2> /dev/null || true
 }
 
 #######################################
@@ -605,6 +659,8 @@ function __dybatpho_ai_conversation_build {
   local system
   dybatpho::expect_args system -- "$@"
   shift
+  # The system prompt leaves the machine as much as the question does.
+  [[ -z "${system}" ]] || system=$(__dybatpho_ai_redact "${system}")
   # Every value is a plain string, so the document is spelled here with the
   # library's one escaper: building it through `jq` cost two
   # processes per turn and one more for the envelope.
@@ -942,7 +998,7 @@ function __dybatpho_ai_http {
     return 0
   fi
 
-  __dybatpho_ai_count_call
+  __dybatpho_ai_count_call || return 1
   local response_file
   dybatpho::create_temp response_file ".json" "ai_response"
 
@@ -1202,7 +1258,7 @@ function __dybatpho_ai_cli_complete {
     return 0
   fi
 
-  __dybatpho_ai_count_call
+  __dybatpho_ai_count_call || return 1
   dybatpho::debug "ai: running ${command}"
   case "${command}" in
     claude)
@@ -1247,8 +1303,10 @@ function __dybatpho_ai_complete {
   __dybatpho_ai_provider_into provider
 
   if [[ "${provider}" == "cli" ]]; then
+    # The client's own status is the call's: a client that failed answered
+    # nothing, and success would record that nothing as the reply.
     __dybatpho_ai_cli_complete "${conversation}"
-    return 0
+    return
   fi
 
   local payload body text
@@ -1328,6 +1386,8 @@ function __dybatpho_ai_conversation_file_into {
 
 #######################################
 # @description Append a turn to a conversation file.
+# Registered secrets are masked first, as everything the file holds is sent
+# with the next `dybatpho::ai_chat`.
 # @example
 #   dybatpho::ai_conversation_add "${CHAT}" assistant "Noted."
 #
@@ -1346,6 +1406,7 @@ function dybatpho::ai_conversation_add {
     *) dybatpho::die "dybatpho::ai_conversation_add: Unknown role '${role}', expected user or assistant" ;;
   esac
   local turn updated
+  content=$(__dybatpho_ai_redact "${content}")
   turn=$(dybatpho::json_object role "${role}" content "${content}")
   local cat
   cat=$(< "${file}")
@@ -1394,7 +1455,6 @@ function dybatpho::ai_chat {
   dybatpho::expect_args file prompt -- "$@"
   dybatpho::is file "${file}" || dybatpho::die "dybatpho::ai_chat: '${file}' is not a conversation file"
   __dybatpho_ai_budget_check
-  prompt=$(__dybatpho_ai_redact "${prompt}")
   dybatpho::ai_conversation_add "${file}" user "${prompt}"
   local answer
   local cat
@@ -1461,7 +1521,7 @@ ${schema}"
     # before parsing rather than failing a well-formed answer on packaging.
     local fence_open='s/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$//' fence_close='s/^[[:space:]]*```[[:space:]]*$//'
     candidate=$(printf '%s\n' "${answer}" | sed -e "${fence_open}" -e "${fence_close}")
-    if dybatpho::json_valid "${candidate}"; then
+    if dybatpho::json_valid "${candidate}" && __dybatpho_ai_json_fits "${candidate}" "${schema}"; then
       dybatpho::json_eval "${candidate}" '.'
       return 0
     fi
@@ -1469,6 +1529,33 @@ ${schema}"
     attempt=$((attempt + 1))
   done
   dybatpho::die "dybatpho::ai_json: No valid JSON after ${DYBATPHO_AI_JSON_RETRIES} attempts"
+}
+
+#######################################
+# @description Tell whether an answer matches the top of its schema: its
+#   `type`, and for an object the keys `required` lists.
+#   Any JSON passed before, so a `cli` client answering `42` to a schema asking
+#   for an object was accepted. A dry run stands in `{}` for the answer, which
+#   no schema with required keys accepts, so it is not checked.
+# @arg $1 string Answer, valid JSON
+# @arg $2 string Schema, valid JSON
+# @exitcode 0 The answer fits, or this is a dry run
+# @exitcode 1 It does not
+# @internal
+#######################################
+function __dybatpho_ai_json_fits {
+  dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}" && return 0
+  # `$s` and `$v` are variables of the filter, not of the shell.
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+  # shellcheck disable=SC2016
+  local program='. as $v | type as $t | ([$s | objects | .type // empty] | flatten) as $types
+    | (($types | length) == 0
+      or any($types[]; . == $t or (. == "integer" and $t == "number" and ($v | floor) == $v)))
+    and ($t != "object" or all(($s | objects | .required // [])[]; . as $k | $v | has($k)))'
+  # kcov(enabled)
+  local verdict
+  verdict=$(dybatpho::json_get "$1" "($2) as \$s | ${program}" 2> /dev/null) || return 1
+  [[ "${verdict}" == "true" ]]
 }
 
 #######################################
@@ -1528,7 +1615,7 @@ function dybatpho::ai_stream {
     return 0
   fi
 
-  __dybatpho_ai_count_call
+  __dybatpho_ai_count_call || return 1
   dybatpho::debug "ai: streaming from ${shown_url}"
   local filter
   case "${provider}" in
@@ -1801,6 +1888,8 @@ function dybatpho::ai_run {
   dybatpho::expect_args __dybatpho_ai_run_prompt -- "$@"
   __dybatpho_ai_run_system="${2:-${DYBATPHO_AI_SYSTEM}}"
   __dybatpho_ai_run_prompt=$(__dybatpho_ai_redact "${__dybatpho_ai_run_prompt}")
+  [[ -z "${__dybatpho_ai_run_system}" ]] \
+    || __dybatpho_ai_run_system=$(__dybatpho_ai_redact "${__dybatpho_ai_run_system}")
 
   local __dybatpho_ai_run_provider
   __dybatpho_ai_provider_into __dybatpho_ai_run_provider
@@ -1897,6 +1986,9 @@ function dybatpho::ai_run {
       __dybatpho_ai_run_call_arguments="${__dybatpho_ai_run_call#*$'\n'}"
       __dybatpho_ai_run_fields=("${__dybatpho_ai_run_call_name}" "${__dybatpho_ai_run_call_arguments}")
       __dybatpho_ai_run_result=$(__dybatpho_ai_tool_invoke "${__dybatpho_ai_run_fields[@]}")
+      # What a tool printed goes to the provider too, and a tool that reads a
+      # config or the environment prints secrets.
+      __dybatpho_ai_run_result=$(__dybatpho_ai_redact "${__dybatpho_ai_run_result}")
       case "${__dybatpho_ai_run_provider}" in
         anthropic)
           __dybatpho_ai_run_fields=(type tool_result tool_use_id "${__dybatpho_ai_run_call_id}")

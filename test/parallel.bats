@@ -96,6 +96,45 @@ _failing_job() {
   assert_equal "$(dybatpho::parallel_failed)" "0"
 }
 
+@test "a job under errexit stops at its first failure" {
+  # The job ran on the left of `||`, where Bash turns `errexit` off, so a job
+  # under `set -e` carried on past a failed command and reported success. Run
+  # as a script, because the caller must not be in such a context either.
+  local script="${BATS_TEST_TMPDIR}/errexit.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules parallel
+function _halting_job {
+  false
+  printf 'went on past the failure\n'
+}
+_halting_job_line=_halting_job
+if [[ "${2}" == run ]]; then
+  dybatpho::parallel_run 1 _halting_job_line
+else
+  dybatpho::parallel_map 1 _halting_job one
+fi
+SCRIPT
+  local entry
+  for entry in map run; do
+    run bash "${script}" "${DYBATPHO_DIR}" "${entry}"
+    assert_failure
+    refute_output --partial "went on"
+  done
+}
+
+@test "a pool removes its capture directory when it is done" {
+  # Every call kept a directory of its jobs' output, and one more cleanup entry,
+  # until the script exited.
+  # shellcheck disable=SC2154 # declared by `process.sh`
+  local probe registered="${#DYBATPHO_CLEANUP_PATHS[@]}"
+  dybatpho::create_temp probe "/" "probe"
+  dybatpho::parallel_map 2 _echo_job alpha bravo > /dev/null 2>&1
+  dybatpho::parallel_map 2 _failing_job bad1 good1 > /dev/null 2>&1 || true
+  assert_equal "${#DYBATPHO_CLEANUP_PATHS[@]}" "$((registered + 1))"
+  run compgen -G "${probe%/*}/*parallel*"
+  assert_failure
+}
+
 @test "an item containing spaces and quotes stays one item" {
   _capture_job() { printf '[%s]\n' "$1"; }
   run_traced --separate-stderr -0 dybatpho::parallel_map 2 _capture_job 'two words' "it's quoted" '$(echo hi)'

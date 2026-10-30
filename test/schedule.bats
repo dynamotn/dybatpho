@@ -381,6 +381,14 @@ SCRIPT
   run_traced -1 dybatpho::schedule_cron_due "30 14 * 10 1" "${FRIDAY}"
 }
 
+@test "dybatpho::schedule_cron_due treats a stepped star as an unrestricted day" {
+  # Cron reads a day field starting with `*` as unrestricted, so `*/2` with a
+  # weekday needs both to match; it was read as either. The 2nd is not odd.
+  run_traced -1 dybatpho::schedule_cron_due "30 14 */2 * 5" "${FRIDAY}"
+  run_traced -0 dybatpho::schedule_cron_due "30 14 */1 * 5" "${FRIDAY}"
+  run_traced -1 dybatpho::schedule_cron_due "30 14 2 * */2" "${FRIDAY}"
+}
+
 @test "dybatpho::schedule_cron_due reads a zero-padded hour as decimal" {
   # `08` is not a valid octal literal, so an unguarded arithmetic expansion
   # fails on exactly the hours a nightly job cares about.

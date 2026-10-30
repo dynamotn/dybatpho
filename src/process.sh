@@ -190,6 +190,9 @@ function __dybatpho_process_traps_save_into {
   shift
   local __dybatpho_process_saved_signal
   __dybatpho_process_saved_ref=""
+  # Inside a subshell, only the handlers live there are saved: those listed
+  # from the parent came back to life when the saved text was run.
+  __dybatpho_process_trap_forget_inherited
   for __dybatpho_process_saved_signal in "$@"; do
     __dybatpho_process_saved_ref+="$(trap -p "${__dybatpho_process_saved_signal}")"$'\n'
   done
@@ -247,6 +250,7 @@ function dybatpho::trap {
   dybatpho::expect_args command -- "$@"
   shift
 
+  __dybatpho_process_trap_forget_inherited
   local signal finalize_command
   for signal in "$@"; do
     __dybatpho_process_trap_command_into finalize_command "${signal}"
@@ -254,6 +258,33 @@ function dybatpho::trap {
     # shellcheck disable=SC2064 # the text is meant to expand now; the caller chose the quoting
     trap "${finalize_command}" "${signal}"
   done
+}
+
+#######################################
+# @description Stop a subshell listing the handlers it inherited.
+#   A subshell still reports its parent's handlers through `trap -p` until it
+#   sets one of its own, although an inherited `EXIT` or signal handler never
+#   fires there. Appending to that text made it live: a temporary file created
+#   inside `$(...)` ran the parent's `EXIT` cleanup in the subshell, deleting
+#   what the parent still used. Resetting a signal that has no handler is how
+#   Bash is told to drop that listing; the handlers that are live -- set in this
+#   shell, `ERR` under `set -E`, an ignored signal -- are kept. A signal the
+#   shell started with ignored is listed too, so the real-time signals back up
+#   the five spares a launcher could have ignored all together.
+# @noargs
+# @internal
+#######################################
+function __dybatpho_process_trap_forget_inherited {
+  # The main shell inherited nothing.
+  [[ "${BASHPID}" != "$$" ]] || return 0
+  local spare
+  for spare in SYS XCPU XFSZ VTALRM PROF RTMIN RTMIN+{1..15} RTMAX-{14..1} RTMAX; do
+    # A system without real-time signals rejects their names.
+    [[ -z "$(trap -p "${spare}" 2> /dev/null)" ]] || continue
+    trap - "${spare}" 2> /dev/null || continue
+    return 0
+  done
+  dybatpho::die "trap: no spare signal left to drop the handlers this subshell inherited"
 }
 
 #######################################
@@ -744,6 +775,9 @@ function dybatpho::run_with_timeout {
 
   if ! dybatpho::is function "$1" &> /dev/null \
     && __dybatpho_process_has_timeout; then
+    # `timeout -k 0` never sends SIGKILL, where zero here means at once, as it
+    # does on the Bash path.
+    ((__dybatpho_process_timeout_kill_after > 0)) || __dybatpho_process_timeout_kill_after=0.01
     timeout -k "${__dybatpho_process_timeout_kill_after}" "${__dybatpho_process_timeout_seconds}" "$@"
     return $?
   fi

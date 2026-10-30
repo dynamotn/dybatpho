@@ -69,6 +69,10 @@ of every waiting job of a lower priority, and one pushed with `--delay` or
 - A payload is text, and may be anything including newlines; encode a structured payload with `json.sh` before pushing it and decode it after
 - A bare queue name lives under `DYBATPHO_QUEUE_DIR`; a name containing a slash is used as the directory itself
 
+**[`dybatpho::queue_work`](#dybatphoqueue_work)**
+
+- The handler keeps the worker's `set -e`, unless the call itself is a condition (`if`, `||`, `&&`), where Bash turns `errexit` off for everything it runs
+
 <a id="reference"></a>
 
 ## 📚 Reference

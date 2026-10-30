@@ -537,6 +537,55 @@ SCRIPT
   [[ "${stderr}" == *"failed 3 times; moved to dead letters"* ]]
 }
 
+@test "dybatpho::queue_work fails a job whose handler stops under errexit" {
+  # The handler ran as an `if` condition, where Bash turns `errexit` off, so a
+  # handler under `set -e` carried on past its failure and completed its job.
+  local script="${BATS_TEST_TMPDIR}/errexit.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules queue
+function halting {
+  false
+  printf 'went on past the failure\n'
+}
+dybatpho::queue_push "${2}" job > /dev/null
+dybatpho::queue_work --retries 0 "${2}" halting 2> /dev/null
+printf 'dead=%s\n' "$(dybatpho::queue_len "${2}" dead)"
+SCRIPT
+  run bash "${script}" "${DYBATPHO_DIR}" "${QUEUE}"
+  assert_success
+  refute_output --partial "went on"
+  assert_output "dead=1"
+}
+
+@test "dybatpho::queue_work leaves a job claimed when it cannot be requeued" {
+  # The failed requeue printed nothing, which read as a dead letter: the worker
+  # said so while the job sat in `claimed`.
+  fails() { return 1; }
+  dybatpho::queue_requeue() { return 1; }
+  dybatpho::queue_push "${QUEUE}" job > /dev/null
+
+  run --separate-stderr dybatpho::queue_work "${QUEUE}" fails
+  assert_success
+  assert_stderr --partial "stays claimed"
+  refute_stderr --partial "dead letters"
+  run_traced dybatpho::queue_len "${QUEUE}" claimed
+  assert_output "1"
+}
+
+@test "a payload keeps its trailing line breaks through every read" {
+  # Each read went through `$(< file)`, which drops every trailing newline.
+  local text=$'last line\n\n' id payload fresh
+  id="$(dybatpho::queue_push "${QUEUE}" "${text}")"
+  dybatpho::queue_peek "${QUEUE}" > "${BATS_TEST_TMPDIR}/peeked"
+  printf '%s\n' "${text}" > "${BATS_TEST_TMPDIR}/expected"
+  cmp "${BATS_TEST_TMPDIR}/peeked" "${BATS_TEST_TMPDIR}/expected"
+  dybatpho::queue_pop "${QUEUE}" id payload
+  assert_equal "${payload}" "${text}"
+  fresh="$(dybatpho::queue_requeue "${QUEUE}" "${id}")"
+  dybatpho::queue_read "${QUEUE}" "${fresh}" payload
+  assert_equal "${payload}" "${text}"
+}
+
 @test "dybatpho::queue_work isolates a handler that exits" {
   quits() { exit 3; }
   dybatpho::queue_push "${QUEUE}" job > /dev/null

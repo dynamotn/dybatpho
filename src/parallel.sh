@@ -497,6 +497,7 @@ function __dybatpho_parallel_pool {
   [[ "${__dybatpho_parallel_monitor}" == "on" ]] || set +m
   __dybatpho_process_traps_restore "${__dybatpho_parallel_traps}" SIGINT SIGTERM
   if [[ -n "${__dybatpho_parallel_interrupted}" ]]; then
+    __dybatpho_parallel_discard "${__dybatpho_parallel_pool_directory}"
     kill -s "${__dybatpho_parallel_interrupted}" "${BASHPID}"
     # Still here means the caller's handler took the signal and carried on.
     [[ "${__dybatpho_parallel_interrupted}" == INT ]] && return 130
@@ -504,7 +505,20 @@ function __dybatpho_parallel_pool {
   fi
 
   __dybatpho_parallel_flush "${__dybatpho_parallel_pool_directory}" "${__dybatpho_parallel_pool_total}"
+  __dybatpho_parallel_discard "${__dybatpho_parallel_pool_directory}"
   ((__dybatpho_parallel_pool_failed == 0))
+}
+
+#######################################
+# @description Remove a pool's capture directory once its output is replayed.
+#   Left to the end of the script, every pool call kept a directory of its jobs'
+#   output and one more cleanup entry for the rest of the run.
+# @arg $1 string Capture directory
+# @internal
+#######################################
+function __dybatpho_parallel_discard {
+  rm -rf -- "${1:?}" &> /dev/null || true
+  __dybatpho_process_forget_cleanup "$1"
 }
 
 #######################################
@@ -555,6 +569,8 @@ function __dybatpho_parallel_pool {
 # @tip The per-job exit codes are kept in the calling shell, so a call made
 #   inside `$(...)` or a pipeline reports its own output but leaves
 #   `dybatpho::parallel_status` unchanged
+# @tip A job keeps the caller's `set -e`, unless the call itself is a condition (`if`, `||`, `&&`), where Bash turns
+#   `errexit` off for everything it runs
 #######################################
 function dybatpho::parallel_map {
   local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
@@ -587,10 +603,13 @@ function dybatpho::parallel_map {
     local __dybatpho_parallel_map_index="$1" __dybatpho_parallel_map_directory="$2" __dybatpho_parallel_map_code=0
     # The job runs one subshell deeper so that a command calling `exit` ends
     # only itself. Without that, the exit would skip the line below and the job
-    # would be reported as never having run.
+    # would be reported as never having run. It runs on its own and is waited
+    # for, because a command on the left of `||` runs with `errexit` off, and a
+    # job under `set -e` carried on past its failure and reported success.
     ("${__dybatpho_parallel_map_command}" "${__dybatpho_parallel_items[__dybatpho_parallel_map_index]}") \
       > "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.out" 2> \
-      "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.err" || __dybatpho_parallel_map_code=$?
+      "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.err" &
+    wait "$!" || __dybatpho_parallel_map_code=$?
     printf '%s' "${__dybatpho_parallel_map_code}" > \
       "${__dybatpho_parallel_map_directory}/${__dybatpho_parallel_map_index}.status"
   }
@@ -638,6 +657,8 @@ function dybatpho::parallel_map {
 # @tip The per-job exit codes are kept in the calling shell, so a call made
 #   inside `$(...)` or a pipeline reports its own output but leaves
 #   `dybatpho::parallel_status` unchanged
+# @tip A job keeps the caller's `set -e`, unless the call itself is a condition (`if`, `||`, `&&`), where Bash turns
+#   `errexit` off for everything it runs
 #######################################
 function dybatpho::parallel_run {
   local __dybatpho_parallel_opt_failfast=false __dybatpho_parallel_opt_timeout=""
@@ -698,10 +719,12 @@ function dybatpho::parallel_run {
     # line quoted word by word under `--argv`. `exit` is ordinary inside a
     # command string, so the evaluation runs one subshell deeper: otherwise
     # the exit would skip the line below and the job would be reported as
-    # never having run.
+    # never having run. It is waited for rather than run left of `||`, which
+    # would turn `errexit` off inside it.
     (eval "${__dybatpho_parallel_commands[__dybatpho_parallel_run_index]}") \
       > "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.out" 2> \
-      "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.err" || __dybatpho_parallel_run_code=$?
+      "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.err" &
+    wait "$!" || __dybatpho_parallel_run_code=$?
     printf '%s' "${__dybatpho_parallel_run_code}" > \
       "${__dybatpho_parallel_run_directory}/${__dybatpho_parallel_run_index}.status"
   }

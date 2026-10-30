@@ -157,6 +157,38 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   days and weeks correctly across a daylight-saving change.**
 - **`date` — with GNU `date`, `dybatpho::date_parse` accepts a date whose
   midnight a clock change skips, reading it as 01:00.**
+- **`parallel`, `queue` — `dybatpho::parallel_map`, `dybatpho::parallel_run` and
+  `dybatpho::queue_work` stop a job or handler at its first failure under `set
+  -e`, instead of reporting it as a success, unless the call itself is a
+  condition.**
+- **`parallel` — a `dybatpho::parallel_map` or `dybatpho::parallel_run` call no
+  longer leaves its jobs' captured output on disk until the script exits.**
+- **`process` — `dybatpho::run_with_timeout` with
+  `DYBATPHO_TIMEOUT_KILL_AFTER=0` kills a program that ignores SIGTERM at once
+  on the `timeout` path, instead of letting it run on.**
+- **`ai` — the call budget holds, and calls and tokens are counted correctly,
+  when several calls run at once.**
+- **`ai` — with the `cli` backend, `dybatpho::ai_ask` and `dybatpho::ai_chat`
+  fail when the client fails, and `dybatpho::ai_chat` no longer records an empty
+  reply.**
+- **`ai` — `dybatpho::ai_json` retries an answer whose type or required keys do
+  not match the schema, instead of accepting any JSON.**
+- **`queue` — `dybatpho::queue_work` reports a job it could not requeue as still
+  claimed, instead of as dead-lettered, and keeps running.**
+- **`queue` — payloads keep their trailing line breaks through `queue_pop`,
+  `queue_peek`, `queue_read` and `queue_requeue`.**
+- **`schedule` — `dybatpho::schedule_cron_due` treats a day field such as `*/2`
+  as unrestricted, as cron does.**
+- **`agent` — `dybatpho::agent_mode` ignores `DYBATPHO_AGENT_ENV` entries that
+  are not variable names, and no longer expands `*` to file names.**
+- **`process` — `dybatpho::trap` no longer runs the parent's EXIT handler inside
+  a command substitution when the shell started with SIGSYS, XCPU, XFSZ, VTALRM
+  and PROF all ignored, and fails loudly if no spare signal is left.**
+- **`process` — handlers that lock, parallel and schedule set for the length of
+  a call no longer bring the parent's HUP/INT/TERM handlers back to life inside
+  a subshell.**
+- **`ai` — the call counter's lock no longer lets two jobs hold it at once when
+  waiters take over a stale lock together.**
 
 ### Security
 
@@ -168,8 +200,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   in its subscript.**
 - **`cli` — a `count:true` flag no longer evaluates its `env:` or `config:` seed
   as arithmetic, which ran any `$(...)` inside it, and reads `08` as eight.**
+- **`process` — creating a temporary file inside `$(...)` or a subshell no
+  longer runs the parent shell's EXIT handler there.** That handler could delete
+  files the script still needed.
+- **`ai` — the AI helpers mask registered secrets in the system prompt and in
+  tool output before sending them to the provider.**
 - **`cli` — a `count:true` flag seeded from `env:` or `config:` reaches the
   script as a plain number even when the flag is not given.**
+- **`ai` — `dybatpho::ai_conversation_add` masks registered secrets before
+  storing a turn, so `dybatpho::ai_chat` never sends them.**
 
 ## [7.0.0] - 2026-10-23
 

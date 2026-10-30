@@ -47,6 +47,19 @@ _spec_test_deploy() {
   assert_equal "$(dybatpho::agent_mode)" "on"
 }
 
+@test "dybatpho::agent_mode skips a DYBATPHO_AGENT_ENV word that is no variable name" {
+  # The list was expanded unquoted and each word used as a name: `*` matched the
+  # files here, and `MY-AGENT` stopped detection with a Bash error.
+  cd "${BATS_TEST_TMPDIR}"
+  touch AGENT.md
+  MY_OWN_AGENT=1
+  DYBATPHO_AGENT_ENV="MY-AGENT * MY_OWN_AGENT"
+  run --separate-stderr dybatpho::agent_mode
+  assert_success
+  assert_output "on"
+  refute_stderr
+}
+
 @test "dybatpho::agent_mode ignores an empty marker" {
   CLAUDECODE=""
   assert_equal "$(dybatpho::agent_mode)" "off"

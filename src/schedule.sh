@@ -487,9 +487,11 @@ function dybatpho::schedule_cron_due {
   __dybatpho_schedule_field_matches "${fields[1]}" "$((10#${hour}))" 0 23 || return 1
   __dybatpho_schedule_field_matches "${fields[3]}" "$((10#${month}))" 1 12 || return 1
 
+  # A day field starting with `*` counts as unrestricted, `*/2` included, which
+  # is how cron decides between "both days" and "either day".
   local day_restricted=1 weekday_restricted=1
-  [[ "${fields[2]}" == "*" ]] && day_restricted=0
-  [[ "${fields[4]}" == "*" ]] && weekday_restricted=0
+  [[ "${fields[2]}" == "*"* ]] && day_restricted=0
+  [[ "${fields[4]}" == "*"* ]] && weekday_restricted=0
 
   local day_ok=1 weekday_ok=1
   __dybatpho_schedule_field_matches "${fields[2]}" "$((10#${day}))" 1 31 || day_ok=0

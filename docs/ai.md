@@ -59,7 +59,7 @@ anything is sent, and a call budget that stops a runaway loop.
 - [`dybatpho::ai_cache_clear`](#dybatphoai_cache_clear) — Forget every cached response.
 - [`dybatpho::ai_ask`](#dybatphoai_ask) — Ask the model a single question and print its answer.
 - [`dybatpho::ai_conversation_new`](#dybatphoai_conversation_new) — Create a conversation file and store its path in a variable. The file is registered for cleanup when the script exits.
-- [`dybatpho::ai_conversation_add`](#dybatphoai_conversation_add) — Append a turn to a conversation file.
+- [`dybatpho::ai_conversation_add`](#dybatphoai_conversation_add) — Append a turn to a conversation file. Registered secrets are masked first, as everything the file holds is sent with the next `dybatpho::ai_chat`.
 - [`dybatpho::ai_conversation_show`](#dybatphoai_conversation_show) — Print a conversation as readable transcript lines.
 - [`dybatpho::ai_chat`](#dybatphoai_chat) — Send the next turn of a stored conversation and record the reply. Both the question and the answer are appended to the file, so the next call carries the full history.
 - [`dybatpho::ai_json`](#dybatphoai_json) — Ask for an answer that matches a JSON schema, and validate it. Backends with native structured output are told about the schema; the rest are asked in the prompt. Either way the answer is parsed and re-checked locally, and the call is retried when the model returns something unusable.
@@ -358,6 +358,8 @@ dybatpho::ai_conversation_new CHAT "You are a release manager"
 ### `dybatpho::ai_conversation_add`
 
 Append a turn to a conversation file.
+Registered secrets are masked first, as everything the file holds is sent
+with the next `dybatpho::ai_chat`.
 
 **🧪 Example**
 

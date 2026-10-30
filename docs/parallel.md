@@ -56,11 +56,13 @@ the caller has defined without exporting anything.
 
 - A function defined by the caller works as the command, because each job runs in a subshell of the calling shell
 - The per-job exit codes are kept in the calling shell, so a call made inside `$(...)` or a pipeline reports its own output but leaves `dybatpho::parallel_status` unchanged
+- A job keeps the caller's `set -e`, unless the call itself is a condition (`if`, `||`, `&&`), where Bash turns `errexit` off for everything it runs
 
 **[`dybatpho::parallel_run`](#dybatphoparallel_run)**
 
 - A job array may name a shell function the caller defined, because each job runs in a subshell of the calling shell
 - The per-job exit codes are kept in the calling shell, so a call made inside `$(...)` or a pipeline reports its own output but leaves `dybatpho::parallel_status` unchanged
+- A job keeps the caller's `set -e`, unless the call itself is a condition (`if`, `||`, `&&`), where Bash turns `errexit` off for everything it runs
 
 <a id="reference"></a>
 

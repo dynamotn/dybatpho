@@ -96,8 +96,13 @@ DYBATPHO_AGENT_MARKERS+=" AIDER_ACTIVE CURSOR_AGENT OPENAI_AGENT MCP_SERVER"
 # @internal
 #######################################
 function __dybatpho_agent_marker_present {
+  # Split without globbing, and a word that is not a variable name skipped: a
+  # `*` matched file names, and one bad name ended detection with a Bash error.
   local name
-  for name in ${DYBATPHO_AGENT_MARKERS} ${DYBATPHO_AGENT_ENV}; do
+  local -a names=()
+  read -r -a names <<< "${DYBATPHO_AGENT_MARKERS} ${DYBATPHO_AGENT_ENV}"
+  for name in ${names[@]+"${names[@]}"}; do
+    [[ "${name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
     [[ -n "${!name-}" ]] && return 0
   done
   return 1

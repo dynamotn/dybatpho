@@ -404,7 +404,9 @@ setup() {
 
 @test "dybatpho::pkg_installed warns on emerge without qlist or equery" {
   DYBATPHO_PKG_MANAGER=emerge
-  PATH="${BATS_MOCK_BINDIR}:$(path_without qlist)"
+  # Hide both: a Gentoo host keeps a real equery next to qlist.
+  PATH="$(path_without qlist)"
+  PATH="${BATS_MOCK_BINDIR}:$(path_without equery)"
   run_traced --separate-stderr -1 dybatpho::pkg_installed net-misc/curl
   assert_stderr --partial "without qlist or equery"
 }

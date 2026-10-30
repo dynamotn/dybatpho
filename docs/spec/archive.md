@@ -112,6 +112,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **FR-012**: Creating, extracting and listing MUST treat a source or archive whose name begins with a dash as a name, never as an option of the underlying tool.
 - **FR-013**: Creating a `.zip` MUST replace an existing output rather than add to it, and MUST archive the source relative to its own directory whatever `CDPATH` holds.
 - **FR-014**: Extracting a single-file archive MUST write its output through a staging file, so a failed decompression leaves an existing file of that name untouched and no partial output behind.
+- **FR-015**: `archive_unsafe_entries` and `archive_is_safe` MUST report a symbolic link whose target is empty, absolute, or climbs out of the extraction directory when resolved from the link's own directory, for tar and zip archives.
+- **FR-016**: The strip-components count MUST be read in base ten, so `08` strips eight components.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -149,6 +151,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **IT-012**: Create, list and extract gzip, tar and zip archives of `-file`, `-tree` and `-copy.gz`.
 - **IT-013**: Re-create a zip after removing a source file and see the stale entry gone; zip a relative source with `CDPATH` set to a decoy.
 - **IT-014**: Extract a corrupt `.gz` over an existing file and find the file unchanged and nothing else written.
+- **IT-015**: List a tar holding `link -> ../../victim`, `abs -> /etc` and `inner/up -> ../file.txt`, and a zip holding `a link -> ../victim` and `dir/up -> ../file.txt`, and find only the escaping links reported.
+- **IT-016**: Extract a nine-level tar with strip-components `08` and find the file at the top of the destination.
 
 ## Acceptance Criteria *(mandatory)*
 

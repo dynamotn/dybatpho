@@ -300,6 +300,19 @@ setup() {
   unstub tar
 }
 
+@test "dybatpho::archive_extract reads strip-components in base ten" {
+  # `08` passed the number check and then failed the arithmetic as an invalid
+  # octal number, which skipped the stripping and extracted the full paths.
+  local tree="${BATS_TEST_TMPDIR}/deep" archive_path="${BATS_TEST_TMPDIR}/deep.tar"
+  mkdir -p "${tree}/1/2/3/4/5/6/7/8"
+  printf 'data\n' > "${tree}/1/2/3/4/5/6/7/8/file.txt"
+  tar -C "${tree}" -cf "${archive_path}" 1
+
+  run_traced dybatpho::archive_extract "${archive_path}" "${BATS_TEST_TMPDIR}/out" 08
+  assert_success
+  assert_file_exist "${BATS_TEST_TMPDIR}/out/file.txt"
+}
+
 @test "dybatpho::archive_list supports compressed tar variants" {
   local args_file="${BATS_TEST_TMPDIR}/tar-variant-args"
   local gz_archive="${BATS_TEST_TMPDIR}/bundle.tar.gz"
@@ -376,6 +389,57 @@ function _create_traversal_test_archive {
 
   assert_equal "$(dybatpho::archive_unsafe_entries "${evil_archive}" 2> /dev/null)" "../victim.txt"
   run_traced -1 dybatpho::archive_is_safe "${evil_archive}"
+}
+
+@test "dybatpho::archive_unsafe_entries reports a symbolic link that points outside" {
+  # A link to `../../victim` passed, because only the names were checked: a
+  # later entry, or a second archive extracted into the same directory, then
+  # wrote through it.
+  local tree="${BATS_TEST_TMPDIR}/links" archive_path="${BATS_TEST_TMPDIR}/links.tar"
+  mkdir -p "${tree}/inner"
+  printf 'data\n' > "${tree}/file.txt"
+  ln -s ../../victim "${tree}/link"
+  ln -s ../file.txt "${tree}/inner/up"
+  ln -s /etc "${tree}/abs"
+  tar -C "${tree}" -cf "${archive_path}" file.txt link inner abs
+
+  run_traced dybatpho::archive_unsafe_entries "${archive_path}"
+  assert_success
+  assert_output "link
+abs"
+  run_traced -1 dybatpho::archive_is_safe "${archive_path}"
+
+  local inside="${BATS_TEST_TMPDIR}/inside.tar"
+  tar -C "${tree}" -cf "${inside}" file.txt inner
+  dybatpho::archive_is_safe "${inside}"
+}
+
+@test "dybatpho::archive_unsafe_entries reports a zip symbolic link that points outside" {
+  dybatpho::is command python3 && dybatpho::is command unzip || skip "needs python3 and unzip"
+  local archive_path="${BATS_TEST_TMPDIR}/links.zip"
+  python3 -I - "${archive_path}" << 'PY'
+import stat, sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as archive:
+    for name, target in (("a link", "../victim"), ("dir/up", "../file.txt")):
+        info = zipfile.ZipInfo(name)
+        info.create_system = 3
+        info.external_attr = (stat.S_IFLNK | 0o777) << 16
+        archive.writestr(info, target)
+    archive.writestr("file.txt", "data")
+PY
+
+  run_traced dybatpho::archive_unsafe_entries "${archive_path}"
+  assert_success
+  assert_output "a link"
+}
+
+@test "__dybatpho_archive_link_is_safe resolves a target from the link's directory" {
+  __dybatpho_archive_link_is_safe "a/b/link" "../c"
+  __dybatpho_archive_link_is_safe "a/link" "./x/../y"
+  run_traced -1 __dybatpho_archive_link_is_safe "a/link" "../../c"
+  run_traced -1 __dybatpho_archive_link_is_safe "link" "/etc"
+  run_traced -1 __dybatpho_archive_link_is_safe "link" 'C:\Windows'
+  run_traced -1 __dybatpho_archive_link_is_safe "link" ""
 }
 
 @test "dybatpho::archive_is_safe refuses an archive it cannot list" {

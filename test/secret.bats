@@ -222,6 +222,13 @@ teardown() {
   assert_equal "$(< "${masked}")" "$(printf 'a=***\nb=other')"
 }
 
+@test "secret_mask writes a placeholder holding & or a backslash literally" {
+  dybatpho::secret_register "hunter2-supersecret"
+
+  DYBATPHO_SECRET_PLACEHOLDER='<&\&>' run_traced dybatpho::secret_mask "token=hunter2-supersecret"
+  assert_output 'token=<&\&>'
+}
+
 @test "secret_mask keeps output unchanged when nothing is registered" {
   local masked="${BATS_TEST_TMPDIR}/masked"
   dybatpho::secret_mask "nothing to hide" > "${masked}"
@@ -303,9 +310,23 @@ teardown() {
   dybatpho::secret_hint "short" > "${hint}"
   assert_equal "$(< "${hint}")" "***"
 
+  # Nothing revealed means nothing: `${value: -0}` would be the whole secret.
+  dybatpho::secret_hint "abcdefghij" 0 > "${hint}"
+  assert_equal "$(< "${hint}")" "***"
+
   run dybatpho::secret_hint "abcdefghij" two
   assert_failure
   assert_output --partial "Expected a number"
+}
+
+@test "secret_hint reads a huge or zero-padded count as a decimal" {
+  local hint="${BATS_TEST_TMPDIR}/hint"
+  # 2^64 - 1 wrapped round to -1 and revealed all but the first character.
+  dybatpho::secret_hint "SECRETVALUE" 18446744073709551615 > "${hint}"
+  assert_equal "$(< "${hint}")" "***"
+
+  dybatpho::secret_hint "abcdefghijklmnopqrst" 08 > "${hint}"
+  assert_equal "$(< "${hint}")" "***mnopqrst"
 }
 
 @test "secret_write_file creates a 0600 file that round-trips" {

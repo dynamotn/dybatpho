@@ -167,14 +167,22 @@ function __dybatpho_metrics_key {
 
 #######################################
 # @description Record the type and help text of a metric, the first time it is seen.
+#   A metric keeps the type it was first recorded as: rendering reads only the
+#   series of that type, so a value recorded under another one would be lost.
 # @arg $1 string Metric name
 # @arg $2 string Metric type
+# @exitcode 1 The metric is already recorded as another type
 # @internal
 #######################################
 function __dybatpho_metrics_declare {
   local name type
   dybatpho::expect_args name type -- "$@"
-  [[ -n "${__dybatpho_metrics_type[${name}]-}" ]] && return 0
+  local recorded="${__dybatpho_metrics_type[${name}]-}"
+  if [[ -n "${recorded}" ]]; then
+    [[ "${recorded}" == "${type}" ]] \
+      || dybatpho::die "${FUNCNAME[1]}: Metric '${name}' is already recorded as a ${recorded}"
+    return 0
+  fi
   __dybatpho_metrics_type["${name}"]="${type}"
   __dybatpho_metrics_help["${name}"]="${__dybatpho_metrics_help[${name}]-${name}}"
   return 0
@@ -584,8 +592,14 @@ function dybatpho::metrics_render {
   # punctuation and folds case, so `a_z` and `ab` swapped places there.
   local LC_ALL=C
   __dybatpho_helpers_sort names __dybatpho_metrics_before
+  local help
   for name in ${names[@]+"${names[@]}"}; do
-    printf '# HELP %s %s\n' "${name}" "${__dybatpho_metrics_help[${name}]}"
+    # The exposition format escapes these two in a HELP line, or a line break
+    # would start a line no parser accepts.
+    help="${__dybatpho_metrics_help[${name}]}"
+    help="${help//\\/\\\\}"
+    help="${help//$'\n'/\\n}"
+    printf '# HELP %s %s\n' "${name}" "${help}"
     printf '# TYPE %s %s\n' "${name}" "${__dybatpho_metrics_type[${name}]}"
     case "${__dybatpho_metrics_type[${name}]}" in
       counter)
@@ -698,12 +712,15 @@ function __dybatpho_metrics_keys_of {
 #
 # @arg $1 string Destination file path, conventionally ending in `.prom`
 # @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
-# @exitcode 1 The destination directory is missing or the write fails
+# @exitcode 1 The destination directory is missing, the metrics cannot be rendered, or the write fails
 #######################################
 function dybatpho::metrics_write {
-  local path
+  local path body
   dybatpho::expect_args path -- "$@"
-  dybatpho::metrics_render | dybatpho::file_write_atomic "${path}"
+  # Rendered in full first: piped straight in, a render that stopped halfway
+  # still replaced the previous file with what it had printed so far.
+  body="$(dybatpho::metrics_render)" || return $?
+  printf '%s' "${body:+${body}$'\n'}" | dybatpho::file_write_atomic "${path}"
 }
 
 #######################################
@@ -749,6 +766,26 @@ function __dybatpho_metrics_base64url {
   done
   # The Pushgateway reads an empty value as a lone `=`.
   __b64_out="${__b64_result:-=}"
+}
+
+#######################################
+# @description Print a Pushgateway URL without the `user:password@` it may carry.
+#   The credentials run from `scheme://` to the last `@` of the gateway as
+#   given, so a password holding an unencoded `/` or `@` is dropped whole.
+# @arg $1 string Gateway URL as given by the caller
+# @arg $2 string [default: ] Path appended to the gateway, shown as it is
+# @stdout The URL with its credentials removed
+# @internal
+#######################################
+function __dybatpho_metrics_shown_url {
+  local url
+  dybatpho::expect_args url -- "$@"
+  local scheme=""
+  if [[ "${url}" == *://* ]]; then
+    scheme="${url%%://*}://"
+    url="${url#*://}"
+  fi
+  printf '%s%s%s\n' "${scheme}" "${url##*@}" "${2-}"
 }
 
 #######################################
@@ -810,8 +847,11 @@ function dybatpho::metrics_push {
   dybatpho::expect_args gateway job -- "$@"
   shift 2
   __dybatpho_metrics_need network __dybatpho_network_get_http_code
-  [[ "${gateway}" =~ ^https?://[^/]+ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Pushgateway URL must start with http:// or https://, got '${gateway}'"
+  if ! [[ "${gateway}" =~ ^https?://[^/]+ ]]; then
+    local shown_gateway
+    shown_gateway="$(__dybatpho_metrics_shown_url "${gateway}")"
+    dybatpho::die "${FUNCNAME[0]}: Pushgateway URL must start with http:// or https://, got '${shown_gateway}'"
+  fi
   [[ -n "${job}" ]] || dybatpho::die "${FUNCNAME[0]}: Job name must not be empty"
 
   local path="${gateway%/}/metrics" pair key
@@ -842,7 +882,7 @@ function dybatpho::metrics_push {
   local body
   body="$(dybatpho::metrics_render)" || return $?
   if [[ -z "${body}" ]]; then
-    dybatpho::warn "Nothing recorded, so nothing was pushed to ${gateway}"
+    dybatpho::warn "Nothing recorded, so nothing was pushed to $(__dybatpho_metrics_shown_url "${gateway}")"
     return 0
   fi
 
@@ -855,9 +895,12 @@ function dybatpho::metrics_push {
     --request "${method}" \
     --header "Content-Type: text/plain; version=0.0.4" || status=$?
   if ((status != 0)); then
-    local detail=""
+    local detail="" shown
     [[ -s "${response}" ]] && detail=": $(< "${response}")"
-    dybatpho::error "Pushgateway refused the push to ${path} (exit ${status})${detail}"
+    # Only the gateway loses its credentials: the grouping path names the
+    # group, and an `@` in it is the Pushgateway's `@base64` marker.
+    shown="$(__dybatpho_metrics_shown_url "${gateway%/}" "${path#"${gateway%/}"}")"
+    dybatpho::error "Pushgateway refused the push to ${shown} (exit ${status})${detail}"
   fi
   return "${status}"
 }

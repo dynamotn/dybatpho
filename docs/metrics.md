@@ -393,7 +393,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 
 **🚦 Exit codes**
 
-- `1`: The destination directory is missing or the write fails
+- `1`: The destination directory is missing, the metrics cannot be rendered, or the write fails
 
 ---
 

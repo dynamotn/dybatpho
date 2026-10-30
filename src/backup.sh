@@ -82,11 +82,11 @@ function __dybatpho_backup_is_snapshot {
 
 #######################################
 # @description Build the key that orders a backup among the others.
-#   The key is the backup name, the UTC stamp, and the same-second suffix
-#   zero-padded to nine digits, joined by a byte lower than any character a
-#   name can hold, so a byte-wise comparison orders by name, then by the time
-#   the backup was taken, then by the suffix as a number. A file name that does
-#   not carry a stamp keys as itself.
+#   The key is the UTC stamp, the same-second suffix zero-padded to nine
+#   digits, and the backup name, joined by a byte lower than any character a
+#   name can hold, so a byte-wise comparison orders by the time the backup was
+#   taken, then by the suffix as a number, whatever the names. A file name that
+#   does not carry a stamp keys as itself.
 # @arg $1 string Name of the variable receiving the key
 # @arg $2 string Path of the backup
 # @set The named variable
@@ -99,8 +99,8 @@ function __dybatpho_backup_sort_key_into {
   __dybatpho_backup_base="${__dybatpho_backup_base%."${DYBATPHO_BACKUP_EXTENSION}"}"
 
   if [[ "${__dybatpho_backup_base}" =~ ^(.*)-([0-9]{8}T[0-9]{6}Z)(-([0-9]+))?$ ]]; then
-    printf -v __dybatpho_backup_key_ref '%s\001%s\001%09d' \
-      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "$((10#${BASH_REMATCH[4]:-0}))"
+    printf -v __dybatpho_backup_key_ref '%s\001%09d\001%s' \
+      "${BASH_REMATCH[2]}" "$((10#${BASH_REMATCH[4]:-0}))" "${BASH_REMATCH[1]}"
   else
     __dybatpho_backup_key_ref="${__dybatpho_backup_base}"
   fi
@@ -109,9 +109,9 @@ function __dybatpho_backup_sort_key_into {
 #######################################
 # @description Collect a directory's backups into a named array, newest first.
 #   Archives and incremental snapshots are both backups. Each kind is globbed
-#   on its own, and the two are ordered together by name, stamp and
-#   same-second suffix, so the result stays in the order the backups were taken
-#   whatever the caller's collation.
+#   on its own, and the two are ordered together by stamp and same-second
+#   suffix, so the result stays in the order the backups were taken whatever
+#   the names and the caller's collation.
 # @arg $1 string Name of the array variable to fill
 # @arg $2 string Directory holding the backups
 # @arg $3 string Backup name to match, or empty for every name
@@ -173,6 +173,12 @@ function __dybatpho_backup_collect_into {
     ${__dybatpho_backup_files[@]+"${__dybatpho_backup_files[@]}"} \
     ${__dybatpho_backup_trees[@]+"${__dybatpho_backup_trees[@]}"}; do
     __dybatpho_backup_sort_key_into __dybatpho_backup_key "${__dybatpho_backup_path}"
+    # The glob for `web` also matches `web-api-<stamp>`, so a stamped backup
+    # counts only when the name in its key is exactly the one asked for.
+    if [[ -n "${__dybatpho_backup_name}" && "${__dybatpho_backup_key}" == *$'\001'* ]] \
+      && [[ "${__dybatpho_backup_key##*$'\001'}" != "${__dybatpho_backup_name}" ]]; then
+      continue
+    fi
     __dybatpho_backup_at="${#__dybatpho_backup_sorted[@]}"
     while ((__dybatpho_backup_at > 0)) \
       && [[ "${__dybatpho_backup_keys[__dybatpho_backup_at - 1]}" > "${__dybatpho_backup_key}" ]]; do
@@ -245,7 +251,7 @@ function __dybatpho_backup_publish_into {
       continue
     fi
 
-    __dybatpho_backup_staged="${__dybatpho_backup_dest}/.${__dybatpho_backup_final##*/}.$$.partial"
+    __dybatpho_backup_staged="${__dybatpho_backup_dest}/.${__dybatpho_backup_final##*/}.${BASHPID}.partial"
     __dybatpho_backup_staged+=".${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}"
     if ! printf '%s  %s\n' "${__dybatpho_backup_sum}" "${__dybatpho_backup_final##*/}" \
       > "${__dybatpho_backup_staged}" \
@@ -453,7 +459,7 @@ function __dybatpho_backup_snapshot {
   local link_dest=""
   ((${#previous[@]} == 0)) || link_dest="${previous[0]}"
 
-  local partial="${destination}/.${name}-${stamp}.$$.partial.snapshot"
+  local partial="${destination}/.${name}-${stamp}.${BASHPID}.partial.snapshot"
   mkdir -- "${partial}"
   # "dybatpho::backup_create --incremental leaves nothing behind when a file
   # cannot be read" covers these two lines. `dybatpho::die` exits, so that test
@@ -535,7 +541,7 @@ function dybatpho::backup_create {
   # because `archive.sh` reads the format from it, and it starts with a dot,
   # which is what keeps a half-written file out of every listing here: a glob
   # does not match a leading dot.
-  local partial="${destination}/.${name}-${stamp}.$$.partial.${DYBATPHO_BACKUP_EXTENSION}"
+  local partial="${destination}/.${name}-${stamp}.${BASHPID}.partial.${DYBATPHO_BACKUP_EXTENSION}"
   if ! dybatpho::archive_create "${source}" "${partial}"; then
     rm -f -- "${partial}"
     dybatpho::die "${FUNCNAME[0]}: Could not archive: ${source}"

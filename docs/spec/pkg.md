@@ -133,7 +133,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - Homebrew refuses to run under `sudo`, so no elevation prefix is ever added for `brew`.
 - The script already runs as root, or `sudo` is not installed: no elevation prefix is added.
 - `apt-get` can open a debconf dialog: the install command sets a non-interactive frontend.
-- A package name begins with `-`: everything after `--` is treated as a package.
+- A package name begins with `-`: it is refused, because the manager has no `--` of its own and would read it as an option.
 - Homebrew installs formulae and casks into separate scopes, and the default scope of `brew list` has not always covered both: each scope is asked in turn so an installed cask is never reported as missing and reinstalled on every run.
 - `emerge` has no built-in installed-package query: `qlist` is used, then `equery`, and the check reports a warning when neither is present.
 - Every package in the list is already installed: the ensure helper installs nothing and succeeds.
@@ -158,7 +158,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **FR-012**: The exit code of the package manager MUST reach the caller unchanged.
 - **FR-013**: The ensure helper MUST install only the packages that are missing, and MUST succeed without installing anything when they are all present.
 - **FR-014**: The require helper MUST do nothing when the command is available, MUST install the package resolved for this manager otherwise, and MUST fail when the command is still missing after a real install.
-- **FR-015**: Every mutating function MUST treat arguments after `--` as packages, and MUST reject an unknown option and an empty package list.
+- **FR-015**: Every mutating function MUST treat arguments after `--` as packages, MUST reject an unknown option and an empty package list, and MUST refuse a package name beginning with `-`.
 - **FR-016**: The install and update functions, and the command renderer, MUST accept `--arg`/`-a` once per extra manager argument, MUST place those arguments after the manager's own flags and before the package names, and MUST preserve the order they were given in.
 - **FR-017**: `--arg` without a following value MUST stop the script with a message naming the option.
 - **FR-018**: The extra arguments of an install MUST NOT be passed to the index refresh that `--update` runs.
@@ -198,7 +198,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **IT-011**: Verify a non-interactive run without `--force` is skipped, and that `--force` or `DYBATPHO_FORCE` runs the manager.
 - **IT-012**: Verify `--update` refreshes the index before installing, and that the index refresh asks for confirmation on its own.
 - **IT-013**: Verify a non-zero exit code from the package manager reaches the caller.
-- **IT-014**: Verify an unknown option and an empty package list stop the script, and that a package after `--` is passed through.
+- **IT-014**: Verify an unknown option and an empty package list stop the script, and that a package name beginning with `-` is refused before the manager runs.
 - **IT-015**: Verify the ensure helper installs only the missing packages and does nothing when they are all present.
 - **IT-016**: Verify the require helper skips an available command, installs the resolved package name, and fails when the command is still missing.
 - **IT-017**: Verify the rendered install command carries one `--arg` on `brew` and several on `apk`, in order, before the package names.

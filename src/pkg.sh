@@ -242,6 +242,13 @@ function __dybatpho_pkg_action_command_into {
     if [[ "$1" == "--" ]]; then
       shift
       __dybatpho_pkg_cmd_packages+=("$@")
+      # The managers get no `--` of their own, so a name such as
+      # `-oAPT::Update::Pre-Invoke::=cmd` would reach them as an option.
+      local __dybatpho_pkg_cmd_package
+      for __dybatpho_pkg_cmd_package in "$@"; do
+        [[ "${__dybatpho_pkg_cmd_package}" != -* ]] \
+          || dybatpho::die "${FUNCNAME[1]}: invalid package name '${__dybatpho_pkg_cmd_package}'"
+      done
       break
     fi
     __dybatpho_pkg_cmd_extra+=("$1")
@@ -506,7 +513,7 @@ function dybatpho::pkg_missing {
 # @arg $1 string Option `--arg`/`-a` to pass one extra argument to the manager, repeatable
 # @arg $@ string Package names, optionally after a `--` separator
 # @stdout The install command as a single quoted line
-# @exitcode 1 No package manager was detected
+# @exitcode 1 No package manager was detected, or a package name begins with `-`
 #######################################
 function dybatpho::pkg_install_command {
   local -a extra_args=() packages=()
@@ -573,7 +580,7 @@ function dybatpho::pkg_update {
 #   to refresh the index first, `--arg`/`-a` to pass one extra argument to the manager, repeatable
 # @arg $@ string Packages, optionally after a `--` separator
 # @exitcode 0 The packages were installed, or the command was printed
-# @exitcode 1 The install is declined, the command failed, or no manager was detected
+# @exitcode 1 The install is declined, the command failed, no manager was detected, or a package name begins with `-`
 # @env DYBATPHO_DRY_RUN string When true-like, print the command instead of running it
 # @env DYBATPHO_FORCE bool Approve the change without prompting
 # @tip An `--arg` belongs to the install command alone: the `--update` refresh that may run before it is never given the

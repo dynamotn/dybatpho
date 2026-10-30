@@ -151,6 +151,20 @@ setup() {
   assert_output --partial "Metric 's_seconds' is already recorded as a summary"
 }
 
+@test "a metric keeps the type it was first recorded as" {
+  dybatpho::metrics_counter_inc jobs 3
+  run dybatpho::metrics_gauge_set jobs 7
+  assert_failure
+  assert_output --partial "dybatpho::metrics_gauge_set: Metric 'jobs' is already recorded as a counter"
+  run dybatpho::metrics_observe_ms jobs 12
+  assert_failure
+  assert_output --partial "Metric 'jobs' is already recorded as a counter"
+  dybatpho::metrics_gauge_set depth 1
+  run dybatpho::metrics_counter_inc depth
+  assert_failure
+  assert_output --partial "Metric 'depth' is already recorded as a gauge"
+}
+
 @test "dybatpho::metrics_reset forgets the samples of a summary" {
   dybatpho::metrics_summary_ms d_seconds 900
   dybatpho::metrics_reset
@@ -228,6 +242,15 @@ setup() {
   assert_line --index 5 "jobs_total 1"
 }
 
+@test "dybatpho::metrics_render escapes a line break and a backslash in HELP text" {
+  dybatpho::metrics_help up $'First line\nsecond \\ line'
+  dybatpho::metrics_gauge_set up 1
+  run dybatpho::metrics_render
+  assert_line --index 0 '# HELP up First line\nsecond \\ line'
+  assert_line --index 1 "# TYPE up gauge"
+  assert_line --index 2 "up 1"
+}
+
 @test "dybatpho::metrics_render prints nothing when nothing was recorded" {
   run dybatpho::metrics_render
   assert_output ""
@@ -262,6 +285,16 @@ setup() {
   run find "${BATS_TEST_TMPDIR}" -name '.dybatpho_staging_*'
   assert_output ""
   run ! dybatpho::metrics_write "${BATS_TEST_TMPDIR}/missing/dir/metrics.prom"
+}
+
+@test "dybatpho::metrics_write keeps the previous file when rendering fails" {
+  dybatpho::metrics_counter_inc jobs_total
+  dybatpho::metrics_summary_ms step_seconds 5
+  local target="${BATS_TEST_TMPDIR}/metrics.prom"
+  printf 'previous\n' > "${target}"
+  DYBATPHO_METRICS_QUANTILES=2 run ! dybatpho::metrics_write "${target}"
+  assert_output --partial "Quantile must be a number from 0 to 1"
+  assert_equal "$(< "${target}")" "previous"
 }
 
 @test "logged messages are counted by level" {
@@ -341,6 +374,31 @@ setup() {
   DYBATPHO_CURL_MAX_RETRIES=0 run -4 dybatpho::metrics_push http://pushgateway.test nightly
   assert_output --partial "Pushgateway refused the push to http://pushgateway.test/metrics/job/nightly (exit 4)"
   assert_output --partial "text format parsing error in line 1"
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push keeps gateway credentials out of its error" {
+  dybatpho::mock_http "pushgateway.test" 500 "boom"
+  dybatpho::metrics_counter_inc jobs_total
+  DYBATPHO_CURL_MAX_RETRIES=0 run -5 dybatpho::metrics_push https://ci:S3cretPass@pushgateway.test nightly
+  assert_output --partial "Pushgateway refused the push to https://pushgateway.test/metrics/job/nightly (exit 5)"
+  refute_output --partial "S3cretPass"
+  dybatpho::unmock_all
+}
+
+@test "dybatpho::metrics_push keeps a password holding a slash out of every message" {
+  dybatpho::mock_http "gw" 500 "boom"
+  run -0 dybatpho::metrics_push http://alice:pa/ss@gw:9091 nightly
+  assert_output --partial "nothing was pushed to http://gw:9091"
+  refute_output --partial "pa/ss"
+  run dybatpho::metrics_push ftp://alice:pa/ss@gw nightly
+  assert_output --partial "got 'ftp://gw'"
+  refute_output --partial "pa/ss"
+  dybatpho::metrics_counter_inc jobs_total
+  DYBATPHO_CURL_MAX_RETRIES=0 run dybatpho::metrics_push http://alice:pa/ss@gw:9091 nightly
+  assert_failure
+  assert_output --partial "Pushgateway refused the push to http://gw:9091/metrics/job/nightly"
+  refute_output --partial "pa/ss"
   dybatpho::unmock_all
 }
 

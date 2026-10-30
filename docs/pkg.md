@@ -279,7 +279,7 @@ dybatpho::pkg_install_command --arg --cask -- firefox   # brew install --cask fi
 
 **🚦 Exit codes**
 
-- `1`: No package manager was detected
+- `1`: No package manager was detected, or a package name begins with `-`
 
 ---
 
@@ -344,7 +344,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 **🚦 Exit codes**
 
 - `0`: The packages were installed, or the command was printed
-- `1`: The install is declined, the command failed, or no manager was detected
+- `1`: The install is declined, the command failed, no manager was detected, or a package name begins with `-`
 
 ---
 

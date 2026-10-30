@@ -261,6 +261,79 @@ setup() {
   assert_output --partial "expected a source and a destination"
 }
 
+@test "safe_overwrite and safe_copy judge a destination link by its target" {
+  local root="${BATS_TEST_TMPDIR}/root" outside="${BATS_TEST_TMPDIR}/outside"
+  mkdir -p "${root}" "${outside}" "${BATS_TEST_TMPDIR}/hop"
+  printf 'keep\n' > "${outside}/victim"
+  printf 'new\n' > "${BATS_TEST_TMPDIR}/source"
+  printf 'old\n' > "${root}/inside"
+  ln -s "${outside}/victim" "${root}/direct"
+  # A relative target is read from the directory holding the link.
+  ln -s ../outside/victim "${BATS_TEST_TMPDIR}/hop/relative"
+  ln -s "${BATS_TEST_TMPDIR}/hop/relative" "${root}/chained"
+  ln -s inside "${root}/ok"
+  export DYBATPHO_SAFE_ROOTS="${root}:${BATS_TEST_TMPDIR}/hop"
+
+  run dybatpho::safe_overwrite --force "${root}/direct"
+  assert_failure
+  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${outside}/victim"
+  run dybatpho::safe_copy --force "${BATS_TEST_TMPDIR}/source" "${root}/chained"
+  assert_failure
+  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${outside}/victim"
+  assert_equal "$(< "${outside}/victim")" "keep"
+
+  dybatpho::safe_copy --force "${BATS_TEST_TMPDIR}/source" "${root}/ok"
+  assert_equal "$(< "${root}/inside")" "new"
+}
+
+@test "dybatpho::safe_move refuses a protected source or one outside the safe roots" {
+  local root="${BATS_TEST_TMPDIR}/root"
+  mkdir -p "${root}" "${BATS_TEST_TMPDIR}/keep" "${BATS_TEST_TMPDIR}/elsewhere"
+
+  DYBATPHO_PROTECTED_PATHS="${BATS_TEST_TMPDIR}/keep" \
+    run dybatpho::safe_move --force "${BATS_TEST_TMPDIR}/keep" "${BATS_TEST_TMPDIR}/moved"
+  assert_failure
+  assert_output --partial "Refusing to touch protected source: ${BATS_TEST_TMPDIR}/keep"
+  DYBATPHO_SAFE_ROOTS="${root}" \
+    run dybatpho::safe_move --force "${BATS_TEST_TMPDIR}/elsewhere" "${root}/moved"
+  assert_failure
+  assert_output --partial "source outside DYBATPHO_SAFE_ROOTS"
+  [[ -d "${BATS_TEST_TMPDIR}/keep" ]]
+  [[ -d "${BATS_TEST_TMPDIR}/elsewhere" ]]
+}
+
+@test "safe_move hands mv the source as written" {
+  cd "${BATS_TEST_TMPDIR}"
+  mkdir -p sub
+  printf 'v1\n' > source.txt
+
+  DRY_RUN=true run dybatpho::safe_move --force sub/../source.txt moved.txt
+  assert_success
+  assert_output --partial "DRY RUN: mv -f -- sub/../source.txt moved.txt"
+}
+
+@test "assert_safe_path refuses a '..' that steps back out of a linked directory" {
+  local root="${BATS_TEST_TMPDIR}/root" outside="${BATS_TEST_TMPDIR}/outside"
+  mkdir -p "${root}" "${outside}/sub"
+  ln -s "${outside}/sub" "${root}/d"
+  ln -s d/../victim "${root}/link"
+
+  # The kernel reads `d/..` as `outside`, not as the root the text folds to.
+  DYBATPHO_SAFE_ROOTS="${root}" run dybatpho::safe_overwrite --force "${root}/d/../victim"
+  assert_failure
+  assert_output --partial "steps back out of a symbolic link: ${root}/d/../victim"
+  DYBATPHO_SAFE_ROOTS="${root}" run dybatpho::safe_overwrite --force "${root}/link"
+  assert_failure
+  assert_output --partial "steps back out of a symbolic link"
+  [[ ! -e "${outside}/victim" ]]
+
+  # A `..` over a plain directory still folds as written.
+  mkdir "${root}/plain"
+  DYBATPHO_SAFE_ROOTS="${root}" run_traced dybatpho::assert_safe_path "${root}/plain/../file"
+  assert_success
+  assert_output "${root}/file"
+}
+
 @test "safe_rm and safe_overwrite accept the short option forms" {
   local target="${BATS_TEST_TMPDIR}/short.txt"
   local tree="${BATS_TEST_TMPDIR}/tree"
@@ -414,6 +487,19 @@ function _create_traversal_archive {
   assert_failure
   assert_output --partial "Refusing to extract entry outside ${destination}: ../victim.txt"
   [ ! -e "${BATS_TEST_TMPDIR}/victim.txt" ]
+}
+
+@test "dybatpho::safe_extract refuses a symbolic link that points outside" {
+  local tree="${BATS_TEST_TMPDIR}/links" archive_path="${BATS_TEST_TMPDIR}/links.tar"
+  local destination="${BATS_TEST_TMPDIR}/out"
+  mkdir -p "${tree}"
+  ln -s ../../victim "${tree}/link"
+  tar -C "${tree}" -cf "${archive_path}" link
+
+  run dybatpho::safe_extract --force "${archive_path}" "${destination}"
+  assert_failure
+  assert_output --partial "a symbolic link in it points outside"
+  [ ! -L "${destination}/link" ]
 }
 
 @test "dybatpho::safe_extract refuses an archive it cannot list" {

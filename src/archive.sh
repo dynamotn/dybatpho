@@ -283,6 +283,8 @@ function dybatpho::archive_extract {
   format=$(__dybatpho_archive_format "${archive_path}") || return $?
   [[ "${strip_components}" =~ ^[0-9]+$ ]] || dybatpho::die \
     "strip-components must be a non-negative integer: ${strip_components}"
+  # Base ten: `08` is eight, not an invalid octal number.
+  strip_components=$((10#${strip_components}))
   if ((strip_components > 0)); then
     strip_args=(--strip-components "${strip_components}")
   fi
@@ -386,7 +388,102 @@ function __dybatpho_archive_entry_is_safe {
 }
 
 #######################################
-# @description List archive entries that would escape the extraction directory.
+# @description Return success when a symbolic link entry points inside the
+#   extraction directory. The target is resolved against the entry's own
+#   directory, so `a/link -> ../b` stays inside while `link -> ../b` does not.
+# @arg $1 string Entry name of the link
+# @arg $2 string Target the link points at
+# @exitcode 0 The target stays inside the extraction directory
+# @exitcode 1 The target is empty, absolute, or climbs out of the directory
+# @internal
+#######################################
+function __dybatpho_archive_link_is_safe {
+  local entry target
+  dybatpho::expect_args entry target -- "$@"
+  local normalized="${target//\\//}"
+  # shellcheck disable=SC2088 # the `~/` branch matches a literal target, it never expands
+  case "${normalized}" in
+    '' | /* | '~/'* | [a-zA-Z]:/*) return 1 ;;
+    *) ;; # kcov(skip) - a case arm has no command to fire on
+  esac
+  local parent="${entry//\\//}"
+  parent="${parent%/}"
+  if [[ "${parent}" == */* ]]; then
+    parent="${parent%/*}"
+  else
+    parent=""
+  fi
+  local part depth=0
+  local -a parts=()
+  IFS=/ read -r -a parts <<< "${parent}/${normalized}"
+  for part in ${parts[@]+"${parts[@]}"}; do
+    case "${part}" in
+      '' | .) ;; # kcov(skip) - a case arm has no command to fire on
+      ..)
+        depth=$((depth - 1))
+        ((depth >= 0)) || return 1
+        ;;
+      *) depth=$((depth + 1)) ;;
+    esac
+  done
+  return 0
+}
+
+#######################################
+# @description Collect the targets of an archive's symbolic links.
+#   The plain listing names a link but not where it points, and a link that
+#   points outside lets a later entry, or a later archive, write through it.
+#   The long listing is read in the same order as the plain one, so each line
+#   is paired with the name the plain listing gave it rather than parsed apart.
+# @arg $1 string Name of the associative array receiving entry -> target
+# @arg $2 string Archive file path
+# @arg $3 string Its plain listing, one entry per line
+# @set The named array
+# @exitcode 0 The targets were collected
+# @exitcode other The long listing failed, with its status
+# @internal
+#######################################
+function __dybatpho_archive_link_targets_into {
+  local targets_var archive_path listing
+  dybatpho::expect_args targets_var archive_path listing -- "$@"
+  local -n __dybatpho_archive_targets_ref="${targets_var}"
+  local format tool letter verbose line name status=0
+  local -a prefix=() pack=() unpack=() names=() lines=()
+  format=$(__dybatpho_archive_format "${archive_path}") || return $?
+  if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
+    verbose="$(tar ${prefix[@]+"${prefix[@]}"} "-tv${letter}f" "${archive_path}")" || status=$?
+  elif __dybatpho_archive_codec_into tool pack unpack "${format}"; then
+    return 0
+  else
+    verbose="$(unzip -Z "${archive_path/#-/./-}")" || status=$?
+  fi
+  ((status == 0)) || return "${status}"
+  mapfile -t names <<< "${listing}"
+  while IFS= read -r line; do
+    # `unzip -Z` frames its entries with a header and a total; an entry line
+    # opens with its ten-character mode.
+    [[ "${format}" != zip || "${line}" =~ ^[^[:space:]]{10}[[:space:]] ]] && lines+=("${line}")
+  done <<< "${verbose}"
+  local index
+  for ((index = 0; index < ${#lines[@]}; index++)); do
+    [[ "${lines[index]}" == l* ]] || continue
+    name="${names[index]-}"
+    if [[ "${format}" == zip ]]; then
+      # zip keeps the target as the link's content.
+      __dybatpho_archive_targets_ref["${name}"]="$(unzip -p "${archive_path/#-/./-}" "${name}")"
+    elif [[ "${lines[index]}" == *" ${name} -> "* ]]; then
+      __dybatpho_archive_targets_ref["${name}"]="${lines[index]#*" ${name} -> "}"
+    else
+      # A line that cannot be paired with its name cannot be vouched for.
+      __dybatpho_archive_targets_ref["${name}"]="/"
+    fi
+  done
+}
+
+#######################################
+# @description List archive entries that would escape the extraction directory:
+#   a path that is absolute or climbs out through `..`, and a symbolic link
+#   whose target does, resolved from the link's own directory.
 #   An archive that cannot be listed -- corrupt, truncated, or a zip with no
 #   `unzip` installed -- is a failure, not an empty list: no entry was checked,
 #   so none can be vouched for.
@@ -403,10 +500,15 @@ function dybatpho::archive_unsafe_entries {
   dybatpho::expect_args archive_path -- "$@"
   local entry
   local archive_list_output
+  local -A links=()
   __dybatpho_archive_list_into archive_list_output "${archive_path}" || return $?
+  __dybatpho_archive_link_targets_into links "${archive_path}" "${archive_list_output}" || return $?
   while IFS= read -r entry || [[ -n "${entry}" ]]; do
     [[ -n "${entry}" ]] || continue
     if ! __dybatpho_archive_entry_is_safe "${entry}"; then
+      printf '%s\n' "${entry}"
+    elif [[ -n "${links[${entry}]+set}" ]] \
+      && ! __dybatpho_archive_link_is_safe "${entry}" "${links[${entry}]}"; then
       printf '%s\n' "${entry}"
     fi
     # kcov never records the `done` of a loop fed by a process substitution;
@@ -419,7 +521,7 @@ function dybatpho::archive_unsafe_entries {
 # @arg $1 string Archive file path
 # @stderr An error when the archive cannot be listed
 # @exitcode 0 Every entry is a safe relative path
-# @exitcode 1 At least one entry is absolute or traverses outside the destination
+# @exitcode 1 At least one entry, or symbolic link target, is absolute or traverses outside the destination
 # @exitcode other The archive could not be listed, so nothing was checked
 #######################################
 function dybatpho::archive_is_safe {

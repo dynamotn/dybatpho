@@ -199,6 +199,8 @@ dybatpho::secret_wipe TOKEN
 - **FR-025**: `dybatpho::secret_shred` MUST remove a symbolic link without writing through it.
 - **FR-026**: `secret_write_file` MUST write a relative path beginning with a dash, and MUST NOT leave the staging copy behind.
 - **FR-027**: `secret_shred` MUST overwrite every byte when it falls back from `shred`, in whole blocks followed by the remaining bytes.
+- **FR-028**: Masking MUST write `DYBATPHO_SECRET_PLACEHOLDER` literally, so a `&` or `\` in it never brings the matched secret back, whatever the Bash version.
+- **FR-029**: `secret_hint` MUST read the count of revealed characters as a decimal, so a zero-padded count such as `08` works and a count too large for Bash arithmetic reveals nothing rather than wrapping round.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -261,6 +263,9 @@ dybatpho::secret_wipe TOKEN
 - **IT-020**: Shred a link to a file and find the link gone and the file intact.
 - **IT-021**: Write a secret to `-token` and find it written with no staging copy left.
 - **IT-022**: Shred an 8197-byte file without `shred` and see a second link to it hold only zero bytes of the same length.
+- **IT-023**: Mask a secret with the placeholder `<&\&>` and see the placeholder, not the secret, in the output.
+- **IT-024**: Ask `secret_hint` to reveal `0` characters and see only the placeholder.
+- **IT-025**: Ask `secret_hint` to reveal `18446744073709551615` characters and see only the placeholder; ask for `08` and see the last eight.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -200,6 +200,8 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-036**: A snapshot, and the checksum of one, MUST be refused when part of the source tree cannot be read, leaving no partial snapshot behind.
 - **FR-037**: `--keep-days` MUST age incremental snapshots by their modification time, as it ages archives.
 - **FR-038**: Snapshot creation and restore MUST resolve relative paths against the working directory whatever `CDPATH` holds, and MUST accept a path beginning with a dash.
+- **FR-039**: Listing, `backup_latest` and `--keep-count` MUST order backups of different names by when they were taken, and a name filter MUST NOT match a longer name that starts with it, such as `web` against `web-api`.
+- **FR-040**: The temporary name of a backup in progress MUST be unique per process, so backups started from subshells of one script in the same second do not share it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -264,6 +266,8 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-042**: Take an incremental snapshot without `rsync` of a source with an unreadable subdirectory, and fail without leaving a snapshot.
 - **IT-043**: Prune with `--keep-days` a backdated snapshot beside a fresh archive, and find the snapshot and its sidecar gone.
 - **IT-044**: Snapshot a relative source with `CDPATH` pointing at a decoy of the same name, and restore a snapshot from a directory named `-bk`.
+- **IT-045**: List and prune `zeta` and a newer `alpha` without a name, and find `alpha` first and kept; list, resolve and prune `web` beside a newer `web-api`, and find only `web` considered and both kept.
+- **IT-046**: Take two backups from two subshells with the clock frozen, and find each wrote its own temporary archive.
 
 ## Acceptance Criteria *(mandatory)*
 

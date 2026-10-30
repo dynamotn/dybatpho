@@ -154,6 +154,9 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   it.
 - A directory of the target path is a symlink that points outside every safe
   root, or at a protected path, while the path as written looks safe.
+- The destination of an overwrite or copy is itself a symlink, whose target a
+  write would reach, or the source of a move is a protected path or lies
+  outside every safe root.
 - The target is a directory and the caller didn't pass `--recursive`.
 - A path begins with `-` and must be passed after a `--` separator.
 - The destination of a copy or move is an existing directory, or its parent
@@ -248,6 +251,16 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **FR-026**: `dybatpho::safe_system` MUST run the command after `--` as an argument vector, never through `eval`, even when it is a single argument.
 - **FR-027**: `dybatpho::assert_safe_path` MUST resolve a root that does not exist yet through the directories above it, so a root under a linked directory accepts the paths inside it.
 - **FR-028**: Every guard MUST act on the whole path it is given, including one holding a newline, never on a shorter path that precedes the newline.
+- **FR-029**: `safe_overwrite`, and through it `safe_copy` and `safe_move`, MUST
+  run every target of a destination symlink chain through `assert_safe_path`,
+  because a write follows the link.
+- **FR-030**: `safe_move` MUST run its source through `assert_safe_path`,
+  because moving a path removes it from where it was.
+- **FR-031**: `assert_safe_path` MUST refuse a path whose `..` steps back out
+  of a linked directory, since the kernel resolves it elsewhere than the
+  normalized path every caller acts on.
+- **FR-032**: `safe_move` MUST hand `mv` the source as the caller wrote it,
+  not the normalized path it validated.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -316,6 +329,15 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **IT-016**: Accept a path beneath a safe root that does not exist yet, compared as written.
 - **IT-017**: Run `safe_system --force demo -- 'echo first; echo INJECTED'` and see nothing injected.
 - **IT-018**: Remove `keep<newline>doomed` with `safe_rm` and find `keep` still there.
+- **IT-019**: Refuse to overwrite or copy onto a link inside a safe root that
+  points outside it, directly or through a second link, and accept one whose
+  target stays inside.
+- **IT-020**: Refuse to move a protected path, or one outside the safe roots,
+  and leave it in place.
+- **IT-021**: Refuse to overwrite `root/d/../victim`, and a link to it, where
+  `d` links outside the safe root, and accept a `..` over a plain directory.
+- **IT-022**: Move `sub/../source.txt` under `DYBATPHO_DRY_RUN` and see `mv`
+  given that path as written.
 
 ## Acceptance Criteria *(mandatory)*
 

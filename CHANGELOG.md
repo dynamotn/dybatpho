@@ -181,6 +181,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   as unrestricted, as cron does.**
 - **`agent` — `dybatpho::agent_mode` ignores `DYBATPHO_AGENT_ENV` entries that
   are not variable names, and no longer expands `*` to file names.**
+- **`metrics` — recording a metric as a different type from its first recording
+  stops the script instead of silently dropping the value.**
+- **`metrics` — `dybatpho::metrics_render` escapes a line break and a backslash
+  in HELP text, so the exposition stays parseable.**
+- **`metrics` — `dybatpho::metrics_write` leaves the previous file in place when
+  the metrics cannot be rendered.**
 - **`file` — `dybatpho::file_write_atomic` and the other file writers write
   through a relative symlink reached via a symlinked directory to the file it
   really points at, instead of creating a new file elsewhere.**
@@ -204,6 +210,18 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   a subshell.**
 - **`ai` — the call counter's lock no longer lets two jobs hold it at once when
   waiters take over a stale lock together.**
+- **`safety` — `dybatpho::safe_move` moves the source path as given, instead of
+  its normalised form, which could name a different file.**
+- **`secret` — `dybatpho::secret_hint` reads a zero-padded count such as `08` as
+  decimal, and a count too large for Bash arithmetic reveals nothing instead of
+  almost the whole secret.**
+- **`backup` — `dybatpho::backup_list`, `backup_latest` and `backup_prune
+  --keep-count` order backups of different names by when they were taken, so
+  pruning without `--name` no longer deletes the newest backup.**
+- **`backup` — `dybatpho::backup_create` run from several subshells of one
+  script in the same second no longer fails on a shared temporary file.**
+- **`archive` — `dybatpho::archive_extract` reads a strip-components count such
+  as `08` in base ten instead of silently extracting unstripped paths.**
 
 ### Security
 
@@ -220,6 +238,20 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   files the script still needed.
 - **`ai` — the AI helpers mask registered secrets in the system prompt and in
   tool output before sending them to the provider.**
+- **`safety` — `dybatpho::safe_overwrite` and `dybatpho::safe_copy` no longer
+  write through a symlink whose target lies outside `DYBATPHO_SAFE_ROOTS` or on
+  a protected path.**
+- **`safety` — `dybatpho::safe_move` refuses to move a protected source or one
+  outside `DYBATPHO_SAFE_ROOTS`.**
+- **`secret` — `dybatpho::secret_hint` with a reveal count of `0` no longer
+  prints the whole secret.**
+- **`secret` — masking keeps a `&` or `\` in `DYBATPHO_SECRET_PLACEHOLDER`
+  literal on Bash 5.2+, so the secret no longer reappears in logs and masked
+  output.**
+- **`pkg` — the install helpers refuse a package name beginning with `-`, which
+  the package manager would otherwise read as an option.**
+- **`metrics` — `dybatpho::metrics_push` no longer logs the `user:password@` of
+  the Pushgateway URL when a push is refused.**
 - **`lock` — `dybatpho::lock_acquire` no longer takes a lock that a live process
   holds in the older directory form.** It used to report success while both
   processes ran.
@@ -233,6 +265,21 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   script as a plain number even when the flag is not given.**
 - **`ai` — `dybatpho::ai_conversation_add` masks registered secrets before
   storing a turn, so `dybatpho::ai_chat` never sends them.**
+- **`safety` — `dybatpho::assert_safe_path`, and through it `safe_rm`,
+  `safe_overwrite`, `safe_copy` and `safe_move`, refuses a path whose `..` steps
+  back out of a symlinked directory, which could reach a file outside
+  `DYBATPHO_SAFE_ROOTS`.**
+- **`metrics` — `dybatpho::metrics_push` no longer shows the gateway's
+  `user:password` in any message, including the "nothing was pushed" warning and
+  passwords that contain an unencoded `/`.**
+- **`backup` — `dybatpho::backup_prune --name web` no longer deletes the backups
+  of `web-api` and other names that start with it.**
+- **`archive` — `dybatpho::archive_is_safe` and
+  `dybatpho::archive_unsafe_entries` report a symbolic link entry that points
+  outside the extraction directory.**
+- **`safety` — `dybatpho::safe_extract`, and `dybatpho::backup_restore` through
+  it, refuse an archive holding a symbolic link that points outside the
+  destination.**
 
 ## [7.0.0] - 2026-10-23
 

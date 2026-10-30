@@ -251,10 +251,14 @@ setup() {
   assert_output --partial "expected at least one package"
 }
 
-@test "dybatpho::pkg_install passes a package that looks like an option after --" {
-  DYBATPHO_PKG_MANAGER=apk
-  run_traced -0 dybatpho::pkg_install --dry-run -- --weird-name
-  assert_output --partial "DRY RUN: apk add --weird-name"
+@test "dybatpho::pkg_install refuses a package name the manager would read as an option" {
+  DYBATPHO_PKG_MANAGER=apt
+  stub_repeated apt-get ": echo 'apt-get should not run'"
+  run ! dybatpho::pkg_install --force -- curl '-oAPT::Update::Pre-Invoke::=touch pwned'
+  assert_output --partial "dybatpho::pkg_install: invalid package name '-oAPT::Update::Pre-Invoke::=touch pwned'"
+  refute_output --partial "apt-get should not run"
+  run ! dybatpho::pkg_install_command -- --allow-downgrades
+  assert_output --partial "dybatpho::pkg_install_command: invalid package name '--allow-downgrades'"
 }
 
 @test "dybatpho::pkg_update asks before refreshing the index" {

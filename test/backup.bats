@@ -79,6 +79,26 @@ plant() {
   assert_file_exist "${second}"
 }
 
+@test "dybatpho::backup_create gives each subshell its own temporary archive" {
+  # `$$` is the same in every subshell, so two backups run as `( ... ) &` in
+  # the same second wrote one temporary file, and the second could not publish.
+  dybatpho::date_now() { printf '20260101T000000Z\n'; }
+  local record="${BATS_TEST_TMPDIR}/partials"
+  # shellcheck disable=SC2329 # invoked by backup_create
+  dybatpho::archive_create() {
+    printf '%s\n' "$2" >> "${record}"
+    printf 'archive\n' > "$2"
+  }
+
+  (dybatpho::backup_create "${SOURCE}" "${DEST}" snap > /dev/null)
+  (dybatpho::backup_create "${SOURCE}" "${DEST}" snap > /dev/null)
+
+  local -a partials=()
+  mapfile -t partials < "${record}"
+  assert_equal "${#partials[@]}" "2"
+  [ "${partials[0]}" != "${partials[1]}" ]
+}
+
 @test "dybatpho::backup_create never shows a backup without its complete sidecar" {
   # The backup used to be moved into place first and its sidecar written after,
   # with a plain redirection. When that write failed -- here because something
@@ -297,6 +317,45 @@ plant() {
   run_traced -0 dybatpho::backup_list "${DEST}" snap
   assert_equal "${#lines[@]}" 2
   assert_line "${DEST}/snap-manual.tar.gz"
+}
+
+@test "dybatpho::backup_list orders backups of different names by when they were taken" {
+  # The key used to lead with the name, so without a name filter `zeta` listed
+  # ahead of a newer `alpha`, and `--keep-count` deleted the newest backup.
+  plant "zeta-20260101T000000Z.tar.gz"
+  plant "alpha-20260301T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_list "${DEST}"
+  assert_success
+  assert_line --index 0 "${DEST}/alpha-20260301T000000Z.tar.gz"
+  assert_line --index 1 "${DEST}/zeta-20260101T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_latest "${DEST}"
+  assert_output "${DEST}/alpha-20260301T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_prune --keep-count 1 --force "${DEST}"
+  assert_success
+  assert_file_exist "${DEST}/alpha-20260301T000000Z.tar.gz"
+  assert_file_not_exist "${DEST}/zeta-20260101T000000Z.tar.gz"
+}
+
+@test "dybatpho::backup_list does not count a longer name that starts with the one asked for" {
+  # The glob for `web` matches `web-api-<stamp>` too, and pruning `web` then
+  # deleted the only `web` backup in favour of a newer `web-api` one.
+  plant "web-20260101T000000Z.tar.gz"
+  plant "web-api-20260301T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_list "${DEST}" web
+  assert_success
+  assert_output "${DEST}/web-20260101T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_latest "${DEST}" web
+  assert_output "${DEST}/web-20260101T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_prune --keep-count 1 --name web --force "${DEST}"
+  assert_success
+  assert_file_exist "${DEST}/web-20260101T000000Z.tar.gz"
+  assert_file_exist "${DEST}/web-api-20260301T000000Z.tar.gz"
 }
 
 @test "dybatpho::backup_list leaves a half-written archive out" {

@@ -22,7 +22,7 @@ and `.zst`. Extraction also supports optional strip-components behavior.
 - [`dybatpho::archive_create`](#dybatphoarchive_create) — Create an archive from a file or directory.
 - [`dybatpho::archive_extract`](#dybatphoarchive_extract) — Extract an archive into a target directory.
 - [`dybatpho::archive_list`](#dybatphoarchive_list) — List the contents of an archive without extracting it.
-- [`dybatpho::archive_unsafe_entries`](#dybatphoarchive_unsafe_entries) — List archive entries that would escape the extraction directory. An archive that cannot be listed -- corrupt, truncated, or a zip with no `unzip` installed -- is a failure, not an empty list: no entry was checked, so none can be vouched for.
+- [`dybatpho::archive_unsafe_entries`](#dybatphoarchive_unsafe_entries) — List archive entries that would escape the extraction directory: a path that is absolute or climbs out through `..`, and a symbolic link whose target does, resolved from the link's own directory. An archive that cannot be listed -- corrupt, truncated, or a zip with no `unzip` installed -- is a failure, not an empty list: no entry was checked, so none can be vouched for.
 - [`dybatpho::archive_is_safe`](#dybatphoarchive_is_safe) — Return success when no archive entry escapes the extraction directory.
 
 <a id="see-also"></a>
@@ -96,7 +96,9 @@ List the contents of an archive without extracting it.
 
 ### `dybatpho::archive_unsafe_entries`
 
-List archive entries that would escape the extraction directory.
+List archive entries that would escape the extraction directory:
+a path that is absolute or climbs out through `..`, and a symbolic link
+whose target does, resolved from the link's own directory.
 An archive that cannot be listed -- corrupt, truncated, or a zip with no
 `unzip` installed -- is a failure, not an empty list: no entry was checked,
 so none can be vouched for.
@@ -139,5 +141,5 @@ Return success when no archive entry escapes the extraction directory.
 **🚦 Exit codes**
 
 - `0`: Every entry is a safe relative path
-- `1`: At least one entry is absolute or traverses outside the destination
+- `1`: At least one entry, or symbolic link target, is absolute or traverses outside the destination
 - `other`: The archive could not be listed, so nothing was checked

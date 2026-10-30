@@ -44,7 +44,7 @@ Every wrapper applies the same three rules:
 - [`dybatpho::confirm`](#dybatphoconfirm) — Ask a yes/no question and return the answer as an exit code.
 - [`dybatpho::assert_safe_path`](#dybatphoassert_safe_path) — Validate a path before a destructive operation and print it as an absolute path. The checks are made on the path as written and on the path its directories resolve to through symbolic links, so a link inside a safe root that points elsewhere cannot carry the operation out of it. The last component is not followed, as `rm` and `mv` act on a link itself.
 - [`dybatpho::safe_rm`](#dybatphosafe_rm) — Remove files and directories after validating them and confirming the removal.
-- [`dybatpho::safe_overwrite`](#dybatphosafe_overwrite) — Confirm that an existing file may be replaced, optionally keeping a backup.
+- [`dybatpho::safe_overwrite`](#dybatphosafe_overwrite) — Confirm that an existing file may be replaced, optionally keeping a backup. A destination that is a symbolic link is judged by its target as well, since a write goes through the link.
 - [`dybatpho::safe_copy`](#dybatphosafe_copy) — Copy a file or directory, guarding the destination against an accidental overwrite.
 - [`dybatpho::safe_move`](#dybatphosafe_move) — Move a file or directory, guarding the destination against an accidental overwrite.
 - [`dybatpho::safe_extract`](#dybatphosafe_extract) — Extract an archive after rejecting entries that escape the destination.
@@ -184,6 +184,7 @@ component is not followed, as `rm` and `mv` act on a link itself.
 **🚦 Exit codes**
 
 - `1`: Stop the script when the path is empty, protected, or outside `DYBATPHO_SAFE_ROOTS`
+- `1`: Stop the script when a `..` in the path steps back out of a linked directory, which the kernel resolves elsewhere than the normalized path
 
 ---
 
@@ -214,6 +215,8 @@ Remove files and directories after validating them and confirming the removal.
 ### `dybatpho::safe_overwrite`
 
 Confirm that an existing file may be replaced, optionally keeping a backup.
+A destination that is a symbolic link is judged by its target as well,
+since a write goes through the link.
 
 **🧾 Arguments**
 
@@ -281,7 +284,7 @@ Move a file or directory, guarding the destination against an accidental overwri
 **🚦 Exit codes**
 
 - `0`: The move is done
-- `1`: The overwrite is declined, or the script stops when the source is missing
+- `1`: The overwrite is declined, or the script stops when the source is missing, protected, or outside `DYBATPHO_SAFE_ROOTS`
 
 ---
 

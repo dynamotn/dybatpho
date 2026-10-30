@@ -100,11 +100,12 @@ function __dybatpho_secret_mask_var {
   # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
   # the masking tests run these lines, unseen.
   __dybatpho_secret_trace_off __dybatpho_mask_trace
+  # The placeholder is quoted in the loop, or Bash 5.2's `patsub_replacement` reads a `&` in it as the secret.
   local -n __dybatpho_mask_target="${__dybatpho_mask_name}"                                                # kcov(skip)
   local __dybatpho_mask_value                                                                              # kcov(skip)
-  local __dybatpho_mask_with="${DYBATPHO_SECRET_PLACEHOLDER}"                                              # kcov(skip)
+  local __dybatpho_mask_to="${DYBATPHO_SECRET_PLACEHOLDER}"                                                # kcov(skip)
   for __dybatpho_mask_value in ${DYBATPHO_SECRET_VALUES[@]+"${DYBATPHO_SECRET_VALUES[@]}"}; do             # kcov(skip)
-    __dybatpho_mask_target="${__dybatpho_mask_target//"${__dybatpho_mask_value}"/${__dybatpho_mask_with}}" # kcov(skip)
+    __dybatpho_mask_target="${__dybatpho_mask_target//"${__dybatpho_mask_value}"/"${__dybatpho_mask_to}"}" # kcov(skip)
   done
   __dybatpho_secret_trace_on "${__dybatpho_mask_trace}" # kcov(skip)
 }
@@ -267,7 +268,11 @@ function dybatpho::secret_hint {
   dybatpho::expect_args value -- "$@"
   reveal="${2:-4}"
   [[ "${reveal}" =~ ^[0-9]+$ ]] || dybatpho::die "${FUNCNAME[0]}: Expected a number of revealed characters"
-  if ((${#value} <= reveal * 2)); then
+  # Capped, or a long count wraps round to a negative one; `10#` keeps `08` decimal.
+  ((${#reveal} <= 9)) || reveal=999999999
+  reveal=$((10#${reveal}))
+  # `${value: -0}` is the whole value, so revealing nothing is its own case.
+  if ((reveal == 0 || ${#value} <= reveal * 2)); then
     printf '%s\n' "${DYBATPHO_SECRET_PLACEHOLDER}"
   else
     printf '%s%s\n' "${DYBATPHO_SECRET_PLACEHOLDER}" "${value: -reveal}"

@@ -184,6 +184,11 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-028**: A command timed by `metrics_time` MUST see the caller's variables and MUST NOT change what is recorded by assigning to one: the timer MUST keep its state in prefixed locals.
 - **FR-029**: Counter amounts, durations, and the bounds in `DYBATPHO_METRICS_BUCKETS_MS` MUST be read in base ten whatever zeros they lead with, and a bucket MUST count against the bound it renders.
 - **FR-030**: `dybatpho::metrics_render` MUST order metric names, series and labels in byte order, whatever the locale.
+- **FR-031**: Every recording function MUST stop when the metric is already recorded as another type, rather than keep a value that rendering never reads.
+- **FR-032**: `dybatpho::metrics_render` MUST escape `\` and a line break in HELP text.
+- **FR-033**: `dybatpho::metrics_write` MUST leave the destination untouched when the metrics cannot be rendered.
+- **FR-034**: `dybatpho::metrics_push` MUST drop the `user:password@` of the gateway URL from the error it logs.
+- **FR-035**: Every message of `dybatpho::metrics_push` that names the gateway MUST drop everything from `scheme://` to the last `@` of the gateway URL, so a password holding an unencoded `/` stays hidden, while keeping the job and grouping path.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -240,6 +245,11 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-030**: Record a summary, make `DYBATPHO_METRICS_QUANTILES` invalid, push, and fail under the name of `metrics_push` without sending a request.
 - **IT-031**: Time a command that reads variables named like the timer's locals and assigns to one, and see the caller's values and the metric recorded under its own name.
 - **IT-032**: Count `08`, observe `09` against the buckets `05,010`, and record a summary sample of `010`; render names and labels that collate differently by locale under `en_US.UTF-8`; render summary quantiles `0`, `0.5` and `1` of unsorted samples.
+- **IT-033**: Record a counter, then set a gauge and observe a duration under its name, and see both refused.
+- **IT-034**: Describe a metric with a line break and a backslash and see one escaped HELP line.
+- **IT-035**: Make the quantiles invalid after recording a summary, write the metrics, and find the previous file intact.
+- **IT-036**: Have a push to `https://user:password@gateway` refused and see the error without the password.
+- **IT-037**: Push to `http://alice:pa/ss@gw:9091` with nothing recorded, to an `ftp://` gateway, and with a refused request, and see none of the messages hold the password.
 
 ## Acceptance Criteria *(mandatory)*
 

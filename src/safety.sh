@@ -101,32 +101,42 @@ function __dybatpho_safety_absolute_path {
 }
 
 #######################################
-# @description Resolve the directories of a normalized absolute path through
-#   their symbolic links, and keep the last component as it is.
-#   The deepest directory that exists is resolved with `cd -P`; the components
-#   below it, which do not exist yet, are appended unchanged. The last
-#   component is never followed: `rm` and `mv` act on a link itself, not on
-#   what it points to, so a link is judged where it is.
-# @arg $1 string Normalized absolute path
+# @description Resolve the directories of an absolute path through their
+#   symbolic links, and keep the last component as it is.
+#   The components are walked the way the kernel walks them: a `..` steps up
+#   from where the link before it really leads, not textually. Components that
+#   do not exist yet are appended unchanged. The last component is never
+#   followed: `rm` and `mv` act on a link itself, not on what it points to, so
+#   a link is judged where it is.
+# @arg $1 string Absolute path
 # @stdout The path with its directories resolved
 # @internal
 #######################################
 function __dybatpho_safety_physical_path {
   local path
   dybatpho::expect_args path -- "$@"
-  if [[ "${path}" == "/" ]]; then
-    printf '/\n'
-    return 0
-  fi
-  local parent="${path%/*}" leaf="${path##*/}" rest="" resolved
-  parent="${parent:-/}"
-  while [[ ! -d "${parent}" ]]; do
-    rest="/${parent##*/}${rest}"
-    parent="${parent%/*}"
-    parent="${parent:-/}"
+  while [[ "${path}" == */ && "${path}" != / ]]; do
+    path="${path%/}"
   done
-  resolved="$(CDPATH='' cd -P -- "${parent}" 2> /dev/null && pwd)" || resolved="${parent}"
-  printf '%s\n' "${resolved%/}${rest}/${leaf}"
+  local -a parts=()
+  __dybatpho_file_split_into parts "${path#/}"
+  local resolved="" part index=0 linked
+  for part in ${parts[@]+"${parts[@]}"}; do
+    index=$((index + 1))
+    case "${part}" in
+      '' | .) ;;
+      ..) resolved="${resolved%/*}" ;;
+      *)
+        if ((index < ${#parts[@]})) && [[ -L "${resolved}/${part}" ]] \
+          && linked="$(CDPATH='' cd -P -- "${resolved}/${part}" 2> /dev/null && pwd)"; then
+          resolved="${linked%/}"
+        else
+          resolved+="/${part}"
+        fi
+        ;;
+    esac
+  done
+  printf '%s\n' "${resolved:-/}"
 }
 
 #######################################
@@ -255,6 +265,8 @@ function dybatpho::confirm {
 # @arg $2 string [default: path] Wording used in error messages
 # @stdout Normalized absolute path, as written
 # @exitcode 1 Stop the script when the path is empty, protected, or outside `DYBATPHO_SAFE_ROOTS`
+# @exitcode 1 Stop the script when a `..` in the path steps back out of a linked directory,
+#   which the kernel resolves elsewhere than the normalized path
 # @env DYBATPHO_SAFE_ROOTS string Colon-separated roots the path must stay inside when set
 # @env DYBATPHO_PROTECTED_PATHS string Extra colon-separated paths that are always rejected
 #######################################
@@ -267,6 +279,15 @@ function dybatpho::assert_safe_path {
   local absolute_path physical_path shown protected_path protected_physical candidate
   absolute_path="$(__dybatpho_safety_absolute_path "${path}")"
   physical_path="$(__dybatpho_safety_physical_path "${absolute_path}")"
+  # Callers act on the folded path, so a `..` that the kernel takes from where
+  # a link leads, somewhere else than the folded path, is refused outright.
+  if [[ "/${path}/" == */../* ]]; then
+    local raw_path="${path}"
+    dybatpho::path_is_abs "${raw_path}" || raw_path="${PWD%/}/${raw_path}"
+    raw_path="$(__dybatpho_safety_physical_path "${raw_path}")"
+    [[ "${raw_path}" == "${physical_path}" ]] \
+      || dybatpho::die "Refusing a ${description} whose '..' steps back out of a symbolic link: ${path}"
+  fi
   shown="${absolute_path}"
   [[ "${physical_path}" == "${absolute_path}" ]] || shown="${absolute_path} (resolves to ${physical_path})"
   local safety_protected_paths_output
@@ -364,6 +385,8 @@ function dybatpho::safe_rm {
 
 #######################################
 # @description Confirm that an existing file may be replaced, optionally keeping a backup.
+#   A destination that is a symbolic link is judged by its target as well,
+#   since a write goes through the link.
 # @arg $1 string Option `--force`/`-f` to skip confirmation, or `--backup`/`-b` to keep a `.bak` copy
 # @arg $2 string Destination path to overwrite
 # @exitcode 0 The destination is free, or replacing it is approved
@@ -380,6 +403,17 @@ function dybatpho::safe_overwrite {
 
   local absolute_path
   absolute_path="$(dybatpho::assert_safe_path "${targets[0]}" "destination")" || return $?
+  # Writing to a link writes to what it points at, so every hop of the chain is
+  # judged too: `assert_safe_path` leaves the last component alone for `rm`.
+  local link_path="${absolute_path}" link_target hops=0
+  while [[ -L "${link_path}" ]] && ((hops++ < 40)); do
+    link_target="$(readlink -- "${link_path}")"
+    if ! dybatpho::path_is_abs "${link_target}"; then
+      link_path="$(__dybatpho_safety_physical_path "${link_path}")"
+      link_target="${link_path%/*}/${link_target}"
+    fi
+    link_path="$(dybatpho::assert_safe_path "${link_target}" "destination")" || return $?
+  done
   if dybatpho::is dir "${absolute_path}"; then
     dybatpho::die "Refusing to overwrite a directory: ${absolute_path}"
   fi
@@ -433,7 +467,8 @@ function dybatpho::safe_copy {
 # @arg $2 string Source path
 # @arg $3 string Destination path or directory
 # @exitcode 0 The move is done
-# @exitcode 1 The overwrite is declined, or the script stops when the source is missing
+# @exitcode 1 The overwrite is declined, or the script stops when the source is missing, protected, or outside
+#   `DYBATPHO_SAFE_ROOTS`
 # @env DYBATPHO_DRY_RUN string When true-like, print the `mv` command instead of running it
 #######################################
 function dybatpho::safe_move {
@@ -460,6 +495,11 @@ function __dybatpho_safety_transfer {
 
   local source_path="${positional[0]}" destination="${positional[1]}"
   dybatpho::is exist "${source_path}" || dybatpho::die "Source doesn't exist: ${source_path}"
+  # A move removes the source, so it is guarded like `safe_rm` guards a path;
+  # only validated: `mv` gets the path as the caller wrote it.
+  if [[ "${mode}" == move ]]; then
+    dybatpho::assert_safe_path "${source_path}" "source" > /dev/null || return $?
+  fi
   destination="$(__dybatpho_safety_transfer_target "${source_path}" "${destination}")"
 
   local -a guard_args=()
@@ -542,6 +582,10 @@ function dybatpho::safe_extract {
     # kcov never records the `done` of a loop fed by a process substitution;
     # "safe_extract extracts a safe archive" runs it.
   done < <(printf '%s' "${archive_list_output}") # kcov(skip)
+  # Entry names alone miss a symbolic link pointing outside, which a later
+  # entry, or a second archive, could then write through.
+  dybatpho::archive_is_safe "${archive_path}" \
+    || dybatpho::die "Refusing to extract ${archive_path}: a symbolic link in it points outside ${destination_path}"
 
   if ((${#collisions[@]})); then
     if ! __dybatpho_safety_approve "${force}" \

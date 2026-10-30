@@ -30,6 +30,7 @@ function _setup_repo {
   git -C "${REPO}" config user.email "dybatpho@example.com"
   git -C "${REPO}" config commit.gpgsign false
   git -C "${REPO}" config tag.gpgsign false
+  git -C "${REPO}" config tag.forcesignannotated false
 
   _commit "feat: first working version"
   git -C "${REPO}" tag -m v1.0.0 v1.0.0

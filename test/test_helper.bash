@@ -61,6 +61,13 @@ unset -v __dybatpho_helper_pattern __dybatpho_helper_lib __dybatpho_helper_lines
 # the real home, generated completions survived from one run to the next, and
 # a later run answered from them without running the code under test.
 export XDG_CACHE_HOME="${BATS_TEST_TMPDIR:-${BATS_FILE_TMPDIR:-${BATS_RUN_TMPDIR:-${TMPDIR:-/tmp}}}}/cache"
+export XDG_STATE_HOME="${XDG_CACHE_HOME%/cache}/state"
+# The host's own git config reached every throwaway repository: with signing
+# forced there (`tag.forcesignannotated`, a signing key the sandbox cannot
+# read), each test commit and tag failed. Tests see only this identity.
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="${XDG_CACHE_HOME%/cache}/gitconfig"
+printf '[user]\n\tname = dybatpho\n\temail = dybatpho@example.test\n[init]\n\tdefaultBranch = main\n' \
+  > "${GIT_CONFIG_GLOBAL}"
 # The module tests reach across the whole library, so the helper asks for every
 # module. A script under test that cares about a narrower module set sources
 # `init.sh` itself in a fresh shell, the way `test/init.bats` does.

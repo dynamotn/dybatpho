@@ -1735,7 +1735,7 @@ setup() {
 # =============================================================================
 
 @test "config:<key> supplies a value when no flag or environment variable is set" {
-  DYBATPHO_CONFIG=([server.port]=9999)
+  DYBATPHO_CONFIG=(["server.port"]=9999)
   # shellcheck disable=2329
   _spec_config_bind() {
     dybatpho::opts::setup "Config bound" CONFIG_ARGS action:'printf "%s" "${CONFIG_PORT}"'
@@ -1758,7 +1758,7 @@ setup() {
 }
 
 @test "the flag beats the environment variable, which beats the config file" {
-  DYBATPHO_CONFIG=([server.port]=3333)
+  DYBATPHO_CONFIG=(["server.port"]=3333)
   # shellcheck disable=2329
   _spec_config_precedence() {
     dybatpho::opts::setup "Precedence" CONFIG_PREC_ARGS action:'printf "%s" "${CONFIG_PREC_PORT}"'
@@ -2622,7 +2622,7 @@ SCRIPT
 }
 
 @test "config:<key> keeps a value bound with export:false out of the environment" {
-  DYBATPHO_CONFIG=([server.port]=9999)
+  DYBATPHO_CONFIG=(["server.port"]=9999)
   # shellcheck disable=2329
   _spec_config_private() {
     dybatpho::opts::setup "Config private" CONFIG_PRIV_ARGS \

@@ -19,8 +19,8 @@ setup() {
   # under a UTF-8 locale, plain spaces where they cannot be written. Which ones
   # they are is checked by "the no-break spaces are seeded only where they can
   # be written"; the other tests check where they go.
-  NBSP="${DYBATPHO_I18N_NUMBER[ru.group]}"
-  NNBSP="${DYBATPHO_I18N_NUMBER[fr.group]}"
+  NBSP="${DYBATPHO_I18N_NUMBER["ru.group"]}"
+  NNBSP="${DYBATPHO_I18N_NUMBER["fr.group"]}"
 }
 
 teardown() {

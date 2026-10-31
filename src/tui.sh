@@ -157,6 +157,38 @@ function __dybatpho_tui_repeat_into {
 }
 
 #######################################
+# @description Cut text down to a number of terminal columns, never leaving half
+#   of a double-width glyph behind. A drawn widget counts the lines it printed
+#   to move back over them, and a line that wraps takes two rows.
+# @arg $1 string Name of the variable receiving the text
+# @arg $2 string Text to cut
+# @arg $3 number Columns available
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_tui_fit_into {
+  local -n __dybatpho_tui_fit_out="$1"
+  local __dybatpho_tui_fit_text="$2" __dybatpho_tui_fit_limit="$3"
+  local -a __dybatpho_tui_fit_chars=()
+  local __dybatpho_tui_fit_char __dybatpho_tui_fit_each __dybatpho_tui_fit_used=0
+
+  if __dybatpho_log_is_ascii "${__dybatpho_tui_fit_text}"; then
+    ((__dybatpho_tui_fit_limit > 0)) || __dybatpho_tui_fit_limit=0
+    __dybatpho_tui_fit_out="${__dybatpho_tui_fit_text:0:__dybatpho_tui_fit_limit}"
+    return 0
+  fi
+  __dybatpho_tui_fit_out=""
+  __dybatpho_log_chars_into __dybatpho_tui_fit_chars "${__dybatpho_tui_fit_text}"
+  for __dybatpho_tui_fit_char in ${__dybatpho_tui_fit_chars[@]+"${__dybatpho_tui_fit_chars[@]}"}; do
+    __dybatpho_log_char_width_into __dybatpho_tui_fit_each "${__dybatpho_tui_fit_char}"
+    ((__dybatpho_tui_fit_used + __dybatpho_tui_fit_each <= __dybatpho_tui_fit_limit)) || break
+    __dybatpho_tui_fit_out+="${__dybatpho_tui_fit_char}"
+    __dybatpho_tui_fit_used=$((__dybatpho_tui_fit_used + __dybatpho_tui_fit_each))
+  done
+  return 0
+}
+
+#######################################
 # @description Hide the cursor while a widget is drawing, and arrange for it to
 #   come back however the script ends.
 #
@@ -253,18 +285,34 @@ function __dybatpho_tui_duration_into {
 }
 
 #######################################
-# @description Validate a whole number, or end the script naming what was wrong.
+# @description Rewrite a whole number in base ten, so a leading zero is not
+#   read as octal: `08` stopped the script and `010` was eight.
+# @arg $1 string Name of the variable holding the value, rewritten in place
+# @exitcode 1 The value is not a whole number of at most 18 digits
+# @internal
+#######################################
+function __dybatpho_tui_whole {
+  local -n __dybatpho_tui_whole_ref="$1"
+  [[ "${__dybatpho_tui_whole_ref-}" =~ ^(-?)([0-9]{1,18})$ ]] || return 1
+  __dybatpho_tui_whole_ref=$((${BASH_REMATCH[1]}10#${BASH_REMATCH[2]}))
+}
+
+#######################################
+# @description Validate a whole number and rewrite it in base ten, or end the
+#   script naming what was wrong. A leading zero is not octal: `08` is eight.
 # @arg $1 string Name of the caller, used in the message
 # @arg $2 string Description of the value, used in the message
-# @arg $3 string Value to check
+# @arg $3 string Name of the variable holding the value, rewritten in place
 # @arg $4 number Smallest value accepted
+# @set The named variable, in base ten
 # @internal
 #######################################
 function __dybatpho_tui_expect_int {
-  [[ "${3-}" =~ ^-?[0-9]+$ ]] \
-    || dybatpho::die "$1: $2 must be a whole number, got '${3-}'"
-  (($3 >= $4)) \
-    || dybatpho::die "$1: $2 must be at least $4, got '$3'"
+  local -n __dybatpho_tui_ei_ref="$3"
+  __dybatpho_tui_whole "$3" \
+    || dybatpho::die "$1: $2 must be a whole number, got '${__dybatpho_tui_ei_ref-}'"
+  ((__dybatpho_tui_ei_ref >= $4)) \
+    || dybatpho::die "$1: $2 must be at least $4, got '${__dybatpho_tui_ei_ref}'"
 }
 
 #######################################
@@ -294,9 +342,9 @@ function dybatpho::tui_bar {
   dybatpho::expect_args current total -- "$@"
   local width="${3:-${DYBATPHO_TUI_BAR_WIDTH}}"
 
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Completed units" "${current}" 0
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Total units" "${total}" 1
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Bar width" "${width}" 1
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Completed units" current 0
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Total units" total 1
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Bar width" width 1
 
   local bar
   __dybatpho_tui_bar_into bar "${current}" "${total}" "${width}"
@@ -431,7 +479,7 @@ function dybatpho::tui_spinner_message {
 #   dybatpho::tui_spinner_stop 0 "Uploaded"
 #   dybatpho::tui_spinner_stop 1 "Upload failed"
 #
-# @arg $1 number [default: 0] Exit status the work ended with
+# @arg $1 number [default: 0] Exit status the work ended with, from 0 to 255
 # @arg $2 string? Closing message, default is none
 # @set DYBATPHO_TUI_SPINNER_PID string Cleared
 # @stderr A success or failure banner, when a message is given
@@ -441,7 +489,11 @@ function dybatpho::tui_spinner_message {
 function dybatpho::tui_spinner_stop {
   local status="${1:-0}"
   local message="${2-}"
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Exit status" "${status}" 0
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Exit status" status 0
+  # `return` keeps only the low byte, and 256 would come back as success.
+  # dyshellint disable=BSG087 # checked and rewritten in base ten by __dybatpho_tui_expect_int
+  ((status <= 255)) \
+    || dybatpho::die "${FUNCNAME[0]}: Exit status must be at most 255, got '${status}'"
 
   if [[ -n "${DYBATPHO_TUI_SPINNER_PID}" ]]; then
     # kcov(disabled)
@@ -497,6 +549,7 @@ function __dybatpho_tui_progress_render {
     # A log line per update would bury the log of a thousand-item loop, so the
     # fallback reports on a percentage grid instead of on every call.
     local step="${DYBATPHO_TUI_PROGRESS_STEP}"
+    __dybatpho_tui_whole step || step=1
     ((step > 0)) || step=1
     local bucket=$((percentage / step * step))
     # The closing frame is a report of the same percentage the last update
@@ -529,7 +582,7 @@ function __dybatpho_tui_progress_render {
   # The same checks `dybatpho::tui_bar` makes, under its name, without the
   # subshell that capturing its output cost on every frame.
   local width="${DYBATPHO_TUI_BAR_WIDTH}"
-  __dybatpho_tui_expect_int dybatpho::tui_bar "Bar width" "${width}" 1
+  __dybatpho_tui_expect_int dybatpho::tui_bar "Bar width" width 1
   __dybatpho_tui_bar_into bar "${current}" "${total}" "${width}"
   printf -v line '%s%s%s %s (%s/%s)%s' \
     "${bold}" "${__dybatpho_tui_progress_label}" "${reset}" \
@@ -558,7 +611,7 @@ function __dybatpho_tui_progress_render {
 function dybatpho::tui_progress_start {
   local label total
   dybatpho::expect_args label total -- "$@"
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Total units" "${total}" 1
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Total units" total 1
 
   __dybatpho_tui_progress_label="${label}"
   DYBATPHO_TUI_PROGRESS_TOTAL="${total}"
@@ -581,12 +634,13 @@ function dybatpho::tui_progress_start {
 function dybatpho::tui_progress_update {
   local current
   dybatpho::expect_args current -- "$@"
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Completed units" "${current}" 0
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Completed units" current 0
 
   if [[ "${__dybatpho_tui_progress_active}" != true ]]; then
     dybatpho::error "${FUNCNAME[0]}: No progress bar is running; start one with dybatpho::tui_progress_start"
     return 1
   fi
+  # dyshellint disable=BSG087 # checked and rewritten in base ten by __dybatpho_tui_expect_int
   ((current <= DYBATPHO_TUI_PROGRESS_TOTAL)) || current="${DYBATPHO_TUI_PROGRESS_TOTAL}"
   DYBATPHO_TUI_PROGRESS_CURRENT="${current}"
   [[ -z "${2-}" ]] || __dybatpho_tui_progress_label="$2"
@@ -602,7 +656,8 @@ function dybatpho::tui_progress_update {
 #######################################
 function dybatpho::tui_progress_step {
   local increment="${1:-1}"
-  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Increment" "${increment}" 0
+  __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Increment" increment 0
+  # dyshellint disable=BSG087 # checked and rewritten in base ten by __dybatpho_tui_expect_int
   dybatpho::tui_progress_update "$((DYBATPHO_TUI_PROGRESS_CURRENT + increment))" "${2-}"
 }
 
@@ -752,7 +807,8 @@ function __dybatpho_tui_defaults_into {
   IFS=',' read -r -a __dybatpho_tui_defaults_tokens <<< "${DYBATPHO_TUI_DEFAULT}"
   for __dybatpho_tui_defaults_token in ${__dybatpho_tui_defaults_tokens[@]+"${__dybatpho_tui_defaults_tokens[@]}"}; do
     __dybatpho_tui_defaults_token="${__dybatpho_tui_defaults_token//[[:space:]]/}"
-    [[ "${__dybatpho_tui_defaults_token}" =~ ^[0-9]+$ ]] || continue
+    [[ "${__dybatpho_tui_defaults_token}" =~ ^[0-9]{1,18}$ ]] || continue
+    __dybatpho_tui_defaults_token=$((10#${__dybatpho_tui_defaults_token}))
     ((__dybatpho_tui_defaults_token >= 1 && __dybatpho_tui_defaults_token <= __dybatpho_tui_defaults_count)) || continue
     __dybatpho_tui_defaults_out+=("${__dybatpho_tui_defaults_token}")
   done
@@ -824,7 +880,8 @@ function __dybatpho_tui_menu_fallback {
     IFS=',' read -r -a __dybatpho_tui_fb_tokens <<< "${__dybatpho_tui_fb_answer}"
     for __dybatpho_tui_fb_token in ${__dybatpho_tui_fb_tokens[@]+"${__dybatpho_tui_fb_tokens[@]}"}; do
       __dybatpho_tui_fb_token="${__dybatpho_tui_fb_token//[[:space:]]/}"
-      [[ "${__dybatpho_tui_fb_token}" =~ ^[0-9]+$ ]] || continue
+      [[ "${__dybatpho_tui_fb_token}" =~ ^[0-9]{1,18}$ ]] || continue
+      __dybatpho_tui_fb_token=$((10#${__dybatpho_tui_fb_token}))
       ((__dybatpho_tui_fb_token >= 1 && __dybatpho_tui_fb_token <= ${#__dybatpho_tui_fb_items[@]})) || continue
       __dybatpho_tui_fb_wanted["${__dybatpho_tui_fb_token}"]=1
     done
@@ -911,6 +968,7 @@ function __dybatpho_tui_menu_interactive {
   fi
 
   local __dybatpho_tui_menu_window="${DYBATPHO_TUI_MENU_HEIGHT}"
+  __dybatpho_tui_whole __dybatpho_tui_menu_window || __dybatpho_tui_menu_window=1
   ((__dybatpho_tui_menu_window >= 1)) || __dybatpho_tui_menu_window=1
   ((__dybatpho_tui_menu_window <= __dybatpho_tui_menu_count)) \
     || __dybatpho_tui_menu_window="${__dybatpho_tui_menu_count}"
@@ -935,6 +993,11 @@ function __dybatpho_tui_menu_interactive {
   local __dybatpho_tui_menu_key
   local __dybatpho_tui_menu_answered=false __dybatpho_tui_menu_cancelled=false
   local __dybatpho_tui_menu_marker __dybatpho_tui_menu_pointer __dybatpho_tui_menu_style
+  local __dybatpho_tui_menu_line __dybatpho_tui_menu_used
+  local __dybatpho_tui_menu_cols __dybatpho_tui_menu_title
+  __dybatpho_tui_menu_cols="$(dybatpho::terminal_width 80)"
+  __dybatpho_tui_fit_into __dybatpho_tui_menu_title "${__dybatpho_tui_menu_prompt}" "${__dybatpho_tui_menu_cols}"
+  __dybatpho_tui_fit_into __dybatpho_tui_menu_hint "${__dybatpho_tui_menu_hint}" "$((__dybatpho_tui_menu_cols - 1))"
 
   __dybatpho_tui_hide_cursor
   while true; do
@@ -948,7 +1011,7 @@ function __dybatpho_tui_menu_interactive {
     __dybatpho_tui_menu_drawn=0
 
     printf '\r%s%s%s\033[K\n' "${__dybatpho_tui_menu_bold}" \
-      "${__dybatpho_tui_menu_prompt}" "${__dybatpho_tui_menu_reset}" >&2
+      "${__dybatpho_tui_menu_title}" "${__dybatpho_tui_menu_reset}" >&2
     __dybatpho_tui_menu_drawn=$((__dybatpho_tui_menu_drawn + 1))
 
     for ((__dybatpho_tui_menu_index = __dybatpho_tui_menu_top;  \
@@ -970,9 +1033,12 @@ function __dybatpho_tui_menu_interactive {
       else
         __dybatpho_tui_menu_marker=""
       fi
-      printf '\r %s %s%s%s%s\033[K\n' "${__dybatpho_tui_menu_pointer}" \
-        "${__dybatpho_tui_menu_style}" "${__dybatpho_tui_menu_marker}" \
-        "${__dybatpho_tui_menu_items[__dybatpho_tui_menu_index]}" \
+      __dybatpho_log_width_into __dybatpho_tui_menu_used "${__dybatpho_tui_menu_pointer}"
+      __dybatpho_tui_fit_into __dybatpho_tui_menu_line \
+        "${__dybatpho_tui_menu_marker}${__dybatpho_tui_menu_items[__dybatpho_tui_menu_index]}" \
+        "$((__dybatpho_tui_menu_cols - 2 - __dybatpho_tui_menu_used))"
+      printf '\r %s %s%s%s\033[K\n' "${__dybatpho_tui_menu_pointer}" \
+        "${__dybatpho_tui_menu_style}" "${__dybatpho_tui_menu_line}" \
         "${__dybatpho_tui_menu_reset}" >&2
       __dybatpho_tui_menu_drawn=$((__dybatpho_tui_menu_drawn + 1))
     done

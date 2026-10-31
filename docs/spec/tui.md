@@ -214,7 +214,8 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   separate calls, so it can bracket a region rather than wrap one command.
 - **FR-008**: Starting a spinner while one is running MUST be refused.
 - **FR-009**: Stopping a spinner MUST return the status it was given, so one
-  call both reports and propagates an outcome.
+  call both reports and propagates an outcome, and MUST refuse a status above
+  255, which `return` would wrap to a different one.
 - **FR-010**: The progress helpers MUST support an absolute move and a relative
   step, and MUST clamp a position past the total.
 - **FR-011**: Advancing a progress bar with no terminal MUST report on a

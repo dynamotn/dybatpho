@@ -16,6 +16,16 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`validate` — `dybatpho::validate_is semver` follows the semver.org grammar,
   as `dybatpho::semver_valid` does,** so `01.2.3` and `1.0.0-a..b` are no longer
   accepted.
+- **`cli` — completion caching no longer keeps serving a truncated completion
+  script after an interrupted or failed write**, such as a full disk.
+- **`tui` — drawn `dybatpho::tui_menu` and `dybatpho::tui_multi_menu` cut the
+  prompt, entries and key hint to the terminal width,** so a long or
+  wide-character entry no longer leaves a duplicate menu behind on every
+  keypress.
+- **`tui` — `dybatpho::tui_spinner_stop` refuses an exit status above 255**
+  instead of returning success for 256.
+- **`screen` — `dybatpho::screen_chart` honours `min:` when it is given without
+  `max:`.**
 - **`init` — `dybatpho::load` no longer reports success for a module whose
   earlier load failed,** and a failed on-demand load is retried on the next call
   instead of being skipped for good.
@@ -29,6 +39,31 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   or in parentheses.
 - **`i18n` — `dybatpho::i18n_tn` is about 2.5 times faster:** it no longer
   starts a subshell per locale in the fallback chain.
+- **`screen` — `screen_sparkline`, `screen_barchart` and `screen_chart` read
+  values such as `08` and `010` as eight and ten** instead of failing or reading
+  octal.
+- **`tui` — `DYBATPHO_TUI_DEFAULT` and typed menu answers with a leading zero
+  (`09`, `010`) select that position.**
+- **`screen` — `screen_layout` constraints (`length:`, `percent:`, `ratio:`,
+  `min:`, `max:`, `fill:`), widget options (`max:`, `min:`, `label_width:`,
+  `selected:`, `offset:`, `widths:`, `active:`), `screen_gauge` and
+  `screen_scrollbar` numbers and the `screen_spans` width are read in base
+  ten:** `08` no longer stops the script and `010` is ten, not eight.
+- **`tui` — `tui_bar`, `tui_spinner_stop`, `tui_progress_start`,
+  `tui_progress_update`, `tui_progress_step`, `DYBATPHO_TUI_PROGRESS_STEP` and
+  `DYBATPHO_TUI_MENU_HEIGHT` read numbers with a leading zero in base ten.**
+- **`screen` — every widget, `screen_layout`, `screen_rect_inner` and
+  `screen_rect_center` read rectangle parts in base ten,** so `08` no longer
+  stops the script and `010` is ten; a rectangle part that is not a whole number
+  stops with "Invalid rectangle", and an empty rectangle still draws nothing.
+
+### Security
+
+- **`screen`, `tui` — a numeric screen option such as `max:` or `offset:`, or
+  `DYBATPHO_TUI_PROGRESS_STEP` and `DYBATPHO_TUI_MENU_HEIGHT`, holding text such
+  as `x[$(cmd)]` no longer runs the command.**
+- **`screen` — a rectangle part such as `items[$(cmd)]` no longer runs the
+  command.**
 
 ## [7.1.0] - 2026-10-31
 

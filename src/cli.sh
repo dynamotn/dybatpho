@@ -1975,7 +1975,12 @@ function dybatpho::generate_completion {
   __dybatpho_cli_gc_generated="$(__dybatpho_cli_generate_completion_command "${__dybatpho_cli_gc_spec}" "${__dybatpho_cli_gc_shell}" "${__dybatpho_cli_gc_name}" "${__dybatpho_cli_gc_name}")"
   printf '%s\n' "${__dybatpho_cli_gc_generated}"
   if [[ -n "${__dybatpho_cli_gc_cache_file}" ]]; then
-    printf '%s\n' "${__dybatpho_cli_gc_generated}" > "${__dybatpho_cli_gc_cache_file}" 2> /dev/null || true
+    # Written aside and renamed, so a short write (a full disk, a concurrent
+    # shell) never leaves a truncated entry that the `-s` test above would serve.
+    local __dybatpho_cli_gc_tmp="${__dybatpho_cli_gc_cache_file}.${BASHPID}.tmp"
+    { printf '%s\n' "${__dybatpho_cli_gc_generated}" > "${__dybatpho_cli_gc_tmp}" \
+      && mv -f -- "${__dybatpho_cli_gc_tmp}" "${__dybatpho_cli_gc_cache_file}"; } 2> /dev/null \
+      || rm -f -- "${__dybatpho_cli_gc_tmp}" 2> /dev/null || true
   fi
   return 0
 }
@@ -2022,6 +2027,7 @@ function __dybatpho_cli_cache_file {
   # The library version is part of the key, so an upgrade that changes the
   # generated completion does not keep serving the old one.
   local key version
+  # dyshellint disable=BSG084 # `DYBATPHO_VERSION` only memoizes the version file
   version="$(dybatpho::version)"
   key="${digest:0:32}-${spec_digest:0:16}-${version}-$*"
   key="${key//[^a-zA-Z0-9._-]/_}"

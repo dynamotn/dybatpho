@@ -173,18 +173,58 @@ __dybatpho_screen_trapped=false
 __DYBATPHO_SCREEN_TTY="${__DYBATPHO_SCREEN_TTY:-/dev/tty}"
 
 #######################################
-# @description Validate a whole number, or end the script naming what was wrong.
+# @description Split a rectangle into its four whole numbers, read in base ten.
+#   A part left out is zero, so an empty rectangle draws nothing, as it always
+#   has; any other text ends the script, because arithmetic read `08` as an
+#   invalid octal number and ran `a[$(cmd)]` as a command.
+# @arg $1 string Name of the variable receiving the column
+# @arg $2 string Name of the variable receiving the row
+# @arg $3 string Name of the variable receiving the width
+# @arg $4 string Name of the variable receiving the height
+# @arg $5 string Rectangle, `x y width height`
+# @set The four named variables
+# @exitcode 1 Stop the script when a part is not a whole number
+# @internal
+#######################################
+function __dybatpho_screen_read_rect_into {
+  local __dybatpho_screen_rr_part
+  read -r "$1" "$2" "$3" "$4" <<< "${5-}"
+  for __dybatpho_screen_rr_part in "$1" "$2" "$3" "$4"; do
+    [[ -n "${!__dybatpho_screen_rr_part}" ]] || printf -v "${__dybatpho_screen_rr_part}" '%s' 0
+    __dybatpho_screen_whole "${__dybatpho_screen_rr_part}" \
+      || dybatpho::die "${FUNCNAME[1]}: Invalid rectangle: '${5-}', expected four whole numbers"
+  done
+}
+
+#######################################
+# @description Validate a whole number and rewrite it in base ten, or end the
+#   script naming what was wrong. A leading zero is not octal: `08` is eight.
 # @arg $1 string Name of the caller, used in the message
 # @arg $2 string Description of the value, used in the message
-# @arg $3 string Value to check
+# @arg $3 string Name of the variable holding the value, rewritten in place
 # @arg $4 number Smallest value accepted
+# @set The named variable, in base ten
 # @internal
 #######################################
 function __dybatpho_screen_expect_int {
-  [[ "${3-}" =~ ^-?[0-9]+$ ]] \
-    || dybatpho::die "$1: $2 must be a whole number, got '${3-}'"
-  (($3 >= $4)) \
-    || dybatpho::die "$1: $2 must be at least $4, got '$3'"
+  local -n __dybatpho_screen_ei_ref="$3"
+  __dybatpho_screen_whole "$3" \
+    || dybatpho::die "$1: $2 must be a whole number, got '${__dybatpho_screen_ei_ref-}'"
+  ((__dybatpho_screen_ei_ref >= $4)) \
+    || dybatpho::die "$1: $2 must be at least $4, got '${__dybatpho_screen_ei_ref}'"
+}
+
+#######################################
+# @description Rewrite a whole number in base ten, so a leading zero is not
+#   read as octal: `08` stopped the script and `010` was eight.
+# @arg $1 string Name of the variable holding the value, rewritten in place
+# @exitcode 1 The value is not a whole number of at most 18 digits
+# @internal
+#######################################
+function __dybatpho_screen_whole {
+  local -n __dybatpho_screen_whole_ref="$1"
+  [[ "${__dybatpho_screen_whole_ref-}" =~ ^(-?)([0-9]{1,18})$ ]] || return 1
+  __dybatpho_screen_whole_ref=$((${BASH_REMATCH[1]}10#${BASH_REMATCH[2]}))
 }
 
 #######################################
@@ -795,7 +835,7 @@ function __dybatpho_screen_layout_into {
   local direction="$2" rect="$3"
   shift 3
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
 
   local total
   case "${direction}" in
@@ -814,32 +854,32 @@ function __dybatpho_screen_layout_into {
     caps[index]=-1
     case "${constraint}" in
       length:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A length" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A length" value 0
         sizes[index]="${value}"
         ;;
       percent:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A percentage" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A percentage" value 0
         sizes[index]=$((total * value / 100))
         ;;
       ratio:*)
-        [[ "${value}" =~ ^([0-9]+)/([0-9]+)$ ]] \
+        [[ "${value}" =~ ^([0-9]{1,18})/([0-9]{1,18})$ ]] \
           || dybatpho::die "${FUNCNAME[1]}: A ratio must be written A/B, got '${value}'"
-        ((BASH_REMATCH[2] > 0)) \
+        ((10#${BASH_REMATCH[2]} > 0)) \
           || dybatpho::die "${FUNCNAME[1]}: A ratio cannot be divided by zero"
-        sizes[index]=$((total * BASH_REMATCH[1] / BASH_REMATCH[2]))
+        sizes[index]=$((total * 10#${BASH_REMATCH[1]} / 10#${BASH_REMATCH[2]}))
         ;;
       min:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A minimum" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A minimum" value 0
         sizes[index]="${value}"
         weights[index]=1
         ;;
       max:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A maximum" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A maximum" value 0
         weights[index]=1
         caps[index]="${value}"
         ;;
       fill:*)
-        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A fill weight" "${value}" 0
+        __dybatpho_screen_expect_int "${FUNCNAME[1]}" "A fill weight" value 0
         weights[index]="${value}"
         ;;
       *)
@@ -949,7 +989,7 @@ function __dybatpho_screen_rect_inner_into {
   local -n __dybatpho_screen_in_ref="$1"
   local margin="$3"
   local x y width height
-  read -r x y width height <<< "$2"
+  __dybatpho_screen_read_rect_into x y width height "$2"
 
   local inner_width=$((width - margin * 2))
   local inner_height=$((height - margin * 2))
@@ -995,7 +1035,7 @@ function __dybatpho_screen_rect_center_into {
   local -n __dybatpho_screen_c_ref="$1"
   local want_width="$3" want_height="$4"
   local x y width height
-  read -r x y width height <<< "$2"
+  __dybatpho_screen_read_rect_into x y width height "$2"
 
   ((want_width <= width)) || want_width="${width}"
   ((want_height <= height)) || want_height="${height}"
@@ -1467,7 +1507,7 @@ function dybatpho::screen_block {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   DYBATPHO_SCREEN_INNER="${x} ${y} ${width} ${height}"
   ((width > 0 && height > 0)) || return 0
 
@@ -1552,7 +1592,7 @@ function dybatpho::screen_text {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
 
   local style="${options[style]:-0}"
@@ -1635,8 +1675,8 @@ function dybatpho::screen_list {
 
   local __dybatpho_screen_l_x __dybatpho_screen_l_y
   local __dybatpho_screen_l_width __dybatpho_screen_l_height
-  read -r __dybatpho_screen_l_x __dybatpho_screen_l_y \
-    __dybatpho_screen_l_width __dybatpho_screen_l_height <<< "${__dybatpho_screen_l_rect}"
+  __dybatpho_screen_read_rect_into __dybatpho_screen_l_x __dybatpho_screen_l_y \
+    __dybatpho_screen_l_width __dybatpho_screen_l_height "${__dybatpho_screen_l_rect}"
   ((__dybatpho_screen_l_width > 0 && __dybatpho_screen_l_height > 0)) || return 0
 
   local __dybatpho_screen_l_count=${#__dybatpho_screen_l_items[@]}
@@ -1646,6 +1686,8 @@ function dybatpho::screen_list {
   __dybatpho_screen_l_selected_style="${__dybatpho_screen_l_options[selected_style]:-${DYBATPHO_SCREEN_STYLE_SELECTED}}"
   local __dybatpho_screen_l_pointer="${__dybatpho_screen_l_options[pointer]:-true}"
   local __dybatpho_screen_l_offset="${__dybatpho_screen_l_options[offset]:-0}"
+  __dybatpho_screen_whole __dybatpho_screen_l_selected || __dybatpho_screen_l_selected=-1
+  __dybatpho_screen_whole __dybatpho_screen_l_offset || __dybatpho_screen_l_offset=0
 
   if ((__dybatpho_screen_l_selected >= 0)); then
     ((__dybatpho_screen_l_selected < __dybatpho_screen_l_offset)) \
@@ -1709,7 +1751,7 @@ function dybatpho::screen_table {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
 
   local delimiter="${options[delimiter]:-|}"
@@ -1738,6 +1780,12 @@ function dybatpho::screen_table {
 
   if [[ -n "${options[widths]-}" ]]; then
     IFS=',' read -r -a widths <<< "${options[widths]}"
+    local column column_width
+    for column in "${!widths[@]}"; do
+      column_width="${widths[column]}"
+      __dybatpho_screen_whole column_width || column_width=0
+      widths[column]="${column_width}"
+    done
   else
     local each=$((width / column_count)) index
     for ((index = 0; index < column_count; index++)); do
@@ -1779,6 +1827,8 @@ function dybatpho::screen_table {
 
   local count=${#__dybatpho_screen_table_rows[@]}
   local offset="${options[offset]:-0}"
+  __dybatpho_screen_whole selected || selected=-1
+  __dybatpho_screen_whole offset || offset=0
   if ((selected >= 0 && body_height > 0)); then
     ((selected < offset)) && offset="${selected}"
     ((selected >= offset + body_height)) && offset=$((selected - body_height + 1))
@@ -1820,8 +1870,10 @@ function dybatpho::screen_gauge {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
+  __dybatpho_screen_whole value || value=0
+  __dybatpho_screen_whole total || total=1
   ((total > 0)) || total=1
   ((value >= 0)) || value=0
   ((value <= total)) || value="${total}"
@@ -1879,10 +1931,11 @@ function dybatpho::screen_tabs {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
 
   local active="${options[active]:-0}"
+  __dybatpho_screen_whole active || active=0
   local style="${options[style]:-0}"
   local active_style="${options[active_style]:-${DYBATPHO_SCREEN_STYLE_TAB_ACTIVE}}"
   local divider="${options[divider]:- │ }"
@@ -1928,8 +1981,10 @@ function dybatpho::screen_scrollbar {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
+  __dybatpho_screen_whole position || position=0
+  __dybatpho_screen_whole total || total=0
   ((total > height)) || return 0
 
   local thumb_char="${options[thumb]:-█}"
@@ -1979,15 +2034,16 @@ function dybatpho::screen_sparkline {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
 
   local -a levels=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █)
   local maximum="${options[max]:-0}"
+  __dybatpho_screen_whole maximum || maximum=0
   local point
   if ((maximum <= 0)); then
     for point in ${__dybatpho_screen_spark_data[@]+"${__dybatpho_screen_spark_data[@]}"}; do
-      [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
+      __dybatpho_screen_whole point || continue
       ((point > maximum)) && maximum="${point}"
     done
   fi
@@ -2002,7 +2058,7 @@ function dybatpho::screen_sparkline {
   local line="" index level
   for ((index = first; index < count; index++)); do
     point="${__dybatpho_screen_spark_data[index]}"
-    [[ "${point}" =~ ^-?[0-9]+$ ]] || point=0
+    __dybatpho_screen_whole point || point=0
     ((point >= 0)) || point=0
     level=$((point * 7 / maximum))
     ((level <= 7)) || level=7
@@ -2042,19 +2098,21 @@ function dybatpho::screen_barchart {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
 
   local maximum="${options[max]:-0}" point
+  __dybatpho_screen_whole maximum || maximum=0
   if ((maximum <= 0)); then
     for point in ${__dybatpho_screen_bar_data[@]+"${__dybatpho_screen_bar_data[@]}"}; do
-      [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
+      __dybatpho_screen_whole point || continue
       ((point > maximum)) && maximum="${point}"
     done
   fi
   ((maximum > 0)) || maximum=1
 
   local label_width="${options[label_width]:-0}"
+  __dybatpho_screen_whole label_width || label_width=0
   if ((label_width == 0)) && ((${#__dybatpho_screen_bar_names[@]} > 0)); then
     local measured
     for point in ${__dybatpho_screen_bar_names[@]+"${__dybatpho_screen_bar_names[@]}"}; do
@@ -2075,7 +2133,7 @@ function dybatpho::screen_barchart {
   # "screen_barchart draws labelled bars with partial blocks" runs it.
   for ((index = 0; index < height && index < ${#__dybatpho_screen_bar_data[@]}; index++)); do # kcov(skip)
     point="${__dybatpho_screen_bar_data[index]}"
-    [[ "${point}" =~ ^-?[0-9]+$ ]] || point=0
+    __dybatpho_screen_whole point || point=0
     ((point >= 0)) || point=0
     # A value past `max:` fills its bar rather than running out of the rectangle.
     ((point <= maximum)) || point="${maximum}"
@@ -2155,25 +2213,26 @@ function dybatpho::screen_chart {
   __dybatpho_screen_options options "$@"
 
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
   local count=${#__dybatpho_screen_chart_data[@]}
   ((count > 0)) || return 0
 
   __dybatpho_screen_braille_table
 
-  local point minimum="${options[min]:-0}" maximum="${options[max]:-0}"
-  local have_range=0
-  [[ -n "${options[max]-}" ]] && have_range=1
-  if ((have_range == 0)); then
-    maximum="${__dybatpho_screen_chart_data[0]}"
-    minimum="${maximum}"
-    for point in ${__dybatpho_screen_chart_data[@]+"${__dybatpho_screen_chart_data[@]}"}; do
-      [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
-      ((point > maximum)) && maximum="${point}"
-      ((point < minimum)) && minimum="${point}"
-    done
-  fi
+  # A bound the caller leaves out is taken from the data, except that `max:`
+  # alone keeps the scale starting at zero.
+  local point minimum="" maximum=""
+  for point in ${__dybatpho_screen_chart_data[@]+"${__dybatpho_screen_chart_data[@]}"}; do
+    __dybatpho_screen_whole point || continue
+    [[ -n "${maximum}" ]] && ((point <= maximum)) || maximum="${point}"
+    [[ -n "${minimum}" ]] && ((point >= minimum)) || minimum="${point}"
+  done
+  maximum="${options[max]:-${maximum:-0}}"
+  [[ -z "${options[max]-}" ]] || minimum=0
+  minimum="${options[min]:-${minimum:-0}}"
+  __dybatpho_screen_whole maximum || maximum=0
+  __dybatpho_screen_whole minimum || minimum=0
   ((maximum > minimum)) || maximum=$((minimum + 1))
 
   # Every character is two dots across and four down, so the plot resolution is
@@ -2191,7 +2250,7 @@ function dybatpho::screen_chart {
   # "screen_chart plots a continuous line in Braille" runs it.
   for ((index = 0; index < count; index++)); do # kcov(skip)
     point="${__dybatpho_screen_chart_data[index]}"
-    [[ "${point}" =~ ^-?[0-9]+$ ]] || continue
+    __dybatpho_screen_whole point || continue
     dot_x=$((count > 1 ? index * (dots_x - 1) / (count - 1) : 0))
     dot_y=$(((maximum - point) * (dots_y - 1) / (maximum - minimum)))
     ((dot_y >= 0)) || dot_y=0
@@ -2262,7 +2321,7 @@ function dybatpho::screen_popup {
   local rect="${1-}"
   shift || true
   local x y width height
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((width > 0 && height > 0)) || return 0
 
   local blank index
@@ -2301,7 +2360,7 @@ function dybatpho::screen_popup {
 function dybatpho::screen_spans {
   local row="${1-}" column="${2-}" width="${3-}" background="${4-}"
   shift 4 2> /dev/null || return 0
-  __dybatpho_screen_expect_int "${FUNCNAME[0]}" "width" "${width}" 0
+  __dybatpho_screen_expect_int "${FUNCNAME[0]}" "width" width 0
   local left="${width}" text style used
   while (($# >= 2)) && ((left > 0)); do
     text="$1" style="$2"
@@ -2398,7 +2457,7 @@ function dybatpho::screen_keybar {
   local rect x y width height
   dybatpho::expect_args rect -- "$@"
   shift
-  read -r x y width height <<< "${rect}"
+  __dybatpho_screen_read_rect_into x y width height "${rect}"
   ((${width:-0} > 0 && ${height:-0} > 0)) || return 0
   local -a spans=()
   while (($# >= 2)); do

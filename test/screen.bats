@@ -925,6 +925,19 @@ SCRIPT
   assert_equal "${DYBATPHO_SCREEN_OFFSET}" 3
 }
 
+@test "dybatpho::screen_chart honours min: given without max:" {
+  # A flat series at 10 sits at the top of a 0-to-10 scale; with `min:` dropped
+  # the scale shrank to 10-to-11 and the line fell to the bottom row.
+  # shellcheck disable=SC2034 # read by name by the widget
+  local -a flat=(10 10 10 10)
+  dybatpho::screen_chart "0 0 2 4" flat min:0
+  local top bottom
+  top="$(screen_row 0)"
+  bottom="$(screen_row 3)"
+  [[ "${top:0:2}" != "  " ]] || fail "the line is not on the top row"
+  assert_equal "${bottom:0:2}" "  "
+}
+
 @test "dybatpho::screen_chart draws samples that share a column" {
   local -a series=(0 5 9)
   dybatpho::screen_chart "0 0 1 2" series
@@ -1056,4 +1069,89 @@ SCRIPT
   screen_on_pty "${script}"
   [[ -s "${result}" ]] || skip "no pseudo-terminal to test with"
   assert_equal "$(< "${result}")" "status=143"
+}
+
+@test "screen charts read values with a leading zero in base ten" {
+  # Arithmetic read `08` as an invalid octal number and `010` as eight.
+  local -a plain=(0 4 8 10) padded=(00 04 08 010)
+  local chart row
+  for chart in sparkline barchart chart; do
+    dybatpho::screen_clear
+    "dybatpho::screen_${chart}" "0 0 20 4" plain
+    "dybatpho::screen_${chart}" "0 4 20 4" padded
+    for row in 0 1 2 3; do
+      assert_equal "$(screen_row "$((row + 4))")" "$(screen_row "${row}")"
+    done
+  done
+}
+
+@test "screen widgets read numeric arguments and options with a leading zero in base ten" {
+  # Arithmetic read `08` as an invalid octal number and `010` as eight, and a
+  # value such as `a[$(cmd)]` ran the command.
+  local -a parts=() expected=()
+  dybatpho::screen_layout expected vertical "0 0 20 40" length:8 percent:10 ratio:1/8 min:9 max:8 fill:1
+  dybatpho::screen_layout parts vertical "0 0 20 40" length:08 percent:010 ratio:1/08 min:09 max:08 fill:01
+  assert_equal "${parts[*]}" "${expected[*]}"
+
+  local -a items=(a b c d e f g h i j k) values=(3 9) tabs=(0 1 2 3 4 5 6 7 8 9)
+  local -a rows=(r0\|x r1\|x r2\|x r3\|x r4\|x r5\|x r6\|x r7\|x r8\|x r9\|x r10\|x)
+  local -a plain=() padded=()
+  # Compared with their styles, which is all `selected:` and `active:` change.
+  plain=("list items selected:9 offset:8" "table rows selected:9" "table rows offset:8 widths:3,10"
+    "tabs tabs active:9 divider:|" "barchart values max:10 label_width:8" "sparkline values max:10"
+    "chart values max:10 min:8" "gauge 9 10" "scrollbar 8 9")
+  padded=("list items selected:09 offset:08" "table rows selected:09" "table rows offset:08 widths:03,010"
+    "tabs tabs active:09 divider:|" "barchart values max:010 label_width:08" "sparkline values max:010"
+    "chart values max:010 min:08" "gauge 09 010" "scrollbar 08 09")
+  local index row widget
+  local -a words=()
+  for index in "${!plain[@]}"; do
+    dybatpho::screen_clear
+    read -r -a words <<< "${plain[index]}"
+    widget="${words[0]}"
+    "dybatpho::screen_${widget}" "0 0 40 3" "${words[@]:1}"
+    read -r -a words <<< "${padded[index]}"
+    "dybatpho::screen_${widget}" "0 4 40 3" "${words[@]:1}"
+    for row in 0 1 2; do
+      assert_equal "$(screen_raw "$((row + 4))")" "$(screen_raw "${row}")"
+    done
+  done
+
+  local marker="${BATS_TEST_TMPDIR}/ran"
+  dybatpho::screen_clear
+  dybatpho::screen_sparkline "0 0 10 1" values "max:x[\$(touch ${marker})]"
+  dybatpho::screen_spans 0 0 08 "" text 0
+  [[ ! -e "${marker}" ]] || fail "an option ran a command"
+}
+
+@test "screen widgets read a rectangle in base ten and refuse one that is not numbers" {
+  # Arithmetic read `08` as an invalid octal number and `010` as eight, and a
+  # part such as `x[$(cmd)]` ran the command.
+  local -a items=(alpha beta gamma) values=(1 5 9)
+  dybatpho::screen_list "0 0 10 3" items
+  dybatpho::screen_list "00 04 010 03" items
+  dybatpho::screen_sparkline "02 8 08 1" values
+  dybatpho::screen_sparkline "2 9 8 1" values
+  local row
+  for row in 0 1 2; do
+    assert_equal "$(screen_raw "$((row + 4))")" "$(screen_raw "${row}")"
+  done
+  assert_equal "$(screen_raw 8)" "$(screen_raw 9)"
+
+  local inner centred
+  dybatpho::screen_rect_inner inner "00 00 010 08" 1
+  assert_equal "${inner}" "1 1 8 6"
+  dybatpho::screen_rect_center centred "0 0 010 010" 4 2
+  assert_equal "${centred}" "3 4 4 2"
+
+  # An empty rectangle still draws nothing.
+  run dybatpho::screen_list "" items
+  assert_success
+
+  local marker="${BATS_TEST_TMPDIR}/ran"
+  # No blank inside the part, which the split would otherwise cut it at.
+  run --separate-stderr dybatpho::screen_list "0 0 items[\$(:>${marker})] 1" items
+  assert_failure
+  assert_stderr --partial "Invalid rectangle"
+  [[ ! -e "${marker}" ]] || fail "a rectangle ran a command"
 }

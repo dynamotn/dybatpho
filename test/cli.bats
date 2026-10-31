@@ -2406,6 +2406,32 @@ setup() {
   refute_output --partial "--alpha"
 }
 
+@test "dybatpho::generate_completion never caches a short write" {
+  local DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache-short"
+  local DYBATPHO_CLI_CACHE=true
+  # shellcheck disable=2329
+  _spec_cache_short() {
+    dybatpho::opts::setup "Short" -
+    local i
+    for i in {1..60}; do
+      dybatpho::opts::flag "Flag ${i}" "SHORT_F${i}" "--flag-number-${i}"
+    done
+  }
+  local full
+  full="$(DYBATPHO_CLI_CACHE=false dybatpho::generate_completion _spec_cache_short bash shorttool)"
+  ((${#full} > 1024))
+
+  # A 1 KiB file size limit stands in for a full disk: the write stops short.
+  (
+    trap '' XFSZ
+    ulimit -f 1
+    dybatpho::generate_completion _spec_cache_short bash shorttool > /dev/null
+  )
+  run_traced dybatpho::generate_completion _spec_cache_short bash shorttool
+  assert_success
+  assert_equal "${output}" "${full}"
+}
+
 @test "DYBATPHO_CLI_CACHE=false skips the completion cache" {
   local DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache-off"
   local DYBATPHO_CLI_CACHE=false

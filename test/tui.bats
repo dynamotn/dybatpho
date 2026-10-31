@@ -133,6 +133,13 @@ EOF
   [[ "${stderr}" == *"Resolution failed"* ]] || fail "failure message missing: ${stderr}"
 }
 
+@test "dybatpho::tui_spinner_stop refuses a status a return cannot carry" {
+  # `return 256` is `return 0`: a failure would have been reported as success.
+  run dybatpho::tui_spinner_stop 256 "Resolution failed"
+  assert_failure
+  assert_output --partial "Exit status must be at most 255, got '256'"
+}
+
 @test "dybatpho::tui_spinner_stop keeps its closing banner off stdout" {
   # `dybatpho::success` draws its banner on stdout, which is right for a script
   # reporting its own result and wrong for a widget: the banner landed inside
@@ -313,6 +320,30 @@ EOF
   assert_equal "${picked[*]}" "api worker"
 }
 
+@test "the drawn menus never draw a line wider than the terminal" {
+  # A line that wraps takes two rows while the redraw moves up by one per line
+  # drawn, so each keypress left a copy of the menu behind.
+  local DYBATPHO_TUI=always COLUMNS=20 chosen=""
+  local drawn="${BATS_TEST_TMPDIR}/menu.out"
+  dybatpho::tui_menu chosen "Pick one of these long entries" \
+    "a-very-long-entry-name-that-wraps" "漢字漢字漢字漢字漢字漢字" \
+    < <(printf 'j\n') 2> "${drawn}"
+  assert_equal "${chosen}" "漢字漢字漢字漢字漢字漢字"
+
+  local -a rows=()
+  local text row width
+  text="$(sed $'s/\033\\[[0-9;?]*[A-Za-z]//g' "${drawn}")"
+  mapfile -t rows <<< "${text//$'\r'/$'\n'}"
+  # The last row is the answer left in the transcript, which no redraw counts.
+  assert_equal "${rows[-1]}" "Pick one of these long entries 漢字漢字漢字漢字漢字漢字"
+  unset 'rows[-1]'
+  ((${#rows[@]} > 0))
+  for row in "${rows[@]}"; do
+    dybatpho::screen_width width "${row}"
+    ((width <= COLUMNS)) || fail "drawn row is ${width} columns wide: ${row}"
+  done
+}
+
 @test "dybatpho::tui_menu asks again after an answer that names no entry" {
   local chosen=""
   dybatpho::tui_menu chosen "Environment?" dev staging prod <<< $'9\nnope\n1'
@@ -442,4 +473,34 @@ EOF
   local captured
   captured="$(DYBATPHO_INTERACTIVE=true dybatpho::tui_confirm "Continue?" <<< "y" && printf 'yes')"
   assert_equal "${captured}" "yes"
+}
+
+@test "dybatpho::tui_menu and tui_multi_menu read positions with a leading zero in base ten" {
+  # Arithmetic read `09` as an invalid octal number and `010` as eight.
+  local -a items=(a b c d e f g h i j)
+  local chosen=""
+  DYBATPHO_TUI_DEFAULT=09 dybatpho::tui_menu chosen "Letter?" "${items[@]}" < /dev/null
+  assert_equal "${chosen}" "i"
+  local -a several=()
+  dybatpho::tui_multi_menu several "Letters?" "${items[@]}" <<< "02,010"
+  assert_equal "${several[*]}" "b j"
+}
+
+@test "tui bars, spinners and progress read numbers with a leading zero in base ten" {
+  # Arithmetic read `08` as an invalid octal number and `010` as eight.
+  run_traced dybatpho::tui_bar 06 08 08
+  assert_success
+  assert_output "[██████░░]  75%"
+
+  run_traced --separate-stderr dybatpho::tui_spinner_stop 08 "Resolution failed"
+  assert_equal "${status}" 8
+
+  local log="${BATS_TEST_TMPDIR}/progress.log"
+  DYBATPHO_TUI=never DYBATPHO_TUI_PROGRESS_STEP=08
+  dybatpho::tui_progress_start "Work" 010 2> "${log}"
+  dybatpho::tui_progress_step 08 2>> "${log}"
+  DYBATPHO_TUI=auto DYBATPHO_TUI_PROGRESS_STEP=10
+  assert_equal "${DYBATPHO_TUI_PROGRESS_TOTAL}/${DYBATPHO_TUI_PROGRESS_CURRENT}" "10/8"
+  run grep -c 'value too great' "${log}"
+  assert_output "0"
 }

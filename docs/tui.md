@@ -274,7 +274,7 @@ dybatpho::tui_spinner_stop 1 "Upload failed"
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | number | no | `0` | Exit status the work ended with |
+| `$1` | number | no | `0` | Exit status the work ended with, from 0 to 255 |
 | `$2` | string | no |  | Closing message, default is none |
 
 **🧩 Variable sets**

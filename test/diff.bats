@@ -113,6 +113,12 @@ EOF
   assert_output ""
   run_traced -2 --separate-stderr dybatpho::diff_summary "${unreadable}" "hi"
   assert_output ""
+  # BusyBox `diff` warns about a file it cannot open and still answers 0.
+  # shellcheck disable=SC2329 # stands in for BusyBox diff
+  diff() { return 0; }
+  run_traced -2 --separate-stderr dybatpho::diff_text "${unreadable}" "hi"
+  run_traced -2 --separate-stderr dybatpho::diff_summary "${unreadable}" "hi"
+  unset -f diff
   chmod 600 "${unreadable}"
 }
 

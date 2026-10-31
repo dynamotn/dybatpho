@@ -105,6 +105,19 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `screen_rect_center` read rectangle parts in base ten,** so `08` no longer
   stops the script and `010` is ten; a rectangle part that is not a whole number
   stops with "Invalid rectangle", and an empty rectangle still draws nothing.
+- **`process` — on Bash 5.1, `dybatpho::run_with_timeout` and
+  `dybatpho::background_run` report the exit code of a function that made a
+  temporary file:** Bash 5.1 turned it into 0 in a background job holding an
+  EXIT trap, so `curl_do` under a timeout and failed background jobs read as
+  success.
+- **`process` — `dybatpho::trap` keeps a parent's EXIT handler out of subshells
+  on macOS** when the usual spare signals are ignored, instead of stopping with
+  "no spare signal left".
+- **`diff` — `dybatpho::diff_text`, `diff_summary`, `diff_json` and `diff_yaml`
+  answer 2 for a file they cannot read whatever `diff` is installed:** BusyBox
+  `diff` warns and still answers 0, so an unreadable file compared as identical.
+- **`string` — `dybatpho::url_decode` stays linear on Bash 4.3,** where indexing
+  an array and appending to a string made it quadratic.
 
 ### Security
 

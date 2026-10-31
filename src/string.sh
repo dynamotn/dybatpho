@@ -690,15 +690,19 @@ function dybatpho::url_decode {
   # every escape, which made decoding quadratic in its length.
   local -a parts=()
   __dybatpho_string_split_into parts "${value}" "%"
-  local decoded="${parts[0]}" part index
-  for ((index = 1; index < ${#parts[@]}; index++)); do
-    part="${parts[index]}"
+  # Walked in order and joined once: on Bash 4.3 both indexing an array and
+  # appending to a string cost time in the length so far, which made the loop
+  # quadratic there.
+  local -a pieces=("${parts[0]}")
+  local part decoded
+  for part in "${parts[@]:1}"; do
     if [[ "${part}" =~ ^[0-9A-Fa-f]{2} ]]; then
-      decoded+="\\x${part}"
+      pieces+=("\\x${part}")
     else
-      decoded+="%${part}"
+      pieces+=("%${part}")
     fi
   done
+  printf -v decoded '%s' "${pieces[@]}"
   printf '%b\n' "${decoded}"
 }
 

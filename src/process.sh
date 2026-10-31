@@ -278,7 +278,10 @@ function __dybatpho_process_trap_forget_inherited {
   # The main shell inherited nothing.
   [[ "${BASHPID}" != "$$" ]] || return 0
   local spare
-  for spare in SYS XCPU XFSZ VTALRM PROF RTMIN RTMIN+{1..15} RTMAX-{14..1} RTMAX; do
+  # Last come signals whose default is already to be ignored, and the BSD and
+  # Linux extras, so macOS, which has no real-time signals, still finds one.
+  for spare in SYS XCPU XFSZ VTALRM PROF RTMIN RTMIN+{1..15} RTMAX-{14..1} RTMAX \
+    URG WINCH INFO EMT PWR STKFLT; do
     # A system without real-time signals rejects their names.
     [[ -z "$(trap -p "${spare}" 2> /dev/null)" ]] || continue
     trap - "${spare}" 2> /dev/null || continue
@@ -679,7 +682,16 @@ function __dybatpho_process_timeout_fallback {
   esac
   set -m
 
-  "$@" &
+  # On Bash 5.1 a function ending with `return` in a background job that set an
+  # EXIT trap, as a temporary file does, reported 0 whatever it returned; a
+  # subshell of its own keeps the status there. Elsewhere it is started bare: in
+  # that subshell an ERR trap fires on the function's own failure, and on Bash
+  # 4.3 that replaced its status.
+  if ((BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] == 1)); then
+    ("$@") &
+  else
+    "$@" &
+  fi
   local command_pid=$!
 
   # The watchdog writes nothing, and holds none of the caller's streams: its
@@ -829,7 +841,12 @@ function dybatpho::background_run {
     *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   set -m
-  "$@" &
+  # Started as the timeout fallback starts its command, for the same reason.
+  if ((BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] == 1)); then
+    ("$@") &
+  else
+    "$@" &
+  fi
   local __dybatpho_process_bg_pid=$!
   [[ "${__dybatpho_process_bg_monitor}" == "on" ]] || set +m
 

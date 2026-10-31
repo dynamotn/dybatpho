@@ -721,6 +721,15 @@ changed code against all of them.
 - **errexit is off inside a condition.** `( job ) || code=$?` and `if handler`
   run with `set -e` ignored throughout; run the job in the background,
   `( job ) & wait $! || code=$?`, when its own failures must stop it.
+- **A background job's status depends on how it is started.** On Bash 5.1 a
+  function that ends with `return` in a bare `"$@" &` job holding an EXIT trap,
+  which any temporary file installs, reports 0 whatever it returned; wrapping it
+  as `("$@") &` keeps the status there, but on Bash 4.3 the wrapper's ERR trap
+  replaces it. Start it the way `dybatpho::background_run` does, and test a job
+  that fails after making a temporary file under 4.3 and 5.1.
+- **Do not trust a tool's exit code where implementations disagree.** BusyBox
+  `diff` warns about a file it cannot open and answers 0, "identical"; check
+  what the library can check itself, such as `[[ -r ]]`, before the tool runs.
 - **Judge the physical path, not the text.** `dybatpho::path_normalize` folds
   `dir/..` as text, but when `dir` is a symbolic link the kernel goes
   elsewhere. A safety check resolves the directory part with `cd -P`, follows
@@ -879,7 +888,13 @@ run and the instrument cannot see, never for code no test reaches.
 - Use only what GNU, BSD/macOS and BusyBox agree on; the `portable` and
   `busybox` CI jobs run the whole suite. `touch -t` works everywhere,
   `touch -d '@N'`, `mv -T`, `date -d` and a bare `sed -i` do not; rewrite a
-  file with `sed_in_place`.
+  file with `sed_in_place`. BSD `wc -l` pads its count and BSD `od` spaces its
+  columns differently, so compare output through a sentinel instead
+  (`"$(cmd; printf x)"`); macOS keeps temporary files under `/var`, a link to
+  `/private/var`, so compare a reported path with `cd -P`; BusyBox `cp`
+  replaces a destination link where GNU `cp` writes through it; and macOS has
+  no real-time signals. A timing test needs a margin wide enough for a busy
+  CI runner, far from both the fixed and the broken timing.
 - A regression test must fail without its fix. Undo the fix by hand, watch the
   test fail, then restore it. Cover every path that reaches the bug: the
   `count:true` guard was first tested only with the flag given, and the same

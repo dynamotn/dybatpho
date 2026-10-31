@@ -378,13 +378,26 @@ stub_curl_recording() {
 @test "the call budget holds for jobs running at once" {
   # Each job passed the budget check before any had counted its call, and the
   # counts they wrote back overwrote one another, so every job got through.
-  # The stub takes exactly three requests.
-  local record="${BATS_TEST_TMPDIR}/requests" answer="${BATS_TEST_TMPDIR}/answer.json"
+  # Not a bats-mock stub: it keeps its place in a file it reads and rewrites
+  # unlocked, so two requests at once could take the same answer. This one
+  # keeps no state; each request appends one line, which is atomic.
+  local sent="${BATS_TEST_TMPDIR}/sent" answer="${BATS_TEST_TMPDIR}/answer.json"
+  local bin="${BATS_TEST_TMPDIR}/fake-curl"
   anthropic_body > "${answer}"
+  mkdir -p "${bin}"
+  cat > "${bin}/curl" << STUB
+#!/usr/bin/env bash
+out=""; prev=""
+for arg in "\$@"; do [[ "\${prev}" == -o ]] && out="\${arg}"; prev="\${arg}"; done
+cat > /dev/null
+cat '${answer}' > "\${out}"
+printf 'sent\n' >> '${sent}'
+echo 200
+STUB
+  chmod +x "${bin}/curl"
   dybatpho::ai_budget 3
-  stub_curl_recording "${record}" "${answer}" "${answer}" "${answer}"
-  dybatpho::parallel_map 6 dybatpho::ai_ask q1 q2 q3 q4 q5 q6 > /dev/null 2>&1 || true
-  unstub curl
+  PATH="${bin}:${PATH}" dybatpho::parallel_map 6 dybatpho::ai_ask q1 q2 q3 q4 q5 q6 > /dev/null 2>&1 || true
+  assert_equal "$(wc -l < "${sent}" | tr -d ' ')" "3"
   run_traced dybatpho::ai_usage_field calls
   assert_output "3"
 }

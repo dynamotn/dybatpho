@@ -897,6 +897,10 @@ run and the instrument cannot see, never for code no test reaches.
   GNU `cp` writes through it; and macOS has no real-time signals. A timing
   test needs a margin wide enough for a busy CI runner, far from both the fixed
   and the broken timing.
+- Never hand a bats-mock `stub` to commands that run at once. It keeps its
+  place in a file it reads and rewrites unlocked, so two calls at once can take
+  the same answer and `unstub` fails now and then. Give concurrent jobs a stub
+  of their own that keeps no state, such as one that appends a line per call.
 - A regression test must fail without its fix. Undo the fix by hand, watch the
   test fail, then restore it. Cover every path that reaches the bug: the
   `count:true` guard was first tested only with the flag given, and the same

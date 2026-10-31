@@ -426,14 +426,16 @@ function dybatpho::curl_do {
   fi
 
   dybatpho::require curl
-  [[ "${DYBATPHO_CURL_MAX_RETRIES}" =~ ^[0-9]+$ ]] \
+  [[ "${DYBATPHO_CURL_MAX_RETRIES}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "DYBATPHO_CURL_MAX_RETRIES must be a non-negative integer"
   [[ "${DYBATPHO_CURL_RETRY_BASE_DELAY}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "DYBATPHO_CURL_RETRY_BASE_DELAY must be a non-negative integer"
   [[ "${DYBATPHO_CURL_RETRY_MAX_DELAY}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "DYBATPHO_CURL_RETRY_MAX_DELAY must be a non-negative integer"
-  [[ "${DYBATPHO_CURL_MAX_REDIRECTS}" =~ ^[0-9]+$ ]] \
+  [[ "${DYBATPHO_CURL_MAX_REDIRECTS}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "DYBATPHO_CURL_MAX_REDIRECTS must be a non-negative integer"
+  # A leading zero would make arithmetic read these as octal: `08` stops the script.
+  local max_retries=$((10#${DYBATPHO_CURL_MAX_RETRIES})) max_redirects=$((10#${DYBATPHO_CURL_MAX_REDIRECTS}))
 
   local code="" retry_after delay attempt=0
   # The response headers are where a redirect's `Location:` and a throttled
@@ -535,7 +537,7 @@ function dybatpho::curl_do {
     if [[ "${follow_here}" == true && "${code}" =~ ^30[12378]$ ]]; then
       location=$(awk 'tolower($1) == "location:" { sub("\r$", "", $2); print $2; exit }' "${header_file}")
       if [[ -n "${location}" ]]; then
-        if ((redirects >= DYBATPHO_CURL_MAX_REDIRECTS)); then
+        if ((redirects >= max_redirects)); then
           dybatpho::warn "Stopped after ${redirects} redirects from ${shown_url}"
           rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
           break
@@ -588,7 +590,7 @@ function dybatpho::curl_do {
           ;;
       esac
     fi
-    if ((attempt >= DYBATPHO_CURL_MAX_RETRIES)); then
+    if ((attempt >= max_retries)); then
       dybatpho::warn "No more retries left to run curl ${shown_url}."
       rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
       break
@@ -603,7 +605,7 @@ function dybatpho::curl_do {
       dybatpho::metrics_counter_inc dybatpho_http_retries_total
     fi
     # On stderr: the caller may be capturing the request's own output.
-    __dybatpho_log_progress_to stderr "Retrying in ${delay} seconds" "(${attempt}/${DYBATPHO_CURL_MAX_RETRIES})"
+    __dybatpho_log_progress_to stderr "Retrying in ${delay} seconds" "(${attempt}/${max_retries})"
     sleep "${delay}" || true
   done
 
@@ -699,8 +701,8 @@ function dybatpho::curl_download {
 
   # Create destination folder
   local dst_dir
-  dst_dir=$(dirname "${dst_file}") || return 6
-  mkdir -p "${dst_dir}" || return 6
+  dst_dir=$(dirname -- "${dst_file}") || return 6
+  mkdir -p -- "${dst_dir}" || return 6
 
   dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent "$@"
 }
@@ -854,8 +856,8 @@ function dybatpho::curl_resume_download {
   fi
 
   local dst_dir
-  dst_dir=$(dirname "${dst_file}") || return 6
-  mkdir -p "${dst_dir}" || return 6
+  dst_dir=$(dirname -- "${dst_file}") || return 6
+  mkdir -p -- "${dst_dir}" || return 6
 
   local shown_url
   __dybatpho_network_redact_url_into shown_url "${url}"
@@ -1263,8 +1265,9 @@ function dybatpho::rate_limit {
   __dybatpho_network_rl_parsed="$(__dybatpho_network_rate_spec "${__dybatpho_network_rl_spec}")" \
     || dybatpho::die "${FUNCNAME[0]}: Invalid rate limit spec: ${__dybatpho_network_rl_spec}"
   read -r __dybatpho_network_rl_count __dybatpho_network_rl_window_ms <<< "${__dybatpho_network_rl_parsed}"
-  [[ "${DYBATPHO_RATE_LIMIT_MAX_WAIT}" =~ ^[0-9]+$ ]] \
+  [[ "${DYBATPHO_RATE_LIMIT_MAX_WAIT}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "DYBATPHO_RATE_LIMIT_MAX_WAIT must be a non-negative integer"
+  local __dybatpho_network_rl_cap=$((10#${DYBATPHO_RATE_LIMIT_MAX_WAIT}))
 
   local __dybatpho_network_rl_now __dybatpho_network_rl_remaining __dybatpho_network_rl_oldest
   local __dybatpho_network_rl_wait_ms
@@ -1291,9 +1294,9 @@ function dybatpho::rate_limit {
       dybatpho::warn "Rate limit '${__dybatpho_network_rl_key}' is spent; skipping call (${__dybatpho_network_rl_free})"
       return 9
     fi
-    if ((DYBATPHO_RATE_LIMIT_MAX_WAIT > 0 && __dybatpho_network_rl_wait_ms > DYBATPHO_RATE_LIMIT_MAX_WAIT * 1000)); then
+    if ((__dybatpho_network_rl_cap > 0 && __dybatpho_network_rl_wait_ms > __dybatpho_network_rl_cap * 1000)); then
       local __dybatpho_network_rl_over="needs ${__dybatpho_network_rl_wait_ms}ms"
-      __dybatpho_network_rl_over+=", over the ${DYBATPHO_RATE_LIMIT_MAX_WAIT}s budget"
+      __dybatpho_network_rl_over+=", over the ${__dybatpho_network_rl_cap}s budget"
       dybatpho::warn "Rate limit '${__dybatpho_network_rl_key}' ${__dybatpho_network_rl_over}; skipping call"
       return 9
     fi
@@ -1386,8 +1389,9 @@ function dybatpho::curl_paginate {
   local url
   dybatpho::expect_args url -- "$@"
   shift
-  [[ "${DYBATPHO_PAGINATE_MAX_PAGES}" =~ ^[0-9]+$ ]] \
+  [[ "${DYBATPHO_PAGINATE_MAX_PAGES}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "DYBATPHO_PAGINATE_MAX_PAGES must be a non-negative integer"
+  local max_pages=$((10#${DYBATPHO_PAGINATE_MAX_PAGES}))
 
   local rate_key=""
   if [[ -n "${DYBATPHO_PAGINATE_RATE}" ]]; then
@@ -1410,8 +1414,8 @@ function dybatpho::curl_paginate {
     fi
     visited["${url}"]=1
     page=$((page + 1))
-    if ((DYBATPHO_PAGINATE_MAX_PAGES > 0 && page > DYBATPHO_PAGINATE_MAX_PAGES)); then
-      dybatpho::warn "Pagination stopped after ${DYBATPHO_PAGINATE_MAX_PAGES} pages"
+    if ((max_pages > 0 && page > max_pages)); then
+      dybatpho::warn "Pagination stopped after ${max_pages} pages"
       break
     fi
     [[ -n "${rate_key}" ]] && dybatpho::rate_limit "${rate_key}" "${DYBATPHO_PAGINATE_RATE}"
@@ -1981,10 +1985,11 @@ function dybatpho::wait_port {
   dybatpho::expect_args host port -- "$@"
   local total="${3:-${DYBATPHO_WAIT_PORT_TIMEOUT}}"
   local interval="${4:-${DYBATPHO_WAIT_PORT_INTERVAL}}"
-  [[ "${total}" =~ ^[0-9]+$ ]] \
+  [[ "${total}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${total}' is not a number of seconds"
-  [[ "${interval}" =~ ^[0-9]+$ ]] \
+  [[ "${interval}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: '${interval}' is not a number of seconds"
+  total=$((10#${total})) interval=$((10#${interval}))
 
   local deadline=$((SECONDS + total)) remaining attempt
   while :; do

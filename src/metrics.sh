@@ -423,7 +423,7 @@ function dybatpho::metrics_timer_stop {
     || dybatpho::die "${FUNCNAME[0]}: Timer '${name}' was never started"
   elapsed=$(($(__dybatpho_log_now_ms) - started))
   ((elapsed < 0)) && elapsed=0
-  unset "__dybatpho_metrics_timer[${name}]"
+  unset -v '__dybatpho_metrics_timer[$name]'
   local __dybatpho_metrics_check
   __dybatpho_metrics_key __dybatpho_metrics_check "${name}" "$@"
   dybatpho::metrics_observe_ms "${name}" "${elapsed}" "$@"

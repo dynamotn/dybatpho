@@ -645,3 +645,20 @@ SCRIPT
   assert_equal "$(cat ./-token)" "dashed-secret-value"
   assert_equal "$(find . -name '*dybatpho_secret*' | wc -l | tr -d ' ')" "0"
 }
+
+@test "secret_with_file hands over a fallback path holding an ampersand as it is" {
+  # Bash 5.2 reads an unquoted `&` in a replacement as the matched text, so a
+  # temporary directory named `a&b` turned `{}` into a path that did not exist.
+  export TMPDIR="${BATS_TEST_TMPDIR}/a&b"
+  mkdir -p "${TMPDIR}"
+  eval "__test_original_is() $(declare -f dybatpho::is | tail -n +2)"
+  # shellcheck disable=SC2329 # replaces the library's check, called from it
+  dybatpho::is() {
+    [[ "$1" == readable && "${2-}" == /dev/fd/* ]] && return 1
+    __test_original_is "$@"
+  }
+  local TOKEN="s3cret"
+  run --separate-stderr dybatpho::secret_with_file TOKEN cat '{}'
+  assert_success
+  assert_output "s3cret"
+}

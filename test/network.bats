@@ -1555,3 +1555,82 @@ SCRIPT
 @test "dybatpho::port_open probes through /dev/tcp when there is no timeout command" {
   PATH="$(path_without timeout)" run_traced ! dybatpho::port_open 127.0.0.1 1 1
 }
+
+# --- Budgets with a leading zero ---------------------------------------------
+
+@test "dybatpho::curl_do reads a retry budget with a leading zero in base ten" {
+  # The check of `08` failed as an invalid octal number, so the budget never
+  # ran out; the deadline turns that into a failure instead of a hang.
+  export DYBATPHO_CURL_MAX_RETRIES=08 DYBATPHO_CURL_RETRY_BASE_DELAY=0 DYBATPHO_CURL_RETRY_MAX_DELAY=0
+  local -a answers=()
+  local try
+  for try in {0..8}; do answers+=(": echo '500'"); done
+  stub curl "${answers[@]}"
+  run_traced -5 dybatpho::run_with_timeout 20 dybatpho::curl_do https://this
+  unstub curl
+}
+
+
+@test "dybatpho::curl_do reads a redirect budget with a leading zero in base ten" {
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 301 Moved\r\nLocation: /loop\r\n\r\n' > "$2"
+  shift
+done
+echo 301
+HELPER
+  local -a answers=()
+  local hop
+  for hop in {0..8}; do answers+=(": bash ${helper} \"\$@\""); done
+  stub curl "${answers[@]}"
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+  export DYBATPHO_CURL_MAX_RETRIES=0 DYBATPHO_CURL_MAX_REDIRECTS=08
+  run_traced --separate-stderr -3 dybatpho::curl_do https://api.example/loop
+  unstub curl
+  assert_stderr --partial "Stopped after 8 redirects"
+}
+
+@test "dybatpho::rate_limit reads a wait budget with a leading zero in base ten" {
+  dybatpho::rate_limit_reset octal
+  DYBATPHO_RATE_LIMIT_MAX_WAIT=08
+  dybatpho::rate_limit octal 1/1h
+  # Waiting out the hour is the bug, so a deadline bounds it.
+  run_traced --separate-stderr -9 dybatpho::run_with_timeout 20 dybatpho::rate_limit octal 1/1h -- true
+  DYBATPHO_RATE_LIMIT_MAX_WAIT=0
+  assert_stderr --partial "over the 8s budget"
+}
+
+@test "dybatpho::curl_paginate reads a page budget with a leading zero in base ten" {
+  local page
+  for page in {1..8}; do
+    dybatpho::mock_http "items?page=${page}" 200 "page-${page}" \
+      "Link: <https://api.example.test/items?page=$((page + 1))>; rel=\"next\""
+  done
+  dybatpho::mock_http "items?page=9" 200 'page-9'
+  DYBATPHO_PAGINATE_MAX_PAGES=08
+  run_traced dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  DYBATPHO_PAGINATE_MAX_PAGES=100
+  assert_success
+  assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "8"
+  refute_output --partial "page-9"
+}
+
+@test "dybatpho::wait_port reads seconds with a leading zero in base ten" {
+  local port
+  port="$(start_listener)" || skip "no way to open a listening socket here"
+  run_traced dybatpho::wait_port 127.0.0.1 "${port}" 08 09
+}
+
+@test "dybatpho::curl_download and curl_resume_download take a directory starting with a dash" {
+  # `dirname` and `mkdir` read `-out` as an option, and the download failed.
+  cd "${BATS_TEST_TMPDIR}"
+  stub curl ": echo '200'" ": echo '200'"
+  run_traced dybatpho::curl_download https://this -out/file
+  assert_success
+  run_traced dybatpho::curl_resume_download https://this -again/file
+  assert_success
+  unstub curl
+  assert_dir_exists "${BATS_TEST_TMPDIR}/-out"
+  assert_dir_exists "${BATS_TEST_TMPDIR}/-again"
+}

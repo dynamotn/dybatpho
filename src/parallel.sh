@@ -749,8 +749,9 @@ function dybatpho::parallel_run {
 function dybatpho::parallel_status {
   local index
   dybatpho::expect_args index -- "$@"
-  [[ "${index}" =~ ^[0-9]+$ ]] \
+  [[ "${index}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Job index must be a non-negative integer, got '${index}'"
+  index=$((10#${index}))
   ((index < ${#DYBATPHO_PARALLEL_STATUS[@]})) \
     || dybatpho::die "${FUNCNAME[0]}: No job with index ${index} in the last run"
   if [[ -z "${DYBATPHO_PARALLEL_STATUS[index]}" ]]; then

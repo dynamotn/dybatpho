@@ -271,11 +271,11 @@ function dybatpho::text_box {
   # slicing one long rule, since a slice counts bytes in the C locale.
   local rule title_rule
   printf -v rule '%*s' "$((inner + 2))" ""
-  rule="${rule// /${horizontal}}"
+  rule="${rule// /"${horizontal}"}"
 
   if [[ -n "${title}" ]]; then
     printf -v title_rule '%*s' "$((inner - title_width - 1))" ""
-    title_rule="${title_rule// /${horizontal}}"
+    title_rule="${title_rule// /"${horizontal}"}"
     printf '%s%s %s %s%s\n' "${top_left}" "${horizontal}" "${title}" \
       "${title_rule}" "${top_right}"
   else
@@ -412,7 +412,7 @@ function dybatpho::text_truncate_lines {
       marker="… ${hidden} more lines"
     fi
   else
-    marker="${marker//\{count\}/${hidden}}"
+    marker="${marker//\{count\}/"${hidden}"}"
   fi
   printf '%s\n' "${marker}"
 }

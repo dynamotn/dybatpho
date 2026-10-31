@@ -70,6 +70,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   escapes in double-quoted values.**
 - **`testing` — the `dybatpho::mock_http` curl mock writes headers to standard
   output for `-D -` and accepts `--dump-header`.**
+- **`network` — `DYBATPHO_CURL_MAX_RETRIES`, `DYBATPHO_CURL_MAX_REDIRECTS`,
+  `DYBATPHO_RATE_LIMIT_MAX_WAIT`, `DYBATPHO_PAGINATE_MAX_PAGES` and the
+  `dybatpho::wait_port` seconds are read in base ten:** a leading zero such as
+  `08` no longer makes `curl_do` retry forever or `rate_limit` wait out the
+  whole window, and values over 18 digits are refused.
+- **`network` — `dybatpho::curl_download` and `dybatpho::curl_resume_download`
+  accept a destination whose directory starts with `-`.**
+- **`parallel` — `dybatpho::parallel_status 08` reads job 8 instead of
+  failing.**
 - **`process` — `dybatpho::run_with_timeout` reads seconds and
   `DYBATPHO_TIMEOUT_KILL_AFTER` in base ten:** a grace of `09` no longer turns
   into an immediate SIGKILL.
@@ -82,6 +91,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   ten.**
 - **`tui` — `DYBATPHO_TUI_DEFAULT` and typed menu answers with a leading zero
   (`09`, `010`) select that position.**
+- **`helpers` — the unknown-option message of self-parsing functions shows an
+  option containing `&` as typed.**
 - **`screen` — `screen_layout` constraints (`length:`, `percent:`, `ratio:`,
   `min:`, `max:`, `fill:`), widget options (`max:`, `min:`, `label_width:`,
   `selected:`, `offset:`, `widths:`, `active:`), `screen_gauge` and
@@ -103,6 +114,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`testing` — `dybatpho::unmock_command` and `dybatpho::mock_calls` refuse a
   command name containing a slash,** so `../` can no longer delete or read files
   outside the mock directory.
+- **`secret` — on systems without `/dev/fd`, `dybatpho::secret_with_file`
+  substitutes its temporary file path as is when `TMPDIR` contains `&`,**
+  instead of handing the command a wrong path.
 - **`screen`, `tui` — a numeric screen option such as `max:` or `offset:`, or
   `DYBATPHO_TUI_PROGRESS_STEP` and `DYBATPHO_TUI_MENU_HEIGHT`, holding text such
   as `x[$(cmd)]` no longer runs the command.**

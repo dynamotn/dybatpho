@@ -542,7 +542,7 @@ function __dybatpho_helpers_options_into {
           || __dybatpho_helpers_po_refused=true
       fi
       [[ "${__dybatpho_helpers_po_refused}" == false ]] \
-        || dybatpho::die "${__dybatpho_helpers_po_unknown//\{option\}/${__dybatpho_helpers_po_arg}}"
+        || dybatpho::die "${__dybatpho_helpers_po_unknown//\{option\}/"${__dybatpho_helpers_po_arg}"}"
       if [[ "${__dybatpho_helpers_po_ends}" == true ]]; then
         shift
         __dybatpho_helpers_po_used+=1
@@ -565,8 +565,8 @@ function __dybatpho_helpers_options_into {
       && [[ "${__dybatpho_helpers_po_has_value}" == false ]]; then
       if (($# < 2)); then
         __dybatpho_helpers_po_noun="${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]##*:}"
-        __dybatpho_helpers_po_message="${__dybatpho_helpers_po_missing//\{option\}/${__dybatpho_helpers_po_arg}}"
-        dybatpho::die "${__dybatpho_helpers_po_message//\{noun\}/${__dybatpho_helpers_po_noun:-value}}"
+        __dybatpho_helpers_po_message="${__dybatpho_helpers_po_missing//\{option\}/"${__dybatpho_helpers_po_arg}"}"
+        dybatpho::die "${__dybatpho_helpers_po_message//\{noun\}/"${__dybatpho_helpers_po_noun:-value}"}"
       fi
       __dybatpho_helpers_po_value="$2"
       shift

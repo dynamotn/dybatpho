@@ -560,10 +560,10 @@ function dybatpho::secret_with_file {
     # kcov(enabled)
   fi
 
-  local -a __dybatpho_secret_wf_command=()                                                                # kcov(skip)
-  local __dybatpho_secret_wf_argument                                                                     # kcov(skip)
-  for __dybatpho_secret_wf_argument in "$@"; do                                                           # kcov(skip)
-    __dybatpho_secret_wf_command+=("${__dybatpho_secret_wf_argument//\{\}/${__dybatpho_secret_wf_path}}") # kcov(skip)
+  local -a __dybatpho_secret_wf_command=()                                                                  # kcov(skip)
+  local __dybatpho_secret_wf_argument                                                                       # kcov(skip)
+  for __dybatpho_secret_wf_argument in "$@"; do                                                             # kcov(skip)
+    __dybatpho_secret_wf_command+=("${__dybatpho_secret_wf_argument//\{\}/"${__dybatpho_secret_wf_path}"}") # kcov(skip)
   done
 
   local __dybatpho_secret_wf_status=0                                                                       # kcov(skip)

@@ -618,8 +618,8 @@ function __dybatpho_csv_parse_into {
       local -a __dybatpho_csv_decoded=()
       local __dybatpho_csv_newline=$'\n'
       mapfile -t __dybatpho_csv_decoded <<< "${__dybatpho_csv_encoded%"${__dybatpho_csv_newline}"}"
-      __dybatpho_csv_decoded=("${__dybatpho_csv_decoded[@]//"${__dybatpho_csv_unit}1"/${__dybatpho_csv_newline}}")
-      __dybatpho_csv_records_ref=("${__dybatpho_csv_decoded[@]//"${__dybatpho_csv_unit}0"/${__dybatpho_csv_unit}}")
+      __dybatpho_csv_decoded=("${__dybatpho_csv_decoded[@]//"${__dybatpho_csv_unit}1"/"${__dybatpho_csv_newline}"}")
+      __dybatpho_csv_records_ref=("${__dybatpho_csv_decoded[@]//"${__dybatpho_csv_unit}0"/"${__dybatpho_csv_unit}"}")
       return 0
     fi
   fi

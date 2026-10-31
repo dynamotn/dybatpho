@@ -1381,3 +1381,12 @@ EOF
   assert_line --index 0 "dybatpho::own_hello  (${file}:2)"
   assert_line --index 2 "Says hello."
 }
+
+@test "the option reader names an unknown option holding an ampersand as given" {
+  # Bash 5.2 reads an unquoted `&` in a replacement as the matched text, so
+  # the message said `-a{option}b` for the option `-a&b`.
+  run --separate-stderr __dybatpho_helpers_options_into - - '-f=force' '' '-*' \
+    'caller: unknown option: {option}' '' -- '-a&b'
+  assert_failure
+  assert_stderr --partial "caller: unknown option: -a&b"
+}

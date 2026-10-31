@@ -736,7 +736,7 @@ function __dybatpho_config_schema_clear {
   dybatpho::expect_args key -- "$@"
   for attribute in "${!DYBATPHO_CONFIG_SCHEMA[@]}"; do
     if [[ "${attribute}" == "${key}."* ]]; then
-      unset "DYBATPHO_CONFIG_SCHEMA[${attribute}]"
+      unset -v 'DYBATPHO_CONFIG_SCHEMA[$attribute]'
     fi
   done
   return 0

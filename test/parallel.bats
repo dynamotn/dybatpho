@@ -695,3 +695,10 @@ SCRIPT
   assert_line "caught"
   assert_line "status 143"
 }
+
+@test "dybatpho::parallel_status reads an index with a leading zero in base ten" {
+  dybatpho::parallel_map 2 _echo_job a b c d e f g h i > /dev/null
+  run_traced dybatpho::parallel_status 08
+  assert_success
+  assert_output "0"
+}

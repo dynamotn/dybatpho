@@ -498,8 +498,8 @@ function __dybatpho_agent_each_tool_into {
   local __dybatpho_agent_each_jq __dybatpho_agent_each_def
   for __dybatpho_agent_each_name in ${__dybatpho_agent_each_list[@]+"${__dybatpho_agent_each_list[@]}"}; do
     __dybatpho_agent_tool_name_into __dybatpho_agent_each_name "${__dybatpho_agent_each_name}"
-    __dybatpho_agent_each_filter="${__dybatpho_agent_each_template//@NAME@/\"${__dybatpho_agent_each_name}\"}"
-    __dybatpho_agent_each_filter="${__dybatpho_agent_each_filter//@SCHEMA@/${__dybatpho_agent_each_schema}}"
+    __dybatpho_agent_each_filter="${__dybatpho_agent_each_template//@NAME@/"\"${__dybatpho_agent_each_name}\""}"
+    __dybatpho_agent_each_filter="${__dybatpho_agent_each_filter//@SCHEMA@/"${__dybatpho_agent_each_schema}"}"
     __dybatpho_agent_each_jq=".[${__dybatpho_agent_each_index}] | (${__dybatpho_agent_each_filter}) | @json"
     __dybatpho_agent_each_def=$(dybatpho::json_get "${__dybatpho_agent_each_commands}" "${__dybatpho_agent_each_jq}")
     __dybatpho_agent_each_out+=("${__dybatpho_agent_each_def}")

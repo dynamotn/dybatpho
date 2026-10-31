@@ -145,7 +145,6 @@ SCRIPT
 }
 
 @test "fail-fast leaves the remaining jobs unstarted" {
-  # shellcheck disable=2030
   DYBATPHO_PARALLEL_FAILFAST=true
   ! dybatpho::parallel_map 1 _failing_job a bad1 c d > /dev/null
   DYBATPHO_PARALLEL_FAILFAST=false
@@ -249,7 +248,6 @@ SCRIPT
     printf '%s' "$!" > "${BATS_TEST_TMPDIR}/sleeper"
     wait
   }
-  # shellcheck disable=2030
   DYBATPHO_TIMEOUT_KILL_AFTER=1
   local started="${SECONDS}"
   ! dybatpho::parallel_run --timeout=1s 1 "_stubborn" > /dev/null 2>&1
@@ -269,7 +267,6 @@ SCRIPT
 }
 
 @test "DYBATPHO_PARALLEL_TIMEOUT sets the limit when no option does" {
-  # shellcheck disable=2030
   DYBATPHO_PARALLEL_TIMEOUT=1
   ! dybatpho::parallel_run 1 "sleep 30" > /dev/null 2>&1
   DYBATPHO_PARALLEL_TIMEOUT=""
@@ -360,7 +357,6 @@ SCRIPT
   # it started, one running and one already exited.
   [[ -r /proc/self/stat ]] || skip "needs /proc to tell a zombie apart"
   local groups="${BATS_TEST_TMPDIR}/groups" holder live dead state="" tick
-  # shellcheck disable=SC2016
   bash -c 'set -m; sleep 30 & live=$!; sleep 0.1 & printf "%s %s\n" "${live}" "$!" > "$1"; exec sleep 30' \
     _ "${groups}" &
   holder=$!
@@ -421,7 +417,6 @@ SCRIPT
 }
 
 @test "DYBATPHO_PARALLEL_PROGRESS turns progress on without the option" {
-  # shellcheck disable=2030
   DYBATPHO_PARALLEL_PROGRESS=true
   run_traced --separate-stderr -0 dybatpho::parallel_run 2 "true" "true"
   DYBATPHO_PARALLEL_PROGRESS=false
@@ -518,7 +513,6 @@ SCRIPT
 }
 
 @test "a job count of zero follows the configuration, then the machine" {
-  # shellcheck disable=2030
   DYBATPHO_PARALLEL_JOBS=2
   run_traced --separate-stderr -0 dybatpho::parallel_map 0 _echo_job a b c
   assert_line --index 0 "out a"
@@ -543,7 +537,6 @@ SCRIPT
 }
 
 @test "the pool runs nothing under DRY_RUN" {
-  # shellcheck disable=2030,2031
   export DRY_RUN=true
   run_traced --separate-stderr -0 dybatpho::parallel_map 2 _failing_job a bad1
   assert_output --partial "DRY RUN"

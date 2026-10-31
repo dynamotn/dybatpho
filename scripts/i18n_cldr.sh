@@ -273,7 +273,6 @@ function __dybatpho_cldr_symbol_into {
   # English inheriting the bare code from the root locale leaves no entry.
   if [[ -z "${__dybatpho_cldr_found}" || "${__dybatpho_cldr_found}" == "${__dybatpho_cldr_c}" ]]; then
     __dybatpho_cldr_home="${__dybatpho_cldr_c:0:2}"
-    # shellcheck disable=SC2016 # jq variables, not shell ones
     __dybatpho_cldr_lang="$(jq -r --arg t "und-${__dybatpho_cldr_home}" '.supplemental.likelySubtags[$t] // empty
       | split("-")[0]' "${__dybatpho_cldr_likely}")"
     if [[ -n "${__dybatpho_cldr_lang}" ]] \
@@ -332,7 +331,6 @@ function __dybatpho_cldr_plural_signatures {
   local plurals languages aliases
   dybatpho::expect_args plurals languages aliases -- "$@"
   local rules
-  # shellcheck disable=SC2016 # jq variables, not shell ones
   rules="$(jq -r --arg langs "${languages}" --slurpfile aliases "${aliases}" '
     .supplemental["plurals-type-cardinal"] as $p
     | ($aliases[0].supplemental.metadata.alias.languageAlias) as $a
@@ -509,7 +507,6 @@ function __dybatpho_cldr_run {
   # Deliberate deviations: `TABLE[key] reason`, one per line.
   local -A allowed=()
   local id reason
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if [[ -n "${CLDR_ALLOW}" ]]; then
     dybatpho::is file "${CLDR_ALLOW}" || dybatpho::die "No allowlist at ${CLDR_ALLOW}"
     while IFS= read -r line || [[ -n "${line}" ]]; do
@@ -629,7 +626,6 @@ function __dybatpho_cldr_run {
       DYBATPHO_I18N_CURRENCY)
         local code="${key%%.*}" what="${key#*.}"
         if [[ "${what}" == digits ]]; then
-          # shellcheck disable=SC2016 # jq variables, not shell ones
           value="$(jq -r --arg c "${code}" '.supplemental.currencyData.fractions
             | (.[$c] // .DEFAULT)._digits' "${core}/currencyData.json")"
         else

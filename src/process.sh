@@ -404,7 +404,6 @@ function dybatpho::dry_run {
     printf ' %q' "$@"
     printf '\n'
   else
-    # shellcheck disable=2294 # a single argument is a shell string by contract; see the @tip
     if [[ "${__dybatpho_dry_run_argv}" == false ]] && (($# == 1)); then
       eval "$1"
     else

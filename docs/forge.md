@@ -243,7 +243,6 @@ serves `/api/v4` from its own host.
 **📤 Output on stdout**
 
 - API base URL, without a trailing slash
-  this module have no remote of their own to pass and rely on the defaults
 
 ---
 

@@ -396,7 +396,6 @@ stub_curl_recording() {
   local lock="${DYBATPHO_AI_STATE_FILE}.lock"
   mkdir "${lock}"
   touch -t 197001020000 "${lock}"
-  # shellcheck disable=SC2329 # stands in for the waiter's pause
   sleep() {
     naps=$((${naps:-0} + 1))
     ((naps != 10)) || { rmdir "${lock}" && mkdir "${lock}"; }
@@ -411,7 +410,6 @@ stub_curl_recording() {
   local lock="${DYBATPHO_AI_STATE_FILE}.lock"
   mkdir "${lock}"
   touch -t 197001020000 "${lock}"
-  # shellcheck disable=SC2329 # stands in for the waiter's pause
   sleep() { :; }
   run __dybatpho_ai_state_lock "${DYBATPHO_AI_STATE_FILE}"
   assert_success

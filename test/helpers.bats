@@ -3,7 +3,6 @@ setup() {
 }
 
 @test "dybatpho::expect_args have right spec" {
-  # shellcheck disable=2329
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 -- "$@"
@@ -14,7 +13,6 @@ setup() {
 }
 
 @test "dybatpho::expect_args not have right spec" {
-  # shellcheck disable=2329
   test_function() {
     local arg1 arg2
     dybatpho::expect_args arg1 arg2 "$@"
@@ -77,7 +75,6 @@ setup() {
 }
 
 @test "dybatpho::expect_envs have right envs" {
-  # shellcheck disable=2030
   export DYBATPHO_TEST_ENV1="test1"
   export DYBATPHO_TEST_ENV2="test2"
   dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
@@ -87,7 +84,6 @@ setup() {
   run --separate-stderr dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
   assert_failure
   assert_stderr --partial "Environment variable \`DYBATPHO_TEST_ENV1\` isn't set"
-  # shellcheck disable=2031
   export DYBATPHO_TEST_ENV1="test1"
   run --separate-stderr dybatpho::expect_envs DYBATPHO_TEST_ENV1 DYBATPHO_TEST_ENV2
   assert_failure
@@ -579,7 +575,6 @@ EOF
   assert_stderr --partial "numbers mismatch"
 }
 
-# shellcheck disable=2329
 _test_retry() {
   count=$((count + 1))
   if [ "${count}" -lt 3 ]; then
@@ -1083,7 +1078,6 @@ EOF
 }
 
 @test "__dybatpho_helpers_sort orders through the comparator and keeps ties in place" {
-  # shellcheck disable=2329
   by_first_letter() { [[ "${1:0:1}" < "${2:0:1}" ]]; }
   local values=(b1 a1 c1 b2 a2 $'a\nline' b3)
   __dybatpho_helpers_sort values by_first_letter
@@ -1094,7 +1088,6 @@ EOF
 }
 
 @test "__dybatpho_helpers_sort passes extra arguments and handles short lists" {
-  # shellcheck disable=2329
   by_length() { if [[ "$3" == desc ]]; then ((${#1} > ${#2})); else ((${#1} < ${#2})); fi; }
   local words=(ccc a bb dddd)
   __dybatpho_helpers_sort words by_length desc
@@ -1304,11 +1297,8 @@ EOF
 
 @test "__dybatpho_helpers_public_caller_into names the nearest public function" {
   local who=""
-  # shellcheck disable=SC2329 # called through the functions below
   __helper() { __dybatpho_helpers_public_caller_into who; }
-  # shellcheck disable=SC2329
   __inner() { __helper; }
-  # shellcheck disable=SC2329
   dybatpho::outer_for_test() { __inner; }
   dybatpho::outer_for_test
   assert_equal "${who}" "dybatpho::outer_for_test"

@@ -94,7 +94,6 @@ note() {
   # overruns its one-second slot; the missed ticks are skipped, not queued.
   local clock="${BATS_TEST_TMPDIR}/clock"
   printf '100\n' > "${clock}"
-  # shellcheck disable=SC2329 # invoked by schedule_every
   dybatpho::date_now() {
     local now
     now="$(< "${clock}")"
@@ -249,9 +248,7 @@ SCRIPT
   # by reporting its age as 0 -- a live caller re-taking it would look the
   # same -- and the pause between attempts is skipped, since neither is what
   # is under test.
-  # shellcheck disable=SC2329
   sleep() { :; }
-  # shellcheck disable=SC2329
   dybatpho::file_age_seconds() { printf '0\n'; }
   mkdir -p "${DYBATPHO_SCHEDULE_DIR}"
   printf '%s\n' "$$" > "${DYBATPHO_SCHEDULE_DIR}/held.claim"

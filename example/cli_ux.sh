@@ -37,7 +37,6 @@ dybatpho::register_common_handlers
 # `config:<key>` reads, underneath any environment variable or explicit flag.
 # A real CLI would reach this state through `dybatpho::config_load ./app.yaml`;
 # the keys are set directly here to keep the example free of a data file.
-# shellcheck disable=SC2034 # read by the generated parser through config:<key>
 DYBATPHO_CONFIG["deploy.environment"]="staging"
 # shellcheck disable=SC2034 # read by the generated parser through config:<key>
 DYBATPHO_CONFIG["deploy.color"]="true"

@@ -3,9 +3,8 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # shares some variables with the caller or across calls on purpose, which is
 # what `local` would break; it keeps its declarations with the functions they
-# describe; it parses its own arguments, so the raw form is what the reader
-# sees.
-# dyshellint disable=BSG050,BSG011,BSG033,BSG051
+# describe.
+# dyshellint disable=BSG050,BSG011,BSG033
 # The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
 # here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
 # which test/conventions.bats enforces.

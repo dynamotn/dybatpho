@@ -38,7 +38,6 @@ function _release_tool {
   dybatpho::curl_do "https://api.example.test/releases/${version}" "${out_dir}/release.json" \
     || return 1
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   # The two values are fixed strings this example sets, with no quote, backslash or newline.
   # dyshellint disable=BSG086 # fixed strings, nothing to escape
   printf '{"version":"%s","channel":"%s"}\n' "${version}" "${RELEASE_CHANNEL:-}" \

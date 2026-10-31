@@ -327,7 +327,6 @@ tag() {
   local target="${BATS_TEST_TMPDIR}/SHA256SUMS"
   printf 'sums\n' > "${target}"
   local signature
-  # shellcheck disable=2030
   DYBATPHO_RELEASE_SIGN_CMD="${BATS_TEST_TMPDIR}/signer"
   cat > "${BATS_TEST_TMPDIR}/signer" << 'SIGNER'
 #!/usr/bin/env bash
@@ -351,7 +350,6 @@ SIGNER
   cd "${BATS_TEST_TMPDIR}"
   local target="${dir}/SUMS \$(touch pwned); x"
   printf 'sums\n' > "${target}"
-  # shellcheck disable=2030,2031
   DYBATPHO_RELEASE_SIGN_CMD="${BATS_TEST_TMPDIR}/signer3 --flag"
   cat > "${BATS_TEST_TMPDIR}/signer3" << 'SIGNER'
 #!/usr/bin/env bash
@@ -385,7 +383,6 @@ SIGNER
 @test "dybatpho::release_sign accepts an explicit signature path and rejects a missing file" {
   local target="${BATS_TEST_TMPDIR}/artifact"
   printf 'x\n' > "${target}"
-  # shellcheck disable=2030,2031
   DYBATPHO_RELEASE_SIGN_CMD="${BATS_TEST_TMPDIR}/signer2"
   printf '#!/usr/bin/env bash\nprintf sig > "$1"\n' > "${BATS_TEST_TMPDIR}/signer2"
   chmod +x "${BATS_TEST_TMPDIR}/signer2"
@@ -403,7 +400,6 @@ SIGNER
   mkdir -p "${out}"
   printf 'one\n' > "${out}/mytool_1.0.0_linux_amd64.tar.gz"
 
-  # shellcheck disable=2030,2031
   export DRY_RUN=true
   local artifact sums signature
   artifact="$(dybatpho::release_package "${source}" "${BATS_TEST_TMPDIR}/dist6" mytool 1.0.0 linux amd64 | tail -1)"

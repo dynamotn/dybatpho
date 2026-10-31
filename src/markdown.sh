@@ -1,8 +1,7 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# keeps its declarations with the functions they describe.
-# dyshellint disable=BSG050,BSG033
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file markdown.sh
 # @brief Utilities for building structured Markdown content
 # @namespace dybatpho

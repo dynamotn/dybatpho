@@ -4,7 +4,6 @@
 # @brief Example showing portable process locking utilities
 # @description Demonstrates dybatpho::lock_acquire, lock_release, lock_is_held,
 #              lock_info, and with_lock to prevent concurrent script runs
-# shellcheck disable=SC2034 # DYBATPHO_LOCK_DIR is read by the lock module, not by this script
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules lock

@@ -125,7 +125,6 @@ function __dybatpho_table_parse_alignments {
   dybatpho::expect_args spec widths_var alignments_var -- "$@"
   # shellcheck disable=SC2178 # nameref to the caller's array
   local -n widths_ref="${widths_var}"
-  # shellcheck disable=SC2178 # nameref to the caller's array
   local -n alignments_ref="${alignments_var}"
   local -a requested=()
   local index alignment

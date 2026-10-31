@@ -726,7 +726,6 @@ SCRIPT
 _replay_reclaim_race() {
   RACE_LOCK="$1" RACE_FRESH="$2" RACE_THIRD="${3-}" RACE_READS="${BATS_TEST_TMPDIR}/reads"
   : > "${RACE_READS}"
-  # shellcheck disable=SC2329 # called by dybatpho::lock_reclaim_stale
   __dybatpho_lock_identity() {
     printf '.' >> "${RACE_READS}"
     if [[ "$(< "${RACE_READS}")" == "..." ]]; then

@@ -2,9 +2,8 @@
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # shares some variables with the caller or across calls on purpose, which is
-# what `local` would break; it parses its own arguments, so the raw form is
-# what the reader sees.
-# dyshellint disable=BSG050,BSG011,BSG051
+# what `local` would break.
+# dyshellint disable=BSG050,BSG011
 # A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
 # own diagnostic when it fails, so a separate assignment for each would only add lines.
 # shellcheck disable=SC2312 # values are passed on through $(...)
@@ -418,11 +417,9 @@ function dybatpho::config_require {
 #######################################
 function dybatpho::config_export {
   local prefix="${1-}" key
-  # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
   [[ -z "${prefix}" || "${prefix}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
     || dybatpho::die "Invalid configuration variable prefix: ${prefix}"
   for key in "${!DYBATPHO_CONFIG[@]}"; do
-    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
     [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
       || dybatpho::die "Cannot export configuration key as variable: ${key}"
     export "${prefix}${key}=${DYBATPHO_CONFIG[${key}]}"
@@ -471,7 +468,6 @@ function __dybatpho_config_save_dotenv {
   file="$1"
   shift
   for key in "$@"; do
-    # shellcheck disable=SC2154 # declared by `src/helpers.sh`, a core module
     [[ "${key}" =~ ${__DYBATPHO_HELPERS_RE_IDENTIFIER} ]] \
       || dybatpho::die "Cannot save configuration key to a dotenv file: ${key}"
     wanted["${key}"]=1

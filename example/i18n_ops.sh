@@ -322,9 +322,7 @@ SOURCE
 
 # Run one call with the library's own text routed through the catalog. The
 # subshell is the point: the rest of the demo keeps printing in English, and
-# nothing set here reaches the caller. ShellCheck reads that confinement as a
-# lost assignment, which is exactly the behavior being relied on.
-# shellcheck disable=SC2030,SC2031
+# nothing set here reaches the caller.
 # @description Run a fragment with library translation on, so its own output is localized.
 # @noargs
 function _translated {

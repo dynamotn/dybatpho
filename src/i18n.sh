@@ -3,9 +3,8 @@
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # shares some variables with the caller or across calls on purpose, which is
 # what `local` would break; it keeps its declarations with the functions they
-# describe; it parses its own arguments, so the raw form is what the reader
-# sees.
-# dyshellint disable=BSG050,BSG011,BSG033,BSG051
+# describe.
+# dyshellint disable=BSG050,BSG011,BSG033
 # `__dybatpho_i18n_state` only memoizes the resolved locale and its fallback chain; losing it with a subshell means
 # the same answer is worked out again.
 # dyshellint disable=BSG084 # the state is a memo
@@ -1834,10 +1833,8 @@ function dybatpho::i18n_bytes {
   printf '%s %s\n' "${formatted}" "${units[index]}"
 }
 
-# Month, weekday, and day-period names. These maps are read through a nameref in
-# `__dybatpho_i18n_data_into` rather than by name, which static analysis cannot
-# follow, so they look unused where they are written.
-# shellcheck disable=SC2034
+# Month, weekday, and day-period names, read through a nameref in
+# `__dybatpho_i18n_data_into` rather than by name.
 # Weekdays are stored Monday first so that
 # their index is the one `date +%u` already reports; storing them Sunday first
 # would put an off-by-one conversion at every use site. Values are comma

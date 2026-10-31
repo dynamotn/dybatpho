@@ -114,7 +114,7 @@ function _collect {
   if [[ -n "${raw}" ]]; then
     # One `sort` per refresh rather than a comparison ladder in Bash: sorting
     # several hundred rows in the shell costs far more than the process does.
-    # shellcheck disable=SC2086,SC2248 # the sort flags are words on purpose
+    # shellcheck disable=SC2248 # the sort flags are words on purpose
     sorted="$(printf '%s\n' "${raw}" | LC_ALL=C sort ${key} ${direction} 2> /dev/null)" \
       || sorted="${raw}"
   fi

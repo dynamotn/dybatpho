@@ -1,9 +1,8 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# uses `eval`, which is how the spec engine builds a parser; it parses its own
-# arguments, so the raw form is what the reader sees.
-# dyshellint disable=BSG050,BSG040,BSG051
+# uses `eval`, which is how the spec engine builds a parser.
+# dyshellint disable=BSG050,BSG040
 # `"$@"` in these functions is the argument list of the external `curl`, or of one of this module's own request
 # functions, never code the caller wrote. The `DYBATPHO_CURL_*` locals shadow the globals on purpose: that is how per-
 # call settings reach `dybatpho::curl_do`.
@@ -299,7 +298,6 @@ function __dybatpho_network_with_secret_headers {
     ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"}
   )
   local -a DYBATPHO_CURL_SECRET_HEADERS
-  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
   DYBATPHO_CURL_SECRET_HEADERS=(
     ${__dybatpho_network_wsh_inherited[@]+"${__dybatpho_network_wsh_inherited[@]}"}
     ${__dybatpho_network_wsh_added[@]+"${__dybatpho_network_wsh_added[@]}"}
@@ -1103,7 +1101,6 @@ function dybatpho::circuit_breaker {
   if [[ "${__dybatpho_network_cb_command}" == "--" ]]; then
     "$@" || __dybatpho_network_cb_exit_code=$?
   else
-    # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form runs no `eval`
     eval "${__dybatpho_network_cb_command}" || __dybatpho_network_cb_exit_code=$?
   fi
 
@@ -1565,7 +1562,6 @@ function dybatpho::curl_graphql {
   # kcov(enabled)
   local authorization=""
   [[ -z "${DYBATPHO_GRAPHQL_TOKEN}" ]] || authorization="Authorization: Bearer ${DYBATPHO_GRAPHQL_TOKEN}"
-  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
   local DYBATPHO_CURL_SECRET_DATA="${payload}"
 
   local exit_code=0

@@ -11,7 +11,7 @@
 # as one string so that the code it produces reads the way it runs, and the
 # error paths carry a `# kcov(skip)` marker that has to stay on the line it
 # marks.
-# dyshellint disable=BSG050,BSG011,BSG040,BSG051,BSG003,BSG070
+# dyshellint disable=BSG050,BSG011,BSG040,BSG003,BSG070
 # The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
 # here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
 # which test/conventions.bats enforces.
@@ -1351,7 +1351,6 @@ function __dybatpho_cli_generate_logic {
   dybatpho::is true "${__abbr}" \
     && __dybatpho_cli_print_indent 1 'local __abbr_rc=0 __abbr_out=""'
   __dybatpho_cli_print_persistent_help_defs
-  # shellcheck disable=2016 # the `$` is for the generated parser, which is text here
   __dybatpho_cli_print_indent 1 \
     "while OPTARG= && [ \"\${__rest_end}\" != end ] && [ \$# -gt 0 ]; do"
   __dybatpho_cli_print_indent 2 "case \$1 in"
@@ -1904,7 +1903,6 @@ function __dybatpho_cli_generate_man_command {
     for __dybatpho_cli_gmc_command in ${__dybatpho_cli_gmc_commands[@]+"${__dybatpho_cli_gmc_commands[@]}"}; do
       local __dybatpho_cli_gmc_cmd __dybatpho_cli_gmc_child __dybatpho_cli_gmc_aliases __dybatpho_cli_gmc_child_hidden
       local __dybatpho_cli_gmc_child_deprecated
-      # shellcheck disable=SC2034 # child_deprecated fills a field slot this loop doesn't read
       IFS="${__DYBATPHO_CLI_META_SEP}" read -r __dybatpho_cli_gmc_cmd __dybatpho_cli_gmc_child \
         __dybatpho_cli_gmc_aliases __dybatpho_cli_gmc_child_hidden __dybatpho_cli_gmc_child_deprecated <<< \
         "${__dybatpho_cli_gmc_command}"
@@ -2066,7 +2064,6 @@ function __dybatpho_cli_completion_words {
 # @internal
 #######################################
 function __dybatpho_cli_generate_completion_command {
-  # shellcheck disable=SC2034 # root keeps the positional signature uniform across generators
   local __dybatpho_cli_gcc_spec="$1" __dybatpho_cli_gcc_shell="$2" __dybatpho_cli_gcc_name="$3" \
     __dybatpho_cli_gcc_root="$4" __dybatpho_cli_gcc_description
   local -a __dybatpho_cli_gcc_options=() __dybatpho_cli_gcc_commands=() __dybatpho_cli_gcc_words=()
@@ -2085,9 +2082,7 @@ function __dybatpho_cli_generate_completion_command {
       # user can ever type.
       [[ "${__dybatpho_cli_gcc_aliases}" = "@none" ]] && __dybatpho_cli_gcc_aliases=""
       __dybatpho_cli_gcc_cmd_list+=" ${__dybatpho_cli_gcc_cmd}${__dybatpho_cli_gcc_aliases:+ ${__dybatpho_cli_gcc_aliases}}"
-      # shellcheck disable=SC2034 # out-params required by collect_spec_metadata's signature
       local -a __dybatpho_cli_gcc_child_options=() __dybatpho_cli_gcc_child_commands=()
-      # shellcheck disable=SC2034 # out-param required by collect_spec_metadata's signature
       local __dybatpho_cli_gcc_child_description
       __dybatpho_cli_collect_spec_metadata "${__dybatpho_cli_gcc_child}" __dybatpho_cli_gcc_child_options \
         __dybatpho_cli_gcc_child_commands __dybatpho_cli_gcc_child_description
@@ -3390,7 +3385,6 @@ function dybatpho::opts::cmd {
   fi
 }
 
-# shellcheck disable=2016 # the `$` is for the generated parser, which is text here
 #######################################
 # @description Declare a positional argument. Its value is assigned to the named
 #              variable once parsing succeeds, and it also gives the usage line a

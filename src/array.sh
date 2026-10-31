@@ -56,7 +56,6 @@ function dybatpho::array_reverse {
 
   local __dybatpho_array_i
   for ((__dybatpho_array_i = ${#__dybatpho_array_indices[@]} - 1; __dybatpho_array_i >= 0; __dybatpho_array_i--)); do
-    # shellcheck disable=SC2190 # __dybatpho_array_result is indexed; the nameref misleads ShellCheck
     __dybatpho_array_result+=("${__dybatpho_array_ref[${__dybatpho_array_indices[${__dybatpho_array_i}]}]}")
   done
 
@@ -374,7 +373,6 @@ function dybatpho::array_join {
 #######################################
 function __dybatpho_array_copy {
   local -n __dybatpho_array_copy_out="$1"
-  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_copy_in="$2"
   __dybatpho_array_copy_out=()
   ((${#__dybatpho_array_copy_in[@]} == 0)) || __dybatpho_array_copy_out=("${__dybatpho_array_copy_in[@]}")
@@ -704,7 +702,6 @@ function dybatpho::array_difference {
 #######################################
 function __dybatpho_array_graph_visit {
   local __dybatpho_array_graph_node="$1"
-  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_edges="$2"
   local -n __dybatpho_array_graph_seen="$3"
   local -n __dybatpho_array_graph_built="$4"
@@ -716,7 +713,6 @@ function __dybatpho_array_graph_visit {
       # The entry is still being visited further up the stack, so this edge
       # closes a cycle. It is dropped rather than followed, which is what lets
       # an order come back at all; the caller is told through the exit code.
-      # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
       __dybatpho_array_graph_broken=1
       return 0
       ;;
@@ -745,7 +741,6 @@ function __dybatpho_array_graph_visit {
 #######################################
 function __dybatpho_array_graph_roots_into {
   local -n __dybatpho_array_graph_roots="$1"
-  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_all="$2"
   shift 2
 
@@ -816,9 +811,7 @@ function dybatpho::array_toposort {
       __dybatpho_array_graph_order __dybatpho_array_graph_cycle
   done
 
-  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_result="${__dybatpho_array_graph_out}"
-  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   __dybatpho_array_graph_result=(${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"})
 
   ((__dybatpho_array_graph_cycle == 0))
@@ -867,8 +860,6 @@ function dybatpho::array_closure {
       < <(printf '%s\n' ${__dybatpho_array_graph_order[@]+"${__dybatpho_array_graph_order[@]}"} | LC_ALL=C sort -u)
   fi
 
-  # shellcheck disable=SC2178 # the nameref stands for an array; ShellCheck reads the assignment as a scalar
   local -n __dybatpho_array_graph_reachable="${__dybatpho_array_graph_out}"
-  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   __dybatpho_array_graph_reachable=(${__dybatpho_array_graph_sorted[@]+"${__dybatpho_array_graph_sorted[@]}"})
 }

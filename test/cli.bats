@@ -12,7 +12,6 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::generate_from_spec simple" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     echo "called" >&2
@@ -28,12 +27,10 @@ setup() {
   # The parser runs inside generate_from_spec and assigns the variables the
   # spec names; `spec` and `gen_file` were that function's own locals, so an
   # option or positional array with either name came back empty.
-  # shellcheck disable=2329
   _spec_named() {
     dybatpho::opts::setup "Named" gen_file action:"_named_action"
     dybatpho::opts::param "A value" spec --value
   }
-  # shellcheck disable=2329
   _named_action() { printf 'spec=%s rest=%s\n' "${spec}" "${gen_file[*]}"; }
   local spec="" gen_file=()
   run_traced dybatpho::generate_from_spec _spec_named --value hello one two
@@ -209,12 +206,10 @@ setup() {
   # and the file sourced, so every value went through a round of expansion.
   # The file now only defines the parser; the arguments reach it as an
   # argument vector.
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" ARGS action:"printf '%s\n' \"\${ARGS[@]}\""
   }
 
-  # shellcheck disable=2030
   export LOG_LEVEL=debug
   export DYBATPHO_CLI_DEBUG=true
   run_traced --separate-stderr dybatpho::generate_from_spec _spec 1 2 "3\""
@@ -230,7 +225,6 @@ setup() {
   # a value ending in a backslash escaped the closing quote and left the
   # generated file unparseable. Any script built on this parser therefore ran
   # whatever an argument value asked it to.
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" ARGS action:"printf '%s\n' \"\${NAME}\" \${ARGS[@]+\"\${ARGS[@]}\"}"
     dybatpho::opts::param "name" NAME --name
@@ -262,7 +256,6 @@ setup() {
 }
 
 @test "dybatpho::generate_from_spec handling rest arguments" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" ARGS action:"echo \${ARGS[*]}"
   }
@@ -271,7 +264,6 @@ setup() {
 }
 
 @test "dybatpho::generate_from_spec handling arguments with doesn't have sub commands" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" ARGS action:"echo -e \"\${ARGS[*]}\n\$FLAG_A\""
     dybatpho::opts::flag "" FLAG_A -a
@@ -293,7 +285,6 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::opts::flag basic long switch" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$VERBOSE"
     dybatpho::opts::flag "Verbose" VERBOSE --verbose
@@ -305,7 +296,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag basic short switch" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$DEBUGF"
     dybatpho::opts::flag "Debug" DEBUGF -d
@@ -315,7 +305,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag multiple switches" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$MFLAG"
     dybatpho::opts::flag "Multi" MFLAG -m --multi --multiple
@@ -329,7 +318,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag custom on/off values" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$FEAT"
     dybatpho::opts::flag "Feature" FEAT --feature on:yes off:no init:="no"
@@ -341,7 +329,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag init:@on" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$FFLAG"
     dybatpho::opts::flag "Flag" FFLAG --flag init:@on
@@ -351,7 +338,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag init:@off" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$OFFLAG"
     dybatpho::opts::flag "Flag" OFFLAG --flag on:yes off:no init:@off
@@ -361,7 +347,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag init:@keep preserves existing value" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$KFLAG"
     dybatpho::opts::flag "Flag" KFLAG --flag init:@keep
@@ -372,7 +357,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag init:@unset unsets variable" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \${UFLAG:-UNSET}"
     dybatpho::opts::flag "Flag" UFLAG --flag init:@unset
@@ -383,7 +367,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag --{no-} expand" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$NOFEAT"
     dybatpho::opts::flag "Feature" NOFEAT --{no-}feature
@@ -395,7 +378,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag --with{out}- expand" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$WFEAT"
     dybatpho::opts::flag "Feature" WFEAT --with{out}-wfeat
@@ -407,7 +389,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag export:false" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PRIVFLAG"
     dybatpho::opts::flag "Private" PRIVFLAG --flag export:false
@@ -421,7 +402,6 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::opts::param basic long switch" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PNAME"
     dybatpho::opts::param "Name" PNAME --name
@@ -431,7 +411,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param basic short switch" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PVAL"
     dybatpho::opts::param "Value" PVAL -v
@@ -441,7 +420,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param short switch with attached value" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PVALATTACHED"
     dybatpho::opts::param "Value" PVALATTACHED -v
@@ -451,7 +429,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param multiple switches" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PMSW"
     dybatpho::opts::param "Multi" PMSW -p --param --parameter
@@ -465,7 +442,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param init:=" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PDEF"
     dybatpho::opts::param "Default" PDEF --default init:="default-value"
@@ -477,7 +453,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param optional:true with = value" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$POPT"
     dybatpho::opts::param "Optional" POPT --opt optional:true
@@ -488,7 +463,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param optional:true without value" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$POPT2"
     dybatpho::opts::param "Optional" POPT2 --opt2 optional:true
@@ -500,7 +474,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param optional:true with separated value" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" PREST action:"printf '%s|%s\n' \"\$POPT3\" \"\${PREST[*]-}\""
     dybatpho::opts::param "Optional" POPT3 --opt3 optional:true
@@ -511,7 +484,6 @@ setup() {
 
 @test "dybatpho::opts::param validate passes for valid input" {
   _validate_positive() { [[ "$1" -gt 0 ]] 2> /dev/null; }
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PCOUNT"
     dybatpho::opts::param "Count" PCOUNT --count validate:"_validate_positive \$OPTARG"
@@ -522,7 +494,6 @@ setup() {
 
 @test "dybatpho::opts::param validate fails for invalid input" {
   _validate_positive2() { [[ "$1" -gt 0 ]] 2> /dev/null; }
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$PCOUNT2"
     dybatpho::opts::param "Count" PCOUNT2 --count2 validate:"_validate_positive2 \$OPTARG"
@@ -535,7 +506,6 @@ setup() {
 
 @test "dybatpho::opts::param init not leaked from previous flag" {
   # Regression: __init from flag's off:value must not leak into setup's __dybatpho_cli_define_var
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" PREST action:"echo \${PREST[*]}"
     dybatpho::opts::flag "Dry" PDRY --dry-run on:true off:false init:="false"
@@ -548,7 +518,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param required:true fails when option is missing" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$REQNAME"
     dybatpho::opts::param "Name" REQNAME -n --name required:true
@@ -560,7 +529,6 @@ setup() {
 }
 
 @test "dybatpho::opts::param required:true succeeds when option is present" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$REQNAME2"
     dybatpho::opts::param "Name" REQNAME2 -n --name required:true
@@ -570,7 +538,6 @@ setup() {
 }
 
 @test "dybatpho::opts::setup rejects invalid rest variable name" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" bad-name action:"echo nope"
   }
@@ -581,7 +548,6 @@ setup() {
 }
 
 @test "dybatpho::opts::setup args:none rejects positional args" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - args:none action:"echo ok"
   }
@@ -594,7 +560,6 @@ setup() {
 }
 
 @test "dybatpho::opts::setup args:exact:N validates positional args" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" REST args:exact:2 action:"printf '[%s]\n' \"\${REST[*]}\""
   }
@@ -607,11 +572,9 @@ setup() {
 }
 
 @test "dybatpho::opts::setup args:min/max validate positional args" {
-  # shellcheck disable=2329
   _spec_min() {
     dybatpho::opts::setup "" REST args:min:1 action:"printf '[%s]\n' \"\${REST[*]}\""
   }
-  # shellcheck disable=2329
   _spec_max() {
     dybatpho::opts::setup "" REST args:max:1 action:"printf '[%s]\n' \"\${REST[*]}\""
   }
@@ -630,11 +593,9 @@ setup() {
 }
 
 @test "dybatpho::opts::setup args:range validates subcommand positional args" {
-  # shellcheck disable=2329
   _spec_leaf() {
     dybatpho::opts::setup "" LEAF_ARGS args:range:1:2 action:"printf '[%s]\n' \"\${LEAF_ARGS[*]}\""
   }
-  # shellcheck disable=2329
   _spec_root() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd leaf _spec_leaf
@@ -652,7 +613,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag omits variable assignment with dash" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" REST action:"echo ${REST:-EMPTY}"
     dybatpho::opts::flag "Verbose" - --verbose
@@ -662,7 +622,6 @@ setup() {
 }
 
 @test "dybatpho::opts::flag alias metadata adds alternate switches" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$VERBOSE_ALIAS"
     dybatpho::opts::flag "Verbose" VERBOSE_ALIAS --verbose alias:-v aliases:--chatty
@@ -678,7 +637,6 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::opts::disp runs action and exits" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::disp "Show version" --version action:"echo v1.0"
@@ -688,7 +646,6 @@ setup() {
 }
 
 @test "dybatpho::opts::disp short switch" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::disp "Show help" -h action:"echo help-text"
@@ -698,7 +655,6 @@ setup() {
 }
 
 @test "dybatpho::opts::disp exits before action runs" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo main"
     dybatpho::opts::disp "Version" --version action:"echo v2.0"
@@ -715,11 +671,9 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::opts::cmd dispatches to subcommand" {
-  # shellcheck disable=2329
   _spec_child() {
     dybatpho::opts::setup "Child" CHILD_ARGS action:"echo \${CHILD_ARGS[*]}"
   }
-  # shellcheck disable=2329
   _spec_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd child _spec_child
@@ -729,12 +683,10 @@ setup() {
 }
 
 @test "dybatpho::opts::cmd passes flags to subcommand" {
-  # shellcheck disable=2329
   _spec_flag_child() {
     dybatpho::opts::setup "" - action:"echo \$CFLAG"
     dybatpho::opts::flag "Flag" CFLAG --cflag
   }
-  # shellcheck disable=2329
   _spec_flag_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd child _spec_flag_child
@@ -744,16 +696,13 @@ setup() {
 }
 
 @test "dybatpho::opts::cmd nested subcommand dispatch" {
-  # shellcheck disable=2329
   _spec_leaf() {
     dybatpho::opts::setup "Leaf" LEAF_ARGS action:"echo leaf:\${LEAF_ARGS[*]}"
   }
-  # shellcheck disable=2329
   _spec_mid() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd leaf _spec_leaf
   }
-  # shellcheck disable=2329
   _spec_root() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd mid _spec_mid
@@ -763,12 +712,10 @@ setup() {
 }
 
 @test "dybatpho::opts::cmd global options before subcommand" {
-  # shellcheck disable=2329
   _spec_gc_child() {
     dybatpho::opts::setup "" - action:"echo \$GFLAG:\$CFLAG2"
     dybatpho::opts::flag "Child flag" CFLAG2 --cflag2
   }
-  # shellcheck disable=2329
   _spec_gc_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Global flag" GFLAG --gflag
@@ -779,11 +726,9 @@ setup() {
 }
 
 @test "dybatpho::opts::flag persistent:true works after subcommand dispatch" {
-  # shellcheck disable=2329
   _spec_persist_child() {
     dybatpho::opts::setup "" - action:"echo \$PERSIST_FLAG"
   }
-  # shellcheck disable=2329
   _spec_persist_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Persistent flag" PERSIST_FLAG --persist persistent:true
@@ -794,7 +739,6 @@ setup() {
 }
 
 @test "dybatpho::opts::setup prerun/postrun wrap action" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - prerun:"echo pre" action:"echo main" postrun:"echo post"
   }
@@ -807,11 +751,9 @@ setup() {
 }
 
 @test "dybatpho::opts::setup prerun/postrun are scoped to active subcommand" {
-  # shellcheck disable=2329
   _spec_hook_child() {
     dybatpho::opts::setup "" - prerun:"echo child-pre" action:"echo child-main" postrun:"echo child-post"
   }
-  # shellcheck disable=2329
   _spec_hook_parent() {
     dybatpho::opts::setup "" - prerun:"echo parent-pre" action:"echo parent-main" postrun:"echo parent-post"
     dybatpho::opts::cmd child _spec_hook_child
@@ -831,15 +773,12 @@ setup() {
 }
 
 @test "dybatpho::opts::cmd multiple subcommands dispatch correctly" {
-  # shellcheck disable=2329
   _spec_cmd_a() {
     dybatpho::opts::setup "" - action:"echo cmd-a"
   }
-  # shellcheck disable=2329
   _spec_cmd_b() {
     dybatpho::opts::setup "" - action:"echo cmd-b"
   }
-  # shellcheck disable=2329
   _spec_multi_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd cmda _spec_cmd_a
@@ -852,11 +791,9 @@ setup() {
 }
 
 @test "dybatpho::opts::cmd alias metadata dispatches to subcommand" {
-  # shellcheck disable=2329
   _spec_alias_child() {
     dybatpho::opts::setup "" CHILD_ARGS action:"echo alias:\${CHILD_ARGS[*]}"
   }
-  # shellcheck disable=2329
   _spec_alias_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd config _spec_alias_child alias:cfg aliases:conf,settings
@@ -870,11 +807,9 @@ setup() {
 @test "dybatpho::opts::cmd matches a command name literally, whatever it holds" {
   # The name used to reach the generated `case` unquoted: a space or a quote
   # left the parser unparseable, and a `*` matched any word with that prefix.
-  # shellcheck disable=2329
   _spec_literal_child() {
     dybatpho::opts::setup "" - action:"printf 'path=%s\n' \"\${__current_cmd_path}\""
   }
-  # shellcheck disable=2329
   _spec_literal_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd "say hi" _spec_literal_child
@@ -903,7 +838,6 @@ setup() {
 @test "error: unrecognized option via combined short flag" {
   # Combined short flag (-b--foo) triggers the "unknown" path when the
   # remainder after expansion starts with "--"
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "" BFLAG -b
@@ -915,7 +849,6 @@ setup() {
 }
 
 @test "error: option requires an argument" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::param "" REQVAL --reqval
@@ -927,7 +860,6 @@ setup() {
 }
 
 @test "error: option does not allow an argument" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "" NOFLAG --noflag
@@ -939,11 +871,9 @@ setup() {
 }
 
 @test "error: invalid subcommand" {
-  # shellcheck disable=2329
   _spec_dummy_err() {
     dybatpho::opts::setup "" -
   }
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd sub _spec_dummy_err
@@ -957,7 +887,6 @@ setup() {
 @test "error: validation failure" {
   # Use a validator that won't have $1 unbound: pass a non-empty invalid value
   _validate_alpha() { [[ "${1:-}" =~ ^[a-z]+$ ]]; }
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::param "" VALIDATED --validated validate:"_validate_alpha \$OPTARG"
@@ -969,7 +898,6 @@ setup() {
 }
 
 @test "deprecated flag warns but still works" {
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" - action:"echo \$OLD_FLAG"
     dybatpho::opts::flag "Old flag" OLD_FLAG --old deprecated:"Use --new instead"
@@ -982,11 +910,9 @@ setup() {
 }
 
 @test "deprecated command warns but still dispatches" {
-  # shellcheck disable=2329
   _spec_old_cmd() {
     dybatpho::opts::setup "" - action:"echo old-cmd"
   }
-  # shellcheck disable=2329
   _spec() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd old _spec_old_cmd deprecated:"Use 'new' instead"
@@ -1003,7 +929,6 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::generate_help shows usage line" {
-  # shellcheck disable=2329
   _spec_hu() {
     dybatpho::opts::setup "My tool" -
   }
@@ -1016,7 +941,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help shows description" {
-  # shellcheck disable=2329
   _spec_hd() {
     dybatpho::opts::setup "My tool description" -
   }
@@ -1027,7 +951,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help shows Options section with flag and param" {
-  # shellcheck disable=2329
   _spec_ho() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Enable verbose" HVERBOSE --verbose
@@ -1044,7 +967,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help hides hidden flags" {
-  # shellcheck disable=2329
   _spec_hidden_flag() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Visible flag" HVISIBLE --visible
@@ -1059,7 +981,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help param shows <VAR> in label" {
-  # shellcheck disable=2329
   _spec_hpv() {
     dybatpho::opts::setup "" -
     dybatpho::opts::param "Value" HPVAL --param-val
@@ -1071,7 +992,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help marks required:true params automatically" {
-  # shellcheck disable=2329
   _spec_hreq() {
     dybatpho::opts::setup "" -
     dybatpho::opts::param "Set name" HREQ --name required:true
@@ -1084,7 +1004,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help disp shows without <VAR>" {
-  # shellcheck disable=2329
   _spec_hdisp() {
     dybatpho::opts::setup "" -
     dybatpho::opts::disp "Show version" --version action:"echo v1"
@@ -1098,15 +1017,12 @@ setup() {
 }
 
 @test "dybatpho::generate_help shows Commands section with subcommand descriptions" {
-  # shellcheck disable=2329
   _spec_hc_sub1() {
     dybatpho::opts::setup "First sub command" -
   }
-  # shellcheck disable=2329
   _spec_hc_sub2() {
     dybatpho::opts::setup "Second sub command" -
   }
-  # shellcheck disable=2329
   _spec_hc() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd sub1 _spec_hc_sub1
@@ -1123,11 +1039,9 @@ setup() {
 }
 
 @test "dybatpho::generate_help hides hidden commands" {
-  # shellcheck disable=2329
   _spec_hc_hidden_sub() {
     dybatpho::opts::setup "Hidden sub" -
   }
-  # shellcheck disable=2329
   _spec_hc_hidden_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd visible _spec_hc_hidden_sub
@@ -1142,11 +1056,9 @@ setup() {
 }
 
 @test "dybatpho::generate_help annotates deprecated items" {
-  # shellcheck disable=2329
   _spec_hdeprecated_sub() {
     dybatpho::opts::setup "Deprecated sub" -
   }
-  # shellcheck disable=2329
   _spec_hdeprecated() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Legacy flag" HLEGACY --legacy deprecated:"Use --modern instead"
@@ -1161,12 +1073,10 @@ setup() {
 }
 
 @test "dybatpho::generate_help includes persistent parent options in child help" {
-  # shellcheck disable=2329
   _spec_hpersist_child() {
     dybatpho::opts::setup "Child help" -
     dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_hpersist_child"
   }
-  # shellcheck disable=2329
   _spec_hpersist_parent() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Persistent flag" HPERSIST --persist persistent:true
@@ -1181,11 +1091,9 @@ setup() {
 }
 
 @test "dybatpho::generate_help shows command aliases" {
-  # shellcheck disable=2329
   _spec_hc_alias_sub() {
     dybatpho::opts::setup "Config command" -
   }
-  # shellcheck disable=2329
   _spec_hc_alias() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd config _spec_hc_alias_sub alias:cfg aliases:conf
@@ -1198,7 +1106,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help shows switch aliases from metadata" {
-  # shellcheck disable=2329
   _spec_halias() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Verbose output" HALIAS --verbose alias:-v aliases:--chatty
@@ -1213,7 +1120,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help no Commands section when no subcommands" {
-  # shellcheck disable=2329
   _spec_hnc() {
     dybatpho::opts::setup "No subcommands" -
   }
@@ -1224,7 +1130,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help subcommand path shown in usage from __current_cmd_path" {
-  # shellcheck disable=2329
   _spec_hsp() {
     dybatpho::opts::setup "Sub description" -
   }
@@ -1235,7 +1140,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help nested subcommand path in usage" {
-  # shellcheck disable=2329
   _spec_hnsp() {
     dybatpho::opts::setup "Nested sub" -
   }
@@ -1246,7 +1150,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help hidden option is excluded" {
-  # shellcheck disable=2329
   _spec_hh() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Visible" HVIS --visible
@@ -1260,7 +1163,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help label: overrides switch display" {
-  # shellcheck disable=2329
   _spec_hlbl() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Custom" HLBL --custom label:"[--custom]"
@@ -1272,7 +1174,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help --{no-} expands both variants" {
-  # shellcheck disable=2329
   _spec_hno() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "Toggle" HTOGGLE --{no-}toggle
@@ -1285,7 +1186,6 @@ setup() {
 }
 
 @test "dybatpho::generate_help --with{out}- expands both variants" {
-  # shellcheck disable=2329
   _spec_hwith() {
     dybatpho::opts::setup "" -
     dybatpho::opts::flag "With" HWITH --with{out}-feature
@@ -1298,12 +1198,10 @@ setup() {
 }
 
 @test "dybatpho::generate_help subcommand path tracked via generate_from_spec dispatch" {
-  # shellcheck disable=2329
   _spec_dp_sub() {
     dybatpho::opts::setup "Dispatched sub" -
     dybatpho::opts::disp "Help" --help action:"dybatpho::generate_help _spec_dp_sub"
   }
-  # shellcheck disable=2329
   _spec_dp_root() {
     dybatpho::opts::setup "" -
     dybatpho::opts::cmd mysub _spec_dp_sub
@@ -1316,7 +1214,6 @@ setup() {
 }
 
 @test "switch metadata expands bracketed aliases in help and schema" {
-  # shellcheck disable=2329
   _spec_alias_forms() {
     dybatpho::opts::setup "Alias forms" -
     dybatpho::opts::flag "Colored output" COLORED --color alias:--{no-}colour
@@ -1339,7 +1236,6 @@ setup() {
 }
 
 @test "bracketed aliases parse into the same destination variable" {
-  # shellcheck disable=2329
   _spec_alias_parse() {
     dybatpho::opts::setup "" - action:'printf "%s|%s" "${COLORED:-}" "${CACHE:-}"'
     dybatpho::opts::flag "Colored output" COLORED --color alias:--{no-}colour
@@ -1352,7 +1248,6 @@ setup() {
 }
 
 @test "generated parsers prompt for missing values" {
-  # shellcheck disable=2329
   _spec_prompts() {
     dybatpho::opts::setup "" - action:'printf "%s|%s" "${NAME}" "${COLOR}"'
     dybatpho::opts::param "Name" NAME --name prompt:"Your name"
@@ -1365,11 +1260,9 @@ setup() {
 }
 
 @test "persistent params and display options are inherited by subcommands" {
-  # shellcheck disable=2329
   _spec_persistent_sub() {
     dybatpho::opts::setup "Child" - action:'printf "%s" "${TOKEN}"'
   }
-  # shellcheck disable=2329
   _spec_persistent_root() {
     dybatpho::opts::setup "Root" -
     dybatpho::opts::param "Token" TOKEN --token persistent:true
@@ -1382,7 +1275,6 @@ setup() {
 }
 
 @test "init:action: runs a shell action while initializing an option" {
-  # shellcheck disable=2329
   _spec_init_action() {
     dybatpho::opts::setup "" - action:'printf "%s" "${STAMP}"'
     dybatpho::opts::param "Stamp" STAMP --stamp init:action:'STAMP=generated'
@@ -1392,7 +1284,6 @@ setup() {
 }
 
 @test "generated artifacts expand bracketed aliases for every shell" {
-  # shellcheck disable=2329
   _spec_alias_artifacts() {
     dybatpho::opts::setup "Alias artifacts" -
     dybatpho::opts::flag "Colored output" COLORED --color alias:--{no-}colour
@@ -1401,7 +1292,6 @@ setup() {
     dybatpho::opts::flag "Timing" TIMING --timing alias:--with{out}-timing
     dybatpho::opts::cmd deploy _spec_alias_artifacts_child
   }
-  # shellcheck disable=2329
   _spec_alias_artifacts_child() {
     dybatpho::opts::setup "Child" -
   }
@@ -1428,7 +1318,6 @@ setup() {
 }
 
 @test "short aliases stay usable while long aliases set the help label" {
-  # shellcheck disable=2329
   _spec_alias_short() {
     dybatpho::opts::setup "" - action:'printf "%s|%s" "${QUIET:-}" "${NAME:-}"'
     dybatpho::opts::flag "Quiet" QUIET --quiet aliases:-q,--silent
@@ -1453,7 +1342,6 @@ setup() {
 }
 
 @test "primary bracketed switches and short primaries flow through every artifact" {
-  # shellcheck disable=2329
   _spec_primary_forms() {
     dybatpho::opts::setup "Primary forms" - action:'printf "%s|%s|%s" "${TOGGLE:-}" "${FEATURE:-}" "${QUIET:-}"'
     dybatpho::opts::flag "Toggle" TOGGLE --{no-}toggle
@@ -1521,7 +1409,6 @@ setup() {
 }
 
 @test "unrecognized options suggest the closest switch" {
-  # shellcheck disable=2329
   _spec_suggest_opt() {
     dybatpho::opts::setup "Suggest options" SUGGEST_ARGS action:"echo ran"
     dybatpho::opts::flag "Colorize" SUGGEST_COLOR --color
@@ -1535,9 +1422,7 @@ setup() {
 }
 
 @test "invalid commands suggest the closest command" {
-  # shellcheck disable=2329
   _spec_suggest_cmd_child() { dybatpho::opts::setup "Deploy" -; }
-  # shellcheck disable=2329
   _spec_suggest_cmd() {
     dybatpho::opts::setup "Suggest commands" SUGGEST_CMD_ARGS action:"echo ran"
     dybatpho::opts::cmd deploy _spec_suggest_cmd_child
@@ -1551,9 +1436,7 @@ setup() {
 }
 
 @test "a mistyped option is reported as an option even when the spec has subcommands" {
-  # shellcheck disable=2329
   _spec_suggest_mixed_child() { dybatpho::opts::setup "Child" -; }
-  # shellcheck disable=2329
   _spec_suggest_mixed() {
     dybatpho::opts::setup "Mixed" SUGGEST_MIXED_ARGS action:"echo ran"
     dybatpho::opts::flag "Verbose" SUGGEST_MIXED_VERBOSE --verbose
@@ -1567,7 +1450,6 @@ setup() {
 }
 
 @test "an unrecognized option with no close match reports no suggestion" {
-  # shellcheck disable=2329
   _spec_suggest_none() {
     dybatpho::opts::setup "No suggestion" SUGGEST_NONE_ARGS action:"echo ran"
     dybatpho::opts::flag "Colorize" SUGGEST_NONE_COLOR --color
@@ -1584,7 +1466,6 @@ setup() {
 # =============================================================================
 
 @test "negatable:true generates a --no- switch that turns the flag off" {
-  # shellcheck disable=2329
   _spec_negatable() {
     dybatpho::opts::setup "Negatable" NEG_ARGS action:'printf "%s" "${NEG_COLOR}"'
     dybatpho::opts::flag "Colorize" NEG_COLOR --color negatable:true init:="true"
@@ -1596,7 +1477,6 @@ setup() {
 }
 
 @test "negatable:true honours an explicit off: value" {
-  # shellcheck disable=2329
   _spec_negatable_off() {
     dybatpho::opts::setup "Negatable off" NEG_OFF_ARGS action:'printf "%s" "${NEG_OFF_COLOR}"'
     dybatpho::opts::flag "Colorize" NEG_OFF_COLOR --color negatable:true on:yes off:no init:="yes"
@@ -1607,7 +1487,6 @@ setup() {
 }
 
 @test "negatable:true applies to long aliases and leaves short switches alone" {
-  # shellcheck disable=2329
   _spec_negatable_alias() {
     dybatpho::opts::setup "Negatable alias" NEG_ALIAS_ARGS action:'printf "%s" "${NEG_ALIAS_COLOR}"'
     dybatpho::opts::flag "Colorize" NEG_ALIAS_COLOR -c aliases:--color,--colour negatable:true init:="true"
@@ -1618,7 +1497,6 @@ setup() {
 }
 
 @test "negatable:true shows both switches in help and schema" {
-  # shellcheck disable=2329
   _spec_negatable_help() {
     dybatpho::opts::setup "Negatable help" -
     dybatpho::opts::flag "Colorize" NEG_HELP_COLOR --color negatable:true
@@ -1638,7 +1516,6 @@ setup() {
 # =============================================================================
 
 @test "count:true counts repeated occurrences of a flag" {
-  # shellcheck disable=2329
   _spec_count() {
     dybatpho::opts::setup "Counting" COUNT_ARGS action:'printf "%s" "${COUNT_VERBOSE}"'
     dybatpho::opts::flag "Increase verbosity" COUNT_VERBOSE -v alias:--verbose count:true
@@ -1652,7 +1529,6 @@ setup() {
 }
 
 @test "count:true never evaluates its env seed as arithmetic" {
-  # shellcheck disable=2329
   _spec_count_env() {
     dybatpho::opts::setup "Counting" COUNT_ARGS action:'printf "%s" "${COUNT_ENV}"'
     dybatpho::opts::flag "Verbosity" COUNT_ENV -v count:true env:COUNT_ENV_SEED
@@ -1669,7 +1545,7 @@ setup() {
 }
 
 @test "a value seeded by env: is held to choices:, type: and pattern:" {
-  # shellcheck disable=2016,2329
+  # shellcheck disable=2016
   _spec_seed_env() {
     dybatpho::opts::setup "Seeded" - action:'printf "%s/%s/%s" "${SEED_PORT}" "${SEED_MODE}" "${SEED_NAME}"'
     dybatpho::opts::param "Port" SEED_PORT --port type:port env:SEED_PORT_ENV
@@ -1701,7 +1577,7 @@ setup() {
   assert_success
   assert_output "h a b"
 
-  # shellcheck disable=2016,2329
+  # shellcheck disable=2016
   _spec_octal_rules() {
     dybatpho::opts::setup "Octal" OCTAL_ARGS args:range:08:09 action:'printf "%s" "${#OCTAL_ARGS[@]}"'
   }
@@ -1736,7 +1612,6 @@ setup() {
 
 @test "config:<key> supplies a value when no flag or environment variable is set" {
   DYBATPHO_CONFIG=(["server.port"]=9999)
-  # shellcheck disable=2329
   _spec_config_bind() {
     dybatpho::opts::setup "Config bound" CONFIG_ARGS action:'printf "%s" "${CONFIG_PORT}"'
     dybatpho::opts::param "Port" CONFIG_PORT --port config:server.port init:="8080"
@@ -1748,7 +1623,6 @@ setup() {
 
 @test "config:<key> falls back to the declared default when the key is missing" {
   DYBATPHO_CONFIG=()
-  # shellcheck disable=2329
   _spec_config_missing() {
     dybatpho::opts::setup "Config missing" CONFIG_MISS_ARGS action:'printf "%s" "${CONFIG_MISS_PORT}"'
     dybatpho::opts::param "Port" CONFIG_MISS_PORT --port config:server.port init:="8080"
@@ -1759,7 +1633,6 @@ setup() {
 
 @test "the flag beats the environment variable, which beats the config file" {
   DYBATPHO_CONFIG=(["server.port"]=3333)
-  # shellcheck disable=2329
   _spec_config_precedence() {
     dybatpho::opts::setup "Precedence" CONFIG_PREC_ARGS action:'printf "%s" "${CONFIG_PREC_PORT}"'
     dybatpho::opts::param "Port" CONFIG_PREC_PORT --port \
@@ -1810,7 +1683,6 @@ setup() {
 }
 
 @test "config:<key> is shown in help and schema" {
-  # shellcheck disable=2329
   _spec_config_help() {
     dybatpho::opts::setup "Config help" -
     dybatpho::opts::param "Port" CONFIG_HELP_PORT --port config:server.port
@@ -1829,7 +1701,6 @@ setup() {
 # =============================================================================
 
 @test "dybatpho::opts::arg documents positional arguments in usage and help" {
-  # shellcheck disable=2329
   _spec_args() {
     dybatpho::opts::setup "Copy files" ARG_ARGS action:"echo ran"
     dybatpho::opts::arg "File to read" SOURCE
@@ -1847,7 +1718,6 @@ setup() {
 }
 
 @test "a variadic argument renders with an ellipsis" {
-  # shellcheck disable=2329
   _spec_args_variadic() {
     dybatpho::opts::setup "Variadic" ARG_VAR_ARGS action:"echo ran"
     dybatpho::opts::arg "Files" FILES variadic:true
@@ -1859,7 +1729,6 @@ setup() {
 }
 
 @test "declared arguments derive the positional argument count rule" {
-  # shellcheck disable=2329
   _spec_args_rule() {
     dybatpho::opts::setup "Derived rule" ARG_RULE_ARGS action:"echo ran"
     dybatpho::opts::arg "First" FIRST
@@ -1873,7 +1742,6 @@ setup() {
 }
 
 @test "an explicit args: rule wins over the declared arguments" {
-  # shellcheck disable=2329
   _spec_args_explicit() {
     dybatpho::opts::setup "Explicit rule" ARG_EXP_ARGS args:min:1 action:"echo ran"
     dybatpho::opts::arg "First" FIRST
@@ -1884,12 +1752,10 @@ setup() {
 }
 
 @test "the rest array keeps argument boundaries and special characters" {
-  # shellcheck disable=2329
   _spec_rest_array() {
     dybatpho::opts::setup "Rest" REST_ARR action:"_run_rest_array"
     dybatpho::opts::flag "Verbose" REST_V -v
   }
-  # shellcheck disable=2329
   _run_rest_array() {
     printf 'n=%s\n' "${#REST_ARR[@]}"
     printf '<%s>\n' "${REST_ARR[@]}"
@@ -1918,12 +1784,10 @@ setup() {
 }
 
 @test "the rest array collects dashed values passed after --" {
-  # shellcheck disable=2329
   _spec_rest_dash() {
     dybatpho::opts::setup "Rest" DASH_ARR action:"_run_rest_dash"
     dybatpho::opts::flag "Verbose" DASH_V -v
   }
-  # shellcheck disable=2329
   _run_rest_dash() {
     printf 'n=%s\n' "${#DASH_ARR[@]}"
     printf '<%s>\n' "${DASH_ARR[@]}"
@@ -1937,13 +1801,11 @@ setup() {
 }
 
 @test "dybatpho::opts::arg assigns each positional argument to its variable" {
-  # shellcheck disable=2329
   _spec_arg_bind() {
     dybatpho::opts::setup "Copy" BIND_ARGS action:"_run_arg_bind"
     dybatpho::opts::arg "Source" BIND_SOURCE
     dybatpho::opts::arg "Target" BIND_TARGET required:false
   }
-  # shellcheck disable=2329
   _run_arg_bind() {
     printf 'source=<%s>\n' "${BIND_SOURCE}"
     printf 'target=<%s>\n' "${BIND_TARGET}"
@@ -1962,13 +1824,11 @@ setup() {
 }
 
 @test "a variadic argument binds the remaining values as an array" {
-  # shellcheck disable=2329
   _spec_arg_variadic_bind() {
     dybatpho::opts::setup "Copy" VAR_ARGS action:"_run_arg_variadic_bind"
     dybatpho::opts::arg "Source" VAR_SOURCE
     dybatpho::opts::arg "Rest" VAR_EXTRA required:false variadic:true
   }
-  # shellcheck disable=2329
   _run_arg_variadic_bind() {
     printf 'source=<%s>\n' "${VAR_SOURCE}"
     printf 'n=%s\n' "${#VAR_EXTRA[@]}"
@@ -1990,12 +1850,10 @@ setup() {
 }
 
 @test "dybatpho::opts::arg documents an argument without binding it when given -" {
-  # shellcheck disable=2329
   _spec_arg_unbound() {
     dybatpho::opts::setup "Run" UNBOUND_ARGS action:"_run_arg_unbound"
     dybatpho::opts::arg "Ignored" -
   }
-  # shellcheck disable=2329
   _run_arg_unbound() {
     printf 'rest=<%s>\n' "${UNBOUND_ARGS[0]}"
   }
@@ -2007,7 +1865,6 @@ setup() {
 
 
 @test "pattern: accepts a matching value and rejects anything else" {
-  # shellcheck disable=2329
   _spec_pattern() {
     dybatpho::opts::setup "Pattern" PAT_ARGS action:"echo \$PAT_MODE"
     dybatpho::opts::param "Mode" PAT_MODE --mode pattern:'fast|slow'
@@ -2022,7 +1879,6 @@ setup() {
 }
 
 @test "pattern: refuses a glob that could inject code into the parser" {
-  # shellcheck disable=2329
   _spec_pattern_injected() {
     dybatpho::opts::setup "Pattern" INJ_ARGS action:"echo ran"
     dybatpho::opts::param "Mode" INJ_MODE --mode pattern:'x) ;; *) echo PWNED ;; esac #'
@@ -2035,7 +1891,6 @@ setup() {
 }
 
 @test "pattern: is annotated in help and carried into the schema" {
-  # shellcheck disable=2329
   _spec_pattern_help() {
     dybatpho::opts::setup "Pattern" PATH_ARGS action:"echo ran"
     dybatpho::opts::param "Mode" PATH_MODE --mode pattern:'fast|slow'
@@ -2053,7 +1908,6 @@ setup() {
 @test "type: rejects a value that is not of the declared type" {
   # The check itself belongs to the `validate` module; what is tested here is
   # that a spec reaches it and that the rejection reads like the library's own.
-  # shellcheck disable=2329
   _spec_type() {
     dybatpho::opts::setup "Typed" TYPE_ARGS action:"echo \$TYPE_PORT"
     dybatpho::opts::param "Port" TYPE_PORT --port type:port
@@ -2067,12 +1921,10 @@ setup() {
 }
 
 @test "type: accepts any registered type, including one of the caller's own" {
-  # shellcheck disable=2329
   function _spec_type_custom() {
     dybatpho::opts::setup "Typed" TYPEC_ARGS action:"echo \$TYPEC_SERVICE"
     dybatpho::opts::param "Service" TYPEC_SERVICE --service type:service
   }
-  # shellcheck disable=2329
   function _test_is_service { [[ "$1" =~ ^[a-z]+-api$ ]]; }
   dybatpho::validate_register service _test_is_service "a service name"
 
@@ -2087,7 +1939,6 @@ setup() {
 
 @test "type: naming a type nobody registered fails while the parser is built" {
   # A typo in a spec should not wait for the first user to type a value.
-  # shellcheck disable=2329
   _spec_type_unknown() {
     dybatpho::opts::setup "Typed" TYPEU_ARGS action:"echo ran"
     dybatpho::opts::param "Thing" TYPEU_THING --thing type:nosuchtype
@@ -2100,7 +1951,6 @@ setup() {
 }
 
 @test "type: is annotated in help, the man page, and the schema" {
-  # shellcheck disable=2329
   _spec_type_help() {
     dybatpho::opts::setup "Typed" TYPEH_ARGS action:"echo ran"
     dybatpho::opts::param "Contact" TYPEH_MAIL --contact type:email
@@ -2120,7 +1970,6 @@ setup() {
 }
 
 @test "dybatpho::opts::msg places free text in help without declaring an option" {
-  # shellcheck disable=2329
   _spec_msg() {
     dybatpho::opts::setup "Grouped" MSG_ARGS action:"echo ran"
     dybatpho::opts::msg "Connection options:"
@@ -2149,7 +1998,6 @@ setup() {
 }
 
 @test "dybatpho::opts::msg leaves option alignment untouched" {
-  # shellcheck disable=2329
   _spec_msg_align() {
     dybatpho::opts::setup "Aligned" ALIGN_ARGS action:"echo ran"
     dybatpho::opts::msg "A very long heading that must not widen the label column"
@@ -2162,7 +2010,6 @@ setup() {
 }
 
 @test "abbr:true accepts an unambiguous prefix of a long switch" {
-  # shellcheck disable=2329
   _spec_abbr() {
     dybatpho::opts::setup "Abbr" ABBR_ARGS abbr:true action:"printf '%s|%s\\n' \"\${ABBR_VERBOSE}\" \"\${ABBR_CONFIG}\""
     dybatpho::opts::flag "Verbose" ABBR_VERBOSE --verbose
@@ -2176,7 +2023,6 @@ setup() {
 }
 
 @test "abbr:true reports an ambiguous prefix with its candidates" {
-  # shellcheck disable=2329
   _spec_abbr_ambiguous() {
     dybatpho::opts::setup "Abbr" AMB_ARGS abbr:true action:"echo ran"
     dybatpho::opts::flag "Color" AMB_COLOR --color
@@ -2189,7 +2035,6 @@ setup() {
 }
 
 @test "abbr:true prefers an exact switch over the longer one it prefixes" {
-  # shellcheck disable=2329
   _spec_abbr_exact() {
     dybatpho::opts::setup "Abbr" EXACT_ARGS abbr:true action:"printf '%s|%s\\n' \"\${EXACT_LOG}\" \"\${EXACT_LOGLEVEL}\""
     dybatpho::opts::flag "Log" EXACT_LOG --log
@@ -2201,7 +2046,6 @@ setup() {
 }
 
 @test "abbr:true leaves an unmatched switch to the unrecognized-option path" {
-  # shellcheck disable=2329
   _spec_abbr_unknown() {
     dybatpho::opts::setup "Abbr" UNK_ARGS abbr:true action:"echo ran"
     dybatpho::opts::flag "Verbose" UNK_VERBOSE --verbose
@@ -2213,7 +2057,6 @@ setup() {
 }
 
 @test "abbreviation is off unless the spec asks for it" {
-  # shellcheck disable=2329
   _spec_abbr_off() {
     dybatpho::opts::setup "Abbr" OFF_ARGS action:"echo ran"
     dybatpho::opts::flag "Verbose" OFF_VERBOSE --verbose
@@ -2225,7 +2068,6 @@ setup() {
   assert_stderr --partial "Did you mean '--verbose'?"
 }
 @test "declared arguments appear in the schema and the man page" {
-  # shellcheck disable=2329
   _spec_args_doc() {
     dybatpho::opts::setup "Documented args" ARG_DOC_ARGS action:"echo ran"
     dybatpho::opts::arg "File to read" SOURCE
@@ -2243,7 +2085,6 @@ setup() {
   # A tab is whitespace to `read`, so two tabs in a row used to collapse and
   # every field after an empty one moved left: the switch became the
   # description and the schema was not even valid JSON.
-  # shellcheck disable=2329
   _spec_empty_fields() {
     dybatpho::opts::setup "Empty fields" EMPTY_ARGS action:"echo ran"
     dybatpho::opts::param "" TOKEN --token env:API_TOKEN
@@ -2269,7 +2110,6 @@ setup() {
 }
 
 @test "dybatpho::generate_man escapes descriptions roff would read as requests" {
-  # shellcheck disable=2329
   _spec_roff_text() {
     dybatpho::opts::setup ".dotted tool" ROFF_ARGS action:"echo ran"
     dybatpho::opts::flag ".gitignore entries are honoured" VCS --vcs
@@ -2285,7 +2125,6 @@ setup() {
 }
 
 @test "generated help lists the automatic --help option" {
-  # shellcheck disable=2329
   _spec_auto_help_row() {
     dybatpho::opts::setup "Auto help row" -
   }
@@ -2297,7 +2136,6 @@ setup() {
 }
 
 @test "generated help omits COMMAND from usage when there are no subcommands" {
-  # shellcheck disable=2329
   _spec_no_cmd_usage() {
     dybatpho::opts::setup "No commands" -
   }
@@ -2309,9 +2147,7 @@ setup() {
 }
 
 @test "generated help names COMMAND and points at per-command help" {
-  # shellcheck disable=2329
   _spec_cmd_usage_child() { dybatpho::opts::setup "Child" -; }
-  # shellcheck disable=2329
   _spec_cmd_usage() {
     dybatpho::opts::setup "Has commands" -
     dybatpho::opts::cmd deploy _spec_cmd_usage_child
@@ -2324,7 +2160,6 @@ setup() {
 }
 
 @test "args:none leaves the argument placeholder out of usage" {
-  # shellcheck disable=2329
   _spec_usage_noargs() {
     dybatpho::opts::setup "No arguments" - args:none
   }
@@ -2335,7 +2170,6 @@ setup() {
 }
 
 @test "generated help annotates env, choices, default, and repeatable options" {
-  # shellcheck disable=2329
   _spec_annotations() {
     dybatpho::opts::setup "Annotated" -
     dybatpho::opts::param "Environment" ANN_ENV --environment \
@@ -2352,7 +2186,6 @@ setup() {
 }
 
 @test "generated help hides a default that is only known at run time" {
-  # shellcheck disable=2329
   _spec_dynamic_default() {
     dybatpho::opts::setup "Dynamic default" -
     dybatpho::opts::param "Workers" DYN_WORKERS --workers init:='$(echo 4)'
@@ -2370,7 +2203,6 @@ setup() {
 @test "dybatpho::generate_completion caches its output and reuses it" {
   local DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache"
   local DYBATPHO_CLI_CACHE=true
-  # shellcheck disable=2329
   _spec_cache() {
     dybatpho::opts::setup "Cached" -
     dybatpho::opts::flag "Colorize" CACHE_COLOR --color
@@ -2435,7 +2267,6 @@ setup() {
 @test "DYBATPHO_CLI_CACHE=false skips the completion cache" {
   local DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache-off"
   local DYBATPHO_CLI_CACHE=false
-  # shellcheck disable=2329
   _spec_cache_off() {
     dybatpho::opts::setup "Uncached" -
     dybatpho::opts::flag "Colorize" CACHE_OFF_COLOR --color
@@ -2448,9 +2279,7 @@ setup() {
 }
 
 @test "generated completion leaves the alias sentinel out of the word list" {
-  # shellcheck disable=2329
   _spec_completion_sentinel_child() { dybatpho::opts::setup "Child" -; }
-  # shellcheck disable=2329
   _spec_completion_sentinel() {
     dybatpho::opts::setup "Sentinel" -
     dybatpho::opts::cmd deploy _spec_completion_sentinel_child
@@ -2463,7 +2292,6 @@ setup() {
 }
 
 @test "generated help lists the short switch first whatever order the spec used" {
-  # shellcheck disable=2329
   _spec_switch_order() {
     dybatpho::opts::setup "Switch order" -
     dybatpho::opts::flag "Verbose" ORDER_VERBOSE --verbose alias:-v
@@ -2477,9 +2305,7 @@ setup() {
 }
 
 @test "a persistent option is listed once in the help of the command declaring it" {
-  # shellcheck disable=2329
   _spec_persist_once_child() { dybatpho::opts::setup "Child" -; }
-  # shellcheck disable=2329
   _spec_persist_once() {
     dybatpho::opts::setup "Parent" -
     dybatpho::opts::flag "Verbose" PERSIST_ONCE_VERBOSE --verbose persistent:true
@@ -2567,7 +2393,6 @@ SCRIPT
   # The generator joins its option lists with a single space, and that IFS
   # used to be in force while the caller's own spec ran.
   local seen="${BATS_TEST_TMPDIR}/ifs"
-  # shellcheck disable=2329
   _spec() {
     printf '%q\n' "${IFS}" > "${seen}"
     dybatpho::opts::setup "" -
@@ -2582,7 +2407,6 @@ SCRIPT
 # =============================================================================
 
 @test "an option switch that is neither -x nor --name stops the script" {
-  # shellcheck disable=2329
   _spec_bad_alias() {
     dybatpho::opts::setup "Bad alias" -
     dybatpho::opts::flag "Verbose" BAD_ALIAS_VERBOSE --verbose alias:verbose
@@ -2608,7 +2432,6 @@ SCRIPT
 @test "an args rule that cannot be read stops the script" {
   local rule
   for rule in exact:one min:one max:one range:3:1 sometimes; do
-    # shellcheck disable=2329
     eval "_spec_bad_rule() { dybatpho::opts::setup 'Bad rule' BAD_RULE_ARGS args:${rule}; }"
     run dybatpho::generate_from_spec _spec_bad_rule
     assert_failure
@@ -2623,7 +2446,6 @@ SCRIPT
 
 @test "config:<key> keeps a value bound with export:false out of the environment" {
   DYBATPHO_CONFIG=(["server.port"]=9999)
-  # shellcheck disable=2329
   _spec_config_private() {
     dybatpho::opts::setup "Config private" CONFIG_PRIV_ARGS \
       action:'printf "%s|%s" "${CONFIG_PRIV_PORT}" "$(printenv CONFIG_PRIV_PORT || true)"'
@@ -2635,7 +2457,6 @@ SCRIPT
 }
 
 @test "help names the environment variable env:true binds and the literal defaults" {
-  # shellcheck disable=2329
   _spec_help_details() {
     dybatpho::opts::setup "Help details" -
     dybatpho::opts::param "Region" HELP_REGION --region env:true
@@ -2655,7 +2476,6 @@ SCRIPT
 }
 
 @test "negatable:true leaves a switch that is already negative as it is" {
-  # shellcheck disable=2329
   _spec_negative() {
     dybatpho::opts::setup "Negative" NEGATIVE_ARGS action:'printf "%s" "${NEGATIVE_CACHE}"'
     dybatpho::opts::flag "Skip the cache" NEGATIVE_CACHE --no-cache negatable:true
@@ -2668,7 +2488,6 @@ SCRIPT
 }
 
 @test "help marks a counting flag as one to repeat" {
-  # shellcheck disable=2329
   _spec_help_count() {
     dybatpho::opts::setup "Help count" -
     dybatpho::opts::flag "Verbosity" HELP_VERBOSITY -v count:true

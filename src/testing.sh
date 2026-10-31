@@ -123,7 +123,6 @@ function __dybatpho_test_fail {
 # @internal
 #######################################
 function __dybatpho_test_need_json {
-  # shellcheck disable=SC2310 # a module that cannot be loaded fails the assertion instead
   __dybatpho_helpers_load_soft json __dybatpho_json_need_jq "${FUNCNAME[1]}" && return 0
   __dybatpho_test_fail "${FUNCNAME[1]} needs the json module, load it with: dybatpho::load json"
 }
@@ -622,7 +621,6 @@ function dybatpho::assert_snapshot {
   __dybatpho_test_fail "Snapshot ${name} does not match ${snapshot_file}"
   # The difference is drawn by `diff`, which `testing` loads only now: the
   # mismatch is reported either way, and only its rendering needs the module.
-  # shellcheck disable=SC2310 # a module that cannot be loaded only loses the rendering
   if ! __dybatpho_helpers_load_soft diff __dybatpho_diff_paint "${FUNCNAME[0]}"; then
     dybatpho::error "${FUNCNAME[0]} needs the diff module to show the difference, load it with: dybatpho::load diff"
     return 1

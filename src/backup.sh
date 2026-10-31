@@ -1,8 +1,7 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# parses its own options, so the raw form is what the reader sees.
-# dyshellint disable=BSG050,BSG051,BSG033
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
 # here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
 # which test/conventions.bats enforces.

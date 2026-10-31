@@ -634,7 +634,6 @@ function __dybatpho_test_run {
   dybatpho::create_temp _run_dir "/" "test"
   local _tap="${_run_dir}/run.tap"
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   local -a _bats_args=(
     --print-output-on-failure
     --timing
@@ -648,7 +647,6 @@ function __dybatpho_test_run {
   [[ -n "${FILTER}" ]] && _bats_args+=(--filter "${FILTER}")
 
   local value=""
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if [[ "${COVERAGE}" == "true" ]]; then
     printf -v value ' · coverage in chunks of %s' "${CHUNK}"
   fi

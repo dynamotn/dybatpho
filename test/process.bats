@@ -130,7 +130,6 @@ SCRIPT
 }
 
 @test 'dybatpho::trap preserves existing trap handlers' {
-  # shellcheck disable=2329
   _trap_chain() {
     trap 'echo first' EXIT
     dybatpho::trap 'echo second' EXIT
@@ -146,7 +145,6 @@ SCRIPT
   # The existing handler was read by cutting `trap -p` at its first and last
   # quote, which left a quote inside it in its escaped `'\''` form, so the
   # handler put back was a different command from the one it replaced.
-  # shellcheck disable=2329
   _trap_quoted() {
     trap "printf '%s\\n' \"it's here\"" EXIT
     dybatpho::trap 'echo second' EXIT
@@ -263,7 +261,6 @@ SCRIPT
 
 @test 'dybatpho::cleanup_file_on_exit removes file on shell exit' {
   local filepath="${BATS_TEST_TMPDIR}/cleanup-me"
-  # shellcheck disable=2329
   _register_cleanup() {
     local file="$1"
     touch "${file}"
@@ -369,7 +366,6 @@ SCRIPT
 }
 
 @test "dybatpho::dry_run with DRY_RUN=true should print dry run message and not execute command" {
-  # shellcheck disable=2030
   export DRY_RUN="true"
   local test_file="dry_run_test_file.tmp"
   rm -f "${test_file}"
@@ -380,7 +376,6 @@ SCRIPT
 }
 
 @test "dybatpho::dry_run with DRY_RUN=true displays args with spaces as single quoted tokens" {
-  # shellcheck disable=2030
   export DRY_RUN="true"
   run_traced dybatpho::dry_run curl -H "Authorization: Bearer token"
   assert_output --partial "DRY RUN:"
@@ -401,7 +396,6 @@ SCRIPT
 }
 
 @test "dybatpho::dry_run with DRY_RUN=false preserves argument quoting during execution" {
-  # shellcheck disable=2031
   export DRY_RUN="false"
   # Use printf to write args one-per-line; verify "hello world" stays as one arg
   local temp_file="${BATS_TEST_TMPDIR}/dry_run_exec"
@@ -413,7 +407,6 @@ SCRIPT
 }
 
 @test "dybatpho::dry_run with DRY_RUN=false should execute command and produce no dry run output" {
-  # shellcheck disable=2031
   export DRY_RUN="false"
   local test_file="actual_run_test_file.tmp"
   rm -f "${test_file}"
@@ -475,7 +468,6 @@ SCRIPT
   # `timeout` executes a program, so it can never see a function the caller
   # defined; the Bash watchdog is what makes this work.
   __dybatpho_test_slow() { sleep 30; }
-  # shellcheck disable=SC2329 # run by name
   __dybatpho_test_quick() { printf 'called with %s\n' "$1"; }
 
   local status=0
@@ -554,7 +546,6 @@ SCRIPT
   # process it started that ignored SIGTERM never got the SIGKILL.
   __dybatpho_process_timeout_probe=no
   local pid_file="${BATS_TEST_TMPDIR}/stubborn-grandchild.pid"
-  # shellcheck disable=SC2329 # run by name
   __dybatpho_test_stubborn_nest() {
     bash -c "trap '' TERM; printf '%s\n' \"\$\$\" > '${pid_file}'; sleep 30" &
     wait
@@ -879,7 +870,6 @@ SCRIPT
   run_traced -0 dybatpho::pid_file_is_running "${pid_file}"
 
   printf '%s\n' "$$" > "${pid_file}"
-  # shellcheck disable=SC2329 # called by the library, which it overrides
   kill() { return 1; }
   run_traced -0 dybatpho::pid_file_is_running "${pid_file}"
   printf '%s\n' "99999999" > "${pid_file}"
@@ -1096,7 +1086,6 @@ SCRIPT
 
 @test "dybatpho::pid_file_write stops and cleans up when the file cannot be moved into place" {
   local path="${BATS_TEST_TMPDIR}/run/app.pid"
-  # shellcheck disable=SC2329 # called by dybatpho::pid_file_write
   mv() { return 1; }
   run -1 dybatpho::pid_file_write "${path}" 4242
   unset -f mv

@@ -301,7 +301,6 @@ function dybatpho::notify_teams {
   fi
 
   local payload
-  # shellcheck disable=SC2016 # the `$` is for jq, which reads the text as a filter
   local payload_format='{"type":"message","attachments":[{"contentType":'
   # shellcheck disable=SC2016 # `$schema` is a key of the card, not an expansion
   payload_format+='"application/vnd.microsoft.card.adaptive","content":{"$schema":'

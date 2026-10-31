@@ -176,9 +176,6 @@ function _demo_config {
   dybatpho::config_schema_reset
 }
 
-# This section is not an option spec; it defines one and runs it, so the
-# `--help` the rule asks for belongs to `_deploy_spec` inside it.
-# dyshellint disable=BSG052
 # @description Run the `THE SAME TYPES ON A CLI OPTION` section of this example.
 # @noargs
 function _demo_cli {

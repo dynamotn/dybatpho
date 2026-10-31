@@ -512,7 +512,6 @@ function __dybatpho_log_json_event_into {
   __dybatpho_log_hostname > /dev/null
   local event_format='{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s",'
   event_format+='"hostname":"%s","pid":%s,"duration_ms":%s%s%s}\n'
-  # shellcheck disable=SC2059 # the format is built above, not taken from input
   local log_context_json=""
   if ((${#__dybatpho_log_context_keys[@]} > 0)); then
     log_context_json=$(__dybatpho_log_context_json)
@@ -1518,7 +1517,6 @@ $("${@:3}")" # kcov(skip)
     return 0
   fi
   dybatpho::compare_log_level debug || return 0
-  # dyshellint disable=BSG080 # deprecated string form, kept for compatibility; the `--` form above runs no `eval`
   # Likewise run by "dybatpho::debug_command output".
   __dybatpho_log_inspect debug "COMMAND 💻    " "$1
 $(eval "$2")" # kcov(skip)

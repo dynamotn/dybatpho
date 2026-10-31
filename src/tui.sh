@@ -907,7 +907,7 @@ function __dybatpho_tui_menu_fallback {
   # single one, which is the contract of the two public functions. ShellCheck
   # sees one variable assigned both ways and cannot know only one branch runs
   # for any given caller.
-  # shellcheck disable=SC2178,SC2128
+  # shellcheck disable=SC2178
   if dybatpho::is true "${__dybatpho_tui_fb_multiple}"; then
     DYBATPHO_TUI_INDEXES="${__dybatpho_tui_fb_chosen[*]-}"
     __dybatpho_tui_fb_out=()
@@ -916,7 +916,6 @@ function __dybatpho_tui_menu_fallback {
     done
   else
     DYBATPHO_TUI_INDEX="${__dybatpho_tui_fb_chosen[0]}"
-    # shellcheck disable=SC2034 # output for the caller; nothing in this module reads it back
     DYBATPHO_TUI_INDEXES="${DYBATPHO_TUI_INDEX}"
     # The output variable is an array when several entries are accepted and a
     # scalar when one is. Both are the documented contract, but a nameref is
@@ -1118,7 +1117,6 @@ function __dybatpho_tui_menu_interactive {
       __dybatpho_tui_menu_positions+=("$((__dybatpho_tui_menu_index + 1))")
     done
     DYBATPHO_TUI_INDEXES="${__dybatpho_tui_menu_positions[*]-}"
-    # shellcheck disable=SC2034 # the nameref writes the caller's array
     __dybatpho_tui_menu_out=(${__dybatpho_tui_menu_selected[@]+"${__dybatpho_tui_menu_selected[@]}"})
     printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt}" \
       "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_selected[*]-}" >&2

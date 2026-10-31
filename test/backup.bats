@@ -84,7 +84,6 @@ plant() {
   # the same second wrote one temporary file, and the second could not publish.
   dybatpho::date_now() { printf '20260101T000000Z\n'; }
   local record="${BATS_TEST_TMPDIR}/partials"
-  # shellcheck disable=SC2329 # invoked by backup_create
   dybatpho::archive_create() {
     printf '%s\n' "$2" >> "${record}"
     printf 'archive\n' > "$2"
@@ -127,7 +126,6 @@ plant() {
   # which `mv` moved inside it, and the path printed was the directory.
   dybatpho::date_now() { printf '20260101T000000Z\n'; }
   eval "__test_file_hash() $(declare -f dybatpho::file_hash | tail -n +2)"
-  # shellcheck disable=SC2329 # invoked by backup_create
   dybatpho::file_hash() {
     mkdir -p "${DEST}/snap-20260101T000000Z.tar.gz"
     __test_file_hash "$@"
@@ -146,7 +144,6 @@ plant() {
   # so a snapshot published there would have been nested a level too deep.
   dybatpho::date_now() { printf '20260101T000000Z\n'; }
   eval "__test_tree_hash_into() $(declare -f __dybatpho_backup_tree_hash_into | tail -n +2)"
-  # shellcheck disable=SC2329 # invoked by backup_create
   __dybatpho_backup_tree_hash_into() {
     mkdir -p "${DEST}/snap-20260101T000000Z.snapshot"
     __test_tree_hash_into "$@"
@@ -222,7 +219,6 @@ SCRIPT
   # Another process can take the free name between the check and the hard
   # link that publishes the archive; the link then fails on the taken name.
   dybatpho::date_now() { printf '20260101T000000Z\n'; }
-  # shellcheck disable=SC2329 # invoked by backup_create in place of ln(1)
   ln() {
     if [[ "${3-}" == "${DEST}/snap-20260101T000000Z.tar.gz" ]]; then
       printf 'taken\n' > "$3"
@@ -238,7 +234,6 @@ SCRIPT
 }
 
 @test "dybatpho::backup_create publishes with a rename where hard links are refused" {
-  # shellcheck disable=SC2329 # invoked by backup_create in place of ln(1)
   ln() { return 1; }
 
   run_traced -0 dybatpho::backup_create "${SOURCE}" "${DEST}" snap
@@ -254,7 +249,6 @@ SCRIPT
   # A directory that appears between the check and the rename swallows the
   # snapshot, which is taken back out and published under the next name.
   dybatpho::date_now() { printf '20260101T000000Z\n'; }
-  # shellcheck disable=SC2329 # invoked by backup_create in place of mv(1)
   mv() {
     if [[ "${3-}" == "${DEST}/snap-20260101T000000Z.snapshot" && ! -e "$3" ]]; then
       command mkdir -p "$3"

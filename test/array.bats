@@ -69,7 +69,6 @@ kiwi"
 }
 
 @test "dybatpho::array_unique with spaces in elements" {
-  # shellcheck disable=2034
   arr=("hello world" "hello world" "foo bar")
   run_traced dybatpho::array_unique "arr" "--"
   assert_success
@@ -192,7 +191,6 @@ EOF
 @test "dybatpho::array_map maps an array named like its own locals" {
   # The mapped values are written back through the caller's name, so an array
   # sharing a name with one of the function's locals came back unmapped.
-  # shellcheck disable=SC2329
   upper() { printf '%s' "${1^^}"; }
   local -a status=(a b)
   dybatpho::array_map status upper
@@ -506,7 +504,6 @@ EOF
   # The merge takes from the left run on a tie, which is what makes sorting by
   # one field leave the rest of the order alone.
   local values=(b1 a1 b2 a2 b3 a3)
-  # shellcheck disable=2329
   __dybatpho_array_before() { [[ "${1:0:1}" < "${2:0:1}" ]]; }
   dybatpho::array_sort values
   assert_equal "${values[*]}" "a1 a2 a3 b1 b2 b3"

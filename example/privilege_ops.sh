@@ -24,7 +24,6 @@ function _install_stub {
   local target
   dybatpho::expect_args target -- "$@"
   dybatpho::expect_ref "${target}"
-  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   local -n stub_ref="${target}"
 
   dybatpho::create_temp_dir stub_ref "privilege-demo"

@@ -140,7 +140,6 @@ setup() {
   DYBATPHO_CONFIG=()
   dybatpho::config_load "${file}"
 
-  # shellcheck disable=2329
   _spec_nested_binding() {
     dybatpho::opts::setup "Nested binding" - action:'printf "%s\n" "${PORT}"'
     dybatpho::opts::param "Port" PORT --port config:server.port init:="80"
@@ -154,7 +153,6 @@ setup() {
   DYBATPHO_CONFIG=()
   dybatpho::config_set server.port not-a-port
 
-  # shellcheck disable=2329
   _spec_typed_binding() {
     dybatpho::opts::setup "Typed binding" - action:"echo ran"
     dybatpho::opts::param "Port" PORT --port type:port config:server.port
@@ -305,7 +303,6 @@ setup() {
   # the `validate` module is a configuration type, including a custom one.
   DYBATPHO_CONFIG=()
   dybatpho::config_schema_reset
-  # shellcheck disable=2329
   function _test_is_region { [[ "$1" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]]; }
   dybatpho::validate_register region _test_is_region "an AWS region"
 

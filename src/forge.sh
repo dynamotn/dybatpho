@@ -233,8 +233,6 @@ function dybatpho::forge_repo {
 # @env DYBATPHO_FORGE_API string Override the computed value
 # @stdout API base URL, without a trailing slash
 #######################################
-# shellcheck disable=SC2120 # the remote and path are optional; callers inside
-#   this module have no remote of their own to pass and rely on the defaults
 function dybatpho::forge_api {
   if [[ -n "${DYBATPHO_FORGE_API}" ]]; then
     printf '%s\n' "${DYBATPHO_FORGE_API%/}"

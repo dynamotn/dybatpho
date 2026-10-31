@@ -1,8 +1,7 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# keeps its declarations with the functions they describe.
-# dyshellint disable=BSG050,BSG033
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
 # own diagnostic when it fails, so a separate assignment for each would only add lines.
 # shellcheck disable=SC2312 # values are passed on through $(...)
@@ -552,7 +551,6 @@ function __dybatpho_queue_pop {
   dybatpho::lock_release "${__dybatpho_queue_lock_path}"
 
   local -n __dybatpho_queue_id_ref="${__dybatpho_queue_id_target}"
-  # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
   __dybatpho_queue_id_ref="${__dybatpho_queue_identifier}"
   __dybatpho_queue_payload_into "${__dybatpho_queue_payload_target}" \
     "${__dybatpho_queue_directory}/claimed/${__dybatpho_queue_identifier}.job"
@@ -584,7 +582,6 @@ function dybatpho::queue_peek {
 
   if [[ -n "${__dybatpho_queue_id_target}" ]]; then
     local -n __dybatpho_queue_peek_ref="${__dybatpho_queue_id_target}"
-    # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
     __dybatpho_queue_peek_ref="${__dybatpho_queue_identifier}"
   fi
   local __dybatpho_queue_peek_payload

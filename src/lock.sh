@@ -680,7 +680,6 @@ function __dybatpho_lock_semaphore_acquire {
     __dybatpho_lock_try_slots __dybatpho_lock_taken "${__dybatpho_lock_base%.lock}" "${__dybatpho_lock_slots}"; then
     if [[ -n "${__dybatpho_lock_target}" ]]; then
       local -n __dybatpho_lock_slot_ref="${__dybatpho_lock_target}"
-      # shellcheck disable=SC2034 # output for the caller; nothing here reads it back
       __dybatpho_lock_slot_ref="${__dybatpho_lock_taken}"
     fi
     return 0

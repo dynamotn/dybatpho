@@ -50,8 +50,6 @@ dybatpho::config_export APP_
 
 dybatpho::header "CONFIGURATION"
 # shellcheck disable=SC2154 # set by the option spec of this script
-# Set by `dybatpho::config_load` above from the file it reads, which the linter cannot follow.
-# dyshellint disable=BSG073 # set by `dybatpho
 dybatpho::print "host: ${APP_HOST}"
 # shellcheck disable=SC2154 # set by the option spec of this script
 # Set by `dybatpho::config_load` above from the file it reads, which the linter cannot follow.

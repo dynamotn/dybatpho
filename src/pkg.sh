@@ -1,8 +1,7 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# parses its own arguments, so the raw form is what the reader sees.
-# dyshellint disable=BSG050,BSG051
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file pkg.sh
 # @brief Package manager detection and guarded dependency installation
 # @namespace dybatpho

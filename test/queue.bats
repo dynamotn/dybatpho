@@ -790,7 +790,6 @@ SCRIPT
   ln -s "${holder}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${QUEUE}/.lock"
   local pauses="${BATS_TEST_TMPDIR}/pauses"
   : > "${pauses}"
-  # shellcheck disable=SC2329
   sleep() {
     printf '%s\n' "$1" >> "${pauses}"
     command sleep 0.01

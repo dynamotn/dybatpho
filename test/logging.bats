@@ -195,32 +195,27 @@ SCRIPT
 }
 
 @test "dybatpho::compare_log_level with same level" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=info
   dybatpho::compare_log_level "info"
 }
 
 @test "dybatpho::compare_log_level with lower level" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=info
   dybatpho::compare_log_level "error"
 }
 
 @test "dybatpho::compare_log_level with higher level" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=error
   run_traced dybatpho::compare_log_level "debug"
   assert_failure
 }
 
 @test "dybatpho::compare_log_level with trace and fatal" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=trace
   dybatpho::compare_log_level "fatal"
 }
 
 @test "dybatpho::compare_log_level case insensitive" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=INFO
   dybatpho::compare_log_level "info"
 }
@@ -253,7 +248,6 @@ SCRIPT
 }
 
 @test "dybatpho::debug output when using debug level" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
   # The decision follows the stream now, and a captured stderr is not a
   # terminal; this test is about which colour a level uses, not about
@@ -268,7 +262,6 @@ SCRIPT
 }
 
 @test "dybatpho::debug_command output" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
   run_traced --separate-stderr dybatpho::debug_command "Who am I" "whoami"
   assert_success
@@ -277,7 +270,6 @@ SCRIPT
 }
 
 @test "dybatpho::debug_command -- runs a command and its arguments as words, never as shell" {
-  # shellcheck disable=2030,2031
   export LOG_LEVEL=debug
   local marker="${BATS_TEST_TMPDIR}/pwned"
   local quoted="it's \"quoted\" \$(touch ${marker}) \`touch ${marker}\` a  b"
@@ -640,7 +632,6 @@ PY
 }
 
 @test "dybatpho::start_trace output when using trace level" {
-  # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
   # The decision follows the stream now, and a captured stderr is not a
   # terminal; this test is about which colour a level uses, not about
@@ -662,7 +653,6 @@ PY
 }
 
 @test "dybatpho::end_trace output when using trace level" {
-  # shellcheck disable=SC2030,SC2031
   export LOG_LEVEL=trace
   # The decision follows the stream now, and a captured stderr is not a
   # terminal; this test is about which colour a level uses, not about
@@ -821,7 +811,6 @@ assert event["duration_ms"] >= 0
 @test "LOG_FILE does not start a process per line to check the size" {
   local count_file="${BATS_TEST_TMPDIR}/wc-calls"
   # A function stands in for `wc` and counts how often the size is measured.
-  # shellcheck disable=SC2329 # called by the library, through `wc -c`
   wc() {
     printf 'x' >> "${count_file}"
     command wc "$@"
@@ -1441,7 +1430,6 @@ _logging_child() {
 @test "__dybatpho_log reports an unknown or uppercase level instead of aborting under nounset" {
   # The colour table used to be indexed by the raw level before it was
   # validated, so `set -u` stopped the script with "unbound variable".
-  # shellcheck disable=SC2016 # expanded by the child shell
   run_traced --separate-stderr _logging_child "${BASH}" "set -u" \
     'NO_COLOR=1 __dybatpho_log INFO shown stdout; echo "rc=$?"' \
     '__dybatpho_log bogus hidden stdout || echo "rc=$?"'
@@ -1513,7 +1501,6 @@ _logging_child() {
 
 @test "a library diagnostic is translated once translation of library messages is on" {
   # A catalog that knows one message, standing in for the i18n module's.
-  # shellcheck disable=SC2329 # called by the hook
   __dybatpho_i18n_lookup() {
     local -n __test_out="$1"
     [[ "$2" == "Disk full" ]] || return 1
@@ -1566,7 +1553,6 @@ _logging_child() {
   local counter="${BATS_TEST_TMPDIR}/clock"
   printf '10\n' > "${counter}"
   # A clock that steps back by 50ms on every reading.
-  # shellcheck disable=SC2329 # called by dybatpho::spinner
   __dybatpho_log_now_ms() {
     local tick
     tick="$(< "${counter}")"

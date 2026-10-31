@@ -1,12 +1,8 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# keeps its declarations with the functions they describe; it parses its own
-# arguments, so the raw form is what the reader sees.
-# dyshellint disable=BSG050,BSG033,BSG051
-# A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
-# own diagnostic when it fails, so a separate assignment for each would only add lines.
-# shellcheck disable=SC2312 # values are passed on through $(...)
+# keeps its declarations with the functions they describe.
+# dyshellint disable=BSG050,BSG033
 # The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
 # here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
 # which test/conventions.bats enforces.
@@ -383,7 +379,6 @@ function __dybatpho_doctor_graph {
   # A soft dependency is loaded on demand rather than up front, so it does not
   # widen the scope, but an unknown name would still fail at the call site.
   for module in ${known[@]+"${known[@]}"}; do
-    # shellcheck disable=SC2154 # the soft dependency map is declared by `init.sh`
     for dep in ${__dybatpho_module_soft_deps[${module}]-}; do
       __dybatpho_module_exists "${dep}" \
         || __graph_unknown+=("${module} ~> ${dep}")
@@ -471,7 +466,6 @@ function __dybatpho_doctor_report_text {
   done
   printf '\n%-*s  %-12s  %s\n' "${module_width}" "MODULE" "TIER" "LOADS ON DEMAND"
   for module in "$@"; do
-    # shellcheck disable=SC2154 # the registry maps are declared by `init.sh`
     printf '%-*s  %-12s  %s\n' "${module_width}" "${module}" \
       "${__dybatpho_module_tiers[${module}]-experimental}" \
       "${__dybatpho_module_soft_deps[${module}]:--}"

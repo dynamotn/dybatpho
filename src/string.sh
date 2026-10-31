@@ -30,7 +30,6 @@
 # @arg $1 string String to trim
 # @stdout Trimmed string
 #######################################
-# shellcheck disable=SC2317
 function dybatpho::trim {
   local value
   __dybatpho_string_trim_into value "${1-}"

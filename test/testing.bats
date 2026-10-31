@@ -211,7 +211,6 @@ ports: [80, 443]
 @test "the json assertions and a snapshot diff report a module that cannot be loaded" {
   # Neither module is loaded, and the loader finds neither on disk.
   unset -f __dybatpho_json_need_jq __dybatpho_diff_paint
-  # shellcheck disable=SC2329 # invoked by the on-demand loader
   __dybatpho_module_exists() { return 1; }
   local file="${BATS_TEST_TMPDIR}/doc.json"
   printf '{"a":1}\n' > "${file}"

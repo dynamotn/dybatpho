@@ -53,7 +53,6 @@ _catalog() {
   local dir="${BATS_TEST_TMPDIR}/locale"
   mkdir -p "${dir}"
   printf '%s\n' "$@" > "${dir}/${name}"
-  # shellcheck disable=2030,2031
   export DYBATPHO_I18N_PATH="${dir}"
   printf '%s' "${dir}/${name}"
 }
@@ -633,7 +632,6 @@ PO
   local dir="${BATS_TEST_TMPDIR}/locale"
   mkdir -p "${dir}/vi_VN/LC_MESSAGES"
   printf 'app.greeting = Xin chào\n' > "${dir}/vi_VN/LC_MESSAGES/messages.msg"
-  # shellcheck disable=2030,2031
   export DYBATPHO_I18N_PATH="${dir}"
   dybatpho::i18n_init vi_VN
   assert_equal "$(dybatpho::i18n_t app.greeting)" "Xin chào"
@@ -643,7 +641,6 @@ PO
   local dir="${BATS_TEST_TMPDIR}/locale"
   mkdir -p "${dir}"
   printf 'app.greeting = Xin chào\n' > "${dir}/vi_VN.msg"
-  # shellcheck disable=2030,2031
   export DYBATPHO_I18N_PATH="${dir}"
   dybatpho::i18n_init vi_VN
   assert_equal "$(dybatpho::i18n_t app.greeting)" "Xin chào"
@@ -669,7 +666,6 @@ PO
   mkdir -p "${dir}"
   printf 'a = 1\n' > "${dir}/vi_VN.msg"
   printf 'a = 1\n' > "${dir}/de.msg"
-  # shellcheck disable=2030,2031
   export DYBATPHO_I18N_PATH="${dir}"
   run_traced -0 dybatpho::i18n_locales
   assert_line --index 0 "de"

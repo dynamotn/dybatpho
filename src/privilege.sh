@@ -1,11 +1,7 @@
 # shellcheck shell=bash
 # This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# parses its own options, so the raw form is what the reader sees.
-#
-# Calling the escalation command is this module's whole purpose, so the rule
-# against doing it from a script is answered here rather than at each call.
-# dyshellint disable=BSG050,BSG051,BSG033,BSG035
+# than adding a `dybatpho::expect_args` call to paths written to avoid one.
+# dyshellint disable=BSG050
 # @file privilege.sh
 # @brief Acquiring and holding a privilege escalation for a run
 # @namespace dybatpho

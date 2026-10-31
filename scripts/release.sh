@@ -308,7 +308,6 @@ function __dybatpho_release_resolve_version_into {
 # @internal
 #######################################
 function __dybatpho_release_check_options {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if [[ -n "${RELEASE_VERSION}" && -n "${BUMP}" ]]; then
     dybatpho::die "--version and --bump both choose the version; pass only one of them"
   fi
@@ -378,7 +377,6 @@ function __dybatpho_release_run {
   dybatpho::require "git"
   # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::is true "${DOCS}" && dybatpho::require "gawk"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${DYBATPHO_DRY_RUN}"; then
     # Resolved before any local step runs: a missing token should not be found
     # out after the tree is stamped, committed and tagged.
@@ -390,7 +388,6 @@ function __dybatpho_release_run {
 
   local _current
   _current="$(__dybatpho_release_current_version)"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   __dybatpho_release_resolve_version_into _version "${RELEASE_VERSION}" "${BUMP}" "${_current}"
   _tag="v${_version}"
   __dybatpho_release_preflight "${_tag}"
@@ -441,10 +438,8 @@ function __dybatpho_release_run {
   } > "${_message}"
   dybatpho::dry_run git -C "${DYBATPHO_DIR}" tag -a "${_tag}" -F "${_message}"
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${BUNDLE}"; then
     local _artifact
-    # shellcheck disable=SC2154 # set by the option spec of this script
     local release_artifacts_output
     release_artifacts_output=$(__dybatpho_release_artifacts "${_version}" "${SIGN}")
     while read -r _artifact || [[ -n "${_artifact}" ]]; do
@@ -452,7 +447,6 @@ function __dybatpho_release_run {
     done < <(printf '%s' "${release_artifacts_output}")
   fi
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${PUSH}"; then
     dybatpho::progress "Pushing to ${REMOTE}"
     dybatpho::dry_run git -C "${DYBATPHO_DIR}" push "${REMOTE}" HEAD
@@ -474,7 +468,6 @@ function __dybatpho_release_run {
         dybatpho::dry_run -- forge_release_upload "${_tag}" "${_artifact}"
       done
     else
-      # shellcheck disable=SC2154 # set by the option spec of this script
       dybatpho::forge_release_create "${_tag}" "${_tag}" "$(< "${_notes}")" "${DRAFT}" > /dev/null
       local _artifact
       for _artifact in ${_artifacts[@]+"${_artifacts[@]}"}; do

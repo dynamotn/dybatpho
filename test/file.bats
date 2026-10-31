@@ -3,7 +3,6 @@ setup() {
 }
 
 @test "dybatpho::show_file cat content file" {
-  # shellcheck disable=2030
   local temp_file="${BATS_TEST_TMPDIR}/file_has_content"
   local content="Toi la ai day la dau"
   echo "${content}" >> "${temp_file}"
@@ -138,11 +137,9 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp file" {
-  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt"
-    # shellcheck disable=2031
     [[ -f ${temp_file} ]] && [[ -n "${temp_file}" ]]
   }
   run_traced _create
@@ -168,11 +165,9 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp folder" {
-  # shellcheck disable=2329
   _create() {
     local temp_folder
     dybatpho::create_temp temp_folder "${1:-}"
-    # shellcheck disable=2031
     [[ -d ${temp_folder} ]] && [[ -n "${temp_folder}" ]]
   }
   run_traced _create "/"
@@ -185,11 +180,9 @@ setup() {
 }
 
 @test "dybatpho::create_temp create file with prefix" {
-  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".sh" "prefix1"
-    # shellcheck disable=2031
     [[ -f ${temp_file} ]] && [[ -n "${temp_file}" ]] && [[ ${temp_file} =~ .*prefix1.* ]]
   }
   run_traced _create
@@ -257,11 +250,9 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp file in not existed folder" {
-  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt" "" "/not-existed-folder"
-    # shellcheck disable=2031
     [[ -f ${temp_file} ]] && [[ -n "${temp_file}" ]]
   }
   run --separate-stderr _create
@@ -271,11 +262,9 @@ setup() {
 }
 
 @test "dybatpho::create_temp create temp file in existed folder, different with TMPDIR" {
-  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt" "" "${BATS_TEST_TMPDIR}"
-    # shellcheck disable=2031
     [[ -f ${temp_file} ]] && [[ -n "${temp_file}" ]]
   }
   run_traced _create
@@ -284,7 +273,6 @@ setup() {
 }
 
 @test "dybatpho::create_temp uses TMPDIR by default" {
-  # shellcheck disable=2329
   _create() {
     local temp_file
     export TMPDIR="${BATS_TEST_TMPDIR}"
@@ -310,7 +298,6 @@ setup() {
 }
 
 @test "dybatpho::create_temp sanitizes extension suffix" {
-  # shellcheck disable=2329
   _create() {
     local temp_file
     dybatpho::create_temp temp_file ".txt/../../ignored"
@@ -619,7 +606,6 @@ EOF
   local target="${BATS_TEST_TMPDIR}/dry.conf"
   printf 'keep = 1\n' > "${target}"
   local backup
-  # shellcheck disable=2030
   export DRY_RUN=true
   printf 'clobbered\n' | dybatpho::file_write_atomic "${target}"
   dybatpho::file_replace "${target}" 'keep' 'gone'
@@ -699,7 +685,6 @@ EOF
   printf 'tracked\n' > "${repo}/rc"
   local link="${BATS_TEST_TMPDIR}/rc-link"
   ln -s "${repo}/rc" "${link}"
-  # shellcheck disable=2030
   DYBATPHO_FILE_FOLLOW_SYMLINKS=false
   printf 'detached\n' | dybatpho::file_write_atomic "${link}"
   DYBATPHO_FILE_FOLLOW_SYMLINKS=true
@@ -820,7 +805,6 @@ EOF
 
 @test "dybatpho::ensure_dir creates nothing under DRY_RUN but still prints the path" {
   local target="${BATS_TEST_TMPDIR}/dry_dir"
-  # shellcheck disable=2030
   export DRY_RUN=true
   local printed
   printed="$(dybatpho::ensure_dir "${target}" 700 | tail -1)"
@@ -853,7 +837,6 @@ EOF
   printf 'untouched\n' > "${victim}"
   printf 'old\n' > "${dir}/app.conf"
   eval "__test_path_basename() $(declare -f dybatpho::path_basename | tail -n +2)"
-  # shellcheck disable=SC2329 # invoked by the writers
   dybatpho::path_basename() {
     local pid parent _
     read -r _ _ _ parent _ < "/proc/${BASHPID}/stat"
@@ -954,7 +937,6 @@ SCRIPT
 @test "the XDG helpers honor the environment and scope to an application" {
   # Set on their own lines: a `VAR=value command` prefix would not reach the
   # command substitution, which the shell expands before running the command.
-  # shellcheck disable=2030
   local XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/cfg"
   local XDG_CACHE_HOME="${BATS_TEST_TMPDIR}/cache"
   local XDG_DATA_HOME="${BATS_TEST_TMPDIR}/data"
@@ -986,7 +968,6 @@ SCRIPT
 }
 
 @test "dybatpho::xdg_runtime_dir reads XDG_RUNTIME_DIR and fails without it" {
-  # shellcheck disable=2030
   local XDG_RUNTIME_DIR="${BATS_TEST_TMPDIR}/run/"
   run_traced dybatpho::xdg_runtime_dir
   assert_success

@@ -758,14 +758,16 @@ function dybatpho::run_with_timeout {
   dybatpho::expect_args __dybatpho_process_timeout_seconds -- "$@"
   shift
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected: seconds command [args...]"
-  [[ "${__dybatpho_process_timeout_seconds}" =~ ^[0-9]+$ ]] \
+  [[ "${__dybatpho_process_timeout_seconds}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die \
       "${FUNCNAME[0]}: Timeout must be a non-negative integer, got '${__dybatpho_process_timeout_seconds}'"
 
   local __dybatpho_process_timeout_kill_after="${DYBATPHO_TIMEOUT_KILL_AFTER:-5}"
   local __dybatpho_process_timeout_why="DYBATPHO_TIMEOUT_KILL_AFTER must be a non-negative integer"
-  [[ "${__dybatpho_process_timeout_kill_after}" =~ ^[0-9]+$ ]] \
+  [[ "${__dybatpho_process_timeout_kill_after}" =~ ^[0-9]{1,18}$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: ${__dybatpho_process_timeout_why}, got '${__dybatpho_process_timeout_kill_after}'"
+  __dybatpho_process_timeout_seconds=$((10#${__dybatpho_process_timeout_seconds}))
+  __dybatpho_process_timeout_kill_after=$((10#${__dybatpho_process_timeout_kill_after}))
 
   # Zero is "no limit", the same meaning `timeout` gives it.
   if ((__dybatpho_process_timeout_seconds == 0)); then
@@ -814,7 +816,9 @@ function dybatpho::background_run {
   (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected: name command [args...]"
   [[ "${__dybatpho_process_bg_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Invalid job name: ${__dybatpho_process_bg_name}"
+  # A job `dybatpho::wait_all` reaped is over, whatever now holds its PID.
   if [[ -n "${DYBATPHO_BACKGROUND_PIDS[${__dybatpho_process_bg_name}]+set}" ]] \
+    && [[ -z "${DYBATPHO_BACKGROUND_STATUS[${__dybatpho_process_bg_name}]+set}" ]] \
     && kill -0 "${DYBATPHO_BACKGROUND_PIDS[${__dybatpho_process_bg_name}]}" 2> /dev/null; then
     dybatpho::die "${FUNCNAME[0]}: Job '${__dybatpho_process_bg_name}' is already running"
   fi
@@ -835,7 +839,7 @@ function dybatpho::background_run {
     || DYBATPHO_BACKGROUND_NAMES+=("${__dybatpho_process_bg_name}")
   DYBATPHO_BACKGROUND_PIDS["${__dybatpho_process_bg_name}"]="${__dybatpho_process_bg_pid}"
   DYBATPHO_BACKGROUND_GROUPS["${__dybatpho_process_bg_name}"]=true
-  unset "DYBATPHO_BACKGROUND_STATUS[${__dybatpho_process_bg_name}]"
+  unset -v 'DYBATPHO_BACKGROUND_STATUS[$__dybatpho_process_bg_name]'
   dybatpho::debug "Started background job '${__dybatpho_process_bg_name}' as pid ${__dybatpho_process_bg_pid}"
 }
 
@@ -914,7 +918,8 @@ function dybatpho::kill_children {
   local name pid
   for name in ${DYBATPHO_BACKGROUND_NAMES[@]+"${DYBATPHO_BACKGROUND_NAMES[@]}"}; do
     pid="${DYBATPHO_BACKGROUND_PIDS[${name}]-}"
-    [[ -n "${pid}" ]] || continue
+    # A reaped job's PID may since belong to an unrelated process.
+    [[ -n "${pid}" && -z "${DYBATPHO_BACKGROUND_STATUS[${name}]+set}" ]] || continue
     __dybatpho_process_end_job "${pid}" "${DYBATPHO_BACKGROUND_GROUPS[${name}]-false}" "${kill_after}"
     wait "${pid}" 2> /dev/null || true
   done

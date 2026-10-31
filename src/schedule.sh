@@ -234,11 +234,13 @@ function dybatpho::schedule_debounce {
   dybatpho::lock_acquire "${__dybatpho_schedule_debounce_lock}" 10 || return 1
   local __dybatpho_schedule_debounce_counter=0
   if dybatpho::is file "${__dybatpho_schedule_debounce_ticket}"; then
-    read -r __dybatpho_schedule_debounce_counter < "${__dybatpho_schedule_debounce_ticket}"
+    read -r __dybatpho_schedule_debounce_counter < "${__dybatpho_schedule_debounce_ticket}" || true
     [[ "${__dybatpho_schedule_debounce_counter}" =~ ^[0-9]+$ ]] || __dybatpho_schedule_debounce_counter=0
   fi
-  __dybatpho_schedule_debounce_counter=$((__dybatpho_schedule_debounce_counter + 1))
-  printf '%s\n' "${__dybatpho_schedule_debounce_counter}" > "${__dybatpho_schedule_debounce_ticket}"
+  __dybatpho_schedule_debounce_counter=$((10#${__dybatpho_schedule_debounce_counter} + 1))
+  # Moved into place, so a crash mid-write never leaves an empty ticket.
+  printf '%s\n' "${__dybatpho_schedule_debounce_counter}" > "${__dybatpho_schedule_debounce_ticket}.tmp"
+  mv -f -- "${__dybatpho_schedule_debounce_ticket}.tmp" "${__dybatpho_schedule_debounce_ticket}"
   dybatpho::lock_release "${__dybatpho_schedule_debounce_lock}"
 
   sleep "${__dybatpho_schedule_debounce_window}"
@@ -249,8 +251,8 @@ function dybatpho::schedule_debounce {
   if [[ -f "${__dybatpho_schedule_debounce_ticket}" ]]; then
     read -r __dybatpho_schedule_debounce_latest < "${__dybatpho_schedule_debounce_ticket}" || true
   fi
-  [[ "${__dybatpho_schedule_debounce_latest}" =~ ^[0-9]+$ ]] || __dybatpho_schedule_debounce_latest=0
-  if ((__dybatpho_schedule_debounce_latest != __dybatpho_schedule_debounce_counter)); then
+  [[ "${__dybatpho_schedule_debounce_latest}" =~ ^[0-9]{1,18}$ ]] || __dybatpho_schedule_debounce_latest=0
+  if ((10#${__dybatpho_schedule_debounce_latest} != __dybatpho_schedule_debounce_counter)); then
     return 9
   fi
 
@@ -300,7 +302,7 @@ function dybatpho::schedule_once_per {
     if [[ "${__dybatpho_schedule_once_period}" =~ ^[0-9]+$ ]]; then
       local __dybatpho_schedule_once_age
       __dybatpho_schedule_once_age="$(dybatpho::file_age_seconds "${__dybatpho_schedule_once_marker}")"
-      if ((__dybatpho_schedule_once_age < __dybatpho_schedule_once_period)); then
+      if ((__dybatpho_schedule_once_age < 10#${__dybatpho_schedule_once_period})); then
         rm -f -- "${__dybatpho_schedule_once_claim}"
         return 9
       fi
@@ -395,7 +397,7 @@ function __dybatpho_schedule_claim_stale {
     modified="$(__dybatpho_file_stat mtime "$1")" || return 1
     [[ "${modified}" =~ ^[0-9]+$ ]] || return 1
     now="$(dybatpho::date_now "%s")"
-    age=$((now - modified))
+    age=$((now - 10#${modified}))
   else
     # The path can vanish between the test and the read; that is age 0.
     age="$(dybatpho::file_age_seconds "$1" 2> /dev/null)" || age=0
@@ -417,7 +419,7 @@ function __dybatpho_schedule_bucket_into {
     month) __dybatpho_schedule_bucket_ref="$(dybatpho::date_now "%Y%m")" ;;
     *)
       # shellcheck disable=SC2015 # the `die` is meant to run when either test fails
-      [[ "$2" =~ ^[0-9]+$ ]] && (($2 > 0)) \
+      [[ "$2" =~ ^[0-9]{1,18}$ ]] && ((10#$2 > 0)) \
         || dybatpho::die "${FUNCNAME[1]}: Not a period: $2. Use hour, day, month, or a number of seconds"
       __dybatpho_schedule_bucket_ref="$(dybatpho::date_now "%s")"
       ;;

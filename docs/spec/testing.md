@@ -294,6 +294,8 @@ dybatpho::unmock_all
   `json`, or a snapshot mismatches in a suite that did not load `diff`.
 - The variable a caller names for a fixture matches a name the helper uses internally, such as `content`.
 - Several scrubs are registered, one rewriting what another produced, or a duration budget leads with a zero.
+- The HTTP mock is given `-D -` (or `--dump-header -`): the headers go to standard output, as curl writes them, not to a file named `-`.
+- A mocked command name holds a slash, such as `../file`: `dybatpho::unmock_command` and `dybatpho::mock_calls` refuse it rather than reach outside the mock directory.
 
 ## Requirements *(mandatory)*
 
@@ -554,6 +556,8 @@ dybatpho::unmock_all
 - **IT-034**: Run a command through each assertion that reads variables named like their locals, and see the caller's values; a command assigning the expected status still fails the assertion.
 - **IT-035**: Snapshot a command that reads variables named like the assertion's locals, and see the caller's values in the snapshot.
 - **IT-036**: Register three scrubs where the second rewrites the first's replacement and snapshot two lines; time `true` against `090000` and `000`.
+- **IT-037**: Call the HTTP mock with `-D -` and verify the headers reach standard output.
+- **IT-038**: Pass `../` names to `dybatpho::unmock_command` and `dybatpho::mock_calls` and verify both are refused and nothing outside the mock directory is removed.
 
 ## Acceptance Criteria *(mandatory)*
 

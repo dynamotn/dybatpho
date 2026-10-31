@@ -120,6 +120,7 @@ fi
 - `COLUMNS` is set to something that is not a positive number, or the output is a pipe rather than a terminal.
 - macOS has no `os-release` file, and a rolling release has no `VERSION_ID`.
 - A CI service sets `CI=false`, which means the run is not on CI.
+- A double-quoted `os-release` value holds `\"`, `\\`, `\$` or `` \` `` escapes, which are undone; any other backslash is kept.
 
 ## Requirements *(mandatory)*
 
@@ -189,6 +190,7 @@ fi
 - **IT-014**: `FORCE_COLOR` turns colour on for a stream that is not a terminal.
 - **IT-015**: `TERM=dumb` turns colour off.
 - **IT-016**: With nothing overriding it, the stream decides, and an unknown stream is rejected.
+- **IT-017**: Read a double-quoted value holding escapes and verify they are undone.
 
 ## Acceptance Criteria *(mandatory)*
 

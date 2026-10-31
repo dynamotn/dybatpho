@@ -710,6 +710,24 @@ SCRIPT
   assert_output "0"
 }
 
+@test "dybatpho::kill_children and background_run ignore a reaped job whose PID was reused" {
+  __dybatpho_test_ok() { return 0; }
+  dybatpho::background_run reaped __dybatpho_test_ok
+  dybatpho::wait_all
+  # Stand in for the kernel handing the reaped job's PID to an unrelated process.
+  sleep 30 &
+  local unrelated=$!
+  DYBATPHO_BACKGROUND_PIDS["reaped"]="${unrelated}"
+
+  run_traced dybatpho::background_run reaped __dybatpho_test_ok
+  assert_success
+  dybatpho::wait_all
+  DYBATPHO_BACKGROUND_PIDS["reaped"]="${unrelated}"
+  DYBATPHO_TIMEOUT_KILL_AFTER=1 dybatpho::kill_children
+  kill -0 "${unrelated}"
+  kill "${unrelated}"
+}
+
 @test "dybatpho::kill_children ends every background job and empties the registry" {
   dybatpho::background_run sleeper sleep 30
   local pid
@@ -1086,4 +1104,19 @@ SCRIPT
   assert_file_not_exist "${path}"
   run_traced -1 compgen -G "${path}.*.tmp"
   assert_output ""
+}
+
+@test "dybatpho::run_with_timeout reads seconds with a leading zero in base ten" {
+  # Arithmetic read `08` as an invalid octal number: each check failed with an
+  # error, and a grace of `09` became an immediate SIGKILL.
+  # shellcheck disable=SC2329 # run through the Bash watchdog
+  _in_time() { printf 'in time\n'; }
+  run_traced --separate-stderr dybatpho::run_with_timeout 08 _in_time
+  assert_success
+  assert_output "in time"
+  assert_stderr ""
+  DYBATPHO_TIMEOUT_KILL_AFTER=09 run_traced --separate-stderr dybatpho::run_with_timeout 08 printf 'binary\n'
+  assert_success
+  assert_output "binary"
+  assert_stderr ""
 }

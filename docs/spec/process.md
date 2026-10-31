@@ -229,6 +229,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   standard input, changes a caller variable, or fails under the caller's ERR
   handler.
 - `dybatpho::try` is given an empty name for a stream the caller does not want.
+- A job reaped by `dybatpho::wait_all` keeps its recorded PID, which the system may hand to an unrelated process: `dybatpho::kill_children` never signals it, and `dybatpho::background_run` may start the name again.
 
 ## Requirements *(mandatory)*
 
@@ -376,6 +377,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-026**: Run a function that prints and dies with 3 through `dybatpho::try`, and a command that calls `exit 5`, and get each status with the output and the die message captured while the test carries on.
 - **IT-027**: Capture a succeeding command's two streams, discard one through an empty name, feed standard input through, and see a caller variable the command changed left alone and no temporary file left behind.
 - **IT-028**: Fail a command through `dybatpho::try` in a script with the common handlers registered and see the script recover; call it without `--`, without a command, and with a reserved or invalid name and see each refused.
+- **IT-030**: Point a reaped job's PID at an unrelated process and verify `dybatpho::kill_children` leaves it running and the name can be started again.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -55,9 +55,31 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   or in parentheses.
 - **`i18n` — `dybatpho::i18n_tn` is about 2.5 times faster:** it no longer
   starts a subshell per locale in the fallback chain.
+- **`process` — `dybatpho::kill_children` no longer signals a job that
+  `dybatpho::wait_all` already reaped,** so a reused PID can no longer end an
+  unrelated process, and `dybatpho::background_run` can start that name again.
+- **`queue` — `dybatpho::queue_push` no longer reuses and overwrites an older
+  job's id after a crash left the sequence counter empty,** and the counter is
+  written atomically.
+- **`schedule` — `dybatpho::schedule_debounce` no longer stops the script, with
+  its lock still held, when a crash left its trigger ticket empty.**
+- **`queue` — `dybatpho::queue_work` no longer stops as if the queue were
+  drained when another worker holds the queue lock longer than
+  `DYBATPHO_QUEUE_TIMEOUT`.**
+- **`os` — `dybatpho::os_release` undoes the `\"`, `\\`, `\$` and `` \` ``
+  escapes in double-quoted values.**
+- **`testing` — the `dybatpho::mock_http` curl mock writes headers to standard
+  output for `-D -` and accepts `--dump-header`.**
+- **`process` — `dybatpho::run_with_timeout` reads seconds and
+  `DYBATPHO_TIMEOUT_KILL_AFTER` in base ten:** a grace of `09` no longer turns
+  into an immediate SIGKILL.
+- **`schedule` — `dybatpho::schedule_once_per` accepts a period in seconds with
+  a leading zero.**
 - **`screen` — `screen_sparkline`, `screen_barchart` and `screen_chart` read
   values such as `08` and `010` as eight and ten** instead of failing or reading
   octal.
+- **`testing` — `dybatpho::mock_time_advance` reads `08` and `-010` in base
+  ten.**
 - **`tui` — `DYBATPHO_TUI_DEFAULT` and typed menu answers with a leading zero
   (`09`, `010`) select that position.**
 - **`screen` — `screen_layout` constraints (`length:`, `percent:`, `ratio:`,
@@ -78,6 +100,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`file` — `dybatpho::create_temp` refuses a directory or link planted at the
   temporary file's final name,** instead of returning a path someone else
   controls.
+- **`testing` — `dybatpho::unmock_command` and `dybatpho::mock_calls` refuse a
+  command name containing a slash,** so `../` can no longer delete or read files
+  outside the mock directory.
 - **`screen`, `tui` — a numeric screen option such as `max:` or `offset:`, or
   `DYBATPHO_TUI_PROGRESS_STEP` and `DYBATPHO_TUI_MENU_HEIGHT`, holding text such
   as `x[$(cmd)]` no longer runs the command.**

@@ -408,6 +408,29 @@ function __dybatpho_os_terminal_size {
 }
 
 #######################################
+# @description Undo the backslash escapes os-release(5) allows inside double
+#   quotes, `\"`, `\\`, `\$` and `` \` ``, into a named variable. Any other
+#   backslash is kept as it is.
+# @arg $1 string Name of the variable receiving the text
+# @arg $2 string Text between the double quotes
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_os_unescape_into {
+  local -n __dybatpho_os_unescape_ref="$1"
+  local __dybatpho_os_unescape_rest="$2" __dybatpho_os_unescape_plain=""
+  while [[ "${__dybatpho_os_unescape_rest}" =~ ^([^\\]*)\\(.)(.*)$ ]]; do
+    __dybatpho_os_unescape_plain+="${BASH_REMATCH[1]}"
+    case "${BASH_REMATCH[2]}" in
+      [\"\\\$\`]) __dybatpho_os_unescape_plain+="${BASH_REMATCH[2]}" ;;
+      *) __dybatpho_os_unescape_plain+="\\${BASH_REMATCH[2]}" ;;
+    esac
+    __dybatpho_os_unescape_rest="${BASH_REMATCH[3]}"
+  done
+  __dybatpho_os_unescape_ref="${__dybatpho_os_unescape_plain}${__dybatpho_os_unescape_rest}"
+}
+
+#######################################
 # @description Print one field of the host's `os-release` file.
 # @example
 #   dybatpho::os_release PRETTY_NAME
@@ -428,10 +451,14 @@ function dybatpho::os_release {
     while IFS= read -r line || [[ -n "${line}" ]]; do
       [[ "${line}" == "${key}="* ]] || continue
       value="${line#*=}"
-      value="${value%\"}"
-      value="${value#\"}"
-      value="${value%\'}"
-      value="${value#\'}"
+      if [[ "${value}" == \"*\" ]]; then
+        __dybatpho_os_unescape_into value "${value:1:${#value}-2}"
+      else
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+      fi
       printf '%s\n' "${value}"
       return 0
       # kcov never records the `done` of a redirected loop;

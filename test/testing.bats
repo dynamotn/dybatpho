@@ -522,6 +522,16 @@ ports: [80, 443]
   assert_output --partial "https://example.test/data"
 }
 
+@test "dybatpho::mock_http writes headers to standard output for -D -" {
+  dybatpho::mock_http "example.test/data" 200 'ok' "X-Request-Id: abc123"
+
+  cd "${BATS_TEST_TMPDIR}"
+  run_traced curl -sS -D - -o /dev/null "https://example.test/data"
+  assert_success
+  assert_output --partial "X-Request-Id: abc123"
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/-"
+}
+
 @test "dybatpho::mock_http_payloads records what never reached the argument vector" {
   export DYBATPHO_CURL_MAX_RETRIES=0
   dybatpho::mock_http "example.test/secure" 200 'ok'
@@ -950,6 +960,21 @@ BSD
   assert_equal "${#DYBATPHO_TEST_TTY[@]}" "0"
 }
 
+@test "dybatpho::unmock_command and mock_calls refuse a name outside the mock directory" {
+  dybatpho::mock_command tool
+  local victim="${DYBATPHO_TEST_MOCK_DIR%/*}/victim"
+  echo keep > "${victim}"
+
+  run --separate-stderr dybatpho::unmock_command "../victim"
+  assert_failure
+  assert_stderr --partial "Invalid command name"
+  assert_file_exist "${victim}"
+
+  run_traced dybatpho::mock_calls "../../${victim##*/}"
+  assert_failure
+  assert_output ""
+}
+
 @test "dybatpho::unmock_command makes a hashed command resolve to the real one" {
   dybatpho::mock_command printenv 0 "mocked"
   assert_equal "$(printenv)" "mocked"
@@ -1042,4 +1067,12 @@ BSD
   run_traced --separate-stderr dybatpho::assert_duration_under 000 -- true
   assert_failure
   assert_stderr --partial "Expected to finish in under 0ms"
+}
+
+@test "dybatpho::mock_time_advance reads seconds with a leading zero in base ten" {
+  dybatpho::mock_time 1000
+  dybatpho::mock_time_advance 08
+  assert_equal "$(date -u +%s)" "1008"
+  dybatpho::mock_time_advance -010
+  assert_equal "$(date -u +%s)" "998"
 }

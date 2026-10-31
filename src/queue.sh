@@ -167,15 +167,31 @@ function __dybatpho_queue_ids {
 function __dybatpho_queue_next_sequence_into {
   local -n __dybatpho_queue_seq_ref="$1"
   local __dybatpho_queue_counter="$2/.sequence"
-  local __dybatpho_queue_value=0
+  local __dybatpho_queue_value="" __dybatpho_queue_path __dybatpho_queue_seen
 
   if dybatpho::is file "${__dybatpho_queue_counter}"; then
-    read -r __dybatpho_queue_value < "${__dybatpho_queue_counter}"
-    [[ "${__dybatpho_queue_value}" =~ ^[0-9]+$ ]] || __dybatpho_queue_value=0
+    read -r __dybatpho_queue_value < "${__dybatpho_queue_counter}" || true
+  fi
+  # A counter that is missing or unreadable restarts past the highest id still
+  # on disk: restarting at one would hand out an id an older job holds, and
+  # overwrite it.
+  if ! [[ "${__dybatpho_queue_value}" =~ ^[0-9]+$ ]]; then
+    __dybatpho_queue_value=0
+    for __dybatpho_queue_path in "$2"/{pending,claimed,dead}/*.job; do
+      dybatpho::is file "${__dybatpho_queue_path}" || continue
+      __dybatpho_queue_seen="${__dybatpho_queue_path##*/}"
+      __dybatpho_queue_seen="${__dybatpho_queue_seen%%-*}"
+      [[ "${__dybatpho_queue_seen}" =~ ^[0-9]+$ ]] || continue
+      ((10#${__dybatpho_queue_seen} <= __dybatpho_queue_value)) \
+        || __dybatpho_queue_value=$((10#${__dybatpho_queue_seen}))
+    done
   fi
 
-  __dybatpho_queue_value=$((__dybatpho_queue_value + 1))
-  printf '%s\n' "${__dybatpho_queue_value}" > "${__dybatpho_queue_counter}"
+  __dybatpho_queue_value=$((10#${__dybatpho_queue_value} + 1))
+  # Written beside the counter and moved over it, so a crash never leaves it
+  # truncated.
+  printf '%s\n' "${__dybatpho_queue_value}" > "${__dybatpho_queue_counter}.tmp"
+  mv -f -- "${__dybatpho_queue_counter}.tmp" "${__dybatpho_queue_counter}"
   printf -v __dybatpho_queue_seq_ref '%012d' "${__dybatpho_queue_value}"
 }
 
@@ -485,7 +501,10 @@ function dybatpho::queue_pop {
   dybatpho::expect_args __dybatpho_queue_pop_name __dybatpho_queue_pop_id __dybatpho_queue_pop_payload -- "$@"
   dybatpho::expect_ref "${__dybatpho_queue_pop_id}"
   dybatpho::expect_ref "${__dybatpho_queue_pop_payload}"
-  __dybatpho_queue_pop "$@"
+  local __dybatpho_queue_pop_status=0
+  __dybatpho_queue_pop "$@" || __dybatpho_queue_pop_status=$?
+  ((__dybatpho_queue_pop_status < 2)) || __dybatpho_queue_pop_status=1
+  return "${__dybatpho_queue_pop_status}"
 }
 
 #######################################
@@ -497,6 +516,7 @@ function dybatpho::queue_pop {
 # @arg $3 string Name of the variable receiving the payload
 # @exitcode 0 A job was claimed
 # @exitcode 1 The queue had no job due
+# @exitcode 2 The queue lock could not be taken, so the queue was not looked at
 # @internal
 #######################################
 function __dybatpho_queue_pop {
@@ -512,7 +532,7 @@ function __dybatpho_queue_pop {
 
   local __dybatpho_queue_lock_path
   __dybatpho_queue_lock_path="$(__dybatpho_queue_lock "${__dybatpho_queue_directory}")"
-  __dybatpho_queue_acquire "${__dybatpho_queue_lock_path}" || return 1
+  __dybatpho_queue_acquire "${__dybatpho_queue_lock_path}" || return 2
 
   # Choosing and moving the job happen under one lock. Apart, two workers
   # would both read the same oldest job and both go on to run it.
@@ -910,8 +930,13 @@ function dybatpho::queue_work {
     __dybatpho_queue_work_payload __dybatpho_queue_work_attempts __dybatpho_queue_work_delay \
     __dybatpho_queue_work_outcome __dybatpho_queue_work_status
   while ((__dybatpho_queue_work_max_jobs == 0 || __dybatpho_queue_work_handled < __dybatpho_queue_work_max_jobs)); do
-    if ! __dybatpho_queue_pop "${__dybatpho_queue_work_queue}" \
-      __dybatpho_queue_work_id __dybatpho_queue_work_payload; then
+    __dybatpho_queue_work_status=0
+    __dybatpho_queue_pop "${__dybatpho_queue_work_queue}" \
+      __dybatpho_queue_work_id __dybatpho_queue_work_payload || __dybatpho_queue_work_status=$?
+    # A lock another worker held past the wait says nothing about whether a
+    # job is due, so the worker looks again rather than stopping as if drained.
+    ((__dybatpho_queue_work_status != 2)) || continue
+    if ((__dybatpho_queue_work_status != 0)); then
       [[ -n "${__dybatpho_queue_work_poll}" ]] || return 0
       # Idle time is counted in polls rather than read from the clock, so a
       # frozen or jumping clock cannot keep a worker alive or end it early.

@@ -936,9 +936,22 @@ function dybatpho::unmock_env {
 function dybatpho::mock_command_script {
   local name body
   dybatpho::expect_args name body -- "$@"
-  [[ "${name}" =~ ^[a-zA-Z0-9_.-]+$ ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Invalid command name: ${name}"
+  __dybatpho_test_expect_mock_name "${name}"
   __dybatpho_test_mock_script_write "${name}" <<< "${body}"
+}
+
+#######################################
+# @description Stop when a mocked command name could reach a path outside the
+#   mock directory, which a name holding a slash, such as `../file`, does.
+# @arg $1 string Command name
+# @exitcode 1 Stop the script when the name is not a valid executable name
+# @internal
+#######################################
+function __dybatpho_test_expect_mock_name {
+  local name
+  dybatpho::expect_args name -- "$@"
+  [[ "${name}" =~ ^[a-zA-Z0-9_.-]+$ ]] \
+    || dybatpho::die "${FUNCNAME[1]}: Invalid command name: ${name}"
 }
 
 #######################################
@@ -1009,6 +1022,8 @@ function dybatpho::mock_command {
 function dybatpho::mock_calls {
   local name
   dybatpho::expect_args name -- "$@"
+  # A name that could reach outside the mock directory was never mocked.
+  [[ "${name}" =~ ^[a-zA-Z0-9_.-]+$ ]] || return 1
   local calls="${DYBATPHO_TEST_MOCK_DIR}/calls/${name}"
   dybatpho::is file "${calls}" || return 1
   cat "${calls}"
@@ -1084,6 +1099,7 @@ function dybatpho::assert_mock_called {
 function dybatpho::unmock_command {
   local name
   dybatpho::expect_args name -- "$@"
+  __dybatpho_test_expect_mock_name "${name}"
   [[ -n "${DYBATPHO_TEST_MOCK_DIR}" ]] || return 0
   rm -f "${DYBATPHO_TEST_MOCK_DIR}/${name}" "${DYBATPHO_TEST_MOCK_DIR}/calls/${name}"
   hash -d "${name}" 2> /dev/null || true
@@ -1172,7 +1188,7 @@ while ((\$#)); do
       output="\$2"
       shift 2
       ;;
-    -D)
+    -D | --dump-header)
       header_file="\$2"
       shift 2
       ;;
@@ -1235,6 +1251,8 @@ while IFS=\$'\t' read -r pattern route_status route; do
   fi
 done < "\${routes}"
 
+# curl writes the headers to standard output for \`-D -\`, ahead of the body.
+[[ "\${header_file}" != "-" ]] || header_file=/dev/stdout
 if [[ -n "\${header_file}" ]]; then
   if [[ -n "\${route_id}" ]]; then
     cat "\${route_dir}/\${route_id}.headers" > "\${header_file}"
@@ -1443,8 +1461,9 @@ MOCK_DATE
 function dybatpho::mock_time_advance {
   local seconds
   dybatpho::expect_args seconds -- "$@"
-  [[ "${seconds}" =~ ^-?[0-9]+$ ]] \
+  [[ "${seconds}" =~ ^(-?)([0-9]{1,18})$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Expected a whole number of seconds: ${seconds}"
+  seconds=$((${BASH_REMATCH[1]}10#${BASH_REMATCH[2]}))
   local state="${DYBATPHO_TEST_MOCK_DIR}/time-epoch"
   [[ -n "${DYBATPHO_TEST_MOCK_DIR}" && -f "${state}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: The clock is not frozen; call dybatpho::mock_time first"

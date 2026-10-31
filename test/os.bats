@@ -324,6 +324,12 @@ _os_release() {
   assert_equal "$(dybatpho::os_release PRETTY_NAME)" "Ubuntu 24.04 LTS"
 }
 
+@test "dybatpho::os_release undoes the escapes of a double-quoted value" {
+  _os_release 'PRETTY_NAME="A \"B\" C\\D \$x \`y\` \n"' "NAME='it\\s'"
+  assert_equal "$(dybatpho::os_release PRETTY_NAME)" 'A "B" C\D $x `y` \n'
+  assert_equal "$(dybatpho::os_release NAME)" 'it\s'
+}
+
 @test "dybatpho::os_release fails for a field the file does not carry" {
   _os_release 'ID=ubuntu'
   run_traced ! dybatpho::os_release VARIANT_ID

@@ -154,6 +154,8 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - The clock is frozen or jumps while a worker waits.
 - The variable names a caller passes to `queue_pop`, `queue_peek` or `queue_read` match a name the function uses internally, such as `identifier` or `lock`.
 - A worker claims a requeued job the instant it becomes visible, before anything else is written about it.
+- A crash leaves the sequence counter empty: the next push numbers past the highest id still on disk instead of reusing an older job's id.
+- Another worker holds the queue lock past `DYBATPHO_QUEUE_TIMEOUT`: `dybatpho::queue_work` looks again rather than stopping as if the queue were drained.
 
 ## Requirements *(mandatory)*
 
@@ -263,6 +265,8 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **IT-042**: Push with neither XDG_STATE_HOME nor HOME set under `if !`, and stop under the name of `queue_push` without touching `/queues`.
 - **IT-043**: Push while another process holds the queue lock nine tenths of the time, freeing it briefly, and find the push succeeds within its wait.
 - **IT-044**: Work a job with a handler that reads variables named like the worker's locals, and see the caller's values.
+- **IT-045**: Empty the sequence counter and verify the next push neither reuses nor overwrites an existing job.
+- **IT-046**: Hold the queue lock past the wait and verify `dybatpho::queue_work` still drains the queue.
 
 ## Acceptance Criteria *(mandatory)*
 

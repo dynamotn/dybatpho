@@ -25,6 +25,19 @@ setup() {
   assert_equal "${third%%-*}" "000000000003"
 }
 
+@test "dybatpho::queue_push recovers from an empty sequence counter without reusing an id" {
+  local first second third
+  first="$(dybatpho::queue_push "${QUEUE}" one)"
+  second="$(dybatpho::queue_push "${QUEUE}" two)"
+  # What a crash between truncating the counter and writing it leaves behind.
+  : > "${QUEUE}/.sequence"
+
+  third="$(dybatpho::queue_push "${QUEUE}" three)"
+  assert_equal "${third%%-*}" "000000000003"
+  assert_equal "$(cat "${QUEUE}/pending/${first}.job")" "one"
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "3"
+}
+
 @test "dybatpho::queue_push reads a payload from stdin and keeps its line breaks" {
   local id payload
   id="$(printf 'line one\nline two' | dybatpho::queue_push "${QUEUE}" -)"
@@ -513,6 +526,24 @@ SCRIPT
   assert_equal "$(< "${log}")" "$(printf 'tag two 000000000002\ntag one 000000000001')"
   assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
   assert_equal "$(dybatpho::queue_len "${QUEUE}" claimed)" "0"
+}
+
+@test "dybatpho::queue_work keeps going when another worker holds the lock past its wait" {
+  export DYBATPHO_QUEUE_TIMEOUT=1
+  dybatpho::queue_push "${QUEUE}" job > /dev/null
+  (
+    dybatpho::lock_acquire "${QUEUE}/.lock" 1
+    sleep 2.5
+    dybatpho::lock_release "${QUEUE}/.lock"
+  ) &
+  local holder=$!
+  # The holder has the lock before the worker looks.
+  while [[ ! -L "${QUEUE}/.lock" && ! -e "${QUEUE}/.lock" ]]; do sleep 0.05; done
+
+  run_traced dybatpho::queue_work "${QUEUE}" true
+  wait "${holder}"
+  assert_success
+  assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
 }
 
 @test "dybatpho::queue_work returns at once on an empty queue" {

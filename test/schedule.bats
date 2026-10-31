@@ -310,6 +310,14 @@ SCRIPT
   assert_equal "$(cat "${LOG}")" "only"
 }
 
+@test "dybatpho::schedule_debounce survives an empty ticket left by a crash" {
+  local directory
+  __dybatpho_schedule_dir_into directory
+  : > "${directory}/emptied.trigger"
+  dybatpho::schedule_debounce 1 emptied -- note ran
+  assert_equal "$(cat "${LOG}")" "ran"
+}
+
 @test "dybatpho::schedule_debounce collapses a burst into the last trigger" {
   # Running on the first event is what an editor's write-then-rename breaks:
   # the file is still half written. The run belongs after the burst settles.
@@ -510,4 +518,11 @@ SCRIPT
   run_traced -9 dybatpho::schedule_debounce 1 "${key}" -- echo ran
   wait
   assert_output ""
+}
+
+@test "dybatpho::schedule_once_per reads seconds with a leading zero in base ten" {
+  run_traced dybatpho::schedule_once_per 08 octal -- note first
+  assert_success
+  run_traced -9 dybatpho::schedule_once_per 08 octal -- note second
+  assert_equal "$(cat "${LOG}")" "first"
 }

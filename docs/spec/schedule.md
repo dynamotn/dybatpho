@@ -106,6 +106,7 @@ dybatpho::schedule_every 60 -- check_health
 - Several callers start `schedule_once_per` for the same key at the same moment, or one dies while holding the short claim around the marker.
 - Several callers find the same stale claim at once.
 - A caller died while holding the reclaim, the directory that guards removing a stale claim.
+- A crash leaves a debounce ticket empty: the next trigger restarts the count instead of stopping the script under `errexit`.
 
 ## Requirements *(mandatory)*
 
@@ -190,6 +191,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-029**: Plant a link at the old pid-based staging name of a marker, run once, and find the link target untouched and a real marker in place.
 - **IT-030**: Reset the key from a background job while a debounce window is open, and get exit code 9 with no output.
 - **IT-031**: Plant a stale claim and a stale reclaim directory, run once, and find the command ran and neither is left behind.
+- **IT-032**: Leave an empty ticket and verify the next debounce still runs its command.
 
 ## Acceptance Criteria *(mandatory)*
 

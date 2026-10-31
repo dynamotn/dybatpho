@@ -672,6 +672,80 @@ scripts/i18n_cldr.sh --cldr /tmp/cldr           # print the regenerated tables
   its reason, in `test/scope-leak.allow`.
 - Validate and quote every option or variable inserted into generated shell code.
 
+### Pitfalls a line-by-line audit found
+
+Each rule below names a class of bug that reached a release. Check new and
+changed code against all of them.
+
+- **Read every number in base ten.** A value that passes `^[0-9]+$` and is then
+  used bare in `(( ))` or `$(( ))` is read as octal when it has a leading zero:
+  `08` stops the script with "value too great for base" and `010` is eight.
+  Normalise once after the check, `n=$((10#${n}))`, and when the value comes
+  from outside, refuse more than 18 digits first, because arithmetic wraps
+  silently past 2^63. Cache TTLs, i18n precisions, archive strip counts, retry
+  delays, scales and `select` answers all had this.
+- **Keep outside text out of every context that evaluates it.** Bash evaluates
+  array subscripts in arithmetic, `${!name}`, `printf -v`, `declare -n` and
+  `unset`, so a value such as `x[$(cmd)]` from the environment, a config file or
+  the caller runs `cmd`. Check a name against an identifier pattern before
+  expanding it indirectly, check a number with a pattern before arithmetic, and
+  remove an associative entry with a single-quoted subscript,
+  `unset -v 'map[$key]'`, so the key is expanded once. A `count:true` seed, a
+  timer name and `expect_envs` arguments all ran code this way.
+- **Quote the replacement in `${var//pattern/replacement}`.** Bash 5.2 turned on
+  `patsub_replacement`, so an unquoted `&` in the replacement becomes the
+  matched text: a placeholder `<&>` put the secret back into masked output.
+  Write `${var//"${pattern}"/"${replacement}"}`.
+- **End the options before any operand a caller supplies**: `mv -f --`,
+  `mkdir -p --`, `dirname --`, `sudo -- cmd`. A log file named `-run.log` and a
+  command named `-u` were parsed as options. When the receiving program has no
+  `--`, as with a rendered package-manager command, refuse an operand that
+  starts with `-`.
+- **Name a temporary file after `${BASHPID}`, not `$$`.** `$$` is the same in
+  every subshell, so two `( … ) &` jobs of one script shared a partial file.
+- **Write state atomically**: to a temporary file in the same directory, then
+  `mv` it into place. An interrupted truncating `>` leaves an empty file the
+  next reader trusts. Never replace a good file with the output of a step that
+  can fail: render into a variable, check the status, then write.
+- **Keep stdout for data.** Progress, banners and retry notices go to stderr,
+  or `out=$(fn)` captures them, as it did the retry banner.
+- **`$(...)` drops trailing newlines.** A function that promises output byte
+  for byte captures with a sentinel (`out="$(cmd; printf x)"`, then
+  `out="${out%x}"`) or reads with `IFS= read -r -d ''`.
+- **Never let a handler swallow its signal.** An INT or TERM handler that
+  restores the terminal must then `trap - SIG` and `kill -s SIG "${BASHPID}"`,
+  or Ctrl-C leaves the script running. Register handlers through
+  `dybatpho::trap`: a subshell still lists the traps of its parent, and code
+  that appended to that list ran the parent's EXIT handler, which deleted its
+  work directory, inside every `$(...)`.
+- **errexit is off inside a condition.** `( job ) || code=$?` and `if handler`
+  run with `set -e` ignored throughout; run the job in the background,
+  `( job ) & wait $! || code=$?`, when its own failures must stop it.
+- **Judge the physical path, not the text.** `dybatpho::path_normalize` folds
+  `dir/..` as text, but when `dir` is a symbolic link the kernel goes
+  elsewhere. A safety check resolves the directory part with `cd -P`, follows
+  every hop of a link, and checks an archive's link targets as well as its
+  entry names. Claim a name with `ln -sn` and confirm it with `readlink`:
+  `ln -s` onto an existing directory, or a link to one planted at the name,
+  succeeds by creating the link inside it.
+- **Mask a secret everywhere it can leave.** Every message that prints a URL
+  redacts it, treating everything up to the last `@` of the authority as
+  credentials; every part of an AI request (system prompt, stored turns, tool
+  output) goes through redaction; a file holding a secret is registered for
+  cleanup on exit and on a signal.
+- **Keep loops linear.** `rest="${rest#*,}"` in a loop copies the rest of the
+  string for every field, and `$(...)` in a per-line loop forks per line. Split
+  once (`mapfile -d` on Bash 4.4+, `read -d` on 4.3), return through namerefs,
+  and keep a running count rather than measuring again with `wc`.
+- **Guard every Bash 4.4+ feature** (`mapfile -d`, `inherit_errexit`,
+  `${var@Q}`, `wait -p`) with a 4.3 path that gives the same results, and run
+  the touched tests under 4.3 before reporting done.
+- **Answer a lint finding that is wrong for the code with a reasoned
+  directive**, `# dyshellint disable=<CODE> # <reason>` on the line above, or
+  after the shebang for a whole file, never with code that only silences it.
+  BSG104 in a script that sources `init.sh` is one: `init.sh` already turns on
+  `inherit_errexit`.
+
 ## CLI change workflow
 
 ### 1. Update the CLI spec
@@ -794,6 +868,24 @@ and confirm, in `coverage/bats/cobertura.xml`:
 A line that is genuinely unreachable does not belong in the library at all;
 delete it rather than excluding it. `# kcov(skip)` is for code that a test does
 run and the instrument cannot see, never for code no test reaches.
+
+### Keep tests hermetic, portable and proven
+
+- Never read the host's configuration or write under the real home.
+  `test/test_helper.bash` points git at its own global config
+  (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_NOSYSTEM`) and `XDG_CACHE_HOME` and
+  `XDG_STATE_HOME` at the test's directory: a host that forced tag signing
+  failed every release test, and an example wrote into `~/.local/state`.
+- Use only what GNU, BSD/macOS and BusyBox agree on; the `portable` and
+  `busybox` CI jobs run the whole suite. `touch -t` works everywhere,
+  `touch -d '@N'`, `mv -T`, `date -d` and a bare `sed -i` do not; rewrite a
+  file with `sed_in_place`.
+- A regression test must fail without its fix. Undo the fix by hand, watch the
+  test fail, then restore it. Cover every path that reaches the bug: the
+  `count:true` guard was first tested only with the flag given, and the same
+  seed still ran code when the flag was left out.
+- To run a file under an older Bash without Docker, put that Bash first on
+  `PATH`: `PATH=/opt/bash-4.3/bin:$PATH test/lib/core/bin/bats test/<file>.bats`.
 
 ## Tests required for CLI changes
 

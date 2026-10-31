@@ -682,8 +682,10 @@ function __dybatpho_forge_or_die {
 #######################################
 # @description Print the number of an open issue whose title matches exactly.
 #   GitLab can filter server-side; GitHub cannot search titles on the issues
-#   endpoint, so the open issues are compared here. Both are exact matches, so
-#   "Build failing" never collides with "Build failing on macOS".
+#   endpoint, so the open issues are compared here, skipping the pull requests
+#   that endpoint also lists. Both are read page by page until one matches,
+#   and both are exact matches, so "Build failing" never collides with
+#   "Build failing on macOS".
 # @arg $1 string Issue title
 # @stdout Issue number, or nothing when no open issue has that title
 # @exitcode 0 A matching issue exists
@@ -700,28 +702,33 @@ function dybatpho::forge_issue_find {
   kind="${context[kind]}"
   dybatpho::create_temp body ".json"
 
+  local title_json list filter
+  title_json=$(dybatpho::json_string "${title}")
   case "${kind}" in
     github)
-      dybatpho::forge_request GET "issues?state=open&per_page=100" "" "${body}" || return 2
-      local title_json
-      title_json=$(dybatpho::json_string "${title}")
-      local issues
-      issues=$(< "${body}")
-      number="$(dybatpho::json_get "${issues}" ".[] | select(.title == ${title_json}) | .number")" || return 2
+      list="issues?state=open"
+      filter=".[] | select(.title == ${title_json} and .pull_request == null) | .number"
       ;;
     gitlab)
       local url_encode
       url_encode=$(dybatpho::url_encode "${title}")
-      dybatpho::forge_request GET \
-        "issues?state=opened&search=${url_encode}&in=title" "" "${body}" || return 2
-      local json_string
-      json_string=$(dybatpho::json_string "${title}")
-      local issues
-      issues=$(< "${body}")
-      number="$(dybatpho::json_get "${issues}" ".[] | select(.title == ${json_string}) | .iid")" || return 2
+      list="issues?state=opened&search=${url_encode}&in=title"
+      filter=".[] | select(.title == ${title_json}) | .iid"
       ;;
     *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
+
+  # Both list a page at a time, and GitHub's list holds pull requests too.
+  local issues count page=1
+  while true; do
+    dybatpho::forge_request GET "${list}&per_page=100&page=${page}" "" "${body}" || return 2
+    issues=$(< "${body}")
+    number="$(dybatpho::json_get "${issues}" "${filter}")" || return 2
+    count="$(dybatpho::json_get "${issues}" 'length')" || return 2
+    [[ -z "${number}" && "${count}" =~ ^[0-9]{1,18}$ ]] || break
+    ((10#${count} >= 100)) || break
+    page=$((page + 1))
+  done
 
   # The first match wins, as the list comes back newest first.
   number="${number%%$'\n'*}"
@@ -889,7 +896,7 @@ function dybatpho::forge_release_find {
 
   case "${kind}" in
     github)
-      dybatpho::forge_request GET "releases/tags/${tag}" "" "${body}" || return 1
+      dybatpho::forge_request GET "releases/tags/$(dybatpho::url_encode "${tag}")" "" "${body}" || return 1
       value="$(dybatpho::json_get "$(< "${body}")" '.id')"
       ;;
     gitlab)

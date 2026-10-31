@@ -45,7 +45,7 @@ token can never reach a log line even when a request is traced.
 - [`dybatpho::forge_token`](#dybatphoforge_token) — Print the token used to authenticate against the forge. The token is registered with `secret.sh` before it is returned, so a later log line containing it is masked instead. That registration only reaches the shell this function runs in. Capturing the token with `token="$(dybatpho::forge_token)"` runs it in a subshell, which takes the registration with it when it exits — a Bash property no function can work around. A script that holds the token itself should register it once, in its own shell: ```bash token="$(dybatpho::forge_token)" dybatpho::secret_register "${token}" ``` The module never logs the token, so this matters for what the calling script does with it rather than for the requests made here.
 - [`dybatpho::forge_request`](#dybatphoforge_request) — Make an authenticated request against the forge API. The path is relative to the project, so callers write `issues` rather than repeating the API base and the project identifier on every call.
 - [`dybatpho::forge_error`](#dybatphoforge_error) — Print what the forge said about the last failed request. A forge refuses a request for a reason, and puts the reason in the response body: which field was missing, that the token cannot see this repository, that a release already exists for the tag. Reporting only `HTTP 422` throws that away and leaves a bad field, an expired token and a rate limit looking identical. The status is always included, because the body is not guaranteed to be JSON, or to be there at all.
-- [`dybatpho::forge_issue_find`](#dybatphoforge_issue_find) — Print the number of an open issue whose title matches exactly. GitLab can filter server-side; GitHub cannot search titles on the issues endpoint, so the open issues are compared here. Both are exact matches, so "Build failing" never collides with "Build failing on macOS".
+- [`dybatpho::forge_issue_find`](#dybatphoforge_issue_find) — Print the number of an open issue whose title matches exactly. GitLab can filter server-side; GitHub cannot search titles on the issues endpoint, so the open issues are compared here, skipping the pull requests that endpoint also lists. Both are read page by page until one matches, and both are exact matches, so "Build failing" never collides with "Build failing on macOS".
 - [`dybatpho::forge_issue_create`](#dybatphoforge_issue_create) — Open an issue and print its number.
 - [`dybatpho::forge_issue_comment`](#dybatphoforge_issue_comment) — Add a comment to an existing issue.
 - [`dybatpho::forge_issue_report`](#dybatphoforge_issue_report) — Report something once, then keep reporting to the same issue. A script that runs on a schedule should not open a new issue on every failure. This opens one the first time and comments on it afterwards, and says in its output which of the two it did so a pipeline can react.
@@ -377,8 +377,10 @@ dybatpho::forge_request POST "issues" "${payload}" "${response}" \
 
 Print the number of an open issue whose title matches exactly.
 GitLab can filter server-side; GitHub cannot search titles on the issues
-endpoint, so the open issues are compared here. Both are exact matches, so
-"Build failing" never collides with "Build failing on macOS".
+endpoint, so the open issues are compared here, skipping the pull requests
+that endpoint also lists. Both are read page by page until one matches,
+and both are exact matches, so "Build failing" never collides with
+"Build failing on macOS".
 
 **🧾 Arguments**
 

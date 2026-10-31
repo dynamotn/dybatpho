@@ -630,7 +630,9 @@ function dybatpho::backup_verify {
     || dybatpho::die "${FUNCNAME[0]}: No checksum sidecar beside: ${archive}"
 
   local recorded actual
-  read -r recorded _ < "${sidecar}"
+  # An empty sidecar, or one with no final newline, makes `read` fail; the
+  # comparison below still has to run, not errexit.
+  read -r recorded _ < "${sidecar}" || true
   if __dybatpho_backup_is_snapshot "${archive}"; then
     __dybatpho_backup_tree_hash_into actual "${archive}"
   else

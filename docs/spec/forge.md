@@ -143,7 +143,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **FR-007**: The module MUST address a GitLab project by its URL-encoded path
   and a GitHub repository as `repos/owner/name`.
 - **FR-008**: `dybatpho::forge_issue_find` MUST match a title exactly and MUST
-  read `number` on GitHub and `iid` on GitLab.
+  read `number` on GitHub and `iid` on GitLab. It MUST read every page of
+  results until one matches, and on GitHub it MUST skip pull requests.
 - **FR-009**: `dybatpho::forge_issue_create` MUST send `body` on GitHub and
   `description` on GitLab, and MUST send labels as a JSON array on GitHub and as
   a comma-separated string on GitLab.
@@ -156,6 +157,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
   draft, because GitLab has no draft release.
 - **FR-011**: `dybatpho::forge_release_find` MUST print the identifier the
   forge's own upload step needs: the numeric id on GitHub, the tag on GitLab.
+  It MUST URL-encode the tag in the request path on both forges.
 - **FR-012**: `dybatpho::forge_release_upload` MUST refuse a missing file and a
   tag with no release, MUST send GitHub assets to the upload host, and MUST
   store GitLab assets as a generic package and then link them to the release.
@@ -238,6 +240,9 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **IT-028**: The GitLab auth header is `JOB-TOKEN` for the CI job token and `PRIVATE-TOKEN` otherwise, and a request made with only `CI_JOB_TOKEN` set carries `JOB-TOKEN`.
 - **IT-029**: Trace a GitHub request with `set -x`, and find the token sent but absent from the trace, which still shows the request.
 - **IT-030**: Normalize `ssh://git@host:2222/g/r.git`, `deploy@host:g/r.git` and `https://github.com/o/r.git/`, and read the API base and project of the second as a remote.
+- **IT-031**: Answer a GitHub issue search with a full first page holding a pull request of the title and a second page holding the issue, and see `forge_issue_find` print the issue.
+- **IT-032**: Look up the release of tag `release/1.0#1` on GitHub, and see the tag sent encoded as `release%2F1.0%231`.
+- **IT-033**: Answer a GitLab issue search with a full first page of near matches and a second page holding the exact title, and see `forge_issue_find` print its iid.
 
 ## Acceptance Criteria *(mandatory)*
 

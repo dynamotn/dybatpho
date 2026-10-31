@@ -432,6 +432,7 @@ dybatpho::show_file "${report_file}"
 - **IT-041**: Read the runtime directory through an absolute fallback, with and without an application name and for `/`, and refuse a relative fallback.
 - **IT-042**: Write through `alias/link`, where `alias -> deep/b` and `link -> ../t`, and see `deep/t` change and no `t` created beside `alias`.
 - **IT-043**: Rewrite a file whose name is 230 bytes long.
+- **IT-044**: Plant a link to a directory at the extended name while `create_temp` renames its file onto it, and see the call stop rather than hand back the link.
 
 ## Acceptance Criteria *(mandatory)*
 

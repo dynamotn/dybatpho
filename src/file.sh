@@ -426,7 +426,11 @@ function dybatpho::create_temp {
     else
       __dybatpho_tmp_path=$(mktemp "${__dybatpho_tmp_template}")
       local __dybatpho_tmp_extended="${__dybatpho_tmp_path}${__dybatpho_tmp_ext}"
-      mv "${__dybatpho_tmp_path}" "${__dybatpho_tmp_extended}"
+      mv -- "${__dybatpho_tmp_path}" "${__dybatpho_tmp_extended}"
+      # `mv -T` is GNU only: a directory, or a link to one, planted at the new
+      # name took the file in, and that name is not ours to hand back.
+      [[ -f "${__dybatpho_tmp_extended}" && ! -L "${__dybatpho_tmp_extended}" ]] \
+        || dybatpho::die "${FUNCNAME[0]}: Something else took ${__dybatpho_tmp_extended}"
       __dybatpho_tmp_path="${__dybatpho_tmp_extended}"
     fi
   else

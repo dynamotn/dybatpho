@@ -66,6 +66,27 @@ age_entry() {
   run --separate-stderr ! dybatpho::cache_key
 }
 
+@test "dybatpho::cache_key stays SHA-256 without sha256sum or shasum" {
+  # The last fallback was `cksum`, a 32-bit CRC: two keys that collide serve
+  # each other's entries.
+  command -v openssl > /dev/null || skip "openssl is not installed"
+  local tools="${BATS_TEST_TMPDIR}/bin" tool source expected
+  mkdir -p "${tools}"
+  for tool in cksum cut openssl; do
+    source="$(command -v "${tool}")"
+    ln -s "${source}" "${tools}/${tool}"
+  done
+  expected="$(printf 'a\nb\n' | openssl dgst -sha256 -r)"
+
+  local key saved_path="${PATH}"
+  PATH="${tools}"
+  hash -r
+  key="$(dybatpho::cache_key a b)"
+  PATH="${saved_path}"
+  hash -r
+  assert_equal "${key}" "${expected%% *}"
+}
+
 @test "dybatpho::cache_set stores what it is given and cache_get reads it back" {
   printf 'hello\n' | dybatpho::cache_set greeting
   assert_equal "$(dybatpho::cache_get greeting 3600)" "hello"

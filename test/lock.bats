@@ -771,6 +771,24 @@ _replay_reclaim_race() {
   rm -f -- "${lock_path}" "${lock_path}".stale.*
 }
 
+@test "dybatpho::lock_reclaim_stale keeps the command of a holder that claims after the move" {
+  # The stale lock's command sidecar was removed after the lock was moved
+  # aside, by which time a new holder may have claimed and written its own.
+  local lock_path dead
+  lock_path="$(dybatpho::lock_path "new-command")"
+  dead="${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z"
+  ln -s "${dead}" "${lock_path}"
+  printf 'old job' > "${lock_path}.command"
+  # The notice is the first thing run once the name is free.
+  dybatpho::warn() {
+    DYBATPHO_LOCK_COMMAND="new job" dybatpho::lock_acquire "new-command"
+  }
+  run_traced -0 dybatpho::lock_reclaim_stale "${lock_path}"
+  run_traced -0 dybatpho::lock_field "${lock_path}" command
+  assert_output "new job"
+  dybatpho::lock_release "new-command"
+}
+
 @test "dybatpho::lock_reclaim_stale keeps a live lock when a directory is planted before it is put back" {
   # `ln -s` put the link inside the directory and reported success, so the live
   # lock moved aside was deleted and its holder no longer held anything.

@@ -319,6 +319,9 @@ function dybatpho::lock_reclaim_stale {
   # lock must not collide on the destination, or the rename would succeed for
   # both and the check below would lose its meaning.
   local aside="${lock_path}.stale.$$.${RANDOM}"
+  # The dead holder's command goes while its lock still holds the name: once
+  # the lock is moved, a new holder may claim and write its own there.
+  rm -f -- "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" 2> /dev/null || true
   mv -- "${lock_path}" "${aside}" 2> /dev/null || return 0
 
   local moved
@@ -344,7 +347,7 @@ function dybatpho::lock_reclaim_stale {
   # `rm` on a symbolic link removes the link, never what it points at.
   [[ -n "${aside}" && -n "${lock_path}" ]] || return 0
   # dyshellint disable=BSG089 # the line above returns first when the path is empty
-  rm -rf -- "${aside}" "${lock_path}${__DYBATPHO_LOCK_COMMAND_SUFFIX}" &> /dev/null || true
+  rm -rf -- "${aside}" &> /dev/null || true
 }
 
 #######################################

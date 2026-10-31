@@ -141,11 +141,14 @@ function __dybatpho_cache_base_into {
 function dybatpho::cache_key {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one value"
   local hasher
-  hasher="$(dybatpho::coalesce_cmd sha256sum shasum cksum)" \
-    || dybatpho::die "${FUNCNAME[0]}: No hashing command found; install one of sha256sum, shasum, or cksum"
+  # Not `cksum`: a 32-bit CRC lets two keys collide and share an entry.
+  hasher="$(dybatpho::coalesce_cmd sha256sum shasum openssl)" \
+    || dybatpho::die "${FUNCNAME[0]}: No hashing command found; install one of sha256sum, shasum, or openssl"
+  local -a hash_command=("${hasher}")
+  [[ "${hasher}" != openssl ]] || hash_command+=(dgst -sha256 -r)
   # Each value is followed by a newline so that two different splits of the
   # same text cannot hash to the same key.
-  printf '%s\n' "$@" | "${hasher}" | cut -d' ' -f1
+  printf '%s\n' "$@" | "${hash_command[@]}" | cut -d' ' -f1
 }
 
 #######################################

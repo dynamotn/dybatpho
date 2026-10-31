@@ -235,6 +235,27 @@ setup() {
     || stat -f '%Lp' "${first}")" "600"
 }
 
+@test "dybatpho::create_temp refuses a directory planted at the extended name" {
+  # The file is renamed onto its name with the extension, and a plain `mv`
+  # onto a link to a directory moves it inside; the link was handed back.
+  local sandbox="${BATS_TEST_TMPDIR}/planted" elsewhere="${BATS_TEST_TMPDIR}/elsewhere"
+  mkdir -p "${sandbox}" "${elsewhere}"
+  # shellcheck disable=2329
+  _create() {
+    mv() {
+      ln -s "${elsewhere}" "${*: -1}"
+      command mv "$@"
+    }
+    local path
+    dybatpho::create_temp path ".txt" probe "${sandbox}"
+    printf '%s\n' "${path}"
+  }
+  # `run`, not `run_traced`: the refusal stops the shell it runs in.
+  run --separate-stderr _create
+  assert_failure
+  assert_stderr --partial "Something else took"
+}
+
 @test "dybatpho::create_temp create temp file in not existed folder" {
   # shellcheck disable=2329
   _create() {

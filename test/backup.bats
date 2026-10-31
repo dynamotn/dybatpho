@@ -176,6 +176,32 @@ plant() {
   assert_stderr --partial "does not match its sidecar"
 }
 
+@test "dybatpho::backup_verify reads an empty or unterminated sidecar under errexit" {
+  # `read` fails on an empty sidecar and on one with no final newline, and
+  # under `set -e` that stopped the check before it compared anything.
+  local archive
+  archive="$(dybatpho::backup_create "${SOURCE}" "${DEST}" snap)"
+  local sum
+  read -r sum _ < "${archive}.sha256"
+  local script="${BATS_TEST_TMPDIR}/verify.sh"
+  cat > "${script}" << 'SCRIPT'
+set -e
+. "${1}/init.sh" --modules backup
+dybatpho::backup_verify "${2}"
+printf 'verified\n'
+SCRIPT
+
+  printf '%s' "${sum}" > "${archive}.sha256"
+  run bash "${script}" "${DYBATPHO_DIR}" "${archive}"
+  assert_success
+  assert_output --partial "verified"
+
+  : > "${archive}.sha256"
+  run --separate-stderr bash "${script}" "${DYBATPHO_DIR}" "${archive}"
+  assert_failure
+  assert_stderr --partial "does not match its sidecar"
+}
+
 @test "dybatpho::backup_verify refuses to pass a backup it cannot check" {
   # "No sidecar" is not the same answer as "matches", and treating it as one
   # would report a corrupted restore as a good one.

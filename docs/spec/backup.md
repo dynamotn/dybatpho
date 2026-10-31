@@ -268,6 +268,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-044**: Snapshot a relative source with `CDPATH` pointing at a decoy of the same name, and restore a snapshot from a directory named `-bk`.
 - **IT-045**: List and prune `zeta` and a newer `alpha` without a name, and find `alpha` first and kept; list, resolve and prune `web` beside a newer `web-api`, and find only `web` considered and both kept.
 - **IT-046**: Take two backups from two subshells with the clock frozen, and find each wrote its own temporary archive.
+- **IT-047**: Verify, under `set -e`, a backup whose sidecar has no final newline and see it pass, then one whose sidecar is empty and see it reported as a mismatch rather than the script stopping.
 
 ## Acceptance Criteria *(mandatory)*
 

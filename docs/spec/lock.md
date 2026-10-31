@@ -354,6 +354,7 @@ dybatpho::lock_semaphore_holders downloads 4
 - **IT-029**: Run a command under a lock and under a semaphore that reads and overwrites variables named like the runners' locals, and see the caller's values and a released lock.
 - **IT-030**: Plant a link named `<lock>.command` at a file, acquire the lock, and find the file untouched and the link replaced.
 - **IT-031**: Acquire a lock whose name holds a live lock in the older directory form, and see the acquire refused with no link left inside the directory.
+- **IT-032**: Let a new holder claim a stale lock while it is being reclaimed, and see the new holder's command still recorded.
 
 ## Acceptance Criteria *(mandatory)*
 

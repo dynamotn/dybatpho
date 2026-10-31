@@ -26,6 +26,22 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   instead of returning success for 256.
 - **`screen` — `dybatpho::screen_chart` honours `min:` when it is given without
   `max:`.**
+- **`forge` — `dybatpho::forge_issue_find` on GitHub no longer takes a pull
+  request with the same title for the issue, and finds an open issue past the
+  first 100,** so `forge_issue_report` stops opening duplicates.
+- **`forge` — `dybatpho::forge_release_find` on GitHub URL-encodes the tag,** so
+  a tag containing `/`, `#`, `?` or `%` finds its release.
+- **`backup` — `dybatpho::backup_verify` under `set -e` reports an empty sidecar
+  as a mismatch and accepts a sidecar with no final newline,** instead of
+  stopping the script.
+- **`cache` — `dybatpho::cache_key` falls back to `openssl` SHA-256 instead of a
+  32-bit `cksum`,** so different keys can no longer collide and share a cache
+  entry.
+- **`lock` — `dybatpho::lock_reclaim_stale` no longer deletes the command record
+  of a holder that claims the lock just after a stale one is reclaimed.**
+- **`forge` — `dybatpho::forge_issue_find` on GitLab reads every page of search
+  results,** so an open issue beyond the first 20 near matches is found and
+  `forge_issue_report` no longer opens a duplicate.
 - **`init` — `dybatpho::load` no longer reports success for a module whose
   earlier load failed,** and a failed on-demand load is retried on the next call
   instead of being skipped for good.
@@ -59,6 +75,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`file` — `dybatpho::create_temp` refuses a directory or link planted at the
+  temporary file's final name,** instead of returning a path someone else
+  controls.
 - **`screen`, `tui` — a numeric screen option such as `max:` or `offset:`, or
   `DYBATPHO_TUI_PROGRESS_STEP` and `DYBATPHO_TUI_MENU_HEIGHT`, holding text such
   as `x[$(cmd)]` no longer runs the command.**

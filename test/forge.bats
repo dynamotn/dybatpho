@@ -316,6 +316,34 @@ curl_payload() {
   assert_failure
 }
 
+@test "dybatpho::forge_issue_find skips pull requests and reads every page on GitHub" {
+  # The issues endpoint lists pull requests as well, a page at a time: a pull
+  # request of the same title was taken for the issue, and an issue past the
+  # first page was never seen, so the caller opened a duplicate.
+  local first
+  first="$(jq -cn '[range(100) | {number: (1000 + .), title: "Other \(.)"}]
+    | .[5] = {number: 8, title: "Build failing", pull_request: {}}')"
+  dybatpho::mock_http "api.github.com" 200 "${first}"
+  dybatpho::mock_http "&page=2" 200 '[{"number":4,"title":"Build failing"}]'
+
+  run_traced -0 dybatpho::forge_issue_find "Build failing"
+  assert_output "4"
+}
+
+@test "dybatpho::forge_issue_find reads every page of the GitLab search" {
+  # The search came back as one page of 20 near matches, so an issue past it
+  # was missed and the caller opened a duplicate.
+  use_gitlab
+  local first
+  first="$(jq -cn '[range(100) | {iid: (1000 + .), title: "Nightly failing \(.)"}]')"
+  dybatpho::mock_http "gitlab.com" 200 "${first}"
+  dybatpho::mock_http "&page=2" 200 '[{"iid":11,"title":"Nightly failing"}]'
+
+  run_traced -0 dybatpho::forge_issue_find "Nightly failing"
+  assert_output "11"
+  dybatpho::assert_http_called "per_page=100&page=2"
+}
+
 @test "dybatpho::forge_issue_find reads the iid on GitLab and searches by title" {
   use_gitlab
   dybatpho::mock_http "gitlab.com" 200 '[{"iid":11,"title":"Nightly failing"}]'
@@ -465,6 +493,14 @@ curl_payload() {
   dybatpho::mock_http "releases/tags/v1.2.0" 200 '{"id":9001,"tag_name":"v1.2.0"}'
 
   assert_equal "$(dybatpho::forge_release_find "v1.2.0")" "9001"
+}
+
+@test "dybatpho::forge_release_find encodes the tag in the GitHub path" {
+  # Raw, `#` ended the path and `/` added a segment, asking for another resource.
+  dybatpho::mock_http "releases/tags/release%2F1.0%231" 200 '{"id":9003}'
+
+  run_traced -0 dybatpho::forge_release_find "release/1.0#1"
+  assert_output "9003"
 }
 
 @test "dybatpho::forge_release_find returns the tag GitLab addresses releases by" {

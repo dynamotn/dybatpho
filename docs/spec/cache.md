@@ -299,6 +299,7 @@ fi
 - **IT-037**: Count and prune a namespace that also holds a link, a directory and a hidden file with the suffix; set, describe, forget and clear in a cache directory named `-cache`.
 - **IT-038**: Read an entry with a time to live of `08` and `09`, run, prune and describe with leading-zero values, and see no arithmetic error.
 - **IT-039**: Run a command printing trailing blank lines and one printing no final newline, and get the same bytes back on a miss, a hit and a stale hit.
+- **IT-040**: Hash a key with `sha256sum` and `shasum` off the `PATH`, and see a SHA-256 key from `openssl`, never a `cksum` CRC.
 
 ## Acceptance Criteria *(mandatory)*
 

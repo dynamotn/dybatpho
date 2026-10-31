@@ -118,6 +118,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `diff` warns and still answers 0, so an unreadable file compared as identical.
 - **`string` — `dybatpho::url_decode` stays linear on Bash 4.3,** where indexing
   an array and appending to a string made it quadratic.
+- **`process` — `dybatpho::run_with_timeout` leaves the caller's stderr to the
+  command:** under job control Bash 4.3 to 5.1 reported the job it waited for
+  (`Done`, `Exit 3`, `Terminated`) and macOS Bash the watchdog it ended
+  (`Killed: 9`) there.
 
 ### Security
 

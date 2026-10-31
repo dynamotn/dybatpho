@@ -703,7 +703,10 @@ function __dybatpho_process_timeout_fallback {
   local watchdog_pid=$!
 
   local status=0
-  wait "${command_pid}" || status=$?
+  # Under job control Bash 4.3 to 5.1 report the job, `Done`, `Exit 3` or
+  # `Terminated`, on the shell's stderr as `wait` reaps it; the command's own
+  # stderr was fixed when it started, so only that report is silenced.
+  wait "${command_pid}" 2> /dev/null || status=$?
 
   if [[ -s "${__dybatpho_process_fallback_marker}" ]]; then
     # The watchdog fired and is ending the command's group; it is left to
@@ -721,8 +724,12 @@ function __dybatpho_process_timeout_fallback {
     # SIGTERM reaches that early still runs the EXIT trap it inherited, so the
     # caller's own cleanup ran a second time, in the watchdog, while the caller
     # went on. The watchdog has nothing to clean up, and SIGKILL runs no trap.
+    #
+    # Disowned first: a shell with job control reports a job that SIGKILL ends
+    # as `Killed: 9` on the caller's stderr, which macOS Bash did. Bash still
+    # reaps it, so no zombie is left.
+    disown "${watchdog_pid}" 2> /dev/null || true
     kill -KILL -- "-${watchdog_pid}" 2> /dev/null || kill -KILL "${watchdog_pid}" 2> /dev/null || true
-    wait "${watchdog_pid}" 2> /dev/null || true
   fi
 
   [[ "${__dybatpho_process_fallback_monitor}" == "on" ]] || set +m

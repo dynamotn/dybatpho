@@ -473,6 +473,25 @@ SCRIPT
   assert_equal "${status}" 3
 }
 
+@test "dybatpho::run_with_timeout leaves the caller's stderr to the command" {
+  # Under job control Bash 4.3 to 5.1 reported the job it waited for (`Done`,
+  # `Exit 3`, `Terminated`), and macOS Bash the watchdog it killed, on the
+  # caller's stderr. Run as a script, where job control is what it is in use.
+  local script="${BATS_TEST_TMPDIR}/quiet.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules process
+ok() { printf 'own\n' >&2; }
+bad() { return 3; }
+slow() { sleep 5; }
+dybatpho::run_with_timeout 5 ok
+dybatpho::run_with_timeout 5 bad || printf 'bad=%s\n' "$?" >&2
+dybatpho::run_with_timeout 1 slow || printf 'slow=%s\n' "$?" >&2
+SCRIPT
+  run --separate-stderr bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+  assert_equal "${stderr}" $'own\nbad=3\nslow=124'
+}
+
 @test "a background function that made a temporary file keeps its exit code" {
   # Bash 5.1 reported 0 for a function that returned non-zero in a background
   # job holding an EXIT trap, which a temporary file installs.

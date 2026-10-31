@@ -507,7 +507,7 @@ teardown() {
 
   run_traced --separate-stderr dybatpho::lock_acquire "legacy-live"
   assert_failure
-  assert_equal "$(find "${legacy_path}" -type l | wc -l)" "0"
+  assert_equal "$(find "${legacy_path}" -type l)" ""
 
   kill "${holder_pid}" 2> /dev/null || true
   rm -rf "${legacy_path}"

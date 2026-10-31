@@ -891,10 +891,12 @@ run and the instrument cannot see, never for code no test reaches.
   file with `sed_in_place`. BSD `wc -l` pads its count and BSD `od` spaces its
   columns differently, so compare output through a sentinel instead
   (`"$(cmd; printf x)"`); macOS keeps temporary files under `/var`, a link to
-  `/private/var`, so compare a reported path with `cd -P`; BusyBox `cp`
-  replaces a destination link where GNU `cp` writes through it; and macOS has
-  no real-time signals. A timing test needs a margin wide enough for a busy
-  CI runner, far from both the fixed and the broken timing.
+  `/private/var`, so check that a message names the `cd -P` path rather than
+  where in the message it stands (run a file with `TMPDIR` set to a link to a
+  directory to see it on Linux); BusyBox `cp` replaces a destination link where
+  GNU `cp` writes through it; and macOS has no real-time signals. A timing
+  test needs a margin wide enough for a busy CI runner, far from both the fixed
+  and the broken timing.
 - A regression test must fail without its fix. Undo the fix by hand, watch the
   test fail, then restore it. Cover every path that reaches the bug: the
   `count:true` guard was first tested only with the flag given, and the same

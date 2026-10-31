@@ -73,9 +73,14 @@ __DYBATPHO_VALIDATE_RE_EMAIL+='(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$'
 # expression `config` used before this module existed, so a schema that passed
 # then still passes now.
 __DYBATPHO_VALIDATE_RE_URL='^[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]+$'
-# Kept character for character in step with `DYBATPHO_SEMVER_REGEX`; the two are
-# pinned against each other in `test/validate.bats` so neither can drift.
-__DYBATPHO_VALIDATE_RE_SEMVER='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z0-9._-]+))?(\+([a-zA-Z0-9._-]+))?$'
+# The semver.org grammar `dybatpho::semver_valid` checks: no leading zero in a
+# number, no empty identifier. The two are pinned against each other in
+# `test/validate.bats` so neither can drift.
+__DYBATPHO_VALIDATE_RE_SEMVER='^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+__dybatpho_validate_semver_id='(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)'
+__DYBATPHO_VALIDATE_RE_SEMVER+="(-${__dybatpho_validate_semver_id}(\\.${__dybatpho_validate_semver_id})*)?"
+unset -v __dybatpho_validate_semver_id
+__DYBATPHO_VALIDATE_RE_SEMVER+='(\+[0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*)?$'
 __DYBATPHO_VALIDATE_RE_UUID='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 __DYBATPHO_VALIDATE_RE_MAC='^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$'
 __DYBATPHO_VALIDATE_RE_HEX='^(0[xX])?[0-9a-fA-F]+$'
@@ -382,7 +387,7 @@ function dybatpho::validate_register {
   if [[ "${4-}" == "numeric" ]]; then
     __DYBATPHO_VALIDATE_NUMERIC["${name}"]=1
   else
-    unset "__DYBATPHO_VALIDATE_NUMERIC[${name}]"
+    unset -v '__DYBATPHO_VALIDATE_NUMERIC[$name]'
   fi
   return 0
 }

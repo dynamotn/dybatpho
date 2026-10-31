@@ -11,6 +11,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Fixed
+
+- **`validate` — `dybatpho::validate_is semver` follows the semver.org grammar,
+  as `dybatpho::semver_valid` does,** so `01.2.3` and `1.0.0-a..b` are no longer
+  accepted.
+
 ## [7.1.0] - 2026-10-31
 
 ### Added

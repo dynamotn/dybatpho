@@ -199,7 +199,8 @@ teardown() {
   local version expected actual
   for version in \
     "1.2.3" "v1.2.3" "1.2" "1.0.0-alpha.1" "1.0.0+build.42" \
-    "1.0.0-beta.2+exp.sha.5114f85" "not-a-version" ""; do
+    "1.0.0-beta.2+exp.sha.5114f85" "not-a-version" "" \
+    "01.2.3" "1.02.3" "1.0.0-01" "1.0.0-a..b" "1.0.0-." "1.0.0+" "1.0.0-0.3.7" "1.0.0-x-y.0a"; do
     expected=no && dybatpho::semver_valid "${version}" && expected=yes
     actual=no && dybatpho::validate_is semver "${version}" && actual=yes
     assert_equal "${version} ${actual}" "${version} ${expected}"

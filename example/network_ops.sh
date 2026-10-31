@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
-# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
-# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 # @file network_ops.sh
 # @brief Example showing network utilities
 # @description Demonstrates dybatpho::curl_do, curl_download, curl_json,

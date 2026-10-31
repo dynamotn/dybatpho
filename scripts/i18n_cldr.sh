@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # via init.sh (Bash 4.4+); the reader it writes has no `$(...)`
 # @file i18n_cldr.sh
 # @brief Regenerate the CLDR tables of src/i18n.sh from cldr-json, or check them
 # @description
@@ -487,10 +486,8 @@ function __dybatpho_cldr_render {
 # @description Regenerate or check the tables.
 # @noargs
 # @internal
-# dyshellint disable=BSG050 # the `$1` and `$2` it holds are fields of an awk program, not its arguments
 function __dybatpho_cldr_run {
   dybatpho::require jq
-  # shellcheck disable=SC2154 # set by the option spec of this script
   local root="${CLDR_ROOT}" source="${CLDR_SOURCE}"
   dybatpho::is file "${source}" || dybatpho::die "No module source at ${source}"
   local core="${root}/cldr-core/supplemental" numbers="" dates="" flavour
@@ -724,7 +721,6 @@ function __dybatpho_cldr_run {
     report+=("note: allowlist entry ${id} names nothing in the tables")
   done
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if ! dybatpho::is true "${CLDR_CHECK}"; then
     __dybatpho_cldr_render "${rendered}"
     [[ -s "${notes}" ]] && cat "${notes}" >&2

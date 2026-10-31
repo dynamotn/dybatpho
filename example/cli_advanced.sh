@@ -73,7 +73,6 @@ function _spec_db_migrate {
 # @description Run the `DB SEED (fixture: ${FIXTURE})` section of this example.
 # @noargs
 function _run_db_seed {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::header "DB SEED (fixture: ${FIXTURE})"
   dybatpho::dry_run -- echo "Seeding from ${FIXTURE}..."
   dybatpho::success "Seeding complete" && exit 0

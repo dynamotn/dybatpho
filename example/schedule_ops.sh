@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file schedule_ops.sh
 # @brief Example deciding when work should run
 # @description Demonstrates dybatpho::schedule_every, schedule_once_per,

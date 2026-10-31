@@ -1,8 +1,6 @@
 # shellcheck shell=bash
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# uses `eval`, which is how the spec engine builds a parser.
-# dyshellint disable=BSG050,BSG040
+# This file uses `eval`, which is how the spec engine builds a parser.
+# dyshellint disable=BSG040
 # `"$@"` in these functions is the argument list of the external `curl`, or of one of this module's own request
 # functions, never code the caller wrote. The `DYBATPHO_CURL_*` locals shadow the globals on purpose: that is how per-
 # call settings reach `dybatpho::curl_do`.

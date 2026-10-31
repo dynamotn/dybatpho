@@ -118,7 +118,6 @@ function dybatpho::semver_compare {
 # @set The named variable
 # @internal
 #######################################
-# dyshellint disable=BSG050 a sort compares through this up to three times per comparison, so it skips the argument loop
 function __dybatpho_semver_num_cmp_into {
   local -n __sv_num_out="$1"
   local __sv_num_a="${2#"${2%%[!0]*}"}" __sv_num_b="${3#"${3%%[!0]*}"}"
@@ -606,7 +605,6 @@ function dybatpho::semver_satisfies {
 # @exitcode 1 It is not
 # @internal
 #######################################
-# dyshellint disable=BSG050 a sort calls this once per comparison, so it skips the argument loop
 function __dybatpho_semver_before {
   local __dybatpho_semver_before_order
   __dybatpho_semver_cmp_into __dybatpho_semver_before_order "${1#v}" "${2#v}"

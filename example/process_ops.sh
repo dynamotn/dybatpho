@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file shares some variables with the caller or across calls on purpose,
 # which is what `local` would break.
 # dyshellint disable=BSG011
@@ -14,7 +13,6 @@
 # shellcheck disable=SC2154 # `dybatpho::expect_args` assigns these names through a nameref
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
 # its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"

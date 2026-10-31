@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
 # @file lint.sh
 # @brief Check the repository itself: shell syntax, dyshellint, changelog format
 # @description
@@ -284,7 +281,6 @@ function __dybatpho_lint_is_stage {
 # @noargs
 # @internal
 function __dybatpho_lint_run {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${LIST}"; then
     local -a listed=()
     __dybatpho_lint_scripts_into listed
@@ -293,7 +289,6 @@ function __dybatpho_lint_run {
   fi
 
   local failures=0
-  # shellcheck disable=SC2154 # set by the option spec of this script
   case "${STAGE}" in
     all | shell)
       __dybatpho_lint_syntax || failures=$((failures + 1))

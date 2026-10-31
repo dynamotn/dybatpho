@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file keeps its declarations with the functions they describe.
 # dyshellint disable=BSG033
 # @file cli_basic.sh
@@ -28,7 +27,6 @@ VERSION="v1.0.0"
 # @description The action behind the spec: greet the name that was parsed out.
 # @noargs
 function _run {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   local _msg="${GREETING:-Hello}, ${NAME}!"
 
   if [[ -n "${SHOUT:-}" ]]; then

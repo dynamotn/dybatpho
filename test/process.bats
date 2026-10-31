@@ -1098,7 +1098,6 @@ SCRIPT
 @test "dybatpho::run_with_timeout reads seconds with a leading zero in base ten" {
   # Arithmetic read `08` as an invalid octal number: each check failed with an
   # error, and a grace of `09` became an immediate SIGKILL.
-  # shellcheck disable=SC2329 # run through the Bash watchdog
   _in_time() { printf 'in time\n'; }
   run_traced --separate-stderr dybatpho::run_with_timeout 08 _in_time
   assert_success

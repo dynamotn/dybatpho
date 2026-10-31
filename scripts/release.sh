@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
 # its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
 # dyshellint disable=BSG047 # values come back on stdout
@@ -311,15 +307,12 @@ function __dybatpho_release_check_options {
   if [[ -n "${RELEASE_VERSION}" && -n "${BUMP}" ]]; then
     dybatpho::die "--version and --bump both choose the version; pass only one of them"
   fi
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${PUSH}"; then
     dybatpho::die "--publish needs the tag pushed; drop --no-push or pass --no-publish"
   fi
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${SIGN}" && dybatpho::is false "${BUNDLE}"; then
     dybatpho::die "--sign needs the checksum file the bundle step writes; drop --no-bundle or --sign"
   fi
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${DRAFT}" && dybatpho::is false "${PUBLISH}"; then
     dybatpho::die "--draft needs --publish; there is no release to mark as a draft"
   fi
@@ -349,7 +342,6 @@ function __dybatpho_release_artifacts {
 
   # A dry run leaves nothing on disk for the checksum step to read, and a checksum
   # over files that weren't built would be a lie rather than a rehearsal.
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${DYBATPHO_DRY_RUN}"; then
     printf '%s\n' "${_bundle}"
     return 0
@@ -375,7 +367,6 @@ function __dybatpho_release_run {
 
   __dybatpho_release_check_options
   dybatpho::require "git"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::is true "${DOCS}" && dybatpho::require "gawk"
   if dybatpho::is true "${PUBLISH}" && dybatpho::is false "${DYBATPHO_DRY_RUN}"; then
     # Resolved before any local step runs: a missing token should not be found
@@ -396,7 +387,6 @@ function __dybatpho_release_run {
   _previous="$(dybatpho::git_latest_tag "${DYBATPHO_DIR}" "${DYBATPHO_RELEASE_TAG_PATTERN}" || true)"
   _previous="${_previous#v}"
   _date="$(dybatpho::date_today)"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   _url="$(__dybatpho_release_repo_url "${REMOTE}")"
 
   dybatpho::header "Releasing ${_tag}"

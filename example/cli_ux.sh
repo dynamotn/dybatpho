@@ -46,20 +46,13 @@ DYBATPHO_CONFIG["deploy.color"]="true"
 function _run_deploy {
   # A counting flag carries how often `-v` was repeated, which maps onto the
   # log level: `-v` is debug and `-vv` is trace.
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::cli_apply_verbosity "${VERBOSITY}"
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::header "DEPLOY ${DEPLOY_ENV}"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Service: ${SERVICE}"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Selected components: ${COMPONENTS}"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Colorized output: ${COLOR}"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Dry run: ${DYBATPHO_DRY_RUN}"
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::info "Replicas: ${REPLICAS}"
   dybatpho::debug "Verbosity requested ${VERBOSITY} time(s), log level is ${DYBATPHO_LOG_LEVEL:-${LOG_LEVEL:-info}}"
   dybatpho::success "Deployment plan is ready"
@@ -75,7 +68,6 @@ function _run_root {
 # @description The action of `completion`: write the completion script for a shell.
 # @noargs
 function _run_completion {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   dybatpho::generate_completion _spec_root "${COMPLETION_SHELL}" cli_ux.sh
   exit 0
 }

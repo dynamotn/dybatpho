@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file lock_ops.sh
 # @brief Example showing portable process locking utilities
 # @description Demonstrates dybatpho::lock_acquire, lock_release, lock_is_held,

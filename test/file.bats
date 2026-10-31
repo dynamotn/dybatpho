@@ -233,7 +233,6 @@ setup() {
   # onto a link to a directory moves it inside; the link was handed back.
   local sandbox="${BATS_TEST_TMPDIR}/planted" elsewhere="${BATS_TEST_TMPDIR}/elsewhere"
   mkdir -p "${sandbox}" "${elsewhere}"
-  # shellcheck disable=2329
   _create() {
     mv() {
       ln -s "${elsewhere}" "${*: -1}"

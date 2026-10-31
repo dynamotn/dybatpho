@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one; it
 # keeps its declarations with the functions they describe.
 # dyshellint disable=BSG050,BSG033
-# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
-# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 # @file testing_ops.sh
 # @brief Example showing the extended assertion, snapshot, mock, and fixture helpers
 # @description Verifies a small "release" script end to end without touching the

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
@@ -600,7 +599,6 @@ function _run_interactive {
     # The refresh is the read's deadline rather than a sleep, so the keyboard
     # stays live between refreshes instead of being ignored for a second at a
     # time.
-    # shellcheck disable=SC2154 # set by the option spec of this script
     if ! dybatpho::screen_event key "${INTERVAL}"; then
       _collect
       continue
@@ -636,7 +634,6 @@ function _main {
   # No terminal, or asked for a single frame: draw once and leave. This is the
   # path the example suite takes, and it is why this file can be an example at
   # all rather than something that waits forever for a keystroke.
-  # shellcheck disable=SC2154 # set by the option spec of this script
   # shellcheck disable=SC2310 # both are questions about the terminal
   if dybatpho::is true "${ONCE}" || ! _has_terminal; then
     _render_once

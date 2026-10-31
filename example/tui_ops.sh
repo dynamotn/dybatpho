@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
-# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
-# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 # @file tui_ops.sh
 # @brief Example showing the interactive terminal widgets
 # @description

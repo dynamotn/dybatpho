@@ -1494,7 +1494,6 @@ function dybatpho::unmock_time {
 #######################################
 # The stream is optional and defaults to stdout, exactly as in the function this
 # stands in for, so there is no fixed argument list to name.
-# dyshellint disable=BSG050
 function __dybatpho_test_tty_answer {
   local stream="${1:-stdout}"
   __dybatpho_os_assert_stream "${stream}"

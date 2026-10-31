@@ -976,7 +976,6 @@ SCRIPT
 }
 
 @test "dybatpho::screen_barchart keeps a value above max: inside its rectangle" {
-  # shellcheck disable=SC2034 # read by name by the widget
   local -a values=(20)
   dybatpho::screen_barchart "0 0 6 1" values max:10
   local row
@@ -1005,7 +1004,6 @@ SCRIPT
 }
 
 @test "dybatpho::screen_table splits on a delimiter of several characters" {
-  # shellcheck disable=SC2034 # read by name by the widget
   local -a rows=("a::b")
   dybatpho::screen_table "0 0 20 1" rows delimiter:"::"
   local row

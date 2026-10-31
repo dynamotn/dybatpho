@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file keeps its declarations with the functions they describe.
 # dyshellint disable=BSG033
-# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
-# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 # @file doctor_ops.sh
 # @brief Example showing the environment report a script can run before it works
 # @description Demonstrates dybatpho::version, dybatpho::doctor with a module

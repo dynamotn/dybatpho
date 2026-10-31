@@ -1,8 +1,6 @@
 # shellcheck shell=bash
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# uses `eval`, which is how the spec engine builds a parser.
-# dyshellint disable=BSG050,BSG040
+# This file uses `eval`, which is how the spec engine builds a parser.
+# dyshellint disable=BSG040
 # The library returns its values on stdout, so its own functions are called inside `$(...)` by design. Every call
 # here that can stop the script was reviewed: it is fixed, or listed with its reason in test/die-in-substitution.allow,
 # which test/conventions.bats enforces.
@@ -346,7 +344,6 @@ function dybatpho::lock_reclaim_stale {
   dybatpho::warn "Reclaiming stale lock ${lock_path} (pid ${pid} is no longer running)"
   # `rm` on a symbolic link removes the link, never what it points at.
   [[ -n "${aside}" && -n "${lock_path}" ]] || return 0
-  # dyshellint disable=BSG089 # the line above returns first when the path is empty
   rm -rf -- "${aside}" &> /dev/null || true
 }
 

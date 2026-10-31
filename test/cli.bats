@@ -2241,7 +2241,6 @@ setup() {
 @test "dybatpho::generate_completion never caches a short write" {
   local DYBATPHO_CLI_CACHE_DIR="${BATS_TEST_TMPDIR}/cli-cache-short"
   local DYBATPHO_CLI_CACHE=true
-  # shellcheck disable=2329
   _spec_cache_short() {
     dybatpho::opts::setup "Short" -
     local i

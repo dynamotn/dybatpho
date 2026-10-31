@@ -1,7 +1,4 @@
 # shellcheck shell=bash
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
 # @file validate.sh
 # @brief One validator for the whole library: named value types and declarative rules
 # @namespace dybatpho

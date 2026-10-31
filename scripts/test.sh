@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
 # A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
 # own diagnostic when it fails, so a separate assignment for each would only add lines.
 # shellcheck disable=SC2312 # values are passed on through $(...)
-# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
-# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 # @file test.sh
 # @brief Test all modules of dybatpho
 # @description
@@ -213,7 +206,6 @@ function __dybatpho_test_related {
 # @stdin TAP output from Bats
 # @internal
 function __dybatpho_test_progress {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   awk -v total="$1" -v color="${COLOR}" \
     -v red="${__DYBATPHO_TEST_RED}" \
     -v dim="${__DYBATPHO_TEST_DIM}" \
@@ -409,7 +401,6 @@ function __dybatpho_test_bats_coverage {
   # One Bats run per chunk, so each writes its own junit report; they are
   # concatenated afterwards and summarised as one.
   local test_pack_output
-  # shellcheck disable=SC2154 # set by the option spec of this script
   test_pack_output=$(__dybatpho_test_pack "${CHUNK}" "${_files[@]}")
   while IFS= read -r _line || [[ -n "${_line}" ]]; do
     IFS=$'\t' read -r -a _chunk_files <<< "${_line}"
@@ -583,9 +574,7 @@ function __dybatpho_test_run {
 
   # `dybatpho::opts::setup` collects the positional arguments into an array, so
   # a path containing a space reaches the collector as one target.
-  # shellcheck disable=SC2154 # set by the option spec of this script
   local -a _targets=(${TEST_ARGS[@]+"${TEST_ARGS[@]}"})
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if [[ "${RELATED}" == "true" ]]; then
     local _related
     # shellcheck disable=SC2310 # the handler's status is the point of the `if`: a failing job is counted, not fatal
@@ -617,7 +606,6 @@ function __dybatpho_test_run {
   # the Bash workers instead. kcov follows one process tree at a time, so a
   # coverage run without `parallel` still has one worker.
   local _runner="bats"
-  # shellcheck disable=SC2154 # SHARDS and COVERAGE are set by the option spec of this script
   if ((JOBS > 1)); then
     if [[ "${SHARDS}" == "true" ]] || ! command -v parallel &> /dev/null; then
       _runner="shards"
@@ -642,7 +630,6 @@ function __dybatpho_test_run {
     --output "${_run_dir}"
     --jobs "${JOBS}"
   )
-  # shellcheck disable=SC2154 # set by the option spec of this script
   [[ "${VERBOSE_RUN}" == "true" ]] && _bats_args+=(--verbose-run)
   [[ -n "${FILTER}" ]] && _bats_args+=(--filter "${FILTER}")
 

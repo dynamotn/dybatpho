@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file changelog_archive.sh
 # @brief Move old releases out of CHANGELOG.md into per-major archive files
 # @description
@@ -201,7 +200,6 @@ function __dybatpho_changelog_render_main {
 # @noargs
 # @internal
 function __dybatpho_changelog_archive_run {
-  # shellcheck disable=SC2154 # set by the option spec of this script
   local changelog="${ARCHIVE_CHANGELOG}" before="${ARCHIVE_BEFORE}" archive_dir="${ARCHIVE_TARGET}"
   dybatpho::is file "${changelog}" || dybatpho::die "No changelog at ${changelog}"
   grep -q '^## \[Unreleased\]' "${changelog}" \
@@ -226,7 +224,6 @@ function __dybatpho_changelog_archive_run {
   else
     dybatpho::info "Archiving ${#moved[@]} release(s) older than ${before}: ${moved[*]-}"
   fi
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${DYBATPHO_DRY_RUN}"; then
     return 0
   fi

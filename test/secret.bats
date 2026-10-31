@@ -652,7 +652,6 @@ SCRIPT
   export TMPDIR="${BATS_TEST_TMPDIR}/a&b"
   mkdir -p "${TMPDIR}"
   eval "__test_original_is() $(declare -f dybatpho::is | tail -n +2)"
-  # shellcheck disable=SC2329 # replaces the library's check, called from it
   dybatpho::is() {
     [[ "$1" == readable && "${2-}" == /dev/fd/* ]] && return 1
     __test_original_is "$@"

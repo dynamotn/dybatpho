@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # via init.sh; the bundle turns inherit_errexit on itself (Bash 4.4+)
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
 # A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
 # own diagnostic when it fails, so a separate assignment for each would only add lines.
 # shellcheck disable=SC2312 # values are passed on through $(...)
-# This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
-# its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
-# dyshellint disable=BSG047 # values come back on stdout
 # The two `$(dybatpho::version)` calls sit in the text of the bundle prologue,
 # where no comment can go. `DYBATPHO_VERSION` only memoizes the version file,
 # so losing it with the subshell means the file is read again.
@@ -178,7 +171,6 @@ function __dybatpho_bundle_prologue {
   local _soft_missing
   _soft_missing="$(__dybatpho_bundle_soft_missing "${_modules}")"
 
-  # shellcheck disable=SC2154 # OUTPUT is set by the option spec of this script
   cat << PROLOGUE
 #!/usr/bin/env bash
 # dybatpho $(dybatpho::version) bundle
@@ -335,14 +327,11 @@ function __dybatpho_bundle_module {
 #######################################
 function __dybatpho_bundle_run {
   local _modules _module _count=0
-  # shellcheck disable=SC2153 # MODULES is the option variable the CLI spec declares
-  # shellcheck disable=SC2154 # set by the option spec of this script
   local _selection="${MODULES}" _soft_missing _edge
   _modules="$(__dybatpho_bundle_resolve "${_selection}" | tr '\n' ' ')"
   _modules="$(dybatpho::trim "${_modules}")"
   # Widen the selection until every soft dependency is carried: a soft
   # dependency brings hard dependencies, and soft ones, of its own.
-  # shellcheck disable=SC2154 # set by the option spec of this script
   while [[ "${WITH_SOFT_DEPS}" == "true" ]]; do
     _soft_missing="$(__dybatpho_bundle_soft_missing "${_modules}")"
     [[ -n "${_soft_missing}" ]] || break

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file docs.sh
 # @brief Generate documentation of dybatpho
 # @description
@@ -50,7 +49,6 @@ function __dybatpho_doc_sources {
   # ever documented, and on an empty array it is unset, which `errexit` turns
   # into a failure inside the process substitution below -- where it stops the
   # loop without stopping the caller.
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if ((${#DOC_ARGS[@]})); then
     printf '%s\n' "${DOC_ARGS[@]}"
     return 0
@@ -98,7 +96,6 @@ function __dybatpho_doc_run {
   [[ -x "${SH_DOCS}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: ${SH_DOCS} is missing; run \`git submodule update --init scripts/sh-docs\`"
 
-  # shellcheck disable=SC2154 # set by the option spec of this script
   if dybatpho::is true "${CHECK}"; then
     __dybatpho_doc_sh_docs true
     return

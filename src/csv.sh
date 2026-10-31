@@ -1,7 +1,4 @@
 # shellcheck shell=bash
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one.
-# dyshellint disable=BSG050
 # @file csv.sh
 # @brief Utilities for reading, filtering and writing CSV data
 # @namespace dybatpho

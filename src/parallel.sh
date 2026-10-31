@@ -1,10 +1,8 @@
 # shellcheck shell=bash
-# This file lets its internal helpers take their arguments positionally, rather
-# than adding a `dybatpho::expect_args` call to paths written to avoid one; it
-# shares some variables with the caller or across calls on purpose, which is
-# what `local` would break; it uses `eval`, which is how the spec engine builds
-# a parser.
-# dyshellint disable=BSG050,BSG011,BSG040
+# This file shares some variables with the caller or across calls on purpose,
+# which is what `local` would break; it uses `eval`, which is how the spec
+# engine builds a parser.
+# dyshellint disable=BSG011,BSG040
 # @file parallel.sh
 # @brief Utilities for running work concurrently with a bounded worker pool
 # @namespace dybatpho

@@ -193,6 +193,14 @@ SCRIPT
   run bash -c 'trap "" SYS XCPU XFSZ VTALRM PROF; exec bash "$@"' _ "${script}" "${DYBATPHO_DIR}" "${work}"
   assert_success
   assert_output "made, kept"
+  # macOS has no real-time signals: with those taken as well, a later spare
+  # must still be found. The first run's own exit removed the directory.
+  mkdir "${work}"
+  # shellcheck disable=SC2016 # expanded by the inner shell
+  run bash -c 'trap "" SYS XCPU XFSZ VTALRM PROF; for s in RTMIN RTMIN+{1..15} RTMAX-{14..1} RTMAX; do
+    trap "" "${s}" 2> /dev/null; done; exec bash "$@"' _ "${script}" "${DYBATPHO_DIR}" "${work}"
+  assert_success
+  assert_output "made, kept"
 }
 
 @test '__dybatpho_process_traps_save_into skips the handlers a subshell inherited' {
@@ -456,6 +464,45 @@ SCRIPT
   status=0
   dybatpho::run_with_timeout 60 bash -c 'exit 3' || status=$?
   assert_equal "${status}" 3
+}
+
+@test "dybatpho::run_with_timeout leaves the caller's stderr to the command" {
+  # Under job control Bash 4.3 to 5.1 reported the job it waited for (`Done`,
+  # `Exit 3`, `Terminated`), and macOS Bash the watchdog it killed, on the
+  # caller's stderr. Run as a script, where job control is what it is in use.
+  local script="${BATS_TEST_TMPDIR}/quiet.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules process
+ok() { printf 'own\n' >&2; }
+bad() { return 3; }
+slow() { sleep 5; }
+dybatpho::run_with_timeout 5 ok
+dybatpho::run_with_timeout 5 bad || printf 'bad=%s\n' "$?" >&2
+dybatpho::run_with_timeout 1 slow || printf 'slow=%s\n' "$?" >&2
+SCRIPT
+  run --separate-stderr bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+  assert_equal "${stderr}" $'own\nbad=3\nslow=124'
+}
+
+@test "a background function that made a temporary file keeps its exit code" {
+  # Bash 5.1 reported 0 for a function that returned non-zero in a background
+  # job holding an EXIT trap, which a temporary file installs.
+  # shellcheck disable=SC2329 # run by run_with_timeout and background_run
+  _fails_with_temp() {
+    local scratch
+    dybatpho::create_temp scratch ".txt"
+    return 5
+  }
+  local status=0
+  dybatpho::run_with_timeout 60 _fails_with_temp || status=$?
+  assert_equal "${status}" 5
+  dybatpho::background_run temp_job _fails_with_temp
+  status=0
+  dybatpho::wait_all || status=$?
+  assert_equal "${status}" 1
+  run_traced dybatpho::background_status temp_job
+  assert_output "5"
 }
 
 @test "dybatpho::run_with_timeout reports 124 when the command outlives the limit" {

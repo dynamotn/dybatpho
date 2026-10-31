@@ -278,7 +278,10 @@ function __dybatpho_process_trap_forget_inherited {
   # The main shell inherited nothing.
   [[ "${BASHPID}" != "$$" ]] || return 0
   local spare
-  for spare in SYS XCPU XFSZ VTALRM PROF RTMIN RTMIN+{1..15} RTMAX-{14..1} RTMAX; do
+  # Last come signals whose default is already to be ignored, and the BSD and
+  # Linux extras, so macOS, which has no real-time signals, still finds one.
+  for spare in SYS XCPU XFSZ VTALRM PROF RTMIN RTMIN+{1..15} RTMAX-{14..1} RTMAX \
+    URG WINCH INFO EMT PWR STKFLT; do
     # A system without real-time signals rejects their names.
     [[ -z "$(trap -p "${spare}" 2> /dev/null)" ]] || continue
     trap - "${spare}" 2> /dev/null || continue
@@ -678,7 +681,16 @@ function __dybatpho_process_timeout_fallback {
   esac
   set -m
 
-  "$@" &
+  # On Bash 5.1 a function ending with `return` in a background job that set an
+  # EXIT trap, as a temporary file does, reported 0 whatever it returned; a
+  # subshell of its own keeps the status there. Elsewhere it is started bare: in
+  # that subshell an ERR trap fires on the function's own failure, and on Bash
+  # 4.3 that replaced its status.
+  if ((BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] == 1)); then
+    ("$@") &
+  else
+    "$@" &
+  fi
   local command_pid=$!
 
   # The watchdog writes nothing, and holds none of the caller's streams: its
@@ -690,7 +702,10 @@ function __dybatpho_process_timeout_fallback {
   local watchdog_pid=$!
 
   local status=0
-  wait "${command_pid}" || status=$?
+  # Under job control Bash 4.3 to 5.1 report the job, `Done`, `Exit 3` or
+  # `Terminated`, on the shell's stderr as `wait` reaps it; the command's own
+  # stderr was fixed when it started, so only that report is silenced.
+  wait "${command_pid}" 2> /dev/null || status=$?
 
   if [[ -s "${__dybatpho_process_fallback_marker}" ]]; then
     # The watchdog fired and is ending the command's group; it is left to
@@ -708,8 +723,12 @@ function __dybatpho_process_timeout_fallback {
     # SIGTERM reaches that early still runs the EXIT trap it inherited, so the
     # caller's own cleanup ran a second time, in the watchdog, while the caller
     # went on. The watchdog has nothing to clean up, and SIGKILL runs no trap.
+    #
+    # Disowned first: a shell with job control reports a job that SIGKILL ends
+    # as `Killed: 9` on the caller's stderr, which macOS Bash did. Bash still
+    # reaps it, so no zombie is left.
+    disown "${watchdog_pid}" 2> /dev/null || true
     kill -KILL -- "-${watchdog_pid}" 2> /dev/null || kill -KILL "${watchdog_pid}" 2> /dev/null || true
-    wait "${watchdog_pid}" 2> /dev/null || true
   fi
 
   [[ "${__dybatpho_process_fallback_monitor}" == "on" ]] || set +m
@@ -828,7 +847,12 @@ function dybatpho::background_run {
     *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
   esac
   set -m
-  "$@" &
+  # Started as the timeout fallback starts its command, for the same reason.
+  if ((BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] == 1)); then
+    ("$@") &
+  else
+    "$@" &
+  fi
   local __dybatpho_process_bg_pid=$!
   [[ "${__dybatpho_process_bg_monitor}" == "on" ]] || set +m
 

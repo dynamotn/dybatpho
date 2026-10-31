@@ -159,17 +159,17 @@ age_entry() {
   blank_tail() { printf 'line\n\n\n'; }
   no_newline() { printf 'bare'; }
   local seen
-  seen="$(dybatpho::cache_run tail 3600 -- blank_tail | od -An -c | tr -s ' ')"
-  assert_equal "${seen}" " l i n e \n \n \n"
-  seen="$(dybatpho::cache_run tail 3600 -- blank_tail | od -An -c | tr -s ' ')"
-  assert_equal "${seen}" " l i n e \n \n \n"
-  seen="$(dybatpho::cache_run bare 3600 -- no_newline | od -An -c | tr -s ' ')"
-  assert_equal "${seen}" " b a r e"
-  seen="$(dybatpho::cache_run bare 3600 -- no_newline | od -An -c | tr -s ' ')"
-  assert_equal "${seen}" " b a r e"
+  seen="$(dybatpho::cache_run tail 3600 -- blank_tail; printf x)"
+  assert_equal "${seen}" $'line\n\n\nx'
+  seen="$(dybatpho::cache_run tail 3600 -- blank_tail; printf x)"
+  assert_equal "${seen}" $'line\n\n\nx'
+  seen="$(dybatpho::cache_run bare 3600 -- no_newline; printf x)"
+  assert_equal "${seen}" "barex"
+  seen="$(dybatpho::cache_run bare 3600 -- no_newline; printf x)"
+  assert_equal "${seen}" "barex"
   age_entry tail '2 hours ago'
-  seen="$(dybatpho::cache_run tail 60 --stale 999999 -- blank_tail | od -An -c | tr -s ' ')"
-  assert_equal "${seen}" " l i n e \n \n \n"
+  seen="$(dybatpho::cache_run tail 60 --stale 999999 -- blank_tail; printf x)"
+  assert_equal "${seen}" $'line\n\n\nx'
   dybatpho::cache_wait tail 10
 }
 

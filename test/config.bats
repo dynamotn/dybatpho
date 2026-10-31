@@ -822,13 +822,22 @@ require_tool() {
   done
 }
 
-@test "config_save refuses a TOML save that would land inside the last table" {
+@test "config_save never lets a new TOML key land inside the last table" {
   require_tool yq
   local file="${BATS_TEST_TMPDIR}/tables.toml"
   printf '[server]\nport = 8080\n' > "${file}"
   dybatpho::config_set NAME app
   run --separate-stderr dybatpho::config_save "${file}" NAME
-  assert_failure
+  if ((status == 0)); then
+    # A yq whose TOML writer puts a new root key ahead of the tables (4.53 does)
+    # saves; what reloads must then be exactly what was set, nothing misplaced.
+    DYBATPHO_CONFIG=()
+    dybatpho::config_load "${file}"
+    assert_equal "${DYBATPHO_CONFIG[NAME]-}" "app"
+    assert_equal "${DYBATPHO_CONFIG[server.port]-}" "8080"
+    assert_equal "${DYBATPHO_CONFIG[server.NAME]-absent}" "absent"
+    return 0
+  fi
   assert_stderr --partial "would put a new key inside the last table"
   # The file is left as it was.
   run_traced cat "${file}"

@@ -73,6 +73,7 @@ function __dybatpho_diff_wants_color {
 # @arg $2 string File path, `-`, or text
 # @arg $3 string Label used in the diff header
 # @set The named variable
+# @exitcode 2 The side is a file that cannot be read
 # @internal
 #######################################
 function __dybatpho_diff_side_into {
@@ -80,6 +81,12 @@ function __dybatpho_diff_side_into {
   local __dybatpho_diff_source="$2"
 
   if dybatpho::is file "${__dybatpho_diff_source}"; then
+    # Checked here, not left to `diff`: BusyBox `diff` warns about a file it
+    # cannot open and still answers 0, "identical".
+    if [[ ! -r "${__dybatpho_diff_source}" ]]; then
+      dybatpho::error "${FUNCNAME[1]}: Cannot read ${__dybatpho_diff_source}"
+      return 2
+    fi
     __dybatpho_diff_side_ref="${__dybatpho_diff_source}"
     return 0
   fi
@@ -151,8 +158,8 @@ function dybatpho::diff_text {
   [[ -n "${second_label}" ]] || dybatpho::is file "${second}" || second_label="b"
 
   local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a"
-  __dybatpho_diff_side_into second_file "${second}" "b"
+  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
+  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
 
   local color=0
   __dybatpho_diff_wants_color && color=1
@@ -205,8 +212,8 @@ function dybatpho::diff_summary {
   dybatpho::expect_args first second -- "$@"
 
   local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a"
-  __dybatpho_diff_side_into second_file "${second}" "b"
+  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
+  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
 
   local raw status=0
   raw="$(diff -U0 -- "${first_file}" "${second_file}")" || status=$?
@@ -294,8 +301,8 @@ function dybatpho::diff_json {
     || dybatpho::die "${FUNCNAME[0]}: jq is required to compare documents by key" 127
 
   local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a"
-  __dybatpho_diff_side_into second_file "${second}" "b"
+  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
+  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
   __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${first_file}" first
   __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${second_file}" second
 
@@ -424,8 +431,8 @@ function dybatpho::diff_yaml {
   __dybatpho_diff_need_json
 
   local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a"
-  __dybatpho_diff_side_into second_file "${second}" "b"
+  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
+  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
 
   # Checked out here, where the refusal is seen: the conversions below silence
   # their own diagnostics, which would hide a missing `jq` or `yq` as well.

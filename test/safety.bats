@@ -273,17 +273,23 @@ setup() {
   ln -s "${BATS_TEST_TMPDIR}/hop/relative" "${root}/chained"
   ln -s inside "${root}/ok"
   export DYBATPHO_SAFE_ROOTS="${root}:${BATS_TEST_TMPDIR}/hop"
+  # The refusal names the physical path: on macOS the temporary directory sits
+  # under `/var`, a link to `/private/var`.
+  local victim
+  victim="$(cd -P -- "${outside}" && pwd)/victim"
 
   run dybatpho::safe_overwrite --force "${root}/direct"
   assert_failure
-  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${outside}/victim"
+  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${victim}"
   run dybatpho::safe_copy --force "${BATS_TEST_TMPDIR}/source" "${root}/chained"
   assert_failure
-  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${outside}/victim"
+  assert_output --partial "outside DYBATPHO_SAFE_ROOTS: ${victim}"
   assert_equal "$(< "${outside}/victim")" "keep"
 
+  # GNU `cp` writes through the link and BusyBox `cp` replaces it with a file;
+  # either way the name now holds the new content.
   dybatpho::safe_copy --force "${BATS_TEST_TMPDIR}/source" "${root}/ok"
-  assert_equal "$(< "${root}/inside")" "new"
+  assert_equal "$(< "${root}/ok")" "new"
 }
 
 @test "dybatpho::safe_move refuses a protected source or one outside the safe roots" {

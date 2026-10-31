@@ -598,13 +598,15 @@ EOF
 }
 
 @test "dybatpho::url_decode takes time in proportion to its input" {
-  # Every escape used to re-match the rest of the text: 10000 took ~16s.
+  # Every escape used to re-match the rest of the text: 10000 took ~16s, so
+  # 20000 takes over a minute, while the linear walk stays near a second even
+  # on Bash 4.3. The wide margin keeps a busy CI runner from failing it.
   local text
-  printf -v text '%%41%.0s' {1..10000}
+  printf -v text '%%41%.0s' {1..20000}
   local started="${SECONDS}"
   run_traced dybatpho::url_decode "${text}%2x%"
-  assert [ "$((SECONDS - started))" -le 5 ]
-  assert_equal "${#output}" "10004"
+  assert [ "$((SECONDS - started))" -le 20 ]
+  assert_equal "${#output}" "20004"
   assert_equal "${output: -5}" "A%2x%"
 }
 

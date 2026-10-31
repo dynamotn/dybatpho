@@ -278,6 +278,7 @@ fi
 - **FR-028**: `dybatpho::module_list` MUST accept the `stable` and `experimental` selections, which together list the whole registry, and `dybatpho::module_tier` MUST print the tier of a module and stop the script for an unknown one.
 - **FR-029**: The registry MUST record every soft dependency -- a module that another module loads on demand from only some of its functions -- and every module it names MUST be registered. Each call site that asks for a module on demand MUST be recorded, and each record MUST have a call site.
 - **FR-030**: A function that needs a soft dependency MUST load it on demand through `dybatpho::load`, with its own dependencies, and MUST stop naming itself and the module only when the module cannot be loaded.
+- **FR-031**: A module whose load failed MUST NOT be taken as loaded or as part of a dependency cycle by a later load: `dybatpho::load` of it MUST fail again, and a load on demand MUST try it afresh.
 
 ### Key Entities *(include if feature involves data)*
 

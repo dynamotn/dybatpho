@@ -436,7 +436,7 @@ function __dybatpho_i18n_lookup {
       # English catalog that has no such category.
       language="${locale%%@*}"
       language="${language%%[_-]*}"
-      category="$(__dybatpho_i18n_plural_category "${language}" "${count}")"
+      __dybatpho_i18n_plural_category "${language}" "${count}" category
       local plural_key="${locale}${__DYBATPHO_I18N_US}${key}${__DYBATPHO_I18N_US}${category}"
       hit="${__dybatpho_i18n_plural[${plural_key}]-${__DYBATPHO_I18N_NONE}}"
       if [[ "${hit}" != "${__DYBATPHO_I18N_NONE}" ]]; then
@@ -554,351 +554,351 @@ declare -gA __dybatpho_i18n_plural_family=(
 # kcov(enabled)
 
 #######################################
-# @description Print `other` for a language with a single cardinal form.
+# @description Set `other` for a language with a single cardinal form.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_other {
-  printf 'other'
+  printf -v "$2" other
 }
 
 #######################################
-# @description Print the plural category for a one-versus-other language.
+# @description Set the plural category for a one-versus-other language.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_one {
-  if (($1 == 1)); then printf 'one'; else printf 'other'; fi
+  if (($1 == 1)); then printf -v "$2" one; else printf -v "$2" other; fi
 }
 
 #######################################
-# @description Print the plural category for French, which counts zero as singular.
+# @description Set the plural category for French, which counts zero as singular.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_fr {
-  if (($1 == 0 || $1 == 1)); then printf 'one'; else printf 'other'; fi
+  if (($1 == 0 || $1 == 1)); then printf -v "$2" one; else printf -v "$2" other; fi
 }
 
 #######################################
-# @description Print the plural category for Portuguese, which counts zero as singular.
+# @description Set the plural category for Portuguese, which counts zero as singular.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_pt {
-  if (($1 == 0 || $1 == 1)); then printf 'one'; else printf 'other'; fi
+  if (($1 == 0 || $1 == 1)); then printf -v "$2" one; else printf -v "$2" other; fi
 }
 
 #######################################
-# @description Print the plural category for Hindi and its relatives, which
+# @description Set the plural category for Hindi and its relatives, which
 #   count zero as singular.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_hi {
-  if (($1 == 0 || $1 == 1)); then printf 'one'; else printf 'other'; fi
+  if (($1 == 0 || $1 == 1)); then printf -v "$2" one; else printf -v "$2" other; fi
 }
 
 #######################################
-# @description Print the plural category for Russian and the other East Slavic
+# @description Set the plural category for Russian and the other East Slavic
 #   languages. The singular test is on the last digit, not on the whole number,
 #   which is what separates this rule from the Polish one below.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_ru {
   local last=$(($1 % 10)) pair=$(($1 % 100))
   if ((last == 1 && pair != 11)); then
-    printf 'one'
+    printf -v "$2" one
   elif ((last >= 2 && last <= 4 && (pair < 12 || pair > 14))); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'many'
+    printf -v "$2" many
   fi
 }
 
 #######################################
-# @description Print the plural category for Serbian, Croatian and Bosnian.
+# @description Set the plural category for Serbian, Croatian and Bosnian.
 #   The `one` and `few` tests are the Russian ones, but every other count is
 #   `other` rather than `many`, so a catalog written to CLDR is read as written.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_sr {
   local last=$(($1 % 10)) pair=$(($1 % 100))
   if ((last == 1 && pair != 11)); then
-    printf 'one'
+    printf -v "$2" one
   elif ((last >= 2 && last <= 4 && (pair < 12 || pair > 14))); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Polish, whose singular is the
+# @description Set the plural category for Polish, whose singular is the
 #   number one itself rather than anything ending in one.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_pl {
   local last=$(($1 % 10)) pair=$(($1 % 100))
   if (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif ((last >= 2 && last <= 4 && (pair < 12 || pair > 14))); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'many'
+    printf -v "$2" many
   fi
 }
 
 #######################################
-# @description Print the plural category for Czech and Slovak. Their `many`
+# @description Set the plural category for Czech and Slovak. Their `many`
 #   category applies only to fractions, which integer counts never produce.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_cs {
   if (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 >= 2 && $1 <= 4)); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Arabic, the one language that uses
+# @description Set the plural category for Arabic, the one language that uses
 #   all six.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_ar {
   local pair=$(($1 % 100))
   if (($1 == 0)); then
-    printf 'zero'
+    printf -v "$2" zero
   elif (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 == 2)); then
-    printf 'two'
+    printf -v "$2" two
   elif ((pair >= 3 && pair <= 10)); then
-    printf 'few'
+    printf -v "$2" few
   elif ((pair >= 11 && pair <= 99)); then
-    printf 'many'
+    printf -v "$2" many
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Hebrew, which has a dual form.
+# @description Set the plural category for Hebrew, which has a dual form.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_he {
   if (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 == 2)); then
-    printf 'two'
+    printf -v "$2" two
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Lithuanian.
+# @description Set the plural category for Lithuanian.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_lt {
   local last=$(($1 % 10)) pair=$(($1 % 100))
   if ((last == 1 && (pair < 11 || pair > 19))); then
-    printf 'one'
+    printf -v "$2" one
   elif ((last >= 2 && last <= 9 && (pair < 11 || pair > 19))); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Latvian, which has a zero form.
+# @description Set the plural category for Latvian, which has a zero form.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_lv {
   local last=$(($1 % 10)) pair=$(($1 % 100))
   if ((last == 0 || (pair >= 11 && pair <= 19))); then
-    printf 'zero'
+    printf -v "$2" zero
   elif ((last == 1 && pair != 11)); then
-    printf 'one'
+    printf -v "$2" one
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Romanian.
+# @description Set the plural category for Romanian.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_ro {
   local pair=$(($1 % 100))
   if (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 == 0 || (pair >= 1 && pair <= 19))); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Slovenian, which has a dual form.
+# @description Set the plural category for Slovenian, which has a dual form.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_sl {
   local pair=$(($1 % 100))
   if ((pair == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif ((pair == 2)); then
-    printf 'two'
+    printf -v "$2" two
   elif ((pair == 3 || pair == 4)); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Icelandic.
+# @description Set the plural category for Icelandic.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_is {
   local last=$(($1 % 10)) pair=$(($1 % 100))
-  if ((last == 1 && pair != 11)); then printf 'one'; else printf 'other'; fi
+  if ((last == 1 && pair != 11)); then printf -v "$2" one; else printf -v "$2" other; fi
 }
 
 #######################################
-# @description Print the plural category for Macedonian.
+# @description Set the plural category for Macedonian.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_mk {
   local last=$(($1 % 10)) pair=$(($1 % 100))
-  if ((last == 1 && pair != 11)); then printf 'one'; else printf 'other'; fi
+  if ((last == 1 && pair != 11)); then printf -v "$2" one; else printf -v "$2" other; fi
 }
 
 #######################################
-# @description Print the plural category for Filipino and Tagalog.
+# @description Set the plural category for Filipino and Tagalog.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_fil {
   local last=$(($1 % 10))
   if (($1 == 1 || $1 == 2 || $1 == 3)); then
-    printf 'one'
+    printf -v "$2" one
   elif ((last != 4 && last != 6 && last != 9)); then
-    printf 'one'
+    printf -v "$2" one
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Welsh, which uses all six.
+# @description Set the plural category for Welsh, which uses all six.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_cy {
   case "$1" in
-    0) printf 'zero' ;;
-    1) printf 'one' ;;
-    2) printf 'two' ;;
-    3) printf 'few' ;;
-    6) printf 'many' ;;
-    *) printf 'other' ;;
+    0) printf -v "$2" zero ;;
+    1) printf -v "$2" one ;;
+    2) printf -v "$2" two ;;
+    3) printf -v "$2" few ;;
+    6) printf -v "$2" many ;;
+    *) printf -v "$2" other ;;
   esac
 }
 
 #######################################
-# @description Print the plural category for Maltese.
+# @description Set the plural category for Maltese.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_mt {
   local pair=$(($1 % 100))
   if (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 == 2)); then
-    printf 'two'
+    printf -v "$2" two
   elif (($1 == 0 || (pair >= 3 && pair <= 10))); then
-    printf 'few'
+    printf -v "$2" few
   elif ((pair >= 11 && pair <= 19)); then
-    printf 'many'
+    printf -v "$2" many
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Irish.
+# @description Set the plural category for Irish.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_ga {
   if (($1 == 1)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 == 2)); then
-    printf 'two'
+    printf -v "$2" two
   elif (($1 >= 3 && $1 <= 6)); then
-    printf 'few'
+    printf -v "$2" few
   elif (($1 >= 7 && $1 <= 10)); then
-    printf 'many'
+    printf -v "$2" many
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
 #######################################
-# @description Print the plural category for Scottish Gaelic.
+# @description Set the plural category for Scottish Gaelic.
 # @arg $1 number Count
-# @stdout Plural category
+# @arg $2 string Name of the variable receiving the plural category
 # @internal
 #######################################
 function __dybatpho_i18n_plural_gd {
   if (($1 == 1 || $1 == 11)); then
-    printf 'one'
+    printf -v "$2" one
   elif (($1 == 2 || $1 == 12)); then
-    printf 'two'
+    printf -v "$2" two
   elif (($1 >= 3 && $1 <= 19)); then
-    printf 'few'
+    printf -v "$2" few
   else
-    printf 'other'
+    printf -v "$2" other
   fi
 }
 
@@ -923,10 +923,12 @@ function dybatpho::i18n_plural_form {
 }
 
 #######################################
-# @description Print the CLDR plural category for a count in a language.
+# @description Print the CLDR plural category for a count in a language, or
+#   store it in a variable, which spares a lookup the subshell of a `$(...)`.
 # @arg $1 string Language subtag
 # @arg $2 number Count
-# @stdout One of `zero`, `one`, `two`, `few`, `many`, `other`
+# @arg $3 string? Name of the variable receiving the category instead of stdout
+# @stdout One of `zero`, `one`, `two`, `few`, `many`, `other`, without `$3`
 # @internal
 #######################################
 function __dybatpho_i18n_plural_category {
@@ -944,7 +946,13 @@ function __dybatpho_i18n_plural_category {
   # running whatever else happens to carry that name.
   dybatpho::is function "__dybatpho_i18n_plural_${family}" \
     || dybatpho::die "${FUNCNAME[0]}: No plural rule for family '${family}'"
-  "__dybatpho_i18n_plural_${family}" "${count}"
+  if (($# > 2)); then
+    "__dybatpho_i18n_plural_${family}" "${count}" "$3"
+    return 0
+  fi
+  local category
+  "__dybatpho_i18n_plural_${family}" "${count}" category
+  printf '%s' "${category}"
 }
 
 #######################################
@@ -1048,7 +1056,7 @@ function dybatpho::i18n_tn {
   [[ "${count}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Count must be an integer, got '${count}'"
   local locale template rendered grouped
-  locale="$(dybatpho::i18n_locale)"
+  __dybatpho_i18n_locale_into locale
   __dybatpho_i18n_number_into grouped "${count}" 0 "${locale}"
   if __dybatpho_i18n_lookup template "${key}" "${count}"; then
     __dybatpho_i18n_interpolate rendered "${template}" \
@@ -1354,7 +1362,7 @@ function __dybatpho_i18n_seed_symbols {
   local locale layout
   for locale in "${!DYBATPHO_I18N_CURRENCY_LAYOUT[@]}"; do
     layout="${DYBATPHO_I18N_CURRENCY_LAYOUT[${locale}]}"
-    DYBATPHO_I18N_CURRENCY_LAYOUT[${locale}]="${layout// /${nbsp}}"
+    DYBATPHO_I18N_CURRENCY_LAYOUT[${locale}]="${layout// /"${nbsp}"}"
   done
 }
 __dybatpho_i18n_seed_symbols
@@ -1664,8 +1672,8 @@ function dybatpho::i18n_percent {
 # @description Move a negative sign outside the rendered amount, or wrap the
 #   amount in parentheses when accounting style was asked for. Without this a
 #   prefix symbol produces `$-1,234.50`, which no locale writes.
-# @arg $1 string Rendered amount
-# @arg $2 string Minus glyph the number was formatted with
+# @arg $1 string Rendered amount, with the number in it unsigned
+# @arg $2 string Minus glyph the number carried, empty for a positive amount
 # @stdout The corrected amount
 # @internal
 #######################################
@@ -1673,15 +1681,12 @@ function __dybatpho_i18n_negative {
   local rendered minus
   rendered="$1"
   minus="$2"
-  if [[ "${rendered}" != *"${minus}"* ]]; then
+  if [[ -z "${minus}" ]]; then
     printf '%s' "${rendered}"
-    return 0
-  fi
-  local stripped="${rendered/"${minus}"/}"
-  if [[ "${DYBATPHO_I18N_CURRENCY_NEGATIVE}" == "parens" ]]; then
-    printf '(%s)' "${stripped}"
+  elif [[ "${DYBATPHO_I18N_CURRENCY_NEGATIVE}" == "parens" ]]; then
+    printf '(%s)' "${rendered}"
   else
-    printf '%s%s' "${minus}" "${stripped}"
+    printf '%s%s' "${minus}" "${rendered}"
   fi
 }
 
@@ -1727,6 +1732,12 @@ function dybatpho::i18n_currency {
   __dybatpho_i18n_number_into number "${amount}" "${digits}" "${locale}"
   __dybatpho_i18n_data_into layout DYBATPHO_I18N_CURRENCY_LAYOUT "${locale}" layout || layout='¤#'
   __dybatpho_i18n_data_into minus DYBATPHO_I18N_NUMBER "${locale}" minus || minus="-"
+  # The sign is read off the number alone: a symbol such as `A-B` is no minus.
+  if [[ "${number}" == *"${minus}"* ]]; then
+    number="${number/"${minus}"/}"
+  else
+    minus=""
+  fi
   # Quoted replacements: from Bash 5.2 an unquoted `&` stands for the matched
   # placeholder, so a currency registered as `R&D` rendered as `R¤D`.
   rendered="${layout/¤/"${symbol}"}"
@@ -2219,7 +2230,9 @@ function __dybatpho_i18n_render_pattern {
       done
       continue
     fi
-    if [[ "${char}" != [a-zA-Z] ]]; then
+    # Spelled out: before Bash 5.0 `[a-zA-Z]` follows the locale and matches `à`.
+    # shellcheck disable=SC2154 # declared by `src/string.sh`, a core module
+    if [[ "${char}" != [${__DYBATPHO_STRING_UPPER}${__DYBATPHO_STRING_LOWER}] ]]; then
       out+="${char}"
       index=$((index + 1))
       continue
@@ -2913,7 +2926,7 @@ function __dybatpho_i18n_read_msg {
 function __dybatpho_i18n_po_unescape_into {
   local -n __po_unescape_out="$1"
   local __po_unescape_text="$2" __po_unescape_sentinel=$'\x01'
-  __po_unescape_text="${__po_unescape_text//\\\"/${__po_unescape_sentinel}}"
+  __po_unescape_text="${__po_unescape_text//\\\"/"${__po_unescape_sentinel}"}"
   printf -v __po_unescape_text '%b' "${__po_unescape_text}"
   __po_unescape_out="${__po_unescape_text//${__po_unescape_sentinel}/\"}"
 }

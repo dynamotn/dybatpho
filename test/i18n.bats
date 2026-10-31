@@ -412,6 +412,21 @@ _catalog() {
   assert_equal "$(dybatpho::i18n_tn app.files 21)" "21 файл"
 }
 
+@test "dybatpho::i18n_tn works out the plural category without a subshell" {
+  # Each locale in the chain used to cost a `$(...)` for its category.
+  local file
+  file="$(_catalog en.msg 'app.files[other] = {count} files')"
+  dybatpho::i18n_load en "${file}"
+  dybatpho::i18n_set_locale ru
+  __dybatpho_i18n_plural_ru() {
+    printf '%s\n' "${BASH_SUBSHELL}" >> "${BATS_TEST_TMPDIR}/depth"
+    printf -v "$2" many
+  }
+  dybatpho::i18n_tn app.files 5 > "${BATS_TEST_TMPDIR}/out"
+  assert_equal "$(< "${BATS_TEST_TMPDIR}/out")" "5 files"
+  assert_equal "$(< "${BATS_TEST_TMPDIR}/depth")" "${BASH_SUBSHELL}"
+}
+
 @test "a count is grouped for the locale before it is substituted" {
   local file
   file="$(_catalog de.msg 'app.files[other] = {count} Dateien')"
@@ -861,6 +876,16 @@ EOF
   assert_output "(\$1,234.50)"
 }
 
+@test "a hyphen in a currency symbol is not taken for the minus sign" {
+  # The sign used to be looked for in the whole rendered amount, so a positive
+  # amount in `A-B` came out as `-AB5.00`.
+  dybatpho::i18n_register_currency XAB "A-B" 2
+  assert_equal "$(dybatpho::i18n_currency 5 XAB en)" "A-B5.00"
+  assert_equal "$(dybatpho::i18n_currency -5 XAB en)" "-A-B5.00"
+  DYBATPHO_I18N_CURRENCY_NEGATIVE=parens run -0 dybatpho::i18n_currency 5 XAB en
+  assert_output "A-B5.00"
+}
+
 @test "an unknown currency warns and uses the code, rather than stopping" {
   run_traced --separate-stderr -0 dybatpho::i18n_currency 1234.5 XPF en
   assert_output "XPF1,234.50"
@@ -943,6 +968,25 @@ EOF
 @test "an explicit pattern is rendered" {
   assert_equal "$(dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "EEEE, d MMMM yyyy" fr)" \
     "jeudi, 29 février 2024"
+}
+
+@test "an unquoted non-ASCII letter in a pattern is literal whatever the locale collates" {
+  # Before Bash 5.0 `globasciiranges` is off, and `[a-zA-Z]` then follows the
+  # locale's collation: under en_US.UTF-8 it matches `à`, which died as an
+  # unsupported pattern field.
+  local locale
+  for locale in en_US.UTF-8 en_US.utf8 ""; do
+    [[ -n "${locale}" ]] || skip "no locale here collates [a-zA-Z] over accented letters"
+    LC_ALL="${locale}" bash -c 'shopt -u globasciiranges; case à in [a-zA-Z]) exit 0 ;; esac; exit 1' 2> /dev/null \
+      && break
+  done
+  _render_collated() {
+    shopt -u globasciiranges
+    LC_ALL="${locale}"
+    dybatpho::i18n_date_pattern "${FIXED_EPOCH}" "d MMMM yyyy à HH:mm" fr
+  }
+  run_traced -0 _render_collated
+  assert_output "29 février 2024 à 12:34"
 }
 
 @test "an unsupported pattern field is reported rather than ignored" {

@@ -300,16 +300,21 @@ function __dybatpho_load_module {
     return 1
   fi
   __dybatpho_loading_modules="${__dybatpho_loading_modules:+${__dybatpho_loading_modules} }${module}"
-  local dep
+  local dep status=0
   for dep in ${__dybatpho_module_deps[${module}]-}; do
-    __dybatpho_load_module "${dep}" || return 1
+    __dybatpho_load_module "${dep}" || {
+      status=1
+      break
+    }
   done
-  __dybatpho_source_module "${module}" || return 1
+  ((status)) || __dybatpho_source_module "${module}" || status=1
   # Record after sourcing so that the list reads in real load order, with every
   # dependency ahead of the module that pulled it in.
-  DYBATPHO_LOADED_MODULES="${DYBATPHO_LOADED_MODULES:+${DYBATPHO_LOADED_MODULES} }${module}"
+  ((status)) || DYBATPHO_LOADED_MODULES="${DYBATPHO_LOADED_MODULES:+${DYBATPHO_LOADED_MODULES} }${module}"
+  # Unmark a failed module too, or the next load of it would pass as a cycle.
   __dybatpho_loading_modules="${__dybatpho_loading_modules% "${module}"}"
   __dybatpho_loading_modules="${__dybatpho_loading_modules#"${module}"}"
+  return "${status}"
 }
 
 #######################################

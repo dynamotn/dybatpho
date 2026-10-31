@@ -245,7 +245,7 @@ Render a percentage-based progress bar on the current output line.
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | number | yes |  | Progress percentage from 0 to 100 |
+| `$1` | number | yes |  | Progress percentage from 0 to 100; a larger one shows a full bar |
 | `$2` | number | no | `50` | Width of the progress bar in characters |
 
 **📤 Output on stdout**

@@ -451,6 +451,15 @@ a newline'
   assert_output --partial "[####################]"
 }
 
+@test "dybatpho::progress_bar keeps a percentage over 100 to the requested width" {
+  # The empty part used to get a negative width, which printf reads as left
+  # alignment, so the bar came out wider than asked.
+  run_traced --separate-stderr dybatpho::progress_bar 150 10
+  assert_success
+  refute_stderr
+  assert_output $'[##########]\r'
+}
+
 @test "dybatpho::header output" {
   # The decision follows the stream now, and a captured stdout is not a
   # terminal; this test is about which colour is used, not about whether

@@ -486,6 +486,7 @@ dybatpho::log_context clear
 - **FR-050**: The log file sink MUST NOT start a process per line to check the
   file size; it MUST keep the count of bytes it appends and measure the file
   only when the path changes or the count reaches the threshold.
+- **FR-051**: `dybatpho::progress_bar` MUST show a percentage over 100 as a full bar of the requested width.
 
 ### Key Entities *(include if feature involves data)*
 

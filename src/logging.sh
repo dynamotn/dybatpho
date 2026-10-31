@@ -411,7 +411,7 @@ function __dybatpho_log_now_ms_into {
   fi
   local __dybatpho_log_now_ns
   if __dybatpho_log_now_ns=$(date +%s%N 2> /dev/null) && [[ "${__dybatpho_log_now_ns}" =~ ^[0-9]+$ ]]; then
-    __dybatpho_log_now_out=$((__dybatpho_log_now_ns / 1000000))
+    __dybatpho_log_now_out=$((10#${__dybatpho_log_now_ns} / 1000000))
     return 0
   fi
   # kcov(disabled) - only reachable without EPOCHREALTIME or GNU/busybox date
@@ -1570,7 +1570,7 @@ function __dybatpho_log_progress_to {
 
 #######################################
 # @description Render a percentage-based progress bar on the current output line.
-# @arg $1 number Progress percentage from 0 to 100
+# @arg $1 number Progress percentage from 0 to 100; a larger one shows a full bar
 # @arg $2 number [default: 50] Width of the progress bar in characters
 # @stdout Show the progress bar; print a newline in the caller when the task is done
 #######################################
@@ -1585,6 +1585,7 @@ function dybatpho::progress_bar {
     || dybatpho::die "${FUNCNAME[0]}: Width must be a whole number, got '${length}'"
   percentage=$((10#${percentage}))
   length=$((10#${length}))
+  ((percentage <= 100)) || percentage=100
   local elapsed=$((percentage * length / 100))
   local prog total
 

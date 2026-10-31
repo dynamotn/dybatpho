@@ -16,6 +16,19 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`validate` — `dybatpho::validate_is semver` follows the semver.org grammar,
   as `dybatpho::semver_valid` does,** so `01.2.3` and `1.0.0-a..b` are no longer
   accepted.
+- **`init` — `dybatpho::load` no longer reports success for a module whose
+  earlier load failed,** and a failed on-demand load is retried on the next call
+  instead of being skipped for good.
+- **`logging` — `dybatpho::progress_bar` shows a percentage over 100 as a full
+  bar of the requested width** instead of a wider one.
+- **`i18n` — date patterns with an unquoted non-ASCII letter such as `à` render
+  on Bash 4.3 and 4.4 under a UTF-8 locale** instead of stopping with
+  "Unsupported pattern field".
+- **`i18n` — `dybatpho::i18n_currency` no longer treats a `-` in a currency
+  symbol as a minus sign,** so a positive amount is no longer shown as negative
+  or in parentheses.
+- **`i18n` — `dybatpho::i18n_tn` is about 2.5 times faster:** it no longer
+  starts a subshell per locale in the fallback chain.
 
 ## [7.1.0] - 2026-10-31
 

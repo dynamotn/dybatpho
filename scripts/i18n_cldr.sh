@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # via init.sh (Bash 4.4+); the reader it writes has no `$(...)`
 # @file i18n_cldr.sh
 # @brief Regenerate the CLDR tables of src/i18n.sh from cldr-json, or check them
 # @description
@@ -406,17 +407,17 @@ function __dybatpho_cldr_plural_signatures {
 # @stdout One line per family
 # @internal
 function __dybatpho_cldr_family_signatures {
-  local family n
+  local family n category
   for family in "$@"; do
     declare -F "__dybatpho_i18n_plural_${family}" > /dev/null || continue
     printf '%s\t' "${family}"
     for ((n = 0; n <= CLDR_SAMPLE_MAX; n++)); do
       ((n == 0)) || printf ','
-      "__dybatpho_i18n_plural_${family}" "${n}"
+      "__dybatpho_i18n_plural_${family}" "${n}" category
+      printf '%s' "${category}"
     done
-    printf '\t'
-    "__dybatpho_i18n_plural_${family}" "${CLDR_MILLION}"
-    printf '\n'
+    "__dybatpho_i18n_plural_${family}" "${CLDR_MILLION}" category
+    printf '\t%s\n' "${category}"
   done
 }
 

@@ -89,7 +89,6 @@ src/forge.sh	dybatpho::forge_api	dybatpho::forge_kind	an empty kind is reported 
 src/forge.sh	dybatpho::forge_issue_report	dybatpho::forge_issue_url	the number was checked by the request that returned it
 src/forge.sh	dybatpho::forge_kind	dybatpho::forge_host	an empty host is reported as an unknown forge, status 1
 src/i18n.sh	__dybatpho_i18n_discover	__dybatpho_i18n_roots	with no HOME the user catalogue directory is simply not searched
-src/i18n.sh	__dybatpho_i18n_lookup	__dybatpho_i18n_plural_category	library plural rules only; the count is checked before the lookup
 src/i18n.sh	__dybatpho_i18n_render_pattern	dybatpho::i18n_month_name	month index comes from calendar fields already read
 src/i18n.sh	__dybatpho_i18n_render_pattern	dybatpho::i18n_weekday_name	weekday index comes from calendar fields already read
 src/i18n.sh	__dybatpho_i18n_roots	dybatpho::xdg_data_dir	with no HOME the user catalogue directory is simply not searched

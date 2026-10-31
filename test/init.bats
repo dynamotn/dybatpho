@@ -360,6 +360,19 @@ echo reached'
   assert_output --partial "does not exist"
 }
 
+@test "a module whose load failed is not taken as loaded on the next load" {
+  # A failed load used to leave the module marked as being resolved, so the
+  # next load of it passed as a dependency cycle without sourcing anything.
+  run -1 init_sh "--modules core" \
+    'DYBATPHO_OPTIONAL_MODULES="${DYBATPHO_OPTIONAL_MODULES} ghost"
+__dybatpho_helpers_load_soft ghost __dybatpho_ghost_marker me || echo "soft failed"
+dybatpho::load ghost
+echo reached'
+  assert_output --partial "soft failed"
+  refute_output --partial "reached"
+  assert_output --partial "Can't load module 'ghost'"
+}
+
 @test "dybatpho::version reports the stamped release version" {
   local stamped
   stamped="$(head -n 1 "${DYBATPHO_DIR}/VERSION")"

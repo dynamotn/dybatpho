@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file config_ops.sh
 # @brief Example showing layered configuration and schema validation.
 # @description

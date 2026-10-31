@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
@@ -186,7 +187,7 @@ function __dybatpho_test_related {
     # `network`, `validate` and `cli` to most of the suite, and CI runs the
     # whole of it anyway.
     while read -r _file; do
-      _name="$(basename "${_file}" .sh)"
+      _name="$(basename -- "${_file}" .sh)"
       _tests["${_test_dir}/${_name}.bats"]=1
     done < <(grep -lwFf "${_patterns}" "${DYBATPHO_DIR}"/src/*.sh || true)
     # A test file of another area, or an example, may call the module directly.
@@ -332,7 +333,7 @@ function __dybatpho_test_shard_worker {
     # `awk` writes each line whole, so the workers' lines interleave in the
     # live view without tearing one another apart. `|| true`: a failing file
     # has to reach the summary.
-    "${BATS_CMD}" "${_worker_args[@]/${_run_dir}/${_out}}" "${_files[_i]}" 2>&1 \
+    "${BATS_CMD}" "${_worker_args[@]/"${_run_dir}"/"${_out}"}" "${_files[_i]}" 2>&1 \
       | tee "${_out}/run.tap" | awk '{ print; fflush() }' || true
   done
 }
@@ -422,7 +423,7 @@ function __dybatpho_test_bats_coverage {
       --dump-summary \
       "${_kcov_source_args[@]}" \
       "${_part}" \
-      "${BATS_CMD}" "${_bats_args[@]/${_run_dir}/${_chunk_out}}" \
+      "${BATS_CMD}" "${_bats_args[@]/"${_run_dir}"/"${_chunk_out}"}" \
       ${_chunk_files[@]+"${_chunk_files[@]}"} \
       2>&1 | tee -a "${_tap}" | __dybatpho_test_progress "${_expected}" || true
     _chunk_parts+=("${_part}")

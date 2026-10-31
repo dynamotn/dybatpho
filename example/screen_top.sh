@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050
@@ -143,8 +144,8 @@ function _measure_totals {
     # dropping it keeps the arithmetic in the shell's integers.
     cpu_whole="${cpu%%.*}"
     mem_whole="${mem%%.*}"
-    [[ "${cpu_whole}" =~ ^[0-9]+$ ]] && cpu_sum=$((cpu_sum + cpu_whole))
-    [[ "${mem_whole}" =~ ^[0-9]+$ ]] && mem_sum=$((mem_sum + mem_whole))
+    [[ "${cpu_whole}" =~ ^[0-9]+$ ]] && cpu_sum=$((cpu_sum + 10#${cpu_whole}))
+    [[ "${mem_whole}" =~ ^[0-9]+$ ]] && mem_sum=$((mem_sum + 10#${mem_whole}))
   done
 
   CPU_PERCENT=$((cpu_sum / CPU_COUNT))
@@ -184,7 +185,8 @@ function _measure_totals {
 function _format_size {
   local -n _size_out="$1"
   local kilobytes="${2:-0}"
-  [[ "${kilobytes}" =~ ^[0-9]+$ ]] || kilobytes=0
+  [[ "${kilobytes}" =~ ^[0-9]{1,18}$ ]] || kilobytes=0
+  kilobytes=$((10#${kilobytes}))
   if ((kilobytes >= 1048576)); then
     printf -v _size_out '%s.%sG' "$((kilobytes / 1048576))" "$((kilobytes % 1048576 * 10 / 1048576))"
   elif ((kilobytes >= 1024)); then

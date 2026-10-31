@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # A `$(...)` inside an argument passes a value on, the way this code calls the library; the inner command prints its
 # own diagnostic when it fails, so a separate assignment for each would only add lines.
 # shellcheck disable=SC2312 # values are passed on through $(...)

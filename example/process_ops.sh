@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file shares some variables with the caller or across calls on purpose,
 # which is what `local` would break.
 # dyshellint disable=BSG011
@@ -210,7 +211,7 @@ function _demo_try {
   function _parse_port {
     local candidate
     dybatpho::expect_args candidate -- "$@"
-    if [[ ! "${candidate}" =~ ^[0-9]+$ ]] || ((candidate < 1 || candidate > 65535)); then
+    if [[ ! "${candidate}" =~ ^[0-9]+$ ]] || ((10#${candidate} < 1 || 10#${candidate} > 65535)); then
       dybatpho::die "not a port: ${candidate}" 2
     fi
     printf '%s\n' "${candidate}"

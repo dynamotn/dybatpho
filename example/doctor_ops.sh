@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file keeps its declarations with the functions they describe.
 # dyshellint disable=BSG033
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints

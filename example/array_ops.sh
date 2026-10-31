@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # This file lets its internal helpers take their arguments positionally, rather
 # than adding a `dybatpho::expect_args` call to paths written to avoid one.
 # dyshellint disable=BSG050

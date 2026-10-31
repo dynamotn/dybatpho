@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file helpers_ops.sh
 # @brief Example showing dependency checks, conditions, defaults, and retry.
 # shellcheck disable=SC2034 # the DYBATPHO_RETRY_* values are read by the helpers module

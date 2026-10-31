@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# dyshellint disable=BSG104 # init.sh turns on inherit_errexit (Bash 4.4+)
 # @file changelog_archive.sh
 # @brief Move old releases out of CHANGELOG.md into per-major archive files
 # @description

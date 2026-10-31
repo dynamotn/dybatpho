@@ -305,6 +305,7 @@ function path_without {
     # A name an earlier directory, or an earlier call, already linked keeps
     # that link, the way `PATH` lookup would: `ln` refuses it and carries on
     # with the rest, so its status and complaint are expected.
+    # dyshellint disable=BSG095 # test scaffolding must act even when a test sets DRY_RUN for the code under test
     ln -s ${targets[@]+"${targets[@]}"} "${bin}/" 2> /dev/null || true
   done
   printf '%s\n' "${bin}:${kept%:}"
@@ -320,5 +321,6 @@ function path_without {
 # @arg $2 string File to rewrite
 function sed_in_place {
   local script="$1" file="$2"
+  # dyshellint disable=BSG095 # test scaffolding must act even when a test sets DRY_RUN for the code under test
   sed -e "${script}" "${file}" > "${file}.sed" && mv -f -- "${file}.sed" "${file}"
 }

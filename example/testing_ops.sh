@@ -195,6 +195,22 @@ dybatpho::color_supported stderr || dybatpho::info "stderr is treated as a pipe"
 dybatpho::unmock_tty
 dybatpho::success "Terminal detection followed the mock"
 
+dybatpho::header "ISOLATED HOME"
+# A test_helper.bash runs these for every test: the suite then never touches
+# the real home, nor the repository a git hook runs it from. A subshell here
+# keeps the example's own HOME as it was.
+declare sandbox
+dybatpho::fixture_dir sandbox
+(
+  export GIT_DIR=/the/repository/being/committed/.git
+  dybatpho::test_unset_git_env
+  dybatpho::test_home "${sandbox}/home"
+  dybatpho::info "HOME=${HOME}"
+  dybatpho::info "XDG_CONFIG_HOME=${XDG_CONFIG_HOME-}"
+  dybatpho::info "GIT_DIR=${GIT_DIR:-<unset>}"
+)
+dybatpho::success "Home and git moved out of the real ones"
+
 # --- failure reporting -------------------------------------------------------
 
 dybatpho::header "FAILURE REPORTING"

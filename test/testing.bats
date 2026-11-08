@@ -419,6 +419,55 @@ ports: [80, 443]
   assert_stderr --partial "Invalid assignment"
 }
 
+@test "dybatpho::test_home points HOME and the XDG dirs at the test's own directory" {
+  local real_path="${PATH}"
+  dybatpho::test_home
+  # pwd -P: macOS keeps /tmp as a link to /private/tmp.
+  assert_equal "${HOME}" "$(cd -- "${BATS_TEST_TMPDIR}/home" && pwd -P)"
+  assert_equal "${XDG_CONFIG_HOME}" "${HOME}/.config"
+  assert_equal "${XDG_DATA_HOME}" "${HOME}/.local/share"
+  assert_equal "${XDG_STATE_HOME}" "${HOME}/.local/state"
+  assert_equal "${XDG_CACHE_HOME}" "${HOME}/.cache"
+  assert_equal "${DYBATPHO_CACHE_DIR}" "${HOME}/.cache/dybatpho"
+  assert_equal "${PATH}" "${HOME}/.local/bin:${real_path}"
+  assert_dir_exists "${HOME}/.local/bin"
+  # Exported, so a child process sees the same.
+  run_traced bash -c 'printf "%s\n" "${HOME}" "${XDG_CONFIG_HOME}"'
+  assert_output "${HOME}"$'\n'"${HOME}/.config"
+
+  # A directory given through a link and with a space is created and resolved.
+  ln -s "${BATS_TEST_TMPDIR}" "${BATS_TEST_TMPDIR}/link"
+  dybatpho::test_home "${BATS_TEST_TMPDIR}/link/other place/home"
+  assert_equal "${HOME}" "$(cd -- "${BATS_TEST_TMPDIR}/other place/home" && pwd -P)"
+  assert_equal "${XDG_STATE_HOME}" "${HOME}/.local/state"
+}
+
+@test "dybatpho::test_home needs a directory outside a Bats test" {
+  local script="${BATS_TEST_TMPDIR}/no_tmpdir.sh"
+  printf '%s\n' '. "$1/init.sh" --modules testing' 'unset BATS_TEST_TMPDIR' 'dybatpho::test_home' > "${script}"
+  run --separate-stderr bash "${script}" "${DYBATPHO_DIR}"
+  assert_failure
+  assert_stderr --partial "Expected a directory, or BATS_TEST_TMPDIR to be set"
+}
+
+@test "dybatpho::test_unset_git_env unsets every name git reads to reach another repository" {
+  local -a names=()
+  local name
+  mapfile -t names < <(git rev-parse --local-env-vars)
+  ((${#names[@]} > 0))
+  for name in "${names[@]}"; do
+    export "${name}=/elsewhere"
+  done
+  export GIT_AUTHOR_NAME=kept
+  dybatpho::test_unset_git_env
+  for name in "${names[@]}"; do
+    [[ ! -v "${name}" ]] || fail "${name} is still set"
+  done
+  # The others are the caller's to keep.
+  assert_equal "${GIT_AUTHOR_NAME}" "kept"
+  unset GIT_AUTHOR_NAME
+}
+
 @test "dybatpho::mock_command records calls and assert_mock_called matches arguments" {
   dybatpho::mock_command kubectl 0 "pod/api Running"
 

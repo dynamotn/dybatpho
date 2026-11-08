@@ -140,6 +140,17 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`screen` — a rectangle part such as `items[$(cmd)]` no longer runs the
   command.**
 
+### Added
+
+- **`testing` — a test suite keeps clear of the real home and repository in
+  two calls.** `dybatpho::test_home` points `HOME`, the XDG directories and
+  `DYBATPHO_CACHE_DIR` at the test's own directory (`${BATS_TEST_TMPDIR}/home`
+  by default), resolved physically so macOS's `/tmp` link does not split paths,
+  and puts its `~/.local/bin` first on `PATH`. `dybatpho::test_unset_git_env`
+  drops `GIT_DIR`, `GIT_INDEX_FILE` and the other variables a git hook exports,
+  so a suite run from a pre-commit hook no longer writes into the repository
+  being committed to.
+
 ## [7.1.0] - 2026-10-31
 
 ### Added

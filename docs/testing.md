@@ -62,6 +62,8 @@ Only programming mistakes, such as a missing argument, are fatal.
 - [`dybatpho::benchmark`](#dybatphobenchmark) — Time a command over several runs and report its fastest, median, and slowest.
 - [`dybatpho::mock_env`](#dybatphomock_env) — Set environment variables for the duration of a test, remembering their previous state.
 - [`dybatpho::unmock_env`](#dybatphounmock_env) — Restore every environment variable changed through `dybatpho::mock_env`.
+- [`dybatpho::test_home`](#dybatphotest_home) — Point `HOME` and the XDG base directories at a directory of the test's own. Code that reads `~` or an `XDG_*` directory would otherwise read and write the real ones of whoever runs the suite. The directory is resolved physically: macOS keeps `/tmp` as a link to `/private/tmp`, and the paths `pwd -P` and `git` print would not match the ones a test builds from it. `~/.local/bin` is created and put first on `PATH`, so a test can drop a command there.
+- [`dybatpho::test_unset_git_env`](#dybatphotest_unset_git_env) — Unset the variables through which git reaches a repository other than the one a command runs in. A git hook runs with the repository it fires in exported as `GIT_DIR`, `GIT_INDEX_FILE` and friends, and a pre-commit hook commonly runs the test suite. Left in place, every `git init`, `config` or `commit` a test aims at its own temporary repository lands in the real one instead. These are the names `git rev-parse --local-env-vars` lists.
 - [`dybatpho::mock_command_script`](#dybatphomock_command_script) — Replace a command with a script that records every invocation.
 - [`dybatpho::mock_command`](#dybatphomock_command) — Replace a command with a mock that prints fixed output and exits with a fixed code.
 - [`dybatpho::mock_calls`](#dybatphomock_calls) — Print one line per recorded invocation of a mocked command.
@@ -170,6 +172,10 @@ dybatpho::assert_mock_called kubectl get pods
 **[`dybatpho::mock_env`](#dybatphomock_env)**
 
 - Variables that were unset before the mock are unset again on restore, rather than being left behind as empty strings.
+
+**[`dybatpho::test_home`](#dybatphotest_home)**
+
+- Call it in the test's own shell, as `setup` does, not through `run`: a subshell would change nothing the test sees.
 
 **[`dybatpho::mock_command_script`](#dybatphomock_command_script)**
 
@@ -758,6 +764,68 @@ _Function has no arguments._
 **🧩 Variable sets**
 
 - **`DYBATPHO_TEST_ENV_BACKUP`**: Emptied
+
+---
+
+### `dybatpho::test_home`
+
+Point `HOME` and the XDG base directories at a directory of the test's own.
+Code that reads `~` or an `XDG_*` directory would otherwise read and write
+the real ones of whoever runs the suite. The directory is resolved
+physically: macOS keeps `/tmp` as a link to `/private/tmp`, and the paths
+`pwd -P` and `git` print would not match the ones a test builds from it.
+`~/.local/bin` is created and put first on `PATH`, so a test can drop a
+command there.
+
+**🧪 Example**
+
+```bash
+setup() {
+  dybatpho::test_home
+}
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no | `${BATS_TEST_TMPDIR}/home` | Directory to use as `HOME`, created when missing |
+
+**🧩 Variable sets**
+
+- **`HOME`** (string): The directory, resolved physically
+- **`XDG_CONFIG_HOME`** (string): `${HOME}/.config`
+- **`XDG_DATA_HOME`** (string): `${HOME}/.local/share`
+- **`XDG_STATE_HOME`** (string): `${HOME}/.local/state`
+- **`XDG_CACHE_HOME`** (string): `${HOME}/.cache`
+- **`DYBATPHO_CACHE_DIR`** (string): `${XDG_CACHE_HOME}/dybatpho`
+- **`PATH`** (string): `${HOME}/.local/bin`, then the `PATH` from before
+
+**🚦 Exit codes**
+
+- `1`: No directory was given and `BATS_TEST_TMPDIR` is not set, or the directory cannot be created
+
+---
+
+### `dybatpho::test_unset_git_env`
+
+Unset the variables through which git reaches a repository other than the one a command runs in.
+A git hook runs with the repository it fires in exported as `GIT_DIR`,
+`GIT_INDEX_FILE` and friends, and a pre-commit hook commonly runs the test
+suite. Left in place, every `git init`, `config` or `commit` a test aims at
+its own temporary repository lands in the real one instead. These are the
+names `git rev-parse --local-env-vars` lists.
+
+**🧪 Example**
+
+```bash
+# test_helper.bash, loaded by every test file
+dybatpho::test_unset_git_env
+
+```
+
+_Function has no arguments._
 
 ---
 

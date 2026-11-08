@@ -920,6 +920,72 @@ function dybatpho::unmock_env {
 }
 
 #######################################
+# @description Point `HOME` and the XDG base directories at a directory of the test's own.
+#   Code that reads `~` or an `XDG_*` directory would otherwise read and write
+#   the real ones of whoever runs the suite. The directory is resolved
+#   physically: macOS keeps `/tmp` as a link to `/private/tmp`, and the paths
+#   `pwd -P` and `git` print would not match the ones a test builds from it.
+#   `~/.local/bin` is created and put first on `PATH`, so a test can drop a
+#   command there.
+# @example
+#   setup() {
+#     dybatpho::test_home
+#   }
+#
+# @arg $1 string [default: ${BATS_TEST_TMPDIR}/home] Directory to use as `HOME`, created when missing
+# @set HOME string The directory, resolved physically
+# @set XDG_CONFIG_HOME string `${HOME}/.config`
+# @set XDG_DATA_HOME string `${HOME}/.local/share`
+# @set XDG_STATE_HOME string `${HOME}/.local/state`
+# @set XDG_CACHE_HOME string `${HOME}/.cache`
+# @set DYBATPHO_CACHE_DIR string `${XDG_CACHE_HOME}/dybatpho`
+# @set PATH string `${HOME}/.local/bin`, then the `PATH` from before
+# @exitcode 1 No directory was given and `BATS_TEST_TMPDIR` is not set, or the directory cannot be created
+# @tip Call it in the test's own shell, as `setup` does, not through `run`: a
+#      subshell would change nothing the test sees.
+#######################################
+# dyshellint disable=BSG050 its one argument is optional, which expect_args cannot express
+function dybatpho::test_home {
+  local dir="${1-}"
+  if [[ -z "${dir}" ]]; then
+    [[ -n "${BATS_TEST_TMPDIR-}" ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Expected a directory, or BATS_TEST_TMPDIR to be set"
+    dir="${BATS_TEST_TMPDIR}/home"
+  fi
+  mkdir -p -- "${dir}/.local/bin" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot create ${dir}" # kcov(skip) mkdir only fails on a read-only or full disk
+  dir="$(cd -- "${dir}" && pwd -P)"
+  export HOME="${dir}"
+  export XDG_CONFIG_HOME="${HOME}/.config"
+  export XDG_DATA_HOME="${HOME}/.local/share"
+  export XDG_STATE_HOME="${HOME}/.local/state"
+  export XDG_CACHE_HOME="${HOME}/.cache"
+  # The cache module took its directory from the real XDG cache when it loaded.
+  export DYBATPHO_CACHE_DIR="${XDG_CACHE_HOME}/dybatpho"
+  export PATH="${HOME}/.local/bin:${PATH}"
+}
+
+#######################################
+# @description Unset the variables through which git reaches a repository other than the one a command runs in.
+#   A git hook runs with the repository it fires in exported as `GIT_DIR`,
+#   `GIT_INDEX_FILE` and friends, and a pre-commit hook commonly runs the test
+#   suite. Left in place, every `git init`, `config` or `commit` a test aims at
+#   its own temporary repository lands in the real one instead. These are the
+#   names `git rev-parse --local-env-vars` lists.
+# @example
+#   # test_helper.bash, loaded by every test file
+#   dybatpho::test_unset_git_env
+#
+# @noargs
+#######################################
+function dybatpho::test_unset_git_env {
+  unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS \
+    GIT_CONFIG_COUNT GIT_OBJECT_DIRECTORY GIT_DIR GIT_WORK_TREE \
+    GIT_IMPLICIT_WORK_TREE GIT_GRAFT_FILE GIT_INDEX_FILE GIT_NO_REPLACE_OBJECTS \
+    GIT_REPLACE_REF_BASE GIT_PREFIX GIT_SHALLOW_FILE GIT_COMMON_DIR
+}
+
+#######################################
 # @description Replace a command with a script that records every invocation.
 # @example
 #   dybatpho::mock_command_script kubectl 'printf "pod/api Running\n"; exit 0'

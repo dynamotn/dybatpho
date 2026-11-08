@@ -224,6 +224,29 @@ direction and verify the diagnostic.
    runs, **Then** it fails naming the expected and actual status, followed by
    the command's output
 
+### User Story 11 - Keep a test away from the real home and repository (Priority: P1)
+
+As a maintainer whose suite runs from a git hook and on a developer's machine, I
+want one call that moves `HOME` and the XDG directories into the test's own
+directory and one that drops the variables a hook exports to point git at its
+repository, so that no test reads or writes the real configuration or the
+repository being committed to.
+
+**Independent Test**: Call `test_home` and verify `HOME`, every XDG directory,
+the cache directory and `PATH`; export every name git lists as local, call
+`test_unset_git_env`, and verify none is left.
+
+**Acceptance Scenarios**:
+
+1. **Given** a Bats test, **When** `test_home` runs without an argument,
+   **Then** `HOME` is `${BATS_TEST_TMPDIR}/home` resolved physically, the XDG
+   directories sit under it, and `~/.local/bin` exists and leads `PATH`
+2. **Given** a directory reached through a link, **When** `test_home` is given
+   it, **Then** it is created and `HOME` is its physical path
+3. **Given** git's local variables exported by a hook, **When**
+   `test_unset_git_env` runs, **Then** none of them is set and every other
+   variable is untouched
+
 ### Example Workflow
 
 ```bash
@@ -296,6 +319,7 @@ dybatpho::unmock_all
 - Several scrubs are registered, one rewriting what another produced, or a duration budget leads with a zero.
 - The HTTP mock is given `-D -` (or `--dump-header -`): the headers go to standard output, as curl writes them, not to a file named `-`.
 - A mocked command name holds a slash, such as `../file`: `dybatpho::unmock_command` and `dybatpho::mock_calls` refuse it rather than reach outside the mock directory.
+- `test_home` runs outside Bats with no directory, or is given one reached through a link or holding a space.
 
 ## Requirements *(mandatory)*
 
@@ -433,6 +457,8 @@ dybatpho::unmock_all
 - **FR-044**: A command run by `assert_exit_code`, `benchmark` or `assert_duration_under` MUST see the caller's variables and MUST NOT change the verdict by assigning to one: they MUST keep their state in prefixed locals.
 - **FR-045**: A command run by `assert_cli_snapshot` MUST see the caller's variables: the assertion MUST keep its state in prefixed locals.
 - **FR-046**: Registered scrubs MUST apply in the order they were registered, each to the output of the one before, and `dybatpho::assert_duration_under` MUST read its budget in base ten.
+- **FR-047**: `test_home` MUST create the given directory, or `${BATS_TEST_TMPDIR}/home` when none is given, and export it resolved physically as `HOME`, with `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME` and `DYBATPHO_CACHE_DIR` under it and `${HOME}/.local/bin` created and put first on `PATH`. With no directory and no `BATS_TEST_TMPDIR` it MUST fail through the fatal path.
+- **FR-048**: `test_unset_git_env` MUST unset every variable `git rev-parse --local-env-vars` lists, and no other.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -558,6 +584,8 @@ dybatpho::unmock_all
 - **IT-036**: Register three scrubs where the second rewrites the first's replacement and snapshot two lines; time `true` against `090000` and `000`.
 - **IT-037**: Call the HTTP mock with `-D -` and verify the headers reach standard output.
 - **IT-038**: Pass `../` names to `dybatpho::unmock_command` and `dybatpho::mock_calls` and verify both are refused and nothing outside the mock directory is removed.
+- **IT-039**: Call `test_home` bare and with a directory reached through a link and holding a space, and verify `HOME`, the XDG directories, the cache directory and `PATH`, here and in a child process; call it outside Bats with no directory and see it refused.
+- **IT-040**: Export every name `git rev-parse --local-env-vars` lists and one it does not, call `test_unset_git_env`, and verify only the listed names are gone.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -24,9 +24,11 @@ This document describes the repository workflow and conventions to preserve.
   across it; see *Versioning and stability* below.
 - `scripts/test.sh` — test runner; `--coverage` adds the kcov report, and
   `--related <changed files>` runs only the tests covering them (the
-  pre-commit hook uses it). Without GNU `parallel` (or with `--shards`) it
-  shares the files out to `--jobs` background Bats workers, one file at a time
-  each, and merges their reports into the same table and totals.
+  pre-commit hook uses it). It shares the files out to background Bats
+  workers, one file at a time each, and merges their reports into the same
+  table and totals: with GNU `parallel`, `--jobs / 2` workers that each run
+  their file's tests side by side; without it (or with `--shards`), `--jobs`
+  workers that each run their file's tests one after another.
 - `scripts/bundle.sh` — flatten a module selection into one vendorable file;
   covered by `test/bundle.bats` and specified in `docs/spec/doctor.md`.
 - `scripts/release.sh` — cut a release: stamp `VERSION` and `CHANGELOG.md`,

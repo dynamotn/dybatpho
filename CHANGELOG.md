@@ -11,6 +11,14 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Changed
+
+- **`scripts/test.sh` runs the suite faster.** Every test file gets its own
+  Bats run even with GNU parallel, so the files' tests are gathered side by
+  side instead of one file after another, and the test helper no longer
+  traces its own code, which made each `path_without` call take about a second.
+  The suite went from about 100s to about 92s on a 16-core Ryzen.
+
 ### Fixed
 
 - **`validate` — `dybatpho::validate_is semver` follows the semver.org grammar,

@@ -77,9 +77,11 @@ printf '[user]\n\tname = dybatpho\n\temail = dybatpho@example.test\n[init]\n\tde
 # for every command, the library's own included: a test driving the Bash math
 # engine over twenty-digit values spent 28s in the trap and 0.1s in the code.
 # The trap Bats installs is therefore put back behind a test of where the
-# command comes from, so a command of `src/` or of a bats library never calls
-# the handler, and a failure is reported at the line of the `.bats` file that
-# called into it. Telling Bats to exclude those paths is not enough: a skipped
+# command comes from, so a command of `src/`, of a bats library or of this
+# helper never calls the handler, and a failure is reported at the line of the
+# `.bats` file that called into it. `path_without` alone, walking the thousands
+# of entries of `/usr/bin`, spent 1.1s per call in the trap and 0.1s in its own
+# code. Telling Bats to exclude those paths is not enough: a skipped
 # call into the handler still costs some fifty microseconds. A trap of any
 # other shape, from another Bats version, is put back as it was.
 #
@@ -93,6 +95,7 @@ printf '[user]\n\tname = dybatpho\n\temail = dybatpho@example.test\n[init]\n\tde
 # command of the test clears the mark again.
 __DYBATPHO_HELPER_QUIET_SRC="${DYBATPHO_DIR}/src/"
 __DYBATPHO_HELPER_QUIET_LIB="${DYBATPHO_DIR}/test/lib/"
+__DYBATPHO_HELPER_QUIET_SELF="${BASH_SOURCE[0]}"
 # The expansions are the trap's own, made each time it fires.
 # shellcheck disable=SC2016
 if [[ "${__dybatpho_helper_saved_trap}" == "trap -- 'bats_debug_trap \"\$BASH_SOURCE\" \"\$_\"' DEBUG" ]]; then
@@ -100,7 +103,8 @@ if [[ "${__dybatpho_helper_saved_trap}" == "trap -- 'bats_debug_trap \"\$BASH_SO
   # reads, so a trap spread over several would shift every reported line.
   __dybatpho_helper_saved_trap='__DYBATPHO_HELPER_LAST_ARG=$_; '
   __dybatpho_helper_saved_trap+='if [[ "${BASH_SOURCE}" == "${__DYBATPHO_HELPER_QUIET_SRC}"* || '
-  __dybatpho_helper_saved_trap+='"${BASH_SOURCE}" == "${__DYBATPHO_HELPER_QUIET_LIB}"* ]]; '
+  __dybatpho_helper_saved_trap+='"${BASH_SOURCE}" == "${__DYBATPHO_HELPER_QUIET_LIB}"* || '
+  __dybatpho_helper_saved_trap+='"${BASH_SOURCE}" == "${__DYBATPHO_HELPER_QUIET_SELF}" ]]; '
   __dybatpho_helper_saved_trap+='then BATS_DEBUG_LAST_STACK_TRACE_IS_VALID=1; '
   __dybatpho_helper_saved_trap+='else BATS_DEBUG_LAST_STACK_TRACE_IS_VALID=; '
   __dybatpho_helper_saved_trap+='bats_debug_trap "$BASH_SOURCE" "${__DYBATPHO_HELPER_LAST_ARG}"; fi'

@@ -15,9 +15,12 @@
 #   parking the Bats `DEBUG` trap while it sources the library, which is what
 #   makes a test cost ~150ms instead of ~800ms.
 #
-#   Bats needs GNU `parallel` for `--jobs`. Without it -- or with `--shards` --
-#   the files are shared out to `--jobs` background Bats processes instead, each
-#   running one file at a time: a worker claims the next unclaimed file, the
+#   Each file gets a Bats run of its own, on background workers: one Bats over
+#   the whole suite would gather every file's tests on one core before running
+#   any. With GNU `parallel`, `--jobs / 2` workers each run their file with
+#   `--jobs`. Bats needs `parallel` for that; without it -- or with `--shards`
+#   -- there are `--jobs` workers instead, each running its file one test at a
+#   time. Either way a worker claims the next unclaimed file, the
 #   heaviest first, with an atomic `mkdir`, so a slow file never holds up a
 #   queue of others behind it. The slowest file sets the floor of the run. Their TAP and JUnit output is merged into the
 #   same report, so the table and totals read the same either way.
@@ -347,12 +350,17 @@ function __dybatpho_test_shard_worker {
 function __dybatpho_test_bats_shards {
   local _claims="${_run_dir}/claims" _workers="${JOBS}" _w _i
   mkdir -p "${_claims}"
+  # With `parallel` ("files") each Bats keeps `--jobs` for the tests of its
+  # file, and half as many workers saturate the CPU. Fewer slots per file would
+  # not do: Bats' semaphore polls for a free slot once a second, so at 8 slots
+  # a file barely ran faster than one test at a time.
+  [[ "${_runner}" == "files" ]] && _workers=$(((JOBS + 1) / 2))
   ((_workers <= ${#_files[@]})) || _workers="${#_files[@]}"
-  # Each worker's Bats runs with `--jobs 1`: the width comes from the workers.
+  # Without it each worker's Bats runs with `--jobs 1`: the width comes from the workers.
   local -a _worker_args=()
   local _arg _after_jobs=0
   for _arg in "${_bats_args[@]}"; do
-    ((_after_jobs)) && _arg=1
+    ((_after_jobs)) && [[ "${_runner}" == "shards" ]] && _arg=1
     _after_jobs=0
     [[ "${_arg}" == "--jobs" ]] && _after_jobs=1
     _worker_args+=("${_arg}")
@@ -605,10 +613,16 @@ function __dybatpho_test_run {
   # that reported every test as never run and nothing about why; it now gets
   # the Bash workers instead. kcov follows one process tree at a time, so a
   # coverage run without `parallel` still has one worker.
+  #
+  # With `parallel`, the files still get a Bats run each ("files"): one Bats
+  # over the whole suite gathers every file's tests one after another before
+  # running any, about 14s of a run on one core.
   local _runner="bats"
   if ((JOBS > 1)); then
     if [[ "${SHARDS}" == "true" ]] || ! command -v parallel &> /dev/null; then
       _runner="shards"
+    else
+      _runner="files"
     fi
     if [[ "${_runner}" == "shards" && "${COVERAGE}" == "true" ]]; then
       dybatpho::warn "GNU parallel is not installed; coverage runs with one worker"
@@ -654,7 +668,7 @@ function __dybatpho_test_run {
   local _start="${SECONDS}"
   if [[ "${COVERAGE}" == "true" ]]; then
     __dybatpho_test_bats_coverage _parts
-  elif [[ "${_runner}" == "shards" ]]; then
+  elif [[ "${_runner}" != "bats" ]]; then
     __dybatpho_test_bats_shards
   else
     __dybatpho_test_bats

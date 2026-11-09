@@ -37,6 +37,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `validate.md`
 - `config.md`
 - `lock.md`
+- `sign.md`
 - `cache.md`
 - `archive.md`
 - `forge.md`
@@ -84,6 +85,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/validate.sh` -> `validate.md`
 - `src/config.sh` -> `config.md`
 - `src/lock.sh` -> `lock.md`
+- `src/sign.sh` -> `sign.md`
 - `src/cache.sh` -> `cache.md`
 - `src/archive.sh` -> `archive.md`
 - `src/forge.sh` -> `forge.md`

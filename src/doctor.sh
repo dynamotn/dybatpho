@@ -136,6 +136,8 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   [notification]="notify-send|osascript sendmail"
   [os]="hostname nproc|sysctl|getconf tput"
   [release]="gpg"
+  # A backend needs its own tool; any one of them makes the module usable.
+  [sign]="ssh-keygen|minisign|gpgv"
 )
 # kcov(enabled)
 

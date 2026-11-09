@@ -310,6 +310,7 @@ in any release.
 | [validate.sh](docs/validate.md)  | stable | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
 | [config.sh](docs/config.md)      | stable | Config files + env vars with precedence and schema validation      |
 | [secret.sh](docs/secret.md)      | stable | Read secrets safely, mask them in output, shred and wipe them      |
+| [sign.sh](docs/sign.md)          | experimental | Sign files and check signatures with ssh-keygen, minisign or gpg, against the keys you name |
 | [safety.sh](docs/safety.md)      | stable | Confirm-or-refuse guards for rm, overwrite, extract, system changes |
 
 ### 🤖 AI

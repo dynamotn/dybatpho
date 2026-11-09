@@ -398,6 +398,86 @@ function __dybatpho_sign_minisign_verify {
 }
 
 #######################################
+# @description Sign with `gpg`, as an armored detached signature. Away from a
+#   terminal the agent is told to fail rather than start a pinentry.
+# @arg $1 string Key id, fingerprint or user id in the user's keyring
+# @arg $2 path File to sign
+# @arg $3 path Signature to write
+# @arg $4 path Working directory
+# @internal
+#######################################
+function __dybatpho_sign_gpg_sign {
+  local -a mode=()
+  dybatpho::is_tty stdin && dybatpho::is_tty stderr || mode=(--pinentry-mode error)
+  __dybatpho_sign_run gpg --batch --yes ${mode[@]+"${mode[@]}"} --armor --detach-sign \
+    --local-user "$1" --output "$3" -- "$2" < /dev/null > /dev/null 2> "$4/err" || {
+    local status=$?
+    __dybatpho_sign_report "gpg could not sign $2" "$4/err"
+    return "${status}"
+  }
+}
+
+#######################################
+# @description Append the OpenPGP packets of an exported public key to a
+#   keyring file: a binary export as it is, an armored one decoded from its
+#   base64 body, so `gpgv` needs no `gpg --dearmor`.
+# @arg $1 path Exported public key
+# @arg $2 path Keyring to append to
+# @exitcode 1 Stop script when the file holds no key
+# @internal
+#######################################
+function __dybatpho_sign_gpg_keyring_add {
+  local key="$1" keyring="$2" line in_body=0 body="" before after first=""
+  before="$(wc -c < "${keyring}")"
+  IFS= read -r first < "${key}" || true
+  if [[ "${first%$'\r'}" != "-----BEGIN PGP PUBLIC KEY BLOCK-----" ]]; then
+    cat -- "${key}" >> "${keyring}"
+  else
+    # The body starts after the blank line ending the armor headers and stops at
+    # the checksum line (`=xxxx`) or the END line.
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+      line="${line%$'\r'}"
+      case "${line}" in
+        "-----BEGIN PGP PUBLIC KEY BLOCK-----") in_body=1 body="" ;;
+        "-----END PGP PUBLIC KEY BLOCK-----" | =*)
+          if ((in_body)) && [[ -n "${body}" ]]; then
+            printf '%s' "${body}" | base64 -d >> "${keyring}" 2> /dev/null \
+              || dybatpho::die "${FUNCNAME[1]}: Cannot decode the key in ${key}"
+          fi
+          in_body=0 body=""
+          ;;
+        "") ((in_body)) && in_body=2 ;;
+        *) ((in_body != 2)) || body+="${line}" ;;
+      esac
+    done < "${key}"
+  fi
+  after="$(wc -c < "${keyring}")"
+  ((after > before)) || dybatpho::die "${FUNCNAME[1]}: No public key in ${key}"
+}
+
+#######################################
+# @description Verify with `gpgv`, against a keyring holding only the trusted
+#   keys, in a home directory of its own: neither the user's keyring nor their
+#   `GNUPGHOME` is read, and no agent starts.
+# @arg $1 path File
+# @arg $2 path Signature
+# @arg $3 path Working directory
+# @arg $@ path Trusted exported public keys
+# @internal
+#######################################
+function __dybatpho_sign_gpg_verify {
+  local file="$1" signature="$2" work="$3" key
+  shift 3
+  mkdir -m 700 -- "${work}/gnupg"
+  : > "${work}/trusted.gpg"
+  for key in "$@"; do
+    __dybatpho_sign_gpg_keyring_add "${key}" "${work}/trusted.gpg"
+  done
+  __dybatpho_sign_run gpgv --homedir "${work}/gnupg" --keyring "${work}/trusted.gpg" \
+    -- "${signature}" "${file}" < /dev/null > /dev/null 2> "${work}/err"
+}
+
+#######################################
 # @description Sign a file with a key and print the signature's path.
 # @example
 #   dybatpho::sign_file ssh ~/.ssh/id_ed25519 accounts.yaml

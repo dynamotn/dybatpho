@@ -2,6 +2,11 @@ setup() {
   load test_helper
 }
 
+teardown() {
+  # A gpg test starts an agent inside its GNUPGHOME; it must not outlive the test.
+  [[ "${GNUPGHOME-}" != "${BATS_TEST_TMPDIR}"/* ]] || gpgconf --kill all &> /dev/null || true
+}
+
 # Skip where `ssh-keygen` cannot sign: missing, or older than OpenSSH 8.1. It
 # probes the tool itself rather than through the module under test.
 _need_ssh_y() {
@@ -270,4 +275,69 @@ _minisign_pub() {
   DYBATPHO_SIGN_NAMESPACE=registry dybatpho::sign_file minisign "${BATS_TEST_TMPDIR}/alice.key" "${file}" > /dev/null
   DYBATPHO_SIGN_NAMESPACE=deploy run_traced -0 dybatpho::verify_file "${file}" "${file}.minisig" \
     "$(_ssh_pub carol)" "$(_minisign_pub alice)"
+}
+
+# A GNUPGHOME of the test's own, holding a passphrase-less signing key for each
+# name given; skipped where no gpg-agent can start, as in a sandbox that refuses
+# its socket.
+_gpg_keys() {
+  command -v gpg > /dev/null || skip "gpg is not installed"
+  export GNUPGHOME="${BATS_TEST_TMPDIR}/gnupg"
+  mkdir -p -m 700 "${GNUPGHOME}"
+  local name
+  for name in "$@"; do
+    gpg --batch --passphrase '' --quick-gen-key "${name} <${name}@example.test>" ed25519 sign never \
+      &> /dev/null || skip "gpg cannot generate a key here"
+    gpg --armor --export "${name}@example.test" > "${BATS_TEST_TMPDIR}/${name}.asc"
+    gpg --export "${name}@example.test" > "${BATS_TEST_TMPDIR}/${name}.gpg"
+  done
+}
+
+@test "dybatpho::sign_file gpg writes an armored FILE.asc, which verifies against an armored or binary export" {
+  _gpg_keys alice
+  local file
+  file="$(_payload doc.txt)"
+  run_traced -0 dybatpho::sign_file gpg alice@example.test "${file}"
+  assert_output "${file}.asc"
+  assert_equal "$(head -1 "${file}.asc")" "-----BEGIN PGP SIGNATURE-----"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/alice.asc"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/alice.gpg"
+}
+
+@test "dybatpho::verify_file returns 1 for a gpg signature by another key or of a changed file" {
+  _gpg_keys alice bob
+  local file
+  file="$(_payload doc.txt)"
+  dybatpho::sign_file gpg alice@example.test "${file}" > /dev/null
+  run_traced -1 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/bob.asc"
+  printf 'changed\n' >> "${file}"
+  run_traced -1 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/alice.asc"
+}
+
+@test "dybatpho::verify_file refuses a gpg signer the caller's own keyring trusts but the caller did not pass" {
+  _gpg_keys alice bob
+  local file
+  file="$(_payload doc.txt)"
+  dybatpho::sign_file gpg alice@example.test "${file}" > /dev/null
+  # alice is in GNUPGHOME, and gpg --verify there would accept her.
+  gpg --verify "${file}.asc" "${file}" &> /dev/null
+  run_traced -1 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/bob.asc"
+}
+
+@test "dybatpho::verify_file stops on a gpg key file that holds no key" {
+  _gpg_keys alice
+  local file empty="${BATS_TEST_TMPDIR}/empty.asc"
+  file="$(_payload doc.txt)"
+  dybatpho::sign_file gpg alice@example.test "${file}" > /dev/null
+  printf -- '-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n-----END PGP PUBLIC KEY BLOCK-----\n' > "${empty}"
+  run -1 --separate-stderr dybatpho::verify_file "${file}" "${file}.asc" "${empty}"
+  assert_stderr --partial "No public key in ${empty}"
+}
+
+@test "dybatpho::sign_file gpg stops with the gnupg hint when only gpgv is installed" {
+  command -v gpgv > /dev/null || skip "gpgv is not installed"
+  local file
+  file="$(_payload doc.txt)"
+  PATH="$(path_without gpg)" run -127 --separate-stderr dybatpho::sign_file gpg someone "${file}"
+  assert_stderr --partial "gpg isn't installed; install gnupg"
 }

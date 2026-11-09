@@ -541,6 +541,20 @@ function __dybatpho_service_run {
 }
 
 #######################################
+# @description Give a systemd unit name its type suffix: systemd reads only
+#   files named `<unit>.<type>`, and `systemctl` adds `.service` itself, so a
+#   bare name means a service.
+# @arg $1 string Name of the variable holding the name, updated in place
+# @arg $2 string Manager
+# @internal
+#######################################
+function __dybatpho_service_unit_name {
+  local -n __dybatpho_service_unit_name_ref="$1"
+  [[ "$2" == systemd && "${__dybatpho_service_unit_name_ref}" != *.* ]] || return 0
+  __dybatpho_service_unit_name_ref+=.service
+}
+
+#######################################
 # @description Name the directory a manager reads unit files from.
 # @arg $1 string Name of the variable receiving the directory
 # @arg $2 string Manager
@@ -596,10 +610,14 @@ function __dybatpho_service_ready_into {
 #######################################
 # dyshellint disable=BSG050 # its one argument is an optional flag, which expect_args cannot express
 function dybatpho::service_reload_manager {
-  local scope=system manager
+  local scope=system manager=""
   [[ "${1-}" != --user ]] || scope=user
-  __dybatpho_service_manager_into manager || return 0
+  __dybatpho_service_manager_into manager || true
   [[ "${manager}" == systemd ]] || return 0
+  if ! __dybatpho_service_ready_into manager "${scope}" "reload of the ${manager} manager"; then
+    dybatpho::is true "${DYBATPHO_SERVICE_STRICT}" && return 1
+    return 0
+  fi
   local -a user=()
   [[ "${scope}" != user ]] || user=(--user)
   local elevate=0
@@ -660,6 +678,7 @@ function dybatpho::service_install {
     return 0
   fi
   __dybatpho_service_unit_dir_into dir "${manager}" "${scope}"
+  __dybatpho_service_unit_name name "${manager}"
 
   local label="${name%.plist}" dest elevate=0
   [[ "${scope}" != system ]] || elevate=1
@@ -687,7 +706,7 @@ function dybatpho::service_install {
     if ((changed)) || ! launchctl print "${domain}/${label}" &> /dev/null; then
       __dybatpho_service_run "${elevate}" launchctl enable "${domain}/${label}" || return
       # Fails when the job is not loaded yet, as on a first install.
-      __dybatpho_service_run "${elevate}" launchctl bootout "${domain}" "${dest}" &> /dev/null || true
+      __dybatpho_service_run "${elevate}" launchctl bootout "${domain}" "${dest}" 2> /dev/null || true
       __dybatpho_service_run "${elevate}" launchctl bootstrap "${domain}" "${dest}" || return
     fi
   elif ((changed)); then
@@ -722,10 +741,17 @@ function dybatpho::service_uninstall {
     || dybatpho::die "${FUNCNAME[0]}: This service manager takes no unit file: ${manager}"
   local -a flag=()
   [[ "${scope}" != user ]] || flag=(--user)
+  __dybatpho_service_unit_name name "${manager}"
   local elevate=0 dest="${dir}/${name}"
   [[ "${scope}" != system ]] || elevate=1
-  [[ "${manager}" != launchd ]] || dest="${dir}/${name%.plist}.plist"
-  __dybatpho_service_act disable "${name}" ${flag[@]+"${flag[@]}"} || return
+  if [[ "${manager}" == launchd ]]; then
+    dest="${dir}/${name%.plist}.plist"
+    # `disable` unloads the job, which fails when it is not loaded -- as after
+    # a `service_stop`. The plist still has to go.
+    __dybatpho_service_act disable "${name}" ${flag[@]+"${flag[@]}"} 2> /dev/null || true
+  else
+    __dybatpho_service_act disable "${name}" ${flag[@]+"${flag[@]}"} || return
+  fi
   if [[ -e "${dest}" ]]; then
     __dybatpho_service_run "${elevate}" rm -f -- "${dest}" || return
   fi

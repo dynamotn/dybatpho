@@ -438,3 +438,56 @@ _unit() {
   assert_line "systemctl --user daemon-reload"
   DYBATPHO_SERVICE_MANAGER=openrc run_traced -0 dybatpho::service_reload_manager
 }
+
+# A launchd user host whose `bootout` fails, as it does for a job not loaded.
+_launchd_bootout_fails() {
+  _os Darwin
+  printf '%s\n' '#!/usr/bin/env bash' "printf '%s\\n' \"launchctl \$*\" >> '${CALLS}'" \
+    '[[ "$1" != bootout ]] || exit 3' > "${STUBS}/launchctl"
+  chmod +x "${STUBS}/launchctl"
+  export HOME="${BATS_TEST_TMPDIR}/home"
+}
+
+@test "dybatpho::service_uninstall on launchd removes the plist even when the job is not loaded" {
+  _launchd_bootout_fails
+  local plist="${HOME}/Library/LaunchAgents/dev.x.plist"
+  mkdir -p "${plist%/*}"
+  printf '<plist/>\n' > "${plist}"
+  run_traced -0 dybatpho::service_uninstall dev.x.plist --user
+  assert_file_not_exists "${plist}"
+}
+
+@test "dybatpho::service_install on launchd prints every command under dry-run, bootout included" {
+  _launchd_bootout_fails
+  local uid
+  uid="$(id -u)"
+  DYBATPHO_DRY_RUN=true run_traced -0 dybatpho::service_install "$(_unit dev.x.plist)" --user
+  assert_output --partial "launchctl bootout gui/${uid}"
+  assert_output --partial "launchctl bootstrap gui/${uid}"
+}
+
+@test "dybatpho::service_uninstall on systemd finds the unit when named without .service" {
+  _systemd_user
+  dybatpho::service_install "$(_unit foo.service)" --user
+  run_traced -0 dybatpho::service_uninstall foo --user
+  assert_file_not_exists "${XDG_CONFIG_HOME}/systemd/user/foo.service"
+}
+
+@test "dybatpho::service_install on systemd gives a name without a unit suffix .service" {
+  _systemd_user
+  run_traced -0 dybatpho::service_install "$(_unit foo.service)" --user --name bar
+  assert_file_exists "${XDG_CONFIG_HOME}/systemd/user/bar.service"
+  run -0 cat "${CALLS}"
+  assert_line "systemctl --user enable --now bar.service"
+}
+
+@test "dybatpho::service_reload_manager warns and skips where systemd cannot act" {
+  _os Linux
+  _stub systemctl
+  mkdir -p "${__DYBATPHO_SERVICE_ROOT}/run/systemd/system"
+  : > "${__DYBATPHO_SERVICE_ROOT}/.dockerenv"
+  STUB_OUT_systemctl=running run_traced -0 --separate-stderr dybatpho::service_reload_manager
+  assert_stderr --partial "skipping reload"
+  run -1 grep -qx "systemctl daemon-reload" "${CALLS}"
+  DYBATPHO_SERVICE_STRICT=true STUB_OUT_systemctl=running run_traced -1 --separate-stderr dybatpho::service_reload_manager
+}

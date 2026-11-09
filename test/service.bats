@@ -126,3 +126,185 @@ _os() {
   run_traced -1 dybatpho::service_manager_available
   run_traced -1 dybatpho::service_manager_available --user
 }
+
+# Assert the commands `service_command` prints for foo, one per argument.
+# System actions are elevated with `sudo`, whoever runs the test.
+_commands() {
+  local manager="$1" action="$2" scope="$3" expected
+  shift 3
+  local -a flag=()
+  [[ "${scope}" != user ]] || flag=(--user)
+  dybatpho::privilege_needed() { return 0; }
+  DYBATPHO_PRIVILEGE_COMMAND=sudo DYBATPHO_SERVICE_MANAGER="${manager}" \
+    run_traced -0 dybatpho::service_command "${action}" foo ${flag[@]+"${flag[@]}"}
+  printf -v expected '%s\n' "$@"
+  assert_output "${expected%$'\n'}"
+}
+
+@test "dybatpho::service_command prints the systemd commands of every action" {
+  _commands systemd enable system "sudo -- systemctl enable --now foo"
+  _commands systemd enable user "systemctl --user enable --now foo"
+  _commands systemd disable system "sudo -- systemctl disable --now foo"
+  _commands systemd start system "sudo -- systemctl start foo"
+  _commands systemd stop user "systemctl --user stop foo"
+  _commands systemd restart system "sudo -- systemctl restart foo"
+  _commands systemd is-active system "systemctl is-active foo"
+  _commands systemd is-enabled user "systemctl --user is-enabled foo"
+}
+
+@test "dybatpho::service_command prints the OpenRC commands of every action" {
+  _commands openrc enable system "sudo -- rc-update add foo default" "sudo -- rc-service foo start"
+  _commands openrc enable user "rc-update --user add foo default" "rc-service --user foo start"
+  _commands openrc disable system "sudo -- rc-service foo stop" "sudo -- rc-update del foo default"
+  _commands openrc start user "rc-service --user foo start"
+  _commands openrc stop system "sudo -- rc-service foo stop"
+  _commands openrc restart system "sudo -- rc-service foo restart"
+  _commands openrc is-active system "rc-service foo status"
+  _commands openrc is-enabled user "rc-update --user show default"
+}
+
+@test "dybatpho::service_command prints the runit commands, never elevated" {
+  PREFIX="/data/usr"
+  _commands runit enable system "sv-enable foo" "sv up foo"
+  _commands runit enable user "sv-enable foo" "sv up foo"
+  _commands runit disable system "sv down foo" "sv-disable foo"
+  _commands runit start system "sv up foo"
+  _commands runit stop system "sv down foo"
+  _commands runit restart system "sv restart foo"
+  _commands runit is-active system "sv status foo"
+  _commands runit is-enabled system 'test \! -e /data/usr/var/service/foo/down'
+}
+
+@test "dybatpho::service_command prints the launchd commands in the right domain" {
+  local uid
+  uid="$(id -u)"
+  _commands launchd enable user "launchctl enable gui/${uid}/foo" "launchctl kickstart gui/${uid}/foo"
+  _commands launchd enable system "sudo -- launchctl enable system/foo" "sudo -- launchctl kickstart system/foo"
+  _commands launchd disable user "launchctl disable gui/${uid}/foo" "launchctl bootout gui/${uid}/foo"
+  _commands launchd start user "launchctl kickstart gui/${uid}/foo"
+  _commands launchd stop user "launchctl bootout gui/${uid}/foo"
+  _commands launchd restart system "sudo -- launchctl kickstart -k system/foo"
+  _commands launchd is-active user "launchctl print gui/${uid}/foo"
+  _commands launchd is-enabled user "launchctl print-disabled gui/${uid}"
+}
+
+@test "dybatpho::service_command keeps a .service suffix and drops a .plist one" {
+  dybatpho::privilege_needed() { return 1; }
+  DYBATPHO_SERVICE_MANAGER=systemd run_traced -0 dybatpho::service_command start foo.service
+  assert_output "systemctl start foo.service"
+  DYBATPHO_SERVICE_MANAGER=launchd run_traced -0 dybatpho::service_command start dev.example.foo.plist
+  assert_output "launchctl kickstart system/dev.example.foo"
+}
+
+@test "dybatpho::service_command refuses an unknown action, a missing name and a path" {
+  DYBATPHO_SERVICE_MANAGER=systemd run -1 --separate-stderr dybatpho::service_command reboot foo
+  assert_stderr --partial "Unknown action: reboot"
+  DYBATPHO_SERVICE_MANAGER=systemd run -1 --separate-stderr dybatpho::service_command start
+  assert_stderr --partial "Expected a service name"
+  DYBATPHO_SERVICE_MANAGER=systemd run -1 --separate-stderr dybatpho::service_command start ../foo
+  assert_stderr --partial "Invalid service name: ../foo"
+}
+
+@test "dybatpho::service_enable elevates a system action and not a user one" {
+  _os Linux
+  _stub systemctl
+  mkdir -p "${__DYBATPHO_SERVICE_ROOT}/run/systemd/system"
+  STUB_OUT_systemctl=running
+  export STUB_OUT_systemctl
+  dybatpho::privilege_run() { printf 'ELEVATED %s\n' "${*:2}" >> "${CALLS}"; }
+  run_traced -0 dybatpho::service_enable foo
+  run_traced -0 dybatpho::service_enable foo --user
+  run -0 cat "${CALLS}"
+  assert_line "ELEVATED systemctl enable --now foo"
+  assert_line "systemctl --user enable --now foo"
+  refute_line "ELEVATED systemctl --user enable --now foo"
+}
+
+@test "dybatpho::service_enable on OpenRC stops at the first command that fails" {
+  _os Linux
+  _stub rc-service
+  _stub rc-update
+  # Only `add` fails: the user scope probe, `rc-update --user show`, succeeds.
+  printf '%s\n' '#!/usr/bin/env bash' "printf '%s\\n' \"rc-update \$*\" >> '${CALLS}'" \
+    '[[ "$2" != add ]] || exit 3' > "${STUBS}/rc-update"
+  run_traced -3 dybatpho::service_enable foo --user
+  run -0 cat "${CALLS}"
+  assert_line "rc-update --user add foo default"
+  refute_line "rc-service --user foo start"
+}
+
+@test "DYBATPHO_DRY_RUN prints an action and runs nothing, but a question still runs" {
+  _os Linux
+  _stub systemctl
+  mkdir -p "${__DYBATPHO_SERVICE_ROOT}/run/systemd/system"
+  DYBATPHO_DRY_RUN=true run_traced -0 dybatpho::service_restart foo --user
+  assert_output --partial "systemctl --user restart foo"
+  run -0 cat "${CALLS}"
+  refute_line "systemctl --user restart foo"
+  DYBATPHO_DRY_RUN=true run_traced -0 dybatpho::service_is_active foo --user
+  run -0 cat "${CALLS}"
+  assert_line "systemctl --user is-active foo"
+}
+
+@test "an action warns and skips where no manager can act, and fails when strict" {
+  _os Linux
+  run_traced -0 --separate-stderr dybatpho::service_enable foo
+  assert_stderr --partial "No service manager can act on the system scope here; skipping enable foo"
+  DYBATPHO_SERVICE_STRICT=true run_traced -1 --separate-stderr dybatpho::service_enable foo
+  run_traced -1 --separate-stderr dybatpho::service_is_active foo
+  assert_stderr ""
+}
+
+@test "dybatpho::service_is_active reads a running launchd job and an anchored runit status" {
+  local uid
+  uid="$(id -u)"
+  _os Darwin
+  _stub launchctl
+  STUB_OUT_launchctl=$'gui/'"${uid}"$'/foo = {\n\tstate = running\n\tpid = 42\n}' \
+    run_traced -0 dybatpho::service_is_active foo --user
+  STUB_OUT_launchctl=$'gui/'"${uid}"$'/foo = {\n\tstate = not running\n}' \
+    run_traced -1 dybatpho::service_is_active foo --user
+  _os Linux
+  rm -f "${STUBS}/launchctl"
+  _stub sv-enable
+  _stub sv
+  STUB_OUT_sv="run: foo: (pid 12) 9s; run: log: (pid 13) 9s" run_traced -0 dybatpho::service_is_active foo
+  STUB_OUT_sv="down: foo: 5s, normally up; run: log: (pid 12) 9s" run_traced -1 dybatpho::service_is_active foo
+  STUB_OUT_sv="fail: foo: unable to change to service directory" run_traced -1 dybatpho::service_is_active foo
+}
+
+@test "dybatpho::service_is_enabled reads OpenRC, runit and both launchd spellings" {
+  _os Linux
+  _stub rc-service
+  _stub rc-update
+  STUB_OUT_rc_update=$'            foo | default\n            bar | default' \
+    run_traced -0 dybatpho::service_is_enabled foo --user
+  STUB_OUT_rc_update=$'         foobar | default' run_traced -1 dybatpho::service_is_enabled foo --user
+  rm -f "${STUBS}/rc-service" "${STUBS}/rc-update"
+  _stub sv-enable
+  export PREFIX="${BATS_TEST_TMPDIR}/usr"
+  mkdir -p "${PREFIX}/var/service/foo"
+  run_traced -0 dybatpho::service_is_enabled foo
+  : > "${PREFIX}/var/service/foo/down"
+  run_traced -1 dybatpho::service_is_enabled foo
+  run_traced -1 dybatpho::service_is_enabled missing
+  _os Darwin
+  _stub launchctl
+  STUB_OUT_launchctl=$'disabled services = {\n\t"foo" => disabled\n\t"bar" => enabled\n}' \
+    run_traced -1 dybatpho::service_is_enabled foo --user
+  STUB_OUT_launchctl=$'disabled services = {\n\t"foo" => true\n}' run_traced -1 dybatpho::service_is_enabled foo --user
+  STUB_OUT_launchctl=$'disabled services = {\n\t"bar" => disabled\n}' run_traced -0 dybatpho::service_is_enabled foo --user
+}
+
+@test "dybatpho::service_disable, service_start and service_stop run their table's commands" {
+  _os Linux
+  _stub systemctl
+  mkdir -p "${__DYBATPHO_SERVICE_ROOT}/run/systemd/system"
+  run_traced -0 dybatpho::service_start foo --user
+  run_traced -0 dybatpho::service_stop foo --user
+  run_traced -0 dybatpho::service_disable foo --user
+  run -0 cat "${CALLS}"
+  assert_line "systemctl --user start foo"
+  assert_line "systemctl --user stop foo"
+  assert_line "systemctl --user disable --now foo"
+}

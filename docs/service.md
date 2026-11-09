@@ -4,7 +4,7 @@ Utilities for enabling, controlling and installing services
 
 > 🧭 Source: [src/service.sh](../src/service.sh)
 >
-> Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Reference](#reference)
+> Jump to: [Overview](#overview) · [Usage](#usage) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
 
@@ -36,6 +36,14 @@ not fail on it; `DYBATPHO_SERVICE_STRICT` makes that a failure.
 
 - [`dybatpho::service_manager`](#dybatphoservice_manager) — Print the service manager this machine runs.
 - [`dybatpho::service_manager_available`](#dybatphoservice_manager_available) — Tell whether the service manager can act in a scope here: it is installed, and running for that scope. systemd's user scope needs a user manager answering `show-environment`; its system scope a system that is not `offline` (a chroot) and not a container. OpenRC's user scope needs a user instance, OpenRC 0.60 and later; launchd's, a GUI session.
+- [`dybatpho::service_command`](#dybatphoservice_command) — Print the commands an action would run, one shell-quoted command per line, with the elevation prefix where the action is elevated. Nothing is run.
+- [`dybatpho::service_enable`](#dybatphoservice_enable) — Enable a service so it starts at boot or login, and start it now.
+- [`dybatpho::service_disable`](#dybatphoservice_disable) — Disable a service so it no longer starts, and stop it now. On launchd the job is also unloaded.
+- [`dybatpho::service_start`](#dybatphoservice_start) — Start a service now, without enabling it.
+- [`dybatpho::service_stop`](#dybatphoservice_stop) — Stop a service now, without disabling it. On launchd the job is unloaded, since a stopped job with `KeepAlive` would be started again.
+- [`dybatpho::service_restart`](#dybatphoservice_restart) — Restart a service.
+- [`dybatpho::service_is_active`](#dybatphoservice_is_active) — Tell whether a service is running now. On launchd a loaded job that is not running counts as not active.
+- [`dybatpho::service_is_enabled`](#dybatphoservice_is_enabled) — Tell whether a service is enabled, so it starts at boot or login.
 
 <a id="usage"></a>
 
@@ -58,6 +66,14 @@ dybatpho::service_enable sshd
 ## 🔗 See also
 
 - [example/service_ops.sh](../example/service_ops.sh)
+
+<a id="tips"></a>
+
+## 💡 Tips
+
+**[`dybatpho::service_enable`](#dybatphoservice_enable)**
+
+- On launchd the job must already be loaded; `dybatpho::service_install` loads it
 
 <a id="reference"></a>
 
@@ -120,3 +136,191 @@ dybatpho::service_manager_available --user || dybatpho::warn "No user services h
 
 - `0`: The manager can act in that scope
 - `1`: It cannot, or there is none
+
+---
+
+### `dybatpho::service_command`
+
+Print the commands an action would run, one shell-quoted
+command per line, with the elevation prefix where the action is elevated.
+Nothing is run.
+
+**🧪 Example**
+
+```bash
+dybatpho::service_command enable sshd
+# sudo -- systemctl enable --now sshd
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Action: `enable`, `disable`, `start`, `stop`, `restart`, `is-active` or `is-enabled` |
+| `$2` | string | Service name |
+| `$3` | string | [optional] `--user` for the user's own manager |
+
+**📤 Output on stdout**
+
+- The commands, one per line
+
+**🚦 Exit codes**
+
+- `0`: The commands were printed
+- `1`: No service manager was found
+
+---
+
+### `dybatpho::service_enable`
+
+Enable a service so it starts at boot or login, and start it now.
+
+**🧪 Example**
+
+```bash
+dybatpho::service_enable sshd
+dybatpho::service_enable syncthing --user
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the commands instead of running them |
+
+**🚦 Exit codes**
+
+- `0`: Enabled, or skipped with a warning where no manager can act
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+- `other`: Exit code of the command that failed
+
+---
+
+### `dybatpho::service_disable`
+
+Disable a service so it no longer starts, and stop it now. On
+launchd the job is also unloaded.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: Disabled, or skipped with a warning
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+- `other`: Exit code of the command that failed
+
+---
+
+### `dybatpho::service_start`
+
+Start a service now, without enabling it.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: Started, or skipped with a warning
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+- `other`: Exit code of the command that failed
+
+---
+
+### `dybatpho::service_stop`
+
+Stop a service now, without disabling it. On launchd the job is
+unloaded, since a stopped job with `KeepAlive` would be started again.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: Stopped, or skipped with a warning
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+- `other`: Exit code of the command that failed
+
+---
+
+### `dybatpho::service_restart`
+
+Restart a service.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: Restarted, or skipped with a warning
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+- `other`: Exit code of the command that failed
+
+---
+
+### `dybatpho::service_is_active`
+
+Tell whether a service is running now. On launchd a loaded job
+that is not running counts as not active.
+
+**🧪 Example**
+
+```bash
+dybatpho::service_is_active rclone --user && dybatpho::info "rclone is running"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: It is running
+- `1`: It is not, or no manager can answer
+
+---
+
+### `dybatpho::service_is_enabled`
+
+Tell whether a service is enabled, so it starts at boot or login.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: It is enabled
+- `1`: It is not, or no manager can answer

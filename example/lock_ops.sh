@@ -2,7 +2,9 @@
 # @file lock_ops.sh
 # @brief Example showing portable process locking utilities
 # @description Demonstrates dybatpho::lock_acquire, lock_release, lock_is_held,
-#              lock_info, and with_lock to prevent concurrent script runs
+#              lock_info, and with_lock to prevent concurrent script runs, and
+#              flock_acquire, flock_release and with_flock to share a lock with
+#              programs that `flock` the same file
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules lock
@@ -120,6 +122,42 @@ function _demo_semaphore {
   dybatpho::success "Every slot given back"
 }
 
+# --- flock -----------------------------------------------------------------
+
+# @description Count one more update of the demo state; run under `with_flock`,
+#   in the current shell, so the count reaches the caller.
+# @noargs
+function _bump_state {
+  STATE_UPDATES=$((STATE_UPDATES + 1))
+}
+
+# @description Run the `FLOCK` section of this example: a lock shared with a
+#   program that `flock`s the same file, two locks held at once, and a function
+#   run under the lock. Skipped where `flock` isn't installed, as on macOS.
+# @noargs
+function _demo_flock {
+  dybatpho::header "FLOCK"
+  if ! command -v flock > /dev/null; then
+    dybatpho::warn "flock isn't installed; skipping (install util-linux, or 'brew install flock')"
+    return 0
+  fi
+  local state index state_fd index_fd
+  state="$(dybatpho::lock_path "${LOCK_NAME}-state")"
+  index="$(dybatpho::lock_path "${LOCK_NAME}-index")"
+  dybatpho::flock_acquire state_fd "${state}"
+  dybatpho::flock_acquire index_fd "${index}" 0
+  dybatpho::info "Holding both locks, on descriptors ${state_fd} and ${index_fd}"
+  if ! flock -n "${state}" true; then
+    dybatpho::warn "Another program running 'flock -n' on the file is turned away (expected)"
+  fi
+  dybatpho::flock_release "${index_fd}"
+  dybatpho::flock_release "${state_fd}"
+
+  STATE_UPDATES=0
+  dybatpho::with_flock "${state}" 5 -- _bump_state
+  dybatpho::success "Updated the state ${STATE_UPDATES} time under the lock, then let it go"
+}
+
 # --- main -----------------------------------------------------------------
 
 # @description Run every section of this example, in order.
@@ -131,6 +169,7 @@ function _main {
   _demo_wait_with_timeout
   _demo_with_lock
   _demo_semaphore
+  _demo_flock
   dybatpho::success "Lock operations demo complete"
 }
 

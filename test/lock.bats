@@ -11,6 +11,7 @@ setup() {
 }
 
 teardown() {
+  _release_flock_holder
   rm -rf "${DYBATPHO_LOCK_DIR}"/dybatpho-*.lock 2> /dev/null || true
 }
 
@@ -802,4 +803,159 @@ _replay_reclaim_race() {
   run_traced -0 compgen -G "${lock_path}.stale.*"
   run_traced -1 compgen -G "${lock_path}/*"
   rm -rf -- "${lock_path}" "${lock_path}".stale.*
+}
+
+# Skip where `flock` is missing: the flock locks need it, and a stock macOS has
+# none.
+_need_flock() {
+  command -v flock > /dev/null || skip "flock is not installed"
+}
+
+# Hold a flock on a file from another process for some seconds, and return once
+# it is held: the background process may not have it yet when `&` returns. One
+# process holds it, rather than `flock file sleep`, whose child would keep the
+# lock after the parent is killed.
+_hold_flock() {
+  local file="$1" seconds="$2" i
+  bash -c 'exec 9>> "$1" && flock 9 && exec sleep "$2"' _ "${file}" "${seconds}" &> /dev/null 3>&- &
+  FLOCK_HOLDER=$!
+  for ((i = 0; i < 50; i++)); do
+    flock -n "${file}" true || return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+_release_flock_holder() {
+  [[ -z "${FLOCK_HOLDER-}" ]] || kill "${FLOCK_HOLDER}" 2> /dev/null || true
+}
+
+@test "dybatpho::flock_acquire holds a lock other processes see until it is released" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/state.lock" fd=""
+  dybatpho::flock_acquire fd "${file}"
+  [[ "${fd}" =~ ^[0-9]+$ ]]
+  run -1 flock -n "${file}" true
+  dybatpho::flock_release "${fd}"
+  run -0 flock -n "${file}" true
+}
+
+@test "dybatpho::flock_acquire gives up at once with a wait of 0 while another process holds the lock" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/held.lock" fd="" before="" after=""
+  local -a fds=()
+  _hold_flock "${file}" 30
+  [[ ! -d /proc/self/fd ]] || { fds=(/proc/"${BASHPID}"/fd/*) && before="${#fds[@]}"; }
+  local start="${SECONDS}"
+  local status=0
+  dybatpho::flock_acquire fd "${file}" 0 || status=$?
+  assert_equal "${status}" 1
+  assert_equal "${fd}" ""
+  ((SECONDS - start < 5))
+  # The descriptor opened for the attempt is closed again.
+  [[ ! -d /proc/self/fd ]] || { fds=(/proc/"${BASHPID}"/fd/*) && after="${#fds[@]}"; }
+  assert_equal "${after}" "${before}"
+  _release_flock_holder
+}
+
+@test "dybatpho::flock_acquire gives up after the given seconds while another process holds the lock" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/slow.lock" fd=""
+  _hold_flock "${file}" 30
+  local start="${SECONDS}"
+  local status=0
+  dybatpho::flock_acquire fd "${file}" 0.3 || status=$?
+  assert_equal "${status}" 1
+  ((SECONDS - start < 5))
+  _release_flock_holder
+}
+
+@test "dybatpho::flock_acquire waits for a holder that lets go within the given seconds" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/brief.lock" fd=""
+  _hold_flock "${file}" 0.5
+  dybatpho::flock_acquire fd "${file}" 10
+  run -1 flock -n "${file}" true
+  dybatpho::flock_release "${fd}"
+}
+
+@test "dybatpho::flock_acquire holds two locks at once on separate descriptors" {
+  _need_flock
+  local first="" second=""
+  dybatpho::flock_acquire first "${BATS_TEST_TMPDIR}/one.lock"
+  dybatpho::flock_acquire second "${BATS_TEST_TMPDIR}/two.lock"
+  [[ "${first}" != "${second}" ]]
+  run -1 flock -n "${BATS_TEST_TMPDIR}/one.lock" true
+  run -1 flock -n "${BATS_TEST_TMPDIR}/two.lock" true
+  dybatpho::flock_release "${second}"
+  dybatpho::flock_release "${first}"
+  run -0 flock -n "${BATS_TEST_TMPDIR}/one.lock" true
+}
+
+@test "dybatpho::flock_release lets go even while a background child still has the descriptor" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/inherited.lock" fd="" child
+  dybatpho::flock_acquire fd "${file}"
+  sleep 30 &> /dev/null 3>&- &
+  child=$!
+  dybatpho::flock_release "${fd}"
+  run -0 flock -n "${file}" true
+  kill "${child}"
+}
+
+@test "dybatpho::flock_acquire refuses a wait that is not a number of seconds" {
+  local fd=""
+  run -1 --separate-stderr dybatpho::flock_acquire fd "${BATS_TEST_TMPDIR}/x.lock" soon
+  assert_stderr --partial "The wait must be a number of seconds, got: soon"
+}
+
+@test "dybatpho::flock_acquire stops with an install hint when flock is missing" {
+  local fd=""
+  PATH="$(path_without flock)" run -127 --separate-stderr dybatpho::flock_acquire fd "${BATS_TEST_TMPDIR}/x.lock"
+  assert_stderr --partial "flock isn't installed"
+  assert_stderr --partial "util-linux"
+}
+
+@test "dybatpho::flock_release refuses a descriptor that is not a number" {
+  run -1 --separate-stderr dybatpho::flock_release "nine"
+  assert_stderr --partial "Expected a file descriptor number, got: nine"
+}
+
+@test "dybatpho::with_flock runs the command in the current shell while holding the lock" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/with.lock" seen=""
+  _probe() { if flock -n "${file}" true; then seen=free; else seen=held; fi; }
+  dybatpho::with_flock "${file}" 0 -- _probe
+  assert_equal "${seen}" "held"
+  run -0 flock -n "${file}" true
+}
+
+@test "dybatpho::with_flock releases the lock and returns the command's status when it fails" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/fail.lock"
+  run_traced -3 dybatpho::with_flock "${file}" 0 -- bash -c 'exit 3'
+  run -0 flock -n "${file}" true
+}
+
+@test "dybatpho::with_flock returns 1 without running the command while the lock is held" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/busy.lock"
+  _hold_flock "${file}" 30
+  run_traced -1 dybatpho::with_flock "${file}" 0 -- touch "${BATS_TEST_TMPDIR}/ran"
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/ran"
+  _release_flock_holder
+}
+
+@test "dybatpho::with_flock with an empty wait waits for the holder to finish" {
+  _need_flock
+  local file="${BATS_TEST_TMPDIR}/drain.lock"
+  _hold_flock "${file}" 0.5
+  dybatpho::with_flock "${file}" "" -- true
+  run -0 flock -n "${file}" true
+}
+
+@test "dybatpho::with_flock requires a -- separator" {
+  run dybatpho::with_flock "${BATS_TEST_TMPDIR}/sep.lock" 0 true
+  assert_failure
+  assert_output --partial "Expected: file wait -- command"
 }

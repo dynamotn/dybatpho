@@ -25,6 +25,11 @@ A lock is a symbolic link whose target records the process holding it
 - inspect which process currently holds a lock
 - detect and reclaim stale locks left behind by a dead process
 
+When a lock has to be shared with other programs that `flock` the same
+file, `dybatpho::flock_acquire`, `dybatpho::flock_release` and
+`dybatpho::with_flock` take a `flock` instead. They need `flock` installed
+and stop the script with an install hint when it isn't.
+
 ### 🌍 Environment
 
 | Variable | Type | Description |
@@ -44,6 +49,9 @@ A lock is a symbolic link whose target records the process holding it
 - [`dybatpho::lock_acquire`](#dybatpholock_acquire) — Acquire a portable, cross-platform (Linux/macOS) file lock, waiting up to a timeout.
 - [`dybatpho::lock_release`](#dybatpholock_release) — Release a lock previously acquired by the current process.
 - [`dybatpho::with_lock`](#dybatphowith_lock) — Acquire a lock, run a command while holding it, then release it, even if the command fails.
+- [`dybatpho::flock_acquire`](#dybatphoflock_acquire) — Take a `flock` on a file through a descriptor of its own, for sharing a lock with other programs that `flock` the same file. Unlike `dybatpho::lock_acquire`, it needs `flock`, and records no holder: the kernel drops the lock when the holder dies, so there is nothing stale to reclaim.
+- [`dybatpho::flock_release`](#dybatphoflock_release) — Let go of a lock taken by `dybatpho::flock_acquire` and close its descriptor. The lock is dropped before the descriptor is closed: a background job started while it was held has its own copy of the descriptor, and closing ours alone would leave the lock held for as long as that job runs.
+- [`dybatpho::with_flock`](#dybatphowith_flock) — Take a `flock` on a file, run a command while holding it, then let go, even if the command fails. The command runs in the current shell, so a function it calls can set the caller's variables.
 - [`dybatpho::lock_semaphore_acquire`](#dybatpholock_semaphore_acquire) — Take one of a fixed number of slots, so that at most that many processes run a section at once, waiting up to a timeout for one to free up. A semaphore is a row of ordinary locks, one per slot, tried in order. Each slot is claimed atomically and records its holder, so a slot left by a dead process is reclaimed exactly as a stale lock is, and a refusal names every process holding a slot. Every caller must give the same slot count.
 - [`dybatpho::lock_semaphore_release`](#dybatpholock_semaphore_release) — Give back a semaphore slot taken by the current process. Naming the slot releases that one; without it, every slot the current process holds is released, which is what an exit handler wants.
 - [`dybatpho::lock_semaphore_holders`](#dybatpholock_semaphore_holders) — Print who holds each taken slot of a semaphore.
@@ -72,6 +80,12 @@ dybatpho::with_lock "deploy" 30 -- ./deploy.sh
 dybatpho::lock_info "deploy"
 ```
 
+### Share a lock with programs that `flock` the same file
+
+```bash
+dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
+```
+
 <a id="see-also"></a>
 
 ## 🔗 See also
@@ -90,6 +104,11 @@ dybatpho::lock_info "deploy"
 **[`dybatpho::lock_release`](#dybatpholock_release)**
 
 - Safe to call even when the lock was never acquired by this process
+
+**[`dybatpho::flock_acquire`](#dybatphoflock_acquire)**
+
+- Each call opens a new descriptor, so several locks can be held at once
+- A background job started while the lock is held inherits the descriptor; `dybatpho::flock_release` lets go even so
 
 <a id="reference"></a>
 
@@ -306,6 +325,96 @@ dybatpho::with_lock "deploy" 30 -- ./deploy.sh --env prod
 **🚦 Exit codes**
 
 - `1`: The lock couldn't be acquired within the timeout
+- `other`: Exit code of the wrapped command
+
+---
+
+### `dybatpho::flock_acquire`
+
+Take a `flock` on a file through a descriptor of its own, for
+sharing a lock with other programs that `flock` the same file. Unlike
+`dybatpho::lock_acquire`, it needs `flock`, and records no holder: the
+kernel drops the lock when the holder dies, so there is nothing stale to
+reclaim.
+
+**🧪 Example**
+
+```bash
+local fd
+dybatpho::flock_acquire fd "${state_dir}/state.lock" 5 || dybatpho::die "State is busy"
+# ... read, change and write the state ...
+dybatpho::flock_release "${fd}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the descriptor |
+| `$2` | path | yes |  | File to lock, used as given and created when missing |
+| `$3` | number | no | `wait until free` | Seconds to wait; `0` tries once without waiting |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable, to the descriptor holding the lock
+
+**🚦 Exit codes**
+
+- `0`: The lock was taken
+- `1`: Another process held the lock for the whole wait
+- `127`: Stop script when `flock` isn't installed
+
+---
+
+### `dybatpho::flock_release`
+
+Let go of a lock taken by `dybatpho::flock_acquire` and close its
+descriptor.
+The lock is dropped before the descriptor is closed: a background job
+started while it was held has its own copy of the descriptor, and closing
+ours alone would leave the lock held for as long as that job runs.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | number | Descriptor set by `dybatpho::flock_acquire` |
+
+---
+
+### `dybatpho::with_flock`
+
+Take a `flock` on a file, run a command while holding it, then
+let go, even if the command fails. The command runs in the current shell,
+so a function it calls can set the caller's variables.
+
+**🧪 Examples**
+
+```bash
+dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state "${id}"
+
+```
+
+```bash
+# Wait for whoever holds the lock to finish
+dybatpho::with_flock "${state_dir}/state.lock" "" -- true
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | path | File to lock |
+| `$2` | number | Seconds to wait; `0` tries once, empty waits until free |
+| `$3` | string | Literal `--` separating lock options from the command |
+| `$@` | string | Command and arguments to run while holding the lock |
+
+**🚦 Exit codes**
+
+- `1`: The lock couldn't be taken within the wait
+- `127`: Stop script when `flock` isn't installed
 - `other`: Exit code of the wrapped command
 
 ---

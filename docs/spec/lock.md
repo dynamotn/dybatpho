@@ -2,7 +2,7 @@
 
 **Feature Branch**: `[reverse-spec-lock]`
 **Status**: Implemented
-**Input**: Existing source analysis: `src/lock.sh`, `docs/lock.md`, `test/lock.bats`, and `example/lock_ops.sh`
+**Input**: Existing source analysis: `src/lock.sh`, `docs/lock.md`, `test/lock.bats`, and `example/lock_ops.sh`; the `flock` locks from how `dyai` guards its shared state
 
 ## Problem Statement *(mandatory)*
 
@@ -20,6 +20,8 @@ give the operator no way to see who is holding it.
   the holder instead of failing silently.
 - Recover automatically from locks abandoned by a crashed process.
 - Guarantee the lock is released when the guarded command fails.
+- Let a script share a lock with other programs that `flock` the same file,
+  without each one opening and closing descriptors by hand.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -140,6 +142,39 @@ eventually runs.
    **Then** the command runs holding a slot, the slot is given back afterwards,
    and the command's exit code is propagated
 
+---
+
+### User Story 7 - Share a lock with programs that use `flock` (Priority: P2)
+
+As a script author whose state file is also guarded by other programs through
+`flock`, I want to take that same lock, wait for it, or give up at once, and
+hold several such locks together, so my script and theirs never write at the
+same time.
+
+**Independent Test**: Hold a `flock` on a file from another process, then take
+it through `flock_acquire` with no wait, a short wait and an unlimited wait,
+and run a function under `with_flock`.
+
+**Acceptance Scenarios**:
+
+1. **Given** a free file, **When** `flock_acquire VAR FILE` runs, **Then** VAR
+   names a descriptor holding a `flock` that other processes see, until
+   `flock_release` lets it go
+2. **Given** another process holds the lock, **When** the wait is `0`, **Then**
+   `flock_acquire` returns 1 at once and leaves no descriptor open; **When** the
+   wait is N seconds, **Then** it returns 1 after them, or takes the lock as
+   soon as the holder lets go
+3. **Given** two files, **When** both are locked, **Then** each lock has its own
+   descriptor
+4. **Given** a background job inherited the descriptor, **When**
+   `flock_release` runs, **Then** the lock is free
+5. **Given** `with_flock FILE WAIT -- COMMAND`, **When** it runs, **Then** the
+   command runs in the current shell holding the lock, the lock is released
+   whatever the command returns, and its exit code is propagated; an empty WAIT
+   waits for the holder to finish
+6. **Given** `flock` is not installed, **When** any of them runs, **Then** the
+   script stops with exit code 127 and says how to install it
+
 ### Example Workflow
 
 ```bash
@@ -156,6 +191,9 @@ dybatpho::lock_info "deploy"
 # At most four downloads at once, across every copy of the script.
 dybatpho::with_semaphore downloads 4 60 -- curl -fsSLO "${url}"
 dybatpho::lock_semaphore_holders downloads 4
+
+# Update state that another program also guards with flock.
+dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 ```
 
 ## Edge Cases
@@ -186,13 +224,20 @@ dybatpho::lock_semaphore_holders downloads 4
 - The variable a caller names for the slot number matches a name the semaphore uses internally, such as `timeout`.
 - `lock_acquire` is given a timeout that is not a number of seconds.
 - A directory sits at the lock name, as an older copy of the library leaves one, while its holder still runs.
+- `flock` is not installed, as on a stock macOS.
+- A `flock` wait that is not a number of seconds, a fractional wait, and an
+  empty wait.
+- A background job inherits the descriptor of a held `flock` and outlives the
+  release.
+- The function run by `with_flock` sets a variable of its caller.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The module MUST implement locking without depending on `flock`,
-  and MUST work the same way on Linux and macOS.
+- **FR-001**: The module MUST implement its named locks and semaphores without
+  depending on `flock`, and MUST work the same way on Linux and macOS; only the
+  `flock_*` functions and `with_flock` use `flock`.
 - **FR-002**: Lock creation MUST be atomic, using one `ln -s` whose target
   already names the holder, rather than a check-then-create sequence or a
   claim followed by a separate write of the owner.
@@ -274,6 +319,13 @@ dybatpho::lock_semaphore_holders downloads 4
 - **FR-034**: `__dybatpho_lock_try` MUST remove whatever sits at `<lock>.command` and create the sidecar with `noclobber`, so a planted link is never written through.
 - **FR-035**: `__dybatpho_lock_holder_alive` MUST treat a process `kill -0` is refused for as alive when `/proc/<pid>` exists or `ps -p` finds it.
 - **FR-036**: A claim MUST succeed only when the lock name itself became the link; a directory at the name MUST be refused, and nothing MUST be left inside it.
+- **FR-037**: `flock_acquire` MUST open the file, creating it when missing, on a new descriptor the shell allocates, take a `flock` on it, and set the named variable to that descriptor.
+- **FR-038**: `flock_acquire` MUST wait until the lock is free when no wait is given, try once when the wait is `0`, and give up after the given seconds otherwise, fractions included; on giving up it MUST return 1 and close the descriptor it opened.
+- **FR-039**: `flock_acquire` MUST stop the script when the wait is not a number of seconds.
+- **FR-040**: `flock_acquire` and `with_flock` MUST stop the script with exit code 127 and a hint naming `util-linux` and `brew install flock` when `flock` is not installed, rather than fall back to another kind of lock.
+- **FR-041**: `flock_release` MUST unlock before it closes the descriptor, so a copy held by a background job does not keep the lock, and MUST stop the script when given anything but a descriptor number.
+- **FR-042**: `with_flock` MUST follow the `with_lock` contract -- the `--` separator, release after success, failure and interruption, and the command's exit code -- and MUST run the command in the current shell.
+- **FR-043**: `with_flock` MUST return 1 without running the command when the lock cannot be taken within the wait.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -287,6 +339,9 @@ dybatpho::lock_semaphore_holders downloads 4
   current host.
 - **Lock Base Directory**: `DYBATPHO_LOCK_DIR`, the root used to resolve bare
   lock names.
+- **Flock Lock**: A `flock` held on an ordinary file through a descriptor; the
+  kernel drops it when its holder exits, so it is never stale and records no
+  holder.
 - **Semaphore Slot**: One of N locks named `<name>.slot<n>.lock` beside the
   semaphore's lock path; holding any one of them is holding the semaphore.
 
@@ -300,8 +355,10 @@ dybatpho::lock_semaphore_holders downloads 4
 - **SC-003**: A lock abandoned by a crashed process never blocks later runs.
 - **SC-004**: A command run through `with_lock` never leaves the lock behind,
   including when it fails.
-- **SC-005**: No lock operation depends on `flock` or any other tool absent
-  from a default macOS install.
+- **SC-005**: No named lock or semaphore operation depends on `flock` or any
+  other tool absent from a default macOS install.
+- **SC-007**: A script and another program that `flock` the same file are
+  never inside it at once.
 - **SC-006**: However many copies start, no more than the slot count are ever
   inside a semaphore at once.
 
@@ -355,6 +412,14 @@ dybatpho::lock_semaphore_holders downloads 4
 - **IT-030**: Plant a link named `<lock>.command` at a file, acquire the lock, and find the file untouched and the link replaced.
 - **IT-031**: Acquire a lock whose name holds a live lock in the older directory form, and see the acquire refused with no link left inside the directory.
 - **IT-032**: Let a new holder claim a stale lock while it is being reclaimed, and see the new holder's command still recorded.
+- **IT-033**: Take a `flock`, see another process refused, release it, and see the other process get it.
+- **IT-034**: Against a lock held by another process, give up at once with a wait of `0` and leave no descriptor open, and give up after a 0.3 second wait.
+- **IT-035**: Take a lock whose holder lets go within the wait.
+- **IT-036**: Hold two `flock` locks at once on different descriptors.
+- **IT-037**: Release a lock while a background job still has its descriptor, and see another process take it.
+- **IT-038**: Refuse the wait `soon` and the descriptor `nine`, and stop with an install hint when `flock` is not on the `PATH`.
+- **IT-039**: Run a function under `with_flock` that sees the lock held and sets a caller variable; propagate a failing exit code and release; refuse to run while another process holds the lock.
+- **IT-040**: Wait under `with_flock` with an empty wait for a holder to finish, and reject a missing `--`.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -365,3 +430,6 @@ dybatpho::lock_semaphore_holders downloads 4
    silently.
 4. A semaphore is built from the same atomic, self-describing locks, so it
    inherits their stale reclaim and holder reporting rather than adding its own.
+5. A `flock` lock taken through the module excludes every other program that
+   `flock`s the same file, and is never silently replaced by another kind of
+   lock.

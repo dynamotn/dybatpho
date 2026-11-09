@@ -158,6 +158,14 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   drops `GIT_DIR`, `GIT_INDEX_FILE` and the other variables a git hook exports,
   so a suite run from a pre-commit hook no longer writes into the repository
   being committed to.
+- **`lock` — share a lock with other programs that `flock` the same file.**
+  `dybatpho::flock_acquire <var> <file> [seconds]` takes a `flock` on a
+  descriptor of its own (no wait: until free; `0`: try once), so several locks
+  can be held at once; `dybatpho::flock_release` lets go even when a background
+  job inherited the descriptor; `dybatpho::with_flock <file> <seconds> --
+  command` runs a command in the current shell under the lock. They need
+  `flock` and stop with an install hint when it is missing, rather than fall
+  back to the portable lock.
 
 ## [7.1.0] - 2026-10-31
 

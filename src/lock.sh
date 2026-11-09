@@ -23,6 +23,11 @@
 #   - wait for a lock with a timeout instead of failing immediately
 #   - inspect which process currently holds a lock
 #   - detect and reclaim stale locks left behind by a dead process
+#
+#   When a lock has to be shared with other programs that `flock` the same
+#   file, `dybatpho::flock_acquire`, `dybatpho::flock_release` and
+#   `dybatpho::with_flock` take a `flock` instead. They need `flock` installed
+#   and stop the script with an install hint when it isn't.
 # @usage
 #   ### Prevent concurrent runs of the same script
 #
@@ -41,6 +46,12 @@
 #
 #   ```bash
 #   dybatpho::lock_info "deploy"
+#   ```
+#
+#   ### Share a lock with programs that `flock` the same file
+#
+#   ```bash
+#   dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 #   ```
 # @see
 #   - `example/lock_ops.sh`
@@ -588,6 +599,106 @@ function __dybatpho_lock_run_holding {
     kill -s "${__dybatpho_lock_caught}" "${BASHPID}"
   fi
   return "${__dybatpho_lock_hold_exit_code}"
+}
+
+#######################################
+# @description Take a `flock` on a file through a descriptor of its own, for
+#   sharing a lock with other programs that `flock` the same file. Unlike
+#   `dybatpho::lock_acquire`, it needs `flock`, and records no holder: the
+#   kernel drops the lock when the holder dies, so there is nothing stale to
+#   reclaim.
+# @example
+#   local fd
+#   dybatpho::flock_acquire fd "${state_dir}/state.lock" 5 || dybatpho::die "State is busy"
+#   # ... read, change and write the state ...
+#   dybatpho::flock_release "${fd}"
+#
+# @arg $1 string Name of the variable receiving the descriptor
+# @arg $2 path File to lock, used as given and created when missing
+# @arg $3 number [default: wait until free] Seconds to wait; `0` tries once without waiting
+# @set The named variable, to the descriptor holding the lock
+# @exitcode 0 The lock was taken
+# @exitcode 1 Another process held the lock for the whole wait
+# @exitcode 127 Stop script when `flock` isn't installed
+# @tip Each call opens a new descriptor, so several locks can be held at once
+# @tip A background job started while the lock is held inherits the descriptor;
+#   `dybatpho::flock_release` lets go even so
+#######################################
+function dybatpho::flock_acquire {
+  local __dybatpho_flock_var __dybatpho_flock_file
+  dybatpho::expect_args __dybatpho_flock_var __dybatpho_flock_file -- "$@"
+  local __dybatpho_flock_wait="${3-}"
+  [[ -z "${__dybatpho_flock_wait}" || "${__dybatpho_flock_wait}" =~ ^[0-9]+(\.[0-9]+)?$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: The wait must be a number of seconds, got: ${__dybatpho_flock_wait}"
+  command -v flock > /dev/null || dybatpho::die \
+    "${FUNCNAME[0]}: flock isn't installed; install util-linux, or 'brew install flock' on macOS" 127
+
+  local -a __dybatpho_flock_mode=()
+  if [[ "${__dybatpho_flock_wait}" =~ ^0+(\.0+)?$ ]]; then
+    __dybatpho_flock_mode=(-n)
+  elif [[ -n "${__dybatpho_flock_wait}" ]]; then
+    __dybatpho_flock_mode=(-w "${__dybatpho_flock_wait}")
+  fi
+
+  local __dybatpho_flock_fd
+  { exec {__dybatpho_flock_fd}>> "${__dybatpho_flock_file}"; } 2> /dev/null \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot open the lock file ${__dybatpho_flock_file}"
+  if ! flock ${__dybatpho_flock_mode[@]+"${__dybatpho_flock_mode[@]}"} "${__dybatpho_flock_fd}"; then
+    exec {__dybatpho_flock_fd}>&-
+    return 1
+  fi
+  printf -v "${__dybatpho_flock_var}" '%s' "${__dybatpho_flock_fd}"
+}
+
+#######################################
+# @description Let go of a lock taken by `dybatpho::flock_acquire` and close its
+#   descriptor.
+#   The lock is dropped before the descriptor is closed: a background job
+#   started while it was held has its own copy of the descriptor, and closing
+#   ours alone would leave the lock held for as long as that job runs.
+# @arg $1 number Descriptor set by `dybatpho::flock_acquire`
+#######################################
+function dybatpho::flock_release {
+  local __dybatpho_flock_fd
+  dybatpho::expect_args __dybatpho_flock_fd -- "$@"
+  [[ "${__dybatpho_flock_fd}" =~ ^[0-9]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected a file descriptor number, got: ${__dybatpho_flock_fd}"
+  flock -u "${__dybatpho_flock_fd}" 2> /dev/null || true
+  exec {__dybatpho_flock_fd}>&-
+}
+
+#######################################
+# @description Take a `flock` on a file, run a command while holding it, then
+#   let go, even if the command fails. The command runs in the current shell,
+#   so a function it calls can set the caller's variables.
+# @example
+#   dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state "${id}"
+#
+# @example
+#   # Wait for whoever holds the lock to finish
+#   dybatpho::with_flock "${state_dir}/state.lock" "" -- true
+#
+# @arg $1 path File to lock
+# @arg $2 number Seconds to wait; `0` tries once, empty waits until free
+# @arg $3 string Literal `--` separating lock options from the command
+# @arg $@ string Command and arguments to run while holding the lock
+# @exitcode 1 The lock couldn't be taken within the wait
+# @exitcode 127 Stop script when `flock` isn't installed
+# @exitcode other Exit code of the wrapped command
+#######################################
+function dybatpho::with_flock {
+  local __dybatpho_flock_with_file __dybatpho_flock_with_wait __dybatpho_flock_with_separator
+  dybatpho::expect_args __dybatpho_flock_with_file __dybatpho_flock_with_wait \
+    __dybatpho_flock_with_separator -- "$@"
+  shift 3
+  [[ "${__dybatpho_flock_with_separator}" == "--" ]] || dybatpho::die \
+    "${FUNCNAME[0]}: Expected: file wait -- command [args...]"
+  (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command to run after --"
+
+  local __dybatpho_flock_with_fd
+  dybatpho::flock_acquire __dybatpho_flock_with_fd "${__dybatpho_flock_with_file}" \
+    "${__dybatpho_flock_with_wait}" || return 1
+  __dybatpho_lock_run_holding "dybatpho::flock_release ${__dybatpho_flock_with_fd}" "$@"
 }
 
 #######################################

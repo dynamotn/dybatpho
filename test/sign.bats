@@ -430,3 +430,12 @@ _without_terminal() {
   gpg --armor --export alice@example.test > "${BATS_TEST_TMPDIR}/alice-revoked.asc"
   run_traced -1 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/alice-revoked.asc"
 }
+
+@test "dybatpho::sign_public_key gpg refuses a user id that matches more than one key" {
+  _gpg_keys alice bob
+  run -1 --separate-stderr dybatpho::sign_public_key gpg example.test
+  assert_stderr --partial "example.test matches 2 keys"
+  dybatpho::sign_public_key gpg alice@example.test > "${BATS_TEST_TMPDIR}/one.asc"
+  run -0 bash -c "gpg --show-keys --with-colons '${BATS_TEST_TMPDIR}/one.asc' | grep -c '^pub:'"
+  assert_output "1"
+}

@@ -558,9 +558,36 @@ function __dybatpho_sign_minisign_public_key {
 # @internal
 #######################################
 function __dybatpho_sign_gpg_public_key {
-  __dybatpho_sign_run gpg --batch --armor --export -- "$1" < /dev/null > "$2/public" 2> "$2/err" \
-    && [[ -s "$2/public" ]] || {
+  # A user id matches by substring, so `example.com` can name several keys,
+  # and pinning all of them would trust more than the caller meant. Resolve it
+  # to exactly one fingerprint, then export that key alone.
+  local line fpr="" keys=0 field
+  __dybatpho_sign_run gpg --batch --with-colons --list-keys -- "$1" \
+    < /dev/null > "$2/keys" 2> "$2/err" || true
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    case "${line}" in
+      pub:*) keys=$((keys + 1)) field=fpr ;;
+      fpr:*)
+        if [[ "${field-}" == fpr ]]; then
+          fpr="${line#fpr:::::::::}"
+          fpr="${fpr%%:*}"
+          field=""
+        fi
+        ;;
+      *) ;;
+    esac
+  done < "$2/keys"
+  if ((keys == 0)); then
     dybatpho::error "No public key for $1"
+    return 1
+  fi
+  if ((keys > 1)); then
+    dybatpho::error "$1 matches ${keys} keys; name one by its fingerprint"
+    return 1
+  fi
+  __dybatpho_sign_run gpg --batch --armor --export-options export-minimal --export -- "${fpr}!" \
+    < /dev/null > "$2/public" 2> "$2/err" && [[ -s "$2/public" ]] || {
+    __dybatpho_sign_report "gpg could not export $1" "$2/err"
     return 1
   }
   cat -- "$2/public"

@@ -474,7 +474,96 @@ function __dybatpho_sign_gpg_verify {
     __dybatpho_sign_gpg_keyring_add "${key}" "${work}/trusted.gpg"
   done
   __dybatpho_sign_run gpgv --homedir "${work}/gnupg" --keyring "${work}/trusted.gpg" \
-    -- "${signature}" "${file}" < /dev/null > /dev/null 2> "${work}/err"
+    --status-fd 3 -- "${signature}" "${file}" \
+    < /dev/null > /dev/null 2> "${work}/err" 3> "${work}/status" || return
+  # gpgv's exit code alone is not enough: it is 0 for a signature by a revoked
+  # or expired key. Accept only a valid signature with no other verdict beside
+  # it, and no data carried inside the signature itself.
+  local tag rest valid=0
+  while read -r tag rest || [[ -n "${tag}" ]]; do
+    case "${rest%% *}" in
+      VALIDSIG) valid=1 ;;
+      BADSIG | ERRSIG | EXPSIG | EXPKEYSIG | REVKEYSIG | KEYREVOKED | KEYEXPIRED | NO_PUBKEY | PLAINTEXT | \
+        BADARMOR | NODATA) return 1 ;;
+      *) ;;
+    esac
+    [[ "${tag}" == "[GNUPG:]" ]] || return 1
+  done < "${work}/status"
+  ((valid))
+}
+
+#######################################
+# @description Print the key line of the first line of a file a backend
+#   recognises as its own public key.
+# @arg $1 string Backend
+# @arg $2 path File
+# @stdout The key, as `__dybatpho_sign_classify` returns it without the backend
+# @exitcode 1 No such line
+# @internal
+#######################################
+function __dybatpho_sign_public_line {
+  local line kind
+  [[ -f "$2" && -r "$2" ]] || return 1
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    kind="$(__dybatpho_sign_classify "${line%$'\r'}")"
+    if [[ "${kind%% *}" == "$1" ]]; then
+      printf '%s\n' "${kind#* }"
+      return 0
+    fi
+  done < "$2"
+  return 1
+}
+
+#######################################
+# @description Print the public key of an SSH key file.
+# @arg $1 path Private key, or a public key file
+# @arg $2 path Working directory
+# @internal
+#######################################
+function __dybatpho_sign_ssh_public_key {
+  __dybatpho_sign_public_line ssh "$1" && return 0
+  local line
+  __dybatpho_sign_run ssh-keygen -y -f "$1" < /dev/null > "$2/public" 2> "$2/err" || {
+    local status=$?
+    __dybatpho_sign_report "ssh-keygen could not read $1" "$2/err"
+    return "${status}"
+  }
+  __dybatpho_sign_public_line ssh "$2/public"
+}
+
+#######################################
+# @description Print the public key of a minisign key: from a public key file,
+#   from the `.pub` beside a secret key, or recreated from the secret key.
+# @arg $1 path Secret or public key file
+# @arg $2 path Working directory
+# @internal
+#######################################
+function __dybatpho_sign_minisign_public_key {
+  __dybatpho_sign_public_line minisign "$1" && return 0
+  __dybatpho_sign_public_line minisign "${1%.key}.pub" && return 0
+  local input=/dev/stdin
+  dybatpho::is_tty stdin && dybatpho::is_tty stderr || input=/dev/null
+  __dybatpho_sign_run minisign -R -s "$1" -p "$2/public" < "${input}" > /dev/null 2> "$2/err" || {
+    local status=$?
+    __dybatpho_sign_report "minisign could not read $1" "$2/err"
+    return "${status}"
+  }
+  __dybatpho_sign_public_line minisign "$2/public"
+}
+
+#######################################
+# @description Print the armored public key of a key in the user's keyring.
+# @arg $1 string Key id, fingerprint or user id
+# @arg $2 path Working directory
+# @internal
+#######################################
+function __dybatpho_sign_gpg_public_key {
+  __dybatpho_sign_run gpg --batch --armor --export -- "$1" < /dev/null > "$2/public" 2> "$2/err" \
+    && [[ -s "$2/public" ]] || {
+    dybatpho::error "No public key for $1"
+    return 1
+  }
+  cat -- "$2/public"
 }
 
 #######################################
@@ -513,8 +602,39 @@ function dybatpho::sign_file {
   "__dybatpho_sign_${backend}_sign" "${key}" "${file}" "${work}/signature" "${work}" || status=$?
   ((status)) || mv -f -- "${work}/signature" "${signature}" || status=$?
   [[ -z "${work}" ]] || rm -rf -- "${work}"
+  ((status == 0 || status == 124)) || status=1
   ((status == 0)) || return "${status}"
   printf '%s\n' "${signature}"
+}
+
+#######################################
+# @description Print the value `dybatpho::verify_file` trusts for a key, to pin
+#   it in configuration.
+# @example
+#   dybatpho::sign_public_key ssh ~/.ssh/id_ed25519 >> trusted_keys
+#
+# @example
+#   dybatpho::sign_public_key gpg release@example.com > release.asc
+#
+# @arg $1 string Backend: `ssh`, `minisign` or `gpg`
+# @arg $2 string Key: an SSH private or public key file; a minisign secret or
+#   public key file; a GnuPG key id
+# @stdout `<type> <base64>` for ssh, the base64 public key for minisign, an
+#   armored public key for gpg
+# @exitcode 0 The key was printed
+# @exitcode 1 The key cannot be read, or needs a passphrase away from a terminal
+# @exitcode 127 Stop script when the backend's tool is missing
+#######################################
+function dybatpho::sign_public_key {
+  local backend key
+  dybatpho::expect_args backend key -- "$@"
+  __dybatpho_sign_require "${backend}" sign
+  local work status=0
+  dybatpho::create_temp_dir work "sign"
+  "__dybatpho_sign_${backend}_public_key" "${key}" "${work}" || status=$?
+  [[ -z "${work}" ]] || rm -rf -- "${work}"
+  ((status == 0 || status == 124)) || status=1
+  return "${status}"
 }
 
 #######################################

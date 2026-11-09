@@ -341,3 +341,92 @@ _gpg_keys() {
   PATH="$(path_without gpg)" run -127 --separate-stderr dybatpho::sign_file gpg someone "${file}"
   assert_stderr --partial "gpg isn't installed; install gnupg"
 }
+
+# Run a library call in a fresh shell with no controlling terminal and stdin
+# from /dev/null, bounded so a call that waits on a prompt fails the test
+# rather than hanging the suite.
+_without_terminal() {
+  command -v setsid > /dev/null || skip "setsid is not installed"
+  local script="${BATS_TEST_TMPDIR}/no-tty.sh"
+  # shellcheck disable=SC2154 # DYBATPHO_DIR is set by test_helper
+  printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules sign" "$*" > "${script}"
+  timeout 20 setsid -w bash "${script}" < /dev/null
+}
+
+@test "dybatpho::sign_public_key ssh prints the type and base64 of a private key, which verifies its signature" {
+  _need_ssh_y
+  _ssh_key alice
+  local file
+  file="$(_payload doc.txt)"
+  run_traced -0 dybatpho::sign_public_key ssh "${BATS_TEST_TMPDIR}/alice"
+  assert_output "$(_ssh_pub alice)"
+  dybatpho::sign_file ssh "${BATS_TEST_TMPDIR}/alice" "${file}" > /dev/null
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.sig" "$(dybatpho::sign_public_key ssh "${BATS_TEST_TMPDIR}/alice")"
+}
+
+@test "dybatpho::sign_public_key minisign prints the public key of a secret key" {
+  _need_minisign
+  _minisign_key alice
+  run_traced -0 dybatpho::sign_public_key minisign "${BATS_TEST_TMPDIR}/alice.key"
+  assert_output "$(_minisign_pub alice)"
+}
+
+@test "dybatpho::sign_public_key gpg prints an armored export that verifies the key's signature" {
+  _gpg_keys alice
+  local file
+  file="$(_payload doc.txt)"
+  dybatpho::sign_public_key gpg alice@example.test > "${BATS_TEST_TMPDIR}/exported.asc"
+  assert_equal "$(head -1 "${BATS_TEST_TMPDIR}/exported.asc")" "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+  dybatpho::sign_file gpg alice@example.test "${file}" > /dev/null
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/exported.asc"
+  run -1 --separate-stderr dybatpho::sign_public_key gpg nobody@example.test
+  assert_stderr --partial "No public key for nobody@example.test"
+}
+
+@test "an ssh key with a passphrase fails at once without a terminal, from sign_file and sign_public_key" {
+  _need_ssh_y
+  ssh-keygen -q -t ed25519 -N 'a passphrase' -f "${BATS_TEST_TMPDIR}/locked"
+  local file
+  file="$(_payload doc.txt)"
+  run -1 _without_terminal dybatpho::sign_file ssh "'${BATS_TEST_TMPDIR}/locked'" "'${file}'"
+  assert_file_not_exists "${file}.sig"
+  run -1 _without_terminal dybatpho::sign_public_key ssh "'${BATS_TEST_TMPDIR}/locked'"
+}
+
+@test "a gpg key with a passphrase fails at once without a terminal" {
+  _gpg_keys
+  gpg --batch --pinentry-mode loopback --passphrase 'a passphrase' \
+    --quick-gen-key "locked <locked@example.test>" ed25519 sign never &> /dev/null \
+    || skip "gpg cannot generate a key here"
+  # The agent caches the passphrase from key generation; forget it.
+  gpgconf --kill gpg-agent
+  local file
+  file="$(_payload doc.txt)"
+  run -1 _without_terminal dybatpho::sign_file gpg locked@example.test "'${file}'"
+  assert_file_not_exists "${file}.asc"
+}
+
+@test "dybatpho::verify_file refuses a gpg 'signature' that carries signed data of its own" {
+  _gpg_keys alice
+  local file other="${BATS_TEST_TMPDIR}/other.txt" forged="${BATS_TEST_TMPDIR}/forged.asc"
+  file="$(_payload doc.txt)"
+  printf 'something alice did sign\n' > "${other}"
+  # A signed message, relabelled as a detached signature: gpgv would check the
+  # data inside it and never look at the file named beside it.
+  gpg --batch --armor --local-user alice@example.test --output - --sign -- "${other}" \
+    | sed 's/PGP MESSAGE/PGP SIGNATURE/' > "${forged}"
+  run_traced -1 dybatpho::verify_file "${file}" "${forged}" "${BATS_TEST_TMPDIR}/alice.asc"
+}
+
+@test "dybatpho::verify_file refuses a gpg signature by a key that has since been revoked" {
+  _gpg_keys alice
+  local file fpr revocation
+  file="$(_payload doc.txt)"
+  dybatpho::sign_file gpg alice@example.test "${file}" > /dev/null
+  fpr="$(gpg --with-colons --list-keys alice@example.test | awk -F: '$1 == "fpr" { print $10; exit }')"
+  revocation="${GNUPGHOME}/openpgp-revocs.d/${fpr}.rev"
+  # gpg stores the certificate defused with a leading colon; restore it.
+  sed 's/^:-----BEGIN/-----BEGIN/' "${revocation}" | gpg --batch --import &> /dev/null
+  gpg --armor --export alice@example.test > "${BATS_TEST_TMPDIR}/alice-revoked.asc"
+  run_traced -1 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/alice-revoked.asc"
+}

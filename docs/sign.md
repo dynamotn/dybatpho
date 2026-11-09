@@ -35,6 +35,7 @@ makes the call fail at once instead of waiting.
 
 - [`dybatpho::sign_backends`](#dybatphosign_backends) — Print the backends that can sign, or verify, on this machine.
 - [`dybatpho::sign_file`](#dybatphosign_file) — Sign a file with a key and print the signature's path.
+- [`dybatpho::sign_public_key`](#dybatphosign_public_key) — Print the value `dybatpho::verify_file` trusts for a key, to pin it in configuration.
 - [`dybatpho::verify_file`](#dybatphoverify_file) — Check that a file was signed by one of the trusted keys. The backend is read from the signature; only the trusted keys of that backend count, and nothing else on the machine is consulted.
 
 <a id="usage"></a>
@@ -142,6 +143,43 @@ DYBATPHO_SIGN_NAMESPACE="registry" dybatpho::sign_file ssh ~/.ssh/id_ed25519.pub
 - `0`: The file was signed
 - `1`: Signing failed
 - `124`: The tool ran out of time
+- `127`: Stop script when the backend's tool is missing
+
+---
+
+### `dybatpho::sign_public_key`
+
+Print the value `dybatpho::verify_file` trusts for a key, to pin
+it in configuration.
+
+**🧪 Examples**
+
+```bash
+dybatpho::sign_public_key ssh ~/.ssh/id_ed25519 >> trusted_keys
+
+```
+
+```bash
+dybatpho::sign_public_key gpg release@example.com > release.asc
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Backend: `ssh`, `minisign` or `gpg` |
+| `$2` | string | Key: an SSH private or public key file; a minisign secret or public key file; a GnuPG key id |
+
+**📤 Output on stdout**
+
+- `<type> <base64>` for ssh, the base64 public key for minisign, an
+  armored public key for gpg
+
+**🚦 Exit codes**
+
+- `0`: The key was printed
+- `1`: The key cannot be read, or needs a passphrase away from a terminal
 - `127`: Stop script when the backend's tool is missing
 
 ---

@@ -166,6 +166,16 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   command` runs a command in the current shell under the lock. They need
   `flock` and stop with an install hint when it is missing, rather than fall
   back to the portable lock.
+- **`sign` — a new module to sign files and check signatures, with
+  `ssh-keygen -Y`, `minisign` or `gpg`, behind one pair of calls.**
+  `dybatpho::sign_file <backend> <key> <file>` writes `FILE.sig`, `.minisig` or
+  `.asc`; `dybatpho::verify_file <file> <signature> <trusted>...` tells the
+  backend from the signature and accepts it only from the keys you pass, never
+  from your `allowed_signers`, keyring or `GNUPGHOME`; an SSH signature is also
+  bound to `DYBATPHO_SIGN_NAMESPACE`. `dybatpho::sign_public_key` prints the
+  value to pin, and `dybatpho::sign_backends` lists what this machine can do.
+  A tool asks for a passphrase only at a terminal, and a gpg signature by a
+  revoked or expired key is refused.
 
 ## [7.1.0] - 2026-10-31
 

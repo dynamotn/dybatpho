@@ -1,8 +1,8 @@
 # Feature Specification: Signing and Verifying Files
 
 **Feature Branch**: `[feature-sign]`
-**Status**: Draft
-**Input**: How `dyai` signs and checks its account registry with `ssh-keygen -Y` (`lib/dyai_store.sh`), `dybatpho::release_sign` in `src/release.sh`, and issue #10, closed because a module that only wraps one tool cannot be tested against the real thing
+**Status**: Implemented
+**Input**: `src/sign.sh`, `test/sign.bats`, `docs/sign.md`, `example/sign_ops.sh`; designed from how `dyai` signs and checks its account registry with `ssh-keygen -Y` (`lib/dyai_store.sh`), `dybatpho::release_sign` in `src/release.sh`, and issue #10, closed because a module that only wraps one tool cannot be tested against the real thing
 
 ## Problem Statement *(mandatory)*
 
@@ -135,6 +135,8 @@ dybatpho::verify_file tool.tar.gz tool.tar.gz.minisig "RWQf6LRCGA9i53mlYecO4IzT5
 - **FR-014**: `sign_public_key BACKEND KEY` MUST print the value `verify_file` accepts for that key, following the same rule as FR-010 for passphrases.
 - **FR-015**: `sign_backends [sign|verify]` MUST print each backend that can do that here, one per line, in the order `ssh`, `minisign`, `gpg`, checking verification by default: `gpg` verifies with `gpgv` and signs with `gpg`, so it can be listed for one and not the other. `sign_file gpg` and `sign_public_key gpg` without `gpg` MUST stop with the `gnupg` install hint.
 - **FR-016**: No call MUST print key material other than public keys, or a passphrase, to stdout, stderr or the log.
+- **FR-017**: gpg verification MUST read `gpgv`'s status and accept only a `VALIDSIG` with no `BADSIG`, `ERRSIG`, `EXPSIG`, `EXPKEYSIG`, `REVKEYSIG`, `KEYREVOKED`, `KEYEXPIRED`, `NO_PUBKEY`, `PLAINTEXT`, `BADARMOR` or `NODATA` beside it: `gpgv` exits 0 for a signature by a revoked key.
+- **FR-018**: `sign_public_key gpg` MUST resolve the user id to exactly one key and export that key alone, minimal, and MUST fail when it matches none or several: a user id matches by substring.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -166,9 +168,11 @@ dybatpho::verify_file tool.tar.gz tool.tar.gz.minisig "RWQf6LRCGA9i53mlYecO4IzT5
 - **IT-010**: Accept trusted keys as strings and as files, mixed across backends.
 - **IT-011**: Print the trusted value of each key and verify against it.
 - **IT-012**: List only the backends whose tool is on the `PATH`, and leave `gpg` out of the signing list when only `gpgv` is there.
-- **IT-015**: Stop on a missing file, a missing signature, a trusted key path that does not exist and an unrecognised key string; return 124 when a check runs out of time.
 - **IT-013**: Leave no temporary file behind after a verification succeeds, fails, or is interrupted.
 - **IT-014**: Sign and verify a file whose name holds a space and starts with `-`.
+- **IT-015**: Stop on a missing file, a missing signature, a trusted key path that does not exist and an unrecognised key string; return 124 when a check runs out of time.
+- **IT-016**: Refuse a gpg signature by a key revoked after signing, and a signed message relabelled as a detached signature.
+- **IT-017**: Refuse to print the public key for a gpg user id matching two keys, and print one key for an exact one.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -93,7 +93,10 @@ jobs:
           # screen widgets and `dybatpho::string_slugify` see raw bytes.
           # bzip2: `tar` shells out to it, and the backup tests archive with
           # `DYBATPHO_BACKUP_EXTENSION=tar.bz2`.
-          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk locales bzip2
+          # openssh-client, gnupg, minisign: each `sign` backend is tested
+          # against its real tool, and skips where the tool is missing.
+          apt-get update && apt-get install -y --fix-missing git parallel curl netcat-openbsd jq gawk locales bzip2 \
+            openssh-client gnupg minisign
           locale -a | grep -qix 'C\.utf-\?8' || localedef -i C -f UTF-8 C.UTF-8
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
@@ -152,7 +155,8 @@ jobs:
         # musl instead — which is what the repository's own Dockerfile does,
         # so building that image would not have checked the claim either.
         run: |
-          apk add --no-cache bash git curl gawk jq parallel tar xz zip unzip gzip bzip2 zstd openssl ca-certificates tzdata python3 shadow
+          apk add --no-cache bash git curl gawk jq parallel tar xz zip unzip gzip bzip2 zstd openssl ca-certificates tzdata python3 shadow \
+            openssh-keygen gnupg minisign
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
           chmod +x /usr/local/bin/yq
@@ -202,7 +206,8 @@ jobs:
         # git comes first so the checkout below is a real clone: the version
         # and example tests read the repository's history and working tree.
         run: |
-          apk add --no-cache git curl gawk jq parallel tar xz zip unzip gzip bzip2 zstd openssl ca-certificates tzdata python3 shadow coreutils findutils sed grep
+          apk add --no-cache git curl gawk jq parallel tar xz zip unzip gzip bzip2 zstd openssl ca-certificates tzdata python3 shadow coreutils findutils sed grep \
+            openssh-keygen gnupg minisign
           curl -fsSL -o /usr/local/bin/yq \
             "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
           chmod +x /usr/local/bin/yq

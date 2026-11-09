@@ -176,6 +176,17 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   value to pin, and `dybatpho::sign_backends` lists what this machine can do.
   A tool asks for a passphrase only at a terminal, and a gpg signature by a
   revoked or expired key is refused.
+- **`service` — enable, control and install services on systemd, OpenRC,
+  Termux's runit or launchd, with one set of calls.**
+  `dybatpho::service_enable|disable|start|stop|restart <name> [--user]` and
+  `dybatpho::service_is_active|is_enabled` work the same on every manager,
+  elevating a system-scope change through `privilege_run`;
+  `dybatpho::service_install <unit file> [--user]` puts a unit or plist in
+  place and has the manager pick it up, skipping the reload when nothing
+  changed; `dybatpho::service_command` prints exactly what an action would run.
+  The manager is the one that booted the machine, so a Gentoo host booted by
+  OpenRC is not mistaken for systemd, and a container or CI runner is skipped
+  with a warning instead of failing a bootstrap.
 
 ## [7.1.0] - 2026-10-31
 

@@ -1,8 +1,8 @@
 # Feature Specification: Service Management Across Init Systems
 
 **Feature Branch**: `[feature-service]`
-**Status**: Draft
-**Input**: `scripts/lib/init_system.sh` and `scripts/test/init_system.bats` in the dotfiles repository, which wrap systemd, OpenRC, launchd and runit for `dytoy`; `lib/dyai_node.sh` in `dyai`, which installs and reloads its node daemon on systemd and launchd by hand; `src/pkg.sh`, whose detection and printable-command contract this module follows
+**Status**: Implemented
+**Input**: `src/service.sh`, `test/service.bats`, `docs/service.md`, `example/service_ops.sh`; designed from `scripts/lib/init_system.sh` and `scripts/test/init_system.bats` in the dotfiles repository, which wrap systemd, OpenRC, launchd and runit for `dytoy`; `lib/dyai_node.sh` in `dyai`, which installs and reloads its node daemon on systemd and launchd by hand; `src/pkg.sh`, whose detection and printable-command contract this module follows
 
 ## Problem Statement *(mandatory)*
 

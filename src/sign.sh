@@ -355,6 +355,49 @@ function __dybatpho_sign_ssh_verify {
 }
 
 #######################################
+# @description Sign with `minisign`. Away from a terminal its stdin is
+#   `/dev/null`, so a password it might read from there is empty and an
+#   encrypted key fails instead of taking whatever the caller piped in.
+# @arg $1 path Secret key
+# @arg $2 path File to sign
+# @arg $3 path Signature to write
+# @arg $4 path Working directory
+# @internal
+#######################################
+function __dybatpho_sign_minisign_sign {
+  local input=/dev/stdin
+  dybatpho::is_tty stdin && dybatpho::is_tty stderr || input=/dev/null
+  __dybatpho_sign_run minisign -S -s "$1" -m "$2" -x "$3" < "${input}" > /dev/null 2> "$4/err" || {
+    local status=$?
+    __dybatpho_sign_report "minisign could not sign $2" "$4/err"
+    return "${status}"
+  }
+}
+
+#######################################
+# @description Verify with `minisign`, trying each trusted key in turn.
+# @arg $1 path File
+# @arg $2 path Signature
+# @arg $3 path Working directory
+# @arg $@ string Trusted base64 public keys
+# @exitcode 0 One of the keys made the signature
+# @exitcode 1 None did
+# @exitcode 124 A check ran out of time
+# @internal
+#######################################
+function __dybatpho_sign_minisign_verify {
+  local file="$1" signature="$2" work="$3" key status=1
+  shift 3
+  for key in "$@"; do
+    __dybatpho_sign_run minisign -V -q -P "${key}" -m "${file}" -x "${signature}" \
+      < /dev/null > /dev/null 2> "${work}/err" && return 0
+    status=$?
+    ((status != 124)) || return 124
+  done
+  return 1
+}
+
+#######################################
 # @description Sign a file with a key and print the signature's path.
 # @example
 #   dybatpho::sign_file ssh ~/.ssh/id_ed25519 accounts.yaml

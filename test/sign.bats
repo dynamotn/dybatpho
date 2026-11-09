@@ -221,3 +221,53 @@ _payload() {
   after="${#found[@]}"
   assert_equal "${after}" "${before}"
 }
+
+_need_minisign() {
+  command -v minisign > /dev/null || skip "minisign is not installed"
+}
+
+# A minisign key pair without a password: `<name>.key` and `<name>.pub`.
+_minisign_key() {
+  minisign -G -W -p "${BATS_TEST_TMPDIR}/$1.pub" -s "${BATS_TEST_TMPDIR}/$1.key" > /dev/null
+}
+
+# The trusted value of a generated minisign key: the second line of its .pub.
+_minisign_pub() {
+  sed -n 2p "${BATS_TEST_TMPDIR}/$1.pub"
+}
+
+@test "dybatpho::sign_file minisign writes FILE.minisig, which verifies against the key or its .pub file" {
+  _need_minisign
+  _minisign_key alice
+  local file
+  file="$(_payload doc.txt)"
+  run_traced -0 dybatpho::sign_file minisign "${BATS_TEST_TMPDIR}/alice.key" "${file}"
+  assert_output "${file}.minisig"
+  assert_equal "$(head -c 18 "${file}.minisig")" "untrusted comment:"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.minisig" "$(_minisign_pub alice)"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.minisig" "${BATS_TEST_TMPDIR}/alice.pub"
+}
+
+@test "dybatpho::verify_file returns 1 for a minisign signature by another key or of a changed file" {
+  _need_minisign
+  _minisign_key alice
+  _minisign_key bob
+  local file
+  file="$(_payload doc.txt)"
+  dybatpho::sign_file minisign "${BATS_TEST_TMPDIR}/alice.key" "${file}" > /dev/null
+  run_traced -1 dybatpho::verify_file "${file}" "${file}.minisig" "$(_minisign_pub bob)"
+  printf 'changed\n' >> "${file}"
+  run_traced -1 dybatpho::verify_file "${file}" "${file}.minisig" "$(_minisign_pub alice)"
+}
+
+@test "dybatpho::verify_file ignores the namespace for minisign and reads a list mixing ssh and minisign keys" {
+  _need_minisign
+  _need_ssh_y
+  _minisign_key alice
+  _ssh_key carol
+  local file
+  file="$(_payload doc.txt)"
+  DYBATPHO_SIGN_NAMESPACE=registry dybatpho::sign_file minisign "${BATS_TEST_TMPDIR}/alice.key" "${file}" > /dev/null
+  DYBATPHO_SIGN_NAMESPACE=deploy run_traced -0 dybatpho::verify_file "${file}" "${file}.minisig" \
+    "$(_ssh_pub carol)" "$(_minisign_pub alice)"
+}

@@ -138,6 +138,8 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   [release]="gpg"
   # A backend needs its own tool; any one of them makes the module usable.
   [sign]="ssh-keygen|minisign|gpgv"
+  # Whichever manager the machine runs; none is needed to skip with a warning.
+  [service]="systemctl|rc-service|sv-enable|launchctl"
 )
 # kcov(enabled)
 

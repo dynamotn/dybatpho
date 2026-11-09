@@ -156,18 +156,55 @@ function __dybatpho_sign_check_namespace {
 }
 
 #######################################
-# @description Run a signing tool under the prompt rule. At a terminal -- stdin
-#   and stderr both -- it runs as it is and may ask for a passphrase. Anywhere
-#   else it runs in a session of its own, so it has no terminal to ask on, with
-#   `SSH_ASKPASS_REQUIRE=never` and a limit of `DYBATPHO_SIGN_TIMEOUT` seconds.
-#   The tools read a passphrase from `/dev/tty`, so closing stdin would not do.
+# @description Start a call: decide once whether it runs at a terminal, and
+#   create its working directory. The answer is taken here, before any
+#   redirection: inside a backend stderr is always the captured file. At a
+#   terminal the tools' stderr goes to the terminal, where a prompt can be seen.
+# @arg $1 string Name of the variable receiving the working directory
+# @arg $2 string Name of the variable receiving 1 at a terminal, 0 otherwise;
+#   the backends read it as `__dybatpho_sign_interactive`
+# @arg $3 string `prompt` when the call may ask for a passphrase, `never` otherwise
+# @set Both named variables
+# @internal
+#######################################
+function __dybatpho_sign_begin {
+  local -n __dybatpho_sign_begin_flag="$2"
+  __dybatpho_sign_begin_flag=0
+  if [[ "$3" == prompt ]] && dybatpho::is_tty stdin && dybatpho::is_tty stderr; then
+    __dybatpho_sign_begin_flag=1
+  fi
+  dybatpho::create_temp_dir "$1" "sign"
+  if ((__dybatpho_sign_begin_flag)); then
+    ln -s /dev/stderr "${!1}/err"
+  fi
+}
+
+#######################################
+# @description The stdin a signing tool gets: the terminal when the call may
+#   prompt, `/dev/null` otherwise, so that a tool falling back to stdin for a
+#   passphrase reads nothing rather than data the caller piped in.
+# @noargs
+# @stdout `/dev/stdin` or `/dev/null`
+# @internal
+#######################################
+function __dybatpho_sign_stdin {
+  if ((${__dybatpho_sign_interactive:-0})); then printf '/dev/stdin'; else printf '/dev/null'; fi
+}
+
+#######################################
+# @description Run a signing tool under the prompt rule. At a terminal, as
+#   decided by `__dybatpho_sign_begin`, it runs as it is and may ask for a
+#   passphrase. Anywhere else it runs in a session of its own, so it has no
+#   terminal to ask on, with `SSH_ASKPASS_REQUIRE=never` and a limit of
+#   `DYBATPHO_SIGN_TIMEOUT` seconds. The tools read a passphrase from
+#   `/dev/tty`, so closing stdin would not do.
 # @arg $@ string Tool and its arguments
 # @exitcode 124 The tool ran out of time
 # @exitcode other Exit code of the tool
 # @internal
 #######################################
 function __dybatpho_sign_run {
-  if dybatpho::is_tty stdin && dybatpho::is_tty stderr; then
+  if ((${__dybatpho_sign_interactive:-0})); then
     "$@"
     return
   fi
@@ -192,6 +229,11 @@ function __dybatpho_sign_run {
 #######################################
 function __dybatpho_sign_report {
   local line="" last=""
+  # At a terminal the tool already wrote to it; there is nothing to replay.
+  if [[ -L "$2" ]]; then
+    dybatpho::error "$1"
+    return 0
+  fi
   while IFS= read -r line || [[ -n "${line}" ]]; do
     [[ -z "${line}" ]] || last="${line}"
   done < "$2"
@@ -261,6 +303,7 @@ function __dybatpho_sign_trusted_into {
     kind="$(__dybatpho_sign_classify "${trusted}")"
     if [[ -z "${kind}" && ! -e "${trusted}" ]]; then
       [[ "${trusted}" != */* ]] || dybatpho::die "${FUNCNAME[1]}: Trusted key not found: ${trusted}"
+      ((${#trusted} <= 24)) || trusted="${trusted:0:12}..."
       dybatpho::die "${FUNCNAME[1]}: Not a key any backend knows: ${trusted}"
     fi
     if [[ -n "${kind}" ]]; then
@@ -272,11 +315,17 @@ function __dybatpho_sign_trusted_into {
       [[ "${backend}" != gpg ]] || __dybatpho_sign_keys+=("${trusted}")
       continue
     fi
+    local number=0 hint=""
     while IFS= read -r line || [[ -n "${line}" ]]; do
+      number=$((number + 1))
       line="${line%$'\r'}"
+      [[ "${line}" != *"secret key"* && "${line}" != *"PRIVATE KEY"* ]] \
+        || hint=" -- it looks like a secret key; pass its public half"
       [[ -n "${line//[[:space:]]/}" && "${line}" != \#* && "${line}" != "untrusted comment:"* ]] || continue
       kind="$(__dybatpho_sign_classify "${line}")"
-      [[ -n "${kind}" ]] || dybatpho::die "${FUNCNAME[1]}: Not a key any backend knows, in ${trusted}: ${line}"
+      # The line itself is never shown: it may be a secret key passed by mistake.
+      [[ -n "${kind}" ]] || dybatpho::die \
+        "${FUNCNAME[1]}: Not a key any backend knows, in ${trusted} line ${number}${hint}"
       [[ "${kind%% *}" != "${backend}" ]] || __dybatpho_sign_keys+=("${kind#* }")
     done < "${trusted}"
   done
@@ -317,9 +366,10 @@ function __dybatpho_sign_extension {
 }
 
 #######################################
-# @description Sign with `ssh-keygen -Y`. The data goes in on stdin and the
-#   signature comes out on stdout, so `ssh-keygen` never finds a `.sig` to ask
-#   about overwriting.
+# @description Sign with `ssh-keygen -Y`, on a copy of the file in the working
+#   directory: there is no `.sig` beside it to ask about overwriting, and the
+#   data is not on stdin, where `ssh-keygen` would look for a passphrase when it
+#   has no terminal and take the file's first line.
 # @arg $1 string Private key, or public key whose private half the agent holds
 # @arg $2 path File to sign
 # @arg $3 path Signature to write
@@ -327,12 +377,16 @@ function __dybatpho_sign_extension {
 # @internal
 #######################################
 function __dybatpho_sign_ssh_sign {
-  __dybatpho_sign_run ssh-keygen -Y sign -n "${DYBATPHO_SIGN_NAMESPACE}" -f "$1" \
-    < "$2" > "$3" 2> "$4/err" || {
+  local input
+  input="$(__dybatpho_sign_stdin)"
+  cp -- "$2" "$4/data"
+  __dybatpho_sign_run ssh-keygen -Y sign -n "${DYBATPHO_SIGN_NAMESPACE}" -f "$1" "$4/data" \
+    < "${input}" > /dev/null 2> "$4/err" || {
     local status=$?
     __dybatpho_sign_report "ssh-keygen could not sign $2" "$4/err"
     return "${status}"
   }
+  mv -f -- "$4/data.sig" "$3"
 }
 
 #######################################
@@ -365,8 +419,8 @@ function __dybatpho_sign_ssh_verify {
 # @internal
 #######################################
 function __dybatpho_sign_minisign_sign {
-  local input=/dev/stdin
-  dybatpho::is_tty stdin && dybatpho::is_tty stderr || input=/dev/null
+  local input
+  input="$(__dybatpho_sign_stdin)"
   __dybatpho_sign_run minisign -S -s "$1" -m "$2" -x "$3" < "${input}" > /dev/null 2> "$4/err" || {
     local status=$?
     __dybatpho_sign_report "minisign could not sign $2" "$4/err"
@@ -408,7 +462,7 @@ function __dybatpho_sign_minisign_verify {
 #######################################
 function __dybatpho_sign_gpg_sign {
   local -a mode=()
-  dybatpho::is_tty stdin && dybatpho::is_tty stderr || mode=(--pinentry-mode error)
+  ((${__dybatpho_sign_interactive:-0})) || mode=(--pinentry-mode error)
   __dybatpho_sign_run gpg --batch --yes ${mode[@]+"${mode[@]}"} --armor --detach-sign \
     --local-user "$1" --output "$3" -- "$2" < /dev/null > /dev/null 2> "$4/err" || {
     local status=$?
@@ -483,7 +537,10 @@ function __dybatpho_sign_gpg_verify {
   while read -r tag rest || [[ -n "${tag}" ]]; do
     case "${rest%% *}" in
       VALIDSIG) valid=1 ;;
-      BADSIG | ERRSIG | EXPSIG | EXPKEYSIG | REVKEYSIG | KEYREVOKED | KEYEXPIRED | NO_PUBKEY | PLAINTEXT | \
+      # Not KEYEXPIRED or KEYREVOKED: gpgv emits them for a key's unused
+      # subkeys too. The key that made the signature is judged by EXPKEYSIG
+      # and REVKEYSIG.
+      BADSIG | ERRSIG | EXPSIG | EXPKEYSIG | REVKEYSIG | NO_PUBKEY | PLAINTEXT | \
         BADARMOR | NODATA) return 1 ;;
       *) ;;
     esac
@@ -541,8 +598,8 @@ function __dybatpho_sign_ssh_public_key {
 function __dybatpho_sign_minisign_public_key {
   __dybatpho_sign_public_line minisign "$1" && return 0
   __dybatpho_sign_public_line minisign "${1%.key}.pub" && return 0
-  local input=/dev/stdin
-  dybatpho::is_tty stdin && dybatpho::is_tty stderr || input=/dev/null
+  local input
+  input="$(__dybatpho_sign_stdin)"
   __dybatpho_sign_run minisign -R -s "$1" -p "$2/public" < "${input}" > /dev/null 2> "$2/err" || {
     local status=$?
     __dybatpho_sign_report "minisign could not read $1" "$2/err"
@@ -623,9 +680,11 @@ function dybatpho::sign_file {
   [[ -f "${file}" && -r "${file}" ]] || dybatpho::die "${FUNCNAME[0]}: Cannot read ${file}"
   [[ "${backend}" != ssh ]] || __dybatpho_sign_check_namespace
   [[ -n "${signature}" ]] || signature="${file}$(__dybatpho_sign_extension "${backend}")"
+  [[ ! "${signature}" -ef "${file}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: The signature would overwrite ${file}"
 
-  local work status=0
-  dybatpho::create_temp_dir work "sign"
+  local work status=0 __dybatpho_sign_interactive
+  __dybatpho_sign_begin work __dybatpho_sign_interactive prompt
   "__dybatpho_sign_${backend}_sign" "${key}" "${file}" "${work}/signature" "${work}" || status=$?
   ((status)) || mv -f -- "${work}/signature" "${signature}" || status=$?
   [[ -z "${work}" ]] || rm -rf -- "${work}"
@@ -656,8 +715,8 @@ function dybatpho::sign_public_key {
   local backend key
   dybatpho::expect_args backend key -- "$@"
   __dybatpho_sign_require "${backend}" sign
-  local work status=0
-  dybatpho::create_temp_dir work "sign"
+  local work status=0 __dybatpho_sign_interactive
+  __dybatpho_sign_begin work __dybatpho_sign_interactive prompt
   "__dybatpho_sign_${backend}_public_key" "${key}" "${work}" || status=$?
   [[ -z "${work}" ]] || rm -rf -- "${work}"
   ((status == 0 || status == 124)) || status=1
@@ -701,10 +760,13 @@ function dybatpho::verify_file {
   __dybatpho_sign_trusted_into keys "${backend}" "$@"
   ((${#keys[@]})) || return 1
 
-  local work status=0
-  dybatpho::create_temp_dir work "sign"
-  # A signature that crossed a Windows machine carries CRLF, which the tools refuse.
-  tr -d '\r' < "${signature}" > "${work}/signature"
+  # Checking needs no passphrase, so it never prompts and is always bounded.
+  local work status=0 __dybatpho_sign_interactive
+  __dybatpho_sign_begin work __dybatpho_sign_interactive never
+  # A signature that crossed a Windows machine carries CRLF, and one pasted into
+  # a file may open with a blank line; the tools refuse both.
+  tr -d '\r' < "${signature}" > "${work}/unix"
+  sed '/./,$!d' "${work}/unix" > "${work}/signature"
   "__dybatpho_sign_${backend}_verify" "${file}" "${work}/signature" "${work}" ${keys[@]+"${keys[@]}"} || status=$?
   [[ -z "${work}" ]] || rm -rf -- "${work}"
   ((status == 0 || status == 124)) || status=1

@@ -439,3 +439,78 @@ _without_terminal() {
   run -0 bash -c "gpg --show-keys --with-colons '${BATS_TEST_TMPDIR}/one.asc' | grep -c '^pub:'"
   assert_output "1"
 }
+
+@test "an ssh passphrase is never read from the file being signed" {
+  _need_ssh_y
+  ssh-keygen -q -t ed25519 -N 'secretpw' -f "${BATS_TEST_TMPDIR}/locked"
+  local file="${BATS_TEST_TMPDIR}/starts-with-the-passphrase.txt"
+  printf 'secretpw\nthe rest\n' > "${file}"
+  run -1 _without_terminal dybatpho::sign_file ssh "'${BATS_TEST_TMPDIR}/locked'" "'${file}'"
+  assert_file_not_exists "${file}.sig"
+}
+
+@test "at a terminal, sign_file asks for the ssh passphrase" {
+  _need_ssh_y
+  command -v script > /dev/null || skip "script is not installed"
+  ssh-keygen -q -t ed25519 -N 'typed at the prompt' -f "${BATS_TEST_TMPDIR}/locked"
+  local file script="${BATS_TEST_TMPDIR}/at-a-terminal.sh"
+  file="$(_payload doc.txt)"
+  # shellcheck disable=SC2154 # DYBATPHO_DIR is set by test_helper
+  printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules sign" \
+    "dybatpho::sign_file ssh '${BATS_TEST_TMPDIR}/locked' '${file}'" > "${script}"
+  # `script` gives the shell a terminal and types the passphrase into it.
+  { sleep 2; printf 'typed at the prompt\n'; sleep 3; } \
+    | timeout 30 script -qec "bash '${script}'" /dev/null > /dev/null 2>&1 || true
+  assert_file_exists "${file}.sig"
+  ssh-keygen -y -P 'typed at the prompt' -f "${BATS_TEST_TMPDIR}/locked" | cut -d' ' -f1,2 > "${BATS_TEST_TMPDIR}/locked.trusted"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.sig" "${BATS_TEST_TMPDIR}/locked.trusted"
+}
+
+@test "dybatpho::verify_file never prints a secret key passed by mistake as a trusted key" {
+  local file keys="${BATS_TEST_TMPDIR}/minisign.key" secret
+  secret="RWRTY0IyQ2V0aGlzaXNub3RhcmVhbGtleWJ1dGl0bG9va3NsaWtlb25lMDEyMzQ1Njc4OQ=="
+  file="$(_payload doc.txt)"
+  printf 'untrusted comment: minisign encrypted secret key\n%s\n' "${secret}" > "${keys}"
+  _need_ssh_y
+  _ssh_key alice
+  dybatpho::sign_file ssh "${BATS_TEST_TMPDIR}/alice" "${file}" > /dev/null
+  run -1 --separate-stderr dybatpho::verify_file "${file}" "${file}.sig" "${keys}"
+  refute_output --partial "${secret}"
+  refute_stderr --partial "${secret}"
+  assert_stderr --partial "line 2"
+}
+
+@test "dybatpho::verify_file accepts an ssh signature with a leading blank line" {
+  _need_ssh_y
+  _ssh_key alice
+  local file
+  file="$(_payload doc.txt)"
+  dybatpho::sign_file ssh "${BATS_TEST_TMPDIR}/alice" "${file}" > /dev/null
+  { printf '\n'; cat "${file}.sig"; } > "${file}.padded.sig"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.padded.sig" "$(_ssh_pub alice)"
+}
+
+@test "dybatpho::sign_file refuses to write the signature over the file it signs" {
+  _need_ssh_y
+  _ssh_key alice
+  local file
+  file="$(_payload doc.txt)"
+  run -1 --separate-stderr dybatpho::sign_file ssh "${BATS_TEST_TMPDIR}/alice" "${file}" "${file}"
+  assert_stderr --partial "would overwrite"
+  assert_equal "$(cat "${file}")" "payload doc.txt"
+}
+
+@test "dybatpho::verify_file accepts a gpg signature by a key with an old, expired, unused subkey" {
+  _gpg_keys
+  local file fpr then=(--faked-system-time 20200101T000000)
+  file="$(_payload doc.txt)"
+  # A key made in 2020 with a signing subkey that expired the next day; the
+  # primary key, which never expires, signs today.
+  gpg --batch --passphrase '' "${then[@]}" --quick-gen-key "alice <alice@example.test>" ed25519 sign never \
+    &> /dev/null || skip "gpg cannot generate a key here"
+  fpr="$(gpg --with-colons --list-keys alice@example.test | awk -F: '$1 == "fpr" { print $10; exit }')"
+  gpg --batch --passphrase '' "${then[@]}" --quick-add-key "${fpr}" ed25519 sign 1d &> /dev/null
+  gpg --batch --armor --local-user "${fpr}!" --output "${file}.asc" --detach-sign -- "${file}"
+  gpg --armor --export alice@example.test > "${BATS_TEST_TMPDIR}/alice-with-old-subkey.asc"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.asc" "${BATS_TEST_TMPDIR}/alice-with-old-subkey.asc"
+}

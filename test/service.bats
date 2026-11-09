@@ -41,11 +41,11 @@ EOF
   chmod +x "${STUBS}/${tool}"
 }
 
-# Pretend to run on an OS, as `uname -s` reports it.
+# Pretend to run on an OS, as `uname -s` reports it. Unlike the manager stubs it
+# records nothing, so CALLS holds only what was asked of the manager.
 _os() {
-  STUB_OUT_uname="$1"
-  export STUB_OUT_uname
-  _stub uname
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" %q\n' "$1" > "${STUBS}/uname"
+  chmod +x "${STUBS}/uname"
 }
 
 @test "dybatpho::service_manager finds systemd when it booted the machine" {
@@ -307,4 +307,134 @@ _commands() {
   assert_line "systemctl --user start foo"
   assert_line "systemctl --user stop foo"
   assert_line "systemctl --user disable --now foo"
+}
+
+# A systemd host whose user manager answers, with a home of the test's own.
+_systemd_user() {
+  _os Linux
+  _stub systemctl
+  mkdir -p "${__DYBATPHO_SERVICE_ROOT}/run/systemd/system"
+  export XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
+}
+
+_unit() {
+  local file="${BATS_TEST_TMPDIR}/$1"
+  printf '[Service]\nExecStart=/bin/true %s\n' "${2:-one}" > "${file}"
+  printf '%s\n' "${file}"
+}
+
+@test "dybatpho::service_install puts a systemd user unit in place, reloads, then enables it" {
+  _systemd_user
+  local unit
+  unit="$(_unit foo.service)"
+  run_traced -0 dybatpho::service_install "${unit}" --user
+  assert_file_exists "${XDG_CONFIG_HOME}/systemd/user/foo.service"
+  run -0 grep -v 'show-environment\|is-active' "${CALLS}"
+  assert_output $'systemctl --user daemon-reload\nsystemctl --user enable --now foo.service'
+}
+
+@test "dybatpho::service_install of an unchanged unit writes and reloads nothing, but still enables" {
+  _systemd_user
+  local unit
+  unit="$(_unit foo.service)"
+  dybatpho::service_install "${unit}" --user
+  : > "${CALLS}"
+  run_traced -0 dybatpho::service_install "${unit}" --user
+  run -0 cat "${CALLS}"
+  refute_line "systemctl --user daemon-reload"
+  assert_line "systemctl --user enable --now foo.service"
+}
+
+@test "dybatpho::service_install of a changed unit reloads and restarts a running service" {
+  _systemd_user
+  dybatpho::service_install "$(_unit foo.service one)" --user
+  : > "${CALLS}"
+  run_traced -0 dybatpho::service_install "$(_unit foo.service two)" --user
+  run -0 cat "${CALLS}"
+  assert_line "systemctl --user daemon-reload"
+  assert_line "systemctl --user restart foo.service"
+  assert_equal "$(tail -1 "${XDG_CONFIG_HOME}/systemd/user/foo.service")" "ExecStart=/bin/true two"
+}
+
+@test "dybatpho::service_install loads a launchd agent: enable, bootout ignoring failure, bootstrap" {
+  _os Darwin
+  _stub launchctl
+  # bootout fails, as it does when the agent is not loaded yet.
+  printf '%s\n' '#!/usr/bin/env bash' "printf '%s\\n' \"launchctl \$*\" >> '${CALLS}'" \
+    '[[ "$1" != bootout ]] || exit 3' > "${STUBS}/launchctl"
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  local uid plist dest
+  uid="$(id -u)"
+  plist="$(_unit dev.example.foo.plist)"
+  dest="${HOME}/Library/LaunchAgents/dev.example.foo.plist"
+  run_traced -0 dybatpho::service_install "${plist}" --user
+  assert_file_exists "${dest}"
+  run -0 grep -v "print gui/${uid}\$" "${CALLS}"
+  assert_line --index 0 "launchctl enable gui/${uid}/dev.example.foo"
+  assert_line --index 1 "launchctl bootout gui/${uid} ${dest}"
+  assert_line --index 2 "launchctl bootstrap gui/${uid} ${dest}"
+}
+
+@test "dybatpho::service_install elevates a system unit, root-owned on launchd" {
+  dybatpho::privilege_run() { printf 'ELEVATED %s\n' "${*:2}" >> "${CALLS}"; }
+  _systemd_user
+  STUB_OUT_systemctl=running
+  export STUB_OUT_systemctl
+  local unit
+  unit="$(_unit foo.service)"
+  run_traced -0 dybatpho::service_install "${unit}"
+  run -0 cat "${CALLS}"
+  assert_line "ELEVATED install -m 644 -- ${unit} ${__DYBATPHO_SERVICE_ROOT}/etc/systemd/system/foo.service"
+  assert_line "ELEVATED systemctl daemon-reload"
+  assert_line "ELEVATED systemctl enable --now foo.service"
+  : > "${CALLS}"
+  _os Darwin
+  _stub launchctl
+  run_traced -0 dybatpho::service_install "$(_unit dev.example.foo.plist)"
+  run -0 cat "${CALLS}"
+  assert_line --partial "ELEVATED install -m 644 -o root -g wheel -- "
+  assert_line --partial "/Library/LaunchDaemons/dev.example.foo.plist"
+}
+
+@test "dybatpho::service_install stops on OpenRC and runit, which take no unit file" {
+  _os Linux
+  _stub rc-service
+  _stub rc-update
+  run -1 --separate-stderr dybatpho::service_install "$(_unit foo.service)" --user
+  assert_stderr --partial "takes no unit file: openrc"
+}
+
+@test "dybatpho::service_install under DYBATPHO_DRY_RUN copies and reloads nothing" {
+  _systemd_user
+  DYBATPHO_DRY_RUN=true run_traced -0 dybatpho::service_install "$(_unit foo.service)" --user
+  assert_output --partial "systemctl --user daemon-reload"
+  assert_file_not_exists "${XDG_CONFIG_HOME}/systemd/user/foo.service"
+  run -0 cat "${CALLS}"
+  refute_line "systemctl --user daemon-reload"
+}
+
+@test "dybatpho::service_install takes a unit whose path holds a space, and --name" {
+  _systemd_user
+  mkdir -p "${BATS_TEST_TMPDIR}/my units"
+  printf '[Service]\nExecStart=/bin/true\n' > "${BATS_TEST_TMPDIR}/my units/app.service"
+  run_traced -0 dybatpho::service_install "${BATS_TEST_TMPDIR}/my units/app.service" --user --name other.service
+  assert_file_exists "${XDG_CONFIG_HOME}/systemd/user/other.service"
+}
+
+@test "dybatpho::service_uninstall disables, removes the unit and reloads" {
+  _systemd_user
+  dybatpho::service_install "$(_unit foo.service)" --user
+  : > "${CALLS}"
+  run_traced -0 dybatpho::service_uninstall foo.service --user
+  assert_file_not_exists "${XDG_CONFIG_HOME}/systemd/user/foo.service"
+  run -0 grep -v 'show-environment' "${CALLS}"
+  assert_output $'systemctl --user disable --now foo.service\nsystemctl --user daemon-reload'
+}
+
+@test "dybatpho::service_reload_manager reloads systemd and does nothing elsewhere" {
+  _systemd_user
+  run_traced -0 dybatpho::service_reload_manager --user
+  run -0 cat "${CALLS}"
+  assert_line "systemctl --user daemon-reload"
+  DYBATPHO_SERVICE_MANAGER=openrc run_traced -0 dybatpho::service_reload_manager
 }

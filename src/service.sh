@@ -522,3 +522,212 @@ function dybatpho::service_is_active {
 function dybatpho::service_is_enabled {
   __dybatpho_service_ask is-enabled "$@"
 }
+
+#######################################
+# @description Run one command, elevated or as it is, honouring `DYBATPHO_DRY_RUN`.
+# @arg $1 number 1 to elevate, 0 not to
+# @arg $@ string Command and arguments
+# @exitcode other Exit code of the command
+# @internal
+#######################################
+function __dybatpho_service_run {
+  local elevate="$1"
+  shift
+  if ((elevate)); then
+    dybatpho::privilege_run -- "$@"
+  else
+    dybatpho::dry_run -- "$@"
+  fi
+}
+
+#######################################
+# @description Name the directory a manager reads unit files from.
+# @arg $1 string Name of the variable receiving the directory
+# @arg $2 string Manager
+# @arg $3 string Scope
+# @set The named variable
+# @exitcode 1 The manager takes no unit file
+# @internal
+#######################################
+function __dybatpho_service_unit_dir_into {
+  local -n __dybatpho_service_unit_dir="$1"
+  local root="${__DYBATPHO_SERVICE_ROOT}"
+  case "$2:$3" in
+    systemd:user) __dybatpho_service_unit_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/systemd/user" ;;
+    systemd:system) __dybatpho_service_unit_dir="${root}/etc/systemd/system" ;;
+    launchd:user) __dybatpho_service_unit_dir="${HOME}/Library/LaunchAgents" ;;
+    launchd:system) __dybatpho_service_unit_dir="${root}/Library/LaunchDaemons" ;;
+    *) return 1 ;;
+  esac
+}
+
+#######################################
+# @description Check a manager can act in a scope, warning and deciding the
+#   return code when it cannot.
+# @arg $1 string Name of the variable receiving the manager
+# @arg $2 string Scope
+# @arg $3 string What would have been done, for the warning
+# @set The named variable
+# @exitcode 0 The manager can act
+# @exitcode 1 It cannot; the caller returns `DYBATPHO_SERVICE_STRICT`'s answer
+# @internal
+#######################################
+function __dybatpho_service_ready_into {
+  local -n __dybatpho_service_ready="$1"
+  local -a flag=()
+  [[ "$2" != user ]] || flag=(--user)
+  if __dybatpho_service_manager_into __dybatpho_service_ready \
+    && dybatpho::service_manager_available ${flag[@]+"${flag[@]}"}; then
+    return 0
+  fi
+  dybatpho::warn "No service manager can act on the $2 scope here; skipping $3"
+  return 1
+}
+
+#######################################
+# @description Reload the manager's view of its unit files: `daemon-reload`
+#   on systemd, nothing elsewhere.
+# @example
+#   dybatpho::service_reload_manager --user
+#
+# @arg $1 string [optional] `--user` for the user's own manager
+# @exitcode 0 Reloaded, nothing to do, or skipped with a warning
+# @exitcode other Exit code of `systemctl daemon-reload`
+#######################################
+# dyshellint disable=BSG050 # its one argument is an optional flag, which expect_args cannot express
+function dybatpho::service_reload_manager {
+  local scope=system manager
+  [[ "${1-}" != --user ]] || scope=user
+  __dybatpho_service_manager_into manager || return 0
+  [[ "${manager}" == systemd ]] || return 0
+  local -a user=()
+  [[ "${scope}" != user ]] || user=(--user)
+  local elevate=0
+  [[ "${scope}" != system ]] || elevate=1
+  __dybatpho_service_run "${elevate}" systemctl ${user[@]+"${user[@]}"} daemon-reload
+}
+
+#######################################
+# @description Put a unit file or launchd plist where the manager reads it,
+#   have the manager pick it up, and enable the service.
+#   The file is compared with what is there first: an identical one is not
+#   written and causes no reload. A changed one is replaced, the manager
+#   reloads, and a running service restarts. On launchd the label is enabled
+#   before `bootstrap`, which refuses a label left disabled.
+# @example
+#   dybatpho::service_install ./sync.service --user
+#   dybatpho::service_install ./dev.example.sync.plist --user
+#
+# @arg $1 path Unit file or plist
+# @arg $@ string [optional] `--user` for the user's own manager, and
+#   `--name NAME` to install under another name
+# @env DYBATPHO_DRY_RUN string When true-like, print the commands instead of running them
+# @exitcode 0 Installed and enabled, or skipped with a warning
+# @exitcode 1 No manager can act and `DYBATPHO_SERVICE_STRICT` is set, or the file is missing
+# @exitcode other Exit code of the command that failed
+# @tip A system file is written mode 644, and root:wheel on launchd, as `bootstrap` requires
+#######################################
+function dybatpho::service_install {
+  local file
+  dybatpho::expect_args file -- "$@"
+  shift
+  local scope=system name="" arg
+  while (($#)); do
+    arg="$1"
+    shift
+    case "${arg}" in
+      --user) scope=user ;;
+      --name)
+        (($#)) || dybatpho::die "${FUNCNAME[0]}: Expected a name after --name"
+        name="$1"
+        shift
+        ;;
+      *) dybatpho::die "${FUNCNAME[0]}: Unknown argument: ${arg}" ;;
+    esac
+  done
+  [[ -f "${file}" && -r "${file}" ]] || dybatpho::die "${FUNCNAME[0]}: Cannot read ${file}"
+  [[ -n "${name}" ]] || name="${file##*/}"
+  local -a scope_flag=()
+  [[ "${scope}" != user ]] || scope_flag=(--user)
+  __dybatpho_service_parse_into name scope -- "${name}" ${scope_flag[@]+"${scope_flag[@]}"}
+
+  local manager dir
+  if __dybatpho_service_manager_into manager && ! __dybatpho_service_unit_dir_into dir "${manager}" "${scope}"; then
+    dybatpho::die "${FUNCNAME[0]}: This service manager takes no unit file: ${manager}"
+  fi
+  if ! __dybatpho_service_ready_into manager "${scope}" "install ${name}"; then
+    dybatpho::is true "${DYBATPHO_SERVICE_STRICT}" && return 1
+    return 0
+  fi
+  __dybatpho_service_unit_dir_into dir "${manager}" "${scope}"
+
+  local label="${name%.plist}" dest elevate=0
+  [[ "${scope}" != system ]] || elevate=1
+  dest="${dir}/${name}"
+  [[ "${manager}" != launchd ]] || dest="${dir}/${label}.plist"
+  local -a flag=() owner=()
+  [[ "${scope}" != user ]] || flag=(--user)
+  [[ "${manager}:${scope}" != launchd:system ]] || owner=(-o root -g wheel)
+
+  local changed=1 was_active=0
+  if [[ -f "${dest}" ]] && cmp -s -- "${file}" "${dest}"; then
+    changed=0
+  elif [[ -f "${dest}" ]] && dybatpho::service_is_active "${name}" ${flag[@]+"${flag[@]}"}; then
+    was_active=1
+  fi
+
+  if ((changed)); then
+    __dybatpho_service_run "${elevate}" mkdir -p -- "${dir}" || return
+    __dybatpho_service_run "${elevate}" install -m 644 ${owner[@]+"${owner[@]}"} -- "${file}" "${dest}" || return
+  fi
+
+  if [[ "${manager}" == launchd ]]; then
+    local domain=system
+    [[ "${scope}" != user ]] || domain="gui/$(id -u)"
+    if ((changed)) || ! launchctl print "${domain}/${label}" &> /dev/null; then
+      __dybatpho_service_run "${elevate}" launchctl enable "${domain}/${label}" || return
+      # Fails when the job is not loaded yet, as on a first install.
+      __dybatpho_service_run "${elevate}" launchctl bootout "${domain}" "${dest}" &> /dev/null || true
+      __dybatpho_service_run "${elevate}" launchctl bootstrap "${domain}" "${dest}" || return
+    fi
+  elif ((changed)); then
+    dybatpho::service_reload_manager ${flag[@]+"${flag[@]}"} || return
+    if ((was_active)); then
+      __dybatpho_service_act restart "${name}" ${flag[@]+"${flag[@]}"} || return
+    fi
+  fi
+  __dybatpho_service_act enable "${name}" ${flag[@]+"${flag[@]}"}
+}
+
+#######################################
+# @description Disable a service, remove the unit file `dybatpho::service_install`
+#   put in place, and reload the manager.
+# @example
+#   dybatpho::service_uninstall sync.service --user
+#
+# @arg $1 string Service name, as installed
+# @arg $2 string [optional] `--user` for the user's own manager
+# @exitcode 0 Removed, or skipped with a warning
+# @exitcode 1 No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+# @exitcode other Exit code of the command that failed
+#######################################
+function dybatpho::service_uninstall {
+  local name scope manager dir
+  __dybatpho_service_parse_into name scope -- "$@"
+  if ! __dybatpho_service_ready_into manager "${scope}" "uninstall ${name}"; then
+    dybatpho::is true "${DYBATPHO_SERVICE_STRICT}" && return 1
+    return 0
+  fi
+  __dybatpho_service_unit_dir_into dir "${manager}" "${scope}" \
+    || dybatpho::die "${FUNCNAME[0]}: This service manager takes no unit file: ${manager}"
+  local -a flag=()
+  [[ "${scope}" != user ]] || flag=(--user)
+  local elevate=0 dest="${dir}/${name}"
+  [[ "${scope}" != system ]] || elevate=1
+  [[ "${manager}" != launchd ]] || dest="${dir}/${name%.plist}.plist"
+  __dybatpho_service_act disable "${name}" ${flag[@]+"${flag[@]}"} || return
+  if [[ -e "${dest}" ]]; then
+    __dybatpho_service_run "${elevate}" rm -f -- "${dest}" || return
+  fi
+  dybatpho::service_reload_manager ${flag[@]+"${flag[@]}"}
+}

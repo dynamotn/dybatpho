@@ -44,6 +44,9 @@ not fail on it; `DYBATPHO_SERVICE_STRICT` makes that a failure.
 - [`dybatpho::service_restart`](#dybatphoservice_restart) — Restart a service.
 - [`dybatpho::service_is_active`](#dybatphoservice_is_active) — Tell whether a service is running now. On launchd a loaded job that is not running counts as not active.
 - [`dybatpho::service_is_enabled`](#dybatphoservice_is_enabled) — Tell whether a service is enabled, so it starts at boot or login.
+- [`dybatpho::service_reload_manager`](#dybatphoservice_reload_manager) — Reload the manager's view of its unit files: `daemon-reload` on systemd, nothing elsewhere.
+- [`dybatpho::service_install`](#dybatphoservice_install) — Put a unit file or launchd plist where the manager reads it, have the manager pick it up, and enable the service. The file is compared with what is there first: an identical one is not written and causes no reload. A changed one is replaced, the manager reloads, and a running service restarts. On launchd the label is enabled before `bootstrap`, which refuses a label left disabled.
+- [`dybatpho::service_uninstall`](#dybatphoservice_uninstall) — Disable a service, remove the unit file `dybatpho::service_install` put in place, and reload the manager.
 
 <a id="usage"></a>
 
@@ -74,6 +77,10 @@ dybatpho::service_enable sshd
 **[`dybatpho::service_enable`](#dybatphoservice_enable)**
 
 - On launchd the job must already be loaded; `dybatpho::service_install` loads it
+
+**[`dybatpho::service_install`](#dybatphoservice_install)**
+
+- A system file is written mode 644, and root:wheel on launchd, as `bootstrap` requires
 
 <a id="reference"></a>
 
@@ -324,3 +331,93 @@ Tell whether a service is enabled, so it starts at boot or login.
 
 - `0`: It is enabled
 - `1`: It is not, or no manager can answer
+
+---
+
+### `dybatpho::service_reload_manager`
+
+Reload the manager's view of its unit files: `daemon-reload`
+on systemd, nothing elsewhere.
+
+**🧪 Example**
+
+```bash
+dybatpho::service_reload_manager --user
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: Reloaded, nothing to do, or skipped with a warning
+- `other`: Exit code of `systemctl daemon-reload`
+
+---
+
+### `dybatpho::service_install`
+
+Put a unit file or launchd plist where the manager reads it,
+have the manager pick it up, and enable the service.
+The file is compared with what is there first: an identical one is not
+written and causes no reload. A changed one is replaced, the manager
+reloads, and a running service restarts. On launchd the label is enabled
+before `bootstrap`, which refuses a label left disabled.
+
+**🧪 Example**
+
+```bash
+dybatpho::service_install ./sync.service --user
+dybatpho::service_install ./dev.example.sync.plist --user
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | path | Unit file or plist |
+| `$@` | string | [optional] `--user` for the user's own manager, and `--name NAME` to install under another name |
+
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_DRY_RUN`** | string | When true-like, print the commands instead of running them |
+
+**🚦 Exit codes**
+
+- `0`: Installed and enabled, or skipped with a warning
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set, or the file is missing
+- `other`: Exit code of the command that failed
+
+---
+
+### `dybatpho::service_uninstall`
+
+Disable a service, remove the unit file `dybatpho::service_install`
+put in place, and reload the manager.
+
+**🧪 Example**
+
+```bash
+dybatpho::service_uninstall sync.service --user
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Service name, as installed |
+| `$2` | string | [optional] `--user` for the user's own manager |
+
+**🚦 Exit codes**
+
+- `0`: Removed, or skipped with a warning
+- `1`: No manager can act and `DYBATPHO_SERVICE_STRICT` is set
+- `other`: Exit code of the command that failed

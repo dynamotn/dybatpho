@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`i18n` — `dybatpho::i18n_duration` and `dybatpho::i18n_relative` refuse
+  integers beyond 9223372036854775807,** or two timestamps too far apart,
+  instead of printing "0 minutes" or "1 year ago".
 - **`date` — `dybatpho::date_seconds_to_hms` refuses seconds beyond
   9223372036854775807** instead of printing `0:00:00`.
 - **`semver` — bumping, `^`/`~`/partial ranges and `dybatpho::semver_coerce`

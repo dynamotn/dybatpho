@@ -2479,6 +2479,24 @@ function __dybatpho_i18n_seed_relative {
 }
 
 #######################################
+# @description Refuse an integer whose magnitude Bash arithmetic cannot hold.
+#   Nineteen digits stay below 2^64, so one past 2^63 - 1 wraps to a negative
+#   number, and more digits wrap to anything.
+# @arg $1 string Name of the function to report
+# @arg $2 string What the value is, for the message
+# @arg $3 string The integer, as written, with an optional leading minus
+# @exitcode 1 Stop the script when the magnitude is above 9223372036854775807
+# @internal
+#######################################
+function __dybatpho_i18n_check_int64 {
+  local __i18n_check_digits="${3#-}"
+  __i18n_check_digits="${__i18n_check_digits#"${__i18n_check_digits%%[!0]*}"}"
+  if ((${#__i18n_check_digits} > 19 || 10#0${__i18n_check_digits} < 0)); then
+    dybatpho::die "$1: $2 must be at most 9223372036854775807 in magnitude, got '$3'"
+  fi
+}
+
+#######################################
 # @description Choose the unit and count that best describe a span of seconds.
 #   The thresholds are the conventional ones rather than exact unit multiples,
 #   because an hour and fifty minutes reads better as two hours than as a
@@ -2517,7 +2535,8 @@ function __dybatpho_i18n_span {
     __span_count=$(((__span_seconds + 1314900) / 2629800))
   else
     __span_unit="year"
-    __span_count=$(((__span_seconds + 15778800) / 31557600))
+    # Rounded without adding to the span, which may be the largest number.
+    __span_count=$((__span_seconds / 31557600 + (__span_seconds % 31557600 >= 15778800 ? 1 : 0)))
   fi
   [[ "${__span_unit}" == "now" ]] || ((__span_count >= 1)) || __span_count=1
 }
@@ -2555,8 +2574,14 @@ function dybatpho::i18n_relative {
   [[ "${now}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Reference time must be an integer, got '${now}'"
 
+  __dybatpho_i18n_check_int64 "${FUNCNAME[0]}" Timestamp "${timestamp}"
+  __dybatpho_i18n_check_int64 "${FUNCNAME[0]}" "Reference time" "${now}"
   # Each one in base ten with its sign outside the `10#`, so `0100` is a hundred.
-  local delta=$(((${now%%[0-9]*}10#${now#-}) - (${timestamp%%[0-9]*}10#${timestamp#-})))
+  local ts_n=$((${timestamp%%[0-9]*}10#${timestamp#-})) now_n=$((${now%%[0-9]*}10#${now#-}))
+  local delta=$((now_n - ts_n))
+  # The difference of two numbers that fit can still wrap: its sign gives it away.
+  (((now_n >= ts_n) == (delta >= 0))) \
+    || dybatpho::die "${FUNCNAME[0]}: The span between '${timestamp}' and '${now}' is too large"
   local direction="past"
   ((delta < 0)) && {
     direction="future"
@@ -2591,6 +2616,7 @@ function dybatpho::i18n_duration {
   dybatpho::expect_args seconds -- "$@"
   [[ "${seconds}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Seconds must be an integer, got '${seconds}'"
+  __dybatpho_i18n_check_int64 "${FUNCNAME[0]}" Seconds "${seconds}"
   # The magnitude, in base ten: `0100` is a hundred seconds, not sixty-four.
   seconds=$((10#${seconds#-}))
   local unit count

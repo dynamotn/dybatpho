@@ -1057,6 +1057,22 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+@test "duration and relative refuse integers that do not fit in a number" {
+  dybatpho::i18n_init en
+  # 2^64 wrapped to 0 and was shown as "0 minutes".
+  run --separate-stderr ! dybatpho::i18n_duration 18446744073709551616
+  assert_stderr --partial "dybatpho::i18n_duration: Seconds must be at most 9223372036854775807"
+  run --separate-stderr ! dybatpho::i18n_relative 18446744073709551616 0
+  assert_stderr --partial "dybatpho::i18n_relative: Timestamp must be at most 9223372036854775807"
+  run --separate-stderr ! dybatpho::i18n_relative 0 18446744073709551616
+  assert_stderr --partial "Reference time must be at most 9223372036854775807"
+  # Two numbers that fit can still be further apart than one can say.
+  run --separate-stderr ! dybatpho::i18n_relative 9223372036854775807 -2
+  assert_stderr --partial "is too large"
+  assert_equal "$(dybatpho::i18n_duration 9223372036854775807)" "292,271,023,045 years"
+  assert_equal "$(dybatpho::i18n_relative 0 9223372036854775807)" "292,271,023,045 years ago"
+}
+
 # dybatpho::i18n_relative
 # ---------------------------------------------------------------------------
 

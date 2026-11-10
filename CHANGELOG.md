@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`doctor` — the `cache` row lists the hashers `cache_key` accepts,**
+  `openssl` instead of `cksum`, so a host with only `cksum` is no longer
+  reported healthy.
 - **`git` — `dybatpho::git_changed_files` prints every path as it is on
   disk.** Names holding `"`, `\` or a tab are no longer C-quoted.
 - **`metrics` — `dybatpho::metrics_summary_ms` is as cheap as a histogram

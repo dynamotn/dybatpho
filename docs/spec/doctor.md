@@ -174,6 +174,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 
 - **FR-021**: The report MUST list every module it covers with its stability tier and its soft dependencies, as a table in the text report and as `tiers` and `soft_dependencies` objects keyed by module in the JSON one, MUST NOT widen its scope along a soft dependency, and MUST fail on a soft dependency naming an unknown module.
 - **FR-022**: A generated bundle MUST carry the stability tier of each module it holds and the soft dependencies between them. The bundler MUST name, in its output and in the bundle's header, every soft dependency it leaves out, and `--with-soft-deps` MUST widen the selection until every soft dependency is carried. Inside a bundle, a function needing a soft dependency it does not carry MUST stop with the command that regenerates it.
+- **FR-023**: The optional dependencies listed for a module MUST be the commands that module accepts; for `cache` that is `sha256sum`, `shasum` or `openssl`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -228,6 +229,7 @@ scripts/bundle.sh --modules "logging git semver" --output dist/dybatpho.sh
 - **IT-018**: Bundle from a copy of the library whose `init.sh` misspells a bootstrap function header, and fail with no output file.
 - **IT-019**: Verify the text report lists each module with its tier and soft dependencies without widening the scope along them, the JSON report carries `tiers` and `soft_dependencies`, and an unknown soft dependency fails the report.
 - **IT-020**: Verify a bundle answers `dybatpho::module_tier` and the tier selections, names the soft dependencies it leaves out in its output and header, stops a call needing one with the regeneration hint, and with `--with-soft-deps` carries them and converts.
+- **IT-021**: List the optional requirements of `cache` and get `sha256sum|shasum|openssl`.
 
 ## Acceptance Criteria *(mandatory)*
 

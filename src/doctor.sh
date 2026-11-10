@@ -99,7 +99,7 @@ declare -gA DYBATPHO_DOCTOR_OPTIONAL=(
   [agent]="git"
   [ai]="claude|llm|ollama"
   # Only `dybatpho::cache_key` needs one, and any of the three will do.
-  [cache]="sha256sum|shasum|cksum"
+  [cache]="sha256sum|shasum|openssl"
   [archive]="unzip zip gzip bzip2 xz zstd"
   # An incremental snapshot links unchanged files with `rsync --link-dest`
   # when it is there, and walks the source in Bash when it is not.

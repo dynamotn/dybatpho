@@ -96,6 +96,13 @@ fake_versioned_command() {
   assert_output ""
 }
 
+@test "dybatpho::doctor_requirements lists the hashers the cache module accepts" {
+  # `cache_key` refuses `cksum`, a 32-bit CRC, and falls back to `openssl`; the
+  # row named `cksum`, so a host with only `openssl` was reported as missing one.
+  run_traced -0 dybatpho::doctor_requirements cache optional
+  assert_output "sha256sum|shasum|openssl"
+}
+
 @test "dybatpho::doctor_requirements lists what the privilege module needs" {
   # Neither is required: a script already running as root escalates nothing,
   # so an absent `sudo` is a missing capability rather than a broken module.

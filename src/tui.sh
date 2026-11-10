@@ -159,7 +159,9 @@ function __dybatpho_tui_repeat_into {
 #######################################
 # @description Cut text down to a number of terminal columns, never leaving half
 #   of a double-width glyph behind. A drawn widget counts the lines it printed
-#   to move back over them, and a line that wraps takes two rows.
+#   to move back over them, and a line that wraps takes two rows. A control
+#   character is spelled out first, in caret notation: a line break would draw
+#   a row the count misses, and an escape sequence would reach the terminal.
 # @arg $1 string Name of the variable receiving the text
 # @arg $2 string Text to cut
 # @arg $3 number Columns available
@@ -172,6 +174,7 @@ function __dybatpho_tui_fit_into {
   local -a __dybatpho_tui_fit_chars=()
   local __dybatpho_tui_fit_char __dybatpho_tui_fit_each __dybatpho_tui_fit_used=0
 
+  __dybatpho_log_visible_into __dybatpho_tui_fit_text "${__dybatpho_tui_fit_text}"
   if __dybatpho_log_is_ascii "${__dybatpho_tui_fit_text}"; then
     ((__dybatpho_tui_fit_limit > 0)) || __dybatpho_tui_fit_limit=0
     __dybatpho_tui_fit_out="${__dybatpho_tui_fit_text:0:__dybatpho_tui_fit_limit}"

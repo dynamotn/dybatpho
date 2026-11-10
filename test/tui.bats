@@ -504,3 +504,16 @@ EOF
   run grep -c 'value too great' "${log}"
   assert_output "0"
 }
+
+@test "the drawn menus show control characters in an entry instead of sending them to the terminal" {
+  # A line break in an entry drew two rows where the redraw counted one, and an
+  # escape sequence in it reached the terminal.
+  local DYBATPHO_TUI=always COLUMNS=60 chosen=""
+  local drawn="${BATS_TEST_TMPDIR}/menu.out"
+  dybatpho::tui_menu chosen "Pick" $'two\nlines' $'title\033]0;owned\a' < <(printf '\n') 2> "${drawn}"
+  # The answer is the entry as given; only its drawing is spelled out.
+  assert_equal "${chosen}" $'two\nlines'
+  grep -qF 'two^Jlines' "${drawn}" || fail "entry not spelled out: $(cat -v "${drawn}")"
+  grep -qF 'title^[]0;owned^G' "${drawn}" || fail "entry not spelled out: $(cat -v "${drawn}")"
+  ! grep -q $'\033]' "${drawn}" || fail "sequence reached the terminal: $(cat -v "${drawn}")"
+}

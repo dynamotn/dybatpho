@@ -171,6 +171,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 ## Edge Cases
 
 - Streams are captured, piped, or redirected, in any combination.
+- A menu entry, prompt or hint holds a line break or an escape sequence.
 - The terminal is `TERM=dumb`, which cannot move the cursor or erase a line.
 - The terminal sends arrows in application cursor mode (`ESC O A`), or a key
   whose sequence is longer than three bytes, such as Delete (`ESC [ 3 ~`).
@@ -259,6 +260,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **FR-027**: `tui_menu` and `tui_multi_menu` MUST write the choice into the variable the caller named, whatever that name is, including `prompt` and `result_var`.
 - **FR-028**: A widget that hid the cursor MUST, on INT or TERM, show it again and then end the script with the signal, status 128+n.
 - **FR-029**: A single-choice menu that cannot ask MUST take the first entry `DYBATPHO_TUI_DEFAULT` names when it names several, rather than ask again.
+- **FR-030**: A drawn widget MUST show a control character of its prompt, hint or entries in caret notation (`^J` for a line break, `^[` for ESC), so an entry neither draws a row the redraw does not count nor sends an escape sequence to the terminal; the value returned MUST be the entry as given.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -317,6 +319,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **IT-015**: Under a pseudo-terminal, detection draws for `TERM=xterm` and falls back for `TERM=dumb`.
 - **IT-016**: Send TERM to a script while its progress bar is drawn, and get status 143 with the cursor shown again.
 - **IT-017**: With `DYBATPHO_TUI_DEFAULT=1,3` and nothing to read, get the first entry from a single-choice menu.
+- **IT-018**: Draw a menu whose entries hold a line break and an OSC title, and find them spelled `^J` and `^[]0;...^G` with no raw OSC on the terminal, while the chosen entry comes back unchanged.
 
 ## Acceptance Criteria *(mandatory)*
 

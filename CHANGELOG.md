@@ -27,6 +27,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`tui` — menu entries, prompts and hints show control characters in caret
+  notation,** so a line break in an entry no longer breaks the redraw; the
+  chosen value comes back unchanged.
 - **`screen` — `dybatpho::screen_ansi` reads charset designations, OSC strings
   such as hyperlinks, and colon SGR parameters,** so `tput sgr0` and
   `ls --hyperlink` output no longer shifts the layout.

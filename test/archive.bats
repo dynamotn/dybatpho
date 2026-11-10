@@ -161,6 +161,15 @@ PY
   unstub unzip
 }
 
+@test "dybatpho::archive_extract gives a decompressed file the mode the umask gives" {
+  local gz_archive="${BATS_TEST_TMPDIR}/data.gz" destination="${BATS_TEST_TMPDIR}/out"
+  : > "${gz_archive}"
+  stub gzip ": printf 'hello-gz\n'"
+  (umask 022 && dybatpho::archive_extract "${gz_archive}" "${destination}")
+  unstub gzip
+  assert_equal "$(stat -c %a "${destination}/data" 2> /dev/null || stat -f %Lp "${destination}/data")" "644"
+}
+
 @test "dybatpho::archive_extract supports xz gz and bz2 single-file archives" {
   local xz_archive="${BATS_TEST_TMPDIR}/bundle.txt.xz"
   local gz_archive="${BATS_TEST_TMPDIR}/bundle.txt.gz"
@@ -437,6 +446,24 @@ abs"
   ln -s ./file.txt "${tree}/same"
   tar -C "${tree}" -cf "${inside}" file.txt same
   dybatpho::archive_is_safe "${inside}"
+}
+
+@test "dybatpho::archive_is_safe reads a link target an owner name cannot forge" {
+  # The target was read after the first ` a -> ` of the long listing, and an
+  # owner named `x a -> ok` put that text ahead of the real target.
+  dybatpho::is command python3 || skip "needs python3"
+  local forged="${BATS_TEST_TMPDIR}/forged.tar"
+  python3 -I - "${forged}" << 'PY'
+import sys, tarfile
+with tarfile.open(sys.argv[1], "w", format=tarfile.GNU_FORMAT) as archive:
+    info = tarfile.TarInfo("a")
+    info.type, info.linkname, info.mode, info.uname = tarfile.SYMTYPE, "/etc", 0o777, "x a -> ok"
+    archive.addfile(info)
+PY
+  run_traced dybatpho::archive_unsafe_entries "${forged}"
+  assert_success
+  assert_output "a"
+  run_traced -1 dybatpho::archive_is_safe "${forged}"
 }
 
 @test "dybatpho::archive_unsafe_entries reports a link that escapes through another link" {

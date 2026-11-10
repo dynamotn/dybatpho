@@ -232,6 +232,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`archive` — an owner name in a tar archive can no longer hide a link's
+  target from `dybatpho::archive_is_safe`.** The listing is read with numeric
+  owners, so an owner named `x a -> ok` no longer makes an absolute link look
+  safe.
 - **`privilege` — Ctrl-C, `kill` and a hangup end the script again after
   `dybatpho::privilege_acquire`.** The release replaced what those signals
   do, so a script with no handlers of its own kept running with root.

@@ -212,7 +212,7 @@ function __dybatpho_archive_decompress {
     rm -f -- "${staging}"
     return "${status}"
   fi
-  mv -f -- "${staging}" "${output}"
+  __dybatpho_file_commit "${staging}" "${output}" "Cannot extract ${archive_path}"
 }
 
 #######################################
@@ -435,7 +435,9 @@ function __dybatpho_archive_link_targets_into {
   local -a prefix=() pack=() unpack=() names=() lines=()
   format=$(__dybatpho_archive_format "${archive_path}") || return $?
   if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
-    verbose="$(tar ${prefix[@]+"${prefix[@]}"} "-tv${letter}f" "${archive_path}")" || status=$?
+    # Owner names are the archive's own text and could hold ` name -> `
+    # ahead of the real target; as numbers they cannot.
+    verbose="$(tar ${prefix[@]+"${prefix[@]}"} --numeric-owner "-tv${letter}f" "${archive_path}")" || status=$?
   elif __dybatpho_archive_codec_into tool pack unpack "${format}"; then
     return 0
   else

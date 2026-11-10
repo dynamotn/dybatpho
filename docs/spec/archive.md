@@ -116,6 +116,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **FR-016**: The strip-components count MUST be read in base ten, so `08` strips eight components.
 - **FR-017**: A symbolic link stored more than once under one name MUST be reported when any of its targets is unsafe, not only the last.
 - **FR-018**: Extracting a zip MUST overwrite existing files without unzip asking again, so the decision stays with the caller.
+- **FR-019**: The long listing a link target is read from MUST show owners as numbers, so an owner name cannot place a forged ` name -> ` ahead of the real target.
+- **FR-020**: A single-file archive MUST be decompressed into a file with the mode the umask gives, as any other new file.
 
 ### Key Entities *(include if feature involves data)*
 

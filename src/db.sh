@@ -69,7 +69,7 @@ function __dybatpho_db_scan_into {
   # 0x80 is an identifier character to it.
   local LC_ALL=C
   local sql="$2" allow="$3" i=0 n="${#2}" c next rest end name run
-  local word="^([A-Za-z0-9_]|[^"$'\x01'"-"$'\x7f'"])+"
+  local word="^([A-Za-z0-9_\$]|[^"$'\x01'"-"$'\x7f'"])+"
   local -A seen=()
   __dybatpho_db_scan_names=()
   while ((i < n)); do
@@ -120,6 +120,12 @@ function __dybatpho_db_scan_into {
         run=""
         [[ ! "${sql:i+1}" =~ ${word} ]] || run="${BASH_REMATCH[0]}"
         if [[ -n "${run}" ]]; then
+          # sqlite3 also reads `::name` and `(...)` after a name into the
+          # variable, the TCL forms, and would bind the whole to NULL.
+          local after="${sql:i+1+${#run}:2}"
+          if [[ "${after}" == "::" || "${after:0:1}" == "(" ]]; then
+            run+="${after:0:1}"
+          fi
           if [[ "${c}" != : || "${allow}" != params || ! "${run}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
             local why="Use :name placeholders, a word passed as name=value, not ${c}${run}"
             dybatpho::die "${why}: sqlite3 would bind it to NULL"
@@ -169,12 +175,12 @@ function __dybatpho_db_hex_into {
 #######################################
 function __dybatpho_db_escapes {
   if [[ -z "${__DYBATPHO_DB_ESCAPES-}" ]]; then
-    local version major minor
-    version="$(sqlite3 --version 2> /dev/null)" || version=""
+    # Asked of the tool rather than read from its version: a build that
+    # reports its version otherwise would leave values escaped again.
     __DYBATPHO_DB_ESCAPES=false
-    if [[ "${version}" =~ ^([0-9]+)\.([0-9]+) ]]; then
-      major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}"
-      ((10#${major} > 3 || (10#${major} == 3 && 10#${minor} >= 50))) && __DYBATPHO_DB_ESCAPES=true
+    if printf '.bail on\n.mode ascii --escape off\nselect 1;\n' \
+      | sqlite3 -init /dev/null -batch :memory: &> /dev/null; then
+      __DYBATPHO_DB_ESCAPES=true
     fi
   fi
   [[ "${__DYBATPHO_DB_ESCAPES}" == true ]]
@@ -394,9 +400,15 @@ function dybatpho::db_migrate {
   for version in ${versions[@]+"${versions[@]}"}; do
     [[ -n "${version}" && "${applied}" != *",${version},"* ]] || continue
     file="${files[${version}]}"
+    # Scanned here first, so a refusal stops with its own reason.
+    local tail
+    tail="$(< "${file}")"
+    # shellcheck disable=SC2034 # filled with nothing: a migration holds no parameter
+    local -a refused=()
+    __dybatpho_db_scan_into refused "${tail}" none
     err="$(__dybatpho_db_run none "${db}" \
       "insert into dybatpho_migrations values (cast(:version as integer), :name, datetime('now'))" \
-      "$(< "${file}")" version="${version}" name="${file##*/}" 2>&1 > /dev/null)" && continue
+      "${tail}" version="${version}" name="${file##*/}" 2>&1 > /dev/null)" && continue
     # Recorded by another process meanwhile: it applied this file.
     [[ "${err}" != *"UNIQUE constraint failed: dybatpho_migrations.version"* ]] || continue
     printf '%s\n' "${err}" >&2

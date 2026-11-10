@@ -236,3 +236,20 @@ _migrations() {
   dybatpho::db_exec 'file:uri.db?mode=memory' "create table x (a)"
   assert_file_exists "${BATS_TEST_TMPDIR}/file:uri.db?mode=memory"
 }
+
+@test "dybatpho::db_exec stops on the TCL-style suffixes sqlite3 reads into a placeholder" {
+  local sql
+  # The placeholders are SQL, meant literally.
+  # shellcheck disable=SC2016
+  for sql in 'select :a$' "select :a::b" "select :a(x)"; do
+    run -1 --separate-stderr dybatpho::db_exec "${DB}" "${sql}" a=5 b=6
+    assert_stderr --partial "placeholder"
+  done
+}
+
+@test "dybatpho::db_migrate names the placeholder it refused in a migration file" {
+  _migrations 001_a.sql "create table m (n text); insert into m values (:zzz);"
+  run -1 --separate-stderr dybatpho::db_migrate "${DB}" "${MIGRATIONS}"
+  assert_stderr --partial "not :zzz"
+  refute_stderr --partial "was rolled back"
+}

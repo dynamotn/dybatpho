@@ -104,7 +104,7 @@ count="$(dybatpho::db_value "${db}" "select count(*) from tasks")"
 - **FR-009**: The SQL and every value MUST reach `sqlite3` on its standard input, never on its command line, so neither appears in the process list.
 - **FR-010**: With `DYBATPHO_DB_WAL` true-like, every call MUST first put the database in WAL mode (outside the transaction, its output discarded), so readers do not block a writer.
 - **FR-011**: Statements that control a transaction (`BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`), and those that cannot run inside one (`VACUUM`, `PRAGMA journal_mode`, `PRAGMA foreign_keys`), are not supported in `db_exec`, `db_query`, `db_value` or a migration file. Values are text: one that is not valid UTF-8 is stored exactly but read back through JSON with replacement characters.
-- **FR-012**: The SQL of every call and of every migration file MUST be read as sqlite3 tokenizes it, byte by byte, and MUST stop the script on: a placeholder other than a `:name` that is a word (`:1`, `:é`, `$x`, `@x`, `#x`, `?`), any placeholder in a migration file, an unterminated string literal, quoted identifier, `[` or `/*` -- which would swallow the `COMMIT` and drop the call silently -- and a line starting with `.`, which sqlite3 would run as a dot-command such as `.shell`.
+- **FR-012**: The SQL of every call and of every migration file MUST be read as sqlite3 tokenizes it, byte by byte, and MUST stop the script on: a placeholder other than a `:name` that is a word (`:1`, `:é`, `$x`, `@x`, `#x`, `?`, and `:a$`, `:a::b`, `:a(x)`, whose `$`, `::` and `(...)` sqlite3 reads into the name), any placeholder in a migration file, an unterminated string literal, quoted identifier, `[` or `/*` -- which would swallow the `COMMIT` and drop the call silently -- and a line starting with `.`, which sqlite3 would run as a dot-command such as `.shell`.
 - **FR-013**: Hex encoding MUST take time linear in the value's length. `db_value` MUST return control characters as they are, turning off the escaping of sqlite3 3.50 and later; a value holding the separators `\037` or `\036` reads as several columns or rows, and one equal to `\035NULL\035` as NULL. A relative database path MUST be anchored with `./`, so it is never read as an option or a `file:` URI.
 
 ### Key Entities
@@ -136,7 +136,7 @@ Tests run the real `sqlite3` in the test directory and skip where it is missing.
 - **IT-011**: `db_value` returns 1 on NULL and stops on two rows.
 - **IT-012**: Two processes migrate the same directory at once; both succeed and each file runs once.
 - **IT-013**: With `DYBATPHO_DB_WAL=true`, the database reports `journal_mode` `wal` and `db_query` output is still pure JSON.
-- **IT-014**: Read back `\x01` and an escape sequence unchanged; stop on an unterminated comment, quote and bracket; stop on `:idé`, `:1`, `$1`, `@1`, `:é`, `$é`, `#a`; refuse `.shell` and `.bail off` lines while keeping them as data in a literal; refuse a placeholder and a dot-command in a migration file; bind a 400 KB value in seconds; keep `file:uri.db?mode=memory` a file.
+- **IT-014**: Read back `\x01` and an escape sequence unchanged; stop on an unterminated comment, quote and bracket; stop on `:idé`, `:1`, `$1`, `@1`, `:é`, `$é`, `#a`; refuse `.shell` and `.bail off` lines while keeping them as data in a literal; refuse a placeholder and a dot-command in a migration file; bind a 400 KB value in seconds; keep `file:uri.db?mode=memory` a file; stop on `:a$`, `:a::b` and `:a(x)`, and name a placeholder refused in a migration file.
 
 ## Acceptance Criteria *(mandatory)*
 

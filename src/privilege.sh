@@ -245,9 +245,11 @@ function dybatpho::privilege_acquire {
 
   # Registered after the work above succeeded, so a failed acquire leaves no
   # teardown behind for a resource that was never taken. Once is enough: a
-  # release that has nothing left to let go of does nothing.
+  # release that has nothing left to let go of does nothing. `EXIT` alone:
+  # Bash runs it when HUP, INT or TERM end the shell, while trapping those
+  # signals replaced what they do and kept the script running with root.
   if [[ "${__DYBATPHO_PRIVILEGE_TRAPPED}" != "true" ]]; then
-    dybatpho::trap "dybatpho::privilege_release" EXIT HUP INT TERM
+    dybatpho::trap "dybatpho::privilege_release" EXIT
     __DYBATPHO_PRIVILEGE_TRAPPED="true"
   fi
   return 0

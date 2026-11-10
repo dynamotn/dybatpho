@@ -121,6 +121,7 @@ dybatpho::privilege_release
 - **FR-019**: `DYBATPHO_PRIVILEGE` MUST turn elevation off for every value `dybatpho::is false` accepts, in any case.
 - **FR-020**: `doas` MUST be authenticated by running `true` through it, since it has no `-v`.
 - **FR-021**: `dybatpho::privilege_run` MUST pass `--` before the command, so a command word starting with a dash is never read as an option of the escalation command.
+- **FR-022**: Acquiring MUST NOT change what `HUP`, `INT` and `TERM` do: the teardown is registered on `EXIT`, which those signals still run, so a script without handlers of its own still ends on them.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -157,6 +158,7 @@ dybatpho::privilege_release
 - **IT-015**: Report no elevation needed for `false`, `FALSE`, `False`, `no`, `NO`, `off`, `Off` and `1`, with a command pinned and not root.
 - **IT-016**: Acquire through a `doas` stub that refuses `-v`, and see it run `true`.
 - **IT-017**: Run a command named `-dash` through `privilege_run` with elevation, and see the command run rather than refused as an option.
+- **IT-018**: Acquire in a script with no signal handlers, send it `HUP`, `INT` and `TERM`, and see it end with `128 + signal` instead of running on.
 
 ## Acceptance Criteria *(mandatory)*
 

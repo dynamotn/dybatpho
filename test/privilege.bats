@@ -308,3 +308,28 @@ STUB
   done
   unset -f dybatpho::is_root
 }
+
+@test "dybatpho::privilege_acquire leaves HUP, INT and TERM ending the script" {
+  # The release was trapped on the signals themselves, which replaced what
+  # they do: after an acquire, a `kill` or Ctrl-C no longer ended a script
+  # that had no handler of its own, and it carried on holding root.
+  local script="${BATS_TEST_TMPDIR}/acquired.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh" --modules privilege
+dybatpho::is_root() { return 1; }
+# A signal inherited as ignored (bats --jobs does this) can't be trapped.
+[[ "$(trap -p "SIG${2}")" == "trap -- '' SIG${2}" ]] && exit 99
+dybatpho::privilege_acquire --no-keepalive || exit 98
+kill -"${2}" "$$"
+printf 'kept running\n'
+SCRIPT
+  : > "${TICKET}"
+  local signal expected
+  for signal in HUP INT TERM; do
+    run_traced bash "${script}" "${DYBATPHO_DIR}" "${signal}"
+    [[ "${status}" == 99 ]] && continue
+    expected=$((128 + $(kill -l "${signal}")))
+    assert_equal "${status}" "${expected}"
+    refute_output --partial "kept running"
+  done
+}

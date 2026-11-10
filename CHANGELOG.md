@@ -219,6 +219,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`privilege` — Ctrl-C, `kill` and a hangup end the script again after
+  `dybatpho::privilege_acquire`.** The release replaced what those signals
+  do, so a script with no handlers of its own kept running with root.
 - **`screen` — `dybatpho::screen_put` draws control characters as text,** so
   an escape sequence in drawn text, such as an OSC 52 clipboard write, cannot
   reach the terminal.

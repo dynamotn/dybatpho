@@ -708,7 +708,8 @@ function __dybatpho_file_staging_into {
   while ((__dybatpho_file_staging_try++ < 20)); do
     __dybatpho_file_staging_name="${__dybatpho_file_staging_dir%/}/.dybatpho_staging_${__dybatpho_file_staging_base}"
     __dybatpho_file_staging_name+=".${BASHPID}.${RANDOM}${RANDOM}"
-    if (set -C && : > "${__dybatpho_file_staging_name}") 2> /dev/null; then
+    # Owner only until the commit, as the new contents may be a secret.
+    if (set -C && umask 077 && : > "${__dybatpho_file_staging_name}") 2> /dev/null; then
       # `noclobber` still opens an existing non-regular file, such as a link
       # to a device, so what was opened has to be the plain file just made.
       if [[ -f "${__dybatpho_file_staging_name}" && ! -L "${__dybatpho_file_staging_name}" ]]; then
@@ -764,14 +765,18 @@ function __dybatpho_file_operand {
 function __dybatpho_file_commit {
   local staging path caller mode owner operand
   dybatpho::expect_args staging path caller -- "$@"
+  operand="$(__dybatpho_file_operand "${staging}")"
   if dybatpho::is file "${path}"; then
-    operand="$(__dybatpho_file_operand "${staging}")"
     mode="$(__dybatpho_file_stat mode "${path}" || true)"
     [[ -n "${mode}" ]] && chmod "${mode}" "${operand}"
     # Changing the owner needs privilege the caller usually does not have, so a
     # refusal here is expected rather than a failure.
     owner="$(__dybatpho_file_stat owner "${path}" || true)"
     [[ -n "${owner}" ]] && chown "${owner}" "${operand}" 2> /dev/null || true
+  else
+    # The staging file was made owner only; a new file gets what the umask gives.
+    mode="$(umask)"
+    chmod "$(printf '%o' "$((0666 & ~8#${mode}))")" "${operand}"
   fi
   if ! mv -f -- "${staging}" "${path}"; then
     __dybatpho_file_discard "${staging}"

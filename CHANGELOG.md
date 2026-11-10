@@ -21,6 +21,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`file` — the atomic writers no longer expose new contents to other users
+  while they are written.** The staging file behind `file_write_atomic`,
+  `config_save`, `json_set`, `file_replace` and the other in-place writers was
+  created with the umask mode, so a secret written over a `0600` file was
+  readable by anyone until the commit; it is now owner only until then.
 - **`validate` — `dybatpho::validate_is semver` follows the semver.org grammar,
   as `dybatpho::semver_valid` does,** so `01.2.3` and `1.0.0-a..b` are no longer
   accepted.

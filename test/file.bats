@@ -365,6 +365,23 @@ EOF
   assert_equal "$(stat -c %a "${target}" 2> /dev/null || stat -f %Lp "${target}")" "640"
 }
 
+@test "dybatpho::file_write_atomic stages new contents where only the owner can read them" {
+  local target="${BATS_TEST_TMPDIR}/secret.env"
+  printf 'old\n' > "${target}"
+  chmod 600 "${target}"
+  # Report the staging file's mode while the new contents are being written.
+  _producer() {
+    stat -c %a "$1" 2> /dev/null || stat -f %Lp "$1"
+    printf 'new\n' > "$1"
+  }
+  run_traced -0 __dybatpho_file_rewrite test "${target}" failed _producer
+  assert_output "600"
+  assert_equal "$(stat -c %a "${target}" 2> /dev/null || stat -f %Lp "${target}")" "600"
+  # A new file still gets the mode the umask gives it.
+  (umask 022 && printf 'x\n' | dybatpho::file_write_atomic "${BATS_TEST_TMPDIR}/fresh")
+  assert_equal "$(stat -c %a "${BATS_TEST_TMPDIR}/fresh" 2> /dev/null || stat -f %Lp "${BATS_TEST_TMPDIR}/fresh")" "644"
+}
+
 @test "dybatpho::file_write_atomic replaces the file by rename, not by truncation" {
   local target="${BATS_TEST_TMPDIR}/rename.conf"
   printf 'old\n' > "${target}"

@@ -357,6 +357,7 @@ dybatpho::show_file "${report_file}"
 - **FR-055**: Without a usable `XDG_RUNTIME_DIR`, `xdg_runtime_dir` MUST use the absolute fallback passed as its second argument, and MUST otherwise report an error on stderr and return 1 rather than stop the script, so the failure survives a command substitution; a relative fallback MUST be refused the same way.
 - **FR-056**: A relative symlink target MUST be resolved against the link's directory as the kernel resolves it, never by folding `..` away as text.
 - **FR-057**: The staging file name MUST fit the file name limit whatever the length of the destination name.
+- **FR-058**: The staging file MUST be readable by its owner only until it is committed; a new destination MUST then get the mode the umask gives it, and an existing one keeps its own.
 
 ### Key Entities *(include if feature involves data)*
 

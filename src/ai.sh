@@ -430,7 +430,14 @@ function __dybatpho_ai_record_usage {
 function __dybatpho_ai_ollama_alive {
   hash curl &> /dev/null || return 1
   local base="${DYBATPHO_AI_BASE_URL:-http://localhost:11434}"
-  curl --silent --fail --max-time 2 "${base}/api/tags" &> /dev/null
+  # The base URL can carry a key, so it goes through a private config rather
+  # than an argument anyone can read in `/proc/<pid>/cmdline`.
+  local DYBATPHO_CURL_SECRET_URL=true config alive=0
+  local -a DYBATPHO_CURL_SECRET_HEADERS=()
+  __dybatpho_network_secret_config config "${base}/api/tags"
+  curl --silent --fail --max-time 2 --config "${config}" &> /dev/null || alive=1
+  rm -f "${config}"
+  return "${alive}"
 }
 
 #######################################
@@ -988,7 +995,10 @@ function __dybatpho_ai_http {
   local -a headers=()
   # The API key and the prompt both go to curl out of band: an argument is
   # world-readable through `/proc/<pid>/cmdline` for the life of the request.
+  # The base URL too: it can carry a key, which is why logs redact it.
   local -a DYBATPHO_CURL_SECRET_HEADERS=()
+  # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
+  local DYBATPHO_CURL_SECRET_URL=true
   __dybatpho_ai_endpoint_into "${provider}" url headers
 
   if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
@@ -1629,8 +1639,10 @@ function dybatpho::ai_stream {
     *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
 
-  local stream_config=""
-  __dybatpho_network_secret_config stream_config
+  # The URL goes in the private config with the key: it can carry one too.
+  # shellcheck disable=SC2034 # read by __dybatpho_network_secret_config through dynamic scoping
+  local stream_config="" DYBATPHO_CURL_SECRET_URL=true
+  __dybatpho_network_secret_config stream_config "${url}"
   # The status comes from the response headers and curl's own exit code from a
   # file: both are lost otherwise, because the body is read through a process
   # substitution. Without them a refused request -- whose error object matches
@@ -1671,7 +1683,7 @@ function dybatpho::ai_stream {
     body+="${data}"$'\n'
     __dybatpho_ai_stream_chunk "${data}" "${filter}"
     # A loop's `done` is never traced; every streaming test reads through it.
-  done < <(__dybatpho_ai_stream_request "${curl_status_file}" "${payload}" "${stream_args[@]}" "${url}") # kcov(skip)
+  done < <(__dybatpho_ai_stream_request "${curl_status_file}" "${payload}" "${stream_args[@]}") # kcov(skip)
   [[ -n "${stream_config}" ]] && rm -f "${stream_config}"
 
   local code="" protocol status rest curl_status

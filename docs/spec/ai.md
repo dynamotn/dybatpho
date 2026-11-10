@@ -251,6 +251,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-036**: `ai_stream` MUST read the stream to its end before judging curl's exit status, so a server that closes the connection after `[DONE]` is not reported as a failed request.
 - **FR-037**: A tool run by `ai_run` MUST see the caller's variables: the loop and the tool invoker MUST keep their state in prefixed locals.
 - **FR-038**: Streaming MUST print a final chunk that ends without a newline.
+- **FR-039**: `DYBATPHO_AI_BASE_URL` MUST reach `curl` only through a private config file, never as an argument, for a buffered call, a streamed call, and the Ollama probe alike, since it can carry a credential.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -330,6 +331,7 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-032**: Stream a response whose server lingers after `[DONE]`, and return the answer with exit 0.
 - **IT-033**: Run a tool through `ai_run` that reads variables named like the loop's locals, and see the caller's values.
 - **IT-034**: Stream Ollama objects whose last one has no trailing newline and get the whole answer.
+- **IT-035**: Point the base URL at one holding a password and a secret path, run `ai_ask`, `ai_stream` and the Ollama probe, and find neither among curl's arguments but the URL in its config file each time.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -191,6 +191,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`ai` — the provider base URL no longer appears in the process table.**
+  Buffered and streaming calls and the Ollama probe pass
+  `DYBATPHO_AI_BASE_URL` to curl through its private config, so credentials
+  in the URL stay out of `/proc/<pid>/cmdline`.
 - **`network` — a redirect followed while secret headers are set can no longer
   read a local file.** `dybatpho::curl_do` follows only `http` and `https`
   hops; a `Location:` to `file://`, `gopher://` or `dict://` is refused with a

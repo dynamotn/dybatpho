@@ -1442,3 +1442,51 @@ stub_curl_recording_config() {
   # The second request carries the result as a `tool` message for the call.
   assert_file_contains "${args_file}" '"role":"tool","tool_call_id":"call_1","content":"tool output"'
 }
+
+# A stand-in for curl that records its arguments and its private config, then
+# answers like a buffered endpoint (`-o`), a streaming one (`-D`), or a probe.
+write_recording_curl() {
+  cat > "${BATS_TEST_TMPDIR}/curl.sh" << 'HELPER'
+args="$1"; cfg="$2"; body="$3"; shift 3
+printf '%s\n' "$*" >> "${args}"
+out="" hdr=""
+while (($#)); do
+  case "$1" in
+    -o) out="$2" ;;
+    -D) hdr="$2" ;;
+    --config) cat "$2" >> "${cfg}" ;;
+  esac
+  shift
+done
+if [[ -n "${out}" ]]; then cat > /dev/null; cat "${body}" > "${out}"; echo 200
+elif [[ -n "${hdr}" ]]; then cat > /dev/null; printf 'HTTP/1.1 200 OK\r\n\r\n' > "${hdr}"; cat "${body}"
+fi
+HELPER
+}
+
+@test "the base URL reaches curl out of band, never as an argument" {
+  # `DYBATPHO_AI_BASE_URL` is redacted in logs because it can carry a key, and
+  # an argument is world-readable through `/proc/<pid>/cmdline`.
+  local args="${BATS_TEST_TMPDIR}/args" cfg="${BATS_TEST_TMPDIR}/cfg"
+  local body="${BATS_TEST_TMPDIR}/body" sse="${BATS_TEST_TMPDIR}/sse"
+  anthropic_body 'buffered' > "${body}"
+  printf 'data: {"type":"content_block_delta","delta":{"text":"streamed"}}\n' > "${sse}"
+  write_recording_curl
+  stub curl \
+    ": bash ${BATS_TEST_TMPDIR}/curl.sh ${args} ${cfg} ${body} \"\$@\"" \
+    ": bash ${BATS_TEST_TMPDIR}/curl.sh ${args} ${cfg} ${sse} \"\$@\"" \
+    ": bash ${BATS_TEST_TMPDIR}/curl.sh ${args} ${cfg} /dev/null \"\$@\""
+  DYBATPHO_AI_BASE_URL="https://user:hunter2@llm.example.com/k/secret-path"
+  run_traced dybatpho::ai_ask "question"
+  assert_output "buffered"
+  run_traced dybatpho::ai_stream "question"
+  assert_output "streamed"
+  run_traced __dybatpho_ai_ollama_alive
+  assert_success
+  unstub curl
+  run grep -c 'hunter2\|secret-path' "${args}"
+  assert_output "0"
+  # The URL still reaches curl, once per request, through its config.
+  run grep -c 'url = "https://user:hunter2@llm.example.com/k/secret-path' "${cfg}"
+  assert_output "3"
+}

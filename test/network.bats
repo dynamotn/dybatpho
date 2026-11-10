@@ -1864,3 +1864,71 @@ _shared_state() {
     PATH="$(path_without find)" run -1 --separate-stderr dybatpho::circuit_state svc
   assert_stderr --partial "Cannot check"
 }
+
+@test "dybatpho::curl_do refuses a redirect to a scheme other than http or https" {
+  # Plain `curl -L` refuses `file://` in a redirect; following by hand used to
+  # hand it to curl as an ordinary URL, which then read the local file.
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 302 Found\r\nLocation: file:///etc/passwd\r\n\r\n' > "$2"
+  shift
+done
+echo 302
+HELPER
+  stub curl ": bash ${helper} \"\$@\""
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk-LEAKME")
+  export DYBATPHO_CURL_MAX_RETRIES=0
+  run_traced --separate-stderr -3 dybatpho::curl_do https://api.example/v1
+  unstub curl
+  assert_stderr --partial "Not following the redirect to file: only http and https are followed"
+}
+
+@test "dybatpho::curl_paginate drops secret headers for a next page on another origin" {
+  # A stand-in for curl: answers with a `Link` to the next page it is given and
+  # records its arguments and private config.
+  local helper="${BATS_TEST_TMPDIR}/page.sh"
+  cat > "${helper}" << 'HELPER'
+next="$1"; record="$2"; shift 2
+printf '%s\n' "$@" > "${record}"
+while (($#)); do
+  if [[ "$1" == "-D" ]]; then
+    if [[ -n "${next}" ]]; then
+      printf 'HTTP/1.1 200 OK\r\nLink: <%s>; rel="next"\r\n\r\n' "${next}" > "$2"
+    else
+      printf 'HTTP/1.1 200 OK\r\n\r\n' > "$2"
+    fi
+  fi
+  [[ "$1" == "--config" ]] && cat "$2" >> "${record}"
+  shift
+done
+echo 200
+HELPER
+  local first="${BATS_TEST_TMPDIR}/first" second="${BATS_TEST_TMPDIR}/second" third="${BATS_TEST_TMPDIR}/third"
+  stub curl \
+    ": bash ${helper} /items?page=2 ${first} \"\$@\"" \
+    ": bash ${helper} http://api.example/items?page=3 ${second} \"\$@\"" \
+    ": bash ${helper} '' ${third} \"\$@\""
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("Authorization: Bearer LEAKME")
+  run_traced dybatpho::curl_paginate "https://api.example/items?page=1"
+  unstub curl
+  assert_success
+  # The page on the same origin keeps the token.
+  run grep -c 'LEAKME' "${second}"
+  assert_output "1"
+  # The page that downgrades to http is another origin and does not get it.
+  run grep -c 'LEAKME' "${third}"
+  assert_output "0"
+  run grep -c -x 'http://api.example/items?page=3' "${third}"
+  assert_output "1"
+}
+
+@test "dybatpho::curl_paginate stops before another origin when the body is a secret" {
+  dybatpho::mock_http "api.example.test/items?page=1" 200 'page-one' \
+    'Link: <https://other.example.test/items?page=2>; rel="next"'
+  local DYBATPHO_CURL_SECRET_DATA='{"q":1}'
+  run_traced --separate-stderr dybatpho::curl_paginate "https://api.example.test/items?page=1"
+  assert_success
+  assert_stderr --partial "Not following pagination to https://other.example.test"
+  assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "1"
+}

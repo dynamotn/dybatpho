@@ -191,6 +191,14 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`network` — a redirect followed while secret headers are set can no longer
+  read a local file.** `dybatpho::curl_do` follows only `http` and `https`
+  hops; a `Location:` to `file://`, `gopher://` or `dict://` is refused with a
+  warning and exit code 3.
+- **`network` — `dybatpho::curl_paginate` no longer sends secret headers to a
+  page on another origin.** A `next` link to another host, or to the same host
+  over plain http, is fetched without `DYBATPHO_CURL_SECRET_HEADERS`, and
+  paging stops before it when the body is a secret, as redirects already do.
 - **`json` — `dybatpho::json_set` and `dybatpho::yaml_set` no longer put the
   value on a command line,** so a secret being set is not visible to other
   users in `/proc/<pid>/cmdline`.

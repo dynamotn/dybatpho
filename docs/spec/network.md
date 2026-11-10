@@ -354,6 +354,8 @@ dybatpho::circuit_breaker api.example.test -- \
 - **FR-057**: A shared key MUST map to a file name that keeps keys apart which differ only in characters a file name cannot carry, and both shared modes MUST stay off by default, so a caller pays for a lock only when it asks to.
 - **FR-058**: Shared state MUST be read as data, never evaluated: a rate limit window MUST keep only tokens of digits. Every directory of the shared state -- `DYBATPHO_NETWORK_STATE_DIR`, or `dybatpho/network` under `XDG_RUNTIME_DIR`, or `dybatpho-<uid>/dybatpho/network` under `TMPDIR` -- MUST be created one level at a time with mode 700, and one that already exists MUST be a real directory owned by the user, or the script MUST stop before reading or writing anything there.
 - **FR-059**: The module MUST never change the mode of a directory: one it creates is made 700 by `mkdir`, and an existing one that others can write to -- or whose permissions cannot be checked -- MUST be refused. A relative `DYBATPHO_NETWORK_STATE_DIR` MUST be made absolute before a breaker runs its command. A time in a circuit state file MUST be bounded to 18 digits, an opening in the future read as now and written back, and a trial in the future dropped; a breaker in memory MUST read a future opening as now too; a rate limit window MUST drop a call recorded after now. A clock stepping back therefore holds a breaker or a budget one cooldown or window, never until the clock catches up.
+- **FR-060**: A redirect `dybatpho::curl_do` follows itself MUST go only to an `http` or `https` URL; any other scheme, such as `file://`, MUST be refused with a warning and the 3xx returned as exit code 3.
+- **FR-061**: `dybatpho::curl_paginate` MUST send `DYBATPHO_CURL_SECRET_HEADERS` only to pages on the origin of the first page; a page on another origin, including the same host over plain `http`, MUST be fetched without them, and pagination MUST stop with a warning before it when `DYBATPHO_CURL_SECRET_DATA` is set.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -507,6 +509,8 @@ dybatpho::circuit_breaker api.example.test -- \
 - **IT-054**: Plant `a[$(id>file)]` in a shared window and see no command run; point the state at a symlink, and plant a symlink at the `TMPDIR` fallback, and see the script stop with nothing written through either.
 - **IT-055**: Point the state at a mode 1777 directory and see it refused with its mode intact, and at a mode 750 one and see it used with its mode intact; read an overflowing opening as closed and a future trial as none; keep a relative state directory in one place while the command changes directory.
 - **IT-056**: Plant an opening a day ahead in a shared circuit and in memory, and see a trial run after one cooldown; plant a call far ahead in a shared window and in memory, and see the next call run; hide `find` and see a writable state directory refused.
+- **IT-057**: Answer a request carrying a secret header with a 302 to `file:///etc/passwd`, and get exit code 3 and a warning with curl run only once.
+- **IT-058**: Paginate with a bearer token from https to a same-origin page and then to `http://` on the same host, and see the token sent to the second page only; with a secret body, stop before a page on another host.
 
 ## Acceptance Criteria *(mandatory)*
 

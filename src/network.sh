@@ -548,6 +548,13 @@ function dybatpho::curl_do {
         fi
         redirects=$((redirects + 1))
         __dybatpho_network_resolve_location_into next_url "${current_url}" "${location}"
+        # Handed to curl as a plain URL, a `file://` (or `gopher://`, `dict://`)
+        # hop is fetched, where `curl -L` would refuse it in a redirect.
+        if [[ ! "${next_url}" =~ ^[Hh][Tt][Tt][Pp][Ss]?:// ]]; then
+          dybatpho::warn "Not following the redirect to ${next_url%%:*}: only http and https are followed"
+          rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
+          break
+        fi
         local origin next_origin
         __dybatpho_network_origin_into origin "${current_url}"
         __dybatpho_network_origin_into next_origin "${next_url}"
@@ -1677,7 +1684,11 @@ function dybatpho::curl_paginate {
   local body
   dybatpho::create_temp body ".body"
   local -A visited=()
-  local page=0 next exit_code=0 shown_url
+  local page=0 next exit_code=0 shown_url origin first_origin
+  # Secret headers belong to the origin pagination started on, as they do to
+  # the origin of a redirect: a `next` link elsewhere -- another host, or the
+  # same one over plain http -- is fetched without them.
+  __dybatpho_network_origin_into first_origin "${url}"
   while [[ -n "${url}" ]]; do
     if [[ -n "${visited[${url}]+set}" ]]; then
       __dybatpho_network_redact_url_into shown_url "${url}"
@@ -1696,7 +1707,16 @@ function dybatpho::curl_paginate {
     dybatpho::debug "Fetching page ${page}: ${shown_url}"
     : > "${body}"
     exit_code=0
-    dybatpho::curl_request "${url}" "${body}" "$@" || exit_code=$?
+    __dybatpho_network_origin_into origin "${url}"
+    if [[ "${origin}" == "${first_origin}" ]]; then
+      dybatpho::curl_request "${url}" "${body}" "$@" || exit_code=$?
+    elif [[ -n "${DYBATPHO_CURL_SECRET_DATA}" ]]; then
+      dybatpho::warn "Not following pagination to ${origin}: the request body is a secret"
+      break
+    else
+      dybatpho::debug "Dropping secret headers for the page on ${origin}"
+      __dybatpho_network_request_without_secret_headers "${url}" "${body}" "$@" || exit_code=$?
+    fi
     if ((exit_code != 0)); then
       rm -f "${body}"
       return "${exit_code}"
@@ -1722,6 +1742,18 @@ function dybatpho::curl_paginate {
   done
   rm -f "${body}"
   return 0
+}
+
+#######################################
+# @description Make a `dybatpho::curl_request` with `DYBATPHO_CURL_SECRET_HEADERS`
+#   emptied for it alone; the caller's headers are back once it returns.
+# @arg $@ string Arguments of `dybatpho::curl_request`
+# @exitcode other The exit code of `dybatpho::curl_request`
+# @internal
+#######################################
+function __dybatpho_network_request_without_secret_headers {
+  local -a DYBATPHO_CURL_SECRET_HEADERS=()
+  dybatpho::curl_request "$@"
 }
 
 #######################################

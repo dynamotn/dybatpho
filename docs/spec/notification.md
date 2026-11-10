@@ -300,6 +300,9 @@ fi
   band -- the URL through the network module's private config file and the body
   on standard input -- so neither a webhook URL, a bot token nor the message
   appears on `curl`'s command line.
+- **FR-029**: `dybatpho::notify_webhook` MUST send the caller's
+  `DYBATPHO_CURL_SECRET_HEADERS` through the same private config file, and its
+  documentation MUST show a token passed that way rather than as `--header`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -358,6 +361,9 @@ fi
 - **IT-014**: Send through Slack and Telegram and find neither the webhook
   secret, the bot token nor the message among curl's arguments, while the
   config file and standard input carry them.
+- **IT-015**: Send a webhook with an `Authorization` header in
+  `DYBATPHO_CURL_SECRET_HEADERS`, and find it in curl's config file and not
+  among its arguments.
 
 ## Acceptance Criteria *(mandatory)*
 

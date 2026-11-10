@@ -362,9 +362,9 @@ Send a raw JSON payload to an arbitrary webhook URL via HTTP POST.
 
 ```bash
 dybatpho::notify_webhook "https://my.service/hook" '{"event":"deploy","status":"ok"}'
-# With extra curl flags:
-dybatpho::notify_webhook "https://my.service/hook" '{"text":"hi"}' \
-  --header "Authorization: Bearer ${TOKEN}"
+# With a token, kept off curl's command line:
+local -a DYBATPHO_CURL_SECRET_HEADERS=("Authorization: Bearer ${TOKEN}")
+dybatpho::notify_webhook "https://my.service/hook" '{"text":"hi"}'
 
 ```
 

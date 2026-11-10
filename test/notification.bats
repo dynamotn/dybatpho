@@ -329,6 +329,20 @@ stub_curl_recording() {
   grep -- '--header Authorization: Bearer SECRET' "${args_file}"
 }
 
+@test "dybatpho::notify_webhook sends a secret header out of band" {
+  # The documented way to authenticate a webhook: the token reaches curl
+  # through its private config, never through an argument.
+  local args_file="${BATS_TEST_TMPDIR}/webhook-secret-args"
+  stub_curl_recording "${args_file}"
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("Authorization: Bearer SECRET")
+  run_traced dybatpho::notify_webhook "https://my.service/hook" '{"event":"test"}'
+  unstub curl
+  assert_success
+  run head -n 1 "${args_file}"
+  refute_output --partial "SECRET"
+  grep -- 'header = "Authorization: Bearer SECRET"' "${args_file}"
+}
+
 @test "notification helpers return HTTP client status codes" {
   export DYBATPHO_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TEST"
   export DYBATPHO_CURL_MAX_RETRIES=0

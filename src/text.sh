@@ -186,10 +186,31 @@ function __dybatpho_text_strip_ansi_into {
   local -n __dybatpho_text_strip_out="${__dybatpho_text_strip_target}"
   if [[ "${__dybatpho_text_strip_line}" == *$'\e'* ]]; then
     local LC_ALL=C
-    local __dybatpho_text_strip_re=$'\e''(\[[0-?]*[ -/]*[@-~]|\][^'$'\a\e'']*('$'\a''|'$'\e''\\)|[ -/]+[0-~])'
-    while [[ "${__dybatpho_text_strip_line}" =~ ${__dybatpho_text_strip_re} ]]; do
-      __dybatpho_text_strip_line="${__dybatpho_text_strip_line/"${BASH_REMATCH[0]}"/}"
+    # Split on ESC once, then match each part anchored: no regex ever sees the
+    # whole line. An OSC ended by `ESC \` ends one part and starts the next.
+    local __dybatpho_text_strip_re='^(\[[0-?]*[ -/]*[@-~]|\][^'$'\a'']*'$'\a''|[ -/]+[0-~])'
+    local -a __dybatpho_text_strip_parts=()
+    local IFS=$'\e' __dybatpho_text_strip_part __dybatpho_text_strip_k
+    local __dybatpho_text_strip_res
+    read -r -a __dybatpho_text_strip_parts <<< "${__dybatpho_text_strip_line}x"
+    __dybatpho_text_strip_parts[-1]="${__dybatpho_text_strip_parts[-1]%x}"
+    __dybatpho_text_strip_res="${__dybatpho_text_strip_parts[0]}"
+    local __dybatpho_text_strip_len="${#__dybatpho_text_strip_parts[@]}"
+    __dybatpho_text_strip_k=1
+    for (( ; __dybatpho_text_strip_k < __dybatpho_text_strip_len; __dybatpho_text_strip_k++)); do
+      __dybatpho_text_strip_part="${__dybatpho_text_strip_parts[__dybatpho_text_strip_k]}"
+      if [[ "${__dybatpho_text_strip_part}" =~ ${__dybatpho_text_strip_re} ]]; then
+        __dybatpho_text_strip_part="${__dybatpho_text_strip_part:${#BASH_REMATCH[0]}}"
+      elif [[ "${__dybatpho_text_strip_part}" == ']'* &&
+        "${__dybatpho_text_strip_parts[__dybatpho_text_strip_k + 1]-}" == "\\"* ]]; then
+        # An OSC ended by ESC \: the next part starts with the backslash.
+        __dybatpho_text_strip_part="${__dybatpho_text_strip_parts[++__dybatpho_text_strip_k]:1}"
+      else
+        __dybatpho_text_strip_part=$'\e'"${__dybatpho_text_strip_part}"
+      fi
+      __dybatpho_text_strip_res+="${__dybatpho_text_strip_part}"
     done
+    __dybatpho_text_strip_line="${__dybatpho_text_strip_res}"
   fi
   __dybatpho_text_strip_out="${__dybatpho_text_strip_line}"
 }

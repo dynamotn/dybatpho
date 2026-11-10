@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`text` — `dybatpho::text_strip_ansi` keeps up with progress-bar logs.** A
+  line holding thousands of escape sequences used to take time quadratic in
+  their number; it is now stripped in one pass with the same output.
 - **`forge` — uploading a GitHub release asset no longer loads the whole file
   into memory;** `forge_release_upload` streams it from disk as the GitLab
   upload already did.

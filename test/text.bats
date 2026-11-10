@@ -53,6 +53,17 @@ EOF
   assert_line --index 2 $'| \e[31malert\e(B\e[m |'
 }
 
+@test "dybatpho::text_strip_ansi takes time in proportion to the escapes on a line" {
+  # Each escape used to rescan and copy the line: 12000 of them took ~17s.
+  local text
+  printf -v text '\e[1;32mab\e[0m%.0s' {1..12000}
+  local started="${SECONDS}"
+  run_traced dybatpho::text_strip_ansi "${text}"
+  assert_success
+  assert_equal "${#output}" "24000"
+  assert [ "$((SECONDS - started))" -le 10 ]
+}
+
 @test "dybatpho::text_bullet_list prefixes non-empty lines and preserves blanks" {
   run_traced dybatpho::text_bullet_list $'alpha\n\nbeta' "*"
   assert_success

@@ -285,9 +285,10 @@ function dybatpho::profile_report {
   for ((i = 1; i < ${#names[@]}; i++)); do
     for ((j = i; j > 0; j--)); do
       local a="${names[j - 1]}" b="${names[j]}"
-      ((__DYBATPHO_PROFILE_SELF[${b}] > __DYBATPHO_PROFILE_SELF[${a}])) \
-        || { ((__DYBATPHO_PROFILE_SELF[${b}] == __DYBATPHO_PROFILE_SELF[${a}])) && [[ "${b}" < "${a}" ]]; } \
-        || break
+      # Read out first: a name is caller text, and inside arithmetic a subscript
+      # such as `x$(cmd)` would run as a command on older Bash.
+      local self_a="${__DYBATPHO_PROFILE_SELF["${a}"]}" self_b="${__DYBATPHO_PROFILE_SELF["${b}"]}"
+      ((self_b > self_a)) || { ((self_b == self_a)) && [[ "${b}" < "${a}" ]]; } || break
       swap="${names[j]}"
       names[j]="${names[j - 1]}"
       names[j - 1]="${swap}"

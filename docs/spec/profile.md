@@ -92,6 +92,7 @@ dybatpho::profile_report
 - **FR-006**: The profiler's own functions and the library's internals MUST NOT appear as functions in the report.
 - **FR-007**: `profile_report` MUST print name, calls, total ms and self ms per name, sorted by self time descending, aligned through `table_align`, or tab-separated with a header under `--tsv`; milliseconds MUST carry three decimals.
 - **FR-008**: `profile_reset` MUST forget every record and every open block.
+- **FR-009**: A block name MUST be used only as data: never inside arithmetic, where an older Bash would run a subscript such as `x$(cmd)` as a command.
 
 ### Key Entities
 
@@ -113,6 +114,7 @@ dybatpho::profile_report
 - **IT-004**: In a child Bash 5 script with `DYBATPHO_PROFILE=true`, profile `f` calling `g`; both appear, `f`'s total covers `g`'s, and no profiler or library internal appears.
 - **IT-005**: Without `DYBATPHO_PROFILE`, `profile_start` installs no trap; a caller's `DEBUG` trap set under `set -T` is back after a profiled run.
 - **IT-006**: `--tsv` prints a header and rows sorted by self time; `profile_reset` empties the report.
+- **IT-007**: Report a block named `x$(touch file)` and find no file, on every Bash the suite runs.
 
 ## Acceptance Criteria *(mandatory)*
 

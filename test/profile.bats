@@ -119,3 +119,11 @@ _profile_child() {
     'trap -p DEBUG'
   assert_line "trap -- 'true' DEBUG"
 }
+
+@test "dybatpho::profile_report never evaluates a block name" {
+  local name="x\$(touch ${BATS_TEST_TMPDIR}/pwned)"
+  dybatpho::profile_run "${name}" -- true
+  dybatpho::profile_run other -- true
+  dybatpho::profile_report --tsv > /dev/null
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/pwned"
+}

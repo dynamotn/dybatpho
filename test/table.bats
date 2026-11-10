@@ -273,3 +273,13 @@ EOF
   assert_success
   assert_output --partial "│ a │ b │"
 }
+
+@test "dybatpho::table_markdown escapes a pipe inside a cell, so the row keeps its columns" {
+  run_traced dybatpho::table_markdown $'name,note\nfoo,a|b' ","
+  assert_success
+  assert_line --index 2 '| foo  | a\|b |'
+
+  # With `|` itself as the delimiter there is no pipe left to escape.
+  run_traced dybatpho::table_markdown $'A|B\n1|2'
+  assert_line --index 2 '| 1 | 2 |'
+}

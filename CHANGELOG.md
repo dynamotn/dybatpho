@@ -23,6 +23,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`table` — `dybatpho::table_markdown` escapes `|` inside a cell,** so a
+  value split on another delimiter keeps the row's column count.
 - **`i18n` — `dybatpho::i18n_duration` and `dybatpho::i18n_relative` refuse
   integers beyond 9223372036854775807,** or two timestamps too far apart,
   instead of printing "0 minutes" or "1 year ago".

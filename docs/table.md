@@ -27,7 +27,7 @@ strict CSV parsing.
 - [`dybatpho::table_print`](#dybatphotable_print) — Render aligned columns without borders from delimited rows.
 - [`dybatpho::table_align`](#dybatphotable_align) — Render aligned columns with optional per-column alignment rules.
 - [`dybatpho::table_box`](#dybatphotable_box) — Render a Unicode boxed table from delimited rows.
-- [`dybatpho::table_markdown`](#dybatphotable_markdown) — Render a Markdown table from delimited rows.
+- [`dybatpho::table_markdown`](#dybatphotable_markdown) — Render a Markdown table from delimited rows. A `|` inside a cell is escaped, so a value cannot open a column of its own; nothing else in a cell is escaped. `dybatpho::md_table` escapes a cell completely.
 - [`dybatpho::table_csv`](#dybatphotable_csv) — Render lightweight comma-delimited table data using one of the supported styles.
 - [`dybatpho::table_from_csv`](#dybatphotable_from_csv) — Render real CSV as a table, quoting and all. Unlike `dybatpho::table_csv`, which splits on every comma, this parses the input with `dybatpho::csv_read` first, so a quoted comma stays inside its cell, a doubled quote is one quote, and `DYBATPHO_CSV_DELIMITER` picks a semicolon or `tab` file. A table row is one line, so a line break inside a value is drawn as a space; the Markdown style also escapes `|` so a value cannot open a column of its own. Cells are trimmed, as in every renderer here.
 - [`dybatpho::table_from_json`](#dybatphotable_from_json) — Render a JSON array of objects as a table. The keys of the first object become the header, in document order, and a later object missing one of them leaves that cell empty -- the conversion `dybatpho::csv_from_json` performs, rendered through `dybatpho::table_from_csv`.
@@ -104,6 +104,9 @@ Render a Unicode boxed table from delimited rows.
 ### `dybatpho::table_markdown`
 
 Render a Markdown table from delimited rows.
+A `|` inside a cell is escaped, so a value cannot open a column of its own;
+nothing else in a cell is escaped. `dybatpho::md_table` escapes a cell
+completely.
 
 **🧾 Arguments**
 

@@ -313,6 +313,9 @@ function dybatpho::table_box {
 
 #######################################
 # @description Render a Markdown table from delimited rows.
+#   A `|` inside a cell is escaped, so a value cannot open a column of its own;
+#   nothing else in a cell is escaped. `dybatpho::md_table` escapes a cell
+#   completely.
 # @arg $1 string Input text block or `-` for stdin
 # @arg $2 string [default: |] Exact delimiter
 # @stdout Markdown table using the first row as the header
@@ -321,14 +324,34 @@ function dybatpho::table_markdown {
   local input
   dybatpho::expect_args input -- "$@"
   local delimiter="${2:-|}"
-  local -a rows=() widths=() cells=()
-  local row row_index index line separator segment width cell_text
+  local -a rows=()
 
   __dybatpho_string_read_lines_into rows "${input}"
-  __dybatpho_table_measure_widths rows "${delimiter}" widths
+  # With `|` as the delimiter a cell cannot hold one.
+  # shortcut: a longer delimiter holding `|`, such as `||`, leaves a lone `|`
+  # in a cell unescaped; escape cell by cell if such a delimiter is ever needed.
+  [[ "${delimiter}" == *'|'* ]] || rows=(${rows[@]+"${rows[@]//|/\\|}"})
+  __dybatpho_table_markdown_rows rows "${delimiter}"
+}
 
-  for row_index in "${!rows[@]}"; do
-    row="${rows[${row_index}]}"
+#######################################
+# @description Render rows that are ready for Markdown as a Markdown table,
+#   escaping nothing.
+# @arg $1 string Name of the row array variable
+# @arg $2 string Exact delimiter
+# @stdout Markdown table using the first row as the header
+# @internal
+#######################################
+function __dybatpho_table_markdown_rows {
+  local -n __dybatpho_table_md_rows="$1"
+  local delimiter="$2"
+  local -a widths=() cells=()
+  local row row_index index line separator segment width cell_text
+
+  __dybatpho_table_measure_widths "$1" "${delimiter}" widths
+
+  for row_index in "${!__dybatpho_table_md_rows[@]}"; do
+    row="${__dybatpho_table_md_rows[${row_index}]}"
     __dybatpho_table_split_row "${row}" "${delimiter}" cells
     line="|"
     for ((index = 0; index < ${#widths[@]}; index++)); do
@@ -481,7 +504,6 @@ function dybatpho::table_from_csv {
     for field in ${fields[@]+"${fields[@]}"}; do
       field="${field//$'\r\n'/ }"
       field="${field//[$'\r\n']/ }"
-      [[ "${style}" != "markdown" ]] || field="${field//|/\\|}"
       cells+=("${field}")
     done
     IFS="${unit}"

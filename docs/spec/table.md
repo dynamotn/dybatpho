@@ -143,6 +143,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **FR-017**: Loading `table` MUST NOT load `csv` up front. The CSV and JSON renderers MUST load it on demand when it is not loaded, and MUST stop the script, naming the `csv` module, only when it cannot be loaded, before reading any input; the other renderers MUST work without it.
 - **FR-018**: Cells MUST be measured without their ANSI escape sequences and with wide characters counted as the columns they occupy, using the same measurement as `text`.
 - **FR-019**: A plain aligned row MUST NOT end in whitespace: the last column is not padded to its width.
+- **FR-020**: `dybatpho::table_markdown` MUST escape `|` inside a cell whatever renderer called it, so a value split on another delimiter cannot open a column of its own.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -179,6 +180,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **IT-014**: In a shell that loaded `table` alone, draw a plain table, have the CSV renderer load `csv` on demand and render, have the JSON renderer load it too before turning away input that is not JSON, and render the same way when `csv` is named up front.
 - **IT-015**: Draw a box table with a coloured cell and verify it is padded by its visible width, keeping the right border in line.
 - **IT-016**: Render a plain table whose last column varies in width and compare the whole output exactly, so no row ends in padding.
+- **IT-017**: Render `foo,a|b` as Markdown with `,` as the delimiter and get `a\|b` in one cell; render with `|` as the delimiter and get the cells unchanged.
 
 ## Acceptance Criteria *(mandatory)*
 

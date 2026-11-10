@@ -1380,3 +1380,30 @@ EOF
   assert_failure
   assert_stderr --partial "caller: unknown option: -a&b"
 }
+
+@test "dybatpho::has_version answers for a command alone, with no range" {
+  require_fake_tool faketool "faketool 1.7.1"
+  run_traced -0 dybatpho::has_version faketool
+  run_traced -1 dybatpho::has_version no-such-tool-here
+  assert_output ""
+}
+
+@test "dybatpho::has_version answers a range, without stopping the script" {
+  require_fake_tool faketool "faketool 1.7.1"
+  run_traced -0 dybatpho::has_version 'faketool>=1.6'
+  run_traced -0 dybatpho::has_version 'faketool^1'
+  run_traced -1 dybatpho::has_version 'faketool>=2'
+  assert_output ""
+}
+
+@test "dybatpho::has_version takes alternatives separated by |, as the doctor registry does" {
+  require_fake_tool faketool "faketool 1.7.1"
+  run_traced -0 dybatpho::has_version 'no-such-tool-here|faketool>=1.6'
+  run_traced -1 dybatpho::has_version 'no-such-tool-here|faketool>=2'
+}
+
+@test "dybatpho::has_version counts a version it cannot read as not satisfying a range" {
+  require_fake_tool faketool ""
+  run_traced -0 dybatpho::has_version faketool
+  run_traced -1 dybatpho::has_version 'faketool>=1'
+}

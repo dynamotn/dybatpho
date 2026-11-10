@@ -49,6 +49,7 @@ reach for at a prompt.
 - [`dybatpho::still_has_args`](#dybatphostill_has_args) — Check whether at least one more positional argument remains after the current one. This helper is useful while manually parsing a shifting argument list.
 - [`dybatpho::expect_envs`](#dybatphoexpect_envs) — Ensure that required environment variables are set.
 - [`dybatpho::require`](#dybatphorequire) — Ensure that a required command is installed, and new enough. With a version range, the command is asked what version it is through `dybatpho::command_version`, the answer is normalized by `dybatpho::semver_coerce`, and the result is matched with `dybatpho::semver_satisfies`. The range is written the way that function documents it: `>=1.6`, `^4`, `>=1.2 <2`, `1.2.x`, or alternatives with `||`. The range has to open with one of `>`, `<`, `=`, `^`, or `~`. A bare `4` is a valid range on its own elsewhere, but this argument has meant an exit code since before ranges existed here, and no amount of cleverness makes `require jq 3` mean both things at once. Matching a version needs the optional `semver` module, which is loaded on demand the first time a range is given. Rather than let a range pass unchecked when it cannot be loaded, this stops with a message naming it: a requirement that is silently not enforced is worse than one that was never written. A command whose version cannot be read is also a failure, for the same reason. `dybatpho::doctor` treats that case as a report rather than a failure, because a report is allowed to say "I could not tell".
+- [`dybatpho::has_version`](#dybatphohas_version) — Tell whether a command is installed, and new enough, without stopping the script: the question `dybatpho::require` asks, for a caller that wants to take another path rather than stop. The spec is the one the `doctor` registry uses: a command, optionally followed by a range, and alternatives separated by `|`. A command whose version cannot be read does not satisfy a range: a check that passes when it could not tell is the quietly wrong answer this exists to avoid.
 - [`dybatpho::command_exists_all`](#dybatphocommand_exists_all) — Return success when all listed commands are available.
 - [`dybatpho::is`](#dybatphois) — Check whether a value matches a supported shell-oriented condition. `number` is a plain decimal, optionally signed, with an optional fraction and exponent (`-1.5`, `.5`, `1e3`), the same as `validate_is number`. `int` is an optionally signed decimal integer with no leading zero, since Bash arithmetic reads one as octal. Neither accepts blanks, `0x`, a locale's decimal comma, or the quoted character codes `printf` takes.
 - [`dybatpho::coalesce`](#dybatphocoalesce) — Print the first non-empty value from a list of fallbacks.
@@ -340,6 +341,52 @@ dybatpho::require yq '^4' 3
 - [dybatpho::command_version](#dybatphocommand_version)
 - [dybatpho::semver_coerce](#dybatphosemver_coerce)
 - [dybatpho::semver_satisfies](#dybatphosemver_satisfies)
+
+---
+
+### `dybatpho::has_version`
+
+Tell whether a command is installed, and new enough, without
+stopping the script: the question `dybatpho::require` asks, for a caller
+that wants to take another path rather than stop. The spec is the one the
+`doctor` registry uses: a command, optionally followed by a range, and
+alternatives separated by `|`.
+
+A command whose version cannot be read does not satisfy a range: a check
+that passes when it could not tell is the quietly wrong answer this exists
+to avoid.
+
+**🧪 Examples**
+
+```bash
+if dybatpho::has_version 'yq>=4'; then
+  yq -i '.a = 1' config.yaml
+else
+  jq '.a = 1' config.json > config.json.new
+fi
+
+```
+
+```bash
+dybatpho::has_version 'gawk|mawk>=1.3.4' || dybatpho::warn "Using the slow path"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Spec: `cmd`, `cmd>=1.2`, `cmd^4`, or alternatives `a\|b>=2` |
+
+**🚦 Exit codes**
+
+- `0`: One alternative is installed and satisfies its range
+- `1`: None is
+
+**🔗 See also**
+
+- [dybatpho::require](#dybatphorequire)
+- [dybatpho::command_version](#dybatphocommand_version)
 
 ---
 

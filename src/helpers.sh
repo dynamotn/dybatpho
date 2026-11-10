@@ -690,6 +690,73 @@ function dybatpho::require {
       "${command_name} ${range} is required, found ${found}" "${exit_code}"
 }
 
+# Splits one dependency spec alternative, `yq>=4`, into its command and range.
+__DYBATPHO_HELPERS_SPEC_REGEX='^([^<>=^~]+)([<>=^~].*)$'
+
+#######################################
+# @description Split one alternative of a dependency spec into the command and
+#   the range, the syntax `dybatpho::has_version` and the `doctor` registry
+#   share: `yq`, `yq>=4`, `jq^1.6`.
+# @arg $1 string Name of the variable receiving the command name
+# @arg $2 string Name of the variable receiving the range, empty when there is none
+# @arg $3 string One alternative
+# @set Both named variables
+# @internal
+#######################################
+function __dybatpho_helpers_spec_split_into {
+  local -n __dybatpho_helpers_spec_name="$1"
+  local -n __dybatpho_helpers_spec_range="$2"
+  if [[ "$3" =~ ${__DYBATPHO_HELPERS_SPEC_REGEX} ]]; then
+    __dybatpho_helpers_spec_name="${BASH_REMATCH[1]}"
+    __dybatpho_helpers_spec_range="${BASH_REMATCH[2]}"
+  else
+    __dybatpho_helpers_spec_name="$3"
+    __dybatpho_helpers_spec_range=""
+  fi
+}
+
+#######################################
+# @description Tell whether a command is installed, and new enough, without
+#   stopping the script: the question `dybatpho::require` asks, for a caller
+#   that wants to take another path rather than stop. The spec is the one the
+#   `doctor` registry uses: a command, optionally followed by a range, and
+#   alternatives separated by `|`.
+#
+#   A command whose version cannot be read does not satisfy a range: a check
+#   that passes when it could not tell is the quietly wrong answer this exists
+#   to avoid.
+# @example
+#   if dybatpho::has_version 'yq>=4'; then
+#     yq -i '.a = 1' config.yaml
+#   else
+#     jq '.a = 1' config.json > config.json.new
+#   fi
+#
+# @example
+#   dybatpho::has_version 'gawk|mawk>=1.3.4' || dybatpho::warn "Using the slow path"
+#
+# @arg $1 string Spec: `cmd`, `cmd>=1.2`, `cmd^4`, or alternatives `a|b>=2`
+# @exitcode 0 One alternative is installed and satisfies its range
+# @exitcode 1 None is
+# @see dybatpho::require
+# @see dybatpho::command_version
+#######################################
+function dybatpho::has_version {
+  local spec
+  dybatpho::expect_args spec -- "$@"
+  local alternative name range found
+  for alternative in ${spec//|/ }; do
+    __dybatpho_helpers_spec_split_into name range "${alternative}"
+    type -P "${name}" &> /dev/null || continue
+    [[ -n "${range}" ]] || return 0
+    __dybatpho_helpers_need_module semver __dybatpho_semver_holds "dybatpho::has_version ${alternative}"
+    found="$(dybatpho::command_version "${name}")" || continue
+    found="$(dybatpho::semver_coerce "${found}")" || continue
+    dybatpho::semver_satisfies "${found}" "${range}" && return 0
+  done
+  return 1
+}
+
 #######################################
 # @description Return success when all listed commands are available.
 # @arg $@ string Commands to check

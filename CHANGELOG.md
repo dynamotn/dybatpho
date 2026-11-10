@@ -150,6 +150,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Added
 
+- **`helpers` — ask whether a command is new enough without stopping:**
+  `dybatpho::has_version 'yq>=4'` returns 0 or 1, for a script that takes
+  another path rather than stop the way `dybatpho::require` does. It reads the
+  `doctor` registry's syntax, alternatives included (`'gawk|mawk>=1.3.4'`), and
+  shares its parser with `doctor`.
 - **`testing` — a test suite keeps clear of the real home and repository in
   two calls.** `dybatpho::test_home` points `HOME`, the XDG directories and
   `DYBATPHO_CACHE_DIR` at the test's own directory (`${BATS_TEST_TMPDIR}/home`

@@ -148,6 +148,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - The `--` form is given with no command after it.
 - Breakpoint is invoked in unattended CI rather than an interactive terminal.
 - `dybatpho::is int` or `dybatpho::is number` is given a quoted character such as `'a`, a hexadecimal `0x1F`, surrounding blanks, a decimal comma, or an integer with a leading zero.
+- `has_version` is given alternatives none of which is installed, or a command whose version it cannot read.
 
 ## Requirements *(mandatory)*
 
@@ -227,6 +228,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-032**: `dybatpho::expect_envs` and `dybatpho::require_envs_any` MUST stop the script on an argument that is not a variable name, before expanding it.
 - **FR-033**: The retry delay computation MUST read a delay, a cap or an override with leading zeros in base ten, so a `Retry-After: 08` waits eight seconds.
 - **FR-034**: The IPv6 parser behind `is_ipv6` and `validate_is ipv6` MUST refuse a dotted IPv4 part that is not the last 32 bits of the address, such as `1.2.3.4::`.
+- **FR-035**: `dybatpho::has_version SPEC` MUST answer, without stopping the script, whether a command is installed and satisfies its range; SPEC MUST take the `doctor` registry syntax -- `cmd`, `cmd>=1.2`, alternatives `a|b>=2` -- read by the same splitter `doctor` uses, and a version that cannot be read MUST NOT satisfy a range.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -299,6 +301,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-036**: Pass `a[$(touch file)]` to `expect_envs` and `require_envs_any`, and verify both stop the script and no file was created.
 - **IT-037**: Compute a delay with an override of `08`, a base of `09` and a cap of `09`, and verify each is read in base ten.
 - **IT-038**: Verify `1.2.3.4::`, `1:2:1.2.3.4::` and `1.2.3.4::1` are refused and `::1.2.3.4` is accepted.
+- **IT-039**: Ask `has_version` about a fake tool alone, with ranges it meets and misses, through alternatives, and with no readable version; it returns 0 or 1 and prints nothing.
 
 ## Acceptance Criteria *(mandatory)*
 

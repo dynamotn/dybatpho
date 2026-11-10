@@ -81,6 +81,7 @@ src/cli.sh	__dybatpho_cli_define_var	__dybatpho_cli_define_var	re-renders a defi
 src/cli.sh	__dybatpho_cli_generate_logic	dybatpho::select	text of the generated parser, not a call made here
 src/cli.sh	__dybatpho_cli_generate_logic	dybatpho::validate_describe	text of the generated parser, not a call made here
 src/doctor.sh	__dybatpho_doctor_resolve	dybatpho::semver_coerce	the version text came from command_version, which only returns a version
+src/helpers.sh	dybatpho::has_version	dybatpho::semver_coerce	the version text came from command_version, which only returns a version
 src/doctor.sh	__dybatpho_doctor_rows	__dybatpho_doctor_resolve	read with `|| true`: a refusal is reported as an unknown version
 src/file.sh	__dybatpho_xdg_dir_into	__dybatpho_xdg_dir	the HOME check that could refuse ran in the caller's shell first
 src/forge.sh	__dybatpho_forge_or_die	dybatpho::forge_error	only shapes a message for the die that follows

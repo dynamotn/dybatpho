@@ -168,7 +168,6 @@ function __dybatpho_doctor_rank {
 # goes through quote removal first, so an escaped `\^` would arrive at the regex
 # engine as a bare `^` at the head of the bracket expression and negate it,
 # which matches nearly every character instead of none.
-__DYBATPHO_DOCTOR_SPEC_REGEX='^([^<>=^~]+)([<>=^~].*)$'
 
 #######################################
 # @description Split a dependency alternative into its command and version range.
@@ -185,15 +184,8 @@ __DYBATPHO_DOCTOR_SPEC_REGEX='^([^<>=^~]+)([<>=^~].*)$'
 # @internal
 #######################################
 function __dybatpho_doctor_split_into {
-  local -n __dybatpho_doctor_split_name="$1"
-  local -n __dybatpho_doctor_split_range="$2"
-  if [[ "$3" =~ ${__DYBATPHO_DOCTOR_SPEC_REGEX} ]]; then
-    __dybatpho_doctor_split_name="${BASH_REMATCH[1]}"
-    __dybatpho_doctor_split_range="${BASH_REMATCH[2]}"
-  else
-    __dybatpho_doctor_split_name="$3"
-    __dybatpho_doctor_split_range=""
-  fi
+  # One syntax, kept in `helpers` so `dybatpho::has_version` reads it the same way.
+  __dybatpho_helpers_spec_split_into "$@"
 }
 
 #######################################

@@ -23,8 +23,9 @@
 #   4. Regenerate `docs/` so the published docs match the tagged source.
 #   5. Commit `chore(release): v<version>` and tag it, annotated with the
 #      changelog entry so `git show v<version>` carries the release notes.
-#   6. Build the artifacts from the tagged tree: the all-modules bundle, a
-#      checksum file, and a detached signature when `--sign` is given.
+#   6. Build the artifacts from the tagged tree into `dist/<version>/`: the
+#      all-modules bundle, a checksum file, and a detached signature when
+#      `--sign` is given.
 #   7. Push the branch and the tag, then create the release with the changelog
 #      entry as its body and the artifacts attached.
 #
@@ -330,11 +331,14 @@ function __dybatpho_release_check_options {
 # @internal
 #######################################
 function __dybatpho_release_artifacts {
-  local _version _sign _bundle _sums
+  local _version _sign _dir _bundle _sums
   dybatpho::expect_args _version _sign -- "$@"
 
-  dybatpho::ensure_dir "${DIST_DIR}" > /dev/null
-  _bundle="${DIST_DIR}/dybatpho-${_version}.bundle.sh"
+  # A directory per version: the checksums cover every file beside them, and a
+  # bundle left from an earlier release must not be listed with this one.
+  _dir="${DIST_DIR}/${_version}"
+  dybatpho::ensure_dir "${_dir}" > /dev/null
+  _bundle="${_dir}/dybatpho-${_version}.bundle.sh"
   # Standard output here is the artifact list the caller reads, so progress and
   # whatever the bundler prints both belong on standard error.
   dybatpho::progress "Building ${_bundle}" >&2
@@ -347,7 +351,7 @@ function __dybatpho_release_artifacts {
     return 0
   fi
 
-  _sums="$(dybatpho::release_checksums "${DIST_DIR}")"
+  _sums="$(dybatpho::release_checksums "${_dir}")"
   printf '%s\n%s\n' "${_bundle}" "${_sums}"
   if dybatpho::is true "${_sign}"; then
     dybatpho::release_sign "${_sums}"
@@ -472,7 +476,7 @@ function __dybatpho_release_run {
   fi
 
   dybatpho::success "Released ${_tag}"
-  ((${#_artifacts[@]})) && dybatpho::info "Artifacts in ${DIST_DIR}"
+  ((${#_artifacts[@]})) && dybatpho::info "Artifacts in ${DIST_DIR}/${_version}"
   dybatpho::is false "${PUBLISH}" \
     && dybatpho::info "Publish it later with dybatpho::forge_release_create and forge_release_upload"
   return 0

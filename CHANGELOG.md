@@ -21,6 +21,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`scripts/release.sh` — the published `SHA256SUMS` lists only the bundle
+  that release uploads.** Each release builds into `dist/<version>/`, so a
+  bundle left from an earlier release no longer breaks `sha256sum -c`.
+- **`release` — `dybatpho::release_next_version` no longer counts from a
+  pre-release above the last release.** With `v1.0.0` and then `v1.1.0-rc.1`
+  tagged, a fix now asks for `1.1.0` rather than `1.1.1`.
 - **`helpers` — `dybatpho::retry_until` refuses a delay that is not a number**
   such as `two` or `1m30`, instead of retrying at once while its message
   promised a wait.

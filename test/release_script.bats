@@ -64,3 +64,36 @@ release() {
   assert_equal "$(cat "${repo}/docs/marker")" "regenerated"
   assert_equal "$(git -C "${repo}" log -1 --format=%s)" "chore(release): v9.9.9"
 }
+
+@test "release.sh checksums only the bundle it builds" {
+  # The checksums covered every file in `dist/`, which is never cleaned, so a
+  # bundle from an earlier release was listed in the published SHA256SUMS
+  # while only the new bundle was uploaded, and `sha256sum -c` failed.
+  local repo="${BATS_TEST_TMPDIR}/repo"
+  mkdir -p "${repo}/scripts" "${repo}/dist" "${repo}/docs"
+  touch "${repo}/docs/.keep"
+  cp -R "${DYBATPHO_DIR}/src" "${repo}/src"
+  cp "${DYBATPHO_DIR}/init.sh" "${DYBATPHO_DIR}/VERSION" "${repo}/"
+  printf '%s\n' '# Changelog' '' '## [Unreleased]' '' '### Fixed' '' '- Something.' \
+    > "${repo}/CHANGELOG.md"
+  cp "${RELEASE_SH}" "${repo}/scripts/release.sh"
+  # The real bundler is not what is under test; any file at `--output` will do.
+  printf '%s\n' '#!/usr/bin/env bash' 'printf "bundle\n" > "$4"' > "${repo}/scripts/bundle.sh"
+  chmod +x "${repo}/scripts/bundle.sh"
+  printf '%s\n' "dist/" > "${repo}/.gitignore"
+  git -C "${repo}" init -q
+  git -C "${repo}" remote add origin "git@github.com:example/release-dist.git"
+  git -C "${repo}" -c user.name=t -c user.email=t@example.test add -A
+  git -C "${repo}" -c user.name=t -c user.email=t@example.test commit -q -m "feat: start"
+  printf 'old\n' > "${repo}/dist/dybatpho-1.0.0.bundle.sh"
+
+  run --separate-stderr env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test \
+    "${repo}/scripts/release.sh" --version 9.9.9 --no-push --no-publish --no-docs --yes
+  assert_success
+  local bundle
+  bundle="$(find "${repo}/dist" -name 'dybatpho-9.9.9.bundle.sh')"
+  [[ -n "${bundle}" ]]
+  run cat "${bundle%/*}/SHA256SUMS"
+  assert_output --regexp '^[0-9a-f]+  dybatpho-9\.9\.9\.bundle\.sh$'
+}

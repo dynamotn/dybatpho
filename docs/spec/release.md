@@ -150,6 +150,8 @@ dybatpho::release_sign "${sums}"
 - **FR-019**: A base or head ref that does not name a commit MUST stop `release_bump_type` and `release_changelog` with an error naming the ref, rather than being read as a range with nothing to release.
 - **FR-020**: `scripts/release.sh` MUST run the documentation step from a checkout whose path contains spaces.
 - **FR-021**: `release_next_version` MUST start from the highest release tag, not from a pre-release of it.
+- **FR-022**: With no base given, `release_next_version` MUST skip every pre-release tag, so a candidate above the last release is never the base.
+- **FR-023**: `scripts/release.sh` MUST build each release's bundle and checksum file in a directory of its own, so the published checksum file lists only what that release uploads.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -193,6 +195,8 @@ dybatpho::release_sign "${sums}"
 - **IT-019**: From a script, call `release_bump_type` and `release_changelog` with an unknown base, an unknown head, and an unknown head without a base, and verify the script stops with `Unknown git commit` each time.
 - **IT-020**: Release from a copy of the repository under a directory with a space in its name, and find the docs regenerated and the release committed.
 - **IT-021**: Tag `v1.0.0-rc.1`, then a feature as `v1.0.0`, then commit a fix, and get `1.0.1`.
+- **IT-022**: Tag `v1.0.0`, then a feature as `v1.1.0-rc.1`, then commit a fix, and get `1.1.0`.
+- **IT-023**: Release from a copy of the repository whose `dist/` holds an earlier bundle, and find the checksum file beside the new bundle lists only that bundle.
 
 ## Acceptance Criteria *(mandatory)*
 

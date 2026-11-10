@@ -231,7 +231,7 @@ function dybatpho::release_bump_type {
 #   fi
 #
 # @arg $1 string [default: .] Repository path
-# @arg $2 string? Base tag, default is the highest matching tag
+# @arg $2 string? Base tag, default is the highest matching tag that is not a pre-release
 # @arg $3 string [default: ${HEAD}] Head ref
 # @env DYBATPHO_RELEASE_TAG_PATTERN string Glob that release tags match
 # @stdout Next version, without a leading `v`
@@ -245,7 +245,16 @@ function dybatpho::release_next_version {
   head_ref="${3:-HEAD}"
   base_tag="${2-}"
   if [[ -z "${base_tag}" ]]; then
-    base_tag="$(dybatpho::git_latest_tag "${repo_path}" "${DYBATPHO_RELEASE_TAG_PATTERN}")" || base_tag=""
+    # A pre-release is not a release: taking `v1.1.0-rc.1` as the base would
+    # skip `1.1.0` itself. Tags come highest first, as `git_latest_tag` sorts them.
+    local tag
+    local -a parts
+    while IFS= read -r tag; do
+      __dybatpho_semver_parse_into parts "${tag#v}" && [[ -n "${parts[3]}" ]] && continue
+      base_tag="${tag}"
+      break
+    done < <(__dybatpho_git "${repo_path}" -c versionsort.suffix=- tag --list \
+      "${DYBATPHO_RELEASE_TAG_PATTERN}" --sort=-v:refname)
   fi
 
   if [[ -z "${base_tag}" ]]; then

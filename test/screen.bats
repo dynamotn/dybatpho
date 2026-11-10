@@ -1153,3 +1153,28 @@ SCRIPT
   assert_stderr --partial "Invalid rectangle"
   [[ ! -e "${marker}" ]] || fail "a rectangle ran a command"
 }
+
+@test "dybatpho::screen_put spells out control characters instead of sending them to the terminal" {
+  # An OSC 52 sequence in drawn text wrote the clipboard, and a tab or a line
+  # break broke the column arithmetic.
+  dybatpho::screen_put 0 0 $'a\033]52;c;eHl6\ab\tc\nd\177' "0"
+  [[ "$(screen_raw 0)" != *$'\033]'* && "$(screen_raw 0)" != *$'\a'* ]] || fail "sequence drawn: $(screen_raw 0 | cat -v)"
+  assert_equal "$(screen_row 0 | sed -E 's/ +$//')" 'a^[]52;c;eHl6^Gb^Ic^Jd^?'
+}
+
+@test "dybatpho::screen_ansi reads charset, OSC and colon SGR sequences the way a terminal does" {
+  # `tput sgr0` writes `ESC ( B` before its reset, `ls --hyperlink` wraps names
+  # in OSC 8, and a curly underline is `ESC [ 4:3 m`; all three came out as
+  # text or lost their style.
+  dybatpho::screen_ansi 0 0 60 \
+    $'\033(B\033[mreset \033]8;;https://x\033\\link\033]8;;\033\\ \033[4:3mcurly\033[0m \033]0;t\aend\0337z\033'
+  assert_equal "$(screen_row 0 | LC_ALL=C sed -E 's/\x1B\[[0-9:;]*m//g; s/ +$//')" "reset link curly endz"
+  [[ "$(screen_raw 0)" == *$'\033[4:3mcurly'* ]] || fail "curly underline lost: $(screen_raw 0 | cat -v)"
+  [[ "$(screen_raw 0)" != *$'\033]'* && "$(screen_raw 0)" != *$'\033('* ]] || fail "sequence drawn: $(screen_raw 0 | cat -v)"
+}
+
+@test "dybatpho::screen_ansi ends an OSC string at an escape that starts the next sequence" {
+  dybatpho::screen_ansi 0 0 40 $'a\033]0;cut\033[31mred'
+  assert_equal "$(screen_row 0 | sed -E 's/ +$//')" "ared"
+  [[ "$(screen_raw 0)" == *$'\033[31mred'* ]] || fail "colour lost: $(screen_raw 0 | cat -v)"
+}

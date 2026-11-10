@@ -210,6 +210,10 @@ dybatpho::screen_end
 - The terminal is resized mid-frame, or resized several times before an event
   is read.
 - A caller's array is named the same as one of a widget's own variables.
+- Text holds control characters or escape sequences from outside, such as an
+  OSC 52 clipboard write.
+- A line given to `screen_ansi` was written by `tput sgr0`, holds OSC 8
+  hyperlinks, or uses colon-separated SGR parameters.
 - A list is empty, or the selection is past its end.
 - A gauge is given a total of zero, or a value above its total.
 - A chart is given one sample, or samples that are all equal.
@@ -314,6 +318,15 @@ dybatpho::screen_end
 - **FR-042**: Drawing over one column of a wide glyph MUST turn what is left of the glyph into blanks, so a row keeps exactly the width of the screen.
 - **FR-043**: `dybatpho::screen_barchart` MUST draw a value above `max:` as a full bar, and `dybatpho::screen_tabs` MUST cut the tab that reaches the edge, so neither draws outside its rectangle.
 - **FR-044**: `dybatpho::screen_table` MUST split cells on its delimiter as a whole string, as `table.sh` does.
+- **FR-045**: `dybatpho::screen_put`, and every widget drawing through it, MUST
+  draw a control character of its text in caret notation (`^[` for ESC, `^I`
+  for a tab) and measure it as such, so text cannot send an escape sequence,
+  such as an OSC 52 clipboard write, to the terminal.
+- **FR-046**: `dybatpho::screen_ansi` MUST read the escapes a terminal reads:
+  SGR parameters separated by `;` or `:`, such as the curly underline `4:3`;
+  a character set designation (`ESC (`, `ESC )`, `ESC *`, `ESC +` and one more
+  byte), dropped; an OSC, DCS, APC, PM or SOS string up to BEL or `ESC \`,
+  dropped; and any other two-byte escape, dropped.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -405,6 +418,12 @@ dybatpho::screen_end
 - **IT-039**: Under a pseudo-terminal of 123x41, begin the screen with stdout and stderr redirected and get a 123x41 buffer.
 - **IT-040**: Draw `x` over the right half and `y` over the left half of `世`, and keep a 40-column row with the rest blanked.
 - **IT-041**: Draw a bar of 20 with `max:10` in six columns and get six full blocks; draw tabs in eight columns and get ` Overvie`; draw `a::b` with `delimiter:::` and get two cells.
+- **IT-042**: Put text holding an OSC 52 sequence, BEL, a tab, a line break and
+  DEL, and find none of them raw in the row, each spelled in caret notation.
+- **IT-043**: Draw a line holding `ESC ( B ESC [ m`, an OSC 8 hyperlink closed
+  by `ESC \`, `ESC [ 4:3 m`, an OSC title closed by BEL, `ESC 7` and a
+  trailing ESC, and get only the text, with the curly underline kept; draw an
+  OSC cut short by the next CSI and keep that CSI's colour.
 
 ## Acceptance Criteria *(mandatory)*
 

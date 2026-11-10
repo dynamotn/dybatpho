@@ -27,6 +27,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`screen` — `dybatpho::screen_ansi` reads charset designations, OSC strings
+  such as hyperlinks, and colon SGR parameters,** so `tput sgr0` and
+  `ls --hyperlink` output no longer shifts the layout.
 - **`table` — `dybatpho::table_markdown` escapes `|` inside a cell,** so a
   value split on another delimiter keeps the row's column count.
 - **`i18n` — `dybatpho::i18n_duration` and `dybatpho::i18n_relative` refuse
@@ -213,6 +216,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`screen` — `dybatpho::screen_put` draws control characters as text,** so
+  an escape sequence in drawn text, such as an OSC 52 clipboard write, cannot
+  reach the terminal.
 - **`markdown` — `dybatpho::md_collapsible` escapes its summary as HTML,** so
   a summary cannot inject a tag.
 - **`markdown` — a control character in untrusted text can no longer switch

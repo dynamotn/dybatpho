@@ -509,6 +509,9 @@ function dybatpho::screen_put {
   ((row >= 0 && row < DYBATPHO_SCREEN_HEIGHT)) || return 0
   ((column < DYBATPHO_SCREEN_WIDTH)) || return 0
   [[ -n "${text}" ]] || return 0
+  # Text is drawn as text: a control character has no width, and an escape
+  # sequence in it could write the clipboard or move the cursor out of the frame.
+  __dybatpho_log_visible_into text "${text}"
 
   local skip=0
   if ((column < 0)); then
@@ -2395,9 +2398,11 @@ function dybatpho::screen_spans {
 #   colours.
 #
 #   Each sequence changes the style of the text after it, the way a terminal
-#   reads it: parameters accumulate until a reset. A sequence that is not a
-#   colour change, such as a cursor movement, is dropped rather than drawn,
-#   because it would move the cursor out of the frame.
+#   reads it: parameters accumulate until a reset, and a colon parameter such
+#   as the curly underline `4:3` is kept. Every other sequence -- a cursor
+#   movement, a character set, an OSC title or hyperlink -- is dropped rather
+#   than drawn, because it would move the cursor out of the frame or show as
+#   text.
 # @example
 #   dybatpho::screen_ansi 5 1 60 $'\033[1;32mok\033[0m installed ripgrep'
 #
@@ -2413,18 +2418,42 @@ function dybatpho::screen_ansi {
   local row="${1-}" column="${2-}" width="${3-}" rest="${4-}"
   local style="0" before params
   local -a spans=()
-  while [[ "${rest}" == *$'\033['* ]]; do
-    before="${rest%%$'\033['*}"
+  # The final byte of a control sequence; only `m` is a colour. `~` and the
+  # other punctuation finals are left out, so a broken `ESC [ ~` shows as text.
+  local csi_final='^([0-9:;<=>?]*)[ !"#$%&'"'"'()*+,./-]*([@A-Za-z])'
+  while [[ "${rest}" == *$'\033'* ]]; do
+    before="${rest%%$'\033'*}"
     [[ -n "${before}" ]] && spans+=("${before}" "${style}")
-    rest="${rest#*$'\033['}"
-    # The final byte of a control sequence is a letter; only `m` is a colour.
-    if [[ "${rest}" =~ ^([0-9\;?]*)([A-Za-z]) ]]; then
-      params="${BASH_REMATCH[1]}"
-      rest="${rest:${#BASH_REMATCH[0]}}"
-      [[ "${BASH_REMATCH[2]}" == m && "${params}" =~ ^[0-9\;]*$ ]] || continue
-    else
-      continue
-    fi
+    rest="${rest#*$'\033'}"
+    case "${rest:0:1}" in
+      \[)
+        rest="${rest:1}"
+        [[ "${rest}" =~ ${csi_final} ]] || continue
+        params="${BASH_REMATCH[1]}"
+        rest="${rest:${#BASH_REMATCH[0]}}"
+        [[ "${BASH_REMATCH[2]}" == m && "${params}" =~ ^[0-9:\;]*$ ]] || continue
+        ;;
+      # A string -- OSC, as in a title or a hyperlink, DCS, APC, PM or SOS --
+      # runs to BEL or to `ESC \`, or to the end of a line that cut it short.
+      \] | P | _ | ^ | X)
+        before="${rest%%[$'\a\033']*}"
+        rest="${rest:${#before}}"
+        [[ "${rest}" != $'\a'* ]] || rest="${rest:1}"
+        [[ "${rest}" != $'\033\\'* ]] || rest="${rest:2}"
+        continue
+        ;;
+      # A character set designation, such as the `ESC ( B` of `tput sgr0`,
+      # takes one more byte; any other escape is two bytes long.
+      \( | \) | \* | +)
+        rest="${rest:2}"
+        continue
+        ;;
+      [0-9A-Za-z=\>\<@\`~\\])
+        rest="${rest:1}"
+        continue
+        ;;
+      *) continue ;;
+    esac
     case "${params}" in
       "" | 0 | 00) style="0" ;;
       0\;* | 00\;*) style="${params#*;}" ;;

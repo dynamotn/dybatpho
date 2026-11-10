@@ -117,6 +117,11 @@ function __dybatpho_db_scan_into {
         fi
         ;;
       : | '$' | @ | '#')
+        # sqlite3 carries on through `::` even with no name before it, so
+        # `:::a` or `$::a` is one unbound variable, not a sigil and then `:a`.
+        if [[ "${sql:i+1:2}" == "::" ]]; then
+          dybatpho::die "Use :name placeholders, not ${c}::...: sqlite3 would bind it to NULL"
+        fi
         run=""
         [[ ! "${sql:i+1}" =~ ${word} ]] || run="${BASH_REMATCH[0]}"
         if [[ -n "${run}" ]]; then
@@ -177,10 +182,16 @@ function __dybatpho_db_escapes {
   if [[ -z "${__DYBATPHO_DB_ESCAPES-}" ]]; then
     # Asked of the tool rather than read from its version: a build that
     # reports its version otherwise would leave values escaped again.
-    __DYBATPHO_DB_ESCAPES=false
     if printf '.bail on\n.mode ascii --escape off\nselect 1;\n' \
       | sqlite3 -init /dev/null -batch :memory: &> /dev/null; then
       __DYBATPHO_DB_ESCAPES=true
+    elif printf '.bail on\n.mode ascii\nselect 1;\n' \
+      | sqlite3 -init /dev/null -batch :memory: &> /dev/null; then
+      # It runs, but knows no `--escape`: older than 3.50, which never escaped.
+      __DYBATPHO_DB_ESCAPES=false
+    else
+      # It did not run at all; ask again next time rather than remember a guess.
+      return 1
     fi
   fi
   [[ "${__DYBATPHO_DB_ESCAPES}" == true ]]

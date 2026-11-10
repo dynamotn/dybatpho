@@ -136,7 +136,7 @@ Tests run the real `sqlite3` in the test directory and skip where it is missing.
 - **IT-011**: `db_value` returns 1 on NULL and stops on two rows.
 - **IT-012**: Two processes migrate the same directory at once; both succeed and each file runs once.
 - **IT-013**: With `DYBATPHO_DB_WAL=true`, the database reports `journal_mode` `wal` and `db_query` output is still pure JSON.
-- **IT-014**: Read back `\x01` and an escape sequence unchanged; stop on an unterminated comment, quote and bracket; stop on `:idé`, `:1`, `$1`, `@1`, `:é`, `$é`, `#a`; refuse `.shell` and `.bail off` lines while keeping them as data in a literal; refuse a placeholder and a dot-command in a migration file; bind a 400 KB value in seconds; keep `file:uri.db?mode=memory` a file; stop on `:a$`, `:a::b` and `:a(x)`, and name a placeholder refused in a migration file.
+- **IT-014**: Read back `\x01` and an escape sequence unchanged; stop on an unterminated comment, quote and bracket; stop on `:idé`, `:1`, `$1`, `@1`, `:é`, `$é`, `#a`; refuse `.shell` and `.bail off` lines while keeping them as data in a literal; refuse a placeholder and a dot-command in a migration file; bind a 400 KB value in seconds; keep `file:uri.db?mode=memory` a file; stop on `:a$`, `:a::b`, `:a(x)`, `:::a` and `$::a`, and name a placeholder refused in a migration file.
 
 ## Acceptance Criteria *(mandatory)*
 

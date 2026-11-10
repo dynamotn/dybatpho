@@ -241,7 +241,7 @@ _migrations() {
   local sql
   # The placeholders are SQL, meant literally.
   # shellcheck disable=SC2016
-  for sql in 'select :a$' "select :a::b" "select :a(x)"; do
+  for sql in 'select :a$' "select :a::b" "select :a(x)" "select :::a" 'select $::a' "select @::a" "select #::a"; do
     run -1 --separate-stderr dybatpho::db_exec "${DB}" "${sql}" a=5 b=6
     assert_stderr --partial "placeholder"
   done

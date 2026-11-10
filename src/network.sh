@@ -1038,21 +1038,74 @@ function dybatpho::curl_timeout {
 function __dybatpho_network_shared_open {
   local -n __dybatpho_network_shared_path="$1"
   local -n __dybatpho_network_shared_fd="$2"
-  local kind="$3" key="$4" dir="${DYBATPHO_NETWORK_STATE_DIR}"
+  local kind="$3" key="$4" dir="${DYBATPHO_NETWORK_STATE_DIR-}"
   __dybatpho_helpers_need_module lock __dybatpho_lock_run_holding "Shared ${kind} state"
-  if [[ -z "${dir}" ]]; then
-    local uid
+  # Every directory this module creates, or would write through, is checked
+  # first: under a shared `/tmp`, another user could have made one of them, or
+  # a link to a place of their choosing, and filled it with state this reads.
+  local -a own=()
+  if [[ -n "${dir}" ]]; then
+    own=("${dir}")
+  elif [[ "${XDG_RUNTIME_DIR-}" == /* ]]; then
+    own=("${XDG_RUNTIME_DIR:-}/dybatpho" "${XDG_RUNTIME_DIR:-}/dybatpho/network")
+  else
+    local uid base
     uid="$(id -u)"
-    dir="$(dybatpho::xdg_runtime_dir dybatpho "${TMPDIR:-/tmp}/dybatpho-${uid}")" \
-      || dybatpho::die "No directory for the shared ${kind} state; set DYBATPHO_NETWORK_STATE_DIR"
-    dir+="/network"
+    base="${TMPDIR:-/tmp}/dybatpho-${uid}"
+    own=("${base}" "${base}/dybatpho" "${base}/dybatpho/network")
   fi
-  { mkdir -p -- "${dir}" && chmod 700 -- "${dir}"; } \
-    || dybatpho::die "Cannot create ${dir} for the shared ${kind} state"
+  local part
+  for part in ${own[@]+"${own[@]}"}; do
+    __dybatpho_network_private_dir "${part}" "${kind}"
+  done
+  dir="${own[-1]}"
   local sum
   sum="$(printf '%s' "${key}" | cksum)"
   __dybatpho_network_shared_path="${dir}/${kind}-${key//[^A-Za-z0-9._-]/_}-${sum%% *}"
   dybatpho::flock_acquire __dybatpho_network_shared_fd "${__dybatpho_network_shared_path}.lock"
+}
+
+#######################################
+# @description Make sure a directory of the shared state is the user's own: a
+#   real directory, not a link, owned by them and closed to others. A missing
+#   one is created with mode 700; an existing one that is not private stops the
+#   script before anything is read from or written into it.
+# @arg $1 path Directory
+# @arg $2 string `rate` or `circuit`, for the message
+# @exitcode 1 Stop script when the directory is not private and cannot be made so
+# @internal
+#######################################
+function __dybatpho_network_private_dir {
+  local dir="$1" kind="$2"
+  if [[ ! -e "${dir}" && ! -L "${dir}" ]]; then
+    mkdir -m 700 -- "${dir}" 2> /dev/null || true
+  fi
+  if [[ -L "${dir}" || ! -d "${dir}" || ! -O "${dir}" ]]; then
+    dybatpho::die "${dir} is not a private directory; refusing to keep shared ${kind} state there"
+  fi
+  chmod 700 -- "${dir}" || dybatpho::die "Cannot make ${dir} private for the shared ${kind} state"
+}
+
+#######################################
+# @description Read a shared rate limit window into memory, keeping only the
+#   tokens that are plain timestamps: the file can be written by anything that
+#   can reach it, and a token such as `a[$(cmd)]` would run as a command once
+#   Bash evaluated it in arithmetic.
+# @arg $1 string Rate limit key
+# @arg $2 path State file
+# @set DYBATPHO_RATE_EVENTS The key's timestamps
+# @internal
+#######################################
+function __dybatpho_network_rate_load {
+  local -a tokens=() kept=()
+  local token
+  if [[ -s "$2" ]]; then
+    read -r -a tokens < "$2" || true
+  fi
+  for token in ${tokens[@]+"${tokens[@]}"}; do
+    [[ "${token}" =~ ^[0-9]{1,18}$ ]] && kept+=("$((10#${token}))")
+  done
+  DYBATPHO_RATE_EVENTS["$1"]="${kept[*]-}"
 }
 
 #######################################
@@ -1348,8 +1401,7 @@ function dybatpho::rate_limit_remaining {
   log_now_ms=$(__dybatpho_log_now_ms)
   if dybatpho::is true "${DYBATPHO_RATE_LIMIT_SHARED}"; then
     __dybatpho_network_shared_open path fd rate "${key}"
-    DYBATPHO_RATE_EVENTS["${key}"]=""
-    [[ ! -s "${path}" ]] || DYBATPHO_RATE_EVENTS["${key}"]="$(< "${path}")"
+    __dybatpho_network_rate_load "${key}" "${path}"
   fi
   __dybatpho_network_rate_prune "${key}" "${count}" "${window_ms}" "${log_now_ms}"
   if [[ -n "${fd}" ]]; then
@@ -1435,9 +1487,7 @@ function dybatpho::rate_limit {
     if [[ "${__dybatpho_network_rl_shared}" == true ]]; then
       __dybatpho_network_shared_open __dybatpho_network_rl_path __dybatpho_network_rl_fd rate \
         "${__dybatpho_network_rl_key}"
-      DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]=""
-      [[ ! -s "${__dybatpho_network_rl_path}" ]] \
-        || DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]="$(< "${__dybatpho_network_rl_path}")"
+      __dybatpho_network_rate_load "${__dybatpho_network_rl_key}" "${__dybatpho_network_rl_path}"
     fi
     __dybatpho_network_rl_now="$(__dybatpho_log_now_ms)"
     # Read through the variable rather than a command substitution, so that the

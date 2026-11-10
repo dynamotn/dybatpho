@@ -1728,3 +1728,41 @@ _shared_state() {
   local -a ran=("${BATS_TEST_TMPDIR}"/ran.*)
   assert_equal "${#ran[@]}" 3
 }
+
+@test "dybatpho::rate_limit never evaluates what it reads from a shared state file" {
+  _shared_state
+  DYBATPHO_RATE_LIMIT_SHARED=true
+  dybatpho::rate_limit_reset planted
+  local state
+  state="$(compgen -G "${DYBATPHO_NETWORK_STATE_DIR}/rate-planted-*" | grep -v '\.lock$')"
+  # Arithmetic would run a command substitution held in a subscript.
+  # No space in it, or splitting the window into timestamps would break it apart.
+  printf 'a[$(id>%s)] 1\n' "${BATS_TEST_TMPDIR}/pwned" > "${state}"
+  dybatpho::rate_limit planted 5/60
+  dybatpho::rate_limit_remaining planted 5/60 > /dev/null
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/pwned"
+}
+
+@test "shared network state refuses a directory that is a symlink, or not the user's own" {
+  _shared_state
+  mkdir -p "${BATS_TEST_TMPDIR}/elsewhere"
+  ln -s "${BATS_TEST_TMPDIR}/elsewhere" "${BATS_TEST_TMPDIR}/link"
+  DYBATPHO_NETWORK_STATE_DIR="${BATS_TEST_TMPDIR}/link" DYBATPHO_RATE_LIMIT_SHARED=true \
+    run -1 --separate-stderr dybatpho::rate_limit api 1/60
+  assert_stderr --partial "is not a private directory"
+  assert_equal "$(ls -A "${BATS_TEST_TMPDIR}/elsewhere")" ""
+}
+
+@test "shared network state falls back under TMPDIR only through private directories" {
+  command -v flock > /dev/null || skip "flock is not installed"
+  unset XDG_RUNTIME_DIR DYBATPHO_NETWORK_STATE_DIR
+  local uid
+  uid="$(id -u)"
+  export TMPDIR="${BATS_TEST_TMPDIR}/tmp"
+  mkdir -p "${TMPDIR}" "${BATS_TEST_TMPDIR}/planted"
+  # Someone made the fallback a link to a directory of their choosing.
+  ln -s "${BATS_TEST_TMPDIR}/planted" "${TMPDIR}/dybatpho-${uid}"
+  DYBATPHO_RATE_LIMIT_SHARED=true run -1 --separate-stderr dybatpho::rate_limit api 1/60
+  assert_stderr --partial "is not a private directory"
+  assert_equal "$(ls -A "${BATS_TEST_TMPDIR}/planted")" ""
+}

@@ -240,6 +240,7 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **FR-027**: Every helper but `json_string` MUST stop with exit code 127 and a message naming `jq` when `jq` is not installed.
 - **FR-028**: Every helper that reads or writes YAML MUST stop with exit code 127 when `yq` is missing, and MUST refuse the Python `yq` and a Go `yq` older than v4 by name; the check MUST run once for as long as `PATH` is unchanged.
 - **FR-029**: The module MUST declare `jq` 1.7 or newer to `dybatpho::doctor`, because `jq` 1.6 reads every number as a binary double and so does not keep a number as written; with `jq` 1.6 the helpers MUST still work.
+- **FR-030**: `json_set` and `yaml_set` MUST hand the value to `jq` and `yq` through the environment, never as a command-line argument of any process.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -315,6 +316,7 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
   ones keep working, and name the Python `yq`, a pre-v4 Go `yq` and an
   unidentifiable one.
 - **IT-026**: Ask `yq --version` once across several YAML calls under one `PATH`.
+- **IT-027**: Set a value with and without `--json` through `json_set` and `yaml_set`, with `jq`, `yq` and `env` recorded, and find the value in none of their arguments.
 
 ## Acceptance Criteria *(mandatory)*
 

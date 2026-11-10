@@ -532,6 +532,28 @@ __json_fixture() {
   assert_equal "$(jq -r '.["\"] | .k = 1 | .[\"x"]' <<< "${result}")" "y"
 }
 
+@test "dybatpho::json_set and yaml_set keep the value off every command line" {
+  # Arguments are world-readable through /proc/<pid>/cmdline: `jq --arg`
+  # carried the value there, and so did the `env` that started `yq`.
+  local file="${BATS_TEST_TMPDIR}/doc.json" yaml="${BATS_TEST_TMPDIR}/doc.yaml" tool real
+  printf '{"k":"v"}\n' > "${file}"
+  printf 'k: v\n' > "${yaml}"
+  for tool in jq yq env; do
+    real="$(command -v "${tool}")"
+    dybatpho::mock_command_script "${tool}" "exec '${real}' \"\$@\""
+  done
+  hash -r
+
+  assert_equal "$(dybatpho::json_set "${file}" token leak-me-not | jq -r .token)" "leak-me-not"
+  assert_equal "$(dybatpho::json_set --json "${file}" token '{"s":"leak-me-not"}' | jq -r .token.s)" "leak-me-not"
+  assert_equal "$(dybatpho::yaml_set "${yaml}" token leak-me-not | yq .token)" "leak-me-not"
+  assert_equal "$(dybatpho::yaml_set --json "${yaml}" token '"leak-me-not"' | yq .token)" "leak-me-not"
+  for tool in jq yq env; do
+    run_traced dybatpho::mock_calls "${tool}"
+    refute_output --partial "leak-me-not"
+  done
+}
+
 @test "dybatpho::json_set reads escapes in a path" {
   local file result
   file="$(__json_fixture)"

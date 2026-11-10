@@ -624,16 +624,18 @@ function __dybatpho_json_set {
   fi
 
   local message="Cannot set '${path}': it passes through a value that is not an object or array of the matching kind"
+  # The value reaches `jq` and `yq` through the environment of this call alone,
+  # never as an argument: arguments are world-readable in `/proc/<pid>/cmdline`.
+  local -x __dybatpho_json_value="${value}" __dybatpho_json_error="${message}"
 
   if [[ "${backend}" == jq ]]; then
     local path_array
     __dybatpho_json_path_array_into path_array ${segments[@]+"${segments[@]}"}
-    local value_flag=--arg
-    [[ "${typed}" == true ]] && value_flag=--argjson
-    # shellcheck disable=SC2016 # `$path`, `$value` and `$message` are jq variables
+    # shellcheck disable=SC2016 # `$ENV` is jq's, not the shell's
+    local stored='$ENV.__dybatpho_json_value'
+    [[ "${typed}" == true ]] && stored+=' | fromjson'
     __dybatpho_json_emit "${output}" jq --argjson path "${path_array}" \
-      "${value_flag}" value "${value}" --arg message "${message}" \
-      'try setpath($path; $value) catch error($message)' "${input}"
+      "try setpath(\$path; ${stored}) catch error(\$ENV.__dybatpho_json_error)" "${input}"
     return
   fi
 
@@ -645,14 +647,13 @@ function __dybatpho_json_set {
   # the caller wrote is ever parsed as part of the expression. The guards make
   # yq refuse what jq refuses: yq would otherwise ignore an assignment through
   # a scalar, and store a numeric segment as a key of an object.
-  local -a environment=("__dybatpho_json_error=${message}" "__dybatpho_json_value=${value}")
   #
   # The guards read each parent as `.[a] | .[b]` and match its tag with one
   # regular expression: on a key that is missing, yq answers `!=`, `and` and
   # `or` wrongly, and a chained `.[a][b]` compares differently from a pipe.
   local filter="" parent="." target="" accessor kind index=0 segment
   for segment in ${segments[@]+"${segments[@]}"}; do
-    environment+=("__dybatpho_json_s${index}=${segment:1}")
+    local -x "__dybatpho_json_s${index}=${segment:1}"
     if [[ "${segment}" == "#"* ]]; then
       kind=seq
       accessor="[env(__dybatpho_json_s${index})]"
@@ -676,8 +677,7 @@ function __dybatpho_json_set {
   else
     filter+="${parent} = strenv(__dybatpho_json_value)"
   fi
-  __dybatpho_json_emit "${output}" env "${environment[@]}" \
-    yq eval "-o=${format}" "${filter}" "${input}"
+  __dybatpho_json_emit "${output}" yq eval "-o=${format}" "${filter}" "${input}"
 }
 
 #######################################

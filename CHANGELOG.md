@@ -186,6 +186,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`json` — `dybatpho::json_set` and `dybatpho::yaml_set` no longer put the
+  value on a command line,** so a secret being set is not visible to other
+  users in `/proc/<pid>/cmdline`.
 - **`secret` — `dybatpho::secret_write_file` and `dybatpho::secret_wipe` no
   longer print the secret under `set -x`.**
 - **`archive` / `safety` — `dybatpho::safe_extract` and

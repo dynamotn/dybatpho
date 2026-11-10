@@ -517,3 +517,17 @@ EOF
   grep -qF 'title^[]0;owned^G' "${drawn}" || fail "entry not spelled out: $(cat -v "${drawn}")"
   ! grep -q $'\033]' "${drawn}" || fail "sequence reached the terminal: $(cat -v "${drawn}")"
 }
+
+@test "the menus spell out control characters in the answer line and the numbered list" {
+  # The entry was drawn spelled out, then echoed raw once it was picked.
+  local DYBATPHO_TUI=always COLUMNS=60 chosen=""
+  local drawn="${BATS_TEST_TMPDIR}/menu.out" listed="${BATS_TEST_TMPDIR}/list.out"
+  dybatpho::tui_menu chosen $'Pick\033]52;c;eA==\a' 'safe' $'title\033]0;owned\a' \
+    < <(printf '\033[B\n') 2> "${drawn}"
+  assert_equal "${chosen}" $'title\033]0;owned\a'
+  ! grep -q $'\033]' "${drawn}" || fail "sequence reached the terminal: $(cat -v "${drawn}")"
+  DYBATPHO_TUI=never dybatpho::tui_menu chosen $'Pick\033]52;c;eA==\a' 'safe' $'title\033]0;owned\a' \
+    < <(printf '2\n') 2> "${listed}"
+  assert_equal "${chosen}" $'title\033]0;owned\a'
+  ! grep -q $'\033]' "${listed}" || fail "sequence reached the terminal: $(cat -v "${listed}")"
+}

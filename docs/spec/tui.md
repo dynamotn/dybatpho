@@ -261,6 +261,7 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **FR-028**: A widget that hid the cursor MUST, on INT or TERM, show it again and then end the script with the signal, status 128+n.
 - **FR-029**: A single-choice menu that cannot ask MUST take the first entry `DYBATPHO_TUI_DEFAULT` names when it names several, rather than ask again.
 - **FR-030**: A drawn widget MUST show a control character of its prompt, hint or entries in caret notation (`^J` for a line break, `^[` for ESC), so an entry neither draws a row the redraw does not count nor sends an escape sequence to the terminal; the value returned MUST be the entry as given.
+- **FR-031**: The answer line and the numbered fallback list MUST show control characters in the prompt and entries in caret notation, as the drawn menu does.
 
 ### Key Entities *(include if feature involves data)*
 

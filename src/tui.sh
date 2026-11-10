@@ -844,10 +844,13 @@ function __dybatpho_tui_menu_fallback {
 
   __dybatpho_tui_defaults_into __dybatpho_tui_fb_defaults "${#__dybatpho_tui_fb_items[@]}"
 
-  printf '%s\n' "${__dybatpho_tui_fb_prompt}" >&2
+  # Entries are often untrusted names, so control characters are spelled out.
+  local __dybatpho_tui_fb_shown
+  __dybatpho_log_visible_into __dybatpho_tui_fb_shown "${__dybatpho_tui_fb_prompt}"
+  printf '%s\n' "${__dybatpho_tui_fb_shown}" >&2
   for __dybatpho_tui_fb_index in "${!__dybatpho_tui_fb_items[@]}"; do
-    printf '  %d) %s\n' "$((__dybatpho_tui_fb_index + 1))" \
-      "${__dybatpho_tui_fb_items[__dybatpho_tui_fb_index]}" >&2
+    __dybatpho_log_visible_into __dybatpho_tui_fb_shown "${__dybatpho_tui_fb_items[__dybatpho_tui_fb_index]}"
+    printf '  %d) %s\n' "$((__dybatpho_tui_fb_index + 1))" "${__dybatpho_tui_fb_shown}" >&2
   done
 
   local __dybatpho_tui_fb_label
@@ -1110,6 +1113,9 @@ function __dybatpho_tui_menu_interactive {
   local -a __dybatpho_tui_menu_selected=() __dybatpho_tui_menu_positions=()
   # As in the fallback: one nameref, an array for a multi-select and a scalar
   # for a single one, and only one of the branches ever runs for a caller.
+  # The answer line echoes untrusted entries, so control characters are spelled out.
+  local __dybatpho_tui_menu_shown __dybatpho_tui_menu_prompt_shown
+  __dybatpho_log_visible_into __dybatpho_tui_menu_prompt_shown "${__dybatpho_tui_menu_prompt}"
   # shellcheck disable=SC2178,SC2128,SC2034
   if dybatpho::is true "${__dybatpho_tui_menu_multiple}"; then
     for ((__dybatpho_tui_menu_index = 0;  \
@@ -1121,8 +1127,9 @@ function __dybatpho_tui_menu_interactive {
     done
     DYBATPHO_TUI_INDEXES="${__dybatpho_tui_menu_positions[*]-}"
     __dybatpho_tui_menu_out=(${__dybatpho_tui_menu_selected[@]+"${__dybatpho_tui_menu_selected[@]}"})
-    printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt}" \
-      "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_selected[*]-}" >&2
+    __dybatpho_log_visible_into __dybatpho_tui_menu_shown "${__dybatpho_tui_menu_selected[*]-}"
+    printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt_shown}" \
+      "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_shown}" >&2
   else
     DYBATPHO_TUI_INDEX=$((__dybatpho_tui_menu_cursor + 1))
     # shellcheck disable=SC2034 # output for the caller; nothing in this module reads it back
@@ -1132,8 +1139,9 @@ function __dybatpho_tui_menu_interactive {
     # shellcheck disable=SC2178 # nameref to the caller's variable, a scalar here
     __dybatpho_tui_menu_out="${__dybatpho_tui_menu_items[__dybatpho_tui_menu_cursor]}"
     # shellcheck disable=SC2128 # the same nameref, holding that scalar
-    printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt}" \
-      "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_out}" >&2
+    __dybatpho_log_visible_into __dybatpho_tui_menu_shown "${__dybatpho_tui_menu_out}"
+    printf '%s%s%s %s\n' "${__dybatpho_tui_menu_bold}" "${__dybatpho_tui_menu_prompt_shown}" \
+      "${__dybatpho_tui_menu_reset}" "${__dybatpho_tui_menu_shown}" >&2
   fi
   return 0
   # kcov(enabled)

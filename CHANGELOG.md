@@ -232,6 +232,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`tui` — the answer line printed after a choice and the numbered list
+  without a terminal spell out control characters too,** so a picked entry or
+  the prompt can no longer send an escape sequence to the terminal.
 - **`network` — `dybatpho::curl_paginate` follows only `http` and `https`
   next links;** a `Link:` to `file://`, `dict://` or `gopher://` stops paging
   with a warning instead of being fetched.

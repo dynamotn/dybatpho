@@ -475,8 +475,14 @@ function dybatpho::secret_write_file {
   dybatpho::expect_args __dybatpho_secret_path __dybatpho_secret_var -- "$@"
   dybatpho::expect_ref "${__dybatpho_secret_var}"
   local -n __dybatpho_secret_source="${__dybatpho_secret_var}"
-  [[ -n "${__dybatpho_secret_source:-}" ]] \
-    || dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty"
+  local __dybatpho_secret_write_trace
+  # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+  # "secret_write_file and secret_wipe keep the value out of a set -x trace" runs these lines, unseen.
+  __dybatpho_secret_trace_off __dybatpho_secret_write_trace
+  if [[ -z "${__dybatpho_secret_source:-}" ]]; then                                # kcov(skip)
+    dybatpho::die "${FUNCNAME[0]}: Variable \`${__dybatpho_secret_var}\` is empty" # kcov(skip)
+  fi
+  __dybatpho_secret_trace_on "${__dybatpho_secret_write_trace}" # kcov(skip)
 
   # An empty path, or one naming a directory, has no file to write; staging for
   # it would leave a plain-text copy of the secret in the working directory,
@@ -496,7 +502,15 @@ function dybatpho::secret_write_file {
   __dybatpho_secret_previous_umask="$(umask)"
   umask 077
   __dybatpho_secret_staging="${__dybatpho_secret_path}.dybatpho_secret.${BASHPID}.${RANDOM}${RANDOM}"
-  if ! (set -C && printf '%s\n' "${__dybatpho_secret_source}" > "${__dybatpho_secret_staging}") 2> /dev/null; then
+  local __dybatpho_secret_write_status=0
+  __dybatpho_secret_trace_off __dybatpho_secret_write_trace
+  # kcov(disabled) - the trace is off, so kcov cannot see these lines; the
+  # "secret_write_file and secret_wipe keep the value out of a set -x trace" test runs them.
+  (set -C && printf '%s\n' "${__dybatpho_secret_source}" > "${__dybatpho_secret_staging}") 2> /dev/null \
+    || __dybatpho_secret_write_status=$?
+  __dybatpho_secret_trace_on "${__dybatpho_secret_write_trace}"
+  # kcov(enabled)
+  if ((__dybatpho_secret_write_status != 0)); then
     umask "${__dybatpho_secret_previous_umask}"
     dybatpho::die "Cannot create secret file: ${__dybatpho_secret_staging}"
   fi
@@ -599,14 +613,18 @@ function dybatpho::secret_no_history {
 #######################################
 function dybatpho::secret_wipe {
   (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one variable name"
-  local __dybatpho_secret_name
+  local __dybatpho_secret_name __dybatpho_secret_wipe_trace
   for __dybatpho_secret_name in "$@"; do
     dybatpho::expect_ref "${__dybatpho_secret_name}"
     [[ -n "${!__dybatpho_secret_name+set}" ]] || continue
     local -n __dybatpho_secret_target="${__dybatpho_secret_name}"
-    if [[ -n "${__dybatpho_secret_target}" ]]; then
-      printf -v __dybatpho_secret_target '%*s' "${#__dybatpho_secret_target}" ''
+    # kcov reads the trace, which is off from here to `__dybatpho_secret_trace_on`:
+    # "secret_write_file and secret_wipe keep the value out of a set -x trace" runs these lines, unseen.
+    __dybatpho_secret_trace_off __dybatpho_secret_wipe_trace
+    if [[ -n "${__dybatpho_secret_target}" ]]; then                              # kcov(skip)
+      printf -v __dybatpho_secret_target '%*s' "${#__dybatpho_secret_target}" '' # kcov(skip)
     fi
+    __dybatpho_secret_trace_on "${__dybatpho_secret_wipe_trace}" # kcov(skip)
     unset -n __dybatpho_secret_target
     unset -v "${__dybatpho_secret_name}"
   done

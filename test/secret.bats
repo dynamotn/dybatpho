@@ -611,6 +611,26 @@ SCRIPT
   assert_stderr --partial "dybatpho::info"
 }
 
+@test "secret_write_file and secret_wipe keep the value out of a set -x trace" {
+  # Both read the value with the trace on, so `set -x` printed
+  # `[[ -n hunter2secret ]]` and the `printf` that wrote it.
+  local file="${BATS_TEST_TMPDIR}/written" script="${BATS_TEST_TMPDIR}/traced.sh"
+  cat > "${script}" << SCRIPT
+. $(printf '%q' "${DYBATPHO_DIR}")/init.sh
+BASH_XTRACEFD=2
+TOKEN=hunter2secret
+set -x
+dybatpho::secret_write_file $(printf '%q' "${file}") TOKEN
+dybatpho::secret_wipe TOKEN
+dybatpho::info "hello"
+SCRIPT
+  run_traced --separate-stderr bash "${script}"
+  assert_success
+  assert_equal "$(< "${file}")" "hunter2secret"
+  refute_stderr --partial "hunter2secret"
+  assert_stderr --partial "dybatpho::info"
+}
+
 @test "secret_shred removes a link without writing through it" {
   local target="${BATS_TEST_TMPDIR}/keep" link="${BATS_TEST_TMPDIR}/link"
   printf 'keep this\n' > "${target}"

@@ -173,6 +173,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`secret` — `dybatpho::secret_write_file` and `dybatpho::secret_wipe` no
+  longer print the secret under `set -x`.**
 - **`archive` / `safety` — `dybatpho::safe_extract` and
   `dybatpho::archive_is_safe` no longer let a symbolic link escape the
   destination.** Chained links, a hard link to a link, and links moved by

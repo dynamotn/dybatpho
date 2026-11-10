@@ -201,6 +201,7 @@ dybatpho::secret_wipe TOKEN
 - **FR-027**: `secret_shred` MUST overwrite every byte when it falls back from `shred`, in whole blocks followed by the remaining bytes.
 - **FR-028**: Masking MUST write `DYBATPHO_SECRET_PLACEHOLDER` literally, so a `&` or `\` in it never brings the matched secret back, whatever the Bash version.
 - **FR-029**: `secret_hint` MUST read the count of revealed characters as a decimal, so a zero-padded count such as `08` works and a count too large for Bash arithmetic reveals nothing rather than wrapping round.
+- **FR-030**: `secret_write_file` and `secret_wipe` MUST suspend `set -x` for the lines that hold the value and resume it afterwards.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -266,6 +267,7 @@ dybatpho::secret_wipe TOKEN
 - **IT-023**: Mask a secret with the placeholder `<&\&>` and see the placeholder, not the secret, in the output.
 - **IT-024**: Ask `secret_hint` to reveal `0` characters and see only the placeholder.
 - **IT-025**: Ask `secret_hint` to reveal `18446744073709551615` characters and see only the placeholder; ask for `08` and see the last eight.
+- **IT-026**: Under `set -x`, write a secret to a file with `secret_write_file` and wipe it with `secret_wipe`: the file holds the value, stderr never does, and the log call that follows is still traced.
 
 ## Acceptance Criteria *(mandatory)*
 

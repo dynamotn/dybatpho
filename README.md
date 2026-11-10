@@ -310,6 +310,7 @@ in any release.
 | [validate.sh](docs/validate.md)  | stable | One validator for email, URL, IP, CIDR, semver, port, dates, paths and your own types |
 | [config.sh](docs/config.md)      | stable | Config files + env vars with precedence and schema validation      |
 | [secret.sh](docs/secret.md)      | stable | Read secrets safely, mask them in output, shred and wipe them      |
+| [profile.sh](docs/profile.md)    | experimental | Find where a script spends its time: marked blocks or every function, with self and total time |
 | [service.sh](docs/service.md)    | experimental | Enable, control and install services on systemd, OpenRC, Termux runit or launchd, with one set of calls |
 | [sign.sh](docs/sign.md)          | experimental | Sign files and check signatures with ssh-keygen, minisign or gpg, against the keys you name |
 | [safety.sh](docs/safety.md)      | stable | Confirm-or-refuse guards for rm, overwrite, extract, system changes |

@@ -150,6 +150,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Added
 
+- **`profile` — find where a script spends its time.**
+  `dybatpho::profile_begin`/`profile_end` and `dybatpho::profile_run` time
+  named blocks, nested or not, and `dybatpho::profile_report` prints calls,
+  total and self time per name -- self time leaves out the blocks inside, so
+  nothing is counted twice. For one run, `DYBATPHO_PROFILE=true` with
+  `dybatpho::profile_start`/`profile_stop` times every function through a
+  `DEBUG` trap (Bash 5).
 - **`network` — rate limits and circuit breakers shared between processes.**
   With `DYBATPHO_RATE_LIMIT_SHARED=true`, every process calling
   `dybatpho::rate_limit` on a key spends one budget -- two cron runs, or a loop

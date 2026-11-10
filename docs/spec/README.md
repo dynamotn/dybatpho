@@ -39,6 +39,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `lock.md`
 - `sign.md`
 - `service.md`
+- `profile.md`
 - `cache.md`
 - `archive.md`
 - `forge.md`
@@ -88,6 +89,7 @@ The goal is to capture the current product behavior of the library in a form tha
 - `src/lock.sh` -> `lock.md`
 - `src/sign.sh` -> `sign.md`
 - `src/service.sh` -> `service.md`
+- `src/profile.sh` -> `profile.md`
 - `src/cache.sh` -> `cache.md`
 - `src/archive.sh` -> `archive.md`
 - `src/forge.sh` -> `forge.md`

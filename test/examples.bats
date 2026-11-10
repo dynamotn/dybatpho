@@ -94,6 +94,7 @@ run_example() {
 @test "example/release_ops.sh runs clean" { run_example "release_ops.sh"; }
 @test "example/safety_ops.sh runs clean" { run_example "safety_ops.sh"; }
 @test "example/schedule_ops.sh runs clean" { run_example "schedule_ops.sh"; }
+@test "example/profile_ops.sh runs clean" { run_example "profile_ops.sh"; }
 @test "example/secret_ops.sh runs clean" { run_example "secret_ops.sh"; }
 @test "example/semver_ops.sh runs clean" { run_example "semver_ops.sh"; }
 @test "example/service_ops.sh runs clean" { run_example "service_ops.sh"; }

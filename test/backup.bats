@@ -330,15 +330,6 @@ SCRIPT
   assert_output ""
 }
 
-@test "dybatpho::backup_list keeps a backup whose name carries no stamp" {
-  plant "snap-20260101T000000Z.tar.gz"
-  plant "snap-manual.tar.gz"
-
-  run_traced -0 dybatpho::backup_list "${DEST}" snap
-  assert_equal "${#lines[@]}" 2
-  assert_line "${DEST}/snap-manual.tar.gz"
-}
-
 @test "dybatpho::backup_list orders backups of different names by when they were taken" {
   # The key used to lead with the name, so without a name filter `zeta` listed
   # ahead of a newer `alpha`, and `--keep-count` deleted the newest backup.
@@ -376,6 +367,29 @@ SCRIPT
   assert_success
   assert_file_exist "${DEST}/web-20260101T000000Z.tar.gz"
   assert_file_exist "${DEST}/web-api-20260301T000000Z.tar.gz"
+}
+
+@test "dybatpho::backup_list leaves out a file whose name carries no stamp" {
+  # `app-notes.tar.gz` matched the glob and, keyed by its bare name, sorted
+  # after every stamp: it was the latest backup, and pruning to one deleted
+  # both real ones.
+  plant "app-20260101T000000Z.tar.gz"
+  plant "app-20260102T000000Z.tar.gz"
+  plant "app-notes.tar.gz"
+  mkdir -p "${DEST}/app-old.snapshot"
+
+  run_traced dybatpho::backup_latest "${DEST}" app
+  assert_output "${DEST}/app-20260102T000000Z.tar.gz"
+  run_traced dybatpho::backup_list "${DEST}"
+  assert_output "${DEST}/app-20260102T000000Z.tar.gz
+${DEST}/app-20260101T000000Z.tar.gz"
+
+  run_traced dybatpho::backup_prune --keep-count 1 --name app --force "${DEST}"
+  assert_success
+  assert_file_exist "${DEST}/app-20260102T000000Z.tar.gz"
+  assert_file_exist "${DEST}/app-notes.tar.gz"
+  run_traced dybatpho::backup_prune --keep-count 1 --force "${DEST}"
+  assert_file_exist "${DEST}/app-notes.tar.gz"
 }
 
 @test "dybatpho::backup_list leaves a half-written archive out" {

@@ -169,10 +169,12 @@ function __dybatpho_backup_collect_into {
     ${__dybatpho_backup_files[@]+"${__dybatpho_backup_files[@]}"} \
     ${__dybatpho_backup_trees[@]+"${__dybatpho_backup_trees[@]}"}; do
     __dybatpho_backup_sort_key_into __dybatpho_backup_key "${__dybatpho_backup_path}"
-    # The glob for `web` also matches `web-api-<stamp>`, so a stamped backup
+    # A name with no stamp, like `app-notes`, is not a backup: keyed by its
+    # bare name it sorted as the newest and pruning deleted the real ones. The
+    # glob for `web` also matches `web-api-<stamp>`, so a stamped backup
     # counts only when the name in its key is exactly the one asked for.
-    if [[ -n "${__dybatpho_backup_name}" && "${__dybatpho_backup_key}" == *$'\001'* ]] \
-      && [[ "${__dybatpho_backup_key##*$'\001'}" != "${__dybatpho_backup_name}" ]]; then
+    [[ "${__dybatpho_backup_key}" == *$'\001'* ]] || continue
+    if [[ -n "${__dybatpho_backup_name}" && "${__dybatpho_backup_key##*$'\001'}" != "${__dybatpho_backup_name}" ]]; then
       continue
     fi
     __dybatpho_backup_at="${#__dybatpho_backup_sorted[@]}"

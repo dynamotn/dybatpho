@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`backup` — a file that merely starts with a backup's name is no longer
+  taken for a backup.** `backup_latest` could return `app-notes.tar.gz`, and
+  `backup_prune` delete the real backups in its place.
 - **`archive` — extracting a zip over existing files no longer fails without
   a terminal;** the confirmation `safe_extract` asks for (or `--force`) is the
   only one.

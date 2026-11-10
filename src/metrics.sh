@@ -60,6 +60,9 @@ declare -gA __dybatpho_metrics_samples=()
 declare -gA __dybatpho_metrics_help=()
 declare -gA __dybatpho_metrics_type=()
 declare -gA __dybatpho_metrics_timer=()
+# The quantile list last found valid, so a summary checks it again only after
+# it changes rather than on every observation.
+__dybatpho_metrics_quantiles_ok=""
 
 #######################################
 # @description Fail unless a string is a valid Prometheus metric or label name.
@@ -325,6 +328,10 @@ function __dybatpho_metrics_need {
 # @internal
 #######################################
 function __dybatpho_metrics_validate_quantiles {
+  if [[ -n "${__dybatpho_metrics_quantiles_ok}" &&
+    "${__dybatpho_metrics_quantiles_ok}" == "${DYBATPHO_METRICS_QUANTILES}" ]]; then
+    return 0
+  fi
   local quantile below above
   local -a quantiles=()
   IFS=, read -r -a quantiles <<< "${DYBATPHO_METRICS_QUANTILES}"
@@ -338,6 +345,7 @@ function __dybatpho_metrics_validate_quantiles {
     ((below >= 0 && above <= 0)) \
       || dybatpho::die "${FUNCNAME[1]}: Quantile must be a number from 0 to 1, got '${quantile}'"
   done
+  __dybatpho_metrics_quantiles_ok="${DYBATPHO_METRICS_QUANTILES}"
 }
 
 #######################################

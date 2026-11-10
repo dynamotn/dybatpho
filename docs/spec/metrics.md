@@ -189,6 +189,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **FR-033**: `dybatpho::metrics_write` MUST leave the destination untouched when the metrics cannot be rendered.
 - **FR-034**: `dybatpho::metrics_push` MUST drop the `user:password@` of the gateway URL from the error it logs.
 - **FR-035**: Every message of `dybatpho::metrics_push` that names the gateway MUST drop everything from `scheme://` to the last `@` of the gateway URL, so a password holding an unencoded `/` stays hidden, while keeping the job and grouping path.
+- **FR-036**: `dybatpho::metrics_summary_ms` MUST check `DYBATPHO_METRICS_QUANTILES` again only when it differs from the list last found valid, so recording a summary costs about what a histogram does.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -250,6 +251,7 @@ dybatpho::metrics_write /var/lib/node_exporter/textfile_collector/backup.prom
 - **IT-035**: Make the quantiles invalid after recording a summary, write the metrics, and find the previous file intact.
 - **IT-036**: Have a push to `https://user:password@gateway` refused and see the error without the password.
 - **IT-037**: Push to `http://alice:pa/ss@gw:9091` with nothing recorded, to an `ftp://` gateway, and with a refused request, and see none of the messages hold the password.
+- **IT-038**: Record a summary, then record twice more and see the quantiles not compared again; change them to an invalid list and see the next observation refused.
 
 ## Acceptance Criteria *(mandatory)*
 

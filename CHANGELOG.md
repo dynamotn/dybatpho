@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`metrics` — `dybatpho::metrics_summary_ms` is as cheap as a histogram
+  observation.** `DYBATPHO_METRICS_QUANTILES` is checked again only when it
+  changes: 500 observations take about 0.2s instead of over 4s.
 - **`cache` — `dybatpho::cache_key` keeps values that contain a newline
   apart,** so two different requests no longer share an entry, and keys no
   longer depend on the locale. Every existing key changes once, so the first

@@ -140,6 +140,26 @@ setup() {
   assert_equal "$(dybatpho::metrics_get count d_seconds)" "0"
 }
 
+@test "dybatpho::metrics_summary_ms checks the quantiles again only when they change" {
+  # Every observation checked the list with two forks per quantile, so 500
+  # observations took seconds where a histogram took a fraction of one.
+  local calls="${BATS_TEST_TMPDIR}/calls"
+  eval "$(declare -f dybatpho::math_compare | sed '1s/dybatpho::math_compare/__real_math_compare/')"
+  function dybatpho::math_compare {
+    printf 'x' >> "${calls}"
+    __real_math_compare "$@"
+  }
+  dybatpho::metrics_summary_ms d_seconds 1
+  : > "${calls}"
+  dybatpho::metrics_summary_ms d_seconds 2
+  dybatpho::metrics_summary_ms d_seconds 3
+  assert_equal "$(< "${calls}")" ""
+  DYBATPHO_METRICS_QUANTILES="0.5,1.5" run dybatpho::metrics_summary_ms d_seconds 4
+  assert_failure
+  assert_output --partial "got '1.5'"
+  assert_equal "$(dybatpho::metrics_get count d_seconds)" "3"
+}
+
 @test "a metric cannot be both a histogram and a summary" {
   dybatpho::metrics_observe_ms h_seconds 5
   run dybatpho::metrics_summary_ms h_seconds 5

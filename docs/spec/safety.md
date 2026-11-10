@@ -165,8 +165,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   backslash separators, or carries a Windows drive letter.
 - `strip-components` is larger than the depth of an entry, so the entry expands
   to nothing.
-- Symlink targets stored inside an archive aren't inspected, so untrusted
-  archives should be extracted into a scratch directory.
+- A symbolic link stored inside an archive points outside, or has a `..`
+  component that a strip-components count or another link could move out.
 - The shell has no terminal, so a confirmation can't be asked.
 - `DYBATPHO_DRY_RUN` is enabled, so no operation may change the filesystem.
 - `safe_extract` is called while the `archive` module it lists and extracts
@@ -261,6 +261,9 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   normalized path every caller acts on.
 - **FR-032**: `safe_move` MUST hand `mv` the source as the caller wrote it,
   not the normalized path it validated.
+- **FR-033**: `safe_extract` MUST refuse a symbolic link that would point
+  outside the destination once strip-components has removed its leading
+  directories, as well as one that points outside as stored.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -338,6 +341,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   `d` links outside the safe root, and accept a `..` over a plain directory.
 - **IT-022**: Move `sub/../source.txt` under `DYBATPHO_DRY_RUN` and see `mv`
   given that path as written.
+- **IT-023**: Extract `top/b/l -> ../..` with strip-components `1` and see it
+  refused, with no `b/l` written.
 
 ## Acceptance Criteria *(mandatory)*
 

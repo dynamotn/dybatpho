@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`archive` — extracting a zip over existing files no longer fails without
+  a terminal;** the confirmation `safe_extract` asks for (or `--force`) is the
+  only one.
 - **`pkg` — `dybatpho::pkg_install_command` shell-quotes what it prints,** so
   the line can be pasted or `eval`ed safely with any package name.
 - **`doctor` — the `cache` row lists the hashers `cache_key` accepts,**
@@ -167,6 +170,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`archive` / `safety` — `dybatpho::safe_extract` and
+  `dybatpho::archive_is_safe` no longer let a symbolic link escape the
+  destination.** Chained links, a hard link to a link, and links moved by
+  strip-components could point outside it. A link target with a `..`
+  component is now refused, like an absolute or empty one, so archives that
+  carry `../` links inside their own tree are refused too.
 - **`file` — `dybatpho::create_temp` refuses a directory or link planted at the
   temporary file's final name,** instead of returning a path someone else
   controls.

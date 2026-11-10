@@ -122,8 +122,31 @@ setup() {
   stub unzip ": echo \"\$*\" > ${args_file}"
   dybatpho::archive_extract "${archive_path}" "${destination}"
   [ -d "${destination}" ]
-  assert_equal "$(cat "${args_file}")" "-q ${archive_path} -d ${destination}"
+  assert_equal "$(cat "${args_file}")" "-o -q ${archive_path} -d ${destination}"
   unstub unzip
+}
+
+@test "dybatpho::archive_extract overwrites a file from a zip without asking again" {
+  # Without `-o`, unzip asked once more after safe_extract had approved the
+  # overwrite; with no terminal it read end of file, kept the old file, and failed.
+  dybatpho::is command python3 && dybatpho::is command unzip || skip "needs python3 and unzip"
+  local archive_path="${BATS_TEST_TMPDIR}/bundle.zip" destination="${BATS_TEST_TMPDIR}/out"
+  mkdir -p "${destination}/sub"
+  printf 'old\n' > "${destination}/f.txt"
+  printf 'old\n' > "${destination}/sub/g.txt"
+  python3 -I - "${archive_path}" << 'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as archive:
+    archive.writestr("f.txt", "new\n")
+    archive.writestr("top/sub/g.txt", "new\n")
+PY
+
+  run_traced dybatpho::archive_extract "${archive_path}" "${destination}" < /dev/null
+  assert_success
+  assert_equal "$(cat "${destination}/f.txt")" "new"
+  run_traced dybatpho::archive_extract "${archive_path}" "${destination}" 1 < /dev/null
+  assert_success
+  assert_equal "$(cat "${destination}/sub/g.txt")" "new"
 }
 
 @test "dybatpho::archive_extract supports strip-components for zip archives" {
@@ -131,7 +154,7 @@ setup() {
   local destination="${BATS_TEST_TMPDIR}/out"
   : > "${archive_path}"
 
-  stub unzip ": mkdir -p \"\$4/bundle/nested\"; printf 'hello\n' > \"\$4/bundle/nested/file.txt\""
+  stub unzip ": mkdir -p \"\$5/bundle/nested\"; printf 'hello\n' > \"\$5/bundle/nested/file.txt\""
   dybatpho::archive_extract "${archive_path}" "${destination}" 1
   [ -f "${destination}/nested/file.txt" ]
   assert_equal "$(cat "${destination}/nested/file.txt")" "hello"
@@ -406,12 +429,44 @@ function _create_traversal_test_archive {
   run_traced dybatpho::archive_unsafe_entries "${archive_path}"
   assert_success
   assert_output "link
+inner/up
 abs"
   run_traced -1 dybatpho::archive_is_safe "${archive_path}"
 
   local inside="${BATS_TEST_TMPDIR}/inside.tar"
-  tar -C "${tree}" -cf "${inside}" file.txt inner
+  ln -s ./file.txt "${tree}/same"
+  tar -C "${tree}" -cf "${inside}" file.txt same
   dybatpho::archive_is_safe "${inside}"
+}
+
+@test "dybatpho::archive_unsafe_entries reports a link that escapes through another link" {
+  # Each link resolved from its own name stayed inside, yet `l -> .` put
+  # `l/l2 -> ..` at the top, and a hard link to `a/l -> ..` put `..` there too.
+  # A link stored twice was checked by its last, harmless target only.
+  dybatpho::is command python3 || skip "needs python3"
+  local chained="${BATS_TEST_TMPDIR}/chained.tar" hard="${BATS_TEST_TMPDIR}/hard.tar"
+  local twice="${BATS_TEST_TMPDIR}/twice.tar"
+  python3 -I - "${chained}" "${hard}" "${twice}" << 'PY'
+import sys, tarfile
+def build(path, members):
+    with tarfile.open(path, "w") as archive:
+        for name, kind, target in members:
+            info = tarfile.TarInfo(name)
+            info.type, info.linkname, info.mode = kind, target, 0o755
+            archive.addfile(info)
+build(sys.argv[1], [("l", tarfile.SYMTYPE, "."), ("l/l2", tarfile.SYMTYPE, "..")])
+build(sys.argv[2], [("a/", tarfile.DIRTYPE, ""), ("a/l", tarfile.SYMTYPE, ".."), ("h", tarfile.LNKTYPE, "a/l")])
+build(sys.argv[3], [("l", tarfile.SYMTYPE, ".."), ("l/f", tarfile.REGTYPE, ""), ("l", tarfile.SYMTYPE, "x")])
+PY
+
+  run_traced dybatpho::archive_unsafe_entries "${chained}"
+  assert_success
+  assert_output "l/l2"
+  run_traced -1 dybatpho::archive_is_safe "${hard}"
+  run_traced dybatpho::archive_unsafe_entries "${twice}"
+  assert_success
+  assert_output "l
+l"
 }
 
 @test "dybatpho::archive_unsafe_entries reports a zip symbolic link that points outside" {
@@ -420,7 +475,7 @@ abs"
   python3 -I - "${archive_path}" << 'PY'
 import stat, sys, zipfile
 with zipfile.ZipFile(sys.argv[1], "w") as archive:
-    for name, target in (("a link", "../victim"), ("dir/up", "../file.txt")):
+    for name, target in (("a link", "../victim"), ("dir/up", "../file.txt"), ("dir/down", "sub/f")):
         info = zipfile.ZipInfo(name)
         info.create_system = 3
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
@@ -430,16 +485,21 @@ PY
 
   run_traced dybatpho::archive_unsafe_entries "${archive_path}"
   assert_success
-  assert_output "a link"
+  assert_output "a link
+dir/up"
 }
 
-@test "__dybatpho_archive_link_is_safe resolves a target from the link's directory" {
-  __dybatpho_archive_link_is_safe "a/b/link" "../c"
-  __dybatpho_archive_link_is_safe "a/link" "./x/../y"
-  run_traced -1 __dybatpho_archive_link_is_safe "a/link" "../../c"
-  run_traced -1 __dybatpho_archive_link_is_safe "link" "/etc"
-  run_traced -1 __dybatpho_archive_link_is_safe "link" 'C:\Windows'
-  run_traced -1 __dybatpho_archive_link_is_safe "link" ""
+@test "__dybatpho_archive_link_is_safe accepts only a relative target that descends" {
+  __dybatpho_archive_link_is_safe "c"
+  __dybatpho_archive_link_is_safe "./x/y"
+  __dybatpho_archive_link_is_safe "x..y/..z"
+  run_traced -1 __dybatpho_archive_link_is_safe "../c"
+  run_traced -1 __dybatpho_archive_link_is_safe "./x/../y"
+  run_traced -1 __dybatpho_archive_link_is_safe "x/.."
+  run_traced -1 __dybatpho_archive_link_is_safe '..\x'
+  run_traced -1 __dybatpho_archive_link_is_safe "/etc"
+  run_traced -1 __dybatpho_archive_link_is_safe 'C:\Windows'
+  run_traced -1 __dybatpho_archive_link_is_safe ""
 }
 
 @test "dybatpho::archive_is_safe refuses an archive it cannot list" {

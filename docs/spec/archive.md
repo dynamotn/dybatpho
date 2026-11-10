@@ -112,8 +112,10 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **FR-012**: Creating, extracting and listing MUST treat a source or archive whose name begins with a dash as a name, never as an option of the underlying tool.
 - **FR-013**: Creating a `.zip` MUST replace an existing output rather than add to it, and MUST archive the source relative to its own directory whatever `CDPATH` holds.
 - **FR-014**: Extracting a single-file archive MUST write its output through a staging file, so a failed decompression leaves an existing file of that name untouched and no partial output behind.
-- **FR-015**: `archive_unsafe_entries` and `archive_is_safe` MUST report a symbolic link whose target is empty, absolute, or climbs out of the extraction directory when resolved from the link's own directory, for tar and zip archives.
+- **FR-015**: `archive_unsafe_entries` and `archive_is_safe` MUST report a symbolic link whose target is empty, absolute, or has a `..` component, for tar and zip archives. A `..` that stays inside when resolved from the link's own name is refused too: an earlier link in its path, a hard link to it, or strip-components can each move the link so that `..` climbs out.
 - **FR-016**: The strip-components count MUST be read in base ten, so `08` strips eight components.
+- **FR-017**: A symbolic link stored more than once under one name MUST be reported when any of its targets is unsafe, not only the last.
+- **FR-018**: Extracting a zip MUST overwrite existing files without unzip asking again, so the decision stays with the caller.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -151,8 +153,10 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **IT-012**: Create, list and extract gzip, tar and zip archives of `-file`, `-tree` and `-copy.gz`.
 - **IT-013**: Re-create a zip after removing a source file and see the stale entry gone; zip a relative source with `CDPATH` set to a decoy.
 - **IT-014**: Extract a corrupt `.gz` over an existing file and find the file unchanged and nothing else written.
-- **IT-015**: List a tar holding `link -> ../../victim`, `abs -> /etc` and `inner/up -> ../file.txt`, and a zip holding `a link -> ../victim` and `dir/up -> ../file.txt`, and find only the escaping links reported.
+- **IT-015**: List a tar holding `link -> ../../victim`, `abs -> /etc` and `inner/up -> ../file.txt`, and a zip holding `a link -> ../victim`, `dir/up -> ../file.txt` and `dir/down -> sub/f`, and find every link with a `..` or absolute target reported, and `same -> ./file.txt` and `dir/down` accepted.
 - **IT-016**: Extract a nine-level tar with strip-components `08` and find the file at the top of the destination.
+- **IT-017**: List a tar holding `l -> .` then `l/l2 -> ..`, one holding `a/l -> ..` and a hard link `h` to it, and one storing `l -> ..` then `l -> x`, and find each refused.
+- **IT-018**: Extract a zip over an existing file with stdin at end of file, with and without strip-components, and find the file replaced.
 
 ## Acceptance Criteria *(mandatory)*
 

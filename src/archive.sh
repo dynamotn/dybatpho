@@ -304,13 +304,14 @@ function dybatpho::archive_extract {
     __dybatpho_archive_decompress "${archive_path}" "${name}" "${tool}" ${unpack[@]+"${unpack[@]}"}
   else
     dybatpho::require unzip
-    # `unzip` takes no `--`, so an archive named like an option keeps `./`.
+    # `unzip` takes no `--`, so an archive named like an option keeps `./`;
+    # `-o` overwrites, as tar does: the caller, not unzip, decides on that.
     if ((strip_components == 0)); then
-      unzip -q "${archive_path/#-/./-}" -d "${destination}"
+      unzip -o -q "${archive_path/#-/./-}" -d "${destination}"
     else
       local temp_dir
       dybatpho::create_temp temp_dir ""
-      unzip -q "${archive_path/#-/./-}" -d "${temp_dir}"
+      unzip -o -q "${archive_path/#-/./-}" -d "${temp_dir}"
       __dybatpho_archive_move_stripped "${temp_dir}" "${destination}" "${strip_components}"
     fi
   fi
@@ -388,44 +389,27 @@ function __dybatpho_archive_entry_is_safe {
 }
 
 #######################################
-# @description Return success when a symbolic link entry points inside the
-#   extraction directory. The target is resolved against the entry's own
-#   directory, so `a/link -> ../b` stays inside while `link -> ../b` does not.
-# @arg $1 string Entry name of the link
-# @arg $2 string Target the link points at
-# @exitcode 0 The target stays inside the extraction directory
-# @exitcode 1 The target is empty, absolute, or climbs out of the directory
+# @description Return success when a symbolic link target stays inside the
+#   extraction directory wherever the link lands. A target with a `..`
+#   component is refused outright: resolved lexically it
+#   can look inside, yet an earlier link in the path (`l -> .`, then
+#   `l/up -> ..`), a hard link to the link from another directory, or
+#   strip-components can each move the link so `..` climbs out.
+# @arg $1 string Target the link points at
+# @exitcode 0 The target is relative and only descends
+# @exitcode 1 The target is empty, absolute, or has a `..` component
 # @internal
 #######################################
 function __dybatpho_archive_link_is_safe {
-  local entry target
-  dybatpho::expect_args entry target -- "$@"
+  local target
+  dybatpho::expect_args target -- "$@"
   local normalized="${target//\\//}"
   # shellcheck disable=SC2088 # the `~/` branch matches a literal target, it never expands
   case "${normalized}" in
     '' | /* | '~/'* | [a-zA-Z]:/*) return 1 ;;
+    .. | ../* | */../* | */..) return 1 ;;
     *) ;; # kcov(skip) - a case arm has no command to fire on
   esac
-  local parent="${entry//\\//}"
-  parent="${parent%/}"
-  if [[ "${parent}" == */* ]]; then
-    parent="${parent%/*}"
-  else
-    parent=""
-  fi
-  local part depth=0
-  local -a parts=()
-  IFS=/ read -r -a parts <<< "${parent}/${normalized}"
-  for part in ${parts[@]+"${parts[@]}"}; do
-    case "${part}" in
-      '' | .) ;; # kcov(skip) - a case arm has no command to fire on
-      ..)
-        depth=$((depth - 1))
-        ((depth >= 0)) || return 1
-        ;;
-      *) depth=$((depth + 1)) ;;
-    esac
-  done
   return 0
 }
 
@@ -464,18 +448,24 @@ function __dybatpho_archive_link_targets_into {
     # opens with its ten-character mode.
     [[ "${format}" != zip || "${line}" =~ ^[^[:space:]]{10}[[:space:]] ]] && lines+=("${line}")
   done <<< "${verbose}"
-  local index
+  local index target
   for ((index = 0; index < ${#lines[@]}; index++)); do
     [[ "${lines[index]}" == l* ]] || continue
     name="${names[index]-}"
     if [[ "${format}" == zip ]]; then
       # zip keeps the target as the link's content.
-      __dybatpho_archive_targets_ref["${name}"]="$(unzip -p "${archive_path/#-/./-}" "${name}")"
+      target="$(unzip -p "${archive_path/#-/./-}" "${name}")"
     elif [[ "${lines[index]}" == *" ${name} -> "* ]]; then
-      __dybatpho_archive_targets_ref["${name}"]="${lines[index]#*" ${name} -> "}"
+      target="${lines[index]#*" ${name} -> "}"
     else
       # A line that cannot be paired with its name cannot be vouched for.
-      __dybatpho_archive_targets_ref["${name}"]="/"
+      target="/"
+    fi
+    # A name stored twice keeps its unsafe target: a later safe one replaces
+    # the link only after entries in between have written through it.
+    if [[ -z "${__dybatpho_archive_targets_ref[${name}]+set}" ]] \
+      || __dybatpho_archive_link_is_safe "${__dybatpho_archive_targets_ref[${name}]}"; then
+      __dybatpho_archive_targets_ref["${name}"]="${target}"
     fi
   done
 }
@@ -483,7 +473,7 @@ function __dybatpho_archive_link_targets_into {
 #######################################
 # @description List archive entries that would escape the extraction directory:
 #   a path that is absolute or climbs out through `..`, and a symbolic link
-#   whose target does, resolved from the link's own directory.
+#   whose target is absolute or has a `..` component.
 #   An archive that cannot be listed -- corrupt, truncated, or a zip with no
 #   `unzip` installed -- is a failure, not an empty list: no entry was checked,
 #   so none can be vouched for.
@@ -508,7 +498,7 @@ function dybatpho::archive_unsafe_entries {
     if ! __dybatpho_archive_entry_is_safe "${entry}"; then
       printf '%s\n' "${entry}"
     elif [[ -n "${links[${entry}]+set}" ]] \
-      && ! __dybatpho_archive_link_is_safe "${entry}" "${links[${entry}]}"; then
+      && ! __dybatpho_archive_link_is_safe "${links[${entry}]}"; then
       printf '%s\n' "${entry}"
     fi
     # kcov never records the `done` of a loop fed by a process substitution;

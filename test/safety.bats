@@ -511,6 +511,21 @@ function _create_traversal_archive {
   [ ! -L "${destination}/link" ]
 }
 
+@test "dybatpho::safe_extract refuses a link that strip-components moves outside" {
+  # `top/b/l -> ../..` stays inside as stored, but stripping `top` puts it at
+  # `b/l`, where `../..` climbs out of the destination.
+  local tree="${BATS_TEST_TMPDIR}/strip" archive_path="${BATS_TEST_TMPDIR}/strip.tar"
+  local destination="${BATS_TEST_TMPDIR}/out/dest"
+  mkdir -p "${tree}/top/b"
+  ln -s ../.. "${tree}/top/b/l"
+  tar -C "${tree}" -cf "${archive_path}" top
+
+  run dybatpho::safe_extract --force "${archive_path}" "${destination}" 1
+  assert_failure
+  assert_output --partial "a symbolic link in it points outside"
+  [[ ! -L "${destination}/b/l" ]]
+}
+
 @test "dybatpho::safe_extract refuses an archive it cannot list" {
   # The entries are checked before anything is written, so an archive whose
   # entries cannot be read must stop there rather than be extracted unchecked.

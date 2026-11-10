@@ -358,6 +358,7 @@ dybatpho::show_file "${report_file}"
 - **FR-056**: A relative symlink target MUST be resolved against the link's directory as the kernel resolves it, never by folding `..` away as text.
 - **FR-057**: The staging file name MUST fit the file name limit whatever the length of the destination name.
 - **FR-058**: The staging file MUST be readable by its owner only until it is committed; a new destination MUST then get the mode the umask gives it, and an existing one keeps its own.
+- **FR-059**: `path_relative` MUST resolve two relative paths against the working directory when either still starts with `..` after normalising, so the result reaches the target from the base.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -434,6 +435,7 @@ dybatpho::show_file "${report_file}"
 - **IT-042**: Write through `alias/link`, where `alias -> deep/b` and `link -> ../t`, and see `deep/t` change and no `t` created beside `alias`.
 - **IT-043**: Rewrite a file whose name is 230 bytes long.
 - **IT-044**: Plant a link to a directory at the extended name while `create_temp` renames its file onto it, and see the call stop rather than hand back the link.
+- **IT-045**: From `top/here`, get `../here/a` for `a` from `../b`, `here/a` for `a` from `..`, and `../top/a` for `../a` from `../../x`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -332,6 +332,12 @@ function dybatpho::path_relative {
     printf '%s\n' "${target}"
     return 0
   fi
+  # A leading `..` names a directory only the working directory can spell: from
+  # `../b`, the way back to `a` runs through the name of the directory left.
+  if [[ "${target}" == ".." || "${target}" == ../* || "${base}" == ".." || "${base}" == ../* ]]; then
+    target=$(dybatpho::path_normalize "${PWD}/${target}")
+    base=$(dybatpho::path_normalize "${PWD}/${base}")
+  fi
 
   local -a target_parts=() base_parts=() relative_parts=()
   local i common=0

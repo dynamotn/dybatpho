@@ -356,6 +356,18 @@ EOF
   assert_equal "$(dybatpho::path_relative "/var/log/app" "/var/cache")" "../log/app"
 }
 
+@test "dybatpho::path_relative resolves a base that climbs above the working directory" {
+  # A leading `..` was counted as a directory to climb out of: `a` from `../b`
+  # came out as `../../a`, and from `..` as `../a`.
+  mkdir -p "${BATS_TEST_TMPDIR}/top/here"
+  cd "${BATS_TEST_TMPDIR}/top/here"
+  assert_equal "$(dybatpho::path_relative a ../b)" "../here/a"
+  assert_equal "$(dybatpho::path_relative a ..)" "here/a"
+  assert_equal "$(dybatpho::path_relative ../a ../../x)" "../top/a"
+  assert_equal "$(dybatpho::path_relative ../a b)" "../../a"
+  assert_equal "$(dybatpho::path_relative ../a ../b)" "../a"
+}
+
 @test "dybatpho::file_write_atomic writes stdin and keeps the destination mode" {
   local target="${BATS_TEST_TMPDIR}/atomic.conf"
   printf 'old\n' > "${target}"

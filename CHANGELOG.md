@@ -21,6 +21,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`file` — `dybatpho::path_relative` handles a base above the working
+  directory:** `path_relative a ../b` gives `../<cwd name>/a`, not `../../a`.
 - **`diff` — comparisons remove the temporary files they write before
   returning,** so a script that compares in a loop no longer piles up files
   until it exits.

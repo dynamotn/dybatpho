@@ -95,6 +95,11 @@ function __dybatpho_lock_exists {
 #   The time comes from Bash's own clock, so building it starts no process: a
 #   claim is attempted on every poll, and two processes per attempt -- `date`
 #   and the host name -- were most of what polling a held lock cost.
+#   The pid is `BASHPID`, the process that claims: `$$` is the script's, so
+#   every background worker recorded its parent, a killed worker's lock read as
+#   alive for as long as the parent ran, and a sibling passed the ownership
+#   check of a release. A caller whose lock outlives the subshell that takes it
+#   sets `__dybatpho_lock_holder_pid` to the process that keeps it.
 # @arg $1 string Name of the variable receiving the target
 # @set The named variable
 # @internal
@@ -104,7 +109,8 @@ function __dybatpho_lock_target_into {
   local __dybatpho_lock_target_at __dybatpho_lock_target_host
   TZ=UTC printf -v __dybatpho_lock_target_at '%(%Y-%m-%dT%H:%M:%SZ)T' -1
   __dybatpho_lock_host_into __dybatpho_lock_target_host
-  __dybatpho_lock_target_out="$$:${__dybatpho_lock_target_host}:${__dybatpho_lock_target_at}"
+  __dybatpho_lock_target_out="${__dybatpho_lock_holder_pid:-${BASHPID}}"
+  __dybatpho_lock_target_out+=":${__dybatpho_lock_target_host}:${__dybatpho_lock_target_at}"
 }
 
 #######################################
@@ -298,6 +304,13 @@ function dybatpho::lock_info {
 #   the one that was judged stale: they differ only when the lock was replaced
 #   between the judgement and the move, and the fresh lock is put back rather
 #   than deleted.
+#
+#   Putting it back still lost to a third process: A judged the lock stale, B
+#   reclaimed and claimed it before A's move, A moved B's lock aside, and C
+#   claimed the emptied name before A could put it back, so B and C both held
+#   it. Reclaimers therefore take a guard, `<lock>.reclaim`, and look at the
+#   holder again once they hold it; with one reclaimer at a time the name only
+#   changes by a holder letting go, and a dead holder never does.
 # @arg $1 string Lock directory path
 # @stderr Notice when a stale lock is reclaimed
 #######################################
@@ -306,7 +319,7 @@ function dybatpho::lock_reclaim_stale {
   dybatpho::expect_args lock_path -- "$@"
   __dybatpho_lock_exists "${lock_path}" || return 0
 
-  local holder pid
+  local holder
   holder="$(__dybatpho_lock_identity "${lock_path}")"
   # The holder released it between the two reads, so there is nothing to
   # reclaim. Going on would judge a lock this call never saw: the name is
@@ -316,10 +329,48 @@ function dybatpho::lock_reclaim_stale {
   # Judge the holder that was read, not whatever holds the name by the time
   # the check runs, for the same reason.
   __dybatpho_lock_holder_alive "${lock_path}" "${holder}" && return 0
-  pid="${holder%%:*}"
 
-  # Another reclaimer may have finished between the judgement and here and
-  # put a live lock in its place; that one is not stale.
+  # Someone else is reclaiming; the claim that follows sees what they leave.
+  # A guard is held for a few file operations, so one this old was left by a
+  # reclaimer that died holding it.
+  local guard="${lock_path}.reclaim"
+  if ! mkdir -- "${guard}" 2> /dev/null; then
+    __dybatpho_lock_guard_stale "${guard}" && rmdir -- "${guard}" 2> /dev/null
+    return 0
+  fi
+  __dybatpho_lock_reclaim_guarded "${lock_path}" "${holder}"
+  rmdir -- "${guard}" 2> /dev/null || true
+}
+
+#######################################
+# @description Return success when a reclaim guard is older than a live
+#   reclaimer ever holds one.
+# @arg $1 string Guard path
+# @exitcode 0 It exists and is stale
+# @exitcode 1 It is gone or still fresh
+# @internal
+#######################################
+function __dybatpho_lock_guard_stale {
+  local modified now
+  modified="$(__dybatpho_file_stat mtime "$1" 2> /dev/null)" || return 1
+  [[ "${modified}" =~ ^[0-9]+$ ]] || return 1
+  printf -v now '%(%s)T' -1
+  ((now - 10#${modified} > 5))
+}
+
+#######################################
+# @description Move a stale lock aside and remove it, holding the reclaim
+#   guard. See `dybatpho::lock_reclaim_stale`.
+# @arg $1 string Lock path
+# @arg $2 string Identity of the holder judged dead
+# @stderr Notice when a stale lock is reclaimed
+# @internal
+#######################################
+function __dybatpho_lock_reclaim_guarded {
+  local lock_path="$1" holder="$2" pid="${2%%:*}"
+
+  # Another reclaimer may have finished between the judgement and taking the
+  # guard, and a live lock may be in its place; that one is not stale.
   local current
   current="$(__dybatpho_lock_identity "${lock_path}")"
   [[ "${current}" == "${holder}" ]] || return 0
@@ -416,6 +467,20 @@ function __dybatpho_lock_identity {
 }
 
 #######################################
+# @description Return success when a recorded pid is this process, or the
+#   script it runs in. A lock is released by the process that took it, and a
+#   subshell may still release one the script itself holds, as a background
+#   release of the script's lock always could; a sibling's lock is not its own.
+# @arg $1 string Recorded pid
+# @exitcode 0 The pid is `BASHPID` or `$$`
+# @exitcode 1 It is another process
+# @internal
+#######################################
+function __dybatpho_lock_owned_here {
+  [[ "${1-}" == "${BASHPID}" || "${1-}" == "$$" ]]
+}
+
+#######################################
 # @description Make one attempt at a lock path, reclaiming it first when its
 #   holder is dead.
 # @arg $1 string Lock path
@@ -509,7 +574,8 @@ function dybatpho::lock_release {
 
   local owner_pid
   owner_pid="$(dybatpho::lock_field "${lock_path}" pid)"
-  if [[ -n "${owner_pid}" && "${owner_pid}" != "$$" ]] && dybatpho::lock_is_alive "${lock_path}"; then
+  if [[ -n "${owner_pid}" ]] && ! __dybatpho_lock_owned_here "${owner_pid}" \
+    && dybatpho::lock_is_alive "${lock_path}"; then
     dybatpho::warn "Lock ${lock_path} is held by pid ${owner_pid}, not the current process; skipping release"
     return 1
   fi
@@ -859,7 +925,7 @@ function dybatpho::lock_semaphore_release {
   for ((slot = 1; slot <= slots; slot++)); do
     slot_path="$(__dybatpho_lock_slot_path "${name}" "${slot}")"
     owner="$(dybatpho::lock_field "${slot_path}" pid)"
-    [[ "${owner}" == "$$" ]] || continue
+    __dybatpho_lock_owned_here "${owner}" || continue
     dybatpho::lock_release "${slot_path}"
   done
 }

@@ -27,6 +27,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`lock` — reclaiming a stale lock no longer hands it to two processes;**
+  reclaimers take turns behind a short guard and check the holder again.
+- **`lock` — a lock taken by a background worker belongs to that worker.** A
+  killed worker's lock is reclaimed instead of held for as long as the parent
+  runs, and a worker can no longer release a lock or semaphore slot a live
+  sibling holds. A subshell can still release a lock the script took.
 - **`tui` — menu entries, prompts and hints show control characters in caret
   notation,** so a line break in an entry no longer breaks the redraw; the
   chosen value comes back unchanged.

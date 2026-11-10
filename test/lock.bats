@@ -959,3 +959,114 @@ _release_flock_holder() {
   assert_failure
   assert_output --partial "Expected: file wait -- command"
 }
+
+# Take a lock (or a semaphore slot) in a background subshell that then becomes
+# `sleep`, keeping its pid, and return once the claim is on disk.
+_hold_in_worker() {
+  local lock_path="$1" i
+  shift
+  ("$@" && exec sleep 30) &> /dev/null 3>&- &
+  WORKER=$!
+  for ((i = 0; i < 50; i++)); do
+    [[ -L "${lock_path}" ]] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+@test "a lock taken by a background worker that was killed is reclaimed" {
+  # Every worker recorded the parent's pid, `$$`, so a SIGKILLed worker's lock
+  # read as held for as long as the parent ran, and was never reclaimed.
+  local lock_path
+  lock_path="$(dybatpho::lock_path "dead-worker")"
+  _hold_in_worker "${lock_path}" dybatpho::lock_acquire "dead-worker"
+  kill -9 "${WORKER}"
+  wait "${WORKER}" 2> /dev/null || true
+
+  run_traced --separate-stderr dybatpho::lock_acquire "dead-worker"
+  assert_success
+  dybatpho::lock_release "dead-worker"
+}
+
+@test "a worker cannot release a lock or a slot a sibling worker holds" {
+  # With every worker recorded as `$$`, a sibling passed the ownership check
+  # and deleted a live worker's lock, and the next claim made two holders.
+  local lock_path slot_path
+  lock_path="$(dybatpho::lock_path "sibling")"
+  _hold_in_worker "${lock_path}" dybatpho::lock_acquire "sibling"
+  local holder="${WORKER}"
+  (dybatpho::lock_release "sibling" 2> /dev/null) && fail "a sibling released a live worker's lock"
+  [[ -L "${lock_path}" ]]
+
+  slot_path="$(dybatpho::lock_path "sibling-pool")"
+  slot_path="${slot_path%.lock}.slot1.lock"
+  _hold_in_worker "${slot_path}" dybatpho::lock_semaphore_acquire "sibling-pool" 1
+  (dybatpho::lock_semaphore_release "sibling-pool" 1)
+  [[ -L "${slot_path}" ]]
+
+  kill "${holder}" "${WORKER}"
+  wait 2> /dev/null || true
+
+  # A worker still releases what it took itself.
+  (dybatpho::lock_acquire "own" && dybatpho::lock_release "own")
+  run_traced -1 dybatpho::lock_is_held "own"
+  (dybatpho::lock_semaphore_acquire "own-pool" 1 && dybatpho::lock_semaphore_release "own-pool" 1)
+  run_traced -1 dybatpho::lock_semaphore_holders "own-pool" 1
+}
+
+@test "dybatpho::lock_reclaim_stale never leaves two holders when a third process claims mid-reclaim" {
+  # A judges the lock stale; B reclaims and claims it before A's move; A then
+  # moves B's live lock aside, C claims the emptied name before A can put it
+  # back, and B and C both held the lock. A's `mv` is wrapped to force that
+  # order: it waits for B, moves, and lets C claim straight after.
+  sleep 120 &
+  local c_pid=$!
+  local lock_path dead c_claim at_mv="${BATS_TEST_TMPDIR}/a-at-mv" b_done="${BATS_TEST_TMPDIR}/b-done"
+  lock_path="$(dybatpho::lock_path "three-way")"
+  dead="${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z"
+  c_claim="${c_pid}:$(dybatpho::lock_hostname):2026-01-03T00:00:00Z"
+  ln -s "${dead}" "${lock_path}"
+
+  (
+    mv() {
+      : > "${at_mv}"
+      local i
+      for ((i = 0; i < 30; i++)); do
+        [[ -e "${b_done}" ]] && break
+        sleep 0.1
+      done
+      command mv "$@"
+      ln -s "${c_claim}" "${lock_path}" 2> /dev/null || true
+    }
+    dybatpho::lock_reclaim_stale "${lock_path}"
+  ) &> /dev/null 3>&- &
+  local a_pid=$! i
+  for ((i = 0; i < 50; i++)); do
+    [[ -e "${at_mv}" ]] && break
+    sleep 0.1
+  done
+  [[ -e "${at_mv}" ]]
+
+  local b_won=false
+  dybatpho::lock_acquire "three-way" 0 2> /dev/null && b_won=true
+  : > "${b_done}"
+  wait "${a_pid}" || true
+
+  local owner
+  owner="$(dybatpho::lock_field "${lock_path}" pid)"
+  kill "${c_pid}" 2> /dev/null || true
+  rm -rf -- "${lock_path}" "${lock_path}".stale.* "${lock_path}.reclaim"
+  # B may lose the race, but if it believes it holds the lock, the lock is B's.
+  [[ "${b_won}" == false ]] || assert_equal "${owner}" "${BASHPID}"
+}
+
+@test "dybatpho::lock_acquire clears a reclaim guard left by a reclaimer that died" {
+  local lock_path
+  lock_path="$(dybatpho::lock_path "dead-guard")"
+  ln -s "${DEAD_PID}:$(dybatpho::lock_hostname):2026-01-01T00:00:00Z" "${lock_path}"
+  mkdir "${lock_path}.reclaim"
+  touch -t 202001010000 "${lock_path}.reclaim"
+  run_traced -0 --separate-stderr dybatpho::lock_acquire "dead-guard" 2
+  assert_dir_not_exist "${lock_path}.reclaim"
+  dybatpho::lock_release "dead-guard"
+}

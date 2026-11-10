@@ -326,6 +326,9 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 - **FR-041**: `flock_release` MUST unlock before it closes the descriptor, so a copy held by a background job does not keep the lock, and MUST stop the script when given anything but a descriptor number.
 - **FR-042**: `with_flock` MUST follow the `with_lock` contract -- the `--` separator, release after success, failure and interruption, and the command's exit code -- and MUST run the command in the current shell.
 - **FR-043**: `with_flock` MUST return 1 without running the command when the lock cannot be taken within the wait.
+- **FR-044**: A lock or semaphore slot MUST record the pid of the process that claimed it (`BASHPID`), not the script's `$$`, so a background worker that is killed leaves a lock that reads as stale.
+- **FR-045**: `lock_release` and `lock_semaphore_release` MUST treat a lock as their own only when its recorded pid is the calling process or the script it runs in (`$$`): a subshell MAY still release the script's lock, and MUST NOT release a live sibling worker's.
+- **FR-046**: `lock_reclaim_stale` MUST move a stale lock aside only while holding the guard `<lock>.reclaim`, MUST read the holder again once it holds it, and MUST remove a guard older than five seconds, which only a reclaimer that died leaves.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -420,6 +423,10 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 - **IT-038**: Refuse the wait `soon` and the descriptor `nine`, and stop with an install hint when `flock` is not on the `PATH`.
 - **IT-039**: Run a function under `with_flock` that sees the lock held and sets a caller variable; propagate a failing exit code and release; refuse to run while another process holds the lock.
 - **IT-040**: Wait under `with_flock` with an empty wait for a holder to finish, and reject a missing `--`.
+- **IT-041**: Take a lock in a background worker, SIGKILL it, and take the lock at once.
+- **IT-042**: From a subshell, fail to release a lock and leave a semaphore slot that sibling workers hold; release a lock and a slot a subshell took itself.
+- **IT-043**: Force A to move the lock aside after B reclaimed and claimed it, and C to claim the emptied name, and see that if B believes it holds the lock, it does.
+- **IT-044**: Take a lock whose dead holder is behind a reclaim guard from 2020, and see the guard cleared.
 
 ## Acceptance Criteria *(mandatory)*
 

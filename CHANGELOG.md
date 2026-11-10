@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`forge` — uploading a GitHub release asset no longer loads the whole file
+  into memory;** `forge_release_upload` streams it from disk as the GitLab
+  upload already did.
 - **`file` — `dybatpho::path_relative` handles a base above the working
   directory:** `path_relative a ../b` gives `../<cwd name>/a`, not `../../a`.
 - **`diff` — comparisons remove the temporary files they write before

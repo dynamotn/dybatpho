@@ -179,6 +179,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **FR-019**: A GitLab request MUST send a token that is the CI job token (`CI_JOB_TOKEN`) as `JOB-TOKEN`, and any other token as `PRIVATE-TOKEN`.
 - **FR-020**: The token MUST NOT appear in a `set -x` trace of a forge request, and the trace MUST be back on for the request itself.
 - **FR-021**: Remote detection MUST drop the port of an `ssh://` URL, accept the scp-like form with any user, and drop `.git` before a trailing slash.
+- **FR-022**: `dybatpho::forge_release_upload` MUST stream a GitHub asset from disk (`--upload-file`) rather than read it into memory, as it already does for GitLab.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -243,6 +244,7 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **IT-031**: Answer a GitHub issue search with a full first page holding a pull request of the title and a second page holding the issue, and see `forge_issue_find` print the issue.
 - **IT-032**: Look up the release of tag `release/1.0#1` on GitHub, and see the tag sent encoded as `release%2F1.0%231`.
 - **IT-033**: Answer a GitLab issue search with a full first page of near matches and a second page holding the exact title, and see `forge_issue_find` print its iid.
+- **IT-034**: Upload a GitHub asset and see curl given `--upload-file <file>` with `--request POST`, and never `--data-binary`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -1018,7 +1018,7 @@ function dybatpho::forge_release_upload {
         dybatpho::curl_request "${upload_url}" "${response}" \
         --request POST \
         --header "Content-Type: application/octet-stream" \
-        --data-binary "@${file}"
+        --upload-file "${file}"
       dybatpho::json_get "$(< "${response}")" '.browser_download_url'
       ;;
     gitlab)

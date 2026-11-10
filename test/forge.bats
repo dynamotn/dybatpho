@@ -579,6 +579,29 @@ curl_payload() {
   dybatpho::assert_http_called "uploads.github.com/repos/acme/widget/releases/9001/assets?name=app-v1.2.0.tar.gz"
 }
 
+@test "dybatpho::forge_release_upload streams a GitHub asset from disk" {
+  # `--data-binary @file` reads the whole file into curl's memory before the
+  # upload starts; `--upload-file` streams it, as the GitLab upload does.
+  local artifact="${BATS_TEST_TMPDIR}/app-v1.2.0.tar.gz"
+  printf 'payload' > "${artifact}"
+  dybatpho::mock_http "releases/tags/v1.2.0" 200 '{"id":9001}'
+  dybatpho::mock_http "uploads.github.com" 201 '{"browser_download_url":"https://x/a"}'
+  # A wrapper ahead of the mock records the arguments each request was given.
+  local mock wrap="${BATS_TEST_TMPDIR}/wrap" args="${BATS_TEST_TMPDIR}/args"
+  mock="$(command -v curl)"
+  mkdir -p "${wrap}"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexec %q "$@"\n' "${args}" "${mock}" > "${wrap}/curl"
+  chmod +x "${wrap}/curl"
+  PATH="${wrap}:${PATH}" run_traced dybatpho::forge_release_upload "v1.2.0" "${artifact}"
+  assert_success
+  run grep -c -- "--upload-file ${artifact}" "${args}"
+  assert_output "1"
+  run grep -c -- "--data-binary" "${args}"
+  assert_output "0"
+  run grep -c -- "--request POST" "${args}"
+  assert_output "1"
+}
+
 @test "dybatpho::forge_release_upload sends the asset to a GitHub Enterprise upload path" {
   git -C "${REPO}" remote set-url origin "https://github.acme.dev/acme/widget.git"
   local artifact="${BATS_TEST_TMPDIR}/app-v1.2.0.tar.gz"

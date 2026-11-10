@@ -46,6 +46,32 @@ setup() {
   assert_equal "${payload}" "$(printf 'line one\nline two')"
 }
 
+@test "dybatpho::queue_push keeps the trailing line breaks of a payload from stdin" {
+  # `$(cat)` dropped every trailing newline; the argument form kept them.
+  local id payload
+  id="$(printf 'line one\n\n\n' | dybatpho::queue_push "${QUEUE}" -)"
+  dybatpho::queue_read "${QUEUE}" "${id}" payload
+  assert_equal "${payload}" $'line one\n\n\n'
+}
+
+@test "dybatpho::queue_push never shows a reader a job that is still being written" {
+  # The job file was written in place, so a peek during the write found the
+  # job with an empty payload. The payload write is where the peek is made.
+  local seen="${BATS_TEST_TMPDIR}/seen"
+  printf() {
+    if [[ "${2-}" == "the whole payload" ]]; then
+      dybatpho::queue_peek "${QUEUE}" > "${seen}" 2>&1 || builtin printf 'nothing\n' > "${seen}"
+    fi
+    # shellcheck disable=SC2059 # passes the caller's own format through
+    builtin printf "$@"
+  }
+  dybatpho::queue_push "${QUEUE}" "the whole payload" > /dev/null
+  unset -f printf
+  assert_equal "$(< "${seen}")" "nothing"
+  run_traced -0 dybatpho::queue_peek "${QUEUE}"
+  assert_output "the whole payload"
+}
+
 @test "dybatpho::queue_pop claims the oldest job, oldest first" {
   dybatpho::queue_push "${QUEUE}" one > /dev/null
   dybatpho::queue_push "${QUEUE}" two > /dev/null

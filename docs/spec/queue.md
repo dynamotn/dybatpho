@@ -198,6 +198,8 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **FR-035**: The default queue directory MUST be resolved in the caller's shell, so that with neither XDG_STATE_HOME nor HOME set the function that was called stops instead of placing queues under `/`.
 - **FR-036**: A queue operation waiting for a busy queue lock MUST try again every `DYBATPHO_QUEUE_POLL_INTERVAL` seconds (default `0.05`), so it gets a turn against workers that keep re-taking the lock instead of failing after its whole wait.
 - **FR-037**: A handler run by `queue_work` MUST see the caller's variables: the worker MUST keep its state in prefixed locals.
+- **FR-038**: A payload read from stdin MUST keep its trailing line breaks, as the argument form does.
+- **FR-039**: A job file MUST be written to a staging file and renamed into place, so a reader that takes no lock never sees a job whose payload is still being written, and a push that dies mid-write leaves no truncated job.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -267,6 +269,8 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **IT-044**: Work a job with a handler that reads variables named like the worker's locals, and see the caller's values.
 - **IT-045**: Empty the sequence counter and verify the next push neither reuses nor overwrites an existing job.
 - **IT-046**: Hold the queue lock past the wait and verify `dybatpho::queue_work` still drains the queue.
+- **IT-047**: Push `line one` followed by three newlines from stdin and read all three back.
+- **IT-048**: Peek at the queue while a push writes its payload, see no job, and see the whole payload once the push returns.
 
 ## Acceptance Criteria *(mandatory)*
 

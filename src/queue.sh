@@ -422,7 +422,14 @@ function dybatpho::queue_push {
   __dybatpho_queue_prepare "${directory}"
 
   local text="${payload}"
-  [[ "${payload}" != "-" ]] || text="$(cat)"
+  # The sentinel keeps the trailing newlines `$(...)` would strip.
+  if [[ "${payload}" == "-" ]]; then
+    text="$(
+      cat
+      printf x
+    )"
+    text="${text%x}"
+  fi
 
   local lock
   lock="$(__dybatpho_queue_lock "${directory}")"
@@ -468,7 +475,14 @@ function __dybatpho_queue_push_locked {
     || printf '%s\n' "${__dybatpho_queue_push_due}" > "${__dybatpho_queue_push_base}.due"
   ((__dybatpho_queue_push_retries == 0)) \
     || printf '%s\n' "${__dybatpho_queue_push_retries}" > "${__dybatpho_queue_push_base}.retries"
-  printf '%s\n' "${__dybatpho_queue_push_text}" > "${__dybatpho_queue_push_base}.job"
+  # Staged and renamed into place: the readers that take no lock -- peek,
+  # read, list -- saw a job written in place with its payload still missing,
+  # and a push killed mid-write left a truncated job to be claimed.
+  local __dybatpho_queue_push_staging
+  __dybatpho_file_staging_into __dybatpho_queue_push_staging "${__dybatpho_queue_push_base}.job" \
+    || dybatpho::die "dybatpho::queue_push: Cannot write ${__dybatpho_queue_push_base}.job"
+  printf '%s\n' "${__dybatpho_queue_push_text}" > "${__dybatpho_queue_push_staging}"
+  __dybatpho_file_commit "${__dybatpho_queue_push_staging}" "${__dybatpho_queue_push_base}.job" dybatpho::queue_push
 }
 
 #######################################

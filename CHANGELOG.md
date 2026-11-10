@@ -27,6 +27,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`queue` — a payload pushed from stdin keeps its trailing blank lines, and
+  readers never see a half-written job;** the job file is written aside and
+  renamed into place.
 - **`schedule` — `dybatpho::schedule_cron_due` reports a malformed expression
   with exit code 2.** Typos such as `3O`, values like `99`, a `*/0` step,
   reversed ranges and names like `mon` read as "not due", so the job silently

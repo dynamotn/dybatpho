@@ -35,3 +35,4 @@ src/cli.sh	__dybatpho_cli_generate_child_logic	spread	its `__` locals are the sp
 src/cli.sh	dybatpho::generate_help	spread	its `__` locals are the spec DSL's context, read on purpose by `dybatpho::opts::*`
 src/notification.sh	__dybatpho_notification_post	stop	runs only `dybatpho::curl_json`, whose `DYBATPHO_CURL_*` settings these locals scope to the request on purpose
 src/network.sh	__dybatpho_network_circuit_shared	runs	scopes `DYBATPHO_NETWORK_STATE_DIR` to the call on purpose, made absolute so the state written after the command is the one read before it; the command seeing that absolute value is intended
+src/validate.sh	__dybatpho_validate_run	spread	`LC_ALL=C` is local on purpose and set only for the library's own predicates; a caller's predicate keeps its locale

@@ -283,6 +283,7 @@ dybatpho::opts::param "Port" PORT --port type:port
 - **FR-027**: `minlen:` and `maxlen:` MUST be read in base ten whatever zeros they lead with.
 - **FR-028**: `min`, `max`, `minlen` and `maxlen` MUST compare the exact decimal value, whatever its number of digits, fraction digits, exponent, sign or leading zeros; a value that cannot be measured MUST be reported as out of bounds.
 - **FR-029**: A type name MUST be looked up as data and never evaluated, on every supported Bash.
+- **FR-030**: The built-in types MUST read digits and letters as ASCII whatever the locale, so a UTF-8 locale cannot widen `[0-9]` or `[A-Za-z]` to other scripts; a length MUST still be counted in characters, and a registered type MUST still run under the caller's locale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -366,6 +367,7 @@ dybatpho::opts::param "Port" PORT --port type:port
 - **IT-025**: Validate `10000000000000.5` against `min:1` with no error, `-10000000000000.5` with `must be at least 1`, and a 20-digit value against a smaller 20-digit `max:`.
 - **IT-026**: Validate a nine-character value against `minlen:08 maxlen:09` with no error.
 - **IT-027**: Bound `-0.0000001` by `min:0`, a twenty-digit decimal and integer by `max`, `1.5e1` and `-1e-400`, and `1e400` by `max:5`; bound a length by `minlen:+3` and `minlen:0004`; ask for a type named `x$(touch ...)` and `a]b` and see neither run nor match.
+- **IT-028**: Under `en_US.UTF-8`, refuse `١٢` as an `int`, `café` as an `identifier`, `é` as `alpha`, and `٨٠` as a `port` with nothing on stderr, while `maxlen:4` still accepts `café` and a registered `[[:alpha:]]` type accepts it.
 
 ## Acceptance Criteria *(mandatory)*
 

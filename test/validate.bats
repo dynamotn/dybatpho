@@ -621,3 +621,33 @@ teardown() {
   assert_failure
   assert_output --partial "is not a known type"
 }
+
+@test "the built-in types read ASCII digits and letters whatever the locale" {
+  # Under a UTF-8 locale `[0-9]` and `[A-Za-z]` follow the locale's collation:
+  # Arabic-Indic digits passed as an integer, and `port` handed them to shell
+  # arithmetic, which failed with an error of its own.
+  local LC_ALL=en_US.UTF-8
+  [[ "١" =~ ^[0-9]$ ]] || skip "the test locale does not widen [0-9]"
+  run dybatpho::validate_is int '١٢'
+  assert_failure
+  run dybatpho::validate_is identifier café
+  assert_failure
+  run dybatpho::validate_is alpha é
+  assert_failure
+  run --separate-stderr dybatpho::validate_is port '٨٠'
+  assert_failure
+  assert_stderr ""
+  run --separate-stderr dybatpho::validate_value '٨٠' type:port
+  assert_failure
+  assert_stderr ""
+  run --separate-stderr dybatpho::validate_value 5 min:'١'
+  assert_failure
+  assert_stderr --partial "needs a number"
+
+  # A length is still counted in characters, and a type of one's own still
+  # sees the caller's locale.
+  dybatpho::validate_value café maxlen:4
+  _letters() { [[ "$1" =~ ^[[:alpha:]]+$ ]]; }
+  dybatpho::validate_register letters _letters "letters"
+  dybatpho::validate_is letters café
+}

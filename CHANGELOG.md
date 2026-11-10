@@ -21,6 +21,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`validate` — built-in types accept only ASCII digits and letters,
+  whatever the locale.** Under a UTF-8 locale `int` no longer accepts
+  Arabic-Indic digits, `identifier` no longer accepts `é`, and `port` refuses
+  such a value instead of failing with a shell arithmetic error.
 - **`backup` — a file that merely starts with a backup's name is no longer
   taken for a backup.** `backup_latest` could return `app-notes.tar.gz`, and
   `backup_prune` delete the real backups in its place.

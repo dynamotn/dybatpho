@@ -308,7 +308,27 @@ function dybatpho::validate_is {
   dybatpho::expect_args type value -- "$@"
   __dybatpho_validate_canonical canonical "${type}" \
     || dybatpho::die "${FUNCNAME[0]}: '${type}' is not a known type"
-  "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"
+  __dybatpho_validate_run "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"
+}
+
+#######################################
+# @description Run a type's predicate on a value. A built-in one runs under
+#   `LC_ALL=C`: its expressions are written for ASCII, and under a UTF-8 locale
+#   `[0-9]` matched Arabic-Indic digits and `[A-Za-z]` matched `é`. A predicate
+#   registered by the caller keeps the caller's locale.
+# @arg $1 string Predicate function name
+# @arg $2 string Value to test
+# @exitcode 0 The predicate accepts the value
+# @exitcode 1 It does not
+# @internal
+#######################################
+function __dybatpho_validate_run {
+  if [[ "$1" == __dybatpho_validate_is_* ]]; then
+    # Only the library's own predicates see it, and changing it is the point.
+    # dyshellint disable=BSG015 # the locale variable cannot take a prefix
+    local LC_ALL=C
+  fi
+  "$1" "$2"
 }
 
 #######################################
@@ -471,7 +491,7 @@ function dybatpho::validate_value {
         choices="${setting}"
         ;;
       min | max | minlen | maxlen)
-        [[ "${setting}" =~ ${__DYBATPHO_VALIDATE_RE_INT} ]] \
+        __dybatpho_validate_run __dybatpho_validate_is_int "${setting}" \
           || dybatpho::die "${FUNCNAME[0]}: \`${name}\` needs a number, got '${setting}'"
         printf -v "${name}" '%s' "${setting}"
         ;;
@@ -483,7 +503,7 @@ function dybatpho::validate_value {
   __dybatpho_validate_canonical canonical "${type}" \
     || dybatpho::die "${FUNCNAME[0]}: '${type}' is not a known type"
 
-  if ! "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"; then
+  if ! __dybatpho_validate_run "${__DYBATPHO_VALIDATE_PREDICATES[${canonical}]}" "${value}"; then
     __dybatpho_validate_error "expected ${__DYBATPHO_VALIDATE_DESCRIPTIONS[${canonical}]}, got \`${value}\`"
     return 1
   fi

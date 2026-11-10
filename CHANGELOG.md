@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`diff` — comparisons remove the temporary files they write before
+  returning,** so a script that compares in a loop no longer piles up files
+  until it exits.
 - **`csv` — a record made of one empty field survives a write and read.**
 - **`csv` — `dybatpho::csv_from_json` refuses a value holding the ASCII unit
   separator,** as the readers do, instead of splitting it into an extra column.

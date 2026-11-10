@@ -122,6 +122,27 @@ EOF
   chmod 600 "${unreadable}"
 }
 
+@test "the diff functions remove the temporary files they compare through" {
+  # A literal side was written to a temporary file kept until the shell exited,
+  # so a long-running script left two files and two cleanup entries per call.
+  local before="${#DYBATPHO_CLEANUP_PATHS[@]}" kept="${BATS_TEST_TMPDIR}/kept.txt"
+  printf 'a\n' > "${kept}"
+  dybatpho::diff_text "${kept}" b > /dev/null || true
+  dybatpho::diff_text a a > /dev/null
+  dybatpho::diff_summary a b > /dev/null || true
+  printf 'b\n' | dybatpho::diff_summary - "${kept}" > /dev/null || true
+  dybatpho::diff_json '{"a":1}' '{"a":2}' > /dev/null || true
+  dybatpho::diff_yaml 'a: 1' 'a: 2' > /dev/null || true
+  chmod 000 "${kept}"
+  dybatpho::diff_text a "${kept}" > /dev/null 2>&1 || true
+  chmod 600 "${kept}"
+
+  assert_equal "${#DYBATPHO_CLEANUP_PATHS[@]}" "${before}"
+  assert_equal "$(compgen -G "${BATS_TEST_TMPDIR}/dybatpho_diff*")" ""
+  # A side that was a file of the caller's is never removed.
+  assert_file_exists "${kept}"
+}
+
 @test "dybatpho::diff_summary reports no change for identical input" {
   run_traced -0 dybatpho::diff_summary "${FIRST}" "${FIRST}"
   assert_output "+0 -0 ~0"

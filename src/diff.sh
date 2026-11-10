@@ -105,6 +105,25 @@ function __dybatpho_diff_side_into {
 }
 
 #######################################
+# @description Remove the temporary files `__dybatpho_diff_side_into` wrote,
+#   and drop them from the cleanup registry, as soon as a comparison is done
+#   with them: kept until the shell exited, a script comparing in a loop
+#   gathered two files and two registry entries per call. A side that was
+#   the caller's own file resolved to itself, and is left alone.
+# @arg $@ string Pairs of a resolved path and the side it was resolved from
+# @internal
+#######################################
+function __dybatpho_diff_release {
+  while (($# >= 2)); do
+    if [[ -n "$1" && "$1" != "$2" ]]; then
+      rm -f -- "$1"
+      __dybatpho_process_forget_cleanup "$1"
+    fi
+    shift 2
+  done
+}
+
+#######################################
 # @description Print a unified diff line with the color its prefix calls for.
 # @arg $1 string One line of unified diff output
 # @arg $2 string `1` to color, `0` to print plain
@@ -157,9 +176,13 @@ function dybatpho::diff_text {
   [[ -n "${first_label}" ]] || dybatpho::is file "${first}" || first_label="a"
   [[ -n "${second_label}" ]] || dybatpho::is file "${second}" || second_label="b"
 
-  local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
-  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
+  local first_file="" second_file="" side_status=0
+  __dybatpho_diff_side_into first_file "${first}" "a" \
+    && __dybatpho_diff_side_into second_file "${second}" "b" || side_status=$?
+  if ((side_status != 0)); then
+    __dybatpho_diff_release "${first_file}" "${first}"
+    return "${side_status}"
+  fi
 
   local color=0
   __dybatpho_diff_wants_color && color=1
@@ -169,6 +192,7 @@ function dybatpho::diff_text {
   # is not, so a caller that named its sides gets the rename applied here
   # rather than by the tool.
   raw="$(diff -U "${DYBATPHO_DIFF_CONTEXT}" -- "${first_file}" "${second_file}")" || status=$?
+  __dybatpho_diff_release "${first_file}" "${first}" "${second_file}" "${second}"
   ((status == 0)) && return 0
   # `diff` answers 2 when it could not compare at all, such as for an unreadable
   # file; passing that on keeps it apart from the 1 that means "they differ".
@@ -211,12 +235,17 @@ function dybatpho::diff_summary {
   local first second
   dybatpho::expect_args first second -- "$@"
 
-  local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
-  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
+  local first_file="" second_file="" side_status=0
+  __dybatpho_diff_side_into first_file "${first}" "a" \
+    && __dybatpho_diff_side_into second_file "${second}" "b" || side_status=$?
+  if ((side_status != 0)); then
+    __dybatpho_diff_release "${first_file}" "${first}"
+    return "${side_status}"
+  fi
 
   local raw status=0
   raw="$(diff -U0 -- "${first_file}" "${second_file}")" || status=$?
+  __dybatpho_diff_release "${first_file}" "${first}" "${second_file}" "${second}"
   # Trouble is not a difference, so no summary is printed for it.
   ((status <= 1)) || return "${status}"
 
@@ -300,9 +329,13 @@ function dybatpho::diff_json {
   dybatpho::is command jq > /dev/null \
     || dybatpho::die "${FUNCNAME[0]}: jq is required to compare documents by key" 127
 
-  local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
-  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
+  local first_file="" second_file="" side_status=0
+  __dybatpho_diff_side_into first_file "${first}" "a" \
+    && __dybatpho_diff_side_into second_file "${second}" "b" || side_status=$?
+  if ((side_status != 0)); then
+    __dybatpho_diff_release "${first_file}" "${first}"
+    return "${side_status}"
+  fi
   __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${first_file}" first
   __dybatpho_diff_expect_json "${FUNCNAME[0]}" "${second_file}" second
 
@@ -323,6 +356,7 @@ function dybatpho::diff_json {
     # kcov never records the `done` of a loop fed by a process substitution;
     # "diff_json reports keys added, removed and changed" runs it.
   done < <(__dybatpho_diff_flatten "${second_file}") # kcov(skip)
+  __dybatpho_diff_release "${first_file}" "${first}" "${second_file}" "${second}"
 
   local color=0
   __dybatpho_diff_wants_color && color=1
@@ -430,9 +464,13 @@ function dybatpho::diff_yaml {
   dybatpho::expect_args first second -- "$@"
   __dybatpho_diff_need_json
 
-  local first_file second_file
-  __dybatpho_diff_side_into first_file "${first}" "a" || return $?
-  __dybatpho_diff_side_into second_file "${second}" "b" || return $?
+  local first_file="" second_file="" side_status=0
+  __dybatpho_diff_side_into first_file "${first}" "a" \
+    && __dybatpho_diff_side_into second_file "${second}" "b" || side_status=$?
+  if ((side_status != 0)); then
+    __dybatpho_diff_release "${first_file}" "${first}"
+    return "${side_status}"
+  fi
 
   # Checked out here, where the refusal is seen: the conversions below silence
   # their own diagnostics, which would hide a missing `jq` or `yq` as well.
@@ -449,8 +487,12 @@ function dybatpho::diff_yaml {
     || dybatpho::die "${FUNCNAME[0]}: Not valid YAML: the first document" 2
   dybatpho::yaml_to_json "${second_file}" "${second_json}" 2> /dev/null \
     || dybatpho::die "${FUNCNAME[0]}: Not valid YAML: the second document" 2
+  __dybatpho_diff_release "${first_file}" "${first}" "${second_file}" "${second}"
 
-  dybatpho::diff_json "${first_json}" "${second_json}"
+  local status=0
+  dybatpho::diff_json "${first_json}" "${second_json}" || status=$?
+  __dybatpho_diff_release "${first_json}" "" "${second_json}" ""
+  return "${status}"
 }
 
 #######################################

@@ -165,6 +165,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 - **FR-030**: `dybatpho::diff_json` MUST match leaves on their path written as JSON, so the key `a.b` and the nested `a` then `b`, or an array index and the key `0`, are different leaves even though they print the same label.
 - **FR-031**: `dybatpho::diff_json` MUST print a value exactly as JSON writes it, with no backslash doubled, and MUST compare a leaf under the empty key like any other.
 - **FR-032**: `dybatpho::diff_text` and `dybatpho::diff_summary` MUST exit 2, printing nothing, when `diff` cannot compare the two sides, such as for an unreadable file.
+- **FR-033**: `diff_text`, `diff_summary`, `diff_json` and `diff_yaml` MUST remove the temporary files they write for a literal or stdin side, and drop them from the cleanup registry, before returning; a side given as a file MUST be left alone.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -221,6 +222,7 @@ dybatpho::diff_dir --summary ./release-1.2 ./release-1.3 || true
 - **IT-034**: Compare `{"a.b":1}` with `{"a":{"b":1}}` and `{"a":["x"]}` with `{"a":{"0":"x"}}`, and get a difference for each.
 - **IT-035**: Compare `{"k":"a\\b"}` with `{"k":"c"}` and get the value printed as `"a\\b"`; compare `{"":1}` with `{"":2}` and get `~ : 1 -> 2`.
 - **IT-036**: Compare an unreadable file with text through `diff_text` and `diff_summary`, and get exit 2 with nothing on stdout.
+- **IT-037**: Run each comparison on literal, stdin and file sides, including an unreadable file, and find no temporary file and no new cleanup entry afterwards, with the caller's file still there.
 
 ## Acceptance Criteria *(mandatory)*
 

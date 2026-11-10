@@ -21,6 +21,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`date` — `dybatpho::date_seconds_to_hms` refuses seconds beyond
+  9223372036854775807** instead of printing `0:00:00`.
 - **`semver` — bumping, `^`/`~`/partial ranges and `dybatpho::semver_coerce`
   refuse an identifier too large for shell arithmetic** instead of wrapping
   it; `semver_valid` and comparisons still accept any length.

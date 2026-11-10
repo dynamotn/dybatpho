@@ -206,6 +206,7 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **FR-022**: Parsing MUST read an ISO 8601 date and time with a `Z`, `+HH:MM` or `+HHMM` offset on GNU, BSD and BusyBox `date`, and MUST reject one whose day the platform would roll over.
 - **FR-023**: `dybatpho::date_diff` MUST count days and weeks on the wall clock of `DYBATPHO_DATE_TIMEZONE`, so a span across a daylight-saving change counts its calendar days, while seconds, minutes and hours stay the time that elapsed.
 - **FR-024**: With GNU `date`, a bare `YYYY-MM-DD` whose midnight a clock change skips MUST parse as the moment the skipped hour ends, 01:00, rather than be refused.
+- **FR-025**: `dybatpho::date_seconds_to_hms` MUST refuse a number of seconds whose magnitude is above 9223372036854775807 rather than let it wrap, and leading zeros MUST NOT count against that limit.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -257,6 +258,7 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **IT-029**: Parse `2024-02-29T12:34:56` with `Z`, `+02:00` and `-0130` on every platform and with BSD `date` forced; refuse `2024-02-30T12:34:56Z`.
 - **IT-030**: In `America/New_York`, count 31 days from 2024-03-01 to 2024-04-01, 1 day across 2024-03-10 and -1 back across 2024-11-03, and 4 hours from midnight to 05:00 on 2024-03-10.
 - **IT-031**: In `America/Sao_Paulo` with GNU `date`, accept 2018-11-04, read it as 01:00, and end its month on 2018-11-30.
+- **IT-032**: Write `9223372036854775807` seconds as a length of time; refuse `18446744073709551616` and `-9223372036854775808`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -552,6 +552,12 @@ function dybatpho::date_seconds_to_hms {
     sign="-"
     total="${total#-}"
   fi
+  # More digits than a number holds wrap in the arithmetic below, so they are
+  # counted as text first; leading zeros do not count.
+  local digits="${total#"${total%%[!0]*}"}"
+  if ((${#digits} > 19 || 10#0${digits} < 0)); then
+    dybatpho::die "${FUNCNAME[0]}: '${sign}${total}' is more than 9223372036854775807 seconds"
+  fi
   # Read in base ten: a leading zero would make `08` an invalid octal number.
   total=$((10#${total}))
   ((total > 0)) || sign=""

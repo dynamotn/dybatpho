@@ -219,6 +219,16 @@ setup() {
   assert_stderr --partial "is not a whole number of seconds"
 }
 
+@test "dybatpho::date_seconds_to_hms refuses seconds that do not fit in a number" {
+  # 2^64 wrapped to 0 and was written as 0:00:00.
+  run --separate-stderr ! dybatpho::date_seconds_to_hms 18446744073709551616
+  assert_stderr --partial "more than 9223372036854775807 seconds"
+  run --separate-stderr ! dybatpho::date_seconds_to_hms -9223372036854775808
+  assert_stderr --partial "more than 9223372036854775807 seconds"
+  assert_equal "$(dybatpho::date_seconds_to_hms 9223372036854775807)" "2562047788015215:30:07"
+  assert_equal "$(dybatpho::date_seconds_to_hms 0000000000000000000000090)" "0:01:30"
+}
+
 @test "dybatpho::date_parse_duration reads seconds and parts with units" {
   local seconds
   dybatpho::date_parse_duration seconds 90

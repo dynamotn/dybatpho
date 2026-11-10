@@ -53,6 +53,8 @@ declare -ga DYBATPHO_CONFIG_ERRORS=()
 # @internal
 #######################################
 function __dybatpho_config_require_key {
+  # Under a UTF-8 locale the ranges below matched letters such as `é`.
+  local LC_ALL=C
   [[ "${1-}" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]] \
     || dybatpho::die "Invalid configuration key: ${1-}"
 }
@@ -72,6 +74,35 @@ function __dybatpho_config_set {
   dybatpho::expect_args key value -- "$@"
   __dybatpho_config_require_key "${key}"
   DYBATPHO_CONFIG["${key}"]="${value}"
+}
+
+#######################################
+# @description Undo the escapes of a double-quoted dotenv value, into a named
+#   variable: `\\`, `\n`, `\t`, `\r` and `\"`, the ones
+#   `__dybatpho_config_dotenv_value_into` writes. Any other backslash is kept
+#   as it is, so `C:\code` reads back whole rather than through `printf '%b'`,
+#   where `\c` ended the value and `\0101` became `A`.
+# @arg $1 string Name of the variable receiving the value
+# @arg $2 string Text between the quotes
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_config_dotenv_unescape_into {
+  local -n __dybatpho_config_unescape_ref="$1"
+  local __dybatpho_config_rest="$2" __dybatpho_config_out=""
+  while [[ "${__dybatpho_config_rest}" == *\\* ]]; do
+    __dybatpho_config_out+="${__dybatpho_config_rest%%\\*}"
+    __dybatpho_config_rest="${__dybatpho_config_rest#*\\}"
+    case "${__dybatpho_config_rest:0:1}" in
+      n) __dybatpho_config_out+=$'\n' ;;
+      t) __dybatpho_config_out+=$'\t' ;;
+      r) __dybatpho_config_out+=$'\r' ;;
+      \\ | '"') __dybatpho_config_out+="${__dybatpho_config_rest:0:1}" ;;
+      *) __dybatpho_config_out+="\\${__dybatpho_config_rest:0:1}" ;;
+    esac
+    __dybatpho_config_rest="${__dybatpho_config_rest:1}"
+  done
+  __dybatpho_config_unescape_ref="${__dybatpho_config_out}${__dybatpho_config_rest}"
 }
 
 #######################################
@@ -96,12 +127,11 @@ function __dybatpho_config_load_dotenv {
     key="${BASH_REMATCH[2]}"
     value="${BASH_REMATCH[3]}"
     if [[ "${value}" == \"*\" && "${value: -1}" == '"' ]]; then
-      value="${value:1:${#value}-2}"
-      printf -v value '%b' "${value}"
+      __dybatpho_config_dotenv_unescape_into value "${value:1:${#value}-2}"
     elif [[ "${value}" == \'*\' && "${value: -1}" == "'" ]]; then
       value="${value:1:${#value}-2}"
     elif [[ "${value}" =~ ${double_commented} ]]; then
-      printf -v value '%b' "${BASH_REMATCH[1]}"
+      __dybatpho_config_dotenv_unescape_into value "${BASH_REMATCH[1]}"
     elif [[ "${value}" =~ ${single_commented} ]]; then
       value="${BASH_REMATCH[1]}"
     else
@@ -430,9 +460,8 @@ function dybatpho::config_export {
 # @description Render one value the way a dotenv file has to carry it.
 #   A value made only of characters the loader reads back verbatim is written
 #   bare; anything else is double-quoted, because that is the only form whose
-#   escapes the loader expands. The double quote itself is left alone on
-#   purpose: the loader strips the outer pair by position rather than by
-#   parsing, and `printf '%b'` has no `\"` escape to undo.
+#   escapes the loader expands. A double quote is escaped too, so a value
+#   followed by a comment still finds its closing quote.
 # @arg $1 string Name of the variable receiving the rendered value
 # @arg $2 string Value
 # @set The named variable: the value, bare or double-quoted
@@ -449,6 +478,7 @@ function __dybatpho_config_dotenv_value_into {
   __dybatpho_config_dv="${__dybatpho_config_dv//$'\n'/\\n}"
   __dybatpho_config_dv="${__dybatpho_config_dv//$'\t'/\\t}"
   __dybatpho_config_dv="${__dybatpho_config_dv//$'\r'/\\r}"
+  __dybatpho_config_dv="${__dybatpho_config_dv//\"/\\\"}"
   __dybatpho_config_dotenv_ref="\"${__dybatpho_config_dv}\""
 }
 

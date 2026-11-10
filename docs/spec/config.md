@@ -369,6 +369,8 @@ dybatpho::config_save ./config.yaml PORT
 - **FR-034**: The dotenv loader MUST remove the quotes of a quoted value followed by a comment, a trailing carriage return, and an `export` prefix; a save MUST rewrite an `export` line in place and keep its prefix.
 - **FR-035**: `config_save` MUST write a dotted key to the nested path it names in JSON, YAML and TOML, and MUST refuse a TOML save whose result would read back differently, leaving the file untouched.
 - **FR-036**: A value an option binding reads with `config:` MUST be held to the option's `choices:`, `type:` and `pattern:`.
+- **FR-037**: A configuration key MUST be made of ASCII letters, digits and `_.-` whatever the locale.
+- **FR-038**: A double-quoted dotenv value MUST expand only `\\`, `\n`, `\t`, `\r` and `\"`, keeping every other backslash as written, and `config_save` MUST escape a double quote, so every value it writes reads back unchanged.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -460,6 +462,8 @@ dybatpho::config_save ./config.yaml PORT
 - **IT-026**: Load a nested port from YAML, JSON and TOML, save `server.port`, and reload only the nested key with the new value.
 - **IT-027**: Save a new top-level key into a TOML file that has a table, and see the save refused and the file unchanged.
 - **IT-028**: Bind a typed parameter to a configuration key holding an invalid value and see the parser refuse it.
+- **IT-029**: Under `en_US.UTF-8`, refuse `config_set café 1`.
+- **IT-030**: Load `"C:\code\new"`, `"x\0101y"`, `"say \"hi\""` and a quoted value followed by a comment, and get each back with only the five escapes expanded; save and reload a value holding quotes, backslashes and a tab.
 
 ## Acceptance Criteria *(mandatory)*
 

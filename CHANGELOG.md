@@ -21,6 +21,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`config` — keys must be ASCII names in every locale,** so `config_set
+  café 1` is refused up front instead of breaking `config_export` later.
+- **`config` — double-quoted dotenv values keep their backslashes.** Only
+  `\\`, `\n`, `\t`, `\r` and `\"` are expanded, so `"C:\code\new"` is no longer
+  cut off at `\c`; `config_save` escapes double quotes, so what it writes
+  loads back unchanged.
 - **`validate` — built-in types accept only ASCII digits and letters,
   whatever the locale.** Under a UTF-8 locale `int` no longer accepts
   Arabic-Indic digits, `identifier` no longer accepts `é`, and `port` refuses

@@ -58,6 +58,36 @@ setup() {
   assert_equal "$(dybatpho::config_get SPACED)" "trimmed"
 }
 
+@test "config_load reads only the escapes a dotenv file writes" {
+  # Double-quoted values went through `printf '%b'`: `\c` cut the value short,
+  # `\0101` became `A`, and `\"` kept its backslash.
+  local config="${BATS_TEST_TMPDIR}/escapes.env"
+  printf '%s\n' \
+    'WINDOWS="C:\code\new"' \
+    'OCTAL="x\0101y"' \
+    'QUOTED="say \"hi\""' \
+    'MIXED="a\tb\\nc\r"' \
+    'COMMENTED="it\"s \\" # note' > "${config}"
+
+  DYBATPHO_CONFIG=()
+  dybatpho::config_load "${config}"
+  assert_equal "${DYBATPHO_CONFIG[WINDOWS]}" $'C:\\code\new'
+  assert_equal "${DYBATPHO_CONFIG[OCTAL]}" 'x\0101y'
+  assert_equal "${DYBATPHO_CONFIG[QUOTED]}" 'say "hi"'
+  assert_equal "${DYBATPHO_CONFIG[MIXED]}" $'a\tb\\nc\r'
+  assert_equal "${DYBATPHO_CONFIG[COMMENTED]}" 'it"s \'
+
+  # What the saver writes, the loader reads back.
+  local saved="${BATS_TEST_TMPDIR}/saved.env"
+  dybatpho::config_set TRICKY $'"\\c\\0101 # x\t"'
+  dybatpho::config_save "${saved}" TRICKY OCTAL WINDOWS
+  DYBATPHO_CONFIG=()
+  dybatpho::config_load "${saved}"
+  assert_equal "${DYBATPHO_CONFIG[TRICKY]}" $'"\\c\\0101 # x\t"'
+  assert_equal "${DYBATPHO_CONFIG[OCTAL]}" 'x\0101y'
+  assert_equal "${DYBATPHO_CONFIG[WINDOWS]}" $'C:\\code\new'
+}
+
 @test "config_load strips quotes before a comment, CRLF endings, and export prefixes" {
   local config="${BATS_TEST_TMPDIR}/edge.env"
   printf '%s\n' \
@@ -487,6 +517,16 @@ require_tool() {
 
   run --separate-stderr dybatpho::config_set ONLY_A_KEY
   assert_failure
+}
+
+@test "config_set refuses a key with a letter outside ASCII whatever the locale" {
+  # Under a UTF-8 locale `[a-zA-Z]` matched `é`, and `config_export` then
+  # failed on the stored key with an error of Bash's own.
+  local LC_ALL=en_US.UTF-8
+  [[ "é" =~ ^[a-z]$ ]] || skip "the test locale does not widen [a-z]"
+  run --separate-stderr dybatpho::config_set café 1
+  assert_failure
+  assert_stderr --partial "Invalid configuration key: café"
 }
 
 @test "config_load --optional skips absent files and keeps the merge order" {

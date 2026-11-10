@@ -209,7 +209,7 @@ declare -gA __dybatpho_module_deps=(
 # kcov(disabled) - a table literal: its lines are data, not commands
 declare -gA __dybatpho_module_soft_deps=(
   [helpers]="semver"
-  [network]="json"
+  [network]="json lock"
   [safety]="archive"
   [text]="table"
   [table]="csv"

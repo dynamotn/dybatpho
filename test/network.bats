@@ -1634,3 +1634,97 @@ HELPER
   assert_dir_exists "${BATS_TEST_TMPDIR}/-out"
   assert_dir_exists "${BATS_TEST_TMPDIR}/-again"
 }
+
+# Shared limiters keep their state in a directory of the test's own, and need
+# flock, which a stock macOS lacks.
+_shared_state() {
+  command -v flock > /dev/null || skip "flock is not installed"
+  export DYBATPHO_NETWORK_STATE_DIR="${BATS_TEST_TMPDIR}/network-state"
+}
+
+@test "dybatpho::rate_limit keeps a budget per process unless it is shared" {
+  _shared_state
+  DYBATPHO_RATE_LIMIT_WAIT=false
+  # Each subshell is a process of its own: in memory, each gets a full budget.
+  (dybatpho::rate_limit api 1/60)
+  local in_memory=0
+  (dybatpho::rate_limit api 1/60) || in_memory=$?
+  assert_equal "${in_memory}" 0
+  DYBATPHO_RATE_LIMIT_SHARED=true
+  (dybatpho::rate_limit shared-api 1/60)
+  local status=0
+  (dybatpho::rate_limit shared-api 1/60 -- touch "${BATS_TEST_TMPDIR}/ran") || status=$?
+  assert_equal "${status}" 9
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/ran"
+}
+
+@test "dybatpho::rate_limit_remaining and rate_limit_reset read and clear a shared budget" {
+  _shared_state
+  DYBATPHO_RATE_LIMIT_SHARED=true
+  (dybatpho::rate_limit api 3/60)
+  (dybatpho::rate_limit api 3/60)
+  run_traced -0 dybatpho::rate_limit_remaining api 3/60
+  assert_output "1"
+  (dybatpho::rate_limit_reset api)
+  run_traced -0 dybatpho::rate_limit_remaining api 3/60
+  assert_output "3"
+}
+
+@test "dybatpho::circuit_breaker opens for every process once failures are shared" {
+  _shared_state
+  DYBATPHO_CIRCUIT_SHARED=true DYBATPHO_CIRCUIT_THRESHOLD=2 DYBATPHO_CIRCUIT_COOLDOWN=60
+  (dybatpho::circuit_breaker svc -- false) || true
+  (dybatpho::circuit_breaker svc -- false) || true
+  local status=0
+  (dybatpho::circuit_breaker svc -- touch "${BATS_TEST_TMPDIR}/ran") || status=$?
+  assert_equal "${status}" 9
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/ran"
+  run_traced -0 dybatpho::circuit_state svc
+  assert_output "open"
+  (dybatpho::circuit_reset svc)
+  run_traced -0 dybatpho::circuit_state svc
+  assert_output "closed"
+}
+
+@test "dybatpho::circuit_breaker lets one process probe a shared half-open circuit" {
+  _shared_state
+  DYBATPHO_CIRCUIT_SHARED=true DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=30
+  (dybatpho::circuit_breaker svc -- false) || true
+  local state now
+  now="$(date +%s)"
+  state="$(compgen -G "${DYBATPHO_NETWORK_STATE_DIR}/circuit-svc-*" | grep -v '\.lock$')"
+  # Opened long ago, and another process took the trial a second ago.
+  printf '1 %s %s\n' "$((now - 100))" "$((now - 1))" > "${state}"
+  local status=0
+  (dybatpho::circuit_breaker svc -- touch "${BATS_TEST_TMPDIR}/ran") || status=$?
+  assert_equal "${status}" 9
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/ran"
+  # That trial was taken longer than a cooldown ago: its process is gone.
+  printf '1 %s %s\n' "$((now - 100))" "$((now - 60))" > "${state}"
+  (dybatpho::circuit_breaker svc -- touch "${BATS_TEST_TMPDIR}/ran")
+  assert_file_exists "${BATS_TEST_TMPDIR}/ran"
+  run_traced -0 dybatpho::circuit_state svc
+  assert_output "closed"
+}
+
+@test "dybatpho::circuit_breaker keeps a key with odd characters apart from a similar one" {
+  _shared_state
+  DYBATPHO_CIRCUIT_SHARED=true DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=60
+  (dybatpho::circuit_breaker 'https://a/b' -- false) || true
+  run_traced -0 dybatpho::circuit_state 'https://a/b'
+  assert_output "open"
+  run_traced -0 dybatpho::circuit_state 'https:__a_b'
+  assert_output "closed"
+}
+
+@test "dybatpho::rate_limit hands a shared budget to exactly that many concurrent processes" {
+  _shared_state
+  DYBATPHO_RATE_LIMIT_SHARED=true DYBATPHO_RATE_LIMIT_WAIT=false
+  local i
+  for i in 1 2 3 4 5 6 7 8; do
+    (dybatpho::rate_limit burst 3/60 -- touch "${BATS_TEST_TMPDIR}/ran.${i}" 2> /dev/null || true) &
+  done
+  wait
+  local -a ran=("${BATS_TEST_TMPDIR}"/ran.*)
+  assert_equal "${#ran[@]}" 3
+}

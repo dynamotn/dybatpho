@@ -45,6 +45,11 @@
 #   (default
 #   `true`)
 # @env DYBATPHO_RATE_LIMIT_MAX_WAIT number Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit
+# @env DYBATPHO_RATE_LIMIT_SHARED bool [default: false] Share each rate limit budget between processes, through a file
+# @env DYBATPHO_CIRCUIT_SHARED bool [default: false] Share each circuit breaker's state between processes, through a
+#   file
+# @env DYBATPHO_NETWORK_STATE_DIR string? Directory of the shared state, default `dybatpho/network` under the XDG
+#   runtime directory
 #   (default `0`)
 # @env DYBATPHO_PAGINATE_MAX_PAGES number [default: 100] Most pages `dybatpho::curl_paginate` fetches, `0` for no limit
 # @env DYBATPHO_PAGINATE_RATE string? Rate limit spec applied per page by `dybatpho::curl_paginate`
@@ -63,6 +68,9 @@ DYBATPHO_CIRCUIT_THRESHOLD=${DYBATPHO_CIRCUIT_THRESHOLD:-5}
 DYBATPHO_CIRCUIT_COOLDOWN=${DYBATPHO_CIRCUIT_COOLDOWN:-30}
 DYBATPHO_RATE_LIMIT_WAIT=${DYBATPHO_RATE_LIMIT_WAIT:-true}
 DYBATPHO_RATE_LIMIT_MAX_WAIT=${DYBATPHO_RATE_LIMIT_MAX_WAIT:-0}
+DYBATPHO_RATE_LIMIT_SHARED=${DYBATPHO_RATE_LIMIT_SHARED:-false}
+DYBATPHO_CIRCUIT_SHARED=${DYBATPHO_CIRCUIT_SHARED:-false}
+DYBATPHO_NETWORK_STATE_DIR=${DYBATPHO_NETWORK_STATE_DIR:-}
 DYBATPHO_PAGINATE_MAX_PAGES=${DYBATPHO_PAGINATE_MAX_PAGES:-100}
 DYBATPHO_PAGINATE_RATE=${DYBATPHO_PAGINATE_RATE:-}
 DYBATPHO_GRAPHQL_TOKEN=${DYBATPHO_GRAPHQL_TOKEN:-}
@@ -1015,6 +1023,57 @@ function dybatpho::curl_timeout {
 }
 
 #######################################
+# @description Name the file holding a limiter's state shared between
+#   processes, creating its directory, and take a `flock` on it. The key is
+#   made safe for a file name and suffixed with its checksum, so `a/b` and `a_b`
+#   stay apart.
+# @arg $1 string Name of the variable receiving the state file
+# @arg $2 string Name of the variable receiving the lock's descriptor
+# @arg $3 string `rate` or `circuit`
+# @arg $4 string Key
+# @set Both named variables
+# @exitcode 1 Stop script when there is no directory for the state, or no `flock`
+# @internal
+#######################################
+function __dybatpho_network_shared_open {
+  local -n __dybatpho_network_shared_path="$1"
+  local -n __dybatpho_network_shared_fd="$2"
+  local kind="$3" key="$4" dir="${DYBATPHO_NETWORK_STATE_DIR}"
+  __dybatpho_helpers_need_module lock __dybatpho_lock_run_holding "Shared ${kind} state"
+  if [[ -z "${dir}" ]]; then
+    local uid
+    uid="$(id -u)"
+    dir="$(dybatpho::xdg_runtime_dir dybatpho "${TMPDIR:-/tmp}/dybatpho-${uid}")" \
+      || dybatpho::die "No directory for the shared ${kind} state; set DYBATPHO_NETWORK_STATE_DIR"
+    dir+="/network"
+  fi
+  { mkdir -p -- "${dir}" && chmod 700 -- "${dir}"; } \
+    || dybatpho::die "Cannot create ${dir} for the shared ${kind} state"
+  local sum
+  sum="$(printf '%s' "${key}" | cksum)"
+  __dybatpho_network_shared_path="${dir}/${kind}-${key//[^A-Za-z0-9._-]/_}-${sum%% *}"
+  dybatpho::flock_acquire __dybatpho_network_shared_fd "${__dybatpho_network_shared_path}.lock"
+}
+
+#######################################
+# @description Read a shared circuit's state: failures, the time it opened,
+#   and the time a process took its trial request, each 0 when unset.
+# @arg $1 path State file
+# @stdout The three numbers, space-separated
+# @internal
+#######################################
+function __dybatpho_network_circuit_read {
+  local failures=0 opened=0 probe=0
+  if [[ -s "$1" ]]; then
+    read -r failures opened probe < "$1" || true
+  fi
+  [[ "${failures}" =~ ^[0-9]+$ ]] || failures=0
+  [[ "${opened}" =~ ^[0-9]+$ ]] || opened=0
+  [[ "${probe:-0}" =~ ^[0-9]+$ ]] || probe=0
+  printf '%s %s %s\n' "$((10#${failures}))" "$((10#${opened}))" "$((10#${probe:-0}))"
+}
+
+#######################################
 # @description Report whether a circuit breaker key is currently open, half-open, or closed.
 # @arg $1 string Circuit key
 # @stdout `open`, `half-open`, or `closed`
@@ -1023,6 +1082,15 @@ function dybatpho::circuit_state {
   local key
   dybatpho::expect_args key -- "$@"
   local opened_at="${DYBATPHO_CIRCUIT_OPENED_AT[${key}]:-0}"
+  if dybatpho::is true "${DYBATPHO_CIRCUIT_SHARED}"; then
+    local path fd state
+    __dybatpho_network_shared_open path fd circuit "${key}"
+    state="$(__dybatpho_network_circuit_read "${path}")"
+    dybatpho::flock_release "${fd}"
+    read -r _ opened_at _ <<< "${state}"
+  fi
+  [[ "${opened_at}" =~ ^[0-9]+$ ]] || opened_at=0
+  opened_at=$((10#${opened_at}))
   if ((opened_at == 0)); then
     echo closed
     return 0
@@ -1047,6 +1115,12 @@ function dybatpho::circuit_reset {
   dybatpho::expect_args key -- "$@"
   DYBATPHO_CIRCUIT_FAILURES["${key}"]=0
   DYBATPHO_CIRCUIT_OPENED_AT["${key}"]=0
+  if dybatpho::is true "${DYBATPHO_CIRCUIT_SHARED}"; then
+    local path fd
+    __dybatpho_network_shared_open path fd circuit "${key}"
+    printf '0 0 0\n' > "${path}"
+    dybatpho::flock_release "${fd}"
+  fi
 }
 
 #######################################
@@ -1069,7 +1143,8 @@ function dybatpho::circuit_reset {
 # @exitcode 0 The command succeeded, or a trial request succeeded and closed the circuit
 # @exitcode 9 The circuit is open; the command was not attempted
 # @exitcode other The command's own exit code, while the circuit is closed or half-open
-# @note Circuit breaker state is in-memory and process-local; it does not persist across script invocations
+# @note Circuit breaker state is in-memory and process-local unless `DYBATPHO_CIRCUIT_SHARED` is set, in which case
+#   every process shares it through a file, and once the cooldown has passed one process at a time takes the trial
 #######################################
 function dybatpho::circuit_breaker {
   local __dybatpho_network_cb_key __dybatpho_network_cb_command
@@ -1084,6 +1159,11 @@ function dybatpho::circuit_breaker {
   local __dybatpho_network_cb_now
   printf -v __dybatpho_network_cb_now '%(%s)T' -1
   local __dybatpho_network_cb_name="Circuit '${__dybatpho_network_cb_key}'"
+
+  if dybatpho::is true "${DYBATPHO_CIRCUIT_SHARED}"; then
+    __dybatpho_network_circuit_shared "$@"
+    return
+  fi
 
   if ((__dybatpho_network_cb_opened_at > 0)); then
     local __dybatpho_network_cb_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cb_opened_at))
@@ -1114,6 +1194,74 @@ function dybatpho::circuit_breaker {
     fi
   fi
   return "${__dybatpho_network_cb_exit_code}"
+}
+
+#######################################
+# @description The shared form of `dybatpho::circuit_breaker`: the state lives
+#   in a file read and written under a `flock`, so every process sees the same
+#   breaker. Once the cooldown has passed, one process takes the trial request
+#   and the others are refused until it reports; a trial whose process died is
+#   given up after another cooldown. The command runs outside the lock.
+#   It reads `__dybatpho_network_cb_key`, `__dybatpho_network_cb_command`,
+#   `__dybatpho_network_cb_now` and `__dybatpho_network_cb_name` from its caller.
+# @arg $@ string The command, as `dybatpho::circuit_breaker` received it after the key and `--`
+# @exitcode 9 The circuit is open, or another process holds its trial
+# @exitcode other The command's own exit code
+# @internal
+#######################################
+function __dybatpho_network_circuit_shared {
+  local __dybatpho_network_cs_path __dybatpho_network_cs_fd __dybatpho_network_cs_state
+  local __dybatpho_network_cs_failures __dybatpho_network_cs_opened __dybatpho_network_cs_probe
+  __dybatpho_network_shared_open __dybatpho_network_cs_path __dybatpho_network_cs_fd circuit \
+    "${__dybatpho_network_cb_key}"
+  __dybatpho_network_cs_state="$(__dybatpho_network_circuit_read "${__dybatpho_network_cs_path}")"
+  read -r __dybatpho_network_cs_failures __dybatpho_network_cs_opened __dybatpho_network_cs_probe \
+    <<< "${__dybatpho_network_cs_state}"
+  if ((__dybatpho_network_cs_opened > 0)); then
+    local __dybatpho_network_cs_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cs_opened))
+    if ((__dybatpho_network_cs_elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
+      dybatpho::flock_release "${__dybatpho_network_cs_fd}"
+      local __dybatpho_network_cs_left=$((DYBATPHO_CIRCUIT_COOLDOWN - __dybatpho_network_cs_elapsed))
+      dybatpho::warn "${__dybatpho_network_cb_name} is open; skipping request (retry in ${__dybatpho_network_cs_left}s)"
+      return 9
+    fi
+    if ((__dybatpho_network_cs_probe > 0 && \
+      __dybatpho_network_cb_now - __dybatpho_network_cs_probe < DYBATPHO_CIRCUIT_COOLDOWN)); then
+      dybatpho::flock_release "${__dybatpho_network_cs_fd}"
+      dybatpho::warn "${__dybatpho_network_cb_name} is half-open and another process holds its trial; skipping request"
+      return 9
+    fi
+    dybatpho::debug "${__dybatpho_network_cb_name} cooldown elapsed; taking the trial request"
+    printf '%s %s %s\n' "${__dybatpho_network_cs_failures}" "${__dybatpho_network_cs_opened}" \
+      "${__dybatpho_network_cb_now}" > "${__dybatpho_network_cs_path}"
+  fi
+  dybatpho::flock_release "${__dybatpho_network_cs_fd}"
+
+  local __dybatpho_network_cs_exit=0
+  if [[ "${__dybatpho_network_cb_command}" == "--" ]]; then
+    "$@" || __dybatpho_network_cs_exit=$?
+  else
+    eval "${__dybatpho_network_cb_command}" || __dybatpho_network_cs_exit=$?
+  fi
+
+  # Read again: other processes may have recorded their own results meanwhile.
+  __dybatpho_network_shared_open __dybatpho_network_cs_path __dybatpho_network_cs_fd circuit \
+    "${__dybatpho_network_cb_key}"
+  __dybatpho_network_cs_state="$(__dybatpho_network_circuit_read "${__dybatpho_network_cs_path}")"
+  read -r __dybatpho_network_cs_failures __dybatpho_network_cs_opened _ <<< "${__dybatpho_network_cs_state}"
+  if ((__dybatpho_network_cs_exit == 0)); then
+    printf '0 0 0\n' > "${__dybatpho_network_cs_path}"
+  else
+    __dybatpho_network_cs_failures=$((__dybatpho_network_cs_failures + 1))
+    if ((__dybatpho_network_cs_failures >= DYBATPHO_CIRCUIT_THRESHOLD)); then
+      __dybatpho_network_cs_opened="${__dybatpho_network_cb_now}"
+      dybatpho::warn "${__dybatpho_network_cb_name} opened after ${__dybatpho_network_cs_failures} consecutive failures"
+    fi
+    printf '%s %s 0\n' "${__dybatpho_network_cs_failures}" "${__dybatpho_network_cs_opened}" \
+      > "${__dybatpho_network_cs_path}"
+  fi
+  dybatpho::flock_release "${__dybatpho_network_cs_fd}"
+  return "${__dybatpho_network_cs_exit}"
 }
 
 #######################################
@@ -1196,9 +1344,18 @@ function dybatpho::rate_limit_remaining {
     || dybatpho::die "${FUNCNAME[0]}: Invalid rate limit spec: ${spec}"
   read -r count window_ms <<< "${parsed}"
 
-  local log_now_ms
+  local log_now_ms path="" fd=""
   log_now_ms=$(__dybatpho_log_now_ms)
+  if dybatpho::is true "${DYBATPHO_RATE_LIMIT_SHARED}"; then
+    __dybatpho_network_shared_open path fd rate "${key}"
+    DYBATPHO_RATE_EVENTS["${key}"]=""
+    [[ ! -s "${path}" ]] || DYBATPHO_RATE_EVENTS["${key}"]="$(< "${path}")"
+  fi
   __dybatpho_network_rate_prune "${key}" "${count}" "${window_ms}" "${log_now_ms}"
+  if [[ -n "${fd}" ]]; then
+    printf '%s\n' "${DYBATPHO_RATE_EVENTS[${key}]}" > "${path}"
+    dybatpho::flock_release "${fd}"
+  fi
 }
 
 #######################################
@@ -1210,6 +1367,12 @@ function dybatpho::rate_limit_reset {
   local key
   dybatpho::expect_args key -- "$@"
   DYBATPHO_RATE_EVENTS["${key}"]=""
+  if dybatpho::is true "${DYBATPHO_RATE_LIMIT_SHARED}"; then
+    local path fd
+    __dybatpho_network_shared_open path fd rate "${key}"
+    : > "${path}"
+    dybatpho::flock_release "${fd}"
+  fi
 }
 
 #######################################
@@ -1245,8 +1408,8 @@ function dybatpho::rate_limit_reset {
 # @see dybatpho::circuit_breaker
 # @note The command runs as an argument vector rather than through `eval`, like the `--` form of
 #   `dybatpho::circuit_breaker`; wrap a shell string in `bash -c` when one is really wanted
-# @note The window is in-memory and process-local, like the circuit breaker's state; it does not persist across script
-#   invocations, nor out of a subshell
+# @note The window is in-memory and process-local unless `DYBATPHO_RATE_LIMIT_SHARED` is set, in which case
+#   every process shares it through a file under `DYBATPHO_NETWORK_STATE_DIR`, read and written under a `flock`
 #######################################
 function dybatpho::rate_limit {
   local __dybatpho_network_rl_key __dybatpho_network_rl_spec
@@ -1265,15 +1428,33 @@ function dybatpho::rate_limit {
   local __dybatpho_network_rl_cap=$((10#${DYBATPHO_RATE_LIMIT_MAX_WAIT}))
 
   local __dybatpho_network_rl_now __dybatpho_network_rl_remaining __dybatpho_network_rl_oldest
-  local __dybatpho_network_rl_wait_ms
+  local __dybatpho_network_rl_wait_ms __dybatpho_network_rl_path="" __dybatpho_network_rl_fd=""
+  local __dybatpho_network_rl_shared=false
+  ! dybatpho::is true "${DYBATPHO_RATE_LIMIT_SHARED}" || __dybatpho_network_rl_shared=true
   while :; do
+    if [[ "${__dybatpho_network_rl_shared}" == true ]]; then
+      __dybatpho_network_shared_open __dybatpho_network_rl_path __dybatpho_network_rl_fd rate \
+        "${__dybatpho_network_rl_key}"
+      DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]=""
+      [[ ! -s "${__dybatpho_network_rl_path}" ]] \
+        || DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]="$(< "${__dybatpho_network_rl_path}")"
+    fi
     __dybatpho_network_rl_now="$(__dybatpho_log_now_ms)"
     # Read through the variable rather than a command substitution, so that the
     # pruned window is the one this shell keeps.
     __dybatpho_network_rate_prune "${__dybatpho_network_rl_key}" "${__dybatpho_network_rl_count}" \
       "${__dybatpho_network_rl_window_ms}" "${__dybatpho_network_rl_now}" > /dev/null
     __dybatpho_network_rl_remaining="${__DYBATPHO_RATE_REMAINING}"
-    ((__dybatpho_network_rl_remaining > 0)) && break
+    if ((__dybatpho_network_rl_remaining > 0)); then
+      local __dybatpho_network_rl_events="${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]-}"
+      __dybatpho_network_rl_events="${__dybatpho_network_rl_events:+${__dybatpho_network_rl_events} }"
+      DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]="${__dybatpho_network_rl_events}${__dybatpho_network_rl_now}"
+      if [[ -n "${__dybatpho_network_rl_fd}" ]]; then
+        printf '%s\n' "${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]}" > "${__dybatpho_network_rl_path}"
+        dybatpho::flock_release "${__dybatpho_network_rl_fd}"
+      fi
+      break
+    fi
 
     # The window is full, so the next free slot opens one window after the
     # oldest call still inside it.
@@ -1283,6 +1464,11 @@ function dybatpho::rate_limit {
     __dybatpho_network_rl_wait_ms=$((__dybatpho_network_rl_oldest + __dybatpho_network_rl_window_ms - \
       __dybatpho_network_rl_now))
     ((__dybatpho_network_rl_wait_ms < 1)) && __dybatpho_network_rl_wait_ms=1
+    # Another process may free or take a slot while this one waits.
+    if [[ -n "${__dybatpho_network_rl_fd}" ]]; then
+      dybatpho::flock_release "${__dybatpho_network_rl_fd}"
+      __dybatpho_network_rl_fd=""
+    fi
 
     if ! dybatpho::is true "${DYBATPHO_RATE_LIMIT_WAIT}"; then
       local __dybatpho_network_rl_free="free in ${__dybatpho_network_rl_wait_ms}ms"
@@ -1305,9 +1491,6 @@ function dybatpho::rate_limit {
       || true
   done
 
-  local __dybatpho_network_rl_events="${DYBATPHO_RATE_EVENTS[${__dybatpho_network_rl_key}]-}"
-  __dybatpho_network_rl_events="${__dybatpho_network_rl_events:+${__dybatpho_network_rl_events} }"
-  DYBATPHO_RATE_EVENTS["${__dybatpho_network_rl_key}"]="${__dybatpho_network_rl_events}${__dybatpho_network_rl_now}"
   (($#)) || return 0
   "$@"
 }

@@ -349,6 +349,9 @@ dybatpho::circuit_breaker api.example.test -- \
 - **FR-052**: The private curl config holding secret headers MUST be removed when the script exits, including on a signal during a retry.
 - **FR-053**: `dybatpho::curl_do` MUST report a retry on stderr, so a caller capturing the response does not capture the banner.
 - **FR-054**: A URL written to a log MUST hide everything between `scheme://` and the last `@` before the host, so a password holding `/` is not shown in part.
+- **FR-055**: With `DYBATPHO_RATE_LIMIT_SHARED` true-like, `rate_limit`, `rate_limit_remaining` and `rate_limit_reset` MUST keep a key's window in a file under `DYBATPHO_NETWORK_STATE_DIR` (default `dybatpho/network` in the XDG runtime directory), read and written under a `flock`, so separate processes share one budget; the command MUST run outside the lock, and a waiting process MUST release it while it sleeps.
+- **FR-056**: With `DYBATPHO_CIRCUIT_SHARED` true-like, `circuit_breaker`, `circuit_state` and `circuit_reset` MUST share a key's failures and opening time the same way; once the cooldown has passed, exactly one process MUST take the trial request while the others are refused with exit code 9, and a trial whose process did not report within another cooldown MUST be given up.
+- **FR-057**: A shared key MUST map to a file name that keeps keys apart which differ only in characters a file name cannot carry, and both shared modes MUST stay off by default, so a caller pays for a lock only when it asks to.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -496,6 +499,9 @@ dybatpho::circuit_breaker api.example.test -- \
 - **IT-048**: Upload with `--header "X-Sig: k=v"` and see the header passed whole; resolve `?page=2` and `#end` against a URL with a path.
 - **IT-049**: Kill a script during a retry with a secret header and find no private curl config left; retry once and find the banner on stderr only.
 - **IT-050**: Redact `http://alice:pa/ss@gw/x` and see only `http://gw/[redacted]`.
+- **IT-051**: Spend a one-call budget in a subshell, and see a second subshell refused only when the budget is shared; read and reset a shared budget from other processes.
+- **IT-052**: Start eight processes on a shared three-call budget at once and see exactly three run.
+- **IT-053**: Open a shared circuit from subshells, see a third refused and the state read as open from another process, and reset it; refuse a half-open trial another process holds, and take one whose holder is gone; keep `https://a/b` apart from `https:__a_b`.
 
 ## Acceptance Criteria *(mandatory)*
 

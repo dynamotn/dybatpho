@@ -43,7 +43,10 @@ the resolver does.
 | **`DYBATPHO_CIRCUIT_THRESHOLD`** | number | yes |  | Consecutive failures before `dybatpho::circuit_breaker` opens a circuit (default `5`) |
 | **`DYBATPHO_CIRCUIT_COOLDOWN`** | number | no | `30` | Seconds an open circuit waits before allowing a trial request |
 | **`DYBATPHO_RATE_LIMIT_WAIT`** | bool | yes |  | Let `dybatpho::rate_limit` wait for a free slot instead of refusing the call (default `true`) |
-| **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | yes |  | Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit (default `0`) |
+| **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | yes |  | Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit |
+| **`DYBATPHO_RATE_LIMIT_SHARED`** | bool | no | `false` | Share each rate limit budget between processes, through a file |
+| **`DYBATPHO_CIRCUIT_SHARED`** | bool | no | `false` | Share each circuit breaker's state between processes, through a file |
+| **`DYBATPHO_NETWORK_STATE_DIR`** | string | no |  | Directory of the shared state, default `dybatpho/network` under the XDG runtime directory (default `0`) |
 | **`DYBATPHO_PAGINATE_MAX_PAGES`** | number | no | `100` | Most pages `dybatpho::curl_paginate` fetches, `0` for no limit |
 | **`DYBATPHO_PAGINATE_RATE`** | string | no |  | Rate limit spec applied per page by `dybatpho::curl_paginate` |
 | **`DYBATPHO_GRAPHQL_TOKEN`** | string | no |  | Bearer token sent by `dybatpho::curl_graphql` |
@@ -484,7 +487,7 @@ dybatpho::circuit_breaker api.example.com "dybatpho::curl_do https://api.example
 
 **📝 Notes**
 
-- Circuit breaker state is in-memory and process-local; it does not persist across script invocations
+- Circuit breaker state is in-memory and process-local unless `DYBATPHO_CIRCUIT_SHARED` is set, in which case every process shares it through a file, and once the cooldown has passed one process at a time takes the trial
 
 **🚦 Exit codes**
 
@@ -585,7 +588,7 @@ dybatpho::rate_limit api.example.com 10/60   # take a slot, run nothing
 **📝 Notes**
 
 - The command runs as an argument vector rather than through `eval`, like the `--` form of `dybatpho::circuit_breaker`; wrap a shell string in `bash -c` when one is really wanted
-- The window is in-memory and process-local, like the circuit breaker's state; it does not persist across script invocations, nor out of a subshell
+- The window is in-memory and process-local unless `DYBATPHO_RATE_LIMIT_SHARED` is set, in which case every process shares it through a file under `DYBATPHO_NETWORK_STATE_DIR`, read and written under a `flock`
 
 **🚦 Exit codes**
 

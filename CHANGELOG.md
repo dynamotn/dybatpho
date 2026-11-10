@@ -150,6 +150,14 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Added
 
+- **`network` — rate limits and circuit breakers shared between processes.**
+  With `DYBATPHO_RATE_LIMIT_SHARED=true`, every process calling
+  `dybatpho::rate_limit` on a key spends one budget -- two cron runs, or a loop
+  inside `$( )`, no longer each get a full one; with `DYBATPHO_CIRCUIT_SHARED=true`
+  a breaker opened by one run stays open for the next, and once its cooldown
+  passes a single process takes the trial request. The state lives in
+  `DYBATPHO_NETWORK_STATE_DIR` under a `flock`. Both stay off by default, so
+  existing callers see no change and pay for no lock.
 - **`helpers` — ask whether a command is new enough without stopping:**
   `dybatpho::has_version 'yq>=4'` returns 0 or 1, for a script that takes
   another path rather than stop the way `dybatpho::require` does. It reads the

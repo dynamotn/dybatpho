@@ -1766,3 +1766,51 @@ _shared_state() {
   assert_stderr --partial "is not a private directory"
   assert_equal "$(ls -A "${BATS_TEST_TMPDIR}/planted")" ""
 }
+
+@test "shared network state never changes the mode of a directory the caller names" {
+  command -v flock > /dev/null || skip "flock is not installed"
+  local shared="${BATS_TEST_TMPDIR}/team"
+  mkdir -p "${shared}"
+  chmod 1777 "${shared}"
+  DYBATPHO_NETWORK_STATE_DIR="${shared}" DYBATPHO_CIRCUIT_SHARED=true \
+    run -1 --separate-stderr dybatpho::circuit_state svc
+  assert_stderr --partial "is open to other users"
+  run -0 stat -c '%a' "${shared}"
+  assert_output "1777"
+  mkdir -p "${BATS_TEST_TMPDIR}/mine"
+  chmod 750 "${BATS_TEST_TMPDIR}/mine"
+  DYBATPHO_NETWORK_STATE_DIR="${BATS_TEST_TMPDIR}/mine" DYBATPHO_CIRCUIT_SHARED=true \
+    run_traced -0 dybatpho::circuit_state svc
+  run -0 stat -c '%a' "${BATS_TEST_TMPDIR}/mine"
+  assert_output "750"
+}
+
+@test "a shared circuit ignores an overflowing or future time in its state file" {
+  _shared_state
+  DYBATPHO_CIRCUIT_SHARED=true DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=30
+  dybatpho::circuit_reset svc
+  local state now
+  now="$(date +%s)"
+  state="$(compgen -G "${DYBATPHO_NETWORK_STATE_DIR}/circuit-svc-*" | grep -v '\.lock$')"
+  printf '5 99999999999999999999999 0\n' > "${state}"
+  run_traced -0 dybatpho::circuit_state svc
+  assert_output "closed"
+  # A trial "taken" in the future would otherwise refuse every trial.
+  printf '1 %s %s\n' "$((now - 100))" "$((now + 100000))" > "${state}"
+  (dybatpho::circuit_breaker svc -- touch "${BATS_TEST_TMPDIR}/ran")
+  assert_file_exists "${BATS_TEST_TMPDIR}/ran"
+}
+
+@test "a relative shared state directory stays one place when the command changes directory" {
+  _shared_state
+  mkdir -p "${BATS_TEST_TMPDIR}/a" "${BATS_TEST_TMPDIR}/b"
+  local script="${BATS_TEST_TMPDIR}/relative.sh"
+  # shellcheck disable=SC2154 # DYBATPHO_DIR is set by test_helper
+  printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules network" "cd '${BATS_TEST_TMPDIR}/a'" \
+    "DYBATPHO_NETWORK_STATE_DIR=st DYBATPHO_CIRCUIT_SHARED=true DYBATPHO_CIRCUIT_THRESHOLD=1 \\" \
+    "  dybatpho::circuit_breaker svc -- cd '${BATS_TEST_TMPDIR}/b'" > "${script}"
+  run -0 bash "${script}"
+  # Not assert_file_not_exists: it checks for a regular file, and this is a directory.
+  [[ ! -e "${BATS_TEST_TMPDIR}/b/st" ]] || fail "the state split into b/st"
+  run -0 compgen -G "${BATS_TEST_TMPDIR}/a/st/circuit-svc-*"
+}

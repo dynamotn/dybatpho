@@ -49,7 +49,7 @@
 # @env DYBATPHO_CIRCUIT_SHARED bool [default: false] Share each circuit breaker's state between processes, through a
 #   file
 # @env DYBATPHO_NETWORK_STATE_DIR string? Directory of the shared state, default `dybatpho/network` under the XDG
-#   runtime directory
+#   runtime directory; it must be the user's own and closed to others, and its parents trusted
 #   (default `0`)
 # @env DYBATPHO_PAGINATE_MAX_PAGES number [default: 100] Most pages `dybatpho::curl_paginate` fetches, `0` for no limit
 # @env DYBATPHO_PAGINATE_RATE string? Rate limit spec applied per page by `dybatpho::curl_paginate`
@@ -1044,19 +1044,26 @@ function __dybatpho_network_shared_open {
   # first: under a shared `/tmp`, another user could have made one of them, or
   # a link to a place of their choosing, and filled it with state this reads.
   local -a own=()
+  local made=1
   if [[ -n "${dir}" ]]; then
+    # Absolute now: the command a breaker runs may change directory before the
+    # state is written back.
+    [[ "${dir}" == /* ]] || dir="${PWD}/${dir}"
     own=("${dir}")
+    made=0
   elif [[ "${XDG_RUNTIME_DIR-}" == /* ]]; then
     own=("${XDG_RUNTIME_DIR:-}/dybatpho" "${XDG_RUNTIME_DIR:-}/dybatpho/network")
   else
     local uid base
     uid="$(id -u)"
-    base="${TMPDIR:-/tmp}/dybatpho-${uid}"
+    base="${TMPDIR:-/tmp}"
+    [[ "${base}" == /* ]] || base=/tmp
+    base+="/dybatpho-${uid}"
     own=("${base}" "${base}/dybatpho" "${base}/dybatpho/network")
   fi
   local part
   for part in ${own[@]+"${own[@]}"}; do
-    __dybatpho_network_private_dir "${part}" "${kind}"
+    __dybatpho_network_private_dir "${part}" "${kind}" "${made}"
   done
   dir="${own[-1]}"
   local sum
@@ -1072,18 +1079,30 @@ function __dybatpho_network_shared_open {
 #   script before anything is read from or written into it.
 # @arg $1 path Directory
 # @arg $2 string `rate` or `circuit`, for the message
+# @arg $3 number 1 when the directory is one of the module's own, which it may
+#   make private; 0 when the caller named it, which is never changed: a caller
+#   that pointed it at `/tmp` as root would otherwise lock every user out of it
 # @exitcode 1 Stop script when the directory is not private and cannot be made so
 # @internal
 #######################################
 function __dybatpho_network_private_dir {
-  local dir="$1" kind="$2"
+  local dir="$1" kind="$2" made="$3"
+  local hint="set DYBATPHO_NETWORK_STATE_DIR to a directory of your own"
   if [[ ! -e "${dir}" && ! -L "${dir}" ]]; then
     mkdir -m 700 -- "${dir}" 2> /dev/null || true
   fi
   if [[ -L "${dir}" || ! -d "${dir}" || ! -O "${dir}" ]]; then
-    dybatpho::die "${dir} is not a private directory; refusing to keep shared ${kind} state there"
+    dybatpho::die "${dir} is not a private directory; refusing to keep shared ${kind} state there (${hint})"
   fi
-  chmod 700 -- "${dir}" || dybatpho::die "Cannot make ${dir} private for the shared ${kind} state"
+  if ((made)); then
+    chmod 700 -- "${dir}" || dybatpho::die "Cannot make ${dir} private for the shared ${kind} state"
+    return 0
+  fi
+  local open_to_others
+  open_to_others="$(find "${dir}" -prune \( -perm -g+w -o -perm -o+w \) -print)"
+  if [[ -n "${open_to_others}" ]]; then
+    dybatpho::die "${dir} is open to other users; refusing to keep shared ${kind} state there (${hint})"
+  fi
 }
 
 #######################################
@@ -1111,19 +1130,27 @@ function __dybatpho_network_rate_load {
 #######################################
 # @description Read a shared circuit's state: failures, the time it opened,
 #   and the time a process took its trial request, each 0 when unset.
+#   A value too long to be a time is dropped; a time in the future -- the clock
+#   stepped back, or the file came from another host -- is read as now for the
+#   opening, so the circuit stays open one cooldown rather than for ever, and
+#   as no trial at all.
 # @arg $1 path State file
+# @arg $2 number The current time, in seconds
 # @stdout The three numbers, space-separated
 # @internal
 #######################################
 function __dybatpho_network_circuit_read {
-  local failures=0 opened=0 probe=0
+  local failures=0 opened=0 probe=0 now="$2"
   if [[ -s "$1" ]]; then
     read -r failures opened probe < "$1" || true
   fi
-  [[ "${failures}" =~ ^[0-9]+$ ]] || failures=0
-  [[ "${opened}" =~ ^[0-9]+$ ]] || opened=0
-  [[ "${probe:-0}" =~ ^[0-9]+$ ]] || probe=0
-  printf '%s %s %s\n' "$((10#${failures}))" "$((10#${opened}))" "$((10#${probe:-0}))"
+  [[ "${failures}" =~ ^[0-9]{1,18}$ ]] || failures=0
+  [[ "${opened}" =~ ^[0-9]{1,18}$ ]] || opened=0
+  [[ "${probe:-0}" =~ ^[0-9]{1,18}$ ]] || probe=0
+  failures=$((10#${failures})) opened=$((10#${opened})) probe=$((10#${probe:-0}))
+  ((opened <= now)) || opened="${now}"
+  ((probe <= now)) || probe=0
+  printf '%s %s %s\n' "${failures}" "${opened}" "${probe}"
 }
 
 #######################################
@@ -1138,7 +1165,9 @@ function dybatpho::circuit_state {
   if dybatpho::is true "${DYBATPHO_CIRCUIT_SHARED}"; then
     local path fd state
     __dybatpho_network_shared_open path fd circuit "${key}"
-    state="$(__dybatpho_network_circuit_read "${path}")"
+    local now
+    printf -v now '%(%s)T' -1
+    state="$(__dybatpho_network_circuit_read "${path}" "${now}")"
     dybatpho::flock_release "${fd}"
     read -r _ opened_at _ <<< "${state}"
   fi
@@ -1263,11 +1292,18 @@ function dybatpho::circuit_breaker {
 # @internal
 #######################################
 function __dybatpho_network_circuit_shared {
+  # Fixed once, before the command runs: a command that changes directory would
+  # otherwise send the state written afterwards to another relative place.
+  local DYBATPHO_NETWORK_STATE_DIR="${DYBATPHO_NETWORK_STATE_DIR-}"
+  if [[ -n "${DYBATPHO_NETWORK_STATE_DIR}" && "${DYBATPHO_NETWORK_STATE_DIR}" != /* ]]; then
+    DYBATPHO_NETWORK_STATE_DIR="${PWD}/${DYBATPHO_NETWORK_STATE_DIR}"
+  fi
   local __dybatpho_network_cs_path __dybatpho_network_cs_fd __dybatpho_network_cs_state
   local __dybatpho_network_cs_failures __dybatpho_network_cs_opened __dybatpho_network_cs_probe
   __dybatpho_network_shared_open __dybatpho_network_cs_path __dybatpho_network_cs_fd circuit \
     "${__dybatpho_network_cb_key}"
-  __dybatpho_network_cs_state="$(__dybatpho_network_circuit_read "${__dybatpho_network_cs_path}")"
+  __dybatpho_network_cs_state="$(__dybatpho_network_circuit_read "${__dybatpho_network_cs_path}" \
+    "${__dybatpho_network_cb_now}")"
   read -r __dybatpho_network_cs_failures __dybatpho_network_cs_opened __dybatpho_network_cs_probe \
     <<< "${__dybatpho_network_cs_state}"
   if ((__dybatpho_network_cs_opened > 0)); then
@@ -1300,7 +1336,8 @@ function __dybatpho_network_circuit_shared {
   # Read again: other processes may have recorded their own results meanwhile.
   __dybatpho_network_shared_open __dybatpho_network_cs_path __dybatpho_network_cs_fd circuit \
     "${__dybatpho_network_cb_key}"
-  __dybatpho_network_cs_state="$(__dybatpho_network_circuit_read "${__dybatpho_network_cs_path}")"
+  __dybatpho_network_cs_state="$(__dybatpho_network_circuit_read "${__dybatpho_network_cs_path}" \
+    "${__dybatpho_network_cb_now}")"
   read -r __dybatpho_network_cs_failures __dybatpho_network_cs_opened _ <<< "${__dybatpho_network_cs_state}"
   if ((__dybatpho_network_cs_exit == 0)); then
     printf '0 0 0\n' > "${__dybatpho_network_cs_path}"

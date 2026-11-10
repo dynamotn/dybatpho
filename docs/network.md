@@ -46,7 +46,7 @@ the resolver does.
 | **`DYBATPHO_RATE_LIMIT_MAX_WAIT`** | number | yes |  | Longest wait in seconds `dybatpho::rate_limit` accepts, `0` for no limit |
 | **`DYBATPHO_RATE_LIMIT_SHARED`** | bool | no | `false` | Share each rate limit budget between processes, through a file |
 | **`DYBATPHO_CIRCUIT_SHARED`** | bool | no | `false` | Share each circuit breaker's state between processes, through a file |
-| **`DYBATPHO_NETWORK_STATE_DIR`** | string | no |  | Directory of the shared state, default `dybatpho/network` under the XDG runtime directory (default `0`) |
+| **`DYBATPHO_NETWORK_STATE_DIR`** | string | no |  | Directory of the shared state, default `dybatpho/network` under the XDG runtime directory; it must be the user's own and closed to others, and its parents trusted (default `0`) |
 | **`DYBATPHO_PAGINATE_MAX_PAGES`** | number | no | `100` | Most pages `dybatpho::curl_paginate` fetches, `0` for no limit |
 | **`DYBATPHO_PAGINATE_RATE`** | string | no |  | Rate limit spec applied per page by `dybatpho::curl_paginate` |
 | **`DYBATPHO_GRAPHQL_TOKEN`** | string | no |  | Bearer token sent by `dybatpho::curl_graphql` |

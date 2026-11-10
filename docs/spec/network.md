@@ -353,6 +353,7 @@ dybatpho::circuit_breaker api.example.test -- \
 - **FR-056**: With `DYBATPHO_CIRCUIT_SHARED` true-like, `circuit_breaker`, `circuit_state` and `circuit_reset` MUST share a key's failures and opening time the same way; once the cooldown has passed, exactly one process MUST take the trial request while the others are refused with exit code 9, and a trial whose process did not report within another cooldown MUST be given up.
 - **FR-057**: A shared key MUST map to a file name that keeps keys apart which differ only in characters a file name cannot carry, and both shared modes MUST stay off by default, so a caller pays for a lock only when it asks to.
 - **FR-058**: Shared state MUST be read as data, never evaluated: a rate limit window MUST keep only tokens of digits. Every directory of the shared state -- `DYBATPHO_NETWORK_STATE_DIR`, or `dybatpho/network` under `XDG_RUNTIME_DIR`, or `dybatpho-<uid>/dybatpho/network` under `TMPDIR` -- MUST be created one level at a time with mode 700, and one that already exists MUST be a real directory owned by the user, or the script MUST stop before reading or writing anything there.
+- **FR-059**: A directory the caller names in `DYBATPHO_NETWORK_STATE_DIR` MUST never have its mode changed; one that others can write to MUST be refused. It MUST be made absolute before a breaker runs its command, and a time in a circuit state file MUST be bounded to 18 digits, an opening in the future read as now, and a trial in the future dropped.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -504,6 +505,7 @@ dybatpho::circuit_breaker api.example.test -- \
 - **IT-052**: Start eight processes on a shared three-call budget at once and see exactly three run.
 - **IT-053**: Open a shared circuit from subshells, see a third refused and the state read as open from another process, and reset it; refuse a half-open trial another process holds, and take one whose holder is gone; keep `https://a/b` apart from `https:__a_b`.
 - **IT-054**: Plant `a[$(id>file)]` in a shared window and see no command run; point the state at a symlink, and plant a symlink at the `TMPDIR` fallback, and see the script stop with nothing written through either.
+- **IT-055**: Point the state at a mode 1777 directory and see it refused with its mode intact, and at a mode 750 one and see it used with its mode intact; read an overflowing opening as closed and a future trial as none; keep a relative state directory in one place while the command changes directory.
 
 ## Acceptance Criteria *(mandatory)*
 

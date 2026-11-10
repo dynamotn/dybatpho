@@ -275,7 +275,7 @@ dybatpho::pkg_install_command --arg --cask -- firefox   # brew install --cask fi
 
 **📤 Output on stdout**
 
-- The install command as a single quoted line
+- The install command as a single line, each word shell-quoted
 
 **🚦 Exit codes**
 

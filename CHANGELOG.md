@@ -21,6 +21,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`pkg` — `dybatpho::pkg_install_command` shell-quotes what it prints,** so
+  the line can be pasted or `eval`ed safely with any package name.
 - **`doctor` — the `cache` row lists the hashers `cache_key` accepts,**
   `openssl` instead of `cksum`, so a host with only `cksum` is no longer
   reported healthy.

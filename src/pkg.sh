@@ -511,7 +511,7 @@ function dybatpho::pkg_missing {
 #
 # @arg $1 string Option `--arg`/`-a` to pass one extra argument to the manager, repeatable
 # @arg $@ string Package names, optionally after a `--` separator
-# @stdout The install command as a single quoted line
+# @stdout The install command as a single line, each word shell-quoted
 # @exitcode 1 No package manager was detected, or a package name begins with `-`
 #######################################
 function dybatpho::pkg_install_command {
@@ -525,8 +525,9 @@ function dybatpho::pkg_install_command {
   local -a command_parts=()
   __dybatpho_pkg_action_command_into command_parts "${manager}" install \
     ${extra_args[@]+"${extra_args[@]}"} -- ${packages[@]+"${packages[@]}"}
-  printf '%s' "${command_parts[0]}"
-  printf ' %s' "${command_parts[@]:1}"
+  # Quoted so the line can be pasted or evaluated as the same command.
+  printf '%q' "${command_parts[0]}"
+  printf ' %q' "${command_parts[@]:1}"
   printf '\n'
 }
 

@@ -164,6 +164,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **FR-018**: The extra arguments of an install MUST NOT be passed to the index refresh that `--update` runs.
 - **FR-019**: The ensure and require helpers MUST forward `--arg`/`-a` and its value to the install they perform.
 - **FR-020**: `dybatpho::pkg_ensure` MUST stop when it cannot tell which packages are missing, rather than treating the failure as nothing missing.
+- **FR-021**: `dybatpho::pkg_install_command` MUST shell-quote every word it prints, so the line runs as the same command when pasted or evaluated.
 
 ### Key Entities
 
@@ -205,6 +206,7 @@ dybatpho::pkg_install --force --arg --cask -- firefox
 - **IT-018**: Verify `--arg` without a value stops the command renderer.
 - **IT-019**: Verify an install with `--arg` and `--update` refreshes the index without the extra arguments and installs with them.
 - **IT-020**: Verify the update function renders its extra arguments, and that the ensure and require helpers forward theirs to the install.
+- **IT-021**: Render the install command for `jq;touch PWNED` and `my pkg`, and see both quoted as single words.
 
 ## Acceptance Criteria *(mandatory)*
 

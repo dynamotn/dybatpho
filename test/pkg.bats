@@ -104,6 +104,14 @@ setup() {
     "apk add --no-cache --no-interactive curl"
 }
 
+@test "dybatpho::pkg_install_command quotes what the shell would read otherwise" {
+  # The line is meant to be pasted or evaluated; printed raw, a package named
+  # `jq;touch PWNED` ran a second command and `my pkg` became two packages.
+  DYBATPHO_PKG_MANAGER=apk
+  assert_equal "$(dybatpho::pkg_install_command 'jq;touch PWNED' 'my pkg')" \
+    'apk add jq\;touch\ PWNED my\ pkg'
+}
+
 @test "dybatpho::pkg_install_command rejects an --arg without a value" {
   DYBATPHO_PKG_MANAGER=apk
   run ! dybatpho::pkg_install_command curl --arg

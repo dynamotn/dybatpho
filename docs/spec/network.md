@@ -356,6 +356,7 @@ dybatpho::circuit_breaker api.example.test -- \
 - **FR-059**: The module MUST never change the mode of a directory: one it creates is made 700 by `mkdir`, and an existing one that others can write to -- or whose permissions cannot be checked -- MUST be refused. A relative `DYBATPHO_NETWORK_STATE_DIR` MUST be made absolute before a breaker runs its command. A time in a circuit state file MUST be bounded to 18 digits, an opening in the future read as now and written back, and a trial in the future dropped; a breaker in memory MUST read a future opening as now too; a rate limit window MUST drop a call recorded after now. A clock stepping back therefore holds a breaker or a budget one cooldown or window, never until the clock catches up.
 - **FR-060**: A redirect `dybatpho::curl_do` follows itself MUST go only to an `http` or `https` URL; any other scheme, such as `file://`, MUST be refused with a warning and the 3xx returned as exit code 3.
 - **FR-061**: `dybatpho::curl_paginate` MUST send `DYBATPHO_CURL_SECRET_HEADERS` only to pages on the origin of the first page; a page on another origin, including the same host over plain `http`, MUST be fetched without them, and pagination MUST stop with a warning before it when `DYBATPHO_CURL_SECRET_DATA` is set.
+- **FR-062**: Pagination MUST follow only an `http` or `https` next link, and MUST stop with a warning before any other scheme.
 
 ### Key Entities *(include if feature involves data)*
 

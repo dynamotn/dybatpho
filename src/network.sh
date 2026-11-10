@@ -1738,6 +1738,12 @@ function dybatpho::curl_paginate {
     # A `Link` target may be relative (RFC 8288), and curl has nothing to
     # resolve `/items?page=2` against; it is resolved against this page.
     [[ -z "${next}" ]] || __dybatpho_network_resolve_location_into next "${url}" "${next}"
+    # The server names the next page; curl would fetch a `file://`, `dict://`
+    # or `gopher://` one as readily, as with a redirect.
+    if [[ -n "${next}" && ! "${next}" =~ ^[Hh][Tt][Tt][Pp][Ss]?:// ]]; then
+      dybatpho::warn "Not following pagination to ${next%%:*}: only http and https are followed"
+      break
+    fi
     url="${next}"
   done
   rm -f "${body}"

@@ -232,6 +232,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`network` — `dybatpho::curl_paginate` follows only `http` and `https`
+  next links;** a `Link:` to `file://`, `dict://` or `gopher://` stops paging
+  with a warning instead of being fetched.
 - **`archive` — an owner name in a tar archive can no longer hide a link's
   target from `dybatpho::archive_is_safe`.** The listing is read with numeric
   owners, so an owner named `x a -> ok` no longer makes an absolute link look

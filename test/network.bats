@@ -1923,6 +1923,20 @@ HELPER
   assert_output "1"
 }
 
+@test "dybatpho::curl_paginate follows only http and https next links" {
+  local scheme pages=0
+  for scheme in "dict://127.0.0.1:2628/d:x" "file:///etc/passwd" "gopher://127.0.0.1/x"; do
+    pages=$((pages + 1))
+    dybatpho::mock_http "api.example.test/items?page=1" 200 'page-one' "Link: <${scheme}>; rel=\"next\""
+    run_traced --separate-stderr dybatpho::curl_paginate "https://api.example.test/items?page=1"
+    assert_success
+    assert_output "page-one"
+    assert_stderr --partial "Not following pagination to ${scheme%%:*}"
+    # Only the first page was requested each time.
+    assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "${pages}"
+  done
+}
+
 @test "dybatpho::curl_paginate stops before another origin when the body is a secret" {
   dybatpho::mock_http "api.example.test/items?page=1" 200 'page-one' \
     'Link: <https://other.example.test/items?page=2>; rel="next"'

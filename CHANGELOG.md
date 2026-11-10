@@ -21,6 +21,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`cache` — `dybatpho::cache_key` keeps values that contain a newline
+  apart,** so two different requests no longer share an entry, and keys no
+  longer depend on the locale. Every existing key changes once, so the first
+  lookup after upgrading is a miss.
 - **`scripts/release.sh` — the published `SHA256SUMS` lists only the bundle
   that release uploads.** Each release builds into `dist/<version>/`, so a
   bundle left from an earlier release no longer breaks `sha256sum -c`.

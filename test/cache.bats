@@ -66,6 +66,13 @@ age_entry() {
   run --separate-stderr ! dybatpho::cache_key
 }
 
+@test "dybatpho::cache_key keeps values holding a newline apart" {
+  # A newline between values could not tell `a` + `b\nc` from `a\nb` + `c`,
+  # so two different requests shared one entry.
+  refute [ "$(dybatpho::cache_key "POST /api" $'line1\nline2')" \
+    = "$(dybatpho::cache_key $'POST /api\nline1' line2)" ]
+}
+
 @test "dybatpho::cache_key stays SHA-256 without sha256sum or shasum" {
   # The last fallback was `cksum`, a 32-bit CRC: two keys that collide serve
   # each other's entries.
@@ -76,7 +83,7 @@ age_entry() {
     source="$(command -v "${tool}")"
     ln -s "${source}" "${tools}/${tool}"
   done
-  expected="$(printf 'a\nb\n' | openssl dgst -sha256 -r)"
+  expected="$(printf '1:a\n1:b\n' | openssl dgst -sha256 -r)"
 
   local key saved_path="${PATH}"
   PATH="${tools}"
@@ -282,6 +289,19 @@ age_entry() {
   assert_output "old"
   run_traced -0 dybatpho::cache_wait swr 10
   assert_equal "$(cat "${counter}")" "1"
+  assert_equal "$(dybatpho::cache_get swr 60)" "new"
+}
+
+@test "dybatpho::cache_wait waits for a refresh started inside a command substitution" {
+  slow_fetch() {
+    sleep 1
+    printf 'new\n'
+  }
+  printf 'old\n' | dybatpho::cache_set swr
+  age_entry swr '2 hours ago'
+  # The substitution that took the refresh lock exits before the refresh does.
+  assert_equal "$(dybatpho::cache_run swr 60 --stale 999999999 -- slow_fetch)" "old"
+  run_traced -0 dybatpho::cache_wait swr 10
   assert_equal "$(dybatpho::cache_get swr 60)" "new"
 }
 

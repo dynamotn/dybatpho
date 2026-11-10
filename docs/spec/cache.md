@@ -235,6 +235,7 @@ fi
 - **FR-031**: `cache_stats` and `cache_prune` MUST read the namespace in one listing, counting only regular, non-hidden files with the entry suffix, and every accessor MUST accept a cache directory beginning with a dash.
 - **FR-032**: Every number of seconds or entries MUST be read in base 10, so a leading zero never makes it octal.
 - **FR-033**: `dybatpho::cache_run` MUST print and store the command's output byte for byte, trailing newlines included, on a miss, a hit and a stale hit.
+- **FR-034**: `dybatpho::cache_key` MUST give different keys to different lists of values, including values that hold a newline, and MUST NOT depend on the caller's locale.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -300,6 +301,7 @@ fi
 - **IT-038**: Read an entry with a time to live of `08` and `09`, run, prune and describe with leading-zero values, and see no arithmetic error.
 - **IT-039**: Run a command printing trailing blank lines and one printing no final newline, and get the same bytes back on a miss, a hit and a stale hit.
 - **IT-040**: Hash a key with `sha256sum` and `shasum` off the `PATH`, and see a SHA-256 key from `openssl`, never a `cksum` CRC.
+- **IT-041**: Hash `POST /api` with `line1\nline2`, and `POST /api\nline1` with `line2`, and get two different keys.
 
 ## Acceptance Criteria *(mandatory)*
 

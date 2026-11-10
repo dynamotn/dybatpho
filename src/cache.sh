@@ -146,9 +146,13 @@ function dybatpho::cache_key {
     || dybatpho::die "${FUNCNAME[0]}: No hashing command found; install one of sha256sum, shasum, or openssl"
   local -a hash_command=("${hasher}")
   [[ "${hasher}" != openssl ]] || hash_command+=(dgst -sha256 -r)
-  # Each value is followed by a newline so that two different splits of the
-  # same text cannot hash to the same key.
-  printf '%s\n' "$@" | "${hash_command[@]}" | cut -d' ' -f1
+  # Each value is prefixed with its length so that two different splits of the
+  # same text, newlines included, cannot hash to the same key.
+  # Lengths in bytes, so a key does not change with the caller's locale.
+  local part LC_ALL=C
+  for part in "$@"; do
+    printf '%d:%s\n' "${#part}" "${part}"
+  done | "${hash_command[@]}" | cut -d' ' -f1
 }
 
 #######################################
@@ -439,6 +443,9 @@ function __dybatpho_cache_refresh_background {
   shift 2
   local __dybatpho_cache_refresh_bg_lock
   __dybatpho_cache_refresh_bg_lock="$(__dybatpho_cache_refresh_lock "${__dybatpho_cache_refresh_bg_path}")"
+  # This often runs inside the caller's `$( )`, which exits while the refresh
+  # still holds the lock, so the lock records the script, which outlives both.
+  local __dybatpho_lock_holder_pid=$$
   if ! dybatpho::lock_acquire "${__dybatpho_cache_refresh_bg_lock}" 0 &> /dev/null; then
     dybatpho::debug "cache: ${__dybatpho_cache_refresh_bg_key} is already being refreshed"
     return 0

@@ -219,11 +219,12 @@ EOF
 }
 
 @test "dybatpho::md_collapsible escapes the summary and keeps the body as Markdown" {
+  # The summary is HTML, where a Markdown escape would show its backslash.
   run_traced dybatpho::md_collapsible "Full log *raw*" $'first\nsecond'
   assert_success
   assert_output - << EOF
 <details>
-<summary>Full log \*raw\*</summary>
+<summary>Full log *raw*</summary>
 
 first
 second
@@ -329,4 +330,55 @@ EOF
 @test "dybatpho::md_list numbers from a marker with a leading zero" {
   run_traced dybatpho::md_list $'a\nb' "08."
   assert_output $'8. a\n9. b'
+}
+
+@test "a builder escapes text whose control characters imitate a raw region" {
+  # Only `dybatpho::md_raw` may open a raw region: a `\001` in a filename or a
+  # commit message used to switch the escape off for the rest of the text.
+  local forged
+  forged="$(printf 'file\001[click](https://evil.example) *bold*')"
+  run_traced dybatpho::md_list "${forged}"
+  assert_success
+  assert_output '- file\[click\](https://evil.example) \*bold\*'
+
+  forged="$(printf 'a\001*x*\002 *y*')"
+  run_traced dybatpho::md_heading 2 "${forged}"
+  assert_success
+  assert_output '## a\*x\* \*y\*'
+
+  # A genuine fragment beside a forged mark still renders as built.
+  run_traced dybatpho::md_list "$(printf '\001*x*') $(dybatpho::md_raw '**ok**')"
+  assert_success
+  assert_output '- \*x\* **ok**'
+}
+
+@test "dybatpho::md_collapsible escapes its summary as HTML, where Markdown escapes do not apply" {
+  run_traced dybatpho::md_collapsible '<img src=x onerror=alert(1)> & co' body
+  assert_success
+  assert_line --index 1 '<summary>&lt;img src=x onerror=alert(1)&gt; &amp; co</summary>'
+  refute_output --partial '<img'
+}
+
+@test "dybatpho::md_table escapes every cell, so a value cannot add a column or format itself" {
+  run_traced dybatpho::md_table $'name,note\nfoo,a|b *x* [y](z)' ","
+  assert_success
+  assert_line --index 2 '| foo  | a\|b \*x\* \[y\](z) |'
+
+  # A fragment marked raw is a cell's Markdown as built.
+  run_traced dybatpho::md_table "Link::$(dybatpho::md_raw '[docs](https://example.com)')" "::"
+  assert_success
+  assert_line --index 0 '| Link | [docs](https://example.com) |'
+}
+
+@test "dybatpho::md_code_block picks the fence of a body made of backticks in well under a second" {
+  local body start="${SECONDS}"
+  printf -v body '%40000s' ''
+  body="${body// /\`}"
+  run_traced dybatpho::md_code_block "" "${body}"
+  # Growing the fence until the body no longer held it took 14 seconds here.
+  ((SECONDS - start < 10))
+  assert_success
+  local fence
+  printf -v fence '%40001s' ''
+  assert_line --index 0 "${fence// /\`}"
 }

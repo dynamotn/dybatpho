@@ -13,6 +13,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Changed
 
+- **`markdown` — `dybatpho::md_code_block` picks its fence in linear time.**
+- **`markdown` — `dybatpho::md_table` escapes every cell like the other
+  builders.** A value holding `|`, `*`, `_` or `[` stays one plain cell; wrap
+  a cell that already is Markdown in `dybatpho::md_raw`.
 - **`logging` — JSON escaping keeps up with text full of control characters,
   and context fields no longer start a process per log line.**
 - **`scripts/test.sh` runs the suite faster.** Every test file gets its own
@@ -209,6 +213,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`markdown` — `dybatpho::md_collapsible` escapes its summary as HTML,** so
+  a summary cannot inject a tag.
+- **`markdown` — a control character in untrusted text can no longer switch
+  escaping off.** Only `dybatpho::md_raw` can mark a raw region; a stray
+  `\001` or `\002` in data is dropped. A marked fragment is raw only in the
+  process that marked it and its subshells.
 - **`logging` — a text log line can no longer drive the terminal.** Control
   characters in the message and context fields, such as an OSC title or a
   clear-screen sequence from untrusted input, are shown in caret notation

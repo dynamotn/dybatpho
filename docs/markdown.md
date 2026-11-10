@@ -40,8 +40,8 @@ document object.
 - [`dybatpho::md_link`](#dybatphomd_link) — Render an inline link.
 - [`dybatpho::md_badge`](#dybatphomd_badge) — Render a shields.io badge as an image, optionally wrapped in a link. The label and value are encoded the way shields.io requires: `-` doubles, `_` doubles, and a space becomes `_`. Every other character that is not safe in a URL path, the color's included, is percent-encoded.
 - [`dybatpho::md_code_block`](#dybatphomd_code_block) — Render a fenced code block. The body is literal by definition, so it is not escaped. The fence grows past the longest run of backticks the body contains, which is what keeps a block that itself shows fenced Markdown from ending early.
-- [`dybatpho::md_table`](#dybatphomd_table) — Render a Markdown table through `table.sh`. Cells are passed through unescaped, because escaping them here would also escape the delimiter that separates them. Escape the values first with `dybatpho::md_escape` and assemble the rows with a delimiter of your own, such as `::`, which the escape leaves alone.
-- [`dybatpho::md_collapsible`](#dybatphomd_collapsible) — Render a collapsible `<details>` section. The summary is escaped; the body is the Markdown the caller already built, so it is emitted as given. The blank lines around the body are what let a renderer treat it as Markdown rather than as raw HTML.
+- [`dybatpho::md_table`](#dybatphomd_table) — Render a Markdown table through `table.sh`. Every cell is escaped like any other builder's text, after the row is split on the delimiter, so a value holding `|`, `*` or `[` stays one plain cell. Wrap a cell that is already Markdown, such as a link, in `dybatpho::md_raw`.
+- [`dybatpho::md_collapsible`](#dybatphomd_collapsible) — Render a collapsible `<details>` section. The summary is escaped as HTML, since it sits inside an HTML element where Markdown escapes are not read, and a line break in it becomes a space; the body is the Markdown the caller already built, so it is emitted as given. The blank lines around the body are what let a renderer treat it as Markdown rather than as raw HTML.
 - [`dybatpho::md_mention`](#dybatphomd_mention) — Render a mention of a user or group. A leading `@` in the name is accepted and not doubled.
 - [`dybatpho::md_emoji`](#dybatphomd_emoji) — Render an emoji shortcode. Surrounding colons are accepted and not doubled.
 
@@ -284,16 +284,15 @@ dybatpho::md_code_block bash 'ls -la'
 ### `dybatpho::md_table`
 
 Render a Markdown table through `table.sh`.
-Cells are passed through unescaped, because escaping them here would also
-escape the delimiter that separates them. Escape the values first with
-`dybatpho::md_escape` and assemble the rows with a delimiter of your own,
-such as `::`, which the escape leaves alone.
+Every cell is escaped like any other builder's text, after the row is split
+on the delimiter, so a value holding `|`, `*` or `[` stays one plain cell.
+Wrap a cell that is already Markdown, such as a link, in `dybatpho::md_raw`.
 
 **🧪 Example**
 
 ```bash
 . dybatpho/init.sh --modules markdown table
-dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
+dybatpho::md_table $'Name,Role\nAlice,Dev *lead*' ","
 ```
 
 **🧾 Arguments**
@@ -317,9 +316,11 @@ dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
 ### `dybatpho::md_collapsible`
 
 Render a collapsible `<details>` section.
-The summary is escaped; the body is the Markdown the caller already built,
-so it is emitted as given. The blank lines around the body are what let a
-renderer treat it as Markdown rather than as raw HTML.
+The summary is escaped as HTML, since it sits inside an HTML element where
+Markdown escapes are not read, and a line break in it becomes a space;
+the body is the Markdown the caller already built, so it is emitted as
+given. The blank lines around the body are what let a renderer treat it as
+Markdown rather than as raw HTML.
 
 **🧪 Example**
 

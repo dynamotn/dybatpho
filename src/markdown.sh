@@ -34,7 +34,13 @@
 # marker such as `<!--raw-->` on purpose: any textual marker is something a
 # caller's data could also contain, at which point the data decides whether it
 # is escaped. `\001` and `\002` cannot appear in Markdown that renders.
-__dybatpho_md_raw_open=$'\001'
+# Control characters can still arrive in data, though -- a filename, a commit
+# message -- so the opening mark also carries a value drawn when the module
+# loads, which data cannot guess, and the escape drops a stray `\001` or `\002`.
+# A fragment marked in one process is therefore raw only in that process and
+# its subshells, and is drawn once, so loading the module again keeps it.
+[[ -n "${__dybatpho_md_raw_open-}" ]] || printf -v __dybatpho_md_raw_open '\001%04x%04x%04x%04x\001' \
+  "${SRANDOM:-${RANDOM}}" "${RANDOM}" "${RANDOM}" "${RANDOM}"
 __dybatpho_md_raw_close=$'\002'
 
 #######################################
@@ -54,6 +60,31 @@ function __dybatpho_md_join_into {
 }
 
 #######################################
+# @description Escape only the characters that carry meaning anywhere in a
+#   line, writing the result into a named variable. A table cell takes this
+#   alone, since nothing in a cell starts a block.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string Text to escape
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_md_escape_inline {
+  local -n __dybatpho_md_inline_ref="$1"
+  local __dybatpho_md_inline="${2-}"
+
+  # A mark that did not come from `dybatpho::md_raw` is data, and dropped.
+  __dybatpho_md_inline="${__dybatpho_md_inline//[$'\001\002']/}"
+  # The backslash goes first: escaping it after any other character would also
+  # escape the backslashes this loop just introduced.
+  __dybatpho_md_inline="${__dybatpho_md_inline//\\/\\\\}"
+  local __dybatpho_md_char
+  for __dybatpho_md_char in '`' '*' '_' '[' ']' '<' '>' '|' '~'; do
+    __dybatpho_md_inline="${__dybatpho_md_inline//"${__dybatpho_md_char}"/\\"${__dybatpho_md_char}"}"
+  done
+  __dybatpho_md_inline_ref="${__dybatpho_md_inline}"
+}
+
+#######################################
 # @description Escape the characters that carry inline meaning in Markdown,
 #   writing the result into a named variable. Raw regions are not handled here:
 #   `__dybatpho_md_escape_into` splits them off first.
@@ -64,15 +95,8 @@ function __dybatpho_md_join_into {
 #######################################
 function __dybatpho_md_escape_plain {
   local -n __dybatpho_md_plain_ref="$1"
-  local __dybatpho_md_value="${2-}"
-
-  # The backslash goes first: escaping it after any other character would also
-  # escape the backslashes this loop just introduced.
-  __dybatpho_md_value="${__dybatpho_md_value//\\/\\\\}"
-  local __dybatpho_md_char
-  for __dybatpho_md_char in '`' '*' '_' '[' ']' '<' '>' '|' '~'; do
-    __dybatpho_md_value="${__dybatpho_md_value//"${__dybatpho_md_char}"/\\"${__dybatpho_md_char}"}"
-  done
+  local __dybatpho_md_value
+  __dybatpho_md_escape_inline __dybatpho_md_value "${2-}"
 
   # `#`, `-`, `+`, `=` and an ordered-list marker only start a block when they
   # start a line, so they are escaped by position instead of everywhere: a
@@ -95,22 +119,44 @@ function __dybatpho_md_escape_plain {
 }
 
 #######################################
+# @description Escape text for an HTML element, writing the result into a
+#   named variable: inside raw HTML a Markdown backslash escape is not read, so
+#   `\<img>` would still be an element. A line break becomes a space, since a
+#   blank line would end the HTML block early.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string Text to escape
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_md_escape_html_plain {
+  local -n __dybatpho_md_html_ref="$1"
+  local __dybatpho_md_html="${2-}"
+  __dybatpho_md_html="${__dybatpho_md_html//[$'\001\002']/}"
+  __dybatpho_md_html="${__dybatpho_md_html//&/"&amp;"}"
+  __dybatpho_md_html="${__dybatpho_md_html//</"&lt;"}"
+  __dybatpho_md_html="${__dybatpho_md_html//>/"&gt;"}"
+  __dybatpho_md_html_ref="${__dybatpho_md_html//$'\n'/ }"
+}
+
+#######################################
 # @description Escape text for inline use, copying through any region that
 #   `dybatpho::md_raw` marked.
 # @arg $1 string Name of the variable receiving the result
 # @arg $2 string Text to escape
+# @arg $3 string [default: __dybatpho_md_escape_plain] Function escaping the text outside raw regions
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_md_escape_into {
   local -n __dybatpho_md_escaped_ref="$1"
   local __dybatpho_md_rest="${2-}"
+  local __dybatpho_md_plain="${3:-__dybatpho_md_escape_plain}"
   local __dybatpho_md_result="" __dybatpho_md_segment="" __dybatpho_md_piece=""
 
   while [[ "${__dybatpho_md_rest}" == *"${__dybatpho_md_raw_open}"* ]]; do
     __dybatpho_md_segment="${__dybatpho_md_rest%%"${__dybatpho_md_raw_open}"*}"
     __dybatpho_md_rest="${__dybatpho_md_rest#*"${__dybatpho_md_raw_open}"}"
-    __dybatpho_md_escape_plain __dybatpho_md_piece "${__dybatpho_md_segment}"
+    "${__dybatpho_md_plain}" __dybatpho_md_piece "${__dybatpho_md_segment}"
     __dybatpho_md_result+="${__dybatpho_md_piece}"
 
     if [[ "${__dybatpho_md_rest}" == *"${__dybatpho_md_raw_close}"* ]]; then
@@ -125,7 +171,7 @@ function __dybatpho_md_escape_into {
     fi
   done
 
-  __dybatpho_md_escape_plain __dybatpho_md_piece "${__dybatpho_md_rest}"
+  "${__dybatpho_md_plain}" __dybatpho_md_piece "${__dybatpho_md_rest}"
   __dybatpho_md_escaped_ref="${__dybatpho_md_result}${__dybatpho_md_piece}"
 }
 
@@ -440,14 +486,19 @@ function dybatpho::md_code_block {
   local text
   __dybatpho_md_join_into text lines
 
-  # The fence has to be longer than every backtick run inside it, so it grows
-  # until the body no longer contains it. Walking the body a character at a
-  # time instead cost quadratic time, since Bash finds `${text:index:1}` by
-  # counting from the start: a 70 KB log took 18 seconds.
-  local fence='```'
-  while [[ "${text}" == *"${fence}"* ]]; do
-    fence+='`'
+  # The fence has to be longer than every backtick run inside it. Everything
+  # but a backtick turns into a space, which leaves the runs as words to
+  # measure in one pass. Walking the body a character at a time cost quadratic
+  # time, since Bash finds `${text:index:1}` by counting from the start, and so
+  # did growing the fence until the body no longer held it: 40000 backticks
+  # took 14 seconds.
+  local -a runs=()
+  local run longest=2 fence
+  IFS=" " read -r -a runs <<< "${text//[!\`]/ }"
+  for run in ${runs[@]+"${runs[@]}"}; do
+    ((${#run} <= longest)) || longest=${#run}
   done
+  __dybatpho_log_repeat_into fence '`' "$((longest + 1))"
 
   printf '%s%s\n' "${fence}" "${language}"
   printf '%s\n' ${lines[@]+"${lines[@]}"}
@@ -456,10 +507,9 @@ function dybatpho::md_code_block {
 
 #######################################
 # @description Render a Markdown table through `table.sh`.
-#   Cells are passed through unescaped, because escaping them here would also
-#   escape the delimiter that separates them. Escape the values first with
-#   `dybatpho::md_escape` and assemble the rows with a delimiter of your own,
-#   such as `::`, which the escape leaves alone.
+#   Every cell is escaped like any other builder's text, after the row is split
+#   on the delimiter, so a value holding `|`, `*` or `[` stays one plain cell.
+#   Wrap a cell that is already Markdown, such as a link, in `dybatpho::md_raw`.
 # @arg $1 string Rows, one per line, cells split on the delimiter, or `-` for stdin
 # @arg $2 string [default: |] Delimiter
 # @stdout The rendered table
@@ -467,7 +517,7 @@ function dybatpho::md_code_block {
 # @exitcode 1 Stop the script when the `table` module cannot be loaded on demand
 # @example
 #   . dybatpho/init.sh --modules markdown table
-#   dybatpho::md_table $'Name::Role\nAlice::Dev' "::"
+#   dybatpho::md_table $'Name,Role\nAlice,Dev *lead*' ","
 #######################################
 function dybatpho::md_table {
   local input
@@ -479,14 +529,32 @@ function dybatpho::md_table {
   # so testing the public name would pass in a child that never loaded `table`
   # and then fail on the first internal call.
   __dybatpho_helpers_need_module table __dybatpho_table_measure_widths "${FUNCNAME[0]}"
-  dybatpho::table_markdown "${input}" "${delimiter}"
+
+  # The escaped cells are joined on the unit separator, which no escaped cell
+  # holds, since an escape can add a backslash that a delimiter contains.
+  local -a rows=() cells=() escaped_rows=()
+  local row index escaped unit=$'\037' IFS
+  __dybatpho_string_read_lines_into rows "${input}"
+  for row in ${rows[@]+"${rows[@]}"}; do
+    __dybatpho_table_split_row "${row}" "${delimiter}" cells
+    for index in "${!cells[@]}"; do
+      __dybatpho_md_escape_into escaped "${cells[${index}]//"${unit}"/}" __dybatpho_md_escape_inline
+      cells[index]="${escaped}"
+    done
+    IFS="${unit}"
+    escaped_rows+=("${cells[*]-}")
+    unset IFS
+  done
+  __dybatpho_table_markdown_rows escaped_rows "${unit}"
 }
 
 #######################################
 # @description Render a collapsible `<details>` section.
-#   The summary is escaped; the body is the Markdown the caller already built,
-#   so it is emitted as given. The blank lines around the body are what let a
-#   renderer treat it as Markdown rather than as raw HTML.
+#   The summary is escaped as HTML, since it sits inside an HTML element where
+#   Markdown escapes are not read, and a line break in it becomes a space;
+#   the body is the Markdown the caller already built, so it is emitted as
+#   given. The blank lines around the body are what let a renderer treat it as
+#   Markdown rather than as raw HTML.
 # @arg $1 string Summary line shown when collapsed
 # @arg $2 string Body, or `-` for stdin
 # @stdout The rendered section
@@ -499,7 +567,7 @@ function dybatpho::md_collapsible {
   local -a lines=()
   local escaped
 
-  __dybatpho_md_escape_into escaped "${summary}"
+  __dybatpho_md_escape_into escaped "${summary}" __dybatpho_md_escape_html_plain
   __dybatpho_string_read_lines_into lines "${body}"
 
   printf '<details>\n'

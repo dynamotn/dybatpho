@@ -82,8 +82,8 @@ dybatpho::md_task_list $'x|Tag the commit\n|Announce the release'
 # A value the escape must not touch, because it is Markdown already.
 dybatpho::md_list "see $(dybatpho::md_raw "$(dybatpho::md_link 'the notes' "${url}")")"
 
-# Cells are escaped first and joined with a delimiter the escape leaves alone.
-dybatpho::md_table "Artifact::Size"$'\n'"$(dybatpho::md_escape "${name}")::${size}" "::"
+# Every cell is escaped by the builder itself.
+dybatpho::md_table "Artifact::Size"$'\n'"${name}::${size}" "::"
 dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}")"
 ```
 
@@ -95,6 +95,9 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - A code body contains a fence as long as or longer than the default one.
 - A URL contains a space, a parenthesis, or an angle bracket.
 - A raw region is cut so its closing mark is missing.
+- Text from outside holds `\001` or `\002`, the control characters that mark a raw region.
+- A collapsible summary holds an HTML tag or `&`.
+- A table cell holds `|` or inline syntax, or is already Markdown.
 - A heading level, an emoji shortcode, an account name, or a code-block language is invalid.
 - `dybatpho::md_table` is called without the `table` module loaded.
 - A badge's label, value or color holds a character that is not safe in a URL path, such as `/`, `?`, `#`, `%` or a parenthesis.
@@ -117,7 +120,7 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-012**: The code-block builder MUST NOT escape its body, and MUST choose a fence longer than the longest backtick run the body contains.
 - **FR-013**: The code-block builder MUST reject a language containing a backtick.
 - **FR-014**: The table builder MUST render through `dybatpho::table_markdown`. Loading `markdown` MUST NOT load `table` up front, and the table builder MUST load it on demand when it is not loaded, stopping with a message naming the `table` module only when it cannot be loaded.
-- **FR-015**: The collapsible builder MUST escape its summary and MUST emit its body unchanged, surrounded by blank lines.
+- **FR-015**: The collapsible builder MUST escape `&`, `<` and `>` in its summary as HTML entities, since the summary sits inside raw HTML where a Markdown escape is not read, MUST turn a line break in it into a space, and MUST emit its body unchanged, surrounded by blank lines.
 - **FR-016**: The mention and emoji builders MUST accept an already-delimited argument without doubling the delimiter, and MUST reject a value that cannot render.
 - **FR-017**: Every builder that takes a text block MUST accept stdin when the input argument is `-`.
 - **FR-018**: `md_badge` MUST percent-encode every character of the label, value and color outside the unreserved URL set, after the shields.io doubling of `-` and `_` and the space-to-`_` rule.
@@ -125,6 +128,8 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-020**: `dybatpho::md_list` MUST read an ordered marker with a leading zero, such as `08.`, in base ten.
 - **FR-021**: `dybatpho::md_code_block` MUST choose its fence in time linear in the size of the body, so a body of tens of kilobytes renders in well under a second.
 - **FR-022**: The escape MUST mark an ordered-list marker on its `.` or `)`, as `1\.`, since CommonMark escapes nothing but punctuation.
+- **FR-023**: Only `dybatpho::md_raw` MUST be able to open a raw region: its opening mark MUST carry a value drawn when the module loads, and the escape MUST drop a `\001` or `\002` that arrives in a builder's text, so control characters in data never turn the escape off.
+- **FR-024**: `dybatpho::md_table` MUST escape the inline syntax of every cell after splitting the row on the delimiter, so a value holding `|`, `*`, `_` or `[` stays one plain cell, and MUST emit a cell marked with `dybatpho::md_raw` unchanged.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -160,6 +165,10 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **IT-015**: Render two items with marker `08.` and get `8.` and `9.`.
 - **IT-016**: Render a 2000-line body holding a run of five backticks and get a six-backtick fence around it.
 - **IT-017**: Escape `1. item` and `  12) step` and get `1\. item` and `  12\) step`.
+- **IT-018**: Pass a list item and a heading holding a forged `\001` and `\002` around a link and emphasis, and get them escaped; beside a forged mark, a genuine `md_raw` fragment still renders as built.
+- **IT-019**: Render a collapsible section whose summary holds `<img ...>` and `&`, and get `&lt;`, `&gt;` and `&amp;` with no tag left.
+- **IT-020**: Render a table cell holding `a|b *x* [y](z)` with `,` as the delimiter and get one escaped cell; render a cell marked raw and get it as built.
+- **IT-021**: Render a body of 40000 backticks in under three seconds and get a fence of 40001.
 
 ## Acceptance Criteria *(mandatory)*
 

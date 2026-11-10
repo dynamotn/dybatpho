@@ -745,7 +745,9 @@ function dybatpho::has_version {
   local spec
   dybatpho::expect_args spec -- "$@"
   local alternative name range found
-  for alternative in ${spec//|/ }; do
+  local -a alternatives
+  IFS='|' read -r -a alternatives <<< "${spec}"
+  for alternative in ${alternatives[@]+"${alternatives[@]}"}; do
     __dybatpho_helpers_spec_split_into name range "${alternative}"
     type -P "${name}" &> /dev/null || continue
     [[ -n "${range}" ]] || return 0
@@ -1392,6 +1394,10 @@ function dybatpho::retry_until {
   [[ "${__dybatpho_retry_retries}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Number of retries must be a whole number, got '${__dybatpho_retry_retries}'"
   __dybatpho_retry_retries=$((10#${__dybatpho_retry_retries}))
+  # `sleep` takes a fraction, so a plain decimal passes; anything else used to
+  # skip the wait while the banner still promised one.
+  [[ "${__dybatpho_retry_delay_seconds}" =~ ^([0-9]+\.?[0-9]*|\.[0-9]+)$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Delay must be a number of seconds, got '${__dybatpho_retry_delay_seconds}'"
   local __dybatpho_retry_exit_code=0 __dybatpho_retry_count=0
   until if ((${#__dybatpho_retry_argv[@]})); then
     ${__dybatpho_retry_argv[@]+"${__dybatpho_retry_argv[@]}"}

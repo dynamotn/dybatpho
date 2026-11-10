@@ -229,6 +229,8 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-033**: The retry delay computation MUST read a delay, a cap or an override with leading zeros in base ten, so a `Retry-After: 08` waits eight seconds.
 - **FR-034**: The IPv6 parser behind `is_ipv6` and `validate_is ipv6` MUST refuse a dotted IPv4 part that is not the last 32 bits of the address, such as `1.2.3.4::`.
 - **FR-035**: `dybatpho::has_version SPEC` MUST answer, without stopping the script, whether a command is installed and satisfies its range; SPEC MUST take the `doctor` registry syntax -- `cmd`, `cmd>=1.2`, alternatives `a|b>=2` -- read by the same splitter `doctor` uses, and a version that cannot be read MUST NOT satisfy a range.
+- **FR-036**: `dybatpho::has_version` MUST read a glob character in a range (`bash>=5.*`) as text, whatever `nullglob`, `failglob` or the working directory hold.
+- **FR-037**: `dybatpho::retry_until` MUST refuse a delay that is not a plain decimal number of seconds before running the command, as `dybatpho::retry` refuses its delay settings.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -302,6 +304,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-037**: Compute a delay with an override of `08`, a base of `09` and a cap of `09`, and verify each is read in base ten.
 - **IT-038**: Verify `1.2.3.4::`, `1:2:1.2.3.4::` and `1.2.3.4::1` are refused and `::1.2.3.4` is accepted.
 - **IT-039**: Ask `has_version` about a fake tool alone, with ranges it meets and misses, through alternatives, and with no readable version; it returns 0 or 1 and prints nothing.
+- **IT-040**: Ask `has_version` for `faketool>=5.*` under `nullglob` and under `failglob`, and get yes; run `retry_until 1 two false` and see it refuse.
 
 ## Acceptance Criteria *(mandatory)*
 

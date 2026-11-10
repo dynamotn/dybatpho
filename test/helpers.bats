@@ -1174,6 +1174,17 @@ EOF
   assert_success
 }
 
+@test "dybatpho::retry_until refuses a delay that is not a number" {
+  local delay
+  for delay in two "" 1m30 -1; do
+    run --separate-stderr dybatpho::retry_until 1 "${delay}" false
+    assert_failure
+    assert_stderr --partial "Delay must be a number of seconds, got '${delay}'"
+  done
+  run_traced dybatpho::retry_until 1 0.01 true
+  assert_success
+}
+
 @test "dybatpho::retry refuses a delay setting that is not a whole number" {
   # These reached `local -i`, so `0.5` ended the script with a bare arithmetic
   # error and an array subscript ran the command inside it.
@@ -1400,6 +1411,16 @@ EOF
   require_fake_tool faketool "faketool 1.7.1"
   run_traced -0 dybatpho::has_version 'no-such-tool-here|faketool>=1.6'
   run_traced -1 dybatpho::has_version 'no-such-tool-here|faketool>=2'
+}
+
+@test "dybatpho::has_version reads a glob character in a range as text, whatever the shell options" {
+  require_fake_tool faketool "faketool 5.2.1"
+  shopt -s nullglob
+  run_traced -0 dybatpho::has_version 'faketool>=5.*'
+  shopt -u nullglob
+  shopt -s failglob
+  run_traced -0 dybatpho::has_version 'no-such-tool-here|faketool>=5.*'
+  shopt -u failglob
 }
 
 @test "dybatpho::has_version counts a version it cannot read as not satisfying a range" {

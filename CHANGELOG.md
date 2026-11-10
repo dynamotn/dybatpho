@@ -21,6 +21,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`helpers` — `dybatpho::retry_until` refuses a delay that is not a number**
+  such as `two` or `1m30`, instead of retrying at once while its message
+  promised a wait.
+- **`helpers` — `dybatpho::has_version` no longer expands glob characters in a
+  range,** so `bash>=5.*` is answered correctly under `nullglob` and no longer
+  stops the script under `failglob`.
 - **`string` — `dybatpho::split` on a multi-character delimiter runs in
   linear time.** Splitting 20000 fields on `, ` or `::` takes about a second
   instead of about 40s; empty fields are kept as before.

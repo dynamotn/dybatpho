@@ -186,28 +186,52 @@ function __dybatpho_log_json_escape_into {
   __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\t'/\\t}"
   __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\b'/\\b}"
   __dybatpho_log_json_value="${__dybatpho_log_json_value//$'\f'/\\f}"
-  # The walk below costs a pass per character, so it runs only when something
-  # is left that the substitutions above could not spell.
+  # One global substitution per control code point that is left: a walk by
+  # character rebuilt the string once per escape and took seconds on a line
+  # full of colour codes. Each code point is a literal, not a bracket range,
+  # which the locale's collation resolves and a multi-byte character can fall in.
   if [[ "${__dybatpho_log_json_value}" == *[[:cntrl:]]* ]]; then
-    local __dybatpho_log_json_walked="" __dybatpho_log_json_index
-    local __dybatpho_log_json_char __dybatpho_log_json_code
-    for ((__dybatpho_log_json_index = 0;  \
-    __dybatpho_log_json_index < ${#__dybatpho_log_json_value};  \
-    __dybatpho_log_json_index++)); do
-      __dybatpho_log_json_char="${__dybatpho_log_json_value:__dybatpho_log_json_index:1}"
-      # The code point decides, not a bracket range: a range is resolved by the
-      # locale's collation and a multi-byte character can fall inside one.
-      printf -v __dybatpho_log_json_code '%d' "'${__dybatpho_log_json_char}"
-      if ((__dybatpho_log_json_code < 32 || __dybatpho_log_json_code == 127)); then
-        printf -v __dybatpho_log_json_walked '%s\\u%04x' \
-          "${__dybatpho_log_json_walked}" "${__dybatpho_log_json_code}"
-      else
-        __dybatpho_log_json_walked+="${__dybatpho_log_json_char}"
-      fi
+    local __dybatpho_log_json_code __dybatpho_log_json_c __dybatpho_log_json_u
+    for __dybatpho_log_json_code in {1..31} 127; do
+      printf -v __dybatpho_log_json_c '\\0%03o' "${__dybatpho_log_json_code}"
+      printf -v __dybatpho_log_json_c '%b' "${__dybatpho_log_json_c}"
+      [[ "${__dybatpho_log_json_value}" == *"${__dybatpho_log_json_c}"* ]] || continue
+      printf -v __dybatpho_log_json_u '\\u%04x' "${__dybatpho_log_json_code}"
+      __dybatpho_log_json_value="${__dybatpho_log_json_value//"${__dybatpho_log_json_c}"/"${__dybatpho_log_json_u}"}"
     done
-    __dybatpho_log_json_value="${__dybatpho_log_json_walked}"
   fi
   __dybatpho_log_json_escape_out="${__dybatpho_log_json_value}"
+}
+
+#######################################
+# @description Spell out the control characters of a string in caret notation
+#   (`^[` for ESC, `^?` for DEL), into a variable, so text from a caller reaches
+#   a terminal as text: an escape sequence in it could otherwise retitle the
+#   window, clear the screen, or write the clipboard. Shared by the text log
+#   line, `tui` and `screen`.
+# @arg $1 string Name of the variable receiving the text
+# @arg $2 string Input text
+# @arg $3 string Control characters to leave as they are, such as a newline
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_log_visible_into {
+  local -n __dybatpho_log_visible_out="$1"
+  local __dybatpho_log_visible_text="${2-}" __dybatpho_log_visible_keep="${3-}"
+  # Same linear shape as the JSON escaper: one substitution per code point left.
+  local __dybatpho_log_vis_code __dybatpho_log_vis_c __dybatpho_log_vis_r
+  if [[ "${__dybatpho_log_visible_text}" == *[[:cntrl:]]* ]]; then
+    for __dybatpho_log_vis_code in {1..31} 127; do
+      printf -v __dybatpho_log_vis_c '\\0%03o' "${__dybatpho_log_vis_code}"
+      printf -v __dybatpho_log_vis_c '%b' "${__dybatpho_log_vis_c}"
+      [[ "${__dybatpho_log_visible_text}" == *"${__dybatpho_log_vis_c}"* ]] || continue
+      [[ "${__dybatpho_log_visible_keep}" != *"${__dybatpho_log_vis_c}"* ]] || continue
+      printf -v __dybatpho_log_vis_r '^\\0%03o' $((__dybatpho_log_vis_code ^ 64))
+      printf -v __dybatpho_log_vis_r '%b' "${__dybatpho_log_vis_r}"
+      __dybatpho_log_visible_text="${__dybatpho_log_visible_text//"${__dybatpho_log_vis_c}"/"${__dybatpho_log_vis_r}"}"
+    done
+  fi
+  __dybatpho_log_visible_out="${__dybatpho_log_visible_text}"
 }
 
 #######################################
@@ -512,10 +536,8 @@ function __dybatpho_log_json_event_into {
   __dybatpho_log_hostname > /dev/null
   local event_format='{"timestamp":"%s","level":"%s","source":"%s","message":"%s","request_id":"%s",'
   event_format+='"hostname":"%s","pid":%s,"duration_ms":%s%s%s}\n'
-  local log_context_json=""
-  if ((${#__dybatpho_log_context_keys[@]} > 0)); then
-    log_context_json=$(__dybatpho_log_context_json)
-  fi
+  local log_context_json
+  __dybatpho_log_context_json_into log_context_json
   local log_json_escape
   __dybatpho_log_json_escape_into log_json_escape "${message}"
   local log_json_escape_2
@@ -619,6 +641,14 @@ function __dybatpho_log_write_file {
   local log_event
   __dybatpho_log_json_event_into log_event "${log_timestamp}" "${log_level}" "${source}" \
     "${message}" "$((log_now_ms - DYBATPHO_LOG_START_MS))" "${extra_fields}"
+  # A file this sink creates -- the first one, or the next one after a rotation
+  # -- is private, as `dybatpho::log_to_file` makes it, whatever the umask.
+  if [[ ! -e "${log_file}" ]]; then
+    (
+      umask 077
+      : >> "${log_file}"
+    ) || return 0
+  fi
   printf '%s' "${log_event}" >> "${log_file}"
   __dybatpho_log_count_bytes "${log_file}" "${log_event}"
 }
@@ -893,13 +923,14 @@ function __dybatpho_log_inspect {
   if [[ "${DYBATPHO_LOG_FORMAT:-${LOG_FORMAT:-text}}" == "json" ]]; then
     __dybatpho_log_structured "${log_level}" "${indicator}" "${message}" "${extra_fields}"
   else
-    local log_context_text="" log_timestamp
-    if ((${#__dybatpho_log_context_keys[@]} > 0)); then
-      log_context_text=$(__dybatpho_log_context_text)
-    fi
+    local log_context_text log_timestamp
+    __dybatpho_log_context_text_into log_context_text
+    # Only what the caller wrote is spelled out, never the colour added below,
+    # and a line break or tab in it is kept.
+    __dybatpho_log_visible_into message "${message}${log_context_text}" $'\n\t'
     __dybatpho_log_timestamp_into log_timestamp
     __dybatpho_log "${log_level}" \
-      "${log_timestamp} ‖ ${log_level_text} ‖ ${indicator}: ${message}${log_context_text}" \
+      "${log_timestamp} ‖ ${log_level_text} ‖ ${indicator}: ${message}" \
       stderr "${color}"
   fi
 }
@@ -1649,43 +1680,44 @@ function dybatpho::fatal {
 
 #######################################
 # @description Render the fields registered with `dybatpho::log_context` as a
-#   JSON fragment ready to be spliced into a structured event.
+#   JSON fragment ready to be spliced into a structured event, into a variable,
+#   so a log line does not start a process for it.
 #
 #   Values are redacted here rather than when the field is registered, so a
 #   secret registered after the fact is still masked on the next event.
-# @noargs
-# @stdout `,"name":"value"` for every registered field, in registration order
+# @arg $1 string Name of the variable receiving the fragment
+# @set The named variable: `,"name":"value"` for every registered field, in registration order
 # @internal
 #######################################
-function __dybatpho_log_context_json {
-  ((${#__dybatpho_log_context_keys[@]} > 0)) || return 0
-  local key value
-  for key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
-    value="${__dybatpho_log_context_values[${key}]-}"
-    __dybatpho_log_redact value
-    local log_json_escape
-    __dybatpho_log_json_escape_into log_json_escape "${value}"
-    local log_json_escape_2
-    __dybatpho_log_json_escape_into log_json_escape_2 "${key}"
-    printf ',"%s":"%s"' \
-      "${log_json_escape_2}" \
-      "${log_json_escape}"
+function __dybatpho_log_context_json_into {
+  local -n __dybatpho_log_context_json_out="$1"
+  __dybatpho_log_context_json_out=""
+  local __dybatpho_log_context_key __dybatpho_log_context_value
+  local __dybatpho_log_context_k __dybatpho_log_context_v
+  for __dybatpho_log_context_key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
+    __dybatpho_log_context_value="${__dybatpho_log_context_values[${__dybatpho_log_context_key}]-}"
+    __dybatpho_log_redact __dybatpho_log_context_value
+    __dybatpho_log_json_escape_into __dybatpho_log_context_v "${__dybatpho_log_context_value}"
+    __dybatpho_log_json_escape_into __dybatpho_log_context_k "${__dybatpho_log_context_key}"
+    __dybatpho_log_context_json_out+=",\"${__dybatpho_log_context_k}\":\"${__dybatpho_log_context_v}\""
   done
 }
 
 #######################################
-# @description Render the registered context fields for a human-readable line.
-# @noargs
-# @stdout ` name=value` for every registered field, in registration order
+# @description Render the registered context fields for a human-readable line,
+#   into a variable, so a log line does not start a process for it.
+# @arg $1 string Name of the variable receiving the text
+# @set The named variable: ` name=value` for every registered field, in registration order
 # @internal
 #######################################
-function __dybatpho_log_context_text {
-  ((${#__dybatpho_log_context_keys[@]} > 0)) || return 0
-  local key value
-  for key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
-    value="${__dybatpho_log_context_values[${key}]-}"
-    __dybatpho_log_redact value
-    printf ' %s=%s' "${key}" "${value}"
+function __dybatpho_log_context_text_into {
+  local -n __dybatpho_log_context_text_out="$1"
+  __dybatpho_log_context_text_out=""
+  local __dybatpho_log_context_key __dybatpho_log_context_value
+  for __dybatpho_log_context_key in ${__dybatpho_log_context_keys[@]+"${__dybatpho_log_context_keys[@]}"}; do
+    __dybatpho_log_context_value="${__dybatpho_log_context_values[${__dybatpho_log_context_key}]-}"
+    __dybatpho_log_redact __dybatpho_log_context_value
+    __dybatpho_log_context_text_out+=" ${__dybatpho_log_context_key}=${__dybatpho_log_context_value}"
   done
 }
 

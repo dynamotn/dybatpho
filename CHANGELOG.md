@@ -13,6 +13,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Changed
 
+- **`logging` — JSON escaping keeps up with text full of control characters,
+  and context fields no longer start a process per log line.**
 - **`scripts/test.sh` runs the suite faster.** Every test file gets its own
   Bats run even with GNU parallel, so the files' tests are gathered side by
   side instead of one file after another, and the test helper no longer
@@ -205,6 +207,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Security
 
+- **`logging` — a text log line can no longer drive the terminal.** Control
+  characters in the message and context fields, such as an OSC title or a
+  clear-screen sequence from untrusted input, are shown in caret notation
+  (`^[`); line breaks, tabs and the level colour are kept.
+- **`logging` — a log file the sink recreates after rotation, or opens through
+  `LOG_FILE` alone, is no longer readable by other users;** every file the
+  sink creates is mode 600 whatever the umask.
 - **`ai` — the provider base URL no longer appears in the process table.**
   Buffered and streaming calls and the Ollama probe pass
   `DYBATPHO_AI_BASE_URL` to curl through its private config, so credentials

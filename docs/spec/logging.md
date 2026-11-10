@@ -328,6 +328,10 @@ dybatpho::log_context clear
 - `DYBATPHO_LOG_FORMAT` is set to a value other than `json` (the implementation uses
   text output).
 - A message contains quotes, backslashes, or control characters in JSON mode.
+- A text-mode message carries terminal escape sequences, such as an OSC title
+  or a clear-screen sequence, taken from untrusted input.
+- The umask is permissive when the log file is first created or recreated
+  after a rotation.
 - `COLUMNS` or terminal detection is unavailable while rendering a box.
 - A progress percentage is zero, 100, or outside the usual range.
 - Trace helpers run in environments that use traps or child shells.
@@ -487,6 +491,16 @@ dybatpho::log_context clear
   file size; it MUST keep the count of bytes it appends and measure the file
   only when the path changes or the count reaches the threshold.
 - **FR-051**: `dybatpho::progress_bar` MUST show a percentage over 100 as a full bar of the requested width.
+- **FR-052**: Every log file the file sink creates, including the one that
+  replaces a rotated file and one named only through `LOG_FILE` or
+  `DYBATPHO_LOG_FILE`, MUST be created with mode `600` whatever the umask.
+- **FR-053**: A text log line MUST show every control character of the
+  caller's message and context fields other than a line break and a tab in
+  caret notation (`^[` for ESC, `^?` for DEL), so the message cannot drive the
+  terminal; the level colour the module adds MUST still apply.
+- **FR-054**: JSON string escaping MUST take time linear in the length of the
+  value, however many control characters it holds.
+- **FR-055**: Rendering context fields onto a log line MUST NOT start a process.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -632,6 +646,15 @@ dybatpho::log_context clear
 - **IT-038**: Log twenty lines with `wc` replaced by a counting function and
   verify it ran at most twice; set a threshold of three seed lines and verify
   the file rotates only once it is crossed.
+- **IT-039**: Under umask `022`, rotate a file opened with
+  `dybatpho::log_to_file` and log to a file named only through `LOG_FILE`, and
+  verify both new files have mode `600`.
+- **IT-040**: Log a text line whose message holds an OSC title, a clear-screen
+  sequence, BEL, CR and DEL, with a context field holding ESC, and verify none
+  reaches stderr raw, each is spelled in caret notation, and a newline and a
+  tab survive.
+- **IT-041**: Escape 8000 `\001` characters for JSON in under two seconds and
+  verify each became `\u0001`.
 
 ## Acceptance Criteria *(mandatory)*
 

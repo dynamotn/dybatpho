@@ -1621,3 +1621,46 @@ _logging_child() {
   assert_failure
   assert_output --partial "Cannot create log file '${directory}/app.log'"
 }
+
+@test "a log file recreated after rotation, or opened through LOG_FILE alone, only its owner can read" {
+  # `dybatpho::log_to_file` made the first file private, but the line after a
+  # rotation recreated it under the umask, and a sink set through `LOG_FILE`
+  # alone never went through that call at all.
+  umask 022
+  local log_file="${BATS_TEST_TMPDIR}/rotated-private.log"
+  dybatpho::log_to_file "${log_file}"
+  export DYBATPHO_LOG_FILE_MAX_BYTES=1
+  dybatpho::info "first" 2> /dev/null
+  dybatpho::info "second" 2> /dev/null
+  assert_file_exist "${log_file}.1"
+  assert_equal "$(stat -L -c '%a' "${log_file}" 2> /dev/null || stat -L -f '%Lp' "${log_file}")" "600"
+
+  local bare_file="${BATS_TEST_TMPDIR}/bare-private.log"
+  dybatpho::log_to_file off
+  export LOG_FILE="${bare_file}"
+  dybatpho::info "bare" 2> /dev/null
+  assert_equal "$(stat -L -c '%a' "${bare_file}" 2> /dev/null || stat -L -f '%Lp' "${bare_file}")" "600"
+}
+
+@test "a text log line shows control characters in its message instead of sending them to the terminal" {
+  export LOG_FORMAT=text
+  dybatpho::log_context add stage=$'x\033[2J'
+  run_traced --separate-stderr dybatpho::warn $'title\033]0;owned\a\033[2J\rcr\177 line\ttab\nnext'
+  # The terminal must never see the sequences; a reader sees them spelled out.
+  [[ "${stderr}" != *$'\033]'* && "${stderr}" != *$'\033[2J'* && "${stderr}" != *$'\a'* ]]
+  [[ "${stderr}" != *$'\r'* && "${stderr}" != *$'\177'* ]]
+  assert_stderr --partial 'title^[]0;owned^G^[[2J^Mcr^? line'
+  # A line break and a tab the caller wrote are kept, as is the context field.
+  assert_stderr --partial $'line\ttab\nnext stage=x^[[2J'
+}
+
+@test "the JSON string escaper stays linear in the number of control characters" {
+  local value escaped start="${SECONDS}"
+  printf -v value '%8000s' ''
+  value="${value// /$'\001'}"
+  __dybatpho_log_json_escape_into escaped "${value}"
+  # The walk it replaces took seconds here and grew with the square of the count.
+  ((SECONDS - start < 2))
+  assert_equal "${#escaped}" "48000"
+  assert_equal "${escaped:0:12}" '\u0001\u0001'
+}

@@ -150,6 +150,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Added
 
+- **`db` — keep a script's state in SQLite, safely.**
+  `dybatpho::db_exec`, `dybatpho::db_query` (JSON) and `dybatpho::db_value`
+  run SQL with `:name` parameters passed as `name=value`; every value is bound
+  hex-encoded, so a quote, a newline or `; DROP TABLE` stays data, and neither
+  SQL nor values appear on `sqlite3`'s command line. Each call is one
+  `BEGIN IMMEDIATE` transaction that waits for other processes, so
+  `update ... returning` claims a task atomically. `dybatpho::db_migrate`
+  applies numbered `.sql` files once, safely from several processes, and
+  `DYBATPHO_DB_WAL=true` lets readers and a writer work at once.
 - **`profile` — find where a script spends its time.**
   `dybatpho::profile_begin`/`profile_end` and `dybatpho::profile_run` time
   named blocks, nested or not, and `dybatpho::profile_report` prints calls,

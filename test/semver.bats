@@ -401,6 +401,26 @@ setup() {
   run ! dybatpho::semver_max nonsense
 }
 
+@test "bump, ranges and coerce refuse an identifier too large to compute with" {
+  # 99999999999999999999 wrapped to 7766279631452241920 in a bump.
+  run --separate-stderr ! dybatpho::semver_bump 99999999999999999999.0.0 major
+  assert_stderr --partial "semver_bump: Identifier '99999999999999999999' is too large"
+  run --separate-stderr ! dybatpho::semver_bump 1.9223372036854775807.0 minor
+  assert_stderr --partial "is too large"
+  assert_equal "$(dybatpho::semver_bump 1.2.9223372036854775806 patch)" "1.2.9223372036854775807"
+  # Only the part that is bumped counts.
+  assert_equal "$(dybatpho::semver_bump 1.99999999999999999999.3 major)" "2.0.0"
+  run --separate-stderr ! dybatpho::semver_satisfies 9223372036854775807.1.0 '^9223372036854775807.0.0'
+  assert_stderr --partial "Identifier '9223372036854775807' is too large"
+  run --separate-stderr ! dybatpho::semver_satisfies 1.0.0 '~99999999999999999999.0.0'
+  assert_stderr --partial "is too large"
+  # A comparison does no arithmetic, so it still takes a long identifier.
+  run dybatpho::semver_satisfies 99999999999999999999.0.0 '>= 1.0.0'
+  assert_success
+  run --separate-stderr ! dybatpho::semver_coerce 18446744073709551617.0
+  assert_stderr --partial "semver_coerce: Identifier '18446744073709551617' is too large"
+}
+
 @test "dybatpho::semver_coerce fills the fields a real version leaves out" {
   assert_equal "$(dybatpho::semver_coerce 1.35)" "1.35.0"
   assert_equal "$(dybatpho::semver_coerce 4)" "4.0.0"

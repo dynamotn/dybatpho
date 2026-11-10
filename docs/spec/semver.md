@@ -173,6 +173,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **FR-014**: `semver_valid`, and every function that validates through it, MUST refuse a leading zero in a numeric part or identifier and an empty identifier, as the SemVer grammar does, while keeping the optional leading `v`; comparison MUST refuse an empty identifier.
 - **FR-015**: A range MUST read an operator followed by whitespace, such as `>= 1.2.3`, as one comparator.
 - **FR-016**: `semver_release_type` MUST compare numbers by value whatever their length.
+- **FR-017**: `semver_bump`, a `^` or `~` range, a partial version in a range, and `semver_coerce` MUST refuse a numeric identifier that is not below 9223372036854775807, naming it, rather than let Bash arithmetic wrap it. `semver_valid` and the comparisons keep accepting identifiers of any length; a bump uses only the part it raises.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -221,6 +222,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **IT-008**: Compare `18446744073709551617.0.0` with `2.0.0` and the same numbers as pre-release identifiers; check `8.5.0` and `9.0.0` against `^08.1`, `8.9.3` against `~8.09`, and `8.0.0` against `08`.
 - **IT-009**: Refuse `01.2.3`, `1.0.0-01`, `1.0.0-a..b` and `1.0.0+b..c`, accept `v1.0.0-0.a-1.10+001.x`, and refuse to compare `1.0.0-a..b`.
 - **IT-010**: Check `1.5.0` against `>= 1.2.3` and `3.1.4` against `^ 1.2 || ~ 3.1`, and classify `1.0.0` to `18446744073709551617.0.0` as `major`.
+- **IT-011**: Refuse to bump `99999999999999999999.0.0`, to bound `^9223372036854775807.0.0` or `~99999999999999999999.0.0`, and to coerce `18446744073709551617.0`; bump `1.99999999999999999999.3` by major, and compare it with `>= 1.0.0`.
 
 ## Acceptance Criteria *(mandatory)*
 

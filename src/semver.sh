@@ -238,6 +238,25 @@ function __dybatpho_semver_cmp_into {
 }
 
 #######################################
+# @description Refuse a numeric identifier that Bash arithmetic cannot bump.
+#   `semver_valid` accepts identifiers of any length, but `$(( ))` wraps past
+#   64 bits: `99999999999999999999` would be bumped to `7766279631452241920`.
+#   Nineteen digits stay below 2^64, so a wrapped one is negative.
+# @arg $1 string Name of the function to report
+# @arg $2 string The identifier, as digits
+# @exitcode 1 Stop the script when the identifier is not below 9223372036854775807
+# @internal
+#######################################
+function __dybatpho_semver_check_int64 {
+  local __sv_check_digits="$2"
+  __sv_check_digits="${__sv_check_digits#"${__sv_check_digits%%[!0]*}"}"
+  local __sv_check_value="$((10#0${__sv_check_digits}))"
+  if ((${#__sv_check_digits} > 19 || __sv_check_value < 0 || __sv_check_value == 9223372036854775807)); then
+    dybatpho::die "$1: Identifier '$2' is too large, it must be below 9223372036854775807"
+  fi
+}
+
+#######################################
 # @description Bump a semver version by the specified part.
 # @arg $1 string Version string to bump
 # @arg $2 string Part to bump: major | minor | patch
@@ -262,6 +281,10 @@ function dybatpho::semver_bump {
   local -a parts
   __dybatpho_semver_parse_into parts "${version}"
   local major="${parts[0]}" minor="${parts[1]}" patch="${parts[2]}"
+  case "${part}" in
+    major | minor | patch) __dybatpho_semver_check_int64 semver_bump "${!part}" ;;
+    *) ;; # rejected below
+  esac
 
   case "${part}" in
     major)
@@ -439,6 +462,16 @@ function __dybatpho_semver_expand {
   dybatpho::semver_valid "${filled}" \
     || dybatpho::die "${FUNCNAME[1]-${FUNCNAME[0]}}: Not a usable version in range: '${token}'"
   IFS='.' read -r major minor patch <<< "${filled%%[-+]*}"
+  case "${operator}" in
+    '>' | '>=' | '<' | '<=' | '=') ;;
+    *)
+      # The upper bound adds one to a part, which must not wrap.
+      local caller="${FUNCNAME[1]-${FUNCNAME[0]}}"
+      __dybatpho_semver_check_int64 "${caller}" "${major}"
+      __dybatpho_semver_check_int64 "${caller}" "${minor}"
+      __dybatpho_semver_check_int64 "${caller}" "${patch}"
+      ;;
+  esac
   # Read in base ten: `^08.1` stopped on an invalid octal `08`.
   major=$((10#${major})) minor=$((10#${minor})) patch=$((10#${patch}))
 
@@ -732,7 +765,10 @@ function dybatpho::semver_coerce {
 
   local -a fields
   IFS='.' read -r -a fields <<< "${core}"
-  local result
+  local result field
+  for field in "${fields[@]:0:3}"; do
+    __dybatpho_semver_check_int64 "${FUNCNAME[0]}" "${field}"
+  done
   # `10#` is what strips the leading zeros: `unzip` answers `6.00`, and `06`
   # is not a valid semver field.
   printf -v result '%d.%d.%d' \

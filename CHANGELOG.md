@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`semver` — bumping, `^`/`~`/partial ranges and `dybatpho::semver_coerce`
+  refuse an identifier too large for shell arithmetic** instead of wrapping
+  it; `semver_valid` and comparisons still accept any length.
 - **`text` — `dybatpho::text_strip_ansi` keeps up with progress-bar logs.** A
   line holding thousands of escape sequences used to take time quadratic in
   their number; it is now stripped in one pass with the same output.

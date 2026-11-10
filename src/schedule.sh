@@ -449,7 +449,9 @@ function dybatpho::schedule_reset {
 #
 #   Fields are the usual five -- minute, hour, day of month, month, day of
 #   week -- each one `*`, a number, `a-b`, a comma-separated list, or any of
-#   those with a `/n` step. Sunday is `0` or `7`.
+#   those with a `/n` step. Sunday is `0` or `7`. Names such as `mon` or `jan`
+#   are not read; they, a value out of its field's range, a reversed range and
+#   a zero step make the expression malformed rather than "not due".
 #
 #   When both day of month and day of week are restricted, the expression
 #   matches if **either** does, which is what cron itself does and what a
@@ -480,26 +482,28 @@ function dybatpho::schedule_cron_due {
   read -r minute hour day month weekday <<< "${parts}"
 
   # `10#` on every one: `%M` and friends are zero-padded, and `08` is an
-  # invalid octal literal to Bash arithmetic.
-  __dybatpho_schedule_field_matches "${fields[0]}" "$((10#${minute}))" 0 59 || return 1
-  __dybatpho_schedule_field_matches "${fields[1]}" "$((10#${hour}))" 0 23 || return 1
-  __dybatpho_schedule_field_matches "${fields[3]}" "$((10#${month}))" 1 12 || return 1
+  # invalid octal literal to Bash arithmetic. Every field is read before any
+  # verdict, so a malformed one is reported even when another does not match.
+  # Each status is 0 for a match, 1 for none and 2 for a malformed field.
+  local minute_status=0 hour_status=0 day_status=0 month_status=0 weekday_status=0
+  __dybatpho_schedule_field_matches "${fields[0]}" "$((10#${minute}))" 0 59 || minute_status=$?
+  __dybatpho_schedule_field_matches "${fields[1]}" "$((10#${hour}))" 0 23 || hour_status=$?
+  __dybatpho_schedule_field_matches "${fields[2]}" "$((10#${day}))" 1 31 || day_status=$?
+  __dybatpho_schedule_field_matches "${fields[3]}" "$((10#${month}))" 1 12 || month_status=$?
+  __dybatpho_schedule_weekday_matches "${fields[4]}" "$((10#${weekday}))" || weekday_status=$?
+  if ((minute_status == 2 || hour_status == 2 || day_status == 2 || month_status == 2 || weekday_status == 2)); then
+    dybatpho::error "${FUNCNAME[0]}: Not a valid cron expression: ${expression}"
+    return 2
+  fi
+  ((minute_status == 0 && hour_status == 0 && month_status == 0)) || return 1
 
   # A day field starting with `*` counts as unrestricted, `*/2` included, which
   # is how cron decides between "both days" and "either day".
-  local day_restricted=1 weekday_restricted=1
-  [[ "${fields[2]}" == "*"* ]] && day_restricted=0
-  [[ "${fields[4]}" == "*"* ]] && weekday_restricted=0
-
-  local day_ok=1 weekday_ok=1
-  __dybatpho_schedule_field_matches "${fields[2]}" "$((10#${day}))" 1 31 || day_ok=0
-  __dybatpho_schedule_weekday_matches "${fields[4]}" "$((10#${weekday}))" || weekday_ok=0
-
-  if ((day_restricted && weekday_restricted)); then
-    ((day_ok || weekday_ok)) || return 1
+  if [[ "${fields[2]}" != "*"* && "${fields[4]}" != "*"* ]]; then
+    ((day_status == 0 || weekday_status == 0)) || return 1
     return 0
   fi
-  ((day_ok && weekday_ok)) || return 1
+  ((day_status == 0 && weekday_status == 0)) || return 1
   return 0
 }
 
@@ -509,13 +513,15 @@ function dybatpho::schedule_cron_due {
 # @arg $2 number Day of week, `0` for Sunday
 # @exitcode 0 The field matches
 # @exitcode 1 It does not
+# @exitcode 2 The field is malformed
 #######################################
 function __dybatpho_schedule_weekday_matches {
-  __dybatpho_schedule_field_matches "$1" "$2" 0 7 && return 0
+  local status=0
+  __dybatpho_schedule_field_matches "$1" "$2" 0 7 || status=$?
   # `7` and `0` are both Sunday, so an expression naming one must match a time
   # reported as the other.
-  (($2 == 0)) && __dybatpho_schedule_field_matches "$1" 7 0 7 && return 0
-  return 1
+  ((status == 1 && $2 == 0)) || return "${status}"
+  __dybatpho_schedule_field_matches "$1" 7 0 7
 }
 
 #######################################
@@ -526,36 +532,43 @@ function __dybatpho_schedule_weekday_matches {
 # @arg $4 number Highest value the field allows
 # @exitcode 0 The field matches
 # @exitcode 1 It does not
+# @exitcode 2 The field is malformed: not a number, out of range, a reversed
+#   range or a zero step
 #######################################
 function __dybatpho_schedule_field_matches {
-  local specification="$1" value="$2" lowest="$3" highest="$4"
+  local specification="$1" value="$2" lowest="$3" highest="$4" matched=1
+  # `read` drops a trailing empty alternative, so `1,` is caught here.
+  [[ "${specification}" != *, ]] || return 2
   local -a alternatives=()
   IFS=',' read -r -a alternatives <<< "${specification}"
 
+  # Every alternative is checked, not only those up to the first match, so
+  # `30,99` is malformed whatever the minute.
   local alternative step first last
   for alternative in ${alternatives[@]+"${alternatives[@]}"}; do
     step=1
     if [[ "${alternative}" == */* ]]; then
-      step="${alternative##*/}"
+      step="${alternative#*/}"
       alternative="${alternative%%/*}"
-      [[ "${step}" =~ ^[1-9][0-9]*$ ]] || return 1
+      [[ "${step}" =~ ^[0-9]{1,4}$ ]] && ((10#${step} > 0)) || return 2
+      step="$((10#${step}))"
     fi
 
     if [[ "${alternative}" == "*" ]]; then
       first="${lowest}"
       last="${highest}"
-    elif [[ "${alternative}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+    elif [[ "${alternative}" =~ ^([0-9]{1,4})-([0-9]{1,4})$ ]]; then
       first="$((10#${BASH_REMATCH[1]}))"
       last="$((10#${BASH_REMATCH[2]}))"
-    elif [[ "${alternative}" =~ ^[0-9]+$ ]]; then
+    elif [[ "${alternative}" =~ ^[0-9]{1,4}$ ]]; then
       first="$((10#${alternative}))"
       last="${first}"
     else
-      return 1
+      return 2
     fi
+    ((first >= lowest && last <= highest && first <= last)) || return 2
 
-    ((value >= first && value <= last)) || continue
-    (((value - first) % step == 0)) && return 0
+    ((value >= first && value <= last && (value - first) % step == 0)) && matched=0
   done
-  return 1
+  return "${matched}"
 }

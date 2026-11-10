@@ -406,8 +406,17 @@ SCRIPT
   run --separate-stderr -2 dybatpho::schedule_cron_due "bad expr" "${FRIDAY}"
   assert_stderr --partial "five fields"
 
-  run_traced -1 dybatpho::schedule_cron_due "x * * * *" "${FRIDAY}"
-  run_traced -1 dybatpho::schedule_cron_due "*/0 * * * *" "${FRIDAY}"
+  # A malformed field read as "not due", so a typo silently never ran.
+  local expression
+  for expression in "x * * * *" "*/0 * * * *" "3O 10 * * *" "99 * * * *" "* 24 * * *" \
+    "* * 0 * *" "* * * 13 *" "* * * * 8" "30 10 * * mon" "30 10 * jan *" "5-1 * * * *" \
+    "1,,2 * * * *" "1, * * * *" "1/2/3 * * * *" "30,99 * * * *" "30 14 * * 9"; do
+    run --separate-stderr -2 dybatpho::schedule_cron_due "${expression}" "${FRIDAY}"
+    assert_stderr --partial "Not a valid cron expression"
+  done
+  # Valid at the edges of each field.
+  run_traced -1 dybatpho::schedule_cron_due "59 23 31 12 7" "${FRIDAY}"
+  run_traced -0 dybatpho::schedule_cron_due "0-59 0-23 1-31 1-12 0-7" "${FRIDAY}"
 }
 
 @test "dybatpho::schedule_cron_due defaults to the current time" {

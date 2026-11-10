@@ -100,7 +100,7 @@ dybatpho::schedule_every 60 -- check_health
 - Two triggers for the same key arrive at the same moment.
 - The marker directory does not exist yet.
 - A key would name a file outside the marker directory.
-- A cron field is zero-padded, has a zero step, or is not a number.
+- A cron field is zero-padded, has a zero step, is out of its range, names a day or month, or is not a number.
 - A cron expression names Sunday as `7` rather than `0`.
 - A script debounces without having loaded the `lock` module.
 - Several callers start `schedule_once_per` for the same key at the same moment, or one dies while holding the short claim around the marker.
@@ -141,6 +141,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-027**: `dybatpho::schedule_debounce` MUST treat a ticket removed during its window as a superseded trigger (exit code 9) rather than failing.
 - **FR-028**: `dybatpho::schedule_every` MUST end its wait between runs as soon as a HUP, INT or TERM arrives, then return once the run in progress is over.
 - **FR-029**: A reclaim older than a few seconds MUST be removed as left by a caller that died, so it never blocks its key for good.
+- **FR-030**: The cron predicate MUST check every field before matching and return exit code 2 for a value that is not a number, a value outside its field's range, a reversed range, a zero step, an empty list item, or a day or month name, which it does not read.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -192,6 +193,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-030**: Reset the key from a background job while a debounce window is open, and get exit code 9 with no output.
 - **IT-031**: Plant a stale claim and a stale reclaim directory, run once, and find the command ran and neither is left behind.
 - **IT-032**: Leave an empty ticket and verify the next debounce still runs its command.
+- **IT-033**: Get exit code 2 for `3O 10 * * *`, `99 * * * *`, `*/0 * * * *`, `30 10 * * mon`, a reversed range, an empty list item and an out-of-range alternative after a matching one, and accept the edges of every field.
 
 ## Acceptance Criteria *(mandatory)*
 

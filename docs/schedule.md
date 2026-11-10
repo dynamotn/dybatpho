@@ -39,7 +39,7 @@ case a variable cannot cover.
 - [`dybatpho::schedule_once_per`](#dybatphoschedule_once_per) — Run a command at most once in each period. The marker is a file, so the limit holds across separate invocations of the script rather than only within one run. A named period is a calendar bucket -- `hour` means "once in this clock hour", not "once in any sixty minutes" -- while a number of seconds measures from the last run.
 - [`__dybatpho_schedule_bucket_into`](#__dybatpho_schedule_bucket_into) — Work out the bucket a period puts the current time in.
 - [`dybatpho::schedule_reset`](#dybatphoschedule_reset) — Forget what a key has recorded, so the next call runs.
-- [`dybatpho::schedule_cron_due`](#dybatphoschedule_cron_due) — Return success when a time matches a cron expression. This answers "am I due", which is what a script run from an existing scheduler needs. It deliberately does not compute the next fire time: that needs a full calendar walk, and a half-right answer about when something will next run is worse than no answer. Fields are the usual five -- minute, hour, day of month, month, day of week -- each one `*`, a number, `a-b`, a comma-separated list, or any of those with a `/n` step. Sunday is `0` or `7`. When both day of month and day of week are restricted, the expression matches if **either** does, which is what cron itself does and what a hand-written check almost always gets wrong.
+- [`dybatpho::schedule_cron_due`](#dybatphoschedule_cron_due) — Return success when a time matches a cron expression. This answers "am I due", which is what a script run from an existing scheduler needs. It deliberately does not compute the next fire time: that needs a full calendar walk, and a half-right answer about when something will next run is worse than no answer. Fields are the usual five -- minute, hour, day of month, month, day of week -- each one `*`, a number, `a-b`, a comma-separated list, or any of those with a `/n` step. Sunday is `0` or `7`. Names such as `mon` or `jan` are not read; they, a value out of its field's range, a reversed range and a zero step make the expression malformed rather than "not due". When both day of month and day of week are restricted, the expression matches if **either** does, which is what cron itself does and what a hand-written check almost always gets wrong.
 - [`__dybatpho_schedule_weekday_matches`](#__dybatpho_schedule_weekday_matches) — Match a day-of-week field, accepting `7` for Sunday.
 - [`__dybatpho_schedule_field_matches`](#__dybatpho_schedule_field_matches) — Match one cron field against one value.
 
@@ -271,7 +271,9 @@ will next run is worse than no answer.
 
 Fields are the usual five -- minute, hour, day of month, month, day of
 week -- each one `*`, a number, `a-b`, a comma-separated list, or any of
-those with a `/n` step. Sunday is `0` or `7`.
+those with a `/n` step. Sunday is `0` or `7`. Names such as `mon` or `jan`
+are not read; they, a value out of its field's range, a reversed range and
+a zero step make the expression malformed rather than "not due".
 
 When both day of month and day of week are restricted, the expression
 matches if **either** does, which is what cron itself does and what a
@@ -313,6 +315,7 @@ Match a day-of-week field, accepting `7` for Sunday.
 
 - `0`: The field matches
 - `1`: It does not
+- `2`: The field is malformed
 
 ---
 
@@ -333,3 +336,4 @@ Match one cron field against one value.
 
 - `0`: The field matches
 - `1`: It does not
+- `2`: The field is malformed: not a number, out of range, a reversed range or a zero step

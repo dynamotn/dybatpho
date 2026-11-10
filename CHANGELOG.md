@@ -27,6 +27,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`schedule` — `dybatpho::schedule_cron_due` reports a malformed expression
+  with exit code 2.** Typos such as `3O`, values like `99`, a `*/0` step,
+  reversed ranges and names like `mon` read as "not due", so the job silently
+  never ran.
 - **`lock` — reclaiming a stale lock no longer hands it to two processes;**
   reclaimers take turns behind a short guard and check the holder again.
 - **`lock` — a lock taken by a background worker belongs to that worker.** A

@@ -45,20 +45,31 @@ DYBATPHO_DB_WAL="${DYBATPHO_DB_WAL:-false}"
 __DYBATPHO_DB_COLUMN=$'\037'
 __DYBATPHO_DB_ROW=$'\036'
 __DYBATPHO_DB_NULL=$'\035NULL\035'
+# Whether this sqlite3 escapes control characters; read once, on first use.
+__DYBATPHO_DB_ESCAPES=""
 
 #######################################
-# @description Find the `:name` parameters a statement refers to, outside
-#   string literals, quoted identifiers and comments, and stop on the other
-#   placeholder forms, which `sqlite3` would bind as NULL without a word.
+# @description Read SQL the way sqlite3 will, outside string literals, quoted
+#   identifiers and comments, and collect the `:name` parameters it refers to.
+#   It stops the script on anything that would make sqlite3 do other than run
+#   that SQL in the call's transaction: a placeholder other than `:name`, which
+#   sqlite3 binds as NULL without a word; an unterminated literal or comment,
+#   which would swallow the `COMMIT` after it; and a line starting with `.`,
+#   which sqlite3 runs as a dot-command such as `.shell`.
 # @arg $1 string Name of the array receiving the parameter names, each once
 # @arg $2 string SQL
+# @arg $3 string `params` to collect `:name` references, `none` to refuse them
 # @set The named array
-# @exitcode 1 Stop script on a `$name`, `@name` or `?` placeholder
+# @exitcode 1 Stop script on any of the above
 # @internal
 #######################################
 function __dybatpho_db_scan_into {
   local -n __dybatpho_db_scan_names="$1"
-  local sql="$2" i=0 n="${#2}" c next end name
+  # Bytes, not characters: sqlite3 tokenizes bytes, and any byte at or above
+  # 0x80 is an identifier character to it.
+  local LC_ALL=C
+  local sql="$2" allow="$3" i=0 n="${#2}" c next rest end name run
+  local word="^([A-Za-z0-9_]|[^"$'\x01'"-"$'\x7f'"])+"
   local -A seen=()
   __dybatpho_db_scan_names=()
   while ((i < n)); do
@@ -67,19 +78,19 @@ function __dybatpho_db_scan_into {
     case "${c}" in
       "'" | '"' | '`')
         # A quote is escaped by doubling it, so the next lone one ends it.
-        end="${sql:i+1}"
-        end="${end%%"${c}"*}"
-        i=$((i + ${#end} + 2))
-        while [[ "${sql:i:1}" == "${c}" ]]; do
-          end="${sql:i+1}"
-          end="${end%%"${c}"*}"
+        while :; do
+          rest="${sql:i+1}"
+          [[ "${rest}" == *"${c}"* ]] || dybatpho::die "Unterminated ${c} in the SQL"
+          end="${rest%%"${c}"*}"
           i=$((i + ${#end} + 2))
+          [[ "${sql:i:1}" == "${c}" ]] || break
         done
         continue
         ;;
       '[')
-        end="${sql:i+1}"
-        end="${end%%]*}"
+        rest="${sql:i+1}"
+        [[ "${rest}" == *']'* ]] || dybatpho::die "Unterminated [ in the SQL"
+        end="${rest%%]*}"
         i=$((i + ${#end} + 2))
         continue
         ;;
@@ -93,26 +104,33 @@ function __dybatpho_db_scan_into {
         ;;
       /)
         if [[ "${next}" == '*' ]]; then
-          end="${sql:i+2}"
-          end="${end%%'*/'*}"
+          rest="${sql:i+2}"
+          [[ "${rest}" == *'*/'* ]] || dybatpho::die "Unterminated /* comment in the SQL"
+          end="${rest%%'*/'*}"
           i=$((i + ${#end} + 4))
           continue
         fi
         ;;
-      :)
-        if [[ "${sql:i+1}" =~ ^([A-Za-z_][A-Za-z0-9_]*) ]]; then
-          name="${BASH_REMATCH[1]}"
-          if [[ -z "${seen[${name}]-}" ]]; then
-            seen["${name}"]=1
-            __dybatpho_db_scan_names+=("${name}")
-          fi
-          i=$((i + 1 + ${#name}))
-          continue
+      .)
+        if ((i == 0)) || [[ "${sql:i-1:1}" == $'\n' ]]; then
+          dybatpho::die "A line of the SQL starts with '.', which sqlite3 would run as a dot-command"
         fi
         ;;
-      '$' | @)
-        [[ ! "${next}" =~ [A-Za-z_] ]] \
-          || dybatpho::die "Use :name placeholders, not ${c}${next}...: sqlite3 would bind it to NULL"
+      : | '$' | @ | '#')
+        run=""
+        [[ ! "${sql:i+1}" =~ ${word} ]] || run="${BASH_REMATCH[0]}"
+        if [[ -n "${run}" ]]; then
+          if [[ "${c}" != : || "${allow}" != params || ! "${run}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            local why="Use :name placeholders, a word passed as name=value, not ${c}${run}"
+            dybatpho::die "${why}: sqlite3 would bind it to NULL"
+          fi
+          if [[ -z "${seen[${run}]-}" ]]; then
+            seen["${run}"]=1
+            __dybatpho_db_scan_names+=("${run}")
+          fi
+          i=$((i + 1 + ${#run}))
+          continue
+        fi
         ;;
       '?') dybatpho::die "Use :name placeholders, not ?: sqlite3 would bind it to NULL" ;;
       *) ;;
@@ -134,8 +152,32 @@ function __dybatpho_db_hex_into {
     __dybatpho_db_hex=""
     return 0
   fi
-  __dybatpho_db_hex="$(printf '%s' "$2" | od -An -v -tx1)"
-  __dybatpho_db_hex="${__dybatpho_db_hex//[[:space:]]/}"
+  # `tr` strips the spaces: a pattern substitution over the whole text would
+  # take time quadratic in its length, minutes for a large value.
+  # None of the three can fail on a value already in memory.
+  # shellcheck disable=SC2312
+  __dybatpho_db_hex="$(printf '%s' "$2" | od -An -v -tx1 | tr -d ' \n')"
+}
+
+#######################################
+# @description Tell whether this `sqlite3` escapes control characters in its
+#   output, as 3.50 and later do, so `.mode` needs `--escape off`.
+# @noargs
+# @exitcode 0 It does
+# @exitcode 1 It does not
+# @internal
+#######################################
+function __dybatpho_db_escapes {
+  if [[ -z "${__DYBATPHO_DB_ESCAPES-}" ]]; then
+    local version major minor
+    version="$(sqlite3 --version 2> /dev/null)" || version=""
+    __DYBATPHO_DB_ESCAPES=false
+    if [[ "${version}" =~ ^([0-9]+)\.([0-9]+) ]]; then
+      major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}"
+      ((10#${major} > 3 || (10#${major} == 3 && 10#${minor} >= 50))) && __DYBATPHO_DB_ESCAPES=true
+    fi
+  fi
+  [[ "${__DYBATPHO_DB_ESCAPES}" == true ]]
 }
 
 #######################################
@@ -171,7 +213,13 @@ function __dybatpho_db_run {
     [[ -z "${passed[${name}]+set}" ]] || dybatpho::die "Parameter ${name} is passed twice"
     passed["${name}"]="${pair#*=}"
   done
-  __dybatpho_db_scan_into used "${sql}"
+  __dybatpho_db_scan_into used "${sql}" params
+  if [[ -n "${tail}" ]]; then
+    # Filled with nothing: the tail may hold no parameter at all.
+    # shellcheck disable=SC2034
+    local -a none=()
+    __dybatpho_db_scan_into none "${tail}" none
+  fi
   for name in ${used[@]+"${used[@]}"}; do
     [[ -n "${passed[${name}]+set}" ]] || dybatpho::die "Parameter :${name} is not passed"
   done
@@ -185,7 +233,13 @@ function __dybatpho_db_run {
   fi
   case "${mode}" in
     json) lines+=(".mode json") ;;
-    ascii) lines+=(".mode ascii" '.separator "\037" "\036"' '.nullvalue "\035NULL\035"') ;;
+    ascii)
+      # sqlite3 3.50 and later write control characters in caret notation
+      # unless told not to; earlier ones write them as they are.
+      local ascii=".mode ascii"
+      __dybatpho_db_escapes && ascii+=" --escape off"
+      lines+=("${ascii}" '.separator "\037" "\036"' '.nullvalue "\035NULL\035"')
+      ;;
     *) ;;
   esac
   lines+=(".param init")
@@ -196,8 +250,9 @@ function __dybatpho_db_run {
   # The newline before each `;` ends a trailing `--` comment first.
   lines+=("BEGIN IMMEDIATE;" "${sql}" ";" "${tail}" ";" "COMMIT;")
 
-  # A path that starts with `-` would be read as an option.
-  [[ "${db}" != -* ]] || db="./${db}"
+  # A relative path would be read as an option when it starts with `-`, and as
+  # a URI when it starts with `file:`; anchored, it is a file name.
+  [[ "${db}" == /* ]] || db="./${db}"
   mkdir -p -- "$(dirname -- "${db}")" || dybatpho::die "Cannot create the directory of ${db}"
   local output status=0
   output="$(printf '%s\n' "${lines[@]}" | sqlite3 -init /dev/null -batch "${db}")" || status=$?
@@ -345,7 +400,8 @@ function dybatpho::db_migrate {
     # Recorded by another process meanwhile: it applied this file.
     [[ "${err}" != *"UNIQUE constraint failed: dybatpho_migrations.version"* ]] || continue
     printf '%s\n' "${err}" >&2
-    dybatpho::error "Migration ${file##*/} failed; it took no effect"
+    local why="unless it ran COMMIT itself, which is not supported"
+    dybatpho::error "Migration ${file##*/} failed and was rolled back, ${why}"
     return 1
   done
 }

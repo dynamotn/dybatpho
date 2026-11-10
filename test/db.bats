@@ -174,3 +174,65 @@ _migrations() {
   PATH="$(path_without sqlite3)" run -127 --separate-stderr dybatpho::db_exec "${DB}" "select 1"
   assert_stderr --partial "sqlite3 isn't installed"
 }
+
+@test "dybatpho::db_value returns control characters as they are" {
+  local value=$'\x01x\x1b[31m'
+  dybatpho::db_exec "${DB}" "insert into t values ('c', :v)" v="${value}"
+  run_traced -0 dybatpho::db_value "${DB}" "select v from t where k = 'c'"
+  assert_output "${value}"
+}
+
+@test "dybatpho::db_exec stops on an unterminated comment, quote or bracket" {
+  local sql
+  for sql in "insert into t values ('a', 'b') /* note" "insert into t values ('a, 'b')" \
+    "select [k from t"; do
+    run -1 --separate-stderr dybatpho::db_exec "${DB}" "${sql}"
+    assert_stderr --partial "Unterminated"
+  done
+}
+
+@test "dybatpho::db_exec stops on every placeholder form sqlite3 would bind as NULL" {
+  local sql
+  # The placeholders are SQL, meant literally.
+  # shellcheck disable=SC2016
+  for sql in "select :idé" "select :1" 'select $1' "select @1" "select :é" 'select $é' "select #a"; do
+    run -1 --separate-stderr dybatpho::db_exec "${DB}" "${sql}" id=5
+    assert_stderr --partial "placeholder"
+  done
+}
+
+@test "dybatpho::db_exec refuses a line that sqlite3 would run as a dot-command" {
+  run -1 --separate-stderr dybatpho::db_exec "${DB}" $'select 1;\n.shell touch '"${BATS_TEST_TMPDIR}/pwned"
+  assert_stderr --partial "dot-command"
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/pwned"
+  run -1 --separate-stderr dybatpho::db_exec "${DB}" ".bail off"
+  assert_stderr --partial "dot-command"
+  # Inside a literal it is data.
+  dybatpho::db_exec "${DB}" $'insert into t values (\'d\', \'\n.shell id\')'
+}
+
+@test "dybatpho::db_migrate scans its files: no placeholder, no dot-command" {
+  _migrations 001_a.sql "create table m (n text); insert into m values (:zzz);"
+  run -1 --separate-stderr dybatpho::db_migrate "${DB}" "${MIGRATIONS}"
+  assert_stderr --partial "placeholder"
+  rm "${MIGRATIONS}/001_a.sql"
+  _migrations 001_b.sql $'create table m (n text);\n.shell touch '"${BATS_TEST_TMPDIR}/pwned"
+  run -1 --separate-stderr dybatpho::db_migrate "${DB}" "${MIGRATIONS}"
+  assert_file_not_exists "${BATS_TEST_TMPDIR}/pwned"
+}
+
+@test "dybatpho::db_exec binds a large value in linear time" {
+  local value
+  value="$(head -c 400000 /dev/zero | tr '\0' 'x')"
+  local start="${SECONDS}"
+  dybatpho::db_exec "${DB}" "insert into t values ('big', :v)" v="${value}"
+  ((SECONDS - start < 10))
+  run_traced -0 dybatpho::db_value "${DB}" "select length(v) from t where k = 'big'"
+  assert_output "400000"
+}
+
+@test "a database path is a file, never a sqlite URI" {
+  cd "${BATS_TEST_TMPDIR}"
+  dybatpho::db_exec 'file:uri.db?mode=memory' "create table x (a)"
+  assert_file_exists "${BATS_TEST_TMPDIR}/file:uri.db?mode=memory"
+}

@@ -23,7 +23,9 @@ _path_without_managers() {
       command -v "${tool}" > /dev/null || continue
       path="$(PATH="${path}" path_without "${tool}")"
     done
-    printf '%s\n' "${path}" > "${cache}"
+    # Tests of this file run side by side: write then rename, so none reads it half written.
+    printf '%s\n' "${path}" > "${cache}.$$"
+    mv -f "${cache}.$$" "${cache}"
   fi
   cat "${cache}"
 }

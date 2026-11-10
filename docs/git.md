@@ -374,9 +374,8 @@ List changed files relative to a base ref, including untracked.
 **📤 Output on stdout**
 
 - One changed file path per line, sorted byte-wise and deduplicated,
-  so the order does not depend on the caller's locale; a non-ASCII name is
-  printed as it is on disk, while one holding a control character, a double
-  quote or a backslash is still C-quoted by Git
+  so the order does not depend on the caller's locale; every name is printed
+  as it is on disk, though one holding a newline spans two lines
 
 **🚦 Exit codes**
 

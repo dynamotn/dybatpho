@@ -345,6 +345,23 @@ function _append_git_commit {
   assert_output $'café.txt\nnaïve notes.txt'
 }
 
+@test "dybatpho::git_changed_files names a path holding a quote, backslash or tab as it is on disk" {
+  # `core.quotePath=false` only stops Git quoting non-ASCII bytes: a name with
+  # `"`, `\` or a control character still came back as `"say \"hi\".txt"`.
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  (
+    unset GIT_DIR GIT_WORK_TREE
+    printf 'a\n' > "${repo_path}/say \"hi\".txt"
+    git -C "${repo_path}" add 'say "hi".txt'
+  )
+  printf 'b\n' > "${repo_path}/back\\slash"$'\t'"tab.txt"
+
+  run_traced -0 dybatpho::git_changed_files "${repo_path}"
+  assert_output $'back\\slash\ttab.txt\nsay "hi".txt'
+}
+
 @test "dybatpho::git_tags_containing lists tags in byte order whatever the locale" {
   # A locale-aware `sort` ignores case and punctuation at first, so the same
   # tags came back in another order on another machine.

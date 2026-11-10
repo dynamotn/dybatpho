@@ -21,6 +21,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`git` — `dybatpho::git_changed_files` prints every path as it is on
+  disk.** Names holding `"`, `\` or a tab are no longer C-quoted.
 - **`metrics` — `dybatpho::metrics_summary_ms` is as cheap as a histogram
   observation.** `DYBATPHO_METRICS_QUANTILES` is checked again only when it
   changes: 500 observations take about 0.2s instead of over 4s.

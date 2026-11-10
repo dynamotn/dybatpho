@@ -1044,13 +1044,11 @@ function __dybatpho_network_shared_open {
   # first: under a shared `/tmp`, another user could have made one of them, or
   # a link to a place of their choosing, and filled it with state this reads.
   local -a own=()
-  local made=1
   if [[ -n "${dir}" ]]; then
     # Absolute now: the command a breaker runs may change directory before the
     # state is written back.
     [[ "${dir}" == /* ]] || dir="${PWD}/${dir}"
     own=("${dir}")
-    made=0
   elif [[ "${XDG_RUNTIME_DIR-}" == /* ]]; then
     own=("${XDG_RUNTIME_DIR:-}/dybatpho" "${XDG_RUNTIME_DIR:-}/dybatpho/network")
   else
@@ -1063,7 +1061,7 @@ function __dybatpho_network_shared_open {
   fi
   local part
   for part in ${own[@]+"${own[@]}"}; do
-    __dybatpho_network_private_dir "${part}" "${kind}" "${made}"
+    __dybatpho_network_private_dir "${part}" "${kind}"
   done
   dir="${own[-1]}"
   local sum
@@ -1079,14 +1077,14 @@ function __dybatpho_network_shared_open {
 #   script before anything is read from or written into it.
 # @arg $1 path Directory
 # @arg $2 string `rate` or `circuit`, for the message
-# @arg $3 number 1 when the directory is one of the module's own, which it may
-#   make private; 0 when the caller named it, which is never changed: a caller
-#   that pointed it at `/tmp` as root would otherwise lock every user out of it
-# @exitcode 1 Stop script when the directory is not private and cannot be made so
+#   No directory's mode is ever changed: one the caller named, or an
+#   `XDG_RUNTIME_DIR` they set, could be `/tmp` under root, and a chmod would
+#   lock every user out of it. A directory this creates is made 700 by `mkdir`.
+# @exitcode 1 Stop script when the directory is not private, or cannot be checked
 # @internal
 #######################################
 function __dybatpho_network_private_dir {
-  local dir="$1" kind="$2" made="$3"
+  local dir="$1" kind="$2"
   local hint="set DYBATPHO_NETWORK_STATE_DIR to a directory of your own"
   if [[ ! -e "${dir}" && ! -L "${dir}" ]]; then
     mkdir -m 700 -- "${dir}" 2> /dev/null || true
@@ -1094,12 +1092,10 @@ function __dybatpho_network_private_dir {
   if [[ -L "${dir}" || ! -d "${dir}" || ! -O "${dir}" ]]; then
     dybatpho::die "${dir} is not a private directory; refusing to keep shared ${kind} state there (${hint})"
   fi
-  if ((made)); then
-    chmod 700 -- "${dir}" || dybatpho::die "Cannot make ${dir} private for the shared ${kind} state"
-    return 0
-  fi
   local open_to_others
-  open_to_others="$(find "${dir}" -prune \( -perm -g+w -o -perm -o+w \) -print)"
+  # A check that cannot run refuses: an empty answer must mean "closed".
+  open_to_others="$(find "${dir}" -prune \( -perm -g+w -o -perm -o+w \) -print)" \
+    || dybatpho::die "Cannot check who can write to ${dir}; refusing to keep shared ${kind} state there"
   if [[ -n "${open_to_others}" ]]; then
     dybatpho::die "${dir} is open to other users; refusing to keep shared ${kind} state there (${hint})"
   fi
@@ -1247,6 +1243,11 @@ function dybatpho::circuit_breaker {
     return
   fi
 
+  if ((__dybatpho_network_cb_opened_at > __dybatpho_network_cb_now)); then
+    # Opened "in the future": the clock stepped back. Held one cooldown from now.
+    __dybatpho_network_cb_opened_at="${__dybatpho_network_cb_now}"
+    DYBATPHO_CIRCUIT_OPENED_AT["${__dybatpho_network_cb_key}"]="${__dybatpho_network_cb_now}"
+  fi
   if ((__dybatpho_network_cb_opened_at > 0)); then
     local __dybatpho_network_cb_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cb_opened_at))
     if ((__dybatpho_network_cb_elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
@@ -1309,6 +1310,10 @@ function __dybatpho_network_circuit_shared {
   if ((__dybatpho_network_cs_opened > 0)); then
     local __dybatpho_network_cs_elapsed=$((__dybatpho_network_cb_now - __dybatpho_network_cs_opened))
     if ((__dybatpho_network_cs_elapsed < DYBATPHO_CIRCUIT_COOLDOWN)); then
+      # Written back as read: an opening clamped from the future to now has to
+      # stay at now, or the next read would find the future time again.
+      printf '%s %s %s\n' "${__dybatpho_network_cs_failures}" "${__dybatpho_network_cs_opened}" \
+        "${__dybatpho_network_cs_probe}" > "${__dybatpho_network_cs_path}"
       dybatpho::flock_release "${__dybatpho_network_cs_fd}"
       local __dybatpho_network_cs_left=$((DYBATPHO_CIRCUIT_COOLDOWN - __dybatpho_network_cs_elapsed))
       dybatpho::warn "${__dybatpho_network_cb_name} is open; skipping request (retry in ${__dybatpho_network_cs_left}s)"
@@ -1405,8 +1410,10 @@ function __dybatpho_network_rate_prune {
   local -a recorded=() kept=()
   read -r -a recorded <<< "${DYBATPHO_RATE_EVENTS[${key}]:-}"
   local cutoff=$((now - window_ms)) timestamp
+  # A call recorded after now -- the clock stepped back, or a planted file --
+  # would make the next free slot that far away; it is dropped.
   for timestamp in ${recorded[@]+"${recorded[@]}"}; do
-    ((timestamp > cutoff)) && kept+=("${timestamp}")
+    ((timestamp > cutoff && timestamp <= now)) && kept+=("${timestamp}")
   done
   DYBATPHO_RATE_EVENTS["${key}"]="${kept[*]-}"
 

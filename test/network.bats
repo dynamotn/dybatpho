@@ -1814,3 +1814,53 @@ _shared_state() {
   [[ ! -e "${BATS_TEST_TMPDIR}/b/st" ]] || fail "the state split into b/st"
   run -0 compgen -G "${BATS_TEST_TMPDIR}/a/st/circuit-svc-*"
 }
+
+@test "a shared circuit opened in the future is held open one cooldown, not until then" {
+  _shared_state
+  DYBATPHO_CIRCUIT_SHARED=true DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=1
+  dybatpho::circuit_reset svc
+  local state now status=0
+  now="$(date +%s)"
+  state="$(compgen -G "${DYBATPHO_NETWORK_STATE_DIR}/circuit-svc-*" | grep -v '\.lock$')"
+  printf '1 %s 0\n' "$((now + 86400))" > "${state}"
+  (dybatpho::circuit_breaker svc -- true) || status=$?
+  assert_equal "${status}" 9
+  sleep 2
+  (dybatpho::circuit_breaker svc -- touch "${BATS_TEST_TMPDIR}/ran")
+  assert_file_exists "${BATS_TEST_TMPDIR}/ran"
+}
+
+@test "a call recorded in the future does not hold a rate limit for ever" {
+  _shared_state
+  DYBATPHO_RATE_LIMIT_SHARED=true DYBATPHO_RATE_LIMIT_WAIT=false
+  dybatpho::rate_limit_reset ahead
+  local state
+  state="$(compgen -G "${DYBATPHO_NETWORK_STATE_DIR}/rate-ahead-*" | grep -v '\.lock$')"
+  printf '999999999999999999\n' > "${state}"
+  run_traced -0 dybatpho::rate_limit ahead 1/1 -- true
+  # The same in memory, as after the clock stepped back.
+  DYBATPHO_RATE_LIMIT_SHARED=false
+  DYBATPHO_RATE_EVENTS[mem]=999999999999999999
+  run_traced -0 dybatpho::rate_limit mem 1/1 -- true
+}
+
+@test "an in-memory circuit opened in the future is held open one cooldown, not until then" {
+  DYBATPHO_CIRCUIT_THRESHOLD=1 DYBATPHO_CIRCUIT_COOLDOWN=1
+  local now status=0
+  now="$(date +%s)"
+  DYBATPHO_CIRCUIT_FAILURES[mem]=1
+  DYBATPHO_CIRCUIT_OPENED_AT[mem]="$((now + 86400))"
+  dybatpho::circuit_breaker mem -- true || status=$?
+  assert_equal "${status}" 9
+  sleep 2
+  run_traced -0 dybatpho::circuit_breaker mem -- true
+}
+
+@test "shared network state refuses a directory it cannot check" {
+  command -v flock > /dev/null || skip "flock is not installed"
+  mkdir -p "${BATS_TEST_TMPDIR}/mine"
+  chmod 777 "${BATS_TEST_TMPDIR}/mine"
+  DYBATPHO_NETWORK_STATE_DIR="${BATS_TEST_TMPDIR}/mine" DYBATPHO_CIRCUIT_SHARED=true \
+    PATH="$(path_without find)" run -1 --separate-stderr dybatpho::circuit_state svc
+  assert_stderr --partial "Cannot check"
+}

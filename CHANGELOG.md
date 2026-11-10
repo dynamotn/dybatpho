@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`string` — `dybatpho::split` on a multi-character delimiter runs in
+  linear time.** Splitting 20000 fields on `, ` or `::` takes about a second
+  instead of about 40s; empty fields are kept as before.
 - **`file` — the atomic writers no longer expose new contents to other users
   while they are written.** The staging file behind `file_write_atomic`,
   `config_save`, `json_set`, `file_replace` and the other in-place writers was

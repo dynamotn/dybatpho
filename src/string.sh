@@ -107,6 +107,16 @@ function __dybatpho_string_split_into {
     done <<< "${__dybatpho_string_split_rest}${__dybatpho_string_split_tail}"
     return 0
   fi
+  # A longer delimiter becomes one unit separator byte when the text has none,
+  # so the same single pass applies; otherwise the loop below copies the rest
+  # of the text per field.
+  if [[ -n "${__dybatpho_string_split_delimiter}" ]] && ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[1] >= 4)) \
+    && [[ "${__dybatpho_string_split_rest}" != *$'\x1f'* ]]; then
+    mapfile -t -d $'\x1f' __dybatpho_string_split_out \
+      <<< "${__dybatpho_string_split_rest//"${__dybatpho_string_split_delimiter}"/$'\x1f'}"$'\x1f'
+    unset -v '__dybatpho_string_split_out[-1]'
+    return 0
+  fi
   if [[ -n "${__dybatpho_string_split_delimiter}" ]]; then
     while [[ "${__dybatpho_string_split_rest}" == *"${__dybatpho_string_split_delimiter}"* ]]; do
       __dybatpho_string_split_out+=("${__dybatpho_string_split_rest%%"${__dybatpho_string_split_delimiter}"*}")

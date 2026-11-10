@@ -100,6 +100,26 @@ EOF
   assert [ "$((SECONDS - started))" -le 5 ]
 }
 
+@test "dybatpho::split takes time in proportion to its input with a longer delimiter" {
+  # The loop copied the rest of the text per field: 20000 fields took ~40s.
+  local text
+  printf -v text 'f%s, ' {1..20000}
+  local -a parts=()
+  local started="${SECONDS}"
+  __dybatpho_string_split_into parts "${text}" ", "
+  assert_equal "${#parts[@]}" "20001"
+  assert_equal "${parts[19999]}|${parts[20000]}" "f20000|"
+  # Loose enough for a loaded machine running the whole suite side by side.
+  assert [ "$((SECONDS - started))" -le 20 ]
+  # Empty fields, a text holding the unit separator, and a newline survive.
+  __dybatpho_string_split_into parts "::a::::b::" "::"
+  assert_equal "${#parts[@]}" "5"
+  assert_equal "${parts[0]}|${parts[1]}|${parts[2]}|${parts[3]}|${parts[4]}" "|a||b|"
+  __dybatpho_string_split_into parts $'a\x1f::b\n' "::"
+  assert_equal "${#parts[@]}" "2"
+  assert_equal "${parts[0]}|${parts[1]}" $'a\x1f|b\n'
+}
+
 @test "dybatpho::string_starts_with matches exact prefix" {
   dybatpho::string_starts_with "dybatpho-utils" "dybatpho"
 

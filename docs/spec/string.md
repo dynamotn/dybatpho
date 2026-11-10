@@ -232,6 +232,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **FR-033**: `dybatpho::string_wrap` MUST read words from every line of its input and split them on blanks whatever `IFS` the caller has set.
 - **FR-034**: `dybatpho::url_encode` MUST write each byte of a multibyte character as one `%XX` under every C locale, musl's included.
 - **FR-035**: `dybatpho::split` and `dybatpho::url_decode` MUST take time in proportion to the length of their input, not to its square.
+- **FR-036**: `dybatpho::split` MUST also take time in proportion to the length of its input when the delimiter is longer than one character.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -282,6 +283,7 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **IT-022**: Wrap `one two\nthree four` at 100 into one line, and wrap `a b c d` at 3 with `IFS=,`.
 - **IT-023**: Encode `é ü/a~` to `%C3%A9%20%C3%BC%2Fa~`.
 - **IT-024**: Split 20000 fields and decode 10000 escapes, each within five seconds, keeping the trailing empty field and a lone `%`.
+- **IT-025**: Split 20000 fields on `, ` within five seconds, keeping empty fields, a text that holds the unit separator byte, and a trailing newline.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -218,6 +218,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **FR-045**: An input the `awk` engine would have to refuse MUST be handed to the Bash engine before anything is printed, so the error, the exit status and the empty output are the Bash engine's.
 - **FR-046**: An unknown `DYBATPHO_CSV_ENGINE` MUST stop the script, naming the function and the accepted values.
 - **FR-047**: Line breaks at the end of the input MUST end its last record rather than add empty records, whichever source the input came from.
+- **FR-048**: `csv_from_json` MUST refuse a value or key holding the ASCII unit separator, as every reader does.
+- **FR-049**: A record made of one empty field MUST be written as `""`, so it reads back as a record rather than being dropped as an empty line.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -294,6 +296,8 @@ DYBATPHO_CSV_DELIMITER=tab dybatpho::csv_col billing.tsv "owner"
 - **IT-054**: Remove `awk` from `PATH` and get the Bash engine's output for every operation.
 - **IT-055**: Read a value holding a line break and a trailing empty field through the `awk` engine into records that split back correctly.
 - **IT-056**: Read text with a final newline, and a CRLF file ending in a blank line, through both engines, and get only the records the data holds.
+- **IT-057**: Convert `[{"a":"x\u001fy","b":"z"}]` and see the call refused with nothing on stdout.
+- **IT-058**: Write the records `name`, empty, `bob`, empty, and read four records back.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -472,10 +472,22 @@ function __dybatpho_csv_input_into {
     __dybatpho_csv_input_ref="${__dybatpho_csv_input_ref%?}"
   done
 
+  __dybatpho_csv_refuse_unit "${__dybatpho_csv_input_ref}" "${__dybatpho_csv_who}"
+}
+
+#######################################
+# @description Stop the script when text holds the ASCII unit separator, which
+#   this module joins a record's fields with: a value holding it would be split
+#   into an extra column.
+# @arg $1 string Text to check
+# @arg $2 string Name the refusal is reported under
+# @exitcode 1 Stop the script when the text holds the unit separator
+# @internal
+#######################################
+function __dybatpho_csv_refuse_unit {
   local __dybatpho_csv_reason="The input contains the ASCII unit separator,"
   __dybatpho_csv_reason+=" which this module uses to join a record's fields"
-  [[ "${__dybatpho_csv_input_ref}" != *"${__dybatpho_csv_unit}"* ]] || dybatpho::die \
-    "${__dybatpho_csv_who}: ${__dybatpho_csv_reason}"
+  [[ "$1" != *"${__dybatpho_csv_unit}"* ]] || dybatpho::die "$2: ${__dybatpho_csv_reason}"
 }
 
 #######################################
@@ -866,6 +878,8 @@ function __dybatpho_csv_write_with {
         __dybatpho_csv_line+="${__dybatpho_csv_delimiter}${__dybatpho_csv_quoted}"
       fi
     done
+    # A record of one empty field would be an empty line, which a reader drops.
+    [[ -n "${__dybatpho_csv_line}" ]] || __dybatpho_csv_line='""'
     printf '%s\n' "${__dybatpho_csv_line}"
   done
 }
@@ -1540,6 +1554,7 @@ function dybatpho::csv_from_json {
   local converted
   converted="$(printf '%s' "${text}" | jq -r "${filter}")" \
     || dybatpho::die "${FUNCNAME[0]}: The document is not an array of objects"
+  __dybatpho_csv_refuse_unit "${converted}" "${FUNCNAME[0]}"
 
   local -a records=()
   # `jq` uses `,` whatever the caller set, so the conversion is read back with

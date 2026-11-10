@@ -399,6 +399,27 @@ SCRIPT
   assert_stderr --partial "not an array of objects"
 }
 
+@test "dybatpho::csv_from_json refuses a value holding the separator it joins fields with" {
+  # The value was split on it while being written back, and came out as an
+  # extra column with a zero exit.
+  run --separate-stderr dybatpho::csv_from_json '[{"a":"x\u001fy","b":"z"}]'
+  assert_failure
+  assert_output ""
+  assert_stderr --partial "dybatpho::csv_from_json: The input contains the ASCII unit separator"
+}
+
+@test "dybatpho::csv_write keeps a record that is one empty field" {
+  # It was written as an empty line, which a reader drops.
+  local -a records=(name "" bob "") back=()
+  local text
+  text="$(dybatpho::csv_write records)"
+  assert_equal "${text}" $'name\n""\nbob\n""'
+  dybatpho::csv_read "${text}" back
+  assert_equal "${#back[@]}" 4
+  assert_equal "${back[1]}" ""
+  assert_equal "${back[3]}" ""
+}
+
 @test "DYBATPHO_CSV_DELIMITER reads and writes the files that use another delimiter" {
   # `env` cannot run a shell function, so the variable is set for the call.
   DYBATPHO_CSV_DELIMITER=";" \

@@ -21,6 +21,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Fixed
 
+- **`csv` — a record made of one empty field survives a write and read.**
+- **`csv` — `dybatpho::csv_from_json` refuses a value holding the ASCII unit
+  separator,** as the readers do, instead of splitting it into an extra column.
 - **`config` — keys must be ASCII names in every locale,** so `config_set
   café 1` is refused up front instead of breaking `config_export` later.
 - **`config` — double-quoted dotenv values keep their backslashes.** Only

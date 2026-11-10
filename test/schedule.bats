@@ -127,6 +127,12 @@ SCRIPT
   assert_equal "$(cat "${LOG}")" "first"
 }
 
+@test "dybatpho::schedule_once_per writes its marker with the mode the umask gives" {
+  local marker="${DYBATPHO_SCHEDULE_DIR}/moded.last"
+  (umask 022 && dybatpho::schedule_once_per day moded -- true)
+  assert_equal "$(stat -c %a "${marker}" 2> /dev/null || stat -f %Lp "${marker}")" "644"
+}
+
 @test "dybatpho::schedule_once_per holds across separate invocations" {
   # The marker is on disk precisely so the limit survives the process; a
   # variable would reset on every run.

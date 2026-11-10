@@ -142,6 +142,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-028**: `dybatpho::schedule_every` MUST end its wait between runs as soon as a HUP, INT or TERM arrives, then return once the run in progress is over.
 - **FR-029**: A reclaim older than a few seconds MUST be removed as left by a caller that died, so it never blocks its key for good.
 - **FR-030**: The cron predicate MUST check every field before matching and return exit code 2 for a value that is not a number, a value outside its field's range, a reversed range, a zero step, an empty list item, or a day or month name, which it does not read.
+- **FR-031**: The once-per-period marker MUST get the mode the umask gives a new file.
 
 ### Key Entities *(include if feature involves data)*
 

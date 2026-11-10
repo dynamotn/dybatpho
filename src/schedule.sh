@@ -321,7 +321,8 @@ function dybatpho::schedule_once_per {
     dybatpho::die "${FUNCNAME[0]}: Cannot write the marker for ${__dybatpho_schedule_once_key}"
   fi
   printf '%s\n' "${__dybatpho_schedule_once_bucket}" > "${__dybatpho_schedule_once_staging}"
-  mv -f -- "${__dybatpho_schedule_once_staging}" "${__dybatpho_schedule_once_marker}"
+  __dybatpho_file_commit "${__dybatpho_schedule_once_staging}" "${__dybatpho_schedule_once_marker}" \
+    "${FUNCNAME[0]}"
   rm -f -- "${__dybatpho_schedule_once_claim}"
   ${__dybatpho_schedule_once_command[@]+"${__dybatpho_schedule_once_command[@]}"}
 }

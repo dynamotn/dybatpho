@@ -321,6 +321,21 @@ SCRIPT
   assert_equal "$(cat "${LOG}")" "ran"
 }
 
+@test "dybatpho::schedule_debounce does not write its ticket through a planted link" {
+  # The ticket was staged at the predictable `<key>.trigger.tmp` with a plain
+  # redirection, so a link planted there had the counter land in its target.
+  local directory victim="${BATS_TEST_TMPDIR}/victim"
+  __dybatpho_schedule_dir_into directory
+  mkdir -p "${directory}"
+  printf 'untouched\n' > "${victim}"
+  ln -s "${victim}" "${directory}/planted.trigger.tmp"
+
+  run_traced dybatpho::schedule_debounce 1 planted -- note ran
+  assert_success
+  assert_equal "$(cat "${victim}")" "untouched"
+  assert_equal "$(cat "${LOG}")" "ran"
+}
+
 @test "dybatpho::schedule_debounce collapses a burst into the last trigger" {
   # Running on the first event is what an editor's write-then-rename breaks:
   # the file is still half written. The run belongs after the burst settles.

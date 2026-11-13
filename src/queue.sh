@@ -185,9 +185,13 @@ function __dybatpho_queue_next_sequence_into {
 
   __dybatpho_queue_value=$((10#${__dybatpho_queue_value} + 1))
   # Written beside the counter and moved over it, so a crash never leaves it
-  # truncated.
-  printf '%s\n' "${__dybatpho_queue_value}" > "${__dybatpho_queue_counter}.tmp"
-  mv -f -- "${__dybatpho_queue_counter}.tmp" "${__dybatpho_queue_counter}"
+  # truncated. The staging name is unguessable and created exclusively: a fixed
+  # `.sequence.tmp` followed a link planted there.
+  local __dybatpho_queue_staging
+  __dybatpho_file_staging_into __dybatpho_queue_staging "${__dybatpho_queue_counter}" \
+    || dybatpho::die "dybatpho::queue_push: Cannot write ${__dybatpho_queue_counter}"
+  printf '%s\n' "${__dybatpho_queue_value}" > "${__dybatpho_queue_staging}"
+  __dybatpho_file_commit "${__dybatpho_queue_staging}" "${__dybatpho_queue_counter}" dybatpho::queue_push
   printf -v __dybatpho_queue_seq_ref '%012d' "${__dybatpho_queue_value}"
 }
 
@@ -961,10 +965,15 @@ function dybatpho::queue_work {
 
     # Waited for rather than tested with `if`, under which Bash turns `errexit`
     # off: a handler under `set -e` carried on past its failure and completed
-    # the job. Standard input stays the worker's.
+    # the job. Standard input stays the worker's. A non-interactive shell starts
+    # a background subshell with INT and QUIT ignored, so they are put back:
+    # otherwise Ctrl-C ended the worker while the handler ran on to the end.
     __dybatpho_queue_work_status=0
-    (DYBATPHO_QUEUE_JOB_ID="${__dybatpho_queue_work_id}" "${__dybatpho_queue_work_handler}" "$@" \
-      "${__dybatpho_queue_work_payload}") <&0 &
+    (
+      trap - INT QUIT
+      DYBATPHO_QUEUE_JOB_ID="${__dybatpho_queue_work_id}" "${__dybatpho_queue_work_handler}" "$@" \
+        "${__dybatpho_queue_work_payload}"
+    ) <&0 &
     wait "$!" || __dybatpho_queue_work_status=$?
     if ((__dybatpho_queue_work_status == 0)); then
       dybatpho::queue_complete "${__dybatpho_queue_work_queue}" "${__dybatpho_queue_work_id}"

@@ -53,7 +53,7 @@ and stop the script with an install hint when it isn't.
 - [`dybatpho::flock_release`](#dybatphoflock_release) — Let go of a lock taken by `dybatpho::flock_acquire` and close its descriptor. The lock is dropped before the descriptor is closed: a background job started while it was held has its own copy of the descriptor, and closing ours alone would leave the lock held for as long as that job runs.
 - [`dybatpho::with_flock`](#dybatphowith_flock) — Take a `flock` on a file, run a command while holding it, then let go, even if the command fails. The command runs in the current shell, so a function it calls can set the caller's variables.
 - [`dybatpho::lock_semaphore_acquire`](#dybatpholock_semaphore_acquire) — Take one of a fixed number of slots, so that at most that many processes run a section at once, waiting up to a timeout for one to free up. A semaphore is a row of ordinary locks, one per slot, tried in order. Each slot is claimed atomically and records its holder, so a slot left by a dead process is reclaimed exactly as a stale lock is, and a refusal names every process holding a slot. Every caller must give the same slot count.
-- [`dybatpho::lock_semaphore_release`](#dybatpholock_semaphore_release) — Give back a semaphore slot taken by the current process. Naming the slot releases that one; without it, every slot the current process holds is released, which is what an exit handler wants.
+- [`dybatpho::lock_semaphore_release`](#dybatpholock_semaphore_release) — Give back a semaphore slot taken by the current process. Naming the slot releases that one; without it, every slot the current process (`BASHPID`) holds is released, which is what an exit handler wants. A subshell releasing all its slots leaves the script's alone.
 - [`dybatpho::lock_semaphore_holders`](#dybatpholock_semaphore_holders) — Print who holds each taken slot of a semaphore.
 - [`dybatpho::with_semaphore`](#dybatphowith_semaphore) — Take a semaphore slot, run a command while holding it, then give the slot back, even if the command fails or the shell is interrupted.
 
@@ -480,7 +480,8 @@ dybatpho::lock_semaphore_release downloads 4 "${slot}"
 
 Give back a semaphore slot taken by the current process.
 Naming the slot releases that one; without it, every slot the current
-process holds is released, which is what an exit handler wants.
+process (`BASHPID`) holds is released, which is what an exit handler
+wants. A subshell releasing all its slots leaves the script's alone.
 
 **🧾 Arguments**
 

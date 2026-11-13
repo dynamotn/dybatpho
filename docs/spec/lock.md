@@ -298,7 +298,8 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
   slot, and on failure MUST report every holder on stderr.
 - **FR-023**: `lock_semaphore_release` MUST release the named slot under the
   same ownership rule as `lock_release`, and without a slot MUST release every
-  slot held by the current process and no other.
+  slot held by the current process (`BASHPID`) and no other: a subshell
+  releasing all its slots MUST NOT free the slots its script (`$$`) holds.
 - **FR-024**: `lock_semaphore_holders` MUST print `slot=<n>` followed by the
   holder metadata for each held slot, and MUST fail when no slot is held.
 - **FR-025**: `with_semaphore` MUST follow the `with_lock` contract — the `--`
@@ -327,7 +328,7 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 - **FR-042**: `with_flock` MUST follow the `with_lock` contract -- the `--` separator, release after success, failure and interruption, and the command's exit code -- and MUST run the command in the current shell.
 - **FR-043**: `with_flock` MUST return 1 without running the command when the lock cannot be taken within the wait.
 - **FR-044**: A lock or semaphore slot MUST record the pid of the process that claimed it (`BASHPID`), not the script's `$$`, so a background worker that is killed leaves a lock that reads as stale.
-- **FR-045**: `lock_release` and `lock_semaphore_release` MUST treat a lock as their own only when its recorded pid is the calling process or the script it runs in (`$$`): a subshell MAY still release the script's lock, and MUST NOT release a live sibling worker's.
+- **FR-045**: `lock_release` and `lock_semaphore_release` MUST treat a lock as their own only when its recorded pid is the calling process or the script it runs in (`$$`): a subshell MAY still release the script's lock or a slot it names (but not by the release-all form, see FR-023), and MUST NOT release a live sibling worker's.
 - **FR-046**: `lock_reclaim_stale` MUST move a stale lock aside only while holding the guard `<lock>.reclaim`, MUST read the holder again once it holds it, and MUST remove a guard older than five seconds, which only a reclaimer that died leaves.
 
 ### Key Entities *(include if feature involves data)*
@@ -427,6 +428,7 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 - **IT-042**: From a subshell, fail to release a lock and leave a semaphore slot that sibling workers hold; release a lock and a slot a subshell took itself.
 - **IT-043**: Force A to move the lock aside after B reclaimed and claimed it, and C to claim the emptied name, and see that if B believes it holds the lock, it does.
 - **IT-044**: Take a lock whose dead holder is behind a reclaim guard from 2020, and see the guard cleared.
+- **IT-045**: Hold a slot in the script, take and release-all from a worker subshell, and see the script's slot still held.
 
 ## Acceptance Criteria *(mandatory)*
 

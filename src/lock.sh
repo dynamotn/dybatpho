@@ -896,7 +896,8 @@ function __dybatpho_lock_try_slots {
 #######################################
 # @description Give back a semaphore slot taken by the current process.
 #   Naming the slot releases that one; without it, every slot the current
-#   process holds is released, which is what an exit handler wants.
+#   process (`BASHPID`) holds is released, which is what an exit handler
+#   wants. A subshell releasing all its slots leaves the script's alone.
 # @arg $1 string Semaphore name or path
 # @arg $2 number Number of slots, as given when acquiring
 # @arg $3 number? Slot number to release
@@ -925,7 +926,9 @@ function dybatpho::lock_semaphore_release {
   for ((slot = 1; slot <= slots; slot++)); do
     slot_path="$(__dybatpho_lock_slot_path "${name}" "${slot}")"
     owner="$(dybatpho::lock_field "${slot_path}" pid)"
-    __dybatpho_lock_owned_here "${owner}" || continue
+    # Only this process's own slots: a worker subshell must not free the
+    # slots its script (`$$`) holds on its way out.
+    [[ "${owner}" == "${BASHPID}" ]] || continue
     dybatpho::lock_release "${slot_path}"
   done
 }

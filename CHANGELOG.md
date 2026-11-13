@@ -231,6 +231,17 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   command:** under job control Bash 4.3 to 5.1 reported the job it waited for
   (`Done`, `Exit 3`, `Terminated`) and macOS Bash the watchdog it ended
   (`Killed: 9`) there.
+- **`process` — Ctrl-C reaches a command run by `dybatpho::run_with_timeout`;**
+  a shell function was left running as an orphan, and with the `timeout`
+  program the script ignored Ctrl-C and carried on.
+- **`process` — restoring signal handlers keeps a signal the script started
+  with ignored (as under `nohup` or in a background job) ignored;** `lock`,
+  `parallel`, `schedule`, `run_with_timeout`, `tui` and `screen` used to make
+  it fatal.
+- **`queue` — Ctrl-C stops the handler `dybatpho::queue_work` is running,**
+  instead of letting it finish while its job stays claimed and runs again.
+- **`lock` — a worker's `dybatpho::lock_semaphore_release name N` frees only
+  its own slots,** not the parent script's.
 - **`testing` — `dybatpho::assert_file_mode` refuses a malformed mode** instead
   of passing, and mocks count calls made without arguments.
 - **`release` — `dybatpho::release_checksums` never lists its own output, and
@@ -306,6 +317,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   as `x[$(cmd)]` no longer runs the command.**
 - **`screen` — a rectangle part such as `items[$(cmd)]` no longer runs the
   command.**
+- **`schedule`, `queue` — the debounce ticket and the sequence counter are
+  never written through a planted symlink.**
 
 ### Added
 

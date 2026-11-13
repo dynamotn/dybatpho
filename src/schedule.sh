@@ -234,9 +234,17 @@ function dybatpho::schedule_debounce {
     [[ "${__dybatpho_schedule_debounce_counter}" =~ ^[0-9]+$ ]] || __dybatpho_schedule_debounce_counter=0
   fi
   __dybatpho_schedule_debounce_counter=$((10#${__dybatpho_schedule_debounce_counter} + 1))
-  # Moved into place, so a crash mid-write never leaves an empty ticket.
-  printf '%s\n' "${__dybatpho_schedule_debounce_counter}" > "${__dybatpho_schedule_debounce_ticket}.tmp"
-  mv -f -- "${__dybatpho_schedule_debounce_ticket}.tmp" "${__dybatpho_schedule_debounce_ticket}"
+  # Moved into place, so a crash mid-write never leaves an empty ticket. The
+  # staging name is unguessable and created exclusively: a fixed
+  # `<key>.trigger.tmp` followed a link planted there.
+  local __dybatpho_schedule_debounce_staging
+  if ! __dybatpho_file_staging_into __dybatpho_schedule_debounce_staging "${__dybatpho_schedule_debounce_ticket}"; then
+    dybatpho::lock_release "${__dybatpho_schedule_debounce_lock}"
+    dybatpho::die "${FUNCNAME[0]}: Cannot write the ticket for ${__dybatpho_schedule_debounce_key}"
+  fi
+  printf '%s\n' "${__dybatpho_schedule_debounce_counter}" > "${__dybatpho_schedule_debounce_staging}"
+  __dybatpho_file_commit "${__dybatpho_schedule_debounce_staging}" "${__dybatpho_schedule_debounce_ticket}" \
+    "${FUNCNAME[0]}"
   dybatpho::lock_release "${__dybatpho_schedule_debounce_lock}"
 
   sleep "${__dybatpho_schedule_debounce_window}"

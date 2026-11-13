@@ -143,6 +143,7 @@ dybatpho::schedule_every 60 -- check_health
 - **FR-029**: A reclaim older than a few seconds MUST be removed as left by a caller that died, so it never blocks its key for good.
 - **FR-030**: The cron predicate MUST check every field before matching and return exit code 2 for a value that is not a number, a value outside its field's range, a reversed range, a zero step, an empty list item, or a day or month name, which it does not read.
 - **FR-031**: The once-per-period marker MUST get the mode the umask gives a new file.
+- **FR-032**: `schedule_debounce` MUST stage its trigger ticket in a file created exclusively under an unpredictable name, so a link planted at `<key>.trigger.tmp` is never written through.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -195,6 +196,7 @@ dybatpho::schedule_every 60 -- check_health
 - **IT-031**: Plant a stale claim and a stale reclaim directory, run once, and find the command ran and neither is left behind.
 - **IT-032**: Leave an empty ticket and verify the next debounce still runs its command.
 - **IT-033**: Get exit code 2 for `3O 10 * * *`, `99 * * * *`, `*/0 * * * *`, `30 10 * * mon`, a reversed range, an empty list item and an out-of-range alternative after a matching one, and accept the edges of every field.
+- **IT-034**: Plant a link at `<key>.trigger.tmp`, debounce that key, and see the link's target untouched and the command run.
 
 ## Acceptance Criteria *(mandatory)*
 

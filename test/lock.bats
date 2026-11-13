@@ -1014,6 +1014,18 @@ _hold_in_worker() {
   run_traced -1 dybatpho::lock_semaphore_holders "own-pool" 1
 }
 
+@test "a worker releasing all its slots leaves the script's own slots held" {
+  # The release-all form matched `$$` as well as `BASHPID`, so a worker's exit
+  # handler also freed every slot the script itself held.
+  dybatpho::lock_semaphore_acquire "shared-pool" 2
+  (dybatpho::lock_semaphore_acquire "shared-pool" 2 && dybatpho::lock_semaphore_release "shared-pool" 2)
+  run_traced dybatpho::lock_semaphore_holders "shared-pool" 2
+  assert_success
+  assert_output --regexp "^slot=1 pid=$$ "
+  refute_output --partial "slot=2"
+  dybatpho::lock_semaphore_release "shared-pool" 2
+}
+
 @test "dybatpho::lock_reclaim_stale never leaves two holders when a third process claims mid-reclaim" {
   # A judges the lock stale; B reclaims and claims it before A's move; A then
   # moves B's live lock aside, C claims the emptied name before A can put it

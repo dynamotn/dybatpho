@@ -466,6 +466,17 @@ SCRIPT
   assert_equal "${status}" 3
 }
 
+@test "dybatpho::run_with_timeout hands the caller's standard input to the command" {
+  local input="${BATS_TEST_TMPDIR}/input"
+  printf 'from the caller\n' > "${input}"
+  run_traced dybatpho::run_with_timeout 5 cat < "${input}"
+  assert_success
+  assert_output "from the caller"
+  __dybatpho_process_timeout_probe=no
+  run_traced dybatpho::run_with_timeout 5 cat < "${input}"
+  assert_output "from the caller"
+}
+
 @test "dybatpho::run_with_timeout leaves the caller's stderr to the command" {
   # Under job control Bash 4.3 to 5.1 reported the job it waited for (`Done`,
   # `Exit 3`, `Terminated`), and macOS Bash the watchdog it killed, on the
@@ -650,6 +661,144 @@ SCRIPT
   run_traced bash "${script}"
   assert_success
   assert_equal "$(cat "${log}")" "${output}"
+}
+
+# Run a script in a session of its own with INT at its default, as a terminal
+# starts it, send INT to its whole process group once it has started its
+# command, and set `status` to how it ended. Bats runs tests with INT ignored,
+# which a child shell could not undo. The script records its pid in `leader`
+# and creates `started` from its command.
+_interrupt_script() {
+  command -v setsid > /dev/null || skip "setsid is not installed"
+  env --default-signal=INT true 2> /dev/null || skip "env cannot reset SIGINT"
+  setsid env --default-signal=INT bash "$1" < /dev/null &
+  local script_pid=$!
+  while [[ ! -e "${BATS_TEST_TMPDIR}/started" ]]; do sleep 0.05; done
+  kill -INT -- "-$(< "${BATS_TEST_TMPDIR}/leader")"
+  status=0
+  wait "${script_pid}" || status=$?
+}
+
+@test "saving and restoring handlers leaves a signal ignored at startup ignored" {
+  # In a shell started with INT ignored, `trap - INT` makes Bash catch INT
+  # itself, and no later `trap '' INT` ignores it again: every function that
+  # put the caller's handlers back turned an ignored Ctrl-C into a fatal one.
+  env --ignore-signal=INT true 2> /dev/null || skip "env cannot ignore SIGINT"
+  local script="${BATS_TEST_TMPDIR}/ignored.sh"
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules process lock parallel" \
+    "export DYBATPHO_LOCK_DIR=$(printf '%q' "${BATS_TEST_TMPDIR}")" \
+    "noop() { :; }" \
+    "dybatpho::run_with_timeout 5 noop" \
+    "dybatpho::run_with_timeout 5 true" \
+    "dybatpho::with_lock ignored 1 -- true" \
+    "dybatpho::parallel_map 1 noop a > /dev/null" \
+    "kill -INT \$\$" \
+    "printf 'survived\n'" > "${script}"
+  run env --ignore-signal=INT bash "${script}"
+  assert_success
+  assert_output "survived"
+}
+
+@test "dybatpho::run_with_timeout leaves a signal the caller ignores ignored" {
+  # Its handlers took over INT although the script had chosen `trap '' INT`,
+  # passed Ctrl-C on to the command and raised it in the script: both ended.
+  local script="${BATS_TEST_TMPDIR}/ignores.sh" tmp="${BATS_TEST_TMPDIR}" status run_as
+  for run_as in "slow" "bash -c ': > \"\$1\"/started; sleep 2; : > \"\$1\"/finished' _ $(printf '%q' "${tmp}")"; do
+    rm -f "${tmp}/started" "${tmp}/finished" "${tmp}/continued"
+    printf '%s\n' \
+      ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules process" \
+      "printf '%s' \"\$\$\" > $(printf '%q' "${tmp}/leader")" \
+      "trap '' INT" \
+      "slow() { : > $(printf '%q' "${tmp}/started"); sleep 2; : > $(printf '%q' "${tmp}/finished"); }" \
+      "dybatpho::run_with_timeout 10 ${run_as}" \
+      ": > $(printf '%q' "${tmp}/continued")" > "${script}"
+    _interrupt_script "${script}"
+    assert_equal "${status}" "0"
+    assert_file_exist "${tmp}/finished"
+    assert_file_exist "${tmp}/continued"
+  done
+}
+
+@test "waiting for a timed command stops once the job is reaped, whatever its pid now names" {
+  # The wait looped while `kill -0` found the pid, so a pid reused by another
+  # process after the job was reaped kept it waiting for ever.
+  kill() { [[ "$1" == -0 ]] && return 0; command kill "$@"; }
+  local done_file="${BATS_TEST_TMPDIR}/waited" tick=0
+  (
+    bash -c 'exit 3' &
+    __dybatpho_process_wait_job_into st "$!"
+    printf '%s' "${st}" > "${done_file}"
+  ) &
+  local waiter=$!
+  while [[ ! -e "${done_file}" ]] && ((tick++ < 50)); do sleep 0.1; done
+  unset -f kill
+  kill "${waiter}" 2> /dev/null || true
+  assert_file_exist "${done_file}"
+  assert_equal "$(< "${done_file}")" "3"
+}
+
+@test "waiting for a stopped timed command does not spin" {
+  # Under job control `wait` returns at once for a stopped job, which is still
+  # in the job table, so the wait looped on it, asking `jobs` each time, until
+  # the job went on.
+  __dybatpho_process_timeout_probe=no
+  local tmp="${BATS_TEST_TMPDIR}" status=0
+  jobs() { printf 'x' >> "${tmp}/asked"; builtin jobs "$@"; }
+  _stoppable() {
+    printf '%s' "${BASHPID}" > "${tmp}/group"
+    sleep 3
+  }
+  (
+    while [[ ! -s "${tmp}/group" ]]; do sleep 0.05; done
+    kill -STOP -- "-$(< "${tmp}/group")"
+    sleep 2
+    kill -CONT -- "-$(< "${tmp}/group")"
+  ) &
+  local controller=$!
+  dybatpho::run_with_timeout 10 _stoppable || status=$?
+  wait "${controller}"
+  unset -f jobs
+  kill -KILL -- "-$(< "${tmp}/group")" 2> /dev/null || true
+  local asked=""
+  [[ ! -e "${tmp}/asked" ]] || asked="$(< "${tmp}/asked")"
+  ((${#asked} < 5))
+}
+
+@test "dybatpho::run_with_timeout passes Ctrl-C on to a function it runs" {
+  # The fallback ran the command in a process group of its own, out of reach
+  # of the terminal's INT: Ctrl-C ended the script and orphaned the command
+  # and its watchdog, which ran on to the end.
+  local script="${BATS_TEST_TMPDIR}/fn.sh" tmp="${BATS_TEST_TMPDIR}" status
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules process" \
+    "printf '%s' \"\$\$\" > $(printf '%q' "${tmp}/leader")" \
+    "slow() { : > $(printf '%q' "${tmp}/started"); sleep 3; : > $(printf '%q' "${tmp}/finished"); }" \
+    "dybatpho::run_with_timeout 10 slow" \
+    ": > $(printf '%q' "${tmp}/continued")" > "${script}"
+  _interrupt_script "${script}"
+  assert_equal "${status}" "130"
+  sleep 3.5
+  assert_file_not_exist "${tmp}/finished"
+  assert_file_not_exist "${tmp}/continued"
+}
+
+@test "dybatpho::run_with_timeout passes Ctrl-C on to a program run by the timeout binary" {
+  # `timeout` puts itself in a process group of its own, so the terminal's INT
+  # never reached it, and the script, seeing its child carry on, carried on too.
+  __dybatpho_process_has_timeout || skip "no coreutils timeout"
+  local script="${BATS_TEST_TMPDIR}/prog.sh" tmp="${BATS_TEST_TMPDIR}" status
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules process" \
+    "printf '%s' \"\$\$\" > $(printf '%q' "${tmp}/leader")" \
+    "dybatpho::run_with_timeout 10 bash -c ': > \"\$1\"/started; sleep 3; : > \"\$1\"/finished' \\" \
+    "  _ $(printf '%q' "${tmp}")" \
+    ": > $(printf '%q' "${tmp}/continued")" > "${script}"
+  _interrupt_script "${script}"
+  assert_equal "${status}" "130"
+  sleep 3.5
+  assert_file_not_exist "${tmp}/finished"
+  assert_file_not_exist "${tmp}/continued"
 }
 
 @test "dybatpho::run_with_timeout with a limit of 0 runs without a limit" {

@@ -42,7 +42,7 @@ writes PID files.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a command instead of executing it when dry-run mode is enabled.
 - [`dybatpho::try`](#dybatphotry) — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script. The command runs in a subshell of the calling shell, so it can call any function the caller has defined, read its variables and its standard input, and nothing it changes -- variables, the working directory, traps -- leaks back. Its standard output and standard error are captured into the two named variables, with trailing newlines removed as `$(...)` would, so the message a `dybatpho::die` printed is in the error variable rather than on the terminal. The status of the command is the status of this call. Give an empty name to discard one of the streams. As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit` for the command, and calling `dybatpho::try` outside such a condition under `set -e` ends the script when the command fails. Test its status, or collect it with `|| status=$?`.
-- [`dybatpho::run_with_timeout`](#dybatphorun_with_timeout) — Run a command and end it if it takes too long. The system `timeout` is used when it is available and usable, and a pure-Bash watchdog takes over when it is not, which is the common case on macOS, where coreutils is not installed by default. A shell function always takes the Bash path, because `timeout` executes a program and cannot see the caller's functions. The command is ended with SIGTERM first and SIGKILL afterwards, so a job that traps SIGTERM still gets to clean up before it is removed, and one that ignores it is still removed.
+- [`dybatpho::run_with_timeout`](#dybatphorun_with_timeout) — Run a command and end it if it takes too long. The system `timeout` is used when it is available and usable, and a pure-Bash watchdog takes over when it is not, which is the common case on macOS, where coreutils is not installed by default. A shell function always takes the Bash path, because `timeout` executes a program and cannot see the caller's functions. The command is ended with SIGTERM first and SIGKILL afterwards, so a job that traps SIGTERM still gets to clean up before it is removed, and one that ignores it is still removed. A HUP, INT or TERM the script receives while the command runs, such as Ctrl-C, is passed on to the command and whatever it started, and raised again in the script once the command has ended, so the script stops -- or its own handler runs -- as it would without a time limit. A signal the script ignores stays ignored, for the command as well.
 - [`dybatpho::background_run`](#dybatphobackground_run) — Start a command in the background under a name. The name is how every other helper in this group refers to the job, because a process ID is both unreadable in a script and unusable once the job has been reaped. Starting a second job under a name whose job is still running is refused rather than silently forgetting the first one. The job runs in a subshell of the calling shell, so it can call any function the caller has defined, and it leads its own process group, so `dybatpho::kill_children` can end its children along with it.
 - [`dybatpho::background_pid`](#dybatphobackground_pid) — Print the process ID of a background job.
 - [`dybatpho::background_status`](#dybatphobackground_status) — Print the exit code of a background job that has finished. The code is only known once the job has been waited for, which is what `dybatpho::wait_all` does; before that the job has no exit code to report.
@@ -307,6 +307,12 @@ caller's functions.
 The command is ended with SIGTERM first and SIGKILL afterwards, so a job
 that traps SIGTERM still gets to clean up before it is removed, and one that
 ignores it is still removed.
+
+A HUP, INT or TERM the script receives while the command runs, such as
+Ctrl-C, is passed on to the command and whatever it started, and raised
+again in the script once the command has ended, so the script stops -- or
+its own handler runs -- as it would without a time limit. A signal the
+script ignores stays ignored, for the command as well.
 
 **🧪 Examples**
 

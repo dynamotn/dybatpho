@@ -200,6 +200,8 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **FR-037**: A handler run by `queue_work` MUST see the caller's variables: the worker MUST keep its state in prefixed locals.
 - **FR-038**: A payload read from stdin MUST keep its trailing line breaks, as the argument form does.
 - **FR-039**: A job file MUST be written to a staging file and renamed into place, so a reader that takes no lock never sees a job whose payload is still being written, and a push that dies mid-write leaves no truncated job.
+- **FR-040**: The sequence counter MUST be rewritten through an exclusively created staging file with an unguessable name, so a link planted beside it in a shared queue directory is never written through.
+- **FR-041**: `queue_work` MUST run its handler with INT and QUIT at the disposition the script itself started with, so Ctrl-C stops the handler along with the worker instead of letting it finish a job that stays claimed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -271,6 +273,8 @@ dybatpho::queue_work --retries 5 --backoff 10s --poll 5s --idle 10m deploys hand
 - **IT-046**: Hold the queue lock past the wait and verify `dybatpho::queue_work` still drains the queue.
 - **IT-047**: Push `line one` followed by three newlines from stdin and read all three back.
 - **IT-048**: Peek at the queue while a push writes its payload, see no job, and see the whole payload once the push returns.
+- **IT-049**: Plant a link at `.sequence.tmp`, push, and see the link's target untouched and the counter written.
+- **IT-050**: Interrupt a worker started in its own session with INT at its default while its handler sleeps, and see it exit 130 with the handler stopped.
 
 ## Acceptance Criteria *(mandatory)*
 

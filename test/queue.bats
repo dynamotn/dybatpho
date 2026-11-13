@@ -38,6 +38,21 @@ setup() {
   assert_equal "$(dybatpho::queue_len "${QUEUE}")" "3"
 }
 
+@test "dybatpho::queue_push does not write its sequence counter through a planted link" {
+  # The counter was staged at the predictable `.sequence.tmp` with a plain
+  # redirection, so a link planted there had the next id land in its target.
+  mkdir -p "${QUEUE}"
+  local victim="${BATS_TEST_TMPDIR}/victim"
+  printf 'untouched\n' > "${victim}"
+  ln -s "${victim}" "${QUEUE}/.sequence.tmp"
+
+  run_traced dybatpho::queue_push "${QUEUE}" job
+  assert_success
+  assert_equal "$(cat "${victim}")" "untouched"
+  assert_equal "$(cat "${QUEUE}/.sequence")" "1"
+  [[ ! -L "${QUEUE}/.sequence" ]]
+}
+
 @test "dybatpho::queue_push reads a payload from stdin and keeps its line breaks" {
   local id payload
   id="$(printf 'line one\nline two' | dybatpho::queue_push "${QUEUE}" -)"
@@ -552,6 +567,31 @@ SCRIPT
   assert_equal "$(< "${log}")" "$(printf 'tag two 000000000002\ntag one 000000000001')"
   assert_equal "$(dybatpho::queue_len "${QUEUE}")" "0"
   assert_equal "$(dybatpho::queue_len "${QUEUE}" claimed)" "0"
+}
+
+@test "dybatpho::queue_work stops its handler on Ctrl-C" {
+  # The handler ran as a background subshell, where a non-interactive shell
+  # ignores INT and QUIT: Ctrl-C ended the worker but the handler ran to the
+  # end, and its job, left claimed, ran a second time on the next pass.
+  command -v setsid > /dev/null || skip "setsid is not installed"
+  env --default-signal=INT true 2> /dev/null || skip "env cannot reset SIGINT"
+  local script="${BATS_TEST_TMPDIR}/worker.sh" ran="${BATS_TEST_TMPDIR}/ran" status=0
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules queue" \
+    "printf '%s' \"\$\$\" > $(printf '%q' "${BATS_TEST_TMPDIR}/leader")" \
+    "handler() { : > $(printf '%q' "${ran}.started"); sleep 3; : > $(printf '%q' "${ran}"); }" \
+    "dybatpho::queue_push $(printf '%q' "${QUEUE}") job > /dev/null" \
+    "dybatpho::queue_work $(printf '%q' "${QUEUE}") handler" > "${script}"
+  # A session of its own with INT at its default, as a terminal would start it;
+  # Bats runs tests with INT ignored, which a child shell cannot undo.
+  setsid env --default-signal=INT bash "${script}" < /dev/null &
+  local worker=$!
+  while [[ ! -e "${ran}.started" ]]; do sleep 0.05; done
+  kill -INT -- "-$(< "${BATS_TEST_TMPDIR}/leader")"
+  wait "${worker}" || status=$?
+  assert_equal "${status}" "130"
+  sleep 3.5
+  assert_file_not_exist "${ran}"
 }
 
 @test "dybatpho::queue_work keeps going when another worker holds the lock past its wait" {

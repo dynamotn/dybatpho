@@ -299,6 +299,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-035**: A process group holding nothing but zombies MUST count as ended where `/proc` can tell them apart, so a job ended in a container whose PID 1 never reaps does not cost the whole grace period.
 - **FR-036**: `dybatpho::try <out> <err> -- <command>` MUST run the command in a subshell of the caller with the caller's standard input, MUST capture its standard output and standard error into the named variables with trailing newlines removed, and MUST return the command's status, including the status of an `exit` or `dybatpho::die` inside it, without ending the caller.
 - **FR-037**: `dybatpho::try` MUST NOT set off the caller's ERR handler or `errexit` when the command fails, MUST discard a stream whose variable name is empty, MUST remove its temporary files, and MUST stop the script when the `--` separator or the command is missing or a variable name is invalid or reserved.
+- **FR-039**: `run_with_timeout` MUST pass a HUP, INT or TERM it receives while the command runs on to the command's process group, on both the `timeout` and the fallback path, MUST then raise it again once the caller's handlers are back, MUST leave a signal the caller ignores ignored -- neither passed on nor raised, and still ignored by the command -- and MUST hand the command the caller's standard input; the exit code of a command that ends on its own or times out MUST stay as before.
+- **FR-040**: A function that installs handlers for its own duration and puts the caller's back MUST leave a signal that was ignored -- by the script or from its start -- ignored, and MUST NOT reset it to its default on the way, since in a shell started with INT ignored that reset cannot be undone.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -378,6 +380,12 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-027**: Capture a succeeding command's two streams, discard one through an empty name, feed standard input through, and see a caller variable the command changed left alone and no temporary file left behind.
 - **IT-028**: Fail a command through `dybatpho::try` in a script with the common handlers registered and see the script recover; call it without `--`, without a command, and with a reserved or invalid name and see each refused.
 - **IT-030**: Point a reaped job's PID at an unrelated process and verify `dybatpho::kill_children` leaves it running and the name can be started again.
+- **IT-031**: Interrupt a script, started in its own session with INT at its default, while `run_with_timeout` runs a function, and again while it runs a program through `timeout`, and see the script exit 130 with the command stopped and the rest of the script not run.
+- **IT-032**: Feed a file to `run_with_timeout 5 cat` on both paths and see its contents.
+- **IT-033**: Start a script with INT ignored, call `run_with_timeout` on a function and a program, `with_lock` and `parallel_map`, then send itself INT and see it carry on.
+- **IT-034**: Interrupt a script that ran `trap '' INT` while `run_with_timeout` runs a function, then a program, and see the command finish and the script carry on with exit code 0.
+- **IT-035**: Wait for a reaped job with `kill -0` answering for its pid and see the wait return the job's exit code.
+- **IT-036**: Stop a function `run_with_timeout` runs on the fallback path for two seconds and see the wait ask about the job no more than a handful of times.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -199,9 +199,25 @@ function __dybatpho_process_traps_save_into {
 }
 
 #######################################
+# @description Tell whether handlers `__dybatpho_process_traps_save_into` saved
+#   had a signal ignored.
+# @arg $1 string The saved handlers
+# @arg $2 string Signal name, with or without `SIG`
+# @exitcode 0 The signal was ignored
+# @exitcode 1 It had a handler, or none
+# @internal
+#######################################
+function __dybatpho_process_traps_ignored {
+  [[ $'\n'"$1" == *$'\n'"trap -- '' SIG${2#SIG}"$'\n'* ]]
+}
+
+#######################################
 # @description Put back the handlers `__dybatpho_process_traps_save_into` saved,
 #   clearing whatever the signals have now. A signal that had no handler is
-#   left with none.
+#   left with none, and one that was ignored is ignored again without being
+#   reset first: in a shell started with INT ignored, `trap - INT` makes Bash
+#   catch INT itself, and no later `trap '' INT` ignores it again, so Ctrl-C
+#   would end a script that had been started to ignore it.
 # @arg $1 string The saved handlers
 # @arg $@ string Signals they were saved for
 # @internal
@@ -209,7 +225,14 @@ function __dybatpho_process_traps_save_into {
 function __dybatpho_process_traps_restore {
   local __dybatpho_process_saved="$1"
   shift
-  trap - "$@"
+  local __dybatpho_process_restore_signal
+  local -a __dybatpho_process_restore_reset=()
+  for __dybatpho_process_restore_signal in "$@"; do
+    __dybatpho_process_traps_ignored "${__dybatpho_process_saved}" "${__dybatpho_process_restore_signal}" \
+      || __dybatpho_process_restore_reset+=("${__dybatpho_process_restore_signal}")
+  done
+  ((${#__dybatpho_process_restore_reset[@]} == 0)) \
+    || trap - ${__dybatpho_process_restore_reset[@]+"${__dybatpho_process_restore_reset[@]}"}
   # `trap -p` prints the commands that reinstate the handlers, so running them
   # is how they come back; there is no other form to build here.
   # dyshellint disable=BSG040
@@ -647,6 +670,52 @@ function __dybatpho_process_timeout_watch {
 }
 
 #######################################
+# @description Send a signal to a timed command: to its whole process group,
+#   which it leads, or to the command alone while it has not made the group
+#   yet. Nothing is sent before there is a signal and a command.
+# @arg $1 string Signal name, or empty
+# @arg $2 number Process ID of the command, or empty
+# @internal
+#######################################
+function __dybatpho_process_signal_job {
+  [[ -n "${1-}" && -n "${2-}" ]] || return 0
+  kill -s "$1" -- "-$2" 2> /dev/null || kill -s "$1" "$2" 2> /dev/null || true
+}
+
+#######################################
+# @description Wait for a background job to end and set a variable to its exit
+#   code. A trapped signal ends `wait` early, while the job it was passed on to
+#   is still ending, so after a handler has run the job is waited for again
+#   until it has been reaped. A stopped job ends the wait with its status, as
+#   it always did.
+# @arg $1 string Name of the variable receiving the exit code
+# @arg $2 number Process ID of the job
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_process_wait_job_into {
+  local -n __dybatpho_process_wait_ref="$1"
+  local __dybatpho_process_wait_fired
+  while :; do
+    # Counted by the handlers of `dybatpho::run_with_timeout`, the only caller.
+    __dybatpho_process_wait_fired="${__dybatpho_process_timeout_fired-0}"
+    __dybatpho_process_wait_ref=0
+    # Under job control Bash 4.3 to 5.1 report the job, `Done`, `Exit 3` or
+    # `Terminated`, on the shell's stderr as `wait` reaps it; the command's own
+    # stderr was fixed when it started, so only that report is silenced.
+    wait "$2" 2> /dev/null || __dybatpho_process_wait_ref=$?
+    # Waited for again only after a handler ran: under job control a stopped
+    # job also ends `wait` at once, and looping on that spun until it went on.
+    ((${__dybatpho_process_timeout_fired-0} != __dybatpho_process_wait_fired)) || return 0
+    # Asked of the shell's own job table, not `kill -0`: once the job is reaped
+    # it is gone from there, whatever process its pid names by then.
+    local __dybatpho_process_wait_jobs
+    __dybatpho_process_wait_jobs="$(jobs -p)"
+    [[ $'\n'"${__dybatpho_process_wait_jobs}"$'\n' == *$'\n'"$2"$'\n'* ]] || return 0
+  done
+}
+
+#######################################
 # @description Run a command under a time limit without the `timeout` binary.
 #   The command runs under job control so it leads its own process group, and a
 #   watchdog subshell ends that group once the limit elapses. The watchdog
@@ -692,6 +761,9 @@ function __dybatpho_process_timeout_fallback {
     "$@" &
   fi
   local command_pid=$!
+  # Signals the caller's handler in `dybatpho::run_with_timeout` passes on.
+  __dybatpho_process_timeout_pid="${command_pid}"
+  __dybatpho_process_signal_job "${__dybatpho_process_timeout_caught-}" "${command_pid}"
 
   # The watchdog writes nothing, and holds none of the caller's streams: its
   # `sleep` can outlive it, and one holding the caller's output open kept
@@ -701,11 +773,8 @@ function __dybatpho_process_timeout_fallback {
     "${__dybatpho_process_fallback_kill_after}" "${__dybatpho_process_fallback_marker}" < /dev/null &> /dev/null &
   local watchdog_pid=$!
 
-  local status=0
-  # Under job control Bash 4.3 to 5.1 report the job, `Done`, `Exit 3` or
-  # `Terminated`, on the shell's stderr as `wait` reaps it; the command's own
-  # stderr was fixed when it started, so only that report is silenced.
-  wait "${command_pid}" 2> /dev/null || status=$?
+  local status
+  __dybatpho_process_wait_job_into status "${command_pid}"
 
   if [[ -s "${__dybatpho_process_fallback_marker}" ]]; then
     # The watchdog fired and is ending the command's group; it is left to
@@ -752,6 +821,12 @@ function __dybatpho_process_timeout_fallback {
 #   The command is ended with SIGTERM first and SIGKILL afterwards, so a job
 #   that traps SIGTERM still gets to clean up before it is removed, and one that
 #   ignores it is still removed.
+#
+#   A HUP, INT or TERM the script receives while the command runs, such as
+#   Ctrl-C, is passed on to the command and whatever it started, and raised
+#   again in the script once the command has ended, so the script stops -- or
+#   its own handler runs -- as it would without a time limit. A signal the
+#   script ignores stays ignored, for the command as well.
 # @example
 #   dybatpho::run_with_timeout 30 curl -fsSL https://example.com
 #
@@ -793,16 +868,53 @@ function dybatpho::run_with_timeout {
     return $?
   fi
 
+  # Either way the command leads a process group of its own -- `timeout` makes
+  # one, the fallback runs it under job control -- where the terminal's Ctrl-C
+  # does not reach it: the script ended and orphaned it, or, seeing `timeout`
+  # carry on, carried on itself. So HUP, INT and TERM are handled alone while it
+  # runs, passed on to its group, and raised again once the caller's handlers
+  # are back, so the script stops as it would have, or the caller's handler runs.
+  local __dybatpho_process_timeout_traps __dybatpho_process_timeout_caught="" __dybatpho_process_timeout_pid=""
+  local __dybatpho_process_timeout_signal __dybatpho_process_timeout_status=0 __dybatpho_process_timeout_fired=0
+  # QUIT is saved only to tell whether the caller ignores it.
+  __dybatpho_process_traps_save_into __dybatpho_process_timeout_traps HUP INT TERM QUIT
+  for __dybatpho_process_timeout_signal in HUP INT TERM; do
+    # A signal the caller ignores stays ignored, for the command too.
+    ! __dybatpho_process_traps_ignored "${__dybatpho_process_timeout_traps}" "${__dybatpho_process_timeout_signal}" \
+      || continue
+    # shellcheck disable=SC2016 # the pid is read when the signal arrives
+    __dybatpho_process_trap_only "__dybatpho_process_timeout_caught=${__dybatpho_process_timeout_signal}; \
+__dybatpho_process_timeout_fired=\$((__dybatpho_process_timeout_fired + 1)); \
+__dybatpho_process_signal_job ${__dybatpho_process_timeout_signal} \"\${__dybatpho_process_timeout_pid}\"" \
+      "${__dybatpho_process_timeout_signal}"
+  done
+
   if ! dybatpho::is function "$1" &> /dev/null \
     && __dybatpho_process_has_timeout; then
     # `timeout -k 0` never sends SIGKILL, where zero here means at once, as it
     # does on the Bash path.
     ((__dybatpho_process_timeout_kill_after > 0)) || __dybatpho_process_timeout_kill_after=0.01
-    timeout -k "${__dybatpho_process_timeout_kill_after}" "${__dybatpho_process_timeout_seconds}" "$@"
-    return $?
+    # In the background, so the handlers run while it does; a background job
+    # starts with INT and QUIT ignored, which `timeout` would hand its command,
+    # and with standard input from /dev/null rather than the caller's.
+    (
+      __dybatpho_process_traps_ignored "${__dybatpho_process_timeout_traps}" INT || trap - INT
+      __dybatpho_process_traps_ignored "${__dybatpho_process_timeout_traps}" QUIT || trap - QUIT
+      exec timeout -k "${__dybatpho_process_timeout_kill_after}" "${__dybatpho_process_timeout_seconds}" "$@"
+    ) <&0 &
+    __dybatpho_process_timeout_pid=$!
+    __dybatpho_process_signal_job "${__dybatpho_process_timeout_caught}" "${__dybatpho_process_timeout_pid}"
+    __dybatpho_process_wait_job_into __dybatpho_process_timeout_status "${__dybatpho_process_timeout_pid}"
+  else
+    __dybatpho_process_timeout_fallback "${__dybatpho_process_timeout_seconds}" \
+      "${__dybatpho_process_timeout_kill_after}" "$@" || __dybatpho_process_timeout_status=$?
   fi
-  __dybatpho_process_timeout_fallback "${__dybatpho_process_timeout_seconds}" \
-    "${__dybatpho_process_timeout_kill_after}" "$@"
+
+  __dybatpho_process_traps_restore "${__dybatpho_process_timeout_traps}" HUP INT TERM QUIT
+  if [[ -n "${__dybatpho_process_timeout_caught}" ]]; then
+    kill -s "${__dybatpho_process_timeout_caught}" "${BASHPID}"
+  fi
+  return "${__dybatpho_process_timeout_status}"
 }
 
 #######################################

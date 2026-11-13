@@ -575,7 +575,7 @@ function dybatpho::prompt {
   printf "%s" "${prompt}" >&2
   [[ -n "${default}" ]] && printf " [%s]" "${default}" >&2
   printf ": " >&2
-  IFS= read -r value || return 1
+  IFS= read -r value || [[ -n "${value}" ]] || return 1
   [[ -n "${value}" ]] || value="${default}"
   printf "%s" "${value}"
 }
@@ -930,7 +930,7 @@ function __dybatpho_cli_parse_opt {
 
   if dybatpho::is false "${__done_initial}"; then
     __on="true" __off="" __init="@empty" __export="true" __required="false" __persistent="false" __hidden="false"
-    __deprecated="" __label="" __env="" __multiple="false" __prompt="" __choices="" __config="" __pattern="" __type=""
+    __deprecated="" __label="" __validate="" __env="" __multiple="false" __prompt="" __choices="" __config="" __pattern="" __type=""
     # A counting flag accumulates repeats, so it starts from zero rather than
     # from the empty string every other option type uses.
     if dybatpho::is true "${__count}"; then __init="=0"; fi
@@ -1292,7 +1292,7 @@ function __dybatpho_cli_generate_logic {
   local __has_help="false"
   declare -a __sub_specs=()
   local __dybatpho_cli_logic_sub_spec __required_check
-  declare -a __prompt_defs=()
+  declare -a __prompt_defs=() __prompt_checks=()
   declare -a __known_switches=()
   declare -a __declared_args=()
 
@@ -1480,25 +1480,29 @@ function __dybatpho_cli_generate_logic {
   # Binding runs after the count check, so an argument variable is only ever
   # read once the command is known to have been called correctly.
   __dybatpho_cli_print_arg_bindings "${__rest}" ${__declared_args[@]+"${__declared_args[@]}"}
-  local __prompt_def __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export
+  local __prompt_def __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export __prompt_check
   for __prompt_def in ${__prompt_defs[@]+"${__prompt_defs[@]}"}; do
     IFS=$'\x1f' read -r __prompt_var __prompt_text __prompt_choices __prompt_multiple __prompt_export <<< \
       "${__prompt_def}"
     __dybatpho_cli_assign_quoted __prompt_text "${__prompt_text}"
+    # A failed check stops the later prompts, so the error is not asked past.
+    __dybatpho_cli_print_indent 2 "if [ \$# -eq 0 ] && [ -z \"\${${__prompt_var}:-}\" ]; then"
     # Quote the choices only after testing them: quoting an empty value yields `''`.
     if [[ -n "${__prompt_choices}" ]]; then
       __dybatpho_cli_assign_quoted __prompt_choices "${__prompt_choices}"
-      __dybatpho_cli_print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
       __dybatpho_cli_print_indent 3 \
         "${__prompt_var}=\$(dybatpho::select ${__prompt_text} ${__prompt_choices} ${__prompt_multiple})"
-      [[ "${__prompt_export}" = "true" ]] && __dybatpho_cli_print_indent 3 "export ${__prompt_var}"
-      __dybatpho_cli_print_indent 2 "fi"
     else
-      __dybatpho_cli_print_indent 2 "if [ -z \"\${${__prompt_var}:-}\" ]; then"
       __dybatpho_cli_print_indent 3 "${__prompt_var}=\$(dybatpho::prompt ${__prompt_text})"
-      [[ "${__prompt_export}" = "true" ]] && __dybatpho_cli_print_indent 3 "export ${__prompt_var}"
-      __dybatpho_cli_print_indent 2 "fi"
     fi
+    [[ "${__prompt_export}" = "true" ]] && __dybatpho_cli_print_indent 3 "export ${__prompt_var}"
+    # A typed value meets the same `choices:`, `type:`, `pattern:` and
+    # `validate:` rules as one given on the command line.
+    for __prompt_check in ${__prompt_checks[@]+"${__prompt_checks[@]}"}; do
+      [[ "${__prompt_check%%$'\x1f'*}" == "${__prompt_var}" ]] || continue
+      __dybatpho_cli_print_indent 3 "[ \$# -eq 0 ] && { ${__prompt_check#*$'\x1f'}; }"
+    done
+    __dybatpho_cli_print_indent 2 "fi"
   done
   __dybatpho_cli_print_indent 2 '[ $# -eq 0 ] && {'
   [[ -n "${__setup_prerun}" ]] && __dybatpho_cli_print_indent 3 "${__setup_prerun}"
@@ -1925,7 +1929,9 @@ function __dybatpho_cli_generate_man_command {
 #######################################
 function __dybatpho_cli_roff_escape_into {
   local -n __dybatpho_cli_roff_out="$1"
+  # `\x1e` is a newline stored in a metadata record by `__dybatpho_cli_meta_join`.
   local __dybatpho_cli_roff_text="${2-}"
+  __dybatpho_cli_roff_text="${__dybatpho_cli_roff_text//$'\x1e'/$'\n'}"
   __dybatpho_cli_roff_text="${__dybatpho_cli_roff_text//\\/\\e}"
   # `\&` is a zero-width character, so the line no longer starts with the dot.
   __dybatpho_cli_roff_text="${__dybatpho_cli_roff_text//$'\n.'/$'\n\\&.'}"
@@ -2605,19 +2611,23 @@ function __dybatpho_cli_print_validate {
 #   They run once parsing is done, so a value given on the command line, which
 #   was checked as it was read, still overrides a bad seed. A `multiple:` value
 #   is a space-joined list and a `count:` value a number, so neither is checked.
+#   Given a second argument, the checks are for a value typed at a `prompt:`:
+#   they go to that array instead, whatever the seeds, and run `validate:` too.
 # @arg $1 string Destination variable name, or `-`
+# @arg $2 string? Name of the array to append to instead, for a prompted value
 # @set __required_checks Appends one generated check per rule
 # @internal
 #######################################
 function __dybatpho_cli_add_seed_checks {
   local __seed_var="$1" __seed_env="${__env:-}"
+  local -n __seed_checks="${2:-__required_checks}"
   [[ "${__seed_var}" != "-" ]] || return 0
   [[ "${__seed_env}" != "false" ]] || __seed_env=""
-  [[ -n "${__seed_env}" || -n "${__config:-}" ]] || return 0
+  [[ -n "${2:-}" || -n "${__seed_env}" || -n "${__config:-}" ]] || return 0
   if dybatpho::is true "${__count:-false}"; then
     # Without the flag on the line, the seed reaches the script untouched, and
     # its own `(( V > 1 ))` would run any `$(...)` in a subscript.
-    __required_checks+=("case \"\${${__seed_var}:-}\" in '' | *[!0-9]*) ${__seed_var}=0 ;; *) ${__seed_var}=\$((10#\$${__seed_var})) ;; esac")
+    __seed_checks+=("case \"\${${__seed_var}:-}\" in '' | *[!0-9]*) ${__seed_var}=0 ;; *) ${__seed_var}=\$((10#\$${__seed_var})) ;; esac")
     return 0
   fi
   dybatpho::is false "${__multiple:-false}" || return 0
@@ -2625,19 +2635,24 @@ function __dybatpho_cli_add_seed_checks {
   if [[ -n "${__choices:-}" ]]; then
     local __seed_choices
     __dybatpho_cli_assign_quoted __seed_choices "${__choices}"
-    __required_checks+=("${__seed_guard} dybatpho::opts::validate_choice \"\$${__seed_var}\" ${__seed_choices} || set \"choice\" \"\$${__seed_var}\"")
+    __seed_checks+=("${__seed_guard} dybatpho::opts::validate_choice \"\$${__seed_var}\" ${__seed_choices} || set \"choice\" \"\$${__seed_var}\"")
   fi
   if [[ -n "${__type:-}" ]]; then
     local __seed_type
     __dybatpho_validate_canonical __seed_type "${__type}" \
       || dybatpho::die "$(__dybatpho_log_text cli.unknown_type "Unknown type: ${__type}" "type=${__type}")"
-    __required_checks+=("${__seed_guard} dybatpho::validate_is ${__seed_type} \"\$${__seed_var}\" || set \"type:${__seed_type}\" \"\$${__seed_var}\"")
+    __seed_checks+=("${__seed_guard} dybatpho::validate_is ${__seed_type} \"\$${__seed_var}\" || set \"type:${__seed_type}\" \"\$${__seed_var}\"")
   fi
   if [[ -n "${__pattern:-}" ]]; then
     __dybatpho_cli_require_case_pattern "${__pattern}"
     local __seed_message
     __dybatpho_cli_assign_quoted __seed_message "pattern:${__pattern}"
-    __required_checks+=("${__seed_guard} case \"\$${__seed_var}\" in ${__pattern}) ;; *) set ${__seed_message} \"\$${__seed_var}\" ;; esac")
+    __seed_checks+=("${__seed_guard} case \"\$${__seed_var}\" in ${__pattern}) ;; *) set ${__seed_message} \"\$${__seed_var}\" ;; esac")
+  fi
+  if [[ -n "${2:-}" && -n "${__validate:-}" ]]; then
+    local __seed_label
+    __dybatpho_cli_assign_quoted __seed_label "${__label:-${__seed_var}}"
+    __seed_checks+=("OPTARG=\$${__seed_var}; ${__validate} || set -- ${__validate%% *}:\$? ${__seed_label} ${__validate}")
   fi
   return 0
 }
@@ -2952,12 +2967,16 @@ function __dybatpho_cli_collect_switches {
 function __dybatpho_cli_json_quote {
   __dybatpho_cli_require_shell_name "$1"
   local __dybatpho_cli_json_value
-  __dybatpho_log_json_escape_into __dybatpho_cli_json_value "${2-}"
+  # `\x1e` is a newline stored in a metadata record by `__dybatpho_cli_meta_join`.
+  local __dybatpho_cli_json_text="${2-}"
+  __dybatpho_log_json_escape_into __dybatpho_cli_json_value "${__dybatpho_cli_json_text//$'\x1e'/$'\n'}"
   printf -v "$1" '%s' "\"${__dybatpho_cli_json_value}\""
 }
 
 #######################################
 # @description Join metadata fields into one record with the metadata separator.
+#   A record is read back with `read`, which stops at a newline, so a newline
+#   inside a field is stored as `\x1e`; the JSON and roff writers turn it back.
 # @arg $1 string Name of the variable receiving the record
 # @arg $@ string Fields, in record order
 # @set The named variable
@@ -2966,6 +2985,7 @@ function __dybatpho_cli_json_quote {
 function __dybatpho_cli_meta_join {
   local -n __meta_join_out="$1"
   shift
+  set -- "${@//$'\n'/$'\x1e'}"
   local IFS="${__DYBATPHO_CLI_META_SEP}"
   __meta_join_out="$*"
 }
@@ -3188,6 +3208,12 @@ function dybatpho::opts::param {
     if [[ -n "${__prompt}" ]]; then
       # A unit separator keeps empty fields, which tabs would collapse on read.
       __prompt_defs+=("${var}"$'\x1f'"${__prompt}"$'\x1f'"${__choices}"$'\x1f'"${__multiple}"$'\x1f'"${__export}")
+      local -a __prompt_var_checks=()
+      __dybatpho_cli_add_seed_checks "${var}" __prompt_var_checks
+      local __prompt_check
+      for __prompt_check in ${__prompt_var_checks[@]+"${__prompt_var_checks[@]}"}; do
+        __prompt_checks+=("${var}"$'\x1f'"${__prompt_check}")
+      done
     fi
     if dybatpho::is true "${__required}"; then
       local __required_marker="__dybatpho_required_${__dybatpho_cli_logic_spec//[^a-zA-Z0-9_]/_}_${var}"

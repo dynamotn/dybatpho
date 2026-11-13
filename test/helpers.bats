@@ -1130,6 +1130,14 @@ EOF
   assert_equal "${info[0]}" "0"
 }
 
+@test "the option reader keeps an empty argument as a positional" {
+  local force=false
+  local -a positional=() info=()
+  __dybatpho_helpers_options_into positional info '-f|--force=force' '' '-*' u m -- a "" -f b
+  assert_equal "${force}|${#positional[@]}|${positional[1]}|${positional[2]}" "true|3||b"
+  assert_equal "${info[*]}" "4 -1"
+}
+
 @test "the option reader refuses unknown options and missing values" {
   run --separate-stderr __dybatpho_helpers_options_into - - '-f=force' '' '-*' \
     'caller: unknown option: {option}' '' -- -q

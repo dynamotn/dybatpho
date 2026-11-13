@@ -166,6 +166,8 @@ dybatpho::generate_man _spec mytool
 - Completion generation is requested for an unsupported shell.
 - Schema or man-page metadata contains quotes, backslashes, or newlines.
 - A standalone prompt or selection helper receives EOF or an invalid choice.
+- The last answer piped to a prompt has no trailing newline.
+- A value typed at a `prompt:` breaks the option's `type:`, `pattern:`, `choices:` or `validate:` rule.
 - A command or alias name holds a space, a quote, or a glob character such as `*`.
 
 ## Requirements *(mandatory)*
@@ -241,6 +243,9 @@ dybatpho::generate_man _spec mytool
 - **FR-039**: The man page MUST escape descriptions for roff, so a backslash prints as itself and a line starting with `.` or `'` is shown rather than read as a request.
 - **FR-040**: The completion cache key MUST change when the file declaring the root spec changes, even when the script only sources it, and when the library version changes.
 - **FR-041**: `dybatpho::select` and the `args:` rules MUST read a number with a leading zero, such as `08`, as decimal.
+- **FR-042**: `dybatpho::prompt`, `dybatpho::select` and generated prompts MUST accept a last answer that ends at EOF without a newline, and MUST still fail on EOF with no answer.
+- **FR-043**: A value typed at a generated `prompt:` MUST be held to the option's `choices:`, `type:`, `pattern:` and `validate:` rules and refused with the same error as the same value given on the command line; later prompts MUST NOT be asked once one is refused.
+- **FR-044**: A newline in option metadata, such as a description, MUST NOT cut the option short: its switches, environment name, required state and the rest MUST still reach the schema, the man page, completion and `abbr:` matching, and the schema and man page MUST print the newline.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -295,6 +300,9 @@ dybatpho::generate_man _spec mytool
 - **IT-023**: Generate the man page for descriptions starting with `.` and `'` or holding a backslash, and verify each is escaped.
 - **IT-024**: Generate completion from a spec declared in a sourced file, change that file, and get the new switches.
 - **IT-025**: Select `08` and the range `01-02`, and run `args:range:08:09` with eight arguments without an error.
+- **IT-026**: Pipe `abc` and `2` without a trailing newline to `dybatpho::prompt` and `dybatpho::select` and get them; prompt on empty input and see it fail.
+- **IT-027**: Type `abc` at a `type:port` prompt and see it refused with the error `--port abc` gets, while `8080` is accepted.
+- **IT-028**: Declare a flag with a two-line description, `required:true` and `env:`, and see the schema, man page and completion keep its switches and metadata and `abbr:` accept `--verb`.
 
 ## Acceptance Criteria *(mandatory)*
 

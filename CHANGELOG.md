@@ -248,6 +248,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   instead of letting it finish while its job stays claimed and runs again.
 - **`lock` — a worker's `dybatpho::lock_semaphore_release name N` frees only
   its own slots,** not the parent script's.
+- **`helpers` — an empty argument no longer stops `safe_rm`, `safe_system`,
+  `pkg_*`, `parallel`, `queue`, `backup`, `diff` or `schedule` with
+  `bad array subscript`.**
+- **`cli` — `dybatpho::prompt`, `dybatpho::select` and `prompt:` options keep
+  a last answer without a trailing newline.**
+- **`cli` — a value typed at a `prompt:` is checked against the option's
+  `type:`, `pattern:` and `validate:`** like one given on the command line.
+- **`cli` — a description holding a newline keeps the rest of the option,**
+  so the schema, man page, completion and `abbr:` still see its switches.
 - **`network` — `dybatpho::curl_paginate` stops when the rate limit refuses a
   page;** `dybatpho::curl_resume_download` on a complete file succeeds and
   checks it; `dybatpho::curl_request` no longer keeps a header file per call

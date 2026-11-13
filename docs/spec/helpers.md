@@ -149,6 +149,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - Breakpoint is invoked in unattended CI rather than an interactive terminal.
 - `dybatpho::is int` or `dybatpho::is number` is given a quoted character such as `'a`, a hexadecimal `0x1F`, surrounding blanks, a decimal comma, or an integer with a leading zero.
 - `has_version` is given alternatives none of which is installed, or a command whose version it cannot read.
+- The shared option reader behind the modules' `-f`/`--force` style options meets an empty argument.
 
 ## Requirements *(mandatory)*
 
@@ -231,6 +232,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-035**: `dybatpho::has_version SPEC` MUST answer, without stopping the script, whether a command is installed and satisfies its range; SPEC MUST take the `doctor` registry syntax -- `cmd`, `cmd>=1.2`, alternatives `a|b>=2` -- read by the same splitter `doctor` uses, and a version that cannot be read MUST NOT satisfy a range.
 - **FR-036**: `dybatpho::has_version` MUST read a glob character in a range (`bash>=5.*`) as text, whatever `nullglob`, `failglob` or the working directory hold.
 - **FR-037**: `dybatpho::retry_until` MUST refuse a delay that is not a plain decimal number of seconds before running the command, as `dybatpho::retry` refuses its delay settings.
+- **FR-038**: The shared option reader used by the modules' own options MUST keep an empty argument as an ordinary positional rather than fail on it.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -305,6 +307,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-038**: Verify `1.2.3.4::`, `1:2:1.2.3.4::` and `1.2.3.4::1` are refused and `::1.2.3.4` is accepted.
 - **IT-039**: Ask `has_version` about a fake tool alone, with ranges it meets and misses, through alternatives, and with no readable version; it returns 0 or 1 and prints nothing.
 - **IT-040**: Ask `has_version` for `faketool>=5.*` under `nullglob` and under `failglob`, and get yes; run `retry_until 1 two false` and see it refuse.
+- **IT-041**: Read `a "" -f b` with the option reader, and get `-f` set and `a`, the empty argument and `b` as positionals.
 
 ## Acceptance Criteria *(mandatory)*
 

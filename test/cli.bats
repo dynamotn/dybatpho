@@ -66,6 +66,16 @@ setup() {
   assert_equal "Guest" "${entered}"
 }
 
+@test "dybatpho::prompt and dybatpho::select keep a last answer without a newline" {
+  local entered
+  entered="$(printf 'abc' | dybatpho::prompt 'Name')"
+  assert_equal "abc" "${entered}"
+  entered="$(printf '2' | dybatpho::select 'Choose' 'red,green')"
+  assert_equal "green" "${entered}"
+  run dybatpho::prompt 'Name' 'Guest' < /dev/null
+  assert_failure
+}
+
 @test "dybatpho::select supports numeric multiple selections" {
   local selected
   selected="$(printf '1,3\n' | dybatpho::select 'Choose colors' 'red,green,blue' true)"
@@ -1259,6 +1269,21 @@ setup() {
   assert_equal "${result}" "Alice|green"
 }
 
+@test "generated parsers check a prompted value like a value given on the command line" {
+  _spec_prompt_checks() {
+    dybatpho::opts::setup "" - action:'printf "%s" "${PORT}"'
+    dybatpho::opts::param "Port" PORT --port type:port prompt:"Port"
+  }
+
+  run --separate-stderr dybatpho::generate_from_spec _spec_prompt_checks <<< 'abc'
+  assert_failure
+  run --separate-stderr dybatpho::generate_from_spec _spec_prompt_checks --port abc
+  local cli_stderr="${stderr}" cli_status="${status}"
+  run --separate-stderr dybatpho::generate_from_spec _spec_prompt_checks <<< 'abc'
+  assert_equal "${status}|${stderr##*: }" "${cli_status}|${cli_stderr##*: }"
+  assert_equal "$(printf '8080' | dybatpho::generate_from_spec _spec_prompt_checks 2> /dev/null)" "8080"
+}
+
 @test "persistent params and display options are inherited by subcommands" {
   _spec_persistent_sub() {
     dybatpho::opts::setup "Child" - action:'printf "%s" "${TOKEN}"'
@@ -2354,6 +2379,23 @@ setup() {
   assert_success
   assert_line --index 0 $'Ring \a and \033[1mbold\033[0m'
   assert_line --index 1 $'Form\ffeed'
+}
+
+@test "a description holding a newline keeps the rest of the option metadata" {
+  _spec_newline_desc() {
+    dybatpho::opts::setup "Tool" - abbr:true action:'printf "%s" "${VERB}"'
+    dybatpho::opts::flag $'line one\nline two' VERB -v --verbose required:true env:VERBOSE
+  }
+
+  run_traced dybatpho::generate_schema _spec_newline_desc tool
+  assert_success
+  run_traced jq -r '.options[0] | .description, (.switches | join(" ")), .env, .required' <<< "${output}"
+  assert_output $'line one\nline two\n-v --verbose\nVERBOSE\ntrue'
+  run_traced dybatpho::generate_man _spec_newline_desc tool
+  assert_output --partial $'.B -v, --verbose\nline one\nline two (required) [env: VERBOSE]'
+  DYBATPHO_CLI_CACHE=false run_traced dybatpho::generate_completion _spec_newline_desc bash tool
+  assert_output --partial -- '--verbose'
+  assert_equal "$(dybatpho::generate_from_spec _spec_newline_desc --verb)" "true"
 }
 
 @test "a spec and its action see the caller's variables, not the generator's" {

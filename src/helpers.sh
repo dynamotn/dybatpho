@@ -526,7 +526,9 @@ function __dybatpho_helpers_options_into {
       __dybatpho_helpers_po_has_value=true
     fi
 
-    if [[ -z "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]+set}" ]]; then
+    # An empty argument is not a valid subscript, and is a positional anyway.
+    if [[ -z "${__dybatpho_helpers_po_arg}" ]] \
+      || [[ -z "${__dybatpho_helpers_po_targets[${__dybatpho_helpers_po_arg}]+set}" ]]; then
       __dybatpho_helpers_po_ends=false __dybatpho_helpers_po_refused=false
       if [[ "${__dybatpho_helpers_po_arg}" == "--" && "${__dybatpho_helpers_po_mode}" != *,keep-dashes,* ]]; then
         __dybatpho_helpers_po_ends=true

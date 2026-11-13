@@ -101,6 +101,9 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - A heading level, an emoji shortcode, an account name, or a code-block language is invalid.
 - `dybatpho::md_table` is called without the `table` module loaded.
 - A badge's label, value or color holds a character that is not safe in a URL path, such as `/`, `?`, `#`, `%` or a parenthesis.
+- A URL holds a backslash or a control character such as a line break.
+- A heading ends in a run of `#` after a blank, such as `Issue #`, which CommonMark reads as a closing sequence.
+- Text holds `&`, which could start an entity reference such as `&amp;`.
 
 ## Requirements *(mandatory)*
 
@@ -130,6 +133,9 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **FR-022**: The escape MUST mark an ordered-list marker on its `.` or `)`, as `1\.`, since CommonMark escapes nothing but punctuation.
 - **FR-023**: Only `dybatpho::md_raw` MUST be able to open a raw region: its opening mark MUST carry a value drawn when the module loads, and the escape MUST drop a `\001` or `\002` that arrives in a builder's text, so control characters in data never turn the escape off.
 - **FR-024**: `dybatpho::md_table` MUST escape the inline syntax of every cell after splitting the row on the delimiter, so a value holding `|`, `*`, `_` or `[` stays one plain cell, and MUST emit a cell marked with `dybatpho::md_raw` unchanged.
+- **FR-025**: A link or image URL MUST percent-encode a backslash as `%5C` and every control character, U+0001 to U+001F and U+007F, as its `%XX` code.
+- **FR-026**: `dybatpho::md_heading` MUST escape the last `#` of a trailing `#` run that follows a blank or makes up the whole text, so it is not dropped as a closing sequence.
+- **FR-027**: Inline escaping MUST escape `&` as `\&`, so an entity reference in the text renders literally.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -169,6 +175,9 @@ dybatpho::md_collapsible "Full build log" "$(dybatpho::md_code_block '' "${log}"
 - **IT-019**: Render a collapsible section whose summary holds `<img ...>` and `&`, and get `&lt;`, `&gt;` and `&amp;` with no tag left.
 - **IT-020**: Render a table cell holding `a|b *x* [y](z)` with `,` as the delimiter and get one escaped cell; render a cell marked raw and get it as built.
 - **IT-021**: Render a body of 40000 backticks in under three seconds and get a fence of 40001.
+- **IT-022**: Link `http://x/a\` as `http://x/a%5C`, and a URL holding a line feed, carriage return, tab, U+0001 and U+007F with each percent-encoded.
+- **IT-023**: Render `Issue #` as `## Issue \#`, `Issue ##  ` as `## Issue #\#  `, and `C#` unchanged.
+- **IT-024**: Escape `AT&amp;T` as `AT\&amp;T`.
 
 ## Acceptance Criteria *(mandatory)*
 

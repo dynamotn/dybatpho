@@ -935,6 +935,7 @@ function __dybatpho_i18n_plural_category {
   dybatpho::expect_args language count -- "$@"
   [[ "${count}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[1]}: Count must be an integer, got '${count}'"
+  __dybatpho_i18n_check_int64 "${FUNCNAME[1]}" Count "${count}"
   # Every CLDR rule is defined on the absolute value: minus one takes the same
   # form as one in every language the tables cover. Base ten, so that a count
   # such as `08` from a padded field is eight rather than an invalid octal.
@@ -1531,6 +1532,21 @@ function __dybatpho_i18n_group {
 }
 
 #######################################
+# @description Refuse a precision above 100, once it is known to be digits.
+#   Every digit asked for is padded out one at a time, so an unbounded
+#   precision would never return, and one past 2^63 - 1 would wrap.
+# @arg $1 string Name of the function to report
+# @arg $2 string The precision, as written
+# @exitcode 1 Stop the script when the precision is out of range
+# @internal
+#######################################
+function __dybatpho_i18n_check_precision {
+  local __i18n_precision_digits="${2#"${2%%[!0]*}"}"
+  ((${#__i18n_precision_digits} <= 3 && 10#0${__i18n_precision_digits} <= 100)) \
+    || dybatpho::die "$1: Precision must be at most 100, got '$2'"
+}
+
+#######################################
 # @description Format a number the way a locale writes it.
 # @example
 #   dybatpho::i18n_number 1234567.891 2 de   # 1.234.567,89
@@ -1540,7 +1556,7 @@ function __dybatpho_i18n_group {
 # @arg $2 number? Fraction digits, default keeps what the input had
 # @arg $3 string? Locale, default is the active locale
 # @stdout The formatted number
-# @exitcode 1 The value is not a number or the precision is not an integer
+# @exitcode 1 The value is not a number or the precision is not an integer from 0 to 100
 # @tip Formatted output is for display. Never parse it back: several locales
 #   group with a narrow no-break space, which is invisible but is not a space
 #######################################
@@ -1585,6 +1601,7 @@ function __dybatpho_i18n_number_into {
   fi
   [[ "${__num_precision}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[1]}: Precision must be a non-negative integer, got '${__num_precision}'"
+  __dybatpho_i18n_check_precision "${FUNCNAME[1]}" "${__num_precision}"
   # Base ten: `010` is ten digits, not the eight an octal reading gives.
   __num_precision=$((10#${__num_precision}))
   __dybatpho_i18n_round __num_integer __num_fraction "${__num_precision}"
@@ -1629,6 +1646,7 @@ function dybatpho::i18n_number_plain {
   fi
   [[ "${precision}" =~ ^[0-9]+$ ]] \
     || dybatpho::die "${FUNCNAME[0]}: Precision must be a non-negative integer, got '${precision}'"
+  __dybatpho_i18n_check_precision "${FUNCNAME[0]}" "${precision}"
   precision=$((10#${precision}))
   __dybatpho_i18n_round integer fraction "${precision}"
   if [[ "${integer}" == "0" && "${fraction}" != *[1-9]* ]]; then
@@ -2744,7 +2762,7 @@ function dybatpho::i18n_bidi_strip {
 # @arg $1 string Locale tag
 # @arg $2 string Group separator, or the empty string for none
 # @arg $3 string Decimal separator
-# @arg $4 string Grouping, such as `3` or `3;2`, or `0` for no grouping
+# @arg $4 string Grouping of positive sizes, such as `3` or `3;2`, or `0` for no grouping
 # @arg $5 string [default: -] Minus sign
 # @set DYBATPHO_I18N_NUMBER
 # @exitcode 1 The grouping is malformed
@@ -2753,9 +2771,11 @@ function dybatpho::i18n_register_number {
   local locale group decimal grouping
   dybatpho::expect_args locale group decimal grouping -- "$@"
   local minus="${5:--}"
-  [[ "${grouping}" =~ ^[0-9]+(\;[0-9]+)?$ ]] \
+  # A group of zero digits never ends the loop that inserts separators, so
+  # only the whole grouping `0`, which means none, may be zero.
+  [[ "${grouping}" =~ ^(0|[1-9][0-9]*(\;[1-9][0-9]*)?)$ ]] \
     || dybatpho::die \
-      "${FUNCNAME[0]}: Grouping must be a number, optionally two separated by a semicolon, got '${grouping}'"
+      "${FUNCNAME[0]}: Grouping must be 0, or one or two positive numbers separated by a semicolon, got '${grouping}'"
   [[ -n "${decimal}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Decimal separator must not be empty"
   DYBATPHO_I18N_NUMBER["${locale}.group"]="${group}"
@@ -2843,10 +2863,7 @@ function dybatpho::i18n_register_names {
     *) dybatpho::die "${FUNCNAME[0]}: Unknown name set '${set}'" ;;
   esac
   local -a parsed=()
-  local old_ifs="${IFS}"
-  IFS=','
-  read -r -a parsed <<< "${names}"
-  IFS="${old_ifs}"
+  IFS=',' read -r -a parsed <<< "${names}"
   ((${#parsed[@]} == expected)) \
     || dybatpho::die "${FUNCNAME[0]}: ${set} needs ${expected} names, got ${#parsed[@]}"
   # shellcheck disable=SC2034 # read through a nameref in __dybatpho_i18n_data
@@ -3088,7 +3105,8 @@ function __dybatpho_i18n_read_po {
       continue
     fi
     if [[ "${line}" =~ ^msgstr\[([0-9]+)\][[:space:]]+\"(.*)\"$ ]]; then
-      index="${BASH_REMATCH[1]}"
+      # Base ten: an index such as `08` is eight, not an invalid octal number.
+      index=$((10#${BASH_REMATCH[1]}))
       # Through a scalar: Bash 4.3 drops an assignment made through a nameref
       # that names an array element.
       __dybatpho_i18n_po_unescape_into piece "${BASH_REMATCH[2]}"
@@ -3411,7 +3429,9 @@ function __dybatpho_i18n_literal {
       [[ "${__lit_key}" == *'$'* || "${__lit_key}" == *'`'* ]] && return 1
       ;;
     *)
-      __lit_key="${__lit_text%%[[:space:]]*}"
+      # A bare word ends where the shell would end it: at a blank, or at the
+      # `)`, `;`, `|` or `&` that closes the command it is part of.
+      __lit_key="${__lit_text%%[[:space:]);|&]*}"
       __lit_rest="${__lit_text#"${__lit_key}"}"
       [[ -n "${__lit_key}" ]] || return 1
       [[ "${__lit_key}" == *'$'* || "${__lit_key}" == *'`'* ]] && return 1
@@ -3465,32 +3485,36 @@ function __dybatpho_i18n_scan {
     number=0
     while IFS= read -r line || [[ -n "${line}" ]]; do
       number+=1
-      [[ "${line}" == *"dybatpho::i18n_t"* ]] || continue
       # The character before the call must not be part of an identifier, so a
       # function whose own name ends in these is not mistaken for one of them.
-      [[ "${line}" =~ (^|[^A-Za-z0-9_:])dybatpho::(i18n_tn|i18n_tc|i18n_t)[[:space:]]+(.*)$ ]] || continue
-      call="${BASH_REMATCH[2]}"
-      rest="${BASH_REMATCH[3]}"
-      local context=""
-      if [[ "${call}" == "i18n_tc" ]]; then
-        # The context is the first argument, so it is read before the key and
-        # kept, because the pair is what identifies the message.
-        __dybatpho_i18n_literal "${rest}" context rest || {
-          dybatpho::warn "${file}:${number}: context is not a literal, not extracted"
+      # Each match leaves the text after it to be scanned again, so every call
+      # on a line is read, not only the first.
+      while [[ "${line}" =~ (^|[^A-Za-z0-9_:])dybatpho::(i18n_tn|i18n_tc|i18n_t)[[:space:]]+(.*)$ ]]; do
+        call="${BASH_REMATCH[2]}"
+        rest="${BASH_REMATCH[3]}"
+        line="${rest}"
+        local context=""
+        if [[ "${call}" == "i18n_tc" ]]; then
+          # The context is the first argument, so it is read before the key and
+          # kept, because the pair is what identifies the message.
+          __dybatpho_i18n_literal "${rest}" context rest || {
+            dybatpho::warn "${file}:${number}: context is not a literal, not extracted"
+            continue
+          }
+        fi
+        if ! __dybatpho_i18n_literal "${rest}" key rest; then
+          dybatpho::warn "${file}:${number}: key is not a literal, not extracted"
           continue
-        }
-      fi
-      if ! __dybatpho_i18n_literal "${rest}" key rest; then
-        dybatpho::warn "${file}:${number}: key is not a literal, not extracted"
-        continue
-      fi
-      [[ -n "${context}" ]] && key="${context}${__DYBATPHO_I18N_CTX}${key}"
-      kind="plain"
-      [[ "${call}" == "i18n_tn" ]] && kind="plural"
-      if [[ -n "${__scan_out[${key}]-}" && "${__scan_out[${key}]}" != "${kind}" ]]; then
-        kind="both"
-      fi
-      __scan_out["${key}"]="${kind}"
+        fi
+        line="${rest}"
+        [[ -n "${context}" ]] && key="${context}${__DYBATPHO_I18N_CTX}${key}"
+        kind="plain"
+        [[ "${call}" == "i18n_tn" ]] && kind="plural"
+        if [[ -n "${__scan_out[${key}]-}" && "${__scan_out[${key}]}" != "${kind}" ]]; then
+          kind="both"
+        fi
+        __scan_out["${key}"]="${kind}"
+      done
       # kcov never records the redirection line of a loop, which "keys are
       # extracted from a source file" runs.
     done < "${file}" # kcov(skip)

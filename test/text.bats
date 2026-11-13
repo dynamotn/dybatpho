@@ -352,3 +352,13 @@ EOF
   assert_failure
   assert_stderr --partial "Line count must be a non-negative integer: many"
 }
+
+@test "dybatpho::text_number_lines and dybatpho::text_truncate_lines refuse a count past 2^63 - 1" {
+  run --separate-stderr dybatpho::text_number_lines $'a\nb' 99999999999999999999
+  assert_failure
+  assert_stderr --partial "9223372036854775807"
+  run --separate-stderr dybatpho::text_truncate_lines $'a\nb' 9223372036854775808
+  assert_failure
+  assert_stderr --partial "9223372036854775807"
+  assert_equal "$(dybatpho::text_truncate_lines $'a\nb' 9223372036854775807)" $'a\nb'
+}

@@ -283,3 +283,12 @@ EOF
   run_traced dybatpho::table_markdown $'A|B\n1|2'
   assert_line --index 2 '| 1 | 2 |'
 }
+
+@test "dybatpho::table_csv renders a lone dash read from stdin as data" {
+  run_traced dybatpho::table_csv - markdown < <(printf -- '-\n')
+  assert_success
+  assert_output --partial '| - |'
+  run_traced dybatpho::table_csv - < <(printf -- '-\n')
+  assert_success
+  assert_equal "${output}" "-"
+}

@@ -186,6 +186,8 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - A candidate list is empty, contains duplicates or empty entries, or has several candidates tied at the best distance.
 - The maximum distance is zero, negative, or not a number.
 - A width or count given to `string_pad`, `string_truncate`, `string_repeat` or `string_wrap` is a word, or a number with a leading zero.
+- `string_truncate` is given an empty suffix.
+- `lower` or `upper` is called with no argument under `set -u`.
 
 ## Requirements *(mandatory)*
 
@@ -233,6 +235,8 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **FR-034**: `dybatpho::url_encode` MUST write each byte of a multibyte character as one `%XX` under every C locale, musl's included.
 - **FR-035**: `dybatpho::split` and `dybatpho::url_decode` MUST take time in proportion to the length of their input, not to its square.
 - **FR-036**: `dybatpho::split` MUST also take time in proportion to the length of its input when the delimiter is longer than one character.
+- **FR-037**: `dybatpho::string_truncate` MUST use `...` only when no suffix is given; an empty suffix MUST cut without one.
+- **FR-038**: `dybatpho::lower` and `dybatpho::upper` MUST treat a missing argument as the empty string, also under `set -u`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -284,6 +288,8 @@ dybatpho::string_closest guesses "staus" 2 status start stash \
 - **IT-023**: Encode `é ü/a~` to `%C3%A9%20%C3%BC%2Fa~`.
 - **IT-024**: Split 20000 fields and decode 10000 escapes, each within five seconds, keeping the trailing empty field and a lone `%`.
 - **IT-025**: Split 20000 fields on `, ` within five seconds, keeping empty fields, a text that holds the unit separator byte, and a trailing newline.
+- **IT-026**: Truncate `abcdef` to 3 with an empty suffix and get `abc`, and with no suffix get `...`.
+- **IT-027**: Call `lower` and `upper` with no argument under `set -u` and get empty lines.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -110,6 +110,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - A CSV value holds the delimiter, a quote, a line break, or `|`; the only cell is `-`; the file uses `;` or a tab.
 - A JSON document is an empty array, is not an array of objects, or no JSON processor is installed.
 - The script loaded `table` but not `csv`, and asks for a CSV or JSON rendering.
+- The data read from stdin by `dybatpho::table_csv` is exactly `-`.
 
 ## Requirements *(mandatory)*
 
@@ -144,6 +145,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **FR-018**: Cells MUST be measured without their ANSI escape sequences and with wide characters counted as the columns they occupy, using the same measurement as `text`.
 - **FR-019**: A plain aligned row MUST NOT end in whitespace: the last column is not padded to its width.
 - **FR-020**: `dybatpho::table_markdown` MUST escape `|` inside a cell whatever renderer called it, so a value split on another delimiter cannot open a column of its own.
+- **FR-021**: `dybatpho::table_csv` MUST render data read from stdin as data, even when it is exactly `-`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -181,6 +183,7 @@ dybatpho::table_from_json pods.json markdown >> report.md
 - **IT-015**: Draw a box table with a coloured cell and verify it is padded by its visible width, keeping the right border in line.
 - **IT-016**: Render a plain table whose last column varies in width and compare the whole output exactly, so no row ends in padding.
 - **IT-017**: Render `foo,a|b` as Markdown with `,` as the delimiter and get `a\|b` in one cell; render with `|` as the delimiter and get the cells unchanged.
+- **IT-018**: Pipe a lone `-` into `dybatpho::table_csv -` and get `-` in plain style and a `| - |` cell in Markdown.
 
 ## Acceptance Criteria *(mandatory)*
 

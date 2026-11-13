@@ -78,7 +78,7 @@ function __dybatpho_md_escape_inline {
   # escape the backslashes this loop just introduced.
   __dybatpho_md_inline="${__dybatpho_md_inline//\\/\\\\}"
   local __dybatpho_md_char
-  for __dybatpho_md_char in '`' '*' '_' '[' ']' '<' '>' '|' '~'; do
+  for __dybatpho_md_char in '`' '*' '_' '[' ']' '<' '>' '|' '~' '&'; do
     __dybatpho_md_inline="${__dybatpho_md_inline//"${__dybatpho_md_char}"/\\"${__dybatpho_md_char}"}"
   done
   __dybatpho_md_inline_ref="${__dybatpho_md_inline}"
@@ -194,6 +194,15 @@ function __dybatpho_md_encode_url_into {
   __dybatpho_md_url="${__dybatpho_md_url//")"/%29}"
   __dybatpho_md_url="${__dybatpho_md_url//</%3C}"
   __dybatpho_md_url="${__dybatpho_md_url//>/%3E}"
+  __dybatpho_md_url="${__dybatpho_md_url//\\/%5C}"
+  # A line break ends the link, and the other control characters are not
+  # valid in a URL either, so each one is percent-encoded too.
+  local __dybatpho_md_code __dybatpho_md_hex __dybatpho_md_ctl
+  for __dybatpho_md_code in {1..31} 127; do
+    printf -v __dybatpho_md_hex '%02X' "${__dybatpho_md_code}"
+    printf -v __dybatpho_md_ctl '%b' "\\x${__dybatpho_md_hex}"
+    __dybatpho_md_url="${__dybatpho_md_url//"${__dybatpho_md_ctl}"/"%${__dybatpho_md_hex}"}"
+  done
   __dybatpho_md_url_ref="${__dybatpho_md_url}"
 }
 
@@ -261,6 +270,11 @@ function dybatpho::md_heading {
 
   local escaped hashes
   __dybatpho_md_escape_into escaped "${text}"
+  # A run of `#` after a blank at the end would be read as the closing
+  # sequence and dropped, so its last `#` is escaped.
+  if [[ "${escaped}" =~ ^(.*[[:space:]])?(#+)([[:space:]]*)$ ]]; then
+    escaped="${BASH_REMATCH[1]}${BASH_REMATCH[2]%#}\\#${BASH_REMATCH[3]}"
+  fi
   printf -v hashes '%*s' "${level}" ''
   printf '%s %s\n' "${hashes// /#}" "${escaped}"
 }

@@ -2272,3 +2272,70 @@ SOURCE
   run_traced -0 dybatpho::i18n_t 'Press "q" to quit'
   assert_output "X"
 }
+
+@test "a bare key closed by a parenthesis and every call on a line are extracted" {
+  local source="${BATS_TEST_TMPDIR}/app.sh"
+  cat > "${source}" << 'SOURCE'
+printf '%s\n' "$(dybatpho::i18n_t app.ready)"
+echo "$(dybatpho::i18n_t one.key) and $(dybatpho::i18n_t 'two.key')"
+x=$(dybatpho::i18n_t pipe.key|cat); y=$(dybatpho::i18n_t semi.key;)
+SOURCE
+  run_traced --separate-stderr -0 dybatpho::i18n_extract --locale en "${source}"
+  assert_equal "${stderr}" ""
+  assert_output --partial "app.ready ="
+  assert_output --partial "one.key ="
+  assert_output --partial "two.key ="
+  assert_output --partial "pipe.key ="
+  assert_output --partial "semi.key ="
+}
+
+@test "a group size of zero is rejected unless it is the plain no-grouping zero" {
+  run ! dybatpho::i18n_register_number xx "," "." "3;0"
+  run ! dybatpho::i18n_register_number xx "," "." "0;3"
+  run ! dybatpho::i18n_register_number xx "," "." "00"
+  dybatpho::i18n_register_number xx "," "." 0
+  assert_equal "$(dybatpho::i18n_number 1234567 0 xx)" "1234567"
+}
+
+@test "a plural count past 2^63 - 1 is refused rather than wrapped" {
+  run --separate-stderr dybatpho::i18n_plural_form 18446744073709551617 ru
+  assert_failure
+  assert_stderr --partial "9223372036854775807"
+  assert_equal "$(dybatpho::i18n_plural_form 9223372036854775807 ru)" "many"
+}
+
+@test "a precision above 100 is refused" {
+  run --separate-stderr dybatpho::i18n_number 1.5 99999999999999999999 en
+  assert_failure
+  assert_stderr --partial "at most 100"
+  run ! dybatpho::i18n_number 1.5 101 en
+  run ! dybatpho::i18n_number_plain 1.5 101
+  run_traced -0 dybatpho::i18n_number_plain 1.5 0100
+  assert_output "1.5$(printf '%099d' 0)"
+}
+
+@test "registering names leaves IFS as it was, even unset under nounset" {
+  run_traced -0 _child 'set -u' 'unset IFS' \
+    'dybatpho::i18n_register_names xx dayperiods "AM,PM"' \
+    '[[ -z "${IFS+set}" ]] && echo unset'
+  assert_output "unset"
+  run_traced -0 _child 'IFS=":"' \
+    'dybatpho::i18n_register_names xx dayperiods "AM,PM"' \
+    'printf "[%s]\n" "${IFS}"'
+  assert_output "[:]"
+}
+
+@test "a po plural index with a leading zero is read in base ten" {
+  local dir="${BATS_TEST_TMPDIR}/locale"
+  mkdir -p "${dir}"
+  cat > "${dir}/ru.po" << 'PO'
+msgid "app.files"
+msgid_plural "app.files"
+msgstr[00] "{count} файл"
+msgstr[01] "{count} файла"
+msgstr[08] "{count} extra"
+PO
+  run_traced -0 _child "dybatpho::i18n_load ru '${dir}/ru.po'" \
+    'dybatpho::i18n_set_locale ru' 'dybatpho::i18n_tn app.files 2'
+  assert_output "2 файла"
+}

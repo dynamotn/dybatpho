@@ -382,3 +382,28 @@ EOF
   printf -v fence '%40001s' ''
   assert_line --index 0 "${fence// /\`}"
 }
+
+@test "dybatpho::md_link percent-encodes a backslash and control characters" {
+  run_traced dybatpho::md_link "t" 'http://x/a\'
+  assert_success
+  assert_output '[t](http://x/a%5C)'
+  run_traced dybatpho::md_link "t" $'http://x/a\nb\rc\td\001e\177f'
+  assert_success
+  assert_output '[t](http://x/a%0Ab%0Dc%09d%01e%7Ff)'
+}
+
+@test "dybatpho::md_heading escapes a trailing hash run so it is not a closing sequence" {
+  run_traced dybatpho::md_heading 2 "Issue #"
+  assert_success
+  assert_output '## Issue \#'
+  run_traced dybatpho::md_heading 2 "Issue ##  "
+  assert_output '## Issue #\#  '
+  run_traced dybatpho::md_heading 1 "C#"
+  assert_output '# C#'
+}
+
+@test "dybatpho::md_escape escapes an ampersand so an entity stays literal" {
+  run_traced dybatpho::md_escape 'AT&amp;T'
+  assert_success
+  assert_output 'AT\&amp;T'
+}

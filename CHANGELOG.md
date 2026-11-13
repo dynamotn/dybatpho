@@ -22,6 +22,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `1.2.x`.
 - **`date` — `dybatpho::date_add @<epoch> …` works with GNU `date`,** adding
   elapsed seconds as on other systems.
+- **`markdown` — every builder escapes `&`,** so an entity in data such as
+  `AT&amp;T` is shown as written.
+- **`string` — `dybatpho::string_truncate text 3 ""` cuts without a suffix.**
+- **`i18n` — a precision above 100 and a digit group size of `0` inside a
+  pattern such as `3;0` are refused;** both used to hang the call.
 - **`json` — an invalid `:json` value in `dybatpho::json_object` exits 5,
   not 2.**
 - **`testing` — `dybatpho::mock_calls` records a line break inside an argument
@@ -279,6 +284,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   leading zeros.**
 - **`date` — `dybatpho::date_in_tz` refuses a zoneinfo file that is not a
   zone,** such as `leapseconds`, instead of silently using UTC.
+- **`i18n` — `dybatpho::i18n_extract` finds a bare key closed by `)` and every
+  call on a line;** a plural count past 2^63 - 1 is refused instead of wrapped;
+  a `.po` index such as `msgstr[08]` reads in base ten; registering names
+  leaves `IFS` as it was.
+- **`markdown` — `dybatpho::md_link` encodes `\` and control characters in a
+  URL, and `dybatpho::md_heading "Issue #"` keeps its `#`.**
+- **`table` — `dybatpho::table_csv -` shows a lone `-` read from stdin.**
+- **`text` — line counts past 2^63 - 1 are refused;** `dybatpho::lower` and
+  `dybatpho::upper` with no argument work under `set -u`.
 - **`logging` — `DYBATPHO_LOG_FILE_MAX_BYTES=10M` is read as a size,** not
   reported as an error on every line; `tui_spinner_stop` removes its file.
 - **`screen` — `dybatpho::screen_put` at a negative column blanks the half of

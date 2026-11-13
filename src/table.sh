@@ -447,19 +447,14 @@ function dybatpho::table_csv {
   __dybatpho_table_reject_quoted "${input}"
 
   case "${style}" in
-    plain)
-      dybatpho::table_align "${input}" "," "${align_spec}" 2
-      ;;
-    box)
-      dybatpho::table_box "${input}" ","
-      ;;
-    markdown)
-      dybatpho::table_markdown "${input}" ","
-      ;;
+    plain | box | markdown) ;;
     *)
       dybatpho::die "Unsupported table CSV style: ${style}" # kcov(skip)
       ;;
   esac
+  # Through stdin, as `dybatpho::table_from_csv` does: passed as an argument,
+  # data that is exactly `-` would be read as a request to read stdin again.
+  __dybatpho_table_render "${style}" "," "${align_spec}" <<< "${input}"
 }
 
 #######################################

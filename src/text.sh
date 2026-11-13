@@ -366,7 +366,7 @@ function dybatpho::text_center {
 # @arg $2 number [default: 1] Number of the first line
 # @arg $3 string? Separator between number and text, default is two spaces
 # @stdout The numbered text block
-# @exitcode 1 The first line number is not a non-negative integer
+# @exitcode 1 The first line number is not an integer from 0 to 9223372036854775807
 #######################################
 function dybatpho::text_number_lines {
   local input
@@ -374,6 +374,7 @@ function dybatpho::text_number_lines {
   local start="${2:-1}"
   local separator="${3-  }"
   [[ "${start}" =~ ^[0-9]+$ ]] || dybatpho::die "Start line must be a non-negative integer: ${start}"
+  __dybatpho_text_check_int64 "Start line" "${start}"
   # Strip leading zeros so `08` is not read as an invalid octal number.
   start=$((10#${start}))
 
@@ -385,6 +386,21 @@ function dybatpho::text_number_lines {
   for index in "${!lines[@]}"; do
     printf '%*d%s%s\n' "${digits}" "$((start + index))" "${separator}" "${lines[index]}"
   done
+}
+
+#######################################
+# @description Refuse a non-negative integer Bash arithmetic cannot hold,
+#   rather than let it wrap to an unrelated number.
+# @arg $1 string What the value is, for the message
+# @arg $2 string The digits, as written
+# @exitcode 1 Stop the script when the value is above 9223372036854775807
+# @internal
+#######################################
+function __dybatpho_text_check_int64 {
+  local __text_check_digits="${2#"${2%%[!0]*}"}"
+  if ((${#__text_check_digits} > 19 || 10#0${__text_check_digits} < 0)); then
+    dybatpho::die "$1 must be at most 9223372036854775807: $2"
+  fi
 }
 
 #######################################
@@ -405,13 +421,14 @@ function dybatpho::text_number_lines {
 # @arg $2 number Number of lines to keep
 # @arg $3 string? Marker template, `{count}` is replaced by the number of lines left out
 # @stdout The kept lines and, when lines were left out, the marker
-# @exitcode 1 The count is not a non-negative integer
+# @exitcode 1 The count is not an integer from 0 to 9223372036854775807
 #######################################
 function dybatpho::text_truncate_lines {
   local input count
   dybatpho::expect_args input count -- "$@"
   local marker="${3-}"
   [[ "${count}" =~ ^[0-9]+$ ]] || dybatpho::die "Line count must be a non-negative integer: ${count}"
+  __dybatpho_text_check_int64 "Line count" "${count}"
   count=$((10#${count}))
 
   local -a lines=()

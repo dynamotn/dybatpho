@@ -332,7 +332,7 @@ Truncate a string to a maximum width and append a suffix when needed.
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | Input string |
 | `$2` | number | yes |  | Maximum width |
-| `$3` | string | no | `...` | Truncation suffix |
+| `$3` | string | no | `...` | Truncation suffix, or the empty string for none |
 
 **📤 Output on stdout**
 

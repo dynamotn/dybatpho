@@ -251,7 +251,7 @@ dybatpho::text_number_lines $'alpha\nbeta' 9 ": "
 
 **🚦 Exit codes**
 
-- `1`: The first line number is not a non-negative integer
+- `1`: The first line number is not an integer from 0 to 9223372036854775807
 
 ---
 
@@ -289,4 +289,4 @@ git log --oneline | dybatpho::text_truncate_lines - 5 "(+{count} commits)"
 
 **🚦 Exit codes**
 
-- `1`: The count is not a non-negative integer
+- `1`: The count is not an integer from 0 to 9223372036854775807

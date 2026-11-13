@@ -531,14 +531,14 @@ function __dybatpho_string_expect_int {
 # @description Truncate a string to a maximum width and append a suffix when needed.
 # @arg $1 string Input string
 # @arg $2 number Maximum width
-# @arg $3 string [default: ...] Truncation suffix
+# @arg $3 string [default: ...] Truncation suffix, or the empty string for none
 # @stdout Truncated string
 #######################################
 function dybatpho::string_truncate {
   local input width suffix
   dybatpho::expect_args input width -- "$@"
   __dybatpho_string_expect_int "${width}"
-  suffix="${3:-...}"
+  suffix="${3-...}"
   if ((width <= 0)); then
     printf '\n'
     return 0
@@ -721,7 +721,8 @@ function dybatpho::url_decode {
 # @stdout Converted string
 #######################################
 function dybatpho::lower {
-  printf '%s\n' "${1,,}"
+  local value="${1-}"
+  printf '%s\n' "${value,,}"
 }
 
 #######################################
@@ -730,7 +731,8 @@ function dybatpho::lower {
 # @stdout Converted string
 #######################################
 function dybatpho::upper {
-  printf '%s\n' "${1^^}"
+  local value="${1-}"
+  printf '%s\n' "${value^^}"
 }
 
 #######################################

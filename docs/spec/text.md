@@ -118,6 +118,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - A line is wider than the centering width, or the width is zero or not a number.
 - A first line number has leading zeros, such as `09`.
 - A block already fits within the truncation count, or the count is zero.
+- A first line number or truncation count is past 2^63 - 1.
 
 ## Requirements *(mandatory)*
 
@@ -139,6 +140,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **FR-014**: Text passed as an argument MUST split into the same lines as the same text on stdin: one trailing newline ends the last line rather than adding an empty one.
 - **FR-015**: Stripping and measuring MUST remove OSC sequences such as hyperlinks and character-set designations such as the `\e(B` from `tput sgr0`, not only CSI sequences.
 - **FR-016**: Stripping a line MUST take time proportional to its length, not to its length times its number of escape sequences, so a progress-bar line of thousands of updates strips in well under a second.
+- **FR-017**: `dybatpho::text_number_lines` and `dybatpho::text_truncate_lines` MUST refuse a start line or count above 9223372036854775807 rather than wrap.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -178,6 +180,7 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **IT-015**: Indent a block ending in a newline given as an argument and on stdin, and get the same lines; keep a blank line that comes before the final newline.
 - **IT-016**: Strip a `tput sgr0` reset and hyperlinks ended by a string terminator or a bell, and box a line colored that way with straight edges.
 - **IT-017**: Strip a line of 12000 colored fragments within a generous time bound.
+- **IT-018**: Refuse `99999999999999999999` as a start line and `9223372036854775808` as a count, and keep both lines under `9223372036854775807`.
 
 ## Acceptance Criteria *(mandatory)*
 

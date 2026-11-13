@@ -701,3 +701,19 @@ _string_child() {
   run_traced dybatpho::url_encode ""
   assert_output ""
 }
+
+@test "dybatpho::string_truncate with an empty suffix cuts without one" {
+  assert_equal "$(dybatpho::string_truncate abcdef 3 "")" "abc"
+  assert_equal "$(dybatpho::string_truncate abcdef 3)" "..."
+}
+
+@test "dybatpho::lower and dybatpho::upper with no argument work under nounset" {
+  # From a file rather than `bash -c`, whose empty BASH_SOURCE trips the
+  # coverage hook under nounset.
+  local script="${BATS_TEST_TMPDIR}/nounset.sh"
+  printf '%s\n' "set -u" ". '${DYBATPHO_DIR}/init.sh' --modules string" \
+    'printf "[%s]" "$(dybatpho::lower)" "$(dybatpho::upper)"' > "${script}"
+  run_traced bash "${script}"
+  assert_success
+  assert_output "[][]"
+}

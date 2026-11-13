@@ -17,6 +17,10 @@ This document describes the repository workflow and conventions to preserve.
 - `docs/` — API documentation generated from source comments, including
   `docs/init.md` for the bootstrap's own public functions.
 - `docs/spec/` — Spec Kit-style feature specifications.
+- `llms.txt`, `llms-full.txt`, `skills/dybatpho/` — the library for agents: the
+  module index, every public signature, and an Agent Skill whose
+  `references/modules.md` is generated; `scripts/docs.sh` writes the generated
+  ones and `--check` fails when they are stale (`test/docs_script.bats`).
 - `CHANGELOG.md` — user-visible history, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
   Releases before the current major are moved to `docs/changelog/CHANGELOG-<major>.x.md`
   by `scripts/changelog_archive.sh`.

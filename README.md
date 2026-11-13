@@ -335,6 +335,15 @@ in any release.
 | [metrics.sh](docs/metrics.md)  | experimental | Command timing, counters, retry/HTTP/error stats, Prometheus export |
 | [doctor.sh](docs/doctor.md)    | experimental | Report the Bash version, the library version and every external tool the loaded modules need |
 
+## 🤖 For AI agents
+
+[`llms.txt`](llms.txt) indexes the modules for a language model, and
+[`llms-full.txt`](llms-full.txt) lists every public function's signature with a
+one-line description; both are generated from the source comments. The
+[Agent Skill](skills/dybatpho/SKILL.md) teaches an agent to write scripts on
+dybatpho: copy `skills/dybatpho/` into your agent's skills directory (for
+Claude Code, `~/.claude/skills/` or `.claude/skills/` in a project).
+
 ## 🗂 Directory Structure
 
 ```
@@ -344,11 +353,14 @@ in any release.
 │   └── spec/       # Module specifications and design docs
 ├── example/        # Example scripts for users
 ├── scripts/        # Helper scripts (test, doc generation, bundling, releasing)
+├── skills/         # Agent Skill for writing scripts on dybatpho
 ├── src/            # Source code of modules
 ├── test/           # Unit tests
 ├── CHANGELOG.md    # User-visible history
 ├── VERSION         # Version of this copy, reported by `dybatpho::version`
-└── init.sh         # Initialization script, **must be sourced first**
+├── init.sh         # Initialization script, **must be sourced first**
+├── llms.txt        # Module index for language models (generated)
+└── llms-full.txt   # Every public function signature (generated)
 ```
 
 ## 💬 Contribution & Support

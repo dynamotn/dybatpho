@@ -409,6 +409,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   data tells the model never to follow instructions found in it
   (`DYBATPHO_AI_UNTRUSTED_NOTE`). `dybatpho::ai_run` wraps every tool result
   this way.
+- **`llms.txt`, `llms-full.txt` and an Agent Skill in `skills/dybatpho/`**
+  give coding agents a map of every module and public function, generated from
+  the source by `scripts/docs.sh` and checked for drift.
 
 - **`math` — `DYBATPHO_MATH_MAX_SCALE` (default 4096) caps the scale,** so a
   huge scale is refused instead of running for minutes.

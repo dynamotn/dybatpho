@@ -359,6 +359,7 @@ dybatpho::show_file "${report_file}"
 - **FR-057**: The staging file name MUST fit the file name limit whatever the length of the destination name.
 - **FR-058**: The staging file MUST be readable by its owner only until it is committed; a new destination MUST then get the mode the umask gives it, and an existing one keeps its own.
 - **FR-059**: `path_relative` MUST resolve two relative paths against the working directory when either still starts with `..` after normalising, so the result reaches the target from the base.
+- **FR-060**: `dir_size` MUST follow a symbolic link given as its directory argument, while still leaving out every link met inside the tree.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -436,6 +437,7 @@ dybatpho::show_file "${report_file}"
 - **IT-043**: Rewrite a file whose name is 230 bytes long.
 - **IT-044**: Plant a link to a directory at the extended name while `create_temp` renames its file onto it, and see the call stop rather than hand back the link.
 - **IT-045**: From `top/here`, get `../here/a` for `a` from `../b`, `here/a` for `a` from `..`, and `../top/a` for `../a` from `../../x`.
+- **IT-046**: Measure a tree through a symbolic link to its directory and get the size of the files behind it.
 
 ## Acceptance Criteria *(mandatory)*
 

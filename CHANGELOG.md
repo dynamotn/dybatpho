@@ -246,6 +246,7 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   instead of letting it finish while its job stays claimed and runs again.
 - **`lock` — a worker's `dybatpho::lock_semaphore_release name N` frees only
   its own slots,** not the parent script's.
+- **`file` — `dybatpho::dir_size` measures the directory a symlink names.**
 - **`logging` — `DYBATPHO_LOG_FILE_MAX_BYTES=10M` is read as a size,** not
   reported as an error on every line; `tui_spinner_stop` removes its file.
 - **`screen` — `dybatpho::screen_put` at a negative column blanks the half of
@@ -325,6 +326,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   as `x[$(cmd)]` no longer runs the command.**
 - **`screen` — a rectangle part such as `items[$(cmd)]` no longer runs the
   command.**
+- **`archive` — a zip symlink is checked even after a FAT or NTFS entry, or
+  when its name holds `[`, `*` or `?`, and a zip link stored under the same
+  name as another entry is refused;** each let `archive_is_safe`,
+  `safe_extract` and `backup_restore` accept a link to `/etc`.
+- **`backup` — `dybatpho::backup_create` writes archives readable only by
+  their owner.**
 - **`schedule`, `queue` — the debounce ticket and the sequence counter are
   never written through a planted symlink.**
 - **`logging`, `tui` — the spinner message, the progress label and boxed

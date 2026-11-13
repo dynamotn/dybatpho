@@ -32,6 +32,18 @@ plant() {
   assert_file_exist "${archive}.sha256"
 }
 
+@test "dybatpho::backup_create keeps the archive private to its owner" {
+  # The archive holds whatever the source holds, 0600 files included; under
+  # the usual umask it was created 0644 and readable by everyone.
+  local previous
+  previous="$(umask)"
+  umask 022
+  run_traced dybatpho::backup_create "${SOURCE}" "${DEST}" snap
+  umask "${previous}"
+  assert_success
+  dybatpho::assert_file_mode "${output}" 600
+}
+
 @test "dybatpho::backup_create names the backup after the source when none is given" {
   run_traced dybatpho::backup_create "${SOURCE}" "${DEST}"
   assert_success

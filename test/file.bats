@@ -1084,6 +1084,16 @@ SCRIPT
   assert_equal "$(dybatpho::dir_size "${tree}")" "1000"
 }
 
+@test "dybatpho::dir_size measures the directory a symlink argument names" {
+  # `dybatpho::is dir` follows the link, so `find` must follow it too, or the
+  # tree behind it reads as empty.
+  local tree="${BATS_TEST_TMPDIR}/real"
+  mkdir -p "${tree}"
+  head -c 1000 /dev/zero > "${tree}/a"
+  ln -s "${tree}" "${BATS_TEST_TMPDIR}/alias"
+  assert_equal "$(dybatpho::dir_size "${BATS_TEST_TMPDIR}/alias")" "1000"
+}
+
 @test "dybatpho::dir_size reports a tree it could not read in full" {
   # A subdirectory it could not enter was left out of the total, and the size
   # came back as a success; the fallback for BSD `stat` also walked the tree a

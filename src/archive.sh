@@ -431,7 +431,7 @@ function __dybatpho_archive_link_targets_into {
   local targets_var archive_path listing
   dybatpho::expect_args targets_var archive_path listing -- "$@"
   local -n __dybatpho_archive_targets_ref="${targets_var}"
-  local format tool letter verbose line name status=0
+  local format tool letter verbose name status=0
   local -a prefix=() pack=() unpack=() names=() lines=()
   format=$(__dybatpho_archive_format "${archive_path}") || return $?
   if __dybatpho_archive_tar_mode_into prefix letter "${format}"; then
@@ -445,18 +445,32 @@ function __dybatpho_archive_link_targets_into {
   fi
   ((status == 0)) || return "${status}"
   mapfile -t names <<< "${listing}"
-  while IFS= read -r line; do
-    # `unzip -Z` frames its entries with a header and a total; an entry line
-    # opens with its ten-character mode.
-    [[ "${format}" != zip || "${line}" =~ ^[^[:space:]]{10}[[:space:]] ]] && lines+=("${line}")
-  done <<< "${verbose}"
-  local index target
+  mapfile -t lines <<< "${verbose}"
+  # `unzip -Z` frames its entries with a two-line header and a one-line total.
+  # Every line between is an entry, whatever the width of its mode: a FAT
+  # entry's `-rw-a--` is seven characters, a Unix one's ten.
+  [[ "${format}" != zip ]] || lines=("${lines[@]:2:${#lines[@]}-3}")
+  local index target pattern
+  local -A seen=()
+  for name in ${names[@]+"${names[@]}"}; do
+    [[ -z "${name}" ]] || seen["${name}"]=$((${seen["${name}"]-0} + 1))
+  done
   for ((index = 0; index < ${#lines[@]}; index++)); do
     [[ "${lines[index]}" == l* ]] || continue
     name="${names[index]-}"
-    if [[ "${format}" == zip ]]; then
-      # zip keeps the target as the link's content.
-      target="$(unzip -p "${archive_path/#-/./-}" "${name}")"
+    if [[ "${format}" == zip ]] && ((${seen["${name}"]-0} > 1)); then
+      # `unzip -p` prints every member of that name in a row, so `x` then
+      # `/etc` would read as the harmless `x/etc`.
+      target="/"
+    elif [[ "${format}" == zip && "${lines[index]}" == *" ${name}" ]]; then
+      # zip keeps the target as the link's content. unzip reads a member name
+      # as a wildcard, so `[e]vil` would read the file `evil` unescaped.
+      pattern="${name//\\/\\\\}"
+      pattern="${pattern//\[/\\[}"
+      pattern="${pattern//\]/\\]}"
+      pattern="${pattern//\*/\\*}"
+      pattern="${pattern//\?/\\?}"
+      target="$(unzip -p "${archive_path/#-/./-}" "${pattern}")"
     elif [[ "${lines[index]}" == *" ${name} -> "* ]]; then
       target="${lines[index]#*" ${name} -> "}"
     else

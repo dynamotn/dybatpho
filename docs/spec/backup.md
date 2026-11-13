@@ -203,6 +203,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **FR-039**: Listing, `backup_latest` and `--keep-count` MUST order backups of different names by when they were taken, and a name filter MUST NOT match a longer name that starts with it, such as `web` against `web-api`.
 - **FR-040**: The temporary name of a backup in progress MUST be unique per process, so backups started from subshells of one script in the same second do not share it.
 - **FR-041**: Listing, resolving the latest and pruning MUST leave out a file or directory whose name is not `<name>-<UTC timestamp>`, with or without a name filter, so a file such as `app-notes.tar.gz` is never taken for the newest backup nor counted against `--keep-count`.
+- **FR-042**: `backup_create` MUST create its archive readable and writable by its owner only, whatever the umask, since it holds the source's files.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -271,6 +272,7 @@ dybatpho::backup_restore --force "$(dybatpho::backup_latest /var/backups nginx)"
 - **IT-046**: Take two backups from two subshells with the clock frozen, and find each wrote its own temporary archive.
 - **IT-047**: Verify, under `set -e`, a backup whose sidecar has no final newline and see it pass, then one whose sidecar is empty and see it reported as a mismatch rather than the script stopping.
 - **IT-048**: Beside two stamped `app` backups, plant `app-notes.tar.gz` and `app-old.snapshot`; see the newer stamped one as the latest, both listed alone, and `--keep-count 1` prune only the older one, with and without `--name`, leaving `app-notes.tar.gz`.
+- **IT-049**: Under `umask 022`, create a backup and find the archive mode `600`.
 
 ## Acceptance Criteria *(mandatory)*
 

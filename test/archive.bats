@@ -516,6 +516,81 @@ PY
 dir/up"
 }
 
+@test "dybatpho::archive_unsafe_entries pairs a zip link with its name past a FAT entry" {
+  # A FAT entry's mode is seven characters wide. Keeping only ten-character
+  # modes dropped it, so the later link was paired with the wrong name.
+  dybatpho::is command python3 && dybatpho::is command unzip || skip "needs python3 and unzip"
+  local archive_path="${BATS_TEST_TMPDIR}/fat.zip"
+  python3 -I - "${archive_path}" << 'PY'
+import stat, sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as archive:
+    info = zipfile.ZipInfo("dos.txt")
+    info.create_system = 0
+    info.external_attr = 0x20
+    archive.writestr(info, "data")
+    info = zipfile.ZipInfo("evil")
+    info.create_system = 3
+    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+    archive.writestr(info, "/etc")
+PY
+
+  run_traced dybatpho::archive_unsafe_entries "${archive_path}"
+  assert_success
+  assert_output "evil"
+  run_traced -1 dybatpho::archive_is_safe "${archive_path}"
+}
+
+@test "dybatpho::archive_unsafe_entries reads a zip link whose name is a wildcard" {
+  # unzip reads a member name as a pattern: unescaped, `[e]vil` read the
+  # content of the regular file `evil` instead of the link's own target.
+  dybatpho::is command python3 && dybatpho::is command unzip || skip "needs python3 and unzip"
+  local archive_path="${BATS_TEST_TMPDIR}/glob.zip"
+  python3 -I - "${archive_path}" << 'PY'
+import stat, sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as archive:
+    archive.writestr("evil", "safe")
+    info = zipfile.ZipInfo("[e]vil")
+    info.create_system = 3
+    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+    archive.writestr(info, "/etc")
+PY
+
+  run_traced dybatpho::archive_unsafe_entries "${archive_path}"
+  assert_success
+  assert_output "[e]vil"
+}
+
+@test "dybatpho::archive_unsafe_entries refuses a zip link whose name is stored twice" {
+  # `unzip -p` prints every member of that name in a row, so `x` then `/etc`
+  # read as the harmless `x/etc` while extraction leaves `evil -> /etc`.
+  dybatpho::is command python3 && dybatpho::is command unzip || skip "needs python3 and unzip"
+  local file_first="${BATS_TEST_TMPDIR}/file-first.zip" two_links="${BATS_TEST_TMPDIR}/two-links.zip"
+  python3 -I - "${file_first}" "${two_links}" << 'PY'
+import stat, sys, zipfile, warnings
+warnings.simplefilter("ignore")
+def link(archive, name, target):
+    info = zipfile.ZipInfo(name)
+    info.create_system = 3
+    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+    archive.writestr(info, target)
+with zipfile.ZipFile(sys.argv[1], "w") as archive:
+    archive.writestr("evil", "x")
+    link(archive, "evil", "/etc")
+with zipfile.ZipFile(sys.argv[2], "w") as archive:
+    link(archive, "evil", "a")
+    link(archive, "evil", "/etc")
+PY
+
+  run_traced dybatpho::archive_unsafe_entries "${file_first}"
+  assert_success
+  assert_output "evil
+evil"
+  run_traced dybatpho::archive_unsafe_entries "${two_links}"
+  assert_success
+  assert_output "evil
+evil"
+}
+
 @test "__dybatpho_archive_link_is_safe accepts only a relative target that descends" {
   __dybatpho_archive_link_is_safe "c"
   __dybatpho_archive_link_is_safe "./x/y"

@@ -540,7 +540,9 @@ function dybatpho::backup_create {
   # which is what keeps a half-written file out of every listing here: a glob
   # does not match a leading dot.
   local partial="${destination}/.${name}-${stamp}.${BASHPID}.partial.${DYBATPHO_BACKUP_EXTENSION}"
-  if ! dybatpho::archive_create "${source}" "${partial}"; then
+  # Created owner-only, as the cache is: the archive holds files that may be
+  # 0600 at the source, and the usual `umask 022` would leave it 0644.
+  if ! (umask 077 && dybatpho::archive_create "${source}" "${partial}"); then
     rm -f -- "${partial}"
     dybatpho::die "${FUNCNAME[0]}: Could not archive: ${source}"
   fi

@@ -126,7 +126,7 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 
 **[`dybatpho::dir_size`](#dybatphodir_size)**
 
-- Symbolic links are not counted at all, the way `du` treats them, so a link to a file inside the same tree cannot count its target twice
+- Symbolic links are not counted at all, the way `du` treats them, so a link to a file inside the same tree cannot count its target twice; only a link given as the directory itself is followed
 
 **[`dybatpho::file_is_binary`](#dybatphofile_is_binary)**
 

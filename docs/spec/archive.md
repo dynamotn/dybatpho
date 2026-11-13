@@ -118,6 +118,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **FR-018**: Extracting a zip MUST overwrite existing files without unzip asking again, so the decision stays with the caller.
 - **FR-019**: The long listing a link target is read from MUST show owners as numbers, so an owner name cannot place a forged ` name -> ` ahead of the real target.
 - **FR-020**: A single-file archive MUST be decompressed into a file with the mode the umask gives, as any other new file.
+- **FR-021**: A zip link MUST be paired with its own entry in the long listing whatever the width of the mode each entry shows, and its target MUST be read from that member by its literal name, never as a wildcard that could match another member.
+- **FR-022**: A zip link whose name is stored more than once MUST be reported, since its target cannot be read apart from the other members of that name.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -159,6 +161,8 @@ dybatpho::archive_extract release.tar.gz /srv/app 1
 - **IT-016**: Extract a nine-level tar with strip-components `08` and find the file at the top of the destination.
 - **IT-017**: List a tar holding `l -> .` then `l/l2 -> ..`, one holding `a/l -> ..` and a hard link `h` to it, and one storing `l -> ..` then `l -> x`, and find each refused.
 - **IT-018**: Extract a zip over an existing file with stdin at end of file, with and without strip-components, and find the file replaced.
+- **IT-019**: List a zip holding a FAT entry `dos.txt` ahead of a Unix link `evil -> /etc`, and one holding a file `evil` and a link `[e]vil -> /etc`, and find each link reported.
+- **IT-020**: List a zip holding a file `evil` then a link `evil -> /etc`, and one holding `evil -> a` then `evil -> /etc`, and find `evil` reported for each entry.
 
 ## Acceptance Criteria *(mandatory)*
 

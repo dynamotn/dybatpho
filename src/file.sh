@@ -1480,7 +1480,8 @@ function dybatpho::file_mtime {
 # @exitcode 1 The directory is missing, or part of it could not be read; the
 #   size printed then counts only what could be read
 # @tip Symbolic links are not counted at all, the way `du` treats them, so a
-#   link to a file inside the same tree cannot count its target twice
+#   link to a file inside the same tree cannot count its target twice; only a
+#   link given as the directory itself is followed
 #######################################
 function dybatpho::dir_size {
   local directory total
@@ -1496,7 +1497,8 @@ function dybatpho::dir_size {
   local dybatpho_file_size_list sizes status=0 entry
   local -a files=()
   dybatpho::create_temp dybatpho_file_size_list ".list" "size"
-  find "${directory/#-/./-}" -type f -print0 > "${dybatpho_file_size_list}" 2> /dev/null || status=$?
+  # `-H` follows a link given as the argument, never one met in the tree.
+  find -H "${directory/#-/./-}" -type f -print0 > "${dybatpho_file_size_list}" 2> /dev/null || status=$?
   while IFS= read -r -d '' entry; do
     files+=("${entry}")
   done < "${dybatpho_file_size_list}" # kcov(skip)

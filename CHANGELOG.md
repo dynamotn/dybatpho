@@ -13,6 +13,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Changed
 
+- **`tui`, `screen` — a widget gives the caller's `INT` and `TERM` handlers
+  back when it ends.** A script that handles Ctrl-C after drawing a progress
+  bar or a screen now carries on instead of being killed right after its
+  handler ran, and a handler added later runs at all.
 - **`testing` — `dybatpho::mock_calls` records a line break inside an argument
   as `\n`,** so each call stays one line.
 - **`markdown` — `dybatpho::md_code_block` picks its fence in linear time.**
@@ -242,6 +246,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   instead of letting it finish while its job stays claimed and runs again.
 - **`lock` — a worker's `dybatpho::lock_semaphore_release name N` frees only
   its own slots,** not the parent script's.
+- **`logging` — `DYBATPHO_LOG_FILE_MAX_BYTES=10M` is read as a size,** not
+  reported as an error on every line; `tui_spinner_stop` removes its file.
+- **`screen` — `dybatpho::screen_put` at a negative column blanks the half of
+  a wide glyph it cuts.**
 - **`testing` — `dybatpho::assert_file_mode` refuses a malformed mode** instead
   of passing, and mocks count calls made without arguments.
 - **`release` — `dybatpho::release_checksums` never lists its own output, and
@@ -319,6 +327,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   command.**
 - **`schedule`, `queue` — the debounce ticket and the sequence counter are
   never written through a planted symlink.**
+- **`logging`, `tui` — the spinner message, the progress label and boxed
+  output spell out control characters** instead of sending escape sequences.
 
 ### Added
 

@@ -25,7 +25,7 @@ appended to a rotating log file at an independent verbosity level.
 | **`DYBATPHO_LOG_REQUEST_ID`** | string | yes |  | Correlation ID attached to every structured log event; falls back to `LOG_REQUEST_ID`. Generated automatically, and kept unexported, when both are empty |
 | **`DYBATPHO_LOG_FILE`** | string | no |  | Path to append structured JSON log lines to, independent of the log format; falls back to `LOG_FILE` |
 | **`DYBATPHO_LOG_FILE_LEVEL`** | string | no | `${DYBATPHO_LOG_LEVEL}` | Verbosity threshold applied only to the log file; falls back to `LOG_FILE_LEVEL` |
-| **`DYBATPHO_LOG_FILE_MAX_BYTES`** | number | no | `10485760` | Rotate the log file once it reaches this size in bytes, 10 MiB by default. `0` disables rotation; falls back to `LOG_FILE_MAX_BYTES` |
+| **`DYBATPHO_LOG_FILE_MAX_BYTES`** | number | no | `10485760` | Rotate the log file once it reaches this size in bytes, 10 MiB by default, or with a `K`, `M`, `G` or `T` suffix; a size it cannot read keeps the default. `0` disables rotation; falls back to `LOG_FILE_MAX_BYTES` |
 | **`DYBATPHO_LOG_FILE_MAX_BACKUPS`** | number | no | `5` | Number of rotated log file backups to keep; falls back to `LOG_FILE_MAX_BACKUPS` |
 | **`DYBATPHO_SPINNER`** | string | yes |  | When `dybatpho::spinner` animates (`auto\|always\|never`). `auto` animates only on a terminal. Default `auto` |
 | **`DYBATPHO_SPINNER_INTERVAL`** | string | no | `0.1` | Seconds between spinner frames |

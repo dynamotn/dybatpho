@@ -92,6 +92,8 @@ DYBATPHO_TUI_PROGRESS_TOTAL=0
 # `dybatpho::tui_spinner_message` would silently do nothing.
 __dybatpho_tui_spinner_file=""
 __dybatpho_tui_progress_label=""
+# Columns the bar is drawn in, measured once when it starts.
+__dybatpho_tui_progress_cols=80
 __dybatpho_tui_progress_started_ms=0
 __dybatpho_tui_progress_active=false
 # Last percentage reported to the log in the fallback rendering, so an update
@@ -99,6 +101,10 @@ __dybatpho_tui_progress_active=false
 __dybatpho_tui_progress_reported=-1
 __dybatpho_tui_cursor_hidden=false
 __dybatpho_tui_cursor_trapped=false
+# The caller's INT and TERM handlers, saved while a widget holds the cursor,
+# and the signals they were saved for.
+__dybatpho_tui_saved_traps=""
+declare -ga __dybatpho_tui_saved_signals=()
 
 #######################################
 # @description Return success when the widgets may draw in place and read raw
@@ -204,12 +210,27 @@ function __dybatpho_tui_hide_cursor {
   # kcov(disabled)
   dybatpho::tui_supported || return 0
   if [[ "${__dybatpho_tui_cursor_trapped}" != true ]]; then
-    # A handler on INT or TERM replaces the signal's default, so it raises the
-    # signal again once the cursor is back: the script still ends with 128+n.
     dybatpho::trap "__dybatpho_tui_show_cursor" EXIT
-    dybatpho::trap "__dybatpho_tui_on_signal INT" INT
-    dybatpho::trap "__dybatpho_tui_on_signal TERM" TERM
     __dybatpho_tui_cursor_trapped=true
+  fi
+  if [[ "${__dybatpho_tui_cursor_hidden}" != true ]]; then
+    # The INT and TERM handlers stand alone while the widget runs, and the
+    # caller's come back when it ends: left in place, they killed a script
+    # whose own handler meant to carry on, and hid any handler added later.
+    # An ignored signal cannot interrupt the widget, and is left alone: Bash
+    # resets one ignored on entry to its default and cannot ignore it again.
+    local signal listing
+    __dybatpho_tui_saved_signals=()
+    for signal in INT TERM; do
+      listing="$(trap -p "${signal}")"
+      [[ "${listing}" == "trap -- '' SIG${signal}" ]] && continue
+      __dybatpho_tui_saved_signals+=("${signal}")
+    done
+    __dybatpho_process_traps_save_into __dybatpho_tui_saved_traps \
+      ${__dybatpho_tui_saved_signals[@]+"${__dybatpho_tui_saved_signals[@]}"}
+    for signal in ${__dybatpho_tui_saved_signals[@]+"${__dybatpho_tui_saved_signals[@]}"}; do
+      __dybatpho_process_trap_only "__dybatpho_tui_on_signal ${signal}" "${signal}"
+    done
   fi
   __dybatpho_tui_cursor_hidden=true
   printf '\033[?25l' >&2
@@ -217,7 +238,8 @@ function __dybatpho_tui_hide_cursor {
 }
 
 #######################################
-# @description Show the cursor again, if a widget hid it.
+# @description Show the cursor again, if a widget hid it, and give the
+#   caller's INT and TERM handlers back.
 # @noargs
 # @exitcode 0 Always, so it cannot change the exit status of a trap
 # @internal
@@ -226,20 +248,22 @@ function __dybatpho_tui_show_cursor {
   # kcov(disabled)
   [[ "${__dybatpho_tui_cursor_hidden}" == true ]] || return 0
   __dybatpho_tui_cursor_hidden=false
+  ((${#__dybatpho_tui_saved_signals[@]} == 0)) \
+    || __dybatpho_process_traps_restore "${__dybatpho_tui_saved_traps}" "${__dybatpho_tui_saved_signals[@]}"
   printf '\033[?25h' >&2
   return 0
   # kcov(enabled)
 }
 
 #######################################
-# @description Show the cursor, then end the shell with the signal that
-#   interrupted it, as it would have ended without a handler.
+# @description Show the cursor, then raise the signal again with the caller's
+#   handlers back: they run once, or the shell ends with 128+n as it would have
+#   without a handler.
 # @arg $1 string Signal name, `INT` or `TERM`
 # @internal
 #######################################
 function __dybatpho_tui_on_signal {
   __dybatpho_tui_show_cursor
-  trap - "$1"
   kill -s "$1" "${BASHPID}"
 }
 
@@ -507,6 +531,12 @@ function dybatpho::tui_spinner_stop {
     __dybatpho_tui_show_cursor
     # kcov(enabled)
   fi
+  # The message file goes with the spinner: left to the exit cleanup, every
+  # start and stop cycle kept one more until the script ended.
+  if [[ -n "${__dybatpho_tui_spinner_file}" ]]; then
+    rm -f -- "${__dybatpho_tui_spinner_file}"
+    __dybatpho_process_forget_cleanup "${__dybatpho_tui_spinner_file}"
+  fi
   __dybatpho_tui_spinner_file=""
 
   [[ -z "${message}" ]] || __dybatpho_tui_banner "${status}" "${message}"
@@ -587,9 +617,14 @@ function __dybatpho_tui_progress_render {
   local width="${DYBATPHO_TUI_BAR_WIDTH}"
   __dybatpho_tui_expect_int dybatpho::tui_bar "Bar width" width 1
   __dybatpho_tui_bar_into bar "${current}" "${total}" "${width}"
-  printf -v line '%s%s%s %s (%s/%s)%s' \
-    "${bold}" "${__dybatpho_tui_progress_label}" "${reset}" \
-    "${bar}" "${current}" "${total}" "${timing}"
+  # The label is cut to what the bar leaves of the line: a line that wraps
+  # leaves a row behind on every redraw. One column stays free, as in the menus.
+  local rest label rest_width
+  printf -v rest ' %s (%s/%s)%s' "${bar}" "${current}" "${total}" "${timing}"
+  __dybatpho_log_width_into rest_width "${rest}"
+  __dybatpho_tui_fit_into label "${__dybatpho_tui_progress_label}" \
+    "$((__dybatpho_tui_progress_cols - 1 - rest_width))"
+  line="${bold}${label}${reset}${rest}"
   __dybatpho_tui_draw_line "${line}"
   # kcov(enabled)
 }
@@ -616,13 +651,18 @@ function dybatpho::tui_progress_start {
   dybatpho::expect_args label total -- "$@"
   __dybatpho_tui_expect_int "${FUNCNAME[0]}" "Total units" total 1
 
-  __dybatpho_tui_progress_label="${label}"
+  # Spelled out once here rather than on every frame; the label cannot carry
+  # an escape sequence to the terminal, nor to the log in the fallback.
+  __dybatpho_log_visible_into __dybatpho_tui_progress_label "${label}"
+  dybatpho::tui_supported && __dybatpho_tui_progress_cols="$(dybatpho::terminal_width 80)"
   DYBATPHO_TUI_PROGRESS_TOTAL="${total}"
   DYBATPHO_TUI_PROGRESS_CURRENT=0
-  __dybatpho_log_now_ms_into __dybatpho_tui_progress_started_ms
   __dybatpho_tui_progress_reported=-1
   __dybatpho_tui_progress_active=true
   __dybatpho_tui_hide_cursor
+  # Timed from here: saving the caller's traps above forks, which a loaded
+  # machine can make slow enough to show in a short bar's total.
+  __dybatpho_log_now_ms_into __dybatpho_tui_progress_started_ms
   __dybatpho_tui_progress_render false
 }
 
@@ -646,7 +686,7 @@ function dybatpho::tui_progress_update {
   # dyshellint disable=BSG087 # checked and rewritten in base ten by __dybatpho_tui_expect_int
   ((current <= DYBATPHO_TUI_PROGRESS_TOTAL)) || current="${DYBATPHO_TUI_PROGRESS_TOTAL}"
   DYBATPHO_TUI_PROGRESS_CURRENT="${current}"
-  [[ -z "${2-}" ]] || __dybatpho_tui_progress_label="$2"
+  [[ -z "${2-}" ]] || __dybatpho_log_visible_into __dybatpho_tui_progress_label "$2"
   __dybatpho_tui_progress_render false
 }
 
@@ -1116,7 +1156,7 @@ function __dybatpho_tui_menu_interactive {
   # The answer line echoes untrusted entries, so control characters are spelled out.
   local __dybatpho_tui_menu_shown __dybatpho_tui_menu_prompt_shown
   __dybatpho_log_visible_into __dybatpho_tui_menu_prompt_shown "${__dybatpho_tui_menu_prompt}"
-  # shellcheck disable=SC2178,SC2128,SC2034
+  # shellcheck disable=SC2178,SC2128,SC2034 # one nameref serves both shapes; only the matching branch runs
   if dybatpho::is true "${__dybatpho_tui_menu_multiple}"; then
     for ((__dybatpho_tui_menu_index = 0;  \
     __dybatpho_tui_menu_index < __dybatpho_tui_menu_count;  \

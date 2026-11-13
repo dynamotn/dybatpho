@@ -55,7 +55,7 @@ resizes back one event at a time. It is the `ratatui` shape, in Bash.
 - [`dybatpho::screen_rect_inner`](#dybatphoscreen_rect_inner) — Shrink a rectangle by a margin on every side.
 - [`dybatpho::screen_rect_center`](#dybatphoscreen_rect_center) — Centre a rectangle of a given size inside another, which is what a popup needs.
 - [`dybatpho::screen_begin`](#dybatphoscreen_begin) — Take over the terminal: alternate screen, raw mode, hidden cursor, and mouse reporting. The terminal is opened directly rather than taken from stdin and stdout, so an application can still read a pipe and print a result that a caller captures while it is drawing.
-- [`dybatpho::screen_end`](#dybatphoscreen_end) — Give the terminal back: mouse reporting off, cursor shown, the alternate screen left, and the original line settings restored.
+- [`dybatpho::screen_end`](#dybatphoscreen_end) — Give the terminal back: mouse reporting off, cursor shown, the alternate screen left, the original line settings restored, and the caller's INT, TERM and WINCH handlers put back.
 - [`dybatpho::screen_event`](#dybatphoscreen_event) — Wait for the next event and report it under a stable name. Keys come back as `up`, `down`, `left`, `right`, `enter`, `space`, `tab`, `backspace`, `escape`, `home`, `end`, `pageup`, `pagedown`, `delete`, or `char:<c>`. A terminal that changed size reports `resize`, a mouse click reports `mouse:<button>`, and a closed input reports `eof`.
 - [`dybatpho::screen_pending`](#dybatphoscreen_pending) — Return success when an event is already waiting, so reading it with `dybatpho::screen_event` will not block. A frame drawn in Bash takes longer than a terminal takes to repeat a held key, so an application that draws once per event falls further behind for as long as the key is held, and keeps moving after it is released. Handling every event that is waiting before drawing the next frame keeps the screen in step with the keyboard instead.
 - [`dybatpho::screen_block`](#dybatphoscreen_block) — Draw a bordered box, optionally titled, and report the area left inside it. The inner rectangle is published rather than returned, because a block is almost always followed by a widget drawn inside it and computing that rectangle by hand is where off-by-one borders come from.
@@ -487,7 +487,8 @@ _Function has no arguments._
 ### `dybatpho::screen_end`
 
 Give the terminal back: mouse reporting off, cursor shown, the
-alternate screen left, and the original line settings restored.
+alternate screen left, the original line settings restored, and the
+caller's INT, TERM and WINCH handlers put back.
 
 _Function has no arguments._
 

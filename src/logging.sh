@@ -42,7 +42,8 @@
 # @env DYBATPHO_LOG_FILE_LEVEL string [default: ${DYBATPHO_LOG_LEVEL}] Verbosity threshold applied only to the log
 #   file; falls back to `LOG_FILE_LEVEL`
 # @env DYBATPHO_LOG_FILE_MAX_BYTES number [default: 10485760] Rotate the log file once it reaches this size in bytes,
-#   10 MiB by default. `0` disables rotation; falls back to `LOG_FILE_MAX_BYTES`
+#   10 MiB by default, or with a `K`, `M`, `G` or `T` suffix; a size it cannot read keeps the default. `0` disables
+#   rotation; falls back to `LOG_FILE_MAX_BYTES`
 # @env DYBATPHO_LOG_FILE_MAX_BACKUPS number [default: 5] Number of rotated log file backups to keep; falls back to
 #   `LOG_FILE_MAX_BACKUPS`
 # @env DYBATPHO_SPINNER string When `dybatpho::spinner` animates (`auto|always|never`). `auto` animates only on a
@@ -633,7 +634,14 @@ function __dybatpho_log_write_file {
   fi
   [[ -d "${log_dir}" ]] || mkdir -p -- "${log_dir}" 2> /dev/null || return 0
 
-  __dybatpho_log_rotate_file "${log_file}" "${DYBATPHO_LOG_FILE_MAX_BYTES:-${LOG_FILE_MAX_BYTES:-10485760}}" \
+  # A size is read as `log_to_file rotate:` reads it, so `10M` works here too;
+  # one it cannot read keeps the default rather than failing every log line.
+  # Plain digits, the usual case, need no subshell.
+  local max_bytes="${DYBATPHO_LOG_FILE_MAX_BYTES:-${LOG_FILE_MAX_BYTES:-10485760}}"
+  if [[ ! "${max_bytes}" =~ ^[0-9]{1,18}$ ]]; then
+    max_bytes="$(__dybatpho_log_parse_size "${max_bytes}")" || max_bytes=10485760
+  fi
+  __dybatpho_log_rotate_file "${log_file}" "$((10#${max_bytes}))" \
     "${DYBATPHO_LOG_FILE_MAX_BACKUPS:-${LOG_FILE_MAX_BACKUPS:-5}}"
   local log_now_ms log_timestamp
   __dybatpho_log_now_ms_into log_now_ms
@@ -1436,6 +1444,9 @@ function __dybatpho_log_box {
   local terminal_width inner_limit line content_width=0
   local -a input_lines=() wrapped_lines=()
 
+  # A control character is spelled out, as on a log line, so an escape
+  # sequence never reaches the terminal and the border counts what is drawn.
+  __dybatpho_log_visible_into message "${message}" $'\n'
   terminal_width=$(__dybatpho_log_get_terminal_width)
   inner_limit=$((terminal_width - 4))
   if ((inner_limit < 1)); then
@@ -1845,7 +1856,10 @@ function __dybatpho_log_spin_loop {
   local -a frames=()
   read -r -a frames <<< "$1"
   ((${#frames[@]} > 0)) || frames=('-' "\\" '|' '/')
-  local index=0 parent="$$"
+  local index=0 parent="$$" shown seen="${message}"
+  # A control character is spelled out once per message, not on every frame,
+  # so an escape sequence in it never reaches the terminal.
+  __dybatpho_log_visible_into shown "${message}"
   while true; do
     # The animation is a background job of the script; when the script ends
     # without stopping it -- `die`, `set -e`, a plain `exit` -- it would be
@@ -1862,8 +1876,12 @@ function __dybatpho_log_spin_loop {
       while [[ "${message}" == *$'\n' ]]; do
         message="${message%$'\n'}"
       done
+      if [[ "${message}" != "${seen}" ]]; then
+        __dybatpho_log_visible_into shown "${message}"
+        seen="${message}"
+      fi
     fi
-    printf '\r%s %s\033[K' "${frames[index % ${#frames[@]}]}" "${message}" >&2
+    printf '\r%s %s\033[K' "${frames[index % ${#frames[@]}]}" "${shown}" >&2
     index=$((index + 1))
     __dybatpho_log_sleep "${interval}"
   done

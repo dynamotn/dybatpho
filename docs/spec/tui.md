@@ -187,6 +187,10 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   none is.
 - `NO_COLOR` is set.
 - The script is killed while a widget has the cursor hidden.
+- The caller has its own INT or TERM handler, adds one after a widget ended,
+  or started with INT ignored.
+- A progress label or spinner message holds an escape sequence, or a label is
+  wider than the terminal.
 - A registered secret appears in a spinner message.
 
 ## Requirements *(mandatory)*
@@ -258,10 +262,14 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
   than a lone escape as the cancel key or leave part of it to be read as the
   next key.
 - **FR-027**: `tui_menu` and `tui_multi_menu` MUST write the choice into the variable the caller named, whatever that name is, including `prompt` and `result_var`.
-- **FR-028**: A widget that hid the cursor MUST, on INT or TERM, show it again and then end the script with the signal, status 128+n.
+- **FR-028**: A widget that hid the cursor MUST, on INT or TERM, show it again and then raise the signal again with the caller's handlers back: a caller handler runs once, and without one the script ends with status 128+n.
 - **FR-029**: A single-choice menu that cannot ask MUST take the first entry `DYBATPHO_TUI_DEFAULT` names when it names several, rather than ask again.
 - **FR-030**: A drawn widget MUST show a control character of its prompt, hint or entries in caret notation (`^J` for a line break, `^[` for ESC), so an entry neither draws a row the redraw does not count nor sends an escape sequence to the terminal; the value returned MUST be the entry as given.
 - **FR-031**: The answer line and the numbered fallback list MUST show control characters in the prompt and entries in caret notation, as the drawn menu does.
+- **FR-032**: A widget that ends MUST put back the INT and TERM handlers the caller had before it hid the cursor, so a caller's own handler and one added later with `dybatpho::trap` run as if no widget had drawn. A signal the caller ignores MUST be left alone.
+- **FR-033**: The progress bar MUST show control characters of its label in caret notation, and MUST cut the label so the drawn line stays narrower than the terminal.
+- **FR-034**: The spinner MUST show control characters of its message in caret notation, the first message and every one sent with `dybatpho::tui_spinner_message`.
+- **FR-035**: `dybatpho::tui_spinner_stop` MUST remove the file the spinner kept its message in, rather than leave one per start until the script exits.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -321,6 +329,9 @@ dybatpho::tui_progress_stop "Uploaded ${#components[@]} components"
 - **IT-016**: Send TERM to a script while its progress bar is drawn, and get status 143 with the cursor shown again.
 - **IT-017**: With `DYBATPHO_TUI_DEFAULT=1,3` and nothing to read, get the first entry from a single-choice menu.
 - **IT-018**: Draw a menu whose entries hold a line break and an OSC title, and find them spelled `^J` and `^[]0;...^G` with no raw OSC on the terminal, while the chosen entry comes back unchanged.
+- **IT-019**: Set a TERM handler, send TERM during a progress bar and twice after it, the second time with a handler added by `dybatpho::trap`, and see every handler run, the cursor shown, and the script carry on.
+- **IT-020**: Draw a progress bar whose long label holds an OSC title in 60 columns, and find it spelled `^[]0;...^G`, with no raw OSC and every frame narrower than 60 columns.
+- **IT-021**: Start and stop a drawn spinner, and find its message file gone and no longer registered for cleanup.
 
 ## Acceptance Criteria *(mandatory)*
 

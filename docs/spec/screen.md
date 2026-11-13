@@ -206,7 +206,10 @@ dybatpho::screen_end
 
 - A widget is given a rectangle of zero width or height, or one off the screen.
 - Text is wider than the rectangle, or ends with a double-width glyph exactly
-  at the edge.
+  at the edge, or starts left of the screen with the edge cutting a
+  double-width glyph.
+- The caller has its own INT or TERM handler, adds one after the screen ends,
+  or started with INT ignored.
 - The terminal is resized mid-frame, or resized several times before an event
   is read.
 - A caller's array is named the same as one of a widget's own variables.
@@ -313,7 +316,7 @@ dybatpho::screen_end
 - **FR-037**: `dybatpho::screen_gauge` MUST draw whole glyphs under any locale, including `C`, where Bash indexes a string by byte.
 - **FR-038**: Locating a column on a row that holds wide glyphs or combining marks MUST cost the number of non-ASCII characters on the row, not its width, so a full frame of such rows stays interactive.
 - **FR-039**: A layout MUST NOT grow a `max:N` part past `N` to absorb rounding; the last flexible part that can take it does, then the last part of any kind that can, then the last part.
-- **FR-040**: Interrupting the screen with INT or TERM MUST give the terminal back and then end the script with the signal, status 128+n, rather than let it carry on.
+- **FR-040**: Interrupting the screen with INT or TERM MUST give the terminal back and then raise the signal again with the caller's handlers back: a caller handler runs once, and without one the script ends with status 128+n rather than carry on.
 - **FR-041**: `dybatpho::screen_begin` MUST size the buffer from the terminal it opened, so redirected stdout and stderr do not fall back to 80x24.
 - **FR-042**: Drawing over one column of a wide glyph MUST turn what is left of the glyph into blanks, so a row keeps exactly the width of the screen.
 - **FR-043**: `dybatpho::screen_barchart` MUST draw a value above `max:` as a full bar, and `dybatpho::screen_tabs` MUST cut the tab that reaches the edge, so neither draws outside its rectangle.
@@ -327,6 +330,8 @@ dybatpho::screen_end
   a character set designation (`ESC (`, `ESC )`, `ESC *`, `ESC +` and one more
   byte), dropped; an OSC, DCS, APC, PM or SOS string up to BEL or `ESC \`,
   dropped; and any other two-byte escape, dropped.
+- **FR-047**: `dybatpho::screen_end` MUST put back the INT, TERM and WINCH handlers the caller had before `dybatpho::screen_begin`, so a caller's own handler and one added later with `dybatpho::trap` run as if the screen had never been taken. A signal the caller ignores MUST be left alone.
+- **FR-048**: Text cut by the left edge through a wide glyph MUST draw the half left on screen as a blank, as FR-042 does for an overdraw, so the rest of the text keeps its columns.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -424,6 +429,8 @@ dybatpho::screen_end
   by `ESC \`, `ESC [ 4:3 m`, an OSC title closed by BEL, `ESC 7` and a
   trailing ESC, and get only the text, with the curly underline kept; draw an
   OSC cut short by the next CSI and keep that CSI's colour.
+- **IT-044**: Under a pseudo-terminal, set a TERM handler, begin and end the screen, send TERM twice with a second handler added by `dybatpho::trap` between, and see both handlers run and the script carry on with status 0.
+- **IT-045**: Put `世ab` at column -1 and read back ` ab` at column 0, the row still 40 columns wide.
 
 ## Acceptance Criteria *(mandatory)*
 

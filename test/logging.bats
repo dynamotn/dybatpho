@@ -855,6 +855,27 @@ assert event["duration_ms"] >= 0
   grep -q '"message":"two"' "${log_file}"
 }
 
+@test "DYBATPHO_LOG_FILE_MAX_BYTES takes a size with a suffix, and falls back on one it cannot read" {
+  # `10M` was handed to arithmetic: every line printed an error and rotation
+  # never ran.
+  local log_file="${BATS_TEST_TMPDIR}/suffixed.log"
+  export DYBATPHO_LOG_FILE="${log_file}" DYBATPHO_LOG_FILE_MAX_BYTES=1K
+  printf '%2000s\n' '' > "${log_file}"
+  run_traced --separate-stderr dybatpho::info "one"
+  refute_stderr --partial "value too great"
+  assert_file_exist "${log_file}.1"
+  rm -f -- "${log_file}" "${log_file}.1"
+
+  # A value no size parser reads keeps the 10 MiB default rather than
+  # stopping every log line.
+  export DYBATPHO_LOG_FILE_MAX_BYTES=lots
+  printf '%2000s\n' '' > "${log_file}"
+  run_traced --separate-stderr dybatpho::info "two"
+  assert_success
+  refute_stderr --partial "lots"
+  assert_file_not_exist "${log_file}.1"
+}
+
 @test "LOG_FILE is a no-op when unset" {
   unset LOG_FILE
   run_traced --separate-stderr dybatpho::info "no file configured"
@@ -1652,6 +1673,38 @@ _logging_child() {
   assert_stderr --partial 'title^[]0;owned^G^[[2J^Mcr^? line'
   # A line break and a tab the caller wrote are kept, as is the context field.
   assert_stderr --partial $'line\ttab\nnext stage=x^[[2J'
+}
+
+@test "the spinner loop shows control characters in its message instead of sending them to the terminal" {
+  # Both spinners draw through this loop; the message from the argument and
+  # the one re-read from the state file reached the terminal raw.
+  local state="${BATS_TEST_TMPDIR}/spin-evil" err="${BATS_TEST_TMPDIR}/spin-evil-err"
+  __dybatpho_log_spin_loop "x" 0.02 $'arg\033]0;owned\a' 2> "${err}" &
+  local spinning=$!
+  sleep 0.1
+  kill "${spinning}"
+  wait "${spinning}" 2> /dev/null || true
+  printf 'file\033]52;c;SGk=\a' > "${state}"
+  __dybatpho_log_spin_loop "x" 0.02 "" "${state}" 2>> "${err}" &
+  spinning=$!
+  sleep 0.1
+  kill "${spinning}"
+  wait "${spinning}" 2> /dev/null || true
+
+  local drawn
+  drawn="$(< "${err}")"
+  [[ "${drawn}" != *$'\033]'* && "${drawn}" != *$'\a'* ]] || fail "raw escape drawn: ${drawn@Q}"
+  [[ "${drawn}" == *$'\rx arg^[]0;owned^G\033[K'* ]] || fail "argument not spelled out: ${drawn@Q}"
+  [[ "${drawn}" == *$'\rx file^[]52;c;SGk=^G\033[K'* ]] || fail "file not spelled out: ${drawn@Q}"
+}
+
+@test "boxed output shows control characters instead of sending them, with the border fitted" {
+  run_traced --separate-stderr dybatpho::header $'hdr\033]0;owned\a'
+  assert_success
+  [[ "${output}" != *$'\033]'* && "${output}" != *$'\a'* ]] || fail "raw escape drawn: ${output@Q}"
+  # The border counts the spelled-out text, one column per character.
+  assert_line --index 0 "╔═════════════════╗"
+  assert_line --index 1 "║ hdr^[]0;owned^G ║"
 }
 
 @test "the JSON string escaper stays linear in the number of control characters" {

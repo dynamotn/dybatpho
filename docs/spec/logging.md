@@ -344,7 +344,9 @@ dybatpho::log_context clear
   more/less verbose than the stdout level.
 - Concurrent processes append to the same `DYBATPHO_LOG_FILE` simultaneously.
 - A rotation size is given in a form the parser does not accept (`1.5M`,
-  `ten megabytes`, a negative number), or as `0` to disable rotation.
+  `ten megabytes`, a negative number), or as `0` to disable rotation, through
+  `rotate:` or `DYBATPHO_LOG_FILE_MAX_BYTES`.
+- A spinner message or boxed message holds an escape sequence.
 - The configured log path exists but is not writable, or its parent directory
   cannot be created.
 - A context field name collides with a field every event already carries, is
@@ -403,6 +405,9 @@ dybatpho::log_context clear
 - **FR-018**: The module MUST rotate `DYBATPHO_LOG_FILE` once it reaches
   `DYBATPHO_LOG_FILE_MAX_BYTES`, keeping up to `DYBATPHO_LOG_FILE_MAX_BACKUPS` numbered backups
   and pruning older ones; `DYBATPHO_LOG_FILE_MAX_BYTES=0` MUST disable rotation.
+  `DYBATPHO_LOG_FILE_MAX_BYTES` MUST accept a size with a suffix as FR-021
+  reads it, and one it cannot read MUST keep the 10 MiB default rather than
+  fail or print an error on every line.
 - **FR-019**: File log lines MUST be redacted using the same masking registry
   as stdout/stderr output.
 - **FR-020**: The module MUST provide `dybatpho::log_to_file`, configuring the
@@ -501,6 +506,7 @@ dybatpho::log_context clear
 - **FR-054**: JSON string escaping MUST take time linear in the length of the
   value, however many control characters it holds.
 - **FR-055**: Rendering context fields onto a log line MUST NOT start a process.
+- **FR-056**: A spinner frame and a boxed message (`header`, `success`, `start_progress`, and the tui banner) MUST show every control character of the message in caret notation, as a text log line does, and a box MUST size its border to the spelled-out text; a box keeps the line breaks it splits on. The spinner MUST spell a message out once, not on every frame.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -655,6 +661,14 @@ dybatpho::log_context clear
   tab survive.
 - **IT-041**: Escape 8000 `\001` characters for JSON in under two seconds and
   verify each became `\u0001`.
+- **IT-042**: Run the spinner loop with an OSC title in its message argument
+  and an OSC 52 write in its state file, and find both spelled in caret
+  notation with no raw OSC or BEL on stderr.
+- **IT-043**: Draw a header holding an OSC title, and find it spelled out with
+  the border as wide as the spelled-out text.
+- **IT-044**: Log with `DYBATPHO_LOG_FILE_MAX_BYTES=1K` past that size and get
+  a rotated backup with no arithmetic error; with an unreadable size get no
+  error and the default threshold.
 
 ## Acceptance Criteria *(mandatory)*
 

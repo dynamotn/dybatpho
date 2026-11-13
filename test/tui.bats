@@ -411,6 +411,64 @@ EOF
   [[ "${stderr}" == *$'\033[?25h'* ]] || fail "cursor not shown again: ${stderr}"
 }
 
+@test "dybatpho::tui_spinner_stop removes the message file its start created" {
+  # Every start left one file behind until the script exited.
+  local file
+  DYBATPHO_TUI=always
+  dybatpho::tui_spinner_start "Working" 2> /dev/null
+  # shellcheck disable=SC2154 # set by the tui module the helper loaded
+  file="${__dybatpho_tui_spinner_file}"
+  assert_file_exist "${file}"
+  dybatpho::tui_spinner_stop 0 2> /dev/null
+  assert_file_not_exist "${file}"
+  [[ " ${DYBATPHO_CLEANUP_PATHS[*]-} " != *":${file} "* ]] || fail "still registered: ${file}"
+}
+
+@test "the drawn progress bar spells out control characters in its label and fits the terminal" {
+  # The label reached the terminal raw, and a long one wrapped the line, so
+  # every redraw left a row behind.
+  local script="${BATS_TEST_TMPDIR}/label.sh" long frame
+  printf -v long '%50s' ''
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules tui" \
+    'DYBATPHO_TUI=always COLUMNS=60' \
+    "dybatpho::tui_progress_start $(printf '%q' $'lab\033]0;owned\ael'"${long// /x}") 2" \
+    'dybatpho::tui_progress_stop' > "${script}"
+  run_traced --separate-stderr bash "${script}"
+  [[ "${stderr}" != *$'\033]'* && "${stderr}" != *$'\a'* ]] || fail "raw escape drawn: ${stderr@Q}"
+  assert_stderr --partial 'lab^[]0;owned^G'
+  # Each redraw, its colour and erase sequences taken out, stays narrower
+  # than the terminal.
+  while IFS= read -r -d $'\r' frame || [[ -n "${frame}" ]]; do
+    frame="${frame%$'\n'}"
+    ((${#frame} < 60)) || fail "frame wider than the terminal: ${frame@Q}"
+  done < <(printf '%s' "${stderr}" | sed $'s/\033\\[[0-9;?]*[A-Za-z]//g')
+}
+
+@test "a widget gives the caller's INT and TERM handlers back when it ends" {
+  # The handlers installed by the first widget stayed for the rest of the
+  # script: a caller's own `trap ... TERM` was followed by a kill, and a
+  # handler added later with `dybatpho::trap` never ran. A signal during the
+  # widget restores the cursor, then reaches the caller's handler once. TERM
+  # stands for both: the runner starts the script with INT ignored.
+  local script="${BATS_TEST_TMPDIR}/handlers.sh"
+  # shellcheck disable=SC2016 # expanded by the child shell
+  printf '%s\n' \
+    ". $(printf '%q' "${DYBATPHO_DIR}")/init.sh --modules tui" \
+    'DYBATPHO_TUI=always' \
+    "trap 'echo handled' TERM" \
+    'dybatpho::tui_progress_start "Working" 2' \
+    'kill -s TERM "${BASHPID}"' \
+    'dybatpho::tui_progress_stop' \
+    'kill -s TERM "${BASHPID}"' \
+    "dybatpho::trap 'echo later' TERM" \
+    'kill -s TERM "${BASHPID}"' \
+    'echo "still running"' > "${script}"
+  run_traced --separate-stderr bash "${script}"
+  assert_output $'handled\nhandled\nhandled\nlater\nstill running'
+  [[ "${stderr}" == *$'\033[?25h'* ]] || fail "cursor not shown again: ${stderr}"
+}
+
 # =============================================================================
 # dybatpho::tui_multi_menu
 # =============================================================================

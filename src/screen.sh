@@ -165,6 +165,10 @@ __dybatpho_screen_saved_stty=""
 __dybatpho_screen_fd=""
 __dybatpho_screen_resized=false
 __dybatpho_screen_trapped=false
+# The caller's INT, TERM and WINCH handlers, saved while the screen is taken,
+# and the signals they were saved for.
+__dybatpho_screen_saved_traps=""
+declare -ga __dybatpho_screen_saved_signals=()
 
 [[ -n "${__DYBATPHO_SCREEN_US-}" ]] || readonly __DYBATPHO_SCREEN_US=$'\x1f'
 [[ -n "${__DYBATPHO_SCREEN_RS-}" ]] || readonly __DYBATPHO_SCREEN_RS=$'\x1e'
@@ -522,6 +526,15 @@ function dybatpho::screen_put {
     local dropped
     __dybatpho_screen_truncate_into dropped "${text}" "${skip}"
     text="${text:${#dropped}}"
+    # A wide glyph the edge cuts cannot be half drawn: the half left on
+    # screen becomes a blank, as when new text covers half of one.
+    local dropped_width glyph_width gap
+    __dybatpho_log_width_into dropped_width "${dropped}"
+    if ((dropped_width < skip)) && [[ -n "${text}" ]]; then
+      __dybatpho_log_width_into glyph_width "${text:0:1}"
+      __dybatpho_log_repeat_into gap " " "$((dropped_width + glyph_width - skip))"
+      text="${gap}${text:1}"
+    fi
   fi
 
   local available=$((DYBATPHO_SCREEN_WIDTH - column))
@@ -1056,14 +1069,14 @@ function __dybatpho_screen_on_resize {
 }
 
 #######################################
-# @description Give the terminal back, then end the shell with the signal that
-#   interrupted it, as it would have ended without a handler.
+# @description Give the terminal back, then raise the signal again with the
+#   caller's handlers back: they run once, or the shell ends with 128+n as it
+#   would have without a handler.
 # @arg $1 string Signal name, `INT` or `TERM`
 # @internal
 #######################################
 function __dybatpho_screen_on_signal {
   dybatpho::screen_end
-  trap - "$1"
   kill -s "$1" "${BASHPID}"
 }
 
@@ -1108,14 +1121,30 @@ function dybatpho::screen_begin {
   stty raw -echo <&"${__dybatpho_screen_fd}" 2> /dev/null || true
 
   if [[ "${__dybatpho_screen_trapped}" != true ]]; then
-    # A handler on INT or TERM replaces the signal's default, so it raises the
-    # signal again once the terminal is back: the script still ends with 128+n.
     dybatpho::trap "dybatpho::screen_end" EXIT
-    dybatpho::trap "__dybatpho_screen_on_signal INT" INT
-    dybatpho::trap "__dybatpho_screen_on_signal TERM" TERM
-    dybatpho::trap "__dybatpho_screen_on_resize" WINCH
     __dybatpho_screen_trapped=true
   fi
+  # The INT and TERM handlers stand alone while the screen is taken, and the
+  # caller's come back with screen_end: left in place, they killed a script
+  # whose own handler meant to carry on, and hid any handler added later.
+  # An ignored signal cannot interrupt the application, and is left alone:
+  # Bash resets one ignored on entry to its default and cannot ignore it again.
+  local signal listing
+  __dybatpho_screen_saved_signals=()
+  for signal in INT TERM WINCH; do
+    listing="$(trap -p "${signal}")"
+    [[ "${listing}" == "trap -- '' SIG${signal}" ]] && continue
+    __dybatpho_screen_saved_signals+=("${signal}")
+  done
+  __dybatpho_process_traps_save_into __dybatpho_screen_saved_traps \
+    ${__dybatpho_screen_saved_signals[@]+"${__dybatpho_screen_saved_signals[@]}"}
+  for signal in ${__dybatpho_screen_saved_signals[@]+"${__dybatpho_screen_saved_signals[@]}"}; do
+    if [[ "${signal}" == WINCH ]]; then
+      dybatpho::trap "__dybatpho_screen_on_resize" WINCH
+    else
+      __dybatpho_process_trap_only "__dybatpho_screen_on_signal ${signal}" "${signal}"
+    fi
+  done
 
   # Alternate screen, cursor hidden, and the cursor parked at the origin.
   printf '\033[?1049h\033[?25l\033[H' 1>&"${__dybatpho_screen_fd}"
@@ -1133,7 +1162,8 @@ function dybatpho::screen_begin {
 
 #######################################
 # @description Give the terminal back: mouse reporting off, cursor shown, the
-#   alternate screen left, and the original line settings restored.
+#   alternate screen left, the original line settings restored, and the
+#   caller's INT, TERM and WINCH handlers put back.
 # @noargs
 # @set DYBATPHO_SCREEN_ACTIVE bool `false`
 # @exitcode 0 Always, so it is safe in a trap and safe to call twice
@@ -1142,6 +1172,8 @@ function dybatpho::screen_end {
   [[ "${DYBATPHO_SCREEN_ACTIVE}" == true ]] || return 0
   # kcov(disabled)
   DYBATPHO_SCREEN_ACTIVE=false
+  ((${#__dybatpho_screen_saved_signals[@]} == 0)) \
+    || __dybatpho_process_traps_restore "${__dybatpho_screen_saved_traps}" "${__dybatpho_screen_saved_signals[@]}"
   if [[ -n "${__dybatpho_screen_fd}" ]]; then
     printf '\033[?1006l\033[?1000l\033[?25h\033[?1049l' 1>&"${__dybatpho_screen_fd}" 2> /dev/null || true
     [[ -n "${__dybatpho_screen_saved_stty}" ]] \

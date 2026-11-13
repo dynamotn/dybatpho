@@ -856,6 +856,16 @@ _end_then_write_stderr() {
   assert_equal "${row:0:4}" "cdef"
 }
 
+@test "dybatpho::screen_put blanks the half of a wide glyph the left edge cuts" {
+  # The glyph was kept whole, so the text after it landed one column right.
+  dybatpho::screen_put 0 -1 "世ab" "0"
+  local row columns
+  row="$(screen_row 0)"
+  assert_equal "${row:0:4}" " ab "
+  dybatpho::screen_width columns "${row}"
+  assert_equal "${columns}" 40
+}
+
 @test "dybatpho::screen_flush writes to stderr when no terminal was opened" {
   __dybatpho_screen_fd=""
   dybatpho::screen_put 0 0 "frame" "0"
@@ -1067,6 +1077,32 @@ SCRIPT
   screen_on_pty "${script}"
   [[ -s "${result}" ]] || skip "no pseudo-terminal to test with"
   assert_equal "$(< "${result}")" "status=143"
+}
+
+@test "dybatpho::screen_end gives the caller's INT and TERM handlers back" {
+  # The handlers screen_begin installed stayed after screen_end: the caller's
+  # own `trap ... TERM` was followed by a kill, and a handler added later with
+  # `dybatpho::trap` never ran. TERM stands for both: the runner starts the
+  # script with INT ignored, which no handler can change.
+  local app="${BATS_TEST_TMPDIR}/handlers-app.sh" script="${BATS_TEST_TMPDIR}/handlers.sh"
+  local result="${BATS_TEST_TMPDIR}/handlers.out"
+  cat > "${app}" << SCRIPT
+. "${DYBATPHO_DIR}/init.sh" --modules screen
+trap 'echo handled >> "${result}"' TERM
+dybatpho::screen_begin || exit 0
+dybatpho::screen_end
+kill -s TERM "\${BASHPID}"
+dybatpho::trap 'echo later >> "${result}"' TERM
+kill -s TERM "\${BASHPID}"
+echo "still running" >> "${result}"
+SCRIPT
+  cat > "${script}" << SCRIPT
+bash "${app}" 2> /dev/null
+printf 'status=%s\n' "\$?" >> "${result}"
+SCRIPT
+  screen_on_pty "${script}"
+  [[ -s "${result}" ]] || skip "no pseudo-terminal to test with"
+  assert_equal "$(< "${result}")" $'handled\nhandled\nlater\nstill running\nstatus=0'
 }
 
 @test "screen charts read values with a leading zero in base ten" {

@@ -13,6 +13,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Changed
 
+- **`agent` — the tool schemas from `dybatpho::agent_tools` and
+  `dybatpho::agent_mcp` list positional arguments and no longer list `--help`
+  as a property named `-`.**
 - **`tui`, `screen` — a widget gives the caller's `INT` and `TERM` handlers
   back when it ends.** A script that handles Ctrl-C after drawing a progress
   bar or a screen now carries on instead of being killed right after its
@@ -395,6 +398,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `json_set --json` no longer repeats a rejected value in its error.
 
 ### Added
+
+- **`agent` — `dybatpho::agent_mcp_serve` turns a script into an MCP server
+  over stdio,** so Claude Code, Claude Desktop or any MCP host can call its
+  commands as tools (`claude mcp add mytool -- /path/mytool mcp`). Tool
+  arguments are checked against the option spec and become argv without ever
+  being read as options; `DYBATPHO_AGENT_MCP_TIMEOUT` limits each call.
 
 - **`math` — `DYBATPHO_MATH_MAX_SCALE` (default 4096) caps the scale,** so a
   huge scale is refused instead of running for minutes.

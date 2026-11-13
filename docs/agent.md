@@ -17,7 +17,7 @@ did in a form that parses, it must never block on a prompt nobody will
 answer, it must refuse dangerous work it was not explicitly cleared for,
 and it must leave a record of what an agent made it do.
 
-The module provides five things:
+The module provides six things:
 
 - **Detection** – is this run being driven by an agent, or by a person?
 - **Structured results and errors** – JSON for agents, plain text for people,
@@ -28,6 +28,8 @@ The module provides five things:
 - **An allowlist gate** – interactive confirmation for people, an explicit
   allowlist for agents, never a silent yes
 - **An audit trail** – one JSON line per agent-initiated action
+- **An MCP server** – the same tools served over stdio, so `mytool mcp` can
+  be registered with Claude Code or Claude Desktop as it is
 
 ### 🌍 Environment
 
@@ -37,6 +39,7 @@ The module provides five things:
 | **`DYBATPHO_AGENT_ALLOW`** | string | yes |  | Space separated actions an agent may perform, or `all` |
 | **`DYBATPHO_AGENT_AUDIT_FILE`** | string | yes |  | Path of the JSON Lines audit log |
 | **`DYBATPHO_AGENT_ENV`** | string | yes |  | Extra environment variable names that mark an agent run |
+| **`DYBATPHO_AGENT_MCP_TIMEOUT`** | number | no | `0` | Seconds an MCP tool call may run, `0` for no limit |
 
 ### 🚀 Highlights
 
@@ -50,6 +53,7 @@ The module provides five things:
 - [`dybatpho::agent_audit_show`](#dybatphoagent_audit_show) — Print the audit log as readable lines.
 - [`dybatpho::agent_tools`](#dybatphoagent_tools) — Generate tool definitions from a CLI option spec. The root command and every subcommand become one tool, named by joining the command path with underscores. Because the definitions come from the same spec the parser uses, a tool can never describe an option the CLI does not have.
 - [`dybatpho::agent_mcp`](#dybatphoagent_mcp) — Generate an MCP `tools/list` payload for a CLI option spec. Each tool carries the command line it maps to under `x-dybatpho-command`, so a thin MCP server can dispatch without a second source of truth.
+- [`dybatpho::agent_mcp_serve`](#dybatphoagent_mcp_serve) — Serve a script's commands as MCP tools over stdio. A JSON-RPC 2.0 loop answers `initialize`, `ping`, `tools/list` and `tools/call`, one message per line, until stdin closes. The tools are those `dybatpho::agent_mcp` lists, and each call runs the tool's recorded command in agent mode, so `dybatpho::agent_confirm` and `dybatpho::agent_audit` apply unchanged.
 
 <a id="usage"></a>
 
@@ -82,6 +86,19 @@ dybatpho::agent_tools _spec_root mytool openai     # function-calling schema
 dybatpho::agent_mcp _spec_root mytool              # MCP tools/list payload
 ```
 
+#### Serve the CLI to an MCP host
+
+```bash
+[[ "${1:-}" == mcp ]] && { dybatpho::agent_mcp_serve _spec_root mytool "$0"; exit; }
+```
+
+Register it with `claude mcp add mytool -- /usr/local/bin/mytool mcp`, or in
+Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{"mcpServers": {"mytool": {"command": "/usr/local/bin/mytool", "args": ["mcp"]}}}
+```
+
 #### Gate a dangerous action
 
 ```bash
@@ -95,6 +112,7 @@ dybatpho::agent_confirm restart "Restart the API service" \
 ## 🔗 See also
 
 - [example/agent_ops.sh](../example/agent_ops.sh)
+- [example/agent_mcp.sh](../example/agent_mcp.sh)
 - [docs/cli.md` for the option spec these tool definitions are generated from](cli.md` for the option spec these tool definitions are generated from)
 
 <a id="tips"></a>
@@ -123,6 +141,10 @@ dybatpho::agent_confirm restart "Restart the API service" \
 **[`dybatpho::agent_tools`](#dybatphoagent_tools)**
 
 - Feed the result straight into the tool registry of the `ai` module, or into an API request; it needs no hand editing
+
+**[`dybatpho::agent_mcp_serve`](#dybatphoagent_mcp_serve)**
+
+- Keep the `mcp` entry point out of the spec, as the example does, so the server does not list itself as a tool
 
 <a id="reference"></a>
 
@@ -439,7 +461,7 @@ dybatpho::agent_mcp _spec_root mytool > mytool-mcp.json
 
 **📝 Notes**
 
-- This is the tool manifest, not a running server; point your MCP host at it and dispatch with the recorded command
+- This is the tool manifest; `dybatpho::agent_mcp_serve` serves the same tools to an MCP host
 
 **📤 Output on stdout**
 
@@ -453,3 +475,71 @@ dybatpho::agent_mcp _spec_root mytool > mytool-mcp.json
 **🔗 See also**
 
 - [dybatpho::agent_tools](#dybatphoagent_tools)
+- [dybatpho::agent_mcp_serve](#dybatphoagent_mcp_serve)
+
+---
+
+### `dybatpho::agent_mcp_serve`
+
+Serve a script's commands as MCP tools over stdio.
+A JSON-RPC 2.0 loop answers `initialize`, `ping`, `tools/list` and
+`tools/call`, one message per line, until stdin closes. The tools are those
+`dybatpho::agent_mcp` lists, and each call runs the tool's recorded command
+in agent mode, so `dybatpho::agent_confirm` and `dybatpho::agent_audit`
+apply unchanged.
+
+> ⚠️ **Warning**
+>
+> Tools, not resources or prompts; a call returns one result, with no progress notifications
+
+**🧪 Examples**
+
+```bash
+# mytool: `mytool mcp` serves every other command as a tool.
+if [[ "${1:-}" == mcp ]]; then
+  dybatpho::agent_mcp_serve _spec_root mytool "$0"
+  exit
+fi
+dybatpho::generate_from_spec _spec_root "$@"
+
+```
+
+```bash
+claude mcp add mytool -- /usr/local/bin/mytool mcp
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Spec function |
+| `$2` | string | no |  | Server and tool name prefix, default is the script name |
+| `$3` | string | no |  | Command the tools run, default is the script path; it must be executable |
+
+**🌍 Environment variables**
+
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_AGENT_MCP_TIMEOUT`** | number | no | `0` | Seconds a tool call may run, `0` for no limit |
+| **`DYBATPHO_AGENT_MCP_VERSION`** | string | yes |  | Version reported in `serverInfo`, default is the dybatpho version |
+
+**📝 Notes**
+
+- Arguments are checked before anything runs: an unknown tool, an unknown argument, a missing required one or a value of the wrong JSON type is refused with error `-32602`. A flag is passed as its switch (`--no-<name>` when negatable and false), a param as one `--name=value` element, a `multiple:` param once per item, and positional arguments after `--`, so a value is never read as an option. A `null` argument counts as omitted.
+- A call runs in a child process with `DYBATPHO_AGENT_MODE=on` and stdin from `/dev/null`. Its result carries stdout as the first text item and stderr, when there is any, as a second one starting `stderr:`; `isError` is set from the exit status, and stdout that is a single JSON object, such as `dybatpho::agent_result` prints, is also returned as `structuredContent`.
+- stdout is the protocol stream: for the whole loop, everything else the script or the library prints goes to stderr. Notifications get no reply.
+- The protocol version is the one the client asks for when it is `2025-06-18`, `2025-03-26` or `2024-11-05`, and `2025-06-18` otherwise. A batch (a JSON array) is refused as an invalid request.
+
+**📤 Output on stdout**
+
+- JSON-RPC responses, one per line
+
+**🚦 Exit codes**
+
+- `0`: stdin closed
+- `1`: Stop the script on missing arguments, an invalid timeout, or two commands with the same tool name
+
+**🔗 See also**
+
+- [dybatpho::agent_mcp](#dybatphoagent_mcp)

@@ -402,6 +402,17 @@ _spec_test_deploy() {
   assert_equal "$(dybatpho::json_get "${tools}" '.[0].function.parameters.properties.verbose.type')" "boolean"
 }
 
+@test "dybatpho::agent_tools omits display options and describes positional arguments" {
+  # `--help` became a string property named `-`, and positionals were missing.
+  local tools
+  tools=$(dybatpho::agent_tools _spec_test_rt rt)
+  assert_equal "$(dybatpho::json_eval "${tools}" '.[0].input_schema.properties | keys')" \
+    '["color","extra","item","need","short","src","tag","verbose"]'
+  assert_equal "$(dybatpho::json_eval "${tools}" '.[0].input_schema.properties.src.type')" '"string"'
+  assert_equal "$(dybatpho::json_eval "${tools}" '.[0].input_schema.properties.extra.items')" '{"type":"string"}'
+  assert_equal "$(dybatpho::json_eval "${tools}" '.[0].input_schema.required')" '["need","src"]'
+}
+
 @test "dybatpho::agent_tools produces tool names that are safe to call" {
   local tools
   tools=$(dybatpho::agent_tools _spec_test_root "my tool")
@@ -436,6 +447,340 @@ _spec_test_deploy() {
   manifest=$(dybatpho::agent_mcp _spec_test_root mytool /usr/bin/mytool)
   assert_equal "$(dybatpho::json_eval "${manifest}" '.tools[0]."x-dybatpho-command"')" '["/usr/bin/mytool"]'
   assert_equal "$(dybatpho::json_eval "${manifest}" '.tools[1]."x-dybatpho-command"')" '["/usr/bin/mytool","deploy"]'
+}
+
+# ---------------------------------------------------------------------------
+# dybatpho::agent_mcp_serve
+# ---------------------------------------------------------------------------
+
+_spec_test_rt() {
+  dybatpho::opts::setup "Round trip" RT_ARGS action:":"
+  dybatpho::opts::flag "Verbose" VERBOSE --verbose alias:-v
+  dybatpho::opts::flag "Color" COLOR --{no-}color negatable:true init:@on
+  dybatpho::opts::param "Tag" TAG --tag
+  dybatpho::opts::param "Short only" SHORT -s
+  dybatpho::opts::param "Items" ITEM --item multiple:true
+  dybatpho::opts::param "Needed" NEED --need required:true
+  dybatpho::opts::arg "Source" SRC
+  dybatpho::opts::arg "Extra" EXTRA required:false variadic:true
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec_test_rt"
+}
+
+# Writes the tool table of `_spec_test_rt` to `${table}`.
+_rt_table() {
+  local tools
+  __dybatpho_agent_mcp_table_into tools _spec_test_rt rt /bin/rt
+  table="${BATS_TEST_TMPDIR}/table.json"
+  printf '%s\n' "${tools}" > "${table}"
+}
+
+# Writes an executable MCP server script to `${server}`, with a `mcp` entry point.
+_mcp_server_fixture() {
+  server="${BATS_TEST_TMPDIR}/mytool"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf '. %q --modules agent json\n' "${DYBATPHO_DIR}/init.sh"
+    cat << 'EOF'
+_spec() {
+  dybatpho::opts::setup "Greet someone" ARGS action:"_greet"
+  dybatpho::opts::flag "Shout" SHOUT --shout
+  dybatpho::opts::param "Greeting" GREETING --greeting
+  dybatpho::opts::arg "Who to greet" WHO
+  dybatpho::opts::cmd fail _spec_fail
+  dybatpho::opts::cmd slow _spec_slow
+  dybatpho::opts::cmd leave _spec_leave
+  dybatpho::opts::cmd wait _spec_wait
+  dybatpho::opts::disp "Show help" --help action:"dybatpho::generate_help _spec"
+}
+_spec_leave() { dybatpho::opts::setup "Leave a process behind" LARGS action:"_leave"; }
+_spec_wait() { dybatpho::opts::setup "Wait a while" WARGS action:"sleep 2; printf 'second\\n'; exit 0"; }
+_leave() {
+  (
+    sleep 1
+    printf '{"injected":true}'
+    printf x > "${MCP_MARK}"
+  ) &
+  disown
+  printf 'first\n'
+  # The root action would run next and ask for its positional.
+  exit 0
+}
+_spec_fail() { dybatpho::opts::setup "Always fail" FARGS action:"_fail"; }
+_spec_slow() { dybatpho::opts::setup "Sleep" SARGS action:"sleep 5"; }
+_greet() {
+  dybatpho::agent_result ok greeting="${GREETING:-hello} ${WHO}" shout="${SHOUT}" \
+    mode="${DYBATPHO_AGENT_MODE}" stdin="$(cat)"
+}
+_fail() { printf 'partial\n'; printf 'went wrong\n' >&2; exit 3; }
+dybatpho::register_common_handlers
+if [[ "${1:-}" == mcp ]]; then
+  dybatpho::info "serving"
+  dybatpho::agent_mcp_serve _spec mytool "$0"
+  exit
+fi
+dybatpho::generate_from_spec _spec "$@"
+EOF
+  } > "${server}"
+  chmod +x "${server}"
+}
+
+# Runs the fixture server on the request file given.
+_mcp_serve() {
+  run --separate-stderr env -u DYBATPHO_MODULES -u DYBATPHO_LOADED_MODULES "${server}" mcp < "$1"
+}
+
+@test "dybatpho::agent_mcp_serve no arg" {
+  run dybatpho::agent_mcp_serve
+  assert_failure
+}
+
+@test "dybatpho::agent_mcp_serve answers a scripted session line by line" {
+  _mcp_server_fixture
+  local requests="${BATS_TEST_TMPDIR}/requests"
+  cat > "${requests}" << 'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"bats","version":"1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+
+{"jsonrpc":"2.0","id":"p","method":"ping"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"mytool","arguments":{"who":"-world","greeting":"hi there"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"mytool_fail","arguments":{}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"mytool","arguments":{"bogus":1}}}
+{"jsonrpc":"2.0","id":6,"method":"resources/list"}
+not json
+{"jsonrpc":"2.0","id":7}
+{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"mytool_nope"}}
+{"jsonrpc":"2.0","id":9,"result":{}}
+EOF
+  _mcp_serve "${requests}"
+  assert_success
+  # The notification, the blank line and the client's response get no reply.
+  assert_equal "${#lines[@]}" 10
+  local line
+  for line in "${lines[@]}"; do
+    assert_equal "$(jq -r '.jsonrpc' <<< "${line}")" "2.0"
+  done
+  assert_equal "$(jq -c '[.id, .result.protocolVersion, .result.capabilities, .result.serverInfo.name]' \
+    <<< "${lines[0]}")" '[1,"2025-03-26",{"tools":{}},"mytool"]'
+  assert_equal "$(jq -c '[.id, .result]' <<< "${lines[1]}")" '["p",{}]'
+  assert_equal "$(jq -c '[.result.tools[].name]' <<< "${lines[2]}")" \
+    '["mytool","mytool_fail","mytool_slow","mytool_leave","mytool_wait"]'
+  assert_equal "$(jq -c '[.result.tools[] | keys[]] | unique' <<< "${lines[2]}")" \
+    '["description","inputSchema","name"]'
+  assert_equal "$(jq -c '.result.tools[0].inputSchema.required' <<< "${lines[2]}")" '["who"]'
+  assert_equal "$(jq -c '.result | [.isError, .structuredContent.greeting, .structuredContent.mode,
+    .structuredContent.stdin, (.content | length)]' <<< "${lines[3]}")" '[false,"hi there -world","on","",1]'
+  assert_equal "$(jq -c '.result | [.isError, .content[].text, has("structuredContent")]' <<< "${lines[4]}")" \
+    '[true,"partial\n","stderr:\nwent wrong\n",false]'
+  assert_equal "$(jq -c '[.id, .error.code, .error.message]' <<< "${lines[5]}")" '[5,-32602,"Unknown argument bogus"]'
+  assert_equal "$(jq -c '[.id, .error.code]' <<< "${lines[6]}")" '[6,-32601]'
+  assert_equal "$(jq -c '[.id, .error.code]' <<< "${lines[7]}")" '[null,-32700]'
+  assert_equal "$(jq -c '[.id, .error.code]' <<< "${lines[8]}")" '[7,-32600]'
+  assert_equal "$(jq -c '[.id, .error.code, .error.message]' <<< "${lines[9]}")" \
+    '[8,-32602,"Unknown tool mytool_nope"]'
+  # The script's logging went to stderr, leaving stdout to the protocol.
+  assert_stderr --partial "serving"
+}
+
+@test "dybatpho::agent_mcp_serve falls back to its newest protocol version" {
+  _mcp_server_fixture
+  local requests="${BATS_TEST_TMPDIR}/requests"
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}' \
+    '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' > "${requests}"
+  DYBATPHO_AGENT_MCP_VERSION=3.2.1 _mcp_serve "${requests}"
+  assert_success
+  assert_equal "$(jq -c '[.result.protocolVersion, .result.serverInfo.version]' <<< "${lines[0]}")" \
+    '["2025-06-18","3.2.1"]'
+  assert_equal "$(jq -r '.result.protocolVersion' <<< "${lines[1]}")" "2024-11-05"
+}
+
+@test "dybatpho::agent_mcp_serve refuses malformed requests" {
+  _mcp_server_fixture
+  local requests="${BATS_TEST_TMPDIR}/requests"
+  cat > "${requests}" << 'EOF'
+[{"jsonrpc":"2.0","id":1,"method":"ping"}]
+{"jsonrpc":"1.0","id":2,"method":"ping"}
+{"jsonrpc":"2.0","id":null,"method":"ping"}
+{"jsonrpc":"2.0","id":3,"method":"ping","params":"x"}
+{"jsonrpc":"2.0","id":4,"method":"ping"} {"jsonrpc":"2.0","id":5,"method":"ping"}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"mytool","arguments":[]}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{}}
+EOF
+  _mcp_serve "${requests}"
+  assert_success
+  assert_equal "$(printf '%s\n' "${lines[@]}" | jq -c -s 'map([.id, .error.code])')" \
+    '[[null,-32600],[2,-32600],[null,-32600],[3,-32600],[null,-32600],[6,-32602],[7,-32602]]'
+}
+
+@test "dybatpho::agent_mcp_serve ends a tool call at DYBATPHO_AGENT_MCP_TIMEOUT" {
+  _mcp_server_fixture
+  local requests="${BATS_TEST_TMPDIR}/requests"
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mytool_slow"}}' > "${requests}"
+  DYBATPHO_AGENT_MCP_TIMEOUT=1 _mcp_serve "${requests}"
+  assert_success
+  assert_equal "$(jq -c '[.result.isError, .result.content[-1].text]' <<< "${lines[0]}")" \
+    '[true,"Timed out after 1 seconds"]'
+}
+
+@test "dybatpho::agent_mcp_serve ends what a tool left running when the call returns" {
+  # The temporary files were shared by every call, so a process a tool left
+  # behind wrote into a later call's result, even as its structuredContent.
+  _mcp_server_fixture
+  local requests="${BATS_TEST_TMPDIR}/requests"
+  export MCP_MARK="${BATS_TEST_TMPDIR}/straggler"
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mytool_leave"}}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mytool_wait"}}' > "${requests}"
+  _mcp_serve "${requests}"
+  assert_success
+  assert_equal "$(jq -c '.result.content' <<< "${lines[0]}")" '[{"type":"text","text":"first\n"}]'
+  assert_equal "$(jq -c '.result' <<< "${lines[1]}")" '{"content":[{"type":"text","text":"second\n"}],"isError":false}'
+  sleep 1
+  assert_file_not_exist "${MCP_MARK}"
+}
+
+@test "dybatpho::agent_mcp_serve rejects an invalid timeout" {
+  _mcp_server_fixture
+  DYBATPHO_AGENT_MCP_TIMEOUT=soon _mcp_serve /dev/null
+  assert_failure
+  assert_stderr --partial "DYBATPHO_AGENT_MCP_TIMEOUT must be a number of seconds"
+  assert_output ""
+}
+
+@test "dybatpho::agent_mcp_serve ends with success at end of input" {
+  _mcp_server_fixture
+  _mcp_serve /dev/null
+  assert_success
+  assert_output ""
+}
+
+@test "dybatpho::agent_mcp_serve refuses two commands with the same tool name" {
+  _spec_test_clash() {
+    dybatpho::opts::setup "Clash" ARGS action:":"
+    dybatpho::opts::cmd a-b _spec_test_deploy
+    dybatpho::opts::cmd a_b _spec_test_deploy
+  }
+  run dybatpho::agent_mcp_serve _spec_test_clash tool /bin/tool < /dev/null
+  assert_failure
+  assert_output --partial "Two commands share the tool name 'tool_a_b'"
+}
+
+@test "the MCP argv builder round-trips arguments through the parser" {
+  _rt_table
+  local args nl=$'\n'
+  args=$(jq -c -n --arg nl "${nl}" '{"verbose": true, "color": false, "tag": ("-x y=z" + $nl + "line 日本 $(id)"),
+    "short": "--verbose", "item": ["-a", "b=c", "--"], "need": "-", "src": "--", "extra": ["a b", "-e", "--help"]}')
+  local -a argv=()
+  local reason
+  run_traced __dybatpho_agent_mcp_argv_into argv reason "${table}" "{\"name\":\"rt\",\"arguments\":${args}}"
+  assert_success
+  __dybatpho_agent_mcp_argv_into argv reason "${table}" "{\"name\":\"rt\",\"arguments\":${args}}"
+  assert_equal "${argv[0]}" "/bin/rt"
+  # A value starting with `-` stays glued to its switch, in one element.
+  assert_equal "${argv[3]}" "--tag=-x y=z${nl}line 日本 \$(id)"
+  dybatpho::generate_from_spec _spec_test_rt "${argv[@]:1}"
+  local parsed
+  # A `multiple:` param is stored by the parser as one space-joined string.
+  parsed=$(jq -c -n --arg verbose "${VERBOSE}" --arg color "${COLOR}" --arg tag "${TAG}" --arg short "${SHORT}" \
+    --arg item "${ITEM}" --arg need "${NEED}" --arg src "${SRC}" --args \
+    '{"verbose": ($verbose == "true"), "color": ($color == "true"), "tag": $tag, "short": $short,
+      "item": ($item | split(" ")), "need": $need, "src": $src, "extra": $ARGS.positional}' -- "${EXTRA[@]}")
+  assert_equal "${parsed}" "$(jq -c '.' <<< "${args}")"
+}
+
+@test "the MCP argv builder passes a param as one element and positionals after --" {
+  _rt_table
+  local -a argv=()
+  local reason
+  __dybatpho_agent_mcp_argv_into argv reason "${table}" \
+    '{"name":"rt","arguments":{"need":"-n","short":"-x","color":true,"verbose":false,"src":"s","item":null}}'
+  assert_equal "$(printf '<%s>' "${argv[@]}")" "</bin/rt><--color><-s><-x><--need=-n><--><s>"
+}
+
+@test "the MCP argv builder refuses what the schema does not allow" {
+  _rt_table
+  local -a argv=()
+  local reason call
+  local -a calls=(
+    '{"name":"rt","arguments":{"need":"x","src":"s","help":true}}|Unknown argument help'
+    '{"name":"rt","arguments":{"need":"x","src":"s","VERBOSE":true}}|Unknown argument VERBOSE'
+    '{"name":"rt","arguments":{"src":"s"}}|Missing required argument need'
+    '{"name":"rt","arguments":{"need":"x"}}|Missing required argument src'
+    '{"name":"rt","arguments":{"need":"x","src":"s","verbose":"yes"}}|Argument verbose must be a boolean'
+    '{"name":"rt","arguments":{"need":8080,"src":"s"}}|Argument need must be a string'
+    '{"name":"rt","arguments":{"need":"x","src":"s","item":"a"}}|Argument item must be an array of strings'
+    '{"name":"rt","arguments":{"need":"x","src":"s","extra":[1]}}|Argument extra must be a string'
+    '{"name":"rt","arguments":{"need":"a\u0000b","src":"s"}}|Argument need must not contain a NUL byte'
+    '{"name":"rt","arguments":"--need x"}|Arguments must be an object'
+    '{"name":"RT","arguments":{}}|Unknown tool RT'
+    '{"name":"rt ","arguments":{}}|Unknown tool rt '
+    '{"arguments":{}}|tools/call needs a tool name'
+  )
+  for call in "${calls[@]}"; do
+    run_traced __dybatpho_agent_mcp_argv_into argv reason "${table}" "${call%|*}"
+    assert_failure 1
+    __dybatpho_agent_mcp_argv_into argv reason "${table}" "${call%|*}" || true
+    assert_equal "${reason}" "${call##*|}"
+  done
+}
+
+@test "the MCP argv builder refuses to turn off a negatable flag with no switch for it" {
+  # A short-only negatable flag set to false built `--no--n`.
+  _spec_test_short_neg() {
+    dybatpho::opts::setup "Short" ARGS action:":"
+    dybatpho::opts::flag "Lines" NL -n negatable:true
+  }
+  local tools table="${BATS_TEST_TMPDIR}/neg.json" reason
+  local -a argv=()
+  __dybatpho_agent_mcp_table_into tools _spec_test_short_neg neg /bin/neg
+  printf '%s\n' "${tools}" > "${table}"
+  run_traced __dybatpho_agent_mcp_argv_into argv reason "${table}" '{"name":"neg","arguments":{"nl":false}}'
+  assert_failure 1
+  __dybatpho_agent_mcp_argv_into argv reason "${table}" '{"name":"neg","arguments":{"nl":false}}' || true
+  assert_equal "${reason}" "Option nl has no switch to turn it off"
+  __dybatpho_agent_mcp_argv_into argv reason "${table}" '{"name":"neg","arguments":{"nl":true}}'
+  assert_equal "$(printf '<%s>' "${argv[@]}")" "</bin/neg><-n>"
+}
+
+@test "the MCP argv builder counts an empty required value as missing" {
+  _spec_test_empty() {
+    dybatpho::opts::setup "Empty" ARGS action:":"
+    dybatpho::opts::param "Needed" NEED --need required:true
+    dybatpho::opts::arg "Files" FILES variadic:true
+  }
+  local tools table="${BATS_TEST_TMPDIR}/empty.json" reason call
+  local -a argv=()
+  __dybatpho_agent_mcp_table_into tools _spec_test_empty empty /bin/empty
+  printf '%s\n' "${tools}" > "${table}"
+  for call in '{"need":"","files":["a"]}|need' '{"need":"x","files":[]}|files'; do
+    run_traced __dybatpho_agent_mcp_argv_into argv reason "${table}" "{\"name\":\"empty\",\"arguments\":${call%|*}}"
+    assert_failure 1
+    __dybatpho_agent_mcp_argv_into argv reason "${table}" "{\"name\":\"empty\",\"arguments\":${call%|*}}" || true
+    assert_equal "${reason}" "Missing required argument ${call##*|}"
+  done
+}
+
+@test "the MCP argv builder refuses a positional after an omitted one" {
+  _spec_test_gap() {
+    dybatpho::opts::setup "Gap" ARGS action:":"
+    dybatpho::opts::arg "First" FIRST required:false
+    dybatpho::opts::arg "Second" SECOND required:false
+  }
+  local tools table="${BATS_TEST_TMPDIR}/gap.json" reason
+  local -a argv=()
+  __dybatpho_agent_mcp_table_into tools _spec_test_gap gap /bin/gap
+  printf '%s\n' "${tools}" > "${table}"
+  run_traced __dybatpho_agent_mcp_argv_into argv reason "${table}" '{"name":"gap","arguments":{"second":"x"}}'
+  assert_failure 1
+  __dybatpho_agent_mcp_argv_into argv reason "${table}" '{"name":"gap","arguments":{"second":"x"}}' || true
+  assert_equal "${reason}" "Argument second needs first before it"
+}
+
+@test "the MCP argv builder reports a table it cannot read as a server fault" {
+  local -a argv=()
+  local reason
+  printf 'not json\n' > "${BATS_TEST_TMPDIR}/broken.json"
+  run_traced __dybatpho_agent_mcp_argv_into argv reason "${BATS_TEST_TMPDIR}/broken.json" '{"name":"x"}'
+  assert_failure 2
 }
 
 # ---------------------------------------------------------------------------

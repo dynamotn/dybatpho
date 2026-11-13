@@ -58,6 +58,7 @@ run_example() {
 }
 
 @test "example/agent_ops.sh runs clean" { run_example "agent_ops.sh"; }
+@test "example/agent_mcp.sh runs clean" { run_example "agent_mcp.sh"; }
 @test "example/ai_ops.sh runs clean" { run_example "ai_ops.sh"; }
 @test "example/archive_ops.sh runs clean" { run_example "archive_ops.sh"; }
 @test "example/array_ops.sh runs clean" { run_example "array_ops.sh"; }

@@ -61,6 +61,8 @@ scripts/release.sh	__dybatpho_release_run	dybatpho::git_latest_tag	repository sc
 scripts/test.sh	_spec	__dybatpho_test_tty	repository script run under errexit: the failed assignment ends the run
 src/agent.sh	dybatpho::agent_mcp	dybatpho::generate_schema	refuses only a malformed option spec, the script author's error at definition time
 src/agent.sh	dybatpho::agent_tools	dybatpho::generate_schema	refuses only a malformed option spec, the script author's error at definition time
+src/agent.sh	__dybatpho_agent_mcp_table_into	dybatpho::agent_mcp	refuses only a malformed option spec, the script author's error at definition time
+src/agent.sh	__dybatpho_agent_mcp_table_into	dybatpho::generate_schema	refuses only a malformed option spec, the script author's error at definition time
 src/ai.sh	__dybatpho_ai_cli_complete	dybatpho::ai_model	provider is the literal cli, which ai_model accepts
 src/ai.sh	__dybatpho_ai_dry_run_body	dybatpho::ai_model	provider was already resolved in the caller's shell
 src/ai.sh	__dybatpho_ai_endpoint_into	__dybatpho_ai_base_url	provider was already resolved in the caller's shell

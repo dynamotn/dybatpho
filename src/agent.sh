@@ -14,7 +14,7 @@
 #   answer, it must refuse dangerous work it was not explicitly cleared for,
 #   and it must leave a record of what an agent made it do.
 #
-#   The module provides five things:
+#   The module provides six things:
 #
 #   - **Detection** – is this run being driven by an agent, or by a person?
 #   - **Structured results and errors** – JSON for agents, plain text for people,
@@ -25,6 +25,8 @@
 #   - **An allowlist gate** – interactive confirmation for people, an explicit
 #     allowlist for agents, never a silent yes
 #   - **An audit trail** – one JSON line per agent-initiated action
+#   - **An MCP server** – the same tools served over stdio, so `mytool mcp` can
+#     be registered with Claude Code or Claude Desktop as it is
 #
 # @usage
 #   ### When to use this module
@@ -54,6 +56,19 @@
 #   dybatpho::agent_mcp _spec_root mytool              # MCP tools/list payload
 #   ```
 #
+#   #### Serve the CLI to an MCP host
+#
+#   ```bash
+#   [[ "${1:-}" == mcp ]] && { dybatpho::agent_mcp_serve _spec_root mytool "$0"; exit; }
+#   ```
+#
+#   Register it with `claude mcp add mytool -- /usr/local/bin/mytool mcp`, or in
+#   Claude Desktop's `claude_desktop_config.json`:
+#
+#   ```json
+#   {"mcpServers": {"mytool": {"command": "/usr/local/bin/mytool", "args": ["mcp"]}}}
+#   ```
+#
 #   #### Gate a dangerous action
 #
 #   ```bash
@@ -64,6 +79,7 @@
 #
 # @see
 #   - `example/agent_ops.sh`
+#   - `example/agent_mcp.sh`
 #   - `docs/cli.md` for the option spec these tool definitions are generated from
 # @tip Agent mode is detected automatically; force it either way with `DYBATPHO_AGENT_MODE`
 # @tip Tool definitions are generated from the live option spec, so a new flag becomes a new tool parameter without a
@@ -78,6 +94,11 @@ DYBATPHO_AGENT_MODE=${DYBATPHO_AGENT_MODE:-auto}
 DYBATPHO_AGENT_ALLOW=${DYBATPHO_AGENT_ALLOW:-}
 DYBATPHO_AGENT_AUDIT_FILE=${DYBATPHO_AGENT_AUDIT_FILE:-}
 DYBATPHO_AGENT_ENV=${DYBATPHO_AGENT_ENV:-}
+# @env DYBATPHO_AGENT_MCP_TIMEOUT number [default: 0] Seconds an MCP tool call may run, `0` for no limit
+DYBATPHO_AGENT_MCP_TIMEOUT=${DYBATPHO_AGENT_MCP_TIMEOUT:-0}
+
+# MCP protocol versions `dybatpho::agent_mcp_serve` speaks, newest first.
+__DYBATPHO_AGENT_MCP_VERSIONS='"2025-06-18" "2025-03-26" "2024-11-05"'
 
 # Environment variables set by the agent runtimes this module recognises. Any
 # one of them being non-empty is taken as evidence that a model is driving.
@@ -416,7 +437,9 @@ function dybatpho::agent_audit_show {
 # The whole tree is walked by one recursive `jq` filter, depth first, so a
 # command is listed before its subcommands.
 # @arg $1 string CLI schema JSON from `dybatpho::generate_schema`
-# @stdout JSON array of `{path, description, options}` objects
+# Display options such as `--help` are dropped too: they print and exit, so
+# they are no parameter a tool can be called with.
+# @stdout JSON array of `{path, description, options, arguments}` objects
 # @internal
 #######################################
 function __dybatpho_agent_flatten_schema {
@@ -429,7 +452,8 @@ function __dybatpho_agent_flatten_schema {
     def flat($parent):
       ($parent + [(.name | tostring)]) as $path
       | {"path": $path, "description": (.description | tostring),
-         "options": [.options[]? | select(.hidden != true)]},
+         "options": [.options[]? | select(.hidden != true and .type != "disp")],
+         "arguments": [.arguments[]?]},
         (.commands[]? | flat($path));
     [flat([])]'
   # kcov(enabled)
@@ -437,8 +461,9 @@ function __dybatpho_agent_flatten_schema {
 }
 
 #######################################
-# @description Build the filter that renders a command entry's options as a
-#   JSON Schema object, in one pass over the entry.
+# @description Build the filter that renders a command entry's options and
+#   positional arguments as a JSON Schema object, in one pass over the entry.
+#   A positional argument is a string, or an array of strings when variadic.
 #   Each option became a property through several reads and a growing document
 #   rewritten per option, around ten processes each. A `jq` filter does it in
 #   the one read that renders the whole tool.
@@ -457,10 +482,15 @@ function __dybatpho_agent_options_filter_into {
     // (select(.multiple == true)
       | {\"type\": \"array\", ${description}, \"items\": ({\"type\": \"string\"} + ${enum})})
     // ({\"type\": \"string\", ${description}} + ${enum}))"
+  local argument="(\$arg | (select(.variadic == true)
+      | {\"type\": \"array\", ${description}, \"items\": {\"type\": \"string\"}})
+    // {\"type\": \"string\", ${description}})"
   __dybatpho_agent_opts_out="{\"type\": \"object\",
     \"properties\": (reduce .options[] as \$opt ({};
-      . + {((\$opt | .name | tostring) | ascii_downcase): ${property}})),
-    \"required\": [.options[] | select(.required == true)
+      . + {((\$opt | .name | tostring) | ascii_downcase): ${property}})
+      + reduce .arguments[]? as \$arg ({};
+      . + {((\$arg | .name | tostring) | ascii_downcase): ${argument}})),
+    \"required\": [.options[], .arguments[]? | select(.required == true)
       | (.name | tostring | ascii_downcase)],
     \"additionalProperties\": false}"
   # kcov(enabled)
@@ -597,8 +627,8 @@ function __dybatpho_agent_tool_name_into {
 # @exitcode 0 The payload was printed
 # @exitcode 1 Missing arguments
 # @see dybatpho::agent_tools
-# @note This is the tool manifest, not a running server; point your MCP host at it and dispatch with the recorded
-#   command
+# @see dybatpho::agent_mcp_serve
+# @note This is the tool manifest; `dybatpho::agent_mcp_serve` serves the same tools to an MCP host
 #######################################
 function dybatpho::agent_mcp {
   local __dybatpho_agent_mcp_spec __dybatpho_agent_mcp_name __dybatpho_agent_mcp_command
@@ -625,4 +655,412 @@ function dybatpho::agent_mcp {
     printf '%s' "${__dybatpho_agent_mcp_definitions[*]-}"
   )]"
   dybatpho::json_object name "${__dybatpho_agent_mcp_name}" version 1.0.0 tools:json "${__dybatpho_agent_mcp_tools}"
+}
+
+#######################################
+# @description Build the table a server dispatches from: every tool of the MCP
+#   manifest, joined with the flattened command entry it was rendered from, so
+#   one lookup by name yields both the command line and the option metadata.
+# @arg $1 string Name of the variable receiving the table, a compact JSON array
+# @arg $2 string Spec function
+# @arg $3 string Tool name prefix
+# @arg $4 string Command the tools run
+# @set The named variable
+# @exitcode 1 Stop the script when two commands render to the same tool name
+# @internal
+#######################################
+function __dybatpho_agent_mcp_table_into {
+  local __dybatpho_agent_mcp_table_var __dybatpho_agent_mcp_table_spec __dybatpho_agent_mcp_table_prefix
+  local __dybatpho_agent_mcp_table_command
+  dybatpho::expect_args __dybatpho_agent_mcp_table_var __dybatpho_agent_mcp_table_spec \
+    __dybatpho_agent_mcp_table_prefix __dybatpho_agent_mcp_table_command -- "$@"
+  local -n __dybatpho_agent_mcp_table_out="${__dybatpho_agent_mcp_table_var}"
+  local __dybatpho_agent_mcp_table_manifest __dybatpho_agent_mcp_table_schema __dybatpho_agent_mcp_table_entries
+  __dybatpho_agent_mcp_table_manifest=$(dybatpho::agent_mcp "${__dybatpho_agent_mcp_table_spec}" \
+    "${__dybatpho_agent_mcp_table_prefix}" "${__dybatpho_agent_mcp_table_command}")
+  __dybatpho_agent_mcp_table_schema=$(dybatpho::generate_schema "${__dybatpho_agent_mcp_table_spec}" \
+    "${__dybatpho_agent_mcp_table_prefix}")
+  __dybatpho_agent_mcp_table_entries=$(__dybatpho_agent_flatten_schema "${__dybatpho_agent_mcp_table_schema}")
+  # Both lists come from the same walk of the same schema, so they are in step.
+  __dybatpho_agent_mcp_table_out=$(jq -c -n --argjson m "${__dybatpho_agent_mcp_table_manifest}" \
+    --argjson c "${__dybatpho_agent_mcp_table_entries}" \
+    '[$m.tools, $c] | transpose | map(.[0] + {"x-dybatpho-entry": .[1]})')
+  # A name must lead to exactly one command, or a call could run the wrong one.
+  local __dybatpho_agent_mcp_table_dup
+  __dybatpho_agent_mcp_table_dup=$(dybatpho::json_get "${__dybatpho_agent_mcp_table_out}" \
+    '[.[].name] | group_by(.) | map(select(length > 1) | .[0]) | first // ""')
+  [[ -z "${__dybatpho_agent_mcp_table_dup}" ]] \
+    || dybatpho::die "dybatpho::agent_mcp_serve: Two commands share the tool name '${__dybatpho_agent_mcp_table_dup}'"
+}
+
+#######################################
+# @description Turn a `tools/call` request into the command line to run.
+#   This is the trust boundary of the server: the name and the arguments come
+#   from a model. The tool is looked up by its exact name and only its recorded
+#   command is ever run; every argument must be a property of the tool's input
+#   schema, with the JSON type the schema states, and becomes argv elements
+#   that the parser can only read back as that value:
+#
+#   - a flag is its switch when `true`; when `false` it is left out, or given
+#     as `--no-<name>` when the flag is negatable;
+#   - a param is `--name=value` as one element when it has a long switch, so a
+#     value starting with `-` stays a value, and the short switch followed by
+#     the value as a separate element otherwise;
+#   - a `multiple:` param repeats that once per array item;
+#   - positional arguments follow a `--`, in the order the spec declares them.
+#
+#   Nothing is evaluated or split: the elements are handed back NUL-separated
+#   and read into an array. A `null` argument counts as omitted.
+# @arg $1 string Name of the array receiving the command and its arguments
+# @arg $2 string Name of the variable receiving the reason a call is refused
+# @arg $3 string Path of the tool table written by the server
+# @arg $4 string The request's `params`, as JSON
+# @set The named array, or the named reason
+# @exitcode 0 The command line was built
+# @exitcode 1 The call is invalid; the reason says why
+# @exitcode 2 The params could not be checked at all, a fault of the server
+# @internal
+#######################################
+function __dybatpho_agent_mcp_argv_into {
+  local __dybatpho_agent_mcp_argv_var __dybatpho_agent_mcp_argv_err __dybatpho_agent_mcp_argv_table
+  local __dybatpho_agent_mcp_argv_params
+  dybatpho::expect_args __dybatpho_agent_mcp_argv_var __dybatpho_agent_mcp_argv_err \
+    __dybatpho_agent_mcp_argv_table __dybatpho_agent_mcp_argv_params -- "$@"
+  local -n __dybatpho_agent_mcp_argv_out="${__dybatpho_agent_mcp_argv_var}"
+  local -n __dybatpho_agent_mcp_argv_reason="${__dybatpho_agent_mcp_argv_err}"
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+  # shellcheck disable=SC2016 # `$p`, `$a` and friends are jq variables
+  local __dybatpho_agent_mcp_argv_program='
+    def lname: .name | tostring | ascii_downcase;
+    def str($k): if type != "string" then error("Argument \($k) must be a string")
+      elif test("\u0000") then error("Argument \($k) must not contain a NUL byte") else . end;
+    def strs($k): if type == "array" then map(str($k)) else error("Argument \($k) must be an array of strings") end;
+    def negative: startswith("--no-") or startswith("--without-");
+    def sw: first(.switches[]? | select(startswith("--") and (negative | not))) // .switches[0]?;
+    def off($k): first(.switches[]? | select(negative)) // error("Option \($k) has no switch to turn it off");
+    def empty_value: . == null or . == "" or . == [];
+    def value($s): if $s | startswith("--") then $s + "=" + . else ($s, .) end;
+    . as $p
+    | try (
+      (if ($p | type) == "object" and ($p.name | type) == "string" then .
+        else error("tools/call needs a tool name") end)
+      | (first($tools[0][] | select(.name == $p.name)) // error("Unknown tool \($p.name)")) as $tool
+      | (if $p.arguments == null then {} else $p.arguments end) as $a
+      | def val($k): if $a | has($k) then $a[$k] else null end;
+      (if ($a | type) == "object" then . else error("Arguments must be an object") end)
+      | $tool["x-dybatpho-entry"] as $e
+      | (($a | keys_unsorted) - [$e.options[], $e.arguments[] | lname]) as $unknown
+      | (if ($unknown | length) > 0 then error("Unknown argument \($unknown[0])") else . end)
+      | ([$e.options[], $e.arguments[] | select(.required == true) | lname | select(val(.) | empty_value)])
+        as $missing
+      | (if ($missing | length) > 0 then error("Missing required argument \($missing[0])") else . end)
+      | [$e.options[] | lname as $k | val($k) as $v | select($v != null)
+          | (sw // error("Option \($k) has no switch to pass it with")) as $s
+          | if .type == "flag" then
+              if ($v | type) != "boolean" then error("Argument \($k) must be a boolean")
+              elif $v then $s
+              elif .negatable == true then off($k)
+              else empty end
+            elif .multiple == true then ($v | strs($k))[] | value($s)
+            else $v | str($k) | value($s) end] as $options
+      | (reduce $e.arguments[] as $arg ({"gap": null, "out": []};
+          ($arg | lname) as $k | val($k) as $v
+          | if $v == null then .gap = (.gap // $k)
+            elif .gap != null then error("Argument \($k) needs \(.gap) before it")
+            elif $arg.variadic == true then .out += ($v | strs($k))
+            else .out += [$v | str($k)] end) | .out) as $positional
+      | ["ok"] + $tool["x-dybatpho-command"] + $options
+        + (if ($positional | length) > 0 then ["--"] + $positional else [] end)
+    ) catch ["error", (. | tostring)]
+    | .[] | . + "\u0000"'
+  # kcov(enabled)
+  local -a __dybatpho_agent_mcp_argv_words=()
+  local __dybatpho_agent_mcp_argv_word
+  # A failed `jq` leaves the list empty, which is answered below as a server fault.
+  # shellcheck disable=SC2312
+  while IFS= read -r -d '' __dybatpho_agent_mcp_argv_word; do
+    __dybatpho_agent_mcp_argv_words+=("${__dybatpho_agent_mcp_argv_word}")
+  done < <(jq -j --slurpfile tools "${__dybatpho_agent_mcp_argv_table}" "${__dybatpho_agent_mcp_argv_program}" \
+    <<< "${__dybatpho_agent_mcp_argv_params}") # kcov(skip) - a loop's `done` is never traced
+  if [[ "${__dybatpho_agent_mcp_argv_words[0]-}" == ok ]]; then
+    __dybatpho_agent_mcp_argv_out=("${__dybatpho_agent_mcp_argv_words[@]:1}")
+    return 0
+  fi
+  if [[ "${__dybatpho_agent_mcp_argv_words[0]-}" == error ]]; then
+    __dybatpho_agent_mcp_argv_reason="${__dybatpho_agent_mcp_argv_words[1]-}"
+    return 1
+  fi
+  __dybatpho_agent_mcp_argv_reason="Could not read the tools/call params"
+  return 2
+}
+
+#######################################
+# @description Write one JSON-RPC message to the protocol stream.
+# @arg $1 string Compact JSON message, on one line
+# @internal
+#######################################
+function __dybatpho_agent_mcp_send {
+  printf '%s\n' "$1" >&"${__dybatpho_agent_mcp_fd}"
+}
+
+#######################################
+# @description Write a JSON-RPC error response.
+# @arg $1 string Request id as JSON, `null` when it could not be read
+# @arg $2 number JSON-RPC error code
+# @arg $3 string Message
+# @internal
+#######################################
+function __dybatpho_agent_mcp_send_error {
+  local __dybatpho_agent_mcp_error_message __dybatpho_agent_mcp_error
+  __dybatpho_json_escape_into __dybatpho_agent_mcp_error_message "$3"
+  __dybatpho_agent_mcp_error="{\"code\":$2,\"message\":${__dybatpho_agent_mcp_error_message}}"
+  __dybatpho_agent_mcp_send "{\"jsonrpc\":\"2.0\",\"id\":$1,\"error\":${__dybatpho_agent_mcp_error}}"
+}
+
+#######################################
+# @description Run a tool's command and render its outcome as a `tools/call`
+#   result: stdout as the first text item, stderr as a second one when there
+#   is any, `isError` from the exit status, and `structuredContent` when stdout
+#   is a single JSON object, such as `dybatpho::agent_result` prints.
+#   The command runs in a child process in agent mode, reading nothing, with
+#   the protocol stream closed and `DYBATPHO_AGENT_MCP_TIMEOUT` as its limit.
+#   It leads a process group of its own, which is killed when it returns, so
+#   nothing it left running outlives the call; its output goes to files of its
+#   own, removed once read.
+# @arg $1 string Name of the variable receiving the result, compact JSON
+# @arg $@ string The command and its arguments
+# @set The named variable
+# @exitcode 1 The result could not be rendered
+# @internal
+#######################################
+function __dybatpho_agent_mcp_run_into {
+  local -n __dybatpho_agent_mcp_run_out="$1"
+  shift
+  local __dybatpho_agent_mcp_run_status=0 __dybatpho_agent_mcp_run_pid __dybatpho_agent_mcp_run_monitor=off
+  # Fresh files for every call: a process an earlier call left behind still
+  # holds that call's files, and must not write into this result.
+  # dyshellint disable=BSG011 # the call counter is a local of __dybatpho_agent_mcp_loop, the only caller
+  __dybatpho_agent_mcp_calls=$((__dybatpho_agent_mcp_calls + 1))
+  local __dybatpho_agent_mcp_stdout="${__dybatpho_agent_mcp_dir}/${__dybatpho_agent_mcp_calls}.out"
+  local __dybatpho_agent_mcp_stderr="${__dybatpho_agent_mcp_dir}/${__dybatpho_agent_mcp_calls}.err"
+  # Under job control the call leads a process group of its own, so whatever
+  # it starts can be ended with it once it returns.
+  [[ "$-" == *m* ]] && __dybatpho_agent_mcp_run_monitor=on
+  set -m
+  (
+    set +m
+    exec {__dybatpho_agent_mcp_fd}>&-
+    export DYBATPHO_AGENT_MODE=on
+    dybatpho::run_with_timeout "${__dybatpho_agent_mcp_limit}" "$@" || exit $?
+  ) < /dev/null > "${__dybatpho_agent_mcp_stdout}" 2> "${__dybatpho_agent_mcp_stderr}" &
+  __dybatpho_agent_mcp_run_pid=$!
+  [[ "${__dybatpho_agent_mcp_run_monitor}" == on ]] || set +m
+  wait "${__dybatpho_agent_mcp_run_pid}" || __dybatpho_agent_mcp_run_status=$?
+  kill -KILL -- "-${__dybatpho_agent_mcp_run_pid}" 2> /dev/null || true
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+  # shellcheck disable=SC2016 # `$out`, `$err` and friends are jq variables
+  local __dybatpho_agent_mcp_run_program='
+    $out as $o | $err as $e
+    | {"content": ([{"type": "text", "text": $o}]
+        + (if $e != "" then [{"type": "text", "text": ("stderr:\n" + $e)}] else [] end)
+        + (if $status == 124 and $limit > 0
+            then [{"type": "text", "text": "Timed out after \($limit) seconds"}] else [] end)),
+       "isError": ($status != 0)}
+    + ((try ($o | fromjson) catch null) as $j
+       | if ($j | type) == "object" then {"structuredContent": $j} else {} end)'
+  # kcov(enabled)
+  __dybatpho_agent_mcp_run_out=$(jq -c -n --rawfile out "${__dybatpho_agent_mcp_stdout}" \
+    --rawfile err "${__dybatpho_agent_mcp_stderr}" --argjson status "${__dybatpho_agent_mcp_run_status}" \
+    --argjson limit "${__dybatpho_agent_mcp_limit}" "${__dybatpho_agent_mcp_run_program}") \
+    || __dybatpho_agent_mcp_run_status=-1
+  rm -f -- "${__dybatpho_agent_mcp_stdout}" "${__dybatpho_agent_mcp_stderr}"
+  ((__dybatpho_agent_mcp_run_status != -1))
+}
+
+#######################################
+# @description Answer one line read from the client.
+#   The line is read by one `jq` call into its kind, method, id and params,
+#   each printed as JSON on a line of its own, so nothing a client sends is
+#   ever split or evaluated by the shell. Notifications and responses get no
+#   reply.
+# @arg $1 string The line
+# @internal
+#######################################
+function __dybatpho_agent_mcp_handle {
+  local __dybatpho_agent_mcp_parsed
+  # kcov(disabled) - a jq program spread over lines: data, not Bash commands
+  # shellcheck disable=SC2016 # `$k`, `$id` and friends are jq variables
+  local __dybatpho_agent_mcp_classify='
+    def out($k; $m; $i; $p): $k, ($m | @json), ($i | @json), ($p | @json);
+    if length != 1 or (.[0] | type) != "object" then out("invalid"; null; null; null)
+    else .[0]
+      | (has("id") and ((.id | type) == "string" or (.id | type) == "number")) as $ok
+      | (if $ok then .id else null end) as $id
+      | if (has("method") | not) and (has("result") or has("error")) then out("response"; null; null; null)
+        elif .jsonrpc != "2.0" or (.method | type) != "string" then out("invalid"; null; $id; null)
+        elif (has("id") | not) then out("notification"; .method; null; null)
+        elif ($ok | not) then out("invalid"; null; null; null)
+        elif has("params") and ((.params | type) != "object" and (.params | type) != "array")
+          then out("invalid"; null; $id; null)
+        else out("request"; .method; $id; (.params // {})) end
+    end'
+  # kcov(enabled)
+  if ! __dybatpho_agent_mcp_parsed=$(jq -r -s "${__dybatpho_agent_mcp_classify}" <<< "$1" 2> /dev/null); then
+    __dybatpho_agent_mcp_send_error null -32700 "Parse error"
+    return 0
+  fi
+  local __dybatpho_agent_mcp_kind __dybatpho_agent_mcp_method __dybatpho_agent_mcp_id __dybatpho_agent_mcp_params
+  {
+    IFS= read -r __dybatpho_agent_mcp_kind
+    IFS= read -r __dybatpho_agent_mcp_method
+    IFS= read -r __dybatpho_agent_mcp_id
+    IFS= read -r __dybatpho_agent_mcp_params
+  } <<< "${__dybatpho_agent_mcp_parsed}"
+  case "${__dybatpho_agent_mcp_kind}" in
+    request) ;; # kcov(skip) - a case arm has no command to fire on
+    invalid)
+      __dybatpho_agent_mcp_send_error "${__dybatpho_agent_mcp_id}" -32600 "Invalid Request"
+      return 0
+      ;;
+    *) return 0 ;;
+  esac
+
+  local __dybatpho_agent_mcp_result __dybatpho_agent_mcp_reason
+  case "${__dybatpho_agent_mcp_method}" in
+    '"initialize"')
+      local __dybatpho_agent_mcp_version
+      __dybatpho_agent_mcp_version=$(jq -c 'if type == "object" then .protocolVersion else null end' \
+        <<< "${__dybatpho_agent_mcp_params}")
+      case " ${__DYBATPHO_AGENT_MCP_VERSIONS} " in
+        *" ${__dybatpho_agent_mcp_version} "*) ;; # kcov(skip) - a case arm has no command to fire on
+        *) __dybatpho_agent_mcp_version="${__DYBATPHO_AGENT_MCP_VERSIONS%% *}" ;;
+      esac
+      __dybatpho_agent_mcp_result="{\"protocolVersion\":${__dybatpho_agent_mcp_version},"
+      __dybatpho_agent_mcp_result+="\"capabilities\":{\"tools\":{}},\"serverInfo\":${__dybatpho_agent_mcp_info}}"
+      ;;
+    '"ping"') __dybatpho_agent_mcp_result="{}" ;;
+    '"tools/list"') __dybatpho_agent_mcp_result="${__dybatpho_agent_mcp_list}" ;;
+    '"tools/call"')
+      local -a __dybatpho_agent_mcp_argv=()
+      local __dybatpho_agent_mcp_status=0
+      __dybatpho_agent_mcp_argv_into __dybatpho_agent_mcp_argv __dybatpho_agent_mcp_reason \
+        "${__dybatpho_agent_mcp_table}" "${__dybatpho_agent_mcp_params}" || __dybatpho_agent_mcp_status=$?
+      if ((__dybatpho_agent_mcp_status != 0)); then
+        local __dybatpho_agent_mcp_code=-32602
+        ((__dybatpho_agent_mcp_status == 1)) || __dybatpho_agent_mcp_code=-32603
+        __dybatpho_agent_mcp_send_error "${__dybatpho_agent_mcp_id}" "${__dybatpho_agent_mcp_code}" \
+          "${__dybatpho_agent_mcp_reason}"
+        return 0
+      fi
+      # The list always holds the command, at least.
+      if ! __dybatpho_agent_mcp_run_into __dybatpho_agent_mcp_result \
+        ${__dybatpho_agent_mcp_argv[@]+"${__dybatpho_agent_mcp_argv[@]}"}; then
+        __dybatpho_agent_mcp_send_error "${__dybatpho_agent_mcp_id}" -32603 "Could not render the tool result"
+        return 0
+      fi
+      ;;
+    *)
+      __dybatpho_agent_mcp_send_error "${__dybatpho_agent_mcp_id}" -32601 "Method not found"
+      return 0
+      ;;
+  esac
+  local __dybatpho_agent_mcp_reply="{\"jsonrpc\":\"2.0\",\"id\":${__dybatpho_agent_mcp_id},"
+  __dybatpho_agent_mcp_send "${__dybatpho_agent_mcp_reply}\"result\":${__dybatpho_agent_mcp_result}}"
+}
+
+#######################################
+# @description Read JSON-RPC messages from stdin and answer them until stdin
+#   closes. The body of `dybatpho::agent_mcp_serve`, run with stdout already
+#   pointed at stderr.
+# @arg $1 string Spec function
+# @arg $2 string Server and tool name prefix
+# @arg $3 string Command the tools run
+# @internal
+#######################################
+function __dybatpho_agent_mcp_loop {
+  local __dybatpho_agent_mcp_tools __dybatpho_agent_mcp_dir __dybatpho_agent_mcp_calls=0
+  __dybatpho_agent_mcp_table_into __dybatpho_agent_mcp_tools "$1" "$2" "$3"
+  __dybatpho_create_temp_into __dybatpho_agent_mcp_dir "/" "agent_mcp"
+  local __dybatpho_agent_mcp_table="${__dybatpho_agent_mcp_dir}/tools.json"
+  printf '%s\n' "${__dybatpho_agent_mcp_tools}" > "${__dybatpho_agent_mcp_table}"
+
+  # The command each tool maps to is the server's own business, and the entry
+  # is metadata it dispatches with; a client is shown plain MCP tools.
+  local __dybatpho_agent_mcp_list __dybatpho_agent_mcp_info __dybatpho_agent_mcp_name __dybatpho_agent_mcp_version
+  __dybatpho_agent_mcp_list=$(dybatpho::json_eval "${__dybatpho_agent_mcp_tools}" \
+    '{"tools": map(del(."x-dybatpho-command", ."x-dybatpho-entry"))}')
+  __dybatpho_json_escape_into __dybatpho_agent_mcp_name "$2"
+  __dybatpho_agent_mcp_version="${DYBATPHO_AGENT_MCP_VERSION:-}"
+  [[ -n "${__dybatpho_agent_mcp_version}" ]] || __dybatpho_agent_mcp_version=$(dybatpho::version)
+  __dybatpho_json_escape_into __dybatpho_agent_mcp_version "${__dybatpho_agent_mcp_version}"
+  __dybatpho_agent_mcp_info="{\"name\":${__dybatpho_agent_mcp_name},\"version\":${__dybatpho_agent_mcp_version}}"
+
+  local __dybatpho_agent_mcp_line
+  while IFS= read -r __dybatpho_agent_mcp_line || [[ -n "${__dybatpho_agent_mcp_line}" ]]; do
+    [[ -n "${__dybatpho_agent_mcp_line//[[:space:]]/}" ]] || continue
+    __dybatpho_agent_mcp_handle "${__dybatpho_agent_mcp_line}"
+  done # kcov(skip) - a loop's `done` is never traced
+  rm -f -- "${__dybatpho_agent_mcp_table}"
+  rmdir -- "${__dybatpho_agent_mcp_dir}" 2> /dev/null || true
+  return 0
+}
+
+#######################################
+# @description Serve a script's commands as MCP tools over stdio.
+#   A JSON-RPC 2.0 loop answers `initialize`, `ping`, `tools/list` and
+#   `tools/call`, one message per line, until stdin closes. The tools are those
+#   `dybatpho::agent_mcp` lists, and each call runs the tool's recorded command
+#   in agent mode, so `dybatpho::agent_confirm` and `dybatpho::agent_audit`
+#   apply unchanged.
+# @note Arguments are checked before anything runs: an unknown tool, an unknown argument, a missing required one or a
+#   value of the wrong JSON type is refused with error `-32602`. A flag is passed as its switch (`--no-<name>` when
+#   negatable and false), a param as one `--name=value` element, a `multiple:` param once per item, and positional
+#   arguments after `--`, so a value is never read as an option. A `null` argument counts as omitted.
+# @note A call runs in a child process with `DYBATPHO_AGENT_MODE=on` and stdin from `/dev/null`. Its result carries
+#   stdout as the first text item and stderr, when there is any, as a second one starting `stderr:`; `isError` is set
+#   from the exit status, and stdout that is a single JSON object, such as `dybatpho::agent_result` prints, is also
+#   returned as `structuredContent`.
+# @note stdout is the protocol stream: for the whole loop, everything else the script or the library prints goes to
+#   stderr. Notifications get no reply.
+# @note The protocol version is the one the client asks for when it is `2025-06-18`, `2025-03-26` or `2024-11-05`, and
+#   `2025-06-18` otherwise. A batch (a JSON array) is refused as an invalid request.
+# @example
+#   # mytool: `mytool mcp` serves every other command as a tool.
+#   if [[ "${1:-}" == mcp ]]; then
+#     dybatpho::agent_mcp_serve _spec_root mytool "$0"
+#     exit
+#   fi
+#   dybatpho::generate_from_spec _spec_root "$@"
+#
+# @example
+#   claude mcp add mytool -- /usr/local/bin/mytool mcp
+#
+# @arg $1 string Spec function
+# @arg $2 string? Server and tool name prefix, default is the script name
+# @arg $3 string? Command the tools run, default is the script path; it must be executable
+# @env DYBATPHO_AGENT_MCP_TIMEOUT number [default: 0] Seconds a tool call may run, `0` for no limit
+# @env DYBATPHO_AGENT_MCP_VERSION string Version reported in `serverInfo`, default is the dybatpho version
+# @stdout JSON-RPC responses, one per line
+# @exitcode 0 stdin closed
+# @exitcode 1 Stop the script on missing arguments, an invalid timeout, or two commands with the same tool name
+# @see dybatpho::agent_mcp
+# @tip Keep the `mcp` entry point out of the spec, as the example does, so the server does not list itself as a tool
+# @warning Tools, not resources or prompts; a call returns one result, with no progress notifications
+#######################################
+function dybatpho::agent_mcp_serve {
+  local __dybatpho_agent_mcp_spec __dybatpho_agent_mcp_prefix __dybatpho_agent_mcp_command
+  dybatpho::expect_args __dybatpho_agent_mcp_spec -- "$@"
+  __dybatpho_agent_mcp_prefix="${2:-${0##*/}}"
+  __dybatpho_agent_mcp_command="${3:-$0}"
+  local __dybatpho_agent_mcp_limit="${DYBATPHO_AGENT_MCP_TIMEOUT}"
+  local __dybatpho_agent_mcp_why="DYBATPHO_AGENT_MCP_TIMEOUT must be a number of seconds"
+  [[ "${__dybatpho_agent_mcp_limit}" =~ ^[0-9]{1,18}$ ]] \
+    || dybatpho::die "dybatpho::agent_mcp_serve: ${__dybatpho_agent_mcp_why}, got '${__dybatpho_agent_mcp_limit}'"
+  __dybatpho_agent_mcp_limit=$((10#${__dybatpho_agent_mcp_limit}))
+
+  local __dybatpho_agent_mcp_fd
+  exec {__dybatpho_agent_mcp_fd}>&1
+  __dybatpho_agent_mcp_loop "${__dybatpho_agent_mcp_spec}" "${__dybatpho_agent_mcp_prefix}" \
+    "${__dybatpho_agent_mcp_command}" >&2
+  exec {__dybatpho_agent_mcp_fd}>&-
 }

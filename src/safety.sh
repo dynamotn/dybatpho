@@ -556,6 +556,13 @@ function dybatpho::safe_extract {
 
   local destination_path
   destination_path="$(dybatpho::assert_safe_path "${destination}" "destination")" || return $?
+  # tar writes through a destination that is a link, which `assert_safe_path`
+  # leaves unresolved for `rm`, so where it leads is judged and used too.
+  local extract_path
+  extract_path="$(__dybatpho_safety_physical_dir "${destination_path}")"
+  if [[ "${extract_path}" != "${destination_path}" ]]; then
+    extract_path="$(dybatpho::assert_safe_path "${extract_path}" "destination")" || return $?
+  fi
 
   local entry stripped_entry target_path
   local -a collisions=()
@@ -590,7 +597,7 @@ function dybatpho::safe_extract {
       return 1
     fi
   fi
-  dybatpho::archive_extract "${archive_path}" "${destination_path}" "${strip_components}"
+  dybatpho::archive_extract "${archive_path}" "${extract_path}" "${strip_components}"
 }
 
 #######################################

@@ -161,6 +161,15 @@ teardown() {
   unset APP_TOKEN
 }
 
+@test "secret_from_env keeps the value but drops the export when both names match" {
+  export APP_TOKEN="environment-secret"
+  dybatpho::secret_from_env APP_TOKEN APP_TOKEN
+  assert_equal "${APP_TOKEN}" "environment-secret"
+  run bash -c 'printf %s "${APP_TOKEN:-gone}"'
+  assert_output "gone"
+  unset APP_TOKEN
+}
+
 @test "secret_from_env validates its arguments" {
   unset APP_TOKEN || true
   run dybatpho::secret_from_env TOKEN APP_TOKEN

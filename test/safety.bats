@@ -526,6 +526,35 @@ function _create_traversal_archive {
   [[ ! -L "${destination}/b/l" ]]
 }
 
+@test "dybatpho::safe_extract judges a destination link by where it leads" {
+  # `assert_safe_path` leaves the last component alone, as `rm` acts on a link
+  # itself, but tar writes through it, into a protected or outside directory.
+  local archive_path="${BATS_TEST_TMPDIR}/plain.tar" tree="${BATS_TEST_TMPDIR}/plain"
+  local protected="${BATS_TEST_TMPDIR}/prot" root="${BATS_TEST_TMPDIR}/root"
+  mkdir -p "${tree}" "${protected}" "${root}"
+  printf 'a\n' > "${tree}/a.txt"
+  tar -C "${tree}" -cf "${archive_path}" a.txt
+  ln -s "${protected}" "${BATS_TEST_TMPDIR}/dst"
+  ln -s "${protected}" "${root}/dst"
+
+  local destination
+  for destination in "${BATS_TEST_TMPDIR}/dst" "${BATS_TEST_TMPDIR}/dst/"; do
+    DYBATPHO_PROTECTED_PATHS="${protected}" run dybatpho::safe_extract --force "${archive_path}" "${destination}"
+    assert_failure
+    assert_output --partial "Refusing to touch protected destination"
+  done
+  DYBATPHO_SAFE_ROOTS="${root}" run dybatpho::safe_extract --force "${archive_path}" "${root}/dst"
+  assert_failure
+  assert_output --partial "outside DYBATPHO_SAFE_ROOTS"
+  [[ ! -e "${protected}/a.txt" ]]
+
+  # A link that leads somewhere safe still extracts, into its target.
+  mkdir -p "${root}/real"
+  ln -s real "${root}/ok"
+  DYBATPHO_SAFE_ROOTS="${root}" run_traced -0 dybatpho::safe_extract --force "${archive_path}" "${root}/ok"
+  assert_equal "$(cat "${root}/real/a.txt")" "a"
+}
+
 @test "dybatpho::safe_extract refuses an archive it cannot list" {
   # The entries are checked before anything is written, so an archive whose
   # entries cannot be read must stop there rather than be extracted unchecked.

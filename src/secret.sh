@@ -388,11 +388,18 @@ function dybatpho::secret_from_env {
   if [[ -z "${!__dybatpho_secret_name:-}" ]]; then                                           # kcov(skip)
     dybatpho::die "Environment variable \`${__dybatpho_secret_name}\` isn't set or is empty" # kcov(skip)
   fi
-  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}"                         # kcov(skip)
-  __dybatpho_secret_dest="${!__dybatpho_secret_name}"                                # kcov(skip)
-  dybatpho::secret_register "${__dybatpho_secret_dest}"                              # kcov(skip)
-  [[ "${__dybatpho_secret_mode}" == unset ]] && unset -v "${__dybatpho_secret_name}" # kcov(skip)
-  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"                            # kcov(skip)
+  local -n __dybatpho_secret_dest="${__dybatpho_secret_var}" # kcov(skip)
+  __dybatpho_secret_dest="${!__dybatpho_secret_name}"        # kcov(skip)
+  dybatpho::secret_register "${__dybatpho_secret_dest}"      # kcov(skip)
+  if [[ "${__dybatpho_secret_mode}" == unset ]]; then        # kcov(skip)
+    # The same name holds the copy, so it only stops being inherited.
+    if [[ "${__dybatpho_secret_name}" == "${__dybatpho_secret_var}" ]]; then # kcov(skip)
+      export -n "${__dybatpho_secret_name?}"                                 # kcov(skip)
+    else                                                                     # kcov(skip)
+      unset -v "${__dybatpho_secret_name}"                                   # kcov(skip)
+    fi                                                                       # kcov(skip)
+  fi                                                                         # kcov(skip)
+  __dybatpho_secret_trace_on "${__dybatpho_secret_trace}"                    # kcov(skip)
   return 0
 }
 

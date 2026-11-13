@@ -75,6 +75,7 @@ function dybatpho::json_query {
   dybatpho::expect_args input filter -- "$@"
   shift 2
   __dybatpho_json_need_jq
+  __dybatpho_json_guard_paths input
   jq "${filter}" "${input}" "$@"
 }
 
@@ -93,6 +94,7 @@ function dybatpho::json_has {
   local input filter
   dybatpho::expect_args input filter -- "$@"
   __dybatpho_json_need_jq
+  __dybatpho_json_guard_paths input
   __dybatpho_json_test jq -e "${filter}" "${input}"
 }
 
@@ -109,6 +111,7 @@ function dybatpho::json_pretty {
   local input
   dybatpho::expect_args input -- "$@"
   __dybatpho_json_need_jq
+  __dybatpho_json_guard_paths input
   __dybatpho_json_emit "${2-}" jq '.' "${input}"
 }
 
@@ -125,6 +128,7 @@ function dybatpho::json_to_yaml {
   local input
   dybatpho::expect_args input -- "$@"
   __dybatpho_json_need_yq
+  __dybatpho_json_guard_paths input
   __dybatpho_json_emit "${2-}" yq -p=json -o=yaml -P '.' "${input}"
 }
 
@@ -194,6 +198,7 @@ function dybatpho::yaml_pretty {
   local input
   dybatpho::expect_args input -- "$@"
   __dybatpho_json_need_yq
+  __dybatpho_json_guard_paths input
   __dybatpho_json_emit "${2-}" yq -P '.' "${input}"
 }
 
@@ -274,21 +279,32 @@ function dybatpho::json_object {
   # Every pair is assigned in a single `jq` invocation. Building the object one
   # key at a time would fork once per field, which is the difference between a
   # handful of processes per request and several dozen.
-  local filter='{}' name value index=0
-  local -a arguments=()
+  #
+  # The pairs reach `jq` on stdin as one stream of NUL-terminated
+  # `name, value, is_json` fields, never as arguments: one argument holds
+  # 128 KiB at most, and arguments are world-readable in `/proc/<pid>/cmdline`.
+  # A value cannot hold a NUL, so the framing is unambiguous; quoting in the
+  # shell instead slows down quadratically on a value full of quotes. The
+  # stream costs one descriptor and one fork, however many pairs there are.
+  local trace
+  __dybatpho_json_trace_off trace
+  local status=0
+  local -a fields=()
   while (($# >= 2)); do
-    name="$1"
-    value="$2"
-    shift 2
-    if [[ "${name}" == *:json ]]; then
-      arguments+=(--arg "n${index}" "${name%:json}" --argjson "v${index}" "${value}")
+    if [[ "$1" == *:json ]]; then
+      fields+=("${1%:json}" "$2" 1)
     else
-      arguments+=(--arg "n${index}" "${name}" --arg "v${index}" "${value}")
+      fields+=("$1" "$2" 0)
     fi
-    filter+=" | .[\$n${index}] = \$v${index}"
-    index=$((index + 1))
+    shift 2
   done
-  jq -n -c ${arguments[@]+"${arguments[@]}"} "${filter}"
+  # shellcheck disable=SC2016 # `$f` and `$i` are jq variables
+  jq -c -R -s 'split("\u0000") as $f | reduce range(0; ($f | length) - 1; 3) as $i ({};
+    .[$f[$i]] = if $f[$i + 2] == "1"
+      then ($f[$i + 1] | try fromjson catch error("The value of \($f[$i]) is not valid JSON"))
+      else $f[$i + 1] end)' < <(printf '%s\0' ${fields[@]+"${fields[@]}"}) || status=$?
+  __dybatpho_json_trace_on "${trace}"
+  return "${status}"
 }
 
 #######################################
@@ -420,7 +436,56 @@ function __dybatpho_json_need_yq {
 #######################################
 function __dybatpho_json_read_yaml_into {
   local -n __dybatpho_json_read_out="$1"
-  __dybatpho_json_read_out=$(yq -o=json -I=0 '.' "$2")
+  local __dybatpho_json_read_input="$2"
+  __dybatpho_json_guard_paths __dybatpho_json_read_input
+  __dybatpho_json_read_out=$(yq -o=json -I=0 '.' "${__dybatpho_json_read_input}")
+}
+
+#######################################
+# @description Suspend `set -x` while a caller's value is handled, so the
+#   trace does not print it.
+# @arg $1 string Name of the variable receiving `true` when the trace was on
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_json_trace_off {
+  local -n __dybatpho_json_trace_state="$1"
+  __dybatpho_json_trace_state=false
+  if [[ "$-" == *x* ]]; then
+    __dybatpho_json_trace_state=true
+    { set +x; } 2> /dev/null
+  fi
+}
+
+#######################################
+# @description Resume the trace `__dybatpho_json_trace_off` suspended.
+# @arg $1 string The state it handed back
+# @internal
+#######################################
+function __dybatpho_json_trace_on {
+  # The test runs while the trace is still off, so kcov cannot see it.
+  # dyshellint disable=BSG034 # this resumes the trace the caller already had on
+  [[ "${1-}" == true ]] && set -x # kcov(skip)
+  return 0
+}
+
+#######################################
+# @description Prefix `./` to each named input path that starts with `-`.
+#   `jq` and `yq` would read a file named `--slurp` as an option, and their
+#   handling of `--` differs between versions, so such a name is spelled as a
+#   relative path instead. A lone `-`, which means stdin, is left alone.
+# @arg $@ string Names of the variables holding input paths
+# @set The named variables
+# @internal
+#######################################
+function __dybatpho_json_guard_paths {
+  local __dybatpho_json_guard_name
+  for __dybatpho_json_guard_name in "$@"; do
+    local -n __dybatpho_json_guard_path="${__dybatpho_json_guard_name}"
+    [[ "${__dybatpho_json_guard_path}" != -?* ]] \
+      || __dybatpho_json_guard_path="./${__dybatpho_json_guard_path}"
+    unset -n __dybatpho_json_guard_path
+  done
 }
 
 #######################################
@@ -620,23 +685,29 @@ function __dybatpho_json_set {
   fi
   if [[ "${typed}" == true ]]; then
     __dybatpho_json_parses "${backend}" "${value}" \
-      || dybatpho::die "${caller}: Value is not valid JSON: ${value}"
+      || dybatpho::die "${caller}: Value is not valid JSON"
   fi
 
   local message="Cannot set '${path}': it passes through a value that is not an object or array of the matching kind"
-  # The value reaches `jq` and `yq` through the environment of this call alone,
-  # never as an argument: arguments are world-readable in `/proc/<pid>/cmdline`.
-  local -x __dybatpho_json_value="${value}" __dybatpho_json_error="${message}"
+  local -x __dybatpho_json_error="${message}"
+  # The value reaches `jq` and `yq` through a here-string on its own
+  # descriptor, never as an argument or in the environment: either holds
+  # 128 KiB at most, and arguments are world-readable in `/proc/<pid>/cmdline`.
+  # The here-string ends in a newline, which the filter takes off again.
+  local value_fd status=0
+  exec {value_fd}<<< "${value}"
+  __dybatpho_json_guard_paths input
 
   if [[ "${backend}" == jq ]]; then
     local path_array
     __dybatpho_json_path_array_into path_array ${segments[@]+"${segments[@]}"}
-    # shellcheck disable=SC2016 # `$ENV` is jq's, not the shell's
-    local stored='$ENV.__dybatpho_json_value'
+    # shellcheck disable=SC2016 # `$value` is jq's, not the shell's
+    local stored='$value | rtrimstr("\n")'
     [[ "${typed}" == true ]] && stored+=' | fromjson'
-    __dybatpho_json_emit "${output}" jq --argjson path "${path_array}" \
-      "try setpath(\$path; ${stored}) catch error(\$ENV.__dybatpho_json_error)" "${input}"
-    return
+    __dybatpho_json_emit "${output}" jq --argjson path "${path_array}" --rawfile value "/dev/fd/${value_fd}" \
+      "try setpath(\$path; ${stored}) catch error(\$ENV.__dybatpho_json_error)" "${input}" || status=$?
+    exec {value_fd}<&-
+    return "${status}"
   fi
 
   # A YAML document is edited by `yq` itself rather than through JSON, which is
@@ -672,12 +743,15 @@ function __dybatpho_json_set {
     index=$((index + 1))
   done
   parent=".${target}"
+  local stored="load_str(\"/dev/fd/${value_fd}\") | sub(\"\\n\$\"; \"\")"
   if [[ "${typed}" == true ]]; then
-    filter+="${parent} = (strenv(__dybatpho_json_value) | from_json)"
+    filter+="${parent} = (${stored} | from_json)"
   else
-    filter+="${parent} = strenv(__dybatpho_json_value)"
+    filter+="${parent} = (${stored})"
   fi
-  __dybatpho_json_emit "${output}" yq eval "-o=${format}" "${filter}" "${input}"
+  __dybatpho_json_emit "${output}" yq eval "-o=${format}" "${filter}" "${input}" || status=$?
+  exec {value_fd}<&-
+  return "${status}"
 }
 
 #######################################
@@ -705,6 +779,7 @@ function __dybatpho_json_del {
   else
     __dybatpho_json_need_yq
   fi
+  __dybatpho_json_guard_paths input
 
   if [[ "${backend}" == jq ]]; then
     local path_array
@@ -757,6 +832,7 @@ function __dybatpho_json_merge {
   else
     __dybatpho_json_need_yq
   fi
+  __dybatpho_json_guard_paths base overlay
 
   if [[ "${backend}" == jq ]]; then
     # kcov(disabled) - a jq program spread over two lines: data, not Bash commands
@@ -799,12 +875,18 @@ function __dybatpho_json_merge {
 # @exitcode 1 Invalid arguments, path, or `--json` value
 # @exitcode other `jq`'s exit code when the input is invalid or the path runs through a scalar
 # @exitcode 127 `jq` is not installed
-# @note The path and the value reach `jq` as arguments, never as part of
-#   the expression, so neither needs escaping
+# @note The path reaches `jq` as an argument and the value through a file
+#   descriptor, never as part of the expression, so neither needs escaping and
+#   a value may be of any size
 # @tip The output file is written atomically after the whole result is known, so a failure leaves it untouched
 #######################################
 function dybatpho::json_set {
-  __dybatpho_json_set "${FUNCNAME[0]}" json "$@"
+  # The value must not reach a `set -x` trace.
+  local __dybatpho_json_trace __dybatpho_json_status=0
+  __dybatpho_json_trace_off __dybatpho_json_trace
+  __dybatpho_json_set "${FUNCNAME[0]}" json "$@" || __dybatpho_json_status=$?
+  __dybatpho_json_trace_on "${__dybatpho_json_trace}"
+  return "${__dybatpho_json_status}"
 }
 
 #######################################
@@ -871,7 +953,12 @@ function dybatpho::json_merge {
 # @exitcode 127 The Go `yq` v4 is not installed
 #######################################
 function dybatpho::yaml_set {
-  __dybatpho_json_set "${FUNCNAME[0]}" yaml "$@"
+  # The value must not reach a `set -x` trace.
+  local __dybatpho_json_trace __dybatpho_json_status=0
+  __dybatpho_json_trace_off __dybatpho_json_trace
+  __dybatpho_json_set "${FUNCNAME[0]}" yaml "$@" || __dybatpho_json_status=$?
+  __dybatpho_json_trace_on "${__dybatpho_json_trace}"
+  return "${__dybatpho_json_status}"
 }
 
 #######################################

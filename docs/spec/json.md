@@ -180,6 +180,9 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - `yq`, which edits YAML in place, would otherwise ignore an assignment
   through a scalar and pad an array when deleting a missing index; the YAML
   editors make it behave as the JSON editors do.
+- A value is larger than the 128 KiB a single argument or environment entry
+  may hold, such as a long conversation passed to `json_object` as `:json`.
+- An input file is named like an option, such as `--slurp` or `-P`.
 
 ## Requirements *(mandatory)*
 
@@ -224,8 +227,9 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **FR-021**: The module MUST provide `json_merge` and `yaml_merge`, which
   deep-merge two objects with the overlay winning and MUST refuse a document
   that is not an object.
-- **FR-022**: Paths and values MUST reach `jq` or `yq` as arguments or
-  environment variables, never as part of the expression text.
+- **FR-022**: Paths and values MUST reach `jq` or `yq` as arguments,
+  environment variables or file descriptors, never as part of the expression
+  text.
 - **FR-023**: The editing helpers MUST print the result when no output file is
   given, and MUST otherwise write the output file atomically, only after the
   command succeeded, so the output may be the input and a failure leaves it
@@ -240,7 +244,10 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **FR-027**: Every helper but `json_string` MUST stop with exit code 127 and a message naming `jq` when `jq` is not installed.
 - **FR-028**: Every helper that reads or writes YAML MUST stop with exit code 127 when `yq` is missing, and MUST refuse the Python `yq` and a Go `yq` older than v4 by name; the check MUST run once for as long as `PATH` is unchanged.
 - **FR-029**: The module MUST declare `jq` 1.7 or newer to `dybatpho::doctor`, because `jq` 1.6 reads every number as a binary double and so does not keep a number as written; with `jq` 1.6 the helpers MUST still work.
-- **FR-030**: `json_set` and `yaml_set` MUST hand the value to `jq` and `yq` through the environment, never as a command-line argument of any process.
+- **FR-030**: `json_object`, `json_set` and `yaml_set` MUST hand each value to `jq` and `yq` through a file descriptor, never as a command-line argument or an environment variable of any process, so a value of any size is accepted and none is readable in `/proc/<pid>/cmdline`; a value MUST be stored byte for byte, trailing newlines included.
+- **FR-032**: `json_object` MUST keep the number of descriptors it opens bounded, whatever the number of pairs, and MUST NOT fork once per value.
+- **FR-033**: Under `set -x`, `json_object`, `json_set` and `yaml_set` MUST NOT trace a value beyond the caller's own call line, and the message refusing a `--json` value MUST NOT repeat the value.
+- **FR-031**: Every helper that reads a file MUST read an input path that starts with `-` (other than a lone `-`, which is stdin) as a file, never as an option of `jq` or `yq`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -317,6 +324,12 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
   unidentifiable one.
 - **IT-026**: Ask `yq --version` once across several YAML calls under one `PATH`.
 - **IT-027**: Set a value with and without `--json` through `json_set` and `yaml_set`, with `jq`, `yq` and `env` recorded, and find the value in none of their arguments.
+- **IT-028**: Build an object from a 200,000-byte string value and a 200,000-byte `:json` value, with `jq` recorded, and find no value in its arguments; keep a value's trailing newlines; refuse an invalid `:json` value.
+- **IT-029**: Set a 200,000-byte value, with and without `--json`, through `json_set` and `yaml_set`, and keep a value's trailing newlines.
+- **IT-030**: Read files named `--slurp`, `-o.json`, `--null-input` and `-P` through every file-reading JSON and YAML helper.
+- **IT-031**: Build an object of 300 pairs under `ulimit -n 64`.
+- **IT-032**: Build objects from tabs, control characters, multi-byte and invalid UTF-8, quotes and backslashes, and see exactly what `jq --arg` encodes.
+- **IT-033**: Under `set -x`, see a value of `json_object` and `json_set` only on the caller's line, and see a refused `--json` value left out of the error.
 
 ## Acceptance Criteria *(mandatory)*
 

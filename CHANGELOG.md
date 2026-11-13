@@ -17,6 +17,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   back when it ends.** A script that handles Ctrl-C after drawing a progress
   bar or a screen now carries on instead of being killed right after its
   handler ran, and a handler added later runs at all.
+- **`json` — an invalid `:json` value in `dybatpho::json_object` exits 5,
+  not 2.**
 - **`testing` — `dybatpho::mock_calls` records a line break inside an argument
   as `\n`,** so each call stays one line.
 - **`markdown` — `dybatpho::md_code_block` picks its fence in linear time.**
@@ -246,6 +248,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   instead of letting it finish while its job stays claimed and runs again.
 - **`lock` — a worker's `dybatpho::lock_semaphore_release name N` frees only
   its own slots,** not the parent script's.
+- **`secret` — `dybatpho::secret_from_env NAME NAME` keeps the value** and only
+  drops its export.
+- **`json` — `dybatpho::json_object`, `json_set` and `yaml_set` take values
+  over 128 KiB,** such as a long `ai` conversation, and every file helper reads
+  a file whose name starts with `-`.
 - **`file` — `dybatpho::dir_size` measures the directory a symlink names.**
 - **`logging` — `DYBATPHO_LOG_FILE_MAX_BYTES=10M` is read as a size,** not
   reported as an error on every line; `tui_spinner_stop` removes its file.
@@ -330,12 +337,18 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   when its name holds `[`, `*` or `?`, and a zip link stored under the same
   name as another entry is refused;** each let `archive_is_safe`,
   `safe_extract` and `backup_restore` accept a link to `/etc`.
+- **`safety` — `dybatpho::safe_extract` judges a destination symlink by where
+  it leads,** so it cannot extract into a protected directory or outside
+  `DYBATPHO_SAFE_ROOTS`.
 - **`backup` — `dybatpho::backup_create` writes archives readable only by
   their owner.**
 - **`schedule`, `queue` — the debounce ticket and the sequence counter are
   never written through a planted symlink.**
 - **`logging`, `tui` — the spinner message, the progress label and boxed
   output spell out control characters** instead of sending escape sequences.
+- **`json` — `dybatpho::json_object` values stay off jq's command line, and
+  `json_object`, `json_set` and `yaml_set` keep values out of an xtrace;**
+  `json_set --json` no longer repeats a rejected value in its error.
 
 ### Added
 

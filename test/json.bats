@@ -379,6 +379,120 @@ __yaml_query_fixture() {
   assert_equal "$(dybatpho::json_get "${document}" '.["two words"]')" "value"
 }
 
+@test "dybatpho::json_object takes a value past the argument size limit, kept off jq's command line" {
+  # One argument may hold 128 KiB at most, and a command line is world-readable
+  # in /proc/<pid>/cmdline, so values must reach jq some other way.
+  local bin="${BATS_TEST_TMPDIR}/argv-bin" real_jq
+  real_jq="$(command -v jq)"
+  mkdir -p "${bin}"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" >> %q\nexec %q "$@"\n' \
+    "${BATS_TEST_TMPDIR}/argv" "${real_jq}" > "${bin}/jq"
+  chmod +x "${bin}/jq"
+  local big document
+  big="$(printf '%*s' 200000 '' | tr ' ' x)"
+  document=$(PATH="${bin}:${PATH}" dybatpho::json_object text "${big}" nested:json "[\"${big}\"]" \
+    tail $'a\n\n' secret 's3cr3t-marker')
+  assert_equal "$(jq -r '.text | length' <<< "${document}")" 200000
+  assert_equal "$(jq -r '.nested[0] | length' <<< "${document}")" 200000
+  assert_equal "$(jq -c '.tail' <<< "${document}")" '"a\n\n"'
+  run grep -c 's3cr3t-marker' "${BATS_TEST_TMPDIR}/argv"
+  assert_output 0
+
+  run --separate-stderr dybatpho::json_object bad:json 'not json'
+  assert_failure
+  refute_output
+}
+
+@test "dybatpho::json_object keeps the number of open descriptors bounded" {
+  local -a pairs=()
+  local index
+  for ((index = 0; index < 300; index++)); do
+    pairs+=("k${index}" "v${index}")
+  done
+  local child='init="$1" && shift && . "${init}" --modules json && ulimit -n 64 && "$@" | jq -r "length, .k299"'
+  run bash -c "${child}" _ "${DYBATPHO_DIR}/init.sh" dybatpho::json_object "${pairs[@]}"
+  assert_success
+  assert_output $'300\nv299'
+}
+
+@test "dybatpho::json_object matches jq's own encoding of awkward values" {
+  local value expected
+  for value in $'tab\there' $'\x01\x1f\x7f' 'é 中 🎉' $'\xff\xfe broken' 'back\\slash "q"' $'\r\n' ' '; do
+    expected="$(jq -n -c --arg v "${value}" '{a: $v}')"
+    assert_equal "$(dybatpho::json_object a "${value}")" "${expected}"
+  done
+  assert_equal "$(dybatpho::json_object a:json '{"x": [1, 2.50]}' a b)" '{"a":"b"}'
+  assert_equal "$(dybatpho::json_object a:json '{"x": [1, 2.50]}' b:json 'null')" '{"a":{"x":[1,2.50]},"b":null}'
+}
+
+@test "the value helpers keep a value out of an xtrace" {
+  local file="${BATS_TEST_TMPDIR}/trace.json" init="${DYBATPHO_DIR}/init.sh"
+  local child='init="$1"; shift; . "${init}" --modules json; set -x; "$@" > /dev/null'
+  printf '{}\n' > "${file}"
+  run --separate-stderr bash -c "${child}" _ "${init}" dybatpho::json_object k 'tr4ce-marker'
+  assert_success
+  assert_equal "$(grep -c 'tr4ce-marker' <<< "${stderr}")" 1
+  run --separate-stderr bash -c "${child}" _ "${init}" dybatpho::json_set "${file}" k 'tr4ce-marker'
+  assert_success
+  assert_equal "$(grep -c 'tr4ce-marker' <<< "${stderr}")" 1
+  run --separate-stderr dybatpho::json_set --json "${file}" k 'tr4ce-marker'
+  assert_failure
+  assert_stderr --partial "not valid JSON"
+  refute_stderr --partial 'tr4ce-marker'
+}
+
+@test "dybatpho::json_set and dybatpho::yaml_set store a value past the argument size limit" {
+  local file="${BATS_TEST_TMPDIR}/big.json" big
+  printf '{}\n' > "${file}"
+  big="$(printf '%*s' 200000 '' | tr ' ' x)"
+  run_traced dybatpho::json_set "${file}" text "${big}" "${file}"
+  assert_success
+  assert_equal "$(jq -r '.text | length' "${file}")" 200000
+  run_traced dybatpho::json_set --json "${file}" list "[\"${big}\"]" "${file}"
+  assert_success
+  assert_equal "$(jq -r '.list[0] | length' "${file}")" 200000
+  dybatpho::json_set "${file}" tail $'a\n\n' "${file}"
+  assert_equal "$(jq -c '.tail' "${file}")" '"a\n\n"'
+
+  __json_need_yq
+  local yaml="${BATS_TEST_TMPDIR}/big.yaml"
+  printf 'a: 1\n' > "${yaml}"
+  run_traced dybatpho::yaml_set "${yaml}" text "${big}" "${yaml}"
+  assert_success
+  assert_equal "$(yq '.text | length' "${yaml}")" 200000
+  run_traced dybatpho::yaml_set --json "${yaml}" list "[\"${big}\"]" "${yaml}"
+  assert_success
+  assert_equal "$(yq '.list[0] | length' "${yaml}")" 200000
+  assert_equal "$(dybatpho::yaml_set "${yaml}" tail $'a\n\n' | yq -o=json '.tail')" '"a\n\n"'
+  dybatpho::yaml_set "${yaml}" plain 'x' "${yaml}"
+  assert_equal "$(yq -o=json '.plain' "${yaml}")" '"x"'
+}
+
+@test "the file helpers read a file whose name starts with a dash" {
+  # A name such as `--slurp` must not be read as an option of jq or yq.
+  cd "${BATS_TEST_TMPDIR}"
+  printf '{"a":1}\n' > --slurp
+  printf '{"b":2}\n' > -o.json
+  assert_equal "$(dybatpho::json_query --slurp '.a')" 1
+  dybatpho::json_has --slurp '.a'
+  assert_equal "$(dybatpho::json_pretty -o.json | jq -c .)" '{"b":2}'
+  assert_equal "$(dybatpho::json_set --slurp c 3 | jq -c .)" '{"a":1,"c":"3"}'
+  assert_equal "$(dybatpho::json_del --slurp a | jq -c .)" '{}'
+  assert_equal "$(dybatpho::json_merge --slurp -o.json | jq -c .)" '{"a":1,"b":2}'
+
+  __json_need_yq
+  printf 'a: 1\n' > --null-input
+  printf 'b: 2\n' > -P
+  assert_equal "$(dybatpho::yaml_query --null-input '.a')" 1
+  dybatpho::yaml_has --null-input '.a'
+  assert_equal "$(dybatpho::yaml_pretty --null-input)" 'a: 1'
+  assert_equal "$(dybatpho::yaml_to_json --null-input | jq -c .)" '{"a":1}'
+  assert_equal "$(dybatpho::json_to_yaml -o.json)" 'b: 2'
+  assert_equal "$(dybatpho::yaml_set --null-input c 3)" $'a: 1\nc: "3"'
+  assert_equal "$(dybatpho::yaml_del --null-input a)" '{}'
+  assert_equal "$(dybatpho::yaml_merge --null-input -P)" $'a: 1\nb: 2'
+}
+
 @test "dybatpho::json_eval no arg" {
   run dybatpho::json_eval
   assert_failure

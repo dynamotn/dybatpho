@@ -173,6 +173,8 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   through is not loaded yet, so it is loaded on demand.
 - `safe_extract` is given an archive that cannot be listed, so its entries
   cannot be checked.
+- The `safe_extract` destination is itself a symbolic link, with or without a
+  trailing slash, to a protected directory or one outside the safe roots.
 - A guarded path holds a newline.
 
 ## Requirements *(mandatory)*
@@ -264,6 +266,9 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
 - **FR-033**: `safe_extract` MUST refuse a symbolic link that would point
   outside the destination once strip-components has removed its leading
   directories, as well as one that points outside as stored.
+- **FR-034**: `safe_extract` MUST resolve a destination that is a symbolic
+  link, refuse it when where it leads is protected or outside
+  `DYBATPHO_SAFE_ROOTS`, and otherwise extract into the resolved directory.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -343,6 +348,10 @@ dybatpho::safe_system "Restart nginx" -- systemctl restart nginx
   given that path as written.
 - **IT-023**: Extract `top/b/l -> ../..` with strip-components `1` and see it
   refused, with no `b/l` written.
+- **IT-024**: Extract into a destination link to a protected directory (also
+  written with a trailing slash) and into one leading outside the safe root,
+  see both refused with nothing written, and see a link to a safe directory
+  extract into its target.
 
 ## Acceptance Criteria *(mandatory)*
 

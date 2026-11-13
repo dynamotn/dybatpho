@@ -151,7 +151,8 @@ dybatpho::secret_wipe TOKEN
 - **FR-001**: `secret_from_file` MUST validate permissions before reading and
   MUST reject missing, non-regular, unreadable, or empty files.
 - **FR-002**: `secret_from_env` MUST require a non-empty source variable and
-  MUST unset it unless `keep` is requested.
+  MUST unset it unless `keep` is requested; when the destination is the
+  source variable itself, it MUST keep the value and only remove its export.
 - **FR-003**: `secret_from_stdin` MUST disable echo when stdin is a terminal,
   MUST write its optional prompt to stderr, and MUST fail on empty input.
 - **FR-004**: `secret_read` MUST support `file:PATH`, `env:NAME`, `stdin`, and
@@ -268,6 +269,7 @@ dybatpho::secret_wipe TOKEN
 - **IT-024**: Ask `secret_hint` to reveal `0` characters and see only the placeholder.
 - **IT-025**: Ask `secret_hint` to reveal `18446744073709551615` characters and see only the placeholder; ask for `08` and see the last eight.
 - **IT-026**: Under `set -x`, write a secret to a file with `secret_write_file` and wipe it with `secret_wipe`: the file holds the value, stderr never does, and the log call that follows is still traced.
+- **IT-027**: Read `APP_TOKEN` into `APP_TOKEN` with `secret_from_env`: the value stays and a child process no longer inherits it.
 
 ## Acceptance Criteria *(mandatory)*
 

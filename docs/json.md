@@ -489,7 +489,7 @@ dybatpho::json_set --json config.json server.ports '[80,443]'
 
 **📝 Notes**
 
-- The path and the value reach `jq` as arguments, never as part of the expression, so neither needs escaping
+- The path reaches `jq` as an argument and the value through a file descriptor, never as part of the expression, so neither needs escaping and a value may be of any size
 
 **📤 Output on stdout**
 

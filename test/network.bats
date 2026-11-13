@@ -1937,6 +1937,193 @@ HELPER
   done
 }
 
+@test "dybatpho::curl_do drops a secret body on a same-origin redirect only where curl -L does" {
+  # A stand-in for curl: the first argument is the status to answer, the second
+  # where to record the arguments and the body read from stdin.
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+code="$1"; record="$2"; shift 2
+printf '%s\n' "$@" > "${record}"
+body=false
+for arg in "$@"; do [[ "${arg}" == "@-" ]] && body=true; done
+[[ "${body}" == true ]] && cat > "${record}.body"
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 %s Moved\r\nLocation: /done\r\n\r\n' "${code}" > "$2"
+  shift
+done
+echo "${code}"
+HELPER
+  local case code method expected
+  # status, method sent, method expected after the redirect (GET drops the body)
+  for case in 303:POST:GET 303:PUT:GET 302:POST:GET 301:POST:GET 302:PUT:PUT 307:POST:POST 308:PATCH:PATCH; do
+    IFS=: read -r code method expected <<< "${case}"
+    local first="${BATS_TEST_TMPDIR}/first-${case}" second="${BATS_TEST_TMPDIR}/second-${case}"
+    stub curl ": bash ${helper} ${code} '${first}' \"\$@\"" ": bash ${helper} 200 '${second}' \"\$@\""
+    local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+    DYBATPHO_CURL_SECRET_DATA='{"create":"issue"}' run_traced dybatpho::curl_do \
+      https://api.example/start /dev/null --request "${method}"
+    unstub curl
+    assert_success
+    assert_equal "$(cat "${first}.body")" '{"create":"issue"}'
+    # The method is the last `--request` curl is given.
+    assert_equal "$(grep -A1 -x -- '--request' "${second}" | tail -n 1)" "${expected}"
+    if [[ "${expected}" == GET ]]; then
+      assert_file_not_exist "${second}.body"
+    else
+      assert_equal "$(cat "${second}.body")" '{"create":"issue"}'
+    fi
+  done
+}
+
+@test "dybatpho::curl_paginate does not fetch a page the rate limit refused" {
+  dybatpho::mock_http "api.example.test/items" 200 'page-one'
+  dybatpho::rate_limit_reset api.example.test
+  dybatpho::rate_limit api.example.test 1/60
+  local DYBATPHO_PAGINATE_RATE=1/60 DYBATPHO_RATE_LIMIT_WAIT=false
+  run_traced --separate-stderr -9 dybatpho::curl_paginate "https://api.example.test/items"
+  refute_output --partial "page-one"
+  assert_equal "$(dybatpho::mock_http_calls | wc -l | tr -d ' ')" "0"
+}
+
+@test "dybatpho::curl_do refuses a secret header or URL holding a line break" {
+  local sent="${BATS_TEST_TMPDIR}/request-sent"
+  stub_repeated curl ": touch '${sent}'; echo 200"
+  local -a DYBATPHO_CURL_SECRET_HEADERS=($'X-Gotify-Key: tok\r\nX-Evil: injected')
+  run --separate-stderr dybatpho::curl_do https://api.example/message
+  assert_failure
+  assert_stderr --partial "must not contain a line break"
+  refute_stderr --partial "X-Evil"
+  DYBATPHO_CURL_SECRET_HEADERS=()
+  DYBATPHO_CURL_SECRET_URL=true run --separate-stderr dybatpho::curl_do $'https://api.example/a\nb'
+  assert_failure
+  assert_stderr --partial "must not contain a line break"
+  assert_file_not_exist "${sent}"
+}
+
+@test "dybatpho::curl_resume_download treats 416 on a complete file as done and checks it" {
+  local temp_file="${BATS_TEST_TMPDIR}/test/resume_complete"
+  mkdir -p "${temp_file%/*}"
+  printf 'hahaa' > "${temp_file}"
+  local digest
+  digest=$(printf 'hahaa' | sha256sum | awk '{print $1}')
+  # The first argument is the Content-Range line to answer with, if any.
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+range="$1"; shift
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 416 Range Not Satisfiable\r\n%s\r\n' "${range}" > "$2"
+  shift
+done
+echo 416
+HELPER
+  stub curl \
+    ": bash ${helper} 'Content-Range: bytes */5' \"\$@\"" \
+    ": bash ${helper} 'Content-Range: bytes */5' \"\$@\"" \
+    ": bash ${helper} 'Content-Range: bytes */100' \"\$@\"" \
+    ": bash ${helper} '' \"\$@\""
+  run_traced dybatpho::curl_resume_download https://this "${temp_file}" "sha256:${digest}"
+  assert_success
+  run_traced -7 dybatpho::curl_resume_download https://this "${temp_file}" "sha256:${digest/?/0}"
+  # A partial file is not complete because the server refused a range: the
+  # size the server names must be the size on disk.
+  run_traced -4 dybatpho::curl_resume_download https://this "${temp_file}"
+  run_traced -4 dybatpho::curl_resume_download https://this "${temp_file}"
+  unstub curl
+}
+
+@test "dybatpho::curl_do drops the caller's own body args where curl -L drops the body" {
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+code="$1"; record="$2"; shift 2
+printf '%s\n' "$@" > "${record}"
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 %s Moved\r\nLocation: /done\r\n\r\n' "${code}" > "$2"
+  shift
+done
+echo "${code}"
+HELPER
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+  local -a body_args=(-d a=1 --data b=2 --data-raw c=3 --data-binary @f --data-urlencode e=5 --json '{}'
+    -F g=7 --form h=8 --form-string i=9 -dj=10 -Fk=11)
+  local code first second
+  for code in 303 307; do
+    first="${BATS_TEST_TMPDIR}/first-${code}" second="${BATS_TEST_TMPDIR}/second-${code}"
+    stub curl ": bash ${helper} ${code} '${first}' \"\$@\"" ": bash ${helper} 200 '${second}' \"\$@\""
+    run_traced dybatpho::curl_do https://api.example/start /dev/null --header "X-Keep: 1" "${body_args[@]}"
+    unstub curl
+    assert_success
+    run grep -c -x -- 'X-Keep: 1' "${second}"
+    assert_output "1"
+    if [[ "${code}" == 303 ]]; then
+      # Without -X, data makes the request a POST, which a 303 turns into a GET.
+      run grep -c -E -x -- '-d|--data.*|--json|-F|--form.*|-dj=10|-Fk=11|[a-k]=[0-9]+|@f|\{\}' "${second}"
+      assert_output "0"
+      assert_equal "$(grep -A1 -x -- '--request' "${second}" | tail -n 1)" "GET"
+    else
+      run grep -c -x -- 'a=1' "${second}"
+      assert_output "1"
+      run grep -c -x -- '-Fk=11' "${second}"
+      assert_output "1"
+    fi
+  done
+}
+
+@test "__dybatpho_network_walk_args_into skips the values of curl's options" {
+  local -a kept=()
+  local method dump body
+  # A header whose value is `-d` is not a body, and `-o` after it is kept.
+  __dybatpho_network_walk_args_into kept method dump body -H -d -o out -sd x -#
+  assert_equal "$(printf '[%s]' "${kept[@]}")" "[-H][-d][-o][out][-s][-#]"
+  assert_equal "${body}" "data"
+  assert_equal "${method}" ""
+  __dybatpho_network_walk_args_into kept method dump body -H -X -XPUT -D hdr -T file --json='{}'
+  assert_equal "$(printf '[%s]' "${kept[@]}")" "[-H][-X][-XPUT][-D][hdr]"
+  assert_equal "${method}" "PUT"
+  assert_equal "${dump}" "hdr"
+  assert_equal "${body}" "upload"
+  __dybatpho_network_walk_args_into kept method dump body -sX patch --request=delete -C - -- -d x
+  assert_equal "$(printf '[%s]' "${kept[@]}")" "[-sX][patch][--request=delete][-C][-][--][-d][x]"
+  assert_equal "${method}" "DELETE"
+  assert_equal "${body}" ""
+}
+
+@test "dybatpho::curl_do reads a bundled -X when deciding a redirect's method" {
+  local helper="${BATS_TEST_TMPDIR}/answer.sh"
+  cat > "${helper}" << 'HELPER'
+code="$1"; record="$2"; shift 2
+printf '%s\n' "$@" > "${record}"
+for arg in "$@"; do [[ "${arg}" == "@-" ]] && cat > "${record}.body"; done
+while (($#)); do
+  [[ "$1" == "-D" ]] && printf 'HTTP/1.1 %s Moved\r\nLocation: /done\r\n\r\n' "${code}" > "$2"
+  shift
+done
+echo "${code}"
+HELPER
+  local -a DYBATPHO_CURL_SECRET_HEADERS=("x-api-key: sk")
+  local spelling first second
+  for spelling in -XPUT "-sX PUT"; do
+    first="${BATS_TEST_TMPDIR}/first" second="${BATS_TEST_TMPDIR}/second"
+    rm -f "${second}.body"
+    stub curl ": bash ${helper} 302 '${first}' \"\$@\"" ": bash ${helper} 200 '${second}' \"\$@\""
+    # shellcheck disable=SC2086 # the spelling is split into its words on purpose
+    DYBATPHO_CURL_SECRET_DATA='{"x":1}' run_traced dybatpho::curl_do https://api.example/start /dev/null ${spelling}
+    unstub curl
+    assert_success
+    # A PUT keeps its method and body on a 302.
+    assert_equal "$(grep -c -x -- '--request' "${second}")" "0"
+    assert_equal "$(cat "${second}.body")" '{"x":1}'
+  done
+}
+
+@test "dybatpho::curl_request removes its response header file" {
+  stub curl \
+    ": while ((\$#)); do [[ \$1 == -D ]] && printf 'HTTP/1.1 200 OK\r\n\r\n' > \$2; shift; done; echo 200"
+  dybatpho::curl_request https://this /dev/null
+  unstub curl
+  assert_equal "${DYBATPHO_HTTP_STATUS}" "200"
+  assert_equal "$(find "${BATS_TEST_TMPDIR}" -name '*.headers' | wc -l | tr -d ' ')" "0"
+}
+
 @test "dybatpho::curl_paginate stops before another origin when the body is a secret" {
   dybatpho::mock_http "api.example.test/items?page=1" 200 'page-one' \
     'Link: <https://other.example.test/items?page=2>; rel="next"'

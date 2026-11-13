@@ -234,9 +234,9 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   and the provider's message and printing no answer -- and `1` when no response
   arrived or curl failed. It MUST honour `DYBATPHO_CURL_CONNECT_TIMEOUT` and
   `DYBATPHO_CURL_TIMEOUT`, with `DYBATPHO_AI_TIMEOUT` as the overall limit.
-- **FR-024**: A streamed request MUST show its URL redacted to the scheme and
-  host in a `DYBATPHO_DRY_RUN` rehearsal and in its debug line, never the credentials or
-  path of the base URL.
+- **FR-024**: A streamed or buffered request MUST show its URL redacted to the scheme and
+  host in a `DYBATPHO_DRY_RUN` rehearsal and in its debug line, never the credentials,
+  path or query of the base URL.
 - **FR-025**: `ai_conversation_new` MUST write the conversation path into the variable the caller named, whatever that name is.
 - **FR-026**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
 - **FR-027**: The counter file MUST be placed and read in the caller's shell, so that a missing HOME or a symbolic link in its place stops the public function that needed it instead of letting it report empty counters.
@@ -311,7 +311,8 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   provider's message on stderr and nothing on stdout, a 529 returns `5`, and a
   request that never reached the server returns `1`.
 - **IT-015**: Verify a `DYBATPHO_DRY_RUN` stream against a base URL holding
-  credentials and a secret path prints the host only.
+  credentials and a secret path prints the host only, and that `ai_ask` rehearsed
+  against one holding credentials and a key in its query does the same.
 - **IT-016**: Start conversations into variables named `file`, `system`, `path_var` and `conversation_path`, and find the file with its system prompt.
 - **IT-017**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.
 - **IT-018**: Read usage with no HOME, and with the counter file replaced by a symbolic link, under `if !`; stop both times without printing counters.

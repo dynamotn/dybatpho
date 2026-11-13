@@ -197,6 +197,10 @@ dybatpho::circuit_breaker api.example.test -- \
 - A rate limit spec names a window in milliseconds, seconds, minutes, or hours, or is not `count/window` at all.
 - A rate limit key's window empties while the script is doing something else, so the budget is whole again.
 - A paginated collection's last page offers no `next` relation, one entry names several relations at once, or the pages form a cycle.
+- A request with a secret body is redirected with a 301, 302 or 303, or with a 307 or 308.
+- A secret header or a secret URL holds a carriage return or a line feed.
+- A resumed download is already complete, so the server answers `416 Range Not Satisfiable`.
+- A paginated request's rate limit is spent while waiting is disabled.
 - A GraphQL response answers `200 OK` while carrying an `errors` array, or the caller passes variables that are not a JSON object.
 - The GraphQL helper is called by a script that loaded `network` without `json`.
 
@@ -357,6 +361,11 @@ dybatpho::circuit_breaker api.example.test -- \
 - **FR-060**: A redirect `dybatpho::curl_do` follows itself MUST go only to an `http` or `https` URL; any other scheme, such as `file://`, MUST be refused with a warning and the 3xx returned as exit code 3.
 - **FR-061**: `dybatpho::curl_paginate` MUST send `DYBATPHO_CURL_SECRET_HEADERS` only to pages on the origin of the first page; a page on another origin, including the same host over plain `http`, MUST be fetched without them, and pagination MUST stop with a warning before it when `DYBATPHO_CURL_SECRET_DATA` is set.
 - **FR-062**: Pagination MUST follow only an `http` or `https` next link, and MUST stop with a warning before any other scheme.
+- **FR-063**: A redirect `dybatpho::curl_do` follows itself MUST change the method as `curl -L` does: a 303 MUST turn every method but `HEAD` into `GET`, and a 301 or 302 only a `POST` (an explicit one, or the one a `DYBATPHO_CURL_SECRET_DATA` body or the caller's own `-d`, `--data*`, `--json`, `-F` or `--form*` implies; `-T` alone implies a `PUT`), each without the body -- the secret one and those arguments with their values, `-T` included; the arguments MUST be read as curl reads them, so the value of an option such as `-H -d` is never taken for an option, a short bundle such as `-sd x` or `-XPUT` is understood, and the flags bundled before a body option are kept; any other method on a 301 or 302, and every method on a 307 or 308, MUST keep the method and the body.
+- **FR-064**: `dybatpho::curl_paginate` MUST NOT fetch a page its rate limit refused; it MUST return the limiter's exit code (9) instead.
+- **FR-065**: A secret header or secret URL holding a carriage return or a line feed MUST stop the script before any request is made, without printing the value.
+- **FR-066**: `dybatpho::curl_resume_download` MUST treat a `416` answer as a complete download, and go on to verify its checksum, only when its `Content-Range: bytes */N` names exactly the size of the non-empty destination; a `416` with another size or no `Content-Range` MUST still fail with exit code 4.
+- **FR-067**: `dybatpho::curl_request` MUST remove its response header file once the response is parsed.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -512,6 +521,13 @@ dybatpho::circuit_breaker api.example.test -- \
 - **IT-056**: Plant an opening a day ahead in a shared circuit and in memory, and see a trial run after one cooldown; plant a call far ahead in a shared window and in memory, and see the next call run; hide `find` and see a writable state directory refused.
 - **IT-057**: Answer a request carrying a secret header with a 302 to `file:///etc/passwd`, and get exit code 3 and a warning with curl run only once.
 - **IT-058**: Paginate with a bearer token from https to a same-origin page and then to `http://` on the same host, and see the token sent to the second page only; with a secret body, stop before a page on another host.
+- **IT-059**: With a secret body and a secret header, answer a same-origin 303 to a POST and to a PUT, and a 301 or 302 to a POST, and see the next request sent as `GET` with no body; answer a 302 to a PUT, a 307 to a POST and a 308 to a PATCH, and see the method and the body sent again.
+- **IT-060**: Spend a one-call paginate budget with waiting disabled and see exit code 9 with no page fetched.
+- **IT-061**: Set a secret header holding `\r\n` and a secret URL holding `\n` and see the call stop with no request made and the injected header not printed.
+- **IT-062**: Resume a complete file against a 416 naming its size and see success when its checksum matches and exit code 7 when it does not; against a 416 naming a larger size, or none, see exit code 4.
+- **IT-063**: Make a request through `dybatpho::curl_request` and find no `.headers` file left behind.
+- **IT-064**: Send the caller's own `-d`, `--data*`, `--json`, `-F`, `--form*` and attached `-dX`/`-FX` arguments with a secret header, and see a 303 followed by a GET without any of them while other arguments stay, and a 307 followed with them all.
+- **IT-065**: Walk `-H -d -o out -sd x`, `-H -X -XPUT -D hdr -T file --json=…` and `-sX patch --request=delete -C - -- -d x`, and see only the body options and their values dropped, the method, `-D` file and body kind read correctly; answer a secret-body request spelled `-XPUT` or `-sX PUT` with a 302 and see the PUT and its body sent again.
 
 ## Acceptance Criteria *(mandatory)*
 

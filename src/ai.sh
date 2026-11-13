@@ -1001,8 +1001,11 @@ function __dybatpho_ai_http {
   local DYBATPHO_CURL_SECRET_URL=true
   __dybatpho_ai_endpoint_into "${provider}" url headers
 
+  # The base URL can carry a key, so only its redacted form is logged.
+  local shown_url
+  __dybatpho_network_redact_url_into shown_url "${url}"
   if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
-    dybatpho::info "🧪 DRY RUN: POST ${url} as ${provider}"
+    dybatpho::info "🧪 DRY RUN: POST ${shown_url} as ${provider}"
     __dybatpho_ai_dry_run_body "${provider}" "${payload}"
     return 0
   fi
@@ -1013,8 +1016,6 @@ function __dybatpho_ai_http {
 
   # shellcheck disable=SC2034 # read by dybatpho::curl_do through dynamic scoping
   local DYBATPHO_CURL_SECRET_DATA="${payload}"
-  local shown_url
-  __dybatpho_network_redact_url_into shown_url "${url}"
   dybatpho::debug "ai: POST ${shown_url}"
   dybatpho::curl_json "${url}" "${response_file}" \
     --request POST \

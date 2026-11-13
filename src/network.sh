@@ -240,6 +240,20 @@ function __dybatpho_network_secret_config {
   [[ -z "${__config_url}" ]] || ! dybatpho::is true "${DYBATPHO_CURL_SECRET_URL}" || __config_secret_url=true
   ((${#DYBATPHO_CURL_SECRET_HEADERS[@]})) || [[ "${__config_secret_url}" == true ]] || return 0
 
+  # curl's config parser turns an escaped `\r\n` back into a line break, so a
+  # value holding one added a header of its own. It is refused, unprinted.
+  local trace __config_value
+  __dybatpho_network_trace_off trace
+  local -a __config_values=( # kcov(skip)
+    ${DYBATPHO_CURL_SECRET_HEADERS[@]+"${DYBATPHO_CURL_SECRET_HEADERS[@]}"} # kcov(skip)
+    "${__config_url}"                                                       # kcov(skip)
+  )
+  for __config_value in "${__config_values[@]}"; do # kcov(skip)
+    [[ "${__config_value}" != *[$'\r\n']* ]] \
+      || dybatpho::die "${FUNCNAME[1]}: a secret header or URL must not contain a line break" # kcov(skip)
+  done
+  __dybatpho_network_trace_on "${trace}" # kcov(skip)
+
   local previous_umask path header
   previous_umask="$(umask)"
   umask 077
@@ -255,7 +269,7 @@ function __dybatpho_network_secret_config {
   # the request's own `rm`, and left the credential on disk.
   dybatpho::cleanup_file_on_exit "${path}"
 
-  local network_config_escape trace
+  local network_config_escape
   # kcov reads the trace, which is off from here to `__dybatpho_network_trace_on`:
   # the secret header and secret URL tests run these lines, unseen.
   __dybatpho_network_trace_off trace
@@ -448,14 +462,12 @@ function dybatpho::curl_do {
   # used to leave the file read here empty: a secret-header request then never
   # followed a redirect and retried it as a failure instead. The caller's file
   # is read instead of a temporary one, and is left in place afterwards.
-  local header_file="" header_cleanup="" scanned
-  local -a scan=("$@")
-  for ((scanned = 0; scanned + 1 < ${#scan[@]}; scanned++)); do
-    case "${scan[scanned]}" in
-      -D | --dump-header) [[ "${scan[scanned + 1]}" == "-" ]] || header_file="${scan[scanned + 1]}" ;;
-      *) ;; # kcov(skip) - a case arm has no command to fire on
-    esac
-  done
+  # The same walk finds the method and the caller's own body, `-d` or `-F`
+  # (which make it a POST without `-X`) or `-T` (a PUT), and the arguments
+  # without that body, for a redirect that drops it.
+  local header_file="" header_cleanup="" method="" caller_body=""
+  local -a request_args=("$@") bodyless_args=()
+  __dybatpho_network_walk_args_into bodyless_args method header_file caller_body "$@"
   if [[ -z "${header_file}" ]]; then
     dybatpho::create_temp header_file ".headers" "curl"
     header_cleanup="${header_file}"
@@ -482,6 +494,7 @@ function dybatpho::curl_do {
   local follow_here=false redirects=0 current_url="${url}" location next_url
   ((${#DYBATPHO_CURL_SECRET_HEADERS[@]})) && follow_here=true
   local body_on_stdin=false
+  local -a method_args=()
   if [[ -n "${DYBATPHO_CURL_SECRET_DATA}" ]]; then
     secret_args+=(--data-binary @-)
     body_on_stdin=true
@@ -509,7 +522,8 @@ function dybatpho::curl_do {
     [[ -n "${DYBATPHO_CURL_CONNECT_TIMEOUT}" ]] && curl_args+=(--connect-timeout "${DYBATPHO_CURL_CONNECT_TIMEOUT}")
     [[ -n "${DYBATPHO_CURL_TIMEOUT}" ]] && curl_args+=(--max-time "${DYBATPHO_CURL_TIMEOUT}")
     curl_args+=(${secret_args[@]+"${secret_args[@]}"})
-    curl_args+=("$@")
+    curl_args+=(${request_args[@]+"${request_args[@]}"})
+    curl_args+=(${method_args[@]+"${method_args[@]}"})
 
     : > "${header_file}"
     if [[ "${body_on_stdin}" == true ]]; then
@@ -554,6 +568,23 @@ function dybatpho::curl_do {
           dybatpho::warn "Not following the redirect to ${next_url%%:*}: only http and https are followed"
           rm -f ${header_cleanup:+"${header_cleanup}"} ${secret_config:+"${secret_config}"}
           break
+        fi
+        # As `curl -L` does: a 303 turns every method but HEAD into a GET with
+        # no body, a 301 or 302 only a POST, and a 307 or 308 none. Following
+        # here, the body went to the new URL whatever the status.
+        local sent_method="${method:-GET}"
+        if [[ -z "${method}" && "${caller_body}" == upload ]]; then
+          sent_method=PUT
+        elif [[ -z "${method}" ]] && [[ "${body_on_stdin}" == true || "${caller_body}" == data ]]; then
+          sent_method=POST
+        fi
+        if [[ "${code}" == 303 && ! "${sent_method}" =~ ^(GET|HEAD)$ ]] \
+          || [[ "${code}" =~ ^30[12]$ && "${sent_method}" == POST ]]; then
+          body_on_stdin=false caller_body=""
+          method=GET
+          method_args=(--request GET)
+          request_args=(${bodyless_args[@]+"${bodyless_args[@]}"})
+          secret_args=(--config "${secret_config}")
         fi
         local origin next_origin
         __dybatpho_network_origin_into origin "${current_url}"
@@ -674,6 +705,97 @@ function __dybatpho_network_resolve_location_into {
       && __dybatpho_network_resolve_path+="/"
     __dybatpho_network_resolve_out="${__dybatpho_network_resolve_path%/*}/${__dybatpho_network_resolve_ref}"
   fi
+}
+
+#######################################
+# @description Walk a request's curl arguments the way curl reads them: an
+#   option that takes a value takes the next argument (or the rest of a short
+#   bundle, `-XPUT`, `-sd x`), whatever it looks like, so `-H -d` is a header
+#   and not a body. It stores the arguments without the body options -- `-d`,
+#   `--data*`, `--json`, `-F`, `--form*`, `-T` -- and their values, which a
+#   redirect that turns the request into a GET must not resend, and reports the
+#   method, the `-D` file and which kind of body there was.
+# @arg $1 string Name of the array receiving the arguments without a body
+# @arg $2 string Name of the variable receiving the upper-cased `-X` method
+# @arg $3 string Name of the variable receiving the `-D` file, unless it is `-`
+# @arg $4 string Name of the variable receiving `data`, `upload` or nothing
+# @arg $@ string The request's curl arguments
+# @set The named variables
+# @internal
+#######################################
+function __dybatpho_network_walk_args_into {
+  local -n __dybatpho_network_walk_kept="$1" __dybatpho_network_walk_method="$2"
+  local -n __dybatpho_network_walk_dump="$3" __dybatpho_network_walk_body="$4"
+  shift 4
+  __dybatpho_network_walk_kept=()
+  __dybatpho_network_walk_method="" __dybatpho_network_walk_dump="" __dybatpho_network_walk_body=""
+  local arg option value prefix letters index
+  local -a tokens
+  while (($#)); do
+    arg="$1"
+    shift
+    tokens=("${arg}") option="" value="" prefix=""
+    case "${arg}" in
+      --)
+        __dybatpho_network_walk_kept+=("${arg}" "$@")
+        break
+        ;;
+      --*=*) option="${arg%%=*}" value="${arg#*=}" ;;
+      --*)
+        option="${arg}"
+        case "${option}" in
+          --header | --output | --output-dir | --user | --user-agent | --referer | --cookie | --cookie-jar | \
+            --request | --write-out | --max-time | --config | --upload-file | --proxy | --proxy-user | \
+            --cert | --key | --cacert | --capath | --connect-timeout | --retry | --retry-delay | \
+            --retry-max-time | --url | --data | --data-* | --json | --form | --form-string | \
+            --dump-header | --continue-at | --range | --resolve | --connect-to | --limit-rate | \
+            --max-filesize | --max-redirs | --interface | --oauth2-bearer | --unix-socket | --time-cond | \
+            --variable | --stderr | --trace | --trace-ascii | --ciphers | --pinnedpubkey | --keepalive-time | \
+            --expect100-timeout)
+            if (($#)); then
+              value="$1"
+              tokens+=("$1")
+              shift
+            fi
+            ;;
+          *) ;; # kcov(skip) - a case arm has no command to fire on
+        esac
+        ;;
+      -?*)
+        letters="${arg:1}"
+        for ((index = 0; index < ${#letters}; index++)); do
+          case "${letters:index:1}" in
+            [AbcCdDeEFHKmoPQrtTuUwxXyYz])
+              option="-${letters:index:1}" prefix="${letters:0:index}" value="${letters:index+1}"
+              if [[ -z "${value}" ]] && (($#)); then
+                value="$1"
+                tokens+=("$1")
+                shift
+              fi
+              break
+              ;;
+            *) ;; # kcov(skip) - a case arm has no command to fire on
+          esac
+        done
+        ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
+    esac
+    case "${option}" in
+      -X | --request) __dybatpho_network_walk_method="${value^^}" ;;
+      -D | --dump-header) [[ "${value}" == "-" ]] || __dybatpho_network_walk_dump="${value}" ;;
+      -d | --data | --data-* | --json | -F | --form | --form-string | -T | --upload-file)
+        case "${option}" in
+          -T | --upload-file) __dybatpho_network_walk_body=upload ;;
+          *) [[ "${__dybatpho_network_walk_body}" == upload ]] || __dybatpho_network_walk_body=data ;;
+        esac
+        # The flags bundled before it, `-s` of `-sd x`, are not part of the body.
+        [[ -z "${prefix}" ]] || __dybatpho_network_walk_kept+=("-${prefix}")
+        continue
+        ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
+    esac
+    __dybatpho_network_walk_kept+=(${tokens[@]+"${tokens[@]}"})
+  done
 }
 
 #######################################
@@ -873,7 +995,23 @@ function dybatpho::curl_resume_download {
   local shown_url
   __dybatpho_network_redact_url_into shown_url "${url}"
   dybatpho::progress "Downloading ${shown_url} (resume enabled)"
-  dybatpho::curl_do "${url}" "${dst_file}" -# --no-silent -C - "$@" || return $?
+  # A file that is already complete has no range left to ask for: the server
+  # answers 416, and that is not a failure to report but a file to verify.
+  local exit_code=0
+  dybatpho::curl_request "${url}" "${dst_file}" -# --no-silent -C - "$@" || exit_code=$?
+  # Only when the size the server names is the size on disk: a 416 alone also
+  # answers a partial file the server will not resume.
+  local complete_range='^bytes \*/([0-9]{1,18})$' range_header=content-range
+  if ((exit_code == 4)) && [[ "${DYBATPHO_HTTP_STATUS-}" == 416 && -s "${dst_file}" ]] \
+    && [[ "${DYBATPHO_HTTP_HEADERS[${range_header}]-}" =~ ${complete_range} ]]; then
+    local full_size="${BASH_REMATCH[1]}" local_size
+    local_size=$(wc -c < "${dst_file}") || local_size=""
+    if [[ -n "${local_size}" ]] && ((10#${full_size} > 0 && 10#${full_size} == local_size)); then
+      dybatpho::debug "${dst_file} is already complete"
+      exit_code=0
+    fi
+  fi
+  ((exit_code == 0)) || return "${exit_code}"
 
   if [[ -n "${checksum}" ]]; then
     dybatpho::verify_checksum "${dst_file}" "${checksum}" || return $?
@@ -980,6 +1118,8 @@ function dybatpho::curl_request {
   if ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::curl_parse_response "${header_file}" "${output}"
   fi
+  # Not left for the exit trap: a loop of requests piled them up, Set-Cookie and all.
+  rm -f "${header_file}"
   return "${exit_code}"
 }
 
@@ -1701,7 +1841,14 @@ function dybatpho::curl_paginate {
       dybatpho::warn "Pagination stopped after ${max_pages} pages"
       break
     fi
-    [[ -n "${rate_key}" ]] && dybatpho::rate_limit "${rate_key}" "${DYBATPHO_PAGINATE_RATE}"
+    # Not `&&`: its exit code was dropped, and a refused page fetched anyway.
+    if [[ -n "${rate_key}" ]]; then
+      dybatpho::rate_limit "${rate_key}" "${DYBATPHO_PAGINATE_RATE}" || {
+        exit_code=$?
+        rm -f "${body}"
+        return "${exit_code}"
+      }
+    fi
 
     __dybatpho_network_redact_url_into shown_url "${url}"
     dybatpho::debug "Fetching page ${page}: ${shown_url}"

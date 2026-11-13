@@ -248,6 +248,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   instead of letting it finish while its job stays claimed and runs again.
 - **`lock` — a worker's `dybatpho::lock_semaphore_release name N` frees only
   its own slots,** not the parent script's.
+- **`network` — `dybatpho::curl_paginate` stops when the rate limit refuses a
+  page;** `dybatpho::curl_resume_download` on a complete file succeeds and
+  checks it; `dybatpho::curl_request` no longer keeps a header file per call
+  until exit.
 - **`secret` — `dybatpho::secret_from_env NAME NAME` keeps the value** and only
   drops its export.
 - **`json` — `dybatpho::json_object`, `json_set` and `yaml_set` take values
@@ -340,6 +344,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`safety` — `dybatpho::safe_extract` judges a destination symlink by where
   it leads,** so it cannot extract into a protected directory or outside
   `DYBATPHO_SAFE_ROOTS`.
+- **`network` — a secret header or URL holding a line break is refused,** so a
+  token cannot add request headers; a same-origin redirect drops the body
+  (secret or passed with `-d`, `--json` or `-F`) and the method exactly where
+  `curl -L` does, instead of posting it again.
+- **`ai` — a dry run no longer logs credentials or a key in the base URL.**
 - **`backup` — `dybatpho::backup_create` writes archives readable only by
   their owner.**
 - **`schedule`, `queue` — the debounce ticket and the sequence counter are

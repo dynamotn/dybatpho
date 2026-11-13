@@ -1045,6 +1045,18 @@ _secret_tool() { printf 'token=swordfish-token\n'; }
   refute_output --partial "secret-path"
 }
 
+@test "dybatpho::ai_ask rehearses without printing the whole URL" {
+  # The buffered rehearsal logged the base URL as given, credentials and all.
+  DRY_RUN=true
+  DYBATPHO_AI_PROVIDER=openai
+  DYBATPHO_AI_BASE_URL="https://user:hunter2@llm.example.com/v1?key=SEKRET"
+  run_traced --separate-stderr dybatpho::ai_ask "q"
+  assert_success
+  assert_stderr --partial "POST https://llm.example.com/[redacted]"
+  refute_stderr --partial "hunter2"
+  refute_stderr --partial "SEKRET"
+}
+
 @test "the counter file defaults to a private directory, not a shared one" {
   local state_home="${BATS_TEST_TMPDIR}/state"
   DYBATPHO_AI_STATE_FILE=""

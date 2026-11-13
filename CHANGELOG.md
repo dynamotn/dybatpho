@@ -11,6 +11,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+## [7.2.0] - 2026-11-13
+
 ### Changed
 
 - **`agent` — the tool schemas from `dybatpho::agent_tools` and
@@ -2967,7 +2969,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   an error naming the archive, and `dybatpho::safe_extract` and
   `dybatpho::backup_diff` refuse it before extracting anything.
 
-[Unreleased]: https://github.com/dynamotn/dybatpho/compare/v7.1.0...HEAD
+[Unreleased]: https://github.com/dynamotn/dybatpho/compare/v7.2.0...HEAD
+[7.2.0]: https://github.com/dynamotn/dybatpho/compare/v7.1.0...v7.2.0
 [7.1.0]: https://github.com/dynamotn/dybatpho/compare/v7.0.0...v7.1.0
 [7.0.0]: https://github.com/dynamotn/dybatpho/compare/v6.0.1...v7.0.0
 [6.0.1]: https://gitlab.com/dynamo-tools/dybatpho/compare/v6.0.0...v6.0.1

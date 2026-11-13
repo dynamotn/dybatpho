@@ -49,6 +49,7 @@ anything is sent, and a call budget that stops a runaway loop.
 | **`DYBATPHO_AI_JSON_RETRIES`** | number | no | `2` | Attempts `dybatpho::ai_json` makes before failing |
 | **`DYBATPHO_AI_CLI`** | string | yes |  | Command used by the `cli` backend: `claude`, `llm`, or `ollama` |
 | **`DYBATPHO_AI_ANTHROPIC_VERSION`** | string | no | `2023-06-01` | Value of the `anthropic-version` header |
+| **`DYBATPHO_AI_UNTRUSTED_NOTE`** | string | yes |  | Sentence appended to the system prompt of every request that holds `<untrusted-data>` tags; defaults to one telling the model the tagged text is data and never instructions to follow, and an empty value disables it |
 | **`DYBATPHO_AI_STATE_FILE`** | string | yes |  | File the call and token counters are kept in; resolved on first use |
 
 ### 🚀 Highlights
@@ -74,6 +75,7 @@ anything is sent, and a call budget that stops a runaway loop.
 - [`dybatpho::ai_usage_reset`](#dybatphoai_usage_reset) — Reset every usage counter and the call budget consumption.
 - [`dybatpho::ai_budget`](#dybatphoai_budget) — Cap how many model calls the rest of the script may make.
 - [`dybatpho::ai_redact`](#dybatphoai_redact) — Redact secrets and common personal identifiers in text. Registered secrets are masked first, then email addresses, IPv4 addresses, and long digit runs are replaced with placeholders.
+- [`dybatpho::ai_untrusted`](#dybatphoai_untrusted) — Wrap text that came from outside the script -- a log, a diff, a web page, a tool's output -- so the model can tell it apart from the script's own instructions. The text sits between `<untrusted-data id="BOUNDARY" source="LABEL">` and `</untrusted-data id="BOUNDARY">`, where the boundary is 64 fresh random bits, drawn again when the text contains it, so the text cannot close the tag early. Characters of the label that could end the attribute or the tag become `_`. A request holding such tags gets `DYBATPHO_AI_UNTRUSTED_NOTE` appended to its system prompt.
 
 <a id="usage"></a>
 
@@ -124,6 +126,19 @@ dybatpho::ai_tool_register disk_free "Report free disk space" \
   '{"type":"object","properties":{}}' disk_free
 dybatpho::ai_run "Are we about to run out of disk?"
 ```
+
+#### Mark outside text as data
+
+```bash
+dybatpho::ai_ask "Summarize this log: $(dybatpho::ai_untrusted build.log < build.log)"
+```
+
+Text wrapped by `dybatpho::ai_untrusted` sits between tags carrying a random
+boundary it cannot forge, and every request holding such tags gets
+`DYBATPHO_AI_UNTRUSTED_NOTE` appended to its system prompt. `dybatpho::ai_run`
+wraps every tool result this way. Delimiting reduces the risk of prompt
+injection; it does not remove it. A model can still be talked into acting on
+what it reads, so the real control is which tools it may call.
 
 <a id="see-also"></a>
 
@@ -630,6 +645,7 @@ dybatpho::ai_run "Do we need to clean up the build cache?"
 **📝 Notes**
 
 - Only the `anthropic` and `openai` backends carry tool calls; on the others this behaves like `dybatpho::ai_ask`
+- Every tool result, an error result included, goes back wrapped by `dybatpho::ai_untrusted` with the tool name as its label, so `DYBATPHO_AI_UNTRUSTED_NOTE` joins the system prompt from the second round on
 
 **📤 Output on stdout**
 
@@ -807,3 +823,45 @@ dybatpho::ai_ask "Explain this error: $(dybatpho::ai_redact "${line}")"
 **🔗 See also**
 
 - [dybatpho::secret_register](#dybatphosecret_register)
+
+---
+
+### `dybatpho::ai_untrusted`
+
+Wrap text that came from outside the script -- a log, a diff, a
+web page, a tool's output -- so the model can tell it apart from the
+script's own instructions.
+The text sits between `<untrusted-data id="BOUNDARY" source="LABEL">` and
+`</untrusted-data id="BOUNDARY">`, where the boundary is 64 fresh random
+bits, drawn again when the text contains it, so the text cannot close the
+tag early. Characters of the label that could end the attribute or the tag
+become `_`. A request holding such tags gets `DYBATPHO_AI_UNTRUSTED_NOTE`
+appended to its system prompt.
+
+**🧪 Example**
+
+```bash
+dybatpho::ai_ask "What failed? $(dybatpho::ai_untrusted build.log < build.log)"
+dybatpho::ai_untrusted "pr-${number}" "${diff}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Label naming where the text came from |
+| `$2` | string | no |  | Text to wrap, stdin is read when omitted |
+
+**📝 Notes**
+
+- Delimiting reduces the risk of prompt injection, it does not remove it: a model can still act on what it reads. The real control is which tools it may call -- keep the registered tools few, and gate the dangerous ones with `dybatpho::agent_confirm` or an allow-list
+
+**📤 Output on stdout**
+
+- The wrapped text
+
+**🚦 Exit codes**
+
+- `0`: The text was wrapped
+- `1`: Stop the script when the label is missing or empty

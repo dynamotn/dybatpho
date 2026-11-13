@@ -404,6 +404,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   commands as tools (`claude mcp add mytool -- /path/mytool mcp`). Tool
   arguments are checked against the option spec and become argv without ever
   being read as options; `DYBATPHO_AGENT_MCP_TIMEOUT` limits each call.
+- **`ai` — `dybatpho::ai_untrusted <label> [text]` marks a log, file or tool
+  output as data inside an unforgeable tag,** and any request holding such
+  data tells the model never to follow instructions found in it
+  (`DYBATPHO_AI_UNTRUSTED_NOTE`). `dybatpho::ai_run` wraps every tool result
+  this way.
 
 - **`math` — `DYBATPHO_MATH_MAX_SCALE` (default 4096) caps the scale,** so a
   huge scale is refused instead of running for minutes.

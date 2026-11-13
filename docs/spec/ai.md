@@ -132,6 +132,37 @@ call is refused.
    request is sent, no budget is consumed, and a placeholder of the right shape
    is returned
 
+### User Story 6 - Mark outside text as data, not instructions (Priority: P1)
+
+As a script author, I want to hand the model a log, a diff, a page or a tool's
+output marked as data, so that instructions hidden in that text do not reach the
+model with the same standing as my own prompt.
+
+**Independent Test**: Wrap text with `dybatpho::ai_untrusted`, check the tags
+share one boundary the text does not contain, send it and find the untrusted
+data note in the request's system prompt; run a tool through `ai_run` and find
+its result wrapped.
+
+**Acceptance Scenarios**:
+
+1. **Given** a label and text, **When** `dybatpho::ai_untrusted` runs, **Then**
+   the text is printed between `<untrusted-data id="BOUNDARY" source="LABEL">`
+   and `</untrusted-data id="BOUNDARY">`, with a fresh 64-bit boundary per call
+2. **Given** text that contains the drawn boundary, **When** it is wrapped,
+   **Then** a new boundary is drawn until the text does not contain it
+3. **Given** a label holding quotes, angle brackets or control characters,
+   **When** it is wrapped, **Then** each such character becomes `_`
+4. **Given** a request whose text holds wrapped data, **When** it is sent,
+   **Then** `DYBATPHO_AI_UNTRUSTED_NOTE` is appended to its system prompt, and a
+   request without wrapped data is sent unchanged
+5. **Given** a tool-use loop, **When** a tool result or an error result is fed
+   back, **Then** it is wrapped with the tool name as its label
+
+Delimiting reduces the risk of prompt injection; it does not remove it. A model
+can still be talked into acting on what it reads, so the real control remains
+which tools it may call: few registered tools, and `dybatpho::agent_confirm` or
+an allow-list in front of the dangerous ones.
+
 ### Example Workflow
 
 ```bash
@@ -170,6 +201,13 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
   delta, or one that never reaches the provider.
 - A base URL that carries credentials or a key in its path, rehearsed under
   `DYBATPHO_DRY_RUN` or logged at debug level.
+- Wrapped text that contains the boundary it was given, or a closing tag.
+- A label, possibly chosen by the model as a tool name, holding `"`, `<`, `>`,
+  or control characters; an empty label.
+- `DYBATPHO_AI_UNTRUSTED_NOTE` set to an empty string, or a request with no
+  system prompt of its own.
+- A Bash older than 5.1, which has no `SRANDOM`, or where the environment sets
+  `SRANDOM` to a constant; a `SRANDOM` the script reassigned on a newer Bash.
 
 ## Requirements *(mandatory)*
 
@@ -253,6 +291,11 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **FR-038**: Streaming MUST print a final chunk that ends without a newline.
 - **FR-039**: `DYBATPHO_AI_BASE_URL` MUST reach `curl` only through a private config file, never as an argument, for a buffered call, a streamed call, and the Ollama probe alike, since it can carry a credential.
 
+- **FR-040**: `dybatpho::ai_untrusted` MUST wrap its text argument, or stdin when it has none, between `<untrusted-data id="BOUNDARY" source="LABEL">` and `</untrusted-data id="BOUNDARY">`, where BOUNDARY is 64 random bits from `SRANDOM` (Bash 5.1 or newer only) or `/dev/urandom`, drawn again while the text contains it; after two such draws it MUST draw from `/dev/urandom`, and after 16 it MUST stop with an error rather than draw forever.
+- **FR-041**: `dybatpho::ai_untrusted` MUST replace every label character outside letters, digits, space and `._:/@+-` with `_`, and MUST refuse an empty label.
+- **FR-042**: A request whose conversation holds `<untrusted-data id=` MUST carry `DYBATPHO_AI_UNTRUSTED_NOTE` appended to its system prompt, after a blank line when there is one, for `ai_ask`, `ai_chat`, `ai_json`, `ai_stream`, `ai_run` and the `cli` backend; an empty note disables this, and a request without wrapped data MUST be sent unchanged.
+- **FR-043**: `dybatpho::ai_run` MUST wrap every tool result fed back to the model, an error result included, with `dybatpho::ai_untrusted` framing, after secret masking, labelled with the tool name the model asked for.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Backend**: One of four transports, each with its own payload shape,
@@ -264,6 +307,9 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **Counter File**: The shared record of calls and token totals for one script
   run.
 - **Cache Entry**: A stored response keyed by a hash of the request.
+- **Untrusted Data Block**: Text from outside the script between an opening and
+  a closing `untrusted-data` tag that share one random boundary and name the
+  text's source.
 
 ## Success Criteria *(mandatory)*
 
@@ -333,6 +379,13 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
 - **IT-033**: Run a tool through `ai_run` that reads variables named like the loop's locals, and see the caller's values.
 - **IT-034**: Stream Ollama objects whose last one has no trailing newline and get the whole answer.
 - **IT-035**: Point the base URL at one holding a password and a secret path, run `ai_ask`, `ai_stream` and the Ollama probe, and find neither among curl's arguments but the URL in its config file each time.
+- **IT-036**: Wrap an argument and stdin with `ai_untrusted`, and find both tags with one boundary of sixteen letters `a`-`p`; wrap twice and get two boundaries.
+- **IT-037**: Make the first boundary draw one the text contains, and find the second draw used.
+- **IT-038**: Wrap with a label holding quotes, angle brackets, a newline and a tab, and find them replaced by `_`; refuse an empty label.
+- **IT-039**: Draw boundaries with `SRANDOM` unset, and get two different sixteen-letter tokens from `/dev/urandom`.
+- **IT-040**: Send wrapped data through `ai_ask` with and without a system prompt and through `ai_stream`, and find the note in the system prompt; send a plain prompt and find no note; replace the note, then empty it, and find the replacement once and no system prompt after.
+- **IT-041**: Run `ai_run` with a registered tool and an unknown tool named `nope">`, and find both results wrapped, the second labelled `nope__`, and the note in the system prompt; find the OpenAI `tool` message content wrapped too.
+- **IT-042**: Set `SRANDOM` to a constant with the Bash 5.1 check failing and get random boundaries; set it to a constant on a newer Bash and wrap text holding that boundary, and finish with another; make every draw return a boundary the text holds, and stop with an error.
 
 ## Acceptance Criteria *(mandatory)*
 
@@ -346,3 +399,6 @@ dybatpho::info "Model usage: $(dybatpho::ai_usage total)"
    returned where JSON was required.
 5. Every documented exit code matches the behavior of the network module it
    builds on.
+6. Outside text and tool results can be marked as data with a boundary they
+   cannot forge, and the model is told so, while requests without such data are
+   sent as before.

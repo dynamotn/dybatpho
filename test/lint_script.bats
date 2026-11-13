@@ -22,3 +22,19 @@ setup() {
   [[ -n "${from_root}" ]]
   assert_equal "${from_elsewhere}" "${from_root}"
 }
+
+@test "scripts/lint.sh fails the bundle stage when bundle.sh fails" {
+  # The stage is called as `… || failures++`, which turns errexit off inside
+  # it: a failing bundle.sh was ignored and the stage reported success.
+  local tree="${BATS_TEST_TMPDIR}/tree"
+  mkdir -p "${tree}/scripts"
+  ln -s "${DYBATPHO_DIR}/init.sh" "${tree}/init.sh"
+  ln -s "${DYBATPHO_DIR}/src" "${tree}/src"
+  cp "${LINT_SH}" "${tree}/scripts/lint.sh"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "${tree}/scripts/bundle.sh"
+  chmod +x "${tree}/scripts/bundle.sh"
+  run --separate-stderr bash "${tree}/scripts/lint.sh" --stage bundle
+  assert_failure
+  refute_output --partial "Bundle builds and loads"
+  refute_stderr --partial "Bundle builds and loads"
+}

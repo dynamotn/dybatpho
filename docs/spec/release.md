@@ -123,6 +123,8 @@ dybatpho::release_sign "${sums}"
 - A file to sign, or its signature, whose path holds a space or shell syntax
   such as `$(...)` or `;`.
 - An artifact is packaged while the `archive` module is not loaded yet, so it is loaded on demand.
+- A tag matches the release pattern but is no version, such as `vnext`: it is never the base.
+- The checksum output is named by a path spelled differently from the directory, such as `./out/sums.txt` for `out`: it is still left out of the sums.
 
 ## Requirements *(mandatory)*
 
@@ -152,6 +154,8 @@ dybatpho::release_sign "${sums}"
 - **FR-021**: `release_next_version` MUST start from the highest release tag, not from a pre-release of it.
 - **FR-022**: With no base given, `release_next_version` MUST skip every pre-release tag, so a candidate above the last release is never the base.
 - **FR-023**: `scripts/release.sh` MUST build each release's bundle and checksum file in a directory of its own, so the published checksum file lists only what that release uploads.
+- **FR-024**: With no base given, `release_next_version` MUST skip every tag that does not parse as a semantic version.
+- **FR-025**: `release_checksums` MUST leave its output file out of the sums whenever it is the same file as an entry, however either path is spelled.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -197,6 +201,8 @@ dybatpho::release_sign "${sums}"
 - **IT-021**: Tag `v1.0.0-rc.1`, then a feature as `v1.0.0`, then commit a fix, and get `1.0.1`.
 - **IT-022**: Tag `v1.0.0`, then a feature as `v1.1.0-rc.1`, then commit a fix, and get `1.1.0`.
 - **IT-023**: Release from a copy of the repository whose `dist/` holds an earlier bundle, and find the checksum file beside the new bundle lists only that bundle.
+- **IT-024**: Tag `v1.0.0`, then a feature as `vnext`, then commit a fix, and get `1.1.0`.
+- **IT-025**: Checksum `rel_out` into `./rel_out/checksums.txt` twice and find one line, not naming the sums file.
 
 ## Acceptance Criteria *(mandatory)*
 

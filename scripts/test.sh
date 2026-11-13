@@ -333,6 +333,36 @@ function __dybatpho_test_shard_worker {
   done
 }
 
+# @description End the shard workers and everything they started. Each worker
+#   is the leader of its own process group. The worker itself goes first, so it
+#   claims no further file; its group then gets `INT`, which Bats handles by
+#   removing its run directory, then `TERM`, then `KILL`, each after up to two
+#   seconds for the group to empty.
+# @arg $@ number Process IDs of the workers
+# @internal
+function __dybatpho_test_stop_workers {
+  local _pid _signal _tick _alive
+  for _pid in "$@"; do
+    kill -TERM "${_pid}" 2> /dev/null || true
+  done
+  wait "$@" 2> /dev/null || true
+  for _signal in INT TERM KILL; do
+    _alive=0
+    for _pid in "$@"; do
+      kill "-${_signal}" -- "-${_pid}" 2> /dev/null && _alive=1
+    done
+    for ((_tick = 0; _alive && _tick < 20; _tick++)); do
+      sleep 0.1
+      _alive=0
+      for _pid in "$@"; do
+        kill -0 -- "-${_pid}" 2> /dev/null && _alive=1
+      done
+    done
+    ((_alive)) || return 0
+  done
+  return 0
+}
+
 # @description Run the collected files on `JOBS` background Bats workers, for a
 #   machine without GNU `parallel`, which Bats needs to spread files over
 #   `--jobs`.
@@ -370,9 +400,20 @@ function __dybatpho_test_bats_shards {
   # reach the summary below rather than stop the run.
   # shellcheck disable=SC2310 # a failing file has to reach the summary below
   {
+    # A job started with `&` in a non-interactive shell ignores SIGINT, so
+    # after Ctrl-C the workers ran the remaining files into a run directory the
+    # exit cleanup had already removed. Job control puts each worker in a
+    # process group of its own, which ends together with the Bats it started.
+    # The handlers come first, so no signal finds a worker started but untracked.
+    local -a _pids=()
+    trap '__dybatpho_test_stop_workers ${_pids[@]+"${_pids[@]}"}; trap - SIGINT; kill -INT "${BASHPID}"' SIGINT
+    trap '__dybatpho_test_stop_workers ${_pids[@]+"${_pids[@]}"}; trap - SIGTERM; kill -TERM "${BASHPID}"' SIGTERM
+    set -m
     for ((_w = 0; _w < _workers; _w++)); do
       __dybatpho_test_shard_worker &
+      _pids+=("$!")
     done
+    set +m
     wait
   } | __dybatpho_test_progress "${_expected}" || true
 

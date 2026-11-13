@@ -98,6 +98,20 @@ setup() {
   assert_stderr --partial "Expected an existing path"
 }
 
+@test "dybatpho::assert_file_mode rejects an expected mode that is not octal" {
+  # The mode went straight into arithmetic: `0o644` or `600x` raised an
+  # arithmetic error there, and the assertion passed.
+  local file="${BATS_TEST_TMPDIR}/secret.txt" mode
+  printf 'token\n' > "${file}"
+  chmod 600 "${file}"
+
+  for mode in 0o644 600x 9 "" 68 12345; do
+    run --separate-stderr dybatpho::assert_file_mode "${file}" "${mode}"
+    assert_failure
+    assert_stderr --partial "Expected mode must be 3 or 4 octal digits"
+  done
+}
+
 @test "dybatpho::assert_file_mode checks the file a link points at" {
   # A link's own mode is 777 on Linux whatever the file allows, so checking it
   # would fail every secret reached through a link.
@@ -482,6 +496,25 @@ ports: [80, 443]
   run_traced --separate-stderr dybatpho::assert_mock_called kubectl apply -f manifest.yaml
   assert_failure
   assert_stderr --partial "was never called with"
+}
+
+@test "dybatpho::mock_call_count and assert_mock_called count calls without arguments" {
+  # A call without arguments is recorded as an empty line, which `$(...)`
+  # stripped: two calls counted as none, and the mock as never called.
+  dybatpho::mock_command whoami 0 "root"
+  whoami > /dev/null
+  whoami > /dev/null
+  assert_equal "$(dybatpho::mock_call_count whoami)" "2"
+  dybatpho::assert_mock_called whoami
+}
+
+@test "dybatpho::mock_call_count counts a call whose argument holds a line break once" {
+  dybatpho::mock_command tool 0
+  tool "first line"$'\n'"second line" --flag
+  assert_equal "$(dybatpho::mock_call_count tool)" "1"
+  dybatpho::assert_mock_called tool "first line"$'\n'"second line" --flag
+  run_traced -0 dybatpho::mock_calls tool
+  assert_output 'first line\nsecond line --flag'
 }
 
 @test "dybatpho::mock_command honors the requested exit code" {

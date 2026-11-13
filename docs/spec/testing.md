@@ -320,6 +320,8 @@ dybatpho::unmock_all
 - The HTTP mock is given `-D -` (or `--dump-header -`): the headers go to standard output, as curl writes them, not to a file named `-`.
 - A mocked command name holds a slash, such as `../file`: `dybatpho::unmock_command` and `dybatpho::mock_calls` refuse it rather than reach outside the mock directory.
 - `test_home` runs outside Bats with no directory, or is given one reached through a link or holding a space.
+- `assert_file_mode` is given an expected mode that is not octal, such as `0o644` or `600x`: it stops through the fatal path rather than pass.
+- A mocked command is called without arguments, or with an argument holding a line break: each call still counts once, and the line break is recorded as `\n`.
 
 ## Requirements *(mandatory)*
 
@@ -459,6 +461,8 @@ dybatpho::unmock_all
 - **FR-046**: Registered scrubs MUST apply in the order they were registered, each to the output of the one before, and `dybatpho::assert_duration_under` MUST read its budget in base ten.
 - **FR-047**: `test_home` MUST create the given directory, or `${BATS_TEST_TMPDIR}/home` when none is given, and export it resolved physically as `HOME`, with `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME` and `DYBATPHO_CACHE_DIR` under it and `${HOME}/.local/bin` created and put first on `PATH`. With no directory and no `BATS_TEST_TMPDIR` it MUST fail through the fatal path.
 - **FR-048**: `test_unset_git_env` MUST unset every variable `git rev-parse --local-env-vars` lists, and no other.
+- **FR-049**: `assert_file_mode` MUST stop through the fatal path when the expected mode is not 3 or 4 octal digits.
+- **FR-050**: A mock MUST record one line per call, including a call without arguments, with a line break inside an argument written as `\n`; `mock_call_count` MUST count every recorded call, `assert_mock_called` MUST treat any recorded call as a call, and MUST match an expected argument holding a line break the way it is recorded.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -586,6 +590,8 @@ dybatpho::unmock_all
 - **IT-038**: Pass `../` names to `dybatpho::unmock_command` and `dybatpho::mock_calls` and verify both are refused and nothing outside the mock directory is removed.
 - **IT-039**: Call `test_home` bare and with a directory reached through a link and holding a space, and verify `HOME`, the XDG directories, the cache directory and `PATH`, here and in a child process; call it outside Bats with no directory and see it refused.
 - **IT-040**: Export every name `git rev-parse --local-env-vars` lists and one it does not, call `test_unset_git_env`, and verify only the listed names are gone.
+- **IT-041**: Call `assert_file_mode` with `0o644`, `600x`, `9`, an empty mode, `68` and `12345`, and see each refused with a message naming the octal rule.
+- **IT-042**: Call a mocked `whoami` twice without arguments and count `2`; call a mock with an argument holding a line break and count `1`, match it with `assert_mock_called`, and see `\n` in `mock_calls`.
 
 ## Acceptance Criteria *(mandatory)*
 

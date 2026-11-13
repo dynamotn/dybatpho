@@ -231,7 +231,7 @@ function dybatpho::release_bump_type {
 #   fi
 #
 # @arg $1 string [default: .] Repository path
-# @arg $2 string? Base tag, default is the highest matching tag that is not a pre-release
+# @arg $2 string? Base tag, default is the highest matching tag that is a semantic version and not a pre-release
 # @arg $3 string [default: ${HEAD}] Head ref
 # @env DYBATPHO_RELEASE_TAG_PATTERN string Glob that release tags match
 # @stdout Next version, without a leading `v`
@@ -246,11 +246,13 @@ function dybatpho::release_next_version {
   base_tag="${2-}"
   if [[ -z "${base_tag}" ]]; then
     # A pre-release is not a release: taking `v1.1.0-rc.1` as the base would
-    # skip `1.1.0` itself. Tags come highest first, as `git_latest_tag` sorts them.
+    # skip `1.1.0` itself. Nor is a tag that is no version at all, such as
+    # `vnext`. Tags come highest first, as `git_latest_tag` sorts them.
     local tag
     local -a parts
     while IFS= read -r tag; do
-      __dybatpho_semver_parse_into parts "${tag#v}" && [[ -n "${parts[3]}" ]] && continue
+      __dybatpho_semver_parse_into parts "${tag#v}" || continue
+      [[ -z "${parts[3]}" ]] || continue
       base_tag="${tag}"
       break
     done < <(__dybatpho_git "${repo_path}" -c versionsort.suffix=- tag --list \
@@ -427,7 +429,8 @@ function dybatpho::release_checksums {
   for entry in "${directory}"/*; do
     [[ -f "${entry}" ]] || continue
     # The sums file itself and any signature beside it are not release content.
-    [[ "${entry}" == "${output}" ]] && continue
+    # `-ef`, not the strings: `./out/sums` and `out/sums` are the same file.
+    [[ "${entry}" -ef "${output}" ]] && continue
     case "${entry}" in
       *.asc | *.sig | *SHA256SUMS*) continue ;;
       *) ;; # kcov(skip) - a case arm has no command to fire on

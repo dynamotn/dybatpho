@@ -293,11 +293,15 @@ function dybatpho::assert_file_empty {
 # @arg $2 string Expected octal mode, such as `600` or `0700`
 # @exitcode 0 The permissions match
 # @exitcode 1 The path is missing or its permissions differ
+# @exitcode 1 Stop the script when the expected mode is not 3 or 4 octal digits
 # @tip Useful for verifying that secret files are not group- or world-readable
 #######################################
 function dybatpho::assert_file_mode {
   local path expected
   dybatpho::expect_args path expected -- "$@"
+  # Checked before the arithmetic below, where `0o644` raised an error and passed.
+  [[ "${expected}" =~ ^[0-7]{3,4}$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Expected mode must be 3 or 4 octal digits: ${expected}"
   if ! dybatpho::is exist "${path}"; then
     __dybatpho_test_fail "Expected an existing path: ${path}"
     return 1
@@ -1040,7 +1044,12 @@ function __dybatpho_test_mock_script_write {
   local script="${mock_dir}/${name}"
   {
     printf '#!/usr/bin/env bash\n'
-    printf 'printf "%%s\\n" "$*" >> %q\n' "${mock_dir}/calls/${name}"
+    # One line per call: a line break inside an argument is written as `\n`.
+    # The replacement sits in a variable: a backslash written into it directly
+    # is read differently from one Bash version to the next.
+    printf '%s\n' "__dybatpho_mock_newline='\\n'"
+    # shellcheck disable=SC2016 # the expansion is the mock's, run when it is called
+    printf 'printf "%%s\\n" "${*//$'"'"'\\n'"'"'/${__dybatpho_mock_newline}}" >> %q\n' "${mock_dir}/calls/${name}"
     cat
     # kcov never records the closing line of a redirected group; every mock runs it.
   } > "${script}" # kcov(skip)
@@ -1080,7 +1089,8 @@ function dybatpho::mock_command {
 #######################################
 # @description Print one line per recorded invocation of a mocked command.
 # @arg $1 string Mocked command name
-# @stdout The arguments of each call, oldest first
+# @stdout The arguments of each call, oldest first, one call per line; a line
+#   break inside an argument is shown as `\n`
 # @exitcode 1 The command was never mocked
 #######################################
 function dybatpho::mock_calls {
@@ -1099,19 +1109,16 @@ function dybatpho::mock_calls {
 # @stdout Call count, `0` when the mock was never invoked
 #######################################
 function dybatpho::mock_call_count {
-  local name output
+  local name lines=0 line
   dybatpho::expect_args name -- "$@"
-  if ! output="$(dybatpho::mock_calls "${name}" 2> /dev/null)"; then
-    printf '0'
-    return 0
+  # Read from the file itself: `$(...)` strips the empty lines that calls
+  # without arguments record, and those calls went uncounted.
+  if [[ "${name}" =~ ^[a-zA-Z0-9_.-]+$ && -f "${DYBATPHO_TEST_MOCK_DIR}/calls/${name}" ]]; then
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+      lines=$((lines + 1))
+    done < "${DYBATPHO_TEST_MOCK_DIR}/calls/${name}"
   fi
-  if [[ -z "${output}" ]]; then
-    printf '0'
-    return 0
-  fi
-  # One call per line: the newlines between them, plus the last line.
-  local newlines="${output//[!$'\n']/}"
-  printf '%s' "$((${#newlines} + 1))"
+  printf '%s' "${lines}"
 }
 
 #######################################
@@ -1136,7 +1143,9 @@ function dybatpho::assert_mock_called {
     __dybatpho_test_fail "Command was never mocked: ${name}"
     return 1
   fi
-  if [[ -z "${calls}" ]]; then
+  # The file, not `${calls}`: a call without arguments is an empty line, which
+  # the substitution above stripped.
+  if [[ ! -s "${DYBATPHO_TEST_MOCK_DIR}/calls/${name}" ]]; then
     __dybatpho_test_fail "Mocked command was never called: ${name}"
     return 1
   fi
@@ -1144,7 +1153,10 @@ function dybatpho::assert_mock_called {
 
   # Pad both sides so the comparison lands on argument boundaries: a call
   # recorded as `deploy production` must not match a `loy produc` fragment.
-  local expected="$*" line
+  # A line break is matched the way the mock records it.
+  local newline='\n'
+  # dyshellint disable=BSG131 the replacement is a fixed `\n`, which holds no `&`
+  local expected="${*//$'\n'/${newline}}" line
   while IFS= read -r line; do
     if dybatpho::string_contains " ${line} " " ${expected} "; then
       return 0

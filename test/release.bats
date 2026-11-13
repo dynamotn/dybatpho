@@ -164,6 +164,17 @@ tag() {
   assert_equal "$(dybatpho::release_next_version "${REPO}")" "1.1.0"
 }
 
+@test "dybatpho::release_next_version skips a tag that is not a version" {
+  # `vnext` matches `v*` and sorts above the releases, so it was taken as the
+  # base and the call died instead of reading `v1.0.0`.
+  commit "feat: one"
+  tag v1.0.0
+  commit "feat: two"
+  tag vnext
+  commit "fix: three"
+  assert_equal "$(dybatpho::release_next_version "${REPO}")" "1.1.0"
+}
+
 @test "dybatpho::release_next_version accepts an explicit base tag" {
   commit "feat: one"
   tag v1.0.0
@@ -326,6 +337,18 @@ tag() {
   # Running again must not fold the previous checksum file into the new one.
   dybatpho::release_checksums "${out}" > /dev/null
   assert_equal "$(wc -l < "${sums}" | tr -d ' ')" "1"
+}
+
+@test "dybatpho::release_checksums leaves out its output however its path is spelled" {
+  # The output was skipped by comparing path strings, so `./rel_out/sums.txt`
+  # never equalled `rel_out/sums.txt` and a second run hashed it into itself.
+  cd "${BATS_TEST_TMPDIR}"
+  mkdir -p rel_out
+  printf 'one\n' > rel_out/mytool_1.0.0_linux_amd64.tar.gz
+  dybatpho::release_checksums rel_out ./rel_out/checksums.txt > /dev/null
+  dybatpho::release_checksums rel_out ./rel_out/checksums.txt > /dev/null
+  assert_equal "$(wc -l < rel_out/checksums.txt | tr -d ' ')" "1"
+  refute grep -q 'checksums.txt' rel_out/checksums.txt
 }
 
 @test "dybatpho::release_checksums rejects an empty or missing directory" {

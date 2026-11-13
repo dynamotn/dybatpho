@@ -13,6 +13,8 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ### Changed
 
+- **`testing` — `dybatpho::mock_calls` records a line break inside an argument
+  as `\n`,** so each call stays one line.
 - **`markdown` — `dybatpho::md_code_block` picks its fence in linear time.**
 - **`markdown` — `dybatpho::md_table` escapes every cell like the other
   builders.** A value holding `|`, `*`, `_` or `[` stays one plain cell; wrap
@@ -229,6 +231,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   command:** under job control Bash 4.3 to 5.1 reported the job it waited for
   (`Done`, `Exit 3`, `Terminated`) and macOS Bash the watchdog it ended
   (`Killed: 9`) there.
+- **`testing` — `dybatpho::assert_file_mode` refuses a malformed mode** instead
+  of passing, and mocks count calls made without arguments.
+- **`release` — `dybatpho::release_checksums` never lists its own output, and
+  `dybatpho::release_next_version` skips a tag such as `vnext`.**
+- **`scripts/lint.sh` fails when the bundle does not build, and Ctrl-C stops
+  `scripts/test.sh` and its workers.**
 
 ### Security
 

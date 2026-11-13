@@ -195,7 +195,7 @@ fi
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | no | `.` | Repository path |
-| `$2` | string | no |  | Base tag, default is the highest matching tag that is not a pre-release |
+| `$2` | string | no |  | Base tag, default is the highest matching tag that is a semantic version and not a pre-release |
 | `$3` | string | no | `${HEAD}` | Head ref |
 
 **🌍 Environment variables**

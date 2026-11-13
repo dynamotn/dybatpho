@@ -344,6 +344,7 @@ dybatpho::assert_file_mode "${HOME}/.netrc" 600
 
 - `0`: The permissions match
 - `1`: The path is missing or its permissions differ
+- `1`: Stop the script when the expected mode is not 3 or 4 octal digits
 
 ---
 
@@ -894,7 +895,8 @@ Print one line per recorded invocation of a mocked command.
 
 **📤 Output on stdout**
 
-- The arguments of each call, oldest first
+- The arguments of each call, oldest first, one call per line; a line
+  break inside an argument is shown as `\n`
 
 **🚦 Exit codes**
 

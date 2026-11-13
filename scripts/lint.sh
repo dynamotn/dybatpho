@@ -263,7 +263,9 @@ function __dybatpho_lint_doc {
 function __dybatpho_lint_bundle {
   local output
   dybatpho::create_temp output ".sh" "bundle"
-  DYBATPHO_FORCE=true "${SCRIPT_DIR}/bundle.sh" --modules all --output "${output}" > /dev/null
+  # Called as `… || failures++`, so errexit is off here: check it by hand.
+  DYBATPHO_FORCE=true "${SCRIPT_DIR}/bundle.sh" --modules all --output "${output}" > /dev/null \
+    || return 1
   dybatpho::success "Bundle builds and loads"
 }
 

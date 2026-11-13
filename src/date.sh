@@ -443,7 +443,9 @@ function dybatpho::date_add {
   # Empty is not a date on any system; GNU would read it as now.
   [[ -n "${input//[[:space:]]/}" ]] || return 1
 
-  if __dybatpho_date_is_gnu; then
+  # GNU refuses a relative offset next to an `@epoch` timestamp, so one takes
+  # the arithmetic path below and is shifted by elapsed seconds, as elsewhere.
+  if [[ "${input}" != @* ]] && __dybatpho_date_is_gnu; then
     # GNU's relative syntax walks the calendar itself, which keeps the answer
     # right across a daylight-saving change in a non-UTC timezone. The offset
     # goes first: after a time of day GNU reads a signed amount as a zone, so
@@ -866,8 +868,9 @@ function dybatpho::date_iso_week {
 # @description Report whether a timezone name can be honored, rather than
 #   letting `date` quietly fall back to UTC: GNU, BSD and BusyBox all answer in
 #   UTC for a zone they cannot find, which would turn a typo into a wrong time.
-#   `UTC` and `GMT` are always known; any other name must be a file under the
-#   zone database, `TZDIR` or `/usr/share/zoneinfo`.
+#   `UTC` and `GMT` are always known; any other name must be a compiled zone
+#   file, one opening with the `TZif` magic, under the zone database, `TZDIR`
+#   or `/usr/share/zoneinfo`.
 # @arg $1 string Timezone name
 # @exitcode 0 The zone is known
 # @exitcode 1 It is not, or the name is not a zone name at all
@@ -879,7 +882,13 @@ function __dybatpho_date_zone_known {
   # Path-shaped names only: no leading slash, no `..`, nothing a shell would
   # read twice. A POSIX rule string such as `EST5EDT,M3.2.0` is not accepted.
   [[ "${zone}" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ ]] || return 1
-  [[ -f "${TZDIR:-/usr/share/zoneinfo}/${zone}" ]]
+  local file="${TZDIR:-/usr/share/zoneinfo}/${zone}" magic=""
+  [[ -f "${file}" && -r "${file}" ]] || return 1
+  # The zone database also holds text such as `leapseconds` and `tzdata.zi`,
+  # which `date` reads as UTC like any other name it cannot use; a compiled
+  # zone opens with the `TZif` magic.
+  LC_ALL=C IFS= read -r -N 4 magic < "${file}" || true
+  [[ "${magic}" == "TZif" ]]
 }
 
 #######################################

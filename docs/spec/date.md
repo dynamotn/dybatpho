@@ -157,7 +157,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - A date compared cannot be parsed, which must not read as a "no".
 - A date in the first days of January belongs to the previous ISO week-year, or one in the last days of December to the next.
 - A year has 53 ISO weeks.
-- A timezone name is misspelled, is a path, or is a POSIX rule string, any of which `date` would quietly treat as UTC.
+- A timezone name is misspelled, is a path, is a POSIX rule string, or names a zone-database file that is not a zone (`leapseconds`), any of which `date` would quietly treat as UTC.
+- The base date is an `@epoch` timestamp, which GNU `date` refuses beside a relative offset.
 - The date given to `dybatpho::date_add` carries a time of day and the amount is negative, or the amount is written with a leading zero.
 - An ISO 8601 timestamp ends in `Z` or in an offset with a colon, which BSD `date -j -f %z` does not read.
 
@@ -199,7 +200,7 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **FR-015b**: The duration parser MUST refuse a duration whose total exceeds the largest Bash integer rather than returning a wrapped value.
 - **FR-016**: The module MUST provide predicates reporting whether one date comes strictly before, or strictly after, another, both parsed in the configured timezone, and MUST stop the script when either date cannot be parsed.
 - **FR-017**: The module MUST print the ISO 8601 week a date falls in together with its week-year, default `%G-W%V`, accepting `%G`, `%V`, `%u`, and `%%` in the format and copying anything else, and computing the week from the day of the year and the day of the week so that the answer does not depend on the platform's `date`.
-- **FR-018**: The module MUST print a date, parsed in the configured timezone, as it reads in a named target timezone, default format `%F %T %z`. It MUST accept `UTC`, `GMT`, and any path-shaped name that exists under `TZDIR` or `/usr/share/zoneinfo`, and MUST stop the script for any other zone rather than letting `date` fall back to UTC.
+- **FR-018**: The module MUST print a date, parsed in the configured timezone, as it reads in a named target timezone, default format `%F %T %z`. It MUST accept `UTC`, `GMT`, and any path-shaped name of a compiled zone file (one opening with the `TZif` magic) under `TZDIR` or `/usr/share/zoneinfo`, and MUST stop the script for any other zone rather than letting `date` fall back to UTC.
 - **FR-019**: `dybatpho::date_parse` MUST refuse an empty or blank string on every platform.
 - **FR-020**: On BusyBox, `dybatpho::date_parse` MUST read an ISO 8601 timestamp ending in `Z`, `+hhmm` or `+hh:mm` by applying the offset itself.
 - **FR-021**: `dybatpho::date_add` MUST shift a date that carries a time of day by a signed amount on every `date` flavor, and MUST read an amount with a leading zero in base ten; `dybatpho::date_seconds_to_hms` MUST read its argument in base ten and never print `-0:00:00`.
@@ -207,6 +208,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **FR-023**: `dybatpho::date_diff` MUST count days and weeks on the wall clock of `DYBATPHO_DATE_TIMEZONE`, so a span across a daylight-saving change counts its calendar days, while seconds, minutes and hours stay the time that elapsed.
 - **FR-024**: With GNU `date`, a bare `YYYY-MM-DD` whose midnight a clock change skips MUST parse as the moment the skipped hour ends, 01:00, rather than be refused.
 - **FR-025**: `dybatpho::date_seconds_to_hms` MUST refuse a number of seconds whose magnitude is above 9223372036854775807 rather than let it wrap, and leading zeros MUST NOT count against that limit.
+- **FR-026**: `dybatpho::date_add` MUST shift an `@epoch` timestamp on every `date` flavor, by elapsed seconds, rather than hand GNU `date` a mix of relative offset and timestamp it refuses.
+- **FR-027**: `dybatpho::date_in_tz` MUST refuse a file in the zone database that is not a compiled zone, such as `leapseconds`, which `date` would quietly read as UTC.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -259,6 +262,8 @@ dybatpho::info "Tokyo time: $(dybatpho::date_in_tz "$(dybatpho::date_now '%F %T'
 - **IT-030**: In `America/New_York`, count 31 days from 2024-03-01 to 2024-04-01, 1 day across 2024-03-10 and -1 back across 2024-11-03, and 4 hours from midnight to 05:00 on 2024-03-10.
 - **IT-031**: In `America/Sao_Paulo` with GNU `date`, accept 2018-11-04, read it as 01:00, and end its month on 2018-11-30.
 - **IT-032**: Write `9223372036854775807` seconds as a length of time; refuse `18446744073709551616` and `-9223372036854775808`.
+- **IT-033**: Shift `@1700000000` by `1 days` and `-2 hours` and get `2023-11-15 22:13:20` and `1699992800`.
+- **IT-034**: Refuse a text `leapseconds` file and a truncated `TZi` file under `TZDIR`, and accept a copy of the real `UTC` zone beside them.
 
 ## Acceptance Criteria *(mandatory)*
 

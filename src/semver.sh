@@ -462,25 +462,47 @@ function __dybatpho_semver_expand {
   dybatpho::semver_valid "${filled}" \
     || dybatpho::die "${FUNCNAME[1]-${FUNCNAME[0]}}: Not a usable version in range: '${token}'"
   IFS='.' read -r major minor patch <<< "${filled%%[-+]*}"
+  # Every shorthand but a complete comparison adds one to a part for its upper
+  # bound, which must not wrap.
+  local bumps=true
   case "${operator}" in
-    '>' | '>=' | '<' | '<=' | '=') ;;
-    *)
-      # The upper bound adds one to a part, which must not wrap.
-      local caller="${FUNCNAME[1]-${FUNCNAME[0]}}"
-      __dybatpho_semver_check_int64 "${caller}" "${major}"
-      __dybatpho_semver_check_int64 "${caller}" "${minor}"
-      __dybatpho_semver_check_int64 "${caller}" "${patch}"
-      ;;
+    '>=' | '<') bumps=false ;;
+    '>' | '<=' | '=') ((parts < 3)) || bumps=false ;;
+    *) ;;
   esac
+  if [[ "${bumps}" == true ]]; then
+    local caller="${FUNCNAME[1]-${FUNCNAME[0]}}"
+    __dybatpho_semver_check_int64 "${caller}" "${major}"
+    __dybatpho_semver_check_int64 "${caller}" "${minor}"
+    __dybatpho_semver_check_int64 "${caller}" "${patch}"
+  fi
   # Read in base ten: `^08.1` stopped on an invalid octal `08`.
   major=$((10#${major})) minor=$((10#${minor})) patch=$((10#${patch}))
 
+  # The first version past everything a partial version covers: `1.2` covers
+  # every 1.2.x, so it ends before 1.3.0.
+  local next="${major}.$((10#${minor} + 1)).0"
+  ((parts != 1)) || next="$((10#${major} + 1)).0.0"
+
   case "${operator}" in
-    '>' | '>=' | '<' | '<=')
+    '>=' | '<')
+      # Zero-filling is already right here: `>=1.2` is `>=1.2.0`, and `<1.2`
+      # is `<1.2.0`.
       __bounds_out+=("${operator} ${filled}")
       ;;
-    '=')
-      __bounds_out+=("= ${filled}")
+    '>' | '<=' | '=')
+      # A partial version stands for every version it covers, as npm and Cargo
+      # read it: `>1.2` is above all of 1.2.x, `<=1.2` takes all of them, and
+      # `=1.2` is exactly them.
+      if ((parts == 3)); then
+        __bounds_out+=("${operator} ${filled}")
+      elif [[ "${operator}" == '>' ]]; then
+        __bounds_out+=(">= ${next}")
+      elif [[ "${operator}" == '<=' ]]; then
+        __bounds_out+=("< ${next}")
+      else
+        __bounds_out+=(">= ${filled}" "< ${next}")
+      fi
       ;;
     '^')
       # A caret allows changes that do not alter the leftmost non-zero part,

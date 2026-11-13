@@ -446,3 +446,26 @@ setup() {
   PATH="/usr/bin:/bin" run_traced -1 dybatpho::date_parse "2024-02-30T12:34:56Z"
   run_traced -1 dybatpho::date_parse "2024-02-30T12:34:56Z"
 }
+
+@test "dybatpho::date_add shifts a Unix timestamp written as @epoch" {
+  # GNU `date -d "1 days @1700000000"` refuses the mix, so the timestamp is
+  # parsed first and the shift added to it.
+  assert_equal "$(DYBATPHO_DATE_TIMEZONE=UTC dybatpho::date_add @1700000000 1 days '%F %T')" "2023-11-15 22:13:20"
+  assert_equal "$(DYBATPHO_DATE_TIMEZONE=UTC dybatpho::date_add @1700000000 -2 hours '%s')" "1699992800"
+}
+
+@test "dybatpho::date_in_tz refuses a zoneinfo file that is not a zone" {
+  # `leapseconds` and friends live beside the zones but are text: `date` read
+  # such a name as UTC without a word.
+  mkdir -p "${BATS_TEST_TMPDIR}/zones"
+  printf '# leap seconds\nLeap\t1972\tJun\t30\t23:59:60\t+\tS\n' > "${BATS_TEST_TMPDIR}/zones/leapseconds"
+  printf 'TZi' > "${BATS_TEST_TMPDIR}/zones/Short"
+  TZDIR="${BATS_TEST_TMPDIR}/zones" run --separate-stderr dybatpho::date_in_tz 2024-02-29 leapseconds
+  assert_failure
+  assert_stderr --partial "'leapseconds' is not a timezone"
+  TZDIR="${BATS_TEST_TMPDIR}/zones" run --separate-stderr ! dybatpho::date_in_tz 2024-02-29 Short
+  cp "${TZDIR:-/usr/share/zoneinfo}/UTC" "${BATS_TEST_TMPDIR}/zones/Real" 2> /dev/null \
+    || skip "no zone database"
+  TZDIR="${BATS_TEST_TMPDIR}/zones" run_traced -0 dybatpho::date_in_tz 2024-02-29 Real '%F'
+  assert_output "2024-02-29"
+}

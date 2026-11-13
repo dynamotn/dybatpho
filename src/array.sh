@@ -445,19 +445,38 @@ function __dybatpho_array_set_op_into {
 #######################################
 function __dybatpho_array_before {
   if [[ "$3" == true ]]; then
-    # Read in base ten whatever zeros a value leads with: `08` is eight, and
-    # as an octal literal it ended the sort with the array in its old order.
-    local __dybatpho_array_before_a __dybatpho_array_before_b
-    __dybatpho_array_before_a="${1#[+-]}"
-    __dybatpho_array_before_b="${2#[+-]}"
-    __dybatpho_array_before_a=$((10#${__dybatpho_array_before_a}))
-    __dybatpho_array_before_b=$((10#${__dybatpho_array_before_b}))
-    [[ "$1" == -* ]] && __dybatpho_array_before_a=$((-__dybatpho_array_before_a))
-    [[ "$2" == -* ]] && __dybatpho_array_before_b=$((-__dybatpho_array_before_b))
+    # Compared as digit strings rather than through `$((…))`, which wraps past
+    # 64 bits (18446744073709551615 sorted as -1): sign first, then the length
+    # of the magnitude without its leading zeros, then the digits themselves.
+    # Stripping the zeros also reads `08` as eight rather than as bad octal.
+    local __dybatpho_array_before_a="$1" __dybatpho_array_before_b="$2"
     if [[ "$4" == true ]]; then
-      ((__dybatpho_array_before_a > __dybatpho_array_before_b))
+      __dybatpho_array_before_a="$2"
+      __dybatpho_array_before_b="$1"
+    fi
+    local __dybatpho_array_before_am="${__dybatpho_array_before_a#-}"
+    local __dybatpho_array_before_bm="${__dybatpho_array_before_b#-}"
+    __dybatpho_array_before_am="${__dybatpho_array_before_am#"${__dybatpho_array_before_am%%[!0]*}"}"
+    __dybatpho_array_before_bm="${__dybatpho_array_before_bm#"${__dybatpho_array_before_bm%%[!0]*}"}"
+    # Minus zero is zero: an empty magnitude has no sign.
+    local __dybatpho_array_before_as=1 __dybatpho_array_before_bs=1
+    [[ "${__dybatpho_array_before_a}" == -* && -n "${__dybatpho_array_before_am}" ]] && __dybatpho_array_before_as=-1
+    [[ "${__dybatpho_array_before_b}" == -* && -n "${__dybatpho_array_before_bm}" ]] && __dybatpho_array_before_bs=-1
+    if ((__dybatpho_array_before_as != __dybatpho_array_before_bs)); then
+      ((__dybatpho_array_before_as < __dybatpho_array_before_bs))
+      return
+    fi
+    # Same sign: two negatives order by the larger magnitude first.
+    if ((__dybatpho_array_before_as < 0)); then
+      local __dybatpho_array_before_swap="${__dybatpho_array_before_am}"
+      __dybatpho_array_before_am="${__dybatpho_array_before_bm}"
+      __dybatpho_array_before_bm="${__dybatpho_array_before_swap}"
+    fi
+    if ((${#__dybatpho_array_before_am} != ${#__dybatpho_array_before_bm})); then
+      ((${#__dybatpho_array_before_am} < ${#__dybatpho_array_before_bm}))
     else
-      ((__dybatpho_array_before_a < __dybatpho_array_before_b))
+      local LC_ALL=C
+      [[ "${__dybatpho_array_before_am}" < "${__dybatpho_array_before_bm}" ]]
     fi
   elif [[ "$4" == true ]]; then
     [[ "$1" > "$2" ]]
@@ -540,6 +559,25 @@ function dybatpho::array_sort {
 }
 
 #######################################
+# @description Read a whole number in base ten into a variable, clamped to
+#   ±999999999999999999 so the arithmetic done on it cannot wrap past 64
+#   bits. Any index beyond that is past the end of every Bash array anyway.
+#   Base ten also reads `08` as eight rather than as an invalid octal number.
+# @arg $1 string Name of the variable receiving the number
+# @arg $2 string Whole number, optionally negative, already validated
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_array_clamp_int_into {
+  local -n __dybatpho_array_clamp_out="$1"
+  local __dybatpho_array_clamp_sign="" __dybatpho_array_clamp_digits="${2#-}"
+  [[ "$2" == -* ]] && __dybatpho_array_clamp_sign="-"
+  __dybatpho_array_clamp_digits="${__dybatpho_array_clamp_digits#"${__dybatpho_array_clamp_digits%%[!0]*}"}"
+  ((${#__dybatpho_array_clamp_digits} <= 18)) || __dybatpho_array_clamp_digits=999999999999999999
+  __dybatpho_array_clamp_out=$((${__dybatpho_array_clamp_sign}10#${__dybatpho_array_clamp_digits:-0}))
+}
+
+#######################################
 # @description Keep a run of an array in place and drop the rest.
 #   A negative start counts back from the end, so `-2` takes the last two
 #   elements without the caller working out the length first. A start past
@@ -562,11 +600,7 @@ function dybatpho::array_slice {
   local __dybatpho_array_slice_start="${2-}"
   [[ "${__dybatpho_array_slice_start}" =~ ^-?[0-9]+$ ]] \
     || dybatpho::die "dybatpho::array_slice: '${__dybatpho_array_slice_start}' is not a whole number"
-  if [[ "${__dybatpho_array_slice_start}" == -* ]]; then
-    __dybatpho_array_slice_start=$((-10#${__dybatpho_array_slice_start#-}))
-  else
-    __dybatpho_array_slice_start=$((10#${__dybatpho_array_slice_start}))
-  fi
+  __dybatpho_array_clamp_int_into __dybatpho_array_slice_start "${__dybatpho_array_slice_start}"
 
   local -a __dybatpho_array_slice_values=()
   __dybatpho_array_copy __dybatpho_array_slice_values "$1"
@@ -580,8 +614,7 @@ function dybatpho::array_slice {
   elif [[ -n "${3-}" ]]; then
     [[ "$3" =~ ^[0-9]+$ ]] \
       || dybatpho::die "dybatpho::array_slice: '$3' is not a count"
-    # Base ten: a count of `08` is eight, not an invalid octal number.
-    __dybatpho_array_slice_length=$((10#$3))
+    __dybatpho_array_clamp_int_into __dybatpho_array_slice_length "$3"
   fi
 
   if ((__dybatpho_array_slice_start < 0)); then
@@ -593,9 +626,10 @@ function dybatpho::array_slice {
   local __dybatpho_array_slice_index
   # One bound rather than two comparisons a step: the slice ends at its own
   # length or at the end of the array, whichever comes first.
-  local __dybatpho_array_slice_end=$((__dybatpho_array_slice_start + __dybatpho_array_slice_length))
-  ((__dybatpho_array_slice_end <= __dybatpho_array_slice_count)) \
-    || __dybatpho_array_slice_end="${__dybatpho_array_slice_count}"
+  # Compared as count - start, not start + length, which could overflow.
+  local __dybatpho_array_slice_end="${__dybatpho_array_slice_count}"
+  ((__dybatpho_array_slice_length >= __dybatpho_array_slice_count - __dybatpho_array_slice_start)) \
+    || __dybatpho_array_slice_end=$((__dybatpho_array_slice_start + __dybatpho_array_slice_length))
   for ((__dybatpho_array_slice_index = __dybatpho_array_slice_start;  \
   __dybatpho_array_slice_index < __dybatpho_array_slice_end;  \
   __dybatpho_array_slice_index++)); do
@@ -691,8 +725,14 @@ function dybatpho::array_difference {
 # @description Walk a dependency graph depth-first, appending each entry after
 #   everything it depends on.
 #   The traversal state is passed by name rather than left to Bash's dynamic
-#   scoping: the recursion then says what it reads and writes, and the state
-#   stays a local of the public function that owns it.
+#   scoping: the walk then says what it reads and writes, and the state stays a
+#   local of the public function that owns it.
+#
+#   The walk keeps its own stack rather than recursing: a recursive function
+#   took one Bash call frame per link and crashed the shell on a chain a few
+#   thousand entries deep. Each stack item is an entry prefixed with `+` to
+#   enter it or `-` to finish it, which visits in the same order the recursion
+#   did.
 # @arg $1 string Entry to visit
 # @arg $2 string Name of the associative array of edges
 # @arg $3 string Name of the associative array tracking visited entries
@@ -701,35 +741,54 @@ function dybatpho::array_difference {
 # @set The named state, result and flag
 #######################################
 function __dybatpho_array_graph_visit {
-  local __dybatpho_array_graph_node="$1"
   local -n __dybatpho_array_graph_edges="$2"
   local -n __dybatpho_array_graph_seen="$3"
   local -n __dybatpho_array_graph_built="$4"
   local -n __dybatpho_array_graph_broken="$5"
 
-  case "${__dybatpho_array_graph_seen[${__dybatpho_array_graph_node}]-}" in
-    done) return 0 ;;
-    open)
-      # The entry is still being visited further up the stack, so this edge
-      # closes a cycle. It is dropped rather than followed, which is what lets
-      # an order come back at all; the caller is told through the exit code.
-      __dybatpho_array_graph_broken=1
-      return 0
-      ;;
-    *) ;; # kcov(skip) - a case arm has no command to fire on
-  esac
+  local -a __dybatpho_array_graph_stack=("+$1") __dybatpho_array_graph_deps=()
+  local __dybatpho_array_graph_top=0 __dybatpho_array_graph_item __dybatpho_array_graph_node __dybatpho_array_graph_i
+  while ((__dybatpho_array_graph_top >= 0)); do
+    __dybatpho_array_graph_item="${__dybatpho_array_graph_stack[__dybatpho_array_graph_top]}"
+    __dybatpho_array_graph_node="${__dybatpho_array_graph_item:1}"
+    ((__dybatpho_array_graph_top--)) || true
 
-  __dybatpho_array_graph_seen["${__dybatpho_array_graph_node}"]="open"
+    if [[ "${__dybatpho_array_graph_item}" == -* ]]; then
+      __dybatpho_array_graph_seen["${__dybatpho_array_graph_node}"]="done"
+      __dybatpho_array_graph_built+=("${__dybatpho_array_graph_node}")
+      continue
+    fi
 
-  # Edges are followed in the order they were written. That order is already
-  # deterministic, and it is the one the author chose.
-  local __dybatpho_array_graph_dep
-  for __dybatpho_array_graph_dep in ${__dybatpho_array_graph_edges[${__dybatpho_array_graph_node}]-}; do
-    __dybatpho_array_graph_visit "${__dybatpho_array_graph_dep}" "$2" "$3" "$4" "$5"
+    case "${__dybatpho_array_graph_seen[${__dybatpho_array_graph_node}]-}" in
+      done) continue ;;
+      open)
+        # The entry is still being visited further up the stack, so this edge
+        # closes a cycle. It is dropped rather than followed, which is what
+        # lets an order come back at all; the caller is told through the exit
+        # code.
+        __dybatpho_array_graph_broken=1
+        continue
+        ;;
+      *) ;; # kcov(skip) - a case arm has no command to fire on
+    esac
+
+    __dybatpho_array_graph_seen["${__dybatpho_array_graph_node}"]="open"
+    __dybatpho_array_graph_stack[++__dybatpho_array_graph_top]="-${__dybatpho_array_graph_node}"
+
+    # Split on whitespace with `read`, never by an unquoted expansion, which
+    # would also glob: a dependency named `evil*` became the files it matched.
+    __dybatpho_array_graph_deps=()
+    IFS=$' \t\n' read -r -d '' -a __dybatpho_array_graph_deps \
+      <<< "${__dybatpho_array_graph_edges[${__dybatpho_array_graph_node}]-}" || true
+    # Edges are followed in the order they were written. That order is already
+    # deterministic, and it is the one the author chose; pushing them in
+    # reverse pops the first one first.
+    __dybatpho_array_graph_i="${#__dybatpho_array_graph_deps[@]}"
+    while ((__dybatpho_array_graph_i-- > 0)); do
+      __dybatpho_array_graph_item="${__dybatpho_array_graph_deps[__dybatpho_array_graph_i]}"
+      __dybatpho_array_graph_stack[++__dybatpho_array_graph_top]="+${__dybatpho_array_graph_item}"
+    done
   done
-
-  __dybatpho_array_graph_seen["${__dybatpho_array_graph_node}"]="done"
-  __dybatpho_array_graph_built+=("${__dybatpho_array_graph_node}")
 }
 
 #######################################

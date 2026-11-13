@@ -17,6 +17,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   back when it ends.** A script that handles Ctrl-C after drawing a progress
   bar or a screen now carries on instead of being killed right after its
   handler ran, and a handler added later runs at all.
+- **`semver` — a partial version after `>`, `<=` or `=` reads as npm and Cargo
+  read it:** `>1.2` means `>=1.3.0`, `<=1.2` means `<1.3.0` and `=1.2` means
+  `1.2.x`.
+- **`date` — `dybatpho::date_add @<epoch> …` works with GNU `date`,** adding
+  elapsed seconds as on other systems.
 - **`json` — an invalid `:json` value in `dybatpho::json_object` exits 5,
   not 2.**
 - **`testing` — `dybatpho::mock_calls` records a line break inside an argument
@@ -267,6 +272,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   over 128 KiB,** such as a long `ai` conversation, and every file helper reads
   a file whose name starts with `-`.
 - **`file` — `dybatpho::dir_size` measures the directory a symlink names.**
+- **`array` — `array_toposort` and `array_closure` never glob a dependency
+  name and walk chains thousands deep;** `array_sort -n` and `array_slice`
+  handle integers past 64 bits.
+- **`math` — `dybatpho::math_random` measures a bound without its sign or
+  leading zeros.**
+- **`date` — `dybatpho::date_in_tz` refuses a zoneinfo file that is not a
+  zone,** such as `leapseconds`, instead of silently using UTC.
 - **`logging` — `DYBATPHO_LOG_FILE_MAX_BYTES=10M` is read as a size,** not
   reported as an error on every line; `tui_spinner_stop` removes its file.
 - **`screen` — `dybatpho::screen_put` at a negative column blanks the half of
@@ -369,6 +381,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `json_set --json` no longer repeats a rejected value in its error.
 
 ### Added
+
+- **`math` — `DYBATPHO_MATH_MAX_SCALE` (default 4096) caps the scale,** so a
+  huge scale is refused instead of running for minutes.
 
 - **`db` — keep a script's state in SQLite, safely.**
   `dybatpho::db_exec`, `dybatpho::db_query` (JSON) and `dybatpho::db_value`

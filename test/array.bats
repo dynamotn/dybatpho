@@ -820,3 +820,72 @@ EOF
 
   [[ ! -e "${marker}" ]]
 }
+
+@test "dybatpho::array_toposort and array_closure never glob a dependency" {
+  # The dependency list is split on whitespace only: an entry named `evil*`
+  # stays itself rather than becoming every file in the current directory.
+  cd "${BATS_TEST_TMPDIR}"
+  touch evil1 evil2
+  declare -A deps=([app]='evil*' ['evil*']='')
+  local -a order=() reach=()
+  dybatpho::array_toposort deps order app
+  assert_equal "${order[*]}" "evil* app"
+  dybatpho::array_closure deps reach app
+  assert_equal "${reach[*]}" "app evil*"
+}
+
+@test "dybatpho::array_toposort walks a deep chain without overflowing the stack" {
+  # A recursive walk took one Bash call frame per link and crashed around 4000.
+  declare -A chain=()
+  local i
+  for ((i = 1; i < 5000; i++)); do chain[n$((i - 1))]="n${i}"; done
+  chain[n4999]=''
+  local -a order=()
+  dybatpho::array_toposort chain order n0
+  assert_equal "${#order[@]}" 5000
+  assert_equal "${order[0]}" n4999
+  assert_equal "${order[4999]}" n0
+}
+
+@test "dybatpho::array_toposort follows edges in the order written" {
+  declare -A graph=([a]="c b" [b]="d" [c]="d e" [d]="" [e]="")
+  local -a order=()
+  dybatpho::array_toposort graph order a
+  assert_equal "${order[*]}" "d e c b a"
+  declare -A cyclic=([a]="b c" [b]="a" [c]="b")
+  dybatpho::array_toposort cyclic order a || true
+  assert_equal "${order[*]}" "b c a"
+}
+
+@test "dybatpho::array_sort --numeric orders integers past the 64-bit range" {
+  # `$((…))` wrapped 18446744073709551615 to -1.
+  local big=(10 18446744073709551615 5 -99999999999999999999 -3 0009223372036854775808 -0)
+  dybatpho::array_sort big --numeric
+  assert_equal "${big[*]}" "-99999999999999999999 -3 -0 5 10 0009223372036854775808 18446744073709551615"
+  dybatpho::array_sort big -n -r
+  assert_equal "${big[*]}" "18446744073709551615 0009223372036854775808 10 5 -0 -3 -99999999999999999999"
+  # Zero and minus zero are equal, so the sort keeps their order.
+  local zeros=(-0 0 -00)
+  dybatpho::array_sort zeros -n
+  assert_equal "${zeros[*]}" "-0 0 -00"
+}
+
+@test "dybatpho::array_slice clamps a start or count past the 64-bit range" {
+  # Each of these wrapped in `$((…))`: a huge start came back as a negative
+  # one, and start + count overflowed to an end before the start.
+  local items=(a b c d e)
+  dybatpho::array_slice items 18446744073709551614
+  assert_equal "${#items[@]}" 0
+  items=(a b c d e)
+  dybatpho::array_slice items 1 9223372036854775807
+  assert_equal "${items[*]}" "b c d e"
+  items=(a b c d e)
+  dybatpho::array_slice items 1 99999999999999999999
+  assert_equal "${items[*]}" "b c d e"
+  items=(a b c d e)
+  dybatpho::array_slice items -18446744073709551614 2
+  assert_equal "${items[*]}" "a b"
+  items=(a b c d e)
+  dybatpho::array_slice items 4 9223372036854775807
+  assert_equal "${items[*]}" "e"
+}

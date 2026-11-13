@@ -116,6 +116,7 @@ As a script author, I want to ask whether a version satisfies a range so that a 
 3. **Given** several comparators separated by spaces, **When** a version is tested, **Then** all of them must hold
 4. **Given** alternatives separated by `||`, **When** a version is tested, **Then** satisfying any one of them is enough
 5. **Given** a pre-release version, **When** it is tested against a range that names no pre-release of the same release, **Then** it does not satisfy the range
+6. **Given** a partial version after `>`, `<=` or `=`, **When** a version is tested, **Then** the partial version stands for every version it covers, so `>1.2` needs 1.3.0 or above and `<=1.2` and `=1.2` take every 1.2.x
 
 ---
 
@@ -145,6 +146,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **FR-R04**: A pre-release MUST satisfy a range only when the range names a pre-release of the same `major.minor.patch`, so that a range below the next major does not quietly accept its pre-release.
 - **FR-R05**: A range that cannot be understood MUST stop the caller rather than reporting a result, and MUST NOT be validated inside a command substitution, where the rejection could not reach the caller.
 - **FR-R06**: The module MUST order versions by the specification's rules, accepting the list as arguments or on standard input, preserving a leading `v`, and MUST report the highest of them.
+- **FR-R07**: A partial version after a comparison operator MUST stand for every version it covers, as npm and Cargo read it: `>1.2` MUST mean `>=1.3.0`, `<=1.2` MUST mean `<1.3.0`, `=1.2` MUST mean `>=1.2.0 <1.3.0`, and a major-only partial MUST widen the same way to the next major; `>=` and `<` MUST fill the absent parts with zero.
 - **FR-C01**: The module MUST turn a version as a real command reports it into a complete SemVer string, filling absent fields with zero, dropping a leading `v`, stripping the leading zeros SemVer forbids, and keeping only the first three fields.
 - **FR-C02**: The coercion MUST locate the version inside surrounding text, and MUST NOT accept a run of digits that carries no dot, so that a number which is part of a product description is not mistaken for a version.
 - **FR-C03**: The coercion MUST keep a trailing `-<tail>` as a pre-release only when the tail opens with a word naming one, and MUST otherwise drop it as a build or packaging marker, so that a distribution-patched tool counts as the release it was built from rather than as something older.
@@ -205,6 +207,7 @@ As a release script, I want a list of versions ordered as versions so that the n
 - **IT-R04**: Verify an invalid version and an invalid range both stop the caller.
 - **IT-R05**: Sort lists whose string order differs from their version order, including pre-releases, from arguments and from standard input, and verify the maximum.
 - **IT-R06**: Verify the sort agrees with the comparison helper for every adjacent pair of its result.
+- **IT-R07**: Verify a partial version after `>`, `<=` and `=`, with one or two parts and with a trailing wildcard, covers every version it names, and that `<` and `>=` still fill it with zeros.
 - **IT-C01**: Verify a partial version is filled out to `major.minor.patch`, a bare major release is accepted, and a leading `v` is dropped.
 - **IT-C02**: Verify a version is found inside the sentence a real command prints, and that a number which is not a version is not mistaken for one.
 - **IT-C03**: Verify leading zeros are stripped, so the result is a valid SemVer, and that more than three fields are cut down to three.

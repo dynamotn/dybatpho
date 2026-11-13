@@ -73,6 +73,10 @@ DYBATPHO_MATH_NUMBER_REGEX='^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)$'
 # multiplication, so an unbounded exponent is an unbounded wait rather than an
 # answer.
 DYBATPHO_MATH_MAX_EXPONENT=4096
+# The largest scale, in fraction digits, any function here accepts. Every digit
+# lengthens the long division or square root behind it, so a scale of a million
+# ran for minutes rather than answering.
+DYBATPHO_MATH_MAX_SCALE=4096
 
 # @env DYBATPHO_MATH_ENGINE string [default: auto] `auto`, `awk` or `bash`: the engine of the list aggregates
 DYBATPHO_MATH_ENGINE="${DYBATPHO_MATH_ENGINE:-auto}"
@@ -1055,7 +1059,9 @@ function __dybatpho_math_mul2 {
 # @arg $1 string Name of the variable receiving the scale
 # @arg $2 string Scale as written
 # @set The named variable
-# @exitcode 1 Stop the script when the scale is not a non-negative integer, or is longer than 18 digits
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
+# @exitcode 1 Stop the script when the scale is not a non-negative integer, is longer than 18 digits,
+#   or is above `DYBATPHO_MATH_MAX_SCALE`
 # @internal
 #######################################
 function __dybatpho_math_scale_into {
@@ -1066,6 +1072,8 @@ function __dybatpho_math_scale_into {
     __dybatpho_math_scale_problem="must be a non-negative integer"
   elif ((${#__dybatpho_math_scale_digits} > 18)); then
     __dybatpho_math_scale_problem="must be at most 18 digits long"
+  elif ((10#${__dybatpho_math_scale_digits:-0} > DYBATPHO_MATH_MAX_SCALE)); then
+    __dybatpho_math_scale_problem="must be at most ${DYBATPHO_MATH_MAX_SCALE}"
   fi
   if [[ -n "${__dybatpho_math_scale_problem}" ]]; then
     local math_caller_detail
@@ -1318,6 +1326,7 @@ function dybatpho::math_mul {
 # @arg $2 string Divisor
 # @arg $3 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @stdout The quotient
 # @exitcode 1 Stop the script on a non-number, a bad scale, or a zero divisor
 # @tip Division is the one operation that cannot always be exact; every other
@@ -1371,6 +1380,7 @@ function dybatpho::math_mod {
 # @arg $2 string Exponent, a whole number
 # @arg $3 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits for a negative exponent
 # @env DYBATPHO_MATH_SCALE number Default fraction digits for a negative exponent
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @env DYBATPHO_MATH_MAX_EXPONENT number Largest exponent magnitude accepted
 # @stdout The power
 # @exitcode 1 Stop the script on a fractional or oversized exponent, or on `0` raised to a negative power
@@ -1609,6 +1619,7 @@ function dybatpho::math_ceil {
 #
 # @arg $1 string Value
 # @arg $2 number [default: 0] Fraction digits to keep
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @stdout The rounded value, with trailing zeros dropped
 # @exitcode 1 Stop the script when the value is not a number or the scale is not a non-negative integer
 # @tip This rounds for computation. Use `dybatpho::i18n_number` when the result
@@ -1726,6 +1737,7 @@ function dybatpho::math_mul_into {
 # @arg $3 string Divisor
 # @arg $4 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @set The named variable
 # @exitcode 1 Stop the script on a non-number, a bad scale, a zero divisor, or a name that cannot be bound
 #######################################
@@ -1892,6 +1904,7 @@ function dybatpho::math_sum {
 # @arg $@ string Values, or none to read them from standard input
 # @stdin One or more values per line, when no argument is given
 # @env DYBATPHO_MATH_SCALE number Fraction digits kept in the result
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @stdout The mean
 # @exitcode 1 Stop the script when no value is given or one is not a number
 # @note Every argument is a value, so the scale is taken from
@@ -2335,6 +2348,7 @@ function __dybatpho_math_percentile_sorted_into {
 # @arg $1 string Value, not negative
 # @arg $2 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @stdout The square root
 # @exitcode 1 Stop the script on a non-number, a negative value, or a bad scale
 #######################################
@@ -2363,6 +2377,7 @@ function dybatpho::math_sqrt {
 # @arg $@ string Values, or none to read them from standard input
 # @stdin One or more values per line, when no value argument is given
 # @env DYBATPHO_MATH_SCALE number Fraction digits kept in the result
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @stdout The standard deviation
 # @exitcode 1 Stop the script on an empty list, a single value with `--sample`, or a value that is not a number
 #######################################
@@ -2461,6 +2476,7 @@ function dybatpho::math_clamp {
 # @arg $2 string Whole
 # @arg $3 number [default: ${DYBATPHO_MATH_SCALE}] Fraction digits to keep
 # @env DYBATPHO_MATH_SCALE number Default fraction digits
+# @env DYBATPHO_MATH_MAX_SCALE number Largest scale accepted
 # @stdout The percentage, without a `%` sign
 # @exitcode 1 Stop the script on a non-number, a bad scale, or a whole of zero
 # @tip Pair it with `dybatpho::i18n_percent` to print the result the way the
@@ -2561,11 +2577,14 @@ function dybatpho::math_lcm {
 function dybatpho::math_random {
   local lower upper
   dybatpho::expect_args lower upper -- "$@"
-  local bound
+  local bound digits
   for bound in "${lower}" "${upper}"; do
     [[ "${bound}" =~ ^[+-]?[0-9]+$ ]] \
       || dybatpho::die "${FUNCNAME[0]}: Bounds must be whole numbers, got '${bound}'"
-    ((${#bound} <= 18)) \
+    # The sign and leading zeros carry no magnitude, so they do not count.
+    digits="${bound#[+-]}"
+    digits="${digits#"${digits%%[!0]*}"}"
+    ((${#digits} <= 18)) \
       || dybatpho::die "${FUNCNAME[0]}: Bound '${bound}' is outside the range Bash can draw from"
   done
   # A leading zero would make the arithmetic below read the bound as octal.

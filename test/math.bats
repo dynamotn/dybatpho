@@ -1007,3 +1007,34 @@ math_engine_run_all_untraced() {
   assert_success
   assert_output "2.67"
 }
+
+@test "a scale above DYBATPHO_MATH_MAX_SCALE is refused rather than computed for minutes" {
+  # Each fraction digit lengthens the long division, so `math_div 1 3 1000000`
+  # ran for longer than a minute; the cap mirrors DYBATPHO_MATH_MAX_EXPONENT.
+  assert_equal "${DYBATPHO_MATH_MAX_SCALE}" 4096
+  run --separate-stderr dybatpho::math_div 1 3 1000000
+  assert_failure
+  assert_stderr --partial "dybatpho::math_div: Scale must be at most 4096, got '1000000'"
+  run --separate-stderr ! dybatpho::math_round 1.5 4097
+  run --separate-stderr ! dybatpho::math_sqrt 2 04097
+  DYBATPHO_MATH_SCALE=99999 run --separate-stderr dybatpho::math_avg 1 2
+  assert_failure
+  assert_stderr --partial "Scale must be at most 4096"
+  run_traced -0 dybatpho::math_round 1.5 4096
+  assert_output "1.5"
+}
+
+@test "dybatpho::math_random measures a bound without its sign or leading zeros" {
+  # The sign and the zeros counted towards the 18-digit limit, so a negative
+  # 18-digit bound and a zero-padded 1 were refused.
+  run_traced -0 dybatpho::math_random -999999999999999999 -999999999999999999
+  assert_output "-999999999999999999"
+  run_traced -0 dybatpho::math_random -999999999999999999 0
+  run_traced -0 dybatpho::math_random 0000000000000000001 0000000000000000001
+  assert_output "1"
+  run_traced -0 dybatpho::math_random +999999999999999999 +999999999999999999
+  assert_output "999999999999999999"
+  run dybatpho::math_random 1 -0001000000000000000000
+  assert_failure
+  assert_output --partial "outside the range Bash can draw from"
+}

@@ -552,3 +552,30 @@ setup() {
   run_traced dybatpho::semver_satisfies 8.0.0 "08"
   assert_success
 }
+
+@test "dybatpho::semver_satisfies reads a partial version after >, <= and = as npm does" {
+  # A partial version stands for every version it covers, so `>1.2` is
+  # `>=1.3.0`, `<=1.2` is `<1.3.0`, and `=1.2` is `>=1.2.0 <1.3.0`. Zero-filling
+  # it made `>1.2` take 1.2.5 and `<=1.2` refuse it.
+  run_traced ! dybatpho::semver_satisfies "1.2.5" ">1.2"
+  dybatpho::semver_satisfies "1.3.0" ">1.2"
+  dybatpho::semver_satisfies "1.2.5" "<=1.2"
+  run_traced ! dybatpho::semver_satisfies "1.3.0" "<=1.2"
+  dybatpho::semver_satisfies "1.2.5" "=1.2"
+  dybatpho::semver_satisfies "1.2.0" "=1.2"
+  run_traced ! dybatpho::semver_satisfies "1.3.0" "=1.2"
+  run_traced ! dybatpho::semver_satisfies "1.1.9" "=1.2"
+  # A major-only partial covers the whole major.
+  run_traced ! dybatpho::semver_satisfies "1.5.0" ">1"
+  dybatpho::semver_satisfies "2.0.0" ">1"
+  dybatpho::semver_satisfies "1.9.9" "<=1"
+  run_traced ! dybatpho::semver_satisfies "2.0.0" "<=1"
+  dybatpho::semver_satisfies "1.0.0" "=1"
+  run_traced ! dybatpho::semver_satisfies "2.0.0" "=1"
+  dybatpho::semver_satisfies "1.3.5" ">1.2.x <=1.3"
+  # The trailing wildcard reads the same as the partial version.
+  run_traced ! dybatpho::semver_satisfies "1.2.5" ">1.2.x"
+  # `<` and `>=` were already right.
+  run_traced ! dybatpho::semver_satisfies "1.2.5" "<1.2"
+  dybatpho::semver_satisfies "1.2.0" ">=1.2"
+}

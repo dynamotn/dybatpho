@@ -269,6 +269,7 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
   finish.
 - Zero is raised to a negative power.
 - An aggregate is asked for with no values at all.
+- A scale is far larger than any answer needs, such as a million digits.
 - A random range is reversed, fractional, or wider than the generator can cover
   uniformly.
 - Values exceed what `$(( ))` can represent, in a sum, a product, or a
@@ -385,6 +386,11 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **FR-033**: A scale of more than 18 significant digits MUST stop the script
   rather than wrap, and values read from standard input MUST split on blanks
   whatever `IFS` the caller set.
+- **FR-034**: A scale above `DYBATPHO_MATH_MAX_SCALE` (4096) MUST stop the
+  script, naming the limit, rather than run a division or square root for
+  minutes.
+- **FR-035**: `dybatpho::math_random` MUST measure a bound's 18-digit limit
+  without its sign or leading zeros.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -477,6 +483,11 @@ dybatpho::info "Done: $(dybatpho::math_percent "${finished}" "${jobs}" 1)%"
 - **IT-026**: Refuse scale `18446744073709551616` in round, round-into, div,
   sqrt and stddev, accept `0000000000000000000002`, and sum `1 2 3` and `4`
   piped in under `IFS=$'\n\t'` to `10`.
+- **IT-027**: Check `DYBATPHO_MATH_MAX_SCALE` is 4096; refuse scale `1000000`
+  in div, `4097` in round, `04097` in sqrt and `99999` through
+  `DYBATPHO_MATH_SCALE` in avg; accept `4096` in round.
+- **IT-028**: Draw from `-999999999999999999`, `0000000000000000001` and
+  `+999999999999999999` bounds, and refuse `-0001000000000000000000`.
 
 ## Acceptance Criteria *(mandatory)*
 

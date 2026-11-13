@@ -146,6 +146,8 @@ fi
 - An array is sparse, so its indexes do not run from 0 to its length minus one; or a helper is given, or produces, an empty array under `nounset` on Bash 4.3.
 - A set operation receives an empty element in either array.
 - A value given to a set operation holds `$(...)` or `]`.
+- A dependency name holds a glob character, or a dependency chain is thousands of entries deep.
+- A numeric sort value, a slice start or a slice count has more digits than a 64-bit integer holds.
 
 ## Requirements *(mandatory)*
 
@@ -195,6 +197,10 @@ fi
 - **FR-033**: `dybatpho::array_sort --numeric` MUST read a value with a leading zero in base ten, with its sign.
 - **FR-034**: `dybatpho::array_slice` MUST read a start or count with leading zeros in base ten.
 - **FR-035**: `dybatpho::array_unique`, `array_union`, `array_intersect` and `array_difference` MUST treat every value as data on every supported Bash: a value is never evaluated, and one holding `]` is deduplicated and matched like any other.
+- **FR-036**: `dybatpho::array_toposort` and `dybatpho::array_closure` MUST split a dependency list on whitespace only, never expanding it as a glob against the current directory, whatever the caller's `noglob` setting.
+- **FR-037**: `dybatpho::array_toposort` and `dybatpho::array_closure` MUST walk a chain of any depth without exhausting the shell's call stack, following edges in the order written.
+- **FR-038**: `dybatpho::array_sort --numeric` MUST order integers of any length by value, rather than wrap those past 64 bits, and MUST treat `-0` as equal to `0`.
+- **FR-039**: `dybatpho::array_slice` MUST accept a start or count of any length, treating one past the array's end as past it, rather than wrap it or overflow start plus count.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -246,6 +252,10 @@ fi
 - **IT-025**: Sort `10 08 9 -3 -08 7` numerically and get `-08 -3 7 08 9 10`.
 - **IT-026**: Slice ten items from `02` for `03`, from `-02`, and from `00` for `08`, and get the matching runs.
 - **IT-027**: Deduplicate, subtract and intersect values holding `$(touch ...)` and `a]b`, and see the command never run and `a]b` matched.
+- **IT-028**: In a directory holding `evil1` and `evil2`, order and close a graph whose entry depends on `evil*`, and get `evil*` itself.
+- **IT-029**: Order a 5000-entry chain, and follow `[a]="c b"` edges in the written order, with a cycle broken the same way as before.
+- **IT-030**: Sort `18446744073709551615`, `0009223372036854775808`, `-99999999999999999999`, `-0` and small values numerically both ways, and keep `-0 0 -00` in their order.
+- **IT-031**: Slice from `18446744073709551614`, `-18446744073709551614`, and from 1 and 4 for `9223372036854775807` and `99999999999999999999`, and get the clamped runs.
 
 ## Acceptance Criteria *(mandatory)*
 

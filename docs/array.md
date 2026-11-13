@@ -50,7 +50,7 @@ other core modules. `doctor` walks the module graph with the graph helpers.
 - [`dybatpho::array_union`](#dybatphoarray_union) — Replace an array with the union of it and another, in place. The result is a set: every value appears once, in the order it was first seen, the first array's values ahead of the second's. A set operation that kept duplicates would not be one, so `dybatpho::array_unique` afterwards has nothing left to do. Empty elements are dropped, as `dybatpho::array_unique` drops them.
 - [`dybatpho::array_intersect`](#dybatphoarray_intersect) — Keep only the values an array shares with another, in place. The result is a set, in the order the first array had them, without empty elements.
 - [`dybatpho::array_difference`](#dybatphoarray_difference) — Drop the values an array shares with another, in place. The result is a set, in the order the first array had them, without empty elements. The operation is one-sided: values only the second array holds are not added.
-- [`__dybatpho_array_graph_visit`](#__dybatpho_array_graph_visit) — Walk a dependency graph depth-first, appending each entry after everything it depends on. The traversal state is passed by name rather than left to Bash's dynamic scoping: the recursion then says what it reads and writes, and the state stays a local of the public function that owns it.
+- [`__dybatpho_array_graph_visit`](#__dybatpho_array_graph_visit) — Walk a dependency graph depth-first, appending each entry after everything it depends on. The traversal state is passed by name rather than left to Bash's dynamic scoping: the walk then says what it reads and writes, and the state stays a local of the public function that owns it. The walk keeps its own stack rather than recursing: a recursive function took one Bash call frame per link and crashed the shell on a chain a few thousand entries deep. Each stack item is an entry prefixed with `+` to enter it or `-` to finish it, which visits in the same order the recursion did.
 - [`__dybatpho_array_graph_roots_into`](#__dybatpho_array_graph_roots_into) — Collect the entries a traversal should start from, into a named array: the roots given, or every key of the graph in a stable order.
 - [`dybatpho::array_toposort`](#dybatphoarray_toposort) — Order a dependency graph so every entry comes after the entries it depends on. The graph is an associative array mapping an entry to the entries it depends on, separated by spaces -- the shape `init.sh` already keeps its module dependencies in. An entry named only as a dependency, with no entry of its own, is part of the result: a leaf is still something to order. With roots given, only what they reach is ordered. Without them, the whole graph is, starting from its keys in sorted order so two runs agree. A cycle is reported rather than refused. The edge that would close it is dropped and the rest of the order still comes back, because a cycle is legitimate in some graphs -- `init.sh` allows one on purpose, since calls between modules resolve at run time -- and a caller that cares reads the exit code.
 - [`dybatpho::array_closure`](#dybatphoarray_closure) — Collect everything reachable from some roots in a dependency graph, the roots included. This answers "what does this pull in", where `dybatpho::array_toposort` answers "in what order". The result is sorted, so it is a set rather than a walk: a caller that wants the order asks for the order.
@@ -543,8 +543,14 @@ dybatpho::array_difference wanted granted --   # read admin
 Walk a dependency graph depth-first, appending each entry after
 everything it depends on.
 The traversal state is passed by name rather than left to Bash's dynamic
-scoping: the recursion then says what it reads and writes, and the state
-stays a local of the public function that owns it.
+scoping: the walk then says what it reads and writes, and the state stays a
+local of the public function that owns it.
+
+The walk keeps its own stack rather than recursing: a recursive function
+took one Bash call frame per link and crashed the shell on a chain a few
+thousand entries deep. Each stack item is an entry prefixed with `+` to
+enter it or `-` to finish it, which visits in the same order the recursion
+did.
 
 **🧾 Arguments**
 

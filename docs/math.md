@@ -298,6 +298,7 @@ dybatpho::math_div 1 3 0       # 0
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 
 **📤 Output on stdout**
 
@@ -365,6 +366,7 @@ dybatpho::math_pow 2 -3        # 0.125
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits for a negative exponent |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 | **`DYBATPHO_MATH_MAX_EXPONENT`** | number | Largest exponent magnitude accepted |
 
 **📝 Notes**
@@ -650,6 +652,12 @@ dybatpho::math_round 1.005 2    # 1.01
 | `$1` | string | yes |  | Value |
 | `$2` | number | no | `0` | Fraction digits to keep |
 
+**🌍 Environment variables**
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
+
 **📤 Output on stdout**
 
 - The rounded value, with trailing zeros dropped
@@ -782,6 +790,7 @@ dybatpho::math_div_into share 2 3 5   # share=0.66667
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 
 **🧩 Variable sets**
 
@@ -973,6 +982,7 @@ DYBATPHO_MATH_SCALE=2 dybatpho::math_avg 10 20 25   # 18.33
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Fraction digits kept in the result |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 
 **📝 Notes**
 
@@ -1098,6 +1108,7 @@ dybatpho::math_sqrt 0.25        # 0.5
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 
 **📤 Output on stdout**
 
@@ -1145,6 +1156,7 @@ DYBATPHO_MATH_SCALE=3 dybatpho::math_stddev 1 2 3 4   # 1.118
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Fraction digits kept in the result |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 
 **📥 Input on stdin**
 
@@ -1216,6 +1228,7 @@ dybatpho::math_percent 1 3 2        # 33.33
 | Variable | Type | Description |
 | --- | --- | --- |
 | **`DYBATPHO_MATH_SCALE`** | number | Default fraction digits |
+| **`DYBATPHO_MATH_MAX_SCALE`** | number | Largest scale accepted |
 
 **📤 Output on stdout**
 

@@ -22,6 +22,9 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`ai` — `dybatpho::ai_untrusted` makes a full 16-letter boundary on musl
   and on Bash before 5.1,** where a random byte over 127 read as a wide
   number and dropped letters from it.
+- **`string` — `dybatpho::split` on a delimiter longer than one character
+  takes time in proportion to its input on Bash 4.3 too;** 20000 fields took
+  minutes there.
 - **`testing` — `dybatpho::test_unset_git_env` also unsets
   `GIT_INTERNAL_SUPER_PREFIX`,** which older git still reads.
 

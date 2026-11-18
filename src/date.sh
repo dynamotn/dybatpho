@@ -115,6 +115,11 @@ function __dybatpho_date_parse {
     TZ="${DYBATPHO_DATE_TIMEZONE}" date -d "${input}" +%s
     return
   fi
+  # An `@epoch` timestamp is already the answer; neither format below reads it.
+  if [[ "${input}" =~ ^@(-?[0-9]+)$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return 0
+  fi
   # Neither BSD `date -j -f` nor BusyBox `date -D` rejects an impossible date:
   # both roll `2024-02-30` over into `2024-03-01`. The parsed timestamp is
   # therefore formatted back and compared with the input before it is accepted.

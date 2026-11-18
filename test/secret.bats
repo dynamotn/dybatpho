@@ -624,10 +624,12 @@ SCRIPT
   # Both read the value with the trace on, so `set -x` printed
   # `[[ -n hunter2secret ]]` and the `printf` that wrote it.
   local file="${BATS_TEST_TMPDIR}/written" script="${BATS_TEST_TMPDIR}/traced.sh"
+  printf 'hunter2secret\n' > "${BATS_TEST_TMPDIR}/token"
   cat > "${script}" << SCRIPT
 . $(printf '%q' "${DYBATPHO_DIR}")/init.sh
 BASH_XTRACEFD=2
-TOKEN=hunter2secret
+# Read, not assigned: the kcov hook traces every line, set -x or not.
+read -r TOKEN < $(printf '%q' "${BATS_TEST_TMPDIR}/token")
 set -x
 dybatpho::secret_write_file $(printf '%q' "${file}") TOKEN
 dybatpho::secret_wipe TOKEN

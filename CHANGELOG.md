@@ -11,6 +11,20 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Fixed
+
+- **`sign` — signing works on Alpine and other BusyBox systems,** whose
+  `setsid` has no `-w`: it failed every call with `setsid`'s usage text.
+- **`lock` — `dybatpho::flock_acquire` with a wait works with BusyBox
+  `flock`,** which has no `-w`.
+- **`date` — `dybatpho::date_add @<epoch> …` works with BusyBox and BSD
+  `date`,** which printed nothing.
+- **`ai` — `dybatpho::ai_untrusted` makes a full 16-letter boundary on musl
+  and on Bash before 5.1,** where a random byte over 127 read as a wide
+  number and dropped letters from it.
+- **`testing` — `dybatpho::test_unset_git_env` also unsets
+  `GIT_INTERNAL_SUPER_PREFIX`,** which older git still reads.
+
 ## [7.2.0] - 2026-11-13
 
 ### Changed

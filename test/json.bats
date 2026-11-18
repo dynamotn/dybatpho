@@ -409,8 +409,10 @@ __yaml_query_fixture() {
   for ((index = 0; index < 300; index++)); do
     pairs+=("k${index}" "v${index}")
   done
-  local child='init="$1" && shift && . "${init}" --modules json && ulimit -n 64 && "$@" | jq -r "length, .k299"'
-  run bash -c "${child}" _ "${DYBATPHO_DIR}/init.sh" dybatpho::json_object "${pairs[@]}"
+  # A script file, not `bash -c`, whose empty `BASH_SOURCE` the kcov hook trips over.
+  local child="${BATS_TEST_TMPDIR}/child.sh"
+  printf '%s\n' 'init="$1" && shift && . "${init}" --modules json && ulimit -n 64 && "$@" | jq -r "length, .k299"' > "${child}"
+  run bash "${child}" "${DYBATPHO_DIR}/init.sh" dybatpho::json_object "${pairs[@]}"
   assert_success
   assert_output $'300\nv299'
 }
@@ -422,17 +424,21 @@ __yaml_query_fixture() {
     assert_equal "$(dybatpho::json_object a "${value}")" "${expected}"
   done
   assert_equal "$(dybatpho::json_object a:json '{"x": [1, 2.50]}' a b)" '{"a":"b"}'
-  assert_equal "$(dybatpho::json_object a:json '{"x": [1, 2.50]}' b:json 'null')" '{"a":{"x":[1,2.50]},"b":null}'
+  # jq before 1.7 rewrites 2.50 as 2.5; the point is to agree with it.
+  assert_equal "$(dybatpho::json_object a:json '{"x": [1, 2.50]}' b:json 'null')" "$(jq -n -c '{"a":{"x":[1,2.50]},"b":null}')"
 }
 
 @test "the value helpers keep a value out of an xtrace" {
   local file="${BATS_TEST_TMPDIR}/trace.json" init="${DYBATPHO_DIR}/init.sh"
-  local child='init="$1"; shift; . "${init}" --modules json; set -x; "$@" > /dev/null'
+  # A script file, not `bash -c`, whose empty `BASH_SOURCE` the kcov hook trips over.
+  local child="${BATS_TEST_TMPDIR}/child.sh"
+  # kcov owns the trace through `BASH_XTRACEFD`, so it is pointed back at stderr.
+  printf '%s\n' 'init="$1"; shift; . "${init}" --modules json; BASH_XTRACEFD=2; set -x; "$@" > /dev/null' > "${child}"
   printf '{}\n' > "${file}"
-  run --separate-stderr bash -c "${child}" _ "${init}" dybatpho::json_object k 'tr4ce-marker'
+  run --separate-stderr bash "${child}" "${init}" dybatpho::json_object k 'tr4ce-marker'
   assert_success
   assert_equal "$(grep -c 'tr4ce-marker' <<< "${stderr}")" 1
-  run --separate-stderr bash -c "${child}" _ "${init}" dybatpho::json_set "${file}" k 'tr4ce-marker'
+  run --separate-stderr bash "${child}" "${init}" dybatpho::json_set "${file}" k 'tr4ce-marker'
   assert_success
   assert_equal "$(grep -c 'tr4ce-marker' <<< "${stderr}")" 1
   run --separate-stderr dybatpho::json_set --json "${file}" k 'tr4ce-marker'

@@ -709,7 +709,22 @@ function dybatpho::flock_acquire {
   local __dybatpho_flock_fd
   { exec {__dybatpho_flock_fd}>> "${__dybatpho_flock_file}"; } 2> /dev/null \
     || dybatpho::die "${FUNCNAME[0]}: Cannot open the lock file ${__dybatpho_flock_file}"
-  if ! flock ${__dybatpho_flock_mode[@]+"${__dybatpho_flock_mode[@]}"} "${__dybatpho_flock_fd}"; then
+  local __dybatpho_flock_status=0 __dybatpho_flock_help=""
+  # BusyBox prints its usage and fails; only what it says matters.
+  [[ "${__dybatpho_flock_mode[0]-}" != -w ]] || __dybatpho_flock_help="$(flock --help 2>&1)" || :
+  if [[ "${__dybatpho_flock_mode[0]-}" == -w && "${__dybatpho_flock_help}" != *-w* ]]; then
+    # BusyBox `flock` cannot wait for a while, so a blocking one is stopped
+    # instead; the lock it took belongs to the descriptor, which outlives it.
+    local __dybatpho_flock_seconds="${__dybatpho_flock_wait%.*}"
+    [[ "${__dybatpho_flock_wait}" != *.* || "${__dybatpho_flock_wait#*.}" =~ ^0+$ ]] \
+      || __dybatpho_flock_seconds=$((10#${__dybatpho_flock_seconds:-0} + 1))
+    dybatpho::run_with_timeout "${__dybatpho_flock_seconds}" flock "${__dybatpho_flock_fd}" \
+      || __dybatpho_flock_status=$?
+  else
+    flock ${__dybatpho_flock_mode[@]+"${__dybatpho_flock_mode[@]}"} "${__dybatpho_flock_fd}" \
+      || __dybatpho_flock_status=$?
+  fi
+  if ((__dybatpho_flock_status)); then
     exec {__dybatpho_flock_fd}>&-
     return 1
   fi

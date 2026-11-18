@@ -97,6 +97,17 @@ _payload() {
   assert_file_exists "${BATS_TEST_TMPDIR}/elsewhere.sig"
 }
 
+@test "dybatpho::sign_file waits for the tool under a BusyBox setsid, which has no -w" {
+  _need_ssh_y
+  command -v setsid > /dev/null || skip "setsid is not installed"
+  ! setsid -w true &> /dev/null || skip "this setsid takes -w"
+  _ssh_key alice
+  local file
+  file="$(_payload doc.txt)"
+  PATH="$(path_without perl)" run_traced -0 dybatpho::sign_file ssh "${BATS_TEST_TMPDIR}/alice" "${file}"
+  run_traced -0 dybatpho::verify_file "${file}" "${file}.sig" "$(_ssh_pub alice)"
+}
+
 @test "dybatpho::verify_file accepts an ssh signature by a trusted key, given as a string or a .pub file" {
   _need_ssh_y
   _ssh_key alice
@@ -345,8 +356,12 @@ _gpg_keys() {
 # Run a library call in a fresh shell with no controlling terminal and stdin
 # from /dev/null, bounded so a call that waits on a prompt fails the test
 # rather than hanging the suite.
+# Called by the test itself: a `skip` inside `run` only ends run's subshell.
+_need_setsid_w() {
+  setsid -w true &> /dev/null || skip "no setsid with -w"
+}
+
 _without_terminal() {
-  command -v setsid > /dev/null || skip "setsid is not installed"
   local script="${BATS_TEST_TMPDIR}/no-tty.sh"
   # shellcheck disable=SC2154 # DYBATPHO_DIR is set by test_helper
   printf '%s\n' ". '${DYBATPHO_DIR}/init.sh' --modules sign" "$*" > "${script}"
@@ -384,6 +399,7 @@ _without_terminal() {
 }
 
 @test "an ssh key with a passphrase fails at once without a terminal, from sign_file and sign_public_key" {
+  _need_setsid_w
   _need_ssh_y
   ssh-keygen -q -t ed25519 -N 'a passphrase' -f "${BATS_TEST_TMPDIR}/locked"
   local file
@@ -394,6 +410,7 @@ _without_terminal() {
 }
 
 @test "a gpg key with a passphrase fails at once without a terminal" {
+  _need_setsid_w
   _gpg_keys
   gpg --batch --pinentry-mode loopback --passphrase 'a passphrase' \
     --quick-gen-key "locked <locked@example.test>" ed25519 sign never &> /dev/null \
@@ -441,6 +458,7 @@ _without_terminal() {
 }
 
 @test "an ssh passphrase is never read from the file being signed" {
+  _need_setsid_w
   _need_ssh_y
   ssh-keygen -q -t ed25519 -N 'secretpw' -f "${BATS_TEST_TMPDIR}/locked"
   local file="${BATS_TEST_TMPDIR}/starts-with-the-passphrase.txt"
@@ -451,7 +469,8 @@ _without_terminal() {
 
 @test "at a terminal, sign_file asks for the ssh passphrase" {
   _need_ssh_y
-  command -v script > /dev/null || skip "script is not installed"
+  # BSD `script` takes neither `-e` nor `-c`.
+  [[ "$(script --version 2>&1)" == *util-linux* ]] || skip "no util-linux script"
   ssh-keygen -q -t ed25519 -N 'typed at the prompt' -f "${BATS_TEST_TMPDIR}/locked"
   local file script="${BATS_TEST_TMPDIR}/at-a-terminal.sh"
   file="$(_payload doc.txt)"

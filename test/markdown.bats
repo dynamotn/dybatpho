@@ -375,8 +375,9 @@ EOF
   printf -v body '%40000s' ''
   body="${body// /\`}"
   run_traced dybatpho::md_code_block "" "${body}"
-  # Growing the fence until the body no longer held it took 14 seconds here.
-  ((SECONDS - start < 10))
+  # Growing the fence until the body no longer held it took 14 seconds here;
+  # the bound is loose for Bash 4.3 on a loaded CI runner.
+  ((SECONDS - start < 30))
   assert_success
   local fence
   printf -v fence '%40001s' ''

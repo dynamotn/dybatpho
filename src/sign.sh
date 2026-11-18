@@ -209,12 +209,21 @@ function __dybatpho_sign_run {
     return
   fi
   local -a __dybatpho_sign_detach=()
-  if command -v setsid > /dev/null; then
+  if command -v setsid > /dev/null && setsid -w true &> /dev/null; then
     __dybatpho_sign_detach=(setsid -w)
   elif command -v perl > /dev/null; then
     # macOS has no `setsid`; Perl's POSIX module does the same call.
     # shellcheck disable=SC2016 # Perl code, expanded by Perl
     __dybatpho_sign_detach=(perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV or die "exec $ARGV[0]: $!\n"')
+  elif command -v setsid > /dev/null; then
+    # BusyBox `setsid` has no `-w`, and forks and returns at once when it leads
+    # a process group, as it does under the timeout's job control. Started in
+    # the background of a shell without job control it does not, and it then
+    # becomes the tool, which the trap stops along with the shell.
+    # shellcheck disable=SC2016 # expanded by the inner shell
+    __dybatpho_sign_detach=(bash -c 'setsid "$@" <&0 & p=$!
+trap "kill \$p 2> /dev/null; exit 143" HUP INT TERM
+wait "$p"' _)
   fi
   SSH_ASKPASS_REQUIRE=never dybatpho::run_with_timeout "${DYBATPHO_SIGN_TIMEOUT}" \
     ${__dybatpho_sign_detach[@]+"${__dybatpho_sign_detach[@]}"} "$@"

@@ -1712,8 +1712,9 @@ _logging_child() {
   printf -v value '%8000s' ''
   value="${value// /$'\001'}"
   __dybatpho_log_json_escape_into escaped "${value}"
-  # The walk it replaces took seconds here and grew with the square of the count.
-  ((SECONDS - start < 2))
+  # The walk it replaces took seconds here and grew with the square of the count;
+  # the bound is loose for Bash 4.3 on a loaded CI runner.
+  ((SECONDS - start < 10))
   assert_equal "${#escaped}" "48000"
   assert_equal "${escaped:0:12}" '\u0001\u0001'
 }

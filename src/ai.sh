@@ -2242,6 +2242,9 @@ function __dybatpho_ai_boundary_into {
       for __dybatpho_ai_boundary_i in {1..8}; do
         IFS= read -r -d '' -n 1 __dybatpho_ai_boundary_byte || :
         printf -v __dybatpho_ai_boundary_value '%d' "'${__dybatpho_ai_boundary_byte}"
+        # A byte over 127 can come back as a wide or negative number (musl,
+        # older Bash); only its low eight bits are the byte.
+        ((__dybatpho_ai_boundary_value &= 255)) || :
         __dybatpho_ai_boundary_nibble=$((__dybatpho_ai_boundary_value >> 4))
         __dybatpho_ai_boundary_token+="${__dybatpho_ai_boundary_abc:__dybatpho_ai_boundary_nibble:1}"
         __dybatpho_ai_boundary_nibble=$((__dybatpho_ai_boundary_value & 15))

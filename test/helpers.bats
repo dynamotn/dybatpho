@@ -517,6 +517,46 @@ require_fake_tool() {
   assert_failure
 }
 
+@test "dybatpho::int_or reads a whole number in base ten and falls back on anything else" {
+  local n text
+  dybatpho::int_or n "08" 5
+  assert_equal "${n}" 8
+  dybatpho::int_or n "-012" 5
+  assert_equal "${n}" -12
+  dybatpho::int_or n "-0" 5
+  assert_equal "${n}" 0
+  for text in "" "abc" "1.5" "+3" " 7" "12345678901234567890" 'x[$(id)]' "0x10"; do
+    dybatpho::int_or n "${text}" 5
+    assert_equal "${n}" 5
+  done
+}
+
+@test "dybatpho::int_or clamps into the range it is given" {
+  local n
+  dybatpho::int_or n 9000 30 5 3600
+  assert_equal "${n}" 3600
+  dybatpho::int_or n 1 30 5 3600
+  assert_equal "${n}" 5
+  dybatpho::int_or n nope 1 5 3600
+  assert_equal "${n}" 5
+  dybatpho::int_or n 42 30 5
+  assert_equal "${n}" 42
+  dybatpho::int_or n 42 30 "" 10
+  assert_equal "${n}" 10
+}
+
+@test "dybatpho::int_or refuses a default, a range or a name the caller wrote wrong" {
+  run -1 dybatpho::int_or n 3 x
+  assert_output --partial "Default must be a whole number"
+  run -1 dybatpho::int_or n 3 1 a
+  assert_output --partial "Smallest value"
+  run -1 dybatpho::int_or n 3 1 0 b
+  assert_output --partial "Largest value"
+  run -1 dybatpho::int_or __dybatpho_n 3 1
+  run dybatpho::int_or '1n' 3 1
+  assert_failure
+}
+
 @test "dybatpho::default_env sets a variable named like its own locals" {
   # The name and default were held in plain locals, so a variable called
   # `env_name` or `default_value` was shadowed and never set.

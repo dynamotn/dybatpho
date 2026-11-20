@@ -45,6 +45,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   `dybatpho::retry --on <codes>`.** A failure whose exit code is in the list
   (a lost race, a busy resource) is retried with the usual backoff; any other
   is returned at once, so a real error no longer waits through every retry.
+- **`helpers` — read an untrusted number safely with `dybatpho::int_or`.** A
+  value from a config file, the environment or another process is read in base
+  ten (`08` is 8), falls back to a default when it is not a whole number or has
+  more than 18 digits, and can be clamped into a range, so it is safe to use in
+  arithmetic.
 
 ## [7.2.1] - 2026-11-19
 

@@ -1105,6 +1105,73 @@ function dybatpho::coalesce_cmd {
 }
 
 #######################################
+# @description Read a whole number that is not trusted -- from a config file,
+#   the environment, another process -- into a variable, falling back to a
+#   default when it is not one. The number is read in base ten, so `08` is 8
+#   rather than an octal error, more than 18 digits fall back rather than wrap
+#   past 2^63, and text such as `x[$(cmd)]` never reaches arithmetic. Given a
+#   range, the number is clamped into it.
+# @example
+#   local interval
+#   dybatpho::int_or interval "${POLL_INTERVAL-}" 30 5 3600
+#   sleep "${interval}"
+#
+# @arg $1 string Name of the variable receiving the number
+# @arg $2 string Text to read: an optional `-` and up to 18 digits
+# @arg $3 number Default, used when the text is not a whole number
+# @arg $4 number? Smallest value allowed
+# @arg $5 number? Largest value allowed
+# @set The named variable
+# @exitcode 0 Always, once the arguments the caller wrote are valid
+# @tip Falling back is silent, as the point is a usable value; validate with `dybatpho::validate_value` to refuse
+#   bad input instead
+#######################################
+function dybatpho::int_or {
+  local __dybatpho_int_var __dybatpho_int_text __dybatpho_int_default
+  dybatpho::expect_args __dybatpho_int_var __dybatpho_int_text __dybatpho_int_default -- "$@"
+  dybatpho::expect_ref "${__dybatpho_int_var}"
+  [[ "${__dybatpho_int_var}" != __dybatpho* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid name for the result variable: '${__dybatpho_int_var}'"
+  local __dybatpho_int_value __dybatpho_int_min="" __dybatpho_int_max=""
+  __dybatpho_helpers_int_into __dybatpho_int_default "${__dybatpho_int_default}" \
+    || dybatpho::die "${FUNCNAME[0]}: Default must be a whole number, got '${__dybatpho_int_default}'"
+  if [[ -n "${4-}" ]]; then
+    __dybatpho_helpers_int_into __dybatpho_int_min "$4" \
+      || dybatpho::die "${FUNCNAME[0]}: Smallest value must be a whole number, got '$4'"
+  fi
+  if [[ -n "${5-}" ]]; then
+    __dybatpho_helpers_int_into __dybatpho_int_max "$5" \
+      || dybatpho::die "${FUNCNAME[0]}: Largest value must be a whole number, got '$5'"
+  fi
+
+  __dybatpho_helpers_int_into __dybatpho_int_value "${__dybatpho_int_text}" \
+    || __dybatpho_int_value="${__dybatpho_int_default}"
+  if [[ -n "${__dybatpho_int_min}" ]] && ((__dybatpho_int_value < __dybatpho_int_min)); then
+    __dybatpho_int_value="${__dybatpho_int_min}"
+  fi
+  if [[ -n "${__dybatpho_int_max}" ]] && ((__dybatpho_int_value > __dybatpho_int_max)); then
+    __dybatpho_int_value="${__dybatpho_int_max}"
+  fi
+  local -n __dybatpho_int_ref="${__dybatpho_int_var}"
+  __dybatpho_int_ref="${__dybatpho_int_value}"
+}
+
+#######################################
+# @description Read text as a whole number in base ten.
+# @arg $1 string Name of the variable receiving the number
+# @arg $2 string Text: an optional `-` and up to 18 digits
+# @set The named variable, only when the text is a whole number
+# @exitcode 1 The text is not a whole number
+# @internal
+#######################################
+function __dybatpho_helpers_int_into {
+  local -n __dybatpho_helpers_int_ref="$1"
+  [[ "$2" =~ ^(-?)([0-9]{1,18})$ ]] || return 1
+  __dybatpho_helpers_int_ref="${BASH_REMATCH[1]}$((10#${BASH_REMATCH[2]}))"
+  [[ "${__dybatpho_helpers_int_ref}" != "-0" ]] || __dybatpho_helpers_int_ref=0
+}
+
+#######################################
 # @description Assign and export a default value for an environment variable when it is empty.
 # @arg $1 string Environment variable name
 # @arg $2 string Default value

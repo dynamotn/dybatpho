@@ -341,6 +341,7 @@ Utilities for common shell-script helper patterns.. Loaded: always. Stability: s
 - `dybatpho::is <string> <string>` — Check whether a value matches a supported shell-oriented condition.
 - `dybatpho::coalesce <string...>` — Print the first non-empty value from a list of fallbacks.
 - `dybatpho::coalesce_cmd <string...>` — Print the first available command from a list of candidates.
+- `dybatpho::int_or <string> <string> <number> [number] [number]` — Read a whole number that is not trusted -- from a config file, the environment, another process -- into a variable, falling back to a default when it is not one.
 - `dybatpho::default_env <string> <string>` — Assign and export a default value for an environment variable when it is empty.
 - `dybatpho::require_envs_any <string...>` — Ensure that at least one of the listed environment variables is set.
 - `dybatpho::assert [string] [string]` — Run a check and stop with a message when it fails.

@@ -54,6 +54,7 @@ reach for at a prompt.
 - [`dybatpho::is`](#dybatphois) — Check whether a value matches a supported shell-oriented condition. `number` is a plain decimal, optionally signed, with an optional fraction and exponent (`-1.5`, `.5`, `1e3`), the same as `validate_is number`. `int` is an optionally signed decimal integer with no leading zero, since Bash arithmetic reads one as octal. Neither accepts blanks, `0x`, a locale's decimal comma, or the quoted character codes `printf` takes.
 - [`dybatpho::coalesce`](#dybatphocoalesce) — Print the first non-empty value from a list of fallbacks.
 - [`dybatpho::coalesce_cmd`](#dybatphocoalesce_cmd) — Print the first available command from a list of candidates.
+- [`dybatpho::int_or`](#dybatphoint_or) — Read a whole number that is not trusted -- from a config file, the environment, another process -- into a variable, falling back to a default when it is not one. The number is read in base ten, so `08` is 8 rather than an octal error, more than 18 digits fall back rather than wrap past 2^63, and text such as `x[$(cmd)]` never reaches arithmetic. Given a range, the number is clamped into it.
 - [`dybatpho::default_env`](#dybatphodefault_env) — Assign and export a default value for an environment variable when it is empty.
 - [`dybatpho::require_envs_any`](#dybatphorequire_envs_any) — Ensure that at least one of the listed environment variables is set.
 - [`dybatpho::assert`](#dybatphoassert) — Run a check and stop with a message when it fails. The check is given after `--` as a command and its arguments, which run as they are, never parsed as shell. The older form, a single shell condition string, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
@@ -154,6 +155,10 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 **[`dybatpho::is`](#dybatphois)**
 
 - Use this helper to keep calling code readable instead of scattering shell test syntax across the script
+
+**[`dybatpho::int_or`](#dybatphoint_or)**
+
+- Falling back is silent, as the point is a usable value; validate with `dybatpho::validate_value` to refuse bad input instead
 
 **[`dybatpho::assert`](#dybatphoassert)**
 
@@ -470,6 +475,44 @@ Print the first available command from a list of candidates.
 
 - `0`: An available command is found
 - `1`: No commands are available
+
+---
+
+### `dybatpho::int_or`
+
+Read a whole number that is not trusted -- from a config file,
+the environment, another process -- into a variable, falling back to a
+default when it is not one. The number is read in base ten, so `08` is 8
+rather than an octal error, more than 18 digits fall back rather than wrap
+past 2^63, and text such as `x[$(cmd)]` never reaches arithmetic. Given a
+range, the number is clamped into it.
+
+**🧪 Example**
+
+```bash
+local interval
+dybatpho::int_or interval "${POLL_INTERVAL-}" 30 5 3600
+sleep "${interval}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the number |
+| `$2` | string | yes |  | Text to read: an optional `-` and up to 18 digits |
+| `$3` | number | yes |  | Default, used when the text is not a whole number |
+| `$4` | number | no |  | Smallest value allowed |
+| `$5` | number | no |  | Largest value allowed |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `0`: Always, once the arguments the caller wrote are valid
 
 ---
 

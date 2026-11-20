@@ -6,7 +6,7 @@
 # @brief Example showing process control utilities
 # @description Demonstrates dybatpho::retry, retry_until, dry_run, breakpoint,
 #              expect_args, expect_envs, require, command_exists_all, is,
-#              coalesce, coalesce_cmd, default_env, require_envs_any, assert,
+#              coalesce, coalesce_cmd, default_env, int_or, require_envs_any, assert,
 #              try, run_with_timeout, background_run, wait_all, kill_children,
 #              pid_file_write, pid_file_is_running, pid_file_remove,
 #              process_stop, signals_capture, signals_restore, signals_raise,
@@ -179,6 +179,12 @@ function _demo_env_defaults {
   export APP_BACKUP_TOKEN="configured"
   dybatpho::require_envs_any APP_TOKEN APP_BACKUP_TOKEN
   dybatpho::success "At least one application token is configured"
+
+  # A number from the environment: `08` reads as 8, junk falls back to the
+  # default, and the result is kept between 5 and 3600 seconds.
+  local interval
+  dybatpho::int_or interval "${APP_POLL_INTERVAL:-08}" 30 5 3600
+  dybatpho::info "Polling every ${interval} seconds"
 }
 
 # @description Run the `ASSERT` section of this example.

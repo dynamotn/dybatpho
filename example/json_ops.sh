@@ -3,7 +3,8 @@
 # @brief Example showing JSON and YAML utilities
 # @description
 #   Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty,
-#   yaml_to_json, and the editing helpers json_set, json_del, json_merge, yaml_set, yaml_del, and yaml_merge
+#   yaml_to_json, json_read, and the editing helpers json_set, json_del, json_merge, yaml_set, yaml_del, and
+#   yaml_merge
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules json
@@ -137,6 +138,10 @@ function _demo_in_memory {
   local json_eval
   json_eval=$(dybatpho::json_eval "${document}" '.ports')
   dybatpho::print "  ports:   ${json_eval}"
+  # Several fields at once, one jq call, a default written in jq.
+  local service note owner
+  dybatpho::json_read "${document}" service=.service note=.note owner='.owner // "nobody"'
+  dybatpho::print "  read:    ${service} / ${note} / ${owner}"
 
   dybatpho::info "Appending to an array:"
   local list='[]'

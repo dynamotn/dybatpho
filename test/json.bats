@@ -521,6 +521,54 @@ __yaml_query_fixture() {
   assert_equal "$(dybatpho::json_eval '[]' '. + [{"a":1}]')" '[{"a":1}]'
 }
 
+@test "dybatpho::json_read reads several values into variables with one call" {
+  local doc='{"status":"done","node":null,"attempts":3,"ok":true,"tags":["a","b"],"note":"line one\nline two"}'
+  local status node attempts ok tags note port missing
+  dybatpho::json_read "${doc}" status=.status node=.node attempts=.attempts ok=.ok tags=.tags \
+    note=.note port='.port // 8080' missing=.nothing.here
+  assert_equal "${status}" "done"
+  assert_equal "${node}" ""
+  assert_equal "${attempts}" 3
+  assert_equal "${ok}" true
+  assert_equal "${tags}" '["a","b"]'
+  assert_equal "${note}" $'line one\nline two'
+  assert_equal "${port}" 8080
+  assert_equal "${missing}" ""
+  # A filter with several outputs gives its first.
+  local first
+  dybatpho::json_read "${doc}" first='.tags[]'
+  assert_equal "${first}" a
+}
+
+@test "dybatpho::json_read returns 1 for a blank or multi-document text, and takes a filter ending in a comment" {
+  local value=kept other
+  # Blank text: no document, so status 1 and nothing set -- not a stop of the script.
+  run_traced dybatpho::json_read "" value=.a
+  assert_failure 1
+  dybatpho::json_read '' value=.a || true
+  assert_equal "${value}" kept
+  run_traced dybatpho::json_read '{"a":1}{"a":2}' value=.a
+  assert_failure 1
+  dybatpho::json_read '{"a":1,"b":2}' value='.a # the a' other=.b
+  assert_equal "${value}" 1
+  assert_equal "${other}" 2
+}
+
+@test "dybatpho::json_read sets nothing on an invalid document and refuses a bad pair" {
+  # Not `status`: Bats sets that one after every `run`.
+  local value=kept
+  run_traced dybatpho::json_read '{not json' value=.status
+  assert_failure
+  [[ "${status}" -ne 1 ]]
+  dybatpho::json_read '{not json' value=.status 2> /dev/null || true
+  assert_equal "${value}" kept
+  local bad
+  for bad in "status" "status=" "1x=.a" "__dybatpho_x=.a" "=.a"; do
+    run -1 dybatpho::json_read '{}' "${bad}"
+  done
+  run -1 dybatpho::json_read '{}'
+}
+
 @test "dybatpho::json_get no arg" {
   run dybatpho::json_get
   assert_failure

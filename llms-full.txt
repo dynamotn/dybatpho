@@ -418,6 +418,7 @@ Utilities for working with JSON and YAML data. Loaded: `--modules json`. Stabili
 - `dybatpho::json_object <string...>` — Build a JSON object from name and value pairs.
 - `dybatpho::json_eval <string> <string>` — Evaluate a `jq` filter against a JSON document held in a variable.
 - `dybatpho::json_get <string> <string>` — Evaluate a `jq` filter and print the result as a bare scalar.
+- `dybatpho::json_read <string> <string...>` — Read several values of a JSON document into variables with one `jq` call, instead of one call per field.
 - `dybatpho::json_valid <string>` — Return success when a JSON document held in a variable is valid.
 - `dybatpho::json_set [string] <string> <string> <string> [string]` — Set the value at a path in a JSON document.
 - `dybatpho::json_del <string> <string> [string]` — Remove the value at a path from a JSON document.

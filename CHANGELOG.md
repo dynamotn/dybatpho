@@ -57,6 +57,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **`json` — read several fields into variables with one `jq` call using
+  `dybatpho::json_read "${doc}" status=.status node='.lease.node // ""'`.**
+  Each variable gets its filter's first output (strings as they are, other
+  values as compact JSON, `null` as empty), newlines included; an invalid
+  document sets nothing and returns `jq`'s status.
 - **`file` — resolve a path physically and check it stays inside a directory
   with `dybatpho::path_resolve` and `dybatpho::path_is_inside`.** Every
   symbolic link along the path is followed and `..` is applied after it, the

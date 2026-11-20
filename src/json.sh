@@ -367,6 +367,72 @@ function dybatpho::json_get {
 }
 
 #######################################
+# @description Read several values of a JSON document into variables with one
+#   `jq` call, instead of one call per field. Each variable gets its filter's
+#   first output: a string as it is, any other value as compact JSON, and
+#   nothing at all or `null` as an empty string. Values may hold newlines.
+# @example
+#   local status node attempts
+#   dybatpho::json_read "${state}" status=.status node='.lease.node // ""' attempts='.attempts // 0'
+#
+# @arg $1 string JSON document
+# @arg $@ string `name=filter` pairs: the variable to set and the `jq` filter that gives its value
+# @set The named variables
+# @exitcode 0 Every variable was set
+# @exitcode 1 The text holds no document, as a blank one, or several; no variable is set then
+# @exitcode other `jq`'s own exit code for an invalid document or filter; no variable is set then
+# @exitcode 127 `jq` is not installed
+# @tip A default is plain `jq`: `port='.port // 8080'`
+#######################################
+function dybatpho::json_read {
+  (($# >= 2)) || dybatpho::die "${FUNCNAME[0]}: Expected: document name=filter..."
+  local __dybatpho_json_read_doc="$1"
+  shift
+  __dybatpho_json_need_jq
+  local -a __dybatpho_json_read_names=() __dybatpho_json_read_values=()
+  local __dybatpho_json_read_spec __dybatpho_json_read_name __dybatpho_json_read_filter __dybatpho_json_read_program=""
+  for __dybatpho_json_read_spec in "$@"; do
+    __dybatpho_json_read_name="${__dybatpho_json_read_spec%%=*}"
+    __dybatpho_json_read_filter="${__dybatpho_json_read_spec#*=}"
+    if [[ "${__dybatpho_json_read_spec}" != *=* || -z "${__dybatpho_json_read_filter}" ]] \
+      || [[ ! "${__dybatpho_json_read_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+      || [[ "${__dybatpho_json_read_name}" == __dybatpho* ]]; then
+      dybatpho::die "${FUNCNAME[0]}: Expected name=filter with a variable name, got '${__dybatpho_json_read_spec}'"
+    fi
+    __dybatpho_json_read_names+=("${__dybatpho_json_read_name}")
+    # Exactly one value per filter, so the values line up with the names.
+    # The newline ends a `#` comment the filter may close with.
+    __dybatpho_json_read_program+="${__dybatpho_json_read_program:+, }(first((${__dybatpho_json_read_filter}"
+    __dybatpho_json_read_program+=$'\n'"), null)"
+    __dybatpho_json_read_program+=' | if . == null then "" elif type == "string" then . else tojson end)'
+  done
+
+  # NUL-separated, so a value may hold newlines; the last record carries jq's status.
+  local __dybatpho_json_read_value __dybatpho_json_read_rc
+  while IFS= read -r -d '' __dybatpho_json_read_value; do
+    __dybatpho_json_read_values+=("${__dybatpho_json_read_value}")
+  done < <(
+    # Caught, not left to errexit: a failing jq would end the substitution before its status is sent.
+    __dybatpho_json_read_rc=0
+    # shellcheck disable=SC2312 # the status is caught on this line and sent as the last record
+    jq --raw-output0 "${__dybatpho_json_read_program}" <<< "${__dybatpho_json_read_doc}" || __dybatpho_json_read_rc=$?
+    printf 'rc:%s\0' "${__dybatpho_json_read_rc}"
+  )
+  ((${#__dybatpho_json_read_values[@]})) || dybatpho::die "${FUNCNAME[0]}: Cannot read the values jq gave"
+  local __dybatpho_json_read_status="${__dybatpho_json_read_values[${#__dybatpho_json_read_values[@]} - 1]#rc:}"
+  [[ "${__dybatpho_json_read_status}" =~ ^[0-9]{1,3}$ ]] || dybatpho::die "${FUNCNAME[0]}: Cannot read jq's status"
+  __dybatpho_json_read_status=$((10#${__dybatpho_json_read_status}))
+  ((__dybatpho_json_read_status == 0)) || return "${__dybatpho_json_read_status}"
+  # A blank text holds no document and a stream several: either gives another count.
+  ((${#__dybatpho_json_read_values[@]} == ${#__dybatpho_json_read_names[@]} + 1)) || return 1
+  local -i __dybatpho_json_read_at __dybatpho_json_read_end=${#__dybatpho_json_read_names[@]}
+  for ((__dybatpho_json_read_at = 0; __dybatpho_json_read_at < __dybatpho_json_read_end; __dybatpho_json_read_at++)); do
+    printf -v "${__dybatpho_json_read_names[__dybatpho_json_read_at]}" '%s' \
+      "${__dybatpho_json_read_values[__dybatpho_json_read_at]}"
+  done
+}
+
+#######################################
 # @description Return success when a JSON document held in a variable is valid.
 # @example
 #   dybatpho::json_valid "${answer}" || dybatpho::warn "The model did not return JSON"

@@ -41,6 +41,7 @@ it as outdated.
 - [`dybatpho::json_object`](#dybatphojson_object) — Build a JSON object from name and value pairs. Every value is escaped, so no caller has to think about quoting. A name ending in `:json` marks a value that is already a JSON document and is inserted as-is, which is how you nest an object or an array.
 - [`dybatpho::json_eval`](#dybatphojson_eval) — Evaluate a `jq` filter against a JSON document held in a variable. Unlike `dybatpho::json_query`, which reads a file, this works on a document a script is still assembling.
 - [`dybatpho::json_get`](#dybatphojson_get) — Evaluate a `jq` filter and print the result as a bare scalar. Strings come back without surrounding quotes, so the result drops straight into a shell variable; an object or an array is printed as pretty JSON.
+- [`dybatpho::json_read`](#dybatphojson_read) — Read several values of a JSON document into variables with one `jq` call, instead of one call per field. Each variable gets its filter's first output: a string as it is, any other value as compact JSON, and nothing at all or `null` as an empty string. Values may hold newlines.
 - [`dybatpho::json_valid`](#dybatphojson_valid) — Return success when a JSON document held in a variable is valid.
 - [`dybatpho::json_set`](#dybatphojson_set) — Set the value at a path in a JSON document. The path is a list of keys separated by `.`, such as `spec.ports.0.name`, where a segment of digits indexes an array. Missing objects and arrays on the way are created. The value is stored as a string unless `--json` says it is a JSON document, which is how a number, a boolean, `null`, an array, or an object is written.
 - [`dybatpho::json_del`](#dybatphojson_del) — Remove the value at a path from a JSON document. Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does not exist leaves the document unchanged, and deleting an array element shifts the ones after it.
@@ -65,6 +66,10 @@ it as outdated.
 **[`dybatpho::json_object`](#dybatphojson_object)**
 
 - Build nested structures from the inside out, passing each finished document through a `:json` name
+
+**[`dybatpho::json_read`](#dybatphojson_read)**
+
+- A default is plain `jq`: `port='.port // 8080'`
 
 **[`dybatpho::json_set`](#dybatphojson_set)**
 
@@ -436,6 +441,41 @@ text=$(dybatpho::json_get "${response}" '.choices[0].message.content // ""')
 **🔗 See also**
 
 - [dybatpho::json_eval](#dybatphojson_eval)
+
+---
+
+### `dybatpho::json_read`
+
+Read several values of a JSON document into variables with one
+`jq` call, instead of one call per field. Each variable gets its filter's
+first output: a string as it is, any other value as compact JSON, and
+nothing at all or `null` as an empty string. Values may hold newlines.
+
+**🧪 Example**
+
+```bash
+local status node attempts
+dybatpho::json_read "${state}" status=.status node='.lease.node // ""' attempts='.attempts // 0'
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | JSON document |
+| `$@` | string | `name=filter` pairs: the variable to set and the `jq` filter that gives its value |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variables
+
+**🚦 Exit codes**
+
+- `0`: Every variable was set
+- `1`: The text holds no document, as a blank one, or several; no variable is set then
+- `other`: `jq`'s own exit code for an invalid document or filter; no variable is set then
+- `127`: `jq` is not installed
 
 ---
 

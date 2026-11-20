@@ -368,6 +368,74 @@ EOF
   assert_equal "$(dybatpho::path_relative ../a ../b)" "../a"
 }
 
+@test "dybatpho::file_write_if_changed writes new content and leaves the same content untouched" {
+  local file="${BATS_TEST_TMPDIR}/conf" before
+  printf 'a=1\n' | dybatpho::file_write_if_changed "${file}"
+  assert_equal "$(< "${file}")" "a=1"
+
+  touch -t 200001010000 "${file}"
+  before="$(dybatpho::file_mtime "${file}")"
+  local status=0
+  printf 'a=1\n' | dybatpho::file_write_if_changed "${file}" || status=$?
+  assert_equal "${status}" 9
+  assert_equal "$(dybatpho::file_mtime "${file}")" "${before}"
+
+  printf 'a=2\n' | dybatpho::file_write_if_changed "${file}"
+  assert_equal "$(< "${file}")" "a=2"
+  local leftovers=("${BATS_TEST_TMPDIR}"/.dybatpho_staging_*)
+  [[ ! -e "${leftovers[0]}" ]]
+}
+
+@test "dybatpho::file_write_if_changed creates the directory only with --mkdir" {
+  local file="${BATS_TEST_TMPDIR}/new/dir/conf" script="${BATS_TEST_TMPDIR}/write.sh"
+  printf '%s\n' '. "$1/init.sh"' 'printf x | dybatpho::file_write_if_changed "$2"' > "${script}"
+  run -1 bash "${script}" "${DYBATPHO_DIR}" "${file}"
+  assert_output --partial "Directory doesn't exist"
+  printf 'x\n' | dybatpho::file_write_if_changed --mkdir "${file}"
+  assert_equal "$(< "${file}")" "x"
+}
+
+@test "dybatpho::file_write_if_changed reports instead of writing in dry-run mode" {
+  local file="${BATS_TEST_TMPDIR}/dry"
+  printf 'x' | DYBATPHO_DRY_RUN=true dybatpho::file_write_if_changed "${file}"
+  assert_file_not_exist "${file}"
+}
+
+@test "dybatpho::file_write_if_changed answers a dry run as the real run would" {
+  local file="${BATS_TEST_TMPDIR}/same" missing="${BATS_TEST_TMPDIR}/nodir/f"
+  printf 'x' > "${file}"
+  # The same content: 9, as a real run.
+  local status=0
+  printf 'x' | DYBATPHO_DRY_RUN=true dybatpho::file_write_if_changed "${file}" || status=$?
+  assert_equal "${status}" 9
+  status=0
+  printf 'y' | DYBATPHO_DRY_RUN=true dybatpho::file_write_if_changed "${file}" || status=$?
+  assert_equal "${status}" 0
+  assert_equal "$(cat "${file}")" x
+  # A missing directory without --mkdir fails in a dry run too; with it, nothing is created.
+  _write_dry() { printf x | DYBATPHO_DRY_RUN=true dybatpho::file_write_if_changed "$1"; }
+  run _write_dry "${missing}"
+  assert_failure
+  assert_output --partial "Directory doesn't exist"
+  printf 'x' | DYBATPHO_DRY_RUN=true dybatpho::file_write_if_changed --mkdir "${missing}"
+  assert_file_not_exist "${BATS_TEST_TMPDIR}/nodir"
+}
+
+@test "dybatpho::file_write_if_changed writes through a symlink and refuses a directory" {
+  local real="${BATS_TEST_TMPDIR}/real.conf" link="${BATS_TEST_TMPDIR}/link.conf"
+  printf 'old\n' > "${real}"
+  ln -s "${real}" "${link}"
+  printf 'new\n' | dybatpho::file_write_if_changed "${link}"
+  # The link is kept, and the file it points to holds the new content.
+  [[ -L "${link}" ]]
+  assert_equal "$(cat "${real}")" new
+  mkdir "${BATS_TEST_TMPDIR}/adir"
+  _write_x() { printf x | dybatpho::file_write_if_changed "$1"; }
+  run _write_x "${BATS_TEST_TMPDIR}/adir"
+  assert_failure
+  assert_output --partial "Not a file"
+}
+
 @test "dybatpho::file_write_atomic writes stdin and keeps the destination mode" {
   local target="${BATS_TEST_TMPDIR}/atomic.conf"
   printf 'old\n' > "${target}"
@@ -1133,6 +1201,8 @@ SCRIPT
   run -1 dybatpho::dir_hash sum "${BATS_TEST_TMPDIR}/missing"
   assert_output --partial "Directory doesn't exist"
   run -1 dybatpho::dir_hash __dybatpho_sum "${BATS_TEST_TMPDIR}"
+  run -1 dybatpho::dir_hash sum "${BATS_TEST_TMPDIR}" sha3
+  assert_output --partial "Unknown algorithm"
   # shellcheck disable=SC2016 # a name that would run a command if expanded
   run dybatpho::dir_hash 'x[$(id)]' "${BATS_TEST_TMPDIR}"
   assert_failure

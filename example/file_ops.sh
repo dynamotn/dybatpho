@@ -5,8 +5,8 @@
 #   Demonstrates dybatpho::create_temp, show_file, path_basename, path_dirname, path_extname, path_stem, path_join,
 #   path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, xdg_config_dir, xdg_cache_dir,
 #   xdg_data_dir, xdg_state_dir, xdg_runtime_dir, create_temp_dir, file_mtime, dir_size, dir_hash, file_is_binary,
-#   file_write_atomic, file_replace, file_ensure_line, file_remove_line, file_hash, file_size, file_age_seconds,
-#   file_backup, find_up, ensure_dir, and temp cleanup behavior
+#   file_write_atomic, file_write_if_changed, file_replace, file_ensure_line, file_remove_line, file_hash, file_size,
+#   file_age_seconds, file_backup, find_up, ensure_dir, and temp cleanup behavior
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh"
@@ -160,6 +160,17 @@ EOF
   chmod 640 "${config}"
   dybatpho::info "Wrote ${config}"
   dybatpho::show_file "${config}"
+
+  # Writing the same content again leaves the file, and its modification time,
+  # alone; the status says whether anything changed.
+  if printf 'debug = true\nport = 8080\n' | dybatpho::file_write_if_changed "${config}"; then
+    dybatpho::info "Config changed"
+  else
+    dybatpho::info "Config already up to date, left untouched"
+  fi
+  # --mkdir creates the directory a config lives in the first time it is written.
+  printf 'port = 8080\n' | dybatpho::file_write_if_changed --mkdir "${WORKDIR}/conf.d/app.toml"
+  dybatpho::info "Wrote ${WORKDIR}/conf.d/app.toml, directory included"
 
   # Keep a copy before editing, and report where it went.
   local backup

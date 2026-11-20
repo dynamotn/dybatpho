@@ -883,6 +883,74 @@ function dybatpho::file_write_atomic {
 }
 
 #######################################
+# @description Write standard input to a file only when it differs from what
+#   the file holds, the way `dybatpho::file_write_atomic` writes. An unchanged
+#   file is not touched, so it keeps its modification time and nothing watching
+#   it fires, and the caller learns whether anything changed.
+# @example
+#   if render_config | dybatpho::file_write_if_changed --mkdir "${HOME}/.config/app/config.toml"; then
+#     dybatpho::info "Configuration updated"
+#   fi
+#
+# @arg $1 string? `--mkdir` to create the destination's directory when it is missing
+# @arg $2 string Destination file path
+# @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
+# @env DYBATPHO_FILE_FOLLOW_SYMLINKS string [default: true] When true-like, write through a symlink rather than
+#   replacing it
+# @exitcode 0 The file was written: it was missing or held something else
+# @exitcode 9 The file already held exactly this content and was left alone
+# @exitcode 1 Stop script when the directory is missing (without `--mkdir`) or the write fails
+#######################################
+function dybatpho::file_write_if_changed {
+  local mkdir=false
+  if [[ "${1-}" == "--mkdir" ]]; then
+    mkdir=true
+    shift
+  fi
+  local path directory staging
+  dybatpho::expect_args path -- "$@"
+  [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
+  __dybatpho_file_resolve_into path "${path}" "${FUNCNAME[0]}"
+  directory="$(dybatpho::path_dirname "${path}")"
+  local dry=false
+  ! dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}" || dry=true
+
+  # Checked before the dry run too, so a dry run fails where the real one would.
+  if ! dybatpho::is dir "${directory}"; then
+    [[ "${mkdir}" == true ]] || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${directory}"
+    if [[ "${dry}" == true ]]; then
+      dybatpho::dry_run mkdir -p -- "${directory}"
+    else
+      mkdir -p -- "${directory}" || dybatpho::die "${FUNCNAME[0]}: Cannot create ${directory}"
+    fi
+  fi
+  [[ ! -d "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Not a file: ${path}"
+  if [[ "${dry}" == true ]]; then
+    # Compared as the real run compares, so a dry run reports 9 for content already there.
+    if dybatpho::is file "${path}" && cmp -s -- - "${path}"; then
+      return 9
+    fi
+    # Drained, so the process feeding this is not cut off by a closed pipe.
+    cat > /dev/null
+    dybatpho::dry_run write "${path}"
+    return 0
+  fi
+  __dybatpho_file_staging_into staging "${path}" \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
+  if ! cat > "${staging}"; then
+    __dybatpho_file_discard "${staging}"
+    dybatpho::die "${FUNCNAME[0]}: Cannot write staging file for ${path}"
+  fi
+  if dybatpho::is file "${path}" && cmp -s -- "${staging}" "${path}"; then
+    __dybatpho_file_discard "${staging}"
+    dybatpho::debug "Unchanged ${path}"
+    return 9
+  fi
+  __dybatpho_file_commit "${staging}" "${path}" "${FUNCNAME[0]}"
+  dybatpho::debug "Wrote ${path}"
+}
+
+#######################################
 # @description Producer for `dybatpho::file_write_atomic`: standard input.
 # @arg $1 string Staging file path
 # @internal
@@ -1516,7 +1584,14 @@ function dybatpho::dir_hash {
     || dybatpho::die "${FUNCNAME[0]}: Invalid name for the checksum variable: '${__dybatpho_file_hash_var}'"
   dybatpho::is dir "${__dybatpho_file_hash_tree}" \
     || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${__dybatpho_file_hash_tree}"
-  __dybatpho_file_dir_hash_into "${__dybatpho_file_hash_var}" "${__dybatpho_file_hash_tree}" "${3:-sha256}"
+  # Checked here: `file_hash` would refuse it inside `$(...)`, where the refusal is lost.
+  local __dybatpho_file_hash_algorithm="${3:-sha256}"
+  case "${__dybatpho_file_hash_algorithm}" in
+    md5 | sha1 | sha256 | sha512) ;; # kcov(skip) - a case arm has no command to fire on
+    *) dybatpho::die "${FUNCNAME[0]}: Unknown algorithm '${__dybatpho_file_hash_algorithm}'" ;;
+  esac
+  __dybatpho_file_dir_hash_into "${__dybatpho_file_hash_var}" "${__dybatpho_file_hash_tree}" \
+    "${__dybatpho_file_hash_algorithm}"
 }
 
 #######################################

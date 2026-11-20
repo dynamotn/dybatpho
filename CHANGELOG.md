@@ -36,6 +36,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   longer needs a `find | sha256sum | sort` pipeline. It is the fingerprint
   `backup` already verifies its snapshots with, and existing snapshots keep
   verifying.
+- **`file` — write a file only when its content changed with
+  `dybatpho::file_write_if_changed`.** It writes standard input atomically,
+  like `dybatpho::file_write_atomic`, but leaves a file that already holds
+  exactly that content untouched, modification time included, and answers 9
+  so the caller knows nothing changed. `--mkdir` creates a missing directory.
 
 ## [7.2.1] - 2026-11-19
 

@@ -42,6 +42,7 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 - [`dybatpho::path_relative`](#dybatphopath_relative) — Return the relative path from a base path to a target path.
 - [`dybatpho::create_temp`](#dybatphocreate_temp) — Create a temporary file or directory and register it for cleanup on shell exit.
 - [`dybatpho::file_write_atomic`](#dybatphofile_write_atomic) — Write standard input to a file through a staging file, so that readers see either the previous contents or the complete new contents.
+- [`dybatpho::file_write_if_changed`](#dybatphofile_write_if_changed) — Write standard input to a file only when it differs from what the file holds, the way `dybatpho::file_write_atomic` writes. An unchanged file is not touched, so it keeps its modification time and nothing watching it fires, and the caller learns whether anything changed.
 - [`dybatpho::file_replace`](#dybatphofile_replace) — Substitute every match of a pattern in a file, in place.
 - [`dybatpho::file_ensure_line`](#dybatphofile_ensure_line) — Append a line to a file unless the exact line is already there. Running it again changes nothing, which makes it safe for scripts that maintain a dotfile across repeated runs.
 - [`dybatpho::file_remove_line`](#dybatphofile_remove_line) — Remove every occurrence of an exact line from a file. A file that never contained the line, or that does not exist, is left as is and reported as success: the line is absent either way.
@@ -397,6 +398,44 @@ EOF
 **🚦 Exit codes**
 
 - `1`: The destination directory is missing or the write fails
+
+---
+
+### `dybatpho::file_write_if_changed`
+
+Write standard input to a file only when it differs from what
+the file holds, the way `dybatpho::file_write_atomic` writes. An unchanged
+file is not touched, so it keeps its modification time and nothing watching
+it fires, and the caller learns whether anything changed.
+
+**🧪 Example**
+
+```bash
+if render_config | dybatpho::file_write_if_changed --mkdir "${HOME}/.config/app/config.toml"; then
+  dybatpho::info "Configuration updated"
+fi
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--mkdir` to create the destination's directory when it is missing |
+| `$2` | string | yes |  | Destination file path |
+
+**🌍 Environment variables**
+
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`DYBATPHO_DRY_RUN`** | string | yes |  | When true-like, report the write instead of performing it |
+| **`DYBATPHO_FILE_FOLLOW_SYMLINKS`** | string | no | `true` | When true-like, write through a symlink rather than replacing it |
+
+**🚦 Exit codes**
+
+- `0`: The file was written: it was missing or held something else
+- `9`: The file already held exactly this content and was left alone
+- `1`: Stop script when the directory is missing (without `--mkdir`) or the write fails
 
 ---
 

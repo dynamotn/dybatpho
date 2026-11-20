@@ -73,7 +73,6 @@ src/ai.sh	__dybatpho_ai_payload_ollama	dybatpho::ai_model	provider is a literal 
 src/ai.sh	__dybatpho_ai_payload_openai	dybatpho::ai_model	provider is a literal ai_model accepts
 src/ai.sh	dybatpho::ai_check	dybatpho::ai_model	provider was already resolved in the caller's shell
 src/archive.sh	dybatpho::archive_extract	__dybatpho_archive_output_name	the format was checked in the caller's shell first
-src/backup.sh	__dybatpho_backup_tree_hash_into	dybatpho::file_hash	hashes files this function just walked, with a validated algorithm
 src/backup.sh	dybatpho::backup_create	dybatpho::file_hash	hashes the archive this call just wrote
 src/backup.sh	dybatpho::backup_verify	dybatpho::file_hash	an unreadable archive leaves the checksum empty, which verify then reports as a mismatch
 src/cache.sh	__dybatpho_cache_scan	dybatpho::file_mtime	reads entries this call just listed

@@ -360,6 +360,7 @@ dybatpho::show_file "${report_file}"
 - **FR-058**: The staging file MUST be readable by its owner only until it is committed; a new destination MUST then get the mode the umask gives it, and an existing one keeps its own.
 - **FR-059**: `path_relative` MUST resolve two relative paths against the working directory when either still starts with `..` after normalising, so the result reaches the target from the base.
 - **FR-060**: `dir_size` MUST follow a symbolic link given as its directory argument, while still leaving out every link met inside the tree.
+- **FR-062**: `dybatpho::file_write_if_changed [--mkdir] <path>` MUST write standard input to the file through a staging file the way `file_write_atomic` does when the file is missing or holds different bytes, returning 0, and MUST leave a file that already holds exactly those bytes untouched -- contents, modification time and all -- returning 9 with no staging file left behind; it MUST create a missing directory only with `--mkdir`, stop the script otherwise, and report instead of writing in dry-run mode -- after the same directory check, creating nothing, and answering 9 for content the file already holds, as the real run would.
 - **FR-061**: `dybatpho::dir_hash <var> <dir> [algorithm]` MUST set the named variable to a checksum of the tree that changes when an entry is added, removed or renamed, a file's content changes, or a link's target changes -- read exactly, a trailing newline included -- and that does not change with modification times or permissions; it MUST record links without following them, MUST use the record format that `backup` verifies its snapshots with, and MUST stop the script on a missing directory, a part of the tree it cannot list, a file or link it cannot read, an unknown algorithm, or a variable name that is invalid or starts with `__dybatpho`.
 
 ### Key Entities *(include if feature involves data)*
@@ -440,6 +441,7 @@ dybatpho::show_file "${report_file}"
 - **IT-045**: From `top/here`, get `../here/a` for `a` from `../b`, `here/a` for `a` from `..`, and `../top/a` for `../a` from `../../x`.
 - **IT-046**: Measure a tree through a symbolic link to its directory and get the size of the files behind it.
 - **IT-049**: Hash a fixed tree holding a name with a space, a name with a newline and a link, and get the checksum release 7.2.1 gave its snapshots.
+- **IT-048**: Write a file, write the same bytes again and get 9 with the modification time unchanged, write different bytes and see them; see a missing directory refused without `--mkdir` and created with it; see nothing written in dry-run mode.
 - **IT-047**: Hash a tree, touch a file and get the same checksum; change a file, rename one and point a link elsewhere and get a different one each time, then the first one back once undone; get a 128-digit checksum with `sha512`; see a missing directory and a bad variable name refused.
 
 ## Acceptance Criteria *(mandatory)*

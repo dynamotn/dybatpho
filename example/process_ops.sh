@@ -42,6 +42,12 @@ function _demo_retry {
   dybatpho::header "RETRY WITH BACKOFF"
   dybatpho::retry 5 "flaky command" -- _flaky_command
   dybatpho::success "Flaky command eventually succeeded"
+
+  # Only status 3 is worth another attempt; `false` fails with 1, which is
+  # returned at once instead of waiting through every retry.
+  local status=0
+  dybatpho::retry --on 3 5 "fail for good" -- false || status=$?
+  dybatpho::info "A failure --on does not list came back at once with ${status}"
 }
 
 # --- dry_run --------------------------------------------------------------

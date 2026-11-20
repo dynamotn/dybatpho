@@ -344,7 +344,7 @@ Utilities for common shell-script helper patterns.. Loaded: always. Stability: s
 - `dybatpho::default_env <string> <string>` — Assign and export a default value for an environment variable when it is empty.
 - `dybatpho::require_envs_any <string...>` — Ensure that at least one of the listed environment variables is set.
 - `dybatpho::assert [string] [string]` — Run a check and stop with a message when it fails.
-- `dybatpho::retry <number> [string] <string...>` — Retry a command with escalating delays until it succeeds or retries are exhausted.
+- `dybatpho::retry [string] <number> [string] <string...>` — Retry a command with escalating delays until it succeeds or retries are exhausted.
 - `dybatpho::retry_until <number> <number> [string] <string...>` — Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay.
 - `dybatpho::breakpoint` — Open an interactive breakpoint for debugging a running script.
 - `dybatpho::provides <string> <string...>` — Print the module that defines a function.

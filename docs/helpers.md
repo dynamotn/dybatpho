@@ -162,6 +162,7 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 **[`dybatpho::retry`](#dybatphoretry)**
 
 - A shell function defined by the caller works as the command, and sees the caller's variables
+- With `--on`, a code from the list means the retries ran out, and any other code means the command failed for another reason
 - Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same dependency, so they do not all come back at the same instant
 - Pass a short description when the raw command is noisy so retry logs stay readable
 
@@ -563,10 +564,17 @@ dybatpho::retry 3 "curl -fsSL https://example.com/health" "health check"   # dep
 
 ```
 
+```bash
+# Retry only a lost race (status 1); any other failure is returned at once.
+dybatpho::retry --on 1 5 "claim the lease" -- claim_lease "${id}"
+
+```
+
 **🧾 Arguments**
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--on` followed by a comma-separated list of exit codes: only those are retried |
 | `$1` | number | yes |  | Number of retries |
 | `$2` | string | no |  | Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string |
 | `$@` | string | yes |  | `--` followed by the command and its arguments; or (deprecated) the description |
@@ -582,7 +590,7 @@ dybatpho::retry 3 "curl -fsSL https://example.com/health" "health check"   # dep
 **🚦 Exit codes**
 
 - `0`: The command eventually succeeds
-- `other`: The command never succeeds; its exit code from the final attempt
+- `other`: The command never succeeds; its exit code from the final attempt, or at once the first code that `--on` does not list
 
 ---
 

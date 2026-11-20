@@ -233,6 +233,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-036**: `dybatpho::has_version` MUST read a glob character in a range (`bash>=5.*`) as text, whatever `nullglob`, `failglob` or the working directory hold.
 - **FR-037**: `dybatpho::retry_until` MUST refuse a delay that is not a plain decimal number of seconds before running the command, as `dybatpho::retry` refuses its delay settings.
 - **FR-038**: The shared option reader used by the modules' own options MUST keep an empty argument as an ordinary positional rather than fail on it.
+- **FR-039**: `dybatpho::retry --on <codes>` MUST retry only a failure whose exit code is in the comma-separated list, MUST return any other exit code after that attempt without retrying or warning, and MUST stop the script on a list that is not exit codes of up to three digits or holds one above 255; a code MUST be read in base ten, so `01` matches a status of 1.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -308,6 +309,7 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-039**: Ask `has_version` about a fake tool alone, with ranges it meets and misses, through alternatives, and with no readable version; it returns 0 or 1 and prints nothing.
 - **IT-040**: Ask `has_version` for `faketool>=5.*` under `nullglob` and under `failglob`, and get yes; run `retry_until 1 two false` and see it refuse.
 - **IT-041**: Read `a "" -f b` with the option reader, and get `-f` set and `a`, the empty argument and `b` as positionals.
+- **IT-042**: Retry with `--on 1,6` a command that fails with 1, then 6, then succeeds, and see three attempts; with `--on 1`, see a 3 returned on the second attempt and a run of 1s returned as 1 once the retries run out; see an empty, non-numeric, four-digit or negative list refused.
 
 ## Acceptance Criteria *(mandatory)*
 

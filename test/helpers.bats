@@ -606,6 +606,54 @@ _test_retry() {
   refute_stderr --partial "Retrying in 8 seconds (3/3)"
 }
 
+@test "dybatpho::retry --on retries the listed codes and returns any other at once" {
+  local attempts=0
+  _test_retry_codes() {
+    attempts=$((attempts + 1))
+    return "${codes[attempts - 1]}"
+  }
+  local -a codes=(1 6 0)
+  DYBATPHO_RETRY_BASE_DELAY=0 DYBATPHO_RETRY_MAX_DELAY=0 \
+    dybatpho::retry --on 1,6 5 -- _test_retry_codes 2> /dev/null
+  assert_equal "${attempts}" 3
+
+  attempts=0
+  codes=(1 3 0)
+  local status=0
+  DYBATPHO_RETRY_BASE_DELAY=0 DYBATPHO_RETRY_MAX_DELAY=0 \
+    dybatpho::retry --on 1 5 -- _test_retry_codes 2> /dev/null || status=$?
+  assert_equal "${status}" 3
+  assert_equal "${attempts}" 2
+
+  attempts=0
+  codes=(1 1 1)
+  status=0
+  DYBATPHO_RETRY_BASE_DELAY=0 DYBATPHO_RETRY_MAX_DELAY=0 \
+    dybatpho::retry --on 1 2 -- _test_retry_codes 2> /dev/null || status=$?
+  assert_equal "${status}" 1
+  assert_equal "${attempts}" 3
+}
+
+@test "dybatpho::retry --on refuses a list that is not exit codes" {
+  local bad
+  for bad in "" "a" "1,,2" "1;id" "1234" "-1" "256" "1,300"; do
+    run -1 dybatpho::retry --on "${bad}" 2 -- true
+    assert_output --partial "--on expects exit codes"
+  done
+}
+
+@test "dybatpho::retry --on reads a code with a leading zero as the status it names" {
+  local attempts=0 status=0
+  _test_retry_one() {
+    attempts=$((attempts + 1))
+    return 1
+  }
+  DYBATPHO_RETRY_BASE_DELAY=0 DYBATPHO_RETRY_MAX_DELAY=0 \
+    dybatpho::retry --on 01,006 2 -- _test_retry_one 2> /dev/null || status=$?
+  assert_equal "${status}" 1
+  assert_equal "${attempts}" 3
+}
+
 @test "dybatpho::retry with immediate success" {
   count=0
   _test_retry() {

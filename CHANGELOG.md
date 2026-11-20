@@ -41,6 +41,10 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   like `dybatpho::file_write_atomic`, but leaves a file that already holds
   exactly that content untouched, modification time included, and answers 9
   so the caller knows nothing changed. `--mkdir` creates a missing directory.
+- **`helpers` — retry only the failures worth retrying with
+  `dybatpho::retry --on <codes>`.** A failure whose exit code is in the list
+  (a lost race, a busy resource) is retried with the usual backoff; any other
+  is returned at once, so a real error no longer waits through every retry.
 
 ## [7.2.1] - 2026-11-19
 

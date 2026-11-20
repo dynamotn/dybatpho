@@ -1265,6 +1265,11 @@ function __dybatpho_helpers_backoff_into {
 # @example
 #   dybatpho::retry 3 "curl -fsSL https://example.com/health" "health check"   # deprecated string form
 #
+# @example
+#   # Retry only a lost race (status 1); any other failure is returned at once.
+#   dybatpho::retry --on 1 5 "claim the lease" -- claim_lease "${id}"
+#
+# @arg $1 string? `--on` followed by a comma-separated list of exit codes: only those are retried
 # @arg $1 number Number of retries
 # @arg $2 string? Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string
 # @arg $@ string `--` followed by the command and its arguments; or (deprecated) the description
@@ -1272,8 +1277,11 @@ function __dybatpho_helpers_backoff_into {
 # @env DYBATPHO_RETRY_MAX_DELAY number Longest a single retry waits
 # @env DYBATPHO_RETRY_JITTER bool Add up to one base delay of random jitter
 # @exitcode 0 The command eventually succeeds
-# @exitcode other The command never succeeds; its exit code from the final attempt
+# @exitcode other The command never succeeds; its exit code from the final attempt, or at once the first code that
+#   `--on` does not list
 # @tip A shell function defined by the caller works as the command, and sees the caller's variables
+# @tip With `--on`, a code from the list means the retries ran out, and any other code means the command failed
+#   for another reason
 # @tip Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same
 #   dependency, so they do not all come back at the same instant
 # @tip Pass a short description when the raw command is noisy so retry logs stay readable
@@ -1281,8 +1289,12 @@ function __dybatpho_helpers_backoff_into {
 function dybatpho::retry {
   # Prefixed: the command is evaluated in this function's scope, so a plain
   # `count` or `delay` here would shadow the caller's own variable of that name.
-  local __dybatpho_retry_retries __dybatpho_retry_command __dybatpho_retry_label
+  local __dybatpho_retry_retries __dybatpho_retry_command __dybatpho_retry_label __dybatpho_retry_on=""
   local -a __dybatpho_retry_argv=()
+  if [[ "${1-}" == "--on" ]]; then
+    __dybatpho_helpers_retry_codes_into __dybatpho_retry_on "${FUNCNAME[0]}" "${2-}"
+    shift 2
+  fi
   dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_command -- "$@"
   shift 2
   __dybatpho_helpers_retry_form __dybatpho_retry_argv __dybatpho_retry_label "${__dybatpho_retry_command}" "$@"
@@ -1314,6 +1326,9 @@ function dybatpho::retry {
     eval "${__dybatpho_retry_command}"
   fi; do # kcov(skip) - a closing keyword has no command to fire on; the dybatpho::retry tests run it
     __dybatpho_retry_exit_code="$?"
+    # A failure `--on` does not list is not worth another attempt.
+    [[ -z "${__dybatpho_retry_on}" || ",${__dybatpho_retry_on}," == *",${__dybatpho_retry_exit_code},"* ]] \
+      || return "${__dybatpho_retry_exit_code}"
     __dybatpho_retry_count="$((__dybatpho_retry_count + 1))"
     if [[ "${__dybatpho_retry_count}" -le "${__dybatpho_retry_retries}" ]]; then
       __dybatpho_helpers_backoff_into __dybatpho_retry_delay "${__dybatpho_retry_count}" \
@@ -1334,6 +1349,31 @@ function dybatpho::retry {
       return "${__dybatpho_retry_exit_code}"
     fi
   done
+}
+
+#######################################
+# @description Check the exit codes given to `--on`, and set them read in base
+#   ten, so `01` matches a status of 1: they are matched as text.
+# @arg $1 string Name of the variable receiving the comma-separated codes
+# @arg $2 string Public function the refusal is reported for
+# @arg $3 string Comma-separated exit codes
+# @set The named variable
+# @exitcode 1 Stop the script when the list is not one, or a code is above 255
+# @internal
+#######################################
+function __dybatpho_helpers_retry_codes_into {
+  local -n __dybatpho_helpers_codes_ref="$1"
+  local __dybatpho_helpers_codes_one __dybatpho_helpers_codes_list=""
+  [[ "$3" =~ ^[0-9]{1,3}(,[0-9]{1,3})*$ ]] \
+    || dybatpho::die "$2: --on expects exit codes separated by commas, got '$3'"
+  local -a __dybatpho_helpers_codes=()
+  IFS=, read -r -a __dybatpho_helpers_codes <<< "$3"
+  for __dybatpho_helpers_codes_one in ${__dybatpho_helpers_codes[@]+"${__dybatpho_helpers_codes[@]}"}; do
+    __dybatpho_helpers_codes_one=$((10#${__dybatpho_helpers_codes_one}))
+    ((__dybatpho_helpers_codes_one <= 255)) || dybatpho::die "$2: --on expects exit codes up to 255, got '$3'"
+    __dybatpho_helpers_codes_list+="${__dybatpho_helpers_codes_list:+,}${__dybatpho_helpers_codes_one}"
+  done
+  __dybatpho_helpers_codes_ref="${__dybatpho_helpers_codes_list}"
 }
 
 #######################################

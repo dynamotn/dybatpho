@@ -252,6 +252,7 @@ from a subdirectory.
 - **FR-016**: `git_changed_files` MUST name every path from the top of the repository, and list untracked files from the whole repository, when given a subdirectory.
 - **FR-017**: `git_latest_tag` MUST rank a release above its pre-releases, such as `v1.0.0` above `v1.0.0-rc.1`.
 - **FR-018**: `git_changed_files` MUST print every path as it is spelt on disk, including one holding a double quote, a backslash or a control character other than a newline.
+- **FR-019**: `git_commit_count --soft` MUST print `0` and return 1 when the base or head ref does not resolve to a commit, and MUST otherwise count as `git_commit_count` does; without `--soft` an unknown ref MUST still stop the script.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -316,6 +317,7 @@ from a subdirectory.
 - **IT-011**: List tags that a UTF-8 locale collates differently under `LC_ALL=en_US.UTF-8`, and see them in byte order.
 - **IT-012**: Ask a subdirectory for its changed files and find `rootnew`, `sub/a` and `sub/untracked`; tag `v1.0.0`, `v1.0.0-rc.1` and `v1.0.0-beta` and find `v1.0.0` the latest.
 - **IT-013**: Stage `say "hi".txt`, leave `back\slash<TAB>tab.txt` untracked, and find both names listed unquoted.
+- **IT-014**: Count one commit with `--soft`, get `0` and status 1 for a missing head and a missing base, and see the same missing head stop the script without `--soft`.
 
 ## Acceptance Criteria *(mandatory)*
 

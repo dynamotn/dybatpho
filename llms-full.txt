@@ -312,7 +312,7 @@ Utilities for Git repositories. Loaded: `--modules git`. Stability: stable. Refe
 - `dybatpho::git_commit_author [string] [string]` — Return the author name of a commit.
 - `dybatpho::git_has_commit [string] [string]` — Return success when a commit exists.
 - `dybatpho::git_commits_between <string> <string> [string]` — List commits reachable from a head ref but not from a base ref.
-- `dybatpho::git_commit_count <string> <string> [string]` — Count commits in a range.
+- `dybatpho::git_commit_count [string] <string> <string> [string]` — Count commits in a range.
 - `dybatpho::git_is_clean [string]` — Return success when the worktree has no tracked or untracked changes.
 - `dybatpho::git_remote_url [string] [string]` — Return the URL for a Git remote.
 - `dybatpho::git_has_remote [string] [string]` — Return success when a named remote exists.

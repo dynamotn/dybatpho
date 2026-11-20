@@ -50,6 +50,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   ten (`08` is 8), falls back to a default when it is not a whole number or has
   more than 18 digits, and can be clamped into a range, so it is safe to use in
   arithmetic.
+- **`validate` — a `git_oid` type** accepts a full git object ID (40 or 64
+  lowercase hexadecimal digits) and nothing else, so an ID read from a file or
+  another process can be checked before it reaches git, where a value starting
+  with `-` would be read as an option.
+- **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
+  when a ref does not resolve, instead of stopping the script, for a branch
+  that may not exist yet.
 
 ## [7.2.1] - 2026-11-19
 

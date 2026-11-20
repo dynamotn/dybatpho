@@ -219,6 +219,14 @@ teardown() {
   run_traced dybatpho::validate_is uuid "123e4567-e89b-12d3-a456-42661417400"
   assert_failure
 
+  local sha1="0123456789abcdef0123456789abcdef01234567" bad
+  dybatpho::validate_is git_oid "${sha1}"
+  dybatpho::validate_is git_oid "${sha1}0123456789abcdef01234567"
+  for bad in "" "${sha1:0:39}" "${sha1}0" "${sha1^^}" "--output=x" "HEAD" "${sha1:0:7}" "${sha1}^{commit}"; do
+    run_traced dybatpho::validate_is git_oid "${bad}"
+    assert_failure
+  done
+
   run_traced dybatpho::validate_is slug "Deploy-To-Prod"
   assert_failure
 

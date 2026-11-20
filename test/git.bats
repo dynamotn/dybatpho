@@ -226,6 +226,23 @@ function _append_git_commit {
   assert_equal "$(dybatpho::git_commit_count "${repo_path}" v1.0.0 HEAD)" '2'
 }
 
+@test "dybatpho::git_commit_count --soft answers 0 and 1 for a ref that does not resolve" {
+  local repo_path
+  repo_path="$(_new_git_repo_path)"
+  _create_git_repo "${repo_path}" main
+  _append_git_commit "${repo_path}" "Add feature"
+
+  run_traced dybatpho::git_commit_count --soft "${repo_path}" 'HEAD~1'
+  assert_success
+  assert_output '1'
+  run_traced -1 dybatpho::git_commit_count --soft "${repo_path}" main missing-branch
+  assert_output '0'
+  run_traced -1 dybatpho::git_commit_count --soft "${repo_path}" missing-base
+  assert_output '0'
+  run -1 dybatpho::git_commit_count "${repo_path}" main missing-branch
+  assert_output --partial "Unknown git commit"
+}
+
 @test "dybatpho::git_is_clean reflects repository changes" {
   local repo_path
   repo_path="$(_new_git_repo_path)"

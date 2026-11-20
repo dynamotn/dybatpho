@@ -294,17 +294,28 @@ List commits reachable from a head ref but not from a base ref.
 
 Count commits in a range.
 
+**🧪 Example**
+
+```bash
+ahead="$(dybatpho::git_commit_count --soft . main "feature/${id}")" || dybatpho::info "No such branch yet"
+```
+
 **🧾 Arguments**
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | string | yes |  | Repository path |
-| `$2` | string | yes |  | Base ref (excluded) |
-| `$3` | string | no | `${HEAD}` | Head ref |
+| `$1` | string | no |  | `--soft` to answer `0` and status 1 for a ref that does not resolve, instead of stopping |
+| `$2` | string | yes |  | Repository path |
+| `$3` | string | yes |  | Base ref (excluded) |
+| `$4` | string | no | `${HEAD}` | Head ref |
 
 **📤 Output on stdout**
 
 - Number of commits
+
+**🚦 Exit codes**
+
+- `1`: With `--soft`, a ref does not resolve to a commit; `0` is printed
 
 ---
 

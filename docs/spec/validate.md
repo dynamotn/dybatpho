@@ -219,7 +219,7 @@ dybatpho::opts::param "Port" PORT --port type:port
   `writeable`, `varname`, and `notempty` MUST resolve to their canonical types.
 - **FR-004**: The built-in types MUST cover `string`, `nonempty`, `int`,
   `uint`, `number`, `bool`, `port`, `email`, `url`, `hostname`, `ipv4`, `ipv6`,
-  `ip`, `cidr`, `mac`, `semver`, `uuid`, `hex`, `alpha`, `alnum`, `slug`,
+  `ip`, `cidr`, `mac`, `semver`, `uuid`, `git_oid`, `hex`, `alpha`, `alnum`, `slug`,
   `identifier`, `date`, `time`, `duration`, `path`, `file`, `dir`, `symlink`,
   `readable`, `writable`, `executable`, `abspath`, and `parent_dir`.
 - **FR-005**: `ipv4` and `ipv6` MUST accept and reject exactly what
@@ -367,6 +367,7 @@ dybatpho::opts::param "Port" PORT --port type:port
 - **IT-025**: Validate `10000000000000.5` against `min:1` with no error, `-10000000000000.5` with `must be at least 1`, and a 20-digit value against a smaller 20-digit `max:`.
 - **IT-026**: Validate a nine-character value against `minlen:08 maxlen:09` with no error.
 - **IT-027**: Bound `-0.0000001` by `min:0`, a twenty-digit decimal and integer by `max`, `1.5e1` and `-1e-400`, and `1e400` by `max:5`; bound a length by `minlen:+3` and `minlen:0004`; ask for a type named `x$(touch ...)` and `a]b` and see neither run nor match.
+- **IT-029**: Accept a 40-digit and a 64-digit lowercase object ID as `git_oid`, and refuse an empty value, 39 and 41 digits, uppercase, an option, `HEAD`, an abbreviated ID and a revision expression.
 - **IT-028**: Under `en_US.UTF-8`, refuse `١٢` as an `int`, `café` as an `identifier`, `é` as `alpha`, and `٨٠` as a `port` with nothing on stderr, while `maxlen:4` still accepts `café` and a registered `[[:alpha:]]` type accepts it.
 
 ## Acceptance Criteria *(mandatory)*

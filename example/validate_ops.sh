@@ -43,6 +43,8 @@ function _demo_types {
     "date     2024-02-29"
     "date     2023-02-29"
     "duration 1h30m"
+    "git_oid  0123456789abcdef0123456789abcdef01234567"
+    "git_oid  --output=/tmp/x"
   )
   local pair type value verdict
   for pair in "${pairs[@]}"; do

@@ -273,18 +273,37 @@ function dybatpho::git_commits_between {
 
 #######################################
 # @description Count commits in a range.
-# @arg $1 string Repository path
-# @arg $2 string Base ref (excluded)
-# @arg $3 string [default: ${HEAD}] Head ref
+# @example
+#   ahead="$(dybatpho::git_commit_count --soft . main "feature/${id}")" || dybatpho::info "No such branch yet"
+# @arg $1 string? `--soft` to answer `0` and status 1 for a ref that does not resolve, instead of stopping
+# @arg $2 string Repository path
+# @arg $3 string Base ref (excluded)
+# @arg $4 string [default: ${HEAD}] Head ref
 # @stdout Number of commits
+# @exitcode 1 With `--soft`, a ref does not resolve to a commit; `0` is printed
 #######################################
 function dybatpho::git_commit_count {
+  local soft=false
+  if [[ "${1-}" == "--soft" ]]; then
+    soft=true
+    shift
+  fi
   local repo_path base_ref
   dybatpho::expect_args repo_path base_ref -- "$@"
   local head_ref="${3:-HEAD}"
   __dybatpho_git_expect_repo "${repo_path}"
-  __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
-  __dybatpho_git_resolve_commit "${repo_path}" "${head_ref}" > /dev/null
+  if [[ "${soft}" == true ]]; then
+    local ref
+    for ref in "${base_ref}" "${head_ref}"; do
+      __dybatpho_git "${repo_path}" rev-parse --verify --quiet "${ref}^{commit}" &> /dev/null && continue
+      printf '0\n'
+      return 1
+    done
+  else
+    # Checked once: `--soft` already verified both refs above.
+    __dybatpho_git_resolve_commit "${repo_path}" "${base_ref}" > /dev/null
+    __dybatpho_git_resolve_commit "${repo_path}" "${head_ref}" > /dev/null
+  fi
   __dybatpho_git "${repo_path}" rev-list --count "${base_ref}..${head_ref}"
 }
 

@@ -79,6 +79,7 @@ __DYBATPHO_VALIDATE_RE_SEMVER+="(-${__dybatpho_validate_semver_id}(\\.${__dybatp
 unset -v __dybatpho_validate_semver_id
 __DYBATPHO_VALIDATE_RE_SEMVER+='(\+[0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*)?$'
 __DYBATPHO_VALIDATE_RE_UUID='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+__DYBATPHO_VALIDATE_RE_GIT_OID='^[0-9a-f]{40}([0-9a-f]{24})?$'
 __DYBATPHO_VALIDATE_RE_MAC='^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$'
 __DYBATPHO_VALIDATE_RE_HEX='^(0[xX])?[0-9a-fA-F]+$'
 __DYBATPHO_VALIDATE_RE_SLUG='^[a-z0-9]+(-[a-z0-9]+)*$'
@@ -849,6 +850,20 @@ function __dybatpho_validate_is_uuid {
 }
 
 #######################################
+# @description Return success when a value is a full git object ID: 40
+#   lowercase hexadecimal digits for SHA-1, or 64 for SHA-256. An ID checked
+#   this way can be passed to git without being read as an option or a
+#   revision expression.
+# @arg $1 string Value to test
+# @exitcode 0 The value is a full object ID
+# @exitcode 1 The value is not
+# @internal
+#######################################
+function __dybatpho_validate_is_git_oid {
+  [[ "${1-}" =~ ${__DYBATPHO_VALIDATE_RE_GIT_OID} ]]
+}
+
+#######################################
 # @description Return success when a value is hexadecimal, with an optional
 #   `0x` prefix.
 # @arg $1 string Value to test
@@ -1091,6 +1106,7 @@ function __dybatpho_validate_register_builtins {
   dybatpho::validate_register mac __dybatpho_validate_is_mac "a MAC address"
   dybatpho::validate_register semver __dybatpho_validate_is_semver "a semantic version"
   dybatpho::validate_register uuid __dybatpho_validate_is_uuid "a UUID"
+  dybatpho::validate_register git_oid __dybatpho_validate_is_git_oid "a full git object ID"
   dybatpho::validate_register hex __dybatpho_validate_is_hex "a hexadecimal value"
   dybatpho::validate_register alpha __dybatpho_validate_is_alpha "letters only"
   dybatpho::validate_register alnum __dybatpho_validate_is_alnum "letters and digits only"

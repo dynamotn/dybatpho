@@ -103,6 +103,9 @@ function _main {
   local git_commit_count
   git_commit_count=$(dybatpho::git_commit_count "${repo_path}" v1.0.0 HEAD)
   dybatpho::info "Commit count since v1.0.0: ${git_commit_count}"
+  # A branch that may not exist yet counts as 0 instead of stopping the script.
+  git_commit_count=$(dybatpho::git_commit_count --soft "${repo_path}" HEAD feature/not-yet) \
+    || dybatpho::info "No feature/not-yet branch: counted ${git_commit_count}"
   dybatpho::info "Tags for v1.0.0 commit:"
   local git_tags_containing_output
   git_tags_containing_output=$(dybatpho::git_tags_containing "${repo_path}" v1.0.0)

@@ -9,6 +9,7 @@
 #              coalesce, coalesce_cmd, default_env, require_envs_any, assert,
 #              try, run_with_timeout, background_run, wait_all, kill_children,
 #              pid_file_write, pid_file_is_running, pid_file_remove,
+#              signals_capture, signals_restore, signals_raise,
 #              and error/signal handlers
 # shellcheck disable=SC2154 # `dybatpho::expect_args` assigns these names through a nameref
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
@@ -305,6 +306,43 @@ function _demo_kill_children {
   fi
 }
 
+# --- signals --------------------------------------------------------------
+
+# @description The script's own USR1 handler, which must run after the cleanup.
+# @noargs
+function _demo_signals_caller {
+  dybatpho::info "The script's own handler runs once, after the cleanup"
+}
+
+# @description Stop the worker the signals section started.
+# @arg $1 string Name of the signal that arrived
+function _demo_signals_stop_worker {
+  local signal
+  dybatpho::expect_args signal -- "$@"
+  dybatpho::info "Got ${signal}: stopping the worker first"
+  dybatpho::kill_children
+}
+
+# @description Run the `SIGNALS` section of this example.
+# @noargs
+function _demo_signals {
+  dybatpho::header "SIGNALS"
+
+  trap _demo_signals_caller USR1
+  # shellcheck disable=SC2034 # filled and read through namerefs
+  local traps caught
+  # The worker's cleanup runs alone while the block runs: appended with
+  # dybatpho::trap it would come after the script's handler, too late if that
+  # one exits.
+  dybatpho::signals_capture traps caught USR1 -- _demo_signals_stop_worker
+  dybatpho::background_run worker sleep 300
+  kill -s USR1 "${BASHPID}"
+  dybatpho::signals_restore traps
+  dybatpho::info "Caught: ${caught}"
+  dybatpho::signals_raise "${caught}"
+  trap - USR1
+}
+
 # --- PID files ------------------------------------------------------------
 
 # @description Run the `PID FILE` section of this example.
@@ -363,6 +401,7 @@ function _main {
   _demo_run_with_timeout
   _demo_background_jobs
   _demo_kill_children
+  _demo_signals
   _demo_pid_file
   dybatpho::success "Process operations demo complete"
 }

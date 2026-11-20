@@ -39,6 +39,9 @@ writes PID files.
 - [`dybatpho::run_err_handler`](#dybatphorun_err_handler) — Handle a command failure captured by `dybatpho::register_err_handler`.
 - [`dybatpho::killed_process_handler`](#dybatphokilled_process_handler) — Handle SIGINT or SIGTERM received by the current process. It exits with 130 or 143, and the EXIT handlers registered through `dybatpho::trap` still run on the way out.
 - [`dybatpho::trap`](#dybatphotrap) — Append a command to one or more trap handlers without discarding existing traps.
+- [`dybatpho::signals_capture`](#dybatphosignals_capture) — Take over some signals for the length of a block of code: save the handlers they have now, and install one alone that records which signal arrived and then runs an optional handler. Put the saved handlers back with `dybatpho::signals_restore`, then, if a signal arrived, raise it again with `dybatpho::signals_raise` so the caller's handlers run once, after the cleanup -- or the shell ends, as it would have without the block. Appending a handler with `dybatpho::trap` puts it after the caller's, and a caller handler that exits ends the shell before the cleanup runs; this is the way to run the cleanup first.
+- [`dybatpho::signals_restore`](#dybatphosignals_restore) — Put back the signal handlers `dybatpho::signals_capture` saved, exactly as they were: a signal that had no handler has none again, and one that was ignored is ignored again.
+- [`dybatpho::signals_raise`](#dybatphosignals_raise) — Raise a signal again in the current shell, so the handlers now in place answer it. Nothing happens when the signal is empty, which is what `dybatpho::signals_capture` leaves when none arrived.
 - [`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit) — Register a file or directory to be removed when the current shell exits.
 - [`dybatpho::dry_run`](#dybatphodry_run) — Print a command instead of executing it when dry-run mode is enabled.
 - [`dybatpho::try`](#dybatphotry) — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script. The command runs in a subshell of the calling shell, so it can call any function the caller has defined, read its variables and its standard input, and nothing it changes -- variables, the working directory, traps -- leaks back. Its standard output and standard error are captured into the two named variables, with trailing newlines removed as `$(...)` would, so the message a `dybatpho::die` printed is in the error variable rather than on the terminal. The status of the command is the status of this call. Give an empty name to discard one of the streams. As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit` for the command, and calling `dybatpho::try` outside such a condition under `set -e` ends the script when the command fails. Test its status, or collect it with `|| status=$?`.
@@ -65,6 +68,12 @@ writes PID files.
 **[`dybatpho::register_common_handlers`](#dybatphoregister_common_handlers)**
 
 - This is the usual one-line setup at the top of scripts that want both error and signal handling
+
+**[`dybatpho::signals_capture`](#dybatphosignals_capture)**
+
+- A loop can watch the second variable to stop early once a signal arrived
+- The command runs when the signal arrives, so a function that reads its state then sees values set after this call
+- A signal the shell ignores stays ignored: it is not taken over, recorded, or raised
 
 **[`dybatpho::cleanup_file_on_exit`](#dybatphocleanup_file_on_exit)**
 
@@ -179,6 +188,79 @@ Append a command to one or more trap handlers without discarding existing traps.
 | --- | --- | --- |
 | `$1` | string | Command to run when the signal is trapped |
 | `$@` | string | Signals to trap |
+
+---
+
+### `dybatpho::signals_capture`
+
+Take over some signals for the length of a block of code: save
+the handlers they have now, and install one alone that records which signal
+arrived and then runs an optional handler. Put the saved handlers back with
+`dybatpho::signals_restore`, then, if a signal arrived, raise it again with
+`dybatpho::signals_raise` so the caller's handlers run once, after the
+cleanup -- or the shell ends, as it would have without the block.
+
+Appending a handler with `dybatpho::trap` puts it after the caller's, and a
+caller handler that exits ends the shell before the cleanup runs; this is
+the way to run the cleanup first.
+
+**🧪 Example**
+
+```bash
+local traps caught=""
+dybatpho::signals_capture traps caught INT TERM -- stop_worker
+wait_for_worker
+dybatpho::signals_restore traps
+dybatpho::signals_raise "${caught}"
+```
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the saved handlers; pass it to `dybatpho::signals_restore` |
+| `$2` | string | Name of the variable set to the signal that arrived, such as `TERM`; set to empty first |
+| `$@` | string | Signals to take over, with or without `SIG`; then, optionally, `--` and a command to run when one arrives, with the signal's name appended |
+
+**🧩 Variable sets**
+
+- **`The`** (two): named variables
+
+**📝 Notes**
+
+- `EXIT`, `ERR`, `DEBUG` and `RETURN` are not signals and cannot be raised again, so they are refused
+
+---
+
+### `dybatpho::signals_restore`
+
+Put back the signal handlers `dybatpho::signals_capture` saved,
+exactly as they were: a signal that had no handler has none again, and one
+that was ignored is ignored again.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable `dybatpho::signals_capture` filled |
+
+---
+
+### `dybatpho::signals_raise`
+
+Raise a signal again in the current shell, so the handlers
+now in place answer it. Nothing happens when the signal is empty, which is
+what `dybatpho::signals_capture` leaves when none arrived.
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Signal name, with or without `SIG`, or empty |
+
+**🚦 Exit codes**
+
+- `0`: No signal was given, or the shell is still running after it was raised
 
 ---
 

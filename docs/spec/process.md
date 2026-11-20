@@ -153,6 +153,37 @@ the status.
 
 ---
 
+### User Story 7 - Take over signals for a block of code (Priority: P2)
+
+As a script author, I want to stop a worker or roll back a half-done change
+when the script is interrupted, before the handlers my script already has run,
+and then hand the signal back to them, so that cleanup always happens and the
+script still ends the way it would have.
+
+**Why this priority**: Appending a handler with `dybatpho::trap` puts it after
+the caller's, and a caller handler that exits ends the shell before the cleanup
+runs. The library did this correctly for its own commands only, so callers
+reached for its internal helpers.
+
+**Independent Test**: Install a caller handler for TERM, take TERM over with a
+handler of its own, send TERM, put the handlers back and raise the signal, and
+check the order in which the two handlers ran.
+
+**Acceptance Scenarios**:
+
+1. **Given** a caller handler for TERM, **When** a script takes TERM over with
+   `dybatpho::signals_capture traps caught TERM -- stop_worker` and receives
+   TERM, **Then** only `stop_worker` runs, with `TERM` as its last argument,
+   and `caught` holds `TERM`
+2. **Given** a signal arrived while taken over, **When** the script calls
+   `dybatpho::signals_restore traps` and `dybatpho::signals_raise "${caught}"`,
+   **Then** the caller's handler runs once, after the cleanup
+3. **Given** a signal the script ignores, **When** it is taken over and
+   received, **Then** no handler runs, `caught` stays empty, and the signal is
+   still ignored after the restore
+
+---
+
 ### Example Workflow
 
 ```bash
@@ -229,6 +260,13 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   standard input, changes a caller variable, or fails under the caller's ERR
   handler.
 - `dybatpho::try` is given an empty name for a stream the caller does not want.
+- A block takes over a signal the script ignores, receives it, and hands the
+  handlers back.
+- A handler for a taken-over signal reads a variable that was set after the
+  takeover, such as the PID of a worker started inside the block.
+- `dybatpho::signals_capture` is given `EXIT`, `ERR`, an unknown signal, a
+  variable name that is not an identifier or starts with `__dybatpho`, or the
+  same name for both variables.
 - A job reaped by `dybatpho::wait_all` keeps its recorded PID, which the system may hand to an unrelated process: `dybatpho::kill_children` never signals it, and `dybatpho::background_run` may start the name again.
 
 ## Requirements *(mandatory)*
@@ -301,6 +339,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-037**: `dybatpho::try` MUST NOT set off the caller's ERR handler or `errexit` when the command fails, MUST discard a stream whose variable name is empty, MUST remove its temporary files, and MUST stop the script when the `--` separator or the command is missing or a variable name is invalid or reserved.
 - **FR-039**: `run_with_timeout` MUST pass a HUP, INT or TERM it receives while the command runs on to the command's process group, on both the `timeout` and the fallback path, MUST then raise it again once the caller's handlers are back, MUST leave a signal the caller ignores ignored -- neither passed on nor raised, and still ignored by the command -- and MUST hand the command the caller's standard input; the exit code of a command that ends on its own or times out MUST stay as before.
 - **FR-040**: A function that installs handlers for its own duration and puts the caller's back MUST leave a signal that was ignored -- by the script or from its start -- ignored, and MUST NOT reset it to its default on the way, since in a shell started with INT ignored that reset cannot be undone.
+- **FR-041**: `dybatpho::signals_capture <state> <caught> <signal>... [-- <command>...]` MUST save the current handlers of the signals into the state variable, set the caught variable to empty, and install for each signal not currently ignored a handler that alone sets the caught variable to the name of the first signal that arrives and then runs the command, if any, with that name appended; the signal MUST also be kept in a global of the library's own, so a `local` of the caught name in the function running when it arrives cannot swallow it, and `signals_restore` MUST copy it into the caller's variable. The command MUST run as the words given, never through `eval` of a caller string, and MUST be looked up when the signal arrives.
+- **FR-042**: `dybatpho::signals_restore <state>` MUST put back the handlers `signals_capture` saved, under FR-040, whatever the caller set `IFS` to, and `dybatpho::signals_raise <signal>` MUST send that signal to the current shell, doing nothing when it is empty.
+- **FR-043**: The `signals_*` functions MUST stop the script with status 1 on a variable name that is not an identifier or starts with `__dybatpho`, on equal state and caught names, on a name that is not a signal or is `EXIT`, `ERR`, `DEBUG`, `RETURN`, or `KILL` or `STOP`, which no handler can catch, on `--` with no command after it, and on a state variable `signals_capture` did not fill.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -386,6 +427,11 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-034**: Interrupt a script that ran `trap '' INT` while `run_with_timeout` runs a function, then a program, and see the command finish and the script carry on with exit code 0.
 - **IT-035**: Wait for a reaped job with `kill -0` answering for its pid and see the wait return the job's exit code.
 - **IT-036**: Stop a function `run_with_timeout` runs on the fallback path for two seconds and see the wait ask about the job no more than a handful of times.
+- **IT-037**: Take TERM over with a handler that reads a variable set after the takeover, send TERM, restore and raise, and see the handler run once with the late value, then the caller's handler once, and the script carry on.
+- **IT-038**: Take over a TERM the script ignores, send it, restore and raise, and see no handler run, nothing recorded, and TERM still ignored.
+- **IT-039**: Take USR1 and USR2 over and restore them, and see a quoted USR1 handler put back exactly and USR2 left with none; take over a USR2 that is ignored and see it stay ignored.
+- **IT-040**: Raise an empty signal and see nothing happen, raise USR1 and see the current handler run, and see every invalid call of the three functions refused with status 1.
+- **IT-043**: Take INT and TERM over and restore them with `IFS` set to a newline and a tab, to nothing, and to a comma, and see both handlers back each time.
 
 ## Acceptance Criteria *(mandatory)*
 

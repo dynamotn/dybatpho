@@ -670,6 +670,9 @@ Utilities for process handling. Loaded: always. Stability: stable. Reference: [d
 - `dybatpho::run_err_handler <number>` — Handle a command failure captured by `dybatpho::register_err_handler`.
 - `dybatpho::killed_process_handler <string>` — Handle SIGINT or SIGTERM received by the current process.
 - `dybatpho::trap <string> <string...>` — Append a command to one or more trap handlers without discarding existing traps.
+- `dybatpho::signals_capture <string> <string> <string...>` — Take over some signals for the length of a block of code: save the handlers they have now, and install one alone that records which signal arrived and then runs an optional handler.
+- `dybatpho::signals_restore <string>` — Put back the signal handlers `dybatpho::signals_capture` saved, exactly as they were: a signal that had no handler has none again, and one that was ignored is ignored again.
+- `dybatpho::signals_raise <string>` — Raise a signal again in the current shell, so the handlers now in place answer it.
 - `dybatpho::cleanup_file_on_exit <string>` — Register a file or directory to be removed when the current shell exits.
 - `dybatpho::dry_run <string...>` — Print a command instead of executing it when dry-run mode is enabled.
 - `dybatpho::try <string> <string> <string> <string...>` — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script.

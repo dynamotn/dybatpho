@@ -284,6 +284,182 @@ function dybatpho::trap {
 }
 
 #######################################
+# @description Check the name of a variable a `signals_*` caller chose.
+# @arg $1 string Function name, for the message
+# @arg $2 string What the variable holds, for the message
+# @arg $3 string Variable name
+# @internal
+#######################################
+function __dybatpho_process_signals_check_name {
+  [[ "$3" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "$3" != __dybatpho* ]] \
+    || dybatpho::die "$1: Invalid name for the $2 variable: '$3'"
+}
+
+#######################################
+# @description Take over some signals for the length of a block of code: save
+#   the handlers they have now, and install one alone that records which signal
+#   arrived and then runs an optional handler. Put the saved handlers back with
+#   `dybatpho::signals_restore`, then, if a signal arrived, raise it again with
+#   `dybatpho::signals_raise` so the caller's handlers run once, after the
+#   cleanup -- or the shell ends, as it would have without the block.
+#
+#   Appending a handler with `dybatpho::trap` puts it after the caller's, and a
+#   caller handler that exits ends the shell before the cleanup runs; this is
+#   the way to run the cleanup first.
+# @example
+#   local traps caught=""
+#   dybatpho::signals_capture traps caught INT TERM -- stop_worker
+#   wait_for_worker
+#   dybatpho::signals_restore traps
+#   dybatpho::signals_raise "${caught}"
+# @arg $1 string Name of the variable receiving the saved handlers; pass it to `dybatpho::signals_restore`
+# @arg $2 string Name of the variable set to the signal that arrived, such as `TERM`; set to empty first
+# @arg $@ string Signals to take over, with or without `SIG`; then, optionally,
+#   `--` and a command to run when one arrives, with the signal's name appended
+# @set The two named variables
+# @tip A loop can watch the second variable to stop early once a signal arrived
+# @tip The command runs when the signal arrives, so a function that reads its state then sees values set after this call
+# @tip A signal the shell ignores stays ignored: it is not taken over, recorded, or raised
+# @note `EXIT`, `ERR`, `DEBUG` and `RETURN` are not signals and cannot be raised again, so they are refused
+#######################################
+function dybatpho::signals_capture {
+  (($# >= 3)) || dybatpho::die "${FUNCNAME[0]}: Expected: state caught signal... [-- command [args...]]"
+  local __dybatpho_process_signals_state="$1" __dybatpho_process_signals_caught="$2"
+  shift 2
+  __dybatpho_process_signals_check_name "${FUNCNAME[0]}" state "${__dybatpho_process_signals_state}"
+  __dybatpho_process_signals_check_name "${FUNCNAME[0]}" caught "${__dybatpho_process_signals_caught}"
+  [[ "${__dybatpho_process_signals_state}" != "${__dybatpho_process_signals_caught}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: The state and caught variables must differ"
+
+  local -a __dybatpho_process_signals_list=()
+  local __dybatpho_process_signals_name
+  while (($# > 0)) && [[ "$1" != "--" ]]; do
+    __dybatpho_process_signals_name="${1#SIG}"
+    shift
+    [[ "${__dybatpho_process_signals_name}" =~ ^[A-Z][A-Z0-9+-]*$ ]] \
+      && kill -l "${__dybatpho_process_signals_name}" &> /dev/null \
+      && [[ ! "${__dybatpho_process_signals_name}" =~ ^(EXIT|ERR|DEBUG|RETURN|KILL|STOP)$ ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Not a signal that can be caught and raised again: \
+'${__dybatpho_process_signals_name}'"
+    __dybatpho_process_signals_list+=("${__dybatpho_process_signals_name}")
+  done
+  ((${#__dybatpho_process_signals_list[@]} > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected at least one signal"
+
+  local __dybatpho_process_signals_command=""
+  if (($# > 0)); then
+    shift
+    (($# > 0)) || dybatpho::die "${FUNCNAME[0]}: Expected a command after --"
+    local __dybatpho_process_signals_word __dybatpho_process_signals_quoted
+    for __dybatpho_process_signals_word in "$@"; do
+      printf -v __dybatpho_process_signals_quoted '%q' "${__dybatpho_process_signals_word}"
+      __dybatpho_process_signals_command+=" ${__dybatpho_process_signals_quoted}"
+    done
+  fi
+
+  local -n __dybatpho_process_signals_state_ref="${__dybatpho_process_signals_state}"
+  local -n __dybatpho_process_signals_caught_ref="${__dybatpho_process_signals_caught}"
+  local __dybatpho_process_signals_saved
+  __dybatpho_process_traps_save_into __dybatpho_process_signals_saved \
+    ${__dybatpho_process_signals_list[@]+"${__dybatpho_process_signals_list[@]}"}
+  # The first line names the signals and the second the caught variable, so
+  # restoring needs nothing else. Joined with spaces by `printf`, not `[*]`,
+  # which joins on the caller's `IFS`.
+  local __dybatpho_process_signals_names
+  printf -v __dybatpho_process_signals_names '%s ' \
+    ${__dybatpho_process_signals_list[@]+"${__dybatpho_process_signals_list[@]}"}
+  __dybatpho_process_signals_state_ref="${__dybatpho_process_signals_names% }"$'\n'
+  __dybatpho_process_signals_state_ref+="${__dybatpho_process_signals_caught}"$'\n'
+  __dybatpho_process_signals_state_ref+="${__dybatpho_process_signals_saved}"
+  __dybatpho_process_signals_caught_ref=""
+  __dybatpho_process_signals_install "${__dybatpho_process_signals_caught}" "${__dybatpho_process_signals_saved}" \
+    "${__dybatpho_process_signals_command}" \
+    ${__dybatpho_process_signals_list[@]+"${__dybatpho_process_signals_list[@]}"}
+}
+
+#######################################
+# @description Install the handlers of `dybatpho::signals_capture`: each
+#   records the first signal that arrives, then runs the optional command.
+#   The handler runs in whatever function is running when the signal comes; a
+#   `local` of the caught name there would swallow it, so the signal is also
+#   kept in a global of the library's own, which `signals_restore` copies back.
+# @arg $1 string Name of the caught variable
+# @arg $2 string The saved handlers, to leave an ignored signal ignored
+# @arg $3 string The quoted command, or empty
+# @arg $@ string Signals
+# @internal
+#######################################
+function __dybatpho_process_signals_install {
+  local __dybatpho_process_install_caught="$1" __dybatpho_process_install_saved="$2"
+  local __dybatpho_process_install_command="$3" __dybatpho_process_install_name __dybatpho_process_install_handler
+  shift 3
+  local __dybatpho_process_install_global="__dybatpho_process_signals_got_${__dybatpho_process_install_caught}"
+  unset "${__dybatpho_process_install_global}"
+  for __dybatpho_process_install_name in "$@"; do
+    ! __dybatpho_process_traps_ignored "${__dybatpho_process_install_saved}" "${__dybatpho_process_install_name}" \
+      || continue
+    # The first signal is the one kept: a second, while the block runs, does not replace it.
+    # shellcheck disable=SC2016 # the `${...}` are expanded by the handler, when the signal comes
+    printf -v __dybatpho_process_install_handler '[[ -n "${%s-}" ]] || %s=%s; [[ -n "${%s-}" ]] || %s=%s' \
+      "${__dybatpho_process_install_global}" "${__dybatpho_process_install_global}" \
+      "${__dybatpho_process_install_name}" "${__dybatpho_process_install_caught}" \
+      "${__dybatpho_process_install_caught}" "${__dybatpho_process_install_name}"
+    [[ -z "${__dybatpho_process_install_command}" ]] \
+      || __dybatpho_process_install_handler+=";${__dybatpho_process_install_command} ${__dybatpho_process_install_name}"
+    __dybatpho_process_trap_only "${__dybatpho_process_install_handler}" "${__dybatpho_process_install_name}"
+  done
+}
+
+#######################################
+# @description Put back the signal handlers `dybatpho::signals_capture` saved,
+#   exactly as they were: a signal that had no handler has none again, and one
+#   that was ignored is ignored again.
+# @arg $1 string Name of the variable `dybatpho::signals_capture` filled
+#######################################
+function dybatpho::signals_restore {
+  local __dybatpho_process_signals_state
+  dybatpho::expect_args __dybatpho_process_signals_state -- "$@"
+  __dybatpho_process_signals_check_name "${FUNCNAME[0]}" state "${__dybatpho_process_signals_state}"
+  local -n __dybatpho_process_signals_state_ref="${__dybatpho_process_signals_state}"
+  local __dybatpho_process_signals_names="${__dybatpho_process_signals_state_ref%%$'\n'*}"
+  [[ -n "${__dybatpho_process_signals_names}" && "${__dybatpho_process_signals_names}" =~ ^[A-Z0-9+\ -]+$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: '${__dybatpho_process_signals_state}' holds no handlers saved by capture"
+  local __dybatpho_process_signals_rest="${__dybatpho_process_signals_state_ref#*$'\n'}"
+  local __dybatpho_process_signals_caught="${__dybatpho_process_signals_rest%%$'\n'*}"
+  __dybatpho_process_signals_check_name "${FUNCNAME[0]}" caught "${__dybatpho_process_signals_caught}"
+  # Split on the spaces `signals_capture` joined them with, whatever the caller set `IFS` to.
+  local -a __dybatpho_process_signals_list=()
+  IFS=' ' read -r -a __dybatpho_process_signals_list <<< "${__dybatpho_process_signals_names}"
+  __dybatpho_process_traps_restore "${__dybatpho_process_signals_rest#*$'\n'}" \
+    ${__dybatpho_process_signals_list[@]+"${__dybatpho_process_signals_list[@]}"}
+  # The signal kept in the library's global reaches the caller's variable here,
+  # where the nameref resolves in the caller's scope.
+  local __dybatpho_process_signals_global="__dybatpho_process_signals_got_${__dybatpho_process_signals_caught}"
+  if [[ -n "${!__dybatpho_process_signals_global-}" ]]; then
+    local -n __dybatpho_process_signals_caught_ref="${__dybatpho_process_signals_caught}"
+    __dybatpho_process_signals_caught_ref="${!__dybatpho_process_signals_global}"
+    unset "${__dybatpho_process_signals_global}"
+  fi
+}
+
+#######################################
+# @description Raise a signal again in the current shell, so the handlers
+#   now in place answer it. Nothing happens when the signal is empty, which is
+#   what `dybatpho::signals_capture` leaves when none arrived.
+# @arg $1 string Signal name, with or without `SIG`, or empty
+# @exitcode 0 No signal was given, or the shell is still running after it was raised
+#######################################
+function dybatpho::signals_raise {
+  local __dybatpho_process_signals_name="${1-}"
+  [[ -n "${__dybatpho_process_signals_name}" ]] || return 0
+  __dybatpho_process_signals_name="${__dybatpho_process_signals_name#SIG}"
+  if [[ ! "${__dybatpho_process_signals_name}" =~ ^[A-Z][A-Z0-9+-]*$ ]] \
+    || ! kill -l "${__dybatpho_process_signals_name}" &> /dev/null; then
+    dybatpho::die "${FUNCNAME[0]}: Not a signal: '${__dybatpho_process_signals_name}'"
+  fi
+  kill -s "${__dybatpho_process_signals_name}" "${BASHPID}"
+}
+
+#######################################
 # @description Stop a subshell listing the handlers it inherited.
 #   A subshell still reports its parent's handlers through `trap -p` until it
 #   sets one of its own, although an inherited `EXIT` or signal handler never

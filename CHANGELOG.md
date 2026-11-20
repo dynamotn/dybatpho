@@ -11,6 +11,18 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 
 ## [Unreleased]
 
+### Added
+
+- **`process` — take over signals for a block of code with
+  `dybatpho::signals_capture`, `dybatpho::signals_restore` and
+  `dybatpho::signals_raise`.** While the block runs, a handler of its own runs
+  alone when INT, TERM or another signal arrives (to stop a worker, roll back a
+  half-done change), and the variable it names records which signal came;
+  afterwards the script's own handlers are put back exactly and the signal is
+  raised again, so they run once, after the cleanup. A signal the script
+  ignores stays ignored. Scripts that reached for the library's internal trap
+  helpers to do this can move to these.
+
 ## [7.2.1] - 2026-11-19
 
 ### Fixed

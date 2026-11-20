@@ -249,6 +249,159 @@ SCRIPT
   trap - USR1
 }
 
+@test 'dybatpho::signals_capture runs its handler alone, then the caller handler runs once after restore and raise' {
+  local script="${BATS_TEST_TMPDIR}/capture.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+trap 'printf "caller handler\n"' TERM
+worker=""
+function stop_worker { printf 'stop %s on %s\n' "${worker}" "$1"; }
+dybatpho::signals_capture traps caught INT TERM -- stop_worker
+# Set after the capture: the handler must read it when the signal arrives.
+worker=late
+kill -s TERM "$$"
+printf 'caught=%s\n' "${caught}"
+dybatpho::signals_restore traps
+dybatpho::signals_raise "${caught}"
+printf 'done\n'
+SCRIPT
+  run bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+  assert_line --index 0 "stop late on TERM"
+  assert_line --index 1 "caught=TERM"
+  assert_line --index 2 "caller handler"
+  assert_line --index 3 "done"
+  assert_equal "${#lines[@]}" 4
+}
+
+@test 'dybatpho::signals_capture keeps the first signal, even when a function running then has a local of its name' {
+  local script="${BATS_TEST_TMPDIR}/shadowed-capture.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+trap 'printf "caller handler\n"' TERM
+function inner_work {
+  # The handler runs here, where `caught` is this local: it must not swallow the signal.
+  local caught=""
+  kill -s TERM "$$"
+  kill -s INT "$$"
+}
+function outer {
+  local traps caught=""
+  dybatpho::signals_capture traps caught INT TERM
+  inner_work
+  dybatpho::signals_restore traps
+  printf 'caught=%s\n' "${caught}"
+  dybatpho::signals_raise "${caught}"
+}
+outer
+printf 'done\n'
+SCRIPT
+  run bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+  assert_line --index 0 "caught=TERM"
+  assert_line --index 1 "caller handler"
+  assert_line --index 2 "done"
+}
+
+@test 'dybatpho::signals_capture refuses KILL and STOP, which no handler can catch' {
+  local signal
+  for signal in KILL SIGKILL STOP; do
+    run -1 dybatpho::signals_capture traps caught "${signal}"
+    assert_output --partial "caught and raised again"
+  done
+}
+
+@test 'dybatpho::signals_capture leaves an ignored signal ignored, unrecorded and not raised' {
+  local script="${BATS_TEST_TMPDIR}/ignored-capture.sh"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+trap '' TERM
+dybatpho::signals_capture traps caught TERM -- printf 'handler ran\n'
+kill -s TERM "$$"
+printf '[%s]\n' "${caught}"
+dybatpho::signals_restore traps
+dybatpho::signals_raise "${caught}"
+trap -p TERM
+SCRIPT
+  run bash "${script}" "${DYBATPHO_DIR}"
+  assert_success
+  assert_line --index 0 "[]"
+  assert_line --index 1 "trap -- '' SIGTERM"
+  assert_equal "${#lines[@]}" 2
+}
+
+@test 'dybatpho::signals_restore puts every handler back exactly, and an empty one stays empty' {
+  trap "printf '%s\\n' \"it's USR1\"" USR1
+  trap - USR2
+  local before_usr1 traps caught=kept
+  before_usr1="$(trap -p USR1)"
+  dybatpho::signals_capture traps caught SIGUSR1 USR2 -- printf '%s\n' "it's the handler"
+  assert_equal "${caught}" ""
+  [[ "$(trap -p USR1)" == *"caught=USR1;"*"USR1"* ]]
+  [[ -n "$(trap -p USR2)" ]]
+  dybatpho::signals_restore traps
+  assert_equal "$(trap -p USR1)" "${before_usr1}"
+  assert_equal "$(trap -p USR2)" ""
+  trap - USR1
+}
+
+@test 'dybatpho::signals_restore puts every handler back whatever IFS the caller set' {
+  local ifs before_int before_term traps caught
+  trap 'echo int' INT
+  trap 'echo term' TERM
+  before_int="$(trap -p INT)"
+  before_term="$(trap -p TERM)"
+  for ifs in $'\n\t' '' ','; do
+    IFS="${ifs}"
+    dybatpho::signals_capture traps caught INT TERM
+    dybatpho::signals_restore traps
+    IFS=$' \t\n'
+    assert_equal "$(trap -p INT)" "${before_int}"
+    assert_equal "$(trap -p TERM)" "${before_term}"
+  done
+  trap - INT TERM
+}
+
+@test 'dybatpho::signals_capture skips an ignored signal and records nothing for it' {
+  trap '' USR2
+  # shellcheck disable=SC2034 # filled and read through namerefs
+  local traps caught
+  dybatpho::signals_capture traps caught USR1 USR2
+  assert_equal "$(trap -p USR2)" "trap -- '' SIGUSR2"
+  dybatpho::signals_restore traps
+  assert_equal "$(trap -p USR2)" "trap -- '' SIGUSR2"
+  assert_equal "$(trap -p USR1)" ""
+  trap - USR2
+}
+
+@test 'dybatpho::signals_raise raises a signal in the current shell, and does nothing for an empty one' {
+  local got=""
+  trap 'got=yes' USR1
+  run_traced dybatpho::signals_raise ""
+  assert_success
+  assert_equal "${got}" ""
+  dybatpho::signals_raise SIGUSR1
+  assert_equal "${got}" yes
+  trap - USR1
+}
+
+@test 'dybatpho::signals_* refuse a bad name, a non-signal and a missing command' {
+  local args
+  for args in "traps" "traps caught" "1bad caught TERM" "traps __dybatpho_x TERM" "same same TERM" \
+    "traps caught EXIT" "traps caught ERR" "traps caught NOPE" "traps caught lower" "traps caught --" \
+    "traps caught TERM --"; do
+    # shellcheck disable=SC2086 # each case is a word list
+    run -1 dybatpho::signals_capture ${args}
+  done
+  # shellcheck disable=SC2034 # read through a nameref
+  local junk="not saved"
+  run -1 dybatpho::signals_restore junk
+  assert_output --partial "holds no handlers"
+  run -1 dybatpho::signals_restore 'x[$(id)]'
+  run -1 dybatpho::signals_raise NOPE
+  assert_output --partial "Not a signal"
+}
+
 @test 'dybatpho::cleanup_file_on_exit action' {
   # The call itself must stay quiet, and it must remember the path.
   local filepath
@@ -560,6 +713,7 @@ SCRIPT
   # would break the 124 this helper promises.
   local bin="${BATS_TEST_TMPDIR}/bin"
   mkdir -p "${bin}"
+  # shellcheck disable=SC2016 # `$1` belongs to the generated sh script
   printf '#!/bin/sh\n[ "$1" = --version ] && exit 1\nexit 0\n' > "${bin}/timeout"
   chmod +x "${bin}/timeout"
 

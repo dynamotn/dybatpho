@@ -421,6 +421,7 @@ Utilities for working with JSON and YAML data. Loaded: `--modules json`. Stabili
 - `dybatpho::json_read <string> <string...>` — Read several values of a JSON document into variables with one `jq` call, instead of one call per field.
 - `dybatpho::json_valid <string>` — Return success when a JSON document held in a variable is valid.
 - `dybatpho::json_set [string] <string> <string> <string> [string]` — Set the value at a path in a JSON document.
+- `dybatpho::json_edit [string] <string> <string> <string...>` — Edit a JSON file with a `jq` filter, in place, writing only when the document changes.
 - `dybatpho::json_del <string> <string> [string]` — Remove the value at a path from a JSON document.
 - `dybatpho::json_merge <string> <string> [string]` — Deep-merge two JSON objects, the overlay winning.
 - `dybatpho::yaml_set [string] <string> <string> <string> [string]` — Set the value at a path in a YAML document.

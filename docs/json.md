@@ -44,6 +44,7 @@ it as outdated.
 - [`dybatpho::json_read`](#dybatphojson_read) — Read several values of a JSON document into variables with one `jq` call, instead of one call per field. Each variable gets its filter's first output: a string as it is, any other value as compact JSON, and nothing at all or `null` as an empty string. Values may hold newlines.
 - [`dybatpho::json_valid`](#dybatphojson_valid) — Return success when a JSON document held in a variable is valid.
 - [`dybatpho::json_set`](#dybatphojson_set) — Set the value at a path in a JSON document. The path is a list of keys separated by `.`, such as `spec.ports.0.name`, where a segment of digits indexes an array. Missing objects and arrays on the way are created. The value is stored as a string unless `--json` says it is a JSON document, which is how a number, a boolean, `null`, an array, or an object is written.
+- [`dybatpho::json_edit`](#dybatphojson_edit) — Edit a JSON file with a `jq` filter, in place, writing only when the document changes. A missing file is read as `{}`; the filter must give exactly one document; and a result equal to what the file holds, keys in any order, leaves the file untouched, modification time included. It is the edit `json_set` cannot express: append to an array if absent, rename a key, drop the entries that match.
 - [`dybatpho::json_del`](#dybatphojson_del) — Remove the value at a path from a JSON document. Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does not exist leaves the document unchanged, and deleting an array element shifts the ones after it.
 - [`dybatpho::json_merge`](#dybatphojson_merge) — Deep-merge two JSON objects, the overlay winning. Objects present in both are merged key by key; any other value, arrays included, is replaced by the overlay's. Both documents must be objects.
 - [`dybatpho::yaml_set`](#dybatphoyaml_set) — Set the value at a path in a YAML document. Paths and `--json` work as in `dybatpho::json_set`. The edit is made by `yq` itself, not through JSON, so comments and the rest of the document's layout are kept as `yq` keeps them; this needs `yq` but not `jq`.
@@ -74,6 +75,10 @@ it as outdated.
 **[`dybatpho::json_set`](#dybatphojson_set)**
 
 - The output file is written atomically after the whole result is known, so a failure leaves it untouched
+
+**[`dybatpho::json_edit`](#dybatphojson_edit)**
+
+- Pass values with `--arg`, never inside the filter: they are then data, not code
 
 <a id="reference"></a>
 
@@ -548,6 +553,41 @@ dybatpho::json_set --json config.json server.ports '[80,443]'
 - `0`: The value was set
 - `1`: Invalid arguments, path, or `--json` value
 - `other`: `jq`'s exit code when the input is invalid or the path runs through a scalar
+- `127`: `jq` is not installed
+
+---
+
+### `dybatpho::json_edit`
+
+Edit a JSON file with a `jq` filter, in place, writing only
+when the document changes. A missing file is read as `{}`; the filter must
+give exactly one document; and a result equal to what the file holds,
+keys in any order, leaves the file untouched, modification time included.
+It is the edit `json_set` cannot express: append to an array if absent,
+rename a key, drop the entries that match.
+
+**🧪 Example**
+
+```bash
+dybatpho::json_edit --mkdir "${HOME}/.config/app/servers.json" \
+  '.servers |= ((. // []) + [$name] | unique)' --arg name "${server}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--mkdir` to create the file's directory when it is missing |
+| `$2` | string | yes |  | JSON file path |
+| `$3` | string | yes |  | `jq` filter |
+| `$@` | string | yes |  | More `jq` options after the filter, such as `--arg name value` or `--argjson name json` |
+
+**🚦 Exit codes**
+
+- `0`: The file was written
+- `9`: The document did not change, and the file was left alone
+- `other`: `jq`'s own exit code for an invalid document or filter, or a filter giving no or several documents; the file is left alone
 - `127`: `jq` is not installed
 
 ---

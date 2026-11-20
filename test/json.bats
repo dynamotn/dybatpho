@@ -457,6 +457,11 @@ __yaml_query_fixture() {
   assert_failure
   assert_stderr --partial "not valid JSON"
   refute_stderr --partial 'tr4ce-marker'
+  # An `--arg` value of json_edit: the caller's own line is the only trace of it.
+  # shellcheck disable=SC2016 # `$v` is a jq variable
+  run --separate-stderr bash "${child}" "${init}" dybatpho::json_edit "${file}" '.k = $v' --arg v 'tr4ce-marker'
+  assert_success
+  assert_equal "$(grep -c 'tr4ce-marker' <<< "${stderr}")" 1
 }
 
 @test "dybatpho::json_set and dybatpho::yaml_set store a value past the argument size limit" {
@@ -794,6 +799,62 @@ __json_fixture() {
   local result
   result="$(printf '%s' '{"a":1}' | dybatpho::json_set - b 2)"
   assert_equal "$(__json_compact "${result}")" '{"a":1,"b":"2"}'
+}
+
+@test "dybatpho::json_edit edits with a filter and writes only on change" {
+  local file="${BATS_TEST_TMPDIR}/conf/servers.json"
+  # A missing file is `{}`; --mkdir creates its directory.
+  # shellcheck disable=SC2016 # `$n` is a jq variable, not a shell one
+  run_traced dybatpho::json_edit --mkdir "${file}" '.servers |= ((. // []) + [$n] | unique) # add' --arg n alpha
+  assert_success
+  run jq -c . "${file}"
+  assert_output '{"servers":["alpha"]}'
+  # The same edit again changes nothing: 9, and the file is not rewritten.
+  touch -t 200001010000 "${file}"
+  # shellcheck disable=SC2016 # `$n` is a jq variable, not a shell one
+  run_traced dybatpho::json_edit "${file}" '.servers |= ((. // []) + [$n] | unique)' --arg n alpha
+  assert_failure 9
+  run find "${file}" -newer "${BATS_TEST_TMPDIR}"
+  assert_output ""
+  # Keys in another order are the same document.
+  printf '{"b":1,"a":2}\n' > "${file}"
+  run_traced dybatpho::json_edit "${file}" '{a: .a, b: .b}'
+  assert_failure 9
+}
+
+@test "dybatpho::json_edit starts an empty file from {} and refuses a file of several documents" {
+  local file="${BATS_TEST_TMPDIR}/empty.json"
+  : > "${file}"
+  run_traced dybatpho::json_edit "${file}" '.a = 2'
+  assert_success
+  run jq -c . "${file}"
+  assert_output '{"a":2}'
+  printf '{"a":1}{"a":5}\n' > "${file}"
+  run dybatpho::json_edit "${file}" '.a = 2'
+  assert_failure
+  assert_output --partial "the file holds 2 documents"
+  run cat "${file}"
+  assert_output '{"a":1}{"a":5}'
+}
+
+@test "dybatpho::json_edit leaves the file alone on a bad document or filter" {
+  local file="${BATS_TEST_TMPDIR}/conf.json"
+  printf '{"a":1}\n' > "${file}"
+  run -5 dybatpho::json_edit "${file}" '.a, .a'
+  assert_output --partial "2 documents"
+  run_traced dybatpho::json_edit "${file}" 'empty'
+  assert_failure
+  run_traced dybatpho::json_edit "${file}" '.a |'
+  assert_failure
+  run cat "${file}"
+  assert_output '{"a":1}'
+  printf '{not json\n' > "${file}"
+  run_traced dybatpho::json_edit "${file}" '.a = 2'
+  assert_failure
+  run cat "${file}"
+  assert_output '{not json'
+  run -1 dybatpho::json_edit - '.a'
+  assert_output --partial "Expected a file"
 }
 
 @test "dybatpho::json_del removes keys and elements" {

@@ -3,7 +3,7 @@
 # @brief Example showing JSON and YAML utilities
 # @description
 #   Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty,
-#   yaml_to_json, json_read, and the editing helpers json_set, json_del, json_merge, yaml_set, yaml_del, and
+#   yaml_to_json, json_read, and the editing helpers json_set, json_edit, json_del, json_merge, yaml_set, yaml_del, and
 #   yaml_merge
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
@@ -196,6 +196,12 @@ EOF
   dybatpho::info "Setting a string and a typed value, in place:"
   dybatpho::json_set "${config}" server.note 'set by "deploy"' "${config}"
   dybatpho::json_set --json "${config}" server.port 9090 "${config}"
+  dybatpho::info "Any jq edit, written only when it changes something:"
+  # shellcheck disable=SC2016 # `$t` is a jq variable, not a shell one
+  dybatpho::json_edit "${config}" '.tags |= ((. // []) + [$t] | unique)' --arg t edge
+  # shellcheck disable=SC2016 # `$t` is a jq variable, not a shell one
+  dybatpho::json_edit "${config}" '.tags |= ((. // []) + [$t] | unique)' --arg t edge \
+    || dybatpho::print "  second run: unchanged (status $?)"
   dybatpho::info "Removing a key and an array element:"
   dybatpho::json_del "${config}" debug "${config}"
   dybatpho::json_del "${config}" tags.0 "${config}"

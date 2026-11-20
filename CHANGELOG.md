@@ -57,6 +57,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **`json` — edit a JSON config file with any `jq` filter using
+  `dybatpho::json_edit [--mkdir] <file> <filter> [--arg name value]...`.**
+  A missing file starts as `{}`, the file is written only when the document
+  really changes (exit 9 otherwise), and a failing or multi-document filter
+  leaves it untouched.
 - **`text` — make untrusted text safe to print with
   `dybatpho::text_sanitize`.** Beyond the escape sequences `text_strip_ansi`
   removes, it drops carriage returns and other controls, C1 controls,

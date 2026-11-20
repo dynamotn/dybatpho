@@ -968,6 +968,81 @@ function dybatpho::json_set {
 }
 
 #######################################
+# @description Edit a JSON file with a `jq` filter, in place, writing only
+#   when the document changes. A missing file is read as `{}`; the filter must
+#   give exactly one document; and a result equal to what the file holds,
+#   keys in any order, leaves the file untouched, modification time included.
+#   It is the edit `json_set` cannot express: append to an array if absent,
+#   rename a key, drop the entries that match.
+# @example
+#   dybatpho::json_edit --mkdir "${HOME}/.config/app/servers.json" \
+#     '.servers |= ((. // []) + [$name] | unique)' --arg name "${server}"
+#
+# @arg $1 string? `--mkdir` to create the file's directory when it is missing
+# @arg $2 string JSON file path
+# @arg $3 string `jq` filter
+# @arg $@ string More `jq` options after the filter, such as `--arg name value` or `--argjson name json`
+# @exitcode 0 The file was written
+# @exitcode 9 The document did not change, and the file was left alone
+# @exitcode other `jq`'s own exit code for an invalid document or filter, or a filter giving no or several
+#   documents; the file is left alone
+# @exitcode 127 `jq` is not installed
+# @tip Pass values with `--arg`, never inside the filter: they are then data, not code
+#######################################
+function dybatpho::json_edit {
+  # Values passed with `--arg` must not reach a `set -x` trace, the argument checks included.
+  local __dybatpho_json_trace __dybatpho_json_status=0
+  __dybatpho_json_trace_off __dybatpho_json_trace
+  __dybatpho_json_edit "${FUNCNAME[0]}" "$@" || __dybatpho_json_status=$?
+  __dybatpho_json_trace_on "${__dybatpho_json_trace}"
+  return "${__dybatpho_json_status}"
+}
+
+#######################################
+# @description The work of `dybatpho::json_edit`, run with tracing off.
+# @arg $1 string Public function name, for messages
+# @arg $@ string The public function's own arguments
+# @exitcode 0 Written; 9 unchanged; other: `jq`'s status
+# @internal
+#######################################
+function __dybatpho_json_edit {
+  local caller="$1" mkdir=false
+  shift
+  if [[ "${1-}" == "--mkdir" ]]; then
+    mkdir=true
+    shift
+  fi
+  (($# >= 2)) || dybatpho::die "${caller}: Expected [--mkdir] <file> <filter> [jq options], got $# arguments"
+  local file="$1" filter="$2" current="{}" result
+  shift 2
+  [[ -n "${file}" && "${file}" != "-" ]] || dybatpho::die "${caller}: Expected a file to edit, got '${file}'"
+  __dybatpho_json_need_jq
+  __dybatpho_json_guard_paths file
+  # An empty file, as one just created with `touch`, is `{}` like a missing one.
+  if [[ -s "${file}" ]]; then
+    current="$(< "${file}")" || return 1
+  fi
+  # Exactly one document in, and one out: a filter with none or several would leave
+  # the file unreadable. The newline ends a `#` comment the filter may close with.
+  local program
+  printf -v program '%s[.[0] | %s\n] | if length == 1 then .[0] else error("%s") end' \
+    'if length != 1 then error("the file holds \(length) documents") else . end | ' "${filter}" \
+    'the filter gave \(length) documents'
+  result="$(jq -s "$@" "${program}" <<< "${current}")" || return
+  if [[ -s "${file}" ]]; then
+    local before after
+    before="$(jq -S -c . <<< "${current}")" || return
+    after="$(jq -S -c . <<< "${result}")" || return
+    [[ "${before}" != "${after}" ]] || return 9
+  fi
+  local -a options=()
+  [[ "${mkdir}" == false ]] || options=(--mkdir)
+  local status=0
+  printf '%s\n' "${result}" | dybatpho::file_write_if_changed ${options[@]+"${options[@]}"} "${file}" || status=$?
+  return "${status}"
+}
+
+#######################################
 # @description Remove the value at a path from a JSON document.
 #   Paths use the same syntax as `dybatpho::json_set`. Deleting a path that does
 #   not exist leaves the document unchanged, and deleting an array element

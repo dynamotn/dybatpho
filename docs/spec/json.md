@@ -249,6 +249,7 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **FR-033**: Under `set -x`, `json_object`, `json_set` and `yaml_set` MUST NOT trace a value beyond the caller's own call line, and the message refusing a `--json` value MUST NOT repeat the value.
 - **FR-031**: Every helper that reads a file MUST read an input path that starts with `-` (other than a lone `-`, which is stdin) as a file, never as an option of `jq` or `yq`.
 
+- **FR-036**: `dybatpho::json_edit [--mkdir] <file> <filter> [jq options]...` MUST apply the filter to the file, read as `{}` when missing or empty, and write the result only when it differs from the file's document with keys sorted, returning 9 and leaving the file untouched otherwise; it MUST refuse a file holding several documents and a filter that gives no or several, keep its arguments and `--arg` values out of a `set -x` trace, and on any `jq` failure MUST return `jq`'s status and leave the file as it was; it MUST stop the script on an empty file name or `-`.
 - **FR-035**: `dybatpho::json_read <document> <name>=<filter>...` MUST evaluate every filter in one `jq` run and set each named variable to its filter's first output -- a string as it is, any other value as compact JSON, no output or `null` as an empty string -- keeping newlines; on an invalid document or filter it MUST return `jq`'s status and set no variable, and on a blank text or several documents return 1 and set none; a filter ending in a `#` comment MUST work; and it MUST stop the script on a pair without `=` or a filter, or a name that is not an identifier or starts with `__dybatpho`.
 - **FR-034**: `json_has --optional` MUST return 1, printing nothing, when the file does not exist, and otherwise answer as `json_has` does.
 
@@ -334,6 +335,7 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **IT-032**: Build objects from tabs, control characters, multi-byte and invalid UTF-8, quotes and backslashes, and see exactly what `jq --arg` encodes.
 - **IT-033**: Under `set -x`, see a value of `json_object` and `json_set` only on the caller's line, and see a refused `--json` value left out of the error.
 
+- **IT-036**: Create a missing file in a missing directory with `--mkdir` and an `--arg` value, a filter ending in a comment included; repeat the edit and get 9 with the modification time kept; get 9 for a result whose keys only change order; get the file unchanged for a filter giving two documents or none, a filter that does not parse and an invalid document; see `-` refused.
 - **IT-035**: Read a string, a `null`, a number, a boolean, an array, a value holding a newline, a jq default and a missing path in one call and get each as stated; get the first output of a filter with several; get `jq`'s status and no variable changed for an invalid document; see bad pairs refused.
 - **IT-034**: Ask `json_has --optional` about a missing file and get 1 with nothing on stderr, about an existing file and get its answer, and see the missing file still give `jq`'s error status without the option.
 

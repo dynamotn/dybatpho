@@ -682,6 +682,7 @@ Utilities for process handling. Loaded: always. Stability: stable. Reference: [d
 - `dybatpho::try <string> <string> <string> <string...>` — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script.
 - `dybatpho::run_with_timeout <number> <string...>` — Run a command and end it if it takes too long.
 - `dybatpho::background_run <string> <string...>` — Start a command in the background under a name.
+- `dybatpho::background_detach [options] <string> <string...>` — Start a command that outlives the script: in its own process group, with standard input from `/dev/null`, its output appended to a log, the descriptors named closed, and removed from the shell's job table.
 - `dybatpho::background_pid <string>` — Print the process ID of a background job.
 - `dybatpho::background_status <string>` — Print the exit code of a background job that has finished.
 - `dybatpho::wait_all` — Wait for every background job started by `dybatpho::background_run`.

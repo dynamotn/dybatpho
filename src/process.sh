@@ -1155,6 +1155,77 @@ function dybatpho::background_run {
 }
 
 #######################################
+# @description Start a command that outlives the script: in its own process
+#   group, with standard input from `/dev/null`, its output appended to a log,
+#   the descriptors named closed, and removed from the shell's job table. Unlike
+#   `dybatpho::background_run`, the job is not tracked: `dybatpho::wait_all`
+#   and `dybatpho::kill_children` leave it alone.
+# @example
+#   local fd pid
+#   dybatpho::flock_acquire fd "${state}/queue.lock"
+#   # The worker must not keep holding the lock this script releases.
+#   dybatpho::background_detach pid --log "${state}/worker.log" --close-fd "${fd}" -- run_worker
+#   dybatpho::flock_release "${fd}"
+#
+# @arg $1 string Name of the variable receiving the process ID
+# @arg $@ string Options, then `--` and the command with its arguments
+# @option --log <file> Append the command's output and errors here; `/dev/null` by default
+# @option --close-fd <n> Close this descriptor in the command, such as one holding a lock; repeatable
+# @set The named variable
+# @exitcode 0 The command was started
+# @exitcode 1 Stop the script when the log cannot be written
+# @tip The command runs in a subshell of the caller, so a shell function works; record its start time with
+#   `dybatpho::process_start_time` to stop it safely later with `dybatpho::process_stop --group`
+#######################################
+function dybatpho::background_detach {
+  (($# >= 1)) || dybatpho::die "${FUNCNAME[0]}: Expected: pid-var [options] -- command [args...]"
+  local __dybatpho_process_detach_var="$1" __dybatpho_process_detach_log=/dev/null
+  shift
+  dybatpho::expect_ref "${__dybatpho_process_detach_var}"
+  [[ "${__dybatpho_process_detach_var}" != __dybatpho* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid name for the result variable: '${__dybatpho_process_detach_var}'"
+  local -a __dybatpho_process_detach_fds=()
+  while (($#)) && [[ "$1" != "--" ]]; do
+    (($# >= 2)) || dybatpho::die "${FUNCNAME[0]}: $1 expects a value"
+    case "$1" in
+      --log) __dybatpho_process_detach_log="$2" ;;
+      --close-fd)
+        if [[ ! "$2" =~ ^[0-9]{1,4}$ ]] || ((10#$2 <= 2)); then
+          dybatpho::die "${FUNCNAME[0]}: --close-fd expects a descriptor above 2, got '$2'"
+        fi
+        __dybatpho_process_detach_fds+=("$((10#$2))")
+        ;;
+      *) dybatpho::die "${FUNCNAME[0]}: Unknown option '$1'" ;;
+    esac
+    shift 2
+  done
+  (($# > 1)) || dybatpho::die "${FUNCNAME[0]}: Expected -- and a command"
+  shift
+  [[ -n "${__dybatpho_process_detach_log}" ]] || dybatpho::die "${FUNCNAME[0]}: --log must name a file"
+  # Opened here, not only in the job: a log that cannot be written would end the
+  # job at once, while this call still answered with its process ID.
+  { : >> "${__dybatpho_process_detach_log}"; } 2> /dev/null \
+    || dybatpho::die "${FUNCNAME[0]}: Cannot write the log: ${__dybatpho_process_detach_log}"
+
+  local __dybatpho_process_detach_monitor=off __dybatpho_process_detach_pid __dybatpho_process_detach_fd
+  [[ "$-" != *m* ]] || __dybatpho_process_detach_monitor=on
+  # Its own process group, so a Ctrl-C meant for the script does not reach it.
+  set -m
+  (
+    for __dybatpho_process_detach_fd in ${__dybatpho_process_detach_fds[@]+"${__dybatpho_process_detach_fds[@]}"}; do
+      exec {__dybatpho_process_detach_fd}>&-
+    done
+    exec < /dev/null &>> "${__dybatpho_process_detach_log}"
+    "$@"
+  ) &
+  __dybatpho_process_detach_pid=$!
+  [[ "${__dybatpho_process_detach_monitor}" == on ]] || set +m
+  disown "${__dybatpho_process_detach_pid}" 2> /dev/null || true
+  local -n __dybatpho_process_detach_ref="${__dybatpho_process_detach_var}"
+  __dybatpho_process_detach_ref="${__dybatpho_process_detach_pid}"
+}
+
+#######################################
 # @description Print the process ID of a background job.
 # @arg $1 string Job name
 # @stdout Process ID of the job

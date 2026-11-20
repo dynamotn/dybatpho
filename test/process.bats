@@ -1173,6 +1173,43 @@ _interrupt_script() {
   run -1 dybatpho::process_start_time __dybatpho_start "$$"
 }
 
+@test "dybatpho::background_detach starts a job in its own group, logged, untracked, without closed descriptors" {
+  local log="${BATS_TEST_TMPDIR}/detached.log" held="${BATS_TEST_TMPDIR}/held" fd pid
+  exec {fd}> "${held}"
+  _detached_job() {
+    printf 'started\n'
+    [[ -e "/dev/fd/${fd}" ]] && printf 'fd open\n' || printf 'fd closed\n'
+    read -r -t 1 line && printf 'read %s\n' "${line}" || printf 'stdin empty\n'
+    sleep 30
+  }
+  dybatpho::background_detach pid --log "${log}" --close-fd "${fd}" -- _detached_job
+  exec {fd}>&-
+  [[ "${pid}" =~ ^[0-9]+$ ]]
+  dybatpho::wait_until --timeout 10 --interval 0.2 -- grep -q 'stdin empty' "${log}"
+  assert_file_contains "${log}" 'started'
+  assert_file_contains "${log}" 'fd closed'
+  # Out of the job table, and leading its own process group.
+  [[ "$(jobs -p)" != *"${pid}"* ]]
+  local group
+  __dybatpho_process_group_of_into group "${pid}"
+  assert_equal "${group}" "${pid}"
+  dybatpho::process_stop --group "${pid}" 1
+}
+
+@test "dybatpho::background_detach refuses a bad name, option or descriptor" {
+  local args
+  local -a words
+  for args in "" "__dybatpho_pid -- true" "1pid -- true" "pid --bogus x -- true" "pid --close-fd 2 -- true" \
+    "pid --close-fd x -- true" "pid --log" "pid --"; do
+    read -r -a words <<< "${args}"
+    run -1 dybatpho::background_detach ${words[@]+"${words[@]}"}
+  done
+  run -1 dybatpho::background_detach pid --log "" -- true
+  # A log it cannot write would end the job at once: refused before it starts.
+  run -1 dybatpho::background_detach pid --log "${BATS_TEST_TMPDIR}/missing/dir/w.log" -- true
+  assert_output --partial "Cannot write the log"
+}
+
 @test "dybatpho::process_stop answers 2 for a running process it may not signal" {
   [[ "$(id -u)" != 0 ]] || skip "root may signal every process"
   # A process of another user, other than init.

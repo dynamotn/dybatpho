@@ -47,6 +47,7 @@ writes PID files.
 - [`dybatpho::try`](#dybatphotry) — Run a command and catch its failure, including a `dybatpho::die` or an `exit`, instead of letting it end the script. The command runs in a subshell of the calling shell, so it can call any function the caller has defined, read its variables and its standard input, and nothing it changes -- variables, the working directory, traps -- leaks back. Its standard output and standard error are captured into the two named variables, with trailing newlines removed as `$(...)` would, so the message a `dybatpho::die` printed is in the error variable rather than on the terminal. The status of the command is the status of this call. Give an empty name to discard one of the streams. As with any command run inside `if`, `||`, or `&&`, Bash suspends `errexit` for the command, and calling `dybatpho::try` outside such a condition under `set -e` ends the script when the command fails. Test its status, or collect it with `|| status=$?`.
 - [`dybatpho::run_with_timeout`](#dybatphorun_with_timeout) — Run a command and end it if it takes too long. The system `timeout` is used when it is available and usable, and a pure-Bash watchdog takes over when it is not, which is the common case on macOS, where coreutils is not installed by default. A shell function always takes the Bash path, because `timeout` executes a program and cannot see the caller's functions. The command is ended with SIGTERM first and SIGKILL afterwards, so a job that traps SIGTERM still gets to clean up before it is removed, and one that ignores it is still removed. A HUP, INT or TERM the script receives while the command runs, such as Ctrl-C, is passed on to the command and whatever it started, and raised again in the script once the command has ended, so the script stops -- or its own handler runs -- as it would without a time limit. A signal the script ignores stays ignored, for the command as well.
 - [`dybatpho::background_run`](#dybatphobackground_run) — Start a command in the background under a name. The name is how every other helper in this group refers to the job, because a process ID is both unreadable in a script and unusable once the job has been reaped. Starting a second job under a name whose job is still running is refused rather than silently forgetting the first one. The job runs in a subshell of the calling shell, so it can call any function the caller has defined, and it leads its own process group, so `dybatpho::kill_children` can end its children along with it.
+- [`dybatpho::background_detach`](#dybatphobackground_detach) — Start a command that outlives the script: in its own process group, with standard input from `/dev/null`, its output appended to a log, the descriptors named closed, and removed from the shell's job table. Unlike `dybatpho::background_run`, the job is not tracked: `dybatpho::wait_all` and `dybatpho::kill_children` leave it alone.
 - [`dybatpho::background_pid`](#dybatphobackground_pid) — Print the process ID of a background job.
 - [`dybatpho::background_status`](#dybatphobackground_status) — Print the exit code of a background job that has finished. The code is only known once the job has been waited for, which is what `dybatpho::wait_all` does; before that the job has no exit code to report.
 - [`dybatpho::wait_all`](#dybatphowait_all) — Wait for every background job started by `dybatpho::background_run`. Each job's exit code is recorded under its name instead of being collapsed into one status, because `wait` on its own reports only the last job and a script that started three of them needs to know which one failed.
@@ -93,6 +94,10 @@ writes PID files.
 **[`dybatpho::run_with_timeout`](#dybatphorun_with_timeout)**
 
 - Compare the exit code against 124 to tell a timeout apart from a command that failed on its own
+
+**[`dybatpho::background_detach`](#dybatphobackground_detach)**
+
+- The command runs in a subshell of the caller, so a shell function works; record its start time with `dybatpho::process_start_time` to stop it safely later with `dybatpho::process_stop --group`
 
 **[`dybatpho::wait_all`](#dybatphowait_all)**
 
@@ -484,6 +489,50 @@ dybatpho::wait_all || dybatpho::die "A background job failed"
 
 - `0`: The job was started
 - `1`: Stop the script when the name is invalid, already running, or no command was given
+
+---
+
+### `dybatpho::background_detach`
+
+Start a command that outlives the script: in its own process
+group, with standard input from `/dev/null`, its output appended to a log,
+the descriptors named closed, and removed from the shell's job table. Unlike
+`dybatpho::background_run`, the job is not tracked: `dybatpho::wait_all`
+and `dybatpho::kill_children` leave it alone.
+
+**🧪 Example**
+
+```bash
+local fd pid
+dybatpho::flock_acquire fd "${state}/queue.lock"
+# The worker must not keep holding the lock this script releases.
+dybatpho::background_detach pid --log "${state}/worker.log" --close-fd "${fd}" -- run_worker
+dybatpho::flock_release "${fd}"
+
+```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--log \<file\>** | Append the command's output and errors here; `/dev/null` by default |
+| **--close-fd \<n\>** | Close this descriptor in the command, such as one holding a lock; repeatable |
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$1` | string | Name of the variable receiving the process ID |
+| `$@` | string | Options, then `--` and the command with its arguments |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**🚦 Exit codes**
+
+- `0`: The command was started
+- `1`: Stop the script when the log cannot be written
 
 ---
 

@@ -62,6 +62,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   the start-time fingerprint next to a PID, and check both later: a PID alone
   cannot prove the process is still the one that was recorded, since the
   system hands numbers out again.
+- **`process` — start a command that outlives the script with
+  `dybatpho::background_detach <pid-var> [--log <file>] [--close-fd <n>] --
+  <command>`.** It runs in its own process group with standard input from
+  `/dev/null`, its output appended to a log, the named descriptors (such as
+  one holding a lock) closed, and out of the job table and of the
+  `background_run` registry.
 - **`helpers` — wait for a condition with a deadline using
   `dybatpho::wait_until --timeout <s> [--interval <s>] [--max-interval <s>]
   -- <command>`.** It tries the command until it succeeds (0) or the deadline

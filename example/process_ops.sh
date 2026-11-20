@@ -9,8 +9,8 @@
 #              coalesce, coalesce_cmd, default_env, int_or, require_envs_any, assert, wait_until,
 #              try, run_with_timeout, background_run, wait_all, kill_children,
 #              pid_file_write, pid_file_is_running, pid_file_remove,
-#              process_stop, process_start_time, process_is_same, signals_capture, signals_restore, signals_raise,
-#              and error/signal handlers
+#              process_stop, background_detach, process_start_time, process_is_same,
+#              signals_capture, signals_restore, signals_raise, and error/signal handlers
 # shellcheck disable=SC2154 # `dybatpho::expect_args` assigns these names through a nameref
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
 # its own diagnostic, and in an assignment its status reaches `set -e` through `inherit_errexit` (Bash 4.4+).
@@ -338,6 +338,13 @@ function _demo_kill_children {
   dybatpho::process_is_same "${pid}" "${start}" && dybatpho::info "Process ${pid} is still the one started"
   dybatpho::process_stop "${pid}" 2 && dybatpho::success "Stopped process ${pid}"
   dybatpho::process_stop "${pid}" 2 || dybatpho::info "Process ${pid} was no longer running"
+
+  # A worker meant to outlive the script: its own group, a log, no job entry.
+  local worker_log worker
+  dybatpho::create_temp worker_log ".log" "worker"
+  dybatpho::background_detach worker --log "${worker_log}" -- sleep 300
+  dybatpho::info "Detached worker ${worker}, logging to ${worker_log}"
+  dybatpho::process_stop --group "${worker}" 2 && dybatpho::success "Stopped the detached worker"
 }
 
 # --- signals --------------------------------------------------------------

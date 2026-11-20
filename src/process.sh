@@ -1243,6 +1243,122 @@ function dybatpho::kill_children {
 }
 
 #######################################
+# @description Stop a process politely: SIGTERM, a grace period, then SIGKILL
+#   if it is still there. With `--group`, a process that leads its own process
+#   group is stopped together with everything in that group, so a build or a
+#   server does not leave its children running. It is the same stop
+#   `dybatpho::kill_children` gives the jobs of `dybatpho::background_run`, for
+#   any process ID.
+# @example
+#   dybatpho::process_stop --group "$(< "${pid_file}")" 10 || dybatpho::info "It was not running"
+# @arg $1 string? `--group` to stop the process group the process leads
+# @arg $2 number Process ID
+# @arg $3 number [default: ${DYBATPHO_TIMEOUT_KILL_AFTER:-5}] Seconds between SIGTERM and SIGKILL
+# @exitcode 0 The process was running and has been stopped
+# @exitcode 1 The process was not running
+# @exitcode 2 The process is running, but this user is not permitted to signal it
+# @tip A process that is a child of this shell is also reaped, so it does not linger as a zombie
+# @note The process ID is not proof of identity: a process that exited may have
+#   given its ID to an unrelated one. Stop only an ID this script started or read
+#   from a file it trusts.
+#######################################
+function dybatpho::process_stop {
+  local group=false
+  if [[ "${1-}" == "--group" ]]; then
+    group=true
+    shift
+  fi
+  local pid="${1-}" grace="${2-${DYBATPHO_TIMEOUT_KILL_AFTER:-5}}"
+  if [[ ! "${pid}" =~ ^[0-9]{1,10}$ ]] || ((10#${pid} <= 1)); then
+    dybatpho::die "${FUNCNAME[0]}: Expected a process ID above 1, got '${pid}'"
+  fi
+  pid=$((10#${pid}))
+  [[ "${grace}" =~ ^[0-9]{1,6}$ ]] || dybatpho::die "${FUNCNAME[0]}: Expected a grace period in seconds, got '${grace}'"
+  grace=$((10#${grace}))
+  [[ "${pid}" != "$$" && "${pid}" != "${BASHPID}" ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Refusing to stop this shell (${pid})"
+
+  if [[ "${group}" == true ]]; then
+    # Ending a group this shell belongs to would end the script with it, so a
+    # group this shell cannot place itself against is not stopped at all.
+    local own_group
+    __dybatpho_process_group_of_into own_group "${BASHPID}" \
+      || dybatpho::die "${FUNCNAME[0]}: Cannot tell which process group this shell is in; refusing --group"
+    [[ "${own_group}" != "${pid}" ]] \
+      || dybatpho::die "${FUNCNAME[0]}: Refusing to stop process group ${pid}, which holds this shell"
+    # Only a process that leads a group has one to stop.
+    kill -0 -- "-${pid}" 2> /dev/null || group=false
+  fi
+
+  if ! __dybatpho_process_job_alive "${pid}" "${group}"; then
+    # `kill -0` fails alike for a process that is gone and one this user may not
+    # signal; only the first is "not running".
+    __dybatpho_process_exists "${pid}" || return 1
+    dybatpho::error "${FUNCNAME[0]}: Not permitted to signal process ${pid}"
+    return 2
+  fi
+  __dybatpho_process_end_job "${pid}" "${group}" "${grace}"
+  local status=0 name
+  wait "${pid}" 2> /dev/null || status=$?
+  # A job of `background_run` is now reaped: record it, so `kill_children`
+  # never signals the ID once the system hands it to another process.
+  for name in ${DYBATPHO_BACKGROUND_NAMES[@]+"${DYBATPHO_BACKGROUND_NAMES[@]}"}; do
+    [[ "${DYBATPHO_BACKGROUND_PIDS[${name}]-}" == "${pid}" && -z "${DYBATPHO_BACKGROUND_STATUS[${name}]+set}" ]] \
+      || continue
+    DYBATPHO_BACKGROUND_STATUS["${name}"]="${status}"
+  done
+  return 0
+}
+
+#######################################
+# @description Tell whether a process exists, whoever owns it: `/proc` where it
+#   exists, `ps` otherwise. Unlike `kill -0`, it does not need permission to
+#   signal the process.
+# @arg $1 number Process ID
+# @exitcode 0 The process exists
+# @exitcode 1 It does not
+# @internal
+#######################################
+function __dybatpho_process_exists {
+  if [[ -r /proc/self/stat ]]; then
+    [[ -e "/proc/$1" ]]
+    return
+  fi
+  # kcov(disabled) - a host without /proc; the macOS jobs run it
+  local __dybatpho_process_exists_out
+  __dybatpho_process_exists_out="$(ps -o pid= -p "$1" 2> /dev/null)" || return 1
+  [[ "${__dybatpho_process_exists_out}" == *[0-9]* ]]
+  # kcov(enabled)
+}
+
+#######################################
+# @description Read the process group of a process: from `/proc` where it
+#   exists, otherwise from `ps`, which BusyBox builds may lack `-p` for.
+# @arg $1 string Name of the variable receiving the process group ID
+# @arg $2 number Process ID
+# @set The named variable
+# @exitcode 1 Neither source answered
+# @internal
+#######################################
+function __dybatpho_process_group_of_into {
+  local -n __dybatpho_process_group_ref="$1"
+  local __dybatpho_process_group_stat __dybatpho_process_group_state __dybatpho_process_group_parent
+  __dybatpho_process_group_ref=""
+  if [[ -r "/proc/$2/stat" ]]; then
+    { IFS= read -r __dybatpho_process_group_stat < "/proc/$2/stat"; } 2> /dev/null || __dybatpho_process_group_stat=""
+    # `pid (command) state parent group ...`; the command may hold spaces and `)`.
+    IFS=' ' read -r __dybatpho_process_group_state __dybatpho_process_group_parent __dybatpho_process_group_ref _ \
+      <<< "${__dybatpho_process_group_stat##*) }"
+  fi
+  [[ "${__dybatpho_process_group_ref}" =~ ^[0-9]+$ ]] && return 0
+  # kcov(disabled) - a host without /proc; the macOS jobs run it
+  __dybatpho_process_group_ref="$(ps -o pgid= -p "$2" 2> /dev/null)" || __dybatpho_process_group_ref=""
+  __dybatpho_process_group_ref="${__dybatpho_process_group_ref//[[:space:]]/}"
+  [[ "${__dybatpho_process_group_ref}" =~ ^[0-9]+$ ]]
+  # kcov(enabled)
+}
+
+#######################################
 # @description Write a process ID to a PID file.
 #   The file is written to a neighbouring temporary file and moved into place,
 #   so a reader never sees a half-written or empty PID file, the state that

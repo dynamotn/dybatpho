@@ -9,7 +9,7 @@
 #              coalesce, coalesce_cmd, default_env, require_envs_any, assert,
 #              try, run_with_timeout, background_run, wait_all, kill_children,
 #              pid_file_write, pid_file_is_running, pid_file_remove,
-#              signals_capture, signals_restore, signals_raise,
+#              process_stop, signals_capture, signals_restore, signals_raise,
 #              and error/signal handlers
 # shellcheck disable=SC2154 # `dybatpho::expect_args` assigns these names through a nameref
 # This script reads library results through `$(...)`, which is how the library returns them. A failure there prints
@@ -304,6 +304,13 @@ function _demo_kill_children {
   else
     dybatpho::success "Job ${pid} and its children are gone"
   fi
+
+  # A process that did not come from background_run, such as one read from a
+  # PID file, is stopped the same way.
+  sleep 300 &
+  pid=$!
+  dybatpho::process_stop "${pid}" 2 && dybatpho::success "Stopped process ${pid}"
+  dybatpho::process_stop "${pid}" 2 || dybatpho::info "Process ${pid} was no longer running"
 }
 
 # --- signals --------------------------------------------------------------

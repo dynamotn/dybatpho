@@ -682,6 +682,7 @@ Utilities for process handling. Loaded: always. Stability: stable. Reference: [d
 - `dybatpho::background_status <string>` — Print the exit code of a background job that has finished.
 - `dybatpho::wait_all` — Wait for every background job started by `dybatpho::background_run`.
 - `dybatpho::kill_children` — End every background job started by `dybatpho::background_run`, together with the processes those jobs started.
+- `dybatpho::process_stop [string] <number> [number]` — Stop a process politely: SIGTERM, a grace period, then SIGKILL if it is still there.
 - `dybatpho::pid_file_write <string> [number]` — Write a process ID to a PID file.
 - `dybatpho::pid_file_is_running <string>` — Report whether the process recorded in a PID file is still alive.
 - `dybatpho::pid_file_remove <string> [number]` — Remove a PID file, but only when it records the given process.

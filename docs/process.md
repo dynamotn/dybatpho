@@ -51,6 +51,7 @@ writes PID files.
 - [`dybatpho::background_status`](#dybatphobackground_status) — Print the exit code of a background job that has finished. The code is only known once the job has been waited for, which is what `dybatpho::wait_all` does; before that the job has no exit code to report.
 - [`dybatpho::wait_all`](#dybatphowait_all) — Wait for every background job started by `dybatpho::background_run`. Each job's exit code is recorded under its name instead of being collapsed into one status, because `wait` on its own reports only the last job and a script that started three of them needs to know which one failed.
 - [`dybatpho::kill_children`](#dybatphokill_children) — End every background job started by `dybatpho::background_run`, together with the processes those jobs started. Each job is signalled with SIGTERM and then, if it is still there, SIGKILL, and is waited for afterwards so it does not linger as a zombie. The registry is emptied, so the same names can be started again.
+- [`dybatpho::process_stop`](#dybatphoprocess_stop) — Stop a process politely: SIGTERM, a grace period, then SIGKILL if it is still there. With `--group`, a process that leads its own process group is stopped together with everything in that group, so a build or a server does not leave its children running. It is the same stop `dybatpho::kill_children` gives the jobs of `dybatpho::background_run`, for any process ID.
 - [`dybatpho::pid_file_write`](#dybatphopid_file_write) — Write a process ID to a PID file. The file is written to a neighbouring temporary file and moved into place, so a reader never sees a half-written or empty PID file, the state that makes a supervisor believe a healthy service is dead.
 - [`dybatpho::pid_file_is_running`](#dybatphopid_file_is_running) — Report whether the process recorded in a PID file is still alive. A missing file, an empty one, one holding something other than a number, and one holding a process that has since exited all answer the same way: nothing is running. That is what callers act on, and separating "no PID file" from "stale PID file" only moves the decision up one level.
 - [`dybatpho::pid_file_remove`](#dybatphopid_file_remove) — Remove a PID file, but only when it records the given process. The guard is the point: a service that exits after a replacement has already written its own PID file would otherwise delete the live one on its way out, and the supervisor would then start a second copy.
@@ -98,6 +99,10 @@ writes PID files.
 **[`dybatpho::kill_children`](#dybatphokill_children)**
 
 - Register it on a trap (`dybatpho::trap dybatpho::kill_children EXIT INT TERM`) so an interrupted script leaves nothing behind
+
+**[`dybatpho::process_stop`](#dybatphoprocess_stop)**
+
+- A process that is a child of this shell is also reaped, so it does not linger as a zombie
 
 <a id="reference"></a>
 
@@ -564,6 +569,41 @@ _Function has no arguments._
 **🚦 Exit codes**
 
 - `0`: Always, so a job that had already exited cannot fail the caller
+
+---
+
+### `dybatpho::process_stop`
+
+Stop a process politely: SIGTERM, a grace period, then SIGKILL
+if it is still there. With `--group`, a process that leads its own process
+group is stopped together with everything in that group, so a build or a
+server does not leave its children running. It is the same stop
+`dybatpho::kill_children` gives the jobs of `dybatpho::background_run`, for
+any process ID.
+
+**🧪 Example**
+
+```bash
+dybatpho::process_stop --group "$(< "${pid_file}")" 10 || dybatpho::info "It was not running"
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--group` to stop the process group the process leads |
+| `$2` | number | yes |  | Process ID |
+| `$3` | number | no | `${DYBATPHO_TIMEOUT_KILL_AFTER:-5}` | Seconds between SIGTERM and SIGKILL |
+
+**📝 Notes**
+
+- The process ID is not proof of identity: a process that exited may have given its ID to an unrelated one. Stop only an ID this script started or read from a file it trusts.
+
+**🚦 Exit codes**
+
+- `0`: The process was running and has been stopped
+- `1`: The process was not running
+- `2`: The process is running, but this user is not permitted to signal it
 
 ---
 

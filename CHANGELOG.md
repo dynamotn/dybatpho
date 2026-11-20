@@ -22,6 +22,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   raised again, so they run once, after the cleanup. A signal the script
   ignores stays ignored. Scripts that reached for the library's internal trap
   helpers to do this can move to these.
+- **`process` — stop any process politely with `dybatpho::process_stop`.**
+  It sends SIGTERM, waits a grace period, then SIGKILL, and with `--group`
+  ends the whole process group the process leads, so a server or a build does
+  not leave its children running. It is the stop `dybatpho::kill_children`
+  gives background jobs, for a process ID from anywhere, such as a PID file. It
+  answers 1 when the process was not running, and refuses this shell and its
+  own group.
 
 ## [7.2.1] - 2026-11-19
 

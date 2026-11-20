@@ -1148,6 +1148,108 @@ _interrupt_script() {
   refute_output
 }
 
+@test "dybatpho::process_stop answers 2 for a running process it may not signal" {
+  [[ "$(id -u)" != 0 ]] || skip "root may signal every process"
+  # A process of another user, other than init.
+  local pid="" line uid
+  while read -r line uid; do
+    [[ "${uid}" != "$(id -u)" && "${line}" -gt 1 ]] || continue
+    pid="${line}"
+    break
+  done < <(ps -A -o pid= -o uid= 2> /dev/null || true)
+  [[ -n "${pid}" ]] || skip "no process of another user to try"
+  run --separate-stderr dybatpho::process_stop "${pid}" 1
+  assert_failure 2
+  assert_stderr --partial "Not permitted to signal process ${pid}"
+}
+
+@test "dybatpho::process_stop stops a running process and reaps it" {
+  sleep 30 &
+  local pid=$!
+  run_traced dybatpho::process_stop "${pid}" 2
+  assert_success
+  assert_process_dead "${pid}"
+}
+
+@test "dybatpho::process_stop answers 1 for a process that is not running" {
+  sleep 0 &
+  local pid=$!
+  wait "${pid}"
+  run_traced -1 dybatpho::process_stop "${pid}" 1
+}
+
+@test "dybatpho::process_stop --group ends the group, a member that ignores SIGTERM included" {
+  local pid_file="${BATS_TEST_TMPDIR}/stubborn_member.pid"
+  __dybatpho_test_group() {
+    (
+      trap '' TERM
+      printf '%s\n' "${BASHPID}" > "${pid_file}"
+      sleep 30
+    ) &
+    wait
+  }
+  dybatpho::background_run grouped __dybatpho_test_group
+  local waited=0
+  while [[ ! -s "${pid_file}" ]] && ((waited < 5)); do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  local leader member
+  leader="$(dybatpho::background_pid grouped)"
+  member="$(< "${pid_file}")"
+  run_traced dybatpho::process_stop --group "${leader}" 1
+  assert_success
+  assert_process_dead "${leader}"
+  assert_process_dead "${member}"
+}
+
+@test "dybatpho::process_stop refuses an ID that is not a process it may stop" {
+  local bad
+  for bad in "" 0 1 01 abc -5 12345678901 "$$" "${BASHPID}"; do
+    run -1 dybatpho::process_stop "${bad}"
+  done
+  run -1 dybatpho::process_stop 4242 abc
+}
+
+@test "dybatpho::process_stop --group refuses the group of a shell that does not lead it" {
+  # The script runs inside a subshell that leads a group of its own, so the
+  # script is a member that does not lead it: only the group check, not the
+  # check on the shell's own ID, can refuse it. A group of its own also keeps
+  # the test off PID 1's group, which a container puts everything in.
+  local script="${BATS_TEST_TMPDIR}/own_group.sh" out="${BATS_TEST_TMPDIR}/own_group.out"
+  local code="${BATS_TEST_TMPDIR}/own_group.code"
+  cat > "${script}" << 'SCRIPT'
+. "${1}/init.sh"
+group="$(cut -d' ' -f5 "/proc/$$/stat" 2> /dev/null || ps -o pgid= -p "$$")"
+group="${group//[[:space:]]/}"
+[[ "${group}" != "$$" ]] || { echo "leads its group"; exit 2; }
+dybatpho::process_stop --group "${group}" 1
+SCRIPT
+  set -m
+  (
+    # Job control off again, or the subshell would give the script a group of its own.
+    set +m
+    status=0
+    bash "${script}" "${DYBATPHO_DIR}" &> "${out}" || status=$?
+    printf '%s\n' "${status}" > "${code}"
+  ) &
+  local leader=$!
+  set +m
+  wait "${leader}" || true
+  assert_equal "$(< "${code}")" 1
+  assert_file_contains "${out}" "which holds this shell"
+}
+
+@test "dybatpho::process_stop records a background job it reaped, so kill_children leaves its ID alone" {
+  dybatpho::background_run sleeper sleep 30
+  local pid
+  pid="$(dybatpho::background_pid sleeper)"
+  dybatpho::process_stop "${pid}" 1
+  [[ -n "${DYBATPHO_BACKGROUND_STATUS[sleeper]+set}" ]]
+  run_traced dybatpho::kill_children
+  assert_success
+}
+
 # --- PID files ------------------------------------------------------------
 
 @test "dybatpho::pid_file_write refuses a path it cannot write and leaves nothing behind" {

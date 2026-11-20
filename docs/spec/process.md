@@ -260,6 +260,9 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   standard input, changes a caller variable, or fails under the caller's ERR
   handler.
 - `dybatpho::try` is given an empty name for a stream the caller does not want.
+- A process to stop was not started by `dybatpho::background_run`, has already
+  exited, leads its own process group, shares this shell's group, or ignores
+  SIGTERM.
 - A block takes over a signal the script ignores, receives it, and hands the
   handlers back.
 - A handler for a taken-over signal reads a variable that was set after the
@@ -341,6 +344,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-040**: A function that installs handlers for its own duration and puts the caller's back MUST leave a signal that was ignored -- by the script or from its start -- ignored, and MUST NOT reset it to its default on the way, since in a shell started with INT ignored that reset cannot be undone.
 - **FR-041**: `dybatpho::signals_capture <state> <caught> <signal>... [-- <command>...]` MUST save the current handlers of the signals into the state variable, set the caught variable to empty, and install for each signal not currently ignored a handler that alone sets the caught variable to the name of the first signal that arrives and then runs the command, if any, with that name appended; the signal MUST also be kept in a global of the library's own, so a `local` of the caught name in the function running when it arrives cannot swallow it, and `signals_restore` MUST copy it into the caller's variable. The command MUST run as the words given, never through `eval` of a caller string, and MUST be looked up when the signal arrives.
 - **FR-042**: `dybatpho::signals_restore <state>` MUST put back the handlers `signals_capture` saved, under FR-040, whatever the caller set `IFS` to, and `dybatpho::signals_raise <signal>` MUST send that signal to the current shell, doing nothing when it is empty.
+- **FR-044**: `dybatpho::process_stop [--group] <pid> [grace]` MUST send SIGTERM, wait up to the grace period (default `DYBATPHO_TIMEOUT_KILL_AFTER`), then send SIGKILL, return 0 when the process was running, 1 when it was not, and 2 with an error when it is running but this user may not signal it, and reap it when it is a child of the shell. With `--group` it MUST stop the whole process group when the process leads one and only the process otherwise, and it MUST stop the script on a process ID that is not a number above 1, on this shell's own ID, on a group that holds this shell, on `--group` when neither `/proc` nor `ps` tells which group this shell is in, and on a grace period that is not a whole number of seconds. A job of `background_run` it reaps MUST be recorded with its exit code, so `kill_children` never signals that ID again.
 - **FR-043**: The `signals_*` functions MUST stop the script with status 1 on a variable name that is not an identifier or starts with `__dybatpho`, on equal state and caught names, on a name that is not a signal or is `EXIT`, `ERR`, `DEBUG`, `RETURN`, or `KILL` or `STOP`, which no handler can catch, on `--` with no command after it, and on a state variable `signals_capture` did not fill.
 
 ### Key Entities *(include if feature involves data)*
@@ -431,7 +435,11 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-038**: Take over a TERM the script ignores, send it, restore and raise, and see no handler run, nothing recorded, and TERM still ignored.
 - **IT-039**: Take USR1 and USR2 over and restore them, and see a quoted USR1 handler put back exactly and USR2 left with none; take over a USR2 that is ignored and see it stay ignored.
 - **IT-040**: Raise an empty signal and see nothing happen, raise USR1 and see the current handler run, and see every invalid call of the three functions refused with status 1.
+- **IT-041**: Stop a running `sleep` with `dybatpho::process_stop` and see it gone and reaped; stop one that already exited and get 1.
+- **IT-042**: Start a background job whose child ignores SIGTERM, stop its leader with `--group` and a one-second grace, and see the leader and the child both gone; see the IDs 0, 1, `01`, a non-number, this shell, and this shell's own group refused.
 - **IT-043**: Take INT and TERM over and restore them with `IFS` set to a newline and a tab, to nothing, and to a comma, and see both handlers back each time.
+- **IT-044**: From a script that shares its process group without leading it, stop that group with `--group` and see it refused as the group holding the shell.
+- **IT-045**: Stop a job of `background_run` with `process_stop` and see its exit code recorded, then `kill_children` succeed without touching it.
 
 ## Acceptance Criteria *(mandatory)*
 

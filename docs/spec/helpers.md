@@ -238,6 +238,8 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 
 - **FR-041**: `dybatpho::retry_until --quiet` MUST retry exactly as without the option, and print neither the retry banner nor the final warning.
 
+- **FR-042**: `dybatpho::wait_until --timeout <s> [--interval <s>] [--max-interval <s>] -- <command>` MUST run the command until it succeeds and return 0, or return 124 once the deadline passes -- never before the timeout, and within a second past it, `SECONDS` counting whole seconds; a timeout of 0 tries once -- printing nothing; it MUST pause between tries in a background `sleep` it waits for, double the pause up to `--max-interval` when given, and never pause past the deadline, with or without `--max-interval`, and stop the script on an unknown option, a missing value, a missing command, or a timing that is not seconds (whole seconds above 0 when backing off).
+
 ### Key Entities *(include if feature involves data)*
 
 - **Expectation Contract**: The named-variable input contract declared by a reusable shell function.
@@ -316,6 +318,8 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-042**: Retry with `--on 1,6` a command that fails with 1, then 6, then succeeds, and see three attempts; with `--on 1`, see a 3 returned on the second attempt and a run of 1s returned as 1 once the retries run out; see an empty, non-numeric, four-digit or negative list refused.
 
 - **IT-044**: Poll a failing command with `retry_until --quiet` and see it fail with nothing on stderr, while the same poll without the option warns.
+
+- **IT-045**: Wait for a file another job creates after a second and see 0 with nothing printed; wait on `false` for one second and see 124 within four; back off from 1 to 2 seconds within a four-second deadline and see three to five tries; see unknown options, missing values or commands and bad timings refused.
 
 ## Acceptance Criteria *(mandatory)*
 

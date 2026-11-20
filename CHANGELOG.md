@@ -62,6 +62,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   the start-time fingerprint next to a PID, and check both later: a PID alone
   cannot prove the process is still the one that was recorded, since the
   system hands numbers out again.
+- **`helpers` — wait for a condition with a deadline using
+  `dybatpho::wait_until --timeout <s> [--interval <s>] [--max-interval <s>]
+  -- <command>`.** It tries the command until it succeeds (0) or the deadline
+  passes (124), silently, with an optional doubling pause; a signal the script
+  traps is answered at once rather than after the pause.
 - **Small options that let existing functions be used where they could not
   be:** `dybatpho::ensure_dir --quiet` creates the directory without printing
   its path; `dybatpho::retry_until --quiet` polls without a banner or a final

@@ -6,7 +6,7 @@
 # @brief Example showing process control utilities
 # @description Demonstrates dybatpho::retry, retry_until, dry_run, breakpoint,
 #              expect_args, expect_envs, require, command_exists_all, is,
-#              coalesce, coalesce_cmd, default_env, int_or, require_envs_any, assert,
+#              coalesce, coalesce_cmd, default_env, int_or, require_envs_any, assert, wait_until,
 #              try, run_with_timeout, background_run, wait_all, kill_children,
 #              pid_file_write, pid_file_is_running, pid_file_remove,
 #              process_stop, process_start_time, process_is_same, signals_capture, signals_restore, signals_raise,
@@ -208,6 +208,17 @@ function _demo_retry_until {
   }
   dybatpho::retry_until 2 1 fixed-delay-demo -- _fixed_delay_flaky
   dybatpho::success "Fixed-delay retry succeeded"
+
+  # A quiet poll with a deadline: wait for a file another job writes.
+  local ready
+  dybatpho::create_temp ready ".flag" "ready"
+  rm -f -- "${ready}"
+  (
+    sleep 1
+    : > "${ready}"
+  ) &
+  dybatpho::wait_until --timeout 10 --interval 0.2 -- test -e "${ready}" \
+    && dybatpho::success "The other job is ready"
 }
 
 # --- try ------------------------------------------------------------------

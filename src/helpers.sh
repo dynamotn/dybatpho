@@ -1419,6 +1419,93 @@ function dybatpho::retry {
 }
 
 #######################################
+# @description Wait until a command succeeds, or a deadline passes. The
+#   command is tried, then tried again after each pause, silently: this is a
+#   poll ("wait for the socket", "wait for the lease"), not a retry that
+#   reports. The pause runs in the background and is waited for, so a signal
+#   the script traps is answered at once rather than after the pause.
+# @example
+#   dybatpho::wait_until --timeout 30 --interval 0.5 -- test -S "${socket}" \
+#     || dybatpho::die "The server did not come up within 30 seconds"
+#
+# @example
+#   # 1, 2, 4, 8, then every 10 seconds, for at most 5 minutes.
+#   dybatpho::wait_until --timeout 300 --interval 1 --max-interval 10 -- lease_is_free "${id}"
+#
+# @arg $@ string Options, then `--` and the command with its arguments
+# @option --timeout <seconds> Whole seconds to keep trying; required. The wait ends between this and one second
+#   past it, as Bash counts whole seconds, and no pause runs beyond that; `0` tries once
+# @option --interval <seconds> [default: 1] Pause between tries; a fraction is allowed
+# @option --max-interval <seconds> Double the pause after each try, up to this; whole seconds, as is the interval then
+# @exitcode 0 The command succeeded
+# @exitcode 124 The deadline passed first
+# @tip The command runs in this shell, so a function sees and may change the caller's variables
+# @tip The pause is a background job, so `$!` no longer names a job started before the call; save it first
+# @tip A trapped signal ends the current pause, not the wait: a handler that should stop waiting exits, or makes
+#   the command succeed
+#######################################
+function dybatpho::wait_until {
+  # Prefixed: the command runs in this function's scope.
+  local __dybatpho_wait_timeout="" __dybatpho_wait_delay=1 __dybatpho_wait_max=""
+  while (($#)) && [[ "$1" != "--" ]]; do
+    case "$1" in
+      --timeout) __dybatpho_wait_timeout="${2-}" ;;
+      --interval) __dybatpho_wait_delay="${2-}" ;;
+      --max-interval) __dybatpho_wait_max="${2-}" ;;
+      *) dybatpho::die "${FUNCNAME[0]}: Unknown option '$1'" ;;
+    esac
+    (($# >= 2)) || dybatpho::die "${FUNCNAME[0]}: $1 expects a value"
+    shift 2
+  done
+  (($# > 1)) || dybatpho::die "${FUNCNAME[0]}: Expected -- and a command"
+  shift
+  __dybatpho_helpers_wait_check "${FUNCNAME[0]}" "${__dybatpho_wait_timeout}" "${__dybatpho_wait_delay}" \
+    "${__dybatpho_wait_max}"
+  if [[ -n "${__dybatpho_wait_max}" ]]; then
+    __dybatpho_wait_delay=$((10#${__dybatpho_wait_delay}))
+    __dybatpho_wait_max=$((10#${__dybatpho_wait_max}))
+  fi
+
+  local __dybatpho_wait_start="${SECONDS}" __dybatpho_wait_left __dybatpho_wait_pid __dybatpho_wait_whole
+  while :; do
+    "$@" && return 0
+    # `SECONDS` counts whole seconds, and its first tick may come at once: the
+    # wait ends once more whole seconds than the timeout have passed, between
+    # the timeout and a second past it, never before the timeout.
+    __dybatpho_wait_left=$((10#${__dybatpho_wait_timeout} - (SECONDS - __dybatpho_wait_start) + 1))
+    ((10#${__dybatpho_wait_timeout} > 0 && __dybatpho_wait_left > 0)) || return 124
+    # No pause runs past that: a longer one is cut to what is left.
+    __dybatpho_wait_whole="${__dybatpho_wait_delay%%.*}"
+    ((10#${__dybatpho_wait_whole:-0} < __dybatpho_wait_left)) || __dybatpho_wait_delay="${__dybatpho_wait_left}"
+    sleep "${__dybatpho_wait_delay}" &
+    __dybatpho_wait_pid=$!
+    wait "${__dybatpho_wait_pid}" 2> /dev/null || kill "${__dybatpho_wait_pid}" 2> /dev/null || true
+    [[ -n "${__dybatpho_wait_max}" ]] || continue
+    __dybatpho_wait_delay=$((10#${__dybatpho_wait_delay} * 2))
+    ((10#${__dybatpho_wait_delay} <= 10#${__dybatpho_wait_max})) || __dybatpho_wait_delay="${__dybatpho_wait_max}"
+  done
+}
+
+#######################################
+# @description Check the timing options of `dybatpho::wait_until`.
+# @arg $1 string Public function the refusal is reported for
+# @arg $2 string Timeout
+# @arg $3 string Interval
+# @arg $4 string Largest interval, or empty
+# @exitcode 1 Stop the script on a value that is not a number of seconds
+# @internal
+#######################################
+function __dybatpho_helpers_wait_check {
+  [[ "$2" =~ ^[0-9]{1,9}$ ]] || dybatpho::die "$1: --timeout must be whole seconds, got '$2'"
+  if [[ -z "$4" ]]; then
+    [[ "$3" =~ ^([0-9]{1,9}(\.[0-9]+)?|\.[0-9]+)$ ]] || dybatpho::die "$1: --interval must be seconds, got '$3'"
+    return 0
+  fi
+  [[ "$3" =~ ^[1-9][0-9]{0,8}$ && "$4" =~ ^[1-9][0-9]{0,8}$ ]] \
+    || dybatpho::die "$1: --interval and --max-interval must be whole seconds above 0 to back off, got '$3' and '$4'"
+}
+
+#######################################
 # @description Check the exit codes given to `--on`, and set them read in base
 #   ten, so `01` matches a status of 1: they are matched as text.
 # @arg $1 string Name of the variable receiving the comma-separated codes

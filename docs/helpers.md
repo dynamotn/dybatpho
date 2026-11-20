@@ -59,6 +59,7 @@ reach for at a prompt.
 - [`dybatpho::require_envs_any`](#dybatphorequire_envs_any) — Ensure that at least one of the listed environment variables is set.
 - [`dybatpho::assert`](#dybatphoassert) — Run a check and stop with a message when it fails. The check is given after `--` as a command and its arguments, which run as they are, never parsed as shell. The older form, a single shell condition string, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
 - [`dybatpho::retry`](#dybatphoretry) — Retry a command with escalating delays until it succeeds or retries are exhausted. The command is given after `--` as a command and its arguments, which run as they are, never parsed as shell; an optional description goes before the `--`. The older form, a single shell command string followed by an optional description, still works but is deprecated: it runs through `eval`, so a value interpolated into it is parsed as code.
+- [`dybatpho::wait_until`](#dybatphowait_until) — Wait until a command succeeds, or a deadline passes. The command is tried, then tried again after each pause, silently: this is a poll ("wait for the socket", "wait for the lease"), not a retry that reports. The pause runs in the background and is waited for, so a signal the script traps is answered at once rather than after the pause.
 - [`dybatpho::retry_until`](#dybatphoretry_until) — Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay. The calling forms are those of `dybatpho::retry`: an optional description, then `--` and the command with its arguments. The single shell command string form still works but is deprecated, because it runs through `eval`.
 - [`dybatpho::breakpoint`](#dybatphobreakpoint) — Open an interactive breakpoint for debugging a running script.
 - [`dybatpho::provides`](#dybatphoprovides) — Print the module that defines a function. The answer comes from where Bash says the function was defined, so it describes the code that is actually loaded rather than what a directory listing suggests. Functions the bootstrap defines report `init`.
@@ -170,6 +171,12 @@ dybatpho::is true "${DEBUG_BREAK:-false}" && dybatpho::breakpoint
 - With `--on`, a code from the list means the retries ran out, and any other code means the command failed for another reason
 - Turn on `DYBATPHO_RETRY_JITTER` when several machines retry the same dependency, so they do not all come back at the same instant
 - Pass a short description when the raw command is noisy so retry logs stay readable
+
+**[`dybatpho::wait_until`](#dybatphowait_until)**
+
+- The command runs in this shell, so a function sees and may change the caller's variables
+- The pause is a background job, so `$!` no longer names a job started before the call; save it first
+- A trapped signal ends the current pause, not the wait: a handler that should stop waiting exits, or makes the command succeed
 
 **[`dybatpho::breakpoint`](#dybatphobreakpoint)**
 
@@ -634,6 +641,49 @@ dybatpho::retry --on 1 5 "claim the lease" -- claim_lease "${id}"
 
 - `0`: The command eventually succeeds
 - `other`: The command never succeeds; its exit code from the final attempt, or at once the first code that `--on` does not list
+
+---
+
+### `dybatpho::wait_until`
+
+Wait until a command succeeds, or a deadline passes. The
+command is tried, then tried again after each pause, silently: this is a
+poll ("wait for the socket", "wait for the lease"), not a retry that
+reports. The pause runs in the background and is waited for, so a signal
+the script traps is answered at once rather than after the pause.
+
+**🧪 Examples**
+
+```bash
+dybatpho::wait_until --timeout 30 --interval 0.5 -- test -S "${socket}" \
+  || dybatpho::die "The server did not come up within 30 seconds"
+
+```
+
+```bash
+# 1, 2, 4, 8, then every 10 seconds, for at most 5 minutes.
+dybatpho::wait_until --timeout 300 --interval 1 --max-interval 10 -- lease_is_free "${id}"
+
+```
+
+**🎛️ Options**
+
+| Option | Description |
+| --- | --- |
+| **--timeout \<seconds\>** | Whole seconds to keep trying; required. The wait ends between this and one second past it, as Bash counts whole seconds, and no pause runs beyond that; `0` tries once |
+| **--interval \<seconds\>** | [default: 1] Pause between tries; a fraction is allowed |
+| **--max-interval \<seconds\>** | Double the pause after each try, up to this; whole seconds, as is the interval then |
+
+**🧾 Arguments**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `$@` | string | Options, then `--` and the command with its arguments |
+
+**🚦 Exit codes**
+
+- `0`: The command succeeded
+- `124`: The deadline passed first
 
 ---
 

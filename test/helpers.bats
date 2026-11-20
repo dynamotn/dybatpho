@@ -694,6 +694,74 @@ _test_retry() {
   assert_equal "${attempts}" 3
 }
 
+@test "dybatpho::wait_until returns once the command succeeds, silently" {
+  local marker="${BATS_TEST_TMPDIR}/ready"
+  (
+    sleep 1
+    : > "${marker}"
+  ) &
+  run_traced --separate-stderr dybatpho::wait_until --timeout 10 --interval 0.2 -- test -e "${marker}"
+  assert_success
+  refute_output
+  refute_stderr
+}
+
+@test "dybatpho::wait_until returns 124 once the deadline passes" {
+  local start="${SECONDS}"
+  run_traced -124 dybatpho::wait_until --timeout 1 --interval 0.2 -- false
+  ((SECONDS - start < 4))
+}
+
+@test "dybatpho::wait_until doubles the pause up to --max-interval and never sleeps past the deadline" {
+  local tries=0
+  _count_try() {
+    tries=$((tries + 1))
+    return 1
+  }
+  local start="${SECONDS}" status=0
+  dybatpho::wait_until --timeout 4 --interval 1 --max-interval 2 -- _count_try || status=$?
+  assert_equal "${status}" 124
+  # Tries at about 0, 1, 3 and 4 seconds: the pauses were 1, 2, then cut to the 1 left.
+  ((tries >= 3 && tries <= 5))
+  ((SECONDS - start <= 6))
+}
+
+@test "dybatpho::wait_until cuts a long pause to the deadline, and never gives up before it" {
+  # Without --max-interval too: a 4 second pause is cut to what is left.
+  local start="${SECONDS}" status=0
+  dybatpho::wait_until --timeout 1 --interval 4 -- false || status=$?
+  assert_equal "${status}" 124
+  ((SECONDS - start <= 2))
+  # The whole-second clock may tick at once; the wait still lasts the timeout,
+  # so short pauses are tried for at least a second.
+  local tries=0
+  _count_short() {
+    tries=$((tries + 1))
+    return 1
+  }
+  status=0
+  dybatpho::wait_until --timeout 1 --interval 0.1 -- _count_short || status=$?
+  assert_equal "${status}" 124
+  ((tries >= 8))
+  # A timeout of 0 tries once.
+  tries=0
+  status=0
+  dybatpho::wait_until --timeout 0 --interval 0.1 -- _count_short || status=$?
+  assert_equal "${status}" 124
+  assert_equal "${tries}" 1
+}
+
+@test "dybatpho::wait_until refuses options it does not know or cannot use" {
+  local -a bad
+  local args
+  for args in "--timeout x -- true" "--timeout 1 --interval abc -- true" "--timeout 1 --bogus 2 -- true" \
+    "--timeout 1" "--timeout 1 --" "--timeout 1 --interval 0.5 --max-interval 4 -- true" \
+    "--timeout 1 --interval 1 --max-interval 08 -- true" "--interval" "-- true"; do
+    read -r -a bad <<< "${args}"
+    run -1 dybatpho::wait_until "${bad[@]}"
+  done
+}
+
 @test "dybatpho::retry_until --quiet polls without a banner or a final warning" {
   run_traced --separate-stderr dybatpho::retry_until --quiet 2 0 -- false
   assert_failure

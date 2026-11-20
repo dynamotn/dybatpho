@@ -57,6 +57,11 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **`process` — tell a process from a later one that reused its ID with
+  `dybatpho::process_start_time` and `dybatpho::process_is_same`.** Record
+  the start-time fingerprint next to a PID, and check both later: a PID alone
+  cannot prove the process is still the one that was recorded, since the
+  system hands numbers out again.
 - **Small options that let existing functions be used where they could not
   be:** `dybatpho::ensure_dir --quiet` creates the directory without printing
   its path; `dybatpho::retry_until --quiet` polls without a banner or a final

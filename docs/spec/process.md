@@ -260,6 +260,8 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
   standard input, changes a caller variable, or fails under the caller's ERR
   handler.
 - `dybatpho::try` is given an empty name for a stream the caller does not want.
+- A recorded process ID now belongs to an unrelated process that the system
+  gave the same number.
 - A process to stop was not started by `dybatpho::background_run`, has already
   exited, leads its own process group, shares this shell's group, or ignores
   SIGTERM.
@@ -345,6 +347,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **FR-041**: `dybatpho::signals_capture <state> <caught> <signal>... [-- <command>...]` MUST save the current handlers of the signals into the state variable, set the caught variable to empty, and install for each signal not currently ignored a handler that alone sets the caught variable to the name of the first signal that arrives and then runs the command, if any, with that name appended; the signal MUST also be kept in a global of the library's own, so a `local` of the caught name in the function running when it arrives cannot swallow it, and `signals_restore` MUST copy it into the caller's variable. The command MUST run as the words given, never through `eval` of a caller string, and MUST be looked up when the signal arrives.
 - **FR-042**: `dybatpho::signals_restore <state>` MUST put back the handlers `signals_capture` saved, under FR-040, whatever the caller set `IFS` to, and `dybatpho::signals_raise <signal>` MUST send that signal to the current shell, doing nothing when it is empty.
 - **FR-044**: `dybatpho::process_stop [--group] <pid> [grace]` MUST send SIGTERM, wait up to the grace period (default `DYBATPHO_TIMEOUT_KILL_AFTER`), then send SIGKILL, return 0 when the process was running, 1 when it was not, and 2 with an error when it is running but this user may not signal it, and reap it when it is a child of the shell. With `--group` it MUST stop the whole process group when the process leads one and only the process otherwise, and it MUST stop the script on a process ID that is not a number above 1, on this shell's own ID, on a group that holds this shell, on `--group` when neither `/proc` nor `ps` tells which group this shell is in, and on a grace period that is not a whole number of seconds. A job of `background_run` it reaps MUST be recorded with its exit code, so `kill_children` never signals that ID again.
+- **FR-045**: `dybatpho::process_start_time <var> <pid>` MUST set the variable to a fingerprint of when the process started -- field 22 of `/proc/<pid>/stat` where `/proc` exists, `ps -o lstart=` in UTC otherwise, so the fingerprint does not change with `TZ` -- and return 1 for a process that is not running; `dybatpho::process_is_same <pid> <start>` MUST return 0 only when a process with that ID is running with that fingerprint, so a reused ID is told apart. Both MUST stop the script on an ID that is not a number above 0, and the first on a variable name that is invalid or starts with `__dybatpho`.
 - **FR-043**: The `signals_*` functions MUST stop the script with status 1 on a variable name that is not an identifier or starts with `__dybatpho`, on equal state and caught names, on a name that is not a signal or is `EXIT`, `ERR`, `DEBUG`, `RETURN`, or `KILL` or `STOP`, which no handler can catch, on `--` with no command after it, and on a state variable `signals_capture` did not fill.
 
 ### Key Entities *(include if feature involves data)*
@@ -440,6 +443,7 @@ dybatpho::trap 'dybatpho::pid_file_remove /var/run/app.pid' EXIT
 - **IT-043**: Take INT and TERM over and restore them with `IFS` set to a newline and a tab, to nothing, and to a comma, and see both handlers back each time.
 - **IT-044**: From a script that shares its process group without leading it, stop that group with `--group` and see it refused as the group holding the shell.
 - **IT-045**: Stop a job of `background_run` with `process_stop` and see its exit code recorded, then `kill_children` succeed without touching it.
+- **IT-046**: Take the fingerprint of a running `sleep`, see it match, see another fingerprint and an empty one refused, then kill it and see both functions answer 1; see bad IDs and a reserved name refused.
 
 ## Acceptance Criteria *(mandatory)*
 

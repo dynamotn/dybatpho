@@ -1311,6 +1311,59 @@ function dybatpho::process_stop {
 }
 
 #######################################
+# @description Read when a process started, as a fingerprint that tells it
+#   apart from a later process given the same ID. A PID alone proves nothing
+#   once the process has exited: the system hands the number out again. Record
+#   the fingerprint with the PID, and check both with `dybatpho::process_is_same`.
+# @example
+#   worker &
+#   local pid=$! start
+#   dybatpho::process_start_time start "${pid}"
+#   printf '%s %s\n' "${pid}" "${start}" > "${state_file}"
+#
+# @arg $1 string Name of the variable receiving the fingerprint
+# @arg $2 number Process ID
+# @set The named variable: the start time in clock ticks since boot from
+#   `/proc` on Linux, or what `ps -o lstart=` prints elsewhere
+# @exitcode 0 The process is running and its start time was read
+# @exitcode 1 The process is not running, or its start time cannot be read
+# @tip Compare fingerprints only on the machine that took them: the two sources differ
+#######################################
+function dybatpho::process_start_time {
+  local __dybatpho_process_start_var __dybatpho_process_start_pid
+  dybatpho::expect_args __dybatpho_process_start_var __dybatpho_process_start_pid -- "$@"
+  dybatpho::expect_ref "${__dybatpho_process_start_var}"
+  [[ "${__dybatpho_process_start_var}" != __dybatpho* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid name for the result variable: '${__dybatpho_process_start_var}'"
+  __dybatpho_process_check_pid "${FUNCNAME[0]}" "${__dybatpho_process_start_pid}"
+  local __dybatpho_process_start_value
+  __dybatpho_process_start_into __dybatpho_process_start_value "${__dybatpho_process_start_pid}" || return 1
+  local -n __dybatpho_process_start_ref="${__dybatpho_process_start_var}"
+  __dybatpho_process_start_ref="${__dybatpho_process_start_value}"
+}
+
+#######################################
+# @description Tell whether a process ID still belongs to the process a
+#   fingerprint from `dybatpho::process_start_time` was taken from.
+# @example
+#   read -r pid start < "${state_file}"
+#   dybatpho::process_is_same "${pid}" "${start}" || dybatpho::info "The worker is gone"
+#
+# @arg $1 number Process ID
+# @arg $2 string Fingerprint recorded with it
+# @exitcode 0 A process with this ID is running and started at that time
+# @exitcode 1 No process has this ID, or it is another process that reused it
+#######################################
+function dybatpho::process_is_same {
+  local pid start current
+  dybatpho::expect_args pid start -- "$@"
+  __dybatpho_process_check_pid "${FUNCNAME[0]}" "${pid}"
+  [[ -n "${start}" ]] || return 1
+  __dybatpho_process_start_into current "${pid}" || return 1
+  [[ "${current}" == "${start}" ]]
+}
+
+#######################################
 # @description Tell whether a process exists, whoever owns it: `/proc` where it
 #   exists, `ps` otherwise. Unlike `kill -0`, it does not need permission to
 #   signal the process.
@@ -1328,6 +1381,50 @@ function __dybatpho_process_exists {
   local __dybatpho_process_exists_out
   __dybatpho_process_exists_out="$(ps -o pid= -p "$1" 2> /dev/null)" || return 1
   [[ "${__dybatpho_process_exists_out}" == *[0-9]* ]]
+  # kcov(enabled)
+}
+
+#######################################
+# @description Check a process ID a caller passed.
+# @arg $1 string Public function the refusal is reported for
+# @arg $2 string Process ID
+# @exitcode 1 Stop the script when it is not a number above 0
+# @internal
+#######################################
+function __dybatpho_process_check_pid {
+  if [[ ! "$2" =~ ^[0-9]{1,10}$ ]] || ((10#$2 < 1)); then
+    dybatpho::die "$1: Expected a process ID, got '$2'"
+  fi
+}
+
+#######################################
+# @description Read the start fingerprint of a process: field 22 of
+#   `/proc/<pid>/stat` where it exists, `ps -o lstart=` otherwise.
+# @arg $1 string Name of the variable receiving the fingerprint
+# @arg $2 number Process ID
+# @set The named variable
+# @exitcode 1 The process is not running or neither source answered
+# @internal
+#######################################
+function __dybatpho_process_start_into {
+  local -n __dybatpho_process_start_into_ref="$1"
+  local __dybatpho_process_start_stat
+  local -a __dybatpho_process_start_fields=()
+  __dybatpho_process_start_into_ref=""
+  if [[ -r /proc/self/stat ]]; then
+    # A process that is gone has no entry; the redirection must not print that.
+    { IFS= read -r __dybatpho_process_start_stat < "/proc/$((10#$2))/stat"; } 2> /dev/null || return 1
+    # After `pid (command) `, the fields start at the third; the start time is the 22nd.
+    IFS=' ' read -r -a __dybatpho_process_start_fields <<< "${__dybatpho_process_start_stat##*) }"
+    __dybatpho_process_start_into_ref="${__dybatpho_process_start_fields[19]-}"
+    [[ "${__dybatpho_process_start_into_ref}" =~ ^[0-9]+$ ]]
+    return
+  fi
+  # kcov(disabled) - a host without /proc; the macOS jobs run it
+  # `lstart` is local time: in UTC, a fingerprint taken under another `TZ` still matches.
+  __dybatpho_process_start_into_ref="$(LC_ALL=C TZ=UTC0 ps -o lstart= -p "$((10#$2))" 2> /dev/null)" || return 1
+  [[ "${__dybatpho_process_start_into_ref}" =~ ^[[:space:]]*(.*[^[:space:]]) ]] || return 1
+  __dybatpho_process_start_into_ref="${BASH_REMATCH[1]}"
   # kcov(enabled)
 }
 

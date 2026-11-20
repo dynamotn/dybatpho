@@ -686,6 +686,8 @@ Utilities for process handling. Loaded: always. Stability: stable. Reference: [d
 - `dybatpho::wait_all` — Wait for every background job started by `dybatpho::background_run`.
 - `dybatpho::kill_children` — End every background job started by `dybatpho::background_run`, together with the processes those jobs started.
 - `dybatpho::process_stop [string] <number> [number]` — Stop a process politely: SIGTERM, a grace period, then SIGKILL if it is still there.
+- `dybatpho::process_start_time <string> <number>` — Read when a process started, as a fingerprint that tells it apart from a later process given the same ID.
+- `dybatpho::process_is_same <number> <string>` — Tell whether a process ID still belongs to the process a fingerprint from `dybatpho::process_start_time` was taken from.
 - `dybatpho::pid_file_write <string> [number]` — Write a process ID to a PID file.
 - `dybatpho::pid_file_is_running <string>` — Report whether the process recorded in a PID file is still alive.
 - `dybatpho::pid_file_remove <string> [number]` — Remove a PID file, but only when it records the given process.

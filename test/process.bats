@@ -1148,6 +1148,31 @@ _interrupt_script() {
   refute_output
 }
 
+@test "dybatpho::process_start_time and process_is_same tell a process from one that reused its ID" {
+  sleep 30 &
+  local pid=$! start=""
+  dybatpho::process_start_time start "${pid}"
+  [[ -n "${start}" ]]
+  run_traced -0 dybatpho::process_is_same "${pid}" "${start}"
+  # The same ID with another start time is another process.
+  run_traced -1 dybatpho::process_is_same "${pid}" "0${start}"
+  run_traced -1 dybatpho::process_is_same "${pid}" ""
+  kill "${pid}"
+  wait "${pid}" 2> /dev/null || true
+  run_traced -1 dybatpho::process_is_same "${pid}" "${start}"
+  local after=kept
+  run_traced -1 dybatpho::process_start_time after "${pid}"
+}
+
+@test "dybatpho::process_start_time and process_is_same refuse a bad ID or name" {
+  local bad
+  for bad in "" 0 abc -3 12345678901; do
+    run -1 dybatpho::process_is_same "${bad}" x
+  done
+  run -1 dybatpho::process_start_time start abc
+  run -1 dybatpho::process_start_time __dybatpho_start "$$"
+}
+
 @test "dybatpho::process_stop answers 2 for a running process it may not signal" {
   [[ "$(id -u)" != 0 ]] || skip "root may signal every process"
   # A process of another user, other than init.
@@ -1161,6 +1186,17 @@ _interrupt_script() {
   run --separate-stderr dybatpho::process_stop "${pid}" 1
   assert_failure 2
   assert_stderr --partial "Not permitted to signal process ${pid}"
+}
+
+@test "dybatpho::process_start_time gives the same fingerprint whatever TZ is" {
+  sleep 30 &
+  local pid=$! utc local_time
+  TZ=UTC dybatpho::process_start_time utc "${pid}"
+  TZ=Asia/Ho_Chi_Minh dybatpho::process_start_time local_time "${pid}"
+  assert_equal "${local_time}" "${utc}"
+  TZ=Asia/Ho_Chi_Minh run_traced dybatpho::process_is_same "${pid}" "${utc}"
+  assert_success
+  kill "${pid}"
 }
 
 @test "dybatpho::process_stop stops a running process and reaps it" {

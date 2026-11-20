@@ -315,6 +315,154 @@ function dybatpho::path_change_ext {
 }
 
 #######################################
+# @description Resolve a path to the physical, absolute path the kernel would
+#   reach: every symbolic link along the way is followed, and `..` is applied
+#   after the link before it, not folded away as text. This is the path to
+#   judge when a decision depends on where a path really leads.
+# @example
+#   local real
+#   dybatpho::path_resolve real "${HOME}/.config/app" || dybatpho::die "No such path"
+#
+# @arg $1 string? `--missing-ok` to resolve a path whose last parts do not exist yet
+# @arg $2 string Name of the variable receiving the resolved path
+# @arg $3 string Path, relative to the physical working directory unless absolute
+# @set The named variable
+# @exitcode 0 The path was resolved
+# @exitcode 1 A part of the path does not exist and `--missing-ok` was not given, or the kernel could not
+#   resolve it either: more than 40 links, a link that cannot be read or is empty, a file used as a directory
+# @tip Plain `readlink` is used one link at a time, so it works where `realpath` and `readlink -f` are missing
+# @note With `--missing-ok`, the parts after the first missing one are joined as text: there is nothing on disk
+#   to follow there yet
+#######################################
+function dybatpho::path_resolve {
+  local __dybatpho_file_real_missing=false
+  if [[ "${1-}" == "--missing-ok" ]]; then
+    __dybatpho_file_real_missing=true
+    shift
+  fi
+  local __dybatpho_file_real_var __dybatpho_file_real_path
+  dybatpho::expect_args __dybatpho_file_real_var __dybatpho_file_real_path -- "$@"
+  dybatpho::expect_ref "${__dybatpho_file_real_var}"
+  [[ "${__dybatpho_file_real_var}" != __dybatpho* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid name for the result variable: '${__dybatpho_file_real_var}'"
+  [[ -n "${__dybatpho_file_real_path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
+  local __dybatpho_file_real_result
+  __dybatpho_file_physical_into __dybatpho_file_real_result "${__dybatpho_file_real_path}" \
+    "${__dybatpho_file_real_missing}" "${FUNCNAME[0]}" || return 1
+  local -n __dybatpho_file_real_ref="${__dybatpho_file_real_var}"
+  __dybatpho_file_real_ref="${__dybatpho_file_real_result}"
+}
+
+#######################################
+# @description Tell whether a path really lies inside a directory: both are
+#   resolved with `dybatpho::path_resolve` and compared on a separator boundary,
+#   so neither a symbolic link out of the root, nor `..`, nor a sibling named
+#   like `root-evil` passes. A path that does not exist yet is judged by where
+#   it would be created.
+# @example
+#   dybatpho::path_is_inside "${target}" "${workspace}" || dybatpho::die "Refusing to write outside ${workspace}"
+#
+# @arg $1 string? `--strict` to refuse the root itself
+# @arg $2 string Path
+# @arg $3 string Root directory
+# @exitcode 0 The path is the root, or inside it
+# @exitcode 1 It is outside, the root does not exist, or the path cannot be resolved (a link loop, a link
+#   that cannot be read, a file used as a directory)
+# @warning The check and the later use resolve the path separately. The answer only holds while nobody who is
+#   not trusted can write inside the root or along the path in between: such a writer can swap a part for a
+#   link after the check. Act on the path `dybatpho::path_resolve` returns, not on the text that was checked.
+#######################################
+function dybatpho::path_is_inside {
+  local strict=false
+  if [[ "${1-}" == "--strict" ]]; then
+    strict=true
+    shift
+  fi
+  local path root real_path real_root
+  dybatpho::expect_args path root -- "$@"
+  [[ -n "${path}" && -n "${root}" ]] || dybatpho::die "${FUNCNAME[0]}: Path and root must not be empty"
+  [[ -d "${root}" ]] || return 1
+  __dybatpho_file_physical_into real_root "${root}" false "${FUNCNAME[0]}" || return 1
+  __dybatpho_file_physical_into real_path "${path}" true "${FUNCNAME[0]}" || return 1
+  if [[ "${real_path}" == "${real_root}" ]]; then
+    [[ "${strict}" == false ]]
+    return
+  fi
+  [[ "${real_root}" == / || "${real_path}" == "${real_root}"/* ]]
+}
+
+#######################################
+# @description Resolve a path one component at a time, following every
+#   symbolic link and applying `..` to the physical directory reached so far.
+# @arg $1 string Name of the variable receiving the resolved path
+# @arg $2 string Path
+# @arg $3 bool Whether parts that do not exist may follow the existing ones
+# @arg $4 string Public function a refusal is reported for
+# @set The named variable
+# @exitcode 1 A part does not exist and $3 is false
+# @internal
+#######################################
+function __dybatpho_file_physical_into {
+  local -n __dybatpho_file_phys_ref="$1"
+  local __dybatpho_file_phys_rest="$2" __dybatpho_file_phys_missing="$3" __dybatpho_file_phys_caller="$4"
+  local __dybatpho_file_phys_result=/ __dybatpho_file_phys_part __dybatpho_file_phys_next __dybatpho_file_phys_target
+  local __dybatpho_file_phys_hops=0 __dybatpho_file_phys_gone=false __dybatpho_file_phys_cwd __dybatpho_file_phys_slash
+  # The logical `$PWD` may itself run through a link; the physical one may not.
+  # Read with a sentinel: `$(...)` drops trailing newlines, and a name may end in one.
+  if [[ "${__dybatpho_file_phys_rest}" != /* ]]; then
+    __dybatpho_file_phys_cwd="$(pwd -P && printf x)" || return 1
+    __dybatpho_file_phys_cwd="${__dybatpho_file_phys_cwd%x}"
+    __dybatpho_file_phys_rest="${__dybatpho_file_phys_cwd%$'\n'}/${__dybatpho_file_phys_rest}"
+  fi
+  while [[ -n "${__dybatpho_file_phys_rest}" ]]; do
+    __dybatpho_file_phys_part="${__dybatpho_file_phys_rest%%/*}"
+    # Whether a `/` follows the part: then it has to be a directory, as in `file/`.
+    __dybatpho_file_phys_slash=false
+    [[ "${__dybatpho_file_phys_rest}" != */* ]] || __dybatpho_file_phys_slash=true
+    __dybatpho_file_phys_rest="${__dybatpho_file_phys_rest#"${__dybatpho_file_phys_part}"}"
+    __dybatpho_file_phys_rest="${__dybatpho_file_phys_rest#/}"
+    case "${__dybatpho_file_phys_part}" in
+      "" | .) continue ;;
+      ..)
+        __dybatpho_file_phys_result="${__dybatpho_file_phys_result%/*}"
+        [[ -n "${__dybatpho_file_phys_result}" ]] || __dybatpho_file_phys_result=/
+        # Back on disk after `missing/..`: what follows is checked for links again.
+        [[ "${__dybatpho_file_phys_gone}" == false || ! -e "${__dybatpho_file_phys_result}" ]] \
+          || __dybatpho_file_phys_gone=false
+        continue
+        ;;
+      *) ;; # kcov(skip) - a case arm with no command has nothing for the trap to fire on
+    esac
+    __dybatpho_file_phys_next="${__dybatpho_file_phys_result%/}/${__dybatpho_file_phys_part}"
+    if [[ "${__dybatpho_file_phys_gone}" == false && -L "${__dybatpho_file_phys_next}" ]]; then
+      # A loop is a path the kernel cannot resolve either: an answer, not an error.
+      if ((__dybatpho_file_phys_hops++ >= 40)); then
+        dybatpho::debug "${__dybatpho_file_phys_caller}: Too many levels of symbolic links: $2"
+        return 1
+      fi
+      __dybatpho_file_link_target_into __dybatpho_file_phys_target "${__dybatpho_file_phys_next}" || return 1
+      # The link's target is read from where the link is; an absolute one starts over at the root.
+      [[ "${__dybatpho_file_phys_target}" != /* ]] || __dybatpho_file_phys_result=/
+      __dybatpho_file_phys_rest="${__dybatpho_file_phys_target}/${__dybatpho_file_phys_rest}"
+      continue
+    fi
+    if [[ "${__dybatpho_file_phys_gone}" == false && ! -e "${__dybatpho_file_phys_next}" ]]; then
+      # Missing only if the parent can be searched: in a directory it cannot, `-e`
+      # and `-L` both fail, and a link there would go unchecked.
+      [[ "${__dybatpho_file_phys_missing}" == true && -x "${__dybatpho_file_phys_result}" ]] || return 1
+      __dybatpho_file_phys_gone=true
+    fi
+    # Only a directory can be gone through: `file/`, `file/x` and `file/..` fail in the kernel.
+    if [[ "${__dybatpho_file_phys_gone}" == false && "${__dybatpho_file_phys_slash}" == true ]] \
+      && [[ ! -d "${__dybatpho_file_phys_next}" ]]; then
+      return 1
+    fi
+    __dybatpho_file_phys_result="${__dybatpho_file_phys_next}"
+  done
+  __dybatpho_file_phys_ref="${__dybatpho_file_phys_result}"
+}
+
+#######################################
 # @description Read the target of a symbolic link exactly: `$(...)` drops
 #   trailing newlines, and a target may end in one, so the output is read with
 #   a sentinel.

@@ -253,6 +253,8 @@ Utilities for file handling. Loaded: always. Stability: stable. Reference: [docs
 - `dybatpho::path_is_abs <string>` — Return success when a path is absolute.
 - `dybatpho::path_has_ext <string> [string]` — Return success when a path has any extension or a matching exact extension.
 - `dybatpho::path_change_ext <string> <string>` — Return a path with its final extension replaced.
+- `dybatpho::path_resolve [string] <string> <string>` — Resolve a path to the physical, absolute path the kernel would reach: every symbolic link along the way is followed, and `..` is applied after the link before it, not folded away as text.
+- `dybatpho::path_is_inside [string] <string> <string>` — Tell whether a path really lies inside a directory: both are resolved with `dybatpho::path_resolve` and compared on a separator boundary, so neither a symbolic link out of the root, nor `..`, nor a sibling named like `root-evil` passes.
 - `dybatpho::path_relative <string> <string>` — Return the relative path from a base path to a target path.
 - `dybatpho::create_temp <string> <string> [string] [string]` — Create a temporary file or directory and register it for cleanup on shell exit.
 - `dybatpho::file_write_atomic <string>` — Write standard input to a file through a staging file, so that readers see either the previous contents or the complete new contents.

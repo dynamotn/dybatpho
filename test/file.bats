@@ -115,6 +115,123 @@ setup() {
   assert_equal "$(dybatpho::path_change_ext "README.md" "")" "README"
 }
 
+@test "dybatpho::path_resolve follows every link and applies .. after it" {
+  local base real
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  mkdir -p "${base}/a/b" "${base}/c/d"
+  printf 'x\n' > "${base}/c/d/file"
+  ln -s ../c/d "${base}/a/link"
+  dybatpho::path_resolve real "${base}/a/link/file"
+  assert_equal "${real}" "${base}/c/d/file"
+  # `link/..` is the parent of where the link leads, not `a`.
+  dybatpho::path_resolve real "${base}/a/link/.."
+  assert_equal "${real}" "${base}/c"
+  ln -s "${base}/a/link" "${base}/chain"
+  dybatpho::path_resolve real "${base}/chain/file"
+  assert_equal "${real}" "${base}/c/d/file"
+  (
+    cd "${base}/a"
+    dybatpho::path_resolve real "link/./file"
+    assert_equal "${real}" "${base}/c/d/file"
+  )
+  run_traced -1 dybatpho::path_resolve real "${base}/a/missing/file"
+  dybatpho::path_resolve --missing-ok real "${base}/a/link/new/../other"
+  assert_equal "${real}" "${base}/c/d/other"
+}
+
+@test "dybatpho::path_resolve answers 1 for what the kernel cannot resolve, and refuses a bad call" {
+  local base real
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  ln -s loop2 "${base}/loop1"
+  ln -s loop1 "${base}/loop2"
+  run_traced -1 dybatpho::path_resolve real "${base}/loop1/x"
+  run_traced -1 dybatpho::path_resolve --missing-ok real "${base}/loop1/x"
+  printf 'x\n' > "${base}/file"
+  mkdir "${base}/safe"
+  run_traced -1 dybatpho::path_resolve real "${base}/file/../safe"
+  run_traced -1 dybatpho::path_resolve --missing-ok real "${base}/file/new"
+  run -1 dybatpho::path_resolve real ""
+  run -1 dybatpho::path_resolve __dybatpho_real "${base}"
+}
+
+@test "dybatpho::path_is_inside judges the physical path, on a separator boundary" {
+  local base
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  mkdir -p "${base}/root/sub" "${base}/root-evil" "${base}/outside"
+  ln -s "${base}/outside" "${base}/root/escape"
+  ln -s "${base}/root" "${base}/rootlink"
+  run_traced -0 dybatpho::path_is_inside "${base}/root/sub/file" "${base}/root"
+  run_traced -0 dybatpho::path_is_inside "${base}/root/new/dir/file" "${base}/root"
+  run_traced -0 dybatpho::path_is_inside "${base}/root" "${base}/root"
+  run_traced -1 dybatpho::path_is_inside --strict "${base}/root" "${base}/root"
+  run_traced -1 dybatpho::path_is_inside "${base}/root/escape/file" "${base}/root"
+  run_traced -1 dybatpho::path_is_inside "${base}/root/sub/../../outside" "${base}/root"
+  run_traced -1 dybatpho::path_is_inside "${base}/root-evil/file" "${base}/root"
+  run_traced -0 dybatpho::path_is_inside "${base}/root/sub" "${base}/rootlink"
+  run_traced -1 dybatpho::path_is_inside "${base}/root/sub" "${base}/missing-root"
+  run_traced -0 dybatpho::path_is_inside "${base}/anything" /
+  run -1 dybatpho::path_is_inside "" "${base}/root"
+}
+
+@test "dybatpho::path_is_inside is not fooled by a link target ending in a newline" {
+  # `$(readlink ...)` dropped the newline, so `link` was followed to `safe`,
+  # inside the root, while the kernel follows it to `safe<newline>`, outside.
+  local base
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  mkdir -p "${base}/root/safe" "${base}/outside"
+  ln -s "${base}/outside" "${base}/root/safe"$'\n'
+  ln -s "safe"$'\n' "${base}/root/link"
+  run_traced -1 dybatpho::path_is_inside "${base}/root/link/pwn" "${base}/root"
+  local real
+  dybatpho::path_resolve real "${base}/root/link"
+  assert_equal "${real}" "${base}/outside"
+}
+
+@test "dybatpho::path_is_inside checks links again after a missing part and .." {
+  # Once a part was missing, every later part was joined as text, so `..`
+  # stepped back on disk and a link out of the root went unfollowed.
+  local base
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  mkdir -p "${base}/root" "${base}/outside"
+  ln -s "${base}/outside" "${base}/root/escape"
+  run_traced -1 dybatpho::path_is_inside "${base}/root/missing/../escape/pwn" "${base}/root"
+  run_traced -0 dybatpho::path_is_inside "${base}/root/missing/../new/file" "${base}/root"
+}
+
+@test "dybatpho::path_is_inside refuses a path through a directory it cannot search" {
+  # In a directory it cannot search, `-e` and `-L` both fail, and the part read
+  # as missing let a link below it go unchecked: once the directory opens up,
+  # or for a more privileged writer, the path leads out of the root.
+  [[ "$(id -u)" != 0 ]] || skip "root searches every directory"
+  local base
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  mkdir -p "${base}/root/locked" "${base}/outside"
+  ln -s "${base}/outside" "${base}/root/locked/escape"
+  chmod 000 "${base}/root/locked"
+  local status_code=0
+  dybatpho::path_is_inside "${base}/root/locked/escape/x" "${base}/root" || status_code=$?
+  chmod 755 "${base}/root/locked"
+  assert_equal "${status_code}" 1
+}
+
+@test "dybatpho::path_resolve refuses a file followed by a slash" {
+  local base real
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  printf 'x\n' > "${base}/file"
+  run_traced -1 dybatpho::path_resolve real "${base}/file/"
+  dybatpho::path_resolve real "${base}/file"
+  assert_equal "${real}" "${base}/file"
+}
+
+@test "dybatpho::path_is_inside refuses a path through an empty link target" {
+  local base
+  base="$(cd "${BATS_TEST_TMPDIR}" && pwd -P)"
+  mkdir -p "${base}/root"
+  # Linux refuses to create an empty link; macOS and BSD allow one.
+  ln -s "" "${base}/root/empty" 2> /dev/null || skip "this system cannot create an empty symbolic link"
+  run_traced -1 dybatpho::path_is_inside "${base}/root/empty/x" "${base}/root"
+}
+
 @test "dybatpho::path_relative computes textual relative paths" {
   assert_equal "$(dybatpho::path_relative "/tmp/demo/cache/data.json" "/tmp/demo")" "cache/data.json"
 

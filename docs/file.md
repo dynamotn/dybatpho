@@ -39,6 +39,8 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 - [`dybatpho::path_is_abs`](#dybatphopath_is_abs) — Return success when a path is absolute.
 - [`dybatpho::path_has_ext`](#dybatphopath_has_ext) — Return success when a path has any extension or a matching exact extension.
 - [`dybatpho::path_change_ext`](#dybatphopath_change_ext) — Return a path with its final extension replaced.
+- [`dybatpho::path_resolve`](#dybatphopath_resolve) — Resolve a path to the physical, absolute path the kernel would reach: every symbolic link along the way is followed, and `..` is applied after the link before it, not folded away as text. This is the path to judge when a decision depends on where a path really leads.
+- [`dybatpho::path_is_inside`](#dybatphopath_is_inside) — Tell whether a path really lies inside a directory: both are resolved with `dybatpho::path_resolve` and compared on a separator boundary, so neither a symbolic link out of the root, nor `..`, nor a sibling named like `root-evil` passes. A path that does not exist yet is judged by where it would be created.
 - [`dybatpho::path_relative`](#dybatphopath_relative) — Return the relative path from a base path to a target path.
 - [`dybatpho::create_temp`](#dybatphocreate_temp) — Create a temporary file or directory and register it for cleanup on shell exit.
 - [`dybatpho::file_write_atomic`](#dybatphofile_write_atomic) — Write standard input to a file through a staging file, so that readers see either the previous contents or the complete new contents.
@@ -76,6 +78,10 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 **[`dybatpho::show_file`](#dybatphoshow_file)**
 
 - Uses `bat` when available for richer output, otherwise falls back to `cat -n`
+
+**[`dybatpho::path_resolve`](#dybatphopath_resolve)**
+
+- Plain `readlink` is used one link at a time, so it works where `realpath` and `readlink -f` are missing
 
 **[`dybatpho::create_temp`](#dybatphocreate_temp)**
 
@@ -308,6 +314,78 @@ Return a path with its final extension replaced.
 **📤 Output on stdout**
 
 - Path with updated extension
+
+---
+
+### `dybatpho::path_resolve`
+
+Resolve a path to the physical, absolute path the kernel would
+reach: every symbolic link along the way is followed, and `..` is applied
+after the link before it, not folded away as text. This is the path to
+judge when a decision depends on where a path really leads.
+
+**🧪 Example**
+
+```bash
+local real
+dybatpho::path_resolve real "${HOME}/.config/app" || dybatpho::die "No such path"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--missing-ok` to resolve a path whose last parts do not exist yet |
+| `$2` | string | yes |  | Name of the variable receiving the resolved path |
+| `$3` | string | yes |  | Path, relative to the physical working directory unless absolute |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**📝 Notes**
+
+- With `--missing-ok`, the parts after the first missing one are joined as text: there is nothing on disk to follow there yet
+
+**🚦 Exit codes**
+
+- `0`: The path was resolved
+- `1`: A part of the path does not exist and `--missing-ok` was not given, or the kernel could not resolve it either: more than 40 links, a link that cannot be read or is empty, a file used as a directory
+
+---
+
+### `dybatpho::path_is_inside`
+
+Tell whether a path really lies inside a directory: both are
+resolved with `dybatpho::path_resolve` and compared on a separator boundary,
+so neither a symbolic link out of the root, nor `..`, nor a sibling named
+like `root-evil` passes. A path that does not exist yet is judged by where
+it would be created.
+
+> ⚠️ **Warning**
+>
+> The check and the later use resolve the path separately. The answer only holds while nobody who is not trusted can write inside the root or along the path in between: such a writer can swap a part for a link after the check. Act on the path `dybatpho::path_resolve` returns, not on the text that was checked.
+
+**🧪 Example**
+
+```bash
+dybatpho::path_is_inside "${target}" "${workspace}" || dybatpho::die "Refusing to write outside ${workspace}"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--strict` to refuse the root itself |
+| `$2` | string | yes |  | Path |
+| `$3` | string | yes |  | Root directory |
+
+**🚦 Exit codes**
+
+- `0`: The path is the root, or inside it
+- `1`: It is outside, the root does not exist, or the path cannot be resolved (a link loop, a link that cannot be read, a file used as a directory)
 
 ---
 

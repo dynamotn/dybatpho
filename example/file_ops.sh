@@ -3,7 +3,8 @@
 # @brief Example showing file utilities
 # @description
 #   Demonstrates dybatpho::create_temp, show_file, path_basename, path_dirname, path_extname, path_stem, path_join,
-#   path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, xdg_config_dir, xdg_cache_dir,
+#   path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, path_resolve, path_is_inside,
+#   xdg_config_dir, xdg_cache_dir,
 #   xdg_data_dir, xdg_state_dir, xdg_runtime_dir, create_temp_dir, file_mtime, dir_size, dir_hash, file_is_binary,
 #   file_write_atomic, file_write_if_changed, file_replace, file_ensure_line, file_remove_line, file_hash, file_size,
 #   file_age_seconds, file_backup, find_up, ensure_dir, and temp cleanup behavior
@@ -140,6 +141,20 @@ function _demo_path_checks {
   local path_relative
   path_relative=$(dybatpho::path_relative "${path}" "/tmp")
   dybatpho::info "Relative to /tmp: ${path_relative}"
+
+  # Where a path really leads, links and all, and whether that stays inside a root.
+  local root real
+  dybatpho::create_temp root "/" "root"
+  mkdir -p "${root}/data"
+  ln -s / "${root}/escape"
+  dybatpho::path_resolve real "${root}/escape/etc"
+  dybatpho::info "root/escape/etc really is: ${real}"
+  dybatpho::path_is_inside "${root}/data/new.txt" "${root}" && dybatpho::info "data/new.txt stays inside"
+  dybatpho::path_is_inside "${root}/escape/etc" "${root}" || dybatpho::info "escape/etc leaves the root"
+  # A path to create later resolves too, and --strict refuses the root itself as a target.
+  dybatpho::path_resolve --missing-ok real "${root}/data/later/file.txt"
+  dybatpho::info "a path not created yet: ${real}"
+  dybatpho::path_is_inside --strict "${root}" "${root}" || dybatpho::info "--strict: the root itself is refused"
 }
 
 # @description Run the `FILE CONTENTS` section of this example.

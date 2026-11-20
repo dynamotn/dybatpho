@@ -57,6 +57,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **`file` — resolve a path physically and check it stays inside a directory
+  with `dybatpho::path_resolve` and `dybatpho::path_is_inside`.** Every
+  symbolic link along the path is followed and `..` is applied after it, the
+  way the kernel does, without `realpath` or `readlink -f`; the containment
+  check compares on a `/` boundary, so a link out of the root, `..`, or a
+  sibling named like `root-evil` cannot pass.
 - **`process` — tell a process from a later one that reused its ID with
   `dybatpho::process_start_time` and `dybatpho::process_is_same`.** Record
   the start-time fingerprint next to a PID, and check both later: a PID alone

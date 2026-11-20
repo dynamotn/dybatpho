@@ -140,6 +140,8 @@ dybatpho::verify_file tool.tar.gz tool.tar.gz.minisig "RWQf6LRCGA9i53mlYecO4IzT5
 - **FR-017**: gpg verification MUST read `gpgv`'s status and accept only a `VALIDSIG` with no `BADSIG`, `ERRSIG`, `EXPSIG`, `EXPKEYSIG`, `REVKEYSIG`, `NO_PUBKEY`, `PLAINTEXT`, `BADARMOR` or `NODATA` beside it: `gpgv` exits 0 for a signature by a revoked key. `KEYEXPIRED` and `KEYREVOKED` MUST NOT refuse a signature, since `gpgv` emits them for a key's unused subkeys too.
 - **FR-018**: `sign_public_key gpg` MUST resolve the user id to exactly one key and export that key alone, minimal, and MUST fail when it matches none or several: a user id matches by substring.
 
+- **FR-021**: `verify_file` MUST read the content to check from standard input when the file is `-`, with the same answers as for a file, and MUST stop the script when the signature is `-`.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Backend**: A signing tool and the two functions that drive it.
@@ -175,6 +177,8 @@ dybatpho::verify_file tool.tar.gz tool.tar.gz.minisig "RWQf6LRCGA9i53mlYecO4IzT5
 - **IT-015**: Stop on a missing file, a missing signature, a trusted key path that does not exist and an unrecognised key string; return 124 when a check runs out of time.
 - **IT-016**: Refuse a gpg signature by a key revoked after signing, and a signed message relabelled as a detached signature.
 - **IT-017**: Refuse to print the public key for a gpg user id matching two keys, and print one key for an exact one.
+
+- **IT-018**: Verify signed content fed on standard input as `-` and get 0, feed other content and get 1, and see a signature given as `-` refused.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -84,6 +84,18 @@ __yaml_query_fixture() {
   assert_equal "${without}" "${with}"
 }
 
+@test "dybatpho::json_has --optional answers 1 quietly for a missing file" {
+  local file missing="${BATS_TEST_TMPDIR}/absent.json"
+  file="$(__json_query_fixture)"
+  run_traced --separate-stderr dybatpho::json_has --optional "${missing}" '.name'
+  assert_failure 1
+  refute_stderr
+  run_traced dybatpho::json_has --optional "${file}" '.name'
+  assert_success
+  run_traced --separate-stderr dybatpho::json_has "${missing}" '.name'
+  assert_failure 2
+}
+
 @test "dybatpho::json_has follows jq -e and folds no output into a plain failure" {
   local file
   file="$(__json_query_fixture)"

@@ -306,7 +306,7 @@ function _demo_ensure_dir {
   dybatpho::info "State file: ${cat}"
 
   # Calling it again is a no-op, so scripts can call it before every write.
-  dybatpho::ensure_dir "${WORKDIR}/cache/myapp" 700 > /dev/null
+  dybatpho::ensure_dir --quiet "${WORKDIR}/cache/myapp" 700
   dybatpho::info "Second call changed nothing"
 }
 

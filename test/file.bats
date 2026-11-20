@@ -882,6 +882,15 @@ EOF
   assert [ -d "${target}" ]
 }
 
+@test "dybatpho::ensure_dir --quiet creates the directory and prints nothing" {
+  local dir="${BATS_TEST_TMPDIR}/quiet/nested"
+  run_traced dybatpho::ensure_dir --quiet "${dir}" 700
+  assert_success
+  refute_output
+  assert_dir_exist "${dir}"
+  assert_equal "$(__dybatpho_file_stat mode "${dir}")" 700
+}
+
 @test "dybatpho::ensure_dir is idempotent and applies the requested mode" {
   local target="${BATS_TEST_TMPDIR}/moded"
   dybatpho::ensure_dir "${target}" 700 > /dev/null

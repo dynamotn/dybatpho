@@ -236,6 +236,8 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **FR-040**: `dybatpho::int_or <var> <text> <default> [min [max]]` MUST set the variable to the text read in base ten when it is an optional `-` and 1 to 18 digits, and to the default otherwise without reporting, MUST clamp the result into the range bounds that are given, and MUST stop the script on a default or bound that is not a whole number and on a variable name that is invalid or starts with `__dybatpho`; the text MUST never reach arithmetic unchecked.
 - **FR-039**: `dybatpho::retry --on <codes>` MUST retry only a failure whose exit code is in the comma-separated list, MUST return any other exit code after that attempt without retrying or warning, and MUST stop the script on a list that is not exit codes of up to three digits or holds one above 255; a code MUST be read in base ten, so `01` matches a status of 1.
 
+- **FR-041**: `dybatpho::retry_until --quiet` MUST retry exactly as without the option, and print neither the retry banner nor the final warning.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Expectation Contract**: The named-variable input contract declared by a reusable shell function.
@@ -312,6 +314,8 @@ _deploy prod "${DEPLOY_TOKEN:-}"
 - **IT-041**: Read `a "" -f b` with the option reader, and get `-f` set and `a`, the empty argument and `b` as positionals.
 - **IT-043**: Read `08`, `-012` and `-0` as 8, -12 and 0; get the default for an empty text, letters, a decimal, a plus sign, a leading space, 20 digits, a subscript holding a command and a hex number; see 9000 and 1 clamped into 5..3600, a one-sided range honoured, and a bad default, bound or name refused.
 - **IT-042**: Retry with `--on 1,6` a command that fails with 1, then 6, then succeeds, and see three attempts; with `--on 1`, see a 3 returned on the second attempt and a run of 1s returned as 1 once the retries run out; see an empty, non-numeric, four-digit or negative list refused.
+
+- **IT-044**: Poll a failing command with `retry_until --quiet` and see it fail with nothing on stderr, while the same poll without the option warns.
 
 ## Acceptance Criteria *(mandatory)*
 

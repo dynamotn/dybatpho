@@ -113,6 +113,17 @@ curl_payload() {
   assert_equal "$(dybatpho::forge_repo)" "other/thing"
 }
 
+@test "dybatpho::forge_repo --soft answers 1 for a remote with no URL or no path, without stopping" {
+  assert_equal "$(dybatpho::forge_repo --soft)" "acme/widget"
+  run_traced -1 dybatpho::forge_repo --soft nosuch
+  refute_output
+  git -C "${REPO}" remote add bare "https://github.com"
+  run_traced -1 dybatpho::forge_repo --soft bare
+  refute_output
+  run -1 dybatpho::forge_repo nosuch
+  assert_output --partial "No URL for remote 'nosuch'"
+}
+
 @test "dybatpho::forge_api points at the right base for each forge" {
   assert_equal "$(dybatpho::forge_api)" "https://api.github.com"
 

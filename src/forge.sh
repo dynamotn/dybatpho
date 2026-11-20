@@ -199,13 +199,22 @@ function dybatpho::forge_kind {
 # @description Print the `owner/repo` the remote points at.
 #   A GitLab project may be nested in subgroups, so everything after the host is
 #   kept rather than only the last two segments.
-# @arg $1 string [default: ${DYBATPHO_FORGE_REMOTE}] Remote name
-# @arg $2 string [default: .] Repository path
+# @example
+#   repo="$(dybatpho::forge_repo --soft)" || dybatpho::info "Not a forge checkout"
+#
+# @arg $1 string? `--soft` to return 1, printing nothing, instead of stopping the script
+# @arg $2 string [default: ${DYBATPHO_FORGE_REMOTE}] Remote name
+# @arg $3 string [default: .] Repository path
 # @env DYBATPHO_FORGE_REPO string Override the detected value
 # @stdout `owner/repo`, or `group/subgroup/repo` on GitLab
-# @exitcode 1 The remote URL carries no path
+# @exitcode 1 The remote has no URL or its URL carries no path; without `--soft` the script stops
 #######################################
 function dybatpho::forge_repo {
+  local soft=false
+  if [[ "${1-}" == "--soft" ]]; then
+    soft=true
+    shift
+  fi
   if [[ -n "${DYBATPHO_FORGE_REPO}" ]]; then
     printf '%s\n' "${DYBATPHO_FORGE_REPO}"
     return 0
@@ -213,13 +222,19 @@ function dybatpho::forge_repo {
 
   local remote="${1:-${DYBATPHO_FORGE_REMOTE}}" repo_path="${2:-.}"
   local url
-  url="$(dybatpho::git_remote_url "${remote}" "${repo_path}")" \
-    || dybatpho::die "No URL for remote '${remote}'"
+  if [[ "${soft}" == true ]]; then
+    url="$(dybatpho::git_remote_url "${remote}" "${repo_path}" 2> /dev/null)" || return 1
+  else
+    url="$(dybatpho::git_remote_url "${remote}" "${repo_path}")" \
+      || dybatpho::die "No URL for remote '${remote}'"
+  fi
   url="$(__dybatpho_forge_normalize_url "${url}")"
 
   local project="${url#*/}"
-  [[ "${project}" != "${url}" && -n "${project}" ]] \
-    || dybatpho::die "Remote '${remote}' has no owner/repo path: ${url}"
+  if [[ "${project}" == "${url}" || -z "${project}" ]]; then
+    [[ "${soft}" == false ]] || return 1
+    dybatpho::die "Remote '${remote}' has no owner/repo path: ${url}"
+  fi
   printf '%s\n' "${project}"
 }
 

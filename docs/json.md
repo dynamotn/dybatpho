@@ -116,17 +116,25 @@ Return success when a JSON document satisfies a `jq` filter.
 The filter succeeds when its last output is neither `false` nor `null`;
 a filter that produces nothing at all fails the same way.
 
+**🧪 Example**
+
+```bash
+dybatpho::json_has --optional "${HOME}/.config/app.json" '.debug == true' && enable_debug
+
+```
+
 **🧾 Arguments**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `$1` | string | JSON file path or `-` for stdin |
-| `$2` | string | `jq` filter |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--optional` to answer 1, quietly, for a file that does not exist |
+| `$2` | string | yes |  | JSON file path or `-` for stdin |
+| `$3` | string | yes |  | `jq` filter |
 
 **🚦 Exit codes**
 
 - `0`: The filter succeeds
-- `1`: The filter's last output is `false` or `null`, or it has none
+- `1`: The filter's last output is `false` or `null`, or it has none; or, with `--optional`, the file is missing
 - `other`: `jq`'s own exit code when the document or the filter is invalid
 - `127`: `jq` is not installed
 

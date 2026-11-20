@@ -1325,17 +1325,23 @@ function dybatpho::find_up {
 #   printf 'cached\n' | dybatpho::file_write_atomic "${cache}/last-run"
 #
 # @example
-#   dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
+#   dybatpho::ensure_dir --quiet "${HOME}/.config/myapp" 700
 #
-# @arg $1 string Directory path
-# @arg $2 string? Mode applied to the directory, such as `755`
-# @stdout The directory path
+# @arg $1 string? `--quiet` to print nothing
+# @arg $2 string Directory path
+# @arg $3 string? Mode applied to the directory, such as `755`
+# @stdout The directory path, unless `--quiet` is given
 # @env DYBATPHO_DRY_RUN string When true-like, print the path without creating anything
 # @exitcode 1 The path exists as something other than a directory, or cannot be created
 # @tip A mode is applied whether the directory was just created or already
 #   existed, so the result does not depend on whether the script ran before
 #######################################
 function dybatpho::ensure_dir {
+  local quiet=false
+  if [[ "${1-}" == "--quiet" ]]; then
+    quiet=true
+    shift
+  fi
   local path mode
   dybatpho::expect_args path -- "$@"
   [[ -n "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Path must not be empty"
@@ -1347,7 +1353,7 @@ function dybatpho::ensure_dir {
   if dybatpho::is true "${DYBATPHO_DRY_RUN:-${DRY_RUN:-}}"; then
     dybatpho::is dir "${path}" || dybatpho::dry_run mkdir -p -- "${path}"
     [[ -n "${mode}" ]] && dybatpho::dry_run chmod "${mode}" "$(__dybatpho_file_operand "${path}")"
-    printf '%s\n' "${path}"
+    [[ "${quiet}" == true ]] || printf '%s\n' "${path}"
     return 0
   fi
 
@@ -1360,7 +1366,7 @@ function dybatpho::ensure_dir {
     chmod "${mode}" "$(__dybatpho_file_operand "${path}")" \
       || dybatpho::die "${FUNCNAME[0]}: Cannot set mode ${mode} on ${path}" # kcov(skip)
   fi
-  printf '%s\n' "${path}"
+  [[ "${quiet}" == true ]] || printf '%s\n' "${path}"
 }
 
 #######################################

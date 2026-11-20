@@ -83,16 +83,28 @@ function dybatpho::json_query {
 # @description Return success when a JSON document satisfies a `jq` filter.
 #   The filter succeeds when its last output is neither `false` nor `null`;
 #   a filter that produces nothing at all fails the same way.
-# @arg $1 string JSON file path or `-` for stdin
-# @arg $2 string `jq` filter
+# @example
+#   dybatpho::json_has --optional "${HOME}/.config/app.json" '.debug == true' && enable_debug
+#
+# @arg $1 string? `--optional` to answer 1, quietly, for a file that does not exist
+# @arg $2 string JSON file path or `-` for stdin
+# @arg $3 string `jq` filter
 # @exitcode 0 The filter succeeds
-# @exitcode 1 The filter's last output is `false` or `null`, or it has none
+# @exitcode 1 The filter's last output is `false` or `null`, or it has none; or, with `--optional`, the file is missing
 # @exitcode other `jq`'s own exit code when the document or the filter is invalid
 # @exitcode 127 `jq` is not installed
 #######################################
 function dybatpho::json_has {
+  local optional=false
+  if [[ "${1-}" == "--optional" ]]; then
+    optional=true
+    shift
+  fi
   local input filter
   dybatpho::expect_args input filter -- "$@"
+  if [[ "${optional}" == true && "${input}" != "-" && ! -e "${input}" ]]; then
+    return 1
+  fi
   __dybatpho_json_need_jq
   __dybatpho_json_guard_paths input
   __dybatpho_json_test jq -e "${filter}" "${input}"

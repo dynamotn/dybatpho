@@ -680,7 +680,7 @@ function __dybatpho_lock_run_holding {
 #   dybatpho::flock_release "${fd}"
 #
 # @arg $1 string Name of the variable receiving the descriptor
-# @arg $2 path File to lock, used as given and created when missing
+# @arg $2 path File to lock, used as given and created when missing; or a directory, opened read-only to be locked
 # @arg $3 number [default: wait until free] Seconds to wait; `0` tries once without waiting
 # @set The named variable, to the descriptor holding the lock
 # @exitcode 0 The lock was taken
@@ -707,8 +707,15 @@ function dybatpho::flock_acquire {
   fi
 
   local __dybatpho_flock_fd
-  { exec {__dybatpho_flock_fd}>> "${__dybatpho_flock_file}"; } 2> /dev/null \
-    || dybatpho::die "${FUNCNAME[0]}: Cannot open the lock file ${__dybatpho_flock_file}"
+  # A directory cannot be opened for appending, but read-only it can be locked
+  # like a file, which is how a tool claims a whole worktree.
+  if [[ -d "${__dybatpho_flock_file}" ]]; then
+    { exec {__dybatpho_flock_fd}< "${__dybatpho_flock_file}"; } 2> /dev/null \
+      || dybatpho::die "${FUNCNAME[0]}: Cannot open the directory ${__dybatpho_flock_file}"
+  else
+    { exec {__dybatpho_flock_fd}>> "${__dybatpho_flock_file}"; } 2> /dev/null \
+      || dybatpho::die "${FUNCNAME[0]}: Cannot open the lock file ${__dybatpho_flock_file}"
+  fi
   local __dybatpho_flock_status=0 __dybatpho_flock_help=""
   # BusyBox prints its usage and fails; only what it says matters.
   [[ "${__dybatpho_flock_mode[0]-}" != -w ]] || __dybatpho_flock_help="$(flock --help 2>&1)" || :

@@ -715,7 +715,7 @@ printf 'cached\n' | dybatpho::file_write_atomic "${cache}/last-run"
 ```
 
 ```bash
-dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
+dybatpho::ensure_dir --quiet "${HOME}/.config/myapp" 700
 
 ```
 
@@ -723,8 +723,9 @@ dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | string | yes |  | Directory path |
-| `$2` | string | no |  | Mode applied to the directory, such as `755` |
+| `$1` | string | no |  | `--quiet` to print nothing |
+| `$2` | string | yes |  | Directory path |
+| `$3` | string | no |  | Mode applied to the directory, such as `755` |
 
 **🌍 Environment variables**
 
@@ -734,7 +735,7 @@ dybatpho::ensure_dir "${HOME}/.config/myapp" 700 > /dev/null
 
 **📤 Output on stdout**
 
-- The directory path
+- The directory path, unless `--quiet` is given
 
 **🚦 Exit codes**
 

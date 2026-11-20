@@ -249,6 +249,8 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **FR-033**: Under `set -x`, `json_object`, `json_set` and `yaml_set` MUST NOT trace a value beyond the caller's own call line, and the message refusing a `--json` value MUST NOT repeat the value.
 - **FR-031**: Every helper that reads a file MUST read an input path that starts with `-` (other than a lone `-`, which is stdin) as a file, never as an option of `jq` or `yq`.
 
+- **FR-034**: `json_has --optional` MUST return 1, printing nothing, when the file does not exist, and otherwise answer as `json_has` does.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Filter**: A caller-provided `jq` filter used to query or validate JSON or
@@ -330,6 +332,8 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - **IT-031**: Build an object of 300 pairs under `ulimit -n 64`.
 - **IT-032**: Build objects from tabs, control characters, multi-byte and invalid UTF-8, quotes and backslashes, and see exactly what `jq --arg` encodes.
 - **IT-033**: Under `set -x`, see a value of `json_object` and `json_set` only on the caller's line, and see a refused `--json` value left out of the error.
+
+- **IT-034**: Ask `json_has --optional` about a missing file and get 1 with nothing on stderr, about an existing file and get its answer, and see the missing file still give `jq`'s error status without the option.
 
 ## Acceptance Criteria *(mandatory)*
 

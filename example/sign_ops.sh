@@ -59,6 +59,10 @@ function _demo_ssh {
   if ! DYBATPHO_SIGN_NAMESPACE=release dybatpho::verify_file "${WORK}/tampered.txt" "${signature}" "${trusted}"; then
     dybatpho::warn "Refused for a changed file (expected)"
   fi
+  # `-` checks content read from standard input, such as a file from another git revision.
+  if DYBATPHO_SIGN_NAMESPACE=release dybatpho::verify_file - "${signature}" "${trusted}" < "${DOC}"; then
+    dybatpho::success "The same content, read from standard input, checks out too"
+  fi
 }
 
 # --- minisign -------------------------------------------------------------------

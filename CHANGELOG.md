@@ -57,6 +57,14 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **Small options that let existing functions be used where they could not
+  be:** `dybatpho::ensure_dir --quiet` creates the directory without printing
+  its path; `dybatpho::retry_until --quiet` polls without a banner or a final
+  warning; `dybatpho::verify_file -` checks content read from standard input,
+  such as a file from another git revision; `dybatpho::flock_acquire` locks a
+  directory; `dybatpho::forge_repo --soft` returns 1 instead of stopping when
+  the remote has no URL or no path; and `dybatpho::json_has --optional`
+  answers 1 quietly for a config file that does not exist.
 
 ## [7.2.1] - 2026-11-19
 

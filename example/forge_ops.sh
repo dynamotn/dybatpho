@@ -116,6 +116,9 @@ function _demo_detection {
   local forge_repo_2
   forge_repo_2=$(dybatpho::forge_repo)
   dybatpho::print "  repo: ${forge_repo_2}"
+  # --soft answers 1 instead of stopping when the remote is missing or has no path.
+  dybatpho::forge_repo --soft no-such-remote > /dev/null \
+    || dybatpho::print "  no-such-remote: no repo (--soft, status 1)"
   local forge_api_2
   forge_api_2=$(dybatpho::forge_api)
   dybatpho::print "  api : ${forge_api_2}"

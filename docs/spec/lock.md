@@ -331,6 +331,8 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 - **FR-045**: `lock_release` and `lock_semaphore_release` MUST treat a lock as their own only when its recorded pid is the calling process or the script it runs in (`$$`): a subshell MAY still release the script's lock or a slot it names (but not by the release-all form, see FR-023), and MUST NOT release a live sibling worker's.
 - **FR-046**: `lock_reclaim_stale` MUST move a stale lock aside only while holding the guard `<lock>.reclaim`, MUST read the holder again once it holds it, and MUST remove a guard older than five seconds, which only a reclaimer that died leaves.
 
+- **FR-047**: `flock_acquire` given a directory MUST open it read-only and lock it, instead of stopping on a target it cannot open for appending.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Lock Directory**: A directory ending in `.lock` whose existence represents
@@ -429,6 +431,8 @@ dybatpho::with_flock "${state_dir}/state.lock" 5 -- _update_state
 - **IT-043**: Force A to move the lock aside after B reclaimed and claimed it, and C to claim the emptied name, and see that if B believes it holds the lock, it does.
 - **IT-044**: Take a lock whose dead holder is behind a reclaim guard from 2020, and see the guard cleared.
 - **IT-045**: Hold a slot in the script, take and release-all from a worker subshell, and see the script's slot still held.
+
+- **IT-046**: Lock a directory with `flock_acquire`, see another open of it refused, release it, and see the other open take it.
 
 ## Acceptance Criteria *(mandatory)*
 

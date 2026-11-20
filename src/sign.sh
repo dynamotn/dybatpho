@@ -740,7 +740,10 @@ function dybatpho::sign_public_key {
 #   dybatpho::verify_file accounts.yaml accounts.yaml.sig "ssh-ed25519 AAAAC3Nza..." \
 #     || dybatpho::die "accounts.yaml is not signed by a trusted key"
 #
-# @arg $1 path File
+# @example
+#   git show "origin/main:accounts.yaml" | dybatpho::verify_file - accounts.yaml.sig "${trusted_key}"
+#
+# @arg $1 path File, or `-` to read the content from standard input
 # @arg $2 path Signature
 # @arg $@ string Trusted keys: an SSH `<type> <base64>`, a minisign public key,
 #   or a file holding keys -- for gpg, an exported public key
@@ -758,7 +761,10 @@ function dybatpho::verify_file {
   dybatpho::expect_args file signature -- "$@"
   shift 2
   local path
-  for path in "${file}" "${signature}"; do
+  local -a paths=("${signature}")
+  # Only the content may come from standard input; the signature is always a file.
+  [[ "${file}" == "-" ]] || paths+=("${file}")
+  for path in "${paths[@]}"; do
     [[ -f "${path}" && -r "${path}" ]] || dybatpho::die "${FUNCNAME[0]}: Cannot read ${path}"
   done
   local backend
@@ -772,6 +778,11 @@ function dybatpho::verify_file {
   # Checking needs no passphrase, so it never prompts and is always bounded.
   local work status=0 __dybatpho_sign_interactive
   __dybatpho_sign_begin work __dybatpho_sign_interactive never
+  if [[ "${file}" == "-" ]]; then
+    # The tools need a file; the content read from standard input is checked as one.
+    cat > "${work}/content"
+    file="${work}/content"
+  fi
   # A signature that crossed a Windows machine carries CRLF, and one pasted into
   # a file may open with a blank line; the tools refuse both.
   tr -d '\r' < "${signature}" > "${work}/unix"

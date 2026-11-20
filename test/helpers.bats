@@ -694,6 +694,15 @@ _test_retry() {
   assert_equal "${attempts}" 3
 }
 
+@test "dybatpho::retry_until --quiet polls without a banner or a final warning" {
+  run_traced --separate-stderr dybatpho::retry_until --quiet 2 0 -- false
+  assert_failure
+  refute_stderr
+  run_traced --separate-stderr dybatpho::retry_until 1 0 -- false
+  assert_failure
+  assert_stderr --partial "No more retries left"
+}
+
 @test "dybatpho::retry with immediate success" {
   count=0
   _test_retry() {

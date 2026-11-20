@@ -644,10 +644,15 @@ The calling forms are those of `dybatpho::retry`: an optional description,
 then `--` and the command with its arguments. The single shell command
 string form still works but is deprecated, because it runs through `eval`.
 
-**🧪 Example**
+**🧪 Examples**
 
 ```bash
 dybatpho::retry_until 5 2 "wait for the socket" -- test -S "${socket}"
+
+```
+
+```bash
+dybatpho::retry_until --quiet 50 0.1 -- test -s "${ready_file}"
 
 ```
 
@@ -655,6 +660,7 @@ dybatpho::retry_until 5 2 "wait for the socket" -- test -S "${socket}"
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--quiet` to print no retry banner and no final warning, for a poll |
 | `$1` | number | yes |  | Number of retries |
 | `$2` | number | yes |  | Delay in seconds between attempts |
 | `$3` | string | no |  | Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string |

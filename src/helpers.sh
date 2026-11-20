@@ -1483,6 +1483,10 @@ function __dybatpho_helpers_retry_form {
 # @example
 #   dybatpho::retry_until 5 2 "wait for the socket" -- test -S "${socket}"
 #
+# @example
+#   dybatpho::retry_until --quiet 50 0.1 -- test -s "${ready_file}"
+#
+# @arg $1 string? `--quiet` to print no retry banner and no final warning, for a poll
 # @arg $1 number Number of retries
 # @arg $2 number Delay in seconds between attempts
 # @arg $3 string? Short description for retry logs, when a `--` follows it; or (deprecated) a shell command string
@@ -1495,7 +1499,12 @@ function dybatpho::retry_until {
   # Prefixed for the same reason as `dybatpho::retry`: the command runs in this
   # function's scope and must see the caller's variables, not these.
   local __dybatpho_retry_retries __dybatpho_retry_delay_seconds __dybatpho_retry_command __dybatpho_retry_label
+  local __dybatpho_retry_quiet=false
   local -a __dybatpho_retry_argv=()
+  if [[ "${1-}" == "--quiet" ]]; then
+    __dybatpho_retry_quiet=true
+    shift
+  fi
   dybatpho::expect_args __dybatpho_retry_retries __dybatpho_retry_delay_seconds \
     __dybatpho_retry_command -- "$@"
   shift 3
@@ -1516,12 +1525,14 @@ function dybatpho::retry_until {
     __dybatpho_retry_exit_code=$?
     __dybatpho_retry_count=$((__dybatpho_retry_count + 1))
     if ((__dybatpho_retry_count > __dybatpho_retry_retries)); then
-      dybatpho::warn "No more retries left to run ${__dybatpho_retry_label}."
+      [[ "${__dybatpho_retry_quiet}" == true ]] \
+        || dybatpho::warn "No more retries left to run ${__dybatpho_retry_label}."
       return "${__dybatpho_retry_exit_code}"
     fi
     # On stderr: the caller may be capturing the command's own output.
-    __dybatpho_log_progress_to stderr "Retrying in ${__dybatpho_retry_delay_seconds} seconds" \
-      "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})"
+    [[ "${__dybatpho_retry_quiet}" == true ]] \
+      || __dybatpho_log_progress_to stderr "Retrying in ${__dybatpho_retry_delay_seconds} seconds" \
+        "(${__dybatpho_retry_count}/${__dybatpho_retry_retries})"
     sleep "${__dybatpho_retry_delay_seconds}" || true
   done
 }

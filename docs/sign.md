@@ -190,7 +190,7 @@ Check that a file was signed by one of the trusted keys. The
 backend is read from the signature; only the trusted keys of that backend
 count, and nothing else on the machine is consulted.
 
-**🧪 Example**
+**🧪 Examples**
 
 ```bash
 dybatpho::verify_file accounts.yaml accounts.yaml.sig "ssh-ed25519 AAAAC3Nza..." \
@@ -198,11 +198,16 @@ dybatpho::verify_file accounts.yaml accounts.yaml.sig "ssh-ed25519 AAAAC3Nza..."
 
 ```
 
+```bash
+git show "origin/main:accounts.yaml" | dybatpho::verify_file - accounts.yaml.sig "${trusted_key}"
+
+```
+
 **🧾 Arguments**
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `$1` | path | File |
+| `$1` | path | File, or `-` to read the content from standard input |
 | `$2` | path | Signature |
 | `$@` | string | Trusted keys: an SSH `<type> <base64>`, a minisign public key, or a file holding keys -- for gpg, an exported public key |
 

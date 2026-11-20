@@ -265,7 +265,7 @@ Utilities for file handling. Loaded: always. Stability: stable. Reference: [docs
 - `dybatpho::file_age_seconds <string>` — Print how many seconds have passed since a file was last modified.
 - `dybatpho::file_backup <string>` — Copy a file next to itself under a timestamped name and print the copy's path, so that a caller can undo a change it is about to make.
 - `dybatpho::find_up <string> [string]` — Search a directory and each of its parents for an entry, and print the first one found.
-- `dybatpho::ensure_dir <string> [string]` — Create a directory and every missing parent, then print its path.
+- `dybatpho::ensure_dir [string] <string> [string]` — Create a directory and every missing parent, then print its path.
 - `dybatpho::xdg_config_dir [string]` — Print the directory a program's configuration belongs in.
 - `dybatpho::xdg_cache_dir [string]` — Print the directory a program's cache belongs in.
 - `dybatpho::xdg_data_dir [string]` — Print the directory a program's data belongs in.
@@ -283,7 +283,7 @@ Utilities for talking to the forge a repository is hosted on. Loaded: `--modules
 
 - `dybatpho::forge_host [string] [string]` — Print the host of the configured remote.
 - `dybatpho::forge_kind [string] [string]` — Print which forge the repository is hosted on.
-- `dybatpho::forge_repo [string] [string]` — Print the `owner/repo` the remote points at.
+- `dybatpho::forge_repo [string] [string] [string]` — Print the `owner/repo` the remote points at.
 - `dybatpho::forge_api [string] [string]` — Print the API base URL for the repository's forge.
 - `dybatpho::forge_token [string]` — Print the token used to authenticate against the forge.
 - `dybatpho::forge_request <string> <string> [string] [string] <string...>` — Make an authenticated request against the forge API.
@@ -346,7 +346,7 @@ Utilities for common shell-script helper patterns.. Loaded: always. Stability: s
 - `dybatpho::require_envs_any <string...>` — Ensure that at least one of the listed environment variables is set.
 - `dybatpho::assert [string] [string]` — Run a check and stop with a message when it fails.
 - `dybatpho::retry [string] <number> [string] <string...>` — Retry a command with escalating delays until it succeeds or retries are exhausted.
-- `dybatpho::retry_until <number> <number> [string] <string...>` — Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay.
+- `dybatpho::retry_until [string] <number> <number> [string] <string...>` — Retry a command until it succeeds or the retry budget is exhausted, using a fixed delay.
 - `dybatpho::breakpoint` — Open an interactive breakpoint for debugging a running script.
 - `dybatpho::provides <string> <string...>` — Print the module that defines a function.
 - `dybatpho::describe <string>` — Print the documentation comment of a function.
@@ -404,7 +404,7 @@ Utilities for translating messages and formatting values for a locale. Loaded: `
 Utilities for working with JSON and YAML data. Loaded: `--modules json`. Stability: stable. Reference: [docs/json.md](docs/json.md)
 
 - `dybatpho::json_query <string> <string> <string...>` — Query a JSON document with a `jq` filter.
-- `dybatpho::json_has <string> <string>` — Return success when a JSON document satisfies a `jq` filter.
+- `dybatpho::json_has [string] <string> <string>` — Return success when a JSON document satisfies a `jq` filter.
 - `dybatpho::json_pretty <string> [string]` — Pretty-print a JSON document.
 - `dybatpho::json_to_yaml <string> [string]` — Convert a JSON document to YAML.
 - `dybatpho::yaml_query <string> <string> <string...>` — Query a YAML document with a `jq` filter.

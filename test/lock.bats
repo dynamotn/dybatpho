@@ -840,6 +840,26 @@ _release_flock_holder() {
   run -0 flock -n "${file}" true
 }
 
+@test "dybatpho::flock_acquire locks a directory, which cannot be opened for appending" {
+  _need_flock
+  local dir="${BATS_TEST_TMPDIR}/worktree" fd=""
+  mkdir -p "${dir}"
+  dybatpho::flock_acquire fd "${dir}" 0
+  [[ "${fd}" =~ ^[0-9]+$ ]]
+  # A second open of the directory is a lock of its own, refused while held.
+  local status=0
+  (
+    exec {other}< "${dir}"
+    flock -n "${other}"
+  ) || status=$?
+  assert_equal "${status}" 1
+  dybatpho::flock_release "${fd}"
+  (
+    exec {other}< "${dir}"
+    flock -n "${other}"
+  )
+}
+
 @test "dybatpho::flock_acquire gives up at once with a wait of 0 while another process holds the lock" {
   _need_flock
   local file="${BATS_TEST_TMPDIR}/held.lock" fd="" before="" after=""

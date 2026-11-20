@@ -359,7 +359,7 @@ dybatpho::flock_release "${fd}"
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `$1` | string | yes |  | Name of the variable receiving the descriptor |
-| `$2` | path | yes |  | File to lock, used as given and created when missing |
+| `$2` | path | yes |  | File to lock, used as given and created when missing; or a directory, opened read-only to be locked |
 | `$3` | number | no | `wait until free` | Seconds to wait; `0` tries once without waiting |
 
 **🧩 Variable sets**

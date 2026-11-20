@@ -119,6 +119,19 @@ _payload() {
   run_traced -0 dybatpho::verify_file "${file}" "${file}.sig" "${BATS_TEST_TMPDIR}/alice.pub"
 }
 
+@test "dybatpho::verify_file reads the content from standard input given -, never the signature" {
+  _need_ssh_y
+  _ssh_key alice
+  local file key
+  file="$(_payload doc.txt)"
+  key="$(_ssh_pub alice)"
+  dybatpho::sign_file ssh "${BATS_TEST_TMPDIR}/alice" "${file}" > /dev/null
+  run_traced -0 dybatpho::verify_file - "${file}.sig" "${key}" < "${file}"
+  run_traced -1 dybatpho::verify_file - "${file}.sig" "${key}" <<< "something else"
+  run -1 dybatpho::verify_file - - "${key}" < "${file}"
+  assert_output --partial "Cannot read -"
+}
+
 @test "dybatpho::verify_file returns 1 for another key, a changed file, or no ssh key among the trusted" {
   _need_ssh_y
   _ssh_key alice

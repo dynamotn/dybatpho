@@ -197,12 +197,20 @@ Print the `owner/repo` the remote points at.
 A GitLab project may be nested in subgroups, so everything after the host is
 kept rather than only the last two segments.
 
+**🧪 Example**
+
+```bash
+repo="$(dybatpho::forge_repo --soft)" || dybatpho::info "Not a forge checkout"
+
+```
+
 **🧾 Arguments**
 
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `$1` | string | no | `${DYBATPHO_FORGE_REMOTE}` | Remote name |
-| `$2` | string | no | `.` | Repository path |
+| `$1` | string | no |  | `--soft` to return 1, printing nothing, instead of stopping the script |
+| `$2` | string | no | `${DYBATPHO_FORGE_REMOTE}` | Remote name |
+| `$3` | string | no | `.` | Repository path |
 
 **🌍 Environment variables**
 
@@ -216,7 +224,7 @@ kept rather than only the last two segments.
 
 **🚦 Exit codes**
 
-- `1`: The remote URL carries no path
+- `1`: The remote has no URL or its URL carries no path; without `--soft` the script stops
 
 ---
 

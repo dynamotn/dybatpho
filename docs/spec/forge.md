@@ -181,6 +181,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **FR-021**: Remote detection MUST drop the port of an `ssh://` URL, accept the scp-like form with any user, and drop `.git` before a trailing slash.
 - **FR-022**: `dybatpho::forge_release_upload` MUST stream a GitHub asset from disk (`--upload-file`) rather than read it into memory, as it already does for GitLab.
 
+- **FR-023**: `forge_repo --soft` MUST return 1, printing nothing, for a remote with no URL or a URL with no path, where `forge_repo` without the option stops the script.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Forge kind**: `github` or `gitlab`; selects every path, field name and
@@ -245,6 +247,8 @@ dybatpho::forge_release_upload "v${version}" "dist/app-v${version}-linux-amd64.t
 - **IT-032**: Look up the release of tag `release/1.0#1` on GitHub, and see the tag sent encoded as `release%2F1.0%231`.
 - **IT-033**: Answer a GitLab issue search with a full first page of near matches and a second page holding the exact title, and see `forge_issue_find` print its iid.
 - **IT-034**: Upload a GitHub asset and see curl given `--upload-file <file>` with `--request POST`, and never `--data-binary`.
+
+- **IT-035**: Ask `forge_repo --soft` for a missing remote and for a remote URL with no path, and get 1 and no output each time, while the missing remote still stops `forge_repo`.
 
 ## Acceptance Criteria *(mandatory)*
 

@@ -4,7 +4,7 @@ Utilities for working with multi-line text blocks
 
 > 🧭 Source: [src/text.sh](../src/text.sh)
 >
-> Jump to: [Overview](#overview) · [See also](#see-also) · [Reference](#reference)
+> Jump to: [Overview](#overview) · [See also](#see-also) · [Tips](#tips) · [Reference](#reference)
 
 <a id="overview"></a>
 
@@ -29,6 +29,7 @@ helpers use.
 - [`dybatpho::text_indent`](#dybatphotext_indent) — Prefix every line in a text block with the given indent string.
 - [`dybatpho::text_dedent`](#dybatphotext_dedent) — Remove the shared leading indentation from a text block.
 - [`dybatpho::text_strip_ansi`](#dybatphotext_strip_ansi) — Strip ANSI escape sequences from a text block.
+- [`dybatpho::text_sanitize`](#dybatphotext_sanitize) — Make text that is not trusted -- from another process, a file, the network -- safe to print to a terminal. Escape sequences are removed whole, then every character that can move the cursor, rewrite a line, or change what the reader sees without being seen: C0 controls other than tab (carriage return included), DEL, C1 controls, bidirectional controls, zero-width characters, the byte-order mark and Unicode tag characters, over and over until none is left, since removing one can join its neighbours into another -- at most four rounds, after which input nested that deep loses every byte from 0x80 up. Lines stay lines; printable text, tabs and other Unicode are kept. A caller's `nocasematch` does not change it. The caller's locale says what the terminal reads. Under UTF-8, bytes that cannot be part of a character which is a control (a C1 byte at the start or after ASCII, an overlong form) are removed too, and an 8-bit introducer such as U+009B is read as the sequence it opens; a C1 byte after another non-ASCII byte is left, which a UTF-8 terminal shows as U+FFFD. Under any other locale, every byte 0x80-0x9F is removed, since an 8-bit terminal obeys it as a C1 control -- UTF-8 text then loses those bytes, so run under a UTF-8 locale to keep it.
 - [`dybatpho::text_bullet_list`](#dybatphotext_bullet_list) — Prefix each non-empty line in a text block as a bullet item.
 - [`dybatpho::text_columns`](#dybatphotext_columns) — Align a delimited text block into plain columns. The columns are laid out by `dybatpho::table_align`, so the `table` module is loaded on demand the first time this runs; name it up front to load it once.
 - [`dybatpho::text_box`](#dybatphotext_box) — Draw a border around a text block, with an optional title set into the top edge. The box is as wide as the widest line or the title, whichever is wider, with one space of padding on each side. Lines are padded by their visible width, so colored text and wide characters keep the right edge straight.
@@ -41,6 +42,14 @@ helpers use.
 ## 🔗 See also
 
 - [example/text_ops.sh](../example/text_ops.sh)
+
+<a id="tips"></a>
+
+## 💡 Tips
+
+**[`dybatpho::text_sanitize`](#dybatphotext_sanitize)**
+
+- Use it on anything a peer, a file or a remote wrote before showing it; `text_strip_ansi` alone keeps a bare carriage return or a right-to-left override that can disguise a line
 
 <a id="reference"></a>
 
@@ -92,6 +101,52 @@ Strip ANSI escape sequences from a text block.
 **📤 Output on stdout**
 
 - Text without ANSI color/control sequences
+
+---
+
+### `dybatpho::text_sanitize`
+
+Make text that is not trusted -- from another process, a file,
+the network -- safe to print to a terminal. Escape sequences are removed
+whole, then every character that can move the cursor, rewrite a line, or
+change what the reader sees without being seen: C0 controls other than tab
+(carriage return included), DEL, C1 controls, bidirectional controls,
+zero-width characters, the byte-order mark and Unicode tag characters,
+over and over until none is left, since removing one can join its
+neighbours into another -- at most four rounds, after which input nested
+that deep loses every byte from 0x80 up. Lines stay lines; printable text,
+tabs and other Unicode are kept. A caller's `nocasematch` does not change it.
+
+The caller's locale says what the terminal reads. Under UTF-8, bytes that
+cannot be part of a character which is a control (a C1 byte at the start or
+after ASCII, an overlong form) are removed too, and an 8-bit introducer such
+as U+009B is read as the sequence it opens; a C1 byte after another
+non-ASCII byte is left, which a UTF-8 terminal shows as U+FFFD. Under any other locale,
+every byte 0x80-0x9F is removed, since an 8-bit terminal obeys it as a C1
+control -- UTF-8 text then loses those bytes, so run under a UTF-8 locale to
+keep it.
+
+**🧪 Example**
+
+```bash
+dybatpho::text_sanitize "$(< "${peer_log}")" 2000
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Input text or `-` for stdin |
+| `$2` | number | no |  | Largest number of characters to print, line breaks between lines included; characters as the caller's locale counts them, so bytes under `C` |
+
+**📝 Notes**
+
+- Bash's pattern substitution makes the time grow faster than a line's length: a line of 12000 escape sequences takes about a second; split or bound very long input before sanitizing it
+
+**📤 Output on stdout**
+
+- The text without those characters
 
 ---
 

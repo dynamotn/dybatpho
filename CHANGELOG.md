@@ -57,6 +57,12 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **`text` — make untrusted text safe to print with
+  `dybatpho::text_sanitize`.** Beyond the escape sequences `text_strip_ansi`
+  removes, it drops carriage returns and other controls, C1 controls,
+  right-to-left overrides and other bidirectional controls, zero-width and tag
+  characters, whatever the locale, and can cap the length; tabs, line breaks
+  and ordinary Unicode stay.
 - **`json` — read several fields into variables with one `jq` call using
   `dybatpho::json_read "${doc}" status=.status node='.lease.node // ""'`.**
   Each variable gets its filter's first output (strings as they are, other

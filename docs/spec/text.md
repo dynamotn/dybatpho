@@ -142,6 +142,8 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **FR-016**: Stripping a line MUST take time proportional to its length, not to its length times its number of escape sequences, so a progress-bar line of thousands of updates strips in well under a second.
 - **FR-017**: `dybatpho::text_number_lines` and `dybatpho::text_truncate_lines` MUST refuse a start line or count above 9223372036854775807 rather than wrap.
 
+- **FR-018**: `dybatpho::text_sanitize <text|-> [cap]` MUST remove every escape sequence whole -- CSI, nF, single-character escapes, OSC, DCS, SOS, PM and APC strings ended by BEL, 8-bit ST, `ESC \`, another ESC or the end of the line, and a sequence cut off at the end of the line -- then C0 controls other than tab (carriage return included), DEL, C1 controls, bidirectional controls, zero-width characters, the byte-order mark and Unicode tag characters by their UTF-8 bytes, repeating until none is left so that no removal joins its neighbours into one, for at most four rounds after which every byte from 0x80 up is removed so that nested input costs bounded time; C0 controls inside a sequence and the payload of a sequence opened by a UTF-8 encoded 8-bit introducer MUST go too, and a caller's `nocasematch` MUST NOT change the result; under a UTF-8 locale it MUST also remove C1 bytes with no lead byte before them and overlong forms, and under any other locale every byte 0x80-0x9F; it MUST keep tabs, line breaks and other Unicode, print at most `cap` characters of the caller's locale counting the line breaks between lines and no empty line the cap leaves no room for, and stop the script on a cap that is not a whole number.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Text Block**: A multi-line string passed as a direct argument or through stdin.
@@ -181,6 +183,10 @@ dybatpho::text_number_lines "$(sed -n '40,45p' script.sh)" 40
 - **IT-016**: Strip a `tput sgr0` reset and hyperlinks ended by a string terminator or a bell, and box a line colored that way with straight edges.
 - **IT-017**: Strip a line of 12000 colored fragments within a generous time bound.
 - **IT-018**: Refuse `99999999999999999999` as a start line and `9223372036854775808` as a count, and keep both lines under `9223372036854775807`.
+
+- **IT-019**: Sanitize a line holding a color, a carriage return, a bell, DEL, a C1 control, a right-to-left override, a zero-width space, a byte-order mark and a tag character and get only the letters; keep a tab, a line break and accented and CJK letters; cap at six characters across a line break and at two two-byte characters; read standard input and drop a terminal title sequence.
+- **IT-020**: Get no CSI, right-to-left override or zero-width space back from input where removing a zero-width space, a C1 control, a tag character or a byte-order mark joins the bytes around it into one; drop a raw `0x9B` under UTF-8 and under `C`, an overlong ESC and an `0xFF` byte; remove DCS, APC, PM and SOS strings, an OSC ended by an 8-bit ST, an unended string, `ESC c`, `ESC 7`, a cut-off CSI and nF escape and a bare ESC whole; end the output when a line break uses up the cap.
+- **IT-021**: Sanitize 3000 nested `\xc2` and `\x80` within ten seconds; keep the text after `ESC p` under `nocasematch`; remove a CSI and an OSC opened by `\xc2\x9b` and `\xc2\x9d` and a sequence with a C0 control inside; keep the letters after `ğ` under the `C` locale.
 
 ## Acceptance Criteria *(mandatory)*
 

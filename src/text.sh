@@ -102,6 +102,298 @@ function dybatpho::text_strip_ansi {
 }
 
 #######################################
+# @description Make text that is not trusted -- from another process, a file,
+#   the network -- safe to print to a terminal. Escape sequences are removed
+#   whole, then every character that can move the cursor, rewrite a line, or
+#   change what the reader sees without being seen: C0 controls other than tab
+#   (carriage return included), DEL, C1 controls, bidirectional controls,
+#   zero-width characters, the byte-order mark and Unicode tag characters,
+#   over and over until none is left, since removing one can join its
+#   neighbours into another -- at most four rounds, after which input nested
+#   that deep loses every byte from 0x80 up. Lines stay lines; printable text,
+#   tabs and other Unicode are kept. A caller's `nocasematch` does not change it.
+#
+#   The caller's locale says what the terminal reads. Under UTF-8, bytes that
+#   cannot be part of a character which is a control (a C1 byte at the start or
+#   after ASCII, an overlong form) are removed too, and an 8-bit introducer such
+#   as U+009B is read as the sequence it opens; a C1 byte after another
+#   non-ASCII byte is left, which a UTF-8 terminal shows as U+FFFD. Under any other locale,
+#   every byte 0x80-0x9F is removed, since an 8-bit terminal obeys it as a C1
+#   control -- UTF-8 text then loses those bytes, so run under a UTF-8 locale to
+#   keep it.
+# @example
+#   dybatpho::text_sanitize "$(< "${peer_log}")" 2000
+#
+# @arg $1 string Input text or `-` for stdin
+# @arg $2 number? Largest number of characters to print, line breaks between lines included; characters as
+#   the caller's locale counts them, so bytes under `C`
+# @stdout The text without those characters
+# @note Bash's pattern substitution makes the time grow faster than a line's length: a line of 12000
+#   escape sequences takes about a second; split or bound very long input before sanitizing it
+# @tip Use it on anything a peer, a file or a remote wrote before showing it; `text_strip_ansi` alone keeps a
+#   bare carriage return or a right-to-left override that can disguise a line
+#######################################
+function dybatpho::text_sanitize {
+  local input
+  dybatpho::expect_args input -- "$@"
+  local cap="${2-}"
+  [[ -z "${cap}" || "${cap}" =~ ^[0-9]{1,9}$ ]] \
+    || dybatpho::die "${FUNCNAME[0]}: The largest size must be a number of characters, got '${cap}'"
+  local -a lines=()
+  local line left=-1 first=true
+  [[ -z "${cap}" ]] || left=$((10#${cap}))
+  __dybatpho_string_read_lines_into lines "${input}"
+  for line in ${lines[@]+"${lines[@]}"}; do
+    __dybatpho_text_sanitize_into line "${line}"
+    if ((left >= 0)); then
+      # The newline before every line but the first counts as a character.
+      [[ "${first}" == true ]] || left=$((left - 1))
+      # Nothing left for this line: stop rather than print it empty.
+      ((left > 0)) || break
+      line="${line:0:left}"
+      left=$((left - ${#line}))
+    fi
+    first=false
+    printf '%s\n' "${line}"
+  done
+}
+
+#######################################
+# @description Remove, byte by byte, every character `dybatpho::text_sanitize`
+#   drops. The patterns are UTF-8 byte sequences matched in the C locale, so
+#   they work whatever locale the caller runs in.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string One line of text
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_text_sanitize_into {
+  local -n __dybatpho_text_sanitize_ref="$1"
+  local __dybatpho_text_sanitize_value="$2" __dybatpho_text_sanitize_utf8=false
+  # Read in the caller's locale, before it is switched to C below.
+  case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+    *[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) __dybatpho_text_sanitize_utf8=true ;;
+    *) ;;
+  esac
+  # The escape pass tells `ESC P` from `ESC p` with `case`, which a caller's
+  # `nocasematch` would fold: switch it off here, and back on before returning.
+  local __dybatpho_text_sanitize_nocase=false LC_ALL=C
+  if shopt -q nocasematch; then
+    __dybatpho_text_sanitize_nocase=true
+    shopt -u nocasematch
+  fi
+  # A C0 control inside a sequence is obeyed and the sequence goes on, so they go
+  # first; 8-bit introducers become their ESC forms, so their payload goes too.
+  # Not tab, ESC, or BEL, which ends a string; the byte pass removes BEL later.
+  local __dybatpho_text_sanitize_c0=$'[\x01-\x06\x08\x0b-\x1a\x1c-\x1f\x7f]'
+  # dyshellint disable=BSG117 # the pattern is a bracket expression, so it must not be quoted
+  # shellcheck disable=SC2295
+  __dybatpho_text_sanitize_value="${__dybatpho_text_sanitize_value//${__dybatpho_text_sanitize_c0}/}"
+  # Only under UTF-8: outside it, those bytes are often part of UTF-8 letters
+  # (`ğ` ends in 0x9F) and would swallow the rest of the line; they are removed.
+  local -a __dybatpho_text_sanitize_pairs=()
+  [[ "${__dybatpho_text_sanitize_utf8}" == false ]] \
+    || __dybatpho_text_sanitize_pairs=($'\x9b[' $'\x9d]' $'\x90P' $'\x98X' $'\x9e^' $'\x9f_')
+  local __dybatpho_text_sanitize_pair __dybatpho_text_cf __dybatpho_text_ct
+  for __dybatpho_text_sanitize_pair in ${__dybatpho_text_sanitize_pairs[@]+"${__dybatpho_text_sanitize_pairs[@]}"}; do
+    __dybatpho_text_cf=$'\xc2'"${__dybatpho_text_sanitize_pair:0:1}"
+    __dybatpho_text_ct=$'\e'"${__dybatpho_text_sanitize_pair:1}"
+    __dybatpho_text_sanitize_value="${__dybatpho_text_sanitize_value//"${__dybatpho_text_cf}"/"${__dybatpho_text_ct}"}"
+  done
+  __dybatpho_text_sanitize_escapes_into __dybatpho_text_sanitize_value "${__dybatpho_text_sanitize_value}"
+  __dybatpho_text_sanitize_bytes_into __dybatpho_text_sanitize_value "${__dybatpho_text_sanitize_value}" \
+    "${__dybatpho_text_sanitize_utf8}"
+  [[ "${__dybatpho_text_sanitize_nocase}" == false ]] || shopt -s nocasematch
+  __dybatpho_text_sanitize_ref="${__dybatpho_text_sanitize_value}"
+}
+
+#######################################
+# @description Remove the characters `dybatpho::text_sanitize` drops by their
+#   bytes, in the C locale, going round while a removal joins its neighbours
+#   into another one -- but at most four times: real text settles in two, and
+#   each round costs a pass over the line, so input nested to need more is
+#   hostile, and loses every byte from 0x80 up instead, which is linear and safe.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string One line of text, without escape sequences
+# @arg $3 bool Whether the caller's locale is UTF-8
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_text_sanitize_bytes_into {
+  local -n __dybatpho_text_bytes_ref="$1"
+  local __dybatpho_text_bytes_value="$2" __dybatpho_text_bytes_utf8="$3"
+  local __dybatpho_text_bytes_pattern __dybatpho_text_bytes_prev __dybatpho_text_bytes_round=0
+  # C0 controls but tab, and DEL; C1 controls (U+0080-U+009F); left-to-right and
+  # right-to-left marks and zero-width characters (U+200B-U+200F); embeddings
+  # and overrides (U+202A-U+202E); word joiner and isolates (U+2060, U+2066-U+2069);
+  # the Arabic letter mark (U+061C); the byte-order mark (U+FEFF); tags (U+E0000-U+E007F).
+  # Each pattern is one `$'...'` word: `$'...'` is not expanded inside double quotes.
+  local -a __dybatpho_text_bytes_patterns=(
+    $'[\x01-\x08\x0b-\x1f\x7f]' $'\xc2[\x80-\x9f]' $'\xe2\x80[\x8b-\x8f\xaa-\xae]'
+    $'\xe2\x81[\xa0\xa6-\xa9]' $'\xd8\x9c' $'\xef\xbb\xbf' $'\xf3\xa0[\x80\x81][\x80-\xbf]'
+  )
+  if [[ "${__dybatpho_text_bytes_utf8}" == true ]]; then
+    # Bytes no UTF-8 character starts with, and the overlong forms of controls.
+    __dybatpho_text_bytes_patterns+=($'[\xc0\xc1\xf5-\xff]' $'\xe0[\x80-\x9f]' $'\xf0[\x80-\x8f]')
+  else
+    # An 8-bit terminal reads every byte 0x80-0x9F as a C1 control.
+    __dybatpho_text_bytes_patterns+=($'[\x80-\x9f]')
+  fi
+  local __dybatpho_text_bytes_high=$'[\x80-\xff]'
+  # Removing a character joins its neighbours, which can make a new one to
+  # remove (`\xc2` ZWSP `\x9b` becomes CSI): go round until nothing changes.
+  while :; do
+    if ((++__dybatpho_text_bytes_round > 4)); then
+      # dyshellint disable=BSG117 # the pattern is a bracket expression, so it must not be quoted
+      # shellcheck disable=SC2295
+      __dybatpho_text_bytes_value="${__dybatpho_text_bytes_value//${__dybatpho_text_bytes_high}/}"
+      break
+    fi
+    __dybatpho_text_bytes_prev="${__dybatpho_text_bytes_value}"
+    for __dybatpho_text_bytes_pattern in "${__dybatpho_text_bytes_patterns[@]}"; do
+      # dyshellint disable=BSG117 # the pattern is a bracket expression, so it must not be quoted
+      # shellcheck disable=SC2295
+      __dybatpho_text_bytes_value="${__dybatpho_text_bytes_value//${__dybatpho_text_bytes_pattern}/}"
+    done
+    [[ "${__dybatpho_text_bytes_utf8}" == false ]] \
+      || __dybatpho_text_sanitize_lone_c1_into __dybatpho_text_bytes_value "${__dybatpho_text_bytes_value}"
+    [[ "${__dybatpho_text_bytes_value}" != "${__dybatpho_text_bytes_prev}" ]] || break
+  done
+  __dybatpho_text_bytes_ref="${__dybatpho_text_bytes_value}"
+}
+
+#######################################
+# @description Remove every escape sequence from one line, so that none prints
+#   its payload as text: CSI and nF escapes, a CSI cut off at the end of the
+#   line included; single-character escapes such as `ESC c`; and OSC, DCS, SOS,
+#   PM and APC strings, up to a BEL, an 8-bit ST, an `ESC \`, another ESC
+#   (which a terminal reads as their end) or the end of the line. Like
+#   `__dybatpho_text_strip_ansi_into`, the line is split on ESC once, so the
+#   time is linear in its length. Run in the C locale.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string One line of text
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_text_sanitize_escapes_into {
+  local -n __dybatpho_text_esc_ref="$1"
+  if [[ "$2" != *$'\e'* ]]; then
+    __dybatpho_text_esc_ref="$2"
+    return 0
+  fi
+  local IFS=$'\e' __dybatpho_text_esc_part __dybatpho_text_esc_res __dybatpho_text_esc_k
+  local __dybatpho_text_esc_open=false
+  local -a __dybatpho_text_esc_parts=()
+  read -r -a __dybatpho_text_esc_parts <<< "$2x"
+  __dybatpho_text_esc_parts[-1]="${__dybatpho_text_esc_parts[-1]%x}"
+  __dybatpho_text_esc_res="${__dybatpho_text_esc_parts[0]}"
+  local __dybatpho_text_esc_n="${#__dybatpho_text_esc_parts[@]}"
+  for ((__dybatpho_text_esc_k = 1; __dybatpho_text_esc_k < __dybatpho_text_esc_n; __dybatpho_text_esc_k++)); do
+    __dybatpho_text_esc_part="${__dybatpho_text_esc_parts[__dybatpho_text_esc_k]}"
+    # A string still open ends here: with `ESC \`, or with this ESC starting a new sequence.
+    if [[ "${__dybatpho_text_esc_open}" == true && "${__dybatpho_text_esc_part}" == \\* ]]; then
+      __dybatpho_text_esc_open=false
+      __dybatpho_text_esc_res+="${__dybatpho_text_esc_part:1}"
+      continue
+    fi
+    __dybatpho_text_sanitize_escape_into __dybatpho_text_esc_part __dybatpho_text_esc_open \
+      "${__dybatpho_text_esc_part}"
+    __dybatpho_text_esc_res+="${__dybatpho_text_esc_part}"
+  done
+  __dybatpho_text_esc_ref="${__dybatpho_text_esc_res}"
+}
+
+#######################################
+# @description Remove the escape sequence at the start of the text that
+#   followed one ESC, up to the next ESC.
+# @arg $1 string Name of the variable receiving the text left after the sequence
+# @arg $2 string Name of the variable set to `true` when a string runs on past this text
+# @arg $3 string The text after the ESC
+# @set The two named variables
+# @internal
+#######################################
+function __dybatpho_text_sanitize_escape_into {
+  local -n __dybatpho_text_one_ref="$1" __dybatpho_text_one_open="$2"
+  local __dybatpho_text_one_part="$3" __dybatpho_text_one_bel __dybatpho_text_one_st
+  local __dybatpho_text_one_csi=$'^\\[[0-?]*[ -/]*[@-~]?' __dybatpho_text_one_nf=$'^[ -/]+[0-~]?'
+  __dybatpho_text_one_open=false
+  case "${__dybatpho_text_one_part}" in
+    [PX^_\]]*)
+      __dybatpho_text_one_part="${__dybatpho_text_one_part:1}"
+      __dybatpho_text_one_bel="${__dybatpho_text_one_part%%$'\a'*}"
+      __dybatpho_text_one_st="${__dybatpho_text_one_part%%$'\xc2\x9c'*}"
+      if ((${#__dybatpho_text_one_st} < ${#__dybatpho_text_one_bel})); then
+        __dybatpho_text_one_ref="${__dybatpho_text_one_part:${#__dybatpho_text_one_st}+2}"
+      elif [[ "${__dybatpho_text_one_bel}" != "${__dybatpho_text_one_part}" ]]; then
+        __dybatpho_text_one_ref="${__dybatpho_text_one_part:${#__dybatpho_text_one_bel}+1}"
+      else
+        __dybatpho_text_one_ref=""
+        __dybatpho_text_one_open=true
+      fi
+      ;;
+    \[*)
+      [[ "${__dybatpho_text_one_part}" =~ ${__dybatpho_text_one_csi} ]]
+      __dybatpho_text_one_ref="${__dybatpho_text_one_part:${#BASH_REMATCH[0]}}"
+      ;;
+    [\ -/]*)
+      [[ "${__dybatpho_text_one_part}" =~ ${__dybatpho_text_one_nf} ]]
+      __dybatpho_text_one_ref="${__dybatpho_text_one_part:${#BASH_REMATCH[0]}}"
+      ;;
+    [0-~]*) __dybatpho_text_one_ref="${__dybatpho_text_one_part:1}" ;;
+    *) __dybatpho_text_one_ref="${__dybatpho_text_one_part}" ;;
+  esac
+}
+
+#######################################
+# @description Remove the bytes 0x80-0x9F that do not follow a byte of 0x80 or
+#   above, so are no part of a UTF-8 character: a terminal in 8-bit mode would
+#   read them as C1 controls. Each such byte is marked with a `\x01` before it
+#   (C0 controls are gone by now, so the mark is free) and the line is split on
+#   the mark once, so the time is linear in its length: indexing into the line
+#   instead would measure the whole line on every step. Run in the C locale.
+# @arg $1 string Name of the variable receiving the result
+# @arg $2 string One line of text, with no C0 controls
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_text_sanitize_lone_c1_into {
+  local -n __dybatpho_text_c1_ref="$1"
+  if [[ "$2" != *[$'\x80'-$'\x9f']* ]]; then
+    __dybatpho_text_c1_ref="$2"
+    return 0
+  fi
+  local __dybatpho_text_c1_line="$2" __dybatpho_text_c1_byte __dybatpho_text_c1_k __dybatpho_text_c1_mark
+  local __dybatpho_text_c1_all=$'\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f'
+  __dybatpho_text_c1_all+=$'\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f'
+  for ((__dybatpho_text_c1_k = 0; __dybatpho_text_c1_k < 32; __dybatpho_text_c1_k++)); do
+    __dybatpho_text_c1_byte="${__dybatpho_text_c1_all:__dybatpho_text_c1_k:1}"
+    # A substitution costs more than a search: only bytes the line holds are marked.
+    [[ "${__dybatpho_text_c1_line}" == *"${__dybatpho_text_c1_byte}"* ]] || continue
+    __dybatpho_text_c1_mark=$'\x01'"${__dybatpho_text_c1_byte}"
+    __dybatpho_text_c1_line="${__dybatpho_text_c1_line//"${__dybatpho_text_c1_byte}"/"${__dybatpho_text_c1_mark}"}"
+  done
+  local IFS=$'\x01'
+  local -a __dybatpho_text_c1_fields=()
+  read -r -a __dybatpho_text_c1_fields <<< "${__dybatpho_text_c1_line}x"
+  __dybatpho_text_c1_fields[-1]="${__dybatpho_text_c1_fields[-1]%x}"
+  local __dybatpho_text_c1_res="${__dybatpho_text_c1_fields[0]}" __dybatpho_text_c1_field
+  local __dybatpho_text_c1_n="${#__dybatpho_text_c1_fields[@]}" __dybatpho_text_c1_keep=false
+  # Every field after the first starts with its C1 byte. A run of them is part of a
+  # character only after a lead or continuation byte; at the start or after ASCII it is lone.
+  [[ "${__dybatpho_text_c1_res: -1}" != [$'\x80'-$'\xff'] ]] || __dybatpho_text_c1_keep=true
+  for ((__dybatpho_text_c1_k = 1; __dybatpho_text_c1_k < __dybatpho_text_c1_n; __dybatpho_text_c1_k++)); do
+    __dybatpho_text_c1_field="${__dybatpho_text_c1_fields[__dybatpho_text_c1_k]}"
+    [[ "${__dybatpho_text_c1_keep}" == true ]] || __dybatpho_text_c1_field="${__dybatpho_text_c1_field:1}"
+    __dybatpho_text_c1_res+="${__dybatpho_text_c1_field}"
+    # A field of the C1 byte alone continues the run, which keeps its verdict.
+    ((${#__dybatpho_text_c1_fields[__dybatpho_text_c1_k]} > 1)) || continue
+    __dybatpho_text_c1_keep=false
+    [[ "${__dybatpho_text_c1_field: -1}" != [$'\x80'-$'\xff'] ]] || __dybatpho_text_c1_keep=true
+  done
+  __dybatpho_text_c1_ref="${__dybatpho_text_c1_res}"
+}
+
+#######################################
 # @description Prefix each non-empty line in a text block as a bullet item.
 # @arg $1 string Input text or `-` for stdin
 # @arg $2 string [default: -] Bullet marker

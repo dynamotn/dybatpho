@@ -955,6 +955,7 @@ Utilities for working with multi-line text blocks. Loaded: `--modules text`. Sta
 - `dybatpho::text_indent <string> [string]` — Prefix every line in a text block with the given indent string.
 - `dybatpho::text_dedent <string>` — Remove the shared leading indentation from a text block.
 - `dybatpho::text_strip_ansi <string>` — Strip ANSI escape sequences from a text block.
+- `dybatpho::text_sanitize <string> [number]` — Make text that is not trusted -- from another process, a file, the network -- safe to print to a terminal.
 - `dybatpho::text_bullet_list <string> [string]` — Prefix each non-empty line in a text block as a bullet item.
 - `dybatpho::text_columns <string> [string] [number]` — Align a delimited text block into plain columns.
 - `dybatpho::text_box <string> [string] [string]` — Draw a border around a text block, with an optional title set into the top edge.

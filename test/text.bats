@@ -31,6 +31,134 @@ gamma
 EOF
 }
 
+@test "dybatpho::text_sanitize removes what can disguise a line, and keeps the text" {
+  export LC_ALL=C.UTF-8
+  local input
+  # Color, a bare carriage return, a bell, DEL, a C1 control, a right-to-left
+  # override, a zero-width space, a byte-order mark and a tag character.
+  input=$'\e[31mred\e[0m'$'\r''over'$'\a''x'$'\x7f''y'$'\xc2\x85''z'
+  input+=$'\xe2\x80\xae''rtl'$'\xe2\x80\x8b''zw'$'\xef\xbb\xbf''bom'$'\xf3\xa0\x80\x81''tag'
+  run_traced dybatpho::text_sanitize "${input}"
+  assert_success
+  assert_output "redoverxyzrtlzwbomtag"
+  # Tabs, newlines and ordinary Unicode stay.
+  run_traced dybatpho::text_sanitize $'a\tb\nc\xc3\xa9 \xe6\x97\xa5'
+  assert_line --index 0 $'a\tb'
+  assert_line --index 1 $'c\xc3\xa9 \xe6\x97\xa5'
+}
+
+@test "dybatpho::text_sanitize does not let a removed character join its neighbours into a control" {
+  export LC_ALL=C.UTF-8
+  # Each removal joins the bytes around it: into CSI (U+009B) through a zero-width
+  # space, a C1 control, or a tag character; into a right-to-left override (U+202E)
+  # through a zero-width space or a byte-order mark; into a zero-width space again.
+  local input expected
+  local -a cases=(
+    $'a\xc2\xe2\x80\x8b\x9b31mRED' 'a31mRED'
+    $'a\xc2\xc2\x80\x9b31m' 'a31m'
+    $'a\xc2\xf3\xa0\x80\x81\x9b2J' 'a2J'
+    $'a\xe2\x80\xe2\x80\x8b\xaecba' 'acba'
+    $'a\xe2\x80\xef\xbb\xbf\xaecba' 'acba'
+    # The last byte left is a lone continuation byte, which shows as U+FFFD.
+    $'a\xe2\x80\xe2\x80\x8b\x8b\xaecba' $'a\xaecba'
+  )
+  for ((i = 0; i < ${#cases[@]}; i += 2)); do
+    input="${cases[i]}" expected="${cases[i + 1]}"
+    run_traced dybatpho::text_sanitize "${input}"
+    assert_output "${expected}"
+  done
+}
+
+@test "dybatpho::text_sanitize removes C1 bytes an 8-bit terminal would obey, and overlong forms" {
+  # A raw 0x9B is CSI to a terminal in 8-bit mode; under UTF-8 it is dropped
+  # when no lead byte comes before it, and outside UTF-8 always.
+  LC_ALL=C.UTF-8 run_traced dybatpho::text_sanitize $'a\x9b2Jb\n\x9bx'
+  assert_line --index 0 'a2Jb'
+  assert_line --index 1 'x'
+  LC_ALL=C run_traced dybatpho::text_sanitize $'a\x9b2Jb\xc3\xa9'
+  assert_output $'a2Jb\xc3\xa9'
+  # An overlong ESC, and bytes no UTF-8 character starts with.
+  LC_ALL=C.UTF-8 run_traced dybatpho::text_sanitize $'a\xc0\x9b[2Jb\xff'
+  assert_output 'a[2Jb'
+}
+
+@test "dybatpho::text_sanitize removes every kind of escape sequence whole" {
+  export LC_ALL=C.UTF-8
+  local -a cases=(
+    $'a\eP1$qm\e\\b' 'ab'
+    $'a\e_hidden\ab' 'ab'
+    $'a\e^private\e\\b' 'ab'
+    $'a\eXstring\xc2\x9cb' 'ab'
+    $'a\e]0;title\xc2\x9cb' 'ab'
+    $'a\e_unended' 'a'
+    $'a\e_x\e[31mb' 'ab'
+    $'a\ecb' 'ab'
+    $'a\e78b' 'a8b'
+    $'a\e[31' 'a'
+    $'a\e(' 'a'
+    $'a\e' 'a'
+  )
+  for ((i = 0; i < ${#cases[@]}; i += 2)); do
+    run_traced dybatpho::text_sanitize "${cases[i]}"
+    assert_output "${cases[i + 1]}"
+  done
+}
+
+@test "dybatpho::text_sanitize stays linear-bounded on nested input, and ignores the caller's nocasematch" {
+  export LC_ALL=C.UTF-8
+  # Each round peels one layer of `\xc2`...`\x80`; past four rounds every byte from
+  # 0x80 up goes at once, so a deeply nested line cannot stall the caller.
+  local nested="a" i
+  for ((i = 0; i < 3000; i++)); do nested+=$'\xc2'; done
+  for ((i = 0; i < 3000; i++)); do nested+=$'\x80'; done
+  nested+="b"
+  SECONDS=0
+  run_traced dybatpho::text_sanitize "${nested}"
+  assert_output "ab"
+  ((SECONDS < 10))
+  # Under nocasematch `ESC p` must not open a DCS string and hide what follows.
+  shopt -s nocasematch
+  run_traced dybatpho::text_sanitize $'a\epVISIBLE status=FAILED'
+  assert_output "aVISIBLE status=FAILED"
+  shopt -q nocasematch
+  shopt -u nocasematch
+}
+
+@test "dybatpho::text_sanitize removes 8-bit introduced sequences and controls inside a sequence" {
+  export LC_ALL=C.UTF-8
+  run_traced dybatpho::text_sanitize $'a\xc2\x9b31mb'
+  assert_output "ab"
+  run_traced dybatpho::text_sanitize $'a\xc2\x9d0;title\xc2\x9cb'
+  assert_output "ab"
+  run_traced dybatpho::text_sanitize $'a\e\x01[31mb'
+  assert_output "ab"
+  # Outside UTF-8, a UTF-8 letter ending in such a byte does not swallow the line.
+  LC_ALL=C run_traced dybatpho::text_sanitize $'\xc4\x9fxyz'
+  assert_output $'\xc4xyz'
+}
+
+@test "dybatpho::text_sanitize caps the characters it prints, newlines included" {
+  export LC_ALL=C.UTF-8
+  run_traced dybatpho::text_sanitize $'abcd\nefgh' 6
+  assert_output $'abcd\ne'
+  run_traced dybatpho::text_sanitize $'\xc3\xa9\xc3\xa9\xc3\xa9' 2
+  assert_output $'\xc3\xa9\xc3\xa9'
+  # A cap used up by a line break ends the output there, without an empty line.
+  local result
+  result="$(dybatpho::text_sanitize $'ab\ncd' 3 && printf x)"
+  assert_equal "${result}" $'ab\nx'
+  result="$(dybatpho::text_sanitize 'ab' 0 && printf x)"
+  assert_equal "${result}" 'x'
+  run -1 dybatpho::text_sanitize "x" abc
+  assert_output --partial "number of characters"
+}
+
+@test "dybatpho::text_sanitize reads standard input given -" {
+  run_traced dybatpho::text_sanitize - <<< $'plain\x1b]0;title\x07text'
+  assert_success
+  assert_output "plaintext"
+}
+
 @test "dybatpho::text_strip_ansi removes color escape sequences" {
   run_traced dybatpho::text_strip_ansi $'\e[1;32malpha\e[0m\n\e[0;34mbeta\e[0m'
   assert_success

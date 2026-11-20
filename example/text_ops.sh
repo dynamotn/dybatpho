@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # @file text_ops.sh
 # @brief Example showing multi-line text utilities
-# @description Demonstrates dybatpho::text_indent, text_dedent, text_strip_ansi, text_bullet_list, text_columns,
+# @description Demonstrates dybatpho::text_indent, text_dedent, text_strip_ansi, text_sanitize, text_bullet_list,
+#   text_columns,
 #   text_box, text_center, text_number_lines, and text_truncate_lines
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
@@ -31,6 +32,10 @@ function _demo_strip_ansi {
   local colored=$'\e[1;32mgreen text\e[0m\n\e[0;34mblue text\e[0m'
   dybatpho::header "STRIP ANSI"
   dybatpho::text_strip_ansi "${colored}"
+  # Text from a peer: a carriage return that would overwrite the line and a
+  # right-to-left override that would reverse it are removed as well.
+  local untrusted=$'build ok\rbuild FAILED \xe2\x80\xaedetaliated'
+  dybatpho::text_sanitize "${untrusted}" 80
 }
 
 # @description Run the `BULLET LIST` section of this example.

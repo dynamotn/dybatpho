@@ -57,6 +57,7 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 - [`dybatpho::xdg_state_dir`](#dybatphoxdg_state_dir) — Print the directory a program's state belongs in. State is what a program wants back on the next run but should not be backed up, such as logs and history, which is what separates it from data.
 - [`dybatpho::xdg_runtime_dir`](#dybatphoxdg_runtime_dir) — Print the directory a program's runtime files belong in: its sockets, named pipes, lock files and markers that must not outlive the login session. Unlike the other XDG directories, the specification gives this one no default below HOME, so with `XDG_RUNTIME_DIR` unset or relative the function fails rather than guess, unless the caller names a fallback.
 - [`dybatpho::file_mtime`](#dybatphofile_mtime) — Print when a file was last modified, as a Unix timestamp.
+- [`dybatpho::dir_hash`](#dybatphodir_hash) — Fingerprint a directory tree: one checksum that changes when an entry is added, removed or renamed, when a file's content changes, or when a link points elsewhere. Every entry is recorded as its kind, its path and what identifies its content -- a file's checksum, a link's target -- in bytewise path order, NUL-separated so a name holding a newline cannot pass for two, and the record is hashed. Modification times and permissions are left out.
 - [`dybatpho::dir_size`](#dybatphodir_size) — Print the total size of the regular files in a directory tree. The result is the sum of the files' sizes rather than the disk space they occupy, so it matches `dybatpho::file_size` instead of `du`, whose block accounting and flags differ between platforms.
 - [`dybatpho::file_is_binary`](#dybatphofile_is_binary) — Return success when a file looks like binary rather than text. A NUL byte in the first block is the signal `grep` and `git` use, and it is what makes a file unsafe to pass through line-oriented tools.
 - [`dybatpho::create_temp_dir`](#dybatphocreate_temp_dir) — Create a temporary directory and register it for cleanup on shell exit. This is `dybatpho::create_temp` with the argument that asks for a directory already supplied, because passing `/` as an extension reads like a mistake.
@@ -123,6 +124,10 @@ the privilege to set it. These helpers honor `DYBATPHO_DRY_RUN`.
 **[`dybatpho::file_mtime`](#dybatphofile_mtime)**
 
 - `dybatpho::file_age_seconds` answers the same question relative to now
+
+**[`dybatpho::dir_hash`](#dybatphodir_hash)**
+
+- Symbolic links are recorded, never followed, so a link to a file outside the tree changes the checksum only when it is pointed elsewhere
 
 **[`dybatpho::dir_size`](#dybatphodir_size)**
 
@@ -910,6 +915,45 @@ modified="$(dybatpho::file_mtime "${cache}")"
 **🚦 Exit codes**
 
 - `1`: The file is missing or its modification time cannot be read
+
+---
+
+### `dybatpho::dir_hash`
+
+Fingerprint a directory tree: one checksum that changes when an
+entry is added, removed or renamed, when a file's content changes, or when
+a link points elsewhere. Every entry is recorded as its kind, its path and
+what identifies its content -- a file's checksum, a link's target -- in
+bytewise path order, NUL-separated so a name holding a newline cannot pass
+for two, and the record is hashed. Modification times and permissions are
+left out.
+
+**🧪 Example**
+
+```bash
+local before after
+dybatpho::dir_hash before ./config
+apply_changes
+dybatpho::dir_hash after ./config
+[[ "${before}" == "${after}" ]] || dybatpho::info "The configuration changed"
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Name of the variable receiving the checksum |
+| `$2` | string | yes |  | Directory path |
+| `$3` | string | no | `sha256` | Algorithm, one of `md5`, `sha1`, `sha256`, or `sha512` |
+
+**🧩 Variable sets**
+
+- **`The`** (named): variable
+
+**📝 Notes**
+
+- The record format is a contract: snapshots made by `dybatpho::backup_create` are verified against it
 
 ---
 

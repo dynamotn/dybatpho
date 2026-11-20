@@ -360,6 +360,7 @@ dybatpho::show_file "${report_file}"
 - **FR-058**: The staging file MUST be readable by its owner only until it is committed; a new destination MUST then get the mode the umask gives it, and an existing one keeps its own.
 - **FR-059**: `path_relative` MUST resolve two relative paths against the working directory when either still starts with `..` after normalising, so the result reaches the target from the base.
 - **FR-060**: `dir_size` MUST follow a symbolic link given as its directory argument, while still leaving out every link met inside the tree.
+- **FR-061**: `dybatpho::dir_hash <var> <dir> [algorithm]` MUST set the named variable to a checksum of the tree that changes when an entry is added, removed or renamed, a file's content changes, or a link's target changes -- read exactly, a trailing newline included -- and that does not change with modification times or permissions; it MUST record links without following them, MUST use the record format that `backup` verifies its snapshots with, and MUST stop the script on a missing directory, a part of the tree it cannot list, a file or link it cannot read, an unknown algorithm, or a variable name that is invalid or starts with `__dybatpho`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -438,6 +439,8 @@ dybatpho::show_file "${report_file}"
 - **IT-044**: Plant a link to a directory at the extended name while `create_temp` renames its file onto it, and see the call stop rather than hand back the link.
 - **IT-045**: From `top/here`, get `../here/a` for `a` from `../b`, `here/a` for `a` from `..`, and `../top/a` for `../a` from `../../x`.
 - **IT-046**: Measure a tree through a symbolic link to its directory and get the size of the files behind it.
+- **IT-049**: Hash a fixed tree holding a name with a space, a name with a newline and a link, and get the checksum release 7.2.1 gave its snapshots.
+- **IT-047**: Hash a tree, touch a file and get the same checksum; change a file, rename one and point a link elsewhere and get a different one each time, then the first one back once undone; get a 128-digit checksum with `sha512`; see a missing directory and a bad variable name refused.
 
 ## Acceptance Criteria *(mandatory)*
 

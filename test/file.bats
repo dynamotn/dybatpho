@@ -1062,6 +1062,82 @@ SCRIPT
     "$(dybatpho::file_mtime "${target}")"
 }
 
+@test "dybatpho::dir_hash changes with content, names and link targets, not with modification times" {
+  local tree="${BATS_TEST_TMPDIR}/tree" first second
+  mkdir -p "${tree}/sub"
+  printf 'one\n' > "${tree}/a"
+  printf 'two\n' > "${tree}/sub/b"
+  ln -s a "${tree}/link"
+
+  dybatpho::dir_hash first "${tree}"
+  [[ "${first}" =~ ^[0-9a-f]{64}$ ]]
+  touch -t 200001010000 "${tree}/a"
+  dybatpho::dir_hash second "${tree}"
+  assert_equal "${second}" "${first}"
+
+  printf 'changed\n' > "${tree}/sub/b"
+  dybatpho::dir_hash second "${tree}"
+  [[ "${second}" != "${first}" ]]
+  printf 'two\n' > "${tree}/sub/b"
+
+  mv "${tree}/a" "${tree}/c"
+  dybatpho::dir_hash second "${tree}"
+  [[ "${second}" != "${first}" ]]
+  mv "${tree}/c" "${tree}/a"
+
+  rm "${tree}/link"
+  ln -s sub/b "${tree}/link"
+  dybatpho::dir_hash second "${tree}"
+  [[ "${second}" != "${first}" ]]
+  rm "${tree}/link"
+  ln -s a "${tree}/link"
+  dybatpho::dir_hash second "${tree}"
+  assert_equal "${second}" "${first}"
+
+  dybatpho::dir_hash second "${tree}" sha512
+  [[ "${second}" =~ ^[0-9a-f]{128}$ ]]
+}
+
+@test "dybatpho::dir_hash keeps the record format backup snapshots were verified with" {
+  # Measured with the fingerprint of release 7.2.1, before it became public: a
+  # change of record format would stop every existing snapshot from verifying.
+  local tree="${BATS_TEST_TMPDIR}/tree" sum
+  mkdir -p "${tree}/sub dir"
+  printf 'one\n' > "${tree}/a"
+  printf 'two\n' > "${tree}/sub dir/b"
+  printf 'odd\n' > "${tree}/sub dir/new"$'\n'"line"
+  ln -s a "${tree}/link"
+  dybatpho::dir_hash sum "${tree}"
+  assert_equal "${sum}" 77485783a9831dd2095d74377c0a1354240503f16194a296531c0e8110294c03
+}
+
+@test "dybatpho::dir_hash stops on a file it cannot read, and tells link targets apart exactly" {
+  local a="${BATS_TEST_TMPDIR}/a" b="${BATS_TEST_TMPDIR}/b" one two
+  mkdir -p "${a}" "${b}"
+  # A target ending in a newline is another target than the one without it.
+  ln -s $'x\n' "${a}/l"
+  ln -s x "${b}/l"
+  dybatpho::dir_hash one "${a}"
+  dybatpho::dir_hash two "${b}"
+  [[ "${one}" != "${two}" ]]
+  [[ "$(id -u)" != 0 ]] || skip "root reads every file"
+  printf 'secret\n' > "${a}/f"
+  chmod 000 "${a}/f"
+  run dybatpho::dir_hash one "${a}"
+  chmod 644 "${a}/f"
+  assert_failure
+  assert_output --partial "Cannot read ${a}/f"
+}
+
+@test "dybatpho::dir_hash refuses a missing directory and a bad variable name" {
+  run -1 dybatpho::dir_hash sum "${BATS_TEST_TMPDIR}/missing"
+  assert_output --partial "Directory doesn't exist"
+  run -1 dybatpho::dir_hash __dybatpho_sum "${BATS_TEST_TMPDIR}"
+  # shellcheck disable=SC2016 # a name that would run a command if expanded
+  run dybatpho::dir_hash 'x[$(id)]' "${BATS_TEST_TMPDIR}"
+  assert_failure
+}
+
 @test "dybatpho::dir_size totals the regular files in the tree" {
   local tree="${BATS_TEST_TMPDIR}/tree"
   mkdir -p "${tree}/sub"

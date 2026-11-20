@@ -4,7 +4,7 @@
 # @description
 #   Demonstrates dybatpho::create_temp, show_file, path_basename, path_dirname, path_extname, path_stem, path_join,
 #   path_normalize, path_is_abs, path_has_ext, path_change_ext, path_relative, xdg_config_dir, xdg_cache_dir,
-#   xdg_data_dir, xdg_state_dir, xdg_runtime_dir, create_temp_dir, file_mtime, dir_size, file_is_binary,
+#   xdg_data_dir, xdg_state_dir, xdg_runtime_dir, create_temp_dir, file_mtime, dir_size, dir_hash, file_is_binary,
 #   file_write_atomic, file_replace, file_ensure_line, file_remove_line, file_hash, file_size, file_age_seconds,
 #   file_backup, find_up, ensure_dir, and temp cleanup behavior
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -388,6 +388,9 @@ function _demo_inspect {
   local dir_size
   dir_size=$(dybatpho::dir_size "${WORKDIR}/tree")
   dybatpho::info "Tree total: ${dir_size} bytes"
+  local tree_hash
+  dybatpho::dir_hash tree_hash "${WORKDIR}/tree"
+  dybatpho::info "Tree hash : ${tree_hash}"
   local file_size
   file_size=$(dybatpho::file_size "${WORKDIR}/tree/a.bin")
   dybatpho::info "One file  : ${file_size} bytes"

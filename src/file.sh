@@ -315,6 +315,25 @@ function dybatpho::path_change_ext {
 }
 
 #######################################
+# @description Read the target of a symbolic link exactly: `$(...)` drops
+#   trailing newlines, and a target may end in one, so the output is read with
+#   a sentinel.
+# @arg $1 string Name of the variable receiving the target
+# @arg $2 string Link
+# @set The named variable
+# @exitcode 1 The link cannot be read, or its target is empty: it leads nowhere the kernel would go
+# @internal
+#######################################
+function __dybatpho_file_link_target_into {
+  local -n __dybatpho_file_link_ref="$1"
+  __dybatpho_file_link_ref="$(readlink -- "$2" && printf x)" || return 1
+  __dybatpho_file_link_ref="${__dybatpho_file_link_ref%x}"
+  # `readlink` ends its output with one newline of its own.
+  __dybatpho_file_link_ref="${__dybatpho_file_link_ref%$'\n'}"
+  [[ -n "${__dybatpho_file_link_ref}" ]]
+}
+
+#######################################
 # @description Return the relative path from a base path to a target path.
 # @arg $1 string Target path
 # @arg $2 string Base path
@@ -1464,6 +1483,93 @@ function dybatpho::file_mtime {
   [[ -n "${modified}" ]] \
     || dybatpho::die "${FUNCNAME[0]}: Cannot read modification time of ${path}" # kcov(skip)
   printf '%s\n' "${modified}"
+}
+
+#######################################
+# @description Fingerprint a directory tree: one checksum that changes when an
+#   entry is added, removed or renamed, when a file's content changes, or when
+#   a link points elsewhere. Every entry is recorded as its kind, its path and
+#   what identifies its content -- a file's checksum, a link's target -- in
+#   bytewise path order, NUL-separated so a name holding a newline cannot pass
+#   for two, and the record is hashed. Modification times and permissions are
+#   left out.
+# @example
+#   local before after
+#   dybatpho::dir_hash before ./config
+#   apply_changes
+#   dybatpho::dir_hash after ./config
+#   [[ "${before}" == "${after}" ]] || dybatpho::info "The configuration changed"
+#
+# @arg $1 string Name of the variable receiving the checksum
+# @arg $2 string Directory path
+# @arg $3 string [default: sha256] Algorithm, one of `md5`, `sha1`, `sha256`, or `sha512`
+# @set The named variable
+# @tip Symbolic links are recorded, never followed, so a link to a file outside the tree changes the checksum only when
+#   it is pointed elsewhere
+# @note The record format is a contract: snapshots made by `dybatpho::backup_create` are verified against it
+#######################################
+function dybatpho::dir_hash {
+  local __dybatpho_file_hash_var __dybatpho_file_hash_tree
+  dybatpho::expect_args __dybatpho_file_hash_var __dybatpho_file_hash_tree -- "$@"
+  dybatpho::expect_ref "${__dybatpho_file_hash_var}"
+  [[ "${__dybatpho_file_hash_var}" != __dybatpho* ]] \
+    || dybatpho::die "${FUNCNAME[0]}: Invalid name for the checksum variable: '${__dybatpho_file_hash_var}'"
+  dybatpho::is dir "${__dybatpho_file_hash_tree}" \
+    || dybatpho::die "${FUNCNAME[0]}: Directory doesn't exist: ${__dybatpho_file_hash_tree}"
+  __dybatpho_file_dir_hash_into "${__dybatpho_file_hash_var}" "${__dybatpho_file_hash_tree}" "${3:-sha256}"
+}
+
+#######################################
+# @description The work of `dybatpho::dir_hash`, for callers inside the
+#   library that already checked their arguments.
+# @arg $1 string Name of the variable receiving the checksum
+# @arg $2 string Directory path
+# @arg $3 string Algorithm
+# @set The named variable
+# @internal
+#######################################
+function __dybatpho_file_dir_hash_into {
+  local -n __dybatpho_file_hash_ref="$1"
+  local __dybatpho_file_hash_tree="$2" __dybatpho_file_hash_algorithm="$3"
+  local __dybatpho_file_hash_entry __dybatpho_file_hash_full __dybatpho_file_hash_kind __dybatpho_file_hash_payload
+  local __dybatpho_file_hash_manifest
+  __dybatpho_create_temp_into __dybatpho_file_hash_manifest ".manifest" "hash"
+
+  local -a __dybatpho_file_hash_paths=() __dybatpho_file_hash_kinds=()
+  # A checksum over part of a tree would vouch for files nobody read.
+  __dybatpho_file_walk_into __dybatpho_file_hash_paths __dybatpho_file_hash_kinds "${__dybatpho_file_hash_tree}" \
+    || dybatpho::die "Cannot read every entry under ${__dybatpho_file_hash_tree}"
+  local -i __dybatpho_file_hash_at __dybatpho_file_hash_end=${#__dybatpho_file_hash_paths[@]}
+  for ((__dybatpho_file_hash_at = 0; __dybatpho_file_hash_at < __dybatpho_file_hash_end; __dybatpho_file_hash_at++)); do
+    __dybatpho_file_hash_entry="${__dybatpho_file_hash_paths[__dybatpho_file_hash_at]}"
+    __dybatpho_file_hash_full="${__dybatpho_file_hash_tree}/${__dybatpho_file_hash_entry}"
+    __dybatpho_file_hash_payload=""
+    # Anything that is neither a link nor a directory is hashed as a file.
+    case "${__dybatpho_file_hash_kinds[__dybatpho_file_hash_at]}" in
+      symlink)
+        __dybatpho_file_hash_kind="symlink"
+        # Read exactly: `$(readlink)` drops a trailing newline, and `x` would hash as `x\n`.
+        __dybatpho_file_link_target_into __dybatpho_file_hash_payload "${__dybatpho_file_hash_full}" \
+          || dybatpho::die "Cannot read the link ${__dybatpho_file_hash_full}"
+        ;;
+      directory) __dybatpho_file_hash_kind="directory" ;;
+      *)
+        __dybatpho_file_hash_kind="file"
+        # Listing a file does not need to read it: one this process cannot read
+        # would otherwise hash as empty, and two trees that differ would match.
+        [[ -r "${__dybatpho_file_hash_full}" ]] || dybatpho::die "Cannot read ${__dybatpho_file_hash_full}"
+        __dybatpho_file_hash_payload="$(dybatpho::file_hash "${__dybatpho_file_hash_full}" \
+          "${__dybatpho_file_hash_algorithm}")" || dybatpho::die "Cannot hash ${__dybatpho_file_hash_full}"
+        ;;
+    esac
+    printf '%s\0%s\0%s\0' "${__dybatpho_file_hash_kind}" "${__dybatpho_file_hash_entry}" \
+      "${__dybatpho_file_hash_payload}"
+  done >> "${__dybatpho_file_hash_manifest}"
+
+  __dybatpho_file_hash_ref="$(dybatpho::file_hash "${__dybatpho_file_hash_manifest}" \
+    "${__dybatpho_file_hash_algorithm}")" || dybatpho::die "Cannot hash the manifest of ${__dybatpho_file_hash_tree}"
+  # Removed now, not at exit: a loop calling this would pile them up.
+  rm -f -- "${__dybatpho_file_hash_manifest}"
 }
 
 #######################################

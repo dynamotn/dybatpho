@@ -85,6 +85,7 @@ src/cli.sh	__dybatpho_cli_generate_logic	dybatpho::validate_describe	text of the
 src/doctor.sh	__dybatpho_doctor_resolve	dybatpho::semver_coerce	the version text came from command_version, which only returns a version
 src/helpers.sh	dybatpho::has_version	dybatpho::semver_coerce	the version text came from command_version, which only returns a version
 src/doctor.sh	__dybatpho_doctor_rows	__dybatpho_doctor_resolve	read with `|| true`: a refusal is reported as an unknown version
+src/file.sh	__dybatpho_file_dir_hash_into	dybatpho::file_hash	hashes files it just walked and checked readable, with an algorithm its callers validated; a failure still dies outside
 src/file.sh	__dybatpho_xdg_dir_into	__dybatpho_xdg_dir	the HOME check that could refuse ran in the caller's shell first
 src/forge.sh	__dybatpho_forge_or_die	dybatpho::forge_error	only shapes a message for the die that follows
 src/forge.sh	dybatpho::forge_api	dybatpho::forge_host	an empty kind is reported as an unknown forge, status 1

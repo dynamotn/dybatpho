@@ -29,6 +29,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   gives background jobs, for a process ID from anywhere, such as a PID file. It
   answers 1 when the process was not running, and refuses this shell and its
   own group.
+- **`file` — fingerprint a whole directory with `dybatpho::dir_hash`.** One
+  checksum for a tree that changes when a file's content changes, an entry is
+  added, removed or renamed, or a link points elsewhere, and stays the same
+  when only modification times change, so "did this directory change" no
+  longer needs a `find | sha256sum | sort` pipeline. It is the fingerprint
+  `backup` already verifies its snapshots with, and existing snapshots keep
+  verifying.
 
 ## [7.2.1] - 2026-11-19
 

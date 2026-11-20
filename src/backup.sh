@@ -286,54 +286,17 @@ function __dybatpho_backup_publish_into {
 }
 
 #######################################
-# @description Fingerprint a snapshot tree into a named variable.
-#   Every entry is recorded as its kind, its path, and what identifies its
-#   content -- a file's checksum, a link's target -- in bytewise path order,
-#   and the record is hashed with the sidecar algorithm. The record is
-#   NUL-separated, so a name holding a newline cannot be mistaken for two.
-#   Modification times and permissions are left out: a hard-linked file shares
-#   them with every snapshot that links it, so they are not the snapshot's own.
+# @description Fingerprint a snapshot tree into a named variable, with the
+#   sidecar algorithm. It is `dybatpho::dir_hash`, whose record leaves out
+#   modification times and permissions: a hard-linked file shares them with
+#   every snapshot that links it, so they are not the snapshot's own.
 # @arg $1 string Name of the variable receiving the checksum
 # @arg $2 string Snapshot directory
 # @set The named variable
 # @internal
 #######################################
 function __dybatpho_backup_tree_hash_into {
-  local -n __dybatpho_backup_hash_ref="$1"
-  local __dybatpho_backup_tree="$2"
-  local __dybatpho_backup_entry __dybatpho_backup_full __dybatpho_backup_kind __dybatpho_backup_payload
-  local __dybatpho_backup_algorithm="${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}"
-
-  # Not a `__dybatpho`-prefixed name: `dybatpho::create_temp` refuses one.
-  local dybatpho_backup_manifest
-  dybatpho::create_temp dybatpho_backup_manifest ".manifest" "backup"
-
-  local -a __dybatpho_backup_paths=() __dybatpho_backup_kinds=()
-  # A checksum over part of a tree would vouch for files nobody read.
-  __dybatpho_file_walk_into __dybatpho_backup_paths __dybatpho_backup_kinds "${__dybatpho_backup_tree}" \
-    || dybatpho::die "Cannot read every entry under ${__dybatpho_backup_tree}"
-  local -i __dybatpho_backup_at
-  for ((__dybatpho_backup_at = 0; __dybatpho_backup_at < ${#__dybatpho_backup_paths[@]}; __dybatpho_backup_at++)); do
-    __dybatpho_backup_entry="${__dybatpho_backup_paths[__dybatpho_backup_at]}"
-    __dybatpho_backup_full="${__dybatpho_backup_tree}/${__dybatpho_backup_entry}"
-    __dybatpho_backup_payload=""
-    # Anything that is neither a link nor a directory is hashed as a file.
-    case "${__dybatpho_backup_kinds[__dybatpho_backup_at]}" in
-      symlink)
-        __dybatpho_backup_kind="symlink"
-        __dybatpho_backup_payload="$(readlink -- "${__dybatpho_backup_full}")"
-        ;;
-      directory) __dybatpho_backup_kind="directory" ;;
-      *)
-        __dybatpho_backup_kind="file"
-        __dybatpho_backup_payload="$(dybatpho::file_hash "${__dybatpho_backup_full}" "${__dybatpho_backup_algorithm}")"
-        ;;
-    esac
-    printf '%s\0%s\0%s\0' "${__dybatpho_backup_kind}" "${__dybatpho_backup_entry}" \
-      "${__dybatpho_backup_payload}" >> "${dybatpho_backup_manifest}"
-  done
-
-  __dybatpho_backup_hash_ref="$(dybatpho::file_hash "${dybatpho_backup_manifest}" "${__dybatpho_backup_algorithm}")"
+  __dybatpho_file_dir_hash_into "$1" "$2" "${DYBATPHO_BACKUP_CHECKSUM_ALGORITHM}"
 }
 
 #######################################

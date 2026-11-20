@@ -271,6 +271,7 @@ Utilities for file handling. Loaded: always. Stability: stable. Reference: [docs
 - `dybatpho::xdg_state_dir [string]` — Print the directory a program's state belongs in.
 - `dybatpho::xdg_runtime_dir [string] [string]` — Print the directory a program's runtime files belong in: its sockets, named pipes, lock files and markers that must not outlive the login session.
 - `dybatpho::file_mtime <string>` — Print when a file was last modified, as a Unix timestamp.
+- `dybatpho::dir_hash <string> <string> [string]` — Fingerprint a directory tree: one checksum that changes when an entry is added, removed or renamed, when a file's content changes, or when a link points elsewhere.
 - `dybatpho::dir_size <string>` — Print the total size of the regular files in a directory tree.
 - `dybatpho::file_is_binary <string>` — Return success when a file looks like binary rather than text.
 - `dybatpho::create_temp_dir <string> [string] [string]` — Create a temporary directory and register it for cleanup on shell exit.

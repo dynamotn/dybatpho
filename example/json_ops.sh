@@ -4,7 +4,7 @@
 # @description
 #   Demonstrates dybatpho::json_query, json_has, json_pretty, json_to_yaml, yaml_query, yaml_has, yaml_pretty,
 #   yaml_to_json, json_read, and the editing helpers json_set, json_edit, json_del, json_merge, yaml_set, yaml_del, and
-#   yaml_merge
+#   yaml_merge, and the TOML writers json_to_toml, toml_set, toml_del and toml_merge
 SCRIPTDIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=init.sh
 . "${SCRIPTDIR}/../init.sh" --modules json
@@ -235,6 +235,26 @@ EOF
   _print_document "$(< "${values}")"
 }
 
+# @description Run the TOML editing section of this example.
+# @noargs
+function _demo_toml {
+  dybatpho::header "TOML"
+  if ! dybatpho::is command yq; then
+    dybatpho::warn "The Go yq v4 is required for the TOML demo"
+    return 0
+  fi
+  local cargo
+  dybatpho::create_temp cargo ".toml"
+  printf '[package]\nname = "demo"\nversion = "0.1.0"\n' > "${cargo}"
+  dybatpho::info "Editing TOML: a new top-level key lands ahead of the tables:"
+  dybatpho::toml_set "${cargo}" package.version 0.2.0 "${cargo}"
+  dybatpho::toml_set "${cargo}" edition 2021 "${cargo}"
+  dybatpho::toml_del "${cargo}" package.name "${cargo}"
+  _print_document "$(< "${cargo}")"
+  dybatpho::info "And JSON written as TOML:"
+  dybatpho::json_to_toml - <<< '{"title":"x","owner":{"name":"me"}}'
+}
+
 # @description Run every section of this example, in order.
 # @noargs
 function _main {
@@ -243,6 +263,7 @@ function _main {
   _demo_conversion
   _demo_in_memory
   _demo_editing
+  _demo_toml
   dybatpho::success "JSON operations demo complete"
 }
 

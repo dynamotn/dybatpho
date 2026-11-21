@@ -356,11 +356,11 @@ dybatpho::config_save "${HOME}/.config/app.env"
 
 **📝 Notes**
 
-- A dotted key such as `server.port` is written to the nested path it was loaded from. A TOML file that already has a `[table]` cannot take a new top-level key or table, since it would land inside the last table: that save is refused rather than written.
+- A dotted key such as `server.port` is written to the nested path it was loaded from. A TOML file is rewritten from its data by the `json` module's encoder: a new top-level key goes ahead of the tables, and comments and key order are not kept. A TOML file holding a date, a time, `inf` or `nan` is refused, since rewriting it would change those values.
 
 **🚦 Exit codes**
 
-- `1`: A key is invalid or unset, the format is unsupported, a TOML save would read back differently, or the write fails
+- `1`: A key is invalid or unset, the format is unsupported, a TOML file holds a value JSON cannot keep or would read back differently, or the write fails
 
 ---
 

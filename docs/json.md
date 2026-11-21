@@ -33,6 +33,7 @@ it as outdated.
 - [`dybatpho::json_has`](#dybatphojson_has) — Return success when a JSON document satisfies a `jq` filter. The filter succeeds when its last output is neither `false` nor `null`; a filter that produces nothing at all fails the same way.
 - [`dybatpho::json_pretty`](#dybatphojson_pretty) — Pretty-print a JSON document.
 - [`dybatpho::json_to_yaml`](#dybatphojson_to_yaml) — Convert a JSON document to YAML.
+- [`dybatpho::json_to_toml`](#dybatphojson_to_toml) — Convert a JSON object to TOML. The encoder is a `jq` program, not `yq`'s TOML writer, which drops the quotes a key needs and puts a new top-level key inside the last table. Each table lists its plain keys first, then its tables, then its arrays of tables; a key is quoted when it is not bare; an array that mixes objects with other values is written inline. The result is read back with `yq` and compared with the input, so a document that would not round-trip is refused rather than written.
 - [`dybatpho::yaml_query`](#dybatphoyaml_query) — Query a YAML document with a `jq` filter. The document is read into JSON by `yq` and the filter runs in `jq`, so it is written exactly as it would be for `dybatpho::json_query`. Each result is printed back as YAML: a scalar on its own line without quotes, a mapping or a sequence in block style.
 - [`dybatpho::yaml_has`](#dybatphoyaml_has) — Return success when a YAML document satisfies a `jq` filter.
 - [`dybatpho::yaml_pretty`](#dybatphoyaml_pretty) — Pretty-print a YAML document.
@@ -50,6 +51,9 @@ it as outdated.
 - [`dybatpho::yaml_set`](#dybatphoyaml_set) — Set the value at a path in a YAML document. Paths and `--json` work as in `dybatpho::json_set`. The edit is made by `yq` itself, not through JSON, so comments and the rest of the document's layout are kept as `yq` keeps them; this needs `yq` but not `jq`.
 - [`dybatpho::yaml_del`](#dybatphoyaml_del) — Remove the value at a path from a YAML document. Paths work as in `dybatpho::json_set`, and an absent path is not an error.
 - [`dybatpho::yaml_merge`](#dybatphoyaml_merge) — Deep-merge two YAML mappings, the overlay winning. Merging follows `dybatpho::json_merge`: mappings merge key by key, and every other value is replaced by the overlay's.
+- [`dybatpho::toml_set`](#dybatphotoml_set) — Set the value at a path in a TOML document. Paths and `--json` work as in `dybatpho::json_set`. The document goes through JSON and is written back by the encoder of `dybatpho::json_to_toml`: plain keys first, then tables, then arrays of tables, and a key quoted when it needs it.
+- [`dybatpho::toml_del`](#dybatphotoml_del) — Remove the value at a path from a TOML document. Paths work as in `dybatpho::json_set`, and an absent path is not an error. The document is rewritten as `dybatpho::toml_set` rewrites it.
+- [`dybatpho::toml_merge`](#dybatphotoml_merge) — Deep-merge two TOML documents, the overlay winning. Merging follows `dybatpho::json_merge`: tables merge key by key, and every other value, arrays included, is replaced by the overlay's. The result is written as `dybatpho::toml_set` writes it.
 
 <a id="see-also"></a>
 
@@ -193,6 +197,43 @@ Convert a JSON document to YAML.
 - `0`: Conversion succeeded
 - `other`: `yq`'s own exit code when the document is invalid
 - `127`: The Go `yq` v4 is not installed
+
+---
+
+### `dybatpho::json_to_toml`
+
+Convert a JSON object to TOML.
+The encoder is a `jq` program, not `yq`'s TOML writer, which drops the
+quotes a key needs and puts a new top-level key inside the last table. Each
+table lists its plain keys first, then its tables, then its arrays of
+tables; a key is quoted when it is not bare; an array that mixes objects
+with other values is written inline. The result is read back with `yq` and
+compared with the input, so a document that would not round-trip is
+refused rather than written.
+
+**🧪 Example**
+
+```bash
+dybatpho::json_to_toml settings.json settings.toml
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | JSON file path or `-` for stdin |
+| `$2` | string | no |  | Output file path, which may be the input file |
+
+**📤 Output on stdout**
+
+- TOML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: Conversion succeeded
+- `other`: `jq`'s exit code when the document is invalid, is not an object, or holds a `null`, which TOML has no way to write; 1 when the result would read back differently
+- `127`: `jq` or the Go `yq` v4 is not installed
 
 ---
 
@@ -767,3 +808,127 @@ dybatpho::yaml_merge values.yaml values-prod.yaml > rendered.yaml
 - `1`: Invalid arguments
 - `other`: `yq`'s exit code when a document is not a mapping or is invalid
 - `127`: The Go `yq` v4 is not installed
+
+---
+
+### `dybatpho::toml_set`
+
+Set the value at a path in a TOML document.
+Paths and `--json` work as in `dybatpho::json_set`. The document goes
+through JSON and is written back by the encoder of
+`dybatpho::json_to_toml`: plain keys first, then tables, then arrays of
+tables, and a key quoted when it needs it.
+
+> ⚠️ **Warning**
+>
+> Comments, key order and the layout of the file are not kept: the document is rewritten from its data. A document holding a date, a time, `inf` or `nan`, which JSON cannot keep, is refused with status 1
+
+**🧪 Examples**
+
+```bash
+dybatpho::toml_set Cargo.toml package.version 2.0.0 Cargo.toml
+
+```
+
+```bash
+dybatpho::toml_set --json pyproject.toml tool.black.line-length 100 pyproject.toml
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | no |  | `--json`: parse the value as JSON instead of storing a string |
+| `$2` | string | yes |  | TOML file path or `-` for stdin |
+| `$3` | string | yes |  | Path to set |
+| `$4` | string | yes |  | Value to store |
+| `$5` | string | no |  | Output file path, which may be the input file |
+
+**📤 Output on stdout**
+
+- TOML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The value was set
+- `1`: Invalid arguments, path, or `--json` value, or a result that would read back differently
+- `other`: The exit code of `yq` or `jq` when the input is invalid, the path runs through a scalar, or the value holds a `null`, which TOML cannot write
+- `127`: `jq` or the Go `yq` v4 is not installed
+
+---
+
+### `dybatpho::toml_del`
+
+Remove the value at a path from a TOML document.
+Paths work as in `dybatpho::json_set`, and an absent path is not an error.
+The document is rewritten as `dybatpho::toml_set` rewrites it.
+
+> ⚠️ **Warning**
+>
+> Comments, key order and layout are not kept, as with `dybatpho::toml_set`
+
+**🧪 Example**
+
+```bash
+dybatpho::toml_del Cargo.toml dependencies.serde Cargo.toml
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | TOML file path or `-` for stdin |
+| `$2` | string | yes |  | Path to remove |
+| `$3` | string | no |  | Output file path, which may be the input file |
+
+**📤 Output on stdout**
+
+- TOML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The path was removed or was already absent
+- `1`: Invalid arguments or path
+- `other`: The exit code of `yq` or `jq` when the input is invalid
+- `127`: `jq` or the Go `yq` v4 is not installed
+
+---
+
+### `dybatpho::toml_merge`
+
+Deep-merge two TOML documents, the overlay winning.
+Merging follows `dybatpho::json_merge`: tables merge key by key, and every
+other value, arrays included, is replaced by the overlay's. The result is
+written as `dybatpho::toml_set` writes it.
+
+> ⚠️ **Warning**
+>
+> Comments, key order and layout are not kept, as with `dybatpho::toml_set`
+
+**🧪 Example**
+
+```bash
+dybatpho::toml_merge config.toml config.local.toml > effective.toml
+
+```
+
+**🧾 Arguments**
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `$1` | string | yes |  | Base TOML file path, or `-` for stdin |
+| `$2` | string | yes |  | Overlay TOML file path, or `-` for stdin |
+| `$3` | string | no |  | Output file path, which may be either input |
+
+**📤 Output on stdout**
+
+- TOML when no output file is provided
+
+**🚦 Exit codes**
+
+- `0`: The documents were merged
+- `1`: Invalid arguments
+- `other`: The exit code of `yq` when a document is invalid
+- `127`: `jq` or the Go `yq` v4 is not installed

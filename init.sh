@@ -225,6 +225,8 @@ declare -gA __dybatpho_module_soft_deps=(
   [parallel]="date"
   [metrics]="math network"
   [testing]="json diff"
+  # `config_save` writes a TOML file through `json`'s encoder, loaded when one is saved.
+  [config]="json"
   # `profile_report` draws its table through `table`, loaded when a report is drawn.
   [profile]="table"
 )

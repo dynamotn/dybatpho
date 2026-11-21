@@ -367,7 +367,7 @@ dybatpho::config_save ./config.yaml PORT
 - **FR-032**: `config_ini_get` MUST skip blank lines and lines starting with `;` or `#`, MUST restrict the lookup to the named section when one is given (an empty name meaning the entries above the first header), and MUST print the last match when the key appears more than once in scope.
 - **FR-033**: `config_ini_get` MUST return 1 with no output when the key is not found, and MUST report an error and return 2, rather than stop the script, when the file cannot be read.
 - **FR-034**: The dotenv loader MUST remove the quotes of a quoted value followed by a comment, a trailing carriage return, and an `export` prefix; a save MUST rewrite an `export` line in place and keep its prefix.
-- **FR-035**: `config_save` MUST write a dotted key to the nested path it names in JSON, YAML and TOML, and MUST refuse a TOML save whose result would read back differently, leaving the file untouched.
+- **FR-035**: `config_save` MUST write a dotted key to the nested path it names in JSON, YAML and TOML, and MUST refuse a TOML save whose result would read back differently, leaving the file untouched. A TOML file MUST be written by the `json` module's encoder (`dybatpho::json_to_toml`), loaded on demand, so a new top-level key lands ahead of the tables whatever `yq`'s own TOML writer does; comments in a TOML file are not kept, and a TOML file holding a date, a time, `inf` or `nan` MUST be refused and left untouched.
 - **FR-036**: A value an option binding reads with `config:` MUST be held to the option's `choices:`, `type:` and `pattern:`.
 - **FR-037**: A configuration key MUST be made of ASCII letters, digits and `_.-` whatever the locale.
 - **FR-038**: A double-quoted dotenv value MUST expand only `\\`, `\n`, `\t`, `\r` and `\"`, keeping every other backslash as written, and `config_save` MUST escape a double quote, so every value it writes reads back unchanged.
@@ -464,6 +464,7 @@ dybatpho::config_save ./config.yaml PORT
 - **IT-028**: Bind a typed parameter to a configuration key holding an invalid value and see the parser refuse it.
 - **IT-029**: Under `en_US.UTF-8`, refuse `config_set café 1`.
 - **IT-030**: Load `"C:\code\new"`, `"x\0101y"`, `"say \"hi\""` and a quoted value followed by a comment, and get each back with only the five escapes expanded; save and reload a value holding quotes, backslashes and a tab.
+- **IT-031**: Save a new key to a TOML file holding only a `[server]` table and get the key written ahead of the table, then reload both keys at their own paths.
 
 ## Acceptance Criteria *(mandatory)*
 

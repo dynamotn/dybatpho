@@ -594,6 +594,12 @@ function __dybatpho_config_save_structured {
   # stops the caller.
   case "${format}" in
     json) dybatpho::require jq ;;
+    toml)
+      # TOML is written by the `json` module's encoder, which needs `jq` too.
+      dybatpho::require yq
+      dybatpho::require jq
+      __dybatpho_helpers_need_module json __dybatpho_json_encode_toml "${FUNCNAME[1]}"
+      ;;
     *) dybatpho::require yq ;;
   esac
 
@@ -612,19 +618,15 @@ function __dybatpho_config_save_structured {
         fi
         ;;
       toml)
-        local toml_in='{}' toml_format=yaml toml_out toml_want toml_got
+        local toml_json='{}'
+        # Read through JSON, which refuses a date or `inf` it would change;
+        # yq's own TOML writer can put a new top-level key inside the last
+        # `[table]`, so the TOML is written by the `json` module's encoder.
         if dybatpho::is file "${file}"; then
-          toml_in="$(cat -- "${file}")" || exit 1
-          toml_format=toml
+          __dybatpho_json_read_toml_into toml_json "${file}" dybatpho::config_save || exit 1
         fi
-        toml_out="$(yq -p "${toml_format}" -o toml "${expression}" <<< "${toml_in}")" || exit 1
-        # yq writes a new top-level key or inline table after the file's last
-        # `[table]`, where TOML reads it as part of that table. The result is
-        # read back and compared, so such a save is refused instead of written.
-        toml_want="$(yq -p "${toml_format}" -o json -I 0 "${expression} | sort_keys(..)" <<< "${toml_in}")" || exit 1
-        toml_got="$(yq -p toml -o json -I 0 'sort_keys(..)' <<< "${toml_out}")" || exit 1
-        [[ "${toml_got}" == "${toml_want}" ]] || exit 3
-        printf '%s\n' "${toml_out}"
+        toml_json="$(yq -p json -o json -I 0 "${expression}" <<< "${toml_json}")" || exit 1
+        __dybatpho_json_encode_toml "${toml_json}" dybatpho::config_save || exit 1
         ;;
       *)
         if dybatpho::is file "${file}"; then
@@ -635,8 +637,6 @@ function __dybatpho_config_save_structured {
         ;;
     esac
   )" || status=$?
-  ((status != 3)) || dybatpho::die "Cannot save ${file}: the TOML writer would put a new key inside the last table, \
-so the file would read back differently; add the key to the file by hand first"
   ((status == 0)) || dybatpho::die "Cannot rewrite ${format} configuration: ${file}"
   printf '%s\n' "${rendered}" | dybatpho::file_write_atomic "${file}"
 }
@@ -664,11 +664,12 @@ so the file would read back differently; add the key to the file by hand first"
 # @arg $@ string Configuration keys to write, defaulting to every loaded key in name order
 # @env DYBATPHO_DRY_RUN string When true-like, report the write instead of performing it
 # @note A dotted key such as `server.port` is written to the nested path it was
-#   loaded from. A TOML file that already has a `[table]` cannot take a new
-#   top-level key or table, since it would land inside the last table: that
-#   save is refused rather than written.
-# @exitcode 1 A key is invalid or unset, the format is unsupported, a TOML save would read back differently, or the
-#   write fails
+#   loaded from. A TOML file is rewritten from its data by the `json` module's
+#   encoder: a new top-level key goes ahead of the tables, and comments and key
+#   order are not kept. A TOML file holding a date, a time, `inf` or `nan` is
+#   refused, since rewriting it would change those values.
+# @exitcode 1 A key is invalid or unset, the format is unsupported, a TOML file holds a value JSON cannot keep or
+#   would read back differently, or the write fails
 # @tip Name the keys explicitly when `dybatpho::config_env` was used, so an unrelated environment variable is not
 #   persisted
 #   along with them.

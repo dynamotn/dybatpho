@@ -145,6 +145,129 @@ function dybatpho::json_to_yaml {
 }
 
 #######################################
+# @description Convert a JSON object to TOML.
+#   The encoder is a `jq` program, not `yq`'s TOML writer, which drops the
+#   quotes a key needs and puts a new top-level key inside the last table. Each
+#   table lists its plain keys first, then its tables, then its arrays of
+#   tables; a key is quoted when it is not bare; an array that mixes objects
+#   with other values is written inline. The result is read back with `yq` and
+#   compared with the input, so a document that would not round-trip is
+#   refused rather than written.
+# @example
+#   dybatpho::json_to_toml settings.json settings.toml
+#
+# @arg $1 string JSON file path or `-` for stdin
+# @arg $2 string? Output file path, which may be the input file
+# @stdout TOML when no output file is provided
+# @exitcode 0 Conversion succeeded
+# @exitcode other `jq`'s exit code when the document is invalid, is not an object, or holds a `null`,
+#   which TOML has no way to write; 1 when the result would read back differently
+# @exitcode 127 `jq` or the Go `yq` v4 is not installed
+#######################################
+function dybatpho::json_to_toml {
+  local input
+  dybatpho::expect_args input -- "$@"
+  __dybatpho_json_need_jq
+  __dybatpho_json_need_yq
+  __dybatpho_json_guard_paths input
+  # The document is held in variables below: it must not reach a `set -x` trace.
+  local __dybatpho_json_trace __dybatpho_json_status=0 __dybatpho_json_document
+  __dybatpho_json_trace_off __dybatpho_json_trace
+  __dybatpho_json_document="$(jq -c . "${input}")" \
+    && __dybatpho_json_emit "${2-}" __dybatpho_json_encode_toml "${__dybatpho_json_document}" "${FUNCNAME[0]}" \
+    || __dybatpho_json_status=$?
+  __dybatpho_json_trace_on "${__dybatpho_json_trace}"
+  return "${__dybatpho_json_status}"
+}
+
+#######################################
+# @description Read a TOML document into compact JSON, into a named variable.
+#   An empty document is `{}`: `yq` reads it as `null`. A value JSON cannot
+#   hold -- a date or time, `inf` or `nan` -- is refused, naming its path,
+#   since writing the document back from JSON would turn a date into a string
+#   and cannot write `inf` at all. Only the types JSON keeps are let through.
+# @arg $1 string Name of the variable receiving the JSON
+# @arg $2 string TOML file path or `-` for stdin
+# @arg $3 string Public function name, for the message
+# @set The named variable
+# @exitcode 0 The document was read
+# @exitcode 1 It holds a value JSON cannot keep
+# @exitcode other `yq`'s own exit code when it cannot be read
+# @internal
+#######################################
+function __dybatpho_json_read_toml_into {
+  local -n __dybatpho_json_toml_out="$1"
+  local __dybatpho_json_toml_in="$2" __dybatpho_json_toml_text __dybatpho_json_toml_lossy
+  __dybatpho_json_guard_paths __dybatpho_json_toml_in
+  # Read once, so standard input can be looked at twice.
+  __dybatpho_json_toml_text="$(cat -- "${__dybatpho_json_toml_in}")" || return
+  local __dybatpho_json_toml_check='[.. | select((tag | test("^!!(str|int|bool|map|seq|null)$") | not)
+    and (tag != "!!float" or ((. | to_string) | test("(?i)^[+-]?\.?(inf|nan)$")))) | path | join(".")] | join(", ")'
+  __dybatpho_json_toml_lossy="$(yq -p toml -o json -I 0 "${__dybatpho_json_toml_check}" \
+    <<< "${__dybatpho_json_toml_text}")" || return
+  if [[ "${__dybatpho_json_toml_lossy}" != '""' ]]; then
+    dybatpho::error "$3: Cannot rewrite a TOML document holding a date, a time, inf or nan, which JSON \
+cannot keep, at: ${__dybatpho_json_toml_lossy//\"/}"
+    return 1
+  fi
+  __dybatpho_json_toml_out="$(yq -p toml -o json -I 0 '. // {}' <<< "${__dybatpho_json_toml_text}")"
+}
+
+#######################################
+# @description Write a JSON object as TOML and check it reads back the same.
+#   Numbers are compared by value, so `1.0` and `1` are the same number.
+# @arg $1 string Compact JSON object
+# @arg $2 string? Public function name, for the message
+# @stdout The TOML document
+# @exitcode 0 Written
+# @exitcode 1 The TOML would read back differently
+# @exitcode other `jq`'s exit code for a value TOML cannot hold
+# @internal
+#######################################
+function __dybatpho_json_encode_toml {
+  # kcov(disabled) - a jq program spread over many lines: data, not Bash commands
+  # shellcheck disable=SC2016 # `$path`, `$k` and the rest are jq variables
+  local program='
+    def tkey: if test("^[A-Za-z0-9_-]+$") then . else tojson end;
+    def tname($path): $path | map(tostring) | join(".");
+    def isaot: type == "array" and length > 0 and all(.[]; type == "object");
+    def tval($path):
+      if type == "string" then tojson | gsub("\u007f"; "\\u007f")
+      elif type == "number" or type == "boolean" then tojson
+      elif type == "null" then error("TOML has no null, at \(tname($path))")
+      elif type == "array" then
+        . as $a | "[" + ([range(length) as $i | $a[$i] | tval($path + [$i])] | join(", ")) + "]"
+      elif length == 0 then "{}"
+      else "{ " + ([to_entries[] | .key as $k | "\($k | tkey) = \(.value | tval($path + [$k]))"] | join(", ")) + " }"
+      end;
+    def header($path): $path | map(tkey) | join(".");
+    def body($path):
+      to_entries as $e
+      | ($e[] | select((.value | type) != "object" and (.value | isaot | not))
+          | .key as $k | "\($k | tkey) = \(.value | tval($path + [$k]))"),
+        ($e[] | select(.value | type == "object")
+          | .key as $k | "", "[\(header($path + [$k]))]", (.value | body($path + [$k]))),
+        ($e[] | select(.value | isaot)
+          | .key as $k | .value[] | "", "[[\(header($path + [$k]))]]", body($path + [$k]));
+    if type != "object" then error("TOML needs an object at the top, got \(type)")
+    else [body([])] | join("\n") | ltrimstr("\n") end'
+  # kcov(enabled)
+  local toml want got
+  toml="$(jq -r "${program}" <<< "$1")" || return
+  # Read back and compared by value: what does not round-trip is refused, not written.
+  local normalize='walk(if type == "number" then . + 0 else . end)'
+  want="$(jq -S -c "${normalize}" <<< "$1")" || return
+  # A TOML `yq` cannot read back is a mismatch too: `got` stays empty.
+  got="$(yq -p toml -o json -I 0 '. // {}' <<< "${toml}")" || got=""
+  [[ -z "${got}" ]] || got="$(jq -S -c "${normalize}" <<< "${got}")" || got=""
+  if [[ "${got}" != "${want}" ]]; then
+    dybatpho::error "${2:-${FUNCNAME[1]}}: The TOML written would read back differently, so it is not written"
+    return 1
+  fi
+  [[ -z "${toml}" ]] || printf '%s\n' "${toml}"
+}
+
+#######################################
 # @description Query a YAML document with a `jq` filter.
 #   The document is read into JSON by `yq` and the filter runs in `jq`, so it is
 #   written exactly as it would be for `dybatpho::json_query`. Each result is
@@ -1151,4 +1274,174 @@ function dybatpho::yaml_del {
 #######################################
 function dybatpho::yaml_merge {
   __dybatpho_json_merge "${FUNCNAME[0]}" yaml "$@"
+}
+
+#######################################
+# @description Read a TOML document into JSON, run a JSON editor on it, and
+#   write the result back as TOML with `dybatpho::json_to_toml`'s encoder.
+#   The editor reads the document on stdin and prints the edited JSON.
+# @arg $1 string Public function name, for messages
+# @arg $2 string Output file path, or empty for stdout
+# @arg $3 string TOML file path or `-` for stdin
+# @arg $@ string The editor command
+# @stdout TOML when no output file is provided
+# @exitcode 0 Edited and written
+# @exitcode other The exit code of `yq`, the editor, or the encoder
+# @internal
+#######################################
+function __dybatpho_json_toml_edit {
+  local __dybatpho_json_toml_edit_caller="$1" __dybatpho_json_toml_edit_output="$2"
+  local __dybatpho_json_toml_edit_doc
+  __dybatpho_json_read_toml_into __dybatpho_json_toml_edit_doc "$3" "$1" || return
+  shift 3
+  __dybatpho_json_toml_edit_doc="$("$@" <<< "${__dybatpho_json_toml_edit_doc}")" || return
+  __dybatpho_json_emit "${__dybatpho_json_toml_edit_output}" __dybatpho_json_encode_toml \
+    "${__dybatpho_json_toml_edit_doc}" "${__dybatpho_json_toml_edit_caller}"
+}
+
+#######################################
+# @description Set the value at a path in a TOML document.
+#   Paths and `--json` work as in `dybatpho::json_set`. The document goes
+#   through JSON and is written back by the encoder of
+#   `dybatpho::json_to_toml`: plain keys first, then tables, then arrays of
+#   tables, and a key quoted when it needs it.
+# @example
+#   dybatpho::toml_set Cargo.toml package.version 2.0.0 Cargo.toml
+#
+# @example
+#   dybatpho::toml_set --json pyproject.toml tool.black.line-length 100 pyproject.toml
+#
+# @arg $1 string? `--json`: parse the value as JSON instead of storing a string
+# @arg $2 string TOML file path or `-` for stdin
+# @arg $3 string Path to set
+# @arg $4 string Value to store
+# @arg $5 string? Output file path, which may be the input file
+# @stdout TOML when no output file is provided
+# @exitcode 0 The value was set
+# @exitcode 1 Invalid arguments, path, or `--json` value, or a result that would read back differently
+# @exitcode other The exit code of `yq` or `jq` when the input is invalid, the path runs through a scalar,
+#   or the value holds a `null`, which TOML cannot write
+# @exitcode 127 `jq` or the Go `yq` v4 is not installed
+# @warning Comments, key order and the layout of the file are not kept: the document is rewritten from its
+#   data. A document holding a date, a time, `inf` or `nan`, which JSON cannot keep, is refused with status 1
+#######################################
+function dybatpho::toml_set {
+  # The value must not reach a `set -x` trace.
+  local __dybatpho_json_trace __dybatpho_json_status=0
+  __dybatpho_json_trace_off __dybatpho_json_trace
+  __dybatpho_json_toml_set "${FUNCNAME[0]}" "$@" || __dybatpho_json_status=$?
+  __dybatpho_json_trace_on "${__dybatpho_json_trace}"
+  return "${__dybatpho_json_status}"
+}
+
+#######################################
+# @description The work of `dybatpho::toml_set`, with its arguments checked
+#   here, outside the command substitution the JSON edit runs in.
+# @arg $1 string Public function name, for messages
+# @arg $@ string The public function's own arguments
+# @internal
+#######################################
+function __dybatpho_json_toml_set {
+  local caller="$1"
+  shift
+  local -a flag=()
+  if [[ "${1-}" == "--json" ]]; then
+    flag=(--json)
+    shift
+  fi
+  (($# >= 3 && $# <= 4)) \
+    || dybatpho::die "${caller}: Expected [--json] <input> <path> <value> [output], got $# arguments"
+  local -a segments=()
+  __dybatpho_json_path_split segments "$2" || dybatpho::die "${caller}: Invalid path: '$2'"
+  __dybatpho_json_need_jq
+  __dybatpho_json_need_yq
+  if ((${#flag[@]})); then
+    __dybatpho_json_parses jq "$3" || dybatpho::die "${caller}: Value is not valid JSON"
+  fi
+  __dybatpho_json_toml_edit "${caller}" "${4-}" "$1" \
+    __dybatpho_json_set "${caller}" json ${flag[@]+"${flag[@]}"} - "$2" "$3"
+}
+
+#######################################
+# @description Remove the value at a path from a TOML document.
+#   Paths work as in `dybatpho::json_set`, and an absent path is not an error.
+#   The document is rewritten as `dybatpho::toml_set` rewrites it.
+# @example
+#   dybatpho::toml_del Cargo.toml dependencies.serde Cargo.toml
+#
+# @arg $1 string TOML file path or `-` for stdin
+# @arg $2 string Path to remove
+# @arg $3 string? Output file path, which may be the input file
+# @stdout TOML when no output file is provided
+# @exitcode 0 The path was removed or was already absent
+# @exitcode 1 Invalid arguments or path
+# @exitcode other The exit code of `yq` or `jq` when the input is invalid
+# @exitcode 127 `jq` or the Go `yq` v4 is not installed
+# @warning Comments, key order and layout are not kept, as with `dybatpho::toml_set`
+#######################################
+function dybatpho::toml_del {
+  (($# >= 2 && $# <= 3)) \
+    || dybatpho::die "${FUNCNAME[0]}: Expected <input> <path> [output], got $# arguments"
+  local -a segments=()
+  __dybatpho_json_path_split segments "$2" || dybatpho::die "${FUNCNAME[0]}: Invalid path: '$2'"
+  __dybatpho_json_need_jq
+  __dybatpho_json_need_yq
+  __dybatpho_json_untraced __dybatpho_json_toml_edit "${FUNCNAME[0]}" "${3-}" "$1" \
+    __dybatpho_json_del "${FUNCNAME[0]}" json - "$2"
+}
+
+#######################################
+# @description Run a command with `set -x` suspended, so a document held in
+#   variables does not reach the trace, and resume it afterwards.
+# @arg $@ string The command
+# @exitcode other The command's own status
+# @internal
+#######################################
+function __dybatpho_json_untraced {
+  local __dybatpho_json_trace __dybatpho_json_status=0
+  __dybatpho_json_trace_off __dybatpho_json_trace
+  "$@" || __dybatpho_json_status=$?
+  __dybatpho_json_trace_on "${__dybatpho_json_trace}"
+  return "${__dybatpho_json_status}"
+}
+
+#######################################
+# @description Deep-merge two TOML documents, the overlay winning.
+#   Merging follows `dybatpho::json_merge`: tables merge key by key, and every
+#   other value, arrays included, is replaced by the overlay's. The result is
+#   written as `dybatpho::toml_set` writes it.
+# @example
+#   dybatpho::toml_merge config.toml config.local.toml > effective.toml
+#
+# @arg $1 string Base TOML file path, or `-` for stdin
+# @arg $2 string Overlay TOML file path, or `-` for stdin
+# @arg $3 string? Output file path, which may be either input
+# @stdout TOML when no output file is provided
+# @exitcode 0 The documents were merged
+# @exitcode 1 Invalid arguments
+# @exitcode other The exit code of `yq` when a document is invalid
+# @exitcode 127 `jq` or the Go `yq` v4 is not installed
+# @warning Comments, key order and layout are not kept, as with `dybatpho::toml_set`
+#######################################
+function dybatpho::toml_merge {
+  (($# >= 2 && $# <= 3)) \
+    || dybatpho::die "${FUNCNAME[0]}: Expected <base> <overlay> [output], got $# arguments"
+  __dybatpho_json_need_jq
+  __dybatpho_json_need_yq
+  __dybatpho_json_untraced __dybatpho_json_toml_merge "${FUNCNAME[0]}" "$@"
+}
+
+#######################################
+# @description The work of `dybatpho::toml_merge`, run with tracing off.
+# @arg $1 string Public function name, for messages
+# @arg $@ string Base, overlay, and an optional output file
+# @internal
+#######################################
+function __dybatpho_json_toml_merge {
+  local caller="$1" base_doc overlay_doc merged
+  __dybatpho_json_read_toml_into base_doc "$2" "${caller}" || return
+  __dybatpho_json_read_toml_into overlay_doc "$3" "${caller}" || return
+  # Both are TOML documents, so both are tables, and their JSON merge cannot fail.
+  merged="$(jq -s -c '.[0] * .[1]' <<< "${base_doc}"$'\n'"${overlay_doc}")" || return
+  __dybatpho_json_emit "${4-}" __dybatpho_json_encode_toml "${merged}" "${caller}"
 }

@@ -462,6 +462,21 @@ __yaml_query_fixture() {
   run --separate-stderr bash "${child}" "${init}" dybatpho::json_edit "${file}" '.k = $v' --arg v 'tr4ce-marker'
   assert_success
   assert_equal "$(grep -c 'tr4ce-marker' <<< "${stderr}")" 1
+
+  # A TOML document is held in variables: toml_del and toml_merge must not trace it.
+  __json_need_yq
+  local toml="${BATS_TEST_TMPDIR}/trace.toml" other="${BATS_TEST_TMPDIR}/other.toml"
+  printf 'secret = "tr4ce-marker"\nk = 1\n' > "${toml}"
+  printf 'k = 2\n' > "${other}"
+  run --separate-stderr bash "${child}" "${init}" dybatpho::toml_del "${toml}" k
+  assert_success
+  refute_stderr --partial 'tr4ce-marker'
+  run --separate-stderr bash "${child}" "${init}" dybatpho::toml_merge "${toml}" "${other}"
+  assert_success
+  refute_stderr --partial 'tr4ce-marker'
+  run --separate-stderr bash "${child}" "${init}" dybatpho::json_to_toml - <<< '{"s":"tr4ce-marker"}'
+  assert_success
+  refute_stderr --partial 'tr4ce-marker'
 }
 
 @test "dybatpho::json_set and dybatpho::yaml_set store a value past the argument size limit" {
@@ -1002,6 +1017,149 @@ EOF2
   run --separate-stderr dybatpho::yaml_del "${file}" ''
   assert_failure
   assert_stderr --partial "Invalid path"
+}
+
+@test "dybatpho::json_to_toml writes plain keys, then tables, then arrays of tables" {
+  __json_need_yq
+  local file="${BATS_TEST_TMPDIR}/in.json"
+  # A table comes before a plain key in the JSON: TOML must still write the key first,
+  # or it would read back as part of the table.
+  printf '%s\n' '{"t":{"x":1,"list":[{"n":1,"sub":{"deep":true}},{"n":2}]},"a.b":1,' \
+    '"s":"q\"\\\n\u007f","f":1.5,"mixed":[1,{"k":"v"},[2,{}]],"empty":{},"z":"last"}' > "${file}"
+  run_traced dybatpho::json_to_toml "${file}"
+  assert_success
+  assert_output - << 'EOF2'
+"a.b" = 1
+s = "q\"\\\n\u007f"
+f = 1.5
+mixed = [1, { k = "v" }, [2, {}]]
+z = "last"
+
+[t]
+x = 1
+
+[[t.list]]
+n = 1
+
+[t.list.sub]
+deep = true
+
+[[t.list]]
+n = 2
+
+[empty]
+EOF2
+  # The TOML reads back as the same data.
+  dybatpho::json_to_toml "${file}" "${BATS_TEST_TMPDIR}/out.toml"
+  run jq -S -c . < <(yq -p toml -o json '.' "${BATS_TEST_TMPDIR}/out.toml")
+  assert_output "$(jq -S -c . "${file}")"
+}
+
+@test "dybatpho::json_to_toml refuses what TOML cannot hold" {
+  __json_need_yq
+  run --separate-stderr dybatpho::json_to_toml - <<< '{"a":{"b":null}}'
+  assert_failure
+  assert_stderr --partial "TOML has no null, at a.b"
+  run --separate-stderr dybatpho::json_to_toml - <<< '[1]'
+  assert_failure
+  assert_stderr --partial "TOML needs an object at the top"
+  run --separate-stderr dybatpho::json_to_toml - <<< '{not json'
+  assert_failure
+}
+
+@test "dybatpho::toml_set, toml_del and toml_merge edit TOML through JSON" {
+  __json_need_yq
+  local file="${BATS_TEST_TMPDIR}/app.toml" overlay="${BATS_TEST_TMPDIR}/local.toml"
+  printf '# dropped\n[server]\nport = 8080\n' > "${file}"
+  # A new top-level key lands ahead of the tables, not inside `[server]`.
+  dybatpho::toml_set "${file}" name app "${file}"
+  dybatpho::toml_set --json "${file}" server.hosts '["a","b"]' "${file}"
+  dybatpho::toml_set "${file}" 'server.odd key' x "${file}"
+  run_traced cat "${file}"
+  assert_output - << 'EOF2'
+name = "app"
+
+[server]
+port = 8080
+hosts = ["a", "b"]
+"odd key" = "x"
+EOF2
+  dybatpho::toml_del "${file}" 'server.odd key' "${file}"
+  run_traced dybatpho::toml_del "${file}" missing.path
+  assert_success
+  printf '[server]\nport = 9090\n[log]\nlevel = "debug"\n' > "${overlay}"
+  run_traced dybatpho::toml_merge "${file}" "${overlay}"
+  assert_success
+  assert_output - << 'EOF2'
+name = "app"
+
+[server]
+port = 9090
+hosts = ["a", "b"]
+
+[log]
+level = "debug"
+EOF2
+}
+
+@test "the TOML editors handle an empty document" {
+  __json_need_yq
+  local file="${BATS_TEST_TMPDIR}/one.toml" empty="${BATS_TEST_TMPDIR}/empty.toml"
+  # The last key removed leaves an empty file, which reads back as {}.
+  printf 'a = 1\n' > "${file}"
+  run_traced dybatpho::toml_del "${file}" a "${file}"
+  assert_success
+  run yq -p toml -o json -I 0 '. // {}' "${file}"
+  assert_output '{}'
+  : > "${empty}"
+  run_traced dybatpho::toml_del "${empty}" a
+  assert_success
+  printf 'b = 2\n' > "${file}"
+  run_traced dybatpho::toml_merge "${empty}" "${file}"
+  assert_success
+  assert_output 'b = 2'
+  run_traced dybatpho::json_to_toml - <<< '{}'
+  assert_success
+  assert_output ''
+}
+
+@test "the TOML editors refuse a document holding a value JSON cannot keep" {
+  __json_need_yq
+  local file="${BATS_TEST_TMPDIR}/dated.toml"
+  printf 'created = 1979-05-27T07:32:00Z\nlimit = inf\nport = 1\n' > "${file}"
+  run --separate-stderr dybatpho::toml_set "${file}" port 2 "${file}"
+  assert_failure 1
+  assert_stderr --partial "date, a time, inf or nan"
+  assert_stderr --partial "created, limit"
+  run cat "${file}"
+  assert_output $'created = 1979-05-27T07:32:00Z\nlimit = inf\nport = 1'
+  # A number past what yq reads back exactly is caught by the read-back, not by jq.
+  run --separate-stderr dybatpho::json_to_toml - <<< '{"n":12345678901234567890}'
+  assert_failure 1
+  assert_stderr --partial "read back differently"
+}
+
+@test "dybatpho::toml_set refuses bad arguments and leaves the file on a failed edit" {
+  __json_need_yq
+  local file="${BATS_TEST_TMPDIR}/app.toml"
+  printf 'port = 8080\n' > "${file}"
+  run -1 dybatpho::toml_set "${file}" ''
+  assert_output --partial "Expected [--json]"
+  run -1 dybatpho::toml_set "${file}" '' x
+  assert_output --partial "Invalid path"
+  run -1 dybatpho::toml_set --json "${file}" port '{bad'
+  assert_output --partial "not valid JSON"
+  # A path through a scalar, and a null TOML cannot write, change nothing.
+  run dybatpho::toml_set "${file}" port.inner x "${file}"
+  assert_failure
+  run dybatpho::toml_set --json "${file}" gone null "${file}"
+  assert_failure
+  run cat "${file}"
+  assert_output 'port = 8080'
+  run -1 dybatpho::toml_del "${file}"
+  assert_output --partial "Expected <input> <path>"
+  run -1 dybatpho::toml_merge "${file}"
+  assert_output --partial "Expected <base> <overlay>"
 }
 
 @test "dybatpho::yaml_merge deep-merges mappings" {

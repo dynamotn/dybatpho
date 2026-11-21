@@ -862,26 +862,34 @@ require_tool() {
   done
 }
 
-@test "config_save never lets a new TOML key land inside the last table" {
+@test "config_save refuses a TOML file whose date it would turn into a string" {
   require_tool yq
+  require_tool jq
+  local file="${BATS_TEST_TMPDIR}/dated.toml"
+  printf 'created = 1979-05-27T07:32:00Z\nport = 1\n' > "${file}"
+  dybatpho::config_set NAME app
+  run --separate-stderr dybatpho::config_save "${file}" NAME
+  assert_failure
+  assert_stderr --partial "date, a time, inf or nan"
+  run cat "${file}"
+  assert_output $'created = 1979-05-27T07:32:00Z\nport = 1'
+}
+
+@test "config_save writes a new TOML key ahead of the tables, whatever yq's own writer does" {
+  require_tool yq
+  require_tool jq
   local file="${BATS_TEST_TMPDIR}/tables.toml"
   printf '[server]\nport = 8080\n' > "${file}"
   dybatpho::config_set NAME app
-  run --separate-stderr dybatpho::config_save "${file}" NAME
-  if ((status == 0)); then
-    # A yq whose TOML writer puts a new root key ahead of the tables (4.53 does)
-    # saves; what reloads must then be exactly what was set, nothing misplaced.
-    DYBATPHO_CONFIG=()
-    dybatpho::config_load "${file}"
-    assert_equal "${DYBATPHO_CONFIG[NAME]-}" "app"
-    assert_equal "${DYBATPHO_CONFIG[server.port]-}" "8080"
-    assert_equal "${DYBATPHO_CONFIG[server.NAME]-absent}" "absent"
-    return 0
-  fi
-  assert_stderr --partial "would put a new key inside the last table"
-  # The file is left as it was.
+  run_traced dybatpho::config_save "${file}" NAME
+  assert_success
   run_traced cat "${file}"
-  assert_output $'[server]\nport = 8080'
+  assert_output $'NAME = "app"\n\n[server]\nport = 8080'
+  DYBATPHO_CONFIG=()
+  dybatpho::config_load "${file}"
+  assert_equal "${DYBATPHO_CONFIG[NAME]-}" "app"
+  assert_equal "${DYBATPHO_CONFIG[server.port]-}" "8080"
+  assert_equal "${DYBATPHO_CONFIG[server.NAME]-absent}" "absent"
 }
 
 @test "config_ini_get reads exact keys from sections, skipping comments" {

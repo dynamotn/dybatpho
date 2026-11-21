@@ -410,6 +410,7 @@ Utilities for working with JSON and YAML data. Loaded: `--modules json`. Stabili
 - `dybatpho::json_has [string] <string> <string>` — Return success when a JSON document satisfies a `jq` filter.
 - `dybatpho::json_pretty <string> [string]` — Pretty-print a JSON document.
 - `dybatpho::json_to_yaml <string> [string]` — Convert a JSON document to YAML.
+- `dybatpho::json_to_toml <string> [string]` — Convert a JSON object to TOML.
 - `dybatpho::yaml_query <string> <string> <string...>` — Query a YAML document with a `jq` filter.
 - `dybatpho::yaml_has <string> <string>` — Return success when a YAML document satisfies a `jq` filter.
 - `dybatpho::yaml_pretty <string> [string]` — Pretty-print a YAML document.
@@ -427,6 +428,9 @@ Utilities for working with JSON and YAML data. Loaded: `--modules json`. Stabili
 - `dybatpho::yaml_set [string] <string> <string> <string> [string]` — Set the value at a path in a YAML document.
 - `dybatpho::yaml_del <string> <string> [string]` — Remove the value at a path from a YAML document.
 - `dybatpho::yaml_merge <string> <string> [string]` — Deep-merge two YAML mappings, the overlay winning.
+- `dybatpho::toml_set [string] <string> <string> <string> [string]` — Set the value at a path in a TOML document.
+- `dybatpho::toml_del <string> <string> [string]` — Remove the value at a path from a TOML document.
+- `dybatpho::toml_merge <string> <string> [string]` — Deep-merge two TOML documents, the overlay winning.
 
 ## lock
 

@@ -57,6 +57,13 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
 - **`git` — `dybatpho::git_commit_count --soft`** prints `0` and returns 1
   when a ref does not resolve, instead of stopping the script, for a branch
   that may not exist yet.
+- **`json` — write and edit TOML: `dybatpho::json_to_toml`,
+  `dybatpho::toml_set`, `dybatpho::toml_del` and `dybatpho::toml_merge`.**
+  The encoder is a `jq` program that writes plain keys before tables, quotes a
+  key when it must, and reads its result back so a document that would change
+  is refused. Edits go through JSON: comments, key order and layout are not
+  kept, and a file holding a date, a time, `inf` or `nan` is refused rather
+  than changed.
 - **`json` — edit a JSON config file with any `jq` filter using
   `dybatpho::json_edit [--mkdir] <file> <filter> [--arg name value]...`.**
   A missing file starts as `{}`, the file is written only when the document
@@ -103,6 +110,15 @@ Older releases are archived by major version: [5.x](docs/changelog/CHANGELOG-5.x
   directory; `dybatpho::forge_repo --soft` returns 1 instead of stopping when
   the remote has no URL or no path; and `dybatpho::json_has --optional`
   answers 1 quietly for a config file that does not exist.
+
+### Changed
+
+- **`config` — `dybatpho::config_save` writes TOML with the `json` module's
+  encoder.** Adding a key to a TOML file that ends in a table now saves it
+  ahead of the table instead of refusing the save with any `yq`; saving TOML
+  now needs `jq` as well, and loads the `json` module on demand. Comments in a
+  TOML file are not kept, and a TOML file holding a date, a time, `inf` or
+  `nan` is refused rather than having those values changed.
 
 ## [7.2.1] - 2026-11-19
 
